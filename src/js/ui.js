@@ -1,0 +1,541 @@
+// Multi-point easing curve editor. Was a fixed CSS-cubic-bezier(p1,p2) pair
+// (2 OFF-curve tangent handles, standard CSS easing model) — replaced with
+// an arbitrary number of ON-curve waypoints (After Effects/Blender graph-
+// editor style) so points can be freely added/removed, per request. Each
+// consecutive pair of points forms its own cubic Bezier segment with
+// Catmull-Rom-derived tangents at the shared knots, giving a smooth curve
+// through every point with zero manual handle-dragging. tweens.js only ever
+// consumes `evalCurve(x)` as a pure function (verified: getEasing() in
+// tweens.js just returns window._curveEditor.evalCurve and calls it with a
+// plain [0,1] fraction) — completely decoupled from how many points back it,
+// so this rewrite needed no changes on the tween-generation side.
+(function(){
+  var cvs=document.getElementById('curve-canvas'),ctx=cvs.getContext('2d');
+  var W=cvs.width,H=cvs.height,pad=30;
+  function clonePts(pts){return pts.map(function(p){return{x:p.x,y:p.y};});}
+  var cs={points:[{x:0,y:0},{x:.42,y:0},{x:.58,y:1},{x:1,y:1}]};
+  var dragging=null,selected=null,hovering=false,rect=null;
+  // Approximate through-point equivalents of the old off-curve-handle CSS
+  // presets — not pixel-identical (the underlying curve model changed from
+  // tangent-handle to on-curve-waypoint), but visually match the named
+  // easing behavior.
+  var presets={
+    'linear':[{x:0,y:0},{x:1,y:1}],
+    'ease-in':[{x:0,y:0},{x:.32,y:.04},{x:1,y:1}],
+    'ease-out':[{x:0,y:0},{x:.68,y:.96},{x:1,y:1}],
+    'ease-in-out':[{x:0,y:0},{x:.3,y:.05},{x:.7,y:.95},{x:1,y:1}],
+    'ease-out-back':[{x:0,y:0},{x:.6,y:1.15},{x:.85,y:.95},{x:1,y:1}]
+  };
+  var CUSTOM_KEY='sm_easing_presets';
+  function loadCustomPresets(){try{return JSON.parse(localStorage.getItem(CUSTOM_KEY)||'[]');}catch(e){return[];}}
+  function saveCustomPresets(list){try{localStorage.setItem(CUSTOM_KEY,JSON.stringify(list));}catch(e){}}
+
+  // Y-axis auto-fits to whatever the points' range actually is (with a 10%
+  // margin) instead of a fixed [0,1] — otherwise an overshoot curve (e.g.
+  // "Over", peaking at y=1.15) would get silently clipped at the panel's
+  // edge. X always stays [0,1] (that's the timing axis, points can't go
+  // past the endpoints).
+  function yRange(){
+    var lo=0,hi=1;
+    cs.points.forEach(function(p){if(p.y<lo)lo=p.y;if(p.y>hi)hi=p.y;});
+    var m=(hi-lo)*.12||.1;
+    return{lo:lo-m,hi:hi+m};
+  }
+  function tX(n){return pad+n*(W-2*pad);}
+  function fX(c){return(c-pad)/(W-2*pad);}
+  function tY(n,yr){return H-pad-((n-yr.lo)/(yr.hi-yr.lo))*(H-2*pad);}
+  function fY(c,yr){return yr.lo+((H-pad-c)/(H-2*pad))*(yr.hi-yr.lo);}
+
+  function cubicAt(t,a,b,c,d){var u=1-t;return u*u*u*a+3*u*u*t*b+3*u*t*t*c+t*t*t*d;}
+  function cubicDerivAt(t,a,b,c,d){var u=1-t;return 3*u*u*(b-a)+6*u*t*(c-b)+3*t*t*(d-c);}
+  // Catmull-Rom tangent at pts[i] (open/clamped at the ends), converted to
+  // the pair of cubic-Bezier control points for the segment [pts[i],pts[i+1]].
+  function segCtrl(pts,i){
+    var p0=pts[i],p3=pts[i+1];
+    var prev=pts[i-1]||p0,next=pts[i+2]||p3;
+    var t1x=(p3.x-prev.x)/2,t1y=(p3.y-prev.y)/2;
+    var t2x=(next.x-p0.x)/2,t2y=(next.y-p0.y)/2;
+    return{c1:{x:p0.x+t1x/3,y:p0.y+t1y/3},c2:{x:p3.x-t2x/3,y:p3.y-t2y/3}};
+  }
+  function segFor(x){
+    var pts=cs.points,i=0;
+    while(i<pts.length-2&&pts[i+1].x<x)i++;
+    return i;
+  }
+  function evalCurve(x){
+    var pts=cs.points;
+    if(pts.length<2)return x;
+    x=Math.max(0,Math.min(1,x));
+    var i=segFor(x),p0=pts[i],p3=pts[i+1],ctrl=segCtrl(pts,i);
+    var span=p3.x-p0.x,t=span>1e-6?(x-p0.x)/span:0;
+    for(var k=0;k<8;k++){
+      var ex=cubicAt(t,p0.x,ctrl.c1.x,ctrl.c2.x,p3.x)-x;
+      var dx=cubicDerivAt(t,p0.x,ctrl.c1.x,ctrl.c2.x,p3.x);
+      if(Math.abs(dx)<1e-6)break;
+      t-=ex/dx;t=Math.max(0,Math.min(1,t));
+    }
+    return cubicAt(t,p0.y,ctrl.c1.y,ctrl.c2.y,p3.y);
+  }
+
+  function draw(){
+    var yr=yRange();
+    ctx.clearRect(0,0,W,H);ctx.fillStyle='#111';ctx.fillRect(0,0,W,H);
+    ctx.strokeStyle='#1e293b';ctx.lineWidth=1;
+    for(var i=0;i<=4;i++){var n=i/4;ctx.beginPath();ctx.moveTo(tX(n),tY(yr.lo,yr));ctx.lineTo(tX(n),tY(yr.hi,yr));ctx.stroke();
+      var ny=yr.lo+n*(yr.hi-yr.lo);ctx.beginPath();ctx.moveTo(tX(0),tY(ny,yr));ctx.lineTo(tX(1),tY(ny,yr));ctx.stroke();}
+    // baseline y=0 / y=1 guides (distinct from the generic grid) so the
+    // "nominal" range is still visible even when the view is zoomed out to
+    // fit an overshoot curve.
+    ctx.strokeStyle='#334155';ctx.setLineDash([4,4]);
+    ctx.beginPath();ctx.moveTo(tX(0),tY(0,yr));ctx.lineTo(tX(1),tY(0,yr));ctx.stroke();
+    ctx.beginPath();ctx.moveTo(tX(0),tY(1,yr));ctx.lineTo(tX(1),tY(1,yr));ctx.stroke();
+    ctx.setLineDash([]);
+    // curve
+    ctx.strokeStyle='#4a9eff';ctx.lineWidth=2.5;ctx.beginPath();
+    ctx.moveTo(tX(0),tY(evalCurve(0),yr));
+    var N=100;for(var s=1;s<=N;s++){var xx=s/N;ctx.lineTo(tX(xx),tY(evalCurve(xx),yr));}
+    ctx.stroke();
+    // through-point handles + connecting guide lines between consecutive points
+    ctx.strokeStyle='rgba(255,255,255,.15)';ctx.lineWidth=1;ctx.beginPath();
+    cs.points.forEach(function(p,i2){var px=tX(p.x),py=tY(p.y,yr);if(i2===0)ctx.moveTo(px,py);else ctx.lineTo(px,py);});
+    ctx.stroke();
+    cs.points.forEach(function(p,i3){
+      var isEnd=i3===0||i3===cs.points.length-1;
+      var col=i3===selected?'#fff':(isEnd?'#bd93f9':'#4a9eff');
+      drawH(p.x,p.y,col,yr,isEnd?7:8);
+    });
+    var coordsEl=document.getElementById('curve-coords');
+    if(coordsEl)coordsEl.textContent=cs.points.length+' points';
+  }
+  function drawH(nx,ny,c,yr,r){ctx.beginPath();ctx.arc(tX(nx),tY(ny,yr),r,0,Math.PI*2);ctx.fillStyle=c;ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.stroke();}
+  function hitT(mx,my){
+    var yr=yRange(),best=-1,bestD=16;
+    cs.points.forEach(function(p,i){var d=Math.hypot(mx-tX(p.x),my-tY(p.y,yr));if(d<bestD){bestD=d;best=i;}});
+    return best;
+  }
+  function pushCurve(){if(window.SM)window.SM.setCurve(clonePts(cs.points));upP();}
+
+  cvs.addEventListener('mousedown',function(e){
+    rect=cvs.getBoundingClientRect();
+    var mx=(e.clientX-rect.left)*(W/rect.width),my=(e.clientY-rect.top)*(H/rect.height);
+    var hit=hitT(mx,my);
+    dragging=hit>=0?hit:null;
+    if(hit>=0)selected=hit;
+    draw();
+  });
+  window.addEventListener('mousemove',function(e){
+    if(dragging==null)return;
+    if(!rect)rect=cvs.getBoundingClientRect();
+    var yr=yRange();
+    var mx=(e.clientX-rect.left)*(W/rect.width),my=(e.clientY-rect.top)*(H/rect.height);
+    var nx=fX(mx),ny=fY(my,yr);
+    var p=cs.points[dragging];
+    if(dragging===0)p.x=0;
+    else if(dragging===cs.points.length-1)p.x=1;
+    else{
+      var lo=cs.points[dragging-1].x+.01,hi=cs.points[dragging+1].x-.01;
+      p.x=Math.max(lo,Math.min(hi,nx));
+    }
+    p.y=Math.max(-1,Math.min(2,ny));
+    draw();pushCurve();
+  });
+  window.addEventListener('mouseup',function(){dragging=null;});
+  cvs.addEventListener('dblclick',function(e){
+    rect=cvs.getBoundingClientRect();
+    var mx=(e.clientX-rect.left)*(W/rect.width),my=(e.clientY-rect.top)*(H/rect.height);
+    if(hitT(mx,my)>=0)return; // double-click ON a point does nothing extra
+    var yr=yRange();
+    var nx=Math.max(.01,Math.min(.99,fX(mx))),ny=fY(my,yr);
+    var idx=cs.points.length;
+    for(var i=1;i<cs.points.length;i++){if(cs.points[i].x>nx){idx=i;break;}}
+    cs.points.splice(idx,0,{x:nx,y:ny});
+    selected=idx;
+    draw();pushCurve();
+  });
+  cvs.addEventListener('mouseenter',function(){hovering=true;});
+  cvs.addEventListener('mouseleave',function(){hovering=false;});
+  document.addEventListener('keydown',function(e){
+    if(!hovering||selected==null)return;
+    if(e.key!=='Delete'&&e.key!=='Backspace')return;
+    if(selected===0||selected===cs.points.length-1)return; // endpoints are permanent
+    e.preventDefault();
+    cs.points.splice(selected,1);
+    selected=null;
+    draw();pushCurve();
+  });
+
+  function upP(){
+    document.querySelectorAll('#curve-presets button[data-preset]').forEach(function(b){
+      var p=presets[b.dataset.preset];
+      var match=p&&p.length===cs.points.length&&p.every(function(pt,i){return Math.abs(pt.x-cs.points[i].x)<.03&&Math.abs(pt.y-cs.points[i].y)<.03;});
+      b.classList.toggle('active',!!match);
+    });
+  }
+  document.querySelectorAll('#curve-presets button[data-preset]').forEach(function(b){
+    b.addEventListener('click',function(){cs.points=clonePts(presets[this.dataset.preset]);selected=null;draw();pushCurve();});
+  });
+  function renderCustomPresetButtons(){
+    var wrap=document.getElementById('curve-custom-presets');if(!wrap)return;
+    wrap.innerHTML='';
+    loadCustomPresets().forEach(function(cp,i){
+      var b=document.createElement('button');
+      b.textContent=cp.name;
+      b.title='Clic : appliquer — clic droit : supprimer';
+      b.addEventListener('click',function(){cs.points=clonePts(cp.points);selected=null;draw();pushCurve();});
+      b.addEventListener('contextmenu',function(e){
+        e.preventDefault();
+        if(!window.confirm('Supprimer le preset "'+cp.name+'" ?'))return;
+        var list=loadCustomPresets();list.splice(i,1);saveCustomPresets(list);renderCustomPresetButtons();
+      });
+      wrap.appendChild(b);
+    });
+  }
+  var savePresetBtn=document.getElementById('curve-save-preset');
+  if(savePresetBtn)savePresetBtn.addEventListener('click',function(){
+    var name=window.prompt('Nom du preset :');
+    if(!name)return;
+    var list=loadCustomPresets();
+    list.push({name:name,points:clonePts(cs.points)});
+    saveCustomPresets(list);
+    renderCustomPresetButtons();
+  });
+  renderCustomPresetButtons();
+
+  // Corner drag-resize — same thin-handle idiom as #tl-resize/#layer-panel-resize
+  // elsewhere in this file, just diagonal. Only the CSS display size changes;
+  // the coordinate math above already scales by (W/rect.width) etc, so it
+  // stays correct at any display size without touching the internal buffer.
+  var rh3=document.getElementById('curve-resize-handle');
+  if(rh3){
+    var rsx,rsy,rsw,rshh;
+    rh3.addEventListener('mousedown',function(e){rsx=e.clientX;rsy=e.clientY;rsw=cvs.offsetWidth;rshh=cvs.offsetHeight;window._curveResize=true;e.preventDefault();e.stopPropagation();});
+    window.addEventListener('mousemove',function(e){
+      if(!window._curveResize)return;
+      var nw=Math.max(140,Math.min(500,rsw+(e.clientX-rsx)));
+      var nh=Math.max(140,Math.min(500,rshh+(e.clientY-rsy)));
+      cvs.style.width=nw+'px';cvs.style.height=nh+'px';
+    });
+    window.addEventListener('mouseup',function(){window._curveResize=false;});
+  }
+
+  window._curveEditor={
+    evalCurve:evalCurve,
+    getState:function(){return cs;},
+    setState:function(s){
+      // Backward-compat: projects saved before this rewrite stored
+      // {p1x,p1y,p2x,p2y} (2 off-curve tangent handles) instead of
+      // {points:[...]}—convert on load so old saves still open.
+      if(s&&s.points)cs.points=clonePts(s.points);
+      else if(s&&typeof s.p1x==='number')cs.points=[{x:0,y:0},{x:s.p1x,y:s.p1y},{x:s.p2x,y:s.p2y},{x:1,y:1}];
+      selected=null;draw();upP();
+    },
+    draw:draw
+  };
+  setTimeout(draw,100);
+})();
+
+// ======== UI INTERACTIONS ========
+(function(){
+  document.querySelectorAll('.phdr').forEach(function(h){h.addEventListener('click',function(){if(window._secDragJustEnded){window._secDragJustEnded=false;return;}var b=this.nextElementSibling;if(!b||!b.classList.contains('pbdy'))return;b.classList.toggle('hid');this.classList.toggle('closed');});});
+
+  // All right-panel sections start collapsed (Selection/Component Instance
+  // are already display:none by default via their own conditional-show
+  // logic — collapsing their body too is harmless, they just won't have
+  // been expanded when they eventually become visible on selection).
+  document.querySelectorAll('.psec .pbdy').forEach(function(b){b.classList.add('hid');});
+  document.querySelectorAll('.psec .phdr').forEach(function(h){h.classList.add('closed');});
+
+  // Panel-visibility-by-context is now owned by updatePropsContext() in
+  // timeline.js (the unified Properties panel: Transform/Fill/Stroke/Tool
+  // Options/Effects/Document, shown by priority — selection > active tool
+  // > document), called from window.SM.setTool and updateUI(). This used
+  // to be a standalone per-tool accordion-opener; superseded, not needed
+  // here anymore.
+  // (scrubbable number fields show their own value directly — no separate label span to sync anymore)
+  var rh=document.getElementById('tl-resize'),ta=document.getElementById('timeline-area'),rsy,rsh;
+  rh.addEventListener('mousedown',function(e){rsy=e.clientY;rsh=ta.offsetHeight;window._tlResize=true;e.preventDefault();});
+  window.addEventListener('mousemove',function(e){if(!window._tlResize)return;ta.style.height=Math.max(80,Math.min(500,rsh+(rsy-e.clientY)))+'px';});
+  window.addEventListener('mouseup',function(){window._tlResize=false;});
+
+  // Layers panel horizontal resize — same drag-a-thin-bar pattern as the
+  // timeline's own vertical #tl-resize above.
+  var lpr=document.getElementById('layer-panel-resize'),lp=document.getElementById('layer-panel'),lprx,lprw;
+  lpr.addEventListener('mousedown',function(e){lprx=e.clientX;lprw=lp.offsetWidth;window._lpResize=true;lpr.classList.add('active');e.preventDefault();});
+  window.addEventListener('mousemove',function(e){if(!window._lpResize)return;lp.style.width=Math.max(90,Math.min(400,lprw+(e.clientX-lprx)))+'px';});
+  window.addEventListener('mouseup',function(){window._lpResize=false;lpr.classList.remove('active');});
+
+  var FC=14;
+  function initWaDrag(){
+    var bar=document.getElementById('wa-bar'),hleft=bar.querySelector('.wa-handle.left'),hright=bar.querySelector('.wa-handle.right');
+    var dragType=null,startX,origIn,origOut;
+    function onDown(type,e){dragType=type;startX=e.clientX;origIn=window._waIn||0;origOut=window._waOut||23;e.stopPropagation();e.preventDefault();}
+    hleft.addEventListener('mousedown',function(e){onDown('in',e);});
+    hright.addEventListener('mousedown',function(e){onDown('out',e);});
+    bar.addEventListener('mousedown',function(e){if(e.target===bar)onDown('both',e);});
+    window.addEventListener('mousemove',function(e){
+      if(!dragType)return;var dx=Math.round((e.clientX-startX)/FC);var total=window._totalF||24;
+      if(dragType==='in')window._waIn=Math.max(0,Math.min(origIn+dx,(window._waOut||total-1)-1));
+      else if(dragType==='out')window._waOut=Math.min(total-1,Math.max(origOut+dx,(window._waIn||0)+1));
+      else{var w=origOut-origIn;var ni=Math.max(0,origIn+dx);if(ni+w>=total)ni=total-1-w;window._waIn=ni;window._waOut=ni+w;}
+      window.updateWaBar();if(window.SM)window.SM.setWorkArea(window._waIn,window._waOut);
+    });
+    window.addEventListener('mouseup',function(){dragType=null;});
+  }
+  window.updateWaBar=function(){var bar=document.getElementById('wa-bar');var inF=window._waIn||0;var outF=window._waOut||23;bar.style.left=(inF*FC)+'px';bar.style.width=((outF-inF+1)*FC)+'px';};
+  window._waIn=0;window._waOut=23;window._totalF=24;
+  initWaDrag();
+
+  function updateOnionBar(){
+    var omIn=document.getElementById('om-in'),omOut=document.getElementById('om-out'),bar=document.getElementById('onion-bar');
+    var inF=parseInt(omIn.dataset.frame||0),outF=parseInt(omOut.dataset.frame||23);
+    bar.style.left=(inF*FC)+'px';bar.style.width=Math.max(FC,(outF-inF+1)*FC)+'px';
+  }
+  function initOmDrag(){
+    var omIn=document.getElementById('om-in'),omOut=document.getElementById('om-out');
+    var dragEl=null,startX2,origF;
+    function onDown2(el,e){dragEl=el;startX2=e.clientX;origF=parseInt(el.dataset.frame||0);e.stopPropagation();e.preventDefault();}
+    omIn.addEventListener('mousedown',function(e){onDown2(this,e);});
+    omOut.addEventListener('mousedown',function(e){onDown2(this,e);});
+    window.addEventListener('mousemove',function(e){
+      if(!dragEl)return;var dx=Math.round((e.clientX-startX2)/FC);var nf=Math.max(0,Math.min((window._totalF||24)-1,origF+dx));
+      dragEl.dataset.frame=nf;dragEl.style.left=(nf*FC+3)+'px';updateOnionBar();
+      if(window.SM){var inF2=parseInt(document.getElementById('om-in').dataset.frame||0);var outF2=parseInt(document.getElementById('om-out').dataset.frame||23);window.SM.setOnionRange(inF2,outF2);
+        // manual drag redefines the span the follow mode keeps around the playhead
+        var cf2=window._curFrame||0;window._omSpan={prev:Math.max(0,cf2-inF2),next:Math.max(0,outF2-cf2)};
+      }
+    });
+    window.addEventListener('mouseup',function(){dragEl=null;});
+  }
+  window._omFollow=true;window._omSpan={prev:2,next:2};
+  window.updateOmMarkers=function(curF,totalF){
+    var omIn=document.getElementById('om-in'),omOut=document.getElementById('om-out');
+    if(!omIn.dataset.inited){omIn.dataset.frame=Math.max(0,curF-3);omOut.dataset.frame=Math.min(totalF-1,curF+3);omIn.dataset.inited='1';}
+    if(window._omFollow){
+      var span=window._omSpan||{prev:2,next:2};
+      var inF=Math.max(0,curF-span.prev),outF=Math.min(totalF-1,curF+span.next);
+      omIn.dataset.frame=inF;omOut.dataset.frame=outF;
+      if(window.SM)window.SM.setOnionRange(inF,outF);
+    }
+    omIn.style.left=(parseInt(omIn.dataset.frame)*FC+3)+'px';omOut.style.left=(parseInt(omOut.dataset.frame)*FC+3)+'px';
+    updateOnionBar();
+  };
+  initOmDrag();
+
+  // Timeline scrubbing
+  var scrubbing=false;
+  document.getElementById('frame-hdr').addEventListener('mousedown',function(e){
+    var wrap=document.getElementById('fg-wrap');var rect=wrap.getBoundingClientRect();
+    var x=e.clientX-rect.left+wrap.scrollLeft;var frame=Math.floor(x/FC);
+    if(frame>=0&&frame<(window._totalF||24)){scrubbing=true;if(window.SM){window.SM.stopPlay();window.SM.goToFrame(frame);}}
+    e.preventDefault();
+  });
+  window.addEventListener('mousemove',function(e){
+    if(!scrubbing)return;var wrap=document.getElementById('fg-wrap');var rect=wrap.getBoundingClientRect();
+    var x=e.clientX-rect.left+wrap.scrollLeft;var frame=Math.max(0,Math.min((window._totalF||24)-1,Math.floor(x/FC)));
+    if(window.SM)window.SM.goToFrame(frame);
+  });
+  window.addEventListener('mouseup',function(){scrubbing=false;});
+
+  // Fill well toggle — same dblclick-to-toggle on the Properties panel's
+  // swatch (#pm-fill), merging what used to be a separate "On" checkbox
+  // into the swatch itself: click it to pick a color, double-click to
+  // enable/disable fill. setFillEnabled() (timeline.js) keeps both swatches
+  // in sync with each other.
+  document.getElementById('fill-well').addEventListener('dblclick',function(e){
+    e.preventDefault();e.stopPropagation();this.classList.toggle('none');
+    if(window.SM)window.SM.setFillEnabled(!this.classList.contains('none'));
+  });
+  document.getElementById('pm-fill').addEventListener('dblclick',function(e){
+    e.preventDefault();e.stopPropagation();this.classList.toggle('none');
+    if(window.SM)window.SM.setFillEnabled(!this.classList.contains('none'));
+  });
+
+  // Generic right-click context menu (used by the frame grid and layer
+  // list) — items: [{label, shortcut, action, disabled, sep}]. Positioned
+  // at the click point, clamped to stay on-screen, dismissed on any outside
+  // click/Escape/scroll so it never lingers.
+  var ctxEl=null;
+  function closeCtxMenu(){if(ctxEl){ctxEl.remove();ctxEl=null;}}
+  window.showContextMenu=function(x,y,items){
+    closeCtxMenu();
+    var m=document.createElement('div');m.className='ctx-menu';
+    items.forEach(function(it){
+      if(it.sep){var s=document.createElement('div');s.className='ctx-sep';m.appendChild(s);return;}
+      var row=document.createElement('div');row.className='ctx-item'+(it.disabled?' disabled':'');
+      var lbl=document.createElement('span');lbl.textContent=it.label;row.appendChild(lbl);
+      if(it.shortcut){var sc=document.createElement('span');sc.className='ctx-sc';sc.textContent=it.shortcut;row.appendChild(sc);}
+      if(!it.disabled)row.addEventListener('click',function(e){e.stopPropagation();closeCtxMenu();it.action();});
+      m.appendChild(row);
+    });
+    document.body.appendChild(m);
+    var mw=m.offsetWidth,mh=m.offsetHeight;
+    m.style.left=Math.min(x,window.innerWidth-mw-4)+'px';
+    m.style.top=Math.min(y,window.innerHeight-mh-4)+'px';
+    ctxEl=m;
+  };
+  window.addEventListener('mousedown',function(e){if(ctxEl&&!ctxEl.contains(e.target))closeCtxMenu();});
+  window.addEventListener('scroll',closeCtxMenu,true);
+  window.addEventListener('keydown',function(e){if(e.key==='Escape')closeCtxMenu();});
+
+  // Modern instant tooltips — native title tooltips are slow to appear and
+  // unstyled; this swaps every title attribute for a shared styled tip on
+  // first hover (delegated, so dynamically-created elements work too).
+  var tip=document.createElement('div');tip.id='ui-tip';document.body.appendChild(tip);
+  document.addEventListener('mouseover',function(e){
+    var el=e.target.closest?e.target.closest('[title],[data-tip]'):null;
+    if(!el){tip.classList.remove('show');return;}
+    if(el.hasAttribute('title')){el.dataset.tip=el.getAttribute('title');el.removeAttribute('title');}
+    var t=el.dataset.tip;if(!t){tip.classList.remove('show');return;}
+    tip.textContent=t;tip.classList.add('show');
+    var r=el.getBoundingClientRect();
+    var tw=tip.offsetWidth,th=tip.offsetHeight;
+    var x=Math.max(4,Math.min(window.innerWidth-tw-4,r.left+r.width/2-tw/2));
+    var y=r.bottom+7;if(y+th>window.innerHeight-4)y=r.top-th-7;
+    tip.style.left=x+'px';tip.style.top=y+'px';
+  });
+  document.addEventListener('mousedown',function(){tip.classList.remove('show');},true);
+
+  // Detachable property panels — drag a section header to tear the section
+  // off as a floating window that follows the cursor. Drop it back inside
+  // the right panel to re-dock it (at the position under the cursor), drop
+  // it anywhere else and it stays floating where you left it; its header
+  // remains draggable to move it again. Docked order persists per label.
+  var secDrag={el:null,startX:0,startY:0,started:false,offX:0,offY:0,wasFloating:false};
+  function secKey(sec){var h=sec.querySelector('.phdr');return h?h.textContent.replace(/[^A-Za-z]/g,'').slice(0,20):'';}
+  function saveSecOrder(){
+    var pp=document.getElementById('props-panel');
+    try{localStorage.setItem('sm-panel-order',JSON.stringify(Array.prototype.slice.call(pp.querySelectorAll('.psec:not(.floating)')).map(secKey)));}catch(e){}
+  }
+  var savedOrder=null;
+  try{savedOrder=JSON.parse(localStorage.getItem('sm-panel-order')||'null');}catch(e){}
+  if(savedOrder&&Array.isArray(savedOrder)){
+    var pp0=document.getElementById('props-panel');
+    savedOrder.forEach(function(k){
+      var secs=Array.prototype.slice.call(pp0.querySelectorAll('.psec'));
+      var m=secs.filter(function(s){return secKey(s)===k;})[0];
+      if(m)pp0.appendChild(m);
+    });
+  }
+  document.addEventListener('mousedown',function(e){
+    var h=e.target.closest?e.target.closest('.phdr'):null;if(!h)return;
+    var sec=h.parentElement;if(!sec.classList.contains('psec'))return;
+    secDrag.el=sec;secDrag.startX=e.clientX;secDrag.startY=e.clientY;secDrag.started=false;
+    secDrag.wasFloating=sec.classList.contains('floating');
+    var r=sec.getBoundingClientRect();secDrag.offX=e.clientX-r.left;secDrag.offY=e.clientY-r.top;
+  });
+  window.addEventListener('mousemove',function(e){
+    if(!secDrag.el)return;
+    if(!secDrag.started){
+      if(Math.abs(e.clientY-secDrag.startY)+Math.abs(e.clientX-secDrag.startX)<7)return;
+      secDrag.started=true;
+      if(!secDrag.el.classList.contains('floating')){
+        var r2=secDrag.el.getBoundingClientRect();
+        secDrag.el.classList.add('floating');
+        secDrag.el.style.left=r2.left+'px';secDrag.el.style.top=r2.top+'px';
+        document.body.appendChild(secDrag.el);
+      }
+      secDrag.el.classList.add('drag-sec');
+    }
+    // clamp so a floating panel can never be dropped outside the app window
+    var fw=secDrag.el.offsetWidth,fh=secDrag.el.offsetHeight;
+    secDrag.el.style.left=Math.max(0,Math.min(window.innerWidth-fw,e.clientX-secDrag.offX))+'px';
+    secDrag.el.style.top=Math.max(0,Math.min(window.innerHeight-fh,e.clientY-secDrag.offY))+'px';
+    document.querySelectorAll('.psec.drag-over-sec').forEach(function(s){s.classList.remove('drag-over-sec');});
+    var ppr=document.getElementById('props-panel').getBoundingClientRect();
+    if(e.clientX>=ppr.left&&e.clientX<=ppr.right&&e.clientY>=ppr.top&&e.clientY<=ppr.bottom){
+      secDrag.el.style.pointerEvents='none';
+      var under=document.elementFromPoint(e.clientX,e.clientY);
+      secDrag.el.style.pointerEvents='';
+      var over=under&&under.closest?under.closest('.psec'):null;
+      if(over&&over!==secDrag.el)over.classList.add('drag-over-sec');
+    }
+  });
+  window.addEventListener('mouseup',function(e){
+    if(!secDrag.el)return;
+    if(secDrag.started){
+      var pp3=document.getElementById('props-panel');
+      var ppr2=pp3.getBoundingClientRect();
+      var inside=e.clientX>=ppr2.left&&e.clientX<=ppr2.right&&e.clientY>=ppr2.top&&e.clientY<=ppr2.bottom;
+      if(inside){
+        var over2=document.querySelector('.psec.drag-over-sec');
+        secDrag.el.classList.remove('floating');
+        secDrag.el.style.left='';secDrag.el.style.top='';
+        if(over2)pp3.insertBefore(secDrag.el,over2);
+        else pp3.appendChild(secDrag.el);
+        saveSecOrder();
+      }
+      window._secDragJustEnded=true;
+      document.querySelectorAll('.psec').forEach(function(s){s.classList.remove('drag-sec','drag-over-sec');});
+    }
+    secDrag.el=null;secDrag.started=false;
+  });
+  window.addEventListener('resize',function(){
+    document.querySelectorAll('.psec.floating').forEach(function(s){
+      s.style.left=Math.max(0,Math.min(window.innerWidth-s.offsetWidth,parseInt(s.style.left)||0))+'px';
+      s.style.top=Math.max(0,Math.min(window.innerHeight-s.offsetHeight,parseInt(s.style.top)||0))+'px';
+    });
+  });
+
+  // Rive-style scrubbable numeric fields, replacing every slider in the
+  // right panel: drag left/right on the field to change its value (hold
+  // Shift for fine 0.1-step adjustments, Alt for x10 coarse steps — same
+  // modifier convention Rive/AE use), or just click to place a caret and
+  // type a value directly. A plain click (no drag) never fires a change,
+  // so tabbing/typing behaves exactly like a normal number input.
+  // Pointer Events + explicit setPointerCapture, not raw mousedown/mousemove/
+  // mouseup on window: the previous version tracked drag state in a plain
+  // closure variable cleared on a *global* window 'mouseup' listener — if
+  // that mouseup was ever missed (button released while the pointer had
+  // drifted over another element/window that swallowed it, or any other
+  // listener elsewhere calling stopPropagation/preventDefault on the
+  // gesture) the state var was NEVER cleared, so every future mousemove
+  // anywhere kept computing a new value from the stale startX/startVal —
+  // exactly the reported "value keeps changing no matter what I do
+  // afterward" bug. Pointer capture makes the target element itself the
+  // guaranteed recipient of every subsequent pointer event up to and
+  // including pointerup/pointercancel, regardless of where the cursor
+  // physically ends up, which is the robust, standard fix for this whole
+  // class of "drag state got stuck" bug.
+  var scrubState=null;
+  document.addEventListener('pointerdown',function(e){
+    var el=e.target.closest&&e.target.closest('input.scrub');
+    if(!el||document.activeElement===el)return;
+    scrubState={el:el,pointerId:e.pointerId,startX:e.clientX,startVal:parseFloat(el.value)||0,moved:false};
+    el.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  document.addEventListener('pointermove',function(e){
+    if(!scrubState||e.pointerId!==scrubState.pointerId)return;
+    var dx=e.clientX-scrubState.startX;
+    if(!scrubState.moved){
+      if(Math.abs(dx)<3)return;
+      scrubState.moved=true;scrubState.el.classList.add('scrubbing');
+    }
+    var step=parseFloat(scrubState.el.dataset.step)||1;
+    if(e.shiftKey)step*=0.1;else if(e.altKey)step*=10;
+    var raw=scrubState.startVal+Math.round(dx/4)*step;
+    var min=scrubState.el.min!==''?parseFloat(scrubState.el.min):null;
+    var max=scrubState.el.max!==''?parseFloat(scrubState.el.max):null;
+    if(min!==null)raw=Math.max(min,raw);
+    if(max!==null)raw=Math.min(max,raw);
+    var decimals=(String(step).split('.')[1]||'').length;
+    scrubState.el.value=decimals?raw.toFixed(decimals):Math.round(raw);
+    scrubState.el.dispatchEvent(new Event('input',{bubbles:true}));
+  });
+  function endScrub(e){
+    if(!scrubState||(e&&e.pointerId!==undefined&&e.pointerId!==scrubState.pointerId))return;
+    if(!scrubState.moved){scrubState.el.focus();scrubState.el.select();}
+    else{
+      scrubState.el.classList.remove('scrubbing');
+      scrubState.el.dispatchEvent(new Event('change',{bubbles:true}));
+    }
+    scrubState=null;
+  }
+  document.addEventListener('pointerup',endScrub);
+  document.addEventListener('pointercancel',endScrub);
+  // Last-resort safety net: even with pointer capture this should never be
+  // needed, but if the pointer capture itself is ever lost/released by the
+  // browser without a matching pointerup (e.g. devtools interfering, or the
+  // window losing focus mid-drag), don't leave a scrub stuck forever.
+  window.addEventListener('blur',function(){scrubState=null;});
+})();

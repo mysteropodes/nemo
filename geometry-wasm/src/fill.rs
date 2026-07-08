@@ -1,0 +1,687 @@
+// Fill-engine graph tracing, ported from the JS reference implementation
+// in src/js/tools.js (fillBuildGraph/fillEdgeDir/fillTraceLoop/fillVectorFind).
+//
+// Was previously a hand-rolled polyline-only affair: JS flattened each wall
+// Path to a polyline (Path#flatten), Rust traced the loop over THOSE points
+// and only ever handed back which wall/fraction-range/direction made up each
+// hop, and JS re-cut the REAL bezier curve for the final result via
+// Path#getLocationAt/splitAt so the fill stayed curve-accurate rather than
+// polygon-approximated. That split existed because Rust had no curve
+// primitives of its own to work with.
+//
+// It does now: engine.rs's VelloEngine already builds real
+// vello::kurbo::BezPath scene geometry from the exact same Paper.js segment
+// shape (point/handleIn/handleOut) fill.rs receives, via
+// `build_bezpath_from_segments`. Reusing that here means the fill engine
+// builds its OWN flattened polylines (via kurbo::flatten, replacing
+// Path#flatten) and its OWN curve-accurate final result (via arc-length
+// sampling over the real BezPath, replacing getLocationAt/splitAt) — JS no
+// longer touches Paper.js curve APIs for fill-finding at all, it only hands
+// over raw segment data and gets back a finished segment list to build a
+// Path from directly.
+//
+// One seam intentionally stays JS-side: exact wall-wall crossing points
+// (CrossingIn, still optional/falls back to find_crossings below) are still
+// computed via Paper.js's own curve-curve intersection (Path#getIntersections).
+// kurbo has no general bezier-bezier intersection primitive, and
+// reimplementing one robustly is a separate, riskier project — not folded
+// into this pass.
+use crate::engine::{build_bezpath_from_segments, SegIn};
+use serde::{Deserialize, Serialize};
+use vello::kurbo::{BezPath, ParamCurve, ParamCurveArclen, PathEl, PathSeg};
+use wasm_bindgen::prelude::*;
+
+#[derive(Deserialize)]
+struct Wall {
+    segments: Vec<SegIn>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CrossingIn {
+    wall: usize,
+    frac: f64,
+    pt: [f64; 2],
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FillInput {
+    open_walls: Vec<Wall>,
+    closed_walls: Vec<Wall>,
+    gap_thr: f64,
+    click: [f64; 2],
+    #[serde(default)]
+    crossings: Option<Vec<CrossingIn>>,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+struct Vec2 {
+    x: f64,
+    y: f64,
+}
+impl Vec2 {
+    fn sub(self, o: Vec2) -> Vec2 {
+        Vec2 { x: self.x - o.x, y: self.y - o.y }
+    }
+    fn dist(self, o: Vec2) -> f64 {
+        ((self.x - o.x).powi(2) + (self.y - o.y).powi(2)).sqrt()
+    }
+    fn normalize(self) -> Vec2 {
+        let l = (self.x * self.x + self.y * self.y).sqrt();
+        if l < 1e-9 { Vec2 { x: 1.0, y: 0.0 } } else { Vec2 { x: self.x / l, y: self.y / l } }
+    }
+}
+
+// Builds an open (non-closed) BezPath for a wall plus its flattened
+// polyline (via kurbo's own adaptive flattener) — the polyline is what the
+// existing graph-tracing math below operates on, same tolerance class as
+// the JS-side `Path#flatten(1)` it replaces.
+fn wall_geometry(w: &Wall, closed: bool) -> (BezPath, Vec<[f64; 2]>) {
+    let bez = build_bezpath_from_segments(&w.segments, closed);
+    let mut pts: Vec<[f64; 2]> = Vec::new();
+    vello::kurbo::flatten(bez.elements().iter().copied(), 0.75, |el| match el {
+        PathEl::MoveTo(p) | PathEl::LineTo(p) => pts.push([p.x, p.y]),
+        _ => {}
+    });
+    (bez, pts)
+}
+
+// Arc-length sampler over a wall's real BezPath (not the flattened
+// polyline) — lets the final result be reconstructed by sampling the TRUE
+// curve at fine resolution instead of inheriting the coarser flatten
+// tolerance used just for graph-building. Mirrors the PathSampler idiom
+// already established in tweenmatch.rs.
+struct PathSampler {
+    segs: Vec<PathSeg>,
+    cum_lens: Vec<f64>,
+    seg_lens: Vec<f64>,
+    total: f64,
+}
+impl PathSampler {
+    fn new(path: &BezPath) -> Self {
+        let segs: Vec<PathSeg> = path.segments().collect();
+        let mut cum_lens = Vec::with_capacity(segs.len());
+        let mut seg_lens = Vec::with_capacity(segs.len());
+        let mut cum = 0.0;
+        for s in &segs {
+            cum_lens.push(cum);
+            let l = s.arclen(0.1);
+            seg_lens.push(l);
+            cum += l;
+        }
+        PathSampler { segs, cum_lens, seg_lens, total: cum }
+    }
+    fn point_at(&self, dist: f64) -> Vec2 {
+        if self.segs.is_empty() {
+            return Vec2 { x: 0.0, y: 0.0 };
+        }
+        let d = dist.clamp(0.0, self.total);
+        let mut idx = self.segs.len() - 1;
+        for i in 0..self.segs.len() {
+            if d < self.cum_lens[i] + self.seg_lens[i] {
+                idx = i;
+                break;
+            }
+        }
+        let local = (d - self.cum_lens[idx]).max(0.0);
+        let t = if self.seg_lens[idx] > 1e-9 { self.segs[idx].inv_arclen(local, 0.1) } else { 0.0 };
+        let p = self.segs[idx].eval(t);
+        Vec2 { x: p.x, y: p.y }
+    }
+}
+
+// Douglas-Peucker polyline simplification — collapses the dense point
+// sample resample_result() produces down to the minimum points needed to
+// stay within `eps` of the original curve. Tried extracting EXACT bezier
+// subsegments first (real cubic control points, not sampled points) to get
+// a low point count directly — arc-length-parametrized subsegment
+// extraction on a degenerate (zero-velocity-at-endpoints) cubic turned out
+// numerically unstable in kurbo (inv_arclen occasionally converges to the
+// wrong parametric t right at that singularity), producing a garbled
+// self-crossing result once in a while. Simplifying an already-verified-
+// correct dense sample is a much smaller blast radius: it can only ever
+// REMOVE points from a polyline whose topology is already right, it can't
+// introduce a new one.
+fn simplify_polyline(pts: &[Vec2], eps: f64) -> Vec<Vec2> {
+    if pts.len() < 3 {
+        return pts.to_vec();
+    }
+    fn perp_dist(p: Vec2, a: Vec2, b: Vec2) -> f64 {
+        let d = b.sub(a);
+        let len_sq = d.x * d.x + d.y * d.y;
+        if len_sq < 1e-12 {
+            return p.dist(a);
+        }
+        let t = ((p.x - a.x) * d.x + (p.y - a.y) * d.y) / len_sq;
+        let proj = Vec2 { x: a.x + d.x * t, y: a.y + d.y * t };
+        p.dist(proj)
+    }
+    fn dp(pts: &[Vec2], eps: f64, out: &mut Vec<Vec2>) {
+        let n = pts.len();
+        if n < 2 {
+            return;
+        }
+        let (a, b) = (pts[0], pts[n - 1]);
+        let mut max_d = 0.0;
+        let mut idx = 0;
+        for i in 1..n - 1 {
+            let d = perp_dist(pts[i], a, b);
+            if d > max_d {
+                max_d = d;
+                idx = i;
+            }
+        }
+        if max_d > eps && idx > 0 {
+            dp(&pts[0..=idx], eps, out);
+            out.pop(); // shared midpoint — the second half's dp() re-adds it
+            dp(&pts[idx..], eps, out);
+        } else {
+            out.push(a);
+            out.push(b);
+        }
+    }
+    let mut out = Vec::new();
+    dp(pts, eps, &mut out);
+    out
+}
+
+struct Node {
+    pt: Vec2,
+    edges: Vec<usize>,
+}
+#[derive(Clone, Copy, PartialEq)]
+enum EdgeType {
+    Stroke,
+    Gap,
+}
+struct Edge {
+    kind: EdgeType,
+    stroke_idx: usize, // valid only for Stroke edges — which ORIGINAL wall this sub-segment came from
+    // Arc-length fraction range [0,1] along the original wall this edge
+    // covers (measured over the flattened polyline) — used to re-sample
+    // the real BezPath for that wall between these two fractions when
+    // reconstructing the final result.
+    frac_a: f64,
+    frac_b: f64,
+    pts: Vec<Vec2>, // this sub-edge's own flattened points, a-to-b order
+    a: usize,
+    b: usize,
+}
+
+fn find_or_create_node(nodes: &mut Vec<Node>, pt: Vec2, join_eps: f64) -> usize {
+    for (i, n) in nodes.iter().enumerate() {
+        if n.pt.dist(pt) <= join_eps {
+            return i;
+        }
+    }
+    nodes.push(Node { pt, edges: Vec::new() });
+    nodes.len() - 1
+}
+
+// Arc-length cumulative-distance table for a polyline: cum[i] = distance
+// from points[0] to points[i]; cum[0] = 0, cum.last() = total length.
+fn arc_lengths(pts: &[[f64; 2]]) -> (Vec<f64>, f64) {
+    let mut cum = vec![0.0; pts.len()];
+    for i in 1..pts.len() {
+        let a = Vec2 { x: pts[i - 1][0], y: pts[i - 1][1] };
+        let b = Vec2 { x: pts[i][0], y: pts[i][1] };
+        cum[i] = cum[i - 1] + a.dist(b);
+    }
+    let total = *cum.last().unwrap_or(&0.0);
+    (cum, total)
+}
+
+// Point + arc-length fraction at a given target distance along the polyline.
+fn point_at_distance(pts: &[[f64; 2]], cum: &[f64], total: f64, dist: f64) -> Vec2 {
+    if total < 1e-9 {
+        return Vec2 { x: pts[0][0], y: pts[0][1] };
+    }
+    let d = dist.max(0.0).min(total);
+    for i in 1..cum.len() {
+        if d <= cum[i] || i == cum.len() - 1 {
+            let seg_len = (cum[i] - cum[i - 1]).max(1e-9);
+            let t = ((d - cum[i - 1]) / seg_len).max(0.0).min(1.0);
+            let a = Vec2 { x: pts[i - 1][0], y: pts[i - 1][1] };
+            let b = Vec2 { x: pts[i][0], y: pts[i][1] };
+            return Vec2 { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+        }
+    }
+    Vec2 { x: pts[pts.len() - 1][0], y: pts[pts.len() - 1][1] }
+}
+
+// Exact-segment intersection between two 2D line segments, returning the
+// intersection point plus the fractional position along EACH segment
+// (0..1), or None if parallel or the crossing falls outside either segment.
+fn segseg_intersect(p1: Vec2, p2: Vec2, p3: Vec2, p4: Vec2) -> Option<(Vec2, f64, f64)> {
+    let d1 = p2.sub(p1);
+    let d2 = p4.sub(p3);
+    let denom = d1.x * d2.y - d1.y * d2.x;
+    if denom.abs() < 1e-12 {
+        return None;
+    }
+    let dx = p3.sub(p1);
+    let t = (dx.x * d2.y - dx.y * d2.x) / denom;
+    let u = (dx.x * d1.y - dx.y * d1.x) / denom;
+    let eps = 1e-9;
+    if t < -eps || t > 1.0 + eps || u < -eps || u > 1.0 + eps {
+        return None;
+    }
+    Some((Vec2 { x: p1.x + d1.x * t, y: p1.y + d1.y * t }, t.max(0.0).min(1.0), u.max(0.0).min(1.0)))
+}
+
+// Finds every point where two DIFFERENT open walls actually cross each
+// other (not just come near each other) — this is what lets the fill
+// engine trace the small lens/petal shape bounded by two crossing strokes
+// (e.g. an "X" of two curves), which the endpoint-only gap-bridging below
+// can never reach since the crossing point isn't either wall's endpoint.
+// Self-intersections within a single wall are intentionally out of scope
+// for now — a real but separate case, not what was reported.
+fn find_crossings(open_pts: &[Vec<[f64; 2]>]) -> Vec<(usize, f64, Vec2)> {
+    let mut hits: Vec<(usize, f64, Vec2)> = Vec::new();
+    let tables: Vec<(Vec<f64>, f64)> = open_pts.iter().map(|p| arc_lengths(p)).collect();
+    for i in 0..open_pts.len() {
+        for j in (i + 1)..open_pts.len() {
+            let pi = &open_pts[i];
+            let pj = &open_pts[j];
+            let (cum_i, total_i) = &tables[i];
+            let (cum_j, total_j) = &tables[j];
+            if *total_i < 1e-9 || *total_j < 1e-9 {
+                continue;
+            }
+            for ki in 0..pi.len() - 1 {
+                let a1 = Vec2 { x: pi[ki][0], y: pi[ki][1] };
+                let a2 = Vec2 { x: pi[ki + 1][0], y: pi[ki + 1][1] };
+                for kj in 0..pj.len() - 1 {
+                    let b1 = Vec2 { x: pj[kj][0], y: pj[kj][1] };
+                    let b2 = Vec2 { x: pj[kj + 1][0], y: pj[kj + 1][1] };
+                    if let Some((pt, t, u)) = segseg_intersect(a1, a2, b1, b2) {
+                        let di = cum_i[ki] + t * (cum_i[ki + 1] - cum_i[ki]);
+                        let dj = cum_j[kj] + u * (cum_j[kj + 1] - cum_j[kj]);
+                        hits.push((i, di / total_i, pt));
+                        hits.push((j, dj / total_j, pt));
+                    }
+                }
+            }
+        }
+    }
+    hits
+}
+
+fn build_graph(
+    open_pts: &[Vec<[f64; 2]>],
+    gap_thr: f64,
+    external_crossings: Option<&[CrossingIn]>,
+) -> (Vec<Node>, Vec<Edge>) {
+    let join_eps = (1.5_f64).max(gap_thr * 0.15).max(1.5);
+    let mut nodes: Vec<Node> = Vec::new();
+    let mut edges: Vec<Edge> = Vec::new();
+
+    let tables: Vec<(Vec<f64>, f64)> = open_pts.iter().map(|p| arc_lengths(p)).collect();
+    // Prefer exact, JS-computed crossings (real bezier-curve intersections)
+    // over our own polyline-approximated find_crossings() — see CrossingIn's
+    // own doc comment for why this matters (eliminates a small overshoot/
+    // flap artifact at intersections). Falls back to find_crossings() if the
+    // caller didn't provide any.
+    let crossings: Vec<(usize, f64, Vec2)> = match external_crossings {
+        Some(cs) => cs.iter().map(|c| (c.wall, c.frac, Vec2 { x: c.pt[0], y: c.pt[1] })).collect(),
+        None => find_crossings(open_pts),
+    };
+
+    // Per-wall sorted cut-fraction list: always includes 0.0/1.0 (the real
+    // endpoints, no exact point — recomputed via point_at_distance, which is
+    // already exact for a real endpoint), plus every crossing found on that
+    // wall (WITH its exact point when known) — this is what turns "one edge
+    // per whole wall" into "one edge per sub-segment between consecutive
+    // cuts", so the wall-follower can route through a crossing exactly like
+    // it already routes through a gap-bridge node.
+    for (i, pts) in open_pts.iter().enumerate() {
+        let (cum, total) = &tables[i];
+        let mut cuts: Vec<(f64, Option<Vec2>)> = vec![(0.0, None), (1.0, None)];
+        for (wi, frac, pt) in &crossings {
+            if *wi == i {
+                cuts.push((*frac, Some(*pt)));
+            }
+        }
+        cuts.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+        cuts.dedup_by(|a, b| (a.0 - b.0).abs() < 1e-6);
+
+        for pair in cuts.windows(2) {
+            let (f0, p0opt) = pair[0];
+            let (f1, p1opt) = pair[1];
+            if (f1 - f0) * total < 1e-6 {
+                continue; // degenerate zero-length sub-edge (crossing exactly at an existing cut)
+            }
+            let p0 = p0opt.unwrap_or_else(|| point_at_distance(pts, cum, *total, f0 * total));
+            let p1 = p1opt.unwrap_or_else(|| point_at_distance(pts, cum, *total, f1 * total));
+            let a = find_or_create_node(&mut nodes, p0, join_eps);
+            let b = find_or_create_node(&mut nodes, p1, join_eps);
+
+            // Rebuild this sub-edge's own point list: the original points
+            // strictly between f0/f1, plus exact interpolated endpoints.
+            let d0 = f0 * total;
+            let d1 = f1 * total;
+            let mut edge_pts = vec![p0];
+            for (k, cd) in cum.iter().enumerate() {
+                if *cd > d0 + 1e-6 && *cd < d1 - 1e-6 {
+                    edge_pts.push(Vec2 { x: pts[k][0], y: pts[k][1] });
+                }
+            }
+            edge_pts.push(p1);
+
+            edges.push(Edge { kind: EdgeType::Stroke, stroke_idx: i, frac_a: f0, frac_b: f1, pts: edge_pts, a, b });
+        }
+    }
+
+    let n = nodes.len();
+    for i in 0..n {
+        for j in (i + 1)..n {
+            let d = nodes[i].pt.dist(nodes[j].pt);
+            if d > join_eps && d <= gap_thr {
+                edges.push(Edge { kind: EdgeType::Gap, stroke_idx: 0, frac_a: 0.0, frac_b: 0.0, pts: Vec::new(), a: i, b: j });
+            }
+        }
+    }
+    for (idx, e) in edges.iter().enumerate() {
+        nodes[e.a].edges.push(idx);
+        nodes[e.b].edges.push(idx);
+    }
+    (nodes, edges)
+}
+
+// Direction of travel leaving `node` via `edge`, using the endpoint-adjacent
+// polyline segment as a stand-in for the true curve tangent there (accurate
+// in the limit as the flatten tolerance shrinks — same tradeoff already
+// accepted for boolean.rs).
+fn edge_dir(nodes: &[Node], edge: &Edge, node: usize) -> Vec2 {
+    if edge.kind == EdgeType::Gap {
+        let other = if edge.a == node { edge.b } else { edge.a };
+        return nodes[other].pt.sub(nodes[node].pt).normalize();
+    }
+    let pts = &edge.pts;
+    if edge.a == node {
+        pts[1.min(pts.len() - 1)].sub(pts[0]).normalize()
+    } else {
+        let n = pts.len();
+        pts[n - 2].sub(pts[n - 1]).normalize()
+    }
+}
+
+fn poly_area(pts: &[Vec2]) -> f64 {
+    let mut a = 0.0;
+    let n = pts.len();
+    for i in 0..n {
+        let p1 = pts[i];
+        let p2 = pts[(i + 1) % n];
+        a += p1.x * p2.y - p2.x * p1.y;
+    }
+    (a / 2.0).abs()
+}
+
+fn point_in_poly(pt: Vec2, pts: &[Vec2]) -> bool {
+    let mut inside = false;
+    let n = pts.len();
+    let mut j = n - 1;
+    for i in 0..n {
+        let (xi, yi) = (pts[i].x, pts[i].y);
+        let (xj, yj) = (pts[j].x, pts[j].y);
+        if (yi > pt.y) != (yj > pt.y) && pt.x < (xj - xi) * (pt.y - yi) / (yj - yi) + xi {
+            inside = !inside;
+        }
+        j = i;
+    }
+    inside
+}
+
+struct Hop {
+    edge_idx: usize,
+    from: usize,
+    to: usize,
+}
+
+fn trace_loop(
+    nodes: &[Node],
+    edges: &[Edge],
+    start_node: usize,
+    first_edge: usize,
+    turn_sign: f64,
+    max_steps: usize,
+) -> Option<Vec<Hop>> {
+    let mut seq: Vec<Hop> = Vec::new();
+    let mut cur_node = start_node;
+    let mut cur_edge = first_edge;
+    let mut to_node = if edges[cur_edge].a == cur_node { edges[cur_edge].b } else { edges[cur_edge].a };
+    seq.push(Hop { edge_idx: cur_edge, from: cur_node, to: to_node });
+    let mut steps = 0;
+    while to_node != start_node {
+        steps += 1;
+        if steps > max_steps {
+            return None;
+        }
+        let arrival = edge_dir(nodes, &edges[cur_edge], cur_node);
+        let arrival_dir = Vec2 { x: -arrival.x, y: -arrival.y };
+        let back_angle = arrival_dir.y.atan2(arrival_dir.x);
+        let node = &nodes[to_node];
+        let mut best_edge: Option<usize> = None;
+        let mut best_rel = f64::INFINITY;
+        for &e2i in &node.edges {
+            if e2i == cur_edge {
+                continue;
+            }
+            let out_dir = edge_dir(nodes, &edges[e2i], to_node);
+            let ang = out_dir.y.atan2(out_dir.x);
+            let mut rel = if turn_sign > 0.0 { ang - back_angle } else { back_angle - ang };
+            let two_pi = std::f64::consts::PI * 2.0;
+            rel = ((rel % two_pi) + two_pi) % two_pi;
+            if rel < 1e-6 {
+                rel = two_pi;
+            }
+            if rel < best_rel {
+                best_rel = rel;
+                best_edge = Some(e2i);
+            }
+        }
+        let best_edge = best_edge?;
+        let next_node = if edges[best_edge].a == to_node { edges[best_edge].b } else { edges[best_edge].a };
+        seq.push(Hop { edge_idx: best_edge, from: to_node, to: next_node });
+        cur_node = to_node;
+        cur_edge = best_edge;
+        to_node = next_node;
+    }
+    Some(seq)
+}
+
+fn loop_points(nodes: &[Node], edges: &[Edge], seq: &[Hop]) -> Vec<Vec2> {
+    let mut pts = Vec::new();
+    for hop in seq {
+        let e = &edges[hop.edge_idx];
+        if e.kind == EdgeType::Gap {
+            pts.push(nodes[hop.to].pt);
+        } else if e.a == hop.from {
+            for p in &e.pts {
+                pts.push(*p);
+            }
+        } else {
+            for p in e.pts.iter().rev() {
+                pts.push(*p);
+            }
+        }
+    }
+    pts
+}
+
+// Rebuilds the winning loop as an exact, curve-accurate point sequence by
+// sampling each Stroke hop's REAL bezier wall (via PathSampler, not the
+// coarser flattened polyline used for graph-tracing) between its frac_a/
+// frac_b arc-length range, and each Gap hop as a straight line to the next
+// node. This is what used to require handing frac_a/frac_b back to JS for
+// Path#getLocationAt/splitAt — now done once, here, with kurbo.
+fn resample_result(open_samplers: &[PathSampler], nodes: &[Node], edges: &[Edge], seq: &[Hop]) -> Vec<Vec2> {
+    let mut pts: Vec<Vec2> = Vec::new();
+    for hop in seq {
+        let e = &edges[hop.edge_idx];
+        if e.kind == EdgeType::Gap {
+            pts.push(nodes[hop.to].pt);
+            continue;
+        }
+        let sampler = &open_samplers[e.stroke_idx];
+        let total = sampler.total;
+        let mut da = e.frac_a * total;
+        let mut db = e.frac_b * total;
+        let reversed = e.a != hop.from;
+        if reversed {
+            std::mem::swap(&mut da, &mut db);
+        }
+        // Density scales with the sub-edge's own length so long strokes
+        // still look smooth without over-sampling short ones — the point
+        // count this produces is cut back down by simplify_polyline() once
+        // the whole loop is assembled (see fill_find), so oversampling a
+        // little here is cheap and safe.
+        let n_samples = ((db - da).abs() / 4.0).ceil().max(6.0) as usize;
+        for si in 0..=n_samples {
+            let t = si as f64 / n_samples as f64;
+            let d = da + (db - da) * t;
+            pts.push(sampler.point_at(d));
+        }
+    }
+    pts
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SegOut {
+    point: [f64; 2],
+    handle_in: [f64; 2],
+    handle_out: [f64; 2],
+}
+
+#[derive(Serialize)]
+#[serde(tag = "kind")]
+enum FillResult {
+    #[serde(rename = "closedWall")]
+    ClosedWall { index: usize },
+    #[serde(rename = "traced")]
+    // `walls`: unique input open-wall indices whose sub-edges make up the
+    // winning loop — lets JS record exactly WHICH source strokes bound this
+    // fill (data.fillWalls), so later regeneration can be restricted to
+    // those same strokes instead of re-deriving the region from a bare
+    // seed point against the whole layer.
+    // `usedGap`: whether the winning loop needed any Gap (bridged, not a
+    // real stroke) edge to close — a loop that closes on real strokes/
+    // crossings ALONE is provably the tightest possible closure through the
+    // click point, since it needs no bridging at all; the caller uses this
+    // to stop escalating gapThr the moment such a "pure" candidate is
+    // found, rather than continuing to try larger gapThr values whose extra
+    // (spurious) gap edges can occasionally trace a smaller-by-area but
+    // topologically wrong shortcut loop that cuts across the real shape.
+    Traced {
+        segments: Vec<SegOut>,
+        walls: Vec<usize>,
+        #[serde(rename = "usedGap")]
+        used_gap: bool,
+    },
+    #[serde(rename = "notFound")]
+    NotFound,
+}
+
+#[wasm_bindgen]
+pub fn fill_find(input_json: &str) -> Result<String, JsValue> {
+    let input: FillInput =
+        serde_json::from_str(input_json).map_err(|e| JsValue::from_str(&e.to_string()))?;
+    let click = Vec2 { x: input.click[0], y: input.click[1] };
+
+    // Build real BezPaths + flattened polylines once, up front, for every
+    // wall — the polylines feed the existing graph/area math unchanged, the
+    // BezPaths (open walls only) feed the curve-accurate resampling of
+    // whichever loop wins below.
+    let closed_geo: Vec<(BezPath, Vec<[f64; 2]>)> =
+        input.closed_walls.iter().map(|w| wall_geometry(w, true)).collect();
+    let open_geo: Vec<(BezPath, Vec<[f64; 2]>)> =
+        input.open_walls.iter().map(|w| wall_geometry(w, false)).collect();
+    let open_pts: Vec<Vec<[f64; 2]>> = open_geo.iter().map(|(_, p)| p.clone()).collect();
+
+    // Candidate winner, tracked as (area, kind) so the "smallest containing
+    // loop wins" comparison is a single flat rule across BOTH closed walls
+    // and traced open-wall loops — the traced Hop sequence is only resampled
+    // into real segments once, after the winner is fully decided, since
+    // that's the expensive step.
+    enum Best {
+        Closed(usize),
+        Traced(Vec<Hop>),
+    }
+    let mut best: Option<(f64, Best)> = None;
+
+    // closed standalone walls: same "smallest containing loop wins" rule as
+    // the traced candidates below, so collect both kinds before comparing.
+    for (i, (_, pts)) in closed_geo.iter().enumerate() {
+        let vpts: Vec<Vec2> = pts.iter().map(|p| Vec2 { x: p[0], y: p[1] }).collect();
+        let area = poly_area(&vpts);
+        if area >= 1.0 && point_in_poly(click, &vpts) {
+            if best.as_ref().map_or(true, |(a, _)| area < *a) {
+                best = Some((area, Best::Closed(i)));
+            }
+        }
+    }
+
+    let mut nodes_edges: Option<(Vec<Node>, Vec<Edge>)> = None;
+    if !open_pts.is_empty() {
+        let (nodes, edges) = build_graph(&open_pts, input.gap_thr, input.crossings.as_deref());
+        let stroke_edge_idxs: Vec<usize> = edges
+            .iter()
+            .enumerate()
+            .filter(|(_, e)| e.kind == EdgeType::Stroke)
+            .map(|(i, _)| i)
+            .collect();
+        let seed_cap = stroke_edge_idxs.len().min(150);
+        let max_steps = edges.len() * 2 + 8;
+        for &seed_idx in stroke_edge_idxs.iter().take(seed_cap) {
+            let seed_edge = &edges[seed_idx];
+            for &start_node in &[seed_edge.a, seed_edge.b] {
+                for &turn_sign in &[1.0, -1.0] {
+                    if let Some(seq) = trace_loop(&nodes, &edges, start_node, seed_idx, turn_sign, max_steps) {
+                        if seq.len() < 2 {
+                            continue;
+                        }
+                        let pts = loop_points(&nodes, &edges, &seq);
+                        let area = poly_area(&pts);
+                        if area < 1.0 || !point_in_poly(click, &pts) {
+                            continue;
+                        }
+                        if best.as_ref().map_or(true, |(a, _)| area < *a) {
+                            best = Some((area, Best::Traced(seq)));
+                        }
+                    }
+                }
+            }
+        }
+        nodes_edges = Some((nodes, edges));
+    }
+
+    let result = match best {
+        Some((_, Best::Closed(i))) => FillResult::ClosedWall { index: i },
+        Some((_, Best::Traced(seq))) => {
+            let (nodes, edges) = nodes_edges.as_ref().unwrap();
+            let mut walls: Vec<usize> = seq
+                .iter()
+                .filter(|h| edges[h.edge_idx].kind == EdgeType::Stroke)
+                .map(|h| edges[h.edge_idx].stroke_idx)
+                .collect();
+            walls.sort_unstable();
+            walls.dedup();
+            let used_gap = seq.iter().any(|h| edges[h.edge_idx].kind == EdgeType::Gap);
+            let samplers: Vec<PathSampler> = open_geo.iter().map(|(bez, _)| PathSampler::new(bez)).collect();
+            let raw_pts = resample_result(&samplers, nodes, edges, &seq);
+            // 0.35px tolerance: well under a single rendered pixel at any
+            // normal zoom, so this is a point-count optimization only —
+            // visually lossless, not a visible simplification.
+            let simplified = simplify_polyline(&raw_pts, 0.35);
+            let segments = simplified
+                .iter()
+                .map(|p| SegOut { point: [p.x, p.y], handle_in: [0.0, 0.0], handle_out: [0.0, 0.0] })
+                .collect();
+            FillResult::Traced { segments, walls, used_gap }
+        }
+        None => FillResult::NotFound,
+    };
+    serde_json::to_string(&result).map_err(|e| JsValue::from_str(&e.to_string()))
+}

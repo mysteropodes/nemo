@@ -1,0 +1,18 @@
+{
+  "name": "strokemotion",
+  "version": "0.0.1",
+  "description": "2D frame-by-frame vector animation with auto inbetweening",
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "serve": "python3 -m http.server 1420 -d src"
+  },
+  "keywords": ["animation", "vector", "inbetweening"],
+  "author": "Cyril",
+  "license": "MIT",
+  "type": "commonjs",
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.11.4"
+  }
+}

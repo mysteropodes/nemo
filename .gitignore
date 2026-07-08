@@ -1,0 +1,20 @@
+node_modules/
+.DS_Store
+**/.DS_Store
+src-tauri/target/
+dist/
+*.dmg
+*.exe
+*.msi
+*.AppImage
+*.deb
+src-tauri/.tauri_private_key
+src-tauri/strokemotion.key
+src-tauri/strokemotion.key.pub
+geometry-wasm/target/
+# src/wasm/ (wasm-pack build output) is intentionally NOT ignored: the app
+# has no build step that regenerates it before packaging (frontendDist just
+# copies src/ verbatim), so it's committed like paper-full.min.js — a
+# vendored build artifact, not something to regenerate on every checkout.
+# Re-run `wasm-pack build --target web --out-dir ../src/wasm` from
+# geometry-wasm/ after any change to geometry-wasm/src/.

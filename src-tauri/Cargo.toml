@@ -1,0 +1,26 @@
+[package]
+name = "strokemotion"
+version = "0.0.1"
+description = "2D frame-by-frame vector animation with auto inbetweening"
+authors = ["Cyril"]
+edition = "2021"
+
+[lib]
+name = "strokemotion_lib"
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["devtools"] }
+tauri-plugin-shell = "2"
+tauri-plugin-updater = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tauri-plugin-fs = "2.5.1"
+tauri-plugin-dialog = "2.7.1"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc = "0.2"
+block = "0.1"

@@ -1,0 +1,36 @@
+[package]
+name = "geometry-wasm"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+geo-types = "0.6"
+geo-booleanop = "0.3"
+# tiny-skia was the Phase C1 proof-of-concept rasterizer (CPU/software).
+# Swapped for vello (GPU compute via WebGPU/wgpu) per explicit direction —
+# faster and the geometry primitives (kurbo/peniko) are the intended long-
+# term base for the scene graph anyway. Real tradeoff accepted knowingly:
+# WebGPU support in Tauri's system WKWebView is recent and not guaranteed on
+# older macOS — needs verifying in the actual shipped app, not just the
+# (Chromium-based, WebGPU-enabled-by-default) browser preview used to test.
+# Pinned to a recent release deliberately: vello 0.3's wgpu 22 sent a
+# requestDevice() limits dict with a field name ("maxInterStageShaderComponents")
+# this browser's current WebGPU implementation no longer recognizes —
+# spec/version drift between wgpu 22 (mid-2024) and a much newer browser.
+# 0.9 (wgpu 29) matches the current spec cleanly.
+vello = "0.9"
+wasm-bindgen-futures = "0.4"
+# Tiny oneshot channel used to await wgpu's callback-style buffer map_async
+# from an async wasm export (GPU->CPU pixel readback for the export pipeline).
+futures-channel = "0.3"
+web-sys = { version = "0.3", features = ["HtmlCanvasElement", "console"] }
+
+[profile.release]
+opt-level = "s"
+lto = true
