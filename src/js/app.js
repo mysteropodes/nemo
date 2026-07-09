@@ -997,6 +997,11 @@ function loadFrame(idx){
   // through them.
   var strokes=getEffectiveStrokes(i,idx);strokes.forEach(function(sd){if(sd.isRaster)desR(sd,userLayers[i]);else desP(sd,userLayers[i]);});relinkBrushCompanions(userLayers[i]);}
   userLayers[state.activeLayerIdx].activate();
+  // Vue caméra (v18) : loadFrame est LE point de passage de tout changement
+  // de frame (scrub, lecture, goToFrame) — même raison que le hook
+  // SMReference au-dessus. Le hook updatePlayhead seul ne couvrait que la
+  // lecture (goToFrame hors lecture passe par updateUI, pas updatePlayhead).
+  if(window.SMCamera)SMCamera.applyCameraView();
 }
 // Solo (After Effects-style): while ANY layer has ld.solo set, only soloed
 // layers render — overriding each layer's own eye/visible toggle entirely

@@ -2273,6 +2273,8 @@ function onMouseDown(event){
     var existing=(state.comments||[]).filter(function(cm){return cm.frame===state.currentFrame;})
       .find(function(cm){return event.point.getDistance(new Point(cm.x,cm.y))<hitRadius;});
     openCommentPopover(event.point,existing);
+  }else if(state.tool==='camera'){
+    if(window.SMCamera)SMCamera.onDown(event);
   }else if(state.tool==='fsselect'){
     _fsSel=fsHitTest(event.point,layer);
     updateUI();
@@ -2442,6 +2444,7 @@ function onMouseDown(event){
 function onMouseDrag(event){
   if(state.playing)return;
   if(state.isPanning||state.spaceDown){var dx=event.event.movementX||0;var dy=event.event.movementY||0;view.center=view.center.subtract(new Point(dx,dy).divide(view.zoom));return;}
+  if(state.tool==='camera'){if(window.SMCamera)SMCamera.onDrag(event);return;}
   if(state.tool==='draw'){
     if(!currentPath)return;
     if(state.vectorBrush){
@@ -2571,6 +2574,7 @@ function onMouseDrag(event){
 }
 function onMouseUp(event){
   if(state.isPanning){state.isPanning=false;return;}if(state.playing)return;
+  if(state.tool==='camera'){if(window.SMCamera)SMCamera.onUp(event);return;}
   _eraseDragActive=false;_eraseLastPt=null;
   if(state.tool==='draw'&&currentPath){
     if(state.vectorBrush){

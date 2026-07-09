@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>StrokeMotion v0.0.9</title>
+<title>StrokeMotion v0.1.0</title>
 <script src="paper-full.min.js"></script>
 <!-- Manrope (redesign, 2026-07-09) — matches the CSS var font stack's own
      fallback order, so an offline load (no internet, no Tauri font cache)
@@ -206,6 +206,16 @@
           <button class="pbtn" id="btn-revision-accept" style="flex:1" title="Garder cette correction, supprimer l'original">Accepter</button>
           <button class="pbtn" id="btn-revision-reject" style="flex:1" title="Annuler cette correction, restaurer l'original">Rejeter</button>
         </div>
+      </div>
+    </div>
+    <div class="psec" id="camera-sec" style="display:none">
+      <div class="phdr"><span class="ar">☰</span> Caméra</div>
+      <div class="pbdy">
+        <div class="pr" id="cam-key-info" style="font-size:10px;color:var(--text-dim)"></div>
+        <div class="pr"><button class="pbtn ac" id="btn-cam-addkey" style="flex:1">Ajouter une clé</button></div>
+        <div class="pr" id="cam-ease-label" style="font-size:10px;color:var(--text-dim)"></div>
+        <div class="pr"><canvas id="cam-ease-canvas" width="220" height="140" style="width:100%;border-radius:6px;background:var(--panel3);cursor:crosshair"></canvas></div>
+        <div class="pr" style="font-size:9px;color:var(--text-dim)">Glisse les 2 poignées pour sculpter l'accélération du mouvement entre les 2 clés encadrant la frame courante. Déplace/resize le rectangle caméra directement sur le canvas.</div>
       </div>
     </div>
     <div class="psec" id="fill-sec">
@@ -642,6 +652,7 @@
     <button class="tb" id="btn-ghost-all" title="Ghost all keyframes — shows every keyframe of the active layer at once" style="margin-left:4px"><span style="font-size:13px;line-height:1">&#x2637;</span></button>
     <button class="tb" id="btn-ghost-select" title="Select all keyframes' content to move/transform together" disabled><span style="font-size:12px;line-height:1">&#x2725;</span></button>
     <button class="tb" id="btn-revision-view" title="Vue de révision — cycle Tout / Mes traits / Corrections" style="margin-left:4px;width:auto;padding:0 8px;font-size:10px">Tout</button>
+    <button class="tb" id="btn-camera" title="Calque caméra — clés de cadrage (zoom/pan) interpolées avec courbes de Bézier, comme dans TVPaint/Callipeg" style="margin-left:4px"><span style="font-size:12px;line-height:1">&#x1F3A5;</span></button>
     <button class="tb" id="btn-audio" title="Importer une piste audio (mp3/ogg/wav) — waveform sous la timeline, lecture synchronisée" style="margin-left:4px"><span style="font-size:13px;line-height:1">&#x266b;</span></button>
     <input type="file" id="audio-file-input" accept="audio/*" multiple style="display:none">
   </div>
@@ -678,7 +689,7 @@
 
 <div id="statusbar">
   <span><span class="sc">F5</span>Frame <span class="sc">F6</span>Key <span class="sc">F7</span>Blank <span class="sc">T</span>Tween <span class="sc">D</span>Dupli <span class="sc">F</span>Flip <span class="sc">X</span>Mirror <span class="sc">Enter</span>Play</span>
-  <span id="status-text">StrokeMotion v0.0.9</span>
+  <span id="status-text">StrokeMotion v0.1.0</span>
 </div>
 </div>
 <div id="toast"></div>
@@ -693,6 +704,7 @@
 <script src="js/brush-editor.js"></script>
 <script src="js/export.js"></script>
 <script src="js/timeline.js"></script>
+<script src="js/camera.js"></script>
 <script src="js/audio-bridge.js"></script>
 <script src="js/reference-bridge.js"></script>
 <script src="js/drop-import.js"></script>

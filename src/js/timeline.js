@@ -18,6 +18,7 @@ function stopPlay(){if(!state.playing)return;state.playing=false;clearInterval(p
 function togglePlay(){if(state.playing)stopPlay();else startPlay();}
 
 function updatePlayhead(){
+  if(window.SMCamera){SMCamera.applyCameraView();if(window.updateCameraPanel)updateCameraPanel();}
   document.getElementById('tl-cf').textContent=state.currentFrame+1;
   document.getElementById('info-frame').textContent=state.currentFrame+1;
   document.getElementById('playhead').style.left=(state.currentFrame*FC)+'px';
@@ -77,7 +78,7 @@ window.SM={
     }
     if(t!=='select'&&t!=='subselect')clearSel();if(t!=='fsselect')fsClearSel();if(t!=='pen'&&_pen.path)finalizePen();if(t!=='eraser'&&typeof _eraserCursor!=='undefined'&&_eraserCursor){_eraserCursor.remove();_eraserCursor=null;}state.tool=t;renderArcs();
     document.querySelectorAll('.tool-btn').forEach(function(b){b.classList.toggle('active',b.dataset.tool===t);});
-    var cc={draw:'crosshair',pen:'crosshair',line:'crosshair',rect:'crosshair',ellipse:'crosshair',select:'default',subselect:'default',fsselect:'default',comment:'crosshair',eraser:'pointer',fill:'crosshair',fillbrush:'crosshair',eyedropper:'crosshair',hand:'grab',zoom:'zoom-in',rotate:'grab',perspective:'crosshair'};
+    var cc={draw:'crosshair',pen:'crosshair',line:'crosshair',rect:'crosshair',ellipse:'crosshair',select:'default',subselect:'default',fsselect:'default',comment:'crosshair',camera:'move',eraser:'pointer',fill:'crosshair',fillbrush:'crosshair',eyedropper:'crosshair',hand:'grab',zoom:'zoom-in',rotate:'grab',perspective:'crosshair'};
     canvasEl.style.cursor=cc[t]||'default';
     updatePropsContext();},
   toggleOnion:function(){state.onionSkin=!state.onionSkin;renderOS();var el=document.getElementById('os-st');el.textContent=state.onionSkin?'ON':'OFF';el.style.color=state.onionSkin?'var(--green)':'var(--text-dim)';var b=document.getElementById('btn-os');if(b)b.classList.toggle('active',state.onionSkin);},
@@ -475,7 +476,8 @@ window.SM={
       refMedia:state.refMedia?{type:state.refMedia.type,name:state.refMedia.name,src:state.refMedia.src,frames:state.refMedia.frames,opacity:state.refMedia.opacity,visible:state.refMedia.visible,offsetFrames:state.refMedia.offsetFrames||0}:null,
       perspectiveEnabled:state.perspectiveEnabled,perspectiveMode:state.perspectiveMode,perspectiveDensity:state.perspectiveDensity,perspectiveVPs:state.perspectiveVPs,
       motionArcs:state.motionArcs,easingCurve:state.easingCurve,resamplePts:state.resamplePts,tweenStep:state.tweenStep,
-      tweenOverrides:state.tweenOverrides,comments:state.comments||[]});
+      tweenOverrides:state.tweenOverrides,comments:state.comments||[],
+      cameraKeys:state.cameraKeys||[],cameraLayerOn:!!state.cameraLayerOn});
   },
   mergeRemoteSnapshot:function(remoteData,remoteProfile){return mergeRemoteSnapshot(remoteData,remoteProfile);},
   importJSON:function(json,silent){
@@ -500,6 +502,7 @@ window.SM={
     state.layerFolders=d.layerFolders||{};state.layerLinkGroups=d.layerLinkGroups||{};
     state.motionArcs=d.motionArcs||{};state.tweenOverrides=d.tweenOverrides||{};if(d.easingCurve){state.easingCurve=d.easingCurve;if(window._curveEditor)window._curveEditor.setState(d.easingCurve);}
     state.comments=d.comments||[];
+    state.cameraKeys=d.cameraKeys||[];state.cameraLayerOn=!!d.cameraLayerOn;state.cameraView=false;
     // Explicit fallback to the app default, not just "leave whatever was
     // there" — opening an old-format project right after working on a
     // DIFFERENT project would otherwise silently carry that other
@@ -873,6 +876,7 @@ var _tlDrag={active:false,startL:-1,startF:-1,ghost:null,moved:false,mode:null};
 
 function renderTimeline(){
   var hdr=document.getElementById('frame-hdr'),grid=document.getElementById('frame-grid');hdr.innerHTML='';grid.innerHTML='';
+  if(window.SMCamera)SMCamera.renderGridRow(grid);
   var fps=Math.max(1,state.fps);
   for(var i=0;i<state.totalFrames;i++){
     var c=document.createElement('div');c.className='fhc';if(i===state.currentFrame)c.classList.add('cur');
@@ -1504,6 +1508,7 @@ function openLayerColorSwatches(anchorEl,currentHex,onPick){
 }
 function renderLayerList(){
   var list=document.getElementById('layer-list');list.innerHTML='';
+  if(window.SMCamera)SMCamera.renderPanelRow(list);
   var order=computeLayerRenderOrder();
   order.forEach(function(entry){
     if(entry.type==='folder'){

@@ -34,6 +34,9 @@ function exportBuildFrame(frameIdx,alpha){
     var strokes=getEffectiveStrokes(li,frameIdx);
     strokes.forEach(function(sd){desP(sd,L,sd.opacity!==undefined?sd.opacity:1);});
   }
+  // Caméra (v18) : bake le zoom/pan de la frame dans le rendu exporté —
+  // le rect caméra interpolé remplit exactement le canvas de sortie.
+  if(window.SMCamera)SMCamera.applyToExportLayer(L,frameIdx);
   prev.activate();
   return L;
 }

@@ -296,6 +296,10 @@
     if (revisionItems.length) layers.push({ items: revisionItems });
     var commentItems = buildCommentPinItems();
     if (commentItems.length) layers.push({ items: commentItems });
+    if (window.SMCamera) {
+      var cameraItems = SMCamera.buildOverlayItems();
+      if (cameraItems.length) layers.push({ items: cameraItems.map(function (it) { it.segments = roundSegs(it.segments); return it; }) });
+    }
     if (!skipVolatile) {
       var eraserItems = buildEraserCursorItems();
       if (eraserItems.length) layers.push({ items: eraserItems });

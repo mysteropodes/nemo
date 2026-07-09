@@ -207,6 +207,12 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--gutter);color:
 #layer-panel-resize:hover,#layer-panel-resize.active{background:var(--accent);}
 #layer-list{flex:1;overflow-y:auto;}
 .lrow{display:flex;align-items:center;height:34px;padding:0 6px;border-bottom:1px solid rgba(255,255,255,.035);cursor:pointer;gap:3px;font-size:11.5px;}
+/* Camera layer row (v18): same 34px rhythm as .lrow/.frow so the panel and
+   grid stay perfectly aligned; a warm accent to read as "not a draw layer". */
+.lrow.camrow{background:rgba(255,170,40,.05);}
+.lrow.camrow.act{box-shadow:inset 3px 0 0 #ffaa28;background:rgba(255,170,40,.10);}
+.frow.camrow{display:flex;border-bottom:1px solid rgba(255,170,40,.18);}
+.fc.camkey::before{content:'';position:absolute;left:50%;top:50%;width:9px;height:9px;transform:translate(-50%,-50%) rotate(45deg);background:#ffaa28;border:1px solid rgba(0,0,0,.5);}
 .lrow:hover{background:rgba(255,255,255,.03);}
 /* v4: matches the mockup's "Layer 1 Stroke" selected-row treatment — the
    tint and left accent bar span the FULL row (name column + frame-grid

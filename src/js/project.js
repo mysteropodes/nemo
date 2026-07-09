@@ -58,6 +58,7 @@
     state.audioTracks=[];if(window.SMAudio)SMAudio.reload();
     state.refMedia=null;if(window.SMReference)SMReference.reload();
     state.layerFolders={};state.layerLinkGroups={};
+    state.cameraKeys=[];state.cameraLayerOn=false;state.cameraView=false;
     createUserLayer('Layer 1');activateUL(0);
     drawStage();loadFrame(0);renderOS();renderArcs();updateUI();renderSymbolTabs();
     if(window.renderPaletteGrid)window.renderPaletteGrid();
