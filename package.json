@@ -1,6 +1,6 @@
 {
   "name": "strokemotion",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "description": "2D frame-by-frame vector animation with auto inbetweening",
   "scripts": {
     "tauri": "tauri",

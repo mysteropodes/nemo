@@ -1294,7 +1294,12 @@ var BRUSH_PRESETS={
 // Spacing is widened (never narrowed below the preset's own value) just
 // enough to land under this cap rather than silently truncating the tail
 // of the stroke.
-var BRUSH_MAX_DABS=180;
+// 450 (was 180): with spacing now proportional to the dab diameter (see
+// buildBrushDabs), the count only depends on len/width — a thin stroke
+// swept across a big canvas is the one case that still needs headroom,
+// and at 180 it visibly beaded. Still comfortably inside the perf
+// envelope the audit measured (60fps at ~2600 scene items).
+var BRUSH_MAX_DABS=450;
 // Single lookup point for a preset's parameters, whether built-in or one of
 // the user's own saved presets (state.customBrushPresets, keyed by a
 // generated id — see brush-editor.js) — every reader of BRUSH_PRESETS[key]
@@ -1387,17 +1392,24 @@ function buildBrushDabs(pathLike,preset,baseWidth,rng){
   var len=pathLike.length;
   if(!(len>0))return[];
   var nibDiam=Math.max(.5,baseWidth*(preset.nibSize!==undefined?preset.nibSize:1));
-  // Spacing is deliberately NOT derived from nibDiam (i.e. not from the
-  // live stroke width) — it used to be, which compounded with preset.nibSize
-  // so a thicker line's dabs came out both bigger AND visibly further apart
-  // (reported: "en fonction de la taille de la ligne les points s'écartent",
-  // texture reading as sparser/falling apart at larger widths). Basing it on
-  // a fixed reference nib diameter instead keeps the dab-to-dab spacing —
-  // the texture's grain density — a constant property of the preset, while
-  // dab SIZE still scales with width as expected.
-  var BRUSH_SPACING_REF_NIB=3;
-  var refNibDiam=Math.max(.5,BRUSH_SPACING_REF_NIB*(preset.nibSize!==undefined?preset.nibSize:1));
-  var spacing=Math.max(.4,refNibDiam*(preset.spacing!==undefined?preset.spacing:.35));
+  // Spacing is a PERCENTAGE OF THE DAB'S OWN DIAMETER (Photoshop's model —
+  // its Spacing slider is literally % of brush diameter): dab size AND gap
+  // both scale with the set stroke width, so the texture's visual density
+  // is identical at every width — just scaled, like a real physical nib.
+  //
+  // History: this replaced an earlier fixed-world-unit spacing (pinned to a
+  // reference nib of 3, task #106) that tried to keep grain density
+  // constant in absolute pixels. That made the dab count proportional to
+  // raw world length at a tiny fixed pitch (~2-4 units), so ANY long
+  // stroke — or any normal gesture on a big canvas at Fit zoom, where one
+  // sweep covers thousands of world units — blew through BRUSH_MAX_DABS
+  // and the cap fallback stretched the pitch to len/180: dabs 6x further
+  // apart than their own size, the texture visibly disintegrating into
+  // fat isolated dots (reported: "les presets grossissent en fonction de
+  // la longueur de la stroke"). Proportional spacing keeps the dab count
+  // a function of len/width instead of raw len, which stays under the cap
+  // for realistic strokes at any canvas scale.
+  var spacing=Math.max(.4,nibDiam*(preset.spacing!==undefined?preset.spacing:.35));
   // Bristle tips emit several sub-strands PER stamp position (see below) —
   // divide the position budget by that count up front so total emitted
   // dabs still respects BRUSH_MAX_DABS regardless of tip shape.
@@ -1473,6 +1485,24 @@ function applyBrushTexture(basePath,presetKey){
   var preset=resolveBrushPreset(presetKey);
   if(!preset||!basePath.segments||basePath.segments.length<2)return basePath;
   var baseWidth=basePath.strokeWidth;
+  // A fill on an open freehand path is auto-closed by Paper.js (last point
+  // straight back to first) for rendering, which can sweep out a shape far
+  // wider than the drawn line's own strokeWidth (e.g. a wavy stroke ~500x78
+  // world units filled solid while strokeWidth is still the 3px the Width
+  // slider says) — dabs sized off strokeWidth alone then come out a
+  // near-invisible ~3px sliver against that much bigger flat fill (reported:
+  // texture reads as "not applied" once fill is on). area/length approximates
+  // that swept shape's average cross-section (exact for a uniform-width
+  // ribbon, which is what these ARE geometrically) — only ever pushes the
+  // nib size UP via Math.max, so a fill that closely hugs the stroke (small
+  // area) leaves plain strokeWidth sizing untouched.
+  if(basePath.fillColor){
+    var sweptLen=basePath.length;
+    if(sweptLen>0){
+      var avgFillWidth=Math.abs(basePath.area)/sweptLen;
+      if(avgFillWidth>baseWidth)baseWidth=avgFillWidth;
+    }
+  }
   // On RE-apply (switching preset on an already-textured stroke) the live
   // strokeColor may already be nulled by the fill-visible branch below —
   // fall back to the remembered original so the new dabs don't silently
