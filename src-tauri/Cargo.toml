@@ -1,6 +1,6 @@
 [package]
 name = "strokemotion"
-version = "0.0.8"
+version = "0.0.9"
 description = "2D frame-by-frame vector animation with auto inbetweening"
 authors = ["Cyril"]
 edition = "2021"

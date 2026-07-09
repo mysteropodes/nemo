@@ -1485,24 +1485,16 @@ function applyBrushTexture(basePath,presetKey){
   var preset=resolveBrushPreset(presetKey);
   if(!preset||!basePath.segments||basePath.segments.length<2)return basePath;
   var baseWidth=basePath.strokeWidth;
-  // A fill on an open freehand path is auto-closed by Paper.js (last point
-  // straight back to first) for rendering, which can sweep out a shape far
-  // wider than the drawn line's own strokeWidth (e.g. a wavy stroke ~500x78
-  // world units filled solid while strokeWidth is still the 3px the Width
-  // slider says) — dabs sized off strokeWidth alone then come out a
-  // near-invisible ~3px sliver against that much bigger flat fill (reported:
-  // texture reads as "not applied" once fill is on). area/length approximates
-  // that swept shape's average cross-section (exact for a uniform-width
-  // ribbon, which is what these ARE geometrically) — only ever pushes the
-  // nib size UP via Math.max, so a fill that closely hugs the stroke (small
-  // area) leaves plain strokeWidth sizing untouched.
-  if(basePath.fillColor){
-    var sweptLen=basePath.length;
-    if(sweptLen>0){
-      var avgFillWidth=Math.abs(basePath.area)/sweptLen;
-      if(avgFillWidth>baseWidth)baseWidth=avgFillWidth;
-    }
-  }
+  // Dab size derives from strokeWidth and NOTHING else — explicitly per
+  // user requirement ("il faut que la taille corresponde à la taille que
+  // l'on a définie dans width stroke"). An earlier heuristic bumped
+  // baseWidth to |area|/length for filled paths (trying to make texture
+  // visible against a wide fill): correct for a thin ribbon, but for a
+  // CLOSED filled shape — the completely ordinary draw-an-outline-and-
+  // fill-it case — area/length is the average width of the WHOLE shape,
+  // producing monstrous dabs (reported with a screenshot: ~150px blobs
+  // ringing a potato drawn at Width 3). The texture replaces the STROKE's
+  // look only; the fill stays flat by design.
   // On RE-apply (switching preset on an already-textured stroke) the live
   // strokeColor may already be nulled by the fill-visible branch below —
   // fall back to the remembered original so the new dabs don't silently

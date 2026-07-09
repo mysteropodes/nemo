@@ -75,7 +75,18 @@
   // most of that pure fractional noise no renderer can show. Rounding here
   // touches ONLY what's sent to the renderer; persistence (serP into frame
   // records) keeps full precision, so document data never degrades.
-  function r2(v) { return Math.round(v * 100) / 100; }
+  // NaN/Infinity (a degenerate anchor, a zero-length normalize, a stray
+  // divide-by-zero anywhere upstream) silently becomes JSON `null` under
+  // JSON.stringify — and SegIn.point on the Rust side is a plain, non-
+  // Option [f64;2] with no #[serde(default)] (unlike every other ItemIn
+  // field, see the file-level comment above), so ONE bad coordinate
+  // anywhere in the scene throws serde's "invalid type: null, expected
+  // f64" and takes the WHOLE render (every layer, not just the offending
+  // item) down with it — tick()'s catch then disables the engine for the
+  // rest of the session. Falling back to 0 here is a strictly better
+  // failure mode: a single item renders in the wrong place instead of the
+  // entire GPU-accelerated engine going dark.
+  function r2(v) { return isFinite(v) ? Math.round(v * 100) / 100 : 0; }
   function roundSegs(segs) {
     for (var i = 0; i < segs.length; i++) {
       var s = segs[i];
@@ -391,7 +402,7 @@
         handleOut: [t[0] * k, t[1] * k],
       };
     });
-    return { segments: segments, closed: true, fillColor: fillColor, strokeColor: strokeColor, strokeWidth: strokeWidth };
+    return { segments: roundSegs(segments), closed: true, fillColor: fillColor, strokeColor: strokeColor, strokeWidth: strokeWidth };
   }
   function rectItem(cx, cy, halfSize, fillColor, strokeColor, strokeWidth) {
     var segments = [
@@ -400,11 +411,11 @@
       { point: [cx + halfSize, cy + halfSize] },
       { point: [cx - halfSize, cy + halfSize] },
     ];
-    return { segments: segments, closed: true, fillColor: fillColor, strokeColor: strokeColor, strokeWidth: strokeWidth };
+    return { segments: roundSegs(segments), closed: true, fillColor: fillColor, strokeColor: strokeColor, strokeWidth: strokeWidth };
   }
   function lineItem(fromPt, toPt, strokeColor, strokeWidth) {
     return {
-      segments: [{ point: fromPt }, { point: toPt }],
+      segments: roundSegs([{ point: fromPt }, { point: toPt }]),
       closed: false,
       fillColor: null,
       strokeColor: strokeColor,
@@ -416,7 +427,7 @@
       { point: [left, top] }, { point: [right, top] },
       { point: [right, bottom] }, { point: [left, bottom] },
     ];
-    return { segments: segments, closed: true, fillColor: fillColor, strokeColor: strokeColor, strokeWidth: strokeWidth };
+    return { segments: roundSegs(segments), closed: true, fillColor: fillColor, strokeColor: strokeColor, strokeWidth: strokeWidth };
   }
 
   // ---- "Clip to canvas" mask (see the call site's own comment) ----
@@ -690,7 +701,7 @@
         var t = s / 24;
         pts.push({ point: [qBez(ah.ptA[0], ac[0], ah.ptB[0], t), qBez(ah.ptA[1], ac[1], ah.ptB[1], t)] });
       }
-      items.push({ segments: pts, closed: false, fillColor: null, strokeColor: col.concat([153]), strokeWidth: 2 * zs });
+      items.push({ segments: roundSegs(pts), closed: false, fillColor: null, strokeColor: col.concat([153]), strokeWidth: 2 * zs });
       items.push(circleItem(ah.ptA[0], ah.ptA[1], 4 * zs, col.concat([204]), null, 0));
       items.push(circleItem(ah.ptB[0], ah.ptB[1], 4 * zs, col.concat([204]), null, 0));
       items.push(circleItem(ac[0], ac[1], 7 * zs, [255, 255, 255, 242], col.concat([255]), 2 * zs));
