@@ -151,9 +151,9 @@ var state={
 function initUserProfile(){
   try{
     var saved=JSON.parse(localStorage.getItem('sm-profile')||'null');
-    if(saved&&saved.id){state.userProfile=saved;return;}
+    if(saved&&saved.id){if(!saved.role)saved.role='animator';state.userProfile=saved;return;}
   }catch(e){}
-  state.userProfile={id:'u_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8),name:'Animateur',color:'#4a9eff'};
+  state.userProfile={id:'u_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8),name:'Animateur',color:'#4a9eff',role:'animator'};
   try{localStorage.setItem('sm-profile',JSON.stringify(state.userProfile));}catch(e){}
 }
 function saveUserProfile(){

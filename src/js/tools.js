@@ -625,6 +625,17 @@ function forkIfForeignOwner(path){
   if(!path||!path.data||!path.data.ownerId||!state.userProfile)return path;
   if(path.data.ownerId===state.userProfile.id)return path;
   if(path.data.isRevisionGhost)return path;
+  // RBAC (Phase 3): a supervisor has editorial authority over any layer and
+  // edits in place, no fork/ghost — the review safety-net is for ordinary
+  // peer-to-peer edits (an animator touching another animator's stroke),
+  // not for a supervisor doing their job. Honor-system only, no server-side
+  // enforcement — see strokemotion CLAUDE.md-adjacent plan notes.
+  if(state.userProfile.role==='supervisor'){
+    path.data.ownerId=state.userProfile.id;
+    path.data.ownerName=state.userProfile.name;
+    path.data.ownerColor=state.userProfile.color;
+    return path;
+  }
   var layer=path.layer;
   if(!layer)return path;
   var sid=path.data.strokeId;
@@ -664,6 +675,7 @@ function markDeleteAsRevision(path){
   if(!path||!path.data||!path.data.ownerId||!state.userProfile)return false;
   if(path.data.ownerId===state.userProfile.id)return false;
   if(path.data.isRevisionGhost)return false;
+  if(state.userProfile.role==='supervisor')return false; // deletes outright, like their own content
   path.data.isRevisionGhost=true;
   path.data.revisionAction='delete';
   path.data.preRevisionOpacity=path.opacity!==undefined?path.opacity:1;

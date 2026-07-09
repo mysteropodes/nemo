@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>StrokeMotion v0.0.3</title>
+<title>StrokeMotion v0.0.4</title>
 <script src="paper-full.min.js"></script>
 <!-- Manrope (redesign, 2026-07-09) — matches the CSS var font stack's own
      fallback order, so an offline load (no internet, no Tauri font cache)
@@ -526,6 +526,15 @@
         <input type="text" id="profile-name" class="pi" style="flex:1" placeholder="Ton nom">
         <div class="cw-mini" id="profile-color-well" style="background:#4a9eff"><input type="color" id="profile-color"></div>
       </div>
+      <div class="pr" style="gap:8px;margin-top:6px">
+        <span class="pl">Rôle</span>
+        <select id="profile-role" class="pi" style="flex:1">
+          <option value="animator">Animateur</option>
+          <option value="supervisor">Superviseur</option>
+          <option value="producer">Producteur</option>
+        </select>
+      </div>
+      <div style="font-size:9px;color:var(--text-dim);margin-top:4px" id="profile-role-hint"></div>
       <div class="phdr" style="padding:14px 0 4px 0;font-size:9px;color:var(--text-dim)">Sync équipe (dossier partagé)</div>
       <div style="font-size:10px;color:var(--text-dim);margin-bottom:6px">Publie tes modifs dans un dossier partagé (kDrive, Drive monté, S3…) et récupère celles des autres — async, pas de temps réel. Nouveaux traits fusionnés automatiquement ; un même trait modifié des deux côtés devient une correction à Accepter/Rejeter (comme un calque de révision).</div>
       <div class="pr" style="gap:6px">
@@ -630,7 +639,7 @@
 
 <div id="statusbar">
   <span><span class="sc">F5</span>Frame <span class="sc">F6</span>Key <span class="sc">F7</span>Blank <span class="sc">T</span>Tween <span class="sc">D</span>Dupli <span class="sc">F</span>Flip <span class="sc">X</span>Mirror <span class="sc">Enter</span>Play</span>
-  <span id="status-text">StrokeMotion v0.0.3</span>
+  <span id="status-text">StrokeMotion v0.0.4</span>
 </div>
 </div>
 <div id="toast"></div>

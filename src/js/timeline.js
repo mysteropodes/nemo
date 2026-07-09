@@ -63,9 +63,19 @@ function selBounds(){
 }
 
 // ---- API ----
+var PRODUCER_ALLOWED_TOOLS=['hand','zoom','rotate','comment'];
 window.SM={
   goToFrame:function(idx){goToFrame(idx);},togglePlay:togglePlay,stopPlay:stopPlay,undo:undo,redo:redo,
-  setTool:function(t){if(t!=='select'&&t!=='subselect')clearSel();if(t!=='fsselect')fsClearSel();if(t!=='pen'&&_pen.path)finalizePen();if(t!=='eraser'&&typeof _eraserCursor!=='undefined'&&_eraserCursor){_eraserCursor.remove();_eraserCursor=null;}state.tool=t;renderArcs();
+  setTool:function(t){
+    // RBAC (Phase 3): "producteur" is read-only + comments/validation — see
+    // the roadmap plan. Gated here rather than at every individual mutation
+    // site since virtually every edit path requires picking a tool first;
+    // honor-system only (no server-side enforcement in v1).
+    if(state.userProfile&&state.userProfile.role==='producer'&&PRODUCER_ALLOWED_TOOLS.indexOf(t)<0){
+      showToast('Profil "Producteur" : lecture seule + commentaires');
+      return;
+    }
+    if(t!=='select'&&t!=='subselect')clearSel();if(t!=='fsselect')fsClearSel();if(t!=='pen'&&_pen.path)finalizePen();if(t!=='eraser'&&typeof _eraserCursor!=='undefined'&&_eraserCursor){_eraserCursor.remove();_eraserCursor=null;}state.tool=t;renderArcs();
     document.querySelectorAll('.tool-btn').forEach(function(b){b.classList.toggle('active',b.dataset.tool===t);});
     var cc={draw:'crosshair',pen:'crosshair',line:'crosshair',rect:'crosshair',ellipse:'crosshair',select:'default',subselect:'default',fsselect:'default',comment:'crosshair',eraser:'pointer',fill:'crosshair',fillbrush:'crosshair',eyedropper:'crosshair',hand:'grab',zoom:'zoom-in',rotate:'grab',perspective:'crosshair'};
     canvasEl.style.cursor=cc[t]||'default';
@@ -1909,16 +1919,24 @@ function initSettingsModal(){
     renderShortcutsList();showToast('Raccourcis réinitialisés');
   });
 }
+var ROLE_HINTS={
+  animator:'Édite ses propres traits. Éditer le trait d\'un autre profil crée une correction à Accepter/Rejeter.',
+  supervisor:'Édite n\'importe quel calque directement, sans créer de correction — autorité de révision.',
+  producer:'Lecture seule + commentaires. Les outils de dessin/édition sont désactivés.'
+};
 function syncProfileFields(){
-  var nameEl=document.getElementById('profile-name'),colorEl=document.getElementById('profile-color'),wellEl=document.getElementById('profile-color-well');
+  var nameEl=document.getElementById('profile-name'),colorEl=document.getElementById('profile-color'),wellEl=document.getElementById('profile-color-well'),roleEl=document.getElementById('profile-role'),hintEl=document.getElementById('profile-role-hint');
   if(!nameEl||!state.userProfile)return;
   nameEl.value=state.userProfile.name;
   var c=state.userProfile.color;
   if(colorEl){colorEl.value=c;colorEl.dataset.hex8=c;}
   if(wellEl)wellEl.style.background=c;
+  var role=state.userProfile.role||'animator';
+  if(roleEl)roleEl.value=role;
+  if(hintEl)hintEl.textContent=ROLE_HINTS[role]||'';
 }
 function initProfileFields(){
-  var nameEl=document.getElementById('profile-name'),colorEl=document.getElementById('profile-color');
+  var nameEl=document.getElementById('profile-name'),colorEl=document.getElementById('profile-color'),roleEl=document.getElementById('profile-role');
   if(!nameEl||!colorEl)return;
   syncProfileFields();
   nameEl.addEventListener('input',function(){
@@ -1930,6 +1948,16 @@ function initProfileFields(){
     state.userProfile.color=v;
     document.getElementById('profile-color-well').style.background=v;
     saveUserProfile();
+  });
+  if(roleEl)roleEl.addEventListener('change',function(){
+    state.userProfile.role=this.value;
+    saveUserProfile();
+    var hintEl=document.getElementById('profile-role-hint');
+    if(hintEl)hintEl.textContent=ROLE_HINTS[this.value]||'';
+    // Switching TO producer while mid-edit with a non-view tool active would
+    // leave a blocked tool selected — force back to a safe one immediately,
+    // same as the boot-time role check.
+    if(this.value==='producer'&&PRODUCER_ALLOWED_TOOLS.indexOf(state.tool)<0)window.SM.setTool('hand');
   });
   if(window.ColorPicker)window.ColorPicker.wireColorSwatches([{wrap:'profile-color-well',input:'profile-color'}]);
 }
@@ -2414,4 +2442,4 @@ setInterval(function(){
 // alongside the new start screen (state.js decides whether to actually
 // show that card, and surfaces its own confirmation once chosen).
 try{var saved=localStorage.getItem('sm-auto');if(saved)window.SM.importJSON(saved,true);}catch(e){}
-window.SM.setTool('draw');updateUI();renderSymbolTabs();
+window.SM.setTool(state.userProfile&&state.userProfile.role==='producer'?'hand':'draw');updateUI();renderSymbolTabs();
