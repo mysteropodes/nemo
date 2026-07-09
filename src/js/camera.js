@@ -343,6 +343,7 @@
     _gridRow = null;
     if (!state.cameraLayerOn) return;
     var row = document.createElement('div'); row.className = 'frow camrow';
+    row.style.position = 'relative';
     for (var i = 0; i < state.totalFrames; i++) {
       var c = document.createElement('div');
       c.className = 'fc' + (i === state.currentFrame ? ' cur' : '');
@@ -355,6 +356,49 @@
     }
     grid.appendChild(row);
     _gridRow = row;
+    drawSpeedCurves(row);
+  }
+  // Vitesse/ease inline dans la ligne caméra (demande explicite : les
+  // courbes doivent se voir directement dans la timeline, pas seulement
+  // dans l'editeur du panneau droit) — un SVG superposé aux cellules de
+  // frame, une polyline par segment entre 2 cles, echantillonnant la
+  // VRAIE valeur de bezierEase (pas un graphique decoratif) : plat en bas
+  // = depart lent, plat en haut = arrivee lente, diagonale = vitesse
+  // constante. Clic sur la courbe = comportement identique a un clic sur
+  // la cellule (va a cette frame + ouvre l'editeur de courbe du segment).
+  function drawSpeedCurves(row) {
+    var old = row.querySelector('svg.cam-speed-svg');
+    if (old) old.remove();
+    var ks = state.cameraKeys;
+    if (ks.length < 2) return;
+    var w = state.totalFrames * FC, h = 34;
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', 'cam-speed-svg');
+    svg.setAttribute('width', w); svg.setAttribute('height', h);
+    svg.style.cssText = 'position:absolute;left:0;top:0;pointer-events:none;';
+    var pad = 4;
+    for (var i = 0; i < ks.length - 1; i++) {
+      var a = ks[i], b = ks[i + 1], e = a.ease || DEFAULT_EASE;
+      var span = b.frame - a.frame;
+      if (span <= 0) continue;
+      var pts = [];
+      var steps = Math.max(4, Math.min(40, span));
+      for (var s = 0; s <= steps; s++) {
+        var t = s / steps;
+        var y = bezierEase(t, e[0], e[1], e[2], e[3]);
+        var px = (a.frame + t * span) * FC + FC / 2;
+        var py = h - pad - y * (h - 2 * pad);
+        pts.push(px.toFixed(1) + ',' + py.toFixed(1));
+      }
+      var poly = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+      poly.setAttribute('points', pts.join(' '));
+      poly.setAttribute('fill', 'none');
+      poly.setAttribute('stroke', '#ffaa28');
+      poly.setAttribute('stroke-width', '1.6');
+      poly.setAttribute('opacity', '0.85');
+      svg.appendChild(poly);
+    }
+    row.appendChild(svg);
   }
   // Refresh only the key markers on the existing row (drag feedback) —
   // renderTimeline() is a full rebuild, too heavy per mousemove.
@@ -363,6 +407,7 @@
     for (var i = 0; i < _gridRow.children.length; i++) {
       _gridRow.children[i].classList.toggle('camkey', !!keyAt(i));
     }
+    drawSpeedCurves(_gridRow);
   }
 
   // ---- viewport lock ("Vue caméra") + loadFrame hook ----
@@ -489,6 +534,7 @@
       if (_easeDrag.which === 0) { e[0] = xy[0]; e[1] = xy[1]; }
       else { e[2] = xy[0]; e[3] = xy[1]; }
       drawEaseEditor();
+      renderCameraRow(); // reflete le nouvel ease dans la ligne timeline en direct
       if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
     });
     window.addEventListener('mouseup', function () { _easeDrag = null; });
