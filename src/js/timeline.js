@@ -133,6 +133,7 @@ window.SM={
     else if(state.tool==='fsselect'&&_fsSel&&(_fsSel.kind==='fill'||_fsSel.kind==='fillregion')){pushUndo();if(_fsSel.kind==='fillregion')_fsSel=fsRealizeFillRegion(_fsSel,userLayers[state.activeLayerIdx]);_fsSel.path.fillColor=v;saveActiveLayerFrame();updateUI();}},
   setFillEnabled:function(v){state.fillEnabled=v;var fw=document.getElementById('fill-well'),pf=document.getElementById('pm-fill');fw.classList.toggle('none',!v);pf.classList.toggle('none',!v);document.getElementById('p-fill-on').checked=v;
     var ft=document.getElementById('fill-enable-toggle');if(ft)ft.classList.toggle('off',!v);
+    var ftlp=document.getElementById('fill-enable-toggle-lp');if(ftlp){ftlp.classList.toggle('off',!v);ftlp.innerHTML=v?ICO_EYE:ICO_EYE_CLOSED;}
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(p.data&&p.data.isVectorBrush)return;p.fillColor=v?state.fillColor:null;});saveActiveLayerFrame();updateUI();}
     else if(state.tool==='fsselect'&&_fsSel&&(_fsSel.kind==='fill'||_fsSel.kind==='fillregion')){pushUndo();if(_fsSel.kind==='fillregion')_fsSel=fsRealizeFillRegion(_fsSel,userLayers[state.activeLayerIdx]);_fsSel.path.fillColor=v?state.fillColor:null;if(!v){fsUnlinkFillRegen(_fsSel.path);if(!_fsSel.path.strokeColor){_fsSel.path.remove();fsClearSel();}}saveActiveLayerFrame();updateUI();}},
   // Mirrors setFillEnabled exactly, for the Stroke side — didn't exist
@@ -141,6 +142,7 @@ window.SM={
   // opening the color popover and hunting for "None".
   setStrokeEnabled:function(v){state.strokeEnabled=v;
     var st=document.getElementById('stroke-enable-toggle');if(st)st.classList.toggle('off',!v);
+    var stlp=document.getElementById('stroke-enable-toggle-lp');if(stlp){stlp.classList.toggle('off',!v);stlp.innerHTML=v?ICO_EYE:ICO_EYE_CLOSED;}
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(p.data&&p.data.isVectorBrush)return;p.strokeColor=v?state.strokeColor:null;});saveActiveLayerFrame();updateUI();}
     // fsselect's 'stroke' selection can be just a bounded segment (between
     // two crossings), which has no standalone color to null — disabling it
@@ -2041,6 +2043,8 @@ function initSettingsModal(){
   var btn=document.getElementById('btn-settings'),modal=document.getElementById('settings-modal');
   if(!btn||!modal)return;
   btn.addEventListener('click',function(){renderShortcutsList();syncProfileFields();syncFolderFields();modal.style.display='flex';});
+  var topBtn=document.getElementById('project-tabs-settings');
+  if(topBtn)topBtn.addEventListener('click',function(){btn.click();});
   var closeBtn=document.getElementById('settings-close');
   if(closeBtn)closeBtn.addEventListener('click',function(){modal.style.display='none';});
   modal.addEventListener('click',function(e){if(e.target===modal)modal.style.display='none';});
@@ -2227,6 +2231,8 @@ document.getElementById('pm-fill-c').addEventListener('input',function(){var v=t
 document.getElementById('p-fill-on').addEventListener('change',function(){window.SM.setFillEnabled(this.checked);});
 document.getElementById('fill-enable-toggle').addEventListener('click',function(){window.SM.setFillEnabled(!state.fillEnabled);});
 document.getElementById('stroke-enable-toggle').addEventListener('click',function(){window.SM.setStrokeEnabled(!state.strokeEnabled);});
+document.getElementById('fill-enable-toggle-lp').addEventListener('click',function(){window.SM.setFillEnabled(!state.fillEnabled);});
+document.getElementById('stroke-enable-toggle-lp').addEventListener('click',function(){window.SM.setStrokeEnabled(!state.strokeEnabled);});
 document.getElementById('color-stroke').addEventListener('input',function(){window.SM.setStrokeColor(this.dataset.hex8||this.value);if(!state.strokeEnabled)window.SM.setStrokeEnabled(true);});
 document.getElementById('pm-stroke-c').addEventListener('input',function(){var v=this.dataset.hex8||this.value;window.SM.setStrokeColor(v);document.getElementById('color-stroke').value=v;document.getElementById('color-stroke').dataset.hex8=v;if(!state.strokeEnabled)window.SM.setStrokeEnabled(true);});
 // Paint the panel's fill swatch from the actual starting state.fillColor/
