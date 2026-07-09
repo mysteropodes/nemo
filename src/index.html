@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>StrokeMotion v0.0.2</title>
+<title>StrokeMotion v0.0.3</title>
 <script src="paper-full.min.js"></script>
 <!-- Manrope (redesign, 2026-07-09) — matches the CSS var font stack's own
      fallback order, so an offline load (no internet, no Tauri font cache)
@@ -79,6 +79,10 @@
          segment between the two nearest intersections) — Delete/recolor act
          on ONLY the clicked aspect, never both at once. -->
     <button class="tool-btn" data-tool="fsselect" title="Fill/Stroke Select — click a fill or a stroke segment to select it independently (M)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="8" fill="currentColor" fill-opacity="0.35"/><path d="M4 12a8 8 0 0 1 16 0" stroke-dasharray="2.2 2.2"/></svg><span class="sk">M</span></button>
+    <!-- Team review: click anywhere on the canvas to pin a text comment,
+         color-coded to the author's profile — see tools.js commentTool*
+         and engine-bridge.js buildCommentPinItems. -->
+    <button class="tool-btn" data-tool="comment" title="Comment — click the canvas to pin a note (C)"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M20 2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4l4 4 4-4h4a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2z"/></svg><span class="sk">C</span></button>
     <button class="tool-btn active" data-tool="draw" title="Brush (B)"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M7 14c-1.66 0-3 1.34-3 3 0 1.31-1.16 2-2 2 .92 1.22 2.49 2 4 2 2.21 0 4-1.79 4-4 0-1.66-1.34-3-3-3z"/><path d="M20.71 4.63l-1.34-1.34a1 1 0 00-1.41 0L9 12.25 11.75 15l8.96-8.96a1 1 0 000-1.41z"/></svg><span class="sk">B</span></button>
     <button class="tool-btn" data-tool="pen" title="Pen — click to place points, drag for curves (P)"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="m4.93 21.482 5.845-5.846a2 2 0 1 0-1.414-1.414l-5.846 5.846-1.06-1.06c2.827-3.3 3.888-6.954 5.302-13.082l6.364-.707 5.657 5.657-.707 6.364c-6.128 1.414-9.782 2.475-13.08 5.303l-1.062-1.06v-.001ZM16.595 2.037l6.347 6.346a.5.5 0 0 1-.277.848l-1.474.23-5.656-5.656.212-1.485a.5.5 0 0 1 .848-.283Z"/></svg><span class="sk">P</span></button>
     <button class="tool-btn" data-tool="fillbrush" title="Fill brush — paint a freehand filled shape, pressure-sensitive (N)"><span style="font-size:14px;line-height:1">&#x25CF;</span><span class="sk">N</span></button>
@@ -186,6 +190,16 @@
           <button class="pbtn" id="btn-bool-subtract" title="Subtract — cut later shapes out of the first">Subtract</button>
           <button class="pbtn" id="btn-bool-intersect" title="Intersect — keep only the overlapping area">Intersect</button>
           <button class="pbtn" id="btn-bool-exclude" title="Exclude — keep everything except the overlap">Exclude</button>
+        </div>
+      </div>
+    </div>
+    <div class="psec" id="revision-sec" style="display:none">
+      <div class="phdr"><span class="ar">☰</span> Révision</div>
+      <div class="pbdy">
+        <div class="pr" id="revision-author-row" style="font-size:10px;color:var(--text-dim)"></div>
+        <div class="pr" style="gap:6px">
+          <button class="pbtn" id="btn-revision-accept" style="flex:1" title="Garder cette correction, supprimer l'original">Accepter</button>
+          <button class="pbtn" id="btn-revision-reject" style="flex:1" title="Annuler cette correction, restaurer l'original">Rejeter</button>
         </div>
       </div>
     </div>
@@ -505,13 +519,46 @@
   <div class="modal-box">
     <div class="modal-hdr">Réglages <button id="settings-close" class="modal-x">&times;</button></div>
     <div class="modal-bdy">
-      <div class="phdr" style="padding:0 0 4px 0;font-size:9px;color:var(--text-dim)">Raccourcis clavier — outils</div>
+      <div class="phdr" style="padding:0 0 4px 0;font-size:9px;color:var(--text-dim)">Profil (calques de révision)</div>
+      <div style="font-size:10px;color:var(--text-dim);margin-bottom:6px">Ton nom et ta couleur identifient tes traits face aux corrections d'un autre profil (superviseur, etc.) — voir l'outil Fill/Stroke Select et le mode "Corrections".</div>
+      <div class="pr" style="gap:8px">
+        <span class="pl">Nom</span>
+        <input type="text" id="profile-name" class="pi" style="flex:1" placeholder="Ton nom">
+        <div class="cw-mini" id="profile-color-well" style="background:#4a9eff"><input type="color" id="profile-color"></div>
+      </div>
+      <div class="phdr" style="padding:14px 0 4px 0;font-size:9px;color:var(--text-dim)">Sync équipe (dossier partagé)</div>
+      <div style="font-size:10px;color:var(--text-dim);margin-bottom:6px">Publie tes modifs dans un dossier partagé (kDrive, Drive monté, S3…) et récupère celles des autres — async, pas de temps réel. Nouveaux traits fusionnés automatiquement ; un même trait modifié des deux côtés devient une correction à Accepter/Rejeter (comme un calque de révision).</div>
+      <div class="pr" style="gap:6px">
+        <span class="pl" style="flex:none">Dossier</span>
+        <input type="text" id="sync-folder-path" class="pi" style="flex:1" placeholder="Aucun dossier configuré" readonly>
+        <button class="pbtn" id="sync-choose-folder" style="font-size:10px;padding:4px 8px">Choisir…</button>
+      </div>
+      <div class="pr" style="margin-top:6px;gap:6px">
+        <button class="pbtn" id="sync-publish" style="flex:1;font-size:10px;padding:5px">Publier</button>
+        <button class="pbtn" id="sync-check" style="flex:1;font-size:10px;padding:5px">Vérifier les mises à jour</button>
+      </div>
+      <div id="sync-updates-list" style="display:flex;flex-direction:column;gap:4px;margin-top:6px"></div>
+      <div class="phdr" style="padding:14px 0 4px 0;font-size:9px;color:var(--text-dim)">Raccourcis clavier — outils</div>
       <div style="font-size:10px;color:var(--text-dim);margin-bottom:6px">Cliquer une touche puis appuyer sur une nouvelle touche pour la réassigner. Les autres raccourcis (transport, undo/save…) ne sont pas encore modifiables ici. Import de profils (Animate, Blender…) : à venir.</div>
       <div id="shortcuts-list" style="display:flex;flex-direction:column;gap:2px;max-height:320px;overflow-y:auto"></div>
       <div class="pr" style="margin-top:10px;gap:6px">
         <button class="pbtn" id="shortcuts-reset" style="flex:1">Réinitialiser tout</button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- Team review: anchored comment pin editor — absolutely positioned near
+     the clicked canvas point by tools.js's comment-tool click handler
+     (openCommentPopover), not a centered modal, so it stays visually tied
+     to the spot being discussed. -->
+<div id="comment-popover" style="display:none;position:absolute;z-index:200;width:220px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);padding:8px">
+  <div id="comment-author-row" style="font-size:10px;color:var(--text-dim);margin-bottom:4px"></div>
+  <textarea id="comment-text" rows="3" style="width:100%;resize:vertical;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:11px;padding:5px;box-sizing:border-box"></textarea>
+  <div class="pr" style="margin-top:6px;gap:6px">
+    <label style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text-dim);cursor:pointer"><input type="checkbox" id="comment-resolved"> Résolu</label>
+    <button class="pbtn" id="comment-delete" style="font-size:10px;padding:4px 8px" title="Supprimer ce commentaire">🗑</button>
+    <button class="pbtn" id="comment-save" style="flex:1;font-size:10px;padding:4px 8px">Enregistrer</button>
   </div>
 </div>
 
@@ -546,6 +593,7 @@
     <button class="tb" id="btn-os-range" title="Modify onion markers"><span style="font-size:11px;line-height:1">&#x25be;</span></button>
     <button class="tb" id="btn-ghost-all" title="Ghost all keyframes — shows every keyframe of the active layer at once" style="margin-left:4px"><span style="font-size:13px;line-height:1">&#x2637;</span></button>
     <button class="tb" id="btn-ghost-select" title="Select all keyframes' content to move/transform together" disabled><span style="font-size:12px;line-height:1">&#x2725;</span></button>
+    <button class="tb" id="btn-revision-view" title="Vue de révision — cycle Tout / Mes traits / Corrections" style="margin-left:4px;width:auto;padding:0 8px;font-size:10px">Tout</button>
     <button class="tb" id="btn-audio" title="Importer une piste audio (mp3/ogg/wav) — waveform sous la timeline, lecture synchronisée" style="margin-left:4px"><span style="font-size:13px;line-height:1">&#x266b;</span></button>
     <input type="file" id="audio-file-input" accept="audio/*" multiple style="display:none">
   </div>
@@ -582,7 +630,7 @@
 
 <div id="statusbar">
   <span><span class="sc">F5</span>Frame <span class="sc">F6</span>Key <span class="sc">F7</span>Blank <span class="sc">T</span>Tween <span class="sc">D</span>Dupli <span class="sc">F</span>Flip <span class="sc">X</span>Mirror <span class="sc">Enter</span>Play</span>
-  <span id="status-text">StrokeMotion v0.0.2</span>
+  <span id="status-text">StrokeMotion v0.0.3</span>
 </div>
 </div>
 <div id="toast"></div>

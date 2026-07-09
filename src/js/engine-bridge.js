@@ -155,6 +155,17 @@
       var items = [];
       for (var s = 0; s < children.length; s++) {
         var c = children[s];
+        // Team review view filter — 'mine' hides everyone else's content
+        // (ghosts included, since a ghost's ownerId is the ORIGINAL
+        // author, never you); 'revisions' hides plain uncontested content
+        // so review attention lands only on ghosts + active corrections.
+        // Geometry is untouched either way — this only decides what goes
+        // into THIS render, never mutates the document.
+        if (state.revisionView === 'mine') {
+          if (c.data && c.data.ownerId && state.userProfile && c.data.ownerId !== state.userProfile.id) continue;
+        } else if (state.revisionView === 'revisions') {
+          if (!(c.data && (c.data.isRevisionGhost || c.data.revisionParentId))) continue;
+        }
         if (c instanceof Raster) {
           var imageId = registerRasterIfNeeded(c);
           if (!imageId) continue;
@@ -270,6 +281,10 @@
     if (marqueeItems.length) layers.push({ items: marqueeItems });
     var fsSelItems = buildFSSelectionItems();
     if (fsSelItems.length) layers.push({ items: fsSelItems });
+    var revisionItems = buildRevisionOutlineItems();
+    if (revisionItems.length) layers.push({ items: revisionItems });
+    var commentItems = buildCommentPinItems();
+    if (commentItems.length) layers.push({ items: commentItems });
     if (!skipVolatile) {
       var eraserItems = buildEraserCursorItems();
       if (eraserItems.length) layers.push({ items: eraserItems });
@@ -535,6 +550,54 @@
       testLine.remove();
     }
     return lines;
+  }
+  // Team review (Phase 1): a dashed outline in the AUTHOR's own profile
+  // color over every active (non-ghost) foreign-owned revision currently
+  // in the rendered scene — the ghost itself already reads as "not current
+  // work" via its own reduced opacity (set directly on the item at fork
+  // time, tools.js forkIfForeignOwner), so this only needs to flag the
+  // LIVE correction sitting on top of it. Non-destructive overlay, same
+  // pattern as buildFSSelectionItems below — never touches the real paint.
+  // Team review: one small pin per comment on the CURRENT frame, in the
+  // author's profile color — a resolved comment renders faded (same
+  // reduced-opacity convention as a revision ghost) so unresolved notes
+  // stay the ones that visually grab attention. Never exported (export.js
+  // renders straight from Paper's document, which never sees this overlay
+  // layer at all — same reasoning as every other cursor/highlight builder
+  // in this file).
+  function buildCommentPinItems() {
+    if (!state.comments || !state.comments.length) return [];
+    var zs = 1 / view.zoom;
+    var items = [];
+    state.comments.forEach(function (cm) {
+      if (cm.frame !== state.currentFrame) return;
+      var col = cssColorToRgba(cm.authorColor || '#4a9eff', cm.resolved ? 0.35 : 1) || [74, 158, 255, 230];
+      items.push(circleItem(cm.x, cm.y, 9 * zs, col, [255, 255, 255, cm.resolved ? 90 : 230], 1.5 * zs));
+    });
+    return items;
+  }
+  function buildRevisionOutlineItems() {
+    if (!state.userProfile) return [];
+    var out = [];
+    var zs = 1 / view.zoom;
+    for (var i = 0; i < state.layers.length; i++) {
+      if (!layerIsEffectivelyVisible(i) || !userLayers[i]) continue;
+      var children = userLayers[i].children;
+      for (var s = 0; s < children.length; s++) {
+        var c = children[s];
+        if (!(c instanceof Path) || c.segments.length < 2) continue;
+        if (!(c.data && c.data.revisionParentId && !c.data.isRevisionGhost)) continue;
+        if (c.data.ownerId === state.userProfile.id) continue; // your own revisions don't need flagging to you
+        if (state.revisionView === 'mine') continue; // filtered out of the scene above anyway, but be explicit
+        var col = cssColorToRgba(c.data.ownerColor || '#ff8800', 1) || [255, 136, 0, 230];
+        var segs = c.segments.map(function (seg) { return { point: [seg.point.x, seg.point.y], handleIn: [seg.handleIn.x, seg.handleIn.y], handleOut: [seg.handleOut.x, seg.handleOut.y] }; });
+        out.push({
+          segments: roundSegs(segs), closed: !!c.closed, fillColor: null,
+          strokeColor: col, strokeWidth: ((c.strokeWidth || 2) + 3) * zs, dashPattern: [5 * zs, 4 * zs],
+        });
+      }
+    }
+    return out;
   }
   function buildFSSelectionItems() {
     if (state.tool !== 'fsselect' || !_fsSel || typeof fsHighlightPath !== 'function') return [];

@@ -197,7 +197,91 @@
     });
   }
 
-  window.SMProject={save:save,saveAs:saveAs,open:openDialog,openPath:openPath,newProject:function(cfg){newProject(cfg);hideStartScreen();ensureInitialTab();},pushVersionSnapshot:pushVersionSnapshot,listVersionHistory:listVersionHistory,restoreVersion:restoreVersion};
+  // ---- Team sync (v16, Phase 2) — async, NOT realtime. Reuses the exact
+  // history-snapshot pattern above (a plain directory of timestamped JSON
+  // files, no server), except the directory lives in a user-chosen SHARED
+  // folder (kDrive/S3 mount etc. — just a path from the app's point of
+  // view) and is namespaced by profile id instead of file-path hash, so
+  // every collaborator writes to their own subfolder without clobbering
+  // each other. "Check for updates" lists the latest snapshot per OTHER
+  // profile; "Merge" pulls one in via window.SM.mergeRemoteSnapshot (app.js)
+  // — new strokes merge automatically, same-strokeId edits surface as a
+  // Phase 1 revision pair via the existing ghost/accept/reject UI.
+  var SYNC_MAX_PER_PROFILE=30;
+  function syncFolderKey(){return 'sm-sync-'+historyKey();}
+  function getSyncFolder(){try{return localStorage.getItem(syncFolderKey())||null;}catch(e){return null;}}
+  function setSyncFolder(path){try{if(path)localStorage.setItem(syncFolderKey(),path);else localStorage.removeItem(syncFolderKey());}catch(e){}}
+  function profileDir(root,profileId){return root.replace(/[\\/]+$/,'')+'/'+profileId;}
+  async function chooseSyncFolder(){
+    if(!tauriOk()){showToast('Sync équipe nécessite l\'app desktop');return null;}
+    var path=await window.__TAURI__.dialog.open({title:'Dossier partagé (kDrive, S3 monté, etc.)',directory:true});
+    if(!path)return null;
+    path=Array.isArray(path)?path[0]:path;
+    setSyncFolder(path);
+    showToast('Dossier de sync configuré');
+    return path;
+  }
+  function disableSync(){setSyncFolder(null);}
+  async function publishToShared(){
+    var root=getSyncFolder();
+    if(!root){showToast('Configurez un dossier de sync d\'abord');return;}
+    if(!tauriOk()){showToast('Sync équipe nécessite l\'app desktop');return;}
+    saveAllLayerFrames();
+    var json=window.SM.exportJSON();
+    var dir=profileDir(root,state.userProfile.id);
+    try{
+      await window.__TAURI__.fs.mkdir(dir,{recursive:true});
+      await window.__TAURI__.fs.writeTextFile(dir+'/_profile.json',JSON.stringify(state.userProfile));
+      await window.__TAURI__.fs.writeTextFile(dir+'/'+Date.now()+'.json',json);
+      var entries=await window.__TAURI__.fs.readDir(dir);
+      var names=entries.filter(function(e){return /^\d+\.json$/.test(e.name);}).map(function(e){return e.name;}).sort();
+      while(names.length>SYNC_MAX_PER_PROFILE){
+        var victim=names.shift();
+        try{await window.__TAURI__.fs.remove(dir+'/'+victim);}catch(e){}
+      }
+      showToast('Publié pour l\'équipe');
+    }catch(e){console.warn('[sync] publish failed',e);showToast('Échec de la publication');}
+  }
+  async function checkSharedUpdates(){
+    var root=getSyncFolder();
+    if(!root||!tauriOk())return [];
+    var out=[];
+    try{
+      var entries=await window.__TAURI__.fs.readDir(root);
+      for(var i=0;i<entries.length;i++){
+        var e=entries[i];
+        if(e.name===state.userProfile.id)continue;
+        if(e.children===undefined&&e.isDirectory===false)continue; // skip stray files at the root
+        var subdir=root.replace(/[\\/]+$/,'')+'/'+e.name;
+        try{
+          var sub=await window.__TAURI__.fs.readDir(subdir);
+          var jsons=sub.filter(function(x){return /^\d+\.json$/.test(x.name);}).map(function(x){return x.name;}).sort();
+          if(!jsons.length)continue;
+          var latestName=jsons[jsons.length-1];
+          var profileName=e.name,profileColor='#888888';
+          try{
+            var pj=await window.__TAURI__.fs.readTextFile(subdir+'/_profile.json');
+            var prof=JSON.parse(pj);
+            profileName=prof.name||profileName;profileColor=prof.color||profileColor;
+          }catch(e2){}
+          out.push({profileId:e.name,profileName:profileName,profileColor:profileColor,path:subdir+'/'+latestName,ts:parseInt(latestName,10)});
+        }catch(e3){}
+      }
+    }catch(e4){console.warn('[sync] check failed',e4);}
+    return out.sort(function(a,b){return b.ts-a.ts;});
+  }
+  async function pullAndMerge(entry){
+    if(!tauriOk())return null;
+    var json=await window.__TAURI__.fs.readTextFile(entry.path);
+    var data=JSON.parse(json);
+    var report=window.SM.mergeRemoteSnapshot(data,{id:entry.profileId,name:entry.profileName,color:entry.profileColor});
+    saveAllLayerFrames();
+    showToast('Fusion de '+entry.profileName+' : +'+report.added+' ajout(s)'+(report.conflicts?', '+report.conflicts+' conflit(s) à résoudre':''));
+    return report;
+  }
+
+  window.SMProject={save:save,saveAs:saveAs,open:openDialog,openPath:openPath,newProject:function(cfg){newProject(cfg);hideStartScreen();ensureInitialTab();},pushVersionSnapshot:pushVersionSnapshot,listVersionHistory:listVersionHistory,restoreVersion:restoreVersion,
+    getSyncFolder:getSyncFolder,chooseSyncFolder:chooseSyncFolder,disableSync:disableSync,publishToShared:publishToShared,checkSharedUpdates:checkSharedUpdates,pullAndMerge:pullAndMerge};
 
   // ---- Project tabs (real multi-project switching, v11) ----
   // Each tab holds a full independent snapshot of a project as the SAME

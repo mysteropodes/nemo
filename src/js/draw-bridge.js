@@ -490,6 +490,7 @@
       }
     }
     if (state.shadowMode && path) path.data.channelTag = 'shadow';
+    if (path) tagOwner(path);
     saveActiveLayerFrame();
     updateUI();
     samples = [];

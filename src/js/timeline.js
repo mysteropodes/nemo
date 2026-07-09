@@ -67,7 +67,7 @@ window.SM={
   goToFrame:function(idx){goToFrame(idx);},togglePlay:togglePlay,stopPlay:stopPlay,undo:undo,redo:redo,
   setTool:function(t){if(t!=='select'&&t!=='subselect')clearSel();if(t!=='fsselect')fsClearSel();if(t!=='pen'&&_pen.path)finalizePen();if(t!=='eraser'&&typeof _eraserCursor!=='undefined'&&_eraserCursor){_eraserCursor.remove();_eraserCursor=null;}state.tool=t;renderArcs();
     document.querySelectorAll('.tool-btn').forEach(function(b){b.classList.toggle('active',b.dataset.tool===t);});
-    var cc={draw:'crosshair',pen:'crosshair',line:'crosshair',rect:'crosshair',ellipse:'crosshair',select:'default',subselect:'default',fsselect:'default',eraser:'pointer',fill:'crosshair',fillbrush:'crosshair',eyedropper:'crosshair',hand:'grab',zoom:'zoom-in',rotate:'grab',perspective:'crosshair'};
+    var cc={draw:'crosshair',pen:'crosshair',line:'crosshair',rect:'crosshair',ellipse:'crosshair',select:'default',subselect:'default',fsselect:'default',comment:'crosshair',eraser:'pointer',fill:'crosshair',fillbrush:'crosshair',eyedropper:'crosshair',hand:'grab',zoom:'zoom-in',rotate:'grab',perspective:'crosshair'};
     canvasEl.style.cursor=cc[t]||'default';
     updatePropsContext();},
   toggleOnion:function(){state.onionSkin=!state.onionSkin;renderOS();var el=document.getElementById('os-st');el.textContent=state.onionSkin?'ON':'OFF';el.style.color=state.onionSkin?'var(--green)':'var(--text-dim)';var b=document.getElementById('btn-os');if(b)b.classList.toggle('active',state.onionSkin);},
@@ -383,6 +383,9 @@ window.SM={
     loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast('Keyframe déplacée → '+(toFrame+1));
   },
   deleteSelStrokes:function(){if(selectedPaths.length>0){pushUndo();selectedPaths.forEach(function(p){
+    // Team review: deleting someone else's stroke ghosts it instead of
+    // removing it outright — see markDeleteAsRevision's own comment.
+    if(markDeleteAsRevision(p))return;
     // Companions (linkedFill backdrop, brushCompanions texture copies)
     // are deliberately excluded from selectedPaths (see their own "why" —
     // they're not independently selectable) so deleting the primary has to
@@ -462,8 +465,9 @@ window.SM={
       refMedia:state.refMedia?{type:state.refMedia.type,name:state.refMedia.name,src:state.refMedia.src,frames:state.refMedia.frames,opacity:state.refMedia.opacity,visible:state.refMedia.visible,offsetFrames:state.refMedia.offsetFrames||0}:null,
       perspectiveEnabled:state.perspectiveEnabled,perspectiveMode:state.perspectiveMode,perspectiveDensity:state.perspectiveDensity,perspectiveVPs:state.perspectiveVPs,
       motionArcs:state.motionArcs,easingCurve:state.easingCurve,resamplePts:state.resamplePts,tweenStep:state.tweenStep,
-      tweenOverrides:state.tweenOverrides});
+      tweenOverrides:state.tweenOverrides,comments:state.comments||[]});
   },
+  mergeRemoteSnapshot:function(remoteData,remoteProfile){return mergeRemoteSnapshot(remoteData,remoteProfile);},
   importJSON:function(json,silent){
     try{var d=JSON.parse(json);if(!d.layers&&!d.frames)throw new Error('Invalid');
     if(state.activeSymbolId)exitToScene();
@@ -485,6 +489,7 @@ window.SM={
       ld.frames.forEach(function(f){if(!f.isInterpolated)f.isInterpolated=false;});while(state.layers[idx].frames.length<state.totalFrames)state.layers[idx].frames.push({strokes:[],isKeyframe:false,isInterpolated:false});});
     state.layerFolders=d.layerFolders||{};state.layerLinkGroups=d.layerLinkGroups||{};
     state.motionArcs=d.motionArcs||{};state.tweenOverrides=d.tweenOverrides||{};if(d.easingCurve){state.easingCurve=d.easingCurve;if(window._curveEditor)window._curveEditor.setState(d.easingCurve);}
+    state.comments=d.comments||[];
     // Explicit fallback to the app default, not just "leave whatever was
     // there" — opening an old-format project right after working on a
     // DIFFERENT project would otherwise silently carry that other
@@ -539,7 +544,39 @@ function updateUI(){
   document.getElementById('info-sel').textContent=state.tool==='select'&&selectedPaths.length>0?selectedPaths.length+' selected':'';
   window._totalF=state.totalFrames;window._waIn=state.waIn;window._waOut=state.waOut;window._curFrame=state.currentFrame;
   window.updateWaBar();window.updateOmMarkers(state.currentFrame,state.totalFrames);
-  renderTimeline();renderLayerList();updateCompInstancePanel();updateSelPropsPanel();updateFsSelPanel();updatePropsContext();
+  renderTimeline();renderLayerList();updateCompInstancePanel();updateSelPropsPanel();updateFsSelPanel();updateRevisionPanel();updatePropsContext();
+}
+// Team review Accept/Reject panel — shown when exactly one selected item is
+// either an active (non-ghost) revision (data.revisionParentId) or a
+// delete-revision ghost (data.isRevisionGhost && revisionAction==='delete').
+// A reshape/move ghost is NOT independently actionable here — accepting or
+// rejecting it always happens through its PAIRED active item instead (there
+// would be nothing to "keep" if you accepted the ghost directly), so ghosts
+// only surface this panel for the delete case, which has no pair.
+function updateRevisionPanel(){
+  var sec=document.getElementById('revision-sec');
+  if(!sec)return;
+  var p=(state.tool==='select'&&selectedPaths.length===1)?selectedPaths[0]:null;
+  var isActiveRevision=!!(p&&p.data&&p.data.revisionParentId&&!p.data.isRevisionGhost);
+  var isDeleteGhost=!!(p&&p.data&&p.data.isRevisionGhost&&p.data.revisionAction==='delete');
+  if(!isActiveRevision&&!isDeleteGhost){sec.style.display='none';return;}
+  sec.style.display='';
+  var row=document.getElementById('revision-author-row');
+  if(row)row.textContent=isDeleteGhost
+    ?'Suppression proposée sur le trait de '+(p.data.ownerName||'un autre profil')
+    :'Correction par '+(p.data.ownerName||'un autre profil');
+  document.getElementById('btn-revision-accept').onclick=function(){
+    pushUndo();
+    var layer=userLayers[state.activeLayerIdx];
+    if(isDeleteGhost)acceptDeleteRevision(p);else acceptRevision(p,layer);
+    clearSel();saveActiveLayerFrame();updateUI();
+  };
+  document.getElementById('btn-revision-reject').onclick=function(){
+    pushUndo();
+    var layer=userLayers[state.activeLayerIdx];
+    if(isDeleteGhost)rejectDeleteRevision(p);else rejectRevision(p,layer);
+    clearSel();saveActiveLayerFrame();updateUI();
+  };
 }
 
 // ---- UNIFIED PROPERTIES PANEL (Figma/Graphite-style: one contextual panel
@@ -1718,6 +1755,7 @@ var TOOL_SHORTCUTS=[
   {action:'select',key:'v',label:'Select'},
   {action:'subselect',key:'a',label:'Subselect (node edit)'},
   {action:'fsselect',key:'m',label:'Fill/Stroke Select'},
+  {action:'comment',key:'c',label:'Comment'},
   {action:'pen',key:'p',label:'Pen'},
   {action:'line',key:'u',label:'Line'},
   {action:'rect',key:'r',label:'Rectangle'},
@@ -1790,10 +1828,78 @@ function renderShortcutsList(){
     list.appendChild(row);
   });
 }
+// Team review: anchored comment pins. `_activeComment` is either an
+// existing entry from state.comments (edit-in-place) or a fresh draft
+// object not yet pushed to the array — Save decides which by checking
+// whether it's already in state.comments, so a cancelled/blurred-away new
+// comment never litters the project with an empty pin.
+var _activeComment=null;
+function openCommentPopover(worldPt,existing){
+  if(!document.getElementById('comment-popover'))return;
+  _activeComment=existing||{
+    id:'c_'+Date.now().toString(36)+'_'+Math.floor(Math.random()*1e6),
+    x:worldPt.x,y:worldPt.y,frame:state.currentFrame,
+    authorId:state.userProfile&&state.userProfile.id,
+    authorName:state.userProfile&&state.userProfile.name,
+    authorColor:state.userProfile&&state.userProfile.color,
+    text:'',createdAt:Date.now(),resolved:false,
+  };
+  var pop=document.getElementById('comment-popover');
+  var ca=document.getElementById('canvas-area');
+  var rect=ca.getBoundingClientRect();
+  var vp=view.projectToView(worldPt);
+  pop.style.left=Math.round(rect.left+vp.x+12)+'px';
+  pop.style.top=Math.round(rect.top+vp.y-8)+'px';
+  document.getElementById('comment-author-row').textContent=
+    (existing?'Par ':'Nouveau — ')+(_activeComment.authorName||'Anonyme')+' · frame '+(_activeComment.frame+1);
+  document.getElementById('comment-text').value=_activeComment.text||'';
+  document.getElementById('comment-resolved').checked=!!_activeComment.resolved;
+  document.getElementById('comment-delete').style.display=existing?'':'none';
+  pop.style.display='block';
+  document.getElementById('comment-text').focus();
+}
+function closeCommentPopover(){
+  var pop=document.getElementById('comment-popover');
+  if(pop)pop.style.display='none';
+  _activeComment=null;
+}
+function initCommentPopover(){
+  var saveBtn=document.getElementById('comment-save'),delBtn=document.getElementById('comment-delete'),pop=document.getElementById('comment-popover');
+  if(!saveBtn||!pop)return;
+  saveBtn.addEventListener('click',function(){
+    if(!_activeComment)return;
+    _activeComment.text=document.getElementById('comment-text').value;
+    _activeComment.resolved=document.getElementById('comment-resolved').checked;
+    if(!state.comments)state.comments=[];
+    if(state.comments.indexOf(_activeComment)<0){
+      // A blank draft (never typed into) isn't worth keeping as a pin.
+      if(!_activeComment.text.trim()){closeCommentPopover();return;}
+      state.comments.push(_activeComment);
+    }
+    saveActiveLayerFrame();closeCommentPopover();updateUI();
+    if(window.SMEngineBridge&&window.SMEngineBridge.renderNow)window.SMEngineBridge.renderNow();
+  });
+  delBtn.addEventListener('click',function(){
+    if(!_activeComment||!state.comments)return;
+    var idx=state.comments.indexOf(_activeComment);
+    if(idx>=0)state.comments.splice(idx,1);
+    saveActiveLayerFrame();closeCommentPopover();updateUI();
+    if(window.SMEngineBridge&&window.SMEngineBridge.renderNow)window.SMEngineBridge.renderNow();
+  });
+  // Clicking anywhere outside the popover while it's open just discards an
+  // unsaved draft (or leaves an existing comment's edits unsaved) rather
+  // than forcing an explicit Cancel button — matches the color-picker
+  // popover's own outside-click-closes convention elsewhere in this file.
+  document.addEventListener('mousedown',function(e){
+    if(pop.style.display==='none')return;
+    if(!pop.contains(e.target))closeCommentPopover();
+  },true);
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initCommentPopover);else initCommentPopover();
 function initSettingsModal(){
   var btn=document.getElementById('btn-settings'),modal=document.getElementById('settings-modal');
   if(!btn||!modal)return;
-  btn.addEventListener('click',function(){renderShortcutsList();modal.style.display='flex';});
+  btn.addEventListener('click',function(){renderShortcutsList();syncProfileFields();syncFolderFields();modal.style.display='flex';});
   var closeBtn=document.getElementById('settings-close');
   if(closeBtn)closeBtn.addEventListener('click',function(){modal.style.display='none';});
   modal.addEventListener('click',function(e){if(e.target===modal)modal.style.display='none';});
@@ -1803,7 +1909,90 @@ function initSettingsModal(){
     renderShortcutsList();showToast('Raccourcis réinitialisés');
   });
 }
+function syncProfileFields(){
+  var nameEl=document.getElementById('profile-name'),colorEl=document.getElementById('profile-color'),wellEl=document.getElementById('profile-color-well');
+  if(!nameEl||!state.userProfile)return;
+  nameEl.value=state.userProfile.name;
+  var c=state.userProfile.color;
+  if(colorEl){colorEl.value=c;colorEl.dataset.hex8=c;}
+  if(wellEl)wellEl.style.background=c;
+}
+function initProfileFields(){
+  var nameEl=document.getElementById('profile-name'),colorEl=document.getElementById('profile-color');
+  if(!nameEl||!colorEl)return;
+  syncProfileFields();
+  nameEl.addEventListener('input',function(){
+    state.userProfile.name=this.value||'Animateur';
+    saveUserProfile();
+  });
+  colorEl.addEventListener('input',function(){
+    var v=this.dataset.hex8||this.value;
+    state.userProfile.color=v;
+    document.getElementById('profile-color-well').style.background=v;
+    saveUserProfile();
+  });
+  if(window.ColorPicker)window.ColorPicker.wireColorSwatches([{wrap:'profile-color-well',input:'profile-color'}]);
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initProfileFields);else initProfileFields();
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initSettingsModal);else initSettingsModal();
+
+// ---- Team sync UI (v16, Phase 2) ----
+function syncRelTime(ts){
+  var s=Math.max(0,Math.round((Date.now()-ts)/1000));
+  if(s<60)return 'il y a '+s+'s';
+  var m=Math.round(s/60);
+  if(m<60)return 'il y a '+m+' min';
+  var h=Math.round(m/60);
+  return 'il y a '+h+'h'+(m%60?Math.round(m%60)+'min':'');
+}
+function syncFolderFields(){
+  var pathEl=document.getElementById('sync-folder-path');
+  if(!pathEl)return;
+  pathEl.value=(window.SMProject&&window.SMProject.getSyncFolder())||'';
+  var listEl=document.getElementById('sync-updates-list');
+  if(listEl)listEl.innerHTML='';
+}
+function renderSyncUpdates(entries){
+  var listEl=document.getElementById('sync-updates-list');if(!listEl)return;
+  listEl.innerHTML='';
+  if(!entries||!entries.length){
+    listEl.innerHTML='<div style="font-size:10px;color:var(--text-dim)">Aucune mise à jour d\'un autre profil.</div>';
+    return;
+  }
+  entries.forEach(function(entry){
+    var row=document.createElement('div');
+    row.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:6px;padding:5px 6px;border-radius:4px;background:var(--panel3);font-size:10px';
+    var label=document.createElement('span');
+    var dot=document.createElement('span');dot.style.cssText='display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;background:'+(entry.profileColor||'#888');
+    label.appendChild(dot);
+    label.appendChild(document.createTextNode(entry.profileName+' — '+syncRelTime(entry.ts)));
+    var btn=document.createElement('button');
+    btn.className='pbtn';btn.textContent='Fusionner';btn.style.cssText='font-size:10px;padding:3px 8px';
+    btn.addEventListener('click',function(){
+      window.SMProject.pullAndMerge(entry).then(function(){
+        btn.disabled=true;btn.textContent='Fusionné';
+      });
+    });
+    row.appendChild(label);row.appendChild(btn);
+    listEl.appendChild(row);
+  });
+}
+function initSyncUI(){
+  var chooseBtn=document.getElementById('sync-choose-folder');
+  var publishBtn=document.getElementById('sync-publish');
+  var checkBtn=document.getElementById('sync-check');
+  if(!chooseBtn||!publishBtn||!checkBtn)return;
+  chooseBtn.addEventListener('click',function(){
+    window.SMProject.chooseSyncFolder().then(function(){syncFolderFields();});
+  });
+  publishBtn.addEventListener('click',function(){window.SMProject.publishToShared();});
+  checkBtn.addEventListener('click',function(){
+    var listEl=document.getElementById('sync-updates-list');
+    if(listEl)listEl.innerHTML='<div style="font-size:10px;color:var(--text-dim)">Recherche…</div>';
+    window.SMProject.checkSharedUpdates().then(renderSyncUpdates);
+  });
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initSyncUI);else initSyncUI();
 
 function onKeyDown(event){
   if((event.metaKey||event.ctrlKey)&&event.key==='z'){event.preventDefault();if(event.shiftKey)redo();else undo();return;}
@@ -2070,6 +2259,18 @@ document.getElementById('btn-tw').addEventListener('click',function(){window.SM.
 document.getElementById('btn-os').addEventListener('click',function(){window.SM.toggleOnion();});
 document.getElementById('btn-ghost-all').addEventListener('click',function(){window.SM.toggleGhostAll();});
 document.getElementById('btn-ghost-select').addEventListener('click',function(){selectGhostAll();});
+// Team review view filter — cycles All -> Mine -> Corrections, purely a
+// render-time filter in engine-bridge.js's buildSceneJson (never touches
+// the document), so switching is instant and always reversible.
+var REVISION_VIEW_LABELS={all:'Tout',mine:'Mes traits',revisions:'Corrections'};
+var REVISION_VIEW_ORDER=['all','mine','revisions'];
+document.getElementById('btn-revision-view').addEventListener('click',function(){
+  var idx=REVISION_VIEW_ORDER.indexOf(state.revisionView);
+  state.revisionView=REVISION_VIEW_ORDER[(idx+1)%REVISION_VIEW_ORDER.length];
+  this.textContent=REVISION_VIEW_LABELS[state.revisionView];
+  this.classList.toggle('active',state.revisionView!=='all');
+  window.SMEngineBridge.renderNow();
+});
 document.getElementById('btn-os-outline').addEventListener('click',function(){
   var v=state.onionMode==='outline'?'tinted':'outline';window.SM.setOnionMode(v);
   this.classList.toggle('active',v==='outline');document.getElementById('p-omode').value=v;

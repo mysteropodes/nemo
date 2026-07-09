@@ -268,9 +268,11 @@ function fsApplyDelete(){
   if(_fsSel.kind==='fillregion')_fsSel=fsRealizeFillRegion(_fsSel,layer);
   if(_fsSel.kind==='fill'){
     var p=_fsSel.path;
-    p.fillColor=null;
     fsUnlinkFillRegen(p);
-    if(!p.strokeColor)p.remove();
+    if(!markDeleteAsRevision(p)){ // foreign-owned fill: ghosted in place, keep its color so the ghost still reads correctly
+      p.fillColor=null;
+      if(!p.strokeColor)p.remove();
+    }
     saveActiveLayerFrame();
   }else{
     fsDeleteSegment(_fsSel,layer);
@@ -283,8 +285,10 @@ function fsDeleteSegment(sel,layer){
   if(sel.segStart===0&&sel.segEnd===path.length&&!(path.closed&&sel.segEnd<sel.segStart)){
     // whole stroke, no crossings — same as nulling strokeColor on the
     // combined path (matches Animate deleting an un-crossed stroke)
-    path.strokeColor=null;
-    if(!path.fillColor)path.remove();
+    if(!markDeleteAsRevision(path)){ // foreign-owned: ghosted in place instead
+      path.strokeColor=null;
+      if(!path.fillColor)path.remove();
+    }
     saveActiveLayerFrame();
     return;
   }
@@ -566,6 +570,154 @@ function ensureStrokeId(p){
   if(!p.data)p.data={};
   if(!p.data.strokeId)p.data.strokeId='s'+(Date.now().toString(36))+'_'+(++_strokeIdCounter)+'_'+Math.floor(Math.random()*1e6);
   return p.data.strokeId;
+}
+// Team review (Phase 1): stamps a freshly-committed stroke with who drew it
+// — denormalized name alongside the id so a machine that's never seen this
+// profile before can still show a readable label (see forkIfForeignOwner
+// for the other half: what happens when a DIFFERENT profile later edits
+// this stroke). Also ensureStrokeId's the path: strokeId used to only get
+// assigned lazily by fill-wall tracking, so most ordinary strokes never had
+// one — forkIfForeignOwner needs a STABLE id from the moment of creation to
+// find this exact stroke's pre-edit snapshot later (see
+// findPreEditStrokeData); without it every fork silently fell back to
+// cloning whatever the path's CURRENT — already mutated by the very edit
+// being forked — geometry happened to be, producing a ghost with the wrong
+// (post-edit) shape instead of the original.
+function tagOwner(p){
+  if(!p||!p.data||!state.userProfile)return;
+  p.data.ownerId=state.userProfile.id;
+  p.data.ownerName=state.userProfile.name;
+  // Captured at authorship time, not resolved later — this machine may
+  // never see the authoring profile again (no central identity server in
+  // Phase 1), so the color has to travel WITH the stroke to render its
+  // revision outline correctly.
+  p.data.ownerColor=state.userProfile.color;
+  ensureStrokeId(p);
+}
+// Locates a stroke's data as it was BEFORE the in-progress gesture, from
+// the undo snapshot pushUndo() (tweens.js) already took at drag-start —
+// necessary because Paper.js mutates the live Path in place on every
+// pointermove, so by the time a drag commits at onUp, the path's CURRENT
+// geometry already IS the edit; there's no "before" left to clone. The
+// snapshot is a plain serP-shaped object per stroke (JSON, not a live
+// Path), matched by the same strokeId ensureStrokeId hands out.
+function findPreEditStrokeData(strokeId){
+  var snap=state.undoStack[state.undoStack.length-1];
+  if(!snap||snap.type!=='layers')return null;
+  for(var li=0;li<snap.layers.length;li++){
+    var frame=snap.layers[li].frames&&snap.layers[li].frames[state.currentFrame];
+    if(!frame||!frame.strokes)continue;
+    for(var i=0;i<frame.strokes.length;i++){
+      if(frame.strokes[i].strokeId===strokeId)return frame.strokes[i];
+    }
+  }
+  return null;
+}
+// The core review mechanic: editing a stroke someone ELSE owns doesn't
+// silently overwrite their work — it freezes their pre-edit version as a
+// "ghost" (data.isRevisionGhost, rendered desaturated, excluded from
+// export — see engine-bridge.js/export.js) and turns the just-edited live
+// path into a fresh, separately-owned revision linked back to that ghost
+// via data.revisionParentId. A no-op if the path is unowned, already yours,
+// or is itself a ghost (never fork a ghost — it's a frozen historical
+// record, not something to keep editing forward).
+function forkIfForeignOwner(path){
+  if(!path||!path.data||!path.data.ownerId||!state.userProfile)return path;
+  if(path.data.ownerId===state.userProfile.id)return path;
+  if(path.data.isRevisionGhost)return path;
+  var layer=path.layer;
+  if(!layer)return path;
+  var sid=path.data.strokeId;
+  var preEdit=sid?findPreEditStrokeData(sid):null;
+  var ghost;
+  if(preEdit){
+    ghost=desP(preEdit,layer);
+    ghost.insertBelow(path);
+  }else{
+    // No snapshot found (e.g. this stroke predates any undo entry this
+    // session) — best-effort fallback: clone the current geometry. Not
+    // perfectly accurate if this exact gesture also moved it, but still
+    // correctly marks the fork so ownership isn't silently lost.
+    ghost=path.clone({insert:true,deep:false});
+    ghost.insertBelow(path);
+  }
+  ghost.data.isRevisionGhost=true;
+  delete ghost.data.revisionParentId;
+  ghost.data.preRevisionOpacity=ghost.opacity!==undefined?ghost.opacity:1; // so Reject can restore it exactly, not just guess 1
+  ghost.opacity=ghost.data.preRevisionOpacity*0.35;
+  var parentId=ensureStrokeId(ghost);
+  delete path.data.strokeId; // the revision is a distinct stroke going forward, not a continuation of the ghost's id
+  path.data.ownerId=state.userProfile.id;
+  path.data.ownerName=state.userProfile.name;
+  path.data.ownerColor=state.userProfile.color;
+  path.data.revisionParentId=parentId;
+  return path;
+}
+// Delete-time counterpart: a foreign-owned item never gets p.remove()'d
+// outright — it becomes a ghost tagged revisionAction='delete' (hidden in
+// the normal view, visible + explainable in "Corrections" view) so the
+// original owner can still see and reject the deletion. Returns true if it
+// handled the item as a ghost (caller must NOT also remove it); false for
+// an item that's unowned/already-yours/already-a-ghost, meaning the
+// caller's normal remove() path should proceed as before.
+function markDeleteAsRevision(path){
+  if(!path||!path.data||!path.data.ownerId||!state.userProfile)return false;
+  if(path.data.ownerId===state.userProfile.id)return false;
+  if(path.data.isRevisionGhost)return false;
+  path.data.isRevisionGhost=true;
+  path.data.revisionAction='delete';
+  path.data.preRevisionOpacity=path.opacity!==undefined?path.opacity:1;
+  path.opacity=path.data.preRevisionOpacity*0.35;
+  ensureStrokeId(path);
+  return true;
+}
+// Accept a delete-revision ghost — the original owner agrees their stroke
+// should go; NOW it actually gets removed (a delete-revision ghost, unlike
+// a reshape/move one, has no paired "active revision" item to keep, so
+// there's nothing else to do).
+function acceptDeleteRevision(ghost){
+  if(!ghost||!ghost.data||ghost.data.revisionAction!=='delete')return;
+  if(ghost.data.linkedFill&&!ghost.data.linkedFill.removed)ghost.data.linkedFill.remove();
+  if(ghost.data.brushCompanions)ghost.data.brushCompanions.forEach(function(c){if(!c.removed)c.remove();});
+  ghost.remove();
+}
+// Reject a delete-revision ghost — un-ghosts it back to normal, restoring
+// its exact pre-fork opacity (see preRevisionOpacity above).
+function rejectDeleteRevision(ghost){
+  if(!ghost||!ghost.data||ghost.data.revisionAction!=='delete')return;
+  ghost.opacity=ghost.data.preRevisionOpacity!==undefined?ghost.data.preRevisionOpacity:1;
+  delete ghost.data.isRevisionGhost;
+  delete ghost.data.revisionAction;
+  delete ghost.data.preRevisionOpacity;
+}
+// Accept a reshape/move revision — the correction wins outright: drop the
+// paired ghost, and the active item just becomes normal content again
+// (ownerId stays as the reviewer's, for attribution — matches the plan's
+// "accept keeps reviewer ownership" call).
+function acceptRevision(activeItem,layer){
+  if(!activeItem||!activeItem.data||!activeItem.data.revisionParentId)return;
+  var ghost=findStrokeById(layer,activeItem.data.revisionParentId);
+  if(ghost)ghost.remove();
+  delete activeItem.data.revisionParentId;
+}
+// Reject a reshape/move revision — the original wins: the reviewer's item
+// is discarded, the ghost comes back to life at its exact original opacity.
+function rejectRevision(activeItem,layer){
+  if(!activeItem||!activeItem.data||!activeItem.data.revisionParentId)return;
+  var ghost=findStrokeById(layer,activeItem.data.revisionParentId);
+  if(ghost){
+    ghost.opacity=ghost.data.preRevisionOpacity!==undefined?ghost.data.preRevisionOpacity:1;
+    delete ghost.data.isRevisionGhost;
+    delete ghost.data.preRevisionOpacity;
+  }
+  activeItem.remove();
+}
+function findStrokeById(layer,strokeId){
+  if(!layer||!strokeId)return null;
+  for(var i=0;i<layer.children.length;i++){
+    if(layer.children[i].data&&layer.children[i].data.strokeId===strokeId)return layer.children[i];
+  }
+  return null;
 }
 // onlyIds (optional): restrict wall collection to strokes whose strokeId is
 // in this list — used by fillRegenerateLinked to regenerate a fill against
@@ -1885,8 +2037,10 @@ function finalizePen(){
     outline.insertAbove(p);
     p.remove();
     if(state.shadowMode)outline.data.channelTag='shadow';
-  }else if(state.shadowMode){
-    _pen.path.data.channelTag='shadow';
+    tagOwner(outline);
+  }else{
+    if(state.shadowMode)_pen.path.data.channelTag='shadow';
+    tagOwner(_pen.path);
   }
   _pen.path=null;_pen.draggingHandle=false;
   saveActiveLayerFrame();updateUI();
@@ -1962,6 +2116,14 @@ function onMouseDown(event){
       return;
     }else{clearSel();}
     renderArcs();updateUI();
+  }else if(state.tool==='comment'){
+    // Existing pin nearby -> reopen it for editing; otherwise start a new
+    // one anchored at the click. Hit radius is in world units scaled by
+    // zoom so it feels consistent regardless of how far zoomed in you are.
+    var hitRadius=14/view.zoom;
+    var existing=(state.comments||[]).filter(function(cm){return cm.frame===state.currentFrame;})
+      .find(function(cm){return event.point.getDistance(new Point(cm.x,cm.y))<hitRadius;});
+    openCommentPopover(event.point,existing);
   }else if(state.tool==='fsselect'){
     _fsSel=fsHitTest(event.point,layer);
     updateUI();
@@ -2295,6 +2457,7 @@ function onMouseUp(event){
     // already on the layer instead of stacking on top.
     if(currentPath&&state.drawMode==='behind')userLayers[state.activeLayerIdx].insertChild(0,currentPath);
     if(currentPath&&state.shadowMode)currentPath.data.channelTag='shadow';
+    if(currentPath)tagOwner(currentPath);
     currentPath=null;stabQueue=[];saveActiveLayerFrame();updateUI();
   }else if(state.tool==='fillbrush'&&currentPath){
     _vb.pts.push(event.point.clone());_vb.widths.push(vbSmoothPressure(vbPressureOf(event)));
@@ -2309,13 +2472,17 @@ function onMouseUp(event){
       // comment; replaces the old unconditional "always at the back".
       currentPath=applyFillBrushPlacement(currentPath,userLayers[state.activeLayerIdx]);
       if(currentPath&&state.shadowMode)currentPath.data.channelTag='shadow';
+      if(currentPath)tagOwner(currentPath);
     }
     _vb.pts=[];_vb.widths=[];currentPath=null;stabQueue=[];saveActiveLayerFrame();updateUI();
   }else if(state.tool==='pen'){
     _pen.draggingHandle=false;
   }else if((state.tool==='line'||state.tool==='rect'||state.tool==='ellipse')&&currentPath){
     if(shapeStart&&event.point.getDistance(shapeStart)<2){currentPath.remove();if(state.undoStack.length)state.undoStack.pop();}
-    else if(state.shadowMode)currentPath.data.channelTag='shadow';
+    else{
+      if(state.shadowMode)currentPath.data.channelTag='shadow';
+      tagOwner(currentPath);
+    }
     currentPath=null;shapeStart=null;saveActiveLayerFrame();updateUI();
   }else if(state.tool==='select'){
     if(_xform.active){

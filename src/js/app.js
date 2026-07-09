@@ -132,7 +132,34 @@ var state={
   // ld.channel ('stroke'|'fill'|'shadow') drives the auto-strip enforced in
   // saveActiveLayerFrame/saveAllLayerFrames (app.js).
   layerLinkGroups:{},
+  // Team review (Phase 1): who's currently "you" on this install, and which
+  // subset of ownership the canvas currently shows. userProfile is NOT part
+  // of the project JSON (it's per-installation, like sm-shortcuts) — see
+  // initUserProfile() right below, which loads/generates it from
+  // localStorage independently of any project load/save.
+  userProfile:null,
+  revisionView:'all', // 'all' | 'mine' | 'revisions' — session-only, not persisted
+  // Anchored comments: {id,x,y,frame,authorId,authorName,authorColor,text,
+  // createdAt,resolved}. Canvas-space x/y (world coords, not screen), so
+  // they stay pinned to the artwork through pan/zoom — same coordinate
+  // space every stroke already lives in.
+  comments:[],
 };
+// Local identity, one per installation — generated once, then stable across
+// every project this machine ever opens. Only name/color are user-editable
+// (Settings > Profil); id is internal and never shown.
+function initUserProfile(){
+  try{
+    var saved=JSON.parse(localStorage.getItem('sm-profile')||'null');
+    if(saved&&saved.id){state.userProfile=saved;return;}
+  }catch(e){}
+  state.userProfile={id:'u_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8),name:'Animateur',color:'#4a9eff'};
+  try{localStorage.setItem('sm-profile',JSON.stringify(state.userProfile));}catch(e){}
+}
+function saveUserProfile(){
+  try{localStorage.setItem('sm-profile',JSON.stringify(state.userProfile));}catch(e){}
+}
+initUserProfile();
 
 var stageLayer=new Layer({name:'stage'});
 var onionPrevLayer=new Layer({name:'onion-prev'});
@@ -290,6 +317,17 @@ function serP(p){var isVB=!!(p.data&&p.data.isVectorBrush);var center=isVB&&p.da
   var isNoStrokeChannel=!!(pChLayer&&pChLayer.channel==='fill');
   var isShadowNoStroke=!!(pChLayer&&pChLayer.channel==='shadow'&&!p.strokeColor);
   var channelTag=(p.data&&p.data.channelTag)?p.data.channelTag:undefined;
+  // Team review (Phase 1) — who drew/owns this stroke, and if it's an
+  // active reviewer correction, which original strokeId it's a revision
+  // of (see forkIfForeignOwner, tools.js). isRevisionGhost/revisionAction
+  // mark the frozen "before" copy a fork leaves behind — never mutated
+  // again once created, only accepted (removed) or rejected (un-ghosted).
+  var ownerId=(p.data&&p.data.ownerId)?p.data.ownerId:undefined;
+  var ownerName=(p.data&&p.data.ownerName)?p.data.ownerName:undefined;
+  var ownerColor=(p.data&&p.data.ownerColor)?p.data.ownerColor:undefined;
+  var revisionParentId=(p.data&&p.data.revisionParentId)?p.data.revisionParentId:undefined;
+  var isRevisionGhost=(p.data&&p.data.isRevisionGhost)?true:undefined;
+  var revisionAction=(p.data&&p.data.revisionAction)?p.data.revisionAction:undefined;
   // hasRealStroke records whether p ACTUALLY had a stroke color before the
   // '#ffffff' fallback below (kept for legacy/rendering reasons — see the
   // colorHex8/serP comments above) papers over that with a non-null string.
@@ -299,7 +337,7 @@ function serP(p){var isVB=!!(p.data&&p.data.isVectorBrush);var center=isVB&&p.da
   // otherwise every fill-only shape's phantom '#ffffff' gets misread as a
   // real stroke and the shape is wrongly cloned into the Stroke channel too.
   var hasRealStroke=!!p.strokeColor;
-  return{segments:p.segments.map(function(s){return{point:[s.point.x,s.point.y],handleIn:[s.handleIn.x,s.handleIn.y],handleOut:[s.handleOut.x,s.handleOut.y]};}),closed:!!p.closed,strokeColor:(isVB||isNoStrokeChannel||isShadowNoStroke||isTexAnchor&&!p.strokeColor)?null:(p.strokeColor?colorHex8(p.strokeColor):'#ffffff'),hasRealStroke:hasRealStroke,strokeWidth:p.strokeWidth,strokeCap:p.strokeCap||'round',strokeJoin:p.strokeJoin||'round',miterLimit:p.miterLimit,fillColor:p.fillColor?colorHex8(p.fillColor):null,opacity:p.opacity!==undefined?p.opacity:1,dashArray:(p.dashArray&&p.dashArray.length)?p.dashArray.slice():undefined,dashOffset:p.dashOffset,paintOrder:(p.data&&p.data.paintOrder)?p.data.paintOrder:undefined,isVectorBrush:isVB||undefined,centerSegments:center,widthProfile:widthProfile,fillSeed:fillSeed,fillGapPx:fillGapPx,fillWalls:fillWalls,strokeId:strokeId,brushGroupId:brushGroupId,isBrushTextureCopy:isBrushTextureCopy,brushTexturePreset:brushTexturePreset,preTextureOpacity:preTextureOpacity,preTextureStroke:preTextureStroke,channelTag:channelTag};}
+  return{segments:p.segments.map(function(s){return{point:[s.point.x,s.point.y],handleIn:[s.handleIn.x,s.handleIn.y],handleOut:[s.handleOut.x,s.handleOut.y]};}),closed:!!p.closed,strokeColor:(isVB||isNoStrokeChannel||isShadowNoStroke||isTexAnchor&&!p.strokeColor)?null:(p.strokeColor?colorHex8(p.strokeColor):'#ffffff'),hasRealStroke:hasRealStroke,strokeWidth:p.strokeWidth,strokeCap:p.strokeCap||'round',strokeJoin:p.strokeJoin||'round',miterLimit:p.miterLimit,fillColor:p.fillColor?colorHex8(p.fillColor):null,opacity:p.opacity!==undefined?p.opacity:1,dashArray:(p.dashArray&&p.dashArray.length)?p.dashArray.slice():undefined,dashOffset:p.dashOffset,paintOrder:(p.data&&p.data.paintOrder)?p.data.paintOrder:undefined,isVectorBrush:isVB||undefined,centerSegments:center,widthProfile:widthProfile,fillSeed:fillSeed,fillGapPx:fillGapPx,fillWalls:fillWalls,strokeId:strokeId,brushGroupId:brushGroupId,isBrushTextureCopy:isBrushTextureCopy,brushTexturePreset:brushTexturePreset,preTextureOpacity:preTextureOpacity,preTextureStroke:preTextureStroke,channelTag:channelTag,ownerId:ownerId,ownerName:ownerName,ownerColor:ownerColor,revisionParentId:revisionParentId,isRevisionGhost:isRevisionGhost,revisionAction:revisionAction};}
 // `closed` was missing from this round-trip entirely — every path rebuilt
 // via desP() (onion-skin ghosts, tween/inbetween generation, undo/redo
 // snapshots, project load: everything that goes through serP/desP) silently
@@ -317,7 +355,75 @@ function desP(d,layer,op){var prev=project.activeLayer;layer.activate();var p=ne
   var dLayerIdx=userLayers.indexOf(layer);var dChLayer=dLayerIdx>=0?state.layers[dLayerIdx]:null;
   var dNoStrokeChannel=!!(dChLayer&&dChLayer.channel==='fill');
   var dIsShadowChannel=!!(dChLayer&&dChLayer.channel==='shadow');
-  p.strokeColor=d.strokeColor||((d.isVectorBrush||d.brushTexturePreset||dNoStrokeChannel||dIsShadowChannel)?null:'#fff');p.strokeWidth=d.strokeWidth||3;p.strokeCap=d.strokeCap||'round';p.strokeJoin=d.strokeJoin||'round';if(d.miterLimit!==undefined)p.miterLimit=d.miterLimit;if(d.fillColor)p.fillColor=d.fillColor;else p.fillColor=null;p.opacity=op!==undefined?op:(d.opacity!==undefined?d.opacity:1);if(d.dashArray&&d.dashArray.length)p.dashArray=d.dashArray;if(d.dashOffset!==undefined)p.dashOffset=d.dashOffset;if(d.paintOrder){p.data.paintOrder=d.paintOrder;}if(d.isVectorBrush){p.data.isVectorBrush=true;if(d.centerSegments)p.data.centerSegments=d.centerSegments;if(d.widthProfile)p.data.widthProfile=d.widthProfile;}if(d.fillSeed){p.data.fillSeed=d.fillSeed;p.data.fillGapPx=d.fillGapPx;}if(d.fillWalls)p.data.fillWalls=d.fillWalls;if(d.strokeId)p.data.strokeId=d.strokeId;if(d.brushGroupId)p.data.brushGroupId=d.brushGroupId;if(d.isBrushTextureCopy)p.data.isBrushTextureCopy=true;if(d.brushTexturePreset)p.data.brushTexturePreset=d.brushTexturePreset;if(d.preTextureOpacity!==undefined)p.data.preTextureOpacity=d.preTextureOpacity;if(d.preTextureStroke!==undefined)p.data.preTextureStroke=d.preTextureStroke;if(d.channelTag)p.data.channelTag=d.channelTag;prev.activate();return p;}
+  p.strokeColor=d.strokeColor||((d.isVectorBrush||d.brushTexturePreset||dNoStrokeChannel||dIsShadowChannel)?null:'#fff');p.strokeWidth=d.strokeWidth||3;p.strokeCap=d.strokeCap||'round';p.strokeJoin=d.strokeJoin||'round';if(d.miterLimit!==undefined)p.miterLimit=d.miterLimit;if(d.fillColor)p.fillColor=d.fillColor;else p.fillColor=null;p.opacity=op!==undefined?op:(d.opacity!==undefined?d.opacity:1);if(d.dashArray&&d.dashArray.length)p.dashArray=d.dashArray;if(d.dashOffset!==undefined)p.dashOffset=d.dashOffset;if(d.paintOrder){p.data.paintOrder=d.paintOrder;}if(d.isVectorBrush){p.data.isVectorBrush=true;if(d.centerSegments)p.data.centerSegments=d.centerSegments;if(d.widthProfile)p.data.widthProfile=d.widthProfile;}if(d.fillSeed){p.data.fillSeed=d.fillSeed;p.data.fillGapPx=d.fillGapPx;}if(d.fillWalls)p.data.fillWalls=d.fillWalls;if(d.strokeId)p.data.strokeId=d.strokeId;if(d.brushGroupId)p.data.brushGroupId=d.brushGroupId;if(d.isBrushTextureCopy)p.data.isBrushTextureCopy=true;if(d.brushTexturePreset)p.data.brushTexturePreset=d.brushTexturePreset;if(d.preTextureOpacity!==undefined)p.data.preTextureOpacity=d.preTextureOpacity;if(d.preTextureStroke!==undefined)p.data.preTextureStroke=d.preTextureStroke;if(d.channelTag)p.data.channelTag=d.channelTag;if(d.ownerId)p.data.ownerId=d.ownerId;if(d.ownerName)p.data.ownerName=d.ownerName;if(d.ownerColor)p.data.ownerColor=d.ownerColor;if(d.revisionParentId)p.data.revisionParentId=d.revisionParentId;if(d.isRevisionGhost)p.data.isRevisionGhost=true;if(d.revisionAction)p.data.revisionAction=d.revisionAction;prev.activate();return p;}
+// Phase 2 (async multi-user sync): merges a remote collaborator's exported
+// project JSON into the CURRENT live document at the data level (state.layers
+// serialized strokes — not live Paper objects), so it works the same whether
+// called after reading a real file (desktop) or fed a plain object (tests).
+// Layers are matched by NAME (no stable cross-user layer id exists yet — a
+// known simplification: collaborators are assumed to share the same layer
+// list, same as e.g. TVPaint's exposure-sheet-driven workflow). Frames are
+// matched by index, and only merged where the LOCAL frame is already a real
+// keyframe (isKeyframe) — merging into a tween inbetween would just get
+// overwritten by the next retween, and creating brand-new keyframes via merge
+// is out of scope here.
+//
+// Per remote stroke (matched by data.strokeId, the same id forkIfForeignOwner
+// already relies on):
+//   - not present locally at all         -> pure addition, appended as-is
+//   - present locally with identical data -> no-op, already in sync
+//   - present locally but DIFFERENT       -> genuine conflict: local is left
+//     untouched (still the visible/active content) and the remote version is
+//     appended as a new stroke carrying revisionParentId = the local
+//     strokeId. This deliberately reuses Phase 1's ghost/revision data shape
+//     UNCHANGED (buildRevisionOutlineItems, acceptRevision/rejectRevision) —
+//     the remote edit renders as a dashed correction outline in the remote
+//     author's color, and Accept/Reject resolves it exactly like a
+//     supervisor's in-app revision, without local ever needing an
+//     isRevisionGhost flag (it isn't superseded, just contested).
+function mergeRemoteSnapshot(remoteData, remoteProfile) {
+  var report = { added: 0, conflicts: 0, identical: 0, layersSkipped: 0 };
+  if (!remoteData || !remoteData.layers) return report;
+  remoteData.layers.forEach(function (remoteLd) {
+    var localIdx = state.layers.findIndex(function (ld) { return ld.name === remoteLd.name; });
+    if (localIdx < 0 || !remoteLd.frames) { report.layersSkipped++; return; }
+    var localLd = state.layers[localIdx];
+    var frameCount = Math.min(localLd.frames.length, remoteLd.frames.length);
+    for (var fi = 0; fi < frameCount; fi++) {
+      var localFrame = localLd.frames[fi];
+      var remoteFrame = remoteLd.frames[fi];
+      if (!localFrame || !localFrame.isKeyframe || !remoteFrame || !remoteFrame.strokes) continue;
+      if (!localFrame.strokes) localFrame.strokes = [];
+      remoteFrame.strokes.forEach(function (rs) {
+        if (!rs.strokeId) return; // no stable id -> can't merge safely, skip
+        var localMatch = localFrame.strokes.find(function (ls) { return ls.strokeId === rs.strokeId; });
+        if (!localMatch) {
+          var added = JSON.parse(JSON.stringify(rs));
+          added.ownerId = added.ownerId || remoteProfile.id;
+          added.ownerName = added.ownerName || remoteProfile.name;
+          added.ownerColor = added.ownerColor || remoteProfile.color;
+          localFrame.strokes.push(added);
+          report.added++;
+          return;
+        }
+        if (JSON.stringify(localMatch) === JSON.stringify(rs)) { report.identical++; return; }
+        var conflictClone = JSON.parse(JSON.stringify(rs));
+        conflictClone.strokeId = 'merge_' + rs.strokeId + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        conflictClone.ownerId = remoteProfile.id;
+        conflictClone.ownerName = remoteProfile.name;
+        conflictClone.ownerColor = remoteProfile.color;
+        conflictClone.revisionParentId = localMatch.strokeId;
+        conflictClone.isRevisionGhost = undefined;
+        localFrame.strokes.push(conflictClone);
+        report.conflicts++;
+      });
+    }
+  });
+  if (report.added || report.conflicts) {
+    loadFrame(state.currentFrame); renderOS(); renderArcs(); updateUI();
+  }
+  return report;
+}
 // relinkBrushCompanions's counterpart to fillRegenerateLinked/strokeId —
 // desP() restores brushGroupId/isBrushTextureCopy/brushTexturePreset onto
 // each freshly-reconstructed Path, but the PRIMARY's live

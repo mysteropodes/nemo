@@ -163,6 +163,11 @@
       _nmq.active = false; renderArcs(); updateUI();
     } else if (_nodeDrag.active) {
       var editedPath = _nodeDrag.path; _nodeDrag.active = false; _nodeDrag.path = null;
+      // Team review: reshaping someone else's stroke forks it — see
+      // forkIfForeignOwner's own comment. Must run BEFORE fillRegenerateLinked/
+      // regenerateBrushTexture below, which read the CURRENT strokeId to
+      // re-associate fills/texture — forking assigns editedPath a fresh id.
+      forkIfForeignOwner(editedPath);
       fillRegenerateLinked(userLayers[state.activeLayerIdx], editedPath);
       regenerateBrushTexture(editedPath, userLayers[state.activeLayerIdx]);
       saveActiveLayerFrame(); renderNodeHandles(); updateUI();

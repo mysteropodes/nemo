@@ -158,8 +158,9 @@
     if (start.getDistance(end) < 2) {
       path.remove();
       if (state.undoStack.length) state.undoStack.pop();
-    } else if (state.shadowMode) {
-      path.data.channelTag = 'shadow';
+    } else {
+      if (state.shadowMode) path.data.channelTag = 'shadow';
+      tagOwner(path);
     }
     saveActiveLayerFrame();
     updateUI();

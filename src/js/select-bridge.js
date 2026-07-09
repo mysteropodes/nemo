@@ -335,6 +335,10 @@
         loadFrame(state.currentFrame);
         selectedPaths = userLayers[state.activeLayerIdx].children.filter(function (c) { return (c instanceof Path || c instanceof Raster) && !(c.data && (c.data.isLinkedFillCompanion || c.data.isBrushTextureCopy)); });
       } else {
+        // Team review: a handle drag always means a real transform happened
+        // (unlike 'move', which can fire on a plain click) — fork every
+        // foreign-owned item in the gesture before it's persisted.
+        selectedPaths.forEach(function (p) { forkIfForeignOwner(p); });
         fillRegenerateLinked(userLayers[state.activeLayerIdx], null);
         saveActiveLayerFrame();
       }
@@ -361,6 +365,7 @@
       _marquee.active = false;
       renderArcs(); updateUI();
     } else if (mode === 'move') {
+      var didMove = moveStarted;
       moveStarted = false;
       var mLd = state.layers[state.activeLayerIdx];
       if (mLd && mLd.symbolId) {
@@ -368,6 +373,12 @@
         selectedPaths = userLayers[state.activeLayerIdx].children.filter(function (c) { return (c instanceof Path || c instanceof Raster) && !(c.data && (c.data.isLinkedFillCompanion || c.data.isBrushTextureCopy)); });
         state.selectedStrokeIndices = [];
       } else {
+        // Same fork-on-real-edit guard as xform above, gated on whether a
+        // real drag distance was ever seen (moveStarted flips true lazily
+        // in onMove — see its own comment) so a plain click-release on
+        // someone else's stroke doesn't spawn a spurious identical-geometry
+        // ghost.
+        if (didMove) selectedPaths.forEach(function (p) { forkIfForeignOwner(p); });
         fillRegenerateLinked(userLayers[state.activeLayerIdx], null);
         saveActiveLayerFrame();
       }
