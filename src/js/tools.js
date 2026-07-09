@@ -210,9 +210,31 @@ function fsHitTest(pt,layer){
   }
   var fillHit=layer.hitTest(pt,{fill:true,tolerance:0});
   if(fillHit&&fillHit.item instanceof Path&&fillHit.item.fillColor){
-    var fp=fillHit.item;
-    var region=fsFindFillRegion(fp,pt,layer);
-    if(region){region.regionPath.remove();return{path:fp,kind:'fillregion',boundaryStart:region.boundaryStart,boundaryEnd:region.boundaryEnd,cutter:region.cutter,cutterA:region.cutterA,cutterB:region.cutterB};}
+    // A wide/scattered/fanned brush texture (esp. tipShape:'bristle' — dabs
+    // deliberately spread well past the anchor's own stroke tolerance) can
+    // put the click on an individual dab's fill rather than the anchor's
+    // own geometry. Dabs are disposable rendering detail, not something the
+    // user should be able to select/recolor/delete one-at-a-time here —
+    // resolve back to the anchor exactly like subselect already does
+    // (resolveBrushAnchor, used by the node-edit tool) so Fill/Stroke
+    // Select always operates on "the brush stroke", not "the fleck I
+    // happened to click".
+    var fp=resolveBrushAnchor(fillHit.item,layer);
+    if(fp!==fillHit.item){
+      // The anchor of a stroke-only (no-fill) textured brush has no real
+      // fillColor of its own (opacity:0 invisible-anchor trick) — a "fill"
+      // selection on it would be meaningless. Re-run as a STROKE hit
+      // against the anchor's own geometry instead, which is what the user
+      // actually meant to select.
+      if(!fp.fillColor&&fp.strokeColor){
+        var offs2=fsIntersectionOffsets(fp,layer);
+        var seg2=fsSegmentBounds(fp,pt,offs2);
+        return{path:fp,kind:'stroke',segStart:seg2.segStart,segEnd:seg2.segEnd,closed:fp.closed};
+      }
+    }else{
+      var region=fsFindFillRegion(fp,pt,layer);
+      if(region){region.regionPath.remove();return{path:fp,kind:'fillregion',boundaryStart:region.boundaryStart,boundaryEnd:region.boundaryEnd,cutter:region.cutter,cutterA:region.cutterA,cutterB:region.cutterB};}
+    }
     return{path:fp,kind:'fill'};
   }
   return null;

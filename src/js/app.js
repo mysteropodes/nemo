@@ -297,7 +297,15 @@ function serP(p){var isVB=!!(p.data&&p.data.isVectorBrush);var center=isVB&&p.da
   // A brush-texture anchor with a fill deliberately carries strokeColor=null
   // (the dabs ARE its stroke — applyBrushTexture) — the '#ffffff' fallback
   // below would resurrect a white outline on it after every save/reload.
-  var isTexAnchor=!!(p.data&&p.data.brushTexturePreset);
+  // The dabs themselves (isBrushTextureCopy) need the SAME exemption —
+  // missed originally because only brushTexturePreset (anchor-only) was
+  // checked, so every dab silently grew a phantom white strokeColor on the
+  // very next save/reload. Invisible on the default white canvas (easy to
+  // miss), but a REAL stroke nonetheless: it made Fill/Stroke Select's
+  // stroke hit-test match individual dabs instead of falling through to
+  // the fill-hit path, letting a click select/delete/recolor one dab
+  // fleck instead of the whole textured stroke.
+  var isTexAnchor=!!(p.data&&(p.data.brushTexturePreset||p.data.isBrushTextureCopy));
   // Same fallback hazard for a Fill/Shadow channel layer (Stroke/Fill/
   // Shadow split, convertLayerToStrokeFillShadowFolder): enforceChannelStrip
   // nulls strokeColor on every non-stroke-channel path on purpose — without
@@ -355,7 +363,7 @@ function desP(d,layer,op){var prev=project.activeLayer;layer.activate();var p=ne
   var dLayerIdx=userLayers.indexOf(layer);var dChLayer=dLayerIdx>=0?state.layers[dLayerIdx]:null;
   var dNoStrokeChannel=!!(dChLayer&&dChLayer.channel==='fill');
   var dIsShadowChannel=!!(dChLayer&&dChLayer.channel==='shadow');
-  p.strokeColor=d.strokeColor||((d.isVectorBrush||d.brushTexturePreset||dNoStrokeChannel||dIsShadowChannel)?null:'#fff');p.strokeWidth=d.strokeWidth||3;p.strokeCap=d.strokeCap||'round';p.strokeJoin=d.strokeJoin||'round';if(d.miterLimit!==undefined)p.miterLimit=d.miterLimit;if(d.fillColor)p.fillColor=d.fillColor;else p.fillColor=null;p.opacity=op!==undefined?op:(d.opacity!==undefined?d.opacity:1);if(d.dashArray&&d.dashArray.length)p.dashArray=d.dashArray;if(d.dashOffset!==undefined)p.dashOffset=d.dashOffset;if(d.paintOrder){p.data.paintOrder=d.paintOrder;}if(d.isVectorBrush){p.data.isVectorBrush=true;if(d.centerSegments)p.data.centerSegments=d.centerSegments;if(d.widthProfile)p.data.widthProfile=d.widthProfile;}if(d.fillSeed){p.data.fillSeed=d.fillSeed;p.data.fillGapPx=d.fillGapPx;}if(d.fillWalls)p.data.fillWalls=d.fillWalls;if(d.strokeId)p.data.strokeId=d.strokeId;if(d.brushGroupId)p.data.brushGroupId=d.brushGroupId;if(d.isBrushTextureCopy)p.data.isBrushTextureCopy=true;if(d.brushTexturePreset)p.data.brushTexturePreset=d.brushTexturePreset;if(d.preTextureOpacity!==undefined)p.data.preTextureOpacity=d.preTextureOpacity;if(d.preTextureStroke!==undefined)p.data.preTextureStroke=d.preTextureStroke;if(d.channelTag)p.data.channelTag=d.channelTag;if(d.ownerId)p.data.ownerId=d.ownerId;if(d.ownerName)p.data.ownerName=d.ownerName;if(d.ownerColor)p.data.ownerColor=d.ownerColor;if(d.revisionParentId)p.data.revisionParentId=d.revisionParentId;if(d.isRevisionGhost)p.data.isRevisionGhost=true;if(d.revisionAction)p.data.revisionAction=d.revisionAction;prev.activate();return p;}
+  p.strokeColor=d.strokeColor||((d.isVectorBrush||d.brushTexturePreset||d.isBrushTextureCopy||dNoStrokeChannel||dIsShadowChannel)?null:'#fff');p.strokeWidth=d.strokeWidth||3;p.strokeCap=d.strokeCap||'round';p.strokeJoin=d.strokeJoin||'round';if(d.miterLimit!==undefined)p.miterLimit=d.miterLimit;if(d.fillColor)p.fillColor=d.fillColor;else p.fillColor=null;p.opacity=op!==undefined?op:(d.opacity!==undefined?d.opacity:1);if(d.dashArray&&d.dashArray.length)p.dashArray=d.dashArray;if(d.dashOffset!==undefined)p.dashOffset=d.dashOffset;if(d.paintOrder){p.data.paintOrder=d.paintOrder;}if(d.isVectorBrush){p.data.isVectorBrush=true;if(d.centerSegments)p.data.centerSegments=d.centerSegments;if(d.widthProfile)p.data.widthProfile=d.widthProfile;}if(d.fillSeed){p.data.fillSeed=d.fillSeed;p.data.fillGapPx=d.fillGapPx;}if(d.fillWalls)p.data.fillWalls=d.fillWalls;if(d.strokeId)p.data.strokeId=d.strokeId;if(d.brushGroupId)p.data.brushGroupId=d.brushGroupId;if(d.isBrushTextureCopy)p.data.isBrushTextureCopy=true;if(d.brushTexturePreset)p.data.brushTexturePreset=d.brushTexturePreset;if(d.preTextureOpacity!==undefined)p.data.preTextureOpacity=d.preTextureOpacity;if(d.preTextureStroke!==undefined)p.data.preTextureStroke=d.preTextureStroke;if(d.channelTag)p.data.channelTag=d.channelTag;if(d.ownerId)p.data.ownerId=d.ownerId;if(d.ownerName)p.data.ownerName=d.ownerName;if(d.ownerColor)p.data.ownerColor=d.ownerColor;if(d.revisionParentId)p.data.revisionParentId=d.revisionParentId;if(d.isRevisionGhost)p.data.isRevisionGhost=true;if(d.revisionAction)p.data.revisionAction=d.revisionAction;prev.activate();return p;}
 // Phase 2 (async multi-user sync): merges a remote collaborator's exported
 // project JSON into the CURRENT live document at the data level (state.layers
 // serialized strokes — not live Paper objects), so it works the same whether
