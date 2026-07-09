@@ -218,7 +218,14 @@
       var prevA = project.activeLayer;
       marqueeLayer.activate();
       if (_marquee.rect) _marquee.rect.remove();
-      _marquee.rect = new Path.Rectangle({ from: pt, to: pt });
+      // Lasso (v19) : Alt+drag sur le vide = selection a main levee (le
+      // standard TVPaint/Photoshop), sinon marquee rectangulaire classique.
+      _marquee.lasso = !!e.altKey;
+      if (_marquee.lasso) {
+        _marquee.rect = new Path({ segments: [pt], closed: false });
+      } else {
+        _marquee.rect = new Path.Rectangle({ from: pt, to: pt });
+      }
       _marquee.active = true; _marquee.start = pt.clone();
       prevA.activate();
     }
@@ -234,12 +241,16 @@
     var pt = new Point(w[0], w[1]);
 
     if (mode === 'marquee') {
-      var mx1 = Math.min(marqueeStart.x, pt.x), my1 = Math.min(marqueeStart.y, pt.y);
-      var mx2 = Math.max(marqueeStart.x, pt.x), my2 = Math.max(marqueeStart.y, pt.y);
       var prevA = project.activeLayer;
       marqueeLayer.activate();
-      if (_marquee.rect) _marquee.rect.remove();
-      _marquee.rect = new Path.Rectangle({ from: new Point(mx1, my1), to: new Point(mx2, my2) });
+      if (_marquee.lasso) {
+        _marquee.rect.add(pt);
+      } else {
+        var mx1 = Math.min(marqueeStart.x, pt.x), my1 = Math.min(marqueeStart.y, pt.y);
+        var mx2 = Math.max(marqueeStart.x, pt.x), my2 = Math.max(marqueeStart.y, pt.y);
+        if (_marquee.rect) _marquee.rect.remove();
+        _marquee.rect = new Path.Rectangle({ from: new Point(mx1, my1), to: new Point(mx2, my2) });
+      }
       prevA.activate();
     } else if (mode === 'move') {
       if (!moveStarted) { pushUndo(); moveStarted = true; }
@@ -346,6 +357,11 @@
     } else if (mode === 'marquee') {
       if (_marquee.rect) {
         var mb = _marquee.rect.bounds;
+        var lassoPath = null;
+        if (_marquee.lasso && _marquee.rect.segments.length > 2) {
+          _marquee.rect.closePath();
+          lassoPath = _marquee.rect;
+        }
         var layer2 = userLayers[state.activeLayerIdx];
         layer2.children.forEach(function (c) {
           // A linkedFill backdrop (c.data.isLinkedFillCompanion) is never
@@ -356,6 +372,9 @@
           // pick it up as a second, independent hit whenever the box
           // covered both.
           if (((c instanceof Path && c.segments.length > 0 && (c.strokeColor || c.fillColor)) || c instanceof Raster) && mb.intersects(c.bounds) && !(c.data && (c.data.isLinkedFillCompanion || c.data.isBrushTextureCopy))) {
+            // Lasso : le test bounds ne suffit pas (le lasso peut serpenter) —
+            // l'item doit avoir son centre DANS le trace, ou le croiser.
+            if (lassoPath && !(lassoPath.contains(c.position) || (c instanceof Path && lassoPath.intersects(c)))) return;
             if (selectedPaths.indexOf(c) < 0) selectedPaths.push(c);
           }
         });

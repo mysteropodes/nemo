@@ -1130,6 +1130,7 @@ function convertLayerToStrokeFillShadowFolder(layerIdx){
 function goToFrame(idx){
   if(idx<0||idx>=state.totalFrames)return;
   saveAllLayerFrames();state.currentFrame=idx;window._curFrame=idx;
+  if(window.SMAudio&&!state.playing)SMAudio.scrubAt(idx); // scrub audio au deplacement du playhead (v19)
   loadFrame(idx);if(!state.playing){renderOS();renderArcs();updateUI();}else{updatePlayhead();}
 }
 

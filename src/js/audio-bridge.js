@@ -266,7 +266,31 @@
     r.readAsDataURL(file);
   }
 
+  // Audio scrubbing (v19) : jouer une tranche d'une frame quand le playhead
+  // se deplace hors lecture — le reperage lip-sync de TVPaint/Callipeg.
+  // Throttle (un scrub max par ~40ms) pour qu'un drag rapide ne declenche
+  // pas des dizaines de sources superposees.
+  var _lastScrubT = 0;
+  function scrubAt(frame) {
+    var now = performance.now();
+    if (now - _lastScrubT < 40) return;
+    _lastScrubT = now;
+    var c = ensureCtx();
+    if (!c) return;
+    tracks().forEach(function (track) {
+      if (track.muted || !track._buffer) return;
+      var tSec = (frame - (track.offsetFrames || 0)) / state.fps;
+      if (tSec < 0 || tSec >= track._buffer.duration) return;
+      var src = c.createBufferSource();
+      src.buffer = track._buffer;
+      var gain = c.createGain();
+      gain.gain.value = track.volume !== undefined ? track.volume : 1;
+      src.connect(gain); gain.connect(c.destination);
+      src.start(0, tSec, Math.max(1 / state.fps, 0.045));
+    });
+  }
   window.SMAudio = {
+    scrubAt: scrubAt,
     onPlayStart: function (frame) { ensureCtx(); restartAt(frame); },
     onPlayStop: stopAll,
     onLoop: function (frame) { restartAt(frame); },

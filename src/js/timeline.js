@@ -78,7 +78,7 @@ window.SM={
     }
     if(t!=='select'&&t!=='subselect')clearSel();if(t!=='fsselect')fsClearSel();if(t!=='pen'&&_pen.path)finalizePen();if(t!=='eraser'&&typeof _eraserCursor!=='undefined'&&_eraserCursor){_eraserCursor.remove();_eraserCursor=null;}state.tool=t;renderArcs();
     document.querySelectorAll('.tool-btn').forEach(function(b){b.classList.toggle('active',b.dataset.tool===t);});
-    var cc={draw:'crosshair',pen:'crosshair',line:'crosshair',rect:'crosshair',ellipse:'crosshair',select:'default',subselect:'default',fsselect:'default',comment:'crosshair',camera:'move',eraser:'pointer',fill:'crosshair',fillbrush:'crosshair',eyedropper:'crosshair',hand:'grab',zoom:'zoom-in',rotate:'grab',perspective:'crosshair'};
+    var cc={draw:'crosshair',pen:'crosshair',line:'crosshair',rect:'crosshair',ellipse:'crosshair',select:'default',subselect:'default',fsselect:'default',comment:'crosshair',camera:'move',text:'text',eraser:'pointer',fill:'crosshair',fillbrush:'crosshair',eyedropper:'crosshair',hand:'grab',zoom:'zoom-in',rotate:'grab',perspective:'crosshair'};
     canvasEl.style.cursor=cc[t]||'default';
     updatePropsContext();},
   toggleOnion:function(){state.onionSkin=!state.onionSkin;renderOS();var el=document.getElementById('os-st');el.textContent=state.onionSkin?'ON':'OFF';el.style.color=state.onionSkin?'var(--green)':'var(--text-dim)';var b=document.getElementById('btn-os');if(b)b.classList.toggle('active',state.onionSkin);},
@@ -480,6 +480,71 @@ window.SM={
       cameraKeys:state.cameraKeys||[],cameraLayerOn:!!state.cameraLayerOn});
   },
   mergeRemoteSnapshot:function(remoteData,remoteProfile){return mergeRemoteSnapshot(remoteData,remoteProfile);},
+  // Cycles (v19) : repete N fois la plage de frames selectionnee (walk
+  // cycles etc. — TVPaint instances / Animate graphic loop, version copie).
+  // Copie profonde des strokes, frames marquees keyframe, timeline etendue
+  // si besoin. strokeIds conserves : c'est le MEME dessin qui revient, le
+  // matching de tween inter-cles continue de fonctionner.
+  repeatSelection:function(times){
+    var b=selBounds();
+    if(!b){showToast('Selectionne d\'abord une plage de frames dans la timeline');return;}
+    times=Math.max(1,Math.min(50,parseInt(times,10)||1));
+    pushUndoLayers();
+    saveAllLayerFrames();
+    var span=b.maxF-b.minF+1;
+    var needed=b.maxF+1+span*times;
+    if(needed>state.totalFrames){
+      var add=needed-state.totalFrames;
+      for(var li=0;li<state.layers.length;li++){for(var a=0;a<add;a++)state.layers[li].frames.push({strokes:[],isKeyframe:false,isInterpolated:false});}
+      state.totalFrames=needed;window._totalF=needed;
+      if(state.waOut<needed-1){state.waOut=needed-1;window._waOut=state.waOut;}
+    }
+    for(var l=b.minL;l<=b.maxL;l++){
+      if(!state.layers[l]||state.layers[l].symbolId)continue;
+      for(var r=1;r<=times;r++){
+        for(var f=b.minF;f<=b.maxF;f++){
+          var src=state.layers[l].frames[f];
+          var dst=b.maxF+ (r-1)*span + (f-b.minF) + 1;
+          state.layers[l].frames[dst]={strokes:JSON.parse(JSON.stringify(src.strokes||[])),isKeyframe:!!src.isKeyframe,isInterpolated:!!src.isInterpolated};
+        }
+      }
+    }
+    loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
+    showToast('Cycle : plage repetee '+times+' fois');
+  },
+  // Propagation de couleur (v19) : applique la couleur du fill/trait
+  // selectionne a TOUTES les occurrences du meme strokeId sur toutes les
+  // frames de tous les calques (ink & paint : recolorer un aplat sur toute
+  // la sequence en un clic, facon CTG TVPaint).
+  propagateColorAllFrames:function(){
+    var sid=null,fillHex=null,strokeHex=null;
+    if(state.tool==='fsselect'&&_fsSel&&_fsSel.path&&_fsSel.path.data){
+      sid=_fsSel.path.data.strokeId;
+      if(_fsSel.kind==='stroke'&&_fsSel.path.strokeColor)strokeHex=colorHex8(_fsSel.path.strokeColor);
+      else if(_fsSel.path.fillColor)fillHex=colorHex8(_fsSel.path.fillColor);
+    }else if(selectedPaths.length===1&&selectedPaths[0].data){
+      var p0=selectedPaths[0];sid=p0.data.strokeId;
+      if(p0.fillColor)fillHex=colorHex8(p0.fillColor);
+      if(p0.strokeColor)strokeHex=colorHex8(p0.strokeColor);
+    }
+    if(!sid){showToast('Selectionne un trait/fill (outil V ou M) a propager');return;}
+    pushUndoLayers();saveAllLayerFrames();
+    var count=0;
+    for(var li=0;li<state.layers.length;li++){
+      var frames=state.layers[li].frames;
+      for(var fi=0;fi<frames.length;fi++){
+        var strokes=frames[fi]&&frames[fi].strokes;if(!strokes)continue;
+        for(var si=0;si<strokes.length;si++){
+          if(strokes[si].strokeId!==sid)continue;
+          if(fillHex&&strokes[si].fillColor)strokes[si].fillColor=fillHex;
+          if(strokeHex&&strokes[si].strokeColor)strokes[si].strokeColor=strokeHex;
+          count++;
+        }
+      }
+    }
+    loadFrame(state.currentFrame);updateUI();
+    showToast('Couleur propagee sur '+count+' frame(s)');
+  },
   importJSON:function(json,silent){
     try{var d=JSON.parse(json);if(!d.layers&&!d.frames)throw new Error('Invalid');
     if(state.activeSymbolId)exitToScene();
@@ -1911,6 +1976,67 @@ function initCommentPopover(){
   },true);
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initCommentPopover);else initCommentPopover();
+// ---- Outil texte (v19) ----
+// Le moteur Rust ne rasterise pas de glyphes : le texte est rendu une fois
+// dans un canvas offscreen (2x pour la nettete) puis insere comme Raster —
+// le pipeline image existant (serR/desR, registerImagePixels) fait tout le
+// reste (persistance, rendu, selection/deplacement via l'outil V).
+var _textPendingPt=null;
+function openTextPopover(worldPt){
+  _textPendingPt=worldPt.clone();
+  var pop=document.getElementById('text-popover');if(!pop)return;
+  var v=view.projectToView(worldPt);
+  var cr=document.getElementById('drawing-canvas').getBoundingClientRect();
+  pop.style.display='block';
+  pop.style.left=Math.min(window.innerWidth-240,Math.max(4,cr.left+v.x+10))+'px';
+  pop.style.top=Math.min(window.innerHeight-180,Math.max(4,cr.top+v.y+10))+'px';
+  var ta=document.getElementById('text-input');ta.value='';ta.focus();
+}
+function closeTextPopover(){var pop=document.getElementById('text-popover');if(pop)pop.style.display='none';_textPendingPt=null;}
+function commitText(){
+  var txt=document.getElementById('text-input').value;
+  if(!txt.trim()||!_textPendingPt){closeTextPopover();return;}
+  var size=parseInt(document.getElementById('text-size').value,10)||48;
+  var font=document.getElementById('text-font').value||'sans-serif';
+  var color=state.strokeColor||'#000';
+  var lines=txt.split('\n');
+  var off=document.createElement('canvas');
+  var octx=off.getContext('2d');
+  octx.font=size*2+'px '+font;
+  var wMax=1;lines.forEach(function(l){wMax=Math.max(wMax,octx.measureText(l).width);});
+  off.width=Math.ceil(wMax)+8;off.height=lines.length*size*2*1.25+8;
+  octx=off.getContext('2d');
+  octx.font=size*2+'px '+font;octx.fillStyle=color;octx.textBaseline='top';
+  lines.forEach(function(l,i){octx.fillText(l,4,4+i*size*2*1.25);});
+  var url=off.toDataURL('image/png');
+  pushUndo();
+  var layer=userLayers[state.activeLayerIdx];
+  var prev=project.activeLayer;layer.activate();
+  var r=new Raster(url);
+  r.data.src=url;r.data.isText=true;
+  var pt=_textPendingPt;
+  r.onLoad=function(){r.size=new Size(off.width/2,off.height/2);r.position=pt;saveActiveLayerFrame();updateUI();if(window.SMEngineBridge){if(r.canvas)SMEngineBridge.registerImagePixels&&0;SMEngineBridge.renderNow();}};
+  prev.activate();
+  closeTextPopover();
+}
+function initTextPopover(){
+  var save=document.getElementById('text-apply');if(!save)return;
+  save.addEventListener('click',commitText);
+  document.getElementById('text-cancel').addEventListener('click',closeTextPopover);
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initTextPopover);else initTextPopover();
+window.openTextPopover=openTextPopover;
+function initCycleAndPropagate(){
+  var cyc=document.getElementById('btn-cycle');
+  if(cyc)cyc.addEventListener('click',function(){
+    var n=prompt('Repeter la plage selectionnee combien de fois ?','2');
+    if(n===null)return;
+    window.SM.repeatSelection(n);
+  });
+  var prop=document.getElementById('btn-propagate-color');
+  if(prop)prop.addEventListener('click',function(){window.SM.propagateColorAllFrames();});
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initCycleAndPropagate);else initCycleAndPropagate();
 function initSettingsModal(){
   var btn=document.getElementById('btn-settings'),modal=document.getElementById('settings-modal');
   if(!btn||!modal)return;

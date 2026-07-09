@@ -60,35 +60,45 @@
     return state.cameraKeys.find(function (k) { return k.frame === frame; }) || null;
   }
   function defaultRect() {
-    return { x: state.canvasW / 2, y: state.canvasH / 2, w: state.canvasW };
+    return { x: state.canvasW / 2, y: state.canvasH / 2, w: state.canvasW, rot: 0 };
   }
+  function snap(k) { return { x: k.x, y: k.y, w: k.w, rot: k.rot || 0 }; }
   // The camera rect at ANY frame: exact key, interpolated between keys, or
   // clamped to the first/last key outside the keyed range. Null when the
-  // camera layer has no keys at all.
+  // camera layer has no keys at all. The CENTER travels along a cubic
+  // bezier whose control points are each key's spatial handles (hOut on
+  // the departing key, hIn on the arriving one — [0,0] defaults collapse
+  // to the straight line, so pre-v19 projects behave identically); width
+  // (zoom) and rot (roll) lerp along the same eased t.
   function cameraAtFrame(frame) {
     ensureState();
     var ks = state.cameraKeys;
     if (!ks.length) return null;
-    if (frame <= ks[0].frame) return { x: ks[0].x, y: ks[0].y, w: ks[0].w };
+    if (frame <= ks[0].frame) return snap(ks[0]);
     var last = ks[ks.length - 1];
-    if (frame >= last.frame) return { x: last.x, y: last.y, w: last.w };
+    if (frame >= last.frame) return snap(last);
     for (var i = 0; i < ks.length - 1; i++) {
       var a = ks[i], b = ks[i + 1];
       if (frame >= a.frame && frame < b.frame) {
         var t = (frame - a.frame) / (b.frame - a.frame);
         var e = a.ease || DEFAULT_EASE;
         var y = bezierEase(t, e[0], e[1], e[2], e[3]);
-        return { x: a.x + (b.x - a.x) * y, y: a.y + (b.y - a.y) * y, w: a.w + (b.w - a.w) * y };
+        var ho = a.hOut || [0, 0], hi = b.hIn || [0, 0];
+        var p1x = a.x + ho[0], p1y = a.y + ho[1], p2x = b.x + hi[0], p2y = b.y + hi[1];
+        var v = 1 - y;
+        var px = v * v * v * a.x + 3 * v * v * y * p1x + 3 * v * y * y * p2x + y * y * y * b.x;
+        var py = v * v * v * a.y + 3 * v * v * y * p1y + 3 * v * y * y * p2y + y * y * y * b.y;
+        return { x: px, y: py, w: a.w + (b.w - a.w) * y, rot: (a.rot || 0) + ((b.rot || 0) - (a.rot || 0)) * y };
       }
     }
-    return { x: last.x, y: last.y, w: last.w };
+    return snap(last);
   }
   function setKey(frame, rect) {
     ensureState();
     var k = keyAt(frame);
-    if (k) { k.x = rect.x; k.y = rect.y; k.w = rect.w; }
+    if (k) { k.x = rect.x; k.y = rect.y; k.w = rect.w; if (rect.rot !== undefined) k.rot = rect.rot; }
     else {
-      state.cameraKeys.push({ frame: frame, x: rect.x, y: rect.y, w: rect.w, ease: DEFAULT_EASE.slice() });
+      state.cameraKeys.push({ frame: frame, x: rect.x, y: rect.y, w: rect.w, rot: rect.rot || 0, hOut: [0, 0], hIn: [0, 0], ease: DEFAULT_EASE.slice() });
       sortKeys();
     }
     return keyAt(frame);
@@ -112,10 +122,10 @@
 
   // ---- canvas overlay (engine scene items, non-destructive — same
   // pattern as the revision outlines / comment pins) ----
-  function dashedRectItems(cx, cy, w, h, col, sw, dash, items) {
-    var l = cx - w / 2, t = cy - h / 2, r = cx + w / 2, b = cy + h / 2;
+  function dashedRectItems(k, col, sw, dash, items) {
+    var cs = corners(k);
     items.push({
-      segments: [{ point: [l, t] }, { point: [r, t] }, { point: [r, b] }, { point: [l, b] }],
+      segments: cs.map(function (p) { return { point: p }; }),
       closed: true, fillColor: null, strokeColor: col, strokeWidth: sw,
       dashPattern: dash || undefined
     });
@@ -124,11 +134,17 @@
     items.push({ segments: [{ point: [cx - s, cy] }, { point: [cx + s, cy] }], closed: false, fillColor: null, strokeColor: col, strokeWidth: sw });
     items.push({ segments: [{ point: [cx, cy - s] }, { point: [cx, cy + s] }], closed: false, fillColor: null, strokeColor: col, strokeWidth: sw });
   }
+  function rotPt(px, py, cx, cy, deg) {
+    if (!deg) return [px, py];
+    var a = deg * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
+    var dx = px - cx, dy = py - cy;
+    return [cx + dx * c - dy * s, cy + dx * s + dy * c];
+  }
   function corners(k) {
-    var h = keyHeight(k);
+    var h = keyHeight(k), r = k.rot || 0;
     return [
-      [k.x - k.w / 2, k.y - h / 2], [k.x + k.w / 2, k.y - h / 2],
-      [k.x + k.w / 2, k.y + h / 2], [k.x - k.w / 2, k.y + h / 2],
+      rotPt(k.x - k.w / 2, k.y - h / 2, k.x, k.y, r), rotPt(k.x + k.w / 2, k.y - h / 2, k.x, k.y, r),
+      rotPt(k.x + k.w / 2, k.y + h / 2, k.x, k.y, r), rotPt(k.x - k.w / 2, k.y + h / 2, k.x, k.y, r),
     ];
   }
   function buildOverlayItems() {
@@ -140,7 +156,7 @@
     var curCol = [255, 170, 40, 255]; // accent : rect interpolé de la frame courante
     var dash = [6 * zs, 5 * zs];
     state.cameraKeys.forEach(function (k) {
-      dashedRectItems(k.x, k.y, k.w, keyHeight(k), keyCol, 1.5 * zs, dash, items);
+      dashedRectItems(k, keyCol, 1.5 * zs, dash, items);
       crossItems(k.x, k.y, 7 * zs, keyCol, 1.5 * zs, items);
     });
     // liens pointillés coin-à-coin entre clés consécutives (cf. mockup de réf)
@@ -149,58 +165,133 @@
       for (var c = 0; c < 4; c++) {
         items.push({ segments: [{ point: ca[c] }, { point: cb[c] }], closed: false, fillColor: null, strokeColor: [130, 130, 140, 130], strokeWidth: 1 * zs, dashPattern: [3 * zs, 4 * zs] });
       }
+      // trajectoire réelle du centre (bezier spatiale) échantillonnée —
+      // droite quand les poignées sont à [0,0]
+      var a2 = state.cameraKeys[i], b2 = state.cameraKeys[i + 1];
+      var ho = a2.hOut || [0, 0], hi = b2.hIn || [0, 0];
+      if (ho[0] || ho[1] || hi[0] || hi[1]) {
+        var pts = [];
+        for (var s2 = 0; s2 <= 20; s2++) {
+          var t2 = s2 / 20, v2 = 1 - t2;
+          pts.push({ point: [
+            v2 * v2 * v2 * a2.x + 3 * v2 * v2 * t2 * (a2.x + ho[0]) + 3 * v2 * t2 * t2 * (b2.x + hi[0]) + t2 * t2 * t2 * b2.x,
+            v2 * v2 * v2 * a2.y + 3 * v2 * v2 * t2 * (a2.y + ho[1]) + 3 * v2 * t2 * t2 * (b2.y + hi[1]) + t2 * t2 * t2 * b2.y] });
+        }
+        items.push({ segments: pts, closed: false, fillColor: null, strokeColor: [255, 170, 40, 160], strokeWidth: 1.2 * zs, dashPattern: [4 * zs, 3 * zs] });
+      }
     }
     var cam = cameraAtFrame(state.currentFrame);
     if (cam) {
       var isKey = !!keyAt(state.currentFrame);
-      dashedRectItems(cam.x, cam.y, cam.w, cam.w * aspect(), curCol, 2 * zs, isKey ? undefined : dash, items);
+      dashedRectItems(cam, curCol, 2 * zs, isKey ? undefined : dash, items);
       crossItems(cam.x, cam.y, 9 * zs, curCol, 2 * zs, items);
       if (state.tool === 'camera') {
-        // poignées de resize aux 4 coins (visibles seulement avec l'outil actif)
-        corners({ x: cam.x, y: cam.y, w: cam.w }).forEach(function (pt) {
+        // poignées de resize aux 4 coins
+        corners(cam).forEach(function (pt) {
           var s = 5 * zs;
           items.push({ segments: [{ point: [pt[0] - s, pt[1] - s] }, { point: [pt[0] + s, pt[1] - s] }, { point: [pt[0] + s, pt[1] + s] }, { point: [pt[0] - s, pt[1] + s] }], closed: true, fillColor: [255, 170, 40, 255], strokeColor: [30, 30, 30, 255], strokeWidth: 1 * zs });
+        });
+        // poignée de rotation (roll) : tige + pastille au-dessus du bord haut
+        var stalk = rotationHandlePos(cam);
+        var topMid = rotPt(cam.x, cam.y - keyHeight(cam) / 2, cam.x, cam.y, cam.rot || 0);
+        items.push({ segments: [{ point: topMid }, { point: stalk }], closed: false, fillColor: null, strokeColor: curCol, strokeWidth: 1.2 * zs });
+        items.push({ segments: circleSegs(stalk[0], stalk[1], 6 * zs), closed: true, fillColor: [255, 255, 255, 255], strokeColor: curCol, strokeWidth: 1.5 * zs });
+        // poignées spatiales de trajectoire sur chaque clé (petits ronds pleins)
+        state.cameraKeys.forEach(function (k, ki) {
+          var hs = [];
+          if (ki < state.cameraKeys.length - 1) hs.push(['hOut', k.hOut || [0, 0]]);
+          if (ki > 0) hs.push(['hIn', k.hIn || [0, 0]]);
+          hs.forEach(function (h) {
+            var hx = k.x + h[1][0], hy = k.y + h[1][1];
+            items.push({ segments: [{ point: [k.x, k.y] }, { point: [hx, hy] }], closed: false, fillColor: null, strokeColor: [255, 170, 40, 140], strokeWidth: 1 * zs });
+            items.push({ segments: circleSegs(hx, hy, 4.5 * zs), closed: true, fillColor: [255, 170, 40, 230], strokeColor: [30, 30, 30, 255], strokeWidth: 1 * zs });
+          });
         });
       }
     }
     return items;
   }
+  function circleSegs(cx, cy, r) {
+    var k = r * 0.5523;
+    return [
+      { point: [cx + r, cy], handleIn: [0, k], handleOut: [0, -k] },
+      { point: [cx, cy - r], handleIn: [k, 0], handleOut: [-k, 0] },
+      { point: [cx - r, cy], handleIn: [0, -k], handleOut: [0, k] },
+      { point: [cx, cy + r], handleIn: [-k, 0], handleOut: [k, 0] },
+    ];
+  }
+  function rotationHandlePos(cam) {
+    var d = keyHeight(cam) / 2 + 30 / Math.max(0.0001, view.zoom);
+    return rotPt(cam.x, cam.y - d, cam.x, cam.y, cam.rot || 0);
+  }
 
   // ---- gizmo interactions (Paper-native tool events, delegated from
   // tools.js when state.tool === 'camera') ----
-  var _drag = null; // {mode:'move'|'resize', corner, startPt, startRect, key}
+  var _drag = null; // {mode:'move'|'resize'|'rotate'|'handle', ...}
   function hitCorner(pt, cam) {
     var tol = 12 / view.zoom;
-    var cs = corners({ x: cam.x, y: cam.y, w: cam.w });
+    var cs = corners(cam);
     for (var i = 0; i < 4; i++) {
       if (Math.abs(pt.x - cs[i][0]) < tol && Math.abs(pt.y - cs[i][1]) < tol) return i;
     }
     return -1;
   }
+  // Poignée spatiale (trajectoire) de n'importe quelle clé sous le pointeur.
+  function hitTrajectoryHandle(pt) {
+    var tol = 10 / view.zoom;
+    for (var i = 0; i < state.cameraKeys.length; i++) {
+      var k = state.cameraKeys[i];
+      var hs = [];
+      if (i < state.cameraKeys.length - 1) hs.push(['hOut', k.hOut || [0, 0]]);
+      if (i > 0) hs.push(['hIn', k.hIn || [0, 0]]);
+      for (var j = 0; j < hs.length; j++) {
+        var hx = k.x + hs[j][1][0], hy = k.y + hs[j][1][1];
+        if (Math.hypot(pt.x - hx, pt.y - hy) < tol) return { key: k, which: hs[j][0] };
+      }
+    }
+    return null;
+  }
   function onDown(event) {
     ensureState();
     if (!state.cameraLayerOn) return;
     var cam = cameraAtFrame(state.currentFrame) || defaultRect();
-    var corner = hitCorner(event.point, cam);
-    var h = cam.w * aspect();
-    var inside = Math.abs(event.point.x - cam.x) < cam.w / 2 && Math.abs(event.point.y - cam.y) < h / 2;
-    if (corner < 0 && !inside) return;
+    var traj = hitTrajectoryHandle(event.point);
+    var rotH = rotationHandlePos(cam);
+    var onRot = Math.hypot(event.point.x - rotH[0], event.point.y - rotH[1]) < 12 / view.zoom;
+    var corner = !traj && !onRot ? hitCorner(event.point, cam) : -1;
+    // inside-test dans le repère du rect (inverse-rotation du point)
+    var lp = rotPt(event.point.x, event.point.y, cam.x, cam.y, -(cam.rot || 0));
+    var inside = Math.abs(lp[0] - cam.x) < cam.w / 2 && Math.abs(lp[1] - cam.y) < keyHeight(cam) / 2;
+    if (!traj && !onRot && corner < 0 && !inside) return;
+    pushUndo(); // le snapshot (v19) porte aussi cameraKeys — Cmd+Z restaure le cadrage
+    if (traj) {
+      _drag = { mode: 'handle', key: traj.key, which: traj.which };
+      return;
+    }
     // Éditer une frame sans clé crée la clé (à partir du rect interpolé) —
     // le geste naturel des apps d'anim : on se place, on cadre, c'est clé.
     var key = keyAt(state.currentFrame) || setKey(state.currentFrame, cam);
-    _drag = { mode: corner >= 0 ? 'resize' : 'move', corner: corner, startPt: event.point.clone(), startRect: { x: key.x, y: key.y, w: key.w }, key: key };
+    _drag = { mode: onRot ? 'rotate' : corner >= 0 ? 'resize' : 'move', startPt: event.point.clone(), startRect: snap(key), key: key };
   }
   function onDrag(event) {
     if (!_drag) return;
-    var k = _drag.key, s = _drag.startRect;
-    if (_drag.mode === 'move') {
-      k.x = s.x + (event.point.x - _drag.startPt.x);
-      k.y = s.y + (event.point.y - _drag.startPt.y);
+    var k = _drag.key;
+    if (_drag.mode === 'handle') {
+      k[_drag.which] = [event.point.x - k.x, event.point.y - k.y];
     } else {
-      // resize aspect-lock : la distance au centre pilote la largeur (zoom)
-      var d0 = Math.max(1, Math.abs(_drag.startPt.x - s.x) + Math.abs(_drag.startPt.y - s.y));
-      var d1 = Math.abs(event.point.x - s.x) + Math.abs(event.point.y - s.y);
-      k.w = Math.max(20, s.w * (d1 / d0));
+      var s = _drag.startRect;
+      if (_drag.mode === 'move') {
+        k.x = s.x + (event.point.x - _drag.startPt.x);
+        k.y = s.y + (event.point.y - _drag.startPt.y);
+      } else if (_drag.mode === 'rotate') {
+        // angle pointeur→centre ; la poignée vit au-dessus du bord haut (−90°)
+        k.rot = Math.atan2(event.point.y - s.y, event.point.x - s.x) * 180 / Math.PI + 90;
+      } else {
+        // resize aspect-lock : la distance au centre pilote la largeur (zoom)
+        var d0 = Math.max(1, Math.abs(_drag.startPt.x - s.x) + Math.abs(_drag.startPt.y - s.y));
+        var d1 = Math.abs(event.point.x - s.x) + Math.abs(event.point.y - s.y);
+        k.w = Math.max(20, s.w * (d1 / d0));
+      }
     }
     if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
     renderCameraRow();
@@ -227,6 +318,7 @@
     eye.addEventListener('click', function (e) {
       e.stopPropagation();
       state.cameraView = !state.cameraView;
+      if (!state.cameraView) { state.canvasRotation = 0; if (window.SMEngineBridge) window.SMEngineBridge.renderNow(true); }
       applyCameraView();
       renderLayerList();
     });
@@ -276,6 +368,10 @@
     if (!cam) return;
     view.center = new Point(cam.x, cam.y);
     view.zoom = view.viewSize.width / cam.w;
+    // Roll : réutilise le canal de rotation de viewport existant (radians,
+    // déjà synchronisé au moteur Rust via syncViewport) — négatif car
+    // tourner la caméra dans un sens fait tourner la scène dans l'autre.
+    state.canvasRotation = -(cam.rot || 0) * Math.PI / 180;
     if (window.updZoom) updZoom();
     if (window.SMEngineBridge) window.SMEngineBridge.renderNow(true);
   }
@@ -291,6 +387,7 @@
     var cam = cameraAtFrame(frameIdx);
     if (!cam) return;
     var s = state.canvasW / cam.w;
+    if (cam.rot) L.rotate(-cam.rot, new Point(cam.x, cam.y));
     L.scale(s, new Point(cam.x, cam.y));
     L.translate(new Point(state.canvasW / 2 - cam.x, state.canvasH / 2 - cam.y));
     var clip = new Path.Rectangle({ point: [0, 0], size: [state.canvasW, state.canvasH], insert: false });
@@ -375,6 +472,7 @@
       var e = seg.ease || (seg.ease = DEFAULT_EASE.slice());
       var c1 = easeToPx(e[0], e[1]), c2 = easeToPx(e[2], e[3]);
       var d1 = Math.hypot(px - c1[0], py - c1[1]), d2 = Math.hypot(px - c2[0], py - c2[1]);
+      pushUndo(); // la courbe fait partie du cadrage — Cmd+Z la restaure aussi
       _easeDrag = { seg: seg, which: d1 <= d2 ? 0 : 1 };
       ev.preventDefault();
     });

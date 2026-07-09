@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>StrokeMotion v0.1.0</title>
+<title>StrokeMotion v0.2.0</title>
 <script src="paper-full.min.js"></script>
 <!-- Manrope (redesign, 2026-07-09) — matches the CSS var font stack's own
      fallback order, so an offline load (no internet, no Tauri font cache)
@@ -88,6 +88,7 @@
          color-coded to the author's profile — see tools.js commentTool*
          and engine-bridge.js buildCommentPinItems. -->
     <button class="tool-btn" data-tool="comment" title="Comment — click the canvas to pin a note (C)"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M20 2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4l4 4 4-4h4a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2z"/></svg><span class="sk">C</span></button>
+    <button class="tool-btn" data-tool="text" title="Texte — clique le canvas pour poser un bloc de texte (rendu image)"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M5 4h14v3h-2V6h-4v12h2v2H9v-2h2V6H7v1H5z"/></svg></button>
     <button class="tool-btn active" data-tool="draw" title="Brush (B)"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M7 14c-1.66 0-3 1.34-3 3 0 1.31-1.16 2-2 2 .92 1.22 2.49 2 4 2 2.21 0 4-1.79 4-4 0-1.66-1.34-3-3-3z"/><path d="M20.71 4.63l-1.34-1.34a1 1 0 00-1.41 0L9 12.25 11.75 15l8.96-8.96a1 1 0 000-1.41z"/></svg><span class="sk">B</span></button>
     <button class="tool-btn" data-tool="pen" title="Pen — click to place points, drag for curves (P)"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="m4.93 21.482 5.845-5.846a2 2 0 1 0-1.414-1.414l-5.846 5.846-1.06-1.06c2.827-3.3 3.888-6.954 5.302-13.082l6.364-.707 5.657 5.657-.707 6.364c-6.128 1.414-9.782 2.475-13.08 5.303l-1.062-1.06v-.001ZM16.595 2.037l6.347 6.346a.5.5 0 0 1-.277.848l-1.474.23-5.656-5.656.212-1.485a.5.5 0 0 1 .848-.283Z"/></svg><span class="sk">P</span></button>
     <button class="tool-btn" data-tool="fillbrush" title="Fill brush — paint a freehand filled shape, pressure-sensitive (N)"><span style="font-size:14px;line-height:1">&#x25CF;</span><span class="sk">N</span></button>
@@ -223,6 +224,7 @@
       <div class="pbdy">
         <div class="pr"><span class="pl">Color</span><div class="cw-mini" id="pm-fill" style="background:transparent" title="Click to pick a color, double-click to toggle fill on/off"><input type="color" id="pm-fill-c" value="#ff0000"></div><input type="checkbox" id="p-fill-on" style="display:none"></div>
         <div class="pr"><span class="pl">Opacity</span><input type="number" class="pi scrub" id="p-opacity" value="100" min="5" max="100" data-step="1"></div>
+        <div class="pr"><button class="pbtn" id="btn-propagate-color" style="flex:1;font-size:10px" title="Applique la couleur du trait/fill selectionne a toutes ses occurrences sur toutes les frames (ink &amp; paint)">Propager la couleur a toutes les frames</button></div>
       </div>
     </div>
     <div class="psec" id="stroke-sec">
@@ -610,6 +612,20 @@
      the clicked canvas point by tools.js's comment-tool click handler
      (openCommentPopover), not a centered modal, so it stays visually tied
      to the spot being discussed. -->
+<div id="text-popover" style="display:none;position:absolute;z-index:200;width:230px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);padding:8px">
+  <textarea id="text-input" rows="2" placeholder="Ton texte..." style="width:100%;resize:vertical;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:12px;padding:5px;box-sizing:border-box"></textarea>
+  <div class="pr" style="margin-top:6px;gap:6px">
+    <input type="number" id="text-size" value="48" min="8" max="400" style="width:56px" class="pi" title="Taille (px)">
+    <select id="text-font" class="psel" style="flex:1">
+      <option value="sans-serif">Sans</option><option value="serif">Serif</option><option value="monospace">Mono</option><option value="Manrope">Manrope</option>
+    </select>
+  </div>
+  <div class="pr" style="margin-top:6px;gap:6px">
+    <button class="pbtn" id="text-cancel" style="font-size:10px;padding:4px 8px">Annuler</button>
+    <button class="pbtn ac" id="text-apply" style="flex:1;font-size:10px;padding:4px 8px">Poser le texte</button>
+  </div>
+</div>
+
 <div id="comment-popover" style="display:none;position:absolute;z-index:200;width:220px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);padding:8px">
   <div id="comment-author-row" style="font-size:10px;color:var(--text-dim);margin-bottom:4px"></div>
   <textarea id="comment-text" rows="3" style="width:100%;resize:vertical;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:11px;padding:5px;box-sizing:border-box"></textarea>
@@ -652,6 +668,7 @@
     <button class="tb" id="btn-ghost-all" title="Ghost all keyframes — shows every keyframe of the active layer at once" style="margin-left:4px"><span style="font-size:13px;line-height:1">&#x2637;</span></button>
     <button class="tb" id="btn-ghost-select" title="Select all keyframes' content to move/transform together" disabled><span style="font-size:12px;line-height:1">&#x2725;</span></button>
     <button class="tb" id="btn-revision-view" title="Vue de révision — cycle Tout / Mes traits / Corrections" style="margin-left:4px;width:auto;padding:0 8px;font-size:10px">Tout</button>
+    <button class="tb" id="btn-cycle" title="Cycle — repete N fois la plage de frames selectionnee (walk cycles)" style="margin-left:4px;width:auto;padding:0 8px;font-size:12px">&#x1F501;</button>
     <button class="tb" id="btn-camera" title="Calque caméra — clés de cadrage (zoom/pan) interpolées avec courbes de Bézier, comme dans TVPaint/Callipeg" style="margin-left:4px"><span style="font-size:12px;line-height:1">&#x1F3A5;</span></button>
     <button class="tb" id="btn-audio" title="Importer une piste audio (mp3/ogg/wav) — waveform sous la timeline, lecture synchronisée" style="margin-left:4px"><span style="font-size:13px;line-height:1">&#x266b;</span></button>
     <input type="file" id="audio-file-input" accept="audio/*" multiple style="display:none">
@@ -689,7 +706,7 @@
 
 <div id="statusbar">
   <span><span class="sc">F5</span>Frame <span class="sc">F6</span>Key <span class="sc">F7</span>Blank <span class="sc">T</span>Tween <span class="sc">D</span>Dupli <span class="sc">F</span>Flip <span class="sc">X</span>Mirror <span class="sc">Enter</span>Play</span>
-  <span id="status-text">StrokeMotion v0.1.0</span>
+  <span id="status-text">StrokeMotion v0.2.0</span>
 </div>
 </div>
 <div id="toast"></div>

@@ -419,7 +419,9 @@ var _xform={active:false,type:null,dir:null,anchor:null,center:null,origHandlePo
 function xformSelBounds(){
   if(!selectedPaths.length)return null;
   var b=null;
-  selectedPaths.forEach(function(p){b=b?b.unite(p.bounds):p.bounds.clone();});
+  // entree falsy/retiree tolerée : une seule entree morte dans selectedPaths
+  // faisait crasher buildSceneJson -> tick() desactivait TOUT le moteur.
+  selectedPaths.forEach(function(p){if(!p||!p.bounds)return;b=b?b.unite(p.bounds):p.bounds.clone();});
   return b;
 }
 // Align toolbar (redesign 2026-07-09) — each selected path moves by its OWN
@@ -2275,6 +2277,8 @@ function onMouseDown(event){
     openCommentPopover(event.point,existing);
   }else if(state.tool==='camera'){
     if(window.SMCamera)SMCamera.onDown(event);
+  }else if(state.tool==='text'){
+    if(window.openTextPopover)openTextPopover(event.point);
   }else if(state.tool==='fsselect'){
     _fsSel=fsHitTest(event.point,layer);
     updateUI();

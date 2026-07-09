@@ -1086,7 +1086,7 @@ function renderOS(){
 // like it only worked for strokes. A full snapshot is ~a few hundred KB
 // per entry (JSON) which at maxUndo=60 stays well within budget.
 function pushUndo(){pushUndoLayers();}
-function layersSnapshotNow(){return{type:'layers',layers:JSON.parse(JSON.stringify(state.layers)),active:state.activeLayerIdx,totalFrames:state.totalFrames};}
+function layersSnapshotNow(){return{type:'layers',layers:JSON.parse(JSON.stringify(state.layers)),active:state.activeLayerIdx,totalFrames:state.totalFrames,cameraKeys:JSON.parse(JSON.stringify(state.cameraKeys||[]))};}
 function pushUndoLayers(){saveAllLayerFrames();state.undoStack.push(layersSnapshotNow());if(state.undoStack.length>state.maxUndo)state.undoStack.shift();state.redoStack=[];}
 function restoreLayersSnapshot(s){
   while(userLayers.length>0)userLayers.pop().remove();
@@ -1096,8 +1096,14 @@ function restoreLayersSnapshot(s){
   if(state.waOut>=s.totalFrames)state.waOut=s.totalFrames-1;window._waOut=state.waOut;
   if(state.currentFrame>=s.totalFrames)state.currentFrame=s.totalFrames-1;
   state.activeLayerIdx=Math.max(0,Math.min(s.active,state.layers.length-1));
+  // Caméra (v19) : les clés caméra font partie du snapshot complet — un
+  // undo après un drag de cadrage restaure le cadrage d'avant, pas
+  // seulement les traits. Les snapshots antérieurs à v19 n'ont pas le
+  // champ : on laisse alors les clés actuelles intactes (undefined check).
+  if(s.cameraKeys!==undefined)state.cameraKeys=JSON.parse(JSON.stringify(s.cameraKeys));
   activateUL(state.activeLayerIdx);
   loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
+  if(window.SMCamera&&window.updateCameraPanel){updateCameraPanel();}
 }
 function undo(){if(!state.undoStack.length){showToast('Rien à annuler');return;}var s=state.undoStack.pop();
 if(s.type==='layers'){state.redoStack.push(layersSnapshotNow());restoreLayersSnapshot(s);return;}
