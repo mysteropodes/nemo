@@ -19,8 +19,18 @@
     { key: 'opacityJitter', label: 'Var. opacité', min: 0, max: 1, step: 0.05 },
     { key: 'scatter', label: 'Dispersion', min: 0, max: 1, step: 0.05 },
     { key: 'dashGap', label: 'Trous (bord cassé)', min: 0, max: 0.6, step: 0.02 },
+    { key: 'edgeNoise', label: 'Bord irrégulier', min: 0, max: 0.4, step: 0.02 },
+    { key: 'polySides', label: 'Côtés (polygone)', min: 3, max: 10, step: 1 },
+    { key: 'bristleCount', label: 'Nb. de poils (bristle)', min: 2, max: 12, step: 1 },
   ];
-  var DEFAULT_PARAMS = { nibSize: 1, roundness: 0.9, spacing: 0.4, spaceJitter: 0.2, rotationMode: 'tangent', rotationJitter: 20, sizeJitter: 0.2, opacity: 0.6, opacityJitter: 0.2, scatter: 0.15, dashGap: 0 };
+  var TIP_SHAPES = [
+    { value: 'ellipse', label: 'Ellipse (rond déformé)' },
+    { value: 'rect', label: 'Plat / biseau (marqueur)' },
+    { value: 'polygon', label: 'Polygone (chip anguleux)' },
+    { value: 'splatter', label: 'Éclaboussure' },
+    { value: 'bristle', label: 'Poils (dry-brush)' },
+  ];
+  var DEFAULT_PARAMS = { nibSize: 1, roundness: 0.9, spacing: 0.4, spaceJitter: 0.2, rotationMode: 'tangent', rotationJitter: 20, sizeJitter: 0.2, opacity: 0.6, opacityJitter: 0.2, scatter: 0.15, dashGap: 0, tipShape: 'ellipse', edgeNoise: 0, polySides: 5, bristleCount: 5, tipCorner: 0.15 };
 
   function closePopover() {
     if (!popover) return;
@@ -69,8 +79,10 @@
         '<input type="range" class="bpe-slider" data-key="' + f.key + '" min="' + f.min + '" max="' + f.max + '" step="' + f.step + '">' +
         '<span class="bpe-val" data-valfor="' + f.key + '"></span></div>';
     }).join('');
+    var tipShapeOptionsHtml = TIP_SHAPES.map(function (s) { return '<option value="' + s.value + '">' + s.label + '</option>'; }).join('');
     el.innerHTML =
       '<div class="bpe-preview-wrap"><canvas id="bpe-preview" width="320" height="60"></canvas></div>' +
+      '<div class="bpe-row"><span class="bpe-lbl">Forme de pointe</span><select class="bpe-tipshape" id="bpe-tipshape">' + tipShapeOptionsHtml + '</select></div>' +
       '<div class="bpe-row"><span class="bpe-lbl">Rotation</span><select class="bpe-rotmode" id="bpe-rotmode">' +
       '<option value="tangent">Suit le tracé</option><option value="random">Aléatoire</option><option value="fixed">Fixe</option>' +
       '</select></div>' +
@@ -85,6 +97,8 @@
     nameInput.value = nameSeed;
     var rotSel = el.querySelector('#bpe-rotmode');
     rotSel.value = params.rotationMode || 'tangent';
+    var tipSel = el.querySelector('#bpe-tipshape');
+    tipSel.value = params.tipShape || 'ellipse';
 
     function renderPreview() {
       var ctx = canvas.getContext('2d'), w = canvas.width, h = canvas.height;
@@ -115,6 +129,7 @@
       });
     });
     rotSel.addEventListener('change', function () { params.rotationMode = rotSel.value; renderPreview(); });
+    tipSel.addEventListener('change', function () { params.tipShape = tipSel.value; renderPreview(); });
 
     renderPreview();
 

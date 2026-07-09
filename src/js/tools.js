@@ -1253,6 +1253,17 @@ var BRUSH_PRESETS={
   'pencil-feather':  {nibSize:.7, roundness:.6, spacing:.6, spaceJitter:.35,rotationMode:'random',rotationJitter:90, sizeJitter:.3, opacity:.3, opacityJitter:.3, scatter:.2, dashGap:.15},
   'pencil-thick':    {nibSize:1.8,roundness:.9, spacing:.3, spaceJitter:.15,rotationMode:'tangent',rotationJitter:15, sizeJitter:.15,opacity:.7, opacityJitter:.15,scatter:.08,dashGap:0},
   'pencil-thin':     {nibSize:.5, roundness:.9, spacing:.3, spaceJitter:.1, rotationMode:'tangent',rotationJitter:10, sizeJitter:.1, opacity:.8, opacityJitter:.1, scatter:.05,dashGap:0},
+  // Non-circular tip shapes (tipShape, added alongside the original
+  // deformed-ellipse dabs) — the vector answer to Photoshop's flat/chisel,
+  // angular, splatter and bristle tip families. See buildDabShape/
+  // buildBrushDabs (above) for how each shape is actually constructed.
+  'marker-flat':     {nibSize:1.6,roundness:.4, spacing:.25,spaceJitter:.05,rotationMode:'fixed',fixedAngle:35,rotationJitter:4,  sizeJitter:.05,opacity:.85,opacityJitter:.05,scatter:.02,dashGap:0, tipShape:'rect',tipCorner:.1},
+  'ink-chisel':      {nibSize:1.2,roundness:.3, spacing:.3, spaceJitter:.08,rotationMode:'tangent',rotationJitter:8,  sizeJitter:.1, opacity:.9, opacityJitter:.05,scatter:.03,dashGap:0, tipShape:'rect',tipCorner:.05},
+  'pastel-chip':     {nibSize:1.7,roundness:.85,spacing:.5, spaceJitter:.3, rotationMode:'random',rotationJitter:180,sizeJitter:.3, opacity:.5, opacityJitter:.25,scatter:.2, dashGap:.05,tipShape:'polygon',polySides:6,edgeNoise:.12},
+  'chalk-facet':     {nibSize:1.3,roundness:.9, spacing:.45,spaceJitter:.25,rotationMode:'random',rotationJitter:180,sizeJitter:.25,opacity:.45,opacityJitter:.3, scatter:.15,dashGap:0, tipShape:'polygon',polySides:5,edgeNoise:.18},
+  'ink-splatter':    {nibSize:1.4,roundness:1,  spacing:1.1,spaceJitter:.6, rotationMode:'random',rotationJitter:180,sizeJitter:.7, opacity:.75,opacityJitter:.2, scatter:.5, dashGap:.1, tipShape:'splatter',edgeNoise:.08},
+  'drybrush-bristle':{nibSize:2.2,roundness:1,  spacing:.35,spaceJitter:.15,rotationMode:'tangent',rotationJitter:12, sizeJitter:.3, opacity:.55,opacityJitter:.3, scatter:.6, dashGap:0, tipShape:'bristle',bristleCount:7},
+  'watercolor-edge': {nibSize:2.6,roundness:.7, spacing:.5, spaceJitter:.2, rotationMode:'random',rotationJitter:60, sizeJitter:.35,opacity:.22,opacityJitter:.3, scatter:.3, dashGap:0, tipShape:'ellipse',edgeNoise:.25},
 };
 // Hard ceiling on dabs per stroke, regardless of preset/length — protects
 // against a very long stroke with tight spacing multiplying scene-
@@ -1294,6 +1305,61 @@ function seededRng(seed){
     return((r^r>>>14)>>>0)/4294967296;
   };
 }
+// Tip-shape geometry, factored out of the dab-stamping loop so every shape
+// (not just the original ellipse) gets rotation/scatter/jitter for free.
+// `tipShape` is optional on a preset (defaults to 'ellipse', so every
+// existing built-in/custom preset keeps its exact prior look with zero
+// migration) — this is the vector answer to Photoshop's tip-shape picker
+// (round/flat/angled/scatter-cluster brush categories), built as real
+// bezier Path geometry rather than a raster stamp, per the explicit "stay
+// vector" requirement. `edgeNoise` perturbs any shape's own segment
+// points radially and re-smooths — a cheap, fully-vector way to get an
+// organic broken edge (torn paper / dry-media chip) without a texture map.
+function buildDabShape(w,h,preset,rand){
+  var shape=preset.tipShape||'ellipse';
+  var path;
+  if(shape==='rect'){
+    // Flat/chisel nib — a felt-tip or ink-marker style tip, the thing an
+    // ellipse fundamentally can't produce (Photoshop's "Flat" tip family).
+    var rx=Math.min(w,h)*(preset.tipCorner!==undefined?preset.tipCorner:.15);
+    path=new Path.Rectangle({point:[-w/2,-h/2],size:[w,h],radius:rx,insert:false});
+  }else if(shape==='polygon'){
+    // Angular chip — pastel/chalk-corner look (a real physical chalk chip
+    // has flat facets, not a disc), also usable for a faceted ink-brush tip.
+    var sides=Math.max(3,preset.polySides||5);
+    path=new Path({insert:false,closed:true});
+    for(var i=0;i<sides;i++){
+      var a=(i/sides)*Math.PI*2;
+      var rr=(w/2)*(.8+rand()*.35),rh=(h/2)*(.8+rand()*.35);
+      path.add(new Point(Math.cos(a)*rr,Math.sin(a)*rh));
+    }
+    path.closePath();
+    path.smooth({type:'continuous'});
+  }else if(shape==='splatter'){
+    // Irregular jagged blob — ink-splatter/spray dabs, deliberately NOT
+    // radially uniform (varies per-vertex more than 'polygon') so no two
+    // splatter dabs read as the same stamped shape repeating.
+    var pts=6+Math.floor(rand()*5);
+    path=new Path({insert:false,closed:true});
+    for(var j=0;j<pts;j++){
+      var ang=(j/pts)*Math.PI*2;
+      var rr2=(w/2)*(.35+rand()*1.1),rh2=(h/2)*(.35+rand()*1.1);
+      path.add(new Point(Math.cos(ang)*rr2,Math.sin(ang)*rh2));
+    }
+    path.closePath();
+    path.smooth({type:'catmull-rom',factor:.5});
+  }else{
+    path=new Path.Ellipse({center:[0,0],radius:[w/2,h/2],insert:false});
+  }
+  var edgeNoise=preset.edgeNoise||0;
+  if(edgeNoise>0&&path.segments&&path.segments.length){
+    path.segments.forEach(function(seg){
+      seg.point=seg.point.multiply(1+(rand()*2-1)*edgeNoise);
+    });
+    if(shape!=='rect')path.smooth({type:'continuous'});
+  }
+  return path;
+}
 function buildBrushDabs(pathLike,preset,baseWidth,rng){
   var rand=rng||Math.random;
   var len=pathLike.length;
@@ -1310,30 +1376,57 @@ function buildBrushDabs(pathLike,preset,baseWidth,rng){
   var BRUSH_SPACING_REF_NIB=3;
   var refNibDiam=Math.max(.5,BRUSH_SPACING_REF_NIB*(preset.nibSize!==undefined?preset.nibSize:1));
   var spacing=Math.max(.4,refNibDiam*(preset.spacing!==undefined?preset.spacing:.35));
-  if(len/spacing>BRUSH_MAX_DABS)spacing=len/BRUSH_MAX_DABS;
+  // Bristle tips emit several sub-strands PER stamp position (see below) —
+  // divide the position budget by that count up front so total emitted
+  // dabs still respects BRUSH_MAX_DABS regardless of tip shape.
+  var bristleCount=preset.tipShape==='bristle'?Math.max(1,preset.bristleCount||5):1;
+  var maxPositions=Math.max(1,Math.floor(BRUSH_MAX_DABS/bristleCount));
+  if(len/spacing>maxPositions)spacing=len/maxPositions;
   var roundness=preset.roundness!==undefined?preset.roundness:1;
   var dabs=[],d=0,guard=0;
-  while(d<=len&&guard++<BRUSH_MAX_DABS+2){
+  while(d<=len&&guard++<maxPositions+2&&dabs.length<BRUSH_MAX_DABS){
     if(!(preset.dashGap&&rand()<preset.dashGap)){
       var at=Math.min(len,d);
       var pt=pathLike.getPointAt(at);
       var tan=pathLike.getTangentAt(at)||new Point(1,0);
       var normal=new Point(-tan.y,tan.x);
-      var scatterAmt=(rand()*2-1)*nibDiam*(preset.scatter||0);
-      var center=pt.add(normal.multiply(scatterAmt));
-      var sizeMul=1+(rand()*2-1)*(preset.sizeJitter||0);
-      var w=Math.max(.3,nibDiam*sizeMul);
-      var h=Math.max(.3,w*roundness);
-      var angle;
-      if(preset.rotationMode==='random')angle=rand()*360;
-      else if(preset.rotationMode==='fixed')angle=preset.fixedAngle||0;
-      else angle=tan.angle; // 'tangent' (default): dab follows stroke direction, like a real angled nib
-      angle+=(rand()*2-1)*(preset.rotationJitter||0);
-      var dab=new Path.Ellipse({center:[0,0],radius:[w/2,h/2],insert:false});
-      dab.rotate(angle);
-      dab.position=center;
-      dab.data={dabOpacity:Math.max(0,Math.min(1,(preset.opacity!==undefined?preset.opacity:.5)*(1+(rand()*2-1)*(preset.opacityJitter||0))))};
-      dabs.push(dab);
+      var angleBase;
+      if(preset.rotationMode==='random')angleBase=rand()*360;
+      else if(preset.rotationMode==='fixed')angleBase=preset.fixedAngle||0;
+      else angleBase=tan.angle; // 'tangent' (default): dab follows stroke direction, like a real angled nib
+      if(preset.tipShape==='bristle'){
+        // Dry-brush / watercolor-edge look: several thin parallel strands
+        // fanned across the stroke width instead of one solid dab — the
+        // thing a single ellipse (however deformed) structurally cannot
+        // produce, closest vector analog to Photoshop's Bristle tip family.
+        for(var b=0;b<bristleCount&&dabs.length<BRUSH_MAX_DABS;b++){
+          var frac=bristleCount>1?(b/(bristleCount-1)-.5):0;
+          var strandOffset=frac*nibDiam*(.5+ (preset.scatter||0));
+          var jitterOffset=(rand()*2-1)*nibDiam*(preset.scatter||0)*.3;
+          var center=pt.add(normal.multiply(strandOffset+jitterOffset));
+          var sizeMul=1+(rand()*2-1)*(preset.sizeJitter||0);
+          var w=Math.max(.3,(nibDiam/Math.max(2,bristleCount*.7))*sizeMul);
+          var h=Math.max(.3,nibDiam*roundness*(.7+rand()*.5));
+          var angle=angleBase+(rand()*2-1)*(preset.rotationJitter||0);
+          var dab=buildDabShape(w,h,preset,rand);
+          dab.rotate(angle);
+          dab.position=center;
+          dab.data={dabOpacity:Math.max(0,Math.min(1,(preset.opacity!==undefined?preset.opacity:.5)*(1+(rand()*2-1)*(preset.opacityJitter||0))*.7))};
+          dabs.push(dab);
+        }
+      }else{
+        var scatterAmt=(rand()*2-1)*nibDiam*(preset.scatter||0);
+        var center2=pt.add(normal.multiply(scatterAmt));
+        var sizeMul2=1+(rand()*2-1)*(preset.sizeJitter||0);
+        var w2=Math.max(.3,nibDiam*sizeMul2);
+        var h2=Math.max(.3,w2*roundness);
+        var angle2=angleBase+(rand()*2-1)*(preset.rotationJitter||0);
+        var dab2=buildDabShape(w2,h2,preset,rand);
+        dab2.rotate(angle2);
+        dab2.position=center2;
+        dab2.data={dabOpacity:Math.max(0,Math.min(1,(preset.opacity!==undefined?preset.opacity:.5)*(1+(rand()*2-1)*(preset.opacityJitter||0))))};
+        dabs.push(dab2);
+      }
     }
     d+=spacing*(1+(rand()*2-1)*(preset.spaceJitter||0));
   }
