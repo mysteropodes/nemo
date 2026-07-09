@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>StrokeMotion v0.2.0</title>
+<title>StrokeMotion v0.2.1</title>
 <script src="paper-full.min.js"></script>
 <!-- Manrope (redesign, 2026-07-09) — matches the CSS var font stack's own
      fallback order, so an offline load (no internet, no Tauri font cache)
@@ -668,8 +668,8 @@
     <button class="tb" id="btn-ghost-all" title="Ghost all keyframes — shows every keyframe of the active layer at once" style="margin-left:4px"><span style="font-size:13px;line-height:1">&#x2637;</span></button>
     <button class="tb" id="btn-ghost-select" title="Select all keyframes' content to move/transform together" disabled><span style="font-size:12px;line-height:1">&#x2725;</span></button>
     <button class="tb" id="btn-revision-view" title="Vue de révision — cycle Tout / Mes traits / Corrections" style="margin-left:4px;width:auto;padding:0 8px;font-size:10px">Tout</button>
-    <button class="tb" id="btn-cycle" title="Cycle — repete N fois la plage de frames selectionnee (walk cycles)" style="margin-left:4px;width:auto;padding:0 8px;font-size:12px">&#x1F501;</button>
-    <button class="tb" id="btn-camera" title="Calque caméra — clés de cadrage (zoom/pan) interpolées avec courbes de Bézier, comme dans TVPaint/Callipeg" style="margin-left:4px"><span style="font-size:12px;line-height:1">&#x1F3A5;</span></button>
+    <button class="tb" id="btn-cycle" title="Cycle — repete N fois la plage de frames selectionnee (walk cycles)" style="margin-left:4px"><span class="material-symbols-rounded">&#xe040;</span></button>
+    <button class="tb" id="btn-camera" title="Calque caméra — clés de cadrage (zoom/pan) interpolées avec courbes de Bézier, comme dans TVPaint/Callipeg" style="margin-left:4px"><span class="material-symbols-rounded">&#xe04b;</span></button>
     <button class="tb" id="btn-audio" title="Importer une piste audio (mp3/ogg/wav) — waveform sous la timeline, lecture synchronisée" style="margin-left:4px"><span style="font-size:13px;line-height:1">&#x266b;</span></button>
     <input type="file" id="audio-file-input" accept="audio/*" multiple style="display:none">
   </div>
@@ -706,7 +706,7 @@
 
 <div id="statusbar">
   <span><span class="sc">F5</span>Frame <span class="sc">F6</span>Key <span class="sc">F7</span>Blank <span class="sc">T</span>Tween <span class="sc">D</span>Dupli <span class="sc">F</span>Flip <span class="sc">X</span>Mirror <span class="sc">Enter</span>Play</span>
-  <span id="status-text">StrokeMotion v0.2.0</span>
+  <span id="status-text">StrokeMotion v0.2.1</span>
 </div>
 </div>
 <div id="toast"></div>

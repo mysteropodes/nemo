@@ -311,10 +311,14 @@
     if (!state.cameraLayerOn) return;
     var row = document.createElement('div');
     row.className = 'lrow camrow' + (state.tool === 'camera' ? ' act' : '');
-    var ico = document.createElement('div'); ico.className = 'lico'; ico.textContent = '🎥'; ico.style.fontSize = '11px';
+    // Meme famille d'icones ligne-pleine que le reste du panneau calques
+    // (ICO_EYE/ICO_EYE_CLOSED, timeline.js) — pas d'emoji couleur, qui
+    // detonnait dans une UI flat monochrome.
+    var ico = document.createElement('div'); ico.className = 'lico';
+    ico.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14"><path d="M4 7a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2H4Z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="m17 10 4-2.2v8.4L17 14v-4Z" fill="currentColor"/></svg>';
     var eye = document.createElement('div'); eye.className = 'lico'; eye.title = 'Vue caméra — verrouille le viewport sur la caméra';
-    eye.textContent = state.cameraView ? '⊙' : '○';
-    eye.style.color = state.cameraView ? 'var(--accent, #ffaa28)' : '';
+    eye.innerHTML = state.cameraView ? ICO_EYE : ICO_EYE_CLOSED;
+    eye.style.color = state.cameraView ? '#ffaa28' : '';
     eye.addEventListener('click', function (e) {
       e.stopPropagation();
       state.cameraView = !state.cameraView;
