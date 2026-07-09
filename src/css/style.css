@@ -502,6 +502,11 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--gutter);color:
 
 /* MODAL */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:flex;align-items:center;justify-content:center;}
+/* Kitsu modal (Phase 4) can be opened from the start screen (#start-screen,
+   z-index:500) via its "Ouvrir depuis Kitsu…" card — every other
+   .modal-overlay only ever opens from inside the already-hidden-start-screen
+   editor UI, so this is the one modal that needs to outrank it. */
+#kitsu-modal{z-index:600;}
 .modal-box{background:var(--panel2);border:1px solid var(--border2);border-radius:12px;width:340px;box-shadow:0 12px 40px rgba(0,0,0,.5);}
 .modal-hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);font-size:12px;font-weight:600;}
 .modal-x{background:none;border:none;color:var(--text-dim);font-size:16px;cursor:pointer;line-height:1;}

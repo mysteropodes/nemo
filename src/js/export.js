@@ -108,6 +108,16 @@ function exportTempDirPath(){
   return (window.__TAURI__.path?window.__TAURI__.path.tempDir():null);
 }
 function pad4(n){var s=''+n;while(s.length<4)s='0'+s;return s;}
+async function exportMP4ToPath(outPath,opts){
+  var r=exportFrameRange(opts);var scale=(opts&&opts.scale)||1;var fps=(opts&&opts.fps)||state.fps;
+  var tmp=exportTempDirPath?await exportTempDirPath():null;
+  var workDir=(tmp||outPath.replace(/[^/\\]+$/,''))+'sm-export-'+Date.now();
+  await exportMkdir(workDir);
+  await exportRenderPNGsToDir(workDir,r.start,r.end,scale,opts&&opts.onProgress);
+  await exportRunFfmpeg(['-y','-framerate',String(fps),'-i',workDir+'/frame_%04d.png','-c:v','libx264','-pix_fmt','yuv420p','-crf','18',outPath],opts&&opts.onFfmpeg);
+  await exportRemoveDir(workDir);
+  return{ok:true,path:outPath};
+}
 
 // ---- ffmpeg sidecar ----
 async function exportRunFfmpeg(args,onProgress){
@@ -294,16 +304,17 @@ window.SMExport={
 
   exportMP4:async function(opts){
     if(!exportTauriAvailable())return{ok:false,error:'Disponible uniquement dans l\'app StrokeMotion (pas en preview navigateur).'};
-    var r=exportFrameRange(opts);var scale=(opts&&opts.scale)||1;var fps=(opts&&opts.fps)||state.fps;
     var outPath=await exportPickSaveFile('Exporter en MP4','animation.mp4',[{name:'MP4',extensions:['mp4']}]);
     if(!outPath)return{cancelled:true};
-    var tmp=exportTempDirPath?await exportTempDirPath():null;
-    var workDir=(tmp||outPath.replace(/[^/\\]+$/,''))+'sm-export-'+Date.now();
-    await exportMkdir(workDir);
-    await exportRenderPNGsToDir(workDir,r.start,r.end,scale,opts&&opts.onProgress);
-    await exportRunFfmpeg(['-y','-framerate',String(fps),'-i',workDir+'/frame_%04d.png','-c:v','libx264','-pix_fmt','yuv420p','-crf','18',outPath],opts&&opts.onFfmpeg);
-    await exportRemoveDir(workDir);
-    return{ok:true,path:outPath};
+    return exportMP4ToPath(outPath,opts);
+  },
+  // Kitsu publish (Phase 4) needs the same H.264 render but writing to a
+  // caller-chosen temp path with no save dialog — the publish flow already
+  // asked the user to confirm once, a second native file picker mid-publish
+  // would be a confusing extra step.
+  exportMP4Silent:function(outPath,opts){
+    if(!exportTauriAvailable())return Promise.resolve({ok:false,error:'Disponible uniquement dans l\'app StrokeMotion (pas en preview navigateur).'});
+    return exportMP4ToPath(outPath,opts);
   },
 
   exportProRes:async function(opts){

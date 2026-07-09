@@ -1,6 +1,6 @@
 [package]
 name = "strokemotion"
-version = "0.0.4"
+version = "0.0.5"
 description = "2D frame-by-frame vector animation with auto inbetweening"
 authors = ["Cyril"]
 edition = "2021"
@@ -20,6 +20,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tauri-plugin-fs = "2.5.1"
 tauri-plugin-dialog = "2.7.1"
+tauri-plugin-http = "2"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc = "0.2"

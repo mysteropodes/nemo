@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>StrokeMotion v0.0.4</title>
+<title>StrokeMotion v0.0.5</title>
 <script src="paper-full.min.js"></script>
 <!-- Manrope (redesign, 2026-07-09) — matches the CSS var font stack's own
      fallback order, so an offline load (no internet, no Tauri font cache)
@@ -32,6 +32,11 @@
         <span class="material-symbols-rounded">&#xe8b3;</span>
         <div class="start-card-title">Resume Last Session</div>
         <div class="start-card-sub" id="start-resume-sub">Restore the autosaved state</div>
+      </div>
+      <div class="start-card" id="start-kitsu">
+        <span class="material-symbols-rounded">&#xe80b;</span>
+        <div class="start-card-title">Ouvrir depuis Kitsu…</div>
+        <div class="start-card-sub">Se connecter à la production (async, pas de temps réel)</div>
       </div>
     </div>
 
@@ -434,8 +439,15 @@
           <button class="pbtn" id="btn-new" style="flex:1"><span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle">&#xe145;</span> New…</button>
         </div>
         <div class="pr" style="gap:4px">
+          <button class="pbtn" id="btn-kitsu-open" style="flex:1" title="Ouvrir un shot depuis la production Kitsu"><span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle">&#xe80b;</span> Depuis Kitsu…</button>
+        </div>
+        <div class="pr" style="gap:4px">
           <button class="pbtn" id="btn-history" style="flex:1" title="Historique des versions — un instantané automatique toutes les 30s, récupérable même après un crash"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2"/><path d="M5 3 2 6"/><path d="M2 6h4"/></svg> Historique…</button>
           <button class="pbtn" id="btn-settings" title="Réglages — raccourcis clavier"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></button>
+        </div>
+        <div class="pr" id="kitsu-shot-row" style="font-size:9px;color:var(--text-dim);display:none"></div>
+        <div class="pr" id="kitsu-publish-row" style="gap:4px;display:none">
+          <button class="pbtn ac" id="btn-kitsu-publish" style="flex:1" title="Rend un MP4, l'envoie sur la tâche du shot et passe le statut en révision">Publier vers Kitsu</button>
         </div>
         <input type="file" id="file-input" accept=".json" style="display:none">
         <div class="pr" style="gap:4px"><button class="pbtn" id="btn-export" style="flex:1"><span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle">&#xe2c6;</span> Export…</button></div>
@@ -557,6 +569,33 @@
   </div>
 </div>
 
+<!-- Kitsu (zou/CGWire) pipeline integration (Phase 4) — login then browse
+     Projects > Sequences > Shots, entirely separate workstream from the
+     team-review system above. Async, no realtime — see kitsu.js. -->
+<div id="kitsu-modal" class="modal-overlay" style="display:none">
+  <div class="modal-box">
+    <div class="modal-hdr">Production Kitsu <button id="kitsu-close" class="modal-x">&times;</button></div>
+    <div class="modal-bdy">
+      <div id="kitsu-step-login">
+        <div style="font-size:10px;color:var(--text-dim);margin-bottom:10px">Connexion à ton studio Kitsu (CGWire) — asynchrone, aucune synchronisation en temps réel avec les autres postes.</div>
+        <div class="pr" style="gap:8px"><span class="pl" style="flex:none;width:70px">URL serveur</span><input type="text" id="kitsu-url" class="pi" style="flex:1" placeholder="https://kitsu.monstudio.com"></div>
+        <div class="pr" style="gap:8px;margin-top:6px"><span class="pl" style="flex:none;width:70px">Email</span><input type="email" id="kitsu-email" class="pi" style="flex:1"></div>
+        <div class="pr" style="gap:8px;margin-top:6px"><span class="pl" style="flex:none;width:70px">Mot de passe</span><input type="password" id="kitsu-password" class="pi" style="flex:1"></div>
+        <div id="kitsu-login-error" style="font-size:10px;color:#ff6b6b;margin-top:6px;display:none"></div>
+        <div class="pr" style="margin-top:10px"><button class="pbtn ac" id="kitsu-login-btn" style="flex:1">Se connecter</button></div>
+      </div>
+      <div id="kitsu-step-browse" style="display:none">
+        <div id="kitsu-breadcrumb" style="font-size:10px;color:var(--text-dim);margin-bottom:8px"></div>
+        <div id="kitsu-list" style="display:flex;flex-direction:column;gap:2px;max-height:360px;overflow-y:auto"></div>
+        <div class="pr" style="margin-top:10px;gap:6px">
+          <button class="pbtn" id="kitsu-back-btn">&larr; Retour</button>
+          <button class="pbtn" id="kitsu-logout-btn" style="margin-left:auto">Déconnexion</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Team review: anchored comment pin editor — absolutely positioned near
      the clicked canvas point by tools.js's comment-tool click handler
      (openCommentPopover), not a centered modal, so it stays visually tied
@@ -639,7 +678,7 @@
 
 <div id="statusbar">
   <span><span class="sc">F5</span>Frame <span class="sc">F6</span>Key <span class="sc">F7</span>Blank <span class="sc">T</span>Tween <span class="sc">D</span>Dupli <span class="sc">F</span>Flip <span class="sc">X</span>Mirror <span class="sc">Enter</span>Play</span>
-  <span id="status-text">StrokeMotion v0.0.4</span>
+  <span id="status-text">StrokeMotion v0.0.5</span>
 </div>
 </div>
 <div id="toast"></div>
@@ -659,6 +698,7 @@
 <script src="js/drop-import.js"></script>
 <script src="js/palette-panel.js"></script>
 <script src="js/project.js"></script>
+<script src="js/kitsu.js"></script>
 <script src="js/images.js"></script>
 <script type="module" src="js/geometry-wasm-loader.js"></script>
 <script src="js/engine-bridge.js"></script>

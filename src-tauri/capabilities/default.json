@@ -39,6 +39,13 @@
     },
     "dialog:default",
     "dialog:allow-save",
-    "dialog:allow-open"
+    "dialog:allow-open",
+    {
+      "identifier": "http:default",
+      "allow": [
+        { "url": "http://*/*" },
+        { "url": "https://*/*" }
+      ]
+    }
   ]
 }
