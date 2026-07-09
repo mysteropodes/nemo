@@ -46,6 +46,8 @@ pub struct StrokeIn {
     pub fill_color: Option<String>,
     #[serde(default)]
     pub is_vector_brush: bool,
+    #[serde(default)]
+    pub closed: bool,
 }
 
 fn is_vb(s: &StrokeIn) -> bool {
@@ -191,6 +193,44 @@ struct Feat {
     stype: &'static str,
     rel_x: f64,
     rel_y: f64,
+    fourier: Vec<f64>,
+}
+// Mirrors fourierDescriptor/fourierDist in tweens.js — see that function's
+// own comment for the rationale (style-agnostic silhouette descriptor via
+// low-frequency DFT magnitudes, invariant to translation/rotation/scale).
+const FOURIER_BINS: usize = 6;
+fn fourier_descriptor(pts: &[(f64, f64)], cx: f64, cy: f64) -> Vec<f64> {
+    let n = pts.len();
+    if n < 3 {
+        return Vec::new();
+    }
+    let mut re = vec![0.0; FOURIER_BINS + 1];
+    let mut im = vec![0.0; FOURIER_BINS + 1];
+    for k in 0..n {
+        let (x, y) = (pts[k].0 - cx, pts[k].1 - cy);
+        for m in 1..=FOURIER_BINS {
+            let ang = -2.0 * std::f64::consts::PI * m as f64 * k as f64 / n as f64;
+            let (c, s) = (ang.cos(), ang.sin());
+            re[m] += x * c - y * s;
+            im[m] += x * s + y * c;
+        }
+    }
+    let mags: Vec<f64> = (1..=FOURIER_BINS).map(|m| (re[m] * re[m] + im[m] * im[m]).sqrt()).collect();
+    let norm = mags.iter().map(|v| v * v).sum::<f64>().sqrt();
+    let norm = if norm > 0.0 { norm } else { 1.0 };
+    mags.iter().map(|v| v / norm).collect()
+}
+fn fourier_dist(a: &[f64], b: &[f64]) -> f64 {
+    if a.is_empty() || b.is_empty() {
+        return 0.0;
+    }
+    let n = a.len().min(b.len());
+    let mut s = 0.0;
+    for i in 0..n {
+        let d = a[i] - b[i];
+        s += d * d;
+    }
+    s.sqrt().min(1.0)
 }
 fn stroke_feat(s: &StrokeIn) -> Feat {
     let path = build_feat_path(s);
@@ -242,7 +282,14 @@ fn stroke_feat(s: &StrokeIn) -> Feat {
     }
 
     let diag = (b.width() * b.width() + b.height() * b.height()).sqrt();
-    let closed = n_points > 3 && dl < 4.0_f64.max(diag * 0.08) && len > diag * 1.2;
+    let closed_heuristic = n_points > 3 && dl < 4.0_f64.max(diag * 0.08) && len > diag * 1.2;
+    // Mirrors strokeFeat's own comment in tweens.js: trust the real
+    // open/closed flag over a geometric guess, except for vector-brush
+    // strokes whose feature path is the drawn centerline (never actually
+    // closed) rather than the always-closed rendered ribbon outline s.closed
+    // refers to.
+    let closed = if !is_vb(s) { s.closed } else { closed_heuristic };
+    let fourier = fourier_descriptor(&pts, cx, cy);
 
     Feat {
         cx,
@@ -259,6 +306,7 @@ fn stroke_feat(s: &StrokeIn) -> Feat {
         stype: stroke_type(s),
         rel_x: 0.0,
         rel_y: 0.0,
+        fourier,
     }
 }
 fn union_bounds(feats: &[Feat]) -> (f64, f64, f64, f64) {
@@ -329,6 +377,7 @@ fn match_sc(fa: &Feat, fb: &Feat, same_index: bool, a_pts_override: Option<&[(f6
         cr += (fa.turn[q] + fb.turn[nt - 1 - q]).abs();
     }
     let curve_t = if nt > 0 { (cf.min(cr) / nt as f64 / std::f64::consts::PI).min(1.0) } else { 0.0 };
+    let four_d = fourier_dist(&fa.fourier, &fb.fourier);
 
     let (rdx, rdy) = (fa.rel_x - fb.rel_x, fa.rel_y - fb.rel_y);
     let rel = (rdx * rdx + rdy * rdy).sqrt().min(1.0);
@@ -341,7 +390,7 @@ fn match_sc(fa: &Feat, fb: &Feat, same_index: bool, a_pts_override: Option<&[(f6
     let type_penalty = if fa.stype != fb.stype { 0.5 } else { 0.0 };
     let idx_bonus = if same_index { -0.03 } else { 0.0 };
 
-    prox_t * 0.50 + align_t * 0.15 + curve_t * 0.18 + rel * 0.10 + sz_d * 0.06 + col_d * 0.15 + type_penalty + ratio_pen + closed_pen + idx_bonus
+    prox_t * 0.48 + align_t * 0.15 + curve_t * 0.12 + four_d * 0.10 + rel * 0.10 + sz_d * 0.06 + col_d * 0.15 + type_penalty + ratio_pen + closed_pen + idx_bonus
 }
 
 // ---- "force line" similarity transform (fitSimilarityTransform) ----

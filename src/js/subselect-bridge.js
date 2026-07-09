@@ -67,8 +67,18 @@
     var subHit = layer.hitTest(pt, { stroke: true, fill: true, tolerance: 8 / view.zoom });
     if (subHit && subHit.item instanceof Path) {
       clearSel();
-      selectedPaths.push(subHit.item);
+      var subTarget = resolveBrushAnchor(subHit.item, layer);
+      selectedPaths.push(subTarget);
       state.selectedStrokeIndices = selectedPaths.map(getSI).filter(function (i2) { return i2 >= 0; });
+      // The Rust mirror redraws the handle overlay fresh from
+      // nodeEditTargetPath() every frame regardless, so this looked correct
+      // visually — but the NEXT click's hit-test reads the plain `nodeHandles`
+      // JS array, which only tools.js's renderNodeHandles() populates. Left
+      // stale (still describing whatever was selected before, or empty on
+      // the very first click), so a click that looked like "grab this
+      // tangent handle" silently missed and fell through to reselecting the
+      // path or starting a marquee — the actual "can't edit tangents" bug.
+      renderNodeHandles();
     } else if (selectedPaths.length === 1) {
       // empty-space drag with a path selected: marquee over its anchors
       _nmq.active = true; _nmq.start = pt.clone(); _nmq.rect = null;
@@ -154,6 +164,7 @@
     } else if (_nodeDrag.active) {
       var editedPath = _nodeDrag.path; _nodeDrag.active = false; _nodeDrag.path = null;
       fillRegenerateLinked(userLayers[state.activeLayerIdx], editedPath);
+      regenerateBrushTexture(editedPath, userLayers[state.activeLayerIdx]);
       saveActiveLayerFrame(); renderNodeHandles(); updateUI();
     }
     window.SMEngineBridge.renderNow();

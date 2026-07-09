@@ -18,22 +18,78 @@
 // stopImmediatePropagation for whatever tool happens to be active.
 (function () {
   var panning = false;
+  // Zoom-tool drag state: a click alone still zooms one fixed step (old
+  // behavior), but a click-DRAG now ramps the zoom continuously while
+  // holding the point under the INITIAL click fixed on screen — the same
+  // "drag right to zoom in, drag left to zoom out, anchored where you
+  // grabbed" convention as Photoshop/Illustrator's zoom tool. `anchorWorld`
+  // is computed once at pointerdown and never re-read from the current
+  // (moving) cursor position, which is what makes the anchor point hold
+  // still throughout the whole drag instead of chasing the cursor.
+  var zooming = false, zoomStartX = 0, zoomStartZoom = 1, zoomAnchorWorld = null, zoomMoved = false;
+  // Rotate-tool/Alt-drag state: angle-based, not horizontal-distance-based
+  // like zoom — dragging in a circular motion around the stage center is
+  // the natural gesture for rotation (Animate's Rotate Stage tool, Photoshop's
+  // Rotate View tool), so what's tracked is the ANGLE from the pivot to the
+  // cursor at drag-start vs. the current angle; the difference is added to
+  // whatever state.canvasRotation already was, so a rotate gesture never
+  // "snaps" the stage to a new absolute angle at drag-start.
+  var rotating = false, rotateStartAngle = 0, rotateStartRotation = 0;
 
   function engineOn() { return window.SMEngineBridge && window.SMEngineBridge.isEnabled() && !state.playing; }
   function shouldPan() { return engineOn() && (state.tool === 'hand' || state.spaceDown); }
   function shouldZoom() { return engineOn() && state.tool === 'zoom'; }
   function shouldPick() { return engineOn() && state.tool === 'eyedropper'; }
+  // The zoom tool already owns Alt for its own "click = zoom out" modifier
+  // (see onDown below) — the global Alt-drag-to-rotate shortcut deliberately
+  // excludes it so the two don't fight over the same key while zoom is
+  // selected. Every other tool gets Alt+drag as a temporary rotate, exactly
+  // like Space is a temporary Hand regardless of the active tool.
+  function shouldRotate() { return engineOn() && (state.tool === 'rotate' || (state.altDown && state.tool !== 'zoom' && !state.spaceDown)); }
+
+  function canvasLocal(clientX, clientY) {
+    var r = document.getElementById('drawing-canvas').getBoundingClientRect();
+    return new Point(clientX - r.left, clientY - r.top);
+  }
+  // Stage pivot in CLIENT (screen) coordinates — the artboard center,
+  // projected through Paper's current view then offset by the canvas's own
+  // position on the page. This is what the rotate gesture visually spins
+  // around; recomputed fresh each read since pan/zoom can change between
+  // drag-start and drag-move.
+  function pivotClient() {
+    var local = view.projectToView(new Point(state.canvasW / 2, state.canvasH / 2));
+    var r = document.getElementById('drawing-canvas').getBoundingClientRect();
+    return { x: r.left + local.x, y: r.top + local.y };
+  }
+  function angleFromPivot(clientX, clientY) {
+    var p = pivotClient();
+    return Math.atan2(clientY - p.y, clientX - p.x);
+  }
+  // Sets zoom to `newZoom` then shifts view.center so `anchorWorld` (a world-
+  // space point, captured once at drag-start) still projects to the same
+  // canvas-local pixel it was at originally — same before/after-viewToProject
+  // trick the wheel handler (tools.js) already uses, factored out here so
+  // both the wheel and this drag-to-zoom share identical zoom-to-point math.
+  function recenterOn(anchorWorld, localPt, newZoom) {
+    view.zoom = Math.max(0.05, Math.min(20, newZoom));
+    var nowWorld = view.viewToProject(localPt);
+    view.center = view.center.add(anchorWorld.subtract(nowWorld));
+  }
 
   // Mirrors tools.js's own eyedropper DOM updates for the stroke/fill color
   // pickers (swatch value, well background, on/off checkbox for fill).
   function setColorUI(kind, css) {
     if (kind === 'stroke') {
       state.strokeColor = css;
-      ['color-stroke', 'pm-stroke-c'].forEach(function (id) { var el = document.getElementById(id); if (el) el.value = css; });
+      // .dataset.hex8 alongside .value: the native <input type=color> would
+      // otherwise silently truncate an alpha-bearing hex to 6 digits, and
+      // every other reader of this input prefers dataset.hex8 for exactly
+      // that reason (see color-picker.js's own comment on this).
+      ['color-stroke', 'pm-stroke-c'].forEach(function (id) { var el = document.getElementById(id); if (el) { el.value = css; el.dataset.hex8 = css; } });
       ['stroke-well', 'pm-stroke'].forEach(function (id) { var el = document.getElementById(id); if (el) el.style.background = css; });
     } else {
       state.fillColor = css; state.fillEnabled = true;
-      ['color-fill', 'pm-fill-c'].forEach(function (id) { var el = document.getElementById(id); if (el) el.value = css; });
+      ['color-fill', 'pm-fill-c'].forEach(function (id) { var el = document.getElementById(id); if (el) { el.value = css; el.dataset.hex8 = css; } });
       var pmFill = document.getElementById('pm-fill'); if (pmFill) pmFill.style.background = css;
       var fillWell = document.getElementById('fill-well'); if (fillWell) { fillWell.style.background = css; fillWell.classList.remove('none'); }
       var onCb = document.getElementById('p-fill-on'); if (onCb) onCb.checked = true;
@@ -70,13 +126,22 @@
       window.SMEngineBridge.suspend();
       return;
     }
+    if (shouldRotate()) {
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      rotating = true;
+      rotateStartAngle = angleFromPivot(e.clientX, e.clientY);
+      rotateStartRotation = state.canvasRotation || 0;
+      return;
+    }
     if (shouldZoom()) {
       e.stopImmediatePropagation();
       e.preventDefault();
-      if (e.altKey) view.zoom = Math.max(0.05, view.zoom * 0.8);
-      else view.zoom = Math.min(20, view.zoom * 1.25);
-      updZoom(); renderArcs();
-      window.SMEngineBridge.renderNow();
+      zooming = true;
+      zoomMoved = false;
+      zoomStartX = e.clientX;
+      zoomStartZoom = view.zoom;
+      zoomAnchorWorld = view.viewToProject(canvasLocal(e.clientX, e.clientY));
       return;
     }
     if (shouldPick()) {
@@ -88,14 +153,63 @@
     }
   }
   function onMove(e) {
+    if (rotating) {
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      var angleNow = angleFromPivot(e.clientX, e.clientY);
+      state.canvasRotation = rotateStartRotation + (angleNow - rotateStartAngle);
+      // viewport-only: rotating the stage changes no scene item (overlay
+      // handle sizes depend on zoom, not rotation) — reuse the scene JSON
+      // instead of a full rebuild per pointermove (see renderNow's comment)
+      window.SMEngineBridge.renderNow(true);
+      return;
+    }
+    if (zooming) {
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      var dx = e.clientX - zoomStartX;
+      if (Math.abs(dx) > 2) zoomMoved = true;
+      if (!zoomMoved) return;
+      // Exponential ramp (not linear) so it feels like a continuous zoom
+      // gesture rather than a ruler — every ~120px of drag roughly doubles/
+      // halves zoom, independent of the zoom level you started from.
+      var newZoom = zoomStartZoom * Math.pow(2, dx / 120);
+      recenterOn(zoomAnchorWorld, canvasLocal(e.clientX, e.clientY), newZoom);
+      updZoom(); renderArcs();
+      window.SMEngineBridge.renderNow();
+      return;
+    }
     if (!panning) return;
     e.stopImmediatePropagation();
     e.preventDefault();
-    var dx = e.movementX || 0, dy = e.movementY || 0;
-    view.center = view.center.subtract(new Point(dx, dy).divide(view.zoom));
-    window.SMEngineBridge.renderNow();
+    var dx2 = e.movementX || 0, dy2 = e.movementY || 0;
+    view.center = view.center.subtract(new Point(dx2, dy2).divide(view.zoom));
+    // viewport-only: panning changes no scene item — same reuse as rotate
+    window.SMEngineBridge.renderNow(true);
   }
   function onUp(e) {
+    if (rotating) {
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      rotating = false;
+      window.SMEngineBridge.renderNow();
+      return;
+    }
+    if (zooming) {
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      // A plain click (never dragged past the threshold) still zooms one
+      // fixed step, same gesture as before — but now correctly anchored on
+      // the clicked point instead of always re-centering on view.center.
+      if (!zoomMoved) {
+        var factor = e.altKey ? 0.8 : 1.25;
+        recenterOn(zoomAnchorWorld, canvasLocal(e.clientX, e.clientY), view.zoom * factor);
+        updZoom(); renderArcs();
+        window.SMEngineBridge.renderNow();
+      }
+      zooming = false;
+      return;
+    }
     if (!panning) return;
     e.stopImmediatePropagation();
     e.preventDefault();

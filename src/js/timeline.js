@@ -3,12 +3,14 @@ var playInt=null;
 function startPlay(){if(state.playing)return;state.playing=true;
   document.getElementById('btn-play').innerHTML='<span class="material-symbols-rounded">\u{e034}</span>';
   document.getElementById('btn-play').classList.add('playing');
+  if(window.SMAudio)SMAudio.onPlayStart(state.currentFrame);
   playInt=setInterval(function(){var next=state.currentFrame+1;
-    if(next>state.waOut){if(state.loopPlayback)next=state.waIn;else{stopPlay();return;}}
+    if(next>state.waOut){if(state.loopPlayback){next=state.waIn;if(window.SMAudio)SMAudio.onLoop(next);}else{stopPlay();return;}}
     saveAllLayerFrames();state.currentFrame=next;window._curFrame=next;loadFrame(next);updatePlayhead();
   },1000/state.fps);
 }
 function stopPlay(){if(!state.playing)return;state.playing=false;clearInterval(playInt);playInt=null;
+  if(window.SMAudio)SMAudio.onPlayStop();
   document.getElementById('btn-play').innerHTML='<span class="material-symbols-rounded">\u{e037}</span>';
   document.getElementById('btn-play').classList.remove('playing');
   renderOS();renderArcs();updateUI();
@@ -63,12 +65,21 @@ function selBounds(){
 // ---- API ----
 window.SM={
   goToFrame:function(idx){goToFrame(idx);},togglePlay:togglePlay,stopPlay:stopPlay,undo:undo,redo:redo,
-  setTool:function(t){if(t!=='select'&&t!=='subselect')clearSel();if(t!=='pen'&&_pen.path)finalizePen();if(t!=='eraser'&&typeof _eraserCursor!=='undefined'&&_eraserCursor){_eraserCursor.remove();_eraserCursor=null;}state.tool=t;renderArcs();
+  setTool:function(t){if(t!=='select'&&t!=='subselect')clearSel();if(t!=='fsselect')fsClearSel();if(t!=='pen'&&_pen.path)finalizePen();if(t!=='eraser'&&typeof _eraserCursor!=='undefined'&&_eraserCursor){_eraserCursor.remove();_eraserCursor=null;}state.tool=t;renderArcs();
     document.querySelectorAll('.tool-btn').forEach(function(b){b.classList.toggle('active',b.dataset.tool===t);});
-    var cc={draw:'crosshair',pen:'crosshair',line:'crosshair',rect:'crosshair',ellipse:'crosshair',select:'default',subselect:'default',eraser:'pointer',fill:'crosshair',fillbrush:'crosshair',eyedropper:'crosshair',hand:'grab',zoom:'zoom-in'};
+    var cc={draw:'crosshair',pen:'crosshair',line:'crosshair',rect:'crosshair',ellipse:'crosshair',select:'default',subselect:'default',fsselect:'default',eraser:'pointer',fill:'crosshair',fillbrush:'crosshair',eyedropper:'crosshair',hand:'grab',zoom:'zoom-in',rotate:'grab',perspective:'crosshair'};
     canvasEl.style.cursor=cc[t]||'default';
     updatePropsContext();},
   toggleOnion:function(){state.onionSkin=!state.onionSkin;renderOS();var el=document.getElementById('os-st');el.textContent=state.onionSkin?'ON':'OFF';el.style.color=state.onionSkin?'var(--green)':'var(--text-dim)';var b=document.getElementById('btn-os');if(b)b.classList.toggle('active',state.onionSkin);},
+  toggleGhostAll:function(){
+    state.ghostAllFrames=!state.ghostAllFrames;
+    renderOS();
+    var b=document.getElementById('btn-ghost-all');if(b)b.classList.toggle('active',state.ghostAllFrames);
+    var sb=document.getElementById('btn-ghost-select');if(sb)sb.disabled=!state.ghostAllFrames;
+    if(!state.ghostAllFrames)clearGhostSelection();
+    updateUI();
+  },
+  selectGhostAll:selectGhostAll,
   toggleLoopPlayback:function(){state.loopPlayback=!state.loopPlayback;var b=document.getElementById('btn-loop');if(b)b.classList.toggle('active',state.loopPlayback);},
   setPointType:setPointType,booleanOp:booleanOp,
   generateTweens:generateTweens,insertFrame:insertFrame,insertKeyframe:insertKeyframe,insertBlankKeyframe:insertBlankKeyframe,removeFrame:removeFrame,
@@ -95,15 +106,49 @@ window.SM={
       saveActiveLayerFrame();updateUI();
     }},
   setStrokeColor:function(v){state.strokeColor=v;document.getElementById('stroke-well').style.background=v;document.getElementById('pm-stroke').style.background=v;
-    if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(p.data&&p.data.isVectorBrush)p.fillColor=v;else if(p.strokeColor)p.strokeColor=v;});saveActiveLayerFrame();updateUI();}},
+    ['color-stroke','pm-stroke-c'].forEach(function(id){var el=document.getElementById(id);el.value=v;el.dataset.hex8=v;});
+    if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(p.data&&p.data.isVectorBrush)p.fillColor=v;else if(p.strokeColor)p.strokeColor=v;});saveActiveLayerFrame();updateUI();}
+    // Fill/Stroke Select tool: recolor ONLY the clicked aspect — a 'stroke'
+    // selection here means strokeColor, never touches fillColor even on a
+    // combined shape (that's the whole point of this tool vs plain Select).
+    else if(state.tool==='fsselect'&&_fsSel&&_fsSel.kind==='stroke'){pushUndo();_fsSel.path.strokeColor=v;saveActiveLayerFrame();updateUI();}},
   setFillColor:function(v){state.fillColor=v;
     // Background is written unconditionally (even while fill is disabled) so
     // the swatch shows the last-picked color as soon as fill is re-enabled —
     // the .none overlay (red diagonal) is what actually communicates "off".
-    document.getElementById('fill-well').style.background=v;document.getElementById('pm-fill').style.background=v;document.getElementById('pm-fill-c').value=v;
-    if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(p.fillColor)p.fillColor=v;});saveActiveLayerFrame();updateUI();}},
+    document.getElementById('fill-well').style.background=v;document.getElementById('pm-fill').style.background=v;
+    ['color-fill','pm-fill-c'].forEach(function(id){var el=document.getElementById(id);el.value=v;el.dataset.hex8=v;});
+    if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(p.fillColor)p.fillColor=v;});saveActiveLayerFrame();updateUI();}
+    else if(state.tool==='fsselect'&&_fsSel&&(_fsSel.kind==='fill'||_fsSel.kind==='fillregion')){pushUndo();if(_fsSel.kind==='fillregion')_fsSel=fsRealizeFillRegion(_fsSel,userLayers[state.activeLayerIdx]);_fsSel.path.fillColor=v;saveActiveLayerFrame();updateUI();}},
   setFillEnabled:function(v){state.fillEnabled=v;var fw=document.getElementById('fill-well'),pf=document.getElementById('pm-fill');fw.classList.toggle('none',!v);pf.classList.toggle('none',!v);document.getElementById('p-fill-on').checked=v;
-    if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(p.data&&p.data.isVectorBrush)return;p.fillColor=v?state.fillColor:null;});saveActiveLayerFrame();updateUI();}},
+    var ft=document.getElementById('fill-enable-toggle');if(ft)ft.classList.toggle('off',!v);
+    if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(p.data&&p.data.isVectorBrush)return;p.fillColor=v?state.fillColor:null;});saveActiveLayerFrame();updateUI();}
+    else if(state.tool==='fsselect'&&_fsSel&&(_fsSel.kind==='fill'||_fsSel.kind==='fillregion')){pushUndo();if(_fsSel.kind==='fillregion')_fsSel=fsRealizeFillRegion(_fsSel,userLayers[state.activeLayerIdx]);_fsSel.path.fillColor=v?state.fillColor:null;if(!v){fsUnlinkFillRegen(_fsSel.path);if(!_fsSel.path.strokeColor){_fsSel.path.remove();fsClearSel();}}saveActiveLayerFrame();updateUI();}},
+  // Mirrors setFillEnabled exactly, for the Stroke side — didn't exist
+  // before (Stroke had no on/off concept, only a color), added alongside
+  // the quick phdr toggle button since disabling stroke without it required
+  // opening the color popover and hunting for "None".
+  setStrokeEnabled:function(v){state.strokeEnabled=v;
+    var st=document.getElementById('stroke-enable-toggle');if(st)st.classList.toggle('off',!v);
+    if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(p.data&&p.data.isVectorBrush)return;p.strokeColor=v?state.strokeColor:null;});saveActiveLayerFrame();updateUI();}
+    // fsselect's 'stroke' selection can be just a bounded segment (between
+    // two crossings), which has no standalone color to null — disabling it
+    // means the same real split-and-remove fsApplyDelete's Delete key does.
+    // No re-enable path: once a segment is split out there's nothing left
+    // to flip back on, and the stroke-sec panel disappears with _fsSel.
+    else if(state.tool==='fsselect'&&_fsSel&&_fsSel.kind==='stroke'&&!v){pushUndo();fsDeleteSegment(_fsSel,userLayers[state.activeLayerIdx]);fsClearSel();renderArcs();updateUI();}},
+  // Illustrator's "X" swap — exchanges the stroke and fill colors (tool
+  // defaults, and the current selection's actual colors if select/subselect
+  // is active, since setStrokeColor/setFillColor already apply to
+  // selectedPaths on their own). Fill's enabled/disabled state is left
+  // alone; only the color VALUES swap.
+  swapStrokeFill:function(){
+    var s=state.strokeColor,f=state.fillColor;
+    window.SM.setFillColor(s);
+    window.SM.setStrokeColor(f);
+  },
+  setFillBrushSize:function(v){state.fillBrushSize=Math.max(1,parseInt(v)||40);},
+  setBrushPreset:function(v){state.brushPreset=v||'none';},
   setSmoothing:function(v){state.smoothing=v;},setStabilizer:function(v){state.stabilizer=parseInt(v);},
   setStrokeCap:function(v){state.strokeCap=v;
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(!(p.data&&p.data.isVectorBrush))p.strokeCap=v;});saveActiveLayerFrame();}},
@@ -150,18 +195,33 @@ window.SM={
     fillRegenerateLinked(userLayers[state.activeLayerIdx],null);
     saveActiveLayerFrame();updateUI();
   },
-  setVectorBrush:function(v){state.vectorBrush=v;},setTaperEnds:function(v){state.taperEnds=v;},
+  setVectorBrush:function(v){state.vectorBrush=v;},setTaperEnds:function(v){state.taperEnds=v;},setShadowMode:function(v){state.shadowMode=v;},
   setDrawMode:function(v){state.drawMode=v;},
   setFillBrushMode:function(v){state.fillBrushMode=v;},
   setEraserSize:function(v){state.eraserSize=Math.max(2,parseInt(v)||24);},
   setPressureMin:function(v){state.pressureMin=Math.max(0,Math.min(100,parseInt(v)||0));},
   setPressureMax:function(v){state.pressureMax=Math.max(50,Math.min(300,parseInt(v)||170));},
   setPressureInvert:function(v){state.pressureInvert=!!v;},
-  setOpacity:function(v){state.opacity=parseInt(v);},
-  setFps:function(v){state.fps=Math.max(1,Math.min(60,v));if(state.playing){stopPlay();startPlay();}syncDocFields();},
+  setOpacity:function(v){state.opacity=parseInt(v);
+    // Unlike setFillColor/setStrokeColor right above, this never applied to
+    // the current selection — only ever wrote the tool-default opacity for
+    // the NEXT stroke drawn, so editing the Opacity field with something
+    // already selected (a normal shape, or an imported image/video frame,
+    // which has no fillColor/strokeColor to fall back through) silently did
+    // nothing to what was on screen.
+    if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){
+      pushUndo();
+      var op=Math.max(0,Math.min(100,parseInt(v)||0))/100;
+      selectedPaths.forEach(function(p){p.opacity=op;});
+      saveActiveLayerFrame();updateUI();
+    }
+  },
+  setFps:function(v){state.fps=Math.max(1,Math.min(60,v));if(state.playing){stopPlay();startPlay();}if(window.SMAudio)SMAudio.invalidateWaveforms();syncDocFields();},
   setCurve:function(points){state.easingCurve={points:points};},
   setResamplePts:function(v){state.resamplePts=v;},setTweenStep:function(v){state.tweenStep=parseInt(v);},
   setCanvasSize:function(w,h){state.canvasW=w;state.canvasH=h;drawStage();syncDocFields();},setCanvasBg:function(c){state.canvasBg=c;drawStage();syncDocFields();},
+  setCanvasClip:function(v){state.canvasClip=!!v;if(window.SMEngineBridge)window.SMEngineBridge.renderNow();},
+  setSafetyZones:function(v){state.safetyZones=!!v;if(window.SMEngineBridge)window.SMEngineBridge.renderNow();},
   fitCanvas:fitCanvas,resetView:resetView,
   setOnionRange:function(inF,outF){state.onionIn=inF;state.onionOut=outF;renderOS();},
   setOnionPrevOp:function(v){state.onionPrevOpacity=v;renderOS();},setOnionNextOp:function(v){state.onionNextOpacity=v;renderOS();},
@@ -181,10 +241,11 @@ window.SM={
     if(state.activeLayerIdx>=state.layers.length)state.activeLayerIdx=state.layers.length-1;
     activateUL(state.activeLayerIdx);loadFrame(state.currentFrame);updateUI();showToast('Calque(s) supprimé(s) — ⌘Z pour annuler');
   },
-  duplicateLayer:function(){saveAllLayerFrames();pushUndoLayers();var src=state.layers[state.activeLayerIdx];var ni=createUserLayer(src.name+' copy');state.layers[ni].frames=JSON.parse(JSON.stringify(src.frames));activateUL(ni);loadFrame(state.currentFrame);updateUI();},
+  duplicateLayer:function(){saveAllLayerFrames();pushUndoLayers();var src=state.layers[state.activeLayerIdx];var ni=createUserLayer(src.name+' copy');state.layers[ni].frames=JSON.parse(JSON.stringify(src.frames));if(src.blendMode)state.layers[ni].blendMode=src.blendMode;state.layers[ni].color=src.color;activateUL(ni);loadFrame(state.currentFrame);updateUI();},
   setActiveLayer:function(idx){if(idx<0||idx>=state.layers.length)return;saveAllLayerFrames();activateUL(idx);clearSel();renderArcs();updateUI();},
   toggleLayerVis:function(idx){state.layers[idx].visible=!state.layers[idx].visible;loadFrame(state.currentFrame);updateUI();},
   toggleLayerLock:function(idx){state.layers[idx].locked=!state.layers[idx].locked;updateUI();},
+  toggleLayerSolo:function(idx){state.layers[idx].solo=!state.layers[idx].solo;loadFrame(state.currentFrame);updateUI();},
   renameLayer:function(idx,n){state.layers[idx].name=n;updateUI();},
   reorderLayer:function(fromIdx,toIdx){reorderLayer(fromIdx,toIdx);},
   reorderLayersBatch:function(fromIndices,toIdx){reorderLayersBatch(fromIndices,toIdx);},
@@ -194,6 +255,7 @@ window.SM={
   },
   convertComponentToLayer:function(){convertComponentToLayer(state.activeLayerIdx);},
   convertActiveLayerToLFSGroup:function(){convertLayerToLFSGroup(state.activeLayerIdx);},
+  convertActiveLayerToStrokeFillShadow:function(){convertLayerToStrokeFillShadowFolder(state.activeLayerIdx);},
   convertLFSGroupToLayer:function(){convertLFSGroupToLayer(state.activeLayerIdx);},
   propagateLFSFill:function(which){propagateLFSFill(state.activeLayerIdx,which);},
   enterSymbol:function(symId){enterSymbol(symId);},
@@ -214,6 +276,23 @@ window.SM={
       var ld=state.layers[s.layer];if(!ld)return;
       data.push({layer:s.layer,frame:s.frame,content:JSON.parse(JSON.stringify(ld.frames[s.frame]))});
     });
+    // v16: snapshot each touched layer's keyframe list BEFORE the move so a
+    // retimed keyframe's motion-arc data (tweens.js rekeyTweenPairData) can
+    // follow it to the new frame index instead of orphaning — see that
+    // function's comment for why the arc data itself is still valid, only
+    // its lookup key needs to move.
+    var movedFrameMap={};
+    sel.forEach(function(s){
+      var tl=s.layer+offsetL,tf=s.frame+offsetF;
+      if(tl<0||tl>=state.layers.length||tf<0||tf>=state.totalFrames)return;
+      movedFrameMap[s.layer+':'+s.frame]=tf;
+    });
+    var touchedLayers={};sel.forEach(function(s){touchedLayers[s.layer]=true;});
+    var beforeKeyframes={};
+    Object.keys(touchedLayers).forEach(function(lk){
+      var li=parseInt(lk,10),ld=state.layers[li];if(!ld)return;
+      beforeKeyframes[li]=ld.frames.map(function(f,fi){return f.isKeyframe?fi:null;}).filter(function(x){return x!==null;});
+    });
     sel.forEach(function(s){
       var ld=state.layers[s.layer];if(!ld)return;
       ld.frames[s.frame]={strokes:[],isKeyframe:false,isInterpolated:false};
@@ -222,6 +301,15 @@ window.SM={
       var tl=d.layer+offsetL,tf=d.frame+offsetF;
       if(tl<0||tl>=state.layers.length||tf<0||tf>=state.totalFrames)return;
       state.layers[tl].frames[tf]=d.content;
+    });
+    Object.keys(beforeKeyframes).forEach(function(lk){
+      var li=parseInt(lk,10),kfs=beforeKeyframes[li];
+      for(var i=0;i<kfs.length-1;i++){
+        var fA=kfs[i],fB=kfs[i+1];
+        var newFA=movedFrameMap[li+':'+fA];newFA=(newFA!==undefined)?newFA:fA;
+        var newFB=movedFrameMap[li+':'+fB];newFB=(newFB!==undefined)?newFB:fB;
+        rekeyTweenPairData(fA,fB,newFA,newFB);
+      }
     });
     _sel.frames=[];
     data.forEach(function(d){
@@ -294,7 +382,16 @@ window.SM={
     ld.frames[fromFrame]={strokes:[],isKeyframe:false,isInterpolated:false};
     loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast('Keyframe déplacée → '+(toFrame+1));
   },
-  deleteSelStrokes:function(){if(selectedPaths.length>0){pushUndo();selectedPaths.forEach(function(p){p.remove();});clearSel();saveActiveLayerFrame();updateUI();}},
+  deleteSelStrokes:function(){if(selectedPaths.length>0){pushUndo();selectedPaths.forEach(function(p){
+    // Companions (linkedFill backdrop, brushCompanions texture copies)
+    // are deliberately excluded from selectedPaths (see their own "why" —
+    // they're not independently selectable) so deleting the primary has to
+    // explicitly take them with it too, or they're left behind as
+    // orphaned, invisible-in-the-panel geometry nobody can select to clean up.
+    if(p.data&&p.data.linkedFill&&!p.data.linkedFill.removed)p.data.linkedFill.remove();
+    if(p.data&&p.data.brushCompanions)p.data.brushCompanions.forEach(function(c){if(!c.removed)c.remove();});
+    p.remove();
+  });clearSel();saveActiveLayerFrame();updateUI();}},
   flipPreview:function(){
     var prev=state.currentFrame;var wa=state.waIn;var wo=state.waOut;
     if(state._flipping){state._flipping=false;return;}
@@ -356,9 +453,16 @@ window.SM={
     var sceneWaIn=inSym?_sceneSnapshot.waIn:state.waIn;
     var sceneWaOut=inSym?_sceneSnapshot.waOut:state.waOut;
     return JSON.stringify({version:13,totalFrames:sceneTotal,fps:sceneFps,canvasW:state.canvasW,canvasH:state.canvasH,canvasBg:state.canvasBg,waIn:sceneWaIn,waOut:sceneWaOut,
-      layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings};}),
-      symbols:state.symbols,
-      motionArcs:state.motionArcs,easingCurve:state.easingCurve,resamplePts:state.resamplePts,tweenStep:state.tweenStep});
+      layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color};}),
+      layerFolders:state.layerFolders,layerLinkGroups:state.layerLinkGroups,
+      symbols:state.symbols,palettes:state.palettes,activePaletteIdx:state.activePaletteIdx,customBrushPresets:state.customBrushPresets,
+      // audio: only the persistable fields — _buffer/_peaksCanvas/_srcNode
+      // are live runtime objects that must never hit JSON
+      audioTracks:(state.audioTracks||[]).map(function(t){return{name:t.name,dataB64:t.dataB64,offsetFrames:t.offsetFrames||0,volume:t.volume!==undefined?t.volume:1,muted:!!t.muted};}),
+      refMedia:state.refMedia?{type:state.refMedia.type,name:state.refMedia.name,src:state.refMedia.src,frames:state.refMedia.frames,opacity:state.refMedia.opacity,visible:state.refMedia.visible,offsetFrames:state.refMedia.offsetFrames||0}:null,
+      perspectiveEnabled:state.perspectiveEnabled,perspectiveMode:state.perspectiveMode,perspectiveDensity:state.perspectiveDensity,perspectiveVPs:state.perspectiveVPs,
+      motionArcs:state.motionArcs,easingCurve:state.easingCurve,resamplePts:state.resamplePts,tweenStep:state.tweenStep,
+      tweenOverrides:state.tweenOverrides});
   },
   importJSON:function(json,silent){
     try{var d=JSON.parse(json);if(!d.layers&&!d.frames)throw new Error('Invalid');
@@ -371,10 +475,38 @@ window.SM={
     Object.keys(_symbolPaperLayers).forEach(function(k){_symbolPaperLayers[k].forEach(function(l){l.remove();});});_symbolPaperLayers={};
     state.symbols=d.symbols||{};state.openSymbolTabs=[];state.activeSymbolId=null;
     d.layers.forEach(function(ld){var idx=createUserLayer(ld.name);state.layers[idx].visible=ld.visible!==false;state.layers[idx].locked=ld.locked||false;state.layers[idx].frames=ld.frames;
-      if(ld.symbolId){state.layers[idx].symbolId=ld.symbolId;state.layers[idx].symPlayMode=ld.symPlayMode||'loop';state.layers[idx].symSpeed=ld.symSpeed||1;state.layers[idx].symPlacedAt=ld.symPlacedAt||0;state.layers[idx].symSingleFrame=ld.symSingleFrame||0;}
+      if(ld.blendMode)state.layers[idx].blendMode=ld.blendMode;
+      if(ld.symbolId){state.layers[idx].symbolId=ld.symbolId;state.layers[idx].symPlayMode=ld.symPlayMode||'loop';state.layers[idx].symSpeed=ld.symSpeed||1;state.layers[idx].symPlacedAt=ld.symPlacedAt||0;state.layers[idx].symSingleFrame=ld.symSingleFrame||0;if(ld.symMatrix)state.layers[idx].symMatrix=ld.symMatrix;}
       if(ld.lfsGroup){state.layers[idx].lfsGroup=true;state.layers[idx].lfsIds=ld.lfsIds;state.layers[idx].lfsSettings=ld.lfsSettings;}
+      if(ld.folderId)state.layers[idx].folderId=ld.folderId;
+      if(ld.channel)state.layers[idx].channel=ld.channel;
+      if(ld.linkGroupId)state.layers[idx].linkGroupId=ld.linkGroupId;
+      state.layers[idx].color=ld.color||nextLayerColor();
       ld.frames.forEach(function(f){if(!f.isInterpolated)f.isInterpolated=false;});while(state.layers[idx].frames.length<state.totalFrames)state.layers[idx].frames.push({strokes:[],isKeyframe:false,isInterpolated:false});});
-    state.motionArcs=d.motionArcs||{};if(d.easingCurve){state.easingCurve=d.easingCurve;if(window._curveEditor)window._curveEditor.setState(d.easingCurve);}
+    state.layerFolders=d.layerFolders||{};state.layerLinkGroups=d.layerLinkGroups||{};
+    state.motionArcs=d.motionArcs||{};state.tweenOverrides=d.tweenOverrides||{};if(d.easingCurve){state.easingCurve=d.easingCurve;if(window._curveEditor)window._curveEditor.setState(d.easingCurve);}
+    // Explicit fallback to the app default, not just "leave whatever was
+    // there" — opening an old-format project right after working on a
+    // DIFFERENT project would otherwise silently carry that other
+    // project's palette over, since importJSON can be called directly from
+    // the Open dialog without newProject() resetting state first.
+    // Back-compat: a pre-multi-palette file only has the flat
+    // `colorPalette` array — wrap it into a single palette instead of
+    // losing the artist's saved colors.
+    if(d.palettes&&d.palettes.length)state.palettes=d.palettes;
+    else if(d.colorPalette)state.palettes=[{id:'p0',name:'Palette 1',colors:d.colorPalette}];
+    else state.palettes=[{id:'p0',name:'Palette 1',colors:['#000000','#ffffff','#ff0000','#ff8800','#ffee00','#00cc44','#0088ff','#8833ff']}];
+    state.activePaletteIdx=d.activePaletteIdx||0;
+    state.customBrushPresets=d.customBrushPresets||{};
+    state.audioTracks=d.audioTracks||[];
+    if(window.SMAudio)SMAudio.reload();
+    state.refMedia=d.refMedia||null;
+    if(window.SMReference)SMReference.reload();
+    state.perspectiveEnabled=d.perspectiveEnabled||false;state.perspectiveMode=d.perspectiveMode||'2pt';state.perspectiveDensity=d.perspectiveDensity||24;state.perspectiveVPs=d.perspectiveVPs||null;
+    var perspOnCb=document.getElementById('p-persp-on');if(perspOnCb)perspOnCb.checked=state.perspectiveEnabled;
+    var perspModeSel=document.getElementById('p-persp-mode');if(perspModeSel)perspModeSel.value=state.perspectiveMode;
+    var perspDensityInp=document.getElementById('p-persp-density');if(perspDensityInp)perspDensityInp.value=state.perspectiveDensity;
+    if(window.renderPaletteGrid)window.renderPaletteGrid();
     if(d.resamplePts)state.resamplePts=d.resamplePts;if(d.tweenStep)state.tweenStep=d.tweenStep;
     state.currentFrame=0;state.activeLayerIdx=0;activateUL(0);drawStage();loadFrame(0);renderOS();renderArcs();updateUI();renderSymbolTabs();
     syncDocFields();
@@ -407,7 +539,7 @@ function updateUI(){
   document.getElementById('info-sel').textContent=state.tool==='select'&&selectedPaths.length>0?selectedPaths.length+' selected':'';
   window._totalF=state.totalFrames;window._waIn=state.waIn;window._waOut=state.waOut;window._curFrame=state.currentFrame;
   window.updateWaBar();window.updateOmMarkers(state.currentFrame,state.totalFrames);
-  renderTimeline();renderLayerList();updateCompInstancePanel();updateSelPropsPanel();updatePropsContext();
+  renderTimeline();renderLayerList();updateCompInstancePanel();updateSelPropsPanel();updateFsSelPanel();updatePropsContext();
 }
 
 // ---- UNIFIED PROPERTIES PANEL (Figma/Graphite-style: one contextual panel
@@ -426,22 +558,60 @@ var TOOL_OPTS_TOOLS=['draw','pen','eraser','fillbrush'];
 var TOOL_LABELS={draw:'Draw',pen:'Pen',eraser:'Eraser',fillbrush:'Fill Brush',line:'Line',rect:'Rectangle',ellipse:'Ellipse',fill:'Fill'};
 var _selPropsSig='';
 var _propsCtxSig=null;
+// Force-expands a right-panel section by id (Tween/Easing Curve, etc.) and
+// scrolls it into view — used when a UI action (clicking a tween cell)
+// implies the user wants to see that section NOW, distinct from the normal
+// user-toggle-only .phdr click handler (ui.js) which never auto-opens
+// anything the user didn't click directly.
+function openPropsSection(id){
+  var sec=document.getElementById(id);if(!sec)return;
+  var h=sec.querySelector('.phdr'),b=sec.querySelector('.pbdy');
+  if(h&&b){b.classList.remove('hid');h.classList.remove('closed');}
+  sec.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
 function updatePropsContext(){
   var hasSel=(state.tool==='select'||state.tool==='subselect')&&selectedPaths.length>0;
   var ctx,hdrText;
-  var show={'sel-props-sec':false,'fill-sec':false,'stroke-sec':false,'tool-opts-sec':false,'effects-sec':false,'canvas-sec':false};
-  if(hasSel){
+  var show={'sel-props-sec':false,'fill-sec':false,'stroke-sec':false,'tool-opts-sec':false,'effects-sec':false,'canvas-sec':false,'layer-sec':false};
+  if(state.tool==='fsselect'&&_fsSel){
+    // Only the ONE clicked aspect's panel shows — no Position/Size (this
+    // tool doesn't offer transform, Select already owns that) and no
+    // Effects (blend mode lives on the layer, not a fill/stroke aspect).
+    ctx='fsselect';
+    show['fill-sec']=_fsSel.kind==='fill'||_fsSel.kind==='fillregion';
+    show['stroke-sec']=_fsSel.kind==='stroke';
+    var fsSegLabel=_fsSel.kind==='stroke'&&!(_fsSel.segStart===0&&_fsSel.segEnd===_fsSel.path.length)?' (segment)':'';
+    var fsFillLabel=_fsSel.kind==='fillregion'?' (région)':'';
+    hdrText=(_fsSel.kind==='stroke'?'Stroke'+fsSegLabel:'Fill'+fsFillLabel)+' sélectionné(e)';
+  }else if(hasSel){
     ctx='selection';
     show['sel-props-sec']=show['fill-sec']=show['stroke-sec']=show['effects-sec']=true;
     hdrText=selectedPaths.length+(selectedPaths.length>1?' éléments sélectionnés':' élément sélectionné');
   }else if(FILL_STROKE_TOOLS.indexOf(state.tool)>=0){
     ctx='tool:'+state.tool;
-    show['fill-sec']=show['stroke-sec']=true;
+    // Fill Brush never touches strokeColor at all (it paints a genuine
+    // filled shape, no outline — see draw-bridge.js commitStroke's
+    // isFillBrush() branch: strokeColor is always null). Showing the Stroke
+    // section while it's the active tool implied it was some kind of
+    // stroke/line tool, which is exactly the "fill brush est une stroke pas
+    // un fill" confusion reported — it only ever needs Fill + its own Tool
+    // Options (Above/Below/Merge placement, pressure range, eraser size).
+    show['fill-sec']=true;
+    show['stroke-sec']=state.tool!=='fillbrush';
     if(TOOL_OPTS_TOOLS.indexOf(state.tool)>=0)show['tool-opts-sec']=true;
     hdrText=(TOOL_LABELS[state.tool]||state.tool)+' — Options';
   }else{
     ctx='document';
     show['canvas-sec']=true;
+    // Nothing selected on canvas — the right panel falls back to Document,
+    // which is also the natural place to surface the clicked layer's own
+    // properties (Blend Mode). state.activeLayerIdx is already whatever
+    // layer was last clicked in the layer list (setActiveLayer runs on
+    // every row click), so this needs no separate "layer panel selection"
+    // tracking of its own.
+    show['layer-sec']=!!(state.layers[state.activeLayerIdx]);
+    var blendSel=document.getElementById('p-blendmode');
+    if(blendSel&&state.layers[state.activeLayerIdx])blendSel.value=state.layers[state.activeLayerIdx].blendMode||'normal';
     hdrText='Document';
   }
   var hdrEl=document.getElementById('props-context-hdr');if(hdrEl)hdrEl.textContent=hdrText;
@@ -455,6 +625,29 @@ function updatePropsContext(){
   var dmRow=document.getElementById('p-drawmode-row'),fbRow=document.getElementById('p-fillbrushmode-row');
   if(dmRow)dmRow.style.display=isFillBrush?'none':'flex';
   if(fbRow)fbRow.style.display=isFillBrush?'flex':'none';
+  // Fill Brush is UNCONDITIONALLY pressure/centerline-based (draw-bridge.js
+  // checks isFillBrush() before ever looking at state.vectorBrush) and never
+  // tapers its ends (a fill patch has no "line ends") — the checkbox and the
+  // taper toggle only mean anything for the Draw tool, so hide both rather
+  // than show controls that silently do nothing while this tool is active.
+  var vbRow=document.getElementById('p-vecbrush-row'),taperRow=document.getElementById('p-taper-row');
+  if(vbRow)vbRow.style.display=isFillBrush?'none':'flex';
+  if(taperRow)taperRow.style.display=isFillBrush?'none':'flex';
+  var fbSizeRow=document.getElementById('p-fillbrushsize-row');
+  if(fbSizeRow)fbSizeRow.style.display=isFillBrush?'flex':'none';
+  // Brush presets apply to Draw's plain constant-width commit path (see
+  // draw-bridge.js's commitStroke) AND, now, retroactively to an already-
+  // drawn plain stroke via "Apply to selection" below — but not to a
+  // vector-brush ribbon or a fill-shape (companion-stacking technique
+  // doesn't coexist with either, see applyBrushTexture's own comment), so a
+  // selection of ONLY plain strokes is required for the row to make sense
+  // during selection; it's unconditionally shown for the Draw tool itself
+  // since it just sets the default for the NEXT stroke.
+  var eligibleSel=hasSel&&selectedPaths.every(function(p){return p instanceof Path&&p.strokeColor&&!(p.data&&(p.data.isVectorBrush||p.data.isFillShape));});
+  var brushPresetRow=document.getElementById('p-brushpreset-row');
+  if(brushPresetRow)brushPresetRow.style.display=(state.tool==='draw'||eligibleSel)?'flex':'none';
+  var brushApplyRow=document.getElementById('p-brushpreset-apply-row');
+  if(brushApplyRow)brushApplyRow.style.display=eligibleSel?'flex':'none';
   // Only auto-(re)expand sections on an actual context CHANGE — every
   // updateUI() tick calls this, and forcing every visible section back open
   // on each call would fight a user who deliberately collapsed one while
@@ -475,6 +668,11 @@ function updatePropsContext(){
 function updateSelPropsPanel(){
   if((state.tool!=='select'&&state.tool!=='subselect')||!selectedPaths.length){_selPropsSig='';return;}
   var b=xformSelBounds();if(!b)return;
+  // Align toolbar only makes sense with 2+ objects (nothing to align a
+  // single selection AGAINST) — toggled every call, not gated behind the
+  // signature-change check below, since it only depends on count.
+  var alignBar=document.getElementById('align-toolbar');
+  if(alignBar)alignBar.style.display=selectedPaths.length>=2?'flex':'none';
   var sig=selectedPaths.map(function(p){return p.id;}).sort(function(a,c){return a-c;}).join(',');
   if(sig!==_selPropsSig){
     state.selRotAccum=0;_selPropsSig=sig;
@@ -488,12 +686,20 @@ function updateSelPropsPanel(){
     var ref=selectedPaths[0];
     if(ref){
       var hasFill=!!ref.fillColor;
-      var css=hasFill?ref.fillColor.toCSS(true):state.fillColor;
+      // colorHex8(), not .toCSS(true) — the latter always forces alpha to
+      // 1 (Paper.js quirk, see colorHex8's own comment in app.js); .dataset
+      // .hex8 alongside .value for the same native-<input>-truncates-alpha
+      // reason as every other color-input writer in this codebase.
+      var css=hasFill?colorHex8(ref.fillColor):state.fillColor;
       state.fillColor=css;state.fillEnabled=hasFill;
       document.getElementById('pm-fill').style.background=css;
       document.getElementById('pm-fill').classList.toggle('none',!hasFill);
       document.getElementById('pm-fill-c').value=css;
+      document.getElementById('pm-fill-c').dataset.hex8=css;
       document.getElementById('p-fill-on').checked=hasFill;
+      var ftog=document.getElementById('fill-enable-toggle');if(ftog)ftog.classList.toggle('off',!hasFill);
+      var hasStroke=!!ref.strokeColor;state.strokeEnabled=hasStroke;
+      var stog=document.getElementById('stroke-enable-toggle');if(stog)stog.classList.toggle('off',!hasStroke);
       // Same staleness fix for Cap/Join/Paint Order/Miter Limit/Dash Offset —
       // reflect the selected path's actual values instead of leaving
       // whatever the tool-default last was.
@@ -518,20 +724,85 @@ function updateSelPropsPanel(){
   document.getElementById('sp-pointtype-row').style.display=(state.tool==='subselect'&&_nodeSel.length)?'flex':'none';
   document.getElementById('sp-boolean-row').style.display=(state.tool==='select'&&selectedPaths.length>=2)?'flex':'none';
 }
-function selPropsApplyMove(dx,dy){
-  if((!dx&&!dy)||!selectedPaths.length)return;
+// Fill/Stroke Select tool: reflect the clicked aspect's ACTUAL current
+// color into the Fill/Stroke panel swatches — passive display only (does
+// NOT go through setFillColor/setStrokeColor, which would re-apply back
+// onto the selection and turn a read into a write).
+function updateFsSelPanel(){
+  if(state.tool!=='fsselect'||!_fsSel)return;
+  var p=_fsSel.path;
+  var ftog=document.getElementById('fill-enable-toggle'),stog=document.getElementById('stroke-enable-toggle');
+  if((_fsSel.kind==='fill'||_fsSel.kind==='fillregion')&&p.fillColor){
+    var fc=colorHex8(p.fillColor);
+    document.getElementById('fill-well').style.background=fc;document.getElementById('pm-fill').style.background=fc;
+    ['color-fill','pm-fill-c'].forEach(function(id){var el=document.getElementById(id);if(el){el.value=fc;el.dataset.hex8=fc;}});
+    if(ftog)ftog.classList.remove('off');
+  }else if(_fsSel.kind==='stroke'&&p.strokeColor){
+    var sc=colorHex8(p.strokeColor);
+    document.getElementById('stroke-well').style.background=sc;document.getElementById('pm-stroke').style.background=sc;
+    ['color-stroke','pm-stroke-c'].forEach(function(id){var el=document.getElementById(id);if(el){el.value=sc;el.dataset.hex8=sc;}});
+    if(stog)stog.classList.remove('off');
+  }
+}
+// ---- GHOST ALL: turn the visual-only ghosts into real, editable, jointly-
+// selected proxy objects (see app.js's _writeBackGhostProxies for how their
+// edits get routed back to each proxy's own frame instead of the current one).
+var _ghostProxyActive=false;
+function selectGhostAll(){
+  if(!state.ghostAllFrames)return;
+  window.SM.setTool('select');
+  var li=state.activeLayerIdx,cf=state.currentFrame;
+  var ld=state.layers[li];if(!ld||ld.symbolId){showToast('Ghost All ne fonctionne pas sur un composant');return;}
+  var layer=userLayers[li];
   pushUndo();
+  var count=0,frameCount=0;
+  for(var fi=0;fi<ld.frames.length;fi++){
+    if(fi===cf)continue;
+    var fr=ld.frames[fi];if(!fr.isKeyframe||!fr.strokes.length)continue;
+    frameCount++;
+    fr.strokes.forEach(function(sd){
+      if(sd.isRaster)return;
+      var p=desP(sd,layer);
+      p.data.ghostFrame=fi;
+      count++;
+    });
+  }
+  _ghostProxyActive=count>0;
+  selectedPaths=layer.children.filter(function(c){return c instanceof Path&&!(c.data&&(c.data.isLinkedFillCompanion||c.data.isBrushTextureCopy));});
+  state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;});
+  renderArcs();updateUI();
+  showToast(count+' élément(s) sur '+frameCount+' image(s) clé — déplacez/transformez ensemble');
+}
+function clearGhostSelection(){
+  if(!_ghostProxyActive)return;
+  saveActiveLayerFrame(); // flush any move/scale/rotate on the proxies back to their own frames first
+  var layer=userLayers[state.activeLayerIdx];
+  if(layer)layer.children.slice().forEach(function(c){if(c.data&&c.data.ghostFrame!==undefined)c.remove();});
+  _ghostProxyActive=false;
+  clearSel();loadFrame(state.currentFrame);updateUI();
+}
+function selPropsApplyMove(dx,dy,skipUndo){
+  if((!dx&&!dy)||!selectedPaths.length)return;
+  if(!skipUndo)pushUndo();
+  // translate(), not position=position.add() — see select-bridge.js's live
+  // canvas-drag move handler for the full explanation (same fix, same
+  // reason): .position round-trips through a bounds computation that the
+  // stroke ribbon and its linkedFill backdrop (two different objects,
+  // different geometry) don't round the same way, drifting apart a little
+  // more on every tick — this field now fires on every 'input' tick of a
+  // scrub-drag (many times per gesture), same accumulation risk.
   selectedPaths.forEach(function(p){
-    p.position=p.position.add(new Point(dx,dy));
+    p.translate(new Point(dx,dy));
     if(p.data&&p.data.isVectorBrush&&p.data.centerSegments)p.data.centerSegments.forEach(function(s){s.point=[s.point[0]+dx,s.point[1]+dy];});
-    if(p.data&&p.data.linkedFill&&!p.data.linkedFill.removed)p.data.linkedFill.position=p.data.linkedFill.position.add(new Point(dx,dy));
+    if(p.data&&p.data.linkedFill&&!p.data.linkedFill.removed)p.data.linkedFill.translate(new Point(dx,dy));
+    if(p.data&&p.data.brushCompanions)p.data.brushCompanions.forEach(function(c){if(!c.removed)c.translate(new Point(dx,dy));});
   });
   fillRegenerateLinked(userLayers[state.activeLayerIdx],null);
   saveActiveLayerFrame();renderArcs();updateUI();
 }
-function selPropsApplyScale(sx,sy,anchor){
+function selPropsApplyScale(sx,sy,anchor,skipUndo){
   if((sx===1&&sy===1)||!selectedPaths.length)return;
-  pushUndo();
+  if(!skipUndo)pushUndo();
   selectedPaths.forEach(function(p){
     p.scale(sx,sy,anchor);
     if(p.data&&p.data.isVectorBrush&&p.data.centerSegments){scaleCenterSegments(p.data.centerSegments,sx,sy,anchor.x,anchor.y);rebuildVectorBrushOutline(p);}
@@ -539,9 +810,9 @@ function selPropsApplyScale(sx,sy,anchor){
   fillRegenerateLinked(userLayers[state.activeLayerIdx],null);
   saveActiveLayerFrame();renderArcs();updateUI();
 }
-function selPropsApplyRotate(deltaDeg,center){
+function selPropsApplyRotate(deltaDeg,center,skipUndo){
   if(!deltaDeg||!selectedPaths.length)return;
-  pushUndo();
+  if(!skipUndo)pushUndo();
   selectedPaths.forEach(function(p){
     p.rotate(deltaDeg,center);
     if(p.data&&p.data.isVectorBrush&&p.data.centerSegments){rotateCenterSegments(p.data.centerSegments,deltaDeg,center.x,center.y);rebuildVectorBrushOutline(p);}
@@ -569,80 +840,240 @@ function renderTimeline(){
   // layer panel, which lists topmost (last-drawn-above) layers first. The
   // two lists previously ran in opposite orders, so after any reorder the
   // keyframe rows appeared to belong to the wrong layer.
-  for(var li=state.layers.length-1;li>=0;li--){var row=document.createElement('div');row.className='frow';var ld=state.layers[li];
-    for(var fi=0;fi<state.totalFrames;fi++){var cell=document.createElement('div');cell.className='fc';cell.dataset.frame=fi;cell.dataset.layer=li;
-      if(fi===state.currentFrame)cell.classList.add('cur');if(fi<state.waIn||fi>state.waOut)cell.classList.add('outside-wa');
-      if(selHas(li,fi))cell.classList.add('sel');
-      var fr=ld.frames[fi];
-      if(fr.isKeyframe){
-        var mk=document.createElement('div');mk.className='km '+(fr.strokes.length>0?'fl':'hl');cell.appendChild(mk);
-        // the keyframe cell itself carries the span tint so the band reads
-        // as starting AT the key, not one cell after it (the hollow
-        // end-rectangle only ever sits on held cells — a lone keyframe
-        // shows just its dot, like Animate)
-        cell.classList.add(fr.strokes.length>0?'kf-full':'kf-empty');
+  // Same folder-aware order as renderLayerList() (computeLayerRenderOrder)
+  // so the two panels' rows always line up — a folder header gets a blank
+  // spacer row here (frame data is per-LAYER, a folder has none of its own),
+  // and a collapsed folder's member layers are skipped entirely, matching
+  // renderLayerList() hiding those same rows.
+  var order=computeLayerRenderOrder();
+  var rowCount=0;
+  order.forEach(function(entry){
+    if(entry.type==='folder'){
+      // Collapsed: show the representative member's actual keyframes instead
+      // of a blank spacer — a collapsed Stroke/Fill/Shadow folder (synced
+      // timing via syncLinkedKeyframeFolder) previously hid its keyframes
+      // entirely, which read as "the keys disappeared". Cells point at
+      // keyLayerIdx via dataset.layer, so the existing insert/clear/drag
+      // handlers keep working unmodified — for a linked folder that already
+      // propagates the change to every member; for a plain (non-linked)
+      // folder it only affects that one representative layer, same as before.
+      var collapsed=!!state.layerFolders[entry.id].collapsed;
+      var frow=document.createElement('div');frow.className='frow ffolder'+(collapsed?' ffolder-collapsed':'');
+      if(collapsed&&entry.keyLayerIdx!==undefined){
+        renderKeyframeCellsInto(frow,entry.keyLayerIdx);
       }
-      else if(fr.isInterpolated){cell.classList.add(fr.isManualEdit?'tw-manual':'tw');var td=document.createElement('div');td.className='km td'+(fr.isManualEdit?' manual':'');cell.appendChild(td);}
-      else{
-        // Extended ("held") frames read differently depending on whether
-        // they trace back to an empty or a drawn keyframe, and the last
-        // extended cell before the next keyframe gets an end-of-span tick
-        // — both distinctions Animate shows and this app previously didn't.
-        var hc=false,srcFound=false;
-        for(var pi=fi;pi>=0;pi--){if(ld.frames[pi].isKeyframe){hc=ld.frames[pi].strokes.length>0;srcFound=true;break;}}
-        if(srcFound){
-          cell.classList.add(hc?'span-full':'span-empty');
-          var nextFr=ld.frames[fi+1];
-          if(!nextFr||nextFr.isKeyframe||nextFr.isInterpolated)cell.classList.add('span-end');
-        }
+      grid.appendChild(frow);rowCount++;
+      return;
+    }
+    if(entry.hidden)return;
+    rowCount++;
+    var li=entry.idx;var row=document.createElement('div');row.className='frow'+(li===state.activeLayerIdx?' act':'');
+    // Collapsed Stroke/Fill/Shadow head row: its OWN strokes are what the
+    // 'fl'/'hl' (full/hollow) keyframe dot would normally reflect, but the
+    // head is whichever member happens to render topmost (often Shadow,
+    // which starts empty on every frame by design — no shadow-generation
+    // algorithm exists yet) — showing only ITS content read as "the
+    // keyframes went empty" the moment you collapsed, even though Stroke/
+    // Fill right underneath are fully drawn. Pass every sibling's layer
+    // index so the collapsed row's dots reflect "does ANY channel have
+    // content here", matching what collapsing is supposed to summarize.
+    var contentIdxs=null;
+    if(entry.linkGroupHead&&state.layerLinkGroups[entry.linkGroupId]&&state.layerLinkGroups[entry.linkGroupId].collapsed){
+      contentIdxs=[];
+      state.layers.forEach(function(l,idx){if(l.linkGroupId===entry.linkGroupId)contentIdxs.push(idx);});
+    }
+    renderKeyframeCellsInto(row,li,contentIdxs);
+    grid.appendChild(row);
+  });
+  document.getElementById('playhead').style.left=(state.currentFrame*FC)+'px';document.getElementById('playhead').style.height=(30+rowCount*ROW_H)+'px';
+  if(window.SMAudio)SMAudio.renderStrip();
+}
+// Builds one row's worth of frame cells for layer `li` into `rowEl` — shared
+// by the normal per-layer row and a collapsed folder's representative row
+// (see renderTimeline() above) so both stay pixel-identical.
+function hexToRgbTriplet(hex){
+  hex=(hex||'').replace('#','');
+  if(hex.length===3)hex=hex.split('').map(function(c){return c+c;}).join('');
+  var r=parseInt(hex.substr(0,2),16)||0,g=parseInt(hex.substr(2,2),16)||0,b=parseInt(hex.substr(4,2),16)||0;
+  return r+','+g+','+b;
+}
+function renderKeyframeCellsInto(rowEl,li,contentLayerIdxs){
+  var ld=state.layers[li];
+  // Normally just this layer's own strokes; when contentLayerIdxs is given
+  // (collapsed Stroke/Fill/Shadow head row — see renderTimeline's call
+  // site), "full" means ANY sibling channel has content at that frame.
+  function hasContentAt(fi){
+    if(!contentLayerIdxs)return ld.frames[fi].strokes.length>0;
+    return contentLayerIdxs.some(function(idx){var f=state.layers[idx]&&state.layers[idx].frames[fi];return f&&f.strokes.length>0;});
+  }
+  for(var fi=0;fi<state.totalFrames;fi++){var cell=document.createElement('div');cell.className='fc';cell.dataset.frame=fi;cell.dataset.layer=li;
+    if(fi===state.currentFrame)cell.classList.add('cur');if(fi<state.waIn||fi>state.waOut)cell.classList.add('outside-wa');
+    if(selHas(li,fi))cell.classList.add('sel');
+    // Set once per cell (not just on the .km dot) so the CSS-inherited
+    // --dot-color/--dot-rgb custom props also reach the cell's OWN
+    // kf-full/span-full/span-end backgrounds (see style.css) — the whole
+    // span reads in the layer's own color, matching the mockup, not a
+    // generic gray.
+    if(ld.color){cell.style.setProperty('--dot-color',ld.color);cell.style.setProperty('--dot-rgb',hexToRgbTriplet(ld.color));}
+    var fr=ld.frames[fi];
+    if(fr.isKeyframe){
+      var full=hasContentAt(fi);
+      var mk=document.createElement('div');mk.className='km '+(full?'fl':'hl');
+      cell.appendChild(mk);
+      // the keyframe cell itself carries the span tint so the band reads
+      // as starting AT the key, not one cell after it (the hollow
+      // end-rectangle only ever sits on held cells — a lone keyframe
+      // shows just its dot, like Animate)
+      cell.classList.add(full?'kf-full':'kf-empty');
+    }
+    else if(fr.isInterpolated){cell.classList.add(fr.isManualEdit?'tw-manual':'tw');var td=document.createElement('div');td.className='km td'+(fr.isManualEdit?' manual':'');cell.appendChild(td);}
+    else{
+      // Extended ("held") frames read differently depending on whether
+      // they trace back to an empty or a drawn keyframe, and the last
+      // extended cell before the next keyframe gets an end-of-span tick
+      // — both distinctions Animate shows and this app previously didn't.
+      var hc=false,srcFound=false;
+      for(var pi=fi;pi>=0;pi--){if(ld.frames[pi].isKeyframe){hc=hasContentAt(pi);srcFound=true;break;}}
+      if(srcFound){
+        cell.classList.add(hc?'span-full':'span-empty');
+        var nextFr=ld.frames[fi+1];
+        if(!nextFr||nextFr.isKeyframe||nextFr.isInterpolated)cell.classList.add('span-end');
       }
-      row.appendChild(cell);}grid.appendChild(row);}
-  document.getElementById('playhead').style.left=(state.currentFrame*FC)+'px';document.getElementById('playhead').style.height=(30+state.layers.length*24)+'px';
+    }
+    rowEl.appendChild(cell);}
 }
 
-// ---- HELD-KEYFRAME SPAN SHRINK HANDLE ----
+// ---- HELD-KEYFRAME SPAN SHRINK/TRIM HANDLE ----
 // A held/extended span's end (the small bracket drawn by .fc.span-end::after
 // in CSS) has no stored length of its own — it's always wherever the next
-// real keyframe happens to sit (see renderTimeline() above). Dragging this
-// handle leftward "shortens the hold" by literally dropping a new keyframe
-// at the drop frame (insertKeyframeAt), which becomes the new boundary —
-// there's no other way to shrink a purely-derived span. Capture-phase so it
-// runs before the existing mousedown handler below and can stopPropagation
-// to prevent that handler's own select/drag logic from also firing when the
-// user is grabbing this handle specifically (only the last ~6px of a
-// .span-end cell counts as grabbing it).
-var _spanShrink={active:false,li:-1,srcFi:-1,maxFi:-1};
+// real keyframe happens to sit (see renderTimeline() above). Capture-phase
+// so it runs before the existing mousedown handler below — but
+// stopPropagation() alone did NOT stop that handler: both listeners sit on
+// the SAME element (#frame-grid), and per spec, listeners on one element
+// all fire "at target" in registration order regardless of the capture
+// flag — only stopImmediatePropagation() skips a later sibling listener on
+// that same element. The old stopPropagation()-only version let the plain
+// cell mousedown handler ALSO run on every handle grab, starting its own
+// range-select drag (_tlDrag) concurrently with this one — that's what
+// read as "the drag jumps rows" and "fights with selection": two unrelated
+// drag state machines were both live off one mousedown. The last ~7px of a
+// .span-end cell counts as grabbing the handle (cell is only 14px wide
+// total — see --fc — so this is deliberately close to half the cell).
+//
+// Trim, not insert: if a REAL keyframe borders the span right after it
+// (nextKeyFi), dragging is a video-editor-style trim — that keyframe's own
+// content MOVES to the drop frame, exactly like dragging a clip's edge in
+// Premiere/After Effects moves the cut point without leaving a duplicate
+// behind. The first version always called insertKeyframeAt() at the drop
+// frame regardless, which left the ORIGINAL next keyframe untouched in
+// place and just wedged an extra one in front of it — visually looked like
+// "shrinking" only because the new key's content happened to match, but the
+// real next keyframe never actually moved, and dragging couldn't extend the
+// span later (past nextKeyFi) at all. If there's no bordering keyframe (the
+// hold just runs to the end of the timeline, or of an unbroken empty tail),
+// there's nothing to move, so it falls back to the original insert-a-new-
+// keyframe behavior — the only way to "shrink" an open-ended hold.
+var _spanShrink={active:false,li:-1,srcFi:-1,maxFi:-1,nextKeyFi:-1,dragMax:-1};
 document.getElementById('frame-grid').addEventListener('mousedown',function(e){
   if(e.button!==0)return;
   var cell=e.target.closest('.fc.span-end');if(!cell)return;
-  var r=cell.getBoundingClientRect();
-  if(e.clientX<r.right-6)return; // not grabbing the handle itself — let the normal cell click/drag handler run
-  e.preventDefault();e.stopPropagation();
+  // v8: the whole span-end cell is now the grab zone (was progressively
+  // widened from 7px → 65% of the cell across earlier passes and still
+  // read as fiddly/hard to grab per feedback) — a span-end cell's ONLY
+  // useful single-cell action was ever this resize anyway, so there's no
+  // competing "just select this cell" gesture being lost by claiming the
+  // whole thing. The visible grab-bar (.fc.span-end::after, style.css) is
+  // sized to match this generous hit area now instead of a small fraction
+  // of it.
+  e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();
   var fi=parseInt(cell.dataset.frame),li=parseInt(cell.dataset.layer);
   var ld=state.layers[li];
   var srcFi=fi;for(var pi=fi;pi>=0;pi--){if(ld.frames[pi].isKeyframe){srcFi=pi;break;}}
-  _spanShrink={active:true,li:li,srcFi:srcFi,maxFi:fi};
+  var nextKeyFi=-1;
+  if(ld.frames[fi+1]&&ld.frames[fi+1].isKeyframe)nextKeyFi=fi+1;
+  // How far right the handle can be dragged: up to (but not onto) whichever
+  // keyframe comes after nextKeyFi — can't trim past the FOLLOWING span's
+  // own boundary — or the last frame of the timeline if there's no such
+  // keyframe (nothing else to collide with).
+  var dragMax=state.totalFrames-1;
+  if(nextKeyFi>=0){for(var ni=nextKeyFi+1;ni<state.layers[li].frames.length;ni++){if(ld.frames[ni].isKeyframe){dragMax=ni-1;break;}}}
+  else dragMax=fi; // no bordering keyframe — old shrink-only behavior, capped at the current end
+  _spanShrink={active:true,li:li,srcFi:srcFi,maxFi:fi,nextKeyFi:nextKeyFi,dragMax:dragMax};
+  cell.classList.add('tl-outdrag-hide-end');
+  // Trim path (a REAL bordering keyframe is being relocated, not just an
+  // abstract span end) — hide ITS dot too for the drag's duration, same
+  // reasoning as hiding the old square: otherwise the keyframe you're
+  // dragging looks like it never moves until you let go.
+  if(nextKeyFi>=0){
+    var nextCell=document.querySelector('.fc[data-layer="'+li+'"][data-frame="'+nextKeyFi+'"]');
+    if(nextCell)nextCell.classList.add('tl-outdrag-hide-key');
+  }
 },true);
 function _spanShrinkFrameAt(e){
   var wrap=document.getElementById('fg-wrap');var rect=wrap.getBoundingClientRect();
   var x=e.clientX-rect.left+wrap.scrollLeft;
-  return Math.max(_spanShrink.srcFi+1,Math.min(_spanShrink.maxFi,Math.floor(x/FC)));
+  return Math.max(_spanShrink.srcFi+1,Math.min(_spanShrink.dragMax,Math.floor(x/FC)));
 }
 window.addEventListener('mousemove',function(e){
   if(!_spanShrink.active)return;
   var fi=_spanShrinkFrameAt(e);
+  document.querySelectorAll('.fc.span-drag-band').forEach(function(c){c.classList.remove('span-drag-band');});
   document.querySelectorAll('.fc.span-drag-preview').forEach(function(c){c.classList.remove('span-drag-preview');});
+  document.querySelectorAll('.km.drag-key-preview').forEach(function(k){k.remove();});
+  // v8: tint the WHOLE prospective span (source key's next frame through
+  // the current drag position), not just the single cell under the cursor
+  // — reads as the held region actually growing/shrinking as you drag,
+  // instead of one small marker silently teleporting between cells with no
+  // sense of the span's new extent until you let go.
+  for(var bf=_spanShrink.srcFi+1;bf<=fi;bf++){
+    var bandCell=document.querySelector('.fc[data-layer="'+_spanShrink.li+'"][data-frame="'+bf+'"]');
+    if(bandCell)bandCell.classList.add('span-drag-band');
+  }
   var prevCell=document.querySelector('.fc[data-layer="'+_spanShrink.li+'"][data-frame="'+fi+'"]');
-  if(prevCell)prevCell.classList.add('span-drag-preview');
+  if(prevCell){
+    prevCell.classList.add('span-drag-preview');
+    // Trim path: show the relocating keyframe's OWN dot (full/hollow,
+    // matching whatever it'll actually look like once dropped) riding
+    // along with the preview cell, instead of only the abstract square —
+    // same visual language as a real committed keyframe.
+    if(_spanShrink.nextKeyFi>=0){
+      var ld=state.layers[_spanShrink.li];
+      var movedFr=ld.frames[_spanShrink.nextKeyFi];
+      var full=movedFr&&movedFr.strokes.length>0;
+      var dot=document.createElement('div');
+      dot.className='km drag-key-preview '+(full?'fl':'hl');
+      prevCell.appendChild(dot);
+      prevCell.classList.add('span-drag-preview-key');
+    }
+  }
 });
 window.addEventListener('mouseup',function(e){
   if(!_spanShrink.active)return;
-  document.querySelectorAll('.fc.span-drag-preview').forEach(function(c){c.classList.remove('span-drag-preview');});
+  document.querySelectorAll('.fc.span-drag-band').forEach(function(c){c.classList.remove('span-drag-band');});
+  document.querySelectorAll('.fc.span-drag-preview').forEach(function(c){c.classList.remove('span-drag-preview','span-drag-preview-key');});
+  document.querySelectorAll('.km.drag-key-preview').forEach(function(k){k.remove();});
+  // Explicit cleanup, not just "a re-render will replace it" — several
+  // branches below return early on a no-op drop (dropped back on the
+  // source, or back on the already-existing end) with no re-render at all,
+  // which would otherwise leave the original marker permanently hidden.
+  document.querySelectorAll('.fc.tl-outdrag-hide-end').forEach(function(c){c.classList.remove('tl-outdrag-hide-end');});
+  document.querySelectorAll('.fc.tl-outdrag-hide-key').forEach(function(c){c.classList.remove('tl-outdrag-hide-key');});
   var fi=_spanShrinkFrameAt(e);
-  var li=_spanShrink.li;
+  var li=_spanShrink.li,nextKeyFi=_spanShrink.nextKeyFi;
   _spanShrink.active=false;
-  if(fi<=_spanShrink.srcFi||fi>=_spanShrink.maxFi)return; // dropped back on the source key or the existing end — no-op
-  insertKeyframeAt(li,fi);
+  if(fi<=_spanShrink.srcFi)return; // dropped back on the source key — no-op
+  if(nextKeyFi>=0){
+    if(fi===nextKeyFi)return; // dropped right back where it already was
+    pushUndo();saveAllLayerFrames();
+    var ld=state.layers[li];
+    var moved=ld.frames[nextKeyFi];
+    ld.frames[nextKeyFi]={strokes:[],isKeyframe:false,isInterpolated:false};
+    ld.frames[fi]=moved;
+    loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
+  }else{
+    if(fi>=_spanShrink.maxFi)return; // dropped on the existing (open-ended) end — no-op
+    insertKeyframeAt(li,fi);
+  }
 });
 
 // ---- FRAME GRID MOUSE HANDLERS (multi-select + drag) ----
@@ -692,7 +1123,7 @@ document.getElementById('frame-grid').addEventListener('mousedown',function(e){
     var fr0=ld0&&ld0.frames[fi];
     if(fr0&&fr0.isKeyframe&&fr0.strokes.length>0&&userLayers[li]){
       window.SM.setTool('select');
-      selectedPaths=userLayers[li].children.filter(function(c){return c instanceof Path;});
+      selectedPaths=userLayers[li].children.filter(function(c){return c instanceof Path&&!(c.data&&(c.data.isLinkedFillCompanion||c.data.isBrushTextureCopy));});
       state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;});
       renderArcs();updateUI();
     }else if(selectedPaths.length){
@@ -704,6 +1135,11 @@ document.getElementById('frame-grid').addEventListener('mousedown',function(e){
       // from that original keyframe.
       clearSel();renderArcs();updateUI();
     }
+    // Clicking a tween (interpolated) cell jumps straight to the Tween +
+    // Easing Curve sections on the right — those are exactly the two panels
+    // relevant to an inbetween frame, and they previously stayed collapsed
+    // (or whatever section the user last had open) until manually expanded.
+    if(fr0&&fr0.isInterpolated){openPropsSection('tween-sec');openPropsSection('easing-sec');}
   }
 
   _tlDrag.active=true;_tlDrag.startL=li;_tlDrag.startF=fi;_tlDrag.moved=false;_tlDrag.ghost=null;
@@ -761,13 +1197,20 @@ document.getElementById('frame-grid').addEventListener('mousemove',function(e){
   var toF=Math.max(0,Math.min(state.totalFrames-1,Math.floor(xRel/FC)));
   // grid rows run top-to-bottom from the highest layer index (see
   // renderTimeline), so the row under the cursor maps to a flipped index
-  var toL=Math.max(0,Math.min(state.layers.length-1,state.layers.length-1-Math.floor(yRel/24)));
+  var toL=Math.max(0,Math.min(state.layers.length-1,state.layers.length-1-Math.floor(yRel/ROW_H)));
 
   if(!_tlDrag.moved){
     var dist=Math.abs(toF-_tlDrag.startF)+Math.abs(toL-_tlDrag.startL);
     if(dist<1)return;
     _tlDrag.moved=true;
     if(_tlDrag.mode==='move'&&!_sel.frames.length)selAdd(_tlDrag.startL,_tlDrag.startF);
+    // Fade the ORIGINAL held span each dragged keyframe belongs to, not just
+    // the single keyframe cell — otherwise only a small ghost box tracks the
+    // cursor while the full colored band it's being pulled out of stays
+    // solid and unchanged-looking until drop, reading as "the color stays
+    // behind" (real feedback: it wasn't obvious anything was actually being
+    // moved out of its old span until you let go).
+    if(_tlDrag.mode==='move')fadeDragSourceSpans(true);
   }
 
   if(_tlDrag.mode==='select'){
@@ -804,7 +1247,7 @@ document.getElementById('frame-grid').addEventListener('mousemove',function(e){
   // keyframe point is following the cursor across the timeline, while the
   // ghost cell below still shows the precise snapped drop target.
   var clampedX=Math.max(0,Math.min(state.totalFrames*FC,xRel));
-  var clampedY=Math.max(12,Math.min(state.layers.length*24-12,yRel));
+  var clampedY=Math.max(12,Math.min(state.layers.length*ROW_H-12,yRel));
   _tlDrag.cursorDot.style.left=(clampedX+gridOffLeft)+'px';
   _tlDrag.cursorDot.style.top=(clampedY+gridOffTop)+'px';
 
@@ -813,8 +1256,8 @@ document.getElementById('frame-grid').addEventListener('mousemove',function(e){
     var gl=s.layer+offL,gf=s.frame+offF;
     if(gl<0||gl>=state.layers.length||gf<0||gf>=state.totalFrames)return;
     var d=document.createElement('div');
-    d.style.cssText='position:absolute;width:'+FC+'px;height:24px;background:rgba(74,158,255,.35);border:1px solid rgba(74,158,255,.7);border-radius:2px;box-sizing:border-box;';
-    d.style.left=(gf*FC+gridOffLeft)+'px';d.style.top=((state.layers.length-1-gl)*24+gridOffTop)+'px';
+    d.style.cssText='position:absolute;width:'+FC+'px;height:'+ROW_H+'px;background:rgba(74,158,255,.35);border:1px solid rgba(74,158,255,.7);border-radius:2px;box-sizing:border-box;';
+    d.style.left=(gf*FC+gridOffLeft)+'px';d.style.top=((state.layers.length-1-gl)*ROW_H+gridOffTop)+'px';
     var fr=state.layers[s.layer].frames[s.frame];
     if(fr&&fr.isKeyframe){
       var dot=document.createElement('div');
@@ -827,8 +1270,32 @@ document.getElementById('frame-grid').addEventListener('mousemove',function(e){
   _tlDrag._toL=toL;_tlDrag._toF=toF;
 });
 
+// Held-span fade for an in-progress keyframe MOVE drag (see the mousemove
+// handler above) — finds the full run of frames each selected keyframe
+// belongs to (its own key up through whatever comes right before the next
+// one) and dims those actual .fc cells for the duration of the drag, so the
+// span you're pulling a keyframe out of visibly recedes instead of staying
+// solid while a separate ghost tracks the cursor elsewhere. Purely a CSS
+// class toggle on existing DOM cells — no re-render, so it's cheap enough
+// to call once per drag-start.
+function fadeDragSourceSpans(on){
+  document.querySelectorAll('.fc.tl-drag-fading').forEach(function(c){c.classList.remove('tl-drag-fading');});
+  if(!on)return;
+  var seen={};
+  _sel.frames.forEach(function(s){
+    var key=s.layer+':'+s.frame;if(seen[key])return;seen[key]=true;
+    var ld=state.layers[s.layer];if(!ld)return;
+    var start=s.frame;while(start>0&&!ld.frames[start].isKeyframe)start--;
+    var end=s.frame;while(end+1<state.totalFrames&&!ld.frames[end+1].isKeyframe)end++;
+    for(var f=start;f<=end;f++){
+      var c=document.querySelector('.fc[data-layer="'+s.layer+'"][data-frame="'+f+'"]');
+      if(c)c.classList.add('tl-drag-fading');
+    }
+  });
+}
 window.addEventListener('mouseup',function(){
   if(!_tlDrag.active)return;
+  fadeDragSourceSpans(false);
   if(_tlDrag.moved&&_tlDrag.ghost&&_sel.frames.length>0){
     var offL=_tlDrag._toL-_tlDrag.startL;
     var offF=_tlDrag._toF-_tlDrag.startF;
@@ -860,23 +1327,227 @@ function startLayerRename(idx){
   input.addEventListener('mousedown',function(e){e.stopPropagation();});
   input.addEventListener('dblclick',function(e){e.stopPropagation();});
 }
+// Shared by renderLayerList() and renderTimeline() so the layer list and
+// the frame grid always agree on which rows are visible — a folder header
+// entry appears once, right before the first of its (consecutive) member
+// layers in display order; a collapsed folder's members are marked
+// hidden:true instead of omitted outright, so callers that need the real
+// layer index (frame grid columns) can still find it if they need to.
+function computeLayerRenderOrder(){
+  var order=[],seenFolder={},folderEntry={},seenLinkGroup={};
+  for(var i=state.layers.length-1;i>=0;i--){
+    var ld=state.layers[i];
+    var fid=ld.folderId;
+    if(fid&&state.layerFolders[fid]){
+      if(!seenFolder[fid]){
+        seenFolder[fid]=true;
+        var fe={type:'folder',id:fid,keyLayerIdx:i};
+        folderEntry[fid]=fe;
+        order.push(fe);
+      }
+      // A collapsed folder still needs ONE layer's frame data to represent the
+      // group in renderTimeline() (see its comment) — the LOWEST member index
+      // wins simply because this loop runs top-down (highest index first), so
+      // the last member visited (lowest index) is whichever one sticks.
+      folderEntry[fid].keyLayerIdx=i;
+      order.push({type:'layer',idx:i,hidden:!!state.layerFolders[fid].collapsed});
+      continue;
+    }
+    var gid=ld.linkGroupId;
+    if(gid&&state.layerLinkGroups[gid]){
+      // Stroke/Fill/Shadow link groups (app.js convertLayerToStrokeFillShadowFolder)
+      // are NOT layerFolders — deliberately, so each member stays a fully
+      // normal, independently-controlled layer row (see that function's own
+      // comment). This is only the collapse/expand SPACE-SAVING affordance:
+      // the first member encountered (topmost, since this loop runs high-
+      // index-first) is the permanent "head" row — it always shows ITS OWN
+      // real eye/lock/solo (never an aggregate), and while the group is
+      // collapsed the other members are just marked hidden, same technique
+      // the folder path above already uses, so renderTimeline's frame-grid
+      // needs zero special-casing (each hidden/visible real layer carries
+      // its own real frame data, unlike a synthetic folder header row).
+      var isHead=!seenLinkGroup[gid];
+      if(isHead)seenLinkGroup[gid]=true;
+      var collapsed=!!state.layerLinkGroups[gid].collapsed;
+      order.push({type:'layer',idx:i,hidden:collapsed&&!isHead,linkGroupId:gid,linkGroupHead:isHead});
+    }else{
+      order.push({type:'layer',idx:i,hidden:false});
+    }
+  }
+  return order;
+}
+// Groups the current multi-selection (_layerSel) into a new folder — only
+// when they're already CONSECUTIVE in layer order (computeLayerRenderOrder
+// derives a folder's membership purely from adjacency, so a non-contiguous
+// selection would render wrong: reorder first, like Animate requires too).
+function groupSelectionIntoFolder(){
+  if(_layerSel.length<2){showToast('Sélectionnez au moins 2 calques');return;}
+  var sorted=_layerSel.slice().sort(function(a,b){return a-b;});
+  for(var k=1;k<sorted.length;k++)if(sorted[k]!==sorted[k-1]+1){showToast('Les calques doivent être consécutifs — réordonnez-les d\'abord');return;}
+  if(sorted.some(function(i){return state.layers[i].folderId;})){showToast('Un calque sélectionné est déjà dans un dossier');return;}
+  var fid='folder-'+Date.now()+'-'+Math.floor(Math.random()*1000);
+  state.layerFolders[fid]={name:'Dossier',collapsed:false};
+  sorted.forEach(function(i){state.layers[i].folderId=fid;});
+  renderLayerList();renderTimeline();
+}
+function folderMemberIndices(fid){
+  var idxs=[];
+  state.layers.forEach(function(ld,i){if(ld.folderId===fid)idxs.push(i);});
+  return idxs;
+}
+function ungroupFolder(fid){
+  state.layers.forEach(function(ld){if(ld.folderId===fid)delete ld.folderId;});
+  delete state.layerFolders[fid];
+  renderLayerList();renderTimeline();
+}
+function startFolderRename(fid){
+  var fmeta=state.layerFolders[fid];if(!fmeta)return;
+  var row=document.querySelector('.lrow.lfolder');
+  var frows=[...document.querySelectorAll('.lrow.lfolder')].filter(function(r){return r.querySelector('.lnm').textContent===fmeta.name;});
+  var target=frows[0]||row;if(!target)return;
+  var nm=target.querySelector('.lnm');if(!nm)return;
+  var input=document.createElement('input');input.type='text';input.value=fmeta.name;
+  input.style.cssText='flex:1;background:var(--bg);border:1px solid var(--accent);color:var(--text);font-size:11px;padding:0 4px;font-weight:700;';
+  nm.replaceWith(input);input.focus();input.select();
+  function commit(){fmeta.name=input.value.trim()||fmeta.name;renderLayerList();}
+  input.addEventListener('blur',commit);
+  input.addEventListener('keydown',function(e){e.stopPropagation();if(e.key==='Enter')input.blur();else if(e.key==='Escape'){input.value=fmeta.name;input.blur();}});
+}
+// Real icon-handoff SVGs (v5) instead of Material Symbols codepoints — no
+// risk of a codepoint missing from the subsetted embedded font (see the
+// lock-icon comment below, a bug that class of mistake caused before).
+var ICO_EYE='<svg viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>';
+// v11: distinct closed-eye icon for the hidden state (icon-handoff SVG)
+// instead of the same open-eye glyph just dimmed via .off — reads as
+// "hidden" at a glance instead of "same icon, slightly grayed out".
+// v14: explicit fill="currentColor" — SVG's own default fill (black, per
+// spec, when unspecified) was silently overriding the CSS `color` this
+// icon is supposed to follow (.lico.off{color:var(--text-dark)}), which is
+// exactly why the closed-eye icon rendered solid black instead of the same
+// dim gray every other "off" icon in this list uses.
+var ICO_EYE_CLOSED='<svg viewBox="0 0 24 24"><path fill="currentColor" d="m9.342 18.781-1.931-.518.787-2.939a10.99 10.99 0 0 1-3.237-1.872l-2.153 2.154-1.415-1.415 2.154-2.153a10.957 10.957 0 0 1-2.371-5.07l1.968-.359C3.903 10.811 7.579 14 12 14c4.42 0 8.097-3.188 8.856-7.39l1.968.358a10.958 10.958 0 0 1-2.37 5.071l2.153 2.153-1.415 1.415-2.153-2.154a10.99 10.99 0 0 1-3.237 1.872l.787 2.94-1.931.517-.788-2.94a11.07 11.07 0 0 1-3.74 0l-.788 2.94Z"/></svg>';
+var ICO_LOCK='<svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="1.8" fill="currentColor"/><path d="M8 11V8a4 4 0 018 0v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+var ICO_UNLOCK='<svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="1.8" fill="currentColor"/><path d="M8 11V8a4 4 0 017.6-1.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+// Layer color label picker (v5) — a small predefined-swatch "nuancier"
+// instead of jumping straight to the full SV/hue/hex ColorPicker. Reuses
+// LAYER_COLOR_PALETTE (app.js) so the choices match the auto-assigned
+// colors new layers already get; a "+" cell falls through to the full
+// picker for anyone who wants an arbitrary custom color.
+function openLayerColorSwatches(anchorEl,currentHex,onPick){
+  var old=document.getElementById('layer-color-swatches');if(old)old.remove();
+  var pop=document.createElement('div');pop.id='layer-color-swatches';pop.className='lcs-pop';
+  LAYER_COLOR_PALETTE.forEach(function(hex){
+    var sw=document.createElement('button');sw.className='lcs-swatch'+(hex.toLowerCase()===(currentHex||'').toLowerCase()?' sel':'');
+    sw.style.background=hex;sw.title=hex;
+    sw.addEventListener('click',function(e){e.stopPropagation();onPick(hex);pop.remove();});
+    pop.appendChild(sw);
+  });
+  var custom=document.createElement('button');custom.className='lcs-swatch lcs-custom';custom.title='Couleur personnalisée…';custom.textContent='+';
+  custom.addEventListener('click',function(e){e.stopPropagation();pop.remove();window.ColorPicker.open(anchorEl,currentHex,onPick);});
+  pop.appendChild(custom);
+  document.body.appendChild(pop);
+  var r=anchorEl.getBoundingClientRect();
+  pop.style.left=Math.min(r.left,window.innerWidth-pop.offsetWidth-8)+'px';
+  pop.style.top=(r.bottom+4)+'px';
+  setTimeout(function(){
+    document.addEventListener('mousedown',function closeOnce(e){
+      if(!pop.contains(e.target)){pop.remove();document.removeEventListener('mousedown',closeOnce);}
+    });
+  },0);
+}
 function renderLayerList(){
   var list=document.getElementById('layer-list');list.innerHTML='';
-  for(var i=state.layers.length-1;i>=0;i--){var ld=state.layers[i];var row=document.createElement('div');row.className='lrow'+(ld.symbolId?' is-comp':'');row.dataset.layer=i;if(i===state.activeLayerIdx)row.classList.add('act');
+  var order=computeLayerRenderOrder();
+  order.forEach(function(entry){
+    if(entry.type==='folder'){
+      var fid=entry.id,fmeta=state.layerFolders[fid];if(!fmeta)return;
+      var members=folderMemberIndices(fid);
+      var frow=document.createElement('div');frow.className='lrow lfolder'+(fmeta.collapsed?' collapsed':'');
+      var arrow=document.createElement('div');arrow.className='lico larrow';arrow.style.cursor='pointer';arrow.textContent=fmeta.collapsed?'▸':'▾';
+      arrow.addEventListener('click',function(e){e.stopPropagation();fmeta.collapsed=!fmeta.collapsed;renderLayerList();renderTimeline();});
+      // A collapsed Stroke/Fill/Shadow folder should look and behave like
+      // ONE ordinary layer — same eye/lock/solo icon set as a normal row,
+      // each toggling that property on EVERY member at once (set to the
+      // opposite of the current state, not each one individually inverted,
+      // so a mixed on/off state always lands on a single clean result
+      // rather than flipping each member independently).
+      var allVisible=members.every(function(mi){return state.layers[mi].visible;});
+      var allLocked=members.length>0&&members.every(function(mi){return state.layers[mi].locked;});
+      var allSolo=members.length>0&&members.every(function(mi){return state.layers[mi].solo;});
+      var feye=document.createElement('div');feye.className='lico'+(allVisible?'':' off');feye.title='Show / hide all channels';feye.innerHTML=allVisible?ICO_EYE:ICO_EYE_CLOSED;
+      feye.addEventListener('click',function(e){e.stopPropagation();var target=!allVisible;members.forEach(function(mi){if(state.layers[mi].visible!==target)window.SM.toggleLayerVis(mi);});});
+      var flock=document.createElement('div');flock.className='lico'+(allLocked?'':' off');flock.title='Lock / unlock all channels';flock.innerHTML=allLocked?ICO_LOCK:ICO_UNLOCK;
+      flock.addEventListener('click',function(e){e.stopPropagation();var target=!allLocked;members.forEach(function(mi){if(state.layers[mi].locked!==target)window.SM.toggleLayerLock(mi);});});
+      var fsolo=document.createElement('div');fsolo.className='lico solo-btn'+(allSolo?' on':' off');fsolo.title='Solo all channels';fsolo.textContent='S';
+      fsolo.addEventListener('click',function(e){e.stopPropagation();var target=!allSolo;members.forEach(function(mi){if(state.layers[mi].solo!==target)window.SM.toggleLayerSolo(mi);});});
+      var nm=document.createElement('div');nm.className='lnm';nm.textContent=fmeta.name;nm.style.fontWeight='700';
+      frow.appendChild(arrow);frow.appendChild(feye);frow.appendChild(flock);frow.appendChild(fsolo);frow.appendChild(nm);
+      frow.addEventListener('dblclick',function(){startFolderRename(fid);});
+      frow.addEventListener('contextmenu',function(e){
+        e.preventDefault();
+        window.showContextMenu(e.clientX,e.clientY,[
+          {label:'Renommer le dossier',action:function(){startFolderRename(fid);}},
+          {label:'Dissoudre le dossier',action:function(){ungroupFolder(fid);}},
+        ]);
+      });
+      list.appendChild(frow);
+      return;
+    }
+    if(entry.hidden)return;
+    var i=entry.idx;
+    var ld=state.layers[i];var row=document.createElement('div');row.className='lrow'+(ld.symbolId?' is-comp':'')+(ld.folderId?' in-folder':'')+(ld.linkGroupId?' in-linkgroup':'');row.dataset.layer=i;if(i===state.activeLayerIdx)row.classList.add('act');
     if(_layerSel.indexOf(i)>=0)row.classList.add('sel');
-    var eye=document.createElement('div');eye.className='lico'+(ld.visible?'':' off');eye.title='Show / hide layer';eye.innerHTML='<span class="material-symbols-rounded">'+(ld.visible?'\u{e8f4}':'\u{e8f5}')+'</span>';eye.dataset.layer=i;eye.addEventListener('click',function(e){e.stopPropagation();window.SM.toggleLayerVis(parseInt(this.dataset.layer));});
-    // '\u{e898}' (lock_open) isn't in this project's subsetted Material
-    // Symbols font (only glyphs actually referenced elsewhere got embedded
-    // — confirmed live: it rendered as a totally empty/invisible glyph,
-    // which is why the icon looked "not visible when inactive" even after
-    // the first fix). Same lock glyph in both states, dimmed via the
-    // existing `.off` class instead — matches the eye icon's convention of
-    // always showing SOME icon and varying just its color/emphasis.
-    var lock=document.createElement('div');lock.className='lico'+(ld.locked?'':' off');lock.title='Lock / unlock layer';lock.innerHTML='<span class="material-symbols-rounded">\u{e899}</span>';lock.dataset.layer=i;lock.addEventListener('click',function(e){e.stopPropagation();window.SM.toggleLayerLock(parseInt(this.dataset.layer));});
+    // Every row reserves the SAME arrow slot a folder header uses, even
+    // when it does nothing here — otherwise every other icon shifts left
+    // by one slot's width depending on whether the row above happens to be
+    // a folder, which reads as visually broken alignment down the list.
+    // The head row of a Stroke/Fill/Shadow link group gets a REAL collapse
+    // arrow here (toggles state.layerLinkGroups[gid].collapsed) instead of
+    // the inert spacer — this is the "open/close" affordance for the group,
+    // deliberately NOT a folder header: the row underneath it is still this
+    // same real layer's own normal row (own eye/lock/solo/name), just with
+    // an arrow prepended.
+    if(entry.linkGroupHead){
+      var garr=document.createElement('div');garr.className='lico larrow';garr.style.cursor='pointer';
+      var gmeta=state.layerLinkGroups[entry.linkGroupId];
+      garr.textContent=gmeta.collapsed?'▸':'▾';
+      garr.title=gmeta.collapsed?'Afficher les calques Stroke/Fill/Shadow liés':'Masquer les calques Stroke/Fill/Shadow liés';
+      garr.addEventListener('click',function(e){e.stopPropagation();gmeta.collapsed=!gmeta.collapsed;renderLayerList();renderTimeline();});
+      row.appendChild(garr);
+    }else if(!ld.folderId){var spacer=document.createElement('div');spacer.className='lico larrow-spacer';row.appendChild(spacer);}
+    // Layer color label (redesign 2026-07-09) — click opens the same
+    // color-picker popover used for stroke/fill swatches; every layer
+    // already has SOME color (assigned at creation, app.js nextLayerColor),
+    // this only ever changes which one, never turns it "off".
+    var cdot=document.createElement('div');cdot.className='lico layer-color-dot';cdot.title='Couleur du calque';cdot.style.setProperty('--dot-color',ld.color||'#8b8b9e');
+    cdot.addEventListener('click',function(e){
+      e.stopPropagation();
+      openLayerColorSwatches(cdot,ld.color||'#8b8b9e',function(hex){ld.color=hex;cdot.style.setProperty('--dot-color',hex);renderTimeline();});
+    });
+    row.appendChild(cdot);
+    var eye=document.createElement('div');eye.className='lico'+(ld.visible?'':' off');eye.title='Show / hide layer';eye.innerHTML=ld.visible?ICO_EYE:ICO_EYE_CLOSED;eye.dataset.layer=i;eye.addEventListener('click',function(e){e.stopPropagation();window.SM.toggleLayerVis(parseInt(this.dataset.layer));});
+    // Real lock/unlock icon pair (icon-handoff SVGs, v5) — the old single-
+    // glyph-dimmed-via-.off workaround was because Material Symbols'
+    // lock_open codepoint wasn't in this project's subsetted embedded font
+    // (rendered totally blank). Actual distinct shapes now, no font risk.
+    var lock=document.createElement('div');lock.className='lico'+(ld.locked?'':' off');lock.title='Lock / unlock layer';lock.innerHTML=ld.locked?ICO_LOCK:ICO_UNLOCK;lock.dataset.layer=i;lock.addEventListener('click',function(e){e.stopPropagation();window.SM.toggleLayerLock(parseInt(this.dataset.layer));});
+    // Plain text badge, not a Material Symbols glyph — this project's font
+    // is a subsetted embed containing ONLY codepoints already referenced
+    // elsewhere (see the lock-icon fix above); inventing a new one renders
+    // silently blank. 'S' matches the existing text-badge convention (LFS,
+    // the ◈ component badge) already used for icons outside that font.
+    var solo=document.createElement('div');solo.className='lico solo-btn'+(ld.solo?' on':' off');solo.title='Solo layer (hide all others)';solo.textContent='S';solo.dataset.layer=i;solo.addEventListener('click',function(e){e.stopPropagation();window.SM.toggleLayerSolo(parseInt(this.dataset.layer));});
     var nm=document.createElement('div');nm.className='lnm';nm.textContent=ld.name;
-    row.appendChild(eye);row.appendChild(lock);
+    row.appendChild(eye);row.appendChild(lock);row.appendChild(solo);
     if(ld.symbolId){var cb=document.createElement('div');cb.className='lico comp-badge';cb.title='Component — double-click to edit';cb.innerHTML='<span style="font-size:11px;line-height:1">\u25c8</span>';row.appendChild(cb);}
     if(ld.lfsGroup){var lb=document.createElement('div');lb.className='lico comp-badge';lb.title='Ligne/Plein/Ombre layer';lb.innerHTML='<span style="font-size:11px;line-height:1">LFS</span>';row.appendChild(lb);}
+    // Stroke/Fill/Shadow channel badge — a fully normal layer row (own
+    // working eye/lock/solo above, no folder wrapper), just visually
+    // labeled so its role in the split is obvious at a glance. Letter
+    // matches the channel initial (S/F/O for Ombre, avoiding a clash with
+    // the Solo 'S' badge's own single-letter convention would need 2
+    // letters here anyway since Fill/Shadow both start differently in FR).
+    if(ld.channel){var chLabel=ld.channel==='stroke'?'Tr':ld.channel==='fill'?'Pl':'Om';var chb=document.createElement('div');chb.className='lico comp-badge';chb.title='Calque '+(ld.channel==='stroke'?'Trait':ld.channel==='fill'?'Plein':'Ombre')+' (Stroke/Fill/Shadow) — calque normal, keyframes liées';chb.innerHTML='<span style="font-size:9px;line-height:1;font-weight:700">'+chLabel+'</span>';row.appendChild(chb);}
     row.appendChild(nm);
     row.addEventListener('click',function(e){
       // A completed drag-drop still fires a trailing native 'click' on
@@ -917,9 +1588,13 @@ function renderLayerList(){
         {label:'Supprimer le calque',action:function(){window.SM.deleteLayer();}},
         {sep:true},
         {label:'Renommer',action:function(){startLayerRename(idx4);}},
+        {label:'Grouper en dossier',disabled:_layerSel.length<2,action:function(){groupSelectionIntoFolder();}},
+        {label:'Retirer du dossier',disabled:!l4.folderId,action:function(){delete l4.folderId;renderLayerList();renderTimeline();}},
         {label:'Convertir en composant',disabled:!!l4.symbolId||!!l4.lfsGroup,action:function(){window.SM.convertActiveLayerToComponent();}},
         {label:'Décomposer le composant',disabled:!l4.symbolId,action:function(){window.SM.convertComponentToLayer();}},
         {sep:true},
+        {label:'Séparer Stroke/Fill/Shadow (3 calques liés, keyframes partagées)',disabled:!!l4.symbolId||!!l4.lfsGroup||!!l4.linkGroupId,action:function(){window.SM.convertActiveLayerToStrokeFillShadow();}},
+        {label:'Dissocier ce calque du groupe Stroke/Fill/Shadow',disabled:!l4.linkGroupId,action:function(){delete l4.channel;delete l4.linkGroupId;renderLayerList();renderTimeline();showToast('Calque dissocié — reste un calque normal, keyframes plus liées');}},
         {label:'Grouper (Ligne/Plein/Ombre)',disabled:!!l4.symbolId||!!l4.lfsGroup,action:function(){window.SM.convertActiveLayerToLFSGroup();}},
         {label:'Éditer Ligne',disabled:!l4.lfsGroup,action:function(){window.SM.enterSymbol(l4.lfsIds.line);}},
         {label:'Éditer Plein',disabled:!l4.lfsGroup,action:function(){window.SM.enterSymbol(l4.lfsIds.full);}},
@@ -929,7 +1604,14 @@ function renderLayerList(){
         {label:'Décomposer le groupe',disabled:!l4.lfsGroup,action:function(){window.SM.convertLFSGroupToLayer();}},
       ]);
     });
-    list.appendChild(row);}
+    list.appendChild(row);
+  });
+  // v14: audio tracks get their own rows appended after the real layers —
+  // synthetic (not part of state.layers, so none of the layer.children
+  // consumers CLAUDE.md warns about need to know they exist), but visually
+  // and interactively a layer row: name + mute + volume live here now
+  // instead of overlapping the waveform strip in the frame grid.
+  if(window.SMAudio)window.SMAudio.renderStrip();
 }
 // Manual mouse-based drag-to-reorder (kept consistent with the frame grid's
 // custom drag rather than HTML5 draggable, which behaves inconsistently
@@ -1024,6 +1706,105 @@ function renderCompFrameStrip(ld){
 function showToast(m){var el=document.getElementById('toast');el.textContent=m;el.classList.add('show');clearTimeout(window._toastT);window._toastT=setTimeout(function(){el.classList.remove('show');},2500);}
 
 // ---- KEYBOARD ----
+// ---- Remappable tool shortcuts (v15) ----
+// Only the single-key tool-switch bindings are table-driven — the rest of
+// onKeyDown below (transport, modifiers, pen-editing Delete/Escape) has
+// conditional logic beyond a flat key->action map and stays hardcoded.
+// Overrides persist to localStorage so a rebind survives restarts; nothing
+// here is imported from Animate/Blender — that's a larger, separate effort
+// (see the Settings panel's own note).
+var TOOL_SHORTCUTS=[
+  {action:'draw',key:'b',label:'Draw'},
+  {action:'select',key:'v',label:'Select'},
+  {action:'subselect',key:'a',label:'Subselect (node edit)'},
+  {action:'fsselect',key:'m',label:'Fill/Stroke Select'},
+  {action:'pen',key:'p',label:'Pen'},
+  {action:'line',key:'u',label:'Line'},
+  {action:'rect',key:'r',label:'Rectangle'},
+  {action:'ellipse',key:'l',label:'Ellipse'},
+  {action:'eraser',key:'e',label:'Eraser'},
+  {action:'fill',key:'g',label:'Fill'},
+  {action:'fillbrush',key:'n',label:'Fill Brush'},
+  {action:'eyedropper',key:'i',label:'Eyedropper'},
+  {action:'hand',key:'h',label:'Hand (pan)'},
+  {action:'zoom',key:'z',label:'Zoom'},
+  {action:'toggleOnion',key:'o',label:'Toggle Onion Skin'},
+];
+var _shortcutOverrides=null;
+function shortcutOverrides(){
+  if(_shortcutOverrides)return _shortcutOverrides;
+  try{_shortcutOverrides=JSON.parse(localStorage.getItem('sm-shortcuts')||'{}');}catch(e){_shortcutOverrides={};}
+  return _shortcutOverrides;
+}
+function shortcutKeyFor(action){
+  var ov=shortcutOverrides();if(ov[action])return ov[action];
+  var d=TOOL_SHORTCUTS.find(function(s){return s.action===action;});
+  return d?d.key:null;
+}
+function setShortcutKey(action,key){
+  var ov=shortcutOverrides();
+  if(key)ov[action]=key.toLowerCase();else delete ov[action];
+  try{localStorage.setItem('sm-shortcuts',JSON.stringify(ov));}catch(e){}
+}
+function runToolShortcut(k){
+  var lk=(k||'').toLowerCase();
+  for(var i=0;i<TOOL_SHORTCUTS.length;i++){
+    if(shortcutKeyFor(TOOL_SHORTCUTS[i].action)===lk){
+      if(TOOL_SHORTCUTS[i].action==='toggleOnion')window.SM.toggleOnion();
+      else window.SM.setTool(TOOL_SHORTCUTS[i].action);
+      return true;
+    }
+  }
+  return false;
+}
+// ---- Settings modal: shortcut rebinding UI ----
+function renderShortcutsList(){
+  var list=document.getElementById('shortcuts-list');if(!list)return;
+  list.innerHTML='';
+  TOOL_SHORTCUTS.forEach(function(s){
+    var row=document.createElement('div');
+    row.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:4px;font-size:11px;';
+    var lbl=document.createElement('span');lbl.textContent=s.label;
+    row.appendChild(lbl);
+    var keyBtn=document.createElement('button');
+    keyBtn.className='pbtn';keyBtn.style.cssText='min-width:60px;font-family:monospace;text-transform:uppercase;';
+    keyBtn.textContent=shortcutKeyFor(s.action);
+    keyBtn.title='Cliquer puis appuyer sur une touche';
+    keyBtn.addEventListener('click',function(){
+      keyBtn.textContent='…';keyBtn.classList.add('ac');
+      function capture(ev){
+        ev.preventDefault();ev.stopPropagation();
+        if(ev.key==='Escape'){keyBtn.textContent=shortcutKeyFor(s.action);}
+        else{
+          // reject a key already bound to a different tool action
+          var clash=TOOL_SHORTCUTS.find(function(o){return o.action!==s.action&&shortcutKeyFor(o.action)===ev.key.toLowerCase();});
+          if(clash){showToast('Touche déjà utilisée par « '+clash.label+' »');keyBtn.textContent=shortcutKeyFor(s.action);}
+          else{setShortcutKey(s.action,ev.key);keyBtn.textContent=ev.key.toLowerCase();}
+        }
+        keyBtn.classList.remove('ac');
+        document.removeEventListener('keydown',capture,true);
+      }
+      document.addEventListener('keydown',capture,true);
+    });
+    row.appendChild(keyBtn);
+    list.appendChild(row);
+  });
+}
+function initSettingsModal(){
+  var btn=document.getElementById('btn-settings'),modal=document.getElementById('settings-modal');
+  if(!btn||!modal)return;
+  btn.addEventListener('click',function(){renderShortcutsList();modal.style.display='flex';});
+  var closeBtn=document.getElementById('settings-close');
+  if(closeBtn)closeBtn.addEventListener('click',function(){modal.style.display='none';});
+  modal.addEventListener('click',function(e){if(e.target===modal)modal.style.display='none';});
+  var resetBtn=document.getElementById('shortcuts-reset');
+  if(resetBtn)resetBtn.addEventListener('click',function(){
+    _shortcutOverrides={};try{localStorage.removeItem('sm-shortcuts');}catch(e){}
+    renderShortcutsList();showToast('Raccourcis réinitialisés');
+  });
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initSettingsModal);else initSettingsModal();
+
 function onKeyDown(event){
   if((event.metaKey||event.ctrlKey)&&event.key==='z'){event.preventDefault();if(event.shiftKey)redo();else undo();return;}
   if((event.metaKey||event.ctrlKey)&&event.key==='s'){event.preventDefault();if(event.shiftKey)window.SMProject.saveAs();else window.SMProject.save();return;}
@@ -1032,22 +1813,20 @@ function onKeyDown(event){
   if((event.metaKey||event.ctrlKey)&&event.key==='v'){event.preventDefault();window.SM.pasteFrames();return;}
   if(event.target.tagName==='INPUT'||event.target.tagName==='SELECT')return;
   var k=event.key;
-  if(k==='b'||k==='B')window.SM.setTool('draw');
-  else if(k==='v'||k==='V')window.SM.setTool('select');
-  else if(k==='a'||k==='A')window.SM.setTool('subselect');
-  else if(k==='p'||k==='P')window.SM.setTool('pen');
-  else if(k==='u'||k==='U')window.SM.setTool('line');
-  else if(k==='r'||k==='R')window.SM.setTool('rect');
-  else if(k==='l'||k==='L')window.SM.setTool('ellipse');
-  else if(k==='e'||k==='E')window.SM.setTool('eraser');
-  else if(k==='g'||k==='G')window.SM.setTool('fill');
-  else if(k==='k'||k==='K')window.SM.setTool('fillbrush');
-  else if(k==='i')window.SM.setTool('eyedropper');
-  else if(k==='h'||k==='H')window.SM.setTool('hand');
-  else if(k==='z')window.SM.setTool('zoom');
-  else if(k==='o'||k==='O')window.SM.toggleOnion();
+  if(runToolShortcut(k)){}
+  // NLE-style transport: J/K jump to the previous/next real keyframe on the
+  // active layer (Premiere/Final Cut convention); ','/'.' step exactly one
+  // frame at a time regardless of keyframes. K was freed up from Fill Brush
+  // (moved to N) specifically to make room for this — J/K next-key/prev-key
+  // navigation was an explicit, named request.
+  else if(k==='j'||k==='J'){if(state.playing)stopPlay();goToFrame(prevKeyframeFrame(state.activeLayerIdx,state.currentFrame));}
+  else if(k==='k'||k==='K'){if(state.playing)stopPlay();goToFrame(nextKeyframeFrame(state.activeLayerIdx,state.currentFrame));}
+  else if(k===','){if(state.playing)stopPlay();goToFrame(state.currentFrame-1);}
+  else if(k==='.'||k===';'){if(state.playing)stopPlay();goToFrame(state.currentFrame+1);}
+  else if(k==='x'||k==='X')window.SM.swapStrokeFill();
   else if(k==='t'||k==='T')window.SM.generateTweens();
   else if(k===' '){event.preventDefault();if(!state.spaceDown){state.spaceDown=true;canvasEl.style.cursor='grab';}}
+  else if(k==='Alt'){state.altDown=true;}
   else if(k==='Enter'){event.preventDefault();if(state.tool==='pen'&&_pen.path)finalizePen();else togglePlay();}
   else if(k==='Escape'){if(state.tool==='pen'&&_pen.path){if(_pen.previewLine){_pen.previewLine.remove();_pen.previewLine=null;}_pen.path.remove();if(state.undoStack.length)state.undoStack.pop();_pen.path=null;_pen.draggingHandle=false;saveActiveLayerFrame();updateUI();}}
   else if(k==='ArrowLeft'){if(state.playing)stopPlay();goToFrame(state.currentFrame-1);}
@@ -1069,6 +1848,7 @@ function onKeyDown(event){
       saveActiveLayerFrame();updateUI();
     }
     else if(_sel.frames.length>0){event.preventDefault();window.SM.deleteSelectedFrames();}
+    else if(state.tool==='fsselect'&&_fsSel){event.preventDefault();fsApplyDelete();}
     else if(state.tool==='select'&&selectedPaths.length>0)window.SM.deleteSelStrokes();
     else if(event.shiftKey)removeFrame();
   }
@@ -1080,12 +1860,10 @@ function onKeyDown(event){
   else if(k==='x'||k==='X'){if(event.shiftKey)window.SM.flipVertical();else window.SM.flipHorizontal();}
   else if(k==='+'||k==='='){window.SM.extendExposure(1);}
 }
-function onKeyUp(event){if(event.key===' '){state.spaceDown=false;state.isPanning=false;var cc={draw:'crosshair',pen:'crosshair',line:'crosshair',rect:'crosshair',ellipse:'crosshair',select:'default',subselect:'default',eraser:'pointer',fill:'crosshair',fillbrush:'crosshair',eyedropper:'crosshair',hand:'grab',zoom:'zoom-in'};canvasEl.style.cursor=cc[state.tool]||'default';}}
+function onKeyUp(event){if(event.key===' '){state.spaceDown=false;state.isPanning=false;var cc={draw:'crosshair',pen:'crosshair',line:'crosshair',rect:'crosshair',ellipse:'crosshair',select:'default',subselect:'default',eraser:'pointer',fill:'crosshair',fillbrush:'crosshair',eyedropper:'crosshair',hand:'grab',zoom:'zoom-in',rotate:'grab',perspective:'crosshair'};canvasEl.style.cursor=cc[state.tool]||'default';}else if(event.key==='Alt'){state.altDown=false;}}
 
 document.addEventListener('keydown',onKeyDown);document.addEventListener('keyup',onKeyUp);
 document.querySelectorAll('.tool-btn').forEach(function(b){b.addEventListener('click',function(){window.SM.setTool(this.dataset.tool);});});
-document.getElementById('color-stroke').addEventListener('input',function(){window.SM.setStrokeColor(this.value);});
-document.getElementById('pm-stroke-c').addEventListener('input',function(){window.SM.setStrokeColor(this.value);document.getElementById('color-stroke').value=this.value;});
 document.getElementById('p-sw').addEventListener('change',function(){window.SM.setBrushSize(parseInt(this.value));});
 // Actively picking a fill color also ENABLES fill (Graphite behavior) —
 // without this, the default-off fill state made "I set my fill to red, drew,
@@ -1096,14 +1874,19 @@ document.getElementById('p-sw').addEventListener('change',function(){window.SM.s
 // custom popover writing into the input) — programmatic .value writes on
 // load/selection-sync don't dispatch events, so they can't re-enable fill
 // behind the user's back.
-document.getElementById('color-fill').addEventListener('input',function(){window.SM.setFillColor(this.value);if(!state.fillEnabled)window.SM.setFillEnabled(true);});
-document.getElementById('pm-fill-c').addEventListener('input',function(){window.SM.setFillColor(this.value);document.getElementById('color-fill').value=this.value;if(!state.fillEnabled)window.SM.setFillEnabled(true);});
+document.getElementById('color-fill').addEventListener('input',function(){window.SM.setFillColor(this.dataset.hex8||this.value);if(!state.fillEnabled)window.SM.setFillEnabled(true);});
+document.getElementById('pm-fill-c').addEventListener('input',function(){var v=this.dataset.hex8||this.value;window.SM.setFillColor(v);document.getElementById('color-fill').value=v;document.getElementById('color-fill').dataset.hex8=v;if(!state.fillEnabled)window.SM.setFillEnabled(true);});
 document.getElementById('p-fill-on').addEventListener('change',function(){window.SM.setFillEnabled(this.checked);});
+document.getElementById('fill-enable-toggle').addEventListener('click',function(){window.SM.setFillEnabled(!state.fillEnabled);});
+document.getElementById('stroke-enable-toggle').addEventListener('click',function(){window.SM.setStrokeEnabled(!state.strokeEnabled);});
+document.getElementById('color-stroke').addEventListener('input',function(){window.SM.setStrokeColor(this.dataset.hex8||this.value);if(!state.strokeEnabled)window.SM.setStrokeEnabled(true);});
+document.getElementById('pm-stroke-c').addEventListener('input',function(){var v=this.dataset.hex8||this.value;window.SM.setStrokeColor(v);document.getElementById('color-stroke').value=v;document.getElementById('color-stroke').dataset.hex8=v;if(!state.strokeEnabled)window.SM.setStrokeEnabled(true);});
 // Paint the panel's fill swatch from the actual starting state.fillColor/
 // fillEnabled on load — without this it sits at whatever background the
 // static HTML happened to have (transparent) until the user touches it.
 window.SM.setFillColor(state.fillColor);
 window.SM.setFillEnabled(state.fillEnabled);
+window.SM.setStrokeEnabled(state.strokeEnabled);
 if(window.ColorPicker){
   window.ColorPicker.wireColorSwatches([
     {wrap:'stroke-well',input:'color-stroke',onEyedrop:function(){window.SM.setTool('eyedropper');}},
@@ -1153,11 +1936,50 @@ function syncMiterLimitEnabled(){document.getElementById('p-miterlimit').disable
 document.getElementById('p-join-grp').addEventListener('click',syncMiterLimitEnabled);
 syncMiterLimitEnabled();
 document.getElementById('p-vecbrush').addEventListener('change',function(){window.SM.setVectorBrush(this.checked);});
-document.getElementById('sp-x').addEventListener('change',function(){var b=xformSelBounds();if(!b)return;selPropsApplyMove((parseFloat(this.value)||0)-b.x,0);});
-document.getElementById('sp-y').addEventListener('change',function(){var b=xformSelBounds();if(!b)return;selPropsApplyMove(0,(parseFloat(this.value)||0)-b.y);});
-document.getElementById('sp-w').addEventListener('change',function(){var b=xformSelBounds();if(!b||b.width<0.01)return;var nv=Math.max(0.01,parseFloat(this.value)||b.width);selPropsApplyScale(nv/b.width,1,b.topLeft);});
-document.getElementById('sp-h').addEventListener('change',function(){var b=xformSelBounds();if(!b||b.height<0.01)return;var nv=Math.max(0.01,parseFloat(this.value)||b.height);selPropsApplyScale(1,nv/b.height,b.topLeft);});
-document.getElementById('sp-rot').addEventListener('change',function(){var b=xformSelBounds();if(!b)return;var nv=parseFloat(this.value)||0;var delta=nv-(state.selRotAccum||0);state.selRotAccum=nv;selPropsApplyRotate(delta,b.center);});
+// Transform panel fields (position/size/rotation) used to only apply on
+// 'change' — the native event that fires once, at the END of a drag-scrub
+// or on blur after typing — so dragging one of these values showed no
+// effect on the canvas (or the panel's OWN other fields, e.g. dragging
+// Width while Height stays stale) until you released the mouse. Every
+// scrub-capable field elsewhere in the app (ui.js's pointer-based scrub
+// handler) already dispatches a real 'input' event on every drag tick
+// specifically so listeners can react live — these five just never listened
+// for it. Switched to 'input' for live application, with a per-field
+// "gesture already has an undo entry" flag (reset on the drag-ending
+// 'change') so a single scrub still pushes exactly one undo step instead of
+// one per tick.
+function wireLiveXformField(id,apply){
+  var el=document.getElementById(id),started=false;
+  el.addEventListener('input',function(){apply(this,started);started=true;});
+  el.addEventListener('change',function(){started=false;});
+}
+wireLiveXformField('sp-x',function(el,started){var b=xformSelBounds();if(!b)return;selPropsApplyMove((parseFloat(el.value)||0)-b.x,0,started);});
+wireLiveXformField('sp-y',function(el,started){var b=xformSelBounds();if(!b)return;selPropsApplyMove(0,(parseFloat(el.value)||0)-b.y,started);});
+wireLiveXformField('sp-w',function(el,started){var b=xformSelBounds();if(!b||b.width<0.01)return;var nv=Math.max(0.01,parseFloat(el.value)||b.width);selPropsApplyScale(nv/b.width,1,b.topLeft,started);});
+wireLiveXformField('sp-h',function(el,started){var b=xformSelBounds();if(!b||b.height<0.01)return;var nv=Math.max(0.01,parseFloat(el.value)||b.height);selPropsApplyScale(1,nv/b.height,b.topLeft,started);});
+wireLiveXformField('sp-rot',function(el,started){var b=xformSelBounds();if(!b)return;var nv=parseFloat(el.value)||0;var delta=nv-(state.selRotAccum||0);state.selRotAccum=nv;selPropsApplyRotate(delta,xformAnchorPoint(b),started);});
+// Anchor-point (pivot) picker — see tools.js xformAnchorPoint's own comment.
+// Clicking a dot just changes WHICH point future rotations pivot around
+// (state.xformAnchorKey); it doesn't move anything on its own, so no
+// undo/render is needed here beyond repainting the widget's active dot.
+function renderXformAnchorGrid(){
+  document.querySelectorAll('#xform-anchor-grid .xa-dot').forEach(function(btn){
+    btn.classList.toggle('xa-active',btn.dataset.key===state.xformAnchorKey);
+  });
+}
+document.querySelectorAll('#xform-anchor-grid .xa-dot').forEach(function(btn){
+  btn.addEventListener('click',function(e){
+    e.stopPropagation();
+    state.xformAnchorKey=btn.dataset.key;
+    renderXformAnchorGrid();
+    if(window.renderTransformHandles)renderTransformHandles();
+    if(window.SMEngineBridge)SMEngineBridge.renderNow();
+  });
+});
+renderXformAnchorGrid();
+document.querySelectorAll('#align-toolbar .align-btn').forEach(function(btn){
+  btn.addEventListener('click',function(){alignSelection(btn.dataset.align);});
+});
 document.getElementById('btn-pt-corner').addEventListener('click',function(){window.SM.setPointType('corner');});
 document.getElementById('btn-pt-smooth').addEventListener('click',function(){window.SM.setPointType('smooth');});
 document.getElementById('btn-pt-symmetric').addEventListener('click',function(){window.SM.setPointType('symmetric');});
@@ -1166,14 +1988,56 @@ document.getElementById('btn-bool-subtract').addEventListener('click',function()
 document.getElementById('btn-bool-intersect').addEventListener('click',function(){window.SM.booleanOp('intersect');});
 document.getElementById('btn-bool-exclude').addEventListener('click',function(){window.SM.booleanOp('exclude');});
 document.getElementById('p-erasersize').addEventListener('input',function(){window.SM.setEraserSize(this.value);});
+document.getElementById('p-fillbrushsize').addEventListener('input',function(){window.SM.setFillBrushSize(this.value);});
+document.getElementById('p-brushpreset').addEventListener('change',function(){window.SM.setBrushPreset(this.value);if(window.BrushPresetPicker)window.BrushPresetPicker.paintButton(this.value);});
+document.getElementById('btn-brushpreset-apply').addEventListener('click',function(){
+  var preset=state.brushPreset;
+  var eligible=selectedPaths.filter(function(p){return p instanceof Path&&p.strokeColor&&!(p.data&&(p.data.isVectorBrush||p.data.isFillShape));});
+  if(!eligible.length)return;
+  pushUndo();
+  eligible.forEach(function(p){
+    // Re-applying: drop the OLD companions first (a fresh applyBrushTexture
+    // call only touches `p` itself + inserts new ones — it doesn't know
+    // about or clean up a previous texture's copies, so switching presets
+    // on the same stroke would otherwise leave the old jittered clones
+    // behind underneath the new ones).
+    if(p.data&&p.data.brushCompanions){
+      p.data.brushCompanions.forEach(function(c){c.remove();});
+      p.data.brushCompanions=null;
+      // applyBrushTexture hid the primary (opacity 0 for stroke-only paths,
+      // strokeColor nulled for filled ones — see its own comment) — restore
+      // both remembered values, otherwise switching back to "None" leaves
+      // the stroke permanently invisible / permanently fill-only.
+      if(p.data.preTextureOpacity!==undefined){p.opacity=p.data.preTextureOpacity;delete p.data.preTextureOpacity;}
+      if(p.data.preTextureStroke!==undefined){p.strokeColor=p.data.preTextureStroke;delete p.data.preTextureStroke;}
+    }
+    if(preset&&preset!=='none')applyBrushTexture(p,preset);
+  });
+  saveActiveLayerFrame();updateUI();showToast('Brush appliqué à la sélection');
+});
+if(window.BrushPresetPicker)window.BrushPresetPicker.paintButton(state.brushPreset);
 document.getElementById('p-drawmode').addEventListener('change',function(){window.SM.setDrawMode(this.value);});
 document.getElementById('p-pmin').addEventListener('input',function(){window.SM.setPressureMin(this.value);});
 document.getElementById('p-pmax').addEventListener('input',function(){window.SM.setPressureMax(this.value);});
 document.getElementById('p-pinv').addEventListener('change',function(){window.SM.setPressureInvert(this.checked);});
 document.getElementById('p-taper').addEventListener('change',function(){window.SM.setTaperEnds(this.checked);});
+document.getElementById('p-shadowmode').addEventListener('change',function(){window.SM.setShadowMode(this.checked);});
 document.getElementById('p-cw').addEventListener('change',function(){window.SM.setCanvasSize(parseInt(this.value),state.canvasH);});
 document.getElementById('p-ch').addEventListener('change',function(){window.SM.setCanvasSize(state.canvasW,parseInt(this.value));});
 document.getElementById('p-cbg').addEventListener('input',function(){window.SM.setCanvasBg(this.value);});
+document.getElementById('p-clip').addEventListener('change',function(){window.SM.setCanvasClip(this.checked);});
+document.getElementById('p-safety').addEventListener('change',function(){window.SM.setSafetyZones(this.checked);});
+document.getElementById('p-persp-on').addEventListener('change',function(){state.perspectiveEnabled=this.checked;if(this.checked&&window.ensurePerspectiveVPs)window.ensurePerspectiveVPs();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
+document.getElementById('p-persp-mode').addEventListener('change',function(){if(window.setPerspectiveMode)window.setPerspectiveMode(this.value);});
+document.getElementById('p-persp-density').addEventListener('input',function(){state.perspectiveDensity=parseInt(this.value)||24;if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
+document.getElementById('p-persp-lock').addEventListener('change',function(){var locked=this.checked;(window.ensurePerspectiveVPs?window.ensurePerspectiveVPs():[]).forEach(function(vp){vp.locked=locked;});if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
+document.getElementById('btn-persp-reset').addEventListener('click',function(){if(window.resetPerspectiveVPs)window.resetPerspectiveVPs();});
+document.getElementById('p-blendmode').addEventListener('change',function(){
+  var ld=state.layers[state.activeLayerIdx];if(!ld)return;
+  pushUndo();ld.blendMode=this.value==='normal'?undefined:this.value;
+  window._sceneVersion=(window._sceneVersion||0)+1;
+  if(window.SMEngineBridge&&window.SMEngineBridge.renderNow)window.SMEngineBridge.renderNow();
+});
 // Same canvas/fps/frame-count controls, duplicated in the Project panel —
 // both sets write through the same SM.setCanvasSize/setFps/setTotalFrames
 // so either one stays in sync via syncDocFields().
@@ -1183,11 +2047,29 @@ document.getElementById('proj-fps').addEventListener('change',function(){window.
 document.getElementById('proj-frames').addEventListener('change',function(){window.SM.setTotalFrames(parseInt(this.value));});
 document.getElementById('btn-fit').addEventListener('click',function(){window.SM.fitCanvas();});
 document.getElementById('btn-resetv').addEventListener('click',function(){window.SM.resetView();});
+// v10: canvas-viewport zoom/fit pills (mockup) — #zoom-scrub picks up ui.js's
+// generic pointer-scrub handler automatically (class="scrub" is all that
+// takes), this just applies the resulting value to the live view on every
+// drag tick ('input', not 'change') so the canvas visibly zooms while
+// scrubbing instead of only on release.
+document.getElementById('zoom-scrub').addEventListener('input',function(){
+  var pct=parseFloat(this.value);if(!pct||pct<=0)return;
+  view.zoom=pct/100;renderArcs();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();
+});
+document.getElementById('canvas-fit-btn').addEventListener('click',function(e){
+  var r=this.getBoundingClientRect();
+  window.showContextMenu(r.left,r.top-70,[
+    {label:'Fit',action:function(){window.SM.fitCanvas();}},
+    {label:'Reset View (100%)',action:function(){window.SM.resetView();}},
+  ]);
+});
 document.getElementById('p-resamp').addEventListener('input',function(){window.SM.setResamplePts(parseInt(this.value));});
 document.getElementById('p-step').addEventListener('change',function(){window.SM.setTweenStep(this.value);});
 document.getElementById('p-skipmanual').addEventListener('change',function(){state.tweenSkipManual=this.checked;});
 document.getElementById('btn-tw').addEventListener('click',function(){window.SM.generateTweens();});
 document.getElementById('btn-os').addEventListener('click',function(){window.SM.toggleOnion();});
+document.getElementById('btn-ghost-all').addEventListener('click',function(){window.SM.toggleGhostAll();});
+document.getElementById('btn-ghost-select').addEventListener('click',function(){selectGhostAll();});
 document.getElementById('btn-os-outline').addEventListener('click',function(){
   var v=state.onionMode==='outline'?'tinted':'outline';window.SM.setOnionMode(v);
   this.classList.toggle('active',v==='outline');document.getElementById('p-omode').value=v;
@@ -1249,14 +2131,39 @@ document.getElementById('comp-offset').addEventListener('change',function(){wind
   var rangeSel=document.getElementById('exp-range');
   var scaleRow=document.getElementById('exp-scale-row');
   var scaleSel=document.getElementById('exp-scale');
+  var sizeRow=document.getElementById('exp-size-row');
+  var wInput=document.getElementById('exp-w'),hInput=document.getElementById('exp-h');
+  var alphaRow=document.getElementById('exp-alpha-row');
   var progEl=document.getElementById('exp-progress');
   var runBtn=document.getElementById('exp-run');
-
+  // Alpha only makes sense for formats that actually HAVE an alpha channel:
+  // a PNG sequence trivially does, and ProRes 4444 (.mov) supports it too
+  // (switches ffmpeg profile — see export.js) — MP4/H.264 and GIF have no
+  // alpha channel at the codec level at all, and TIFF/SVG/Lottie weren't
+  // asked for, so kept out of scope rather than guessing.
+  var ALPHA_FORMATS=['png','prores'];
   function updateScaleVisibility(){
     var v=fmtSel.value;
     scaleRow.style.display=(v==='lottie')?'none':'flex';
+    sizeRow.style.display=(v!=='lottie'&&scaleSel.value==='custom')?'flex':'none';
+    alphaRow.style.display=ALPHA_FORMATS.indexOf(v)>=0?'flex':'none';
   }
   fmtSel.addEventListener('change',updateScaleVisibility);
+  scaleSel.addEventListener('change',function(){
+    if(scaleSel.value==='custom'){wInput.value=state.canvasW;hInput.value=state.canvasH;}
+    updateScaleVisibility();
+  });
+  // Keep W/H locked to the canvas' own aspect ratio — this is a uniform
+  // render-resolution multiplier, not a crop/stretch/reflow control.
+  wInput.addEventListener('input',function(){hInput.value=Math.round(parseFloat(wInput.value||state.canvasW)*state.canvasH/state.canvasW);});
+  hInput.addEventListener('input',function(){wInput.value=Math.round(parseFloat(hInput.value||state.canvasH)*state.canvasW/state.canvasH);});
+  function currentExportScale(){
+    if(scaleSel.value==='custom'){
+      var w=parseFloat(wInput.value)||state.canvasW;
+      return w/state.canvasW;
+    }
+    return parseFloat(scaleSel.value);
+  }
 
   document.getElementById('btn-export').addEventListener('click',function(){
     if(!window.SMExport.isAvailable()){
@@ -1272,8 +2179,9 @@ document.getElementById('comp-offset').addEventListener('change',function(){wind
   runBtn.addEventListener('click',async function(){
     saveAllLayerFrames();
     var range=(rangeSel.value==='all')?{start:0,end:state.totalFrames-1}:{start:state.waIn,end:state.waOut};
-    var scale=parseFloat(scaleSel.value);
-    var opts={start:range.start,end:range.end,scale:scale,fps:state.fps,
+    var scale=currentExportScale();
+    var alpha=ALPHA_FORMATS.indexOf(fmtSel.value)>=0&&document.getElementById('exp-alpha').checked;
+    var opts={start:range.start,end:range.end,scale:scale,alpha:alpha,fps:state.fps,
       onProgress:function(i,n){progEl.style.display='block';progEl.textContent='Rendu image '+i+'/'+n+'…';},
       onFfmpeg:function(line){progEl.style.display='block';progEl.textContent=line.substring(0,80);}};
     runBtn.disabled=true;progEl.style.display='block';progEl.textContent='Préparation…';
@@ -1291,7 +2199,15 @@ document.getElementById('comp-offset').addEventListener('change',function(){wind
   });
 })();
 
-setInterval(function(){if(!state.playing){saveAllLayerFrames();try{localStorage.setItem('sm-auto',window.SM.exportJSON());}catch(e){}}},30000);
+setInterval(function(){
+  if(state.playing)return;
+  saveAllLayerFrames();
+  var json=window.SM.exportJSON();
+  try{localStorage.setItem('sm-auto',json);}catch(e){}
+  // v15: dense on-disk version history (Tauri only) alongside the single-
+  // slot localStorage fallback above — see project.js pushVersionSnapshot.
+  if(window.SMProject&&window.SMProject.pushVersionSnapshot)window.SMProject.pushVersionSnapshot(json);
+},30000);
 // Restored quietly into memory so it's ready the instant the start screen's
 // "Resume Last Session" card is clicked — the toast there was confusing
 // alongside the new start screen (state.js decides whether to actually

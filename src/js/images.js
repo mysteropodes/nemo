@@ -148,5 +148,87 @@
   });
 
   document.getElementById('btn-import-img').addEventListener('click',importImages);
-  window.SM=window.SM||{};window.SM.importImages=importImages;
+
+  // ---- VIDEO IMPORT (v14) — decodes to a per-frame image sequence and
+  // feeds the EXACT SAME isRaster-per-frame layer pipeline as importSequence
+  // above, instead of inventing a new "video layer" item type. Deliberately
+  // NOT a new consumer-of-layer.children type (see CLAUDE.md §1 — every new
+  // item/tag on layer.children has to be re-verified against ~7 separate
+  // consumers, which is the real cost of a from-scratch video layer, not
+  // the UI work) — a video import becomes indistinguishable from an
+  // imported image sequence the moment the frames exist, so it's already
+  // transformable/scalable/opacity-capable via the same Raster+layer path
+  // images already use, with zero new code needed anywhere else.
+  function seekTo(video,t){
+    return new Promise(function(resolve){
+      function onSeeked(){video.removeEventListener('seeked',onSeeked);resolve();}
+      video.addEventListener('seeked',onSeeked);
+      video.currentTime=t;
+    });
+  }
+  async function decodeVideoFrames(blobUrl){
+    var video=document.createElement('video');
+    video.src=blobUrl;video.muted=true;video.playsInline=true;video.preload='auto';
+    await new Promise(function(resolve,reject){
+      video.addEventListener('loadedmetadata',resolve,{once:true});
+      video.addEventListener('error',function(){reject(new Error('video decode failed'));},{once:true});
+    });
+    var duration=video.duration||0;
+    var fps=state.fps;
+    // Capped at the same 999 ceiling proj-frames itself allows — a longer
+    // clip just gets sampled at the project's own fps up to that many
+    // frames rather than failing outright.
+    var frameCount=Math.max(1,Math.min(999,Math.round(duration*fps)));
+    var fit=fitSize(video.videoWidth||1,video.videoHeight||1);
+    var canvas=document.createElement('canvas');
+    canvas.width=video.videoWidth||1;canvas.height=video.videoHeight||1;
+    var ctx=canvas.getContext('2d');
+    var frames=[];
+    for(var i=0;i<frameCount;i++){
+      await seekTo(video,Math.min(i/fps,Math.max(0,duration-0.001)));
+      ctx.drawImage(video,0,0,canvas.width,canvas.height);
+      // JPEG, not PNG — a few hundred full-frame PNGs would bloat the
+      // project JSON far more than this session's frame counts warrant;
+      // 0.85 quality is visually clean enough for a rotoscope/reference
+      // source layer.
+      var dataUrl=canvas.toDataURL('image/jpeg',0.85);
+      frames.push({strokes:[{isRaster:true,src:dataUrl,x:state.canvasW/2,y:state.canvasH/2,width:fit.w,height:fit.h,opacity:1}],isKeyframe:true,isInterpolated:false});
+    }
+    return frames;
+  }
+  async function importVideoFrames(frames,prefix){
+    saveAllLayerFrames();pushUndoLayers();
+    if(frames.length>state.totalFrames)window.SM.setTotalFrames(frames.length);
+    var idx=createUserLayer(prefix);
+    while(frames.length<state.totalFrames)frames.push({strokes:[],isKeyframe:false,isInterpolated:false});
+    state.layers[idx].frames=frames;
+    activateUL(idx);loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
+    showToast('Vidéo importée : '+frames.filter(function(f){return f.strokes.length;}).length+' images sur le calque "'+prefix+'"');
+  }
+  async function importVideo(){
+    if(!tauriOk()){document.getElementById('video-input').click();return;}
+    var path=await window.__TAURI__.dialog.open({title:'Import Video',multiple:false,filters:[{name:'Videos',extensions:['mp4','mov','webm','m4v']}]});
+    if(!path)return;
+    showToast('Décodage de la vidéo…');
+    var bytes=await window.__TAURI__.fs.readFile(path);
+    var ext=extOf(path);
+    var mime={mp4:'video/mp4',mov:'video/quicktime',webm:'video/webm',m4v:'video/mp4'}[ext]||'video/mp4';
+    var blobUrl=URL.createObjectURL(new Blob([bytes],{type:mime}));
+    try{
+      var frames=await decodeVideoFrames(blobUrl);
+      await importVideoFrames(frames,baseName(path).replace(/\.[^.]+$/,''));
+    }finally{URL.revokeObjectURL(blobUrl);}
+  }
+  document.getElementById('video-input')&&document.getElementById('video-input').addEventListener('change',async function(e){
+    var file=e.target.files[0];e.target.value='';if(!file)return;
+    showToast('Décodage de la vidéo…');
+    var blobUrl=URL.createObjectURL(file);
+    try{
+      var frames=await decodeVideoFrames(blobUrl);
+      await importVideoFrames(frames,file.name.replace(/\.[^.]+$/,''));
+    }finally{URL.revokeObjectURL(blobUrl);}
+  });
+  document.getElementById('btn-import-video')&&document.getElementById('btn-import-video').addEventListener('click',importVideo);
+
+  window.SM=window.SM||{};window.SM.importImages=importImages;window.SM.importVideo=importVideo;
 })();

@@ -10,7 +10,7 @@
 // inherently async) and keeps the returned handle to call `.render(json)`
 // on every frame.
 use serde::{Deserialize, Serialize};
-use vello::kurbo::{Affine, BezPath, Shape, Stroke};
+use vello::kurbo::{Affine, BezPath, Rect, Shape, Stroke};
 use vello::peniko::Color;
 use vello::{wgpu, AaConfig, AaSupport, RenderParams, Renderer, RendererOptions, Scene};
 use wasm_bindgen::prelude::*;
@@ -103,6 +103,58 @@ fn default_stroke_width() -> f64 {
 #[derive(Deserialize, Serialize)]
 pub(crate) struct LayerIn {
     pub(crate) items: Vec<ItemIn>,
+    // Photoshop/Illustrator-style layer blend mode — composites this
+    // whole layer's painted pixels against everything already drawn
+    // beneath it. Applied via a push_layer/pop_layer bracket around the
+    // WHOLE layer's items (not per-item), since blend mode is conventionally
+    // a layer-level property, matching the Properties panel UI it's wired
+    // from (click a layer -> blend mode dropdown). None/"normal" skips the
+    // bracket entirely — cheap default path, no vello layer-stack overhead
+    // for the (overwhelmingly common) unblended case.
+    #[serde(default)]
+    pub(crate) blend_mode: Option<String>,
+}
+
+// KNOWN BROKEN (v17 investigation, not fixed): layer blend modes render
+// with zero visual effect. Root-caused via direct experimentation (NOT a
+// JS wiring bug — confirmed the JSON payload correctly carries the right
+// blendMode string on the right layer every time): a push_layer(Mix::X)
+// group only sees a correct backdrop to blend against when EVERY layer
+// beneath it was ALSO wrapped in its own push_layer/pop_layer using a
+// non-Normal Mix. Wrapping every layer in Mix::Normal (Vello's own
+// documented "no blend" default) for the unblended ones does NOT work —
+// the blended layer still renders as if the backdrop were empty (plain
+// source color, un-blended). Compose::Copy for the unblended layers was
+// also tried and made it worse (erased the canvas background entirely)
+// without fixing the blend. This smells like a Vello 0.9 optimization
+// that fast-paths Mix::Normal groups by skipping backdrop capture
+// entirely, which a later real-Mix group then reads as blank. No safe
+// fix found without either a different Vello version or a CPU-side
+// pre-blend (rendering each blended layer against a manually composited
+// backdrop texture) — a real rendering-pipeline change, not attempted
+// here to avoid destabilizing this render path (see CLAUDE.md's warning
+// on the perf-critical, already-regression-prone rendering pipeline).
+fn blend_from(name: Option<&str>) -> Option<vello::peniko::BlendMode> {
+    use vello::peniko::{BlendMode, Compose, Mix};
+    let mix = match name? {
+        "multiply" => Mix::Multiply,
+        "screen" => Mix::Screen,
+        "overlay" => Mix::Overlay,
+        "darken" => Mix::Darken,
+        "lighten" => Mix::Lighten,
+        "colorDodge" => Mix::ColorDodge,
+        "colorBurn" => Mix::ColorBurn,
+        "hardLight" => Mix::HardLight,
+        "softLight" => Mix::SoftLight,
+        "difference" => Mix::Difference,
+        "exclusion" => Mix::Exclusion,
+        "hue" => Mix::Hue,
+        "saturation" => Mix::Saturation,
+        "color" => Mix::Color,
+        "luminosity" => Mix::Luminosity,
+        _ => return None, // "normal" (or anything unrecognized) — no bracket needed
+    };
+    Some(BlendMode::new(mix, Compose::SrcOver))
 }
 
 #[derive(Deserialize, Serialize)]
@@ -308,6 +360,10 @@ pub struct VelloEngine {
     // same format the blitter was built for — the blitter itself doesn't
     // need rebuilding on a resize, only width/height change.
     surface_format: wgpu::TextureFormat,
+    // Resolved once in create_engine from the surface's actual capabilities
+    // and reused verbatim by resize() — see the comment at its computation
+    // site for why this can't just be CompositeAlphaMode::Auto.
+    surface_alpha_mode: wgpu::CompositeAlphaMode,
     // Uploaded-once image cache, keyed by a caller-chosen stable id (JS uses
     // the Raster's own data URL / a per-raster id — see engine-bridge.js).
     // peniko::ImageData's `data` field is a Blob<u8> (Arc-backed, cheap to
@@ -363,6 +419,21 @@ pub async fn create_engine(
         .copied()
         .find(|f| matches!(f, wgpu::TextureFormat::Rgba8Unorm | wgpu::TextureFormat::Bgra8Unorm))
         .ok_or_else(|| JsValue::from_str("no compatible surface format"))?;
+    // render()'s offscreen pass clears to Color::TRANSPARENT and the blit to
+    // the visible surface is a straight copy (no blending) — so whatever the
+    // browser's canvas compositor does with alpha=0 pixels is what the user
+    // sees behind the drawing. CompositeAlphaMode::Auto resolves to Opaque on
+    // every browser tested, which paints alpha=0 as solid black, hiding the
+    // CSS panel color set on the canvas's parent element. PreMultiplied (when
+    // the surface actually supports it) blends against that CSS background
+    // instead — falls back to Auto/Opaque on a surface that doesn't offer it
+    // rather than erroring, since Opaque-with-black was already the
+    // long-standing behavior.
+    let alpha_mode = if caps.alpha_modes.contains(&wgpu::CompositeAlphaMode::PreMultiplied) {
+        wgpu::CompositeAlphaMode::PreMultiplied
+    } else {
+        wgpu::CompositeAlphaMode::Auto
+    };
     surface.configure(
         &device,
         &wgpu::SurfaceConfiguration {
@@ -372,7 +443,7 @@ pub async fn create_engine(
             height,
             present_mode: wgpu::PresentMode::AutoVsync,
             desired_maximum_frame_latency: 2,
-            alpha_mode: wgpu::CompositeAlphaMode::Auto,
+            alpha_mode,
             view_formats: vec![],
         },
     );
@@ -410,6 +481,7 @@ pub async fn create_engine(
         width,
         height,
         surface_format: format,
+        surface_alpha_mode: alpha_mode,
         images: std::collections::HashMap::new(),
     })
 }
@@ -420,7 +492,13 @@ impl VelloEngine {
     /// the artboard center (e.g. canvasW/2, canvasH/2) to match Animate's
     /// Rotate Stage tool; pass (0,0) for a plain top-left-anchored zoom/pan.
     pub fn set_viewport(&mut self, pan_x: f64, pan_y: f64, zoom: f64, rotation: f64, pivot_x: f64, pivot_y: f64) {
-        self.viewport = Viewport { pan_x, pan_y, zoom, rotation, pivot_x, pivot_y };
+        // A zero/negative zoom (a stray or buggy JS-side value — this is
+        // caller-controlled, not otherwise validated) makes Affine::scale
+        // singular; screen_to_world's inverse() then yields inf/NaN that
+        // silently poisons all hit-testing/coordinate math afterward
+        // instead of failing loudly. Same floor already used by
+        // gizmo_handles for the same reason (see its own zoom.max call).
+        self.viewport = Viewport { pan_x, pan_y, zoom: zoom.max(0.0001), rotation, pivot_x, pivot_y };
     }
 
     /// Screen (canvas pixel) coordinates -> world coordinates, accounting
@@ -630,7 +708,7 @@ impl VelloEngine {
                 height,
                 present_mode: wgpu::PresentMode::AutoVsync,
                 desired_maximum_frame_latency: 2,
-                alpha_mode: wgpu::CompositeAlphaMode::Auto,
+                alpha_mode: self.surface_alpha_mode,
                 view_formats: vec![],
             },
         );
@@ -687,7 +765,12 @@ impl VelloEngine {
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
         let view_tf = self.viewport.transform();
         let mut scene = Scene::new();
+        let full_canvas = Rect::new(0.0, 0.0, self.width as f64, self.height as f64);
         for layer in &scene_in.layers {
+            let blend = blend_from(layer.blend_mode.as_deref());
+            if let Some(b) = blend {
+                scene.push_layer(vello::peniko::Fill::NonZero, b, 1.0, Affine::IDENTITY, &full_canvas);
+            }
             for item in &layer.items {
                 if let Some(img_ref) = &item.image {
                     if let Some(image_data) = self.images.get(&img_ref.image_id) {
@@ -726,10 +809,24 @@ impl VelloEngine {
                     paint_stroke(&mut scene);
                 }
             }
+            if blend.is_some() {
+                scene.pop_layer();
+            }
         }
 
         let params = RenderParams {
-            base_color: Color::TRANSPARENT,
+            // Confirmed in-browser (see removed [wasm-debug] probe) that this
+            // canvas's WebGPU surface only advertises CompositeAlphaMode::
+            // Opaque — Premultiplied isn't available to blend transparent
+            // pixels against the canvas's CSS background, so the pasteboard
+            // (area outside the document bounds, wherever nothing gets
+            // drawn) must be baked in as an opaque fill here instead of
+            // relying on browser compositing. Matches the app's --panel CSS
+            // var (#201f25) so the canvas reads as one continuous surface
+            // with the surrounding UI chrome rather than a separate black
+            // box — keep this in sync with :root{--panel} in style.css if
+            // that ever changes.
+            base_color: Color::from_rgba8(0x20, 0x1f, 0x25, 0xff),
             width: self.width,
             height: self.height,
             antialiasing_method: AaConfig::Area,
@@ -764,7 +861,12 @@ impl VelloEngine {
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
         let view_tf = self.viewport.transform();
         let mut scene = Scene::new();
+        let full_canvas = Rect::new(0.0, 0.0, self.width as f64, self.height as f64);
         for layer in &scene_in.layers {
+            let blend = blend_from(layer.blend_mode.as_deref());
+            if let Some(b) = blend {
+                scene.push_layer(vello::peniko::Fill::NonZero, b, 1.0, Affine::IDENTITY, &full_canvas);
+            }
             for item in &layer.items {
                 if let Some(img_ref) = &item.image {
                     if let Some(image_data) = self.images.get(&img_ref.image_id) {
@@ -802,6 +904,9 @@ impl VelloEngine {
                     paint_fill(&mut scene);
                     paint_stroke(&mut scene);
                 }
+            }
+            if blend.is_some() {
+                scene.pop_layer();
             }
         }
         let params = RenderParams {

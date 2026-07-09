@@ -31,6 +31,43 @@ function buildTPFeat(sd){
   segs.forEach(function(s){p.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));});
   return p;
 }
+// Fourier magnitude descriptor of a boundary point sequence — captures
+// the overall SILHOUETTE of a stroke independent of art style. It's
+// translation-invariant by construction (points are already centroid-
+// relative), rotation-invariant because rotating the shape by θ multiplies
+// every DFT bin by e^{iθ} which leaves its MAGNITUDE unchanged (only phase
+// is discarded here, deliberately), and scale-invariant because the
+// magnitude vector is normalized by its own L2 norm. Only the first few
+// low-frequency bins are kept: those encode the coarse shape (an "eye" vs
+// an "eyebrow" vs "a fold of cloth"), which is what should read as the
+// same across a bold cartoon stroke and a detailed realistic one of the
+// same subject — the fine wobble/hachure-density differences between art
+// styles live almost entirely in the higher frequencies this deliberately
+// excludes, instead of polluting the comparison. Existing per-stroke cost
+// terms (Chamfer proximity, turning-angle curvature) already do a good job
+// on strokes drawn in a consistent style; this adds a second, independent
+// style-agnostic signal matchSc can fall back on when those disagree.
+var FOURIER_BINS=6;
+function fourierDescriptor(pts,cx,cy){
+  var n=pts.length;if(n<3)return null;
+  var re=new Array(FOURIER_BINS+1).fill(0),im=new Array(FOURIER_BINS+1).fill(0);
+  for(var k=0;k<n;k++){
+    var x=pts[k][0]-cx,y=pts[k][1]-cy;
+    for(var m=1;m<=FOURIER_BINS;m++){
+      var ang=-2*Math.PI*m*k/n,c=Math.cos(ang),s=Math.sin(ang);
+      re[m]+=x*c-y*s;im[m]+=x*s+y*c;
+    }
+  }
+  var mags=[];for(var m2=1;m2<=FOURIER_BINS;m2++)mags.push(Math.sqrt(re[m2]*re[m2]+im[m2]*im[m2]));
+  var norm=Math.sqrt(mags.reduce(function(a,b){return a+b*b;},0))||1;
+  return mags.map(function(v){return v/norm;});
+}
+function fourierDist(a,b){
+  if(!a||!b)return 0;
+  var n=Math.min(a.length,b.length),s=0;
+  for(var i=0;i<n;i++){var d=a[i]-b[i];s+=d*d;}
+  return Math.min(1,Math.sqrt(s));
+}
 function strokeFeat(sd){var p=buildTPFeat(sd);var b=p.bounds,len=p.length;var cx=0,cy=0,nS=12;for(var i=0;i<nS;i++){var pt=p.getPointAt(i/(nS-1)*len);if(pt){cx+=pt.x;cy+=pt.y;}}cx/=nS;cy/=nS;var f2=p.firstSegment.point,l=p.lastSegment.point;var dx=l.x-f2.x,dy=l.y-f2.y,dl=Math.sqrt(dx*dx+dy*dy);if(dl>0){dx/=dl;dy/=dl;}var shape=[];for(var i2=0;i2<8;i2++){var pt2=p.getPointAt(i2/7*len);if(pt2)shape.push([(pt2.x-cx)/Math.max(b.width,1),(pt2.y-cy)/Math.max(b.height,1)]);}
   // dense absolute samples + turning-angle profile: the raw material the
   // geometric cost below is computed from (real line-to-line proximity and
@@ -46,8 +83,23 @@ function strokeFeat(sd){var p=buildTPFeat(sd);var b=p.bounds,len=p.length;var cx
   // closed-ness: a loop (head outline, iris, closed fill boundary) is a
   // fundamentally different animal from an open stroke of similar bulk
   var diag=Math.sqrt(b.width*b.width+b.height*b.height);
-  var isClosed=p.segments.length>3&&dl<Math.max(4,diag*0.08)&&len>diag*1.2;
-  p.remove();return{cx:cx,cy:cy,length:len,dirX:dx,dirY:dy,bounds:{x:b.x,y:b.y,w:b.width,h:b.height},shape:shape,pts:pts,turn:turn,closed:isClosed,strokeCol:parseHexColor(sd.strokeColor),fillCol:parseHexColor(sd.fillColor),type:strokeType(sd)};}
+  var closedHeuristic=p.segments.length>3&&dl<Math.max(4,diag*0.08)&&len>diag*1.2;
+  // Real topology beats guessed topology: sd.closed is the actual
+  // open/closed flag Paper.js stored on the path (ground truth), but a
+  // pressure-brush stroke compared here is its DRAWN CENTERLINE
+  // (buildTPFeat above swaps in centerSegments), which is never a closed
+  // Path even though its rendered ribbon OUTLINE (sd.closed) always is —
+  // for that case the geometric heuristic below is the only signal that
+  // means anything, so it's kept as the sole source. For every other
+  // stroke type, trusting sd.closed instead of re-guessing from where the
+  // endpoints happen to land avoids exactly the "visually plausible but
+  // topologically wrong" mismatch this exists to prevent (e.g. two nearly-
+  // touching endpoints on a genuinely open stroke previously read as
+  // "closed", silently matching it against real closed loops).
+  var usingCenterline=sd.isVectorBrush&&sd.centerSegments&&sd.centerSegments.length>1;
+  var isClosed=(!usingCenterline&&typeof sd.closed==='boolean')?sd.closed:closedHeuristic;
+  var fourier=fourierDescriptor(pts,cx,cy);
+  p.remove();return{cx:cx,cy:cy,length:len,dirX:dx,dirY:dy,bounds:{x:b.x,y:b.y,w:b.width,h:b.height},shape:shape,pts:pts,turn:turn,closed:isClosed,strokeCol:parseHexColor(sd.strokeColor),fillCol:parseHexColor(sd.fillColor),type:strokeType(sd),fourier:fourier};}
 // Relative position (within the whole frame's own composition bbox) is what
 // actually distinguishes "left eye" from "right eye" — raw absolute centroid
 // distance breaks down whenever the whole drawing translates/scales between
@@ -99,6 +151,15 @@ function matchSc(fA,fB,sameIndex,aPtsOverride){
   var cf=0,cr=0;
   for(var q=0;q<nT;q++){cf+=Math.abs(TA[q]-TB[q]);cr+=Math.abs(TA[q]+TB[nT-1-q]);}
   var curveT=nT?Math.min(1,Math.min(cf,cr)/nT/Math.PI):0;
+  // 3b. SILHOUETTE: style-agnostic Fourier magnitude descriptor distance —
+  // see fourierDescriptor's own comment. Independent of curveT (which
+  // compares LOCAL turning at each sample) in that this compares the
+  // GLOBAL coarse outline, so it can still agree two shapes are "the same
+  // drawing" even when local stylistic detail (hachures, a wobblier line,
+  // extra tiny curvature) makes curveT noisy — the actual goal behind
+  // adding it: matching should hold up across cartoon/simple/realistic
+  // linework of the same underlying shape, not just within one style.
+  var fourD=fourierDist(fA.fourier,fB.fourier);
   // 4. secondary cues & hard penalties
   var rdx=fA.relX-fB.relX,rdy=fA.relY-fB.relY;var rel=Math.min(1,Math.sqrt(rdx*rdx+rdy*rdy));
   var lenRatio=Math.max(fA.length,fB.length)/Math.max(1,Math.min(fA.length,fB.length));
@@ -109,7 +170,7 @@ function matchSc(fA,fB,sameIndex,aPtsOverride){
   var colD=(colorDist(fA.strokeCol,fB.strokeCol)+colorDist(fA.fillCol,fB.fillCol))/2;
   var typePenalty=fA.type!==fB.type?0.5:0;
   var idxBonus=sameIndex?-0.03:0;
-  return proxT*.50+alignT*.15+curveT*.18+rel*.10+szD*.06+colD*.15+typePenalty+ratioPen+closedPen+idxBonus;
+  return proxT*.48+alignT*.15+curveT*.12+fourD*.10+rel*.10+szD*.06+colD*.15+typePenalty+ratioPen+closedPen+idxBonus;
 }
 // "Force line" motion model: eyes, chin, and other small close-together
 // features are exactly where independent per-stroke shape/position matching
@@ -180,7 +241,7 @@ function hungarian(cost){
 // autoMatchJS below for the reference implementation, kept as the fallback
 // on any WASM failure/absence, same pattern as fill/erase/boolean/shapes.
 function _strokeInJson(sd){
-  return{segments:sd.segments||[],centerSegments:sd.centerSegments,strokeColor:sd.strokeColor||null,fillColor:sd.fillColor||null,isVectorBrush:!!sd.isVectorBrush};
+  return{segments:sd.segments||[],centerSegments:sd.centerSegments,strokeColor:sd.strokeColor||null,fillColor:sd.fillColor||null,isVectorBrush:!!sd.isVectorBrush,closed:!!sd.closed};
 }
 function autoMatch(sA,sB){
   if(!sA.length||!sB.length)return[];
@@ -265,11 +326,12 @@ function _resampleStrokeWasm(sd,n){
     out.strokeWidth=sd.strokeWidth;out.strokeCap=sd.strokeCap;out.strokeJoin=sd.strokeJoin;
     out.opacity=sd.opacity!==undefined?sd.opacity:1;
     if(!out.isVectorBrush)out.strokeColor=sd.strokeColor;
+    out.closed=!!sd.closed;
     return out;
   }catch(e){console.warn('[geometry-wasm] resample_stroke failed, falling back to JS',e);return null;}
 }
 function resampleP(sd,n){var w=_resampleStrokeWasm(sd,n);if(w)return w;return resamplePJS(sd,n);}
-function resamplePJS(sd,n){var p=new Path({insert:false});sd.segments.forEach(function(s){p.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));});var len=p.length;if(len<1||n<2){p.remove();return sd;}var segs=[];for(var i=0;i<n;i++){var t=i/(n-1);var off=t*len;var pt=p.getPointAt(off);if(!pt)pt=p.getPointAt(len);var tan=p.getTangentAt(off);if(!tan)tan=new Point(1,0);var hl=len/(n-1)/3;segs.push({point:[pt.x,pt.y],handleIn:i===0?[0,0]:[-tan.x*hl,-tan.y*hl],handleOut:i===n-1?[0,0]:[tan.x*hl,tan.y*hl]});}p.remove();return{segments:segs,strokeColor:sd.strokeColor,strokeWidth:sd.strokeWidth,strokeCap:sd.strokeCap,strokeJoin:sd.strokeJoin,fillColor:sd.fillColor||null,opacity:sd.opacity!==undefined?sd.opacity:1};}
+function resamplePJS(sd,n){var p=new Path({insert:false});sd.segments.forEach(function(s){p.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));});var len=p.length;if(len<1||n<2){p.remove();return sd;}var segs=[];for(var i=0;i<n;i++){var t=i/(n-1);var off=t*len;var pt=p.getPointAt(off);if(!pt)pt=p.getPointAt(len);var tan=p.getTangentAt(off);if(!tan)tan=new Point(1,0);var hl=len/(n-1)/3;segs.push({point:[pt.x,pt.y],handleIn:i===0?[0,0]:[-tan.x*hl,-tan.y*hl],handleOut:i===n-1?[0,0]:[tan.x*hl,tan.y*hl]});}p.remove();return{segments:segs,closed:!!sd.closed,strokeColor:sd.strokeColor,strokeWidth:sd.strokeWidth,strokeCap:sd.strokeCap,strokeJoin:sd.strokeJoin,fillColor:sd.fillColor||null,opacity:sd.opacity!==undefined?sd.opacity:1};}
 // Centerline-driven variable-width strokes (vector brush / taper) are
 // matched and interpolated via their lean editable centerline + per-anchor
 // widths (data.centerSegments) instead of the dense filled outline that's
@@ -305,6 +367,142 @@ function resampleCenterlineJS(sd,n){
   p.remove();
   return{segments:segs,widths:widths,isVectorBrush:true,strokeColor:null,fillColor:sd.fillColor||null,opacity:sd.opacity!==undefined?sd.opacity:1};
 }
+// ---- FEATURE-AWARE RETOPOLOGY ----
+// Plain uniform arc-length resampling (resamplePJS/resampleCenterlineJS
+// above) spreads n points evenly by DISTANCE, with zero regard for where
+// each shape's actual corners/cusps land — a sharp corner on A can end up
+// several samples away from where B's corresponding corner falls, and the
+// interpolation (straight per-index lerp in interpStroke) then smears that
+// corner into a soft curve for the whole tween instead of holding a crisp
+// point, or times it wrong relative to the rest of the shape. This doesn't
+// change the point BUDGET (still exactly `n` samples, so interpStroke's
+// index-paired lerp needs no changes) — it changes WHERE within that budget
+// the samples land: any point close to a detected corner on EITHER shape
+// gets snapped exactly onto it, so both A and B keep a real sample sitting
+// on (or very near) their own landmarks, and — since both sides use the
+// SAME shared fraction list — roughly at the same relative position along
+// the curve, which is the closest approximation of "corresponding points"
+// achievable without solving actual point-to-point correspondence.
+//
+// Curvature is estimated by dense fixed-step sampling (independent of the
+// path's own segment count — matters for the ribbon-shaped outlines
+// pressure-brush strokes are stored as, which have far more segments than
+// meaningful corners) rather than reading Paper's authored segments, so it
+// also works on paths with no "real" authored corners at all (resampled/
+// erased/boolean-op output).
+function detectFeatureFractions(paperPath,maxFeatures){
+  var len=paperPath.length;
+  if(!(len>0))return[];
+  var STEPS=96;
+  var angles=[];
+  for(var i=0;i<=STEPS;i++){
+    var tan=paperPath.getTangentAt(Math.min(len,len*i/STEPS));
+    angles.push(tan?Math.atan2(tan.y,tan.x):0);
+  }
+  var turn=[];
+  for(var k=1;k<angles.length;k++){
+    var d=angles[k]-angles[k-1];
+    while(d>Math.PI)d-=Math.PI*2;while(d<-Math.PI)d+=Math.PI*2;
+    turn.push(Math.abs(d));
+  }
+  // local maxima of |turning angle| above a modest threshold — corners and
+  // cusps stand out as sharp spikes in this signal; smooth curves stay low.
+  var TH=0.28;
+  var feats=[];
+  for(var m=0;m<turn.length;m++){
+    if(turn[m]<TH)continue;
+    var prev=turn[m-1]!==undefined?turn[m-1]:-1;
+    var next=turn[m+1]!==undefined?turn[m+1]:-1;
+    if(turn[m]>=prev&&turn[m]>=next)feats.push({t:(m+1)/STEPS,mag:turn[m]});
+  }
+  feats.sort(function(a,b){return b.mag-a.mag;});
+  return feats.slice(0,maxFeatures).map(function(f){return f.t;}).sort(function(a,b){return a-b;});
+}
+// Builds ONE shared t-fraction list (length n) from the union of A's and
+// B's detected feature fractions, snapping the nearest uniform grid index
+// onto each feature instead of inserting extra points — keeps the point
+// count exactly n (interpStroke needs equal-length arrays) while biasing
+// WHERE those n samples fall toward both shapes' actual landmarks. Falls
+// back to a plain uniform grid if there are no notable features (e.g. a
+// circle) — same result as the old behavior in that case.
+function buildSharedFractions(pathA,pathB,n){
+  var grid=[];for(var i=0;i<n;i++)grid.push(i/(n-1));
+  if(n<4)return grid;
+  var maxFeat=Math.max(2,Math.min(10,Math.floor(n/4)));
+  var feats=detectFeatureFractions(pathA,maxFeat).concat(detectFeatureFractions(pathB,maxFeat));
+  if(!feats.length)return grid;
+  var minGap=1/(n*2); // don't let two features collapse onto the same grid slot
+  var used={};
+  feats.forEach(function(f){
+    if(f<=0||f>=1)return; // endpoints are pinned — snapping them risks breaking the start/end continuity resampleP's endpoint handling relies on
+    var bestI=-1,bestD=Infinity;
+    for(var gi=1;gi<n-1;gi++){
+      if(used[gi])continue;
+      var d=Math.abs(grid[gi]-f);
+      if(d<bestD){bestD=d;bestI=gi;}
+    }
+    if(bestI>=0&&bestD<0.5/n*4){grid[bestI]=f;used[bestI]=true;}
+  });
+  grid.sort(function(a,b){return a-b;});
+  grid[0]=0;grid[n-1]=1;
+  // Re-enforce a minimum gap after sorting — two features snapped to
+  // adjacent grid slots can end up closer than minGap, which would starve
+  // interpStroke's per-vertex lerp of any real spacing between them.
+  for(var j=1;j<n;j++)if(grid[j]-grid[j-1]<minGap)grid[j]=grid[j-1]+minGap;
+  if(grid[n-1]>1){var over=grid[n-1]-1;for(var j2=0;j2<n;j2++)grid[j2]=Math.max(0,grid[j2]-over*(j2/(n-1)));}
+  return grid;
+}
+function _sampleAtFractions(p,len,fractions){
+  var segs=[];
+  for(var i=0;i<fractions.length;i++){
+    var off=fractions[i]*len;
+    var pt=p.getPointAt(off);if(!pt)pt=p.getPointAt(len);
+    var tan=p.getTangentAt(off);if(!tan)tan=new Point(1,0);
+    var hl=len/Math.max(1,fractions.length-1)/3;
+    segs.push({point:[pt.x,pt.y],handleIn:i===0?[0,0]:[-tan.x*hl,-tan.y*hl],handleOut:i===fractions.length-1?[0,0]:[tan.x*hl,tan.y*hl]});
+  }
+  return segs;
+}
+// Feature-aware replacement for the plain `rfn(spec.aData,resN)` /
+// `rfn(spec.bData,resN)` independent-resample pair used to build each
+// matched pair's interpolation input (generateTweens) — same output shape
+// as resampleP/resampleCenterline, just sampled at a shared, landmark-
+// biased fraction list instead of two independently-uniform ones.
+function resamplePairFeatureAware(aData,bData,n,isVB){
+  if(n<4){var rfn0=isVB?resampleCenterline:resampleP;return[rfn0(aData,n),rfn0(bData,n)];}
+  var segKeyA=isVB?'centerSegments':'segments',segKeyB=segKeyA;
+  var srcA=(isVB&&aData.centerSegments&&aData.centerSegments.length>1)?aData.centerSegments:aData.segments;
+  var srcB=(isVB&&bData.centerSegments&&bData.centerSegments.length>1)?bData.centerSegments:bData.segments;
+  if(!srcA||!srcB||srcA.length<2||srcB.length<2){var rfn1=isVB?resampleCenterline:resampleP;return[rfn1(aData,n),rfn1(bData,n)];}
+  var pA=new Path({insert:false});srcA.forEach(function(s){pA.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));});
+  var pB=new Path({insert:false});srcB.forEach(function(s){pB.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));});
+  var lenA=pA.length,lenB=pB.length;
+  if(!(lenA>0)||!(lenB>0)){pA.remove();pB.remove();var rfn2=isVB?resampleCenterline:resampleP;return[rfn2(aData,n),rfn2(bData,n)];}
+  var fractions=buildSharedFractions(pA,pB,n);
+  var segsA=_sampleAtFractions(pA,lenA,fractions);
+  var segsB=_sampleAtFractions(pB,lenB,fractions);
+  var ra,rb;
+  if(isVB){
+    function widthsAt(srcSegs,total){
+      var segLens=[0];for(var i=1;i<srcSegs.length;i++)segLens.push(segLens[i-1]+new Point(srcSegs[i].point[0],srcSegs[i].point[1]).getDistance(new Point(srcSegs[i-1].point[0],srcSegs[i-1].point[1])));
+      var tot=segLens[segLens.length-1]||1;
+      return fractions.map(function(t){
+        var targetLen=t*tot;
+        var wi=0;while(wi<segLens.length-2&&segLens[wi+1]<targetLen)wi++;
+        var span=Math.max(0.0001,segLens[wi+1]-segLens[wi]);
+        var lt=Math.min(1,Math.max(0,(targetLen-segLens[wi])/span));
+        return srcSegs[wi].width+(srcSegs[wi+1].width-srcSegs[wi].width)*lt;
+      });
+    }
+    ra={segments:segsA,widths:widthsAt(srcA,lenA),isVectorBrush:true,strokeColor:null,fillColor:aData.fillColor||null,opacity:aData.opacity!==undefined?aData.opacity:1};
+    rb={segments:segsB,widths:widthsAt(srcB,lenB),isVectorBrush:true,strokeColor:null,fillColor:bData.fillColor||null,opacity:bData.opacity!==undefined?bData.opacity:1};
+  }else{
+    ra={segments:segsA,closed:!!aData.closed,strokeColor:aData.strokeColor,strokeWidth:aData.strokeWidth,strokeCap:aData.strokeCap,strokeJoin:aData.strokeJoin,fillColor:aData.fillColor||null,opacity:aData.opacity!==undefined?aData.opacity:1};
+    rb={segments:segsB,closed:!!bData.closed,strokeColor:bData.strokeColor,strokeWidth:bData.strokeWidth,strokeCap:bData.strokeCap,strokeJoin:bData.strokeJoin,fillColor:bData.fillColor||null,opacity:bData.opacity!==undefined?bData.opacity:1};
+  }
+  pA.remove();pB.remove();
+  return[ra,rb];
+}
 // Rebuilds a filled outline (plain serializable segments) from a centerline
 // control-segments array + per-anchor widths. Mirrors tools.js's
 // rebuildVectorBrushOutline but works on plain data (no live Path/data
@@ -337,18 +535,88 @@ function lerp(a,b,t){return a+(b-a)*t;}function lerpV(a,b,t){return[lerp(a[0],b[
 function arcKey(fA,fB,i){return fA+'-'+fB+'-'+i;}
 function getArcCtrl(fA,fB,i,ptA,ptB){var k=arcKey(fA,fB,i);var a=state.motionArcs[k];var mx=(ptA[0]+ptB[0])/2,my=(ptA[1]+ptB[1])/2;if(a)return{x:mx+a.cx,y:my+a.cy};return{x:mx,y:my};}
 function setArcCtrl(fA,fB,i,ptA,ptB,cx,cy){var mx=(ptA[0]+ptB[0])/2,my=(ptA[1]+ptB[1])/2;state.motionArcs[arcKey(fA,fB,i)]={cx:cx-mx,cy:cy-my};}
+// v16: motion-arc handles are keyed by literal frame numbers (arcKey above)
+// with no separate "belongs to this keyframe pair" identity — retiming a
+// keyframe (dragging it to a new frame index, timeline.js moveFrames)
+// used to leave the old fA-fB-i entries stranded forever (nothing ever
+// deleted them) while the new fA-fB pair silently started blank, i.e. a
+// custom arc "reset" on retime and leaked a stale orphaned entry. The cx/cy
+// offset itself is still valid after a retime (it's relative to the
+// matched shapes' own positions, which a pure timing change doesn't
+// touch) — so this MOVES the entry to the new key instead of dropping it,
+// called by moveFrames for every keyframe pair whose fA and/or fB frame
+// index changed in that move.
+function rekeyTweenPairData(fA,fB,newFA,newFB){
+  if(fA===newFA&&fB===newFB)return;
+  var oldPrefix=fA+'-'+fB+'-';
+  Object.keys(state.motionArcs).forEach(function(k){
+    if(k.indexOf(oldPrefix)!==0)return;
+    var idx=k.slice(oldPrefix.length);
+    var val=state.motionArcs[k];
+    delete state.motionArcs[k];
+    state.motionArcs[newFA+'-'+newFB+'-'+idx]=val;
+  });
+}
 function qBez(a,c,b,t){var u=1-t;return u*u*a+2*u*t*c+t*t*b;}
+// Rotates+scales a vector (px,py) by angle ang (radians) and uniform factor
+// scale — the rigid part of a similarity transform, used below to give
+// tweens real rotation instead of every point sliding along a straight
+// line toward its counterpart (which, for a stroke that's simply turned
+// between its two keyframes — a swinging arm, a clock hand, a turning
+// wheel spoke — makes the shape visibly warp/flatten through its own
+// center instead of appearing to rotate).
+function rotScalePt(px,py,ang,scale){var c=Math.cos(ang),s=Math.sin(ang);return[scale*(px*c-py*s),scale*(px*s+py*c)];}
 function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
   var et=easFn(t);var n=Math.min(rA.segments.length,rB.segments.length);var segs=[];
   var cxA=0,cyA=0,cxB=0,cyB=0;for(var i=0;i<n;i++){cxA+=rA.segments[i].point[0];cyA+=rA.segments[i].point[1];cxB+=rB.segments[i].point[0];cyB+=rB.segments[i].point[1];}cxA/=n;cyA/=n;cxB/=n;cyB/=n;
   var ac=getArcCtrl(fA,fB,mIdx,[cxA,cyA],[cxB,cyB]);var cx2=qBez(cxA,ac.x,cxB,et);var cy2=qBez(cyA,ac.y,cyB,et);
-  for(var i2=0;i2<n;i2++){var sA=rA.segments[i2],sB=rB.segments[i2];segs.push({point:[cx2+lerp(sA.point[0]-cxA,sB.point[0]-cxB,et),cy2+lerp(sA.point[1]-cyA,sB.point[1]-cyB,et)],handleIn:lerpV(sA.handleIn,sB.handleIn,et),handleOut:lerpV(sA.handleOut,sB.handleOut,et)});}
+  // Fit the rigid rotation+scale that best explains A's centroid-relative
+  // points turning into B's (same similarity-transform math the "force
+  // line" matching pass already uses, just fit per-pair here instead of
+  // across the whole frame). thetaT/scaleT ramp this transform from
+  // identity (t=0, exactly reproduces A) to the full fit (t=1, exactly
+  // reproduces B) applied FORWARD from A; thetaB/scaleB ramp the inverse
+  // transform from full (t=0, approximates A) to identity (t=1, exactly
+  // reproduces B) applied BACKWARD from B — blending the two keeps both
+  // keyframe endpoints exact by construction (each formula evaluates to
+  // identity at its own boundary regardless of the fitted values), so this
+  // can never make a tween's start/end frames deviate from the keyframes
+  // themselves, only reshape the path between them. A small dead-zone on
+  // theta avoids introducing visible spurious spin on ordinary shape
+  // morphs where the least-squares fit finds SOME best-fit rotation just
+  // by chance even though the two shapes aren't really related by a turn.
+  var theta=0,scaleF=1;
+  if(n>=2){
+    var loA=[],loB=[];
+    for(var li=0;li<n;li++){loA.push({x:rA.segments[li].point[0]-cxA,y:rA.segments[li].point[1]-cyA});loB.push({x:rB.segments[li].point[0]-cxB,y:rB.segments[li].point[1]-cyB});}
+    var simT=fitSimilarityTransform(loA,loB);
+    if(simT){
+      var mag=Math.sqrt(simT.wRe*simT.wRe+simT.wIm*simT.wIm);
+      if(mag>0.15&&mag<8){
+        var th=Math.atan2(simT.wIm,simT.wRe);
+        if(Math.abs(th)>=0.06)theta=th; // ~3.4° dead-zone
+        scaleF=Math.min(3,Math.max(0.33,mag));
+      }
+    }
+  }
+  var thetaT=theta*et,scaleT=lerp(1,scaleF,et);
+  var thetaB=thetaT-theta,scaleB=lerp(scaleF>1e-6?1/scaleF:1,1,et);
+  for(var i2=0;i2<n;i2++){var sA=rA.segments[i2],sB=rB.segments[i2];
+    var fwd=rotScalePt(sA.point[0]-cxA,sA.point[1]-cyA,thetaT,scaleT);
+    var bwd=rotScalePt(sB.point[0]-cxB,sB.point[1]-cyB,thetaB,scaleB);
+    var hiF=rotScalePt(sA.handleIn[0],sA.handleIn[1],thetaT,scaleT),hiB=rotScalePt(sB.handleIn[0],sB.handleIn[1],thetaB,scaleB);
+    var hoF=rotScalePt(sA.handleOut[0],sA.handleOut[1],thetaT,scaleT),hoB=rotScalePt(sB.handleOut[0],sB.handleOut[1],thetaB,scaleB);
+    segs.push({point:[cx2+lerp(fwd[0],bwd[0],et),cy2+lerp(fwd[1],bwd[1],et)],handleIn:[lerp(hiF[0],hiB[0],et),lerp(hiF[1],hiB[1],et)],handleOut:[lerp(hoF[0],hoB[0],et),lerp(hoF[1],hoB[1],et)]});}
   if(rA.isVectorBrush&&rB.isVectorBrush){
     var widths=[];for(var w=0;w<n;w++)widths.push(lerp(rA.widths[w]||1,rB.widths[w]||1,et));
     var centerSegs=segs.map(function(s,idx){return{point:s.point,handleIn:s.handleIn,handleOut:s.handleOut,width:widths[idx]};});
-    return{segments:outlineFromCenterSegs(centerSegs),strokeColor:null,strokeWidth:lerp(rA.strokeWidth||3,rB.strokeWidth||3,et),strokeCap:rA.strokeCap||'round',strokeJoin:rA.strokeJoin||'round',fillColor:et<.5?(rA.fillColor||null):(rB.fillColor||null),opacity:lerp(rA.opacity!==undefined?rA.opacity:1,rB.opacity!==undefined?rB.opacity:1,et),isVectorBrush:true,centerSegments:centerSegs};
+    return{segments:outlineFromCenterSegs(centerSegs),closed:true,strokeColor:null,strokeWidth:lerp(rA.strokeWidth||3,rB.strokeWidth||3,et),strokeCap:rA.strokeCap||'round',strokeJoin:rA.strokeJoin||'round',fillColor:et<.5?(rA.fillColor||null):(rB.fillColor||null),opacity:lerp(rA.opacity!==undefined?rA.opacity:1,rB.opacity!==undefined?rB.opacity:1,et),isVectorBrush:true,centerSegments:centerSegs};
   }
-  return{segments:segs,strokeColor:et<.5?rA.strokeColor:rB.strokeColor,strokeWidth:lerp(rA.strokeWidth||3,rB.strokeWidth||3,et),strokeCap:rA.strokeCap||'round',strokeJoin:rA.strokeJoin||'round',fillColor:et<.5?(rA.fillColor||null):(rB.fillColor||null),opacity:lerp(rA.opacity!==undefined?rA.opacity:1,rB.opacity!==undefined?rB.opacity:1,et)};
+  // A closed shape tweening into another closed shape should stay closed
+  // throughout — matches the same "switch at the halfway point" convention
+  // already used for strokeColor/fillColor a few lines up, rather than
+  // trying to blend "closedness" itself (not a numeric quantity).
+  return{segments:segs,closed:et<.5?!!rA.closed:!!rB.closed,strokeColor:et<.5?rA.strokeColor:rB.strokeColor,strokeWidth:lerp(rA.strokeWidth||3,rB.strokeWidth||3,et),strokeCap:rA.strokeCap||'round',strokeJoin:rA.strokeJoin||'round',fillColor:et<.5?(rA.fillColor||null):(rB.fillColor||null),opacity:lerp(rA.opacity!==undefined?rA.opacity:1,rB.opacity!==undefined?rB.opacity:1,et)};
 }
 // ---- RESAMPLED-PAIR ALIGNMENT ----
 // Even with a correct match, interpolating point i of A toward point i of B
@@ -526,6 +794,43 @@ function resolveSplitMatches(sA,sB,pairSpecs,unA,unB){
   tryDirection('B');
   tryDirection('A');
 }
+// Brush-texture dabs are RENDERING artifacts of their anchor stroke, not
+// drawings in their own right — letting them into the matcher (as happened
+// the moment presets landed) exploded the Hungarian matrix to hundreds of
+// entries (O(n³)!), had dabs of one feature "matching" dabs of a completely
+// different feature (the reported mouth-inbetweens-with-nose class of
+// garbage), and interpolated each little ellipse independently, shredding
+// the texture. Matching/interpolation now runs on ANCHORS ONLY; the dabs of
+// a generated inbetween are re-stamped fresh along the interpolated
+// centerline (dabRecordsForTween below) with a per-pair SEEDED rng so the
+// texture sticks to the morphing stroke instead of re-rolling (boiling)
+// on every frame.
+function splitTweenables(strokes){
+  var list=[],orig=[],dabsByGroup={};
+  strokes.forEach(function(sd,i){
+    if(sd.isBrushTextureCopy){
+      if(sd.brushGroupId)(dabsByGroup[sd.brushGroupId]=dabsByGroup[sd.brushGroupId]||[]).push(sd);
+      return;
+    }
+    list.push(sd);orig.push(i);
+  });
+  return{list:list,orig:orig,dabsByGroup:dabsByGroup};
+}
+function dabRecordsForTween(rec,presetKey,colorHexStr,baseWidth,seed,opacityMul){
+  var preset=resolveBrushPreset(presetKey);
+  if(!preset)return[];
+  var p=new Path({insert:false});
+  rec.segments.forEach(function(s){p.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));});
+  if(rec.closed)p.closed=true;
+  var dabs=buildBrushDabs(p,preset,baseWidth||3,seededRng(seed));
+  p.remove();
+  return dabs.map(function(dab){
+    var segs=dab.segments.map(function(s){return{point:[s.point.x,s.point.y],handleIn:[s.handleIn.x,s.handleIn.y],handleOut:[s.handleOut.x,s.handleOut.y]};});
+    var op=dab.data.dabOpacity*(opacityMul!==undefined?opacityMul:1);
+    dab.remove();
+    return{segments:segs,closed:true,strokeColor:null,fillColor:colorHexStr,opacity:op,isBrushTextureCopy:true,brushGroupId:rec.brushGroupId};
+  });
+}
 function generateTweens(){
   saveAllLayerFrames();var li=state.activeLayerIdx;var ld=state.layers[li];
   var keys=[];for(var i=0;i<state.totalFrames;i++){if(ld.frames[i].isKeyframe&&ld.frames[i].strokes.length>0)keys.push(i);}
@@ -547,15 +852,37 @@ function generateTweens(){
   for(var ki=0;ki<keys.length-1;ki++){
     var fA=keys[ki],fB=keys[ki+1];
     if(restrictTo&&!restrictTo[fA])continue;
-    var sA=ld.frames[fA].strokes,sB=ld.frames[fB].strokes;
-    var matches=autoMatch(sA,sB);if(!matches.length)continue;
+    var sAsplit=splitTweenables(ld.frames[fA].strokes),sBsplit=splitTweenables(ld.frames[fB].strokes);
+    var sA=sAsplit.list,sB=sBsplit.list;
+    // v16: manual pairing overrides (state.tweenOverrides) take priority
+    // over autoMatch for this specific keyframe pair — resolved here by
+    // stable strokeId, since sA/sB index order isn't stable across edits.
+    // A stroke removed since the override was made just makes that one
+    // override silently inert (falls through to auto-matching again),
+    // rather than erroring the whole tween generation.
+    var ovKey=li+':'+fA+'-'+fB;
+    var overrides=(state.tweenOverrides&&state.tweenOverrides[ovKey])||[];
+    var forcedAIdx={},forcedBIdx={},forcedPairs=[];
+    overrides.forEach(function(ov){
+      var aIdx=-1,bIdx=-1;
+      for(var ii=0;ii<sA.length;ii++)if(sA[ii].strokeId===ov.aId){aIdx=ii;break;}
+      for(var jj=0;jj<sB.length;jj++)if(sB[jj].strokeId===ov.bId){bIdx=jj;break;}
+      if(aIdx<0||bIdx<0||forcedAIdx[aIdx]||forcedBIdx[bIdx])return;
+      forcedAIdx[aIdx]=1;forcedBIdx[bIdx]=1;
+      forcedPairs.push({aIdx:aIdx,bIdx:bIdx,aData:sA[aIdx],bData:sB[bIdx],mi:-1-forcedPairs.length,score:0,forced:true});
+    });
+    var matches=autoMatch(sA,sB);if(!matches.length&&!forcedPairs.length)continue;
     // Only morph plausible pairs. A stroke whose best assignment still
     // scores badly (no real counterpart in the other key — count mismatch,
     // or a shape that genuinely appears/disappears) cross-fades in place
     // instead of scaling/warping toward an unrelated stroke.
     var MATCH_TH=0.48;
     var pairSpecs=[],aMatched={},bMatched={};
-    matches.forEach(function(m){if(m.score<=MATCH_TH){pairSpecs.push({aIdx:m.a,bIdx:m.b,aData:sA[m.a],bData:sB[m.b],mi:matches.indexOf(m),score:m.score});aMatched[m.a]=1;bMatched[m.b]=1;}});
+    forcedPairs.forEach(function(fp){pairSpecs.push(fp);aMatched[fp.aIdx]=1;bMatched[fp.bIdx]=1;});
+    matches.forEach(function(m){
+      if(forcedAIdx[m.a]||forcedBIdx[m.b])return; // conflicts with a manual override — drop the auto guess
+      if(m.score<=MATCH_TH){pairSpecs.push({aIdx:m.a,bIdx:m.b,aData:sA[m.a],bData:sB[m.b],mi:matches.indexOf(m),score:m.score});aMatched[m.a]=1;bMatched[m.b]=1;}
+    });
     var unA=[],unB=[];
     for(var ai=0;ai<sA.length;ai++)if(!aMatched[ai])unA.push(ai);
     for(var bi2=0;bi2<sB.length;bi2++)if(!bMatched[bi2])unB.push(bi2);
@@ -564,11 +891,52 @@ function generateTweens(){
     if(unA.length||unB.length)resolveSplitMatches(sA,sB,pairSpecs,unA,unB);
     var fadeOutA=unA.map(function(i){return sA[i];}),fadeInB=unB.map(function(i){return sB[i];});
     if(!pairSpecs.length&&!fadeOutA.length&&!fadeInB.length)continue;
+    // ---- OCCLUSION: stacking order interpolated from real authored data ----
+    // The z-order (draw/stack order, front-to-back) of a generated inbetween
+    // used to be frozen on whatever order pairSpecs happened to iterate in —
+    // effectively frame A's own stacking for the WHOLE span. If the artist
+    // deliberately restacked two elements between the keyframes (an arm
+    // drawn BEHIND the torso in A, but drawn IN FRONT of it in B — a common,
+    // intentional way to indicate the arm swinging to the near side), the
+    // frozen order meant the whole tween stayed on A's stacking then POPPED
+    // to B's at the very last frame, instead of crossing at a sensible point.
+    // A true depth-aware solution (recomputing which surface should occlude
+    // which via boolean geometry every generated frame) has no principled
+    // answer for 2D vector art — flat strokes carry no inherent depth, only
+    // the artist's own draw order does, so there's nothing for booleans to
+    // resolve that isn't already expressed by that order. This uses exactly
+    // that real, authored signal instead: each matched pair's stacking RANK
+    // (its position within A's/B's own stroke array, 0=bottom..1=top) is
+    // interpolated the same way its shape and easing already are, and the
+    // whole `tw` array is re-sorted by that interpolated rank every
+    // generated frame — so a restack between keyframes crosses smoothly
+    // in-between (typically right around the shape's own halfway point)
+    // instead of freezing on A then popping to B on the last frame.
     var pairs=pairSpecs.map(function(spec){
       var isVB=!!(spec.aData.isVectorBrush&&spec.bData.isVectorBrush);
-      var rfn=isVB?resampleCenterline:resampleP;
-      var ra=rfn(spec.aData,resN),rb=rfn(spec.bData,resN);
-      return{a:ra,b:alignResampledPair(ra,rb),mi:spec.mi};
+      // Feature-aware (corner/cusp-biased) shared resampling — see
+      // resamplePairFeatureAware's own comment. Falls back internally to
+      // the old independent uniform resampleP/resampleCenterline for
+      // degenerate inputs (very low resN, missing centerline data, etc.).
+      var rpair=resamplePairFeatureAware(spec.aData,spec.bData,resN,isVB);
+      var ra=rpair[0],rb=rpair[1];
+      // Brush-texture metadata for re-stamping the dabs on every generated
+      // frame (see splitTweenables' comment). texSide tracks WHICH keyframe
+      // is textured so a textured→plain morph fades the texture out rather
+      // than double-drawing it over the fading-in plain stroke.
+      var texA=spec.aData.brushTexturePreset,texB=spec.bData.brushTexturePreset;
+      var tex=null;
+      if(texA||texB){
+        tex={
+          preset:texA||texB,
+          side:texA&&texB?'both':(texA?'a':'b'),
+          color:spec.aData.preTextureStroke||spec.aData.strokeColor||spec.bData.preTextureStroke||spec.bData.strokeColor||'#000000',
+          groupId:spec.aData.brushGroupId||spec.bData.brushGroupId,
+          seed:(fA*7919+spec.mi*131+1)>>>0,
+        };
+      }
+      return{a:ra,b:alignResampledPair(ra,rb),mi:spec.mi,tex:tex,
+        aRank:spec.aIdx/Math.max(1,sA.length-1),bRank:spec.bIdx/Math.max(1,sB.length-1)};
     });
     var gap=fB-fA;
     for(var fi=fA+1;fi<fB;fi++){
@@ -577,10 +945,43 @@ function generateTweens(){
       // explicitly unchecked "skip manually-edited frames".
       if(state.tweenSkipManual&&ld.frames[fi].isManualEdit)continue;
       if(step>1&&(fi-fA)%step!==0){ld.frames[fi]={strokes:[],isInterpolated:false,isKeyframe:false};continue;}
-      var t=(fi-fA)/gap;var tw=pairs.map(function(pr){return interpStroke(pr.a,pr.b,t,easFn,fA,fB,pr.mi);});
-      var et2=easFn(t);
-      fadeOutA.forEach(function(sd){var c=JSON.parse(JSON.stringify(sd));c.opacity=(c.opacity!==undefined?c.opacity:1)*(1-et2);if(c.opacity>0.02)tw.push(c);});
-      fadeInB.forEach(function(sd){var c=JSON.parse(JSON.stringify(sd));c.opacity=(c.opacity!==undefined?c.opacity:1)*et2;if(c.opacity>0.02)tw.push(c);});
+      var t=(fi-fA)/gap;var et2=easFn(t);
+      var tw=[];
+      pairs.forEach(function(pr){
+        var sdOut=interpStroke(pr.a,pr.b,t,easFn,fA,fB,pr.mi);
+        sdOut.__zKey=lerp(pr.aRank,pr.bRank,et2);
+        if(pr.tex){
+          // carry the anchor's texture identity so a later manual edit of
+          // this frame keeps behaving as a textured group
+          sdOut.brushTexturePreset=pr.tex.preset;
+          if(pr.tex.groupId)sdOut.brushGroupId=pr.tex.groupId;
+          var mul=pr.tex.side==='a'?(1-et2):pr.tex.side==='b'?et2:1;
+          if(mul>0.02){
+            dabRecordsForTween(sdOut,pr.tex.preset,pr.tex.color,sdOut.strokeWidth||3,pr.tex.seed,mul)
+              .forEach(function(dr){dr.__zKey=sdOut.__zKey-1e-4;tw.push(dr);});
+          }
+        }
+        tw.push(sdOut);
+      });
+      // Fading strokes have no counterpart to interpolate a rank toward —
+      // they keep their own frame's rank fixed for the whole span (a
+      // disappearing element stays wherever it was stacked in A; an
+      // appearing one stays wherever it'll be stacked in B). A textured
+      // fader's own record may be invisible (opacity-0 anchor) — its dabs
+      // (cloned from the source frame, opacity-scaled) are what fades.
+      function pushFade(sd,rank,mul,dabsByGroup){
+        var c=JSON.parse(JSON.stringify(sd));c.opacity=(c.opacity!==undefined?c.opacity:1)*mul;c.__zKey=rank;
+        if(c.opacity>0.02)tw.push(c);
+        var grp=sd.brushTexturePreset&&sd.brushGroupId&&dabsByGroup[sd.brushGroupId];
+        if(grp)grp.forEach(function(d){
+          var dc=JSON.parse(JSON.stringify(d));dc.opacity=(dc.opacity!==undefined?dc.opacity:1)*mul;dc.__zKey=rank-1e-4;
+          if(dc.opacity>0.02)tw.push(dc);
+        });
+      }
+      fadeOutA.forEach(function(sd,fi2){pushFade(sd,unA[fi2]/Math.max(1,sA.length-1),1-et2,sAsplit.dabsByGroup);});
+      fadeInB.forEach(function(sd,fi2){pushFade(sd,unB[fi2]/Math.max(1,sB.length-1),et2,sBsplit.dabsByGroup);});
+      tw.sort(function(x,y){return x.__zKey-y.__zKey;});
+      tw.forEach(function(s){delete s.__zKey;});
       ld.frames[fi]={strokes:tw,isInterpolated:true,isKeyframe:false};total++;
     }
   }
@@ -599,8 +1000,14 @@ function renderArcs(){
   if(keys.length<2)return;
   var fA=-1,fB=-1;for(var i2=0;i2<keys.length-1;i2++){if(state.currentFrame>=keys[i2]&&state.currentFrame<=keys[i2+1]){fA=keys[i2];fB=keys[i2+1];break;}}
   if(fA<0)return;
-  var sA=ld.frames[fA].strokes,sB=ld.frames[fB].strokes;var matches=autoMatch(sA,sB);if(!matches.length)return;
-  var sel=state.selectedStrokeIndices;var fm=matches.filter(function(m){return sel.indexOf(m.a)>=0;});if(!fm.length)return;
+  // Same anchors-only filtering as generateTweens (see splitTweenables'
+  // comment) — this runs on every selection render, so dab pollution here
+  // was ALSO an O(n³) Hungarian on hundreds of entries per click. m.a
+  // indexes the filtered list; selectedStrokeIndices index the raw frame
+  // array — map back through .orig for the selection check.
+  var spA=splitTweenables(ld.frames[fA].strokes),spB=splitTweenables(ld.frames[fB].strokes);
+  var sA=spA.list,sB=spB.list;var matches=autoMatch(sA,sB);if(!matches.length)return;
+  var sel=state.selectedStrokeIndices;var fm=matches.filter(function(m){return sel.indexOf(spA.orig[m.a])>=0;});if(!fm.length)return;
   arcLayer.activate();var cols=['#ff6b6b','#4ecdc4','#ffe66d','#a29bfe','#fd79a8','#00cec9'];var easFn=getEasing();
   fm.forEach(function(m,di){
     var pA=buildTP(sA[m.a]),pB=buildTP(sB[m.b]);var cA=pA.bounds.center,cB=pB.bounds.center;pA.remove();pB.remove();
@@ -615,12 +1022,59 @@ function renderArcs(){
   userLayers[state.activeLayerIdx].activate();
 }
 
+// ---- GHOST ALL KEYFRAMES ----
+// Onion skin only shows the neighboring frames either side of the playhead
+// — this shows EVERY keyframe of the active layer at once (a purple-tinted
+// ghost per keyframe, current frame excluded since its real content is
+// already on screen), a quick way to see the whole layer's timing/spacing
+// in one view. Purely visual; selectGhostAll() below is the separate step
+// that turns these into real, editable, per-frame-tagged proxy objects.
+function renderGhostAll(){
+  ghostAllLayer.removeChildren();
+  if(!state.ghostAllFrames)return;
+  var li=state.activeLayerIdx,cf=state.currentFrame;
+  var ld=state.layers[li];if(!ld||ld.symbolId)return;
+  for(var fi=0;fi<ld.frames.length;fi++){
+    if(fi===cf)continue;
+    var fr=ld.frames[fi];if(!fr.isKeyframe||!fr.strokes.length)continue;
+    var dist=Math.abs(fi-cf);
+    var op=Math.max(.12,.4-dist*.03);
+    fr.strokes.forEach(function(sd){
+      if(sd.isRaster)return;
+      var p=desP(sd,ghostAllLayer,op);
+      p.strokeColor=new Color(.68,.6,1,op*1.6);
+      p.fillColor=null;
+      p.data.ghostFrame=fi;
+    });
+  }
+  userLayers[li]&&userLayers[li].activate?userLayers[li].activate():null;
+}
+
 // ---- ONION ----
+// Folded into the same function (rather than adding renderGhostAll() to
+// every one of renderOS()'s many call sites across app.js/timeline.js) so
+// every existing "state changed, recompute the ghost overlays" call site
+// keeps working unmodified and picks up Ghost All for free.
 function renderOS(){
+  // toggleOnion()/setOnionMode()/setOnionRange()/toggleGhostAll() etc. all
+  // just mutate state then call renderOS() — none of them ever bumped
+  // window._sceneVersion, so engine-bridge.js's tick() (which skips
+  // rebuilding the scene JSON entirely unless that counter or the viewport
+  // changed) kept painting the PREVIOUS onion/ghost picture until some
+  // unrelated action — typically the next frame navigation — happened to
+  // bump the version for its own reasons. Toggling onion/ghost state IS a
+  // real scene change and belongs in the same "things that dirty the
+  // picture" bucket as everything else that already increments this here.
+  window._sceneVersion++;
+  renderGhostAll();
   onionPrevLayer.removeChildren();onionNextLayer.removeChildren();
   if(!state.onionSkin)return;var li=state.activeLayerIdx;var cf=state.currentFrame;
-  for(var fi=cf-1;fi>=state.onionIn&&fi>=0;fi--){var strokes=getEffectiveStrokes(li,fi);if(!strokes.length)continue;var dist=cf-fi;var op=(state.onionPrevOpacity/100)*Math.max(.15,1-dist*.2);strokes.forEach(function(sd){var p=desP(sd,onionPrevLayer,op);if(state.onionMode==='tinted')p.strokeColor=new Color(1,.3,.3,op);else if(state.onionMode==='outline'){p.strokeColor=new Color(1,.3,.3,op*.8);p.strokeWidth=1;}else p.opacity=op;});}
-  for(var fi2=cf+1;fi2<=state.onionOut&&fi2<state.totalFrames;fi2++){var strokes2=getEffectiveStrokes(li,fi2);if(!strokes2.length)continue;var dist2=fi2-cf;var op2=(state.onionNextOpacity/100)*Math.max(.15,1-dist2*.2);strokes2.forEach(function(sd){var p=desP(sd,onionNextLayer,op2);if(state.onionMode==='tinted')p.strokeColor=new Color(.3,.55,1,op2);else if(state.onionMode==='outline'){p.strokeColor=new Color(.3,.55,1,op2*.8);p.strokeWidth=1;}else p.opacity=op2;});}
+  // isRaster entries (imported image/video frames) go through desR, not
+  // desP — a Raster has no fillColor/strokeColor, so tinted/outline modes
+  // (which recolor the stroke) fall back to a plain opacity fade for it,
+  // same as its normal on-canvas rendering just dimmer.
+  for(var fi=cf-1;fi>=state.onionIn&&fi>=0;fi--){var strokes=getEffectiveStrokes(li,fi);if(!strokes.length)continue;var dist=cf-fi;var op=(state.onionPrevOpacity/100)*Math.max(.15,1-dist*.2);strokes.forEach(function(sd){if(sd.isRaster){var pr=desR(sd,onionPrevLayer);pr.opacity=op;return;}var p=desP(sd,onionPrevLayer,op);if(state.onionMode==='tinted')p.strokeColor=new Color(1,.3,.3,op);else if(state.onionMode==='outline'){p.fillColor=null;p.strokeColor=new Color(1,.3,.3,op*.8);p.strokeWidth=1;}else p.opacity=op;});}
+  for(var fi2=cf+1;fi2<=state.onionOut&&fi2<state.totalFrames;fi2++){var strokes2=getEffectiveStrokes(li,fi2);if(!strokes2.length)continue;var dist2=fi2-cf;var op2=(state.onionNextOpacity/100)*Math.max(.15,1-dist2*.2);strokes2.forEach(function(sd){if(sd.isRaster){var nr=desR(sd,onionNextLayer);nr.opacity=op2;return;}var p=desP(sd,onionNextLayer,op2);if(state.onionMode==='tinted')p.strokeColor=new Color(.3,.55,1,op2);else if(state.onionMode==='outline'){p.fillColor=null;p.strokeColor=new Color(.3,.55,1,op2*.8);p.strokeWidth=1;}else p.opacity=op2;});}
   userLayers[state.activeLayerIdx].activate();
 }
 
@@ -651,4 +1105,99 @@ var cur={frame:state.currentFrame,layers:[]};for(var i=0;i<state.layers.length;i
 function redo(){if(!state.redoStack.length){showToast('Rien à refaire');return;}var s=state.redoStack.pop();
 if(s.type==='layers'){state.undoStack.push(layersSnapshotNow());restoreLayersSnapshot(s);return;}
 var cur={frame:state.currentFrame,layers:[]};for(var i=0;i<state.layers.length;i++){var f=state.layers[i].frames[state.currentFrame];cur.layers.push({strokes:JSON.parse(JSON.stringify(f.strokes)),isKeyframe:f.isKeyframe,isInterpolated:f.isInterpolated});}state.undoStack.push(cur);for(var i2=0;i2<s.layers.length&&i2<state.layers.length;i2++){var tf=state.layers[i2].frames[s.frame];tf.strokes=s.layers[i2].strokes;tf.isKeyframe=s.layers[i2].isKeyframe;tf.isInterpolated=s.layers[i2].isInterpolated;}if(s.frame!==state.currentFrame)state.currentFrame=s.frame;loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();}
+
+// ---- MANUAL INBETWEEN REASSIGNMENT (v16) ----
+// autoMatch (top of this file) sometimes misidentifies correspondence when
+// a shape changes too much between keyframes (size, stroke/fill change) —
+// this lets the artist force ONE pairing by clicking the element on
+// keyframe A then the corresponding element on keyframe B, persisted via
+// stable data.strokeId into state.tweenOverrides and consumed by
+// generateTweens() above. A 2-click guided flow, not a from-scratch cross-
+// frame multi-select UI (nothing like that exists anywhere in the app yet
+// per this session's own architecture research) — reuses ensureStrokeId
+// (tools.js) and a simple capture-phase click intercept registered on
+// `document`, same pattern ui.js already uses to steal a click before any
+// per-tool bridge (draw/select/etc, all on #canvas-area) sees it.
+var _reassign={active:false,step:0,layer:-1,frameA:-1,frameB:-1,aId:null};
+function reassignStatusEl(){return document.getElementById('tw-reassign-status');}
+function reassignSetStatus(msg){
+  var el=reassignStatusEl();if(!el)return;
+  if(msg){el.textContent=msg;el.style.display='block';}else el.style.display='none';
+}
+function cancelReassign(silent){
+  if(!_reassign.active)return;
+  _reassign.active=false;_reassign.step=0;_reassign.aId=null;
+  reassignSetStatus(null);
+  if(!silent)showToast('Réattribution annulée');
+}
+function startReassign(){
+  if(_reassign.active){cancelReassign();return;}
+  saveAllLayerFrames();
+  var li=state.activeLayerIdx,ld=state.layers[li],cf=state.currentFrame;
+  var fA=-1;
+  for(var i=cf;i>=0;i--){if(ld.frames[i].isKeyframe){fA=i;break;}}
+  if(fA<0){showToast('Placez le playhead sur une keyframe (ou après une keyframe)');return;}
+  var fB=-1;
+  for(var j=fA+1;j<state.totalFrames;j++){if(ld.frames[j].isKeyframe){fB=j;break;}}
+  if(fB<0){showToast('Cette keyframe n\'a pas de keyframe suivante à réattribuer');return;}
+  _reassign.active=true;_reassign.step=1;_reassign.layer=li;_reassign.frameA=fA;_reassign.frameB=fB;_reassign.aId=null;
+  reassignSetStatus('1/2 — Cliquez l\'élément sur la keyframe '+(fA+1)+' (départ)');
+  showToast('Cliquez l\'élément de départ sur le canvas');
+}
+function reassignHandleClick(pt){
+  if(!_reassign.active)return false;
+  var li=_reassign.layer;
+  if(li!==state.activeLayerIdx||state.currentFrame!==(_reassign.step===1?_reassign.frameA:_reassign.frameB)){
+    // playhead/layer changed mid-flow — the click can't be trusted to be on
+    // the intended keyframe's own content, safer to just cancel than guess
+    cancelReassign();return false;
+  }
+  var layer=userLayers[li];
+  var hit=layer.hitTest(pt,{stroke:true,fill:true,tolerance:8/view.zoom});
+  if(!hit||!(hit.item instanceof Path)){showToast('Aucun élément à cet endroit');return true;}
+  var target=resolveBrushAnchor(hit.item,layer);
+  var sid=ensureStrokeId(target);
+  if(_reassign.step===1){
+    _reassign.aId=sid;_reassign.step=2;
+    saveActiveLayerFrame();
+    goToFrame(_reassign.frameB);
+    reassignSetStatus('2/2 — Cliquez l\'élément correspondant sur la keyframe '+(_reassign.frameB+1));
+    showToast('Cliquez l\'élément correspondant sur la keyframe suivante');
+    return true;
+  }
+  // step 2
+  saveActiveLayerFrame();
+  var key=li+':'+_reassign.frameA+'-'+_reassign.frameB;
+  var list=state.tweenOverrides[key]=state.tweenOverrides[key]||[];
+  // replace any earlier override touching either side of this pair — one
+  // strokeId can't sensibly be forced into two different correspondences
+  // for the same keyframe pair
+  state.tweenOverrides[key]=list.filter(function(ov){return ov.aId!==_reassign.aId&&ov.bId!==sid;});
+  state.tweenOverrides[key].push({aId:_reassign.aId,bId:sid});
+  var doneA=_reassign.frameA;
+  cancelReassign(true);
+  // regenerate just this span: select the origin keyframe so generateTweens'
+  // own restrictTo logic (tweens.js generateTweens, selOnLayer) narrows to
+  // it instead of redoing the whole layer.
+  selClear();selAdd(li,doneA);
+  generateTweens();
+  selClear();
+  showToast('Inbetween réattribué');
+  return true;
+}
+document.addEventListener('pointerdown',function(e){
+  if(!_reassign.active)return;
+  var area=document.getElementById('canvas-area');
+  if(!area||!area.contains(e.target))return;
+  var w=window.SMEngineBridge?window.SMEngineBridge.screenToWorld(e.clientX,e.clientY):null;
+  var pt=w?new Point(w[0],w[1]):null;
+  if(!pt)return;
+  if(reassignHandleClick(pt)){e.stopImmediatePropagation();e.preventDefault();}
+},true);
+document.addEventListener('keydown',function(e){if(e.key==='Escape'&&_reassign.active)cancelReassign();},true);
+function initReassignUI(){
+  var btn=document.getElementById('btn-tw-reassign');
+  if(btn)btn.addEventListener('click',startReassign);
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initReassignUI);else initReassignUI();
 

@@ -30,6 +30,40 @@
   var lastMoveT = 0, lastWorldPt = null;
   var lastPenPressure = null; // held across a real-pen gesture, see pressureOf()
   var extendTarget = null; // {path, end:'first'|'last'} — set at pointerdown when starting near an open path's endpoint
+  // state.stabilizer (position-averaging while drawing) used to only exist
+  // in tools.js's Paper-native onMouseDrag mirror — dead code in practice,
+  // since this engine-bridge path is what actually runs whenever the Rust
+  // engine is on (the default, almost always). Mirrors that same moving-
+  // average-of-recent-points technique here, on the real raw pointer
+  // stream, so the Stabilizer UI setting (off/low/med/high) finally does
+  // something. Reset every stroke so it never drags in a stale point from
+  // the previous gesture.
+  var stabQueue = [];
+  function stabilizePoint(w) {
+    var stab = state.stabilizer;
+    if (!stab) { stabQueue.length = 0; return w; }
+    stabQueue.push(w);
+    var maxQ = stab === 1 ? 3 : stab === 2 ? 6 : 10;
+    while (stabQueue.length > maxQ) stabQueue.shift();
+    var ax = 0, ay = 0;
+    for (var i = 0; i < stabQueue.length; i++) { ax += stabQueue[i][0]; ay += stabQueue[i][1]; }
+    return [ax / stabQueue.length, ay / stabQueue.length];
+  }
+  // Raw per-sample pressure (especially the speed-fallback formula, and
+  // some stylus hardware) is noisy enough to visibly bump the variable-
+  // width outline's edge — a one-pole low-pass filter (exponential moving
+  // average) smooths that out while still tracking a deliberate press/
+  // release fast enough to feel responsive, not laggy. Reset to null every
+  // stroke so it snaps straight to the first real reading instead of
+  // ramping up from 0 (a real pressed-down pen should register full weight
+  // immediately, not fade in).
+  var smoothedPressure = null;
+  var PRESSURE_SMOOTH_ALPHA = 0.45;
+  function smoothPressure(p) {
+    if (smoothedPressure == null) { smoothedPressure = p; return p; }
+    smoothedPressure += (p - smoothedPressure) * PRESSURE_SMOOTH_ALPHA;
+    return smoothedPressure;
+  }
 
   // Graphite's Freehand tool auto-continues an open path when you start a
   // new stroke near one of its endpoints, instead of always creating a
@@ -92,6 +126,19 @@
       }
       if (lastPenPressure != null) return lastPenPressure;
     }
+    // Tauri/WKWebView: many tablet drivers (XP-Pen, Huion…) never surface
+    // real pressure through PointerEvent.pressure in that webview — tools.js
+    // already built two fallback channels for the vector-brush path
+    // (webkitForce on synthesized mouse events, and a native AppKit reading
+    // streamed from Rust as 'stylus-pressure') into the shared `_stylus`
+    // object. This bridge draws with the Rust/vello engine and never
+    // consulted them, so pressure silently degraded to the speed heuristic
+    // below ONLY inside the desktop app, never in the browser preview where
+    // Chrome's PointerEvent.pressure just works.
+    if (typeof _stylus !== 'undefined' && _stylus.force > 0 && Date.now() - _stylus.forceT < 250) {
+      lastPenPressure = _stylus.force;
+      return _stylus.force;
+    }
     var now = Date.now();
     var dt = Math.max(8, now - (lastMoveT || now));
     lastMoveT = now;
@@ -103,13 +150,34 @@
   function widthFor(p) {
     if (state.pressureInvert) p = 1 - p;
     var lo = state.pressureMin / 100, hi = state.pressureMax / 100;
-    return state.brushSize * (lo + (hi - lo) * p);
+    // Fill Brush gets its own base size — it was silently sharing
+    // state.brushSize with the Draw tool (and, one panel field further,
+    // with the Pen tool's stroke width too), so changing either elsewhere
+    // silently resized fill-brush strokes with no dedicated control of its
+    // own.
+    var base = isFillBrush() ? state.fillBrushSize : state.brushSize;
+    return base * (lo + (hi - lo) * p);
+  }
+  // Sticks a freehand sample onto the nearest perspective guide line
+  // (perspective-bridge.js) when it's within the magnet tolerance — no-op
+  // (returns the point unchanged) whenever the guide is off or nothing's
+  // close enough, so this is always safe to call unconditionally on every
+  // sample of a Draw/Fillbrush stroke.
+  function magnetSnap(w) {
+    if (!window.perspectiveSnapPointMagnetic) return w;
+    var snapped = window.perspectiveSnapPointMagnetic(new Point(w[0], w[1]));
+    return snapped ? [snapped.x, snapped.y] : w;
   }
   function hexToRgba(css, opacityPct) {
     if (!css) return null;
     var h = css.replace('#', '');
     var r = parseInt(h.substr(0, 2), 16), g = parseInt(h.substr(2, 2), 16), b = parseInt(h.substr(4, 2), 16);
-    return [r, g, b, Math.round(255 * (opacityPct !== undefined ? opacityPct / 100 : 1))];
+    // An 8-digit hex (#rrggbbaa) carries its own alpha byte — the color's
+    // own transparency multiplies with the object's separate opacity slider
+    // rather than one silently overriding the other.
+    var hexA = h.length === 8 ? parseInt(h.substr(6, 2), 16) / 255 : 1;
+    var op = (opacityPct !== undefined ? opacityPct / 100 : 1) * hexA;
+    return [r, g, b, Math.round(255 * op)];
   }
 
   function overlayItem() {
@@ -207,8 +275,10 @@
     dragging = true;
     samples = [];
     lastMoveT = 0; lastWorldPt = null; lastPenPressure = null;
+    stabQueue = []; smoothedPressure = null;
     var w0 = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
     extendTarget = findOpenEndpointNear(w0);
+    if (!extendTarget) w0 = magnetSnap(w0);
     // engine-bridge.js's own tick() loop keeps running unconditionally in
     // the background (it's not started/stopped per-drag) — without
     // suspending it here, it races renderWithOverlayItem below on every
@@ -221,7 +291,8 @@
     // click point) so the extended path has no visible gap/jump at the
     // seam — mirrors Graphite's should_extend behavior.
     var w = extendTarget ? [extendTarget.path[extendTarget.end === 'first' ? 'firstSegment' : 'lastSegment'].point.x, extendTarget.path[extendTarget.end === 'first' ? 'firstSegment' : 'lastSegment'].point.y] : w0;
-    var pressure = (state.vectorBrush || isFillBrush()) ? pressureOf(e, w) : 1;
+    var pressure = smoothPressure((state.vectorBrush || isFillBrush()) ? pressureOf(e, w) : 1);
+    if (extendTarget) stabQueue.push(w); // seeds the average AT the seam, not off it
     samples.push([w[0], w[1], widthFor(pressure)]);
     if (state.vectorBrush) window.SMEngineBridge.setPressureCursor(w, widthFor(pressure) / 2);
   }
@@ -230,7 +301,13 @@
     e.stopImmediatePropagation();
     e.preventDefault();
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
-    var pressure = (state.vectorBrush || isFillBrush()) ? pressureOf(e, w) : 1;
+    w = magnetSnap(w);
+    // Pressure is read from the RAW point (speed-fallback pressure needs
+    // the real, un-averaged motion to feel right) — only the drawn
+    // POSITION gets stabilized, matching TVPaint-style "smoothing" where
+    // the line itself calms down without pressure lagging behind it.
+    var pressure = smoothPressure((state.vectorBrush || isFillBrush()) ? pressureOf(e, w) : 1);
+    w = stabilizePoint(w);
     samples.push([w[0], w[1], widthFor(pressure)]);
     if (state.vectorBrush) window.SMEngineBridge.setPressureCursor(w, widthFor(pressure) / 2);
     window.SMEngineBridge.renderWithOverlayItem(overlayItem());
@@ -240,6 +317,17 @@
     e.stopImmediatePropagation();
     e.preventDefault();
     dragging = false;
+    // The position stabilizer above is a trailing moving average, so the
+    // last sample pushed by onMove sits BEHIND the pen's true position by
+    // design — without this, the committed stroke's tail would visibly stop
+    // short of wherever the animator actually lifted the pen (the exact
+    // opposite of "feels natural"). Push one final RAW, unstabilized point
+    // at the true release position so the line always reaches it, same
+    // catch-up behavior Photoshop/Clip Studio's stabilized brushes use.
+    var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
+    w = magnetSnap(w);
+    var pressure = smoothPressure((state.vectorBrush || isFillBrush()) ? pressureOf(e, w) : 1);
+    samples.push([w[0], w[1], widthFor(pressure)]);
     window.SMEngineBridge.resume();
     commitStroke();
   }
@@ -283,7 +371,23 @@
       var fbCs = buildCenterSegmentsFromRawStroke(fbPts, fbWidths, state.smoothing);
       path.data.centerSegments = fbCs;
       path.data.widthProfile = fbCs.widthProfile;
+      path.data.isVectorBrush = true; // scaffold flag ONLY for the duration of this call — cleared right below
       rebuildVectorBrushOutline(path);
+      // Fill Brush is meant to draw a genuine filled SHAPE, editable like
+      // any hand-plotted Pen path — real anchors sitting directly ON the
+      // outline, standard node/tangent editing (Subselect). The centerline+
+      // width-profile scaffolding above is only how the OUTLINE gets built;
+      // once built, drop the isVectorBrush/centerSegments/widthProfile
+      // linkage entirely so subselect-bridge.js's node editor takes the
+      // ordinary path.segments branch instead of the special vector-brush
+      // centerline-editing mode (which would otherwise let you drag a
+      // handful of centerline anchors but never touch the outline's own
+      // points directly — not what a filled shape's nodes should behave
+      // like). isFillShape stays (still needed by findOpenEndpointNear's
+      // exclusion guard in draw-bridge.js/pen-bridge.js).
+      delete path.data.isVectorBrush;
+      delete path.data.centerSegments;
+      delete path.data.widthProfile;
       // Placement (Above/Below/Merge) — see applyFillBrushPlacement's own
       // comment; replaces the old unconditional "always at the back".
       applyFillBrushPlacement(path, userLayers[state.activeLayerIdx]);
@@ -320,6 +424,19 @@
         fillPath.opacity = state.opacity / 100;
         fillPath.insertBelow(path);
         path.data.linkedFill = fillPath;
+        // Reverse tag — marquee-select (select-bridge.js) iterates every
+        // Path in the layer independently and had no way to recognize a
+        // linkedFill backdrop as "not its own selectable thing, always
+        // moves as part of its parent ribbon" — a marquee box that covered
+        // both ended up with BOTH in selectedPaths as separate entries, so
+        // the move handler's own "also translate p.data.linkedFill" logic
+        // ran a SECOND time on the exact same fill object once the forEach
+        // reached its own now-independent entry — translating it 2x delta
+        // per tick against the ribbon's 1x, a real, growing divergence
+        // ("parallax") between stroke and fill the longer/further a multi-
+        // element drag went. This flag is how selectedPaths building code
+        // excludes it from ever being added as its own entry.
+        fillPath.data.isLinkedFillCompanion = true;
       }
       rebuildVectorBrushOutline(path);
       if (state.drawMode === 'behind') {
@@ -355,8 +472,24 @@
       applyStrokeStyle(path);
       samples.forEach(function (s) { path.add(new Point(s[0], s[1])); });
       path.simplify(state.smoothing);
-      if (state.drawMode === 'behind') userLayers[state.activeLayerIdx].insertChild(0, path);
+      // Brush preset texture (Chalk/Charcoal/Pencil) — only for this plain
+      // constant-width mode, not vector-brush or fill-brush, which have
+      // their own width-profile/outline machinery this jittered-copies
+      // technique isn't built to coexist with. See applyBrushTexture's own
+      // comment (tools.js) for how the "texture" is actually achieved in a
+      // pure-vector renderer.
+      if (state.brushPreset && state.brushPreset !== 'none') applyBrushTexture(path, state.brushPreset);
+      if (state.drawMode === 'behind') {
+        userLayers[state.activeLayerIdx].insertChild(0, path);
+        // Same re-anchor need as the linkedFill case a few lines up in the
+        // vector-brush branch — insertChild(0) only moves the primary copy,
+        // stranding its texture companions at their old stacking position.
+        if (path.data.brushCompanions) {
+          path.data.brushCompanions.forEach(function (c) { c.insertBelow(path); });
+        }
+      }
     }
+    if (state.shadowMode && path) path.data.channelTag = 'shadow';
     saveActiveLayerFrame();
     updateUI();
     samples = [];

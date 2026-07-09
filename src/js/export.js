@@ -12,10 +12,23 @@ function exportEnsureLayer(){
 // Builds the frame's full visual content (bg + all visible layers, in
 // z-order) into the hidden export layer. Synchronous, no repaint occurs
 // before callers consume it, so it never flashes on screen.
-function exportBuildFrame(frameIdx){
+function exportBuildFrame(frameIdx,alpha){
   var L=exportEnsureLayer();L.removeChildren();
   var prev=project.activeLayer;L.activate();
-  new Path.Rectangle({point:[0,0],size:[state.canvasW,state.canvasH],fillColor:state.canvasBg,insert:true});
+  if(!alpha){
+    new Path.Rectangle({point:[0,0],size:[state.canvasW,state.canvasH],fillColor:state.canvasBg,insert:true});
+  }else{
+    // A fully-transparent rect (alpha:0), not "no rect at all" — an empty
+    // Layer has no bounds for rasterize()/exportSVG() to work from, so a
+    // frame with zero visible content on an alpha export (a blank keyframe
+    // in the middle of an otherwise-drawn timeline is a completely normal
+    // thing to hit exporting a whole range) produced an invalid zero-size
+    // raster (toDataURL silently returning the empty "data:," placeholder,
+    // i.e. a corrupt frame in the sequence) instead of a valid fully-
+    // transparent PNG at the real canvas size. Zero alpha still paints
+    // nothing but keeps the layer's bounds pinned to the canvas rect.
+    new Path.Rectangle({point:[0,0],size:[state.canvasW,state.canvasH],fillColor:new Color(0,0,0,0),insert:true});
+  }
   for(var li=0;li<state.layers.length;li++){
     var ld=state.layers[li];if(!ld.visible)continue;
     var strokes=getEffectiveStrokes(li,frameIdx);
@@ -24,8 +37,8 @@ function exportBuildFrame(frameIdx){
   prev.activate();
   return L;
 }
-function exportFrameDataURL(frameIdx,scale){
-  var L=exportBuildFrame(frameIdx);
+function exportFrameDataURL(frameIdx,scale,alpha){
+  var L=exportBuildFrame(frameIdx,alpha);
   // Paper.js's rasterize() skips invisible items entirely (same rule as
   // on-screen rendering), so the hidden export layer must be flipped
   // visible for the actual rasterize call — synchronously flipped back off
@@ -109,9 +122,9 @@ async function exportRunFfmpeg(args,onProgress){
 }
 
 // ---- PNG sequence rendering to a working directory (shared by raster exports) ----
-async function exportRenderPNGsToDir(dir,start,end,scale,onProgress){
+async function exportRenderPNGsToDir(dir,start,end,scale,onProgress,alpha){
   for(var f=start,i=1;f<=end;f++,i++){
-    var url=exportFrameDataURL(f,scale);
+    var url=exportFrameDataURL(f,scale,alpha);
     var bytes=exportDataURLToBytes(url);
     await exportWriteBytes(dir+'/frame_'+pad4(i)+'.png',bytes);
     if(onProgress)onProgress(i,end-start+1);
@@ -245,7 +258,7 @@ window.SMExport={
     var r=exportFrameRange(opts);var scale=(opts&&opts.scale)||1;
     var dir=await exportPickDir('Dossier de séquence PNG');
     if(!dir)return{cancelled:true};
-    await exportRenderPNGsToDir(dir,r.start,r.end,scale,opts&&opts.onProgress);
+    await exportRenderPNGsToDir(dir,r.start,r.end,scale,opts&&opts.onProgress,opts&&opts.alpha);
     return{ok:true,dir:dir};
   },
 
@@ -296,13 +309,21 @@ window.SMExport={
   exportProRes:async function(opts){
     if(!exportTauriAvailable())return{ok:false,error:'Disponible uniquement dans l\'app StrokeMotion (pas en preview navigateur).'};
     var r=exportFrameRange(opts);var scale=(opts&&opts.scale)||1;var fps=(opts&&opts.fps)||state.fps;
+    var alpha=!!(opts&&opts.alpha);
     var outPath=await exportPickSaveFile('Exporter en ProRes','animation.mov',[{name:'QuickTime',extensions:['mov']}]);
     if(!outPath)return{cancelled:true};
     var tmp=exportTempDirPath?await exportTempDirPath():null;
     var workDir=(tmp||outPath.replace(/[^/\\]+$/,''))+'sm-export-'+Date.now();
     await exportMkdir(workDir);
-    await exportRenderPNGsToDir(workDir,r.start,r.end,scale,opts&&opts.onProgress);
-    await exportRunFfmpeg(['-y','-framerate',String(fps),'-i',workDir+'/frame_%04d.png','-c:v','prores_ks','-profile:v','3','-pix_fmt','yuv422p10le',outPath],opts&&opts.onFfmpeg);
+    await exportRenderPNGsToDir(workDir,r.start,r.end,scale,opts&&opts.onProgress,alpha);
+    // ProRes 4444 (profile 4) is the alpha-capable variant — regular ProRes
+    // (profile 3, "HQ") has no alpha channel at all, same as any other
+    // standard video codec, so a real alpha export needs both the profile
+    // AND pixel format switched together, not just the pix_fmt.
+    var vArgs=alpha
+      ?['-c:v','prores_ks','-profile:v','4','-pix_fmt','yuva444p10le']
+      :['-c:v','prores_ks','-profile:v','3','-pix_fmt','yuv422p10le'];
+    await exportRunFfmpeg(['-y','-framerate',String(fps),'-i',workDir+'/frame_%04d.png'].concat(vArgs).concat([outPath]),opts&&opts.onFfmpeg);
     await exportRemoveDir(workDir);
     return{ok:true,path:outPath};
   },

@@ -25,7 +25,11 @@
     if (!css) return null;
     var h = css.replace('#', '');
     var r = parseInt(h.substr(0, 2), 16), g = parseInt(h.substr(2, 2), 16), b = parseInt(h.substr(4, 2), 16);
-    return [r, g, b, Math.round(255 * (opacityPct !== undefined ? opacityPct / 100 : 1))];
+    // An 8-digit hex (#rrggbbaa) carries its own alpha byte — multiply it
+    // with the object's separate opacity slider rather than ignoring it.
+    var hexA = h.length === 8 ? parseInt(h.substr(6, 2), 16) / 255 : 1;
+    var op = (opacityPct !== undefined ? opacityPct / 100 : 1) * hexA;
+    return [r, g, b, Math.round(255 * op)];
   }
 
   // Geometry (segments/closed) comes from geometry-wasm's line_segments/
@@ -75,7 +79,7 @@
   }
 
   function overlayItem(x1, y1) {
-    var sc = hexToRgba(state.strokeColor, state.opacity);
+    var sc = state.strokeEnabled ? hexToRgba(state.strokeColor, state.opacity) : null;
     var fc = state.fillEnabled ? hexToRgba(state.fillColor, state.opacity) : null;
     var geom = shapeGeom(shapeTool, shapeStart[0], shapeStart[1], x1, y1);
     return {
@@ -98,12 +102,24 @@
     window.SMEngineBridge.suspend();
     window.SMEngineBridge.renderWithOverlayItem(overlayItem(w[0], w[1]));
   }
+  // Perspective-guide snapping (perspective-bridge.js) only makes sense for
+  // the Line tool — a straight ruler line drawn roughly toward a vanishing
+  // point locks onto it exactly, same as Sketchbook's perspective guide
+  // cursor. Rect/Ellipse have no single "direction" to snap. No-ops
+  // (returns the point unchanged) when the guide is off or nothing's close
+  // enough in angle, so this is always safe to call unconditionally.
+  function maybeSnap(wx, wy) {
+    if (shapeTool !== 'line' || !window.perspectiveSnapPoint || !shapeStart) return [wx, wy];
+    var snapped = window.perspectiveSnapPoint(new Point(shapeStart[0], shapeStart[1]), new Point(wx, wy));
+    return [snapped.x, snapped.y];
+  }
   function onMove(e) {
     if (!dragging) return;
     e.stopImmediatePropagation();
     e.preventDefault();
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
-    window.SMEngineBridge.renderWithOverlayItem(overlayItem(w[0], w[1]));
+    var s = maybeSnap(w[0], w[1]);
+    window.SMEngineBridge.renderWithOverlayItem(overlayItem(s[0], s[1]));
   }
   function onUp(e) {
     if (!dragging) return;
@@ -112,7 +128,8 @@
     dragging = false;
     window.SMEngineBridge.resume();
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
-    commitShape(w[0], w[1]);
+    var s = maybeSnap(w[0], w[1]);
+    commitShape(s[0], s[1]);
   }
 
   function commitShape(ex, ey) {
@@ -128,7 +145,7 @@
         sd.handleOut ? new Point(sd.handleOut[0], sd.handleOut[1]) : new Point(0, 0)));
     });
     path.closed = geom.closed;
-    path.strokeColor = state.strokeColor;
+    path.strokeColor = state.strokeEnabled ? state.strokeColor : null;
     path.strokeWidth = state.brushSize;
     path.opacity = state.opacity / 100;
     if (shapeTool === 'line') {
@@ -141,6 +158,8 @@
     if (start.getDistance(end) < 2) {
       path.remove();
       if (state.undoStack.length) state.undoStack.pop();
+    } else if (state.shadowMode) {
+      path.data.channelTag = 'shadow';
     }
     saveActiveLayerFrame();
     updateUI();

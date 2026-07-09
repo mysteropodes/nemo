@@ -38,11 +38,29 @@
     Object.keys(_symbolPaperLayers).forEach(function(k){_symbolPaperLayers[k].forEach(function(l){l.remove();});});_symbolPaperLayers={};
     state.symbols={};state.openSymbolTabs=[];state.activeSymbolId=null;
     state.canvasW=cfg.w;state.canvasH=cfg.h;state.canvasBg='#ffffff';state.fps=cfg.fps;
-    state.totalFrames=24;state.waIn=0;state.waOut=23;
-    window._waIn=0;window._waOut=23;window._totalF=24;
-    state.motionArcs={};state.currentFrame=0;
+    // v12: default timeline length is 5 SECONDS of frames at the project's
+    // own fps (was a flat 24 frames — only 1s at 24fps, or under a second
+    // at 30/60fps), per explicit request. Every entry point that creates a
+    // blank project (New Project form, a "+" tab, a blank tab restored on
+    // close) funnels through here, so this one change covers all of them.
+    var defFrames=Math.max(1,Math.round(cfg.fps*5));
+    state.totalFrames=defFrames;state.waIn=0;state.waOut=defFrames-1;
+    window._waIn=0;window._waOut=defFrames-1;window._totalF=defFrames;
+    state.motionArcs={};state.tweenOverrides={};state.currentFrame=0;
+    // Viewport/UI state, not document content — reset the same way
+    // fitCanvas()/resetView() already do, so a new project doesn't silently
+    // inherit the previous project's stage rotation.
+    state.canvasRotation=0;
+    state.palettes=[{id:'p0',name:'Palette 1',colors:['#000000','#ffffff','#ff0000','#ff8800','#ffee00','#00cc44','#0088ff','#8833ff']}];
+    state.activePaletteIdx=0;
+    state.customBrushPresets={};
+    state.perspectiveEnabled=false;state.perspectiveMode='2pt';state.perspectiveDensity=24;state.perspectiveVPs=null;
+    state.audioTracks=[];if(window.SMAudio)SMAudio.reload();
+    state.refMedia=null;if(window.SMReference)SMReference.reload();
+    state.layerFolders={};state.layerLinkGroups={};
     createUserLayer('Layer 1');activateUL(0);
     drawStage();loadFrame(0);renderOS();renderArcs();updateUI();renderSymbolTabs();
+    if(window.renderPaletteGrid)window.renderPaletteGrid();
     syncDocFields();
     currentPath=null;currentName=cfg.name||'Untitled';updateCurrentLabel();
     try{localStorage.setItem('sm-auto',window.SM.exportJSON());}catch(e){}
@@ -81,6 +99,7 @@
       touchRecent(path,currentName,{canvasW:state.canvasW,canvasH:state.canvasH,fps:state.fps});
       renderRecents();
       hideStartScreen();
+      ensureInitialTab();
       showToast('Opened: '+currentName);
     }catch(e){
       showToast('Could not open file — it may have moved or been deleted');
@@ -94,7 +113,187 @@
     await openPath(Array.isArray(path)?path[0]:path);
   }
 
-  window.SMProject={save:save,saveAs:saveAs,open:openDialog,openPath:openPath,newProject:function(cfg){newProject(cfg);hideStartScreen();}};
+  // ---- Version history (v15) — the existing 30s autosave (timeline.js)
+  // only ever held ONE slot ('sm-auto' in localStorage): a crash right
+  // after a bad edit overwrote the one good copy with the bad one on the
+  // very next tick. This keeps a dense rolling history of real files on
+  // disk (Tauri fs — no localStorage quota risk with base64 media embedded
+  // in every snapshot) so "I crashed 10 min ago" can recover "the version
+  // from 11 min ago", not just "whatever was last written".
+  var HISTORY_MAX=120; // 60 min of history at the existing 30s cadence
+  function simpleHash(s){var h=0;for(var i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))|0;return (h>>>0).toString(36);}
+  function historyKey(){return currentPath?(baseName(currentPath).replace(/[^a-z0-9]+/gi,'-').toLowerCase()+'-'+simpleHash(currentPath)):'untitled-autosave';}
+  async function historyDir(){
+    var base=await window.__TAURI__.path.appDataDir();
+    return base.replace(/[\\/]+$/,'')+'/history/'+historyKey();
+  }
+  async function pushVersionSnapshot(json){
+    if(!tauriOk())return; // browser preview: 'sm-auto' single-slot fallback only
+    try{
+      var dir=await historyDir();
+      await window.__TAURI__.fs.mkdir(dir,{recursive:true});
+      await window.__TAURI__.fs.writeTextFile(dir+'/'+Date.now()+'.json',json);
+      var entries=await window.__TAURI__.fs.readDir(dir);
+      var names=entries.filter(function(e){return /\.json$/.test(e.name);}).map(function(e){return e.name;}).sort();
+      while(names.length>HISTORY_MAX){
+        var victim=names.shift();
+        try{await window.__TAURI__.fs.remove(dir+'/'+victim);}catch(e){}
+      }
+    }catch(e){console.warn('[history] snapshot failed',e);}
+  }
+  async function listVersionHistory(){
+    if(!tauriOk())return [];
+    try{
+      var dir=await historyDir();
+      var entries=await window.__TAURI__.fs.readDir(dir);
+      return entries.filter(function(e){return /\.json$/.test(e.name);})
+        .map(function(e){return {ts:parseInt(e.name,10),path:dir+'/'+e.name};})
+        .filter(function(v){return !isNaN(v.ts);})
+        .sort(function(a,b){return b.ts-a.ts;});
+    }catch(e){return [];}
+  }
+  async function restoreVersion(path){
+    saveAllLayerFrames();
+    var json=await window.__TAURI__.fs.readTextFile(path);
+    window.SM.importJSON(json,true);
+    ensureInitialTab();
+    showToast('Version restaurée');
+  }
+
+  function relTime(ts){
+    var s=Math.max(0,Math.round((Date.now()-ts)/1000));
+    if(s<60)return 'il y a '+s+'s';
+    var m=Math.round(s/60);
+    if(m<60)return 'il y a '+m+' min';
+    var h=Math.round(m/60);
+    return 'il y a '+h+'h'+(m%60?Math.round(m%60)+'min':'');
+  }
+  async function openHistoryModal(){
+    var modal=document.getElementById('history-modal'),list=document.getElementById('history-list');
+    if(!modal||!list)return;
+    if(!tauriOk()){list.innerHTML='<div style="font-size:11px;color:var(--text-dim)">Historique disque disponible uniquement dans l\'app desktop.</div>';modal.style.display='flex';return;}
+    list.innerHTML='<div style="font-size:11px;color:var(--text-dim)">Chargement…</div>';
+    modal.style.display='flex';
+    var versions=await listVersionHistory();
+    if(!versions.length){list.innerHTML='<div style="font-size:11px;color:var(--text-dim)">Aucun instantané pour l\'instant — revenez dans 30s.</div>';return;}
+    list.innerHTML='';
+    versions.forEach(function(v){
+      var row=document.createElement('div');
+      row.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:6px 8px;border-radius:4px;cursor:pointer;font-size:11px;';
+      row.onmouseenter=function(){row.style.background='var(--panel3)';};
+      row.onmouseleave=function(){row.style.background='';};
+      var d=new Date(v.ts);
+      var abs=d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+      row.innerHTML='<span>'+relTime(v.ts)+' <span style="color:var(--text-dim)">('+abs+')</span></span>';
+      var btn=document.createElement('button');
+      btn.className='pbtn';btn.textContent='Restaurer';btn.style.fontSize='10px';
+      btn.addEventListener('click',function(e){
+        e.stopPropagation();
+        if(!confirm('Restaurer cette version ? Le document actuel non sauvegardé sera remplacé.'))return;
+        restoreVersion(v.path).then(function(){modal.style.display='none';});
+      });
+      row.appendChild(btn);
+      list.appendChild(row);
+    });
+  }
+
+  window.SMProject={save:save,saveAs:saveAs,open:openDialog,openPath:openPath,newProject:function(cfg){newProject(cfg);hideStartScreen();ensureInitialTab();},pushVersionSnapshot:pushVersionSnapshot,listVersionHistory:listVersionHistory,restoreVersion:restoreVersion};
+
+  // ---- Project tabs (real multi-project switching, v11) ----
+  // Each tab holds a full independent snapshot of a project as the SAME
+  // JSON string window.SM.exportJSON()/importJSON() already use for file
+  // save/open — switching tabs is just "export the outgoing one into its
+  // slot, import the incoming one", reusing all existing serialization
+  // instead of re-architecting `state` into a multi-document structure.
+  // Genuinely separate projects (own layers/frames/palettes/etc.), not a
+  // cosmetic tab strip — confirmed against the user's own clarification
+  // ("real management of several completely different projects").
+  var tabs=[],activeTabId=null;
+  function makeTabId(){return 't'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
+  function activeTab(){return tabs.find(function(t){return t.id===activeTabId;});}
+  function snapshotActiveIntoTab(){
+    var t=activeTab();if(!t)return;
+    saveAllLayerFrames();
+    t.json=window.SM.exportJSON();t.name=currentName;t.path=currentPath;
+  }
+  function ensureInitialTab(){
+    // Called after every entry point that makes a project "live" (new,
+    // opened, or resumed autosave) — only actually creates a tab the FIRST
+    // time (app boot), otherwise just refreshes the active tab's own
+    // name/path so e.g. a fresh Save As renames its own tab in place
+    // rather than spawning a duplicate.
+    if(!tabs.length){
+      activeTabId=makeTabId();
+      tabs.push({id:activeTabId,name:currentName,json:null,path:currentPath});
+    }else{
+      var t=activeTab();
+      if(t){t.name=currentName;t.path=currentPath;}
+    }
+    renderTabBar();
+  }
+  function switchToTab(id){
+    if(id===activeTabId)return;
+    var target=tabs.find(function(t){return t.id===id;});if(!target)return;
+    snapshotActiveIntoTab();
+    activeTabId=id;
+    if(target.json)window.SM.importJSON(target.json,true);
+    else newProject({w:1920,h:1080,fps:24,name:target.name});
+    currentPath=target.path||null;currentName=target.name;updateCurrentLabel();
+    renderTabBar();
+  }
+  function addTab(){
+    snapshotActiveIntoTab();
+    var n=tabs.length+1;
+    var id=makeTabId();
+    tabs.push({id:id,name:'Untitled '+n,json:null,path:null});
+    activeTabId=id;
+    newProject({w:1920,h:1080,fps:24,name:'Untitled '+n});
+    currentPath=null;currentName='Untitled '+n;updateCurrentLabel();
+    renderTabBar();
+  }
+  function closeTab(id){
+    var idx=tabs.findIndex(function(t){return t.id===id;});if(idx<0)return;
+    if(tabs.length===1){showToast('Impossible de fermer le dernier onglet');return;}
+    var wasActive=id===activeTabId;
+    tabs.splice(idx,1);
+    if(wasActive){
+      var next=tabs[Math.max(0,idx-1)];
+      activeTabId=next.id; // switchToTab no-ops on equal id, so load directly
+      if(next.json)window.SM.importJSON(next.json,true);
+      else newProject({w:1920,h:1080,fps:24,name:next.name});
+      currentPath=next.path||null;currentName=next.name;updateCurrentLabel();
+    }
+    renderTabBar();
+  }
+  function startTabRename(id){
+    var el=document.querySelector('.project-tab[data-tab="'+id+'"] .pt-name');if(!el)return;
+    var t=tabs.find(function(t){return t.id===id;});if(!t)return;
+    var input=document.createElement('input');input.className='pt-rename-input';input.value=t.name;
+    el.replaceWith(input);input.focus();input.select();
+    function commit(){
+      var v=input.value.trim()||t.name;t.name=v;
+      if(id===activeTabId){currentName=v;updateCurrentLabel();}
+      renderTabBar();
+    }
+    input.addEventListener('blur',commit);
+    input.addEventListener('keydown',function(e){e.stopPropagation();if(e.key==='Enter')input.blur();else if(e.key==='Escape'){input.value=t.name;input.blur();}});
+  }
+  function renderTabBar(){
+    var list=document.getElementById('project-tabs-list');if(!list)return;
+    list.innerHTML='';
+    tabs.forEach(function(t){
+      var el=document.createElement('div');el.className='project-tab'+(t.id===activeTabId?' act':'');el.dataset.tab=t.id;
+      var dot=document.createElement('span');dot.className='pt-dot';
+      var nm=document.createElement('span');nm.className='pt-name';nm.textContent=t.name;
+      var close=document.createElement('span');close.className='pt-close';close.textContent='×';close.title='Fermer l\'onglet';
+      close.addEventListener('click',function(e){e.stopPropagation();closeTab(t.id);});
+      el.appendChild(dot);el.appendChild(nm);el.appendChild(close);
+      el.addEventListener('click',function(){switchToTab(t.id);});
+      el.addEventListener('dblclick',function(e){e.stopPropagation();startTabRename(t.id);});
+      list.appendChild(el);
+    });
+  }
+  document.getElementById('project-tab-add')&&document.getElementById('project-tab-add').addEventListener('click',addTab);
 
   // ---- Start screen ----
   function hideStartScreen(){document.getElementById('start-screen').classList.add('hid');}
@@ -134,7 +333,7 @@
 
     document.getElementById('start-resume').addEventListener('click',function(){
       currentPath=null;currentName='Untitled';updateCurrentLabel();
-      hideStartScreen();showToast('Session resumed');
+      hideStartScreen();ensureInitialTab();showToast('Session resumed');
     });
     document.getElementById('start-new').addEventListener('click',function(){
       document.getElementById('start-newpanel').style.display='block';
@@ -164,6 +363,13 @@
     document.getElementById('btn-saveas').addEventListener('click',saveAs);
     document.getElementById('btn-open').addEventListener('click',openDialog);
     document.getElementById('btn-new').addEventListener('click',showStartScreen);
+    // Version history modal (v15)
+    var histBtn=document.getElementById('btn-history');
+    if(histBtn)histBtn.addEventListener('click',openHistoryModal);
+    var histClose=document.getElementById('history-close');
+    if(histClose)histClose.addEventListener('click',function(){document.getElementById('history-modal').style.display='none';});
+    var histModal=document.getElementById('history-modal');
+    if(histModal)histModal.addEventListener('click',function(e){if(e.target===histModal)histModal.style.display='none';});
     // legacy fallback for non-Tauri (plain browser) testing: upload/download
     document.getElementById('file-input').addEventListener('change',function(e){
       var f=e.target.files[0];if(!f)return;

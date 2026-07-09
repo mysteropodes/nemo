@@ -15,6 +15,7 @@
   var pointerIsDown = false; // gesture lifecycle (suspend/resume span)
   var erasing = false; // true once the FIRST successful hit of this gesture has fired (gates the one-time pushUndo, matching _eraseDragActive in tools.js)
   var lastErasePt = null; // world Point of the previous erase sample this gesture, or null for the first — fed to eraseAtPoint so it sweeps a continuous capsule instead of a lone circle per move (see eraseAtPoint's own comment for why)
+  var lastPenPressure = null; // held across a real-pen gesture — same hold-last-value fix as draw-bridge.js's pressureOf(), for the exact same reason (0/missing samples at lift-off otherwise misread as "max pressure")
 
   function shouldIntercept() {
     return (
@@ -23,9 +24,39 @@
     );
   }
 
-  function eraseAt(pt) {
+  // A fixed-radius circle eraser can only ever cut a uniform-width channel
+  // — the reference behavior (a natural, hand-drawn-looking mask with
+  // varying-width gaps) needs the erase radius to actually respond to
+  // stylus pressure the same way the pressure brush's ink width does, not
+  // stay pinned to state.eraserSize regardless of how hard you press.
+  // Mouse input (no real pressure signal) falls back to the plain nominal
+  // radius rather than guessing from cursor speed — unlike the brush tools,
+  // an eraser that silently changes width based on how fast you drag would
+  // be a worse, more surprising default for a mouse user than just "always
+  // the size the panel says".
+  function eraseRadiusFor(e) {
+    var base = state.eraserSize / 2;
+    var p = null;
+    if (e.pointerType === 'pen') {
+      p = (typeof e.pressure === 'number' && e.pressure > 0) ? Math.min(1, e.pressure) : lastPenPressure;
+    }
+    // Tauri/WKWebView fallback — same native/webkitForce channel draw-bridge.js
+    // now consults: on that webview, many tablet drivers synthesize plain
+    // 'mouse' pointerType events (e.pointerType!=='pen' above), so real
+    // pressure never reaches the branch above at all in the desktop app,
+    // even though it works fine in the browser preview via real pen events.
+    if (p == null && typeof _stylus !== 'undefined' && _stylus.force > 0 && Date.now() - _stylus.forceT < 250) {
+      p = _stylus.force;
+    }
+    if (p == null) return base;
+    lastPenPressure = p;
+    var lo = state.pressureMin / 100, hi = state.pressureMax / 100;
+    return base * (lo + (hi - lo) * p);
+  }
+
+  function eraseAt(pt, radius) {
     var layer = userLayers[state.activeLayerIdx];
-    var hit = layer.hitTest(pt, { stroke: true, fill: true, tolerance: Math.max(8, state.eraserSize / 2) / view.zoom });
+    var hit = layer.hitTest(pt, { stroke: true, fill: true, tolerance: Math.max(8, radius) / view.zoom });
     // instanceof Path AND CompoundPath: eraseAtPoint turns a shape into a
     // CompoundPath the moment a bite creates a hole — an instanceof-Path-only
     // guard silently stopped erasing that same shape any further after the
@@ -33,9 +64,15 @@
     // matching the reported "sometimes erases, sometimes not".
     if (hit && (hit.item instanceof Path || hit.item instanceof CompoundPath) && (hit.item.strokeColor || hit.item.fillColor || (hit.item.data && hit.item.data.isVectorBrush))) {
       if (!erasing) { pushUndo(); erasing = true; }
-      eraseAtPoint(hit.item, pt, state.eraserSize / 2, lastErasePt);
+      var erasedItem = hit.item;
+      eraseAtPoint(erasedItem, pt, radius, lastErasePt);
       lastErasePt = pt.clone();
-      fillRegenerateLinked(layer, null);
+      // The touched item, not null — fillRegenerateLinked can then skip
+      // re-tracing fills whose fillWalls don't involve this stroke at all,
+      // instead of unconditionally re-running fillVectorFind (a real
+      // boundary walk) on EVERY fill bucket in the layer on every single
+      // erase sample during a drag (perf audit finding).
+      fillRegenerateLinked(layer, erasedItem);
       saveActiveLayerFrame();
       updateUI();
     }
@@ -46,13 +83,15 @@
     e.stopImmediatePropagation();
     e.preventDefault();
     ensureKeyframe();
+    lastPenPressure = null;
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
+    var radius = eraseRadiusFor(e);
     pointerIsDown = true;
     erasing = false;
     lastErasePt = null;
     window.SMEngineBridge.suspend();
-    window.SMEngineBridge.setEraserCursor(w);
-    eraseAt(new Point(w[0], w[1]));
+    window.SMEngineBridge.setEraserCursor(w, radius);
+    eraseAt(new Point(w[0], w[1]), radius);
     window.SMEngineBridge.renderNow();
   }
   function onMove(e) {
@@ -60,8 +99,9 @@
     e.stopImmediatePropagation();
     e.preventDefault();
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
-    window.SMEngineBridge.setEraserCursor(w);
-    if (pointerIsDown) eraseAt(new Point(w[0], w[1]));
+    var radius = eraseRadiusFor(e);
+    window.SMEngineBridge.setEraserCursor(w, radius);
+    if (pointerIsDown) eraseAt(new Point(w[0], w[1]), radius);
     window.SMEngineBridge.renderNow();
   }
   function onUp(e) {

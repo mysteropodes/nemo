@@ -3,8 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>StrokeMotion v0.0.1</title>
+<title>StrokeMotion v0.0.2</title>
 <script src="paper-full.min.js"></script>
+<!-- Manrope (redesign, 2026-07-09) — matches the CSS var font stack's own
+     fallback order, so an offline load (no internet, no Tauri font cache)
+     degrades to the previous system-font look instead of breaking. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -55,34 +61,53 @@
   </div>
 </div>
 <div id="app">
+<!-- v11: real multi-project tabs — each tab holds its own independent
+     serialized project snapshot in memory (project.js), switching saves
+     the outgoing tab and imports the incoming one via the same JSON
+     export/import already used for file save/open. -->
+<div id="project-tabs-bar">
+  <div id="project-tabs-list"></div>
+  <button id="project-tab-add" title="Nouveau projet (nouvel onglet)">+</button>
+</div>
 <div id="top-area">
   <div id="tools-panel">
-    <button class="tool-btn" data-tool="select" title="Selection / Transform (V)"><span class="material-symbols-rounded">&#xe569;</span><span class="sk">V</span></button>
+    <button class="tool-btn" data-tool="select" title="Selection / Transform (V)"><svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor"><path d="M5 3l14 8-6 1.3L11 20z"/></svg><span class="sk">V</span></button>
     <button class="tool-btn" data-tool="subselect" title="Subselection — points &amp; tangents (A)"><span style="font-size:15px;line-height:1">&#x25b3;</span><span class="sk">A</span></button>
-    <button class="tool-btn active" data-tool="draw" title="Brush (B)"><span class="material-symbols-rounded">&#xe3ae;</span><span class="sk">B</span></button>
-    <button class="tool-btn" data-tool="pen" title="Pen — click to place points, drag for curves (P)"><span class="material-symbols-rounded">&#xf097;</span><span class="sk">P</span></button>
-    <button class="tool-btn" data-tool="fillbrush" title="Fill brush — paint a freehand filled shape, pressure-sensitive (K)"><span style="font-size:14px;line-height:1">&#x25CF;</span><span class="sk">K</span></button>
+    <!-- v18: independent fill/stroke selection, Animate merge-drawing style —
+         click a fill to select just that fill, click a stroke to select just
+         that stroke (or, at a crossing with another stroke, just the bounded
+         segment between the two nearest intersections) — Delete/recolor act
+         on ONLY the clicked aspect, never both at once. -->
+    <button class="tool-btn" data-tool="fsselect" title="Fill/Stroke Select — click a fill or a stroke segment to select it independently (M)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="8" fill="currentColor" fill-opacity="0.35"/><path d="M4 12a8 8 0 0 1 16 0" stroke-dasharray="2.2 2.2"/></svg><span class="sk">M</span></button>
+    <button class="tool-btn active" data-tool="draw" title="Brush (B)"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M7 14c-1.66 0-3 1.34-3 3 0 1.31-1.16 2-2 2 .92 1.22 2.49 2 4 2 2.21 0 4-1.79 4-4 0-1.66-1.34-3-3-3z"/><path d="M20.71 4.63l-1.34-1.34a1 1 0 00-1.41 0L9 12.25 11.75 15l8.96-8.96a1 1 0 000-1.41z"/></svg><span class="sk">B</span></button>
+    <button class="tool-btn" data-tool="pen" title="Pen — click to place points, drag for curves (P)"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="m4.93 21.482 5.845-5.846a2 2 0 1 0-1.414-1.414l-5.846 5.846-1.06-1.06c2.827-3.3 3.888-6.954 5.302-13.082l6.364-.707 5.657 5.657-.707 6.364c-6.128 1.414-9.782 2.475-13.08 5.303l-1.062-1.06v-.001ZM16.595 2.037l6.347 6.346a.5.5 0 0 1-.277.848l-1.474.23-5.656-5.656.212-1.485a.5.5 0 0 1 .848-.283Z"/></svg><span class="sk">P</span></button>
+    <button class="tool-btn" data-tool="fillbrush" title="Fill brush — paint a freehand filled shape, pressure-sensitive (N)"><span style="font-size:14px;line-height:1">&#x25CF;</span><span class="sk">N</span></button>
     <button class="tool-btn" data-tool="line" title="Line (U)"><span class="material-symbols-rounded">&#xf755;</span><span class="sk">U</span></button>
     <button class="tool-btn" data-tool="rect" title="Rectangle (R)"><span class="material-symbols-rounded">&#xe3c6;</span><span class="sk">R</span></button>
     <button class="tool-btn" data-tool="ellipse" title="Ellipse (L)"><span class="material-symbols-rounded">&#xef4a;</span><span class="sk">L</span></button>
     <div class="tool-sep"></div>
-    <button class="tool-btn" data-tool="eraser" title="Eraser (E)"><span class="material-symbols-rounded">&#xe6d0;</span><span class="sk">E</span></button>
+    <button class="tool-btn" data-tool="eraser" title="Eraser (E)"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M14 19.002h7v2h-9l-3.998.002-6.487-6.487a1 1 0 0 1 0-1.414L12.12 2.496a1 1 0 0 1 1.415 0l7.778 7.778a1 1 0 0 1 0 1.414L14 19.002Zm1.657-4.485 3.535-3.536-6.364-6.364-3.535 3.536 6.364 6.364Z"/></svg><span class="sk">E</span></button>
     <button class="tool-btn" data-tool="fill" title="Paint bucket — click an enclosed area to fill it (G)"><span class="material-symbols-rounded">&#xe23a;</span><span class="sk">G</span></button>
     <button class="tool-btn" data-tool="eyedropper" title="Eyedropper (I)"><span class="material-symbols-rounded">&#xe3b8;</span><span class="sk">I</span></button>
     <div class="tool-sep"></div>
-    <button class="tool-btn" data-tool="hand" title="Hand — pan the canvas (H or Space)"><span class="material-symbols-rounded">&#xe925;</span><span class="sk">H</span></button>
-    <button class="tool-btn" data-tool="zoom" title="Zoom — click to zoom in, Alt+click to zoom out (Z)"><span class="material-symbols-rounded">&#xe8ff;</span><span class="sk">Z</span></button>
+    <button class="tool-btn" data-tool="hand" title="Hand — pan the canvas (H or Space)"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M20.5 5A1.5 1.5 0 0 0 19 6.5V11h-1V4.5a1.5 1.5 0 0 0-3 0V11h-1V3.5a1.5 1.5 0 0 0-3 0V11h-1V5.5a1.5 1.5 0 0 0-3 0v10.81l-2.22-3.6a1.504 1.504 0 1 0-2.56 1.58l3.31 5.34A5 5 0 0 0 9.78 22H17a5 5 0 0 0 5-5V6.5A1.5 1.5 0 0 0 20.5 5Z"/></svg><span class="sk">H</span></button>
+    <button class="tool-btn" data-tool="zoom" title="Zoom — click to zoom in, Alt+click to zoom out (Z)"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.35-4.35" stroke-linecap="round"/></svg><span class="sk">Z</span></button>
+    <button class="tool-btn" data-tool="rotate" title="Rotate canvas — drag to spin the stage around its center. Also works as Alt+drag from any other tool."><span style="font-size:15px;line-height:1">&#x21bb;</span></button>
+    <button class="tool-btn" data-tool="perspective" title="Perspective guide — drag vanishing points to place them. Once enabled, the Line tool snaps toward them from any tool."><span style="font-size:15px;line-height:1">&#x25C7;</span></button>
     <div class="tool-sep"></div>
+    <!-- v9: overlapping stroke/fill swatches (mockup pattern) — stroke well
+         top-left, fill well bottom-right, replacing the old stacked pair
+         with separate S/F text labels. Same IDs/inputs as before so every
+         existing JS wire-up (setStrokeColor/setFillColor/eyedropper/etc.,
+         all keyed off #stroke-well/#fill-well/#color-stroke/#color-fill)
+         needs no changes at all. -->
     <div class="color-wells">
-      <div class="color-well-wrap">
-        <div class="color-well" id="stroke-well"><input type="color" id="color-stroke" value="#000000" title="Stroke color"></div>
-        <div class="color-well-label">S</div>
-      </div>
-      <div class="color-well-wrap">
+      <div class="cw-stack">
+        <div class="color-well" id="stroke-well" title="Stroke color"><input type="color" id="color-stroke" value="#000000" title="Stroke color"></div>
         <div class="color-well none" id="fill-well" title="Fill color — double-click to enable/disable"><input type="color" id="color-fill" value="#ff0000" title="Fill color"></div>
-        <div class="color-well-label">F</div>
       </div>
     </div>
+    <button id="tools-invert-btn" class="tool-btn" title="Swap stroke and fill colors (X)" style="margin-top:4px"><span style="font-size:14px;line-height:1">&#x21C4;</span></button>
   </div>
 
   <div id="canvas-area">
@@ -94,17 +119,63 @@
       <br><span id="info-sel" style="color:var(--orange);font-size:10px"></span>
     </div>
     <div id="match-info"></div>
-    <div id="zoom-ind">100%</div>
+    <!-- v13: bottom-RIGHT zoom/fit pills — the zoom value is a real
+         scrubbable field (drag to change, click to type; class="scrub"
+         alone is enough to pick up ui.js's existing generic pointer-based
+         scrub handler, no per-field wiring needed), and the Fit pill opens
+         a small menu with Fit/Reset View, reusing the same actions already
+         wired to the Document panel's own Fit/Reset View buttons. Replaces
+         the old plain-text #zoom-ind readout entirely — this pill IS the
+         zoom indicator now, just an editable one. -->
+    <div id="canvas-zoom-pills">
+      <div class="zoom-pill" id="canvas-fit-btn">Fit <span class="zoom-caret">▾</span></div>
+      <div class="zoom-pill"><input type="number" id="zoom-scrub" class="scrub" value="100" min="5" max="800" data-step="5">%</div>
+    </div>
   </div>
 
   <div id="props-panel">
     <div id="props-context-hdr" style="padding:8px 10px;font-size:10px;font-weight:600;letter-spacing:.03em;color:var(--text-dim);text-transform:uppercase;border-bottom:1px solid var(--border)">Document</div>
-    <div class="psec" id="sel-props-sec" style="display:none">
-      <div class="phdr"><span class="ar">▼</span> Transform <span id="sel-count" style="margin-left:auto;font-size:9px;color:var(--text-dim)"></span></div>
-      <div class="pbdy">
-        <div class="pr"><span class="pl">Position</span><input type="number" class="pi scrub" id="sp-x" value="0" data-step="1" title="X — drag to scrub, click to type"><input type="number" class="pi scrub" id="sp-y" value="0" data-step="1" title="Y — drag to scrub, click to type"></div>
-        <div class="pr"><span class="pl">Size</span><input type="number" class="pi scrub" id="sp-w" value="0" min="1" data-step="1" title="Width"><input type="number" class="pi scrub" id="sp-h" value="0" min="1" data-step="1" title="Height"></div>
-        <div class="pr"><span class="pl">Rotate</span><input type="number" class="pi scrub" id="sp-rot" value="0" data-step="1" title="Rotation relative to selection state (degrees)"><span style="font-size:9px;color:var(--text-dim)">°</span></div>
+    <div id="sel-props-sec" style="display:none;border-bottom:1px solid var(--border)">
+      <div class="pbdy" style="padding:13px 16px 12px">
+        <!-- Align/distribute toolbar (redesign 2026-07-09, restyled v3 —
+             matches the mockup's standalone top-row toolbar, no longer
+             nested inside a "Transform" card/header) — aligns the current
+             multi-selection against its own combined bounding box. Only
+             meaningful with 2+ objects; hidden otherwise (see
+             updateSelPropsPanel in timeline.js). -->
+        <div class="pr" id="align-toolbar" style="gap:2px;display:none">
+          <button class="align-btn" data-align="left" title="Aligner à gauche"><svg viewBox="0 0 24 24"><line x1="4" y1="3" x2="4" y2="21" stroke="currentColor" stroke-width="2"/><rect x="7" y="6" width="10" height="5" fill="currentColor"/><rect x="7" y="14" width="6" height="5" fill="currentColor"/></svg></button>
+          <button class="align-btn" data-align="centerH" title="Centrer horizontalement"><svg viewBox="0 0 24 24"><line x1="12" y1="3" x2="12" y2="21" stroke="currentColor" stroke-width="2"/><rect x="7" y="6" width="10" height="5" fill="currentColor"/><rect x="9" y="14" width="6" height="5" fill="currentColor"/></svg></button>
+          <button class="align-btn" data-align="right" title="Aligner à droite"><svg viewBox="0 0 24 24"><line x1="20" y1="3" x2="20" y2="21" stroke="currentColor" stroke-width="2"/><rect x="7" y="6" width="10" height="5" fill="currentColor"/><rect x="11" y="14" width="6" height="5" fill="currentColor"/></svg></button>
+          <span style="width:1px;height:16px;background:var(--border2);margin:0 4px"></span>
+          <button class="align-btn" data-align="top" title="Aligner en haut"><svg viewBox="0 0 24 24"><line x1="3" y1="4" x2="21" y2="4" stroke="currentColor" stroke-width="2"/><rect x="6" y="7" width="5" height="10" fill="currentColor"/><rect x="14" y="7" width="5" height="6" fill="currentColor"/></svg></button>
+          <button class="align-btn" data-align="centerV" title="Centrer verticalement"><svg viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12" stroke="currentColor" stroke-width="2"/><rect x="6" y="7" width="5" height="10" fill="currentColor"/><rect x="14" y="9" width="5" height="6" fill="currentColor"/></svg></button>
+          <button class="align-btn" data-align="bottom" title="Aligner en bas"><svg viewBox="0 0 24 24"><line x1="3" y1="20" x2="21" y2="20" stroke="currentColor" stroke-width="2"/><rect x="6" y="7" width="5" height="10" fill="currentColor"/><rect x="14" y="11" width="5" height="6" fill="currentColor"/></svg></button>
+          <span style="flex:1"></span>
+          <span id="sel-count" style="font-size:9px;color:var(--text-dim)"></span>
+        </div>
+        <div class="pr" style="align-items:flex-start;gap:14px">
+          <div style="flex:1;min-width:0">
+            <div class="pr"><span class="pl">Position</span><input type="number" class="pi scrub" id="sp-x" value="0" data-step="1" title="X — drag to scrub, click to type"><input type="number" class="pi scrub" id="sp-y" value="0" data-step="1" title="Y — drag to scrub, click to type"></div>
+            <div class="pr"><span class="pl">Size</span><input type="number" class="pi scrub" id="sp-w" value="0" min="1" data-step="1" title="Width"><input type="number" class="pi scrub" id="sp-h" value="0" min="1" data-step="1" title="Height"></div>
+            <div class="pr"><span class="pl">Rotate</span><input type="number" class="pi scrub" id="sp-rot" value="0" data-step="1" title="Rotation relative to selection state (degrees)"><span style="font-size:9px;color:var(--text-dim)">°</span></div>
+          </div>
+          <!-- Anchor point (pivot) picker — redesign 2026-07-09, AE-style
+               9-dot widget. Sets state.xformAnchorKey (tools.js), read by
+               both the on-canvas rotate handle (select-bridge.js) and this
+               panel's own Rotate field (wireLiveXformField 'sp-rot' below). -->
+          <div id="xform-anchor-grid" class="xform-anchor-grid" title="Point d'ancrage (pivot de rotation)">
+            <button class="xa-dot" data-key="tl" title="Haut-gauche"></button>
+            <button class="xa-dot" data-key="tc" title="Haut-centre"></button>
+            <button class="xa-dot" data-key="tr" title="Haut-droite"></button>
+            <button class="xa-dot" data-key="ml" title="Milieu-gauche"></button>
+            <button class="xa-dot xa-center" data-key="mc" title="Centre">+</button>
+            <button class="xa-dot" data-key="mr" title="Milieu-droite"></button>
+            <button class="xa-dot" data-key="bl" title="Bas-gauche"></button>
+            <button class="xa-dot" data-key="bc" title="Bas-centre"></button>
+            <button class="xa-dot" data-key="br" title="Bas-droite"></button>
+          </div>
+        </div>
         <div class="pr" id="sp-pointtype-row" style="display:none;gap:4px">
           <button class="pbtn" id="btn-pt-corner" title="Corner point — no curvature, handles zeroed">Corner</button>
           <button class="pbtn" id="btn-pt-smooth" title="Smooth point — handles stay tangent but can differ in length">Smooth</button>
@@ -119,14 +190,14 @@
       </div>
     </div>
     <div class="psec" id="fill-sec">
-      <div class="phdr"><span class="ar">▼</span> Fill</div>
+      <div class="phdr"><span class="ar">☰</span> Fill<button class="phdr-toggle" id="fill-enable-toggle" type="button" title="Enable/disable fill (faster than opening the color swatch)"></button></div>
       <div class="pbdy">
         <div class="pr"><span class="pl">Color</span><div class="cw-mini" id="pm-fill" style="background:transparent" title="Click to pick a color, double-click to toggle fill on/off"><input type="color" id="pm-fill-c" value="#ff0000"></div><input type="checkbox" id="p-fill-on" style="display:none"></div>
         <div class="pr"><span class="pl">Opacity</span><input type="number" class="pi scrub" id="p-opacity" value="100" min="5" max="100" data-step="1"></div>
       </div>
     </div>
     <div class="psec" id="stroke-sec">
-      <div class="phdr"><span class="ar">▼</span> Stroke</div>
+      <div class="phdr"><span class="ar">☰</span> Stroke<button class="phdr-toggle" id="stroke-enable-toggle" type="button" title="Enable/disable stroke (faster than opening the color swatch)"></button></div>
       <div class="pbdy">
         <div class="pr"><span class="pl">Color</span><div class="cw-mini" id="pm-stroke" style="background:#000"><input type="color" id="pm-stroke-c" value="#000000"></div></div>
         <div class="pr"><span class="pl">Width</span><input type="number" class="pi scrub" id="p-sw" value="3" min="1" max="80" data-step="1" title="Stroke width (px)"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
@@ -147,11 +218,41 @@
           <button class="icon-btn" data-value="strokeFirst" title="Stroke in front of Fill"><svg viewBox="0 0 20 20"><rect x="7" y="2" width="11" height="11" rx="2" fill="currentColor" opacity=".35"/><rect x="2" y="6" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button>
         </div></div>
         <div class="pr"><span class="pl">Dash Offset</span><input type="number" class="pi scrub" id="p-dashoffset" value="0" data-step="1" title="Shifts the dash pattern along the stroke — only visible when Style is Dashed or Dotted"></div>
+        <div class="pr" id="p-brushpreset-row" title="Vector-approximated natural-media textures — several jittered, partially-transparent copies of the stroke layered together, not a raster texture stamp">
+          <span class="pl">Brush</span>
+          <button class="bp-swatch-btn" id="p-brushpreset-btn" type="button"><canvas id="p-brushpreset-preview" width="120" height="20"></canvas><span id="p-brushpreset-label">None (solid)</span></button>
+          <select class="psel" id="p-brushpreset" style="display:none">
+            <option value="none">None (solid)</option>
+            <optgroup label="Chalk">
+              <option value="chalk-blunt">Chalk - Blunt</option>
+              <option value="chalk-round">Chalk - Round</option>
+              <option value="chalk-scribble">Chalk - Scribble</option>
+            </optgroup>
+            <optgroup label="Charcoal">
+              <option value="charcoal-feather">Charcoal - Feather</option>
+              <option value="charcoal-pencil">Charcoal - Pencil</option>
+              <option value="charcoal-rough">Charcoal - Rough</option>
+              <option value="charcoal-rounded">Charcoal - Rounded</option>
+              <option value="charcoal-smooth">Charcoal - Smooth</option>
+              <option value="charcoal-soft">Charcoal - Soft</option>
+              <option value="charcoal-tapered">Charcoal - Tapered</option>
+              <option value="charcoal-thick">Charcoal - Thick</option>
+              <option value="charcoal-thin">Charcoal - Thin</option>
+              <option value="charcoal-varied">Charcoal - Varied</option>
+            </optgroup>
+            <optgroup label="Pencil">
+              <option value="pencil-feather">Pencil - Feather</option>
+              <option value="pencil-thick">Pencil - Thick</option>
+              <option value="pencil-thin">Pencil - Thin</option>
+            </optgroup>
+          </select>
+        </div>
+        <div class="pr" id="p-brushpreset-apply-row" style="display:none"><span class="pl"></span><button class="pbtn" id="btn-brushpreset-apply">Apply to selection</button></div>
         <div class="pr" title="Re-smooths the SELECTED stroke's existing geometry — unlike Tool Options' Smooth (which only shapes new strokes as you draw), this is a one-shot action you can apply after the fact, repeatedly, to a stroke already on the canvas. Note: a freshly-drawn stroke is already simplified at draw time (Tool Options' Smooth, 10 by default) — applying THIS at the same or lower value won't visibly change anything since it's already fit that tightly; raise it for a visible extra effect."><span class="pl">Smooth</span><input type="number" class="pi scrub" id="p-poststroke-smooth" value="25" min="0" max="80" data-step="1"><button class="pbtn" id="btn-poststroke-smooth">Apply</button></div>
       </div>
     </div>
     <div class="psec" id="tool-opts-sec">
-      <div class="phdr"><span class="ar">▼</span> Tool Options</div>
+      <div class="phdr"><span class="ar">☰</span> Tool Options</div>
       <div class="pbdy">
         <div class="pr"><span class="pl">Smooth</span><input type="number" class="pi scrub" id="p-smooth" value="10" min="0" max="60" data-step="1"></div>
         <div class="pr"><span class="pl">Stabilizer</span><select class="psel" id="p-stab"><option value="0">Off</option><option value="1">Low</option><option value="2" selected>Medium</option><option value="3">High</option></select></div>
@@ -161,59 +262,129 @@
           <button class="icon-btn" data-value="below" title="Below — behind existing fills (background patch)"><svg viewBox="0 0 20 20"><rect x="2" y="6" width="11" height="11" rx="2" fill="currentColor" opacity=".35"/><rect x="7" y="2" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button>
           <button class="icon-btn" data-value="merge" title="Merge — unite with any existing fill it overlaps"><svg viewBox="0 0 20 20"><circle cx="7" cy="10" r="6" fill="currentColor" opacity=".35"/><circle cx="13" cy="10" r="6" fill="currentColor" opacity=".35"/></svg></button>
         </div></div>
-        <div class="pr"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="p-vecbrush" style="accent-color:var(--accent)"> Pressure brush (Draw)</label></div>
+        <div class="pr" id="p-fillbrushsize-row" style="display:none" title="Fill Brush's own base thickness — independent of Draw's Stroke Width and Pen's line width"><span class="pl">Thickness</span><input type="number" class="pi scrub" id="p-fillbrushsize" value="40" min="1" max="500" data-step="1"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
+        <div class="pr" id="p-vecbrush-row"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="p-vecbrush" style="accent-color:var(--accent)"> Pressure brush (Draw)</label></div>
         <div class="pr"><span class="pl">P. min</span><input type="number" class="pi scrub" id="p-pmin" value="30" min="0" max="100" data-step="1" title="Width at zero pressure (% of brush size)"><span style="font-size:9px;color:var(--text-dim)">%</span></div>
         <div class="pr"><span class="pl">P. max</span><input type="number" class="pi scrub" id="p-pmax" value="170" min="50" max="300" data-step="1" title="Width at full pressure (% of brush size)"><span style="font-size:9px;color:var(--text-dim)">%</span></div>
         <div class="pr"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer" title="Hard press = thin line, light touch = thick line"><input type="checkbox" id="p-pinv" style="accent-color:var(--accent)"> Invert pressure</label></div>
         <div class="pr" title="Live stylus pressure — draw on the canvas to test your tablet"><span class="pl">P. live</span><div style="flex:1;height:6px;background:var(--bg);border-radius:3px;overflow:hidden"><div id="p-live-fill" style="height:100%;width:0;background:var(--accent);transition:width .05s"></div></div></div>
-        <div class="pr"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="p-taper" style="accent-color:var(--accent)"> Taper ends (Draw/Pen)</label></div>
+        <div class="pr" id="p-taper-row"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="p-taper" style="accent-color:var(--accent)"> Taper ends (Draw/Pen)</label></div>
+        <div class="pr" id="p-shadowmode-row" title="Tags what you draw as Shadow — draw fills first, then rough shadow-boundary lines over them like a Japanese anime layout; separating Stroke/Fill/Shadow later routes anything drawn with this on into its own Shadow layer instead of Stroke/Fill"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="p-shadowmode" style="accent-color:var(--accent)"> Shadow (Draw/Pen/Shape)</label></div>
         <div class="pr" title="Eraser cuts the path precisely at this width instead of deleting the whole stroke"><span class="pl">Eraser</span><input type="number" class="pi scrub" id="p-erasersize" value="14" min="4" max="120" data-step="1"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
       </div>
     </div>
     <div class="psec" id="effects-sec">
-      <div class="phdr"><span class="ar">▼</span> Effects</div>
+      <div class="phdr"><span class="ar">☰</span> Effects</div>
       <div class="pbdy">
         <div class="pr" style="font-size:9px;color:var(--text-dim)">Bientôt disponible</div>
       </div>
     </div>
+    <div class="psec" id="layer-sec" style="display:none">
+      <div class="phdr"><span class="ar">☰</span> Layer</div>
+      <div class="pbdy">
+        <div class="pr"><span class="pl">Blend</span><select class="psel" id="p-blendmode">
+          <option value="normal">Normal</option>
+          <option value="multiply">Multiply</option>
+          <option value="screen">Screen</option>
+          <option value="overlay">Overlay</option>
+          <option value="darken">Darken</option>
+          <option value="lighten">Lighten</option>
+          <option value="colorDodge">Color Dodge</option>
+          <option value="colorBurn">Color Burn</option>
+          <option value="hardLight">Hard Light</option>
+          <option value="softLight">Soft Light</option>
+          <option value="difference">Difference</option>
+          <option value="exclusion">Exclusion</option>
+          <option value="hue">Hue</option>
+          <option value="saturation">Saturation</option>
+          <option value="color">Color</option>
+          <option value="luminosity">Luminosity</option>
+        </select></div>
+      </div>
+    </div>
     <div class="psec" id="canvas-sec">
-      <div class="phdr"><span class="ar">▼</span> Document</div>
+      <div class="phdr"><span class="ar">☰</span> Document</div>
       <div class="pbdy">
         <div class="pr"><span class="pl">Width</span><input type="number" class="pi" id="p-cw" value="1920" min="1" max="7680"></div>
         <div class="pr"><span class="pl">Height</span><input type="number" class="pi" id="p-ch" value="1080" min="1" max="4320"></div>
         <div class="pr"><span class="pl">BG</span><input type="color" id="p-cbg" value="#ffffff" style="width:28px;height:22px;border:none;cursor:pointer;padding:0;"></div>
         <div class="pr" style="gap:4px"><button class="pbtn" id="btn-fit">Fit</button><button class="pbtn" id="btn-resetv">Reset View</button></div>
+        <div class="pr"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer" title="Hide artwork outside the canvas bounds — off by default, so you can see and work with content that spills over the edge"><input type="checkbox" id="p-clip" style="accent-color:var(--accent)"> Clip to canvas</label></div>
+        <div class="pr"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer" title="Broadcast-safe overlay guides: 90% action-safe / 80% title-safe margins, standard TV/film safe areas"><input type="checkbox" id="p-safety" style="accent-color:var(--accent)"> Safety zones</label></div>
+      </div>
+    </div>
+    <div class="psec">
+      <div class="phdr"><span class="ar">☰</span> Nuancier</div>
+      <div class="pbdy">
+        <div id="palette-tabs" class="palette-tabs"></div>
+        <div class="pr" style="gap:4px">
+          <button class="pbtn" id="btn-palette-new" title="Créer une nouvelle palette">+ Palette</button>
+        </div>
+        <div class="pr" style="font-size:9px;color:var(--text-dim)">Clic: fill · Maj+clic: stroke · Glisser: réordonner · Double-clic onglet: renommer</div>
+        <div id="palette-grid" class="palette-grid"></div>
+        <div class="pr" style="gap:4px">
+          <button class="pbtn" id="btn-palette-add-fill" title="Ajouter la couleur de Fill actuelle à la palette">+ Fill</button>
+          <button class="pbtn" id="btn-palette-add-stroke" title="Ajouter la couleur de Stroke actuelle à la palette">+ Stroke</button>
+          <button class="pbtn" id="btn-palette-swap" title="Échanger Fill ↔ Stroke">⇄</button>
+        </div>
+        <div class="pr" style="gap:4px">
+          <button class="pbtn" id="btn-palette-replace" title="Remplacer une couleur dans le calque actif : clic sur la source, puis sur la cible" style="flex:1">🔁 Remplacer dans le calque</button>
+        </div>
+      </div>
+    </div>
+    <div class="psec">
+      <div class="phdr"><span class="ar">☰</span> Perspective Guide</div>
+      <div class="pbdy">
+        <div class="pr"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer" title="Shows the vanishing-point grid and snaps the Line tool toward it, from any tool"><input type="checkbox" id="p-persp-on" style="accent-color:var(--accent)"> Enabled</label></div>
+        <div class="pr"><span class="pl">Mode</span><select class="psel" id="p-persp-mode"><option value="1pt">1 point</option><option value="2pt" selected>2 points</option><option value="3pt">3 points</option></select></div>
+        <div class="pr"><span class="pl">Density</span><input type="number" class="pi scrub" id="p-persp-density" value="24" min="4" max="72" data-step="2"></div>
+        <div class="pr"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer" title="Prevents dragging any vanishing point with the Perspective tool"><input type="checkbox" id="p-persp-lock" style="accent-color:var(--accent)"> Lock vanishing points</label></div>
+        <div class="pr" style="gap:4px"><button class="pbtn" id="btn-persp-reset">Reset positions</button></div>
+        <div class="pr" style="font-size:9px;color:var(--text-dim)">Select the ◇ tool to drag vanishing points. Draw a Line roughly toward one to snap onto it.</div>
+      </div>
+    </div>
+    <div class="psec" id="ref-sec">
+      <div class="phdr"><span class="ar">☰</span> Référence (roto)</div>
+      <div class="pbdy">
+        <div class="pr" style="gap:4px">
+          <button class="pbtn" id="btn-ref-import" title="Importer une vidéo, une séquence d'images (sélection multiple) ou une image seule comme référence de rotoscopie">Importer…</button>
+          <button class="pbtn" id="btn-ref-remove" disabled>Retirer</button>
+          <input type="file" id="ref-file-input" accept="video/*,image/*" multiple style="display:none">
+        </div>
+        <div class="pr" style="font-size:9px;color:var(--text-dim)" id="p-ref-name">Aucune référence</div>
+        <div class="pr"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="p-ref-on" style="accent-color:var(--accent)"> Visible</label></div>
+        <div class="pr"><span class="pl">Opacité</span><input type="range" id="p-ref-opacity" min="5" max="100" value="50" style="flex:1"></div>
+        <div class="pr"><span class="pl">Offset</span><input type="number" class="pi scrub" id="p-ref-offset" value="0" data-step="1" title="Frame de la timeline où la référence démarre"></div>
+        <div class="pr" style="font-size:9px;color:var(--text-dim)">S'affiche sous le dessin, suit la frame courante (vidéo/séquence). Jamais exportée.</div>
       </div>
     </div>
     <div class="psec" id="tween-sec">
-      <div class="phdr"><span class="ar">▼</span> Tween</div>
+      <div class="phdr"><span class="ar">☰</span> Tween</div>
       <div class="pbdy">
         <div class="pr"><span class="pl">Step</span><select class="psel" id="p-step"><option value="1">1 (every frame)</option><option value="2">2 (on 2s)</option><option value="3">3 (on 3s)</option></select></div>
         <div class="pr"><span class="pl">Resample</span><input type="number" class="pi scrub" id="p-resamp" value="50" min="20" max="120" data-step="1"></div>
         <div class="pr"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer" title="Frames shown in green were hand-corrected after a tween — leave this checked to keep those edits when regenerating"><input type="checkbox" id="p-skipmanual" checked style="accent-color:var(--accent)"> Skip manually-edited frames</label></div>
         <div class="pr" style="font-size:9px;color:var(--text-dim)" title="Select one or more keyframes on the timeline first to re-tween only their span — with nothing selected, Tween regenerates the whole layer">Select keyframe(s) to tween only that span</div>
         <div class="pr"><button class="pbtn ac" id="btn-tw" style="flex:1">Tween (T)</button></div>
+        <div class="pr" id="tw-reassign-row" style="gap:4px"><button class="pbtn" id="btn-tw-reassign" style="flex:1" title="Le playhead doit être sur une keyframe qui a un inbetween vers la suivante. Cliquez l'élément de départ, puis l'élément correspondant sur la keyframe suivante — force cette correspondance au lieu de la détection automatique.">Réattribuer un inbetween…</button></div>
+        <div class="pr" id="tw-reassign-status" style="display:none;font-size:9px;color:var(--accent)"></div>
       </div>
     </div>
-    <div class="psec">
-      <div class="phdr"><span class="ar">▼</span> Easing Curve</div>
+    <div class="psec" id="easing-sec">
+      <div class="phdr"><span class="ar">☰</span> Easing Curve</div>
       <div class="pbdy" style="align-items:center">
         <div id="curve-canvas-wrap" title="Clic+glisser un point pour le déplacer. Double-clic sur une zone vide pour ajouter un point. Suppr/Retour arrière (survol du curseur) pour retirer le point sélectionné (les 2 extrémités ne peuvent pas être retirées).">
           <canvas id="curve-canvas" width="400" height="400"></canvas>
           <div id="curve-resize-handle" title="Glisser pour redimensionner"></div>
         </div>
-        <div id="curve-presets">
-          <button data-preset="linear">Linear</button><button data-preset="ease-in">In</button>
-          <button data-preset="ease-out">Out</button><button data-preset="ease-in-out" class="active">InOut</button>
-          <button data-preset="ease-out-back">Over</button>
-          <button id="curve-save-preset" title="Enregistrer la courbe actuelle comme preset">+</button>
-        </div>
+        <div id="curve-presets"></div>
         <div id="curve-custom-presets"></div>
+        <button id="curve-save-preset" title="Enregistrer la courbe actuelle comme preset">+ Enregistrer preset</button>
         <div id="curve-coords"></div>
       </div>
     </div>
     <div class="psec">
-      <div class="phdr"><span class="ar">▼</span> Onion Skin <span id="os-st" style="margin-left:auto;font-size:9px;color:var(--green)">ON</span></div>
+      <div class="phdr"><span class="ar">☰</span> Onion Skin <span id="os-st" style="margin-left:auto;font-size:9px;color:var(--green)">ON</span></div>
       <div class="pbdy">
         <div class="pr" style="font-size:9px;color:var(--text-dim)">Drag red/blue markers on timeline</div>
         <div class="pr"><span class="pl">Mode</span><select class="psel" id="p-omode"><option value="tinted">Tinted</option><option value="original">Original</option><option value="outline">Outline</option></select></div>
@@ -222,7 +393,7 @@
       </div>
     </div>
     <div class="psec" id="comp-instance-sec" style="display:none">
-      <div class="phdr"><span class="ar">▼</span> Component Instance</div>
+      <div class="phdr"><span class="ar">☰</span> Component Instance</div>
       <div class="pbdy">
         <div class="pr"><span class="pl">Lecture</span><select class="psel" id="comp-playmode"><option value="loop">Loop</option><option value="pingpong">Ping-Pong</option><option value="once">Play Once</option><option value="single">Single Frame</option></select></div>
         <div class="pr" id="comp-singleframe-row"><span class="pl">Frame</span><input type="number" class="pi" id="comp-singleframe" value="0" min="0"></div>
@@ -237,7 +408,7 @@
       </div>
     </div>
     <div class="psec">
-      <div class="phdr"><span class="ar">▼</span> Project</div>
+      <div class="phdr"><span class="ar">☰</span> Project</div>
       <div class="pbdy">
         <div class="pr" id="proj-current" style="font-size:9px;color:var(--text-dim)" title="Currently open project">Untitled (not saved)</div>
         <div class="pr" style="gap:4px">
@@ -247,6 +418,10 @@
         <div class="pr" style="gap:4px">
           <button class="pbtn" id="btn-open" style="flex:1"><span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle">&#xe2c8;</span> Open…</button>
           <button class="pbtn" id="btn-new" style="flex:1"><span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle">&#xe145;</span> New…</button>
+        </div>
+        <div class="pr" style="gap:4px">
+          <button class="pbtn" id="btn-history" style="flex:1" title="Historique des versions — un instantané automatique toutes les 30s, récupérable même après un crash"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2"/><path d="M5 3 2 6"/><path d="M2 6h4"/></svg> Historique…</button>
+          <button class="pbtn" id="btn-settings" title="Réglages — raccourcis clavier"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></button>
         </div>
         <input type="file" id="file-input" accept=".json" style="display:none">
         <div class="pr" style="gap:4px"><button class="pbtn" id="btn-export" style="flex:1"><span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle">&#xe2c6;</span> Export…</button></div>
@@ -258,6 +433,12 @@
         <div class="phdr" style="padding-top:10px;font-size:9px;color:var(--text-dim)">Import</div>
         <div class="pr" style="gap:4px"><button class="pbtn" id="btn-import-img" style="flex:1" title="Import bitmap image(s) — a numbered sequence (frame001.png, frame002.png…) auto-detects into a new animated layer, one image per frame"><span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle">&#xe410;</span> Import Image(s)…</button></div>
         <input type="file" id="image-input" accept="image/*" multiple style="display:none">
+        <!-- v14: video import decodes to a per-frame image sequence and
+             lands on a normal layer via the same isRaster pipeline as
+             Import Image(s) above — real layer, transformable/scalable/
+             opacity like anything else, no separate "video layer" concept. -->
+        <div class="pr" style="gap:4px"><button class="pbtn" id="btn-import-video" style="flex:1" title="Import a video — decoded to one image per frame at the project's fps and dropped onto a new animated layer, same as an image sequence"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="vertical-align:middle"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="M17 10.5l4-2.5v8l-4-2.5z"/></svg> Import Video…</button></div>
+        <input type="file" id="video-input" accept="video/*" style="display:none">
       </div>
     </div>
   </div>
@@ -285,11 +466,23 @@
         </select>
       </div>
       <div class="pr" id="exp-scale-row"><span class="pl" style="width:90px">Échelle</span>
-        <select class="psel" id="exp-scale" style="flex:1">
-          <option value="1">1x</option>
+        <select class="psel" id="exp-scale" style="flex:1" title="Contenu vectoriel — l'agrandissement reste net à n'importe quelle échelle">
+          <option value="0.5">0.5x</option>
+          <option value="1" selected>1x</option>
+          <option value="1.5">1.5x</option>
           <option value="2">2x</option>
+          <option value="3">3x</option>
+          <option value="4">4x</option>
+          <option value="custom">Personnalisé…</option>
         </select>
       </div>
+      <div class="pr" id="exp-size-row" style="display:none"><span class="pl" style="width:90px">Taille</span>
+        <input type="number" class="pi" id="exp-w" min="1" max="16384" style="width:70px">
+        <span style="font-size:9px;color:var(--text-dim)">×</span>
+        <input type="number" class="pi" id="exp-h" min="1" max="16384" style="width:70px">
+        <span style="font-size:9px;color:var(--text-dim)">px</span>
+      </div>
+      <div class="pr" id="exp-alpha-row" title="Fond transparent au lieu de la couleur BG du document — n'affecte pas les formats qui ne supportent pas la transparence (MP4, GIF)"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="exp-alpha" style="accent-color:var(--accent)"> Fond transparent (alpha)</label></div>
       <div id="exp-progress" style="display:none;font-size:11px;color:var(--text-dim);margin-top:6px"></div>
       <div class="pr" style="margin-top:10px;gap:6px">
         <button class="pbtn ac" id="exp-run" style="flex:1">Exporter</button>
@@ -298,25 +491,63 @@
   </div>
 </div>
 
+<div id="history-modal" class="modal-overlay" style="display:none">
+  <div class="modal-box">
+    <div class="modal-hdr">Historique des versions <button id="history-close" class="modal-x">&times;</button></div>
+    <div class="modal-bdy">
+      <div style="font-size:10px;color:var(--text-dim);margin-bottom:4px">Instantané automatique toutes les 30s — cliquer une version pour la restaurer (remplace le document actuel).</div>
+      <div id="history-list" style="display:flex;flex-direction:column;gap:2px;max-height:320px;overflow-y:auto"></div>
+    </div>
+  </div>
+</div>
+
+<div id="settings-modal" class="modal-overlay" style="display:none">
+  <div class="modal-box">
+    <div class="modal-hdr">Réglages <button id="settings-close" class="modal-x">&times;</button></div>
+    <div class="modal-bdy">
+      <div class="phdr" style="padding:0 0 4px 0;font-size:9px;color:var(--text-dim)">Raccourcis clavier — outils</div>
+      <div style="font-size:10px;color:var(--text-dim);margin-bottom:6px">Cliquer une touche puis appuyer sur une nouvelle touche pour la réassigner. Les autres raccourcis (transport, undo/save…) ne sont pas encore modifiables ici. Import de profils (Animate, Blender…) : à venir.</div>
+      <div id="shortcuts-list" style="display:flex;flex-direction:column;gap:2px;max-height:320px;overflow-y:auto"></div>
+      <div class="pr" style="margin-top:10px;gap:6px">
+        <button class="pbtn" id="shortcuts-reset" style="flex:1">Réinitialiser tout</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="timeline-area">
   <div id="tl-resize"></div>
-  <div id="symbol-tabs"><div class="sym-tab act" data-sym="">Scene</div></div>
   <div id="tl-toolbar">
+    <!-- v4 redesign (2026-07-09): symbol tabs merged onto the same row as
+         the transport controls (used to be a separate #symbol-tabs bar
+         above #tl-toolbar) — matches the mockup's single 44px header row.
+         v5: reordered to match the mockup exactly — tabs sit alone on the
+         left with the flex spacer right after them (not after the
+         transport controls), so counter+transport+FPS/Frames+extra icons
+         all group together on the right instead of being split across the
+         spacer. -->
+    <div id="symbol-tabs"><div class="sym-tab act" data-sym="">Scene</div></div>
+    <div style="flex:1"></div>
+    <div class="ti"><b id="tl-cf">1</b> / <span id="tl-tf">24</span></div>
     <button class="tb" id="btn-ff" title="Go to first frame"><span class="material-symbols-rounded">&#xe045;</span></button>
     <button class="tb" id="btn-pf" title="Previous frame"><span class="material-symbols-rounded">&#xe5cb;</span></button>
     <button class="tb" id="btn-play" title="Play / Stop (Enter)"><span class="material-symbols-rounded">&#xe037;</span></button>
     <button class="tb" id="btn-nf" title="Next frame"><span class="material-symbols-rounded">&#xe5cc;</span></button>
     <button class="tb" id="btn-lf" title="Go to last frame"><span class="material-symbols-rounded">&#xe044;</span></button>
     <button class="tb active" id="btn-loop" title="Loop playback (work area)"><span style="font-size:14px;line-height:1">&#x21bb;</span></button>
-    <div class="ti" style="margin-left:4px"><b id="tl-cf">1</b> / <span id="tl-tf">24</span></div>
-    <div style="flex:1"></div>
+    <span style="width:1px;height:20px;background:var(--border2);flex:none"></span>
     <div class="ti">
       <span>FPS</span><input type="number" id="tl-fps" value="12" min="1" max="60">
       <span style="margin-left:6px">Frames</span><input type="number" id="tl-total" value="24" min="1" max="999">
     </div>
-    <button class="tb active" id="btn-os" title="Onion skin on/off (O)" style="margin-left:4px"><span class="material-symbols-rounded" style="font-size:16px">&#xe53b;</span></button>
+    <span style="width:1px;height:20px;background:var(--border2);flex:none"></span>
+    <button class="tb active" id="btn-os" title="Onion skin on/off (O)"><span class="material-symbols-rounded" style="font-size:16px">&#xe53b;</span></button>
     <button class="tb" id="btn-os-outline" title="Onion skin outlines only"><span style="font-size:13px;line-height:1">&#x25ad;</span></button>
     <button class="tb" id="btn-os-range" title="Modify onion markers"><span style="font-size:11px;line-height:1">&#x25be;</span></button>
+    <button class="tb" id="btn-ghost-all" title="Ghost all keyframes — shows every keyframe of the active layer at once" style="margin-left:4px"><span style="font-size:13px;line-height:1">&#x2637;</span></button>
+    <button class="tb" id="btn-ghost-select" title="Select all keyframes' content to move/transform together" disabled><span style="font-size:12px;line-height:1">&#x2725;</span></button>
+    <button class="tb" id="btn-audio" title="Importer une piste audio (mp3/ogg/wav) — waveform sous la timeline, lecture synchronisée" style="margin-left:4px"><span style="font-size:13px;line-height:1">&#x266b;</span></button>
+    <input type="file" id="audio-file-input" accept="audio/*" multiple style="display:none">
   </div>
   <div id="tl-content">
     <div id="layer-panel">
@@ -324,7 +555,11 @@
       <div id="layer-list"></div>
       <div id="layer-ctrls">
         <button id="btn-al" title="New layer"><span class="material-symbols-rounded">&#xe145;</span></button>
-        <button id="btn-dl" title="Delete active layer"><span class="material-symbols-rounded">&#xe15b;</span></button>
+        <!-- v5: flat filled trash icon instead of the 🗑 emoji — the emoji
+             renders as a detailed/colored glyph depending on the OS font,
+             out of step with the rest of the toolbar's flat single-color
+             SVG icons. -->
+        <button id="btn-dl" title="Delete active layer"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 3h6l1 2h4v2H4V5h4z"/><path d="M6 9h12l-1 12H7z"/></svg></button>
         <button id="btn-dupl" title="Duplicate active layer"><span class="material-symbols-rounded">&#xe14d;</span></button>
         <button id="btn-comp" title="Convert layer to component"><span style="font-size:13px;line-height:1">&#x25c8;</span></button>
       </div>
@@ -339,6 +574,7 @@
       </div>
       <div id="frame-hdr"></div>
       <div id="frame-grid"></div>
+      <div id="audio-strip" style="display:none"></div>
       <div id="playhead"></div>
     </div>
   </div>
@@ -346,7 +582,7 @@
 
 <div id="statusbar">
   <span><span class="sc">F5</span>Frame <span class="sc">F6</span>Key <span class="sc">F7</span>Blank <span class="sc">T</span>Tween <span class="sc">D</span>Dupli <span class="sc">F</span>Flip <span class="sc">X</span>Mirror <span class="sc">Enter</span>Play</span>
-  <span id="status-text">StrokeMotion v0.0.1</span>
+  <span id="status-text">StrokeMotion v0.0.2</span>
 </div>
 </div>
 <div id="toast"></div>
@@ -357,12 +593,19 @@
 <script src="js/app.js"></script>
 <script src="js/tweens.js"></script>
 <script src="js/tools.js"></script>
+<script src="js/brush-preset-picker.js"></script>
+<script src="js/brush-editor.js"></script>
 <script src="js/export.js"></script>
 <script src="js/timeline.js"></script>
+<script src="js/audio-bridge.js"></script>
+<script src="js/reference-bridge.js"></script>
+<script src="js/drop-import.js"></script>
+<script src="js/palette-panel.js"></script>
 <script src="js/project.js"></script>
 <script src="js/images.js"></script>
 <script type="module" src="js/geometry-wasm-loader.js"></script>
 <script src="js/engine-bridge.js"></script>
+<script src="js/perspective-bridge.js"></script>
 <script src="js/viewtools-bridge.js"></script>
 <script src="js/draw-bridge.js"></script>
 <script src="js/select-bridge.js"></script>

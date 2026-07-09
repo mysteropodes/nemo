@@ -15,17 +15,49 @@
   function clonePts(pts){return pts.map(function(p){return{x:p.x,y:p.y};});}
   var cs={points:[{x:0,y:0},{x:.42,y:0},{x:.58,y:1},{x:1,y:1}]};
   var dragging=null,selected=null,hovering=false,rect=null;
-  // Approximate through-point equivalents of the old off-curve-handle CSS
-  // presets — not pixel-identical (the underlying curve model changed from
-  // tangent-handle to on-curve-waypoint), but visually match the named
-  // easing behavior.
+  // A small easing gallery (After Effects/GreenSock-style grid of named
+  // curve families, each in/out/inout where that makes sense) — through-
+  // point approximations of their usual off-curve-handle shapes, since the
+  // underlying model here is on-curve waypoints, not tangent handles.
+  // Rendered as actual curve-shape thumbnails (see buildThumbSvg), not text
+  // labels — a text button gave zero indication of what a preset looked
+  // like before clicking it.
   var presets={
     'linear':[{x:0,y:0},{x:1,y:1}],
-    'ease-in':[{x:0,y:0},{x:.32,y:.04},{x:1,y:1}],
-    'ease-out':[{x:0,y:0},{x:.68,y:.96},{x:1,y:1}],
-    'ease-in-out':[{x:0,y:0},{x:.3,y:.05},{x:.7,y:.95},{x:1,y:1}],
-    'ease-out-back':[{x:0,y:0},{x:.6,y:1.15},{x:.85,y:.95},{x:1,y:1}]
+    'sine-in':[{x:0,y:0},{x:.36,y:.1},{x:1,y:1}],
+    'sine-out':[{x:0,y:0},{x:.64,y:.9},{x:1,y:1}],
+    'sine-in-out':[{x:0,y:0},{x:.3,y:.1},{x:.7,y:.9},{x:1,y:1}],
+    'quad-in':[{x:0,y:0},{x:.4,y:.08},{x:1,y:1}],
+    'quad-out':[{x:0,y:0},{x:.6,y:.92},{x:1,y:1}],
+    'quad-in-out':[{x:0,y:0},{x:.28,y:.06},{x:.72,y:.94},{x:1,y:1}],
+    'cubic-in':[{x:0,y:0},{x:.5,y:.04},{x:1,y:1}],
+    'cubic-out':[{x:0,y:0},{x:.5,y:.96},{x:1,y:1}],
+    'cubic-in-out':[{x:0,y:0},{x:.25,y:.02},{x:.75,y:.98},{x:1,y:1}],
+    'back-in':[{x:0,y:0},{x:.3,y:-.15},{x:1,y:1}],
+    'back-out':[{x:0,y:0},{x:.7,y:1.15},{x:1,y:1}],
+    'back-in-out':[{x:0,y:0},{x:.2,y:-.15},{x:.8,y:1.15},{x:1,y:1}],
+    'elastic-out':[{x:0,y:0},{x:.35,y:1.3},{x:.55,y:.85},{x:.75,y:1.08},{x:1,y:1}],
+    'bounce-out':[{x:0,y:0},{x:.36,y:.68},{x:.5,y:.4},{x:.72,y:.94},{x:.84,y:.78},{x:1,y:1}],
+    'ease-in-out':[{x:0,y:0},{x:.3,y:.05},{x:.7,y:.95},{x:1,y:1}]
   };
+  var PRESET_ORDER=['linear','sine-in','sine-out','sine-in-out','quad-in','quad-out','quad-in-out',
+    'cubic-in','cubic-out','cubic-in-out','back-in','back-out','back-in-out','elastic-out','bounce-out','ease-in-out'];
+  // Small inline SVG sparkline of a points array's actual evaluated curve —
+  // shared by both the built-in and the user's saved custom presets, so a
+  // hand-tuned custom curve gets the exact same visual treatment.
+  function buildThumbSvg(pts){
+    var w=44,h=30,pad=4,N=24;
+    var lo=0,hi=1;
+    pts.forEach(function(p){if(p.y<lo)lo=p.y;if(p.y>hi)hi=p.y;});
+    var m=(hi-lo)*.12||.1;lo-=m;hi+=m;
+    var d='';
+    for(var i=0;i<=N;i++){
+      var x=i/N,y=evalPointsCurve(pts,x);
+      var px=pad+x*(w-2*pad),py=h-pad-((y-lo)/(hi-lo))*(h-2*pad);
+      d+=(i===0?'M':'L')+px.toFixed(1)+','+py.toFixed(1)+' ';
+    }
+    return '<svg viewBox="0 0 '+w+' '+h+'" width="'+w+'" height="'+h+'"><path d="'+d+'" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  }
   var CUSTOM_KEY='sm_easing_presets';
   function loadCustomPresets(){try{return JSON.parse(localStorage.getItem(CUSTOM_KEY)||'[]');}catch(e){return[];}}
   function saveCustomPresets(list){try{localStorage.setItem(CUSTOM_KEY,JSON.stringify(list));}catch(e){}}
@@ -57,16 +89,18 @@
     var t2x=(next.x-p0.x)/2,t2y=(next.y-p0.y)/2;
     return{c1:{x:p0.x+t1x/3,y:p0.y+t1y/3},c2:{x:p3.x-t2x/3,y:p3.y-t2y/3}};
   }
-  function segFor(x){
-    var pts=cs.points,i=0;
+  function segForPts(pts,x){
+    var i=0;
     while(i<pts.length-2&&pts[i+1].x<x)i++;
     return i;
   }
-  function evalCurve(x){
-    var pts=cs.points;
+  // Pure function of an explicit points array — pulled out of evalCurve so
+  // the preset gallery's thumbnails can plot the exact same math the main
+  // canvas uses, without touching the live `cs.points` state.
+  function evalPointsCurve(pts,x){
     if(pts.length<2)return x;
     x=Math.max(0,Math.min(1,x));
-    var i=segFor(x),p0=pts[i],p3=pts[i+1],ctrl=segCtrl(pts,i);
+    var i=segForPts(pts,x),p0=pts[i],p3=pts[i+1],ctrl=segCtrl(pts,i);
     var span=p3.x-p0.x,t=span>1e-6?(x-p0.x)/span:0;
     for(var k=0;k<8;k++){
       var ex=cubicAt(t,p0.x,ctrl.c1.x,ctrl.c2.x,p3.x)-x;
@@ -76,6 +110,7 @@
     }
     return cubicAt(t,p0.y,ctrl.c1.y,ctrl.c2.y,p3.y);
   }
+  function evalCurve(x){return evalPointsCurve(cs.points,x);}
 
   function draw(){
     var yr=yRange();
@@ -164,24 +199,44 @@
     draw();pushCurve();
   });
 
+  function isMatch(p){
+    return p&&p.length===cs.points.length&&p.every(function(pt,i){return Math.abs(pt.x-cs.points[i].x)<.03&&Math.abs(pt.y-cs.points[i].y)<.03;});
+  }
   function upP(){
-    document.querySelectorAll('#curve-presets button[data-preset]').forEach(function(b){
-      var p=presets[b.dataset.preset];
-      var match=p&&p.length===cs.points.length&&p.every(function(pt,i){return Math.abs(pt.x-cs.points[i].x)<.03&&Math.abs(pt.y-cs.points[i].y)<.03;});
-      b.classList.toggle('active',!!match);
+    document.querySelectorAll('#curve-presets button[data-preset], #curve-custom-presets button[data-preset]').forEach(function(b){
+      var p=presets[b.dataset.preset]||_customByKey[b.dataset.preset];
+      b.classList.toggle('active',!!isMatch(p));
     });
   }
-  document.querySelectorAll('#curve-presets button[data-preset]').forEach(function(b){
-    b.addEventListener('click',function(){cs.points=clonePts(presets[this.dataset.preset]);selected=null;draw();pushCurve();});
-  });
+  // Built-in gallery: rendered once, each button a real curve-shape
+  // thumbnail (buildThumbSvg) plus a small caption underneath, laid out in
+  // a CSS grid (see style.css #curve-presets) instead of a plain button row.
+  function renderPresetGallery(){
+    var wrap=document.getElementById('curve-presets');if(!wrap)return;
+    wrap.innerHTML='';
+    PRESET_ORDER.forEach(function(key){
+      var pts=presets[key];
+      var b=document.createElement('button');
+      b.dataset.preset=key;
+      b.title=key;
+      b.innerHTML=buildThumbSvg(pts)+'<span>'+key+'</span>';
+      b.addEventListener('click',function(){cs.points=clonePts(pts);selected=null;draw();upP();pushCurve();});
+      wrap.appendChild(b);
+    });
+  }
+  var _customByKey={};
   function renderCustomPresetButtons(){
     var wrap=document.getElementById('curve-custom-presets');if(!wrap)return;
     wrap.innerHTML='';
+    _customByKey={};
     loadCustomPresets().forEach(function(cp,i){
+      var key='custom:'+i;
+      _customByKey[key]=cp.points;
       var b=document.createElement('button');
-      b.textContent=cp.name;
-      b.title='Clic : appliquer — clic droit : supprimer';
-      b.addEventListener('click',function(){cs.points=clonePts(cp.points);selected=null;draw();pushCurve();});
+      b.dataset.preset=key;
+      b.title=cp.name+' — clic : appliquer, clic droit : supprimer';
+      b.innerHTML=buildThumbSvg(cp.points)+'<span>'+cp.name+'</span>';
+      b.addEventListener('click',function(){cs.points=clonePts(cp.points);selected=null;draw();upP();pushCurve();});
       b.addEventListener('contextmenu',function(e){
         e.preventDefault();
         if(!window.confirm('Supprimer le preset "'+cp.name+'" ?'))return;
@@ -190,6 +245,7 @@
       wrap.appendChild(b);
     });
   }
+  renderPresetGallery();
   var savePresetBtn=document.getElementById('curve-save-preset');
   if(savePresetBtn)savePresetBtn.addEventListener('click',function(){
     var name=window.prompt('Nom du preset :');
@@ -234,6 +290,15 @@
   setTimeout(draw,100);
 })();
 
+// Stroke/Fill swap button (Illustrator's "X") — was originally built as a
+// left-panel light/dark theme toggle, corrected per explicit feedback: this
+// button swaps the stroke and fill COLORS, not the toolbar's own UI colors.
+(function(){
+  var btn=document.getElementById('tools-invert-btn');
+  if(!btn)return;
+  btn.addEventListener('click',function(){window.SM.swapStrokeFill();});
+})();
+
 // ======== UI INTERACTIONS ========
 (function(){
   document.querySelectorAll('.phdr').forEach(function(h){h.addEventListener('click',function(){if(window._secDragJustEnded){window._secDragJustEnded=false;return;}var b=this.nextElementSibling;if(!b||!b.classList.contains('pbdy'))return;b.classList.toggle('hid');this.classList.toggle('closed');});});
@@ -264,7 +329,13 @@
   window.addEventListener('mousemove',function(e){if(!window._lpResize)return;lp.style.width=Math.max(90,Math.min(400,lprw+(e.clientX-lprx)))+'px';});
   window.addEventListener('mouseup',function(){window._lpResize=false;lpr.classList.remove('active');});
 
-  var FC=14;
+  // No local FC here (was a stale hardcoded 14, a duplicate of app.js's
+  // global FC that drifted out of sync with it — real bug, caused the
+  // work-area bar and onion markers to desync from the actual frame-cell
+  // width). Every reference below resolves to app.js's global `FC` via the
+  // normal scope chain instead, since none of these closures run until a
+  // user actually drags — long after app.js (loaded after this file) has
+  // set it.
   function initWaDrag(){
     var bar=document.getElementById('wa-bar'),hleft=bar.querySelector('.wa-handle.left'),hright=bar.querySelector('.wa-handle.right');
     var dragType=null,startX,origIn,origOut;
@@ -496,6 +567,24 @@
   // including pointerup/pointercancel, regardless of where the cursor
   // physically ends up, which is the robust, standard fix for this whole
   // class of "drag state got stuck" bug.
+  // v13: every drawing tool bridge (draw/pen/eraser/select/shape/subselect/
+  // perspective/viewtools-bridge.js) registers its own pointerdown/move/up
+  // with {capture:true} on #canvas-area AS A WHOLE (not just the actual
+  // <canvas>), and none of them check the event's target before deciding
+  // whether to intercept — so ANY click anywhere inside #canvas-area,
+  // including UI chrome overlaid on top of it, gets swallowed by whichever
+  // tool is currently active before it ever reaches the element the user
+  // actually clicked. Confirmed real bug: the canvas zoom-scrub pill (a
+  // child of #canvas-area) couldn't be dragged OR typed into — draw-bridge's
+  // onDown ran first on every click and called stopImmediatePropagation.
+  // Fixed centrally here rather than patching all 9 bridge files: a
+  // document-level capture listener runs before #canvas-area's own capture
+  // listener (capture order follows DOM position, root to target, not
+  // registration order), so stopping propagation here keeps the event from
+  // ever reaching those bridges at all when it started on real UI chrome.
+  document.addEventListener('pointerdown',function(e){
+    if(e.target.closest&&e.target.closest('#canvas-zoom-pills'))e.stopPropagation();
+  },true);
   var scrubState=null;
   document.addEventListener('pointerdown',function(e){
     var el=e.target.closest&&e.target.closest('input.scrub');

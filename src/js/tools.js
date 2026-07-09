@@ -24,6 +24,289 @@ function hitTestComponentLayers(point){
   return null;
 }
 
+// ---- FILL/STROKE SELECT (v18) ----
+// Animate's classic merge-drawing model treats a shape's fill and its
+// stroke as independently selectable/editable things, and a stroke
+// automatically "breaks" into separately-selectable segments wherever it
+// crosses another stroke (its own or a different path's). This app's data
+// model doesn't actually merge/split geometry live like Animate does — a
+// drawn shape stays ONE Path with both a fillColor and a strokeColor — so
+// this tool fakes the same UX on top of that: clicking a fill selects just
+// state.fillColor's side of that one path, clicking a stroke selects just
+// its strokeColor side, and clicking a stroke between two crossings
+// computes those crossing points live (Paper's getIntersections) and
+// scopes the selection (and, on Delete, an ACTUAL path split) to just that
+// bounded arc — the rest of the stroke and any fill are left untouched.
+var _fsSel=null; // {path, kind:'fill'|'stroke', segStart, segEnd, closed} | null
+function fsClearSel(){_fsSel=null;}
+// Every OTHER path in the same layer, plus this path's own self-crossings
+// — each contributes its crossing points as offsets (0..path.length)
+// along `path`'s own parametrization.
+function fsIntersectionOffsets(path,layer){
+  var offsets=[];
+  try{
+    (path.getIntersections()||[]).forEach(function(loc){offsets.push(loc.offset);});
+  }catch(e){}
+  layer.children.forEach(function(other){
+    if(other===path||!(other instanceof Path)||other.segments.length<2)return;
+    if(!(other.strokeColor||other.data&&other.data.isVectorBrush))return; // only strokes act as "cutting" edges, matching Animate (a bare fill never splits a stroke)
+    try{
+      (path.getIntersections(other)||[]).forEach(function(loc){offsets.push(loc.offset);});
+    }catch(e){}
+  });
+  offsets.sort(function(a,b){return a-b;});
+  // de-dupe near-identical offsets (two curves crossing exactly at a shared
+  // anchor point report the same crossing twice)
+  var out=[];
+  offsets.forEach(function(o){if(!out.length||o-out[out.length-1]>0.01)out.push(o);});
+  return out;
+}
+// Given the full sorted crossing-offset list and where the user actually
+// clicked, returns the {segStart,segEnd} pair bracketing the click — or
+// the whole path (0..length) when there are no crossings to bound it.
+function fsSegmentBounds(path,clickPt,offsets){
+  var len=path.length;
+  if(!offsets.length)return{segStart:0,segEnd:len};
+  var loc=path.getNearestLocation(clickPt);
+  var co=loc?loc.offset:0;
+  var start=0,end=len;
+  for(var i=0;i<offsets.length;i++){
+    if(offsets[i]<=co)start=offsets[i];
+    if(offsets[i]>=co){end=offsets[i];break;}
+  }
+  if(path.closed&&start===0&&end===len&&offsets.length){
+    // click landed before the first / after the last crossing on a CLOSED
+    // path — that arc actually wraps around through offset 0, not the
+    // open 0..len span every other bracket uses.
+    start=offsets[offsets.length-1];end=offsets[0];
+  }
+  return{segStart:start,segEnd:end};
+}
+// Non-destructive: returns a standalone, non-inserted open Path tracing
+// `path` from segStart to segEnd (wrapping through 0 if closed and
+// segEnd<segStart). Shared by fsHighlightPath (arc-only highlight) and the
+// fill-region builder below (boundary arcs) — same splitAt-clone technique
+// fsDeleteSegment uses for the real split, just discarding the pieces
+// instead of committing them.
+function fsExtractArc(path,segStart,segEnd){
+  var whole=(segStart===0&&segEnd===path.length&&!(path.closed&&segEnd<segStart));
+  if(whole)return path.clone({insert:false,deep:false});
+  var clone=path.clone({insert:true,deep:false}); // splitAt requires the item to be inserted in a project
+  var arc;
+  if(clone.closed){
+    var loopLen=clone.length;
+    clone.splitAt(clone.getLocationAt(segStart));
+    var newEndOffset=((segEnd-segStart)+loopLen)%loopLen;
+    if(newEndOffset<=0.001)newEndOffset=loopLen;
+    var remainder=clone.splitAt(clone.getLocationAt(newEndOffset));
+    arc=clone;
+    if(remainder)remainder.remove();
+  }else{
+    var tail=clone.splitAt(clone.getLocationAt(segEnd));
+    if(tail)tail.remove();
+    arc=clone.splitAt(clone.getLocationAt(segStart));
+    if(arc)clone.remove();
+  }
+  var result=(arc||clone).clone({insert:false,deep:false});
+  if(clone&&clone.remove)clone.remove();
+  if(arc&&arc!==clone&&arc.remove)arc.remove();
+  return result;
+}
+// Animate divides a fill wherever a stroke crosses THROUGH it (not just
+// touches its edge), so clicking either side of the crossing stroke selects
+// only that side. This app's fill is still one Path underneath — so, like
+// the stroke-segment case above, this computes the divided sub-region live
+// (never mutates on a plain click) by walling off the clicked side with the
+// cutting stroke's own chord: boundary arc of the fill from one crossing to
+// the other, plus the cutter's chord between those same two points, joined
+// into a closed region. Only handles the simple single-clean-crossing case
+// (exactly 2 intersections with one open cutter) — multiple cutters or a
+// cutter that weaves in/out more than once falls back to whole-fill
+// selection (a real planar-subdivision engine is out of scope here, see
+// CLAUDE.md's fragility notes on the rendering pipeline).
+function fsBuildFillRegion(fillPath,boundaryStart,boundaryEnd,cutter,cutterA,cutterB){
+  var arc=fsExtractArc(fillPath,boundaryStart,boundaryEnd);
+  var lo=Math.min(cutterA,cutterB),hi=Math.max(cutterA,cutterB);
+  var chord=fsExtractArc(cutter,lo,hi);
+  if(!arc.segments.length||!chord.segments.length){arc.remove();chord.remove();return null;}
+  // orient the chord so it continues from the arc's end point (join()
+  // connects end-to-start; the raw chord's start/end could be either way).
+  var dEnd=arc.lastSegment.point.getDistance(chord.firstSegment.point);
+  var dEndRev=arc.lastSegment.point.getDistance(chord.lastSegment.point);
+  if(dEndRev<dEnd)chord.reverse();
+  arc.join(chord,4); // tolerance in world px — closes the loop when the chord's far end meets the arc's start
+  if(!arc.closed){
+    if(arc.firstSegment.point.getDistance(arc.lastSegment.point)<4)arc.closePath();
+    else{arc.remove();return null;} // ends didn't meet — bail rather than fake a wrong shape
+  }
+  return arc;
+}
+function fsFindFillRegion(fillPath,pt,layer){
+  for(var i=0;i<layer.children.length;i++){
+    var c=layer.children[i];
+    if(c===fillPath||!(c instanceof Path)||c.closed||!c.strokeColor||c.segments.length<2)continue;
+    var ix;
+    try{ix=fillPath.getIntersections(c);}catch(e){continue;}
+    if(!ix||ix.length!==2)continue; // only the simple single-chord case
+    var o1=ix[0].offset,o2=ix[1].offset;
+    var co1=ix[0].intersection.offset,co2=ix[1].intersection.offset;
+    if(o1>o2){var t=o1;o1=o2;o2=t;t=co1;co1=co2;co2=t;}
+    var regionA=fsBuildFillRegion(fillPath,o1,o2,c,co1,co2);
+    var regionB=fsBuildFillRegion(fillPath,o2,o1,c,co1,co2);
+    if(!regionA||!regionB){if(regionA)regionA.remove();if(regionB)regionB.remove();continue;}
+    var chosen=regionA.contains(pt)?regionA:(regionB.contains(pt)?regionB:null);
+    if(!chosen){regionA.remove();regionB.remove();continue;}
+    var other=chosen===regionA?regionB:regionA;
+    other.remove();
+    return{regionPath:chosen,cutter:c,boundaryStart:(chosen===regionA?o1:o2),boundaryEnd:(chosen===regionA?o2:o1),cutterA:co1,cutterB:co2};
+  }
+  return null;
+}
+// DESTRUCTIVE: turns a still-virtual 'fillregion' selection into two real,
+// independent Path objects (matching Animate — recoloring/deleting one side
+// of a divided fill genuinely separates it), inserts both at the original
+// fillPath's stacking position, and returns the one the user actually
+// clicked as a plain 'fill' selection so the caller can apply its edit
+// exactly like an ordinary whole-fill selection.
+function fsRealizeFillRegion(sel,layer){
+  var fillPath=sel.path;
+  var idx=layer.children.indexOf(fillPath);
+  var a=fsExtractArc(fillPath,sel.boundaryStart,sel.boundaryEnd);
+  var chordA=fsExtractArc(sel.cutter,Math.min(sel.cutterA,sel.cutterB),Math.max(sel.cutterA,sel.cutterB));
+  var b=fsExtractArc(fillPath,sel.boundaryEnd,sel.boundaryStart);
+  var chordB=chordA.clone({insert:false,deep:false});
+  [[a,chordA],[b,chordB]].forEach(function(pair){
+    var arc=pair[0],chord=pair[1];
+    var dEnd=arc.lastSegment.point.getDistance(chord.firstSegment.point);
+    var dEndRev=arc.lastSegment.point.getDistance(chord.lastSegment.point);
+    if(dEndRev<dEnd)chord.reverse();
+    arc.join(chord,4);
+    if(!arc.closed&&arc.firstSegment.point.getDistance(arc.lastSegment.point)<4)arc.closePath();
+  });
+  a.fillColor=fillPath.fillColor;a.strokeColor=fillPath.strokeColor;a.strokeWidth=fillPath.strokeWidth;
+  b.fillColor=fillPath.fillColor;b.strokeColor=fillPath.strokeColor;b.strokeWidth=fillPath.strokeWidth;
+  // fsExtractArc clones fillPath internally, and Paper's clone() copies
+  // .data along with it — if fillPath was a paint-bucket fill (fillSeed/
+  // fillWalls/fillGapPx), BOTH split pieces would otherwise inherit that
+  // stale tracking, still pointing at the ORIGINAL undivided seed+walls.
+  // The next fillRegenerateLinked pass (any wall move) would then re-trace
+  // straight past the cutter — which was never added to fillWalls — and
+  // regenerate the full original undivided shape, silently undoing the
+  // split. A divided fill is definitionally no longer that single bucket
+  // region, on EITHER side, so both pieces must be fully disconnected from
+  // auto-regen here, not just whichever one later gets deleted.
+  fsUnlinkFillRegen(a);fsUnlinkFillRegen(b);
+  layer.insertChild(idx,a);layer.insertChild(idx,b);
+  fillPath.remove();
+  return{path:a,kind:'fill'};
+}
+function fsHitTest(pt,layer){
+  var strokeHit=layer.hitTest(pt,{stroke:true,tolerance:8/view.zoom});
+  if(strokeHit&&strokeHit.item instanceof Path&&strokeHit.item.strokeColor){
+    var sp=strokeHit.item;
+    var offs=fsIntersectionOffsets(sp,layer);
+    var seg=fsSegmentBounds(sp,pt,offs);
+    return{path:sp,kind:'stroke',segStart:seg.segStart,segEnd:seg.segEnd,closed:sp.closed};
+  }
+  var fillHit=layer.hitTest(pt,{fill:true,tolerance:0});
+  if(fillHit&&fillHit.item instanceof Path&&fillHit.item.fillColor){
+    var fp=fillHit.item;
+    var region=fsFindFillRegion(fp,pt,layer);
+    if(region){region.regionPath.remove();return{path:fp,kind:'fillregion',boundaryStart:region.boundaryStart,boundaryEnd:region.boundaryEnd,cutter:region.cutter,cutterA:region.cutterA,cutterB:region.cutterB};}
+    return{path:fp,kind:'fill'};
+  }
+  return null;
+}
+// Non-destructive: builds a standalone Path tracing just the selected arc,
+// for the render-overlay highlight — operates on a throwaway clone, never
+// touches the real path. Mirrors fsDeleteSegment's splitAt logic exactly
+// (see that function's comment for the semantics), just keeping the arc
+// piece here instead of discarding it.
+function fsHighlightPath(sel){
+  if(!sel)return null;
+  if(sel.kind==='fill')return sel.path.clone({insert:false,deep:false});
+  if(sel.kind==='fillregion'){
+    var region=fsBuildFillRegion(sel.path,sel.boundaryStart,sel.boundaryEnd,sel.cutter,sel.cutterA,sel.cutterB);
+    if(!region)return sel.path.clone({insert:false,deep:false}); // cutter/geometry changed since selection — fall back to whole fill
+    var out=region.clone({insert:false,deep:false});
+    region.remove();
+    return out;
+  }
+  return fsExtractArc(sel.path,sel.segStart,sel.segEnd);
+}
+// DESTRUCTIVE: isolates the selected arc as its own Path and removes it,
+// leaving the remainder of the stroke (and any fill — Paper.js copies
+// style to both sides of a split, so the kept remainder keeps its own
+// fillColor untouched) in the layer.
+//
+// Path#splitAt(location) semantics this relies on (Paper.js): on an OPEN
+// path it MUTATES the receiver into [start..splitPoint] and RETURNS a new
+// path [splitPoint..end]. On a CLOSED path it returns null and instead
+// re-bases the path to start AT that location (same loop, same length,
+// still closed) — the first splitAt on a closed path never removes
+// anything by itself, it just picks a new "seam".
+// Top-level entry point for the Delete key while this tool is active —
+// dispatches to the fill-only or stroke/segment path, then clears the
+// (now possibly stale, geometry-mutated) selection.
+// A fill manually touched through this tool (deleted, recolored, toggled
+// off) must STAY that way — Animate has no such thing as a fill spontaneously
+// reappearing because a nearby stroke moved. This app's paint-bucket fills
+// DO have that magic (data.fillSeed/fillWalls, see fillRegenerateLinked in
+// this file), which is exactly backwards for anything the user just hand-
+// edited here: if the touched path survives (kept for its strokeColor) with
+// its old fillSeed/fillWalls still attached, the next stroke-move regen pass
+// would silently repaint a fill right back over the user's own edit. Strip
+// the tracking unconditionally so a manual edit always wins and stays put.
+function fsUnlinkFillRegen(p){
+  if(!p||!p.data)return;
+  delete p.data.fillSeed;delete p.data.fillWalls;delete p.data.fillGapPx;
+}
+function fsApplyDelete(){
+  if(!_fsSel)return;
+  pushUndo();
+  var layer=userLayers[state.activeLayerIdx];
+  if(_fsSel.kind==='fillregion')_fsSel=fsRealizeFillRegion(_fsSel,layer);
+  if(_fsSel.kind==='fill'){
+    var p=_fsSel.path;
+    p.fillColor=null;
+    fsUnlinkFillRegen(p);
+    if(!p.strokeColor)p.remove();
+    saveActiveLayerFrame();
+  }else{
+    fsDeleteSegment(_fsSel,layer);
+  }
+  fsClearSel();
+  renderArcs();updateUI();
+}
+function fsDeleteSegment(sel,layer){
+  var path=sel.path;
+  if(sel.segStart===0&&sel.segEnd===path.length&&!(path.closed&&sel.segEnd<sel.segStart)){
+    // whole stroke, no crossings — same as nulling strokeColor on the
+    // combined path (matches Animate deleting an un-crossed stroke)
+    path.strokeColor=null;
+    if(!path.fillColor)path.remove();
+    saveActiveLayerFrame();
+    return;
+  }
+  if(path.closed){
+    var loopLen=path.length;
+    path.splitAt(path.getLocationAt(sel.segStart)); // re-bases the seam to segStart; still closed, still one object
+    var newEndOffset=((sel.segEnd-sel.segStart)+loopLen)%loopLen;
+    if(newEndOffset<=0.001)newEndOffset=loopLen; // selected arc is the WHOLE (now-open) loop
+    var remainder=path.splitAt(path.getLocationAt(newEndOffset)); // now open (re-based+split) -> real split: path=[segStart..segEnd] (the arc), remainder=[segEnd..segStart] (the kept tail)
+    path.remove(); // `path` is the selected arc post-split — discard it
+    // `remainder` (if any) is the kept, now-open remainder of the stroke —
+    // already in the layer, nothing further to do.
+  }else{
+    var tail=path.splitAt(path.getLocationAt(sel.segEnd)); // path=[start..segEnd] (kept head + arc), tail=[segEnd..originalEnd] (kept tail)
+    if(tail&&tail.length<0.001)tail.remove(); // segEnd was the original end -> "tail" is degenerate, drop it
+    var arc=path.splitAt(path.getLocationAt(sel.segStart)); // path=[start..segStart] (kept head), arc=[segStart..segEnd] (the selected arc)
+    if(arc)arc.remove();
+    if(path.length<0.001)path.remove(); // segStart was 0 -> "head" is degenerate, drop it
+  }
+  saveActiveLayerFrame();
+}
+
 // ---- NODE / TANGENT EDIT (select tool, single-path selection) ----
 // Circles = anchor points, squares = bezier tangent handles (connected by a
 // thin guide line), exactly like Illustrator's Direct Selection. For
@@ -42,6 +325,24 @@ var _nmq={active:false,start:null,rect:null};
 // arrow, A) — the main Select tool (black arrow, V) owns move + the
 // transform gizmo instead, mirroring Animate's two-arrow split so the two
 // kinds of handles never fight over the same click.
+// A brush-texture dab (data.isBrushTextureCopy) is what's actually visible
+// and thus what hitTest lands on — but it's a tiny disposable stamp, not
+// the real editable path. Its underlying anchor is USUALLY fully invisible
+// (opacity 0, see applyBrushTexture in this file) so a click can never land
+// on the anchor directly; this resolves a dab hit back to its real anchor
+// (same layer, matching data.brushGroupId, itself NOT a dab) so subselect
+// node-editing (tangents, points) operates on the real path instead of
+// silently editing a disposable dab that gets regenerated on the next
+// stroke edit anyway.
+function resolveBrushAnchor(item,layer){
+  if(!item||!item.data||!item.data.isBrushTextureCopy||!item.data.brushGroupId)return item;
+  var gid=item.data.brushGroupId;
+  for(var i=0;i<layer.children.length;i++){
+    var c=layer.children[i];
+    if(c.data&&c.data.brushGroupId===gid&&!c.data.isBrushTextureCopy)return c;
+  }
+  return item;
+}
 function nodeEditTargetPath(){
   if(state.tool!=='subselect'||selectedPaths.length!==1)return null;
   var p=selectedPaths[0];
@@ -95,6 +396,49 @@ function xformSelBounds(){
   selectedPaths.forEach(function(p){b=b?b.unite(p.bounds):p.bounds.clone();});
   return b;
 }
+// Align toolbar (redesign 2026-07-09) — each selected path moves by its OWN
+// delta against the combined selection bounds (not a uniform group shift
+// like selPropsApplyMove), so this can't reuse that function; the per-path
+// translate block below is deliberately identical to it though (see its own
+// comment) — same companion objects (vector-brush centerline, linkedFill
+// backdrop, brush-texture dabs) need the same translate to avoid the
+// "parallax drift" bug already fixed once this session.
+function alignSelection(mode){
+  if(selectedPaths.length<2)return;
+  var b=xformSelBounds();if(!b)return;
+  pushUndo();
+  var moved=false;
+  selectedPaths.forEach(function(p){
+    var pb=p.bounds,dx=0,dy=0;
+    if(mode==='left')dx=b.left-pb.left;
+    else if(mode==='right')dx=b.right-pb.right;
+    else if(mode==='centerH')dx=b.center.x-pb.center.x;
+    else if(mode==='top')dy=b.top-pb.top;
+    else if(mode==='bottom')dy=b.bottom-pb.bottom;
+    else if(mode==='centerV')dy=b.center.y-pb.center.y;
+    if(Math.abs(dx)<1e-6&&Math.abs(dy)<1e-6)return;
+    moved=true;
+    var d=new Point(dx,dy);
+    p.translate(d);
+    if(p.data&&p.data.isVectorBrush&&p.data.centerSegments)p.data.centerSegments.forEach(function(s){s.point=[s.point[0]+dx,s.point[1]+dy];});
+    if(p.data&&p.data.linkedFill&&!p.data.linkedFill.removed)p.data.linkedFill.translate(d);
+    if(p.data&&p.data.brushCompanions)p.data.brushCompanions.forEach(function(c){if(!c.removed)c.translate(d);});
+  });
+  if(!moved){state.undoStack.pop();return;}
+  fillRegenerateLinked(userLayers[state.activeLayerIdx],null);
+  saveActiveLayerFrame();renderArcs();updateUI();
+  if(window.SMEngineBridge)SMEngineBridge.renderNow();
+}
+// Rotation/scale pivot picker (redesign 2026-07-09, AE-style 9-dot anchor
+// widget) — a TOOL preference like state.tool, not document content: it
+// resets to center on a fresh selection rather than being saved per-object,
+// since this app's transform model doesn't carry a persistent per-path
+// anchor offset the way After Effects' layers do. Paper.js Rectangle
+// already exposes all 9 named points as getters, so no geometry math needed
+// here — just the key->getter-name map both select-bridge.js (drag-rotate)
+// and timeline.js (numeric Rotate field) read from.
+var XFORM_ANCHOR_PROP={tl:'topLeft',tc:'topCenter',tr:'topRight',ml:'leftCenter',mc:'center',mr:'rightCenter',bl:'bottomLeft',bc:'bottomCenter',br:'bottomRight'};
+function xformAnchorPoint(b){return b[XFORM_ANCHOR_PROP[state.xformAnchorKey]||'center'];}
 function renderTransformHandles(){
   xformLayer.removeChildren();xformHandles=[];
   if(state.tool!=='select'||!selectedPaths.length)return;
@@ -181,7 +525,16 @@ if(window.__TAURI__&&window.__TAURI__.event&&window.__TAURI__.event.listen){
   });
 }
 
-function ensureKeyframe(){var curF=state.layers[state.activeLayerIdx].frames[state.currentFrame];if(!curF.isKeyframe&&!curF.isInterpolated){curF.isKeyframe=true;curF.strokes=JSON.parse(JSON.stringify(getEffectiveStrokes(state.activeLayerIdx,state.currentFrame)));loadFrame(state.currentFrame);}}
+// THE choke point for "a new keyframe appears" during normal drawing —
+// every Draw/Pen/Shape/Fillbrush commit calls this first. A Stroke/Fill/
+// Shadow-linked layer (convertLayerToStrokeFillShadowFolder, app.js) needs
+// syncLinkedKeyframeFolder here too, not just on the explicit F6/insert-
+// keyframe path (insertKeyframeAt) — without it, simply drawing a first
+// stroke on the "XXX Stroke" channel at a plain frame never propagated the
+// new keyframe to "XXX Fill"/"XXX Shadow" at all, breaking the "keyframes
+// partagées" premise of the split for the single most common way a
+// keyframe actually gets created.
+function ensureKeyframe(){var curF=state.layers[state.activeLayerIdx].frames[state.currentFrame];if(!curF.isKeyframe&&!curF.isInterpolated){curF.isKeyframe=true;curF.strokes=JSON.parse(JSON.stringify(getEffectiveStrokes(state.activeLayerIdx,state.currentFrame)));loadFrame(state.currentFrame);syncLinkedKeyframeFolder(state.activeLayerIdx,state.currentFrame);}}
 
 // ---- VECTOR FILL ENGINE ----
 // The fill of an area IS just the closed loop formed by the strokes around
@@ -348,10 +701,20 @@ function fillRegenerateLinked(layer,touchedPath){
   if(!layer)return;
   var fills=layer.children.filter(function(c){return c instanceof Path&&c.data&&c.data.fillSeed;});
   if(!fills.length)return;
+  // `touchedPath`'s own strokeId, when known — lets the loop below skip
+  // fills that are wall-restricted to OTHER strokes entirely, instead of
+  // re-tracing (fillVectorFind: real boundary-walk/gap-search) every fill
+  // bucket in the layer on every call. Matters most for the eraser, which
+  // calls this once per pointermove sample during a drag (eraser-bridge.js)
+  // — a layer with several unrelated fill buckets used to pay full
+  // re-trace cost for ALL of them on every sample, not just the one(s)
+  // actually bounded by the stroke being erased.
+  var touchedId=touchedPath&&touchedPath.data&&touchedPath.data.strokeId;
   fills.forEach(function(f){
+    var onlyIds=(f.data.fillWalls&&f.data.fillWalls.length)?f.data.fillWalls:undefined;
+    if(touchedId&&onlyIds&&onlyIds.indexOf(touchedId)<0)return; // this fill's boundary doesn't involve the touched stroke at all — nothing to re-check
     var seed=new Point(f.data.fillSeed[0],f.data.fillSeed[1]);
     var col=f.fillColor,op=f.opacity;
-    var onlyIds=(f.data.fillWalls&&f.data.fillWalls.length)?f.data.fillWalls:undefined;
     // With the wall restriction in place the gap cap is unnecessary (see
     // block comment above); without it (legacy fill), the cap remains the
     // only guard against grabbing unrelated strokes, so keep it.
@@ -673,6 +1036,220 @@ function buildVariableWidthPath(pts,widths){
 // first existing fill it overlaps (last-drawn/topmost first, so it merges
 // with whatever's visually on top at that spot) instead of stacking a
 // separate object — falls back to 'above' if nothing underneath overlaps.
+// ---- PROCEDURAL BRUSH ENGINE (dab/nib stamping, Sketchbook-style) ----
+// A real raster texture brush stamps a small bitmap ("nib") repeatedly
+// along the path — there's no bitmap primitive in a pure-vector renderer,
+// so each "dab" here is a small vector ellipse instead, placed at
+// arc-length intervals with randomized spacing/rotation/size/opacity/
+// perpendicular offset (scatter). This is a genuine procedural stamp
+// engine (matches Sketchbook's Nib model: Spacing/Space Randomize/
+// Rotation/Rotation Randomize/Scatter/Roundness), a deliberate replacement
+// for the earlier "a handful of whole-length jittered copies" approximation
+// — that technique could only ever fake an even, blurry grain; discrete
+// dabs read as real chalk/charcoal/pencil texture at any zoom level and
+// are what applyBrushTexture (below) actually builds.
+//
+// Parameters (all in the SAME units regardless of preset, so the editor
+// panel's sliders mean the same thing for every preset):
+//   nibSize    — dab diameter, as a multiplier of the stroke's own width
+//   roundness  — 0..1, dab height/width ratio (1 = round nib, <1 = flat/
+//                calligraphic nib)
+//   spacing    — gap between dab centers, as a fraction of nib diameter
+//                (small = smooth solid coverage, large = visible individual
+//                dabs/grain)
+//   spaceJitter    — 0..1, randomizes spacing per step
+//   rotationMode   — 'tangent' (follows the stroke direction, like a real
+//                    angled nib), 'random' (each dab spun independently —
+//                    reads as rougher grain), or 'fixed' (all dabs at the
+//                    same angle, calligraphic look)
+//   rotationJitter — degrees of random rotation added on top of the mode
+//   sizeJitter     — 0..1, per-dab scale randomization
+//   opacity/opacityJitter — per-dab alpha and its randomization
+//   scatter    — perpendicular random offset from the centerline, as a
+//                fraction of nib diameter (spreads dabs off the exact
+//                path — real charcoal/chalk never lays down a perfectly
+//                centered line)
+//   dashGap    — 0..1 probability a given dab is skipped entirely (broken/
+//                torn edge, replaces the old preset system's literal dash
+//                array)
+var BRUSH_PRESETS={
+  'chalk-blunt':     {nibSize:1.3,roundness:.85,spacing:.55,spaceJitter:.25,rotationMode:'random',rotationJitter:60, sizeJitter:.25,opacity:.55,opacityJitter:.25,scatter:.18,dashGap:0},
+  'chalk-round':     {nibSize:1.1,roundness:1,  spacing:.4, spaceJitter:.2, rotationMode:'random',rotationJitter:30, sizeJitter:.18,opacity:.5, opacityJitter:.2, scatter:.12,dashGap:0},
+  'chalk-scribble':  {nibSize:1.0,roundness:.7, spacing:.7, spaceJitter:.4, rotationMode:'random',rotationJitter:180,sizeJitter:.4, opacity:.4, opacityJitter:.3, scatter:.3, dashGap:.15},
+  'charcoal-feather':{nibSize:1.4,roundness:.6, spacing:.6, spaceJitter:.35,rotationMode:'random',rotationJitter:90, sizeJitter:.45,opacity:.3, opacityJitter:.35,scatter:.35,dashGap:.1},
+  'charcoal-pencil': {nibSize:.8, roundness:.9, spacing:.3, spaceJitter:.15,rotationMode:'tangent',rotationJitter:15, sizeJitter:.15,opacity:.7, opacityJitter:.15,scatter:.08,dashGap:0},
+  'charcoal-rough':  {nibSize:1.5,roundness:.65,spacing:.65,spaceJitter:.45,rotationMode:'random',rotationJitter:180,sizeJitter:.55,opacity:.4, opacityJitter:.35,scatter:.4, dashGap:.18},
+  'charcoal-rounded':{nibSize:1.3,roundness:1,  spacing:.45,spaceJitter:.2, rotationMode:'random',rotationJitter:45, sizeJitter:.15,opacity:.55,opacityJitter:.2, scatter:.15,dashGap:0},
+  'charcoal-smooth': {nibSize:1.2,roundness:1,  spacing:.25,spaceJitter:.1, rotationMode:'random',rotationJitter:20, sizeJitter:.1, opacity:.65,opacityJitter:.1, scatter:.06,dashGap:0},
+  'charcoal-soft':   {nibSize:1.6,roundness:.75,spacing:.5, spaceJitter:.3, rotationMode:'random',rotationJitter:90, sizeJitter:.3, opacity:.32,opacityJitter:.3, scatter:.25,dashGap:.05},
+  'charcoal-tapered':{nibSize:1.2,roundness:.8, spacing:.45,spaceJitter:.2, rotationMode:'tangent',rotationJitter:25, sizeJitter:.2, opacity:.55,opacityJitter:.2, scatter:.15,dashGap:0},
+  'charcoal-thick':  {nibSize:2.2,roundness:.9, spacing:.4, spaceJitter:.2, rotationMode:'random',rotationJitter:40, sizeJitter:.15,opacity:.6, opacityJitter:.15,scatter:.12,dashGap:0},
+  'charcoal-thin':   {nibSize:.6, roundness:.9, spacing:.35,spaceJitter:.15,rotationMode:'random',rotationJitter:30, sizeJitter:.15,opacity:.65,opacityJitter:.15,scatter:.1, dashGap:0},
+  'charcoal-varied': {nibSize:1.3,roundness:.7, spacing:.6, spaceJitter:.5, rotationMode:'random',rotationJitter:180,sizeJitter:.65,opacity:.4, opacityJitter:.4, scatter:.3, dashGap:.12},
+  'pencil-feather':  {nibSize:.7, roundness:.6, spacing:.6, spaceJitter:.35,rotationMode:'random',rotationJitter:90, sizeJitter:.3, opacity:.3, opacityJitter:.3, scatter:.2, dashGap:.15},
+  'pencil-thick':    {nibSize:1.8,roundness:.9, spacing:.3, spaceJitter:.15,rotationMode:'tangent',rotationJitter:15, sizeJitter:.15,opacity:.7, opacityJitter:.15,scatter:.08,dashGap:0},
+  'pencil-thin':     {nibSize:.5, roundness:.9, spacing:.3, spaceJitter:.1, rotationMode:'tangent',rotationJitter:10, sizeJitter:.1, opacity:.8, opacityJitter:.1, scatter:.05,dashGap:0},
+};
+// Hard ceiling on dabs per stroke, regardless of preset/length — protects
+// against a very long stroke with tight spacing multiplying scene-
+// serialization cost unboundedly (each dab is a real, separately-
+// serialized Path — see the perf audit note in strokemotion/CLAUDE.md).
+// Spacing is widened (never narrowed below the preset's own value) just
+// enough to land under this cap rather than silently truncating the tail
+// of the stroke.
+var BRUSH_MAX_DABS=180;
+// Single lookup point for a preset's parameters, whether built-in or one of
+// the user's own saved presets (state.customBrushPresets, keyed by a
+// generated id — see brush-editor.js) — every reader of BRUSH_PRESETS[key]
+// (applyBrushTexture, brush-preset-picker.js's preview) goes through this
+// instead of the raw dict so custom presets work everywhere built-ins do,
+// with no separate code path to keep in sync.
+function resolveBrushPreset(key){
+  if(!key||key==='none')return null;
+  return BRUSH_PRESETS[key]||(state.customBrushPresets&&state.customBrushPresets[key])||null;
+}
+// Stamps dabs along `pathLike` (anything with .length/.getPointAt/
+// .getTangentAt — a live Path, works equally on a throwaway preview path)
+// and returns an array of freshly-built, unstyled-position dab Paths (each
+// already positioned/rotated/sized, but caller decides fill/opacity/
+// insertion — see applyBrushTexture and brush-preset-picker.js's live
+// preview, which both call this so the actual placement math can never
+// drift between "what you see in the editor" and "what you actually get").
+// Deterministic RNG (mulberry32) for dab placement when the SAME texture
+// must be reproducible across calls — tween generation re-stamps the dabs
+// on every generated inbetween frame from the interpolated centerline, and
+// a fresh Math.random each frame would make the texture "boil" violently
+// instead of sticking to the morphing stroke. Interactive application keeps
+// true randomness (rng omitted → Math.random).
+function seededRng(seed){
+  var t=seed>>>0;
+  return function(){
+    t+=0x6D2B79F5;
+    var r=Math.imul(t^t>>>15,1|t);
+    r=r+Math.imul(r^r>>>7,61|r)^r;
+    return((r^r>>>14)>>>0)/4294967296;
+  };
+}
+function buildBrushDabs(pathLike,preset,baseWidth,rng){
+  var rand=rng||Math.random;
+  var len=pathLike.length;
+  if(!(len>0))return[];
+  var nibDiam=Math.max(.5,baseWidth*(preset.nibSize!==undefined?preset.nibSize:1));
+  // Spacing is deliberately NOT derived from nibDiam (i.e. not from the
+  // live stroke width) — it used to be, which compounded with preset.nibSize
+  // so a thicker line's dabs came out both bigger AND visibly further apart
+  // (reported: "en fonction de la taille de la ligne les points s'écartent",
+  // texture reading as sparser/falling apart at larger widths). Basing it on
+  // a fixed reference nib diameter instead keeps the dab-to-dab spacing —
+  // the texture's grain density — a constant property of the preset, while
+  // dab SIZE still scales with width as expected.
+  var BRUSH_SPACING_REF_NIB=3;
+  var refNibDiam=Math.max(.5,BRUSH_SPACING_REF_NIB*(preset.nibSize!==undefined?preset.nibSize:1));
+  var spacing=Math.max(.4,refNibDiam*(preset.spacing!==undefined?preset.spacing:.35));
+  if(len/spacing>BRUSH_MAX_DABS)spacing=len/BRUSH_MAX_DABS;
+  var roundness=preset.roundness!==undefined?preset.roundness:1;
+  var dabs=[],d=0,guard=0;
+  while(d<=len&&guard++<BRUSH_MAX_DABS+2){
+    if(!(preset.dashGap&&rand()<preset.dashGap)){
+      var at=Math.min(len,d);
+      var pt=pathLike.getPointAt(at);
+      var tan=pathLike.getTangentAt(at)||new Point(1,0);
+      var normal=new Point(-tan.y,tan.x);
+      var scatterAmt=(rand()*2-1)*nibDiam*(preset.scatter||0);
+      var center=pt.add(normal.multiply(scatterAmt));
+      var sizeMul=1+(rand()*2-1)*(preset.sizeJitter||0);
+      var w=Math.max(.3,nibDiam*sizeMul);
+      var h=Math.max(.3,w*roundness);
+      var angle;
+      if(preset.rotationMode==='random')angle=rand()*360;
+      else if(preset.rotationMode==='fixed')angle=preset.fixedAngle||0;
+      else angle=tan.angle; // 'tangent' (default): dab follows stroke direction, like a real angled nib
+      angle+=(rand()*2-1)*(preset.rotationJitter||0);
+      var dab=new Path.Ellipse({center:[0,0],radius:[w/2,h/2],insert:false});
+      dab.rotate(angle);
+      dab.position=center;
+      dab.data={dabOpacity:Math.max(0,Math.min(1,(preset.opacity!==undefined?preset.opacity:.5)*(1+(rand()*2-1)*(preset.opacityJitter||0))))};
+      dabs.push(dab);
+    }
+    d+=spacing*(1+(rand()*2-1)*(preset.spaceJitter||0));
+  }
+  return dabs;
+}
+// Builds the real, layer-inserted texture from `basePath`'s own already-
+// committed geometry — deliberately reads basePath's live Paper.js shape
+// (via buildBrushDabs' .getPointAt/.getTangentAt walk) rather than needing
+// the tool's raw pre-simplify samples, so this works identically whether
+// called at draw-commit time OR later via "Apply to selection" on an
+// arbitrary existing stroke (timeline.js). basePath itself becomes an
+// invisible (opacity 0) anchor: still hit-testable (Paper.js hit-testing
+// checks path geometry/style, not rendered opacity) so click-to-select and
+// the existing move/duplicate/delete machinery all keep working on "the
+// stroke" as one unit, while every dab is a real separate Path tagged
+// data.isBrushTextureCopy + a shared data.brushGroupId (persisted by serP/
+// desP, regrouped into a live data.brushCompanions array by
+// relinkBrushCompanions() after every layer rebuild — see that function's
+// own comment in app.js for why a live object-reference array can't
+// survive a save/reload on its own).
+function applyBrushTexture(basePath,presetKey){
+  var preset=resolveBrushPreset(presetKey);
+  if(!preset||!basePath.segments||basePath.segments.length<2)return basePath;
+  var baseWidth=basePath.strokeWidth;
+  // On RE-apply (switching preset on an already-textured stroke) the live
+  // strokeColor may already be nulled by the fill-visible branch below —
+  // fall back to the remembered original so the new dabs don't silently
+  // come out colorless.
+  var baseColor=basePath.strokeColor||(basePath.data&&basePath.data.preTextureStroke?new Color(basePath.data.preTextureStroke):null);
+  var groupId='bg'+Date.now().toString(36)+'_'+Math.floor(Math.random()*1e6);
+  var dabs=buildBrushDabs(basePath,preset,baseWidth);
+  var companions=dabs.map(function(dab){
+    dab.fillColor=baseColor;dab.strokeColor=null;dab.opacity=dab.data.dabOpacity;
+    dab.data={isBrushTextureCopy:true,brushGroupId:groupId};
+    // Above, not below: when basePath also carries a fill (kept visible,
+    // see the fill-case branch just below), inserting dabs UNDER it left
+    // its own opaque fill painting straight over the texture — only a thin
+    // sliver of dabs peeking out past the fill's own edge was ever visible
+    // (reported: texture looked like it wasn't applied at all). The no-fill
+    // anchor is invisible (opacity 0) either way, so this is a no-op there.
+    dab.insertAbove(basePath);
+    return dab;
+  });
+  // The dabs replace the STROKE's look only. A path that also carries a
+  // FILL must keep painting it — the old unconditional `opacity=0` hid the
+  // fill along with the stroke (reported: "avec un preset le fill n'est pas
+  // visible sauf avec l'onion skin", onion mode forcing its own opacity was
+  // exactly why it showed up there). Fill case: keep the path visible and
+  // null only the strokeColor (remembered in data.preTextureStroke, same
+  // first-application-only convention as preTextureOpacity — whoever clears
+  // back to 'none' restores both). No-fill case: the opacity-0 invisible-
+  // anchor trick stays (a fill-less stroke-less path draws nothing anyway,
+  // but opacity 0 also survives any later fill assignment).
+  if(basePath.fillColor){
+    if(basePath.data.preTextureStroke===undefined)basePath.data.preTextureStroke=basePath.strokeColor?colorHex8(basePath.strokeColor):null;
+    basePath.strokeColor=null;
+  }else{
+    if(basePath.data.preTextureOpacity===undefined)basePath.data.preTextureOpacity=basePath.opacity!==undefined?basePath.opacity:1;
+    basePath.opacity=0; // invisible anchor — the dabs are the whole visible stroke now
+  }
+  basePath.data.brushCompanions=companions;
+  basePath.data.brushTexturePreset=presetKey;
+  basePath.data.brushGroupId=groupId;
+  return basePath;
+}
+// Node/tangent edits (subselect drag) mutate the anchor's segments directly
+// but the dabs are disposable stamps computed once at apply-time — they
+// never re-follow an edited anchor, so a tangent drag "did nothing"
+// visually even once resolveBrushAnchor() let you select the real path.
+// Re-stamps the whole texture from the anchor's current geometry; call on
+// drag-END only (buildBrushDabs is a full rebuild, not cheap per mousemove).
+function regenerateBrushTexture(basePath,layer){
+  if(!basePath.data||!basePath.data.brushTexturePreset||!basePath.data.brushGroupId)return;
+  var gid=basePath.data.brushGroupId;
+  for(var i=layer.children.length-1;i>=0;i--){
+    var c=layer.children[i];
+    if(c.data&&c.data.isBrushTextureCopy&&c.data.brushGroupId===gid)c.remove();
+  }
+  applyBrushTexture(basePath,basePath.data.brushTexturePreset);
+}
 function applyFillBrushPlacement(path,layer){
   var mode=state.fillBrushMode;
   if(mode==='merge'){
@@ -684,11 +1261,15 @@ function applyFillBrushPlacement(path,layer){
     }
     if(target){
       var united=target.unite(path,{insert:false});
-      united.fillColor=path.fillColor;united.strokeColor=null;united.opacity=path.opacity;
       var idx=layer.children.indexOf(target);
       target.remove();path.remove();
-      layer.insertChild(Math.min(idx,layer.children.length),united);
-      return united;
+      // unite() returns a CompoundPath the moment the two shapes don't
+      // fully overlap (bbox-intersecting but not actually touching) — split
+      // into flat Paths at insertion, same as eraseAtPoint/booleanOp, so it
+      // isn't silently dropped by saveActiveLayerFrame's `instanceof Path`
+      // filter the moment the frame next saves.
+      var islands=insertBooleanResult(layer,Math.min(idx,layer.children.length),united,path.fillColor,path.opacity);
+      return islands[0];
     }
     return path;
   }
@@ -888,7 +1469,21 @@ function rebuildVectorBrushOutline(path){
   }
   center.remove();
   var outline=buildVariableWidthPath(pts,widths);
-  if(outline){path.segments=outline.segments;path.closed=true;outline.remove();}
+  if(outline){
+    path.segments=outline.segments;path.closed=true;outline.remove();
+    // Fill Brush's whole point is to draw a genuine filled SHAPE — a clean
+    // editable path with a handful of real bezier anchors/tangent handles,
+    // the same as a hand-plotted Pen path — not a dense point-cloud ribbon
+    // outline (buildVariableWidthPath emits one point per width-profile
+    // sample, easily 50-200+ points for an ordinary stroke). The pressure
+    // STROKE brush (isVectorBrush without isFillShape) deliberately keeps
+    // the dense outline as-is: its centerSegments/widthProfile editing
+    // model depends on this exact geometry being regenerated identically on
+    // every edit. Only fill-brush shapes get this extra simplify pass,
+    // right here in the single choke point every edit (scale/rotate/node-
+    // drag) already funnels through, so it stays smooth after edits too.
+    if(path.data&&path.data.isFillShape)path.simplify(2.5);
+  }
 }
 
 // ---- POINT TYPE CONVERSION (corner / smooth / symmetric) ----
@@ -1016,10 +1611,15 @@ function booleanOp(op){
   result.strokeColor=style.strokeColor;result.strokeWidth=style.strokeWidth;
   result.strokeCap=style.strokeCap;result.strokeJoin=style.strokeJoin;
   result.fillColor=style.fillColor;result.opacity=style.opacity;
-  userLayers[state.activeLayerIdx].addChild(result);
+  var boolLayer=userLayers[state.activeLayerIdx];
+  // subtract/exclude routinely produce a CompoundPath (disjoint remainders,
+  // or a hole) — split into flat Paths at insertion, same as eraseAtPoint,
+  // so it isn't silently dropped by saveActiveLayerFrame's `instanceof
+  // Path` filter (or selection/click-to-pick) the moment the frame saves.
+  var islands=insertBooleanResult(boolLayer,boolLayer.children.length,result,style.fillColor,style.opacity);
   paths.forEach(function(p){p.remove();});
-  selectedPaths=[result];state.selectedStrokeIndices=[];
-  fillRegenerateLinked(userLayers[state.activeLayerIdx],result);
+  selectedPaths=islands;state.selectedStrokeIndices=[];
+  fillRegenerateLinked(boolLayer,islands[0]);
   saveActiveLayerFrame();updateUI();showToast('Opération booléenne appliquée');
 }
 
@@ -1096,12 +1696,44 @@ function eraseAtPoint(path,worldPt,radius,fromPt){
   var idx=layer.children.indexOf(path);
   var target=path;
   var isVB=!!(path.data&&path.data.isVectorBrush);
-  if(!isVB&&path.strokeColor&&!path.fillColor){
+  // An OPEN path has zero real fill area no matter what fillColor says —
+  // since Draw-tool strokes now get a fillColor by default (fillEnabled
+  // defaults true), an open hand-drawn line can reach here with
+  // path.fillColor set but path.closed===false. Subtracting directly
+  // against that degenerate zero-area "fill" always empties out, which
+  // deleted the ENTIRE stroke on any erase touch instead of notching it.
+  // Still expand to a proper capsule/ribbon whenever the path isn't closed.
+  //
+  // A CLOSED path with BOTH a fill AND a visible stroke (the default for
+  // almost anything drawn — fillEnabled defaults true) used to skip this
+  // whole branch and erase only the interior fill polygon, then unconditionally
+  // null out strokeColor on the result below. Since a Path can only carry one
+  // strokeColor for its whole outline, that didn't "notch" the border where
+  // touched — it deleted the visible stroke everywhere on the shape in one
+  // touch, which read as "the eraser deletes the whole stroke+fill". Fix:
+  // whenever there IS a strokeColor, always expand it into real ink geometry
+  // and UNION it with the existing fill first, so the border becomes part of
+  // the erasable area instead of being discarded outright.
+  if(!isVB&&path.strokeColor){
     var expanded=eraseExpandStrokeToFill(path);
-    if(!expanded)return;
-    layer.insertChild(idx,expanded);
-    path.remove();
-    target=expanded;
+    if(expanded){
+      if(path.fillColor&&path.closed){
+        var fillCopy=path.clone({insert:false});
+        fillCopy.strokeColor=null;
+        var merged=fillCopy.unite(expanded,{insert:false});
+        fillCopy.remove();expanded.remove();
+        merged.fillColor=path.fillColor;merged.opacity=path.opacity;
+        layer.insertChild(idx,merged);
+        path.remove();
+        target=merged;
+      }else{
+        layer.insertChild(idx,expanded);
+        path.remove();
+        target=expanded;
+      }
+    }else if(!path.fillColor||!path.closed){
+      return;
+    }
   }
   if(!target.fillColor)return;
   var col=target.fillColor,op=target.opacity;
@@ -1129,12 +1761,68 @@ function eraseAtPoint(path,worldPt,radius,fromPt){
     // here on (still fully colorable/selectable/erasable, just not
     // re-editable as a tapered centerline) — the same tradeoff Illustrator
     // makes when you erase into a live stroke.
-    layer.insertChild(Math.min(tIdx,layer.children.length),result);
+    insertBooleanResult(layer,Math.min(tIdx,layer.children.length),result,col,op);
   }else if(result)result.remove();
+}
+// Inserts the result of a Paper.js/WASM boolean op (subtract/unite/
+// intersect/exclude — used by eraseAtPoint above, booleanOp, and
+// applyFillBrushPlacement's "merge" mode) into `layer` at `insertAt`.
+// A boolean op routinely returns a CompoundPath the moment its result has
+// more than one contour (disjoint islands) or a hole — but every OTHER
+// consumer of layer children (saveActiveLayerFrame/saveAllLayerFrames's
+// `instanceof Path` filter, selection construction in select-bridge.js/
+// tools.js/timeline.js, tween matching) only ever expected flat Paths, the
+// same historical assumption every one of these boolean-op call sites used
+// to make. A raw CompoundPath left in the layer renders fine on the CURRENT
+// frame (engine-bridge.js's buildSceneJson/onionLayerItems both flatten
+// CompoundPath already) but silently vanishes from persisted frame data —
+// and from every selection/click-to-pick path — the moment the frame next
+// saves, which reads exactly like "the shape deletes itself" with a delay.
+// Splitting each island into its own independent Path here, once, at every
+// insertion point, means nothing downstream needs to learn about
+// CompoundPath at all. A genuinely fully-enclosed hole (rare outside a
+// deliberate "punch a hole" op) loses its cutout this way (each island
+// paints solid) — an accepted tradeoff, since every other consumer already
+// can't represent a hole through this same flat-Path convention.
+function insertBooleanResult(layer,insertAt,result,fillColor,opacity){
+  if(!(result instanceof CompoundPath)){
+    layer.insertChild(insertAt,result);
+    return[result];
+  }
+  var islands=result.children.slice();
+  islands.forEach(function(isl,k){
+    isl.remove(); // detach from the CompoundPath (only removes it from ITS parent, the island itself survives)
+    if(fillColor!==undefined)isl.fillColor=fillColor;
+    isl.strokeColor=null;
+    if(opacity!==undefined)isl.opacity=opacity;
+    layer.insertChild(insertAt+k,isl);
+  });
+  result.remove(); // now-empty wrapper, nothing left to discard but itself
+  return islands;
 }
 
 // ---- PRESSURE-SIMULATED VECTOR BRUSH ----
 var _vb={pts:[],widths:[],lastT:0,lastPt:null};
+// Mirrors draw-bridge.js's smoothPressure()/stabilizePoint() — this Paper-
+// native path is only a fallback (the engine is on by default), but the two
+// must stay in phase per this file's own duplication-hazard convention, or
+// falling back here mid-session would visibly change how a stroke feels.
+var _vbSmoothedPressure=null;
+function vbSmoothPressure(p){
+  if(_vbSmoothedPressure==null){_vbSmoothedPressure=p;return p;}
+  _vbSmoothedPressure+=(p-_vbSmoothedPressure)*0.45;
+  return _vbSmoothedPressure;
+}
+function vbStabilizePoint(pt){
+  var stab=state.stabilizer;
+  if(!stab){stabQueue.length=0;return pt;}
+  stabQueue.push(pt);
+  var maxQ=stab===1?3:stab===2?6:10;
+  while(stabQueue.length>maxQ)stabQueue.shift();
+  var avg=new Point(0,0);
+  stabQueue.forEach(function(p){avg=avg.add(p);});
+  return avg.divide(stabQueue.length);
+}
 // See draw-bridge.js's pressureOf() for the full story: once a real pen
 // sample has been seen this gesture, a later 0/missing reading (most
 // tablets report exactly that for the sample right as contact ends at
@@ -1196,6 +1884,9 @@ function finalizePen(){
     rebuildVectorBrushOutline(outline);
     outline.insertAbove(p);
     p.remove();
+    if(state.shadowMode)outline.data.channelTag='shadow';
+  }else if(state.shadowMode){
+    _pen.path.data.channelTag='shadow';
   }
   _pen.path=null;_pen.draggingHandle=false;
   saveActiveLayerFrame();updateUI();
@@ -1209,7 +1900,7 @@ function onMouseDown(event){
   if(state.tool==='draw'){
     if(state.layers[state.activeLayerIdx].locked)return;ensureKeyframe();pushUndo();layer.activate();
     if(state.vectorBrush){
-      _vbLastPenPressure=null;_vb.pts=[event.point.clone()];_vb.widths=[vbPressureOf(event)];_vb.lastT=Date.now();_vb.lastPt=event.point.clone();
+      _vbLastPenPressure=null;_vbSmoothedPressure=null;stabQueue=[event.point.clone()];_vb.pts=[event.point.clone()];_vb.widths=[vbPressureOf(event)];_vb.lastT=Date.now();_vb.lastPt=event.point.clone();
       currentPath=new Path();currentPath.fillColor=state.strokeColor;currentPath.strokeColor=null;currentPath.opacity=state.opacity/100;
       currentPath.data.isVectorBrush=true;
     }else{
@@ -1240,9 +1931,9 @@ function onMouseDown(event){
     _pen.draggingHandle=true;
   }else if(state.tool==='line'||state.tool==='rect'||state.tool==='ellipse'){
     if(state.layers[state.activeLayerIdx].locked)return;ensureKeyframe();pushUndo();layer.activate();shapeStart=event.point.clone();
-    if(state.tool==='line')currentPath=new Path.Line({from:event.point,to:event.point,strokeColor:state.strokeColor,strokeWidth:state.brushSize,strokeCap:state.strokeCap,fillColor:null,opacity:state.opacity/100});
-    else if(state.tool==='rect')currentPath=new Path.Rectangle({from:event.point,to:event.point.add(new Point(1,1)),strokeColor:state.strokeColor,strokeWidth:state.brushSize,fillColor:state.fillEnabled?state.fillColor:null,opacity:state.opacity/100});
-    else currentPath=new Path.Ellipse({rectangle:new Rectangle(event.point,new Size(1,1)),strokeColor:state.strokeColor,strokeWidth:state.brushSize,fillColor:state.fillEnabled?state.fillColor:null,opacity:state.opacity/100});
+    if(state.tool==='line')currentPath=new Path.Line({from:event.point,to:event.point,strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,strokeCap:state.strokeCap,fillColor:null,opacity:state.opacity/100});
+    else if(state.tool==='rect')currentPath=new Path.Rectangle({from:event.point,to:event.point.add(new Point(1,1)),strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,fillColor:state.fillEnabled?state.fillColor:null,opacity:state.opacity/100});
+    else currentPath=new Path.Ellipse({rectangle:new Rectangle(event.point,new Size(1,1)),strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,fillColor:state.fillEnabled?state.fillColor:null,opacity:state.opacity/100});
   }else if(state.tool==='subselect'){
     var bestNh=null,bestNd=8/view.zoom;
     for(var ni=0;ni<nodeHandles.length;ni++){var nh=nodeHandles[ni];var nd=event.point.getDistance(nh.pos);if(nd<bestNd){bestNd=nd;bestNh=nh;}}
@@ -1260,13 +1951,25 @@ function onMouseDown(event){
     var subHit=layer.hitTest(event.point,{stroke:true,fill:true,tolerance:8/view.zoom});
     if(subHit&&subHit.item instanceof Path){
       clearSel();
-      selectedPaths.push(subHit.item);state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;});
+      var subTarget=resolveBrushAnchor(subHit.item,layer);
+      selectedPaths.push(subTarget);state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;});
+      // nodeHandles (hit-test array) is stale until rebuilt — see the same
+      // fix's comment in subselect-bridge.js for the full story.
+      renderNodeHandles();
     }else if(selectedPaths.length===1){
       // empty-space drag with a path selected: marquee over its anchors
       _nmq.active=true;_nmq.start=event.point.clone();_nmq.rect=null;
       return;
     }else{clearSel();}
     renderArcs();updateUI();
+  }else if(state.tool==='fsselect'){
+    _fsSel=fsHitTest(event.point,layer);
+    updateUI();
+    // A plain click-to-select mutates no layer content, so it never bumps
+    // window._sceneVersion (saveActiveLayerFrame/loadFrame's job) — without
+    // this the highlight overlay wouldn't actually appear until some
+    // unrelated action happened to trigger the next render tick.
+    if(window.SMEngineBridge&&window.SMEngineBridge.renderNow)window.SMEngineBridge.renderNow();
   }else if(state.tool==='select'){
     for(var i=0;i<arcHandles.length;i++){var ah=arcHandles[i];if(event.point.getDistance(ah.handle.position)<14/view.zoom){draggingArc=ah;return;}}draggingArc=null;
     var bestXh=null,bestXd=9/view.zoom;
@@ -1287,6 +1990,21 @@ function onMouseDown(event){
       return;
     }
     var hit=layer.hitTest(event.point,{stroke:true,fill:true,tolerance:8/view.zoom});
+    var hitOtherLayerIdx=-1;
+    // Nothing on the active layer — check every OTHER normal layer too
+    // (clicking a stroke drawn on layer 1 while layer 2 is active must
+    // switch to layer 1), same courtesy the component fallback below
+    // already gives symbol layers. Topmost-drawn first.
+    if(!hit){
+      for(var pli=project.layers.length-1;pli>=0;pli--){
+        var pl=project.layers[pli];var oli=userLayers.indexOf(pl);
+        if(oli<0||oli===state.activeLayerIdx)continue;
+        var ld2=state.layers[oli];
+        if(!ld2||ld2.locked||!ld2.visible||ld2.symbolId)continue;
+        var oh=pl.hitTest(event.point,{stroke:true,fill:true,tolerance:8/view.zoom});
+        if(oh){hit=oh;hitOtherLayerIdx=oli;break;}
+      }
+    }
     if(!hit){
       // Nothing on the active layer — but a component instance sitting on
       // a DIFFERENT layer should still act like a clickable object (Animate
@@ -1299,14 +2017,33 @@ function onMouseDown(event){
         _compClick.layerIdx=compHit.layerIdx;_compClick.time=now2;
         if(!event.modifiers.shift)clearSel();
         state.activeLayerIdx=compHit.layerIdx;activateUL(compHit.layerIdx);
-        selectedPaths=userLayers[compHit.layerIdx].children.filter(function(c){return c instanceof Path;});
+        selectedPaths=userLayers[compHit.layerIdx].children.filter(function(c){return (c instanceof Path||c instanceof Raster)&&!(c.data&&(c.data.isLinkedFillCompanion||c.data.isBrushTextureCopy));});
         state.selectedStrokeIndices=[];
         renderArcs();updateUI();
         if(isDbl)window.SM.enterSymbol(state.layers[compHit.layerIdx].symbolId);
         return;
       }
     }
-    if(hit&&hit.item instanceof Path){
+    if(hit&&(hit.item instanceof Path||hit.item instanceof Raster)){
+      if(hitOtherLayerIdx>=0){state.activeLayerIdx=hitOtherLayerIdx;activateUL(hitOtherLayerIdx);}
+      // Same "act as one rigid group" requirement as the compHit fallback
+      // above, for the case where the component is ALREADY the active
+      // layer (hitTestComponentLayers is only ever consulted when the
+      // active layer's own hitTest misses, so this plain branch used to be
+      // reachable for a component too, selecting just the one clicked
+      // child instead of the whole instance).
+      var activeLd2=state.layers[state.activeLayerIdx];
+      if(activeLd2&&activeLd2.symbolId){
+        var now3=Date.now();
+        var isDbl2=_compClick.layerIdx===state.activeLayerIdx&&(now3-_compClick.time<350);
+        _compClick.layerIdx=state.activeLayerIdx;_compClick.time=now3;
+        if(!event.modifiers.shift)clearSel();
+        selectedPaths=userLayers[state.activeLayerIdx].children.filter(function(c){return (c instanceof Path||c instanceof Raster)&&!(c.data&&(c.data.isLinkedFillCompanion||c.data.isBrushTextureCopy));});
+        state.selectedStrokeIndices=[];
+        renderArcs();updateUI();
+        if(isDbl2)window.SM.enterSymbol(activeLd2.symbolId);
+        return;
+      }
       var p=hit.item;var idx2=selectedPaths.indexOf(p);
       if(event.modifiers.shift){
         if(idx2>=0)selectedPaths.splice(idx2,1);else selectedPaths.push(p);
@@ -1344,9 +2081,10 @@ function onMouseDown(event){
     var hit2=layer.hitTest(event.point,{stroke:true,fill:true,tolerance:Math.max(8,state.eraserSize/2)/view.zoom});
     if(hit2&&(hit2.item instanceof Path||hit2.item instanceof CompoundPath)&&(hit2.item.strokeColor||hit2.item.fillColor||(hit2.item.data&&hit2.item.data.isVectorBrush))){
       pushUndo();_eraseDragActive=true;
-      eraseAtPoint(hit2.item,event.point,state.eraserSize/2);
+      var erasedItem2=hit2.item;
+      eraseAtPoint(erasedItem2,event.point,state.eraserSize/2);
       _eraseLastPt=event.point.clone();
-      fillRegenerateLinked(layer,null);saveActiveLayerFrame();updateUI();
+      fillRegenerateLinked(layer,erasedItem2);saveActiveLayerFrame();updateUI();
     }
   }else if(state.tool==='fill'){
     if(state.layers[state.activeLayerIdx].locked)return;ensureKeyframe();
@@ -1376,10 +2114,15 @@ function onMouseDown(event){
     var hit4=layer.hitTest(event.point,{stroke:true,fill:true,tolerance:8/view.zoom});
     if(hit4&&hit4.item instanceof Path){var ep=hit4.item;
       var isVB=!!(ep.data&&ep.data.isVectorBrush);
-      if(isVB&&ep.fillColor){state.strokeColor=ep.fillColor.toCSS(true);document.getElementById('color-stroke').value=state.strokeColor;document.getElementById('pm-stroke-c').value=state.strokeColor;document.getElementById('stroke-well').style.background=state.strokeColor;document.getElementById('pm-stroke').style.background=state.strokeColor;}
+      // colorHex8(), not .toCSS(true) — Paper's own toCSS(true) always
+      // forces alpha to 1 (see colorHex8's comment in app.js), which threw
+      // away a picked color's real transparency; .dataset.hex8 alongside
+      // .value for the same reason as everywhere else this pattern appears
+      // — the native <input type=color> truncates alpha out of .value.
+      if(isVB&&ep.fillColor){state.strokeColor=colorHex8(ep.fillColor);document.getElementById('color-stroke').value=state.strokeColor;document.getElementById('color-stroke').dataset.hex8=state.strokeColor;document.getElementById('pm-stroke-c').value=state.strokeColor;document.getElementById('pm-stroke-c').dataset.hex8=state.strokeColor;document.getElementById('stroke-well').style.background=state.strokeColor;document.getElementById('pm-stroke').style.background=state.strokeColor;}
       else{
-        if(ep.strokeColor){state.strokeColor=ep.strokeColor.toCSS(true);document.getElementById('color-stroke').value=state.strokeColor;document.getElementById('pm-stroke-c').value=state.strokeColor;document.getElementById('stroke-well').style.background=state.strokeColor;document.getElementById('pm-stroke').style.background=state.strokeColor;}
-        if(ep.fillColor){state.fillColor=ep.fillColor.toCSS(true);state.fillEnabled=true;document.getElementById('color-fill').value=state.fillColor;document.getElementById('pm-fill-c').value=state.fillColor;document.getElementById('pm-fill').style.background=state.fillColor;document.getElementById('fill-well').style.background=state.fillColor;document.getElementById('fill-well').classList.remove('none');document.getElementById('p-fill-on').checked=true;}
+        if(ep.strokeColor){state.strokeColor=colorHex8(ep.strokeColor);document.getElementById('color-stroke').value=state.strokeColor;document.getElementById('color-stroke').dataset.hex8=state.strokeColor;document.getElementById('pm-stroke-c').value=state.strokeColor;document.getElementById('pm-stroke-c').dataset.hex8=state.strokeColor;document.getElementById('stroke-well').style.background=state.strokeColor;document.getElementById('pm-stroke').style.background=state.strokeColor;}
+        if(ep.fillColor){state.fillColor=colorHex8(ep.fillColor);state.fillEnabled=true;document.getElementById('color-fill').value=state.fillColor;document.getElementById('color-fill').dataset.hex8=state.fillColor;document.getElementById('pm-fill-c').value=state.fillColor;document.getElementById('pm-fill-c').dataset.hex8=state.fillColor;document.getElementById('pm-fill').style.background=state.fillColor;document.getElementById('fill-well').style.background=state.fillColor;document.getElementById('fill-well').classList.remove('none');document.getElementById('p-fill-on').checked=true;}
       }
       if(ep.strokeWidth){state.brushSize=ep.strokeWidth;document.getElementById('p-sw').value=Math.round(ep.strokeWidth);}
       showToast('Color picked');}
@@ -1391,7 +2134,8 @@ function onMouseDrag(event){
   if(state.tool==='draw'){
     if(!currentPath)return;
     if(state.vectorBrush){
-      _vb.pts.push(event.point.clone());_vb.widths.push(vbPressureOf(event));
+      var vbP=vbSmoothPressure(vbPressureOf(event));
+      _vb.pts.push(vbStabilizePoint(event.point.clone()));_vb.widths.push(vbP);
       vbRebuildPreview();
       return;
     }
@@ -1400,7 +2144,8 @@ function onMouseDrag(event){
     else{stabQueue.push(event.point.clone());var maxQ=stab===1?3:stab===2?6:10;while(stabQueue.length>maxQ)stabQueue.shift();var avg=new Point(0,0);stabQueue.forEach(function(p){avg=avg.add(p);});avg=avg.divide(stabQueue.length);currentPath.add(avg);}
   }else if(state.tool==='fillbrush'){
     if(!currentPath)return;
-    _vb.pts.push(event.point.clone());_vb.widths.push(vbPressureOf(event));
+    var fbP=vbSmoothPressure(vbPressureOf(event));
+    _vb.pts.push(vbStabilizePoint(event.point.clone()));_vb.widths.push(fbP);
     vbRebuildPreview();
   }else if(state.tool==='pen'){
     if(!_pen.path||!_pen.draggingHandle)return;
@@ -1408,9 +2153,9 @@ function onMouseDrag(event){
     seg.handleOut=delta;seg.handleIn=delta.multiply(-1);
   }else if((state.tool==='line'||state.tool==='rect'||state.tool==='ellipse')&&currentPath&&shapeStart){
     currentPath.remove();
-    if(state.tool==='line'){currentPath=new Path.Line({from:shapeStart,to:event.point,strokeColor:state.strokeColor,strokeWidth:state.brushSize,strokeCap:state.strokeCap,fillColor:null,opacity:state.opacity/100});applyStrokeStyle(currentPath);}
-    else if(state.tool==='rect')currentPath=new Path.Rectangle({from:shapeStart,to:event.point,strokeColor:state.strokeColor,strokeWidth:state.brushSize,fillColor:state.fillEnabled?state.fillColor:null,opacity:state.opacity/100});
-    else{currentPath=new Path.Ellipse({rectangle:new Rectangle(shapeStart,event.point),strokeColor:state.strokeColor,strokeWidth:state.brushSize,fillColor:state.fillEnabled?state.fillColor:null,opacity:state.opacity/100});}
+    if(state.tool==='line'){currentPath=new Path.Line({from:shapeStart,to:event.point,strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,strokeCap:state.strokeCap,fillColor:null,opacity:state.opacity/100});applyStrokeStyle(currentPath);}
+    else if(state.tool==='rect')currentPath=new Path.Rectangle({from:shapeStart,to:event.point,strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,fillColor:state.fillEnabled?state.fillColor:null,opacity:state.opacity/100});
+    else{currentPath=new Path.Ellipse({rectangle:new Rectangle(shapeStart,event.point),strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,fillColor:state.fillEnabled?state.fillColor:null,opacity:state.opacity/100});}
   }else if(state.tool==='subselect'){
     if(_nmq.active){
       var nx1=Math.min(_nmq.start.x,event.point.x),ny1=Math.min(_nmq.start.y,event.point.y);
@@ -1460,6 +2205,7 @@ function onMouseDrag(event){
           if(p.data&&p.data.isVectorBrush&&p.data.centerSegments){rotateCenterSegments(p.data.centerSegments,stepAngle,_xform.center.x,_xform.center.y);rebuildVectorBrushOutline(p);}
         });
         _xform.lastAngle=deltaFromStart;
+        symGestureAccumulate(new Matrix().rotate(stepAngle,_xform.center));
       }else{
         var anchor=_xform.anchor,dir=_xform.dir,sx=1,sy=1;
         if(dir==='nw'||dir==='ne'||dir==='sw'||dir==='se'){
@@ -1481,6 +2227,7 @@ function onMouseDrag(event){
           if(p.data&&p.data.isVectorBrush&&p.data.centerSegments){scaleCenterSegments(p.data.centerSegments,stepSx,stepSy,anchor.x,anchor.y);rebuildVectorBrushOutline(p);}
         });
         _xform.lastSx=sx;_xform.lastSy=sy;
+        symGestureAccumulate(new Matrix().scale(stepSx,stepSy,anchor));
       }
       renderTransformHandles();
     }else if(_marquee.active){
@@ -1496,7 +2243,8 @@ function onMouseDrag(event){
       selectedPaths.forEach(function(p){
       p.position=p.position.add(event.delta);
       if(p.data&&p.data.isVectorBrush&&p.data.centerSegments){p.data.centerSegments.forEach(function(s){s.point=[s.point[0]+event.delta.x,s.point[1]+event.delta.y];});}
-    });renderNodeHandles();renderTransformHandles();}
+    });renderNodeHandles();renderTransformHandles();
+    symGestureAccumulate(new Matrix().translate(event.delta));}
   }else if(state.tool==='eraser'){
     eraseUpdateCursor(event);
     if(state.layers[state.activeLayerIdx].locked)return;
@@ -1515,6 +2263,10 @@ function onMouseUp(event){
   _eraseDragActive=false;_eraseLastPt=null;
   if(state.tool==='draw'&&currentPath){
     if(state.vectorBrush){
+      // Catch-up point, mirrors draw-bridge.js's onUp — the stabilizer's
+      // trailing average otherwise leaves the stroke stopping short of
+      // wherever the pen actually lifted.
+      _vb.pts.push(event.point.clone());_vb.widths.push(vbSmoothPressure(vbPressureOf(event)));
       if(_vb.pts.length<2){currentPath.remove();if(state.undoStack.length)state.undoStack.pop();}
       else{
         var rawWidths=_vb.pts.map(function(p,i){return vbWidthFor(_vb.widths[i]);});
@@ -1542,8 +2294,10 @@ function onMouseUp(event){
     // Animate's "Paint behind": the finished stroke slips under everything
     // already on the layer instead of stacking on top.
     if(currentPath&&state.drawMode==='behind')userLayers[state.activeLayerIdx].insertChild(0,currentPath);
+    if(currentPath&&state.shadowMode)currentPath.data.channelTag='shadow';
     currentPath=null;stabQueue=[];saveActiveLayerFrame();updateUI();
   }else if(state.tool==='fillbrush'&&currentPath){
+    _vb.pts.push(event.point.clone());_vb.widths.push(vbSmoothPressure(vbPressureOf(event)));
     if(_vb.pts.length<2){currentPath.remove();if(state.undoStack.length)state.undoStack.pop();}
     else{
       var fbWidths=_vb.pts.map(function(p,i){return vbWidthFor(_vb.widths[i]);});
@@ -1554,23 +2308,34 @@ function onMouseUp(event){
       // Placement (Above/Below/Merge) — see applyFillBrushPlacement's own
       // comment; replaces the old unconditional "always at the back".
       currentPath=applyFillBrushPlacement(currentPath,userLayers[state.activeLayerIdx]);
+      if(currentPath&&state.shadowMode)currentPath.data.channelTag='shadow';
     }
     _vb.pts=[];_vb.widths=[];currentPath=null;stabQueue=[];saveActiveLayerFrame();updateUI();
   }else if(state.tool==='pen'){
     _pen.draggingHandle=false;
   }else if((state.tool==='line'||state.tool==='rect'||state.tool==='ellipse')&&currentPath){
     if(shapeStart&&event.point.getDistance(shapeStart)<2){currentPath.remove();if(state.undoStack.length)state.undoStack.pop();}
+    else if(state.shadowMode)currentPath.data.channelTag='shadow';
     currentPath=null;shapeStart=null;saveActiveLayerFrame();updateUI();
   }else if(state.tool==='select'){
     if(_xform.active){
-      _xform.active=false;fillRegenerateLinked(userLayers[state.activeLayerIdx],null);saveActiveLayerFrame();renderTransformHandles();renderNodeHandles();updateUI();
+      _xform.active=false;
+      var xLd2=state.layers[state.activeLayerIdx];
+      if(xLd2&&xLd2.symbolId){
+        loadFrame(state.currentFrame);
+        selectedPaths=userLayers[state.activeLayerIdx].children.filter(function(c){return (c instanceof Path||c instanceof Raster)&&!(c.data&&(c.data.isLinkedFillCompanion||c.data.isBrushTextureCopy));});
+        state.selectedStrokeIndices=[];
+      }else{
+        fillRegenerateLinked(userLayers[state.activeLayerIdx],null);saveActiveLayerFrame();
+      }
+      renderTransformHandles();renderNodeHandles();updateUI();
     }
     else if(_marquee.active){
       if(_marquee.rect){
         var mb=_marquee.rect.bounds;
         var layer2=userLayers[state.activeLayerIdx];
         layer2.children.forEach(function(c){
-          if(c instanceof Path&&c.segments.length>0&&(c.strokeColor||c.fillColor)&&mb.intersects(c.bounds)){
+          if(((c instanceof Path&&c.segments.length>0&&(c.strokeColor||c.fillColor))||c instanceof Raster)&&mb.intersects(c.bounds)){
             if(selectedPaths.indexOf(c)<0)selectedPaths.push(c);
           }
         });
@@ -1579,7 +2344,17 @@ function onMouseUp(event){
       }
       _marquee.active=false;renderArcs();updateUI();
     }
-    else if(draggingArc){draggingArc=null;generateTweens();}else if(selectedPaths.length>0){_moveDragStarted=false;fillRegenerateLinked(userLayers[state.activeLayerIdx],null);saveActiveLayerFrame();}
+    else if(draggingArc){draggingArc=null;generateTweens();}else if(selectedPaths.length>0){
+      _moveDragStarted=false;
+      var mLd2=state.layers[state.activeLayerIdx];
+      if(mLd2&&mLd2.symbolId){
+        loadFrame(state.currentFrame);
+        selectedPaths=userLayers[state.activeLayerIdx].children.filter(function(c){return (c instanceof Path||c instanceof Raster)&&!(c.data&&(c.data.isLinkedFillCompanion||c.data.isBrushTextureCopy));});
+        state.selectedStrokeIndices=[];
+      }else{
+        fillRegenerateLinked(userLayers[state.activeLayerIdx],null);saveActiveLayerFrame();
+      }
+    }
   }else if(state.tool==='subselect'){
     if(_nmq.active){
       if(_nmq.rect){
@@ -1597,6 +2372,7 @@ function onMouseUp(event){
     }
     else if(_nodeDrag.active){var editedPath=_nodeDrag.path;_nodeDrag.active=false;_nodeDrag.path=null;
       fillRegenerateLinked(userLayers[state.activeLayerIdx],editedPath);
+      regenerateBrushTexture(editedPath,userLayers[state.activeLayerIdx]);
       saveActiveLayerFrame();renderNodeHandles();updateUI();}
   }
 }
@@ -1648,4 +2424,26 @@ function onViewDoubleClick(event){
   renderArcs();updateUI();
 }
 view.onMouseDown=onMouseDown;view.onMouseDrag=onMouseDrag;view.onMouseUp=onMouseUp;view.onMouseMove=onMouseMoveTool;view.onDoubleClick=onViewDoubleClick;
-canvasEl.addEventListener('wheel',function(e){e.preventDefault();var f=e.deltaY>0?.92:1.08;var nz=Math.max(.05,Math.min(20,view.zoom*f));var mp=view.viewToProject(new Point(e.offsetX,e.offsetY));view.zoom=nz;var nm=view.viewToProject(new Point(e.offsetX,e.offsetY));view.center=view.center.add(mp.subtract(nm));updZoom();renderArcs();},{passive:false});
+// Zoom-to-pointer: the fixed ±8%-per-event step (old code) felt identical
+// for a single notchy mouse-wheel click and a fast trackpad fling — every
+// event was the same size regardless of how hard/fast the gesture was.
+// Scaling the exponent by the actual delta magnitude (clamped, so one wild
+// event can't jump too far) makes gentle scrolls fine-grained and fast
+// scrolls ramp up, which is what reads as "fluid" rather than "steppy".
+// Trackpad pinch gestures land here too (browsers report them as wheel
+// events with ctrlKey=true) — boosted sensitivity for those specifically,
+// since they typically report much smaller deltaY per event than a mouse
+// wheel notch for the same perceived gesture size.
+canvasEl.addEventListener('wheel',function(e){
+  e.preventDefault();
+  var mag=Math.min(1,Math.abs(e.deltaY)/(e.ctrlKey?40:100));
+  var pct=(e.ctrlKey?0.06:0.10)*mag;
+  var f=e.deltaY>0?(1-pct):(1+pct);
+  var nz=Math.max(.05,Math.min(20,view.zoom*f));
+  var mp=view.viewToProject(new Point(e.offsetX,e.offsetY));
+  view.zoom=nz;
+  var nm=view.viewToProject(new Point(e.offsetX,e.offsetY));
+  view.center=view.center.add(mp.subtract(nm));
+  updZoom();renderArcs();
+  if(window.SMEngineBridge&&window.SMEngineBridge.renderNow)window.SMEngineBridge.renderNow();
+},{passive:false});

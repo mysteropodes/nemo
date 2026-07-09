@@ -13,19 +13,29 @@
 // behavior is suppressed via pointer-events:none (see wireColorSwatches()
 // below) so our popover opens instead.
 //
-// No alpha channel here: StrokeMotion's color model stores fill/stroke as
-// plain opaque hex — per-object opacity is a separate existing control
-// (#p-opacity), so an alpha slider in the picker would just duplicate/
-// conflict with that rather than mapping onto anything real.
+// Alpha channel: the color itself can carry transparency (#rrggbbaa) on top
+// of the pre-existing, separate per-object opacity control (#p-opacity) —
+// the two are independent (one is "how see-through is this paint", the
+// other "how see-through is the whole object"), same as every other vector
+// tool's fill-alpha vs layer-opacity split. Colors round-trip through
+// serP/desP and engine-bridge's cssColorToRgba/draw-bridge's hexToRgba,
+// all of which now read the 4th hex byte pair when present.
 (function () {
   function hexToRgb(hex) {
     hex = (hex || '#000000').replace('#', '');
     if (hex.length === 3) hex = hex.split('').map(function (c) { return c + c; }).join('');
     return { r: parseInt(hex.substr(0, 2), 16) || 0, g: parseInt(hex.substr(2, 2), 16) || 0, b: parseInt(hex.substr(4, 2), 16) || 0 };
   }
-  function rgbToHex(r, g, b) {
+  function hexToAlpha(hex) {
+    hex = (hex || '').replace('#', '');
+    if (hex.length !== 8) return 1;
+    return (parseInt(hex.substr(6, 2), 16) || 0) / 255;
+  }
+  function rgbToHex(r, g, b, a) {
     function h(n) { return Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0'); }
-    return '#' + h(r) + h(g) + h(b);
+    var hex = '#' + h(r) + h(g) + h(b);
+    if (a !== undefined && a < 1) hex += h(a * 255);
+    return hex;
   }
   function rgbToHsv(r, g, b) {
     r /= 255; g /= 255; b /= 255;
@@ -62,6 +72,7 @@
   function open(anchorEl, initialHex, onChange) {
     closePopover();
     var hsv = rgbToHsv.apply(null, (function (c) { return [c.r, c.g, c.b]; })(hexToRgb(initialHex)));
+    var alpha = hexToAlpha(initialHex);
 
     var el = document.createElement('div');
     el.className = 'ctx-menu color-picker-pop';
@@ -69,12 +80,13 @@
       '<div class="cp-sv"><canvas class="cp-sv-canvas" width="180" height="140"></canvas><div class="cp-sv-thumb"></div></div>' +
       '<div class="cp-sliders">' +
       '<div class="cp-hue"><canvas class="cp-hue-canvas" width="180" height="14"></canvas><div class="cp-hue-thumb"></div></div>' +
+      '<div class="cp-alpha"><canvas class="cp-alpha-canvas" width="180" height="14"></canvas><div class="cp-alpha-thumb"></div></div>' +
       '</div>' +
       '<div class="cp-preview-row"><div class="cp-preview"></div>' +
       '<div class="cp-fields">' +
-      '<label>Hex<input class="cp-hex" type="text" maxlength="7"></label>' +
+      '<label>Hex<input class="cp-hex" type="text" maxlength="9"></label>' +
       '<div class="cp-rgb-row">' +
-      '<input class="cp-r" type="number" min="0" max="255" title="R"><input class="cp-g" type="number" min="0" max="255" title="G"><input class="cp-b" type="number" min="0" max="255" title="B">' +
+      '<input class="cp-r" type="number" min="0" max="255" title="R"><input class="cp-g" type="number" min="0" max="255" title="G"><input class="cp-b" type="number" min="0" max="255" title="B"><input class="cp-a" type="number" min="0" max="100" title="Alpha %">' +
       '</div></div></div>' +
       '<div class="cp-swatch-row">' +
       '<button class="cp-swatch cp-swatch-none" title="None"></button>' +
@@ -89,9 +101,11 @@
     var svThumb = el.querySelector('.cp-sv-thumb');
     var hueCanvas = el.querySelector('.cp-hue-canvas'), hueCtx = hueCanvas.getContext('2d');
     var hueThumb = el.querySelector('.cp-hue-thumb');
+    var alphaCanvas = el.querySelector('.cp-alpha-canvas'), alphaCtx = alphaCanvas.getContext('2d');
+    var alphaThumb = el.querySelector('.cp-alpha-thumb');
     var preview = el.querySelector('.cp-preview');
     var hexInput = el.querySelector('.cp-hex');
-    var rInput = el.querySelector('.cp-r'), gInput = el.querySelector('.cp-g'), bInput = el.querySelector('.cp-b');
+    var rInput = el.querySelector('.cp-r'), gInput = el.querySelector('.cp-g'), bInput = el.querySelector('.cp-b'), aInput = el.querySelector('.cp-a');
 
     function drawHue() {
       var grad = hueCtx.createLinearGradient(0, 0, 180, 0);
@@ -109,33 +123,57 @@
       blackGrad.addColorStop(0, 'rgba(0,0,0,0)'); blackGrad.addColorStop(1, 'rgba(0,0,0,1)');
       svCtx.fillStyle = blackGrad; svCtx.fillRect(0, 0, 180, 140);
     }
+    // Checkerboard base (so 0% reads as "transparent", not "black") plus a
+    // gradient from fully-transparent to the current opaque RGB — hue-
+    // dependent just like the SV square, so this also needs a redraw
+    // whenever the color (not just alpha) changes.
+    function drawAlpha() {
+      alphaCtx.clearRect(0, 0, 180, 14);
+      for (var x = 0; x < 180; x += 7) {
+        for (var y = 0; y < 14; y += 7) {
+          alphaCtx.fillStyle = ((x / 7 + y / 7) % 2 === 0) ? '#3a3a48' : '#232330';
+          alphaCtx.fillRect(x, y, 7, 7);
+        }
+      }
+      var rgb = hsvToRgb(hsv.h, hsv.s, hsv.v);
+      var grad = alphaCtx.createLinearGradient(0, 0, 180, 0);
+      grad.addColorStop(0, 'rgba(' + Math.round(rgb.r) + ',' + Math.round(rgb.g) + ',' + Math.round(rgb.b) + ',0)');
+      grad.addColorStop(1, 'rgba(' + Math.round(rgb.r) + ',' + Math.round(rgb.g) + ',' + Math.round(rgb.b) + ',1)');
+      alphaCtx.fillStyle = grad; alphaCtx.fillRect(0, 0, 180, 14);
+    }
     function positionThumbs() {
       svThumb.style.left = (hsv.s * 180) + 'px'; svThumb.style.top = ((1 - hsv.v) * 140) + 'px';
       hueThumb.style.left = (hsv.h / 360 * 180) + 'px';
+      alphaThumb.style.left = (alpha * 180) + 'px';
     }
     function currentHex() {
       var rgb = hsvToRgb(hsv.h, hsv.s, hsv.v);
-      return rgbToHex(rgb.r, rgb.g, rgb.b);
+      return rgbToHex(rgb.r, rgb.g, rgb.b, alpha);
     }
     function pushChange() {
       var hex = currentHex(), rgb = hexToRgb(hex);
-      preview.style.background = hex;
+      preview.style.backgroundColor = hex; // backgroundColor, not the `background` shorthand — the latter clears the checkerboard background-image already set in CSS for .cp-preview
       hexInput.value = hex;
-      rInput.value = rgb.r; gInput.value = rgb.g; bInput.value = rgb.b;
+      rInput.value = rgb.r; gInput.value = rgb.g; bInput.value = rgb.b; aInput.value = Math.round(alpha * 100);
+      drawSv(); // the SV square's gradient is hue-dependent — must redraw whenever hue changes (hue slider drag, hex/rgb entry), not just at popover open
+      drawAlpha();
       positionThumbs();
       onChange(hex);
     }
     function setFromHsv() { pushChange(); }
     function setFromHex(hex) {
-      if (!/^#[0-9a-fA-F]{6}$/.test(hex)) return;
+      if (!/^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/.test(hex)) return;
       var rgb = hexToRgb(hex);
       hsv = rgbToHsv(rgb.r, rgb.g, rgb.b);
+      alpha = hexToAlpha(hex);
       pushChange();
     }
     function setFromRgb() {
       var r = Math.max(0, Math.min(255, parseInt(rInput.value) || 0));
       var g = Math.max(0, Math.min(255, parseInt(gInput.value) || 0));
       var b = Math.max(0, Math.min(255, parseInt(bInput.value) || 0));
+      var aPct = parseInt(aInput.value); if (isNaN(aPct)) aPct = 100;
+      alpha = Math.max(0, Math.min(100, aPct)) / 100;
       hsv = rgbToHsv(r, g, b);
       pushChange();
     }
@@ -152,9 +190,10 @@
     }
     dragOn(svCanvas, function (p) { hsv.s = p.x / 180; hsv.v = 1 - p.y / 140; setFromHsv(); });
     dragOn(hueCanvas, function (p) { hsv.h = p.x / 180 * 360; setFromHsv(); });
+    dragOn(alphaCanvas, function (p) { alpha = p.x / 180; setFromHsv(); });
 
     hexInput.addEventListener('input', function () { var v = this.value.trim(); if (v[0] !== '#') v = '#' + v; setFromHex(v); });
-    [rInput, gInput, bInput].forEach(function (inp) { inp.addEventListener('input', setFromRgb); });
+    [rInput, gInput, bInput, aInput].forEach(function (inp) { inp.addEventListener('input', setFromRgb); });
     el.querySelectorAll('.cp-swatch[data-hex]').forEach(function (b) {
       b.addEventListener('click', function () { setFromHex(this.dataset.hex); });
     });
@@ -172,11 +211,11 @@
       closePopover();
     });
 
-    drawHue(); drawSv(); positionThumbs();
+    drawHue(); drawSv(); drawAlpha(); positionThumbs();
     hexInput.value = currentHex();
     var rgb0 = hexToRgb(currentHex());
-    rInput.value = rgb0.r; gInput.value = rgb0.g; bInput.value = rgb0.b;
-    preview.style.background = currentHex();
+    rInput.value = rgb0.r; gInput.value = rgb0.g; bInput.value = rgb0.b; aInput.value = Math.round(alpha * 100);
+    preview.style.backgroundColor = currentHex();
 
     // Anchor + clamp to viewport, same idiom as showContextMenu (ui.js).
     var ar = anchorEl.getBoundingClientRect();
@@ -204,6 +243,13 @@
   // <input type="color"> to open this popover instead of the OS picker,
   // writing back into the same input so every existing listener keeps
   // working unchanged.
+  //
+  // Alpha caveat: a native <input type="color"> silently truncates any
+  // value assigned to it down to 6 hex digits (browser-enforced — confirmed
+  // by direct test, it just drops bytes 7-8) — so an 8-digit hex can't
+  // round-trip through `.value` alone. The full hex (with alpha) is also
+  // stashed on `input.dataset.hex8`; every listener that reads the color
+  // back out of these inputs must prefer `.dataset.hex8` over `.value`.
   function wireColorSwatches(pairs) {
     pairs.forEach(function (pair) {
       var wrap = document.getElementById(pair.wrap), input = document.getElementById(pair.input);
@@ -211,8 +257,9 @@
       input.style.pointerEvents = 'none'; // suppress the native OS picker; popover takes over
       wrap.addEventListener('click', function (e) {
         e.preventDefault(); e.stopPropagation();
-        open(wrap, input.value, function (hex) {
+        open(wrap, input.dataset.hex8 || input.value, function (hex) {
           input.value = hex;
+          input.dataset.hex8 = hex;
           input.dispatchEvent(new Event('input', { bubbles: true }));
         });
         open._lastNone = pair.onNone || null;

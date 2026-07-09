@@ -39,7 +39,10 @@
     if (h.length !== 6 && h.length !== 8) return null;
     var r = parseInt(h.substr(0, 2), 16), g = parseInt(h.substr(2, 2), 16), b = parseInt(h.substr(4, 2), 16);
     if (isNaN(r) || isNaN(g) || isNaN(b)) return null;
-    var a = Math.round(255 * (opacity !== undefined ? opacity : 1));
+    // An 8-digit hex (#rrggbbaa) carries its own alpha byte — multiply it
+    // with the object's separate opacity, don't let one silently win.
+    var hexA = h.length === 8 ? parseInt(h.substr(6, 2), 16) / 255 : 1;
+    var a = Math.round(255 * (opacity !== undefined ? opacity : 1) * hexA);
     return [r, g, b, a];
   }
 
@@ -63,6 +66,25 @@
   // simplest reliable way to get raw RGBA8 out without needing any
   // image-decoding logic on the Rust side at all.
   var registeredImageIds = {};
+
+  // Render-only coordinate rounding (2 decimals — 0.01 world units is
+  // sub-pixel until 100× zoom): the scene JSON crosses the JS→wasm boundary
+  // as TEXT and gets re-parsed by serde on every render. Raw jittered dab
+  // coordinates serialize at full double precision (~17 chars per number),
+  // which made a dab-heavy document's scene JSON approach a megabyte —
+  // most of that pure fractional noise no renderer can show. Rounding here
+  // touches ONLY what's sent to the renderer; persistence (serP into frame
+  // records) keeps full precision, so document data never degrades.
+  function r2(v) { return Math.round(v * 100) / 100; }
+  function roundSegs(segs) {
+    for (var i = 0; i < segs.length; i++) {
+      var s = segs[i];
+      s.point = [r2(s.point[0]), r2(s.point[1])];
+      if (s.handleIn) s.handleIn = [r2(s.handleIn[0]), r2(s.handleIn[1])];
+      if (s.handleOut) s.handleOut = [r2(s.handleOut[0]), r2(s.handleOut[1])];
+    }
+    return segs;
+  }
   function registerRasterIfNeeded(raster) {
     // Paper.js's Raster keeps its OWN internal <canvas> representation
     // (`.canvas`, already decoded/ready once `.loaded` is true) rather than
@@ -86,10 +108,49 @@
     return id;
   }
 
-  function buildSceneJson() {
+  // `skipVolatile` (renderWithOverlayItem only): leaves out the three
+  // per-pointermove cursor overlays (pressure/eraser/pen-preview) so the
+  // rest of the scene can be CACHED across the moves of one drag — those
+  // three are the only parts of the scene that legitimately change between
+  // two moves of a suspended drag (the document itself is untouched until
+  // commit, by draw-bridge's own design), and renderWithOverlayItem
+  // re-appends them fresh on every call. Without this split, drawing on a
+  // document full of brush-texture dabs (up to 180 small Paths PER textured
+  // stroke) re-serialized every dab on every single pointermove — the
+  // reported "ça rame avec les brush custom/preset" lag.
+  // Upload helpers for reference-bridge.js: registerCachedImage uploads an
+  // <img>/canvas ONCE per id (image / image-sequence frames, which never
+  // change); registerImagePixels force-re-uploads under the same id (the
+  // video reference re-uses one id and replaces its pixels on every seek,
+  // keeping GPU memory at a single frame regardless of video length).
+  function drawableToPixels(source) {
+    var cv;
+    if (source instanceof HTMLCanvasElement) cv = source;
+    else {
+      cv = document.createElement('canvas');
+      cv.width = source.naturalWidth || source.width;
+      cv.height = source.naturalHeight || source.height;
+      cv.getContext('2d').drawImage(source, 0, 0);
+    }
+    return { pixels: cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data, w: cv.width, h: cv.height };
+  }
+  function registerCachedImage(id, source) {
+    if (!engine || registeredImageIds[id]) return;
+    var p = drawableToPixels(source);
+    engine.register_image(id, p.pixels, p.w, p.h);
+    registeredImageIds[id] = true;
+  }
+  function registerImagePixels(id, source) {
+    if (!engine) return;
+    var p = drawableToPixels(source);
+    engine.register_image(id, p.pixels, p.w, p.h);
+    registeredImageIds[id] = true;
+  }
+
+  function buildSceneJson(skipVolatile) {
     var layers = [];
     for (var i = 0; i < state.layers.length; i++) {
-      if (!state.layers[i].visible || !userLayers[i]) { layers.push({ items: [] }); continue; }
+      if (!layerIsEffectivelyVisible(i) || !userLayers[i]) { layers.push({ items: [] }); continue; }
       var children = userLayers[i].children;
       var items = [];
       for (var s = 0; s < children.length; s++) {
@@ -103,58 +164,126 @@
           });
           continue;
         }
-        if (!(c instanceof Path) || c.segments.length < 2) continue;
-        var sd = serP(c);
-        var op = sd.opacity !== undefined ? sd.opacity : 1;
-        items.push({
-          segments: sd.segments,
-          closed: !!sd.fillColor,
-          fillColor: cssColorToRgba(sd.fillColor, op),
-          strokeColor: cssColorToRgba(sd.strokeColor, op),
-          strokeWidth: sd.strokeWidth || 1,
-          strokeCap: sd.strokeCap,
-          strokeJoin: sd.strokeJoin,
-          miterLimit: sd.miterLimit,
-          dashPattern: sd.dashArray,
-          dashOffset: sd.dashOffset,
-          paintOrder: sd.paintOrder,
+        // The eraser (tools.js eraseAtPoint) produces a CompoundPath the
+        // moment a bite severs a shape into disjoint islands or leaves a
+        // hole — `c instanceof Path` is false for a CompoundPath (siblings
+        // in Paper's class hierarchy, not parent/child), so this loop used
+        // to silently drop the WHOLE shape from the rendered scene the
+        // instant an erase touch produced one, even though it was still
+        // sitting right there in the layer's data — which is exactly what
+        // read as "one eraser touch deletes the whole thing", when really
+        // only the picture stopped updating, not the geometry. Flattening a
+        // CompoundPath into one item per sub-path (styled from the
+        // CompoundPath's own fillColor/strokeColor/opacity, since individual
+        // children never carry their own — Paper.js style cascades from the
+        // parent) renders every island; a true enclosed hole won't be cut
+        // out this way (each island paints solid), but that's a much better
+        // fallback than the shape vanishing outright, and is the rare case
+        // (most erase bites are edge nibbles that split a shape, not punch
+        // a fully-enclosed hole through its middle).
+        var subPaths;
+        if (c instanceof CompoundPath) subPaths = c.children.filter(function (ch) { return ch instanceof Path && ch.segments.length >= 2; });
+        else if (c instanceof Path && c.segments.length >= 2) subPaths = [c];
+        else continue;
+        subPaths.forEach(function (sub) {
+          var sd = serP(sub);
+          var op = c.opacity !== undefined ? c.opacity : 1;
+          // The path's OWN closed flag (now correctly carried by serP(),
+          // see app.js), NOT "has a fillColor" — that heuristic sent an
+          // unwanted closing stroke segment across any OPEN path that also
+          // happened to have a fill (the norm since Draw-tool strokes get
+          // fillColor by default), and conversely dropped the closure on a
+          // genuinely closed STROKE-only shape (no fill) with no visible
+          // symptom for filled shapes (fill rendering closes the boundary
+          // regardless of this flag) but a real one for stroke-only paths.
+          //
+          // Stroke sub-fields are only emitted when there IS a stroke, and
+          // dash fields only when there IS a dash — every ItemIn field is an
+          // Option with a default on the Rust side, and blindly repeating
+          // `"dashPattern":[],"dashOffset":0,"miterLimit":10,...` on every
+          // one of a dab-heavy document's thousands of fill-only items was
+          // ~200 bytes/item of dead weight re-parsed by serde every render.
+          var item = {
+            segments: roundSegs(sd.segments),
+            closed: !!sd.closed,
+            fillColor: cssColorToRgba(c.fillColor ? c.fillColor.toCSS(true) : null, op),
+          };
+          var sc = cssColorToRgba(c.strokeColor ? c.strokeColor.toCSS(true) : null, op);
+          if (sc) {
+            item.strokeColor = sc;
+            item.strokeWidth = c.strokeWidth || 1;
+            item.strokeCap = c.strokeCap;
+            item.strokeJoin = c.strokeJoin;
+            item.miterLimit = c.miterLimit;
+            if (c.dashArray && c.dashArray.length) {
+              item.dashPattern = c.dashArray;
+              item.dashOffset = c.dashOffset;
+            }
+          }
+          if (c.data && c.data.paintOrder) item.paintOrder = c.data.paintOrder;
+          items.push(item);
         });
       }
-      layers.push({ items: items });
+      var bm = state.layers[i].blendMode;
+      layers.push({ items: items, blendMode: (bm && bm !== 'normal') ? bm : undefined });
     }
     // artboard background as the bottom item of a synthetic bottom layer,
     // mirroring drawStage()'s background rect
-    layers.unshift({
-      items: [{
-        segments: [
-          { point: [0, 0] }, { point: [state.canvasW, 0] },
-          { point: [state.canvasW, state.canvasH] }, { point: [0, state.canvasH] },
-        ],
-        closed: true,
-        fillColor: cssColorToRgba(state.canvasBg, 1),
-        strokeColor: null,
-        strokeWidth: 1,
-      }],
-    });
+    var bgItems = [{
+      segments: [
+        { point: [0, 0] }, { point: [state.canvasW, 0] },
+        { point: [state.canvasW, state.canvasH] }, { point: [0, state.canvasH] },
+      ],
+      closed: true,
+      fillColor: cssColorToRgba(state.canvasBg, 1),
+      strokeColor: null,
+      strokeWidth: 1,
+    }];
+    // Rotoscopy reference (reference-bridge.js) — above the artboard rect,
+    // below every drawing layer, exactly where tracing reference belongs.
+    if (window.SMReference) {
+      var refItem = window.SMReference.buildRefItem(registerCachedImage);
+      if (refItem) bgItems.push(refItem);
+    }
+    layers.unshift({ items: bgItems });
+    // "Clip to canvas" (Document panel, off by default — off-canvas artwork
+    // is visible by default, matching every vector tool's normal behavior)
+    // is a mask, not a real GPU clip: four opaque bands, colored to match
+    // #canvas-area's own CSS background (the color that's already visible
+    // through the transparent WebGPU surface outside the artboard), painted
+    // over whatever content sticks out past the canvas rect. Simpler and
+    // lower-risk than plumbing a real vello Scene::push_layer clip through
+    // engine.rs for a purely cosmetic "hide the overflow" toggle.
+    if (state.canvasClip) layers.push({ items: buildClipMaskItems() });
     // Onion ghosts sit right above the background but BELOW the current
     // frame's real artwork (layers[1..]) — a faint reference, never
     // obscuring what's actually being drawn on top of it.
     var onionItems = buildOnionSkinItems();
     if (onionItems.length) layers.splice(1, 0, { items: onionItems });
+    var ghostAllItems = buildGhostAllItems();
+    if (ghostAllItems.length) layers.splice(1, 0, { items: ghostAllItems });
     var nodeItems = buildNodeHandleItems();
     if (nodeItems.length) layers.push({ items: nodeItems });
     var xformItems = buildTransformBoxItems();
     if (xformItems.length) layers.push({ items: xformItems });
     var marqueeItems = buildMarqueeItems();
     if (marqueeItems.length) layers.push({ items: marqueeItems });
-    var eraserItems = buildEraserCursorItems();
-    if (eraserItems.length) layers.push({ items: eraserItems });
-    var pressureItems = buildPressureCursorItems();
-    if (pressureItems.length) layers.push({ items: pressureItems });
-    var penItems = buildPenPreviewItems();
-    if (penItems.length) layers.push({ items: penItems });
+    var fsSelItems = buildFSSelectionItems();
+    if (fsSelItems.length) layers.push({ items: fsSelItems });
+    if (!skipVolatile) {
+      var eraserItems = buildEraserCursorItems();
+      if (eraserItems.length) layers.push({ items: eraserItems });
+      var pressureItems = buildPressureCursorItems();
+      if (pressureItems.length) layers.push({ items: pressureItems });
+      var penItems = buildPenPreviewItems();
+      if (penItems.length) layers.push({ items: penItems });
+    }
     var arcItems = buildArcHandleItems();
     if (arcItems.length) layers.push({ items: arcItems });
+    var safetyItems = buildSafetyZoneItems();
+    if (safetyItems.length) layers.push({ items: safetyItems });
+    var perspectiveItems = window.buildPerspectiveGuideItems ? window.buildPerspectiveGuideItems() : [];
+    if (perspectiveItems.length) layers.push({ items: perspectiveItems });
     return JSON.stringify({ layers: layers });
   }
 
@@ -170,17 +299,44 @@
   function onionLayerItems(layer) {
     var items = [];
     layer.children.forEach(function (c) {
-      if (!(c instanceof Path) || c.segments.length < 2) return;
-      var sd = serP(c);
-      var op = sd.opacity !== undefined ? sd.opacity : 1;
-      items.push({
-        segments: sd.segments,
-        closed: !!sd.fillColor,
-        fillColor: cssColorToRgba(sd.fillColor, op),
-        strokeColor: cssColorToRgba(sd.strokeColor, op),
-        strokeWidth: sd.strokeWidth || 1,
-        strokeCap: sd.strokeCap,
-        strokeJoin: sd.strokeJoin,
+      // Same Raster handling as buildSceneJson() above — an imported image/
+      // video-frame ghosted onto the onion-skin layer (desR, tweens.js
+      // renderOS) was silently dropped here, same "new item type not
+      // handled everywhere" gap as the CompoundPath case right below.
+      if (c instanceof Raster) {
+        var imageId = registerRasterIfNeeded(c);
+        if (imageId) {
+          var rb = c.bounds;
+          items.push({ image: { imageId: imageId, x: rb.x, y: rb.y, width: rb.width, height: rb.height, opacity: c.opacity !== undefined ? c.opacity : 1 } });
+        }
+        return;
+      }
+      // Same CompoundPath flattening as buildSceneJson() above — an erased
+      // (possibly multi-island) shape ghosted onto the onion-skin layer hit
+      // the exact same "silently dropped, not just this frame's real
+      // artwork" gap.
+      var subPaths;
+      if (c instanceof CompoundPath) subPaths = c.children.filter(function (ch) { return ch instanceof Path && ch.segments.length >= 2; });
+      else if (c instanceof Path && c.segments.length >= 2) subPaths = [c];
+      else return;
+      subPaths.forEach(function (sub) {
+        var sd = serP(sub);
+        var op = c.opacity !== undefined ? c.opacity : 1;
+        items.push({
+          segments: roundSegs(sd.segments),
+          // The path's OWN closed flag, not "has a fillColor" — that
+          // heuristic broke Outline onion-skin mode, which intentionally
+          // nulls fillColor on the ghost (renderOS in tweens.js) to show a
+          // silhouette instead of a solid tint: a closed shape traced in
+          // outline mode would otherwise report closed:false and render with
+          // a gap where the fill used to close the loop.
+          closed: !!sub.closed,
+          fillColor: cssColorToRgba(c.fillColor ? c.fillColor.toCSS(true) : null, op),
+          strokeColor: cssColorToRgba(c.strokeColor ? c.strokeColor.toCSS(true) : null, op),
+          strokeWidth: c.strokeWidth || 1,
+          strokeCap: c.strokeCap,
+          strokeJoin: c.strokeJoin,
+        });
       });
     });
     return items;
@@ -188,6 +344,14 @@
   function buildOnionSkinItems() {
     if (!state.onionSkin || state.playing) return [];
     return onionLayerItems(onionPrevLayer).concat(onionLayerItems(onionNextLayer));
+  }
+  // "Ghost all keyframes" reuses the exact same onionLayerItems() reader —
+  // ghostAllLayer (tweens.js's renderGhostAll) is populated the same way
+  // onionPrevLayer/onionNextLayer are, just for every keyframe instead of
+  // only the immediate neighbors.
+  function buildGhostAllItems() {
+    if (!state.ghostAllFrames || state.playing) return [];
+    return onionLayerItems(ghostAllLayer);
   }
 
   // ---- Subselection node/tangent handle overlay ----
@@ -240,6 +404,40 @@
     return { segments: segments, closed: true, fillColor: fillColor, strokeColor: strokeColor, strokeWidth: strokeWidth };
   }
 
+  // ---- "Clip to canvas" mask (see the call site's own comment) ----
+  var CLIP_MASK_COLOR = [35, 35, 48, 255]; // #canvas-area's CSS background
+  var CLIP_MASK_SPAN = 100000; // world units — comfortably past any realistic off-canvas content
+  function buildClipMaskItems() {
+    var w = state.canvasW, h = state.canvasH;
+    return [
+      boundsRectItem(-CLIP_MASK_SPAN, -CLIP_MASK_SPAN, w + CLIP_MASK_SPAN, 0, CLIP_MASK_COLOR, null, 1), // top
+      boundsRectItem(-CLIP_MASK_SPAN, h, w + CLIP_MASK_SPAN, h + CLIP_MASK_SPAN, CLIP_MASK_COLOR, null, 1), // bottom
+      boundsRectItem(-CLIP_MASK_SPAN, 0, 0, h, CLIP_MASK_COLOR, null, 1), // left
+      boundsRectItem(w, 0, w + CLIP_MASK_SPAN, h, CLIP_MASK_COLOR, null, 1), // right
+    ];
+  }
+
+  // ---- Safety zones (Document panel toggle) ----
+  // Standard broadcast/film safe-area convention: action-safe = inset 5% of
+  // each dimension (90% of canvas visible), title-safe = inset 10% (80%
+  // visible) — the same percentages used across TV/animation delivery specs
+  // (e.g. the long-standing SMPTE recommendation), not something specific
+  // to this app to invent. Pure overlay guide, never part of the actual
+  // rendered/exported frame.
+  function buildSafetyZoneItems() {
+    if (!state.safetyZones) return [];
+    var w = state.canvasW, h = state.canvasH, zs = 1 / view.zoom;
+    var actionColor = [255, 210, 0, 200], titleColor = [255, 90, 90, 200];
+    function inset(pct) {
+      var mx = w * pct, my = h * pct;
+      return boundsRectItem(mx, my, w - mx, h - my, null, actionColor, zs);
+    }
+    var action = inset(0.05);
+    var title = inset(0.10);
+    title.strokeColor = titleColor;
+    return [action, title];
+  }
+
   // ---- Select-tool transform box + marquee overlay ----
   // Same reasoning as the node-handle overlay above: renderTransformHandles()
   // and the marquee-rectangle drawing in tools.js both go through Paper's own
@@ -275,12 +473,90 @@
     var rotPos = [midX, b.top - rotOff];
     items.push(lineItem(topCenter, rotPos, [74, 158, 255, 204], 1 * zs));
     items.push(circleItem(rotPos[0], rotPos[1], 5 * zs, [255, 255, 255, 255], [74, 158, 255, 255], 1.2 * zs));
+    // Anchor/pivot marker (redesign 2026-07-09, AE-style anchor point) — a
+    // small ringed crosshair AT the point rotation actually pivots around
+    // (tools.js xformAnchorPoint), so a non-center anchor is visible on the
+    // shape itself, not just as an abstract dot in the side panel widget.
+    if (typeof xformAnchorPoint === 'function') {
+      var ap = xformAnchorPoint(b);
+      var ar = 8 * zs;
+      items.push(circleItem(ap.x, ap.y, ar, null, [74, 158, 255, 255], 1.2 * zs));
+      items.push(lineItem([ap.x - ar, ap.y], [ap.x + ar, ap.y], [74, 158, 255, 255], 1 * zs));
+      items.push(lineItem([ap.x, ap.y - ar], [ap.x, ap.y + ar], [74, 158, 255, 255], 1 * zs));
+    }
     return items;
   }
   function buildMarqueeItems() {
     if (!_marquee.active || !_marquee.rect) return [];
     var b = _marquee.rect.bounds;
     return [boundsRectItem(b.left, b.top, b.right, b.bottom, [74, 158, 255, 20], [74, 158, 255, 230], 1 / view.zoom)];
+  }
+  // Fill/Stroke Select tool (v18, tools.js _fsSel) — a fill selection gets
+  // a filled orange highlight tracing the SAME geometry (Animate's dotted-
+  // pattern convention, simplified to a flat translucent tint since this
+  // engine has no tiled-pattern brush); a stroke/segment selection gets a
+  // thick dashed line traced along fsHighlightPath()'s (non-destructive)
+  // extracted arc — the real geometry never mutates just to show this.
+  // Approximates a tiled crosshatch pattern (the Japanese-animation-layout
+  // convention for marking a designated-but-unresolved area) by clipping a
+  // family of parallel diagonal lines to the region's actual shape — this
+  // engine has no tiled-pattern brush (see buildFSSelectionItems), so the
+  // hatch is just literal short line items computed fresh each call. Works
+  // for concave shapes too: each candidate line's crossings with `region`
+  // are found via getIntersections and paired up even-odd (offset[0]-
+  // offset[1] is "inside", offset[2]-offset[3] is "inside", etc.), same
+  // rule a scanline fill uses — no boolean ops needed.
+  function fsHatchClipLines(region, spacingWorld, angleDeg) {
+    var b = region.bounds;
+    if (!b || b.width <= 0 || b.height <= 0) return [];
+    var diag = Math.sqrt(b.width * b.width + b.height * b.height) + spacingWorld * 2;
+    var cx = b.center.x, cy = b.center.y;
+    var rad = angleDeg * Math.PI / 180;
+    var dx = Math.cos(rad), dy = Math.sin(rad);
+    var nx = -dy, ny = dx;
+    var lines = [];
+    var count = Math.ceil(diag / spacingWorld);
+    for (var i = -count; i <= count; i++) {
+      var off = i * spacingWorld;
+      var ox = cx + nx * off, oy = cy + ny * off;
+      var p1 = new Point(ox - dx * diag / 2, oy - dy * diag / 2);
+      var p2 = new Point(ox + dx * diag / 2, oy + dy * diag / 2);
+      var testLine = new Path({ segments: [p1, p2], insert: false });
+      var ix;
+      try { ix = region.getIntersections(testLine); } catch (e) { ix = []; }
+      if (ix.length >= 2) {
+        var offsets = ix.map(function (loc) { return loc.intersection.offset; }).sort(function (a, c) { return a - c; });
+        for (var j = 0; j + 1 < offsets.length; j += 2) {
+          var pa = testLine.getPointAt(offsets[j]);
+          var pb = testLine.getPointAt(offsets[j + 1]);
+          if (pa && pb) lines.push([pa.x, pa.y, pb.x, pb.y]);
+        }
+      }
+      testLine.remove();
+    }
+    return lines;
+  }
+  function buildFSSelectionItems() {
+    if (state.tool !== 'fsselect' || !_fsSel || typeof fsHighlightPath !== 'function') return [];
+    var hl = fsHighlightPath(_fsSel);
+    if (!hl || !hl.segments || !hl.segments.length) { if (hl) hl.remove(); return []; }
+    var segs = hl.segments.map(function (s) { return { point: [s.point.x, s.point.y], handleIn: [s.handleIn.x, s.handleIn.y], handleOut: [s.handleOut.x, s.handleOut.y] }; });
+    var closed = !!hl.closed;
+    var zs = 1 / view.zoom;
+    if (_fsSel.kind === 'fill' || _fsSel.kind === 'fillregion') {
+      var hatchLines = closed ? fsHatchClipLines(hl, 9 * zs, 45) : [];
+      hl.remove();
+      var items = [{ segments: roundSegs(segs), closed: closed, fillColor: [255, 152, 0, 45], strokeColor: [255, 152, 0, 230], strokeWidth: 2 * zs, dashPattern: [4 * zs, 3 * zs] }];
+      hatchLines.forEach(function (ln) {
+        items.push({
+          segments: [{ point: [ln[0], ln[1]], handleIn: [0, 0], handleOut: [0, 0] }, { point: [ln[2], ln[3]], handleIn: [0, 0], handleOut: [0, 0] }],
+          closed: false, fillColor: null, strokeColor: [255, 152, 0, 150], strokeWidth: 1 * zs,
+        });
+      });
+      return items;
+    }
+    hl.remove();
+    return [{ segments: roundSegs(segs), closed: closed, fillColor: null, strokeColor: [255, 152, 0, 230], strokeWidth: (( _fsSel.path.strokeWidth || 2) + 4) * zs, dashPattern: [5 * zs, 4 * zs] }];
   }
 
   // Set by eraser-bridge.js on every pointermove while the Eraser tool is
@@ -289,10 +565,17 @@
   // likewise invisible under the opaque rust canvas once the beta engine is
   // on.
   var eraserCursorWorld = null;
-  function setEraserCursor(worldPt) { eraserCursorWorld = worldPt; }
+  var eraserCursorRadius = null;
+  // radius is optional — omitted on plain hover (no pressure sample yet),
+  // defaulting to the nominal size; eraser-bridge.js passes the real
+  // pressure-scaled radius while actively erasing so the cursor always
+  // shows the width that's ACTUALLY about to be cut, matching the pressure
+  // brush's own cursor convention (setPressureCursor below).
+  function setEraserCursor(worldPt, radius) { eraserCursorWorld = worldPt; eraserCursorRadius = radius; }
   function buildEraserCursorItems() {
     if (state.tool !== 'eraser' || !eraserCursorWorld) return [];
-    return [circleItem(eraserCursorWorld[0], eraserCursorWorld[1], state.eraserSize / 2, [255, 255, 255, 31], [255, 255, 255, 230], 1 / view.zoom)];
+    var r = eraserCursorRadius != null ? eraserCursorRadius : state.eraserSize / 2;
+    return [circleItem(eraserCursorWorld[0], eraserCursorWorld[1], r, [255, 255, 255, 31], [255, 255, 255, 230], 1 / view.zoom)];
   }
 
   // Set by draw-bridge.js on every pointermove while the Draw tool has
@@ -390,9 +673,38 @@
     var z = view.zoom * scale;
     var panX = engineW / 2 - view.center.x * z;
     var panY = engineH / 2 - view.center.y * z;
-    engine.set_viewport(panX, panY, z, 0, 0, 0);
+    // Rotation/pivot were always plumbed through on the Rust side
+    // (Viewport already has rotation/pivot fields, screen_to_world already
+    // accounts for them) — this was the only remaining piece hardcoding
+    // them to 0, so `state.canvasRotation` never had any visible effect.
+    //
+    // Viewport::transform() (engine.rs) composes:
+    //   screen = pan + pivot + rotate(zoom*(world - pivot))
+    // — i.e. `pivot` is read in WORLD space (matches its own doc comment:
+    // "pass canvasW/2, canvasH/2"), and is ADDED BACK untouched after the
+    // rotate+scale, not scaled itself. Feeding it the plain panX/panY above
+    // is wrong the moment zoom != 1: expanding the formula at rotation=0
+    // gives `pan + pivot*(1-z) + z*world`, not the `pan + z*world` those
+    // panX/panY were actually derived for — a visible jump the instant
+    // rotation went non-zero (confirmed live: world point at screen center
+    // came back wildly off pivot after a 90° rotate before this fix).
+    // Solving for the pan that keeps rotation=0 pixel-identical to before
+    // (`pan_adjusted + pivot*(1-z) + z*world == pan + z*world`) gives
+    // `pan_adjusted = pan + pivot*(z-1)`, applied below — this is exact
+    // algebra, not a heuristic, so rotation=0 stays byte-for-byte the same
+    // scene as before this feature existed, and rotation!=0 now genuinely
+    // spins around the artboard center.
+    var pivotWX = state.canvasW / 2, pivotWY = state.canvasH / 2;
+    var panAdjX = panX + pivotWX * (z - 1);
+    var panAdjY = panY + pivotWY * (z - 1);
+    engine.set_viewport(panAdjX, panAdjY, z, state.canvasRotation || 0, pivotWX, pivotWY);
   }
 
+  // Shared with renderWithOverlayItem/renderNow so all three call sites stay
+  // in sync — canvasRotation was missing here entirely at first, so rotating
+  // the stage via canvasRotation alone (no zoom/pan change alongside it)
+  // never tripped the dirty-check and silently never re-rendered.
+  function viewportKeyNow() { return view.zoom + '|' + view.center.x + ',' + view.center.y + '|' + (state.canvasRotation || 0); }
   var lastViewportKey = '';
   var lastSceneVersion = -1; // forces the very first tick to build+render regardless
   function tick() {
@@ -406,7 +718,7 @@
       // loop running underneath made the whole app feel laggy ("ça rame").
       // Only the two things that can actually change the picture — scene
       // content or viewport — are checked; everything else is a no-op skip.
-      var viewportKey = view.zoom + '|' + view.center.x + ',' + view.center.y;
+      var viewportKey = viewportKeyNow();
       var viewportChanged = viewportKey !== lastViewportKey;
       // buildSceneJson() itself isn't free — it walks every live Paper.js
       // item on every layer and re-serializes them all, every single call.
@@ -424,6 +736,7 @@
         if (viewportChanged || sceneChanged) {
           if (viewportChanged) { syncViewport(); lastViewportKey = viewportKey; }
           lastSceneJson = json;
+          window.__lastSceneJson = json;
           engine.render(json);
         }
         lastSceneVersion = window._sceneVersion;
@@ -483,6 +796,7 @@
     lastSceneJson = ''; // force a full re-render at the new size
     lastViewportKey = '';
     lastSceneVersion = -1; // force tick() to actually rebuild, not just skip on an unchanged version
+    invalidateOverlayBase();
   }
 
   async function ensureEngine() {
@@ -531,11 +845,22 @@
     if (on && !(await ensureEngine())) return;
     enabled = on;
     if (rustCanvas) rustCanvas.style.display = on ? 'block' : 'none';
+    // Paper's own canvas is fully hidden under the opaque rust canvas while
+    // the engine is on, yet Paper kept RASTERIZING it on every view
+    // invalidation (any pan/zoom/center change, any item mutation) — pure
+    // duplicate work that scales with item count, and the actual dominant
+    // cost on dab-heavy documents (measured: ~200ms per pan move at ~2600
+    // items, vs ~6ms for the rust render of the same scene). The scene
+    // graph stays fully live (hit-testing, bounds, exportSVG never needed
+    // the raster), only the invisible repaint is disabled. Restored when
+    // the engine is toggled off, where Paper's canvas is the visible one.
+    if (typeof view !== 'undefined' && view) view.autoUpdate = !on;
     if (on) {
       if (!silent) showToast('Rendu: moteur Rust (vello/WebGPU)');
       tick();
     } else {
       cancelAnimationFrame(rafId);
+      if (typeof view !== 'undefined' && view) view.update();
       if (engine && !silent) showToast('Rendu: Paper.js');
     }
   }
@@ -547,7 +872,18 @@
     var rect = rustCanvas.getBoundingClientRect();
     var sx = (clientX - rect.left) * (engineW / rect.width);
     var sy = (clientY - rect.top) * (engineH / rect.height);
-    return engine.screen_to_world(sx, sy);
+    // engine.screen_to_world (Rust `Vec<f64>` via wasm-bindgen) comes back as
+    // a Float64Array, not a plain Array — every caller here only ever
+    // indexes it (w[0]/w[1], works fine on both), but JSON.stringify()
+    // serializes a Float64Array as {"0":x,"1":y} instead of [x,y]. Any
+    // overlay item built directly from this raw result (e.g. pen-bridge's
+    // live rubber-band preview) silently sent malformed `point` fields to
+    // the Rust renderer, which rejected the whole scene as a deserialize
+    // error — caught by tick()'s try/catch, which then permanently disabled
+    // the ENTIRE engine for the rest of the session (setEnabled(false)),
+    // not just that one overlay. Converting to a real Array here fixes every
+    // call site at once with no behavior change for existing w[0]/w[1] use.
+    return Array.from(engine.screen_to_world(sx, sy));
   }
 
   // Renders the current persisted scene (same as a normal tick) plus one
@@ -555,18 +891,62 @@
   // intercepted tool is building, which deliberately never touches Paper's
   // own scene graph until it's committed (see draw-bridge.js) so Paper.js
   // does zero work — no re-render — for the whole duration of the drag.
+  //
+  // The persisted part of the scene is CACHED as a pre-serialized JSON
+  // prefix for the duration of the drag: since the document is untouched
+  // until commit and the viewport doesn't move mid-draw, rebuilding +
+  // re-serializing every path on every layer on EVERY pointermove was pure
+  // waste — and stopped being merely wasteful once brush-texture presets
+  // meant a single stroke can carry ~180 dab Paths (the reported "ça rame
+  // avec les brush custom" — thousands of serP calls per mousemove). Keyed
+  // on (_sceneVersion, viewportKey); invalidated by renderNow (the "scene
+  // actually mutated mid-drag" path, e.g. the eraser) and resume().
+  // String-splicing the overlay into the cached prefix (instead of
+  // JSON.parse → push → re-stringify of the whole scene) keeps the per-move
+  // cost proportional to the overlay alone, not the document.
+  var overlayBasePrefix = null, overlayBaseVersion = -1, overlayBaseViewKey = '';
+  function invalidateOverlayBase() { overlayBasePrefix = null; }
+  // rAF coalescing: a stylus fires pointermove at 120-240Hz — far beyond
+  // the 60Hz the display can show — and every one of those used to pay a
+  // full render. Only the LAST overlay state per animation frame can ever
+  // reach the screen anyway, so intermediate ones are stored and dropped.
+  // resume() cancels any still-pending render so a stale overlay can't
+  // paint over the freshly-committed stroke after the drag ends.
+  var pendingOverlayItem = null, overlayRafId = 0;
   function renderWithOverlayItem(item) {
+    pendingOverlayItem = item;
+    if (overlayRafId) return;
+    overlayRafId = requestAnimationFrame(function () {
+      overlayRafId = 0;
+      var it = pendingOverlayItem;
+      pendingOverlayItem = null;
+      if (it != null) renderOverlayNow(it);
+    });
+  }
+  function renderOverlayNow(item) {
     if (!engine) return;
     syncViewport();
-    lastViewportKey = view.zoom + '|' + view.center.x + ',' + view.center.y;
-    var scene = JSON.parse(buildSceneJson());
+    var vk = viewportKeyNow();
+    lastViewportKey = vk;
+    if (overlayBasePrefix === null || overlayBaseVersion !== window._sceneVersion || overlayBaseViewKey !== vk) {
+      var base = buildSceneJson(true); // '{"layers":[...]}' — always ends in ']}'
+      overlayBasePrefix = base.slice(0, base.length - 2);
+      overlayBaseVersion = window._sceneVersion;
+      overlayBaseViewKey = vk;
+    }
     // `item` may be a single item (all pre-existing callers) or an array —
     // the wire format (LayerIn.items: Vec<ItemIn>) always supported a list,
     // this just stopped hardcoding it to exactly one so callers like
     // draw-bridge.js can overlay extra items (e.g. endpoint markers)
     // alongside the in-progress stroke in the same render call.
-    scene.layers.push({ items: Array.isArray(item) ? item : [item] });
-    var json = JSON.stringify(scene);
+    var overlayItems = Array.isArray(item) ? item : [item];
+    // The volatile cursor overlays excluded from the cached base (see
+    // buildSceneJson's skipVolatile) — re-collected fresh on every move so
+    // the pressure/eraser cursor keeps tracking the pointer instead of
+    // freezing at its drag-start position inside the cache.
+    var volatileItems = buildEraserCursorItems().concat(buildPressureCursorItems(), buildPenPreviewItems());
+    var json = overlayBasePrefix + ',' + JSON.stringify({ items: overlayItems })
+      + (volatileItems.length ? ',' + JSON.stringify({ items: volatileItems }) : '') + ']}';
     lastSceneJson = ''; // force the next normal tick to re-diff post-commit
     lastSceneVersion = -1; // ditto — don't let an unchanged version skip that rebuild
     engine.render(json);
@@ -579,12 +959,44 @@
   // handles from that same live data on its own (see
   // buildTransformBoxItems/buildMarqueeItems above); unlike draw-bridge's
   // in-progress stroke, there's no separate overlay item to append here.
-  function renderNow() {
+  // `viewportOnly` (opt-in per call site, viewtools-bridge pan/rotate): the
+  // caller guarantees it changed NOTHING but the viewport since the last
+  // render — the scene JSON is re-used verbatim and only the viewport
+  // uniform is re-synced, skipping the full walk+serialize entirely. Safe
+  // for pan/rotate (no scene item reads view.center or rotation; the
+  // 1/view.zoom-sized overlay handles depend on ZOOM only), deliberately
+  // NOT used by the zoom drag, whose zs-sized overlays genuinely change.
+  // Never inferred automatically: select-bridge/eraser-bridge mutate
+  // geometry without bumping _sceneVersion, so only the call site knows.
+  var viewportRafId = 0;
+  function renderNow(viewportOnly) {
     if (!engine) return;
+    if (viewportOnly) {
+      // Same rAF coalescing rationale as renderWithOverlayItem — pan/rotate
+      // pointermoves outrun the display. The callback reads lastSceneJson at
+      // FIRE time (not schedule time), so a full render landing in between
+      // is never overwritten with something staler than itself.
+      if (viewportRafId) return;
+      viewportRafId = requestAnimationFrame(function () {
+        viewportRafId = 0;
+        if (!engine) return;
+        syncViewport();
+        lastViewportKey = viewportKeyNow();
+        if (lastSceneJson) { engine.render(lastSceneJson); return; }
+        var json2 = buildSceneJson();
+        lastSceneJson = json2;
+        window.__lastSceneJson = json2;
+        engine.render(json2);
+      });
+      return;
+    }
+    if (viewportRafId) { cancelAnimationFrame(viewportRafId); viewportRafId = 0; } // a full render supersedes any pending viewport-only one
     syncViewport();
-    lastViewportKey = view.zoom + '|' + view.center.x + ',' + view.center.y;
+    lastViewportKey = viewportKeyNow();
+    invalidateOverlayBase(); // scene may have mutated without a version bump (eraser/select drags) — never let a stale drag-cache survive this
     var json = buildSceneJson();
     lastSceneJson = json;
+    window.__lastSceneJson = json;
     engine.render(json);
   }
 
@@ -597,12 +1009,18 @@
     setEraserCursor: setEraserCursor,
     setPressureCursor: setPressureCursor,
     setPenPreview: setPenPreview,
+    registerImagePixels: registerImagePixels,
+    hasImage: function (id) { return !!registeredImageIds[id]; },
     // Call suspend() at the start of an intercepted drag and resume() at the
     // end — see the `suspended` var above for why: without this, tick()'s
     // own unconditional rAF loop races renderWithOverlayItem and erases the
     // live overlay a frame after every pointermove draws it.
     suspend: function () { suspended = true; },
-    resume: function () { suspended = false; },
+    resume: function () {
+      suspended = false;
+      invalidateOverlayBase();
+      if (overlayRafId) { cancelAnimationFrame(overlayRafId); overlayRafId = 0; pendingOverlayItem = null; }
+    },
   };
 
   // Rust/vello is now the default renderer (no more opt-in checkbox) — per
