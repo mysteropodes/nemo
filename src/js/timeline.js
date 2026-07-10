@@ -1370,6 +1370,14 @@ document.getElementById('frame-grid').addEventListener('contextmenu',function(e)
     {label:'Convertir en images clés',action:function(){window.SM.convertToKeyframes();}},
     {label:'Effacer l\'image clé',action:function(){window.SM.clearKeyframe();}},
     {sep:true},
+    // generateTweens() already scopes itself to the current frame selection
+    // (re-tweens just that span) or the whole layer if nothing's selected —
+    // same behavior as the Tween panel's own button/T shortcut, just
+    // reachable without opening that panel first (feedback #5qmww). Works
+    // equally to CREATE a tween between two keys or to REGENERATE one that
+    // already exists (e.g. after editing an endpoint's content).
+    {label:'Générer / refaire le tween',shortcut:'T',action:function(){window.SM.generateTweens();}},
+    {sep:true},
     {label:'Supprimer les images',action:function(){window.SM.removeFrameSpan();}},
   ]);
 });
