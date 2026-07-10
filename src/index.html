@@ -551,69 +551,92 @@
 <div id="settings-modal" class="modal-overlay" style="display:none">
   <div class="modal-box wide">
     <div class="modal-hdr"><span data-i18n="settingsTitle">Réglages</span> <button id="settings-close" class="modal-x">&times;</button></div>
+    <!-- Tabbed layout (was one long scroll of 6 stacked sections — reported
+         as "mal rangé"). Each pane keeps its exact original content/ids
+         (every existing JS listener still resolves by id unchanged), just
+         grouped under a tab instead of one continuous column. Tab state
+         isn't persisted across opens — always starts on Général, matching
+         how every other modal in the app already behaves. -->
+    <div id="settings-tabs" class="settings-tabs">
+      <button class="settings-tab active" data-tab="general" data-i18n="settingsTabGeneral">Général</button>
+      <button class="settings-tab" data-tab="updates" data-i18n="settingsTabUpdates">Mises à jour</button>
+      <button class="settings-tab" data-tab="collab" data-i18n="settingsTabCollab">Collaboration</button>
+      <button class="settings-tab" data-tab="feedback" data-i18n="settingsTabFeedback">Feedback</button>
+      <button class="settings-tab" data-tab="shortcuts" data-i18n="settingsTabShortcuts">Raccourcis</button>
+    </div>
     <div class="modal-bdy">
-      <div class="phdr" style="padding:0 0 4px 0;font-size:9px;color:var(--text-dim)" data-i18n="settingsLanguage">Langue</div>
-      <div class="pr" style="gap:8px;margin-bottom:10px">
-        <select id="settings-language" class="pi" style="flex:1">
-          <option value="fr">Français</option>
-          <option value="en">English</option>
-          <option value="ja">日本語</option>
-          <option value="es">Español</option>
-        </select>
+      <div class="settings-pane" data-pane="general">
+        <div class="phdr" style="padding:0 0 4px 0;font-size:9px;color:var(--text-dim)" data-i18n="settingsLanguage">Langue</div>
+        <div class="pr" style="gap:8px;margin-bottom:10px">
+          <select id="settings-language" class="pi" style="flex:1">
+            <option value="fr">Français</option>
+            <option value="en">English</option>
+            <option value="ja">日本語</option>
+            <option value="es">Español</option>
+          </select>
+        </div>
+        <div class="phdr" style="padding:0 0 4px 0;font-size:9px;color:var(--text-dim)" data-i18n="settingsProfileHdr">Profil (calques de révision)</div>
+        <div style="font-size:10px;color:var(--text-dim);margin-bottom:6px" data-i18n="settingsProfileDesc">Ton nom et ta couleur identifient tes traits face aux corrections d'un autre profil (superviseur, etc.) — voir l'outil Fill/Stroke Select et le mode "Corrections".</div>
+        <div class="pr" style="gap:8px">
+          <span class="pl" data-i18n="settingsName">Nom</span>
+          <input type="text" id="profile-name" class="pi" style="flex:1" placeholder="Ton nom" data-i18n-placeholder="settingsNamePh">
+          <div class="cw-mini" id="profile-color-well" style="background:#4a9eff"><input type="color" id="profile-color"></div>
+        </div>
+        <div class="pr" style="gap:8px;margin-top:6px">
+          <span class="pl" data-i18n="settingsRole">Rôle</span>
+          <select id="profile-role" class="pi" style="flex:1">
+            <option value="animator" data-i18n="roleAnimator">Animateur</option>
+            <option value="supervisor" data-i18n="roleSupervisor">Superviseur</option>
+            <option value="producer" data-i18n="roleProducer">Producteur</option>
+          </select>
+        </div>
+        <div style="font-size:9px;color:var(--text-dim);margin-top:4px" id="profile-role-hint"></div>
       </div>
-      <div class="phdr" style="padding:0 0 4px 0;font-size:9px;color:var(--text-dim)" data-i18n="settingsProfileHdr">Profil (calques de révision)</div>
-      <div style="font-size:10px;color:var(--text-dim);margin-bottom:6px" data-i18n="settingsProfileDesc">Ton nom et ta couleur identifient tes traits face aux corrections d'un autre profil (superviseur, etc.) — voir l'outil Fill/Stroke Select et le mode "Corrections".</div>
-      <div class="pr" style="gap:8px">
-        <span class="pl" data-i18n="settingsName">Nom</span>
-        <input type="text" id="profile-name" class="pi" style="flex:1" placeholder="Ton nom" data-i18n-placeholder="settingsNamePh">
-        <div class="cw-mini" id="profile-color-well" style="background:#4a9eff"><input type="color" id="profile-color"></div>
+      <div class="settings-pane" data-pane="updates" style="display:none">
+        <div class="phdr" style="padding:0 0 4px 0;font-size:9px;color:var(--text-dim)">Mises à jour de l'app</div>
+        <div class="pr" style="gap:6px">
+          <span id="app-update-status" style="flex:1;font-size:10px;color:var(--text-dim)">Version <span id="app-version-txt">—</span></span>
+          <button class="pbtn" id="app-check-update" style="font-size:10px;padding:5px 8px">Vérifier les mises à jour</button>
+        </div>
       </div>
-      <div class="pr" style="gap:8px;margin-top:6px">
-        <span class="pl" data-i18n="settingsRole">Rôle</span>
-        <select id="profile-role" class="pi" style="flex:1">
-          <option value="animator" data-i18n="roleAnimator">Animateur</option>
-          <option value="supervisor" data-i18n="roleSupervisor">Superviseur</option>
-          <option value="producer" data-i18n="roleProducer">Producteur</option>
-        </select>
+      <div class="settings-pane" data-pane="collab" style="display:none">
+        <div class="phdr" style="padding:0 0 4px 0;font-size:9px;color:var(--text-dim)" data-i18n="settingsSyncHdr">Sync équipe (dossier partagé)</div>
+        <div style="font-size:10px;color:var(--text-dim);margin-bottom:6px" data-i18n="settingsSyncDesc">Publie tes modifs dans un dossier partagé (kDrive, Drive monté, S3…) et récupère celles des autres — async, pas de temps réel. Nouveaux traits fusionnés automatiquement ; un même trait modifié des deux côtés devient une correction à Accepter/Rejeter (comme un calque de révision).</div>
+        <div class="pr" style="gap:6px">
+          <span class="pl" style="flex:none" data-i18n="settingsFolder">Dossier</span>
+          <input type="text" id="sync-folder-path" class="pi" style="flex:1" placeholder="Aucun dossier configuré" readonly data-i18n-placeholder="settingsFolderPh">
+          <button class="pbtn" id="sync-choose-folder" style="font-size:10px;padding:4px 8px" data-i18n="settingsChoose">Choisir…</button>
+        </div>
+        <div class="pr" style="margin-top:6px;gap:6px">
+          <button class="pbtn" id="sync-publish" style="flex:1;font-size:10px;padding:5px" data-i18n="settingsPublish">Publier</button>
+          <button class="pbtn" id="sync-check" style="flex:1;font-size:10px;padding:5px" data-i18n="settingsCheckUpdates">Vérifier les mises à jour</button>
+        </div>
+        <div id="sync-updates-list" style="display:flex;flex-direction:column;gap:4px;margin-top:6px;max-height:160px;overflow-y:auto"></div>
       </div>
-      <div style="font-size:9px;color:var(--text-dim);margin-top:4px" id="profile-role-hint"></div>
-      <div class="phdr" style="padding:14px 0 4px 0;font-size:9px;color:var(--text-dim)">Mises à jour de l'app</div>
-      <div class="pr" style="gap:6px">
-        <span id="app-update-status" style="flex:1;font-size:10px;color:var(--text-dim)">Version <span id="app-version-txt">—</span></span>
-        <button class="pbtn" id="app-check-update" style="font-size:10px;padding:5px 8px">Vérifier les mises à jour</button>
+      <div class="settings-pane" data-pane="feedback" style="display:none">
+        <div class="phdr" style="padding:0 0 4px 0;font-size:9px;color:var(--text-dim)">Feedback (hors projet)</div>
+        <div style="font-size:10px;color:var(--text-dim);margin-bottom:6px">Notes posées via l'outil Comment → "Enregistrer comme feedback" — jamais dans le fichier projet. Les tiennes sont approuvées automatiquement ; celles récupérées d'un autre profil via le dossier partagé restent en attente jusqu'à ce que tu les approuves ici.</div>
+        <div class="pr" style="gap:6px">
+          <button class="pbtn" id="fb-pull" style="flex:1;font-size:10px;padding:5px">Récupérer le feedback de l'équipe</button>
+        </div>
+        <div id="fb-list" style="display:flex;flex-direction:column;gap:4px;margin-top:6px;max-height:160px;overflow-y:auto"></div>
+        <div class="phdr" style="padding:14px 0 4px 0;font-size:9px;color:var(--text-dim)">Feedback beta-testeurs (GitHub)</div>
+        <div style="font-size:10px;color:var(--text-dim);margin-bottom:6px">Chaque feedback envoyé depuis une app distribuée arrive comme Issue sur <a href="https://github.com/mysteropodes/strokemotion-feedback" target="_blank" style="color:var(--accent)">mysteropodes/strokemotion-feedback</a>. Colle ton propre token GitHub personnel (fine-grained, scope "Issues" sur ce repo uniquement) pour pouvoir trier — il reste uniquement sur ta machine, jamais distribué.</div>
+        <div class="pr" style="gap:6px">
+          <input type="password" id="gh-token" placeholder="Ton token GitHub personnel (triage uniquement)" style="flex:1;font-size:10px;padding:5px;border-radius:6px;border:1px solid var(--border2);background:var(--panel3);color:var(--text)">
+          <button class="pbtn" id="gh-token-save" style="font-size:10px;padding:5px">Enregistrer</button>
+        </div>
+        <div class="pr" style="gap:6px;margin-top:6px">
+          <button class="pbtn" id="fb-dashboard-open" style="flex:1;font-size:10px;padding:6px;font-weight:600">📋 Ouvrir le tableau de feedback</button>
+        </div>
       </div>
-      <div class="phdr" style="padding:14px 0 4px 0;font-size:9px;color:var(--text-dim)" data-i18n="settingsSyncHdr">Sync équipe (dossier partagé)</div>
-      <div style="font-size:10px;color:var(--text-dim);margin-bottom:6px" data-i18n="settingsSyncDesc">Publie tes modifs dans un dossier partagé (kDrive, Drive monté, S3…) et récupère celles des autres — async, pas de temps réel. Nouveaux traits fusionnés automatiquement ; un même trait modifié des deux côtés devient une correction à Accepter/Rejeter (comme un calque de révision).</div>
-      <div class="pr" style="gap:6px">
-        <span class="pl" style="flex:none" data-i18n="settingsFolder">Dossier</span>
-        <input type="text" id="sync-folder-path" class="pi" style="flex:1" placeholder="Aucun dossier configuré" readonly data-i18n-placeholder="settingsFolderPh">
-        <button class="pbtn" id="sync-choose-folder" style="font-size:10px;padding:4px 8px" data-i18n="settingsChoose">Choisir…</button>
-      </div>
-      <div class="pr" style="margin-top:6px;gap:6px">
-        <button class="pbtn" id="sync-publish" style="flex:1;font-size:10px;padding:5px" data-i18n="settingsPublish">Publier</button>
-        <button class="pbtn" id="sync-check" style="flex:1;font-size:10px;padding:5px" data-i18n="settingsCheckUpdates">Vérifier les mises à jour</button>
-      </div>
-      <div id="sync-updates-list" style="display:flex;flex-direction:column;gap:4px;margin-top:6px;max-height:160px;overflow-y:auto"></div>
-      <div class="phdr" style="padding:14px 0 4px 0;font-size:9px;color:var(--text-dim)">Feedback (hors projet)</div>
-      <div style="font-size:10px;color:var(--text-dim);margin-bottom:6px">Notes posées via l'outil Comment → "Enregistrer comme feedback" — jamais dans le fichier projet. Les tiennes sont approuvées automatiquement ; celles récupérées d'un autre profil via le dossier partagé restent en attente jusqu'à ce que tu les approuves ici.</div>
-      <div class="pr" style="gap:6px">
-        <button class="pbtn" id="fb-pull" style="flex:1;font-size:10px;padding:5px">Récupérer le feedback de l'équipe</button>
-      </div>
-      <div id="fb-list" style="display:flex;flex-direction:column;gap:4px;margin-top:6px;max-height:160px;overflow-y:auto"></div>
-      <div class="phdr" style="padding:14px 0 4px 0;font-size:9px;color:var(--text-dim)">Feedback beta-testeurs (GitHub)</div>
-      <div style="font-size:10px;color:var(--text-dim);margin-bottom:6px">Chaque feedback envoyé depuis une app distribuée arrive comme Issue sur <a href="https://github.com/mysteropodes/strokemotion-feedback" target="_blank" style="color:var(--accent)">mysteropodes/strokemotion-feedback</a>. Colle ton propre token GitHub personnel (fine-grained, scope "Issues" sur ce repo uniquement) pour pouvoir trier — il reste uniquement sur ta machine, jamais distribué.</div>
-      <div class="pr" style="gap:6px">
-        <input type="password" id="gh-token" placeholder="Ton token GitHub personnel (triage uniquement)" style="flex:1;font-size:10px;padding:5px;border-radius:6px;border:1px solid var(--border2);background:var(--panel3);color:var(--text)">
-        <button class="pbtn" id="gh-token-save" style="font-size:10px;padding:5px">Enregistrer</button>
-      </div>
-      <div class="pr" style="gap:6px;margin-top:6px">
-        <button class="pbtn" id="fb-dashboard-open" style="flex:1;font-size:10px;padding:6px;font-weight:600">📋 Ouvrir le tableau de feedback</button>
-      </div>
-      <div class="phdr" style="padding:14px 0 4px 0;font-size:9px;color:var(--text-dim)" data-i18n="settingsShortcutsHdr">Raccourcis clavier — outils</div>
-      <div style="font-size:10px;color:var(--text-dim);margin-bottom:6px" data-i18n="settingsShortcutsDesc">Cliquer une touche puis appuyer sur une nouvelle touche pour la réassigner. Les autres raccourcis (transport, undo/save…) ne sont pas encore modifiables ici. Import de profils (Animate, Blender…) : à venir.</div>
-      <div id="shortcuts-list" style="display:flex;flex-direction:column;gap:2px;max-height:320px;overflow-y:auto"></div>
-      <div class="pr" style="margin-top:10px;gap:6px">
-        <button class="pbtn" id="shortcuts-reset" style="flex:1" data-i18n="settingsResetAll">Réinitialiser tout</button>
+      <div class="settings-pane" data-pane="shortcuts" style="display:none">
+        <div class="phdr" style="padding:0 0 4px 0;font-size:9px;color:var(--text-dim)" data-i18n="settingsShortcutsHdr">Raccourcis clavier — outils</div>
+        <div style="font-size:10px;color:var(--text-dim);margin-bottom:6px" data-i18n="settingsShortcutsDesc">Cliquer une touche puis appuyer sur une nouvelle touche pour la réassigner. Les autres raccourcis (transport, undo/save…) ne sont pas encore modifiables ici. Import de profils (Animate, Blender…) : à venir.</div>
+        <div id="shortcuts-list" style="display:flex;flex-direction:column;gap:2px;max-height:320px;overflow-y:auto"></div>
+        <div class="pr" style="margin-top:10px;gap:6px">
+          <button class="pbtn" id="shortcuts-reset" style="flex:1" data-i18n="settingsResetAll">Réinitialiser tout</button>
+        </div>
       </div>
     </div>
   </div>

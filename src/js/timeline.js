@@ -2257,9 +2257,26 @@ function initCycleAndPropagate(){
   if(prop)prop.addEventListener('click',function(){window.SM.propagateColorAllFrames();});
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initCycleAndPropagate);else initCycleAndPropagate();
+// Settings tabs (feedback: "le panel réglages encore mal rangé, tu peux
+// pas faire des onglets en haut avec différentes sections ?") — 6 stacked
+// sections regrouped under 5 tabs; every pane keeps its original ids
+// unchanged, so every existing listener in this file still resolves them.
+function initSettingsTabs(){
+  var bar=document.getElementById('settings-tabs');if(!bar)return;
+  bar.querySelectorAll('.settings-tab').forEach(function(tab){
+    tab.addEventListener('click',function(){
+      bar.querySelectorAll('.settings-tab').forEach(function(t){t.classList.remove('active');});
+      tab.classList.add('active');
+      document.querySelectorAll('#settings-modal .settings-pane').forEach(function(p){
+        p.style.display=(p.dataset.pane===tab.dataset.tab)?'':'none';
+      });
+    });
+  });
+}
 function initSettingsModal(){
   var btn=document.getElementById('btn-settings'),modal=document.getElementById('settings-modal');
   if(!btn||!modal)return;
+  initSettingsTabs();
   btn.addEventListener('click',function(){renderShortcutsList();syncProfileFields();syncFolderFields();refreshFeedbackList();modal.style.display='flex';});
   var topBtn=document.getElementById('project-tabs-settings');
   if(topBtn)topBtn.addEventListener('click',function(){btn.click();});

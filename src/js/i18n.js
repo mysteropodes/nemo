@@ -16,6 +16,7 @@
   var I18N={
     en:{
       settingsTitle:'Settings',
+      settingsTabGeneral:'General',settingsTabUpdates:'Updates',settingsTabCollab:'Collaboration',settingsTabFeedback:'Feedback',settingsTabShortcuts:'Shortcuts',
       settingsLanguage:'Language',
       settingsProfileHdr:'Profile (revision layers)',
       settingsProfileDesc:'Your name and color identify your strokes against another profile\'s corrections (supervisor, etc.) — see the Fill/Stroke Select tool and "Corrections" mode.',
@@ -41,6 +42,7 @@
     },
     fr:{
       settingsTitle:'Réglages',
+      settingsTabGeneral:'Général',settingsTabUpdates:'Mises à jour',settingsTabCollab:'Collaboration',settingsTabFeedback:'Feedback',settingsTabShortcuts:'Raccourcis',
       settingsLanguage:'Langue',
       settingsProfileHdr:'Profil (calques de révision)',
       settingsProfileDesc:'Ton nom et ta couleur identifient tes traits face aux corrections d\'un autre profil (superviseur, etc.) — voir l\'outil Fill/Stroke Select et le mode "Corrections".',
@@ -66,6 +68,7 @@
     },
     ja:{
       settingsTitle:'設定',
+      settingsTabGeneral:'一般',settingsTabUpdates:'アップデート',settingsTabCollab:'コラボレーション',settingsTabFeedback:'フィードバック',settingsTabShortcuts:'ショートカット',
       settingsLanguage:'言語',
       settingsProfileHdr:'プロフィール（修正レイヤー）',
       settingsProfileDesc:'名前と色は、他のプロフィール（スーパーバイザーなど）による修正に対して、あなたのストロークを識別します — Fill/Stroke Select ツールと「修正」モードを参照。',
@@ -91,6 +94,7 @@
     },
     es:{
       settingsTitle:'Ajustes',
+      settingsTabGeneral:'General',settingsTabUpdates:'Actualizaciones',settingsTabCollab:'Colaboración',settingsTabFeedback:'Feedback',settingsTabShortcuts:'Atajos',
       settingsLanguage:'Idioma',
       settingsProfileHdr:'Perfil (capas de revisión)',
       settingsProfileDesc:'Tu nombre y color identifican tus trazos frente a las correcciones de otro perfil (supervisor, etc.) — ver la herramienta Selección Relleno/Trazo y el modo "Correcciones".',

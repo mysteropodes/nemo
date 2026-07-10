@@ -583,7 +583,11 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--gutter);color:
    than the viewport ("je vois plus rien"). Constrained to the viewport
    height minus room for the header/margins, body scrolls internally. */
 #settings-modal .modal-box{max-height:88vh;display:flex;flex-direction:column;}
-#settings-modal .modal-bdy{overflow-y:auto;max-height:calc(88vh - 40px);}
+#settings-modal .modal-bdy{overflow-y:auto;max-height:calc(88vh - 78px);}
+.settings-tabs{display:flex;gap:2px;padding:8px 14px 0;border-bottom:1px solid var(--border);flex:none;}
+.settings-tab{background:none;border:none;color:var(--text-dim);font-size:11px;font-weight:600;padding:8px 12px;cursor:pointer;border-radius:6px 6px 0 0;transition:background .15s,color .15s;}
+.settings-tab:hover{background:var(--panel3);color:var(--text);}
+.settings-tab.active{color:var(--accent-hover);background:var(--panel3);box-shadow:inset 0 -2px 0 var(--accent);}
 .fb-card{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border-radius:8px;background:var(--panel3);border:1px solid var(--border);font-size:11px;}
 .fb-card-head{display:flex;align-items:center;gap:6px;flex-wrap:wrap;color:var(--text-dim);font-size:10px;}
 .fb-chip{display:inline-flex;align-items:center;padding:2px 7px;border-radius:10px;font-size:9px;font-weight:600;background:var(--panel);border:1px solid var(--border2);cursor:pointer;user-select:none;white-space:nowrap;}
