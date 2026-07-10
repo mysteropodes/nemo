@@ -63,7 +63,15 @@
       } else {
         var msg = 'Nouvelle version ' + update.version + ' disponible' + (update.body ? ('\n\n' + update.body) : '') + '\n\nInstaller maintenant ?';
         if (statusEl) statusEl.textContent = 'Version ' + update.version + ' disponible';
-        if (confirm(msg)) await doInstall(update, statusEl);
+        // Plain window.confirm() is intercepted inside the Tauri webview and
+        // routed to a deprecated/missing plugin command ("dialog.confirm not
+        // allowed. Command not found") — worse, it returns a Promise, not a
+        // synchronous boolean like a real browser, so `if (confirm(msg))`
+        // was always truthy (a Promise object) and installed unconditionally
+        // regardless of what the user actually clicked. The real, supported,
+        // Promise<boolean> API is window.__TAURI__.dialog.confirm().
+        var proceed = await window.__TAURI__.dialog.confirm(msg, { title: 'Mise à jour disponible' });
+        if (proceed) await doInstall(update, statusEl);
       }
     } catch (e) {
       console.warn('[updater] check failed', e);
