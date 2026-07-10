@@ -37,6 +37,24 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--gutter);color:
 #project-tabs-spacer{flex:1;min-width:8px;}
 #project-tabs-settings{flex:none;width:24px;height:24px;border-radius:6px;background:transparent;border:none;color:rgba(236,234,231,.45);cursor:pointer;display:flex;align-items:center;justify-content:center;}
 #project-tabs-settings:hover{background:var(--panel3);color:var(--text);}
+/* Collaborator avatars: current profile + everyone who's left a feedback
+   comment on this project — Figma-style overlapping circle stack, left of
+   the settings gear. Click opens #fb-avatars-pop listing the comments. */
+#fb-avatars{flex:none;display:flex;align-items:center;cursor:pointer;}
+#fb-avatars .fb-av{flex:none;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:#fff;border:2px solid var(--panel2);margin-left:-8px;}
+#fb-avatars .fb-av:first-child{margin-left:0;}
+#fb-avatars .fb-av.fb-av-more{background:var(--panel3);color:var(--text-dim);font-size:9px;}
+#fb-avatars-pop{display:none;position:fixed;width:280px;max-height:360px;overflow-y:auto;background:var(--panel2);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:600;padding:6px;}
+#fb-avatars-pop.open{display:block;}
+#fb-avatars-pop .fb-pop-item{display:flex;gap:8px;padding:7px 8px;border-radius:6px;font-size:11px;}
+#fb-avatars-pop .fb-pop-item:hover{background:var(--panel3);}
+#fb-avatars-pop .fb-pop-av{flex:none;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;color:#fff;margin-top:1px;}
+#fb-avatars-pop .fb-pop-body{flex:1;min-width:0;}
+#fb-avatars-pop .fb-pop-note{color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+#fb-avatars-pop .fb-pop-meta{color:var(--text-dim);font-size:10px;margin-top:2px;display:flex;gap:6px;align-items:center;}
+#fb-avatars-pop .fb-pop-status{font-size:9px;padding:1px 5px;border-radius:3px;background:var(--panel3);}
+#fb-avatars-pop .fb-pop-status.resolved{color:#7cd992;}
+#fb-avatars-pop .fb-pop-empty{padding:12px 8px;color:var(--text-dim);font-size:11px;text-align:center;}
 .project-tab{flex:none;display:flex;align-items:center;gap:9px;height:100%;padding:0;background:transparent;border-radius:0;font-size:12.5px;font-weight:500;color:rgba(236,234,231,.35);cursor:pointer;max-width:180px;user-select:none;}
 .project-tab:hover{color:rgba(236,234,231,.7);}
 .project-tab.act{background:transparent;color:var(--text);font-weight:600;}

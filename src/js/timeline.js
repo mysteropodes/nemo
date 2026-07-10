@@ -2109,7 +2109,7 @@ function initCommentPopover(){
       pos:new Point(_activeComment.x,_activeComment.y),
       actionTrail:_recordedActionTrail,clickTrail:_recordedClickTrail,
       screenshotDataUrl:_activeShotDataUrl,
-    }).then(function(){showToast(_activeShotDataUrl?'Feedback + capture envoyés':'Feedback enregistré (hors projet)');})
+    }).then(function(){showToast(_activeShotDataUrl?'Feedback + capture envoyés':'Feedback enregistré (hors projet)');refreshFbAvatars();})
       .catch(function(e){console.warn('[feedback] submit failed',e);showToast('Échec de l\'enregistrement du feedback');});
     closeCommentPopover();
   });
@@ -2381,11 +2381,99 @@ function initFeedbackUI(){
     window.SMFeedback.pullAllIncoming().then(function(imported){
       pullBtn.disabled=false;pullBtn.textContent=orig;
       showToast(imported.length?imported.length+' feedback récupéré(s), en attente d\'approbation':'Rien de nouveau');
-      refreshFeedbackList();
+      refreshFeedbackList();refreshFbAvatars();
     }).catch(function(e){pullBtn.disabled=false;pullBtn.textContent=orig;console.warn('[feedback] pull failed',e);showToast('Échec de la récupération');});
   });
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initFeedbackUI);else initFeedbackUI();
+
+// ---- Collaborator avatar stack (top bar, left of the settings gear) ----
+// Shows the current profile plus everyone who's left a feedback comment on
+// this project — click opens a compact list of those comments. Separate
+// from the Settings > Feedback tab (which owns approve/resolve actions);
+// this is a lightweight "who's been here" glance, read-only.
+var _fbAvatarEntries=[];
+function fbInitial(name){return (name||'?').trim().charAt(0).toUpperCase()||'?';}
+function refreshFbAvatars(){
+  var el=document.getElementById('fb-avatars');
+  if(!el||!window.SMFeedback)return;
+  window.SMFeedback.readAllLocal().then(function(entries){
+    _fbAvatarEntries=entries||[];
+    var seen={},people=[];
+    if(state.userProfile){people.push(state.userProfile);seen[state.userProfile.id]=true;}
+    _fbAvatarEntries.forEach(function(e){
+      var a=e.author;
+      if(a&&a.id&&!seen[a.id]){seen[a.id]=true;people.push(a);}
+    });
+    el.innerHTML='';
+    var maxShown=4;
+    people.slice(0,maxShown).forEach(function(p){
+      var av=document.createElement('div');
+      av.className='fb-av';av.style.background=p.color||'#888';
+      av.textContent=fbInitial(p.name);
+      av.title=p.name+(p===state.userProfile?' (toi)':'');
+      el.appendChild(av);
+    });
+    if(people.length>maxShown){
+      var more=document.createElement('div');
+      more.className='fb-av fb-av-more';more.textContent='+'+(people.length-maxShown);
+      el.appendChild(more);
+    }
+  }).catch(function(){});
+}
+function renderFbAvatarPopover(){
+  var pop=document.getElementById('fb-avatars-pop');
+  if(!pop)return;
+  pop.innerHTML='';
+  if(!_fbAvatarEntries.length){
+    pop.innerHTML='<div class="fb-pop-empty">Aucun commentaire feedback sur ce projet.</div>';
+    return;
+  }
+  _fbAvatarEntries.slice().sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);}).forEach(function(entry){
+    var item=document.createElement('div');item.className='fb-pop-item';
+    var av=document.createElement('div');av.className='fb-pop-av';
+    av.style.background=(entry.author&&entry.author.color)||'#888';
+    av.textContent=fbInitial(entry.author&&entry.author.name);
+    item.appendChild(av);
+    var body=document.createElement('div');body.className='fb-pop-body';
+    var note=document.createElement('div');note.className='fb-pop-note';note.textContent=entry.note||'';note.title=entry.note||'';
+    body.appendChild(note);
+    var meta=document.createElement('div');meta.className='fb-pop-meta';
+    meta.appendChild(document.createTextNode((entry.author&&entry.author.name)||'?'));
+    var st=document.createElement('span');
+    st.className='fb-pop-status'+(entry.status==='resolved'?' resolved':'');
+    st.textContent=entry.status==='pending'?'en attente':(entry.status==='resolved'?'résolu':'à traiter');
+    meta.appendChild(st);
+    body.appendChild(meta);
+    item.appendChild(body);
+    item.addEventListener('click',function(){
+      if(typeof entry.frame==='number')goToFrame(entry.frame);
+      document.getElementById('fb-avatars-pop').classList.remove('open');
+    });
+    pop.appendChild(item);
+  });
+}
+function toggleFbAvatarsPopover(){
+  var pop=document.getElementById('fb-avatars-pop');
+  if(!pop)return;
+  if(pop.classList.contains('open')){pop.classList.remove('open');return;}
+  renderFbAvatarPopover();
+  var r=document.getElementById('fb-avatars').getBoundingClientRect();
+  pop.style.top=(r.bottom+6)+'px';
+  pop.style.right=(window.innerWidth-r.right)+'px';
+  pop.classList.add('open');
+}
+function initFbAvatars(){
+  var el=document.getElementById('fb-avatars');
+  if(!el)return;
+  el.addEventListener('click',function(e){e.stopPropagation();toggleFbAvatarsPopover();});
+  document.addEventListener('click',function(e){
+    var pop=document.getElementById('fb-avatars-pop');
+    if(pop&&pop.classList.contains('open')&&!pop.contains(e.target))pop.classList.remove('open');
+  });
+  refreshFbAvatars();
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initFbAvatars);else initFbAvatars();
 
 // ---- GitHub feedback triage dashboard (beta testers → mysteropodes/
 // strokemotion-feedback Issues) — a dedicated wide modal (#fb-dashboard-
