@@ -56,6 +56,9 @@
     res.path.data.fillSeed = [pt.x, pt.y];
     res.path.data.fillGapPx = res.gapPx;
     if (res.wallIds && res.wallIds.length) res.path.data.fillWalls = res.wallIds;
+    // Animate merge-drawing: fuse with touching same-color fills (see
+    // fillMergeSameColor's comment in tools.js — shared logic, both paths).
+    fillMergeSameColor(layer, res.path);
     saveActiveLayerFrame();
     updateUI();
     showToast('Fill appliqué');

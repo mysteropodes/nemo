@@ -1000,6 +1000,56 @@ function fillInsertIndexFor(layer,pt,excludePath){
   }
   return insertAt;
 }
+// Animate merge-drawing (the fill half of it): a fresh bucket fill that
+// touches or overlaps an EXISTING fill of the same color fuses with it into
+// one shape — no hairline seam where the two regions abut (two separate
+// paths sharing a boundary always show an antialiasing seam, "j'ai une
+// séparation"). Only pure fills merge (closed, no strokeColor, none of the
+// special-role tags) — a hand-drawn filled+stroked shape keeps its own
+// identity, matching Animate, where strokes always survive as dividers.
+// The merged result deliberately LOSES fillSeed/fillWalls auto-regen
+// tracking: it's the union of regions traced from different seeds, so a
+// later regeneration from any single seed would silently shrink it back to
+// that one seed's region — a manual merge must stay put (same "manual edit
+// wins" principle as fsUnlinkFillRegen).
+function fillMergeSameColor(layer,newFill){
+  if(!newFill||!newFill.fillColor)return newFill;
+  var col=colorHex8(newFill.fillColor);
+  var absorbed=[];
+  layer.children.forEach(function(c){
+    if(c===newFill||!(c instanceof Path)||!c.closed||!c.fillColor||c.strokeColor)return;
+    if(c.data&&(c.data.isVectorBrush||c.data.isLinkedFillCompanion||c.data.isBrushTextureCopy||c.data.isRevisionGhost||c.data.ghostFrame!==undefined))return;
+    if(colorHex8(c.fillColor)!==col)return;
+    if(!c.bounds.intersects(newFill.bounds))return;
+    var touches=false;
+    try{
+      touches=newFill.intersects(c)
+        ||(c.interiorPoint&&newFill.contains(c.interiorPoint))
+        ||(newFill.interiorPoint&&c.contains(newFill.interiorPoint));
+    }catch(e){}
+    if(touches)absorbed.push(c);
+  });
+  if(!absorbed.length)return newFill;
+  var acc=newFill;
+  absorbed.forEach(function(c){
+    var u=null;
+    try{u=acc.unite(c,{insert:false});}catch(e){}
+    if(!u)return; // degenerate geometry — leave this one unmerged rather than fail the whole fill
+    if(acc!==newFill)acc.remove();
+    acc=u;
+  });
+  if(acc===newFill)return newFill; // every unite failed — nothing changed
+  var op=newFill.opacity;
+  // Highest stacking position among the participants, adjusted for the
+  // removals below it — the union visually replaces ALL of them, so it
+  // takes the topmost one's place relative to everything else.
+  var idxs=[layer.children.indexOf(newFill)].concat(absorbed.map(function(c){return layer.children.indexOf(c);}));
+  var topIdx=Math.max.apply(null,idxs);
+  var removedBelow=idxs.filter(function(i){return i<topIdx;}).length;
+  newFill.remove();absorbed.forEach(function(c){c.remove();});
+  var parts=insertBooleanResult(layer,Math.min(topIdx-removedBelow,layer.children.length),acc,newFill.fillColor,op);
+  return parts[0]||null;
+}
 function fillRegenerateLinked(layer,touchedPath){
   if(!layer)return;
   var fills=layer.children.filter(function(c){return c instanceof Path&&c.data&&c.data.fillSeed;});
@@ -2318,13 +2368,19 @@ function onMouseDown(event){
   if(state.tool==='zoom'){if(event.event.altKey)view.zoom=Math.max(.05,view.zoom*.8);else view.zoom=Math.min(20,view.zoom*1.25);updZoom();renderArcs();return;}
   var layer=userLayers[state.activeLayerIdx];
   if(state.tool==='draw'){
-    if(state.layers[state.activeLayerIdx].locked)return;ensureKeyframe();pushUndo();layer.activate();
+    if(state.layers[state.activeLayerIdx].locked)return;
+    // Same both-eyes-off guard as draw-bridge.js's commitStroke — never
+    // commit fully invisible ink.
+    if(!state.strokeEnabled&&!state.fillEnabled){showToast('Stroke et Fill désactivés — rien à dessiner');return;}
+    ensureKeyframe();pushUndo();layer.activate();
     if(state.vectorBrush){
       _vbLastPenPressure=null;_vbSmoothedPressure=null;stabQueue=[event.point.clone()];_vb.pts=[event.point.clone()];_vb.widths=[vbPressureOf(event)];_vb.lastT=Date.now();_vb.lastPt=event.point.clone();
-      currentPath=new Path();currentPath.fillColor=state.strokeColor;currentPath.strokeColor=null;currentPath.opacity=state.opacity/100;
+      currentPath=new Path();currentPath.fillColor=state.strokeEnabled?state.strokeColor:state.fillColor;currentPath.strokeColor=null;currentPath.opacity=state.opacity/100;
       currentPath.data.isVectorBrush=true;
     }else{
-      currentPath=new Path();currentPath.strokeColor=state.strokeColor;currentPath.strokeWidth=state.brushSize;
+      // Stroke eye honored for the brush (was shape-tools-only) — stroke
+      // OFF + fill ON draws a fill-only path, mirroring draw-bridge.js.
+      currentPath=new Path();currentPath.strokeColor=state.strokeEnabled?state.strokeColor:null;currentPath.strokeWidth=state.brushSize;
       currentPath.strokeCap=state.strokeCap;currentPath.strokeJoin=state.strokeJoin;currentPath.fillColor=state.fillEnabled?state.fillColor:null;currentPath.opacity=state.opacity/100;
       applyStrokeStyle(currentPath);
     }
@@ -2535,6 +2591,7 @@ function onMouseDown(event){
     res.path.data.fillSeed=[event.point.x,event.point.y];
     res.path.data.fillGapPx=res.gapPx;
     if(res.wallIds&&res.wallIds.length)res.path.data.fillWalls=res.wallIds;
+    fillMergeSameColor(layer,res.path); // Animate merge-drawing — see the helper's comment
     saveActiveLayerFrame();updateUI();showToast('Fill appliqué');
   }else if(state.tool==='fillbrush'){
     if(state.layers[state.activeLayerIdx].locked)return;ensureKeyframe();pushUndo();layer.activate();
@@ -2726,6 +2783,18 @@ function onMouseUp(event){
       // wherever the pen actually lifted.
       _vb.pts.push(event.point.clone());_vb.widths.push(vbSmoothPressure(vbPressureOf(event)));
       if(_vb.pts.length<2){currentPath.remove();if(state.undoStack.length)state.undoStack.pop();}
+      else if(!state.strokeEnabled){
+        // Stroke eye OFF: fill-only — commit the enclosed region as a plain
+        // closed filled shape instead of the pressure ribbon (mirrors
+        // draw-bridge.js's own fill-only branch in commitStroke).
+        var rawWidthsF=_vb.pts.map(function(p,i){return vbWidthFor(_vb.widths[i]);});
+        var csF=buildCenterSegmentsFromRawStroke(_vb.pts,rawWidthsF,state.smoothing);
+        currentPath.removeSegments();
+        csF.forEach(function(s){currentPath.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));});
+        currentPath.closed=true;
+        currentPath.fillColor=state.fillColor;currentPath.strokeColor=null;
+        delete currentPath.data.isVectorBrush;
+      }
       else{
         var rawWidths=_vb.pts.map(function(p,i){return vbWidthFor(_vb.widths[i]);});
         var cs=buildCenterSegmentsFromRawStroke(_vb.pts,rawWidths,state.smoothing);

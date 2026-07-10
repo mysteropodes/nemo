@@ -186,6 +186,15 @@
     }
     if (state.vectorBrush) {
       var ribbon = { centerline: samples, fillColor: hexToRgba(state.strokeColor, state.opacity) };
+      // Stroke eye OFF (left panel): the ribbon IS the stroke — preview only
+      // the enclosed region's fill, matching what commitStroke() will
+      // actually produce in that mode.
+      var regionPreview = {
+        segments: samples.map(function (s) { return { point: [s[0], s[1]], handleIn: [0, 0], handleOut: [0, 0] }; }),
+        closed: true,
+        fillColor: hexToRgba(state.fillColor, state.opacity),
+      };
+      if (!state.strokeEnabled && state.fillEnabled) return regionPreview;
       // Pressure-brush strokes are a filled ribbon painted with the STROKE
       // color — state.fillColor was never used in this mode, so with Fill
       // enabled the user saw "only the stroke" while drawing (the exact
@@ -193,14 +202,7 @@
       // enclosed by the centerline underneath the ribbon, same live-fill
       // behavior the plain-stroke mode already has.
       if (state.fillEnabled) {
-        return [
-          {
-            segments: samples.map(function (s) { return { point: [s[0], s[1]], handleIn: [0, 0], handleOut: [0, 0] }; }),
-            closed: true,
-            fillColor: hexToRgba(state.fillColor, state.opacity),
-          },
-          ribbon,
-        ];
+        return [regionPreview, ribbon];
       }
       return ribbon;
     }
@@ -235,7 +237,7 @@
     var item = {
       segments: decimated.map(function (s) { return { point: [s[0], s[1]], handleIn: [0, 0], handleOut: [0, 0] }; }),
       closed: false,
-      strokeColor: hexToRgba(state.strokeColor, state.opacity),
+      strokeColor: state.strokeEnabled ? hexToRgba(state.strokeColor, state.opacity) : null,
       strokeWidth: state.brushSize,
       strokeCap: state.strokeCap,
       strokeJoin: state.strokeJoin,
@@ -351,6 +353,10 @@
 
   function commitStroke() {
     if (samples.length < 2) return;
+    // Both paint channels switched off via the left-panel eyes — committing
+    // would insert a fully invisible path (pollutes the layer, participates
+    // in tween matching, un-hit-testable). Tell the user why instead.
+    if (!isFillBrush() && !state.strokeEnabled && !state.fillEnabled) { showToast('Stroke et Fill désactivés — rien à dessiner'); return; }
     ensureKeyframe();
     pushUndo();
     var layer = userLayers[state.activeLayerIdx];
@@ -391,6 +397,23 @@
       // Placement (Above/Below/Merge) — see applyFillBrushPlacement's own
       // comment; replaces the old unconditional "always at the back".
       applyFillBrushPlacement(path, userLayers[state.activeLayerIdx]);
+    } else if (state.vectorBrush && !state.strokeEnabled) {
+      // Stroke eye OFF + Fill ON: the pressure ribbon IS the stroke, so
+      // drawing "fill seul" means committing only the region enclosed by
+      // the drawn centerline, as an ordinary closed filled shape (no
+      // isVectorBrush scaffolding — nothing ribbon-like survives). Mirrors
+      // what the plain-brush mode gets for free below (open path + fill
+      // renders just the enclosed region once strokeColor is null).
+      var foPts = samples.map(function (s) { return new Point(s[0], s[1]); });
+      var foWidths = samples.map(function (s) { return s[2]; });
+      var foCs = buildCenterSegmentsFromRawStroke(foPts, foWidths, state.smoothing);
+      path = new Path();
+      foCs.forEach(function (s) { path.add(new Segment(new Point(s.point[0], s.point[1]), new Point(s.handleIn[0], s.handleIn[1]), new Point(s.handleOut[0], s.handleOut[1]))); });
+      path.closed = true;
+      path.fillColor = state.fillColor;
+      path.strokeColor = null;
+      path.opacity = state.opacity / 100;
+      if (state.drawMode === 'behind') userLayers[state.activeLayerIdx].insertChild(0, path);
     } else if (state.vectorBrush) {
       var pts = samples.map(function (s) { return new Point(s[0], s[1]); });
       var widths = samples.map(function (s) { return s[2]; });
@@ -463,7 +486,10 @@
       path.simplify(state.smoothing);
     } else {
       path = new Path();
-      path.strokeColor = state.strokeColor;
+      // Left-panel stroke eye honored here too (it always was for the
+      // shape tools, never for the brush): stroke OFF + fill ON commits a
+      // fill-only open path — the renderer paints just the enclosed region.
+      path.strokeColor = state.strokeEnabled ? state.strokeColor : null;
       path.strokeWidth = state.brushSize;
       path.strokeCap = state.strokeCap;
       path.strokeJoin = state.strokeJoin;
@@ -477,8 +503,9 @@
       // their own width-profile/outline machinery this jittered-copies
       // technique isn't built to coexist with. See applyBrushTexture's own
       // comment (tools.js) for how the "texture" is actually achieved in a
-      // pure-vector renderer.
-      if (state.brushPreset && state.brushPreset !== 'none') applyBrushTexture(path, state.brushPreset);
+      // pure-vector renderer. Skipped when the stroke channel is off — the
+      // dabs REPLACE a visible stroke, there's nothing to texture without one.
+      if (state.strokeEnabled && state.brushPreset && state.brushPreset !== 'none') applyBrushTexture(path, state.brushPreset);
       if (state.drawMode === 'behind') {
         userLayers[state.activeLayerIdx].insertChild(0, path);
         // Same re-anchor need as the linkedFill case a few lines up in the
