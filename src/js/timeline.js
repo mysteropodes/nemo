@@ -2321,6 +2321,78 @@ function initFeedbackUI(){
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initFeedbackUI);else initFeedbackUI();
 
+// ---- GitHub feedback triage (beta testers → mysteropodes/strokemotion-
+// feedback Issues) — reading needs no auth (public repo); labeling/
+// closing/commenting/editing needs Cyril's own token, entered below and
+// kept in localStorage on his machine only (see feedback-bridge.js's
+// githubTriageToken doc comment for why this is safe to leave in shipped
+// code — a beta tester's copy has this UI too but it's useless without
+// Cyril's personal token, which is never embedded in the build).
+function ghFbLabelEmoji(l){return {bug:'🐞',perf:'⚡','idée':'💡',polish:'✨',blocking:'🚫',pending:'⏳',resolved:'✓'}[l]||l;}
+function renderGithubFeedbackList(issues){
+  var listEl=document.getElementById('gh-fb-list');if(!listEl)return;
+  listEl.innerHTML='';
+  if(!issues||!issues.length){listEl.innerHTML='<div style="font-size:10px;color:var(--text-dim)">Aucune issue.</div>';return;}
+  issues.forEach(function(issue){
+    var row=document.createElement('div');
+    row.style.cssText='display:flex;flex-direction:column;gap:3px;padding:6px 7px;border-radius:4px;background:var(--panel3);font-size:10px';
+    var head=document.createElement('div');
+    head.style.cssText='display:flex;align-items:center;gap:5px;color:var(--text-dim);flex-wrap:wrap';
+    var labelsTxt=(issue.labels||[]).map(ghFbLabelEmoji).join(' ');
+    var link=document.createElement('a');link.href=issue.url;link.target='_blank';link.style.color='var(--accent)';link.textContent='#'+issue.number;
+    head.appendChild(link);
+    head.appendChild(document.createTextNode((labelsTxt?' · '+labelsTxt:'')+(issue.state==='closed'?' · fermé':'')));
+    row.appendChild(head);
+    var title=document.createElement('div');title.style.cssText='color:var(--text);font-weight:600';title.textContent=issue.title;
+    row.appendChild(title);
+    var actions=document.createElement('div');actions.style.cssText='display:flex;gap:5px;margin-top:2px;flex-wrap:wrap';
+    if(issue.labels.indexOf('pending')>=0){
+      var appBtn=document.createElement('button');appBtn.className='pbtn';appBtn.textContent='Approuver';appBtn.style.cssText='font-size:9px;padding:3px 7px';
+      appBtn.addEventListener('click',function(){
+        window.SMFeedback.approveGithubIssue(issue.number,issue.labels).then(refreshGithubFeedbackList).catch(function(e){showToast(e.message);});
+      });
+      actions.appendChild(appBtn);
+    }
+    if(issue.state!=='closed'){
+      var resBtn=document.createElement('button');resBtn.className='pbtn';resBtn.textContent='Résoudre…';resBtn.style.cssText='font-size:9px;padding:3px 7px';
+      resBtn.addEventListener('click',function(){
+        var txt=prompt('Résolution (postée en commentaire sur l\'issue) :','');
+        if(txt===null)return;
+        window.SMFeedback.resolveGithubIssue(issue.number,issue.labels,txt).then(refreshGithubFeedbackList).catch(function(e){showToast(e.message);});
+      });
+      actions.appendChild(resBtn);
+    }
+    var editBtn=document.createElement('button');editBtn.className='pbtn';editBtn.textContent='Éditer le texte';editBtn.style.cssText='font-size:9px;padding:3px 7px';
+    editBtn.addEventListener('click',function(){
+      var txt=prompt('Nouveau corps de l\'issue :',issue.body||'');
+      if(txt===null)return;
+      window.SMFeedback.editGithubIssueBody(issue.number,txt).then(refreshGithubFeedbackList).catch(function(e){showToast(e.message);});
+    });
+    actions.appendChild(editBtn);
+    row.appendChild(actions);
+    listEl.appendChild(row);
+  });
+}
+function refreshGithubFeedbackList(){
+  if(!window.SMFeedback)return;
+  var listEl=document.getElementById('gh-fb-list');
+  if(listEl)listEl.innerHTML='<div style="font-size:10px;color:var(--text-dim)">Chargement…</div>';
+  window.SMFeedback.fetchGithubIssues().then(renderGithubFeedbackList).catch(function(e){
+    if(listEl)listEl.innerHTML='<div style="font-size:10px;color:var(--text-dim)">Échec du chargement — '+e.message+'</div>';
+  });
+}
+function initGithubFeedbackUI(){
+  var tokenInput=document.getElementById('gh-token'),saveBtn=document.getElementById('gh-token-save'),refreshBtn=document.getElementById('gh-fb-refresh');
+  if(!tokenInput||!window.SMFeedback)return;
+  tokenInput.value=window.SMFeedback.githubTriageToken();
+  saveBtn.addEventListener('click',function(){
+    window.SMFeedback.setGithubTriageToken(tokenInput.value.trim());
+    showToast('Token enregistré (local uniquement)');
+  });
+  refreshBtn.addEventListener('click',refreshGithubFeedbackList);
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initGithubFeedbackUI);else initGithubFeedbackUI();
+
 function onKeyDown(event){
   if((event.metaKey||event.ctrlKey)&&event.key==='z'){event.preventDefault();if(event.shiftKey)redo();else undo();return;}
   if((event.metaKey||event.ctrlKey)&&event.key==='s'){event.preventDefault();if(event.shiftKey)window.SMProject.saveAs();else window.SMProject.save();return;}

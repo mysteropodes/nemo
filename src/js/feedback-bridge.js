@@ -249,7 +249,104 @@
         await window.__TAURI__.fs.writeTextFile(dir + '/' + entry.id + '.json', JSON.stringify(entry));
       } catch (e) { console.warn('[feedback] publish to shared folder failed', e); }
     }
+    // Best-effort: beta testers have no shared Sync folder (that's a local/
+    // network-drive mechanism for Cyril's own machines) — this is THEIR
+    // transport instead: one GitHub Issue per feedback entry, in the public
+    // mysteropodes/strokemotion-feedback repo. The actual HTTP call (and the
+    // write-scoped token) lives entirely in Rust (submit_feedback_issue,
+    // src-tauri/src/lib.rs) so the token never appears in this file or in
+    // any devtools-visible fetch() — see that command's own comment.
+    if (tauriOk()) {
+      try {
+        await publishToGitHubIssue(entry);
+      } catch (e) { console.warn('[feedback] GitHub publish failed', e); }
+    }
     return entry;
+  }
+
+  function fbTagLabelPlain(tag) {
+    return { bug: 'bug', perf: 'perf', idee: 'idée', polish: 'polish' }[tag] || tag;
+  }
+  async function publishToGitHubIssue(entry) {
+    var title = (entry.blocking ? '[BLOQUANT] ' : '') + (entry.note || '(sans titre)').slice(0, 80);
+    var labels = ['pending'].concat((entry.tags || []).map(fbTagLabelPlain));
+    if (entry.blocking) labels.push('blocking');
+    var body = [
+      '**Note**', entry.note || '(vide)', '',
+      '**Contexte**',
+      '- Frame: ' + entry.frame,
+      '- Auteur: ' + (entry.author ? entry.author.name + ' (' + entry.author.role + ')' : 'inconnu'),
+      '- Projet: ' + entry.projectKey,
+      '- Enregistré précisément: ' + (entry.recorded ? 'oui' : 'non (dernières actions)'),
+      '',
+      '**Trail d\'actions**',
+      '```json', JSON.stringify(entry.actionTrail || [], null, 2), '```',
+      '',
+      '**Trail de clics**',
+      '```json', JSON.stringify(entry.clickTrail || [], null, 2), '```',
+      '',
+      '<!-- sm-feedback-id: ' + entry.id + ' -->',
+    ].join('\n');
+    var t = window.__TAURI__;
+    await t.core.invoke('submit_feedback_issue', { title: title, body: body, labels: labels });
+  }
+
+  // ---- Dev-side triage over the GitHub feedback repo (Cyril only — a
+  // beta tester's shipped copy of this app has these functions too, since
+  // it's all one codebase, but they're useless to them without CYRIL'S OWN
+  // GitHub token, which is never embedded/shipped — see setGithubTriageToken
+  // below). Reading issues needs no auth at all (public repo); only
+  // labeling/closing/commenting needs Cyril's token, entered once in
+  // Réglages → Feedback and kept in localStorage on his own machine only. ----
+  var GH_REPO = 'mysteropodes/strokemotion-feedback';
+  var GH_TOKEN_KEY = 'sm-github-triage-token';
+  function githubTriageToken() { try { return localStorage.getItem(GH_TOKEN_KEY) || ''; } catch (e) { return ''; } }
+  function setGithubTriageToken(token) { try { localStorage.setItem(GH_TOKEN_KEY, token || ''); } catch (e) {} }
+
+  async function fetchGithubIssues() {
+    var res = await fetch('https://api.github.com/repos/' + GH_REPO + '/issues?state=all&per_page=100', {
+      headers: { 'Accept': 'application/vnd.github+json' },
+    });
+    if (!res.ok) throw new Error('GitHub list failed: ' + res.status);
+    var issues = await res.json();
+    return issues.filter(function (i) { return !i.pull_request; }).map(function (i) {
+      var m = /sm-feedback-id:\s*(\S+)\s*-->/.exec(i.body || '');
+      return {
+        number: i.number, id: m ? m[1] : ('gh_' + i.number),
+        title: i.title, body: i.body, url: i.html_url,
+        labels: (i.labels || []).map(function (l) { return l.name; }),
+        state: i.state, createdAt: i.created_at,
+      };
+    });
+  }
+  function ghAuthHeaders() {
+    var token = githubTriageToken();
+    if (!token) throw new Error('Aucun token GitHub configuré (Réglages → Feedback)');
+    return { 'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' };
+  }
+  async function patchGithubIssue(number, payload) {
+    var res = await fetch('https://api.github.com/repos/' + GH_REPO + '/issues/' + number, {
+      method: 'PATCH', headers: ghAuthHeaders(), body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error('GitHub update failed: ' + res.status + ' ' + await res.text());
+    return res.json();
+  }
+  async function approveGithubIssue(number, currentLabels) {
+    var labels = (currentLabels || []).filter(function (l) { return l !== 'pending'; });
+    return patchGithubIssue(number, { labels: labels });
+  }
+  async function resolveGithubIssue(number, currentLabels, resolutionText) {
+    if (resolutionText) {
+      await fetch('https://api.github.com/repos/' + GH_REPO + '/issues/' + number + '/comments', {
+        method: 'POST', headers: ghAuthHeaders(), body: JSON.stringify({ body: resolutionText }),
+      });
+    }
+    var labels = (currentLabels || []).filter(function (l) { return l !== 'pending'; });
+    if (labels.indexOf('resolved') < 0) labels.push('resolved');
+    return patchGithubIssue(number, { labels: labels, state: 'closed' });
+  }
+  async function editGithubIssueBody(number, newBody) {
+    return patchGithubIssue(number, { body: newBody });
   }
 
   // ---- Pull from teammates (mirrors checkSharedUpdates/pullAndMerge) ----
@@ -335,5 +432,11 @@
     approveFeedback: approveFeedback,
     resolveFeedback: resolveFeedback,
     deleteFeedback: deleteFeedback,
+    githubTriageToken: githubTriageToken,
+    setGithubTriageToken: setGithubTriageToken,
+    fetchGithubIssues: fetchGithubIssues,
+    approveGithubIssue: approveGithubIssue,
+    resolveGithubIssue: resolveGithubIssue,
+    editGithubIssueBody: editGithubIssueBody,
   };
 })();

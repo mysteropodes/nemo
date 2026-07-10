@@ -150,3 +150,20 @@ Transport multi-poste : réutilise le dossier de Sync équipe déjà existant
 `root/<profileId>/feedback/<id>.json` ; `SMFeedback.pullAllIncoming()` scanne les autres
 profils et importe leurs entrées en LOCAL avec `status:'pending'` (jamais approuvées
 automatiquement, même si le remote dit `'approved'` — seule l'approbation locale compte).
+
+**Transport beta-testeurs (2026-07)** : repo public dédié
+[`mysteropodes/strokemotion-feedback`](https://github.com/mysteropodes/strokemotion-feedback)
+(aucun code de l'app dedans) — une Issue GitHub par feedback, créée depuis Rust
+(`submit_feedback_issue` dans `src-tauri/src/lib.rs`, **jamais** depuis JS) avec un token
+compilé à la build via `env!("STROKEMOTION_FEEDBACK_TOKEN")` (même pattern que
+`STROKEMOTION_UPDATER_TOKEN`) — fine-grained PAT scopé À CE SEUL REPO, permission
+"Issues: write" uniquement, rien d'autre : un token extrait du binaire ne peut au pire que
+spammer des issues, jamais toucher au code. Le label `pending` est posé automatiquement à
+la création.
+
+Lecture des issues : publique, aucune auth requise (`SMFeedback.fetchGithubIssues()`).
+Triage (approuver/résoudre/éditer) : nécessite le token PERSONNEL de Cyril, saisi dans
+Réglages → "Feedback beta-testeurs (GitHub)" et gardé en `localStorage` sur sa machine
+uniquement — jamais embarqué dans le build distribué. Une copie de l'app livrée à un
+beta-testeur a ce même panneau de triage dans le code, mais il est inutilisable sans le
+token perso de Cyril.

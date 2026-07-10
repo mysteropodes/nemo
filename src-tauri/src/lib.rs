@@ -38,6 +38,39 @@ async fn run_ffmpeg(app: tauri::AppHandle, window: tauri::Window, args: Vec<Stri
     }
 }
 
+// Beta-tester feedback → public GitHub repo (mysteropodes/strokemotion-feedback),
+// one Issue per feedback entry. The write token is baked in at compile time
+// via env! (same pattern as STROKEMOTION_UPDATER_TOKEN above — export
+// STROKEMOTION_FEEDBACK_TOKEN before `tauri build`), scoped as a
+// fine-grained PAT to ONLY this one repo, ONLY "Issues: write" — nothing
+// else, so an extracted token can at worst spam issues in a repo that
+// contains no app source. The POST happens entirely in Rust (never in JS)
+// so the token never touches the webview's network inspector or any
+// devtools-visible fetch() call — see feedback-bridge.js's comment for why
+// this command exists instead of a plain JS fetch.
+#[tauri::command]
+async fn submit_feedback_issue(title: String, body: String, labels: Vec<String>) -> Result<(), String> {
+    let token = env!("STROKEMOTION_FEEDBACK_TOKEN");
+    let client = reqwest::Client::new();
+    let payload = serde_json::json!({ "title": title, "body": body, "labels": labels });
+    let resp = client
+        .post("https://api.github.com/repos/mysteropodes/strokemotion-feedback/issues")
+        .header("Authorization", format!("Bearer {}", token))
+        .header("Accept", "application/vnd.github+json")
+        .header("User-Agent", "strokemotion-app")
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    if resp.status().is_success() {
+        Ok(())
+    } else {
+        let status = resp.status();
+        let text = resp.text().await.unwrap_or_default();
+        Err(format!("GitHub API error {}: {}", status, text))
+    }
+}
+
 // Native stylus pressure (macOS): tablet drivers (XP-Pen, Huion, Wacom…)
 // deliver pen pressure through AppKit NSEvents — mouse events carrying the
 // NSEventSubtypeTabletPoint subtype — which WKWebView does not forward to
@@ -113,7 +146,7 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_http::init())
-        .invoke_handler(tauri::generate_handler![run_ffmpeg])
+        .invoke_handler(tauri::generate_handler![run_ffmpeg, submit_feedback_issue])
         .setup(|app| {
             #[cfg(debug_assertions)]
             {
