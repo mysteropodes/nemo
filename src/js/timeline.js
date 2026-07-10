@@ -1935,6 +1935,51 @@ var _activeComment=null;
 // feedback below) — reset on every open, unrelated to _activeComment/
 // state.comments since a feedback submission never becomes a team comment.
 var _activeFbTags=[];
+// Precise start/stop action recording (comment-record button) — bracketing
+// an explicit Record/Stop around the actual repro gesture captures exactly
+// what happened for THIS comment, instead of feedback-bridge.js's own
+// generic "last 20 actions" guess at submit time. While recording, the
+// popover must survive both outside clicks AND switching tools (you need
+// the Draw/Eraser/whatever tool active to actually reproduce something) —
+// see the outside-click listener below and closeCommentPopover's guard.
+var _recording=false,_recActionMark=0,_recClickMark=0,_recStartTime=0;
+var _recordedActionTrail=null,_recordedClickTrail=null;
+function updateRecordUI(){
+  var btn=document.getElementById('comment-record'),status=document.getElementById('comment-record-status');
+  if(!btn)return;
+  if(_recording){
+    btn.textContent='⏹ Arrêter l\'enregistrement';
+    btn.classList.add('ac');
+    if(status){status.style.display='block';status.textContent='🔴 Enregistrement en cours — change d\'outil et reproduis le problème, puis reviens ici cliquer Stop.';}
+  }else{
+    btn.textContent='⏺ Enregistrer les actions';
+    btn.classList.remove('ac');
+    if(status){
+      if(_recordedActionTrail||_recordedClickTrail){
+        var n=(_recordedActionTrail?_recordedActionTrail.length:0)+(_recordedClickTrail?_recordedClickTrail.length:0);
+        status.style.display='block';status.textContent='✓ '+n+' action(s)/clic(s) enregistré(s) pour ce commentaire.';
+      }else{
+        status.style.display='none';status.textContent='';
+      }
+    }
+  }
+}
+function startRecording(){
+  if(!window.SMFeedback)return;
+  _recording=true;
+  _recActionMark=window.SMFeedback.actionLogMark();
+  _recClickMark=window.SMFeedback.clickLogMark();
+  _recStartTime=Date.now();
+  _recordedActionTrail=null;_recordedClickTrail=null;
+  updateRecordUI();
+}
+function stopRecording(){
+  if(!_recording||!window.SMFeedback)return;
+  _recording=false;
+  _recordedActionTrail=window.SMFeedback.actionTrailSince(_recActionMark);
+  _recordedClickTrail=window.SMFeedback.clickTrailSince(_recClickMark);
+  updateRecordUI();
+}
 function openCommentPopover(worldPt,existing){
   if(!document.getElementById('comment-popover'))return;
   _activeComment=existing||{
@@ -1959,6 +2004,8 @@ function openCommentPopover(worldPt,existing){
   _activeFbTags=[];
   document.querySelectorAll('#comment-fb-tags .fb-tag').forEach(function(b){b.classList.remove('active');});
   var fbBlocking=document.getElementById('comment-fb-blocking');if(fbBlocking)fbBlocking.checked=false;
+  _recording=false;_recordedActionTrail=null;_recordedClickTrail=null;
+  updateRecordUI();
   pop.style.display='block';
   document.getElementById('comment-text').focus();
 }
@@ -1966,6 +2013,7 @@ function closeCommentPopover(){
   var pop=document.getElementById('comment-popover');
   if(pop)pop.style.display='none';
   _activeComment=null;
+  _recording=false;_recordedActionTrail=null;_recordedClickTrail=null;
 }
 function initCommentPopover(){
   var saveBtn=document.getElementById('comment-save'),delBtn=document.getElementById('comment-delete'),pop=document.getElementById('comment-popover');
@@ -1978,21 +2026,30 @@ function initCommentPopover(){
       else{_activeFbTags.push(tag);this.classList.add('active');}
     });
   });
+  var recordBtn=document.getElementById('comment-record');
+  if(recordBtn)recordBtn.addEventListener('click',function(){
+    if(_recording)stopRecording();else startRecording();
+  });
   var saveFbBtn=document.getElementById('comment-save-feedback');
   if(saveFbBtn)saveFbBtn.addEventListener('click',function(){
     if(!_activeComment||!window.SMFeedback)return;
+    // Forgot to hit Stop — capture up to right now instead of silently
+    // discarding whatever was being recorded.
+    if(_recording)stopRecording();
     var note=document.getElementById('comment-text').value;
     if(!note.trim()){showToast('Écris une note avant d\'enregistrer le feedback');return;}
     var blocking=document.getElementById('comment-fb-blocking').checked;
     window.SMFeedback.submitFeedback({
       note:note,tags:_activeFbTags.slice(),blocking:blocking,
       pos:new Point(_activeComment.x,_activeComment.y),
+      actionTrail:_recordedActionTrail,clickTrail:_recordedClickTrail,
     }).then(function(){showToast('Feedback enregistré (hors projet)');})
       .catch(function(e){console.warn('[feedback] submit failed',e);showToast('Échec de l\'enregistrement du feedback');});
     closeCommentPopover();
   });
   saveBtn.addEventListener('click',function(){
     if(!_activeComment)return;
+    if(_recording)stopRecording();
     _activeComment.text=document.getElementById('comment-text').value;
     _activeComment.resolved=document.getElementById('comment-resolved').checked;
     if(!state.comments)state.comments=[];
@@ -2015,8 +2072,13 @@ function initCommentPopover(){
   // unsaved draft (or leaves an existing comment's edits unsaved) rather
   // than forcing an explicit Cancel button — matches the color-picker
   // popover's own outside-click-closes convention elsewhere in this file.
+  // Suppressed entirely while recording: reproducing a bug requires
+  // switching to the ACTUAL tool involved (Draw, Eraser…), which is itself
+  // a click outside this popover — the whole point of Record is that this
+  // must NOT close the window mid-repro.
   document.addEventListener('mousedown',function(e){
     if(pop.style.display==='none')return;
+    if(_recording)return;
     if(!pop.contains(e.target))closeCommentPopover();
   },true);
 }

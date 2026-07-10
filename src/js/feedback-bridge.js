@@ -104,6 +104,15 @@
   function recentClickTrail(n) {
     return _clickLog.slice(Math.max(0, _clickLog.length - (n || 20)));
   }
+  // ---- Precise start/stop recording (timeline.js's comment-popover Record
+  // button) — a "last N" trail is a guess at what's relevant; bracketing an
+  // explicit start/stop around the actual repro gesture captures exactly
+  // that and nothing else. Both logs are simple append-only arrays, so a
+  // "since" slice is just the array length at record-start.
+  function actionLogMark() { return (state.actionLog || []).length; }
+  function clickLogMark() { return _clickLog.length; }
+  function actionTrailSince(idx) { return (state.actionLog || []).slice(idx || 0); }
+  function clickTrailSince(idx) { return _clickLog.slice(idx || 0); }
 
   // ---- Storage tiers, tried in order: Tauri fs (real app, real OS folder)
   // -> local dev server (scripts/dev_server.py's /__feedback/* endpoints —
@@ -213,8 +222,12 @@
       tags: opts.tags || [],
       blocking: !!opts.blocking,
       note: opts.note || '',
-      actionTrail: recentActionTrail(20),
-      clickTrail: recentClickTrail(20),
+      // A precise start/stop recording (opts.actionTrail/clickTrail, set by
+      // the popover's Record button — see actionLogMark/clickLogMark below)
+      // always wins over the generic "last 20" guess when one was made.
+      actionTrail: opts.actionTrail || recentActionTrail(20),
+      clickTrail: opts.clickTrail || recentClickTrail(20),
+      recorded: !!(opts.actionTrail || opts.clickTrail),
       status: 'approved', // your own machine, your own profile — trusted by definition
       resolution: null,
       createdAt: Date.now(),
@@ -310,6 +323,10 @@
   window.SMFeedback = {
     logAction: logAction,
     recentClickTrail: recentClickTrail,
+    actionLogMark: actionLogMark,
+    clickLogMark: clickLogMark,
+    actionTrailSince: actionTrailSince,
+    clickTrailSince: clickTrailSince,
     submitFeedback: submitFeedback,
     readAllLocal: readAllLocal,
     checkIncomingFeedback: checkIncomingFeedback,

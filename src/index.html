@@ -655,6 +655,10 @@
        the "Enregistrer comme feedback" path below; a plain team comment
        (Enregistrer) ignores these entirely, same popover either way so
        there's one familiar click-to-pin gesture for both. -->
+  <div class="pr" style="margin-top:6px;gap:6px;align-items:center">
+    <button type="button" class="pbtn" id="comment-record" style="flex:1;font-size:10px;padding:5px" title="Enregistre précisément les actions/clics faits jusqu'au Stop — la fenêtre reste ouverte pendant ce temps, même en changeant d'outil">⏺ Enregistrer les actions</button>
+  </div>
+  <div id="comment-record-status" style="display:none;font-size:9px;color:var(--accent);margin-top:3px"></div>
   <div id="comment-fb-tags" class="pr" style="margin-top:6px;gap:4px;flex-wrap:wrap">
     <button type="button" class="pbtn fb-tag" data-tag="bug" style="font-size:9px;padding:3px 7px">🐞 bug</button>
     <button type="button" class="pbtn fb-tag" data-tag="perf" style="font-size:9px;padding:3px 7px">⚡ perf</button>
