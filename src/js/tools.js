@@ -533,7 +533,16 @@ function alignSelection(mode){
 // here — just the key->getter-name map both select-bridge.js (drag-rotate)
 // and timeline.js (numeric Rotate field) read from.
 var XFORM_ANCHOR_PROP={tl:'topLeft',tc:'topCenter',tr:'topRight',ml:'leftCenter',mc:'center',mr:'rightCenter',bl:'bottomLeft',bc:'bottomCenter',br:'bottomRight'};
-function xformAnchorPoint(b){return b[XFORM_ANCHOR_PROP[state.xformAnchorKey]||'center'];}
+// A freely-placed anchor (Alt+click with the Select tool, see select-
+// bridge.js) overrides the 9-dot preset grid entirely — set by world-space
+// coordinates (state.xformAnchorCustom, [x,y]) rather than a bounds-relative
+// key, since the whole point is letting it sit somewhere the preset grid
+// can't reach. Cleared by clearSel() (new selection = stale anchor is
+// meaningless) and by explicitly picking a preset dot again (timeline.js).
+function xformAnchorPoint(b){
+  if(state.xformAnchorCustom)return new Point(state.xformAnchorCustom[0],state.xformAnchorCustom[1]);
+  return b[XFORM_ANCHOR_PROP[state.xformAnchorKey]||'center'];
+}
 function renderTransformHandles(){
   xformLayer.removeChildren();xformHandles=[];
   if(state.tool!=='select'||!selectedPaths.length)return;
@@ -571,7 +580,7 @@ function rotateCenterSegments(segs,angleDeg,cx,cy){
     s.handleOut=rotVec(s.handleOut[0],s.handleOut[1]);
   });
 }
-function clearSel(){selectedPaths=[];state.selectedStrokeIndices=[];_nodeSel=[];}
+function clearSel(){selectedPaths=[];state.selectedStrokeIndices=[];_nodeSel=[];state.xformAnchorCustom=null;}
 function getSI(path){var ch=userLayers[state.activeLayerIdx].children;for(var i=0;i<ch.length;i++){if(ch[i]===path)return i;}return -1;}
 var canvasEl=document.getElementById('drawing-canvas');
 

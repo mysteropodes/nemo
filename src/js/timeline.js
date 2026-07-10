@@ -2685,14 +2685,19 @@ wireLiveXformField('sp-rot',function(el,started){var b=xformSelBounds();if(!b)re
 // (state.xformAnchorKey); it doesn't move anything on its own, so no
 // undo/render is needed here beyond repainting the widget's active dot.
 function renderXformAnchorGrid(){
+  // A custom Alt+click anchor (select-bridge.js) overrides every preset —
+  // none of the 9 dots is "active" while it's in effect, otherwise the
+  // widget would misleadingly keep showing e.g. "center" highlighted while
+  // the pivot actually sits wherever the artist Alt+clicked.
   document.querySelectorAll('#xform-anchor-grid .xa-dot').forEach(function(btn){
-    btn.classList.toggle('xa-active',btn.dataset.key===state.xformAnchorKey);
+    btn.classList.toggle('xa-active',!state.xformAnchorCustom&&btn.dataset.key===state.xformAnchorKey);
   });
 }
 document.querySelectorAll('#xform-anchor-grid .xa-dot').forEach(function(btn){
   btn.addEventListener('click',function(e){
     e.stopPropagation();
     state.xformAnchorKey=btn.dataset.key;
+    state.xformAnchorCustom=null; // explicit preset pick always wins back over a custom point
     renderXformAnchorGrid();
     if(window.renderTransformHandles)renderTransformHandles();
     if(window.SMEngineBridge)SMEngineBridge.renderNow();

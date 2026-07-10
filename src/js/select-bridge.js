@@ -126,6 +126,23 @@
       return;
     }
 
+    // Alt+click anywhere (not on a handle — already handled above) with an
+    // active selection relocates the rotate/scale pivot to that exact point
+    // — Illustrator/Figma "Option+click to move the reference point"
+    // convention, reported as "avec alt et l'outil de sélection il faudrait
+    // pouvoir changer le point d'ancrage de place". Doesn't touch geometry
+    // (no pushUndo — this is a UI/pivot preference, not a document edit)
+    // and doesn't fall through to select/move/marquee below: the click is
+    // entirely consumed by placing the anchor, matching how the reference
+    // apps behave (an Alt+click never ALSO reselects or starts a drag).
+    if (e.altKey && selectedPaths.length) {
+      state.xformAnchorCustom = [pt.x, pt.y];
+      if (window.renderXformAnchorGrid) renderXformAnchorGrid();
+      window.SMEngineBridge.resume();
+      window.SMEngineBridge.renderNow();
+      return;
+    }
+
     var layer = userLayers[state.activeLayerIdx];
     var activeLdForLock = state.layers[state.activeLayerIdx];
     // A locked ACTIVE layer's own content must be as untouchable as a locked

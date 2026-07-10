@@ -119,6 +119,7 @@ var state={
   perspectiveVPs:null, // lazily seeded to sane defaults for canvasW/H on first enable — see ensurePerspectiveVPs() in perspective-bridge.js
   audioTracks:[], // {name,dataB64,offsetFrames,volume,muted} — playback/waveform in audio-bridge.js
   xformAnchorKey:'mc', // rotate/scale pivot preset (9-dot widget) — tl/tc/tr/ml/mc/mr/bl/bc/br, see tools.js xformAnchorPoint
+  xformAnchorCustom:null, // [x,y] world-space override from Alt+click (select-bridge.js) — takes priority over xformAnchorKey when set
   refMedia:null, // rotoscopy reference {type:'video'|'imageseq'|'image',...} — reference-bridge.js
   symbols:{},activeSymbolId:null,openSymbolTabs:[],
   // Layer folders: purely organizational metadata, not a real tree — each
