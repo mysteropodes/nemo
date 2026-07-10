@@ -400,6 +400,37 @@ function fsDeleteSegment(sel,layer){
   saveActiveLayerFrame();
 }
 
+// Splits sel.path at segStart/segEnd exactly like fsDeleteSegment, but
+// instead of discarding the selected arc it KEEPS both pieces — the arc as
+// an independent Path (returned, so the caller can restyle just that piece)
+// and the remainder left in the layer with the original path's style
+// untouched. Mirrors fsRealizeFillRegion's role for the fill/fillregion
+// case: materializes a SECTION selection into a real standalone Path
+// before the caller mutates its style, so e.g. a stroke-color change never
+// bleeds onto the rest of the stroke (the bug reported in issue #12).
+function fsRealizeStrokeSegment(sel,layer){
+  var path=sel.path;
+  if(sel.segStart===0&&sel.segEnd===path.length&&!(path.closed&&sel.segEnd<sel.segStart)){
+    return path; // whole stroke, no crossings -- nothing to split off
+  }
+  if(path.closed){
+    var loopLen=path.length;
+    path.splitAt(path.getLocationAt(sel.segStart)); // re-bases the seam to segStart; still closed, still one object
+    var newEndOffset=((sel.segEnd-sel.segStart)+loopLen)%loopLen;
+    if(newEndOffset<=0.001)newEndOffset=loopLen; // selected arc is the WHOLE (now-open) loop
+    path.splitAt(path.getLocationAt(newEndOffset)); // now open (re-based+split) -> real split: path=[segStart..segEnd] (the arc), remainder=[segEnd..segStart] (kept tail, stays in the layer with its original style)
+    return path; // `path` is now just the selected arc, open
+  }
+  var tail=path.splitAt(path.getLocationAt(sel.segEnd)); // path=[start..segEnd] (kept head + arc), tail=[segEnd..originalEnd] (kept, stays in the layer)
+  if(tail&&tail.length<0.001)tail.remove(); // segEnd was the original end -> degenerate tail, drop it
+  var arc=path.splitAt(path.getLocationAt(sel.segStart)); // path=[start..segStart] (kept head), arc=[segStart..segEnd] (the selected arc, RETURNED)
+  if(arc){
+    if(path.length<0.001)path.remove(); // segStart was 0 -> "head" is degenerate, drop it
+    return arc;
+  }
+  return path; // segStart was 0: Paper's splitAt no-ops at the exact start, so `path` itself IS the arc (no separate head ever existed)
+}
+
 // ---- NODE / TANGENT EDIT (select tool, single-path selection) ----
 // Circles = anchor points, squares = bezier tangent handles (connected by a
 // thin guide line), exactly like Illustrator's Direct Selection. For

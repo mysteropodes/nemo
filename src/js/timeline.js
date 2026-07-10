@@ -138,7 +138,7 @@ window.SM={
     // Fill/Stroke Select tool: recolor ONLY the clicked aspect — a 'stroke'
     // selection here means strokeColor, never touches fillColor even on a
     // combined shape (that's the whole point of this tool vs plain Select).
-    else if(state.tool==='fsselect'&&_fsSel&&_fsSel.kind==='stroke'){pushUndo();_fsSel.path.strokeColor=v;saveActiveLayerFrame();updateUI();}},
+    else if(state.tool==='fsselect'&&_fsSel&&_fsSel.kind==='stroke'){pushUndo();var arc=fsRealizeStrokeSegment(_fsSel,userLayers[state.activeLayerIdx]);_fsSel={path:arc,kind:'stroke',segStart:0,segEnd:arc.length,closed:arc.closed};arc.strokeColor=v;saveActiveLayerFrame();updateUI();}},
   setFillColor:function(v){state.fillColor=v;
     // Background is written unconditionally (even while fill is disabled) so
     // the swatch shows the last-picked color as soon as fill is re-enabled —
