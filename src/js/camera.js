@@ -357,6 +357,18 @@
       if (keyAt(i)) c.classList.add('camkey');
       (function (fi) {
         c.addEventListener('mousedown', function (e) { e.stopPropagation(); goToFrame(fi); window.SM.setTool('camera'); });
+        // Right-click a camera timeline cell opens the shared easing editor
+        // for the segment covering that frame — the discoverable entry
+        // point this was missing (feedback: "je ne vois toujours pas
+        // comment appliquer les courbes d'interpolation aux keyframe de
+        // caméra, un clic droit dessus, une option dans le menu…").
+        c.addEventListener('contextmenu', function (e) {
+          e.preventDefault(); e.stopPropagation();
+          goToFrame(fi); window.SM.setTool('camera');
+          window.showContextMenu(e.clientX, e.clientY, [
+            { label: 'Modifier la courbe d\'accélération…', action: openCameraEaseEditor },
+          ]);
+        });
       })(i);
       row.appendChild(c);
     }
@@ -381,7 +393,23 @@
     var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('class', 'cam-speed-svg');
     svg.setAttribute('width', w); svg.setAttribute('height', h);
-    svg.style.cssText = 'position:absolute;left:0;top:0;pointer-events:none;';
+    // pointer-events WAS none (the curve was purely decorative — the
+    // header comment above claimed clicking it opened the editor, but that
+    // was never actually wired). auto + a click/contextmenu handler below
+    // makes that claim true.
+    svg.style.cssText = 'position:absolute;left:0;top:0;pointer-events:auto;cursor:pointer;';
+    svg.addEventListener('click', function (e) {
+      var fi = Math.floor(e.offsetX / FC);
+      goToFrame(fi); window.SM.setTool('camera'); openCameraEaseEditor();
+    });
+    svg.addEventListener('contextmenu', function (e) {
+      e.preventDefault();
+      var fi = Math.floor(e.offsetX / FC);
+      goToFrame(fi); window.SM.setTool('camera');
+      window.showContextMenu(e.clientX, e.clientY, [
+        { label: 'Modifier la courbe d\'accélération…', action: openCameraEaseEditor },
+      ]);
+    });
     var pad = 4;
     for (var i = 0; i < ks.length - 1; i++) {
       var a = ks[i], b = ks[i + 1], e = a.ease || DEFAULT_EASE;
