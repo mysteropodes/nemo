@@ -2261,20 +2261,93 @@ function eraseAtPoint(path,worldPt,radius,fromPt){
 // deliberate "punch a hole" op) loses its cutout this way (each island
 // paints solid) — an accepted tradeoff, since every other consumer already
 // can't represent a hole through this same flat-Path convention.
+// A CompoundPath child that's a genuine HOLE (fully enclosed inside a
+// sibling, e.g. the eraser biting the MIDDLE of a shape without touching
+// its outer edge — the single most common real erase gesture) used to be
+// exploded into an independent, uniformly-fillColor'd Path by the loop
+// below exactly like any other island — which turns a transparent cutout
+// into a solid same-color PATCH sitting right on top of the hole, i.e. the
+// erase bite visually does nothing at all ("l'eraser ... s'arrête alors
+// que je drag encore", "supprime complètement" — a nearby unrelated
+// island's hole-turned-patch masks whatever the eraser actually touched).
+// serP()/desP() (app.js) have no CompoundPath support at all (they read
+// `.segments` directly, which a CompoundPath doesn't have) — every frame
+// save would corrupt/drop a raw hole-carrying CompoundPath left in the
+// layer, so genuinely keeping the hole as nested Paper.js structure is not
+// an option here without a much larger persistence-layer change. Instead:
+// merge each hole into its parent exterior via a "keyhole" — slit from the
+// hole's closest point out to the exterior's closest point and back,
+// collapsing the two-contour (exterior+hole) shape into ONE ordinary,
+// hole-free contour that every existing flat-Path consumer already
+// understands, with the bite now visibly cut out of the silhouette.
+function _polyClosestPair(a,b){
+  var bestD=Infinity,bi=0,bj=0;
+  for(var i=0;i<a.length;i++){
+    for(var j=0;j<b.length;j++){
+      var dx=a[i].x-b[j].x,dy=a[i].y-b[j].y,d=dx*dx+dy*dy;
+      if(d<bestD){bestD=d;bi=i;bj=j;}
+    }
+  }
+  return{i:bi,j:bj};
+}
+function _mergeHoleIntoExterior(extSegs,holeSegs){
+  var pair=_polyClosestPair(extSegs.map(function(s){return s.point;}),holeSegs.map(function(s){return s.point;}));
+  var out=[];
+  for(var k=0;k<=pair.i;k++)out.push(extSegs[k]);
+  for(var h=0;h<=holeSegs.length;h++)out.push(holeSegs[(pair.j+h)%holeSegs.length]);
+  out.push(extSegs[pair.i]); // back out through the same slit point (zero-width seam)
+  for(var k2=pair.i+1;k2<extSegs.length;k2++)out.push(extSegs[k2]);
+  return out;
+}
 function insertBooleanResult(layer,insertAt,result,fillColor,opacity){
   if(!(result instanceof CompoundPath)){
     layer.insertChild(insertAt,result);
     return[result];
   }
-  var islands=result.children.slice();
+  var children=result.children.slice();
+  // clockwise===true is an exterior, false is a hole — exactly the
+  // convention _polygonsToPaperItem (tools.js) already establishes when
+  // building these from WASM boolean-op output.
+  var exteriors=children.filter(function(c){return c.clockwise;});
+  var holes=children.filter(function(c){return !c.clockwise;});
+  // No holes at all (plain multi-island result, e.g. an eraser stroke that
+  // split a shape in two) — unchanged prior behavior, one flat Path per
+  // island, nothing to merge.
+  if(!holes.length){
+    var flat=exteriors.length?exteriors:children;
+    flat.forEach(function(isl){isl.remove();});
+    flat.forEach(function(isl,k){
+      if(fillColor!==undefined)isl.fillColor=fillColor;
+      isl.strokeColor=null;
+      if(opacity!==undefined)isl.opacity=opacity;
+      layer.insertChild(insertAt+k,isl);
+    });
+    result.remove();
+    return flat;
+  }
+  var islands=exteriors.map(function(ext){
+    var extSegs=ext.segments.map(function(s){return{point:[s.point.x,s.point.y],handleIn:[0,0],handleOut:[0,0]};});
+    // Bounds-containment pairs each hole with the exterior it sits inside
+    // — good enough since a hole can only ever nest inside the ONE
+    // exterior it was cut from (_polygonsToPaperItem builds one hole list
+    // per source polygon, never shared across exteriors).
+    var myHoles=holes.filter(function(h){return ext.bounds.contains(h.bounds);});
+    myHoles.forEach(function(h){
+      var holeSegs=h.segments.map(function(s){return{point:[s.point.x,s.point.y],handleIn:[0,0],handleOut:[0,0]};});
+      extSegs=_mergeHoleIntoExterior(extSegs,holeSegs);
+    });
+    var merged=new Path({insert:false});
+    extSegs.forEach(function(s){merged.add(new Segment(new Point(s.point[0],s.point[1])));});
+    merged.closed=true;
+    return merged;
+  });
   islands.forEach(function(isl,k){
-    isl.remove(); // detach from the CompoundPath (only removes it from ITS parent, the island itself survives)
     if(fillColor!==undefined)isl.fillColor=fillColor;
     isl.strokeColor=null;
     if(opacity!==undefined)isl.opacity=opacity;
     layer.insertChild(insertAt+k,isl);
   });
-  result.remove(); // now-empty wrapper, nothing left to discard but itself
+  result.remove();
   return islands;
 }
 

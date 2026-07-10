@@ -56,7 +56,22 @@
 
   function eraseAt(pt, radius) {
     var layer = userLayers[state.activeLayerIdx];
-    var hit = layer.hitTest(pt, { stroke: true, fill: true, tolerance: Math.max(8, radius) / view.zoom });
+    // Paper.js's hitTest does NOT prioritize a point genuinely INSIDE an
+    // item's fill over a merely-within-tolerance proximity match on some
+    // OTHER, unrelated item — it returns whichever qualifies first. At low
+    // zoom, radius/view.zoom (the eraser's tolerance in world units) can
+    // get huge, so a tiny leftover fragment from an earlier bite sitting
+    // well outside the visible cursor circle can "steal" the hit away from
+    // the actual shape under the cursor — the eraser then bites (and can
+    // fully consume in one touch) that unrelated fragment while the real
+    // target visually appears untouched, reading as "erases the whole fill
+    // in one go" and "stops responding while still dragging" once nearby
+    // stray fragments run out. An exact (zero-tolerance) hit — what the
+    // user is actually, visually pointing at — always wins first; the
+    // radius-derived tolerance is only a fallback for thin strokes the
+    // cursor is merely near, not squarely on top of.
+    var hit = layer.hitTest(pt, { stroke: true, fill: true, tolerance: 0 });
+    if (!hit) hit = layer.hitTest(pt, { stroke: true, fill: true, tolerance: Math.max(8, radius) / view.zoom });
     // instanceof Path AND CompoundPath: eraseAtPoint turns a shape into a
     // CompoundPath the moment a bite creates a hole — an instanceof-Path-only
     // guard silently stopped erasing that same shape any further after the
