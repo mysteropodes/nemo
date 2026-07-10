@@ -1620,40 +1620,63 @@ function buildDabShape(w,h,preset,rand){
   }
   return path;
 }
-function buildBrushDabs(pathLike,preset,baseWidth,rng){
+// widthProfile (optional): a buildWidthProfile()-shaped {t,width}[] array,
+// t in [0,1] as a fraction of PATHLIKE'S OWN length (not the raw stroke's
+// original arc length — applyBrushTexture is responsible for re-basing a
+// pressure-brush's centerline-length-fractioned profile onto whatever
+// pathLike it actually passes in here). When given, dab size/spacing at
+// each stamp position tracks the LOCAL width there instead of one fixed
+// baseWidth for the whole stroke — this is what lets a texture preset
+// actually taper with a pressure stroke's own pressure curve, instead of
+// silently never being offered on vectorBrush strokes at all (previously
+// the only caller of this function was the plain-constant-width commit
+// branch in draw-bridge.js). Omitting widthProfile reproduces the exact
+// prior constant-width behavior bit-for-bit — every existing (non-
+// pressure) caller is unaffected.
+function buildBrushDabs(pathLike,preset,baseWidth,rng,widthProfile){
   var rand=rng||Math.random;
   var len=pathLike.length;
   if(!(len>0))return[];
-  var nibDiam=Math.max(.5,baseWidth*(preset.nibSize!==undefined?preset.nibSize:1));
-  // Spacing is a PERCENTAGE OF THE DAB'S OWN DIAMETER (Photoshop's model —
-  // its Spacing slider is literally % of brush diameter): dab size AND gap
-  // both scale with the set stroke width, so the texture's visual density
-  // is identical at every width — just scaled, like a real physical nib.
-  //
-  // History: this replaced an earlier fixed-world-unit spacing (pinned to a
-  // reference nib of 3, task #106) that tried to keep grain density
-  // constant in absolute pixels. That made the dab count proportional to
-  // raw world length at a tiny fixed pitch (~2-4 units), so ANY long
-  // stroke — or any normal gesture on a big canvas at Fit zoom, where one
-  // sweep covers thousands of world units — blew through BRUSH_MAX_DABS
-  // and the cap fallback stretched the pitch to len/180: dabs 6x further
-  // apart than their own size, the texture visibly disintegrating into
-  // fat isolated dots (reported: "les presets grossissent en fonction de
-  // la longueur de la stroke"). Proportional spacing keeps the dab count
-  // a function of len/width instead of raw len, which stays under the cap
-  // for realistic strokes at any canvas scale.
-  var spacing=Math.max(.4,nibDiam*(preset.spacing!==undefined?preset.spacing:.35));
+  var nibScale=preset.nibSize!==undefined?preset.nibSize:1;
+  var spacingFrac=preset.spacing!==undefined?preset.spacing:.35;
+  function localWidth(at){
+    if(!widthProfile||!widthProfile.length)return baseWidth;
+    return widthAtFrac(widthProfile,len>0?at/len:0);
+  }
+  // Cap-safety spacing floor: derived from the SMALLEST width along the
+  // profile (or baseWidth when constant) so the total-dab-count bound
+  // below is always a safe worst-case, regardless of where along the
+  // stroke the thin/thick parts fall — a thinner point wants smaller,
+  // more closely-spaced dabs, so sizing the floor off the thinnest point
+  // never under-estimates how many positions a real walk could need.
+  var minWidth=baseWidth;
+  if(widthProfile&&widthProfile.length)minWidth=widthProfile.reduce(function(m,p){return Math.min(m,p.width);},baseWidth);
+  var minNibDiam=Math.max(.5,minWidth*nibScale);
+  var minAllowedSpacing=Math.max(.4,minNibDiam*spacingFrac);
   // Bristle tips emit several sub-strands PER stamp position (see below) —
   // divide the position budget by that count up front so total emitted
   // dabs still respects BRUSH_MAX_DABS regardless of tip shape.
   var bristleCount=preset.tipShape==='bristle'?Math.max(1,preset.bristleCount||5):1;
   var maxPositions=Math.max(1,Math.floor(BRUSH_MAX_DABS/bristleCount));
-  if(len/spacing>maxPositions)spacing=len/maxPositions;
+  // Same cap-safety compression as before (task #106: a long stroke at a
+  // tiny fixed pitch blows through BRUSH_MAX_DABS) — floored per-iteration
+  // spacing below never goes narrower than this, keyed off the profile's
+  // worst case rather than one fixed width.
+  var capFloorSpacing=len/maxPositions;
   var roundness=preset.roundness!==undefined?preset.roundness:1;
   var dabs=[],d=0,guard=0;
   while(d<=len&&guard++<maxPositions+2&&dabs.length<BRUSH_MAX_DABS){
+    var at=Math.min(len,d);
+    // Spacing is a PERCENTAGE OF THE DAB'S OWN DIAMETER (Photoshop's model —
+    // its Spacing slider is literally % of brush diameter): dab size AND gap
+    // both scale with the LOCAL width here, so the texture's visual density
+    // stays consistent as a pressure stroke tapers, same as it already did
+    // across different fixed stroke widths.
+    var localW=localWidth(at);
+    var nibDiam=Math.max(.5,localW*nibScale);
+    var spacing=Math.max(minAllowedSpacing,Math.max(.4,nibDiam*spacingFrac));
+    if(spacing<capFloorSpacing)spacing=capFloorSpacing;
     if(!(preset.dashGap&&rand()<preset.dashGap)){
-      var at=Math.min(len,d);
       var pt=pathLike.getPointAt(at);
       var tan=pathLike.getTangentAt(at)||new Point(1,0);
       var normal=new Point(-tan.y,tan.x);
@@ -1717,24 +1740,46 @@ function buildBrushDabs(pathLike,preset,baseWidth,rng){
 function applyBrushTexture(basePath,presetKey){
   var preset=resolveBrushPreset(presetKey);
   if(!preset||!basePath.segments||basePath.segments.length<2)return basePath;
-  var baseWidth=basePath.strokeWidth;
-  // Dab size derives from strokeWidth and NOTHING else — explicitly per
-  // user requirement ("il faut que la taille corresponde à la taille que
-  // l'on a définie dans width stroke"). An earlier heuristic bumped
-  // baseWidth to |area|/length for filled paths (trying to make texture
-  // visible against a wide fill): correct for a thin ribbon, but for a
-  // CLOSED filled shape — the completely ordinary draw-an-outline-and-
-  // fill-it case — area/length is the average width of the WHOLE shape,
-  // producing monstrous dabs (reported with a screenshot: ~150px blobs
-  // ringing a potato drawn at Width 3). The texture replaces the STROKE's
-  // look only; the fill stays flat by design.
+  // Pressure (vectorBrush) ribbons are a FILLED SHAPE whose width varies
+  // continuously — buildBrushDabs stamps along the ribbon's own centerline
+  // (rebuilt here from data.centerSegments, {insert:false} — a disposable
+  // measuring aid, never added to the layer) rather than the visible outline
+  // path, both because it's the geometrically correct "brush path" and
+  // because data.widthProfile's `t` fractions are centerline-arc-length-
+  // based (buildWidthProfile, tools.js) — walking the outline instead would
+  // misalign the profile lookup against a totally different arc length.
+  var isPressure=!!(basePath.data&&basePath.data.isVectorBrush&&basePath.data.centerSegments&&basePath.data.centerSegments.length>1&&basePath.data.widthProfile);
+  var pathLike=basePath,widthProfile=undefined,baseWidth=basePath.strokeWidth;
+  if(isPressure){
+    var cs=basePath.data.centerSegments;
+    var centerline=new Path({insert:false});
+    for(var ci=0;ci<cs.length;ci++){
+      var s=cs[ci];
+      var seg=new Segment(new Point(s.point[0],s.point[1]),s.handleIn?new Point(s.handleIn[0],s.handleIn[1]):undefined,s.handleOut?new Point(s.handleOut[0],s.handleOut[1]):undefined);
+      centerline.add(seg);
+    }
+    pathLike=centerline;
+    widthProfile=basePath.data.widthProfile;
+    baseWidth=widthProfile.reduce(function(sum,p){return sum+p.width;},0)/widthProfile.length;
+  }
+  // Dab size derives from strokeWidth (or, for a pressure ribbon, the local
+  // width along its profile) and NOTHING else — explicitly per user
+  // requirement ("il faut que la taille corresponde à la taille que l'on a
+  // définie dans width stroke"). An earlier heuristic bumped baseWidth to
+  // |area|/length for filled paths (trying to make texture visible against
+  // a wide fill): correct for a thin ribbon, but for a CLOSED filled shape —
+  // the completely ordinary draw-an-outline-and-fill-it case — area/length
+  // is the average width of the WHOLE shape, producing monstrous dabs
+  // (reported with a screenshot: ~150px blobs ringing a potato drawn at
+  // Width 3). The texture replaces the STROKE's look only; the fill stays
+  // flat by design.
   // On RE-apply (switching preset on an already-textured stroke) the live
   // strokeColor may already be nulled by the fill-visible branch below —
   // fall back to the remembered original so the new dabs don't silently
   // come out colorless.
-  var baseColor=basePath.strokeColor||(basePath.data&&basePath.data.preTextureStroke?new Color(basePath.data.preTextureStroke):null);
+  var baseColor=basePath.strokeColor||(basePath.data&&basePath.data.preTextureStroke?new Color(basePath.data.preTextureStroke):null)||(isPressure?basePath.fillColor:null);
   var groupId='bg'+Date.now().toString(36)+'_'+Math.floor(Math.random()*1e6);
-  var dabs=buildBrushDabs(basePath,preset,baseWidth);
+  var dabs=buildBrushDabs(pathLike,preset,baseWidth,null,widthProfile);
   var companions=dabs.map(function(dab){
     dab.fillColor=baseColor;dab.strokeColor=null;dab.opacity=dab.data.dabOpacity;
     dab.data={isBrushTextureCopy:true,brushGroupId:groupId};
@@ -1757,7 +1802,15 @@ function applyBrushTexture(basePath,presetKey){
   // back to 'none' restores both). No-fill case: the opacity-0 invisible-
   // anchor trick stays (a fill-less stroke-less path draws nothing anyway,
   // but opacity 0 also survives any later fill assignment).
-  if(basePath.fillColor){
+  if(isPressure){
+    // A pressure ribbon's fillColor IS its own visible ink (unlike a plain
+    // stroke's fill, which is separate flat content the texture must leave
+    // alone) — the dabs are meant to be the ENTIRE visible texture here, so
+    // the ribbon must go fully invisible same as the no-fill case below,
+    // regardless of basePath.fillColor being truthy.
+    if(basePath.data.preTextureOpacity===undefined)basePath.data.preTextureOpacity=basePath.opacity!==undefined?basePath.opacity:1;
+    basePath.opacity=0;
+  }else if(basePath.fillColor){
     if(basePath.data.preTextureStroke===undefined)basePath.data.preTextureStroke=basePath.strokeColor?colorHex8(basePath.strokeColor):null;
     basePath.strokeColor=null;
   }else{

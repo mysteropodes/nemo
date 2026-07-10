@@ -499,6 +499,12 @@
         // behind above it. Re-anchor it directly under the ribbon's new spot.
         if (path.data.linkedFill) path.data.linkedFill.insertBelow(path);
       }
+      // Texture presets previously only existed for the plain constant-
+      // width brush (applyBrushTexture couldn't size dabs off a single
+      // baseWidth for a shape whose width varies along its length) — now
+      // that it accepts a widthProfile, wire it up here too so a preset
+      // actually applies to pressure strokes at draw time.
+      if (state.brushPreset && state.brushPreset !== 'none') applyBrushTexture(path, state.brushPreset);
     } else if (extendTarget) {
       // Auto-continue: splice the new samples onto the existing open path's
       // endpoint instead of creating a separate object.

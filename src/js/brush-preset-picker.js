@@ -114,18 +114,20 @@
     if (window.SM) window.SM.setBrushPreset(key);
     paintButton(key);
     // Also retroactively re-texture whatever's currently selected (feedback:
-    // "impossible d'appliquer une brush preset à postériori") — a plain
-    // constant-width stroke only (isVectorBrush/isFillShape ribbons have no
-    // strokeWidth/dab-placement model this applies to; see applyBrushTexture's
-    // own "dab size derives from strokeWidth" comment).
+    // "impossible d'appliquer une brush preset à postériori") — plain
+    // constant-width strokes AND pressure (isVectorBrush) ribbons now that
+    // applyBrushTexture can size dabs off a widthProfile instead of one
+    // fixed strokeWidth. isFillShape/isBrushTextureCopy items still have no
+    // applicable dab-placement model and stay excluded.
     if (typeof selectedPaths !== 'undefined' && selectedPaths.length && typeof applyOrChangeBrushTexture === 'function') {
       var layer = window.userLayers && window.userLayers[state.activeLayerIdx];
       if (layer) {
         var touched = 0;
         if (typeof pushUndo === 'function') pushUndo();
         selectedPaths.forEach(function (p) {
-          if (!p.strokeColor && !(p.data && p.data.preTextureStroke !== undefined) && !(p.data && p.data.preTextureOpacity !== undefined)) return;
-          if (p.data && (p.data.isVectorBrush || p.data.isFillShape || p.data.isBrushTextureCopy)) return;
+          var isPressureRibbon = !!(p.data && p.data.isVectorBrush && p.data.centerSegments && p.data.widthProfile);
+          if (!isPressureRibbon && !p.strokeColor && !(p.data && p.data.preTextureStroke !== undefined) && !(p.data && p.data.preTextureOpacity !== undefined)) return;
+          if (p.data && (p.data.isFillShape || p.data.isBrushTextureCopy)) return;
           applyOrChangeBrushTexture(p, layer, key);
           touched++;
         });
