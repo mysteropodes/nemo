@@ -252,27 +252,12 @@
       paintOrder: state.paintOrder,
     };
     if (state.fillEnabled) item.fillColor = hexToRgba(state.fillColor, state.opacity);
-    // Endpoint markers (first/last point), shown live while drawing — same
-    // small square handles Graphite's Freehand tool overlays on its path
-    // endpoints. World-space half-size scaled by zoom so they read as a
-    // constant on-screen size regardless of canvas zoom level.
-    var hs = 4 / view.zoom;
-    function markerSquare(x, y) {
-      return {
-        segments: [[-hs, -hs], [hs, -hs], [hs, hs], [-hs, hs]].map(function (o) { return { point: [x + o[0], y + o[1]], handleIn: [0, 0], handleOut: [0, 0] }; }),
-        closed: true,
-        fillColor: [255, 255, 255, 255],
-        strokeColor: [74, 158, 255, 255],
-        strokeWidth: 1.5 / view.zoom,
-      };
-    }
-    var items = [item];
-    if (samples.length) {
-      items.push(markerSquare(samples[0][0], samples[0][1]));
-      var last = samples[samples.length - 1];
-      if (samples.length > 1) items.push(markerSquare(last[0], last[1]));
-    }
-    return items;
+    // No endpoint marker squares anymore: the Graphite-style white/blue
+    // squares shown at the stroke's first/last point while drawing read as
+    // visual noise during inking, not as a helpful affordance (feedback
+    // #15 — "les carrés au début et à la fin de ligne qu'il faudrait
+    // supprimer"). The live stroke preview itself is feedback enough.
+    return [item];
   }
 
   function onDown(e) {
