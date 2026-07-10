@@ -26,6 +26,11 @@
 // mousemove.
 (function () {
   var dragging = false;
+  // Alt+drag brush-resize gesture (feedback #24): horizontal drag scales
+  // state.brushSize with a live circle preview at the press point, like
+  // every mainstream drawing app. viewtools-bridge.js's global
+  // Alt-drag-to-rotate explicitly cedes Alt to the brushes for this.
+  var sizing = false, sizeStartX = 0, sizeStartVal = 0, sizeAnchorW = null;
   var samples = []; // [x,y,width]
   var lastMoveT = 0, lastWorldPt = null;
   var lastPenPressure = null; // held across a real-pen gesture, see pressureOf()
@@ -274,6 +279,16 @@
     if (!shouldIntercept()) return;
     e.stopImmediatePropagation();
     e.preventDefault();
+    if (e.altKey) {
+      sizing = true;
+      sizeStartX = e.clientX;
+      sizeStartVal = state.brushSize;
+      sizeAnchorW = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
+      window.SMEngineBridge.suspend();
+      window.SMEngineBridge.setPressureCursor(sizeAnchorW, state.brushSize / 2);
+      window.SMEngineBridge.renderNow();
+      return;
+    }
     dragging = true;
     samples = [];
     lastMoveT = 0; lastWorldPt = null; lastPenPressure = null;
@@ -299,6 +314,18 @@
     if (state.vectorBrush) window.SMEngineBridge.setPressureCursor(w, widthFor(pressure) / 2);
   }
   function onMove(e) {
+    if (sizing) {
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      // 0.5px of size per px of drag: p-sw only spans 1-80, a 1:1 mapping
+      // would burn the whole range in a wrist flick.
+      var ns = Math.max(1, Math.min(80, sizeStartVal + (e.clientX - sizeStartX) * 0.5));
+      state.brushSize = ns;
+      var sw = document.getElementById('p-sw'); if (sw) sw.value = Math.round(ns);
+      window.SMEngineBridge.setPressureCursor(sizeAnchorW, ns / 2);
+      window.SMEngineBridge.renderNow();
+      return;
+    }
     if (!dragging) return;
     e.stopImmediatePropagation();
     e.preventDefault();
@@ -315,6 +342,16 @@
     window.SMEngineBridge.renderWithOverlayItem(overlayItem());
   }
   function onUp(e) {
+    if (sizing) {
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      sizing = false;
+      window.SMEngineBridge.setPressureCursor(null, 0);
+      window.SMEngineBridge.resume();
+      window.SMEngineBridge.renderNow();
+      showToast('Taille du pinceau : ' + Math.round(state.brushSize) + 'px');
+      return;
+    }
     if (!dragging) return;
     e.stopImmediatePropagation();
     e.preventDefault();

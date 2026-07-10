@@ -43,9 +43,12 @@
   // The zoom tool already owns Alt for its own "click = zoom out" modifier
   // (see onDown below) — the global Alt-drag-to-rotate shortcut deliberately
   // excludes it so the two don't fight over the same key while zoom is
-  // selected. Every other tool gets Alt+drag as a temporary rotate, exactly
-  // like Space is a temporary Hand regardless of the active tool.
-  function shouldRotate() { return engineOn() && (state.tool === 'rotate' || (state.altDown && state.tool !== 'zoom' && !state.spaceDown)); }
+  // selected. The brushes (draw/fillbrush) own Alt+drag too: it's their
+  // resize-with-visual-circle gesture (draw-bridge.js, feedback #24), the
+  // standard brush shortcut in every drawing app. Every other tool gets
+  // Alt+drag as a temporary rotate, exactly like Space is a temporary Hand
+  // regardless of the active tool.
+  function shouldRotate() { return engineOn() && (state.tool === 'rotate' || (state.altDown && ['zoom', 'draw', 'fillbrush'].indexOf(state.tool) < 0 && !state.spaceDown)); }
 
   function canvasLocal(clientX, clientY) {
     var r = document.getElementById('drawing-canvas').getBoundingClientRect();
