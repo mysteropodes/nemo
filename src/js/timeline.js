@@ -2321,75 +2321,171 @@ function initFeedbackUI(){
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initFeedbackUI);else initFeedbackUI();
 
-// ---- GitHub feedback triage (beta testers → mysteropodes/strokemotion-
-// feedback Issues) — reading needs no auth (public repo); labeling/
-// closing/commenting/editing needs Cyril's own token, entered below and
-// kept in localStorage on his machine only (see feedback-bridge.js's
-// githubTriageToken doc comment for why this is safe to leave in shipped
-// code — a beta tester's copy has this UI too but it's useless without
-// Cyril's personal token, which is never embedded in the build).
+// ---- GitHub feedback triage dashboard (beta testers → mysteropodes/
+// strokemotion-feedback Issues) — a dedicated wide modal (#fb-dashboard-
+// modal), not crammed into the 340px Réglages sidebar: status tabs + tag
+// chips filter the already-fetched list client-side (no refetch per
+// click), and Résoudre/Éditer expand an inline textarea in the card
+// instead of the browser's prompt()/confirm() (single-line, blocks the
+// whole UI, no way to see what you're editing while typing).
+// Reading needs no auth (public repo); labeling/closing/commenting/editing
+// needs Cyril's own token, entered in Réglages and kept in localStorage on
+// his machine only (see feedback-bridge.js's githubTriageToken comment).
+var _fbDashIssues=[];
+var _fbDashStatus='all'; // all | pending | approved | resolved
+var _fbDashTags=[]; // active tag filters, empty = no filter
+var _fbDashOpenForms={}; // issueNumber -> 'resolve'|'edit'|null
 function ghFbLabelEmoji(l){return {bug:'🐞',perf:'⚡','idée':'💡',polish:'✨',blocking:'🚫',pending:'⏳',resolved:'✓'}[l]||l;}
-function renderGithubFeedbackList(issues){
-  var listEl=document.getElementById('gh-fb-list');if(!listEl)return;
-  listEl.innerHTML='';
-  if(!issues||!issues.length){listEl.innerHTML='<div style="font-size:10px;color:var(--text-dim)">Aucune issue.</div>';return;}
-  issues.forEach(function(issue){
-    var row=document.createElement('div');
-    row.style.cssText='display:flex;flex-direction:column;gap:3px;padding:6px 7px;border-radius:4px;background:var(--panel3);font-size:10px';
-    var head=document.createElement('div');
-    head.style.cssText='display:flex;align-items:center;gap:5px;color:var(--text-dim);flex-wrap:wrap';
-    var labelsTxt=(issue.labels||[]).map(ghFbLabelEmoji).join(' ');
-    var link=document.createElement('a');link.href=issue.url;link.target='_blank';link.style.color='var(--accent)';link.textContent='#'+issue.number;
-    head.appendChild(link);
-    head.appendChild(document.createTextNode((labelsTxt?' · '+labelsTxt:'')+(issue.state==='closed'?' · fermé':'')));
-    row.appendChild(head);
-    var title=document.createElement('div');title.style.cssText='color:var(--text);font-weight:600';title.textContent=issue.title;
-    row.appendChild(title);
-    var actions=document.createElement('div');actions.style.cssText='display:flex;gap:5px;margin-top:2px;flex-wrap:wrap';
-    if(issue.labels.indexOf('pending')>=0){
-      var appBtn=document.createElement('button');appBtn.className='pbtn';appBtn.textContent='Approuver';appBtn.style.cssText='font-size:9px;padding:3px 7px';
-      appBtn.addEventListener('click',function(){
-        window.SMFeedback.approveGithubIssue(issue.number,issue.labels).then(refreshGithubFeedbackList).catch(function(e){showToast(e.message);});
-      });
-      actions.appendChild(appBtn);
-    }
-    if(issue.state!=='closed'){
-      var resBtn=document.createElement('button');resBtn.className='pbtn';resBtn.textContent='Résoudre…';resBtn.style.cssText='font-size:9px;padding:3px 7px';
-      resBtn.addEventListener('click',function(){
-        var txt=prompt('Résolution (postée en commentaire sur l\'issue) :','');
-        if(txt===null)return;
-        window.SMFeedback.resolveGithubIssue(issue.number,issue.labels,txt).then(refreshGithubFeedbackList).catch(function(e){showToast(e.message);});
-      });
-      actions.appendChild(resBtn);
-    }
-    var editBtn=document.createElement('button');editBtn.className='pbtn';editBtn.textContent='Éditer le texte';editBtn.style.cssText='font-size:9px;padding:3px 7px';
-    editBtn.addEventListener('click',function(){
-      var txt=prompt('Nouveau corps de l\'issue :',issue.body||'');
-      if(txt===null)return;
-      window.SMFeedback.editGithubIssueBody(issue.number,txt).then(refreshGithubFeedbackList).catch(function(e){showToast(e.message);});
+function fbDashIssueStatus(issue){
+  if(issue.labels.indexOf('pending')>=0)return 'pending';
+  if(issue.state==='closed'||issue.labels.indexOf('resolved')>=0)return 'resolved';
+  return 'approved';
+}
+function fbDashAllTags(){
+  var set={};
+  _fbDashIssues.forEach(function(i){i.labels.forEach(function(l){if(l!=='pending'&&l!=='resolved')set[l]=true;});});
+  return Object.keys(set);
+}
+function renderFbDashFilters(){
+  var tabsEl=document.getElementById('fb-dash-status-tabs');
+  var chipsEl=document.getElementById('fb-dash-tag-chips');
+  if(!tabsEl||!chipsEl)return;
+  var statuses=[['all','Tous'],['pending','⏳ En attente'],['approved','Approuvé'],['resolved','✓ Résolu']];
+  tabsEl.innerHTML='';
+  statuses.forEach(function(s){
+    var b=document.createElement('button');
+    b.className='fb-chip'+(_fbDashStatus===s[0]?' active':'');
+    b.textContent=s[1];
+    b.addEventListener('click',function(){_fbDashStatus=s[0];renderFbDashFilters();renderFbDashList();});
+    tabsEl.appendChild(b);
+  });
+  chipsEl.innerHTML='';
+  fbDashAllTags().forEach(function(tag){
+    var b=document.createElement('button');
+    var active=_fbDashTags.indexOf(tag)>=0;
+    b.className='fb-chip label-'+tag+(active?' active':'');
+    b.textContent=ghFbLabelEmoji(tag)+' '+tag;
+    b.addEventListener('click',function(){
+      var idx=_fbDashTags.indexOf(tag);
+      if(idx>=0)_fbDashTags.splice(idx,1);else _fbDashTags.push(tag);
+      renderFbDashFilters();renderFbDashList();
     });
-    actions.appendChild(editBtn);
-    row.appendChild(actions);
-    listEl.appendChild(row);
+    chipsEl.appendChild(b);
   });
 }
-function refreshGithubFeedbackList(){
+function fbDashFiltered(){
+  return _fbDashIssues.filter(function(issue){
+    if(_fbDashStatus!=='all'&&fbDashIssueStatus(issue)!==_fbDashStatus)return false;
+    if(_fbDashTags.length&&!_fbDashTags.every(function(t){return issue.labels.indexOf(t)>=0;}))return false;
+    return true;
+  });
+}
+function fbDashCardEl(issue){
+  var card=document.createElement('div');card.className='fb-card';
+  var head=document.createElement('div');head.className='fb-card-head';
+  var link=document.createElement('a');link.href=issue.url;link.target='_blank';link.style.color='var(--accent)';link.textContent='#'+issue.number;
+  head.appendChild(link);
+  issue.labels.forEach(function(l){
+    var chip=document.createElement('span');chip.className='fb-chip label-'+l;chip.textContent=ghFbLabelEmoji(l)+' '+l;
+    head.appendChild(chip);
+  });
+  if(issue.state==='closed'){var c=document.createElement('span');c.className='fb-chip';c.textContent='fermé';head.appendChild(c);}
+  head.appendChild(document.createTextNode(new Date(issue.createdAt).toLocaleDateString()));
+  card.appendChild(head);
+  var title=document.createElement('div');title.className='fb-card-title';title.textContent=issue.title;
+  card.appendChild(title);
+  var noteMatch=/\*\*Note\*\*\n([\s\S]*?)\n\n\*\*Contexte\*\*/.exec(issue.body||'');
+  if(noteMatch&&noteMatch[1].trim()!==issue.title){
+    var note=document.createElement('div');note.style.cssText='color:var(--text-dim);white-space:pre-wrap';note.textContent=noteMatch[1].trim();
+    card.appendChild(note);
+  }
+  var actions=document.createElement('div');actions.className='fb-card-actions';
+  if(issue.labels.indexOf('pending')>=0){
+    var appBtn=document.createElement('button');appBtn.className='pbtn';appBtn.textContent='Approuver';appBtn.style.cssText='font-size:9px;padding:3px 7px';
+    appBtn.addEventListener('click',function(){
+      window.SMFeedback.approveGithubIssue(issue.number,issue.labels).then(refreshFbDashboard).catch(function(e){showToast(e.message);});
+    });
+    actions.appendChild(appBtn);
+  }
+  if(issue.state!=='closed'){
+    var resBtn=document.createElement('button');resBtn.className='pbtn';resBtn.textContent='Résoudre…';resBtn.style.cssText='font-size:9px;padding:3px 7px';
+    resBtn.addEventListener('click',function(){
+      _fbDashOpenForms[issue.number]=_fbDashOpenForms[issue.number]==='resolve'?null:'resolve';
+      renderFbDashList();
+    });
+    actions.appendChild(resBtn);
+  }
+  var editBtn=document.createElement('button');editBtn.className='pbtn';editBtn.textContent='Éditer';editBtn.style.cssText='font-size:9px;padding:3px 7px';
+  editBtn.addEventListener('click',function(){
+    _fbDashOpenForms[issue.number]=_fbDashOpenForms[issue.number]==='edit'?null:'edit';
+    renderFbDashList();
+  });
+  actions.appendChild(editBtn);
+  card.appendChild(actions);
+  var openForm=_fbDashOpenForms[issue.number];
+  if(openForm==='resolve'){
+    var rform=document.createElement('div');rform.className='fb-card-inline-form';
+    var rta=document.createElement('textarea');rta.placeholder='Résolution (postée en commentaire sur l\'issue, puis ferme et tague resolved)…';
+    var rbtn=document.createElement('button');rbtn.className='pbtn';rbtn.style.cssText='font-size:9px;padding:4px 8px;align-self:flex-start';rbtn.textContent='Confirmer la résolution';
+    rbtn.addEventListener('click',function(){
+      window.SMFeedback.resolveGithubIssue(issue.number,issue.labels,rta.value).then(function(){
+        _fbDashOpenForms[issue.number]=null;refreshFbDashboard();
+      }).catch(function(e){showToast(e.message);});
+    });
+    rform.appendChild(rta);rform.appendChild(rbtn);card.appendChild(rform);
+  }else if(openForm==='edit'){
+    var eform=document.createElement('div');eform.className='fb-card-inline-form';
+    var eta=document.createElement('textarea');eta.value=issue.body||'';eta.style.minHeight='140px';
+    var ebtn=document.createElement('button');ebtn.className='pbtn';ebtn.style.cssText='font-size:9px;padding:4px 8px;align-self:flex-start';ebtn.textContent='Enregistrer';
+    ebtn.addEventListener('click',function(){
+      window.SMFeedback.editGithubIssueBody(issue.number,eta.value).then(function(){
+        _fbDashOpenForms[issue.number]=null;refreshFbDashboard();
+      }).catch(function(e){showToast(e.message);});
+    });
+    eform.appendChild(eta);eform.appendChild(ebtn);card.appendChild(eform);
+  }
+  if(issue.body){
+    var det=document.createElement('details');
+    var sum=document.createElement('summary');sum.textContent='Voir le trail complet';
+    var pre=document.createElement('pre');pre.textContent=issue.body;
+    det.appendChild(sum);det.appendChild(pre);card.appendChild(det);
+  }
+  return card;
+}
+function renderFbDashList(){
+  var listEl=document.getElementById('fb-dash-list');if(!listEl)return;
+  var filtered=fbDashFiltered();
+  listEl.innerHTML='';
+  if(!filtered.length){listEl.innerHTML='<div style="font-size:10px;color:var(--text-dim)">Aucune issue pour ce filtre.</div>';return;}
+  filtered.forEach(function(issue){listEl.appendChild(fbDashCardEl(issue));});
+}
+function refreshFbDashboard(){
   if(!window.SMFeedback)return;
-  var listEl=document.getElementById('gh-fb-list');
+  var listEl=document.getElementById('fb-dash-list');
   if(listEl)listEl.innerHTML='<div style="font-size:10px;color:var(--text-dim)">Chargement…</div>';
-  window.SMFeedback.fetchGithubIssues().then(renderGithubFeedbackList).catch(function(e){
+  window.SMFeedback.fetchGithubIssues().then(function(issues){
+    _fbDashIssues=issues;renderFbDashFilters();renderFbDashList();
+  }).catch(function(e){
     if(listEl)listEl.innerHTML='<div style="font-size:10px;color:var(--text-dim)">Échec du chargement — '+e.message+'</div>';
   });
 }
+function openFbDashboard(){
+  document.getElementById('fb-dashboard-modal').style.display='flex';
+  refreshFbDashboard();
+}
+function closeFbDashboard(){document.getElementById('fb-dashboard-modal').style.display='none';}
 function initGithubFeedbackUI(){
-  var tokenInput=document.getElementById('gh-token'),saveBtn=document.getElementById('gh-token-save'),refreshBtn=document.getElementById('gh-fb-refresh');
+  var tokenInput=document.getElementById('gh-token'),saveBtn=document.getElementById('gh-token-save');
+  var openBtn=document.getElementById('fb-dashboard-open'),closeBtn=document.getElementById('fb-dashboard-close'),refreshBtn=document.getElementById('fb-dash-refresh');
   if(!tokenInput||!window.SMFeedback)return;
   tokenInput.value=window.SMFeedback.githubTriageToken();
   saveBtn.addEventListener('click',function(){
     window.SMFeedback.setGithubTriageToken(tokenInput.value.trim());
     showToast('Token enregistré (local uniquement)');
   });
-  refreshBtn.addEventListener('click',refreshGithubFeedbackList);
+  if(openBtn)openBtn.addEventListener('click',openFbDashboard);
+  if(closeBtn)closeBtn.addEventListener('click',closeFbDashboard);
+  if(refreshBtn)refreshBtn.addEventListener('click',refreshFbDashboard);
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initGithubFeedbackUI);else initGithubFeedbackUI();
 

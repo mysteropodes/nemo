@@ -599,21 +599,42 @@
       </div>
       <div id="fb-list" style="display:flex;flex-direction:column;gap:4px;margin-top:6px"></div>
       <div class="phdr" style="padding:14px 0 4px 0;font-size:9px;color:var(--text-dim)">Feedback beta-testeurs (GitHub)</div>
-      <div style="font-size:10px;color:var(--text-dim);margin-bottom:6px">Chaque feedback envoyé depuis une app distribuée arrive ici comme Issue sur <a href="https://github.com/mysteropodes/strokemotion-feedback" target="_blank" style="color:var(--accent)">mysteropodes/strokemotion-feedback</a> (lecture publique, pas besoin de token). Pour valider/résoudre/modifier, colle ton propre token GitHub personnel (fine-grained, scope "Issues" sur ce repo uniquement) — il reste uniquement sur ta machine, jamais distribué.</div>
+      <div style="font-size:10px;color:var(--text-dim);margin-bottom:6px">Chaque feedback envoyé depuis une app distribuée arrive comme Issue sur <a href="https://github.com/mysteropodes/strokemotion-feedback" target="_blank" style="color:var(--accent)">mysteropodes/strokemotion-feedback</a>. Colle ton propre token GitHub personnel (fine-grained, scope "Issues" sur ce repo uniquement) pour pouvoir trier — il reste uniquement sur ta machine, jamais distribué.</div>
       <div class="pr" style="gap:6px">
         <input type="password" id="gh-token" placeholder="Ton token GitHub personnel (triage uniquement)" style="flex:1;font-size:10px;padding:5px;border-radius:6px;border:1px solid var(--border2);background:var(--panel3);color:var(--text)">
         <button class="pbtn" id="gh-token-save" style="font-size:10px;padding:5px">Enregistrer</button>
       </div>
       <div class="pr" style="gap:6px;margin-top:6px">
-        <button class="pbtn" id="gh-fb-refresh" style="flex:1;font-size:10px;padding:5px">Rafraîchir les issues</button>
+        <button class="pbtn" id="fb-dashboard-open" style="flex:1;font-size:10px;padding:6px;font-weight:600">📋 Ouvrir le tableau de feedback</button>
       </div>
-      <div id="gh-fb-list" style="display:flex;flex-direction:column;gap:4px;margin-top:6px"></div>
       <div class="phdr" style="padding:14px 0 4px 0;font-size:9px;color:var(--text-dim)" data-i18n="settingsShortcutsHdr">Raccourcis clavier — outils</div>
       <div style="font-size:10px;color:var(--text-dim);margin-bottom:6px" data-i18n="settingsShortcutsDesc">Cliquer une touche puis appuyer sur une nouvelle touche pour la réassigner. Les autres raccourcis (transport, undo/save…) ne sont pas encore modifiables ici. Import de profils (Animate, Blender…) : à venir.</div>
       <div id="shortcuts-list" style="display:flex;flex-direction:column;gap:2px;max-height:320px;overflow-y:auto"></div>
       <div class="pr" style="margin-top:10px;gap:6px">
         <button class="pbtn" id="shortcuts-reset" style="flex:1" data-i18n="settingsResetAll">Réinitialiser tout</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Feedback beta-testeurs — tableau de triage dédié (GitHub Issues sur
+     mysteropodes/strokemotion-feedback). Volontairement séparé de la modal
+     Réglages (340px de large, illisible pour des cartes de feedback avec
+     trails d'actions) — grande modal propre avec filtres statut/tag et
+     édition/résolution inline (textarea dépliée dans la carte), pas de
+     prompt()/confirm() navigateur qui coupaient le flux. -->
+<div id="fb-dashboard-modal" class="modal-overlay" style="display:none">
+  <div class="modal-box wide">
+    <div class="modal-hdr">Feedback beta-testeurs <button id="fb-dashboard-close" class="modal-x">&times;</button></div>
+    <div class="modal-bdy">
+      <div id="fb-dash-filters" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+        <div id="fb-dash-status-tabs" style="display:flex;gap:4px"></div>
+        <div style="width:1px;height:16px;background:var(--border2)"></div>
+        <div id="fb-dash-tag-chips" style="display:flex;gap:4px;flex-wrap:wrap"></div>
+        <div style="flex:1"></div>
+        <button class="pbtn" id="fb-dash-refresh" style="font-size:10px;padding:5px 8px">↻ Rafraîchir</button>
+      </div>
+      <div id="fb-dash-list" style="display:flex;flex-direction:column;gap:8px;margin-top:10px;max-height:62vh;overflow-y:auto"></div>
     </div>
   </div>
 </div>

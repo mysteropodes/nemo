@@ -532,6 +532,25 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--gutter);color:
 .modal-x{background:none;border:none;color:var(--text-dim);font-size:16px;cursor:pointer;line-height:1;}
 .modal-x:hover{color:var(--text);}
 .modal-bdy{padding:12px 14px;display:flex;flex-direction:column;gap:8px;}
+.modal-box.wide{width:700px;max-width:92vw;}
+.fb-card{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border-radius:8px;background:var(--panel3);border:1px solid var(--border);font-size:11px;}
+.fb-card-head{display:flex;align-items:center;gap:6px;flex-wrap:wrap;color:var(--text-dim);font-size:10px;}
+.fb-chip{display:inline-flex;align-items:center;padding:2px 7px;border-radius:10px;font-size:9px;font-weight:600;background:var(--panel);border:1px solid var(--border2);cursor:pointer;user-select:none;white-space:nowrap;}
+.fb-chip.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+.fb-chip.label-bug{color:#ff8a8a;}
+.fb-chip.label-perf{color:#ffd766;}
+.fb-chip.label-idée{color:#7fe08a;}
+.fb-chip.label-polish{color:#a8c8ff;}
+.fb-chip.label-blocking{color:#ff5c5c;}
+.fb-chip.label-pending{color:var(--text-dim);}
+.fb-chip.label-resolved{color:#6fa8ff;}
+.fb-card-title{font-size:12px;font-weight:600;color:var(--text);white-space:pre-wrap;}
+.fb-card-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px;}
+.fb-card-inline-form{display:flex;flex-direction:column;gap:6px;margin-top:4px;}
+.fb-card-inline-form textarea{width:100%;min-height:70px;resize:vertical;background:var(--panel);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:11px;padding:6px;box-sizing:border-box;font-family:inherit;}
+.fb-card details{margin-top:2px;}
+.fb-card summary{cursor:pointer;font-size:9px;color:var(--text-dim);user-select:none;}
+.fb-card pre{background:var(--panel);border-radius:6px;padding:6px;font-size:9px;overflow-x:auto;max-height:160px;margin:4px 0 0 0;}
 
 /* ---- Audio strip (audio-bridge.js) ---- */
 #audio-strip{position:relative;border-top:1px solid var(--border);background:var(--panel2)}
