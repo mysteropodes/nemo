@@ -49,20 +49,28 @@ ARTIFACT_NAME="StrokeMotion.app.tar.gz"
 
 cp "$ARTIFACT" "$REPO_DIR/$ARTIFACT_NAME"
 
-node -e "
+# Release notes are free-form text (apostrophes, accents, quotes — this IS
+# French prose) — shell-interpolating them directly into a JS string
+# literal broke the moment notes contained a literal ' (e.g. "captures
+# d'écran"), since bash pastes the raw character in BEFORE Node ever
+# parses the source, closing the string literal early regardless of the
+# .replace() meant to escape it (that runs too late — on already-invalid
+# JS). Environment variables sidestep this entirely: process.env.X holds
+# the exact bytes verbatim, no shell/JS quoting interaction at all.
+SM_VERSION="$VERSION" SM_NOTES="$NOTES" SM_PUB_DATE="$PUB_DATE" SM_SIGNATURE="$SIGNATURE" SM_ARTIFACT_NAME="$ARTIFACT_NAME" SM_REPO_DIR="$REPO_DIR" node -e "
 const fs=require('fs');
 const manifest={
-  version:'$VERSION',
-  notes:'$NOTES'.replace(/'/g,\"\\\\'\"),
-  pub_date:'$PUB_DATE',
+  version: process.env.SM_VERSION,
+  notes: process.env.SM_NOTES,
+  pub_date: process.env.SM_PUB_DATE,
   platforms:{
     'darwin-aarch64':{
-      signature:\`$SIGNATURE\`,
-      url:'https://api.github.com/repos/mysteropodes/strokemotion-updates/contents/$ARTIFACT_NAME'
+      signature: process.env.SM_SIGNATURE,
+      url:'https://api.github.com/repos/mysteropodes/strokemotion-updates/contents/'+process.env.SM_ARTIFACT_NAME
     }
   }
 };
-fs.writeFileSync('$REPO_DIR/latest.json', JSON.stringify(manifest,null,2));
+fs.writeFileSync(process.env.SM_REPO_DIR+'/latest.json', JSON.stringify(manifest,null,2));
 "
 
 cd "$REPO_DIR"
