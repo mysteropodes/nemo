@@ -224,7 +224,7 @@
       </div>
     </div>
     <div class="psec" id="revision-sec" style="display:none">
-      <div class="phdr"><span class="ar">☰</span> Révision</div>
+      <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrRevision">Révision</span></div>
       <div class="pbdy">
         <div class="pr" id="revision-author-row" style="font-size:10px;color:var(--text-dim)"></div>
         <div class="pr" style="gap:6px">
@@ -234,7 +234,7 @@
       </div>
     </div>
     <div class="psec" id="camera-sec" style="display:none">
-      <div class="phdr"><span class="ar">☰</span> Caméra</div>
+      <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrCamera">Caméra</span></div>
       <div class="pbdy">
         <div class="pr" id="cam-key-info" style="font-size:10px;color:var(--text-dim)"></div>
         <div class="pr"><button class="pbtn ac" id="btn-cam-addkey" style="flex:1">Ajouter une clé</button></div>
@@ -246,7 +246,7 @@
       </div>
     </div>
     <div class="psec" id="fill-sec">
-      <div class="phdr"><span class="ar">☰</span> Fill</div>
+      <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrFill">Fill</span></div>
       <div class="pbdy">
         <div class="pr"><span class="pl">Color</span><div class="cw-mini" id="pm-fill" style="background:transparent" title="Click to pick a color, double-click to toggle fill on/off"><input type="color" id="pm-fill-c" value="#ff0000"></div><input type="checkbox" id="p-fill-on" style="display:none"></div>
         <div class="pr"><span class="pl">Opacity</span><input type="number" class="pi scrub" id="p-opacity" value="100" min="5" max="100" data-step="1"></div>
@@ -254,7 +254,7 @@
       </div>
     </div>
     <div class="psec" id="stroke-sec">
-      <div class="phdr"><span class="ar">☰</span> Stroke</div>
+      <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrStroke">Stroke</span></div>
       <div class="pbdy">
         <div class="pr"><span class="pl">Color</span><div class="cw-mini" id="pm-stroke" style="background:#000"><input type="color" id="pm-stroke-c" value="#000000"></div></div>
         <div class="pr"><span class="pl">Width</span><input type="number" class="pi scrub" id="p-sw" value="3" min="1" max="80" data-step="1" title="Stroke width (px)"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
@@ -309,7 +309,7 @@
       </div>
     </div>
     <div class="psec" id="tool-opts-sec">
-      <div class="phdr"><span class="ar">☰</span> Tool Options</div>
+      <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrToolOptions">Tool Options</span></div>
       <div class="pbdy">
         <div class="pr"><span class="pl">Smooth</span><input type="number" class="pi scrub" id="p-smooth" value="10" min="0" max="60" data-step="1"></div>
         <div class="pr"><span class="pl">Stabilizer</span><select class="psel" id="p-stab"><option value="0">Off</option><option value="1">Low</option><option value="2" selected>Medium</option><option value="3">High</option></select></div>
@@ -331,13 +331,13 @@
       </div>
     </div>
     <div class="psec" id="effects-sec">
-      <div class="phdr"><span class="ar">☰</span> Effects</div>
+      <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrEffects">Effects</span></div>
       <div class="pbdy">
         <div class="pr" style="font-size:9px;color:var(--text-dim)">Bientôt disponible</div>
       </div>
     </div>
     <div class="psec" id="layer-sec" style="display:none">
-      <div class="phdr"><span class="ar">☰</span> Layer</div>
+      <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrLayer">Layer</span></div>
       <div class="pbdy">
         <!-- Custom dropdown, not a native <select>: hovering each option
              live-previews the blend mode on the canvas before committing
@@ -348,7 +348,7 @@
       </div>
     </div>
     <div class="psec" id="canvas-sec">
-      <div class="phdr"><span class="ar">☰</span> Document</div>
+      <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrDocument">Document</span></div>
       <div class="pbdy">
         <div class="pr"><span class="pl">Width</span><input type="number" class="pi" id="p-cw" value="1920" min="1" max="7680"></div>
         <div class="pr"><span class="pl">Height</span><input type="number" class="pi" id="p-ch" value="1080" min="1" max="4320"></div>
@@ -359,7 +359,7 @@
       </div>
     </div>
     <div class="psec">
-      <div class="phdr"><span class="ar">☰</span> Nuancier</div>
+      <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrSwatches">Nuancier</span></div>
       <div class="pbdy">
         <div id="palette-tabs" class="palette-tabs"></div>
         <div class="pr" style="gap:4px">
@@ -378,7 +378,7 @@
       </div>
     </div>
     <div class="psec">
-      <div class="phdr"><span class="ar">☰</span> Perspective Guide</div>
+      <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrPerspective">Perspective Guide</span></div>
       <div class="pbdy">
         <div class="pr"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer" title="Shows the vanishing-point grid and snaps the Line tool toward it, from any tool"><input type="checkbox" id="p-persp-on" style="accent-color:var(--accent)"> Enabled</label></div>
         <div class="pr"><span class="pl">Mode</span><select class="psel" id="p-persp-mode"><option value="1pt">1 point</option><option value="2pt" selected>2 points</option><option value="3pt">3 points</option></select></div>
@@ -389,7 +389,7 @@
       </div>
     </div>
     <div class="psec" id="ref-sec">
-      <div class="phdr"><span class="ar">☰</span> Référence (roto)</div>
+      <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrReference">Référence (roto)</span></div>
       <div class="pbdy">
         <div class="pr" style="gap:4px">
           <button class="pbtn" id="btn-ref-import" title="Importer une vidéo, une séquence d'images (sélection multiple) ou une image seule comme référence de rotoscopie">Importer…</button>
@@ -404,7 +404,7 @@
       </div>
     </div>
     <div class="psec" id="tween-sec">
-      <div class="phdr"><span class="ar">☰</span> Tween</div>
+      <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrTween">Tween</span></div>
       <div class="pbdy">
         <div class="pr"><span class="pl">Step</span><select class="psel" id="p-step"><option value="1">1 (every frame)</option><option value="2">2 (on 2s)</option><option value="3">3 (on 3s)</option></select></div>
         <div class="pr"><span class="pl">Resample</span><input type="number" class="pi scrub" id="p-resamp" value="50" min="20" max="120" data-step="1"></div>
@@ -416,7 +416,7 @@
       </div>
     </div>
     <div class="psec" id="easing-sec">
-      <div class="phdr"><span class="ar">☰</span> Easing Curve</div>
+      <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrEasingCurve">Easing Curve</span></div>
       <div class="pbdy" style="align-items:center">
         <div id="curve-canvas-wrap" title="Clic+glisser un point pour le déplacer. Double-clic sur une zone vide pour ajouter un point. Suppr/Retour arrière (survol du curseur) pour retirer le point sélectionné (les 2 extrémités ne peuvent pas être retirées).">
           <canvas id="curve-canvas" width="400" height="400"></canvas>
@@ -433,7 +433,7 @@
          see #onion-pop below and initOnionPopover() in timeline.js
          (feedback #23). Same control ids, same wiring. -->
     <div class="psec" id="comp-instance-sec" style="display:none">
-      <div class="phdr"><span class="ar">☰</span> Component Instance</div>
+      <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrComponentInstance">Component Instance</span></div>
       <div class="pbdy">
         <div class="pr"><span class="pl">Lecture</span><select class="psel" id="comp-playmode"><option value="loop">Loop</option><option value="pingpong">Ping-Pong</option><option value="once">Play Once</option><option value="single">Single Frame</option></select></div>
         <div class="pr" id="comp-singleframe-row"><span class="pl">Frame</span><input type="number" class="pi" id="comp-singleframe" value="0" min="0"></div>
@@ -448,7 +448,7 @@
       </div>
     </div>
     <div class="psec">
-      <div class="phdr"><span class="ar">☰</span> Project</div>
+      <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrProject">Project</span></div>
       <div class="pbdy">
         <div class="pr" id="proj-current" style="font-size:9px;color:var(--text-dim)" title="Currently open project">Untitled (not saved)</div>
         <div class="pr" style="gap:4px">
