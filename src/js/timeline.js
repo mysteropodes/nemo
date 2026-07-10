@@ -1,3 +1,19 @@
+// Plain window.confirm() inside the Tauri webview is intercepted and
+// routed to a deprecated/missing plugin command ("dialog.confirm not
+// allowed. Command not found") — the dialog never shows, and since the
+// call returns a Promise (not a synchronous boolean like a real browser),
+// `if (!confirm(msg))` is always false regardless of what got clicked (a
+// Promise object is truthy). Same root cause as the updater's confirm bug
+// (updater-bridge.js) — this is the shared, correct replacement: the real
+// Promise<boolean> API when running in Tauri, plain confirm() otherwise
+// (browser preview has no window.__TAURI__ at all).
+async function smConfirm(msg, title) {
+  if (typeof window.__TAURI__ !== 'undefined' && window.__TAURI__.dialog) {
+    return window.__TAURI__.dialog.confirm(msg, { title: title || 'Confirmer' });
+  }
+  return confirm(msg);
+}
+
 // ---- PLAYBACK (optimized: no DOM rebuild during play) ----
 var playInt=null;
 function startPlay(){if(state.playing)return;state.playing=true;
@@ -2423,8 +2439,10 @@ function fbDashCardEl(issue){
   actions.appendChild(editBtn);
   var delBtn=document.createElement('button');delBtn.className='pbtn';delBtn.textContent='Supprimer';delBtn.style.cssText='font-size:9px;padding:3px 7px;color:#ff8a8a';
   delBtn.addEventListener('click',function(){
-    if(!confirm('Supprimer définitivement l\'issue #'+issue.number+' ("'+issue.title+'") ? Action irréversible.'))return;
-    window.SMFeedback.deleteGithubIssue(issue.nodeId).then(refreshFbDashboard).catch(function(e){showToast(e.message);});
+    smConfirm('Supprimer définitivement l\'issue #'+issue.number+' ("'+issue.title+'") ? Action irréversible.','Supprimer le feedback').then(function(ok){
+      if(!ok)return;
+      window.SMFeedback.deleteGithubIssue(issue.nodeId).then(refreshFbDashboard).catch(function(e){showToast(e.message);});
+    });
   });
   actions.appendChild(delBtn);
   card.appendChild(actions);
