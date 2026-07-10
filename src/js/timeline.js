@@ -259,6 +259,18 @@ window.SM={
   setTotalFrames:function(v){v=Math.max(1,Math.min(999,v));saveAllLayerFrames();for(var i=0;i<state.layers.length;i++){while(state.layers[i].frames.length<v)state.layers[i].frames.push({strokes:[],isKeyframe:false,isInterpolated:false});}state.totalFrames=v;window._totalF=v;if(state.waOut>=v)state.waOut=v-1;window._waOut=state.waOut;if(state.currentFrame>=v)goToFrame(v-1);updateUI();},
   addLayer:function(){saveAllLayerFrames();pushUndoLayers();var idx=createUserLayer(nextLayerName());activateUL(idx);loadFrame(state.currentFrame);updateUI();},
   deleteLayer:function(){
+    // The camera row isn't in state.layers (synthetic pseudo-layer, see
+    // camera.js) — the generic layer-panel trash button silently did
+    // nothing while it was "active" (feedback #5xtsn) since every branch
+    // below only ever touches real layers. Delete it here first and return.
+    if(state.tool==='camera'){
+      state.cameraLayerOn=false;state.cameraKeys=[];state.cameraView=false;
+      window.SM.setTool('select');renderLayerList();renderTimeline();updateUI();
+      if(window.updateCameraPanel)window.updateCameraPanel();
+      if(window.SMEngineBridge)window.SMEngineBridge.renderNow();
+      showToast('Calque caméra supprimé');
+      return;
+    }
     if(state.layers.length<=1)return;saveAllLayerFrames();
     pushUndoLayers();
     var sel=(_layerSel.length?_layerSel.slice():[state.activeLayerIdx]).sort(function(a,b){return b-a;});
@@ -271,7 +283,14 @@ window.SM={
     activateUL(state.activeLayerIdx);loadFrame(state.currentFrame);updateUI();showToast('Calque(s) supprimé(s) — ⌘Z pour annuler');
   },
   duplicateLayer:function(){saveAllLayerFrames();pushUndoLayers();var src=state.layers[state.activeLayerIdx];var ni=createUserLayer(src.name+' copy');state.layers[ni].frames=JSON.parse(JSON.stringify(src.frames));if(src.blendMode)state.layers[ni].blendMode=src.blendMode;state.layers[ni].color=src.color;activateUL(ni);loadFrame(state.currentFrame);updateUI();},
-  setActiveLayer:function(idx){if(idx<0||idx>=state.layers.length)return;saveAllLayerFrames();activateUL(idx);clearSel();renderArcs();updateUI();},
+  setActiveLayer:function(idx){if(idx<0||idx>=state.layers.length)return;saveAllLayerFrames();activateUL(idx);clearSel();
+    // The camera row is a synthetic pseudo-layer (not a real state.layers
+    // entry — see camera.js's renderPanelRow) selected by switching TO the
+    // camera tool, never by an activeLayerIdx change; picking a real layer
+    // here has to explicitly leave it, or its guides/highlight stay stuck
+    // on screen with no layer row left looking selected (feedback #5wrip).
+    if(state.tool==='camera')window.SM.setTool('select');
+    renderArcs();updateUI();},
   toggleLayerVis:function(idx){state.layers[idx].visible=!state.layers[idx].visible;loadFrame(state.currentFrame);updateUI();},
   toggleLayerLock:function(idx){
     state.layers[idx].locked=!state.layers[idx].locked;
