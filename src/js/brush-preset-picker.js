@@ -113,6 +113,29 @@
   function selectPreset(key) {
     if (window.SM) window.SM.setBrushPreset(key);
     paintButton(key);
+    // Also retroactively re-texture whatever's currently selected (feedback:
+    // "impossible d'appliquer une brush preset à postériori") — a plain
+    // constant-width stroke only (isVectorBrush/isFillShape ribbons have no
+    // strokeWidth/dab-placement model this applies to; see applyBrushTexture's
+    // own "dab size derives from strokeWidth" comment).
+    if (typeof selectedPaths !== 'undefined' && selectedPaths.length && typeof applyOrChangeBrushTexture === 'function') {
+      var layer = window.userLayers && window.userLayers[state.activeLayerIdx];
+      if (layer) {
+        var touched = 0;
+        if (typeof pushUndo === 'function') pushUndo();
+        selectedPaths.forEach(function (p) {
+          if (!p.strokeColor && !(p.data && p.data.preTextureStroke !== undefined) && !(p.data && p.data.preTextureOpacity !== undefined)) return;
+          if (p.data && (p.data.isVectorBrush || p.data.isFillShape || p.data.isBrushTextureCopy)) return;
+          applyOrChangeBrushTexture(p, layer, key);
+          touched++;
+        });
+        if (touched) {
+          if (typeof saveActiveLayerFrame === 'function') saveActiveLayerFrame();
+          if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+          if (typeof showToast === 'function') showToast(touched + ' trait(s) retexturé(s)');
+        }
+      }
+    }
   }
 
   function open(anchorEl, currentKey, onSelect) {

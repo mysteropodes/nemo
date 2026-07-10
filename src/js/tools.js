@@ -1784,6 +1784,27 @@ function regenerateBrushTexture(basePath,layer){
   }
   applyBrushTexture(basePath,basePath.data.brushTexturePreset);
 }
+// Applies a brush-texture preset to an ALREADY-DRAWN, already-committed
+// stroke (feedback: "impossible d'appliquer une brush preset à
+// postériori") — previously applyBrushTexture only ever ran once, inline,
+// at draw-commit time. First tears down whatever texture the path already
+// had (same dab-removal as regenerateBrushTexture, plus restoring the
+// anchor's pre-texture opacity/strokeColor so switching presets — or back
+// to "None" — never leaves it invisible/strokeless), then applies the new
+// one. presetKey 'none' just removes texture, leaving a plain stroke.
+function applyOrChangeBrushTexture(basePath,layer,presetKey){
+  if(basePath.data&&basePath.data.brushGroupId){
+    var gid=basePath.data.brushGroupId;
+    for(var i=layer.children.length-1;i>=0;i--){
+      var c=layer.children[i];
+      if(c.data&&c.data.isBrushTextureCopy&&c.data.brushGroupId===gid)c.remove();
+    }
+    if(basePath.data.preTextureOpacity!==undefined){basePath.opacity=basePath.data.preTextureOpacity;delete basePath.data.preTextureOpacity;}
+    if(basePath.data.preTextureStroke!==undefined){basePath.strokeColor=basePath.data.preTextureStroke?new Color(basePath.data.preTextureStroke):null;delete basePath.data.preTextureStroke;}
+    delete basePath.data.brushCompanions;delete basePath.data.brushTexturePreset;delete basePath.data.brushGroupId;
+  }
+  if(presetKey&&presetKey!=='none')applyBrushTexture(basePath,presetKey);
+}
 function applyFillBrushPlacement(path,layer){
   var mode=state.fillBrushMode;
   if(mode==='merge'){
