@@ -600,6 +600,7 @@ window.SM={
     state.layerFolders=d.layerFolders||{};state.layerLinkGroups=d.layerLinkGroups||{};
     state.motionArcs=d.motionArcs||{};state.tweenOverrides=d.tweenOverrides||{};if(d.easingCurve){state.easingCurve=d.easingCurve;if(window._curveEditor)window._curveEditor.setState(d.easingCurve);}
     state.comments=d.comments||[];
+    if(typeof refreshFbAvatars==='function')refreshFbAvatars(); // avatar stack mirrors state.comments — resync on project import
     state.cameraKeys=d.cameraKeys||[];state.cameraLayerOn=!!d.cameraLayerOn;state.cameraView=false;
     // Explicit fallback to the app default, not just "leave whatever was
     // there" — opening an old-format project right after working on a
@@ -2109,7 +2110,7 @@ function initCommentPopover(){
       pos:new Point(_activeComment.x,_activeComment.y),
       actionTrail:_recordedActionTrail,clickTrail:_recordedClickTrail,
       screenshotDataUrl:_activeShotDataUrl,
-    }).then(function(){showToast(_activeShotDataUrl?'Feedback + capture envoyés':'Feedback enregistré (hors projet)');refreshFbAvatars();})
+    }).then(function(){showToast(_activeShotDataUrl?'Feedback + capture envoyés':'Feedback enregistré (hors projet)');})
       .catch(function(e){console.warn('[feedback] submit failed',e);showToast('Échec de l\'enregistrement du feedback');});
     closeCommentPopover();
   });
@@ -2124,14 +2125,14 @@ function initCommentPopover(){
       if(!_activeComment.text.trim()){closeCommentPopover();return;}
       state.comments.push(_activeComment);
     }
-    saveActiveLayerFrame();closeCommentPopover();updateUI();
+    saveActiveLayerFrame();closeCommentPopover();updateUI();refreshFbAvatars();
     if(window.SMEngineBridge&&window.SMEngineBridge.renderNow)window.SMEngineBridge.renderNow();
   });
   delBtn.addEventListener('click',function(){
     if(!_activeComment||!state.comments)return;
     var idx=state.comments.indexOf(_activeComment);
     if(idx>=0)state.comments.splice(idx,1);
-    saveActiveLayerFrame();closeCommentPopover();updateUI();
+    saveActiveLayerFrame();closeCommentPopover();updateUI();refreshFbAvatars();
     if(window.SMEngineBridge&&window.SMEngineBridge.renderNow)window.SMEngineBridge.renderNow();
   });
   // Clicking anywhere outside the popover while it's open just discards an
@@ -2381,73 +2382,72 @@ function initFeedbackUI(){
     window.SMFeedback.pullAllIncoming().then(function(imported){
       pullBtn.disabled=false;pullBtn.textContent=orig;
       showToast(imported.length?imported.length+' feedback récupéré(s), en attente d\'approbation':'Rien de nouveau');
-      refreshFeedbackList();refreshFbAvatars();
+      refreshFeedbackList();
     }).catch(function(e){pullBtn.disabled=false;pullBtn.textContent=orig;console.warn('[feedback] pull failed',e);showToast('Échec de la récupération');});
   });
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initFeedbackUI);else initFeedbackUI();
 
 // ---- Collaborator avatar stack (top bar, left of the settings gear) ----
-// Shows the current profile plus everyone who's left a feedback comment on
-// this project — click opens a compact list of those comments. Separate
-// from the Settings > Feedback tab (which owns approve/resolve actions);
-// this is a lightweight "who's been here" glance, read-only.
-var _fbAvatarEntries=[];
+// Shows the current profile plus every author of a TEAM COMMENT on this
+// project (state.comments — the in-project "Enregistrer" pins shared via
+// Sync équipe), NOT the debug-feedback entries (SMFeedback), which are
+// out-of-project tooling for the dev loop. Click opens a compact list of
+// those comments; clicking one jumps to its frame. Read-only glance —
+// editing/resolving still happens on the pin itself via the Comment tool.
 function fbInitial(name){return (name||'?').trim().charAt(0).toUpperCase()||'?';}
 function refreshFbAvatars(){
   var el=document.getElementById('fb-avatars');
-  if(!el||!window.SMFeedback)return;
-  window.SMFeedback.readAllLocal().then(function(entries){
-    _fbAvatarEntries=entries||[];
-    var seen={},people=[];
-    if(state.userProfile){people.push(state.userProfile);seen[state.userProfile.id]=true;}
-    _fbAvatarEntries.forEach(function(e){
-      var a=e.author;
-      if(a&&a.id&&!seen[a.id]){seen[a.id]=true;people.push(a);}
-    });
-    el.innerHTML='';
-    var maxShown=4;
-    people.slice(0,maxShown).forEach(function(p){
-      var av=document.createElement('div');
-      av.className='fb-av';av.style.background=p.color||'#888';
-      av.textContent=fbInitial(p.name);
-      av.title=p.name+(p===state.userProfile?' (toi)':'');
-      el.appendChild(av);
-    });
-    if(people.length>maxShown){
-      var more=document.createElement('div');
-      more.className='fb-av fb-av-more';more.textContent='+'+(people.length-maxShown);
-      el.appendChild(more);
-    }
-  }).catch(function(){});
+  if(!el)return;
+  var comments=state.comments||[];
+  var seen={},people=[];
+  if(state.userProfile){people.push({id:state.userProfile.id,name:state.userProfile.name,color:state.userProfile.color,me:true});seen[state.userProfile.id]=true;}
+  comments.forEach(function(c){
+    if(c.authorId&&!seen[c.authorId]){seen[c.authorId]=true;people.push({id:c.authorId,name:c.authorName,color:c.authorColor});}
+  });
+  el.innerHTML='';
+  var maxShown=4;
+  people.slice(0,maxShown).forEach(function(p){
+    var av=document.createElement('div');
+    av.className='fb-av';av.style.background=p.color||'#888';
+    av.textContent=fbInitial(p.name);
+    av.title=(p.name||'?')+(p.me?' (toi)':'');
+    el.appendChild(av);
+  });
+  if(people.length>maxShown){
+    var more=document.createElement('div');
+    more.className='fb-av fb-av-more';more.textContent='+'+(people.length-maxShown);
+    el.appendChild(more);
+  }
 }
 function renderFbAvatarPopover(){
   var pop=document.getElementById('fb-avatars-pop');
   if(!pop)return;
   pop.innerHTML='';
-  if(!_fbAvatarEntries.length){
-    pop.innerHTML='<div class="fb-pop-empty">Aucun commentaire feedback sur ce projet.</div>';
+  var comments=(state.comments||[]).slice().sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);});
+  if(!comments.length){
+    pop.innerHTML='<div class="fb-pop-empty">Aucun commentaire d\'équipe sur ce projet.</div>';
     return;
   }
-  _fbAvatarEntries.slice().sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);}).forEach(function(entry){
+  comments.forEach(function(cm){
     var item=document.createElement('div');item.className='fb-pop-item';
     var av=document.createElement('div');av.className='fb-pop-av';
-    av.style.background=(entry.author&&entry.author.color)||'#888';
-    av.textContent=fbInitial(entry.author&&entry.author.name);
+    av.style.background=cm.authorColor||'#888';
+    av.textContent=fbInitial(cm.authorName);
     item.appendChild(av);
     var body=document.createElement('div');body.className='fb-pop-body';
-    var note=document.createElement('div');note.className='fb-pop-note';note.textContent=entry.note||'';note.title=entry.note||'';
+    var note=document.createElement('div');note.className='fb-pop-note';note.textContent=cm.text||'';note.title=cm.text||'';
     body.appendChild(note);
     var meta=document.createElement('div');meta.className='fb-pop-meta';
-    meta.appendChild(document.createTextNode((entry.author&&entry.author.name)||'?'));
+    meta.appendChild(document.createTextNode((cm.authorName||'?')+' · frame '+((cm.frame||0)+1)));
     var st=document.createElement('span');
-    st.className='fb-pop-status'+(entry.status==='resolved'?' resolved':'');
-    st.textContent=entry.status==='pending'?'en attente':(entry.status==='resolved'?'résolu':'à traiter');
+    st.className='fb-pop-status'+(cm.resolved?' resolved':'');
+    st.textContent=cm.resolved?'résolu':'à traiter';
     meta.appendChild(st);
     body.appendChild(meta);
     item.appendChild(body);
     item.addEventListener('click',function(){
-      if(typeof entry.frame==='number')goToFrame(entry.frame);
+      if(typeof cm.frame==='number')goToFrame(cm.frame);
       document.getElementById('fb-avatars-pop').classList.remove('open');
     });
     pop.appendChild(item);
