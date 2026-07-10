@@ -329,6 +329,18 @@
   window.addEventListener('mousemove',function(e){if(!window._lpResize)return;lp.style.width=Math.max(90,Math.min(400,lprw+(e.clientX-lprx)))+'px';});
   window.addEventListener('mouseup',function(){window._lpResize=false;lpr.classList.remove('active');});
 
+  // Left (tools) and right (props) panel horizontal resize — same
+  // drag-a-thin-bar pattern as #layer-panel-resize above.
+  var tpr=document.getElementById('tools-panel-resize'),tp=document.getElementById('tools-panel'),tprx,tprw;
+  tpr.addEventListener('mousedown',function(e){tprx=e.clientX;tprw=tp.offsetWidth;window._tpResize=true;tpr.classList.add('active');e.preventDefault();});
+  window.addEventListener('mousemove',function(e){if(!window._tpResize)return;tp.style.width=Math.max(50,Math.min(160,tprw+(e.clientX-tprx)))+'px';});
+  window.addEventListener('mouseup',function(){window._tpResize=false;tpr.classList.remove('active');});
+
+  var ppr=document.getElementById('props-panel-resize'),pp=document.getElementById('props-panel'),pprx,pprw;
+  ppr.addEventListener('mousedown',function(e){pprx=e.clientX;pprw=pp.offsetWidth;window._ppResize=true;ppr.classList.add('active');e.preventDefault();});
+  window.addEventListener('mousemove',function(e){if(!window._ppResize)return;pp.style.width=Math.max(220,Math.min(520,pprw-(e.clientX-pprx)))+'px';});
+  window.addEventListener('mouseup',function(){window._ppResize=false;ppr.classList.remove('active');});
+
   // No local FC here (was a stale hardcoded 14, a duplicate of app.js's
   // global FC that drifted out of sync with it — real bug, caused the
   // work-area bar and onion markers to desync from the actual frame-cell
