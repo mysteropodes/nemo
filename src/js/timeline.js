@@ -3243,7 +3243,18 @@ document.getElementById('comp-offset').addEventListener('change',function(){wind
       var fn={svg:'exportSVGSequence',png:'exportPNGSequence',tiff:'exportTIFFSequence',gif:'exportGIF',mp4:'exportMP4',prores:'exportProRes',lottie:'exportLottie'}[fmtSel.value];
       var res=await window.SMExport[fn](opts);
       if(res.cancelled){progEl.textContent='Annulé';}
-      else if(res.ok){progEl.textContent='Terminé ✓';showToast('Export terminé');setTimeout(function(){modal.style.display='none';},900);}
+      else if(res.ok){
+        progEl.textContent='Terminé ✓';showToast('Export terminé');
+        // Lottie JSON gets its own preview instead of auto-closing straight
+        // away — a bad export (empty/misplaced shapes) is otherwise silent
+        // until opened in some other player.
+        if(fmtSel.value==='lottie'&&res.json&&window.SMLottiePreview){
+          modal.style.display='none';
+          window.SMLottiePreview.open(res.json);
+        }else{
+          setTimeout(function(){modal.style.display='none';},900);
+        }
+      }
       else{progEl.textContent='Erreur: '+(res.error||'inconnue');}
     }catch(err){
       progEl.textContent='Erreur: '+(err&&err.message?err.message:err);
