@@ -128,6 +128,11 @@
       </div>
     </div>
     <button id="tools-invert-btn" class="tool-btn" title="Swap stroke and fill colors (X)" style="margin-top:6px"><span style="font-size:14px;line-height:1">&#x21C4;</span></button>
+    <!-- Closes off the stroke/fill swatch group with the same divider used
+         between every other tool group above it (feedback: "séparateur en
+         dessous sélection fond/trait") — without it the group ran straight
+         into the panel's bottom edge with nothing marking its end. -->
+    <div class="tool-sep"></div>
   </div>
 
   <div id="tools-panel-resize" title="Glisser pour redimensionner"></div>
@@ -727,7 +732,7 @@
   <input type="file" id="comment-shot-input" accept="image/*" style="display:none">
   <div class="pr" style="margin-top:6px;gap:6px">
     <label style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text-dim);cursor:pointer"><input type="checkbox" id="comment-resolved"> Résolu</label>
-    <button class="pbtn" id="comment-delete" style="font-size:10px;padding:4px 8px" title="Supprimer ce commentaire">🗑</button>
+    <button class="pbtn" id="comment-delete" style="font-size:10px;padding:4px 8px" title="Supprimer ce commentaire"><svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" style="vertical-align:middle"><path d="M9 3h6l1 2h4v2H4V5h4z"/><path d="M6 9h12l-1 12H7z"/></svg></button>
   </div>
   <div class="pr" style="margin-top:6px;gap:6px">
     <button class="pbtn" id="comment-save" style="flex:1;font-size:10px;padding:5px" title="Commentaire visible par l'équipe, reste dans le projet">Enregistrer</button>

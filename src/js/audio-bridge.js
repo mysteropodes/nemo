@@ -170,7 +170,11 @@
       var mute = document.createElement('div');
       mute.className = 'lico' + (track.muted ? ' off' : '');
       mute.title = track.muted ? 'Réactiver' : 'Couper';
-      mute.textContent = track.muted ? '🔇' : '🔊';
+      // Flat monochrome SVGs, not emoji — matches every other .lico icon in
+      // the layer panel (feedback: "encore des icon non flat").
+      mute.innerHTML = track.muted
+        ? '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 5 6 9H3v6h3l5 4V5Z"/><path d="m16 9 5 6M21 9l-5 6"/></svg>'
+        : '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 5 6 9H3v6h3l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18 6a8 8 0 0 1 0 12"/></svg>';
       mute.addEventListener('click', function (e) {
         e.stopPropagation();
         track.muted = !track.muted;
