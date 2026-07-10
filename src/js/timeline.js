@@ -884,8 +884,22 @@ function updateSelPropsPanel(){
       document.getElementById('pm-fill-c').dataset.hex8=css;
       document.getElementById('p-fill-on').checked=hasFill;
       var ftog=document.getElementById('fill-enable-toggle');if(ftog)ftog.classList.toggle('off',!hasFill);
-      var hasStroke=!!ref.strokeColor;state.strokeEnabled=hasStroke;
-      var stog=document.getElementById('stroke-enable-toggle');if(stog)stog.classList.toggle('off',!hasStroke);
+      // Pressure-brush ribbons and fill-brush shapes are ALWAYS
+      // strokeColor:null by construction (they paint via fillColor only —
+      // see draw-bridge.js's commitStroke) — reading that as "this path
+      // has stroke disabled" and writing it into the GLOBAL state.
+      // strokeEnabled silently turned the Stroke channel off for every
+      // FUTURE new stroke the moment one of these got selected (e.g. by
+      // switching tools/selecting while drawing), well after the user had
+      // moved on — reported as "quand je change d'outil ça change en fill
+      // ou stroke non visible" (feedback #6yqij). Skipped for these two
+      // path kinds, matching the same isVectorBrush exclusion already used
+      // for Cap/Join/Dash sync just below.
+      var isBrushShape=ref.data&&(ref.data.isVectorBrush||ref.data.isFillShape);
+      if(!isBrushShape){
+        var hasStroke=!!ref.strokeColor;state.strokeEnabled=hasStroke;
+        var stog=document.getElementById('stroke-enable-toggle');if(stog)stog.classList.toggle('off',!hasStroke);
+      }
       // Same staleness fix for Cap/Join/Paint Order/Miter Limit/Dash Offset —
       // reflect the selected path's actual values instead of leaving
       // whatever the tool-default last was.
