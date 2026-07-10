@@ -533,6 +533,13 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--gutter);color:
 .modal-x:hover{color:var(--text);}
 .modal-bdy{padding:12px 14px;display:flex;flex-direction:column;gap:8px;}
 .modal-box.wide{width:700px;max-width:92vw;}
+/* Réglages accumulates a LOT of sections (langue, sync, feedback local,
+   feedback GitHub, raccourcis…) — without this the whole page scrolled
+   instead of just the modal body, and the panel routinely grew taller
+   than the viewport ("je vois plus rien"). Constrained to the viewport
+   height minus room for the header/margins, body scrolls internally. */
+#settings-modal .modal-box{max-height:88vh;display:flex;flex-direction:column;}
+#settings-modal .modal-bdy{overflow-y:auto;max-height:calc(88vh - 40px);}
 .fb-card{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border-radius:8px;background:var(--panel3);border:1px solid var(--border);font-size:11px;}
 .fb-card-head{display:flex;align-items:center;gap:6px;flex-wrap:wrap;color:var(--text-dim);font-size:10px;}
 .fb-chip{display:inline-flex;align-items:center;padding:2px 7px;border-radius:10px;font-size:9px;font-weight:600;background:var(--panel);border:1px solid var(--border2);cursor:pointer;user-select:none;white-space:nowrap;}

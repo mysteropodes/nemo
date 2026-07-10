@@ -591,13 +591,13 @@
         <button class="pbtn" id="sync-publish" style="flex:1;font-size:10px;padding:5px" data-i18n="settingsPublish">Publier</button>
         <button class="pbtn" id="sync-check" style="flex:1;font-size:10px;padding:5px" data-i18n="settingsCheckUpdates">Vérifier les mises à jour</button>
       </div>
-      <div id="sync-updates-list" style="display:flex;flex-direction:column;gap:4px;margin-top:6px"></div>
+      <div id="sync-updates-list" style="display:flex;flex-direction:column;gap:4px;margin-top:6px;max-height:160px;overflow-y:auto"></div>
       <div class="phdr" style="padding:14px 0 4px 0;font-size:9px;color:var(--text-dim)">Feedback (hors projet)</div>
       <div style="font-size:10px;color:var(--text-dim);margin-bottom:6px">Notes posées via l'outil Comment → "Enregistrer comme feedback" — jamais dans le fichier projet. Les tiennes sont approuvées automatiquement ; celles récupérées d'un autre profil via le dossier partagé restent en attente jusqu'à ce que tu les approuves ici.</div>
       <div class="pr" style="gap:6px">
         <button class="pbtn" id="fb-pull" style="flex:1;font-size:10px;padding:5px">Récupérer le feedback de l'équipe</button>
       </div>
-      <div id="fb-list" style="display:flex;flex-direction:column;gap:4px;margin-top:6px"></div>
+      <div id="fb-list" style="display:flex;flex-direction:column;gap:4px;margin-top:6px;max-height:160px;overflow-y:auto"></div>
       <div class="phdr" style="padding:14px 0 4px 0;font-size:9px;color:var(--text-dim)">Feedback beta-testeurs (GitHub)</div>
       <div style="font-size:10px;color:var(--text-dim);margin-bottom:6px">Chaque feedback envoyé depuis une app distribuée arrive comme Issue sur <a href="https://github.com/mysteropodes/strokemotion-feedback" target="_blank" style="color:var(--accent)">mysteropodes/strokemotion-feedback</a>. Colle ton propre token GitHub personnel (fine-grained, scope "Issues" sur ce repo uniquement) pour pouvoir trier — il reste uniquement sur ta machine, jamais distribué.</div>
       <div class="pr" style="gap:6px">

@@ -2421,6 +2421,12 @@ function fbDashCardEl(issue){
     renderFbDashList();
   });
   actions.appendChild(editBtn);
+  var delBtn=document.createElement('button');delBtn.className='pbtn';delBtn.textContent='Supprimer';delBtn.style.cssText='font-size:9px;padding:3px 7px;color:#ff8a8a';
+  delBtn.addEventListener('click',function(){
+    if(!confirm('Supprimer définitivement l\'issue #'+issue.number+' ("'+issue.title+'") ? Action irréversible.'))return;
+    window.SMFeedback.deleteGithubIssue(issue.nodeId).then(refreshFbDashboard).catch(function(e){showToast(e.message);});
+  });
+  actions.appendChild(delBtn);
   card.appendChild(actions);
   var openForm=_fbDashOpenForms[issue.number];
   if(openForm==='resolve'){

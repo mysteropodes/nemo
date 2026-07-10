@@ -312,7 +312,7 @@
     return issues.filter(function (i) { return !i.pull_request; }).map(function (i) {
       var m = /sm-feedback-id:\s*(\S+)\s*-->/.exec(i.body || '');
       return {
-        number: i.number, id: m ? m[1] : ('gh_' + i.number),
+        number: i.number, id: m ? m[1] : ('gh_' + i.number), nodeId: i.node_id,
         title: i.title, body: i.body, url: i.html_url,
         labels: (i.labels || []).map(function (l) { return l.name; }),
         state: i.state, createdAt: i.created_at,
@@ -347,6 +347,21 @@
   }
   async function editGithubIssueBody(number, newBody) {
     return patchGithubIssue(number, { body: newBody });
+  }
+  // Actual deletion (not just close) — REST has no DELETE for issues, this
+  // needs the GraphQL deleteIssue mutation + the issue's node_id (captured
+  // by fetchGithubIssues above). Requires the token's user to have admin
+  // rights on the repo (verified: works for the repo owner even with a
+  // fine-grained PAT scoped to just "Issues" — the permission check is on
+  // the acting user's role, not the token's own granularity).
+  async function deleteGithubIssue(nodeId) {
+    var res = await fetch('https://api.github.com/graphql', {
+      method: 'POST', headers: ghAuthHeaders(),
+      body: JSON.stringify({ query: 'mutation($id:ID!){deleteIssue(input:{issueId:$id}){clientMutationId}}', variables: { id: nodeId } }),
+    });
+    var json = await res.json();
+    if (!res.ok || json.errors) throw new Error('GitHub delete failed: ' + (json.errors ? json.errors.map(function (e) { return e.message; }).join(', ') : res.status));
+    return true;
   }
 
   // ---- Pull from teammates (mirrors checkSharedUpdates/pullAndMerge) ----
@@ -438,5 +453,6 @@
     approveGithubIssue: approveGithubIssue,
     resolveGithubIssue: resolveGithubIssue,
     editGithubIssueBody: editGithubIssueBody,
+    deleteGithubIssue: deleteGithubIssue,
   };
 })();
