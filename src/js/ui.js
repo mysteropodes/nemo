@@ -74,7 +74,7 @@
     }
     return '<svg viewBox="0 0 '+w+' '+h+'" width="'+w+'" height="'+h+'"><path d="'+d+'" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   }
-  var CUSTOM_KEY='sm_easing_presets';
+  var CUSTOM_KEY='nemo_easing_presets';
   function loadCustomPresets(){try{return JSON.parse(localStorage.getItem(CUSTOM_KEY)||'[]');}catch(e){return[];}}
   function saveCustomPresets(list){try{localStorage.setItem(CUSTOM_KEY,JSON.stringify(list));}catch(e){}}
 
@@ -594,10 +594,10 @@
   function secKey(sec){var h=sec.querySelector('.phdr');return h?h.textContent.replace(/[^A-Za-z]/g,'').slice(0,20):'';}
   function saveSecOrder(){
     var pp=document.getElementById('props-panel');
-    try{localStorage.setItem('sm-panel-order',JSON.stringify(Array.prototype.slice.call(pp.querySelectorAll('.psec:not(.floating)')).map(secKey)));}catch(e){}
+    try{localStorage.setItem('nemo-panel-order',JSON.stringify(Array.prototype.slice.call(pp.querySelectorAll('.psec:not(.floating)')).map(secKey)));}catch(e){}
   }
   var savedOrder=null;
-  try{savedOrder=JSON.parse(localStorage.getItem('sm-panel-order')||'null');}catch(e){}
+  try{savedOrder=JSON.parse(localStorage.getItem('nemo-panel-order')||'null');}catch(e){}
   if(savedOrder&&Array.isArray(savedOrder)){
     var pp0=document.getElementById('props-panel');
     savedOrder.forEach(function(k){

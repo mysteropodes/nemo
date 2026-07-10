@@ -125,7 +125,7 @@
     var base = await window.__TAURI__.path.appDataDir();
     return base.replace(/[\\/]+$/, '') + '/feedback/' + projectKey();
   }
-  function lsKey() { return 'sm-feedback-' + projectKey(); }
+  function lsKey() { return 'nemo-feedback-' + projectKey(); }
   function lsReadAll() { try { return JSON.parse(localStorage.getItem(lsKey()) || '[]'); } catch (e) { return []; } }
   function lsWriteAll(list) { try { localStorage.setItem(lsKey(), JSON.stringify(list)); } catch (e) {} }
 
@@ -322,7 +322,7 @@
   // labeling/closing/commenting needs Cyril's token, entered once in
   // Réglages → Feedback and kept in localStorage on his own machine only. ----
   var GH_REPO = 'mysteropodes/strokemotion-feedback';
-  var GH_TOKEN_KEY = 'sm-github-triage-token';
+  var GH_TOKEN_KEY = 'nemo-github-triage-token';
   function githubTriageToken() { try { return localStorage.getItem(GH_TOKEN_KEY) || ''; } catch (e) { return ''; } }
   function setGithubTriageToken(token) { try { localStorage.setItem(GH_TOKEN_KEY, token || ''); } catch (e) {} }
 

@@ -1,3 +1,23 @@
+// One-time localStorage key migration: StrokeMotion -> Nemo rename. Copies
+// every existing 'sm-'/'sm_' key forward to its 'nemo-'/'nemo_' equivalent
+// (profile, recents, shortcuts, feedback, sync folders, etc.) so existing
+// local data isn't silently orphaned by the rename — old keys are left in
+// place (untouched, not deleted) rather than removed, so this stays safe
+// to run every load even after migration already happened once. Must run
+// before ANYTHING else touches localStorage (initUserProfile/i18n's
+// language load both do, at parse time on the very next scripts) — hence
+// first line of the first app script, before even paper.install.
+(function migrateStorageKeysToNemo(){
+  try{
+    var keys=[];
+    for(var i=0;i<localStorage.length;i++)keys.push(localStorage.key(i));
+    keys.forEach(function(k){
+      if(k.indexOf('sm-')!==0&&k.indexOf('sm_')!==0)return;
+      var nk=k.replace(/^sm[-_]/,function(m){return m[2]==='-'?'nemo-':'nemo_';});
+      if(localStorage.getItem(nk)===null)localStorage.setItem(nk,localStorage.getItem(k));
+    });
+  }catch(e){}
+})();
 paper.install(window);
 // paper.install(window) overwrites window.Event and window.MouseEvent with
 // Paper's own internal classes of the same name (it also clobbers
@@ -159,14 +179,14 @@ var state={
 // (Settings > Profil); id is internal and never shown.
 function initUserProfile(){
   try{
-    var saved=JSON.parse(localStorage.getItem('sm-profile')||'null');
+    var saved=JSON.parse(localStorage.getItem('nemo-profile')||'null');
     if(saved&&saved.id){if(!saved.role)saved.role='animator';state.userProfile=saved;return;}
   }catch(e){}
   state.userProfile={id:'u_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8),name:'Animateur',color:'#4a9eff',role:'animator'};
-  try{localStorage.setItem('sm-profile',JSON.stringify(state.userProfile));}catch(e){}
+  try{localStorage.setItem('nemo-profile',JSON.stringify(state.userProfile));}catch(e){}
 }
 function saveUserProfile(){
-  try{localStorage.setItem('sm-profile',JSON.stringify(state.userProfile));}catch(e){}
+  try{localStorage.setItem('nemo-profile',JSON.stringify(state.userProfile));}catch(e){}
 }
 initUserProfile();
 

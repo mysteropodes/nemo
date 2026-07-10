@@ -13,7 +13,7 @@
 
   // Reads the version straight from the Tauri app API instead of a
   // hardcoded string in index.html — <title> and #status-text used to say
-  // "StrokeMotion v0.4.0" verbatim, forgotten on every version bump (the
+  // "Nemo v0.4.0" verbatim, forgotten on every version bump (the
   // Réglages panel's own version display had the same problem before this
   // function existed). One source of truth (package.json/tauri.conf.json's
   // "version", read at runtime via getVersion()) instead of three places
@@ -25,8 +25,8 @@
       var vEl = document.getElementById('app-version-txt');
       if (vEl) vEl.textContent = v;
       var statusEl = document.getElementById('status-text');
-      if (statusEl) statusEl.textContent = 'StrokeMotion v' + v;
-      document.title = 'StrokeMotion v' + v;
+      if (statusEl) statusEl.textContent = 'Nemo v' + v;
+      document.title = 'Nemo v' + v;
     } catch (e) {}
   }
 
@@ -35,7 +35,7 @@
       if (statusEl) statusEl.textContent = 'Téléchargement…';
       await update.downloadAndInstall();
       if (statusEl) statusEl.textContent = 'Installée — redémarre l\'app pour l\'utiliser.';
-      showToast('Mise à jour installée — redémarre StrokeMotion');
+      showToast('Mise à jour installée — redémarre Nemo');
     } catch (e) {
       console.warn('[updater] install failed', e);
       if (statusEl) statusEl.textContent = 'Échec de l\'installation.';
@@ -86,7 +86,7 @@
     showVersion();
     var btn = document.getElementById('app-check-update');
     if (btn) btn.addEventListener('click', function () { checkForUpdate(false); });
-    // "Vérifier les mises à jour…" in the StrokeMotion app menu (top-left,
+    // "Vérifier les mises à jour…" in the Nemo app menu (top-left,
     // macOS) — Rust (src-tauri/src/lib.rs setup()) inserts that item into
     // the default menu and emits this event on click; same check as the
     // Réglages button, just reachable from the menu too.

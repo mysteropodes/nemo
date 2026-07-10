@@ -186,7 +186,7 @@
     if (onProgress) onProgress('upload');
     var bytes = await window.__TAURI__.fs.readFile(outPath);
 
-    var commentBody = { task_status_id: null, comment: 'Publié depuis StrokeMotion (' + versionLabel + ')' };
+    var commentBody = { task_status_id: null, comment: 'Publié depuis Nemo (' + versionLabel + ')' };
     try {
       var statuses = await listTaskStatuses(session);
       var reviewStatus = statuses.find(function (s) {

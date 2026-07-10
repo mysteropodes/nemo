@@ -1,5 +1,5 @@
 {
-  "name": "strokemotion",
+  "name": "nemo",
   "version": "0.4.2",
   "description": "2D frame-by-frame vector animation with auto inbetweening",
   "scripts": {

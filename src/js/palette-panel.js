@@ -4,7 +4,7 @@
 // swatch to Fill/Stroke, swap Fill↔Stroke, and a "find & replace" mode that
 // walks the active layer's current frame swapping one color for another —
 // the same "search your selection, change every instance of a color" tool
-// Shade offers, scoped here to the active layer (StrokeMotion doesn't have
+// Shade offers, scoped here to the active layer (Nemo doesn't have
 // AE's multi-layer timeline-wide selection concept).
 (function () {
   function palettes() { return state.palettes || (state.palettes = [{ id: 'p0', name: 'Palette 1', colors: [] }]); }

@@ -1,5 +1,5 @@
 {
-  "productName": "StrokeMotion",
+  "productName": "Nemo",
   "version": "0.4.2",
   "identifier": "com.strokemotion.app",
   "build": {
@@ -10,7 +10,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "StrokeMotion",
+        "title": "Nemo",
         "width": 1400,
         "height": 900,
         "minWidth": 900,

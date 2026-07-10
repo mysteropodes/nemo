@@ -150,7 +150,7 @@ async function exportRenderPNGsToDir(dir,start,end,scale,onProgress,alpha){
 // stroke-to-stroke matching across arbitrary keyframe spans that the
 // in-app tween engine already does), each already-resolved per-frame pose
 // (post generateTweens) is emitted as its own keyframe with linear timing,
-// so any Lottie player reproduces exactly what StrokeMotion shows. A new
+// so any Lottie player reproduces exactly what Nemo shows. A new
 // set of shape layers starts wherever a layer's stroke count changes
 // (e.g. a redrawn keyframe) since Lottie path keyframes require a stable
 // vertex/shape count within one animated property.
@@ -236,7 +236,7 @@ function lottieBuild(start,end){
   return{
     v:'5.9.0',fr:fps,ip:start,op:end+1,
     w:state.canvasW,h:state.canvasH,
-    nm:'StrokeMotion Export',ddd:0,assets:[],layers:layers
+    nm:'Nemo Export',ddd:0,assets:[],layers:layers
   };
 }
 
@@ -267,7 +267,7 @@ window.SMExport={
   },
 
   exportPNGSequence:async function(opts){
-    if(!exportTauriAvailable())return{ok:false,error:'Disponible uniquement dans l\'app StrokeMotion (pas en preview navigateur).'};
+    if(!exportTauriAvailable())return{ok:false,error:'Disponible uniquement dans l\'app Nemo (pas en preview navigateur).'};
     var r=exportFrameRange(opts);var scale=(opts&&opts.scale)||1;
     var dir=await exportPickDir('Dossier de séquence PNG');
     if(!dir)return{cancelled:true};
@@ -276,7 +276,7 @@ window.SMExport={
   },
 
   exportTIFFSequence:async function(opts){
-    if(!exportTauriAvailable())return{ok:false,error:'Disponible uniquement dans l\'app StrokeMotion (pas en preview navigateur).'};
+    if(!exportTauriAvailable())return{ok:false,error:'Disponible uniquement dans l\'app Nemo (pas en preview navigateur).'};
     var r=exportFrameRange(opts);var scale=(opts&&opts.scale)||1;
     var outDir=await exportPickDir('Dossier de séquence TIFF');
     if(!outDir)return{cancelled:true};
@@ -290,7 +290,7 @@ window.SMExport={
   },
 
   exportGIF:async function(opts){
-    if(!exportTauriAvailable())return{ok:false,error:'Disponible uniquement dans l\'app StrokeMotion (pas en preview navigateur).'};
+    if(!exportTauriAvailable())return{ok:false,error:'Disponible uniquement dans l\'app Nemo (pas en preview navigateur).'};
     var r=exportFrameRange(opts);var scale=(opts&&opts.scale)||1;var fps=(opts&&opts.fps)||state.fps;
     var outPath=await exportPickSaveFile('Exporter en GIF','animation.gif',[{name:'GIF',extensions:['gif']}]);
     if(!outPath)return{cancelled:true};
@@ -306,7 +306,7 @@ window.SMExport={
   },
 
   exportMP4:async function(opts){
-    if(!exportTauriAvailable())return{ok:false,error:'Disponible uniquement dans l\'app StrokeMotion (pas en preview navigateur).'};
+    if(!exportTauriAvailable())return{ok:false,error:'Disponible uniquement dans l\'app Nemo (pas en preview navigateur).'};
     var outPath=await exportPickSaveFile('Exporter en MP4','animation.mp4',[{name:'MP4',extensions:['mp4']}]);
     if(!outPath)return{cancelled:true};
     return exportMP4ToPath(outPath,opts);
@@ -316,12 +316,12 @@ window.SMExport={
   // asked the user to confirm once, a second native file picker mid-publish
   // would be a confusing extra step.
   exportMP4Silent:function(outPath,opts){
-    if(!exportTauriAvailable())return Promise.resolve({ok:false,error:'Disponible uniquement dans l\'app StrokeMotion (pas en preview navigateur).'});
+    if(!exportTauriAvailable())return Promise.resolve({ok:false,error:'Disponible uniquement dans l\'app Nemo (pas en preview navigateur).'});
     return exportMP4ToPath(outPath,opts);
   },
 
   exportProRes:async function(opts){
-    if(!exportTauriAvailable())return{ok:false,error:'Disponible uniquement dans l\'app StrokeMotion (pas en preview navigateur).'};
+    if(!exportTauriAvailable())return{ok:false,error:'Disponible uniquement dans l\'app Nemo (pas en preview navigateur).'};
     var r=exportFrameRange(opts);var scale=(opts&&opts.scale)||1;var fps=(opts&&opts.fps)||state.fps;
     var alpha=!!(opts&&opts.alpha);
     var outPath=await exportPickSaveFile('Exporter en ProRes','animation.mov',[{name:'QuickTime',extensions:['mov']}]);

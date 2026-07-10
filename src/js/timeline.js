@@ -1931,7 +1931,7 @@ var TOOL_SHORTCUTS=[
 var _shortcutOverrides=null;
 function shortcutOverrides(){
   if(_shortcutOverrides)return _shortcutOverrides;
-  try{_shortcutOverrides=JSON.parse(localStorage.getItem('sm-shortcuts')||'{}');}catch(e){_shortcutOverrides={};}
+  try{_shortcutOverrides=JSON.parse(localStorage.getItem('nemo-shortcuts')||'{}');}catch(e){_shortcutOverrides={};}
   return _shortcutOverrides;
 }
 function shortcutKeyFor(action){
@@ -1942,7 +1942,7 @@ function shortcutKeyFor(action){
 function setShortcutKey(action,key){
   var ov=shortcutOverrides();
   if(key)ov[action]=key.toLowerCase();else delete ov[action];
-  try{localStorage.setItem('sm-shortcuts',JSON.stringify(ov));}catch(e){}
+  try{localStorage.setItem('nemo-shortcuts',JSON.stringify(ov));}catch(e){}
 }
 function runToolShortcut(k){
   var lk=(k||'').toLowerCase();
@@ -2285,7 +2285,7 @@ function initSettingsModal(){
   modal.addEventListener('click',function(e){if(e.target===modal)modal.style.display='none';});
   var resetBtn=document.getElementById('shortcuts-reset');
   if(resetBtn)resetBtn.addEventListener('click',function(){
-    _shortcutOverrides={};try{localStorage.removeItem('sm-shortcuts');}catch(e){}
+    _shortcutOverrides={};try{localStorage.removeItem('nemo-shortcuts');}catch(e){}
     renderShortcutsList();showToast('Raccourcis réinitialisés');
   });
 }
@@ -3198,7 +3198,7 @@ document.getElementById('comp-offset').addEventListener('change',function(){wind
 
   document.getElementById('btn-export').addEventListener('click',function(){
     if(!window.SMExport.isAvailable()){
-      showToast('Export complet disponible uniquement dans l\'app StrokeMotion (Tauri)');
+      showToast('Export complet disponible uniquement dans l\'app Nemo (Tauri)');
     }
     updateScaleVisibility();
     progEl.style.display='none';progEl.textContent='';
@@ -3234,7 +3234,7 @@ setInterval(function(){
   if(state.playing)return;
   saveAllLayerFrames();
   var json=window.SM.exportJSON();
-  try{localStorage.setItem('sm-auto',json);}catch(e){}
+  try{localStorage.setItem('nemo-auto',json);}catch(e){}
   // v15: dense on-disk version history (Tauri only) alongside the single-
   // slot localStorage fallback above — see project.js pushVersionSnapshot.
   if(window.SMProject&&window.SMProject.pushVersionSnapshot)window.SMProject.pushVersionSnapshot(json);
@@ -3243,5 +3243,5 @@ setInterval(function(){
 // "Resume Last Session" card is clicked — the toast there was confusing
 // alongside the new start screen (state.js decides whether to actually
 // show that card, and surfaces its own confirmation once chosen).
-try{var saved=localStorage.getItem('sm-auto');if(saved)window.SM.importJSON(saved,true);}catch(e){}
+try{var saved=localStorage.getItem('nemo-auto');if(saved)window.SM.importJSON(saved,true);}catch(e){}
 window.SM.setTool(state.userProfile&&state.userProfile.role==='producer'?'hand':'draw');updateUI();renderSymbolTabs();

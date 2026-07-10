@@ -138,12 +138,12 @@
   function setLanguage(lang){
     if(LANGS.indexOf(lang)<0)return;
     state.language=lang;
-    try{localStorage.setItem('sm-lang',lang);}catch(e){}
+    try{localStorage.setItem('nemo-lang',lang);}catch(e){}
     applyI18n();
   }
   function initLanguage(){
     var saved=null;
-    try{saved=localStorage.getItem('sm-lang');}catch(e){}
+    try{saved=localStorage.getItem('nemo-lang');}catch(e){}
     state.language=(saved&&LANGS.indexOf(saved)>=0)?saved:(state.language||'fr');
     applyI18n();
     var sel=document.getElementById('settings-language');

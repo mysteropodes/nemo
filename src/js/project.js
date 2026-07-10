@@ -7,7 +7,7 @@
 // plugins instead of the browser download/upload dance the old Save/Load
 // buttons did.
 (function(){
-  var RECENTS_KEY='sm-recents',MAX_RECENTS=8;
+  var RECENTS_KEY='nemo-recents',MAX_RECENTS=8;
   var currentPath=null,currentName='Untitled';
 
   function tauriOk(){return typeof window.__TAURI__!=='undefined';}
@@ -69,7 +69,7 @@
     if(window.renderPaletteGrid)window.renderPaletteGrid();
     syncDocFields();
     currentPath=null;currentName=cfg.name||'Untitled';updateCurrentLabel();
-    try{localStorage.setItem('sm-auto',window.SM.exportJSON());}catch(e){}
+    try{localStorage.setItem('nemo-auto',window.SM.exportJSON());}catch(e){}
     showToast('New project created');
   }
 
@@ -79,12 +79,12 @@
     currentPath=path;currentName=baseName(path);updateCurrentLabel();
     touchRecent(path,currentName,{canvasW:state.canvasW,canvasH:state.canvasH,fps:state.fps});
     renderRecents();
-    try{localStorage.setItem('sm-auto',json);}catch(e){}
+    try{localStorage.setItem('nemo-auto',json);}catch(e){}
   }
   async function saveAs(){
     if(!tauriOk()){showToast('Save As requires the desktop app');return;}
     saveAllLayerFrames();
-    var path=await window.__TAURI__.dialog.save({title:'Save Project As',defaultPath:currentName+'.json',filters:[{name:'StrokeMotion Project',extensions:['json']}]});
+    var path=await window.__TAURI__.dialog.save({title:'Save Project As',defaultPath:currentName+'.json',filters:[{name:'Nemo Project',extensions:['json']}]});
     if(!path)return;
     await writeProjectTo(path);
     showToast('Saved: '+baseName(path));
@@ -114,13 +114,13 @@
   }
   async function openDialog(){
     if(!tauriOk()){document.getElementById('file-input').click();return;}
-    var path=await window.__TAURI__.dialog.open({title:'Open Project',multiple:false,filters:[{name:'StrokeMotion Project',extensions:['json']}]});
+    var path=await window.__TAURI__.dialog.open({title:'Open Project',multiple:false,filters:[{name:'Nemo Project',extensions:['json']}]});
     if(!path)return;
     await openPath(Array.isArray(path)?path[0]:path);
   }
 
   // ---- Version history (v15) — the existing 30s autosave (timeline.js)
-  // only ever held ONE slot ('sm-auto' in localStorage): a crash right
+  // only ever held ONE slot ('nemo-auto' in localStorage): a crash right
   // after a bad edit overwrote the one good copy with the bad one on the
   // very next tick. This keeps a dense rolling history of real files on
   // disk (Tauri fs — no localStorage quota risk with base64 media embedded
@@ -134,7 +134,7 @@
     return base.replace(/[\\/]+$/,'')+'/history/'+historyKey();
   }
   async function pushVersionSnapshot(json){
-    if(!tauriOk())return; // browser preview: 'sm-auto' single-slot fallback only
+    if(!tauriOk())return; // browser preview: 'nemo-auto' single-slot fallback only
     try{
       var dir=await historyDir();
       await window.__TAURI__.fs.mkdir(dir,{recursive:true});
@@ -214,7 +214,7 @@
   // — new strokes merge automatically, same-strokeId edits surface as a
   // Phase 1 revision pair via the existing ghost/accept/reject UI.
   var SYNC_MAX_PER_PROFILE=30;
-  function syncFolderKey(){return 'sm-sync-'+historyKey();}
+  function syncFolderKey(){return 'nemo-sync-'+historyKey();}
   function getSyncFolder(){try{return localStorage.getItem(syncFolderKey())||null;}catch(e){return null;}}
   function setSyncFolder(path){try{if(path)localStorage.setItem(syncFolderKey(),path);else localStorage.removeItem(syncFolderKey());}catch(e){}}
   function profileDir(root,profileId){return root.replace(/[\\/]+$/,'')+'/'+profileId;}
@@ -418,7 +418,7 @@
 
   function initStartScreen(){
     var hasAutosave=false;
-    try{hasAutosave=!!localStorage.getItem('sm-auto');}catch(e){}
+    try{hasAutosave=!!localStorage.getItem('nemo-auto');}catch(e){}
     var resumeCard=document.getElementById('start-resume');
     if(hasAutosave){
       resumeCard.style.display='';
