@@ -539,6 +539,23 @@
   </div>
 </div>
 
+<div id="lottie-preview-modal" class="modal-overlay" style="display:none">
+  <div class="modal-box">
+    <div class="modal-hdr">Prévisualisation Lottie <button id="lottie-preview-close" class="modal-x">&times;</button></div>
+    <div class="modal-bdy">
+      <div style="display:flex;justify-content:center;background:#1a1a1a;border-radius:6px;overflow:hidden">
+        <canvas id="lottie-preview-canvas" style="max-width:100%;max-height:420px"></canvas>
+      </div>
+      <div class="pr" style="margin-top:8px;gap:8px">
+        <button class="pbtn" id="lottie-preview-play" style="width:32px">&#9654;</button>
+        <input type="range" id="lottie-preview-scrub" min="0" max="0" value="0" style="flex:1">
+        <span id="lottie-preview-frame" style="font-size:10px;color:var(--text-dim);min-width:60px;text-align:right">0 / 0</span>
+      </div>
+      <div style="font-size:9px;color:var(--text-dim);margin-top:6px">Lecture directe du JSON exporté (interprète nos propres calques baked) — validation rapide, pas un rendu lottie-web pixel-perfect.</div>
+    </div>
+  </div>
+</div>
+
 <div id="history-modal" class="modal-overlay" style="display:none">
   <div class="modal-box">
     <div class="modal-hdr">Historique des versions <button id="history-close" class="modal-x">&times;</button></div>
@@ -851,6 +868,7 @@
 <script src="js/brush-preset-picker.js"></script>
 <script src="js/brush-editor.js"></script>
 <script src="js/export.js"></script>
+<script src="js/lottie-preview.js"></script>
 <script src="js/timeline.js"></script>
 <script src="js/i18n.js"></script>
 <script src="js/camera.js"></script>

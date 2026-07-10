@@ -161,15 +161,48 @@ function lottieHexToRGBA(hex,opacity){
   var r=parseInt(h.substr(0,2),16)/255,g=parseInt(h.substr(2,2),16)/255,b=parseInt(h.substr(4,2),16)/255;
   return[r,g,b,opacity!==undefined?opacity:1];
 }
-function lottieShapeValue(sd){
+// bm (blend mode) codes, in the exact order lottie-web/dotLottie expect —
+// same list as the app's own BlendMode type (see CLAUDE.md's renderer
+// types), 'srcOver'/anything unrecognized falls back to 0 (Normal) rather
+// than emitting a bogus code a player would silently ignore anyway.
+var LOTTIE_BM_MAP={multiply:1,screen:2,overlay:3,darken:4,lighten:5,colorDodge:6,colorBurn:7,hardLight:8,softLight:9,difference:10,exclusion:11,hue:12,saturation:13,color:14,luminosity:15};
+function lottieBmCode(blendMode){return LOTTIE_BM_MAP[blendMode]||0;}
+// Camera bake: Lottie has no concept of a separate camera layer (3D layers
+// aren't supported by lottie-web) — reproduce cameraAtFrame's pan/zoom/roll
+// by transforming each shape's own vertex/handle coordinates per frame,
+// same math as SMCamera.applyToExportLayer (camera.js) but applied to our
+// plain [x,y] arrays instead of mutating a live Paper Layer. Handles are
+// RELATIVE offsets from their point (Paper/Lottie's shared bezier
+// convention) — rotation+scale apply to them, translation must not.
+function lottieCamMatrix(cam){
+  var rot=-(cam.rot||0)*Math.PI/180;
+  return{cx:cam.x,cy:cam.y,cos:Math.cos(rot),sin:Math.sin(rot),s:state.canvasW/cam.w,tx:state.canvasW/2-cam.x,ty:state.canvasH/2-cam.y};
+}
+function lottieCamPoint(p,cm){
+  var dx=p[0]-cm.cx,dy=p[1]-cm.cy;
+  var rx=(dx*cm.cos-dy*cm.sin)*cm.s,ry=(dx*cm.sin+dy*cm.cos)*cm.s;
+  return[cm.cx+rx+cm.tx,cm.cy+ry+cm.ty];
+}
+function lottieCamVector(v,cm){
+  return[(v[0]*cm.cos-v[1]*cm.sin)*cm.s,(v[0]*cm.sin+v[1]*cm.cos)*cm.s];
+}
+function lottieShapeValue(sd,camMatrix){
+  if(!camMatrix){
+    return{
+      i:sd.segments.map(function(s){return s.handleIn;}),
+      o:sd.segments.map(function(s){return s.handleOut;}),
+      v:sd.segments.map(function(s){return s.point;}),
+      c:false
+    };
+  }
   return{
-    i:sd.segments.map(function(s){return s.handleIn;}),
-    o:sd.segments.map(function(s){return s.handleOut;}),
-    v:sd.segments.map(function(s){return s.point;}),
+    i:sd.segments.map(function(s){return lottieCamVector(s.handleIn,camMatrix);}),
+    o:sd.segments.map(function(s){return lottieCamVector(s.handleOut,camMatrix);}),
+    v:sd.segments.map(function(s){return lottieCamPoint(s.point,camMatrix);}),
     c:false
   };
 }
-function lottiePathLayer(name,runStrokes,runStart,runEnd,fps){
+function lottiePathLayer(name,runStrokes,runStart,runEnd,fps,camByFrame,bm){
   var first=runStrokes[runStart];
   var isStroke=!!first.strokeColor;
   var shapeItems=[
@@ -178,7 +211,8 @@ function lottiePathLayer(name,runStrokes,runStart,runEnd,fps){
   var kfs=shapeItems[0].ks.k;
   for(var f=runStart;f<=runEnd;f++){
     var sd=runStrokes[f];
-    kfs.push({t:f,s:[lottieShapeValue(sd)],i:{x:[1],y:[1]},o:{x:[0],y:[0]}});
+    var cm=camByFrame?camByFrame[f]:null;
+    kfs.push({t:f,s:[lottieShapeValue(sd,cm)],i:{x:[1],y:[1]},o:{x:[0],y:[0]}});
   }
   if(isStroke){
     shapeItems.push({ty:'st',c:{a:0,k:lottieHexToRGBA(first.strokeColor,1)},o:{a:0,k:(first.opacity!==undefined?first.opacity:1)*100},w:{a:0,k:first.strokeWidth||2},lc:first.strokeCap==='round'?2:(first.strokeCap==='square'?3:1),lj:first.strokeJoin==='round'?2:(first.strokeJoin==='bevel'?3:1)});
@@ -192,7 +226,7 @@ function lottiePathLayer(name,runStrokes,runStart,runEnd,fps){
     ks:{o:{a:0,k:100},r:{a:0,k:0},p:{a:0,k:[0,0,0]},a:{a:0,k:[0,0,0]},s:{a:0,k:[100,100,100]}},
     ao:0,
     shapes:[{ty:'gr',it:shapeItems}],
-    ip:runStart,op:runEnd+1,st:0,bm:0
+    ip:runStart,op:runEnd+1,st:0,bm:bm||0
   };
 }
 function lottieBuild(start,end){
@@ -204,11 +238,32 @@ function lottieBuild(start,end){
     ao:0,ip:start,op:end+1,st:0,bm:0,ind:ind++};
   layers.push(bg);
 
+  // Camera keyframes bake into every shape's own vertex coordinates (see
+  // lottieCamMatrix) since Lottie players have no 3D/camera-layer concept —
+  // computed once per exported frame, reused across every layer/slot below.
+  var camActive=!!(window.SMCamera&&state.cameraLayerOn&&state.cameraKeys.length);
+  var camByFrame=null;
+  if(camActive){
+    camByFrame={};
+    for(var cf=start;cf<=end;cf++){
+      var cam=SMCamera.cameraAtFrame(cf);
+      camByFrame[cf]=cam?lottieCamMatrix(cam):null;
+    }
+  }
+
   for(var li=state.layers.length-1;li>=0;li--){
     var ld=state.layers[li];if(!ld.visible)continue;
-    // per-frame strokes array for this layer across the export range
+    var bm=lottieBmCode(ld.blendMode);
+    // per-frame strokes array for this layer across the export range —
+    // drops fully-invisible brush-texture anchors (opacity:0 by convention,
+    // see applyBrushTexture's own comment in tools.js): they render nothing
+    // in any player (o:0 already round-trips correctly) but a textured
+    // stroke can carry dozens to hundreds of dab companions, so skipping
+    // the anchor keeps file size and shape-layer count from ballooning for
+    // zero visual difference. Dab companions themselves are NOT skipped —
+    // they ARE the visible texture.
     var framesStrokes=[];
-    for(var f=start;f<=end;f++)framesStrokes[f]=getEffectiveStrokes(li,f);
+    for(var f=start;f<=end;f++)framesStrokes[f]=getEffectiveStrokes(li,f).filter(function(sd){return sd.opacity!==0;});
 
     // figure out the max stroke-slot count and, for each slot, the
     // contiguous frame runs where that slot exists (count stable)
@@ -224,7 +279,7 @@ function lottieBuild(start,end){
           var runEnd=f-1;
           var runStrokes={};
           for(var rf=runStart;rf<=runEnd;rf++)runStrokes[rf]=framesStrokes[rf][slot];
-          var layer=lottiePathLayer(ld.name+' / shape'+slot,runStrokes,runStart,runEnd,fps);
+          var layer=lottiePathLayer(ld.name+' / shape'+slot,runStrokes,runStart,runEnd,fps,camByFrame,bm);
           layer.ind=ind++;
           layers.push(layer);
           runStart=null;
@@ -350,12 +405,12 @@ window.SMExport={
       var outPath=await exportPickSaveFile('Exporter en Lottie JSON','animation.json',[{name:'Lottie JSON',extensions:['json']}]);
       if(!outPath)return{cancelled:true};
       await exportWriteText(outPath,text);
-      return{ok:true,path:outPath};
+      return{ok:true,path:outPath,json:json};
     }else{
       var blob=new Blob([text],{type:'application/json'});
       var u=URL.createObjectURL(blob);var a=document.createElement('a');
       a.href=u;a.download='animation.json';a.click();URL.revokeObjectURL(u);
-      return{ok:true,browserFallback:true};
+      return{ok:true,browserFallback:true,json:json};
     }
   },
 };
