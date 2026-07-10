@@ -433,15 +433,10 @@
         <div id="curve-coords"></div>
       </div>
     </div>
-    <div class="psec">
-      <div class="phdr"><span class="ar">☰</span> Onion Skin <span id="os-st" style="margin-left:auto;font-size:9px;color:var(--green)">ON</span></div>
-      <div class="pbdy">
-        <div class="pr" style="font-size:9px;color:var(--text-dim)">Drag red/blue markers on timeline</div>
-        <div class="pr"><span class="pl">Mode</span><select class="psel" id="p-omode"><option value="tinted">Tinted</option><option value="original">Original</option><option value="outline">Outline</option></select></div>
-        <div class="pr"><span class="pl">Prev Op</span><input type="number" class="pi scrub" id="p-opop" value="30" min="5" max="80" data-step="1"></div>
-        <div class="pr"><span class="pl">Next Op</span><input type="number" class="pi scrub" id="p-onop" value="30" min="5" max="80" data-step="1"></div>
-      </div>
-    </div>
+    <!-- Onion Skin options moved out of this panel: they now live in a
+         right-click popover on the timeline's own onion button (#btn-os) —
+         see #onion-pop below and initOnionPopover() in timeline.js
+         (feedback #23). Same control ids, same wiring. -->
     <div class="psec" id="comp-instance-sec" style="display:none">
       <div class="phdr"><span class="ar">☰</span> Component Instance</div>
       <div class="pbdy">
@@ -696,6 +691,18 @@
   </div>
 </div>
 
+<!-- Onion Skin options popover — opens on RIGHT-click of #btn-os (the
+     timeline's onion toggle); left-click still toggles on/off. Replaces the
+     old always-visible right-panel section (feedback #23). Control ids are
+     unchanged so the existing p-omode/p-opop/p-onop listeners in
+     timeline.js keep working untouched. -->
+<div id="onion-pop" style="display:none;position:fixed;z-index:300;width:220px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);padding:10px">
+  <div style="display:flex;align-items:center;margin-bottom:8px;font-size:10px;font-weight:600;letter-spacing:.03em;color:var(--text-dim);text-transform:uppercase">Onion Skin <span id="os-st" style="margin-left:auto;font-size:9px;color:var(--green)">ON</span></div>
+  <div class="pr" style="font-size:9px;color:var(--text-dim);margin-bottom:6px">Glisser les marqueurs rouge/bleu sur la timeline</div>
+  <div class="pr" style="margin-bottom:6px"><span class="pl">Mode</span><select class="psel" id="p-omode"><option value="tinted">Tinted</option><option value="original">Original</option><option value="outline">Outline</option></select></div>
+  <div class="pr" style="margin-bottom:6px"><span class="pl">Prev Op</span><input type="number" class="pi scrub" id="p-opop" value="30" min="5" max="80" data-step="1"></div>
+  <div class="pr"><span class="pl">Next Op</span><input type="number" class="pi scrub" id="p-onop" value="30" min="5" max="80" data-step="1"></div>
+</div>
 <div id="comment-popover" style="display:none;position:absolute;z-index:200;width:240px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);padding:8px">
   <div id="comment-author-row" style="font-size:10px;color:var(--text-dim);margin-bottom:4px"></div>
   <textarea id="comment-text" rows="3" style="width:100%;resize:vertical;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:11px;padding:5px;box-sizing:border-box"></textarea>

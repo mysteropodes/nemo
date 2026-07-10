@@ -3008,6 +3008,25 @@ document.getElementById('btn-os-range').addEventListener('click',function(e){
   ]);
 });
 document.getElementById('btn-loop').addEventListener('click',function(){window.SM.toggleLoopPlayback();});
+// Onion Skin options popover (feedback #23): right-click on the timeline's
+// onion toggle opens the options that used to live in the right panel;
+// left-click keeps toggling on/off as before.
+(function initOnionPopover(){
+  var btn=document.getElementById('btn-os'),pop=document.getElementById('onion-pop');
+  if(!btn||!pop)return;
+  btn.addEventListener('contextmenu',function(e){
+    e.preventDefault();e.stopPropagation();
+    var r=btn.getBoundingClientRect();
+    pop.style.display='block';
+    pop.style.left=Math.max(8,Math.min(window.innerWidth-228,r.left))+'px';
+    // Above the button (the timeline sits at the bottom of the window) —
+    // measured AFTER display:block so offsetHeight is real.
+    pop.style.top=Math.max(8,r.top-pop.offsetHeight-6)+'px';
+  });
+  document.addEventListener('pointerdown',function(e){
+    if(pop.style.display!=='none'&&!pop.contains(e.target)&&e.target!==btn)pop.style.display='none';
+  });
+})();
 document.getElementById('p-omode').addEventListener('change',function(){window.SM.setOnionMode(this.value);});
 document.getElementById('p-opop').addEventListener('input',function(){window.SM.setOnionPrevOp(parseInt(this.value));});
 document.getElementById('p-onop').addEventListener('input',function(){window.SM.setOnionNextOp(parseInt(this.value));});
