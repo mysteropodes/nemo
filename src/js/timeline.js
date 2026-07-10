@@ -1931,6 +1931,10 @@ function renderShortcutsList(){
 // whether it's already in state.comments, so a cancelled/blurred-away new
 // comment never litters the project with an empty pin.
 var _activeComment=null;
+// Debug-feedback-only state for the popover's tag chips (see comment-save-
+// feedback below) — reset on every open, unrelated to _activeComment/
+// state.comments since a feedback submission never becomes a team comment.
+var _activeFbTags=[];
 function openCommentPopover(worldPt,existing){
   if(!document.getElementById('comment-popover'))return;
   _activeComment=existing||{
@@ -1952,6 +1956,9 @@ function openCommentPopover(worldPt,existing){
   document.getElementById('comment-text').value=_activeComment.text||'';
   document.getElementById('comment-resolved').checked=!!_activeComment.resolved;
   document.getElementById('comment-delete').style.display=existing?'':'none';
+  _activeFbTags=[];
+  document.querySelectorAll('#comment-fb-tags .fb-tag').forEach(function(b){b.classList.remove('active');});
+  var fbBlocking=document.getElementById('comment-fb-blocking');if(fbBlocking)fbBlocking.checked=false;
   pop.style.display='block';
   document.getElementById('comment-text').focus();
 }
@@ -1963,6 +1970,27 @@ function closeCommentPopover(){
 function initCommentPopover(){
   var saveBtn=document.getElementById('comment-save'),delBtn=document.getElementById('comment-delete'),pop=document.getElementById('comment-popover');
   if(!saveBtn||!pop)return;
+  document.querySelectorAll('#comment-fb-tags .fb-tag').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      var tag=this.dataset.tag;
+      var idx=_activeFbTags.indexOf(tag);
+      if(idx>=0){_activeFbTags.splice(idx,1);this.classList.remove('active');}
+      else{_activeFbTags.push(tag);this.classList.add('active');}
+    });
+  });
+  var saveFbBtn=document.getElementById('comment-save-feedback');
+  if(saveFbBtn)saveFbBtn.addEventListener('click',function(){
+    if(!_activeComment||!window.SMFeedback)return;
+    var note=document.getElementById('comment-text').value;
+    if(!note.trim()){showToast('Écris une note avant d\'enregistrer le feedback');return;}
+    var blocking=document.getElementById('comment-fb-blocking').checked;
+    window.SMFeedback.submitFeedback({
+      note:note,tags:_activeFbTags.slice(),blocking:blocking,
+      pos:new Point(_activeComment.x,_activeComment.y),
+    }).then(function(){showToast('Feedback enregistré (hors projet)');})
+      .catch(function(e){console.warn('[feedback] submit failed',e);showToast('Échec de l\'enregistrement du feedback');});
+    closeCommentPopover();
+  });
   saveBtn.addEventListener('click',function(){
     if(!_activeComment)return;
     _activeComment.text=document.getElementById('comment-text').value;
@@ -2057,7 +2085,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 function initSettingsModal(){
   var btn=document.getElementById('btn-settings'),modal=document.getElementById('settings-modal');
   if(!btn||!modal)return;
-  btn.addEventListener('click',function(){renderShortcutsList();syncProfileFields();syncFolderFields();modal.style.display='flex';});
+  btn.addEventListener('click',function(){renderShortcutsList();syncProfileFields();syncFolderFields();refreshFeedbackList();modal.style.display='flex';});
   var topBtn=document.getElementById('project-tabs-settings');
   if(topBtn)topBtn.addEventListener('click',function(){btn.click();});
   var closeBtn=document.getElementById('settings-close');
@@ -2171,6 +2199,65 @@ function initSyncUI(){
   });
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initSyncUI);else initSyncUI();
+
+// ---- Feedback inbox (feedback-bridge.js) ----
+// Pending vs approved mirrors the Sync updates list right above it in the
+// same panel: your own entries are already 'approved' (written straight to
+// disk by submitFeedback), anything pulled from a teammate's shared folder
+// lands 'pending' until you click Approuver here — see feedback-bridge.js's
+// own doc comment for why that trust boundary exists.
+function fbTagLabel(t){return {bug:'🐞',perf:'⚡',idea:'💡',polish:'✨'}[t]||t;}
+function renderFeedbackList(entries){
+  var listEl=document.getElementById('fb-list');if(!listEl)return;
+  listEl.innerHTML='';
+  if(!entries||!entries.length){
+    listEl.innerHTML='<div style="font-size:10px;color:var(--text-dim)">Aucun feedback pour ce projet.</div>';
+    return;
+  }
+  entries.forEach(function(entry){
+    var row=document.createElement('div');
+    row.style.cssText='display:flex;flex-direction:column;gap:3px;padding:6px 7px;border-radius:4px;background:var(--panel3);font-size:10px';
+    var head=document.createElement('div');
+    head.style.cssText='display:flex;align-items:center;gap:5px;color:var(--text-dim)';
+    var dot=document.createElement('span');dot.style.cssText='display:inline-block;width:7px;height:7px;border-radius:50%;background:'+((entry.author&&entry.author.color)||'#888');
+    head.appendChild(dot);
+    var tagsTxt=(entry.tags||[]).map(fbTagLabel).join(' ');
+    var statusTxt=entry.status==='pending'?'⏳ en attente':(entry.status==='resolved'?'✓ résolu':'');
+    head.appendChild(document.createTextNode(((entry.author&&entry.author.name)||'?')+' · frame '+(entry.frame+1)+(tagsTxt?' · '+tagsTxt:'')+(entry.blocking?' · 🚫 bloquant':'')+(statusTxt?' · '+statusTxt:'')));
+    row.appendChild(head);
+    var note=document.createElement('div');note.style.cssText='color:var(--text)';note.textContent=entry.note;
+    row.appendChild(note);
+    if(entry.status==='pending'){
+      var actions=document.createElement('div');actions.style.cssText='display:flex;gap:5px;margin-top:2px';
+      var appBtn=document.createElement('button');appBtn.className='pbtn';appBtn.textContent='Approuver';appBtn.style.cssText='font-size:9px;padding:3px 7px';
+      appBtn.addEventListener('click',function(){
+        window.SMFeedback.approveFeedback(entry.id).then(refreshFeedbackList);
+      });
+      actions.appendChild(appBtn);
+      row.appendChild(actions);
+    }
+    listEl.appendChild(row);
+  });
+}
+function refreshFeedbackList(){
+  if(!window.SMFeedback)return;
+  var listEl=document.getElementById('fb-list');
+  if(listEl)listEl.innerHTML='<div style="font-size:10px;color:var(--text-dim)">Chargement…</div>';
+  window.SMFeedback.readAllLocal().then(renderFeedbackList);
+}
+function initFeedbackUI(){
+  var pullBtn=document.getElementById('fb-pull');
+  if(!pullBtn||!window.SMFeedback)return;
+  pullBtn.addEventListener('click',function(){
+    pullBtn.disabled=true;var orig=pullBtn.textContent;pullBtn.textContent='Recherche…';
+    window.SMFeedback.pullAllIncoming().then(function(imported){
+      pullBtn.disabled=false;pullBtn.textContent=orig;
+      showToast(imported.length?imported.length+' feedback récupéré(s), en attente d\'approbation':'Rien de nouveau');
+      refreshFeedbackList();
+    }).catch(function(e){pullBtn.disabled=false;pullBtn.textContent=orig;console.warn('[feedback] pull failed',e);showToast('Échec de la récupération');});
+  });
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initFeedbackUI);else initFeedbackUI();
 
 function onKeyDown(event){
   if((event.metaKey||event.ctrlKey)&&event.key==='z'){event.preventDefault();if(event.shiftKey)redo();else undo();return;}

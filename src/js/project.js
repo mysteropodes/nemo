@@ -282,7 +282,12 @@
   }
 
   window.SMProject={save:save,saveAs:saveAs,open:openDialog,openPath:openPath,newProject:function(cfg){newProject(cfg);hideStartScreen();ensureInitialTab();},pushVersionSnapshot:pushVersionSnapshot,listVersionHistory:listVersionHistory,restoreVersion:restoreVersion,
-    getSyncFolder:getSyncFolder,chooseSyncFolder:chooseSyncFolder,disableSync:disableSync,publishToShared:publishToShared,checkSharedUpdates:checkSharedUpdates,pullAndMerge:pullAndMerge};
+    getSyncFolder:getSyncFolder,chooseSyncFolder:chooseSyncFolder,disableSync:disableSync,publishToShared:publishToShared,checkSharedUpdates:checkSharedUpdates,pullAndMerge:pullAndMerge,
+    // Stable per-project filesystem-safe identifier — same slug/hash
+    // feedback-bridge.js's local + shared feedback storage keys off, so a
+    // feedback thread and this project's own history/sync folders always
+    // agree on which project they belong to without re-deriving the logic.
+    getProjectKey:historyKey,profileDir:profileDir};
 
   // ---- Project tabs (real multi-project switching, v11) ----
   // Each tab holds a full independent snapshot of a project as the SAME

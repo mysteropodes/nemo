@@ -129,3 +129,24 @@ dessin au stylet 240Hz : 19fps → 60fps ; pan : 5fps → 60fps. **Ne pas les d�
 depuis le dernier rendu. Vrai pour pan/rotate (aucun item de scène ne dépend de center ou de
 la rotation ; les poignées en `1/view.zoom` dépendent du ZOOM seul). JAMAIS l'inférer
 automatiquement : select-bridge/eraser-bridge muttent la géométrie sans bump de version.
+
+## 6. Feedback debug (`feedback-bridge.js`, 2026-07)
+
+Système de commentaires "hors projet" pour le debug : outil Comment → bouton "Enregistrer
+comme feedback" (au lieu de "Enregistrer" qui reste le commentaire d'équipe classique, IN-
+projet). Jamais dans `exportJSON()` — ni `state.actionLog` (trail d'actions, ring buffer
+alimenté par `pushUndoLayers()`) ni les entrées feedback ne transitent par le fichier projet.
+
+**Où lire les entrées** : dossier `<appDataDir>/feedback/<projectKey>/*.json` (un fichier par
+entrée, Tauri fs — `<projectKey>` = `SMProject.getProjectKey()`, même slug que le dossier
+d'historique). En preview navigateur (pas de Tauri) : `localStorage['sm-feedback-<projectKey>']`.
+Champ `status` : `'approved'` (à traiter) / `'pending'` (attend l'approbation de l'utilisateur
+dans Réglages → Feedback avant de compter) / `'resolved'` (déjà traité — champ `resolution`
+si renseigné). Une fois un point corrigé, écrire `status:'resolved'` + `resolution` dans le
+fichier (via `SMFeedback.resolveFeedback(id, texte)`) pour fermer la boucle.
+
+Transport multi-poste : réutilise le dossier de Sync équipe déjà existant
+(`SMProject.getSyncFolder()`) — `submitFeedback()` publie AUSSI dans
+`root/<profileId>/feedback/<id>.json` ; `SMFeedback.pullAllIncoming()` scanne les autres
+profils et importe leurs entrées en LOCAL avec `status:'pending'` (jamais approuvées
+automatiquement, même si le remote dit `'approved'` — seule l'approbation locale compte).

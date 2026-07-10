@@ -96,6 +96,14 @@ var state={
   tweenOverrides:{},
   selectedStrokeIndices:[],
   undoStack:[],redoStack:[],maxUndo:60,
+  // Session-only, deliberately NEVER included in exportJSON()'s field list
+  // (see that function) — a rolling human-readable trail of what the user
+  // actually DID, feeding the feedback/debug-log system (feedback-bridge.js)
+  // so a bug report comes with real repro context instead of just a static
+  // screenshot. Lives here (not its own module-local array) so it survives
+  // exactly as long as undoStack/redoStack do and needs no separate reset
+  // wiring on New/Open project.
+  actionLog:[],
   waIn:0,waOut:23,
   isPanning:false,spaceDown:false,altDown:false,
   canvasRotation:0, // radians — stage/canvas rotation (Animate "Rotate Stage" style), independent of zoom/pan; only the Rust engine's viewport actually rotates, see engine-bridge.js syncViewport()

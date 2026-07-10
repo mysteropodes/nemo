@@ -587,6 +587,12 @@
         <button class="pbtn" id="sync-check" style="flex:1;font-size:10px;padding:5px" data-i18n="settingsCheckUpdates">Vérifier les mises à jour</button>
       </div>
       <div id="sync-updates-list" style="display:flex;flex-direction:column;gap:4px;margin-top:6px"></div>
+      <div class="phdr" style="padding:14px 0 4px 0;font-size:9px;color:var(--text-dim)">Feedback (hors projet)</div>
+      <div style="font-size:10px;color:var(--text-dim);margin-bottom:6px">Notes posées via l'outil Comment → "Enregistrer comme feedback" — jamais dans le fichier projet. Les tiennes sont approuvées automatiquement ; celles récupérées d'un autre profil via le dossier partagé restent en attente jusqu'à ce que tu les approuves ici.</div>
+      <div class="pr" style="gap:6px">
+        <button class="pbtn" id="fb-pull" style="flex:1;font-size:10px;padding:5px">Récupérer le feedback de l'équipe</button>
+      </div>
+      <div id="fb-list" style="display:flex;flex-direction:column;gap:4px;margin-top:6px"></div>
       <div class="phdr" style="padding:14px 0 4px 0;font-size:9px;color:var(--text-dim)" data-i18n="settingsShortcutsHdr">Raccourcis clavier — outils</div>
       <div style="font-size:10px;color:var(--text-dim);margin-bottom:6px" data-i18n="settingsShortcutsDesc">Cliquer une touche puis appuyer sur une nouvelle touche pour la réassigner. Les autres raccourcis (transport, undo/save…) ne sont pas encore modifiables ici. Import de profils (Animate, Blender…) : à venir.</div>
       <div id="shortcuts-list" style="display:flex;flex-direction:column;gap:2px;max-height:320px;overflow-y:auto"></div>
@@ -642,13 +648,27 @@
   </div>
 </div>
 
-<div id="comment-popover" style="display:none;position:absolute;z-index:200;width:220px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);padding:8px">
+<div id="comment-popover" style="display:none;position:absolute;z-index:200;width:240px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);padding:8px">
   <div id="comment-author-row" style="font-size:10px;color:var(--text-dim);margin-bottom:4px"></div>
   <textarea id="comment-text" rows="3" style="width:100%;resize:vertical;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:11px;padding:5px;box-sizing:border-box"></textarea>
+  <!-- Debug/team-feedback options (feedback-bridge.js) — only meaningful for
+       the "Enregistrer comme feedback" path below; a plain team comment
+       (Enregistrer) ignores these entirely, same popover either way so
+       there's one familiar click-to-pin gesture for both. -->
+  <div id="comment-fb-tags" class="pr" style="margin-top:6px;gap:4px;flex-wrap:wrap">
+    <button type="button" class="pbtn fb-tag" data-tag="bug" style="font-size:9px;padding:3px 7px">🐞 bug</button>
+    <button type="button" class="pbtn fb-tag" data-tag="perf" style="font-size:9px;padding:3px 7px">⚡ perf</button>
+    <button type="button" class="pbtn fb-tag" data-tag="idea" style="font-size:9px;padding:3px 7px">💡 idée</button>
+    <button type="button" class="pbtn fb-tag" data-tag="polish" style="font-size:9px;padding:3px 7px">✨ polish</button>
+  </div>
+  <label style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text-dim);cursor:pointer;margin-top:4px"><input type="checkbox" id="comment-fb-blocking"> Ça me bloque</label>
   <div class="pr" style="margin-top:6px;gap:6px">
     <label style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text-dim);cursor:pointer"><input type="checkbox" id="comment-resolved"> Résolu</label>
     <button class="pbtn" id="comment-delete" style="font-size:10px;padding:4px 8px" title="Supprimer ce commentaire">🗑</button>
-    <button class="pbtn" id="comment-save" style="flex:1;font-size:10px;padding:4px 8px">Enregistrer</button>
+  </div>
+  <div class="pr" style="margin-top:6px;gap:6px">
+    <button class="pbtn" id="comment-save" style="flex:1;font-size:10px;padding:5px" title="Commentaire visible par l'équipe, reste dans le projet">Enregistrer</button>
+    <button class="pbtn ac" id="comment-save-feedback" style="flex:1;font-size:10px;padding:5px" title="Feedback debug avec trace des dernières actions — hors du projet, lu séparément">Enregistrer comme feedback</button>
   </div>
 </div>
 
@@ -744,6 +764,7 @@
 <script src="js/drop-import.js"></script>
 <script src="js/palette-panel.js"></script>
 <script src="js/project.js"></script>
+<script src="js/feedback-bridge.js"></script>
 <script src="js/kitsu.js"></script>
 <script src="js/images.js"></script>
 <script type="module" src="js/geometry-wasm-loader.js"></script>

@@ -1107,7 +1107,7 @@ function renderOS(){
 // per entry (JSON) which at maxUndo=60 stays well within budget.
 function pushUndo(){pushUndoLayers();}
 function layersSnapshotNow(){return{type:'layers',layers:JSON.parse(JSON.stringify(state.layers)),active:state.activeLayerIdx,totalFrames:state.totalFrames,cameraKeys:JSON.parse(JSON.stringify(state.cameraKeys||[]))};}
-function pushUndoLayers(){saveAllLayerFrames();state.undoStack.push(layersSnapshotNow());if(state.undoStack.length>state.maxUndo)state.undoStack.shift();state.redoStack=[];}
+function pushUndoLayers(){saveAllLayerFrames();state.undoStack.push(layersSnapshotNow());if(state.undoStack.length>state.maxUndo)state.undoStack.shift();state.redoStack=[];if(window.SMFeedback)SMFeedback.logAction();}
 function restoreLayersSnapshot(s){
   while(userLayers.length>0)userLayers.pop().remove();
   state.layers=[];
