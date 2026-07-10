@@ -35,6 +35,16 @@
   // TARGET swatch — a 3-click flow (mirrors Shade's find/replace, which is
   // also a pick-then-pick tool) rather than drag-to-replace, which would
   // collide with the reorder drag already on these same swatches.
+  // Highlights whichever swatch(es) in the active palette match the color
+  // currently open in the Fill/Stroke color-picker popover (feedback #20:
+  // "afficher le ou les nuanciers sélectionnés" when the picker opens) —
+  // color-picker.js calls setPaletteHighlight(hex) on open and on every
+  // live change while dragging inside the picker, and clears it (null) on
+  // close so a stale ring doesn't linger after the popover's gone.
+  var highlightHex = null;
+  function setPaletteHighlight(hex) { highlightHex = hex; render(); }
+  window.setPaletteHighlight = setPaletteHighlight;
+
   var replaceArmed = false, replaceSource = null;
   function startReplace() {
     replaceArmed = true; replaceSource = null;
@@ -91,7 +101,7 @@
     var pal = activePalette();
     pal.colors.forEach(function (hex, idx) {
       var btn = document.createElement('button');
-      btn.className = 'palette-swatch' + (replaceArmed && replaceSource === hex ? ' armed' : '');
+      btn.className = 'palette-swatch' + (replaceArmed && replaceSource === hex ? ' armed' : '') + (highlightHex && colorsEqual(hex, highlightHex) ? ' sel-match' : '');
       btn.style.setProperty('--sw-color', hex);
       btn.title = hex;
       wireDrag(btn, idx);

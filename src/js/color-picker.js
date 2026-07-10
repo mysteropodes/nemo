@@ -64,6 +64,7 @@
     popover.remove();
     popover = null;
     if (closeHandlers) { closeHandlers(); closeHandlers = null; }
+    if (window.setPaletteHighlight) window.setPaletteHighlight(null);
   }
 
   // Opens an anchored popover next to `anchorEl`, seeded with `initialHex`,
@@ -159,6 +160,10 @@
       drawAlpha();
       positionThumbs();
       onChange(hex);
+      // Rings whichever swatch(es) match the live color in the Nuancier
+      // panel (feedback #20) — refreshed on every change, not just at open,
+      // so dragging around the picker keeps it in sync.
+      if (window.setPaletteHighlight) window.setPaletteHighlight(hex);
     }
     function setFromHsv() { pushChange(); }
     function setFromHex(hex) {
@@ -216,6 +221,7 @@
     var rgb0 = hexToRgb(currentHex());
     rInput.value = rgb0.r; gInput.value = rgb0.g; bInput.value = rgb0.b; aInput.value = Math.round(alpha * 100);
     preview.style.backgroundColor = currentHex();
+    if (window.setPaletteHighlight) window.setPaletteHighlight(currentHex());
 
     // Anchor + clamp to viewport, same idiom as showContextMenu (ui.js).
     var ar = anchorEl.getBoundingClientRect();
