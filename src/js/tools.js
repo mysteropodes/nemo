@@ -1052,6 +1052,31 @@ function fillInsertIndexFor(layer,pt,excludePath){
 // later regeneration from any single seed would silently shrink it back to
 // that one seed's region — a manual merge must stay put (same "manual edit
 // wins" principle as fsUnlinkFillRegen).
+// True if a real, currently-visible stroke (strokeColor item) in the layer
+// runs between p1 and p2 — used to tell "these two same-color fills only
+// touch because of gap-bridging/rounding" (no real line between them, safe
+// to fuse) apart from "a hand-drawn divider sits right between them" (issue
+// #10: bucket-filling both sides of a drawn line the same color must NOT
+// silently erase that division). Deliberately geometric (a probe segment
+// crossing test) rather than comparing the two fills' recorded fillWalls
+// ids: when a fill itself becomes a tracing wall for a later click right
+// next to it (the "fill inside an already-filled zone" case,
+// fillCollectWalls), the trace can end up recording that NEIGHBORING FILL's
+// own edge as the wall instead of the real coincident stroke underneath it
+// — an id-based check silently misses the divider whenever that happens,
+// which is exactly the failure mode a first attempt at this fix hit.
+function _strokeBetween(layer,p1,p2){
+  if(!p1||!p2)return false;
+  var probe=new Path({segments:[p1,p2],insert:false});
+  for(var i=0;i<layer.children.length;i++){
+    var s=layer.children[i];
+    if(!(s instanceof Path)||!s.strokeColor||s.segments.length<2)continue;
+    var hit=false;
+    try{hit=probe.getIntersections(s).length>0;}catch(e){}
+    if(hit)return true;
+  }
+  return false;
+}
 function fillMergeSameColor(layer,newFill){
   if(!newFill||!newFill.fillColor)return newFill;
   var col=colorHex8(newFill.fillColor);
@@ -1061,6 +1086,7 @@ function fillMergeSameColor(layer,newFill){
     if(c.data&&(c.data.isVectorBrush||c.data.isLinkedFillCompanion||c.data.isBrushTextureCopy||c.data.isRevisionGhost||c.data.ghostFrame!==undefined))return;
     if(colorHex8(c.fillColor)!==col)return;
     if(!c.bounds.intersects(newFill.bounds))return;
+    if(_strokeBetween(layer,newFill.interiorPoint,c.interiorPoint))return;
     var touches=false;
     try{
       touches=newFill.intersects(c)
