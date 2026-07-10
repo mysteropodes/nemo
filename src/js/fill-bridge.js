@@ -42,6 +42,21 @@
 
     var res = fillVectorFind(pt, layer, null);
     if (!res) {
+      // No traceable closed region from the surrounding walls — but if the
+      // click landed directly inside an already-filled shape, recolor it in
+      // place instead of rejecting (same fallback as tools.js's own 'fill'
+      // branch — see its comment for the Animate-parity rationale).
+      var hitFill = layer.hitTest(pt, { fill: true, tolerance: 1 / view.zoom });
+      if (hitFill && (hitFill.item instanceof Path || hitFill.item instanceof CompoundPath) && hitFill.item.fillColor) {
+        pushUndo();
+        hitFill.item.fillColor = state.fillColor;
+        hitFill.item.opacity = state.opacity / 100;
+        saveActiveLayerFrame();
+        updateUI();
+        showToast('Couleur remplacée');
+        window.SMEngineBridge.renderNow();
+        return;
+      }
       showToast('Aucune zone fermée ici');
       return;
     }

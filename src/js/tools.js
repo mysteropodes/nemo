@@ -2582,7 +2582,19 @@ function onMouseDown(event){
       return;
     }
     var res=fillVectorFind(event.point,layer,null);
-    if(!res){showToast('Aucune zone fermée ici');return;}
+    if(!res){
+      // No traceable closed region from the surrounding walls — but if the
+      // click landed directly inside an already-filled shape, recolor it in
+      // place instead of rejecting. Matches Animate's paint bucket: clicking
+      // inside an existing fill always recolors it, even when there's no
+      // fresh wall geometry around it to retrace a brand-new region from.
+      var hitFill=layer.hitTest(event.point,{fill:true,tolerance:1/view.zoom});
+      if(hitFill&&(hitFill.item instanceof Path||hitFill.item instanceof CompoundPath)&&hitFill.item.fillColor){
+        pushUndo();hitFill.item.fillColor=state.fillColor;hitFill.item.opacity=state.opacity/100;
+        saveActiveLayerFrame();updateUI();showToast('Couleur remplacée');return;
+      }
+      showToast('Aucune zone fermée ici');return;
+    }
     pushUndo();
     layer.insertChild(fillInsertIndexFor(layer,event.point,res.path),res.path);
     res.path.fillColor=state.fillColor;res.path.strokeColor=null;res.path.opacity=state.opacity/100;

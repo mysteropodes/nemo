@@ -332,6 +332,13 @@
     samples.push([w[0], w[1], widthFor(pressure)]);
     window.SMEngineBridge.resume();
     commitStroke();
+    // Force an immediate clean render — without this, the endpoint marker
+    // squares from the last overlay frame (renderWithOverlayItem) can still
+    // be on screen if that rAF already fired before resume() got a chance to
+    // cancel it; the ambient tick() loop would eventually clear them on its
+    // own next frame, but forcing it here (same pattern as eraser-bridge.js/
+    // select-bridge.js's own onUp) removes the race entirely.
+    window.SMEngineBridge.renderNow();
   }
 
   // Hover cursor (not actively drawing): shows the brush at a neutral
