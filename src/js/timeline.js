@@ -2327,7 +2327,7 @@ function onKeyDown(event){
   if((event.metaKey||event.ctrlKey)&&event.key==='c'){event.preventDefault();window.SM.copyFrames();return;}
   if((event.metaKey||event.ctrlKey)&&event.key==='x'){event.preventDefault();window.SM.cutFrames();return;}
   if((event.metaKey||event.ctrlKey)&&event.key==='v'){event.preventDefault();window.SM.pasteFrames();return;}
-  if(event.target.tagName==='INPUT'||event.target.tagName==='SELECT')return;
+  if(event.target.tagName==='INPUT'||event.target.tagName==='SELECT'||event.target.tagName==='TEXTAREA'||event.target.isContentEditable)return;
   var k=event.key;
   if(runToolShortcut(k)){}
   // NLE-style transport: J/K jump to the previous/next real keyframe on the
