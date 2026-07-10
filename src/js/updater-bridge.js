@@ -39,7 +39,12 @@
     } catch (e) {
       console.warn('[updater] install failed', e);
       if (statusEl) statusEl.textContent = 'Échec de l\'installation.';
-      showToast('Échec de l\'installation de la mise à jour');
+      // The raw Rust error (e.g. "TargetsNotFound", "signature mismatch",
+      // an HTTP status) used to be swallowed — this was the ONLY thing
+      // shown to the user ("Échec de l'installation"), no way to tell
+      // auth/network/signature/target-mismatch apart without devtools,
+      // which a release build doesn't even expose. Always show it now.
+      showToast('Échec de l\'installation — ' + (e && e.message ? e.message : e));
     }
   }
 
@@ -62,8 +67,9 @@
       }
     } catch (e) {
       console.warn('[updater] check failed', e);
-      if (statusEl) statusEl.textContent = 'Échec de la vérification.';
-      if (!silent) showToast('Échec de la vérification des mises à jour');
+      var detail = (e && e.message) ? e.message : String(e);
+      if (statusEl) statusEl.textContent = 'Échec de la vérification — ' + detail;
+      if (!silent) showToast('Échec de la vérification — ' + detail);
     }
     if (btn) btn.disabled = false;
   }
