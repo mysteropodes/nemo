@@ -178,7 +178,12 @@
           <span id="sel-count" style="font-size:9px;color:var(--text-dim)"></span>
         </div>
         <div class="pr" style="align-items:flex-start;gap:14px">
-          <div style="flex:1;min-width:0">
+          <!-- Column gap here, NOT inherited from .pbdy: these rows are
+               nested one level deeper (inside the fields-column half of the
+               fields|anchor-grid split), so .pbdy's own child gap never
+               reaches them — without it the rounded input backgrounds stack
+               edge-to-edge and visually fuse. -->
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px">
             <div class="pr"><span class="pl">Position</span><input type="number" class="pi scrub" id="sp-x" value="0" data-step="1" title="X — drag to scrub, click to type"><input type="number" class="pi scrub" id="sp-y" value="0" data-step="1" title="Y — drag to scrub, click to type"></div>
             <div class="pr"><span class="pl">Size</span><input type="number" class="pi scrub" id="sp-w" value="0" min="1" data-step="1" title="Width"><input type="number" class="pi scrub" id="sp-h" value="0" min="1" data-step="1" title="Height"></div>
             <div class="pr"><span class="pl">Rotate</span><input type="number" class="pi scrub" id="sp-rot" value="0" data-step="1" title="Rotation relative to selection state (degrees)"><span style="font-size:9px;color:var(--text-dim)">°</span></div>
