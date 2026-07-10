@@ -11,10 +11,23 @@
 (function () {
   function tauriOk() { return typeof window.__TAURI__ !== 'undefined' && window.__TAURI__.updater; }
 
+  // Reads the version straight from the Tauri app API instead of a
+  // hardcoded string in index.html — <title> and #status-text used to say
+  // "StrokeMotion v0.4.0" verbatim, forgotten on every version bump (the
+  // Réglages panel's own version display had the same problem before this
+  // function existed). One source of truth (package.json/tauri.conf.json's
+  // "version", read at runtime via getVersion()) instead of three places
+  // to remember to edit by hand.
   async function showVersion() {
-    var el = document.getElementById('app-version-txt');
-    if (!el || !tauriOk()) return;
-    try { el.textContent = await window.__TAURI__.app.getVersion(); } catch (e) {}
+    if (typeof window.__TAURI__ === 'undefined' || !window.__TAURI__.app) return;
+    try {
+      var v = await window.__TAURI__.app.getVersion();
+      var vEl = document.getElementById('app-version-txt');
+      if (vEl) vEl.textContent = v;
+      var statusEl = document.getElementById('status-text');
+      if (statusEl) statusEl.textContent = 'StrokeMotion v' + v;
+      document.title = 'StrokeMotion v' + v;
+    } catch (e) {}
   }
 
   async function doInstall(update, statusEl) {

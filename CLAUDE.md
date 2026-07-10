@@ -167,3 +167,22 @@ Réglages → "Feedback beta-testeurs (GitHub)" et gardé en `localStorage` sur 
 uniquement — jamais embarqué dans le build distribué. Une copie de l'app livrée à un
 beta-testeur a ce même panneau de triage dans le code, mais il est inutilisable sans le
 token perso de Cyril.
+
+## 7. Avant chaque build : synchroniser le numéro de version partout
+
+Trois fichiers portent le numéro de version et doivent rester identiques à chaque bump :
+`package.json`, `src-tauri/tauri.conf.json`. L'affichage à l'écran (titre de fenêtre, barre
+de statut en bas, Réglages → "Mises à jour de l'app") est lu dynamiquement via
+`window.__TAURI__.app.getVersion()` (`updater-bridge.js`'s `showVersion()`) — donc PAS besoin
+de toucher `index.html` pour ça, c'est déjà la source unique de vérité côté affichage runtime.
+Seul le fallback statique (`<title>` et `#status-text` dans `index.html`, visible un instant
+avant que `getVersion()` résolve, et seule valeur affichée en preview navigateur sans Tauri)
+doit être bumpé à la main en même temps que les deux fichiers de config — sinon le premier
+flash à l'ouverture (et tout le preview navigateur) montre encore l'ancien numéro.
+
+Checklist avant `npm run build` :
+1. Bump `version` dans `package.json` ET `src-tauri/tauri.conf.json` (même valeur).
+2. Bump le fallback statique dans `src/index.html` (`<title>` + `#status-text`).
+3. Si c'est un vrai changement fonctionnel (pas juste un patch de bug) : lancer
+   `./scripts/publish-update.sh "notes"` après la build pour que les installs existantes le
+   voient — voir §6 pour le détail des tokens nécessaires.
