@@ -2694,7 +2694,13 @@ function onMouseDrag(event){
     var fromP=_eraseLastPt||event.point;
     var segDist=fromP.getDistance(event.point);
     var step=Math.max(1,state.eraserSize/4);
-    var steps=Math.max(1,Math.ceil(segDist/step));
+    // Cap the per-event substep count: each substep that hits pays a real
+    // boolean subtract, and eraseAtPoint's capsule (fromPt->subPt) already
+    // guarantees the BITE itself is continuous whatever the spacing — the
+    // resampling only exists so the hit-TEST can't jump clean over an item
+    // on a fast sweep. Past ~40 samples per event, coarser spacing loses
+    // nothing except the pathological worst-case cost spike.
+    var steps=Math.min(40,Math.max(1,Math.ceil(segDist/step)));
     var erasedAny=false;
     for(var esi=1;esi<=steps;esi++){
       var subPt=fromP.add(event.point.subtract(fromP).multiply(esi/steps));

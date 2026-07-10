@@ -661,7 +661,15 @@ function alignCost(a,b){
 function alignResampledPair(a,b){
   if(window.GeometryWasm&&window.GeometryWasm.ready){
     try{
-      var out=JSON.parse(window.GeometryWasm.align_pair(JSON.stringify(a),JSON.stringify(b)));
+      // Rust's ResampledJsonIn requires isVectorBrush (plain `bool`, no
+      // serde default) but the JS resampled dicts only carry the flag when
+      // it's TRUE — JSON.stringify drops the undefined, so EVERY non-brush
+      // pair failed deserialization and silently fell back to the slower
+      // JS alignment (the exact fallback-masks-a-Rust-bug trap CLAUDE.md
+      // §3 warns about — only visible as a console.warn flood). Serialize
+      // through a shallow wrapper that always materializes the flag.
+      var wrap=function(r){return JSON.stringify({segments:r.segments,widths:r.widths!==undefined?r.widths:null,isVectorBrush:!!r.isVectorBrush,strokeColor:r.strokeColor!==undefined?r.strokeColor:null,fillColor:r.fillColor!==undefined?r.fillColor:null});};
+      var out=JSON.parse(window.GeometryWasm.align_pair(wrap(a),wrap(b)));
       // align_pair's ResampledOut doesn't carry strokeWidth/strokeCap/
       // strokeJoin/opacity (unused by the alignment cost) — re-attach from
       // the original b, whose fields the returned segments/widths are just
