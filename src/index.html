@@ -332,24 +332,12 @@
     <div class="psec" id="layer-sec" style="display:none">
       <div class="phdr"><span class="ar">☰</span> Layer</div>
       <div class="pbdy">
-        <div class="pr"><span class="pl">Blend</span><select class="psel" id="p-blendmode">
-          <option value="normal">Normal</option>
-          <option value="multiply">Multiply</option>
-          <option value="screen">Screen</option>
-          <option value="overlay">Overlay</option>
-          <option value="darken">Darken</option>
-          <option value="lighten">Lighten</option>
-          <option value="colorDodge">Color Dodge</option>
-          <option value="colorBurn">Color Burn</option>
-          <option value="hardLight">Hard Light</option>
-          <option value="softLight">Soft Light</option>
-          <option value="difference">Difference</option>
-          <option value="exclusion">Exclusion</option>
-          <option value="hue">Hue</option>
-          <option value="saturation">Saturation</option>
-          <option value="color">Color</option>
-          <option value="luminosity">Luminosity</option>
-        </select></div>
+        <!-- Custom dropdown, not a native <select>: hovering each option
+             live-previews the blend mode on the canvas before committing
+             (feedback #17) — impossible with a native select, whose open
+             popup is OS-rendered and fires no per-option hover events.
+             Options + wiring: initBlendDropdown() in timeline.js. -->
+        <div class="pr"><span class="pl">Blend</span><div class="psel" id="p-blendmode" data-value="normal" role="button" tabindex="0" style="cursor:pointer;user-select:none">Normal</div></div>
       </div>
     </div>
     <div class="psec" id="canvas-sec">

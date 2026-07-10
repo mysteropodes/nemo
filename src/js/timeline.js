@@ -771,8 +771,14 @@ function updatePropsContext(){
     // every row click), so this needs no separate "layer panel selection"
     // tracking of its own.
     show['layer-sec']=!!(state.layers[state.activeLayerIdx]);
+    // p-blendmode is a custom dropdown div now (see initBlendDropdown), so
+    // sync = dataset.value + visible label, not a <select>'s .value.
     var blendSel=document.getElementById('p-blendmode');
-    if(blendSel&&state.layers[state.activeLayerIdx])blendSel.value=state.layers[state.activeLayerIdx].blendMode||'normal';
+    if(blendSel&&state.layers[state.activeLayerIdx]){
+      var bv=state.layers[state.activeLayerIdx].blendMode||'normal';
+      blendSel.dataset.value=bv;
+      blendSel.textContent=(typeof BLEND_MODE_LABELS!=='undefined'&&BLEND_MODE_LABELS[bv])||bv;
+    }
     hdrText='Document';
   }
   var hdrEl=document.getElementById('props-context-hdr');if(hdrEl)hdrEl.textContent=hdrText;
@@ -2928,12 +2934,66 @@ document.getElementById('p-persp-mode').addEventListener('change',function(){if(
 document.getElementById('p-persp-density').addEventListener('input',function(){state.perspectiveDensity=parseInt(this.value)||24;if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
 document.getElementById('p-persp-lock').addEventListener('change',function(){var locked=this.checked;(window.ensurePerspectiveVPs?window.ensurePerspectiveVPs():[]).forEach(function(vp){vp.locked=locked;});if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
 document.getElementById('btn-persp-reset').addEventListener('click',function(){if(window.resetPerspectiveVPs)window.resetPerspectiveVPs();});
-document.getElementById('p-blendmode').addEventListener('change',function(){
-  var ld=state.layers[state.activeLayerIdx];if(!ld)return;
-  pushUndo();ld.blendMode=this.value==='normal'?undefined:this.value;
-  window._sceneVersion=(window._sceneVersion||0)+1;
-  if(window.SMEngineBridge&&window.SMEngineBridge.renderNow)window.SMEngineBridge.renderNow();
-});
+// Custom blend-mode dropdown (feedback #17): hovering an option in the open
+// list applies that blend mode to the active layer IMMEDIATELY as a live
+// canvas preview; clicking commits it (with undo), while closing any other
+// way (outside click, Escape, re-click on the field) reverts to the mode
+// the layer had when the list opened. A native <select> can't do this: its
+// open popup is OS-rendered and exposes no per-option hover events.
+var BLEND_MODE_LABELS={normal:'Normal',multiply:'Multiply',screen:'Screen',overlay:'Overlay',darken:'Darken',lighten:'Lighten',colorDodge:'Color Dodge',colorBurn:'Color Burn',hardLight:'Hard Light',softLight:'Soft Light',difference:'Difference',exclusion:'Exclusion',hue:'Hue',saturation:'Saturation',color:'Color',luminosity:'Luminosity'};
+(function initBlendDropdown(){
+  var dd=document.getElementById('p-blendmode');if(!dd)return;
+  var pop=document.createElement('div');pop.id='blend-pop';document.body.appendChild(pop);
+  var origMode=null; // layer's mode when the list opened — the revert target while previewing
+  function currentLd(){return state.layers[state.activeLayerIdx];}
+  function applyPreview(v){
+    var ld=currentLd();if(!ld)return;
+    ld.blendMode=v==='normal'?undefined:v;
+    window._sceneVersion=(window._sceneVersion||0)+1;
+    if(window.SMEngineBridge&&window.SMEngineBridge.renderNow)window.SMEngineBridge.renderNow();
+  }
+  function setLabel(v){dd.dataset.value=v;dd.textContent=BLEND_MODE_LABELS[v]||v;}
+  function close(revert){
+    pop.style.display='none';
+    if(revert&&origMode!==null)applyPreview(origMode);
+    origMode=null;
+  }
+  function open(){
+    var ld=currentLd();if(!ld)return;
+    origMode=ld.blendMode||'normal';
+    pop.innerHTML='';
+    Object.keys(BLEND_MODE_LABELS).forEach(function(v){
+      var it=document.createElement('div');
+      it.className='blend-opt'+(v===origMode?' sel':'');
+      it.textContent=BLEND_MODE_LABELS[v];
+      it.addEventListener('mouseenter',function(){applyPreview(v);});
+      it.addEventListener('click',function(e){
+        e.stopPropagation();
+        // Restore the original first so pushUndo snapshots the true
+        // pre-preview state, then commit the pick on top of it.
+        var ld2=currentLd();if(ld2)ld2.blendMode=origMode==='normal'?undefined:origMode;
+        pushUndo();
+        applyPreview(v);
+        setLabel(v);
+        origMode=null;
+        close(false);
+      });
+      pop.appendChild(it);
+    });
+    var r=dd.getBoundingClientRect();
+    pop.style.display='block';
+    pop.style.left=Math.max(8,Math.min(window.innerWidth-pop.offsetWidth-8,r.left))+'px';
+    var top=r.bottom+4;
+    if(top+pop.offsetHeight>window.innerHeight-8)top=Math.max(8,r.top-pop.offsetHeight-4);
+    pop.style.top=top+'px';
+  }
+  // Leaving the whole list without picking: preview back to the original so
+  // the canvas never lingers on a mode the user merely passed over.
+  pop.addEventListener('mouseleave',function(){if(origMode!==null)applyPreview(origMode);});
+  dd.addEventListener('click',function(e){e.stopPropagation();if(pop.style.display==='block')close(true);else open();});
+  document.addEventListener('pointerdown',function(e){if(pop.style.display==='block'&&!pop.contains(e.target)&&e.target!==dd)close(true);});
+  window.addEventListener('keydown',function(e){if(e.key==='Escape'&&pop.style.display==='block')close(true);});
+})();
 // Same canvas/fps/frame-count controls, duplicated in the Project panel —
 // both sets write through the same SM.setCanvasSize/setFps/setTotalFrames
 // so either one stays in sync via syncDocFields().
