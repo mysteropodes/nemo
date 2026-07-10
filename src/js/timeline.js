@@ -790,15 +790,24 @@ function updatePropsContext(){
     // every row click), so this needs no separate "layer panel selection"
     // tracking of its own.
     show['layer-sec']=!!(state.layers[state.activeLayerIdx]);
-    // p-blendmode is a custom dropdown div now (see initBlendDropdown), so
-    // sync = dataset.value + visible label, not a <select>'s .value.
-    var blendSel=document.getElementById('p-blendmode');
-    if(blendSel&&state.layers[state.activeLayerIdx]){
-      var bv=state.layers[state.activeLayerIdx].blendMode||'normal';
-      blendSel.dataset.value=bv;
-      blendSel.textContent=(typeof BLEND_MODE_LABELS!=='undefined'&&BLEND_MODE_LABELS[bv])||bv;
-    }
     hdrText='Document';
+  }
+  // p-blendmode sync moved OUT of the 'document' branch above: it only ran
+  // when the props panel happened to be showing that fallback context (no
+  // selection, non-fill/stroke tool) — returning from editing a component
+  // with, say, the Draw tool still active left the dropdown showing stale
+  // data (label/value from whatever it last displayed) even though the
+  // layer's actual blendMode — and the real render, buildSceneJson reads
+  // it directly — were both already correct. Reported as "on revient dans
+  // la scène, on ne voit pas le blend" (component blend mode investigation).
+  // Now runs every updatePropsContext() call, regardless of which section
+  // ends up visible, so the panel is never stale by the time the user
+  // actually looks at it.
+  var blendSel=document.getElementById('p-blendmode');
+  if(blendSel&&state.layers[state.activeLayerIdx]){
+    var bv=state.layers[state.activeLayerIdx].blendMode||'normal';
+    blendSel.dataset.value=bv;
+    blendSel.textContent=(typeof BLEND_MODE_LABELS!=='undefined'&&BLEND_MODE_LABELS[bv])||bv;
   }
   var hdrEl=document.getElementById('props-context-hdr');if(hdrEl)hdrEl.textContent=hdrText;
   Object.keys(show).forEach(function(id){var sec=document.getElementById(id);if(sec)sec.style.display=show[id]?'block':'none';});
