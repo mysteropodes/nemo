@@ -76,9 +76,14 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--gutter);color:
 /* Panel resize grips — same idiom as #tl-resize: fully invisible until
    hover, and they occupy exactly the layout gap that was already between
    the panels (width 8px with -8px side margins cancels the flex gap on
-   both sides), so nothing about the page's spacing changes. */
-#tools-panel-resize{width:8px;margin:0 -8px;cursor:ew-resize;background:transparent;flex-shrink:0;z-index:5;}
-#tools-panel-resize:hover,#tools-panel-resize.active{background:var(--accent);}
+   both sides), so nothing about the page's spacing changes. The hover
+   indicator is deliberately NOT the whole gap lighting up (too heavy —
+   user feedback): a small vertically-centered rounded pill via ::after,
+   while the full 8px×full-height div stays the grab/hit area. */
+#tools-panel-resize,#props-panel-resize{width:8px;margin:0 -8px;cursor:ew-resize;background:transparent;flex-shrink:0;z-index:5;position:relative;}
+#tools-panel-resize::after,#props-panel-resize::after{content:'';position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:3px;height:44px;border-radius:99px;background:transparent;transition:background .15s;}
+#tools-panel-resize:hover::after,#tools-panel-resize.active::after,
+#props-panel-resize:hover::after,#props-panel-resize.active::after{background:var(--accent);}
 .tool-btn{width:34px;height:34px;border:none;background:transparent;color:rgba(236,234,231,.75);
   border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;
   position:relative;transition:background .15s,color .15s;}
@@ -166,8 +171,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--gutter);color:
 #zoom-scrub.scrubbing{color:var(--accent-hover);}
 
 /* PROPS */
-#props-panel-resize{width:8px;margin:0 -8px;cursor:ew-resize;background:transparent;flex-shrink:0;z-index:5;}
-#props-panel-resize:hover,#props-panel-resize.active{background:var(--accent);}
+/* #props-panel-resize styled with #tools-panel-resize in the TOOLS section */
 #props-panel{width:280px;flex-shrink:0;background:var(--panel);border-left:none;overflow-y:auto;padding:0;}
 /* v3 (2026-07-09): each accordion section is its own rounded card
    (mockup wraps every header+body pair in background:#17161a;radius:8px,
