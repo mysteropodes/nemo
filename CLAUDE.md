@@ -156,10 +156,20 @@ automatiquement, même si le remote dit `'approved'` — seule l'approbation loc
 (aucun code de l'app dedans) — une Issue GitHub par feedback, créée depuis Rust
 (`submit_feedback_issue` dans `src-tauri/src/lib.rs`, **jamais** depuis JS) avec un token
 compilé à la build via `env!("STROKEMOTION_FEEDBACK_TOKEN")` (même pattern que
-`STROKEMOTION_UPDATER_TOKEN`) — fine-grained PAT scopé À CE SEUL REPO, permission
-"Issues: write" uniquement, rien d'autre : un token extrait du binaire ne peut au pire que
-spammer des issues, jamais toucher au code. Le label `pending` est posé automatiquement à
-la création.
+`STROKEMOTION_UPDATER_TOKEN`) — fine-grained PAT scopé À CE SEUL REPO, permissions
+"Issues: write" + "Contents: write" (élargi en 2026-07 pour les captures d'écran jointes,
+voir ci-dessous — décision utilisateur explicite, toujours zéro exposition de code) : un
+token extrait du binaire peut au pire spammer des issues ou écrire n'importe quel fichier
+dans CE repo précis, jamais toucher au code de l'app. Le label `pending` est posé
+automatiquement à la création.
+
+**Capture d'écran jointe (2026-07)** : l'outil Commentaire a une zone de drop
+(`#comment-shot-drop`) — glisser-déposer, clic-pour-parcourir, ou Cmd+V. Gardée en data URL
+localement (`entry.screenshotDataUrl`) ; à la publication GitHub, `uploadScreenshotIfAny()`
+(feedback-bridge.js) l'envoie à `upload_feedback_attachment` (Rust) qui la committe dans
+`attachments/<id>.<ext>` via l'API Contents, puis référence l'URL
+`raw.githubusercontent.com` résultante en Markdown dans le corps de l'issue — GFM ne rend
+PAS les data URIs, le fichier doit réellement exister dans le repo pour s'afficher inline.
 
 Lecture des issues : publique, aucune auth requise (`SMFeedback.fetchGithubIssues()`).
 Triage (approuver/résoudre/éditer) : nécessite le token PERSONNEL de Cyril, saisi dans
