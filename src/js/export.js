@@ -187,24 +187,36 @@ function lottieCamVector(v,cm){
   return[(v[0]*cm.cos-v[1]*cm.sin)*cm.s,(v[0]*cm.sin+v[1]*cm.cos)*cm.s];
 }
 function lottieShapeValue(sd,camMatrix){
+  // sd.closed reflects the Paper.js path's own .closed (serP, app.js) — this
+  // was hardcoded to false, so every closed shape (rectangles, ellipses, any
+  // filled region) exported as an OPEN path. lottie-web/most players still
+  // attempt to fill an open path, but the strict validators several online
+  // previewers use (e.g. lottielab) reject/blank a shape whose last vertex
+  // doesn't explicitly close back to the first, which is exactly why nothing
+  // rendered there.
   if(!camMatrix){
     return{
       i:sd.segments.map(function(s){return s.handleIn;}),
       o:sd.segments.map(function(s){return s.handleOut;}),
       v:sd.segments.map(function(s){return s.point;}),
-      c:false
+      c:!!sd.closed
     };
   }
   return{
     i:sd.segments.map(function(s){return lottieCamVector(s.handleIn,camMatrix);}),
     o:sd.segments.map(function(s){return lottieCamVector(s.handleOut,camMatrix);}),
     v:sd.segments.map(function(s){return lottieCamPoint(s.point,camMatrix);}),
-    c:false
+    c:!!sd.closed
   };
 }
 function lottiePathLayer(name,runStrokes,runStart,runEnd,fps,camByFrame,bm){
   var first=runStrokes[runStart];
-  var isStroke=!!first.strokeColor;
+  // sd.strokeColor defaults to '#ffffff' as a legacy fallback even when the
+  // path never had a real stroke (serP, app.js) — CLAUDE.md's documented
+  // hasRealStroke field exists precisely so consumers can tell the two
+  // apart. Reading strokeColor's truthiness directly (as this did) gave
+  // every fill-only shape a phantom white 1px stroke in the export.
+  var isStroke=!!first.hasRealStroke;
   var shapeItems=[
     {ty:'sh',ks:{a:1,k:[]}}
   ];
@@ -287,6 +299,17 @@ function lottieBuild(start,end){
       }
     }
   }
+
+  // Lottie's layers array is FIRST-ENTRY-ON-TOP (same convention as an AE
+  // layer panel) — the opposite of the back-to-front order this function
+  // builds in (Background pushed first meaning "furthest back", each user
+  // layer/stroke-slot appended after in back-to-front z-order). Left
+  // un-reversed, the opaque Background solid — being first in the array —
+  // painted OVER every single shape layer, so nothing but a blank canvas
+  // ever showed in any real Lottie player (confirmed: lottielab.com showed
+  // literally nothing until this reverse was added, despite every layer's
+  // own geometry/color being completely correct in isolation).
+  layers.reverse();
 
   return{
     v:'5.9.0',fr:fps,ip:start,op:end+1,

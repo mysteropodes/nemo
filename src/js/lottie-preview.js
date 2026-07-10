@@ -41,7 +41,10 @@
     proj.activate();
     proj.view.viewSize = new Size(json.w, json.h);
     proj.clear();
-    json.layers.forEach(function (L) {
+    // Lottie layers are first-entry-on-top; Paper.js paints later-added
+    // children on top, so walk the array back-to-front to reproduce the
+    // same stacking (see lottieBuild's own reverse in export.js for why).
+    json.layers.slice().reverse().forEach(function (L) {
       if (frameIdx < L.ip || frameIdx >= L.op) return;
       if (L.ty === 1) {
         new Path.Rectangle({ point: [0, 0], size: [L.sw, L.sh], fillColor: L.sc, insert: true });
