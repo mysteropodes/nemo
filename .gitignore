@@ -18,3 +18,4 @@ geometry-wasm/target/
 # vendored build artifact, not something to regenerate on every checkout.
 # Re-run `wasm-pack build --target web --out-dir ../src/wasm` from
 # geometry-wasm/ after any change to geometry-wasm/src/.
+.feedback

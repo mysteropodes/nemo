@@ -17,6 +17,7 @@
 (function () {
   var LOCAL_MAX = 500; // local entries pruned oldest-first past this count
   var ACTION_LOG_MAX = 150; // mirrors state.actionLog's own cap in app.js
+  var CLICK_LOG_MAX = 200;
 
   function tauriOk() { return typeof window.__TAURI__ !== 'undefined'; }
   function projectKey() { return (window.SMProject && window.SMProject.getProjectKey()) || 'untitled-autosave'; }
@@ -46,9 +47,71 @@
     });
   }
 
-  // ---- Local storage (outside the project — Tauri app-data dir, or a
-  // localStorage fallback so this is still testable in the browser preview) ----
-  function localDirKey() { return 'feedback-' + projectKey(); }
+  // ---- Raw click log (session-only, module-local — deliberately NOT on
+  // `state`, since this is UI-interaction noise, not project or even
+  // action-log-grade semantic data) ----
+  // logAction() above only fires for actual content mutations (pushUndo's
+  // choke point); this fires on EVERY pointerdown across the whole app —
+  // UI chrome buttons, toggles, canvas — so a feedback report comes with
+  // exactly which element was clicked, not just "user did something with
+  // the draw tool". Captured on `document` with capture:true so it sees
+  // the click before any tool bridge's stopImmediatePropagation() can
+  // swallow it (see draw-bridge.js/select-bridge.js's own capture-phase
+  // interception pattern — this listener runs even earlier, at the root).
+  var _clickLog = [];
+  function describeElement(el) {
+    if (!el || el.nodeType !== 1) return null;
+    var parts = [], cur = el, depth = 0;
+    while (cur && cur.nodeType === 1 && depth < 4) {
+      var seg = cur.tagName.toLowerCase();
+      if (cur.id) seg += '#' + cur.id;
+      else if (cur.className && typeof cur.className === 'string' && cur.className.trim()) {
+        seg += '.' + cur.className.trim().split(/\s+/).slice(0, 2).join('.');
+      }
+      parts.unshift(seg);
+      if (cur.id) break; // an id anchors the path uniquely enough — no need to climb further
+      cur = cur.parentElement;
+      depth++;
+    }
+    var data = null;
+    if (el.dataset && Object.keys(el.dataset).length) {
+      data = {};
+      Object.keys(el.dataset).forEach(function (k) { data[k] = el.dataset[k]; });
+    }
+    return {
+      tag: el.tagName.toLowerCase(),
+      id: el.id || null,
+      cls: (el.className && typeof el.className === 'string') ? el.className : null,
+      text: (el.textContent || '').trim().slice(0, 40) || null,
+      title: el.title || null,
+      data: data,
+      path: parts.join(' > '),
+    };
+  }
+  function logClick(e) {
+    var desc = describeElement(e.target);
+    if (!desc) return;
+    var last = _clickLog[_clickLog.length - 1];
+    if (last && last.el && last.el.path === desc.path && last.el.id === desc.id) {
+      last.count = (last.count || 1) + 1;
+      last.t = Date.now();
+      return;
+    }
+    _clickLog.push({ t: Date.now(), x: e.clientX, y: e.clientY, tool: (window.state ? state.tool : null), el: desc, count: 1 });
+    if (_clickLog.length > CLICK_LOG_MAX) _clickLog.shift();
+  }
+  document.addEventListener('pointerdown', logClick, true);
+  function recentClickTrail(n) {
+    return _clickLog.slice(Math.max(0, _clickLog.length - (n || 20)));
+  }
+
+  // ---- Storage tiers, tried in order: Tauri fs (real app, real OS folder)
+  // -> local dev server (scripts/dev_server.py's /__feedback/* endpoints —
+  // a real file too, just reachable over fetch() instead of Tauri's fs
+  // plugin, for the ordinary `python3 -m http.server`-replacement dev
+  // preview) -> localStorage (last resort — a live browser tab only, not
+  // reachable outside an active eval session, but keeps this working even
+  // if the plain http.server is what's actually running). ----
   async function localDir() {
     var base = await window.__TAURI__.path.appDataDir();
     return base.replace(/[\\/]+$/, '') + '/feedback/' + projectKey();
@@ -57,48 +120,82 @@
   function lsReadAll() { try { return JSON.parse(localStorage.getItem(lsKey()) || '[]'); } catch (e) { return []; } }
   function lsWriteAll(list) { try { localStorage.setItem(lsKey(), JSON.stringify(list)); } catch (e) {} }
 
-  async function readAllLocal() {
-    if (!tauriOk()) return lsReadAll();
+  var _devServerChecked = null;
+  async function devServerAvailable() {
+    if (tauriOk()) return false; // Tauri always wins when present, dev server is browser-preview-only
+    if (_devServerChecked !== null) return _devServerChecked;
     try {
-      var dir = await localDir();
-      var entries = await window.__TAURI__.fs.readDir(dir);
-      var files = entries.filter(function (e) { return /\.json$/.test(e.name); });
-      var out = [];
-      for (var i = 0; i < files.length; i++) {
-        try { out.push(JSON.parse(await window.__TAURI__.fs.readTextFile(dir + '/' + files[i].name))); } catch (e) {}
-      }
-      return out.sort(function (a, b) { return b.createdAt - a.createdAt; });
-    } catch (e) { return []; }
+      var r = await fetch('/__feedback/ping');
+      _devServerChecked = r.ok;
+    } catch (e) { _devServerChecked = false; }
+    return _devServerChecked;
+  }
+
+  async function readAllLocal() {
+    if (tauriOk()) {
+      try {
+        var dir = await localDir();
+        var entries = await window.__TAURI__.fs.readDir(dir);
+        var files = entries.filter(function (e) { return /\.json$/.test(e.name); });
+        var out = [];
+        for (var i = 0; i < files.length; i++) {
+          try { out.push(JSON.parse(await window.__TAURI__.fs.readTextFile(dir + '/' + files[i].name))); } catch (e) {}
+        }
+        return out.sort(function (a, b) { return b.createdAt - a.createdAt; });
+      } catch (e) { return []; }
+    }
+    if (await devServerAvailable()) {
+      try {
+        var res = await fetch('/__feedback/list?projectKey=' + encodeURIComponent(projectKey()));
+        if (res.ok) return await res.json();
+      } catch (e) { console.warn('[feedback] dev-server list failed, falling back to localStorage', e); }
+    }
+    return lsReadAll();
   }
   async function writeLocal(entry) {
-    if (!tauriOk()) {
-      var list = lsReadAll();
-      var idx = list.findIndex(function (e) { return e.id === entry.id; });
-      if (idx >= 0) list[idx] = entry; else list.unshift(entry);
-      if (list.length > LOCAL_MAX) list = list.slice(0, LOCAL_MAX);
-      lsWriteAll(list);
+    if (tauriOk()) {
+      var dir = await localDir();
+      await window.__TAURI__.fs.mkdir(dir, { recursive: true });
+      await window.__TAURI__.fs.writeTextFile(dir + '/' + entry.id + '.json', JSON.stringify(entry));
+      // Prune oldest past LOCAL_MAX, same convention as history/sync pruning
+      // elsewhere in this app (pushVersionSnapshot, publishToShared).
+      var entries = await window.__TAURI__.fs.readDir(dir);
+      var files = entries.filter(function (e) { return /\.json$/.test(e.name); });
+      if (files.length > LOCAL_MAX) {
+        var withTimes = [];
+        for (var i = 0; i < files.length; i++) {
+          try { var d = JSON.parse(await window.__TAURI__.fs.readTextFile(dir + '/' + files[i].name)); withTimes.push({ name: files[i].name, createdAt: d.createdAt || 0 }); } catch (e) {}
+        }
+        withTimes.sort(function (a, b) { return a.createdAt - b.createdAt; });
+        var toRemove = withTimes.slice(0, withTimes.length - LOCAL_MAX);
+        for (var j = 0; j < toRemove.length; j++) { try { await window.__TAURI__.fs.remove(dir + '/' + toRemove[j].name); } catch (e) {} }
+      }
       return;
     }
-    var dir = await localDir();
-    await window.__TAURI__.fs.mkdir(dir, { recursive: true });
-    await window.__TAURI__.fs.writeTextFile(dir + '/' + entry.id + '.json', JSON.stringify(entry));
-    // Prune oldest past LOCAL_MAX, same convention as history/sync pruning
-    // elsewhere in this app (pushVersionSnapshot, publishToShared).
-    var entries = await window.__TAURI__.fs.readDir(dir);
-    var files = entries.filter(function (e) { return /\.json$/.test(e.name); });
-    if (files.length > LOCAL_MAX) {
-      var withTimes = [];
-      for (var i = 0; i < files.length; i++) {
-        try { var d = JSON.parse(await window.__TAURI__.fs.readTextFile(dir + '/' + files[i].name)); withTimes.push({ name: files[i].name, createdAt: d.createdAt || 0 }); } catch (e) {}
-      }
-      withTimes.sort(function (a, b) { return a.createdAt - b.createdAt; });
-      var toRemove = withTimes.slice(0, withTimes.length - LOCAL_MAX);
-      for (var j = 0; j < toRemove.length; j++) { try { await window.__TAURI__.fs.remove(dir + '/' + toRemove[j].name); } catch (e) {} }
+    if (await devServerAvailable()) {
+      try {
+        var res = await fetch('/__feedback/save', { method: 'POST', body: JSON.stringify(entry) });
+        if (res.ok) return;
+      } catch (e) { console.warn('[feedback] dev-server save failed, falling back to localStorage', e); }
     }
+    var list = lsReadAll();
+    var idx = list.findIndex(function (e) { return e.id === entry.id; });
+    if (idx >= 0) list[idx] = entry; else list.unshift(entry);
+    if (list.length > LOCAL_MAX) list = list.slice(0, LOCAL_MAX);
+    lsWriteAll(list);
   }
   async function deleteLocal(id) {
-    if (!tauriOk()) { lsWriteAll(lsReadAll().filter(function (e) { return e.id !== id; })); return; }
-    try { await window.__TAURI__.fs.remove((await localDir()) + '/' + id + '.json'); } catch (e) {}
+    if (tauriOk()) {
+      try { await window.__TAURI__.fs.remove((await localDir()) + '/' + id + '.json'); } catch (e) {}
+      return;
+    }
+    if (await devServerAvailable()) {
+      try {
+        var res = await fetch('/__feedback/delete', { method: 'POST', body: JSON.stringify({ id: id, projectKey: projectKey() }) });
+        if (res.ok) return;
+      } catch (e) { console.warn('[feedback] dev-server delete failed, falling back to localStorage', e); }
+    }
+    lsWriteAll(lsReadAll().filter(function (e) { return e.id !== id; }));
   }
 
   function genId() { return 'fb_' + Date.now().toString(36) + '_' + Math.floor(Math.random() * 1e6); }
@@ -117,6 +214,7 @@
       blocking: !!opts.blocking,
       note: opts.note || '',
       actionTrail: recentActionTrail(20),
+      clickTrail: recentClickTrail(20),
       status: 'approved', // your own machine, your own profile — trusted by definition
       resolution: null,
       createdAt: Date.now(),
@@ -211,6 +309,7 @@
 
   window.SMFeedback = {
     logAction: logAction,
+    recentClickTrail: recentClickTrail,
     submitFeedback: submitFeedback,
     readAllLocal: readAllLocal,
     checkIncomingFeedback: checkIncomingFeedback,
