@@ -275,6 +275,45 @@ fn join_from(name: &str) -> vello::kurbo::Join {
         _ => vello::kurbo::Join::Round,
     }
 }
+/// Rotates a kurbo dash pattern ([dash,gap,dash,gap,...], index 0 = dash)
+/// so that starting to draw it from index 0 with offset 0 looks the same as
+/// drawing the ORIGINAL pattern starting `offset` units in. Used to work
+/// around vello 0.9's GPU stroke path ignoring `with_dashes`' offset
+/// argument entirely (see the call site's comment) — bakes the phase shift
+/// into the array instead.
+fn dash_pattern_with_offset(pattern: &[f64], offset: f64) -> Vec<f64> {
+    let total: f64 = pattern.iter().sum();
+    if total <= 0.0 || pattern.is_empty() {
+        return pattern.to_vec();
+    }
+    let mut remaining = offset.rem_euclid(total);
+    let n = pattern.len();
+    let mut start_idx = 0usize;
+    while remaining >= pattern[start_idx] {
+        remaining -= pattern[start_idx];
+        start_idx = (start_idx + 1) % n;
+    }
+    let first_seg_left = pattern[start_idx] - remaining;
+    let mut result = Vec::with_capacity(n + 1);
+    if start_idx % 2 == 0 {
+        // Offset lands inside a DASH segment — start already drawing, for
+        // whatever length of that dash remains.
+        result.push(first_seg_left);
+    } else {
+        // Offset lands inside a GAP segment — start NOT drawing. A dash
+        // pattern's convention always starts with an "on" (dash) entry, so
+        // prepend a zero-length dash to preserve that parity before the
+        // remaining gap length.
+        result.push(0.0);
+        result.push(first_seg_left);
+    }
+    let mut i = (start_idx + 1) % n;
+    while i != start_idx {
+        result.push(pattern[i]);
+        i = (i + 1) % n;
+    }
+    result
+}
 /// Builds the kurbo `Stroke` for an item's stroke_cap/stroke_join/
 /// miter_limit/dash_pattern/dash_offset, all optional with kurbo's own
 /// defaults (Round cap/join, miter limit 4, no dashes) when absent.
@@ -291,7 +330,19 @@ fn stroke_from(item: &ItemIn) -> Stroke {
     }
     if let Some(pattern) = &item.dash_pattern {
         if !pattern.is_empty() {
-            stroke = stroke.with_dashes(item.dash_offset.unwrap_or(0.0), pattern.clone());
+            let off = item.dash_offset.unwrap_or(0.0);
+            // vello 0.9's GPU stroke path (stroke_gpu_inner -> kurbo::dash())
+            // silently ignores the `dash_offset` argument to with_dashes —
+            // confirmed by hardcoding a large offset here directly and
+            // rendering: zero visual difference regardless of value, on a
+            // freshly rebuilt wasm on a never-cached preview port. Rather
+            // than wait on an upstream fix (or risk a vello bump re-hitting
+            // the wgpu/WebGPU version-drift issue this crate is deliberately
+            // pinned against, see Cargo.toml's own comment), bake the phase
+            // shift into the pattern array itself and always pass offset
+            // 0.0, which does render correctly.
+            let shifted = if off != 0.0 { dash_pattern_with_offset(pattern, off) } else { pattern.clone() };
+            stroke = stroke.with_dashes(0.0, shifted);
         }
     }
     stroke
