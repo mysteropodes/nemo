@@ -233,6 +233,10 @@
       createdAt: Date.now(),
       resolvedAt: null,
       origin: 'local',
+      // Kept locally as a data URL for review even without Tauri/GitHub —
+      // the GitHub copy (publishToGitHubIssue below) is a separate,
+      // uploaded file, not this same string re-embedded.
+      screenshotDataUrl: opts.screenshotDataUrl || null,
     };
     await writeLocal(entry);
     // Best-effort: also publish to the shared team-sync folder (if
@@ -267,12 +271,31 @@
   function fbTagLabelPlain(tag) {
     return { bug: 'bug', perf: 'perf', idee: 'idée', polish: 'polish' }[tag] || tag;
   }
+  // Commits the screenshot into strokemotion-feedback's attachments/
+  // folder via the GitHub Contents API (Rust command upload_feedback_
+  // attachment — same reasoning as submit_feedback_issue for keeping the
+  // token out of JS/devtools) and returns a raw.githubusercontent.com URL
+  // that renders inline in the issue body via normal Markdown image syntax
+  // — GFM does NOT render data: URIs, so the file has to actually land in
+  // the repo, not just be inlined as base64 in the issue text.
+  async function uploadScreenshotIfAny(entry) {
+    if (!entry.screenshotDataUrl) return null;
+    var m = /^data:image\/(\w+);base64,(.+)$/.exec(entry.screenshotDataUrl);
+    if (!m) return null;
+    var ext = m[1] === 'jpeg' ? 'jpg' : m[1];
+    var filename = entry.id + '.' + ext;
+    var t = window.__TAURI__;
+    return t.core.invoke('upload_feedback_attachment', { filename: filename, contentBase64: m[2] });
+  }
   async function publishToGitHubIssue(entry) {
     var title = (entry.blocking ? '[BLOQUANT] ' : '') + (entry.note || '(sans titre)').slice(0, 80);
     var labels = ['pending'].concat((entry.tags || []).map(fbTagLabelPlain));
     if (entry.blocking) labels.push('blocking');
+    var shotUrl = null;
+    try { shotUrl = await uploadScreenshotIfAny(entry); } catch (e) { console.warn('[feedback] screenshot upload failed', e); }
     var body = [
       '**Note**', entry.note || '(vide)', '',
+      shotUrl ? ('**Capture d\'écran**\n![capture](' + shotUrl + ')\n') : '',
       '**Contexte**',
       '- Frame: ' + entry.frame,
       '- Auteur: ' + (entry.author ? entry.author.name + ' (' + entry.author.role + ')' : 'inconnu'),

@@ -702,6 +702,20 @@
     <button type="button" class="pbtn fb-tag" data-tag="polish" style="font-size:9px;padding:3px 7px">✨ polish</button>
   </div>
   <label style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text-dim);cursor:pointer;margin-top:4px"><input type="checkbox" id="comment-fb-blocking"> Ça me bloque</label>
+  <!-- Screenshot attachment (feedback only) — drag&drop, click-to-browse,
+       or Cmd+V paste while the popover is focused. Read client-side as a
+       data URL for a thumbnail preview; the actual upload (base64 → GitHub
+       Contents API, committed into strokemotion-feedback's attachments/
+       folder so it renders inline in the issue via raw.githubusercontent.com)
+       only happens on submit — see feedback-bridge.js's uploadScreenshotIfAny. -->
+  <div id="comment-shot-drop" style="margin-top:6px;border:1.5px dashed var(--border2);border-radius:6px;padding:8px;text-align:center;font-size:9px;color:var(--text-dim);cursor:pointer">
+    📎 Glisser une capture ici, cliquer, ou coller (Cmd+V)
+  </div>
+  <div id="comment-shot-preview" style="display:none;margin-top:6px;position:relative">
+    <img id="comment-shot-img" style="max-width:100%;max-height:100px;border-radius:6px;display:block" />
+    <button type="button" id="comment-shot-remove" title="Retirer la capture" style="position:absolute;top:3px;right:3px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.7);color:#fff;border:none;cursor:pointer;font-size:11px;line-height:1">×</button>
+  </div>
+  <input type="file" id="comment-shot-input" accept="image/*" style="display:none">
   <div class="pr" style="margin-top:6px;gap:6px">
     <label style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text-dim);cursor:pointer"><input type="checkbox" id="comment-resolved"> Résolu</label>
     <button class="pbtn" id="comment-delete" style="font-size:10px;padding:4px 8px" title="Supprimer ce commentaire">🗑</button>

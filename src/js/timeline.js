@@ -1951,6 +1951,30 @@ var _activeComment=null;
 // feedback below) — reset on every open, unrelated to _activeComment/
 // state.comments since a feedback submission never becomes a team comment.
 var _activeFbTags=[];
+// Feedback screenshot attachment — a data URL for the thumbnail preview
+// (comment-shot-img) held here for the life of the popover; the actual
+// GitHub upload (base64 → Contents API commit) happens in
+// feedback-bridge.js's uploadScreenshotIfAny() at submit time, not here.
+var _activeShotDataUrl=null;
+function setCommentShot(dataUrl){
+  _activeShotDataUrl=dataUrl;
+  var drop=document.getElementById('comment-shot-drop'),prev=document.getElementById('comment-shot-preview'),img=document.getElementById('comment-shot-img');
+  if(dataUrl){
+    img.src=dataUrl;
+    prev.style.display='block';
+    drop.style.display='none';
+  }else{
+    img.src='';
+    prev.style.display='none';
+    drop.style.display='block';
+  }
+}
+function loadCommentShotFile(file){
+  if(!file||file.type.indexOf('image/')!==0)return;
+  var reader=new FileReader();
+  reader.onload=function(){setCommentShot(reader.result);};
+  reader.readAsDataURL(file);
+}
 // Precise start/stop action recording (comment-record button) — bracketing
 // an explicit Record/Stop around the actual repro gesture captures exactly
 // what happened for THIS comment, instead of feedback-bridge.js's own
@@ -2022,6 +2046,7 @@ function openCommentPopover(worldPt,existing){
   var fbBlocking=document.getElementById('comment-fb-blocking');if(fbBlocking)fbBlocking.checked=false;
   _recording=false;_recordedActionTrail=null;_recordedClickTrail=null;
   updateRecordUI();
+  setCommentShot(existing&&existing.screenshotDataUrl?existing.screenshotDataUrl:null);
   pop.style.display='block';
   document.getElementById('comment-text').focus();
 }
@@ -2030,6 +2055,7 @@ function closeCommentPopover(){
   if(pop)pop.style.display='none';
   _activeComment=null;
   _recording=false;_recordedActionTrail=null;_recordedClickTrail=null;
+  setCommentShot(null);
 }
 function initCommentPopover(){
   var saveBtn=document.getElementById('comment-save'),delBtn=document.getElementById('comment-delete'),pop=document.getElementById('comment-popover');
@@ -2046,6 +2072,29 @@ function initCommentPopover(){
   if(recordBtn)recordBtn.addEventListener('click',function(){
     if(_recording)stopRecording();else startRecording();
   });
+  // Screenshot attachment: drag&drop, click-to-browse, or Cmd+V paste.
+  var shotDrop=document.getElementById('comment-shot-drop'),shotInput=document.getElementById('comment-shot-input'),shotRemove=document.getElementById('comment-shot-remove');
+  if(shotDrop){
+    shotDrop.addEventListener('click',function(){shotInput.click();});
+    shotDrop.addEventListener('dragover',function(e){e.preventDefault();shotDrop.style.borderColor='var(--accent)';});
+    shotDrop.addEventListener('dragleave',function(){shotDrop.style.borderColor='';});
+    shotDrop.addEventListener('drop',function(e){
+      e.preventDefault();shotDrop.style.borderColor='';
+      if(e.dataTransfer.files&&e.dataTransfer.files[0])loadCommentShotFile(e.dataTransfer.files[0]);
+    });
+  }
+  if(shotInput)shotInput.addEventListener('change',function(){
+    if(shotInput.files&&shotInput.files[0])loadCommentShotFile(shotInput.files[0]);
+    shotInput.value='';
+  });
+  if(shotRemove)shotRemove.addEventListener('click',function(e){e.stopPropagation();setCommentShot(null);});
+  pop.addEventListener('paste',function(e){
+    var items=e.clipboardData&&e.clipboardData.items;
+    if(!items)return;
+    for(var i=0;i<items.length;i++){
+      if(items[i].type.indexOf('image/')===0){loadCommentShotFile(items[i].getAsFile());break;}
+    }
+  });
   var saveFbBtn=document.getElementById('comment-save-feedback');
   if(saveFbBtn)saveFbBtn.addEventListener('click',function(){
     if(!_activeComment||!window.SMFeedback)return;
@@ -2059,7 +2108,8 @@ function initCommentPopover(){
       note:note,tags:_activeFbTags.slice(),blocking:blocking,
       pos:new Point(_activeComment.x,_activeComment.y),
       actionTrail:_recordedActionTrail,clickTrail:_recordedClickTrail,
-    }).then(function(){showToast('Feedback enregistré (hors projet)');})
+      screenshotDataUrl:_activeShotDataUrl,
+    }).then(function(){showToast(_activeShotDataUrl?'Feedback + capture envoyés':'Feedback enregistré (hors projet)');})
       .catch(function(e){console.warn('[feedback] submit failed',e);showToast('Échec de l\'enregistrement du feedback');});
     closeCommentPopover();
   });

@@ -71,6 +71,50 @@ async fn submit_feedback_issue(title: String, body: String, labels: Vec<String>)
     }
 }
 
+// Feedback screenshot attachments — committed via the GitHub Contents API
+// into strokemotion-feedback's attachments/ folder, then linked from the
+// issue body via raw.githubusercontent.com (GFM doesn't render data:
+// URIs, so the image has to actually be a file in the repo to show up
+// inline). Needs "Contents: Read and write" on top of submit_feedback_
+// issue's "Issues" permission — a deliberate scope increase on the same
+// embedded, repo-scoped token (see CLAUDE.md's feedback section for the
+// trade-off): a leaked token can now write arbitrary files into this one
+// code-free repo, not just spam issues, but still can't touch anything
+// else. content_base64 is passed straight through — the Contents API's
+// `content` field IS base64 already, no decode/re-encode needed here.
+#[tauri::command]
+async fn upload_feedback_attachment(filename: String, content_base64: String) -> Result<String, String> {
+    let token = env!("STROKEMOTION_FEEDBACK_TOKEN");
+    let client = reqwest::Client::new();
+    let path = format!("attachments/{}", filename);
+    let payload = serde_json::json!({
+        "message": format!("Feedback attachment: {}", filename),
+        "content": content_base64,
+    });
+    let resp = client
+        .put(format!(
+            "https://api.github.com/repos/mysteropodes/strokemotion-feedback/contents/{}",
+            path
+        ))
+        .header("Authorization", format!("Bearer {}", token))
+        .header("Accept", "application/vnd.github+json")
+        .header("User-Agent", "strokemotion-app")
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    if resp.status().is_success() {
+        Ok(format!(
+            "https://raw.githubusercontent.com/mysteropodes/strokemotion-feedback/main/{}",
+            path
+        ))
+    } else {
+        let status = resp.status();
+        let text = resp.text().await.unwrap_or_default();
+        Err(format!("GitHub upload error {}: {}", status, text))
+    }
+}
+
 // Native stylus pressure (macOS): tablet drivers (XP-Pen, Huion, Wacom…)
 // deliver pen pressure through AppKit NSEvents — mouse events carrying the
 // NSEventSubtypeTabletPoint subtype — which WKWebView does not forward to
@@ -146,7 +190,7 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_http::init())
-        .invoke_handler(tauri::generate_handler![run_ffmpeg, submit_feedback_issue])
+        .invoke_handler(tauri::generate_handler![run_ffmpeg, submit_feedback_issue, upload_feedback_attachment])
         // "Vérifier les mises à jour…" in the app (StrokeMotion) menu — same
         // check the Réglages button and the silent startup check already
         // do (updater-bridge.js), just reachable from the menu too (asked
