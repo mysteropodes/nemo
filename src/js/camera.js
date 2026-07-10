@@ -310,7 +310,11 @@
     ensureState();
     if (!state.cameraLayerOn) return;
     var row = document.createElement('div');
-    row.className = 'lrow camrow' + (state.tool === 'camera' ? ' act' : '');
+    // Compact when not actively being edited (feedback: la ligne caméra
+    // prenait toujours la même hauteur que les autres calques même quand on
+    // travaillait sur un calque de dessin — elle n'a besoin de sa pleine
+    // hauteur (courbe de vitesse, poignées) que pendant l'édition caméra).
+    row.className = 'lrow camrow' + (state.tool === 'camera' ? ' act' : ' compact');
     // Meme famille d'icones ligne-pleine que le reste du panneau calques
     // (ICO_EYE/ICO_EYE_CLOSED, timeline.js) — pas d'emoji couleur, qui
     // detonnait dans une UI flat monochrome.
@@ -348,7 +352,8 @@
     ensureState();
     _gridRow = null;
     if (!state.cameraLayerOn) return;
-    var row = document.createElement('div'); row.className = 'frow camrow';
+    var row = document.createElement('div');
+    row.className = 'frow camrow' + (state.tool === 'camera' ? '' : ' compact');
     row.style.position = 'relative';
     for (var i = 0; i < state.totalFrames; i++) {
       var c = document.createElement('div');
@@ -387,6 +392,11 @@
   function drawSpeedCurves(row) {
     var old = row.querySelector('svg.cam-speed-svg');
     if (old) old.remove();
+    // Compact row (not the active tool) has no vertical room for the curve
+    // — skip drawing it rather than overflow a 34px-tall SVG out of an 18px
+    // row; it reappears the moment the camera tool is reselected (renderTimeline
+    // rebuilds the row without 'compact', see renderGridRow above).
+    if (row.classList.contains('compact')) return;
     var ks = state.cameraKeys;
     if (ks.length < 2) return;
     var w = state.totalFrames * FC, h = 34;

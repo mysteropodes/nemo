@@ -269,7 +269,19 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--gutter);color:
    grid stay perfectly aligned; a warm accent to read as "not a draw layer". */
 .lrow.camrow{background:rgba(255,170,40,.05);}
 .lrow.camrow.act{box-shadow:inset 3px 0 0 #ffaa28;background:rgba(255,170,40,.10);}
+/* Compact camera row (feedback: la ligne caméra prend toujours la même
+   place que les calques de dessin, même quand on ne l'édite pas) — shrunk
+   to a thin strip while the camera tool isn't active; back to the normal
+   34px the instant it's reselected. .lrow and .frow MUST shrink to the
+   exact same height (see the "must stay in lockstep" comment on .frow
+   below) or the panel/grid columns drift out of alignment for every row
+   below this one. */
+.lrow.camrow.compact{height:16px;}
+.lrow.camrow.compact .lico{width:14px;height:14px;}
 .frow.camrow{display:flex;border-bottom:1px solid rgba(255,170,40,.18);}
+.frow.camrow.compact{height:16px;}
+.frow.camrow.compact .fc{height:16px;}
+.frow.camrow.compact .fc.camkey::before{width:6px;height:6px;}
 .fc.camkey::before{content:'';position:absolute;left:50%;top:50%;width:9px;height:9px;transform:translate(-50%,-50%) rotate(45deg);background:#ffaa28;border:1px solid rgba(0,0,0,.5);}
 .lrow:hover{background:rgba(255,255,255,.03);}
 /* v4: matches the mockup's "Layer 1 Stroke" selected-row treatment — the
