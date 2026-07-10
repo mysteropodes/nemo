@@ -309,10 +309,21 @@ window.SM={
   setSymbolPlacedAt:function(v){var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.symbolId)return;ld.symPlacedAt=parseInt(v)||0;loadFrame(state.currentFrame);renderOS();updateUI();},
   moveFrames:function(sel,dLayer,dFrame){
     if(!sel.length)return;
-    pushUndo();saveAllLayerFrames();
     var b=selBounds();if(!b)return;
     var offsetL=dLayer-b.minL,offsetF=dFrame-b.minF;
     if(offsetL===0&&offsetF===0)return;
+    // Locked layers are untouchable on BOTH ends of a move: a locked source
+    // must not be blanked out, and a locked target must not be overwritten
+    // (feedback #18 — dragging keyframes in the grid bypassed the lock that
+    // every other edit path already respects).
+    sel=sel.filter(function(s){
+      var srcLd=state.layers[s.layer];if(!srcLd||srcLd.locked)return false;
+      var tl=s.layer+offsetL;
+      var tgtLd=state.layers[tl];
+      return !(tgtLd&&tgtLd.locked);
+    });
+    if(!sel.length){showToast('Calque verrouillé');return;}
+    pushUndo();saveAllLayerFrames();
     var data=[];
     sel.forEach(function(s){
       var ld=state.layers[s.layer];if(!ld)return;
@@ -451,6 +462,7 @@ window.SM={
   },
   duplicateKeyframe:function(){
     saveAllLayerFrames();var li=state.activeLayerIdx;var ld=state.layers[li];var cf=state.currentFrame;
+    if(ld.locked){showToast('Calque verrouillé');return;}
     var strokes=getEffectiveStrokes(li,cf);if(!strokes.length){showToast('Rien à dupliquer');return;}
     pushUndo();for(var i=0;i<state.layers.length;i++)state.layers[i].frames.splice(cf+1,0,{strokes:[],isKeyframe:false,isInterpolated:false});
     state.totalFrames++;if(state.waOut<state.totalFrames-1)state.waOut++;window._waOut=state.waOut;window._totalF=state.totalFrames;
@@ -1138,6 +1150,7 @@ document.getElementById('frame-grid').addEventListener('mousedown',function(e){
   e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();
   var fi=parseInt(cell.dataset.frame),li=parseInt(cell.dataset.layer);
   var ld=state.layers[li];
+  if(ld.locked){showToast('Calque verrouillé');return;} // span-end drag is a keyframe edit like any other (feedback #18)
   var srcFi=fi;for(var pi=fi;pi>=0;pi--){if(ld.frames[pi].isKeyframe){srcFi=pi;break;}}
   var nextKeyFi=-1;
   if(ld.frames[fi+1]&&ld.frames[fi+1].isKeyframe)nextKeyFi=fi+1;
