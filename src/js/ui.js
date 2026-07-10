@@ -15,6 +15,13 @@
   function clonePts(pts){return pts.map(function(p){return{x:p.x,y:p.y};});}
   var cs={points:[{x:0,y:0},{x:.42,y:0},{x:.58,y:1},{x:1,y:1}]};
   var dragging=null,selected=null,hovering=false,rect=null;
+  // Alt/Option reveals the selected point's tangents (feedback #22). The
+  // curve model stores no handles — tangents are DERIVED (Catmull-Rom, see
+  // segCtrl) — so this is a read-only visualization of the actual tangent
+  // the interpolation uses at that knot, drawn as two orange handle stubs.
+  // Sticky: shown by Alt+click (or pressing Alt with a point selected),
+  // hidden again by the next plain click.
+  var showTangents=false;
   // A small easing gallery (After Effects/GreenSock-style grid of named
   // curve families, each in/out/inout where that makes sense) — through-
   // point approximations of their usual off-curve-handle shapes, since the
@@ -139,6 +146,21 @@
       var col=i3===selected?'#fff':(isEnd?'#bd93f9':'#4a9eff');
       drawH(p.x,p.y,col,yr,isEnd?7:8);
     });
+    // Selected point's derived tangent handles (Alt/Option — see
+    // showTangents above): the same (next-prev)/2 Catmull-Rom tangent
+    // segCtrl feeds the interpolation, split into its in/out thirds.
+    if(showTangents&&selected!=null&&cs.points[selected]){
+      var sp=cs.points[selected];
+      var tprev=cs.points[selected-1]||sp,tnext=cs.points[selected+1]||sp;
+      var ttx=(tnext.x-tprev.x)/2,tty=(tnext.y-tprev.y)/2;
+      [{x:sp.x-ttx/3,y:sp.y-tty/3},{x:sp.x+ttx/3,y:sp.y+tty/3}].forEach(function(h){
+        var hx=tX(h.x),hy=tY(h.y,yr);
+        ctx.strokeStyle='#ffb86c';ctx.lineWidth=1.2;
+        ctx.beginPath();ctx.moveTo(tX(sp.x),tY(sp.y,yr));ctx.lineTo(hx,hy);ctx.stroke();
+        ctx.fillStyle='#fff';ctx.fillRect(hx-3,hy-3,6,6);
+        ctx.strokeStyle='#ffb86c';ctx.strokeRect(hx-3,hy-3,6,6);
+      });
+    }
     var coordsEl=document.getElementById('curve-coords');
     if(coordsEl)coordsEl.textContent=cs.points.length+' points';
   }
@@ -155,8 +177,16 @@
     var mx=(e.clientX-rect.left)*(W/rect.width),my=(e.clientY-rect.top)*(H/rect.height);
     var hit=hitT(mx,my);
     dragging=hit>=0?hit:null;
-    if(hit>=0)selected=hit;
+    if(hit>=0){selected=hit;showTangents=e.altKey;}
+    else showTangents=false; // plain click off any point clears the sticky reveal
     draw();
+  });
+  // Alt held while a point is already selected also reveals its tangents —
+  // sticky like the click path (see header comment), not a hold-to-preview:
+  // simpler mental model, and avoids fighting over a keyup that can't tell
+  // "was this reveal from a click or from hovering+Alt" apart.
+  document.addEventListener('keydown',function(e){
+    if(e.key==='Alt'&&hovering&&selected!=null&&!showTangents){showTangents=true;draw();}
   });
   window.addEventListener('mousemove',function(e){
     if(dragging==null)return;
