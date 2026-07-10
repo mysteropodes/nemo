@@ -147,11 +147,42 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_http::init())
         .invoke_handler(tauri::generate_handler![run_ffmpeg, submit_feedback_issue])
+        // "Vérifier les mises à jour…" in the app (StrokeMotion) menu — same
+        // check the Réglages button and the silent startup check already
+        // do (updater-bridge.js), just reachable from the menu too (asked
+        // for after that UI shipped: "on peut mettre la vérif d'update
+        // ici aussi ?"). Tauri's Menu::default() builds the whole standard
+        // macOS menu tree (App/File/Edit/View/Window/Help) — rebuilding it
+        // by hand here would silently drop items on every tauri upgrade;
+        // instead take the default tree and insert one item into the
+        // already-built App submenu, right after About (index 0, before
+        // the separator at index 1).
+        .on_menu_event(|app, event| {
+            if event.id() == "check_update" {
+                let _ = app.emit("menu-check-update", ());
+            }
+        })
         .setup(|app| {
             #[cfg(debug_assertions)]
             {
                 let window = app.get_webview_window("main").unwrap();
                 window.open_devtools();
+            }
+            #[cfg(target_os = "macos")]
+            {
+                use tauri::menu::{Menu, MenuItem, MenuItemKind};
+                let menu = Menu::default(app.handle())?;
+                if let Some(MenuItemKind::Submenu(app_submenu)) = menu.items()?.first() {
+                    let check_update_item = MenuItem::with_id(
+                        app.handle(),
+                        "check_update",
+                        "Vérifier les mises à jour…",
+                        true,
+                        None::<&str>,
+                    )?;
+                    app_submenu.insert(&check_update_item, 1)?;
+                }
+                app.set_menu(menu)?;
             }
             #[cfg(target_os = "macos")]
             start_tablet_pressure_monitor(app.handle().clone());

@@ -59,6 +59,13 @@
     showVersion();
     var btn = document.getElementById('app-check-update');
     if (btn) btn.addEventListener('click', function () { checkForUpdate(false); });
+    // "Vérifier les mises à jour…" in the StrokeMotion app menu (top-left,
+    // macOS) — Rust (src-tauri/src/lib.rs setup()) inserts that item into
+    // the default menu and emits this event on click; same check as the
+    // Réglages button, just reachable from the menu too.
+    if (tauriOk() && window.__TAURI__.event) {
+      window.__TAURI__.event.listen('menu-check-update', function () { checkForUpdate(false); });
+    }
     // Silent startup check, a few seconds in so it never competes with the
     // app's own initial layout/engine-init work for the first paint.
     if (tauriOk()) setTimeout(function () { checkForUpdate(true); }, 4000);
