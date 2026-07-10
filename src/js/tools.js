@@ -2379,6 +2379,16 @@ function _mergeHoleIntoExterior(extSegs,holeSegs){
 }
 function insertBooleanResult(layer,insertAt,result,fillColor,opacity){
   if(!(result instanceof CompoundPath)){
+    // Every OTHER branch below applies fillColor/opacity/strokeColor=null
+    // to its island(s) — this simplest one (the op produced one seamless
+    // Path, no holes or islands at all, e.g. two same-color fills merging
+    // into a single continuous outline) forgot to, silently inserting
+    // `result` with whatever style it happened to inherit from Paper's own
+    // unite()/etc (typically nothing — confirmed live: fillColor came back
+    // null even though a color was explicitly passed in).
+    if(fillColor!==undefined)result.fillColor=fillColor;
+    result.strokeColor=null;
+    if(opacity!==undefined)result.opacity=opacity;
     layer.insertChild(insertAt,result);
     return[result];
   }
