@@ -2365,6 +2365,35 @@ function onKeyDown(event){
     }
     else if(_sel.frames.length>0){event.preventDefault();window.SM.deleteSelectedFrames();}
     else if(state.tool==='fsselect'&&_fsSel){event.preventDefault();fsApplyDelete();}
+    // Subselect: Delete removes just the selected anchor(s) from the path
+    // and lets the curve reflow through the remaining points (Illustrator/
+    // Figma convention) — previously had NO handler at all here, so Delete
+    // silently did nothing while a node was selected with the subselect
+    // tool (reported as "impossible d'enlever le point de la ligne").
+    else if(state.tool==='subselect'&&_nodeSel.length>0){
+      event.preventDefault();
+      var ntp=nodeEditTargetPath();
+      if(ntp){
+        var isCenter=!!(ntp.data&&ntp.data.isVectorBrush&&ntp.data.centerSegments);
+        var curLen=isCenter?ntp.data.centerSegments.length:ntp.segments.length;
+        var minPts=isCenter?2:(ntp.closed?3:2);
+        if(curLen-_nodeSel.length<minPts){showToast('Pas assez de points restants');}
+        else{
+          pushUndo();
+          var idxsDesc=_nodeSel.slice().sort(function(a,b){return b-a;});
+          idxsDesc.forEach(function(i){
+            if(isCenter)ntp.data.centerSegments.splice(i,1);
+            else ntp.removeSegment(i);
+          });
+          if(isCenter)rebuildVectorBrushOutline(ntp);
+          _nodeSel=[];
+          renderNodeHandles();
+          fillRegenerateLinked(userLayers[state.activeLayerIdx],ntp);
+          saveActiveLayerFrame();renderArcs();updateUI();
+          if(window.SMEngineBridge)window.SMEngineBridge.renderNow();
+        }
+      }
+    }
     else if(state.tool==='select'&&selectedPaths.length>0)window.SM.deleteSelStrokes();
     else if(event.shiftKey)removeFrame();
   }
