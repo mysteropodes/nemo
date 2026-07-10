@@ -61,6 +61,11 @@
     state.cameraKeys=[];state.cameraLayerOn=false;state.cameraView=false;
     createUserLayer('Layer 1');activateUL(0);
     drawStage();loadFrame(0);renderOS();renderArcs();updateUI();renderSymbolTabs();
+    // view.zoom/center aren't part of the project data (never saved), so
+    // without this a new project silently inherited whatever zoom was left
+    // over from before (or Paper's raw default) instead of fitting the new
+    // canvas size to the viewport — reported as "le canvas n'est pas fit".
+    window.SM.fitCanvas();
     if(window.renderPaletteGrid)window.renderPaletteGrid();
     syncDocFields();
     currentPath=null;currentName=cfg.name||'Untitled';updateCurrentLabel();
