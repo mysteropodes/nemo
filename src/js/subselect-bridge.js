@@ -26,9 +26,60 @@
 // than reimplementing any of it.
 (function () {
   var lastPt = null;
+  // Click-vs-drag disambiguation for the Alt+click "toggle tangent" gesture
+  // below — onDown already always starts a normal 'point' drag on hit, so
+  // the only way to tell "user clicked to toggle" from "user dragged the
+  // anchor a tiny bit" is comparing screen-space start/end position in onUp.
+  var _downClientX = 0, _downClientY = 0, _downAlt = false;
 
   function shouldIntercept() {
     return window.SMEngineBridge && window.SMEngineBridge.isEnabled() && state.tool === 'subselect' && !state.playing;
+  }
+
+  // Illustrator/Figma "Convert Anchor Point" convention, ported to a plain
+  // Alt+click (no drag) instead of a dedicated tool: a point WITH tangent
+  // handles loses them (becomes a sharp corner); a point with NONE gets a
+  // symmetric pair computed from its neighbors (Catmull-Rom-ish — direction
+  // toward the far neighbor, length 1/3 of the distance to each adjacent
+  // point) instead of requiring a drag to define them, since this is a
+  // single click, not a drag-to-shape gesture.
+  function toggleTangentAtSegments(segs, closed, idx) {
+    var s = segs[idx];
+    var hasTangent = (Math.abs(s.handleIn[0]) > 0.01 || Math.abs(s.handleIn[1]) > 0.01 || Math.abs(s.handleOut[0]) > 0.01 || Math.abs(s.handleOut[1]) > 0.01);
+    if (hasTangent) { s.handleIn = [0, 0]; s.handleOut = [0, 0]; return; }
+    var n = segs.length;
+    var prev = closed ? segs[(idx - 1 + n) % n] : (idx > 0 ? segs[idx - 1] : null);
+    var next = closed ? segs[(idx + 1) % n] : (idx < n - 1 ? segs[idx + 1] : null);
+    var dir, distOut = 40, distIn = 40;
+    var px = s.point[0], py = s.point[1];
+    if (prev && next) {
+      var dx = next.point[0] - prev.point[0], dy = next.point[1] - prev.point[1];
+      var dl = Math.hypot(dx, dy) || 1; dir = [dx / dl, dy / dl];
+    } else if (next) {
+      var dx2 = next.point[0] - px, dy2 = next.point[1] - py;
+      var dl2 = Math.hypot(dx2, dy2) || 1; dir = [dx2 / dl2, dy2 / dl2];
+    } else if (prev) {
+      var dx3 = px - prev.point[0], dy3 = py - prev.point[1];
+      var dl3 = Math.hypot(dx3, dy3) || 1; dir = [dx3 / dl3, dy3 / dl3];
+    } else { dir = [1, 0]; }
+    if (next) distOut = Math.hypot(next.point[0] - px, next.point[1] - py);
+    if (prev) distIn = Math.hypot(px - prev.point[0], py - prev.point[1]);
+    s.handleOut = [dir[0] * distOut / 3, dir[1] * distOut / 3];
+    s.handleIn = [-dir[0] * distIn / 3, -dir[1] * distIn / 3];
+  }
+  function toggleTangentAt(path, idx) {
+    if (path.data && path.data.isVectorBrush && path.data.centerSegments) {
+      toggleTangentAtSegments(path.data.centerSegments, !!path.closed, idx);
+      rebuildVectorBrushOutline(path);
+    } else {
+      var seg = path.segments[idx];
+      var hasTangent = seg.handleIn.length > 0.01 || seg.handleOut.length > 0.01;
+      if (hasTangent) { seg.handleIn = new Point(0, 0); seg.handleOut = new Point(0, 0); return; }
+      var segs = path.segments.map(function (s) { return { point: [s.point.x, s.point.y], handleIn: [s.handleIn.x, s.handleIn.y], handleOut: [s.handleOut.x, s.handleOut.y] }; });
+      toggleTangentAtSegments(segs, !!path.closed, idx);
+      seg.handleOut = new Point(segs[idx].handleOut[0], segs[idx].handleOut[1]);
+      seg.handleIn = new Point(segs[idx].handleIn[0], segs[idx].handleIn[1]);
+    }
   }
 
   function onDown(e) {
@@ -38,6 +89,7 @@
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
     var pt = new Point(w[0], w[1]);
     lastPt = pt;
+    _downClientX = e.clientX; _downClientY = e.clientY; _downAlt = e.altKey;
     window.SMEngineBridge.suspend();
 
     var layer = userLayers[state.activeLayerIdx];
@@ -162,7 +214,23 @@
       } else { clearSel(); }
       _nmq.active = false; renderArcs(); updateUI();
     } else if (_nodeDrag.active) {
-      var editedPath = _nodeDrag.path; _nodeDrag.active = false; _nodeDrag.path = null;
+      var editedPath = _nodeDrag.path; var editedType = _nodeDrag.type; var editedSegIndex = _nodeDrag.segIndex;
+      _nodeDrag.active = false; _nodeDrag.path = null;
+      // Alt+click (not drag) on an anchor toggles its tangent handles —
+      // Illustrator/Figma "Convert Anchor Point" convention, reported as
+      // "avec alt enfoncé il faudrait que ça referme les tangentes et si
+      // il n'y a pas de tangente alors ça les affiche". onDown always
+      // starts a normal 'point' drag on hit (no separate gesture to grab
+      // here), so this only fires when Alt was held at mousedown AND the
+      // pointer barely moved — a real drag still reshapes/repositions.
+      var movedPx = Math.hypot(e.clientX - _downClientX, e.clientY - _downClientY);
+      if (editedType === 'point' && _downAlt && movedPx < 4) {
+        // No pushUndo() here — onDown already snapshotted state before any
+        // mutation (line ~76: pushUndo() right before starting the drag),
+        // a second one here would just double up the undo stack for one
+        // visual change.
+        toggleTangentAt(editedPath, editedSegIndex);
+      }
       // Team review: reshaping someone else's stroke forks it — see
       // forkIfForeignOwner's own comment. Must run BEFORE fillRegenerateLinked/
       // regenerateBrushTexture below, which read the CURRENT strokeId to
