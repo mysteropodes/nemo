@@ -73,7 +73,11 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--gutter);color:
 /* TOOLS */
 #tools-panel{width:50px;flex-shrink:0;background:var(--panel);border-right:none;
   display:flex;flex-direction:column;align-items:center;padding:10px 0;gap:3px;overflow-y:auto;}
-#tools-panel-resize{width:4px;cursor:ew-resize;background:var(--border);flex-shrink:0;}
+/* Panel resize grips — same idiom as #tl-resize: fully invisible until
+   hover, and they occupy exactly the layout gap that was already between
+   the panels (width 8px with -8px side margins cancels the flex gap on
+   both sides), so nothing about the page's spacing changes. */
+#tools-panel-resize{width:8px;margin:0 -8px;cursor:ew-resize;background:transparent;flex-shrink:0;z-index:5;}
 #tools-panel-resize:hover,#tools-panel-resize.active{background:var(--accent);}
 .tool-btn{width:34px;height:34px;border:none;background:transparent;color:rgba(236,234,231,.75);
   border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;
@@ -137,7 +141,11 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--gutter);color:
    --panel tone as the left toolbar and right props panel — no separate
    darker box around the working area, just one continuous panel surface
    with the drawing surface itself floating on top. */
-#canvas-area{flex:1;position:relative;overflow:hidden;background:var(--panel);}
+/* min-width:0 — a flex item's default min-width is its content's intrinsic
+   width, and the drawing canvas's pixel size is set by JS: without this,
+   growing a side panel can't shrink the canvas area, so the props panel
+   gets pushed straight off the window edge instead (reported layout bug). */
+#canvas-area{flex:1;min-width:0;position:relative;overflow:hidden;background:var(--panel);}
 #drawing-canvas{width:100%;height:100%;cursor:crosshair;}
 #canvas-info{position:absolute;top:16px;left:20px;pointer-events:none;font-size:11.5px;color:rgba(236,234,231,.38);font-weight:500;}
 #canvas-info .fnum{font-size:28px;font-weight:700;letter-spacing:-.5px;color:var(--text);}
@@ -158,7 +166,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--gutter);color:
 #zoom-scrub.scrubbing{color:var(--accent-hover);}
 
 /* PROPS */
-#props-panel-resize{width:4px;cursor:ew-resize;background:var(--border);flex-shrink:0;}
+#props-panel-resize{width:8px;margin:0 -8px;cursor:ew-resize;background:transparent;flex-shrink:0;z-index:5;}
 #props-panel-resize:hover,#props-panel-resize.active{background:var(--accent);}
 #props-panel{width:280px;flex-shrink:0;background:var(--panel);border-left:none;overflow-y:auto;padding:0;}
 /* v3 (2026-07-09): each accordion section is its own rounded card
@@ -181,7 +189,11 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--gutter);color:
 .pi{flex:1;background:var(--panel3);border:none;color:var(--text);border-radius:7px;padding:8px 10px;font-size:12.5px;font-weight:600;outline:none;box-shadow:inset 0 0 0 1px transparent;transition:box-shadow .15s;}
 .pi:focus{box-shadow:inset 0 0 0 1px var(--accent);}
 .pi[type="range"]{padding:0;border:none;background:transparent;accent-color:var(--accent);}
-.pi[type="number"]{width:50px;text-align:center;-moz-appearance:textfield;}
+/* min-width:0 — with flex:1 these grow, but the default min-width:auto kept
+   them from ever shrinking below width+padding (~70px); in rows that also
+   carry a fixed-width widget (Position/Size/Rotate + the 9-dot anchor grid)
+   the row overflowed the 280px panel and the inputs slid UNDER the grid. */
+.pi[type="number"]{width:50px;min-width:0;text-align:center;-moz-appearance:textfield;}
 .pi[type="number"]::-webkit-inner-spin-button{-webkit-appearance:none;}
 /* Rive-style scrubbable numeric field: no spinner, drag left/right to
    change the value, click to place a caret and type. A small double-arrow

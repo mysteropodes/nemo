@@ -330,16 +330,20 @@
   window.addEventListener('mouseup',function(){window._lpResize=false;lpr.classList.remove('active');});
 
   // Left (tools) and right (props) panel horizontal resize — same
-  // drag-a-thin-bar pattern as #layer-panel-resize above.
+  // drag-a-thin-bar pattern as #layer-panel-resize above. Each move also
+  // fires a window resize event: the drawing canvas's pixel size is set by
+  // Paper.js's own window-resize listener, so without this the canvas kept
+  // its old size while the panels moved, pushing the props panel clean off
+  // the window edge (reported layout bug).
   var tpr=document.getElementById('tools-panel-resize'),tp=document.getElementById('tools-panel'),tprx,tprw;
   tpr.addEventListener('mousedown',function(e){tprx=e.clientX;tprw=tp.offsetWidth;window._tpResize=true;tpr.classList.add('active');e.preventDefault();});
-  window.addEventListener('mousemove',function(e){if(!window._tpResize)return;tp.style.width=Math.max(50,Math.min(160,tprw+(e.clientX-tprx)))+'px';});
-  window.addEventListener('mouseup',function(){window._tpResize=false;tpr.classList.remove('active');});
+  window.addEventListener('mousemove',function(e){if(!window._tpResize)return;tp.style.width=Math.max(50,Math.min(160,tprw+(e.clientX-tprx)))+'px';window.dispatchEvent(new Event('resize'));});
+  window.addEventListener('mouseup',function(){if(!window._tpResize)return;window._tpResize=false;tpr.classList.remove('active');window.dispatchEvent(new Event('resize'));});
 
   var ppr=document.getElementById('props-panel-resize'),pp=document.getElementById('props-panel'),pprx,pprw;
   ppr.addEventListener('mousedown',function(e){pprx=e.clientX;pprw=pp.offsetWidth;window._ppResize=true;ppr.classList.add('active');e.preventDefault();});
-  window.addEventListener('mousemove',function(e){if(!window._ppResize)return;pp.style.width=Math.max(220,Math.min(520,pprw-(e.clientX-pprx)))+'px';});
-  window.addEventListener('mouseup',function(){window._ppResize=false;ppr.classList.remove('active');});
+  window.addEventListener('mousemove',function(e){if(!window._ppResize)return;pp.style.width=Math.max(240,Math.min(520,pprw-(e.clientX-pprx)))+'px';window.dispatchEvent(new Event('resize'));});
+  window.addEventListener('mouseup',function(){if(!window._ppResize)return;window._ppResize=false;ppr.classList.remove('active');window.dispatchEvent(new Event('resize'));});
 
   // No local FC here (was a stale hardcoded 14, a duplicate of app.js's
   // global FC that drifted out of sync with it — real bug, caused the
