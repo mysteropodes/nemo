@@ -675,9 +675,34 @@
   var penPreviewWorld = null;
   function setPenPreview(worldPt) { penPreviewWorld = worldPt; }
   function buildPenPreviewItems() {
-    if (state.tool !== 'pen' || !penPreviewWorld || typeof _pen === 'undefined' || !_pen.path) return [];
-    var last = _pen.path.lastSegment.point;
-    return [lineItem([last.x, last.y], penPreviewWorld, [120, 170, 255, 153], 1 / view.zoom)];
+    if (state.tool !== 'pen' || typeof _pen === 'undefined' || !_pen.path) return [];
+    var zs = 1 / view.zoom;
+    var items = [];
+    if (penPreviewWorld) {
+      var last = _pen.path.lastSegment.point;
+      items.push(lineItem([last.x, last.y], penPreviewWorld, [120, 170, 255, 153], 1 * zs));
+    }
+    // Anchors + tangent handles of the in-progress pen path (feedback #19)
+    // — same visual language as the Subselection tool's node handles
+    // (buildNodeHandleItems below): circles for anchors, thin guide line +
+    // small square for each non-zero handle, all sized in 1/zoom so they
+    // stay constant on screen.
+    _pen.path.segments.forEach(function (s) {
+      var pt = [s.point.x, s.point.y];
+      var hi = [s.handleIn.x, s.handleIn.y], ho = [s.handleOut.x, s.handleOut.y];
+      if (Math.hypot(hi[0], hi[1]) > 0.5) {
+        var hiPt = [pt[0] + hi[0], pt[1] + hi[1]];
+        items.push(lineItem(pt, hiPt, [120, 170, 255, 178], 1 * zs));
+        items.push(rectItem(hiPt[0], hiPt[1], 3 * zs, [255, 255, 255, 255], [74, 158, 255, 255], 1 * zs));
+      }
+      if (Math.hypot(ho[0], ho[1]) > 0.5) {
+        var hoPt = [pt[0] + ho[0], pt[1] + ho[1]];
+        items.push(lineItem(pt, hoPt, [120, 170, 255, 178], 1 * zs));
+        items.push(rectItem(hoPt[0], hoPt[1], 3 * zs, [255, 255, 255, 255], [74, 158, 255, 255], 1 * zs));
+      }
+      items.push(circleItem(pt[0], pt[1], 3.5 * zs, [255, 255, 255, 255], [74, 158, 255, 255], 1.2 * zs));
+    });
+    return items;
   }
 
   // Tween motion-arc handles: renderArcs() in tweens.js draws these into a
