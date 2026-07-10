@@ -1093,8 +1093,21 @@ function renderOS(){
   // desP — a Raster has no fillColor/strokeColor, so tinted/outline modes
   // (which recolor the stroke) fall back to a plain opacity fade for it,
   // same as its normal on-canvas rendering just dimmer.
-  for(var fi=cf-1;fi>=state.onionIn&&fi>=0;fi--){var strokes=getEffectiveStrokes(li,fi);if(!strokes.length)continue;var dist=cf-fi;var op=(state.onionPrevOpacity/100)*Math.max(.15,1-dist*.2);strokes.forEach(function(sd){if(sd.isRaster){var pr=desR(sd,onionPrevLayer);pr.opacity=op;return;}var p=desP(sd,onionPrevLayer,op);if(state.onionMode==='tinted')p.strokeColor=new Color(1,.3,.3,op);else if(state.onionMode==='outline'){p.fillColor=null;p.strokeColor=new Color(1,.3,.3,op*.8);p.strokeWidth=1;}else p.opacity=op;});}
-  for(var fi2=cf+1;fi2<=state.onionOut&&fi2<state.totalFrames;fi2++){var strokes2=getEffectiveStrokes(li,fi2);if(!strokes2.length)continue;var dist2=fi2-cf;var op2=(state.onionNextOpacity/100)*Math.max(.15,1-dist2*.2);strokes2.forEach(function(sd){if(sd.isRaster){var nr=desR(sd,onionNextLayer);nr.opacity=op2;return;}var p=desP(sd,onionNextLayer,op2);if(state.onionMode==='tinted')p.strokeColor=new Color(.3,.55,1,op2);else if(state.onionMode==='outline'){p.fillColor=null;p.strokeColor=new Color(.3,.55,1,op2*.8);p.strokeWidth=1;}else p.opacity=op2;});}
+  // Brush-texture scaffolding (the invisible anchor behind the dabs,
+  // isBrushTextureCopy dab stamps themselves) is skipped entirely here —
+  // 'tinted'/'outline' onion modes unconditionally FORCE a visible
+  // strokeColor onto every ghosted item, which bypassed the anchor's
+  // opacity:0/strokeColor:null invisibility convention (applyBrushTexture,
+  // tools.js) and showed it as a stray thin blue/red line running the
+  // length of any textured stroke on an adjacent frame (reported: "filet
+  // bleu derrière les brush avec preset de texture") — same "new tag
+  // handled in one consumer (buildSceneJson/live render) but not another
+  // (onion)" bug family documented in this repo's CLAUDE.md. The dabs
+  // themselves are cheap, regenerated-per-frame stamps (not meaningful as a
+  // traced reference), so onion just omits texture-preset strokes
+  // altogether rather than trying to half-render them.
+  for(var fi=cf-1;fi>=state.onionIn&&fi>=0;fi--){var strokes=getEffectiveStrokes(li,fi);if(!strokes.length)continue;var dist=cf-fi;var op=(state.onionPrevOpacity/100)*Math.max(.15,1-dist*.2);strokes.forEach(function(sd){if(sd.isBrushTextureCopy||sd.brushTexturePreset)return;if(sd.isRaster){var pr=desR(sd,onionPrevLayer);pr.opacity=op;return;}var p=desP(sd,onionPrevLayer,op);if(state.onionMode==='tinted')p.strokeColor=new Color(1,.3,.3,op);else if(state.onionMode==='outline'){p.fillColor=null;p.strokeColor=new Color(1,.3,.3,op*.8);p.strokeWidth=1;}else p.opacity=op;});}
+  for(var fi2=cf+1;fi2<=state.onionOut&&fi2<state.totalFrames;fi2++){var strokes2=getEffectiveStrokes(li,fi2);if(!strokes2.length)continue;var dist2=fi2-cf;var op2=(state.onionNextOpacity/100)*Math.max(.15,1-dist2*.2);strokes2.forEach(function(sd){if(sd.isBrushTextureCopy||sd.brushTexturePreset)return;if(sd.isRaster){var nr=desR(sd,onionNextLayer);nr.opacity=op2;return;}var p=desP(sd,onionNextLayer,op2);if(state.onionMode==='tinted')p.strokeColor=new Color(.3,.55,1,op2);else if(state.onionMode==='outline'){p.fillColor=null;p.strokeColor=new Color(.3,.55,1,op2*.8);p.strokeWidth=1;}else p.opacity=op2;});}
   userLayers[state.activeLayerIdx].activate();
 }
 
