@@ -10,7 +10,7 @@
 // inherently async) and keeps the returned handle to call `.render(json)`
 // on every frame.
 use serde::{Deserialize, Serialize};
-use vello::kurbo::{Affine, BezPath, Rect, Shape, Stroke};
+use vello::kurbo::{Affine, BezPath, Shape, Stroke};
 use vello::peniko::Color;
 use vello::{wgpu, AaConfig, AaSupport, RenderParams, Renderer, RendererOptions, Scene};
 use wasm_bindgen::prelude::*;
@@ -101,6 +101,7 @@ fn default_stroke_width() -> f64 {
 }
 
 #[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct LayerIn {
     pub(crate) items: Vec<ItemIn>,
     // Photoshop/Illustrator-style layer blend mode — composites this
@@ -115,46 +116,42 @@ pub(crate) struct LayerIn {
     pub(crate) blend_mode: Option<String>,
 }
 
-// KNOWN BROKEN (v17 investigation, not fixed): layer blend modes render
-// with zero visual effect. Root-caused via direct experimentation (NOT a
-// JS wiring bug — confirmed the JSON payload correctly carries the right
-// blendMode string on the right layer every time): a push_layer(Mix::X)
-// group only sees a correct backdrop to blend against when EVERY layer
-// beneath it was ALSO wrapped in its own push_layer/pop_layer using a
-// non-Normal Mix. Wrapping every layer in Mix::Normal (Vello's own
-// documented "no blend" default) for the unblended ones does NOT work —
-// the blended layer still renders as if the backdrop were empty (plain
-// source color, un-blended). Compose::Copy for the unblended layers was
-// also tried and made it worse (erased the canvas background entirely)
-// without fixing the blend. This smells like a Vello 0.9 optimization
-// that fast-paths Mix::Normal groups by skipping backdrop capture
-// entirely, which a later real-Mix group then reads as blank. No safe
-// fix found without either a different Vello version or a CPU-side
-// pre-blend (rendering each blended layer against a manually composited
-// backdrop texture) — a real rendering-pipeline change, not attempted
-// here to avoid destabilizing this render path (see CLAUDE.md's warning
-// on the perf-critical, already-regression-prone rendering pipeline).
-fn blend_from(name: Option<&str>) -> Option<vello::peniko::BlendMode> {
-    use vello::peniko::{BlendMode, Compose, Mix};
-    let mix = match name? {
-        "multiply" => Mix::Multiply,
-        "screen" => Mix::Screen,
-        "overlay" => Mix::Overlay,
-        "darken" => Mix::Darken,
-        "lighten" => Mix::Lighten,
-        "colorDodge" => Mix::ColorDodge,
-        "colorBurn" => Mix::ColorBurn,
-        "hardLight" => Mix::HardLight,
-        "softLight" => Mix::SoftLight,
-        "difference" => Mix::Difference,
-        "exclusion" => Mix::Exclusion,
-        "hue" => Mix::Hue,
-        "saturation" => Mix::Saturation,
-        "color" => Mix::Color,
-        "luminosity" => Mix::Luminosity,
-        _ => return None, // "normal" (or anything unrecognized) — no bracket needed
-    };
-    Some(BlendMode::new(mix, Compose::SrcOver))
+// FIXED (was "KNOWN BROKEN, v17 investigation" — see git history for the
+// original writeup): layer blend modes used to render with zero visual
+// effect. Root-caused via direct experimentation as a real vello 0.9 issue,
+// not a JS wiring bug: a push_layer(Mix::X) group never saw a correct
+// backdrop to blend against, no matter how the layers beneath it were
+// wrapped. No fix found within vello's own API (0.9 is the current release
+// — nothing to bump to), and CPU-side readback isn't viable either: WebGPU's
+// mapAsync is async-only on wasm32 with no blocking-poll escape hatch, and
+// render() is called synchronously on every frame from engine-bridge.js's
+// tick() — making it async would ripple through the whole render loop for
+// a rarely-used feature. Fixed instead with our OWN compositor (blend.wgsl
+// + composite_scene below): every blended scene renders each layer to its
+// own isolated texture via vello (unmodified, GPU-only, synchronous) and
+// composites them ourselves with a small fullscreen-shader pass implementing
+// the standard W3C Compositing-and-Blending Mix formulas — entirely
+// GPU-side, so it slots into render()'s existing synchronous signature.
+// This index ordering must stay in sync with blend.wgsl's `switch params.mode`.
+fn mix_mode_index(name: Option<&str>) -> u32 {
+    match name.unwrap_or("normal") {
+        "multiply" => 1,
+        "screen" => 2,
+        "overlay" => 3,
+        "darken" => 4,
+        "lighten" => 5,
+        "colorDodge" => 6,
+        "colorBurn" => 7,
+        "hardLight" => 8,
+        "softLight" => 9,
+        "difference" => 10,
+        "exclusion" => 11,
+        "hue" => 12,
+        "saturation" => 13,
+        "color" => 14,
+        "luminosity" => 15,
+        _ => 0, // "normal" (or anything unrecognized) — plain SrcOver, no mix
+    }
 }
 
 #[derive(Deserialize, Serialize)]
@@ -372,6 +369,300 @@ pub struct VelloEngine {
     // lets vello's own internal resource cache recognize "this is the same
     // image as last frame" and skip re-uploading pixels to the GPU.
     images: std::collections::HashMap<String, vello::peniko::ImageData>,
+    // ---- Custom blend compositor (see blend.wgsl's own doc comment for
+    // why this exists instead of vello's own push_layer(Mix::X)) ----
+    // Fullscreen-triangle pipeline: samples a backdrop + a single layer's
+    // isolated render, applies the CSS/W3C Mix formula, writes the SrcOver
+    // composite. Built once; only ever touched when a scene actually
+    // contains a blended layer (see composite_scene's fast-path check) —
+    // the ordinary no-blend render path never allocates or binds any of
+    // this, so it costs nothing when unused.
+    blend_pipeline: wgpu::RenderPipeline,
+    blend_bind_group_layout: wgpu::BindGroupLayout,
+    blend_sampler: wgpu::Sampler,
+    blend_uniform_buf: wgpu::Buffer,
+    // Reused every layer: vello's render_to_texture target for ONE layer's
+    // own content, painted alone against a transparent backdrop. Needs
+    // STORAGE_BINDING (vello's compute-based renderer writes via storage,
+    // not a traditional render-pass attachment — see render_to_texture's
+    // own doc comment) plus TEXTURE_BINDING to be sampled as `source_tex`.
+    blend_layer_tex: wgpu::Texture,
+    blend_layer_view: wgpu::TextureView,
+    // Ping-pong accumulator pair: composite_pass always reads one and
+    // writes the other, so the roles swap after every layer instead of
+    // allocating a fresh output texture per layer. RENDER_ATTACHMENT (my
+    // own fragment shader writes here, not vello) + TEXTURE_BINDING
+    // (sampled as `backdrop_tex` next iteration) + COPY_SRC/DST (seeding
+    // the clear color, copying the final result into self.offscreen).
+    blend_accum_a: wgpu::Texture,
+    blend_accum_a_view: wgpu::TextureView,
+    blend_accum_b: wgpu::Texture,
+    blend_accum_b_view: wgpu::TextureView,
+}
+
+// ---- Blend compositor plumbing (see blend.wgsl's doc comment) ----
+const BLEND_SCRATCH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
+
+fn create_blend_layer_texture(device: &wgpu::Device, width: u32, height: u32) -> (wgpu::Texture, wgpu::TextureView) {
+    let tex = device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("blend-layer-target"),
+        size: wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: BLEND_SCRATCH_FORMAT,
+        // vello's render_to_texture writes via a compute pipeline, hence
+        // STORAGE_BINDING (matches self.offscreen's own usage flags) —
+        // TEXTURE_BINDING lets the blend shader sample it as `source_tex`.
+        usage: wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::TEXTURE_BINDING,
+        view_formats: &[],
+    });
+    let view = tex.create_view(&wgpu::TextureViewDescriptor::default());
+    (tex, view)
+}
+
+fn create_blend_accum_texture(device: &wgpu::Device, width: u32, height: u32, label: &str) -> (wgpu::Texture, wgpu::TextureView) {
+    let tex = device.create_texture(&wgpu::TextureDescriptor {
+        label: Some(label),
+        size: wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: BLEND_SCRATCH_FORMAT,
+        // RENDER_ATTACHMENT: our OWN fragment shader (not vello) writes here.
+        // TEXTURE_BINDING: sampled as `backdrop_tex` on the next layer.
+        // COPY_SRC/DST: seeding the clear color, and copying the final
+        // composited result into self.offscreen at the end.
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+            | wgpu::TextureUsages::TEXTURE_BINDING
+            | wgpu::TextureUsages::COPY_SRC
+            | wgpu::TextureUsages::COPY_DST,
+        view_formats: &[],
+    });
+    let view = tex.create_view(&wgpu::TextureViewDescriptor::default());
+    (tex, view)
+}
+
+fn create_blend_pipeline(device: &wgpu::Device) -> (wgpu::RenderPipeline, wgpu::BindGroupLayout, wgpu::Sampler, wgpu::Buffer) {
+    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        label: Some("blend-compositor"),
+        source: wgpu::ShaderSource::Wgsl(include_str!("blend.wgsl").into()),
+    });
+    let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some("blend-bind-group-layout"),
+        entries: &[
+            wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Texture {
+                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                    multisampled: false,
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 1,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Texture {
+                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                    multisampled: false,
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 2,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 3,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            },
+        ],
+    });
+    let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+        label: Some("blend-pipeline-layout"),
+        bind_group_layouts: &[Some(&bind_group_layout)],
+        immediate_size: 0,
+    });
+    let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        label: Some("blend-pipeline"),
+        layout: Some(&pipeline_layout),
+        vertex: wgpu::VertexState {
+            module: &shader,
+            entry_point: Some("vs_main"),
+            buffers: &[],
+            compilation_options: Default::default(),
+        },
+        fragment: Some(wgpu::FragmentState {
+            module: &shader,
+            entry_point: Some("fs_main"),
+            targets: &[Some(wgpu::ColorTargetState {
+                format: BLEND_SCRATCH_FORMAT,
+                blend: None,
+                write_mask: wgpu::ColorWrites::ALL,
+            })],
+            compilation_options: Default::default(),
+        }),
+        primitive: wgpu::PrimitiveState::default(),
+        depth_stencil: None,
+        multisample: wgpu::MultisampleState::default(),
+        multiview_mask: None,
+        cache: None,
+    });
+    let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+        label: Some("blend-sampler"),
+        address_mode_u: wgpu::AddressMode::ClampToEdge,
+        address_mode_v: wgpu::AddressMode::ClampToEdge,
+        mag_filter: wgpu::FilterMode::Nearest,
+        min_filter: wgpu::FilterMode::Nearest,
+        ..Default::default()
+    });
+    // 16 bytes: one u32 (mode) + padding to satisfy WGSL's minimum uniform
+    // buffer struct alignment (16-byte rounding) — see blend.wgsl's Params.
+    let uniform_buf = device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("blend-params"),
+        size: 16,
+        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    });
+    (pipeline, bind_group_layout, sampler, uniform_buf)
+}
+
+fn wgpu_color_from(c: Color) -> wgpu::Color {
+    let rgba = c.to_rgba8();
+    wgpu::Color { r: rgba.r as f64 / 255.0, g: rgba.g as f64 / 255.0, b: rgba.b as f64 / 255.0, a: rgba.a as f64 / 255.0 }
+}
+
+/// Clears `view` to a flat color via a plain wgpu render pass — used to
+/// seed the blend accumulator with `base_color` before the first layer,
+/// exactly mirroring what vello's own `render_to_texture(..., base_color)`
+/// does for the ordinary (no-blend) fast path.
+fn clear_texture(device: &wgpu::Device, queue: &wgpu::Queue, view: &wgpu::TextureView, color: wgpu::Color) {
+    let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("blend-clear") });
+    {
+        let _pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("blend-clear-pass"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view,
+                resolve_target: None,
+                ops: wgpu::Operations { load: wgpu::LoadOp::Clear(color), store: wgpu::StoreOp::Store },
+                depth_slice: None,
+            })],
+            depth_stencil_attachment: None,
+            timestamp_writes: None,
+            occlusion_query_set: None,
+            multiview_mask: None,
+        });
+    }
+    queue.submit(Some(encoder.finish()));
+}
+
+/// Runs the blend.wgsl fullscreen pass: composites `source_view` over
+/// `backdrop_view` using `mode` (see mix_mode_index), writing into
+/// `target_view`. All GPU-side, synchronous — see blend.wgsl's own doc
+/// comment for why this exists instead of vello's push_layer(Mix::X).
+#[allow(clippy::too_many_arguments)]
+fn composite_pass(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    pipeline: &wgpu::RenderPipeline,
+    bind_group_layout: &wgpu::BindGroupLayout,
+    sampler: &wgpu::Sampler,
+    uniform_buf: &wgpu::Buffer,
+    backdrop_view: &wgpu::TextureView,
+    source_view: &wgpu::TextureView,
+    mode: u32,
+    target_view: &wgpu::TextureView,
+) {
+    let mut payload = [0u8; 16];
+    payload[0..4].copy_from_slice(&mode.to_le_bytes());
+    queue.write_buffer(uniform_buf, 0, &payload);
+    let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("blend-bind-group"),
+        layout: bind_group_layout,
+        entries: &[
+            wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(backdrop_view) },
+            wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(source_view) },
+            wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::Sampler(sampler) },
+            wgpu::BindGroupEntry { binding: 3, resource: uniform_buf.as_entire_binding() },
+        ],
+    });
+    let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("blend-composite") });
+    {
+        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("blend-composite-pass"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: target_view,
+                resolve_target: None,
+                ops: wgpu::Operations { load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT), store: wgpu::StoreOp::Store },
+                depth_slice: None,
+            })],
+            depth_stencil_attachment: None,
+            timestamp_writes: None,
+            occlusion_query_set: None,
+            multiview_mask: None,
+        });
+        pass.set_pipeline(pipeline);
+        pass.set_bind_group(0, &bind_group, &[]);
+        pass.draw(0..3, 0..1);
+    }
+    queue.submit(Some(encoder.finish()));
+}
+
+/// Paints one layer's items into `scene` — the exact same per-item logic
+/// render()/render_to_pixels() always used, factored out so the ordinary
+/// (fast, no-blend) path and the per-layer isolated-texture blend path
+/// both go through one implementation (CLAUDE.md §3: duplicated render
+/// logic drifting out of sync is the recurring bug class here).
+fn paint_layer_items(
+    scene: &mut Scene,
+    layer: &LayerIn,
+    view_tf: Affine,
+    images: &std::collections::HashMap<String, vello::peniko::ImageData>,
+) {
+    for item in &layer.items {
+        if let Some(img_ref) = &item.image {
+            if let Some(image_data) = images.get(&img_ref.image_id) {
+                let sx = img_ref.width / image_data.width as f64;
+                let sy = img_ref.height / image_data.height as f64;
+                let place = Affine::translate((img_ref.x, img_ref.y)) * Affine::scale_non_uniform(sx, sy);
+                let brush = vello::peniko::ImageBrush::new(image_data.clone()).multiply_alpha(img_ref.opacity);
+                scene.draw_image(&brush, view_tf * place);
+            }
+            continue;
+        }
+        let bez = match build_bezpath(item) {
+            Some(b) => b,
+            None => continue,
+        };
+        let paint_fill = |scene: &mut Scene| {
+            if let Some(fc) = item.fill_color {
+                scene.fill(vello::peniko::Fill::NonZero, view_tf, color_from(fc), None, &bez);
+            }
+        };
+        let paint_stroke = |scene: &mut Scene| {
+            if let Some(sc) = item.stroke_color {
+                scene.stroke(&stroke_from(item), view_tf, color_from(sc), None, &bez);
+            }
+        };
+        if item.paint_order.as_deref() == Some("strokeFirst") {
+            paint_stroke(scene);
+            paint_fill(scene);
+        } else {
+            paint_fill(scene);
+            paint_stroke(scene);
+        }
+    }
 }
 
 /// Async because WebGPU adapter/device negotiation is inherently async —
@@ -412,6 +703,14 @@ pub async fn create_engine(
         .request_device(&wgpu::DeviceDescriptor { required_limits: adapter.limits(), ..Default::default() })
         .await
         .map_err(|e| JsValue::from_str(&format!("request_device failed: {e:?}")))?;
+    // wgpu validation/OOM/internal errors from calls made after this point
+    // (e.g. a malformed bind group, an unsupported texture usage combo) are
+    // otherwise swallowed silently on wasm32 — there's no `log`/env_logger
+    // sink installed, so they'd never reach the browser console at all,
+    // making a broken render pass indistinguishable from "nothing to draw".
+    device.on_uncaptured_error(std::sync::Arc::new(|e: wgpu::Error| {
+        web_sys::console::error_1(&format!("[wgpu] uncaptured error: {e}").into());
+    }));
     let caps = surface.get_capabilities(&adapter);
     let format = caps
         .formats
@@ -460,13 +759,24 @@ pub async fn create_engine(
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,
         format: wgpu::TextureFormat::Rgba8Unorm,
+        // COPY_DST: composite_scene's blend path (blend.wgsl) copies the
+        // final ping-ponged accumulator texture into this one as its last
+        // step — the ordinary no-blend fast path never writes here except
+        // via render_to_texture (which doesn't need COPY_DST), so this was
+        // missing until the blend path actually exercised it.
         usage: wgpu::TextureUsages::STORAGE_BINDING
             | wgpu::TextureUsages::TEXTURE_BINDING
-            | wgpu::TextureUsages::COPY_SRC,
+            | wgpu::TextureUsages::COPY_SRC
+            | wgpu::TextureUsages::COPY_DST,
         view_formats: &[],
     });
     let offscreen_view = offscreen.create_view(&wgpu::TextureViewDescriptor::default());
     let blitter = wgpu::util::TextureBlitter::new(&device, format);
+
+    let (blend_pipeline, blend_bind_group_layout, blend_sampler, blend_uniform_buf) = create_blend_pipeline(&device);
+    let (blend_layer_tex, blend_layer_view) = create_blend_layer_texture(&device, width, height);
+    let (blend_accum_a, blend_accum_a_view) = create_blend_accum_texture(&device, width, height, "blend-accum-a");
+    let (blend_accum_b, blend_accum_b_view) = create_blend_accum_texture(&device, width, height, "blend-accum-b");
 
     Ok(VelloEngine {
         surface,
@@ -483,7 +793,86 @@ pub async fn create_engine(
         surface_format: format,
         surface_alpha_mode: alpha_mode,
         images: std::collections::HashMap::new(),
+        blend_pipeline,
+        blend_bind_group_layout,
+        blend_sampler,
+        blend_uniform_buf,
+        blend_layer_tex,
+        blend_layer_view,
+        blend_accum_a,
+        blend_accum_a_view,
+        blend_accum_b,
+        blend_accum_b_view,
     })
+}
+
+// Internal helper, not part of the JS-facing API — kept in its own plain
+// `impl` block (rather than inside the `#[wasm_bindgen] impl` below) so the
+// wasm_bindgen macro never has to reason about a non-exported method.
+impl VelloEngine {
+    /// Shared by render() and render_to_pixels() (CLAUDE.md §3: these two
+    /// must stay in sync) — paints `scene_in` into `self.offscreen_view`.
+    ///
+    /// Fast path (no layer has a real blend_mode, the overwhelmingly common
+    /// case): unchanged from the pre-fix code — one Scene, one
+    /// render_to_texture call, zero extra allocation or GPU work.
+    ///
+    /// Slow path (>=1 blended layer): renders each layer to its own
+    /// isolated, transparent-backed texture (vello, unmodified) and
+    /// composites them one at a time through blend.wgsl's fullscreen pass
+    /// — Normal for an unblended layer (plain SrcOver, mode 0), the real
+    /// Mix formula for a blended one. See blend.wgsl's and
+    /// mix_mode_index's doc comments for why this exists at all.
+    fn composite_scene(&mut self, scene_in: &SceneIn, view_tf: Affine, base_color: Color) -> Result<(), JsValue> {
+        let has_blend = scene_in.layers.iter().any(|l| mix_mode_index(l.blend_mode.as_deref()) != 0);
+        if !has_blend {
+            let mut scene = Scene::new();
+            for layer in &scene_in.layers {
+                paint_layer_items(&mut scene, layer, view_tf, &self.images);
+            }
+            let params = RenderParams { base_color, width: self.width, height: self.height, antialiasing_method: AaConfig::Area };
+            self.renderer
+                .render_to_texture(&self.device, &self.queue, &scene, &self.offscreen_view, &params)
+                .map_err(|e| JsValue::from_str(&format!("render_to_texture failed: {e:?}")))?;
+            return Ok(());
+        }
+
+        clear_texture(&self.device, &self.queue, &self.blend_accum_a_view, wgpu_color_from(base_color));
+        let mut accum_is_a = true;
+        for layer in &scene_in.layers {
+            let mut scene = Scene::new();
+            paint_layer_items(&mut scene, layer, view_tf, &self.images);
+            let layer_params = RenderParams { base_color: Color::TRANSPARENT, width: self.width, height: self.height, antialiasing_method: AaConfig::Area };
+            self.renderer
+                .render_to_texture(&self.device, &self.queue, &scene, &self.blend_layer_view, &layer_params)
+                .map_err(|e| JsValue::from_str(&format!("render_to_texture failed: {e:?}")))?;
+            let mode = mix_mode_index(layer.blend_mode.as_deref());
+            let (backdrop_view, target_view) =
+                if accum_is_a { (&self.blend_accum_a_view, &self.blend_accum_b_view) } else { (&self.blend_accum_b_view, &self.blend_accum_a_view) };
+            composite_pass(
+                &self.device,
+                &self.queue,
+                &self.blend_pipeline,
+                &self.blend_bind_group_layout,
+                &self.blend_sampler,
+                &self.blend_uniform_buf,
+                backdrop_view,
+                &self.blend_layer_view,
+                mode,
+                target_view,
+            );
+            accum_is_a = !accum_is_a;
+        }
+        let final_tex = if accum_is_a { &self.blend_accum_a } else { &self.blend_accum_b };
+        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("blend-final-copy") });
+        encoder.copy_texture_to_texture(
+            final_tex.as_image_copy(),
+            self.offscreen.as_image_copy(),
+            wgpu::Extent3d { width: self.width, height: self.height, depth_or_array_layers: 1 },
+        );
+        self.queue.submit(Some(encoder.finish()));
+        Ok(())
+    }
 }
 
 #[wasm_bindgen]
@@ -719,12 +1108,25 @@ impl VelloEngine {
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: wgpu::TextureFormat::Rgba8Unorm,
+            // Keep in sync with create_engine's own offscreen descriptor —
+            // COPY_DST is needed by composite_scene's blend path (blend.wgsl)
+            // for its final copy into this texture.
             usage: wgpu::TextureUsages::STORAGE_BINDING
                 | wgpu::TextureUsages::TEXTURE_BINDING
-                | wgpu::TextureUsages::COPY_SRC,
+                | wgpu::TextureUsages::COPY_SRC
+                | wgpu::TextureUsages::COPY_DST,
             view_formats: &[],
         });
         self.offscreen_view = self.offscreen.create_view(&wgpu::TextureViewDescriptor::default());
+        let (blend_layer_tex, blend_layer_view) = create_blend_layer_texture(&self.device, width, height);
+        self.blend_layer_tex = blend_layer_tex;
+        self.blend_layer_view = blend_layer_view;
+        let (blend_accum_a, blend_accum_a_view) = create_blend_accum_texture(&self.device, width, height, "blend-accum-a");
+        self.blend_accum_a = blend_accum_a;
+        self.blend_accum_a_view = blend_accum_a_view;
+        let (blend_accum_b, blend_accum_b_view) = create_blend_accum_texture(&self.device, width, height, "blend-accum-b");
+        self.blend_accum_b = blend_accum_b;
+        self.blend_accum_b_view = blend_accum_b_view;
     }
 
     /// Uploads (or re-uploads, if already cached under this id) an image's
@@ -764,76 +1166,18 @@ impl VelloEngine {
         let scene_in: SceneIn = serde_json::from_str(scene_json)
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
         let view_tf = self.viewport.transform();
-        let mut scene = Scene::new();
-        let full_canvas = Rect::new(0.0, 0.0, self.width as f64, self.height as f64);
-        for layer in &scene_in.layers {
-            let blend = blend_from(layer.blend_mode.as_deref());
-            if let Some(b) = blend {
-                scene.push_layer(vello::peniko::Fill::NonZero, b, 1.0, Affine::IDENTITY, &full_canvas);
-            }
-            for item in &layer.items {
-                if let Some(img_ref) = &item.image {
-                    if let Some(image_data) = self.images.get(&img_ref.image_id) {
-                        // draw_image() draws at the image's OWN natural pixel
-                        // size, so the display width/height (which can differ,
-                        // e.g. an imported photo scaled to fit the canvas) is
-                        // baked in as a scale, composed with the placement
-                        // translate and the overall view transform.
-                        let sx = img_ref.width / image_data.width as f64;
-                        let sy = img_ref.height / image_data.height as f64;
-                        let place = Affine::translate((img_ref.x, img_ref.y)) * Affine::scale_non_uniform(sx, sy);
-                        let brush = vello::peniko::ImageBrush::new(image_data.clone()).multiply_alpha(img_ref.opacity);
-                        scene.draw_image(&brush, view_tf * place);
-                    }
-                    continue;
-                }
-                let bez = match build_bezpath(item) {
-                    Some(b) => b,
-                    None => continue,
-                };
-                let paint_fill = |scene: &mut Scene| {
-                    if let Some(fc) = item.fill_color {
-                        scene.fill(vello::peniko::Fill::NonZero, view_tf, color_from(fc), None, &bez);
-                    }
-                };
-                let paint_stroke = |scene: &mut Scene| {
-                    if let Some(sc) = item.stroke_color {
-                        scene.stroke(&stroke_from(item), view_tf, color_from(sc), None, &bez);
-                    }
-                };
-                if item.paint_order.as_deref() == Some("strokeFirst") {
-                    paint_stroke(&mut scene);
-                    paint_fill(&mut scene);
-                } else {
-                    paint_fill(&mut scene);
-                    paint_stroke(&mut scene);
-                }
-            }
-            if blend.is_some() {
-                scene.pop_layer();
-            }
-        }
-
-        let params = RenderParams {
-            // Confirmed in-browser (see removed [wasm-debug] probe) that this
-            // canvas's WebGPU surface only advertises CompositeAlphaMode::
-            // Opaque — Premultiplied isn't available to blend transparent
-            // pixels against the canvas's CSS background, so the pasteboard
-            // (area outside the document bounds, wherever nothing gets
-            // drawn) must be baked in as an opaque fill here instead of
-            // relying on browser compositing. Matches the app's --panel CSS
-            // var (#201f25) so the canvas reads as one continuous surface
-            // with the surrounding UI chrome rather than a separate black
-            // box — keep this in sync with :root{--panel} in style.css if
-            // that ever changes.
-            base_color: Color::from_rgba8(0x20, 0x1f, 0x25, 0xff),
-            width: self.width,
-            height: self.height,
-            antialiasing_method: AaConfig::Area,
-        };
-        self.renderer
-            .render_to_texture(&self.device, &self.queue, &scene, &self.offscreen_view, &params)
-            .map_err(|e| JsValue::from_str(&format!("render_to_texture failed: {e:?}")))?;
+        // Confirmed in-browser (see removed [wasm-debug] probe) that this
+        // canvas's WebGPU surface only advertises CompositeAlphaMode::
+        // Opaque — Premultiplied isn't available to blend transparent
+        // pixels against the canvas's CSS background, so the pasteboard
+        // (area outside the document bounds, wherever nothing gets
+        // drawn) must be baked in as an opaque fill here instead of
+        // relying on browser compositing. Matches the app's --panel CSS
+        // var (#201f25) so the canvas reads as one continuous surface
+        // with the surrounding UI chrome rather than a separate black
+        // box — keep this in sync with :root{--panel} in style.css if
+        // that ever changes.
+        self.composite_scene(&scene_in, view_tf, Color::from_rgba8(0x20, 0x1f, 0x25, 0xff))?;
 
         let surface_texture = match self.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(t) | wgpu::CurrentSurfaceTexture::Suboptimal(t) => t,
@@ -860,64 +1204,7 @@ impl VelloEngine {
         let scene_in: SceneIn = serde_json::from_str(scene_json)
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
         let view_tf = self.viewport.transform();
-        let mut scene = Scene::new();
-        let full_canvas = Rect::new(0.0, 0.0, self.width as f64, self.height as f64);
-        for layer in &scene_in.layers {
-            let blend = blend_from(layer.blend_mode.as_deref());
-            if let Some(b) = blend {
-                scene.push_layer(vello::peniko::Fill::NonZero, b, 1.0, Affine::IDENTITY, &full_canvas);
-            }
-            for item in &layer.items {
-                if let Some(img_ref) = &item.image {
-                    if let Some(image_data) = self.images.get(&img_ref.image_id) {
-                        // draw_image() draws at the image's OWN natural pixel
-                        // size, so the display width/height (which can differ,
-                        // e.g. an imported photo scaled to fit the canvas) is
-                        // baked in as a scale, composed with the placement
-                        // translate and the overall view transform.
-                        let sx = img_ref.width / image_data.width as f64;
-                        let sy = img_ref.height / image_data.height as f64;
-                        let place = Affine::translate((img_ref.x, img_ref.y)) * Affine::scale_non_uniform(sx, sy);
-                        let brush = vello::peniko::ImageBrush::new(image_data.clone()).multiply_alpha(img_ref.opacity);
-                        scene.draw_image(&brush, view_tf * place);
-                    }
-                    continue;
-                }
-                let bez = match build_bezpath(item) {
-                    Some(b) => b,
-                    None => continue,
-                };
-                let paint_fill = |scene: &mut Scene| {
-                    if let Some(fc) = item.fill_color {
-                        scene.fill(vello::peniko::Fill::NonZero, view_tf, color_from(fc), None, &bez);
-                    }
-                };
-                let paint_stroke = |scene: &mut Scene| {
-                    if let Some(sc) = item.stroke_color {
-                        scene.stroke(&stroke_from(item), view_tf, color_from(sc), None, &bez);
-                    }
-                };
-                if item.paint_order.as_deref() == Some("strokeFirst") {
-                    paint_stroke(&mut scene);
-                    paint_fill(&mut scene);
-                } else {
-                    paint_fill(&mut scene);
-                    paint_stroke(&mut scene);
-                }
-            }
-            if blend.is_some() {
-                scene.pop_layer();
-            }
-        }
-        let params = RenderParams {
-            base_color: Color::TRANSPARENT,
-            width: self.width,
-            height: self.height,
-            antialiasing_method: AaConfig::Area,
-        };
-        self.renderer
-            .render_to_texture(&self.device, &self.queue, &scene, &self.offscreen_view, &params)
-            .map_err(|e| JsValue::from_str(&format!("render_to_texture failed: {e:?}")))?;
+        self.composite_scene(&scene_in, view_tf, Color::TRANSPARENT)?;
 
         // WebGPU requires bytes_per_row aligned to 256 for texture->buffer
         // copies; rows get padded on copy and stripped after mapping.
