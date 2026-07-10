@@ -1009,14 +1009,26 @@ function renderArcs(){
   var sA=spA.list,sB=spB.list;var matches=autoMatch(sA,sB);if(!matches.length)return;
   var sel=state.selectedStrokeIndices;var fm=matches.filter(function(m){return sel.indexOf(spA.orig[m.a])>=0;});if(!fm.length)return;
   arcLayer.activate();var cols=['#ff6b6b','#4ecdc4','#ffe66d','#a29bfe','#fd79a8','#00cec9'];var easFn=getEasing();
+  // A multi-element selection used to draw every arc at full brightness/
+  // width in its own cycling color — with more than a handful selected the
+  // dashed lines and endpoint dots pile on top of each other into an
+  // unreadable tangle ("plusieurs lignes de trajectoire qui se superposent,
+  // c'est illisible"). Past one element, fall back to a single neutral,
+  // faint style for all of them: still one real arc + one real draggable
+  // handle per matched pair (each tween keeps its own independently
+  // adjustable easing — collapsing them into one path would lose that), just
+  // rendered so the OVERALL motion reads as one soft bundle instead of a
+  // rainbow pileup. Single-element selections (by far the most common case
+  // for fine-tuning one curve) keep the original full-contrast styling.
+  var multi=fm.length>1;
   fm.forEach(function(m,di){
     var pA=buildTP(sA[m.a]),pB=buildTP(sB[m.b]);var cA=pA.bounds.center,cB=pB.bounds.center;pA.remove();pB.remove();
-    var mIdx=matches.indexOf(m);var ac=getArcCtrl(fA,fB,mIdx,[cA.x,cA.y],[cB.x,cB.y]);var col=cols[di%cols.length];var zs=1/view.zoom;
-    var ap=new Path({insert:true});ap.strokeColor=new Color(col);ap.strokeColor.alpha=.6;ap.strokeWidth=2*zs;ap.dashArray=[6*zs,4*zs];
+    var mIdx=matches.indexOf(m);var ac=getArcCtrl(fA,fB,mIdx,[cA.x,cA.y],[cB.x,cB.y]);var col=multi?'#ffffff':cols[di%cols.length];var zs=1/view.zoom;
+    var ap=new Path({insert:true});ap.strokeColor=new Color(col);ap.strokeColor.alpha=multi?.3:.6;ap.strokeWidth=(multi?1:2)*zs;ap.dashArray=[6*zs,4*zs];
     for(var s=0;s<=24;s++){var t=s/24;var x=qBez(cA.x,ac.x,cB.x,t);var y=qBez(cA.y,ac.y,cB.y,t);if(s===0)ap.moveTo(new Point(x,y));else ap.lineTo(new Point(x,y));}
-    new Path.Circle({center:cA,radius:4*zs,insert:true,fillColor:col,opacity:.8});
-    new Path.Circle({center:cB,radius:4*zs,insert:true,fillColor:col,opacity:.8});
-    var h=new Path.Circle({center:new Point(ac.x,ac.y),radius:7*zs,insert:true});h.fillColor=new Color(1,1,1,.95);h.strokeColor=col;h.strokeWidth=2*zs;
+    new Path.Circle({center:cA,radius:(multi?2.5:4)*zs,insert:true,fillColor:col,opacity:multi?.45:.8});
+    new Path.Circle({center:cB,radius:(multi?2.5:4)*zs,insert:true,fillColor:col,opacity:multi?.45:.8});
+    var h=new Path.Circle({center:new Point(ac.x,ac.y),radius:(multi?4:7)*zs,insert:true});h.fillColor=new Color(1,1,1,multi?.5:.95);h.strokeColor=col;h.strokeWidth=(multi?1:2)*zs;
     arcHandles.push({handle:h,fA:fA,fB:fB,matchIdx:mIdx,ptA:[cA.x,cA.y],ptB:[cB.x,cB.y]});
   });
   userLayers[state.activeLayerIdx].activate();

@@ -257,7 +257,20 @@ window.SM={
   duplicateLayer:function(){saveAllLayerFrames();pushUndoLayers();var src=state.layers[state.activeLayerIdx];var ni=createUserLayer(src.name+' copy');state.layers[ni].frames=JSON.parse(JSON.stringify(src.frames));if(src.blendMode)state.layers[ni].blendMode=src.blendMode;state.layers[ni].color=src.color;activateUL(ni);loadFrame(state.currentFrame);updateUI();},
   setActiveLayer:function(idx){if(idx<0||idx>=state.layers.length)return;saveAllLayerFrames();activateUL(idx);clearSel();renderArcs();updateUI();},
   toggleLayerVis:function(idx){state.layers[idx].visible=!state.layers[idx].visible;loadFrame(state.currentFrame);updateUI();},
-  toggleLayerLock:function(idx){state.layers[idx].locked=!state.layers[idx].locked;updateUI();},
+  toggleLayerLock:function(idx){
+    state.layers[idx].locked=!state.layers[idx].locked;
+    // Locking a layer that already has content selected (selected before the
+    // lock, or the lock toggled while it's the active layer) must drop that
+    // selection immediately — otherwise the resize/rotate handles stay live
+    // on now-locked geometry until the next unrelated selection change,
+    // same "lock isn't total" gap as the plain click/marquee case.
+    if(state.layers[idx].locked&&userLayers[idx]){
+      selectedPaths=selectedPaths.filter(function(p){return p.layer!==userLayers[idx];});
+      state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;});
+      renderArcs();
+    }
+    updateUI();
+  },
   toggleLayerSolo:function(idx){state.layers[idx].solo=!state.layers[idx].solo;loadFrame(state.currentFrame);updateUI();},
   renameLayer:function(idx,n){state.layers[idx].name=n;updateUI();},
   reorderLayer:function(fromIdx,toIdx){reorderLayer(fromIdx,toIdx);},
@@ -353,6 +366,7 @@ window.SM={
     _sel.frames.forEach(function(s){
       var ld=state.layers[s.layer];if(!ld)return;
       _sel.clipboard.push({rl:s.layer-b.minL,rf:s.frame-b.minF,content:JSON.parse(JSON.stringify(ld.frames[s.frame]))});
+      if(ld.locked)return; // keep it in the clipboard (paste elsewhere still works), just don't blank out a locked layer's own content
       ld.frames[s.frame]={strokes:[],isKeyframe:false,isInterpolated:false};
     });
     _sel.clipOp='cut';
@@ -366,6 +380,7 @@ window.SM={
     _sel.clipboard.forEach(function(d){
       var tl=baseL+d.rl,tf=baseF+d.rf;
       if(tl<0||tl>=state.layers.length||tf<0||tf>=state.totalFrames)return;
+      if(state.layers[tl].locked)return; // pasting into a locked layer must no-op for that layer, same as any other edit
       state.layers[tl].frames[tf]=JSON.parse(JSON.stringify(d.content));
     });
     selClear();
@@ -380,14 +395,14 @@ window.SM={
     if(!_sel.frames.length)return;
     pushUndo();saveAllLayerFrames();
     _sel.frames.forEach(function(s){
-      var ld=state.layers[s.layer];if(!ld)return;
+      var ld=state.layers[s.layer];if(!ld||ld.locked)return;
       ld.frames[s.frame]={strokes:[],isKeyframe:false,isInterpolated:false};
     });
     selClear();loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
     showToast('Frames supprimées');
   },
   moveKeyframe:function(layerIdx,fromFrame,toFrame){
-    if(fromFrame===toFrame)return;var ld=state.layers[layerIdx];if(!ld)return;
+    if(fromFrame===toFrame)return;var ld=state.layers[layerIdx];if(!ld||ld.locked)return;
     var src=ld.frames[fromFrame];if(!src||!src.isKeyframe)return;
     var dst=ld.frames[toFrame];if(!dst)return;
     pushUndo();
@@ -2229,8 +2244,9 @@ document.getElementById('p-sw').addEventListener('change',function(){window.SM.s
 document.getElementById('color-fill').addEventListener('input',function(){window.SM.setFillColor(this.dataset.hex8||this.value);if(!state.fillEnabled)window.SM.setFillEnabled(true);});
 document.getElementById('pm-fill-c').addEventListener('input',function(){var v=this.dataset.hex8||this.value;window.SM.setFillColor(v);document.getElementById('color-fill').value=v;document.getElementById('color-fill').dataset.hex8=v;if(!state.fillEnabled)window.SM.setFillEnabled(true);});
 document.getElementById('p-fill-on').addEventListener('change',function(){window.SM.setFillEnabled(this.checked);});
-document.getElementById('fill-enable-toggle').addEventListener('click',function(){window.SM.setFillEnabled(!state.fillEnabled);});
-document.getElementById('stroke-enable-toggle').addEventListener('click',function(){window.SM.setStrokeEnabled(!state.strokeEnabled);});
+// (fill-enable-toggle / stroke-enable-toggle section-header buttons removed
+// per redesign — the left panel's cw-eye badges are the one on/off switch
+// now; every other reference to those old IDs is null-guarded.)
 document.getElementById('fill-enable-toggle-lp').addEventListener('click',function(){window.SM.setFillEnabled(!state.fillEnabled);});
 document.getElementById('stroke-enable-toggle-lp').addEventListener('click',function(){window.SM.setStrokeEnabled(!state.strokeEnabled);});
 document.getElementById('color-stroke').addEventListener('input',function(){window.SM.setStrokeColor(this.dataset.hex8||this.value);if(!state.strokeEnabled)window.SM.setStrokeEnabled(true);});

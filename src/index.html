@@ -78,56 +78,53 @@
 </div>
 <div id="top-area">
   <div id="tools-panel">
-    <button class="tool-btn" data-tool="select" title="Selection / Transform (V)"><svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor"><path d="M5 3l14 8-6 1.3L11 20z"/></svg><span class="sk">V</span></button>
-    <button class="tool-btn" data-tool="subselect" title="Subselection — points &amp; tangents (A)"><span style="font-size:15px;line-height:1">&#x25b3;</span><span class="sk">A</span></button>
+    <button class="tool-btn" data-tool="select" data-i18n-title="toolSelect" title="Selection / Transform (V)"><svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor"><path d="M5 3l14 8-6 1.3L11 20z"/></svg><span class="sk">V</span></button>
+    <button class="tool-btn" data-tool="subselect" data-i18n-title="toolSubselect" title="Subselection — points &amp; tangents (A)"><span style="font-size:15px;line-height:1">&#x25b3;</span><span class="sk">A</span></button>
     <!-- v18: independent fill/stroke selection, Animate merge-drawing style —
          click a fill to select just that fill, click a stroke to select just
          that stroke (or, at a crossing with another stroke, just the bounded
          segment between the two nearest intersections) — Delete/recolor act
          on ONLY the clicked aspect, never both at once. -->
-    <button class="tool-btn" data-tool="fsselect" title="Fill/Stroke Select — click a fill or a stroke segment to select it independently (M)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="8" fill="currentColor" fill-opacity="0.35"/><path d="M4 12a8 8 0 0 1 16 0" stroke-dasharray="2.2 2.2"/></svg><span class="sk">M</span></button>
+    <button class="tool-btn" data-tool="fsselect" data-i18n-title="toolFsselect" title="Fill/Stroke Select — click a fill or a stroke segment to select it independently (M)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="8" fill="currentColor" fill-opacity="0.35"/><path d="M4 12a8 8 0 0 1 16 0" stroke-dasharray="2.2 2.2"/></svg><span class="sk">M</span></button>
     <!-- Team review: click anywhere on the canvas to pin a text comment,
          color-coded to the author's profile — see tools.js commentTool*
          and engine-bridge.js buildCommentPinItems. -->
-    <button class="tool-btn" data-tool="text" title="Texte — clique le canvas pour poser un bloc de texte (rendu image)"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M5 4h14v3h-2V6h-4v12h2v2H9v-2h2V6H7v1H5z"/></svg></button>
-    <button class="tool-btn active" data-tool="draw" title="Brush (B)"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M7 14c-1.66 0-3 1.34-3 3 0 1.31-1.16 2-2 2 .92 1.22 2.49 2 4 2 2.21 0 4-1.79 4-4 0-1.66-1.34-3-3-3z"/><path d="M20.71 4.63l-1.34-1.34a1 1 0 00-1.41 0L9 12.25 11.75 15l8.96-8.96a1 1 0 000-1.41z"/></svg><span class="sk">B</span></button>
-    <button class="tool-btn" data-tool="pen" title="Pen — click to place points, drag for curves (P)"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="m4.93 21.482 5.845-5.846a2 2 0 1 0-1.414-1.414l-5.846 5.846-1.06-1.06c2.827-3.3 3.888-6.954 5.302-13.082l6.364-.707 5.657 5.657-.707 6.364c-6.128 1.414-9.782 2.475-13.08 5.303l-1.062-1.06v-.001ZM16.595 2.037l6.347 6.346a.5.5 0 0 1-.277.848l-1.474.23-5.656-5.656.212-1.485a.5.5 0 0 1 .848-.283Z"/></svg><span class="sk">P</span></button>
-    <button class="tool-btn" data-tool="fillbrush" title="Fill brush — paint a freehand filled shape, pressure-sensitive (N)"><span style="font-size:14px;line-height:1">&#x25CF;</span><span class="sk">N</span></button>
-    <button class="tool-btn" data-tool="line" title="Line (U)"><span class="material-symbols-rounded">&#xf755;</span><span class="sk">U</span></button>
-    <button class="tool-btn" data-tool="rect" title="Rectangle (R)"><span class="material-symbols-rounded">&#xe3c6;</span><span class="sk">R</span></button>
-    <button class="tool-btn" data-tool="ellipse" title="Ellipse (L)"><span class="material-symbols-rounded">&#xef4a;</span><span class="sk">L</span></button>
+    <button class="tool-btn" data-tool="text" data-i18n-title="toolText" title="Texte — clique le canvas pour poser un bloc de texte (rendu image)"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M5 4h14v3h-2V6h-4v12h2v2H9v-2h2V6H7v1H5z"/></svg></button>
+    <button class="tool-btn active" data-tool="draw" data-i18n-title="toolDraw" title="Brush (B)"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M7 14c-1.66 0-3 1.34-3 3 0 1.31-1.16 2-2 2 .92 1.22 2.49 2 4 2 2.21 0 4-1.79 4-4 0-1.66-1.34-3-3-3z"/><path d="M20.71 4.63l-1.34-1.34a1 1 0 00-1.41 0L9 12.25 11.75 15l8.96-8.96a1 1 0 000-1.41z"/></svg><span class="sk">B</span></button>
+    <button class="tool-btn" data-tool="pen" data-i18n-title="toolPen" title="Pen — click to place points, drag for curves (P)"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="m4.93 21.482 5.845-5.846a2 2 0 1 0-1.414-1.414l-5.846 5.846-1.06-1.06c2.827-3.3 3.888-6.954 5.302-13.082l6.364-.707 5.657 5.657-.707 6.364c-6.128 1.414-9.782 2.475-13.08 5.303l-1.062-1.06v-.001ZM16.595 2.037l6.347 6.346a.5.5 0 0 1-.277.848l-1.474.23-5.656-5.656.212-1.485a.5.5 0 0 1 .848-.283Z"/></svg><span class="sk">P</span></button>
+    <button class="tool-btn" data-tool="fillbrush" data-i18n-title="toolFillbrush" title="Fill brush — paint a freehand filled shape, pressure-sensitive (N)"><span style="font-size:14px;line-height:1">&#x25CF;</span><span class="sk">N</span></button>
+    <button class="tool-btn" data-tool="line" data-i18n-title="toolLine" title="Line (U)"><span class="material-symbols-rounded">&#xf755;</span><span class="sk">U</span></button>
+    <button class="tool-btn" data-tool="rect" data-i18n-title="toolRect" title="Rectangle (R)"><span class="material-symbols-rounded">&#xe3c6;</span><span class="sk">R</span></button>
+    <button class="tool-btn" data-tool="ellipse" data-i18n-title="toolEllipse" title="Ellipse (L)"><span class="material-symbols-rounded">&#xef4a;</span><span class="sk">L</span></button>
     <div class="tool-sep"></div>
-    <button class="tool-btn" data-tool="eraser" title="Eraser (E)"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M14 19.002h7v2h-9l-3.998.002-6.487-6.487a1 1 0 0 1 0-1.414L12.12 2.496a1 1 0 0 1 1.415 0l7.778 7.778a1 1 0 0 1 0 1.414L14 19.002Zm1.657-4.485 3.535-3.536-6.364-6.364-3.535 3.536 6.364 6.364Z"/></svg><span class="sk">E</span></button>
-    <button class="tool-btn" data-tool="fill" title="Paint bucket — click an enclosed area to fill it (G)"><span class="material-symbols-rounded">&#xe23a;</span><span class="sk">G</span></button>
-    <button class="tool-btn" data-tool="eyedropper" title="Eyedropper (I)"><span class="material-symbols-rounded">&#xe3b8;</span><span class="sk">I</span></button>
+    <button class="tool-btn" data-tool="eraser" data-i18n-title="toolEraser" title="Eraser (E)"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M14 19.002h7v2h-9l-3.998.002-6.487-6.487a1 1 0 0 1 0-1.414L12.12 2.496a1 1 0 0 1 1.415 0l7.778 7.778a1 1 0 0 1 0 1.414L14 19.002Zm1.657-4.485 3.535-3.536-6.364-6.364-3.535 3.536 6.364 6.364Z"/></svg><span class="sk">E</span></button>
+    <button class="tool-btn" data-tool="fill" data-i18n-title="toolFill" title="Paint bucket — click an enclosed area to fill it (G)"><span class="material-symbols-rounded">&#xe23a;</span><span class="sk">G</span></button>
+    <button class="tool-btn" data-tool="eyedropper" data-i18n-title="toolEyedropper" title="Eyedropper (I)"><span class="material-symbols-rounded">&#xe3b8;</span><span class="sk">I</span></button>
     <div class="tool-sep"></div>
-    <button class="tool-btn" data-tool="comment" title="Comment — click the canvas to pin a note (C)"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M20 2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4l4 4 4-4h4a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2z"/></svg><span class="sk">C</span></button>
-    <button class="tool-btn" data-tool="hand" title="Hand — pan the canvas (H or Space)"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M20.5 5A1.5 1.5 0 0 0 19 6.5V11h-1V4.5a1.5 1.5 0 0 0-3 0V11h-1V3.5a1.5 1.5 0 0 0-3 0V11h-1V5.5a1.5 1.5 0 0 0-3 0v10.81l-2.22-3.6a1.504 1.504 0 1 0-2.56 1.58l3.31 5.34A5 5 0 0 0 9.78 22H17a5 5 0 0 0 5-5V6.5A1.5 1.5 0 0 0 20.5 5Z"/></svg><span class="sk">H</span></button>
-    <button class="tool-btn" data-tool="zoom" title="Zoom — click to zoom in, Alt+click to zoom out (Z)"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.35-4.35" stroke-linecap="round"/></svg><span class="sk">Z</span></button>
-    <button class="tool-btn" data-tool="rotate" title="Rotate canvas — drag to spin the stage around its center. Also works as Alt+drag from any other tool."><span style="font-size:15px;line-height:1">&#x21bb;</span></button>
-    <button class="tool-btn" data-tool="perspective" title="Perspective guide — drag vanishing points to place them. Once enabled, the Line tool snaps toward them from any tool."><span style="font-size:15px;line-height:1">&#x25C7;</span></button>
+    <button class="tool-btn" data-tool="comment" data-i18n-title="toolComment" title="Comment — click the canvas to pin a note (C)"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M20 2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4l4 4 4-4h4a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2z"/></svg><span class="sk">C</span></button>
+    <button class="tool-btn" data-tool="hand" data-i18n-title="toolHand" title="Hand — pan the canvas (H or Space)"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M20.5 5A1.5 1.5 0 0 0 19 6.5V11h-1V4.5a1.5 1.5 0 0 0-3 0V11h-1V3.5a1.5 1.5 0 0 0-3 0V11h-1V5.5a1.5 1.5 0 0 0-3 0v10.81l-2.22-3.6a1.504 1.504 0 1 0-2.56 1.58l3.31 5.34A5 5 0 0 0 9.78 22H17a5 5 0 0 0 5-5V6.5A1.5 1.5 0 0 0 20.5 5Z"/></svg><span class="sk">H</span></button>
+    <button class="tool-btn" data-tool="zoom" data-i18n-title="toolZoom" title="Zoom — click to zoom in, Alt+click to zoom out (Z)"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.35-4.35" stroke-linecap="round"/></svg><span class="sk">Z</span></button>
+    <button class="tool-btn" data-tool="rotate" data-i18n-title="toolRotate" title="Rotate canvas — drag to spin the stage around its center. Also works as Alt+drag from any other tool."><span style="font-size:15px;line-height:1">&#x21bb;</span></button>
+    <button class="tool-btn" data-tool="perspective" data-i18n-title="toolPerspective" title="Perspective guide — drag vanishing points to place them. Once enabled, the Line tool snaps toward them from any tool."><span style="font-size:15px;line-height:1">&#x25C7;</span></button>
     <div class="tool-sep"></div>
-    <!-- v9: overlapping stroke/fill swatches (mockup pattern) — stroke well
-         top-left, fill well bottom-right, replacing the old stacked pair
-         with separate S/F text labels. Same IDs/inputs as before so every
-         existing JS wire-up (setStrokeColor/setFillColor/eyedropper/etc.,
-         all keyed off #stroke-well/#fill-well/#color-stroke/#color-fill)
-         needs no changes at all. -->
+    <!-- v10 (mockup redesign): stroke swatch (colored ring) stacked ABOVE
+         the fill swatch (solid rounded square), each with its own round
+         eye-toggle badge overlapping the swatch's bottom-right corner, and
+         the swap button below. Same IDs/inputs as before so every existing
+         JS wire-up (setStrokeColor/setFillColor/eyedropper/toggle icons —
+         all keyed off #stroke-well/#fill-well/#color-stroke/#color-fill/
+         #stroke-enable-toggle-lp/#fill-enable-toggle-lp) needs no changes. -->
     <div class="color-wells">
-      <div class="cw-stack">
+      <div class="cw-slot">
         <div class="color-well" id="stroke-well" title="Stroke color"><input type="color" id="color-stroke" value="#000000" title="Stroke color"></div>
-        <div class="color-well none" id="fill-well" title="Fill color — double-click to enable/disable"><input type="color" id="color-fill" value="#ff0000" title="Fill color"></div>
+        <div class="lico cw-eye" id="stroke-enable-toggle-lp" title="Enable/disable stroke"></div>
       </div>
-      <!-- Fill/Stroke on-off switches, explicit and right next to their own
-           swatch (was only a hidden double-click gesture, or a toggle
-           buried in the right panel's section headers) — moved here per
-           the redesign, no longer in the main tool options toolbar. -->
-      <div class="cw-toggles">
-        <div class="lico" id="stroke-enable-toggle-lp" title="Enable/disable stroke"></div>
-        <div class="lico" id="fill-enable-toggle-lp" title="Enable/disable fill"></div>
+      <div class="cw-slot">
+        <div class="color-well none" id="fill-well" title="Fill color"><input type="color" id="color-fill" value="#ff0000" title="Fill color"></div>
+        <div class="lico cw-eye" id="fill-enable-toggle-lp" title="Enable/disable fill"></div>
       </div>
     </div>
-    <button id="tools-invert-btn" class="tool-btn" title="Swap stroke and fill colors (X)" style="margin-top:4px"><span style="font-size:14px;line-height:1">&#x21C4;</span></button>
+    <button id="tools-invert-btn" class="tool-btn" title="Swap stroke and fill colors (X)" style="margin-top:6px"><span style="font-size:14px;line-height:1">&#x21C4;</span></button>
   </div>
 
   <div id="canvas-area">
@@ -230,7 +227,7 @@
       </div>
     </div>
     <div class="psec" id="fill-sec">
-      <div class="phdr"><span class="ar">☰</span> Fill<button class="phdr-toggle" id="fill-enable-toggle" type="button" title="Enable/disable fill (faster than opening the color swatch)"></button></div>
+      <div class="phdr"><span class="ar">☰</span> Fill</div>
       <div class="pbdy">
         <div class="pr"><span class="pl">Color</span><div class="cw-mini" id="pm-fill" style="background:transparent" title="Click to pick a color, double-click to toggle fill on/off"><input type="color" id="pm-fill-c" value="#ff0000"></div><input type="checkbox" id="p-fill-on" style="display:none"></div>
         <div class="pr"><span class="pl">Opacity</span><input type="number" class="pi scrub" id="p-opacity" value="100" min="5" max="100" data-step="1"></div>
@@ -238,7 +235,7 @@
       </div>
     </div>
     <div class="psec" id="stroke-sec">
-      <div class="phdr"><span class="ar">☰</span> Stroke<button class="phdr-toggle" id="stroke-enable-toggle" type="button" title="Enable/disable stroke (faster than opening the color swatch)"></button></div>
+      <div class="phdr"><span class="ar">☰</span> Stroke</div>
       <div class="pbdy">
         <div class="pr"><span class="pl">Color</span><div class="cw-mini" id="pm-stroke" style="background:#000"><input type="color" id="pm-stroke-c" value="#000000"></div></div>
         <div class="pr"><span class="pl">Width</span><input type="number" class="pi scrub" id="p-sw" value="3" min="1" max="80" data-step="1" title="Stroke width (px)"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
@@ -551,41 +548,50 @@
 
 <div id="settings-modal" class="modal-overlay" style="display:none">
   <div class="modal-box">
-    <div class="modal-hdr">Réglages <button id="settings-close" class="modal-x">&times;</button></div>
+    <div class="modal-hdr"><span data-i18n="settingsTitle">Réglages</span> <button id="settings-close" class="modal-x">&times;</button></div>
     <div class="modal-bdy">
-      <div class="phdr" style="padding:0 0 4px 0;font-size:9px;color:var(--text-dim)">Profil (calques de révision)</div>
-      <div style="font-size:10px;color:var(--text-dim);margin-bottom:6px">Ton nom et ta couleur identifient tes traits face aux corrections d'un autre profil (superviseur, etc.) — voir l'outil Fill/Stroke Select et le mode "Corrections".</div>
+      <div class="phdr" style="padding:0 0 4px 0;font-size:9px;color:var(--text-dim)" data-i18n="settingsLanguage">Langue</div>
+      <div class="pr" style="gap:8px;margin-bottom:10px">
+        <select id="settings-language" class="pi" style="flex:1">
+          <option value="fr">Français</option>
+          <option value="en">English</option>
+          <option value="ja">日本語</option>
+          <option value="es">Español</option>
+        </select>
+      </div>
+      <div class="phdr" style="padding:0 0 4px 0;font-size:9px;color:var(--text-dim)" data-i18n="settingsProfileHdr">Profil (calques de révision)</div>
+      <div style="font-size:10px;color:var(--text-dim);margin-bottom:6px" data-i18n="settingsProfileDesc">Ton nom et ta couleur identifient tes traits face aux corrections d'un autre profil (superviseur, etc.) — voir l'outil Fill/Stroke Select et le mode "Corrections".</div>
       <div class="pr" style="gap:8px">
-        <span class="pl">Nom</span>
-        <input type="text" id="profile-name" class="pi" style="flex:1" placeholder="Ton nom">
+        <span class="pl" data-i18n="settingsName">Nom</span>
+        <input type="text" id="profile-name" class="pi" style="flex:1" placeholder="Ton nom" data-i18n-placeholder="settingsNamePh">
         <div class="cw-mini" id="profile-color-well" style="background:#4a9eff"><input type="color" id="profile-color"></div>
       </div>
       <div class="pr" style="gap:8px;margin-top:6px">
-        <span class="pl">Rôle</span>
+        <span class="pl" data-i18n="settingsRole">Rôle</span>
         <select id="profile-role" class="pi" style="flex:1">
-          <option value="animator">Animateur</option>
-          <option value="supervisor">Superviseur</option>
-          <option value="producer">Producteur</option>
+          <option value="animator" data-i18n="roleAnimator">Animateur</option>
+          <option value="supervisor" data-i18n="roleSupervisor">Superviseur</option>
+          <option value="producer" data-i18n="roleProducer">Producteur</option>
         </select>
       </div>
       <div style="font-size:9px;color:var(--text-dim);margin-top:4px" id="profile-role-hint"></div>
-      <div class="phdr" style="padding:14px 0 4px 0;font-size:9px;color:var(--text-dim)">Sync équipe (dossier partagé)</div>
-      <div style="font-size:10px;color:var(--text-dim);margin-bottom:6px">Publie tes modifs dans un dossier partagé (kDrive, Drive monté, S3…) et récupère celles des autres — async, pas de temps réel. Nouveaux traits fusionnés automatiquement ; un même trait modifié des deux côtés devient une correction à Accepter/Rejeter (comme un calque de révision).</div>
+      <div class="phdr" style="padding:14px 0 4px 0;font-size:9px;color:var(--text-dim)" data-i18n="settingsSyncHdr">Sync équipe (dossier partagé)</div>
+      <div style="font-size:10px;color:var(--text-dim);margin-bottom:6px" data-i18n="settingsSyncDesc">Publie tes modifs dans un dossier partagé (kDrive, Drive monté, S3…) et récupère celles des autres — async, pas de temps réel. Nouveaux traits fusionnés automatiquement ; un même trait modifié des deux côtés devient une correction à Accepter/Rejeter (comme un calque de révision).</div>
       <div class="pr" style="gap:6px">
-        <span class="pl" style="flex:none">Dossier</span>
-        <input type="text" id="sync-folder-path" class="pi" style="flex:1" placeholder="Aucun dossier configuré" readonly>
-        <button class="pbtn" id="sync-choose-folder" style="font-size:10px;padding:4px 8px">Choisir…</button>
+        <span class="pl" style="flex:none" data-i18n="settingsFolder">Dossier</span>
+        <input type="text" id="sync-folder-path" class="pi" style="flex:1" placeholder="Aucun dossier configuré" readonly data-i18n-placeholder="settingsFolderPh">
+        <button class="pbtn" id="sync-choose-folder" style="font-size:10px;padding:4px 8px" data-i18n="settingsChoose">Choisir…</button>
       </div>
       <div class="pr" style="margin-top:6px;gap:6px">
-        <button class="pbtn" id="sync-publish" style="flex:1;font-size:10px;padding:5px">Publier</button>
-        <button class="pbtn" id="sync-check" style="flex:1;font-size:10px;padding:5px">Vérifier les mises à jour</button>
+        <button class="pbtn" id="sync-publish" style="flex:1;font-size:10px;padding:5px" data-i18n="settingsPublish">Publier</button>
+        <button class="pbtn" id="sync-check" style="flex:1;font-size:10px;padding:5px" data-i18n="settingsCheckUpdates">Vérifier les mises à jour</button>
       </div>
       <div id="sync-updates-list" style="display:flex;flex-direction:column;gap:4px;margin-top:6px"></div>
-      <div class="phdr" style="padding:14px 0 4px 0;font-size:9px;color:var(--text-dim)">Raccourcis clavier — outils</div>
-      <div style="font-size:10px;color:var(--text-dim);margin-bottom:6px">Cliquer une touche puis appuyer sur une nouvelle touche pour la réassigner. Les autres raccourcis (transport, undo/save…) ne sont pas encore modifiables ici. Import de profils (Animate, Blender…) : à venir.</div>
+      <div class="phdr" style="padding:14px 0 4px 0;font-size:9px;color:var(--text-dim)" data-i18n="settingsShortcutsHdr">Raccourcis clavier — outils</div>
+      <div style="font-size:10px;color:var(--text-dim);margin-bottom:6px" data-i18n="settingsShortcutsDesc">Cliquer une touche puis appuyer sur une nouvelle touche pour la réassigner. Les autres raccourcis (transport, undo/save…) ne sont pas encore modifiables ici. Import de profils (Animate, Blender…) : à venir.</div>
       <div id="shortcuts-list" style="display:flex;flex-direction:column;gap:2px;max-height:320px;overflow-y:auto"></div>
       <div class="pr" style="margin-top:10px;gap:6px">
-        <button class="pbtn" id="shortcuts-reset" style="flex:1">Réinitialiser tout</button>
+        <button class="pbtn" id="shortcuts-reset" style="flex:1" data-i18n="settingsResetAll">Réinitialiser tout</button>
       </div>
     </div>
   </div>
@@ -731,6 +737,7 @@
 <script src="js/brush-editor.js"></script>
 <script src="js/export.js"></script>
 <script src="js/timeline.js"></script>
+<script src="js/i18n.js"></script>
 <script src="js/camera.js"></script>
 <script src="js/audio-bridge.js"></script>
 <script src="js/reference-bridge.js"></script>

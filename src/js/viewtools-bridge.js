@@ -157,7 +157,15 @@
       e.stopImmediatePropagation();
       e.preventDefault();
       var angleNow = angleFromPivot(e.clientX, e.clientY);
-      state.canvasRotation = rotateStartRotation + (angleNow - rotateStartAngle);
+      var newRotation = rotateStartRotation + (angleNow - rotateStartAngle);
+      // Shift held: snap to 15° increments, matching every classic 2D-anim
+      // app's canvas-rotate gesture (TVPaint/Animate) — makes it trivial to
+      // return to a clean 0°/45°/90° angle instead of eyeballing it.
+      if (e.shiftKey) {
+        var snapStep = Math.PI / 12;
+        newRotation = Math.round(newRotation / snapStep) * snapStep;
+      }
+      state.canvasRotation = newRotation;
       // viewport-only: rotating the stage changes no scene item (overlay
       // handle sizes depend on zoom, not rotation) — reuse the scene JSON
       // instead of a full rebuild per pointermove (see renderNow's comment)

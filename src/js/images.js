@@ -202,7 +202,45 @@
     var idx=createUserLayer(prefix);
     while(frames.length<state.totalFrames)frames.push({strokes:[],isKeyframe:false,isInterpolated:false});
     state.layers[idx].frames=frames;
-    activateUL(idx);loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
+    activateUL(idx);
+    // convertLayerToComponent() below calls saveAllLayerFrames(), which
+    // re-serializes the CURRENT frame from the live Paper.js document for
+    // every layer — loadFrame() must run first so that live document
+    // actually reflects the frame data just assigned above, or the current
+    // frame's raster gets clobbered with whatever userLayers[idx] happened
+    // to hold before (empty, since this layer was only just created).
+    loadFrame(state.currentFrame);
+    // desR() (app.js) sizes a Raster asynchronously in its own onLoad —
+    // r.bounds is 0x0 until that fires. convertLayerToComponent() below
+    // calls saveAllLayerFrames() synchronously right after this, which would
+    // otherwise serialize the still-unsized raster (serR reads r.bounds),
+    // baking a 0x0 component permanently into frame 0. Wait for the actual
+    // decoded size before proceeding; the 1.5s fallback is a safety net in
+    // case some raster never fires 'load' (shouldn't happen for a data URL,
+    // but a silently-stuck import is worse than a rare redundant wait).
+    await new Promise(function(resolve){
+      var r=userLayers[idx].children.filter(function(c){return c instanceof Raster;})[0];
+      if(!r){resolve();return;}
+      var done=false;
+      r.on('load',function(){if(!done){done=true;resolve();}});
+      setTimeout(function(){if(!done){done=true;resolve();}},1500);
+    });
+    // Each decoded frame is its own independent baked raster at a fixed x/y/
+    // width/height — "transformable via the same Raster+layer path images
+    // use" (see this file's top comment) was true in the narrow sense that
+    // a Raster IS selectable/draggable, but dragging or resizing it only
+    // ever touched THAT ONE frame's copy; every other frame kept the
+    // original centered placement, so the clip as a whole read as "stuck"
+    // (had to redo the transform by hand on every single frame). Wrapping
+    // the fresh layer as a component reuses the SAME symbolId/symMatrix
+    // pipeline every other component instance already goes through (single
+    // shared affine applied uniformly across all frames on move/scale/
+    // rotate, getEffectiveStrokes' ld.symbolId branch, export.js, etc.) —
+    // the video becomes one rigid, uniformly transformable object exactly
+    // like the user expects "comme un symbole", with no new per-item type
+    // or extra consumer to keep in sync (CLAUDE.md §1's actual cost of a
+    // bespoke video-layer type, avoided entirely).
+    convertLayerToComponent(idx);
     showToast('Vidéo importée : '+frames.filter(function(f){return f.strokes.length;}).length+' images sur le calque "'+prefix+'"');
   }
   async function importVideo(){

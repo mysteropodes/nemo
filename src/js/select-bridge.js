@@ -127,7 +127,25 @@
     }
 
     var layer = userLayers[state.activeLayerIdx];
-    var hit = layer.hitTest(pt, { stroke: true, fill: true, tolerance: 8 / view.zoom });
+    var activeLdForLock = state.layers[state.activeLayerIdx];
+    // A locked ACTIVE layer's own content must be as untouchable as a locked
+    // OTHER layer's already is (see the hitOtherLayerIdx loop right below,
+    // which has always skipped ld2.locked) — this hit-test had no such gate,
+    // so selecting/dragging/transforming a locked layer's strokes still
+    // worked the whole time it happened to be the active one, which is
+    // most of the time right after locking it from the layer panel. Forcing
+    // a miss here just falls through to the other-layer/component search
+    // below, exactly as if this layer had nothing at that point.
+    // EXCEPT a component/symbol layer: convertLayerToComponent always sets
+    // .locked=true by design (it blocks hand-editing the baked sub-strokes),
+    // but the component must still be selectable/movable AS ONE RIGID WHOLE
+    // — that's the separate activeLd.symbolId branch a bit further down,
+    // which only runs when `hit` comes back truthy. Nulling hit here for
+    // every locked layer indiscriminately silently broke selecting a
+    // component the instant it was also the active layer (the normal case
+    // right after creating one, or an imported video, or whenever the layer
+    // panel has it selected).
+    var hit = (activeLdForLock.locked && !activeLdForLock.symbolId) ? null : layer.hitTest(pt, { stroke: true, fill: true, tolerance: 8 / view.zoom });
     var hitOtherLayerIdx = -1;
     // If nothing on the active layer, check every OTHER normal (non-
     // component) layer too — clicking a stroke that lives on layer 1 while
@@ -363,7 +381,11 @@
           lassoPath = _marquee.rect;
         }
         var layer2 = userLayers[state.activeLayerIdx];
-        layer2.children.forEach(function (c) {
+        var activeLdForMarqueeLock = state.layers[state.activeLayerIdx];
+        // Same lock gate as the click-select hit-test above (and same
+        // component exception — a component's own .locked=true must not
+        // block marquee-selecting it as a whole either).
+        ((activeLdForMarqueeLock.locked && !activeLdForMarqueeLock.symbolId) ? [] : layer2.children).forEach(function (c) {
           // A linkedFill backdrop (c.data.isLinkedFillCompanion) is never
           // its own selectable thing — it always moves as part of its
           // parent ribbon's own selectedPaths entry (see that flag's own

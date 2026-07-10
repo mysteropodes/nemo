@@ -501,6 +501,22 @@ function symGestureAccumulate(opMatrix){
 // — point gets the full affine, handleIn/handleOut are deltas so only the
 // linear (non-translating) part applies to them.
 function applyMatrixToStrokeData(sd,m){
+  if(sd.isRaster){
+    // A raster stroke has no `segments` (see serR/desR — just a center x/y
+    // and a width/height rect, no rotation field anywhere in this schema:
+    // engine-bridge's image item builder and the Rust image-draw path both
+    // only ever compose a translate+scale, see engine.rs's ItemIn.image
+    // handling). The early-return below would otherwise silently no-op a
+    // symMatrix on an imported-video component (confirmed live: dragging
+    // the component moved nothing at all) — translate the center and scale
+    // width/height by the matrix's own linear-part magnitude so move/resize
+    // gestures work correctly; a rotate gesture degrades to scale-only
+    // (matches the schema's real capability rather than silently doing
+    // nothing or crashing).
+    var c=m.transform(new Point(sd.x,sd.y));
+    var scaleX=Math.sqrt(m.a*m.a+m.b*m.b),scaleY=Math.sqrt(m.c*m.c+m.d*m.d);
+    return{isRaster:true,src:sd.src,x:c.x,y:c.y,width:sd.width*scaleX,height:sd.height*scaleY,opacity:sd.opacity};
+  }
   if(!sd.segments)return sd;
   sd.segments=sd.segments.map(function(s){
     var p=m.transform(new Point(s.point[0],s.point[1]));
@@ -922,6 +938,13 @@ function _normStrokeForCompare(sd){
   n.strokeJoin=n.strokeJoin||'round';
   n.dashOffset=n.dashOffset!==undefined?n.dashOffset:0;
   n.opacity=n.opacity!==undefined?n.opacity:1;
+  // interpStroke() (tweens.js) never sets hasRealStroke — only serP() does —
+  // so a freshly-generated tween frame's stored data has it undefined while
+  // the very next save() re-serializes the live Paper.js object through
+  // serP() and gets hasRealStroke:true/false. Same fallback as the other
+  // hasRealStroke consumer (isTexAnchor branch above): derive it from
+  // strokeColor when absent, so this isn't seen as a real content change.
+  n.hasRealStroke=n.hasRealStroke!==undefined?n.hasRealStroke:!!n.strokeColor;
   return n;
 }
 function strokesEqual(a,b){
@@ -1161,6 +1184,7 @@ function nextKeyframeFrame(layerIdx,fromFrame){
 function insertKeyframeAt(layerIdx,frameIdx){
   saveAllLayerFrames();
   var ld=state.layers[layerIdx];var f=ld.frames[frameIdx];
+  if(ld.locked){showToast('Calque verrouillé');return false;}
   if(f.isKeyframe){showToast('Déjà une keyframe');return false;}
   pushUndoLayers();
   f.strokes=JSON.parse(JSON.stringify(getEffectiveStrokes(layerIdx,frameIdx)));
@@ -1171,8 +1195,9 @@ function insertKeyframeAt(layerIdx,frameIdx){
   return true;
 }
 function insertBlankKeyframe(){
-  saveAllLayerFrames();pushUndoLayers();
   var ld=state.layers[state.activeLayerIdx];
+  if(ld.locked){showToast('Calque verrouillé');return;}
+  saveAllLayerFrames();pushUndoLayers();
   var f={strokes:[],isKeyframe:true,isInterpolated:false};
   // On a component layer this main-timeline row is otherwise dead timing
   // decoration (getEffectiveStrokes' symbolId branch never reads it) — the
@@ -1190,6 +1215,7 @@ function removeFrame(){if(state.totalFrames<=1)return;pushUndoLayers();var cf=st
 // without removing the frame slot itself (unlike removeFrame/removeFrameSpan).
 function clearKeyframe(){
   var ld=state.layers[state.activeLayerIdx];var cf=state.currentFrame;var f=ld.frames[cf];
+  if(ld.locked){showToast('Calque verrouillé');return;}
   if(!f||!f.isKeyframe){showToast('Pas une keyframe');return;}
   pushUndo();f.strokes=[];f.isKeyframe=false;f.isInterpolated=false;
   syncLinkedKeyframeFolder(state.activeLayerIdx,cf);
@@ -1202,6 +1228,7 @@ function clearKeyframe(){
 // disturbing the rest of the tween.
 function convertToKeyframes(){
   var li=state.activeLayerIdx;var ld=state.layers[li];
+  if(ld.locked){showToast('Calque verrouillé');return;}
   var frames=_sel.frames.length?_sel.frames.filter(function(s){return s.layer===li;}).map(function(s){return s.frame;}):[state.currentFrame];
   if(!frames.length){showToast('Aucune sélection');return;}
   pushUndo();saveAllLayerFrames();var count=0;

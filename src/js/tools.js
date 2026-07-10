@@ -144,7 +144,42 @@ function fsBuildFillRegion(fillPath,boundaryStart,boundaryEnd,cutter,cutterA,cut
 function fsFindFillRegion(fillPath,pt,layer){
   for(var i=0;i<layer.children.length;i++){
     var c=layer.children[i];
-    if(c===fillPath||!(c instanceof Path)||c.closed||!c.strokeColor||c.segments.length<2)continue;
+    if(c===fillPath||!(c instanceof Path)||!c.strokeColor||c.segments.length<2)continue;
+    // A CLOSED cutter (e.g. a circle stroked over a filled shape) used to be
+    // excluded here entirely — clicking either side of it just selected the
+    // WHOLE fill, no split at all, exactly the "fill selection cut by a
+    // stroke doesn't select the right zone" complaint. The arc-join trick
+    // below (fsBuildFillRegion) only works for an OPEN cutter: it has a
+    // single unambiguous connecting arc between the two crossing points. A
+    // CLOSED cutter has TWO complementary arcs of its own, same ambiguity as
+    // the fill — tried reusing the same join, and it silently built a region
+    // using an arbitrary one of those two arcs, which can poke outside the
+    // fill's real area entirely (confirmed live: a circle straddling a
+    // rectangle's edge produced a "region" bounded by the circle's OUTSIDE
+    // half). Paper's own boolean ops have no such ambiguity — intersect() is
+    // exactly "the fill piece inside the cutter", subtract() is exactly
+    // "the piece outside it" — so a closed cutter gets its own branch here
+    // instead of forcing it through the open-cutter arc machinery.
+    if(c.closed){
+      var ixc;
+      try{ixc=fillPath.getIntersections(c);}catch(e){continue;}
+      if(!ixc||ixc.length<2)continue; // touches/tangent/fully inside or outside — no real split
+      var inside,outside;
+      try{inside=fillPath.intersect(c,{insert:false});outside=fillPath.subtract(c,{insert:false});}
+      catch(e){continue;}
+      // Multi-island result (concave overlap, cutter weaves in/out more than
+      // once) is out of scope here — same "real planar-subdivision engine
+      // out of scope" boundary the open-cutter path already draws elsewhere
+      // in this function; fall back to whole-fill selection for that case.
+      var okIn=inside&&inside.segments&&inside.segments.length&&!(inside instanceof CompoundPath);
+      var okOut=outside&&outside.segments&&outside.segments.length&&!(outside instanceof CompoundPath);
+      if(!okIn||!okOut){if(inside)inside.remove();if(outside)outside.remove();continue;}
+      var chosenB=inside.contains(pt)?inside:(outside.contains(pt)?outside:null);
+      if(!chosenB){inside.remove();outside.remove();continue;}
+      var otherB=chosenB===inside?outside:inside;
+      otherB.remove();
+      return{regionPath:chosenB,cutter:c,boolCut:true,inside:chosenB===inside};
+    }
     var ix;
     try{ix=fillPath.getIntersections(c);}catch(e){continue;}
     if(!ix||ix.length!==2)continue; // only the simple single-chord case
@@ -171,6 +206,24 @@ function fsFindFillRegion(fillPath,pt,layer){
 function fsRealizeFillRegion(sel,layer){
   var fillPath=sel.path;
   var idx=layer.children.indexOf(fillPath);
+  if(sel.boolCut){
+    var inside,outside;
+    try{inside=fillPath.intersect(sel.cutter,{insert:false});outside=fillPath.subtract(sel.cutter,{insert:false});}
+    catch(e){inside=null;outside=null;}
+    if(!inside||!outside||inside instanceof CompoundPath||outside instanceof CompoundPath){
+      // Cutter moved/geometry changed since selection (same staleness case
+      // fsHighlightPath already falls back on) — bail without touching the
+      // layer rather than leave it half-edited.
+      if(inside)inside.remove();if(outside)outside.remove();
+      return{path:fillPath,kind:'fill'};
+    }
+    inside.fillColor=fillPath.fillColor;inside.strokeColor=fillPath.strokeColor;inside.strokeWidth=fillPath.strokeWidth;
+    outside.fillColor=fillPath.fillColor;outside.strokeColor=fillPath.strokeColor;outside.strokeWidth=fillPath.strokeWidth;
+    fsUnlinkFillRegen(inside);fsUnlinkFillRegen(outside);
+    layer.insertChild(idx,inside);layer.insertChild(idx,outside);
+    fillPath.remove();
+    return{path:sel.inside?inside:outside,kind:'fill'};
+  }
   var a=fsExtractArc(fillPath,sel.boundaryStart,sel.boundaryEnd);
   var chordA=fsExtractArc(sel.cutter,Math.min(sel.cutterA,sel.cutterB),Math.max(sel.cutterA,sel.cutterB));
   var b=fsExtractArc(fillPath,sel.boundaryEnd,sel.boundaryStart);
@@ -233,7 +286,11 @@ function fsHitTest(pt,layer){
       }
     }else{
       var region=fsFindFillRegion(fp,pt,layer);
-      if(region){region.regionPath.remove();return{path:fp,kind:'fillregion',boundaryStart:region.boundaryStart,boundaryEnd:region.boundaryEnd,cutter:region.cutter,cutterA:region.cutterA,cutterB:region.cutterB};}
+      if(region){
+        region.regionPath.remove();
+        if(region.boolCut)return{path:fp,kind:'fillregion',boolCut:true,cutter:region.cutter,inside:region.inside};
+        return{path:fp,kind:'fillregion',boundaryStart:region.boundaryStart,boundaryEnd:region.boundaryEnd,cutter:region.cutter,cutterA:region.cutterA,cutterB:region.cutterB};
+      }
     }
     return{path:fp,kind:'fill'};
   }
@@ -248,6 +305,16 @@ function fsHighlightPath(sel){
   if(!sel)return null;
   if(sel.kind==='fill')return sel.path.clone({insert:false,deep:false});
   if(sel.kind==='fillregion'){
+    if(sel.boolCut){
+      var boolRegion;
+      try{boolRegion=sel.inside?sel.path.intersect(sel.cutter,{insert:false}):sel.path.subtract(sel.cutter,{insert:false});}
+      catch(e){boolRegion=null;}
+      if(!boolRegion||!boolRegion.segments||!boolRegion.segments.length||boolRegion instanceof CompoundPath){
+        if(boolRegion)boolRegion.remove();
+        return sel.path.clone({insert:false,deep:false}); // cutter moved/geometry changed since selection — fall back to whole fill
+      }
+      return boolRegion;
+    }
     var region=fsBuildFillRegion(sel.path,sel.boundaryStart,sel.boundaryEnd,sel.cutter,sel.cutterA,sel.cutterB);
     if(!region)return sel.path.clone({insert:false,deep:false}); // cutter/geometry changed since selection — fall back to whole fill
     var out=region.clone({insert:false,deep:false});
@@ -769,7 +836,27 @@ function fillCollectWalls(layer,excludePath,onlyIds){
     if(onlyIds&&onlyIds.indexOf(sid)<0)return;
     var w=fillWallPath(c);
     if(w.segments.length<2){w.remove();return;}
-    if(w.closed||w.firstSegment.point.getDistance(w.lastSegment.point)<0.5){w.closed=true;closed.push(w);closedSrc.push(sid);}
+    if(w.closed||w.firstSegment.point.getDistance(w.lastSegment.point)<0.5){
+      w.closed=true;closed.push(w);closedSrc.push(sid);
+      // ALSO feed this closed outline into the open-wall trace graph, as a
+      // ring polyline (opened + explicitly re-closed by appending a copy of
+      // its first segment, so its two endpoints coincide and join into one
+      // graph node). Closed walls used to exist ONLY as whole-loop
+      // candidates — a region bounded partly by a closed shape's outline
+      // and partly by open strokes crossing it (the everyday "paint bucket
+      // inside a zone traced over an existing filled shape" case) was
+      // structurally unfindable, so the bucket silently fell back to the
+      // WHOLE closed shape. In the graph, crossings split this ring into
+      // arcs exactly like any open wall (build_graph/fill.rs cuts at every
+      // crossing), letting hybrid loops (stroke arc + outline arc) win by
+      // the existing smallest-area rule. A crossing-less ring degrades to
+      // the same whole-loop candidate it already was — no behavior change.
+      var ring=w.clone({insert:false});
+      ring.closed=false;
+      var rf=ring.firstSegment;
+      ring.add(new Segment(rf.point.clone(),rf.handleIn.clone(),new Point(0,0)));
+      open.push(ring);openSrc.push(sid);
+    }
     else{open.push(w);openSrc.push(sid);}
   });
   return{open:open,closed:closed,openSrc:openSrc,closedSrc:closedSrc};
@@ -885,6 +972,34 @@ function fillBuildPathFromSeq(graph,opens,seq){
 // dragged (even off-canvas) or how slowly/erratically they move. The old
 // behavior (seed-only, gap capped at the original fillGapPx) is kept for
 // legacy fills that predate the association.
+// Animate-style bucket stacking: a paint-bucket click inside a region that
+// sits ON TOP of an existing opaque fill must produce a fill you can
+// actually SEE — the historical insertChild(0, ...) (bottom of the layer,
+// so strokes always stay above) painted the new region BEHIND that
+// existing fill, i.e. invisibly, whenever the clicked region overlapped
+// one ("ça fill derrière, pas devant"). Animate resolves this because its
+// merge-drawing model carves the underlying fill; without that rework
+// (explicitly out of scope — Sujet #100), the visually-equivalent behavior
+// is to insert the new region just ABOVE the topmost fill that covers the
+// click point: the region then reads as replaced/painted-over, while
+// every stroke and fill stacked higher than that covering fill (the
+// boundary strokes the user traced the region with, drawn later) keeps
+// its place on top. No covering fill -> index 0, the classic behavior.
+function fillInsertIndexFor(layer,pt,excludePath){
+  var insertAt=0;
+  for(var i=layer.children.length-1;i>=0;i--){
+    var c=layer.children[i];
+    if(c===excludePath)continue;
+    var covers=false;
+    if((c instanceof Path||c instanceof CompoundPath)&&c.fillColor){
+      try{covers=c.contains(pt);}catch(e){covers=false;}
+    }else if(c instanceof Raster){
+      covers=c.bounds.contains(pt);
+    }
+    if(covers){insertAt=i+1;break;}
+  }
+  return insertAt;
+}
 function fillRegenerateLinked(layer,touchedPath){
   if(!layer)return;
   var fills=layer.children.filter(function(c){return c instanceof Path&&c.data&&c.data.fillSeed;});
@@ -2413,7 +2528,7 @@ function onMouseDown(event){
     var res=fillVectorFind(event.point,layer,null);
     if(!res){showToast('Aucune zone fermée ici');return;}
     pushUndo();
-    layer.insertChild(0,res.path);
+    layer.insertChild(fillInsertIndexFor(layer,event.point,res.path),res.path);
     res.path.fillColor=state.fillColor;res.path.strokeColor=null;res.path.opacity=state.opacity/100;
     // remembers where/how this fill was made so subselection edits to the
     // strokes around it can regenerate it in place (see fillRegenerateLinked)
@@ -2567,13 +2682,31 @@ function onMouseDrag(event){
     eraseUpdateCursor(event);
     if(state.layers[state.activeLayerIdx].locked)return;
     var layer2e=userLayers[state.activeLayerIdx];
-    var hit=layer2e.hitTest(event.point,{stroke:true,fill:true,tolerance:Math.max(8,state.eraserSize/2)/view.zoom});
-    if(hit&&(hit.item instanceof Path||hit.item instanceof CompoundPath)&&(hit.item.strokeColor||hit.item.fillColor||(hit.item.data&&hit.item.data.isVectorBrush))){
-      if(!_eraseDragActive){pushUndo();_eraseDragActive=true;}
-      eraseAtPoint(hit.item,event.point,state.eraserSize/2,_eraseLastPt);
-      _eraseLastPt=event.point.clone();
-      fillRegenerateLinked(layer2e,null);saveActiveLayerFrame();updateUI();
+    // A fast mouse/tablet sweep can jump the cursor several eraser-widths
+    // between two consecutive drag events — hit-testing only the NEW point
+    // then missed shapes the sweep actually crossed, so the erased trail got
+    // gappier the faster you moved (stutter/inconsistent flow). A real brush
+    // doesn't have this problem because its dabs are spaced by arc length,
+    // not by however many move events the OS happened to deliver. Resample
+    // the segment since the last point at a fixed max step (a fraction of
+    // the eraser's own radius) so the bite trail stays dense and continuous
+    // regardless of input sampling rate.
+    var fromP=_eraseLastPt||event.point;
+    var segDist=fromP.getDistance(event.point);
+    var step=Math.max(1,state.eraserSize/4);
+    var steps=Math.max(1,Math.ceil(segDist/step));
+    var erasedAny=false;
+    for(var esi=1;esi<=steps;esi++){
+      var subPt=fromP.add(event.point.subtract(fromP).multiply(esi/steps));
+      var hit=layer2e.hitTest(subPt,{stroke:true,fill:true,tolerance:Math.max(8,state.eraserSize/2)/view.zoom});
+      if(hit&&(hit.item instanceof Path||hit.item instanceof CompoundPath)&&(hit.item.strokeColor||hit.item.fillColor||(hit.item.data&&hit.item.data.isVectorBrush))){
+        if(!_eraseDragActive){pushUndo();_eraseDragActive=true;}
+        eraseAtPoint(hit.item,subPt,state.eraserSize/2,_eraseLastPt);
+        erasedAny=true;
+      }
+      _eraseLastPt=subPt.clone();
     }
+    if(erasedAny){fillRegenerateLinked(layer2e,null);saveActiveLayerFrame();updateUI();}
   }
 }
 function onMouseUp(event){

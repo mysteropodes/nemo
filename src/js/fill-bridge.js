@@ -46,7 +46,10 @@
       return;
     }
     pushUndo();
-    layer.insertChild(0, res.path);
+    // Same Animate-style stacking as tools.js's own 'fill' branch — see
+    // fillInsertIndexFor's comment (tools.js): above the topmost fill
+    // covering the click point, so the new fill is actually visible.
+    layer.insertChild(fillInsertIndexFor(layer, pt, res.path), res.path);
     res.path.fillColor = state.fillColor;
     res.path.strokeColor = null;
     res.path.opacity = state.opacity / 100;
