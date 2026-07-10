@@ -233,9 +233,11 @@
       <div class="pbdy">
         <div class="pr" id="cam-key-info" style="font-size:10px;color:var(--text-dim)"></div>
         <div class="pr"><button class="pbtn ac" id="btn-cam-addkey" style="flex:1">Ajouter une clé</button></div>
-        <div class="pr" id="cam-ease-label" style="font-size:10px;color:var(--text-dim)"></div>
-        <div class="pr"><canvas id="cam-ease-canvas" width="220" height="140" style="width:100%;border-radius:6px;background:var(--panel3);cursor:crosshair"></canvas></div>
-        <div class="pr" style="font-size:9px;color:var(--text-dim)">Glisse les 2 poignées pour sculpter l'accélération du mouvement entre les 2 clés encadrant la frame courante. Déplace/resize le rectangle caméra directement sur le canvas.</div>
+        <!-- The curve itself is edited in the shared Easing Curve widget
+             (right panel, or right-click the camera row) — feedback
+             #5pi90 — not a separate mini-canvas here anymore. -->
+        <div class="pr"><button class="pbtn" id="btn-cam-ease-edit" style="flex:1" title="Ouvre l'éditeur de courbe partagé (section Easing Curve), pointé sur le segment encadrant la frame courante">Modifier la courbe d'accélération…</button></div>
+        <div class="pr" style="font-size:9px;color:var(--text-dim)">Déplace/resize le rectangle caméra directement sur le canvas.</div>
       </div>
     </div>
     <div class="psec" id="fill-sec">

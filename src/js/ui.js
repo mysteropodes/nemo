@@ -22,6 +22,15 @@
   // Sticky: shown by Alt+click (or pressing Alt with a point selected),
   // hidden again by the next plain click.
   var showTangents=false;
+  // Camera-segment ease mode (feedback #5pi90): the camera panel's own tiny
+  // 2-handle editor is gone — right-clicking the camera timeline row now
+  // opens THIS shared widget instead, pointed at that segment's ease
+  // instead of state.easingCurve. Storage stays the classic 2-off-curve-
+  // control-point cubic bezier (camera.js's cameraAtFrame/bezierEase are
+  // untouched) — only the editing surface moves, so no data migration.
+  var camEaseSeg=null,camEaseLabel='';
+  function isCamMode(){return !!camEaseSeg;}
+  function camEase(){return camEaseSeg.ease||(camEaseSeg.ease=[.42,0,.58,1]);}
   // A small easing gallery (After Effects/GreenSock-style grid of named
   // curve families, each in/out/inout where that makes sense) — through-
   // point approximations of their usual off-curve-handle shapes, since the
@@ -119,7 +128,37 @@
   }
   function evalCurve(x){return evalPointsCurve(cs.points,x);}
 
+  // Classic 2-off-curve-control-point cubic bezier (0,0)->(1,1) — the exact
+  // model/rendering camera.js's own mini editor used to have, just drawn on
+  // this shared big canvas with a FIXED [0,1] range (no auto-fit: camera
+  // eases essentially never overshoot, and a fixed frame make the control
+  // handles easier to place precisely by eye).
+  function drawCamEase(){
+    var yr={lo:0,hi:1};
+    ctx.clearRect(0,0,W,H);ctx.fillStyle='#111';ctx.fillRect(0,0,W,H);
+    var e=camEase();
+    ctx.strokeStyle='#334155';ctx.setLineDash([3,3]);
+    var p0=[tX(0),tY(0,yr)],p1=[tX(1),tY(1,yr)];
+    ctx.strokeRect(p0[0],p1[1],p1[0]-p0[0],p0[1]-p1[1]);
+    ctx.beginPath();ctx.moveTo(p0[0],p0[1]);ctx.lineTo(p1[0],p1[1]);ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.strokeStyle='#ffaa28';ctx.lineWidth=2.5;
+    ctx.beginPath();ctx.moveTo(p0[0],p0[1]);
+    var c1=[tX(e[0]),tY(e[1],yr)],c2=[tX(e[2]),tY(e[3],yr)];
+    ctx.bezierCurveTo(c1[0],c1[1],c2[0],c2[1],p1[0],p1[1]);
+    ctx.stroke();
+    ctx.strokeStyle='#556';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(p0[0],p0[1]);ctx.lineTo(c1[0],c1[1]);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(p1[0],p1[1]);ctx.lineTo(c2[0],c2[1]);ctx.stroke();
+    [c1,c2].forEach(function(p){
+      ctx.fillStyle='#ffaa28';ctx.strokeStyle='#fff';ctx.lineWidth=1.5;
+      ctx.beginPath();ctx.arc(p[0],p[1],5,0,Math.PI*2);ctx.fill();ctx.stroke();
+    });
+    var coordsEl=document.getElementById('curve-coords');
+    if(coordsEl)coordsEl.textContent=camEaseLabel;
+  }
   function draw(){
+    if(isCamMode()){drawCamEase();return;}
     var yr=yRange();
     ctx.clearRect(0,0,W,H);ctx.fillStyle='#111';ctx.fillRect(0,0,W,H);
     ctx.strokeStyle='#1e293b';ctx.lineWidth=1;
@@ -172,9 +211,20 @@
   }
   function pushCurve(){if(window.SM)window.SM.setCurve(clonePts(cs.points));upP();}
 
+  // Camera-mode drag state — which control handle (0 or 1) is being moved.
+  var camDragWhich=null;
   cvs.addEventListener('mousedown',function(e){
     rect=cvs.getBoundingClientRect();
     var mx=(e.clientX-rect.left)*(W/rect.width),my=(e.clientY-rect.top)*(H/rect.height);
+    if(isCamMode()){
+      var e2=camEase();
+      var yr={lo:0,hi:1};
+      var c1=[tX(e2[0]),tY(e2[1],yr)],c2=[tX(e2[2]),tY(e2[3],yr)];
+      var d1=Math.hypot(mx-c1[0],my-c1[1]),d2=Math.hypot(mx-c2[0],my-c2[1]);
+      if(window.pushUndo)window.pushUndo(); // camera ease is part of the framing — Cmd+Z restores it too
+      camDragWhich=d1<=d2?0:1;
+      return;
+    }
     var hit=hitT(mx,my);
     dragging=hit>=0?hit:null;
     if(hit>=0){selected=hit;showTangents=e.altKey;}
@@ -189,6 +239,18 @@
     if(e.key==='Alt'&&hovering&&selected!=null&&!showTangents){showTangents=true;draw();}
   });
   window.addEventListener('mousemove',function(e){
+    if(isCamMode()){
+      if(camDragWhich==null)return;
+      if(!rect)rect=cvs.getBoundingClientRect();
+      var cmx=(e.clientX-rect.left)*(W/rect.width),cmy=(e.clientY-rect.top)*(H/rect.height);
+      var cnx=Math.max(0,Math.min(1,fX(cmx))),cny=fY(cmy,{lo:0,hi:1});
+      var ce=camEase();
+      if(camDragWhich===0){ce[0]=cnx;ce[1]=cny;}else{ce[2]=cnx;ce[3]=cny;}
+      draw();
+      if(window.SMCamera&&window.SMCamera.renderCameraRow)window.SMCamera.renderCameraRow();
+      if(window.SMEngineBridge)window.SMEngineBridge.renderNow();
+      return;
+    }
     if(dragging==null)return;
     if(!rect)rect=cvs.getBoundingClientRect();
     var yr=yRange();
@@ -204,7 +266,7 @@
     p.y=Math.max(-1,Math.min(2,ny));
     draw();pushCurve();
   });
-  window.addEventListener('mouseup',function(){dragging=null;});
+  window.addEventListener('mouseup',function(){dragging=null;camDragWhich=null;});
   cvs.addEventListener('dblclick',function(e){
     rect=cvs.getBoundingClientRect();
     var mx=(e.clientX-rect.left)*(W/rect.width),my=(e.clientY-rect.top)*(H/rect.height);
@@ -315,7 +377,18 @@
       else if(s&&typeof s.p1x==='number')cs.points=[{x:0,y:0},{x:s.p1x,y:s.p1y},{x:s.p2x,y:s.p2y},{x:1,y:1}];
       selected=null;draw();upP();
     },
-    draw:draw
+    draw:draw,
+    // Camera-segment ease editing (feedback #5pi90) — see camEaseSeg above.
+    editCameraSeg:function(seg,label){
+      camEaseSeg=seg;camEaseLabel=label||'';
+      if(window.openPropsSection)window.openPropsSection('easing-sec');
+      draw();
+    },
+    exitCameraSeg:function(){
+      if(!camEaseSeg)return;
+      camEaseSeg=null;draw();
+    },
+    isCameraMode:isCamMode
   };
   setTimeout(draw,100);
 })();

@@ -331,7 +331,13 @@
     row.addEventListener('click', function () { window.SM.setTool('camera'); renderLayerList(); });
     row.addEventListener('contextmenu', function (e) {
       e.preventDefault();
+      // Right-click also switches to the camera tool first (matching a
+      // plain click) so segmentLeftKey(state.currentFrame) below resolves
+      // against the right context, and the shared editor panel is visible.
+      window.SM.setTool('camera'); renderLayerList();
       window.showContextMenu(e.clientX, e.clientY, [
+        { label: 'Modifier la courbe d\'accélération…', action: openCameraEaseEditor },
+        { sep: true },
         { label: 'Supprimer le calque caméra', action: function () { state.cameraLayerOn = false; state.cameraKeys = []; state.cameraView = false; if (state.tool === 'camera') window.SM.setTool('select'); renderLayerList(); renderTimeline(); updateCameraPanel(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); } },
       ]);
     });
@@ -444,14 +450,26 @@
     L.clipped = true;
   }
 
-  // ---- right panel : clés + éditeur de courbe de Bézier du segment ----
+  // ---- right panel : clés + bouton d'édition de la courbe du segment ----
+  // La courbe elle-même n'a plus son propre mini-éditeur ici — clic-droit
+  // sur la ligne caméra (ou le bouton ci-dessous) ouvre le widget partagé
+  // de la section Easing Curve, pointé sur l'ease de ce segment au lieu de
+  // state.easingCurve (feedback #5pi90 : réutiliser le même menu/clic-droit
+  // plutôt que maintenir un second éditeur de courbe séparé et plus limité).
   function updateCameraPanel() {
     ensureState();
     var sec = document.getElementById('camera-sec');
     if (!sec) return;
     var show = state.cameraLayerOn && state.tool === 'camera';
     sec.style.display = show ? '' : 'none';
-    if (!show) return;
+    if (!show) {
+      // Leaving the camera tool also leaves camera-ease-editing mode, so
+      // the shared Easing Curve widget falls back to showing the tween
+      // curve again instead of staying stuck mid-edit on a now-hidden
+      // segment.
+      if (window._curveEditor) window._curveEditor.exitCameraSeg();
+      return;
+    }
     var isKey = !!keyAt(state.currentFrame);
     var addBtn = document.getElementById('btn-cam-addkey');
     if (addBtn) addBtn.textContent = isKey ? 'Supprimer la clé (frame ' + (state.currentFrame + 1) + ')' : 'Ajouter une clé (frame ' + (state.currentFrame + 1) + ')';
@@ -460,84 +478,17 @@
       var cam = cameraAtFrame(state.currentFrame);
       info.textContent = state.cameraKeys.length + ' clé(s)' + (cam ? ' — ' + Math.round(cam.w) + '×' + Math.round(cam.w * aspect()) + ' @ ' + Math.round(cam.x) + ',' + Math.round(cam.y) : '');
     }
-    drawEaseEditor();
-  }
-  // Mini éditeur cubic-bezier : 2 points de contrôle draggables, applique
-  // à l'ease du segment couvrant la frame courante.
-  var _easeDrag = null;
-  function easeCanvas() { return document.getElementById('cam-ease-canvas'); }
-  function easeRect() { var c = easeCanvas(); return { w: c.width, h: c.height, pad: 12 }; }
-  function easeToPx(x, y) { var r = easeRect(); return [r.pad + x * (r.w - 2 * r.pad), r.h - r.pad - y * (r.h - 2 * r.pad)]; }
-  function pxToEase(px, py) {
-    var r = easeRect();
-    return [Math.max(0, Math.min(1, (px - r.pad) / (r.w - 2 * r.pad))), (r.h - r.pad - py) / (r.h - 2 * r.pad)];
-  }
-  function drawEaseEditor() {
-    var c = easeCanvas();
-    if (!c) return;
-    var ctx = c.getContext('2d');
-    ctx.clearRect(0, 0, c.width, c.height);
+    var editBtn = document.getElementById('btn-cam-ease-edit');
     var seg = segmentLeftKey(state.currentFrame);
-    var lbl = document.getElementById('cam-ease-label');
-    if (!seg) {
-      if (lbl) lbl.textContent = 'Courbe : ajoute au moins 2 clés';
-      return;
-    }
-    var ks = state.cameraKeys;
-    var next = ks[ks.indexOf(seg) + 1];
-    if (lbl) lbl.textContent = 'Courbe : clé ' + (seg.frame + 1) + ' → ' + (next.frame + 1);
-    var e = seg.ease || DEFAULT_EASE;
-    var dim = getComputedStyle(document.documentElement).getPropertyValue('--text-dim').trim() || '#888';
-    var txt = getComputedStyle(document.documentElement).getPropertyValue('--text').trim() || '#eee';
-    // cadre + diagonale de référence
-    ctx.strokeStyle = dim; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
-    var p0 = easeToPx(0, 0), p1 = easeToPx(1, 1);
-    ctx.strokeRect(p0[0], p1[1], p1[0] - p0[0], p0[1] - p1[1]);
-    ctx.beginPath(); ctx.moveTo(p0[0], p0[1]); ctx.lineTo(p1[0], p1[1]); ctx.stroke();
-    ctx.setLineDash([]);
-    // courbe
-    ctx.strokeStyle = '#ffaa28'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(p0[0], p0[1]);
-    var c1 = easeToPx(e[0], e[1]), c2 = easeToPx(e[2], e[3]);
-    ctx.bezierCurveTo(c1[0], c1[1], c2[0], c2[1], p1[0], p1[1]);
-    ctx.stroke();
-    // bras + poignées
-    ctx.strokeStyle = dim; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(p0[0], p0[1]); ctx.lineTo(c1[0], c1[1]); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(p1[0], p1[1]); ctx.lineTo(c2[0], c2[1]); ctx.stroke();
-    [c1, c2].forEach(function (p) {
-      ctx.fillStyle = '#ffaa28'; ctx.strokeStyle = txt;
-      ctx.beginPath(); ctx.arc(p[0], p[1], 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    });
+    if (editBtn) editBtn.disabled = !seg;
   }
-  function initEaseEditor() {
-    var c = easeCanvas();
-    if (!c) return;
-    c.addEventListener('mousedown', function (ev) {
-      var seg = segmentLeftKey(state.currentFrame);
-      if (!seg) return;
-      var r = c.getBoundingClientRect();
-      var px = (ev.clientX - r.left) * (c.width / r.width), py = (ev.clientY - r.top) * (c.height / r.height);
-      var e = seg.ease || (seg.ease = DEFAULT_EASE.slice());
-      var c1 = easeToPx(e[0], e[1]), c2 = easeToPx(e[2], e[3]);
-      var d1 = Math.hypot(px - c1[0], py - c1[1]), d2 = Math.hypot(px - c2[0], py - c2[1]);
-      pushUndo(); // la courbe fait partie du cadrage — Cmd+Z la restaure aussi
-      _easeDrag = { seg: seg, which: d1 <= d2 ? 0 : 1 };
-      ev.preventDefault();
-    });
-    window.addEventListener('mousemove', function (ev) {
-      if (!_easeDrag) return;
-      var r = c.getBoundingClientRect();
-      var px = (ev.clientX - r.left) * (c.width / r.width), py = (ev.clientY - r.top) * (c.height / r.height);
-      var xy = pxToEase(px, py);
-      var e = _easeDrag.seg.ease;
-      if (_easeDrag.which === 0) { e[0] = xy[0]; e[1] = xy[1]; }
-      else { e[2] = xy[0]; e[3] = xy[1]; }
-      drawEaseEditor();
-      renderCameraRow(); // reflete le nouvel ease dans la ligne timeline en direct
-      if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
-    });
-    window.addEventListener('mouseup', function () { _easeDrag = null; });
+  function openCameraEaseEditor() {
+    var seg = segmentLeftKey(state.currentFrame);
+    if (!seg) { showToast('Ajoute au moins 2 clés pour avoir une courbe'); return; }
+    var ks = state.cameraKeys, next = ks[ks.indexOf(seg) + 1];
+    // pushUndo() happens per-drag-start in ui.js's own camera-mode mousedown
+    // handler, not here — opening the editor alone isn't an edit yet.
+    if (window._curveEditor) window._curveEditor.editCameraSeg(seg, 'Caméra : clé ' + (seg.frame + 1) + ' → ' + (next.frame + 1));
   }
 
   function initUI() {
@@ -562,7 +513,8 @@
       renderCameraRow(); updateCameraPanel();
       if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
     });
-    initEaseEditor();
+    var editEase = document.getElementById('btn-cam-ease-edit');
+    if (editEase) editEase.addEventListener('click', openCameraEaseEditor);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initUI); else initUI();
 
@@ -575,6 +527,7 @@
     onDown: onDown, onDrag: onDrag, onUp: onUp,
     renderPanelRow: renderPanelRow,
     renderGridRow: renderGridRow,
+    renderCameraRow: renderCameraRow,
     applyCameraView: applyCameraView,
     applyToExportLayer: applyToExportLayer,
     updatePanel: updateCameraPanel,
