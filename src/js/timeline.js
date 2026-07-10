@@ -1032,6 +1032,16 @@ function selPropsApplyRotate(deltaDeg,center,skipUndo){
 
 // ---- TIMELINE DRAG STATE ----
 var _tlDrag={active:false,startL:-1,startF:-1,ghost:null,moved:false,mode:null};
+// The camera row (SMCamera.renderGridRow) is always PREPENDED to #frame-grid
+// before any real layer row (renderTimeline, below) — every row-index<->pixel
+// conversion below assumed rows start flush at the grid's own top, off by
+// this row's height whenever a camera track exists. Read live via the DOM
+// rather than a constant, since the row's own height varies (16px compact /
+// 34px active, camera.js) depending on whether the camera tool is selected.
+function camGridRowOffset(){
+  var r=document.querySelector('#frame-grid .frow.camrow');
+  return r?r.getBoundingClientRect().height:0;
+}
 
 function renderTimeline(){
   var hdr=document.getElementById('frame-hdr'),grid=document.getElementById('frame-grid');hdr.innerHTML='';grid.innerHTML='';
@@ -1095,7 +1105,11 @@ function renderTimeline(){
     renderKeyframeCellsInto(row,li,contentIdxs);
     grid.appendChild(row);
   });
-  document.getElementById('playhead').style.left=(state.currentFrame*FC)+'px';document.getElementById('playhead').style.height=(30+rowCount*ROW_H)+'px';
+  // rowCount only counts state.layers rows — the camera row (prepended
+  // above, not part of state.layers) never added its own height here, so
+  // the playhead line always stopped short by one row whenever a camera
+  // track existed.
+  document.getElementById('playhead').style.left=(state.currentFrame*FC)+'px';document.getElementById('playhead').style.height=(30+rowCount*ROW_H+camGridRowOffset())+'px';
   if(window.SMAudio)SMAudio.renderStrip();
 }
 // Builds one row's worth of frame cells for layer `li` into `rowEl` — shared
@@ -1412,10 +1426,13 @@ document.getElementById('frame-grid').addEventListener('mousemove',function(e){
   // grid.getBoundingClientRect() already reflects current scroll position of fg-wrap,
   // so cursor-to-cell mapping needs no manual scroll/offset correction here.
   var xRel=e.clientX-gridRect.left;
-  var yRel=e.clientY-gridRect.top;
+  var camOff=camGridRowOffset();
+  var yRel=e.clientY-gridRect.top-camOff;
   var toF=Math.max(0,Math.min(state.totalFrames-1,Math.floor(xRel/FC)));
   // grid rows run top-to-bottom from the highest layer index (see
-  // renderTimeline), so the row under the cursor maps to a flipped index
+  // renderTimeline), so the row under the cursor maps to a flipped index.
+  // yRel is measured past the camera row (camOff), which is always
+  // prepended before any real layer row and isn't part of state.layers.
   var toL=Math.max(0,Math.min(state.layers.length-1,state.layers.length-1-Math.floor(yRel/ROW_H)));
 
   if(!_tlDrag.moved){
@@ -1468,7 +1485,7 @@ document.getElementById('frame-grid').addEventListener('mousemove',function(e){
   var clampedX=Math.max(0,Math.min(state.totalFrames*FC,xRel));
   var clampedY=Math.max(12,Math.min(state.layers.length*ROW_H-12,yRel));
   _tlDrag.cursorDot.style.left=(clampedX+gridOffLeft)+'px';
-  _tlDrag.cursorDot.style.top=(clampedY+gridOffTop)+'px';
+  _tlDrag.cursorDot.style.top=(clampedY+camOff+gridOffTop)+'px';
 
   _tlDrag.ghost.innerHTML='';
   _sel.frames.forEach(function(s){
@@ -1476,7 +1493,7 @@ document.getElementById('frame-grid').addEventListener('mousemove',function(e){
     if(gl<0||gl>=state.layers.length||gf<0||gf>=state.totalFrames)return;
     var d=document.createElement('div');
     d.style.cssText='position:absolute;width:'+FC+'px;height:'+ROW_H+'px;background:rgba(74,158,255,.35);border:1px solid rgba(74,158,255,.7);border-radius:2px;box-sizing:border-box;';
-    d.style.left=(gf*FC+gridOffLeft)+'px';d.style.top=((state.layers.length-1-gl)*ROW_H+gridOffTop)+'px';
+    d.style.left=(gf*FC+gridOffLeft)+'px';d.style.top=((state.layers.length-1-gl)*ROW_H+camOff+gridOffTop)+'px';
     var fr=state.layers[s.layer].frames[s.frame];
     if(fr&&fr.isKeyframe){
       var dot=document.createElement('div');
