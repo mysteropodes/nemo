@@ -48,7 +48,11 @@
   // standard brush shortcut in every drawing app. Every other tool gets
   // Alt+drag as a temporary rotate, exactly like Space is a temporary Hand
   // regardless of the active tool.
-  function shouldRotate() { return engineOn() && (state.tool === 'rotate' || (state.altDown && ['zoom', 'draw', 'fillbrush'].indexOf(state.tool) < 0 && !state.spaceDown)); }
+  // 'fill' added: Alt+drag on the paint-bucket tool draws a temporary
+  // closing stroke (fill-bridge.js) — without this exclusion, this
+  // capture-phase handler (registered before fill-bridge.js's own) stole
+  // every Alt+drag as a canvas rotate before the fill tool ever saw it.
+  function shouldRotate() { return engineOn() && (state.tool === 'rotate' || (state.altDown && ['zoom', 'draw', 'fillbrush', 'fill'].indexOf(state.tool) < 0 && !state.spaceDown)); }
 
   function canvasLocal(clientX, clientY) {
     var r = document.getElementById('drawing-canvas').getBoundingClientRect();
