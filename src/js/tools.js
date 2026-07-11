@@ -1372,7 +1372,14 @@ function fillVectorFindJS(clickPt,gapThr,layer,excludePath,onlyIds){
   walls.closed.forEach(function(w){
     var pts=w.segments.map(function(sg){return sg.point;});
     var area=fillPolyArea(pts);
-    if(area>=1&&fillPointInPoly(clickPt,pts))candidates.push({chainPath:w,area:area,fromClosedWall:true});
+    // A hand-drawn "closed" wall isn't guaranteed to be a simple ring — an
+    // organic stroke that loops back near its own earlier run can
+    // self-cross exactly like a traced loop can (fillLoopSelfIntersects).
+    // This is the mirror of the fill.rs fix for the same symmetric gap:
+    // Best::Closed there had no guard either, and was confirmed (live,
+    // against the reporter's real drawing) to be exactly what won the
+    // reported diamond-artifact fill.
+    if(area>=1&&fillPointInPoly(clickPt,pts)&&!fillLoopSelfIntersects(w))candidates.push({chainPath:w,area:area,fromClosedWall:true});
   });
   if(walls.open.length){
     var graph=fillBuildGraph(walls.open,gapThr);

@@ -655,7 +655,17 @@ pub fn fill_find(input_json: &str) -> Result<String, JsValue> {
     for (i, (_, pts)) in closed_geo.iter().enumerate() {
         let vpts: Vec<Vec2> = pts.iter().map(|p| Vec2 { x: p[0], y: p[1] }).collect();
         let area = poly_area(&vpts);
-        if area >= 1.0 && point_in_poly(click, &vpts) {
+        // A hand-drawn "closed" wall (Paper.js path.closed===true, or a
+        // near-matching start/end the caller already snapped shut) is not
+        // guaranteed to be a simple ring — an organic stroke that loops back
+        // near its own earlier run can self-cross exactly like a traced
+        // loop can (see poly_self_intersects's own comment). This candidate
+        // used to accept purely on area/containment with no such guard,
+        // which is exactly what won the reported "star-burst"/diamond-
+        // artifact fill (fb_mrgedu37) even after the Traced branch below
+        // got its own self-intersection guard — this wall came in already
+        // closed, never went through trace_loop at all.
+        if area >= 1.0 && point_in_poly(click, &vpts) && !poly_self_intersects(&vpts) {
             if best.as_ref().map_or(true, |(a, _)| area < *a) {
                 best = Some((area, Best::Closed(i)));
             }
@@ -710,15 +720,33 @@ pub fn fill_find(input_json: &str) -> Result<String, JsValue> {
             let used_gap = seq.iter().any(|h| edges[h.edge_idx].kind == EdgeType::Gap);
             let samplers: Vec<PathSampler> = open_geo.iter().map(|(bez, _)| PathSampler::new(bez)).collect();
             let raw_pts = resample_result(&samplers, nodes, edges, &seq);
-            // 0.35px tolerance: well under a single rendered pixel at any
-            // normal zoom, so this is a point-count optimization only —
-            // visually lossless, not a visible simplification.
-            let simplified = simplify_polyline(&raw_pts, 0.35);
-            let segments = simplified
-                .iter()
-                .map(|p| SegOut { point: [p.x, p.y], handle_in: [0.0, 0.0], handle_out: [0.0, 0.0] })
-                .collect();
-            FillResult::Traced { segments, walls, used_gap }
+            // The candidate that won `best` was only ever checked against
+            // loop_points()'s COARSE flattened polyline (0.75px tolerance,
+            // built purely for cheap topology/area comparison across many
+            // candidates) — resample_result rebuilds the same loop from the
+            // REAL bezier curves at full precision, and a subtle
+            // self-crossing invisible at 0.75px tolerance can become
+            // visible here. Confirmed live against a real hand-drawn
+            // character (fb_mrgedu37): the coarse check passed, but this
+            // exact accurate reconstruction was self-intersecting — the
+            // "star-burst"/diamond artifact reported. Re-check on the
+            // accurate points before committing to this result; reject
+            // (NotFound) rather than return a wrong fill — the caller
+            // (fillVectorFind, tools.js) escalates to a larger gapThr and
+            // tries again rather than accepting nothing.
+            if poly_self_intersects(&raw_pts) {
+                FillResult::NotFound
+            } else {
+                // 0.35px tolerance: well under a single rendered pixel at any
+                // normal zoom, so this is a point-count optimization only —
+                // visually lossless, not a visible simplification.
+                let simplified = simplify_polyline(&raw_pts, 0.35);
+                let segments = simplified
+                    .iter()
+                    .map(|p| SegOut { point: [p.x, p.y], handle_in: [0.0, 0.0], handle_out: [0.0, 0.0] })
+                    .collect();
+                FillResult::Traced { segments, walls, used_gap }
+            }
         }
         None => FillResult::NotFound,
     };
