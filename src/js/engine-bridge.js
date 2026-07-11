@@ -657,7 +657,9 @@
   function buildEraserCursorItems() {
     if (state.tool !== 'eraser' || !eraserCursorWorld) return [];
     var r = eraserCursorRadius != null ? eraserCursorRadius : state.eraserSize / 2;
-    return [circleItem(eraserCursorWorld[0], eraserCursorWorld[1], r, [255, 255, 255, 31], [255, 255, 255, 230], 1 / view.zoom)];
+    // Rim was pure white — invisible against a white canvas background
+    // (reported). The app's own blue accent stays visible on any bg.
+    return [circleItem(eraserCursorWorld[0], eraserCursorWorld[1], r, [255, 255, 255, 31], [74, 158, 255, 230], 1 / view.zoom)];
   }
 
   // Set by draw-bridge.js on every pointermove while the Draw tool has
@@ -678,7 +680,9 @@
   function setPressureCursor(worldPt, radius, forced) { pressureCursorWorld = worldPt; pressureCursorRadius = radius; pressureCursorForced = !!forced; }
   function buildPressureCursorItems() {
     if (state.tool !== 'draw' || !pressureCursorWorld || !(state.vectorBrush || pressureCursorForced)) return [];
-    return [circleItem(pressureCursorWorld[0], pressureCursorWorld[1], pressureCursorRadius, [255, 255, 255, 40], [255, 255, 255, 220], 1 / view.zoom)];
+    // Rim was pure white — invisible against a white canvas background
+    // (reported). The app's own blue accent stays visible on any bg.
+    return [circleItem(pressureCursorWorld[0], pressureCursorWorld[1], pressureCursorRadius, [255, 255, 255, 40], [74, 158, 255, 220], 1 / view.zoom)];
   }
 
   // Set by pen-bridge.js on every pointermove while the Pen tool has an
