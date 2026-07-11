@@ -430,6 +430,64 @@
       }
     }
 
+    // ---- Pass 0: figure out per-(layer,slot) stroke data once, and how
+    // many "tracks" (slots) each visible layer needs — shared by the
+    // container pre-pass below and the real shape-building pass, so
+    // getEffectiveStrokes/filtering only runs once per frame. ----
+    var slotsInfo=[];
+    for(var li0=state.layers.length-1;li0>=0;li0--){
+      var ld0=state.layers[li0];if(!ld0.visible)continue;
+      var framesStrokes0=[];
+      // Dab copies (isBrushTextureCopy) are dropped entirely — their
+      // visual contribution is replaced by wobbling the anchor's own
+      // points below, automatically, per riveBrushWobbleParams. A brush
+      // anchor is deliberately opacity:0 in Nemo itself (that's how it
+      // stays invisible on-canvas while its dabs do the actual drawing —
+      // see applyBrushTexture in tools.js) — the general opacity!==0
+      // filter would silently drop exactly the stroke this export needs
+      // to keep, so anchors are exempted from it (their real paint
+      // opacity is overridden separately below, from the preset, not
+      // read from this deliberately-zeroed field).
+      for(var f0=r.start;f0<=r.end;f0++)framesStrokes0[f0]=getEffectiveStrokes(li0,f0).filter(function(sd){return !sd.isBrushTextureCopy&&(sd.opacity!==0||sd.brushTexturePreset);});
+      var maxSlots0=0;
+      for(f0=r.start;f0<=r.end;f0++)maxSlots0=Math.max(maxSlots0,framesStrokes0[f0].length);
+      slotsInfo.push({li:li0,ld:ld0,framesStrokes:framesStrokes0,maxSlots:maxSlots0});
+    }
+
+    // ---- Pass 1: one named, empty container Shape per (layer,slot) —
+    // every frame-shape for that slot gets reparented (at creation, via
+    // parentId) under it instead of sitting loose as a sibling of the
+    // artboard. Reported: an export with everything flat under the
+    // artboard didn't read as organized "layers with their own timeline"
+    // in Rive's hierarchy panel — this groups each animated stroke's
+    // flipbook shapes together the way Nemo's own layer panel already
+    // groups a stroke's frames. (A real Rive "Solo" component — which
+    // additionally auto-hides every child but one — could theoretically
+    // read even better, but no MCP tool creates or attaches one for
+    // plain shapes; a plain container plus this export's own opacity
+    // keyframes achieves the same visible result.)
+    var containerDefs=[];
+    var containerNameByKey={};
+    slotsInfo.forEach(function(si){
+      for(var slot=0;slot<si.maxSlots;slot++){
+        var cname=si.ld.name+' / shape'+slot+' ['+si.li+']';
+        containerNameByKey[si.li+'_'+slot]=cname;
+        containerDefs.push({name:cname,x:0,y:0,parentId:artboardId,paints:[],paths:[]});
+      }
+    });
+    var containerIdByKey={};
+    if(containerDefs.length){
+      onProgress('Création des groupes…');
+      await riveCreateShapesBatch(artboardId,containerDefs);
+      var cTree=await riveCall('get_artboard_hierarchy',{artboardId:artboardId,depth:1});
+      var cIdByName={};
+      (cTree.objects||[]).forEach(function(o){if(o.types&&o.types.indexOf('Shape')>=0)cIdByName[o.name]=o.id;});
+      Object.keys(containerNameByKey).forEach(function(key){
+        var cid=cIdByName[containerNameByKey[key]];
+        if(cid)containerIdByKey[key]=cid;
+      });
+    }
+
     // Background rect — created first so it paints behind everything else
     // (Rive, like most painter's-algorithm renderers, draws children in
     // list order — first child = furthest back).
@@ -451,24 +509,10 @@
     var shapeCounter=0;
 
     onProgress('Préparation des tracés…');
-    for(var li=state.layers.length-1;li>=0;li--){
-      var ld=state.layers[li];if(!ld.visible)continue;
-      var framesStrokes=[];
-      // Dab copies (isBrushTextureCopy) are dropped entirely — their
-      // visual contribution is replaced by wobbling the anchor's own
-      // points below, automatically, per riveBrushWobbleParams. A brush
-      // anchor is deliberately opacity:0 in Nemo itself (that's how it
-      // stays invisible on-canvas while its dabs do the actual drawing —
-      // see applyBrushTexture in tools.js) — the general opacity!==0
-      // filter would silently drop exactly the stroke this export needs
-      // to keep, so anchors are exempted from it (their real paint
-      // opacity is overridden separately below, from the preset, not
-      // read from this deliberately-zeroed field).
-      for(var f=r.start;f<=r.end;f++)framesStrokes[f]=getEffectiveStrokes(li,f).filter(function(sd){return !sd.isBrushTextureCopy&&(sd.opacity!==0||sd.brushTexturePreset);});
-      var maxSlots=0;
-      for(f=r.start;f<=r.end;f++)maxSlots=Math.max(maxSlots,framesStrokes[f].length);
-
+    slotsInfo.forEach(function(si){
+      var li=si.li,ld=si.ld,framesStrokes=si.framesStrokes,maxSlots=si.maxSlots;
       for(var slot=0;slot<maxSlots;slot++){
+        var containerId=containerIdByKey[li+'_'+slot]||artboardId;
         var countRuns=riveCountRuns(framesStrokes,slot,r.start,r.end);
         countRuns.forEach(function(run){
           var firstSd=framesStrokes[run.start][slot];
@@ -511,7 +555,7 @@
             var shapeVal0=lottieShapeValue(firstSd,cm0);
             if(wobble)shapeVal0.v=riveApplyWobble(shapeVal0.v,wobble.amp,wobble.freqPer100,wobble.seed,shapeVal0.c);
             shapeDefs.push({
-              name:name,x:0,y:0,parentId:artboardId,
+              name:name,x:0,y:0,parentId:containerId,
               paints:riveBuildPaints(firstSd,hasRealStroke,opacityOverride),
               paths:[{name:'P',commands:riveBuildCubicCommands(shapeVal0)}]
             });
@@ -532,7 +576,7 @@
               var baseValT=lottieShapeValue(firstSd,null);
               if(wobble)baseValT.v=riveApplyWobble(baseValT.v,wobble.amp,wobble.freqPer100,wobble.seed,baseValT.c);
               shapeDefs.push({
-                name:name,x:0,y:0,parentId:artboardId,
+                name:name,x:0,y:0,parentId:containerId,
                 paints:riveBuildPaints(firstSd,hasRealStroke,opacityOverride),
                 paths:[{name:'P',commands:riveBuildStraightCommands(baseValT.v,baseValT.c)}]
               });
@@ -549,7 +593,7 @@
                 pointsByFrame[f5]=pts3;
               }
               shapeDefs.push({
-                name:name,x:0,y:0,parentId:artboardId,
+                name:name,x:0,y:0,parentId:containerId,
                 paints:riveBuildPaints(firstSd,hasRealStroke,opacityOverride),
                 paths:[{name:'P',commands:riveBuildStraightCommands(startVal.v,startVal.c)}]
               });
@@ -558,7 +602,7 @@
           }
         });
       }
-    }
+    });
 
     onProgress('Création de '+shapeDefs.length+' formes dans Rive…');
     await riveCreateShapesBatch(artboardId,shapeDefs);
