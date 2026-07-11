@@ -65,6 +65,30 @@
 //   creation order and hasn't been visually confirmed correct for a
 //   multi-layer scene. Check this on a real multi-layer export before
 //   trusting stacking on anything more complex than one drawing layer.
+//
+// Brush textures: Nemo renders a textured stroke as one invisible "anchor"
+// path (data.brushTexturePreset) plus dozens/hundreds of separate,
+// semi-transparent, jittered "dab" copy shapes stamped along it
+// (data.isBrushTextureCopy — see BRUSH_PRESETS/buildBrushDabs in
+// tools.js). Exporting all of those dabs as literal Rive shapes would
+// work but be enormous. A genuine Rive PathEffect script (Luau,
+// multi-octave seeded sine wobble) capable of reproducing that per-dab
+// look was written and verified live against a running Rive Editor —
+// but there is NO MCP tool that can attach a custom Luau PathEffect to
+// a Path as a live component (component_editor.addComponents rejects a
+// script asset outright: "Component not found"), so it was deleted
+// again rather than left as a dead, never-attachable asset in the
+// user's real Rive file. Automating that attachment isn't possible
+// today, and this feature explicitly must not require any manual step
+// in Rive Editor afterward.
+// So instead the wobble is baked directly into the EXPORTED geometry
+// here, in JS, before it ever reaches Rive: dab copies are dropped
+// entirely, and the anchor's own points get a smooth per-point
+// perpendicular offset (riveApplyWobble) derived automatically from the
+// stroke's own brush preset (riveBrushWobbleParams) — same multi-octave
+// seeded-sine shape the (now-deleted) Luau script used, so the two
+// stayed conceptually the same "look"; this is the version that
+// actually ships since it needs zero manual Rive Editor step.
 (function(){
   var RIVE_MCP_URL='http://127.0.0.1:9791/mcp';
   var _riveReqId=1,_riveInitialized=false;
@@ -159,10 +183,16 @@
     return cmds;
   }
 
-  function riveBuildPaints(sd,hasRealStroke){
+  function riveBuildPaints(sd,hasRealStroke,opacityOverride){
     var paints=[];
-    if(hasRealStroke)paints.push({paintType:'stroke',color:riveColorHex(sd.strokeColor,sd.opacity),width:sd.strokeWidth||2});
-    if(sd.fillColor)paints.push({paintType:'fill',color:riveColorHex(sd.fillColor,sd.opacity)});
+    // A brush-texture anchor's own opacity is deliberately 0 in Nemo (see
+    // the filter comment above, in exportRive) — reading sd.opacity
+    // directly here would make the exported stroke invisible. Callers
+    // pass preTextureOpacity (the value the user actually authored,
+    // before Nemo hid the anchor to let its dabs draw instead) for those.
+    var op=opacityOverride!==undefined?opacityOverride:sd.opacity;
+    if(hasRealStroke)paints.push({paintType:'stroke',color:riveColorHex(sd.strokeColor,op),width:sd.strokeWidth||2});
+    if(sd.fillColor)paints.push({paintType:'fill',color:riveColorHex(sd.fillColor,op)});
     return paints;
   }
 
@@ -189,6 +219,78 @@
       if(sd2&&sd2.hasRealStroke!==undefined)return !!sd2.hasRealStroke;
     }
     return false;
+  }
+
+  // Same "the tween engine doesn't carry this field onto resampled
+  // interpolated frames" problem as hasRealStroke above, for the brush
+  // preset tag — search neighboring frames in the run instead of trusting
+  // whichever frame happens to be the run's own start.
+  function resolveBrushTexturePreset(framesStrokes,slot,frameIdx,rangeStart,rangeEnd){
+    for(var f=frameIdx;f>=rangeStart;f--){
+      var sd=framesStrokes[f]&&framesStrokes[f][slot];
+      if(sd&&sd.brushTexturePreset)return sd.brushTexturePreset;
+      if(sd&&sd.brushTexturePreset===null)break; // explicit "not textured" on an authored frame — stop searching backward
+    }
+    for(var f2=frameIdx;f2<=rangeEnd;f2++){
+      var sd2=framesStrokes[f2]&&framesStrokes[f2][slot];
+      if(sd2&&sd2.brushTexturePreset)return sd2.brushTexturePreset;
+    }
+    return null;
+  }
+
+  // ---- Brush texture, automatic wobble mapping (no manual step, no
+  // per-preset hand-tuning — see the file's top-of-file architecture
+  // note for why this bakes into geometry instead of a Rive PathEffect) ----
+  function riveNoise(t,seed){
+    var s=seed*12.9898;
+    return Math.sin(t*1.00+s)*0.55+Math.sin(t*2.13+s*1.7)*0.30+Math.sin(t*4.71+s*2.3)*0.15;
+  }
+  // djb2 — turns a stroke's own id (or any string) into a stable numeric
+  // seed, so the SAME stroke wobbles identically every time it's
+  // exported and every frame it appears in (not a fresh random look per
+  // run — same reasoning as Nemo's own seededRng for tween re-stamping).
+  function riveHashSeed(str){
+    var h=5381;
+    for(var i=0;i<str.length;i++)h=((h<<5)+h+str.charCodeAt(i))|0;
+    return (h>>>0)%1000/37; // spread into a few dozen distinct phases
+  }
+  // Derives {amp (px), freqPer100 (wobble cycles per 100px of path)} from
+  // a BRUSH_PRESETS entry — no per-preset hand authoring, every existing
+  // AND future/custom preset (state.customBrushPresets) gets a value for
+  // free from the same knobs Nemo's own dab-stamping already uses:
+  //   - amplitude scales with strokeWidth * nibSize (how big the preset's
+  //     dabs are) * scatter (how far Nemo already lets dabs stray off the
+  //     centerline) — the direct geometric analogue of "scatter".
+  //   - frequency scales inversely with spacing (tighter dab spacing =
+  //     more dabs per unit length = a busier-looking wobble).
+  function riveBrushWobbleParams(preset,strokeWidth){
+    var w=strokeWidth||3;
+    var amp=w*(preset.nibSize||1)*(preset.scatter||0)*0.9;
+    var spacing=Math.max(preset.spacing||0.4,0.05);
+    var freqPer100=Math.min(30,Math.max(1.5,100/(w*(preset.nibSize||1)*spacing*2)));
+    return{amp:amp,freqPer100:freqPer100};
+  }
+  // Applies a smooth per-point perpendicular offset to an absolute point
+  // array (v, as produced by lottieShapeValue) — index-fraction phased
+  // (not true arc-length) since we already have a point ARRAY here, not
+  // a live measurable Path; acceptable given Nemo's own points are
+  // already reasonably evenly spaced along the stroke (especially true
+  // for "morph" runs, which are Nemo's own uniform tween resampling).
+  function riveApplyWobble(v,ampPx,freqPer100,seed,closed){
+    var n=v.length;
+    if(n<2||ampPx<=0)return v;
+    var out=new Array(n);
+    for(var k=0;k<n;k++){
+      var prev=v[k>0?k-1:(closed?n-1:k)];
+      var next=v[k<n-1?k+1:(closed?0:k)];
+      var dx=next[0]-prev[0],dy=next[1]-prev[1];
+      var len=Math.sqrt(dx*dx+dy*dy)||1;
+      var nx=-dy/len,ny=dx/len; // unit normal
+      var phase=(k/Math.max(n-1,1))*freqPer100*2*Math.PI;
+      var w=riveNoise(phase,seed)*ampPx;
+      out[k]=[v[k][0]+nx*w,v[k][1]+ny*w];
+    }
+    return out;
   }
 
   // Content signature — two frames with an identical signature are the
@@ -289,7 +391,17 @@
     for(var li=state.layers.length-1;li>=0;li--){
       var ld=state.layers[li];if(!ld.visible)continue;
       var framesStrokes=[];
-      for(var f=r.start;f<=r.end;f++)framesStrokes[f]=getEffectiveStrokes(li,f).filter(function(sd){return sd.opacity!==0;});
+      // Dab copies (isBrushTextureCopy) are dropped entirely — their
+      // visual contribution is replaced by wobbling the anchor's own
+      // points below, automatically, per riveBrushWobbleParams. A brush
+      // anchor is deliberately opacity:0 in Nemo itself (that's how it
+      // stays invisible on-canvas while its dabs do the actual drawing —
+      // see applyBrushTexture in tools.js) — the general opacity!==0
+      // filter would silently drop exactly the stroke this export needs
+      // to keep, so anchors are exempted from it (their real paint
+      // opacity is overridden separately below, from the preset, not
+      // read from this deliberately-zeroed field).
+      for(var f=r.start;f<=r.end;f++)framesStrokes[f]=getEffectiveStrokes(li,f).filter(function(sd){return !sd.isBrushTextureCopy&&(sd.opacity!==0||sd.brushTexturePreset);});
       var maxSlots=0;
       for(f=r.start;f<=r.end;f++)maxSlots=Math.max(maxSlots,framesStrokes[f].length);
 
@@ -312,27 +424,50 @@
           if(run.end<r.end)opacityKeys.push({frame:run.end-r.start+1,value:0});
           var hasRealStroke=resolveHasRealStroke(framesStrokes,slot,run.start,r.start,r.end);
 
+          // Automatic brush-texture wobble — no user step, no per-preset
+          // authoring: resolve the preset (falls through to null for
+          // plain strokes, a no-op), derive amp/frequency from it, seed
+          // from the stroke's own identity so it stays stable across
+          // frames instead of "boiling".
+          var brushKey=resolveBrushTexturePreset(framesStrokes,slot,run.start,r.start,r.end);
+          var brushPreset=brushKey?resolveBrushPreset(brushKey):null;
+          var wobble=null;
+          // preTextureOpacity is the value the user actually authored
+          // before Nemo zeroed the anchor's own opacity to hide it (see
+          // riveBuildPaints) — undefined for a non-textured stroke, in
+          // which case riveBuildPaints falls back to sd.opacity as usual.
+          var opacityOverride=brushPreset?(firstSd.preTextureOpacity!==undefined?firstSd.preTextureOpacity:1):undefined;
+          if(brushPreset){
+            var seed=riveHashSeed(firstSd.strokeId||(li+'_'+slot));
+            var wp=riveBrushWobbleParams(brushPreset,firstSd.strokeWidth);
+            wobble={amp:wp.amp,freqPer100:wp.freqPer100,seed:seed};
+          }
+
           if(!useMorph){
             var cm0=camByFrame?camByFrame[run.start]:null;
             var shapeVal0=lottieShapeValue(firstSd,cm0);
+            if(wobble)shapeVal0.v=riveApplyWobble(shapeVal0.v,wobble.amp,wobble.freqPer100,wobble.seed,shapeVal0.c);
             shapeDefs.push({
               name:name,x:0,y:0,parentId:artboardId,
-              paints:riveBuildPaints(firstSd,hasRealStroke),
+              paints:riveBuildPaints(firstSd,hasRealStroke,opacityOverride),
               paths:[{name:'P',commands:riveBuildCubicCommands(shapeVal0)}]
             });
             pending.push({name:name,opacityKeys:opacityKeys,morph:null});
           }else{
             var cmStart=camByFrame?camByFrame[run.start]:null;
             var startVal=lottieShapeValue(firstSd,cmStart);
+            if(wobble)startVal.v=riveApplyWobble(startVal.v,wobble.amp,wobble.freqPer100,wobble.seed,startVal.c);
             var pointsByFrame={};
             for(var f3=run.start;f3<=run.end;f3++){
               var sd3=framesStrokes[f3][slot];
               var cm3=camByFrame?camByFrame[f3]:null;
-              pointsByFrame[f3]=lottieShapeValue(sd3,cm3).v;
+              var pts3=lottieShapeValue(sd3,cm3).v;
+              if(wobble)pts3=riveApplyWobble(pts3,wobble.amp,wobble.freqPer100,wobble.seed,startVal.c);
+              pointsByFrame[f3]=pts3;
             }
             shapeDefs.push({
               name:name,x:0,y:0,parentId:artboardId,
-              paints:riveBuildPaints(firstSd,hasRealStroke),
+              paints:riveBuildPaints(firstSd,hasRealStroke,opacityOverride),
               paths:[{name:'P',commands:riveBuildStraightCommands(startVal.v,startVal.c)}]
             });
             pending.push({name:name,opacityKeys:opacityKeys,morph:{start:run.start,end:run.end,pointsByFrame:pointsByFrame}});
