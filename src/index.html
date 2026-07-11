@@ -216,11 +216,16 @@
           <button class="pbtn" id="btn-pt-smooth" title="Smooth point — handles stay tangent but can differ in length">Smooth</button>
           <button class="pbtn" id="btn-pt-symmetric" title="Symmetric point — handles tangent and equal length">Symmetric</button>
         </div>
+        <!-- Flat monochrome icons (matching the .lico/.pbtn icon language elsewhere)
+             built from two overlapping circles as a single combined path, using
+             fill-rule to get Union/Exclude for free (nonzero = solid blob,
+             evenodd = hollow overlap = XOR), and mask/clipPath for Subtract/
+             Intersect since those aren't expressible as one fill-rule. -->
         <div class="pr" id="sp-boolean-row" style="display:none;gap:4px">
-          <button class="pbtn" id="btn-bool-unite" title="Union — merge shapes into one">Union</button>
-          <button class="pbtn" id="btn-bool-subtract" title="Subtract — cut later shapes out of the first">Subtract</button>
-          <button class="pbtn" id="btn-bool-intersect" title="Intersect — keep only the overlapping area">Intersect</button>
-          <button class="pbtn" id="btn-bool-exclude" title="Exclude — keep everything except the overlap">Exclude</button>
+          <button class="pbtn" id="btn-bool-unite" title="Union — merge shapes into one"><svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M3,12 A6,6 0 1,0 15,12 A6,6 0 1,0 3,12 Z M9,12 A6,6 0 1,0 21,12 A6,6 0 1,0 9,12 Z"/></svg></button>
+          <button class="pbtn" id="btn-bool-subtract" title="Subtract — cut later shapes out of the first"><svg viewBox="0 0 24 24" width="15" height="15"><defs><mask id="ic-bool-sub-mask"><circle cx="9" cy="12" r="6" fill="#fff"/><circle cx="15" cy="12" r="6" fill="#000"/></mask></defs><circle cx="9" cy="12" r="6" fill="currentColor" mask="url(#ic-bool-sub-mask)"/><circle cx="15" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="1.3" opacity="0.45"/></svg></button>
+          <button class="pbtn" id="btn-bool-intersect" title="Intersect — keep only the overlapping area"><svg viewBox="0 0 24 24" width="15" height="15"><defs><clipPath id="ic-bool-int-clip"><circle cx="15" cy="12" r="6"/></clipPath></defs><circle cx="9" cy="12" r="6" fill="currentColor" clip-path="url(#ic-bool-int-clip)"/><circle cx="9" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.4"/><circle cx="15" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.4"/></svg></button>
+          <button class="pbtn" id="btn-bool-exclude" title="Exclude — keep everything except the overlap"><svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path fill-rule="evenodd" d="M3,12 A6,6 0 1,0 15,12 A6,6 0 1,0 3,12 Z M9,12 A6,6 0 1,0 21,12 A6,6 0 1,0 9,12 Z"/></svg></button>
         </div>
       </div>
     </div>
