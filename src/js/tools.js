@@ -2380,17 +2380,42 @@ function eraseAtPoint(path,worldPt,radius,fromPt){
   if(!target.fillColor)return;
   var col=target.fillColor,op=target.opacity;
   var tIdx=layer.children.indexOf(target);
+  // Built unconditionally (not just as the JS-fallback shape) so its own
+  // area is available as a sanity reference for the WASM result below —
+  // a single erase bite should never remove drastically more area than the
+  // eraser's own footprint, no matter how thin/concave the target is.
+  var eraserShape=(fromPt&&buildEraserCapsule(fromPt,worldPt,radius))||new Path.Circle({center:worldPt,radius:radius,insert:false});
+  var eraserArea=Math.abs(eraserShape.area);
   var wasmRes=null;
   if(window.GeometryWasm&&window.GeometryWasm.ready){
     try{wasmRes=eraseAtPointWasm(target,worldPt,radius,fromPt);}
     catch(e){console.warn('[geometry-wasm] erase_at_point failed, falling back to Paper.js',e);wasmRes=null;}
   }
+  if(wasmRes&&wasmRes.ok){
+    // geo_booleanop (the WASM boolean-clipping engine) is numerically
+    // fragile right at/near an existing vertex of the input polygons —
+    // exactly the case an erase click near a shape's own corner or a
+    // previous bite's edge can hit — and can return a near-empty/degenerate
+    // difference for that one click location while an identical click 20px
+    // away (landing in ordinary fill interior) works fine. Reported: "en
+    // fonction de là où je gomme ça efface tout ou érase bien." Reject any
+    // result that removed far more area than the eraser shape itself could
+    // plausibly account for and fall back to Paper.js's mature, more
+    // numerically robust boolean clipper instead of trusting it.
+    var targetArea=Math.abs(target.area),wasmArea=Math.abs(wasmRes.item.area||0);
+    var removedArea=targetArea-wasmArea;
+    if(targetArea>eraserArea*4&&removedArea>eraserArea*6){
+      console.warn('[geometry-wasm] erase_at_point result looked implausible (removed '+Math.round(removedArea)+' vs eraser footprint '+Math.round(eraserArea)+'), falling back to Paper.js');
+      wasmRes.item.remove();
+      wasmRes=null;
+    }
+  }
   var result;
   if(wasmRes&&wasmRes.ok){
     result=wasmRes.item;
+    eraserShape.remove();
     target.remove();
   }else{
-    var eraserShape=(fromPt&&buildEraserCapsule(fromPt,worldPt,radius))||new Path.Circle({center:worldPt,radius:radius,insert:false});
     result=target.subtract(eraserShape,{insert:false});
     eraserShape.remove();
     target.remove();
