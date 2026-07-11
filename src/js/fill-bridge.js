@@ -22,6 +22,19 @@
     if (!shouldIntercept()) return;
     e.stopImmediatePropagation();
     e.preventDefault();
+    // Alt+drag: same temporary closing-stroke gesture as tools.js's Paper
+    // Tool 'fill' branch (see that file's fillCloseOverlayItems/
+    // fillMaterializeTempCloseStrokes comments for the full rationale) —
+    // duplicated here because this pointerdown/move/up bridge is the path
+    // actually used whenever the Rust engine is intercepting events
+    // (shouldIntercept() above), which is the normal running case.
+    if (e.altKey) {
+      var w0 = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
+      _fillCloseDrag = { points: [new Point(w0[0], w0[1])] };
+      window.SMEngineBridge.suspend();
+      window.SMEngineBridge.renderWithOverlayItem(fillCloseOverlayItems());
+      return;
+    }
     ensureKeyframe();
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
     var pt = new Point(w[0], w[1]);
@@ -40,7 +53,10 @@
       return;
     }
 
+    var _tempCloseWalls = fillMaterializeTempCloseStrokes(layer);
     var res = fillVectorFind(pt, layer, null);
+    fillRemoveTempCloseStrokes(_tempCloseWalls);
+    _fillCloseStrokes = [];
     if (!res) {
       // No traceable closed region from the surrounding walls — but if the
       // click landed directly inside an already-filled shape, recolor it in
@@ -80,9 +96,31 @@
     window.SMEngineBridge.renderNow();
   }
 
+  function onMove(e) {
+    if (!_fillCloseDrag) return;
+    e.stopImmediatePropagation();
+    e.preventDefault();
+    var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
+    _fillCloseDrag.points.push(new Point(w[0], w[1]));
+    window.SMEngineBridge.renderWithOverlayItem(fillCloseOverlayItems());
+  }
+  function onUp(e) {
+    if (!_fillCloseDrag) return;
+    e.stopImmediatePropagation();
+    e.preventDefault();
+    if (_fillCloseDrag.points.length >= 2) _fillCloseStrokes.push(_fillCloseDrag.points.map(function (p) { return [p.x, p.y]; }));
+    _fillCloseDrag = null;
+    window.SMEngineBridge.resume();
+    window.SMEngineBridge.renderNow();
+    showToast(_fillCloseStrokes.length + ' trait(s) de fermeture en attente — clic sans Alt pour remplir');
+  }
+
   function init() {
     var target = document.getElementById('canvas-area') || document.getElementById('drawing-canvas');
     target.addEventListener('pointerdown', onDown, { capture: true });
+    target.addEventListener('pointermove', onMove, { capture: true });
+    target.addEventListener('pointerup', onUp, { capture: true });
+    target.addEventListener('pointercancel', onUp, { capture: true });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();

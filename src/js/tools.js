@@ -440,6 +440,14 @@ function fsRealizeStrokeSegment(sel,layer){
 var nodeHandles=[];
 var _nodeDrag={active:false,path:null,type:null,segIndex:-1};
 var _marquee={active:false,start:null,rect:null};
+// Fill tool Alt+drag "closing stroke": a temporary, visual-only guide line
+// the user draws to bridge a region the fill engine's own crossing/gap
+// detection can't close on its own — never added to the document, just
+// queued here until the next non-alt fill click consumes (or discards) it.
+// See onMouseDown's 'fill' branch, fillMaterializeTempCloseStrokes, and
+// fillCloseOverlayItems.
+var _fillCloseDrag=null; // {points:[Point,...]} while an alt-drag is in progress
+var _fillCloseStrokes=[]; // [[ [x,y], [x,y], ... ], ...] queued completed strokes, world coords
 // Multi-point selection for the Subselection tool: marquee over anchor
 // points collects their segment indexes here; dragging any selected anchor
 // then moves the whole set together (Animate's white-arrow behavior).
@@ -861,6 +869,40 @@ function findStrokeById(layer,strokeId){
     if(layer.children[i].data&&layer.children[i].data.strokeId===strokeId)return layer.children[i];
   }
   return null;
+}
+// Alt+drag closing-stroke overlay (see onMouseDown/onMouseDrag's 'fill'
+// branches) — a dashed guide line rendered ONLY through the Rust-engine
+// JSON overlay (never a real Paper.js item), same pattern as shape-bridge's
+// in-progress shape preview. Cleared automatically once the drag ends.
+function fillCloseOverlayItems(){
+  if(!_fillCloseDrag||_fillCloseDrag.points.length<2)return[];
+  var zs=1/Math.max(0.0001,view.zoom);
+  return[{
+    segments:_fillCloseDrag.points.map(function(p){return{point:[p.x,p.y]};}),
+    closed:false,fillColor:null,
+    strokeColor:[255,152,0,230],strokeWidth:2*zs,dashPattern:[6*zs,4*zs],
+  }];
+}
+// Turns every queued Alt-drawn closing stroke into a REAL (but disposable)
+// Path, inserted into `layer` so fillCollectWalls picks it up as a wall for
+// the very next fillVectorFind call — then the caller removes it via
+// fillRemoveTempCloseStrokes immediately after, synchronously, before any
+// render/save/selection pass ever runs. Because insert-and-remove happens
+// within one unbroken synchronous click handler, these paths never reach
+// ANY of the layer.children consumers CLAUDE.md warns about (buildSceneJson,
+// saveActiveLayerFrame, selectedPaths, serP/desP, tween matching) — no
+// special-casing needed there, unlike a tag meant to persist.
+function fillMaterializeTempCloseStrokes(layer){
+  return _fillCloseStrokes.map(function(pts){
+    var p=new Path({strokeColor:'#000000',strokeWidth:1,fillColor:null});
+    pts.forEach(function(pt){p.add(new Point(pt[0],pt[1]));});
+    p.data.isFillTempClose=true;
+    layer.addChild(p);
+    return p;
+  });
+}
+function fillRemoveTempCloseStrokes(paths){
+  paths.forEach(function(p){p.remove();});
 }
 // onlyIds (optional): restrict wall collection to strokes whose strokeId is
 // in this list — used by fillRegenerateLinked to regenerate a fill against
@@ -2898,12 +2940,35 @@ function onMouseDown(event){
     }
   }else if(state.tool==='fill'){
     if(state.layers[state.activeLayerIdx].locked)return;ensureKeyframe();
+    if(event.event.altKey){
+      // Alt+drag: draw a TEMPORARY closing stroke to help the fill engine
+      // bridge a region its own crossing/gap detection can't close on its
+      // own (e.g. a busy junction where the wall-follower can't find a
+      // simple loop) — visual-only dashed guide, never added to the real
+      // document. Materialized as a real (but disposable) wall for exactly
+      // the next non-alt fill click, then discarded whether that click
+      // used it or not (see the non-alt branch below).
+      _fillCloseDrag={points:[event.point.clone()]};
+      window.SMEngineBridge.suspend();
+      window.SMEngineBridge.renderWithOverlayItem(fillCloseOverlayItems());
+      return;
+    }
     if(event.modifiers.shift){
       var hitRm=layer.hitTest(event.point,{fill:true,tolerance:12/view.zoom});
       if(hitRm&&hitRm.item instanceof Path&&hitRm.item.fillColor){pushUndo();hitRm.item.fillColor=null;saveActiveLayerFrame();updateUI();showToast('Fill supprimé');}
       return;
     }
+    // Any queued Alt-drawn closing strokes become real (but disposable)
+    // walls for THIS click only — inserted and removed synchronously, so
+    // they never reach any layer.children consumer (buildSceneJson, save,
+    // selection, tween matching…) and need no special-casing there. Gone
+    // after this click regardless of whether the fill succeeded, matching
+    // "une fois le pot de peinture sans alt est fait dedans celle-ci
+    // s'efface et disparaît complètement".
+    var _tempCloseWalls=fillMaterializeTempCloseStrokes(layer);
     var res=fillVectorFind(event.point,layer,null);
+    fillRemoveTempCloseStrokes(_tempCloseWalls);
+    _fillCloseStrokes=[];
     if(!res){
       // No traceable closed region from the surrounding walls — but if the
       // click landed directly inside an already-filled shape, recolor it in
@@ -2966,6 +3031,9 @@ function onMouseDrag(event){
     var stab=state.stabilizer;
     if(stab===0)currentPath.add(event.point);
     else{stabQueue.push(event.point.clone());var maxQ=stab===1?3:stab===2?6:10;while(stabQueue.length>maxQ)stabQueue.shift();var avg=new Point(0,0);stabQueue.forEach(function(p){avg=avg.add(p);});avg=avg.divide(stabQueue.length);currentPath.add(avg);}
+  }else if(state.tool==='fill'&&_fillCloseDrag){
+    _fillCloseDrag.points.push(event.point.clone());
+    window.SMEngineBridge.renderWithOverlayItem(fillCloseOverlayItems());
   }else if(state.tool==='fillbrush'){
     if(!currentPath)return;
     var fbP=vbSmoothPressure(vbPressureOf(event));
@@ -3110,6 +3178,14 @@ function onMouseUp(event){
   if(state.isPanning){state.isPanning=false;return;}if(state.playing)return;
   if(state.tool==='camera'){if(window.SMCamera)SMCamera.onUp(event);return;}
   _eraseDragActive=false;_eraseLastPt=null;
+  if(state.tool==='fill'&&_fillCloseDrag){
+    if(_fillCloseDrag.points.length>=2)_fillCloseStrokes.push(_fillCloseDrag.points.map(function(p){return[p.x,p.y];}));
+    _fillCloseDrag=null;
+    window.SMEngineBridge.resume();
+    window.SMEngineBridge.renderNow();
+    showToast(_fillCloseStrokes.length+' trait(s) de fermeture en attente — clic sans Alt pour remplir');
+    return;
+  }
   if(state.tool==='draw'&&currentPath){
     if(state.vectorBrush){
       // Catch-up point, mirrors draw-bridge.js's onUp — the stabilizer's
