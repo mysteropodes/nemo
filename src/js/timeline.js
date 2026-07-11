@@ -3342,13 +3342,16 @@ document.getElementById('comp-offset').addEventListener('change',function(){wind
   // alpha channel at the codec level at all, and TIFF/SVG/Lottie weren't
   // asked for, so kept out of scope rather than guessing.
   var ALPHA_FORMATS=['png','prores'];
+  var NO_SCALE_FORMATS=['lottie','rive','ae-camera'];
   function updateScaleVisibility(){
     var v=fmtSel.value;
-    scaleRow.style.display=(v==='lottie'||v==='rive')?'none':'flex';
-    sizeRow.style.display=(v!=='lottie'&&v!=='rive'&&scaleSel.value==='custom')?'flex':'none';
+    scaleRow.style.display=NO_SCALE_FORMATS.indexOf(v)>=0?'none':'flex';
+    sizeRow.style.display=(NO_SCALE_FORMATS.indexOf(v)<0&&scaleSel.value==='custom')?'flex':'none';
     alphaRow.style.display=ALPHA_FORMATS.indexOf(v)>=0?'flex':'none';
     var riveHint=document.getElementById('exp-rive-hint');
     if(riveHint)riveHint.style.display=(v==='rive')?'flex':'none';
+    var aeCamHint=document.getElementById('exp-ae-camera-hint');
+    if(aeCamHint)aeCamHint.style.display=(v==='ae-camera')?'flex':'none';
   }
   fmtSel.addEventListener('change',updateScaleVisibility);
   scaleSel.addEventListener('change',function(){
@@ -3389,12 +3392,15 @@ document.getElementById('comp-offset').addEventListener('change',function(){wind
       onRiveProgress:function(msg){progEl.style.display='block';progEl.textContent=msg;}};
     runBtn.disabled=true;progEl.style.display='block';progEl.textContent='Préparation…';
     try{
-      var fn={svg:'exportSVGSequence',png:'exportPNGSequence',tiff:'exportTIFFSequence',gif:'exportGIF',mp4:'exportMP4',prores:'exportProRes',lottie:'exportLottie',rive:'exportRive'}[fmtSel.value];
+      var fn={svg:'exportSVGSequence',png:'exportPNGSequence',tiff:'exportTIFFSequence',gif:'exportGIF',mp4:'exportMP4',prores:'exportProRes',lottie:'exportLottie',rive:'exportRive','ae-camera':'exportAECamera'}[fmtSel.value];
       var res=await window.SMExport[fn](opts);
       if(res.cancelled){progEl.textContent='Annulé';}
       else if(res.ok){
         progEl.textContent='Terminé ✓';
-        showToast(fmtSel.value==='rive'?('Exporté vers l\'artboard Rive "'+res.artboardName+'"'):'Export terminé');
+        var doneMsg=fmtSel.value==='rive'?('Exporté vers l\'artboard Rive "'+res.artboardName+'"')
+          :fmtSel.value==='ae-camera'?('Script caméra exporté ('+res.keyCount+' clé(s))')
+          :'Export terminé';
+        showToast(doneMsg);
         // Lottie JSON gets its own preview instead of auto-closing straight
         // away — a bad export (empty/misplaced shapes) is otherwise silent
         // until opened in some other player.

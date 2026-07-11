@@ -531,9 +531,11 @@
           <option value="prores">ProRes (.mov)</option>
           <option value="lottie">Lottie JSON</option>
           <option value="rive">Rive (via MCP)</option>
+          <option value="ae-camera">Caméra → After Effects (.jsx)</option>
         </select>
       </div>
       <div class="pr" id="exp-rive-hint" style="display:none;font-size:9px;color:var(--text-dim)">Nécessite Rive Editor ouvert en local avec le serveur MCP actif (port 9791).</div>
+      <div class="pr" id="exp-ae-camera-hint" style="display:none;font-size:9px;color:var(--text-dim)">Génère un script .jsx à lancer dans After Effects (File &gt; Scripts &gt; Run Script File…) — nécessite un calque caméra actif.</div>
       <div class="pr"><span class="pl" style="width:90px">Plage</span>
         <select class="psel" id="exp-range" style="flex:1">
           <option value="wa">Zone de travail</option>
@@ -896,6 +898,7 @@
 <script src="js/brush-editor.js"></script>
 <script src="js/export.js"></script>
 <script src="js/rive-export.js"></script>
+<script src="js/ae-camera-export.js"></script>
 <script src="js/lottie-preview.js"></script>
 <script src="js/timeline.js"></script>
 <script src="js/i18n.js"></script>
