@@ -68,6 +68,7 @@ function selApplyCSS(){
     var cell=document.querySelector('.fc[data-layer="'+s.layer+'"][data-frame="'+s.frame+'"]');
     if(cell)cell.classList.add('sel');
   });
+  if(typeof updateStatusBarHelp==='function')updateStatusBarHelp();
 }
 function selBounds(){
   if(!_sel.frames.length)return null;
@@ -761,6 +762,69 @@ function openPropsSection(id){
   if(h&&b){b.classList.remove('hid');h.classList.remove('closed');}
   sec.scrollIntoView({block:'nearest',behavior:'smooth'});
 }
+// ---- Contextual help in the bottom status bar ----
+// Feature request: the bar's shortcut list used to be one hardcoded frame/
+// keyframe cheat-sheet regardless of what's active — user wanted it to
+// explain whatever tool/selection is CURRENT instead ("si je prends le pot
+// de peinture ça explique en une phrase courte ce que ça fait et les
+// raccourcis... si je select une clé pareil"). Reuses .sc styling so it
+// reads identically to the original static bar. Priority, most specific
+// first: a canvas selection (shape/point) > a timeline keyframe selection
+// > the active tool's own help > the original generic frame cheat-sheet
+// as the fallback with nothing more specific going on.
+var TOOL_HELP={
+  select:{desc:'Sélection — clique ou entoure pour sélectionner, glisse les poignées pour transformer.',sc:[['V','Outil'],['Shift+clic','Ajouter'],['Suppr','Effacer']]},
+  subselect:{desc:'Sous-sélection — édite les points d\'ancrage et leurs tangentes.',sc:[['A','Outil'],['Alt+clic','Casser tangente']]},
+  fsselect:{desc:'Sélection fill/stroke — clique une zone remplie ou un segment de trait précis.',sc:[['Shift+clic','Ajouter']]},
+  draw:{desc:'Pinceau — dessine un trait.',sc:[['B','Outil'],['Alt+glisser','Taille'],['[ ]','Taille ±']]},
+  pen:{desc:'Plume — place des ancres, glisse pour une poignée de courbe.',sc:[['P','Outil'],['Clic','Ancre'],['Échap','Terminer']]},
+  line:{desc:'Ligne — glisse pour tracer un segment droit.',sc:[['Shift','Angle 45°']]},
+  rect:{desc:'Rectangle — glisse pour dessiner.',sc:[['Shift','Carré']]},
+  ellipse:{desc:'Ellipse — glisse pour dessiner.',sc:[['Shift','Cercle']]},
+  fill:{desc:'Pot de peinture — clique une zone fermée pour la remplir.',sc:[['Alt+glisser','Trait de fermeture'],['Shift+clic','Retirer le fill'],['Échap','Annuler le trait']]},
+  fillbrush:{desc:'Pinceau de remplissage — peint directement une forme pleine, sans contour.',sc:[]},
+  eraser:{desc:'Gomme — glisse sur un trait ou un fill pour effacer une zone.',sc:[['E','Outil'],['[ ]','Taille ±']]},
+  eyedropper:{desc:'Pipette — clique une couleur du canvas pour la prélever.',sc:[['I','Outil']]},
+  hand:{desc:'Main — glisse pour déplacer la vue.',sc:[['Espace','Maintenir temporairement']]},
+  zoom:{desc:'Zoom — clique pour zoomer, Alt+clic pour dézoomer.',sc:[['Z','Outil']]},
+  rotate:{desc:'Rotation de la vue — glisse pour tourner le canvas (pas le contenu).',sc:[['Alt+glisser','Sur un autre outil']]},
+  camera:{desc:'Caméra — glisse le cadre pour cadrer, clic-droit pour la courbe d\'accélération.',sc:[['Clic-droit','Courbe d\'easing']]},
+  comment:{desc:'Commentaire — clique pour laisser une note à cet endroit.',sc:[]},
+  text:{desc:'Texte — clique pour placer un champ de texte.',sc:[]},
+  perspective:{desc:'Guide de perspective.',sc:[]},
+};
+function statusbarHelpRender(desc,sc){
+  var el=document.getElementById('statusbar-help');
+  if(!el)return;
+  var html=desc?desc+' ':'';
+  html+=sc.map(function(pair){return '<span class="sc">'+pair[0]+'</span>'+pair[1];}).join(' ');
+  el.innerHTML=html;
+}
+var STATUSBAR_DEFAULT_SC=[['F5','Frame'],['F6','Key'],['F7','Blank'],['T','Tween'],['D','Dupli'],['F','Flip'],['X','Mirror'],['Enter','Play']];
+function updateStatusBarHelp(){
+  // 1. A canvas element is selected (select/subselect) — most specific.
+  if((state.tool==='select'||state.tool==='subselect')&&typeof selectedPaths!=='undefined'&&selectedPaths.length>0){
+    var n=selectedPaths.length;
+    statusbarHelpRender(n+(n>1?' éléments sélectionnés':' élément sélectionné')+' —',[['Suppr','Effacer'],['⌘/Ctrl+D','Dupliquer'],['↑↓←→','Déplacer'],['Échap','Désélectionner']]);
+    return;
+  }
+  // 2. fsselect has an active fill/stroke pick.
+  if(state.tool==='fsselect'&&typeof _fsSel!=='undefined'&&_fsSel){
+    statusbarHelpRender((_fsSel.kind==='stroke'?'Stroke':'Fill')+' sélectionné(e) —',[['Suppr','Effacer'],['Échap','Désélectionner']]);
+    return;
+  }
+  // 3. A timeline keyframe cell (or span) is selected.
+  if(typeof _sel!=='undefined'&&_sel.frames&&_sel.frames.length>0){
+    var kn=_sel.frames.length;
+    statusbarHelpRender(kn+(kn>1?' images-clés sélectionnées':' image-clé sélectionnée')+' —',[['F6','Key'],['F7','Blank'],['T','Tween'],['D','Dupli'],['F','Flip'],['X','Mirror'],['Suppr','Effacer']]);
+    return;
+  }
+  // 4. The active tool's own help.
+  var help=TOOL_HELP[state.tool];
+  if(help){statusbarHelpRender(help.desc,help.sc);return;}
+  // 5. Nothing more specific — original generic frame cheat-sheet.
+  statusbarHelpRender('',STATUSBAR_DEFAULT_SC);
+}
 function updatePropsContext(){
   var hasSel=(state.tool==='select'||state.tool==='subselect')&&selectedPaths.length>0;
   var ctx,hdrText;
@@ -868,6 +932,7 @@ function updatePropsContext(){
       if(h&&b){b.classList.remove('hid');h.classList.remove('closed');}
     });
   }
+  updateStatusBarHelp();
 }
 // Populates the Transform section's fields (position/size/rotation/point-
 // type/boolean-op rows) — visibility itself is now owned by
