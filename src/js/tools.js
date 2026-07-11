@@ -443,11 +443,18 @@ var _marquee={active:false,start:null,rect:null};
 // Fill tool Alt+drag "closing stroke": a temporary, visual-only guide line
 // the user draws to bridge a region the fill engine's own crossing/gap
 // detection can't close on its own — never added to the document, just
-// queued here until the next non-alt fill click consumes (or discards) it.
+// queued here until a fill click consumes (or a tool change discards) it.
+// Each queued stroke carries a stable id (assigned as its data.strokeId
+// when materialized — see fillMaterializeTempCloseStrokes) so a fill click
+// can tell, via the winning result's wallIds, exactly WHICH queued
+// strokes it actually used and only clear those — drawing several closing
+// strokes for different regions and filling them one at a time keeps the
+// others queued instead of discarding everything on the first click.
 // See onMouseDown's 'fill' branch, fillMaterializeTempCloseStrokes, and
 // fillCloseOverlayItems.
 var _fillCloseDrag=null; // {points:[Point,...]} while an alt-drag is in progress
-var _fillCloseStrokes=[]; // [[ [x,y], [x,y], ... ], ...] queued completed strokes, world coords
+var _fillCloseIdCounter=0;
+var _fillCloseStrokes=[]; // [{id, points:[[x,y],...]}, ...] queued completed strokes, world coords
 // Multi-point selection for the Subselection tool: marquee over anchor
 // points collects their segment indexes here; dragging any selected anchor
 // then moves the whole set together (Animate's white-arrow behavior).
@@ -894,13 +901,24 @@ function fillCloseOverlayItems(){
 function fillCloseStrokesOverlayItems(){
   if(!_fillCloseStrokes.length)return[];
   var zs=1/Math.max(0.0001,view.zoom);
-  return _fillCloseStrokes.map(function(pts){
+  return _fillCloseStrokes.map(function(entry){
     return{
-      segments:pts.map(function(p){return{point:p};}),
+      segments:entry.points.map(function(p){return{point:p};}),
       closed:false,fillColor:null,
       strokeColor:[255,152,0,230],strokeWidth:2*zs,dashPattern:[6*zs,4*zs],
     };
   });
+}
+// Discards only the queued closing strokes whose id appears in `wallIds`
+// (a just-completed fillVectorFind result's own wallIds — the exact set of
+// stroke ids that bounded the winning region) — drawing several closing
+// strokes for different zones and filling them one at a time keeps every
+// OTHER queued stroke around for its own later click instead of wiping
+// all of them the moment any one fill succeeds.
+function fillConsumeCloseStrokes(wallIds){
+  if(!wallIds||!wallIds.length||!_fillCloseStrokes.length)return;
+  var used={};wallIds.forEach(function(id){used[id]=true;});
+  _fillCloseStrokes=_fillCloseStrokes.filter(function(entry){return!used[entry.id];});
 }
 // Turns every queued Alt-drawn closing stroke into a REAL (but disposable)
 // Path, inserted into `layer` so fillCollectWalls picks it up as a wall for
@@ -910,11 +928,16 @@ function fillCloseStrokesOverlayItems(){
 // within one unbroken synchronous click handler, these paths never reach
 // ANY of the layer.children consumers CLAUDE.md warns about (buildSceneJson,
 // saveActiveLayerFrame, selectedPaths, serP/desP, tween matching) — no
-// special-casing needed there, unlike a tag meant to persist.
+// special-casing needed there, unlike a tag meant to persist. Each temp
+// Path's data.strokeId is pre-set to the queued entry's own stable id
+// (ensureStrokeId, tools.js, is a no-op once data.strokeId already exists)
+// so the result's wallIds can be traced back to exactly which queued
+// closing stroke(s) were actually used — see fillConsumeCloseStrokes.
 function fillMaterializeTempCloseStrokes(layer){
-  return _fillCloseStrokes.map(function(pts){
+  return _fillCloseStrokes.map(function(entry){
     var p=new Path({strokeColor:'#000000',strokeWidth:1,fillColor:null});
-    pts.forEach(function(pt){p.add(new Point(pt[0],pt[1]));});
+    entry.points.forEach(function(pt){p.add(new Point(pt[0],pt[1]));});
+    p.data.strokeId=entry.id;
     p.data.isFillTempClose=true;
     layer.addChild(p);
     return p;
@@ -2987,7 +3010,7 @@ function onMouseDown(event){
     var _tempCloseWalls=fillMaterializeTempCloseStrokes(layer);
     var res=fillVectorFind(event.point,layer,null);
     fillRemoveTempCloseStrokes(_tempCloseWalls);
-    _fillCloseStrokes=[];
+    if(res)fillConsumeCloseStrokes(res.wallIds);
     if(!res){
       // No traceable closed region from the surrounding walls — but if the
       // click landed directly inside an already-filled shape, recolor it in
@@ -3198,7 +3221,7 @@ function onMouseUp(event){
   if(state.tool==='camera'){if(window.SMCamera)SMCamera.onUp(event);return;}
   _eraseDragActive=false;_eraseLastPt=null;
   if(state.tool==='fill'&&_fillCloseDrag){
-    if(_fillCloseDrag.points.length>=2)_fillCloseStrokes.push(_fillCloseDrag.points.map(function(p){return[p.x,p.y];}));
+    if(_fillCloseDrag.points.length>=2)_fillCloseStrokes.push({id:'fc'+Date.now().toString(36)+'_'+(++_fillCloseIdCounter),points:_fillCloseDrag.points.map(function(p){return[p.x,p.y];})});
     _fillCloseDrag=null;
     window.SMEngineBridge.resume();
     window.SMEngineBridge.renderNow();

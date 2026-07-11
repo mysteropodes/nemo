@@ -64,7 +64,12 @@
     var _tempCloseWalls = fillMaterializeTempCloseStrokes(layer);
     var res = fillVectorFind(pt, layer, null);
     fillRemoveTempCloseStrokes(_tempCloseWalls);
-    _fillCloseStrokes = [];
+    // Only discards the closing stroke(s) that actually bounded THIS
+    // result (via its wallIds) — drawing several closing strokes for
+    // different zones and filling them one at a time keeps every other
+    // queued stroke around instead of wiping all of them on the first
+    // click (reported: "j'aurais dû refaire chaque trait").
+    if (res) fillConsumeCloseStrokes(res.wallIds);
     if (!res) {
       // No traceable closed region from the surrounding walls — but if the
       // click landed directly inside an already-filled shape, recolor it in
@@ -117,7 +122,7 @@
     e.stopImmediatePropagation();
     e.preventDefault();
     try { e.target.releasePointerCapture(e.pointerId); } catch (err) {}
-    if (_fillCloseDrag.points.length >= 2) _fillCloseStrokes.push(_fillCloseDrag.points.map(function (p) { return [p.x, p.y]; }));
+    if (_fillCloseDrag.points.length >= 2) _fillCloseStrokes.push({ id: 'fc' + Date.now().toString(36) + '_' + (++_fillCloseIdCounter), points: _fillCloseDrag.points.map(function (p) { return [p.x, p.y]; }) });
     _fillCloseDrag = null;
     window.SMEngineBridge.resume();
     window.SMEngineBridge.renderNow();
