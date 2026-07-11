@@ -50,7 +50,7 @@ function updatePlayhead(){
 
 // ---- FRAME SELECTION (Animate-style) ----
 var _sel={frames:[],clipboard:null,clipOp:null};
-function selClear(){_sel.frames=[];document.querySelectorAll('.fc.sel').forEach(function(el){el.classList.remove('sel');});}
+function selClear(){_sel.frames=[];document.querySelectorAll('.fc.sel').forEach(function(el){el.classList.remove('sel');});if(typeof updateStatusBarHelp==='function')updateStatusBarHelp();}
 function selHas(li,fi){return _sel.frames.some(function(s){return s.layer===li&&s.frame===fi;});}
 function selAdd(li,fi){if(!selHas(li,fi))_sel.frames.push({layer:li,frame:fi});}
 function selRemove(li,fi){_sel.frames=_sel.frames.filter(function(s){return !(s.layer===li&&s.frame===fi);});}
@@ -94,6 +94,10 @@ window.SM={
       return;
     }
     if(t!=='select'&&t!=='subselect')clearSel();if(t!=='fsselect')fsClearSel();if(t!=='pen'&&_pen.path)finalizePen();if(t!=='eraser'&&typeof _eraserCursor!=='undefined'&&_eraserCursor){_eraserCursor.remove();_eraserCursor=null;}
+    // Picking a tool always means "I'm done with the timeline frame
+    // selection" — leaving it selected made the status bar keep showing
+    // keyframe shortcuts instead of the newly-picked tool's help.
+    if(_sel.frames.length)selClear();
     // Leaving the fill tool discards any queued/in-progress Alt-drawn
     // closing stroke (reported: it should persist until either a fill
     // click consumes it or the tool changes — this is the "tool change"
@@ -825,6 +829,44 @@ function updateStatusBarHelp(){
   // 5. Nothing more specific — original generic frame cheat-sheet.
   statusbarHelpRender('',STATUSBAR_DEFAULT_SC);
 }
+// Hovering a right-panel control (or timeline/layer toolbar button) shows
+// its native `title` in the status bar too — those tooltips already exist
+// on nearly every control (added over many sessions) but only surface after
+// the OS's slow hover delay and easy to miss; mirroring them here makes the
+// same text show up instantly. Delegated (not per-element) so it stays in
+// sync automatically as controls are added/removed, and reuses `title`
+// instead of a parallel data-help attribute that would inevitably drift out
+// of sync with the real tooltip text.
+(function(){
+  var hoverEl=null;
+  // ui.js's own delegated tooltip listener (also on document, 'mouseover')
+  // rewrites `title` -> `data-tip` on an element's FIRST hover (to swap in
+  // its own styled instant tooltip instead of the slow native one) — so by
+  // the time we look, the attribute we want may be under either name
+  // depending on whether that listener already ran on this element before.
+  function tipText(el){return el.getAttribute('title')||el.dataset.tip||'';}
+  function showTitle(e){
+    var el=e.target.closest('[title],[data-tip]');
+    var t=el&&tipText(el);
+    if(!el||!t||el===hoverEl)return;
+    hoverEl=el;
+    statusbarHelpRender(t,[]);
+  }
+  function clearTitle(e){
+    if(!hoverEl)return;
+    var el=e.target.closest('[title],[data-tip]');
+    if(el!==hoverEl)return;
+    if(e.relatedTarget&&el.contains(e.relatedTarget))return;
+    hoverEl=null;
+    updateStatusBarHelp();
+  }
+  ['props-panel','tl-toolbar','layer-panel','layer-ctrls'].forEach(function(id){
+    var root=document.getElementById(id);
+    if(!root)return;
+    root.addEventListener('mouseover',showTitle);
+    root.addEventListener('mouseout',clearTitle);
+  });
+})();
 function updatePropsContext(){
   var hasSel=(state.tool==='select'||state.tool==='subselect')&&selectedPaths.length>0;
   var ctx,hdrText;
@@ -1384,6 +1426,16 @@ window.addEventListener('mouseup',function(e){
 // cell that already holds a keyframe (or is already part of the current
 // multi-selection) RELOCATES it. Without this split, every drag tried to
 // move frames, which made simple "select a range" gestures relocate content.
+// Clicking anywhere in the timeline that isn't a frame cell (ruler, layer
+// panel, transport bar, empty grid margin...) drops the frame selection —
+// otherwise it stayed highlighted (and the status-bar help kept showing
+// keyframe shortcuts) even after the user had clearly moved on.
+document.getElementById('tl-content').addEventListener('mousedown',function(e){
+  if(e.button!==0)return;
+  if(e.target.closest('.fc'))return;
+  if(_sel.frames.length)selClear();
+});
+
 document.getElementById('frame-grid').addEventListener('mousedown',function(e){
   if(e.button!==0)return;
   var cell=e.target.closest('.fc');if(!cell)return;
