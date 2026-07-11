@@ -270,7 +270,7 @@
       sizeStartVal = state.brushSize;
       sizeAnchorW = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
       window.SMEngineBridge.suspend();
-      window.SMEngineBridge.setPressureCursor(sizeAnchorW, state.brushSize / 2);
+      window.SMEngineBridge.setPressureCursor(sizeAnchorW, state.brushSize / 2, true);
       window.SMEngineBridge.renderNow();
       return;
     }
@@ -307,7 +307,7 @@
       var ns = Math.max(1, Math.min(80, sizeStartVal + (e.clientX - sizeStartX) * 0.5));
       state.brushSize = ns;
       var sw = document.getElementById('p-sw'); if (sw) sw.value = Math.round(ns);
-      window.SMEngineBridge.setPressureCursor(sizeAnchorW, ns / 2);
+      window.SMEngineBridge.setPressureCursor(sizeAnchorW, ns / 2, true);
       window.SMEngineBridge.renderNow();
       return;
     }

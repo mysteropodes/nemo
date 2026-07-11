@@ -662,10 +662,18 @@
   // radius the NEXT sample would paint at, growing/shrinking live with
   // pressure so the user can feel the brush's dynamic range before/while
   // committing ink, the way Procreate/Photoshop's brush cursor does.
-  var pressureCursorWorld = null, pressureCursorRadius = 0;
-  function setPressureCursor(worldPt, radius) { pressureCursorWorld = worldPt; pressureCursorRadius = radius; }
+  var pressureCursorWorld = null, pressureCursorRadius = 0, pressureCursorForced = false;
+  // `forced` (draw-bridge.js's alt+drag brush-size resize) bypasses the
+  // vectorBrush gate below: that gate exists for the ALWAYS-ON hover
+  // indicator, which is deliberately pressure-brush-only (a fixed-width
+  // brush has no "next sample radius" to preview continuously) — but the
+  // alt-drag gesture is a DIFFERENT, explicit "show me the new size while I
+  // resize" preview that applies to every brush mode. Reported: alt-drag
+  // resize on the plain (non-pressure) brush showed no circle at all, since
+  // this function silently swallowed it via the same gate.
+  function setPressureCursor(worldPt, radius, forced) { pressureCursorWorld = worldPt; pressureCursorRadius = radius; pressureCursorForced = !!forced; }
   function buildPressureCursorItems() {
-    if (state.tool !== 'draw' || !state.vectorBrush || !pressureCursorWorld) return [];
+    if (state.tool !== 'draw' || !pressureCursorWorld || !(state.vectorBrush || pressureCursorForced)) return [];
     return [circleItem(pressureCursorWorld[0], pressureCursorWorld[1], pressureCursorRadius, [255, 255, 255, 40], [255, 255, 255, 220], 1 / view.zoom)];
   }
 
