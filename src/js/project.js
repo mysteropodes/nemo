@@ -401,7 +401,7 @@
     if(!list.length){wrap.innerHTML='<div class="start-empty">No recent projects yet</div>';return;}
     list.forEach(function(r){
       var row=document.createElement('div');row.className='start-recent-row';
-      var icon=document.createElement('span');icon.className='material-symbols-rounded';icon.textContent='';
+      var icon=document.createElement('span');icon.className='start-recent-dot';
       var info=document.createElement('div');
       var nm=document.createElement('div');nm.className='start-recent-name';nm.textContent=r.name;
       var meta=document.createElement('div');meta.className='start-recent-meta';

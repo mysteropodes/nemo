@@ -16,28 +16,48 @@
 <body>
 <div id="start-screen">
   <div id="start-inner">
-    <div id="start-brand"><span class="material-symbols-rounded" style="font-size:32px">&#xe3ae;</span> Nemo</div>
+    <div id="start-brand">
+      <span id="start-brand-mark">
+        <svg width="36" height="36" viewBox="0 0 100 100">
+          <defs>
+            <linearGradient id="hFade" x1="100%" y1="0%" x2="0%" y2="60%">
+              <stop offset="0%" stop-color="#7EA0FA"/>
+              <stop offset="100%" stop-color="#7EA0FA" stop-opacity="0.15"/>
+            </linearGradient>
+          </defs>
+          <g transform="translate(50,52) rotate(-28) scale(0.92)">
+            <path d="M-26 -2 C -20 -20 2 -26 20 -14 C 10 -16 -2 -12 -6 -2 C 4 -6 16 -4 24 6 C 10 10 -6 8 -14 0 C -8 6 2 12 14 14 C -4 18 -22 12 -26 -2 Z" fill="url(#hFade)"/>
+            <circle cx="18" cy="-13" r="3" fill="#0b0a0d"/>
+          </g>
+        </svg>
+      </span>
+      Nemo
+    </div>
     <div id="start-cards">
       <div class="start-card" id="start-new">
-        <span class="material-symbols-rounded">&#xe145;</span>
+        <span class="start-card-ico start-card-ico-accent"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>
         <div class="start-card-title">New Project</div>
         <div class="start-card-sub">Choose canvas size &amp; frame rate</div>
       </div>
       <div class="start-card" id="start-open">
-        <span class="material-symbols-rounded">&#xe2c8;</span>
+        <span class="start-card-ico"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M3 6.5A1.5 1.5 0 014.5 5H9l2 2h8.5A1.5 1.5 0 0121 8.5V18a1.5 1.5 0 01-1.5 1.5h-15A1.5 1.5 0 013 18z"/></svg></span>
         <div class="start-card-title">Open Project…</div>
         <div class="start-card-sub">Browse for a .json project file</div>
       </div>
       <div class="start-card" id="start-resume" style="display:none">
-        <span class="material-symbols-rounded">&#xe8b3;</span>
+        <span class="start-card-ico"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 12a8 8 0 118 8" stroke-dasharray="2.5 3"/><path d="M12 20l-3-2m3 2l-3 2"/></svg></span>
         <div class="start-card-title">Resume Last Session</div>
         <div class="start-card-sub" id="start-resume-sub">Restore the autosaved state</div>
       </div>
-      <div class="start-card" id="start-kitsu">
-        <span class="material-symbols-rounded">&#xe80b;</span>
+    </div>
+
+    <div class="start-row" id="start-kitsu">
+      <span class="start-card-ico"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v16h16"/><path d="M8 15l3-4 3 3 5-7"/></svg></span>
+      <div class="start-row-body">
         <div class="start-card-title">Ouvrir depuis Kitsu…</div>
         <div class="start-card-sub">Se connecter à la production (async, pas de temps réel)</div>
       </div>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(236,234,231,.3)" stroke-width="1.8" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
     </div>
 
     <div id="start-newpanel" style="display:none">
