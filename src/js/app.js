@@ -76,7 +76,7 @@ window.addEventListener('resize',syncCanvasSize);
 var FC=16;
 var ROW_H=34;
 var state={
-  totalFrames:24,currentFrame:0,fps:12,playing:false,loopPlayback:true,
+  totalFrames:24,currentFrame:0,fps:12,playing:false,loopPlayback:true,pingPongPlayback:false,playDir:1,
   tool:'draw',
   onionSkin:true,onionPrevOpacity:30,onionNextOpacity:30,onionMode:'tinted',
   onionIn:0,onionOut:23,

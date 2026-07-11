@@ -29,6 +29,19 @@ def safe_segment(s):
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
+    # SimpleHTTPRequestHandler sends no Cache-Control at all, so the OS
+    # webview (WKWebView in the Tauri app, but also plain Chrome) applies
+    # its own heuristic freshness and can keep serving an old JS/CSS file
+    # after an edit even through an explicit user-triggered reload (only
+    # reloadFromOrigin()/hard-reload bypasses that, and Tauri's native
+    # right-click "Reload" does a plain reload()) — see CLAUDE.md's
+    # documented stale-cache gotcha, this is the same root cause hitting a
+    # different reload path. Every response gets no-store so every dev
+    # reload always reflects the file on disk.
+    def end_headers(self):
+        self.send_header("Cache-Control", "no-store, no-cache, must-revalidate")
+        http.server.SimpleHTTPRequestHandler.end_headers(self)
+
     def _json(self, status, payload):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(status)

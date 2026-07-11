@@ -16,12 +16,25 @@ async function smConfirm(msg, title) {
 
 // ---- PLAYBACK (optimized: no DOM rebuild during play) ----
 var playInt=null;
-function startPlay(){if(state.playing)return;state.playing=true;
+function startPlay(){if(state.playing)return;state.playing=true;state.playDir=1;
   document.getElementById('btn-play').innerHTML='<span class="material-symbols-rounded">\u{e034}</span>';
   document.getElementById('btn-play').classList.add('playing');
   if(window.SMAudio)SMAudio.onPlayStart(state.currentFrame);
-  playInt=setInterval(function(){var next=state.currentFrame+1;
-    if(next>state.waOut){if(state.loopPlayback){next=state.waIn;if(window.SMAudio)SMAudio.onLoop(next);}else{stopPlay();return;}}
+  playInt=setInterval(function(){
+    // Ping-pong (right-click btn-loop, feedback: "quand on clic sur le
+    // lecture loop... il faut switché aussi sur une lecture en pingpong")
+    // bounces back and forth across the work area instead of hard-cutting
+    // back to waIn every pass — direction only flips at the OUT-of-bounds
+    // edge, one frame at a time, same 1000/fps cadence as forward playback.
+    var next=state.currentFrame+state.playDir;
+    if(next>state.waOut){
+      if(state.loopPlayback&&state.pingPongPlayback){state.playDir=-1;next=state.currentFrame-1;if(next<state.waIn)next=state.waIn;}
+      else if(state.loopPlayback){next=state.waIn;if(window.SMAudio)SMAudio.onLoop(next);}
+      else{stopPlay();return;}
+    }else if(next<state.waIn){
+      if(state.loopPlayback&&state.pingPongPlayback){state.playDir=1;next=state.currentFrame+1;if(next>state.waOut)next=state.waOut;}
+      else{stopPlay();return;}
+    }
     saveAllLayerFrames();state.currentFrame=next;window._curFrame=next;loadFrame(next);updatePlayhead();
   },1000/state.fps);
 }
@@ -109,7 +122,17 @@ window.SM={
       if(_fillCloseDrag){_fillCloseDrag=null;if(window.SMEngineBridge)window.SMEngineBridge.resume();}
       _fillCloseStrokes=[];
     }
+    // Camera row's frame-grid twin (SMCamera.renderGridRow) sizes itself
+    // (compact vs full height + speed-curve SVG) off state.tool==='camera',
+    // same condition as the layer-panel row (SMCamera.renderPanelRow) — but
+    // unlike that panel row, nothing here used to rebuild #frame-grid on a
+    // tool switch, so entering/leaving the camera tool expanded/collapsed
+    // the layer row while the keyframes/easing row below it stayed stuck at
+    // its old (stale) height, easing curve included (feedback: "il faut ça
+    // aussi avec la partie keyframes... afficher les easing comme avant").
+    var _camToolChanged=(t==='camera')!==(state.tool==='camera');
     state.tool=t;renderArcs();
+    if(_camToolChanged)renderTimeline();
     document.querySelectorAll('.tool-btn').forEach(function(b){b.classList.toggle('active',b.dataset.tool===t);});
     var cc={draw:'crosshair',pen:'crosshair',line:'crosshair',rect:'crosshair',ellipse:'crosshair',select:'default',subselect:'default',fsselect:'default',comment:'crosshair',camera:'move',text:'text',eraser:'pointer',fill:'crosshair',fillbrush:'crosshair',eyedropper:'crosshair',hand:'grab',zoom:'zoom-in',rotate:'grab',perspective:'crosshair'};
     canvasEl.style.cursor=cc[t]||'default';
@@ -125,6 +148,13 @@ window.SM={
   },
   selectGhostAll:selectGhostAll,
   toggleLoopPlayback:function(){state.loopPlayback=!state.loopPlayback;var b=document.getElementById('btn-loop');if(b)b.classList.toggle('active',state.loopPlayback);},
+  // Right-click btn-loop (feedback: "quand on clic sur le lecture loop...
+  // il faut switché aussi sur une lecture en pingpong") — a secondary
+  // toggle rather than folding into the left-click, so anyone who just
+  // wants a plain wrap-to-start loop keeps that as the default single
+  // click. Ping-pong only has an effect while loop itself is on (see
+  // startPlay's interval) — implied on when picked, doesn't force loop off.
+  togglePingPongPlayback:function(){state.pingPongPlayback=!state.pingPongPlayback;if(state.pingPongPlayback)state.loopPlayback=true;var b=document.getElementById('btn-loop');if(b){b.classList.toggle('active',state.loopPlayback);b.classList.toggle('pingpong',state.pingPongPlayback);b.title=state.pingPongPlayback?'Loop playback — ping-pong (clic droit pour désactiver)':'Loop playback (work area) — clic droit pour ping-pong';}showToast(state.pingPongPlayback?'Lecture ping-pong activée':'Lecture ping-pong désactivée');},
   setPointType:setPointType,booleanOp:booleanOp,
   generateTweens:generateTweens,insertFrame:insertFrame,insertKeyframe:insertKeyframe,insertBlankKeyframe:insertBlankKeyframe,removeFrame:removeFrame,
   clearKeyframe:clearKeyframe,convertToKeyframes:convertToKeyframes,removeFrameSpan:removeFrameSpan,duplicateSelectedFrames:duplicateSelectedFrames,
@@ -3281,6 +3311,7 @@ document.getElementById('btn-os-range').addEventListener('click',function(e){
   ]);
 });
 document.getElementById('btn-loop').addEventListener('click',function(){window.SM.toggleLoopPlayback();});
+document.getElementById('btn-loop').addEventListener('contextmenu',function(e){e.preventDefault();window.SM.togglePingPongPlayback();});
 // Onion Skin options popover (feedback #23): right-click on the timeline's
 // onion toggle opens the options that used to live in the right panel;
 // left-click keeps toggling on/off as before.
