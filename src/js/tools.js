@@ -1338,7 +1338,18 @@ function fillPolySelfIntersects(pts){
   for(var i=0;i<n;i++){
     var a1=pts[i],a2=pts[(i+1)%n];
     for(var j=i+1;j<n;j++){
-      if(j===i||(j+1)%n===i)continue; // skip edges sharing a vertex with edge i
+      // Skip edge j when it shares a vertex with edge i — either the NEXT
+      // edge (j===i+1, sharing a2/pts[i+1]) or, via wraparound, the
+      // PREVIOUS edge ((j+1)%n===i, sharing a1/pts[i]). The original
+      // version only checked the second case: the missing j===i+1 check
+      // let every pair of adjacent edges get tested against each other,
+      // and a segment-crossing test right at a shared endpoint is exactly
+      // where floating-point noise flips sign — with hundreds of closely-
+      // spaced points from dense curve sampling (fillLoopSelfIntersects),
+      // this false-flagged nearly EVERY legitimate simple loop as
+      // self-intersecting, silently discarding every fill candidate
+      // (reported: "il ne détecte aucune zone fermée").
+      if(j===i||j===i+1||(j+1)%n===i)continue;
       if(_fillSegXing(a1,a2,pts[j],pts[(j+1)%n]))return true;
     }
   }

@@ -461,8 +461,19 @@ fn poly_self_intersects(pts: &[Vec2]) -> bool {
     for i in 0..n {
         let (a1, a2) = (pts[i], pts[(i + 1) % n]);
         for j in (i + 1)..n {
-            if j == i || (j + 1) % n == i {
-                continue; // edges sharing a vertex with edge i
+            // Skip edge j when it shares a vertex with edge i — either the
+            // NEXT edge (j == i+1, sharing a2/pts[i+1]) or, via wraparound,
+            // the PREVIOUS edge ((j+1)%n == i, sharing a1/pts[i]). Missing
+            // the j == i+1 case (mirrors a bug just fixed on the JS side,
+            // tools.js's fillPolySelfIntersects) let every pair of adjacent
+            // edges get segment-crossing-tested against each other, and
+            // that test is exactly where floating-point noise flips sign
+            // right at a shared endpoint — with hundreds of closely-spaced
+            // points from dense curve sampling, this false-flagged nearly
+            // every legitimate simple loop as self-intersecting, silently
+            // discarding every fill candidate.
+            if j == i || j == i + 1 || (j + 1) % n == i {
+                continue;
             }
             if segs_cross(a1, a2, pts[j], pts[(j + 1) % n]) {
                 return true;
