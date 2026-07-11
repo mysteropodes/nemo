@@ -116,11 +116,21 @@
     if (!_fillCloseDrag) return;
     e.stopImmediatePropagation();
     e.preventDefault();
+    try { e.target.releasePointerCapture(e.pointerId); } catch (err) {}
     if (_fillCloseDrag.points.length >= 2) _fillCloseStrokes.push(_fillCloseDrag.points.map(function (p) { return [p.x, p.y]; }));
     _fillCloseDrag = null;
     window.SMEngineBridge.resume();
     window.SMEngineBridge.renderNow();
     showToast(_fillCloseStrokes.length + ' trait(s) de fermeture en attente — clic sans Alt pour remplir');
+  }
+  // Belt-and-suspenders alongside setPointerCapture in onDown: a bare
+  // document-level pointerup ALSO finalizes a stuck drag (bubble phase, so
+  // it only ever runs if nothing else already handled/stopped the event —
+  // harmless no-op via the `!_fillCloseDrag` guard once the capture-phase
+  // onUp above has already done its job normally).
+  function onDocUp(e) {
+    if (!_fillCloseDrag) return;
+    onUp(e);
   }
 
   // Recovery valve: if a closing-stroke drag ever gets stuck active (pointer
@@ -143,6 +153,8 @@
     document.addEventListener('keydown', onKeyDown);
     target.addEventListener('pointerup', onUp, { capture: true });
     target.addEventListener('pointercancel', onUp, { capture: true });
+    document.addEventListener('pointerup', onDocUp);
+    document.addEventListener('pointercancel', onDocUp);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();

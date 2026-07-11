@@ -300,6 +300,10 @@
       var cameraItems = SMCamera.buildOverlayItems();
       if (cameraItems.length) layers.push({ items: cameraItems.map(function (it) { it.segments = roundSegs(it.segments); return it; }) });
     }
+    if (typeof fillCloseStrokesOverlayItems === 'function') {
+      var fillCloseItems = fillCloseStrokesOverlayItems();
+      if (fillCloseItems.length) layers.push({ items: fillCloseItems.map(function (it) { it.segments = roundSegs(it.segments); return it; }) });
+    }
     if (!skipVolatile) {
       var eraserItems = buildEraserCursorItems();
       if (eraserItems.length) layers.push({ items: eraserItems });

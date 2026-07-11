@@ -883,6 +883,25 @@ function fillCloseOverlayItems(){
     strokeColor:[255,152,0,230],strokeWidth:2*zs,dashPattern:[6*zs,4*zs],
   }];
 }
+// Every ALREADY-QUEUED closing stroke (drag finished, not yet consumed by a
+// fill click) — unlike fillCloseOverlayItems above (only the drag currently
+// in progress, pushed via renderWithOverlayItem's rAF-coalesced overlay
+// path during onMove), this is called from buildSceneJson so the dashed
+// guide keeps showing on every ORDINARY render too — reported: the line
+// was vanishing right after being drawn instead of staying until either a
+// fill click uses it or a tool switch discards it (see window.SM.setTool,
+// timeline.js, which clears _fillCloseStrokes on leaving 'fill').
+function fillCloseStrokesOverlayItems(){
+  if(!_fillCloseStrokes.length)return[];
+  var zs=1/Math.max(0.0001,view.zoom);
+  return _fillCloseStrokes.map(function(pts){
+    return{
+      segments:pts.map(function(p){return{point:p};}),
+      closed:false,fillColor:null,
+      strokeColor:[255,152,0,230],strokeWidth:2*zs,dashPattern:[6*zs,4*zs],
+    };
+  });
+}
 // Turns every queued Alt-drawn closing stroke into a REAL (but disposable)
 // Path, inserted into `layer` so fillCollectWalls picks it up as a wall for
 // the very next fillVectorFind call — then the caller removes it via

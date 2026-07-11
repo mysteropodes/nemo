@@ -92,7 +92,19 @@ window.SM={
       showToast('Profil "Producteur" : lecture seule + commentaires');
       return;
     }
-    if(t!=='select'&&t!=='subselect')clearSel();if(t!=='fsselect')fsClearSel();if(t!=='pen'&&_pen.path)finalizePen();if(t!=='eraser'&&typeof _eraserCursor!=='undefined'&&_eraserCursor){_eraserCursor.remove();_eraserCursor=null;}state.tool=t;renderArcs();
+    if(t!=='select'&&t!=='subselect')clearSel();if(t!=='fsselect')fsClearSel();if(t!=='pen'&&_pen.path)finalizePen();if(t!=='eraser'&&typeof _eraserCursor!=='undefined'&&_eraserCursor){_eraserCursor.remove();_eraserCursor=null;}
+    // Leaving the fill tool discards any queued/in-progress Alt-drawn
+    // closing stroke (reported: it should persist until either a fill
+    // click consumes it or the tool changes — this is the "tool change"
+    // half of that). Also the recovery half of the pointer-capture fix:
+    // if a drag was somehow left stuck active (_fillCloseDrag non-null),
+    // the engine would still be suspended — resume it here too, not just
+    // on Escape, so switching tools always leaves rendering in a sane state.
+    if(t!=='fill'&&typeof _fillCloseStrokes!=='undefined'){
+      if(_fillCloseDrag){_fillCloseDrag=null;if(window.SMEngineBridge)window.SMEngineBridge.resume();}
+      _fillCloseStrokes=[];
+    }
+    state.tool=t;renderArcs();
     document.querySelectorAll('.tool-btn').forEach(function(b){b.classList.toggle('active',b.dataset.tool===t);});
     var cc={draw:'crosshair',pen:'crosshair',line:'crosshair',rect:'crosshair',ellipse:'crosshair',select:'default',subselect:'default',fsselect:'default',comment:'crosshair',camera:'move',text:'text',eraser:'pointer',fill:'crosshair',fillbrush:'crosshair',eyedropper:'crosshair',hand:'grab',zoom:'zoom-in',rotate:'grab',perspective:'crosshair'};
     canvasEl.style.cursor=cc[t]||'default';
