@@ -404,6 +404,21 @@
     var artboardName='Nemo Export '+new Date().toISOString().slice(0,16).replace('T',' ');
     var abRes=await riveCall('open_file_editor',{command:'createArtboard',data:{createArtboard:[{name:artboardName,width:state.canvasW,height:state.canvasH,x:0,y:0}]}});
     var artboardId=abRes.artboards[0].id;
+    // animation_editor has no artboardId parameter anywhere in its schema
+    // — createLinearAnimations operates on whatever artboard is currently
+    // ACTIVE in the editor, not on the one just created. Confirmed live
+    // via a real bug: every previous export's animation (with every
+    // keyframe correctly written) was silently attaching to whatever
+    // artboard the user had open before running the export (its own
+    // artboardid property pointed at that OTHER artboard, not this
+    // export's) — the exported shapes were all correct, but there was
+    // never a real, visible, playable Timeline animation on the artboard
+    // itself. Focusing the new artboard first is required before any
+    // artboard-implicit tool call (animations, and by the same logic
+    // possibly others) — this is the actual root cause of "the animation
+    // doesn't replay" (reported), not (only) the fps/duration bug fixed
+    // earlier.
+    await riveCall('open_file_editor',{command:'focusArtboard',data:{focusArtboard:{artboardId:artboardId}}});
 
     var animRes=await riveCall('animation_editor',{command:'createLinearAnimations',data:{createLinearAnimations:{linearAnimations:[{name:'Timeline',duration:(r.end-r.start+1)}]}}});
     var animationId=animRes.animations[0].id;
@@ -527,7 +542,21 @@
           }
           var useMorph=(run.end>run.start)&&!allSame;
           var name='n'+(shapeCounter++);
-          var opacityKeys=[{frame:run.start-r.start,value:1}];
+          // A shape whose run doesn't start at r.start needs an explicit
+          // opacity:0 bookend at frame 0 — confirmed live as a real bug
+          // otherwise: a shape with only ONE opacity keyframe (its own
+          // "turn on" at frame N, with no closing key because its run
+          // extends to the end of the export) rendered visible for the
+          // ENTIRE timeline, including before frame N, instead of only
+          // from N onward. Two-plus keyframes on the same property
+          // behaved correctly (hidden before the first one) — a single
+          // keyframe apparently gets treated as a constant value across
+          // the whole animation rather than "hold from here". Bookending
+          // both ends whenever the run doesn't already touch them
+          // sidesteps the single-keyframe case entirely.
+          var opacityKeys=[];
+          if(run.start>r.start)opacityKeys.push({frame:0,value:0});
+          opacityKeys.push({frame:run.start-r.start,value:1});
           if(run.end<r.end)opacityKeys.push({frame:run.end-r.start+1,value:0});
           var hasRealStroke=resolveHasRealStroke(framesStrokes,slot,run.start,r.start,r.end);
 
