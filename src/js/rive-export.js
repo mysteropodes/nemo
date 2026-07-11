@@ -194,6 +194,48 @@
     return cmds;
   }
 
+  // A degenerate single-point path (moveTo+lineTo to the SAME point) —
+  // the minimum createShapes accepts ("at least one moveTo and one
+  // lineTo/cubicTo"). Used as a throwaway placeholder for cubic-fidelity
+  // shapes: see the file's vertex0-tangent-loss note below for why the
+  // path can't just be built from cubicTo commands directly.
+  function riveBuildPlaceholderCommands(pt){
+    return [{commandType:'moveTo',x:pt[0],y:pt[1]},{commandType:'lineTo',x:pt[0],y:pt[1]}];
+  }
+
+  // Converts a lottieShapeValue() result into addVertices' vertex list
+  // (explicit type:'cubic', same relative in/out offset convention
+  // riveBuildCubicCommands already used) — used together with the
+  // placeholder-then-delete dance below instead of createShapes' own
+  // moveTo/cubicTo command list.
+  //
+  // Why: createShapes silently mis-classifies the FIRST vertex of an open
+  // path as a plain StraightVertex (no curvature at all) even when the
+  // very next cubicTo command clearly encodes a real out-tangent for it —
+  // confirmed live, repeatedly, isolating the exact cause: a vertex
+  // defined via `moveTo` never gets typed as cubic, no matter what the
+  // following cubicTo's control1 says. Vertices 2+ (defined by their own
+  // cubicTo) classify correctly. Reported by the user as "la première
+  // n'a pas pris en compte les tangentes".
+  // Fix: create the shape with a single-point PLACEHOLDER path instead,
+  // then use addVertices (which accepts an explicit `type` per vertex,
+  // bypassing whatever heuristic createShapes uses) to insert every real
+  // vertex — including the first — after that placeholder, and finally
+  // delete_objects the placeholder vertex itself (a generic object,
+  // deletable the same way an artboard/shape is elsewhere in this file).
+  // Isclosed doesn't need a duplicated closing vertex/cubic segment the
+  // way the old command-list approach did — once isclosed is set (see
+  // the existing ISCLOSED_KEY fix below), Rive wraps the last vertex's
+  // own out-handle into the first vertex's own in-handle automatically.
+  function riveCubicVerticesFromShapeVal(shapeVal){
+    var v=shapeVal.v,i=shapeVal.i,o=shapeVal.o;
+    var verts=[];
+    for(var k=0;k<v.length;k++){
+      verts.push({x:v[k][0],y:v[k][1],type:'cubic',inX:i[k][0],inY:i[k][1],outX:o[k][0],outY:o[k][1]});
+    }
+    return verts;
+  }
+
   // Straight-segment-only commands (no handles) — used for "morph" shapes,
   // see the straight-vertex tradeoff note at the top of the file.
   function riveBuildStraightCommands(points,closed){
@@ -620,12 +662,16 @@
           if(!useMorph){
             var shapeVal0=lottieShapeValue(firstSd,null);
             if(wobble)shapeVal0.v=riveApplyWobble(shapeVal0.v,wobble.amp,wobble.freqPer100,wobble.seed,shapeVal0.c);
+            // Placeholder path at creation time — real cubic vertices
+            // (including a correctly-typed first one) are inserted via
+            // addVertices afterward. See riveCubicVerticesFromShapeVal's
+            // comment for why.
             shapeDefs.push({
               name:name,x:0,y:0,parentId:containerId,
               paints:riveBuildPaints(firstSd,hasRealStroke,opacityOverride),
-              paths:[{name:'P',commands:riveBuildCubicCommands(shapeVal0)}]
+              paths:[{name:'P',commands:riveBuildPlaceholderCommands(shapeVal0.v[0])}]
             });
-            pending.push({name:name,opacityKeys:opacityKeys,morph:null,translate:null,closed:shapeVal0.c});
+            pending.push({name:name,opacityKeys:opacityKeys,morph:null,translate:null,closed:shapeVal0.c,cubicVerts:riveCubicVerticesFromShapeVal(shapeVal0)});
           }else{
             // Raw points per frame — checked for a pure rigid translation
             // first (see riveDetectTranslation): a stroke that's just
@@ -715,6 +761,41 @@
     var bgPath=pathObjForShape('Background');
     if(bgPath)closedFix[bgPath.id]={32:true};
     if(Object.keys(closedFix).length)await riveCall('set_property_values',{propertyValues:closedFix});
+
+    // Replace each cubic-fidelity shape's placeholder point with its real
+    // vertices (see riveCubicVerticesFromShapeVal for why this can't just
+    // be baked into the createShapes commands above) — insert the real
+    // ones after the placeholder, then delete the placeholder itself.
+    var cubicPending=pending.filter(function(p){return p.cubicVerts&&pathObjForShape(p.name);});
+    if(cubicPending.length){
+      // get_artboard_hierarchy silently OMITS the `children` field
+      // entirely for a PointsPath with exactly one vertex — confirmed
+      // live: a degenerate 1-point placeholder path came back with no
+      // `children` key at all (a 4-vertex Background path, fetched in
+      // the very same tree, had one fine), which meant the very first
+      // live version of this fixup pass ran zero times, silently, with
+      // no error — pathObjForShape(name).children was always undefined
+      // for every placeholder. query_objects doesn't have this gap, so
+      // it's used here instead, batched across every shape needing this
+      // in one call rather than resolved from the earlier tree.
+      var cubicPathIds=cubicPending.map(function(p){return pathObjForShape(p.name).id;});
+      var vTree=await riveCall('query_objects',{objectIds:cubicPathIds,depth:1});
+      var firstChildByPathId={};
+      (vTree.objects||[]).forEach(function(o){
+        if(o.types&&o.types.indexOf('PointsPath')>=0&&o.children&&o.children.length)firstChildByPathId[o.id]=o.children[0];
+      });
+      for(var pi=0;pi<cubicPending.length;pi++){
+        var pc=cubicPending[pi];
+        var cPathObj=pathObjForShape(pc.name);
+        var placeholderId=firstChildByPathId[cPathObj.id];
+        if(!placeholderId)continue;
+        var vertsToAdd=pc.cubicVerts.slice();
+        vertsToAdd[0]=Object.assign({},vertsToAdd[0],{insertAfterVertexId:placeholderId});
+        onProgress('Tangentes des tracés… ('+(pi+1)+'/'+cubicPending.length+')');
+        await riveCall('path_editor',{command:'addVertices',data:{pathId:cPathObj.id,vertices:vertsToAdd}});
+        await riveCall('delete_objects',{objectIds:[placeholderId]});
+      }
+    }
 
     // createShapes doesn't guarantee children end up appended in creation
     // order (confirmed live: a shape created AFTER Background still showed
