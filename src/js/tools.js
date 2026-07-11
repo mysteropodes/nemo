@@ -1297,6 +1297,29 @@ function _computeExactCrossings(opens){
         crossings.push({wall:j,frac:loc.intersection.offset/opens[j].length,pt:pt});
       });
     }
+    // Self-crossings (i===i): a single freehand stroke that loops back over
+    // itself — a hand silhouette's fingers, a cursive/spiral doodle, any
+    // shape where the SAME wall crosses its own path — never got a graph
+    // node at that junction, since the loop above only ever compares two
+    // DIFFERENT walls (j starts at i+1). Without a node there, build_graph
+    // (fill.rs) sees one continuous polyline that geometrically crosses
+    // itself, traces the only loop available through the click point, and
+    // poly_self_intersects correctly (but unhelpfully) rejects it as an
+    // invalid bow-tie — indistinguishable from a genuine mistraced loop at a
+    // near-tangential junction. Reported: a clearly closed, hand-drawn
+    // "hand" outline (fingers necessarily cross the palm's own line)
+    // returning "Aucune zone fermée ici" at every gap threshold, even 280px
+    // — for a ~108px gap that should close trivially. Splitting the wall at
+    // its own self-intersection(s) here, same shape as the cross-wall case,
+    // gives Rust the node it needs to route through the junction instead of
+    // rejecting the whole loop.
+    var selfIx=opens[i].getIntersections(opens[i]);
+    selfIx.forEach(function(loc){
+      if(!loc.intersection)return;
+      var pt=[loc.point.x,loc.point.y];
+      crossings.push({wall:i,frac:loc.offset/opens[i].length,pt:pt});
+      crossings.push({wall:i,frac:loc.intersection.offset/opens[i].length,pt:pt});
+    });
   }
   return crossings;
 }
@@ -1365,11 +1388,36 @@ function fillVectorFind(clickPt,layer,excludePath,maxGapThr,onlyIds){
     var gapThr=FILL_GAP_STEPS[i];
     if(maxGapThr!==undefined&&gapThr>maxGapThr)break;
     var res=null;
-    if(window.GeometryWasm&&window.GeometryWasm.ready){
+    // fillVectorFindJS (fillBuildGraph specifically) is a STALE peer of
+    // build_graph/fill.rs: it never learned the wall-splitting-at-crossings
+    // logic Rust got (see fill.rs's header comment + _computeExactCrossings
+    // above, which ONLY the WASM path consults below) — it still treats
+    // each wall as a single whole edge between its two endpoints, so it
+    // structurally cannot find a region bounded purely by two strokes
+    // CROSSING each other with no shared/nearby endpoints involved — e.g.
+    // the everyday "diamond/losange formed by two crossing strokes" shape
+    // (reported: "je clic sur le losange centrale et il ne detecte pas ça
+    // comme une forme fermée"). Confirmed live: fillVectorFindJS returns
+    // not-found on such a shape at every gapThr, while fillVectorFindWasm
+    // finds it correctly at gapThr=0.
+    // Used to ALSO run this stale JS path whenever WASM merely returned
+    // null (a normal "nothing closes at this gapThr yet" answer, not a
+    // failure) — its wrong/crossing-blind candidate could then win
+    // fillVectorFind's cross-step area comparison over the correct WASM
+    // candidate found at a later, larger gapThr step, or trip the early
+    // usedGap===false break on a wrong answer before the real one was ever
+    // tried (reported: "encore des problème de détection et de fill dans ce
+    // cas de figure" — inconsistent results needing several clicks). Only
+    // fall back to JS when WASM is genuinely unavailable or threw — never
+    // to "double-check" a clean WASM null, which IS the correct answer at
+    // that gapThr.
+    var wasmAvailable=window.GeometryWasm&&window.GeometryWasm.ready;
+    var wasmFailed=false;
+    if(wasmAvailable){
       try{res=fillVectorFindWasm(clickPt,gapThr,layer,excludePath,onlyIds);}
-      catch(e){console.warn('[geometry-wasm] fill_find failed, falling back to JS',e);}
+      catch(e){wasmFailed=true;console.warn('[geometry-wasm] fill_find failed, falling back to JS',e);}
     }
-    if(!res)res=fillVectorFindJS(clickPt,gapThr,layer,excludePath,onlyIds);
+    if(!res&&(!wasmAvailable||wasmFailed))res=fillVectorFindJS(clickPt,gapThr,layer,excludePath,onlyIds);
     if(res){
       var area=Math.abs(res.path.area);
       if(area<bestArea){
@@ -2800,7 +2848,7 @@ function onMouseDown(event){
     // Same both-eyes-off guard as draw-bridge.js's commitStroke — never
     // commit fully invisible ink.
     if(!state.strokeEnabled&&!state.fillEnabled){showToast('Stroke et Fill désactivés — rien à dessiner');return;}
-    ensureKeyframe();pushUndo();layer.activate();
+    pushUndo();ensureKeyframe();layer.activate();
     if(state.vectorBrush){
       _vbLastPenPressure=null;_vbSmoothedPressure=null;stabQueue=[event.point.clone()];_vb.pts=[event.point.clone()];_vb.widths=[vbPressureOf(event)];_vb.lastT=Date.now();_vb.lastPt=event.point.clone();
       currentPath=new Path();currentPath.fillColor=state.strokeEnabled?state.strokeColor:state.fillColor;currentPath.strokeColor=null;currentPath.opacity=state.opacity/100;
@@ -2820,7 +2868,7 @@ function onMouseDown(event){
     _pen.lastClickTime=now;_pen.lastClickPt=event.point.clone();
     if(isDoubleClick){finalizePen();return;}
     if(!_pen.path){
-      ensureKeyframe();pushUndo();layer.activate();
+      pushUndo();ensureKeyframe();layer.activate();
       _pen.path=new Path();_pen.path.strokeColor=state.strokeColor;_pen.path.strokeWidth=state.brushSize;
       _pen.path.strokeCap=state.strokeCap;_pen.path.strokeJoin=state.strokeJoin;_pen.path.fillColor=null;_pen.path.opacity=state.opacity/100;
       applyStrokeStyle(_pen.path);
@@ -2834,7 +2882,7 @@ function onMouseDown(event){
     }
     _pen.draggingHandle=true;
   }else if(state.tool==='line'||state.tool==='rect'||state.tool==='ellipse'){
-    if(state.layers[state.activeLayerIdx].locked)return;ensureKeyframe();pushUndo();layer.activate();shapeStart=event.point.clone();
+    if(state.layers[state.activeLayerIdx].locked)return;pushUndo();ensureKeyframe();layer.activate();shapeStart=event.point.clone();
     if(state.tool==='line')currentPath=new Path.Line({from:event.point,to:event.point,strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,strokeCap:state.strokeCap,fillColor:null,opacity:state.opacity/100});
     else if(state.tool==='rect')currentPath=new Path.Rectangle({from:event.point,to:event.point.add(new Point(1,1)),strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,fillColor:state.fillEnabled?state.fillColor:null,opacity:state.opacity/100});
     else currentPath=new Path.Ellipse({rectangle:new Rectangle(event.point,new Size(1,1)),strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,fillColor:state.fillEnabled?state.fillColor:null,opacity:state.opacity/100});
@@ -2986,7 +3034,11 @@ function onMouseDown(event){
     }
     renderArcs();updateUI();
   }else if(state.tool==='eraser'){
-    if(state.layers[state.activeLayerIdx].locked)return;ensureKeyframe();
+    if(state.layers[state.activeLayerIdx].locked)return;
+    // pushUndo() BEFORE ensureKeyframe(), and unconditionally — see
+    // draw-bridge.js's commitStroke comment: one undo must revert both the
+    // frame's auto-promotion to keyframe and whatever this gesture erases.
+    pushUndo();ensureKeyframe();
     // instanceof Path AND CompoundPath, not just Path: eraseAtPoint (below)
     // turns a shape into a CompoundPath the moment a bite creates a hole
     // (a donut shape can't be represented as a single Path) — if the guard
@@ -2996,14 +3048,14 @@ function onMouseDown(event){
     // not" — it worked until the first bite, then stopped for that shape.
     var hit2=layer.hitTest(event.point,{stroke:true,fill:true,tolerance:Math.max(8,state.eraserSize/2)/view.zoom});
     if(hit2&&(hit2.item instanceof Path||hit2.item instanceof CompoundPath)&&(hit2.item.strokeColor||hit2.item.fillColor||(hit2.item.data&&hit2.item.data.isVectorBrush))){
-      pushUndo();_eraseDragActive=true;
+      _eraseDragActive=true;
       var erasedItem2=hit2.item;
       eraseAtPoint(erasedItem2,event.point,state.eraserSize/2);
       _eraseLastPt=event.point.clone();
       fillRegenerateLinked(layer,erasedItem2);saveActiveLayerFrame();updateUI();
     }
   }else if(state.tool==='fill'){
-    if(state.layers[state.activeLayerIdx].locked)return;ensureKeyframe();
+    if(state.layers[state.activeLayerIdx].locked)return;
     if(event.event.altKey){
       // Alt+drag: draw a TEMPORARY closing stroke to help the fill engine
       // bridge a region its own crossing/gap detection can't close on its
@@ -3011,15 +3063,20 @@ function onMouseDown(event){
       // simple loop) — visual-only dashed guide, never added to the real
       // document. Materialized as a real (but disposable) wall for exactly
       // the next non-alt fill click, then discarded whether that click
-      // used it or not (see the non-alt branch below).
+      // used it or not (see the non-alt branch below). Purely visual — no
+      // pushUndo()/ensureKeyframe() here, nothing is mutated yet.
       _fillCloseDrag={points:[event.point.clone()]};
       window.SMEngineBridge.suspend();
       window.SMEngineBridge.renderWithOverlayItem(fillCloseOverlayItems());
       return;
     }
+    // pushUndo() BEFORE ensureKeyframe(), and unconditionally — see
+    // draw-bridge.js's commitStroke comment: one undo must revert both the
+    // frame's auto-promotion to keyframe and whatever this click does.
+    pushUndo();ensureKeyframe();
     if(event.modifiers.shift){
       var hitRm=layer.hitTest(event.point,{fill:true,tolerance:12/view.zoom});
-      if(hitRm&&hitRm.item instanceof Path&&hitRm.item.fillColor){pushUndo();hitRm.item.fillColor=null;saveActiveLayerFrame();updateUI();showToast('Fill supprimé');}
+      if(hitRm&&hitRm.item instanceof Path&&hitRm.item.fillColor){hitRm.item.fillColor=null;saveActiveLayerFrame();updateUI();showToast('Fill supprimé');}
       return;
     }
     // Any queued Alt-drawn closing strokes become real (but disposable)
@@ -3041,12 +3098,11 @@ function onMouseDown(event){
       // fresh wall geometry around it to retrace a brand-new region from.
       var hitFill=layer.hitTest(event.point,{fill:true,tolerance:1/view.zoom});
       if(hitFill&&(hitFill.item instanceof Path||hitFill.item instanceof CompoundPath)&&hitFill.item.fillColor){
-        pushUndo();hitFill.item.fillColor=state.fillColor;hitFill.item.opacity=state.opacity/100;
+        hitFill.item.fillColor=state.fillColor;hitFill.item.opacity=state.opacity/100;
         saveActiveLayerFrame();updateUI();showToast('Couleur remplacée');return;
       }
       showToast('Aucune zone fermée ici');return;
     }
-    pushUndo();
     layer.insertChild(fillInsertIndexFor(layer,event.point,res.path),res.path);
     res.path.fillColor=state.fillColor;res.path.strokeColor=null;res.path.opacity=state.opacity/100;
     // remembers where/how this fill was made so subselection edits to the
@@ -3057,7 +3113,7 @@ function onMouseDown(event){
     fillMergeSameColor(layer,res.path); // Animate merge-drawing — see the helper's comment
     saveActiveLayerFrame();updateUI();showToast('Fill appliqué');
   }else if(state.tool==='fillbrush'){
-    if(state.layers[state.activeLayerIdx].locked)return;ensureKeyframe();pushUndo();layer.activate();
+    if(state.layers[state.activeLayerIdx].locked)return;pushUndo();ensureKeyframe();layer.activate();
     _vbLastPenPressure=null;_vb.pts=[event.point.clone()];_vb.widths=[vbPressureOf(event)];_vb.lastT=Date.now();_vb.lastPt=event.point.clone();
     currentPath=new Path();currentPath.fillColor=state.fillColor;currentPath.strokeColor=null;currentPath.opacity=state.opacity/100;
     currentPath.data.isVectorBrush=true;currentPath.data.isFillShape=true;

@@ -42,8 +42,11 @@
       return;
     }
     if (!_pen.path) {
-      ensureKeyframe();
+      // Order matters — see draw-bridge.js's commitStroke comment: pushUndo()
+      // must snapshot BEFORE ensureKeyframe() promotes the frame, so one
+      // undo reverts both the new keyframe and the path together.
       pushUndo();
+      ensureKeyframe();
       layer.activate();
       // Starting a click near an existing OPEN path's endpoint continues
       // THAT path (appending, or prepending in reverse order if it's the

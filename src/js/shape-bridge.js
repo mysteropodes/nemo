@@ -93,8 +93,11 @@
     if (!shouldIntercept()) return;
     e.stopImmediatePropagation();
     e.preventDefault();
-    ensureKeyframe();
+    // Order matters — see draw-bridge.js's commitStroke comment: pushUndo()
+    // must snapshot BEFORE ensureKeyframe() promotes the frame, so one
+    // undo reverts both the new keyframe and the shape together.
     pushUndo();
+    ensureKeyframe();
     dragging = true;
     shapeTool = state.tool;
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);

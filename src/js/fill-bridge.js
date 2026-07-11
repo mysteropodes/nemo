@@ -43,6 +43,13 @@
       window.SMEngineBridge.renderWithOverlayItem(fillCloseOverlayItems());
       return;
     }
+    // pushUndo() BEFORE ensureKeyframe(), and unconditionally (not lazily
+    // per-branch like before) — see draw-bridge.js's commitStroke comment:
+    // a single undo must revert both the frame's auto-promotion to keyframe
+    // AND whatever this click does, as one step. Doing it lazily per-branch
+    // also left a "Aucune zone fermée ici" miss's keyframe promotion
+    // permanently un-undoable.
+    pushUndo();
     ensureKeyframe();
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
     var pt = new Point(w[0], w[1]);
@@ -51,7 +58,6 @@
     if (e.shiftKey) {
       var hitRm = layer.hitTest(pt, { fill: true, tolerance: 12 / view.zoom });
       if (hitRm && hitRm.item instanceof Path && hitRm.item.fillColor) {
-        pushUndo();
         hitRm.item.fillColor = null;
         saveActiveLayerFrame();
         updateUI();
@@ -77,7 +83,6 @@
       // branch — see its comment for the Animate-parity rationale).
       var hitFill = layer.hitTest(pt, { fill: true, tolerance: 1 / view.zoom });
       if (hitFill && (hitFill.item instanceof Path || hitFill.item instanceof CompoundPath) && hitFill.item.fillColor) {
-        pushUndo();
         hitFill.item.fillColor = state.fillColor;
         hitFill.item.opacity = state.opacity / 100;
         saveActiveLayerFrame();
@@ -89,7 +94,6 @@
       showToast('Aucune zone fermée ici');
       return;
     }
-    pushUndo();
     // Same Animate-style stacking as tools.js's own 'fill' branch — see
     // fillInsertIndexFor's comment (tools.js): above the topmost fill
     // covering the click point, so the new fill is actually visible.

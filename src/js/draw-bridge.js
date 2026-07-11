@@ -386,8 +386,14 @@
     // would insert a fully invisible path (pollutes the layer, participates
     // in tween matching, un-hit-testable). Tell the user why instead.
     if (!isFillBrush() && !state.strokeEnabled && !state.fillEnabled) { showToast('Stroke et Fill désactivés — rien à dessiner'); return; }
-    ensureKeyframe();
+    // pushUndo() BEFORE ensureKeyframe(): ensureKeyframe's auto-promotion of
+    // an empty/interpolated frame to a real keyframe is itself a mutation —
+    // snapshotting after it ran meant a single Cmd+Z only undid the new
+    // stroke and left the frame stuck as an (now empty) keyframe; a SECOND
+    // undo was needed to remove that, and it consumed the undo slot that
+    // belonged to whatever was drawn before it. One undo must revert both.
     pushUndo();
+    ensureKeyframe();
     var layer = userLayers[state.activeLayerIdx];
     layer.activate();
     var path;

@@ -13,7 +13,6 @@
 // during the drag via suspend()/resume(), matching the other bridges.
 (function () {
   var pointerIsDown = false; // gesture lifecycle (suspend/resume span)
-  var erasing = false; // true once the FIRST successful hit of this gesture has fired (gates the one-time pushUndo, matching _eraseDragActive in tools.js)
   var lastErasePt = null; // world Point of the previous erase sample this gesture, or null for the first — fed to eraseAtPoint so it sweeps a continuous capsule instead of a lone circle per move (see eraseAtPoint's own comment for why)
   var lastPenPressure = null; // held across a real-pen gesture — same hold-last-value fix as draw-bridge.js's pressureOf(), for the exact same reason (0/missing samples at lift-off otherwise misread as "max pressure")
 
@@ -78,7 +77,6 @@
     // first bite (hit-test still found it, the type check rejected it),
     // matching the reported "sometimes erases, sometimes not".
     if (hit && (hit.item instanceof Path || hit.item instanceof CompoundPath) && (hit.item.strokeColor || hit.item.fillColor || (hit.item.data && hit.item.data.isVectorBrush))) {
-      if (!erasing) { pushUndo(); erasing = true; }
       var erasedItem = hit.item;
       eraseAtPoint(erasedItem, pt, radius, lastErasePt);
       lastErasePt = pt.clone();
@@ -97,6 +95,13 @@
     if (!shouldIntercept()) return;
     e.stopImmediatePropagation();
     e.preventDefault();
+    // pushUndo() BEFORE ensureKeyframe(), and unconditionally (not lazily
+    // on the first actual hit like before) — see draw-bridge.js's
+    // commitStroke comment for why the ordering matters: a single undo must
+    // revert both the frame's auto-promotion to keyframe AND whatever this
+    // gesture erases, as one step. Doing it lazily on first hit also left a
+    // miss-only gesture's keyframe promotion permanently un-undoable.
+    pushUndo();
     ensureKeyframe();
     lastPenPressure = null;
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
