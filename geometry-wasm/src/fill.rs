@@ -209,16 +209,6 @@ struct Edge {
     b: usize,
 }
 
-fn find_or_create_node(nodes: &mut Vec<Node>, pt: Vec2, join_eps: f64) -> usize {
-    for (i, n) in nodes.iter().enumerate() {
-        if n.pt.dist(pt) <= join_eps {
-            return i;
-        }
-    }
-    nodes.push(Node { pt, edges: Vec::new() });
-    nodes.len() - 1
-}
-
 // Arc-length cumulative-distance table for a polyline: cum[i] = distance
 // from points[0] to points[i]; cum[0] = 0, cum.last() = total length.
 fn arc_lengths(pts: &[[f64; 2]]) -> (Vec<f64>, f64) {
@@ -308,14 +298,27 @@ fn find_crossings(open_pts: &[Vec<[f64; 2]>]) -> Vec<(usize, f64, Vec2)> {
     hits
 }
 
+fn uf_find(parent: &mut Vec<usize>, x: usize) -> usize {
+    if parent[x] != x {
+        let root = uf_find(parent, parent[x]);
+        parent[x] = root;
+    }
+    parent[x]
+}
+fn uf_union(parent: &mut Vec<usize>, a: usize, b: usize) {
+    let ra = uf_find(parent, a);
+    let rb = uf_find(parent, b);
+    if ra != rb {
+        parent[ra] = rb;
+    }
+}
+
 fn build_graph(
     open_pts: &[Vec<[f64; 2]>],
     gap_thr: f64,
     external_crossings: Option<&[CrossingIn]>,
 ) -> (Vec<Node>, Vec<Edge>) {
     let join_eps = (1.5_f64).max(gap_thr * 0.15).max(1.5);
-    let mut nodes: Vec<Node> = Vec::new();
-    let mut edges: Vec<Edge> = Vec::new();
 
     let tables: Vec<(Vec<f64>, f64)> = open_pts.iter().map(|p| arc_lengths(p)).collect();
     // Prefer exact, JS-computed crossings (real bezier-curve intersections)
@@ -329,14 +332,12 @@ fn build_graph(
     };
 
     // Per-wall sorted cut-fraction list: always includes 0.0/1.0 (the real
-    // endpoints, no exact point — recomputed via point_at_distance, which is
-    // already exact for a real endpoint), plus every crossing found on that
-    // wall (WITH its exact point when known) — this is what turns "one edge
-    // per whole wall" into "one edge per sub-segment between consecutive
-    // cuts", so the wall-follower can route through a crossing exactly like
-    // it already routes through a gap-bridge node.
-    for (i, pts) in open_pts.iter().enumerate() {
-        let (cum, total) = &tables[i];
+    // endpoints), plus every crossing found on that wall — this is what
+    // turns "one edge per whole wall" into "one edge per sub-segment
+    // between consecutive cuts", so the wall-follower can route through a
+    // crossing exactly like it already routes through a gap-bridge node.
+    let mut wall_cuts: Vec<Vec<(f64, Option<Vec2>)>> = Vec::with_capacity(open_pts.len());
+    for i in 0..open_pts.len() {
         let mut cuts: Vec<(f64, Option<Vec2>)> = vec![(0.0, None), (1.0, None)];
         for (wi, frac, pt) in &crossings {
             if *wi == i {
@@ -345,17 +346,88 @@ fn build_graph(
         }
         cuts.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
         cuts.dedup_by(|a, b| (a.0 - b.0).abs() < 1e-6);
+        wall_cuts.push(cuts);
+    }
 
-        for pair in cuts.windows(2) {
-            let (f0, p0opt) = pair[0];
-            let (f1, p1opt) = pair[1];
+    // Resolve every cut to its actual point, and flatten into one list
+    // (with a back-reference to which wall/cut it came from) — the input
+    // to the clustering pass below.
+    let mut all_points: Vec<Vec2> = Vec::new();
+    let mut wall_point_start: Vec<usize> = Vec::with_capacity(open_pts.len());
+    for (wi, cuts) in wall_cuts.iter().enumerate() {
+        wall_point_start.push(all_points.len());
+        let (cum, total) = &tables[wi];
+        let pts = &open_pts[wi];
+        for (f, popt) in cuts {
+            all_points.push(popt.unwrap_or_else(|| point_at_distance(pts, cum, *total, f * total)));
+        }
+    }
+
+    // Cluster all cut points by mutual proximity (union-find over every
+    // pair within join_eps) rather than the old greedy "match the first
+    // existing node found within eps" scan, which processed points in
+    // discovery order and could transitively chain-merge many genuinely
+    // DISTINCT crossing points into one corrupted node — e.g. up to 15
+    // pairwise crossings when 6+ curves converge near one hub, each
+    // individually within eps of *some* earlier point but collectively
+    // spanning well past it. A merged hub node silently deletes the small
+    // lens/petal faces between the real crossings from the graph, breaking
+    // the wall-follower's ability to find the correct local face there —
+    // it falls through to the outer silhouette instead (reported:
+    // "il me donne ça" — a fan/star arrangement's small regions grabbing
+    // unrelated other regions). True clustering (connected components,
+    // one Node per component at its centroid) can't snowball past eps.
+    let m = all_points.len();
+    let mut parent: Vec<usize> = (0..m).collect();
+    for i in 0..m {
+        for j in (i + 1)..m {
+            if all_points[i].dist(all_points[j]) <= join_eps {
+                uf_union(&mut parent, i, j);
+            }
+        }
+    }
+    let mut cluster_of: Vec<usize> = vec![0; m];
+    let mut cluster_node: std::collections::HashMap<usize, usize> = std::collections::HashMap::new();
+    let mut cluster_sum: std::collections::HashMap<usize, (Vec2, usize)> = std::collections::HashMap::new();
+    for i in 0..m {
+        let root = uf_find(&mut parent, i);
+        let entry = cluster_sum.entry(root).or_insert((Vec2 { x: 0.0, y: 0.0 }, 0));
+        entry.0.x += all_points[i].x;
+        entry.0.y += all_points[i].y;
+        entry.1 += 1;
+    }
+    let mut nodes: Vec<Node> = Vec::new();
+    for i in 0..m {
+        let root = uf_find(&mut parent, i);
+        let node_idx = *cluster_node.entry(root).or_insert_with(|| {
+            let (sum, count) = cluster_sum[&root];
+            nodes.push(Node { pt: Vec2 { x: sum.x / count as f64, y: sum.y / count as f64 }, edges: Vec::new() });
+            nodes.len() - 1
+        });
+        cluster_of[i] = node_idx;
+    }
+
+    // Build stroke sub-edges using the resolved cluster node ids.
+    let mut edges: Vec<Edge> = Vec::new();
+    for (wi, cuts) in wall_cuts.iter().enumerate() {
+        let (cum, total) = &tables[wi];
+        let pts = &open_pts[wi];
+        let base = wall_point_start[wi];
+        for w in 0..cuts.len() - 1 {
+            let (f0, _) = cuts[w];
+            let (f1, _) = cuts[w + 1];
             if (f1 - f0) * total < 1e-6 {
                 continue; // degenerate zero-length sub-edge (crossing exactly at an existing cut)
             }
-            let p0 = p0opt.unwrap_or_else(|| point_at_distance(pts, cum, *total, f0 * total));
-            let p1 = p1opt.unwrap_or_else(|| point_at_distance(pts, cum, *total, f1 * total));
-            let a = find_or_create_node(&mut nodes, p0, join_eps);
-            let b = find_or_create_node(&mut nodes, p1, join_eps);
+            let idx0 = base + w;
+            let idx1 = base + w + 1;
+            let a = cluster_of[idx0];
+            let b = cluster_of[idx1];
+            if a == b {
+                continue; // both ends collapsed into the same cluster — no real edge
+            }
+            let p0 = all_points[idx0];
+            let p1 = all_points[idx1];
 
             // Rebuild this sub-edge's own point list: the original points
             // strictly between f0/f1, plus exact interpolated endpoints.
@@ -369,7 +441,7 @@ fn build_graph(
             }
             edge_pts.push(p1);
 
-            edges.push(Edge { kind: EdgeType::Stroke, stroke_idx: i, frac_a: f0, frac_b: f1, pts: edge_pts, a, b });
+            edges.push(Edge { kind: EdgeType::Stroke, stroke_idx: wi, frac_a: f0, frac_b: f1, pts: edge_pts, a, b });
         }
     }
 
