@@ -31,6 +31,14 @@
     if (e.altKey) {
       var w0 = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
       _fillCloseDrag = { points: [new Point(w0[0], w0[1])] };
+      // A closing stroke is often drawn deliberately past the visible
+      // strokes near the canvas edge, more likely than most drags to leave
+      // the canvas element's own bounds mid-gesture — without capture, the
+      // pointerup landing outside #canvas-area would never reach onUp
+      // below, leaving _fillCloseDrag set and the engine suspended forever
+      // (breaking not just the fill tool but every other tool's own
+      // suspend/resume-gated interaction, e.g. Alt+drag rotate elsewhere).
+      try { e.target.setPointerCapture(e.pointerId); } catch (err) {}
       window.SMEngineBridge.suspend();
       window.SMEngineBridge.renderWithOverlayItem(fillCloseOverlayItems());
       return;
@@ -115,10 +123,24 @@
     showToast(_fillCloseStrokes.length + ' trait(s) de fermeture en attente — clic sans Alt pour remplir');
   }
 
+  // Recovery valve: if a closing-stroke drag ever gets stuck active (pointer
+  // capture failing on some platform, a devtools/OS gesture stealing the
+  // pointerup, etc.) the engine would stay suspended forever, silently
+  // breaking every other suspend/resume-gated tool. Escape always cancels
+  // it and resumes rendering.
+  function onKeyDown(e) {
+    if (e.key === 'Escape' && _fillCloseDrag) {
+      _fillCloseDrag = null;
+      window.SMEngineBridge.resume();
+      window.SMEngineBridge.renderNow();
+    }
+  }
+
   function init() {
     var target = document.getElementById('canvas-area') || document.getElementById('drawing-canvas');
     target.addEventListener('pointerdown', onDown, { capture: true });
     target.addEventListener('pointermove', onMove, { capture: true });
+    document.addEventListener('keydown', onKeyDown);
     target.addEventListener('pointerup', onUp, { capture: true });
     target.addEventListener('pointercancel', onUp, { capture: true });
   }
