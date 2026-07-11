@@ -190,6 +190,13 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_http::init())
+        // Lets the frontend offer an immediate "redémarrer maintenant" after
+        // downloadAndInstall() succeeds (updater-bridge.js) — without this,
+        // an installed update only takes effect on the NEXT manual launch,
+        // which reads as "nothing happened" (reported: user only noticed the
+        // update had actually worked because they happened to relaunch the
+        // app later and saw the new version number).
+        .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![run_ffmpeg, submit_feedback_issue, upload_feedback_attachment])
         // "Vérifier les mises à jour…" in the app (StrokeMotion) menu — same
         // check the Réglages button and the silent startup check already

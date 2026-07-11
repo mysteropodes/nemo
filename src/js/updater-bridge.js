@@ -32,10 +32,45 @@
 
   async function doInstall(update, statusEl) {
     try {
+      // downloadAndInstall() on a ~30MB artifact silently ran for several
+      // seconds with ZERO feedback anywhere the user was actually looking —
+      // the confirm dialog closes the instant they click OK, and statusEl
+      // (Réglages' own status line) is invisible unless that panel happens
+      // to be open, which it usually isn't right after a startup prompt.
+      // Reported as "je clique OK et rien ne se passe" even though the
+      // install had, in fact, fully succeeded. A toast with live progress
+      // is the one channel guaranteed visible regardless of what panel is
+      // open — plus it's the only sign of life during the download itself.
+      var total = 0, received = 0;
+      showToast('Téléchargement de la mise à jour…');
       if (statusEl) statusEl.textContent = 'Téléchargement…';
-      await update.downloadAndInstall();
-      if (statusEl) statusEl.textContent = 'Installée — redémarre l\'app pour l\'utiliser.';
-      showToast('Mise à jour installée — redémarre Nemo');
+      await update.downloadAndInstall(function (ev) {
+        if (ev.event === 'Started') {
+          total = ev.data.contentLength || 0;
+        } else if (ev.event === 'Progress') {
+          received += ev.data.chunkLength || 0;
+          if (total > 0) {
+            var pct = Math.min(100, Math.round(received / total * 100));
+            if (statusEl) statusEl.textContent = 'Téléchargement… ' + pct + '%';
+          }
+        } else if (ev.event === 'Finished') {
+          if (statusEl) statusEl.textContent = 'Installation…';
+        }
+      });
+      if (statusEl) statusEl.textContent = 'Installée — v' + update.version;
+      // Offer to relaunch right now instead of leaving the user to
+      // stumble onto the new version number later (which is how this got
+      // reported as "did nothing" the first time — the update HAD worked,
+      // there was just no visible confirmation and no easy way to actually
+      // pick up the new build besides quitting and reopening by hand).
+      var restartNow = tauriOk() && window.__TAURI__.process
+        ? await window.__TAURI__.dialog.confirm('Mise à jour installée (v' + update.version + '). Redémarrer Nemo maintenant ?', { title: 'Mise à jour installée' })
+        : false;
+      if (restartNow) {
+        await window.__TAURI__.process.relaunch();
+      } else {
+        showToast('Mise à jour v' + update.version + ' installée — redémarre Nemo pour l\'utiliser');
+      }
     } catch (e) {
       console.warn('[updater] install failed', e);
       if (statusEl) statusEl.textContent = 'Échec de l\'installation.';

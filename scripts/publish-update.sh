@@ -1,6 +1,6 @@
 #!/bin/bash
 # Publishes the current build as the latest auto-update, by pushing
-# StrokeMotion.app.tar.gz + its .sig + latest.json to the private
+# <productName>.app.tar.gz + its .sig + latest.json to the private
 # strokemotion-updates GitHub repo (consumed via the Contents API — see
 # the comment in src-tauri/src/lib.rs for why, not GitHub Releases).
 #
@@ -26,7 +26,12 @@ cd "$(dirname "$0")/.."
 NOTES="${1:-No release notes provided.}"
 REPO_DIR="../strokemotion-updates"
 BUNDLE_DIR="src-tauri/target/release/bundle/macos"
-ARTIFACT="$BUNDLE_DIR/StrokeMotion.app.tar.gz"
+# Bundle file name follows tauri.conf.json's productName (was "StrokeMotion",
+# renamed to "Nemo") — hardcoding the old name here silently broke this
+# script the moment the app got renamed, since the build now produces
+# Nemo.app.tar.gz and the old name never lands on disk anymore.
+PRODUCT_NAME=$(node -p "require('./src-tauri/tauri.conf.json').productName")
+ARTIFACT="$BUNDLE_DIR/$PRODUCT_NAME.app.tar.gz"
 SIG_FILE="$ARTIFACT.sig"
 VERSION=$(node -p "require('./package.json').version")
 
@@ -45,7 +50,7 @@ fi
 
 SIGNATURE=$(cat "$SIG_FILE")
 PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-ARTIFACT_NAME="StrokeMotion.app.tar.gz"
+ARTIFACT_NAME="$PRODUCT_NAME.app.tar.gz"
 
 cp "$ARTIFACT" "$REPO_DIR/$ARTIFACT_NAME"
 
