@@ -3344,9 +3344,11 @@ document.getElementById('comp-offset').addEventListener('change',function(){wind
   var ALPHA_FORMATS=['png','prores'];
   function updateScaleVisibility(){
     var v=fmtSel.value;
-    scaleRow.style.display=(v==='lottie')?'none':'flex';
-    sizeRow.style.display=(v!=='lottie'&&scaleSel.value==='custom')?'flex':'none';
+    scaleRow.style.display=(v==='lottie'||v==='rive')?'none':'flex';
+    sizeRow.style.display=(v!=='lottie'&&v!=='rive'&&scaleSel.value==='custom')?'flex':'none';
     alphaRow.style.display=ALPHA_FORMATS.indexOf(v)>=0?'flex':'none';
+    var riveHint=document.getElementById('exp-rive-hint');
+    if(riveHint)riveHint.style.display=(v==='rive')?'flex':'none';
   }
   fmtSel.addEventListener('change',updateScaleVisibility);
   scaleSel.addEventListener('change',function(){
@@ -3383,14 +3385,16 @@ document.getElementById('comp-offset').addEventListener('change',function(){wind
     var alpha=ALPHA_FORMATS.indexOf(fmtSel.value)>=0&&document.getElementById('exp-alpha').checked;
     var opts={start:range.start,end:range.end,scale:scale,alpha:alpha,fps:state.fps,
       onProgress:function(i,n){progEl.style.display='block';progEl.textContent='Rendu image '+i+'/'+n+'…';},
-      onFfmpeg:function(line){progEl.style.display='block';progEl.textContent=line.substring(0,80);}};
+      onFfmpeg:function(line){progEl.style.display='block';progEl.textContent=line.substring(0,80);},
+      onRiveProgress:function(msg){progEl.style.display='block';progEl.textContent=msg;}};
     runBtn.disabled=true;progEl.style.display='block';progEl.textContent='Préparation…';
     try{
-      var fn={svg:'exportSVGSequence',png:'exportPNGSequence',tiff:'exportTIFFSequence',gif:'exportGIF',mp4:'exportMP4',prores:'exportProRes',lottie:'exportLottie'}[fmtSel.value];
+      var fn={svg:'exportSVGSequence',png:'exportPNGSequence',tiff:'exportTIFFSequence',gif:'exportGIF',mp4:'exportMP4',prores:'exportProRes',lottie:'exportLottie',rive:'exportRive'}[fmtSel.value];
       var res=await window.SMExport[fn](opts);
       if(res.cancelled){progEl.textContent='Annulé';}
       else if(res.ok){
-        progEl.textContent='Terminé ✓';showToast('Export terminé');
+        progEl.textContent='Terminé ✓';
+        showToast(fmtSel.value==='rive'?('Exporté vers l\'artboard Rive "'+res.artboardName+'"'):'Export terminé');
         // Lottie JSON gets its own preview instead of auto-closing straight
         // away — a bad export (empty/misplaced shapes) is otherwise silent
         // until opened in some other player.
