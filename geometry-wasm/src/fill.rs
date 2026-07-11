@@ -758,21 +758,42 @@ pub fn fill_find(input_json: &str) -> Result<String, JsValue> {
     let mut nodes_edges: Option<(Vec<Node>, Vec<Edge>)> = None;
     if !open_pts.is_empty() {
         let (nodes, edges) = build_graph(&open_pts, input.gap_thr, input.crossings.as_deref());
-        let stroke_edge_idxs: Vec<usize> = edges
-            .iter()
-            .enumerate()
-            .filter(|(_, e)| e.kind == EdgeType::Stroke)
-            .map(|(i, _)| i)
-            .collect();
-        let seed_cap = stroke_edge_idxs.len().min(150);
         let max_steps = edges.len() * 2 + 8;
-        for &seed_idx in stroke_edge_idxs.iter().take(seed_cap) {
+        // Exhaustive planar-face enumeration, not a capped sample of
+        // stroke-only seeds. trace_loop's "always take the sharpest turn"
+        // rule is the textbook-correct method for walking the boundary of
+        // the SPECIFIC face touching a given directed half-edge — every
+        // directed half-edge belongs to exactly one face under this rule.
+        // The old code only tried up to 150 STROKE edges as seeds (missing
+        // every edge past that cap on a busy scene, and never trying Gap
+        // edges as seeds at all) — on a complex multi-overlap arrangement
+        // that silently left real faces completely undiscovered, not
+        // rejected by the filters below, just never traced (mirrors the
+        // JS-side fix, tools.js's fillVectorFindJS, kept in sync with this
+        // for the same reason). Walking every edge from both endpoints in
+        // both turn directions, skipping a (edge,node,turn_sign) combo
+        // once its face has already been traced from elsewhere on its own
+        // boundary, visits every face exactly once — no cap, no missed
+        // faces, and cheaper than the old approach on a busy scene since
+        // it stops re-tracing the same face redundantly from every one of
+        // its boundary edges.
+        let mut visited: std::collections::HashSet<(usize, usize, i8)> = std::collections::HashSet::new();
+        for seed_idx in 0..edges.len() {
             let seed_edge = &edges[seed_idx];
             for &start_node in &[seed_edge.a, seed_edge.b] {
-                for &turn_sign in &[1.0, -1.0] {
+                for &turn_sign in &[1.0_f64, -1.0] {
+                    let ts_key: i8 = if turn_sign > 0.0 { 1 } else { -1 };
+                    let key = (seed_idx, start_node, ts_key);
+                    if visited.contains(&key) {
+                        continue;
+                    }
+                    visited.insert(key);
                     if let Some(seq) = trace_loop(&nodes, &edges, start_node, seed_idx, turn_sign, max_steps) {
                         if seq.len() < 2 {
                             continue;
+                        }
+                        for hop in &seq {
+                            visited.insert((hop.edge_idx, hop.from, ts_key));
                         }
                         let pts = loop_points(&nodes, &edges, &seq);
                         let area = poly_area(&pts);

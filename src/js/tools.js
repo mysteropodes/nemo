@@ -1478,15 +1478,37 @@ function fillVectorFindJS(clickPt,gapThr,layer,excludePath,onlyIds){
   });
   if(walls.open.length){
     var graph=fillBuildGraph(walls.open,gapThr);
-    var strokeEdges=graph.edges.filter(function(e){return e.type==='stroke';});
-    var seedCap=Math.min(strokeEdges.length,150);
     var maxSteps=graph.edges.length*2+8;
-    for(var s=0;s<seedCap;s++){
-      var seedEdge=strokeEdges[s];
+    // Exhaustive planar-face enumeration, not a capped sample of arbitrary
+    // seeds. fillTraceLoop's "always take the sharpest turn" rule is
+    // actually the textbook-correct method for walking the boundary of
+    // the SPECIFIC face touching a given directed half-edge — every
+    // directed half-edge belongs to exactly one face under this rule. The
+    // old code only ever tried up to 150 STROKE edges as seeds (missing
+    // every edge past that cap on a busy scene, and never trying GAP
+    // edges as seeds at all) — on a complex multi-overlap arrangement
+    // (e.g. several existing fills' outlines crossing each other, ~168
+    // crossings in the reported case) that silently left many real faces
+    // completely undiscovered: not rejected by the area/self-intersection
+    // filters below, just NEVER TRACED, so a click squarely inside one of
+    // them found nothing at any gap threshold (confirmed live). Walking
+    // EVERY edge from both endpoints in both turn directions, skipping a
+    // (edge,node,turnSign) combo once its face has already been traced
+    // from elsewhere on its own boundary, visits every face in the graph
+    // exactly once — no cap, no missed faces, and actually cheaper than
+    // the old approach for a busy scene since it stops re-tracing the
+    // same face redundantly from every one of its boundary edges.
+    var visited={};
+    for(var ei=0;ei<graph.edges.length;ei++){
+      var seedEdge=graph.edges[ei];
       [seedEdge.a,seedEdge.b].forEach(function(startNode){
         [1,-1].forEach(function(turnSign){
+          var key=seedEdge.idx+':'+startNode+':'+turnSign;
+          if(visited[key])return;
+          visited[key]=true;
           var seq=fillTraceLoop(graph,walls.open,startNode,seedEdge,turnSign,maxSteps);
           if(!seq||seq.length<2)return;
+          seq.forEach(function(hop){visited[hop.edge.idx+':'+hop.from+':'+turnSign]=true;});
           var chainPath=fillBuildPathFromSeq(graph,walls.open,seq);
           var pts=chainPath.segments.map(function(sg){return sg.point;});
           var area=fillPolyArea(pts);
