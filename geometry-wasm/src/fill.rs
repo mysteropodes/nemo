@@ -433,6 +433,45 @@ fn point_in_poly(pt: Vec2, pts: &[Vec2]) -> bool {
     inside
 }
 
+// trace_loop's turn-picking (sharpest relative angle at each node) can walk
+// onto a different, non-adjacent face's edge when several curves cross
+// near-tangentially at the same node — the loop still closes, but as a
+// self-crossing "bow-tie" polygon spanning disconnected regions, whose
+// shoelace area can come out smaller than the true tight region's and win
+// the caller's area-only comparison (JS side: tools.js's fillPolySelfIntersects,
+// kept in sync with this — see that comment for the full mechanism). A
+// genuine planar face never self-intersects, so reject any candidate that
+// does before it's ever compared by area.
+fn poly_self_intersects(pts: &[Vec2]) -> bool {
+    let n = pts.len();
+    if n < 4 {
+        return false;
+    }
+    fn ccw(a: Vec2, b: Vec2, c: Vec2) -> f64 {
+        (c.y - a.y) * (b.x - a.x) - (b.y - a.y) * (c.x - a.x)
+    }
+    fn segs_cross(p1: Vec2, p2: Vec2, p3: Vec2, p4: Vec2) -> bool {
+        let d1 = ccw(p3, p4, p1);
+        let d2 = ccw(p3, p4, p2);
+        let d3 = ccw(p1, p2, p3);
+        let d4 = ccw(p1, p2, p4);
+        ((d1 > 0.0 && d2 < 0.0) || (d1 < 0.0 && d2 > 0.0))
+            && ((d3 > 0.0 && d4 < 0.0) || (d3 < 0.0 && d4 > 0.0))
+    }
+    for i in 0..n {
+        let (a1, a2) = (pts[i], pts[(i + 1) % n]);
+        for j in (i + 1)..n {
+            if j == i || (j + 1) % n == i {
+                continue; // edges sharing a vertex with edge i
+            }
+            if segs_cross(a1, a2, pts[j], pts[(j + 1) % n]) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
 struct Hop {
     edge_idx: usize,
     from: usize,
@@ -644,7 +683,7 @@ pub fn fill_find(input_json: &str) -> Result<String, JsValue> {
                         }
                         let pts = loop_points(&nodes, &edges, &seq);
                         let area = poly_area(&pts);
-                        if area < 1.0 || !point_in_poly(click, &pts) {
+                        if area < 1.0 || !point_in_poly(click, &pts) || poly_self_intersects(&pts) {
                             continue;
                         }
                         if best.as_ref().map_or(true, |(a, _)| area < *a) {

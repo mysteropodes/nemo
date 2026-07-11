@@ -1310,6 +1310,40 @@ function fillVectorFind(clickPt,layer,excludePath,maxGapThr,onlyIds){
   }
   return best;
 }
+// fillTraceLoop picks, at each graph node, whichever outgoing edge has the
+// sharpest turn from the arrival direction — correct for a simple planar
+// face, but at a node where several curves cross near-tangentially (e.g. 2
+// open curves crossing 2 closed quad-like shapes close together), two
+// candidate turn angles can be near-indistinguishable and the trace can
+// walk onto an edge belonging to a DIFFERENT, non-adjacent face. The loop
+// still closes (nothing checks for that), producing a self-crossing
+// "bow-tie" polygon that legitimately winds through several disconnected
+// regions of the canvas — and because its shoelace sum can come out
+// SMALLER than the true tight region's, it can win the area-only
+// candidate comparison (fillVectorFindJS below), which is exactly the
+// reported "fills the clicked corner but also spawns polygons elsewhere"
+// symptom. A genuine planar face can never self-intersect, so rejecting
+// any self-crossing candidate outright — rather than just deprioritizing
+// it by area — is the correct fix: fillVectorFind's gap-escalation loop
+// then keeps widening gapThr until it finds an actually-simple loop (or
+// gives up and fills nothing), never a wrong one.
+function _fillSegXing(p1,p2,p3,p4){
+  function ccw(a,b,c){return (c.y-a.y)*(b.x-a.x)-(b.y-a.y)*(c.x-a.x);}
+  var d1=ccw(p3,p4,p1),d2=ccw(p3,p4,p2),d3=ccw(p1,p2,p3),d4=ccw(p1,p2,p4);
+  return ((d1>0&&d2<0)||(d1<0&&d2>0))&&((d3>0&&d4<0)||(d3<0&&d4>0));
+}
+function fillPolySelfIntersects(pts){
+  var n=pts.length;
+  if(n<4)return false;
+  for(var i=0;i<n;i++){
+    var a1=pts[i],a2=pts[(i+1)%n];
+    for(var j=i+1;j<n;j++){
+      if(j===i||(j+1)%n===i)continue; // skip edges sharing a vertex with edge i
+      if(_fillSegXing(a1,a2,pts[j],pts[(j+1)%n]))return true;
+    }
+  }
+  return false;
+}
 function fillVectorFindJS(clickPt,gapThr,layer,excludePath,onlyIds){
   var walls=fillCollectWalls(layer,excludePath,onlyIds);
   var candidates=[]; // {chainPath, area, fromClosedWall}
@@ -1332,7 +1366,7 @@ function fillVectorFindJS(clickPt,gapThr,layer,excludePath,onlyIds){
           var chainPath=fillBuildPathFromSeq(graph,walls.open,seq);
           var pts=chainPath.segments.map(function(sg){return sg.point;});
           var area=fillPolyArea(pts);
-          if(area<1||!fillPointInPoly(clickPt,pts)){chainPath.remove();return;}
+          if(area<1||!fillPointInPoly(clickPt,pts)||fillPolySelfIntersects(pts)){chainPath.remove();return;}
           var usedGap=seq.some(function(h){return h.edge.type==='gap';});
           candidates.push({chainPath:chainPath,area:area,fromClosedWall:false,usedGap:usedGap});
         });
