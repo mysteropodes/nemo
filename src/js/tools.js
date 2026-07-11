@@ -1344,6 +1344,28 @@ function fillPolySelfIntersects(pts){
   }
   return false;
 }
+// fillPolySelfIntersects operates on straight edges between successive
+// points — fine for the closed-wall case (a user-drawn closed stroke's own
+// segments), but a TRACED loop's edges are real bezier arcs cloned from
+// hand-drawn strokes (fillBuildPathFromSeq), which routinely bulge well
+// away from the straight chord between their anchor points. Two organic
+// curves whose ANCHOR points form a perfectly simple, non-crossing polygon
+// can still cross each other mid-arc — exactly what a hand-drawn character
+// silhouette (arms/head/torso, all long sweeping curves) produces, and
+// exactly why fillPolySelfIntersects(chainPath.segments) alone missed the
+// reported "star-burst" fill spanning a whole character (fb_mrgedu37):
+// confirmed live — a 4-anchor square path with handles bulging two
+// opposite edges into each other tests as NOT self-intersecting via
+// anchor points alone, but IS once the actual curve is sampled. Densely
+// sampling the real path before the crossing test catches both cases.
+function fillLoopSelfIntersects(chainPath){
+  var len=chainPath.length;
+  if(!(len>0))return false;
+  var n=Math.min(300,Math.max(24,Math.round(len/4)));
+  var pts=[];
+  for(var i=0;i<n;i++)pts.push(chainPath.getPointAt((i/n)*len));
+  return fillPolySelfIntersects(pts);
+}
 function fillVectorFindJS(clickPt,gapThr,layer,excludePath,onlyIds){
   var walls=fillCollectWalls(layer,excludePath,onlyIds);
   var candidates=[]; // {chainPath, area, fromClosedWall}
@@ -1366,7 +1388,7 @@ function fillVectorFindJS(clickPt,gapThr,layer,excludePath,onlyIds){
           var chainPath=fillBuildPathFromSeq(graph,walls.open,seq);
           var pts=chainPath.segments.map(function(sg){return sg.point;});
           var area=fillPolyArea(pts);
-          if(area<1||!fillPointInPoly(clickPt,pts)||fillPolySelfIntersects(pts)){chainPath.remove();return;}
+          if(area<1||!fillPointInPoly(clickPt,pts)||fillLoopSelfIntersects(chainPath)){chainPath.remove();return;}
           var usedGap=seq.some(function(h){return h.edge.type==='gap';});
           candidates.push({chainPath:chainPath,area:area,fromClosedWall:false,usedGap:usedGap});
         });
