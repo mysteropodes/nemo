@@ -66,6 +66,28 @@
 //   multi-layer scene. Check this on a real multi-layer export before
 //   trusting stacking on anything more complex than one drawing layer.
 //
+// Three more real bugs found by actually testing an export in Rive
+// (reported: "l'animation ne rejoue pas avec le bon timing" and "les
+// formes non fermées apparaissent fermées"), all confirmed and fixed
+// via live round-trips against a running Rive Editor:
+// - createLinearAnimations' `duration` input is NOT frame count — it's
+//   SECONDS at Rive's own default fps (60), so passing a raw Nemo frame
+//   count made every exported animation ~60x too long, with all the
+//   actual keyframes crammed into its first ~1.5%. Fixed by explicitly
+//   setting the animation's own fps(56) to state.fps and its real
+//   frame-count duration(57) directly via set_property_values right
+//   after creation, bypassing the seconds-based creation input.
+// - createShapes always creates a PointsPath with isclosed=true
+//   regardless of whether a `close` command was included — every open
+//   stroke this export makes needs isclosed explicitly forced back to
+//   false afterward (batched into one set_property_values call).
+// - A "morph" run that's just the SAME shape rigidly translated (drag a
+//   drawing from one keyframe to another, let it tween) doesn't need
+//   per-vertex keyframing at all — riveDetectTranslation catches this
+//   and keyframes the Shape's own x/y instead, 2*nVertices cheaper.
+//   Confirmed live: a 50-vertex translated run dropped from 1100
+//   keyframes to 22.
+//
 // Brush textures: Nemo renders a textured stroke as one invisible "anchor"
 // path (data.brushTexturePreset) plus dozens/hundreds of separate,
 // semi-transparent, jittered "dab" copy shapes stamped along it
@@ -293,6 +315,35 @@
     return out;
   }
 
+  // Optimization: a "morph" run where every frame is just the SAME shape
+  // rigidly translated (every vertex moves by the identical delta, e.g.
+  // Nemo user drags one drawing from one keyframe's position to another
+  // and lets it tween) doesn't need per-vertex keyframing at all — one
+  // Shape's x/y transform keyframed is geometrically identical and is
+  // 2*nVertices times cheaper (2 keyframes per frame instead of
+  // 2*nVertices). Returns {frame:[dx,dy], ...} keyed by absolute Nemo
+  // frame number if every frame in [startFrame,endFrame] is a pure
+  // translation of startFrame's own points, else null (falls back to the
+  // full per-vertex morph).
+  function riveDetectTranslation(pointsByFrame,startFrame,endFrame){
+    var EPS=0.05;
+    var basePts=pointsByFrame[startFrame];
+    var n=basePts.length;
+    var deltas={};
+    deltas[startFrame]=[0,0];
+    for(var f=startFrame+1;f<=endFrame;f++){
+      var pts=pointsByFrame[f];
+      if(!pts||pts.length!==n)return null;
+      var dx=pts[0][0]-basePts[0][0],dy=pts[0][1]-basePts[0][1];
+      for(var k=1;k<n;k++){
+        var kdx=pts[k][0]-basePts[k][0],kdy=pts[k][1]-basePts[k][1];
+        if(Math.abs(kdx-dx)>EPS||Math.abs(kdy-dy)>EPS)return null;
+      }
+      deltas[f]=[dx,dy];
+    }
+    return deltas;
+  }
+
   // Content signature — two frames with an identical signature are the
   // SAME drawing (a held/non-tweened frame), eligible for the cheap
   // "static" path. Only the raw (pre-camera) fields that affect the
@@ -356,6 +407,18 @@
 
     var animRes=await riveCall('animation_editor',{command:'createLinearAnimations',data:{createLinearAnimations:{linearAnimations:[{name:'Timeline',duration:(r.end-r.start+1)}]}}});
     var animationId=animRes.animations[0].id;
+    // createLinearAnimations' own `duration` input is NOT frame count —
+    // confirmed live: passing 13 produced an animation whose internal
+    // frame-duration read back as 780, i.e. it was treated as SECONDS at
+    // Rive's own default fps (60), 13*60=780. Every keyframe this export
+    // writes uses a literal Nemo frame index as `frame`, so the
+    // animation's own fps MUST equal Nemo's fps for those indices to mean
+    // the same thing Rive does — without this, the whole export crams
+    // into the first ~1.5% of a needlessly 60x-too-long timeline (this is
+    // why an exported animation "didn't replay with the right timing").
+    // fps(56) and the real frame-count duration(57) are set directly,
+    // bypassing the seconds-based creation input entirely.
+    await riveCall('set_property_values',{propertyValues:(function(){var o={};o[animationId]={56:state.fps,57:(r.end-r.start+1)};return o;})()});
 
     var camActive=!!(window.SMCamera&&state.cameraLayerOn&&state.cameraKeys.length);
     var camByFrame=null;
@@ -452,25 +515,46 @@
               paints:riveBuildPaints(firstSd,hasRealStroke,opacityOverride),
               paths:[{name:'P',commands:riveBuildCubicCommands(shapeVal0)}]
             });
-            pending.push({name:name,opacityKeys:opacityKeys,morph:null});
+            pending.push({name:name,opacityKeys:opacityKeys,morph:null,translate:null,closed:shapeVal0.c});
           }else{
-            var cmStart=camByFrame?camByFrame[run.start]:null;
-            var startVal=lottieShapeValue(firstSd,cmStart);
-            if(wobble)startVal.v=riveApplyWobble(startVal.v,wobble.amp,wobble.freqPer100,wobble.seed,startVal.c);
-            var pointsByFrame={};
+            // Raw (pre-camera, pre-wobble) points per frame — checked for
+            // a pure rigid translation first (see riveDetectTranslation):
+            // a stroke that's just been dragged from one keyframe to
+            // another and tweened is a very common case, and doesn't
+            // deserve the full per-vertex cost.
+            var rawPointsByFrame={};
             for(var f3=run.start;f3<=run.end;f3++){
-              var sd3=framesStrokes[f3][slot];
-              var cm3=camByFrame?camByFrame[f3]:null;
-              var pts3=lottieShapeValue(sd3,cm3).v;
-              if(wobble)pts3=riveApplyWobble(pts3,wobble.amp,wobble.freqPer100,wobble.seed,startVal.c);
-              pointsByFrame[f3]=pts3;
+              rawPointsByFrame[f3]=lottieShapeValue(framesStrokes[f3][slot],null).v;
             }
-            shapeDefs.push({
-              name:name,x:0,y:0,parentId:artboardId,
-              paints:riveBuildPaints(firstSd,hasRealStroke,opacityOverride),
-              paths:[{name:'P',commands:riveBuildStraightCommands(startVal.v,startVal.c)}]
-            });
-            pending.push({name:name,opacityKeys:opacityKeys,morph:{start:run.start,end:run.end,pointsByFrame:pointsByFrame}});
+            var translation=camActive?null:riveDetectTranslation(rawPointsByFrame,run.start,run.end);
+
+            if(translation){
+              var baseValT=lottieShapeValue(firstSd,null);
+              if(wobble)baseValT.v=riveApplyWobble(baseValT.v,wobble.amp,wobble.freqPer100,wobble.seed,baseValT.c);
+              shapeDefs.push({
+                name:name,x:0,y:0,parentId:artboardId,
+                paints:riveBuildPaints(firstSd,hasRealStroke,opacityOverride),
+                paths:[{name:'P',commands:riveBuildStraightCommands(baseValT.v,baseValT.c)}]
+              });
+              pending.push({name:name,opacityKeys:opacityKeys,morph:null,translate:{start:run.start,end:run.end,deltas:translation},closed:baseValT.c});
+            }else{
+              var cmStart=camByFrame?camByFrame[run.start]:null;
+              var startVal=lottieShapeValue(firstSd,cmStart);
+              if(wobble)startVal.v=riveApplyWobble(startVal.v,wobble.amp,wobble.freqPer100,wobble.seed,startVal.c);
+              var pointsByFrame={};
+              for(var f5=run.start;f5<=run.end;f5++){
+                var cm3=camByFrame?camByFrame[f5]:null;
+                var pts3=camActive?lottieShapeValue(framesStrokes[f5][slot],cm3).v:rawPointsByFrame[f5];
+                if(wobble)pts3=riveApplyWobble(pts3,wobble.amp,wobble.freqPer100,wobble.seed,startVal.c);
+                pointsByFrame[f5]=pts3;
+              }
+              shapeDefs.push({
+                name:name,x:0,y:0,parentId:artboardId,
+                paints:riveBuildPaints(firstSd,hasRealStroke,opacityOverride),
+                paths:[{name:'P',commands:riveBuildStraightCommands(startVal.v,startVal.c)}]
+              });
+              pending.push({name:name,opacityKeys:opacityKeys,morph:{start:run.start,end:run.end,pointsByFrame:pointsByFrame},translate:null,closed:startVal.c});
+            }
           }
         });
       }
@@ -488,11 +572,33 @@
     (tree.objects||[]).forEach(function(o){objectsById[o.id]=o;});
     var shapeByName={};
     (tree.objects||[]).forEach(function(o){if(o.types&&o.types.indexOf('Shape')>=0)shapeByName[o.name]=o;});
-    function vertexIdsForShape(shapeName){
+    function pathObjForShape(shapeName){
       var shape=shapeByName[shapeName];if(!shape)return null;
-      var pathChild=(shape.children||[]).map(function(id){return objectsById[id];}).find(function(o){return o&&o.types&&o.types.indexOf('PointsPath')>=0;});
+      return (shape.children||[]).map(function(id){return objectsById[id];}).find(function(o){return o&&o.types&&o.types.indexOf('PointsPath')>=0;})||null;
+    }
+    function vertexIdsForShape(shapeName){
+      var pathChild=pathObjForShape(shapeName);
       return pathChild?pathChild.children:null;
     }
+
+    // createShapes always creates a PointsPath with isclosed=true
+    // regardless of whether the commands included a `close` — confirmed
+    // live (an open 3-point stroke with only moveTo/lineTo came back
+    // reporting isclosed:true, rendering as a closed triangle). Every
+    // path this export creates needs its OWN closed-ness set explicitly
+    // afterward; batched into one call since it's just a boolean flip
+    // per shape, not worth chunking.
+    var ISCLOSED_KEY=32;
+    var closedFix={};
+    pending.forEach(function(p){
+      var pathObj=pathObjForShape(p.name);
+      if(!pathObj)return;
+      closedFix[pathObj.id]={};
+      closedFix[pathObj.id][ISCLOSED_KEY]=!!p.closed;
+    });
+    var bgPath=pathObjForShape('Background');
+    if(bgPath)closedFix[bgPath.id]={32:true};
+    if(Object.keys(closedFix).length)await riveCall('set_property_values',{propertyValues:closedFix});
 
     // createShapes doesn't guarantee children end up appended in creation
     // order (confirmed live: a shape created AFTER Background still showed
@@ -523,6 +629,16 @@
               keyframes.push({objectId:vids[k2],propertyKey:VERT_Y,frame:f4-r.start,value:pts[k2][1],interpolationType:'linear'});
             }
           }
+        }
+      }
+      if(p.translate){
+        // Rigid translation optimization (riveDetectTranslation) — the
+        // Shape's own x/y (13/14), not the vertices: 2 keyframes per
+        // frame total instead of 2*nVertices.
+        for(var f6=p.translate.start;f6<=p.translate.end;f6++){
+          var d=p.translate.deltas[f6];
+          keyframes.push({objectId:shape.id,propertyKey:13,frame:f6-r.start,value:d[0],interpolationType:'linear'});
+          keyframes.push({objectId:shape.id,propertyKey:14,frame:f6-r.start,value:d[1],interpolationType:'linear'});
         }
       }
     });
