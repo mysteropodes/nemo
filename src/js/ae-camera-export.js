@@ -92,6 +92,24 @@
     return lines.join('\n');
   }
 
+  // Best-effort: if this project was opened from a Kitsu shot, also push
+  // the script as a Kitsu "working file" (see kitsu.js's pushWorkingFile
+  // for why that's the right endpoint, not "output files") so whoever's
+  // doing the After Effects side of the shot can pull it from Kitsu
+  // instead of needing the file handed to them directly. Never blocks or
+  // fails the local export — the .jsx is always saved to disk regardless
+  // of whether this succeeds.
+  async function pushToKitsuIfOpen(script){
+    if(!(window.SMKitsu&&window.SMKitsu.isOpenedFromKitsu&&window.SMKitsu.isOpenedFromKitsu()))return null;
+    try{
+      var bytes=new TextEncoder().encode(script);
+      var wf=await window.SMKitsu.pushWorkingFile('nemo-camera.jsx',bytes,'text/plain','After Effects','camera');
+      return{ok:true,id:wf&&wf.id};
+    }catch(e){
+      return{ok:false,error:e&&e.message?e.message:String(e)};
+    }
+  }
+
   async function exportAECamera(opts){
     var camActive=!!(window.SMCamera&&state.cameraLayerOn&&state.cameraKeys&&state.cameraKeys.length);
     if(!camActive)return{ok:false,error:'Aucun calque caméra actif — rien à exporter.'};
@@ -102,12 +120,14 @@
       var outPath=await exportPickSaveFile('Exporter la caméra vers After Effects','nemo-camera.jsx',[{name:'ExtendScript',extensions:['jsx']}]);
       if(!outPath)return{cancelled:true};
       await exportWriteText(outPath,script);
-      return{ok:true,path:outPath,keyCount:state.cameraKeys.length};
+      var kitsuRes=await pushToKitsuIfOpen(script);
+      return{ok:true,path:outPath,keyCount:state.cameraKeys.length,kitsu:kitsuRes};
     }else{
       var blob=new Blob([script],{type:'text/plain'});
       var u=URL.createObjectURL(blob);var a=document.createElement('a');
       a.href=u;a.download='nemo-camera.jsx';a.click();URL.revokeObjectURL(u);
-      return{ok:true,browserFallback:true,keyCount:state.cameraKeys.length};
+      var kitsuRes2=await pushToKitsuIfOpen(script);
+      return{ok:true,browserFallback:true,keyCount:state.cameraKeys.length,kitsu:kitsuRes2};
     }
   }
 

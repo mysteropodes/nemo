@@ -221,6 +221,70 @@
     return { ok: true, version: versionLabel, statusChanged: !!commentBody.task_status_id };
   }
 
+  // ---- Cross-app file handoff (e.g. Nemo's After Effects camera .jsx,
+  // or a future Rive export) ----
+  // Kitsu's "Output Files" are metadata-only records that point at a path
+  // on a shared pipeline filesystem (confirmed against gazu's own
+  // files.py: every output-file function either builds/reads a path or
+  // updates metadata — there is no upload-the-bytes endpoint at all,
+  // unlike preview files). Nemo has no shared filesystem to assume, so
+  // this uses "Working Files" instead — same task-scoped versioned-file
+  // concept, but with a real PUT .../working-files/{id}/file upload
+  // endpoint (mirrors the exact FormData pattern publishToKitsu already
+  // uses for preview uploads). This is the one piece of the "reconstitute
+  // the plan from another app, in the target app's own format" pipeline
+  // Kitsu itself can actually do: it stores and versions the file, tagged
+  // by task and software — it does NOT know how to interpret or convert
+  // it. The After Effects side still has to fetch this working file and
+  // run it manually (or via a future dedicated AE panel) — no official
+  // Kitsu↔After Effects addon exists to automate that half.
+  async function getOrCreateSoftware(session, name, shortName, ext) {
+    var list = [];
+    try { list = await apiRequest(session, '/softwares'); } catch (e) { }
+    var found = (list || []).find(function (s) { return (s.name || '').toLowerCase() === name.toLowerCase(); });
+    if (found) return found;
+    return apiRequest(session, '/data/softwares', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name, short_name: shortName, file_extension: ext })
+    });
+  }
+  async function pushWorkingFile(session, taskId, opts) {
+    var wf = await apiRequest(session, '/data/tasks/' + taskId + '/working-files/new', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: opts.name || 'main', comment: opts.comment || '',
+        software_id: opts.softwareId || undefined, revision: 0
+      })
+    });
+    var form = new FormData();
+    form.append('file', new Blob([opts.bytes], { type: opts.mimeType || 'application/octet-stream' }), opts.filename);
+    var uploadRes = await window.__TAURI__.http.fetch(session.serverUrl + '/api/data/working-files/' + wf.id + '/file', {
+      method: 'PUT',
+      headers: { 'Authorization': 'Bearer ' + session.accessToken },
+      body: form
+    });
+    if (!uploadRes.ok) throw new Error('Échec de l\'envoi du fichier vers Kitsu (' + uploadRes.status + ')');
+    return wf;
+  }
+  // filename/bytes/mimeType describe the file to push; softwareName tags
+  // it (e.g. "After Effects") so whoever downloads it from Kitsu can tell
+  // what it's for without opening it.
+  async function pushWorkingFileToCurrentShot(filename, bytes, mimeType, softwareName, label) {
+    if (!state.kitsuShot) throw new Error('Ce projet n\'a pas été ouvert depuis Kitsu');
+    if (!state.kitsuShot.taskId) throw new Error('Aucune tâche trouvée sur ce shot — impossible de publier');
+    var session = state.kitsuShot.session;
+    var software = null;
+    if (softwareName) {
+      try { software = await getOrCreateSoftware(session, softwareName, softwareName.slice(0, 3).toLowerCase(), ''); } catch (e) { }
+    }
+    return pushWorkingFile(session, state.kitsuShot.taskId, {
+      name: label || filename.replace(/\.[^.]+$/, ''),
+      comment: 'Exporté depuis Nemo',
+      softwareId: software && software.id,
+      bytes: bytes, filename: filename, mimeType: mimeType
+    });
+  }
+
   window.SMKitsu = {
     isAvailable: kitsuOk,
     login: login, logout: logout,
@@ -229,7 +293,8 @@
     listShotsForSequence: listShotsForSequence, getShot: getShot,
     openShot: openShot, publish: publishToKitsu,
     isOpenedFromKitsu: function () { return !!state.kitsuShot; },
-    getCurrentShot: function () { return state.kitsuShot; }
+    getCurrentShot: function () { return state.kitsuShot; },
+    pushWorkingFile: pushWorkingFileToCurrentShot
   };
 })();
 

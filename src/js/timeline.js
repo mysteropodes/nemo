@@ -3397,8 +3397,10 @@ document.getElementById('comp-offset').addEventListener('change',function(){wind
       if(res.cancelled){progEl.textContent='Annulé';}
       else if(res.ok){
         progEl.textContent='Terminé ✓';
+        var aeCamMsg='Script caméra exporté ('+res.keyCount+' clé(s))'+
+          (res.kitsu?(res.kitsu.ok?' — envoyé sur Kitsu':' — échec envoi Kitsu: '+res.kitsu.error):'');
         var doneMsg=fmtSel.value==='rive'?('Exporté vers l\'artboard Rive "'+res.artboardName+'"')
-          :fmtSel.value==='ae-camera'?('Script caméra exporté ('+res.keyCount+' clé(s))')
+          :fmtSel.value==='ae-camera'?aeCamMsg
           :'Export terminé';
         showToast(doneMsg);
         // Lottie JSON gets its own preview instead of auto-closing straight
