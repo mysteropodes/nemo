@@ -315,6 +315,30 @@
     return out;
   }
 
+  // Nested-artboard camera: derives the CONTENT instance's own x/y/scale/
+  // rotation (Node transform keys 13/14/16/17/15, already proven live for
+  // opacity/vertices on the same objects) that reproduces Nemo's camera
+  // framing — same math as lottieCamMatrix/lottieCamPoint (export.js),
+  // just solved for a single T*R*S transform applied to the WHOLE nested
+  // artboard instance instead of re-deriving it per vertex:
+  //   worldPos = (canvasW/2,canvasH/2) + R(rot)·S(s)·(localPos - camCenter)
+  //            = T + R·S·localPos   where  T = (canvasW/2,canvasH/2) - R·S·camCenter
+  // Rotation unit assumed radians (Rive/rive-cpp's own internal Node
+  // convention) — NOT independently visually confirmed today (screen
+  // access dropped mid-session before a rotating-camera test could be
+  // scrubbed); position and scale were confirmed live via property
+  // read-back using this exact same key set.
+  function riveCameraInstanceTransform(cam){
+    var rot=-(cam.rot||0)*Math.PI/180;
+    var cos=Math.cos(rot),sin=Math.sin(rot);
+    var s=state.canvasW/cam.w;
+    return{
+      x:state.canvasW/2-(s*cos*cam.x-s*sin*cam.y),
+      y:state.canvasH/2-(s*sin*cam.x+s*cos*cam.y),
+      sx:s,sy:s,r:rot
+    };
+  }
+
   // Optimization: a "morph" run where every frame is just the SAME shape
   // rigidly translated (every vertex moves by the identical delta, e.g.
   // Nemo user drags one drawing from one keyframe's position to another
@@ -436,13 +460,27 @@
     await riveCall('set_property_values',{propertyValues:(function(){var o={};o[animationId]={56:state.fps,57:(r.end-r.start+1)};return o;})()});
 
     var camActive=!!(window.SMCamera&&state.cameraLayerOn&&state.cameraKeys.length);
-    var camByFrame=null;
+    // Camera: NOT baked into content geometry (that was the old approach —
+    // every shape got per-frame-rebuilt points, forcing the expensive
+    // per-vertex morph path everywhere even for otherwise-static drawings,
+    // and re-deriving the exact same pan/zoom math shape by shape). A real
+    // Rive nested-artboard instance does this properly instead: all
+    // content goes into a separate CHILD artboard (isComponent:true,
+    // built completely camera-unaware — content geometry below never
+    // reads `camActive` again), instanced once into this export's real
+    // artboard, and the INSTANCE's own x/y/scale/rotation (same transform
+    // keys already proven live: 13/14/16/17/15) gets keyframed to
+    // reproduce the camera's pan/zoom/roll. Content shapes stay eligible
+    // for the "static"/translation cost optimizations regardless of
+    // camera motion, since their own geometry no longer changes because
+    // of it. Background stays OUTSIDE the nested instance (fixed
+    // backdrop, not panned/zoomed — matches how a camera move in Nemo
+    // itself never rewrites the canvas background).
+    var contentArtboardId=artboardId;
     if(camActive){
-      camByFrame={};
-      for(var cf=r.start;cf<=r.end;cf++){
-        var cam=SMCamera.cameraAtFrame(cf);
-        camByFrame[cf]=cam?lottieCamMatrix(cam):null;
-      }
+      onProgress('Création de l\'artboard de contenu (caméra)…');
+      var childRes=await riveCall('open_file_editor',{command:'createArtboard',data:{createArtboard:[{name:artboardName+' — Content',width:state.canvasW,height:state.canvasH,x:state.canvasW+200,y:0,isComponent:true}]}});
+      contentArtboardId=childRes.artboards[0].id;
     }
 
     // ---- Pass 0: figure out per-(layer,slot) stroke data once, and how
@@ -487,14 +525,14 @@
       for(var slot=0;slot<si.maxSlots;slot++){
         var cname=si.ld.name+' / shape'+slot+' ['+si.li+']';
         containerNameByKey[si.li+'_'+slot]=cname;
-        containerDefs.push({name:cname,x:0,y:0,parentId:artboardId,paints:[],paths:[]});
+        containerDefs.push({name:cname,x:0,y:0,parentId:contentArtboardId,paints:[],paths:[]});
       }
     });
     var containerIdByKey={};
     if(containerDefs.length){
       onProgress('Création des groupes…');
-      await riveCreateShapesBatch(artboardId,containerDefs);
-      var cTree=await riveCall('get_artboard_hierarchy',{artboardId:artboardId,depth:1});
+      await riveCreateShapesBatch(contentArtboardId,containerDefs);
+      var cTree=await riveCall('get_artboard_hierarchy',{artboardId:contentArtboardId,depth:1});
       var cIdByName={};
       (cTree.objects||[]).forEach(function(o){if(o.types&&o.types.indexOf('Shape')>=0)cIdByName[o.name]=o.id;});
       Object.keys(containerNameByKey).forEach(function(key){
@@ -527,18 +565,18 @@
     slotsInfo.forEach(function(si){
       var li=si.li,ld=si.ld,framesStrokes=si.framesStrokes,maxSlots=si.maxSlots;
       for(var slot=0;slot<maxSlots;slot++){
-        var containerId=containerIdByKey[li+'_'+slot]||artboardId;
+        var containerId=containerIdByKey[li+'_'+slot]||contentArtboardId;
         var countRuns=riveCountRuns(framesStrokes,slot,r.start,r.end);
         countRuns.forEach(function(run){
           var firstSd=framesStrokes[run.start][slot];
+          // Content geometry never bakes the camera anymore (see the
+          // camActive block above this loop) — held/non-tweened frames
+          // stay eligible for the cheap "static" path regardless of
+          // whether the camera happens to be moving at the same time.
           var allSame=true;
-          if(!camActive){
-            var sig0=riveSignature(firstSd);
-            for(var f2=run.start+1;f2<=run.end;f2++){
-              if(riveSignature(framesStrokes[f2][slot])!==sig0){allSame=false;break;}
-            }
-          }else{
-            allSame=(run.end===run.start); // camera bake changes geometry every frame
+          var sig0=riveSignature(firstSd);
+          for(var f2=run.start+1;f2<=run.end;f2++){
+            if(riveSignature(framesStrokes[f2][slot])!==sig0){allSame=false;break;}
           }
           var useMorph=(run.end>run.start)&&!allSame;
           var name='n'+(shapeCounter++);
@@ -580,8 +618,7 @@
           }
 
           if(!useMorph){
-            var cm0=camByFrame?camByFrame[run.start]:null;
-            var shapeVal0=lottieShapeValue(firstSd,cm0);
+            var shapeVal0=lottieShapeValue(firstSd,null);
             if(wobble)shapeVal0.v=riveApplyWobble(shapeVal0.v,wobble.amp,wobble.freqPer100,wobble.seed,shapeVal0.c);
             shapeDefs.push({
               name:name,x:0,y:0,parentId:containerId,
@@ -590,16 +627,16 @@
             });
             pending.push({name:name,opacityKeys:opacityKeys,morph:null,translate:null,closed:shapeVal0.c});
           }else{
-            // Raw (pre-camera, pre-wobble) points per frame — checked for
-            // a pure rigid translation first (see riveDetectTranslation):
-            // a stroke that's just been dragged from one keyframe to
-            // another and tweened is a very common case, and doesn't
-            // deserve the full per-vertex cost.
+            // Raw points per frame — checked for a pure rigid translation
+            // first (see riveDetectTranslation): a stroke that's just
+            // been dragged from one keyframe to another and tweened is a
+            // very common case, and doesn't deserve the full per-vertex
+            // cost.
             var rawPointsByFrame={};
             for(var f3=run.start;f3<=run.end;f3++){
               rawPointsByFrame[f3]=lottieShapeValue(framesStrokes[f3][slot],null).v;
             }
-            var translation=camActive?null:riveDetectTranslation(rawPointsByFrame,run.start,run.end);
+            var translation=riveDetectTranslation(rawPointsByFrame,run.start,run.end);
 
             if(translation){
               var baseValT=lottieShapeValue(firstSd,null);
@@ -611,13 +648,11 @@
               });
               pending.push({name:name,opacityKeys:opacityKeys,morph:null,translate:{start:run.start,end:run.end,deltas:translation},closed:baseValT.c});
             }else{
-              var cmStart=camByFrame?camByFrame[run.start]:null;
-              var startVal=lottieShapeValue(firstSd,cmStart);
+              var startVal=lottieShapeValue(firstSd,null);
               if(wobble)startVal.v=riveApplyWobble(startVal.v,wobble.amp,wobble.freqPer100,wobble.seed,startVal.c);
               var pointsByFrame={};
               for(var f5=run.start;f5<=run.end;f5++){
-                var cm3=camByFrame?camByFrame[f5]:null;
-                var pts3=camActive?lottieShapeValue(framesStrokes[f5][slot],cm3).v:rawPointsByFrame[f5];
+                var pts3=rawPointsByFrame[f5];
                 if(wobble)pts3=riveApplyWobble(pts3,wobble.amp,wobble.freqPer100,wobble.seed,startVal.c);
                 pointsByFrame[f5]=pts3;
               }
@@ -640,11 +675,19 @@
     // depth:3 — artboard(0) -> Shape(1) -> PointsPath(2) -> vertices(3).
     // Confirmed live: depth:2 stops one level too early, the PointsPath
     // entries come back without their own `children` (vertex id) array.
-    var tree=await riveCall('get_artboard_hierarchy',{artboardId:artboardId,depth:3});
+    // Two separate trees when the camera is active: content lives in
+    // contentArtboardId (the nested child), Background stays directly in
+    // artboardId (the exported/parent one) — merge both into one lookup.
+    var treeArtboardIds=(contentArtboardId!==artboardId)?[artboardId,contentArtboardId]:[artboardId];
     var objectsById={};
-    (tree.objects||[]).forEach(function(o){objectsById[o.id]=o;});
     var shapeByName={};
-    (tree.objects||[]).forEach(function(o){if(o.types&&o.types.indexOf('Shape')>=0)shapeByName[o.name]=o;});
+    for(var ti=0;ti<treeArtboardIds.length;ti++){
+      var t=await riveCall('get_artboard_hierarchy',{artboardId:treeArtboardIds[ti],depth:3});
+      (t.objects||[]).forEach(function(o){
+        objectsById[o.id]=o;
+        if(o.types&&o.types.indexOf('Shape')>=0)shapeByName[o.name]=o;
+      });
+    }
     function pathObjForShape(shapeName){
       var shape=shapeByName[shapeName];if(!shape)return null;
       return (shape.children||[]).map(function(id){return objectsById[id];}).find(function(o){return o&&o.types&&o.types.indexOf('PointsPath')>=0;})||null;
@@ -717,8 +760,37 @@
     });
     await riveKeyframeBatch(animationId,keyframes);
 
+    // ---- Camera: instance the content artboard once into the exported
+    // artboard, keyframe the instance's own transform. Must happen AFTER
+    // the content shapes/keyframes above (the content artboard has to
+    // exist and be finished first) and uses the SAME animationId so the
+    // camera and the content play back on one synchronized timeline. ----
+    if(camActive){
+      onProgress('Insertion de la caméra…');
+      // Reparenting to the artboard's own root needs an explicit parentId
+      // even though there's only one sensible target — confirmed live: a
+      // first attempt omitting it crashed the tool outright ("Null check
+      // operator used on a null value"), not a graceful validation error.
+      var instRes=await riveCall('component_editor',{command:'addComponents',data:{addComponents:[{componentId:contentArtboardId,artboardId:artboardId,parentId:artboardId,x:0,y:0}]}});
+      var camInstanceId=instRes.components[0].id;
+      var camKeyframes=[];
+      for(var cf=r.start;cf<=r.end;cf++){
+        var cam=SMCamera.cameraAtFrame(cf);
+        if(!cam)continue;
+        var ct=riveCameraInstanceTransform(cam);
+        var ckf=cf-r.start;
+        camKeyframes.push({objectId:camInstanceId,propertyKey:13,frame:ckf,value:ct.x,interpolationType:'linear'});
+        camKeyframes.push({objectId:camInstanceId,propertyKey:14,frame:ckf,value:ct.y,interpolationType:'linear'});
+        camKeyframes.push({objectId:camInstanceId,propertyKey:16,frame:ckf,value:ct.sx,interpolationType:'linear'});
+        camKeyframes.push({objectId:camInstanceId,propertyKey:17,frame:ckf,value:ct.sy,interpolationType:'linear'});
+        camKeyframes.push({objectId:camInstanceId,propertyKey:15,frame:ckf,value:ct.r,interpolationType:'linear'});
+      }
+      await riveKeyframeBatch(animationId,camKeyframes);
+      keyframes=keyframes.concat(camKeyframes);
+    }
+
     onProgress('Terminé.');
-    return{ok:true,artboardId:artboardId,artboardName:artboardName,animationId:animationId,shapeCount:shapeDefs.length,keyframeCount:keyframes.length};
+    return{ok:true,artboardId:artboardId,artboardName:artboardName,animationId:animationId,shapeCount:shapeDefs.length,keyframeCount:keyframes.length,cameraNested:camActive};
   }
 
   window.SMExport=window.SMExport||{};
