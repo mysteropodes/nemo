@@ -295,6 +295,22 @@ structurellement correct, pas juste "a la bonne taille") ; manifest.json
 relu et parsé : fps/dimensions/keyframes tous exacts.
 
 ## Comment décider / trier plus tard
+### 3bis. Storyboard multi-scènes (mise à jour) — Toon Boom Storyboard Pro
+storyboard-mode.js étendu : `SMLabs.setSceneBoundary(frame)` /
+`removeSceneBoundary` / `listSceneBoundaries` groupent les panneaux en
+Scènes numérotées (SBP groupe réellement ses panneaux ainsi — numérotation
+« Scène N — Panneau M », vérifiée dans les docs, pas devinée), avec une
+ligne de durée totale affichée en fin de chaque scène dans les 2 exports
+PDF (grille ET page complète) — SBP affiche littéralement une colonne
+durée « displayed near the end of each scene ». Sans limite posée, tout
+reste dans une Scène 1 unique — comportement identique au prototype
+d'origine, aucune régression.
+**Vérifié en direct** : 6 keyframes, limite posée à la frame 15 → « 2
+scène(s), 6 panneau(x) », Scène 1 = panneaux 1-3 (frames 1/6/11), Scène 2
+repart à Panneau 1 (frames 16/21/26) ; les 2 PDF groupent bien par scène
+avec « Durée totale scène N » / « Fin scène N » présents une fois par
+scène, aux bons endroits ; retirer la limite refusionne tout en 1 scène.
+
 Chaque candidat prototypé peut être adopté indépendamment : `git
 cherry-pick <commit>` sur `main`, puis décision UI (bouton Réglages,
 raccourci, intégration à l'outil). Pour les non-prototypés ci-dessus,

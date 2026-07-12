@@ -1,4 +1,4 @@
-// ---- LABS PROTOTYPE — Storyboard mode (Toon Boom Storyboard Pro, scoped) ----
+// ---- LABS PROTOTYPE — Storyboard mode + multi-scene grouping (Toon Boom Storyboard Pro, scoped) ----
 // feature-scouting.md #3 flagged this as "not a feature, a second app" —
 // true for a FULL storyboard tool (its own project model, shot/sequence
 // data, PDF export pipeline). This is the honestly-scoped slice that's
@@ -26,6 +26,16 @@
 // Captions are Labs-local (localStorage per project key), same precedent
 // as timeline-markers/pose-library — a real adoption would promote them
 // into the project file.
+//
+// Multi-scene grouping (SBP groups panels under numbered Scenes, each
+// with its own "Scene N — Panel M" numbering and a duration shown near
+// the end of the scene — checked against the docs, not guessed):
+//   SMLabs.setSceneBoundary(frame)     — this panel starts a new scene
+//   SMLabs.removeSceneBoundary(frame)
+//   SMLabs.listSceneBoundaries()
+// A project with zero boundaries is treated as one single Scene 1 — no
+// behavior change from the original single-scene prototype until you
+// actually mark a boundary.
 (function () {
   function projectKey() { try { if (window.SMProject && SMProject.getProjectKey) return SMProject.getProjectKey(); } catch (e) {} return 'default'; }
   function storeKey() { return 'nemo-labs-board-captions-' + projectKey(); }
@@ -47,6 +57,44 @@
     m[frame][field] = text;
     saveCaptions(m);
   };
+
+  // ---- scene boundaries (multi-scene grouping) ----
+  function sceneStoreKey() { return 'nemo-labs-board-scenes-' + projectKey(); }
+  function loadSceneBoundaries() {
+    try { return (JSON.parse(localStorage.getItem(sceneStoreKey()) || '[]')).sort(function (a, b) { return a - b; }); }
+    catch (e) { return []; }
+  }
+  function saveSceneBoundaries(arr) { localStorage.setItem(sceneStoreKey(), JSON.stringify(arr)); }
+  window.SMLabs.setSceneBoundary = function (frame) {
+    var b = loadSceneBoundaries();
+    if (b.indexOf(frame) < 0) { b.push(frame); saveSceneBoundaries(b); }
+    return b;
+  };
+  window.SMLabs.removeSceneBoundary = function (frame) {
+    var b = loadSceneBoundaries().filter(function (f) { return f !== frame; });
+    saveSceneBoundaries(b);
+    return b;
+  };
+  window.SMLabs.listSceneBoundaries = function () { return loadSceneBoundaries(); };
+
+  // Splits `keys` (sorted panel frames) into scenes at every boundary
+  // that lands ON a panel frame — a boundary elsewhere is a no-op (there's
+  // no panel there to start a scene on), same "snap to the nearest real
+  // beat" spirit as everything else keyframe-based in this file.
+  function groupIntoScenes(keys) {
+    var boundaries = loadSceneBoundaries();
+    var scenes = [];
+    var cur = { number: 1, panels: [] };
+    keys.forEach(function (f) {
+      if (boundaries.indexOf(f) >= 0 && cur.panels.length) {
+        scenes.push(cur);
+        cur = { number: scenes.length + 1, panels: [] };
+      }
+      cur.panels.push(f);
+    });
+    if (cur.panels.length) scenes.push(cur);
+    return scenes;
+  }
 
   function keyframesOf(layerIdx) {
     var ld = state.layers[layerIdx];
@@ -146,14 +194,20 @@
     var li = state.activeLayerIdx;
     var keys = keyframesOf(li);
     var durs = durationsFor(keys, state.totalFrames);
+    var durByFrame = {}; keys.forEach(function (f, i) { durByFrame[f] = durs[i]; });
+    var scenes = groupIntoScenes(keys);
     var captions = loadCaptions();
     panel = document.createElement('div');
     panel.id = 'labs-storyboard';
     panel.style.cssText = 'position:fixed;inset:24px;z-index:99998;background:#201f25;border:1px solid rgba(255,255,255,.14);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.6);display:flex;flex-direction:column;overflow:hidden;';
     var head = document.createElement('div');
     head.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,.08);font:12px system-ui;color:#eceae7;';
-    head.innerHTML = '<b>Storyboard — ' + keys.length + ' panneau(x) (calque « ' + (state.layers[li].name || '') + ' »)</b>';
+    head.innerHTML = '<b>Storyboard — ' + scenes.length + ' scène(s), ' + keys.length + ' panneau(x) (calque « ' + (state.layers[li].name || '') + ' »)</b>';
     var btns = document.createElement('div');
+    var sceneBtn = document.createElement('button'); sceneBtn.textContent = 'Nouvelle scène ici';
+    sceneBtn.title = 'Marque la frame courante comme début de scène';
+    sceneBtn.style.cssText = 'margin-right:6px;padding:5px 10px;background:#333;color:#eceae7;border:none;border-radius:6px;cursor:pointer;font:12px system-ui;';
+    sceneBtn.addEventListener('click', function () { window.SMLabs.setSceneBoundary(state.currentFrame); build(); });
     var printGridBtn = document.createElement('button'); printGridBtn.textContent = 'PDF — 3 panneaux';
     printGridBtn.style.cssText = 'margin-right:6px;padding:5px 10px;background:#4E6FF2;color:#fff;border:none;border-radius:6px;cursor:pointer;font:12px system-ui;';
     printGridBtn.addEventListener('click', function () { window.SMLabs.printStoryboard({ layout: 'grid' }); });
@@ -163,37 +217,56 @@
     var closeBtn = document.createElement('button'); closeBtn.textContent = 'Fermer';
     closeBtn.style.cssText = 'padding:5px 10px;background:#333;color:#eceae7;border:none;border-radius:6px;cursor:pointer;font:12px system-ui;';
     closeBtn.addEventListener('click', close);
-    btns.appendChild(printGridBtn); btns.appendChild(printFullBtn); btns.appendChild(closeBtn);
+    btns.appendChild(sceneBtn); btns.appendChild(printGridBtn); btns.appendChild(printFullBtn); btns.appendChild(closeBtn);
     head.appendChild(btns);
     var body = document.createElement('div');
-    body.style.cssText = 'flex:1;overflow:auto;padding:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;';
+    body.style.cssText = 'flex:1;overflow:auto;padding:16px;';
     var cw = state.canvasW || 1920, ch = state.canvasH || 1080;
     var thumbH = Math.round(220 * ch / cw);
-    keys.forEach(function (f, idx) {
-      var entry = entryFor(captions, f);
-      var card = document.createElement('div');
-      card.style.cssText = 'background:#141318;border:1px solid rgba(255,255,255,.08);border-radius:8px;overflow:hidden;';
-      var img = document.createElement('img');
-      img.style.cssText = 'width:100%;height:' + thumbH + 'px;object-fit:contain;background:#fff;display:block;cursor:pointer;';
-      img.title = 'Aller à la frame ' + (f + 1);
-      img.src = thumbFor(f, 220, thumbH);
-      img.addEventListener('click', function () { goToFrame(f); });
-      var foot = document.createElement('div');
-      foot.style.cssText = 'padding:6px 8px;';
-      var num = document.createElement('div');
-      num.textContent = 'Panneau ' + (idx + 1) + ' — frame ' + (f + 1) + ' — ' + durs[idx].frames + ' img (' + durs[idx].seconds.toFixed(2) + 's)';
-      num.style.cssText = 'font:10.5px system-ui;color:#9FB4FA;margin-bottom:5px;';
-      foot.appendChild(num);
-      foot.appendChild(captionField('Action', entry.action, function (v) { window.SMLabs.setBoardCaption(f, 'action', v); }));
-      foot.appendChild(captionField('Dialogue', entry.dialogue, function (v) { window.SMLabs.setBoardCaption(f, 'dialogue', v); }));
-      foot.appendChild(captionField('Notes', entry.notes, function (v) { window.SMLabs.setBoardCaption(f, 'notes', v); }));
-      card.appendChild(img); card.appendChild(foot);
-      body.appendChild(card);
+    scenes.forEach(function (scene) {
+      var sceneTotalFrames = scene.panels.reduce(function (s, f) { return s + durByFrame[f].frames; }, 0);
+      var sceneHead = document.createElement('div');
+      sceneHead.style.cssText = 'display:flex;align-items:baseline;gap:10px;margin:10px 0 8px;color:#eceae7;';
+      sceneHead.innerHTML = '<b style="font:13px system-ui;">Scène ' + scene.number + '</b>' +
+        '<span style="font:10.5px system-ui;color:#888;">' + scene.panels.length + ' panneau(x) — ' + (sceneTotalFrames / Math.max(1, state.fps)).toFixed(2) + 's</span>';
+      if (scene.number > 1) {
+        var unmark = document.createElement('button');
+        unmark.textContent = 'Retirer cette limite de scène';
+        unmark.style.cssText = 'margin-left:auto;padding:2px 6px;background:#333;color:#aaa;border:none;border-radius:4px;cursor:pointer;font:10px system-ui;';
+        unmark.addEventListener('click', function () { window.SMLabs.removeSceneBoundary(scene.panels[0]); build(); });
+        sceneHead.appendChild(unmark);
+      }
+      body.appendChild(sceneHead);
+      var grid = document.createElement('div');
+      grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;margin-bottom:6px;';
+      scene.panels.forEach(function (f, idxInScene) {
+        var entry = entryFor(captions, f);
+        var d = durByFrame[f];
+        var card = document.createElement('div');
+        card.style.cssText = 'background:#141318;border:1px solid rgba(255,255,255,.08);border-radius:8px;overflow:hidden;';
+        var img = document.createElement('img');
+        img.style.cssText = 'width:100%;height:' + thumbH + 'px;object-fit:contain;background:#fff;display:block;cursor:pointer;';
+        img.title = 'Aller à la frame ' + (f + 1);
+        img.src = thumbFor(f, 220, thumbH);
+        img.addEventListener('click', function () { goToFrame(f); });
+        var foot = document.createElement('div');
+        foot.style.cssText = 'padding:6px 8px;';
+        var num = document.createElement('div');
+        num.textContent = 'Scène ' + scene.number + ' — Panneau ' + (idxInScene + 1) + ' — frame ' + (f + 1) + ' — ' + d.frames + ' img (' + d.seconds.toFixed(2) + 's)';
+        num.style.cssText = 'font:10.5px system-ui;color:#9FB4FA;margin-bottom:5px;';
+        foot.appendChild(num);
+        foot.appendChild(captionField('Action', entry.action, function (v) { window.SMLabs.setBoardCaption(f, 'action', v); }));
+        foot.appendChild(captionField('Dialogue', entry.dialogue, function (v) { window.SMLabs.setBoardCaption(f, 'dialogue', v); }));
+        foot.appendChild(captionField('Notes', entry.notes, function (v) { window.SMLabs.setBoardCaption(f, 'notes', v); }));
+        card.appendChild(img); card.appendChild(foot);
+        grid.appendChild(card);
+      });
+      body.appendChild(grid);
     });
     if (!keys.length) {
       var empty = document.createElement('div');
       empty.textContent = 'Aucune keyframe sur ce calque — sélectionne un calque avec des poses dessinées.';
-      empty.style.cssText = 'color:#888;font:12px system-ui;grid-column:1/-1;';
+      empty.style.cssText = 'color:#888;font:12px system-ui;';
       body.appendChild(empty);
     }
     panel.appendChild(head); panel.appendChild(body);
@@ -207,12 +280,16 @@
     var layout = opts.layout === 'full' ? 'full' : 'grid';
     var li = state.activeLayerIdx, keys = keyframesOf(li), captions = loadCaptions();
     var durs = durationsFor(keys, state.totalFrames);
+    var durByFrame = {}; keys.forEach(function (f, i) { durByFrame[f] = durs[i]; });
+    var scenes = groupIntoScenes(keys);
     var cw = state.canvasW || 1920, ch = state.canvasH || 1080;
     var win = window.open('', '_blank');
     if (!win) { if (typeof showToast === 'function') showToast('Popup bloquée — autorise les popups pour imprimer'); return; }
     var html;
     if (layout === 'full') {
-      // SBP "Full Page": one large panel + full caption block per printed page.
+      // SBP "Full Page": one large panel + full caption block per printed
+      // page, grouped under a Scene divider page (SBP shows scene+panel
+      // numbers and a duration near the end of each scene).
       var thumbH = Math.round(520 * ch / cw);
       html = '<html><head><title>Storyboard</title><style>' +
         'body{font-family:system-ui;margin:0;} .page{page-break-after:always;padding:28px;box-sizing:border-box;}' +
@@ -220,33 +297,51 @@
         'img{width:100%;height:' + thumbH + 'px;object-fit:contain;background:#fff;border:1px solid #999;display:block;}' +
         '.hdr{display:flex;justify-content:space-between;font-size:13px;margin:8px 0;color:#333;}' +
         '.cap{margin-top:6px;font-size:12px;color:#111;} .cap b{display:inline-block;width:70px;}' +
+        '.scenehdr{font-size:15px;font-weight:600;margin-bottom:4px;}' +
+        '.sceneEnd{font-size:11px;color:#666;margin-top:10px;border-top:1px solid #ccc;padding-top:6px;}' +
         '@media print{.page{padding:14px;}}</style></head><body>';
-      keys.forEach(function (f, idx) {
-        var e = entryFor(captions, f);
-        html += '<div class="page"><div class="hdr"><b>Panneau ' + (idx + 1) + '</b><span>frame ' + (f + 1) + ' — ' + durs[idx].frames + ' img (' + durs[idx].seconds.toFixed(2) + 's)</span></div>' +
-          '<img src="' + thumbFor(f, 900, thumbH * 2) + '">' +
-          '<div class="cap"><b>Action</b>' + (e.action || '').replace(/</g, '&lt;') + '</div>' +
-          '<div class="cap"><b>Dialogue</b>' + (e.dialogue || '').replace(/</g, '&lt;') + '</div>' +
-          '<div class="cap"><b>Notes</b>' + (e.notes || '').replace(/</g, '&lt;') + '</div></div>';
+      scenes.forEach(function (scene) {
+        var sceneTotalFrames = scene.panels.reduce(function (s, f) { return s + durByFrame[f].frames; }, 0);
+        scene.panels.forEach(function (f, idxInScene) {
+          var e = entryFor(captions, f);
+          var d = durByFrame[f];
+          var isLastOfScene = idxInScene === scene.panels.length - 1;
+          html += '<div class="page"><div class="scenehdr">Scène ' + scene.number + '</div>' +
+            '<div class="hdr"><b>Panneau ' + (idxInScene + 1) + '</b><span>frame ' + (f + 1) + ' — ' + d.frames + ' img (' + d.seconds.toFixed(2) + 's)</span></div>' +
+            '<img src="' + thumbFor(f, 900, thumbH * 2) + '">' +
+            '<div class="cap"><b>Action</b>' + (e.action || '').replace(/</g, '&lt;') + '</div>' +
+            '<div class="cap"><b>Dialogue</b>' + (e.dialogue || '').replace(/</g, '&lt;') + '</div>' +
+            '<div class="cap"><b>Notes</b>' + (e.notes || '').replace(/</g, '&lt;') + '</div>' +
+            (isLastOfScene ? '<div class="sceneEnd">Fin scène ' + scene.number + ' — durée totale : ' + (sceneTotalFrames / Math.max(1, state.fps)).toFixed(2) + 's (' + sceneTotalFrames + ' images)</div>' : '') +
+            '</div>';
+        });
       });
     } else {
-      // SBP "3 Panels": grid of thumbnails with compact captions.
+      // SBP "3 Panels": grid of thumbnails with compact captions, grouped
+      // under a scene heading row + a total-duration line at scene end.
       var thumbH2 = Math.round(280 * ch / cw);
       html = '<html><head><title>Storyboard</title><style>' +
-        'body{font-family:system-ui;margin:24px;} .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;}' +
+        'body{font-family:system-ui;margin:24px;} .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-bottom:6px;}' +
         '.card{break-inside:avoid;border:1px solid #ccc;border-radius:6px;overflow:hidden;}' +
         'img{width:100%;height:' + thumbH2 + 'px;object-fit:contain;background:#fff;display:block;}' +
         '.foot{padding:6px 8px;font-size:10.5px;} .foot b{color:#4E6FF2;}' +
-        '@media print{body{margin:0;}}</style></head><body><div class="grid">';
-      keys.forEach(function (f, idx) {
-        var e2 = entryFor(captions, f);
-        var lines = [];
-        if (e2.action) lines.push('<b>Action</b> ' + e2.action.replace(/</g, '&lt;'));
-        if (e2.dialogue) lines.push('<b>Dial.</b> ' + e2.dialogue.replace(/</g, '&lt;'));
-        if (e2.notes) lines.push('<b>Note</b> ' + e2.notes.replace(/</g, '&lt;'));
-        html += '<div class="card"><img src="' + thumbFor(f, 400, thumbH2 * 2) + '"><div class="foot"><b>' + (idx + 1) + '</b> — frame ' + (f + 1) + ' — ' + durs[idx].seconds.toFixed(2) + 's<br>' + lines.join('<br>') + '</div></div>';
+        '.scenehdr{font-size:14px;font-weight:600;margin:14px 0 8px;}' +
+        '.sceneEnd{font-size:11px;color:#666;margin:0 0 14px;}' +
+        '@media print{body{margin:0;}}</style></head><body>';
+      scenes.forEach(function (scene) {
+        var sceneTotalFrames = scene.panels.reduce(function (s, f) { return s + durByFrame[f].frames; }, 0);
+        html += '<div class="scenehdr">Scène ' + scene.number + '</div><div class="grid">';
+        scene.panels.forEach(function (f, idxInScene) {
+          var e2 = entryFor(captions, f);
+          var d2 = durByFrame[f];
+          var lines = [];
+          if (e2.action) lines.push('<b>Action</b> ' + e2.action.replace(/</g, '&lt;'));
+          if (e2.dialogue) lines.push('<b>Dial.</b> ' + e2.dialogue.replace(/</g, '&lt;'));
+          if (e2.notes) lines.push('<b>Note</b> ' + e2.notes.replace(/</g, '&lt;'));
+          html += '<div class="card"><img src="' + thumbFor(f, 400, thumbH2 * 2) + '"><div class="foot"><b>' + (idxInScene + 1) + '</b> — frame ' + (f + 1) + ' — ' + d2.seconds.toFixed(2) + 's<br>' + lines.join('<br>') + '</div></div>';
+        });
+        html += '</div><div class="sceneEnd">Durée totale scène ' + scene.number + ' : ' + (sceneTotalFrames / Math.max(1, state.fps)).toFixed(2) + 's (' + sceneTotalFrames + ' images)</div>';
       });
-      html += '</div>';
     }
     html += '</body></html>';
     win.document.write(html); win.document.close();
@@ -255,7 +350,7 @@
 
   window.SMLabs.register('storyboard-mode', {
     flag: 'nemo-labs-storyboard',
-    describe: 'Storyboard scope Toon Boom Storyboard Pro (chaque keyframe du calque actif = un panneau) — colonnes Action/Dialogue/Notes, durée calculée, 2 mises en page PDF (grille 3-panneaux / page complète)',
+    describe: 'Storyboard scope Toon Boom Storyboard Pro (chaque keyframe du calque actif = un panneau) — multi-scènes (setSceneBoundary), colonnes Action/Dialogue/Notes, durée calculée + durée totale de scène, 2 mises en page PDF (grille 3-panneaux / page complète)',
     onDisable: close,
   });
 })();
