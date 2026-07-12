@@ -899,8 +899,16 @@
 <script src="js/export.js"></script>
 <script src="js/rive-export.js"></script>
 <script src="js/ae-camera-export.js"></script>
-<!-- Labs prototypes (docs/feature-scouting.md) — off by default, no core file touches beyond one guarded hook in draw-bridge.js -->
+<!-- Labs prototypes (docs/feature-scouting.md) — off by default, no core file
+     touches beyond one guarded hook in draw-bridge.js. Order matters:
+     labs-core first (registry), then stroke-MUTATING prototypes
+     (predictive) before stroke-COPYING ones (symmetry) so copies reflect
+     the corrected shape. -->
+<script src="js/labs/labs-core.js"></script>
+<script src="js/labs/predictive-stroke.js"></script>
 <script src="js/labs/symmetry-mirror.js"></script>
+<script src="js/labs/multiframe-draw.js"></script>
+<script src="js/labs/lagoon-menu.js"></script>
 <script src="js/lottie-preview.js"></script>
 <script src="js/timeline.js"></script>
 <script src="js/i18n.js"></script>
