@@ -1,7 +1,7 @@
 # Feature scouting — Umoupen / Callipeg / Autodesk SketchBook vs Nemo
 
 Branche: `experimental/feature-scouting` (jamais mergée sans validation).
-Audit du 2026-07-12, basé sur les pages publiques des 3 apps + grep du code Nemo.
+Audit du 2026-07-12, basé sur les pages publiques de 4 apps (Umoupen, Callipeg,\nAutodesk SketchBook, TVPaint) + grep du code Nemo.
 
 ## Déjà présent chez Nemo (pas la peine de reprototyper)
 - Stabilisation de trait, gap-closing sur le fill, onion skin, pistes audio,
@@ -73,6 +73,7 @@ contact avec le code de prod : UN hook gardé dans `draw-bridge.js`
 | `retime-exposure` (ones→twos→threes) | TVPaint X-sheet | retime-exposure.js | 4 clés sur ones re-calées sur twos (0/2/4/6) avec tenues entre, 1 undo restaure |
 | `interval-assistant` (breakdowns éasés) | Callipeg | interval-assistant.js | spacing chart in-out : breakdowns serrés aux extrémités (frames 4 et 8 entre 3 et 9), pré-remplis du contenu tenu, 1 undo |
 | `xsheet` (feuille d'exposition flottante) | TVPaint/Umoupen | xsheet-panel.js | frames × calques, ●/◆/│, clic = saut de frame, refresh auto sur rebuild timeline, teardown propre |
+| `out-of-pegs` (décaler les fantômes onion) | TVPaint light table | out-of-pegs.js | fantôme prev décalé de +200px vérifié numériquement, survit à la navigation de frames, remis sur pegs au disable (wrapper runtime autour de renderOS, retiré au disable) |
 
 Bugs réels trouvés/corrigés pendant les protos (documentés dans les
 commits) : RDP dégénéré sur boucle fermée, cascade de promotion keyframe
