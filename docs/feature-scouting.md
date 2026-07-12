@@ -90,9 +90,134 @@ Bugs réels trouvés/corrigés pendant les protos (documentés dans les
 commits) : RDP dégénéré sur boucle fermée, cascade de promotion keyframe
 dans le tampon multi-frames, anchors simplifiés qui coupent les coins.
 
+## Volontairement NON prototypé — pourquoi, et par où commencer si adopté
+
+Chaque entrée ci-dessous touche le moteur Rust, le format de fichier, ou
+exige un vrai chantier UI — un prototype Labs "sans risque" y est
+impossible ou mensonger (il donnerait une fausse idée du coût réel).
+Classées par rapport valeur/effort estimé.
+
+### 1. Calques masque / clipping (Umoupen, CSP, Toon Boom stencil)
+**Quoi** : un calque dont l'alpha découpe les calques en dessous (ou un
+clipping-mask par calque adjacent façon CSP).
+**Pourquoi pas en Labs** : le compositing des calques se fait dans
+`engine.rs` (`render()` + `render_to_pixels()`, les DEUX copies à garder
+identiques — CLAUDE.md §3). Un masque exige un vrai groupe de clip au
+niveau vello, plus la sérialisation scène (`buildSceneJson` →
+`ItemIn`/`LayerIn` Rust), plus la persistance (nouveau champ calque dans
+`exportJSON`), plus l'UI calques.
+**Par où commencer** : vello supporte `push_layer` avec clip — ajouter un
+champ `clipMask: bool` au calque, l'appliquer dans les deux fonctions de
+rendu, et brancher le fallback Paper.js (Group.clipMask) pour le mode
+sans moteur. Estimation : 2-3 jours avec tests export inclus.
+**Valeur** : haute (demandé par tous les workflows peinture).
+
+### 2. Effets non-destructifs par calque (Umoupen : motion blur, bloom, filtres shader)
+**Quoi** : pile d'effets réordonnables/désactivables par calque, rendus à
+la volée sans modifier les traits.
+**Pourquoi pas en Labs** : c'est du post-process GPU par calque — donc
+`engine.rs` (rendu offscreen par calque + passe shader) ou le pipeline
+WGSL déjà documenté dans CLAUDE.md (section shaders Rive). Un fake CSS ne
+tiendrait ni à l'export ni au zoom.
+**Par où commencer** : le pattern post-process validé côté Rive (CLAUDE.md
+« Architecture Post-process sur Artboard ») est transposable : rendre le
+calque dans une texture, passe WGSL, composite. Commencer par UN effet
+(blur gaussien) derrière un champ `effects:[]` par calque. Estimation :
+3-5 jours pour l'infra + 1er effet ; chaque effet suivant est petit.
+**Valeur** : moyenne-haute (différenciant visuel fort).
+
+### 3. Mode Storyboard (Umoupen : grille de vignettes, légendes, export PDF)
+**Quoi** : un mode projet entier — vue grille des plans, pistes de
+légendes (dialogue/note/beat), timing par plan, export PDF de board.
+**Pourquoi pas en Labs** : ce n'est pas une feature, c'est une deuxième
+application au-dessus du même document (nouveau mode d'UI, nouveau modèle
+de données plan/séquence, nouvel export). Un prototype console n'aurait
+aucun sens d'usage.
+**Par où commencer** : trancher d'abord si Nemo veut être un outil de
+board OU s'intégrer à un board externe (le pont Kitsu existe déjà — les
+plans peuvent venir de Kitsu, ce qui est plus dans l'ADN prod du projet).
+Si intégré : une vue « grille de projets/plans Kitsu » est un chantier UI
+pur de ~1 semaine. Si natif : compter plusieurs semaines.
+**Valeur** : haute pour la cible prod, mais gros pari produit.
+
+### 4. Référence 3D (Umoupen OBJ/glTF, CSP 3D poser)
+**Quoi** : importer un modèle 3D comme calque de référence orientable.
+**Pourquoi pas en Labs** : il faut un rendu 3D (chargeur OBJ/glTF +
+caméra + rastérisation) que ni Paper ni le moteur vello 2D ne fournissent.
+**Par où commencer** : la voie la moins chère est un canvas WebGL séparé
+(three.js) affiché comme calque de référence NON exporté, hors moteur —
+c'est isolable, mais three.js est une dépendance lourde pour un seul
+usage. Alternative zéro-code : importer des rendus PNG du modèle via la
+référence roto existante (SMReference), qui couvre déjà 80 % de l'usage.
+Estimation : 3-4 jours (three.js) / 0 jour (workaround roto).
+**Valeur** : moyenne — le workaround existant en couvre l'essentiel.
+
+### 5. French curve / guide ellipse avec snap (SketchBook)
+**Quoi** : gabarits de courbes posés sur le canvas, le trait s'y colle.
+(Le guide de PERSPECTIVE existe déjà dans Nemo — panneau « Guide de
+perspective » ; le manque est le gabarit courbe/ellipse aimanté.)
+**Pourquoi pas en Labs** : le snap doit intercepter le trait PENDANT le
+drag (pas au commit comme predictive-stroke) — donc modifier
+draw-bridge.js au cœur de sa boucle pointermove, la zone la plus
+sensible en perf du codebase (§5).
+**Par où commencer** : un hook optionnel `SMLabs.snapSample(pt)` appelé
+dans la boucle d'échantillonnage (même pattern que le hook commitStroke,
+une ligne gardée), le gabarit lui-même en overlay type canvas-grid.
+Estimation : 2 jours, dont la moitié en tests perf stylet.
+**Valeur** : moyenne (public illustration plus qu'anim).
+
+### 6. Bones / smart bones / déformeurs (Moho), node view (Toon Boom)
+**Quoi** : rigging squelettal, déformations, contrôleurs.
+**Pourquoi pas en Labs — ni jamais en natif ?** : c'est un moteur
+d'animation entier. La position déjà prise par le projet (export Rive
+MCP, RiveBar) est la bonne réponse : Nemo dessine, **Rive rigge**. En
+réimplémentant Moho dans Nemo on perdrait sur les deux tableaux.
+**Par où commencer si le besoin se précise** : enrichir l'export Rive
+(les bones existent dans l'object model Rive, cf. mémoire « weight
+encoding / tendon transforms ») plutôt qu'un rig natif.
+**Valeur** : haute, mais à capturer via Rive, pas en interne.
+
+### 7. Brosses animées / moteur de brosses bitmap (TVPaint, CSP)
+**Quoi** : pointes de brosse bitmap, brosses multi-images, mélange humide.
+**Pourquoi pas en Labs** : Nemo est 100 % vectoriel par choix (StrokeMotion
+« Paper.js = source de vérité ») ; une brosse bitmap casse ce contrat de
+bout en bout (données, tween, export Rive). La diversité de brosses
+VECTORIELLES est déjà un chantier queued (mémoire « brush diversity »).
+**Valeur** : à réévaluer seulement après le chantier brush diversity.
+
+### 8. Screentones / trames (CSP)
+**Quoi** : remplissages en trames de points/lignes façon manga.
+**Pourquoi pas en Labs** : en vectoriel naïf c'est des milliers de petits
+Paths par aplat (budget scène §5 explosé) ; la vraie implémentation est un
+motif de fill côté moteur (pattern fill vello) + export.
+**Par où commencer** : `PaintIn` Rust avec un champ pattern ; ou attendre
+les effets par calque (#2) dont c'est un cas particulier.
+**Valeur** : basse pour la cible actuelle (anim > manga).
+
+### 9. Auto lip-sync (Moho, Toon Boom)
+**Quoi** : générer les bouches depuis la piste audio.
+**Pourquoi pas (encore)** : l'analyse audio (amplitude/phonèmes) est un
+chantier en soi. MAIS les deux briques Labs nécessaires existent
+désormais : `pose-library` (kit de bouches) + la piste audio SMAudio.
+**Par où commencer** : un Labs `lipsync-assistant` qui lit l'amplitude
+RMS par frame (SMAudio a déjà les waveforms) et tamponne
+bouche-ouverte/mi-ouverte/fermée via stampPose — PAS de phonèmes, juste
+l'amplitude. C'est le seul de cette liste qui pourrait finalement passer
+en Labs (~1 jour). Gardé hors scope aujourd'hui uniquement par prudence
+sur la lecture des buffers SMAudio.
+**Valeur** : haute en démo, moyenne en prod (l'amplitude seule est grossière).
+
+### 10. Interchange X-sheet (XDTS/OCA — Callipeg, TVPaint, pipeline japonais)
+**Quoi** : import/export du timing au format feuille d'expo standard.
+**Pourquoi pas en Labs** : purement data-level DONC faisable — mais sans
+un vrai cas d'usage (studio en face qui consomme le XDTS), c'est du
+format-guessing. À prototyper le jour où un partenaire pipeline le
+demande, contre ses fichiers réels.
+**Valeur** : nulle sans partenaire, haute avec.
+
 ## Comment décider / trier plus tard
-Chaque candidat ci-dessus peut être prototypé indépendamment dans cette même
-branche, un fichier/commit par feature, sans jamais toucher aux fichiers de
-prod tant que tu n'as pas dit "prends celle-là". Pour intégrer une feature
-choisie sur `main` : `git cherry-pick <commit>` puis retirer le flag Labs si tu
-veux qu'elle soit active par défaut.
+Chaque candidat prototypé peut être adopté indépendamment : `git
+cherry-pick <commit>` sur `main`, puis décision UI (bouton Réglages,
+raccourci, intégration à l'outil). Pour les non-prototypés ci-dessus,
+l'ordre de valeur suggéré : masques (#1) → effets par calque (#2) →
+lip-sync amplitude (#9) → French curve (#5), le reste sur demande.
