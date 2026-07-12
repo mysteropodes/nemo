@@ -211,14 +211,28 @@ bout en bout (données, tween, export Rive). La diversité de brosses
 VECTORIELLES est déjà un chantier queued (mémoire « brush diversity »).
 **Valeur** : à réévaluer seulement après le chantier brush diversity.
 
-### 8. Screentones / trames (CSP)
-**Quoi** : remplissages en trames de points/lignes façon manga.
-**Pourquoi pas en Labs** : en vectoriel naïf c'est des milliers de petits
-Paths par aplat (budget scène §5 explosé) ; la vraie implémentation est un
-motif de fill côté moteur (pattern fill vello) + export.
-**Par où commencer** : `PaintIn` Rust avec un champ pattern ; ou attendre
-les effets par calque (#2) dont c'est un cas particulier.
-**Valeur** : basse pour la cible actuelle (anim > manga).
+### 8. Screentones / trames (CSP) — PROTOTYPÉ
+**Quoi** : screentone-bake.js. `SMLabs.applyScreentone(null,
+{pattern:'dots'|'lines', cellPx, angle, color})` clippe une grille de
+points/lignes générée sur les propres bornes de la forme sélectionnée
+(coût borné, pas la scène entière) via le MÊME pipeline booléen que
+l'outil Boolean Ops existant (`booleanOpWasm`).
+**Bug réel trouvé (grave)** : la première version tentait d'unir la
+grille entière (700+ cellules disjointes) en UNE forme avant
+l'intersection — `booleanOpWasm('unite', ...)` fold pairwise ne garde
+QUE le plus grand morceau comme accumulateur à chaque étape (correct
+pour 2-3 opérandes, sa vraie cible d'usage), donc chaque nouveau point
+disjoint ajouté faisait perdre presque tout ce qui avait déjà été uni.
+Mesuré : 761 points (aire brute 55098) → union à 130 d'aire, 2 morceaux
+survivants. Corrigé par le VRAI algorithme de trame : classifier chaque
+cellule (entièrement dedans → gardée telle quelle sans booléen,
+entièrement dehors → jetée gratuitement, à cheval sur le bord → SEUL
+cas nécessitant un intersect réel, un par un, jamais un fold géant).
+**Vérifié en direct** : motif points, densité 0.281 mesurée vs 0.283
+attendue (surface trame / surface cercle) ; motif lignes, 0.347 vs 0.35
+attendue ; 1 undo restaure exactement l'état d'origine dans les deux cas.
+**Valeur** : basse pour la cible actuelle (anim > manga), mais l'algo de
+classification est réutilisable pour tout futur besoin de pattern-fill.
 
 ### 9. Auto lip-sync (Moho, Toon Boom)
 **Quoi** : générer les bouches depuis la piste audio.
