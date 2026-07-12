@@ -166,17 +166,33 @@ frame, visible à l'écran), durées 7/8/9 images → 0.29/0.33/0.38s
 la fermeture/réouverture, les 2 exports PDF contiennent bien vignettes +
 légendes + durées, zéro erreur console.
 
-### 4. Référence 3D (Umoupen OBJ/glTF, CSP 3D poser)
-**Quoi** : importer un modèle 3D comme calque de référence orientable.
-**Pourquoi pas en Labs** : il faut un rendu 3D (chargeur OBJ/glTF +
-caméra + rastérisation) que ni Paper ni le moteur vello 2D ne fournissent.
-**Par où commencer** : la voie la moins chère est un canvas WebGL séparé
-(three.js) affiché comme calque de référence NON exporté, hors moteur —
-c'est isolable, mais three.js est une dépendance lourde pour un seul
-usage. Alternative zéro-code : importer des rendus PNG du modèle via la
-référence roto existante (SMReference), qui couvre déjà 80 % de l'usage.
-Estimation : 3-4 jours (three.js) / 0 jour (workaround roto).
-**Valeur** : moyenne — le workaround existant en couvre l'essentiel.
+### 4. Référence 3D (Umoupen OBJ) — PROTOTYPÉ sans three.js
+**Quoi** : reference-3d.js. `SMLabs.open3DReference(objText)` — panneau
+flottant WebGL BRUT (aucune dépendance), parseur OBJ maison (v/vn/f,
+triangulation en éventail des n-gones), shader GLSL minimal (Lambert un
+seul directionnel, ~10 lignes), orbite à la souris (drag=rotation,
+molette=zoom). Jamais exporté ni baké — pur calque de référence, même
+rôle que SMReference (roto) mais pour un modèle 3D tournant plutôt
+qu'une image plate.
+**Bug réel trouvé (subtil, non-déterministe)** : `readPixels()` (et un
+simple screenshot) renvoyait tantôt le rendu réel, tantôt du transparent
+pur (0,0,0,0), de façon non-reproductible. Cause : `preserveDrawingBuffer`
+à `false` (défaut WebGL) — le navigateur efface le buffer après CHAQUE
+présentation au compositeur, indépendamment de nos appels `draw()` ; lire
+le canvas dépendait alors d'un timing de course contre l'auto-clear.
+Corrigé en passant `{preserveDrawingBuffer:true}` à `getContext`.
+**Vérifié en direct** : cube-test (8 sommets, 6 faces quad → 12 triangles
+après triangulation, compte exact) ; lecture de pixels stable et
+reproductible après le fix (contre non-déterministe avant) ; preuve
+géométrique que la rotation 3D fonctionne réellement — échantillonnage
+des 4 coins de l'écran à 2 orientations très différentes montre le motif
+fond/cube s'inverser complètement entre les coins (coin haut-droit visible
+en pose 1 → coins haut-gauche ET bas-gauche visibles en pose 2), preuve
+que la silhouette pivote en 3D et non un simple aplat coloré ;
+fermeture propre (panneau + état GL entièrement nettoyés).
+**Valeur** : moyenne — complète le workaround roto existant pour les cas
+où tourner le modèle en direct (plutôt que pré-rendre des poses figées)
+aide vraiment.
 
 ### 5. French curve / guide ellipse avec snap (SketchBook)
 **Quoi** : gabarits de courbes posés sur le canvas, le trait s'y colle.
