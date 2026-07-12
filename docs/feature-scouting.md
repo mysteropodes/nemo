@@ -81,6 +81,10 @@ contact avec le code de prod : UN hook gardé dans `draw-bridge.js`
 | `vector-trim` (gomme vectorielle aux intersections) | Clip Studio Paint | vector-trim.js | branche au-delà d'un croisement supprimée (2306→1153), span central entre 2 croisements isolé (1 trait→2 bouts), autres traits intacts, 1 undo |
 | `view-filter` (contrôle des valeurs) | Clip Studio Paint | view-filter.js | grayscale/contrast/dim en CSS display-only — on peut dessiner pendant (contrairement au miroir) |
 | `speed-lines` (lignes de vitesse manga) | Clip Studio Paint | speed-lines.js | 24 traits radiaux générés avec jitter, couleur/épaisseur courantes, 1 undo retire l'éclat entier |
+| `reference-fill` (ink & paint multi-calques) | CSP reference layer | reference-fill.js | fill sur le calque couleur avec les murs du calque lineart (clones jetables, pattern des closing strokes) ; tag isFillTempClose hérité par le résultat trouvé/corrigé |
+| `pose-library` (substitution de dessins) | Toon Boom | pose-library.js | savePose sur sélection, stampPose sur n'importe quelle frame avec offset, strokeIds frais par tampon |
+| `boil-effect` (ligne bouillante) | Moho vector noise | boil-effect.js | N keyframes-variantes à jitter SEEDÉ par frame (déterministe), points seuls déplacés (les poignées survivent), 1 undo |
+| `follow-path` (bake le long d'un trait) | Moho | follow-path.js | sélection bakée en 8 keyframes le long d'une trajectoire éasée (x −220→7041), guide exclu du bake, 1 undo |
 
 Bugs réels trouvés/corrigés pendant les protos (documentés dans les
 commits) : RDP dégénéré sur boucle fermée, cascade de promotion keyframe
