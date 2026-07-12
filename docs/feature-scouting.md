@@ -131,19 +131,34 @@ calque dans une texture, passe WGSL, composite. Commencer par UN effet
 3-5 jours pour l'infra + 1er effet ; chaque effet suivant est petit.
 **Valeur** : moyenne-haute (différenciant visuel fort).
 
-### 3. Mode Storyboard (Umoupen : grille de vignettes, légendes, export PDF)
-**Quoi** : un mode projet entier — vue grille des plans, pistes de
-légendes (dialogue/note/beat), timing par plan, export PDF de board.
-**Pourquoi pas en Labs** : ce n'est pas une feature, c'est une deuxième
-application au-dessus du même document (nouveau mode d'UI, nouveau modèle
-de données plan/séquence, nouvel export). Un prototype console n'aurait
-aucun sens d'usage.
-**Par où commencer** : trancher d'abord si Nemo veut être un outil de
-board OU s'intégrer à un board externe (le pont Kitsu existe déjà — les
-plans peuvent venir de Kitsu, ce qui est plus dans l'ADN prod du projet).
-Si intégré : une vue « grille de projets/plans Kitsu » est un chantier UI
-pur de ~1 semaine. Si natif : compter plusieurs semaines.
-**Valeur** : haute pour la cible prod, mais gros pari produit.
+### 3. Mode Storyboard (Toon Boom Storyboard Pro, Umoupen) — PROTOTYPÉ (scope honnête)
+**Quoi** : storyboard-mode.js. Chaque keyframe du calque actif = un
+panneau ; vignette rastérisée en direct (pas un placeholder), colonnes de
+légende séparées **Action / Dialogue / Notes** (structure vérifiée dans
+la doc SBP, pas devinée), durée calculée (frames jusqu'au panneau
+suivant, converti en secondes au fps du projet — SBP affiche une colonne
+Durée similaire en fin de scène). Export PDF via impression navigateur
+en 2 mises en page, calquées sur les vraies options SBP : « 3 panneaux »
+(grille) et « page complète » (un grand panneau + bloc légende par page,
+`page-break-after` pour une vraie pagination d'impression).
+**Ce qui reste volontairement hors scope** : pas de notion de
+scène/séquence (Nemo n'a qu'un seul « Scene » par projet), pas de
+réordonnancement par glisser-déposer (réordonner des panneaux =
+réordonner des keyframes sur toute la timeline, une feature à part
+entière), pas d'animatic (transitions/sons) — le grid layout `page-break`
+et le calcul de durée sont testés, pas le rendu PDF pixel-perfect d'un
+vrai imprimeur.
+**Bugs réels trouvés/corrigés** : (1) le premier essai détachait le Layer
+scratch du projet AVANT de le peupler — desP()/desR() insèrent via
+`project.activeLayer`, donc rien n'atterrissait jamais dedans (0 pixel
+non-blanc mesuré sur le PNG de sortie) ; (2) `Item#rasterize({resolution})`
+prend une résolution en DPI (72 = 1:1), pas un facteur d'échelle brut —
+passer l'échelle directement donnait un raster de 3×2px.
+**Vérifié en direct** : 3 vignettes réelles (forme grandissante à chaque
+frame, visible à l'écran), durées 7/8/9 images → 0.29/0.33/0.38s
+(calcul exact), légendes Action/Dialogue/Notes séparées et persistées à
+la fermeture/réouverture, les 2 exports PDF contiennent bien vignettes +
+légendes + durées, zéro erreur console.
 
 ### 4. Référence 3D (Umoupen OBJ/glTF, CSP 3D poser)
 **Quoi** : importer un modèle 3D comme calque de référence orientable.
