@@ -117,19 +117,25 @@ rendu, et brancher le fallback Paper.js (Group.clipMask) pour le mode
 sans moteur. Estimation : 2-3 jours avec tests export inclus.
 **Valeur** : haute (demandé par tous les workflows peinture).
 
-### 2. Effets non-destructifs par calque (Umoupen : motion blur, bloom, filtres shader)
-**Quoi** : pile d'effets réordonnables/désactivables par calque, rendus à
-la volée sans modifier les traits.
-**Pourquoi pas en Labs** : c'est du post-process GPU par calque — donc
-`engine.rs` (rendu offscreen par calque + passe shader) ou le pipeline
-WGSL déjà documenté dans CLAUDE.md (section shaders Rive). Un fake CSS ne
-tiendrait ni à l'export ni au zoom.
-**Par où commencer** : le pattern post-process validé côté Rive (CLAUDE.md
-« Architecture Post-process sur Artboard ») est transposable : rendre le
-calque dans une texture, passe WGSL, composite. Commencer par UN effet
-(blur gaussien) derrière un champ `effects:[]` par calque. Estimation :
-3-5 jours pour l'infra + 1er effet ; chaque effet suivant est petit.
-**Valeur** : moyenne-haute (différenciant visuel fort).
+### 2. Effets non-destructifs par calque (Umoupen) — PROTOTYPÉ (version bakée)
+**Quoi** : layer-effects-bake.js. `SMLabs.bakeLayerEffect(layerIdx,
+'blur(6px)'|'bloom'|cssFilterString)` rastérise la frame courante du
+calque via la même technique que storyboard-mode (Layer scratch ATTACHÉ
+pendant qu'on le peuple, `resolution:72` = 1 unité doc = 1px — les deux
+bugs déjà trouvés dans ce prototype), applique un filtre canvas 2D, puis
+remplace le contenu vectoriel de cette frame par le Raster résultant
+(`desR`, même format que save/load).
+**Ce qui reste réellement hors scope** : ce n'est PAS live/réglable après
+coup (pas de slider qui ré-applique en direct) — un vrai chantier non-
+destructif exige encore `engine.rs` (rendu offscreen par calque + passe
+WGSL, voir l'architecture post-process déjà documentée côté export
+Rive). Ici, un nouveau bake = un nouvel appel, par frame. Documenté
+explicitement, pas caché.
+**Vérifié en direct** : un rond vectoriel rempli devient un Raster
+persisté (strokeCount identique, type Path→Raster confirmé) ; le flou
+est RÉEL (zone de transition alpha de 25px mesurée sur une coupe
+horizontale, pas un dégradé de 1-2px qui trahirait un flou cosmétique) ;
+1 undo restaure exactement le Path vectoriel d'origine.
 
 ### 3. Mode Storyboard (Toon Boom Storyboard Pro, Umoupen) — PROTOTYPÉ (scope honnête)
 **Quoi** : storyboard-mode.js. Chaque keyframe du calque actif = un
