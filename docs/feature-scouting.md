@@ -76,6 +76,11 @@ contact avec le code de prod : UN hook gardé dans `draw-bridge.js`
 | `out-of-pegs` (décaler les fantômes onion) | TVPaint light table | out-of-pegs.js | fantôme prev décalé de +200px vérifié numériquement, survit à la navigation de frames, remis sur pegs au disable (wrapper runtime autour de renderOS, retiré au disable) |
 | `command-palette` (Cmd/Ctrl+K) | Umoupen command search | command-palette.js | filtre fuzzy ('gomme'→1 résultat), Entrée exécute + ferme, toggles Labs inclus dans la liste |
 | `mirror-check` (coup de miroir, maintenir M) | classique animateur | mirror-check.js | scaleX(-1) CSS le temps de l'appui, relâcher OU pointerdown remet droit (contrôle seulement, jamais dessiner en miroir) |
+| `auto-actions` (macros de commandes) | Clip Studio Paint | auto-actions.js | macroStart/Stop/Play — enregistré 4 étapes (outil+frame+keyframe), rejouées exactement ; bug clé-flag/store trouvé et corrigé |
+| `timelapse` (enregistrement de session .webm) | Clip Studio Paint | timelapse.js | captureStream direct du canvas WebGPU = vide (652 o) → composite 2D périodique, vraies frames (5,4 Ko/3 s), download auto |
+| `vector-trim` (gomme vectorielle aux intersections) | Clip Studio Paint | vector-trim.js | branche au-delà d'un croisement supprimée (2306→1153), span central entre 2 croisements isolé (1 trait→2 bouts), autres traits intacts, 1 undo |
+| `view-filter` (contrôle des valeurs) | Clip Studio Paint | view-filter.js | grayscale/contrast/dim en CSS display-only — on peut dessiner pendant (contrairement au miroir) |
+| `speed-lines` (lignes de vitesse manga) | Clip Studio Paint | speed-lines.js | 24 traits radiaux générés avec jitter, couleur/épaisseur courantes, 1 undo retire l'éclat entier |
 
 Bugs réels trouvés/corrigés pendant les protos (documentés dans les
 commits) : RDP dégénéré sur boucle fermée, cascade de promotion keyframe
