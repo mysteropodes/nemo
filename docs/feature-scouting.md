@@ -1,0 +1,68 @@
+# Feature scouting — Umoupen / Callipeg / Autodesk SketchBook vs Nemo
+
+Branche: `experimental/feature-scouting` (jamais mergée sans validation).
+Audit du 2026-07-12, basé sur les pages publiques des 3 apps + grep du code Nemo.
+
+## Déjà présent chez Nemo (pas la peine de reprototyper)
+- Stabilisation de trait, gap-closing sur le fill, onion skin, pistes audio,
+  brush wobble/texture, tween de forme + position, Ghost-All, courbes d'easing,
+  export Rive/AE/vidéo, calque caméra avec keyframes bézier.
+
+## Manque et candidats à prototyper (triés par rapport effort/valeur)
+
+### 1. Outil Symétrie / Miroir (SketchBook) — ★ candidat #1
+Dessiner avec réflexion en temps réel sur un axe X/Y ou en radial (mandala,
+jusqu'à 16 secteurs). Gros ROI pour la symétrie de personnage. Isolable : un
+wrapper au moment du commit de trait, n'importe pas dans le moteur de fill/tween.
+**Prototype fait dans cette branche** (voir plus bas).
+
+### 2. French Curve / guide ellipse-perspective (SketchBook)
+Gabarits de courbes savantes + ellipse qui s'aligne sur des lignes de fuite.
+Utile pour les BG/perspective. Risque UI moyen (nouvel outil + poignées).
+
+### 3. Predictive Stroke (SketchBook)
+Reconnaît et corrige à la volée cercle/rectangle/ligne dessinés à main levée.
+Isolable (post-traitement du trait au commit), mais heuristique de reco à régler.
+
+### 4. Calques masque (Umoupen/Callipeg)
+Un calque qui clippe les calques en dessous par son alpha. Nemo a des
+blend modes mais pas de vrai clipping-mask. Touche le rendu Rust (engine.rs) —
+plus risqué, à faire en dernier.
+
+### 5. Storyboard mode (Umoupen)
+Vue grille de vignettes + pistes de légendes (dialogue/note/beat) + export PDF.
+Gros morceau (nouveau mode de projet entier), pas un "prototype d'un soir".
+
+### 6. Interval Assistant / Cycle tool (Callipeg)
+Génère automatiquement un cycle de marche/course en répétant une plage de
+frames N fois avec option miroir. Nemo a déjà un bouton "Cycle" (repete N fois)
+— à vérifier s'il manque le miroir automatique en fin de cycle.
+
+### 7. Référence 3D (Umoupen)
+Import OBJ/glTF comme calque de référence rotatif. Gros morceau (rendu 3D),
+hors scope pour un prototype léger.
+
+### 8. Effets non-destructifs empilables (Umoupen)
+Motion blur, bloom, filtres shader, réordonnables/togglables sans détruire le
+dessin. Recoupe avec le pipeline shader WGSL déjà en place (voir CLAUDE.md) —
+faisable en Labs comme post-process optionnel par calque.
+
+### 9. Marking-menu radial ("Lagoon", SketchBook)
+Clic-maintenu ouvre un menu circulaire avec les outils les plus utilisés
+autour du curseur. Pure UI/UX, faible risque, gain de vitesse à l'usage tablette.
+
+## Ce qui est prototypé maintenant
+- **Symétrie/Miroir** : nouveau fichier `src/js/labs/symmetry-mirror.js`,
+  activé uniquement via `Réglages → Labs → Symétrie de dessin` (flag
+  `localStorage['nemo-labs-symmetry']`, off par défaut). N'écrit dans aucun
+  fichier existant du pipeline de dessin — s'accroche en écoutant les strokes
+  fraîchement committés et ajoute une copie miroir, comme une action
+  utilisateur normale (passe par `pushUndo`/`ensureKeyframe` comme tout le
+  reste, donc undo/redo la traitent nativement).
+
+## Comment décider / trier plus tard
+Chaque candidat ci-dessus peut être prototypé indépendamment dans cette même
+branche, un fichier/commit par feature, sans jamais toucher aux fichiers de
+prod tant que tu n'as pas dit "prends celle-là". Pour intégrer une feature
+choisie sur `main` : `git cherry-pick <commit>` puis retirer le flag Labs si tu
+veux qu'elle soit active par défaut.

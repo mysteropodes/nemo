@@ -559,6 +559,12 @@
     }
     if (state.shadowMode && path) path.data.channelTag = 'shadow';
     if (path) tagOwner(path);
+    // Labs prototype hook (docs/feature-scouting.md) — no-op unless
+    // window.SMLabs is loaded AND the symmetry toggle is on. Deliberately a
+    // single guarded call at the one point every commitStroke branch
+    // (including extendTarget) funnels through, rather than a change
+    // per-branch — keeps this file's own logic untouched when Labs is off.
+    if (window.SMLabs && window.SMLabs.onStrokeCommitted && path && !extendTarget) window.SMLabs.onStrokeCommitted(path, userLayers[state.activeLayerIdx]);
     saveActiveLayerFrame();
     updateUI();
     samples = [];
