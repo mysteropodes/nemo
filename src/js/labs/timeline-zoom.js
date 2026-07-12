@@ -57,8 +57,17 @@
   }
 
   // ---- custom zoom scrollbar ----
+  // Feedback: "la scroll bar compliqué à comprendre il faudrait que ça
+  // soit les bouts qui soit des poignées bleu pour zoomer ou dézoomer
+  // pas l'ensemble de la barre" — the first version only changed color on
+  // hover of the WHOLE thumb, so the 8px zoom-edge zones were invisible
+  // and indistinguishable from the pan-the-body zone. Fixed: the body
+  // stays a neutral gray pan handle at all times; the two end caps are
+  // now visually separate ALWAYS-blue pill-shaped knobs (not just on
+  // hover), independently brightening only THEMSELVES on hover — the
+  // body never tints blue anymore, only the knobs do.
   var hideNativeStyle = null, bar = null, thumb = null;
-  var EDGE_PX = 8, MIN_THUMB_PX = 20;
+  var EDGE_PX = 10, MIN_THUMB_PX = 28;
 
   function wrapEl() { return document.getElementById('fg-wrap'); }
   function totalContentWidth() { return Math.max(1, (state.totalFrames || 1) * window.FC); }
@@ -91,25 +100,32 @@
     hideNativeStyle.textContent =
       '#fg-wrap{scrollbar-width:none;-ms-overflow-style:none;}' +
       '#fg-wrap::-webkit-scrollbar{display:none;}' +
-      '#labs-tlscrollbar .lbs-tlsb-full{opacity:.35;}';
+      '#labs-tlscrollbar .lbs-tlsb-full{opacity:.5;}' +
+      '#labs-tlscrollbar .lbs-tlsb-handle{background:rgba(74,158,255,.65);transition:background .1s,transform .1s;}' +
+      '#labs-tlscrollbar .lbs-tlsb-handle:hover{background:#4ea9ff;transform:scaleX(1.15);}';
     document.head.appendChild(hideNativeStyle);
 
     bar = document.createElement('div');
     bar.id = 'labs-tlscrollbar';
-    bar.style.cssText = 'position:absolute;left:0;bottom:0;height:10px;z-index:6;background:rgba(255,255,255,.04);border-radius:5px;overflow:visible;';
+    bar.style.cssText = 'position:absolute;left:0;bottom:0;height:12px;z-index:6;background:rgba(255,255,255,.04);border-radius:6px;overflow:visible;';
     thumb = document.createElement('div');
-    thumb.style.cssText = 'position:absolute;top:0;height:10px;background:rgba(120,140,255,.35);border-radius:5px;cursor:grab;transition:background .1s;';
+    // Body = pan handle, neutral gray always (no color change on hover —
+    // color now means "this is a zoom knob", so the body deliberately
+    // never uses it, hover just gives the familiar grab→grabbing cursor).
+    thumb.style.cssText = 'position:absolute;top:0;height:12px;background:rgba(255,255,255,.14);border-radius:6px;cursor:grab;';
     var leftHandle = document.createElement('div'), rightHandle = document.createElement('div');
     [leftHandle, rightHandle].forEach(function (h, i) {
       h.className = 'lbs-tlsb-handle';
-      h.style.cssText = 'position:absolute;top:0;width:' + EDGE_PX + 'px;height:10px;cursor:ew-resize;' + (i === 0 ? 'left:0;' : 'right:0;');
+      h.title = 'Glisser pour zoomer / dézoomer la timeline';
+      h.style.cssText = 'position:absolute;top:0;width:' + EDGE_PX + 'px;height:12px;cursor:ew-resize;border-radius:' + (i === 0 ? '6px 2px 2px 6px' : '2px 6px 6px 2px') + ';' + (i === 0 ? 'left:0;' : 'right:0;');
       thumb.appendChild(h);
     });
     bar.appendChild(thumb);
     wrap.appendChild(bar);
 
-    thumb.addEventListener('pointerenter', function () { thumb.style.background = 'rgba(74,158,255,.55)'; });
-    thumb.addEventListener('pointerleave', function () { if (!dragMode) thumb.style.background = 'rgba(120,140,255,.35)'; });
+    thumb.addEventListener('pointerenter', function () { if (!dragMode) thumb.style.cursor = 'grab'; });
+    thumb.addEventListener('pointerdown', function () { thumb.style.cursor = 'grabbing'; });
+    window.addEventListener('pointerup', function () { thumb.style.cursor = 'grab'; });
 
     var dragMode = null; // 'pan' | 'zoom-left' | 'zoom-right'
     var startX = 0, startScrollLeft = 0, startFC = 0, anchorContentX = 0;
@@ -121,7 +137,6 @@
       var wrap2 = wrapEl();
       startScrollLeft = wrap2.scrollLeft;
       startFC = window.FC;
-      thumb.style.background = 'rgba(74,158,255,.75)';
       // The content-space x-coordinate under the EDGE NOT being dragged —
       // kept visually fixed while resizing, exactly like Premiere's
       // timeline zoom-by-scrollbar-edge behavior.
@@ -161,7 +176,7 @@
     function onUp() {
       if (!dragMode) return;
       dragMode = null;
-      thumb.style.background = 'rgba(120,140,255,.35)';
+      thumb.style.cursor = 'grab';
       localStorage.setItem(KEY, String(window.FC));
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
