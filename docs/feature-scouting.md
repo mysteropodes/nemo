@@ -327,6 +327,52 @@ repart à Panneau 1 (frames 16/21/26) ; les 2 PDF groupent bien par scène
 avec « Durée totale scène N » / « Fin scène N » présents une fois par
 scène, aux bons endroits ; retirer la limite refusionne tout en 1 scène.
 
+### 2bis. Effets WGSL réels façon Figma Motion — PROTOTYPÉ (bloom/CA/pixelate/dither/wave)
+shader-effects-bake.js : mêmes limites que layer-effects-bake.js (baké,
+pas live — voir #2) mais avec de VRAIS shaders WGSL sur la vraie API
+WebGPU (`navigator.gpu`, disponible ici : adaptateur + device obtenus
+avec succès), pas un filtre CSS — CSS ne peut structurellement pas faire
+ce que Figma Motion propose réellement (Config 2026 : bloom/glow,
+aberration chromatique, dithering, pixelisation, distorsion liquide,
+bruit fractal, moiré). 5 effets portés : bloom (seuil+flou+intensité),
+aberration chromatique (décalage radial RGB façon GPUDog), pixelate,
+dither (Bayer 4×4 ordonné), wave (distorsion sinusoïdale). Pipeline
+entièrement offscreen (jamais un GPUCanvasContext live — évite le piège
+de timing de présentation déjà rencontré sur reference-3d.js) : upload
+texture → passe fullscreen-triangle + shader fragment par effet → copie
+vers un buffer (avec le padding bytesPerRow à 256 octets qu'exige
+WebGPU) → PNG final baké dans le calque via `desR`, même format que
+save/load.
+**Bug réel trouvé (le plus retors de la session)** : mes premiers structs
+WGSL déclaraient leurs propres champs `f32` avant un `texel: vec2<f32>`
+(ex. `{blockPx, pad, pad2, texel}`). std140/WebGPU exige qu'un
+`vec2<f32>` démarre à un offset aligné sur 8 OCTETS — pour un nombre
+impair (ou pas multiple de 2) de `f32` précédents, le compilateur insère
+un padding SUPPLÉMENTAIRE que mon empaquetage JS générique (calculé
+depuis `Object.keys(params)`) ne prenait pas en compte. Aucune erreur de
+validation WebGPU ne remontait (`pushErrorScope('validation')` → null) —
+le rendu sortait juste entièrement transparent (0,0,0,0), silencieusement.
+Confirmé en isolant un buffer de test empaqueté à la main (fonctionnait)
+contre le même shader piloté par mon `packParams()` réel (ne fonctionnait
+pas). Corrigé en standardisant TOUS les effets sur un layout unique et
+sans ambiguïté : `struct Params { v: vec4<f32>, texel: vec4<f32> }` — un
+vec4 a une taille ET un alignement de 16 octets, donc aucun padding
+implicite possible.
+**Vérifié en direct, chaque effet avec une preuve géométrique/statistique
+distincte** (pas juste "ça n'a pas planté") :
+- Pixelate : bandes rouge/vert/bleu quantifiées EXACTEMENT sur les
+  frontières de bloc de 20px (transitions à x=60 et x=140 pile).
+- Aberration chromatique : bord du canal rouge déplacé de +25px
+  (66→91) par rapport à sa position d'origine.
+- Bloom : une transition dure (255→32) devient une rampe douce sur
+  ~8px (200,179,158,137,116,95,74,53) — largeur exacte du rayon demandé.
+- Dither : motif de damier Bayer 4×4 parfait (0/128 alternés) sur une
+  valeur choisie pile à cheval sur une frontière de quantification.
+- Wave : bord vertical oscillant entre x=46 et x=74 (amplitude ±14px,
+  proche des 15 demandés), période de 100px sur 200px de hauteur — pile
+  la fréquence=2 demandée, motif qui se répète identiquement à mi-hauteur.
+1 undo restaure les formes vectorielles d'origine dans tous les cas.
+
 Chaque candidat prototypé peut être adopté indépendamment : `git
 cherry-pick <commit>` sur `main`, puis décision UI (bouton Réglages,
 raccourci, intégration à l'outil). Pour les non-prototypés ci-dessus,
