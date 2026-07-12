@@ -20,6 +20,21 @@
 //   SMLabs.zoomTimelineIn()/Out()   — ×1.25 / ÷1.25 around current value
 //   SMLabs.resetTimelineZoom()      — back to the app's default (16px)
 //   Ctrl/Cmd + wheel over the timeline (while flag on) also zooms
+//
+// Custom scrollbar (feedback: "j'arrive à zoomer mais pas dézoomer [au
+// Ctrl+molette], la barre du bas... pourrait avoir un in/out point au
+// hover bleu que si on les drag ça permet d'ajuster le zoom aussi") —
+// same Premiere/Resolve pattern: drag the THUMB BODY to pan, drag either
+// EDGE to resize the thumb, which zooms (a wider thumb = more of the
+// timeline visible at once = smaller FC). #fg-wrap's native scrollbar
+// (`overflow:auto`) can't have custom handles injected into it — it's
+// hidden and replaced with a real DOM bar so the edges can be grabbed.
+// This also sidesteps the wheel-gesture bug entirely: it's a direct
+// mouse drag, not dependent on interpreting a trackpad/wheel deltaY sign
+// (isolated wheel-event testing found the zoom math itself symmetric in
+// both directions — the reported one-way failure looks gesture/OS-level,
+// not a logic bug — so a mouse-drag control is the more robust fix
+// regardless of that root cause).
 (function () {
   var KEY = 'nemo-labs-fc';
   var DEFAULT_FC = 16;
@@ -30,6 +45,7 @@
     if (typeof updatePlayhead === 'function') updatePlayhead();
     if (window.updateWaBar) window.updateWaBar();
     if (window.SMAudio && SMAudio.renderStrip) SMAudio.renderStrip();
+    redrawScrollbar();
   }
   function apply(px) {
     px = clamp(px);
@@ -38,6 +54,130 @@
     localStorage.setItem(KEY, String(px));
     refresh();
     return px;
+  }
+
+  // ---- custom zoom scrollbar ----
+  var hideNativeStyle = null, bar = null, thumb = null;
+  var EDGE_PX = 8, MIN_THUMB_PX = 20;
+
+  function wrapEl() { return document.getElementById('fg-wrap'); }
+  function totalContentWidth() { return Math.max(1, (state.totalFrames || 1) * window.FC); }
+
+  function redrawScrollbar() {
+    if (!bar) return;
+    var wrap = wrapEl();
+    if (!wrap) return;
+    var trackW = wrap.clientWidth;
+    var contentW = totalContentWidth();
+    var visRatio = Math.min(1, trackW / contentW);
+    var thumbW = Math.max(MIN_THUMB_PX, trackW * visRatio);
+    var maxScroll = Math.max(1, contentW - trackW);
+    var scrollRatio = Math.max(0, Math.min(1, wrap.scrollLeft / maxScroll));
+    var thumbLeft = scrollRatio * (trackW - thumbW);
+    bar.style.width = trackW + 'px';
+    thumb.style.width = thumbW + 'px';
+    thumb.style.left = thumbLeft + 'px';
+    // Fully zoomed out (everything visible, nothing to scroll) — thumb
+    // fills the track and dragging its body would have nothing to pan;
+    // dim it to communicate that instead of leaving a dead control.
+    thumb.classList.toggle('lbs-tlsb-full', visRatio >= 0.999);
+  }
+
+  function ensureScrollbar() {
+    if (bar) return;
+    var wrap = wrapEl();
+    if (!wrap) return;
+    hideNativeStyle = document.createElement('style');
+    hideNativeStyle.textContent =
+      '#fg-wrap{scrollbar-width:none;-ms-overflow-style:none;}' +
+      '#fg-wrap::-webkit-scrollbar{display:none;}' +
+      '#labs-tlscrollbar .lbs-tlsb-full{opacity:.35;}';
+    document.head.appendChild(hideNativeStyle);
+
+    bar = document.createElement('div');
+    bar.id = 'labs-tlscrollbar';
+    bar.style.cssText = 'position:absolute;left:0;bottom:0;height:10px;z-index:6;background:rgba(255,255,255,.04);border-radius:5px;overflow:visible;';
+    thumb = document.createElement('div');
+    thumb.style.cssText = 'position:absolute;top:0;height:10px;background:rgba(120,140,255,.35);border-radius:5px;cursor:grab;transition:background .1s;';
+    var leftHandle = document.createElement('div'), rightHandle = document.createElement('div');
+    [leftHandle, rightHandle].forEach(function (h, i) {
+      h.className = 'lbs-tlsb-handle';
+      h.style.cssText = 'position:absolute;top:0;width:' + EDGE_PX + 'px;height:10px;cursor:ew-resize;' + (i === 0 ? 'left:0;' : 'right:0;');
+      thumb.appendChild(h);
+    });
+    bar.appendChild(thumb);
+    wrap.appendChild(bar);
+
+    thumb.addEventListener('pointerenter', function () { thumb.style.background = 'rgba(74,158,255,.55)'; });
+    thumb.addEventListener('pointerleave', function () { if (!dragMode) thumb.style.background = 'rgba(120,140,255,.35)'; });
+
+    var dragMode = null; // 'pan' | 'zoom-left' | 'zoom-right'
+    var startX = 0, startScrollLeft = 0, startFC = 0, anchorContentX = 0;
+
+    function onDown(e, mode) {
+      e.stopPropagation(); e.preventDefault();
+      dragMode = mode;
+      startX = e.clientX;
+      var wrap2 = wrapEl();
+      startScrollLeft = wrap2.scrollLeft;
+      startFC = window.FC;
+      thumb.style.background = 'rgba(74,158,255,.75)';
+      // The content-space x-coordinate under the EDGE NOT being dragged —
+      // kept visually fixed while resizing, exactly like Premiere's
+      // timeline zoom-by-scrollbar-edge behavior.
+      var trackW = wrap2.clientWidth;
+      if (mode === 'zoom-left') anchorContentX = startScrollLeft + trackW; // right edge stays put
+      else if (mode === 'zoom-right') anchorContentX = startScrollLeft; // left edge stays put
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp);
+    }
+    function onMove(e) {
+      if (!dragMode) return;
+      var wrap2 = wrapEl();
+      var trackW = wrap2.clientWidth;
+      var dx = e.clientX - startX;
+      if (dragMode === 'pan') {
+        var contentW = totalContentWidth();
+        var maxScroll = Math.max(1, contentW - trackW);
+        var thumbW = Math.max(MIN_THUMB_PX, trackW * Math.min(1, trackW / contentW));
+        var scrollPerPx = maxScroll / Math.max(1, trackW - thumbW);
+        wrap2.scrollLeft = Math.max(0, Math.min(maxScroll, startScrollLeft + dx * scrollPerPx));
+        redrawScrollbar();
+        return;
+      }
+      // Zoom: dragging the right edge OUTWARD (dx>0) widens the thumb →
+      // more content fits in the same track width → ZOOM OUT (smaller
+      // FC). Dragging it inward zooms in. The left edge is the mirror.
+      var sign = dragMode === 'zoom-right' ? 1 : -1;
+      var newFC = clamp(startFC * trackW / Math.max(20, trackW + sign * dx * 4));
+      window.FC = newFC;
+      document.documentElement.style.setProperty('--fc', newFC + 'px');
+      // Re-anchor so the edge NOT being dragged stays visually still.
+      var newContentW = totalContentWidth();
+      if (dragMode === 'zoom-left') wrap2.scrollLeft = Math.max(0, Math.min(newContentW - trackW, anchorContentX - trackW));
+      else wrap2.scrollLeft = Math.max(0, Math.min(newContentW - trackW, anchorContentX));
+      refresh();
+    }
+    function onUp() {
+      if (!dragMode) return;
+      dragMode = null;
+      thumb.style.background = 'rgba(120,140,255,.35)';
+      localStorage.setItem(KEY, String(window.FC));
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    }
+    thumb.addEventListener('pointerdown', function (e) {
+      if (e.target === leftHandle) onDown(e, 'zoom-left');
+      else if (e.target === rightHandle) onDown(e, 'zoom-right');
+      else onDown(e, 'pan');
+    });
+    wrap.addEventListener('scroll', function () { if (!dragMode) redrawScrollbar(); });
+    window.addEventListener('resize', redrawScrollbar);
+    redrawScrollbar();
+  }
+  function teardownScrollbar() {
+    if (bar) { bar.remove(); bar = null; thumb = null; }
+    if (hideNativeStyle) { hideNativeStyle.remove(); hideNativeStyle = null; }
   }
 
   window.SMLabs.setTimelineZoom = function (px) {
@@ -64,16 +204,19 @@
 
   window.SMLabs.register('timeline-zoom', {
     flag: 'nemo-labs-tlzoom',
-    describe: 'Zoom de la timeline (TVPaint/Harmony/Premiere) : Ctrl/Cmd+molette au-dessus de la grille, ou SMLabs.setTimelineZoom(px)/zoomTimelineIn/Out/resetTimelineZoom — mute FC (JS) + --fc (CSS), les deux déjà lus en direct partout, aucun fichier core touché',
+    describe: 'Zoom de la timeline (TVPaint/Harmony/Premiere) : Ctrl/Cmd+molette au-dessus de la grille, scrollbar custom en bas (glisser le corps = pan, glisser un bord = zoom), ou SMLabs.setTimelineZoom(px)/zoomTimelineIn/Out/resetTimelineZoom — mute FC (JS) + --fc (CSS), les deux déjà lus en direct partout, aucun fichier core touché',
     onEnable: function () {
+      ensureScrollbar();
       var saved = parseInt(localStorage.getItem(KEY), 10);
       if (!isNaN(saved) && saved !== window.FC) apply(saved);
+      else redrawScrollbar();
     },
-    onDisable: function () { apply(DEFAULT_FC); },
+    onDisable: function () { apply(DEFAULT_FC); teardownScrollbar(); },
   });
   // Resume the saved zoom level after a page reload if the flag was left on.
   window.addEventListener('load', function () {
     if (!window.SMLabs.isOn('timeline-zoom')) return;
+    ensureScrollbar();
     var saved = parseInt(localStorage.getItem(KEY), 10);
     if (!isNaN(saved)) apply(saved);
   });
