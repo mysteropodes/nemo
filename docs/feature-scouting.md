@@ -89,6 +89,7 @@ contact avec le code de prod : UN hook gardé dans `draw-bridge.js`
 | `lipsync-assistant` (bouches par amplitude audio) | Moho/Toon Boom (version amplitude-only) | lipsync-assistant.js | WAV synthétique 4 quarts (silence/faible/fort/silence) → bouches fermée/mi/ouverte posées exactement sur les 48 frames correspondantes, aucune dépendance nouvelle (réutilise l'AudioBuffer déjà décodé par SMAudio) |
 | `clip-mask-bake` (masque de découpe BAKÉ) | Umoupen/CSP mask layer (version bakée, pas live — voir #1) | clip-mask-bake.js | intersection booléenne exacte (cercle 502796px² ∩ carré 160000px² = 160000px² pile), pipeline WASM/Paper existant réutilisé, calque masque supprimé, 1 undo restaure les 2 calques |
 | `french-curve` (gabarit courbe/ellipse aimanté) | SketchBook | french-curve.js | drag délibérément bruité (±20px aléatoire) → trait collé à l'ellipse (erreur de rayon normalisé max 0.00025), F seul sans drag ne crée rien, 1 undo |
+| `timeline-zoom` (zoom horizontal de la timeline) | TVPaint/Harmony/Premiere — standard universel | timeline-zoom.js | mute FC (JS, déjà global/live) + --fc (CSS custom prop, déjà lu partout) sans toucher un seul fichier core ; Ctrl+molette vérifié (40→37px), clic sur cellule à FC=40 atterrit sur la bonne frame (hit-test recalculé en direct), reset/disable ramènent à 16px |
 
 Bugs réels trouvés/corrigés pendant les protos (documentés dans les
 commits) : RDP dégénéré sur boucle fermée, cascade de promotion keyframe
