@@ -51,14 +51,25 @@ faisable en Labs comme post-process optionnel par calque.
 Clic-maintenu ouvre un menu circulaire avec les outils les plus utilisés
 autour du curseur. Pure UI/UX, faible risque, gain de vitesse à l'usage tablette.
 
-## Ce qui est prototypé maintenant
-- **Symétrie/Miroir** : nouveau fichier `src/js/labs/symmetry-mirror.js`,
-  activé uniquement via `Réglages → Labs → Symétrie de dessin` (flag
-  `localStorage['nemo-labs-symmetry']`, off par défaut). N'écrit dans aucun
-  fichier existant du pipeline de dessin — s'accroche en écoutant les strokes
-  fraîchement committés et ajoute une copie miroir, comme une action
-  utilisateur normale (passe par `pushUndo`/`ensureKeyframe` comme tout le
-  reste, donc undo/redo la traitent nativement).
+## Ce qui est prototypé (tous testés en live, tous off par défaut)
+
+Console : `SMLabs.list()` / `SMLabs.enable('nom')` / `SMLabs.disable('nom')`.
+Un fichier + un commit par prototype sous `src/js/labs/` ; seul point de
+contact avec le code de prod : UN hook gardé dans `draw-bridge.js`
+(commitStroke) + les balises `<script>` dans index.html.
+
+| Prototype | Source | Fichier | Vérifié |
+|---|---|---|---|
+| `symmetry` (miroir vertical) | SketchBook | symmetry-mirror.js | trait + miroir, 1 undo retire les 2 |
+| `radial-symmetry` (mandala 2-16 secteurs) | SketchBook | symmetry-mirror.js | 6 copies en couronne, 1 undo retire tout |
+| `predictive-stroke` (ligne/ellipse/rectangle parfaits) | SketchBook | predictive-stroke.js | cercle→ellipse 4 seg, ligne→2 pts, rect→4 coins ; chaîné avec symmetry, le miroir reflète la forme corrigée |
+| `multiframe-draw` (trait tamponné sur les frames sélectionnées) | Umoupen | multiframe-draw.js | 1 copie exacte par frame cible, promotion keyframe propre, 1 undo global |
+| `lagoon-menu` (menu radial d'outils sur Q) | SketchBook | lagoon-menu.js | ouverture au curseur, clic = switch d'outil, inerte dans les champs texte |
+| `pingpong-cycle` (cycle aller-retour A B C B A) | Callipeg | pingpong-cycle.js | action `SMLabs.pingpongCycle(n)` sur une plage sélectionnée ; séquence exacte, 1 undo |
+
+Bugs réels trouvés/corrigés pendant les protos (documentés dans les
+commits) : RDP dégénéré sur boucle fermée, cascade de promotion keyframe
+dans le tampon multi-frames, anchors simplifiés qui coupent les coins.
 
 ## Comment décider / trier plus tard
 Chaque candidat ci-dessus peut être prototypé indépendamment dans cette même
