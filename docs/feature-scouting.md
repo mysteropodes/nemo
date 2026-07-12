@@ -192,16 +192,42 @@ une ligne gardée), le gabarit lui-même en overlay type canvas-grid.
 Estimation : 2 jours, dont la moitié en tests perf stylet.
 **Valeur** : moyenne (public illustration plus qu'anim).
 
-### 6. Bones / smart bones / déformeurs (Moho), node view (Toon Boom)
-**Quoi** : rigging squelettal, déformations, contrôleurs.
-**Pourquoi pas en Labs — ni jamais en natif ?** : c'est un moteur
-d'animation entier. La position déjà prise par le projet (export Rive
-MCP, RiveBar) est la bonne réponse : Nemo dessine, **Rive rigge**. En
-réimplémentant Moho dans Nemo on perdrait sur les deux tableaux.
-**Par où commencer si le besoin se précise** : enrichir l'export Rive
-(les bones existent dans l'object model Rive, cf. mémoire « weight
-encoding / tendon transforms ») plutôt qu'un rig natif.
-**Valeur** : haute, mais à capturer via Rive, pas en interne.
+### 6. Bones / déformeurs — PROTOTYPÉ, inspiré de Shapper (pas Moho)
+**Quoi** : rig-deform.js. Un rig hiérarchie d'os classique (Moho/Toon
+Boom node view) reste hors scope — c'est un moteur d'animation entier,
+et la bonne réponse pour ÇA reste l'export Rive MCP existant (les bones
+existent dans l'object model Rive). MAIS le projet studio **Shapper**
+(extension After Effects maison, voir
+`04_Extension/Shapper/wiki/shapper-docs`) utilise un modèle radicalement
+différent, sans hiérarchie d'os du tout : des **points de contrôle**
+mobiles + un poids d'influence 0-100% par SOMMET de forme (calculé par
+proximité, éditable), la déformation = position de repos + Σ(poids ×
+delta du contrôle). C'est de l'arithmétique pure sur les données que
+Nemo a déjà (tableaux `segment.point`) — aucun moteur de skinning,
+aucune touche à `engine.rs`.
+**Fonctions portées de Shapper** (voir les docs sources citées dans les
+commentaires du fichier) : modèle repos+poids (how-it-works.md), poids
+auto par proximité (set-influences.md), IK 2-os à 3 points via loi des
+cosinus (ik-system.md), Magnet Brush à chute cosinus (magnet-brush.md),
+Autosway — **bakée** en vraies keyframes plutôt qu'une expression AE live
+(Nemo n'a pas de moteur d'expression runtime), même compromis que
+boil-effect/follow-path.
+**Vérifié en direct, chaque sous-système séparément** :
+- Poids pondérés : sommet à 0px d'un contrôle → poids 1 exact ; sommet à
+  100px (rayon 150) → poids 0.333 exact ; déplacer le contrôle final de
+  -100px déplace ce sommet de -100 (100%) et son voisin pondéré de -33
+  (33%) — les autres restent parfaitement fixes.
+- IK : chaîne root/joint/end (L1=L2=200), cible à 300px du root → angle
+  du joint recalculé par loi des cosinus, root resté fixe, résultat
+  vérifié par calcul indépendant (concordance à l'arrondi près).
+- Magnet Brush : chute cosinus exacte (centre -60, voisin à 50px -30,
+  bord à 100px 0), 1 undo restaure tout.
+- Autosway : cycle sinusoïdal complet sur 24 frames à 1Hz/24fps —
+  échantillons à sin(0)=960, sin(π/2)=990, sin(π)=960, sin(3π/2)=930,
+  tous exacts.
+**Valeur** : haute — c'est un vrai système de rigging vectoriel natif,
+zéro dépendance moteur, qui colle à l'ADN 100% vectoriel de Nemo mieux
+qu'un import de rig Moho ne l'aurait fait.
 
 ### 7. Brosses animées / moteur de brosses bitmap (TVPaint, CSP)
 **Quoi** : pointes de brosse bitmap, brosses multi-images, mélange humide.
