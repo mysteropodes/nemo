@@ -247,13 +247,26 @@ en Labs (~1 jour). Gardé hors scope aujourd'hui uniquement par prudence
 sur la lecture des buffers SMAudio.
 **Valeur** : haute en démo, moyenne en prod (l'amplitude seule est grossière).
 
-### 10. Interchange X-sheet (XDTS/OCA — Callipeg, TVPaint, pipeline japonais)
-**Quoi** : import/export du timing au format feuille d'expo standard.
-**Pourquoi pas en Labs** : purement data-level DONC faisable — mais sans
-un vrai cas d'usage (studio en face qui consomme le XDTS), c'est du
-format-guessing. À prototyper le jour où un partenaire pipeline le
-demande, contre ses fichiers réels.
-**Valeur** : nulle sans partenaire, haute avec.
+### 10. Interchange OCA/XDTS (Callipeg, TVPaint) — PROTOTYPÉ (scope réaliste)
+**Quoi** : oca-export.js. `SMLabs.exportOCA({range})` télécharge un vrai
+`.zip` — séquence PNG (une image par frame, rendu direct depuis la scène
+Paper live) + `manifest.json` (fps, taille canvas, keyframes par calque).
+**Scope assumé, pas caché** : "OCA-inspiré", pas le schéma OCA complet
+(pas de dossier par calque, pas de XML de timeline) — sans studio
+partenaire pour valider contre de vrais fichiers XDTS/OCA, reproduire le
+schéma exact serait du format-guessing. Ce qui EST livré est la partie
+universellement utile de n'importe quel interchange de ce type : images
++ timing, dans un conteneur standard.
+**Le vrai morceau de chantier** : écrire un ZIP conforme SANS dépendance
+JS — implémenté à la main (CRC32 table-based, en-têtes locaux + répertoire
+central + EOCD selon la spec PKZIP, méthode STORE non compressée).
+**Vérifié en direct** (décodage manuel du zip produit, octet par octet) :
+signature EOCD correcte (0x06054b50), 5 entrées (4 PNG + manifest),
+signature de premier en-tête local correcte (0x04034b50), signature PNG
+valide sur le premier fichier, **CRC32 stocké identique au CRC32
+recalculé** sur les données extraites (preuve que le zip est
+structurellement correct, pas juste "a la bonne taille") ; manifest.json
+relu et parsé : fps/dimensions/keyframes tous exacts.
 
 ## Comment décider / trier plus tard
 Chaque candidat prototypé peut être adopté indépendamment : `git
