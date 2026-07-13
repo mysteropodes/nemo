@@ -277,18 +277,17 @@ attendue ; 1 undo restaure exactement l'état d'origine dans les deux cas.
 **Valeur** : basse pour la cible actuelle (anim > manga), mais l'algo de
 classification est réutilisable pour tout futur besoin de pattern-fill.
 
-### 9. Auto lip-sync (Moho, Toon Boom)
-**Quoi** : générer les bouches depuis la piste audio.
-**Pourquoi pas (encore)** : l'analyse audio (amplitude/phonèmes) est un
-chantier en soi. MAIS les deux briques Labs nécessaires existent
-désormais : `pose-library` (kit de bouches) + la piste audio SMAudio.
-**Par où commencer** : un Labs `lipsync-assistant` qui lit l'amplitude
+### 9. Auto lip-sync (Moho, Toon Boom) — PROTOTYPÉ (version amplitude-only)
+**Quoi** : `lipsync-assistant.js` (voir tableau ligne 89) — lit l'amplitude
 RMS par frame (SMAudio a déjà les waveforms) et tamponne
-bouche-ouverte/mi-ouverte/fermée via stampPose — PAS de phonèmes, juste
-l'amplitude. C'est le seul de cette liste qui pourrait finalement passer
-en Labs (~1 jour). Gardé hors scope aujourd'hui uniquement par prudence
-sur la lecture des buffers SMAudio.
-**Valeur** : haute en démo, moyenne en prod (l'amplitude seule est grossière).
+bouche-ouverte/mi-ouverte/fermée via `stampPose` (réutilise `pose-library`).
+PAS de phonèmes, juste l'amplitude — analyse phonème-par-phonème reste un
+chantier séparé si un jour demandé.
+**Vérifié en direct** : WAV synthétique 4 quarts (silence/faible/fort/silence)
+→ bouches fermée/mi/ouverte posées exactement sur les 48 frames
+correspondantes, aucune dépendance nouvelle.
+**Valeur** : haute en démo, moyenne en prod (l'amplitude seule est grossière —
+un vrai moteur phonème serait le prochain palier si demandé).
 
 ### 10. Interchange OCA/XDTS (Callipeg, TVPaint) — PROTOTYPÉ (scope réaliste)
 **Quoi** : oca-export.js. `SMLabs.exportOCA({range})` télécharge un vrai
@@ -376,9 +375,15 @@ distincte** (pas juste "ça n'a pas planté") :
 
 Chaque candidat prototypé peut être adopté indépendamment : `git
 cherry-pick <commit>` sur `main`, puis décision UI (bouton Réglages,
-raccourci, intégration à l'outil). Pour les non-prototypés ci-dessus,
-l'ordre de valeur suggéré : masques (#1) → effets par calque (#2) →
-lip-sync amplitude (#9) → French curve (#5), le reste sur demande.
+raccourci, intégration à l'outil).
+
+**Ce qui reste réellement non développé** (les 3 seuls items du chapitre
+"Volontairement NON prototypé" jamais touchés — tout le reste de ce
+chapitre a depuis été prototypé, voir les mentions "— PROTOTYPÉ" dans
+les titres) : masques/clipping live (#1, touche `engine.rs`, 2-3j) →
+French curve avec snap PENDANT le tracé (#5, touche la boucle
+`pointermove` de draw-bridge.js, ~2j) → brosses bitmap animées (#7,
+volontairement hors scope tant que "brush diversity" n'est pas fait).
 
 ## QA croisée entre prototypes (2026-07-13)
 
