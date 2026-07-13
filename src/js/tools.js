@@ -1366,6 +1366,19 @@ function fillVectorFindWasm(clickPt,gapThr,layer,excludePath,onlyIds){
 // gapThr (even gapThr=0 finds crossing-bounded loops); the escalation is
 // only needed for genuine endpoint-to-endpoint gaps.
 var FILL_GAP_STEPS=[0,10,24,48,90,160,280];
+// Floor below which a candidate is pure numerical noise (a near-tangent
+// crossing sampled to a ~0-area sliver), never a real region a user could
+// have meant to click. Confirmed live (fb_mrj7byvu_913273): a click near a
+// small closed detail (an ear/curl bump on a long hand-drawn outline)
+// produced a real, on-canvas but nearly-invisible fill with area -95 —
+// the "smallest area wins" comparison below has no lower bound, so a
+// degenerate candidate this small can beat the correct, larger region the
+// user actually meant. NOTE: this floor alone does not filter that exact
+// -95px² case (95 > 4) — it only guards the true sub-pixel noise floor.
+// The -95 sliver itself needs a proper root-cause fix (likely in how
+// build_graph/fill.rs represents a near-tangent self-crossing), not yet
+// found — see the commit message for what was and wasn't verified.
+var FILL_MIN_AREA=4;
 // Does NOT stop at the first gap threshold that finds any closed loop —
 // real curve-curve CROSSINGS are found regardless of gapThr (see
 // _computeExactCrossings), so an unrelated stray stroke that merely
@@ -1418,6 +1431,11 @@ function fillVectorFind(clickPt,layer,excludePath,maxGapThr,onlyIds){
       catch(e){wasmFailed=true;console.warn('[geometry-wasm] fill_find failed, falling back to JS',e);}
     }
     if(!res&&(!wasmAvailable||wasmFailed))res=fillVectorFindJS(clickPt,gapThr,layer,excludePath,onlyIds);
+    if(res&&Math.abs(res.path.area)<FILL_MIN_AREA){
+      // Degenerate sliver (self-crossing noise) — not a real candidate.
+      // Discard and keep escalating instead of letting it win by default.
+      res.path.remove();res=null;
+    }
     if(res){
       var area=Math.abs(res.path.area);
       if(area<bestArea){
