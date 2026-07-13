@@ -14,17 +14,37 @@
 // Runtime-only fields (_video/_seekBusy/_imgCache/_dims) are stripped by
 // exportJSON's explicit mapping, same convention as audio tracks.
 //
-// Video sync: an HTMLVideoElement seeked to (frame - offsetFrames)/fps on
-// every loadFrame; 'seeked' fires async, the decoded picture is drawn to an
-// offscreen canvas and (re)uploaded to the engine under ONE fixed image id
-// ('ref:video') — engine-side the upload replaces the cached texture, so GPU
-// memory stays a single frame regardless of video length. Playback rides the
-// same hook (loadFrame runs per played frame); if decoding can't keep up the
-// reference simply lags a frame or two behind — the drawing layers never do.
+// Video sync (type:'video', browser-preview import only): an HTMLVideoElement
+// seeked to (frame - offsetFrames)/fps on every loadFrame; 'seeked' fires
+// async, the decoded picture is drawn to an offscreen canvas and (re)uploaded
+// to the engine under ONE fixed image id ('ref:video') — engine-side the
+// upload replaces the cached texture, so GPU memory stays a single frame
+// regardless of video length. Playback rides the same hook (loadFrame runs
+// per played frame); if decoding can't keep up the reference simply lags a
+// frame or two behind — the drawing layers never do.
+//
+// Under Tauri, video import instead goes through importViaDialog ->
+// decodeReferenceVideoFfmpeg and lands as type:'imageseq' — pre-decoded PNG
+// frames (alpha preserved via -pix_fmt rgba), not a live <video> element at
+// all. This is deliberate (2026-07, "rust pourrait pas avoir un moteur de
+// lecture vidéo"): the webview's <video> tag can't decode ProRes or most
+// alpha-video codecs and has no reliable failure signal (see
+// verifyVideoDecodable's comment below) — routing through the ffmpeg
+// sidecar fixes both the codec ceiling and the alpha flattening, at the
+// cost of a pre-decode pass instead of live scrubbing (same trade-off
+// already accepted for imported video LAYERS, see images.js).
 (function () {
   var REF_VIDEO_ID = 'ref:video';
 
   function ref() { return state.refMedia || null; }
+  function tauriOk() { return typeof window.__TAURI__ !== 'undefined'; }
+  function extOf(name) { var m = /\.([^.]+)$/.exec(name); return m ? m[1].toLowerCase() : ''; }
+  function baseName(path) { var parts = path.split(/[\\/]/); return parts[parts.length - 1]; }
+  function bytesToBase64(bytes) {
+    var binary = '', chunk = 0x8000;
+    for (var i = 0; i < bytes.length; i += chunk) binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+    return btoa(binary);
+  }
 
   // ---- media loading ----
   function ensureVideo(r) {
@@ -174,14 +194,39 @@
     if (r) syncToFrame(state.currentFrame, true);
     bumpScene();
   }
+  // Browser-only fallback path (see importViaDialog below for the Tauri/
+  // ffmpeg path, which is what actually reads ProRes/alpha and can't hang).
+  // Confirmed live (2026-07, "lecteur de footage... sauter des images"
+  // follow-up): an undecodable file DOES fire a real 'error' on the video
+  // element (MEDIA_ELEMENT_ERROR), but nothing here used to listen for it —
+  // metadata never arrived, refMedia stayed set to a permanently blank
+  // video, no toast, no way out short of hitting "Retirer" blind. A 4s
+  // watchdog races 'loadedmetadata'/'error' exactly like startSeek's own
+  // watchdog below, so an unsupported codec degrades to a toast instead of
+  // a silent forever-hang.
+  function verifyVideoDecodable(src) {
+    return new Promise(function (resolve) {
+      var v = document.createElement('video');
+      var settled = false;
+      function done(ok) { if (settled) return; settled = true; clearTimeout(watchdog); resolve(ok); }
+      v.addEventListener('loadedmetadata', function () { done(true); }, { once: true });
+      v.addEventListener('error', function () { done(false); }, { once: true });
+      var watchdog = setTimeout(function () { done(false); }, 4000);
+      v.src = src;
+    });
+  }
   function importFiles(files) {
     if (!files.length) return;
     var f0 = files[0];
     if (f0.type.indexOf('video/') === 0) {
       var rd = new FileReader();
       rd.onload = function (ev) {
-        setRef({ type: 'video', name: f0.name, src: ev.target.result, opacity: 0.5, visible: true, offsetFrames: 0 });
-        if (ev.target.result.length > 12 * 1024 * 1024) showToast('Vidéo volumineuse : sera incluse dans le fichier projet');
+        var dataUrl = ev.target.result;
+        verifyVideoDecodable(dataUrl).then(function (ok) {
+          if (!ok) { showToast('Vidéo non lisible (codec non supporté par le navigateur) — essayez "Importer…" en app pour le décodage ffmpeg'); return; }
+          setRef({ type: 'video', name: f0.name, src: dataUrl, opacity: 0.5, visible: true, offsetFrames: 0 });
+          if (dataUrl.length > 12 * 1024 * 1024) showToast('Vidéo volumineuse : sera incluse dans le fichier projet');
+        });
       };
       rd.readAsDataURL(f0);
       return;
@@ -202,6 +247,82 @@
       if (urls.length === 1) setRef({ type: 'image', name: imgs[0].name, src: urls[0], opacity: 0.5, visible: true, offsetFrames: 0 });
       else setRef({ type: 'imageseq', name: imgs[0].name + ' (+' + (urls.length - 1) + ')', frames: urls, opacity: 0.5, visible: true, offsetFrames: 0 });
     });
+  }
+
+  // ffmpeg-sidecar decode for the reference video (Tauri-only — mirrors
+  // images.js's decodeVideoFramesFfmpeg for the layer-import path, reusing
+  // export.js's temp-dir/ffmpeg-invoke globals). This is the ONLY reference
+  // path that can read a codec the webview's <video> element can't (ProRes,
+  // etc. — the format ceiling here is "whatever this ffmpeg build
+  // supports"), and the only one that preserves alpha: `-pix_fmt rgba`
+  // forces an alpha channel into every output PNG (harmless, alpha=255, for
+  // an opaque source; real per-pixel alpha for ProRes 4444 and similar).
+  // Frames become an 'imageseq' refMedia — same robust, already-tested path
+  // static image sequences use, deliberately NOT 'video': no <video>
+  // element, no seek/watchdog machinery, no way to hang.
+  async function decodeReferenceVideoFfmpeg(path) {
+    showToast('Décodage de la référence vidéo (ffmpeg)…');
+    var tmp = window.exportTempDirPath ? await exportTempDirPath() : null;
+    var workDir = (tmp || '') + 'sm-ref-video-' + Date.now();
+    await exportMkdir(workDir);
+    try {
+      await exportRunFfmpeg(['-y', '-i', path, '-vf', 'fps=' + Math.max(1, state.fps), '-frames:v', '999', '-pix_fmt', 'rgba', workDir + '/frame_%04d.png']);
+      var frames = [];
+      for (var i = 1; i <= 999; i++) {
+        var framePath = workDir + '/frame_' + String(i).padStart(4, '0') + '.png';
+        var bytes;
+        try { bytes = await window.__TAURI__.fs.readFile(framePath); } catch (e) { break; }
+        frames.push('data:image/png;base64,' + bytesToBase64(bytes));
+      }
+      if (!frames.length) throw new Error('ffmpeg n’a produit aucune image — format non décodable');
+      return frames;
+    } finally {
+      await exportRemoveDir(workDir);
+    }
+  }
+  var VIDEO_EXTS = { mp4: 1, mov: 1, webm: 1, m4v: 1, ogv: 1, mkv: 1, avi: 1, flv: 1, wmv: 1, mts: 1, m2ts: 1, '3gp': 1, mpg: 1, mpeg: 1, vob: 1, ts: 1 };
+  async function readPathAsDataUrl(path) {
+    var bytes = await window.__TAURI__.fs.readFile(path);
+    var ext = extOf(path);
+    var mime = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp' }[ext] || 'image/png';
+    return 'data:' + mime + ';base64,' + bytesToBase64(bytes);
+  }
+  // Native file dialog (Tauri only) — gives a real filesystem path, which
+  // decodeReferenceVideoFfmpeg needs (the ffmpeg sidecar reads from disk,
+  // not from a <input type=file> File object). Browser preview keeps using
+  // importFiles/ref-file-input above, which has no sidecar to route through.
+  async function importViaDialog() {
+    var paths = await window.__TAURI__.dialog.open({
+      title: 'Importer une référence',
+      multiple: true,
+      filters: [
+        { name: 'Vidéos', extensions: Object.keys(VIDEO_EXTS) },
+        { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'] },
+        { name: 'Tous les fichiers', extensions: ['*'] },
+      ],
+    });
+    if (!paths) return;
+    var list = Array.isArray(paths) ? paths : [paths];
+    var ext = extOf(list[0]);
+    if (VIDEO_EXTS[ext]) {
+      if (list.length > 1) showToast('Une seule vidéo à la fois — la première sera utilisée');
+      try {
+        var frames = await decodeReferenceVideoFfmpeg(list[0]);
+        setRef({ type: 'imageseq', name: baseName(list[0]), frames: frames, opacity: 0.5, visible: true, offsetFrames: 0 });
+        showToast('Référence vidéo importée : ' + frames.length + ' images (alpha préservé)');
+      } catch (e) {
+        showToast('Vidéo non lisible : ' + e.message);
+      }
+      return;
+    }
+    try {
+      var urls = [];
+      for (var i = 0; i < list.length; i++) urls.push(await readPathAsDataUrl(list[i]));
+      if (urls.length === 1) setRef({ type: 'image', name: baseName(list[0]), src: urls[0], opacity: 0.5, visible: true, offsetFrames: 0 });
+      else setRef({ type: 'imageseq', name: baseName(list[0]) + ' (+' + (urls.length - 1) + ')', frames: urls, opacity: 0.5, visible: true, offsetFrames: 0 });
+    } catch (e) {
+      showToast('Import référence échoué : ' + e.message);
+    }
   }
 
   // ---- panel UI sync ----
@@ -227,7 +348,7 @@
     var btn = document.getElementById('btn-ref-import');
     var input = document.getElementById('ref-file-input');
     if (btn && input) {
-      btn.addEventListener('click', function () { input.click(); });
+      btn.addEventListener('click', function () { if (tauriOk()) importViaDialog(); else input.click(); });
       input.addEventListener('change', function (e) { importFiles(e.target.files); e.target.value = ''; });
     }
     var on = document.getElementById('p-ref-on');
