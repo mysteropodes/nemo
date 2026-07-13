@@ -1752,6 +1752,10 @@ var BRUSH_PRESETS={
   // Existing presets keep their historical 'uniform' spread untouched.
   'airbrush-soft':   {nibSize:.9, roundness:1,  spacing:.3, spaceJitter:.3, rotationMode:'random',rotationJitter:180,sizeJitter:.4, opacity:.18,opacityJitter:.3, scatter:1.6,dashGap:0, scatterDistribution:'normal'},
   'marker-dry':      {nibSize:1.1,roundness:.6, spacing:.35,spaceJitter:.2, rotationMode:'tangent',rotationJitter:12, sizeJitter:.25,opacity:.5, opacityJitter:.25,scatter:.5, dashGap:0, scatterDistribution:'edge'},
+  // Scribble-fill tip (tipShape:'scribble', buildBrushDabs above) — a woven
+  // patch of short independently-angled marks instead of a line of blobs,
+  // the graphite/charcoal "scribbled shading" look from the reference pack.
+  'graphite-scribble':{nibSize:1.4,roundness:1,  spacing:.5, spaceJitter:.25,rotationMode:'tangent',rotationJitter:0, sizeJitter:0,   opacity:.5, opacityJitter:.3, scatter:0,   dashGap:0, tipShape:'scribble',scribbleCount:9,scribbleLen:1.5,scribbleLenJitter:.4,scribbleWidth:.1,scribbleSpread:.7,scribbleAngleSpread:75},
 };
 // Hard ceiling on dabs per stroke, regardless of preset/length — protects
 // against a very long stroke with tight spacing multiplying scene-
@@ -1963,11 +1967,13 @@ function buildBrushDabs(pathLike,preset,baseWidth,rng,widthProfile){
   if(widthProfile&&widthProfile.length)minWidth=widthProfile.reduce(function(m,p){return Math.min(m,p.width);},baseWidth);
   var minNibDiam=Math.max(.5,minWidth*nibScale);
   var minAllowedSpacing=Math.max(.4,minNibDiam*spacingFrac);
-  // Bristle tips emit several sub-strands PER stamp position (see below) —
-  // divide the position budget by that count up front so total emitted
-  // dabs still respects BRUSH_MAX_DABS regardless of tip shape.
+  // Bristle/scribble tips emit several sub-marks PER stamp position (see
+  // below) — divide the position budget by that count up front so total
+  // emitted dabs still respects BRUSH_MAX_DABS regardless of tip shape.
   var bristleCount=preset.tipShape==='bristle'?Math.max(1,preset.bristleCount||5):1;
-  var maxPositions=Math.max(1,Math.floor(BRUSH_MAX_DABS/bristleCount));
+  var scribbleCount=preset.tipShape==='scribble'?Math.max(1,preset.scribbleCount||8):1;
+  var perPositionCount=Math.max(bristleCount,scribbleCount);
+  var maxPositions=Math.max(1,Math.floor(BRUSH_MAX_DABS/perPositionCount));
   // Cap-safety compression (task #106: a long stroke at a tiny fixed pitch
   // blows through BRUSH_MAX_DABS) — ONLY kicks in when the stroke would
   // actually need more than maxPositions dabs at its own natural spacing
@@ -2007,7 +2013,39 @@ function buildBrushDabs(pathLike,preset,baseWidth,rng,widthProfile){
       if(preset.rotationMode==='random')angleBase=rand()*360;
       else if(preset.rotationMode==='fixed')angleBase=preset.fixedAngle||0;
       else angleBase=tan.angle; // 'tangent' (default): dab follows stroke direction, like a real angled nib
-      if(preset.tipShape==='bristle'){
+      if(preset.tipShape==='scribble'){
+        // Graphite/charcoal scribble-fill — the reference-image texture
+        // that's a woven PATCH of short, independently-angled hatching
+        // marks, not a line of discrete blobs/strands like every other tip
+        // shape here. Structurally different from 'bristle' (which offsets
+        // PARALLEL strands across the width, all at the same angle): each
+        // scribble mark gets its OWN random angle within a wide spread AND
+        // its own 2D jitter (along AND across the path, not just across),
+        // so marks genuinely cross over each other the way a hand-scribbled
+        // patch of shading does. Built as real vector capsules (a fully-
+        // rounded thin rectangle), never a raster texture.
+        var scrCount=Math.max(1,preset.scribbleCount||8);
+        var scrLen=(preset.scribbleLen!==undefined?preset.scribbleLen:1.4)*nibDiam;
+        var scrLenJit=preset.scribbleLenJitter!==undefined?preset.scribbleLenJitter:.4;
+        var scrW=Math.max(.25,(preset.scribbleWidth!==undefined?preset.scribbleWidth:.12)*nibDiam);
+        var scrSpread=(preset.scribbleSpread!==undefined?preset.scribbleSpread:.6)*nibDiam;
+        var scrAngleSpread=preset.scribbleAngleSpread!==undefined?preset.scribbleAngleSpread:70;
+        for(var sc=0;sc<scrCount&&dabs.length<BRUSH_MAX_DABS;sc++){
+          var jAlong=(rand()*2-1)*scrSpread,jAcross=(rand()*2-1)*scrSpread;
+          var markCenter=pt.add(tan.multiply(jAlong)).add(normal.multiply(jAcross));
+          var markLen=Math.max(.4,scrLen*(1+(rand()*2-1)*scrLenJit));
+          var markAngle=angleBase+(rand()*2-1)*scrAngleSpread;
+          var mark=new Path.Rectangle({point:[-markLen/2,-scrW/2],size:[markLen,scrW],radius:scrW/2,insert:false});
+          mark.rotate(markAngle);
+          mark.position=markCenter;
+          // *.6 — many overlapping marks build tone through overlap (how
+          // real scribbling gets darker), not through each mark being
+          // opaque on its own; a full-opacity mark here would read as one
+          // solid stripe instead of a woven texture.
+          mark.data={dabOpacity:Math.max(0,Math.min(1,(preset.opacity!==undefined?preset.opacity:.5)*(1+(rand()*2-1)*(preset.opacityJitter||0))*.6))};
+          dabs.push(mark);
+        }
+      }else if(preset.tipShape==='bristle'){
         // Dry-brush / watercolor-edge look: several thin parallel strands
         // fanned across the stroke width instead of one solid dab — the
         // thing a single ellipse (however deformed) structurally cannot

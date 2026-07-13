@@ -22,6 +22,17 @@
     { key: 'edgeNoise', label: 'Bord irrégulier', min: 0, max: 0.4, step: 0.02 },
     { key: 'polySides', label: 'Côtés (polygone)', min: 3, max: 10, step: 1 },
     { key: 'bristleCount', label: 'Nb. de poils (bristle)', min: 2, max: 12, step: 1 },
+    // Scribble-fill (tipShape:'scribble') — a woven patch of short,
+    // independently-angled hatching marks per stamp position instead of one
+    // blob, the graphite/charcoal "scribbled shading" look. Only meaningful
+    // for that tip shape, same as polySides/bristleCount above are only
+    // meaningful for theirs — shown always, like those, for consistency.
+    { key: 'scribbleCount', label: 'Nb. de traits (scribble)', min: 2, max: 20, step: 1 },
+    { key: 'scribbleLen', label: 'Longueur trait (scribble)', min: 0.4, max: 3, step: 0.1 },
+    { key: 'scribbleLenJitter', label: 'Var. longueur (scribble)', min: 0, max: 1, step: 0.05 },
+    { key: 'scribbleWidth', label: 'Épaisseur trait (scribble)', min: 0.02, max: 0.4, step: 0.01 },
+    { key: 'scribbleSpread', label: 'Étalement patch (scribble)', min: 0.1, max: 2, step: 0.05 },
+    { key: 'scribbleAngleSpread', label: 'Var. angle ° (scribble)', min: 0, max: 180, step: 5 },
   ];
   var TIP_SHAPES = [
     { value: 'ellipse', label: 'Ellipse (rond déformé)' },
@@ -29,9 +40,10 @@
     { value: 'polygon', label: 'Polygone (chip anguleux)' },
     { value: 'splatter', label: 'Éclaboussure' },
     { value: 'bristle', label: 'Poils (dry-brush)' },
+    { value: 'scribble', label: 'Gribouillis (graphite/fusain)' },
     { value: 'custom', label: 'Personnalisé (dessiné)…' },
   ];
-  var DEFAULT_PARAMS = { nibSize: 1, roundness: 0.9, spacing: 0.4, spaceJitter: 0.2, rotationMode: 'tangent', rotationJitter: 20, sizeJitter: 0.2, opacity: 0.6, opacityJitter: 0.2, scatter: 0.15, dashGap: 0, tipShape: 'ellipse', edgeNoise: 0, polySides: 5, bristleCount: 5, tipCorner: 0.15 };
+  var DEFAULT_PARAMS = { nibSize: 1, roundness: 0.9, spacing: 0.4, spaceJitter: 0.2, rotationMode: 'tangent', rotationJitter: 20, sizeJitter: 0.2, opacity: 0.6, opacityJitter: 0.2, scatter: 0.15, dashGap: 0, tipShape: 'ellipse', edgeNoise: 0, polySides: 5, bristleCount: 5, tipCorner: 0.15, scribbleCount: 8, scribbleLen: 1.4, scribbleLenJitter: 0.4, scribbleWidth: 0.12, scribbleSpread: 0.6, scribbleAngleSpread: 70 };
 
   function closePopover() {
     if (!popover) return;
