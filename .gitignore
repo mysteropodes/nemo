@@ -19,3 +19,14 @@ geometry-wasm/target/
 # Re-run `wasm-pack build --target web --out-dir ../src/wasm` from
 # geometry-wasm/ after any change to geometry-wasm/src/.
 .feedback
+
+# Design handoff mockups / ad-hoc screenshots / local backups — working
+# reference material, not part of the app itself. Excluded from the
+# collaboration repo (2026-07) to keep it scoped to source code.
+/backups/
+/design/
+/design-v2/
+/design-v3/
+/design-v4/
+/docs/
+*.zip
