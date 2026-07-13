@@ -40,10 +40,24 @@
     bar.style.width = Math.max(FC, (outF - inF + 1) * FC) + 'px';
     var custom = hasCustomRange(ld);
     bar.classList.toggle('full-range', !custom);
-    bar.style.background = hexToRgba(ld.color, custom ? 0.55 : 0.3);
-    bar.style.borderColor = hexToRgba(ld.color, custom ? 0.95 : 0.55);
+    // Layer-color tint ONLY on a genuinely trimmed range — feedback: the
+    // full-range (untouched, the overwhelming common case) bar tinting
+    // EVERY layer's row with its own color made Animation 2D's whole
+    // timeline "look nothing like before" at a glance, since that neutral
+    // barely-visible strip is what every layer showed pre-in/out-point-
+    // feature too. Reverting to the CSS .full-range default (plain white,
+    // style.css) for that case — only a layer that's actually trimmed
+    // (manually or via the blank-keyframe auto-detect) gets its own color,
+    // exactly the "stands out because it's different" signal intended.
+    if (custom) {
+      bar.style.background = hexToRgba(ld.color, 0.55);
+      bar.style.borderColor = hexToRgba(ld.color, 0.95);
+    } else {
+      bar.style.background = '';
+      bar.style.borderColor = '';
+    }
     var handles = bar.querySelectorAll('.layer-inout-handle');
-    for (var h = 0; h < handles.length; h++) handles[h].style.background = ld.color || '';
+    for (var h = 0; h < handles.length; h++) handles[h].style.background = custom ? (ld.color || '') : '';
     // Animation 2D's per-frame .fc cells (Motion mode's collapsed spacer row
     // has none — nothing to dim there, the bar alone is enough context).
     var cells = row.querySelectorAll('.fc');
