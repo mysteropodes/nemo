@@ -523,6 +523,7 @@
         window._motionExpandedLayer = expanded ? null : li;
         _propFilter = null; // fresh "show all" every time the expanded layer changes
         window._motionExpandedElement = null;
+        setKeySel([]);
         state.activeLayerIdx = li;
         renderLayerList(); renderTimeline();
         if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
@@ -637,6 +638,11 @@
   function trackRowHtml(ld, prop, rowEl) {
     rowEl.innerHTML = '';
     rowEl.style.position = 'relative';
+    // Tagged directly on the element (plain JS properties, not a WeakMap —
+    // simplest way for the marquee-select code below to recover "which
+    // holder/prop does this row belong to" from a DOM hit-test without
+    // threading extra state through render calls).
+    rowEl._smHolder = ld; rowEl._smProp = prop;
     var track = ld.motion && ld.motion[prop];
     var w = state.totalFrames * FC;
     var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -666,13 +672,28 @@
       var k = track ? keyAt(track, fi) : null;
       if (k) {
         var dia = document.createElement('div');
-        dia.className = 'motion-key' + (fi === state.currentFrame ? ' cur' : '');
+        dia.className = 'motion-key' + (fi === state.currentFrame ? ' cur' : '') + (isKeySelected(ld, prop, k) ? ' sel' : '');
         c.appendChild(dia);
       }
       (function (frameIdx, key) {
         c.addEventListener('mousedown', function (e) {
           e.stopPropagation();
-          if (key) { window._motionKeyDrag = { ld: ld, prop: prop, key: key, startX: e.clientX, startFrame: key.frame }; }
+          if (key) {
+            // Dragging a key that's already part of a multi-selection moves
+            // the WHOLE group together, one frame-delta shared by all of
+            // them; grabbing an unselected key resets the selection to just
+            // that one (matches marquee-select's own "click empty = clear"
+            // convention below).
+            pushUndo();
+            if (isKeySelected(ld, prop, key)) {
+              window._motionKeyDrag = { group: true, startX: e.clientX, keys: _motionKeySel.slice() };
+            } else {
+              setKeySel([{ holder: ld, prop: prop, key: key }]);
+              window._motionKeyDrag = { ld: ld, prop: prop, key: key, startX: e.clientX, startFrame: key.frame };
+            }
+          } else {
+            startMarquee(e);
+          }
           goToFrame(frameIdx);
         });
         c.addEventListener('contextmenu', function (e) {
@@ -730,12 +751,90 @@
       }
     });
   }
+  // ---- multi-select (marquee rectangle) + group drag ----
+  // AE/Skew Pro convention: drag a selection rectangle over the keyframe
+  // grid to select several keys across one or more property tracks at
+  // once (position/rotation/scale/... — layer OR element tracks, doesn't
+  // matter which), then drag any ONE of the selected diamonds to retime
+  // the whole group together by the same frame delta.
+  var _motionKeySel = []; // [{holder, prop, key}]
+  function isKeySelected(holder, prop, key) {
+    return _motionKeySel.some(function (s) { return s.holder === holder && s.prop === prop && s.key === key; });
+  }
+  function setKeySel(sel) { _motionKeySel = sel; }
+  var _motionMarquee = null; // {startX, startY, rectEl, moved}
+  function startMarquee(e) {
+    var rect = document.createElement('div'); rect.className = 'motion-marquee-rect';
+    document.body.appendChild(rect);
+    _motionMarquee = { startX: e.clientX, startY: e.clientY, rectEl: rect, moved: false };
+  }
+  function applyMarqueeSelection(x0, y0, x1, y1) {
+    var sel = [];
+    document.querySelectorAll('.motion-track-row').forEach(function (rowEl) {
+      var holder = rowEl._smHolder, prop = rowEl._smProp;
+      if (!holder) return;
+      rowEl.querySelectorAll('.motion-key').forEach(function (dia) {
+        var b = dia.getBoundingClientRect();
+        var cx = b.left + b.width / 2, cy = b.top + b.height / 2;
+        var hit = cx >= x0 && cx <= x1 && cy >= y0 && cy <= y1;
+        dia.classList.toggle('sel', hit);
+        if (!hit) return;
+        var cell = dia.parentElement;
+        var frame = parseInt(cell.dataset.frame, 10);
+        var track = holder.motion && holder.motion[prop];
+        var key = track ? keyAt(track, frame) : null;
+        if (key) sel.push({ holder: holder, prop: prop, key: key });
+      });
+    });
+    setKeySel(sel);
+  }
+  function updateMarquee(e) {
+    if (!_motionMarquee) return;
+    var dx = e.clientX - _motionMarquee.startX, dy = e.clientY - _motionMarquee.startY;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) _motionMarquee.moved = true;
+    var x0 = Math.min(_motionMarquee.startX, e.clientX), y0 = Math.min(_motionMarquee.startY, e.clientY);
+    var w = Math.abs(dx), h = Math.abs(dy);
+    var r = _motionMarquee.rectEl;
+    r.style.left = x0 + 'px'; r.style.top = y0 + 'px'; r.style.width = w + 'px'; r.style.height = h + 'px';
+    if (_motionMarquee.moved) applyMarqueeSelection(x0, y0, x0 + w, y0 + h);
+  }
+  function endMarquee() {
+    if (!_motionMarquee) return;
+    var moved = _motionMarquee.moved;
+    _motionMarquee.rectEl.remove();
+    _motionMarquee = null;
+    // A plain click on empty grid space (no drag) clears the selection,
+    // same "click empty = deselect" convention as the canvas's own
+    // marquee/selection tools elsewhere in this app.
+    if (!moved) { setKeySel([]); renderTimeline(); }
+  }
+
   // Drag-to-retime a keyframe (mousemove/up delegated from ui.js's global
   // pointer handlers via SMMotion.onDragMove/onDragUp, same pattern as the
   // span-end/keyframe drag handlers already in timeline.js).
   function onDragMove(e) {
+    updateMarquee(e);
     var d = window._motionKeyDrag; if (!d) return;
     var deltaFrames = Math.round((e.clientX - d.startX) / FC);
+    if (d.group) {
+      // Whole-group move: compute the delta from ONE reference key (the
+      // first), then check EVERY selected key can land there without
+      // colliding with an UNselected key already at the target frame —
+      // an all-or-nothing move keeps the group's relative spacing intact
+      // rather than silently dropping just the colliding member.
+      if (!deltaFrames) return;
+      var ok = d.keys.every(function (s) {
+        var nf = s.key.frame + deltaFrames;
+        if (nf < 0 || nf >= state.totalFrames) return false;
+        var existing = keyAt(s.holder.motion[s.prop], nf);
+        return !existing || existing === s.key;
+      });
+      if (!ok) return;
+      d.keys.forEach(function (s) { s.key.frame += deltaFrames; sortKeys(s.holder.motion[s.prop]); });
+      d.startX = e.clientX; // re-baseline so the next move is a fresh delta from here
+      renderTimeline();
+      return;
+    }
     var nf = Math.max(0, Math.min(state.totalFrames - 1, d.startFrame + deltaFrames));
     if (nf === d.key.frame) return;
     var track = d.ld.motion[d.prop];
@@ -744,6 +843,7 @@
     renderTimeline();
   }
   function onDragUp() {
+    endMarquee();
     if (!window._motionKeyDrag) return;
     window._motionKeyDrag = null;
     if (window.SMEngineBridge) window.SMEngineBridge.renderNow();

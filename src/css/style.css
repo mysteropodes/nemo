@@ -369,6 +369,11 @@ body.mac-overlay-titlebar #app{padding-top:28px;}
 .fc.motion-fc{cursor:pointer;}
 .motion-key{width:9px;height:9px;border-radius:2px;background:#e6e6e6;border:1px solid rgba(0,0,0,.5);transform:rotate(45deg);}
 .motion-key.cur{background:#ffaa28;width:11px;height:11px;}
+.motion-key.sel{background:var(--accent);border-color:#fff;box-shadow:0 0 0 1.5px var(--accent);}
+.motion-key.sel.cur{background:#ffaa28;box-shadow:0 0 0 1.5px var(--accent);}
+/* Marquee rectangle (motion.js, screen-fixed since it spans multiple .frow
+   rows, unlike per-row overlays elsewhere in this file). */
+.motion-marquee-rect{position:fixed;border:1px solid var(--accent);background:rgba(63,107,245,.15);pointer-events:none;z-index:50;}
 .lrow.motion-disabled{cursor:not-allowed;opacity:.45;}
 .lrow.motion-disabled:hover{background:transparent;}
 body.mode-motion #layer-panel{width:260px;}
