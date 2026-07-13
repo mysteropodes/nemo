@@ -26,6 +26,7 @@
     "fs:allow-read-dir",
     "fs:allow-remove",
     "fs:allow-exists",
+    "fs:allow-rename",
     "fs:scope-app-recursive",
     {
       "identifier": "fs:scope",

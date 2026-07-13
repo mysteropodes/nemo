@@ -563,7 +563,10 @@ pub(crate) fn auto_match_inner(sa: &[StrokeIn], sb: &[StrokeIn]) -> Vec<MatchOut
     }
 
     let mut seeds = matches.clone();
-    seeds.sort_by(|x, y| x.score.partial_cmp(&y.score).unwrap());
+    // total_cmp, not partial_cmp().unwrap(): a NaN score (degenerate stroke
+    // features) would panic auto_match — masked by the JS fallback as a
+    // silent slow path (CLAUDE.md §3), never surfaced as a visible bug.
+    seeds.sort_by(|x, y| x.score.total_cmp(&y.score));
     let seed_count = (seeds.len() as f64 * 0.5).ceil().max(2.0) as usize;
     seeds.truncate(seed_count);
     let pts_a: Vec<(f64, f64)> = seeds.iter().map(|s| (fa[s.a].cx, fa[s.a].cy)).collect();

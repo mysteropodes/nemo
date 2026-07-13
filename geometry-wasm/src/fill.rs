@@ -344,7 +344,11 @@ fn build_graph(
                 cuts.push((*frac, Some(*pt)));
             }
         }
-        cuts.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+        // total_cmp, not partial_cmp().unwrap(): a NaN frac (degenerate wall
+        // geometry) would panic the whole wasm call — and the JS fallback
+        // would mask that as a silent slow path (CLAUDE.md §3), never as a
+        // visible bug.
+        cuts.sort_by(|a, b| a.0.total_cmp(&b.0));
         cuts.dedup_by(|a, b| (a.0 - b.0).abs() < 1e-6);
         wall_cuts.push(cuts);
     }
