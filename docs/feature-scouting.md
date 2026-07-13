@@ -91,6 +91,7 @@ contact avec le code de prod : UN hook gardé dans `draw-bridge.js`
 | `french-curve` (gabarit courbe/ellipse aimanté) | SketchBook | french-curve.js | drag délibérément bruité (±20px aléatoire) → trait collé à l'ellipse (erreur de rayon normalisé max 0.00025), F seul sans drag ne crée rien, 1 undo |
 | `timeline-zoom` (zoom horizontal de la timeline) | TVPaint/Harmony/Premiere — standard universel | timeline-zoom.js | mute FC (JS, déjà global/live) + --fc (CSS custom prop, déjà lu partout) sans toucher un seul fichier core ; Ctrl+molette vérifié (40→37px), clic sur cellule à FC=40 atterrit sur la bonne frame (hit-test recalculé en direct), reset/disable ramènent à 16px |
 | `timeline-zoom` — scrollbar custom (mise à jour) | Premiere/Resolve/DaVinci | timeline-zoom.js | feedback : molette dézoom pas fiable au trackpad → scrollbar #fg-wrap remplacée par une maison (native masquée), glisser un bord = zoom, glisser le corps = pan ; vérifié par drag direct : bord droit dehors → FC 16→10 (zoom out), bord droit dedans → FC 10→14 (zoom in), corps → scrollLeft 0→269 sans toucher FC ; contourne le bug molette (geste trackpad, pas la logique — testée symétrique en isolation) puisque c'est un drag souris direct |
+| `svg-import` (SVG → vecteurs éditables réels) | universel (Illustrator/Figma/CSP tous font ça nativement, manquait à Nemo) | svg-import.js | `<g transform>` imbriqués aplatis (matrice monde calculée sur la chaîne `.parent` avant détachement), trous (CompoundPath) fusionnés façon `insertBooleanResult`/`_mergeHoleIntoExterior` mais en gardant le style propre du SVG + les vraies poignées bézier (pas les [0,0] d'insertBooleanResult, sa source WASM est déjà polygonale) ; SVG groupe+transform+trou → 3 Path plats, couleurs exactes (#ff0000/#00ff00/#0000ff), CompoundPath jamais inséré dans le calque (confirmé) ; `<text>` dans un SVG mixte correctement ignoré + signalé (pas de crash, pas de disparition silencieuse) ; 1 undo restaure exactement |
 
 Bugs réels trouvés/corrigés pendant les protos (documentés dans les
 commits) : RDP dégénéré sur boucle fermée, cascade de promotion keyframe
@@ -384,6 +385,38 @@ les titres) : masques/clipping live (#1, touche `engine.rs`, 2-3j) →
 French curve avec snap PENDANT le tracé (#5, touche la boucle
 `pointermove` de draw-bridge.js, ~2j) → brosses bitmap animées (#7,
 volontairement hors scope tant que "brush diversity" n'est pas fait).
+
+### 11. Vectorisation bitmap → vecteur (Illustrator Image Trace / CSP Vectorize)
+**Quoi** : convertir une image bitmap importée (PNG/JPG déjà supportés
+comme Raster, voir images.js) en vraies formes vectorielles éditables —
+pas juste un import SVG (§ci-dessus, `svg-import.js`, qui suppose que
+la donnée EST déjà du vecteur). Ici la donnée d'entrée est des pixels ;
+il faut un vrai algorithme : seuillage/quantification couleur →
+contour-tracing (marching squares) → ajustement de courbes bézier sur
+le contour (simplification RDP + fit, même famille que le bug "RDP
+dégénéré sur boucle fermée" déjà rencontré cette session — donc de la
+simplification de contour existe déjà dans le codebase, réutilisable).
+**Pourquoi pas en Labs, contrairement à svg-import** : svg-import
+réutilise un parseur EXACT (Paper.js importSVG) + une géométrie EXACTE
+(les trous du SVG source) — zéro incertitude sur le résultat. Un
+traceur bitmap est fondamentalement approximatif (seuil de
+contraste, nombre de couleurs, tolérance de simplification — tous
+réglables, tous changent le résultat) ; livrer une version au rabais
+("ça trace un cercle test") donnerait une fausse impression de qualité
+sur le VRAI cas d'usage (une image scannée, un logo complexe, un
+screenshot) sans jamais avoir testé dessus. Un prototype honnête exige
+un jeu de vraies images de test variées, pas juste une forme
+synthétique.
+**Par où commencer** : version silhouette mono-couleur d'abord (comme
+Illustrator "Image Trace → Silhouette" ou CSP "Vectorize → simple") :
+canvas 2D pour lire les pixels, seuillage alpha/luminance, marching
+squares pour le contour, RDP existant pour simplifier, `new Path` avec
+les segments obtenus. Estimation : 1-2j pour la version silhouette,
++2-3j pour la quantification multi-couleurs (palette k-means + un
+Path par région, façon Illustrator).
+**Valeur** : haute — c'est la fonctionnalité la plus demandée par les
+utilisateurs venant d'Illustrator/CSP pour importer un logo/design
+existant sans redessiner à la main.
 
 ## QA croisée entre prototypes (2026-07-13)
 
