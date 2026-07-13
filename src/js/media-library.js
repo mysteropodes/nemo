@@ -18,7 +18,7 @@
 
   function addEntry(name, kind, thumb, layerName) {
     if (!state.mediaLibrary) state.mediaLibrary = [];
-    state.mediaLibrary.push({ id: uid(), name: name, kind: kind, thumb: thumb, layerName: layerName || null });
+    state.mediaLibrary.push({ id: uid(), name: name, kind: kind, thumb: thumb, layerName: layerName || null, importedAt: Date.now() });
     render();
   }
 
@@ -61,18 +61,68 @@
     img.src = m.thumb;
   }
 
+  // Short relative date, same convention a file browser / project list would
+  // use ("aujourd'hui" beats a raw timestamp for a library you browse often
+  // right after importing). Falls back to a plain date past a week — no
+  // point in "il y a 12 jours" precision once it's old.
+  function formatImportedAt(ts) {
+    if (!ts) return '';
+    var diffMs = Date.now() - ts, day = 86400000;
+    if (diffMs < day) return 'Aujourd’hui';
+    if (diffMs < 2 * day) return 'Hier';
+    if (diffMs < 7 * day) return 'Il y a ' + Math.floor(diffMs / day) + ' j';
+    var d = new Date(ts);
+    return d.getDate() + '/' + (d.getMonth() + 1) + '/' + String(d.getFullYear()).slice(2);
+  }
+  // Rebuilt 2026-07 as a ROW-based list ("l'organisation file des footage
+  // importé dans ce genre là" — a project-list-table reference screenshot:
+  // name+thumbnail, a colored status/type pill, an owner-like avatar+name)
+  // instead of the original plain thumbnail grid — same underlying
+  // state.mediaLibrary data and all existing interactions (click to jump,
+  // context menu, image drag-out), just laid out as scannable rows with
+  // more metadata visible at a glance: kind badge, source LAYER (with that
+  // layer's own color as a stand-in for the reference's owner avatar, since
+  // there's no per-user concept here — the layer IS the "owner" of an
+  // imported asset), and import date.
   function render() {
     var grid = document.getElementById('media-grid'); if (!grid) return;
     grid.innerHTML = '';
     (state.mediaLibrary || []).forEach(function (m) {
-      var cell = document.createElement('div'); cell.className = 'media-item'; cell.title = m.name;
+      var row = document.createElement('div'); row.className = 'media-row'; row.title = m.name;
+      var thumb = document.createElement('div'); thumb.className = 'media-row-thumb';
       var img = document.createElement('img'); img.src = m.thumb; img.draggable = m.kind === 'image';
-      cell.appendChild(img);
-      if (m.kind === 'video') { var badge = document.createElement('div'); badge.className = 'media-item-badge'; badge.textContent = '▶'; cell.appendChild(badge); }
-      var lbl = document.createElement('div'); lbl.className = 'media-item-name'; lbl.textContent = m.name;
-      cell.appendChild(lbl);
-      cell.addEventListener('click', function () { jumpToLayer(m); });
-      cell.addEventListener('contextmenu', function (e) {
+      thumb.appendChild(img);
+      if (m.kind === 'video') { var pb = document.createElement('div'); pb.className = 'media-row-playicon'; pb.textContent = '▶'; thumb.appendChild(pb); }
+      row.appendChild(thumb);
+
+      var main = document.createElement('div'); main.className = 'media-row-main';
+      var nameEl = document.createElement('div'); nameEl.className = 'media-row-name'; nameEl.textContent = m.name;
+      main.appendChild(nameEl);
+
+      var meta = document.createElement('div'); meta.className = 'media-row-meta';
+      var kindBadge = document.createElement('span'); kindBadge.className = 'media-row-badge ' + (m.kind === 'video' ? 'kind-video' : 'kind-image'); kindBadge.textContent = m.kind === 'video' ? 'Vidéo' : 'Image';
+      meta.appendChild(kindBadge);
+
+      // "Owner" column equivalent: the source layer, colored dot + name —
+      // or a muted "Orphelin" pill if that layer no longer exists (deleted/
+      // renamed since import; jumpToLayer already toasted this on click,
+      // this makes it visible without having to click first).
+      var srcLayer = m.layerName ? state.layers.find(function (l) { return l.name === m.layerName; }) : null;
+      if (m.layerName) {
+        var owner = document.createElement('span'); owner.className = 'media-row-owner' + (srcLayer ? '' : ' orphan');
+        if (srcLayer) { var dot = document.createElement('span'); dot.className = 'media-row-owner-dot'; dot.style.background = srcLayer.color || 'var(--text-dim)'; owner.appendChild(dot); }
+        var ownerLbl = document.createElement('span'); ownerLbl.textContent = srcLayer ? m.layerName : 'Orphelin';
+        owner.appendChild(ownerLbl);
+        meta.appendChild(owner);
+      }
+      main.appendChild(meta);
+
+      var dateEl = document.createElement('div'); dateEl.className = 'media-row-date'; dateEl.textContent = formatImportedAt(m.importedAt);
+      main.appendChild(dateEl);
+      row.appendChild(main);
+
+      row.addEventListener('click', function () { jumpToLayer(m); });
+      row.addEventListener('contextmenu', function (e) {
         e.preventDefault(); e.stopPropagation();
         if (!window.showContextMenu) return;
         var items = [];
@@ -87,7 +137,7 @@
           e.dataTransfer.effectAllowed = 'copy';
         });
       }
-      grid.appendChild(cell);
+      grid.appendChild(row);
     });
   }
 

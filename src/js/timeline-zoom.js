@@ -23,8 +23,16 @@
 //
 //   SMTimelineZoom.set(px)      — direct cell width (clamped 4..64)
 //   SMTimelineZoom.zoomIn()/Out() — ×1.25 / ÷1.25 around current value
-//   SMTimelineZoom.reset()      — back to the app's default (16px)
+//   SMTimelineZoom.reset()      — back to the app's default (30px)
 //   Ctrl/Cmd + wheel over the timeline also zooms
+//
+// DEFAULT_FC bumped 16->30 (2026-07, "il faudrait réajuster le zoom... pour
+// qu'il soit proche de celui de la capture") — 16px read as cramped next to
+// the reference screenshot (~30px/frame measured from its ruler spacing).
+// Only affects a session with no persisted localStorage value yet, or an
+// explicit reset() — FC itself is a single shared global (confirmed live:
+// switching Animation2D<->Motion never changes it), so there was never a
+// per-mode divergence to fix, just a default worth raising for both.
 //
 // Custom scrollbar: drag the THUMB BODY (neutral gray) to pan, drag either
 // blue end-cap HANDLE to resize the thumb, which zooms (a wider thumb =
@@ -37,7 +45,7 @@
 // zoom-vs-pan zones actually were.
 (function () {
   var KEY = 'nemo-timeline-fc';
-  var DEFAULT_FC = 16;
+  var DEFAULT_FC = 30;
 
   function clamp(n) { return Math.max(4, Math.min(64, Math.round(n))); }
   function refresh() {

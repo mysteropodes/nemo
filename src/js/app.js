@@ -73,7 +73,7 @@ window.addEventListener('resize',syncCanvasSize);
 // left-right drift the further right you clicked/dragged). Keep these two
 // in lockstep with style.css by hand — there's no single source of truth
 // shared between CSS and JS in this codebase.
-var FC=16;
+var FC=30;// static fallback matching timeline-zoom.js's DEFAULT_FC — overwritten on load by that module's init() (persisted value or this same default), kept in sync to avoid a flash-of-wrong-zoom before that script runs
 var ROW_H=34;
 var state={
   totalFrames:24,currentFrame:0,fps:12,playing:false,loopPlayback:true,pingPongPlayback:false,playDir:1,

@@ -14,7 +14,7 @@
   --accent:#3F6BF5;--accent-hover:#7EA0FA;--accent-dim:rgba(63,107,245,.18);
   --key-color:#c8c8d4;--tween-color:rgba(63,107,245,.16);
   --red:#ff5555;--green:#5FA875;--orange:#F0A585;--purple:#B49BE6;
-  --tool-size:36px;--fc:16px;
+  --tool-size:36px;--fc:30px;
 }
 html,body{width:100%;height:100%;overflow:hidden;background:var(--gutter);color:var(--text);
   font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;user-select:none;font-size:13px;-webkit-font-smoothing:antialiased;}
@@ -840,12 +840,25 @@ body.mode-motion .lrow.act{box-shadow:inset 3px 0 0 #4E6FF2,inset 0 0 0 1px rgba
 /* Media Library (media-library.js, v1 2026-07) */
 .media-drop{margin:0 8px 6px;padding:10px 8px;border:1px dashed var(--border2);border-radius:6px;font-size:9.5px;color:var(--text-dim);text-align:center;cursor:default;}
 .media-drop.drop-hover{border-color:var(--accent);color:var(--text);background:var(--accent-dim);}
-.media-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:0 8px 8px;}
-.media-item{position:relative;border-radius:6px;overflow:hidden;background:var(--panel3);cursor:pointer;aspect-ratio:1;display:flex;align-items:flex-end;}
-.media-item:hover{box-shadow:0 0 0 1px var(--accent);}
-.media-item img{width:100%;height:100%;object-fit:cover;position:absolute;top:0;left:0;}
-.media-item-name{position:relative;width:100%;padding:3px 4px;font-size:8.5px;color:#fff;background:linear-gradient(transparent,rgba(0,0,0,.75));overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.media-item-badge{position:absolute;top:3px;right:3px;width:14px;height:14px;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;font-size:7px;display:flex;align-items:center;justify-content:center;}
+/* Rebuilt 2026-07 as a row-based list (project-list-table reference:
+   thumbnail+name, a colored type pill, an owner-like avatar+name) instead
+   of the original thumbnail grid — see media-library.js render(). */
+.media-grid{display:flex;flex-direction:column;gap:4px;padding:0 8px 8px;}
+.media-row{position:relative;display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:6px;background:var(--panel3);cursor:pointer;}
+.media-row:hover{box-shadow:0 0 0 1px var(--accent);}
+.media-row-thumb{position:relative;width:30px;height:30px;flex:none;border-radius:4px;overflow:hidden;background:var(--panel2);}
+.media-row-thumb img{width:100%;height:100%;object-fit:cover;position:absolute;top:0;left:0;}
+.media-row-playicon{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.35);color:#fff;font-size:9px;}
+.media-row-main{min-width:0;flex:1;display:flex;flex-direction:column;gap:2px;}
+.media-row-name{font-size:10px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.media-row-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.media-row-badge{font-size:8px;line-height:1.6;padding:0 6px;border-radius:8px;font-weight:600;letter-spacing:.02em;}
+.media-row-badge.kind-image{background:rgba(180,155,230,.18);color:#c9b6f2;}
+.media-row-badge.kind-video{background:rgba(74,158,255,.18);color:#7ea0fa;}
+.media-row-owner{display:flex;align-items:center;gap:4px;font-size:8.5px;color:var(--text-dim);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.media-row-owner-dot{width:6px;height:6px;border-radius:50%;flex:none;}
+.media-row-owner.orphan{color:var(--red);font-style:italic;}
+.media-row-date{font-size:8px;color:var(--text-dim);opacity:.75;}
 
 /* Transform anchor-point picker (redesign 2026-07-09) */
 .xform-anchor-grid{width:56px;height:56px;flex:none;position:relative;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);border:1px solid var(--border2);border-radius:4px;margin-top:2px;}
