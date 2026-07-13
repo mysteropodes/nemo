@@ -196,6 +196,97 @@
     if (window.renderLayerList) renderLayerList();
   });
 
+  // ---- batch operations on the current bar selection (Skew Pro punch
+  // list: Align/Distribute/Flip/Select Every/Invert Selection) — all
+  // require >=2 selected bars except Invert, which works off whatever's
+  // currently selected (possibly zero). One pushUndo() per operation.
+  function selectedLayers() {
+    return _barSel.map(function (li) { return { li: li, ld: state.layers[li] }; }).filter(function (x) { return x.ld; });
+  }
+  function applyBatch(fn) {
+    var items = selectedLayers();
+    if (items.length < 2) { if (window.showToast) showToast('Sélectionne au moins 2 calques'); return; }
+    if (window.pushUndo) pushUndo();
+    fn(items);
+    if (window.renderTimeline) renderTimeline();
+    if (window.loadFrame) loadFrame(state.currentFrame);
+    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+  }
+  function alignBars(mode) {
+    applyBatch(function (items) {
+      if (mode === 'left') {
+        var minIn = Math.min.apply(null, items.map(function (x) { return inPointOf(x.ld); }));
+        items.forEach(function (x) { var w = outPointOf(x.ld) - inPointOf(x.ld); x.ld.inPoint = minIn; x.ld.outPoint = minIn + w; });
+      } else if (mode === 'right') {
+        var maxOut = Math.max.apply(null, items.map(function (x) { return outPointOf(x.ld); }));
+        items.forEach(function (x) { var w = outPointOf(x.ld) - inPointOf(x.ld); x.ld.outPoint = maxOut; x.ld.inPoint = maxOut - w; });
+      } else {
+        var avgCenter = items.reduce(function (s, x) { return s + (inPointOf(x.ld) + outPointOf(x.ld)) / 2; }, 0) / items.length;
+        items.forEach(function (x) {
+          var w = outPointOf(x.ld) - inPointOf(x.ld);
+          var ni = Math.max(0, Math.round(avgCenter - w / 2));
+          x.ld.inPoint = ni; x.ld.outPoint = ni + w;
+        });
+      }
+    });
+  }
+  // Evenly spaces the selected bars' START points across the group's own
+  // min-in..max-out span, preserving each bar's own duration — covers
+  // Skew Pro's "Distribute" directly; its separate drag-the-selection-edge
+  // "Space" tool is the same underlying idea (even spacing) via a
+  // different gesture, folded into this one button for v1.
+  function distributeBars() {
+    applyBatch(function (items) {
+      var sorted = items.slice().sort(function (a, b) { return inPointOf(a.ld) - inPointOf(b.ld); });
+      var first = inPointOf(sorted[0].ld), last = inPointOf(sorted[sorted.length - 1].ld);
+      var step = sorted.length > 1 ? (last - first) / (sorted.length - 1) : 0;
+      sorted.forEach(function (x, i) {
+        var w = outPointOf(x.ld) - inPointOf(x.ld);
+        var ni = Math.round(first + step * i);
+        x.ld.inPoint = ni; x.ld.outPoint = ni + w;
+      });
+    });
+  }
+  // Reverses the temporal ORDER of the selected bars' start points (each
+  // bar keeps its own duration, just swaps which "slot" it occupies) —
+  // Skew Pro's "Flip Horizontally".
+  function flipBars() {
+    applyBatch(function (items) {
+      var sorted = items.slice().sort(function (a, b) { return inPointOf(a.ld) - inPointOf(b.ld); });
+      var slots = sorted.map(function (x) { return inPointOf(x.ld); });
+      var reversed = slots.slice().reverse();
+      sorted.forEach(function (x, i) {
+        var w = outPointOf(x.ld) - inPointOf(x.ld);
+        x.ld.inPoint = reversed[i]; x.ld.outPoint = reversed[i] + w;
+      });
+    });
+  }
+  function selectEveryNth(n) {
+    n = Math.max(2, parseInt(n, 10) || 2);
+    var sorted = _barSel.slice().sort(function (a, b) { return inPointOf(state.layers[a]) - inPointOf(state.layers[b]); });
+    _barSel = sorted.filter(function (_li, i) { return i % n === 0; });
+    document.querySelectorAll('.layer-inout-bar').forEach(function (bar) {
+      var row = bar.parentElement, li = row && _rowLayerIdx.get(row);
+      bar.classList.toggle('sel', li != null && isBarSelected(li));
+    });
+    if (window.showToast) showToast(_barSel.length + ' calque(s) sélectionné(s)');
+  }
+  // Selects every layer that HAS a bar row currently rendered and is NOT
+  // already selected — inverts within the same universe Box Select draws
+  // its marquee over, matching Skew Pro's own "I" shortcut.
+  function invertBarSelection() {
+    var all = [];
+    document.querySelectorAll('.layer-inout-bar').forEach(function (bar) {
+      var row = bar.parentElement, li = row && _rowLayerIdx.get(row);
+      if (li != null) all.push(li);
+    });
+    _barSel = all.filter(function (li) { return !isBarSelected(li); });
+    document.querySelectorAll('.layer-inout-bar').forEach(function (bar) {
+      var row = bar.parentElement, li = row && _rowLayerIdx.get(row);
+      bar.classList.toggle('sel', li != null && isBarSelected(li));
+    });
+  }
+
   // Builds the bar + its two handles into `row` (a .frow — Animation 2D's
   // per-layer frame row, or Motion mode's collapsed layer spacer row) and
   // wires its drag handlers. Idempotent-safe to call once per row per
@@ -217,9 +308,23 @@
     bar.addEventListener('contextmenu', function (e) {
       e.preventDefault(); e.stopPropagation();
       if (!window.showContextMenu) return;
-      window.showContextMenu(e.clientX, e.clientY, [
+      var menu = [
         { label: 'Réinitialiser (pleine durée)', action: function () { if (window.pushUndo) pushUndo(); delete state.layers[li].inPoint; delete state.layers[li].outPoint; if (window.renderTimeline) renderTimeline(); if (window.loadFrame) loadFrame(state.currentFrame); if (window.SMEngineBridge) SMEngineBridge.renderNow(); } },
-      ]);
+      ];
+      // Batch ops (Skew Pro punch list) act on the WHOLE current selection,
+      // not just the bar that was right-clicked — offered once >=2 bars are
+      // selected, regardless of which one you right-click.
+      if (_barSel.length >= 2) {
+        menu.push({ sep: true });
+        menu.push({ label: 'Aligner à gauche (in)', action: function () { alignBars('left'); } });
+        menu.push({ label: 'Aligner au centre', action: function () { alignBars('center'); } });
+        menu.push({ label: 'Aligner à droite (out)', action: function () { alignBars('right'); } });
+        menu.push({ label: 'Distribuer uniformément', action: function () { distributeBars(); } });
+        menu.push({ label: 'Inverser l’ordre (flip)', action: function () { flipBars(); } });
+        menu.push({ label: 'Sélectionner 1 sur 2', action: function () { selectEveryNth(2); } });
+      }
+      if (_barSel.length >= 1) menu.push({ label: 'Inverser la sélection', action: invertBarSelection });
+      window.showContextMenu(e.clientX, e.clientY, menu);
     });
     // Marquee starts on a mousedown that lands on the ROW's own empty
     // background — this row's only real content is the bar itself, so
@@ -227,5 +332,9 @@
     row.addEventListener('mousedown', function (e) { if (e.target === row) startMarquee(e); });
   }
 
-  window.SMLayerInOut = { inPointOf: inPointOf, outPointOf: outPointOf, hasCustomRange: hasCustomRange, buildBar: buildBar, updateBar: updateBar };
+  window.SMLayerInOut = {
+    inPointOf: inPointOf, outPointOf: outPointOf, hasCustomRange: hasCustomRange, buildBar: buildBar, updateBar: updateBar,
+    alignBars: alignBars, distributeBars: distributeBars, flipBars: flipBars, selectEveryNth: selectEveryNth, invertBarSelection: invertBarSelection,
+    getBarSelection: function () { return _barSel.slice(); },
+  };
 })();

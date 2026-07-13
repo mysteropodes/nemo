@@ -58,6 +58,14 @@
   // Reset to null (show all) whenever a different layer gets expanded — see
   // the row-click handler in renderLayerListMotion.
   var _propFilter = null;
+  // Skew Pro's "Filter Properties" — hides every property row with no
+  // keyframes at all (both animated-with-a-track AND a plain non-default
+  // static override still count as "has something to show"; only a
+  // completely untouched default-value property gets hidden). Global
+  // toggle (not per-layer/per-group), same one-button-affects-everything
+  // convention as the reference.
+  var _hideUnanimated = false;
+  function propHasContent(holder, prop) { return isAnimated(holder, prop) || !!(holder.motionStatic && holder.motionStatic[prop]); }
   function isPropFiltered(prop) { return !!_propFilter && _propFilter.indexOf(prop) < 0; }
   function handlePropShortcut(key, shiftKey) {
     var prop = PROP_SHORTCUT[(key || '').toLowerCase()];
@@ -607,10 +615,25 @@
   // (stopwatch toggle) since that can affect which rows/tracks exist;
   // scrubbing a value only needs the timeline (track content) + canvas.
   function renderTransformGroup(list, holder, groupLabel) {
-    var grp = document.createElement('div'); grp.className = 'lrow motion-group-row'; grp.textContent = groupLabel;
+    var grp = document.createElement('div'); grp.className = 'lrow motion-group-row';
+    var grpLabel = document.createElement('span'); grpLabel.textContent = groupLabel;
+    grp.appendChild(grpLabel);
+    var filterBtn = document.createElement('span'); filterBtn.className = 'motion-filter-btn' + (_hideUnanimated ? ' on' : '');
+    filterBtn.title = _hideUnanimated ? 'Afficher toutes les propriétés' : 'N’afficher que les propriétés animées';
+    filterBtn.innerHTML = '<svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></svg>';
+    filterBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      _hideUnanimated = !_hideUnanimated;
+      // Both sides — panel AND grid share the exact same skip condition
+      // (renderTransformGroup/renderTracksFor); calling only one here would
+      // silently desync which rows exist between them, the same alignment
+      // bug class ROW_H's own header comment already warns about.
+      renderLayerList(); renderTimeline();
+    });
+    grp.appendChild(filterBtn);
     list.appendChild(grp);
     PROPS.forEach(function (prop) {
-      if (isPropFiltered(prop)) return;
+      if (isPropFiltered(prop) || (_hideUnanimated && !propHasContent(holder, prop))) return;
       var pr = document.createElement('div'); pr.className = 'lrow motion-prop-row';
       var sw = document.createElement('div');
       sw.className = 'lico motion-stopwatch' + (isAnimated(holder, prop) ? ' on' : '');
@@ -779,6 +802,17 @@
             // require a full segment already existing before offering this.
             menu.push({ label: 'Éditer la courbe d’accélération…', action: function () { pushUndo(); openMotionEaseEditor(ld, prop); } });
           }
+          // Batch ops (Skew Pro punch list) act on the WHOLE current
+          // multi-selection, offered regardless of which key/cell was
+          // right-clicked. No Align here (unlike layer bars) — a keyframe
+          // has no duration, "align" doesn't map onto a single point.
+          if (_motionKeySel.length >= 2) {
+            menu.push({ sep: true });
+            menu.push({ label: 'Distribuer uniformément', action: distributeKeys });
+            menu.push({ label: 'Inverser l’ordre (flip)', action: flipKeys });
+            menu.push({ label: 'Sélectionner 1 sur 2', action: function () { selectEveryNthKey(2); } });
+          }
+          if (_motionKeySel.length >= 1) menu.push({ label: 'Inverser la sélection', action: invertKeySelection });
           window.showContextMenu(e.clientX, e.clientY, menu);
         });
       })(fi, k);
@@ -786,7 +820,10 @@
     }
   }
   function renderTracksFor(grid, holder, prop) {
-    if (isPropFiltered(prop)) return;
+    // Must mirror renderTransformGroup's own skip condition exactly (same
+    // alignment-invariant this file's whole panel/grid split depends on —
+    // see ROW_H's own header comment).
+    if (isPropFiltered(prop) || (_hideUnanimated && !propHasContent(holder, prop))) return;
     var row = document.createElement('div'); row.className = 'frow motion-track-row';
     trackRowHtml(holder, prop, row);
     grid.appendChild(row);
@@ -833,6 +870,71 @@
     return _motionKeySel.some(function (s) { return s.holder === holder && s.prop === prop && s.key === key; });
   }
   function setKeySel(sel) { _motionKeySel = sel; }
+  // ---- batch operations on the current keyframe selection (Skew Pro
+  // punch list: Distribute/Flip/Select Every/Invert Selection — no Align
+  // here, unlike layer bars: a keyframe has no duration, "align" doesn't
+  // map onto a single point). Grouped PER TRACK (holder+prop) first: two
+  // selected keys on DIFFERENT properties shouldn't need to avoid
+  // colliding with each other, only with other keys on their OWN track.
+  function _groupKeySelByTrack() {
+    var groups = [];
+    _motionKeySel.forEach(function (s) {
+      var g = groups.filter(function (g2) { return g2.holder === s.holder && g2.prop === s.prop; })[0];
+      if (!g) { g = { holder: s.holder, prop: s.prop, items: [] }; groups.push(g); }
+      g.items.push(s.key);
+    });
+    return groups;
+  }
+  function distributeKeys() {
+    if (_motionKeySel.length < 2) { if (window.showToast) showToast('Sélectionne au moins 2 clés'); return; }
+    pushUndo();
+    _groupKeySelByTrack().forEach(function (g) {
+      if (g.items.length < 2) return;
+      var sorted = g.items.slice().sort(function (a, b) { return a.frame - b.frame; });
+      var first = sorted[0].frame, last = sorted[sorted.length - 1].frame;
+      var step = (last - first) / (sorted.length - 1);
+      sorted.forEach(function (k, i) { k.frame = Math.round(first + step * i); });
+      sortKeys(g.holder.motion[g.prop]);
+    });
+    renderTimeline();
+    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+  }
+  function flipKeys() {
+    if (_motionKeySel.length < 2) { if (window.showToast) showToast('Sélectionne au moins 2 clés'); return; }
+    pushUndo();
+    _groupKeySelByTrack().forEach(function (g) {
+      if (g.items.length < 2) return;
+      var sorted = g.items.slice().sort(function (a, b) { return a.frame - b.frame; });
+      var slots = sorted.map(function (k) { return k.frame; }).reverse();
+      sorted.forEach(function (k, i) { k.frame = slots[i]; });
+      sortKeys(g.holder.motion[g.prop]);
+    });
+    renderTimeline();
+    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+  }
+  function selectEveryNthKey(n) {
+    n = Math.max(2, parseInt(n, 10) || 2);
+    var sorted = _motionKeySel.slice().sort(function (a, b) { return a.key.frame - b.key.frame; });
+    _motionKeySel = sorted.filter(function (_s, i) { return i % n === 0; });
+    renderTimeline();
+    if (window.showToast) showToast(_motionKeySel.length + ' clé(s) sélectionnée(s)');
+  }
+  // Inverts within whatever tracks are CURRENTLY RENDERED (the same
+  // universe the marquee itself draws over) — matches Skew Pro's own "I"
+  // shortcut semantics.
+  function invertKeySelection() {
+    var all = [], prevSel = _motionKeySel;
+    document.querySelectorAll('.motion-track-row').forEach(function (rowEl) {
+      var holder = rowEl._smHolder, prop = rowEl._smProp;
+      var track = holder && holder.motion && holder.motion[prop];
+      if (!track) return;
+      track.keys.forEach(function (k) { all.push({ holder: holder, prop: prop, key: k }); });
+    });
+    _motionKeySel = all.filter(function (s) {
+      return !prevSel.some(function (s2) { return s2.holder === s.holder && s2.prop === s.prop && s2.key === s.key; });
+    });
+    renderTimeline();
+  }
   var _motionMarquee = null; // {startX, startY, rectEl, moved}
   function startMarquee(e) {
     var rect = document.createElement('div'); rect.className = 'motion-marquee-rect';
@@ -960,6 +1062,8 @@
     onDrag: onDrag,
     onUp: onUp,
     handlePropShortcut: handlePropShortcut,
+    distributeKeys: distributeKeys, flipKeys: flipKeys, selectEveryNthKey: selectEveryNthKey, invertKeySelection: invertKeySelection,
+    getKeySelection: function () { return _motionKeySel.slice(); },
     // ui.js's shared curve widget calls this after a motion segment's
     // curvePoints change (drag/preset/add/delete point) — the canvas needs
     // a repaint since the eased value at the current frame may have

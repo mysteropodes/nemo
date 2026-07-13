@@ -346,7 +346,10 @@ body.mac-overlay-titlebar #app{padding-top:28px;}
    layer panel + matching keyframe-track rows in the grid — see motion.js.
    Reuses .lrow/.frow's 34px rhythm; group/property rows below an expanded
    layer are visually indented and slightly recessed. */
-.motion-group-row{padding-left:24px;color:var(--text-dim);font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;cursor:default;background:rgba(255,255,255,.015);}
+.motion-group-row{padding-left:24px;padding-right:8px;color:var(--text-dim);font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;cursor:default;background:rgba(255,255,255,.015);display:flex;align-items:center;justify-content:space-between;}
+.motion-filter-btn{display:flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:3px;cursor:pointer;color:var(--text-dark);flex-shrink:0;}
+.motion-filter-btn:hover{background:var(--panel3);color:var(--text);}
+.motion-filter-btn.on{color:var(--accent);}
 .motion-prop-row{padding-left:24px;gap:6px;}
 .motion-prop-row:hover{background:rgba(255,255,255,.03);}
 /* Élément rows (2026-07, "shape layer" feedback): one per stroke/shape
