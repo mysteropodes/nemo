@@ -61,6 +61,21 @@
   }
 
   // ---- per-frame sync (hooked from loadFrame) ----
+  // Bug found 2026-07 ("le lecteur de footage vidéo... sauter des images"):
+  // `_seekBusy` was ONLY ever cleared inside the 'seeked' handler, with no
+  // fallback. Per the HTML5 spec, setting `currentTime` to a value the
+  // browser resolves to the SAME decoded picture it's already showing
+  // (common when two different requested times round to the same frame at
+  // a video's own fps, or during fast scrubbing) fires NO 'seeked' event at
+  // all. That left `_seekBusy` stuck `true` forever the first time it
+  // happened — every later syncToFrame call would just silently overwrite
+  // `_pendingT` without ever applying it, permanently freezing the
+  // reference on a stale frame instead of the documented "lags a frame or
+  // two" tolerance. Fix: a watchdog timeout races the 'seeked' event; if it
+  // fires first, force-unstick exactly as if 'seeked' had arrived, so a
+  // silently-skipped event degrades to a brief stall instead of a
+  // permanent one.
+  var SEEK_WATCHDOG_MS = 300;
   function syncToFrame(frame, force) {
     var r = ref();
     if (!r || !r.visible) return;
@@ -70,23 +85,41 @@
       var t = Math.max(0, Math.min(v.duration || 0, (frame - (r.offsetFrames || 0)) / state.fps));
       if (!force && Math.abs(v.currentTime - t) < 0.5 / state.fps) return;
       if (r._seekBusy) { r._pendingT = t; return; } // collapse seek bursts — only the latest target matters
-      r._seekBusy = true;
-      var onSeeked = function () {
-        v.removeEventListener('seeked', onSeeked);
-        var cv = r._seekCanvas;
-        cv.width = v.videoWidth; cv.height = v.videoHeight;
-        cv.getContext('2d').drawImage(v, 0, 0);
-        if (window.SMEngineBridge) window.SMEngineBridge.registerImagePixels(REF_VIDEO_ID, cv);
-        r._seekBusy = false;
-        bumpScene();
-        if (r._pendingT !== undefined) { var pt = r._pendingT; delete r._pendingT; v.currentTime = pt; r._seekBusy = true; v.addEventListener('seeked', onSeeked); }
-      };
-      v.addEventListener('seeked', onSeeked);
-      v.currentTime = t;
+      startSeek(r, v, t);
     } else if (r.type === 'imageseq') {
       ensureSeqImage(r, frameToSeqIndex(r, frame)); // pre-decode; onload bumps
     }
     // single image: nothing frame-dependent
+  }
+  function startSeek(r, v, t) {
+    r._seekBusy = true;
+    var settled = false;
+    function finish() {
+      if (settled) return; // whichever of 'seeked'/watchdog fires first wins; the other is a no-op
+      settled = true;
+      v.removeEventListener('seeked', onSeeked);
+      clearTimeout(watchdog);
+      // try/finally: r._seekBusy=false MUST run even if drawImage/upload
+      // throws (a corrupt/mid-decode video frame, a canvas security error,
+      // engine-bridge erroring) — otherwise a throw here would leave the
+      // flag stuck exactly like the original unguarded bug, just via a
+      // different trigger. The whole point of this rewrite is that NOTHING
+      // can leave _seekBusy permanently true.
+      try {
+        var cv = r._seekCanvas;
+        cv.width = v.videoWidth; cv.height = v.videoHeight;
+        cv.getContext('2d').drawImage(v, 0, 0);
+        if (window.SMEngineBridge) window.SMEngineBridge.registerImagePixels(REF_VIDEO_ID, cv);
+      } finally {
+        r._seekBusy = false;
+      }
+      bumpScene();
+      if (r._pendingT !== undefined) { var pt = r._pendingT; delete r._pendingT; startSeek(r, v, pt); }
+    }
+    function onSeeked() { finish(); }
+    v.addEventListener('seeked', onSeeked);
+    var watchdog = setTimeout(finish, SEEK_WATCHDOG_MS);
+    v.currentTime = t;
   }
   function frameToSeqIndex(r, frame) {
     return Math.max(0, Math.min(r.frames.length - 1, frame - (r.offsetFrames || 0)));
