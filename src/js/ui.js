@@ -522,11 +522,33 @@
       if(dragType==='in')window._waIn=Math.max(0,Math.min(origIn+dx,(window._waOut||total-1)-1));
       else if(dragType==='out')window._waOut=Math.min(total-1,Math.max(origOut+dx,(window._waIn||0)+1));
       else{var w=origOut-origIn;var ni=Math.max(0,origIn+dx);if(ni+w>=total)ni=total-1-w;window._waIn=ni;window._waOut=ni+w;}
-      window.updateWaBar();if(window.SM)window.SM.setWorkArea(window._waIn,window._waOut);
+      // Commit to state FIRST, then read it back via updateWaBar() below —
+      // see that function's own comment for why state is now the single
+      // source of truth this bar renders from.
+      if(window.SM)window.SM.setWorkArea(window._waIn,window._waOut);
+      window.updateWaBar();
     });
     window.addEventListener('mouseup',function(){dragType=null;});
   }
-  window.updateWaBar=function(){var bar=document.getElementById('wa-bar');var inF=window._waIn||0;var outF=window._waOut||23;bar.style.left=(inF*FC)+'px';bar.style.width=((outF-inF+1)*FC)+'px';};
+  // Bug found 2026-07 ("le bleu de sélection... ne va pas jusqu'au bout"):
+  // this used to read window._waIn/_waOut — a SEPARATE copy of the work
+  // area range that initWaDrag keeps synced with state.waIn/waOut during
+  // an active drag, but nothing guaranteed every OTHER code path that
+  // mutates state.waOut (frame insert/clear, tween regen, project load —
+  // timeline.js/tweens.js) also updated this window copy before the next
+  // updateWaBar() call. Any one of those missed sync points left the bar
+  // rendering a stale, shorter range than the project's real work area.
+  // Reading state.waIn/waOut directly (the actual single source of truth
+  // — see layerInPoint/layerOutPoint, app.js, for the same fix pattern)
+  // makes that whole class of desync impossible; window._waIn/_waOut are
+  // now only a live scratch value DURING a drag, in sync with state on
+  // every mousemove (see above).
+  window.updateWaBar=function(){
+    var bar=document.getElementById('wa-bar');
+    var inF=(window.state&&state.waIn!=null)?state.waIn:(window._waIn||0);
+    var outF=(window.state&&state.waOut!=null)?state.waOut:(window._waOut||23);
+    bar.style.left=(inF*FC)+'px';bar.style.width=((outF-inF+1)*FC)+'px';
+  };
   window._waIn=0;window._waOut=23;window._totalF=24;
   initWaDrag();
 

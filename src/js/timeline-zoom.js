@@ -207,6 +207,18 @@
     zoomOut: function () { return window.SMTimelineZoom.set(window.FC / 1.25); },
     reset: function () { return window.SMTimelineZoom.set(DEFAULT_FC); },
     get: function () { return window.FC; },
+    // Bug found 2026-07 ("la barre de scroll doit pouvoir aller d'un bout
+    // à l'autre... pas d'offset derrière"): redrawScrollbar() sizes the
+    // thumb off state.totalFrames (totalContentWidth()) but was only ever
+    // called from this module's own zoom/pan/resize/scroll handlers —
+    // any OTHER code path that changes totalFrames (insert/delete frames,
+    // project load, etc., timeline.js/app.js) had no way to tell it the
+    // content width just changed, leaving the thumb sized/positioned
+    // against a stale width with a persistent gap at one edge. Exposed so
+    // renderTimeline() (timeline.js) — the one function that already runs
+    // after every such change — can resync it every time, same "single
+    // choke point" fix as updateWaBar() above.
+    redraw: function () { redrawScrollbar(); },
   };
 
   function inTimeline(el) {

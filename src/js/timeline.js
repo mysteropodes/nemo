@@ -1339,6 +1339,16 @@ function renderTimeline(){
   // across. Sizing it explicitly to match fixes the seam.
   var barsRow=document.getElementById('bars-row');
   if(barsRow)barsRow.style.width=(state.totalFrames*FC)+'px';
+  // Bug found 2026-07 ("la barre de scroll doit pouvoir aller d'un bout à
+  // l'autre... pas d'offset derrière"): the custom zoom scrollbar
+  // (timeline-zoom.js) sizes its thumb off state.totalFrames but only
+  // ever resynced itself from its OWN zoom/pan/resize/scroll handlers —
+  // any totalFrames change coming from elsewhere (frame insert/delete,
+  // project load) left it stale against the real content width.
+  // renderTimeline() already runs after every such change, so resync it
+  // here once instead of chasing every individual call site.
+  if(window.SMTimelineZoom)SMTimelineZoom.redraw();
+  window.updateWaBar&&window.updateWaBar();
   // Motion mode has its own row structure entirely (property tracks, not
   // per-layer frame cells) — same ruler above, different grid content
   // below. Early return, same pattern camera.js's own row already used.
