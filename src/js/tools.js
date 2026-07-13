@@ -1850,6 +1850,19 @@ function buildDabShape(w,h,preset,rand){
     }
     path.closePath();
     path.smooth({type:'catmull-rom',factor:.5});
+  }else if(shape==='custom'&&preset.customStamp&&preset.customStamp.segments&&preset.customStamp.segments.length){
+    // User-drawn tip (captureBrushStamp below) — a normalized {point,
+    // handleIn,handleOut}[] fit to a [-0.5,0.5] box, rescaled per-axis to
+    // (w,h) here exactly like 'rect' stretches to its own w/h, so Roundness
+    // still meaningfully squashes whatever the user drew. Real bezier
+    // geometry (not a raster stamp) — an open captured squiggle fills via
+    // its own implicit closing edge, same as every other filled open path
+    // in this codebase; a closed one keeps its own silhouette.
+    var st=preset.customStamp;
+    path=new Path({insert:false,closed:!!st.closed});
+    st.segments.forEach(function(s){
+      path.add(new Segment(new Point(s.point[0]*w,s.point[1]*h),new Point(s.handleIn[0]*w,s.handleIn[1]*h),new Point(s.handleOut[0]*w,s.handleOut[1]*h)));
+    });
   }else{
     path=new Path.Ellipse({center:[0,0],radius:[w/2,h/2],insert:false});
   }
@@ -1862,6 +1875,28 @@ function buildDabShape(w,h,preset,rand){
   }
   return path;
 }
+// Captures a real, on-canvas path as a reusable brush-tip stamp (the
+// "dessiner sa texture de brush" request) — normalizes it to a [-0.5,0.5]
+// per-axis box so buildDabShape's 'custom' branch can rescale it to any
+// (w,h) exactly like the built-in shapes. Geometry only (silhouette) — a
+// dab is always solid-filled with the stroke's own ink color, so the
+// source path's own fill/stroke never matters, only its outline.
+// CompoundPath/Raster/Group are rejected with a clear reason rather than
+// silently picking one child or flattening — same honest-scope precedent
+// as svg-import.js's unsupported-element handling.
+function captureBrushStamp(p){
+  if(!p)return{ok:false,reason:'Rien à capturer — dessine une forme puis sélectionne-la.'};
+  if(!(p instanceof Path))return{ok:false,reason:'Sélectionne un seul trait simple (pas une forme booléenne/composée, une image, ni un groupe).'};
+  if(!p.segments||p.segments.length<2)return{ok:false,reason:'La forme sélectionnée est trop simple (au moins 2 points).'};
+  var b=p.bounds;
+  if(b.width<1e-6||b.height<1e-6)return{ok:false,reason:'La forme sélectionnée est dégénérée (largeur ou hauteur nulle).'};
+  var cx=b.center.x,cy=b.center.y,sx=1/b.width,sy=1/b.height;
+  var segments=p.segments.map(function(s){
+    return{point:[(s.point.x-cx)*sx,(s.point.y-cy)*sy],handleIn:[s.handleIn.x*sx,s.handleIn.y*sy],handleOut:[s.handleOut.x*sx,s.handleOut.y*sy]};
+  });
+  return{ok:true,stamp:{segments:segments,closed:!!p.closed,pointCount:segments.length}};
+}
+window.captureBrushStamp=captureBrushStamp;
 // widthProfile (optional): a buildWidthProfile()-shaped {t,width}[] array,
 // t in [0,1] as a fraction of PATHLIKE'S OWN length (not the raw stroke's
 // original arc length — applyBrushTexture is responsible for re-basing a

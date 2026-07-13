@@ -29,6 +29,7 @@
     { value: 'polygon', label: 'Polygone (chip anguleux)' },
     { value: 'splatter', label: 'Éclaboussure' },
     { value: 'bristle', label: 'Poils (dry-brush)' },
+    { value: 'custom', label: 'Personnalisé (dessiné)…' },
   ];
   var DEFAULT_PARAMS = { nibSize: 1, roundness: 0.9, spacing: 0.4, spaceJitter: 0.2, rotationMode: 'tangent', rotationJitter: 20, sizeJitter: 0.2, opacity: 0.6, opacityJitter: 0.2, scatter: 0.15, dashGap: 0, tipShape: 'ellipse', edgeNoise: 0, polySides: 5, bristleCount: 5, tipCorner: 0.15 };
 
@@ -83,6 +84,9 @@
     el.innerHTML =
       '<div class="bpe-preview-wrap"><canvas id="bpe-preview" width="320" height="60"></canvas></div>' +
       '<div class="bpe-row"><span class="bpe-lbl">Forme de pointe</span><select class="bpe-tipshape" id="bpe-tipshape">' + tipShapeOptionsHtml + '</select></div>' +
+      '<div class="bpe-row bpe-capture-row" id="bpe-capture-row" style="display:none">' +
+      '<span class="bpe-lbl"></span><button class="pbtn" id="bpe-capture-btn">Capturer la sélection</button>' +
+      '<span class="bpe-val" id="bpe-capture-status"></span></div>' +
       '<div class="bpe-row"><span class="bpe-lbl">Rotation</span><select class="bpe-rotmode" id="bpe-rotmode">' +
       '<option value="tangent">Suit le tracé</option><option value="random">Aléatoire</option><option value="fixed">Fixe</option>' +
       '</select></div>' +
@@ -99,6 +103,37 @@
     rotSel.value = params.rotationMode || 'tangent';
     var tipSel = el.querySelector('#bpe-tipshape');
     tipSel.value = params.tipShape || 'ellipse';
+    var captureRow = el.querySelector('#bpe-capture-row');
+    var captureStatus = el.querySelector('#bpe-capture-status');
+
+    // "dessiner sa texture de brush" — capture whatever's currently
+    // selected on the canvas (drawn with Pen/Draw beforehand, same
+    // pattern as pose-library's savePose) as the dab's own tip geometry,
+    // normalized to a unit box (captureBrushStamp, tools.js) so
+    // buildDabShape's 'custom' branch can rescale it like any other shape.
+    // Geometry only — a dab is always solid-filled with the ink color, so
+    // the captured path's own fill/stroke/color never matters.
+    function refreshCaptureStatus() {
+      if (params.customStamp && params.customStamp.segments && params.customStamp.segments.length) {
+        captureStatus.textContent = 'Forme capturée (' + params.customStamp.segments.length + ' points)';
+      } else {
+        captureStatus.textContent = 'Aucune forme — ellipse utilisée en attendant';
+      }
+    }
+    function syncCaptureRowVisibility() {
+      captureRow.style.display = params.tipShape === 'custom' ? 'flex' : 'none';
+      if (params.tipShape === 'custom') refreshCaptureStatus();
+    }
+    el.querySelector('#bpe-capture-btn').addEventListener('click', function () {
+      var sel = (typeof selectedPaths !== 'undefined' && selectedPaths.length === 1) ? selectedPaths[0] : null;
+      var res = window.captureBrushStamp(sel);
+      if (!res.ok) { showToast(res.reason); return; }
+      params.customStamp = res.stamp;
+      refreshCaptureStatus();
+      renderPreview();
+      showToast('Forme capturée (' + res.stamp.pointCount + ' points)');
+    });
+    syncCaptureRowVisibility();
 
     function renderPreview() {
       var ctx = canvas.getContext('2d'), w = canvas.width, h = canvas.height;
@@ -129,7 +164,7 @@
       });
     });
     rotSel.addEventListener('change', function () { params.rotationMode = rotSel.value; renderPreview(); });
-    tipSel.addEventListener('change', function () { params.tipShape = tipSel.value; renderPreview(); });
+    tipSel.addEventListener('change', function () { params.tipShape = tipSel.value; syncCaptureRowVisibility(); renderPreview(); });
 
     renderPreview();
 
