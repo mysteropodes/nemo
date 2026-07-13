@@ -1424,6 +1424,7 @@ window.addEventListener('mousemove',function(e){
   var fi=_spanShrinkFrameAt(e);
   document.querySelectorAll('.fc.span-drag-band').forEach(function(c){c.classList.remove('span-drag-band');});
   document.querySelectorAll('.fc.span-drag-preview').forEach(function(c){c.classList.remove('span-drag-preview');});
+  document.querySelectorAll('.fc.span-drag-dot-cell').forEach(function(c){c.classList.remove('span-drag-dot-cell');});
   document.querySelectorAll('.km.drag-key-preview').forEach(function(k){k.remove();});
   // v8: tint the WHOLE prospective span (source key's next frame through
   // the current drag position), not just the single cell under the cursor
@@ -1435,27 +1436,38 @@ window.addEventListener('mousemove',function(e){
     if(bandCell)bandCell.classList.add('span-drag-band');
   }
   var prevCell=document.querySelector('.fc[data-layer="'+_spanShrink.li+'"][data-frame="'+fi+'"]');
-  if(prevCell){
-    prevCell.classList.add('span-drag-preview');
-    // Trim path: show the relocating keyframe's OWN dot (full/hollow,
-    // matching whatever it'll actually look like once dropped) riding
-    // along with the preview cell, instead of only the abstract square —
-    // same visual language as a real committed keyframe.
-    if(_spanShrink.nextKeyFi>=0){
-      var ld=state.layers[_spanShrink.li];
-      var movedFr=ld.frames[_spanShrink.nextKeyFi];
-      var full=movedFr&&movedFr.strokes.length>0;
-      var dot=document.createElement('div');
-      dot.className='km drag-key-preview '+(full?'fl':'hl');
-      prevCell.appendChild(dot);
-      prevCell.classList.add('span-drag-preview-key');
+  if(prevCell)prevCell.classList.add('span-drag-preview');
+  // Trim path: show the relocating keyframe's OWN dot (full/hollow, matching
+  // whatever it'll actually look like once dropped) riding one cell to the
+  // RIGHT of the bar — the same adjacency a committed span-end bar + its
+  // bordering keyframe dot already have when nothing is being dragged
+  // (feedback: "le rond de la keyframe doit être juste à côté à droite").
+  // A previous version appended this dot into the SAME cell as the bar
+  // (prevCell) — visually overlapping instead of adjacent.
+  if(_spanShrink.nextKeyFi>=0){
+    var dotCell=document.querySelector('.fc[data-layer="'+_spanShrink.li+'"][data-frame="'+(fi+1)+'"]');
+    if(dotCell){
+      dotCell.classList.add('span-drag-dot-cell');
+      // Still sitting at the keyframe's ORIGINAL spot (fi+1===nextKeyFi) —
+      // its real .km dot is already there (dimmed via tl-outdrag-source-key
+      // on mousedown); the opacity override in style.css brings it back to
+      // full instead of stacking a redundant second dot on top of it.
+      if(fi+1!==_spanShrink.nextKeyFi){
+        var ld=state.layers[_spanShrink.li];
+        var movedFr=ld.frames[_spanShrink.nextKeyFi];
+        var full=movedFr&&movedFr.strokes.length>0;
+        var dot=document.createElement('div');
+        dot.className='km drag-key-preview '+(full?'fl':'hl');
+        dotCell.appendChild(dot);
+      }
     }
   }
 });
 window.addEventListener('mouseup',function(e){
   if(!_spanShrink.active)return;
   document.querySelectorAll('.fc.span-drag-band').forEach(function(c){c.classList.remove('span-drag-band');});
-  document.querySelectorAll('.fc.span-drag-preview').forEach(function(c){c.classList.remove('span-drag-preview','span-drag-preview-key');});
+  document.querySelectorAll('.fc.span-drag-preview').forEach(function(c){c.classList.remove('span-drag-preview');});
+  document.querySelectorAll('.fc.span-drag-dot-cell').forEach(function(c){c.classList.remove('span-drag-dot-cell');});
   document.querySelectorAll('.km.drag-key-preview').forEach(function(k){k.remove();});
   // Explicit cleanup, not just "a re-render will replace it" — several
   // branches below return early on a no-op drop (dropped back on the

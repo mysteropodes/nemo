@@ -417,13 +417,28 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--gutter);color:
    band/square/dot (still full opacity) shows "where it'll land" — both
    visible at once, distinguishable by opacity alone. */
 .fc.span-end.tl-outdrag-source-end::after{opacity:.35;}
+/* v10: at the very start of a drag (before the cursor has crossed into a
+   new cell), the LIVE preview and the dimmed SOURCE are still the exact
+   same DOM cell — CSS doesn't pick one rule over the other for non-
+   conflicting properties, so the dim rule's opacity:.35 above ALSO applied
+   to the preview's ::after (same pseudo-element), making the live bar
+   look faded/"disappeared" right as the drag began — feedback: "la barre
+   bleu disparait pendant le drag". Forces the moving preview back to full
+   opacity whenever it lands on the same cell as the dimmed source. */
+.fc.span-drag-preview.tl-outdrag-source-end::after{opacity:1;}
+.fc.span-drag-dot-cell.tl-outdrag-source-key .km{opacity:1;}
 /* v7: when the drag will actually relocate a real bordering keyframe (the
-   "trim" path, not "insert a new one"), the target cell also gets a live
-   preview dot in the SAME style a committed keyframe dot would have —
-   otherwise only the abstract end-square moved and the next keyframe
-   looked like it was staying put until the drop. */
-.fc.span-drag-preview-key::after{display:none;}
-.fc .km.drag-key-preview{opacity:.85;}
+   "trim" path, not "insert a new one"), the cell ONE FRAME TO THE RIGHT of
+   the bar (span-drag-dot-cell, timeline.js mousemove) gets a live preview
+   dot in the SAME style a committed keyframe dot would have — same
+   adjacency the real bar+dot pair already have when nothing is dragging.
+   (v9 had this dot sharing the BAR's own cell instead — a stray
+   `::after{display:none}` selector meant for a different purpose ended up
+   matching that shared cell too and hid the bar's own pseudo-element,
+   which was the actual cause of "la barre bleu disparait pendant le
+   drag". Splitting the bar cell and the dot cell removes the collision
+   entirely instead of papering over it.) */
+.fc .km.drag-key-preview{opacity:1;}
 .fc.tl-outdrag-source-key .km{opacity:.35;}
 .fc.tw{background:var(--tween-color);}
 /* A tween frame the user hand-corrected reads in green instead of the
