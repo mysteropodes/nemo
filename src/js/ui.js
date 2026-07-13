@@ -31,6 +31,23 @@
   var camEaseSeg=null,camEaseLabel='';
   function isCamMode(){return !!camEaseSeg;}
   function camEase(){return camEaseSeg.ease||(camEaseSeg.ease=[.42,0,.58,1]);}
+  // Motion-segment points-based ease mode (2026-07, explicit request: reuse
+  // the SAME on-curve-waypoint model as the tween's own curve, not camera's
+  // simpler 2-handle bezier) — a motion keyframe's own `curvePoints` array,
+  // same shape as `cs.points` (the tween's global curve) but scoped to ONE
+  // segment instead of applying uniformly everywhere. Mutually exclusive
+  // with camera mode (editMotionSeg/editCameraSeg each clear the other).
+  var motionEaseSeg=null,motionEaseLabel='';
+  function isMotionMode(){return !!motionEaseSeg;}
+  var MOTION_DEFAULT_CURVE=[{x:0,y:0},{x:.42,y:0},{x:.58,y:1},{x:1,y:1}];
+  function motionCurve(){return motionEaseSeg.curvePoints||(motionEaseSeg.curvePoints=clonePts(MOTION_DEFAULT_CURVE));}
+  // The points array actually being viewed/edited right now — motion-segment
+  // mode if active, otherwise the tween's own global curve. Every point-
+  // editing code path below (hit-test, drag, add/delete, presets) reads/
+  // writes through this instead of `cs.points` directly, so camera mode
+  // stays the only thing with genuinely separate rendering/interaction.
+  function activePoints(){return isMotionMode()?motionCurve():cs.points;}
+  function setActivePoints(pts){if(isMotionMode())motionEaseSeg.curvePoints=pts;else cs.points=pts;}
   // A small easing gallery (After Effects/GreenSock-style grid of named
   // curve families, each in/out/inout where that makes sense) — through-
   // point approximations of their usual off-curve-handle shapes, since the
@@ -85,7 +102,7 @@
   // past the endpoints).
   function yRange(){
     var lo=0,hi=1;
-    cs.points.forEach(function(p){if(p.y<lo)lo=p.y;if(p.y>hi)hi=p.y;});
+    activePoints().forEach(function(p){if(p.y<lo)lo=p.y;if(p.y>hi)hi=p.y;});
     var m=(hi-lo)*.12||.1;
     return{lo:lo-m,hi:hi+m};
   }
@@ -159,6 +176,7 @@
   }
   function draw(){
     if(isCamMode()){drawCamEase();return;}
+    var pts=activePoints();
     var yr=yRange();
     ctx.clearRect(0,0,W,H);ctx.fillStyle='#111';ctx.fillRect(0,0,W,H);
     ctx.strokeStyle='#1e293b';ctx.lineWidth=1;
@@ -171,26 +189,29 @@
     ctx.beginPath();ctx.moveTo(tX(0),tY(0,yr));ctx.lineTo(tX(1),tY(0,yr));ctx.stroke();
     ctx.beginPath();ctx.moveTo(tX(0),tY(1,yr));ctx.lineTo(tX(1),tY(1,yr));ctx.stroke();
     ctx.setLineDash([]);
-    // curve
+    // curve — motion-segment mode plots THIS segment's own points (not the
+    // global evalCurve/cs.points), everything else about the rendering is
+    // shared with the tween's own curve view.
     ctx.strokeStyle='#4a9eff';ctx.lineWidth=2.5;ctx.beginPath();
-    ctx.moveTo(tX(0),tY(evalCurve(0),yr));
-    var N=100;for(var s=1;s<=N;s++){var xx=s/N;ctx.lineTo(tX(xx),tY(evalCurve(xx),yr));}
+    var evalFn=isMotionMode()?function(x){return evalPointsCurve(pts,x);}:evalCurve;
+    ctx.moveTo(tX(0),tY(evalFn(0),yr));
+    var N=100;for(var s=1;s<=N;s++){var xx=s/N;ctx.lineTo(tX(xx),tY(evalFn(xx),yr));}
     ctx.stroke();
     // through-point handles + connecting guide lines between consecutive points
     ctx.strokeStyle='rgba(255,255,255,.15)';ctx.lineWidth=1;ctx.beginPath();
-    cs.points.forEach(function(p,i2){var px=tX(p.x),py=tY(p.y,yr);if(i2===0)ctx.moveTo(px,py);else ctx.lineTo(px,py);});
+    pts.forEach(function(p,i2){var px=tX(p.x),py=tY(p.y,yr);if(i2===0)ctx.moveTo(px,py);else ctx.lineTo(px,py);});
     ctx.stroke();
-    cs.points.forEach(function(p,i3){
-      var isEnd=i3===0||i3===cs.points.length-1;
+    pts.forEach(function(p,i3){
+      var isEnd=i3===0||i3===pts.length-1;
       var col=i3===selected?'#fff':(isEnd?'#bd93f9':'#4a9eff');
       drawH(p.x,p.y,col,yr,isEnd?7:8);
     });
     // Selected point's derived tangent handles (Alt/Option — see
     // showTangents above): the same (next-prev)/2 Catmull-Rom tangent
     // segCtrl feeds the interpolation, split into its in/out thirds.
-    if(showTangents&&selected!=null&&cs.points[selected]){
-      var sp=cs.points[selected];
-      var tprev=cs.points[selected-1]||sp,tnext=cs.points[selected+1]||sp;
+    if(showTangents&&selected!=null&&pts[selected]){
+      var sp=pts[selected];
+      var tprev=pts[selected-1]||sp,tnext=pts[selected+1]||sp;
       var ttx=(tnext.x-tprev.x)/2,tty=(tnext.y-tprev.y)/2;
       [{x:sp.x-ttx/3,y:sp.y-tty/3},{x:sp.x+ttx/3,y:sp.y+tty/3}].forEach(function(h){
         var hx=tX(h.x),hy=tY(h.y,yr);
@@ -201,15 +222,25 @@
       });
     }
     var coordsEl=document.getElementById('curve-coords');
-    if(coordsEl)coordsEl.textContent=cs.points.length+' points';
+    if(coordsEl)coordsEl.textContent=isMotionMode()?motionEaseLabel:(pts.length+' points');
   }
   function drawH(nx,ny,c,yr,r){ctx.beginPath();ctx.arc(tX(nx),tY(ny,yr),r,0,Math.PI*2);ctx.fillStyle=c;ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.stroke();}
   function hitT(mx,my){
     var yr=yRange(),best=-1,bestD=16;
-    cs.points.forEach(function(p,i){var d=Math.hypot(mx-tX(p.x),my-tY(p.y,yr));if(d<bestD){bestD=d;best=i;}});
+    activePoints().forEach(function(p,i){var d=Math.hypot(mx-tX(p.x),my-tY(p.y,yr));if(d<bestD){bestD=d;best=i;}});
     return best;
   }
-  function pushCurve(){if(window.SM)window.SM.setCurve(clonePts(cs.points));upP();}
+  // Only the tween's own global curve persists to state.easingCurve/save —
+  // a motion segment's points live on the KEY itself (motion.js's own
+  // save/load path), never here, so pushCurve must not clobber the global
+  // tween curve while a motion segment happens to be open in this same
+  // widget. renderNow()/renderTimeline() aren't called from here (this
+  // module doesn't know about Motion mode's rows) — motion.js's own
+  // onEaseSegChanged hook (if present) picks up the repaint instead.
+  function pushCurve(){
+    if(isMotionMode()){if(window.SMMotion&&window.SMMotion.onEaseSegChanged)window.SMMotion.onEaseSegChanged();return;}
+    if(window.SM)window.SM.setCurve(clonePts(cs.points));upP();
+  }
 
   // Camera-mode drag state — which control handle (0 or 1) is being moved.
   var camDragWhich=null;
@@ -256,11 +287,12 @@
     var yr=yRange();
     var mx=(e.clientX-rect.left)*(W/rect.width),my=(e.clientY-rect.top)*(H/rect.height);
     var nx=fX(mx),ny=fY(my,yr);
-    var p=cs.points[dragging];
+    var pts=activePoints();
+    var p=pts[dragging];
     if(dragging===0)p.x=0;
-    else if(dragging===cs.points.length-1)p.x=1;
+    else if(dragging===pts.length-1)p.x=1;
     else{
-      var lo=cs.points[dragging-1].x+.01,hi=cs.points[dragging+1].x-.01;
+      var lo=pts[dragging-1].x+.01,hi=pts[dragging+1].x-.01;
       p.x=Math.max(lo,Math.min(hi,nx));
     }
     p.y=Math.max(-1,Math.min(2,ny));
@@ -268,31 +300,35 @@
   });
   window.addEventListener('mouseup',function(){dragging=null;camDragWhich=null;});
   cvs.addEventListener('dblclick',function(e){
+    if(isCamMode())return; // camera mode has exactly 2 fixed control points, nothing to add
     rect=cvs.getBoundingClientRect();
     var mx=(e.clientX-rect.left)*(W/rect.width),my=(e.clientY-rect.top)*(H/rect.height);
     if(hitT(mx,my)>=0)return; // double-click ON a point does nothing extra
     var yr=yRange();
     var nx=Math.max(.01,Math.min(.99,fX(mx))),ny=fY(my,yr);
-    var idx=cs.points.length;
-    for(var i=1;i<cs.points.length;i++){if(cs.points[i].x>nx){idx=i;break;}}
-    cs.points.splice(idx,0,{x:nx,y:ny});
+    var pts=activePoints();
+    var idx=pts.length;
+    for(var i=1;i<pts.length;i++){if(pts[i].x>nx){idx=i;break;}}
+    pts.splice(idx,0,{x:nx,y:ny});
     selected=idx;
     draw();pushCurve();
   });
   cvs.addEventListener('mouseenter',function(){hovering=true;});
   cvs.addEventListener('mouseleave',function(){hovering=false;});
   document.addEventListener('keydown',function(e){
-    if(!hovering||selected==null)return;
+    if(!hovering||selected==null||isCamMode())return;
     if(e.key!=='Delete'&&e.key!=='Backspace')return;
-    if(selected===0||selected===cs.points.length-1)return; // endpoints are permanent
+    var pts=activePoints();
+    if(selected===0||selected===pts.length-1)return; // endpoints are permanent
     e.preventDefault();
-    cs.points.splice(selected,1);
+    pts.splice(selected,1);
     selected=null;
     draw();pushCurve();
   });
 
   function isMatch(p){
-    return p&&p.length===cs.points.length&&p.every(function(pt,i){return Math.abs(pt.x-cs.points[i].x)<.03&&Math.abs(pt.y-cs.points[i].y)<.03;});
+    var pts=cs.points;
+    return p&&p.length===pts.length&&p.every(function(pt,i){return Math.abs(pt.x-pts[i].x)<.03&&Math.abs(pt.y-pts[i].y)<.03;});
   }
   function upP(){
     document.querySelectorAll('#curve-presets button[data-preset], #curve-custom-presets button[data-preset]').forEach(function(b){
@@ -312,7 +348,7 @@
       b.dataset.preset=key;
       b.title=key;
       b.innerHTML=buildThumbSvg(pts)+'<span>'+key+'</span>';
-      b.addEventListener('click',function(){cs.points=clonePts(pts);selected=null;draw();upP();pushCurve();});
+      b.addEventListener('click',function(){setActivePoints(clonePts(pts));selected=null;draw();upP();pushCurve();});
       wrap.appendChild(b);
     });
   }
@@ -328,7 +364,7 @@
       b.dataset.preset=key;
       b.title=cp.name+' — clic : appliquer, clic droit : supprimer';
       b.innerHTML=buildThumbSvg(cp.points)+'<span>'+cp.name+'</span>';
-      b.addEventListener('click',function(){cs.points=clonePts(cp.points);selected=null;draw();upP();pushCurve();});
+      b.addEventListener('click',function(){setActivePoints(clonePts(cp.points));selected=null;draw();upP();pushCurve();});
       b.addEventListener('contextmenu',function(e){
         e.preventDefault();
         if(!window.confirm('Supprimer le preset "'+cp.name+'" ?'))return;
@@ -379,7 +415,10 @@
     },
     draw:draw,
     // Camera-segment ease editing (feedback #5pi90) — see camEaseSeg above.
+    // Clears motion mode too — only one "currently edited segment" at a
+    // time on this one shared canvas.
     editCameraSeg:function(seg,label){
+      motionEaseSeg=null;
       camEaseSeg=seg;camEaseLabel=label||'';
       if(window.openPropsSection)window.openPropsSection('easing-sec');
       draw();
@@ -388,7 +427,23 @@
       if(!camEaseSeg)return;
       camEaseSeg=null;draw();
     },
-    isCameraMode:isCamMode
+    // Motion-segment points-based ease editing (2026-07) — see motionEaseSeg
+    // above. `seg` is a motion key object (its own `.curvePoints` gets
+    // lazily created/mutated in place, same live-reference contract
+    // editCameraSeg already has for `.ease`).
+    editMotionSeg:function(seg,label){
+      camEaseSeg=null;
+      motionEaseSeg=seg;motionEaseLabel=label||'';
+      selected=null;
+      if(window.openPropsSection)window.openPropsSection('easing-sec');
+      draw();
+    },
+    exitMotionSeg:function(){
+      if(!motionEaseSeg)return;
+      motionEaseSeg=null;draw();
+    },
+    isCameraMode:isCamMode,
+    isMotionMode:isMotionMode
   };
   setTimeout(draw,100);
 })();

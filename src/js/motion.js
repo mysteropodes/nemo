@@ -5,14 +5,16 @@
 // nos éléments dedans" — the user's own requirement) so the two modes stay
 // two VIEWS of one project, not two separate documents.
 //
-// Engine: a generalized copy of camera.js's proven per-segment cubic-bezier
-// ease + spatial-bezier-handle math (position gets real motion-path
-// curvature via hOut/hIn, same as the camera's framing keys already do;
-// rotation/scale/opacity are scalar lerps along the same eased t). Kept as
-// a SEPARATE small copy of bezierEase rather than a shared import — same
-// call this codebase already makes for other tiny stable pure-math pairs
-// (CLAUDE.md §3's JS/Rust duplicates) — must stay in sync with camera.js's
-// copy if the easing math itself ever changes.
+// Engine: position gets real motion-path curvature via spatial hOut/hIn
+// handles, generalized from camera.js's framing keys; the TIMING/velocity
+// curve between two keys (rotation/scale/opacity are scalar lerps along the
+// same eased t) uses the Tween feature's own N-point on-curve-waypoint
+// model (Catmull-Rom tangents), not camera.js's simpler 2-handle bezier —
+// explicit request to reuse the SAME curve widget/math the Tween panel
+// already has, just scoped PER SEGMENT (key.curvePoints) instead of one
+// curve applying globally. evalCurvePoints below is a deliberate small copy
+// of ui.js's evalPointsCurve (CLAUDE.md §3's "small stable pure-math pairs
+// that must stay in sync" pattern), not a shared import.
 //
 // CRITICAL save-safety constraint (CLAUDE.md's "family of bug #1" — a new
 // per-frame effect that mutates the LIVE Paper.js layer would get baked
@@ -24,7 +26,6 @@
 // Rust renderer (and, symmetrically, export.js's own frame builder) gets
 // translated/rotated/scaled/faded.
 (function () {
-  var DEFAULT_EASE = [0.42, 0, 0.58, 1]; // easeInOut, same default as camera.js
   // 'anchor' is AE's Anchor Point: an OFFSET from the layer's auto-computed
   // bounds center, default [0,0] (== exactly today's behavior, so existing
   // projects/keys are untouched). It doesn't move the artwork itself — it
@@ -71,24 +72,37 @@
     opacity: '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18Z" fill="currentColor" stroke="none"/></svg>',
   };
 
-  // ---- easing math (see header comment: deliberate copy of camera.js) ----
-  function bezierEase(t, x1, y1, x2, y2) {
-    if (t <= 0) return 0;
-    if (t >= 1) return 1;
-    function bx(u) { var v = 1 - u; return 3 * v * v * u * x1 + 3 * v * u * u * x2 + u * u * u; }
-    function by(u) { var v = 1 - u; return 3 * v * v * u * y1 + 3 * v * u * u * y2 + u * u * u; }
-    function dbx(u) { var v = 1 - u; return 3 * v * v * x1 + 6 * v * u * (x2 - x1) + 3 * u * u * (1 - x2); }
-    var u = t;
-    for (var i = 0; i < 8; i++) {
-      var d = dbx(u);
-      if (Math.abs(d) < 1e-6) break;
-      var err = bx(u) - t;
-      if (Math.abs(err) < 1e-5) return by(u);
-      u = Math.max(0, Math.min(1, u - err / d));
+  // ---- easing math: N-point on-curve-waypoint model, deliberate copy of
+  // ui.js's shared curve editor (Catmull-Rom tangents -> per-segment cubic
+  // Bezier, Newton-with-bisection-fallback solve) — 2026-07, switched from
+  // the earlier 2-handle bezier per explicit request to reuse the SAME
+  // widget/model the Tween feature already has, just scoped per motion
+  // segment instead of one curve applying everywhere. See CLAUDE.md §3 on
+  // why this stays a small separate copy rather than a shared import. ----
+  var DEFAULT_CURVE = [{ x: 0, y: 0 }, { x: 0.42, y: 0 }, { x: 0.58, y: 1 }, { x: 1, y: 1 }];
+  function cloneCurvePts(pts) { return pts.map(function (p) { return { x: p.x, y: p.y }; }); }
+  function curveCubicAt(t, a, b, c, d) { var u = 1 - t; return u * u * u * a + 3 * u * u * t * b + 3 * u * t * t * c + t * t * t * d; }
+  function curveCubicDerivAt(t, a, b, c, d) { var u = 1 - t; return 3 * u * u * (b - a) + 6 * u * t * (c - b) + 3 * t * t * (d - c); }
+  function curveSegCtrl(pts, i) {
+    var p0 = pts[i], p3 = pts[i + 1];
+    var prev = pts[i - 1] || p0, next = pts[i + 2] || p3;
+    var t1x = (p3.x - prev.x) / 2, t1y = (p3.y - prev.y) / 2;
+    var t2x = (next.x - p0.x) / 2, t2y = (next.y - p0.y) / 2;
+    return { c1: { x: p0.x + t1x / 3, y: p0.y + t1y / 3 }, c2: { x: p3.x - t2x / 3, y: p3.y - t2y / 3 } };
+  }
+  function curveSegFor(pts, x) { var i = 0; while (i < pts.length - 2 && pts[i + 1].x < x) i++; return i; }
+  function evalCurvePoints(pts, x) {
+    if (!pts || pts.length < 2) return x;
+    x = Math.max(0, Math.min(1, x));
+    var i = curveSegFor(pts, x), p0 = pts[i], p3 = pts[i + 1], ctrl = curveSegCtrl(pts, i);
+    var span = p3.x - p0.x, t = span > 1e-6 ? (x - p0.x) / span : 0;
+    for (var k = 0; k < 8; k++) {
+      var ex = curveCubicAt(t, p0.x, ctrl.c1.x, ctrl.c2.x, p3.x) - x;
+      var dx = curveCubicDerivAt(t, p0.x, ctrl.c1.x, ctrl.c2.x, p3.x);
+      if (Math.abs(dx) < 1e-6) break;
+      t -= ex / dx; t = Math.max(0, Math.min(1, t));
     }
-    var lo = 0, hi = 1;
-    for (var j = 0; j < 24; j++) { u = (lo + hi) / 2; if (bx(u) < t) lo = u; else hi = u; }
-    return by(u);
+    return curveCubicAt(t, p0.y, ctrl.c1.y, ctrl.c2.y, p3.y);
   }
 
   // ---- data model: state.layers[i].motion = {position:{keys:[...]}, ...},
@@ -122,8 +136,7 @@
       var a = ks[i], b = ks[i + 1];
       if (frame >= a.frame && frame < b.frame) {
         var t = (frame - a.frame) / (b.frame - a.frame);
-        var e = a.ease || DEFAULT_EASE;
-        var y = bezierEase(t, e[0], e[1], e[2], e[3]);
+        var y = evalCurvePoints(a.curvePoints || DEFAULT_CURVE, t);
         // Position gets real spatial-bezier curvature through its
         // hOut/hIn handles (same construction as camera.js's motion
         // path) whenever either handle is non-zero — a straight [0,0]
@@ -153,18 +166,38 @@
     return ks[0];
   }
 
-  // Opens the SAME shared ease-curve widget camera.js already uses
-  // (window._curveEditor.editCameraSeg — its name is camera-specific but
-  // the API only cares that `seg` has an `.ease` array, and motion keys use
-  // the identical {ease:[x1,y1,x2,y2],...} shape). Reusing it means no new
-  // curve UI to build: dragging the two handles in that widget mutates
-  // `seg.ease` in place, exactly as it already does for camera keys.
+  // Opens the shared curve widget in its points-based mode
+  // (window._curveEditor.editMotionSeg) — the SAME on-curve-waypoint model
+  // and rendering the Tween feature's own curve already uses (explicit
+  // request: reuse it rather than camera.js's simpler 2-handle bezier), just
+  // scoped to this ONE segment's own `key.curvePoints` instead of the single
+  // global tween curve. Dragging/adding/deleting points in the widget
+  // mutates `seg.curvePoints` in place.
   function openMotionEaseEditor(ld, prop) {
     var track = ld.motion && ld.motion[prop];
-    var seg = track ? segmentLeftKey(track, state.currentFrame) : null;
-    if (!seg) { if (window.showToast) showToast('Ajoute au moins 2 clés sur ' + PROP_LABEL[prop] + ' pour avoir une courbe'); return; }
-    var ks = track.keys, next = ks[ks.indexOf(seg) + 1];
-    if (window._curveEditor) window._curveEditor.editCameraSeg(seg, PROP_LABEL[prop] + ' : clé ' + (seg.frame + 1) + ' → ' + (next.frame + 1));
+    if (!track || !track.keys.length) { if (window.showToast) showToast('Anime d’abord ' + PROP_LABEL[prop] + ' (icône chrono) pour avoir une courbe'); return; }
+    // Auto-create the missing second key — explicit request ("créer les
+    // clés manquantes si il le faut"): a single-key track has nothing to
+    // ease BETWEEN yet, but the user shouldn't have to manually add a
+    // placeholder key first just to open the curve editor. Same value as
+    // the existing key (a flat segment, editing the curve then shapes the
+    // actual motion) at a nearby frame — the current frame if it differs
+    // from the only key's, otherwise +12 frames (or -12 if that overflows).
+    if (track.keys.length === 1) {
+      var only = track.keys[0];
+      var nf = state.currentFrame !== only.frame ? state.currentFrame : Math.min(state.totalFrames - 1, only.frame + 12);
+      if (nf === only.frame) nf = Math.max(0, only.frame - 12);
+      if (nf !== only.frame) {
+        track.keys.push({ frame: nf, v: only.v.slice(), curvePoints: cloneCurvePts(DEFAULT_CURVE), hOut: [0, 0], hIn: [0, 0] });
+        sortKeys(track);
+        renderLayerList(); renderTimeline();
+      }
+    }
+    var seg = segmentLeftKey(track, state.currentFrame) || track.keys[0];
+    var idx = track.keys.indexOf(seg);
+    var next = track.keys[idx + 1] || track.keys[idx - 1];
+    if (!next) { if (window.showToast) showToast('Impossible de créer un segment éditable'); return; }
+    if (window._curveEditor) window._curveEditor.editMotionSeg(seg, PROP_LABEL[prop] + ' : clé ' + (seg.frame + 1) + ' → ' + (next.frame + 1));
   }
 
   function setKeyAtCurrentFrame(ld, prop, values) {
@@ -172,7 +205,7 @@
     var k = keyAt(track, state.currentFrame);
     if (k) { k.v = values.slice(); }
     else {
-      track.keys.push({ frame: state.currentFrame, v: values.slice(), ease: DEFAULT_EASE.slice(), hOut: [0, 0], hIn: [0, 0] });
+      track.keys.push({ frame: state.currentFrame, v: values.slice(), curvePoints: cloneCurvePts(DEFAULT_CURVE), hOut: [0, 0], hIn: [0, 0] });
       sortKeys(track);
     }
     return keyAt(track, state.currentFrame);
@@ -198,7 +231,7 @@
       ld.motionStatic[prop] = v;
     } else {
       var cur = staticValue(ld, prop);
-      ensureTrack(ld, prop).keys = [{ frame: state.currentFrame, v: cur, ease: DEFAULT_EASE.slice(), hOut: [0, 0], hIn: [0, 0] }];
+      ensureTrack(ld, prop).keys = [{ frame: state.currentFrame, v: cur, curvePoints: cloneCurvePts(DEFAULT_CURVE), hOut: [0, 0], hIn: [0, 0] }];
     }
   }
   // Editing a value field: if animated, this is a scrub at the CURRENT
@@ -705,8 +738,11 @@
               ? { label: 'Supprimer cette clé', action: function () { pushUndo(); var tr = ld.motion[prop]; tr.keys.splice(tr.keys.indexOf(key), 1); renderTimeline(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); } }
               : { label: 'Ajouter une clé ici', action: function () { pushUndo(); setKeyAtCurrentFrame(ld, prop, isAnimated(ld, prop) ? valueAtFrame(ld, prop, frameIdx) : staticValue(ld, prop)); renderLayerList(); renderTimeline(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); } },
           ];
-          if (track && segmentLeftKey(track, frameIdx)) {
-            menu.push({ label: 'Éditer la courbe d’accélération…', action: function () { openMotionEaseEditor(ld, prop); } });
+          if (track && track.keys.length) {
+            // A single-key track auto-creates its missing second key on open
+            // (see openMotionEaseEditor's header comment) — no need to
+            // require a full segment already existing before offering this.
+            menu.push({ label: 'Éditer la courbe d’accélération…', action: function () { pushUndo(); openMotionEaseEditor(ld, prop); } });
           }
           window.showContextMenu(e.clientX, e.clientY, menu);
         });
@@ -859,7 +895,7 @@
     // is about to disappear — fall back to the plain tween-curve view, same
     // precedent as camera.js's own exitCameraSeg() call when its tool
     // deactivates.
-    if (state.appMode === 'motion' && window._curveEditor) window._curveEditor.exitCameraSeg();
+    if (state.appMode === 'motion' && window._curveEditor) window._curveEditor.exitMotionSeg();
     state.appMode = mode;
     document.querySelectorAll('.app-mode-btn').forEach(function (b) { b.classList.toggle('active', b.dataset.mode === mode); });
     document.body.classList.toggle('mode-motion', mode === 'motion');
@@ -889,5 +925,11 @@
     onDrag: onDrag,
     onUp: onUp,
     handlePropShortcut: handlePropShortcut,
+    // ui.js's shared curve widget calls this after a motion segment's
+    // curvePoints change (drag/preset/add/delete point) — the canvas needs
+    // a repaint since the eased value at the current frame may have
+    // changed; the panel's scrub field too, if the playhead sits inside
+    // the segment being reshaped.
+    onEaseSegChanged: function () { renderLayerList(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); },
   };
 })();
