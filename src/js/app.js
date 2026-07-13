@@ -1195,8 +1195,53 @@ function goToFrame(idx){
   loadFrame(idx);if(!state.playing){renderOS();renderArcs();updateUI();}else{updatePlayhead();}
 }
 
+// F5/insertFrame is deliberately global (every layer, no _layerSel
+// targeting): it changes state.totalFrames and splices a new cell into
+// EVERY layer's frames array to keep them all the same length — every
+// other piece of code (frame navigation, getEffectiveStrokes, save/load)
+// assumes ld.frames.length===state.totalFrames for every layer at all
+// times. Selectively skipping layers here would desync that invariant and
+// crash frame navigation the moment the playhead reached a frame index a
+// skipped layer's (now-shorter) array doesn't have. F6/insertKeyframe
+// below is the one that's per-layer and safely selection-aware — it only
+// flips a flag + snapshots strokes on frames that already exist, no
+// splice, no shared length to keep in sync.
 function insertFrame(){pushUndoLayers();var cf=state.currentFrame;for(var i=0;i<state.layers.length;i++)state.layers[i].frames.splice(cf+1,0,{strokes:[],isKeyframe:false,isInterpolated:false});state.totalFrames++;if(state.waOut<state.totalFrames-1)state.waOut++;window._waOut=state.waOut;window._totalF=state.totalFrames;goToFrame(cf+1);showToast('Frame insérée (F5)');}
-function insertKeyframe(){insertKeyframeAt(state.activeLayerIdx,state.currentFrame);}
+// Core per-layer step shared by insertKeyframeAt (single layer+frame, own
+// undo/render — used by the span-end drag handle in timeline.js) and
+// insertKeyframe below (multi-layer, ONE undo/render for the whole batch).
+// No undo/render side effects of its own — callers own that.
+function _insertKeyframeCore(layerIdx,frameIdx){
+  var ld=state.layers[layerIdx];var f=ld.frames[frameIdx];
+  f.strokes=JSON.parse(JSON.stringify(getEffectiveStrokes(layerIdx,frameIdx)));
+  f.isKeyframe=true;f.isInterpolated=false;
+  syncLinkedKeyframeFolder(layerIdx,frameIdx);
+}
+// F6 — targets _layerSel (the layer-panel batch selection, see the
+// deselect-all click zones in timeline.js) when the user has explicitly
+// picked layer(s), otherwise every layer — matching Animate/Harmony's "no
+// selection = affects everything" convention. Previously always hit only
+// state.activeLayerIdx no matter what was selected in the panel (reported:
+// "peu importe le layer sélectionné ça ajoute des keyframes à tous" — the
+// bug was the opposite direction, always-all instead of always-active, but
+// same root cause: _layerSel was never consulted at all).
+function insertKeyframe(){
+  saveAllLayerFrames();
+  var targets=(typeof _layerSel!=='undefined'&&_layerSel.length)?_layerSel.slice():state.layers.map(function(_ld,i){return i;});
+  var cf=state.currentFrame;
+  var lockedHit=false;
+  var eligible=targets.filter(function(li){
+    var ld=state.layers[li];
+    if(!ld)return false;
+    if(ld.locked){lockedHit=true;return false;}
+    return !ld.frames[cf].isKeyframe;
+  });
+  if(!eligible.length){showToast(lockedHit?'Calque verrouillé':'Déjà une keyframe');return;}
+  pushUndoLayers();
+  eligible.forEach(function(li){_insertKeyframeCore(li,cf);});
+  loadFrame(cf);renderOS();renderArcs();updateUI();
+  showToast(eligible.length>1?eligible.length+' keyframes insérées':'Keyframe insérée');
+}
 // Same as insertKeyframe() but for an arbitrary layer/frame instead of only
 // the active layer at the current playhead — used to shorten a held/
 // extended keyframe's span by dropping a new keyframe partway through it
@@ -1225,9 +1270,7 @@ function insertKeyframeAt(layerIdx,frameIdx){
   if(ld.locked){showToast('Calque verrouillé');return false;}
   if(f.isKeyframe){showToast('Déjà une keyframe');return false;}
   pushUndoLayers();
-  f.strokes=JSON.parse(JSON.stringify(getEffectiveStrokes(layerIdx,frameIdx)));
-  f.isKeyframe=true;f.isInterpolated=false;
-  syncLinkedKeyframeFolder(layerIdx,frameIdx);
+  _insertKeyframeCore(layerIdx,frameIdx);
   if(layerIdx===state.activeLayerIdx)loadFrame(state.currentFrame);
   renderOS();renderArcs();updateUI();showToast('Keyframe insérée');
   return true;

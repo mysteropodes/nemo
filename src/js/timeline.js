@@ -1533,6 +1533,26 @@ document.getElementById('tl-content').addEventListener('mousedown',function(e){
   if(e.button!==0)return;
   if(e.target.closest('.fc'))return;
   if(_sel.frames.length)selClear();
+  // Deselecting every layer (clicking the empty background below the rows,
+  // either in the left layer-panel list or the timeline grid area) — was
+  // previously impossible, a plain row click always left exactly one layer
+  // in _layerSel and there was no gesture to clear it back to empty. Needed
+  // for F5/insertFrame (and F6/insertKeyframe) to be able to tell "the user
+  // deliberately picked no layer, apply to ALL of them" apart from "some
+  // specific layer(s) are picked, apply to only those" — previously
+  // insertFrame() ignored _layerSel entirely and always hit every layer
+  // regardless of selection (reported: "peu importe le layer sélectionné
+  // ça ajoute des keyframes à tous"). Excludes actual rows/folder headers
+  // and the layer-panel's own buttons (new/delete/duplicate/camera/audio…)
+  // so this never fires from clicking something that already has its own
+  // meaning. state.activeLayerIdx (which layer NEW STROKES draw onto) is
+  // deliberately left untouched — that must always stay a valid layer for
+  // drawing tools to work; only the batch-operation selection (_layerSel,
+  // the .sel highlight) clears here, not the .act "current drawing target"
+  // highlight, so a plain click straight back onto a row still un-ambiguously
+  // resumes drawing on whatever was active before.
+  if(e.target.closest('.lrow,.frow,#layer-ctrls,button'))return;
+  if(_layerSel.length){_layerSel=[];renderLayerList();}
 });
 
 document.getElementById('frame-grid').addEventListener('mousedown',function(e){
