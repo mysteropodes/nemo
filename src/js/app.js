@@ -1195,18 +1195,36 @@ function goToFrame(idx){
   loadFrame(idx);if(!state.playing){renderOS();renderArcs();updateUI();}else{updatePlayhead();}
 }
 
-// F5/insertFrame is deliberately global (every layer, no _layerSel
-// targeting): it changes state.totalFrames and splices a new cell into
-// EVERY layer's frames array to keep them all the same length — every
-// other piece of code (frame navigation, getEffectiveStrokes, save/load)
-// assumes ld.frames.length===state.totalFrames for every layer at all
-// times. Selectively skipping layers here would desync that invariant and
-// crash frame navigation the moment the playhead reached a frame index a
-// skipped layer's (now-shorter) array doesn't have. F6/insertKeyframe
-// below is the one that's per-layer and safely selection-aware — it only
-// flips a flag + snapshots strokes on frames that already exist, no
-// splice, no shared length to keep in sync.
-function insertFrame(){pushUndoLayers();var cf=state.currentFrame;for(var i=0;i<state.layers.length;i++)state.layers[i].frames.splice(cf+1,0,{strokes:[],isKeyframe:false,isInterpolated:false});state.totalFrames++;if(state.waOut<state.totalFrames-1)state.waOut++;window._waOut=state.waOut;window._totalF=state.totalFrames;goToFrame(cf+1);showToast('Frame insérée (F5)');}
+// F5/insertFrame — Animate's actual convention (corrected: an earlier pass
+// here assumed this had to stay global, wrongly): F5 extends ONLY the
+// selected layer(s)' timing at the cursor, or every layer if none is
+// selected. Every layer's frames array must still stay EXACTLY
+// state.totalFrames long (frame navigation/getEffectiveStrokes/save-load
+// all assume that everywhere) — so a NON-targeted layer still grows by one
+// slot to keep pace, but its slot is APPENDED at the very END of its own
+// array instead of spliced at the cursor. That's a pure length pad, not a
+// content change: getEffectiveStrokes already treats anything past a
+// layer's last real keyframe as an ongoing hold of it, so one more blank
+// hold-frame tacked on past the end never changes what's shown at any
+// EXISTING index — the non-targeted layer's own keyframes stay at their
+// exact original frame numbers, completely undisturbed by another layer's
+// insert. Only a TARGETED layer gets the real splice at cf+1, pushing its
+// own later keyframes right by one — exactly where the cursor sits.
+function insertFrame(){
+  var targets=(typeof _layerSel!=='undefined'&&_layerSel.length)?_layerSel.slice():state.layers.map(function(_ld,i){return i;});
+  pushUndoLayers();
+  var cf=state.currentFrame;
+  for(var i=0;i<state.layers.length;i++){
+    var blank={strokes:[],isKeyframe:false,isInterpolated:false};
+    if(targets.indexOf(i)>=0)state.layers[i].frames.splice(cf+1,0,blank);
+    else state.layers[i].frames.push(blank);
+  }
+  state.totalFrames++;
+  if(state.waOut<state.totalFrames-1)state.waOut++;
+  window._waOut=state.waOut;window._totalF=state.totalFrames;
+  goToFrame(cf+1);
+  showToast('Frame insérée (F5)'+(targets.length<state.layers.length?' — '+targets.length+' calque(s)':''));
+}
 // Core per-layer step shared by insertKeyframeAt (single layer+frame, own
 // undo/render — used by the span-end drag handle in timeline.js) and
 // insertKeyframe below (multi-layer, ONE undo/render for the whole batch).
