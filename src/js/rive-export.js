@@ -230,8 +230,16 @@
   function riveCubicVerticesFromShapeVal(shapeVal){
     var v=shapeVal.v,i=shapeVal.i,o=shapeVal.o;
     var verts=[];
+    // inX/inY/outX/outY are ABSOLUTE control-point coordinates, same as
+    // riveBuildCubicCommands' control1X/control2X above — NOT the raw
+    // relative i/o offsets. Sending the raw offsets (as this did before)
+    // put every tangent near the shape's origin instead of next to its
+    // own vertex, fanning every curve into a spike back toward (0,0)
+    // (reported: exported shape became a starburst of thin triangles).
     for(var k=0;k<v.length;k++){
-      verts.push({x:v[k][0],y:v[k][1],type:'cubic',inX:i[k][0],inY:i[k][1],outX:o[k][0],outY:o[k][1]});
+      verts.push({x:v[k][0],y:v[k][1],type:'cubic',
+        inX:v[k][0]+i[k][0],inY:v[k][1]+i[k][1],
+        outX:v[k][0]+o[k][0],outY:v[k][1]+o[k][1]});
     }
     return verts;
   }
