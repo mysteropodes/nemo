@@ -36,6 +36,9 @@ import('../wasm/geometry_wasm.js?v=' + wasmBust).then(function (mod) {
     window.GeometryWasm.ellipse_segments = mod.ellipse_segments;
     window.GeometryWasm.resolve_symbol_frame = mod.resolve_symbol_frame;
     window.GeometryWasm.effective_frame_index = mod.effective_frame_index;
+    // Class export (not a function): stateful per-stroke input smoother —
+    // see stroke-modeler.js (JS reference) / strokemodeler.rs (Rust port).
+    window.GeometryWasm.StrokeModeler = mod.StrokeModeler;
     window.GeometryWasm.ready = true;
   });
 }).catch(function (e) {

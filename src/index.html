@@ -338,7 +338,7 @@
       <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrToolOptions">Tool Options</span></div>
       <div class="pbdy">
         <div class="pr"><span class="pl">Smooth</span><input type="number" class="pi scrub" id="p-smooth" value="10" min="0" max="60" data-step="1"></div>
-        <div class="pr"><span class="pl">Stabilizer</span><select class="psel" id="p-stab"><option value="0">Off</option><option value="1">Low</option><option value="2" selected>Medium</option><option value="3">High</option></select></div>
+        <div class="pr"><span class="pl">Stabilizer</span><select class="psel" id="p-stab" title="Off/Low/Medium/High : moyenne glissante classique. Plume : modèle physique ressort-amortisseur (Google ink-stroke-modeler, comme rnote) — lisse le flux d’entrée en direct sans détruire la géométrie, rattrape la pointe au relâcher"><option value="0">Off</option><option value="1">Low</option><option value="2" selected>Medium</option><option value="3">High</option><option value="4">Plume — légère</option><option value="5">Plume — moyenne</option><option value="6">Plume — forte</option></select></div>
         <div class="pr" id="p-drawmode-row"><span class="pl">Draw mode</span><select class="psel" id="p-drawmode" title="Front = new strokes on top, Behind = new strokes under existing artwork"><option value="front">Front</option><option value="behind">Behind</option></select></div>
         <div class="pr" id="p-fillbrushmode-row" style="display:none"><span class="pl">Placement</span><div class="icon-grp" id="p-fillbrushmode-grp" data-value="above">
           <button class="icon-btn" data-value="above" title="Above — on top of existing fills"><svg viewBox="0 0 20 20"><rect x="7" y="2" width="11" height="11" rx="2" fill="currentColor" opacity=".35"/><rect x="2" y="6" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button>
@@ -894,6 +894,7 @@
 <script src="js/color-picker.js"></script>
 <script src="js/app.js"></script>
 <script src="js/tweens.js"></script>
+<script src="js/stroke-modeler.js"></script>
 <script src="js/tools.js"></script>
 <script src="js/brush-preset-picker.js"></script>
 <script src="js/brush-editor.js"></script>

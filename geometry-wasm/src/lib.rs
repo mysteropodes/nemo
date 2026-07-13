@@ -27,6 +27,7 @@ pub use eraser::erase_at_point;
 mod shapes;
 pub use shapes::{ellipse_segments, line_segments, rect_segments};
 mod timeline;
+mod strokemodeler;
 pub use timeline::{effective_frame_index, resolve_symbol_frame};
 
 #[derive(Deserialize)]

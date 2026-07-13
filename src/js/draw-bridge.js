@@ -44,6 +44,17 @@
   // something. Reset every stroke so it never drags in a stale point from
   // the previous gesture.
   var stabQueue = [];
+  // Stroke-modeler mode (stabilizer values 4/5/6 → levels 1/2/3): the
+  // spring-mass-damper input smoother ported from Google's
+  // ink-stroke-modeler (stroke-modeler.js JS reference / strokemodeler.rs
+  // Rust port, picked automatically by SMStrokeModeler.create). One
+  // instance per gesture; onMove feeds it raw input and pushes its
+  // (possibly several, upsampled) outputs; onUp runs its end-of-stroke
+  // catch-up INSTEAD of the raw-point splice the moving average needs.
+  var modeler = null;
+  function modelerLevel() {
+    return state.stabilizer >= 4 ? state.stabilizer - 3 : 0;
+  }
   function stabilizePoint(w) {
     var stab = state.stabilizer;
     if (!stab) { stabQueue.length = 0; return w; }
@@ -299,6 +310,13 @@
     var w = extendTarget ? [extendTarget.path[extendTarget.end === 'first' ? 'firstSegment' : 'lastSegment'].point.x, extendTarget.path[extendTarget.end === 'first' ? 'firstSegment' : 'lastSegment'].point.y] : w0;
     var pressure = smoothPressure((state.vectorBrush || isFillBrush()) ? pressureOf(e, w) : 1);
     if (extendTarget) stabQueue.push(w); // seeds the average AT the seam, not off it
+    modeler = null;
+    if (modelerLevel() && window.SMStrokeModeler) {
+      // unitScale = view.zoom at stroke start: the wobble speed thresholds
+      // and end-of-stroke stop distance are calibrated in SCREEN px.
+      modeler = window.SMStrokeModeler.create(modelerLevel(), view.zoom);
+      modeler.down(w[0], w[1], performance.now() / 1000, pressure);
+    }
     samples.push([w[0], w[1], widthFor(pressure)]);
     if (state.vectorBrush) window.SMEngineBridge.setPressureCursor(w, widthFor(pressure) / 2);
   }
@@ -325,9 +343,19 @@
     // POSITION gets stabilized, matching TVPaint-style "smoothing" where
     // the line itself calms down without pressure lagging behind it.
     var pressure = smoothPressure((state.vectorBrush || isFillBrush()) ? pressureOf(e, w) : 1);
-    w = stabilizePoint(w);
-    samples.push([w[0], w[1], widthFor(pressure)]);
-    if (state.vectorBrush) window.SMEngineBridge.setPressureCursor(w, widthFor(pressure) / 2);
+    if (modeler) {
+      // The modeler upsamples: one raw input can yield several modeled
+      // points. Width is computed per modeled point from its own carried
+      // (interpolated) pressure, so the ribbon tracks the modeled line.
+      var outs = modeler.move(w[0], w[1], performance.now() / 1000, pressure);
+      for (var mi = 0; mi < outs.length; mi++) samples.push([outs[mi].x, outs[mi].y, widthFor(outs[mi].p)]);
+      var lastOut = outs.length ? outs[outs.length - 1] : null;
+      if (state.vectorBrush && lastOut) window.SMEngineBridge.setPressureCursor([lastOut.x, lastOut.y], widthFor(lastOut.p) / 2);
+    } else {
+      w = stabilizePoint(w);
+      samples.push([w[0], w[1], widthFor(pressure)]);
+      if (state.vectorBrush) window.SMEngineBridge.setPressureCursor(w, widthFor(pressure) / 2);
+    }
     window.SMEngineBridge.renderWithOverlayItem(overlayItem());
   }
   function onUp(e) {
@@ -355,7 +383,17 @@
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
     w = magnetSnap(w);
     var pressure = smoothPressure((state.vectorBrush || isFillBrush()) ? pressureOf(e, w) : 1);
-    samples.push([w[0], w[1], widthFor(pressure)]);
+    if (modeler) {
+      // The modeler's own end-of-stroke catch-up (physics iterated until
+      // the line converges onto the lift-off point) replaces the raw-point
+      // splice below — that splice exists to fix the moving average's
+      // trailing lag, which this mode doesn't have.
+      var outs = modeler.up(w[0], w[1], performance.now() / 1000, pressure);
+      for (var mi = 0; mi < outs.length; mi++) samples.push([outs[mi].x, outs[mi].y, widthFor(outs[mi].p)]);
+      modeler = null;
+    } else {
+      samples.push([w[0], w[1], widthFor(pressure)]);
+    }
     window.SMEngineBridge.resume();
     commitStroke();
     // Force an immediate clean render — without this, the endpoint marker
