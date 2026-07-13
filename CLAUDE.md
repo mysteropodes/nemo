@@ -196,3 +196,34 @@ Checklist avant `npm run build` :
 3. Si c'est un vrai changement fonctionnel (pas juste un patch de bug) : lancer
    `./scripts/publish-update.sh "notes"` après la build pour que les installs existantes le
    voient — voir §6 pour le détail des tokens nécessaires.
+
+## 8. Collaboration Git (2026-07) — repo privé `mysteropodes/nemo`
+
+Depuis l'arrivée d'un collaborateur (pencilpark), ce dossier n'est plus le seul endroit où le
+code vit — `origin` pointe vers un vrai repo GitHub privé, et il faut éviter de s'écraser
+mutuellement. Règles à suivre **sans qu'on ait besoin de le redemander** :
+
+- **Jamais de commit direct sur `main`.** Toujours une branche dédiée par tâche/session :
+  `git checkout -b claude/<sujet-court>` pour le travail fait avec Claude (préfixe qui
+  identifie la provenance dans l'historique), branches sans préfixe particulier pour le
+  travail humain direct. Une fois la tâche terminée, ouvrir une Pull Request vers `main`
+  plutôt que de merger en local en douce.
+- **`git pull` avant de commencer à toucher au code**, à chaque nouvelle session — le dossier
+  peut avoir bougé depuis la dernière fois (pencilpark, ou une session précédente).
+- **Pousser la branche dès qu'un morceau cohérent est fini**, ne pas laisser des commits
+  locaux non poussés s'accumuler sur plusieurs sessions — plus l'écart avec `main` grandit,
+  plus les conflits de merge sont douloureux à résoudre.
+- **Ne jamais toucher à `main` en écriture directe** même pour un "petit" fix — même une
+  correction d'une ligne passe par une branche + PR, pour rester cohérent et laisser une
+  trace revue.
+- Ce dossier reste synchronisé par kDrive/OneDrive en tâche de fond (usage personnel de
+  Cyril) — **ce n'est PAS le mécanisme de partage avec pencilpark**, qui clone sa propre
+  copie du repo GitHub ailleurs. Ne jamais partager ce dossier OneDrive directement avec un
+  collaborateur pour du travail simultané (sync cloud + git en parallèle sur le même dossier
+  risque de corrompre l'historique).
+- Secrets (`TAURI_SIGNING_PRIVATE_KEY`, `STROKEMOTION_PUBLISH_TOKEN`,
+  `STROKEMOTION_UPDATER_TOKEN`, `STROKEMOTION_FEEDBACK_TOKEN`) restent strictement
+  personnels à Cyril — jamais committés (déjà couvert par `.gitignore` pour les clés de
+  signature), jamais partagés même avec un collaborateur de confiance. Pour du dev normal,
+  des valeurs placeholder (`STROKEMOTION_FEEDBACK_TOKEN=dev-placeholder
+  STROKEMOTION_UPDATER_TOKEN=dev-placeholder`) suffisent à compiler et lancer `npm run dev`.
