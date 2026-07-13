@@ -608,7 +608,33 @@ function getLFSSubStrokes(ld,key,frameIdx){
 // share, so gating rendering HERE covers both without touching either
 // caller — see CLAUDE.md's "family of bug #1" for why a single shared
 // chokepoint beats duplicating this check at every consumer.
-function layerInPoint(ld){return ld.inPoint||0;}
+// Mirrors autoOutPointFromBlankKeyframe below (same "why" — a manually-
+// dragged ld.inPoint always wins once set, this is only the DEFAULT/display
+// value when it hasn't been). Bug found 2026-07 ("les inpoints ne reflète
+// pas le bon départ en détectant les keyframes vide"): unlike outPoint,
+// inPoint had NO leading-blank detection at all — a layer that starts
+// drawing at frame 20 still showed an in-point bar starting at frame 0,
+// with the first 20 frames a blank stretch nobody could see was there
+// without scrubbing to it.
+function autoInPointFromBlankKeyframe(ld){
+  if(!ld||ld.symbolId)return null;
+  var frames=ld.frames,firstNonBlank=-1,curBlank=true;
+  for(var f=0;f<frames.length;f++){
+    var fr=frames[f];
+    if(fr.isKeyframe)curBlank=!fr.strokes.length;
+    if(!curBlank&&firstNonBlank<0)firstNonBlank=f;
+  }
+  return(firstNonBlank>0)?firstNonBlank:null;
+}
+// `!=null` (not `||0`, the old check) — `||0` couldn't tell "never set"
+// apart from "explicitly dragged to exactly frame 0", so an explicit
+// user override back to 0 would otherwise be silently reclaimed by the
+// auto-detect below on the very next render.
+function layerInPoint(ld){
+  if(ld.inPoint!=null)return ld.inPoint;
+  var auto=autoInPointFromBlankKeyframe(ld);
+  return auto!=null?auto:0;
+}
 // When the user hasn't manually dragged an out point, default to where the
 // layer's own drawing actually stops (its last blank keyframe — F7,
 // insertBlankKeyframe — with no non-blank keyframe after it) instead of

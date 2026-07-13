@@ -319,13 +319,43 @@
   document.addEventListener('mouseup', function () {
     endMarquee();
     if (!_drag) return;
-    _drag = null;
+    var d = _drag; _drag = null;
+    // Feedback: "il faudrait pouvoir select des in et/out point de calque
+    // avec keyframe pour les déplacer ensemble" — a whole-bar BODY move
+    // (type:'both') now retimes the layer's actual keyframe content along
+    // with the visibility window, via window.SM.shiftLayerFrames
+    // (timeline.js). Applied ONCE here at drop, not live per mousemove —
+    // 'in'/'out' (pure trim) drags deliberately do NOT retime content,
+    // same distinction After Effects/Premiere make between moving a clip
+    // and trimming its head/tail. pushUndo() already happened once at
+    // drag START (onDown) — shiftLayerFrames itself takes no further undo
+    // snapshot, so a whole group move still collapses into one undo step.
+    if (d.type === 'both' && window.SM && window.SM.shiftLayerFrames) {
+      if (d.group) {
+        d.members.forEach(function (m) {
+          var mld = state.layers[m.li]; if (!mld) return;
+          var dx = inPointOf(mld) - m.origIn;
+          if (dx) window.SM.shiftLayerFrames(m.li, dx);
+        });
+      } else {
+        var ld = state.layers[d.li];
+        if (ld) {
+          var dx2 = inPointOf(ld) - d.origIn;
+          if (dx2) window.SM.shiftLayerFrames(d.li, dx2);
+        }
+      }
+      if (window.loadFrame) loadFrame(state.currentFrame);
+      if (window.SMEngineBridge) SMEngineBridge.renderNow();
+    }
     // Full rebuild only once, at drag END: other rows' bars don't move
     // during the drag so a per-move renderTimeline() would be pure waste
-    // (CLAUDE.md §5 — avoid unnecessary per-move rebuild work); a final
-    // renderLayerList() picks up anything the layer-panel might show that
-    // depends on the range (e.g. a future disabled/dimmed state).
-    if (window.renderLayerList) renderLayerList();
+    // (CLAUDE.md §5 — avoid unnecessary per-move rebuild work). Now always
+    // renderTimeline() (not just renderLayerList()) since a body-move drag
+    // may have just shifted keyframe content — Animation 2D's frame-grid
+    // dots and this bar's own tick marks (renderKeyTicks) both need to
+    // rebuild to reflect the new positions.
+    if (window.renderTimeline) renderTimeline();
+    else if (window.renderLayerList) renderLayerList();
   });
 
   // ---- batch operations on the current bar selection (Skew Pro punch

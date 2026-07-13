@@ -366,7 +366,17 @@ body.mac-overlay-titlebar #app{padding-top:28px;}
 .motion-prop-name{display:flex;align-items:center;gap:5px;flex:1;color:var(--text-dim);}
 .motion-prop-name svg{flex-shrink:0;}
 .motion-fields{display:flex;align-items:center;gap:3px;flex-shrink:0;}
-.motion-val{width:44px;}
+/* Bug found 2026-07 ("les box de value de calques sont trop grosses") —
+   .motion-val only overrode width, still inheriting .pi's global
+   padding:5px 8px/font-size:12.5px (sized for the wider Properties panel
+   elsewhere) into Motion's much tighter Transform rows. Shrunk padding/
+   font-size/border-radius here too, scoped to Motion only — .pi itself
+   stays untouched for every other panel using it. `.pi.motion-val` (not
+   plain `.motion-val`) because `.pi[type="number"]{width:50px}` above has
+   higher specificity (class+attribute) than a single class — a bare
+   `.motion-val{width:...}` was silently losing that fight regardless of
+   file order, confirmed live (computed width stayed 50px).*/
+.pi.motion-val{width:34px;padding:2px 3px;font-size:10.5px;border-radius:4px;}
 .motion-unit{color:var(--text-dark);font-size:10px;width:14px;flex-shrink:0;}
 .motion-track-row{position:relative;}
 .fc.motion-fc{cursor:pointer;}

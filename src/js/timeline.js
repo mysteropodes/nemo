@@ -538,6 +538,42 @@ window.SM={
     loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast('Keyframe déplacée → '+(toFrame+1));
     return true;
   },
+  // Shifts EVERY keyframe/content frame of a layer by dx frames at once —
+  // used by layer-inout.js when dragging a bar's BODY (whole-range move,
+  // not a pure in/out trim): "il faudrait pouvoir select des in et/out
+  // point de calque avec keyframe pour les déplacer ensemble". Moving the
+  // visibility window alone (ld.inPoint/outPoint) left the actual drawn
+  // content behind — this keeps them in sync by retiming the whole clip's
+  // source frames together with the window, exactly like dragging a clip
+  // in After Effects/Premiere moves both.
+  //
+  // Deliberately NO pushUndo/saveAllLayerFrames-then-render here: the
+  // caller (layer-inout.js) already took ONE undo snapshot at drag START
+  // (not per mousemove) and may call this once per member of a group
+  // drag — an extra pushUndo here would split one user drag into several
+  // undo steps. Caller is responsible for the final loadFrame/render pass
+  // too, same reasoning.
+  shiftLayerFrames:function(layerIdx,dx){
+    var ld=state.layers[layerIdx];if(!ld||ld.locked||!dx)return false;
+    var total=state.totalFrames;
+    saveAllLayerFrames();
+    var beforeKfs=ld.frames.map(function(f,fi){return f.isKeyframe?fi:null;}).filter(function(x){return x!==null;});
+    var newFrames=[];
+    for(var i=0;i<total;i++)newFrames.push({strokes:[],isKeyframe:false,isInterpolated:false});
+    for(var j=0;j<ld.frames.length;j++){
+      var src=ld.frames[j];
+      if(!src||!src.strokes||!src.strokes.length)continue; // truly empty — nothing to carry
+      var ni=j+dx;
+      if(ni<0||ni>=total)continue; // falls off the timeline edge — dropped, matches moveFrames' own bounds behavior
+      newFrames[ni]=src;
+    }
+    ld.frames=newFrames;
+    for(var k=0;k<beforeKfs.length-1;k++){
+      var fA=beforeKfs[k],fB=beforeKfs[k+1];
+      rekeyTweenPairData(fA,fB,fA+dx,fB+dx);
+    }
+    return true;
+  },
   deleteSelStrokes:function(){if(selectedPaths.length>0){pushUndo();selectedPaths.forEach(function(p){
     // Team review: deleting someone else's stroke ghosts it instead of
     // removing it outright — see markDeleteAsRevision's own comment.
