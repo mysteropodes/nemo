@@ -564,6 +564,7 @@
       var expanded = window._motionExpandedLayer === li;
       var row = document.createElement('div');
       row.className = 'lrow' + (li === state.activeLayerIdx ? ' act' : '') + (isComponent ? ' motion-disabled' : '');
+      row.dataset.layer = li;
       if (isComponent) row.title = 'Motion mode ne gère pas encore les instances de composant (utilise Frame/Speed/Offset dans le panneau du calque)';
       var arrow = document.createElement('div'); arrow.className = 'lico larrow'; arrow.textContent = isComponent ? '·' : (expanded ? '▾' : '▸');
       row.appendChild(arrow);
@@ -594,6 +595,11 @@
       var nm = document.createElement('div'); nm.className = 'lnm'; nm.textContent = ld.name || ('Layer ' + (li + 1));
       row.appendChild(nm);
       row.addEventListener('click', function () {
+        // A completed drag-drop still fires a trailing native 'click' on
+        // mouseup — same guard timeline.js's own layer rows use (see its
+        // comment there) so releasing a reorder drag doesn't ALSO toggle
+        // this row's Transform-group expansion.
+        if (window._layerDragJustEnded) { window._layerDragJustEnded = false; return; }
         if (isComponent) { state.activeLayerIdx = li; renderLayerList(); return; }
         window._motionExpandedLayer = expanded ? null : li;
         _propFilter = null; // fresh "show all" every time the expanded layer changes
@@ -602,6 +608,18 @@
         state.activeLayerIdx = li;
         renderLayerList(); renderTimeline();
         if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+      });
+      // Feedback: "impossible de changer l'index des calques comme dans
+      // animation 2D, avec drag et réorganisation des calques". Reuses the
+      // EXACT same drag machinery Animation 2D's own layer rows use
+      // (timeline.js's global _layerDrag + window mousemove/mouseup
+      // handlers, further down in this same file's sibling) — that state
+      // is a bare top-level var (timeline.js is not IIFE-wrapped), and its
+      // handlers only depend on `.lrow` + `data-layer`, both already set
+      // above, so no duplicate drag logic needed here at all.
+      row.addEventListener('mousedown', function (e) {
+        if (e.button !== 0 || e.target.closest('.lico')) return;
+        _layerDrag.active = true; _layerDrag.srcIdx = li; _layerDrag.startY = e.clientY; _layerDrag.moved = false;
       });
       list.appendChild(row);
       if (!expanded) return;

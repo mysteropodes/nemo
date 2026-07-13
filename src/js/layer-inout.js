@@ -145,20 +145,26 @@
   // range together (relative spacing preserved).
   var _barSel = []; // layer indices whose bar is selected
   function isBarSelected(li) { return _barSel.indexOf(li) >= 0; }
-  var _marquee = null; // {startY, rectEl, moved}
+  var _marquee = null; // {startX, startY, rectEl, moved}
   function startMarquee(e) {
     var rect = document.createElement('div'); rect.className = 'layer-inout-marquee-rect';
     document.body.appendChild(rect);
-    _marquee = { startY: e.clientY, rectEl: rect, moved: false };
+    _marquee = { startX: e.clientX, startY: e.clientY, rectEl: rect, moved: false };
   }
-  function applyMarqueeSelection(y0, y1) {
+  // Bug found 2026-07 ("le drag + rect de selection prend toute la largeur
+  // faut vraiment que ça suivent la souris de manière classique"): this
+  // used to be a Y-ONLY band — left/right pinned to the viewport edges
+  // regardless of where the cursor actually was, X never even read. A real
+  // rectangle now tracks both axes and hit-tests against each BAR's own
+  // rendered rect (not the row's, which is full-width) — true 2D overlap,
+  // exactly the classic click-drag box every other timeline/DAW uses.
+  function applyMarqueeSelection(x0, y0, x1, y1) {
     var sel = [];
     document.querySelectorAll('.layer-inout-bar').forEach(function (bar) {
       var row = bar.parentElement; if (!row) return;
       var li = _rowLayerIdx.get(row); if (li == null) return;
-      var b = row.getBoundingClientRect();
-      var cy = b.top + b.height / 2;
-      var hit = cy >= y0 && cy <= y1;
+      var b = bar.getBoundingClientRect();
+      var hit = b.left <= x1 && b.right >= x0 && b.top <= y1 && b.bottom >= y0;
       bar.classList.toggle('sel', hit);
       if (hit) sel.push(li);
     });
@@ -166,11 +172,12 @@
   }
   function updateMarquee(e) {
     if (!_marquee) return;
-    if (Math.abs(e.clientY - _marquee.startY) > 3) _marquee.moved = true;
+    if (Math.abs(e.clientX - _marquee.startX) > 3 || Math.abs(e.clientY - _marquee.startY) > 3) _marquee.moved = true;
+    var x0 = Math.min(_marquee.startX, e.clientX), x1 = Math.max(_marquee.startX, e.clientX);
     var y0 = Math.min(_marquee.startY, e.clientY), y1 = Math.max(_marquee.startY, e.clientY);
     var r = _marquee.rectEl;
-    r.style.top = y0 + 'px'; r.style.left = '0'; r.style.right = '0'; r.style.height = (y1 - y0) + 'px';
-    if (_marquee.moved) applyMarqueeSelection(y0, y1);
+    r.style.left = x0 + 'px'; r.style.top = y0 + 'px'; r.style.width = (x1 - x0) + 'px'; r.style.height = (y1 - y0) + 'px';
+    if (_marquee.moved) applyMarqueeSelection(x0, y0, x1, y1);
   }
   function endMarquee() {
     if (!_marquee) return;
@@ -448,6 +455,26 @@
     // e.target===row means the click missed the bar entirely.
     row.addEventListener('mousedown', function (e) { if (e.target === row) startMarquee(e); });
   }
+
+  // Feedback: "on doit pouvoir drag + rect en dessous les calques même là
+  // où y en pas dans la timeline". The per-row listener above only ever
+  // sees a mousedown that lands on an actual `.frow`'s own background —
+  // below the LAST rendered row there's no row element at all. `#frame-grid`
+  // itself sizes to its CONTENT height (confirmed: with 2 layer rows it's
+  // ~44px tall), so it doesn't even cover that empty area — `#fg-wrap` is
+  // the actual scroll VIEWPORT underneath it and is what really extends
+  // down to the panel's bottom edge, so that's the element a mousedown in
+  // the empty space actually lands on. Bound once at load — renders clear
+  // `#frame-grid`'s innerHTML but never replace `#fg-wrap` itself, so this
+  // listener survives across re-renders same as the row-level ones would
+  // need rebuilding but this one doesn't.
+  function initEmptyGridMarquee() {
+    var wrap = document.getElementById('fg-wrap');
+    if (!wrap) return;
+    wrap.addEventListener('mousedown', function (e) { if (e.target === wrap) startMarquee(e); });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initEmptyGridMarquee);
+  else initEmptyGridMarquee();
 
   window.SMLayerInOut = {
     inPointOf: inPointOf, outPointOf: outPointOf, hasCustomRange: hasCustomRange, buildBar: buildBar, updateBar: updateBar,
