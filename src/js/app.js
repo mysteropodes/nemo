@@ -78,6 +78,7 @@ var ROW_H=34;
 var state={
   totalFrames:24,currentFrame:0,fps:12,playing:false,loopPlayback:true,pingPongPlayback:false,playDir:1,
   tool:'draw',
+  appMode:'anim2d', // 'anim2d' | 'motion' | 'storyboard' — see #app-mode-switch (index.html) / motion.js
   onionSkin:true,onionPrevOpacity:30,onionNextOpacity:30,onionMode:'tinted',
   onionIn:0,onionOut:23,
   brushSize:3,fillBrushSize:40,strokeColor:'#000000',fillColor:'#ff0000',fillEnabled:true,strokeEnabled:true,shadowMode:false,brushPreset:'none',

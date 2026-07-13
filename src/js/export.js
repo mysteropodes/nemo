@@ -32,7 +32,26 @@ function exportBuildFrame(frameIdx,alpha){
   for(var li=0;li<state.layers.length;li++){
     var ld=state.layers[li];if(!ld.visible)continue;
     var strokes=getEffectiveStrokes(li,frameIdx);
-    strokes.forEach(function(sd){desP(sd,L,sd.opacity!==undefined?sd.opacity:1);});
+    // Motion mode (motion.js): unlike buildSceneJson (engine-bridge.js),
+    // exportBuildFrame merges every original layer's strokes straight into
+    // the ONE shared throwaway `L`, so there's no per-layer Paper object left
+    // to transform after the fact. Fix: read each stroke's transform BEFORE
+    // it's merged in (motionMat/motionPivot computed once per li, same as
+    // the live path), and apply it to the Path `desP` just created — safe
+    // here because `p` lives on `L`, a disposable export-only layer, never
+    // userLayers[li] itself (see CLAUDE.md's family-of-bug-#1).
+    var motionMat=(window.SMMotion&&strokes.length)?SMMotion.layerMotionAt(li,frameIdx):null;
+    var motionPivot=motionMat?userLayers[li].bounds.center:null;
+    strokes.forEach(function(sd){
+      var p=desP(sd,L,sd.opacity!==undefined?sd.opacity:1);
+      if(motionMat){
+        p.scale(motionMat.sx,motionMat.sy,motionPivot);
+        p.rotate(motionMat.rot,motionPivot);
+        p.translate(motionMat.dx,motionMat.dy);
+        p.opacity=p.opacity*motionMat.op;
+        if(p.strokeWidth)p.strokeWidth*=(Math.abs(motionMat.sx)+Math.abs(motionMat.sy))/2;
+      }
+    });
   }
   // Caméra (v18) : bake le zoom/pan de la frame dans le rendu exporté —
   // le rect caméra interpolé remplit exactement le canvas de sortie.

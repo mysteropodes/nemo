@@ -1237,7 +1237,6 @@ function camGridRowOffset(){
 
 function renderTimeline(){
   var hdr=document.getElementById('frame-hdr'),grid=document.getElementById('frame-grid');hdr.innerHTML='';grid.innerHTML='';
-  if(window.SMCamera)SMCamera.renderGridRow(grid);
   var fps=Math.max(1,state.fps);
   for(var i=0;i<state.totalFrames;i++){
     var c=document.createElement('div');c.className='fhc';if(i===state.currentFrame)c.classList.add('cur');
@@ -1248,6 +1247,11 @@ function renderTimeline(){
     else if((i+1)%5===0)c.textContent=i+1;
     hdr.appendChild(c);
   }
+  // Motion mode has its own row structure entirely (property tracks, not
+  // per-layer frame cells) — same ruler above, different grid content
+  // below. Early return, same pattern camera.js's own row already used.
+  if(state.appMode==='motion'){if(window.SMMotion)SMMotion.renderTimelineMotion(grid);return;}
+  if(window.SMCamera)SMCamera.renderGridRow(grid);
   // rows rendered top-to-bottom from the HIGHEST layer index — matching the
   // layer panel, which lists topmost (last-drawn-above) layers first. The
   // two lists previously ran in opposite orders, so after any reorder the
@@ -1991,6 +1995,12 @@ function openLayerColorSwatches(anchorEl,currentHex,onPick){
 }
 function renderLayerList(){
   var list=document.getElementById('layer-list');list.innerHTML='';
+  // Motion mode: expandable Transform property rows instead of the plain
+  // per-layer row list — see motion.js's own header comment for why this
+  // is a full early return rather than a branch woven through the rest of
+  // this function (folders/link-groups/components have no meaning yet in
+  // Motion mode's v1 scope).
+  if(state.appMode==='motion'){if(window.SMMotion)SMMotion.renderLayerListMotion(list);return;}
   if(window.SMCamera)SMCamera.renderPanelRow(list);
   var order=computeLayerRenderOrder();
   order.forEach(function(entry){

@@ -164,6 +164,15 @@
       if (!layerIsEffectivelyVisible(i) || !userLayers[i]) { layers.push({ items: [] }); continue; }
       var children = userLayers[i].children;
       var items = [];
+      // Motion mode (motion.js): a keyed position/rotation/scale/opacity
+      // transform for this layer at the CURRENT frame, applied ONLY to the
+      // JSON items below — never to userLayers[i] itself (see motion.js's
+      // header comment on why: mutating the live Paper.js layer would get
+      // baked into the next saveActiveLayerFrame() permanently). Null (the
+      // overwhelmingly common case — no motion on this layer) skips the
+      // per-item transform pass entirely below.
+      var motionMat = (window.SMMotion && children.length) ? SMMotion.layerMotionAt(i, state.currentFrame) : null;
+      var motionPivot = motionMat ? userLayers[i].bounds.center : null;
       for (var s = 0; s < children.length; s++) {
         var c = children[s];
         // Team review view filter — 'mine' hides everyone else's content
@@ -181,8 +190,10 @@
           var imageId = registerRasterIfNeeded(c);
           if (!imageId) continue;
           var rb = c.bounds; // display rect — Paper's Raster is center-positioned, bounds gives top-left directly
+          var imgOp = c.opacity !== undefined ? c.opacity : 1;
+          if (motionMat) { rb = SMMotion.transformImageRect(rb, motionPivot, motionMat); imgOp *= motionMat.op; }
           items.push({
-            image: { imageId: imageId, x: rb.x, y: rb.y, width: rb.width, height: rb.height, opacity: c.opacity !== undefined ? c.opacity : 1 },
+            image: { imageId: imageId, x: rb.x, y: rb.y, width: rb.width, height: rb.height, opacity: imgOp },
           });
           continue;
         }
@@ -209,7 +220,10 @@
         else continue;
         subPaths.forEach(function (sub) {
           var sd = serP(sub);
+          if (motionMat) sd.segments = SMMotion.transformSegments(sd.segments, motionPivot, motionMat);
           var op = c.opacity !== undefined ? c.opacity : 1;
+          if (motionMat) op *= motionMat.op;
+          var strokeScale = motionMat ? (Math.abs(motionMat.sx) + Math.abs(motionMat.sy)) / 2 : 1;
           // The path's OWN closed flag (now correctly carried by serP(),
           // see app.js), NOT "has a fillColor" — that heuristic sent an
           // unwanted closing stroke segment across any OPEN path that also
@@ -233,7 +247,7 @@
           var sc = cssColorToRgba(c.strokeColor ? c.strokeColor.toCSS(true) : null, op);
           if (sc) {
             item.strokeColor = sc;
-            item.strokeWidth = c.strokeWidth || 1;
+            item.strokeWidth = (c.strokeWidth || 1) * strokeScale;
             item.strokeCap = c.strokeCap;
             item.strokeJoin = c.strokeJoin;
             item.miterLimit = c.miterLimit;
@@ -299,6 +313,10 @@
     if (window.SMCamera) {
       var cameraItems = SMCamera.buildOverlayItems();
       if (cameraItems.length) layers.push({ items: cameraItems.map(function (it) { it.segments = roundSegs(it.segments); return it; }) });
+    }
+    if (window.SMMotion) {
+      var motionItems = SMMotion.buildOverlayItems();
+      if (motionItems.length) layers.push({ items: motionItems.map(function (it) { it.segments = roundSegs(it.segments); return it; }) });
     }
     if (typeof fillCloseStrokesOverlayItems === 'function') {
       var fillCloseItems = fillCloseStrokesOverlayItems();
