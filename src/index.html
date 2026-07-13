@@ -86,18 +86,23 @@
   </div>
 </div>
 <div id="app">
+<!-- App-wide top bar (2026-07 redesign): burger menu (File/Edit-style
+     actions, Rnote-inspired) on the left, app-mode segmented switcher to
+     its right. Full width — sits ABOVE the project tabs bar, which is now
+     scoped to just the canvas column (see #canvas-col below) so it no
+     longer runs over the tools panel / right panel. -->
+<div id="app-topbar">
+  <button id="app-menu-btn" title="Menu"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+  <div id="app-mode-switch">
+    <button class="app-mode-btn" data-mode="storyboard" disabled title="StoryBoard — bientôt disponible">StoryBoard</button>
+    <button class="app-mode-btn active" data-mode="anim2d" title="Animation 2D">Animation 2D</button>
+    <button class="app-mode-btn" data-mode="motion" disabled title="Motion — bientôt disponible">Motion</button>
+  </div>
+</div>
 <!-- v11: real multi-project tabs — each tab holds its own independent
      serialized project snapshot in memory (project.js), switching saves
      the outgoing tab and imports the incoming one via the same JSON
      export/import already used for file save/open. -->
-<div id="project-tabs-bar">
-  <div id="project-tabs-list"></div>
-  <button id="project-tab-add" title="Nouveau projet (nouvel onglet)">+</button>
-  <div id="project-tabs-spacer"></div>
-  <div id="fb-avatars" title="Feedback comments sur ce projet"></div>
-  <div id="fb-avatars-pop"></div>
-  <button id="project-tabs-settings" title="Réglages"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></button>
-</div>
 <div id="top-area">
   <div id="tools-panel">
     <button class="tool-btn" data-tool="select" data-i18n-title="toolSelect" title="Selection / Transform (V)"><svg viewBox="0 0 24 24" width="17" height="17"><rect x="2.5" y="2.5" width="12" height="12" rx="0.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="2.4 2"/><rect x="1.3" y="1.3" width="2.4" height="2.4" fill="currentColor"/><rect x="12.3" y="1.3" width="2.4" height="2.4" fill="currentColor"/><rect x="1.3" y="12.3" width="2.4" height="2.4" fill="currentColor"/><rect x="12.3" y="12.3" width="2.4" height="2.4" fill="currentColor"/><path d="M11 9l8.5 5.2-4.3 0.9L13.2 19z" fill="currentColor"/></svg><span class="sk">V</span></button>
@@ -158,26 +163,38 @@
 
   <div id="tools-panel-resize" title="Glisser pour redimensionner"></div>
 
-  <div id="canvas-area">
-    <canvas id="drawing-canvas" resize></canvas>
-    <div id="canvas-info">
-      <span class="fnum" id="info-frame">1</span>
-      <span id="info-badge" class="badge key" style="display:none">KEY</span>
-      <br><span id="info-strokes">0 traits</span>
-      <br><span id="info-sel" style="color:var(--orange);font-size:10px"></span>
+  <!-- Canvas column: project tabs sit directly above the canvas only (not
+       above the tools panel / right panel), per the 2026-07 layout redesign. -->
+  <div id="canvas-col">
+    <div id="project-tabs-bar">
+      <div id="project-tabs-list"></div>
+      <button id="project-tab-add" title="Nouveau projet (nouvel onglet)">+</button>
+      <div id="project-tabs-spacer"></div>
+      <div id="fb-avatars" title="Feedback comments sur ce projet"></div>
+      <div id="fb-avatars-pop"></div>
+      <button id="project-tabs-settings" title="Réglages"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></button>
     </div>
-    <div id="match-info"></div>
-    <!-- v13: bottom-RIGHT zoom/fit pills — the zoom value is a real
-         scrubbable field (drag to change, click to type; class="scrub"
-         alone is enough to pick up ui.js's existing generic pointer-based
-         scrub handler, no per-field wiring needed), and the Fit pill opens
-         a small menu with Fit/Reset View, reusing the same actions already
-         wired to the Document panel's own Fit/Reset View buttons. Replaces
-         the old plain-text #zoom-ind readout entirely — this pill IS the
-         zoom indicator now, just an editable one. -->
-    <div id="canvas-zoom-pills">
-      <div class="zoom-pill" id="canvas-fit-btn">Fit <span class="zoom-caret">▾</span></div>
-      <div class="zoom-pill"><input type="number" id="zoom-scrub" class="scrub" value="100" min="5" max="800" data-step="5">%</div>
+    <div id="canvas-area">
+      <canvas id="drawing-canvas" resize></canvas>
+      <div id="canvas-info">
+        <span class="fnum" id="info-frame">1</span>
+        <span id="info-badge" class="badge key" style="display:none">KEY</span>
+        <br><span id="info-strokes">0 traits</span>
+        <br><span id="info-sel" style="color:var(--orange);font-size:10px"></span>
+      </div>
+      <div id="match-info"></div>
+      <!-- v13: bottom-RIGHT zoom/fit pills — the zoom value is a real
+           scrubbable field (drag to change, click to type; class="scrub"
+           alone is enough to pick up ui.js's existing generic pointer-based
+           scrub handler, no per-field wiring needed), and the Fit pill opens
+           a small menu with Fit/Reset View, reusing the same actions already
+           wired to the Document panel's own Fit/Reset View buttons. Replaces
+           the old plain-text #zoom-ind readout entirely — this pill IS the
+           zoom indicator now, just an editable one. -->
+      <div id="canvas-zoom-pills">
+        <div class="zoom-pill" id="canvas-fit-btn">Fit <span class="zoom-caret">▾</span></div>
+        <div class="zoom-pill"><input type="number" id="zoom-scrub" class="scrub" value="100" min="5" max="800" data-step="5">%</div>
+      </div>
     </div>
   </div>
 

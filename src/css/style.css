@@ -24,6 +24,22 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--gutter);color:
   -webkit-font-smoothing:antialiased;font-variation-settings:'FILL' 0,'wght' 300,'GRAD' 0,'opsz' 20;}
 #app{display:flex;flex-direction:column;height:100vh;box-sizing:border-box;background:var(--gutter);padding:8px;gap:8px;}
 #top-area{flex:1;display:flex;overflow:hidden;min-height:0;gap:8px;}
+/* App-wide top bar (2026-07 redesign): burger menu + app-mode segmented
+   switcher, full width, above everything (tools panel, canvas, right
+   panel alike) — distinct from #project-tabs-bar, which is scoped to the
+   canvas column only (see #canvas-col below). */
+#app-topbar{flex:none;height:34px;display:flex;align-items:center;gap:10px;padding:0 10px;background:var(--panel2);border-radius:8px;}
+#app-menu-btn{flex:none;width:26px;height:26px;border-radius:6px;background:transparent;border:none;color:var(--text-dim);cursor:pointer;display:flex;align-items:center;justify-content:center;}
+#app-menu-btn:hover{background:var(--panel3);color:var(--text);}
+#app-mode-switch{display:flex;align-items:center;gap:2px;background:var(--bg);border-radius:7px;padding:2px;}
+.app-mode-btn{flex:none;border:none;background:transparent;color:var(--text-dim);font-size:11px;font-weight:500;padding:5px 12px;border-radius:5px;cursor:pointer;}
+.app-mode-btn:hover:not(:disabled){color:var(--text);}
+.app-mode-btn.active{background:var(--panel3);color:var(--text);}
+.app-mode-btn:disabled{color:var(--text-dark);cursor:default;}
+/* Canvas column: the project tabs bar sits directly above the canvas
+   only, not above the tools panel or right panel, so it's wrapped here
+   as a flex column sharing #canvas-area's old flex:1 row slot. */
+#canvas-col{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0;gap:8px;}
 /* v12: flat dot+label pattern (mockup's own "● Composition · StrokeMotion
    ● random_logo.png" header tabs — no boxed/boxed-top-corners browser-tab
    look at all, just plain inline items separated by gaps on one flat
@@ -150,7 +166,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--gutter);color:
    width, and the drawing canvas's pixel size is set by JS: without this,
    growing a side panel can't shrink the canvas area, so the props panel
    gets pushed straight off the window edge instead (reported layout bug). */
-#canvas-area{flex:1;min-width:0;position:relative;overflow:hidden;background:var(--panel);}
+#canvas-area{flex:1;min-width:0;min-height:0;position:relative;overflow:hidden;background:var(--panel);}
 #drawing-canvas{width:100%;height:100%;cursor:crosshair;}
 #canvas-info{position:absolute;top:16px;left:20px;pointer-events:none;font-size:11.5px;color:rgba(236,234,231,.38);font-weight:500;}
 #canvas-info .fnum{font-size:28px;font-weight:700;letter-spacing:-.5px;color:var(--text);}

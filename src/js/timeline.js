@@ -2672,6 +2672,43 @@ function initProfileFields(){
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initProfileFields);else initProfileFields();
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initSettingsModal);else initSettingsModal();
 
+// Burger menu (#app-topbar, 2026-07 redesign) — Rnote-inspired File menu,
+// adapted to Nemo's actual entry points: reuses window.SMProject for
+// new/open/save, the existing import/export buttons (clicked
+// programmatically so their own listeners run unchanged), and the
+// settings modal (general pane, or jump straight to its shortcuts tab).
+function initAppMenu(){
+  var btn=document.getElementById('app-menu-btn');if(!btn||!window.showContextMenu)return;
+  function clickEl(id){var el=document.getElementById(id);if(el)el.click();}
+  btn.addEventListener('click',function(e){
+    e.stopPropagation();
+    var r=btn.getBoundingClientRect();
+    window.showContextMenu(r.left,r.bottom+4,[
+      {label:'Nouveau projet',shortcut:'⌘N',action:function(){clickEl('project-tab-add');}},
+      {label:'Ouvrir…',shortcut:'⌘O',action:function(){if(window.SMProject)window.SMProject.open();}},
+      {label:'Enregistrer',shortcut:'⌘S',action:function(){if(window.SMProject)window.SMProject.save();}},
+      {label:'Enregistrer sous…',shortcut:'⇧⌘S',action:function(){if(window.SMProject)window.SMProject.saveAs();}},
+      {sep:true},
+      {label:'Importer image(s)…',action:function(){clickEl('btn-import-img');}},
+      {label:'Importer vidéo…',action:function(){clickEl('btn-import-video');}},
+      {label:'Exporter…',action:function(){clickEl('btn-export');}},
+      {sep:true},
+      {label:'Réglages',action:function(){clickEl('btn-settings');}},
+      {label:'Raccourcis clavier',action:function(){
+        clickEl('btn-settings');
+        var t=document.querySelector('#settings-tabs .settings-tab[data-tab="shortcuts"]');
+        if(t)t.click();
+      }},
+      {label:'À propos de Nemo',action:function(){
+        clickEl('btn-settings');
+        var t=document.querySelector('#settings-tabs .settings-tab[data-tab="updates"]');
+        if(t)t.click();
+      }}
+    ]);
+  });
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initAppMenu);else initAppMenu();
+
 // ---- Team sync UI (v16, Phase 2) ----
 function syncRelTime(ts){
   var s=Math.max(0,Math.round((Date.now()-ts)/1000));
