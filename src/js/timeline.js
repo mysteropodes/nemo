@@ -1431,7 +1431,19 @@ document.getElementById('frame-grid').addEventListener('mousedown',function(e){
 function _spanShrinkFrameAt(e){
   var wrap=document.getElementById('fg-wrap');var rect=wrap.getBoundingClientRect();
   var x=e.clientX-rect.left+wrap.scrollLeft;
-  return Math.max(_spanShrink.srcFi+1,Math.min(_spanShrink.dragMax,Math.floor(x/FC)));
+  // +HIT_TOLERANCE_PX before flooring: Math.floor(x/FC) alone puts the
+  // ambiguous boundary exactly at each cell's LEFT edge — that's right
+  // where a user aiming to "drop on frame N" naturally releases (the left
+  // edge is where the cell visually begins/where its own outpoint bar from
+  // the PREVIOUS cell sits, at right:2px of it), so a release even 1-2px
+  // short of that edge silently landed one frame back (feedback: "je
+  // relâche sur la frame 20... il va me le positionné en frame 19"). A
+  // few pixels of forward tolerance make reaching the intended cell
+  // reliable without meaningfully changing where a deliberate drop several
+  // cells earlier lands (FC is only ~16px at the default zoom — an
+  // untolerant 1:1 pixel target is unreasonably precise for a mouse drag).
+  var HIT_TOLERANCE_PX=4;
+  return Math.max(_spanShrink.srcFi+1,Math.min(_spanShrink.dragMax,Math.floor((x+HIT_TOLERANCE_PX)/FC)));
 }
 window.addEventListener('mousemove',function(e){
   if(!_spanShrink.active)return;
@@ -1583,6 +1595,28 @@ document.getElementById('frame-grid').addEventListener('mousedown',function(e){
     if(fr0&&fr0.isInterpolated){openPropsSection('tween-sec');openPropsSection('easing-sec');}
   }
 
+  // Relocating a SINGLE keyframe that has its own outpoint (a bordering
+  // NEXT keyframe defining how long it holds) left that hold length behind
+  // — moveFrames only relocates the cells actually in _sel.frames, and a
+  // hold has no stored length of its own (purely derived by scanning
+  // forward to the next real keyframe, timeline.js convention), so only
+  // the dragged keyframe moved while its outpoint/next-keyframe stayed put,
+  // silently changing (or inverting) the gap between them — feedback: "le
+  // drag de la keyframe avec un outpoint derrière elle n'entraine pas
+  // l'outpoint avec elle". Fix: when this move-drag starts from EXACTLY one
+  // selected keyframe (not a deliberate multi-select/range — same
+  // `!wasSelected`-style single-cell precedent used elsewhere in this
+  // handler) and it borders a real next keyframe on the same layer, add
+  // that bordering keyframe to the selection too — moveFrames' single
+  // uniform offset then carries both, preserving the gap between them.
+  if(wasSelected&&_sel.frames.length===1&&_sel.frames[0].layer===li&&_sel.frames[0].frame===fi){
+    var ldBorder=state.layers[li];
+    if(ldBorder&&ldBorder.frames[fi]&&ldBorder.frames[fi].isKeyframe){
+      for(var nb=fi+1;nb<ldBorder.frames.length;nb++){
+        if(ldBorder.frames[nb].isKeyframe){selAdd(li,nb);selApplyCSS();break;}
+      }
+    }
+  }
   _tlDrag.active=true;_tlDrag.startL=li;_tlDrag.startF=fi;_tlDrag.moved=false;_tlDrag.ghost=null;
   _tlDrag.mode=wasSelected?'move':'select';
 });
