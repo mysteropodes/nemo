@@ -379,3 +379,44 @@ cherry-pick <commit>` sur `main`, puis décision UI (bouton Réglages,
 raccourci, intégration à l'outil). Pour les non-prototypés ci-dessus,
 l'ordre de valeur suggéré : masques (#1) → effets par calque (#2) →
 lip-sync amplitude (#9) → French curve (#5), le reste sur demande.
+
+## QA croisée entre prototypes (2026-07-13)
+
+Passe de vérification sur les 37 prototypes enregistrés : conflits de
+raccourcis clavier avec l'app core, et stabilité quand (presque) tous
+sont actifs en même temps.
+
+**Bug réel trouvé et corrigé** (commit `a2c98f4`) : `flip-roll.js` (R),
+`mirror-check.js` (M) et `french-curve.js` (F) écoutent `keydown` en
+phase de capture et appellent `preventDefault()`, mais aucun des trois
+n'appelait `stopPropagation()`. Le handler core (`timeline.js
+onKeyDown`, phase bulle, pas de check `defaultPrevented`) recevait donc
+la MÊME frappe :
+- R est aussi le raccourci par défaut de l'outil Rectangle
+  (`TOOL_SHORTCUTS`) → appuyer sur R pendant un flip-roll changeait
+  l'outil actif sous les pieds de l'utilisateur.
+- M est aussi le raccourci par défaut de l'outil Fill/Stroke-Select →
+  même souci pendant un mirror-check.
+- F déclenche aussi `flipPreview()` (bascule de l'aperçu canvas) →
+  appuyer sur F pour armer French Curve lançait EN PLUS le flicker de
+  prévisualisation.
+
+Confirmé par `dispatchEvent(KeyboardEvent)` synthétique avant/après
+correctif : `state.tool` restait `'draw'` et `state._flipping` restait
+`false` après correctif, alors qu'avant le fix `state.tool` changeait
+réellement. Corrigé en ajoutant `stopPropagation()` dans les 3 handlers
++ `vector-sculpt.js` (W, pas de collision par défaut aujourd'hui, mais
+les raccourcis d'outils sont ré-assignables via Réglages — un futur
+rebind sur W aurait le même bug).
+
+`command-palette.js` (Cmd/Ctrl+K) ne collisionne pas avec le K nu du
+core (navigation J/K de keyframe) — modificateur différent, vérifié.
+
+**Test d'activation simultanée** : les 37 prototypes activés en même
+temps (`SMLabs.enable` sur toute la liste) ne produisent aucune erreur
+console ni doublon d'enregistrement (`SMLabs.list()` = 37 noms
+uniques). Un commit de trait synthétique déclenché avec les 37 actifs
+(`window.SMLabs.onStrokeCommitted(path, layer)`) traverse tout le
+fan-out sans exception et laisse le calque dans un état cohérent
+(items compagnons ajoutés par les prototypes qui réagissent au commit,
+rien de cassé).
