@@ -45,6 +45,8 @@
 // zoom-vs-pan zones actually were.
 (function () {
   var KEY = 'nemo-timeline-fc';
+  var KEY_VER = 'nemo-timeline-fc-ver';
+  var CUR_VER = '2'; // bump whenever DEFAULT_FC changes and existing persisted values should be migrated once
   var DEFAULT_FC = 30;
 
   function clamp(n) { return Math.max(4, Math.min(64, Math.round(n))); }
@@ -127,7 +129,7 @@
     window.addEventListener('pointerup', function () { thumb.style.cursor = 'grab'; });
 
     var dragMode = null; // 'pan' | 'zoom-left' | 'zoom-right'
-    var startX = 0, startScrollLeft = 0, startFC = 0, anchorContentX = 0;
+    var startX = 0, startScrollLeft = 0, startFC = 0, anchorFrame = 0, anchorScreenX = 0;
 
     function onDown(e, mode) {
       e.stopPropagation(); e.preventDefault();
@@ -136,12 +138,17 @@
       var wrap2 = wrapEl();
       startScrollLeft = wrap2.scrollLeft;
       startFC = window.FC;
-      // The content-space x-coordinate under the EDGE NOT being dragged —
-      // kept visually fixed while resizing, exactly like Premiere's
-      // timeline zoom-by-scrollbar-edge behavior.
+      // Bug found 2026-07 ("la scrollbar doit pouvoir se réduire en
+      // direction du curseur de temps des 2 côtés sinon perd le fil de là
+      // où on est"): used to anchor whichever EDGE wasn't being dragged
+      // (Premiere's own convention) — but that could scroll the playhead
+      // straight out of view if it happened to sit near the edge you WERE
+      // dragging. Anchoring to the PLAYHEAD's own screen position instead:
+      // regardless of which handle you drag, the current frame stays
+      // visually still, so you never lose track of where you are.
       var trackW = wrap2.clientWidth;
-      if (mode === 'zoom-left') anchorContentX = startScrollLeft + trackW; // right edge stays put
-      else if (mode === 'zoom-right') anchorContentX = startScrollLeft; // left edge stays put
+      anchorFrame = state.currentFrame;
+      anchorScreenX = (anchorFrame * startFC) - startScrollLeft;
       window.addEventListener('pointermove', onMove);
       window.addEventListener('pointerup', onUp);
     }
@@ -166,10 +173,10 @@
       var newFC = clamp(startFC * trackW / Math.max(20, trackW + sign * dx * 4));
       window.FC = newFC;
       document.documentElement.style.setProperty('--fc', newFC + 'px');
-      // Re-anchor so the edge NOT being dragged stays visually still.
+      // Re-anchor so the PLAYHEAD stays at the same screen position.
       var newContentW = totalContentWidth();
-      if (dragMode === 'zoom-left') wrap2.scrollLeft = Math.max(0, Math.min(newContentW - trackW, anchorContentX - trackW));
-      else wrap2.scrollLeft = Math.max(0, Math.min(newContentW - trackW, anchorContentX));
+      var newAnchorContentX = anchorFrame * newFC;
+      wrap2.scrollLeft = Math.max(0, Math.min(newContentW - trackW, newAnchorContentX - anchorScreenX));
       refresh();
     }
     function onUp() {
@@ -215,6 +222,18 @@
 
   function init() {
     ensureScrollbar();
+    // Bug found 2026-07 ("tu n'as pas ajusté le zoom quand on repasse sur
+    // l'animation 2D"): DEFAULT_FC alone only affects a session with NO
+    // persisted value yet — an existing session already had its OLD
+    // (cramped, 16px) FC saved, so raising the default silently changed
+    // nothing for anyone who'd already used the app once. Version-stamp
+    // the persisted key so this forces exactly ONE migration to the new
+    // default; any zoom the user picks afterward is respected normally.
+    if (localStorage.getItem(KEY_VER) !== CUR_VER) {
+      localStorage.setItem(KEY_VER, CUR_VER);
+      apply(DEFAULT_FC);
+      return;
+    }
     var saved = parseInt(localStorage.getItem(KEY), 10);
     if (!isNaN(saved) && saved !== window.FC) apply(saved);
     else redrawScrollbar();

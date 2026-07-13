@@ -76,6 +76,12 @@
       });
     }
     renderKeyTicks(bar, row, li, ld, inF, outF);
+    // Every renderTimeline() rebuilds row/bar/handle DOM from scratch
+    // (buildBar runs again), so the edge-specific 'sel' highlight needs
+    // reapplying here on every updateBar call too, not just once at the
+    // initial build — otherwise a re-render after a drag/selection change
+    // would silently drop it.
+    applySelClasses(bar, selPartOf(li));
   }
 
   // ---- per-keyframe tick marks inside the bar (the "chantier", 2026-07:
@@ -151,8 +157,22 @@
   // rectangle down the layer column to select several layers' bars at
   // once, then drag any ONE of them to shift the whole group's in/out
   // range together (relative spacing preserved).
-  var _barSel = []; // layer indices whose bar is selected
-  function isBarSelected(li) { return _barSel.indexOf(li) >= 0; }
+  var _barSel = []; // [{li, part:'in'|'out'|'both'}] — which EDGE(S) of each layer's bar are selected
+  function findSelEntry(li) { for (var i = 0; i < _barSel.length; i++) if (_barSel[i].li === li) return _barSel[i]; return null; }
+  function isBarSelected(li) { return !!findSelEntry(li); }
+  function selPartOf(li) { var s = findSelEntry(li); return s ? s.part : null; }
+  // 'both' highlights the whole bar (existing white outline); 'in'/'out'
+  // highlight ONLY that specific handle — feedback: "si on drag sur une
+  // partie du calque alors ça select le in ou out point seulement", a
+  // marquee that only touches one edge of a bar shouldn't visually claim
+  // the whole thing is selected.
+  function applySelClasses(bar, part) {
+    bar.classList.toggle('sel', part === 'both');
+    var hleft = bar.querySelector('.layer-inout-handle.left');
+    var hright = bar.querySelector('.layer-inout-handle.right');
+    if (hleft) hleft.classList.toggle('sel', part === 'in');
+    if (hright) hright.classList.toggle('sel', part === 'out');
+  }
   var _marquee = null; // {startX, startY, rectEl, moved}
   function startMarquee(e) {
     var rect = document.createElement('div'); rect.className = 'layer-inout-marquee-rect';
@@ -166,6 +186,22 @@
   // rectangle now tracks both axes and hit-tests against each BAR's own
   // rendered rect (not the row's, which is full-width) — true 2D overlap,
   // exactly the classic click-drag box every other timeline/DAW uses.
+  //
+  // Follow-up ("si on drag sur une partie du calque alors ça select le in
+  // ou out point seulement, comme sur le calque violet maquette que j'ai
+  // fait"): a bar hit by the marquee is now tagged with WHICH part it was
+  // hit on — only the left half touched -> 'in', only the right half ->
+  // 'out', spanning across (or the whole bar) -> 'both'. Judged against
+  // the OVERLAP region's own midpoint, not the marquee rect's own bounds,
+  // so a wide marquee that only grazes one edge of a narrow bar still
+  // reads as a single-edge selection.
+  function partForOverlap(barRect, ox0, ox1) {
+    var mid = (barRect.left + barRect.right) / 2;
+    var touchesLeft = ox0 <= mid, touchesRight = ox1 >= mid;
+    if (touchesLeft && !touchesRight) return 'in';
+    if (touchesRight && !touchesLeft) return 'out';
+    return 'both';
+  }
   function applyMarqueeSelection(x0, y0, x1, y1) {
     var sel = [];
     document.querySelectorAll('.layer-inout-bar').forEach(function (bar) {
@@ -173,8 +209,12 @@
       var li = _rowLayerIdx.get(row); if (li == null) return;
       var b = bar.getBoundingClientRect();
       var hit = b.left <= x1 && b.right >= x0 && b.top <= y1 && b.bottom >= y0;
-      bar.classList.toggle('sel', hit);
-      if (hit) sel.push(li);
+      var part = null;
+      if (hit) {
+        part = partForOverlap(b, Math.max(x0, b.left), Math.min(x1, b.right));
+        sel.push({ li: li, part: part });
+      }
+      applySelClasses(bar, part);
     });
     _barSel = sel;
   }
@@ -196,12 +236,12 @@
   }
   function clearBarSel() {
     _barSel = [];
-    document.querySelectorAll('.layer-inout-bar.sel').forEach(function (b) { b.classList.remove('sel'); });
+    document.querySelectorAll('.layer-inout-bar').forEach(function (bar) { applySelClasses(bar, null); });
   }
   function refreshBarSelClasses() {
     document.querySelectorAll('.layer-inout-bar').forEach(function (bar) {
       var row = bar.parentElement, rli = row && _rowLayerIdx.get(row);
-      bar.classList.toggle('sel', rli != null && isBarSelected(rli));
+      applySelClasses(bar, rli != null ? selPartOf(rli) : null);
     });
   }
   // Shift/Cmd/Ctrl-click toggles one layer's bar in/out of the selection —
@@ -215,9 +255,13 @@
   // width AND lets non-adjacent layers join one selection (a rectangle is
   // inherently contiguous), matching the standard multi-select convention
   // every other timeline/keyframe editor uses alongside rectangle-select.
+  // Always tags 'both' (a modifier-click is a whole-bar toggle, not tied
+  // to any rectangle geometry) — only the marquee produces edge-scoped
+  // 'in'/'out' selections.
   function toggleBarSel(li) {
-    var idx = _barSel.indexOf(li);
-    if (idx >= 0) _barSel.splice(idx, 1); else _barSel.push(li);
+    var idx = -1;
+    for (var i = 0; i < _barSel.length; i++) if (_barSel[i].li === li) { idx = i; break; }
+    if (idx >= 0) _barSel.splice(idx, 1); else _barSel.push({ li: li, part: 'both' });
     refreshBarSelClasses();
   }
   // Maps a bar's row element to/from its layer index — buildBar populates
@@ -243,10 +287,10 @@
     // was wrong, group-trimming in/out points together is exactly the
     // point of the marquee select here).
     if (isBarSelected(li) && _barSel.length > 1) {
-      var members = _barSel.map(function (mli) {
-        var mld = state.layers[mli], mrow = _liToRow[mli];
+      var members = _barSel.map(function (s) {
+        var mld = state.layers[s.li], mrow = _liToRow[s.li];
         if (!mld || !mrow) return null;
-        return { li: mli, row: mrow, origIn: inPointOf(mld), origOut: outPointOf(mld) };
+        return { li: s.li, row: mrow, origIn: inPointOf(mld), origOut: outPointOf(mld) };
       }).filter(Boolean);
       _drag = { group: true, type: type, startX: e.clientX, members: members };
       return;
@@ -363,7 +407,7 @@
   // require >=2 selected bars except Invert, which works off whatever's
   // currently selected (possibly zero). One pushUndo() per operation.
   function selectedLayers() {
-    return _barSel.map(function (li) { return { li: li, ld: state.layers[li] }; }).filter(function (x) { return x.ld; });
+    return _barSel.map(function (s) { return { li: s.li, ld: state.layers[s.li] }; }).filter(function (x) { return x.ld; });
   }
   function applyBatch(fn) {
     var items = selectedLayers();
@@ -425,28 +469,24 @@
   }
   function selectEveryNth(n) {
     n = Math.max(2, parseInt(n, 10) || 2);
-    var sorted = _barSel.slice().sort(function (a, b) { return inPointOf(state.layers[a]) - inPointOf(state.layers[b]); });
-    _barSel = sorted.filter(function (_li, i) { return i % n === 0; });
-    document.querySelectorAll('.layer-inout-bar').forEach(function (bar) {
-      var row = bar.parentElement, li = row && _rowLayerIdx.get(row);
-      bar.classList.toggle('sel', li != null && isBarSelected(li));
-    });
+    var sorted = _barSel.slice().sort(function (a, b) { return inPointOf(state.layers[a.li]) - inPointOf(state.layers[b.li]); });
+    _barSel = sorted.filter(function (_s, i) { return i % n === 0; });
+    refreshBarSelClasses();
     if (window.showToast) showToast(_barSel.length + ' calque(s) sélectionné(s)');
   }
   // Selects every layer that HAS a bar row currently rendered and is NOT
   // already selected — inverts within the same universe Box Select draws
-  // its marquee over, matching Skew Pro's own "I" shortcut.
+  // its marquee over, matching Skew Pro's own "I" shortcut. Always lands
+  // on 'both' (whole-bar), same as toggleBarSel — inversion isn't tied to
+  // any rectangle geometry either.
   function invertBarSelection() {
     var all = [];
     document.querySelectorAll('.layer-inout-bar').forEach(function (bar) {
       var row = bar.parentElement, li = row && _rowLayerIdx.get(row);
       if (li != null) all.push(li);
     });
-    _barSel = all.filter(function (li) { return !isBarSelected(li); });
-    document.querySelectorAll('.layer-inout-bar').forEach(function (bar) {
-      var row = bar.parentElement, li = row && _rowLayerIdx.get(row);
-      bar.classList.toggle('sel', li != null && isBarSelected(li));
-    });
+    _barSel = all.filter(function (li) { return !isBarSelected(li); }).map(function (li) { return { li: li, part: 'both' }; });
+    refreshBarSelClasses();
   }
 
   // Builds the bar + its two handles into `row` (a .frow — Animation 2D's
@@ -456,7 +496,7 @@
   // scratch every time, same as every other overlay in this codebase).
   function buildBar(row, li) {
     row.style.position = 'relative';
-    var bar = document.createElement('div'); bar.className = 'layer-inout-bar' + (isBarSelected(li) ? ' sel' : '');
+    var bar = document.createElement('div'); bar.className = 'layer-inout-bar' + (selPartOf(li) === 'both' ? ' sel' : '');
     var hleft = document.createElement('div'); hleft.className = 'layer-inout-handle left';
     var hright = document.createElement('div'); hright.className = 'layer-inout-handle right';
     bar.appendChild(hleft); bar.appendChild(hright);

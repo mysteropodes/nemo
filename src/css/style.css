@@ -469,6 +469,13 @@ body.mode-motion .lrow.act{box-shadow:inset 3px 0 0 #4E6FF2,inset 0 0 0 1px rgba
    the bar body used to light up BOTH the in and out handle together,
    when only whichever one the cursor is actually over should react. */
 .layer-inout-handle:hover{opacity:1;background:var(--accent-hover);}
+/* Feedback: "si on drag sur une partie du calque alors ça select le in ou
+   out point seulement" — a marquee that only overlaps one edge of a bar
+   selects (persistently, not just on hover) ONLY that handle instead of
+   the whole bar — same lighter blue as hover, plus a white ring matching
+   the bar's own .sel outline so a single-edge selection still reads as
+   clearly "selected", not just "hovered". */
+.layer-inout-handle.sel{opacity:1;background:var(--accent-hover);box-shadow:0 0 0 1.5px #fff;}
 /* Multi-select (marquee rect -> group-drag several layers' bars together,
    layer-inout.js) */
 .layer-inout-bar.sel{box-shadow:0 0 0 1.5px #fff;}
