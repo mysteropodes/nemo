@@ -510,14 +510,33 @@ window.SM={
     selClear();loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
     showToast('Frames supprimées');
   },
+  // Was dead code (defined, never called from any UI path) until Motion
+  // mode's in/out bar (layer-inout.js) started drawing per-keyframe tick
+  // marks and needed a single-keyframe retime that DOESN'T touch the
+  // frame-grid's own _sel/selBounds state (moveFrames below reads that
+  // global selection directly — fine from timeline.js's own drag handler,
+  // wrong to reach into from a different mode's UI that has nothing
+  // selected there). Brought up to the same standard as moveFrames: syncs
+  // the live document first (saveAllLayerFrames) and rekeys motion-arc
+  // tween data across the move (rekeyTweenPairData), which the original
+  // version of this function skipped.
   moveKeyframe:function(layerIdx,fromFrame,toFrame){
-    if(fromFrame===toFrame)return;var ld=state.layers[layerIdx];if(!ld||ld.locked)return;
-    var src=ld.frames[fromFrame];if(!src||!src.isKeyframe)return;
-    var dst=ld.frames[toFrame];if(!dst)return;
-    pushUndo();
+    if(fromFrame===toFrame)return false;
+    var ld=state.layers[layerIdx];if(!ld||ld.locked)return false;
+    if(toFrame<0||toFrame>=state.totalFrames)return false;
+    var src=ld.frames[fromFrame];if(!src||!src.isKeyframe)return false;
+    pushUndo();saveAllLayerFrames();
+    var beforeKfs=ld.frames.map(function(f,fi){return f.isKeyframe?fi:null;}).filter(function(x){return x!==null;});
     ld.frames[toFrame]={strokes:src.strokes,isKeyframe:true,isInterpolated:false};
     ld.frames[fromFrame]={strokes:[],isKeyframe:false,isInterpolated:false};
+    for(var i=0;i<beforeKfs.length-1;i++){
+      var fA=beforeKfs[i],fB=beforeKfs[i+1];
+      var newFA=fA===fromFrame?toFrame:fA;
+      var newFB=fB===fromFrame?toFrame:fB;
+      rekeyTweenPairData(fA,fB,newFA,newFB);
+    }
     loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast('Keyframe déplacée → '+(toFrame+1));
+    return true;
   },
   deleteSelStrokes:function(){if(selectedPaths.length>0){pushUndo();selectedPaths.forEach(function(p){
     // Team review: deleting someone else's stroke ghosts it instead of

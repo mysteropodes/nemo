@@ -67,7 +67,74 @@
         c.classList.toggle('io-dim', f < inF || f > outF);
       });
     }
+    renderKeyTicks(bar, row, li, ld, inF, outF);
   }
+
+  // ---- per-keyframe tick marks inside the bar (the "chantier", 2026-07:
+  // "les traits violet au milieu... correspondent à d'autres keyframes
+  // pleines que l'on peut modifier dans le temps de ce calque" / linking
+  // Animation 2D's frame content to Motion's bar) ----
+  // Animation 2D's `ld.frames[i]` (isKeyframe + real strokes = a "full"
+  // keyframe, per CLAUDE.md's frame model) was completely invisible from
+  // Motion's collapsed bar until now — the bar only ever showed the
+  // in/out VISIBILITY range, with zero connection to where the layer's
+  // actual drawn keyframes sit in time. One tick per full keyframe within
+  // the visible [inF,outF] range, positioned relative to the bar's own
+  // left edge (bar is itself the positioning context for its handles
+  // already, see style.css) so it stays aligned as the bar gets trimmed.
+  // Rebuilt on every updateBar call, same "rebuild from scratch" idiom as
+  // everything else here — cheap at realistic keyframe counts and avoids
+  // any stale-tick bookkeeping.
+  function renderKeyTicks(bar, row, li, ld, inF, outF) {
+    var old = bar.querySelectorAll('.layer-inout-key');
+    for (var o = 0; o < old.length; o++) old[o].remove();
+    if (!ld.frames) return;
+    for (var f = inF; f <= outF; f++) {
+      var fr = ld.frames[f];
+      if (!fr || !fr.isKeyframe || !fr.strokes || !fr.strokes.length) continue;
+      (function (frameIdx) {
+        var tick = document.createElement('div');
+        tick.className = 'layer-inout-key';
+        tick.style.left = ((frameIdx - inF) * FC) + 'px';
+        tick.title = 'Keyframe — frame ' + (frameIdx + 1) + ' (glisser pour retimer)';
+        bar.appendChild(tick);
+        tick.addEventListener('mousedown', function (e) { onKeyDown(li, row, bar, tick, frameIdx, e); });
+      })(f);
+    }
+  }
+  // Dragging a tick retimes ONE keyframe via window.SM.moveKeyframe
+  // (timeline.js) — the SAME data mutation Animation 2D's own frame
+  // content lives in (ld.frames), not a Motion-only copy, so the change
+  // is visible back in Animation 2D's frame grid the moment you switch
+  // modes (both views render straight off ld.frames, nothing to sync).
+  // Deliberately a SEPARATE drag singleton from _drag above (not folded
+  // into its group/in/out state machine): a keyframe retime is always a
+  // single tick, never a group operation, and keeping it decoupled avoids
+  // any risk of regressing the in/out drag logic that was just fixed.
+  var _keyDrag = null; // {li, row, bar, tickEl, origFrame, startX, previewFrame}
+  function onKeyDown(li, row, bar, tickEl, frame, e) {
+    e.stopPropagation(); e.preventDefault();
+    var ld = state.layers[li]; if (!ld || ld.locked) return;
+    // undo step is taken inside moveKeyframe itself, once, on drop — not per mousemove
+    _keyDrag = { li: li, row: row, bar: bar, tickEl: tickEl, origFrame: frame, startX: e.clientX, previewFrame: frame };
+  }
+  document.addEventListener('mousemove', function (e) {
+    if (!_keyDrag) return;
+    var ld = state.layers[_keyDrag.li]; if (!ld) { _keyDrag = null; return; }
+    var dx = Math.round((e.clientX - _keyDrag.startX) / FC);
+    var inF = inPointOf(ld), outF = outPointOf(ld);
+    var nf = Math.max(inF, Math.min(outF, _keyDrag.origFrame + dx));
+    _keyDrag.previewFrame = nf;
+    _keyDrag.tickEl.style.left = ((nf - inF) * FC) + 'px';
+  });
+  document.addEventListener('mouseup', function () {
+    if (!_keyDrag) return;
+    var kd = _keyDrag; _keyDrag = null;
+    if (kd.previewFrame !== kd.origFrame && window.SM && window.SM.moveKeyframe) {
+      window.SM.moveKeyframe(kd.li, kd.origFrame, kd.previewFrame);
+    }
+    updateBar(kd.row, kd.li); // re-render ticks even if the move was a no-op (snaps back)
+  });
 
   // ---- multi-select (marquee rectangle) across several layers' bars ----
   // Feedback: "impossible de rect + drag sélection sur les inpoint et
