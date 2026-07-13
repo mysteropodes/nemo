@@ -1119,15 +1119,29 @@ function updateFsSelPanel(){
   if(state.tool!=='fsselect'||!_fsSel)return;
   var p=_fsSel.path;
   var ftog=document.getElementById('fill-enable-toggle'),stog=document.getElementById('stroke-enable-toggle');
-  if((_fsSel.kind==='fill'||_fsSel.kind==='fillregion')&&p.fillColor){
+  // Pressure-brush ribbons and fill-brush shapes are ALWAYS fillColor:<ink>/
+  // strokeColor:null by construction (draw-bridge.js commitStroke) — same
+  // exclusion as updateSelPropsPanel's isBrushShape guard just above, same
+  // reason: their fillColor being set is NOT a signal that the Fill/Stroke
+  // eyes were actually on at draw time.
+  var isBrushShape=p.data&&(p.data.isVectorBrush||p.data.isFillShape);
+  if((_fsSel.kind==='fill'||_fsSel.kind==='fillregion')&&p.fillColor&&!isBrushShape){
     var fc=colorHex8(p.fillColor);
     document.getElementById('fill-well').style.background=fc;document.getElementById('pm-fill').style.background=fc;
     ['color-fill','pm-fill-c'].forEach(function(id){var el=document.getElementById(id);if(el){el.value=fc;el.dataset.hex8=fc;}});
+    // Was only removing the toggle's 'off' CSS class here (a display-only
+    // fix, per this function's own header comment) — leaving the actual
+    // state.fillEnabled untouched meant the icon could show "on" while the
+    // NEXT drawn stroke still used a stale, possibly-off state.fillEnabled
+    // underneath it — icon and reality visibly disagreeing (reported: "des
+    // conflits" on Fill/Stroke enabled state). Now both move together.
+    state.fillEnabled=true;
     if(ftog)ftog.classList.remove('off');
   }else if(_fsSel.kind==='stroke'&&p.strokeColor){
     var sc=colorHex8(p.strokeColor);
     document.getElementById('stroke-well').style.background=sc;document.getElementById('pm-stroke').style.background=sc;
     ['color-stroke','pm-stroke-c'].forEach(function(id){var el=document.getElementById(id);if(el){el.value=sc;el.dataset.hex8=sc;}});
+    state.strokeEnabled=true;
     if(stog)stog.classList.remove('off');
   }
 }

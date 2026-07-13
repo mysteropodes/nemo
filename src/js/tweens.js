@@ -1106,8 +1106,23 @@ function renderOS(){
   // themselves are cheap, regenerated-per-frame stamps (not meaningful as a
   // traced reference), so onion just omits texture-preset strokes
   // altogether rather than trying to half-render them.
-  for(var fi=cf-1;fi>=state.onionIn&&fi>=0;fi--){var strokes=getEffectiveStrokes(li,fi);if(!strokes.length)continue;var dist=cf-fi;var op=(state.onionPrevOpacity/100)*Math.max(.15,1-dist*.2);strokes.forEach(function(sd){if(sd.isBrushTextureCopy||sd.brushTexturePreset)return;if(sd.isRaster){var pr=desR(sd,onionPrevLayer);pr.opacity=op;return;}var p=desP(sd,onionPrevLayer,op);if(state.onionMode==='tinted')p.strokeColor=new Color(1,.3,.3,op);else if(state.onionMode==='outline'){p.fillColor=null;p.strokeColor=new Color(1,.3,.3,op*.8);p.strokeWidth=1;}else p.opacity=op;});}
-  for(var fi2=cf+1;fi2<=state.onionOut&&fi2<state.totalFrames;fi2++){var strokes2=getEffectiveStrokes(li,fi2);if(!strokes2.length)continue;var dist2=fi2-cf;var op2=(state.onionNextOpacity/100)*Math.max(.15,1-dist2*.2);strokes2.forEach(function(sd){if(sd.isBrushTextureCopy||sd.brushTexturePreset)return;if(sd.isRaster){var nr=desR(sd,onionNextLayer);nr.opacity=op2;return;}var p=desP(sd,onionNextLayer,op2);if(state.onionMode==='tinted')p.strokeColor=new Color(.3,.55,1,op2);else if(state.onionMode==='outline'){p.fillColor=null;p.strokeColor=new Color(.3,.55,1,op2*.8);p.strokeWidth=1;}else p.opacity=op2;});}
+  // Falloff denominator scales with the ACTUAL configured onion range
+  // (cf-onionIn / onionOut-cf), not a fixed ~5-frame distance — the old
+  // `1-dist*.2` floored out (Math.max(.15,...)) by dist=4.25 regardless of
+  // how far the user dragged the onion markers, so widening the marker to
+  // reach a keyframe 11+ frames away kept adding real scene items (verified:
+  // they DID reach the Rust engine, correctly matched frame content) but at
+  // a flat ~4.5% final opacity (.15 floor × 30% base) — technically present,
+  // practically invisible, reported as "le fantôme n'apparaît/disparaît pas
+  // en conséquence" of resizing the markers. Now the .15 floor is reached
+  // exactly at the FAR EDGE of whatever range the user picked: the farthest
+  // frame in view stays visibly present, nearer frames are progressively
+  // more opaque, and widening the range genuinely changes what's legible
+  // instead of just adding more scene items nobody can see.
+  var prevRangeSpan=Math.max(1,cf-state.onionIn);
+  var nextRangeSpan=Math.max(1,state.onionOut-cf);
+  for(var fi=cf-1;fi>=state.onionIn&&fi>=0;fi--){var strokes=getEffectiveStrokes(li,fi);if(!strokes.length)continue;var dist=cf-fi;var op=(state.onionPrevOpacity/100)*Math.max(.15,1-(dist/prevRangeSpan)*.85);strokes.forEach(function(sd){if(sd.isBrushTextureCopy||sd.brushTexturePreset)return;if(sd.isRaster){var pr=desR(sd,onionPrevLayer);pr.opacity=op;return;}var p=desP(sd,onionPrevLayer,op);if(state.onionMode==='tinted')p.strokeColor=new Color(1,.3,.3,op);else if(state.onionMode==='outline'){p.fillColor=null;p.strokeColor=new Color(1,.3,.3,op*.8);p.strokeWidth=1;}else p.opacity=op;});}
+  for(var fi2=cf+1;fi2<=state.onionOut&&fi2<state.totalFrames;fi2++){var strokes2=getEffectiveStrokes(li,fi2);if(!strokes2.length)continue;var dist2=fi2-cf;var op2=(state.onionNextOpacity/100)*Math.max(.15,1-(dist2/nextRangeSpan)*.85);strokes2.forEach(function(sd){if(sd.isBrushTextureCopy||sd.brushTexturePreset)return;if(sd.isRaster){var nr=desR(sd,onionNextLayer);nr.opacity=op2;return;}var p=desP(sd,onionNextLayer,op2);if(state.onionMode==='tinted')p.strokeColor=new Color(.3,.55,1,op2);else if(state.onionMode==='outline'){p.fillColor=null;p.strokeColor=new Color(.3,.55,1,op2*.8);p.strokeWidth=1;}else p.opacity=op2;});}
   userLayers[state.activeLayerIdx].activate();
 }
 
