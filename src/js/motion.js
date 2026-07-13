@@ -119,6 +119,20 @@
     return ks[0];
   }
 
+  // Opens the SAME shared ease-curve widget camera.js already uses
+  // (window._curveEditor.editCameraSeg — its name is camera-specific but
+  // the API only cares that `seg` has an `.ease` array, and motion keys use
+  // the identical {ease:[x1,y1,x2,y2],...} shape). Reusing it means no new
+  // curve UI to build: dragging the two handles in that widget mutates
+  // `seg.ease` in place, exactly as it already does for camera keys.
+  function openMotionEaseEditor(ld, prop) {
+    var track = ld.motion && ld.motion[prop];
+    var seg = track ? segmentLeftKey(track, state.currentFrame) : null;
+    if (!seg) { if (window.showToast) showToast('Ajoute au moins 2 clés sur ' + PROP_LABEL[prop] + ' pour avoir une courbe'); return; }
+    var ks = track.keys, next = ks[ks.indexOf(seg) + 1];
+    if (window._curveEditor) window._curveEditor.editCameraSeg(seg, PROP_LABEL[prop] + ' : clé ' + (seg.frame + 1) + ' → ' + (next.frame + 1));
+  }
+
   function setKeyAtCurrentFrame(ld, prop, values) {
     var track = ensureTrack(ld, prop);
     var k = keyAt(track, state.currentFrame);
@@ -403,11 +417,16 @@
         c.addEventListener('contextmenu', function (e) {
           e.preventDefault(); e.stopPropagation();
           goToFrame(frameIdx);
-          window.showContextMenu(e.clientX, e.clientY, [
+          var track = ld.motion && ld.motion[prop];
+          var menu = [
             key
               ? { label: 'Supprimer cette clé', action: function () { pushUndo(); var tr = ld.motion[prop]; tr.keys.splice(tr.keys.indexOf(key), 1); renderTimeline(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); } }
               : { label: 'Ajouter une clé ici', action: function () { pushUndo(); setKeyAtCurrentFrame(ld, prop, isAnimated(ld, prop) ? valueAtFrame(ld, prop, frameIdx) : staticValue(ld, prop)); renderLayerList(); renderTimeline(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); } },
-          ]);
+          ];
+          if (track && segmentLeftKey(track, frameIdx)) {
+            menu.push({ label: 'Éditer la courbe d’accélération…', action: function () { openMotionEaseEditor(ld, prop); } });
+          }
+          window.showContextMenu(e.clientX, e.clientY, menu);
         });
       })(fi, k);
       rowEl.appendChild(c);
@@ -455,6 +474,12 @@
   // ---- mode switching ----
   function setAppMode(mode) {
     if (state.appMode === mode) return;
+    // Leaving Motion mode: the shared ease-curve widget (see
+    // openMotionEaseEditor) may still be pointed at a motion key whose row
+    // is about to disappear — fall back to the plain tween-curve view, same
+    // precedent as camera.js's own exitCameraSeg() call when its tool
+    // deactivates.
+    if (state.appMode === 'motion' && window._curveEditor) window._curveEditor.exitCameraSeg();
     state.appMode = mode;
     document.querySelectorAll('.app-mode-btn').forEach(function (b) { b.classList.toggle('active', b.dataset.mode === mode); });
     document.body.classList.toggle('mode-motion', mode === 'motion');
