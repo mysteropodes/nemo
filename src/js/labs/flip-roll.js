@@ -50,6 +50,10 @@
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (e.target && e.target.isContentEditable)) return;
     if (e.key !== 'r' && e.key !== 'R') return;
     if (e.metaKey || e.ctrlKey || e.altKey) return; // don't eat browser/app shortcuts
+    // R is also the default Rectangle-tool shortcut (timeline.js
+    // runToolShortcut) — without stopPropagation the core bubble-phase
+    // onKeyDown still sees this same keydown and switches tools mid-roll.
+    e.stopPropagation();
     if (e.repeat) { e.preventDefault(); return; } // key-repeat spam while held
     e.preventDefault();
     start();

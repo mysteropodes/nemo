@@ -135,6 +135,10 @@
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (e.target && e.target.isContentEditable)) return;
     if (e.key !== 'w' && e.key !== 'W') return;
     if (e.metaKey || e.ctrlKey || e.altKey) return;
+    // W has no default core binding today, but tool shortcuts are user-
+    // rebindable (timeline.js TOOL_SHORTCUTS + Settings) — stop propagation
+    // so a future rebind to W can't silently fight this prototype too.
+    e.stopPropagation();
     e.preventDefault();
     armed = true;
   }, true);

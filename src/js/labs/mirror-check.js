@@ -32,6 +32,10 @@
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (e.target && e.target.isContentEditable)) return;
     if (e.key !== 'm' && e.key !== 'M') return;
     if (e.metaKey || e.ctrlKey || e.altKey) return;
+    // M is also the default Fill/Stroke-Select tool shortcut (timeline.js
+    // runToolShortcut) — without stopPropagation the core bubble-phase
+    // onKeyDown still sees this keydown and switches the active tool.
+    e.stopPropagation();
     e.preventDefault();
     if (!e.repeat) flip(true);
   }, true);

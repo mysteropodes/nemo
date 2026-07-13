@@ -113,6 +113,10 @@
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (e.target && e.target.isContentEditable)) return;
     if (e.key !== 'f' && e.key !== 'F') return;
     if (e.metaKey || e.ctrlKey || e.altKey) return;
+    // F is also the core app's flip-preview shortcut (timeline.js
+    // onKeyDown) — without stopPropagation the core bubble-phase handler
+    // still sees this keydown and flips the canvas while the curve is armed.
+    e.stopPropagation();
     e.preventDefault();
     armed = true;
   }, true);
