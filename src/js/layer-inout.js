@@ -76,12 +76,69 @@
       });
     }
     renderKeyTicks(bar, row, li, ld, inF, outF);
+    renderContentGaps(bar, ld, inF, outF);
     // Every renderTimeline() rebuilds row/bar/handle DOM from scratch
     // (buildBar runs again), so the edge-specific 'sel' highlight needs
     // reapplying here on every updateBar call too, not just once at the
     // initial build — otherwise a re-render after a drag/selection change
     // would silently drop it.
     applySelClasses(bar, selPartOf(li));
+  }
+
+  // ---- gaps for genuinely blank stretches inside the bar (2026-07:
+  // "une timeline dans animation 2D avec des keyframe vide doivent
+  // s'afficher comme ça dans motion" — Animation 2D's own frame grid marks
+  // a blank keyframe with a HOLLOW dot and visibly stops drawing until the
+  // next real one; Motion's bar used to render that whole stretch as one
+  // solid, continuous block, hiding that a real gap existed in there) ----
+  // Purely a rendering addition — inPoint/outPoint (the actual visibility
+  // gate, getEffectiveStrokes) and the bar's drag hit-area are UNCHANGED,
+  // this only draws dimmed overlays + hollow boundary dots over stretches
+  // with no content, same "blank" test as autoIn/OutPointFromBlankKeyframe
+  // (app.js): a keyframe is blank iff isKeyframe && !strokes.length, held/
+  // tween frames between real keyframes don't affect the running state.
+  function renderContentGaps(bar, ld, inF, outF) {
+    var old = bar.querySelectorAll('.layer-inout-seg-gap, .layer-inout-segdot');
+    for (var o = 0; o < old.length; o++) old[o].remove();
+    if (!ld.frames) return;
+    var segs = [], curStart = null, curBlank = true;
+    for (var f = inF; f <= outF; f++) {
+      var fr = ld.frames[f];
+      if (!fr || !fr.isKeyframe) continue;
+      var hasContent = !!(fr.strokes && fr.strokes.length);
+      if (hasContent) {
+        if (curBlank) curStart = f;
+        curBlank = false;
+      } else {
+        if (!curBlank && curStart != null) { segs.push({ start: curStart, end: f }); curStart = null; }
+        curBlank = true;
+      }
+    }
+    if (!curBlank && curStart != null) segs.push({ start: curStart, end: outF });
+    if (segs.length < 2) return; // one continuous stretch (or none) — the plain bar already reads correctly
+
+    function addGap(gf0, gf1) {
+      var gap = document.createElement('div'); gap.className = 'layer-inout-seg-gap';
+      gap.style.left = ((gf0 - inF) * FC) + 'px';
+      gap.style.width = Math.max(1, (gf1 - gf0) * FC) + 'px';
+      bar.appendChild(gap);
+    }
+    var cursor = inF;
+    segs.forEach(function (seg) {
+      if (seg.start > cursor) addGap(cursor, seg.start);
+      cursor = seg.end;
+    });
+    if (cursor < outF) addGap(cursor, outF);
+    // Hollow dot at each segment's END (the blank keyframe that closes it)
+    // — its START already gets the normal filled tick from renderKeyTicks
+    // above, matching Animation 2D's own full/hollow dot convention
+    // instead of drawing a redundant second marker there.
+    segs.forEach(function (seg) {
+      var dot = document.createElement('div'); dot.className = 'layer-inout-segdot';
+      dot.style.left = ((seg.end - inF) * FC) + 'px';
+      dot.title = 'Keyframe vide — frame ' + (seg.end + 1);
+      bar.appendChild(dot);
+    });
   }
 
   // ---- per-keyframe tick marks inside the bar (the "chantier", 2026-07:

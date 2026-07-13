@@ -486,6 +486,15 @@ body.mode-motion .lrow.act{box-shadow:inset 3px 0 0 #4E6FF2,inset 0 0 0 1px rgba
    retime that keyframe without leaving Motion mode. */
 .layer-inout-bar .layer-inout-key{position:absolute;top:0;bottom:0;width:3px;margin-left:-1.5px;background:#fff;opacity:.85;cursor:ew-resize;z-index:3;border-radius:1px;}
 .layer-inout-bar .layer-inout-key:hover{opacity:1;background:var(--accent);width:4px;margin-left:-2px;}
+/* Blank-keyframe gaps inside the bar (layer-inout.js renderContentGaps,
+   2026-07) — dims a genuinely empty stretch instead of letting it read as
+   solid content, pointer-events:none so the bar underneath stays
+   draggable through it. Hollow dot at the blank keyframe that closes each
+   segment, matching Animation 2D's own full/hollow keyframe-dot
+   convention (a filled tick already marks the segment's start, see
+   .layer-inout-key above). */
+.layer-inout-bar .layer-inout-seg-gap{position:absolute;top:0;bottom:0;background:var(--panel);opacity:.82;pointer-events:none;z-index:1;}
+.layer-inout-bar .layer-inout-segdot{position:absolute;top:50%;width:7px;height:7px;margin:-3.5px 0 0 -3.5px;border-radius:50%;background:transparent;border:1.5px solid #fff;pointer-events:none;z-index:4;}
 /* Bug found 2026-07 ("j'ai une barre au dessus de ses inpoint et outpoint
    de l'onion skin qui devrait être au même niveau"): top:2px put the bar
    in the upper half of #bars-row while .onion-marker sits at top:9px —
