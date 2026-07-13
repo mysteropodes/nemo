@@ -116,6 +116,28 @@
     _barSel = [];
     document.querySelectorAll('.layer-inout-bar.sel').forEach(function (b) { b.classList.remove('sel'); });
   }
+  function refreshBarSelClasses() {
+    document.querySelectorAll('.layer-inout-bar').forEach(function (bar) {
+      var row = bar.parentElement, rli = row && _rowLayerIdx.get(row);
+      bar.classList.toggle('sel', rli != null && isBarSelected(rli));
+    });
+  }
+  // Shift/Cmd/Ctrl-click toggles one layer's bar in/out of the selection —
+  // feedback: "je ne peux pas select 2 inpoint de calques différents ou
+  // plus". The rectangle marquee above only starts from a row's EMPTY
+  // background (`e.target===row`), but a layer's bar defaults to the FULL
+  // timeline range (unset inPoint/outPoint = full range, see header
+  // comment) — an untrimmed bar covers the entire row width with zero
+  // empty pixels left to click, so the marquee could never even start on
+  // the common case. A modifier-click toggle works regardless of bar
+  // width AND lets non-adjacent layers join one selection (a rectangle is
+  // inherently contiguous), matching the standard multi-select convention
+  // every other timeline/keyframe editor uses alongside rectangle-select.
+  function toggleBarSel(li) {
+    var idx = _barSel.indexOf(li);
+    if (idx >= 0) _barSel.splice(idx, 1); else _barSel.push(li);
+    refreshBarSelClasses();
+  }
   // Maps a bar's row element to/from its layer index — buildBar populates
   // both below. The marquee only has DOM hit-test info (needs row->li); a
   // group-drag needs the reverse (li->row) to update each member's bar.
@@ -129,6 +151,7 @@
   function onDown(li, row, type, e) {
     e.stopPropagation(); e.preventDefault();
     var ld = state.layers[li]; if (!ld) return;
+    if (e.shiftKey || e.metaKey || e.ctrlKey) { toggleBarSel(li); return; } // select-only, no drag
     if (window.pushUndo) pushUndo(); // one undo step for the whole drag, not one per mousemove
     // Grabbing ANY part of an already-selected bar (body OR an edge handle)
     // moves/trims the whole group together — feedback: "je ne peux pas
@@ -155,16 +178,40 @@
     if (_drag.group) {
       var dx = Math.round((e.clientX - _drag.startX) / FC);
       if (!dx) return;
-      var ok = _drag.members.every(function (m) {
-        var ni = m.origIn + dx, no = m.origOut + dx;
-        return ni >= 0 && no <= total - 1;
-      });
-      if (!ok) return;
-      _drag.members.forEach(function (m) {
-        var mld = state.layers[m.li]; if (!mld) return;
-        mld.inPoint = m.origIn + dx; mld.outPoint = m.origOut + dx;
-        updateBar(m.row, m.li);
-      });
+      // Bug found 2026-07: this branch used to ALWAYS shift both in AND out
+      // by dx for every member, even when the drag started on a single IN
+      // or OUT handle — so a group in-point trim silently shifted the
+      // whole range (out point included) instead of trimming just that
+      // edge. Each handle type now only touches the field it owns, exactly
+      // like the single-bar (non-group) branch below — 'in'/'out' clamp
+      // per-member independently (trimming can't break another member),
+      // 'both' keeps the original whole-range shift with its group-wide
+      // bounds check (shifting must stay valid for every member at once,
+      // since duration is preserved).
+      if (_drag.type === 'in') {
+        _drag.members.forEach(function (m) {
+          var mld = state.layers[m.li]; if (!mld) return;
+          mld.inPoint = Math.max(0, Math.min(m.origIn + dx, m.origOut - 1));
+          updateBar(m.row, m.li);
+        });
+      } else if (_drag.type === 'out') {
+        _drag.members.forEach(function (m) {
+          var mld = state.layers[m.li]; if (!mld) return;
+          mld.outPoint = Math.min(total - 1, Math.max(m.origOut + dx, m.origIn + 1));
+          updateBar(m.row, m.li);
+        });
+      } else {
+        var ok = _drag.members.every(function (m) {
+          var ni = m.origIn + dx, no = m.origOut + dx;
+          return ni >= 0 && no <= total - 1;
+        });
+        if (!ok) return;
+        _drag.members.forEach(function (m) {
+          var mld = state.layers[m.li]; if (!mld) return;
+          mld.inPoint = m.origIn + dx; mld.outPoint = m.origOut + dx;
+          updateBar(m.row, m.li);
+        });
+      }
       if (window.loadFrame) loadFrame(state.currentFrame);
       if (window.SMEngineBridge) SMEngineBridge.renderNow();
       return;
