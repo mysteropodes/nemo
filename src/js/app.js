@@ -598,8 +598,20 @@ function getLFSSubStrokes(ld,key,frameIdx){
   for(var k=ii-1;k>=0;k--){if(symLayer.frames[k].isKeyframe)return symLayer.frames[k].strokes;}
   return[];
 }
+// Layer in/out point (layer-inout.js, After-Effects-style layer bar): a
+// layer with no explicit ld.inPoint/outPoint spans the whole timeline
+// (unset = full range, so every project predating this feature keeps its
+// exact old behavior with zero migration). This is the single choke point
+// both the live path (loadFrame -> getEffectiveStrokes, app.js) and the
+// export path (exportBuildFrame -> getEffectiveStrokes, export.js) already
+// share, so gating rendering HERE covers both without touching either
+// caller — see CLAUDE.md's "family of bug #1" for why a single shared
+// chokepoint beats duplicating this check at every consumer.
+function layerInPoint(ld){return ld.inPoint||0;}
+function layerOutPoint(ld){return ld.outPoint!=null?ld.outPoint:state.totalFrames-1;}
 function getEffectiveStrokes(layerIdx,frameIdx){
   var ld=state.layers[layerIdx];if(!ld)return[];
+  if((ld.inPoint||ld.outPoint!=null)&&(frameIdx<layerInPoint(ld)||frameIdx>layerOutPoint(ld)))return[];
   if(ld.lfsGroup){
     // Traditional cel stacking: shadow at back, full (flat colors) in the
     // middle, line (ink) on top.

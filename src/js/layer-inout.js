@@ -1,0 +1,103 @@
+// ---- LAYER IN/OUT POINT (v1, 2026-07) ----
+// After-Effects-style per-layer visibility range on the main timeline: a
+// layer with no explicit ld.inPoint/outPoint spans the whole project (unset
+// = full range — every existing project keeps its exact old behavior with
+// zero migration, see the header comment on getEffectiveStrokes, app.js).
+// The actual render gate lives there (single shared choke point for both
+// the live path via loadFrame() and the export path). This file is UI-only:
+// the draggable bar + two resize handles, one instance per layer row, in
+// BOTH Animation 2D's frame grid (.frow, timeline.js) and Motion mode's
+// collapsed layer row (motion.js) — a layer's visible range is a layer-
+// level concept, not specific to either timeline view.
+(function () {
+  function inPointOf(ld) { return ld.inPoint || 0; }
+  function outPointOf(ld) { return ld.outPoint != null ? ld.outPoint : state.totalFrames - 1; }
+  function hasCustomRange(ld) { return !!(ld.inPoint || ld.outPoint != null); }
+
+  function updateBar(row, li) {
+    var ld = state.layers[li]; if (!ld) return;
+    var bar = row.querySelector('.layer-inout-bar'); if (!bar) return;
+    var inF = inPointOf(ld), outF = outPointOf(ld);
+    bar.style.left = (inF * FC) + 'px';
+    bar.style.width = Math.max(FC, (outF - inF + 1) * FC) + 'px';
+    bar.classList.toggle('full-range', !hasCustomRange(ld));
+    // Animation 2D's per-frame .fc cells (Motion mode's collapsed spacer row
+    // has none — nothing to dim there, the bar alone is enough context).
+    var cells = row.querySelectorAll('.fc');
+    if (cells.length) {
+      cells.forEach(function (c) {
+        var f = parseInt(c.dataset.frame, 10);
+        c.classList.toggle('io-dim', f < inF || f > outF);
+      });
+    }
+  }
+
+  // Drag state is a single module-level singleton (same idiom as ui.js's
+  // initWaDrag: window-level mousemove/mouseup, not a per-drag add/remove
+  // pair) — only one bar can be dragged at a time anyway.
+  var _drag = null; // {li, row, type:'in'|'out'|'both', startX, origIn, origOut}
+  function onDown(li, row, type, e) {
+    e.stopPropagation(); e.preventDefault();
+    var ld = state.layers[li]; if (!ld) return;
+    if (window.pushUndo) pushUndo(); // one undo step for the whole drag, not one per mousemove
+    _drag = { li: li, row: row, type: type, startX: e.clientX, origIn: inPointOf(ld), origOut: outPointOf(ld) };
+  }
+  document.addEventListener('mousemove', function (e) {
+    if (!_drag) return;
+    var ld = state.layers[_drag.li]; if (!ld) { _drag = null; return; }
+    var dx = Math.round((e.clientX - _drag.startX) / FC);
+    var total = state.totalFrames;
+    if (_drag.type === 'in') ld.inPoint = Math.max(0, Math.min(_drag.origIn + dx, _drag.origOut - 1));
+    else if (_drag.type === 'out') ld.outPoint = Math.min(total - 1, Math.max(_drag.origOut + dx, _drag.origIn + 1));
+    else {
+      var w = _drag.origOut - _drag.origIn;
+      var ni = Math.max(0, _drag.origIn + dx);
+      if (ni + w >= total) ni = total - 1 - w;
+      ld.inPoint = ni; ld.outPoint = ni + w;
+    }
+    updateBar(_drag.row, _drag.li);
+    // Content visibility for the CURRENT frame must reflect the new range
+    // live (dragging the out point below the playhead should hide the
+    // layer immediately) — loadFrame() re-derives userLayers[i] from
+    // getEffectiveStrokes(), which is the actual gate.
+    if (window.loadFrame) loadFrame(state.currentFrame);
+    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+  });
+  document.addEventListener('mouseup', function () {
+    if (!_drag) return;
+    _drag = null;
+    // Full rebuild only once, at drag END: other rows' bars don't move
+    // during the drag so a per-move renderTimeline() would be pure waste
+    // (CLAUDE.md §5 — avoid unnecessary per-move rebuild work); a final
+    // renderLayerList() picks up anything the layer-panel might show that
+    // depends on the range (e.g. a future disabled/dimmed state).
+    if (window.renderLayerList) renderLayerList();
+  });
+
+  // Builds the bar + its two handles into `row` (a .frow — Animation 2D's
+  // per-layer frame row, or Motion mode's collapsed layer spacer row) and
+  // wires its drag handlers. Idempotent-safe to call once per row per
+  // render pass (renderTimeline/renderTimelineMotion rebuild rows from
+  // scratch every time, same as every other overlay in this codebase).
+  function buildBar(row, li) {
+    row.style.position = 'relative';
+    var bar = document.createElement('div'); bar.className = 'layer-inout-bar';
+    var hleft = document.createElement('div'); hleft.className = 'layer-inout-handle left';
+    var hright = document.createElement('div'); hright.className = 'layer-inout-handle right';
+    bar.appendChild(hleft); bar.appendChild(hright);
+    row.appendChild(bar);
+    updateBar(row, li);
+    hleft.addEventListener('mousedown', function (e) { onDown(li, row, 'in', e); });
+    hright.addEventListener('mousedown', function (e) { onDown(li, row, 'out', e); });
+    bar.addEventListener('mousedown', function (e) { if (e.target === bar) onDown(li, row, 'both', e); });
+    bar.addEventListener('contextmenu', function (e) {
+      e.preventDefault(); e.stopPropagation();
+      if (!window.showContextMenu) return;
+      window.showContextMenu(e.clientX, e.clientY, [
+        { label: 'Réinitialiser (pleine durée)', action: function () { if (window.pushUndo) pushUndo(); delete state.layers[li].inPoint; delete state.layers[li].outPoint; if (window.renderTimeline) renderTimeline(); if (window.loadFrame) loadFrame(state.currentFrame); if (window.SMEngineBridge) SMEngineBridge.renderNow(); } },
+      ]);
+    });
+  }
+
+  window.SMLayerInOut = { inPointOf: inPointOf, outPointOf: outPointOf, hasCustomRange: hasCustomRange, buildBar: buildBar, updateBar: updateBar };
+})();

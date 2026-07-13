@@ -395,6 +395,19 @@ body.mode-motion #layer-panel{width:260px;}
 .onion-marker{position:absolute;top:9px;width:8px;height:6px;border-radius:2px;cursor:ew-resize;z-index:4;}
 .onion-marker.om-in{background:rgba(255,80,80,.7);}
 .onion-marker.om-out{background:rgba(80,140,255,.7);}
+/* Layer in/out point (layer-inout.js, v1 2026-07): a thin AE-style bar
+   pinned to the bottom of each .frow/motion spacer row, spanning the
+   layer's visible frame range. Subtle at full range (the common case, zero
+   visual clutter on every project made before this feature) — a visibly
+   distinct accent strip only once a layer actually has a custom range, so
+   a trimmed layer reads at a glance without every other row shouting. */
+.layer-inout-bar{position:absolute;left:0;bottom:2px;height:5px;background:rgba(63,107,245,.55);border-radius:2px;cursor:grab;z-index:2;}
+.layer-inout-bar.full-range{background:rgba(255,255,255,.12);}
+.layer-inout-bar .layer-inout-handle{position:absolute;top:0;width:6px;height:5px;background:var(--accent);cursor:ew-resize;border-radius:2px;opacity:0;transition:opacity .1s;}
+.layer-inout-bar:hover .layer-inout-handle,.layer-inout-bar.full-range:hover .layer-inout-handle{opacity:1;}
+.layer-inout-bar .layer-inout-handle.left{left:0;}
+.layer-inout-bar .layer-inout-handle.right{right:0;}
+.fc.io-dim{background:rgba(0,0,0,.35);opacity:.4;}
 #onion-bar{position:absolute;top:2px;height:5px;background:linear-gradient(90deg,rgba(255,80,80,.35),rgba(80,140,255,.35));border-radius:2px;pointer-events:none;z-index:2;}
 /* v4: the mockup's frame ruler sits flush in the SAME --panel tone as the
    frame grid below it (just a hairline border-bottom) — it previously used

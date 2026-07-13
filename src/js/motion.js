@@ -497,6 +497,7 @@
       var li = entry.idx, ld = state.layers[li];
       var expanded = window._motionExpandedLayer === li;
       var spacer = document.createElement('div'); spacer.className = 'frow';
+      if (window.SMLayerInOut) SMLayerInOut.buildBar(spacer, li);
       grid.appendChild(spacer);
       if (!expanded) return;
       var grpSpacer = document.createElement('div'); grpSpacer.className = 'frow';
