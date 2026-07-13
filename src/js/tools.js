@@ -1458,7 +1458,174 @@ function fillVectorFind(clickPt,layer,excludePath,maxGapThr,onlyIds){
       if(!best.usedGap)break;
     }
   }
+  if(!best){
+    // The graph/wall approach above found NOTHING at any gapThr — before
+    // giving up ("aucune zone fermée"), try the fundamentally different
+    // raster fallback (see fillVectorFindRaster below): rasterize every
+    // wall AND every existing fill as solid barriers and flood-fill from
+    // the click pixel. A bitmap has no concept of "wall endpoint", "graph
+    // edge", or "self-crossing" — it only sees painted vs. empty pixels —
+    // so it can succeed on exactly the shapes that keep defeating the
+    // graph tracer (a self-tangent near-touch, a wrong-pairing gap bridge,
+    // a face the exhaustive enumeration still somehow missed). Only tried
+    // as a last resort (not raced at every gapThr step) since it's far
+    // more expensive per call than a graph lookup.
+    try{
+      var rres=fillVectorFindRaster(clickPt,layer,excludePath,24,onlyIds);
+      if(rres){
+        if(Math.abs(rres.path.area)>=FILL_MIN_AREA){rres.gapPx=rres.gapPx;best=rres;}
+        else rres.path.remove();
+      }
+    }catch(e){console.warn('[fill] raster fallback failed',e);}
+  }
   return best;
+}
+// ---- Raster fallback (2026-07) ----------------------------------------
+// A second, independent fill strategy alongside the vector wall/graph
+// approach above: rasterize the walls (open + closed strokes AND every
+// existing fill shape — reported request: "les stroke, les fermetures de
+// gap faites à la main, les fill existants forment une unique forme" —
+// exactly like a bitmap "magic wand" tool sees a drawing) to an offscreen
+// <canvas>, flood-fill the connected background region from the click
+// pixel, then trace that region's boundary back into a vector Path. Pixel
+// flood fill has no notion of "wall", "graph edge", or "self-crossing" —
+// only painted vs. empty — so it's naturally immune to the whole class of
+// topology bugs the graph tracer keeps hitting (near-tangent slivers,
+// wrong-pairing gap bridges, missed faces). Traded off against: raster
+// resolution caps how small a real gap it can bridge, and it can't (yet)
+// return a genuine multi-loop/holed region — only the single largest
+// boundary loop. Good enough as a last-resort fallback, not a full
+// replacement for the graph approach's precision.
+function fillTraceRasterContour(visited,rw,rh,minX,minY,maxX,maxY){
+  function isFilled(x,y){if(x<0||y<0||x>=rw||y>=rh)return false;return!!visited[y*rw+x];}
+  var edgeMap={};
+  function key(x,y){return x+','+y;}
+  function addEdge(x1,y1,x2,y2){
+    var k1=key(x1,y1),k2=key(x2,y2);
+    (edgeMap[k1]=edgeMap[k1]||[]).push(k2);
+    (edgeMap[k2]=edgeMap[k2]||[]).push(k1);
+  }
+  // Walk every filled pixel's 4 edges — an edge belongs to the boundary
+  // whenever the pixel across it is NOT part of the filled region (blocked
+  // by a wall, or off the raster entirely).
+  for(var y=minY;y<=maxY;y++){
+    for(var x=minX;x<=maxX;x++){
+      if(!isFilled(x,y))continue;
+      if(!isFilled(x-1,y))addEdge(x,y,x,y+1);
+      if(!isFilled(x+1,y))addEdge(x+1,y,x+1,y+1);
+      if(!isFilled(x,y-1))addEdge(x,y,x+1,y);
+      if(!isFilled(x,y+1))addEdge(x,y+1,x+1,y+1);
+    }
+  }
+  var usedEdge={};
+  function edgeKey(a,b){return a<b?a+'|'+b:b+'|'+a;}
+  var loops=[];
+  Object.keys(edgeMap).forEach(function(startK){
+    var neighbors=edgeMap[startK];
+    for(var ni=0;ni<neighbors.length;ni++){
+      var firstNext=neighbors[ni];
+      if(usedEdge[edgeKey(startK,firstNext)])continue;
+      var loop=[startK];
+      var prev=startK,cur=firstNext;
+      usedEdge[edgeKey(prev,cur)]=true;
+      var guard=0,maxGuard=(rw+1)*(rh+1)*4+16;
+      while(cur!==startK&&guard++<maxGuard){
+        loop.push(cur);
+        var opts=edgeMap[cur]||[];
+        var candidates=opts.filter(function(o){return!usedEdge[edgeKey(cur,o)];});
+        if(!candidates.length)break;
+        var pick=null;
+        for(var ci=0;ci<candidates.length;ci++){if(candidates[ci]!==prev){pick=candidates[ci];break;}}
+        if(!pick)pick=candidates[0];
+        usedEdge[edgeKey(cur,pick)]=true;
+        prev=cur;cur=pick;
+      }
+      if(cur===startK)loops.push(loop);
+    }
+  });
+  if(!loops.length)return null;
+  // Several disjoint loops can appear (holes, or unrelated blobs elsewhere
+  // in the raster) — the largest by point count is, in practice, always
+  // the outer boundary of the region the flood fill actually grew from.
+  loops.sort(function(a,b){return b.length-a.length;});
+  return loops[0].map(function(k){var p=k.split(',');return[+p[0],+p[1]];});
+}
+function fillVectorFindRaster(clickPt,layer,excludePath,gapThr,onlyIds){
+  var walls=fillCollectWalls(layer,excludePath,onlyIds);
+  var allWalls=walls.open.concat(walls.closed);
+  function cleanupWalls(){walls.open.forEach(function(w){w.remove();});walls.closed.forEach(function(w){w.remove();});}
+  if(!allWalls.length){cleanupWalls();return null;}
+  var bounds=allWalls[0].bounds.clone();
+  for(var bi=1;bi<allWalls.length;bi++)bounds=bounds.unite(allWalls[bi].bounds);
+  bounds=bounds.expand(gapThr*2+24);
+  var maxDim=1400;
+  var scale=Math.min(1,maxDim/Math.max(bounds.width,bounds.height,1));
+  var rw=Math.max(1,Math.round(bounds.width*scale)),rh=Math.max(1,Math.round(bounds.height*scale));
+  if(rw*rh>maxDim*maxDim*1.2){cleanupWalls();return null;}
+  var canvas=document.createElement('canvas');canvas.width=rw;canvas.height=rh;
+  var ctx=canvas.getContext('2d');
+  ctx.lineJoin='round';ctx.lineCap='round';ctx.fillStyle='#000';ctx.strokeStyle='#000';
+  allWalls.forEach(function(w){
+    var len=w.length;if(!(len>0))return;
+    var n=Math.max(4,Math.min(600,Math.ceil(len/3)));
+    ctx.beginPath();
+    for(var i=0;i<=n;i++){
+      var pt=w.getPointAt(Math.min(len,i/n*len));
+      var sx=(pt.x-bounds.x)*scale,sy=(pt.y-bounds.y)*scale;
+      if(i===0)ctx.moveTo(sx,sy);else ctx.lineTo(sx,sy);
+    }
+    if(w.closed)ctx.closePath();
+    // Inflate by 2×gapThr (radius each side of the centerline) so a real
+    // hand-drawn pen-lift gap up to ~gapThr px visually closes shut —
+    // this IS this engine's equivalent of the graph approach's gap-bridge
+    // edges, just expressed as ink thickness instead of a virtual edge.
+    ctx.lineWidth=Math.max(1.5,(w.strokeWidth||2))+gapThr*2;
+    ctx.stroke();
+    // An existing fill shape's INTERIOR is also a solid barrier — the
+    // reported request: strokes + hand-closed gaps + existing fills should
+    // all read as one combined obstacle map, not just their outlines.
+    if(w.closed&&w.fillColor)ctx.fill();
+  });
+  var img=ctx.getImageData(0,0,rw,rh),data=img.data;
+  var cx=Math.round((clickPt.x-bounds.x)*scale),cy=Math.round((clickPt.y-bounds.y)*scale);
+  if(cx<0||cy<0||cx>=rw||cy>=rh){cleanupWalls();return null;}
+  if(data[(cy*rw+cx)*4+3]>10){cleanupWalls();return null;} // clicked directly on ink/an existing fill
+  var visited=new Uint8Array(rw*rh);
+  var stack=[cy*rw+cx];visited[cy*rw+cx]=1;
+  var minX=cx,maxX=cx,minY=cy,maxY=cy,count=0,touchedEdge=false;
+  var guardMax=rw*rh;
+  while(stack.length&&count<guardMax){
+    var idx=stack.pop();
+    var y=(idx/rw)|0,x=idx-y*rw;
+    count++;
+    if(x<minX)minX=x;if(x>maxX)maxX=x;if(y<minY)minY=y;if(y>maxY)maxY=y;
+    if(x===0||y===0||x===rw-1||y===rh-1)touchedEdge=true;
+    if(x>0){var l=idx-1;if(!visited[l]&&data[l*4+3]<=10){visited[l]=1;stack.push(l);}}
+    if(x<rw-1){var r=idx+1;if(!visited[r]&&data[r*4+3]<=10){visited[r]=1;stack.push(r);}}
+    if(y>0){var t=idx-rw;if(!visited[t]&&data[t*4+3]<=10){visited[t]=1;stack.push(t);}}
+    if(y<rh-1){var bt=idx+rw;if(!visited[bt]&&data[bt*4+3]<=10){visited[bt]=1;stack.push(bt);}}
+  }
+  // The flood fill reached the raster's own edge — the click point sits in
+  // background/open space, not a genuinely enclosed region (the same
+  // "aucune zone fermée" case, just detected differently than the graph
+  // approach's null return).
+  if(touchedEdge||count<4){cleanupWalls();return null;}
+  var contourPx=fillTraceRasterContour(visited,rw,rh,minX,minY,maxX,maxY);
+  if(!contourPx||contourPx.length<3){cleanupWalls();return null;}
+  var rawPath=new Path({insert:true});
+  contourPx.forEach(function(p,i){
+    var doc=new Point(bounds.x+p[0]/scale,bounds.y+p[1]/scale);
+    if(i===0)rawPath.moveTo(doc);else rawPath.lineTo(doc);
+  });
+  rawPath.closed=true;
+  // Blocky pixel-grid outline -> smooth curve, tolerance scaled back to
+  // document units (same Paper.js simplify() already used everywhere else
+  // in this codebase for stroke smoothing).
+  rawPath.simplify(Math.max(1,1.5/scale));
+  if(!rawPath.contains(clickPt)){rawPath.remove();cleanupWalls();return null;}
+  var wallIds=walls.openSrc.concat(walls.closedSrc);
+  cleanupWalls();
+  return{path:rawPath,wallIds:wallIds,usedGap:gapThr>0,gapPx:gapThr,raster:true};
 }
 // fillTraceLoop picks, at each graph node, whichever outgoing edge has the
 // sharpest turn from the arrival direction — correct for a simple planar
