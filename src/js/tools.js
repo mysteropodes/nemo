@@ -3262,6 +3262,14 @@ function onMouseDown(event){
   if(state.playing){stopPlay();return;}
   if(state.tool==='hand'||state.spaceDown){state.isPanning=true;return;}
   if(state.tool==='zoom'){if(event.event.altKey)view.zoom=Math.max(.05,view.zoom*.8);else view.zoom=Math.min(20,view.zoom*1.25);updZoom();renderArcs();return;}
+  // Motion mode (motion.js) is a persistent app-mode, not a tool value —
+  // unlike the camera row below (a dedicated 'camera' tool that REPLACES
+  // Select/Draw/etc.), its on-canvas position-handle dragging must coexist
+  // with whatever tool is active. So it's an early intercept here, not
+  // another branch of this tool chain: only consumes the event (returns
+  // true) when the click actually lands on a motion handle/keyframe dot;
+  // otherwise falls through unchanged into Select/Draw/etc. below.
+  if(state.appMode==='motion'&&window.SMMotion&&SMMotion.onDown(event))return;
   var layer=userLayers[state.activeLayerIdx];
   if(state.tool==='draw'){
     if(state.layers[state.activeLayerIdx].locked)return;
@@ -3560,6 +3568,7 @@ function onMouseDrag(event){
   if(state.playing)return;
   if(state.isPanning||state.spaceDown){var dx=event.event.movementX||0;var dy=event.event.movementY||0;view.center=view.center.subtract(new Point(dx,dy).divide(view.zoom));return;}
   if(state.tool==='camera'){if(window.SMCamera)SMCamera.onDrag(event);return;}
+  if(state.appMode==='motion'&&window.SMMotion&&SMMotion.onDrag(event))return;
   if(state.tool==='draw'){
     if(!currentPath)return;
     if(state.vectorBrush){
@@ -3717,6 +3726,7 @@ function onMouseDrag(event){
 function onMouseUp(event){
   if(state.isPanning){state.isPanning=false;return;}if(state.playing)return;
   if(state.tool==='camera'){if(window.SMCamera)SMCamera.onUp(event);return;}
+  if(state.appMode==='motion'&&window.SMMotion&&SMMotion.onUp(event))return;
   _eraseDragActive=false;_eraseLastPt=null;
   if(state.tool==='fill'&&_fillCloseDrag){
     if(_fillCloseDrag.points.length>=2)_fillCloseStrokes.push({id:'fc'+Date.now().toString(36)+'_'+(++_fillCloseIdCounter),points:_fillCloseDrag.points.map(function(p){return[p.x,p.y];})});

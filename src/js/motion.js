@@ -292,6 +292,64 @@
     return items;
   }
 
+  // ---- canvas drag: position keyframe dots + spatial handles ----
+  // Mirrors camera.js's onDown/onDrag/onUp (its hitTrajectoryHandle in
+  // particular), but Motion mode is a persistent app-mode, not a `state.tool`
+  // value like 'camera' — it must coexist with whatever tool is active, so
+  // these are wired as an early INTERCEPT at the top of tools.js's
+  // onMouseDown/onMouseDrag/onMouseUp (returns true only when the click
+  // actually lands on a handle/dot, so an unrelated click falls through
+  // unchanged into Select/Draw/etc. below it).
+  var _motionDrag = null; // {mode:'point'|'handle', key, which}
+  function hitPositionHandle(pt, ks) {
+    var tol = 10 / view.zoom;
+    for (var i = 0; i < ks.length; i++) {
+      var k = ks[i], hs = [];
+      if (i < ks.length - 1) hs.push(['hOut', k.hOut || [0, 0]]);
+      if (i > 0) hs.push(['hIn', k.hIn || [0, 0]]);
+      for (var j = 0; j < hs.length; j++) {
+        var hx = k.v[0] + hs[j][1][0], hy = k.v[1] + hs[j][1][1];
+        if (Math.hypot(pt.x - hx, pt.y - hy) < tol) return { key: k, which: hs[j][0] };
+      }
+    }
+    return null;
+  }
+  function hitPositionDot(pt, ks) {
+    var tol = 8 / view.zoom;
+    for (var i = 0; i < ks.length; i++) if (Math.hypot(pt.x - ks[i].v[0], pt.y - ks[i].v[1]) < tol) return ks[i];
+    return null;
+  }
+  function activePositionKeys() {
+    if (state.appMode !== 'motion' || window._motionExpandedLayer == null) return null;
+    var ld = state.layers[window._motionExpandedLayer];
+    if (!ld || !hasKeys(ld, 'position')) return null;
+    return ld.motion.position.keys;
+  }
+  function onDown(event) {
+    var ks = activePositionKeys();
+    if (!ks) return false;
+    var hp = hitPositionHandle(event.point, ks);
+    if (hp) { pushUndo(); _motionDrag = { mode: 'handle', key: hp.key, which: hp.which }; return true; }
+    var pk = hitPositionDot(event.point, ks);
+    if (pk) { pushUndo(); _motionDrag = { mode: 'point', key: pk }; return true; }
+    return false;
+  }
+  function onDrag(event) {
+    if (!_motionDrag) return false;
+    var k = _motionDrag.key;
+    if (_motionDrag.mode === 'handle') k[_motionDrag.which] = [event.point.x - k.v[0], event.point.y - k.v[1]];
+    else { k.v[0] = event.point.x; k.v[1] = event.point.y; }
+    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+    return true;
+  }
+  function onUp() {
+    if (!_motionDrag) return false;
+    _motionDrag = null;
+    renderLayerList(); // scrub fields must reflect the dragged position/handle
+    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+    return true;
+  }
+
   // ---- Motion mode UI: layer list (Transform property rows) ----
   function fmtVal(n) { return Math.round(n * 10) / 10; }
   function scrubField(value, onCommit) {
@@ -504,5 +562,8 @@
     renderLayerListMotion: renderLayerListMotion,
     renderTimelineMotion: renderTimelineMotion,
     setAppMode: setAppMode,
+    onDown: onDown,
+    onDrag: onDrag,
+    onUp: onUp,
   };
 })();
