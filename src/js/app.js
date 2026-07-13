@@ -1090,10 +1090,16 @@ function saveActiveLayerFrame(){
   if(!f.isKeyframe&&!f.isInterpolated)return;
   var strokes=[];userLayers[state.activeLayerIdx].children.forEach(function(c){if(c.data&&c.data.ghostFrame!==undefined)return;if(c instanceof Path&&c.segments.length>0){enforceChannelStrip(ld,c);strokes.push(serP(c));}else if(c instanceof Raster)strokes.push(serR(c));});
   // saveActiveLayerFrame also runs on plain navigation (goToFrame calls it
-  // to persist whatever's on screen before switching away) — flagging
-  // "manually edited" just because this ran would mark every tween frame
-  // green the moment you scrub past it. Only a REAL content change counts.
-  if(f.isInterpolated&&!strokesEqual(strokes,f.strokes))f.isManualEdit=true;
+  // to persist whatever's on screen before switching away) — promoting a
+  // tween frame just because this ran would turn every tween frame into a
+  // real keyframe the moment you scrub past it. Only a REAL content change
+  // counts. Feedback ("une keyframe modifié d'une keyframe tween doit
+  // devenir une keyframe normal pleine"): a hand-edited tween frame is now
+  // promoted to a full keyframe outright, rather than staying flagged
+  // isInterpolated with just an isManualEdit marker — the old behavior
+  // left it eligible to be silently overwritten by the next tween
+  // regeneration unless tweenSkipManual happened to be on.
+  if(f.isInterpolated&&!strokesEqual(strokes,f.strokes)){f.isKeyframe=true;f.isInterpolated=false;}
   f.strokes=strokes;
 }
 function saveAllLayerFrames(){
@@ -1101,7 +1107,7 @@ function saveAllLayerFrames(){
   for(var i=0;i<state.layers.length;i++){if(state.layers[i].symbolId)continue;var f=state.layers[i].frames[state.currentFrame];if(!f||(!f.isKeyframe&&!f.isInterpolated))continue;
   var ldi=state.layers[i];
   var strokes=[];userLayers[i].children.forEach(function(c){if(c.data&&c.data.ghostFrame!==undefined)return;if(c instanceof Path&&c.segments.length>0){enforceChannelStrip(ldi,c);strokes.push(serP(c));}else if(c instanceof Raster)strokes.push(serR(c));});
-  if(f.isInterpolated&&!strokesEqual(strokes,f.strokes))f.isManualEdit=true;
+  if(f.isInterpolated&&!strokesEqual(strokes,f.strokes)){f.isKeyframe=true;f.isInterpolated=false;}
   f.strokes=strokes;}
 }
 function loadFrame(idx){
