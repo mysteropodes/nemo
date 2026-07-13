@@ -447,13 +447,18 @@ body.mode-motion .lrow.act{box-shadow:inset 3px 0 0 #4E6FF2,inset 0 0 0 1px rgba
 .layer-inout-bar .layer-inout-handle.left{left:-1px;}
 .layer-inout-bar .layer-inout-handle.right{right:0;}
 /* Bug found 2026-07 ("si hover ou select avec rectangle le in ou outpoint
-   celui ci doit se bleuté") — hover and marquee-selection both tint the
-   handles accent-blue, overriding whatever color (layer tint or neutral
-   full-range) they'd otherwise show. layer-inout.js now sets the layer's
-   own color via --io-handle-color instead of an inline background, so
-   these can actually win via normal cascade (later + more specific). */
-.layer-inout-bar:hover .layer-inout-handle,
-.layer-inout-bar.sel .layer-inout-handle{opacity:1;background:var(--accent);}
+   celui ci doit se bleuté") — hover tints a handle blue, overriding
+   whatever color (layer tint or neutral full-range) it'd otherwise show.
+   layer-inout.js sets the layer's own color via --io-handle-color instead
+   of an inline background, so this can actually win via normal cascade.
+   Follow-up ("le bleu est pas assez clair et tu synchronise le bleuté in
+   et outpoint alors qu'il faut desynchro"): switched to --accent-hover
+   (the app's existing lighter blue, already used for hover states
+   elsewhere) instead of the darker --accent; and scoped to the handle
+   ITSELF (:hover on .layer-inout-handle), not the whole bar — hovering
+   the bar body used to light up BOTH the in and out handle together,
+   when only whichever one the cursor is actually over should react. */
+.layer-inout-handle:hover{opacity:1;background:var(--accent-hover);}
 /* Multi-select (marquee rect -> group-drag several layers' bars together,
    layer-inout.js) */
 .layer-inout-bar.sel{box-shadow:0 0 0 1.5px #fff;}
