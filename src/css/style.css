@@ -44,21 +44,24 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--gutter);color:
    left it to Tauri's own default instead of guessing at a replacement).
    This strip is the drag region behind them (data-tauri-drag-region, same
    effect as dragging a normal title bar) plus the update button parked
-   right after the 3 lights, continuing their own spacing (~12px dots,
-   20px apart, first center ~13,13 — this is a best-effort estimate,
-   confirm against the real window and nudge left/top here if the 4th dot
-   doesn't sit on the same row/rhythm as the other 3). Both stay
-   display:none until #mac-chrome-init (updater-bridge.js) confirms
-   macOS+Tauri — a no-op everywhere else, including this browser preview. */
+   right after the 3 lights, continuing their own spacing. Confirmed live
+   (real window, real traffic lights) that a 12px dot at 20px spacing read
+   as visibly smaller than the lights and a touch low — bumped to 18px
+   at ~28px spacing and nudged up to match. Still an estimate refined
+   against real screenshots, not derived from a spec — nudge left/top/
+   width/height here again if the 4th dot still doesn't sit on the same
+   row/rhythm as the other 3. Both stay display:none until
+   #mac-chrome-init (updater-bridge.js) confirms macOS+Tauri — a no-op
+   everywhere else, including this browser preview. */
 #mac-titlebar-strip{display:none;}
 body.mac-overlay-titlebar #mac-titlebar-strip{display:block;position:fixed;top:0;left:0;width:100%;height:28px;z-index:500;}
 body.mac-overlay-titlebar #app{padding-top:28px;}
-#mac-update-btn{position:fixed;top:7px;left:67px;width:12px;height:12px;border-radius:50%;border:none;padding:0;
+#mac-update-btn{position:fixed;top:5px;left:83px;width:18px;height:18px;border-radius:50%;border:none;padding:0;
   display:none;align-items:center;justify-content:center;cursor:pointer;z-index:501;color:#fff;
   background:var(--accent);box-shadow:0 0 0 0 rgba(63,107,245,0);transition:box-shadow .2s;}
 #mac-update-btn.state-available,#mac-update-btn.state-installed{display:flex;}
 #mac-update-btn.state-available:hover,#mac-update-btn.state-installed:hover{box-shadow:0 0 0 5px rgba(63,107,245,.28);}
-#mac-update-btn svg{width:10px;height:10px;pointer-events:none;}
+#mac-update-btn svg{width:12px;height:12px;pointer-events:none;}
 #mac-update-btn.state-downloading{display:flex;cursor:default;}
 #mac-update-btn.state-downloading svg{animation:mac-update-spin 1s linear infinite;}
 @keyframes mac-update-spin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
