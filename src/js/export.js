@@ -41,7 +41,8 @@ function exportBuildFrame(frameIdx,alpha){
     // here because `p` lives on `L`, a disposable export-only layer, never
     // userLayers[li] itself (see CLAUDE.md's family-of-bug-#1).
     var motionMat=(window.SMMotion&&strokes.length)?SMMotion.layerMotionAt(li,frameIdx):null;
-    var motionPivot=motionMat?userLayers[li].bounds.center:null;
+    // Pivot = auto bounds center + Anchor Point offset (motionMat.ax/ay).
+    var motionPivot=motionMat?new Point(userLayers[li].bounds.center.x+motionMat.ax,userLayers[li].bounds.center.y+motionMat.ay):null;
     strokes.forEach(function(sd){
       var p=desP(sd,L,sd.opacity!==undefined?sd.opacity:1);
       if(motionMat){

@@ -172,7 +172,9 @@
       // overwhelmingly common case — no motion on this layer) skips the
       // per-item transform pass entirely below.
       var motionMat = (window.SMMotion && children.length) ? SMMotion.layerMotionAt(i, state.currentFrame) : null;
-      var motionPivot = motionMat ? userLayers[i].bounds.center : null;
+      // Pivot = auto bounds center + the layer's Anchor Point offset
+      // (motionMat.ax/ay) — see motion.js's layerMotionAt header comment.
+      var motionPivot = motionMat ? { x: userLayers[i].bounds.center.x + motionMat.ax, y: userLayers[i].bounds.center.y + motionMat.ay } : null;
       for (var s = 0; s < children.length; s++) {
         var c = children[s];
         // Team review view filter — 'mine' hides everyone else's content

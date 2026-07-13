@@ -25,13 +25,47 @@
 // translated/rotated/scaled/faded.
 (function () {
   var DEFAULT_EASE = [0.42, 0, 0.58, 1]; // easeInOut, same default as camera.js
-  var PROPS = ['position', 'rotation', 'scale', 'opacity'];
-  var PROP_LABEL = { position: 'Position', rotation: 'Rotation', scale: 'Scale', opacity: 'Opacity' };
-  var PROP_DIM = { position: 2, rotation: 1, scale: 2, opacity: 1 };
-  var PROP_UNIT = { position: 'px', rotation: '°', scale: '%', opacity: '%' };
-  var PROP_DEFAULT = { position: [0, 0], rotation: [0], scale: [100, 100], opacity: [100] };
+  // 'anchor' is AE's Anchor Point: an OFFSET from the layer's auto-computed
+  // bounds center, default [0,0] (== exactly today's behavior, so existing
+  // projects/keys are untouched). It doesn't move the artwork itself — it
+  // shifts WHERE Rotation/Scale pivot around, independent of Position's own
+  // translation. Order matters: it must sit right after 'position' so it
+  // reads naturally in the panel (AE's own Position/Anchor Point ordering),
+  // and R/S/P/T shortcuts (see PROP_SHORTCUT below) map to it as "A".
+  var PROPS = ['position', 'anchor', 'rotation', 'scale', 'opacity'];
+  var PROP_LABEL = { position: 'Position', anchor: 'Anchor Point', rotation: 'Rotation', scale: 'Scale', opacity: 'Opacity' };
+  var PROP_DIM = { position: 2, anchor: 2, rotation: 1, scale: 2, opacity: 1 };
+  var PROP_UNIT = { position: 'px', anchor: 'px', rotation: '°', scale: '%', opacity: '%' };
+  var PROP_DEFAULT = { position: [0, 0], anchor: [0, 0], rotation: [0], scale: [100, 100], opacity: [100] };
+  // AE's own shortcuts: P/A/R/S/T reveal just that property's row. Kept as
+  // a lookup table (not hardcoded in the keydown handler) so the property
+  // list and its shortcuts can't silently drift apart.
+  var PROP_SHORTCUT = { p: 'position', a: 'anchor', r: 'rotation', s: 'scale', t: 'opacity' };
+  // null = show every Transform property (default). A non-null array is an
+  // AE-style "revealed properties" filter: plain P/A/R/S/T replaces it with
+  // just that one property; Shift+key adds/removes it from the current set
+  // (AE's own "shift-click a shortcut to show several at once" convention).
+  // Reset to null (show all) whenever a different layer gets expanded — see
+  // the row-click handler in renderLayerListMotion.
+  var _propFilter = null;
+  function isPropFiltered(prop) { return !!_propFilter && _propFilter.indexOf(prop) < 0; }
+  function handlePropShortcut(key, shiftKey) {
+    var prop = PROP_SHORTCUT[(key || '').toLowerCase()];
+    if (!prop) return false;
+    if (shiftKey) {
+      if (!_propFilter) _propFilter = PROPS.slice(); // shift on a fresh/all-shown state starts from "all", then removes
+      var i = _propFilter.indexOf(prop);
+      if (i >= 0) _propFilter.splice(i, 1); else _propFilter.push(prop);
+      if (_propFilter.length === PROPS.length) _propFilter = null; // back to "all" once everything is re-added
+    } else {
+      _propFilter = [prop];
+    }
+    renderLayerList(); renderTimeline();
+    return true;
+  }
   var PROP_ICON = {
     position: '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/></svg>',
+    anchor: '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M12 4v4M12 16v4M4 12h4M16 12h4"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/></svg>',
     rotation: '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v5h-5"/></svg>',
     scale: '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>',
     opacity: '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18Z" fill="currentColor" stroke="none"/></svg>',
@@ -200,11 +234,18 @@
     // instance's own symMatrix pivot at render time either.
     if (!ld || ld.symbolId || (!ld.motion && !ld.motionStatic)) return null;
     var pos = valueAtFrame(ld, 'position', frameIdx);
+    var anc = valueAtFrame(ld, 'anchor', frameIdx);
     var rot = valueAtFrame(ld, 'rotation', frameIdx)[0];
     var scl = valueAtFrame(ld, 'scale', frameIdx);
     var op = valueAtFrame(ld, 'opacity', frameIdx)[0];
-    if (!pos[0] && !pos[1] && !rot && scl[0] === 100 && scl[1] === 100 && op === 100) return null;
-    return { dx: pos[0], dy: pos[1], rot: rot, sx: scl[0] / 100, sy: scl[1] / 100, op: Math.max(0, op / 100) };
+    if (!pos[0] && !pos[1] && !anc[0] && !anc[1] && !rot && scl[0] === 100 && scl[1] === 100 && op === 100) return null;
+    // ax/ay: the pivot offset callers (engine-bridge.js, export.js) add to
+    // userLayers[i].bounds.center before scaling/rotating around it —
+    // Rotation/Scale pivot around this point, Position's dx/dy is a plain
+    // translation applied independently on top (matches AE: moving the
+    // Anchor Point doesn't move the artwork, only where it spins/scales
+    // from).
+    return { dx: pos[0], dy: pos[1], rot: rot, sx: scl[0] / 100, sy: scl[1] / 100, op: Math.max(0, op / 100), ax: anc[0], ay: anc[1] };
   }
   // Transforms one item's already-built segments array (engine-bridge.js's
   // {point,handleIn,handleOut} triples, handles as RELATIVE offsets — see
@@ -252,12 +293,29 @@
     if (state.appMode !== 'motion' || window._motionExpandedLayer == null) return [];
     var li = window._motionExpandedLayer;
     var ld = state.layers[li];
-    if (!ld || !hasKeys(ld, 'position')) return [];
-    var track = ld.motion.position;
+    if (!ld || ld.symbolId || !userLayers[li]) return [];
     var items = [];
     var zs = 1 / Math.max(0.0001, view.zoom);
     var pathCol = [63, 107, 245, 200]; // --accent
     var handleCol = [255, 170, 40, 220];
+    // Anchor point — AE-style crosshair-in-circle, ALWAYS shown while a
+    // layer is expanded (even with zero keyframes on anything), same as AE
+    // shows it on any selected layer. Pivot = bounds center + anchor offset
+    // (see layerMotionAt's header comment); position/rotation/scale are
+    // NOT applied to this preview point on purpose — it marks where the
+    // pivot sits in the layer's OWN unmoved bounds, matching what
+    // engine-bridge.js/export.js actually pivot around at frame 0-equivalent
+    // (the anchor is a static geometric reference, not itself animated
+    // relative to the moving artwork).
+    var anc = valueAtFrame(ld, 'anchor', state.currentFrame);
+    var bc = userLayers[li].bounds.center;
+    var ax = bc.x + anc[0], ay = bc.y + anc[1];
+    var ancCol = [80, 220, 140, 255];
+    items.push({ segments: [{ point: [ax - 9 * zs, ay] }, { point: [ax + 9 * zs, ay] }], closed: false, fillColor: null, strokeColor: ancCol, strokeWidth: 1.5 * zs });
+    items.push({ segments: [{ point: [ax, ay - 9 * zs] }, { point: [ax, ay + 9 * zs] }], closed: false, fillColor: null, strokeColor: ancCol, strokeWidth: 1.5 * zs });
+    items.push({ segments: circleSegs(ax, ay, 6 * zs), closed: true, fillColor: null, strokeColor: ancCol, strokeWidth: 1.5 * zs });
+    if (!hasKeys(ld, 'position')) return items;
+    var track = ld.motion.position;
     var ks = track.keys;
     for (var i = 0; i < ks.length - 1; i++) {
       var a = ks[i], b = ks[i + 1];
@@ -319,13 +377,30 @@
     for (var i = 0; i < ks.length; i++) if (Math.hypot(pt.x - ks[i].v[0], pt.y - ks[i].v[1]) < tol) return ks[i];
     return null;
   }
-  function activePositionKeys() {
+  function activeExpandedLayer() {
     if (state.appMode !== 'motion' || window._motionExpandedLayer == null) return null;
-    var ld = state.layers[window._motionExpandedLayer];
-    if (!ld || !hasKeys(ld, 'position')) return null;
-    return ld.motion.position.keys;
+    var li = window._motionExpandedLayer, ld = state.layers[li];
+    if (!ld || ld.symbolId || !userLayers[li]) return null;
+    return { li: li, ld: ld };
+  }
+  function activePositionKeys() {
+    var e = activeExpandedLayer();
+    if (!e || !hasKeys(e.ld, 'position')) return null;
+    return e.ld.motion.position.keys;
+  }
+  function hitAnchorPoint(pt, li, ld) {
+    var tol = 9 / view.zoom;
+    var anc = valueAtFrame(ld, 'anchor', state.currentFrame);
+    var bc = userLayers[li].bounds.center;
+    var ax = bc.x + anc[0], ay = bc.y + anc[1];
+    return Math.hypot(pt.x - ax, pt.y - ay) < tol ? { li: li, ld: ld, bc: bc } : null;
   }
   function onDown(event) {
+    var e = activeExpandedLayer();
+    if (e) {
+      var ap = hitAnchorPoint(event.point, e.li, e.ld);
+      if (ap) { pushUndo(); _motionDrag = { mode: 'anchor', ld: ap.ld, bc: ap.bc }; return true; }
+    }
     var ks = activePositionKeys();
     if (!ks) return false;
     var hp = hitPositionHandle(event.point, ks);
@@ -336,9 +411,13 @@
   }
   function onDrag(event) {
     if (!_motionDrag) return false;
-    var k = _motionDrag.key;
-    if (_motionDrag.mode === 'handle') k[_motionDrag.which] = [event.point.x - k.v[0], event.point.y - k.v[1]];
-    else { k.v[0] = event.point.x; k.v[1] = event.point.y; }
+    if (_motionDrag.mode === 'anchor') {
+      setValue(_motionDrag.ld, 'anchor', [event.point.x - _motionDrag.bc.x, event.point.y - _motionDrag.bc.y]);
+    } else {
+      var k = _motionDrag.key;
+      if (_motionDrag.mode === 'handle') k[_motionDrag.which] = [event.point.x - k.v[0], event.point.y - k.v[1]];
+      else { k.v[0] = event.point.x; k.v[1] = event.point.y; }
+    }
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
     return true;
   }
@@ -385,6 +464,7 @@
       row.addEventListener('click', function () {
         if (isComponent) { state.activeLayerIdx = li; renderLayerList(); return; }
         window._motionExpandedLayer = expanded ? null : li;
+        _propFilter = null; // fresh "show all" every time the expanded layer changes
         state.activeLayerIdx = li;
         renderLayerList(); renderTimeline();
         if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
@@ -394,6 +474,7 @@
       var grp = document.createElement('div'); grp.className = 'lrow motion-group-row'; grp.textContent = 'Transform';
       list.appendChild(grp);
       PROPS.forEach(function (prop) {
+        if (isPropFiltered(prop)) return;
         var pr = document.createElement('div'); pr.className = 'lrow motion-prop-row';
         var sw = document.createElement('div');
         sw.className = 'lico motion-stopwatch' + (isAnimated(ld, prop) ? ' on' : '');
@@ -503,6 +584,7 @@
       var grpSpacer = document.createElement('div'); grpSpacer.className = 'frow';
       grid.appendChild(grpSpacer);
       PROPS.forEach(function (prop) {
+        if (isPropFiltered(prop)) return;
         var row = document.createElement('div'); row.className = 'frow motion-track-row';
         trackRowHtml(ld, prop, row);
         grid.appendChild(row);
@@ -566,5 +648,6 @@
     onDown: onDown,
     onDrag: onDrag,
     onUp: onUp,
+    handlePropShortcut: handlePropShortcut,
   };
 })();

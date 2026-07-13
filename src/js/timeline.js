@@ -3121,6 +3121,18 @@ function onKeyDown(event){
   if((event.metaKey||event.ctrlKey)&&event.key==='v'){event.preventDefault();window.SM.pasteFrames();return;}
   if(event.target.tagName==='INPUT'||event.target.tagName==='SELECT'||event.target.tagName==='TEXTAREA'||event.target.isContentEditable)return;
   var k=event.key;
+  // Motion mode's P/A/R/S/T property-reveal shortcuts (After Effects
+  // convention, explicitly requested) DELIBERATELY take priority over the
+  // normal tool shortcuts below — p/r/a are otherwise bound to Pen/
+  // Rectangle/Subselect (TOOL_SHORTCUTS above) and t is hardcoded to
+  // generateTweens a few lines down. Scoped tightly (Motion mode active AND
+  // a layer's Transform group actually expanded) so this contextual
+  // override never fires outside Motion mode — the toolbar buttons for
+  // those tools still work unaffected everywhere, only the KEYBOARD letter
+  // is reassigned while a layer is expanded here, same as AE's own P/A/R/S/T
+  // only means "reveal this property" when a layer is selected in its
+  // Timeline panel.
+  if(state.appMode==='motion'&&window._motionExpandedLayer!=null&&window.SMMotion&&SMMotion.handlePropShortcut(k,event.shiftKey)){event.preventDefault();return;}
   if(runToolShortcut(k)){}
   // NLE-style transport: J/K jump to the previous/next real keyframe on the
   // active layer (Premiere/Final Cut convention); ','/'.' step exactly one
