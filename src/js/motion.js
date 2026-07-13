@@ -223,8 +223,52 @@
     var a = deg * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
     return [dx * c - dy * s, dx * s + dy * c];
   }
-  // Null when the layer has no motion at all this frame (the overwhelmingly
-  // common case) — callers skip the per-item transform pass entirely then.
+  // ---- LAYER vs ELEMENT targets (2026-07, "shape layer" feedback) ----
+  // A Nemo "layer" is a loose bag of independent strokes/shapes drawn across
+  // the timeline — nothing like AE's one-cohesive-graphic layer. Pivoting
+  // Rotation/Scale around the whole layer's bounds.center falls apart the
+  // moment a layer holds two unrelated shapes in opposite corners: the
+  // pivot lands in empty space between them. Fix: Motion can now ALSO target
+  // one specific element (stroke, identified by its stable data.strokeId —
+  // same id fillWalls/team-review already rely on) INSIDE a layer, with its
+  // OWN independent Position/Anchor/Rotation/Scale/Opacity, nested inside
+  // the layer's own transform — exactly AE's shape-group-inside-a-shape-
+  // layer model. Storage: ld.elementMotion[strokeId] = {motion,motionStatic},
+  // the identical shape `ld` itself already has — every function below
+  // (valueAtFrame, isAnimated, setValue, toggleAnimated, etc.) only ever
+  // reads/writes `.motion`/`.motionStatic` on whatever object it's handed,
+  // so passing an element holder instead of `ld` just works, zero duplicated
+  // logic needed for the per-element case.
+  function ensureElementHolder(ld, strokeId) {
+    if (!ld.elementMotion) ld.elementMotion = {};
+    if (!ld.elementMotion[strokeId]) ld.elementMotion[strokeId] = {};
+    return ld.elementMotion[strokeId];
+  }
+  function elementHolder(ld, strokeId) { return ld.elementMotion ? ld.elementMotion[strokeId] : null; }
+  function elementHasMotion(ld, strokeId) {
+    var h = elementHolder(ld, strokeId);
+    return !!(h && (h.motion || h.motionStatic));
+  }
+  // Shared by layerMotionAt/elementMotionAt below — `holder` is either `ld`
+  // itself (layer target) or `ld.elementMotion[strokeId]` (element target).
+  // Null when there's no motion at all this frame (the overwhelmingly common
+  // case) — callers skip the per-item transform pass entirely then.
+  function computeMotionMat(holder, frameIdx) {
+    if (!holder || (!holder.motion && !holder.motionStatic)) return null;
+    var pos = valueAtFrame(holder, 'position', frameIdx);
+    var anc = valueAtFrame(holder, 'anchor', frameIdx);
+    var rot = valueAtFrame(holder, 'rotation', frameIdx)[0];
+    var scl = valueAtFrame(holder, 'scale', frameIdx);
+    var op = valueAtFrame(holder, 'opacity', frameIdx)[0];
+    if (!pos[0] && !pos[1] && !anc[0] && !anc[1] && !rot && scl[0] === 100 && scl[1] === 100 && op === 100) return null;
+    // ax/ay: the pivot offset callers (engine-bridge.js, export.js) add to
+    // the target's own bounds.center before scaling/rotating around it —
+    // Rotation/Scale pivot around this point, Position's dx/dy is a plain
+    // translation applied independently on top (matches AE: moving the
+    // Anchor Point doesn't move the artwork, only where it spins/scales
+    // from).
+    return { dx: pos[0], dy: pos[1], rot: rot, sx: scl[0] / 100, sy: scl[1] / 100, op: Math.max(0, op / 100), ax: anc[0], ay: anc[1] };
+  }
   function layerMotionAt(li, frameIdx) {
     var ld = state.layers[li];
     // Defense in depth: the UI already blocks expanding a component-instance
@@ -232,20 +276,17 @@
     // data can still exist (set before the layer became an instance, or
     // hand-edited into a project file) — never double-apply on top of the
     // instance's own symMatrix pivot at render time either.
-    if (!ld || ld.symbolId || (!ld.motion && !ld.motionStatic)) return null;
-    var pos = valueAtFrame(ld, 'position', frameIdx);
-    var anc = valueAtFrame(ld, 'anchor', frameIdx);
-    var rot = valueAtFrame(ld, 'rotation', frameIdx)[0];
-    var scl = valueAtFrame(ld, 'scale', frameIdx);
-    var op = valueAtFrame(ld, 'opacity', frameIdx)[0];
-    if (!pos[0] && !pos[1] && !anc[0] && !anc[1] && !rot && scl[0] === 100 && scl[1] === 100 && op === 100) return null;
-    // ax/ay: the pivot offset callers (engine-bridge.js, export.js) add to
-    // userLayers[i].bounds.center before scaling/rotating around it —
-    // Rotation/Scale pivot around this point, Position's dx/dy is a plain
-    // translation applied independently on top (matches AE: moving the
-    // Anchor Point doesn't move the artwork, only where it spins/scales
-    // from).
-    return { dx: pos[0], dy: pos[1], rot: rot, sx: scl[0] / 100, sy: scl[1] / 100, op: Math.max(0, op / 100), ax: anc[0], ay: anc[1] };
+    if (!ld || ld.symbolId) return null;
+    return computeMotionMat(ld, frameIdx);
+  }
+  // Nested INSIDE the layer transform (engine-bridge.js/export.js apply this
+  // FIRST, pivoted around the item's own bounds, THEN the layer transform on
+  // top) — matches AE composing a shape group's transform inside its parent
+  // layer's transform.
+  function elementMotionAt(li, strokeId, frameIdx) {
+    var ld = state.layers[li];
+    if (!ld || ld.symbolId || !ld.elementMotion) return null;
+    return computeMotionMat(ld.elementMotion[strokeId], frameIdx);
   }
   // Transforms one item's already-built segments array (engine-bridge.js's
   // {point,handleIn,handleOut} triples, handles as RELATIVE offsets — see
@@ -286,36 +327,30 @@
     ];
   }
   function buildOverlayItems() {
-    // `!= null` (not a truthy check): layer index 0 is a valid, common
-    // expanded-layer value and must not be treated the same as "nothing
-    // expanded" — a bare `!window._motionExpandedLayer` bug hid the motion
-    // path overlay specifically for the first layer in the panel.
-    if (state.appMode !== 'motion' || window._motionExpandedLayer == null) return [];
-    var li = window._motionExpandedLayer;
-    var ld = state.layers[li];
-    if (!ld || ld.symbolId || !userLayers[li]) return [];
+    var t = activeMotionTarget();
+    if (!t) return [];
+    var holder = t.holder, bc = t.boundsCenter;
     var items = [];
     var zs = 1 / Math.max(0.0001, view.zoom);
     var pathCol = [63, 107, 245, 200]; // --accent
     var handleCol = [255, 170, 40, 220];
     // Anchor point — AE-style crosshair-in-circle, ALWAYS shown while a
-    // layer is expanded (even with zero keyframes on anything), same as AE
-    // shows it on any selected layer. Pivot = bounds center + anchor offset
-    // (see layerMotionAt's header comment); position/rotation/scale are
-    // NOT applied to this preview point on purpose — it marks where the
-    // pivot sits in the layer's OWN unmoved bounds, matching what
-    // engine-bridge.js/export.js actually pivot around at frame 0-equivalent
-    // (the anchor is a static geometric reference, not itself animated
-    // relative to the moving artwork).
-    var anc = valueAtFrame(ld, 'anchor', state.currentFrame);
-    var bc = userLayers[li].bounds.center;
+    // layer/element is expanded (even with zero keyframes on anything), same
+    // as AE shows it on any selected layer/shape group. Pivot = bounds
+    // center + anchor offset (see computeMotionMat's header comment);
+    // position/rotation/scale are NOT applied to this preview point on
+    // purpose — it marks where the pivot sits in the target's OWN unmoved
+    // bounds, matching what engine-bridge.js/export.js actually pivot
+    // around at frame 0-equivalent (the anchor is a static geometric
+    // reference, not itself animated relative to the moving artwork).
+    var anc = valueAtFrame(holder, 'anchor', state.currentFrame);
     var ax = bc.x + anc[0], ay = bc.y + anc[1];
     var ancCol = [80, 220, 140, 255];
     items.push({ segments: [{ point: [ax - 9 * zs, ay] }, { point: [ax + 9 * zs, ay] }], closed: false, fillColor: null, strokeColor: ancCol, strokeWidth: 1.5 * zs });
     items.push({ segments: [{ point: [ax, ay - 9 * zs] }, { point: [ax, ay + 9 * zs] }], closed: false, fillColor: null, strokeColor: ancCol, strokeWidth: 1.5 * zs });
     items.push({ segments: circleSegs(ax, ay, 6 * zs), closed: true, fillColor: null, strokeColor: ancCol, strokeWidth: 1.5 * zs });
-    if (!hasKeys(ld, 'position')) return items;
-    var track = ld.motion.position;
+    if (!hasKeys(holder, 'position')) return items;
+    var track = holder.motion.position;
     var ks = track.keys;
     for (var i = 0; i < ks.length - 1; i++) {
       var a = ks[i], b = ks[i + 1];
@@ -377,29 +412,51 @@
     for (var i = 0; i < ks.length; i++) if (Math.hypot(pt.x - ks[i].v[0], pt.y - ks[i].v[1]) < tol) return ks[i];
     return null;
   }
-  function activeExpandedLayer() {
+  // Finds the LIVE Paper item for a strokeId within a layer (including
+  // CompoundPath sub-paths, which share their parent's data.strokeId — see
+  // serP/engine-bridge.js's CompoundPath flattening) — needed to read an
+  // element's own current bounds for its overlay/pivot.
+  function findElementItem(li, strokeId) {
+    var kids = userLayers[li] && userLayers[li].children;
+    if (!kids) return null;
+    for (var i = 0; i < kids.length; i++) {
+      if (kids[i].data && kids[i].data.strokeId === strokeId) return kids[i];
+    }
+    return null;
+  }
+  // Single source of truth for "what is Motion currently focused on" —
+  // the expanded ELEMENT if one is expanded (see renderElementsList),
+  // otherwise the expanded LAYER itself. Both the canvas overlay
+  // (buildOverlayItems) and the drag handlers below resolve through this so
+  // they always agree on the same target and the same pivot-bounds source.
+  function activeMotionTarget() {
     if (state.appMode !== 'motion' || window._motionExpandedLayer == null) return null;
     var li = window._motionExpandedLayer, ld = state.layers[li];
     if (!ld || ld.symbolId || !userLayers[li]) return null;
-    return { li: li, ld: ld };
+    if (window._motionExpandedElement != null) {
+      var item = findElementItem(li, window._motionExpandedElement);
+      if (item) return { li: li, strokeId: window._motionExpandedElement, holder: ensureElementHolder(ld, window._motionExpandedElement), boundsCenter: item.bounds.center };
+      // Element no longer present at this frame (drawing changed) — fall
+      // back to the layer rather than silently drawing nothing.
+    }
+    return { li: li, strokeId: null, holder: ld, boundsCenter: userLayers[li].bounds.center };
   }
   function activePositionKeys() {
-    var e = activeExpandedLayer();
-    if (!e || !hasKeys(e.ld, 'position')) return null;
-    return e.ld.motion.position.keys;
+    var t = activeMotionTarget();
+    if (!t || !hasKeys(t.holder, 'position')) return null;
+    return t.holder.motion.position.keys;
   }
-  function hitAnchorPoint(pt, li, ld) {
+  function hitAnchorPoint(pt, t) {
     var tol = 9 / view.zoom;
-    var anc = valueAtFrame(ld, 'anchor', state.currentFrame);
-    var bc = userLayers[li].bounds.center;
-    var ax = bc.x + anc[0], ay = bc.y + anc[1];
-    return Math.hypot(pt.x - ax, pt.y - ay) < tol ? { li: li, ld: ld, bc: bc } : null;
+    var anc = valueAtFrame(t.holder, 'anchor', state.currentFrame);
+    var ax = t.boundsCenter.x + anc[0], ay = t.boundsCenter.y + anc[1];
+    return Math.hypot(pt.x - ax, pt.y - ay) < tol ? { holder: t.holder, bc: t.boundsCenter } : null;
   }
   function onDown(event) {
-    var e = activeExpandedLayer();
-    if (e) {
-      var ap = hitAnchorPoint(event.point, e.li, e.ld);
-      if (ap) { pushUndo(); _motionDrag = { mode: 'anchor', ld: ap.ld, bc: ap.bc }; return true; }
+    var t = activeMotionTarget();
+    if (t) {
+      var ap = hitAnchorPoint(event.point, t);
+      if (ap) { pushUndo(); _motionDrag = { mode: 'anchor', holder: ap.holder, bc: ap.bc }; return true; }
     }
     var ks = activePositionKeys();
     if (!ks) return false;
@@ -412,7 +469,7 @@
   function onDrag(event) {
     if (!_motionDrag) return false;
     if (_motionDrag.mode === 'anchor') {
-      setValue(_motionDrag.ld, 'anchor', [event.point.x - _motionDrag.bc.x, event.point.y - _motionDrag.bc.y]);
+      setValue(_motionDrag.holder, 'anchor', [event.point.x - _motionDrag.bc.x, event.point.y - _motionDrag.bc.y]);
     } else {
       var k = _motionDrag.key;
       if (_motionDrag.mode === 'handle') k[_motionDrag.which] = [event.point.x - k.v[0], event.point.y - k.v[1]];
@@ -465,53 +522,118 @@
         if (isComponent) { state.activeLayerIdx = li; renderLayerList(); return; }
         window._motionExpandedLayer = expanded ? null : li;
         _propFilter = null; // fresh "show all" every time the expanded layer changes
+        window._motionExpandedElement = null;
         state.activeLayerIdx = li;
         renderLayerList(); renderTimeline();
         if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
       });
       list.appendChild(row);
       if (!expanded) return;
-      var grp = document.createElement('div'); grp.className = 'lrow motion-group-row'; grp.textContent = 'Transform';
-      list.appendChild(grp);
-      PROPS.forEach(function (prop) {
-        if (isPropFiltered(prop)) return;
-        var pr = document.createElement('div'); pr.className = 'lrow motion-prop-row';
-        var sw = document.createElement('div');
-        sw.className = 'lico motion-stopwatch' + (isAnimated(ld, prop) ? ' on' : '');
-        sw.title = isAnimated(ld, prop) ? 'Désactiver l’animation (fige la valeur actuelle)' : 'Activer l’animation de cette propriété';
-        sw.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2"/><path d="M9 2h6"/></svg>';
-        sw.addEventListener('click', function (e) {
-          e.stopPropagation(); pushUndo(); toggleAnimated(ld, prop);
-          renderLayerList(); renderTimeline();
-          if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
-        });
-        var pnm = document.createElement('div'); pnm.className = 'lnm motion-prop-name';
-        pnm.innerHTML = PROP_ICON[prop] + '<span>' + PROP_LABEL[prop] + '</span>';
-        pr.appendChild(sw); pr.appendChild(pnm);
-        var vals = isAnimated(ld, prop) ? valueAtFrame(ld, prop, state.currentFrame) : staticValue(ld, prop);
-        var fieldWrap = document.createElement('div'); fieldWrap.className = 'motion-fields';
-        for (var d = 0; d < PROP_DIM[prop]; d++) {
-          (function (dim) {
-            var f = scrubField(vals[dim], function (nv) {
-              pushUndo();
-              var nvals = isAnimated(ld, prop) ? valueAtFrame(ld, prop, state.currentFrame) : staticValue(ld, prop);
-              nvals[dim] = nv;
-              setValue(ld, prop, nvals);
-              renderTimeline();
-              if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
-            });
-            fieldWrap.appendChild(f);
-          })(d);
-        }
-        var unit = document.createElement('span'); unit.className = 'motion-unit'; unit.textContent = PROP_UNIT[prop];
-        fieldWrap.appendChild(unit);
-        pr.appendChild(fieldWrap);
-        list.appendChild(pr);
+      renderTransformGroup(list, ld, 'Transform');
+      renderElementsList(list, li, ld);
+    });
+  }
+  // Shared by the layer's own Transform group AND each element's — both are
+  // just "a holder with .motion/.motionStatic", see the header comment on
+  // ensureElementHolder. `refreshDeep` is called after any structural change
+  // (stopwatch toggle) since that can affect which rows/tracks exist;
+  // scrubbing a value only needs the timeline (track content) + canvas.
+  function renderTransformGroup(list, holder, groupLabel) {
+    var grp = document.createElement('div'); grp.className = 'lrow motion-group-row'; grp.textContent = groupLabel;
+    list.appendChild(grp);
+    PROPS.forEach(function (prop) {
+      if (isPropFiltered(prop)) return;
+      var pr = document.createElement('div'); pr.className = 'lrow motion-prop-row';
+      var sw = document.createElement('div');
+      sw.className = 'lico motion-stopwatch' + (isAnimated(holder, prop) ? ' on' : '');
+      sw.title = isAnimated(holder, prop) ? 'Désactiver l’animation (fige la valeur actuelle)' : 'Activer l’animation de cette propriété';
+      sw.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2"/><path d="M9 2h6"/></svg>';
+      sw.addEventListener('click', function (e) {
+        e.stopPropagation(); pushUndo(); toggleAnimated(holder, prop);
+        renderLayerList(); renderTimeline();
+        if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
       });
+      var pnm = document.createElement('div'); pnm.className = 'lnm motion-prop-name';
+      pnm.innerHTML = PROP_ICON[prop] + '<span>' + PROP_LABEL[prop] + '</span>';
+      pr.appendChild(sw); pr.appendChild(pnm);
+      var vals = isAnimated(holder, prop) ? valueAtFrame(holder, prop, state.currentFrame) : staticValue(holder, prop);
+      var fieldWrap = document.createElement('div'); fieldWrap.className = 'motion-fields';
+      for (var d = 0; d < PROP_DIM[prop]; d++) {
+        (function (dim) {
+          var f = scrubField(vals[dim], function (nv) {
+            pushUndo();
+            var nvals = isAnimated(holder, prop) ? valueAtFrame(holder, prop, state.currentFrame) : staticValue(holder, prop);
+            nvals[dim] = nv;
+            setValue(holder, prop, nvals);
+            renderTimeline();
+            if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+          });
+          fieldWrap.appendChild(f);
+        })(d);
+      }
+      var unit = document.createElement('span'); unit.className = 'motion-unit'; unit.textContent = PROP_UNIT[prop];
+      fieldWrap.appendChild(unit);
+      pr.appendChild(fieldWrap);
+      list.appendChild(pr);
+    });
+  }
+  // Every unique element (stroke) visible in the layer at the CURRENT frame
+  // — "Éléments", AE shape-group style, listed under the layer's own
+  // Transform group. A layer with a single cohesive drawing shows one
+  // element (harmless — nesting an identity transform costs nothing); a
+  // layer with several unrelated shapes (the exact case that broke the
+  // layer-wide Anchor Point, see computeMotionMat's header comment) can now
+  // target each one independently, each pivoting around its OWN bounds.
+  function layerElements(li, ld) {
+    var strokes = getEffectiveStrokes(li, state.currentFrame) || [];
+    var out = [];
+    strokes.forEach(function (sd, i) {
+      // Lazily stamp a strokeId onto legacy stroke data that predates this
+      // feature (or fillWalls/team-review, the other lazy-assign consumers)
+      // — getEffectiveStrokes returns the LIVE array reference for a real
+      // keyframe (not a clone), so this mutation persists on next save,
+      // same lazy-assign contract ensureStrokeId already has for live Paper
+      // items (tools.js).
+      if (!sd.strokeId) sd.strokeId = 's' + Date.now().toString(36) + '_' + i + '_' + Math.floor(Math.random() * 1e6);
+      out.push({ strokeId: sd.strokeId, sd: sd });
+    });
+    return out;
+  }
+  function elementLabel(entry, idx) {
+    var sd = entry.sd;
+    if (sd.isRaster) return 'Image ' + (idx + 1);
+    return (sd.fillColor ? 'Forme' : 'Trait') + ' ' + (idx + 1);
+  }
+  function renderElementsList(list, li, ld) {
+    var els = layerElements(li, ld);
+    if (!els.length) return;
+    var hdr = document.createElement('div'); hdr.className = 'lrow motion-group-row'; hdr.textContent = 'Éléments';
+    list.appendChild(hdr);
+    els.forEach(function (entry, idx) {
+      var expanded = window._motionExpandedElement === entry.strokeId;
+      var row = document.createElement('div'); row.className = 'lrow motion-elem-row';
+      var swatch = document.createElement('div'); swatch.className = 'motion-elem-swatch';
+      swatch.style.background = entry.sd.fillColor || entry.sd.strokeColor || 'transparent';
+      if (elementHasMotion(ld, entry.strokeId)) swatch.classList.add('has-motion');
+      var arrow = document.createElement('div'); arrow.className = 'lico larrow'; arrow.textContent = expanded ? '▾' : '▸';
+      var nm = document.createElement('div'); nm.className = 'lnm'; nm.textContent = elementLabel(entry, idx);
+      row.appendChild(arrow); row.appendChild(swatch); row.appendChild(nm);
+      row.addEventListener('click', function () {
+        window._motionExpandedElement = expanded ? null : entry.strokeId;
+        renderLayerList(); renderTimeline();
+        if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+      });
+      list.appendChild(row);
+      if (!expanded) return;
+      renderTransformGroup(list, ensureElementHolder(ld, entry.strokeId), 'Transform (élément)');
     });
   }
 
   // ---- Motion mode UI: keyframe tracks (mirrors the layer list's rows) ----
+  // `ld` here is really "the holder" (see ensureElementHolder's header
+  // comment) — it's the layer object itself for a layer's own tracks, or
+  // an element holder (ld.elementMotion[strokeId]) for an element's, same
+  // generic contract as renderTransformGroup/isAnimated/valueAtFrame/etc.
   function trackRowHtml(ld, prop, rowEl) {
     rowEl.innerHTML = '';
     rowEl.style.position = 'relative';
@@ -571,6 +693,12 @@
       rowEl.appendChild(c);
     }
   }
+  function renderTracksFor(grid, holder, prop) {
+    if (isPropFiltered(prop)) return;
+    var row = document.createElement('div'); row.className = 'frow motion-track-row';
+    trackRowHtml(holder, prop, row);
+    grid.appendChild(row);
+  }
   function renderTimelineMotion(grid) {
     var order = (typeof computeLayerRenderOrder === 'function') ? computeLayerRenderOrder() : state.layers.map(function (_l, i) { return { type: 'layer', idx: i }; });
     order.forEach(function (entry) {
@@ -583,12 +711,23 @@
       if (!expanded) return;
       var grpSpacer = document.createElement('div'); grpSpacer.className = 'frow';
       grid.appendChild(grpSpacer);
-      PROPS.forEach(function (prop) {
-        if (isPropFiltered(prop)) return;
-        var row = document.createElement('div'); row.className = 'frow motion-track-row';
-        trackRowHtml(ld, prop, row);
-        grid.appendChild(row);
-      });
+      PROPS.forEach(function (prop) { renderTracksFor(grid, ld, prop); });
+      // Mirrors renderElementsList's panel structure: one spacer per
+      // element, its own track rows only when that ONE element is expanded
+      // (only one element expands at a time, same single-expand contract
+      // as layers).
+      var els = layerElements(li, ld);
+      if (els.length) {
+        var elHdrSpacer = document.createElement('div'); elHdrSpacer.className = 'frow';
+        grid.appendChild(elHdrSpacer);
+        els.forEach(function (entry) {
+          var elExpanded = window._motionExpandedElement === entry.strokeId;
+          var elSpacer = document.createElement('div'); elSpacer.className = 'frow';
+          grid.appendChild(elSpacer);
+          if (!elExpanded) return;
+          PROPS.forEach(function (prop) { renderTracksFor(grid, ensureElementHolder(ld, entry.strokeId), prop); });
+        });
+      }
     });
   }
   // Drag-to-retime a keyframe (mousemove/up delegated from ui.js's global
@@ -639,6 +778,7 @@
     valueAtFrame: valueAtFrame,
     isAnimated: isAnimated,
     layerMotionAt: layerMotionAt,
+    elementMotionAt: elementMotionAt,
     transformSegments: transformSegments,
     transformImageRect: transformImageRect,
     buildOverlayItems: buildOverlayItems,

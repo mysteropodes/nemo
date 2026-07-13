@@ -45,6 +45,20 @@ function exportBuildFrame(frameIdx,alpha){
     var motionPivot=motionMat?new Point(userLayers[li].bounds.center.x+motionMat.ax,userLayers[li].bounds.center.y+motionMat.ay):null;
     strokes.forEach(function(sd){
       var p=desP(sd,L,sd.opacity!==undefined?sd.opacity:1);
+      // Element-level Motion target (2026-07): applied FIRST, pivoted
+      // around THIS stroke's own just-built bounds (not the whole layer's)
+      // — see motion.js's elementMotionAt header comment. sd.strokeId is
+      // the raw serialized field (same one serP/desP already round-trip).
+      var elMat=(window.SMMotion&&sd.strokeId)?SMMotion.elementMotionAt(li,sd.strokeId,frameIdx):null;
+      if(elMat){
+        var epc=p.bounds.center;
+        var elPivot=new Point(epc.x+elMat.ax,epc.y+elMat.ay);
+        p.scale(elMat.sx,elMat.sy,elPivot);
+        p.rotate(elMat.rot,elPivot);
+        p.translate(elMat.dx,elMat.dy);
+        p.opacity=p.opacity*elMat.op;
+        if(p.strokeWidth)p.strokeWidth*=(Math.abs(elMat.sx)+Math.abs(elMat.sy))/2;
+      }
       if(motionMat){
         p.scale(motionMat.sx,motionMat.sy,motionPivot);
         p.rotate(motionMat.rot,motionPivot);

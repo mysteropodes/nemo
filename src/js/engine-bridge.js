@@ -188,11 +188,19 @@
         } else if (state.revisionView === 'revisions') {
           if (!(c.data && (c.data.isRevisionGhost || c.data.revisionParentId))) continue;
         }
+        // Element-level Motion target (2026-07): a strokeId-scoped transform
+        // nested INSIDE the layer's own — applied FIRST below, pivoted
+        // around this item's OWN bounds (never the whole layer's), matching
+        // AE's shape-group-inside-a-layer composition. null in the common
+        // case (this item has no per-element motion of its own).
+        var elMat = (window.SMMotion && c.data && c.data.strokeId) ? SMMotion.elementMotionAt(i, c.data.strokeId, state.currentFrame) : null;
+        var elPivot = elMat ? { x: c.bounds.center.x + elMat.ax, y: c.bounds.center.y + elMat.ay } : null;
         if (c instanceof Raster) {
           var imageId = registerRasterIfNeeded(c);
           if (!imageId) continue;
           var rb = c.bounds; // display rect — Paper's Raster is center-positioned, bounds gives top-left directly
           var imgOp = c.opacity !== undefined ? c.opacity : 1;
+          if (elMat) { rb = SMMotion.transformImageRect(rb, elPivot, elMat); imgOp *= elMat.op; }
           if (motionMat) { rb = SMMotion.transformImageRect(rb, motionPivot, motionMat); imgOp *= motionMat.op; }
           items.push({
             image: { imageId: imageId, x: rb.x, y: rb.y, width: rb.width, height: rb.height, opacity: imgOp },
@@ -222,10 +230,14 @@
         else continue;
         subPaths.forEach(function (sub) {
           var sd = serP(sub);
+          if (elMat) sd.segments = SMMotion.transformSegments(sd.segments, elPivot, elMat);
           if (motionMat) sd.segments = SMMotion.transformSegments(sd.segments, motionPivot, motionMat);
           var op = c.opacity !== undefined ? c.opacity : 1;
+          if (elMat) op *= elMat.op;
           if (motionMat) op *= motionMat.op;
-          var strokeScale = motionMat ? (Math.abs(motionMat.sx) + Math.abs(motionMat.sy)) / 2 : 1;
+          var strokeScale = 1;
+          if (elMat) strokeScale *= (Math.abs(elMat.sx) + Math.abs(elMat.sy)) / 2;
+          if (motionMat) strokeScale *= (Math.abs(motionMat.sx) + Math.abs(motionMat.sy)) / 2;
           // The path's OWN closed flag (now correctly carried by serP(),
           // see app.js), NOT "has a fillColor" — that heuristic sent an
           // unwanted closing stroke segment across any OPEN path that also
