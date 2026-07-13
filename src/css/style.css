@@ -36,15 +36,18 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--gutter);color:
 .app-mode-btn:hover:not(:disabled){color:var(--text);}
 .app-mode-btn.active{background:var(--panel3);color:var(--text);}
 .app-mode-btn:disabled{color:var(--text-dark);cursor:default;}
+#app-topbar-spacer{flex:1;min-width:8px;}
 /* Canvas column: the project tabs bar sits directly above the canvas
    only, not above the tools panel or right panel, so it's wrapped here
-   as a flex column sharing #canvas-area's old flex:1 row slot. */
-#canvas-col{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0;gap:8px;}
+   as a flex column sharing #canvas-area's old flex:1 row slot. Zero gap
+   + matching radii so the tabs bar reads as flush with the canvas below
+   it, no gutter-colored seam between them. */
+#canvas-col{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0;gap:0;}
 /* v12: flat dot+label pattern (mockup's own "● Composition · StrokeMotion
    ● random_logo.png" header tabs — no boxed/boxed-top-corners browser-tab
    look at all, just plain inline items separated by gaps on one flat
    background), replacing the earlier browser-style rounded-top tab strip. */
-#project-tabs-bar{flex:none;height:32px;display:flex;align-items:center;gap:14px;padding:0 14px;background:var(--panel2);border-radius:8px;}
+#project-tabs-bar{flex:none;height:32px;display:flex;align-items:center;gap:14px;padding:0 14px;background:var(--panel2);border-radius:8px 8px 0 0;}
 /* Tabs list hugs its own content (not flex:1 anymore) so "+" sits right
    after the last tab, not stretched to the bar's far edge — the spacer
    below is what actually pushes the settings gear out to the true right
@@ -170,6 +173,8 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--gutter);color:
 #drawing-canvas{width:100%;height:100%;cursor:crosshair;}
 #canvas-info{position:absolute;top:16px;left:20px;pointer-events:none;font-size:11.5px;color:rgba(236,234,231,.38);font-weight:500;}
 #canvas-info .fnum{font-size:28px;font-weight:700;letter-spacing:-.5px;color:var(--text);}
+.canvas-info-row{display:flex;align-items:center;gap:6px;}
+.canvas-info-row .badge{margin-left:0;}
 .badge{display:inline-block;padding:3px 8px;border-radius:5px;font-size:10px;font-weight:600;letter-spacing:.6px;margin-left:6px;vertical-align:middle;}
 .badge.key{background:rgba(255,255,255,.08);color:rgba(236,234,231,.65);}
 .badge.tw{background:var(--green);color:#000;}

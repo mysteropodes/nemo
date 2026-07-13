@@ -98,6 +98,13 @@
     <button class="app-mode-btn active" data-mode="anim2d" title="Animation 2D">Animation 2D</button>
     <button class="app-mode-btn" data-mode="motion" disabled title="Motion — bientôt disponible">Motion</button>
   </div>
+  <div id="app-topbar-spacer"></div>
+  <!-- Feedback avatars + settings gear stay pinned to the top bar (their
+       pre-redesign position) instead of following the project tabs down
+       into the canvas column. -->
+  <div id="fb-avatars" title="Feedback comments sur ce projet"></div>
+  <div id="fb-avatars-pop"></div>
+  <button id="project-tabs-settings" title="Réglages"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></button>
 </div>
 <!-- v11: real multi-project tabs — each tab holds its own independent
      serialized project snapshot in memory (project.js), switching saves
@@ -169,17 +176,15 @@
     <div id="project-tabs-bar">
       <div id="project-tabs-list"></div>
       <button id="project-tab-add" title="Nouveau projet (nouvel onglet)">+</button>
-      <div id="project-tabs-spacer"></div>
-      <div id="fb-avatars" title="Feedback comments sur ce projet"></div>
-      <div id="fb-avatars-pop"></div>
-      <button id="project-tabs-settings" title="Réglages"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></button>
     </div>
     <div id="canvas-area">
       <canvas id="drawing-canvas" resize></canvas>
       <div id="canvas-info">
-        <span class="fnum" id="info-frame">1</span>
-        <span id="info-badge" class="badge key" style="display:none">KEY</span>
-        <br><span id="info-strokes">0 traits</span>
+        <div class="canvas-info-row">
+          <span class="fnum" id="info-frame">1</span>
+          <span id="info-badge" class="badge key" style="display:none">KEY</span>
+        </div>
+        <span id="info-strokes">0 traits</span>
         <br><span id="info-sel" style="color:var(--orange);font-size:10px"></span>
       </div>
       <div id="match-info"></div>
