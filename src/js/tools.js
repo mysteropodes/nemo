@@ -1760,12 +1760,21 @@ var BRUSH_PRESETS={
 // Spacing is widened (never narrowed below the preset's own value) just
 // enough to land under this cap rather than silently truncating the tail
 // of the stroke.
-// 450 (was 180): with spacing now proportional to the dab diameter (see
-// buildBrushDabs), the count only depends on len/width — a thin stroke
-// swept across a big canvas is the one case that still needs headroom,
-// and at 180 it visibly beaded. Still comfortably inside the perf
-// envelope the audit measured (60fps at ~2600 scene items).
-var BRUSH_MAX_DABS=450;
+// 900 (was 450, was 180): the cap is a HARD ceiling on total dabs — once a
+// stroke's natural density (len/minAllowedSpacing) exceeds it, spacing gets
+// compressed to len/maxPositions to stay under budget, and that floor grows
+// linearly with length forever. At 450, a fairly ordinary preset/width
+// combo (chalk-blunt, 8px brush) started compressing past ~2570px of
+// accumulated path length — well within a single meandering stroke on a
+// normal canvas, not just a degenerate case — reported as "en fonction de
+// la longueur... les éléments de texture s'écartent". Doubling to 900
+// pushes that threshold to ~5150px (a single gesture would need to be
+// genuinely very long/looping to still hit it) while commit cost (one-time,
+// at stroke end, not per-frame) measured at 14.8ms worst case across
+// presets — still comfortably inside the perf envelope the audit measured
+// (60fps at ~2600 scene items); 1500 measured 58ms, a real risk of a
+// felt commit hitch, so NOT raised further than this.
+var BRUSH_MAX_DABS=900;
 // Single lookup point for a preset's parameters, whether built-in or one of
 // the user's own saved presets (state.customBrushPresets, keyed by a
 // generated id — see brush-editor.js) — every reader of BRUSH_PRESETS[key]
@@ -1924,11 +1933,24 @@ function buildBrushDabs(pathLike,preset,baseWidth,rng,widthProfile){
   // dabs still respects BRUSH_MAX_DABS regardless of tip shape.
   var bristleCount=preset.tipShape==='bristle'?Math.max(1,preset.bristleCount||5):1;
   var maxPositions=Math.max(1,Math.floor(BRUSH_MAX_DABS/bristleCount));
-  // Same cap-safety compression as before (task #106: a long stroke at a
-  // tiny fixed pitch blows through BRUSH_MAX_DABS) — floored per-iteration
-  // spacing below never goes narrower than this, keyed off the profile's
-  // worst case rather than one fixed width.
-  var capFloorSpacing=len/maxPositions;
+  // Cap-safety compression (task #106: a long stroke at a tiny fixed pitch
+  // blows through BRUSH_MAX_DABS) — ONLY kicks in when the stroke would
+  // actually need more than maxPositions dabs at its own natural spacing
+  // (len/minAllowedSpacing, the worst case across the whole width profile).
+  // The previous version set capFloorSpacing=len/maxPositions
+  // UNCONDITIONALLY — a plain linear function of length alone, with no
+  // regard for whether the budget was ever actually at risk. Since it
+  // grows with length forever, ANY preset's natural spacing eventually
+  // fell below it, silently thinning the texture density on ordinary long
+  // strokes (reported: "en fonction de la longueur... les éléments de
+  // texture s'écartent") — measured live: chalk-blunt held ~5.7-5.85px
+  // spacing from 200-2000px (correct, uniform), then stretched to 8.9px at
+  // 4000px, 17.8px at 8000px, 35px at 16000px, none of which were even
+  // close to the 450-dab ceiling yet. Gating it behind the real risk check
+  // keeps every preset's density constant regardless of stroke length
+  // right up until the budget is genuinely the limiting factor.
+  var worstCasePositions=len/minAllowedSpacing;
+  var capFloorSpacing=worstCasePositions>maxPositions?len/maxPositions:0;
   var roundness=preset.roundness!==undefined?preset.roundness:1;
   var dabs=[],d=0,guard=0;
   while(d<=len&&guard++<maxPositions+2&&dabs.length<BRUSH_MAX_DABS){
