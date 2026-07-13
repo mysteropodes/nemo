@@ -1289,6 +1289,20 @@ function renderTimeline(){
     else if((i+1)%5===0)c.textContent=i+1;
     hdr.appendChild(c);
   }
+  // Bug found 2026-07 ("pourquoi visuellement y a cette séparation du noir
+  // au gris, il faut prolongé le noir jusqu'au bout"): #bars-row (the
+  // onion-skin/work-area strip above the ruler) has no normal-flow
+  // children of its own — #onion-bar/.onion-marker/#wa-bar are all
+  // absolutely positioned, so they don't contribute to its intrinsic
+  // width. #frame-hdr's own width is established naturally by its real
+  // .fhc children (one per frame, just appended above), which stretch the
+  // whole scrollable area out to state.totalFrames*FC — #bars-row never
+  // got that same width, so its dark background stopped wherever it
+  // happened to shrink-to-fit while the ruler (and whatever's behind
+  // #bars-row) kept going, showing through as a lighter seam partway
+  // across. Sizing it explicitly to match fixes the seam.
+  var barsRow=document.getElementById('bars-row');
+  if(barsRow)barsRow.style.width=(state.totalFrames*FC)+'px';
   // Motion mode has its own row structure entirely (property tracks, not
   // per-layer frame cells) — same ruler above, different grid content
   // below. Early return, same pattern camera.js's own row already used.
