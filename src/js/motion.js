@@ -179,7 +179,12 @@
   // common case) — callers skip the per-item transform pass entirely then.
   function layerMotionAt(li, frameIdx) {
     var ld = state.layers[li];
-    if (!ld || (!ld.motion && !ld.motionStatic)) return null;
+    // Defense in depth: the UI already blocks expanding a component-instance
+    // layer's Transform group (see renderLayerListMotion), but stale motion
+    // data can still exist (set before the layer became an instance, or
+    // hand-edited into a project file) — never double-apply on top of the
+    // instance's own symMatrix pivot at render time either.
+    if (!ld || ld.symbolId || (!ld.motion && !ld.motionStatic)) return null;
     var pos = valueAtFrame(ld, 'position', frameIdx);
     var rot = valueAtFrame(ld, 'rotation', frameIdx)[0];
     var scl = valueAtFrame(ld, 'scale', frameIdx);
@@ -289,13 +294,24 @@
     order.forEach(function (entry) {
       if (entry.type !== 'layer' || entry.hidden) return;
       var li = entry.idx, ld = state.layers[li];
+      // Component instances already have their own placement transform
+      // (symMatrix, dragged on canvas) plus Frame/Speed/Offset — stacking
+      // Motion's keyframed Position/Rotation/Scale on top would pivot around
+      // a DIFFERENT center (userLayers[i].bounds vs symMatrix's own pivot)
+      // and fight the instance panel silently. Same precedent as Ghost All
+      // refusing symbolId layers (timeline.js) — block expansion here rather
+      // than let the two transforms produce confusing, uneditable-looking
+      // results.
+      var isComponent = !!ld.symbolId;
       var expanded = window._motionExpandedLayer === li;
       var row = document.createElement('div');
-      row.className = 'lrow' + (li === state.activeLayerIdx ? ' act' : '');
-      var arrow = document.createElement('div'); arrow.className = 'lico larrow'; arrow.textContent = expanded ? '▾' : '▸';
+      row.className = 'lrow' + (li === state.activeLayerIdx ? ' act' : '') + (isComponent ? ' motion-disabled' : '');
+      if (isComponent) row.title = 'Motion mode ne gère pas encore les instances de composant (utilise Frame/Speed/Offset dans le panneau du calque)';
+      var arrow = document.createElement('div'); arrow.className = 'lico larrow'; arrow.textContent = isComponent ? '·' : (expanded ? '▾' : '▸');
       var nm = document.createElement('div'); nm.className = 'lnm'; nm.textContent = ld.name || ('Layer ' + (li + 1));
       row.appendChild(arrow); row.appendChild(nm);
       row.addEventListener('click', function () {
+        if (isComponent) { state.activeLayerIdx = li; renderLayerList(); return; }
         window._motionExpandedLayer = expanded ? null : li;
         state.activeLayerIdx = li;
         renderLayerList(); renderTimeline();
