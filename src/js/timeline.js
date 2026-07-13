@@ -1321,8 +1321,14 @@ function renderTimeline(){
       contentIdxs=[];
       state.layers.forEach(function(l,idx){if(l.linkGroupId===entry.linkGroupId)contentIdxs.push(idx);});
     }
+    // The in/out point bar (layer-inout.js) is Motion-mode-only visually —
+    // motion.js's own renderTimelineMotion builds it on its own collapsed
+    // layer row separately. Animation 2D keeps its classic keyframe-circles
+    // look untouched (explicit feedback: the two modes must stay visually
+    // distinct, not share overlay chrome) — the in/out DATA and render gate
+    // (getEffectiveStrokes, app.js) still fully apply either way, only the
+    // bar's on-screen presence here is gone.
     renderKeyframeCellsInto(row,li,contentIdxs);
-    if(window.SMLayerInOut)SMLayerInOut.buildBar(row,li);
     grid.appendChild(row);
   });
   // rowCount only counts state.layers rows — the camera row (prepended
