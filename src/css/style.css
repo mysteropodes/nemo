@@ -409,7 +409,14 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--gutter);color:
    just the single target cell lighting up in isolation. */
 .fc.span-drag-band{background:var(--accent-dim);}
 .fc.span-drag-preview::after{content:'';position:absolute;right:2px;width:5px;height:22px;border-radius:2px;background:var(--accent);}
-.fc.span-end.tl-outdrag-hide-end::after{opacity:0;}
+/* v9: fully HIDING the original grab-bar during the drag (opacity:0) made
+   it look like the marker had vanished rather than moved — feedback: "il
+   faudrait laisser la barre bleue d'outpoint et la clé d'après visuellement
+   pendant le drag". Dimmed instead of hidden: the original position stays
+   as a faint reference for "where it was" while the span-drag-preview
+   band/square/dot (still full opacity) shows "where it'll land" — both
+   visible at once, distinguishable by opacity alone. */
+.fc.span-end.tl-outdrag-source-end::after{opacity:.35;}
 /* v7: when the drag will actually relocate a real bordering keyframe (the
    "trim" path, not "insert a new one"), the target cell also gets a live
    preview dot in the SAME style a committed keyframe dot would have —
@@ -417,7 +424,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--gutter);color:
    looked like it was staying put until the drop. */
 .fc.span-drag-preview-key::after{display:none;}
 .fc .km.drag-key-preview{opacity:.85;}
-.fc.tl-outdrag-hide-key .km{opacity:0;}
+.fc.tl-outdrag-source-key .km{opacity:.35;}
 .fc.tw{background:var(--tween-color);}
 /* A tween frame the user hand-corrected reads in green instead of the
    normal tween blue — a silent re-tween would otherwise wipe the fix out

@@ -1402,14 +1402,16 @@ document.getElementById('frame-grid').addEventListener('mousedown',function(e){
   if(nextKeyFi>=0){for(var ni=nextKeyFi+1;ni<state.layers[li].frames.length;ni++){if(ld.frames[ni].isKeyframe){dragMax=ni-1;break;}}}
   else dragMax=fi; // no bordering keyframe — old shrink-only behavior, capped at the current end
   _spanShrink={active:true,li:li,srcFi:srcFi,maxFi:fi,nextKeyFi:nextKeyFi,dragMax:dragMax};
-  cell.classList.add('tl-outdrag-hide-end');
+  // Dimmed (not hidden — feedback: "laisser la barre bleue d'outpoint et la
+  // clé d'après visuellement pendant le drag") so the original position
+  // stays visible as a reference next to the live span-drag-preview.
+  cell.classList.add('tl-outdrag-source-end');
   // Trim path (a REAL bordering keyframe is being relocated, not just an
-  // abstract span end) — hide ITS dot too for the drag's duration, same
-  // reasoning as hiding the old square: otherwise the keyframe you're
-  // dragging looks like it never moves until you let go.
+  // abstract span end) — dim ITS dot too for the drag's duration, same
+  // reasoning as the square above.
   if(nextKeyFi>=0){
     var nextCell=document.querySelector('.fc[data-layer="'+li+'"][data-frame="'+nextKeyFi+'"]');
-    if(nextCell)nextCell.classList.add('tl-outdrag-hide-key');
+    if(nextCell)nextCell.classList.add('tl-outdrag-source-key');
   }
 },true);
 function _spanShrinkFrameAt(e){
@@ -1458,9 +1460,9 @@ window.addEventListener('mouseup',function(e){
   // Explicit cleanup, not just "a re-render will replace it" — several
   // branches below return early on a no-op drop (dropped back on the
   // source, or back on the already-existing end) with no re-render at all,
-  // which would otherwise leave the original marker permanently hidden.
-  document.querySelectorAll('.fc.tl-outdrag-hide-end').forEach(function(c){c.classList.remove('tl-outdrag-hide-end');});
-  document.querySelectorAll('.fc.tl-outdrag-hide-key').forEach(function(c){c.classList.remove('tl-outdrag-hide-key');});
+  // which would otherwise leave the original marker permanently dimmed.
+  document.querySelectorAll('.fc.tl-outdrag-source-end').forEach(function(c){c.classList.remove('tl-outdrag-source-end');});
+  document.querySelectorAll('.fc.tl-outdrag-source-key').forEach(function(c){c.classList.remove('tl-outdrag-source-key');});
   var fi=_spanShrinkFrameAt(e);
   var li=_spanShrink.li,nextKeyFi=_spanShrink.nextKeyFi;
   _spanShrink.active=false;
