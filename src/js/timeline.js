@@ -658,8 +658,21 @@ window.SM={
   },
   importJSON:function(json,silent){
     try{var d=JSON.parse(json);if(!d.layers&&!d.frames)throw new Error('Invalid');
-    if(state.activeSymbolId)exitToScene();
     if(!d.layers)d.layers=[{name:'Layer 1',visible:true,locked:false,frames:d.frames}];
+    // Validate the FULL layer/frame structure BEFORE the teardown below —
+    // the old shallow `!d.layers` check let a file that parses but is
+    // structurally broken deeper (layers not an array, a layer whose
+    // frames is null, a frame without a strokes array) destroy the
+    // in-memory document first and THEN throw partway through rebuild,
+    // stranding the app on a half-imported state with only the 30s
+    // autosave to fall back on. Now a bad file is rejected while the
+    // current document is still fully intact.
+    if(!Array.isArray(d.layers)||!d.layers.length)throw new Error('Fichier invalide (layers)');
+    d.layers.forEach(function(ld,li){
+      if(!ld||!Array.isArray(ld.frames))throw new Error('Fichier invalide (calque '+(li+1)+')');
+      ld.frames.forEach(function(f,fi){if(!f||!Array.isArray(f.strokes))throw new Error('Fichier invalide (calque '+(li+1)+', frame '+(fi+1)+')');});
+    });
+    if(state.activeSymbolId)exitToScene();
     state.totalFrames=d.totalFrames||d.layers[0].frames.length;state.fps=d.fps||12;state.canvasW=d.canvasW||1920;state.canvasH=d.canvasH||1080;state.canvasBg=d.canvasBg||'#ffffff';
     state.waIn=d.waIn||0;state.waOut=d.waOut!==undefined?d.waOut:state.totalFrames-1;
     window._waIn=state.waIn;window._waOut=state.waOut;window._totalF=state.totalFrames;
