@@ -1131,11 +1131,14 @@ function fillInsertIndexFor(layer,pt,excludePath){
 // séparation"). Only pure fills merge (closed, no strokeColor, none of the
 // special-role tags) — a hand-drawn filled+stroked shape keeps its own
 // identity, matching Animate, where strokes always survive as dividers.
-// The merged result deliberately LOSES fillSeed/fillWalls auto-regen
-// tracking: it's the union of regions traced from different seeds, so a
-// later regeneration from any single seed would silently shrink it back to
-// that one seed's region — a manual merge must stay put (same "manual edit
-// wins" principle as fsUnlinkFillRegen).
+// The merged result keeps auto-regen tracking, but as data.fillSeeds (an
+// ARRAY, one entry per merged participant) rather than a single fillSeed —
+// regenerating from just ONE seed would silently shrink the merge back to
+// that one participant's own region the next time a bounding stroke moves
+// (reported: "je bouge un tracé dont le fill est complètement collé, celui-
+// ci ne suit pas"), so fillRegenerateLinked instead re-traces EVERY stored
+// seed and re-unions whichever still resolve, keeping the merge alive
+// without that shrink risk.
 // True if a real, currently-visible stroke (strokeColor item) in the layer
 // runs between p1 and p2 — used to tell "these two same-color fills only
 // touch because of gap-bridging/rounding" (no real line between them, safe
@@ -1180,6 +1183,18 @@ function fillMergeSameColor(layer,newFill){
     if(touches)absorbed.push(c);
   });
   if(!absorbed.length)return newFill;
+  // Gather every participant's own regen tracking BEFORE the union — reused
+  // below to tag the merged result(s) so the whole merge stays live (see
+  // this function's own header comment for why fillSeeds is an array).
+  var participants=[newFill].concat(absorbed);
+  var mergedSeeds=[],mergedWallIds=[],mergedGapPx=0;
+  participants.forEach(function(p){
+    if(!p.data)return;
+    var ps=p.data.fillSeeds||(p.data.fillSeed?[p.data.fillSeed]:[]);
+    ps.forEach(function(s){mergedSeeds.push(s);});
+    (p.data.fillWalls||[]).forEach(function(id){if(mergedWallIds.indexOf(id)<0)mergedWallIds.push(id);});
+    if(p.data.fillGapPx>mergedGapPx)mergedGapPx=p.data.fillGapPx;
+  });
   var acc=newFill;
   absorbed.forEach(function(c){
     var u=null;
@@ -1198,11 +1213,62 @@ function fillMergeSameColor(layer,newFill){
   var removedBelow=idxs.filter(function(i){return i<topIdx;}).length;
   newFill.remove();absorbed.forEach(function(c){c.remove();});
   var parts=insertBooleanResult(layer,Math.min(topIdx-removedBelow,layer.children.length),acc,newFill.fillColor,op);
+  if(mergedSeeds.length){
+    parts.forEach(function(part){
+      part.data.fillSeeds=mergedSeeds;
+      if(mergedWallIds.length)part.data.fillWalls=mergedWallIds;
+      part.data.fillGapPx=mergedGapPx||24;
+    });
+  }
   return parts[0]||null;
+}
+// Regenerates a MULTI-seed (merged/"collé") fill: re-traces every stored
+// seed independently and re-unions whichever still resolve, instead of
+// collapsing to a single region. A seed that no longer finds anything
+// (e.g. the stroke move actually detached that one sub-region) is simply
+// dropped rather than aborting the whole merge — same "leave what's still
+// valid alone" spirit as the single-seed path below.
+function _fillRegenerateMulti(layer,f,onlyIds,gapCap){
+  var found=[];
+  (f.data.fillSeeds||[]).forEach(function(s){
+    var seed=new Point(s[0],s[1]);
+    var res=fillVectorFind(seed,layer,f,gapCap,onlyIds);
+    if(res)found.push(res);
+  });
+  if(!found.length)return null;
+  if(found.length===1)return{path:found[0].path,wallIds:found[0].wallIds,seeds:[[found[0].path.interiorPoint.x,found[0].path.interiorPoint.y]]};
+  var acc=found[0].path;
+  var seeds=[];
+  found.forEach(function(r){
+    if(r!==found[0]){
+      var u=null;
+      try{u=acc.unite(r.path,{insert:false});}catch(e){}
+      if(u){if(acc!==found[0].path)acc.remove();acc=u;r.path.remove();}
+      // degenerate unite: keep both un-unioned rather than lose one — acc
+      // stays the last good accumulator, r.path is simply left out of it.
+    }
+  });
+  // A CompoundPath here means the sub-regions no longer touch after the
+  // edit (unite() couldn't merge them into one seamless outline) — inserting
+  // that raw would violate the CompoundPath rule (CLAUDE.md §1: never insert
+  // a boolean result directly, always split via insertBooleanResult). Rather
+  // than wire full island-splitting through this return path for a rare
+  // edge case, fall back to just the largest surviving sub-region: no worse
+  // than the legacy single-seed fallback's own "shrinks to one seed" case,
+  // and the OTHER seeds are still recorded (see the caller) so a further
+  // edit that reconnects them will pick them back up.
+  if(acc instanceof CompoundPath){
+    var largest=found[0];
+    found.forEach(function(r){if(!r.path.removed&&Math.abs(r.path.area)>Math.abs(largest.path.area))largest=r;});
+    acc.remove();
+    return{path:largest.path,seeds:[[largest.path.interiorPoint.x,largest.path.interiorPoint.y]]};
+  }
+  found.forEach(function(r){var ip=r.path.interiorPoint;if(ip)seeds.push([ip.x,ip.y]);});
+  return{path:acc,seeds:seeds};
 }
 function fillRegenerateLinked(layer,touchedPath){
   if(!layer)return;
-  var fills=layer.children.filter(function(c){return c instanceof Path&&c.data&&c.data.fillSeed;});
+  var fills=layer.children.filter(function(c){return c instanceof Path&&c.data&&(c.data.fillSeed||(c.data.fillSeeds&&c.data.fillSeeds.length));});
   if(!fills.length)return;
   // `touchedPath`'s own strokeId, when known — lets the loop below skip
   // fills that are wall-restricted to OTHER strokes entirely, instead of
@@ -1216,38 +1282,56 @@ function fillRegenerateLinked(layer,touchedPath){
   fills.forEach(function(f){
     var onlyIds=(f.data.fillWalls&&f.data.fillWalls.length)?f.data.fillWalls:undefined;
     if(touchedId&&onlyIds&&onlyIds.indexOf(touchedId)<0)return; // this fill's boundary doesn't involve the touched stroke at all — nothing to re-check
-    var seed=new Point(f.data.fillSeed[0],f.data.fillSeed[1]);
     var col=f.fillColor,op=f.opacity;
     // With the wall restriction in place the gap cap is unnecessary (see
     // block comment above); without it (legacy fill), the cap remains the
     // only guard against grabbing unrelated strokes, so keep it.
     var gapCap=onlyIds?undefined:f.data.fillGapPx;
-    var res=fillVectorFind(seed,layer,f,gapCap,onlyIds);
-    if(!res){
-      // The stored seed no longer lands inside the region — usually not
-      // because the shape actually opened up, but because the edit moved
-      // the boundary past the seed point. Retry from points that track the
-      // CURRENT geometry: the fill's own last-good interior first, then the
-      // actively-edited path's live interior (immune to multi-frame drift,
-      // since it's recomputed from the live boundary every call).
-      var fallbackSeed=f.interiorPoint;
-      if(fallbackSeed)res=fillVectorFind(fallbackSeed,layer,f,gapCap,onlyIds);
-      if(!res&&touchedPath&&touchedPath!==f){
-        var touchedSeed=touchedPath.interiorPoint;
-        if(touchedSeed)res=fillVectorFind(touchedSeed,layer,f,gapCap,onlyIds);
+    var isMulti=f.data.fillSeeds&&f.data.fillSeeds.length;
+    var newSeeds=null;
+    var res;
+    if(isMulti){
+      var mres=_fillRegenerateMulti(layer,f,onlyIds,gapCap);
+      if(!mres)return; // none of the merge's seeds still resolve — leave the old fill as-is
+      res={path:mres.path,wallIds:mres.wallIds,gapPx:gapCap};
+      newSeeds=mres.seeds;
+    }else{
+      var seed=new Point(f.data.fillSeed[0],f.data.fillSeed[1]);
+      res=fillVectorFind(seed,layer,f,gapCap,onlyIds);
+      if(!res){
+        // The stored seed no longer lands inside the region — usually not
+        // because the shape actually opened up, but because the edit moved
+        // the boundary past the seed point. Retry from points that track the
+        // CURRENT geometry: the fill's own last-good interior first, then the
+        // actively-edited path's live interior (immune to multi-frame drift,
+        // since it's recomputed from the live boundary every call).
+        var fallbackSeed=f.interiorPoint;
+        if(fallbackSeed)res=fillVectorFind(fallbackSeed,layer,f,gapCap,onlyIds);
+        if(!res&&touchedPath&&touchedPath!==f){
+          var touchedSeed=touchedPath.interiorPoint;
+          if(touchedSeed)res=fillVectorFind(touchedSeed,layer,f,gapCap,onlyIds);
+        }
+        if(!res)return; // genuinely no enclosed region anymore (e.g. shape opened up) — leave the old fill as-is
       }
-      if(!res)return; // genuinely no enclosed region anymore (e.g. shape opened up) — leave the old fill as-is
     }
     var idx=layer.children.indexOf(f);
     f.remove();
     res.path.fillColor=col;res.path.strokeColor=null;res.path.opacity=op;
-    // Re-anchor the seed to the NEW region's own interior point rather than
-    // keeping the original click position — self-correcting, so the next
-    // regeneration starts from wherever the fill actually lives now instead
-    // of a possibly-stale original click point that keeps drifting further
-    // outside the shape with each subsequent edit.
-    var newSeed=res.path.interiorPoint||seed;
-    res.path.data.fillSeed=[newSeed.x,newSeed.y];res.path.data.fillGapPx=res.gapPx;
+    if(isMulti){
+      // Re-anchor to the union's own sub-region interior points — same
+      // self-correcting principle as the single-seed case below, just one
+      // per surviving sub-region instead of one overall.
+      res.path.data.fillSeeds=newSeeds&&newSeeds.length?newSeeds:[[res.path.interiorPoint.x,res.path.interiorPoint.y]];
+    }else{
+      // Re-anchor the seed to the NEW region's own interior point rather than
+      // keeping the original click position — self-correcting, so the next
+      // regeneration starts from wherever the fill actually lives now instead
+      // of a possibly-stale original click point that keeps drifting further
+      // outside the shape with each subsequent edit.
+      var newSeed=res.path.interiorPoint||seed;
+      res.path.data.fillSeed=[newSeed.x,newSeed.y];
+    }
+    res.path.data.fillGapPx=res.gapPx;
     // Keep the ORIGINAL association, not the regeneration's own wallIds:
     // restricted regeneration by construction only ever sees the associated
     // walls, so its result can never widen the set, but a temporarily-open
