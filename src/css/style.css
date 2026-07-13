@@ -442,11 +442,18 @@ body.mode-motion .lrow.act{box-shadow:inset 3px 0 0 #4E6FF2,inset 0 0 0 1px rgba
    trimmed. Handles are a solid bracket, always visible (not hover-only). */
 .layer-inout-bar{position:absolute;left:0;top:2px;bottom:2px;background:rgba(63,107,245,.32);border:1px solid rgba(63,107,245,.85);border-radius:3px;cursor:grab;z-index:2;box-sizing:border-box;}
 .layer-inout-bar.full-range{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.28);}
-.layer-inout-bar .layer-inout-handle{position:absolute;top:-1px;bottom:-1px;width:7px;background:var(--accent);cursor:ew-resize;border-radius:2px;opacity:.85;}
-.layer-inout-bar.full-range .layer-inout-handle{background:rgba(255,255,255,.4);}
-.layer-inout-bar:hover .layer-inout-handle{opacity:1;background:var(--accent);}
+.layer-inout-bar .layer-inout-handle{position:absolute;top:-1px;bottom:-1px;width:7px;background:var(--io-handle-color,var(--accent));cursor:ew-resize;border-radius:2px;opacity:.85;}
+.layer-inout-bar.full-range .layer-inout-handle{--io-handle-color:rgba(255,255,255,.4);}
 .layer-inout-bar .layer-inout-handle.left{left:-1px;}
 .layer-inout-bar .layer-inout-handle.right{right:0;}
+/* Bug found 2026-07 ("si hover ou select avec rectangle le in ou outpoint
+   celui ci doit se bleuté") — hover and marquee-selection both tint the
+   handles accent-blue, overriding whatever color (layer tint or neutral
+   full-range) they'd otherwise show. layer-inout.js now sets the layer's
+   own color via --io-handle-color instead of an inline background, so
+   these can actually win via normal cascade (later + more specific). */
+.layer-inout-bar:hover .layer-inout-handle,
+.layer-inout-bar.sel .layer-inout-handle{opacity:1;background:var(--accent);}
 /* Multi-select (marquee rect -> group-drag several layers' bars together,
    layer-inout.js) */
 .layer-inout-bar.sel{box-shadow:0 0 0 1.5px #fff;}

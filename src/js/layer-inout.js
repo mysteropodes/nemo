@@ -56,8 +56,16 @@
       bar.style.background = '';
       bar.style.borderColor = '';
     }
-    var handles = bar.querySelectorAll('.layer-inout-handle');
-    for (var h = 0; h < handles.length; h++) handles[h].style.background = custom ? (ld.color || '') : '';
+    // Bug found 2026-07 ("si hover ou select avec rectangle le in ou
+    // outpoint celui ci doit se bleuté"): this used to set the handle's
+    // background as an INLINE style, which always wins over any CSS rule
+    // regardless of selector specificity — .layer-inout-handle:hover and
+    // .layer-inout-bar.sel .layer-inout-handle (style.css) existed but
+    // could never actually show through on a trimmed (custom-color) bar.
+    // Routing the layer color through a custom property instead lets
+    // normal CSS cascade rules for hover/selected states win as expected.
+    if (custom) bar.style.setProperty('--io-handle-color', hexToRgba(ld.color, 1));
+    else bar.style.removeProperty('--io-handle-color');
     // Animation 2D's per-frame .fc cells (Motion mode's collapsed spacer row
     // has none — nothing to dim there, the bar alone is enough context).
     var cells = row.querySelectorAll('.fc');
