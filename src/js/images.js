@@ -276,25 +276,55 @@
   }
   async function importVideo(){
     if(!tauriOk()){document.getElementById('video-input').click();return;}
-    // ogv added (2026-07) — Ogg Theora decodes natively via <video> in every
-    // Tauri webview target, same reasoning as svg/avif above for images.
-    // mkv/avi deliberately excluded: neither WebKit nor WebView2 decode
-    // those containers/codecs natively without extra OS codec packs, so
-    // offering them would produce a silent "video decode failed" far more
-    // often than not — a real fix would mean piping decode through the
-    // ffmpeg sidecar (already bundled for export, see export.js) instead of
-    // relying on <video>, which is out of scope for this pass.
-    var path=await window.__TAURI__.dialog.open({title:'Import Video',multiple:false,filters:[{name:'Videos',extensions:['mp4','mov','webm','m4v','ogv']}]});
+    // Broad container/codec list (2026-07) — under Tauri, decode goes
+    // through the bundled ffmpeg sidecar (see decodeVideoFramesFfmpeg
+    // below), not the webview's <video> element, so the format ceiling is
+    // "whatever this ffmpeg build supports" (effectively everything common)
+    // rather than "whatever WebKit/WebView2 happen to decode natively" —
+    // mkv/avi/flv/wmv/etc. that silently failed before now just work. The
+    // dialog filter below is a convenience default, not an enforced
+    // whitelist — "All files" is offered too since ffmpeg itself is the
+    // real gate, not this list.
+    var path=await window.__TAURI__.dialog.open({title:'Import Video',multiple:false,filters:[
+      {name:'Videos',extensions:['mp4','mov','webm','m4v','ogv','mkv','avi','flv','wmv','mts','m2ts','3gp','mpg','mpeg','vob','ts','webp']},
+      {name:'All files',extensions:['*']},
+    ]});
     if(!path)return;
-    showToast('Décodage de la vidéo…');
-    var bytes=await window.__TAURI__.fs.readFile(path);
-    var ext=extOf(path);
-    var mime={mp4:'video/mp4',mov:'video/quicktime',webm:'video/webm',m4v:'video/mp4',ogv:'video/ogg'}[ext]||'video/mp4';
-    var blobUrl=URL.createObjectURL(new Blob([bytes],{type:mime}));
+    var frames=await decodeVideoFramesFfmpeg(path);
+    await importVideoFrames(frames,baseName(path).replace(/\.[^.]+$/,''));
+  }
+  // ffmpeg-sidecar decode (Tauri-only — the sidecar isn't available in the
+  // plain-browser preview, which keeps using decodeVideoFrames/<video>
+  // above for that path). Reuses export.js's own temp-dir/ffmpeg-invoke
+  // helpers (exportTempDirPath/exportMkdir/exportRemoveDir/exportRunFfmpeg —
+  // plain top-level globals, not IIFE-scoped, already used for the export
+  // side of the exact same sidecar) rather than duplicating that plumbing.
+  async function decodeVideoFramesFfmpeg(path){
+    showToast('Décodage de la vidéo (ffmpeg)…');
+    var tmp=window.exportTempDirPath?await exportTempDirPath():null;
+    var workDir=(tmp||'')+'sm-video-import-'+Date.now();
+    await exportMkdir(workDir);
     try{
-      var frames=await decodeVideoFrames(blobUrl);
-      await importVideoFrames(frames,baseName(path).replace(/\.[^.]+$/,''));
-    }finally{URL.revokeObjectURL(blobUrl);}
+      // Capped at the same 999-frame ceiling the <video>-based decoder
+      // already uses (decodeVideoFrames above) — -frames:v enforces it
+      // directly in ffmpeg rather than post-hoc, so a long clip doesn't
+      // spend minutes decoding frames that would just get discarded.
+      await exportRunFfmpeg(['-y','-i',path,'-vf','fps='+Math.max(1,state.fps),'-frames:v','999','-q:v','3',workDir+'/frame_%04d.jpg']);
+      var frames=[];
+      var fit=null;
+      for(var i=1;i<=999;i++){
+        var framePath=workDir+'/frame_'+String(i).padStart(4,'0')+'.jpg';
+        var bytes;
+        try{bytes=await window.__TAURI__.fs.readFile(framePath);}catch(e){break;} // no more frames — ffmpeg stopped here
+        var dataUrl='data:image/jpeg;base64,'+bytesToBase64(bytes);
+        if(!fit){var nat=await naturalSize(dataUrl);fit=fitSize(nat.w,nat.h);}
+        frames.push({strokes:[{isRaster:true,src:dataUrl,x:state.canvasW/2,y:state.canvasH/2,width:fit.w,height:fit.h,opacity:1}],isKeyframe:true,isInterpolated:false});
+      }
+      if(!frames.length)throw new Error('ffmpeg n’a produit aucune image — format non décodable');
+      return frames;
+    }finally{
+      await exportRemoveDir(workDir);
+    }
   }
   document.getElementById('video-input')&&document.getElementById('video-input').addEventListener('change',function(e){
     var file=e.target.files[0];e.target.value='';if(!file)return;

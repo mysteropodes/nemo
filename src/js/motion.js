@@ -549,8 +549,33 @@
       row.className = 'lrow' + (li === state.activeLayerIdx ? ' act' : '') + (isComponent ? ' motion-disabled' : '');
       if (isComponent) row.title = 'Motion mode ne gère pas encore les instances de composant (utilise Frame/Speed/Offset dans le panneau du calque)';
       var arrow = document.createElement('div'); arrow.className = 'lico larrow'; arrow.textContent = isComponent ? '·' : (expanded ? '▾' : '▸');
+      row.appendChild(arrow);
+      // Same color dot / eye / lock / solo controls as Animation 2D's own
+      // layer row (timeline.js's renderLayerList) — Motion mode is a
+      // different VIEW of the same layers, not a different set of layers,
+      // so these need to be reachable here too, and they're already wired
+      // through window.SM.toggleLayerVis/Lock/Solo + layerIsEffectivelyVisible
+      // (app.js), the same choke point Motion's own render pipeline already
+      // goes through — no extra plumbing needed for the toggles to actually
+      // affect what's shown.
+      var cdot = document.createElement('div'); cdot.className = 'lico layer-color-dot'; cdot.title = 'Couleur du calque';
+      cdot.style.setProperty('--dot-color', ld.color || '#8b8b9e');
+      cdot.addEventListener('click', function (e) {
+        e.stopPropagation();
+        openLayerColorSwatches(cdot, ld.color || '#8b8b9e', function (hex) { ld.color = hex; cdot.style.setProperty('--dot-color', hex); renderTimeline(); });
+      });
+      row.appendChild(cdot);
+      var eye = document.createElement('div'); eye.className = 'lico' + (ld.visible ? '' : ' off'); eye.title = 'Show / hide layer'; eye.innerHTML = ld.visible ? ICO_EYE : ICO_EYE_CLOSED;
+      eye.addEventListener('click', function (e) { e.stopPropagation(); window.SM.toggleLayerVis(li); });
+      row.appendChild(eye);
+      var lock = document.createElement('div'); lock.className = 'lico' + (ld.locked ? '' : ' off'); lock.title = 'Lock / unlock layer'; lock.innerHTML = ld.locked ? ICO_LOCK : ICO_UNLOCK;
+      lock.addEventListener('click', function (e) { e.stopPropagation(); window.SM.toggleLayerLock(li); });
+      row.appendChild(lock);
+      var solo = document.createElement('div'); solo.className = 'lico solo-btn' + (ld.solo ? ' on' : ' off'); solo.title = 'Solo layer (hide all others)'; solo.textContent = 'S';
+      solo.addEventListener('click', function (e) { e.stopPropagation(); window.SM.toggleLayerSolo(li); });
+      row.appendChild(solo);
       var nm = document.createElement('div'); nm.className = 'lnm'; nm.textContent = ld.name || ('Layer ' + (li + 1));
-      row.appendChild(arrow); row.appendChild(nm);
+      row.appendChild(nm);
       row.addEventListener('click', function () {
         if (isComponent) { state.activeLayerIdx = li; renderLayerList(); return; }
         window._motionExpandedLayer = expanded ? null : li;
