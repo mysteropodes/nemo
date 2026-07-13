@@ -1744,6 +1744,15 @@ document.getElementById('frame-grid').addEventListener('mousemove',function(e){
     var f0=Math.min(_tlDrag.startF,toF),f1=Math.max(_tlDrag.startF,toF);
     for(var lx=l0;lx<=l1;lx++)for(var fx=f0;fx<=f1;fx++)selAdd(lx,fx);
     selApplyCSS();
+    // Drag-rectangle range-select spanning several layer ROWS (not just the
+    // single-cell shift-click case the mousedown handler already covers) —
+    // every layer touched by the drag needs to show selected in the panel
+    // too, same reasoning as syncLayerSelFromFrameSel's own comment above:
+    // F5/F6 now read _layerSel, so a multi-layer block selection that only
+    // highlighted ONE row understated which layers were actually about to
+    // be affected (reported with a screenshot: dragging a selection across
+    // Layer 1 and Layer 2 only showed Layer 2 as selected in the panel).
+    syncLayerSelFromFrameSel();
     _tlDrag._toL=toL;_tlDrag._toF=toF;
     return;
   }
