@@ -462,6 +462,13 @@
         <div class="pr" style="font-size:9px;color:var(--text-dim)">S'affiche sous le dessin, suit la frame courante (vidéo/séquence). Jamais exportée.</div>
       </div>
     </div>
+    <!-- Motion mode only (hidden otherwise via body:not(.mode-motion),
+         style.css) — the active layer's Transform properties mirrored into
+         the right panel, populated by motion.js renderMotionPropsPanel(). -->
+    <div class="psec" id="motion-props-sec">
+      <div class="phdr"><span class="ar">☰</span> <span>Propriétés du calque</span></div>
+      <div class="pbdy" id="motion-props-body"></div>
+    </div>
     <div class="psec" id="media-sec">
       <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrMedia">Médias</span></div>
       <div class="pbdy">

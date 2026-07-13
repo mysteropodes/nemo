@@ -363,6 +363,19 @@ body.mac-overlay-titlebar #app{padding-top:28px;}
 .motion-stopwatch{color:var(--text-dark);cursor:pointer;}
 .motion-stopwatch:hover{background:var(--panel3);color:var(--text);}
 .motion-stopwatch.on{color:var(--accent);}
+/* AE-style keyframe diamond on each animated property row (shared row
+   builder, so it shows in BOTH the bottom Transform group and the right
+   panel's mirror) — filled/accent when a key sits at the current frame. */
+.motion-addkey{color:var(--text-dark);cursor:pointer;flex-shrink:0;}
+.motion-addkey:hover{background:var(--panel3);color:var(--text);}
+.motion-addkey.on{color:var(--accent);}
+/* Right-panel "Propriétés du calque" section (motion.js
+   renderMotionPropsPanel) — Motion mode only; the rows inside reuse the
+   global .lrow/.motion-prop-row styles, which aren't scoped to
+   #layer-list, so no per-panel duplicates needed. */
+body:not(.mode-motion) #motion-props-sec{display:none;}
+.motion-props-layername{padding:4px 8px 6px;font-size:11px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#motion-props-body .lrow{height:24px;font-size:10.5px;cursor:default;}
 .motion-prop-name{display:flex;align-items:center;gap:5px;flex:1;color:var(--text-dim);}
 .motion-prop-name svg{flex-shrink:0;}
 .motion-fields{display:flex;align-items:center;gap:3px;flex-shrink:0;}

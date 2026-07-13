@@ -626,6 +626,37 @@
       renderTransformGroup(list, ld, 'Transform');
       renderElementsList(list, li, ld);
     });
+    // Right-panel mirror of the active layer's Transform group ("il
+    // faudrait afficher les properties d'un calque sélectionné et la
+    // possibilité d'ajouter des keyframes dans le panel de droite") —
+    // refreshed here because renderLayerListMotion is already the ONE
+    // place every relevant change funnels through (layer selection,
+    // stopwatch toggles, frame navigation via updateUI → renderLayerList),
+    // so the panel can never go stale against the bottom list.
+    renderMotionPropsPanel();
+  }
+  // Populates #motion-props-body (index.html, right panel — hidden outside
+  // Motion mode via body:not(.mode-motion) CSS) with the ACTIVE layer's
+  // Transform rows. Reuses renderTransformGroup verbatim — the rows are
+  // identical to the bottom panel's by construction (same builder, same
+  // holder), including the stopwatch and the add-key diamond, so both
+  // locations can add/remove keyframes and neither can drift from the
+  // other's behavior.
+  function renderMotionPropsPanel() {
+    var body = document.getElementById('motion-props-body');
+    if (!body) return;
+    body.innerHTML = '';
+    var ld = state.layers[state.activeLayerIdx];
+    var nameRow = document.createElement('div');
+    nameRow.className = 'motion-props-layername';
+    if (!ld) { nameRow.textContent = 'Aucun calque sélectionné'; body.appendChild(nameRow); return; }
+    if (ld.symbolId) {
+      nameRow.textContent = (ld.name || 'Calque') + ' — instance de composant (utilise Frame/Speed/Offset dans le panneau du calque)';
+      body.appendChild(nameRow); return;
+    }
+    nameRow.textContent = ld.name || ('Layer ' + (state.activeLayerIdx + 1));
+    body.appendChild(nameRow);
+    renderTransformGroup(body, ld, 'Transform');
   }
   // Shared by the layer's own Transform group AND each element's — both are
   // just "a holder with .motion/.motionStatic", see the header comment on
@@ -674,7 +705,13 @@
             var nvals = isAnimated(holder, prop) ? valueAtFrame(holder, prop, state.currentFrame) : staticValue(holder, prop);
             nvals[dim] = nv;
             setValue(holder, prop, nvals);
-            renderTimeline();
+            // renderLayerList too (not just the timeline, the original
+            // single-panel behavior): these same rows now render in TWO
+            // places (bottom Transform group + right-panel mirror,
+            // renderMotionPropsPanel) — committing a value in one must
+            // refresh the other's copy of the field, or they visibly
+            // disagree until the next unrelated refresh.
+            renderLayerList(); renderTimeline();
             if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
           });
           fieldWrap.appendChild(f);
@@ -683,6 +720,45 @@
       var unit = document.createElement('span'); unit.className = 'motion-unit'; unit.textContent = PROP_UNIT[prop];
       fieldWrap.appendChild(unit);
       pr.appendChild(fieldWrap);
+      // AE-style keyframe diamond ("possibilité d'ajouter des keyframes
+      // dans le panel de droite", 2026-07 — added HERE in the shared row
+      // builder so the bottom Transform group gets it too, not just the
+      // new right-panel section): only rendered once the property is
+      // animated (stopwatch on — before that, the stopwatch itself IS the
+      // add-first-key action, matching AE where the navigator diamond
+      // only exists on keyframed properties). Filled/highlighted when a
+      // key sits exactly at the current frame; click toggles — add a key
+      // at the current interpolated value, or remove the one that's here.
+      if (isAnimated(holder, prop)) {
+        var hasKeyHere = !!keyAt(holder.motion[prop], state.currentFrame);
+        var dia = document.createElement('div');
+        dia.className = 'lico motion-addkey' + (hasKeyHere ? ' on' : '');
+        dia.title = hasKeyHere ? 'Retirer la clé à la frame courante' : 'Ajouter une clé à la frame courante';
+        dia.innerHTML = '<svg viewBox="0 0 24 24" width="11" height="11"><path d="M12 3l9 9-9 9-9-9z" fill="' + (hasKeyHere ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2"/></svg>';
+        dia.addEventListener('click', function (e) {
+          e.stopPropagation(); pushUndo();
+          if (keyAt(holder.motion[prop], state.currentFrame)) {
+            // Removing the LAST key would drop the property back to its
+            // neutral default — freeze the current value as a static
+            // override instead, exactly like toggleAnimated's own ON→OFF
+            // branch ("switching modes must never silently snap a layer
+            // back to its neutral default", its header comment).
+            if (holder.motion[prop].keys.length === 1) {
+              var fv = valueAtFrame(holder, prop, state.currentFrame);
+              holder.motion[prop] = { keys: [] };
+              if (!holder.motionStatic) holder.motionStatic = {};
+              holder.motionStatic[prop] = fv;
+            } else {
+              removeKeyAtCurrentFrame(holder, prop);
+            }
+          } else {
+            setKeyAtCurrentFrame(holder, prop, valueAtFrame(holder, prop, state.currentFrame));
+          }
+          renderLayerList(); renderTimeline();
+          if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+        });
+        pr.appendChild(dia);
+      }
       list.appendChild(pr);
     });
   }
