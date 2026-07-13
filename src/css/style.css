@@ -457,7 +457,13 @@ body.mode-motion .lrow.act{box-shadow:inset 3px 0 0 #4E6FF2,inset 0 0 0 1px rgba
    retime that keyframe without leaving Motion mode. */
 .layer-inout-bar .layer-inout-key{position:absolute;top:0;bottom:0;width:3px;margin-left:-1.5px;background:#fff;opacity:.85;cursor:ew-resize;z-index:3;border-radius:1px;}
 .layer-inout-bar .layer-inout-key:hover{opacity:1;background:var(--accent);width:4px;margin-left:-2px;}
-#onion-bar{position:absolute;top:2px;height:5px;background:linear-gradient(90deg,rgba(255,80,80,.35),rgba(80,140,255,.35));border-radius:2px;pointer-events:none;z-index:2;}
+/* Bug found 2026-07 ("j'ai une barre au dessus de ses inpoint et outpoint
+   de l'onion skin qui devrait être au même niveau"): top:2px put the bar
+   in the upper half of #bars-row while .onion-marker sits at top:9px —
+   visually two different rows instead of one. Now matches the markers'
+   own top/height exactly so the bar and its in/out handles read as one
+   aligned control. */
+#onion-bar{position:absolute;top:9px;height:6px;background:linear-gradient(90deg,rgba(255,80,80,.35),rgba(80,140,255,.35));border-radius:2px;pointer-events:none;z-index:2;}
 /* v4: the mockup's frame ruler sits flush in the SAME --panel tone as the
    frame grid below it (just a hairline border-bottom) — it previously used
    --panel2 here, which read as a separate lighter bar boxed above the

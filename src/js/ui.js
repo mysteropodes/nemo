@@ -554,6 +554,17 @@
   window._omFollow=true;window._omSpan={prev:2,next:2};
   window.updateOmMarkers=function(curF,totalF){
     var omIn=document.getElementById('om-in'),omOut=document.getElementById('om-out');
+    // Bug found 2026-07 ("Quand l'onion skin est désactivé celles ci
+    // devrait disparaitre"): the bar/markers used to render unconditionally
+    // — no code path ever hid them when state.onionSkin was off, they just
+    // sat there always-visible even though renderOS()'s own onion-drawing
+    // is already gated by that same flag. #wa-bar (work area) is a
+    // DIFFERENT feature living in the same #bars-row and stays visible
+    // regardless — only the onion-specific elements toggle here.
+    var onionOn=!!(window.state&&state.onionSkin);
+    document.getElementById('onion-bar').style.display=onionOn?'':'none';
+    omIn.style.display=onionOn?'':'none';
+    omOut.style.display=onionOn?'':'none';
     if(!omIn.dataset.inited){omIn.dataset.frame=Math.max(0,curF-3);omOut.dataset.frame=Math.min(totalF-1,curF+3);omIn.dataset.inited='1';}
     if(window._omFollow){
       var span=window._omSpan||{prev:2,next:2};

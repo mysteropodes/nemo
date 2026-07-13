@@ -137,7 +137,7 @@ window.SM={
     var cc={draw:'crosshair',pen:'crosshair',line:'crosshair',rect:'crosshair',ellipse:'crosshair',select:'default',subselect:'default',fsselect:'default',comment:'crosshair',camera:'move',text:'text',eraser:'pointer',fill:'crosshair',fillbrush:'crosshair',eyedropper:'crosshair',hand:'grab',zoom:'zoom-in',rotate:'grab',perspective:'crosshair'};
     canvasEl.style.cursor=cc[t]||'default';
     updatePropsContext();},
-  toggleOnion:function(){state.onionSkin=!state.onionSkin;renderOS();var el=document.getElementById('os-st');el.textContent=state.onionSkin?'ON':'OFF';el.style.color=state.onionSkin?'var(--green)':'var(--text-dim)';var b=document.getElementById('btn-os');if(b)b.classList.toggle('active',state.onionSkin);},
+  toggleOnion:function(){state.onionSkin=!state.onionSkin;renderOS();var el=document.getElementById('os-st');el.textContent=state.onionSkin?'ON':'OFF';el.style.color=state.onionSkin?'var(--green)':'var(--text-dim)';var b=document.getElementById('btn-os');if(b)b.classList.toggle('active',state.onionSkin);window.updateOmMarkers(state.currentFrame,state.totalFrames);},
   toggleGhostAll:function(){
     state.ghostAllFrames=!state.ghostAllFrames;
     renderOS();
@@ -1305,7 +1305,16 @@ function renderTimeline(){
     if(window.SMMotion)SMMotion.renderTimelineMotion(grid);
     var mph=document.getElementById('playhead');
     mph.style.left=(state.currentFrame*FC)+'px';
-    mph.style.height=grid.scrollHeight+'px';
+    // Bug found 2026-07 ("le curseur de temps devrait descendre jusqu'au
+    // niveau de la scroll bar en bas"): grid.scrollHeight only covers the
+    // RENDERED content — with few tracks that's shorter than #fg-wrap's
+    // own visible box (flex:1, fills the panel), so the line stopped short
+    // of the actual bottom edge/scrollbar with dead space below it. Extend
+    // to whichever is taller: content height (so a tall/scrolled track
+    // list still gets a fully-covering line) or the wrap's own visible
+    // height (so a short list still reaches the panel's bottom).
+    var mwrap=document.getElementById('fg-wrap');
+    mph.style.height=Math.max(grid.scrollHeight,mwrap?mwrap.clientHeight:0)+'px';
     return;
   }
   if(window.SMCamera)SMCamera.renderGridRow(grid);
@@ -1369,7 +1378,13 @@ function renderTimeline(){
   // above, not part of state.layers) never added its own height here, so
   // the playhead line always stopped short by one row whenever a camera
   // track existed.
-  document.getElementById('playhead').style.left=(state.currentFrame*FC)+'px';document.getElementById('playhead').style.height=(30+rowCount*ROW_H+camGridRowOffset())+'px';
+  // Same "reach the actual bottom/scrollbar" fix as Motion mode above:
+  // with few layers the row-count formula is shorter than #fg-wrap's own
+  // visible height, leaving dead space below the line before the
+  // scrollbar. Math.max keeps the line covering a tall/scrolled layer
+  // list too (that case was already correct).
+  var awrap=document.getElementById('fg-wrap');
+  document.getElementById('playhead').style.left=(state.currentFrame*FC)+'px';document.getElementById('playhead').style.height=Math.max(30+rowCount*ROW_H+camGridRowOffset(),awrap?awrap.clientHeight:0)+'px';
   if(window.SMAudio)SMAudio.renderStrip();
 }
 // Builds one row's worth of frame cells for layer `li` into `rowEl` — shared
