@@ -49,7 +49,14 @@
   var CUR_VER = '2'; // bump whenever DEFAULT_FC changes and existing persisted values should be migrated once
   var DEFAULT_FC = 30;
 
-  function clamp(n) { return Math.max(4, Math.min(64, Math.round(n))); }
+  // Bug found 2026-07 ("impossible de l'amener jusqu'au bout"): with the
+  // old 64px ceiling, closing the scrollbar-handle gap all the way down
+  // to MIN_THUMB_PX needed an FC the cap didn't allow for any realistically
+  // long project (e.g. ~145px/frame for a 120-frame timeline at a typical
+  // track width — verified live, the handle stalled at ~63px thumbW,
+  // exactly what FC=64 produces there) — not a math bug in the drag
+  // itself, just a ceiling too low to ever let the gesture finish.
+  function clamp(n) { return Math.max(4, Math.min(400, Math.round(n))); }
   function refresh() {
     if (typeof renderTimeline === 'function') renderTimeline();
     if (typeof updatePlayhead === 'function') updatePlayhead();
@@ -84,6 +91,19 @@
     var maxScroll = Math.max(1, contentW - trackW);
     var scrollRatio = Math.max(0, Math.min(1, wrap.scrollLeft / maxScroll));
     var thumbLeft = scrollRatio * (trackW - thumbW);
+    // Bug found 2026-07 ("le inpoint de la scroll bar... sort offset"):
+    // `bar` used to be a plain child of #fg-wrap — the SAME element that
+    // scrolls horizontally — so its own on-screen position silently
+    // drifted along with the content instead of staying pinned at the
+    // bottom. Harmless as long as nothing read the bar's actual screen
+    // rect, but onMove below now needs an accurate one to solve the drag
+    // geometry exactly. `bar` is position:fixed and appended to
+    // document.body (see ensureScrollbar), so its left/top must be
+    // re-synced to #fg-wrap's live bounding rect on every redraw instead
+    // of being a static CSS left:0/bottom:0.
+    var wrapRect = wrap.getBoundingClientRect();
+    bar.style.left = wrapRect.left + 'px';
+    bar.style.top = (wrapRect.bottom - 12) + 'px';
     bar.style.width = trackW + 'px';
     thumb.style.width = thumbW + 'px';
     thumb.style.left = thumbLeft + 'px';
@@ -108,7 +128,11 @@
 
     bar = document.createElement('div');
     bar.id = 'tlzoom-scrollbar';
-    bar.style.cssText = 'position:absolute;left:0;bottom:0;height:12px;z-index:6;background:rgba(255,255,255,.04);border-radius:6px;overflow:visible;';
+    // position:fixed + appended to document.body (not `wrap`) — see
+    // redrawScrollbar()'s comment: a plain absolutely-positioned child of
+    // #fg-wrap scrolls away with the content it's meant to control.
+    // left/top are resynced to #fg-wrap's live rect on every redraw.
+    bar.style.cssText = 'position:fixed;left:0;top:0;height:12px;z-index:60;background:rgba(255,255,255,.04);border-radius:6px;overflow:visible;';
     thumb = document.createElement('div');
     // Body = pan handle, neutral gray always (no color change on hover —
     // color means "this is a zoom knob", the body deliberately never uses
@@ -122,14 +146,27 @@
       thumb.appendChild(h);
     });
     bar.appendChild(thumb);
-    wrap.appendChild(bar);
+    document.body.appendChild(bar);
 
     thumb.addEventListener('pointerenter', function () { if (!dragMode) thumb.style.cursor = 'grab'; });
     thumb.addEventListener('pointerdown', function () { thumb.style.cursor = 'grabbing'; });
     window.addEventListener('pointerup', function () { thumb.style.cursor = 'grab'; });
 
     var dragMode = null; // 'pan' | 'zoom-left' | 'zoom-right'
-    var startX = 0, startScrollLeft = 0, startFC = 0, anchorFrame = 0, anchorScreenX = 0;
+    var startX = 0, startScrollLeft = 0, startFC = 0, anchorTrackX = 0;
+
+    // Current thumb geometry in TRACK px (0..trackW) — same formula
+    // redrawScrollbar() uses, factored out so onDown/onMove can both
+    // solve it exactly instead of approximating.
+    function thumbGeometry(trackW, fc) {
+      var contentW = Math.max(1, (state.totalFrames || 1) * fc);
+      var visRatio = Math.min(1, trackW / contentW);
+      var thumbW = Math.max(MIN_THUMB_PX, trackW * visRatio);
+      var maxScroll = Math.max(1, contentW - trackW);
+      var scrollRatio = Math.max(0, Math.min(1, wrapEl().scrollLeft / maxScroll));
+      var thumbLeft = scrollRatio * (trackW - thumbW);
+      return { thumbW: thumbW, thumbLeft: thumbLeft, thumbRight: thumbLeft + thumbW, contentW: contentW, maxScroll: maxScroll };
+    }
 
     function onDown(e, mode) {
       e.stopPropagation(); e.preventDefault();
@@ -138,17 +175,20 @@
       var wrap2 = wrapEl();
       startScrollLeft = wrap2.scrollLeft;
       startFC = window.FC;
-      // Bug found 2026-07 ("la scrollbar doit pouvoir se réduire en
-      // direction du curseur de temps des 2 côtés sinon perd le fil de là
-      // où on est"): used to anchor whichever EDGE wasn't being dragged
-      // (Premiere's own convention) — but that could scroll the playhead
-      // straight out of view if it happened to sit near the edge you WERE
-      // dragging. Anchoring to the PLAYHEAD's own screen position instead:
-      // regardless of which handle you drag, the current frame stays
-      // visually still, so you never lose track of where you are.
       var trackW = wrap2.clientWidth;
-      anchorFrame = state.currentFrame;
-      anchorScreenX = (anchorFrame * startFC) - startScrollLeft;
+      // Bug found 2026-07 ("le inpoint de la scroll bar... sort offset...
+      // impossible de l'amener jusqu'au bout"): the old formula scaled FC
+      // by an arbitrary `dx*4` heuristic with no real relationship to
+      // where the handle actually rendered, so it visibly desynced from
+      // the mouse and could stall well before the thumb ever reached the
+      // OTHER handle. Solved exactly instead: whichever edge you're NOT
+      // dragging stays pinned at its exact TRACK-space position
+      // (anchorTrackX), and the dragged edge is set to match the mouse
+      // pixel-for-pixel every move (onMove below) — standard resize-handle
+      // behavior, so it tracks the cursor and can close the gap all the
+      // way down to MIN_THUMB_PX.
+      var g = thumbGeometry(trackW, startFC);
+      anchorTrackX = mode === 'zoom-left' ? g.thumbRight : g.thumbLeft;
       window.addEventListener('pointermove', onMove);
       window.addEventListener('pointerup', onUp);
     }
@@ -156,8 +196,8 @@
       if (!dragMode) return;
       var wrap2 = wrapEl();
       var trackW = wrap2.clientWidth;
-      var dx = e.clientX - startX;
       if (dragMode === 'pan') {
+        var dx = e.clientX - startX;
         var contentW = totalContentWidth();
         var maxScroll = Math.max(1, contentW - trackW);
         var thumbW = Math.max(MIN_THUMB_PX, trackW * Math.min(1, trackW / contentW));
@@ -166,17 +206,21 @@
         redrawScrollbar();
         return;
       }
-      // Zoom: dragging the right edge OUTWARD (dx>0) widens the thumb ->
-      // more content fits in the same track width -> ZOOM OUT (smaller
-      // FC). Dragging it inward zooms in. The left edge is the mirror.
-      var sign = dragMode === 'zoom-right' ? 1 : -1;
-      var newFC = clamp(startFC * trackW / Math.max(20, trackW + sign * dx * 4));
+      var total = Math.max(1, state.totalFrames || 1);
+      var barRect = bar.getBoundingClientRect();
+      var mx = Math.max(0, Math.min(trackW, e.clientX - barRect.left));
+      var wantedThumbW = dragMode === 'zoom-right' ? (mx - anchorTrackX) : (anchorTrackX - mx);
+      wantedThumbW = Math.max(MIN_THUMB_PX, wantedThumbW);
+      var newFC = clamp((trackW * trackW) / (wantedThumbW * total));
       window.FC = newFC;
       document.documentElement.style.setProperty('--fc', newFC + 'px');
-      // Re-anchor so the PLAYHEAD stays at the same screen position.
-      var newContentW = totalContentWidth();
-      var newAnchorContentX = anchorFrame * newFC;
-      wrap2.scrollLeft = Math.max(0, Math.min(newContentW - trackW, newAnchorContentX - anchorScreenX));
+      // clamp() may have capped newFC short of what wantedThumbW asked
+      // for — recompute the ACTUAL resulting thumbW from the final FC so
+      // the anchor edge lands exactly right rather than drifting.
+      var g = thumbGeometry(trackW, newFC);
+      var newThumbLeft = dragMode === 'zoom-right' ? anchorTrackX : (anchorTrackX - g.thumbW);
+      var scrollRatioNew = Math.max(0, Math.min(1, newThumbLeft / Math.max(1, trackW - g.thumbW)));
+      wrap2.scrollLeft = scrollRatioNew * g.maxScroll;
       refresh();
     }
     function onUp() {
