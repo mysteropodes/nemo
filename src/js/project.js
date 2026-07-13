@@ -69,8 +69,19 @@
     if(window.renderPaletteGrid)window.renderPaletteGrid();
     syncDocFields();
     currentPath=null;currentName=cfg.name||'Untitled';updateCurrentLabel();
-    try{localStorage.setItem('nemo-auto',window.SM.exportJSON());}catch(e){}
+    try{var freshJson=window.SM.exportJSON();markSaved(freshJson);localStorage.setItem('nemo-auto',freshJson);}catch(e){}
     showToast('New project created');
+  }
+
+  // Last successfully persisted document, for the close-with-unsaved-work
+  // guard below. null = "never saved/loaded anything yet" — a brand-new
+  // empty document counts as clean until it's actually drawn on (newProject
+  // and openPath both stamp it).
+  var lastSavedJson=null;
+  function markSaved(json){lastSavedJson=json;}
+  function isDirty(){
+    try{return lastSavedJson!==null&&window.SM.exportJSON()!==lastSavedJson;}
+    catch(e){return true;} // can't serialize → assume dirty, never skip the warning
   }
 
   async function writeProjectTo(path){
@@ -96,6 +107,7 @@
     currentPath=path;currentName=baseName(path);updateCurrentLabel();
     touchRecent(path,currentName,{canvasW:state.canvasW,canvasH:state.canvasH,fps:state.fps});
     renderRecents();
+    markSaved(json);
     try{localStorage.setItem('nemo-auto',json);}catch(e){}
   }
   async function saveAs(){
@@ -103,14 +115,20 @@
     saveAllLayerFrames();
     var path=await window.__TAURI__.dialog.save({title:'Save Project As',defaultPath:currentName+'.json',filters:[{name:'Nemo Project',extensions:['json']}]});
     if(!path)return;
-    await writeProjectTo(path);
+    // A failed write MUST be loud — without this catch there was no error
+    // toast at all: the user saw no "Saved" but nothing else either, easy
+    // to miss, and quitting right after meant silent data loss (disk full,
+    // permissions, network volume gone...).
+    try{await writeProjectTo(path);}
+    catch(e){showToast('ÉCHEC de la sauvegarde : '+(e&&e.message||e));throw e;}
     showToast('Saved: '+baseName(path));
   }
   async function save(){
     if(!currentPath){await saveAs();return;}
     if(!tauriOk()){showToast('Save requires the desktop app');return;}
     saveAllLayerFrames();
-    await writeProjectTo(currentPath);
+    try{await writeProjectTo(currentPath);}
+    catch(e){showToast('ÉCHEC de la sauvegarde : '+(e&&e.message||e));throw e;}
     showToast('Saved');
   }
   async function openPath(path){
@@ -118,6 +136,12 @@
     try{
       var json=await window.__TAURI__.fs.readTextFile(path);
       window.SM.importJSON(json,true);
+      // Re-export rather than keeping the file's own text: importJSON
+      // normalizes (fills defaults, pads frames), so the round-tripped
+      // form is what future exportJSON calls will actually produce —
+      // comparing against the raw file text would flag a just-opened
+      // untouched project as dirty forever.
+      try{markSaved(window.SM.exportJSON());}catch(e){}
       currentPath=path;currentName=baseName(path);updateCurrentLabel();
       touchRecent(path,currentName,{canvasW:state.canvasW,canvasH:state.canvasH,fps:state.fps});
       renderRecents();
@@ -316,7 +340,47 @@
     // feedback-bridge.js's local + shared feedback storage keys off, so a
     // feedback thread and this project's own history/sync folders always
     // agree on which project they belong to without re-deriving the logic.
-    getProjectKey:historyKey,profileDir:profileDir};
+    getProjectKey:historyKey,profileDir:profileDir,isDirty:isDirty,markSaved:function(){try{markSaved(window.SM.exportJSON());}catch(e){}}};
+
+  // ---- Close-with-unsaved-work guard ----
+  // Cmd+Q / window-close with unsaved changes asked NOTHING before this —
+  // up to 30s of work (the autosave cadence) vanished without a word, the
+  // single worst data-loss path left in the app. Desktop (Tauri): confirm
+  // dialog on close request, cancel keeps the app open. Browser preview:
+  // the standard beforeunload prompt.
+  (function initCloseGuard(){
+    // Baseline = whatever document is in memory at startup (the default
+    // blank one, or the nemo-auto session timeline.js quietly restored —
+    // that restore runs before this script loads, so it can't stamp
+    // markSaved itself). Without this, isDirty() stayed null-baselined
+    // (never dirty) until the first explicit save/open/new — leaving an
+    // auto-restored session entirely unguarded.
+    try{markSaved(window.SM.exportJSON());}catch(e){}
+    if(tauriOk()&&window.__TAURI__.window&&window.__TAURI__.window.getCurrentWindow){
+      try{
+        window.__TAURI__.window.getCurrentWindow().onCloseRequested(async function(event){
+          if(!isDirty())return; // clean → close proceeds normally
+          try{
+            var leave=await window.__TAURI__.dialog.ask(
+              'Des modifications non sauvegardées seront perdues. Quitter quand même ?',
+              {title:'Modifications non sauvegardées',kind:'warning',okLabel:'Quitter sans sauvegarder',cancelLabel:'Annuler'});
+            if(!leave)event.preventDefault();
+          }catch(e){
+            // dialog unavailable (permission/API) — err on the side of NOT
+            // losing work: block this close so the user can save manually.
+            event.preventDefault();
+            showToast('Modifications non sauvegardées — sauvegarde avant de quitter');
+          }
+        });
+      }catch(e){console.warn('[close-guard] indisponible',e);}
+    }else{
+      window.addEventListener('beforeunload',function(e){
+        if(!isDirty())return;
+        e.preventDefault();
+        e.returnValue=''; // required by Chrome to actually show the prompt
+      });
+    }
+  })();
 
   // ---- Project tabs (real multi-project switching, v11) ----
   // Each tab holds a full independent snapshot of a project as the SAME

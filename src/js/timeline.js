@@ -658,6 +658,15 @@ window.SM={
   },
   importJSON:function(json,silent){
     try{var d=JSON.parse(json);if(!d.layers&&!d.frames)throw new Error('Invalid');
+    // exportJSON stamps version:13 but nothing ever CHECKED it — a file
+    // written by a future format (version bumped for a breaking change)
+    // half-loaded silently, dropping whatever the old code didn't know
+    // about, and the user's next Save destroyed the original. Warn loudly
+    // instead; loading still proceeds (fields degrade to defaults) but the
+    // user knows an app update is needed and not to overwrite the file.
+    // NOT gated on `silent` — openPath passes silent=true (it shows its own
+    // "Opened" toast), and a data-integrity warning must never be muted.
+    if(d.version&&d.version>13)showToast('⚠ Fichier créé par une version plus récente de Nemo (format v'+d.version+') — mettre à jour l’app avant de re-sauvegarder ce fichier');
     if(!d.layers)d.layers=[{name:'Layer 1',visible:true,locked:false,frames:d.frames}];
     // Validate the FULL layer/frame structure BEFORE the teardown below —
     // the old shallow `!d.layers` check let a file that parses but is
