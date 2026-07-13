@@ -377,6 +377,26 @@ body.mac-overlay-titlebar #app{padding-top:28px;}
 .lrow.motion-disabled{cursor:not-allowed;opacity:.45;}
 .lrow.motion-disabled:hover{background:transparent;}
 body.mode-motion #layer-panel{width:260px;}
+/* Motion mode row height (feedback 2026-07: 34px — Animation 2D's default —
+   read as needlessly sparse once a layer's 5 Transform properties, its
+   Elements sub-list, and each element's own 5 properties all stack up).
+   22px MUST match motion.js's own `ROW_H` constant exactly (drives the
+   SVG connection-bar/keyframe positioning in trackRowHtml) — the two are
+   two different files that can't share a literal, so this comment is the
+   sync point; changing one without the other reintroduces the panel/grid
+   misalignment this was explicitly built to avoid. */
+body.mode-motion .lrow{height:22px;font-size:10.5px;}
+body.mode-motion .frow{height:22px;}
+body.mode-motion .fc{height:22px;}
+body.mode-motion .lico{width:16px;height:16px;}
+body.mode-motion .motion-key{width:7px;height:7px;}
+body.mode-motion .motion-key.cur{width:9px;height:9px;}
+body.mode-motion .larrow{font-size:10px;}
+/* Feedback: "la selection d'un calque peut mettre un liserais blanc autour
+   aussi" — a thin white outline in ADDITION to the existing left accent
+   bar, so the selected layer/element/property row reads clearly against
+   the now-colored in/out bars (layer-inout.js) sharing the same row. */
+body.mode-motion .lrow.act{box-shadow:inset 3px 0 0 #4E6FF2,inset 0 0 0 1px rgba(255,255,255,.35);}
 .lrow:hover{background:rgba(255,255,255,.03);}
 /* v4: matches the mockup's "Layer 1 Stroke" selected-row treatment — the
    tint and left accent bar span the FULL row (name column + frame-grid

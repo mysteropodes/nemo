@@ -609,7 +609,31 @@ function getLFSSubStrokes(ld,key,frameIdx){
 // caller — see CLAUDE.md's "family of bug #1" for why a single shared
 // chokepoint beats duplicating this check at every consumer.
 function layerInPoint(ld){return ld.inPoint||0;}
-function layerOutPoint(ld){return ld.outPoint!=null?ld.outPoint:state.totalFrames-1;}
+// When the user hasn't manually dragged an out point, default to where the
+// layer's own drawing actually stops (its last blank keyframe — F7,
+// insertBlankKeyframe — with no non-blank keyframe after it) instead of
+// always the full project length. Purely a DEFAULT/display value: content
+// past a blank keyframe was already invisible regardless (getEffectiveStrokes
+// naturally returns [] for that whole tail, held-frame inheritance included),
+// so this changes nothing about what renders — only what the layer-inout.js
+// bar honestly shows by default, so a layer that stops drawing at frame 40
+// doesn't visually claim to run the full timeline. A manually-dragged
+// ld.outPoint always wins over this once set.
+function autoOutPointFromBlankKeyframe(ld){
+  if(!ld||ld.symbolId)return null; // components have their own Frame/Speed/Offset timing model
+  var frames=ld.frames,lastNonBlank=-1,curBlank=true;
+  for(var f=0;f<frames.length;f++){
+    var fr=frames[f];
+    if(fr.isKeyframe)curBlank=!fr.strokes.length;
+    if(!curBlank)lastNonBlank=f;
+  }
+  return(lastNonBlank>=0&&lastNonBlank<frames.length-1)?lastNonBlank:null;
+}
+function layerOutPoint(ld){
+  if(ld.outPoint!=null)return ld.outPoint;
+  var auto=autoOutPointFromBlankKeyframe(ld);
+  return auto!=null?auto:state.totalFrames-1;
+}
 function getEffectiveStrokes(layerIdx,frameIdx){
   var ld=state.layers[layerIdx];if(!ld)return[];
   if((ld.inPoint||ld.outPoint!=null)&&(frameIdx<layerInPoint(ld)||frameIdx>layerOutPoint(ld)))return[];

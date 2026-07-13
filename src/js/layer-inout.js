@@ -10,17 +10,40 @@
 // collapsed layer row (motion.js) — a layer's visible range is a layer-
 // level concept, not specific to either timeline view.
 (function () {
-  function inPointOf(ld) { return ld.inPoint || 0; }
-  function outPointOf(ld) { return ld.outPoint != null ? ld.outPoint : state.totalFrames - 1; }
-  function hasCustomRange(ld) { return !!(ld.inPoint || ld.outPoint != null); }
+  // Delegates to the shared globals in app.js (layerInPoint/layerOutPoint) —
+  // layerOutPoint's own default now auto-detects a blank-keyframe tail
+  // (see its header comment there) instead of always the full timeline;
+  // keeping ONE definition avoids the two drifting apart.
+  function inPointOf(ld) { return window.layerInPoint ? layerInPoint(ld) : (ld.inPoint || 0); }
+  function outPointOf(ld) { return window.layerOutPoint ? layerOutPoint(ld) : (ld.outPoint != null ? ld.outPoint : state.totalFrames - 1); }
+  // A manually-dragged range OR an auto-detected blank-keyframe trim both
+  // count as "not full range" for styling — a naturally-shortened bar
+  // (layer stops drawing partway through) should read as visually distinct
+  // from the full-timeline default too, not just a manual drag.
+  function hasCustomRange(ld) { return !!(ld.inPoint || ld.outPoint != null || outPointOf(ld) < state.totalFrames - 1); }
 
+  // Skew Pro's own timeline (the reference screenshot) colors every layer
+  // bar with that layer's OWN assigned color, not one uniform accent tint —
+  // makes a busy timeline with many layers scannable at a glance. `ld.color`
+  // is already assigned to every layer at creation (app.js nextLayerColor).
+  function hexToRgba(hex, alpha) {
+    hex = (hex || '#3F6BF5').replace('#', '');
+    if (hex.length === 3) hex = hex.split('').map(function (c) { return c + c; }).join('');
+    var r = parseInt(hex.slice(0, 2), 16), g = parseInt(hex.slice(2, 4), 16), b = parseInt(hex.slice(4, 6), 16);
+    return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+  }
   function updateBar(row, li) {
     var ld = state.layers[li]; if (!ld) return;
     var bar = row.querySelector('.layer-inout-bar'); if (!bar) return;
     var inF = inPointOf(ld), outF = outPointOf(ld);
     bar.style.left = (inF * FC) + 'px';
     bar.style.width = Math.max(FC, (outF - inF + 1) * FC) + 'px';
-    bar.classList.toggle('full-range', !hasCustomRange(ld));
+    var custom = hasCustomRange(ld);
+    bar.classList.toggle('full-range', !custom);
+    bar.style.background = hexToRgba(ld.color, custom ? 0.55 : 0.3);
+    bar.style.borderColor = hexToRgba(ld.color, custom ? 0.95 : 0.55);
+    var handles = bar.querySelectorAll('.layer-inout-handle');
+    for (var h = 0; h < handles.length; h++) handles[h].style.background = ld.color || '';
     // Animation 2D's per-frame .fc cells (Motion mode's collapsed spacer row
     // has none — nothing to dim there, the bar alone is enough context).
     var cells = row.querySelectorAll('.fc');

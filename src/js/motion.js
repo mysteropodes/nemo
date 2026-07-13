@@ -33,6 +33,15 @@
   // translation. Order matters: it must sit right after 'position' so it
   // reads naturally in the panel (AE's own Position/Anchor Point ordering),
   // and R/S/P/T shortcuts (see PROP_SHORTCUT below) map to it as "A".
+  // Motion mode's own row height — deliberately shorter than Animation 2D's
+  // 34px .lrow/.frow default (5 properties × N elements adds up fast; a
+  // 34px-per-row list read as needlessly sparse). Scoped via body.mode-motion
+  // in CSS (style.css), but the SAME number drives every SVG-positioned
+  // element BELOW in JS (the connection-bar rect, keyframe-cell centering)
+  // so the two can never drift apart — the exact alignment bug class this
+  // constant exists to prevent (per explicit feedback: "fait attention au
+  // alignement des keyframes aux properties").
+  var ROW_H = 22;
   var PROPS = ['position', 'anchor', 'rotation', 'scale', 'opacity'];
   var PROP_LABEL = { position: 'Position', anchor: 'Anchor Point', rotation: 'Rotation', scale: 'Scale', opacity: 'Opacity' };
   var PROP_DIM = { position: 2, anchor: 2, rotation: 1, scale: 2, opacity: 1 };
@@ -704,7 +713,7 @@
     var track = ld.motion && ld.motion[prop];
     var w = state.totalFrames * FC;
     var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('width', w); svg.setAttribute('height', 34);
+    svg.setAttribute('width', w); svg.setAttribute('height', ROW_H);
     svg.style.cssText = 'position:absolute;left:0;top:0;pointer-events:none;';
     rowEl.appendChild(svg);
     if (track && track.keys.length) {
@@ -712,13 +721,14 @@
       // changes — AE-wishlist idea (sandervandijk.tv "Connection"/"Keyframe
       // Duration"): makes it obvious at a glance WHERE movement happens
       // instead of a row of identical-looking diamonds with no context.
+      var barH = Math.max(3, Math.round(ROW_H * 0.27)), barY = Math.round((ROW_H - barH) / 2);
       for (var i = 0; i < track.keys.length - 1; i++) {
         var a = track.keys[i], b = track.keys[i + 1];
         var changed = a.v.some(function (v, d) { return v !== b.v[d]; });
         if (!changed) continue;
         var rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-        rect.setAttribute('x', a.frame * FC + FC / 2); rect.setAttribute('y', 14);
-        rect.setAttribute('width', (b.frame - a.frame) * FC); rect.setAttribute('height', 6);
+        rect.setAttribute('x', a.frame * FC + FC / 2); rect.setAttribute('y', barY);
+        rect.setAttribute('width', (b.frame - a.frame) * FC); rect.setAttribute('height', barH);
         rect.setAttribute('fill', 'var(--accent)'); rect.setAttribute('opacity', '0.35');
         svg.appendChild(rect);
       }
