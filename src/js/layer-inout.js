@@ -125,22 +125,25 @@
   // Drag state is a single module-level singleton (same idiom as ui.js's
   // initWaDrag: window-level mousemove/mouseup, not a per-drag add/remove
   // pair) — only one bar (or group) can be dragged at a time anyway.
-  var _drag = null; // {li, row, type:'in'|'out'|'both', startX, origIn, origOut} | {group:true, startX, members:[{li,row,origIn,origOut}]}
+  var _drag = null; // {li, row, type:'in'|'out'|'both', startX, origIn, origOut} | {group:true, type:'in'|'out'|'both', startX, members:[{li,row,origIn,origOut}]}
   function onDown(li, row, type, e) {
     e.stopPropagation(); e.preventDefault();
     var ld = state.layers[li]; if (!ld) return;
     if (window.pushUndo) pushUndo(); // one undo step for the whole drag, not one per mousemove
-    // Grabbing the BODY of an already-selected bar (part of a multi-select)
-    // moves the whole group together; grabbing an edge handle always trims
-    // just that one bar, even inside a selection (matches motion.js's own
-    // keyframe group-drag: only a body/point drag groups, not a handle).
-    if (type === 'both' && isBarSelected(li) && _barSel.length > 1) {
+    // Grabbing ANY part of an already-selected bar (body OR an edge handle)
+    // moves/trims the whole group together — feedback: "je ne peux pas
+    // select les inpoint ou outpoint avec le rect de select + drag" (an
+    // earlier version restricted grouping to body-drags only, on the
+    // mistaken assumption edge handles should always stay single-bar; that
+    // was wrong, group-trimming in/out points together is exactly the
+    // point of the marquee select here).
+    if (isBarSelected(li) && _barSel.length > 1) {
       var members = _barSel.map(function (mli) {
         var mld = state.layers[mli], mrow = _liToRow[mli];
         if (!mld || !mrow) return null;
         return { li: mli, row: mrow, origIn: inPointOf(mld), origOut: outPointOf(mld) };
       }).filter(Boolean);
-      _drag = { group: true, startX: e.clientX, members: members };
+      _drag = { group: true, type: type, startX: e.clientX, members: members };
       return;
     }
     _drag = { li: li, row: row, type: type, startX: e.clientX, origIn: inPointOf(ld), origOut: outPointOf(ld) };

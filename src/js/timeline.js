@@ -1273,7 +1273,22 @@ function renderTimeline(){
   // Motion mode has its own row structure entirely (property tracks, not
   // per-layer frame cells) — same ruler above, different grid content
   // below. Early return, same pattern camera.js's own row already used.
-  if(state.appMode==='motion'){if(window.SMMotion)SMMotion.renderTimelineMotion(grid);return;}
+  // Bug found 2026-07 ("le curseur de temps ne fonctionne pas" in Motion):
+  // this early return skipped the #playhead left/height update below
+  // (line ~1338) entirely, so click/drag-to-scrub on #frame-hdr (ui.js)
+  // still moved state.currentFrame and the canvas correctly, but the
+  // visible playhead line in the timeline stayed frozen at its old spot.
+  // Motion's row structure varies (filtered properties, variable track
+  // counts) so there's no fixed rowCount formula to reuse — grid.scrollHeight
+  // reads the ACTUAL rendered content height after renderTimelineMotion
+  // populates it, which stays correct regardless of how many tracks render.
+  if(state.appMode==='motion'){
+    if(window.SMMotion)SMMotion.renderTimelineMotion(grid);
+    var mph=document.getElementById('playhead');
+    mph.style.left=(state.currentFrame*FC)+'px';
+    mph.style.height=grid.scrollHeight+'px';
+    return;
+  }
   if(window.SMCamera)SMCamera.renderGridRow(grid);
   // rows rendered top-to-bottom from the HIGHEST layer index — matching the
   // layer panel, which lists topmost (last-drawn-above) layers first. The
