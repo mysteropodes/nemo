@@ -85,6 +85,16 @@
     </div>
   </div>
 </div>
+<!-- macOS-only: with titleBarStyle "Overlay" (tauri.conf.json), the native
+     title bar becomes a transparent strip with the traffic lights floating
+     over our own content instead of a solid native bar — this reserves that
+     strip as a drag region (data-tauri-drag-region, same as clicking a
+     normal title bar drags the window) and hosts the update button right
+     next to the traffic lights. Hidden by default; #mac-chrome-init.js
+     class-gates it to macOS+Tauri only (no-op everywhere else, including
+     this browser preview). -->
+<div id="mac-titlebar-strip" data-tauri-drag-region></div>
+<button id="mac-update-btn" title=""></button>
 <div id="app">
 <!-- App-wide top bar (2026-07 redesign): burger menu (File/Edit-style
      actions, Rnote-inspired) on the left, app-mode segmented switcher to

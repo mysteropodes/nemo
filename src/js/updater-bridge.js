@@ -117,8 +117,71 @@
     if (btn) btn.disabled = false;
   }
 
+  // ---- macOS titlebar update button (2026-07) ----------------------------
+  // A persistent icon parked right next to the native traffic lights
+  // (tauri.conf.json's titleBarStyle:"Overlay" + trafficLightPosition —
+  // see #mac-titlebar-strip/#mac-update-btn in index.html) instead of the
+  // one-shot confirm() dialog: hidden while up to date, a download-arrow
+  // once an update is found (silent startup check populates this instead
+  // of interrupting with a dialog), a spinner while downloading, then a
+  // reopen-arrow once installed — click advances the state, matching the
+  // reference GIFs. macOS + Tauri only; a no-op (icon stays display:none
+  // from its own CSS) everywhere else, including this browser preview.
+  var ICON_DOWNLOAD = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12M6 12l6 6 6-6"/></svg>';
+  var ICON_REOPEN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v5h-5"/></svg>';
+  var ICON_SPINNER = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><circle cx="12" cy="12" r="9" stroke-opacity=".3"/><path d="M21 12a9 9 0 0 0-9-9"/></svg>';
+  var _macPendingUpdate = null;
+  function isMac() { return /Mac/i.test(navigator.platform || navigator.userAgent || ''); }
+  function macBtn() { return document.getElementById('mac-update-btn'); }
+  function macBtnSetState(state) {
+    var btn = macBtn();
+    if (!btn) return;
+    btn.className = state ? ('state-' + state) : '';
+    if (state === 'available') { btn.title = 'Update'; btn.innerHTML = ICON_DOWNLOAD; }
+    else if (state === 'downloading') { btn.title = ''; btn.innerHTML = ICON_SPINNER; }
+    else if (state === 'installed') { btn.title = 'Reopen'; btn.innerHTML = ICON_REOPEN; }
+    else { btn.title = ''; btn.innerHTML = ''; }
+  }
+  async function macBtnDownload() {
+    if (!_macPendingUpdate) return;
+    var update = _macPendingUpdate;
+    macBtnSetState('downloading');
+    try {
+      await update.downloadAndInstall(function () {}); // progress not surfaced on this compact icon — the Réglages panel's own status line (doInstall) already covers that for the manual-check flow
+      macBtnSetState('installed');
+      showToast('Mise à jour v' + update.version + ' installée');
+    } catch (e) {
+      console.warn('[updater] mac titlebar install failed', e);
+      macBtnSetState('available'); // let them retry rather than getting stuck on a dead spinner
+      showToast('Échec de l\'installation — ' + (e && e.message ? e.message : e));
+    }
+  }
+  function initMacUpdateButton() {
+    if (!isMac() || !tauriOk()) return; // stays display:none — see CSS
+    document.body.classList.add('mac-overlay-titlebar');
+    var btn = macBtn();
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      if (btn.classList.contains('state-available')) macBtnDownload();
+      else if (btn.classList.contains('state-installed')) { if (window.__TAURI__.process) window.__TAURI__.process.relaunch(); }
+    });
+  }
+  // Silent check populates the titlebar icon instead of interrupting with
+  // checkForUpdate's confirm() dialog — the explicit "Vérifier les mises à
+  // jour" button in Réglages (and the app-menu item) keep that dialog,
+  // since clicking either one already IS the explicit "yes I want to know
+  // now" action a dialog makes sense for.
+  async function macSilentCheck() {
+    if (!isMac() || !tauriOk()) return;
+    try {
+      var update = await window.__TAURI__.updater.check();
+      if (update) { _macPendingUpdate = update; macBtnSetState('available'); }
+    } catch (e) { console.warn('[updater] mac silent check failed', e); }
+  }
+
   function init() {
     showVersion();
+    initMacUpdateButton();
     var btn = document.getElementById('app-check-update');
     if (btn) btn.addEventListener('click', function () { checkForUpdate(false); });
     // "Vérifier les mises à jour…" in the Nemo app menu (top-left,
@@ -129,8 +192,10 @@
       window.__TAURI__.event.listen('menu-check-update', function () { checkForUpdate(false); });
     }
     // Silent startup check, a few seconds in so it never competes with the
-    // app's own initial layout/engine-init work for the first paint.
-    if (tauriOk()) setTimeout(function () { checkForUpdate(true); }, 4000);
+    // app's own initial layout/engine-init work for the first paint. On
+    // macOS this populates the titlebar icon (macSilentCheck) instead of
+    // the dialog-based checkForUpdate(true) used on other platforms.
+    if (tauriOk()) setTimeout(function () { if (isMac()) macSilentCheck(); else checkForUpdate(true); }, 4000);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
