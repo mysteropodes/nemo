@@ -1555,6 +1555,25 @@ document.getElementById('tl-content').addEventListener('mousedown',function(e){
   if(_layerSel.length){_layerSel=[];renderLayerList();}
 });
 
+// Keeps _layerSel (the panel's batch-operation selection — now also what
+// F5/F6 target, see app.js) in lockstep with whichever layer(s) actually
+// have a selected frame cell right now. Without this, clicking a keyframe
+// in Layer 2 right after Layer 1 left Layer 1's row STILL showing selected
+// (reported: "si je select une keyframe dans layer 1 et après select une
+// autre keyframe dans layer 2 sans shift alors le layer 1 reste select") —
+// _layerSel was only ever written by an explicit layer-PANEL row click,
+// never by clicking a frame cell, so a stale panel selection from earlier
+// silently outlived it and (now that F5/F6 read _layerSel) could target
+// the wrong layer entirely. Recomputed as the exact set of layers spanned
+// by _sel.frames, so a plain click collapses to just that one layer, a
+// shift-range or ctrl-toggle spanning several layers targets exactly those.
+function syncLayerSelFromFrameSel(){
+  var layers=[];
+  _sel.frames.forEach(function(s){if(layers.indexOf(s.layer)<0)layers.push(s.layer);});
+  layers.sort(function(a,b){return a-b;});
+  _layerSel=layers;
+  renderLayerList();
+}
 document.getElementById('frame-grid').addEventListener('mousedown',function(e){
   if(e.button!==0)return;
   var cell=e.target.closest('.fc');if(!cell)return;
@@ -1562,12 +1581,12 @@ document.getElementById('frame-grid').addEventListener('mousedown',function(e){
   if(state.playing)stopPlay();
 
   if(e.shiftKey){
-    selRange(li,fi);selApplyCSS();
+    selRange(li,fi);selApplyCSS();syncLayerSelFromFrameSel();
     if(li!==state.activeLayerIdx)window.SM.setActiveLayer(li);
     goToFrame(fi);return;
   }
   if(e.metaKey||e.ctrlKey){
-    selToggle(li,fi);selApplyCSS();
+    selToggle(li,fi);selApplyCSS();syncLayerSelFromFrameSel();
     if(li!==state.activeLayerIdx)window.SM.setActiveLayer(li);
     goToFrame(fi);return;
   }
@@ -1579,7 +1598,7 @@ document.getElementById('frame-grid').addEventListener('mousedown',function(e){
   // when the user only meant to select it.
   var wasSelected=selHas(li,fi);
 
-  if(!wasSelected){selClear();selAdd(li,fi);selApplyCSS();}
+  if(!wasSelected){selClear();selAdd(li,fi);selApplyCSS();syncLayerSelFromFrameSel();}
 
   if(li!==state.activeLayerIdx)window.SM.setActiveLayer(li);
   goToFrame(fi);
