@@ -278,6 +278,7 @@ window.SM={
   setPressureMin:function(v){state.pressureMin=Math.max(0,Math.min(100,parseInt(v)||0));},
   setPressureMax:function(v){state.pressureMax=Math.max(50,Math.min(300,parseInt(v)||170));},
   setPressureInvert:function(v){state.pressureInvert=!!v;},
+  setPressureCurve:function(v){state.pressureCurve=['linear','sqrt','cbrt','pow2','pow3'].indexOf(v)>=0?v:'linear';},
   setOpacity:function(v){state.opacity=parseInt(v);
     // Unlike setFillColor/setStrokeColor right above, this never applied to
     // the current selection — only ever wrote the tool-default opacity for
@@ -3186,6 +3187,7 @@ if(window.BrushPresetPicker)window.BrushPresetPicker.paintButton(state.brushPres
 document.getElementById('p-drawmode').addEventListener('change',function(){window.SM.setDrawMode(this.value);});
 document.getElementById('p-pmin').addEventListener('input',function(){window.SM.setPressureMin(this.value);});
 document.getElementById('p-pmax').addEventListener('input',function(){window.SM.setPressureMax(this.value);});
+var _pcurveSel=document.getElementById('p-pcurve');if(_pcurveSel)_pcurveSel.addEventListener('change',function(){window.SM.setPressureCurve(this.value);});
 document.getElementById('p-pinv').addEventListener('change',function(){window.SM.setPressureInvert(this.checked);});
 document.getElementById('p-taper').addEventListener('change',function(){window.SM.setTaperEnds(this.checked);});
 document.getElementById('p-shadowmode').addEventListener('change',function(){window.SM.setShadowMode(this.checked);});

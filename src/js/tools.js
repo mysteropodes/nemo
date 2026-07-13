@@ -1747,6 +1747,11 @@ var BRUSH_PRESETS={
   'ink-splatter':    {nibSize:1.4,roundness:1,  spacing:1.1,spaceJitter:.6, rotationMode:'random',rotationJitter:180,sizeJitter:.7, opacity:.75,opacityJitter:.2, scatter:.5, dashGap:.1, tipShape:'splatter',edgeNoise:.08},
   'drybrush-bristle':{nibSize:2.2,roundness:1,  spacing:.35,spaceJitter:.15,rotationMode:'tangent',rotationJitter:12, sizeJitter:.3, opacity:.55,opacityJitter:.3, scatter:.6, dashGap:0, tipShape:'bristle',bristleCount:7},
   'watercolor-edge': {nibSize:2.6,roundness:.7, spacing:.5, spaceJitter:.2, rotationMode:'random',rotationJitter:60, sizeJitter:.35,opacity:.22,opacityJitter:.3, scatter:.3, dashGap:0, tipShape:'ellipse',edgeNoise:.25},
+  // Cross-width distribution presets (scatterDistribution, ported from
+  // rnote's TexturedDotsDistribution — see sampleAcrossWidth above).
+  // Existing presets keep their historical 'uniform' spread untouched.
+  'airbrush-soft':   {nibSize:.9, roundness:1,  spacing:.3, spaceJitter:.3, rotationMode:'random',rotationJitter:180,sizeJitter:.4, opacity:.18,opacityJitter:.3, scatter:1.6,dashGap:0, scatterDistribution:'normal'},
+  'marker-dry':      {nibSize:1.1,roundness:.6, spacing:.35,spaceJitter:.2, rotationMode:'tangent',rotationJitter:12, sizeJitter:.25,opacity:.5, opacityJitter:.25,scatter:.5, dashGap:0, scatterDistribution:'edge'},
 };
 // Hard ceiling on dabs per stroke, regardless of preset/length — protects
 // against a very long stroke with tight spacing multiplying scene-
@@ -1861,6 +1866,39 @@ function buildDabShape(w,h,preset,rand){
 // branch in draw-bridge.js). Omitting widthProfile reproduces the exact
 // prior constant-width behavior bit-for-bit — every existing (non-
 // pressure) caller is unaffected.
+// Cross-width placement distribution (ported from rnote's
+// TexturedDotsDistribution — style/textured/textureddotsdistribution.rs):
+// where a dab lands ACROSS the stroke, as a factor in [-1,1] of the scatter
+// range. This is what separates "confetti" from "matter": 'uniform' (the
+// historical behavior) spreads evenly; 'normal' concentrates toward the
+// centerline (felt-tip / airbrush core); 'edge' pushes density toward the
+// two borders (dry marker whose ink pools at the edges); 'center' is a
+// sharper exponential falloff from the centerline than 'normal' (soft
+// airbrush halo). Out-of-range samples re-roll as uniform, same clipping
+// strategy rnote uses.
+function sampleAcrossWidth(rand,distribution){
+  var u=rand()*2-1; // uniform in [-1,1]
+  switch(distribution){
+    case 'normal':{
+      // Box-Muller; std-dev 1/3 of the half-range so ±3σ spans the range,
+      // same σ choice as rnote's Normal branch.
+      var u1=Math.max(1e-12,rand()),u2=rand();
+      var n=Math.sqrt(-2*Math.log(u1))*Math.cos(2*Math.PI*u2)/3;
+      return (n>=-1&&n<=1)?n:u;
+    }
+    case 'center':{
+      var e=-Math.log(Math.max(1e-12,rand()))/4; // Exp(λ=1), scaled by the same 1/4 width factor as rnote
+      var s=(rand()<.5?-1:1)*e;
+      return (s>=-1&&s<=1)?s:u;
+    }
+    case 'edge':{
+      var e2=-Math.log(Math.max(1e-12,rand()))/4;
+      var s2=rand()<.5?(-1+e2):(1-e2); // start AT an edge, decay inward
+      return (s2>=-1&&s2<=1)?s2:u;
+    }
+    default:return u; // 'uniform' — exact historical behavior
+  }
+}
 function buildBrushDabs(pathLike,preset,baseWidth,rng,widthProfile){
   var rand=rng||Math.random;
   var len=pathLike.length;
@@ -1933,7 +1971,7 @@ function buildBrushDabs(pathLike,preset,baseWidth,rng,widthProfile){
           dabs.push(dab);
         }
       }else{
-        var scatterAmt=(rand()*2-1)*nibDiam*(preset.scatter||0);
+        var scatterAmt=sampleAcrossWidth(rand,preset.scatterDistribution)*nibDiam*(preset.scatter||0);
         var center2=pt.add(normal.multiply(scatterAmt));
         var sizeMul2=1+(rand()*2-1)*(preset.sizeJitter||0);
         var w2=Math.max(.3,nibDiam*sizeMul2);
@@ -2795,8 +2833,26 @@ function vbPressureOf(event){
 // the user's pressure range (min% at zero pressure → max% at full), with an
 // optional inversion (hard press = thin line — Callipeg/Sketchbook both
 // offer this for inking styles where light touches carry the weight).
+// Pressure response curve (ported from rnote's PressureCurve — style/mod.rs):
+// remaps raw pressure BEFORE the min/max range mapping. sqrt/cbrt make a
+// light touch already read wide ("soft" felt-tip feel), pow2/pow3 demand a
+// firm press before the line thickens ("hard" pencil feel). 'linear' is
+// exactly the historical behavior. Shared by BOTH width pipelines —
+// widthFor (draw-bridge.js, Rust-engine path) and vbWidthFor below (legacy
+// Paper.js path) — per this file's own duplication-hazard convention.
+function applyPressureCurve(p){
+  switch(state.pressureCurve){
+    case 'sqrt':return Math.sqrt(p);
+    case 'cbrt':return Math.cbrt(p);
+    case 'pow2':return p*p;
+    case 'pow3':return p*p*p;
+    default:return p; // 'linear'
+  }
+}
+window.applyPressureCurve=applyPressureCurve;
 function vbWidthFor(p){
   if(state.pressureInvert)p=1-p;
+  p=applyPressureCurve(p);
   var lo=state.pressureMin/100,hi=state.pressureMax/100;
   return state.brushSize*(lo+(hi-lo)*p);
 }

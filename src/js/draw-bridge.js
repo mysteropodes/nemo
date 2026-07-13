@@ -154,6 +154,10 @@
   }
   function widthFor(p) {
     if (state.pressureInvert) p = 1 - p;
+    // Response curve BEFORE the range mapping — same order as vbWidthFor
+    // (tools.js), where the shared applyPressureCurve is defined; the two
+    // pipelines must stay in phase (duplication-hazard convention).
+    if (window.applyPressureCurve) p = window.applyPressureCurve(p);
     var lo = state.pressureMin / 100, hi = state.pressureMax / 100;
     // Fill Brush gets its own base size — it was silently sharing
     // state.brushSize with the Draw tool (and, one panel field further,

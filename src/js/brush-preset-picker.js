@@ -86,6 +86,7 @@
       { label: 'Charcoal', keys: ['charcoal-feather', 'charcoal-pencil', 'charcoal-rough', 'charcoal-rounded', 'charcoal-smooth', 'charcoal-soft', 'charcoal-tapered', 'charcoal-thick', 'charcoal-thin', 'charcoal-varied'] },
       { label: 'Pencil', keys: ['pencil-feather', 'pencil-thick', 'pencil-thin'] },
       { label: 'Formes de pointe', keys: ['marker-flat', 'ink-chisel', 'pastel-chip', 'chalk-facet', 'ink-splatter', 'drybrush-bristle', 'watercolor-edge'] },
+      { label: 'Distribution (rnote)', keys: ['airbrush-soft', 'marker-dry'] },
     ];
   }
   function customKeys() {

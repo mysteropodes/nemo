@@ -84,7 +84,7 @@ var state={
   smoothing:10,stabilizer:2,strokeCap:'round',strokeJoin:'round',opacity:100,
   miterLimit:10,dashOffset:0,paintOrder:'fillFirst',
   strokeStyle:'solid',vectorBrush:false,taperEnds:false,
-  drawMode:'front',fillBrushMode:'below',pressureMin:30,pressureMax:170,pressureInvert:false,
+  drawMode:'front',fillBrushMode:'below',pressureMin:30,pressureMax:170,pressureInvert:false,pressureCurve:'linear',
   // eraseAtPoint() already does a REAL vector boolean subtract (Paper.js
   // .subtract() / Rust erase_at_point), not item.remove() — verified by
   // reading it end to end. The "gomme supprime des objets entiers" report
