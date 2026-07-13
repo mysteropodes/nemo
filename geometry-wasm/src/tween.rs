@@ -87,6 +87,22 @@ fn pick_color(a: &Option<[u8; 4]>, b: &Option<[u8; 4]>, et: f64) -> Option<[u8; 
     }
 }
 
+// NOT a safe drop-in for JS's current interpStroke (tweens.js) — this port
+// predates two behaviors JS has since grown:
+//   1. Per-pair similarity-transform rotation/scale blending (tweens.js
+//      interpStroke, the fitSimilarityTransform + thetaT/scaleT/thetaB/
+//      scaleB block) — gives a swinging arm/turning wheel real rotation
+//      instead of every point sliding straight toward its counterpart.
+//      fit_similarity_transform already exists in tweenmatch.rs (used by
+//      auto_match's own "force line" pass) but is never called from here.
+//   2. Vector-brush (pressure ribbon) width-profile interpolation +
+//      outline reconstruction (tweens.js interpStroke's isVectorBrush
+//      branch, outlineFromCenterSegs) — entirely absent below.
+// Wiring GeometryWasm.interp_stroke into JS as-is would silently drop both:
+// every rotating tween would go back to warping/flattening through its own
+// center, and every pressure-brush tween would lose its width profile. Do
+// NOT wire this in without porting both first — verified unused as of the
+// 2026-07-13 optimization pass (grep across src/js/*.js found zero callers).
 #[wasm_bindgen]
 pub fn interp_stroke(json: &str) -> Result<String, JsValue> {
     let input: InterpInput = serde_json::from_str(json).map_err(|e| JsValue::from_str(&e.to_string()))?;
