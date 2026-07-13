@@ -770,6 +770,16 @@ body.mode-motion #layer-panel{width:260px;}
 /* Drag-and-drop import hover feedback (drop-import.js) */
 #canvas-area.drop-hover,#timeline-area.drop-hover{outline:2px dashed var(--accent);outline-offset:-2px;}
 
+/* Media Library (media-library.js, v1 2026-07) */
+.media-drop{margin:0 8px 6px;padding:10px 8px;border:1px dashed var(--border2);border-radius:6px;font-size:9.5px;color:var(--text-dim);text-align:center;cursor:default;}
+.media-drop.drop-hover{border-color:var(--accent);color:var(--text);background:var(--accent-dim);}
+.media-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:0 8px 8px;}
+.media-item{position:relative;border-radius:6px;overflow:hidden;background:var(--panel3);cursor:pointer;aspect-ratio:1;display:flex;align-items:flex-end;}
+.media-item:hover{box-shadow:0 0 0 1px var(--accent);}
+.media-item img{width:100%;height:100%;object-fit:cover;position:absolute;top:0;left:0;}
+.media-item-name{position:relative;width:100%;padding:3px 4px;font-size:8.5px;color:#fff;background:linear-gradient(transparent,rgba(0,0,0,.75));overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.media-item-badge{position:absolute;top:3px;right:3px;width:14px;height:14px;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;font-size:7px;display:flex;align-items:center;justify-content:center;}
+
 /* Transform anchor-point picker (redesign 2026-07-09) */
 .xform-anchor-grid{width:56px;height:56px;flex:none;position:relative;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);border:1px solid var(--border2);border-radius:4px;margin-top:2px;}
 .xa-dot{width:100%;height:100%;border:none;background:transparent;padding:0;margin:0;cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative;}

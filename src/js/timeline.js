@@ -595,6 +595,7 @@ window.SM={
       // are live runtime objects that must never hit JSON
       audioTracks:(state.audioTracks||[]).map(function(t){return{name:t.name,dataB64:t.dataB64,offsetFrames:t.offsetFrames||0,volume:t.volume!==undefined?t.volume:1,muted:!!t.muted};}),
       refMedia:state.refMedia?{type:state.refMedia.type,name:state.refMedia.name,src:state.refMedia.src,frames:state.refMedia.frames,opacity:state.refMedia.opacity,visible:state.refMedia.visible,offsetFrames:state.refMedia.offsetFrames||0}:null,
+      mediaLibrary:(state.mediaLibrary||[]).map(function(m){return{id:m.id,name:m.name,kind:m.kind,thumb:m.thumb,layerName:m.layerName};}),
       perspectiveEnabled:state.perspectiveEnabled,perspectiveMode:state.perspectiveMode,perspectiveDensity:state.perspectiveDensity,perspectiveVPs:state.perspectiveVPs,
       motionArcs:state.motionArcs,easingCurve:state.easingCurve,resamplePts:state.resamplePts,tweenStep:state.tweenStep,
       tweenOverrides:state.tweenOverrides,comments:state.comments||[],
@@ -733,6 +734,8 @@ window.SM={
     if(window.SMAudio)SMAudio.reload();
     state.refMedia=d.refMedia||null;
     if(window.SMReference)SMReference.reload();
+    state.mediaLibrary=d.mediaLibrary||[];
+    if(window.SMMediaLibrary)SMMediaLibrary.reload();
     state.perspectiveEnabled=d.perspectiveEnabled||false;state.perspectiveMode=d.perspectiveMode||'2pt';state.perspectiveDensity=d.perspectiveDensity||24;state.perspectiveVPs=d.perspectiveVPs||null;
     var perspOnCb=document.getElementById('p-persp-on');if(perspOnCb)perspOnCb.checked=state.perspectiveEnabled;
     var perspModeSel=document.getElementById('p-persp-mode');if(perspModeSel)perspModeSel.value=state.perspectiveMode;

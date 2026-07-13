@@ -462,6 +462,17 @@
         <div class="pr" style="font-size:9px;color:var(--text-dim)">S'affiche sous le dessin, suit la frame courante (vidéo/séquence). Jamais exportée.</div>
       </div>
     </div>
+    <div class="psec" id="media-sec">
+      <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrMedia">Médias</span></div>
+      <div class="pbdy">
+        <div class="pr" style="gap:4px">
+          <button class="pbtn" id="btn-media-import-img" style="flex:1">Image(s)…</button>
+          <button class="pbtn" id="btn-media-import-video" style="flex:1">Vidéo…</button>
+        </div>
+        <div id="media-drop" class="media-drop">Glisser des images/vidéos ici, ou cliquer Importer…</div>
+        <div id="media-grid" class="media-grid"></div>
+      </div>
+    </div>
     <div class="psec" id="tween-sec">
       <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrTween">Tween</span></div>
       <div class="pbdy">
@@ -948,6 +959,7 @@
 <script src="js/updater-bridge.js"></script>
 <script src="js/kitsu.js"></script>
 <script src="js/images.js"></script>
+<script src="js/media-library.js"></script>
 <script type="module" src="js/geometry-wasm-loader.js"></script>
 <script src="js/engine-bridge.js"></script>
 <script src="js/perspective-bridge.js"></script>

@@ -142,6 +142,7 @@ var state={
   xformAnchorKey:'mc', // rotate/scale pivot preset (9-dot widget) — tl/tc/tr/ml/mc/mr/bl/bc/br, see tools.js xformAnchorPoint
   xformAnchorCustom:null, // [x,y] world-space override from Alt+click (select-bridge.js) — takes priority over xformAnchorKey when set
   refMedia:null, // rotoscopy reference {type:'video'|'imageseq'|'image',...} — reference-bridge.js
+  mediaLibrary:[], // {id,name,kind:'image'|'video',thumb,layerName} — browsable catalog of imports, media-library.js
   symbols:{},activeSymbolId:null,openSymbolTabs:[],
   // Layer folders: purely organizational metadata, not a real tree — each
   // layer optionally carries ld.folderId pointing into this map. Keeping

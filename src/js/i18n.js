@@ -41,7 +41,7 @@
       toolHand:'Hand',toolZoom:'Zoom',toolRotate:'Rotate canvas',toolPerspective:'Perspective',
       hdrRevision:'Revision',hdrCamera:'Camera',hdrFill:'Fill',hdrStroke:'Stroke',hdrToolOptions:'Tool Options',
       hdrEffects:'Effects',hdrLayer:'Layer',hdrDocument:'Document',hdrSwatches:'Swatches',hdrPerspective:'Perspective Guide',
-      hdrReference:'Reference (roto)',hdrTween:'Tween',hdrEasingCurve:'Easing Curve',hdrComponentInstance:'Component Instance',hdrProject:'Project',
+      hdrReference:'Reference (roto)',hdrMedia:'Media',hdrTween:'Tween',hdrEasingCurve:'Easing Curve',hdrComponentInstance:'Component Instance',hdrProject:'Project',
     },
     fr:{
       settingsTitle:'Réglages',
@@ -70,7 +70,7 @@
       toolHand:'Main',toolZoom:'Zoom',toolRotate:'Rotation du canevas',toolPerspective:'Perspective',
       hdrRevision:'Révision',hdrCamera:'Caméra',hdrFill:'Fond',hdrStroke:'Trait',hdrToolOptions:'Options de l\'outil',
       hdrEffects:'Effets',hdrLayer:'Calque',hdrDocument:'Document',hdrSwatches:'Nuancier',hdrPerspective:'Guide de perspective',
-      hdrReference:'Référence (roto)',hdrTween:'Interpolation',hdrEasingCurve:'Courbe d\'accélération',hdrComponentInstance:'Instance de composant',hdrProject:'Projet',
+      hdrReference:'Référence (roto)',hdrMedia:'Médias',hdrTween:'Interpolation',hdrEasingCurve:'Courbe d\'accélération',hdrComponentInstance:'Instance de composant',hdrProject:'Projet',
     },
     ja:{
       settingsTitle:'設定',
@@ -99,7 +99,7 @@
       toolHand:'手のひら',toolZoom:'ズーム',toolRotate:'キャンバス回転',toolPerspective:'パース',
       hdrRevision:'修正',hdrCamera:'カメラ',hdrFill:'塗り',hdrStroke:'線',hdrToolOptions:'ツールオプション',
       hdrEffects:'エフェクト',hdrLayer:'レイヤー',hdrDocument:'ドキュメント',hdrSwatches:'スウォッチ',hdrPerspective:'パースガイド',
-      hdrReference:'参照（ロト）',hdrTween:'トゥイーン',hdrEasingCurve:'イージングカーブ',hdrComponentInstance:'コンポーネントインスタンス',hdrProject:'プロジェクト',
+      hdrReference:'参照（ロト）',hdrMedia:'メディア',hdrTween:'トゥイーン',hdrEasingCurve:'イージングカーブ',hdrComponentInstance:'コンポーネントインスタンス',hdrProject:'プロジェクト',
     },
     es:{
       settingsTitle:'Ajustes',
@@ -128,7 +128,7 @@
       toolHand:'Mano',toolZoom:'Zoom',toolRotate:'Rotar lienzo',toolPerspective:'Perspectiva',
       hdrRevision:'Revisión',hdrCamera:'Cámara',hdrFill:'Relleno',hdrStroke:'Trazo',hdrToolOptions:'Opciones de herramienta',
       hdrEffects:'Efectos',hdrLayer:'Capa',hdrDocument:'Documento',hdrSwatches:'Muestras',hdrPerspective:'Guía de perspectiva',
-      hdrReference:'Referencia (roto)',hdrTween:'Interpolación',hdrEasingCurve:'Curva de aceleración',hdrComponentInstance:'Instancia de componente',hdrProject:'Proyecto',
+      hdrReference:'Referencia (roto)',hdrMedia:'Medios',hdrTween:'Interpolación',hdrEasingCurve:'Curva de aceleración',hdrComponentInstance:'Instancia de componente',hdrProject:'Proyecto',
     },
   };
   var LANGS=['en','fr','ja','es'];

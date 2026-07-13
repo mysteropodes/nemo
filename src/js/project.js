@@ -57,6 +57,7 @@
     state.perspectiveEnabled=false;state.perspectiveMode='2pt';state.perspectiveDensity=24;state.perspectiveVPs=null;
     state.audioTracks=[];if(window.SMAudio)SMAudio.reload();
     state.refMedia=null;if(window.SMReference)SMReference.reload();
+    state.mediaLibrary=[];if(window.SMMediaLibrary)SMMediaLibrary.reload();
     state.layerFolders={};state.layerLinkGroups={};
     state.cameraKeys=[];state.cameraLayerOn=false;state.cameraView=false;
     createUserLayer('Layer 1');activateUL(0);

@@ -2,7 +2,13 @@
 (function(){
   function tauriOk(){return typeof window.__TAURI__!=='undefined';}
   function extOf(name){var m=/\.([^.]+)$/.exec(name);return m?m[1].toLowerCase():'';}
-  function mimeOf(ext){return{png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',gif:'image/gif',webp:'image/webp',bmp:'image/bmp'}[ext]||'image/png';}
+  // svg/avif added (2026-07, user request "gestion de tout format image") —
+  // both decode natively via plain <img> in every Tauri webview target
+  // (WebKit/macOS, WebView2/Windows), so no new decode code, just widening
+  // the filter. heic/tiff deliberately excluded: WebKit has no reliable
+  // native <img> decode for either (would silently fail via naturalSize's
+  // onerror -> 1x1 fallback, worse than just not offering them).
+  function mimeOf(ext){return{png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',gif:'image/gif',webp:'image/webp',bmp:'image/bmp',svg:'image/svg+xml',avif:'image/avif'}[ext]||'image/png';}
   function baseName(path){var parts=path.split(/[\\/]/);return parts[parts.length-1];}
 
   function bytesToBase64(bytes){
@@ -70,6 +76,7 @@
     while(frames.length<state.totalFrames)frames.push({strokes:[],isKeyframe:false,isInterpolated:false});
     state.layers[idx].frames=frames;
     activateUL(idx);loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
+    if(window.SMMediaLibrary)SMMediaLibrary.addEntry(state.layers[idx].name,'image',frames[0].strokes[0].src,state.layers[idx].name);
     showToast('Séquence importée: '+items.length+' images sur le calque "'+prefix+'"');
   }
 
@@ -86,6 +93,7 @@
       var fit=fitSize(nat.w,nat.h);
       var offset=i*24;
       ld.frames[state.currentFrame].strokes.push({isRaster:true,src:dataUrl,x:state.canvasW/2+offset,y:state.canvasH/2+offset,width:fit.w,height:fit.h,opacity:1});
+      if(window.SMMediaLibrary)SMMediaLibrary.addEntry(baseName(paths[i]),'image',dataUrl,ld.name);
     }
     loadFrame(state.currentFrame);updateUI();
     showToast(paths.length>1?paths.length+' images importées':'Image importée');
@@ -93,7 +101,7 @@
 
   async function importImages(){
     if(!tauriOk()){document.getElementById('image-input').click();return;}
-    var paths=await window.__TAURI__.dialog.open({title:'Import Image(s)',multiple:true,filters:[{name:'Images',extensions:['png','jpg','jpeg','gif','webp','bmp']}]});
+    var paths=await window.__TAURI__.dialog.open({title:'Import Image(s)',multiple:true,filters:[{name:'Images',extensions:['png','jpg','jpeg','gif','webp','bmp','svg','avif']}]});
     if(!paths)return;
     paths=Array.isArray(paths)?paths:[paths];
     var seq=paths.length>=2?detectSequence(paths):{isSeq:false};
@@ -108,8 +116,14 @@
   function fileToDataUrl(file){
     return new Promise(function(resolve){var r=new FileReader();r.onload=function(){resolve(r.result);};r.readAsDataURL(file);});
   }
-  document.getElementById('image-input').addEventListener('change',async function(e){
-    var files=Array.prototype.slice.call(e.target.files);e.target.value='';
+  // Factored out of the <input> change handler (below) so media-library.js's
+  // OS drag-and-drop zone — which only ever has real `File` objects, never
+  // filesystem paths — can feed the exact same import logic instead of
+  // duplicating it a third time (Tauri-path importImages/importStandalone
+  // above is the second copy; CLAUDE.md's "avoid duplicating a whole
+  // pipeline" applies here even though this codebase already tolerates a
+  // couple of small JS/Rust math pairs staying separate).
+  async function importImageFiles(files){
     if(!files.length)return;
     var names=files.map(function(f){return f.name;});
     var seq=files.length>=2?detectSequence(names):{isSeq:false};
@@ -128,6 +142,7 @@
       while(frames.length<state.totalFrames)frames.push({strokes:[],isKeyframe:false,isInterpolated:false});
       state.layers[idx].frames=frames;
       activateUL(idx);loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
+      if(window.SMMediaLibrary)SMMediaLibrary.addEntry(state.layers[idx].name,'image',frames[0].strokes[0].src,state.layers[idx].name);
       showToast('Séquence importée: '+seq.items.length+' images');
     }else{
       saveAllLayerFrames();pushUndoLayers();
@@ -141,10 +156,15 @@
         var n=await naturalSize(du);var ft=fitSize(n.w,n.h);
         var off=j*24;
         ld.frames[state.currentFrame].strokes.push({isRaster:true,src:du,x:state.canvasW/2+off,y:state.canvasH/2+off,width:ft.w,height:ft.h,opacity:1});
+        if(window.SMMediaLibrary)SMMediaLibrary.addEntry(files[j].name,'image',du,ld.name);
       }
       loadFrame(state.currentFrame);updateUI();
       showToast(files.length>1?files.length+' images importées':'Image importée');
     }
+  }
+  document.getElementById('image-input').addEventListener('change',function(e){
+    var files=Array.prototype.slice.call(e.target.files);e.target.value='';
+    importImageFiles(files);
   });
 
   document.getElementById('btn-import-img').addEventListener('click',importImages);
@@ -240,33 +260,48 @@
     // like the user expects "comme un symbole", with no new per-item type
     // or extra consumer to keep in sync (CLAUDE.md §1's actual cost of a
     // bespoke video-layer type, avoided entirely).
+    var firstFrameThumb=(frames.filter(function(f){return f.strokes.length;})[0]||{}).strokes;
+    firstFrameThumb=firstFrameThumb&&firstFrameThumb[0]&&firstFrameThumb[0].src;
     convertLayerToComponent(idx);
+    if(window.SMMediaLibrary&&firstFrameThumb)SMMediaLibrary.addEntry(state.layers[idx].name,'video',firstFrameThumb,state.layers[idx].name);
     showToast('Vidéo importée : '+frames.filter(function(f){return f.strokes.length;}).length+' images sur le calque "'+prefix+'"');
   }
-  async function importVideo(){
-    if(!tauriOk()){document.getElementById('video-input').click();return;}
-    var path=await window.__TAURI__.dialog.open({title:'Import Video',multiple:false,filters:[{name:'Videos',extensions:['mp4','mov','webm','m4v']}]});
-    if(!path)return;
-    showToast('Décodage de la vidéo…');
-    var bytes=await window.__TAURI__.fs.readFile(path);
-    var ext=extOf(path);
-    var mime={mp4:'video/mp4',mov:'video/quicktime',webm:'video/webm',m4v:'video/mp4'}[ext]||'video/mp4';
-    var blobUrl=URL.createObjectURL(new Blob([bytes],{type:mime}));
-    try{
-      var frames=await decodeVideoFrames(blobUrl);
-      await importVideoFrames(frames,baseName(path).replace(/\.[^.]+$/,''));
-    }finally{URL.revokeObjectURL(blobUrl);}
-  }
-  document.getElementById('video-input')&&document.getElementById('video-input').addEventListener('change',async function(e){
-    var file=e.target.files[0];e.target.value='';if(!file)return;
+  async function importVideoFile(file){
     showToast('Décodage de la vidéo…');
     var blobUrl=URL.createObjectURL(file);
     try{
       var frames=await decodeVideoFrames(blobUrl);
       await importVideoFrames(frames,file.name.replace(/\.[^.]+$/,''));
     }finally{URL.revokeObjectURL(blobUrl);}
+  }
+  async function importVideo(){
+    if(!tauriOk()){document.getElementById('video-input').click();return;}
+    // ogv added (2026-07) — Ogg Theora decodes natively via <video> in every
+    // Tauri webview target, same reasoning as svg/avif above for images.
+    // mkv/avi deliberately excluded: neither WebKit nor WebView2 decode
+    // those containers/codecs natively without extra OS codec packs, so
+    // offering them would produce a silent "video decode failed" far more
+    // often than not — a real fix would mean piping decode through the
+    // ffmpeg sidecar (already bundled for export, see export.js) instead of
+    // relying on <video>, which is out of scope for this pass.
+    var path=await window.__TAURI__.dialog.open({title:'Import Video',multiple:false,filters:[{name:'Videos',extensions:['mp4','mov','webm','m4v','ogv']}]});
+    if(!path)return;
+    showToast('Décodage de la vidéo…');
+    var bytes=await window.__TAURI__.fs.readFile(path);
+    var ext=extOf(path);
+    var mime={mp4:'video/mp4',mov:'video/quicktime',webm:'video/webm',m4v:'video/mp4',ogv:'video/ogg'}[ext]||'video/mp4';
+    var blobUrl=URL.createObjectURL(new Blob([bytes],{type:mime}));
+    try{
+      var frames=await decodeVideoFrames(blobUrl);
+      await importVideoFrames(frames,baseName(path).replace(/\.[^.]+$/,''));
+    }finally{URL.revokeObjectURL(blobUrl);}
+  }
+  document.getElementById('video-input')&&document.getElementById('video-input').addEventListener('change',function(e){
+    var file=e.target.files[0];e.target.value='';if(!file)return;
+    importVideoFile(file);
   });
   document.getElementById('btn-import-video')&&document.getElementById('btn-import-video').addEventListener('click',importVideo);
 
   window.SM=window.SM||{};window.SM.importImages=importImages;window.SM.importVideo=importVideo;
+  window.SM.importImageFiles=importImageFiles;window.SM.importVideoFile=importVideoFile;
 })();
