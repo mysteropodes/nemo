@@ -1,12 +1,21 @@
 [package]
-name = "strokemotion"
-version = "0.4.0"
+name = "nemo"
+version = "0.5.0"
 description = "2D frame-by-frame vector animation with auto inbetweening"
 authors = ["Cyril"]
 edition = "2021"
 
 [lib]
-name = "strokemotion_lib"
+# Renamed from strokemotion/strokemotion_lib (2026-07, rebrand) — this is
+# what actually shows in Activity Monitor / `ps aux` / crash reports, unlike
+# tauri.conf.json's productName ("Nemo", already renamed) which only
+# controls the .app bundle's display name. `identifier`
+# ("com.strokemotion.app") and the strokemotion-updates/strokemotion-feedback
+# GitHub repo names are deliberately NOT touched here — those are real
+# external resources (repo names, macOS bundle identity tied to
+# auto-update continuity for existing installs), a separate decision from
+# this cosmetic binary-name fix.
+name = "nemo_lib"
 crate-type = ["lib", "cdylib", "staticlib"]
 
 [build-dependencies]
