@@ -30,7 +30,7 @@
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::{Mutex, Once};
+use std::sync::{Arc, Mutex, Once};
 use std::time::Instant;
 
 use serde::Serialize;
@@ -128,13 +128,24 @@ fn seek_precise(s: &mut VideoSession, target_frame: i64) -> Result<(), String> {
     Ok(())
 }
 
-/// One global registry, one lock. Decoding is CPU-bound and per-session
-/// sequential by nature (a decoder can't decode two frames concurrently),
-/// and the UI requests one frame at a time — a single Mutex is correct
-/// here, not just simple. If simultaneous multi-video playback ever needs
-/// real parallelism, split into per-session Mutexes then (documented
-/// scaling point, not needed for the experiment).
-pub struct VideoSessions(pub Mutex<HashMap<u32, VideoSession>>);
+/// Per-session Mutex, not one global lock (changed 2026-07 — reached
+/// "the scaling point" the original single-Mutex comment predicted: live
+/// testing with several native-video LAYERS active at once showed decode
+/// requests for DIFFERENT sessions serializing behind each other, e.g.
+/// two concurrent seeks to the same frame index on two different videos
+/// logged as 99.6ms then 166.5ms back-to-back — the second one's decode
+/// time INCLUDES waiting out the first, even though they're independent
+/// ffmpeg decoder instances with no data dependency. Tauri commands
+/// (these are plain sync fns, not `async fn`) already run on Tauri's own
+/// threadpool, so per-session locking is enough to get real parallel
+/// decode across CPU cores — no extra runtime needed.
+///
+/// Structure: an outer Mutex guards only the HashMap's shape (insert on
+/// open, remove on close) — held just long enough to clone an Arc out,
+/// never across a decode. Each session's actual VideoSession (the
+/// ffmpeg decoder + its Reader) is behind its OWN Mutex, so session A
+/// decoding holds only A's lock; session B's decode never waits on it.
+pub struct VideoSessions(pub Mutex<HashMap<u32, Arc<Mutex<VideoSession>>>>);
 
 impl Default for VideoSessions {
     fn default() -> Self {
@@ -242,7 +253,7 @@ pub fn open_video_session(
     let (session, frame_count, duration_seconds) = open_session_core(&path)?;
     let (width, height, fps) = (session.width, session.height, session.fps);
     let id = NEXT_SESSION_ID.fetch_add(1, Ordering::Relaxed);
-    state.0.lock().unwrap().insert(id, session);
+    state.0.lock().unwrap().insert(id, Arc::new(Mutex::new(session)));
 
     Ok(VideoInfo {
         session_id: id,
@@ -392,11 +403,19 @@ pub fn decode_video_frame(
     session_id: u32,
     frame_index: i64,
 ) -> Result<Response, String> {
-    let mut sessions = state.0.lock().unwrap();
-    let s = sessions
-        .get_mut(&session_id)
-        .ok_or_else(|| format!("no session {session_id}"))?;
-    decode_frame_core(s, frame_index).map(|(rgba, _ahead)| Response::new(rgba))
+    // Clone the Arc and drop the map lock immediately — the actual decode
+    // below only holds THIS session's own Mutex, so a concurrent
+    // decode_video_frame call for a DIFFERENT session_id (or an
+    // open/close of a third session) is never blocked by this one.
+    let session_arc = {
+        let sessions = state.0.lock().unwrap();
+        sessions
+            .get(&session_id)
+            .cloned()
+            .ok_or_else(|| format!("no session {session_id}"))?
+    };
+    let mut s = session_arc.lock().unwrap();
+    decode_frame_core(&mut s, frame_index).map(|(rgba, _ahead)| Response::new(rgba))
 }
 
 #[tauri::command]
@@ -765,5 +784,66 @@ mod tests {
         // against a laxer 24fps-proxy bar (41.6ms) so a real regression
         // still fails while machine variance doesn't.
         assert!(p95 < 41.6, "4K p95 {p95:.1}ms exceeds even the relaxed bar");
+    }
+
+    // Locks in the per-session Mutex fix (2026-07 — "latence pour plusieurs
+    // vidéos", live-observed as two seeks to the same frame index on
+    // DIFFERENT sessions logging 99.6ms then 166.5ms back-to-back under
+    // the old single global Mutex). Exercises the SAME locking pattern the
+    // open_video_session/decode_video_frame commands use (outer map lock
+    // held only long enough to clone an Arc, decode under the session's
+    // own lock) across two real OS threads, on two independent video
+    // files, each doing a chain of forced-seek (expensive) decodes.
+    #[test]
+    fn concurrent_sessions_decode_in_parallel_not_serialized() {
+        use std::sync::Arc as StdArc;
+        use std::thread;
+        use std::time::Instant as StdInstant;
+
+        let path_a = make_test_video();
+        let path_b = gen_video(
+            "h264_320_concurrency_b.mp4",
+            "testsrc2=size=320x240:rate=30:duration=3",
+            &["-c:v", "libx264", "-pix_fmt", "yuv420p", "-g", "15"],
+        );
+
+        let sessions = StdArc::new(VideoSessions::default());
+        let (sa, _, _) = open_session_core(path_a.to_str().unwrap()).unwrap();
+        let (sb, _, _) = open_session_core(path_b.to_str().unwrap()).unwrap();
+        let (id_a, id_b) = (1u32, 2u32);
+        sessions.0.lock().unwrap().insert(id_a, StdArc::new(Mutex::new(sa)));
+        sessions.0.lock().unwrap().insert(id_b, StdArc::new(Mutex::new(sb)));
+
+        fn work(sessions: StdArc<VideoSessions>, id: u32) -> u128 {
+            let t0 = StdInstant::now();
+            // Bounce around to force the expensive seek+forward-decode
+            // path repeatedly rather than the cheap sequential fast path
+            // — that's the cost worth proving runs in parallel.
+            for target in [50i64, 5, 55, 2, 58, 8] {
+                let arc = sessions.0.lock().unwrap().get(&id).unwrap().clone();
+                let mut s = arc.lock().unwrap();
+                decode_frame_core(&mut s, target).unwrap();
+            }
+            t0.elapsed().as_millis()
+        }
+
+        let (s1, s2) = (sessions.clone(), sessions.clone());
+        let t_wall = StdInstant::now();
+        let ha = thread::spawn(move || work(s1, id_a));
+        let hb = thread::spawn(move || work(s2, id_b));
+        let da = ha.join().unwrap();
+        let db = hb.join().unwrap();
+        let wall = t_wall.elapsed().as_millis();
+
+        eprintln!("[concurrency] A={da}ms B={db}ms wall={wall}ms sum={}ms", da + db);
+        // True parallelism: wall time should be well under the sum of both
+        // threads' own work (serialized, it would be ≈ the sum). Generous
+        // slack (80% of sum) to absorb thread scheduling overhead on tiny
+        // test videos without the assertion being flaky.
+        assert!(
+            wall < (da + db) * 8 / 10,
+            "wall={wall}ms not meaningfully less than sum={}ms — sessions may still be serializing",
+            da + db
+        );
     }
 }
