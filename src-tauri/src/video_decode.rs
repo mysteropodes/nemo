@@ -77,7 +77,23 @@ pub struct VideoSession {
     /// open_session_core) — used to clamp requests, AE-style: scrubbing
     /// to/past the last frame holds the last frame, never errors.
     frame_count: i64,
+    /// Recently-decoded frame cache, most-recent-first (2026-07 —
+    /// "encore des latences" with several long-GOP video layers: each
+    /// seek costs a keyframe-seek + forward-decode of up to one GOP,
+    /// live-measured at 70-200ms on real footage with GOP~30-45, and
+    /// scrubbing back and forth over a small range (extremely common in
+    /// rotoscopy work) kept RE-PAYING that cost for frames already
+    /// decoded moments earlier). Bounded by BYTES, not frame count —
+    /// frame size varies 8x between 1080p and 4K, so a fixed frame-count
+    /// cap would either waste memory at 1080p or starve at 4K.
+    cache: std::collections::VecDeque<(i64, Vec<u8>)>,
 }
+
+/// ~8 frames of 1080p (66MB) or ~2 frames of 4K (66MB) per session — small
+/// enough that a handful of simultaneous video layers stays well under
+/// typical available RAM, large enough to cover the short back-and-forth
+/// scrub range animators actually use when checking a few frames of motion.
+const FRAME_CACHE_BUDGET_BYTES: usize = 66 * 1024 * 1024;
 
 /// The packet pump video_rs::Decoder::decode_raw does internally, rebuilt
 /// over the split parts (same read → decode → drain-at-EOF sequence,
@@ -239,6 +255,7 @@ fn open_session_core(path: &str) -> Result<(VideoSession, u64, f64), String> {
             tb,
             next_frame: 0,
             frame_count: frame_count as i64,
+            cache: std::collections::VecDeque::new(),
         },
         frame_count,
         duration_seconds,
@@ -278,6 +295,19 @@ fn decode_frame_core(s: &mut VideoSession, frame_index: i64) -> Result<(Vec<u8>,
     // container duration (see open_session_core), which may round one
     // frame past what the stream actually contains.
     let frame_index = frame_index.clamp(0, (s.frame_count - 1).max(0));
+
+    // Recently-decoded cache hit: skip seek+decode+convert entirely. Found
+    // via linear scan (small deque, a handful of entries — a HashMap here
+    // would cost more to maintain than it saves). Promote to front (LRU).
+    if let Some(pos) = s.cache.iter().position(|(idx, _)| *idx == frame_index) {
+        let (_, bytes) = s.cache.remove(pos).unwrap();
+        let out = bytes.clone();
+        s.cache.push_front((frame_index, bytes));
+        s.next_frame = frame_index + 1; // keep the sequential fast path consistent for the NEXT request
+        eprintln!("[video-decode] frame={frame_index} CACHE HIT (skipped seek+decode)");
+        return Ok((out, 0));
+    }
+
     let tb = s.tb;
 
     // Tail robustness (caught live 2026-07, "decode: stream exhausted"
@@ -381,6 +411,19 @@ fn decode_frame_core(s: &mut VideoSession, frame_index: i64) -> Result<(Vec<u8>,
     }
 
     s.next_frame = frame_index + 1;
+
+    // Populate the cache with what we just paid to decode — push front
+    // (most recent), evict from the back while over budget. A single
+    // frame larger than the whole budget (huge resolution) is still kept
+    // (evicting everything else) rather than refusing to cache it; the
+    // sequential fast path is unaffected either way.
+    s.cache.push_front((frame_index, rgba.clone()));
+    let mut total: usize = s.cache.iter().map(|(_, b)| b.len()).sum();
+    while total > FRAME_CACHE_BUDGET_BYTES && s.cache.len() > 1 {
+        if let Some((_, evicted)) = s.cache.pop_back() {
+            total -= evicted.len();
+        }
+    }
 
     let convert_ms = t0.elapsed().as_secs_f64() * 1000.0 - decode_ms;
     // Timing to stderr (visible in `tauri dev` console) — cheap, honest
@@ -784,6 +827,44 @@ mod tests {
         // against a laxer 24fps-proxy bar (41.6ms) so a real regression
         // still fails while machine variance doesn't.
         assert!(p95 < 41.6, "4K p95 {p95:.1}ms exceeds even the relaxed bar");
+    }
+
+    // Locks in the recently-decoded frame cache (2026-07 — "encore des
+    // latences" with several long-GOP videos: real footage measured
+    // GOP~30-45, each seek costing 70-200ms, and animators scrubbing back
+    // and forth over a short range kept re-paying that cost for frames
+    // decoded moments earlier). A large-GOP file forces every fresh seek
+    // to be expensive (bigger walk = bigger `backoff` retries elsewhere,
+    // but here just gop-1 frames of legitimate work) — revisiting one
+    // should be near-instant instead.
+    #[test]
+    fn revisited_frame_is_cache_accelerated_and_byte_identical() {
+        let p = gen_video(
+            "h264_320_biggop.mp4",
+            "testsrc2=size=320x240:rate=30:duration=3",
+            &["-c:v", "libx264", "-pix_fmt", "yuv420p", "-g", "60"], // large GOP, like real footage
+        );
+        let (mut s, _frame_count, _) = open_session_core(p.to_str().unwrap()).unwrap();
+
+        let target = 45i64; // forces a real seek+forward-walk on this GOP-60 file
+        let t0 = Instant::now();
+        let (first, ahead) = decode_frame_core(&mut s, target).unwrap();
+        let cold_ms = t0.elapsed().as_secs_f64() * 1000.0;
+        assert!(ahead > 0, "target should have required a real seek+walk to set up this test");
+
+        // Simulate scrub-away-then-back: decode a different frame, then
+        // request the ORIGINAL target again — must hit the cache.
+        decode_frame_core(&mut s, 10).unwrap();
+        let t1 = Instant::now();
+        let (second, ahead2) = decode_frame_core(&mut s, target).unwrap();
+        let warm_ms = t1.elapsed().as_secs_f64() * 1000.0;
+
+        assert_eq!(first, second, "cached frame bytes diverged from the original decode");
+        assert_eq!(ahead2, 0, "cache hit should report zero seek-walk");
+        assert!(
+            warm_ms < cold_ms / 2.0,
+            "cache hit ({warm_ms:.2}ms) not meaningfully faster than the cold decode ({cold_ms:.2}ms)"
+        );
     }
 
     // Locks in the per-session Mutex fix (2026-07 — "latence pour plusieurs
