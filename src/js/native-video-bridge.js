@@ -105,13 +105,18 @@
     }
     out.randomSeekMs = stats(rndTimes);
 
-    // Phase 3 — full pipeline: decode + IPC + GPU texture upload + render
+    // Phase 3 — full pipeline: decode + IPC + GPU texture upload + render.
+    // Uses renderImageOnly (not renderNow) to match the production path
+    // (_layerFrameSync/_refSync below) — it reuses the cached scene JSON
+    // instead of rebuilding it, which is the whole point of that fix; a
+    // bench that measured the old renderNow() cost here would no longer
+    // reflect what playback/scrub actually pays.
     var fullTimes = [];
     var canRender = !!(window.SMEngineBridge && SMEngineBridge.isEnabled && SMEngineBridge.isEnabled());
     for (var f = 0; f < Math.min(30, maxSeq); f++) {
       t = performance.now();
       await registerFrame('bench:video', info.session_id, f);
-      if (canRender) SMEngineBridge.renderNow();
+      if (canRender) SMEngineBridge.renderImageOnly();
       fullTimes.push(performance.now() - t);
     }
     out.fullPipelineMs = stats(fullTimes);
@@ -155,7 +160,11 @@
       var px = await frameBytes(r._sessionId, clamped);
       if (window.SMEngineBridge) SMEngineBridge.registerImageRaw('ref:native', px, s.width, s.height);
       window._sceneVersion++;
-      if (window.SMEngineBridge && SMEngineBridge.isEnabled()) SMEngineBridge.renderNow();
+      // renderImageOnly, not renderNow: the scene JSON's reference item
+      // still just points at 'ref:native' by id — only the bytes behind
+      // that id changed, so reuse the cached JSON instead of re-walking
+      // every Paper.js item just to produce byte-identical text.
+      if (window.SMEngineBridge && SMEngineBridge.isEnabled()) SMEngineBridge.renderImageOnly();
     } catch (e) {
       console.error('[native-video] refSync failed:', e);
     } finally {
@@ -200,6 +209,17 @@
   function _targetFor(nv, frame) {
     return Math.max(0, Math.min(nv.frameCount - 1, frame - (nv.offsetFrames || 0)));
   }
+  // renderImageOnly reuses the cached scene JSON verbatim — safe ONLY when
+  // this layer's image rect (x/y/width/height in buildSceneJson) can't have
+  // changed since that JSON was built. A Motion-keyed layer's rect moves
+  // every frame (position/scale animation on the video — see
+  // engine-bridge.js's nvMat handling), so reusing stale JSON there would
+  // freeze the video at its LAST rendered position/scale while only its
+  // pixels kept updating. Falls back to a full renderNow() for those.
+  function _canFastRender(li) {
+    var ld = state.layers[li];
+    return !(ld && ld.motion && Object.keys(ld.motion).length);
+  }
   function _prefetch(li, frame) {
     var st = _syncState(li);
     var ld = state.layers[li];
@@ -222,14 +242,22 @@
       var target = _targetFor(nv, frame);
       if (target === st.lastShown) return; // frame unchanged — loadFrame ran for an unrelated reason
       // SYNC fast path: the prefetched frame is exactly the one needed —
-      // upload inside this very loadFrame turn; the engine's own upcoming
-      // render (from the _sceneVersion bump loadFrame already did) shows
-      // it with no extra render and no decode wait.
+      // upload inside this very loadFrame turn, no decode wait. Must call
+      // renderImageOnly() explicitly (NOT rely on tick()'s own dirty-check
+      // loop): the scene JSON's image item only carries the id string
+      // 'nv:<li>', never the frame's actual bytes, so it's byte-identical
+      // before and after this update — tick()'s string-diff would see
+      // "no change" and skip rendering entirely, leaving the new frame's
+      // pixels sitting unrendered in the engine's image cache (found live
+      // testing: video appeared to freeze/skip on this exact path).
       if (st.cache && st.cache.frame === target) {
         if (window.SMEngineBridge) SMEngineBridge.registerImageRaw('nv:' + li, st.cache.px, nv.width, nv.height);
         st.cache = null;
         st.lastShown = target;
         _prefetch(li, target + 1);
+        if (window.SMEngineBridge && SMEngineBridge.isEnabled()) {
+          if (_canFastRender(li)) SMEngineBridge.renderImageOnly(); else SMEngineBridge.renderNow();
+        }
         return;
       }
     }
@@ -257,7 +285,9 @@
       if (window.SMEngineBridge) SMEngineBridge.registerImageRaw('nv:' + li, px, nv.width, nv.height);
       st.lastShown = target;
       window._sceneVersion++;
-      if (window.SMEngineBridge && SMEngineBridge.isEnabled()) SMEngineBridge.renderNow();
+      if (window.SMEngineBridge && SMEngineBridge.isEnabled()) {
+        if (_canFastRender(li)) SMEngineBridge.renderImageOnly(); else SMEngineBridge.renderNow();
+      }
       _prefetch(li, target + 1);
     } catch (e) {
       console.error('[native-video] layer ' + li + ' sync failed:', e);

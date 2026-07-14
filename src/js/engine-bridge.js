@@ -1189,6 +1189,33 @@
     lastSceneJson = json;
     window.__lastSceneJson = json;
     engine.render(json);
+    lastSceneVersion = window._sceneVersion; // tick() must not redo this render on the next rAF
+  }
+
+  // For native video LAYERS/reference only (native-video-bridge.js):
+  // registering fresh pixels under a STABLE image id ('nv:<i>' or
+  // 'ref:native') changes what's on screen WITHOUT changing the scene
+  // JSON one byte — the JSON only carries the id string. Two problems
+  // this caused before this function existed:
+  //   1. tick()'s own dirty-check string-diffs the rebuilt JSON against
+  //      lastSceneJson and finds NO difference for a video-only frame
+  //      change, so it SKIPS engine.render() entirely — the new pixels
+  //      sit in the Rust-side image HashMap but the canvas never redraws
+  //      them until some unrelated real scene edit finally forces a
+  //      render. This is why video frames sometimes appeared to freeze.
+  //   2. Calling the general renderNow() to work around that pays for a
+  //      full buildSceneJson() walk of every Paper.js item on every
+  //      layer, every video frame (30x/s) — pure waste when the item
+  //      list provably didn't change.
+  // Fix: skip buildSceneJson() entirely, reuse the last built JSON
+  // verbatim, and render unconditionally (bytes changed even though the
+  // JSON string didn't) — then sync tick()'s own version bookkeeping so
+  // it doesn't redundantly rebuild+diff on the very next rAF.
+  function renderImageOnly() {
+    if (!engine) return;
+    if (!lastSceneJson) { renderNow(); return; } // nothing built yet — first frame
+    engine.render(lastSceneJson);
+    lastSceneVersion = window._sceneVersion;
   }
 
   window.SMEngineBridge = {
@@ -1197,6 +1224,7 @@
     screenToWorld: screenToWorld,
     renderWithOverlayItem: renderWithOverlayItem,
     renderNow: renderNow,
+    renderImageOnly: renderImageOnly,
     setEraserCursor: setEraserCursor,
     setPressureCursor: setPressureCursor,
     setPenPreview: setPenPreview,
