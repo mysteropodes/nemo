@@ -273,8 +273,20 @@
       var nv = ld.nativeVideo;
       // Lazy (re)open from the persisted path — first frame after an
       // import OR after a project load lands here without a session.
+      // Prefer the optimized (all-intra) copy when one was produced; if
+      // the OS purged it from the temp cache, fall back to the original
+      // and let _optimizeLayerMedia regenerate it in the background.
       if (!ld._nvSessionId) {
-        var info = await open(nv.path);
+        var info = null;
+        if (nv.optimizedPath) {
+          try { info = await open(nv.optimizedPath); }
+          catch (e) { nv.optimizedPath = null; }
+        }
+        if (!info) {
+          info = await open(nv.path);
+          nv.codec = info.codec || nv.codec || '';
+          _optimizeLayerMedia(li); // no-op if already all-intra or in flight
+        }
         ld._nvSessionId = info.session_id; // runtime-only (not in exportJSON's layer whitelist)
         nv.frameCount = Number(info.frame_count);
         nv.width = info.width; nv.height = info.height; nv.fps = info.fps;
@@ -297,6 +309,60 @@
     }
   }
 
+  // ---- optimized media (the DaVinci Resolve pattern) ----
+  // Long-GOP sources (H.264/HEVC/VP9…) make every seek cost a keyframe
+  // jump + up-to-a-GOP of forward decode (70-200ms measured on real
+  // footage). The pros don't out-engineer that — they transcode AWAY from
+  // it: a one-time background conversion to all-intra MJPEG, where every
+  // frame is independently decodable, makes seek cost = one frame decode
+  // (~3-5ms) STRUCTURALLY. The original file stays untouched (and stays
+  // the layer's persisted source of truth); the optimized copy lives in a
+  // temp cache keyed by (path, size, mtime) and is re-created on demand
+  // if the OS purges it. Codecs that are already all-intra skip this.
+  var ALL_INTRA = { prores: 1, mjpeg: 1, dnxhd: 1, rawvideo: 1, qtrle: 1, huffyuv: 1, ffv1: 1, png: 1, v210: 1 };
+  var _optimizing = {}; // source path -> true while a transcode runs
+  function _isAllIntra(codec) {
+    if (!codec) return false;
+    for (var k in ALL_INTRA) if (codec.indexOf(k) !== -1) return true;
+    return false;
+  }
+  async function _optimizeLayerMedia(li) {
+    var ld = state.layers[li];
+    if (!ld || !ld.nativeVideo) return;
+    var nv = ld.nativeVideo;
+    if (nv.optimizedPath || _isAllIntra(nv.codec) || _optimizing[nv.path]) return;
+    _optimizing[nv.path] = true;
+    try {
+      var res = await invoke('optimized_media_target', { path: nv.path });
+      var target = res[0], exists = res[1];
+      if (!exists) {
+        // MJPEG -q:v 3: all-intra, near-visually-lossless for interaction,
+        // very fast to encode AND decode; -an drops audio (the layer's
+        // audio, when it exists, still comes from the original source).
+        var code = await invoke('run_ffmpeg', { args: ['-y', '-i', nv.path, '-c:v', 'mjpeg', '-q:v', '3', '-an', target] });
+        if (code !== 0) throw new Error('transcode exit ' + code);
+      }
+      // Swap the live session to the optimized copy. Guard against the
+      // layer having been deleted/replaced during the transcode.
+      ld = state.layers[li];
+      if (!ld || !ld.nativeVideo || ld.nativeVideo.path !== nv.path) return;
+      var info = await open(target);
+      var oldSession = ld._nvSessionId;
+      ld._nvSessionId = info.session_id;
+      nv.optimizedPath = target; // persisted (nativeVideo is whitelisted wholesale)
+      var st = _syncState(li);
+      st.cache = null; // cached bytes came from the old decode — refresh
+      st.lastShown = -1;
+      if (oldSession) close(oldSession).catch(function () {});
+      if (window.showToast) showToast('Média optimisé : ' + (nv.path.split('/').pop()) + ' — scrub instantané');
+      if (window.loadFrame) loadFrame(state.currentFrame);
+    } catch (e) {
+      console.warn('[native-video] optimization skipped for ' + nv.path + ':', e && e.message || e);
+    } finally {
+      delete _optimizing[nv.path];
+    }
+  }
+
   // Instant import: opens a session and creates a nativeVideo layer —
   // called by images.js's Vidéo… button (Tauri path) on this branch.
   // Returns the layer index. A small canvas-drawn thumbnail of frame 0
@@ -316,8 +382,12 @@
       width: info.width,
       height: info.height,
       offsetFrames: 0,
+      codec: info.codec || '',
     };
     ld._nvSessionId = info.session_id;
+    // Fire-and-forget: transcode long-GOP sources to all-intra in the
+    // background and swap the session when ready — import stays instant.
+    _optimizeLayerMedia(idx);
     if (Number(info.frame_count) > state.totalFrames && window.SM && SM.setTotalFrames) SM.setTotalFrames(Number(info.frame_count));
     // thumbnail for the Médias panel
     try {

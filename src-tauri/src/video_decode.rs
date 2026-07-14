@@ -87,6 +87,68 @@ pub struct VideoSession {
     /// frame size varies 8x between 1080p and 4K, so a fixed frame-count
     /// cap would either waste memory at 1080p or starve at 4K.
     cache: std::collections::VecDeque<(i64, Vec<u8>)>,
+    /// Readahead thread state (2026-07, the mpv pattern: decode runs on a
+    /// dedicated thread ahead of the playhead, never on the request path).
+    /// `readahead_goal` is the exclusive frame index the thread decodes
+    /// toward; each UI request pushes it forward, so during playback the
+    /// thread stays a few frames ahead and every UI request is a cache hit.
+    readahead_active: bool,
+    readahead_goal: i64,
+    /// Source codec name (lowercase, e.g. "h264", "prores") — lets the JS
+    /// side decide whether background media optimization (transcode to
+    /// all-intra) is worth it: ProRes/MJPEG-family sources already have
+    /// every frame independently decodable.
+    codec: String,
+}
+
+/// How far past the last requested frame the readahead thread decodes.
+/// 8 matches the 1080p capacity of FRAME_CACHE_BUDGET_BYTES; on 4K the
+/// byte-bounded eviction simply keeps fewer of them — the depth constant
+/// doesn't need to know the resolution.
+const READAHEAD_DEPTH: i64 = 8;
+
+/// Decode forward on a dedicated thread until the session's cache holds
+/// everything up to `readahead_goal` (or EOF/error). One frame per lock
+/// acquisition — the UI's own decode_video_frame call waits at most ONE
+/// frame decode (~4ms @1080p) to grab the session, never the whole burst;
+/// that bounded contention is the price of the mpv-style always-warm cache.
+/// If a thread is already running for this session, the goal is simply
+/// extended — at most one readahead thread per session, ever.
+fn spawn_readahead(arc: Arc<Mutex<VideoSession>>, goal: i64) {
+    {
+        let mut s = arc.lock().unwrap();
+        // LATEST request wins, not the max: after a backward scrub the old
+        // (far-ahead) goal must be abandoned, or the thread would keep
+        // decoding dozens of frames toward a position the user just left.
+        // If the new goal is already behind the decoder (backward jump),
+        // the loop's `pos >= goal` check stops the thread naturally.
+        s.readahead_goal = goal.min(s.frame_count);
+        if s.readahead_active {
+            return; // running thread picks up the updated goal
+        }
+        s.readahead_active = true;
+    }
+    std::thread::spawn(move || {
+        loop {
+            let mut s = arc.lock().unwrap();
+            if !s.readahead_active {
+                break; // session closing asked us to stop
+            }
+            let pos = s.next_frame;
+            if pos >= s.readahead_goal.min(s.frame_count) {
+                s.readahead_active = false;
+                break;
+            }
+            // decode_at (not decode_frame_core): must advance the decoder
+            // even if this index is already cached — see decode_at's doc.
+            if decode_at(&mut s, pos).is_err() {
+                s.readahead_active = false;
+                break; // EOF/decode error — stop quietly, UI path reports its own errors
+            }
+            drop(s); // release between frames so a UI request can interleave
+            std::thread::yield_now();
+        }
+    });
 }
 
 /// ~8 frames of 1080p (66MB) or ~2 frames of 4K (66MB) per session — small
@@ -177,6 +239,7 @@ pub struct VideoInfo {
     pub fps: f64,
     pub frame_count: u64,
     pub duration_seconds: f64,
+    pub codec: String,
 }
 
 // Core open logic, tauri-free so `cargo test` can exercise it directly
@@ -243,6 +306,11 @@ fn open_session_core(path: &str) -> Result<(VideoSession, u64, f64), String> {
     let time_base = decoder.time_base();
     let tb = time_base.numerator() as f64 / time_base.denominator() as f64;
     let (split, reader, stream_index) = decoder.into_parts();
+    let codec = reader
+        .input
+        .stream(stream_index)
+        .map(|st| format!("{:?}", st.parameters().id()).to_lowercase())
+        .unwrap_or_default();
 
     Ok((
         VideoSession {
@@ -256,6 +324,9 @@ fn open_session_core(path: &str) -> Result<(VideoSession, u64, f64), String> {
             next_frame: 0,
             frame_count: frame_count as i64,
             cache: std::collections::VecDeque::new(),
+            readahead_active: false,
+            readahead_goal: 0,
+            codec,
         },
         frame_count,
         duration_seconds,
@@ -269,6 +340,7 @@ pub fn open_video_session(
 ) -> Result<VideoInfo, String> {
     let (session, frame_count, duration_seconds) = open_session_core(&path)?;
     let (width, height, fps) = (session.width, session.height, session.fps);
+    let codec = session.codec.clone();
     let id = NEXT_SESSION_ID.fetch_add(1, Ordering::Relaxed);
     state.0.lock().unwrap().insert(id, Arc::new(Mutex::new(session)));
 
@@ -279,6 +351,7 @@ pub fn open_video_session(
         fps,
         frame_count,
         duration_seconds,
+        codec,
     })
 }
 
@@ -288,7 +361,6 @@ pub fn open_video_session(
 // sequential fast path) — asserted against the GOP size in tests since
 // bounding that walk is the whole point of seek_precise.
 fn decode_frame_core(s: &mut VideoSession, frame_index: i64) -> Result<(Vec<u8>, u32), String> {
-    let t0 = Instant::now();
     // Clamp to the stream's real range, AE-style: scrubbing to (or past)
     // the last frame HOLDS the last frame instead of erroring. Also
     // protects the post-seek loop below — frame_count can be derived from
@@ -303,11 +375,31 @@ fn decode_frame_core(s: &mut VideoSession, frame_index: i64) -> Result<(Vec<u8>,
         let (_, bytes) = s.cache.remove(pos).unwrap();
         let out = bytes.clone();
         s.cache.push_front((frame_index, bytes));
-        s.next_frame = frame_index + 1; // keep the sequential fast path consistent for the NEXT request
+        // next_frame is deliberately NOT touched here: it tracks the
+        // DECODER's physical position, and a cache hit never moves the
+        // decoder. The first version of this cache set
+        // next_frame = frame_index + 1 anyway "for the fast path" — which
+        // silently corrupted the position: revisit frame 45 from cache
+        // while the decoder physically sits at 11, then request 46 →
+        // "46 == next_frame" took the no-seek fast path and served the
+        // decoder's REAL next frame (11) labeled as 46. Wrong image, right
+        // frame number — the worst kind of bug. Regression-locked by
+        // cache_hit_does_not_corrupt_decoder_position below.
         eprintln!("[video-decode] frame={frame_index} CACHE HIT (skipped seek+decode)");
         return Ok((out, 0));
     }
 
+    decode_at(s, frame_index)
+}
+
+// The actual seek+decode+convert work, cache-lookup-free — called by
+// decode_frame_core on a cache miss AND by the readahead thread (which
+// must NEVER take the cache-hit shortcut: its whole job is to advance the
+// decoder's physical position while filling the cache, and a hit returns
+// without moving the decoder). Stores its result into the session cache.
+// `frame_index` must already be clamped by the caller.
+fn decode_at(s: &mut VideoSession, frame_index: i64) -> Result<(Vec<u8>, u32), String> {
+    let t0 = Instant::now();
     let tb = s.tb;
 
     // Tail robustness (caught live 2026-07, "decode: stream exhausted"
@@ -457,8 +549,17 @@ pub fn decode_video_frame(
             .cloned()
             .ok_or_else(|| format!("no session {session_id}"))?
     };
-    let mut s = session_arc.lock().unwrap();
-    decode_frame_core(&mut s, frame_index).map(|(rgba, _ahead)| Response::new(rgba))
+    let result = {
+        let mut s = session_arc.lock().unwrap();
+        decode_frame_core(&mut s, frame_index)
+    };
+    // Warm the cache BEHIND this response (mpv pattern): by the time the
+    // UI asks for the next frames of playback/scrub-forward, the dedicated
+    // thread has already decoded them — the request becomes a cache hit.
+    if result.is_ok() {
+        spawn_readahead(session_arc, frame_index + 1 + READAHEAD_DEPTH);
+    }
+    result.map(|(rgba, _ahead)| Response::new(rgba))
 }
 
 #[tauri::command]
@@ -466,8 +567,40 @@ pub fn close_video_session(
     state: tauri::State<'_, VideoSessions>,
     session_id: u32,
 ) -> Result<(), String> {
-    state.0.lock().unwrap().remove(&session_id);
+    let removed = state.0.lock().unwrap().remove(&session_id);
+    if let Some(arc) = removed {
+        // The readahead thread holds its own Arc clone — tell it to stop
+        // rather than letting it decode to its goal against a session
+        // nobody can reach anymore. Waits at most one frame decode.
+        arc.lock().unwrap().readahead_active = false;
+    }
     Ok(())
+}
+
+/// Where the all-intra "optimized media" for `path` lives (Resolve's
+/// pattern: long-GOP sources get background-transcoded once to a codec
+/// where EVERY frame is independently decodable — seek cost becomes one
+/// frame decode, structurally). Key = source path + size + mtime, so an
+/// edited/replaced source regenerates while a re-import of the same file
+/// reuses the existing transcode instantly. Returns (target_path, exists);
+/// the JS side runs the ffmpeg sidecar transcode when !exists.
+#[tauri::command]
+pub fn optimized_media_target(path: String) -> Result<(String, bool), String> {
+    use std::hash::{Hash, Hasher};
+    let meta = std::fs::metadata(&path).map_err(|e| format!("stat {path}: {e}"))?;
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    path.hash(&mut h);
+    meta.len().hash(&mut h);
+    if let Ok(m) = meta.modified() {
+        if let Ok(d) = m.duration_since(std::time::UNIX_EPOCH) {
+            d.as_secs().hash(&mut h);
+        }
+    }
+    let dir = std::env::temp_dir().join("nemo-optimized");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let target = dir.join(format!("{:016x}.mov", h.finish()));
+    let exists = target.exists();
+    Ok((target.to_string_lossy().to_string(), exists))
 }
 
 // ---- headless auto-bench plumbing ----
@@ -865,6 +998,59 @@ mod tests {
             warm_ms < cold_ms / 2.0,
             "cache hit ({warm_ms:.2}ms) not meaningfully faster than the cold decode ({cold_ms:.2}ms)"
         );
+    }
+
+    // Readahead thread (mpv pattern): after one decode + spawn_readahead,
+    // the next frames should land in the cache without any further request
+    // — polled with a deadline instead of a fixed sleep to stay unflaky.
+    #[test]
+    fn readahead_warms_the_cache_ahead_of_requests() {
+        let path = make_test_video();
+        let (s, _, _) = open_session_core(path.to_str().unwrap()).unwrap();
+        let arc = std::sync::Arc::new(Mutex::new(s));
+
+        // Serve frame 0 the way the command does, then kick readahead.
+        decode_frame_core(&mut arc.lock().unwrap(), 0).unwrap();
+        spawn_readahead(arc.clone(), 1 + READAHEAD_DEPTH);
+
+        let deadline = Instant::now() + std::time::Duration::from_secs(5);
+        loop {
+            {
+                let s = arc.lock().unwrap();
+                let warmed = (1..=4).all(|i| s.cache.iter().any(|(idx, _)| *idx == i));
+                if warmed {
+                    break;
+                }
+                assert!(Instant::now() < deadline, "readahead never warmed frames 1-4 (cache: {:?})", s.cache.iter().map(|(i, _)| *i).collect::<Vec<_>>());
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        // And the warmed frames must be served as CACHE HITS (ahead == 0).
+        let (_, ahead) = decode_frame_core(&mut arc.lock().unwrap(), 3).unwrap();
+        assert_eq!(ahead, 0, "frame 3 should have been a readahead cache hit");
+    }
+
+    // Regression: a cache hit must NOT move next_frame (it tracks the
+    // decoder's PHYSICAL position, which a cache hit never changes).
+    // The bug this locks out: revisit frame 45 from cache while the
+    // decoder physically sits after frame 10 → next_frame wrongly said 46
+    // → requesting 46 took the no-seek fast path and served the decoder's
+    // real next frame (11) labeled as 46 — wrong image under the right
+    // frame number.
+    #[test]
+    fn cache_hit_does_not_corrupt_decoder_position() {
+        let path = make_test_video();
+        let (mut s, _, _) = open_session_core(path.to_str().unwrap()).unwrap();
+        // Ground truth for frame 46 from a session that never touches the cache path
+        let (mut s_ref, _, _) = open_session_core(path.to_str().unwrap()).unwrap();
+        let truth_46 = decode_frame_core(&mut s_ref, 46).unwrap().0;
+
+        decode_frame_core(&mut s, 45).unwrap(); // fresh decode, cached; decoder now after 45
+        decode_frame_core(&mut s, 10).unwrap(); // decoder physically after 10
+        let (_, ahead) = decode_frame_core(&mut s, 45).unwrap(); // cache hit — decoder still after 10
+        assert_eq!(ahead, 0, "expected a cache hit for the revisit");
+        let f46 = decode_frame_core(&mut s, 46).unwrap().0;
+        assert_eq!(f46, truth_46, "frame 46 after a cache hit isn't the real frame 46 — decoder position corrupted");
     }
 
     // Locks in the per-session Mutex fix (2026-07 — "latence pour plusieurs
