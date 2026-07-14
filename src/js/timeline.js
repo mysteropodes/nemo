@@ -649,7 +649,7 @@ window.SM={
     var sceneWaIn=inSym?_sceneSnapshot.waIn:state.waIn;
     var sceneWaOut=inSym?_sceneSnapshot.waOut:state.waOut;
     return JSON.stringify({version:13,totalFrames:sceneTotal,fps:sceneFps,canvasW:state.canvasW,canvasH:state.canvasH,canvasBg:state.canvasBg,waIn:sceneWaIn,waOut:sceneWaOut,
-      layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color,motion:l.motion,motionStatic:l.motionStatic,elementMotion:l.elementMotion,inPoint:l.inPoint,outPoint:l.outPoint};}),
+      layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color,motion:l.motion,motionStatic:l.motionStatic,elementMotion:l.elementMotion,inPoint:l.inPoint,outPoint:l.outPoint,nativeVideo:l.nativeVideo};}),
       layerFolders:state.layerFolders,layerLinkGroups:state.layerLinkGroups,
       symbols:state.symbols,palettes:state.palettes,activePaletteIdx:state.activePaletteIdx,customBrushPresets:state.customBrushPresets,
       // audio: only the persistable fields — _buffer/_peaksCanvas/_srcNode
@@ -772,6 +772,10 @@ window.SM={
       if(ld.motionStatic)state.layers[idx].motionStatic=ld.motionStatic;
       if(ld.inPoint)state.layers[idx].inPoint=ld.inPoint;
       if(ld.outPoint!=null)state.layers[idx].outPoint=ld.outPoint;
+      // EXPERIMENTAL (native-video-decode): decoder session is runtime-only
+      // (_nvSessionId) — native-video-bridge reopens it lazily from
+      // nativeVideo.path on the first frame sync after this load.
+      if(ld.nativeVideo)state.layers[idx].nativeVideo=ld.nativeVideo;
       state.layers[idx].color=ld.color||nextLayerColor();
       ld.frames.forEach(function(f){if(!f.isInterpolated)f.isInterpolated=false;});while(state.layers[idx].frames.length<state.totalFrames)state.layers[idx].frames.push({strokes:[],isKeyframe:false,isInterpolated:false});});
     state.layerFolders=d.layerFolders||{};state.layerLinkGroups=d.layerLinkGroups||{};

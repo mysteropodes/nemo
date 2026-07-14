@@ -663,6 +663,10 @@ function layerOutPoint(ld){
 function getEffectiveStrokes(layerIdx,frameIdx){
   var ld=state.layers[layerIdx];if(!ld)return[];
   if((ld.inPoint||ld.outPoint!=null)&&(frameIdx<layerInPoint(ld)||frameIdx>layerOutPoint(ld)))return[];
+  // EXPERIMENTAL (native-video-decode): a natively-decoded video layer has
+  // no vector strokes at all — its picture is an engine-side image item
+  // (buildSceneJson, engine-bridge.js), not frame data.
+  if(ld.nativeVideo)return[];
   if(ld.lfsGroup){
     // Traditional cel stacking: shadow at back, full (flat colors) in the
     // middle, line (ink) on top.
@@ -1084,7 +1088,7 @@ function _writeBackGhostProxies(layerIdx){
 }
 function saveActiveLayerFrame(){
   window._sceneVersion++;
-  var ld=state.layers[state.activeLayerIdx];if(ld.symbolId)return;
+  var ld=state.layers[state.activeLayerIdx];if(ld.symbolId||ld.nativeVideo)return;
   _writeBackGhostProxies(state.activeLayerIdx);
   var f=ld.frames[state.currentFrame];
   if(!f.isKeyframe&&!f.isInterpolated)return;
@@ -1104,7 +1108,7 @@ function saveActiveLayerFrame(){
 }
 function saveAllLayerFrames(){
   _writeBackGhostProxies(state.activeLayerIdx);
-  for(var i=0;i<state.layers.length;i++){if(state.layers[i].symbolId)continue;var f=state.layers[i].frames[state.currentFrame];if(!f||(!f.isKeyframe&&!f.isInterpolated))continue;
+  for(var i=0;i<state.layers.length;i++){if(state.layers[i].symbolId||state.layers[i].nativeVideo)continue;var f=state.layers[i].frames[state.currentFrame];if(!f||(!f.isKeyframe&&!f.isInterpolated))continue;
   var ldi=state.layers[i];
   var strokes=[];userLayers[i].children.forEach(function(c){if(c.data&&c.data.ghostFrame!==undefined)return;if(c instanceof Path&&c.segments.length>0){enforceChannelStrip(ldi,c);strokes.push(serP(c));}else if(c instanceof Raster)strokes.push(serR(c));});
   if(f.isInterpolated&&!strokesEqual(strokes,f.strokes)){f.isKeyframe=true;f.isInterpolated=false;}
@@ -1116,6 +1120,9 @@ function loadFrame(idx){
   // pick) — loadFrame is the one choke point every frame change goes
   // through, scrub and playback alike.
   if(window.SMReference)SMReference.onFrameChanged(idx);
+  // EXPERIMENTAL (native-video-decode branch): natively-decoded video
+  // LAYERS follow the playhead through the same choke point.
+  if(window.SMNativeVideo)SMNativeVideo.onFrameChanged(idx);
   for(var i=0;i<state.layers.length;i++){userLayers[i].removeChildren();if(!layerIsEffectivelyVisible(i))continue;
   // No explicit `op` override here (unlike renderOS()'s onion-skin ghosts,
   // which intentionally force a computed fade-opacity regardless of the

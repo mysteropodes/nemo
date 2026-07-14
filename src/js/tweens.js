@@ -1053,7 +1053,7 @@ function renderGhostAll(){
   ghostAllLayer.removeChildren();
   if(!state.ghostAllFrames)return;
   var li=state.activeLayerIdx,cf=state.currentFrame;
-  var ld=state.layers[li];if(!ld||ld.symbolId)return;
+  var ld=state.layers[li];if(!ld||ld.symbolId||ld.nativeVideo)return;
   for(var fi=0;fi<ld.frames.length;fi++){
     if(fi===cf)continue;
     var fr=ld.frames[fi];if(!fr.isKeyframe||!fr.strokes.length)continue;

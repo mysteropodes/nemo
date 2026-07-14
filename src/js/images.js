@@ -322,6 +322,15 @@
       {name:'All files',extensions:['*']},
     ]});
     if(!path)return;
+    // EXPERIMENTAL (native-video-decode branch): instant import via a live
+    // native decode session (SMNativeVideo.importAsLayer) instead of baking
+    // the whole file to per-frame JPEGs — the JPEG path below remains the
+    // fallback if the native decoder can't open this particular file
+    // (odd container, or a build without the ffmpeg libs linked).
+    if(window.SMNativeVideo){
+      try{await SMNativeVideo.importAsLayer(path);return;}
+      catch(e){showToast('Décodeur natif indisponible ('+(e&&e.message||e)+') — import classique…');}
+    }
     var frames=await decodeVideoFramesFfmpeg(path);
     await importVideoFrames(frames,baseName(path).replace(/\.[^.]+$/,''));
   }

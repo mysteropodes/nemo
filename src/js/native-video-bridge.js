@@ -164,6 +164,90 @@
     }
   }
 
+  // ---- native video LAYERS (ld.nativeVideo) ----
+  // The graduation of the experiment: a video imported via the Vidéo…
+  // button becomes a LAYER backed by a live decode session (instant
+  // import — no JPEG baking), its picture emitted by buildSceneJson as
+  // one image item under 'nv:<layerIdx>' (engine-bridge.js). This hook
+  // runs from loadFrame's choke point (app.js) and keeps each such
+  // layer's texture in sync with the playhead, with the same
+  // latest-target-wins coalescing as _refSync — per layer.
+  var _layerSync = {}; // layerIdx -> {busy, pending, opening}
+  function onFrameChanged(frame) {
+    if (!tauriOk()) return;
+    for (var i = 0; i < state.layers.length; i++) {
+      if (state.layers[i].nativeVideo) _layerFrameSync(i, frame);
+    }
+  }
+  async function _layerFrameSync(li, frame) {
+    var st = _layerSync[li] || (_layerSync[li] = { busy: false, pending: null });
+    if (st.busy) { st.pending = frame; return; }
+    st.busy = true;
+    try {
+      var ld = state.layers[li];
+      if (!ld || !ld.nativeVideo) return;
+      var nv = ld.nativeVideo;
+      // Lazy (re)open from the persisted path — first frame after an
+      // import OR after a project load lands here without a session.
+      if (!ld._nvSessionId) {
+        var info = await open(nv.path);
+        ld._nvSessionId = info.session_id; // runtime-only (not in exportJSON's layer whitelist)
+        nv.frameCount = Number(info.frame_count);
+        nv.width = info.width; nv.height = info.height; nv.fps = info.fps;
+      }
+      var target = Math.max(0, Math.min(nv.frameCount - 1, frame - (nv.offsetFrames || 0)));
+      var px = await frameBytes(ld._nvSessionId, target);
+      if (window.SMEngineBridge) SMEngineBridge.registerImageRaw('nv:' + li, px, nv.width, nv.height);
+      window._sceneVersion++;
+      if (window.SMEngineBridge && SMEngineBridge.isEnabled()) SMEngineBridge.renderNow();
+    } catch (e) {
+      console.error('[native-video] layer ' + li + ' sync failed:', e);
+    } finally {
+      st.busy = false;
+      if (st.pending != null) { var p = st.pending; st.pending = null; _layerFrameSync(li, p); }
+    }
+  }
+
+  // Instant import: opens a session and creates a nativeVideo layer —
+  // called by images.js's Vidéo… button (Tauri path) on this branch.
+  // Returns the layer index. A small canvas-drawn thumbnail of frame 0
+  // is produced for the media library (the ONLY canvas use here — the
+  // render path itself never touches one).
+  async function importAsLayer(path) {
+    var info = await open(path);
+    if (window.saveAllLayerFrames) saveAllLayerFrames();
+    if (window.pushUndoLayers) pushUndoLayers();
+    var name = path.split('/').pop().replace(/\.[^.]+$/, '');
+    var idx = createUserLayer(name);
+    var ld = state.layers[idx];
+    ld.nativeVideo = {
+      path: path,
+      fps: info.fps,
+      frameCount: Number(info.frame_count),
+      width: info.width,
+      height: info.height,
+      offsetFrames: 0,
+    };
+    ld._nvSessionId = info.session_id;
+    if (Number(info.frame_count) > state.totalFrames && window.SM && SM.setTotalFrames) SM.setTotalFrames(Number(info.frame_count));
+    // thumbnail for the Médias panel
+    try {
+      var px = await frameBytes(info.session_id, 0);
+      var tc = document.createElement('canvas');
+      var tw = 96, th = Math.max(1, Math.round(96 * info.height / info.width));
+      tc.width = info.width; tc.height = info.height;
+      tc.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(px), info.width, info.height), 0, 0);
+      var sc = document.createElement('canvas'); sc.width = tw; sc.height = th;
+      sc.getContext('2d').drawImage(tc, 0, 0, tw, th);
+      if (window.SMMediaLibrary) SMMediaLibrary.addEntry(name, 'video', sc.toDataURL('image/jpeg', 0.7), ld.name);
+    } catch (e) { /* thumbnail is cosmetic — import already succeeded */ }
+    if (window.activateUL) activateUL(idx);
+    if (window.loadFrame) loadFrame(state.currentFrame);
+    if (window.updateUI) updateUI();
+    if (window.showToast) showToast('Vidéo native : ' + name + ' (' + info.width + '×' + info.height + ', ' + Number(info.frame_count) + ' images) — import instantané');
+    return idx;
+  }
+
   // USER-FACING TEST ENTRY (experimental): from the dev console —
   //   await SMNativeVideo.attachToPlayhead('/chemin/video.mov')
   // then scrub the timeline: the video follows the playhead as the
@@ -202,6 +286,8 @@
     bench: bench,
     attachToPlayhead: attachToPlayhead,
     detachFromPlayhead: detachFromPlayhead,
+    importAsLayer: importAsLayer,
+    onFrameChanged: onFrameChanged,
     _refSync: _refSync,
     sessions: function () { return Object.assign({}, sessions); },
   };

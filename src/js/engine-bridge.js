@@ -188,6 +188,33 @@
       // Pivot = auto bounds center + the layer's Anchor Point offset
       // (motionMat.ax/ay) — see motion.js's layerMotionAt header comment.
       var motionPivot = motionMat ? { x: userLayers[i].bounds.center.x + motionMat.ax, y: userLayers[i].bounds.center.y + motionMat.ay } : null;
+      // EXPERIMENTAL (native-video-decode branch): a natively-decoded video
+      // layer has NO Paper children — its picture is one image item under a
+      // per-layer fixed id ('nv:<i>'), pixels pushed by native-video-bridge's
+      // onFrameChanged sync (same replaced-GPU-texture pattern as the
+      // rotoscopy reference). Emitted inside the normal per-layer loop so
+      // z-order and layer visibility behave exactly like any other layer;
+      // Motion-mode transforms are computed independently of the
+      // children.length gate above (an empty Paper layer has no usable
+      // bounds, so the pivot is the video rect's own center).
+      if (state.layers[i].nativeVideo && window.SMEngineBridge && registeredImageIds['nv:' + i]) {
+        var nv = state.layers[i].nativeVideo;
+        var inF = window.layerInPoint ? layerInPoint(state.layers[i]) : 0;
+        var outF = window.layerOutPoint ? layerOutPoint(state.layers[i]) : state.totalFrames - 1;
+        if (state.currentFrame >= inF && state.currentFrame <= outF) {
+          var nvS = Math.min(state.canvasW / nv.width, state.canvasH / nv.height);
+          var nvW = nv.width * nvS, nvH = nv.height * nvS;
+          var nvRect = { x: (state.canvasW - nvW) / 2, y: (state.canvasH - nvH) / 2, width: nvW, height: nvH };
+          var nvOp = 1;
+          var nvMat = window.SMMotion ? SMMotion.layerMotionAt(i, state.currentFrame) : null;
+          if (nvMat) {
+            var nvPivot = { x: nvRect.x + nvRect.width / 2 + nvMat.ax, y: nvRect.y + nvRect.height / 2 + nvMat.ay };
+            nvRect = SMMotion.transformImageRect(nvRect, nvPivot, nvMat);
+            nvOp *= nvMat.op;
+          }
+          items.push({ image: { imageId: 'nv:' + i, x: nvRect.x, y: nvRect.y, width: nvRect.width, height: nvRect.height, opacity: nvOp } });
+        }
+      }
       for (var s = 0; s < children.length; s++) {
         var c = children[s];
         // Team review view filter — 'mine' hides everyone else's content
