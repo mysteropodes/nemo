@@ -16,29 +16,72 @@ async function smConfirm(msg, title) {
 
 // ---- PLAYBACK (optimized: no DOM rebuild during play) ----
 var playInt=null;
+var playRaf=null;
+// One logical frame step, preserving the exact edge semantics the old
+// setInterval body had (loop, ping-pong direction flip, audio onLoop,
+// stop at the work-area edge). Returns the next frame, or null meaning
+// "playback ends here". Mutates state.playDir like before.
+// Ping-pong (right-click btn-loop, feedback: "quand on clic sur le
+// lecture loop... il faut switché aussi sur une lecture en pingpong")
+// bounces back and forth across the work area instead of hard-cutting
+// back to waIn every pass — direction only flips at the OUT-of-bounds edge.
+function advancePlayFrame(cur){
+  var next=cur+state.playDir;
+  if(next>state.waOut){
+    if(state.loopPlayback&&state.pingPongPlayback){state.playDir=-1;next=cur-1;if(next<state.waIn)next=state.waIn;}
+    else if(state.loopPlayback){next=state.waIn;if(window.SMAudio)SMAudio.onLoop(next);}
+    else return null;
+  }else if(next<state.waIn){
+    if(state.loopPlayback&&state.pingPongPlayback){state.playDir=1;next=cur+1;if(next>state.waOut)next=state.waOut;}
+    else return null;
+  }
+  return next;
+}
 function startPlay(){if(state.playing)return;state.playing=true;state.playDir=1;
   document.getElementById('btn-play').innerHTML='<span class="material-symbols-rounded">\u{e034}</span>';
   document.getElementById('btn-play').classList.add('playing');
   if(window.SMAudio)SMAudio.onPlayStart(state.currentFrame);
-  playInt=setInterval(function(){
-    // Ping-pong (right-click btn-loop, feedback: "quand on clic sur le
-    // lecture loop... il faut switché aussi sur une lecture en pingpong")
-    // bounces back and forth across the work area instead of hard-cutting
-    // back to waIn every pass — direction only flips at the OUT-of-bounds
-    // edge, one frame at a time, same 1000/fps cadence as forward playback.
-    var next=state.currentFrame+state.playDir;
-    if(next>state.waOut){
-      if(state.loopPlayback&&state.pingPongPlayback){state.playDir=-1;next=state.currentFrame-1;if(next<state.waIn)next=state.waIn;}
-      else if(state.loopPlayback){next=state.waIn;if(window.SMAudio)SMAudio.onLoop(next);}
-      else{stopPlay();return;}
-    }else if(next<state.waIn){
-      if(state.loopPlayback&&state.pingPongPlayback){state.playDir=1;next=state.currentFrame+1;if(next>state.waOut)next=state.waOut;}
-      else{stopPlay();return;}
+  // Wall-clock-driven playback (2026-07 — "à la lecture des accélérations,
+  // décélérations"): the old setInterval(1000/fps) advanced exactly ONE
+  // frame per tick no matter how late the tick fired. Any main-thread work
+  // (engine render, video frame upload, Paper rebuild in loadFrame) delays
+  // ticks, then the browser fires them in a catch-up burst — so playback
+  // visibly slowed down and sped up in waves, an accordion instead of a
+  // steady rate. Standard player fix: a rAF loop with a time accumulator —
+  // each animation frame computes how many SOURCE frames have elapsed on
+  // the wall clock and advances that many logical steps at once (dropping
+  // visual frames when behind, exactly like AE/video players), so the
+  // PACE stays true to state.fps even when individual frames are heavy.
+  var frameMs=1000/state.fps;
+  var playClock=performance.now();
+  function playStep(now){
+    if(!state.playing)return;
+    var steps=Math.floor((now-playClock)/frameMs);
+    if(steps>0){
+      // Cap the catch-up burst (window unfocused, huge stall): jumping
+      // hundreds of logical frames in one go would spin through loop
+      // wraps invisibly; two seconds' worth is plenty, then re-anchor.
+      if(steps>state.fps*2){steps=1;playClock=now;}
+      else playClock+=steps*frameMs;
+      var next=state.currentFrame;
+      for(var k=0;k<steps;k++){
+        var n2=advancePlayFrame(next);
+        if(n2===null){
+          // land exactly on the edge frame before stopping, like before
+          if(next!==state.currentFrame){saveAllLayerFrames();state.currentFrame=next;window._curFrame=next;loadFrame(next);updatePlayhead();}
+          stopPlay();return;
+        }
+        next=n2;
+      }
+      if(next!==state.currentFrame){saveAllLayerFrames();state.currentFrame=next;window._curFrame=next;loadFrame(next);updatePlayhead();}
     }
-    saveAllLayerFrames();state.currentFrame=next;window._curFrame=next;loadFrame(next);updatePlayhead();
-  },1000/state.fps);
+    playRaf=requestAnimationFrame(playStep);
+  }
+  playRaf=requestAnimationFrame(playStep);
 }
-function stopPlay(){if(!state.playing)return;state.playing=false;clearInterval(playInt);playInt=null;
+function stopPlay(){if(!state.playing)return;state.playing=false;
+  if(playRaf){cancelAnimationFrame(playRaf);playRaf=null;}
+  clearInterval(playInt);playInt=null;
   if(window.SMAudio)SMAudio.onPlayStop();
   document.getElementById('btn-play').innerHTML='<span class="material-symbols-rounded">\u{e037}</span>';
   document.getElementById('btn-play').classList.remove('playing');
