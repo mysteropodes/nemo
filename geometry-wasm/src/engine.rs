@@ -114,6 +114,15 @@ pub(crate) struct LayerIn {
     // for the (overwhelmingly common) unblended case.
     #[serde(default)]
     pub(crate) blend_mode: Option<String>,
+    // Track matte (2026-07, scouted from Caddis's Layer.matteMode): this
+    // layer's alpha comes from the layer immediately ABOVE it in the
+    // stack (AE convention — "matteLayerId" is implicit, always the next
+    // layer up, never named explicitly) instead of its own painted pixels'
+    // alpha. "alpha"/"alphaInverted"/"luma"/"lumaInverted"; None/"none" is
+    // the default (no matte). The matte SOURCE layer itself is consumed —
+    // composite_scene skips painting it as its own visible layer.
+    #[serde(default)]
+    pub(crate) matte_mode: Option<String>,
 }
 
 // FIXED (was "KNOWN BROKEN, v17 investigation" — see git history for the
@@ -449,6 +458,21 @@ pub struct VelloEngine {
     blend_accum_a_view: wgpu::TextureView,
     blend_accum_b: wgpu::Texture,
     blend_accum_b_view: wgpu::TextureView,
+    // ---- Track matte compositor (matte.wgsl, scouted from Caddis's
+    // Layer.matteMode field — see composite_scene's matte handling) ----
+    // Same fullscreen-triangle shape as the blend pipeline, kept fully
+    // separate (own textures, own pipeline) rather than shoehorned into
+    // blend_layer_tex: a matted layer needs BOTH its own isolated render
+    // AND its matte source's isolated render alive at once (two inputs to
+    // one pass), which a single reused scratch texture can't hold.
+    matte_pipeline: wgpu::RenderPipeline,
+    matte_bind_group_layout: wgpu::BindGroupLayout,
+    matte_sampler: wgpu::Sampler,
+    matte_uniform_buf: wgpu::Buffer,
+    matte_source_tex: wgpu::Texture,
+    matte_source_view: wgpu::TextureView,
+    matte_result_tex: wgpu::Texture,
+    matte_result_view: wgpu::TextureView,
 }
 
 // ---- Blend compositor plumbing (see blend.wgsl's doc comment) ----
@@ -587,6 +611,191 @@ fn create_blend_pipeline(device: &wgpu::Device) -> (wgpu::RenderPipeline, wgpu::
         mapped_at_creation: false,
     });
     (pipeline, bind_group_layout, sampler, uniform_buf)
+}
+
+// ---- Track matte compositor plumbing (see matte.wgsl's doc comment) ----
+// matte_source_tex/matte_result_tex reuse the exact same descriptor as
+// blend_layer_tex (STORAGE_BINDING for matte_source — vello writes it via
+// render_to_texture same as any isolated layer render; matte_result is
+// written by OUR OWN fragment shader instead, so it needs
+// RENDER_ATTACHMENT, not STORAGE_BINDING, mirroring blend_accum's usage
+// flags rather than blend_layer's).
+fn create_matte_result_texture(device: &wgpu::Device, width: u32, height: u32) -> (wgpu::Texture, wgpu::TextureView) {
+    let tex = device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("matte-result-target"),
+        size: wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: BLEND_SCRATCH_FORMAT,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+        view_formats: &[],
+    });
+    let view = tex.create_view(&wgpu::TextureViewDescriptor::default());
+    (tex, view)
+}
+
+fn create_matte_pipeline(device: &wgpu::Device) -> (wgpu::RenderPipeline, wgpu::BindGroupLayout, wgpu::Sampler, wgpu::Buffer) {
+    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        label: Some("matte-compositor"),
+        source: wgpu::ShaderSource::Wgsl(include_str!("matte.wgsl").into()),
+    });
+    // Same bind group shape as the blend pipeline (2 textures + sampler +
+    // uniform) — see create_blend_pipeline for the entry-by-entry rationale.
+    let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some("matte-bind-group-layout"),
+        entries: &[
+            wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Texture {
+                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                    multisampled: false,
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 1,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Texture {
+                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                    multisampled: false,
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 2,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 3,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            },
+        ],
+    });
+    let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+        label: Some("matte-pipeline-layout"),
+        bind_group_layouts: &[Some(&bind_group_layout)],
+        immediate_size: 0,
+    });
+    let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        label: Some("matte-pipeline"),
+        layout: Some(&pipeline_layout),
+        vertex: wgpu::VertexState {
+            module: &shader,
+            entry_point: Some("vs_main"),
+            buffers: &[],
+            compilation_options: Default::default(),
+        },
+        fragment: Some(wgpu::FragmentState {
+            module: &shader,
+            entry_point: Some("fs_main"),
+            targets: &[Some(wgpu::ColorTargetState {
+                format: BLEND_SCRATCH_FORMAT,
+                blend: None,
+                write_mask: wgpu::ColorWrites::ALL,
+            })],
+            compilation_options: Default::default(),
+        }),
+        primitive: wgpu::PrimitiveState::default(),
+        depth_stencil: None,
+        multisample: wgpu::MultisampleState::default(),
+        multiview_mask: None,
+        cache: None,
+    });
+    let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+        label: Some("matte-sampler"),
+        address_mode_u: wgpu::AddressMode::ClampToEdge,
+        address_mode_v: wgpu::AddressMode::ClampToEdge,
+        mag_filter: wgpu::FilterMode::Nearest,
+        min_filter: wgpu::FilterMode::Nearest,
+        ..Default::default()
+    });
+    // 16 bytes: mode (u32) + invert (u32) + padding — see matte.wgsl's Params.
+    let uniform_buf = device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("matte-params"),
+        size: 16,
+        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    });
+    (pipeline, bind_group_layout, sampler, uniform_buf)
+}
+
+/// Runs matte.wgsl: multiplies `layer_view`'s alpha by `matte_view`'s alpha
+/// (mode 0) or luma (mode 1), optionally inverted, writing into
+/// `target_view`. Mirrors composite_pass's shape (see its own doc comment).
+#[allow(clippy::too_many_arguments)]
+fn matte_pass(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    pipeline: &wgpu::RenderPipeline,
+    bind_group_layout: &wgpu::BindGroupLayout,
+    sampler: &wgpu::Sampler,
+    uniform_buf: &wgpu::Buffer,
+    layer_view: &wgpu::TextureView,
+    matte_view: &wgpu::TextureView,
+    mode: u32,
+    invert: bool,
+    target_view: &wgpu::TextureView,
+) {
+    let mut payload = [0u8; 16];
+    payload[0..4].copy_from_slice(&mode.to_le_bytes());
+    payload[4..8].copy_from_slice(&(invert as u32).to_le_bytes());
+    queue.write_buffer(uniform_buf, 0, &payload);
+    let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("matte-bind-group"),
+        layout: bind_group_layout,
+        entries: &[
+            wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(layer_view) },
+            wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(matte_view) },
+            wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::Sampler(sampler) },
+            wgpu::BindGroupEntry { binding: 3, resource: uniform_buf.as_entire_binding() },
+        ],
+    });
+    let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("matte-composite") });
+    {
+        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("matte-composite-pass"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: target_view,
+                resolve_target: None,
+                ops: wgpu::Operations { load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT), store: wgpu::StoreOp::Store },
+                depth_slice: None,
+            })],
+            depth_stencil_attachment: None,
+            timestamp_writes: None,
+            occlusion_query_set: None,
+            multiview_mask: None,
+        });
+        pass.set_pipeline(pipeline);
+        pass.set_bind_group(0, &bind_group, &[]);
+        pass.draw(0..3, 0..1);
+    }
+    queue.submit(Some(encoder.finish()));
+}
+
+/// Parses a `LayerIn.matte_mode` string into (mode, invert), or None for
+/// "no matte" (absent field, "none", or any unrecognized value — same
+/// forgiving-default spirit as mix_mode_index treating an unknown blend
+/// mode as Normal rather than erroring).
+fn matte_mode_of(s: Option<&str>) -> Option<(u32, bool)> {
+    match s {
+        Some("alpha") => Some((0, false)),
+        Some("alphaInverted") => Some((0, true)),
+        Some("luma") => Some((1, false)),
+        Some("lumaInverted") => Some((1, true)),
+        _ => None,
+    }
 }
 
 fn wgpu_color_from(c: Color) -> wgpu::Color {
@@ -828,6 +1037,9 @@ pub async fn create_engine(
     let (blend_layer_tex, blend_layer_view) = create_blend_layer_texture(&device, width, height);
     let (blend_accum_a, blend_accum_a_view) = create_blend_accum_texture(&device, width, height, "blend-accum-a");
     let (blend_accum_b, blend_accum_b_view) = create_blend_accum_texture(&device, width, height, "blend-accum-b");
+    let (matte_pipeline, matte_bind_group_layout, matte_sampler, matte_uniform_buf) = create_matte_pipeline(&device);
+    let (matte_source_tex, matte_source_view) = create_blend_layer_texture(&device, width, height);
+    let (matte_result_tex, matte_result_view) = create_matte_result_texture(&device, width, height);
 
     Ok(VelloEngine {
         surface,
@@ -854,6 +1066,14 @@ pub async fn create_engine(
         blend_accum_a_view,
         blend_accum_b,
         blend_accum_b_view,
+        matte_pipeline,
+        matte_bind_group_layout,
+        matte_sampler,
+        matte_uniform_buf,
+        matte_source_tex,
+        matte_source_view,
+        matte_result_tex,
+        matte_result_view,
     })
 }
 
@@ -868,15 +1088,33 @@ impl VelloEngine {
     /// case): unchanged from the pre-fix code — one Scene, one
     /// render_to_texture call, zero extra allocation or GPU work.
     ///
-    /// Slow path (>=1 blended layer): renders each layer to its own
-    /// isolated, transparent-backed texture (vello, unmodified) and
-    /// composites them one at a time through blend.wgsl's fullscreen pass
-    /// — Normal for an unblended layer (plain SrcOver, mode 0), the real
-    /// Mix formula for a blended one. See blend.wgsl's and
+    /// Slow path (>=1 blended layer OR >=1 track-matted layer): renders each
+    /// layer to its own isolated, transparent-backed texture (vello,
+    /// unmodified) and composites them one at a time through blend.wgsl's
+    /// fullscreen pass — Normal for an unblended layer (plain SrcOver, mode
+    /// 0), the real Mix formula for a blended one. See blend.wgsl's and
     /// mix_mode_index's doc comments for why this exists at all.
+    ///
+    /// Track matte (2026-07, scouted from Caddis's Layer.matteMode): layer
+    /// i's matte_mode names how the layer immediately ABOVE it (i+1, AE
+    /// convention — the source is implicit, never referenced by id) masks
+    /// it. That source layer is rendered isolated too, matte.wgsl multiplies
+    /// layer i's alpha by the source's alpha/luma, and the MASKED result
+    /// (not the raw layer) is what composite_pass blends into the
+    /// accumulator. The source layer itself is then skipped as its own
+    /// visible layer (`is_matte_source`) — matching AE, where a matte
+    /// source never draws on its own once consumed.
     fn composite_scene(&mut self, scene_in: &SceneIn, view_tf: Affine, base_color: Color) -> Result<(), JsValue> {
+        let n = scene_in.layers.len();
+        let mut is_matte_source = vec![false; n];
+        for (i, l) in scene_in.layers.iter().enumerate() {
+            if matte_mode_of(l.matte_mode.as_deref()).is_some() && i + 1 < n {
+                is_matte_source[i + 1] = true;
+            }
+        }
+        let has_matte = is_matte_source.iter().any(|&b| b);
         let has_blend = scene_in.layers.iter().any(|l| mix_mode_index(l.blend_mode.as_deref()) != 0);
-        if !has_blend {
+        if !has_blend && !has_matte {
             let mut scene = Scene::new();
             for layer in &scene_in.layers {
                 paint_layer_items(&mut scene, layer, view_tf, &self.images);
@@ -890,13 +1128,45 @@ impl VelloEngine {
 
         clear_texture(&self.device, &self.queue, &self.blend_accum_a_view, wgpu_color_from(base_color));
         let mut accum_is_a = true;
-        for layer in &scene_in.layers {
+        let layer_params = RenderParams { base_color: Color::TRANSPARENT, width: self.width, height: self.height, antialiasing_method: AaConfig::Area };
+        for (i, layer) in scene_in.layers.iter().enumerate() {
+            // Consumed as a matte source by the layer below it — doesn't
+            // paint as its own visible layer (AE convention).
+            if is_matte_source[i] {
+                continue;
+            }
             let mut scene = Scene::new();
             paint_layer_items(&mut scene, layer, view_tf, &self.images);
-            let layer_params = RenderParams { base_color: Color::TRANSPARENT, width: self.width, height: self.height, antialiasing_method: AaConfig::Area };
             self.renderer
                 .render_to_texture(&self.device, &self.queue, &scene, &self.blend_layer_view, &layer_params)
                 .map_err(|e| JsValue::from_str(&format!("render_to_texture failed: {e:?}")))?;
+
+            let source_view: &wgpu::TextureView = if let Some((mode, invert)) = matte_mode_of(layer.matte_mode.as_deref()) {
+                // i+1 exists whenever matte_mode_of returned Some (see the
+                // is_matte_source precompute above, same condition).
+                let mut matte_scene = Scene::new();
+                paint_layer_items(&mut matte_scene, &scene_in.layers[i + 1], view_tf, &self.images);
+                self.renderer
+                    .render_to_texture(&self.device, &self.queue, &matte_scene, &self.matte_source_view, &layer_params)
+                    .map_err(|e| JsValue::from_str(&format!("render_to_texture failed: {e:?}")))?;
+                matte_pass(
+                    &self.device,
+                    &self.queue,
+                    &self.matte_pipeline,
+                    &self.matte_bind_group_layout,
+                    &self.matte_sampler,
+                    &self.matte_uniform_buf,
+                    &self.blend_layer_view,
+                    &self.matte_source_view,
+                    mode,
+                    invert,
+                    &self.matte_result_view,
+                );
+                &self.matte_result_view
+            } else {
+                &self.blend_layer_view
+            };
+
             let mode = mix_mode_index(layer.blend_mode.as_deref());
             let (backdrop_view, target_view) =
                 if accum_is_a { (&self.blend_accum_a_view, &self.blend_accum_b_view) } else { (&self.blend_accum_b_view, &self.blend_accum_a_view) };
@@ -908,7 +1178,7 @@ impl VelloEngine {
                 &self.blend_sampler,
                 &self.blend_uniform_buf,
                 backdrop_view,
-                &self.blend_layer_view,
+                source_view,
                 mode,
                 target_view,
             );
@@ -1178,6 +1448,12 @@ impl VelloEngine {
         let (blend_accum_b, blend_accum_b_view) = create_blend_accum_texture(&self.device, width, height, "blend-accum-b");
         self.blend_accum_b = blend_accum_b;
         self.blend_accum_b_view = blend_accum_b_view;
+        let (matte_source_tex, matte_source_view) = create_blend_layer_texture(&self.device, width, height);
+        self.matte_source_tex = matte_source_tex;
+        self.matte_source_view = matte_source_view;
+        let (matte_result_tex, matte_result_view) = create_matte_result_texture(&self.device, width, height);
+        self.matte_result_tex = matte_result_tex;
+        self.matte_result_view = matte_result_view;
     }
 
     /// Uploads (or re-uploads, if already cached under this id) an image's

@@ -404,6 +404,12 @@
              popup is OS-rendered and fires no per-option hover events.
              Options + wiring: initBlendDropdown() in timeline.js. -->
         <div class="pr"><span class="pl">Blend</span><div class="psel" id="p-blendmode" data-value="normal" role="button" tabindex="0" style="cursor:pointer;user-select:none">Normal</div></div>
+        <!-- Track matte (2026-07, scouted from Caddis's Layer.matteMode):
+             this layer's alpha comes from the layer directly ABOVE it
+             (AE convention — implicit source, never picked by id). Same
+             custom-popup pattern as Blend above: initMatteDropdown() in
+             timeline.js. -->
+        <div class="pr"><span class="pl">Matte</span><div class="psel" id="p-mattemode" data-value="none" role="button" tabindex="0" style="cursor:pointer;user-select:none">Aucun</div></div>
       </div>
     </div>
     <div class="psec" id="canvas-sec">

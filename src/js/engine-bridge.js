@@ -315,7 +315,14 @@
         });
       }
       var bm = state.layers[i].blendMode;
-      layers.push({ items: items, blendMode: (bm && bm !== 'normal') ? bm : undefined });
+      // Track matte (2026-07, scouted from Caddis's Layer.matteMode):
+      // AE convention — the matte SOURCE is implicitly the layer directly
+      // above this one (i+1), never referenced by id. Same wire shape as
+      // blendMode (a plain per-layer string, undefined = no matte), read
+      // by engine.rs's composite_scene which also SKIPS painting the
+      // source layer as its own visible content once it's consumed.
+      var mm = state.layers[i].matteMode;
+      layers.push({ items: items, blendMode: (bm && bm !== 'normal') ? bm : undefined, matteMode: (mm && mm !== 'none') ? mm : undefined });
     }
     // artboard background as the bottom item of a synthetic bottom layer,
     // mirroring drawStage()'s background rect

@@ -268,10 +268,10 @@ body.mac-overlay-titlebar #app{padding-top:28px;}
 .psel{background-color:var(--panel3);border:none;color:var(--text);border-radius:6px;padding:5px 24px 5px 8px;font-size:12px;outline:none;flex:1;appearance:none;-webkit-appearance:none;-moz-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='rgba(236,234,231,.45)' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;}
 /* Blend-mode custom dropdown list (hover = live canvas preview, see
    initBlendDropdown in timeline.js) */
-#blend-pop{display:none;position:fixed;z-index:300;width:160px;max-height:340px;overflow-y:auto;background:var(--panel2);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);padding:4px;}
-#blend-pop .blend-opt{padding:6px 10px;border-radius:5px;font-size:12px;color:var(--text);cursor:pointer;}
-#blend-pop .blend-opt:hover{background:var(--accent-dim);color:var(--accent-hover);}
-#blend-pop .blend-opt.sel{background:var(--panel3);font-weight:600;}
+#blend-pop,#matte-pop{display:none;position:fixed;z-index:300;width:180px;max-height:340px;overflow-y:auto;background:var(--panel2);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);padding:4px;}
+#blend-pop .blend-opt,#matte-pop .blend-opt{padding:6px 10px;border-radius:5px;font-size:12px;color:var(--text);cursor:pointer;}
+#blend-pop .blend-opt:hover,#matte-pop .blend-opt:hover{background:var(--accent-dim);color:var(--accent-hover);}
+#blend-pop .blend-opt.sel,#matte-pop .blend-opt.sel{background:var(--panel3);font-weight:600;}
 .pbtn{background:var(--panel3);border:none;color:rgba(236,234,231,.75);border-radius:6px;padding:6px 8px;font-size:12px;font-weight:600;cursor:pointer;transition:background .15s,color .15s;}
 .pbtn:hover{background:#2c2a31;color:var(--text);}
 .pbtn.ac{background:var(--accent);border-color:var(--accent);color:#fff;}

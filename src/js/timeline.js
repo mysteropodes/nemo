@@ -692,7 +692,7 @@ window.SM={
     var sceneWaIn=inSym?_sceneSnapshot.waIn:state.waIn;
     var sceneWaOut=inSym?_sceneSnapshot.waOut:state.waOut;
     return JSON.stringify({version:13,totalFrames:sceneTotal,fps:sceneFps,canvasW:state.canvasW,canvasH:state.canvasH,canvasBg:state.canvasBg,waIn:sceneWaIn,waOut:sceneWaOut,
-      layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color,motion:l.motion,motionStatic:l.motionStatic,elementMotion:l.elementMotion,inPoint:l.inPoint,outPoint:l.outPoint,nativeVideo:l.nativeVideo};}),
+      layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color,motion:l.motion,motionStatic:l.motionStatic,elementMotion:l.elementMotion,inPoint:l.inPoint,outPoint:l.outPoint,nativeVideo:l.nativeVideo,matteMode:l.matteMode};}),
       layerFolders:state.layerFolders,layerLinkGroups:state.layerLinkGroups,
       symbols:state.symbols,palettes:state.palettes,activePaletteIdx:state.activePaletteIdx,customBrushPresets:state.customBrushPresets,
       // audio: only the persistable fields — _buffer/_peaksCanvas/_srcNode
@@ -805,6 +805,7 @@ window.SM={
     state.symbols=d.symbols||{};state.openSymbolTabs=[];state.activeSymbolId=null;
     d.layers.forEach(function(ld){var idx=createUserLayer(ld.name);state.layers[idx].visible=ld.visible!==false;state.layers[idx].locked=ld.locked||false;state.layers[idx].frames=ld.frames;
       if(ld.blendMode)state.layers[idx].blendMode=ld.blendMode;
+      if(ld.matteMode)state.layers[idx].matteMode=ld.matteMode;
       if(ld.symbolId){state.layers[idx].symbolId=ld.symbolId;state.layers[idx].symPlayMode=ld.symPlayMode||'loop';state.layers[idx].symSpeed=ld.symSpeed||1;state.layers[idx].symPlacedAt=ld.symPlacedAt||0;state.layers[idx].symSingleFrame=ld.symSingleFrame||0;if(ld.symMatrix)state.layers[idx].symMatrix=ld.symMatrix;}
       if(ld.lfsGroup){state.layers[idx].lfsGroup=true;state.layers[idx].lfsIds=ld.lfsIds;state.layers[idx].lfsSettings=ld.lfsSettings;}
       if(ld.folderId)state.layers[idx].folderId=ld.folderId;
@@ -1104,6 +1105,12 @@ function updatePropsContext(){
     var bv=state.layers[state.activeLayerIdx].blendMode||'normal';
     blendSel.dataset.value=bv;
     blendSel.textContent=(typeof BLEND_MODE_LABELS!=='undefined'&&BLEND_MODE_LABELS[bv])||bv;
+  }
+  var matteSel=document.getElementById('p-mattemode');
+  if(matteSel&&state.layers[state.activeLayerIdx]){
+    var mv=state.layers[state.activeLayerIdx].matteMode||'none';
+    matteSel.dataset.value=mv;
+    matteSel.textContent=(typeof MATTE_MODE_LABELS!=='undefined'&&MATTE_MODE_LABELS[mv])||mv;
   }
   var hdrEl=document.getElementById('props-context-hdr');if(hdrEl)hdrEl.textContent=hdrText;
   Object.keys(show).forEach(function(id){var sec=document.getElementById(id);if(sec)sec.style.display=show[id]?'block':'none';});
@@ -3617,6 +3624,73 @@ var BLEND_MODE_LABELS={normal:'Normal',multiply:'Multiply',screen:'Screen',overl
   }
   // Leaving the whole list without picking: preview back to the original so
   // the canvas never lingers on a mode the user merely passed over.
+  pop.addEventListener('mouseleave',function(){if(origMode!==null)applyPreview(origMode);});
+  dd.addEventListener('click',function(e){e.stopPropagation();if(pop.style.display==='block')close(true);else open();});
+  document.addEventListener('pointerdown',function(e){if(pop.style.display==='block'&&!pop.contains(e.target)&&e.target!==dd)close(true);});
+  window.addEventListener('keydown',function(e){if(e.key==='Escape'&&pop.style.display==='block')close(true);});
+})();
+
+// Track matte (2026-07, scouted from Caddis's Layer.matteMode) — dropdown
+// wired IDENTICALLY to initBlendDropdown above (same hover-preview /
+// click-commit / Escape-reverts UX), deliberately not factored into a
+// shared helper: the two are independent small pieces of UI logic that
+// happen to look alike today but read/write different layer fields and
+// have already diverged once (Blend has no "which OTHER layer" concept;
+// Matte's whole point is the layer above). A shared abstraction would be
+// solving a duplication that isn't really there yet.
+var MATTE_MODE_LABELS={none:'Aucun',alpha:'Alpha',alphaInverted:'Alpha (inversé)',luma:'Luminance',lumaInverted:'Luminance (inversée)'};
+(function initMatteDropdown(){
+  var dd=document.getElementById('p-mattemode');if(!dd)return;
+  var pop=document.createElement('div');pop.id='matte-pop';document.body.appendChild(pop);
+  var origMode=null;
+  function currentLd(){return state.layers[state.activeLayerIdx];}
+  function applyPreview(v){
+    var ld=currentLd();if(!ld)return;
+    ld.matteMode=v==='none'?undefined:v;
+    window._sceneVersion=(window._sceneVersion||0)+1;
+    if(window.SMEngineBridge&&window.SMEngineBridge.renderNow)window.SMEngineBridge.renderNow();
+  }
+  function setLabel(v){dd.dataset.value=v;dd.textContent=MATTE_MODE_LABELS[v]||v;}
+  function close(revert){
+    pop.style.display='none';
+    if(revert&&origMode!==null)applyPreview(origMode);
+    origMode=null;
+  }
+  function open(){
+    var ld=currentLd();if(!ld)return;
+    // A matte needs a layer ABOVE this one to draw from (AE convention —
+    // the source is implicit, never picked). Nothing to offer on the
+    // topmost layer; refusing to open beats a picker that visibly does
+    // nothing once a mode is chosen.
+    if(state.activeLayerIdx>=state.layers.length-1){
+      if(window.showToast)showToast('Aucun calque au-dessus pour servir de matte');
+      return;
+    }
+    origMode=ld.matteMode||'none';
+    pop.innerHTML='';
+    Object.keys(MATTE_MODE_LABELS).forEach(function(v){
+      var it=document.createElement('div');
+      it.className='blend-opt'+(v===origMode?' sel':'');
+      it.textContent=MATTE_MODE_LABELS[v];
+      it.addEventListener('mouseenter',function(){applyPreview(v);});
+      it.addEventListener('click',function(e){
+        e.stopPropagation();
+        var ld2=currentLd();if(ld2)ld2.matteMode=origMode==='none'?undefined:origMode;
+        pushUndo();
+        applyPreview(v);
+        setLabel(v);
+        origMode=null;
+        close(false);
+      });
+      pop.appendChild(it);
+    });
+    var r=dd.getBoundingClientRect();
+    pop.style.display='block';
+    pop.style.left=Math.max(8,Math.min(window.innerWidth-pop.offsetWidth-8,r.left))+'px';
+    var top=r.bottom+4;
+    if(top+pop.offsetHeight>window.innerHeight-8)top=Math.max(8,r.top-pop.offsetHeight-4);
+    pop.style.top=top+'px';
+  }
   pop.addEventListener('mouseleave',function(){if(origMode!==null)applyPreview(origMode);});
   dd.addEventListener('click',function(e){e.stopPropagation();if(pop.style.display==='block')close(true);else open();});
   document.addEventListener('pointerdown',function(e){if(pop.style.display==='block'&&!pop.contains(e.target)&&e.target!==dd)close(true);});
