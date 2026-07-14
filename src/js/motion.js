@@ -1144,6 +1144,13 @@
   window.SMMotion = {
     valueAtFrame: valueAtFrame,
     isAnimated: isAnimated,
+    // Layer-level get/set for external gesture writers (select-bridge's
+    // native-video footage drag) — same semantics as the Transform panel
+    // fields: reads the effective value at the playhead, writes through
+    // setValue (static override when the stopwatch is off, auto-keyframe
+    // at the current frame when it's on — the AE convention).
+    getLayerValue: function (li, prop) { var ld = state.layers[li]; return ld ? valueAtFrame(ld, prop, state.currentFrame) : null; },
+    setLayerValue: function (li, prop, vals) { var ld = state.layers[li]; if (ld) setValue(ld, prop, vals); },
     layerMotionAt: layerMotionAt,
     elementMotionAt: elementMotionAt,
     transformSegments: transformSegments,

@@ -21,7 +21,13 @@
 // rotate transform box with opposite-corner anchoring, and group move are
 // all ported too.
 (function () {
-  var mode = null; // 'xform-scale' | 'xform-rotate' | 'marquee' | 'move' | 'arc' | null
+  var mode = null; // 'xform-scale' | 'xform-rotate' | 'marquee' | 'move' | 'arc' | 'nv-drag' | null
+  // Native-video footage gesture (experimental branch): drag moves the
+  // footage, Shift+drag scales it uniformly (vertical motion), both writing
+  // through SMMotion.setLayerValue — static override when the property's
+  // stopwatch is off, auto-keyframe at the playhead when it's on, exactly
+  // like typing in the Transform panel fields.
+  var nvIdx = -1, nvStartPt = null, nvStartPos = null, nvStartScale = null, nvScaleMode = false, nvMoved = false;
   var xformDir = null, xformAnchor = null, xformOrigHandlePos = null, xformLastSx = 1, xformLastSy = 1;
   var rotCenter = null, rotStartAngle = 0, rotLastAngle = 0;
   var marqueeStart = null;
@@ -182,6 +188,34 @@
     }
 
     if (!hit) {
+      // Native video footage: click inside a visible video layer's display
+      // rect (topmost first) starts a footage transform gesture. Runs only
+      // when no stroke was hit — drawings sit ON TOP of footage, so a
+      // stroke click must keep selecting the stroke.
+      var nvHit = -1;
+      if (window.SMNativeVideo && window.SMMotion) {
+        for (var nvi = state.layers.length - 1; nvi >= 0; nvi--) {
+          var nld = state.layers[nvi];
+          if (!nld || !nld.nativeVideo || !nld.visible || nld.locked) continue;
+          var nvr = SMNativeVideo.displayRect(nvi);
+          if (nvr && pt.x >= nvr.x && pt.x <= nvr.x + nvr.width && pt.y >= nvr.y && pt.y <= nvr.y + nvr.height) { nvHit = nvi; break; }
+        }
+      }
+      if (nvHit >= 0) {
+        if (!e.shiftKey) clearSel();
+        state.activeLayerIdx = nvHit;
+        activateUL(nvHit);
+        mode = 'nv-drag';
+        nvIdx = nvHit;
+        nvStartPt = pt.clone();
+        nvScaleMode = !!e.shiftKey;
+        nvStartPos = SMMotion.getLayerValue(nvHit, 'position');
+        nvStartScale = SMMotion.getLayerValue(nvHit, 'scale');
+        nvMoved = false;
+        renderArcs(); updateUI();
+        window.SMEngineBridge.renderNow();
+        return;
+      }
       var compHit = hitTestComponentLayers(pt);
       if (compHit) {
         var now2 = Date.now();
@@ -287,6 +321,19 @@
         _marquee.rect = new Path.Rectangle({ from: new Point(mx1, my1), to: new Point(mx2, my2) });
       }
       prevA.activate();
+    } else if (mode === 'nv-drag') {
+      if (!nvMoved) { pushUndo(); nvMoved = true; }
+      var nvd = pt.subtract(nvStartPt);
+      if (nvScaleMode) {
+        // Vertical drag scales uniformly around the current pivot: up =
+        // bigger. 200 world units per doubling feels right at canvas scale.
+        var nvf = Math.max(0.05, 1 - nvd.y / 200);
+        SMMotion.setLayerValue(nvIdx, 'scale', [nvStartScale[0] * nvf, nvStartScale[1] * nvf]);
+      } else {
+        SMMotion.setLayerValue(nvIdx, 'position', [nvStartPos[0] + nvd.x, nvStartPos[1] + nvd.y]);
+      }
+      window._sceneVersion++;
+      window.SMEngineBridge.renderNow();
     } else if (mode === 'move') {
       if (!moveStarted) { pushUndo(); moveStarted = true; }
       var delta = pt.subtract(lastPt);
@@ -365,6 +412,14 @@
     if (!mode) return;
     e.stopImmediatePropagation();
     e.preventDefault();
+    if (mode === 'nv-drag') {
+      mode = null; nvIdx = -1; nvStartPt = null;
+      // One panel/timeline refresh at gesture end (not per tick — the
+      // Transform fields and Motion rows re-read motionStatic/keys).
+      updateUI();
+      window.SMEngineBridge.renderNow();
+      return;
+    }
     if (mode === 'arc') {
       draggingArc = null;
       generateTweens();

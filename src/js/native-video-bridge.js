@@ -427,6 +427,28 @@
     }
   }
 
+  // Current on-canvas rect of a video layer, in WORLD coordinates — the
+  // exact math buildSceneJson (engine-bridge.js) uses to place the image
+  // item: fit-to-canvas centered, then the layer's Motion transform
+  // (static or keyframed) via transformImageRect. select-bridge uses this
+  // for footage hit-testing and drag gestures; keeping the formula in ONE
+  // reusable place here means the gesture and the picture can't drift.
+  function displayRect(li) {
+    var ld = state.layers[li];
+    if (!ld || !ld.nativeVideo) return null;
+    var nv = ld.nativeVideo;
+    if (!nv.width || !nv.height) return null;
+    var s = Math.min(state.canvasW / nv.width, state.canvasH / nv.height);
+    var w = nv.width * s, h = nv.height * s;
+    var rect = { x: (state.canvasW - w) / 2, y: (state.canvasH - h) / 2, width: w, height: h };
+    var mm = window.SMMotion ? SMMotion.layerMotionAt(li, state.currentFrame) : null;
+    if (mm) {
+      var pivot = { x: rect.x + rect.width / 2 + mm.ax, y: rect.y + rect.height / 2 + mm.ay };
+      rect = SMMotion.transformImageRect(rect, pivot, mm);
+    }
+    return rect;
+  }
+
   // Instant import: opens a session and creates a nativeVideo layer —
   // called by images.js's Vidéo… button (Tauri path) on this branch.
   // Returns the layer index. A small canvas-drawn thumbnail of frame 0
@@ -511,6 +533,7 @@
     detachFromPlayhead: detachFromPlayhead,
     importAsLayer: importAsLayer,
     onFrameChanged: onFrameChanged,
+    displayRect: displayRect,
     stats: stats,
     _refSync: _refSync,
     sessions: function () { return Object.assign({}, sessions); },
