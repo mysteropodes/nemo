@@ -5,9 +5,9 @@
   // svg/avif added (2026-07, user request "gestion de tout format image") —
   // both decode natively via plain <img> in every Tauri webview target
   // (WebKit/macOS, WebView2/Windows), so no new decode code, just widening
-  // the filter. heic/tiff deliberately excluded: WebKit has no reliable
-  // native <img> decode for either (would silently fail via naturalSize's
-  // onerror -> 1x1 fallback, worse than just not offering them).
+  // the filter. heic deliberately still excluded: the bundled ffmpeg sidecar
+  // has no libheif compiled in (`ffmpeg -decoders | grep heic` — nothing),
+  // so there's no decode path for it at all right now, native or otherwise.
   function mimeOf(ext){return{png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',gif:'image/gif',webp:'image/webp',bmp:'image/bmp',svg:'image/svg+xml',avif:'image/avif'}[ext]||'image/png';}
   function baseName(path){var parts=path.split(/[\\/]/);return parts[parts.length-1];}
 
@@ -16,9 +16,37 @@
     for(var i=0;i<bytes.length;i+=chunk)binary+=String.fromCharCode.apply(null,bytes.subarray(i,i+chunk));
     return btoa(binary);
   }
+  // "Pro" still-image formats (2026-07, "formats image/vidéo élargis") —
+  // WebKit's native <img> can't decode any of these, but the bundled ffmpeg
+  // sidecar can (verified against the actual binary: `ffmpeg -decoders`
+  // lists tiff/exr/psd/dpx). Same Tauri-only ffmpeg pattern already used
+  // for video import (decodeVideoFramesFfmpeg below) and the rotoscopy
+  // reference video path (reference-bridge.js) — a plain-browser preview
+  // has no sidecar, so these stay unavailable there (image-input's
+  // accept="image/*" is left as-is; an unsupported pick there just falls
+  // through naturalSize's existing onerror->1x1 fallback, same as before).
+  var PRO_IMAGE_EXTS={tiff:1,tif:1,exr:1,psd:1,dpx:1};
+  async function decodeProImageFfmpeg(path){
+    showToast('Décodage de l’image (ffmpeg)…');
+    var tmp=window.exportTempDirPath?await exportTempDirPath():null;
+    var workDir=(tmp||'')+'sm-img-import-'+Date.now();
+    await exportMkdir(workDir);
+    try{
+      // -pix_fmt rgba preserves alpha where the source has it (EXR/PSD both
+      // commonly do) — harmless (alpha=255) for formats that don't.
+      await exportRunFfmpeg(['-y','-i',path,'-frames:v','1','-pix_fmt','rgba',workDir+'/frame.png']);
+      var bytes;
+      try{bytes=await window.__TAURI__.fs.readFile(workDir+'/frame.png');}
+      catch(e){throw new Error('ffmpeg n’a produit aucune image — format non décodable');}
+      return 'data:image/png;base64,'+bytesToBase64(bytes);
+    }finally{
+      await exportRemoveDir(workDir);
+    }
+  }
   async function readAsDataUrl(path){
-    var bytes=await window.__TAURI__.fs.readFile(path);
     var ext=extOf(path);
+    if(PRO_IMAGE_EXTS[ext])return decodeProImageFfmpeg(path);
+    var bytes=await window.__TAURI__.fs.readFile(path);
     return 'data:'+mimeOf(ext)+';base64,'+bytesToBase64(bytes);
   }
   function naturalSize(dataUrl){
@@ -101,7 +129,11 @@
 
   async function importImages(){
     if(!tauriOk()){document.getElementById('image-input').click();return;}
-    var paths=await window.__TAURI__.dialog.open({title:'Import Image(s)',multiple:true,filters:[{name:'Images',extensions:['png','jpg','jpeg','gif','webp','bmp','svg','avif']}]});
+    var paths=await window.__TAURI__.dialog.open({title:'Import Image(s)',multiple:true,filters:[
+      {name:'Images',extensions:['png','jpg','jpeg','gif','webp','bmp','svg','avif']},
+      {name:'Images pro (via ffmpeg)',extensions:Object.keys(PRO_IMAGE_EXTS)},
+      {name:'Tous les fichiers',extensions:['*']},
+    ]});
     if(!paths)return;
     paths=Array.isArray(paths)?paths:[paths];
     var seq=paths.length>=2?detectSequence(paths):{isSeq:false};
