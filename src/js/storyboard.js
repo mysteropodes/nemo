@@ -1,37 +1,74 @@
 // ---- STORYBOARD MODE (2026-07) ----
 // Node-space montage editor — the third app mode next to Animation 2D and
 // Motion. The timeline grid is replaced by a free pan/zoom space holding
-// draggable MODULES (the Rive-state-machine feel, but for editing):
+// draggable MODULES (the Rive-state-machine feel, but for editing).
 //
-//   - instance modules: one per placed COMPONENT instance (state.symbols —
-//     the same symbol system component layers use; double-click opens the
-//     symbol's own timeline via SM.enterSymbol, exactly like a component
-//     layer's double-click). Several modules may instance the SAME symbol.
-//   - montage modules (v1 scope, task 2/4): a horizontal strip instances
-//     snap INTO, becoming an ordered, retimable editing sequence.
-//   - sound modules (task 4/4): audio with waveform, splittable, snapping
-//     onto a montage as its embedded track.
+// ARCHITECTURE v2 (reworked after the user's annotated mock corrected v1's
+// misreading): the montage is NOT a container that absorbs instances into
+// internal chips. It is a small anchor BLOCK (film icon) that real modules
+// SNAP TO in a chain, staying whole and visible (thumbnail + edit button);
+// any member can be desnapped by dragging it out. A time RULER sits above
+// the chain and grows/shrinks as modules join/leave; sounds snap BELOW the
+// chain as visible waveform modules. ("On snap chaque component ou module
+// à cet élément-là pour en faire un montage … on peut aussi desnap
+// n'importe quel module … timeline de montage s'agrandit en fonction de
+// l'ajout ou suppression de module.")
 //
 // Data model — plain JSON, persisted wholesale through exportJSON (no
 // runtime-only fields in `modules`, by construction):
 //   state.storyboard = {
 //     pan: {x, y}, zoom: 1, nextId: 1, activeMontageId: null,
 //     modules: [
-//       { id, type:'instance', symbolId, x, y },
-//       { id, type:'montage', name, x, y,
-//         items: [{ symbolId, trimIn, trimOut, stretch }], audio: [], playhead: 0 },
+//       { id, type:'instance', symbolId, x, y,
+//         trimIn?, trimOut?, duration? },            // retiming, set when chained
+//       { id, type:'montage', name, x, y, playhead,
+//         chain: [instanceModuleId...],              // ORDER = the sequence
+//         audio: [{ moduleId, offsetFrames }] },     // sound modules snapped below
+//       { id, type:'sound', name, dataB64, x, y, inSec, outSec, cursorSec },
 //     ],
 //   }
 (function () {
-  var SNAP_PX = 10; // world-space edge-snap distance while dragging
+  var SNAP_PX = 12;      // world-space edge-snap distance while dragging
+  var RULER_H = 16;      // ruler strip height above a chain
+  var CHAIN_GAP_Y = 8;   // gap between chain and attached sounds
 
   function sb() {
     if (!state.storyboard) {
       state.storyboard = { pan: { x: 40, y: 40 }, zoom: 1, nextId: 1, activeMontageId: null, modules: [] };
     }
+    migrateLegacy(state.storyboard);
     return state.storyboard;
   }
+  // v1 montages stored their sequence as internal `items` chips and audio
+  // with inline dataB64 — convert both to the v2 real-module model once.
+  function migrateLegacy(s) {
+    if (s._v2) return;
+    s._v2 = true;
+    (s.modules || []).forEach(function (m) {
+      if (m.type !== 'montage') return;
+      if (!m.chain) m.chain = [];
+      if (m.items && m.items.length) {
+        m.items.forEach(function (it) {
+          var id = 'sbm' + (s.nextId++);
+          s.modules.push({ id: id, type: 'instance', symbolId: it.symbolId, x: m.x, y: m.y, trimIn: it.trimIn, trimOut: it.trimOut, duration: it.duration });
+          m.chain.push(id);
+        });
+      }
+      delete m.items;
+      if (m.audio && m.audio.length && m.audio[0] && m.audio[0].dataB64) {
+        var conv = [];
+        m.audio.forEach(function (a) {
+          var id = 'sbm' + (s.nextId++);
+          s.modules.push({ id: id, type: 'sound', name: a.name, dataB64: a.dataB64, x: m.x, y: m.y + 140, inSec: a.inSec, outSec: a.outSec, cursorSec: null });
+          conv.push({ moduleId: id, offsetFrames: a.offsetFrames || 0 });
+        });
+        m.audio = conv;
+      }
+      if (!m.audio) m.audio = [];
+    });
+  }
   function newId() { var s = sb(); return 'sbm' + (s.nextId++); }
+  function moduleById(id) { return sb().modules.find(function (x) { return x.id === id; }) || null; }
 
   // Stable per-symbol color (the mock shows plain colored rects as the
   // instance preview) — hash the symbol id onto a fixed pleasant palette
@@ -84,71 +121,41 @@
     if (on) { applyView(); render(); }
   }
 
-  // ---- module rendering ----
-  function render() {
-    if (!world) return;
-    world.innerHTML = '';
-    sb().modules.forEach(function (m) {
-      var el = m.type === 'instance' ? renderInstance(m) : m.type === 'montage' ? renderMontage(m) : m.type === 'sound' ? renderSound(m) : null;
-      if (!el) return;
-      el.style.left = m.x + 'px';
-      el.style.top = m.y + 'px';
-      el.dataset.sbId = m.id;
-      world.appendChild(el);
-    });
-  }
-
-  function renderInstance(m) {
-    var el = document.createElement('div');
-    el.className = 'sb-module sb-instance';
-    var sym = state.symbols[m.symbolId];
-    var card = document.createElement('div');
-    card.className = 'sb-thumb';
-    card.style.background = symbolColor(m.symbolId);
-    el.appendChild(card);
-    var side = document.createElement('div');
-    side.className = 'sb-side';
-    var edit = document.createElement('div');
-    edit.className = 'sb-edit';
-    edit.title = 'Éditer l’animation du composant';
-    edit.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h9M4 12h6M4 18h7"/><path d="m14.5 15.5 5-5 2 2-5 5-2.6.6z"/></svg>';
-    edit.addEventListener('click', function (e) { e.stopPropagation(); openSymbol(m); });
-    side.appendChild(edit);
-    el.appendChild(side);
-    var nm = document.createElement('div');
-    nm.className = 'sb-name';
-    nm.textContent = sym ? sym.name : '(composant supprimé)';
-    el.appendChild(nm);
-    el.addEventListener('dblclick', function (e) { e.stopPropagation(); openSymbol(m); });
-    wireModuleDrag(el, m);
-    wireModuleMenu(el, m);
-    return el;
-  }
-
-  // ---- montage time model ----
-  // item = { symbolId, trimIn, trimOut, duration } (all frames):
-  //   trimIn/trimOut  = the SOURCE range played from the component
-  //   duration        = how many montage frames the item occupies —
-  //                     equal to the source range for plain trims, different
-  //                     after a STRETCH (Alt+drag: same source range squeezed
-  //                     into fewer/more frames = speed change).
-  var FPP = 1.5; // montage lane: pixels per frame
+  // ---- time model ----
+  // A chained instance module carries its own retiming:
+  //   trimIn/trimOut = SOURCE range played from the component
+  //   duration       = montage frames occupied — equals the source range
+  //                    for plain trims, differs after a STRETCH (Alt+drag:
+  //                    same range squeezed into fewer/more frames = speed).
   function symbolDuration(symbolId) {
     var sym = state.symbols[symbolId];
     return sym ? (sym.totalFrames || (sym.layers[0] && sym.layers[0].frames.length) || 24) : 24;
   }
-  function montageTotal(m) { return m.items.reduce(function (a, it) { return a + it.duration; }, 0); }
+  function ensureRetime(mod) {
+    if (mod.trimIn == null) mod.trimIn = 0;
+    if (mod.trimOut == null) mod.trimOut = symbolDuration(mod.symbolId) - 1;
+    if (mod.duration == null) mod.duration = mod.trimOut - mod.trimIn + 1;
+  }
+  // The montage's sequence, derived LIVE from its chain of real modules —
+  // a dangling id (deleted module) is skipped, never crashes.
+  function chainMods(m) {
+    return (m.chain || []).map(moduleById).filter(function (x) { return x && x.type === 'instance'; });
+  }
+  function montageTotal(m) {
+    return chainMods(m).reduce(function (a, mod) { ensureRetime(mod); return a + mod.duration; }, 0);
+  }
   function montageStrokesAt(m, f) {
-    var acc = 0;
-    for (var i = 0; i < m.items.length; i++) {
-      var it = m.items[i];
-      if (f < acc + it.duration) {
+    var mods = chainMods(m), acc = 0;
+    for (var i = 0; i < mods.length; i++) {
+      var mod = mods[i];
+      ensureRetime(mod);
+      if (f < acc + mod.duration) {
         var local = f - acc;
-        var srcLen = it.trimOut - it.trimIn + 1;
-        var srcFrame = it.trimIn + Math.min(srcLen - 1, Math.floor(local * srcLen / it.duration));
-        return symbolStrokesAt(it.symbolId, srcFrame);
+        var srcLen = mod.trimOut - mod.trimIn + 1;
+        var srcFrame = mod.trimIn + Math.min(srcLen - 1, Math.floor(local * srcLen / mod.duration));
+        return symbolStrokesAt(mod.symbolId, srcFrame);
       }
-      acc += it.duration;
+      acc += mod.duration;
     }
     return [];
   }
@@ -170,6 +177,261 @@
     return out;
   }
 
+  // ---- chain layout + piecewise time<->pixels mapping ----
+  // Members keep their natural module widths (the mock shows equal cards,
+  // not duration-proportional strips), so the ruler's time axis is
+  // PIECEWISE: member i spans [cumDur, cumDur+duration) in time and
+  // [cumX, cumX+width) in pixels. Geometry is cached per montage at
+  // layout time — pxToFrame/frameToPx read the cache, never the DOM.
+  var _chainGeom = {}; // montageId -> {startX, y, totalW, totalDur, members:[{id,w,dur}]}
+  function layoutChains() {
+    if (!world) return;
+    _chainGeom = {};
+    sb().modules.forEach(function (m) {
+      if (m.type !== 'montage') return;
+      var blockEl = world.querySelector('[data-sb-id="' + m.id + '"]');
+      if (!blockEl) return;
+      var x = m.x + blockEl.offsetWidth; // chain starts flush at the block's right edge
+      var geom = { startX: x, y: m.y, totalW: 0, totalDur: 0, members: [] };
+      chainMods(m).forEach(function (mod) {
+        ensureRetime(mod);
+        var el = world.querySelector('[data-sb-id="' + mod.id + '"]');
+        if (!el) return;
+        mod.x = x; mod.y = m.y;
+        el.style.left = x + 'px';
+        el.style.top = m.y + 'px';
+        el.classList.add('chained');
+        geom.members.push({ id: mod.id, w: el.offsetWidth, dur: mod.duration });
+        x += el.offsetWidth;
+        geom.totalW += el.offsetWidth;
+        geom.totalDur += mod.duration;
+      });
+      _chainGeom[m.id] = geom;
+      // attached sounds sit UNDER the chain at their time offset
+      var blockH = blockEl.offsetHeight;
+      (m.audio || []).forEach(function (a) {
+        var smod = moduleById(a.moduleId);
+        var sEl = smod && world.querySelector('[data-sb-id="' + smod.id + '"]');
+        if (!smod || !sEl) return;
+        smod.x = frameToPx(m, a.offsetFrames);
+        smod.y = m.y + blockH + CHAIN_GAP_Y;
+        sEl.style.left = smod.x + 'px';
+        sEl.style.top = smod.y + 'px';
+        sEl.classList.add('chained');
+      });
+      positionRuler(m);
+    });
+  }
+  function pxToFrame(m, px) {
+    var g = _chainGeom[m.id];
+    if (!g || !g.members.length) return 0;
+    var rel = px - g.startX;
+    if (rel <= 0) return 0;
+    var cumX = 0, cumF = 0;
+    for (var i = 0; i < g.members.length; i++) {
+      var mb = g.members[i];
+      if (rel < cumX + mb.w) return Math.round(cumF + (rel - cumX) / mb.w * mb.dur);
+      cumX += mb.w; cumF += mb.dur;
+    }
+    return Math.max(0, g.totalDur - 1);
+  }
+  function frameToPx(m, f) {
+    var g = _chainGeom[m.id];
+    if (!g || !g.members.length) return (g ? g.startX : m.x);
+    var cumX = 0, cumF = 0;
+    for (var i = 0; i < g.members.length; i++) {
+      var mb = g.members[i];
+      if (f < cumF + mb.dur) return g.startX + cumX + (f - cumF) / mb.dur * mb.w;
+      cumX += mb.w; cumF += mb.dur;
+    }
+    return g.startX + g.totalW;
+  }
+
+  // ---- ruler (the montage timeline above the chain — grows/shrinks with
+  // membership, scrubbable, carries the playhead marker) ----
+  function positionRuler(m) {
+    var g = _chainGeom[m.id];
+    var ruler = world.querySelector('[data-sb-ruler="' + m.id + '"]');
+    if (!ruler) return;
+    if (!g || !g.members.length) { ruler.style.display = 'none'; return; }
+    ruler.style.display = 'block';
+    ruler.style.left = g.startX + 'px';
+    ruler.style.top = (m.y - RULER_H - 4) + 'px';
+    ruler.style.width = g.totalW + 'px';
+    var ph = ruler.querySelector('.sb-ph');
+    if (ph) ph.style.left = (frameToPx(m, m.playhead || 0) - g.startX) + 'px';
+    var lbl = ruler.querySelector('.sb-ruler-lbl');
+    if (lbl) lbl.textContent = (m.playhead || 0) + ' / ' + g.totalDur + ' f';
+  }
+  function buildRuler(m) {
+    var ruler = document.createElement('div');
+    ruler.className = 'sb-ruler';
+    ruler.dataset.sbRuler = m.id;
+    var lbl = document.createElement('span');
+    lbl.className = 'sb-ruler-lbl';
+    ruler.appendChild(lbl);
+    var ph = document.createElement('div');
+    ph.className = 'sb-ph';
+    ruler.appendChild(ph);
+    ruler.addEventListener('pointerdown', function (e) {
+      e.stopPropagation(); e.preventDefault();
+      sb().activeMontageId = m.id;
+      markActive();
+      function scrub(ev) {
+        var p = toWorld(ev.clientX, ev.clientY);
+        var total = montageTotal(m);
+        m.playhead = Math.max(0, Math.min(Math.max(0, total - 1), pxToFrame(m, p.x)));
+        positionRuler(m);
+        updatePreview();
+      }
+      scrub(e);
+      function up() { document.removeEventListener('pointermove', scrub); document.removeEventListener('pointerup', up); }
+      document.addEventListener('pointermove', scrub);
+      document.addEventListener('pointerup', up);
+    });
+    return ruler;
+  }
+  function markActive() {
+    var act = sb().activeMontageId;
+    world.querySelectorAll('.sb-montageblock').forEach(function (b) {
+      b.classList.toggle('active', b.dataset.sbId === act);
+    });
+  }
+
+  // ---- module rendering ----
+  function render() {
+    if (!world) return;
+    world.innerHTML = '';
+    var s = sb();
+    s.modules.forEach(function (m) {
+      var el = m.type === 'instance' ? renderInstance(m) : m.type === 'montage' ? renderMontageBlock(m) : m.type === 'sound' ? renderSound(m) : null;
+      if (!el) return;
+      el.style.left = m.x + 'px';
+      el.style.top = m.y + 'px';
+      el.dataset.sbId = m.id;
+      world.appendChild(el);
+    });
+    s.modules.forEach(function (m) { if (m.type === 'montage') world.appendChild(buildRuler(m)); });
+    layoutChains();
+    markActive();
+  }
+
+  function chainOf(mod) {
+    return sb().modules.find(function (m) { return m.type === 'montage' && (m.chain || []).indexOf(mod.id) >= 0; }) || null;
+  }
+  function audioHostOf(mod) {
+    return sb().modules.find(function (m) { return m.type === 'montage' && (m.audio || []).some(function (a) { return a.moduleId === mod.id; }); }) || null;
+  }
+
+  function renderInstance(m) {
+    var el = document.createElement('div');
+    el.className = 'sb-module sb-instance';
+    var sym = state.symbols[m.symbolId];
+    var card = document.createElement('div');
+    card.className = 'sb-thumb';
+    card.style.background = symbolColor(m.symbolId);
+    el.appendChild(card);
+    var side = document.createElement('div');
+    side.className = 'sb-side';
+    var edit = document.createElement('div');
+    edit.className = 'sb-edit';
+    edit.title = 'Éditer l’animation du composant';
+    edit.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h9M4 12h6M4 18h7"/><path d="m14.5 15.5 5-5 2 2-5 5-2.6.6z"/></svg>';
+    edit.addEventListener('click', function (e) { e.stopPropagation(); openSymbol(m); });
+    side.appendChild(edit);
+    el.appendChild(side);
+    var host = chainOf(m);
+    var nm = document.createElement('div');
+    nm.className = 'sb-name';
+    var dName = sym ? sym.name : '(composant supprimé)';
+    if (host) {
+      ensureRetime(m);
+      var srcLen = m.trimOut - m.trimIn + 1;
+      dName += ' — ' + m.duration + 'f' + (m.duration !== srcLen ? ' ×' + (srcLen / m.duration).toFixed(2) : '');
+    }
+    nm.textContent = dName;
+    el.appendChild(nm);
+    // Retiming handles only exist while chained ("On y snap, retime les
+    // component"): edges = trim (source range + duration together, speed
+    // unchanged) — Alt+drag right = stretch (duration alone = speed).
+    if (host) {
+      ['left', 'right'].forEach(function (side2) {
+        var hnd = document.createElement('div');
+        hnd.className = 'sb-trim ' + side2;
+        hnd.title = side2 === 'right' ? 'Trim — Alt+glisser : étirer (vitesse)' : 'Trim';
+        hnd.addEventListener('pointerdown', function (e) {
+          e.stopPropagation(); e.preventDefault();
+          ensureRetime(m);
+          var startX = e.clientX, o = { trimIn: m.trimIn, trimOut: m.trimOut, duration: m.duration };
+          var stretch = side2 === 'right' && e.altKey;
+          var maxLen = symbolDuration(m.symbolId);
+          var PXF = 2; // trim gesture scale: 2px per frame — steady, zoom-independent feel
+          function mv(ev) {
+            var df = Math.round((ev.clientX - startX) / PXF);
+            if (stretch) m.duration = Math.max(1, o.duration + df);
+            else if (side2 === 'left') {
+              var ti = Math.max(0, Math.min(o.trimOut, o.trimIn + df));
+              m.trimIn = ti;
+              m.duration = Math.max(1, o.duration - (ti - o.trimIn));
+            } else {
+              var to = Math.min(maxLen - 1, Math.max(o.trimIn, o.trimOut + df));
+              m.trimOut = to;
+              m.duration = Math.max(1, o.duration + (to - o.trimOut));
+            }
+            nm.textContent = (sym ? sym.name : '?') + ' — ' + m.duration + 'f';
+          }
+          function up() {
+            document.removeEventListener('pointermove', mv);
+            document.removeEventListener('pointerup', up);
+            render(); updatePreview();
+          }
+          document.addEventListener('pointermove', mv);
+          document.addEventListener('pointerup', up);
+        });
+        el.appendChild(hnd);
+      });
+    }
+    el.addEventListener('dblclick', function (e) { e.stopPropagation(); openSymbol(m); });
+    wireModuleDrag(el, m);
+    wireModuleMenu(el, m);
+    return el;
+  }
+
+  // The montage anchor BLOCK (film icon) — modules chain to its right.
+  function renderMontageBlock(m) {
+    var el = document.createElement('div');
+    el.className = 'sb-module sb-montageblock' + (sb().activeMontageId === m.id ? ' active' : '');
+    el.title = m.name + ' — glissez des instances contre son bord droit pour monter';
+    el.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 5v14M17 5v14M3 10h4M3 14h4M17 10h4M17 14h4"/></svg>';
+    var play = document.createElement('span');
+    play.className = 'sb-play sb-block-play';
+    play.textContent = _playingMontageId === m.id ? '◼' : '▶';
+    play.title = 'Lire / arrêter le montage';
+    play.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+    play.addEventListener('click', function (e) {
+      e.stopPropagation();
+      sb().activeMontageId = m.id;
+      markActive();
+      toggleMontagePlay(m);
+      updatePreview();
+    });
+    el.appendChild(play);
+    el.addEventListener('click', function () {
+      sb().activeMontageId = m.id;
+      markActive();
+      updatePreview();
+    });
+    wireModuleDrag(el, m);
+    wireModuleMenu(el, m);
+    return el;
+  }
+
+  function openSymbol(m) {
+    if (!state.symbols[m.symbolId]) { showToast('Ce composant n’existe plus'); return; }
+    if (window.SMMotion) SMMotion.setAppMode('anim2d');
+    window.SM.enterSymbol(m.symbolId);
+  }
+
   // ---- canvas preview (service Paper layer, ghostAllLayer pattern —
   // engine-bridge's buildSceneJson swaps the document layers for this one
   // in storyboard mode, reading it through onionLayerItems) ----
@@ -177,7 +439,7 @@
   function getPreviewLayer() {
     var s = sb();
     var m = s.modules.find(function (x) { return x.id === s.activeMontageId; });
-    if (!m || !m.items || !m.items.length) return null;
+    if (!m || !chainMods(m).length) return null;
     return previewLayer;
   }
   function updatePreview() {
@@ -191,7 +453,7 @@
     }
     if (!previewLayer) return;
     previewLayer.removeChildren();
-    if (m && m.items.length) {
+    if (m && chainMods(m).length) {
       var strokes = montageStrokesAt(m, m.playhead || 0);
       strokes.forEach(function (sd) { desP(sd, previewLayer); });
     }
@@ -209,17 +471,18 @@
     _playRaf = null; _playingMontageId = null;
     stopAllAudio();
   }
-  // Start every montage audio entry relative to playhead p (frames):
-  // already-underway entries start immediately at the right position in
-  // their range; not-yet-reached ones are scheduled ahead (WebAudio's own
-  // clock keeps them sample-accurate against the visual rAF loop).
+  // Start every attached sound relative to playhead p (frames): already-
+  // underway entries start mid-range at the exact position; not-yet-reached
+  // ones are scheduled ahead (WebAudio's own clock keeps them sample-
+  // accurate against the visual rAF loop).
   function startMontageAudio(m, p) {
     var fps = state.fps || 24;
     (m.audio || []).forEach(function (a) {
-      var key = 'a' + a.aid;
+      var smod = moduleById(a.moduleId);
+      if (!smod) return;
       var relSec = (p - a.offsetFrames) / fps;
-      if (relSec >= 0) playRange(key, a.dataB64, a.inSec, a.outSec, 0, relSec);
-      else playRange(key, a.dataB64, a.inSec, a.outSec, -relSec, 0);
+      if (relSec >= 0) playRange(smod.id, smod.dataB64, smod.inSec || 0, smod.outSec || 0, 0, relSec);
+      else playRange(smod.id, smod.dataB64, smod.inSec || 0, smod.outSec || 0, -relSec, 0);
     });
   }
   function toggleMontagePlay(m) {
@@ -239,7 +502,7 @@
         var prevPh = m.playhead || 0;
         m.playhead = (prevPh + steps) % total; // loop
         if (m.playhead < prevPh) { stopAllAudio(); startMontageAudio(m, m.playhead); } // wrapped
-        positionPlayhead(m);
+        positionRuler(m);
         updatePreview();
       }
       _playRaf = requestAnimationFrame(step);
@@ -247,301 +510,108 @@
     _playRaf = requestAnimationFrame(step);
     render();
   }
-  function positionPlayhead(m) {
-    var el = world && world.querySelector('[data-sb-id="' + m.id + '"] .sb-ph');
-    if (el) el.style.left = ((m.playhead || 0) * FPP) + 'px';
-  }
 
-  // Montage strip: ordered chips (width = duration), trim handles, stretch
-  // (Alt+drag right handle), drag-to-reorder, scrubbable playhead, play.
-  function renderMontage(m) {
-    var el = document.createElement('div');
-    el.className = 'sb-module sb-montage' + (sb().activeMontageId === m.id ? ' active' : '');
-    var head = document.createElement('div');
-    head.className = 'sb-montage-head';
-    head.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 5v14M17 5v14M3 10h4M3 14h4M17 10h4M17 14h4"/></svg>';
-    var nm = document.createElement('span');
-    nm.textContent = m.name + ' — ' + montageTotal(m) + ' f';
-    head.appendChild(nm);
-    var play = document.createElement('span');
-    play.className = 'sb-play';
-    play.title = 'Lire / arrêter le montage';
-    play.textContent = _playingMontageId === m.id ? '◼' : '▶';
-    play.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
-    play.addEventListener('click', function (e) { e.stopPropagation(); sb().activeMontageId = m.id; toggleMontagePlay(m); updatePreview(); });
-    head.appendChild(play);
-    el.appendChild(head);
-    // The whole montage body drags (head, padding, edges) — the lane,
-    // chips and play button own their gestures and are excluded inside
-    // wireModuleDrag itself, so no head-only rule to discover anymore.
-    wireModuleDrag(el, m);
-
-    var lane = document.createElement('div');
-    lane.className = 'sb-montage-lane';
-    lane.style.width = Math.max(240, montageTotal(m) * FPP + 8) + 'px';
-    if (!m.items.length) {
-      var hint = document.createElement('span');
-      hint.className = 'sb-hint';
-      hint.textContent = 'Glisser des instances ici';
-      lane.appendChild(hint);
-    }
-    m.items.forEach(function (it, idx) { lane.appendChild(renderChip(m, it, idx)); });
-    // playhead
-    var ph = document.createElement('div');
-    ph.className = 'sb-ph';
-    ph.style.left = ((m.playhead || 0) * FPP) + 'px';
-    lane.appendChild(ph);
-    // scrub: drag on the lane background (not a chip)
-    lane.addEventListener('pointerdown', function (e) {
-      if (e.target.closest('.sb-chip')) return;
-      e.stopPropagation();
-      sb().activeMontageId = m.id;
-      function scrub(ev) {
-        var r = lane.getBoundingClientRect();
-        var f = Math.round((ev.clientX - r.left) / (FPP * sb().zoom));
-        m.playhead = Math.max(0, Math.min(Math.max(0, montageTotal(m) - 1), f));
-        positionPlayhead(m);
-        updatePreview();
+  // ---- chain membership (join / leave / re-join by snapping) ----
+  // Joining: an instance released with its LEFT edge flush against (within
+  // SNAP_PX of) the montage block's right edge, a member's right edge, or
+  // overlapping the chain row, inserts at the x-derived index. Leaving:
+  // grabbing a chained member lifts it out immediately (the chain repacks
+  // live), dropping it back in re-inserts, dropping elsewhere leaves it
+  // free — the mock's "desnap n'importe quel module".
+  function tryJoinChain(mod, relX, relY) {
+    if (mod.type !== 'instance') return false;
+    var el = world.querySelector('[data-sb-id="' + mod.id + '"]');
+    var h = el ? el.offsetHeight : 80;
+    var s = sb();
+    for (var i = 0; i < s.modules.length; i++) {
+      var m = s.modules[i];
+      if (m.type !== 'montage') continue;
+      var blockEl = world.querySelector('[data-sb-id="' + m.id + '"]');
+      if (!blockEl) continue;
+      var g = _chainGeom[m.id] || { startX: m.x + blockEl.offsetWidth, totalW: 0, members: [] };
+      var rowY = m.y;
+      // vertical proximity with the chain row
+      if (Math.abs(mod.y - rowY) > h * 0.8) continue;
+      var chainEnd = g.startX + g.totalW;
+      // near the row horizontally: from a bit before the block to a bit past the chain end
+      if (mod.x < m.x - SNAP_PX * 4 || mod.x > chainEnd + SNAP_PX * 6) continue;
+      // insertion index from the module's x against member boundaries
+      var at = 0, cumX = g.startX;
+      for (var k = 0; k < g.members.length; k++) {
+        if (mod.x > cumX + g.members[k].w / 2) at = k + 1;
+        cumX += g.members[k].w;
       }
-      scrub(e);
-      function up() { document.removeEventListener('pointermove', scrub); document.removeEventListener('pointerup', up); render(); }
-      document.addEventListener('pointermove', scrub);
-      document.addEventListener('pointerup', up);
-    });
-    el.appendChild(lane);
-    // Embedded audio track (spec Q&A: "piste audio DANS le module
-    // montage") — one row under the lane, each entry a waveform block at
-    // offsetFrames*FPP, horizontally draggable to re-offset, right-click
-    // to detach (back to a free sound module) or remove.
-    if (m.audio && m.audio.length) {
-      var arow = document.createElement('div');
-      arow.className = 'sb-audio-row';
-      arow.style.width = lane.style.width;
-      m.audio.forEach(function (a) {
-        var blk = document.createElement('div');
-        blk.className = 'sb-audio-blk';
-        var durF = Math.max(1, Math.round(((a.outSec - a.inSec) * (state.fps || 24))));
-        blk.style.left = (a.offsetFrames * FPP) + 'px';
-        blk.style.width = (durF * FPP) + 'px';
-        blk.title = a.name + ' — décaler en glissant';
-        var acv = document.createElement('canvas');
-        acv.width = Math.max(20, durF * FPP); acv.height = 22;
-        blk.appendChild(acv);
-        decodeAudio('a' + a.aid, a.dataB64, function (buf) { drawWave(acv, buf, a.inSec, a.outSec); });
-        blk.addEventListener('pointerdown', function (e) {
-          e.stopPropagation(); e.preventDefault();
-          var startX = e.clientX, o = a.offsetFrames;
-          function mv(ev) {
-            a.offsetFrames = Math.max(0, o + Math.round((ev.clientX - startX) / (FPP * sb().zoom)));
-            blk.style.left = (a.offsetFrames * FPP) + 'px';
-          }
-          function up() { document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up); }
-          document.addEventListener('pointermove', mv);
-          document.addEventListener('pointerup', up);
-        });
-        blk.addEventListener('contextmenu', function (e) {
-          e.preventDefault(); e.stopPropagation();
-          window.showContextMenu(e.clientX, e.clientY, [
-            { label: 'Détacher (redevient un module son)', action: function () { m.audio.splice(m.audio.indexOf(a), 1); sb().modules.push({ id: newId(), type: 'sound', name: a.name, dataB64: a.dataB64, x: m.x, y: m.y + 160, inSec: a.inSec, outSec: a.outSec, cursorSec: null }); render(); } },
-            { label: 'Retirer du montage', action: function () { m.audio.splice(m.audio.indexOf(a), 1); render(); } },
-          ]);
-        });
-        arow.appendChild(blk);
-      });
-      el.appendChild(arow);
-    }
-    el.addEventListener('click', function () {
-      if (sb().activeMontageId !== m.id) { sb().activeMontageId = m.id; render(); updatePreview(); }
-    });
-    wireModuleMenu(el, m);
-    return el;
-  }
-
-  function renderChip(m, it, idx) {
-    var chip = document.createElement('div');
-    chip.className = 'sb-chip';
-    chip.style.width = (it.duration * FPP) + 'px';
-    chip.style.background = symbolColor(it.symbolId);
-    var sym = state.symbols[it.symbolId];
-    var srcLen = it.trimOut - it.trimIn + 1;
-    var stretched = it.duration !== srcLen;
-    chip.title = (sym ? sym.name : '?') + ' — ' + it.duration + ' f' + (stretched ? ' (vitesse ×' + (srcLen / it.duration).toFixed(2) + ')' : '');
-    var lbl = document.createElement('span');
-    lbl.textContent = it.duration + (stretched ? '×' : '');
-    chip.appendChild(lbl);
-
-    // Trim handles (edges). Plain drag = TRIM (source range and duration
-    // move together — speed unchanged); Alt+drag on the RIGHT handle =
-    // STRETCH (duration alone changes — the same source range plays
-    // faster/slower). "Les deux" per the spec Q&A.
-    ['left', 'right'].forEach(function (side) {
-      var h = document.createElement('div');
-      h.className = 'sb-trim ' + side;
-      h.title = side === 'right' ? 'Trim — Alt+glisser : étirer (vitesse)' : 'Trim';
-      h.addEventListener('pointerdown', function (e) {
-        e.stopPropagation(); e.preventDefault();
-        var startX = e.clientX, o = { trimIn: it.trimIn, trimOut: it.trimOut, duration: it.duration };
-        var stretch = side === 'right' && e.altKey;
-        var maxLen = symbolDuration(it.symbolId);
-        function mv(ev) {
-          var df = Math.round((ev.clientX - startX) / (FPP * sb().zoom));
-          if (stretch) {
-            it.duration = Math.max(1, o.duration + df);
-          } else if (side === 'left') {
-            var ti = Math.max(0, Math.min(o.trimOut, o.trimIn + df));
-            var d = ti - o.trimIn;
-            it.trimIn = ti;
-            it.duration = Math.max(1, o.duration - d);
-          } else {
-            var to = Math.min(maxLen - 1, Math.max(o.trimIn, o.trimOut + df));
-            var d2 = to - o.trimOut;
-            it.trimOut = to;
-            it.duration = Math.max(1, o.duration + d2);
-          }
-          chip.style.width = (it.duration * FPP) + 'px';
-        }
-        function up() {
-          document.removeEventListener('pointermove', mv);
-          document.removeEventListener('pointerup', up);
-          render(); updatePreview();
-        }
-        document.addEventListener('pointermove', mv);
-        document.addEventListener('pointerup', up);
-      });
-      chip.appendChild(h);
-    });
-
-    // Body drag = reorder within the lane (swap when crossing a neighbor's
-    // midpoint — the montage list stays the single source of order).
-    chip.addEventListener('pointerdown', function (e) {
-      if (e.target.classList.contains('sb-trim')) return;
-      e.stopPropagation();
-      var curIdx = m.items.indexOf(it);
-      function mv(ev) {
-        var siblings = Array.from(chip.parentElement.querySelectorAll('.sb-chip'));
-        var over = siblings.findIndex(function (c) {
-          var r = c.getBoundingClientRect();
-          return ev.clientX >= r.left && ev.clientX <= r.right;
-        });
-        if (over >= 0 && over !== curIdx) {
-          m.items.splice(curIdx, 1);
-          m.items.splice(over, 0, it);
-          curIdx = over;
-          render();
-        }
-      }
-      function up() { document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up); updatePreview(); }
-      document.addEventListener('pointermove', mv);
-      document.addEventListener('pointerup', up);
-    });
-
-    chip.addEventListener('contextmenu', function (e) {
-      e.preventDefault(); e.stopPropagation();
-      window.showContextMenu(e.clientX, e.clientY, [
-        { label: 'Détacher (redevient un module libre)', action: function () { m.items.splice(m.items.indexOf(it), 1); addInstance(it.symbolId, m.x, m.y + 120); updatePreview(); } },
-        { label: 'Réinitialiser le retiming', action: function () { it.trimIn = 0; it.trimOut = symbolDuration(it.symbolId) - 1; it.duration = it.trimOut + 1; render(); updatePreview(); } },
-        { label: 'Retirer du montage', action: function () { m.items.splice(m.items.indexOf(it), 1); render(); updatePreview(); } },
-      ]);
-    });
-    return chip;
-  }
-
-  // Dropping a free instance module onto a montage lane absorbs it into
-  // the sequence at the pointer's position — the free module is consumed
-  // (detaching from the chip's context menu recreates one).
-  function tryDropIntoMontage(m, clientX, clientY) {
-    if (m.type !== 'instance') return false;
-    var lanes = world.querySelectorAll('.sb-montage .sb-montage-lane');
-    for (var i = 0; i < lanes.length; i++) {
-      var r = lanes[i].getBoundingClientRect();
-      if (clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom) {
-        var mid = lanes[i].closest('.sb-module').dataset.sbId;
-        var montage = sb().modules.find(function (x) { return x.id === mid; });
-        if (!montage) return false;
-        var dur = symbolDuration(m.symbolId);
-        var item = { symbolId: m.symbolId, trimIn: 0, trimOut: dur - 1, duration: dur };
-        // insertion index from pointer x against existing chips
-        var chips = lanes[i].querySelectorAll('.sb-chip');
-        var at = montage.items.length;
-        for (var c = 0; c < chips.length; c++) {
-          var cr = chips[c].getBoundingClientRect();
-          if (clientX < cr.left + cr.width / 2) { at = c; break; }
-        }
-        montage.items.splice(at, 0, item);
-        var s = sb();
-        s.modules.splice(s.modules.indexOf(m), 1);
-        s.activeMontageId = montage.id;
-        render(); updatePreview();
-        return true;
-      }
+      ensureRetime(mod);
+      m.chain.splice(at, 0, mod.id);
+      s.activeMontageId = m.id;
+      return true;
     }
     return false;
   }
-
-  function openSymbol(m) {
-    if (!state.symbols[m.symbolId]) { showToast('Ce composant n’existe plus'); return; }
-    // enterSymbol lives in the Animation 2D world — switch modes first so
-    // the user lands in the symbol's editable timeline, matching the mock
-    // ("double clic … ouvre l’onglet d’instance d’animation 2D").
-    if (window.SMMotion) SMMotion.setAppMode('anim2d');
-    window.SM.enterSymbol(m.symbolId);
+  function tryJoinAudio(mod) {
+    if (mod.type !== 'sound') return false;
+    var s = sb();
+    for (var i = 0; i < s.modules.length; i++) {
+      var m = s.modules[i];
+      if (m.type !== 'montage') continue;
+      var blockEl = world.querySelector('[data-sb-id="' + m.id + '"]');
+      if (!blockEl) continue;
+      var g = _chainGeom[m.id];
+      if (!g || !g.members.length) continue;
+      var blockH = blockEl.offsetHeight;
+      var laneY = m.y + blockH + CHAIN_GAP_Y;
+      if (Math.abs(mod.y - laneY) > 40) continue;
+      if (mod.x < g.startX - SNAP_PX * 6 || mod.x > g.startX + g.totalW + SNAP_PX * 6) continue;
+      m.audio.push({ moduleId: mod.id, offsetFrames: Math.max(0, pxToFrame(m, mod.x)) });
+      s.activeMontageId = m.id;
+      return true;
+    }
+    return false;
+  }
+  function leaveAnyChain(mod) {
+    var host = chainOf(mod);
+    if (host) { host.chain.splice(host.chain.indexOf(mod.id), 1); return host; }
+    var ah = audioHostOf(mod);
+    if (ah) { ah.audio = ah.audio.filter(function (a) { return a.moduleId !== mod.id; }); return ah; }
+    return null;
   }
 
-  // ---- dragging + edge snap ----
-  // Rewritten after real-use feedback ("le drag des modules est complexe
-  // et pas fluide"). What was wrong the first time, in order of felt
-  // impact:
-  //   1. snapToNeighbors re-queried the DOM (querySelector + offsetWidth)
-  //      for EVERY module on EVERY pointermove — forced-layout thrash in
-  //      the middle of the gesture, the stutter itself.
-  //   2. renderMontage passed its HEAD element as the drag target, so
-  //      dragging a montage slid the header INSIDE the module instead of
-  //      moving the module. Real bug, never caught because tests only
-  //      dragged instances.
-  //   3. No pointer capture (a fast drag exiting the window lost its
-  //      pointerup), no rAF coalescing (a 240Hz pen outruns the display —
-  //      same fix as every other drag in this codebase), no drop-target
-  //      feedback (dropping into a montage was invisible until release),
-  //      and a full render() blink after every plain move.
-  // Now: geometry is cached ONCE at pointerdown (neighbor rects, lane
-  // rects in screen space), moves are rAF-coalesced pure math + two style
-  // writes, the montage lane under the pointer highlights live
-  // (.drop-hint), pointer capture guarantees the release, and a plain
-  // move ends with NO re-render (the style already matches the model —
-  // only an actual drop rebuilds).
-  function wireModuleDrag(el, m) {
+  // ---- dragging (rAF-coalesced, geometry cached at pointerdown — see the
+  // v1 rewrite's commit message for the jank post-mortem) ----
+  function wireModuleDrag(el, m, opts) {
     el.addEventListener('pointerdown', function (e) {
       if (e.button !== 0) return;
-      // Interactive sub-parts own their gestures — never start a module
-      // drag from them. (This is also what makes the WHOLE module bodies
-      // safely draggable now, instead of the head-only montage rule.)
-      if (e.target.closest('.sb-montage-lane, .sb-chip, .sb-play, .sb-edit, .sb-wave, .sb-audio-blk, .sb-trim')) return;
+      if (e.target.closest('.sb-play, .sb-edit, .sb-trim')) return;
       e.stopPropagation();
       var start = toWorld(e.clientX, e.clientY);
       var ox = start.x - m.x, oy = start.y - m.y;
       var w = el.offsetWidth, h = el.offsetHeight;
-      // ---- one-time geometry snapshot ----
       var neighbors = [];
       sb().modules.forEach(function (o) {
         if (o.id === m.id) return;
         var oe = world.querySelector('[data-sb-id="' + o.id + '"]');
         if (oe) neighbors.push({ x: o.x, y: o.y, w: oe.offsetWidth, h: oe.offsetHeight });
       });
-      var lanes = (m.type === 'instance' || m.type === 'sound')
-        ? Array.from(world.querySelectorAll('.sb-montage .sb-montage-lane')).filter(function (l) { return !l.closest('[data-sb-id="' + m.id + '"]'); }).map(function (l) { return { el: l, r: l.getBoundingClientRect() }; })
-        : [];
-      var moved = false, lastX = e.clientX, lastY = e.clientY, raf = 0, hintLane = null;
-      // Capture guarantees the pointerup even when a fast drag exits the
-      // window — but it can throw (already-released pointer, synthetic
-      // events); the drag must survive without it, falling back to the
-      // element-scoped listeners below.
+      var moved = false, lastX = e.clientX, lastY = e.clientY, raf = 0, left = false;
       try { el.setPointerCapture(e.pointerId); } catch (err) {}
-      el.style.zIndex = 30; // above siblings while in flight
+      el.style.zIndex = 30;
       function apply() {
         raf = 0;
+        // First real movement of a chained/attached module DESNAPS it —
+        // the chain repacks live underneath, the mock's core gesture.
+        if (!left) {
+          left = true;
+          var wasHosted = leaveAnyChain(m);
+          if (wasHosted) {
+            // repack without rebuilding the dragged element itself
+            render();
+            var el2 = world.querySelector('[data-sb-id="' + m.id + '"]');
+            if (el2) { el2.style.zIndex = 30; el = el2; }
+            updatePreview();
+          }
+        }
         var p = toWorld(lastX, lastY);
         m.x = p.x - ox; m.y = p.y - oy;
-        // edge snap against the cached snapshot — pure math, no DOM reads
         neighbors.forEach(function (o) {
           var vOverlap = m.y < o.y + o.h && m.y + h > o.y;
           var hOverlap = m.x < o.x + o.w && m.x + w > o.x;
@@ -557,39 +627,30 @@
         });
         el.style.left = m.x + 'px';
         el.style.top = m.y + 'px';
-        // live drop-target feedback
-        var over = null;
-        for (var i = 0; i < lanes.length; i++) {
-          var r = lanes[i].r;
-          if (lastX >= r.left && lastX <= r.right && lastY >= r.top - 20 && lastY <= r.bottom + 40) { over = lanes[i].el; break; }
-        }
-        if (over !== hintLane) {
-          if (hintLane) hintLane.classList.remove('drop-hint');
-          if (over) over.classList.add('drop-hint');
-          hintLane = over;
-        }
       }
       function mv(ev) {
         lastX = ev.clientX; lastY = ev.clientY;
         moved = true;
         if (!raf) raf = requestAnimationFrame(apply);
       }
-      function up() {
+      function up(ev) {
         document.removeEventListener('pointermove', mv);
         document.removeEventListener('pointerup', up);
         document.removeEventListener('pointercancel', up);
         if (raf) { cancelAnimationFrame(raf); apply(); }
         el.style.zIndex = '';
-        if (hintLane) hintLane.classList.remove('drop-hint');
-        if (!moved) return;
-        // Released over a montage lane? The instance is absorbed into the
-        // sequence there — a sound module becomes the montage's audio track.
-        if (tryDropIntoMontage(m, lastX, lastY)) return;
-        if (tryDropSoundIntoMontage(m, lastX, lastY)) return;
-        // plain move: the style already matches the model — nothing to redraw
+        if (!moved) {
+          // plain click, no drag — the module's own tap action (sound
+          // modules place their split cursor here; see renderSound)
+          if (opts && opts.onTap) opts.onTap(ev || e);
+          return;
+        }
+        // snap-join: instance → chain row; sound → under-chain audio lane;
+        // montage blocks never join anything.
+        var joined = tryJoinChain(m, 0, 0) || tryJoinAudio(m);
+        render();
+        if (joined) updatePreview();
       }
-      // document-scoped: works whether capture engaged or not (captured
-      // events retarget to el but still bubble through document).
       document.addEventListener('pointermove', mv);
       document.addEventListener('pointerup', up);
       document.addEventListener('pointercancel', up);
@@ -603,6 +664,10 @@
       var menu = [];
       if (m.type === 'instance') {
         menu.push({ label: 'Éditer l’animation', action: function () { openSymbol(m); } });
+        if (chainOf(m)) {
+          menu.push({ label: 'Réinitialiser le retiming', action: function () { m.trimIn = 0; m.trimOut = symbolDuration(m.symbolId) - 1; m.duration = m.trimOut + 1; render(); updatePreview(); } });
+          menu.push({ label: 'Détacher du montage', action: function () { leaveAnyChain(m); m.y += 110; render(); updatePreview(); } });
+        }
       }
       if (m.type === 'montage') {
         menu.push({ label: 'Renommer', action: function () { var v = prompt('Nom du montage', m.name); if (v) { m.name = v; render(); } } });
@@ -613,7 +678,10 @@
         // (app.js ld.montageId branch), like a precomp.
         menu.push({ label: 'Placer comme calque dans Animation 2D', action: function () { placeMontageAsLayer(m); } });
       }
-      menu.push({ label: 'Supprimer le module', action: function () { var s = sb(); s.modules.splice(s.modules.indexOf(m), 1); if (s.activeMontageId === m.id) s.activeMontageId = null; render(); } });
+      if (m.type === 'sound' && audioHostOf(m)) {
+        menu.push({ label: 'Détacher du montage', action: function () { leaveAnyChain(m); m.y += 60; render(); } });
+      }
+      menu.push({ label: 'Supprimer le module', action: function () { leaveAnyChain(m); var s = sb(); s.modules.splice(s.modules.indexOf(m), 1); if (s.activeMontageId === m.id) s.activeMontageId = null; render(); } });
       window.showContextMenu(e.clientX, e.clientY, menu);
     });
   }
@@ -621,7 +689,7 @@
   function wireSpace() {
     // Pan: drag the empty background.
     space.addEventListener('pointerdown', function (e) {
-      if (e.button !== 0 || e.target.closest('.sb-module')) return;
+      if (e.button !== 0 || e.target.closest('.sb-module, .sb-ruler')) return;
       var s = sb();
       var sx = e.clientX - s.pan.x, sy = e.clientY - s.pan.y;
       function mv(ev) { s.pan.x = ev.clientX - sx; s.pan.y = ev.clientY - sy; applyView(); }
@@ -642,7 +710,7 @@
     }, { passive: false });
     // Create modules: right-click empty space.
     space.addEventListener('contextmenu', function (e) {
-      if (e.target.closest('.sb-module')) return;
+      if (e.target.closest('.sb-module, .sb-ruler')) return;
       e.preventDefault();
       var p = toWorld(e.clientX, e.clientY);
       var menu = [];
@@ -664,23 +732,19 @@
   }
   function addMontage(x, y) {
     var s = sb();
-    var m = { id: newId(), type: 'montage', name: 'Montage ' + (s.modules.filter(function (x2) { return x2.type === 'montage'; }).length + 1), x: Math.round(x), y: Math.round(y), items: [], audio: [], playhead: 0 };
+    var m = { id: newId(), type: 'montage', name: 'Montage ' + (s.modules.filter(function (x2) { return x2.type === 'montage'; }).length + 1), x: Math.round(x), y: Math.round(y), chain: [], audio: [], playhead: 0 };
     s.modules.push(m);
     s.activeMontageId = m.id;
     render();
-  }
-
-  function montageById(id) {
-    return sb().modules.find(function (x) { return x.type === 'montage' && x.id === id; }) || null;
+    return m;
   }
 
   // ---- sound modules ----
   // { id, type:'sound', name, dataB64, x, y, inSec, outSec, cursorSec }
   // inSec/outSec = the played RANGE — a split produces two modules sharing
-  // the same dataB64 with complementary ranges (no audio data duplicated
-  // beyond the base64 string reference). Decoded AudioBuffers are runtime
-  // state and live in _audioBuffers keyed by module/audio-entry id — the
-  // persisted model stays plain JSON by construction.
+  // the same dataB64 with complementary ranges. Decoded AudioBuffers are
+  // runtime state in _audioBuffers keyed by module id — the persisted
+  // model stays plain JSON by construction.
   var _audioBuffers = {};
   var _audioCtx = null;
   var _playingSources = [];
@@ -701,7 +765,7 @@
   }
   // Minimal own peaks renderer (NOT SMAudio's peaksCanvasFor — that one is
   // welded to 2D audio-track objects and caches onto them; this draws any
-  // buffer range into any canvas, which split views need).
+  // buffer RANGE into any canvas, which split views need).
   function drawWave(cv, buf, inSec, outSec) {
     var ctx = cv.getContext('2d');
     ctx.clearRect(0, 0, cv.width, cv.height);
@@ -715,8 +779,8 @@
       var b = s0 + Math.floor((s1 - s0) * (x + 1) / cv.width);
       var peak = 0;
       for (var i = a; i < b; i += 16) { var v = Math.abs(ch[i] || 0); if (v > peak) peak = v; }
-      var h = Math.max(1, peak * mid);
-      ctx.fillRect(x, mid - h, 1, h * 2);
+      var hh = Math.max(1, peak * mid);
+      ctx.fillRect(x, mid - hh, 1, hh * 2);
     }
   }
   function stopAllAudio() {
@@ -770,23 +834,12 @@
       if (m.outSec == null) { m.outSec = buf.duration; render(); return; }
       drawWave(cv, buf, m.inSec || 0, m.outSec);
     });
-    // split cursor: click on the wave places it (visual line), context
-    // menu "Scinder ici" cuts at that point — the mock's "scindé".
     if (m.cursorSec != null && m.outSec != null) {
       var cur = document.createElement('div');
       cur.className = 'sb-wave-cursor';
       cur.style.left = (6 + 220 * ((m.cursorSec - (m.inSec || 0)) / (m.outSec - (m.inSec || 0)))) + 'px';
       el.appendChild(cur);
     }
-    cv.addEventListener('pointerdown', function (e) {
-      // plain click = place the split cursor; the module still drags via
-      // anywhere else on its body (the padding/name area).
-      e.stopPropagation();
-      var r = cv.getBoundingClientRect();
-      var t = (e.clientX - r.left) / r.width;
-      m.cursorSec = (m.inSec || 0) + t * ((m.outSec || 0) - (m.inSec || 0));
-      render();
-    });
     var nm = document.createElement('div');
     nm.className = 'sb-name';
     nm.textContent = m.name + (m.outSec != null ? ' — ' + ((m.outSec - (m.inSec || 0)).toFixed(1)) + 's' : '');
@@ -802,7 +855,21 @@
       playRange(m.id, m.dataB64, m.inSec || 0, m.outSec || 0, 0, 0);
     });
     el.appendChild(play);
-    wireModuleDrag(el, m);
+    // Click-vs-drag on the waveform ("le curseur de drag dans le son ne
+    // marche pas bien"): the wave no longer hijacks pointerdown — the
+    // whole module drags normally, and a plain CLICK (release without
+    // movement, handled by wireModuleDrag's onTap) places the split
+    // cursor at the clicked time.
+    wireModuleDrag(el, m, {
+      onTap: function (ev) {
+        if (!ev || m.outSec == null) return;
+        var r = cv.getBoundingClientRect();
+        if (ev.clientX < r.left || ev.clientX > r.right || ev.clientY < r.top || ev.clientY > r.bottom) return;
+        var t = (ev.clientX - r.left) / r.width;
+        m.cursorSec = (m.inSec || 0) + t * (m.outSec - (m.inSec || 0));
+        render();
+      },
+    });
     el.addEventListener('contextmenu', function (e) {
       e.preventDefault(); e.stopPropagation();
       var menu = [];
@@ -811,7 +878,8 @@
       } else {
         menu.push({ label: 'Scinder (cliquer la forme d’onde pour placer le point)', disabled: true, action: function () {} });
       }
-      menu.push({ label: 'Supprimer le module', action: function () { var s = sb(); s.modules.splice(s.modules.indexOf(m), 1); render(); } });
+      if (audioHostOf(m)) menu.push({ label: 'Détacher du montage', action: function () { leaveAnyChain(m); m.y += 60; render(); } });
+      menu.push({ label: 'Supprimer le module', action: function () { leaveAnyChain(m); var s = sb(); s.modules.splice(s.modules.indexOf(m), 1); render(); } });
       window.showContextMenu(e.clientX, e.clientY, menu);
     });
     return el;
@@ -821,38 +889,16 @@
     var right = { id: newId(), type: 'sound', name: m.name, dataB64: m.dataB64, x: m.x + 250, y: m.y, inSec: m.cursorSec, outSec: m.outSec, cursorSec: null };
     m.outSec = m.cursorSec;
     m.cursorSec = null;
-    // the split halves share the decoded buffer — register under the new id too
     if (_audioBuffers[m.id]) _audioBuffers[right.id] = _audioBuffers[m.id];
     s.modules.push(right);
     render();
   }
 
-  // Dropping a sound module onto a montage lane embeds it as the montage's
-  // audio track (spec Q&A: "piste audio DANS le module montage"), starting
-  // at the montage frame under the pointer.
-  function tryDropSoundIntoMontage(m, clientX, clientY) {
-    if (m.type !== 'sound') return false;
-    var lanes = world.querySelectorAll('.sb-montage .sb-montage-lane');
-    for (var i = 0; i < lanes.length; i++) {
-      var r = lanes[i].getBoundingClientRect();
-      if (clientX >= r.left && clientX <= r.right && clientY >= r.top - 20 && clientY <= r.bottom + 40) {
-        var mid = lanes[i].closest('.sb-module').dataset.sbId;
-        var montage = sb().modules.find(function (x) { return x.id === mid; });
-        if (!montage) return false;
-        var atFrame = Math.max(0, Math.round((clientX - r.left) / (FPP * sb().zoom)));
-        montage.audio.push({ aid: newId(), name: m.name, dataB64: m.dataB64, inSec: m.inSec || 0, outSec: m.outSec || 0, offsetFrames: atFrame });
-        if (_audioBuffers[m.id]) _audioBuffers['a' + montage.audio[montage.audio.length - 1].aid] = _audioBuffers[m.id];
-        var s = sb();
-        s.modules.splice(s.modules.indexOf(m), 1);
-        s.activeMontageId = montage.id;
-        render();
-        return true;
-      }
-    }
-    return false;
+  function montageById(id) {
+    return sb().modules.find(function (x) { return x.type === 'montage' && x.id === id; }) || null;
   }
   function placeMontageAsLayer(m) {
-    if (!m.items.length) { showToast('Le montage est vide — glissez-y des instances d\u2019abord'); return; }
+    if (!chainMods(m).length) { showToast('Le montage est vide — snappez des instances contre son bloc d’abord'); return; }
     // One layer per montage: re-placing focuses the existing one instead
     // of stacking duplicates.
     for (var i = 0; i < state.layers.length; i++) {

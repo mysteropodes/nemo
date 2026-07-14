@@ -964,3 +964,12 @@ body.mode-motion .lrow.act{box-shadow:inset 3px 0 0 #4E6FF2,inset 0 0 0 1px rgba
 .sb-audio-blk{position:absolute;top:0;height:24px;border-radius:4px;background:rgba(94,106,210,.25);border:1px solid rgba(94,106,210,.5);overflow:hidden;cursor:grab;}
 .sb-audio-blk:active{cursor:grabbing;}
 .sb-montage-lane.drop-hint{border-color:var(--accent);background:rgba(94,106,210,.12);}
+/* StoryBoard v2 — anchor block + chain + ruler */
+.sb-montageblock{width:64px;height:64px;display:flex;align-items:center;justify-content:center;color:var(--text-dim);cursor:grab;}
+.sb-montageblock.active{border-color:var(--accent);color:var(--text);}
+.sb-block-play{position:absolute;right:3px;bottom:2px;font-size:9px;color:var(--text-dim);cursor:pointer;}
+.sb-block-play:hover{color:var(--accent);}
+.sb-module.chained{border-radius:4px;box-shadow:none;border-color:var(--border2);}
+.sb-ruler{position:absolute;height:14px;background:repeating-linear-gradient(90deg,var(--border2) 0 1px,transparent 1px 8px),var(--panel2);border:1px solid var(--border);border-radius:4px 4px 0 0;cursor:ew-resize;overflow:visible;}
+.sb-ruler .sb-ph{top:0;bottom:-4px;}
+.sb-ruler-lbl{position:absolute;right:4px;top:0;font-size:8px;color:var(--text-dim);pointer-events:none;line-height:14px;}
