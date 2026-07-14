@@ -2286,6 +2286,31 @@ function renderLayerList(){
     // the Solo 'S' badge's own single-letter convention would need 2
     // letters here anyway since Fill/Shadow both start differently in FR).
     if(ld.channel){var chLabel=ld.channel==='stroke'?'Tr':ld.channel==='fill'?'Pl':'Om';var chb=document.createElement('div');chb.className='lico comp-badge';chb.title='Calque '+(ld.channel==='stroke'?'Trait':ld.channel==='fill'?'Plein':'Ombre')+' (Stroke/Fill/Shadow) — calque normal, keyframes liées';chb.innerHTML='<span style="font-size:9px;line-height:1;font-weight:700">'+chLabel+'</span>';row.appendChild(chb);}
+    // Track matte badge (2026-07) — the Blend/Matte dropdowns only surface
+    // in the right panel's Document fallback context (nothing selected,
+    // no draw tool active — see updatePropsContext), which turned out to
+    // be too easy to miss entirely ("je vois pas où appliqué les track
+    // matte"). This badge is visible on the layer row REGARDLESS of tool/
+    // selection state — the always-reachable entry point — and click opens
+    // the exact same picker the right-panel dropdown does, just anchored
+    // here instead. A masked layer shows 'M' (its own matte); the layer
+    // directly above a masked one — its IMPLICIT source, AE convention —
+    // shows a dimmed 'M▲' so its role is visible too, even though nothing
+    // is actually SET on that layer's own data.
+    // A layer i is a matte SOURCE when the layer BELOW it (i-1) has its
+    // matteMode set — matteMode on layer X means "X's alpha comes from
+    // X+1", so X+1 is the source. Row i is that source when i-1's mode is
+    // set, not i+1's (caught by the badge simply never appearing on the
+    // source layer in a quick browser check — the array direction was
+    // backwards on the first pass).
+    var isMatteSource=(i-1>=0)&&state.layers[i-1]&&state.layers[i-1].matteMode;
+    if(ld.matteMode||isMatteSource){
+      var mb=document.createElement('div');mb.className='lico comp-badge'+(isMatteSource&&!ld.matteMode?' off':'');
+      mb.title=ld.matteMode?('Matte: '+(typeof MATTE_MODE_LABELS!=='undefined'?MATTE_MODE_LABELS[ld.matteMode]:ld.matteMode)+' — clic pour changer'):'Source de matte pour le calque du dessous';
+      mb.innerHTML='<span style="font-size:9px;line-height:1;font-weight:700">'+(ld.matteMode?'M':'M▲')+'</span>';
+      if(ld.matteMode){mb.style.cursor='pointer';mb.addEventListener('click',function(e){e.stopPropagation();state.activeLayerIdx=i;activateUL(i);updatePropsContext();openMatteDropdownAt(mb);});}
+      row.appendChild(mb);
+    }
     row.appendChild(nm);
     row.addEventListener('click',function(e){
       // A completed drag-drop still fires a trailing native 'click' on
@@ -2340,6 +2365,24 @@ function renderLayerList(){
         {label:'Propager Plein sur les autres images',disabled:!l4.lfsGroup,action:function(){window.SM.propagateLFSFill('full');}},
         {label:'Propager Ombre sur les autres images',disabled:!l4.lfsGroup,action:function(){window.SM.propagateLFSFill('shadow');}},
         {label:'Décomposer le groupe',disabled:!l4.lfsGroup,action:function(){window.SM.convertLFSGroupToLayer();}},
+        {sep:true},
+        // Track matte (2026-07) — the discoverable entry point: works
+        // whether or not this layer already has a matte, unlike the badge
+        // (which only shows once one exists) or the right-panel dropdown
+        // (buried in a fallback context — see updatePropsContext). Needs a
+        // layer above to draw the mask FROM, AE convention.
+        {label:idx4>=state.layers.length-1?'Matte (aucun calque au-dessus)':(l4.matteMode?'Changer la matte…':'Appliquer une matte…'),disabled:idx4>=state.layers.length-1,action:function(){
+          window.SM.setActiveLayer(idx4);updatePropsContext();
+          // The right-panel dropdown only exists in the Document-fallback
+          // context (see updatePropsContext) — if a draw tool is active it
+          // stays display:none and its getBoundingClientRect() would be
+          // all-zero, opening the popup pinned to the top-left corner.
+          // Fall back to this very row, always visible by construction
+          // (the user just right-clicked it).
+          var panelAnchor=document.getElementById('p-mattemode');
+          var anchor=(panelAnchor&&panelAnchor.offsetParent)?panelAnchor:row;
+          if(window.openMatteDropdownAt)openMatteDropdownAt(anchor);
+        }},
       ]);
     });
     list.appendChild(row);
@@ -3656,7 +3699,14 @@ var MATTE_MODE_LABELS={none:'Aucun',alpha:'Alpha',alphaInverted:'Alpha (inversé
     if(revert&&origMode!==null)applyPreview(origMode);
     origMode=null;
   }
-  function open(){
+  // `anchorEl` defaults to the right-panel dropdown itself, but the layer-
+  // row badge and the row's own context menu (both added because the
+  // right panel's Document-fallback visibility turned out too easy to
+  // miss — "je vois pas où appliqué les track matte") pass THEIR element
+  // instead, so the popup opens next to whatever the user actually clicked
+  // rather than off in the (possibly hidden) right panel.
+  function open(anchorEl){
+    var anchor=anchorEl||dd;
     var ld=currentLd();if(!ld)return;
     // A matte needs a layer ABOVE this one to draw from (AE convention —
     // the source is implicit, never picked). Nothing to offer on the
@@ -3681,10 +3731,11 @@ var MATTE_MODE_LABELS={none:'Aucun',alpha:'Alpha',alphaInverted:'Alpha (inversé
         setLabel(v);
         origMode=null;
         close(false);
+        renderLayerList(); // badge (added/removed) must reflect the new mode immediately
       });
       pop.appendChild(it);
     });
-    var r=dd.getBoundingClientRect();
+    var r=anchor.getBoundingClientRect();
     pop.style.display='block';
     pop.style.left=Math.max(8,Math.min(window.innerWidth-pop.offsetWidth-8,r.left))+'px';
     var top=r.bottom+4;
@@ -3695,6 +3746,10 @@ var MATTE_MODE_LABELS={none:'Aucun',alpha:'Alpha',alphaInverted:'Alpha (inversé
   dd.addEventListener('click',function(e){e.stopPropagation();if(pop.style.display==='block')close(true);else open();});
   document.addEventListener('pointerdown',function(e){if(pop.style.display==='block'&&!pop.contains(e.target)&&e.target!==dd)close(true);});
   window.addEventListener('keydown',function(e){if(e.key==='Escape'&&pop.style.display==='block')close(true);});
+  // Exposed for the layer-row badge and context-menu entry points (see
+  // renderLayerList) — same picker, different trigger, so behavior (hover-
+  // preview, click-commit, Escape-revert) is identical everywhere it opens.
+  window.openMatteDropdownAt=open;
 })();
 // Same canvas/fps/frame-count controls, duplicated in the Project panel —
 // both sets write through the same SM.setCanvasSize/setFps/setTotalFrames
