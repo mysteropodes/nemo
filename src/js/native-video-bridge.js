@@ -83,7 +83,7 @@
     var heap0 = heapMB();
     var info = await open(path);
     var fpsBudgetMs = 1000 / (info.fps || 30);
-    var out = { info: info, frameBudgetMs: +fpsBudgetMs.toFixed(2) };
+    var out = { path: path, info: info, frameBudgetMs: +fpsBudgetMs.toFixed(2) };
 
     // Phase 1 — sequential decode+IPC (playback pattern, no GPU upload)
     var t, seqTimes = [];
@@ -129,12 +129,111 @@
     return out;
   }
 
+  // ---- live rotoscopy-reference integration (type:'native') ----
+  // Wires the native decoder into the app's EXISTING per-frame choke point
+  // (loadFrame -> SMReference.onFrameChanged -> syncToFrame, which calls
+  // _refSync below for type:'native' refMedia). Busy/pending coalescing:
+  // scrubbing fires loadFrame far faster than a decode completes — only
+  // the LATEST requested frame matters, intermediate targets are simply
+  // replaced (same principle as reference-bridge's own startSeek pending).
+  var _refBusy = false, _refPending = null;
+  async function _refSync(r, frame) {
+    var target = Math.max(0, (frame - (r.offsetFrames || 0)));
+    if (_refBusy) { _refPending = { r: r, frame: frame }; return; }
+    _refBusy = true;
+    try {
+      // (Re)open the session from the persisted path (r.src) if missing —
+      // covers both first attach and a project reloaded from disk.
+      if (!r._sessionId) {
+        var info = await open(r.src);
+        r._sessionId = info.session_id;
+        r._frameCount = Number(info.frame_count);
+        r._dims = { w: info.width, h: info.height };
+      }
+      var clamped = Math.min(r._frameCount - 1, target);
+      var s = sessions[r._sessionId];
+      var px = await frameBytes(r._sessionId, clamped);
+      if (window.SMEngineBridge) SMEngineBridge.registerImageRaw('ref:native', px, s.width, s.height);
+      window._sceneVersion++;
+      if (window.SMEngineBridge && SMEngineBridge.isEnabled()) SMEngineBridge.renderNow();
+    } catch (e) {
+      console.error('[native-video] refSync failed:', e);
+    } finally {
+      _refBusy = false;
+      if (_refPending) { var p = _refPending; _refPending = null; _refSync(p.r, p.frame); }
+    }
+  }
+
+  // USER-FACING TEST ENTRY (experimental): from the dev console —
+  //   await SMNativeVideo.attachToPlayhead('/chemin/video.mov')
+  // then scrub the timeline: the video follows the playhead as the
+  // rotoscopy reference, decoded natively frame by frame. Detach with
+  //   await SMNativeVideo.detachFromPlayhead()
+  async function attachToPlayhead(path) {
+    var info = await open(path);
+    state.refMedia = {
+      type: 'native',
+      name: path.split('/').pop() + ' (natif)',
+      src: path, // file path in the whitelisted src field — persists via exportJSON unchanged
+      opacity: 1,
+      visible: true,
+      offsetFrames: 0,
+      _sessionId: info.session_id,
+      _frameCount: Number(info.frame_count),
+      _dims: { w: info.width, h: info.height },
+    };
+    if (window.SMReference) SMReference.reload();
+    return info;
+  }
+  async function detachFromPlayhead() {
+    var r = state.refMedia;
+    if (r && r.type === 'native') {
+      if (r._sessionId) await close(r._sessionId);
+      state.refMedia = null;
+      if (window.SMReference) SMReference.reload();
+    }
+  }
+
   window.SMNativeVideo = {
     open: open,
     frameBytes: frameBytes,
     registerFrame: registerFrame,
     close: close,
     bench: bench,
+    attachToPlayhead: attachToPlayhead,
+    detachFromPlayhead: detachFromPlayhead,
+    _refSync: _refSync,
     sessions: function () { return Object.assign({}, sessions); },
   };
+
+  // ---- scripted auto-bench (see autobench_config in video_decode.rs) ----
+  // Runs the full pipeline bench without human interaction when the app
+  // was launched with NEMO_AUTOBENCH pointing at a config file. Inert
+  // otherwise (autobench_config returns null). The 8s delay lets the
+  // WebGPU engine + wasm init settle so phase 3 measures the real
+  // render path, not a race with startup.
+  if (tauriOk()) {
+    setTimeout(async function () {
+      var cfg = null;
+      try { cfg = await invoke('autobench_config'); } catch (e) { return; }
+      if (!cfg || !cfg.videos || !cfg.videos.length) return;
+      console.log('[autobench] starting,', cfg.videos.length, 'videos');
+      var report = {
+        startedAt: new Date().toISOString(),
+        engineEnabled: !!(window.SMEngineBridge && SMEngineBridge.isEnabled && SMEngineBridge.isEnabled()),
+        runs: [],
+      };
+      for (var i = 0; i < cfg.videos.length; i++) {
+        try {
+          report.runs.push(await bench(cfg.videos[i], cfg.opts || {}));
+        } catch (e) {
+          report.runs.push({ path: cfg.videos[i], error: String((e && e.message) || e) });
+        }
+      }
+      try {
+        await invoke('autobench_report', { report: JSON.stringify(report, null, 2) });
+        console.log('[autobench] done');
+      } catch (e) { console.error('[autobench] report write failed', e); }
+    }, 8000);
+  }
 })();

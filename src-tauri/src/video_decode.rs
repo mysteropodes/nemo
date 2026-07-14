@@ -284,6 +284,31 @@ pub fn close_video_session(
     Ok(())
 }
 
+// ---- headless auto-bench plumbing ----
+// Lets a scripted `tauri dev` run drive the FULL in-app pipeline bench
+// (decode → binary IPC → WASM → GPU upload → render) without a human
+// clicking around: if NEMO_AUTOBENCH points at a JSON config file
+// ({"videos": ["/path/a.mp4", ...]}), native-video-bridge.js picks it up
+// at startup, runs SMNativeVideo.bench() on each entry, and reports back
+// here for a plain std::fs write (no fs-plugin scope involvement).
+// Inert in normal use: without the env var, autobench_config returns None
+// and the JS hook does nothing.
+#[tauri::command]
+pub fn autobench_config() -> Option<serde_json::Value> {
+    let path = std::env::var("NEMO_AUTOBENCH").ok()?;
+    let text = std::fs::read_to_string(&path).ok()?;
+    serde_json::from_str(&text).ok()
+}
+
+#[tauri::command]
+pub fn autobench_report(report: String) -> Result<(), String> {
+    let out = std::env::var("NEMO_AUTOBENCH_OUT")
+        .unwrap_or_else(|_| "/tmp/nemo-autobench-report.json".to_string());
+    std::fs::write(&out, &report).map_err(|e| e.to_string())?;
+    eprintln!("[autobench] report written to {out}");
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

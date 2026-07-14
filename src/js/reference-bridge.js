@@ -108,6 +108,14 @@
       startSeek(r, v, t);
     } else if (r.type === 'imageseq') {
       ensureSeqImage(r, frameToSeqIndex(r, frame)); // pre-decode; onload bumps
+    } else if (r.type === 'native') {
+      // EXPERIMENTAL (native-video-decode branch): frames come from the
+      // native Rust decoder via SMNativeVideo, which owns the busy/pending
+      // coalescing (same latest-target-wins idea as startSeek above) and
+      // registers pixels under 'ref:native'. `src` holds the FILE PATH
+      // (not a dataURL) for this type — reusing the whitelisted field so
+      // exportJSON persists it unchanged.
+      if (window.SMNativeVideo && SMNativeVideo._refSync) SMNativeVideo._refSync(r, frame);
     }
     // single image: nothing frame-dependent
   }
@@ -158,6 +166,13 @@
       if (!r._video || !r._video.videoWidth) { ensureVideo(r); return null; }
       imageId = REF_VIDEO_ID; // pixels uploaded by syncToFrame's seeked handler
       if (!window.SMEngineBridge.hasImage(REF_VIDEO_ID)) return null;
+    } else if (r.type === 'native') {
+      // EXPERIMENTAL — pixels uploaded by SMNativeVideo._refSync under a
+      // fixed id, exactly the REF_VIDEO_ID pattern above (one replaced
+      // GPU texture regardless of video length).
+      imageId = 'ref:native';
+      if (!window.SMEngineBridge.hasImage(imageId)) return null;
+      dims = r._dims;
     } else if (r.type === 'imageseq') {
       var idx = frameToSeqIndex(r, state.currentFrame);
       var img = ensureSeqImage(r, idx);
