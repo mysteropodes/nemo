@@ -152,6 +152,12 @@
     for (var i = 0; i < ks.length - 1; i++) {
       var a = ks[i], b = ks[i + 1];
       if (frame >= a.frame && frame < b.frame) {
+        // Hold keyframe (Caddis/AE convention, 2026-07): the value stays
+        // pinned to `a` for the whole segment, then jumps to `b` the
+        // instant frame reaches b.frame — no interpolation. Flag lives on
+        // the LEFT key (a), matching AE's own model (hold is a property of
+        // the OUTGOING keyframe, not the segment).
+        if (a.hold) return a.v.slice();
         var t = (frame - a.frame) / (b.frame - a.frame);
         var y = evalCurvePoints(a.curvePoints || DEFAULT_CURVE, t);
         // Position gets real spatial-bezier curvature through its
@@ -857,7 +863,10 @@
       var k = track ? keyAt(track, fi) : null;
       if (k) {
         var dia = document.createElement('div');
-        dia.className = 'motion-key' + (fi === state.currentFrame ? ' cur' : '') + (isKeySelected(ld, prop, k) ? ' sel' : '');
+        // Hold keys render as a square, not the usual diamond (AE/Caddis
+        // convention — the shape itself communicates "no interpolation
+        // out of this key" without needing to open the curve editor).
+        dia.className = 'motion-key' + (fi === state.currentFrame ? ' cur' : '') + (isKeySelected(ld, prop, k) ? ' sel' : '') + (k.hold ? ' hold' : '');
         c.appendChild(dia);
       }
       (function (frameIdx, key) {
@@ -895,6 +904,12 @@
             // (see openMotionEaseEditor's header comment) — no need to
             // require a full segment already existing before offering this.
             menu.push({ label: 'Éditer la courbe d’accélération…', action: function () { pushUndo(); openMotionEaseEditor(ld, prop); } });
+          }
+          if (key) {
+            // Hold keyframe (2026-07): no interpolation out of this key —
+            // the value snaps to the NEXT key's value the instant it's
+            // reached. Renders as a square (see the .hold class above).
+            menu.push({ label: key.hold ? 'Retirer le maintien (hold)' : 'Maintenir (hold)', action: function () { pushUndo(); key.hold = !key.hold; renderLayerList(); renderTimeline(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); } });
           }
           // Batch ops (Skew Pro punch list) act on the WHOLE current
           // multi-selection, offered regardless of which key/cell was
