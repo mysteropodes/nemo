@@ -53,15 +53,22 @@
   // hit-testing never depends on Paper's tool system having run at all.
   function computeHandles() {
     if (!selectedPaths.length) return null;
-    var b = xformSelBounds();
-    if (!b) return null;
+    // Oriented box (see tools.js orientedSelBox): after a rotation the
+    // handles sit on the ROTATED box corners, not the axis-aligned union.
+    var box = (typeof orientedSelBox === 'function') ? orientedSelBox() : null;
+    if (!box) return null;
+    var b = box.b;
     var zs = 1 / view.zoom;
     var corners = {
-      nw: b.topLeft, ne: b.topRight, sw: b.bottomLeft, se: b.bottomRight,
-      n: b.topCenter, s: b.bottomCenter, e: b.rightCenter, w: b.leftCenter,
+      nw: selBoxPt(b.left, b.top, box), ne: selBoxPt(b.right, b.top, box),
+      sw: selBoxPt(b.left, b.bottom, box), se: selBoxPt(b.right, b.bottom, box),
+      n: selBoxPt(b.center.x, b.top, box), s: selBoxPt(b.center.x, b.bottom, box),
+      e: selBoxPt(b.right, b.center.y, box), w: selBoxPt(b.left, b.center.y, box),
     };
-    var rotPos = b.topCenter.subtract(new Point(0, 20 * zs));
-    return { bounds: b, corners: corners, rotPos: rotPos };
+    // The rotate grip hangs off the box's OWN top edge (its up axis), so
+    // it swings around with the object instead of hovering above the AABB.
+    var rotPos = selBoxPt(b.center.x, b.top - 20 * zs, box);
+    return { bounds: b, box: box, corners: corners, rotPos: rotPos };
   }
 
   function hitTestHandles(pt) {
@@ -118,7 +125,11 @@
         // (tools.js xformAnchorPoint, state.xformAnchorKey) instead of
         // always the bounding-box center — defaults to center so existing
         // behavior is unchanged until the artist actually picks a corner.
-        rotCenter = xformAnchorPoint(h.bounds).clone();
+        // xformAnchorPoint works in the box's de-rotated space (h.bounds)
+        // — map the pivot back to world through the box angle.
+        var apr = xformAnchorPoint(h.bounds);
+        // Custom pivot (Alt+click) is already world — don't re-rotate it.
+        rotCenter = (h.box && !state.xformAnchorCustom) ? selBoxPt(apr.x, apr.y, h.box) : apr.clone();
         rotStartAngle = Math.atan2(pt.y - rotCenter.y, pt.x - rotCenter.x) * 180 / Math.PI;
         rotLastAngle = 0;
       } else {
@@ -402,6 +413,7 @@
         }
       });
       rotLastAngle = deltaFromStart;
+      window._selBoxAngle = (window._selBoxAngle || 0) + stepAngle; // the box follows the object
       symGestureAccumulate(new Matrix().rotate(stepAngle, rotCenter));
     }
     lastPt = pt;

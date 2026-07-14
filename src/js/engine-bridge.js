@@ -558,25 +558,41 @@
   // type yet, so the dashed outline/marquee border render as solid instead —
   // a cosmetic gap, not a functional one, until dashing is added engine-side.
   function buildTransformBoxItems() {
-    if (state.tool !== 'select' || !selectedPaths.length || typeof xformSelBounds !== 'function') return [];
-    var b = xformSelBounds();
-    if (!b) return [];
+    if (state.tool !== 'select' || !selectedPaths.length || typeof orientedSelBox !== 'function') return [];
+    // Oriented box (tools.js orientedSelBox — "les boîtes de transformation
+    // ne tournent pas avec l'objet quand on rotate"): everything below is
+    // computed in the box's de-rotated space then mapped to world through
+    // selBoxPt, so the whole gizmo — outline, 8 handles, rotate grip,
+    // anchor crosshair — rotates rigidly with the selection.
+    var box = orientedSelBox();
+    if (!box) return [];
+    var b = box.b;
     var zs = 1 / view.zoom;
     var items = [];
-    items.push(boundsRectItem(b.left, b.top, b.right, b.bottom, null, [74, 158, 255, 204], 1 * zs));
+    function W(x, y) { var p = selBoxPt(x, y, box); return [p.x, p.y]; }
+    if (!box.angle) {
+      items.push(boundsRectItem(b.left, b.top, b.right, b.bottom, null, [74, 158, 255, 204], 1 * zs));
+    } else {
+      // rotated outline = four explicit edges (boundsRectItem is AABB-only)
+      var c1 = W(b.left, b.top), c2 = W(b.right, b.top), c3 = W(b.right, b.bottom), c4 = W(b.left, b.bottom);
+      items.push(lineItem(c1, c2, [74, 158, 255, 204], 1 * zs));
+      items.push(lineItem(c2, c3, [74, 158, 255, 204], 1 * zs));
+      items.push(lineItem(c3, c4, [74, 158, 255, 204], 1 * zs));
+      items.push(lineItem(c4, c1, [74, 158, 255, 204], 1 * zs));
+    }
     var midX = b.left + b.width / 2, midY = b.top + b.height / 2;
     var corners = {
-      nw: [b.left, b.top], n: [midX, b.top], ne: [b.right, b.top],
-      e: [b.right, midY], se: [b.right, b.bottom], s: [midX, b.bottom],
-      sw: [b.left, b.bottom], w: [b.left, midY],
+      nw: W(b.left, b.top), n: W(midX, b.top), ne: W(b.right, b.top),
+      e: W(b.right, midY), se: W(b.right, b.bottom), s: W(midX, b.bottom),
+      sw: W(b.left, b.bottom), w: W(b.left, midY),
     };
     Object.keys(corners).forEach(function (k) {
       var p = corners[k];
       items.push(rectItem(p[0], p[1], 3.5 * zs, [255, 255, 255, 255], [74, 158, 255, 255], 1.2 * zs));
     });
     var rotOff = 20 * zs;
-    var topCenter = [midX, b.top];
-    var rotPos = [midX, b.top - rotOff];
+    var topCenter = W(midX, b.top);
+    var rotPos = W(midX, b.top - rotOff);
     items.push(lineItem(topCenter, rotPos, [74, 158, 255, 204], 1 * zs));
     items.push(circleItem(rotPos[0], rotPos[1], 5 * zs, [255, 255, 255, 255], [74, 158, 255, 255], 1.2 * zs));
     // Anchor/pivot marker (redesign 2026-07-09, AE-style anchor point) — a
@@ -584,7 +600,11 @@
     // (tools.js xformAnchorPoint), so a non-center anchor is visible on the
     // shape itself, not just as an abstract dot in the side panel widget.
     if (typeof xformAnchorPoint === 'function') {
-      var ap = xformAnchorPoint(b);
+      var ap0 = xformAnchorPoint(b);
+      // A custom pivot (Alt+click) is ALREADY a world point — only the
+      // bounds-derived anchors live in the box's de-rotated space.
+      var apArr = state.xformAnchorCustom ? [ap0.x, ap0.y] : W(ap0.x, ap0.y);
+      var ap = { x: apArr[0], y: apArr[1] };
       var ar = 8 * zs;
       items.push(circleItem(ap.x, ap.y, ar, null, [74, 158, 255, 255], 1.2 * zs));
       items.push(lineItem([ap.x - ar, ap.y], [ap.x + ar, ap.y], [74, 158, 255, 255], 1 * zs));

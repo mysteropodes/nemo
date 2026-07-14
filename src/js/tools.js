@@ -537,6 +537,41 @@ function xformSelBounds(){
   selectedPaths.forEach(function(p){if(!p||!p.bounds)return;b=b?b.unite(p.bounds):p.bounds.clone();});
   return b;
 }
+// ---- Oriented selection box (2026-07) ----
+// "les boîtes de transformation ne tournent pas avec l'objet quand on
+// rotate" — the transform box was always the axis-aligned union of
+// bounds, so rotating a selection left the box flat (and growing) around
+// the tilted object. The box now carries a persistent angle, accumulated
+// by every rotate gesture (both the engine select-bridge and the Paper-
+// native mirror below) and reset when the selection changes (clearSel).
+// orientedSelBox() computes the TIGHT box in de-rotated space: each
+// selected path is cloned, counter-rotated, and its exact (curve-aware)
+// bounds united — the pivot choice is irrelevant to the box's shape
+// (rigid rotation: any pivot only translates the de-rotated cloud), it
+// just has to be the SAME one selBoxPt uses to map corners back to world.
+window._selBoxAngle=0;
+function orientedSelBox(){
+  if(!selectedPaths.length)return null;
+  var b0=xformSelBounds();if(!b0)return null;
+  var ang=window._selBoxAngle||0;
+  if(!ang)return{b:b0,angle:0,pivot:b0.center};
+  var pivot=b0.center,b=null;
+  selectedPaths.forEach(function(p){
+    if(!p||!p.bounds)return;
+    var c=p.clone({insert:false});
+    c.rotate(-ang,pivot);
+    b=b?b.unite(c.bounds):c.bounds.clone();
+    c.remove();
+  });
+  return b?{b:b,angle:ang,pivot:pivot}:null;
+}
+// De-rotated-space point -> world (rotate by the box angle around its pivot).
+function selBoxPt(x,y,box){
+  if(!box.angle)return new Point(x,y);
+  var r=box.angle*Math.PI/180,c=Math.cos(r),s=Math.sin(r);
+  var dx=x-box.pivot.x,dy=y-box.pivot.y;
+  return new Point(box.pivot.x+dx*c-dy*s,box.pivot.y+dx*s+dy*c);
+}
 // Align toolbar (redesign 2026-07-09) — each selected path moves by its OWN
 // delta against the combined selection bounds (not a uniform group shift
 // like selPropsApplyMove), so this can't reuse that function; the per-path
@@ -592,18 +627,20 @@ function xformAnchorPoint(b){
 function renderTransformHandles(){
   xformLayer.removeChildren();xformHandles=[];
   if(state.tool!=='select'||!selectedPaths.length)return;
-  var b=xformSelBounds();if(!b)return;
+  var box=orientedSelBox();if(!box)return;
+  var b=box.b;
   xformLayer.activate();var zs=1/view.zoom;
-  new Path.Rectangle({rectangle:b,strokeColor:'rgba(74,158,255,.8)',strokeWidth:1*zs,dashArray:[4*zs,3*zs],insert:true});
-  var corners={nw:b.topLeft,ne:b.topRight,sw:b.bottomLeft,se:b.bottomRight,n:b.topCenter,s:b.bottomCenter,e:b.rightCenter,w:b.leftCenter};
+  var boxRect=new Path.Rectangle({rectangle:b,strokeColor:'rgba(74,158,255,.8)',strokeWidth:1*zs,dashArray:[4*zs,3*zs],insert:true});
+  if(box.angle)boxRect.rotate(box.angle,box.pivot);
+  var corners={nw:selBoxPt(b.left,b.top,box),ne:selBoxPt(b.right,b.top,box),sw:selBoxPt(b.left,b.bottom,box),se:selBoxPt(b.right,b.bottom,box),n:selBoxPt(b.center.x,b.top,box),s:selBoxPt(b.center.x,b.bottom,box),e:selBoxPt(b.right,b.center.y,box),w:selBoxPt(b.left,b.center.y,box)};
   Object.keys(corners).forEach(function(k){
     var pos=corners[k];
     new Path.Rectangle({center:pos,size:[7*zs,7*zs],fillColor:'#ffffff',strokeColor:'#4a9eff',strokeWidth:1.2*zs,insert:true});
     xformHandles.push({type:'scale',dir:k,pos:pos});
   });
   var rotOff=20*zs;
-  var rotPos=b.topCenter.subtract(new Point(0,rotOff));
-  new Path.Line({from:b.topCenter,to:rotPos,strokeColor:'rgba(74,158,255,.8)',strokeWidth:1*zs,insert:true});
+  var rotPos=selBoxPt(b.center.x,b.top-rotOff,box);
+  new Path.Line({from:corners.n,to:rotPos,strokeColor:'rgba(74,158,255,.8)',strokeWidth:1*zs,insert:true});
   new Path.Circle({center:rotPos,radius:5*zs,fillColor:'#ffffff',strokeColor:'#4a9eff',strokeWidth:1.2*zs,insert:true});
   xformHandles.push({type:'rotate',pos:rotPos});
   userLayers[state.activeLayerIdx].activate();
@@ -626,7 +663,7 @@ function rotateCenterSegments(segs,angleDeg,cx,cy){
     s.handleOut=rotVec(s.handleOut[0],s.handleOut[1]);
   });
 }
-function clearSel(){selectedPaths=[];state.selectedStrokeIndices=[];_nodeSel=[];state.xformAnchorCustom=null;}
+function clearSel(){selectedPaths=[];state.selectedStrokeIndices=[];_nodeSel=[];state.xformAnchorCustom=null;window._selBoxAngle=0;}
 function getSI(path){var ch=userLayers[state.activeLayerIdx].children;for(var i=0;i<ch.length;i++){if(ch[i]===path)return i;}return -1;}
 var canvasEl=document.getElementById('drawing-canvas');
 
@@ -3379,7 +3416,8 @@ function onMouseDown(event){
         _xform.startAngle=Math.atan2(event.point.y-_xform.center.y,event.point.x-_xform.center.x)*180/Math.PI;_xform.lastAngle=0;
       }else{
         var anchorMap={nw:'se',ne:'sw',sw:'ne',se:'nw',n:'s',s:'n',e:'w',w:'e'};
-        var anchors={nw:xb.topLeft,ne:xb.topRight,sw:xb.bottomLeft,se:xb.bottomRight,n:xb.topCenter,s:xb.bottomCenter,e:xb.rightCenter,w:xb.leftCenter};
+        var xbx=orientedSelBox()||{b:xb,angle:0,pivot:xb.center};
+        var anchors={nw:selBoxPt(xbx.b.left,xbx.b.top,xbx),ne:selBoxPt(xbx.b.right,xbx.b.top,xbx),sw:selBoxPt(xbx.b.left,xbx.b.bottom,xbx),se:selBoxPt(xbx.b.right,xbx.b.bottom,xbx),n:selBoxPt(xbx.b.center.x,xbx.b.top,xbx),s:selBoxPt(xbx.b.center.x,xbx.b.bottom,xbx),e:selBoxPt(xbx.b.right,xbx.b.center.y,xbx),w:selBoxPt(xbx.b.left,xbx.b.center.y,xbx)};
         _xform.active=true;_xform.type='scale';_xform.dir=bestXh.dir;
         _xform.anchor=anchors[anchorMap[bestXh.dir]].clone();_xform.origHandlePos=bestXh.pos.clone();
         _xform.lastSx=1;_xform.lastSy=1;
@@ -3651,6 +3689,7 @@ function onMouseDrag(event){
           if(p.data&&p.data.isVectorBrush&&p.data.centerSegments){rotateCenterSegments(p.data.centerSegments,stepAngle,_xform.center.x,_xform.center.y);rebuildVectorBrushOutline(p);}
         });
         _xform.lastAngle=deltaFromStart;
+        window._selBoxAngle=(window._selBoxAngle||0)+stepAngle; // the box follows the object
         symGestureAccumulate(new Matrix().rotate(stepAngle,_xform.center));
       }else{
         var anchor=_xform.anchor,dir=_xform.dir,sx=1,sy=1;
