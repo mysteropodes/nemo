@@ -72,6 +72,10 @@
     ensureDom();
     if (!space) return;
     space.style.display = on ? 'block' : 'none';
+    if (!on) {
+      stopMontagePlay();
+      if (previewLayer) previewLayer.removeChildren();
+    }
     // The regular timeline chrome shares #tl-content — swap wholesale.
     var lp = document.getElementById('layer-panel');
     var lpr = document.getElementById('layer-panel-resize');
@@ -121,8 +125,118 @@
     return el;
   }
 
-  // Montage strip — v1 shell only in this task (an empty drop target with a
-  // film icon + name); items/retiming/playback land in task 2/4.
+  // ---- montage time model ----
+  // item = { symbolId, trimIn, trimOut, duration } (all frames):
+  //   trimIn/trimOut  = the SOURCE range played from the component
+  //   duration        = how many montage frames the item occupies —
+  //                     equal to the source range for plain trims, different
+  //                     after a STRETCH (Alt+drag: same source range squeezed
+  //                     into fewer/more frames = speed change).
+  var FPP = 1.5; // montage lane: pixels per frame
+  function symbolDuration(symbolId) {
+    var sym = state.symbols[symbolId];
+    return sym ? (sym.totalFrames || (sym.layers[0] && sym.layers[0].frames.length) || 24) : 24;
+  }
+  function montageTotal(m) { return m.items.reduce(function (a, it) { return a + it.duration; }, 0); }
+  function montageStrokesAt(m, f) {
+    var acc = 0;
+    for (var i = 0; i < m.items.length; i++) {
+      var it = m.items[i];
+      if (f < acc + it.duration) {
+        var local = f - acc;
+        var srcLen = it.trimOut - it.trimIn + 1;
+        var srcFrame = it.trimIn + Math.min(srcLen - 1, Math.floor(local * srcLen / it.duration));
+        return symbolStrokesAt(it.symbolId, srcFrame);
+      }
+      acc += it.duration;
+    }
+    return [];
+  }
+  // All layers of the symbol at frame fi, with the same previous-keyframe
+  // backfill getLFSSubStrokes uses (a non-key frame shows the last key).
+  function symbolStrokesAt(symbolId, fi) {
+    var sym = state.symbols[symbolId];
+    if (!sym) return [];
+    var out = [];
+    sym.layers.forEach(function (sl) {
+      var idx = Math.min(fi, sl.frames.length - 1);
+      var fr = sl.frames[idx];
+      if (fr && (fr.isKeyframe || fr.isInterpolated)) { out = out.concat(fr.strokes || []); return; }
+      for (var k = idx - 1; k >= 0; k--) {
+        var f2 = sl.frames[k];
+        if (f2 && f2.isKeyframe) { out = out.concat(f2.strokes || []); return; }
+      }
+    });
+    return out;
+  }
+
+  // ---- canvas preview (service Paper layer, ghostAllLayer pattern —
+  // engine-bridge's buildSceneJson swaps the document layers for this one
+  // in storyboard mode, reading it through onionLayerItems) ----
+  var previewLayer = null;
+  function getPreviewLayer() {
+    var s = sb();
+    var m = s.modules.find(function (x) { return x.id === s.activeMontageId; });
+    if (!m || !m.items || !m.items.length) return null;
+    return previewLayer;
+  }
+  function updatePreview() {
+    var s = sb();
+    var m = s.modules.find(function (x) { return x.id === s.activeMontageId; });
+    if (!previewLayer && window.project) {
+      var prev = project.activeLayer;
+      previewLayer = new Layer({ insert: true });
+      previewLayer.visible = false; // engine-only — Paper's own (hidden) canvas never draws it
+      if (prev) prev.activate();
+    }
+    if (!previewLayer) return;
+    previewLayer.removeChildren();
+    if (m && m.items.length) {
+      var strokes = montageStrokesAt(m, m.playhead || 0);
+      strokes.forEach(function (sd) { desP(sd, previewLayer); });
+    }
+    window._sceneVersion++;
+    if (window.SMEngineBridge && SMEngineBridge.isEnabled()) SMEngineBridge.renderNow();
+  }
+
+  // ---- montage playback (self-contained wall-clock rAF, the same
+  // frame-dropping principle timeline.js's startPlay uses — deliberately
+  // NOT the global transport: a montage plays inside the node space
+  // without touching state.currentFrame or the 2D timeline) ----
+  var _playRaf = null, _playingMontageId = null;
+  function stopMontagePlay() {
+    if (_playRaf) cancelAnimationFrame(_playRaf);
+    _playRaf = null; _playingMontageId = null;
+  }
+  function toggleMontagePlay(m) {
+    if (_playingMontageId === m.id) { stopMontagePlay(); render(); return; }
+    stopMontagePlay();
+    _playingMontageId = m.id;
+    var fps = state.fps || 24, frameMs = 1000 / fps;
+    var clock = performance.now();
+    function step(now) {
+      if (_playingMontageId !== m.id) return;
+      var steps = Math.floor((now - clock) / frameMs);
+      if (steps > 0) {
+        clock += steps * frameMs;
+        var total = montageTotal(m);
+        if (!total) { stopMontagePlay(); render(); return; }
+        m.playhead = ((m.playhead || 0) + steps) % total; // loop
+        positionPlayhead(m);
+        updatePreview();
+      }
+      _playRaf = requestAnimationFrame(step);
+    }
+    _playRaf = requestAnimationFrame(step);
+    render();
+  }
+  function positionPlayhead(m) {
+    var el = world && world.querySelector('[data-sb-id="' + m.id + '"] .sb-ph');
+    if (el) el.style.left = ((m.playhead || 0) * FPP) + 'px';
+  }
+
+  // Montage strip: ordered chips (width = duration), trim handles, stretch
+  // (Alt+drag right handle), drag-to-reorder, scrubbable playhead, play.
   function renderMontage(m) {
     var el = document.createElement('div');
     el.className = 'sb-module sb-montage' + (sb().activeMontageId === m.id ? ' active' : '');
@@ -130,25 +244,179 @@
     head.className = 'sb-montage-head';
     head.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 5v14M17 5v14M3 10h4M3 14h4M17 10h4M17 14h4"/></svg>';
     var nm = document.createElement('span');
-    nm.textContent = m.name;
+    nm.textContent = m.name + ' — ' + montageTotal(m) + ' f';
     head.appendChild(nm);
+    var play = document.createElement('span');
+    play.className = 'sb-play';
+    play.title = 'Lire / arrêter le montage';
+    play.textContent = _playingMontageId === m.id ? '◼' : '▶';
+    play.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+    play.addEventListener('click', function (e) { e.stopPropagation(); sb().activeMontageId = m.id; toggleMontagePlay(m); updatePreview(); });
+    head.appendChild(play);
     el.appendChild(head);
+    // The montage moves by its HEAD only — the lane's own pointer events
+    // are scrub/retime gestures, they must never drag the whole module.
+    wireModuleDrag(head, m);
+
     var lane = document.createElement('div');
     lane.className = 'sb-montage-lane';
+    lane.style.width = Math.max(240, montageTotal(m) * FPP + 8) + 'px';
     if (!m.items.length) {
       var hint = document.createElement('span');
       hint.className = 'sb-hint';
       hint.textContent = 'Glisser des instances ici';
       lane.appendChild(hint);
     }
+    m.items.forEach(function (it, idx) { lane.appendChild(renderChip(m, it, idx)); });
+    // playhead
+    var ph = document.createElement('div');
+    ph.className = 'sb-ph';
+    ph.style.left = ((m.playhead || 0) * FPP) + 'px';
+    lane.appendChild(ph);
+    // scrub: drag on the lane background (not a chip)
+    lane.addEventListener('pointerdown', function (e) {
+      if (e.target.closest('.sb-chip')) return;
+      e.stopPropagation();
+      sb().activeMontageId = m.id;
+      function scrub(ev) {
+        var r = lane.getBoundingClientRect();
+        var f = Math.round((ev.clientX - r.left) / (FPP * sb().zoom));
+        m.playhead = Math.max(0, Math.min(Math.max(0, montageTotal(m) - 1), f));
+        positionPlayhead(m);
+        updatePreview();
+      }
+      scrub(e);
+      function up() { document.removeEventListener('pointermove', scrub); document.removeEventListener('pointerup', up); render(); }
+      document.addEventListener('pointermove', scrub);
+      document.addEventListener('pointerup', up);
+    });
     el.appendChild(lane);
     el.addEventListener('click', function () {
-      sb().activeMontageId = m.id;
-      render();
+      if (sb().activeMontageId !== m.id) { sb().activeMontageId = m.id; render(); updatePreview(); }
     });
-    wireModuleDrag(el, m);
     wireModuleMenu(el, m);
     return el;
+  }
+
+  function renderChip(m, it, idx) {
+    var chip = document.createElement('div');
+    chip.className = 'sb-chip';
+    chip.style.width = (it.duration * FPP) + 'px';
+    chip.style.background = symbolColor(it.symbolId);
+    var sym = state.symbols[it.symbolId];
+    var srcLen = it.trimOut - it.trimIn + 1;
+    var stretched = it.duration !== srcLen;
+    chip.title = (sym ? sym.name : '?') + ' — ' + it.duration + ' f' + (stretched ? ' (vitesse ×' + (srcLen / it.duration).toFixed(2) + ')' : '');
+    var lbl = document.createElement('span');
+    lbl.textContent = it.duration + (stretched ? '×' : '');
+    chip.appendChild(lbl);
+
+    // Trim handles (edges). Plain drag = TRIM (source range and duration
+    // move together — speed unchanged); Alt+drag on the RIGHT handle =
+    // STRETCH (duration alone changes — the same source range plays
+    // faster/slower). "Les deux" per the spec Q&A.
+    ['left', 'right'].forEach(function (side) {
+      var h = document.createElement('div');
+      h.className = 'sb-trim ' + side;
+      h.title = side === 'right' ? 'Trim — Alt+glisser : étirer (vitesse)' : 'Trim';
+      h.addEventListener('pointerdown', function (e) {
+        e.stopPropagation(); e.preventDefault();
+        var startX = e.clientX, o = { trimIn: it.trimIn, trimOut: it.trimOut, duration: it.duration };
+        var stretch = side === 'right' && e.altKey;
+        var maxLen = symbolDuration(it.symbolId);
+        function mv(ev) {
+          var df = Math.round((ev.clientX - startX) / (FPP * sb().zoom));
+          if (stretch) {
+            it.duration = Math.max(1, o.duration + df);
+          } else if (side === 'left') {
+            var ti = Math.max(0, Math.min(o.trimOut, o.trimIn + df));
+            var d = ti - o.trimIn;
+            it.trimIn = ti;
+            it.duration = Math.max(1, o.duration - d);
+          } else {
+            var to = Math.min(maxLen - 1, Math.max(o.trimIn, o.trimOut + df));
+            var d2 = to - o.trimOut;
+            it.trimOut = to;
+            it.duration = Math.max(1, o.duration + d2);
+          }
+          chip.style.width = (it.duration * FPP) + 'px';
+        }
+        function up() {
+          document.removeEventListener('pointermove', mv);
+          document.removeEventListener('pointerup', up);
+          render(); updatePreview();
+        }
+        document.addEventListener('pointermove', mv);
+        document.addEventListener('pointerup', up);
+      });
+      chip.appendChild(h);
+    });
+
+    // Body drag = reorder within the lane (swap when crossing a neighbor's
+    // midpoint — the montage list stays the single source of order).
+    chip.addEventListener('pointerdown', function (e) {
+      if (e.target.classList.contains('sb-trim')) return;
+      e.stopPropagation();
+      var curIdx = m.items.indexOf(it);
+      function mv(ev) {
+        var siblings = Array.from(chip.parentElement.querySelectorAll('.sb-chip'));
+        var over = siblings.findIndex(function (c) {
+          var r = c.getBoundingClientRect();
+          return ev.clientX >= r.left && ev.clientX <= r.right;
+        });
+        if (over >= 0 && over !== curIdx) {
+          m.items.splice(curIdx, 1);
+          m.items.splice(over, 0, it);
+          curIdx = over;
+          render();
+        }
+      }
+      function up() { document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up); updatePreview(); }
+      document.addEventListener('pointermove', mv);
+      document.addEventListener('pointerup', up);
+    });
+
+    chip.addEventListener('contextmenu', function (e) {
+      e.preventDefault(); e.stopPropagation();
+      window.showContextMenu(e.clientX, e.clientY, [
+        { label: 'Détacher (redevient un module libre)', action: function () { m.items.splice(m.items.indexOf(it), 1); addInstance(it.symbolId, m.x, m.y + 120); updatePreview(); } },
+        { label: 'Réinitialiser le retiming', action: function () { it.trimIn = 0; it.trimOut = symbolDuration(it.symbolId) - 1; it.duration = it.trimOut + 1; render(); updatePreview(); } },
+        { label: 'Retirer du montage', action: function () { m.items.splice(m.items.indexOf(it), 1); render(); updatePreview(); } },
+      ]);
+    });
+    return chip;
+  }
+
+  // Dropping a free instance module onto a montage lane absorbs it into
+  // the sequence at the pointer's position — the free module is consumed
+  // (detaching from the chip's context menu recreates one).
+  function tryDropIntoMontage(m, clientX, clientY) {
+    if (m.type !== 'instance') return false;
+    var lanes = world.querySelectorAll('.sb-montage .sb-montage-lane');
+    for (var i = 0; i < lanes.length; i++) {
+      var r = lanes[i].getBoundingClientRect();
+      if (clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom) {
+        var mid = lanes[i].closest('.sb-module').dataset.sbId;
+        var montage = sb().modules.find(function (x) { return x.id === mid; });
+        if (!montage) return false;
+        var dur = symbolDuration(m.symbolId);
+        var item = { symbolId: m.symbolId, trimIn: 0, trimOut: dur - 1, duration: dur };
+        // insertion index from pointer x against existing chips
+        var chips = lanes[i].querySelectorAll('.sb-chip');
+        var at = montage.items.length;
+        for (var c = 0; c < chips.length; c++) {
+          var cr = chips[c].getBoundingClientRect();
+          if (clientX < cr.left + cr.width / 2) { at = c; break; }
+        }
+        montage.items.splice(at, 0, item);
+        var s = sb();
+        s.modules.splice(s.modules.indexOf(m), 1);
+        s.activeMontageId = montage.id;
+        render(); updatePreview();
+        return true;
+      }
+    }
+    return false;
   }
 
   function openSymbol(m) {
@@ -167,8 +435,9 @@
       e.stopPropagation();
       var start = toWorld(e.clientX, e.clientY);
       var ox = start.x - m.x, oy = start.y - m.y;
-      var moved = false;
+      var moved = false, lastX = e.clientX, lastY = e.clientY;
       function mv(ev) {
+        lastX = ev.clientX; lastY = ev.clientY;
         var p = toWorld(ev.clientX, ev.clientY);
         m.x = p.x - ox; m.y = p.y - oy;
         moved = true;
@@ -179,7 +448,11 @@
       function up() {
         document.removeEventListener('pointermove', mv);
         document.removeEventListener('pointerup', up);
-        if (moved) render(); // settle snapped position for everyone
+        if (!moved) return;
+        // Released over a montage lane? The instance is absorbed into the
+        // sequence there instead of staying a free module.
+        if (tryDropIntoMontage(m, lastX, lastY)) return;
+        render(); // settle snapped position for everyone
       }
       document.addEventListener('pointermove', mv);
       document.addEventListener('pointerup', up);
@@ -283,5 +556,9 @@
     render: render,
     addInstance: addInstance,
     addMontage: addMontage,
+    getPreviewLayer: getPreviewLayer,
+    updatePreview: updatePreview,
+    montageStrokesAt: montageStrokesAt,
+    montageTotal: montageTotal,
   };
 })();

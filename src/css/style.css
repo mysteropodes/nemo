@@ -945,3 +945,13 @@ body.mode-motion .lrow.act{box-shadow:inset 3px 0 0 #4E6FF2,inset 0 0 0 1px rgba
 .sb-montage-head{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--text-dim);margin-bottom:6px;}
 .sb-montage-lane{min-height:56px;border:1px dashed var(--border2);border-radius:6px;display:flex;align-items:center;padding:4px;gap:2px;}
 .sb-hint{font-size:9px;color:var(--text-dim);margin:0 auto;}
+.sb-montage-head .sb-play{margin-left:auto;cursor:pointer;font-size:11px;color:var(--text-dim);padding:0 4px;}
+.sb-montage-head .sb-play:hover{color:var(--accent);}
+.sb-montage-lane{position:relative;overflow:visible;}
+.sb-chip{position:relative;height:48px;border-radius:5px;flex:none;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.85);font-size:9px;font-weight:700;cursor:grab;min-width:14px;overflow:hidden;}
+.sb-chip:active{cursor:grabbing;}
+.sb-trim{position:absolute;top:0;bottom:0;width:7px;cursor:ew-resize;background:rgba(0,0,0,.25);}
+.sb-trim.left{left:0;border-radius:5px 0 0 5px;}
+.sb-trim.right{right:0;border-radius:0 5px 5px 0;}
+.sb-trim:hover{background:rgba(255,255,255,.35);}
+.sb-ph{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--accent);pointer-events:none;box-shadow:0 0 4px var(--accent);}

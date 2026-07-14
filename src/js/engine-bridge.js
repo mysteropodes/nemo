@@ -173,6 +173,17 @@
 
   function buildSceneJson(skipVolatile) {
     var layers = [];
+    // StoryBoard montage preview (storyboard.js, 2026-07): when the node
+    // space has an active montage, the canvas shows THAT montage's frame
+    // at its own playhead instead of the document's layers — the preview
+    // strokes live in storyboard.js's dedicated service Paper layer (same
+    // pattern as ghostAllLayer), read through the SAME onionLayerItems
+    // item builder every other stroke-data consumer uses (CLAUDE.md §1:
+    // no new parallel serialization path).
+    var sbPreview = (state.appMode === 'storyboard' && window.SMStoryboard) ? SMStoryboard.getPreviewLayer() : null;
+    if (sbPreview) {
+      layers.push({ items: onionLayerItems(sbPreview) });
+    } else
     for (var i = 0; i < state.layers.length; i++) {
       if (!layerIsEffectivelyVisible(i) || !userLayers[i]) { layers.push({ items: [] }); continue; }
       var children = userLayers[i].children;
