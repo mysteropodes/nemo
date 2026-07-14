@@ -156,6 +156,17 @@
   function renderAudioLayerRows() {
     var list = document.getElementById('layer-list');
     if (!list) return;
+    // Bug (2026-07, "les calques de son se dupliquent quand on clic
+    // dessus"): this function only ever APPENDED rows, relying on the
+    // caller to have cleared #layer-list first. That's true for the
+    // normal path (renderLayerList does list.innerHTML='' before calling
+    // renderStrip, which calls this) — but every row-level action here
+    // (mute toggle, rename commit, delete, drag-to-offset's mouseup) calls
+    // renderStrip() DIRECTLY, skipping renderLayerList entirely, so each
+    // click appended a fresh full set of audio rows ON TOP of the ones
+    // already sitting there. Self-clean here instead of trusting the
+    // caller — idempotent regardless of which path triggered it.
+    list.querySelectorAll('.audio-lrow').forEach(function (r) { r.remove(); });
     tracks().forEach(function (track, ti) {
       var row = document.createElement('div');
       row.className = 'lrow audio-lrow';
