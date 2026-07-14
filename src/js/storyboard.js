@@ -494,6 +494,12 @@
       }
       if (m.type === 'montage') {
         menu.push({ label: 'Renommer', action: function () { var v = prompt('Nom du montage', m.name); if (v) { m.name = v; render(); } } });
+        // The link between the three modes: a montage becomes a LAYER in
+        // Animation 2D/Motion (spec: "apparaîtra comme un layer dans les
+        // autres timelines"). The montage stays the source of truth —
+        // getEffectiveStrokes resolves the layer's content from it live
+        // (app.js ld.montageId branch), like a precomp.
+        menu.push({ label: 'Placer comme calque dans Animation 2D', action: function () { placeMontageAsLayer(m); } });
       }
       menu.push({ label: 'Supprimer le module', action: function () { var s = sb(); s.modules.splice(s.modules.indexOf(m), 1); if (s.activeMontageId === m.id) s.activeMontageId = null; render(); } });
       window.showContextMenu(e.clientX, e.clientY, menu);
@@ -551,6 +557,31 @@
     render();
   }
 
+  function montageById(id) {
+    return sb().modules.find(function (x) { return x.type === 'montage' && x.id === id; }) || null;
+  }
+  function placeMontageAsLayer(m) {
+    if (!m.items.length) { showToast('Le montage est vide — glissez-y des instances d\u2019abord'); return; }
+    // One layer per montage: re-placing focuses the existing one instead
+    // of stacking duplicates.
+    for (var i = 0; i < state.layers.length; i++) {
+      if (state.layers[i].montageId === m.id) {
+        if (window.SMMotion) SMMotion.setAppMode('anim2d');
+        state.activeLayerIdx = i; activateUL(i); updateUI();
+        showToast('Ce montage est déjà placé — calque « ' + state.layers[i].name + ' »');
+        return;
+      }
+    }
+    if (window.saveAllLayerFrames) saveAllLayerFrames();
+    if (window.pushUndoLayers) pushUndoLayers();
+    var idx = createUserLayer(m.name);
+    state.layers[idx].montageId = m.id;
+    if (window.SMMotion) SMMotion.setAppMode('anim2d');
+    state.activeLayerIdx = idx; activateUL(idx);
+    loadFrame(state.currentFrame); updateUI();
+    showToast('Montage placé comme calque « ' + m.name + ' » (' + montageTotal(m) + ' images, en boucle)');
+  }
+
   window.SMStoryboard = {
     setVisible: setVisible,
     render: render,
@@ -560,5 +591,6 @@
     updatePreview: updatePreview,
     montageStrokesAt: montageStrokesAt,
     montageTotal: montageTotal,
+    montageById: montageById,
   };
 })();

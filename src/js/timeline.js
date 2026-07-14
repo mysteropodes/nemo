@@ -692,7 +692,7 @@ window.SM={
     var sceneWaIn=inSym?_sceneSnapshot.waIn:state.waIn;
     var sceneWaOut=inSym?_sceneSnapshot.waOut:state.waOut;
     return JSON.stringify({version:13,totalFrames:sceneTotal,fps:sceneFps,canvasW:state.canvasW,canvasH:state.canvasH,canvasBg:state.canvasBg,waIn:sceneWaIn,waOut:sceneWaOut,
-      layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color,motion:l.motion,motionStatic:l.motionStatic,elementMotion:l.elementMotion,inPoint:l.inPoint,outPoint:l.outPoint,nativeVideo:l.nativeVideo,matteMode:l.matteMode};}),
+      layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color,motion:l.motion,motionStatic:l.motionStatic,elementMotion:l.elementMotion,inPoint:l.inPoint,outPoint:l.outPoint,nativeVideo:l.nativeVideo,matteMode:l.matteMode,montageId:l.montageId};}),
       layerFolders:state.layerFolders,layerLinkGroups:state.layerLinkGroups,
       // StoryBoard node space (2026-07) — plain data by construction (no
       // runtime-only fields live in state.storyboard, see storyboard.js's
@@ -824,6 +824,7 @@ window.SM={
       // (_nvSessionId) — native-video-bridge reopens it lazily from
       // nativeVideo.path on the first frame sync after this load.
       if(ld.nativeVideo)state.layers[idx].nativeVideo=ld.nativeVideo;
+      if(ld.montageId)state.layers[idx].montageId=ld.montageId;
       state.layers[idx].color=ld.color||nextLayerColor();
       ld.frames.forEach(function(f){if(!f.isInterpolated)f.isInterpolated=false;});while(state.layers[idx].frames.length<state.totalFrames)state.layers[idx].frames.push({strokes:[],isKeyframe:false,isInterpolated:false});});
     state.layerFolders=d.layerFolders||{};state.layerLinkGroups=d.layerLinkGroups||{};
@@ -2290,6 +2291,7 @@ function renderLayerList(){
     // matches the channel initial (S/F/O for Ombre, avoiding a clash with
     // the Solo 'S' badge's own single-letter convention would need 2
     // letters here anyway since Fill/Shadow both start differently in FR).
+    if(ld.montageId){var mtb=document.createElement('div');mtb.className='lico comp-badge';mtb.title='Calque montage (StoryBoard) — contenu piloté par le montage \u00ab '+ld.name+' \u00bb, s\u2019édite dans l\u2019onglet StoryBoard';mtb.innerHTML='<span style="font-size:9px;line-height:1;font-weight:700">MT</span>';row.appendChild(mtb);}
     if(ld.channel){var chLabel=ld.channel==='stroke'?'Tr':ld.channel==='fill'?'Pl':'Om';var chb=document.createElement('div');chb.className='lico comp-badge';chb.title='Calque '+(ld.channel==='stroke'?'Trait':ld.channel==='fill'?'Plein':'Ombre')+' (Stroke/Fill/Shadow) — calque normal, keyframes liées';chb.innerHTML='<span style="font-size:9px;line-height:1;font-weight:700">'+chLabel+'</span>';row.appendChild(chb);}
     // Track matte badge (2026-07) — the Blend/Matte dropdowns only surface
     // in the right panel's Document fallback context (nothing selected,

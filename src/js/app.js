@@ -667,6 +667,19 @@ function getEffectiveStrokes(layerIdx,frameIdx){
   // no vector strokes at all — its picture is an engine-side image item
   // (buildSceneJson, engine-bridge.js), not frame data.
   if(ld.nativeVideo)return[];
+  // StoryBoard montage layer (storyboard.js, 2026-07): the layer's content
+  // at frame f IS the montage's resolved frame (looping) — the montage
+  // stays the single source of truth, edits in the node space show up
+  // here live, like a precomp. Placement offset via symPlacedAt (the same
+  // field component layers already use, already persisted).
+  if(ld.montageId){
+    if(!window.SMStoryboard)return[];
+    var mtg=SMStoryboard.montageById(ld.montageId);if(!mtg)return[];
+    var mtot=SMStoryboard.montageTotal(mtg);if(!mtot)return[];
+    var mlf=frameIdx-(ld.symPlacedAt||0);
+    if(mlf<0)return[];
+    return SMStoryboard.montageStrokesAt(mtg,mlf%mtot);
+  }
   if(ld.lfsGroup){
     // Traditional cel stacking: shadow at back, full (flat colors) in the
     // middle, line (ink) on top.
@@ -1088,7 +1101,7 @@ function _writeBackGhostProxies(layerIdx){
 }
 function saveActiveLayerFrame(){
   window._sceneVersion++;
-  var ld=state.layers[state.activeLayerIdx];if(ld.symbolId||ld.nativeVideo)return;
+  var ld=state.layers[state.activeLayerIdx];if(ld.symbolId||ld.nativeVideo||ld.montageId)return;
   _writeBackGhostProxies(state.activeLayerIdx);
   var f=ld.frames[state.currentFrame];
   if(!f.isKeyframe&&!f.isInterpolated)return;
@@ -1108,7 +1121,7 @@ function saveActiveLayerFrame(){
 }
 function saveAllLayerFrames(){
   _writeBackGhostProxies(state.activeLayerIdx);
-  for(var i=0;i<state.layers.length;i++){if(state.layers[i].symbolId||state.layers[i].nativeVideo)continue;var f=state.layers[i].frames[state.currentFrame];if(!f||(!f.isKeyframe&&!f.isInterpolated))continue;
+  for(var i=0;i<state.layers.length;i++){if(state.layers[i].symbolId||state.layers[i].nativeVideo||state.layers[i].montageId)continue;var f=state.layers[i].frames[state.currentFrame];if(!f||(!f.isKeyframe&&!f.isInterpolated))continue;
   var ldi=state.layers[i];
   var strokes=[];userLayers[i].children.forEach(function(c){if(c.data&&c.data.ghostFrame!==undefined)return;if(c instanceof Path&&c.segments.length>0){enforceChannelStrip(ldi,c);strokes.push(serP(c));}else if(c instanceof Raster)strokes.push(serR(c));});
   if(f.isInterpolated&&!strokesEqual(strokes,f.strokes)){f.isKeyframe=true;f.isInterpolated=false;}

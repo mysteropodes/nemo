@@ -744,7 +744,7 @@ if(window.__TAURI__&&window.__TAURI__.event&&window.__TAURI__.event.listen){
 // (their picture is a decoder-fed engine texture, not frame strokes), so a
 // stroke drawn here would VANISH on the next frame navigation. A visible
 // refusal beats silent data loss; draw on a normal layer above the video.
-function ensureKeyframe(){var ldk=state.layers[state.activeLayerIdx];if(ldk.nativeVideo){showToast('Calque vidéo — dessine sur un calque normal au-dessus');return;}var curF=ldk.frames[state.currentFrame];if(!curF.isKeyframe&&!curF.isInterpolated){curF.isKeyframe=true;curF.strokes=JSON.parse(JSON.stringify(getEffectiveStrokes(state.activeLayerIdx,state.currentFrame)));loadFrame(state.currentFrame);syncLinkedKeyframeFolder(state.activeLayerIdx,state.currentFrame);}}
+function ensureKeyframe(){var ldk=state.layers[state.activeLayerIdx];if(ldk.nativeVideo){showToast('Calque vidéo — dessine sur un calque normal au-dessus');return;}if(ldk.montageId){showToast('Calque montage — son contenu s\u2019édite dans le StoryBoard');return;}var curF=ldk.frames[state.currentFrame];if(!curF.isKeyframe&&!curF.isInterpolated){curF.isKeyframe=true;curF.strokes=JSON.parse(JSON.stringify(getEffectiveStrokes(state.activeLayerIdx,state.currentFrame)));loadFrame(state.currentFrame);syncLinkedKeyframeFolder(state.activeLayerIdx,state.currentFrame);}}
 
 // ---- VECTOR FILL ENGINE ----
 // The fill of an area IS just the closed loop formed by the strokes around
