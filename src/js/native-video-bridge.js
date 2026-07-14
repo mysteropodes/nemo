@@ -172,15 +172,71 @@
   // runs from loadFrame's choke point (app.js) and keeps each such
   // layer's texture in sync with the playhead, with the same
   // latest-target-wins coalescing as _refSync — per layer.
-  var _layerSync = {}; // layerIdx -> {busy, pending, opening}
+  // Per-layer sync state. Three performance layers on top of the naive
+  // decode-on-demand (added after real-app testing: "scrub et lecture qui
+  // rament"):
+  //   1. lastShown short-circuit — loadFrame runs on EVERY app action
+  //      (stroke commits, undo, tool ops…), not just frame changes;
+  //      without this, drawing one stroke on ANOTHER layer triggered a
+  //      full decode round-trip of the unchanged video frame.
+  //   2. one-frame prefetch cache — after serving frame N, frame N+1 is
+  //      decoded in the background; during playback the next loadFrame
+  //      hits the cache SYNCHRONOUSLY (no await), so the texture updates
+  //      inside loadFrame's own turn and the engine's normal render shows
+  //      it — zero decode latency in the critical path, ONE render per
+  //      frame instead of render-then-rerender-when-decode-lands.
+  //   3. latest-target-wins coalescing on the async (cache-miss) path —
+  //      scrubbing faster than decode only ever decodes the newest target.
+  var _layerSync = {}; // layerIdx -> {busy, pending, lastShown, cache:{frame,px}, prefetching}
   function onFrameChanged(frame) {
     if (!tauriOk()) return;
     for (var i = 0; i < state.layers.length; i++) {
       if (state.layers[i].nativeVideo) _layerFrameSync(i, frame);
     }
   }
-  async function _layerFrameSync(li, frame) {
-    var st = _layerSync[li] || (_layerSync[li] = { busy: false, pending: null });
+  function _syncState(li) {
+    return _layerSync[li] || (_layerSync[li] = { busy: false, pending: null, lastShown: -1, cache: null, prefetching: false });
+  }
+  function _targetFor(nv, frame) {
+    return Math.max(0, Math.min(nv.frameCount - 1, frame - (nv.offsetFrames || 0)));
+  }
+  function _prefetch(li, frame) {
+    var st = _syncState(li);
+    var ld = state.layers[li];
+    if (st.prefetching || !ld || !ld.nativeVideo || !ld._nvSessionId) return;
+    var nv = ld.nativeVideo;
+    if (frame >= nv.frameCount) return; // past the end — nothing to warm
+    st.prefetching = true;
+    frameBytes(ld._nvSessionId, frame).then(function (px) {
+      st.cache = { frame: frame, px: px };
+    }).catch(function () { /* prefetch is best-effort */ }).finally(function () {
+      st.prefetching = false;
+    });
+  }
+  function _layerFrameSync(li, frame) {
+    var ld = state.layers[li];
+    if (!ld || !ld.nativeVideo) return;
+    var nv = ld.nativeVideo;
+    var st = _syncState(li);
+    if (ld._nvSessionId && nv.frameCount) {
+      var target = _targetFor(nv, frame);
+      if (target === st.lastShown) return; // frame unchanged — loadFrame ran for an unrelated reason
+      // SYNC fast path: the prefetched frame is exactly the one needed —
+      // upload inside this very loadFrame turn; the engine's own upcoming
+      // render (from the _sceneVersion bump loadFrame already did) shows
+      // it with no extra render and no decode wait.
+      if (st.cache && st.cache.frame === target) {
+        if (window.SMEngineBridge) SMEngineBridge.registerImageRaw('nv:' + li, st.cache.px, nv.width, nv.height);
+        st.cache = null;
+        st.lastShown = target;
+        _prefetch(li, target + 1);
+        return;
+      }
+    }
+    _layerFrameSyncAsync(li, frame);
+  }
+  async function _layerFrameSyncAsync(li, frame) {
+    var st = _syncState(li);
     if (st.busy) { st.pending = frame; return; }
     st.busy = true;
     try {
@@ -195,11 +251,14 @@
         nv.frameCount = Number(info.frame_count);
         nv.width = info.width; nv.height = info.height; nv.fps = info.fps;
       }
-      var target = Math.max(0, Math.min(nv.frameCount - 1, frame - (nv.offsetFrames || 0)));
+      var target = _targetFor(nv, frame);
+      if (target === st.lastShown) return;
       var px = await frameBytes(ld._nvSessionId, target);
       if (window.SMEngineBridge) SMEngineBridge.registerImageRaw('nv:' + li, px, nv.width, nv.height);
+      st.lastShown = target;
       window._sceneVersion++;
       if (window.SMEngineBridge && SMEngineBridge.isEnabled()) SMEngineBridge.renderNow();
+      _prefetch(li, target + 1);
     } catch (e) {
       console.error('[native-video] layer ' + li + ' sync failed:', e);
     } finally {
