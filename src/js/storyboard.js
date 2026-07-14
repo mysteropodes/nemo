@@ -89,7 +89,7 @@
     if (!world) return;
     world.innerHTML = '';
     sb().modules.forEach(function (m) {
-      var el = m.type === 'instance' ? renderInstance(m) : m.type === 'montage' ? renderMontage(m) : null;
+      var el = m.type === 'instance' ? renderInstance(m) : m.type === 'montage' ? renderMontage(m) : m.type === 'sound' ? renderSound(m) : null;
       if (!el) return;
       el.style.left = m.x + 'px';
       el.style.top = m.y + 'px';
@@ -207,11 +207,26 @@
   function stopMontagePlay() {
     if (_playRaf) cancelAnimationFrame(_playRaf);
     _playRaf = null; _playingMontageId = null;
+    stopAllAudio();
+  }
+  // Start every montage audio entry relative to playhead p (frames):
+  // already-underway entries start immediately at the right position in
+  // their range; not-yet-reached ones are scheduled ahead (WebAudio's own
+  // clock keeps them sample-accurate against the visual rAF loop).
+  function startMontageAudio(m, p) {
+    var fps = state.fps || 24;
+    (m.audio || []).forEach(function (a) {
+      var key = 'a' + a.aid;
+      var relSec = (p - a.offsetFrames) / fps;
+      if (relSec >= 0) playRange(key, a.dataB64, a.inSec, a.outSec, 0, relSec);
+      else playRange(key, a.dataB64, a.inSec, a.outSec, -relSec, 0);
+    });
   }
   function toggleMontagePlay(m) {
     if (_playingMontageId === m.id) { stopMontagePlay(); render(); return; }
     stopMontagePlay();
     _playingMontageId = m.id;
+    startMontageAudio(m, m.playhead || 0);
     var fps = state.fps || 24, frameMs = 1000 / fps;
     var clock = performance.now();
     function step(now) {
@@ -221,7 +236,9 @@
         clock += steps * frameMs;
         var total = montageTotal(m);
         if (!total) { stopMontagePlay(); render(); return; }
-        m.playhead = ((m.playhead || 0) + steps) % total; // loop
+        var prevPh = m.playhead || 0;
+        m.playhead = (prevPh + steps) % total; // loop
+        if (m.playhead < prevPh) { stopAllAudio(); startMontageAudio(m, m.playhead); } // wrapped
         positionPlayhead(m);
         updatePreview();
       }
@@ -291,6 +308,47 @@
       document.addEventListener('pointerup', up);
     });
     el.appendChild(lane);
+    // Embedded audio track (spec Q&A: "piste audio DANS le module
+    // montage") — one row under the lane, each entry a waveform block at
+    // offsetFrames*FPP, horizontally draggable to re-offset, right-click
+    // to detach (back to a free sound module) or remove.
+    if (m.audio && m.audio.length) {
+      var arow = document.createElement('div');
+      arow.className = 'sb-audio-row';
+      arow.style.width = lane.style.width;
+      m.audio.forEach(function (a) {
+        var blk = document.createElement('div');
+        blk.className = 'sb-audio-blk';
+        var durF = Math.max(1, Math.round(((a.outSec - a.inSec) * (state.fps || 24))));
+        blk.style.left = (a.offsetFrames * FPP) + 'px';
+        blk.style.width = (durF * FPP) + 'px';
+        blk.title = a.name + ' — décaler en glissant';
+        var acv = document.createElement('canvas');
+        acv.width = Math.max(20, durF * FPP); acv.height = 22;
+        blk.appendChild(acv);
+        decodeAudio('a' + a.aid, a.dataB64, function (buf) { drawWave(acv, buf, a.inSec, a.outSec); });
+        blk.addEventListener('pointerdown', function (e) {
+          e.stopPropagation(); e.preventDefault();
+          var startX = e.clientX, o = a.offsetFrames;
+          function mv(ev) {
+            a.offsetFrames = Math.max(0, o + Math.round((ev.clientX - startX) / (FPP * sb().zoom)));
+            blk.style.left = (a.offsetFrames * FPP) + 'px';
+          }
+          function up() { document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up); }
+          document.addEventListener('pointermove', mv);
+          document.addEventListener('pointerup', up);
+        });
+        blk.addEventListener('contextmenu', function (e) {
+          e.preventDefault(); e.stopPropagation();
+          window.showContextMenu(e.clientX, e.clientY, [
+            { label: 'Détacher (redevient un module son)', action: function () { m.audio.splice(m.audio.indexOf(a), 1); sb().modules.push({ id: newId(), type: 'sound', name: a.name, dataB64: a.dataB64, x: m.x, y: m.y + 160, inSec: a.inSec, outSec: a.outSec, cursorSec: null }); render(); } },
+            { label: 'Retirer du montage', action: function () { m.audio.splice(m.audio.indexOf(a), 1); render(); } },
+          ]);
+        });
+        arow.appendChild(blk);
+      });
+      el.appendChild(arow);
+    }
     el.addEventListener('click', function () {
       if (sb().activeMontageId !== m.id) { sb().activeMontageId = m.id; render(); updatePreview(); }
     });
@@ -450,8 +508,9 @@
         document.removeEventListener('pointerup', up);
         if (!moved) return;
         // Released over a montage lane? The instance is absorbed into the
-        // sequence there instead of staying a free module.
+        // sequence there — a sound module becomes the montage's audio track.
         if (tryDropIntoMontage(m, lastX, lastY)) return;
+        if (tryDropSoundIntoMontage(m, lastX, lastY)) return;
         render(); // settle snapped position for everyone
       }
       document.addEventListener('pointermove', mv);
@@ -541,6 +600,7 @@
       if (!symIds.length) menu.push({ label: '(Aucun composant — créez-en un en Animation 2D)', disabled: true, action: function () {} });
       menu.push({ sep: true });
       menu.push({ label: 'Nouveau montage', action: function () { addMontage(p.x, p.y); } });
+      menu.push({ label: 'Importer un son…', action: function () { importSoundAt(p.x, p.y); } });
       window.showContextMenu(e.clientX, e.clientY, menu);
     });
   }
@@ -559,6 +619,184 @@
 
   function montageById(id) {
     return sb().modules.find(function (x) { return x.type === 'montage' && x.id === id; }) || null;
+  }
+
+  // ---- sound modules ----
+  // { id, type:'sound', name, dataB64, x, y, inSec, outSec, cursorSec }
+  // inSec/outSec = the played RANGE — a split produces two modules sharing
+  // the same dataB64 with complementary ranges (no audio data duplicated
+  // beyond the base64 string reference). Decoded AudioBuffers are runtime
+  // state and live in _audioBuffers keyed by module/audio-entry id — the
+  // persisted model stays plain JSON by construction.
+  var _audioBuffers = {};
+  var _audioCtx = null;
+  var _playingSources = [];
+  function audioCtx() {
+    if (!_audioCtx) { var AC = window.AudioContext || window.webkitAudioContext; if (AC) _audioCtx = new AC(); }
+    return _audioCtx;
+  }
+  function decodeAudio(key, dataB64, cb) {
+    if (_audioBuffers[key]) { cb(_audioBuffers[key]); return; }
+    var c = audioCtx();
+    if (!c) return;
+    fetch(dataB64).then(function (r) { return r.arrayBuffer(); }).then(function (ab) {
+      return c.decodeAudioData(ab);
+    }).then(function (buf) {
+      _audioBuffers[key] = buf;
+      cb(buf);
+    }).catch(function (e) { console.warn('[storyboard] audio decode failed', e); });
+  }
+  // Minimal own peaks renderer (NOT SMAudio's peaksCanvasFor — that one is
+  // welded to 2D audio-track objects and caches onto them; this draws any
+  // buffer range into any canvas, which split views need).
+  function drawWave(cv, buf, inSec, outSec) {
+    var ctx = cv.getContext('2d');
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    ctx.fillStyle = 'rgba(140,150,255,.75)';
+    var ch = buf.getChannelData(0);
+    var sr = buf.sampleRate;
+    var s0 = Math.floor(inSec * sr), s1 = Math.min(ch.length, Math.floor(outSec * sr));
+    var mid = cv.height / 2;
+    for (var x = 0; x < cv.width; x++) {
+      var a = s0 + Math.floor((s1 - s0) * x / cv.width);
+      var b = s0 + Math.floor((s1 - s0) * (x + 1) / cv.width);
+      var peak = 0;
+      for (var i = a; i < b; i += 16) { var v = Math.abs(ch[i] || 0); if (v > peak) peak = v; }
+      var h = Math.max(1, peak * mid);
+      ctx.fillRect(x, mid - h, 1, h * 2);
+    }
+  }
+  function stopAllAudio() {
+    _playingSources.forEach(function (s) { try { s.stop(); } catch (e) {} });
+    _playingSources = [];
+  }
+  function playRange(key, dataB64, inSec, outSec, when, offsetIntoRange) {
+    decodeAudio(key, dataB64, function (buf) {
+      var c = audioCtx();
+      var src = c.createBufferSource();
+      src.buffer = buf;
+      src.connect(c.destination);
+      var start = inSec + (offsetIntoRange || 0);
+      if (start >= outSec) return;
+      src.start(c.currentTime + (when || 0), start, outSec - start);
+      _playingSources.push(src);
+    });
+  }
+
+  var _soundInput = null;
+  function importSoundAt(x, y) {
+    if (!_soundInput) {
+      _soundInput = document.createElement('input');
+      _soundInput.type = 'file';
+      _soundInput.accept = 'audio/*';
+      _soundInput.style.display = 'none';
+      document.body.appendChild(_soundInput);
+    }
+    _soundInput.onchange = function () {
+      var f = _soundInput.files && _soundInput.files[0];
+      _soundInput.value = '';
+      if (!f) return;
+      var rd = new FileReader();
+      rd.onload = function () {
+        sb().modules.push({ id: newId(), type: 'sound', name: f.name.replace(/\.[^.]+$/, ''), dataB64: rd.result, x: Math.round(x), y: Math.round(y), inSec: 0, outSec: null, cursorSec: null });
+        render();
+      };
+      rd.readAsDataURL(f);
+    };
+    _soundInput.click();
+  }
+
+  function renderSound(m) {
+    var el = document.createElement('div');
+    el.className = 'sb-module sb-sound';
+    var cv = document.createElement('canvas');
+    cv.width = 220; cv.height = 44;
+    cv.className = 'sb-wave';
+    el.appendChild(cv);
+    decodeAudio(m.id, m.dataB64, function (buf) {
+      if (m.outSec == null) { m.outSec = buf.duration; render(); return; }
+      drawWave(cv, buf, m.inSec || 0, m.outSec);
+    });
+    // split cursor: click on the wave places it (visual line), context
+    // menu "Scinder ici" cuts at that point — the mock's "scindé".
+    if (m.cursorSec != null && m.outSec != null) {
+      var cur = document.createElement('div');
+      cur.className = 'sb-wave-cursor';
+      cur.style.left = (6 + 220 * ((m.cursorSec - (m.inSec || 0)) / (m.outSec - (m.inSec || 0)))) + 'px';
+      el.appendChild(cur);
+    }
+    cv.addEventListener('pointerdown', function (e) {
+      // plain click = place the split cursor; the module still drags via
+      // anywhere else on its body (the padding/name area).
+      e.stopPropagation();
+      var r = cv.getBoundingClientRect();
+      var t = (e.clientX - r.left) / r.width;
+      m.cursorSec = (m.inSec || 0) + t * ((m.outSec || 0) - (m.inSec || 0));
+      render();
+    });
+    var nm = document.createElement('div');
+    nm.className = 'sb-name';
+    nm.textContent = m.name + (m.outSec != null ? ' — ' + ((m.outSec - (m.inSec || 0)).toFixed(1)) + 's' : '');
+    el.appendChild(nm);
+    var play = document.createElement('span');
+    play.className = 'sb-play sb-sound-play';
+    play.textContent = '▶';
+    play.title = 'Écouter';
+    play.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+    play.addEventListener('click', function (e) {
+      e.stopPropagation();
+      stopAllAudio();
+      playRange(m.id, m.dataB64, m.inSec || 0, m.outSec || 0, 0, 0);
+    });
+    el.appendChild(play);
+    wireModuleDrag(el, m);
+    el.addEventListener('contextmenu', function (e) {
+      e.preventDefault(); e.stopPropagation();
+      var menu = [];
+      if (m.cursorSec != null && m.cursorSec > (m.inSec || 0) + 0.05 && m.cursorSec < (m.outSec || 0) - 0.05) {
+        menu.push({ label: 'Scinder ici', action: function () { splitSound(m); } });
+      } else {
+        menu.push({ label: 'Scinder (cliquer la forme d’onde pour placer le point)', disabled: true, action: function () {} });
+      }
+      menu.push({ label: 'Supprimer le module', action: function () { var s = sb(); s.modules.splice(s.modules.indexOf(m), 1); render(); } });
+      window.showContextMenu(e.clientX, e.clientY, menu);
+    });
+    return el;
+  }
+  function splitSound(m) {
+    var s = sb();
+    var right = { id: newId(), type: 'sound', name: m.name, dataB64: m.dataB64, x: m.x + 250, y: m.y, inSec: m.cursorSec, outSec: m.outSec, cursorSec: null };
+    m.outSec = m.cursorSec;
+    m.cursorSec = null;
+    // the split halves share the decoded buffer — register under the new id too
+    if (_audioBuffers[m.id]) _audioBuffers[right.id] = _audioBuffers[m.id];
+    s.modules.push(right);
+    render();
+  }
+
+  // Dropping a sound module onto a montage lane embeds it as the montage's
+  // audio track (spec Q&A: "piste audio DANS le module montage"), starting
+  // at the montage frame under the pointer.
+  function tryDropSoundIntoMontage(m, clientX, clientY) {
+    if (m.type !== 'sound') return false;
+    var lanes = world.querySelectorAll('.sb-montage .sb-montage-lane');
+    for (var i = 0; i < lanes.length; i++) {
+      var r = lanes[i].getBoundingClientRect();
+      if (clientX >= r.left && clientX <= r.right && clientY >= r.top - 20 && clientY <= r.bottom + 40) {
+        var mid = lanes[i].closest('.sb-module').dataset.sbId;
+        var montage = sb().modules.find(function (x) { return x.id === mid; });
+        if (!montage) return false;
+        var atFrame = Math.max(0, Math.round((clientX - r.left) / (FPP * sb().zoom)));
+        montage.audio.push({ aid: newId(), name: m.name, dataB64: m.dataB64, inSec: m.inSec || 0, outSec: m.outSec || 0, offsetFrames: atFrame });
+        if (_audioBuffers[m.id]) _audioBuffers['a' + montage.audio[montage.audio.length - 1].aid] = _audioBuffers[m.id];
+        var s = sb();
+        s.modules.splice(s.modules.indexOf(m), 1);
+        s.activeMontageId = montage.id;
+        render();
+        return true;
+      }
+    }
+    return false;
   }
   function placeMontageAsLayer(m) {
     if (!m.items.length) { showToast('Le montage est vide — glissez-y des instances d\u2019abord'); return; }

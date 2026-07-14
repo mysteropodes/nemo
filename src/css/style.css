@@ -955,3 +955,11 @@ body.mode-motion .lrow.act{box-shadow:inset 3px 0 0 #4E6FF2,inset 0 0 0 1px rgba
 .sb-trim.right{right:0;border-radius:0 5px 5px 0;}
 .sb-trim:hover{background:rgba(255,255,255,.35);}
 .sb-ph{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--accent);pointer-events:none;box-shadow:0 0 4px var(--accent);}
+.sb-sound{padding:6px;padding-bottom:20px;padding-right:24px;}
+.sb-wave{display:block;border-radius:4px;background:rgba(94,106,210,.12);cursor:crosshair;}
+.sb-wave-cursor{position:absolute;top:6px;height:44px;width:1.5px;background:#ffaa28;pointer-events:none;}
+.sb-sound-play{position:absolute;right:6px;top:6px;font-size:10px;color:var(--text-dim);cursor:pointer;}
+.sb-sound-play:hover{color:var(--accent);}
+.sb-audio-row{position:relative;height:26px;margin-top:4px;}
+.sb-audio-blk{position:absolute;top:0;height:24px;border-radius:4px;background:rgba(94,106,210,.25);border:1px solid rgba(94,106,210,.5);overflow:hidden;cursor:grab;}
+.sb-audio-blk:active{cursor:grabbing;}
