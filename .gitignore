@@ -11,6 +11,7 @@ dist/
 src-tauri/.tauri_private_key
 src-tauri/strokemotion.key
 src-tauri/strokemotion.key.pub
+src-tauri/strokemotion_decoded.key
 geometry-wasm/target/
 # src/wasm/ (wasm-pack build output) is intentionally NOT ignored: the app
 # has no build step that regenerates it before packaging (frontendDist just
