@@ -57,6 +57,10 @@ pub struct VideoSession {
     /// the sequential-playback fast path (frame N+1 right after N) never
     /// seeks. i64 because a fresh post-seek position is derived from pts.
     next_frame: i64,
+    /// Total frames (possibly derived from container duration, see
+    /// open_session_core) — used to clamp requests, AE-style: scrubbing
+    /// to/past the last frame holds the last frame, never errors.
+    frame_count: i64,
 }
 
 /// One global registry, one lock. Decoding is CPU-bound and per-session
@@ -149,6 +153,7 @@ fn open_session_core(path: &str) -> Result<(VideoSession, u64, f64), String> {
             height,
             fps,
             next_frame: 0,
+            frame_count: frame_count as i64,
         },
         frame_count,
         duration_seconds,
@@ -179,9 +184,29 @@ pub fn open_video_session(
 // tightly-packed RGBA8 buffer (`width*height*4`, row-major, no padding).
 fn decode_frame_core(s: &mut VideoSession, frame_index: i64) -> Result<Vec<u8>, String> {
     let t0 = Instant::now();
+    // Clamp to the stream's real range, AE-style: scrubbing to (or past)
+    // the last frame HOLDS the last frame instead of erroring. Also
+    // protects the post-seek loop below — frame_count can be derived from
+    // container duration (see open_session_core), which may round one
+    // frame past what the stream actually contains.
+    let frame_index = frame_index.clamp(0, (s.frame_count - 1).max(0));
+    let time_base = s.decoder.time_base();
+    let tb = time_base.numerator() as f64 / time_base.denominator() as f64;
+
+    // Tail robustness (caught live 2026-07, "decode: stream exhausted"
+    // aborting scrubs near the end): requesting a frame at/near the tail
+    // can hit EOF two different ways — (a) the stream really has fewer
+    // frames than metadata claimed, or (b) a re-seek to the LAST frame
+    // after the reader already consumed to EOF lands so close to the end
+    // that the demuxer returns exhausted before yielding anything. Both
+    // are handled by the same widening-backoff retry: re-seek a bit
+    // EARLIER than the target and walk forward; whatever frame the walk
+    // last produced when the stream ends is the honest "nearest earlier"
+    // result (for the true last frame it IS the last frame). Backoff
+    // widens 15 → 60 → 240 → …, giving up only once the origin reaches 0.
     let mut seeked = false;
     if frame_index != s.next_frame {
-        // Random access: ffmpeg's seek lands on the KEYFRAME at/before the
+        // Random access: ffmpeg's seek lands at the KEYFRAME at/before the
         // target (inter-frame codecs can't start mid-GOP), so after the
         // seek we decode forward until the frame whose pts maps to the
         // requested index — that's what frame-accurate means for real
@@ -192,31 +217,58 @@ fn decode_frame_core(s: &mut VideoSession, frame_index: i64) -> Result<Vec<u8>, 
         seeked = true;
     }
 
-    let time_base = s.decoder.time_base();
-    let tb = time_base.numerator() as f64 / time_base.denominator() as f64;
-    let mut decoded_ahead: u32 = 0;
-
-    let frame = loop {
-        let raw = s
-            .decoder
-            .decode_raw()
-            .map_err(|e| format!("decode: {e}"))?;
-        if !seeked {
-            break raw; // sequential fast path: next frame IS the target
-        }
-        // Map the decoded frame's pts back to a frame index. rounding
-        // (not floor) because pts*tb*fps for frame N is N ± float noise.
-        let idx = match raw.pts() {
-            Some(pts) => (pts as f64 * tb * s.fps).round() as i64,
-            None => -1, // no pts (rare) — keep decoding, can't identify it
-        };
-        if idx >= frame_index {
-            break raw;
-        }
-        decoded_ahead += 1;
-        if decoded_ahead > MAX_SEEK_DECODE_AHEAD {
-            // Pathological GOP — return what we have rather than stall.
-            break raw;
+    let mut backoff: i64 = 0;
+    let mut total_ahead: u32 = 0; // across retries, for the timing log below
+    let frame = 'outer: loop {
+        let mut decoded_ahead: u32 = 0;
+        let mut nearest_earlier: Option<video_rs::frame::RawFrame> = None;
+        loop {
+            let raw = match s.decoder.decode_raw() {
+                Ok(raw) => raw,
+                Err(e) => {
+                    if let Some(prev) = nearest_earlier.take() {
+                        eprintln!(
+                            "[video-decode] stream ended before frame {frame_index} ({e}) — returning nearest earlier frame"
+                        );
+                        break 'outer prev;
+                    }
+                    // Nothing decoded on this attempt — retry from an
+                    // earlier origin, unless we already started from 0.
+                    let prev_origin = (frame_index - backoff).max(0);
+                    if prev_origin == 0 {
+                        return Err(format!("decode: {e}"));
+                    }
+                    backoff = if backoff == 0 { 15 } else { backoff * 4 };
+                    let origin = (frame_index - backoff).max(0);
+                    eprintln!(
+                        "[video-decode] tail retry: re-seeking to {origin} for target {frame_index} ({e})"
+                    );
+                    s.decoder
+                        .seek_to_frame(origin)
+                        .map_err(|se| format!("tail retry seek: {se}"))?;
+                    seeked = true;
+                    continue 'outer;
+                }
+            };
+            if !seeked {
+                break 'outer raw; // sequential fast path: next frame IS the target
+            }
+            // Map the decoded frame's pts back to a frame index. rounding
+            // (not floor) because pts*tb*fps for frame N is N ± float noise.
+            let idx = match raw.pts() {
+                Some(pts) => (pts as f64 * tb * s.fps).round() as i64,
+                None => -1, // no pts (rare) — keep decoding, can't identify it
+            };
+            if idx >= frame_index {
+                break 'outer raw;
+            }
+            decoded_ahead += 1;
+            total_ahead += 1;
+            if decoded_ahead > MAX_SEEK_DECODE_AHEAD {
+                // Pathological GOP — return what we have rather than stall.
+                break 'outer raw;
+            }
+            nearest_earlier = Some(raw);
         }
     };
     let decode_ms = t0.elapsed().as_secs_f64() * 1000.0;
@@ -252,7 +304,7 @@ fn decode_frame_core(s: &mut VideoSession, frame_index: i64) -> Result<Vec<u8>, 
     // instrumentation for the experiment; a stats command can replace it
     // if this graduates.
     eprintln!(
-        "[video-decode] frame={frame_index} seeked={seeked} ahead={decoded_ahead} decode={decode_ms:.1}ms convert={convert_ms:.1}ms"
+        "[video-decode] frame={frame_index} seeked={seeked} ahead={total_ahead} decode={decode_ms:.1}ms convert={convert_ms:.1}ms"
     );
 
     Ok(rgba)
@@ -393,13 +445,46 @@ mod tests {
         );
     }
 
+    // Past-end and tail-of-stream behavior — AE-style hold, not errors.
+    // (Was `decode_past_end_errors_cleanly` asserting Err; changed 2026-07
+    // after a live autobench run hit "decode: stream exhausted" from a
+    // random seek near the tail — a user scrubbing to the end of the
+    // timeline must get the last frame, never an error.)
     #[test]
-    fn decode_past_end_errors_cleanly() {
+    fn decode_past_end_clamps_to_last_frame() {
         let path = make_test_video();
         let (mut s, frame_count, _) = open_session_core(path.to_str().unwrap()).unwrap();
-        // Way past the end — must be an Err, not a panic/hang.
-        let r = decode_frame_core(&mut s, frame_count as i64 + 100);
-        assert!(r.is_err(), "decoding past EOF should error, got Ok");
+        let expected_len = (s.width * s.height * 4) as usize;
+        // Way past the end — clamped to the last frame, decodes fine.
+        let past = decode_frame_core(&mut s, frame_count as i64 + 100).unwrap();
+        assert_eq!(past.len(), expected_len);
+        // Exactly the last frame, twice (second run exercises the re-seek
+        // path since next_frame has moved past it) — reproducible.
+        let last_a = decode_frame_core(&mut s, frame_count as i64 - 1).unwrap();
+        let last_b = decode_frame_core(&mut s, frame_count as i64 - 1).unwrap();
+        assert_eq!(last_a, last_b, "last-frame seek not reproducible");
+        assert_eq!(past, last_a, "past-end result should BE the last frame");
+    }
+
+    // Same tail robustness on a container whose frame_count is DERIVED
+    // (WebM: duration×fps, see open_session_core) — the derived count can
+    // overshoot the stream's real content by a frame, which is exactly
+    // the "stream exhausted" trap the nearest-earlier fallback covers.
+    #[test]
+    fn webm_tail_seek_does_not_exhaust() {
+        let p = gen_video(
+            "vp9_tail_320.webm",
+            "testsrc2=size=320x240:rate=30:duration=2",
+            &["-c:v", "libvpx-vp9", "-pix_fmt", "yuv420p", "-g", "15"],
+        );
+        let (mut s, frame_count, _) = open_session_core(p.to_str().unwrap()).unwrap();
+        assert!(frame_count > 0);
+        let expected_len = (s.width * s.height * 4) as usize;
+        for probe in [frame_count as i64 - 1, frame_count as i64, frame_count as i64 + 10] {
+            let f = decode_frame_core(&mut s, probe)
+                .unwrap_or_else(|e| panic!("tail probe {probe} failed: {e}"));
+            assert_eq!(f.len(), expected_len, "tail probe {probe} wrong size");
+        }
     }
 
     // ---- codec/container matrix ----
