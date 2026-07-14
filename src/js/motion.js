@@ -1150,6 +1150,39 @@
     // setValue (static override when the stopwatch is off, auto-keyframe
     // at the current frame when it's on — the AE convention).
     getLayerValue: function (li, prop) { var ld = state.layers[li]; return ld ? valueAtFrame(ld, prop, state.currentFrame) : null; },
+    // Geometry-space <-> rendered-world point mapping for the layer's
+    // CURRENT Motion transform ("si on rotate la propriété dans le panel
+    // la box tourne pas avec l'objet") — the transform box and its gesture
+    // math compose this so the gizmo sits on the object WHERE IT RENDERS,
+    // not where its raw Paper geometry lies. fwd = exactly the per-point
+    // formula transformSegments applies at render time (scale about pivot,
+    // rotate about pivot, then translate); inv is its closed-form inverse.
+    // Returns null when the layer has no effective transform (the
+    // overwhelmingly common case — callers skip all mapping then).
+    layerMotionPointMap: function (li) {
+      var mm = layerMotionAt(li, state.currentFrame);
+      if (!mm) return null;
+      var lb = userLayers[li] && userLayers[li].bounds;
+      if (!lb) return null;
+      var px = lb.center.x + mm.ax, py = lb.center.y + mm.ay;
+      var r = mm.rot * Math.PI / 180, c = Math.cos(r), s = Math.sin(r);
+      return {
+        mat: mm,
+        fwd: function (x, y) {
+          var lx = (x - px) * mm.sx, ly = (y - py) * mm.sy;
+          return [px + lx * c - ly * s + mm.dx, py + lx * s + ly * c + mm.dy];
+        },
+        inv: function (x, y) {
+          var wx = x - mm.dx - px, wy = y - mm.dy - py;
+          var lx = wx * c + wy * s, ly = -wx * s + wy * c;
+          return [px + lx / (mm.sx || 1e-6), py + ly / (mm.sy || 1e-6)];
+        },
+        invVec: function (x, y) {
+          var lx = x * c + y * s, ly = -x * s + y * c;
+          return [lx / (mm.sx || 1e-6), ly / (mm.sy || 1e-6)];
+        },
+      };
+    },
     setLayerValue: function (li, prop, vals) { var ld = state.layers[li]; if (ld) setValue(ld, prop, vals); },
     layerMotionAt: layerMotionAt,
     elementMotionAt: elementMotionAt,

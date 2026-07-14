@@ -549,11 +549,29 @@ function xformSelBounds(){
 // bounds united — the pivot choice is irrelevant to the box's shape
 // (rigid rotation: any pivot only translates the de-rotated cloud), it
 // just has to be the SAME one selBoxPt uses to map corners back to world.
-window._selBoxAngle=0;
+//
+// The angle lives ON EACH STROKE (data.boxAngle, persisted via serP/desP)
+// — not in selection-session state. First version kept it in a global
+// reset on deselection, which meant deselect+reselect snapped the box
+// straight again ("une fois que l'on tourne la box on désélectionne, on
+// retrouve la box droite"). Now a rotated object carries its orientation:
+// reselecting shows the tilted box, across saves/reloads too. A MIXED
+// selection (strokes rotated by different amounts) falls back to the
+// axis-aligned box — no single angle is honest there.
+function selBoxAngleOf(){
+  if(!selectedPaths.length)return 0;
+  var a=null;
+  for(var i=0;i<selectedPaths.length;i++){
+    var p=selectedPaths[i];if(!p)continue;
+    var pa=(p.data&&p.data.boxAngle)||0;
+    if(a===null)a=pa;else if(Math.abs(a-pa)>0.01)return 0;
+  }
+  return a||0;
+}
 function orientedSelBox(){
   if(!selectedPaths.length)return null;
   var b0=xformSelBounds();if(!b0)return null;
-  var ang=window._selBoxAngle||0;
+  var ang=selBoxAngleOf();
   if(!ang)return{b:b0,angle:0,pivot:b0.center};
   var pivot=b0.center,b=null;
   selectedPaths.forEach(function(p){
@@ -663,7 +681,7 @@ function rotateCenterSegments(segs,angleDeg,cx,cy){
     s.handleOut=rotVec(s.handleOut[0],s.handleOut[1]);
   });
 }
-function clearSel(){selectedPaths=[];state.selectedStrokeIndices=[];_nodeSel=[];state.xformAnchorCustom=null;window._selBoxAngle=0;}
+function clearSel(){selectedPaths=[];state.selectedStrokeIndices=[];_nodeSel=[];state.xformAnchorCustom=null;}
 function getSI(path){var ch=userLayers[state.activeLayerIdx].children;for(var i=0;i<ch.length;i++){if(ch[i]===path)return i;}return -1;}
 var canvasEl=document.getElementById('drawing-canvas');
 
@@ -3689,7 +3707,7 @@ function onMouseDrag(event){
           if(p.data&&p.data.isVectorBrush&&p.data.centerSegments){rotateCenterSegments(p.data.centerSegments,stepAngle,_xform.center.x,_xform.center.y);rebuildVectorBrushOutline(p);}
         });
         _xform.lastAngle=deltaFromStart;
-        window._selBoxAngle=(window._selBoxAngle||0)+stepAngle; // the box follows the object
+        selectedPaths.forEach(function(p){if(p)p.data.boxAngle=(((p.data&&p.data.boxAngle)||0)+stepAngle)%360;}); // orientation lives on the stroke
         symGestureAccumulate(new Matrix().rotate(stepAngle,_xform.center));
       }else{
         var anchor=_xform.anchor,dir=_xform.dir,sx=1,sy=1;

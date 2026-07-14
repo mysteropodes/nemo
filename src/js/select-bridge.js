@@ -29,6 +29,7 @@
   // like typing in the Transform panel fields.
   var nvIdx = -1, nvStartPt = null, nvStartPos = null, nvStartScale = null, nvScaleMode = false, nvMoved = false;
   var xformDir = null, xformAnchor = null, xformOrigHandlePos = null, xformLastSx = 1, xformLastSy = 1;
+  var xformMap = null; // geometry<->rendered-world mapper when the active layer has a Motion transform
   var rotCenter = null, rotStartAngle = 0, rotLastAngle = 0;
   var marqueeStart = null;
   var moveStarted = false;
@@ -59,16 +60,31 @@
     if (!box) return null;
     var b = box.b;
     var zs = 1 / view.zoom;
+    // Geometry-space corners first (selBoxPt handles the stroke's own
+    // boxAngle), THEN the layer's Motion transform ("la box tourne pas
+    // avec l'objet" when rotating the panel property) so handles sit on
+    // the object where it actually RENDERS. gCorners stay in geometry
+    // space for the gesture math (p.rotate/scale/translate mutate raw
+    // Paper geometry, never rendered space).
+    var map = (window.SMMotion && SMMotion.layerMotionPointMap) ? SMMotion.layerMotionPointMap(state.activeLayerIdx) : null;
+    function GP(x, y) { return selBoxPt(x, y, box); }
+    function WP(x, y) { var g = GP(x, y); if (!map) return g; var w = map.fwd(g.x, g.y); return new Point(w[0], w[1]); }
+    var gCorners = {
+      nw: GP(b.left, b.top), ne: GP(b.right, b.top),
+      sw: GP(b.left, b.bottom), se: GP(b.right, b.bottom),
+      n: GP(b.center.x, b.top), s: GP(b.center.x, b.bottom),
+      e: GP(b.right, b.center.y), w: GP(b.left, b.center.y),
+    };
     var corners = {
-      nw: selBoxPt(b.left, b.top, box), ne: selBoxPt(b.right, b.top, box),
-      sw: selBoxPt(b.left, b.bottom, box), se: selBoxPt(b.right, b.bottom, box),
-      n: selBoxPt(b.center.x, b.top, box), s: selBoxPt(b.center.x, b.bottom, box),
-      e: selBoxPt(b.right, b.center.y, box), w: selBoxPt(b.left, b.center.y, box),
+      nw: WP(b.left, b.top), ne: WP(b.right, b.top),
+      sw: WP(b.left, b.bottom), se: WP(b.right, b.bottom),
+      n: WP(b.center.x, b.top), s: WP(b.center.x, b.bottom),
+      e: WP(b.right, b.center.y), w: WP(b.left, b.center.y),
     };
     // The rotate grip hangs off the box's OWN top edge (its up axis), so
     // it swings around with the object instead of hovering above the AABB.
-    var rotPos = selBoxPt(b.center.x, b.top - 20 * zs, box);
-    return { bounds: b, box: box, corners: corners, rotPos: rotPos };
+    var rotPos = WP(b.center.x, b.top - 20 * zs);
+    return { bounds: b, box: box, corners: corners, gCorners: gCorners, map: map, rotPos: rotPos };
   }
 
   function hitTestHandles(pt) {
@@ -128,15 +144,21 @@
         // xformAnchorPoint works in the box's de-rotated space (h.bounds)
         // — map the pivot back to world through the box angle.
         var apr = xformAnchorPoint(h.bounds);
-        // Custom pivot (Alt+click) is already world — don't re-rotate it.
+        // Custom pivot (Alt+click) is already world — don't re-rotate it,
+        // but DO pull it back to geometry space if a Motion transform is on.
         rotCenter = (h.box && !state.xformAnchorCustom) ? selBoxPt(apr.x, apr.y, h.box) : apr.clone();
-        rotStartAngle = Math.atan2(pt.y - rotCenter.y, pt.x - rotCenter.x) * 180 / Math.PI;
+        xformMap = h.map;
+        if (state.xformAnchorCustom && h.map) { var rcg = h.map.inv(rotCenter.x, rotCenter.y); rotCenter = new Point(rcg[0], rcg[1]); }
+        var ptg0 = xformMap ? (function () { var g = xformMap.inv(pt.x, pt.y); return new Point(g[0], g[1]); })() : pt;
+        rotStartAngle = Math.atan2(ptg0.y - rotCenter.y, ptg0.x - rotCenter.x) * 180 / Math.PI;
         rotLastAngle = 0;
       } else {
         mode = 'xform-scale';
         xformDir = hh.dir;
-        xformAnchor = h.corners[ANCHOR_MAP[hh.dir]].clone();
-        xformOrigHandlePos = h.corners[hh.dir].clone();
+        // Geometry-space anchor/handle (gesture math mutates raw geometry).
+        xformAnchor = h.gCorners[ANCHOR_MAP[hh.dir]].clone();
+        xformOrigHandlePos = h.gCorners[hh.dir].clone();
+        xformMap = h.map;
         xformLastSx = 1; xformLastSy = 1;
       }
       window.SMEngineBridge.renderNow();
@@ -348,6 +370,11 @@
     } else if (mode === 'move') {
       if (!moveStarted) { pushUndo(); moveStarted = true; }
       var delta = pt.subtract(lastPt);
+      // Layer under a Motion transform: the pointer moves in RENDERED
+      // space, the geometry lives underneath — pull the delta back
+      // (inverse rotate + inverse scale) or the drag drifts/overshoots.
+      var mvMap = (window.SMMotion && SMMotion.layerMotionPointMap) ? SMMotion.layerMotionPointMap(state.activeLayerIdx) : null;
+      if (mvMap) { var dv = mvMap.invVec(delta.x, delta.y); delta = new Point(dv[0], dv[1]); }
       // translate(delta), not position=position.add(delta) — .position is
       // a bounds-CENTER getter/setter, so a move via .position re-derives
       // bounds on every single tick of the drag (many times per gesture)
@@ -373,17 +400,21 @@
       });
       symGestureAccumulate(new Matrix().translate(delta));
     } else if (mode === 'xform-scale') {
+      // Geometry-space pointer (NOT reassigning pt — lastPt at the end of
+      // this handler must stay world-space).
+      var ptS = pt;
+      if (xformMap) { var ptgS = xformMap.inv(pt.x, pt.y); ptS = new Point(ptgS[0], ptgS[1]); }
       var anchor = xformAnchor, dir = xformDir, sx = 1, sy = 1;
       if (dir === 'nw' || dir === 'ne' || dir === 'sw' || dir === 'se') {
         var origDX = xformOrigHandlePos.x - anchor.x, origDY = xformOrigHandlePos.y - anchor.y;
-        var curDX = pt.x - anchor.x, curDY = pt.y - anchor.y;
+        var curDX = ptS.x - anchor.x, curDY = ptS.y - anchor.y;
         sx = origDX !== 0 ? curDX / origDX : 1;
         sy = origDY !== 0 ? curDY / origDY : 1;
       } else if (dir === 'n' || dir === 's') {
-        var origDY2 = xformOrigHandlePos.y - anchor.y, curDY2 = pt.y - anchor.y;
+        var origDY2 = xformOrigHandlePos.y - anchor.y, curDY2 = ptS.y - anchor.y;
         sy = origDY2 !== 0 ? curDY2 / origDY2 : 1;
       } else {
-        var origDX2 = xformOrigHandlePos.x - anchor.x, curDX2 = pt.x - anchor.x;
+        var origDX2 = xformOrigHandlePos.x - anchor.x, curDX2 = ptS.x - anchor.x;
         sx = origDX2 !== 0 ? curDX2 / origDX2 : 1;
       }
       if (Math.abs(sx) < 0.05) sx = sx < 0 ? -0.05 : 0.05;
@@ -402,7 +433,9 @@
       setArcCtrl(draggingArc.fA, draggingArc.fB, draggingArc.matchIdx, draggingArc.ptA, draggingArc.ptB, pt.x, pt.y);
       renderArcs();
     } else if (mode === 'xform-rotate') {
-      var curAngle = Math.atan2(pt.y - rotCenter.y, pt.x - rotCenter.x) * 180 / Math.PI;
+      var ptR = pt;
+      if (xformMap) { var ptgR = xformMap.inv(pt.x, pt.y); ptR = new Point(ptgR[0], ptgR[1]); }
+      var curAngle = Math.atan2(ptR.y - rotCenter.y, ptR.x - rotCenter.x) * 180 / Math.PI;
       var deltaFromStart = curAngle - rotStartAngle;
       var stepAngle = deltaFromStart - rotLastAngle;
       selectedPaths.forEach(function (p) {
@@ -413,7 +446,7 @@
         }
       });
       rotLastAngle = deltaFromStart;
-      window._selBoxAngle = (window._selBoxAngle || 0) + stepAngle; // the box follows the object
+      selectedPaths.forEach(function (p) { if (p) p.data.boxAngle = (((p.data && p.data.boxAngle) || 0) + stepAngle) % 360; }); // orientation lives on the stroke
       symGestureAccumulate(new Matrix().rotate(stepAngle, rotCenter));
     }
     lastPt = pt;

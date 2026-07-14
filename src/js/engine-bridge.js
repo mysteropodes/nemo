@@ -569,9 +569,17 @@
     var b = box.b;
     var zs = 1 / view.zoom;
     var items = [];
-    function W(x, y) { var p = selBoxPt(x, y, box); return [p.x, p.y]; }
-    if (!box.angle) {
-      items.push(boundsRectItem(b.left, b.top, b.right, b.bottom, null, [74, 158, 255, 204], 1 * zs));
+    // Compose the layer's Motion transform on top of the stroke's own
+    // boxAngle — the gizmo must sit on the object where it RENDERS
+    // ("si on rotate la propriété dans le panel la box tourne pas avec
+    // l'objet"), and the panel's position/scale/rotation all flow
+    // through the same map.
+    var nvMap = (window.SMMotion && SMMotion.layerMotionPointMap) ? SMMotion.layerMotionPointMap(state.activeLayerIdx) : null;
+    function W(x, y) { var p = selBoxPt(x, y, box); if (nvMap) { var w = nvMap.fwd(p.x, p.y); return w; } return [p.x, p.y]; }
+    if (!box.angle && !(nvMap && nvMap.mat.rot)) {
+      // no rotation anywhere — but position/scale from Motion still apply
+      var tl = W(b.left, b.top), br = W(b.right, b.bottom);
+      items.push(boundsRectItem(tl[0], tl[1], br[0], br[1], null, [74, 158, 255, 204], 1 * zs));
     } else {
       // rotated outline = four explicit edges (boundsRectItem is AABB-only)
       var c1 = W(b.left, b.top), c2 = W(b.right, b.top), c3 = W(b.right, b.bottom), c4 = W(b.left, b.bottom);
