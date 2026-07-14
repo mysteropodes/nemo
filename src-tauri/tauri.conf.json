@@ -1,6 +1,6 @@
 {
   "productName": "Nemo",
-  "version": "0.4.4",
+  "version": "0.5.0",
   "identifier": "com.strokemotion.app",
   "build": {
     "frontendDist": "../src",
