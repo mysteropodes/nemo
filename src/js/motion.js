@@ -1145,6 +1145,11 @@
     state.appMode = mode;
     document.querySelectorAll('.app-mode-btn').forEach(function (b) { b.classList.toggle('active', b.dataset.mode === mode); });
     document.body.classList.toggle('mode-motion', mode === 'motion');
+    document.body.classList.toggle('mode-storyboard', mode === 'storyboard');
+    // StoryBoard swaps the whole timeline area for the node space —
+    // renderLayerList/renderTimeline still run (their targets are hidden,
+    // harmless) so switching BACK lands on an up-to-date grid.
+    if (window.SMStoryboard) SMStoryboard.setVisible(mode === 'storyboard');
     renderLayerList(); renderTimeline();
     if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
   }
