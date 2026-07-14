@@ -2,6 +2,9 @@ use tauri::{Emitter, Manager};
 use tauri_plugin_shell::process::CommandEvent;
 use tauri_plugin_shell::ShellExt;
 
+// EXPERIMENTAL (experimental/native-video-decode) — see the module header.
+mod video_decode;
+
 #[tauri::command]
 async fn run_ffmpeg(app: tauri::AppHandle, window: tauri::Window, args: Vec<String>) -> Result<i32, String> {
     let sidecar = app
@@ -197,7 +200,15 @@ pub fn run() {
         // update had actually worked because they happened to relaunch the
         // app later and saw the new version number).
         .plugin(tauri_plugin_process::init())
-        .invoke_handler(tauri::generate_handler![run_ffmpeg, submit_feedback_issue, upload_feedback_attachment])
+        .manage(video_decode::VideoSessions::default())
+        .invoke_handler(tauri::generate_handler![
+            run_ffmpeg,
+            submit_feedback_issue,
+            upload_feedback_attachment,
+            video_decode::open_video_session,
+            video_decode::decode_video_frame,
+            video_decode::close_video_session
+        ])
         // "Vérifier les mises à jour…" in the app (StrokeMotion) menu — same
         // check the Réglages button and the silent startup check already
         // do (updater-bridge.js), just reachable from the menu too (asked

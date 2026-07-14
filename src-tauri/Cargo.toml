@@ -32,6 +32,19 @@ tauri-plugin-dialog = "2.7.1"
 tauri-plugin-http = "2"
 tauri-plugin-process = "2"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+# EXPERIMENTAL (2026-07, experimental/native-video-decode branch — NOT for
+# main/motion-mode-v1): native Rust video decode, feeding decoded RGBA8
+# frames to the webview for engine.register_image() (the same GPU-texture
+# entry point static images already use, geometry-wasm/src/engine.rs).
+# video-rs wraps ffmpeg-sys-next/ffmpeg's C libraries — this DYNAMICALLY
+# LINKS against libavcodec/libavformat/etc via pkg-config at build time
+# (confirmed present locally: `pkg-config --modversion libavcodec` ->
+# 62.11.100, Homebrew). Distribution is UNSOLVED: the app currently only
+# bundles the ffmpeg CLI binary (externalBin), not the shared libraries
+# other programs can link against, and several of ffmpeg's optional
+# codecs (x264/x265) are GPL — real licensing question for a commercial
+# build, deliberately not addressed on this experimental branch yet.
+video-rs = "0.11"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc = "0.2"

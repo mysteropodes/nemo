@@ -157,6 +157,19 @@
     engine.register_image(id, p.pixels, p.w, p.h);
     registeredImageIds[id] = true;
   }
+  // Raw-bytes variant (EXPERIMENTAL, native-video-decode branch): the
+  // native decoder already produces tightly-packed RGBA8 — going through
+  // registerImagePixels above would draw those bytes onto a canvas just
+  // to getImageData them straight back out (two full-frame copies + a
+  // premultiply/unpremultiply round-trip that can subtly alter pixel
+  // values). Feed engine.register_image directly instead; `pixels` must
+  // be a Uint8Array of exactly w*h*4 bytes.
+  function registerImageRaw(id, pixels, w, h) {
+    if (!engine) return false;
+    engine.register_image(id, pixels, w, h);
+    registeredImageIds[id] = true;
+    return true;
+  }
 
   function buildSceneJson(skipVolatile) {
     var layers = [];
@@ -1161,6 +1174,7 @@
     setPressureCursor: setPressureCursor,
     setPenPreview: setPenPreview,
     registerImagePixels: registerImagePixels,
+    registerImageRaw: registerImageRaw,
     hasImage: function (id) { return !!registeredImageIds[id]; },
     // Call suspend() at the start of an intercepted drag and resume() at the
     // end — see the `suspended` var above for why: without this, tick()'s
