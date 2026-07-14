@@ -89,9 +89,10 @@ pub struct VideoSession {
     cache: std::collections::VecDeque<(i64, Vec<u8>)>,
     /// Readahead thread state (2026-07, the mpv pattern: decode runs on a
     /// dedicated thread ahead of the playhead, never on the request path).
-    /// `readahead_goal` is the exclusive frame index the thread decodes
-    /// toward; each UI request pushes it forward, so during playback the
-    /// thread stays a few frames ahead and every UI request is a cache hit.
+    /// `readahead_goal` holds the CENTER of the warming window (the last
+    /// frame the UI requested); the thread fills [center+1, center+DEPTH]
+    /// then [center-1, center-BACK] (all-intra only), so during playback
+    /// AND back-and-forth scrubbing, requests land on a warm cache.
     readahead_active: bool,
     readahead_goal: i64,
     /// Source codec name (lowercase, e.g. "h264", "prores") — lets the JS
@@ -101,30 +102,37 @@ pub struct VideoSession {
     codec: String,
 }
 
-/// How far past the last requested frame the readahead thread decodes.
-/// 8 matches the 1080p capacity of FRAME_CACHE_BUDGET_BYTES; on 4K the
-/// byte-bounded eviction simply keeps fewer of them — the depth constant
-/// doesn't need to know the resolution.
+/// How far past the last requested frame the readahead thread decodes,
+/// and how far BEHIND it (bidirectional warming — "mini latences de
+/// scrub" 2026-07: forward-only readahead left every backward step of a
+/// back-and-forth scrub a cold cache miss). Backward warming is only done
+/// for all-intra codecs, where any frame is one cheap independent decode;
+/// on long-GOP sources a backward warm would pay a whole keyframe walk
+/// per frame in the background, competing with the UI for the session.
 const READAHEAD_DEPTH: i64 = 8;
+const READAHEAD_BACK: i64 = 3;
 
-/// Decode forward on a dedicated thread until the session's cache holds
-/// everything up to `readahead_goal` (or EOF/error). One frame per lock
-/// acquisition — the UI's own decode_video_frame call waits at most ONE
-/// frame decode (~4ms @1080p) to grab the session, never the whole burst;
-/// that bounded contention is the price of the mpv-style always-warm cache.
-/// If a thread is already running for this session, the goal is simply
-/// extended — at most one readahead thread per session, ever.
-fn spawn_readahead(arc: Arc<Mutex<VideoSession>>, goal: i64) {
+fn is_all_intra_codec(codec: &str) -> bool {
+    ["mjpeg", "prores", "dnxhd", "rawvideo", "qtrle", "huffyuv", "ffv1", "png", "v210"]
+        .iter()
+        .any(|k| codec.contains(k))
+}
+
+/// Warm the session cache around `center` on a dedicated thread (the mpv
+/// pattern: decode never runs on the request path). Forward frames first
+/// (playback is the common case), then a few backward ones (all-intra
+/// only, see above). One frame per lock acquisition — the UI's own
+/// decode_video_frame call waits at most ONE frame decode to grab the
+/// session, never the whole burst. If a thread is already running for
+/// this session, the center is simply updated (LATEST wins — a scrub
+/// jump abandons warming around the position the user just left); at
+/// most one readahead thread per session, ever.
+fn spawn_readahead(arc: Arc<Mutex<VideoSession>>, center: i64) {
     {
         let mut s = arc.lock().unwrap();
-        // LATEST request wins, not the max: after a backward scrub the old
-        // (far-ahead) goal must be abandoned, or the thread would keep
-        // decoding dozens of frames toward a position the user just left.
-        // If the new goal is already behind the decoder (backward jump),
-        // the loop's `pos >= goal` check stops the thread naturally.
-        s.readahead_goal = goal.min(s.frame_count);
+        s.readahead_goal = center.min(s.frame_count - 1).max(0);
         if s.readahead_active {
-            return; // running thread picks up the updated goal
+            return; // running thread picks up the updated center
         }
         s.readahead_active = true;
     }
@@ -134,16 +142,44 @@ fn spawn_readahead(arc: Arc<Mutex<VideoSession>>, goal: i64) {
             if !s.readahead_active {
                 break; // session closing asked us to stop
             }
-            let pos = s.next_frame;
-            if pos >= s.readahead_goal.min(s.frame_count) {
-                s.readahead_active = false;
-                break;
+            let center = s.readahead_goal;
+            let back = if is_all_intra_codec(&s.codec) { READAHEAD_BACK } else { 0 };
+            // Nearest missing frame: forward window first, then backward.
+            let mut target: Option<i64> = None;
+            for d in 1..=READAHEAD_DEPTH {
+                let f = center + d;
+                if f < s.frame_count && !s.cache.iter().any(|(i, _)| *i == f) {
+                    target = Some(f);
+                    break;
+                }
             }
-            // decode_at (not decode_frame_core): must advance the decoder
-            // even if this index is already cached — see decode_at's doc.
-            if decode_at(&mut s, pos).is_err() {
+            if target.is_none() {
+                for d in 1..=back {
+                    let f = center - d;
+                    if f >= 0 && !s.cache.iter().any(|(i, _)| *i == f) {
+                        target = Some(f);
+                        break;
+                    }
+                }
+            }
+            let Some(f) = target else {
+                s.readahead_active = false;
+                break; // window fully warmed
+            };
+            // decode_at (not decode_frame_core): must actually decode and
+            // advance the decoder, never take the cache-hit shortcut.
+            if decode_at(&mut s, f).is_err() {
                 s.readahead_active = false;
                 break; // EOF/decode error — stop quietly, UI path reports its own errors
+            }
+            // Cache saturated (byte budget can hold fewer frames than the
+            // window at high resolutions): STOP, or eviction would forever
+            // re-open holes in the window and this loop would churn CPU
+            // decoding the same frames endlessly.
+            let total: usize = s.cache.iter().map(|(_, b)| b.len()).sum();
+            if total >= FRAME_CACHE_BUDGET_BYTES {
+                s.readahead_active = false;
+                break;
             }
             drop(s); // release between frames so a UI request can interleave
             std::thread::yield_now();
@@ -557,7 +593,7 @@ pub fn decode_video_frame(
     // UI asks for the next frames of playback/scrub-forward, the dedicated
     // thread has already decoded them — the request becomes a cache hit.
     if result.is_ok() {
-        spawn_readahead(session_arc, frame_index + 1 + READAHEAD_DEPTH);
+        spawn_readahead(session_arc, frame_index);
     }
     result.map(|(rgba, _ahead)| Response::new(rgba))
 }
@@ -1011,7 +1047,7 @@ mod tests {
 
         // Serve frame 0 the way the command does, then kick readahead.
         decode_frame_core(&mut arc.lock().unwrap(), 0).unwrap();
-        spawn_readahead(arc.clone(), 1 + READAHEAD_DEPTH);
+        spawn_readahead(arc.clone(), 0);
 
         let deadline = Instant::now() + std::time::Duration::from_secs(5);
         loop {
@@ -1028,6 +1064,36 @@ mod tests {
         // And the warmed frames must be served as CACHE HITS (ahead == 0).
         let (_, ahead) = decode_frame_core(&mut arc.lock().unwrap(), 3).unwrap();
         assert_eq!(ahead, 0, "frame 3 should have been a readahead cache hit");
+    }
+
+    // Bidirectional readahead: on an all-intra source (every frame an
+    // independent decode), the warming window must also cover frames
+    // BEHIND the center — that's what makes back-and-forth scrubbing hit
+    // the cache in both directions ("mini latences de scrub", 2026-07).
+    #[test]
+    fn readahead_warms_backward_on_all_intra() {
+        let p = gen_video(
+            "mjpeg_320_backwarm.mov",
+            "testsrc2=size=320x240:rate=30:duration=2",
+            &["-c:v", "mjpeg", "-q:v", "3", "-pix_fmt", "yuvj420p"],
+        );
+        let (s, _, _) = open_session_core(p.to_str().unwrap()).unwrap();
+        assert!(is_all_intra_codec(&s.codec), "test file should read as all-intra, got {}", s.codec);
+        let arc = std::sync::Arc::new(Mutex::new(s));
+        decode_frame_core(&mut arc.lock().unwrap(), 20).unwrap();
+        spawn_readahead(arc.clone(), 20);
+        let deadline = Instant::now() + std::time::Duration::from_secs(5);
+        loop {
+            {
+                let s = arc.lock().unwrap();
+                let warmed = (17..=19).all(|i| s.cache.iter().any(|(idx, _)| *idx == i));
+                if warmed { break; }
+                assert!(Instant::now() < deadline, "backward frames 17-19 never warmed (cache: {:?})", s.cache.iter().map(|(i, _)| *i).collect::<Vec<_>>());
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        let (_, ahead) = decode_frame_core(&mut arc.lock().unwrap(), 18).unwrap();
+        assert_eq!(ahead, 0, "backward frame 18 should be a cache hit");
     }
 
     // Regression: a cache hit must NOT move next_frame (it tracks the
