@@ -35,7 +35,9 @@ use std::time::Instant;
 
 use serde::Serialize;
 use tauri::ipc::Response;
-use video_rs::decode::Decoder;
+use video_rs::decode::{Decoder, DecoderSplit};
+use video_rs::io::Reader;
+use video_rs::Error as VrError;
 
 // ffmpeg global init must run exactly once before any decoder is opened.
 static FFMPEG_INIT: Once = Once::new();
@@ -49,11 +51,25 @@ static NEXT_SESSION_ID: AtomicU32 = AtomicU32::new(1);
 const MAX_SEEK_DECODE_AHEAD: u32 = 900;
 
 pub struct VideoSession {
-    decoder: Decoder,
+    // Split decoder (DecoderSplit + Reader via Decoder::into_parts) instead
+    // of the packaged video_rs::Decoder: its Reader::seek_to_frame passes a
+    // FRAME NUMBER to av_seek_frame(ctx, -1, ...) which interprets the
+    // value as MICROSECONDS (AV_TIME_BASE units for stream -1) — every
+    // "seek to frame N" actually landed near t=0 and walked the whole file
+    // forward (measured: ahead=44 for a GOP-15 target at frame 59; scrubs
+    // costing 120-980ms). Owning the Reader lets seek_precise below issue
+    // the call correctly (stream index + stream-time_base timestamp +
+    // AVSEEK_FLAG_BACKWARD), bounding the post-seek walk by one GOP.
+    decoder: DecoderSplit,
+    reader: Reader,
+    stream_index: usize,
     width: u32,
     height: u32,
     fps: f64,
-    /// Frame index the decoder will produce on the NEXT decode_raw() call —
+    /// Stream time base in seconds-per-unit (cached from the decoder) —
+    /// used both for pts→frame-index mapping and seek timestamp math.
+    tb: f64,
+    /// Frame index the decoder will produce on the NEXT decode call —
     /// the sequential-playback fast path (frame N+1 right after N) never
     /// seeks. i64 because a fresh post-seek position is derived from pts.
     next_frame: i64,
@@ -61,6 +77,55 @@ pub struct VideoSession {
     /// open_session_core) — used to clamp requests, AE-style: scrubbing
     /// to/past the last frame holds the last frame, never errors.
     frame_count: i64,
+}
+
+/// The packet pump video_rs::Decoder::decode_raw does internally, rebuilt
+/// over the split parts (same read → decode → drain-at-EOF sequence,
+/// including the decoder reset when the drain finishes).
+fn decode_next_raw(s: &mut VideoSession) -> Result<video_rs::frame::RawFrame, String> {
+    loop {
+        match s.reader.read(s.stream_index) {
+            Ok(packet) => {
+                if let Some(frame) = s
+                    .decoder
+                    .decode_raw(packet)
+                    .map_err(|e| format!("decode: {e}"))?
+                {
+                    return Ok(frame);
+                }
+            }
+            Err(VrError::ReadExhausted) => match s.decoder.drain_raw() {
+                Ok(Some(frame)) => return Ok(frame),
+                Ok(None) | Err(VrError::ReadExhausted) => {
+                    s.decoder.reset();
+                    return Err("decode: stream exhausted".to_string());
+                }
+                Err(e) => return Err(format!("drain: {e}")),
+            },
+            Err(e) => return Err(format!("read: {e}")),
+        }
+    }
+}
+
+/// Frame-accurate-capable seek: timestamp in the STREAM's own time base,
+/// on the stream's own index, with AVSEEK_FLAG_BACKWARD so the demuxer
+/// lands on the keyframe AT OR BEFORE the target (never after — landing
+/// after would make the forward walk skip the requested frame entirely).
+fn seek_precise(s: &mut VideoSession, target_frame: i64) -> Result<(), String> {
+    let ts = (target_frame as f64 / s.fps / s.tb).round() as i64;
+    let ret = unsafe {
+        video_rs::ffmpeg::ffi::av_seek_frame(
+            s.reader.input.as_mut_ptr(),
+            s.stream_index as i32,
+            ts,
+            video_rs::ffmpeg::ffi::AVSEEK_FLAG_BACKWARD as i32,
+        )
+    };
+    if ret < 0 {
+        return Err(format!("seek failed (av_seek_frame ret {ret})"));
+    }
+    s.decoder.reset(); // drop buffered pre-seek codec state
+    Ok(())
 }
 
 /// One global registry, one lock. Decoding is CPU-bound and per-session
@@ -146,12 +211,21 @@ fn open_session_core(path: &str) -> Result<(VideoSession, u64, f64), String> {
         duration_seconds = frame_count as f64 / fps; // last resort, both metadata paths empty
     }
 
+    // Metadata gathered above from the packaged Decoder; now split it to
+    // own the Reader (correct seeking — see the VideoSession field docs).
+    let time_base = decoder.time_base();
+    let tb = time_base.numerator() as f64 / time_base.denominator() as f64;
+    let (split, reader, stream_index) = decoder.into_parts();
+
     Ok((
         VideoSession {
-            decoder,
+            decoder: split,
+            reader,
+            stream_index,
             width,
             height,
             fps,
+            tb,
             next_frame: 0,
             frame_count: frame_count as i64,
         },
@@ -181,8 +255,11 @@ pub fn open_video_session(
 }
 
 // Core per-frame decode, tauri-free (see open_session_core). Returns the
-// tightly-packed RGBA8 buffer (`width*height*4`, row-major, no padding).
-fn decode_frame_core(s: &mut VideoSession, frame_index: i64) -> Result<Vec<u8>, String> {
+// tightly-packed RGBA8 buffer (`width*height*4`, row-major, no padding)
+// plus how many frames the post-seek forward walk consumed (0 on the
+// sequential fast path) — asserted against the GOP size in tests since
+// bounding that walk is the whole point of seek_precise.
+fn decode_frame_core(s: &mut VideoSession, frame_index: i64) -> Result<(Vec<u8>, u32), String> {
     let t0 = Instant::now();
     // Clamp to the stream's real range, AE-style: scrubbing to (or past)
     // the last frame HOLDS the last frame instead of erroring. Also
@@ -190,8 +267,7 @@ fn decode_frame_core(s: &mut VideoSession, frame_index: i64) -> Result<Vec<u8>, 
     // container duration (see open_session_core), which may round one
     // frame past what the stream actually contains.
     let frame_index = frame_index.clamp(0, (s.frame_count - 1).max(0));
-    let time_base = s.decoder.time_base();
-    let tb = time_base.numerator() as f64 / time_base.denominator() as f64;
+    let tb = s.tb;
 
     // Tail robustness (caught live 2026-07, "decode: stream exhausted"
     // aborting scrubs near the end): requesting a frame at/near the tail
@@ -206,14 +282,12 @@ fn decode_frame_core(s: &mut VideoSession, frame_index: i64) -> Result<Vec<u8>, 
     // widens 15 → 60 → 240 → …, giving up only once the origin reaches 0.
     let mut seeked = false;
     if frame_index != s.next_frame {
-        // Random access: ffmpeg's seek lands at the KEYFRAME at/before the
-        // target (inter-frame codecs can't start mid-GOP), so after the
-        // seek we decode forward until the frame whose pts maps to the
-        // requested index — that's what frame-accurate means for real
-        // codecs, and it's why backward scrubs cost more than playback.
-        s.decoder
-            .seek_to_frame(frame_index)
-            .map_err(|e| format!("seek: {e}"))?;
+        // Random access: the seek lands at the KEYFRAME at/before the
+        // target (inter-frame codecs can't start mid-GOP), then we decode
+        // forward until the frame whose pts maps to the requested index —
+        // that's what frame-accurate means for real codecs, and it's why
+        // backward scrubs cost more than playback.
+        seek_precise(s, frame_index)?;
         seeked = true;
     }
 
@@ -223,7 +297,7 @@ fn decode_frame_core(s: &mut VideoSession, frame_index: i64) -> Result<Vec<u8>, 
         let mut decoded_ahead: u32 = 0;
         let mut nearest_earlier: Option<video_rs::frame::RawFrame> = None;
         loop {
-            let raw = match s.decoder.decode_raw() {
+            let raw = match decode_next_raw(s) {
                 Ok(raw) => raw,
                 Err(e) => {
                     if let Some(prev) = nearest_earlier.take() {
@@ -236,16 +310,14 @@ fn decode_frame_core(s: &mut VideoSession, frame_index: i64) -> Result<Vec<u8>, 
                     // earlier origin, unless we already started from 0.
                     let prev_origin = (frame_index - backoff).max(0);
                     if prev_origin == 0 {
-                        return Err(format!("decode: {e}"));
+                        return Err(e);
                     }
                     backoff = if backoff == 0 { 15 } else { backoff * 4 };
                     let origin = (frame_index - backoff).max(0);
                     eprintln!(
                         "[video-decode] tail retry: re-seeking to {origin} for target {frame_index} ({e})"
                     );
-                    s.decoder
-                        .seek_to_frame(origin)
-                        .map_err(|se| format!("tail retry seek: {se}"))?;
+                    seek_precise(s, origin)?;
                     seeked = true;
                     continue 'outer;
                 }
@@ -307,7 +379,7 @@ fn decode_frame_core(s: &mut VideoSession, frame_index: i64) -> Result<Vec<u8>, 
         "[video-decode] frame={frame_index} seeked={seeked} ahead={total_ahead} decode={decode_ms:.1}ms convert={convert_ms:.1}ms"
     );
 
-    Ok(rgba)
+    Ok((rgba, total_ahead))
 }
 
 /// Decodes exactly one frame and returns its pixels as raw RGBA8 bytes —
@@ -324,7 +396,7 @@ pub fn decode_video_frame(
     let s = sessions
         .get_mut(&session_id)
         .ok_or_else(|| format!("no session {session_id}"))?;
-    decode_frame_core(s, frame_index).map(Response::new)
+    decode_frame_core(s, frame_index).map(|(rgba, _ahead)| Response::new(rgba))
 }
 
 #[tauri::command]
@@ -414,8 +486,8 @@ mod tests {
         let path = make_test_video();
         let (mut s, _, _) = open_session_core(path.to_str().unwrap()).unwrap();
         let expected_len = (s.width * s.height * 4) as usize;
-        let f0 = decode_frame_core(&mut s, 0).unwrap();
-        let f1 = decode_frame_core(&mut s, 1).unwrap();
+        let f0 = decode_frame_core(&mut s, 0).unwrap().0;
+        let f1 = decode_frame_core(&mut s, 1).unwrap().0;
         assert_eq!(f0.len(), expected_len);
         assert_eq!(f1.len(), expected_len);
         // Every 4th byte is alpha and must be exactly 255 (opaque source)
@@ -432,13 +504,13 @@ mod tests {
         // ground truth by construction (no seek involved at all).
         let mut sequential_f40 = Vec::new();
         for i in 0..=40 {
-            sequential_f40 = decode_frame_core(&mut s, i).unwrap();
+            sequential_f40 = decode_frame_core(&mut s, i).unwrap().0;
         }
         // Now jump BACKWARD to frame 40 from position 41 — forces a real
         // keyframe seek (gop=15, so the keyframe is frame 30) + forward
         // decode. Frame accuracy = the seeked result matches the
         // sequential ground truth byte-for-byte.
-        let seeked_f40 = decode_frame_core(&mut s, 40).unwrap();
+        let seeked_f40 = decode_frame_core(&mut s, 40).unwrap().0;
         assert_eq!(
             seeked_f40, sequential_f40,
             "seeked frame 40 != sequentially-decoded frame 40 (seek is not frame-accurate)"
@@ -456,12 +528,12 @@ mod tests {
         let (mut s, frame_count, _) = open_session_core(path.to_str().unwrap()).unwrap();
         let expected_len = (s.width * s.height * 4) as usize;
         // Way past the end — clamped to the last frame, decodes fine.
-        let past = decode_frame_core(&mut s, frame_count as i64 + 100).unwrap();
+        let past = decode_frame_core(&mut s, frame_count as i64 + 100).unwrap().0;
         assert_eq!(past.len(), expected_len);
         // Exactly the last frame, twice (second run exercises the re-seek
         // path since next_frame has moved past it) — reproducible.
-        let last_a = decode_frame_core(&mut s, frame_count as i64 - 1).unwrap();
-        let last_b = decode_frame_core(&mut s, frame_count as i64 - 1).unwrap();
+        let last_a = decode_frame_core(&mut s, frame_count as i64 - 1).unwrap().0;
+        let last_b = decode_frame_core(&mut s, frame_count as i64 - 1).unwrap().0;
         assert_eq!(last_a, last_b, "last-frame seek not reproducible");
         assert_eq!(past, last_a, "past-end result should BE the last frame");
     }
@@ -481,7 +553,7 @@ mod tests {
         assert!(frame_count > 0);
         let expected_len = (s.width * s.height * 4) as usize;
         for probe in [frame_count as i64 - 1, frame_count as i64, frame_count as i64 + 10] {
-            let f = decode_frame_core(&mut s, probe)
+            let (f, _) = decode_frame_core(&mut s, probe)
                 .unwrap_or_else(|e| panic!("tail probe {probe} failed: {e}"));
             assert_eq!(f.len(), expected_len, "tail probe {probe} wrong size");
         }
@@ -498,13 +570,13 @@ mod tests {
         assert_eq!((s.width, s.height), (expect_w, expect_h), "{path:?}");
         assert!(frame_count > 10, "{path:?} frame_count={frame_count}");
         let expected_len = (s.width * s.height * 4) as usize;
-        let f0 = decode_frame_core(&mut s, 0).unwrap();
+        let f0 = decode_frame_core(&mut s, 0).unwrap().0;
         assert_eq!(f0.len(), expected_len, "{path:?} frame 0 size");
         // Jump forward then back — two real seeks, both must land.
         let mid = (frame_count as i64) / 2;
-        let fm = decode_frame_core(&mut s, mid).unwrap();
+        let fm = decode_frame_core(&mut s, mid).unwrap().0;
         assert_eq!(fm.len(), expected_len, "{path:?} mid frame size");
-        let f0_again = decode_frame_core(&mut s, 0).unwrap();
+        let f0_again = decode_frame_core(&mut s, 0).unwrap().0;
         assert_eq!(f0, f0_again, "{path:?} re-seek to 0 not reproducible");
     }
 
@@ -553,7 +625,7 @@ mod tests {
             &["-c:v", "prores_ks", "-profile:v", "4", "-pix_fmt", "yuva444p10le"],
         );
         let (mut s, _, _) = open_session_core(p.to_str().unwrap()).unwrap();
-        let f0 = decode_frame_core(&mut s, 0).unwrap();
+        let f0 = decode_frame_core(&mut s, 0).unwrap().0;
         assert!(f0.iter().skip(3).step_by(4).all(|&a| a == 255),
             "alpha bytes should be the constant 255 fill (source alpha is flattened by the RGB24 scaler — see comment)");
     }
@@ -575,6 +647,27 @@ mod tests {
         assert_decodes_and_seeks(&p, 954, 542);
     }
 
+    // ---- seek precision: the post-seek walk must be bounded by one GOP ----
+    // Locks in the seek_precise fix (video-rs's own seek_to_frame passed a
+    // frame NUMBER where av_seek_frame expects AV_TIME_BASE microseconds,
+    // landing every seek near t=0 — measured ahead=44 for a GOP-15 file).
+    // With a correct keyframe seek, reaching any target may only require
+    // walking forward from the keyframe at/before it: ahead < GOP.
+    #[test]
+    fn seek_walk_bounded_by_gop() {
+        let path = make_test_video(); // gop 15
+        let (mut s, frame_count, _) = open_session_core(path.to_str().unwrap()).unwrap();
+        for target in [7i64, 22, 44, frame_count as i64 - 2] {
+            // force the seek path (avoid the sequential fast path)
+            let _ = decode_frame_core(&mut s, 0).unwrap();
+            let (_px, ahead) = decode_frame_core(&mut s, target).unwrap();
+            assert!(
+                ahead < 15,
+                "target {target}: walked {ahead} frames after seek (GOP is 15 — seek landed too early)"
+            );
+        }
+    }
+
     // ---- pts→frame mapping at a different fps ----
     // The frame-index mapping multiplies pts × time_base × fps; a 25fps
     // source with a different time base catches any hidden 30fps
@@ -590,9 +683,9 @@ mod tests {
         assert!((s.fps - 25.0).abs() < 0.01, "fps was {}", s.fps);
         let mut sequential_f30 = Vec::new();
         for i in 0..=30 {
-            sequential_f30 = decode_frame_core(&mut s, i).unwrap();
+            sequential_f30 = decode_frame_core(&mut s, i).unwrap().0;
         }
-        let seeked_f30 = decode_frame_core(&mut s, 30).unwrap();
+        let seeked_f30 = decode_frame_core(&mut s, 30).unwrap().0;
         assert_eq!(seeked_f30, sequential_f30, "25fps seek not frame-accurate");
     }
 
@@ -613,16 +706,16 @@ mod tests {
         let (mut b, _, _) = open_session_core(pb.to_str().unwrap()).unwrap();
         // Interleave: a0 b0 a1 b1 a2 — a's frames must match a clean
         // sequential run despite b decoding in between.
-        let a0 = decode_frame_core(&mut a, 0).unwrap();
-        let _b0 = decode_frame_core(&mut b, 0).unwrap();
-        let a1 = decode_frame_core(&mut a, 1).unwrap();
-        let _b1 = decode_frame_core(&mut b, 1).unwrap();
-        let a2 = decode_frame_core(&mut a, 2).unwrap();
+        let a0 = decode_frame_core(&mut a, 0).unwrap().0;
+        let _b0 = decode_frame_core(&mut b, 0).unwrap().0;
+        let a1 = decode_frame_core(&mut a, 1).unwrap().0;
+        let _b1 = decode_frame_core(&mut b, 1).unwrap().0;
+        let a2 = decode_frame_core(&mut a, 2).unwrap().0;
 
         let (mut a_ref, _, _) = open_session_core(pa.to_str().unwrap()).unwrap();
-        assert_eq!(a0, decode_frame_core(&mut a_ref, 0).unwrap(), "a0 diverged");
-        assert_eq!(a1, decode_frame_core(&mut a_ref, 1).unwrap(), "a1 diverged");
-        assert_eq!(a2, decode_frame_core(&mut a_ref, 2).unwrap(), "a2 diverged");
+        assert_eq!(a0, decode_frame_core(&mut a_ref, 0).unwrap().0, "a0 diverged");
+        assert_eq!(a1, decode_frame_core(&mut a_ref, 1).unwrap().0, "a1 diverged");
+        assert_eq!(a2, decode_frame_core(&mut a_ref, 2).unwrap().0, "a2 diverged");
     }
 
     // ---- performance at production resolutions ----
@@ -637,7 +730,7 @@ mod tests {
         let mut times = Vec::new();
         for i in 0..frames {
             let t = Instant::now();
-            decode_frame_core(&mut s, i).unwrap();
+            decode_frame_core(&mut s, i).unwrap().0;
             times.push(t.elapsed().as_secs_f64() * 1000.0);
         }
         times.sort_by(|x, y| x.partial_cmp(y).unwrap());
