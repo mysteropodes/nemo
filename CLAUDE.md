@@ -193,6 +193,15 @@ flash à l'ouverture (et tout le preview navigateur) montre encore l'ancien num�
 Checklist avant `npm run build` :
 1. Bump `version` dans `package.json` ET `src-tauri/tauri.conf.json` (même valeur).
 2. Bump le fallback statique dans `src/index.html` (`<title>` + `#status-text`).
-3. Si c'est un vrai changement fonctionnel (pas juste un patch de bug) : lancer
+3. **OBLIGATOIRE depuis 0.6.0 (moteur vidéo natif)** : après la build, exécuter
+   `python3 scripts/bundle-ffmpeg-dylibs.py "src-tauri/target/release/bundle/macos/Nemo.app"`
+   AVANT de packager/publier. Le binaire est lié aux dylibs ffmpeg de Homebrew (chemins
+   absolus `/opt/homebrew/...`) — sans cette étape, l'app **crash au lancement** chez tout
+   utilisateur sans Homebrew ffmpeg ("dyld: Library not loaded"). Le script copie ~91 dylibs
+   (~75 Mo) dans `Contents/Frameworks/`, réécrit tous les liens en `@rpath` et re-signe.
+   ⚠️ Licence : les dylibs Homebrew incluent x264/x265 (GPL) — acceptable pour la BETA,
+   mais AVANT toute vente il faut une build ffmpeg custom LGPL-only décode-seul
+   (voir l'en-tête du script).
+4. Si c'est un vrai changement fonctionnel (pas juste un patch de bug) : lancer
    `./scripts/publish-update.sh "notes"` après la build pour que les installs existantes le
    voient — voir §6 pour le détail des tokens nécessaires.

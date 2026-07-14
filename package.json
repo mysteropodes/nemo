@@ -1,6 +1,6 @@
 {
   "name": "nemo",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "2D frame-by-frame vector animation with auto inbetweening",
   "scripts": {
     "tauri": "tauri",
@@ -8,7 +8,11 @@
     "build": "tauri build",
     "serve": "python3 -m http.server 1420 -d src"
   },
-  "keywords": ["animation", "vector", "inbetweening"],
+  "keywords": [
+    "animation",
+    "vector",
+    "inbetweening"
+  ],
   "author": "Cyril",
   "license": "MIT",
   "type": "commonjs",
