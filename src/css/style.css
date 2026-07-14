@@ -963,3 +963,4 @@ body.mode-motion .lrow.act{box-shadow:inset 3px 0 0 #4E6FF2,inset 0 0 0 1px rgba
 .sb-audio-row{position:relative;height:26px;margin-top:4px;}
 .sb-audio-blk{position:absolute;top:0;height:24px;border-radius:4px;background:rgba(94,106,210,.25);border:1px solid rgba(94,106,210,.5);overflow:hidden;cursor:grab;}
 .sb-audio-blk:active{cursor:grabbing;}
+.sb-montage-lane.drop-hint{border-color:var(--accent);background:rgba(94,106,210,.12);}

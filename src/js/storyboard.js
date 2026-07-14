@@ -271,9 +271,10 @@
     play.addEventListener('click', function (e) { e.stopPropagation(); sb().activeMontageId = m.id; toggleMontagePlay(m); updatePreview(); });
     head.appendChild(play);
     el.appendChild(head);
-    // The montage moves by its HEAD only — the lane's own pointer events
-    // are scrub/retime gestures, they must never drag the whole module.
-    wireModuleDrag(head, m);
+    // The whole montage body drags (head, padding, edges) — the lane,
+    // chips and play button own their gestures and are excluded inside
+    // wireModuleDrag itself, so no head-only rule to discover anymore.
+    wireModuleDrag(el, m);
 
     var lane = document.createElement('div');
     lane.className = 'sb-montage-lane';
@@ -487,59 +488,111 @@
   }
 
   // ---- dragging + edge snap ----
+  // Rewritten after real-use feedback ("le drag des modules est complexe
+  // et pas fluide"). What was wrong the first time, in order of felt
+  // impact:
+  //   1. snapToNeighbors re-queried the DOM (querySelector + offsetWidth)
+  //      for EVERY module on EVERY pointermove — forced-layout thrash in
+  //      the middle of the gesture, the stutter itself.
+  //   2. renderMontage passed its HEAD element as the drag target, so
+  //      dragging a montage slid the header INSIDE the module instead of
+  //      moving the module. Real bug, never caught because tests only
+  //      dragged instances.
+  //   3. No pointer capture (a fast drag exiting the window lost its
+  //      pointerup), no rAF coalescing (a 240Hz pen outruns the display —
+  //      same fix as every other drag in this codebase), no drop-target
+  //      feedback (dropping into a montage was invisible until release),
+  //      and a full render() blink after every plain move.
+  // Now: geometry is cached ONCE at pointerdown (neighbor rects, lane
+  // rects in screen space), moves are rAF-coalesced pure math + two style
+  // writes, the montage lane under the pointer highlights live
+  // (.drop-hint), pointer capture guarantees the release, and a plain
+  // move ends with NO re-render (the style already matches the model —
+  // only an actual drop rebuilds).
   function wireModuleDrag(el, m) {
     el.addEventListener('pointerdown', function (e) {
       if (e.button !== 0) return;
+      // Interactive sub-parts own their gestures — never start a module
+      // drag from them. (This is also what makes the WHOLE module bodies
+      // safely draggable now, instead of the head-only montage rule.)
+      if (e.target.closest('.sb-montage-lane, .sb-chip, .sb-play, .sb-edit, .sb-wave, .sb-audio-blk, .sb-trim')) return;
       e.stopPropagation();
       var start = toWorld(e.clientX, e.clientY);
       var ox = start.x - m.x, oy = start.y - m.y;
-      var moved = false, lastX = e.clientX, lastY = e.clientY;
-      function mv(ev) {
-        lastX = ev.clientX; lastY = ev.clientY;
-        var p = toWorld(ev.clientX, ev.clientY);
+      var w = el.offsetWidth, h = el.offsetHeight;
+      // ---- one-time geometry snapshot ----
+      var neighbors = [];
+      sb().modules.forEach(function (o) {
+        if (o.id === m.id) return;
+        var oe = world.querySelector('[data-sb-id="' + o.id + '"]');
+        if (oe) neighbors.push({ x: o.x, y: o.y, w: oe.offsetWidth, h: oe.offsetHeight });
+      });
+      var lanes = (m.type === 'instance' || m.type === 'sound')
+        ? Array.from(world.querySelectorAll('.sb-montage .sb-montage-lane')).filter(function (l) { return !l.closest('[data-sb-id="' + m.id + '"]'); }).map(function (l) { return { el: l, r: l.getBoundingClientRect() }; })
+        : [];
+      var moved = false, lastX = e.clientX, lastY = e.clientY, raf = 0, hintLane = null;
+      // Capture guarantees the pointerup even when a fast drag exits the
+      // window — but it can throw (already-released pointer, synthetic
+      // events); the drag must survive without it, falling back to the
+      // element-scoped listeners below.
+      try { el.setPointerCapture(e.pointerId); } catch (err) {}
+      el.style.zIndex = 30; // above siblings while in flight
+      function apply() {
+        raf = 0;
+        var p = toWorld(lastX, lastY);
         m.x = p.x - ox; m.y = p.y - oy;
-        moved = true;
-        snapToNeighbors(m, el);
+        // edge snap against the cached snapshot — pure math, no DOM reads
+        neighbors.forEach(function (o) {
+          var vOverlap = m.y < o.y + o.h && m.y + h > o.y;
+          var hOverlap = m.x < o.x + o.w && m.x + w > o.x;
+          if (vOverlap) {
+            if (Math.abs(m.x - (o.x + o.w)) < SNAP_PX) m.x = o.x + o.w;
+            else if (Math.abs((m.x + w) - o.x) < SNAP_PX) m.x = o.x - w;
+            if (Math.abs(m.y - o.y) < SNAP_PX) m.y = o.y;
+          }
+          if (hOverlap) {
+            if (Math.abs(m.y - (o.y + o.h)) < SNAP_PX) m.y = o.y + o.h;
+            else if (Math.abs((m.y + h) - o.y) < SNAP_PX) m.y = o.y - h;
+          }
+        });
         el.style.left = m.x + 'px';
         el.style.top = m.y + 'px';
+        // live drop-target feedback
+        var over = null;
+        for (var i = 0; i < lanes.length; i++) {
+          var r = lanes[i].r;
+          if (lastX >= r.left && lastX <= r.right && lastY >= r.top - 20 && lastY <= r.bottom + 40) { over = lanes[i].el; break; }
+        }
+        if (over !== hintLane) {
+          if (hintLane) hintLane.classList.remove('drop-hint');
+          if (over) over.classList.add('drop-hint');
+          hintLane = over;
+        }
+      }
+      function mv(ev) {
+        lastX = ev.clientX; lastY = ev.clientY;
+        moved = true;
+        if (!raf) raf = requestAnimationFrame(apply);
       }
       function up() {
         document.removeEventListener('pointermove', mv);
         document.removeEventListener('pointerup', up);
+        document.removeEventListener('pointercancel', up);
+        if (raf) { cancelAnimationFrame(raf); apply(); }
+        el.style.zIndex = '';
+        if (hintLane) hintLane.classList.remove('drop-hint');
         if (!moved) return;
         // Released over a montage lane? The instance is absorbed into the
         // sequence there — a sound module becomes the montage's audio track.
         if (tryDropIntoMontage(m, lastX, lastY)) return;
         if (tryDropSoundIntoMontage(m, lastX, lastY)) return;
-        render(); // settle snapped position for everyone
+        // plain move: the style already matches the model — nothing to redraw
       }
+      // document-scoped: works whether capture engaged or not (captured
+      // events retarget to el but still bubble through document).
       document.addEventListener('pointermove', mv);
       document.addEventListener('pointerup', up);
-    });
-  }
-
-  // Edge snap: while dragging, if one of this module's edges comes within
-  // SNAP_PX (world units) of a neighbor's opposite edge — and they overlap
-  // on the other axis — glue them flush. Left/right edges AND top/bottom,
-  // so instances can line up in rows or stack, the mock's side-by-side look.
-  function snapToNeighbors(m, el) {
-    var w = el.offsetWidth, h = el.offsetHeight;
-    sb().modules.forEach(function (o) {
-      if (o.id === m.id) return;
-      var oEl = world.querySelector('[data-sb-id="' + o.id + '"]');
-      if (!oEl) return;
-      var ow = oEl.offsetWidth, oh = oEl.offsetHeight;
-      var vOverlap = m.y < o.y + oh && m.y + h > o.y;
-      var hOverlap = m.x < o.x + ow && m.x + w > o.x;
-      if (vOverlap) {
-        if (Math.abs(m.x - (o.x + ow)) < SNAP_PX) m.x = o.x + ow;         // my left to their right
-        else if (Math.abs((m.x + w) - o.x) < SNAP_PX) m.x = o.x - w;      // my right to their left
-        if (Math.abs(m.y - o.y) < SNAP_PX) m.y = o.y;                     // top alignment while side-snapped
-      }
-      if (hOverlap) {
-        if (Math.abs(m.y - (o.y + oh)) < SNAP_PX) m.y = o.y + oh;
-        else if (Math.abs((m.y + h) - o.y) < SNAP_PX) m.y = o.y - h;
-      }
+      document.addEventListener('pointercancel', up);
     });
   }
 
