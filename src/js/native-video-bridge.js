@@ -196,7 +196,16 @@
   //      frame instead of render-then-rerender-when-decode-lands.
   //   3. latest-target-wins coalescing on the async (cache-miss) path —
   //      scrubbing faster than decode only ever decodes the newest target.
-  var _layerSync = {}; // layerIdx -> {busy, pending, lastShown, cache:{frame,px}, prefetching}
+  var _layerSync = {}; // layerIdx -> {busy, pending, lastShown, jsCache:Map, jsBytes, prefetchQueue, prefetching}
+  // JS-SIDE frame window (the AE "green bar" idea, scaled down): frames
+  // kept in THIS process's memory, not just Rust's. The Rust cache made
+  // decode free on revisits, but every request still paid the full IPC
+  // round trip (invoke → locks → 8.3MB response copy across the WKWebView
+  // boundary → new Uint8Array) — the remaining "mini latences de scrub".
+  // A hit here registers + renders synchronously inside loadFrame's own
+  // turn: zero IPC, zero await. Byte-bounded like the Rust cache (frame
+  // size varies 8x between 1080p and 4K), Map insertion order = LRU.
+  var JS_CACHE_BUDGET = 64 * 1024 * 1024; // ~7 frames @1080p per layer
   function onFrameChanged(frame) {
     if (!tauriOk()) return;
     for (var i = 0; i < state.layers.length; i++) {
@@ -204,7 +213,36 @@
     }
   }
   function _syncState(li) {
-    return _layerSync[li] || (_layerSync[li] = { busy: false, pending: null, lastShown: -1, cache: null, prefetching: false });
+    return _layerSync[li] || (_layerSync[li] = { busy: false, pending: null, lastShown: -1, jsCache: new Map(), jsBytes: 0, prefetchQueue: [], prefetching: false });
+  }
+  function _jsCachePut(st, frame, px) {
+    if (st.jsCache.has(frame)) { st.jsBytes -= st.jsCache.get(frame).length; st.jsCache.delete(frame); }
+    st.jsCache.set(frame, px);
+    st.jsBytes += px.length;
+    while (st.jsBytes > JS_CACHE_BUDGET && st.jsCache.size > 1) {
+      var oldest = st.jsCache.keys().next().value;
+      st.jsBytes -= st.jsCache.get(oldest).length;
+      st.jsCache.delete(oldest);
+    }
+  }
+  function _jsCacheGet(st, frame) {
+    var px = st.jsCache.get(frame);
+    if (px) { st.jsCache.delete(frame); st.jsCache.set(frame, px); } // refresh LRU recency
+    return px || null;
+  }
+  // Rolling perf counters — SMNativeVideo.stats() from the console gives
+  // real numbers (hit rate, IPC ms, register+render ms) so the NEXT
+  // optimization round is measurement-driven instead of guessed.
+  var _stats = { serves: 0, jsHits: 0, ipcMs: [], renderMs: [] };
+  function _pushStat(arr, v) { arr.push(v); if (arr.length > 240) arr.shift(); }
+  function _pctl(arr, p) { if (!arr.length) return null; var a = arr.slice().sort(function (x, y) { return x - y; }); return +(a[Math.min(a.length - 1, Math.floor(a.length * p))]).toFixed(1); }
+  function stats() {
+    return {
+      serves: _stats.serves,
+      jsCacheHitRate: _stats.serves ? +(_stats.jsHits / _stats.serves).toFixed(2) : null,
+      ipcMs: { p50: _pctl(_stats.ipcMs, 0.5), p95: _pctl(_stats.ipcMs, 0.95) },
+      registerRenderMs: { p50: _pctl(_stats.renderMs, 0.5), p95: _pctl(_stats.renderMs, 0.95) },
+    };
   }
   function _targetFor(nv, frame) {
     return Math.max(0, Math.min(nv.frameCount - 1, frame - (nv.offsetFrames || 0)));
@@ -220,18 +258,34 @@
     var ld = state.layers[li];
     return !(ld && ld.motion && Object.keys(ld.motion).length);
   }
-  function _prefetch(li, frame) {
+  // Pull frames around `center` into the JS window, nearest-first, both
+  // directions when the source is all-intra (optimized media / ProRes —
+  // backward frames are one cheap independent decode there; on long-GOP
+  // originals backward pulls would pay a keyframe walk each, so forward
+  // only). Single in-flight chain per layer; a new center simply replaces
+  // the queue (latest wins, same principle as everywhere else here).
+  function _prefetch(li, center) {
     var st = _syncState(li);
     var ld = state.layers[li];
-    if (st.prefetching || !ld || !ld.nativeVideo || !ld._nvSessionId) return;
+    if (!ld || !ld.nativeVideo || !ld._nvSessionId) return;
     var nv = ld.nativeVideo;
-    if (frame >= nv.frameCount) return; // past the end — nothing to warm
+    var bidir = !!nv.optimizedPath || _isAllIntra(nv.codec);
+    var wanted = bidir ? [center + 1, center - 1, center + 2, center - 2, center + 3, center + 4] : [center + 1, center + 2, center + 3];
+    st.prefetchQueue = wanted.filter(function (f) { return f >= 0 && f < nv.frameCount && !st.jsCache.has(f); });
+    if (st.prefetching) return; // running chain picks up the new queue
     st.prefetching = true;
-    frameBytes(ld._nvSessionId, frame).then(function (px) {
-      st.cache = { frame: frame, px: px };
-    }).catch(function () { /* prefetch is best-effort */ }).finally(function () {
+    (async function () {
+      try {
+        while (st.prefetchQueue.length) {
+          var f = st.prefetchQueue.shift();
+          var sess = state.layers[li] && state.layers[li]._nvSessionId;
+          if (!sess) break;
+          var px = await frameBytes(sess, f);
+          _jsCachePut(st, f, px);
+        }
+      } catch (e) { /* prefetch is best-effort */ }
       st.prefetching = false;
-    });
+    })();
   }
   function _layerFrameSync(li, frame) {
     var ld = state.layers[li];
@@ -250,14 +304,17 @@
       // "no change" and skip rendering entirely, leaving the new frame's
       // pixels sitting unrendered in the engine's image cache (found live
       // testing: video appeared to freeze/skip on this exact path).
-      if (st.cache && st.cache.frame === target) {
-        if (window.SMEngineBridge) SMEngineBridge.registerImageRaw('nv:' + li, st.cache.px, nv.width, nv.height);
-        st.cache = null;
+      var cached = _jsCacheGet(st, target);
+      if (cached) {
+        var tR = performance.now();
+        if (window.SMEngineBridge) SMEngineBridge.registerImageRaw('nv:' + li, cached, nv.width, nv.height);
         st.lastShown = target;
-        _prefetch(li, target + 1);
         if (window.SMEngineBridge && SMEngineBridge.isEnabled()) {
           if (_canFastRender(li)) SMEngineBridge.renderImageOnly(); else SMEngineBridge.renderNow();
         }
+        _stats.serves++; _stats.jsHits++;
+        _pushStat(_stats.renderMs, performance.now() - tR);
+        _prefetch(li, target);
         return;
       }
     }
@@ -293,14 +350,20 @@
       }
       var target = _targetFor(nv, frame);
       if (target === st.lastShown) return;
+      var tI = performance.now();
       var px = await frameBytes(ld._nvSessionId, target);
+      _pushStat(_stats.ipcMs, performance.now() - tI);
+      _jsCachePut(st, target, px);
+      var tR = performance.now();
       if (window.SMEngineBridge) SMEngineBridge.registerImageRaw('nv:' + li, px, nv.width, nv.height);
       st.lastShown = target;
       window._sceneVersion++;
       if (window.SMEngineBridge && SMEngineBridge.isEnabled()) {
         if (_canFastRender(li)) SMEngineBridge.renderImageOnly(); else SMEngineBridge.renderNow();
       }
-      _prefetch(li, target + 1);
+      _stats.serves++;
+      _pushStat(_stats.renderMs, performance.now() - tR);
+      _prefetch(li, target);
     } catch (e) {
       console.error('[native-video] layer ' + li + ' sync failed:', e);
     } finally {
@@ -351,7 +414,8 @@
       ld._nvSessionId = info.session_id;
       nv.optimizedPath = target; // persisted (nativeVideo is whitelisted wholesale)
       var st = _syncState(li);
-      st.cache = null; // cached bytes came from the old decode — refresh
+      st.jsCache.clear(); st.jsBytes = 0; // cached bytes came from the old decode — refresh
+      st.prefetchQueue = [];
       st.lastShown = -1;
       if (oldSession) close(oldSession).catch(function () {});
       if (window.showToast) showToast('Média optimisé : ' + (nv.path.split('/').pop()) + ' — scrub instantané');
@@ -447,6 +511,7 @@
     detachFromPlayhead: detachFromPlayhead,
     importAsLayer: importAsLayer,
     onFrameChanged: onFrameChanged,
+    stats: stats,
     _refSync: _refSync,
     sessions: function () { return Object.assign({}, sessions); },
   };
