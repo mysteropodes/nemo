@@ -216,23 +216,36 @@ body.mac-overlay-titlebar #app{padding-top:28px;}
 .zoom-pill .zoom-caret{opacity:.4;font-size:9px;}
 #zoom-scrub{width:28px;background:transparent;border:none;color:rgba(236,234,231,.5);font:inherit;padding:0;text-align:right;cursor:ew-resize;-moz-appearance:textfield;}
 #zoom-scrub::-webkit-inner-spin-button{-webkit-appearance:none;}
-/* Labs floating panel (2026-07) — draggable-anywhere horizontal strip of
-   icon toggles, contextual to the active tool (labs-float-panel.js).
-   z-index above the canvas but below any modal (settings-modal etc sit at
-   a higher stack, unaffected). touch-action:none on the handle so drag
-   isn't fought by the browser's own touch-scroll gesture recognition. */
-/* position:fixed, not absolute — this panel is a SIBLING of #canvas-area
-   (see its HTML comment for why), so it has no positioning ancestor of its
-   own; labs-float-panel.js computes left/top in viewport coordinates from
-   #canvas-area's live bounding rect and keeps it clamped there. */
-#labs-float-panel{position:fixed;z-index:6;display:flex;align-items:center;gap:2px;padding:4px;background:var(--panel2);border-radius:9px;box-shadow:0 4px 14px rgba(0,0,0,.35);}
+/* Labs floating panel (2026-07) — draggable-anywhere strip of icon
+   toggles, contextual to the active tool (labs-float-panel.js), plus an
+   optional params row below. z-index above the canvas but below any modal
+   (settings-modal etc sit at a higher stack, unaffected). touch-action:none
+   on the handle so drag isn't fought by the browser's own touch-scroll
+   gesture recognition. position:fixed, not absolute — this panel is a
+   SIBLING of #canvas-area (see its HTML comment for why), so it has no
+   positioning ancestor of its own; labs-float-panel.js computes left/top
+   in viewport coordinates from #canvas-area's live bounding rect and
+   keeps it clamped there. Background is --gutter (near-black, the
+   darkest token already in the palette) rather than --panel2 — live
+   feedback: "le fond de ce panel doit être noir pour plus de visibilité". */
+#labs-float-panel{position:fixed;z-index:6;display:flex;flex-direction:column;padding:4px;background:var(--gutter);border-radius:9px;box-shadow:0 4px 14px rgba(0,0,0,.45);}
+#labs-float-row1{display:flex;align-items:center;gap:2px;}
 #labs-float-handle{width:16px;height:26px;display:flex;align-items:center;justify-content:center;color:rgba(236,234,231,.35);cursor:grab;font-size:13px;touch-action:none;user-select:none;}
 #labs-float-handle:active{cursor:grabbing;}
 #labs-float-icons{display:flex;align-items:center;gap:2px;}
 .labs-float-btn{width:26px;height:26px;border:none;border-radius:6px;background:transparent;color:rgba(236,234,231,.7);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .12s,color .12s;}
-.labs-float-btn:hover{background:rgba(255,255,255,.07);color:var(--text);}
+.labs-float-btn:hover{background:rgba(255,255,255,.09);color:var(--text);}
 .labs-float-btn.active{background:var(--accent-dim);color:var(--accent-hover);}
 .labs-float-divider{width:1px;height:18px;background:var(--border2);margin:0 3px;flex:none;}
+/* Params row — [-] value [+] steppers, one pill per adjustable param,
+   styled after the reference floating panel (dark rounded pill, minus/
+   value/plus in one flat strip). */
+#labs-float-params{display:flex;align-items:center;gap:6px;padding:5px 3px 2px 3px;margin-top:2px;border-top:1px solid rgba(255,255,255,.08);}
+.labs-float-stepper{display:flex;align-items:center;background:var(--panel3);border-radius:7px;overflow:hidden;}
+.labs-float-stepper .lfs-label{font-size:9px;color:var(--text-dim);padding:0 6px 0 8px;white-space:nowrap;}
+.labs-float-stepper .lfs-btn{width:20px;height:22px;border:none;background:transparent;color:rgba(236,234,231,.75);font-size:13px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.labs-float-stepper .lfs-btn:hover{background:rgba(255,255,255,.09);color:var(--text);}
+.labs-float-stepper .lfs-val{min-width:26px;text-align:center;font-size:10.5px;font-weight:600;color:var(--text);padding:0 2px;}
 #zoom-scrub:focus{color:var(--text);outline:none;}
 #zoom-scrub.scrubbing{color:var(--accent-hover);}
 

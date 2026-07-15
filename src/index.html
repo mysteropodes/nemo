@@ -232,8 +232,15 @@
          once labs-float-panel.js confirms there's a relevant, registered
          Labs prototype for the active tool. -->
     <div id="labs-float-panel" style="display:none">
-      <div id="labs-float-handle" title="Glisser pour déplacer">⠿</div>
-      <div id="labs-float-icons"></div>
+      <div id="labs-float-row1">
+        <div id="labs-float-handle" title="Glisser pour déplacer">⠿</div>
+        <div id="labs-float-icons"></div>
+      </div>
+      <!-- Params row (2026-07, "certaines fonctions ont besoin de
+           paramètre ... un panel de paramètres en dessous") — [-] value [+]
+           steppers for the currently-on tool(s) that have a simple numeric
+           knob, built/shown by labs-float-panel.js only when relevant. -->
+      <div id="labs-float-params" style="display:none"></div>
     </div>
   </div>
 
