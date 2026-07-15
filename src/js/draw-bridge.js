@@ -336,6 +336,14 @@
     }
     samples.push([w[0], w[1], widthFor(pressure)]);
     if (state.vectorBrush) window.SMEngineBridge.setPressureCursor(w, widthFor(pressure) / 2);
+    // Bitmap Brush live preview (bitmap-brush.js) — screen-space DOM canvas,
+    // independent of the Rust engine's overlay-item JSON path (see that
+    // file's header for why). Only for the same plain constant-width case
+    // commitStroke's own bitmap-brush branch handles.
+    if (state.bitmapBrushOn && state.strokeEnabled && !state.vectorBrush && !isFillBrush() && window.SMBitmapBrush) {
+      window.SMBitmapBrush.beginLivePreview();
+      window.SMBitmapBrush.livePreviewMove(e.clientX, e.clientY, pressure);
+    }
   }
   function onMove(e) {
     if (sizing) {
@@ -372,6 +380,9 @@
       w = stabilizePoint(w);
       samples.push([w[0], w[1], widthFor(pressure)]);
       if (state.vectorBrush) window.SMEngineBridge.setPressureCursor(w, widthFor(pressure) / 2);
+    }
+    if (state.bitmapBrushOn && state.strokeEnabled && !state.vectorBrush && !isFillBrush() && window.SMBitmapBrush) {
+      window.SMBitmapBrush.livePreviewMove(e.clientX, e.clientY, pressure);
     }
     var previewItems = [].concat(overlayItem());
     // Same guarded, no-op-when-absent pattern as the commitStroke hook
@@ -448,6 +459,7 @@
   }
 
   function commitStroke() {
+    if (window.SMBitmapBrush) window.SMBitmapBrush.endLivePreview(); // clear the screen-space preview — the real baked Raster (if any) takes over below
     if (samples.length < 2) return;
     // Both paint channels switched off via the left-panel eyes — committing
     // would insert a fully invisible path (pollutes the layer, participates
@@ -663,6 +675,7 @@
     dragging = false;
     samples = [];
     extendTarget = null;
+    if (window.SMBitmapBrush) window.SMBitmapBrush.endLivePreview();
     window.SMEngineBridge.resume();
     window.SMEngineBridge.renderNow();
   }

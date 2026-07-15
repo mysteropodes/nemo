@@ -1106,8 +1106,33 @@ function computeArcMatchState(){
   var fA=-1,fB=-1;for(var i2=0;i2<keys.length-1;i2++){if(state.currentFrame>=keys[i2]&&state.currentFrame<=keys[i2+1]){fA=keys[i2];fB=keys[i2+1];break;}}
   if(fA<0)return null;
   var spA=splitTweenables(ld.frames[fA].strokes),spB=splitTweenables(ld.frames[fB].strokes);
-  var sA=spA.list,sB=spB.list;var matches=autoMatch(sA,sB);if(!matches.length)return null;
-  var sel=state.selectedStrokeIndices;var fm=matches.filter(function(m){return sel.indexOf(spA.orig[m.a])>=0;});if(!fm.length)return null;
+  var sA=spA.list,sB=spB.list;
+  // v16: replicate generateTweens' forced-pair resolution (state.tweenOverrides)
+  // here so a forced pair gets the SAME negative matchIdx in both places —
+  // otherwise the handle rendered/dragged here writes to a different
+  // state.motionArcs key (arcKey()) than interpStroke() reads at generation
+  // time, so dragging it has zero effect on the actual tween. Found live
+  // 2026-07: dragged both handles of a forced pair substantially, motionArcs
+  // held real offsets, but the in-between frame's content never moved.
+  var ovKey=li+':'+fA+'-'+fB;
+  var overrides=(state.tweenOverrides&&state.tweenOverrides[ovKey])||[];
+  var forcedAIdx={},forcedBIdx={},forcedPairs=[];
+  overrides.forEach(function(ov){
+    var aIdx=-1,bIdx=-1;
+    for(var ii=0;ii<sA.length;ii++)if(sA[ii].strokeId===ov.aId||sA[ii].strokeId===ov.bId){aIdx=ii;break;}
+    for(var jj=0;jj<sB.length;jj++)if(sB[jj].strokeId===ov.bId||sB[jj].strokeId===ov.aId){bIdx=jj;break;}
+    if(aIdx<0||bIdx<0||forcedAIdx[aIdx]||forcedBIdx[bIdx])return;
+    forcedAIdx[aIdx]=1;forcedBIdx[bIdx]=1;
+    forcedPairs.push({a:aIdx,b:bIdx,mi:-1-forcedPairs.length});
+  });
+  var matches=autoMatch(sA,sB);if(!matches.length&&!forcedPairs.length)return null;
+  var sel=state.selectedStrokeIndices;var fm=[];
+  forcedPairs.forEach(function(fp){if(sel.indexOf(spA.orig[fp.a])>=0)fm.push(fp);});
+  matches.forEach(function(m,idx){
+    if(forcedAIdx[m.a]||forcedBIdx[m.b])return; // superseded by a forced override, same as generateTweens
+    if(sel.indexOf(spA.orig[m.a])>=0)fm.push({a:m.a,b:m.b,mi:idx});
+  });
+  if(!fm.length)return null;
   return {fA:fA,fB:fB,sA:sA,sB:sB,matches:matches,fm:fm};
 }
 function renderArcs(cached){
@@ -1137,7 +1162,7 @@ function renderArcs(cached){
   var multi=fm.length>1;
   fm.forEach(function(m,di){
     var pA=buildTP(sA[m.a]),pB=buildTP(sB[m.b]);var cA=pA.bounds.center,cB=pB.bounds.center;pA.remove();pB.remove();
-    var mIdx=matches.indexOf(m);var ah=getArcHandles(fA,fB,mIdx,[cA.x,cA.y],[cB.x,cB.y]);var col=multi?'#ffffff':cols[di%cols.length];var zs=1/view.zoom;
+    var mIdx=m.mi;var ah=getArcHandles(fA,fB,mIdx,[cA.x,cA.y],[cB.x,cB.y]);var col=multi?'#ffffff':cols[di%cols.length];var zs=1/view.zoom;
     var ap=new Path({insert:true});ap.strokeColor=new Color(col);ap.strokeColor.alpha=multi?.3:.6;ap.strokeWidth=(multi?1:2)*zs;ap.dashArray=[6*zs,4*zs];
     for(var s=0;s<=24;s++){var t=s/24;var x=cubicBez(cA.x,ah.out[0],ah.in[0],cB.x,t);var y=cubicBez(cA.y,ah.out[1],ah.in[1],cB.y,t);if(s===0)ap.moveTo(new Point(x,y));else ap.lineTo(new Point(x,y));}
     new Path.Circle({center:cA,radius:(multi?2.5:4)*zs,insert:true,fillColor:col,opacity:multi?.45:.8});

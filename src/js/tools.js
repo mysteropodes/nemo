@@ -3959,6 +3959,26 @@ function onMouseUp(event){
       _vb.pts=[];_vb.widths=[];
     }else if(currentPath.segments.length<2){
       currentPath.remove();if(state.undoStack.length)state.undoStack.pop();
+    }else if(state.bitmapBrushOn&&state.strokeEnabled&&window.SMBitmapBrush){
+      // Bitmap Brush's tools.js mirror (2026-07) — this Paper-native
+      // fallback path never called applyBrushTexture for the EXISTING
+      // vector presets either (grepped: zero call sites), so this is
+      // actually the more-complete of the two texture features here, not
+      // an inconsistency with precedent. No live preview in this path —
+      // matches that same precedent (the vector presets have none here
+      // either; live preview is a draw-bridge-only, Rust-engine-only
+      // concept via its own DOM overlay canvas). currentPath.segments
+      // carry the already-smoothed vector centerline Paper itself built
+      // during the drag — reused as the stamp walk's sample points, all
+      // constant-width (this plain, non-vectorBrush path has no
+      // per-point pressure to preserve).
+      var bmpSamples=currentPath.segments.map(function(s){return[s.point.x,s.point.y,state.brushSize];});
+      var raster=window.SMBitmapBrush.stamp(bmpSamples);
+      // NOT popping the undo stack here (unlike the degenerate-stroke
+      // aborts above) — a real Raster is being committed, so the pushUndo()
+      // from this gesture's onMouseDown must stay on the stack or Ctrl+Z
+      // would silently skip over this stroke.
+      if(raster){userLayers[state.activeLayerIdx].addChild(raster);currentPath.remove();currentPath=raster;}
     }else{
       currentPath.simplify(state.smoothing);
       if(state.taperEnds){

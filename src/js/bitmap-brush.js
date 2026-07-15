@@ -15,18 +15,26 @@
 // file only needs to PRODUCE a Raster correctly; every consumer already
 // handles it with zero changes.
 //
-// v1 scope, explicitly NOT done here (see the proposal doc's own "what it
-// costs" section): tip shapes are procedural only (no ABR import yet — the
-// tip-rendering functions below are the plug point for that later), no
-// live drag preview (stamped once at commitStroke, same "cheap during
-// drag, full quality on release" precedent as arc-handle dragging elsewhere
-// in this codebase — except here v1 has literally no preview at all, a
-// known limitation to revisit), and only wired into draw-bridge.js's plain
-// constant-width commit path (NOT vector-brush/fill-brush, matching
-// applyBrushTexture's own pre-existing scoping) and NOT yet mirrored into
-// tools.js's Paper-native fallback (dead code when the Rust engine is on,
-// which is the default — see this file's own TODO below for why that's an
-// acceptable v1 gap, not an oversight).
+// v1 scope, explicitly NOT done here: tip shapes are procedural only (no
+// ABR import yet — the tip-rendering functions below are the plug point
+// for that later). Only wired into draw-bridge.js's plain constant-width
+// commit path (NOT vector-brush/fill-brush, matching applyBrushTexture's
+// own pre-existing scoping).
+//
+// Live drag preview (added this pass): does NOT go through the Rust
+// engine's JSON scene bridge at all — re-serializing a growing PNG to
+// base64 into JSON on every pointermove would get slower as the stroke
+// grows (the exact "ça rame en dessinant" problem this app's whole
+// engine-bridge architecture exists to avoid). Instead, a plain DOM
+// <canvas> is layered directly on top of the Rust canvas
+// (position:absolute, pointer-events:none, same insertion pattern
+// engine-bridge.js uses for rustCanvas itself) and stamped to INCREMENTALLY
+// in screen space — each pointermove only draws the new segment since the
+// last one, never redraws the whole stroke, so cost per move stays roughly
+// constant regardless of stroke length. Purely a preview approximation
+// (screen-space stamping, not world-space) — the actual committed Raster
+// on pointerup is baked fresh from the real world-space samples by
+// stampBitmapBrush below, unaffected by whatever the live preview drew.
 (function () {
   var TIP_SIZE = 64; // procedural tip canvas resolution, px — independent of brush Size (that's a WORLD-space display size, this is just texture detail)
 
@@ -196,6 +204,100 @@
     return raster;
   }
 
+  // ---- live drag preview: DOM canvas layered over the Rust canvas,
+  // stamped incrementally in SCREEN space (see file header) ----
+  var liveCanvas = null, liveCtx = null, liveTip = null, liveLastPt = null, liveAcc = 0, liveSeed = 0;
+  function ensureLiveCanvas() {
+    if (liveCanvas) return liveCanvas;
+    var rust = document.getElementById('rust-canvas');
+    var paper = document.getElementById('drawing-canvas');
+    var host = (rust || paper) && (rust || paper).parentNode;
+    if (!host) return null;
+    liveCanvas = document.createElement('canvas');
+    liveCanvas.id = 'bitmap-brush-live';
+    liveCanvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:5;';
+    var after = rust || paper;
+    after.parentNode.insertBefore(liveCanvas, after.nextSibling);
+    liveCtx = liveCanvas.getContext('2d');
+    return liveCanvas;
+  }
+  function beginLivePreview() {
+    var c = ensureLiveCanvas(); if (!c) return;
+    var area = document.getElementById('canvas-area');
+    var rect = area.getBoundingClientRect();
+    var dpr = window.devicePixelRatio || 1;
+    // Sized/cleared fresh each stroke (canvas resize implicitly clears —
+    // exactly what's wanted here, no stale texture from a previous stroke).
+    c.width = Math.max(1, Math.round(rect.width * dpr));
+    c.height = Math.max(1, Math.round(rect.height * dpr));
+    liveCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    liveCtx.clearRect(0, 0, rect.width, rect.height);
+    liveOriginX = rect.left; liveOriginY = rect.top;
+    liveLastPt = null; liveAcc = 0;
+    liveSeed = Math.floor(Math.random() * 0xffffffff);
+    // Tint the tip with the actual brush color ONCE per stroke (color is
+    // fixed for the whole gesture) rather than per stamp — same
+    // white-mask + destination-in tint the real bake uses, just done once
+    // here since it's cheap to do once and expensive-in-spirit to redo per
+    // stamp for a preview that just needs to look right, not be exact.
+    var mask = buildTipCanvas(state.bitmapTip || 'soft', liveSeed);
+    liveTip = document.createElement('canvas');
+    liveTip.width = mask.width; liveTip.height = mask.height;
+    var tctx = liveTip.getContext('2d');
+    tctx.fillStyle = state.strokeColor || '#000000';
+    tctx.fillRect(0, 0, mask.width, mask.height);
+    tctx.globalCompositeOperation = 'destination-in';
+    tctx.drawImage(mask, 0, 0);
+  }
+  var liveOriginX = 0, liveOriginY = 0;
+  // Called on every pointermove with the RAW client (screen) coordinates —
+  // draw-bridge.js already has these before any world-space conversion.
+  // Only stamps the segment between the last call and this one (never
+  // redraws earlier segments), so cost per call is independent of how long
+  // the stroke has gotten so far.
+  function livePreviewMove(clientX, clientY, pressureWidthMul) {
+    if (!liveCanvas || !liveCtx) return;
+    var x = clientX - liveOriginX, y = clientY - liveOriginY;
+    var zoom = (window.view && view.zoom) || 1;
+    var baseSize = (state.bitmapSize || 40) * zoom; // approximate world size at current zoom
+    var spacing = Math.max(1, baseSize * ((state.bitmapSpacing != null ? state.bitmapSpacing : 15) / 100));
+    var scatterPx = baseSize * ((state.bitmapScatter != null ? state.bitmapScatter : 20) / 100);
+    var opacity = (state.bitmapOpacity != null ? state.bitmapOpacity : 100) / 100;
+    var rng = seededRng(liveSeed + Math.floor(x + y)); // cheap per-call variance, not a strict determinism guarantee (preview only)
+    if (!liveLastPt) {
+      liveLastPt = [x, y];
+      stampLive(x, y, baseSize * (pressureWidthMul || 1), scatterPx, opacity, rng);
+      return;
+    }
+    var dx = x - liveLastPt[0], dy = y - liveLastPt[1];
+    var segLen = Math.sqrt(dx * dx + dy * dy);
+    if (segLen < 1e-6) return;
+    var acc = liveAcc;
+    while (acc < segLen) {
+      var t = acc / segLen;
+      stampLive(liveLastPt[0] + dx * t, liveLastPt[1] + dy * t, baseSize * (pressureWidthMul || 1), scatterPx, opacity, rng);
+      acc += spacing;
+    }
+    liveAcc = acc - segLen;
+    liveLastPt = [x, y];
+  }
+  function stampLive(x, y, size, scatterPx, opacity, rng) {
+    var jx = (rng() - 0.5) * 2 * scatterPx, jy = (rng() - 0.5) * 2 * scatterPx;
+    var s = size * (0.75 + rng() * 0.5);
+    liveCtx.save();
+    liveCtx.globalAlpha = opacity;
+    // Plain source-over (default) with a pre-colored tip — overlapping
+    // stamps naturally build up coverage where they intersect, close
+    // enough to the real bake's look for a live preview.
+    liveCtx.drawImage(liveTip, x + jx - s / 2, y + jy - s / 2, s, s);
+    liveCtx.restore();
+  }
+  function endLivePreview() {
+    if (!liveCanvas) return;
+    liveCtx.clearRect(0, 0, liveCanvas.width, liveCanvas.height);
+    liveLastPt = null;
+  }
+
   // ---- panel wiring — plain state fields, same convention as every other
   // scrub/select input in this app (ui.js) ----
   function bindNum(id, key, def) {
@@ -232,5 +334,8 @@
         seed: Math.floor(Math.random() * 0xffffffff),
       });
     },
+    beginLivePreview: beginLivePreview,
+    livePreviewMove: livePreviewMove,
+    endLivePreview: endLivePreview,
   };
 })();
