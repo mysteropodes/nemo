@@ -311,6 +311,39 @@
     });
   }
 
+  // Tween in-between re-stamp (tweens.js's generateTweens, mirroring
+  // dabRecordsForTween's role for the vector presets) — found live via
+  // stress-testing (2026-07, "keyframes avec les brush"): a bitmap-brush
+  // stroke on two keyframes generated tween IN-BETWEEN frames with NO
+  // texture at all (the companion Raster is correctly excluded from shape
+  // matching, same as vector dabs, but nothing re-stamped it for the
+  // generated frames — the vector presets have dabRecordsForTween for
+  // exactly this, bitmap brush had no equivalent). Builds a throwaway Path
+  // from the INTERPOLATED anchor's own segments (tweens.js already
+  // computed these — this file never touches matching/interpolation
+  // itself) and bakes a texture from it, returning a plain serialized
+  // stroke record (matching serR's shape) — tweens.js pushes it into that
+  // frame's strokes array directly, same as it does for dabRecordsForTween's
+  // vector records.
+  function recordForTween(segmentsData, closed, spec, opacityMul, groupId) {
+    var p = new Path({ insert: false });
+    segmentsData.forEach(function (s) {
+      p.add(new Segment(new Point(s.point[0], s.point[1]), new Point(s.handleIn[0], s.handleIn[1]), new Point(s.handleOut[0], s.handleOut[1])));
+    });
+    if (closed) p.closed = true;
+    if (p.segments.length < 2) { p.remove(); return null; }
+    var bake = bakeToCanvas(p, spec, null);
+    p.remove();
+    var dataUrl = bake.canvas.toDataURL('image/png');
+    return {
+      isRaster: true, src: dataUrl,
+      x: bake.minX + bake.w / 2, y: bake.minY + bake.h / 2,
+      width: bake.w, height: bake.h,
+      opacity: (spec.opacity != null ? spec.opacity : 1) * (opacityMul != null ? opacityMul : 1),
+      isBrushTextureCopy: true, isBitmapBrush: true, brushGroupId: groupId,
+    };
+  }
+
   // regenerateBrushTexture's (tools.js) bitmap branch — remove this
   // anchor's companions and re-stamp from its CURRENT geometry, reusing
   // the stored spec (same seed: a re-stamp after a node drag must not make
@@ -446,6 +479,7 @@
     applyToPath: applyBitmapBrushTexture,
     regenerate: regenerate,
     liveRestamp: liveRestamp,
+    recordForTween: recordForTween,
     eraseBite: eraseBite,
     flushEraseDirty: flushEraseDirty,
     beginLivePreview: beginLivePreview,

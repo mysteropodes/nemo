@@ -44,7 +44,16 @@ function exportBuildFrame(frameIdx,alpha){
     // Pivot = auto bounds center + Anchor Point offset (motionMat.ax/ay).
     var motionPivot=motionMat?new Point(userLayers[li].bounds.center.x+motionMat.ax,userLayers[li].bounds.center.y+motionMat.ay):null;
     strokes.forEach(function(sd){
-      var p=desP(sd,L,sd.opacity!==undefined?sd.opacity:1);
+      // Raster strokes (isRaster: imported images, SVG-sequence frames,
+      // and Bitmap Brush's texture companions, bitmap-brush.js) went
+      // through desP() unconditionally before this — desP expects
+      // .segments, which a Raster's serialized shape (x/y/width/height/src)
+      // doesn't have, so ANY layer holding a Raster silently broke every
+      // export (PNG/video/sequence): desP's undefined.map crashed the
+      // whole exportBuildFrame call for that frame. Pre-existing gap (any
+      // imported image already triggered it), surfaced now because Bitmap
+      // Brush adds a Raster companion to nearly every textured stroke.
+      var p=sd.isRaster?desR(sd,L,sd.opacity!==undefined?sd.opacity:1):desP(sd,L,sd.opacity!==undefined?sd.opacity:1);
       // Element-level Motion target (2026-07): applied FIRST, pivoted
       // around THIS stroke's own just-built bounds (not the whole layer's)
       // — see motion.js's elementMotionAt header comment. sd.strokeId is
@@ -308,8 +317,18 @@ function lottieBuild(start,end){
     // the anchor keeps file size and shape-layer count from ballooning for
     // zero visual difference. Dab companions themselves are NOT skipped —
     // they ARE the visible texture.
+    // isRaster strokes (imported images, and Bitmap Brush's texture
+    // companions, bitmap-brush.js) also dropped here — lottieShapeValue
+    // below builds every shape from sd.segments, which a Raster's
+    // serialized shape (x/y/width/height/src) doesn't have; this Lottie
+    // exporter has no image-asset/raster-layer support at all, so a
+    // bitmap-brush stroke degrades to "just its anchor, if it carries a
+    // fill" (still filtered out too when opacity:0, the fill-less case)
+    // rather than crashing lottieBuild for the whole export. Vector-preset
+    // dab companions are UNAFFECTED — they're real Paths with segments,
+    // same as before.
     var framesStrokes=[];
-    for(var f=start;f<=end;f++)framesStrokes[f]=getEffectiveStrokes(li,f).filter(function(sd){return sd.opacity!==0;});
+    for(var f=start;f<=end;f++)framesStrokes[f]=getEffectiveStrokes(li,f).filter(function(sd){return sd.opacity!==0&&!sd.isRaster;});
 
     // figure out the max stroke-slot count and, for each slot, the
     // contiguous frame runs where that slot exists (count stable)

@@ -1014,6 +1014,22 @@ function generateTweens(){
           seed:(fA*7919+spec.mi*131+1)>>>0,
         };
       }
+      // Bitmap Brush's own tween record (bitmap-brush.js's recordForTween,
+      // mirroring dabRecordsForTween just above) — a bitmap-brush anchor
+      // stores its resolved spec (tip/size/spacing/scatter/opacity/color,
+      // already a concrete color string, not the camouflaged null
+      // strokeColor) directly on .data.bitmapBrushSpec at creation, so no
+      // preTextureStroke lookup needed here, unlike the vector case.
+      var bmpA=spec.aData.bitmapBrushSpec,bmpB=spec.bData.bitmapBrushSpec;
+      var bmpTex=null;
+      if(bmpA||bmpB){
+        bmpTex={
+          spec:bmpA||bmpB,
+          side:bmpA&&bmpB?'both':(bmpA?'a':'b'),
+          groupId:spec.aData.brushGroupId||spec.bData.brushGroupId,
+          seed:(fA*7919+spec.mi*131+1)>>>0,
+        };
+      }
       // Stable identity for every frame this pair generates. Ordinary
       // hand-drawn strokes usually have NO strokeId at all — it's
       // assigned lazily only for fill-wall/review purposes (tools.js'
@@ -1033,7 +1049,7 @@ function generateTweens(){
       // interpolated frame in between the exact same identity.
       var pairId=spec.aData.strokeId||spec.bData.strokeId||('tw_'+fA+'_'+spec.mi);
       spec.aData.strokeId=pairId;spec.bData.strokeId=pairId;
-      return{a:ra,b:alignResampledPair(ra,rb),mi:spec.mi,tex:tex,id:pairId,
+      return{a:ra,b:alignResampledPair(ra,rb),mi:spec.mi,tex:tex,bmpTex:bmpTex,id:pairId,
         aRank:spec.aIdx/Math.max(1,sA.length-1),bRank:spec.bIdx/Math.max(1,sB.length-1)};
     });
     var gap=fB-fA;
@@ -1058,6 +1074,20 @@ function generateTweens(){
           if(mul>0.02){
             dabRecordsForTween(sdOut,pr.tex.preset,pr.tex.color,sdOut.strokeWidth||3,pr.tex.seed,mul)
               .forEach(function(dr){dr.__zKey=sdOut.__zKey-1e-4;tw.push(dr);});
+          }
+        }
+        if(pr.bmpTex&&window.SMBitmapBrush){
+          // carry the identity so a later node edit on this generated
+          // frame still resolves through regenerateBrushTexture's bitmap
+          // branch (tools.js) instead of falling through as an untextured
+          // plain anchor.
+          sdOut.bitmapBrushSpec=pr.bmpTex.spec;
+          if(pr.bmpTex.groupId)sdOut.brushGroupId=pr.bmpTex.groupId;
+          var bmul=pr.bmpTex.side==='a'?(1-et2):pr.bmpTex.side==='b'?et2:1;
+          if(bmul>0.02){
+            var specForFrame={tip:pr.bmpTex.spec.tip,size:pr.bmpTex.spec.size,spacing:pr.bmpTex.spec.spacing,scatter:pr.bmpTex.spec.scatter,opacity:pr.bmpTex.spec.opacity,color:pr.bmpTex.spec.color,seed:pr.bmpTex.seed};
+            var brec=SMBitmapBrush.recordForTween(sdOut.segments,sdOut.closed,specForFrame,bmul,pr.bmpTex.groupId);
+            if(brec){brec.__zKey=sdOut.__zKey-1e-4;tw.push(brec);}
           }
         }
         tw.push(sdOut);
