@@ -141,6 +141,22 @@ const FRAME_CACHE_BUDGET_BYTES: usize = 66 * 1024 * 1024;
 /// and how far BEHIND it — unchanged from v1.
 const READAHEAD_DEPTH: i64 = 8;
 const READAHEAD_BACK: i64 = 3;
+/// Shared by decode_at (actual reuse decision) and spawn_readahead (peeking
+/// whether a candidate target would cost a respawn, without paying for one).
+const SMALL_FORWARD_REUSE_TOLERANCE: i64 = 12;
+
+/// Would decoding `target` on session `s` require killing+respawning the
+/// ffmpeg process, or can the running one serve it? Mirrors decode_at's own
+/// reuse decision exactly (backward gaps and gaps beyond tolerance always
+/// need a respawn) — used by spawn_readahead to avoid the tug-of-war where
+/// a readahead-triggered respawn fights foreground playback for the same
+/// session's process (see spawn_readahead's own comment for the full story).
+fn would_need_respawn(s: &VideoSession, target: i64) -> bool {
+    match &s.proc {
+        Some(p) => !(0..=SMALL_FORWARD_REUSE_TOLERANCE).contains(&(target - p.next_frame)),
+        None => true,
+    }
+}
 /// Tail-of-stream backoff-retry cap — unchanged from v1's spirit (widen
 /// the re-seek origin until it reaches 0), expressed here as a max
 /// number of widening attempts instead of a frame-walk count, since v2
@@ -255,8 +271,9 @@ fn decode_at(s: &mut VideoSession, frame_index: i64, caller: &str) -> Result<(Ve
     // state per-frame decode is ~1.5ms (1080p) to ~6.7ms (4K); spawn
     // overhead is ~20-90ms — the break-even frame count (spawn_ms /
     // frame_ms) lands around 10-15 at both ends, so one constant works
-    // without per-resolution tuning.
-    const SMALL_FORWARD_REUSE_TOLERANCE: i64 = 12;
+    // without per-resolution tuning. (Constant now module-level — see
+    // would_need_respawn, which mirrors this exact decision for
+    // spawn_readahead's benefit.)
     let mut origin = frame_index;
     // DIAG (2026-07 — "j'ai mis 3 vidéos ça a du mal à lire en temps réel"):
     // reports the gap this decision was based on whenever a REAL respawn is
@@ -603,52 +620,41 @@ fn spawn_readahead(arc: Arc<Mutex<VideoSession>>, center: i64) {
             last_goal_change = std::time::Instant::now();
         }
         let back = READAHEAD_BACK;
+        // Live-caught 2026-07 ("j'ai mis 3 vidéos ça a du mal à lire les 3
+        // en temps réel"): readahead was fighting foreground playback for
+        // the same session's ffmpeg process. First fix gated only the
+        // backward-fill branch, but a second live capture showed the SAME
+        // fight happening on the FORWARD side too — whenever the process
+        // had drifted (e.g. from an earlier respawn) such that a forward
+        // target fell outside decode_at's small-forward-reuse window, that
+        // forward fill *also* forced a respawn that collided with
+        // foreground's own repeated requests for a stalled frame (one
+        // capture: target=192 requested 3x by foreground, each time with a
+        // fresh negative gap, because readahead kept repositioning the
+        // process for its own forward targets in between). The real rule
+        // is simpler than "forward is fine, backward is dangerous": ANY
+        // candidate that would cost a respawn is dangerous while foreground
+        // is actively live (goal fresh within the last 150ms — one
+        // playback tick is ~33ms, a human pause is much longer). Only a
+        // target reachable without a respawn (small forward gap on the
+        // process as it currently sits, or backward once things go quiet)
+        // is fair game. `readahead_warms_backward_on_all_intra` still
+        // passes: its forward-fill targets are all reachable without a
+        // respawn (fresh session, sequential +1 gaps), so nothing here
+        // defers them.
+        let goal_recently_moving = last_goal_change.elapsed() < std::time::Duration::from_millis(150);
         let mut target: Option<i64> = None;
         for d in 1..=READAHEAD_DEPTH {
             let f = center + d;
-            if f < s.frame_count && !s.cache.iter().any(|(i, _)| *i == f) {
+            if f < s.frame_count
+                && !s.cache.iter().any(|(i, _)| *i == f)
+                && !(goal_recently_moving && would_need_respawn(&s, f))
+            {
                 target = Some(f);
                 break;
             }
         }
-        // Backward warming exists for scrub-back, not for active forward
-        // playback. Gating on the session's process POSITION doesn't work:
-        // readahead's own forward-fill (just above) legitimately pushes the
-        // process ahead of `center` as part of a single, static-goal pass
-        // (readahead_warms_backward_on_all_intra relies on exactly this —
-        // decode center, then backward-warm center-1..center-back — and a
-        // position-based gate broke it, since the forward-fill above had
-        // already moved the process well past center by the time backward
-        // was considered). The real signal for "don't bother, we're mid
-        // live-playback" is whether `readahead_goal` itself keeps being
-        // externally bumped: spawn_readahead is called once per foreground
-        // tick, so during real ~30fps playback a fresh goal arrives every
-        // ~33ms, while a paused/idle/scrub-settled session leaves the goal
-        // untouched. Live-caught 2026-07 ("j'ai mis 3 vidéos ça a du mal à
-        // lire les 3 en temps réel"): the goal chased forward continuously
-        // during playback, and every stale backward target forced a
-        // respawn (backward gaps never reuse, see decode_at) that
-        // repositioned the process behind the playhead, immediately undone
-        // by the next foreground tick — 15907 readahead respawns vs 580
-        // foreground ones in one captured session. Skipping backward-fill
-        // while the goal has moved within the last 150ms (well above one
-        // playback tick, well below a human pause) breaks that fight
-        // without touching the legitimate static-goal case.
-        let goal_recently_moving = last_goal_change.elapsed() < std::time::Duration::from_millis(150);
-        if target.is_none() {
-            if goal_recently_moving {
-                // Forward is fully warmed but the goal is still fresh — don't
-                // give up (that would wrongly end the thread the moment a
-                // single readahead pass's own forward-fill work happens to
-                // finish before 150ms have elapsed, breaking the static-goal
-                // case) and don't force a backward respawn either (that's
-                // the live-playback tug-of-war). Idle briefly and recheck:
-                // a one-shot goal will cross the quiet threshold on its own,
-                // continuous playback will just keep resetting it cheaply.
-                drop(s);
-                std::thread::sleep(std::time::Duration::from_millis(20));
-                continue;
-            }
+        if target.is_none() && !goal_recently_moving {
             for d in 1..=back {
                 let f = center - d;
                 if f >= 0 && !s.cache.iter().any(|(i, _)| *i == f) {
@@ -658,6 +664,16 @@ fn spawn_readahead(arc: Arc<Mutex<VideoSession>>, center: i64) {
             }
         }
         let Some(f) = target else {
+            if goal_recently_moving {
+                // Either nothing to do right now without paying a respawn,
+                // or forward is fully warmed and backward is deferred — in
+                // both cases don't declare the thread done (that would
+                // wrongly end it before a one-shot goal crosses the quiet
+                // threshold); idle briefly and recheck.
+                drop(s);
+                std::thread::sleep(std::time::Duration::from_millis(20));
+                continue;
+            }
             s.readahead_active = false;
             break;
         };
