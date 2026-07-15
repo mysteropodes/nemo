@@ -2518,6 +2518,17 @@ var TOOL_SHORTCUTS=[
   {action:'hand',key:'h',label:'Hand (pan)'},
   {action:'zoom',key:'z',label:'Zoom'},
   {action:'toggleOnion',key:'o',label:'Toggle Onion Skin'},
+  // UI/UX audit (2026-07): these 3 tools had NO letter shortcut at all —
+  // every other tool button does, so their absence read as an
+  // inconsistency rather than a deliberate omission. The alphabet is
+  // nearly exhausted by the bindings above (only q/s/w/y were free); no
+  // mnemonic reads as cleanly as the existing ones (v=select, b=brush,
+  // p=pen...) so these are arbitrary placeholders, not a claimed "right"
+  // answer — rebindable via the existing Réglages > Raccourcis UI
+  // (shortcutOverrides/localStorage) like any other entry here.
+  {action:'text',key:'y',label:'Texte'},
+  {action:'rotate',key:'w',label:'Rotation du canevas'},
+  {action:'perspective',key:'q',label:'Perspective'},
 ];
 var _shortcutOverrides=null;
 function shortcutOverrides(){
@@ -3348,6 +3359,44 @@ function onKeyDown(event){
   if((event.metaKey||event.ctrlKey)&&event.key==='c'){event.preventDefault();window.SM.copyFrames();return;}
   if((event.metaKey||event.ctrlKey)&&event.key==='x'){event.preventDefault();window.SM.cutFrames();return;}
   if((event.metaKey||event.ctrlKey)&&event.key==='v'){event.preventDefault();window.SM.pasteFrames();return;}
+  // UI/UX audit (2026-07): Ctrl/Cmd+A "select all" existed nowhere in the
+  // app — a near-universal convention in every creative tool. Selects
+  // every path/raster on the ACTIVE layer at the current frame, mirroring
+  // the exact filter select-bridge.js already uses for its own "click on
+  // empty layer space selects everything in it" fallback (isLinkedFill
+  // companions and brush-texture dab copies excluded — they're rendering
+  // artifacts of their anchor stroke, not independently selectable
+  // drawings). Scoped to the Select/Subselect tools only: select-all while
+  // Brush/Pen/etc are active would be a silent, confusing side effect with
+  // no visible feedback for what tool is active.
+  if((event.metaKey||event.ctrlKey)&&(event.key==='a'||event.key==='A')&&(state.tool==='select'||state.tool==='subselect')&&userLayers[state.activeLayerIdx]){
+    event.preventDefault();
+    clearSel();
+    selectedPaths=userLayers[state.activeLayerIdx].children.filter(function(c){return(c instanceof Path||c instanceof Raster)&&!(c.data&&(c.data.isLinkedFillCompanion||c.data.isBrushTextureCopy));});
+    state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;});
+    renderArcs();updateUI();
+    if(window.SMEngineBridge)SMEngineBridge.renderNow();
+    return;
+  }
+  // Ctrl/Cmd+G "group into folder" — the action already existed
+  // (groupSelectionIntoFolder, right-click menu only) but every other
+  // grouping-adjacent action in this app has a keyboard path; this one
+  // didn't. Same guard as the menu entry (2+ consecutive, ungrouped
+  // layers) so the shortcut can't silently no-op without the SAME
+  // showToast explanation the menu item already gives on failure.
+  if((event.metaKey||event.ctrlKey)&&(event.key==='g'||event.key==='G')&&!event.shiftKey){
+    event.preventDefault();
+    groupSelectionIntoFolder();
+    return;
+  }
+  // Ctrl/Cmd +/-/0 canvas zoom — mouse wheel already zoomed the canvas
+  // (tools.js), but had no keyboard equivalent; Ctrl+0 mirrors the
+  // existing "Fit" button (window.SM.fitCanvas), +/- step by the same
+  // ratio the wheel handler's own Ctrl-modifier path uses (Fit's own
+  // increment, kept consistent rather than inventing a new one).
+  if((event.metaKey||event.ctrlKey)&&(event.key==='='||event.key==='+')){event.preventDefault();view.zoom=Math.min(20,view.zoom*1.1);updZoom();renderArcs();if(window.SMEngineBridge)SMEngineBridge.renderNow();return;}
+  if((event.metaKey||event.ctrlKey)&&event.key==='-'){event.preventDefault();view.zoom=Math.max(.05,view.zoom/1.1);updZoom();renderArcs();if(window.SMEngineBridge)SMEngineBridge.renderNow();return;}
+  if((event.metaKey||event.ctrlKey)&&event.key==='0'){event.preventDefault();window.SM.fitCanvas();return;}
   if(event.target.tagName==='INPUT'||event.target.tagName==='SELECT'||event.target.tagName==='TEXTAREA'||event.target.isContentEditable)return;
   var k=event.key;
   // Motion mode's P/A/R/S/T property-reveal shortcuts (After Effects
