@@ -42,7 +42,15 @@
     // An 8-digit hex (#rrggbbaa) carries its own alpha byte — multiply it
     // with the object's separate opacity, don't let one silently win.
     var hexA = h.length === 8 ? parseInt(h.substr(6, 2), 16) / 255 : 1;
-    var a = Math.round(255 * (opacity !== undefined ? opacity : 1) * hexA);
+    // opacity can arrive >1 or <0 here: tween easing curves (evalCurve,
+    // ui.js) clamp their x (time) input to [0,1] but not their y (value)
+    // output — overshoot-style curve handles are draggable outside the unit
+    // square on purpose — and that overshot value multiplies straight into
+    // a stroke's opacity through interpStroke/pushFade (tweens.js). Rust's
+    // ItemIn color channels are u8, so an unclamped alpha above 255 (or
+    // below 0) fails serde deserialization and takes the whole render down
+    // (see the r2() comment above for why one bad value kills everything).
+    var a = Math.max(0, Math.min(255, Math.round(255 * (opacity !== undefined ? opacity : 1) * hexA)));
     return [r, g, b, a];
   }
 
@@ -389,14 +397,6 @@
     if (window.SMMotion) {
       var motionItems = SMMotion.buildOverlayItems();
       if (motionItems.length) layers.push({ items: motionItems.map(function (it) { it.segments = roundSegs(it.segments); return it; }) });
-    }
-    // Labs canvas-overlay hook (2026-07) — same guarded, no-op-when-absent
-    // pattern as the SMCamera/SMMotion contributions right above. A single
-    // fan-out point (labs-core.js) rather than one `if` per prototype here,
-    // matching draw-bridge.js's onStrokeCommitted/onPreview hooks.
-    if (window.SMLabs && window.SMLabs.buildCanvasOverlayItems) {
-      var labsOverlayItems = window.SMLabs.buildCanvasOverlayItems();
-      if (labsOverlayItems.length) layers.push({ items: labsOverlayItems.map(function (it) { it.segments = roundSegs(it.segments); return it; }) });
     }
     if (typeof fillCloseStrokesOverlayItems === 'function') {
       var fillCloseItems = fillCloseStrokesOverlayItems();
@@ -852,14 +852,19 @@
   }
 
   // Tween motion-arc handles: renderArcs() in tweens.js draws these into a
-  // real Paper `arcLayer` (dashed quadratic-bezier curve between two
-  // matched strokes' centroids + a draggable control-point handle), same
-  // invisible-under-the-rust-canvas problem as every other overlay above.
-  // Rebuilt here directly from the already-populated `arcHandles` array
-  // (a tweens.js global — populated by the SAME renderArcs() call select-
-  // bridge.js already triggers after any arc drag/selection change), using
-  // the same 24-sample polyline approximation of the quadratic curve the
-  // original does (`qBez`, also a tweens.js global).
+  // real Paper `arcLayer` (dashed CUBIC-bezier curve between two matched
+  // strokes' centroids + two independent OUT/IN draggable handles, upgraded
+  // 2026-07 from a single shared quadratic control point — camera.js's own
+  // motion-path rig), same invisible-under-the-rust-canvas problem as every
+  // other overlay above. Rebuilt here directly from the already-populated
+  // `arcHandles` array (a tweens.js global — populated by the SAME
+  // renderArcs() call select-bridge.js already triggers after any arc drag/
+  // selection change), using the same 24-sample polyline approximation of
+  // the cubic curve the original does (`cubicBez`, also a tweens.js
+  // global). arcHandles now carries TWO entries per matched pair (one
+  // `which:'out'`, one `which:'in'`) instead of one — grouped back into a
+  // single curve+both-handles item set here so the curve draws once, not
+  // twice.
   var ARC_COLORS = [
     [255, 107, 107], [78, 205, 196], [255, 230, 109],
     [162, 155, 254], [253, 121, 168], [0, 206, 201],
@@ -868,18 +873,28 @@
     if (typeof arcHandles === 'undefined' || !arcHandles.length) return [];
     var zs = 1 / view.zoom;
     var items = [];
-    arcHandles.forEach(function (ah, i) {
+    var byPair = {}, order = [];
+    arcHandles.forEach(function (ah) {
+      var k = ah.fA + '-' + ah.fB + '-' + ah.matchIdx;
+      if (!byPair[k]) { byPair[k] = { ptA: ah.ptA, ptB: ah.ptB }; order.push(k); }
+      byPair[k][ah.which] = [ah.handle.position.x, ah.handle.position.y];
+    });
+    order.forEach(function (k, i) {
+      var p = byPair[k];
       var col = ARC_COLORS[i % ARC_COLORS.length];
-      var ac = [ah.handle.position.x, ah.handle.position.y];
+      var out = p.out, inn = p['in'];
       var pts = [];
       for (var s = 0; s <= 24; s++) {
         var t = s / 24;
-        pts.push({ point: [qBez(ah.ptA[0], ac[0], ah.ptB[0], t), qBez(ah.ptA[1], ac[1], ah.ptB[1], t)] });
+        pts.push({ point: [cubicBez(p.ptA[0], out[0], inn[0], p.ptB[0], t), cubicBez(p.ptA[1], out[1], inn[1], p.ptB[1], t)] });
       }
       items.push({ segments: roundSegs(pts), closed: false, fillColor: null, strokeColor: col.concat([153]), strokeWidth: 2 * zs });
-      items.push(circleItem(ah.ptA[0], ah.ptA[1], 4 * zs, col.concat([204]), null, 0));
-      items.push(circleItem(ah.ptB[0], ah.ptB[1], 4 * zs, col.concat([204]), null, 0));
-      items.push(circleItem(ac[0], ac[1], 7 * zs, [255, 255, 255, 242], col.concat([255]), 2 * zs));
+      items.push(circleItem(p.ptA[0], p.ptA[1], 4 * zs, col.concat([204]), null, 0));
+      items.push(circleItem(p.ptB[0], p.ptB[1], 4 * zs, col.concat([204]), null, 0));
+      items.push(lineItem(p.ptA, out, col.concat([140]), 1 * zs));
+      items.push(circleItem(out[0], out[1], 6 * zs, [255, 255, 255, 242], col.concat([255]), 2 * zs));
+      items.push(lineItem(p.ptB, inn, col.concat([140]), 1 * zs));
+      items.push(circleItem(inn[0], inn[1], 6 * zs, [255, 255, 255, 242], col.concat([255]), 2 * zs));
     });
     return items;
   }

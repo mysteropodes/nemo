@@ -533,8 +533,55 @@ function outlineFromCenterSegs(segs){
 function getEasing(){if(window._curveEditor)return window._curveEditor.evalCurve;return function(t){return t;};}
 function lerp(a,b,t){return a+(b-a)*t;}function lerpV(a,b,t){return[lerp(a[0],b[0],t),lerp(a[1],b[1],t)];}
 function arcKey(fA,fB,i){return fA+'-'+fB+'-'+i;}
-function getArcCtrl(fA,fB,i,ptA,ptB){var k=arcKey(fA,fB,i);var a=state.motionArcs[k];var mx=(ptA[0]+ptB[0])/2,my=(ptA[1]+ptB[1])/2;if(a)return{x:mx+a.cx,y:my+a.cy};return{x:mx,y:my};}
-function setArcCtrl(fA,fB,i,ptA,ptB,cx,cy){var mx=(ptA[0]+ptB[0])/2,my=(ptA[1]+ptB[1])/2;state.motionArcs[arcKey(fA,fB,i)]={cx:cx-mx,cy:cy-my};}
+// Cubic bezier through ptA/ptB with independent OUT (leaving A) and IN
+// (arriving at B) handles — upgraded 2026-07 from a single shared quadratic
+// control point, live feedback: "le motion path de caméra a des poignées
+// pour le in et out alors que le motion path de tween c'est juste une
+// poignée pour les 2 donc moins réglable". camera.js/motion.js already use
+// this exact two-handle rig for their own motion paths; this brings the
+// REAL tween-arc system (state.motionArcs — genuinely read by interpStroke
+// below to bend the tween's spatial path, not a decorative overlay) to
+// parity with them instead of being a separate, disconnected visualization.
+//
+// Default (untouched) offsets sit at exactly 1/3 and 2/3 along the A->B
+// segment — the standard exact cubic representation of a straight line.
+// Verified by construction, not just "looks straight": at every t this
+// reproduces the OLD quadratic-at-exact-midpoint system's parametrization
+// exactly (same position at every t, not merely the same endpoints), so
+// every arc nobody has touched yet tweens identically to before. A literal
+// [0,0] offset default was tried first and rejected — the resulting handle
+// sits exactly ON its own endpoint, indistinguishable from the endpoint dot
+// itself rather than merely subtle (the mistake the retired tween-motion-
+// path Labs prototype made and had to fix); 1/3 and 2/3 are already
+// visibly separate from both endpoints with no extra display-only fallback
+// needed.
+//
+// Old single-handle `{cx,cy}` entries (pre-2026-07) are NOT migrated —
+// state.motionArcs is a young (v16), rarely-touched feature; an old custom
+// arc just reads back as this new straight-line default instead of being
+// silently reinterpreted. Simpler and safer than guessing an equivalent
+// two-handle shape from one point, and this is still ui-ux-experimental.
+function getArcHandles(fA,fB,i,ptA,ptB){
+  var k=arcKey(fA,fB,i);var a=state.motionArcs[k];
+  var dx=ptB[0]-ptA[0],dy=ptB[1]-ptA[1];
+  // Field names match setArcHandle's `which` values ('out'/'in') exactly —
+  // confirmed live the hard way: an earlier version read a.hOut/a.hIn here
+  // while setArcHandle wrote cur[which] (i.e. cur.out/cur['in']), so a
+  // dragged handle's offset was stored correctly but this always fell
+  // through to the untouched default regardless, silently ignoring every
+  // drag (state.motionArcs held the right data; nothing ever read it back).
+  var hOut=(a&&a.out)||[dx/3,dy/3];
+  var hIn=(a&&a['in'])||[-dx/3,-dy/3];
+  return { out:[ptA[0]+hOut[0],ptA[1]+hOut[1]], in:[ptB[0]+hIn[0],ptB[1]+hIn[1]] };
+}
+function setArcHandle(fA,fB,i,which,ptA,ptB,x,y){
+  var k=arcKey(fA,fB,i);
+  var cur=state.motionArcs[k]||{};
+  var anchor=which==='out'?ptA:ptB;
+  cur[which]=[x-anchor[0],y-anchor[1]];
+  state.motionArcs[k]=cur;
+}
+function cubicBez(a,c1,c2,b,t){var u=1-t;return u*u*u*a+3*u*u*t*c1+3*u*t*t*c2+t*t*t*b;}
 // v16: motion-arc handles are keyed by literal frame numbers (arcKey above)
 // with no separate "belongs to this keyframe pair" identity — retiming a
 // keyframe (dragging it to a new frame index, timeline.js moveFrames)
@@ -557,7 +604,6 @@ function rekeyTweenPairData(fA,fB,newFA,newFB){
     state.motionArcs[newFA+'-'+newFB+'-'+idx]=val;
   });
 }
-function qBez(a,c,b,t){var u=1-t;return u*u*a+2*u*t*c+t*t*b;}
 // Rotates+scales a vector (px,py) by angle ang (radians) and uniform factor
 // scale — the rigid part of a similarity transform, used below to give
 // tweens real rotation instead of every point sliding along a straight
@@ -569,7 +615,7 @@ function rotScalePt(px,py,ang,scale){var c=Math.cos(ang),s=Math.sin(ang);return[
 function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
   var et=easFn(t);var n=Math.min(rA.segments.length,rB.segments.length);var segs=[];
   var cxA=0,cyA=0,cxB=0,cyB=0;for(var i=0;i<n;i++){cxA+=rA.segments[i].point[0];cyA+=rA.segments[i].point[1];cxB+=rB.segments[i].point[0];cyB+=rB.segments[i].point[1];}cxA/=n;cyA/=n;cxB/=n;cyB/=n;
-  var ac=getArcCtrl(fA,fB,mIdx,[cxA,cyA],[cxB,cyB]);var cx2=qBez(cxA,ac.x,cxB,et);var cy2=qBez(cyA,ac.y,cyB,et);
+  var ah=getArcHandles(fA,fB,mIdx,[cxA,cyA],[cxB,cyB]);var cx2=cubicBez(cxA,ah.out[0],ah.in[0],cxB,et);var cy2=cubicBez(cyA,ah.out[1],ah.in[1],cyB,et);
   // Fit the rigid rotation+scale that best explains A's centroid-relative
   // points turning into B's (same similarity-transform math the "force
   // line" matching pass already uses, just fit per-pair here instead of
@@ -873,8 +919,28 @@ function generateTweens(){
     var forcedAIdx={},forcedBIdx={},forcedPairs=[];
     overrides.forEach(function(ov){
       var aIdx=-1,bIdx=-1;
-      for(var ii=0;ii<sA.length;ii++)if(sA[ii].strokeId===ov.aId){aIdx=ii;break;}
-      for(var jj=0;jj<sB.length;jj++)if(sB[jj].strokeId===ov.bId){bIdx=jj;break;}
+      // Check BOTH stored ids on BOTH sides, not just ov.aId on A / ov.bId
+      // on B — found live testing tween-arc handles (any drag re-triggers
+      // generateTweens): the very first successful resolution of this
+      // override already stamps the SAME shared pairId onto both
+      // spec.aData AND spec.bData a few lines below (splitTweenables
+      // doesn't clone, so this mutates the real keyframe stroke data) —
+      // meaning ov.bId (B's ORIGINAL id) no longer exists anywhere the
+      // instant after the first call. Every regeneration after that first
+      // one silently failed this lookup, fell through to autoMatch, and —
+      // for exactly the pairs that needed a forced override because they
+      // don't auto-match well (dissimilar/far apart) — got treated as a
+      // fade-out+fade-in instead, ADDING that content into frames that
+      // already held the correctly-tweened result from the first pass
+      // (confirmed: strokes.length 1->2 on a plain second call, no other
+      // change). After a merge, A and B share one identical id, so
+      // matching either stored id against either side is safe pre- and
+      // post-merge: pre-merge it degrades to exactly the old aId-on-A/
+      // bId-on-B check (the ids differ, so the OR's second half never
+      // matches); post-merge both sides already carry the same value, so
+      // either id resolves both.
+      for(var ii=0;ii<sA.length;ii++)if(sA[ii].strokeId===ov.aId||sA[ii].strokeId===ov.bId){aIdx=ii;break;}
+      for(var jj=0;jj<sB.length;jj++)if(sB[jj].strokeId===ov.bId||sB[jj].strokeId===ov.aId){bIdx=jj;break;}
       if(aIdx<0||bIdx<0||forcedAIdx[aIdx]||forcedBIdx[bIdx])return;
       forcedAIdx[aIdx]=1;forcedBIdx[bIdx]=1;
       forcedPairs.push({aIdx:aIdx,bIdx:bIdx,aData:sA[aIdx],bData:sB[bIdx],mi:-1-forcedPairs.length,score:0,forced:true});
@@ -1056,13 +1122,21 @@ function renderArcs(){
   var multi=fm.length>1;
   fm.forEach(function(m,di){
     var pA=buildTP(sA[m.a]),pB=buildTP(sB[m.b]);var cA=pA.bounds.center,cB=pB.bounds.center;pA.remove();pB.remove();
-    var mIdx=matches.indexOf(m);var ac=getArcCtrl(fA,fB,mIdx,[cA.x,cA.y],[cB.x,cB.y]);var col=multi?'#ffffff':cols[di%cols.length];var zs=1/view.zoom;
+    var mIdx=matches.indexOf(m);var ah=getArcHandles(fA,fB,mIdx,[cA.x,cA.y],[cB.x,cB.y]);var col=multi?'#ffffff':cols[di%cols.length];var zs=1/view.zoom;
     var ap=new Path({insert:true});ap.strokeColor=new Color(col);ap.strokeColor.alpha=multi?.3:.6;ap.strokeWidth=(multi?1:2)*zs;ap.dashArray=[6*zs,4*zs];
-    for(var s=0;s<=24;s++){var t=s/24;var x=qBez(cA.x,ac.x,cB.x,t);var y=qBez(cA.y,ac.y,cB.y,t);if(s===0)ap.moveTo(new Point(x,y));else ap.lineTo(new Point(x,y));}
+    for(var s=0;s<=24;s++){var t=s/24;var x=cubicBez(cA.x,ah.out[0],ah.in[0],cB.x,t);var y=cubicBez(cA.y,ah.out[1],ah.in[1],cB.y,t);if(s===0)ap.moveTo(new Point(x,y));else ap.lineTo(new Point(x,y));}
     new Path.Circle({center:cA,radius:(multi?2.5:4)*zs,insert:true,fillColor:col,opacity:multi?.45:.8});
     new Path.Circle({center:cB,radius:(multi?2.5:4)*zs,insert:true,fillColor:col,opacity:multi?.45:.8});
-    var h=new Path.Circle({center:new Point(ac.x,ac.y),radius:(multi?4:7)*zs,insert:true});h.fillColor=new Color(1,1,1,multi?.5:.95);h.strokeColor=col;h.strokeWidth=(multi?1:2)*zs;
-    arcHandles.push({handle:h,fA:fA,fB:fB,matchIdx:mIdx,ptA:[cA.x,cA.y],ptB:[cB.x,cB.y]});
+    // Independent OUT (from A) / IN (to B) handles — camera.js's exact rig,
+    // not a single shared knob (live feedback 2026-07). Each gets its own
+    // thin connector line (same convention camera.js/motion.js use) so
+    // it's visually obvious which endpoint a given handle belongs to.
+    var outLine=new Path({insert:true,segments:[cA,new Point(ah.out[0],ah.out[1])]});outLine.strokeColor=new Color(col);outLine.strokeColor.alpha=multi?.25:.5;outLine.strokeWidth=(multi?.8:1)*zs;
+    var hOut=new Path.Circle({center:new Point(ah.out[0],ah.out[1]),radius:(multi?3:6)*zs,insert:true});hOut.fillColor=new Color(1,1,1,multi?.5:.95);hOut.strokeColor=col;hOut.strokeWidth=(multi?1:2)*zs;
+    var inLine=new Path({insert:true,segments:[cB,new Point(ah.in[0],ah.in[1])]});inLine.strokeColor=new Color(col);inLine.strokeColor.alpha=multi?.25:.5;inLine.strokeWidth=(multi?.8:1)*zs;
+    var hIn=new Path.Circle({center:new Point(ah.in[0],ah.in[1]),radius:(multi?3:6)*zs,insert:true});hIn.fillColor=new Color(1,1,1,multi?.5:.95);hIn.strokeColor=col;hIn.strokeWidth=(multi?1:2)*zs;
+    arcHandles.push({handle:hOut,which:'out',fA:fA,fB:fB,matchIdx:mIdx,ptA:[cA.x,cA.y],ptB:[cB.x,cB.y]});
+    arcHandles.push({handle:hIn,which:'in',fA:fA,fB:fB,matchIdx:mIdx,ptA:[cA.x,cA.y],ptB:[cB.x,cB.y]});
   });
   userLayers[state.activeLayerIdx].activate();
 }

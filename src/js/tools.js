@@ -3871,7 +3871,7 @@ function onMouseDrag(event){
       var prevA=project.activeLayer;marqueeLayer.activate();
       _marquee.rect=new Path.Rectangle({from:new Point(mx1,my1),to:new Point(mx2,my2),strokeColor:'rgba(74,158,255,.9)',strokeWidth:1/view.zoom,dashArray:[4/view.zoom,3/view.zoom],fillColor:new Color(0.29,0.62,1,0.08),insert:true});
       prevA.activate();
-    }else if(draggingArc){setArcCtrl(draggingArc.fA,draggingArc.fB,draggingArc.matchIdx,draggingArc.ptA,draggingArc.ptB,event.point.x,event.point.y);renderArcs();}
+    }else if(draggingArc){setArcHandle(draggingArc.fA,draggingArc.fB,draggingArc.matchIdx,draggingArc.which,draggingArc.ptA,draggingArc.ptB,event.point.x,event.point.y);renderArcs();}
     else if(selectedPaths.length>0){
       if(!_moveDragStarted){pushUndo();_moveDragStarted=true;}
       selectedPaths.forEach(function(p){

@@ -195,7 +195,6 @@
     },
     { name: 'xsheet', label: 'Feuille d\'exposition flottante' },
     { name: 'multiframe-draw', label: 'Dessin multi-frames', hintExtra: 'Sélectionne plusieurs frames dans la timeline avant de dessiner — le trait est tamponné sur chacune.' },
-    { name: 'tween-motion-path', label: 'Chemin de tween + barres d\'espacement', hintExtra: 'Sélectionne un trait tweené (outil Sélection) — lecture seule, pas encore de poignées éditables.' },
   ];
 
   function mkLabel2(text) {

@@ -74,22 +74,4 @@
     });
     return out;
   };
-
-  // Fan-out for engine-bridge.js's canvas-overlay hook (2026-07, tween
-  // motion path) — same guarded pattern as SMCamera.buildOverlayItems()/
-  // SMMotion.buildOverlayItems(), just multiplexed across every prototype
-  // that registers an onOverlay handler instead of one `if` per prototype
-  // in a core file.
-  L.buildCanvasOverlayItems = function () {
-    var out = [];
-    Object.keys(protos).forEach(function (n) {
-      var p = protos[n];
-      if (!p.onOverlay || !isOn(n)) return;
-      try {
-        var r = p.onOverlay();
-        if (r) out = out.concat(r);
-      } catch (e) { console.warn('[labs] ' + n + ' overlay failed:', e); }
-    });
-    return out;
-  };
 })();

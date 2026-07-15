@@ -533,7 +533,7 @@
       xformLastSx = sx; xformLastSy = sy;
       symGestureAccumulate(new Matrix().scale(stepSx, stepSy, anchor));
     } else if (mode === 'arc') {
-      setArcCtrl(draggingArc.fA, draggingArc.fB, draggingArc.matchIdx, draggingArc.ptA, draggingArc.ptB, pt.x, pt.y);
+      setArcHandle(draggingArc.fA, draggingArc.fB, draggingArc.matchIdx, draggingArc.which, draggingArc.ptA, draggingArc.ptB, pt.x, pt.y);
       renderArcs();
     } else if (mode === 'xform-rotate') {
       var ptR = pt;
