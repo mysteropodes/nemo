@@ -623,6 +623,15 @@
     if(frame>=0&&frame<(window._totalF||24)){scrubbing=true;if(window.SM){window.SM.stopPlay();window.SM.goToFrame(frame);}}
     e.preventDefault();
   });
+  // Playhead flag handle (UI/UX audit, 2026-07 — see its own HTML/CSS
+  // comments): grabbing it starts the exact same scrub as clicking the
+  // ruler, just from a visible, always-grabbable marker instead of only
+  // "click somewhere in this thin strip of frame cells".
+  var playheadFlag=document.getElementById('playhead-flag');
+  if(playheadFlag)playheadFlag.addEventListener('mousedown',function(e){
+    scrubbing=true;if(window.SM)window.SM.stopPlay();
+    e.preventDefault();e.stopPropagation();
+  });
   window.addEventListener('mousemove',function(e){
     if(!scrubbing)return;var wrap=document.getElementById('fg-wrap');var rect=wrap.getBoundingClientRect();
     var x=e.clientX-rect.left+wrap.scrollLeft;var frame=Math.max(0,Math.min((window._totalF||24)-1,Math.floor(x/FC)));

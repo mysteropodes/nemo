@@ -945,7 +945,18 @@
       <div id="frame-hdr"></div>
       <div id="frame-grid"></div>
       <div id="audio-strip" style="display:none"></div>
-      <div id="playhead"></div>
+      <!-- UI/UX audit (2026-07): the playhead itself is pointer-events:none
+           (style.css) so clicks pass through to the ruler/frame cells below
+           it — deliberate, but it also meant there was NO visible "grab
+           this" affordance at all: just a flat, semi-transparent, zoom-
+           width-proportional strip (6px wide at the default 33% zoom,
+           translucent), no flag/triangle marker the way every NLE/animation
+           timeline (Premiere, Resolve, AE, Harmony) shows one. #playhead-flag
+           is a small pointer-events:auto handle nested inside it — same X
+           position for free (inherits the parent's positioning), directly
+           draggable, wired in ui.js to the SAME scrub flow the ruler
+           already uses. -->
+      <div id="playhead"><div id="playhead-flag" title="Glisse pour te déplacer dans le temps"></div></div>
     </div>
   </div>
 </div>

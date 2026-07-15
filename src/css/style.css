@@ -643,6 +643,18 @@ body.mode-motion .lrow.act{box-shadow:inset 3px 0 0 #4E6FF2,inset 0 0 0 1px rgba
 .fc .km.td{background:var(--accent);width:5px;height:5px;}
 .fc .km.td.manual{background:var(--green);}
 #playhead{position:absolute;top:0;width:var(--fc);pointer-events:none;z-index:5;border-left:2px solid var(--accent);background:rgba(74,158,255,.08);}
+/* UI/UX audit (2026-07): a small flag/triangle handle sitting in the
+   bars-row (top 16px of #fg-wrap, above the ruler) — the one part of the
+   playhead's height that isn't already covered by frame cells, so it
+   doesn't compete with clicking a specific frame. pointer-events:auto
+   deliberately overrides the parent's :none — this is the ONE grabbable
+   part of an otherwise click-through indicator. Centered on the frame
+   cell (left:0 relative to #playhead, which already sits at the correct
+   X) rather than pinned to the left border, so it reads as "this frame"
+   rather than "the edge of this frame". */
+#playhead-flag{position:absolute;top:0;left:0;width:var(--fc);height:14px;pointer-events:auto;cursor:ew-resize;}
+#playhead-flag::before{content:"";position:absolute;top:0;left:calc(var(--fc) / 2 - 5px);width:10px;height:10px;background:var(--accent);border-radius:2px 2px 6px 6px;box-shadow:0 1px 3px rgba(0,0,0,.4);}
+#playhead-flag:hover::before{background:#fff;}
 .fc.outside-wa{opacity:.35;}
 .fc.sel{background:rgba(74,158,255,.28);box-shadow:inset 0 0 0 1px rgba(74,158,255,.5);}
 .fc.sel.cur{background:rgba(74,158,255,.38);}
