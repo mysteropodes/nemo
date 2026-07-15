@@ -1309,7 +1309,7 @@ function selectGhostAll(){
     });
   }
   _ghostProxyActive=count>0;
-  selectedPaths=layer.children.filter(function(c){return c instanceof Path&&!(c.data&&(c.data.isLinkedFillCompanion||c.data.isBrushTextureCopy));});
+  selectedPaths=layer.children.filter(function(c){return c instanceof Path&&isSelectablePathChild(c);});
   state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;});
   renderArcs();updateUI();
   showToast(count+' élément(s) sur '+frameCount+' image(s) clé — déplacez/transformez ensemble');
@@ -1820,7 +1820,7 @@ document.getElementById('frame-grid').addEventListener('mousedown',function(e){
     var fr0=ld0&&ld0.frames[fi];
     if(fr0&&fr0.isKeyframe&&fr0.strokes.length>0&&userLayers[li]){
       window.SM.setTool('select');
-      selectedPaths=userLayers[li].children.filter(function(c){return c instanceof Path&&!(c.data&&(c.data.isLinkedFillCompanion||c.data.isBrushTextureCopy));});
+      selectedPaths=userLayers[li].children.filter(function(c){return c instanceof Path&&isSelectablePathChild(c);});
       state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;});
       renderArcs();updateUI();
     }else if(selectedPaths.length){
@@ -3386,7 +3386,7 @@ function onKeyDown(event){
   if((event.metaKey||event.ctrlKey)&&(event.key==='a'||event.key==='A')&&(state.tool==='select'||state.tool==='subselect')&&userLayers[state.activeLayerIdx]){
     event.preventDefault();
     clearSel();
-    selectedPaths=userLayers[state.activeLayerIdx].children.filter(function(c){return(c instanceof Path||c instanceof Raster)&&!(c.data&&(c.data.isLinkedFillCompanion||c.data.isBrushTextureCopy));});
+    selectedPaths=userLayers[state.activeLayerIdx].children.filter(function(c){return(c instanceof Path||c instanceof Raster)&&isSelectablePathChild(c);});
     state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;});
     renderArcs();updateUI();
     if(window.SMEngineBridge)SMEngineBridge.renderNow();

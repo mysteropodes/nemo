@@ -3589,7 +3589,7 @@ function onMouseDown(event){
         _compClick.layerIdx=compHit.layerIdx;_compClick.time=now2;
         if(!event.modifiers.shift)clearSel();
         state.activeLayerIdx=compHit.layerIdx;activateUL(compHit.layerIdx);
-        selectedPaths=userLayers[compHit.layerIdx].children.filter(function(c){return (c instanceof Path||c instanceof Raster)&&!(c.data&&(c.data.isLinkedFillCompanion||c.data.isBrushTextureCopy));});
+        selectedPaths=userLayers[compHit.layerIdx].children.filter(function(c){return (c instanceof Path||c instanceof Raster)&&isSelectablePathChild(c);});
         state.selectedStrokeIndices=[];
         renderArcs();updateUI();
         if(isDbl)window.SM.enterSymbol(state.layers[compHit.layerIdx].symbolId);
@@ -3610,7 +3610,7 @@ function onMouseDown(event){
         var isDbl2=_compClick.layerIdx===state.activeLayerIdx&&(now3-_compClick.time<350);
         _compClick.layerIdx=state.activeLayerIdx;_compClick.time=now3;
         if(!event.modifiers.shift)clearSel();
-        selectedPaths=userLayers[state.activeLayerIdx].children.filter(function(c){return (c instanceof Path||c instanceof Raster)&&!(c.data&&(c.data.isLinkedFillCompanion||c.data.isBrushTextureCopy));});
+        selectedPaths=userLayers[state.activeLayerIdx].children.filter(function(c){return (c instanceof Path||c instanceof Raster)&&isSelectablePathChild(c);});
         state.selectedStrokeIndices=[];
         renderArcs();updateUI();
         if(isDbl2)window.SM.enterSymbol(activeLd2.symbolId);
@@ -4008,7 +4008,7 @@ function onMouseUp(event){
       var xLd2=state.layers[state.activeLayerIdx];
       if(xLd2&&xLd2.symbolId){
         loadFrame(state.currentFrame);
-        selectedPaths=userLayers[state.activeLayerIdx].children.filter(function(c){return (c instanceof Path||c instanceof Raster)&&!(c.data&&(c.data.isLinkedFillCompanion||c.data.isBrushTextureCopy));});
+        selectedPaths=userLayers[state.activeLayerIdx].children.filter(function(c){return (c instanceof Path||c instanceof Raster)&&isSelectablePathChild(c);});
         state.selectedStrokeIndices=[];
       }else{
         fillRegenerateLinked(userLayers[state.activeLayerIdx],null);saveActiveLayerFrame();
@@ -4034,7 +4034,7 @@ function onMouseUp(event){
       var mLd2=state.layers[state.activeLayerIdx];
       if(mLd2&&mLd2.symbolId){
         loadFrame(state.currentFrame);
-        selectedPaths=userLayers[state.activeLayerIdx].children.filter(function(c){return (c instanceof Path||c instanceof Raster)&&!(c.data&&(c.data.isLinkedFillCompanion||c.data.isBrushTextureCopy));});
+        selectedPaths=userLayers[state.activeLayerIdx].children.filter(function(c){return (c instanceof Path||c instanceof Raster)&&isSelectablePathChild(c);});
         state.selectedStrokeIndices=[];
       }else{
         fillRegenerateLinked(userLayers[state.activeLayerIdx],null);saveActiveLayerFrame();

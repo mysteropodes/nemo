@@ -310,6 +310,13 @@ function colorHex8(c){
   function h(n){return Math.max(0,Math.min(255,Math.round(n))).toString(16).padStart(2,'0');}
   return '#'+h(rgba[0])+h(rgba[1])+h(rgba[2])+h(parseFloat(rgba[3])*255);
 }
+// Copy-pasted across 13 call sites (select-bridge.js, tools.js, timeline.js)
+// before this — the exclusion rule for "is this child a real, independently
+// selectable stroke, or a rendering artifact of its anchor stroke" (linked-
+// fill companions, brush-texture dab copies). One helper so a future sibling
+// tag (CLAUDE.md's own example) can't be added to one call site and
+// forgotten in the other twelve.
+function isSelectablePathChild(c){return !(c.data&&(c.data.isLinkedFillCompanion||c.data.isBrushTextureCopy));}
 function serP(p){var isVB=!!(p.data&&p.data.isVectorBrush);var center=isVB&&p.data.centerSegments?p.data.centerSegments:undefined;
   var widthProfile=isVB&&p.data.widthProfile?p.data.widthProfile:undefined;
   var fillSeed=(p.data&&p.data.fillSeed)?p.data.fillSeed:undefined,fillGapPx=(p.data&&p.data.fillGapPx!==undefined)?p.data.fillGapPx:undefined;
@@ -1103,32 +1110,43 @@ function _writeBackGhostProxies(layerIdx){
     targetFrame.strokes=groups[gfKey].map(function(c){return serP(c);});
   });
 }
+// Shared by saveActiveLayerFrame/saveAllLayerFrames — CLAUDE.md's "family of
+// bug #1" names this exact split (an item/tag excluded in one save path but
+// not the other) as the single most dangerous class of bug in this codebase,
+// since an item dropped HERE disappears from persisted DATA, not just the
+// screen. One collector, called from both, so a future consumer-list change
+// (a new data.* tag to skip) can't be applied to one path and forgotten in
+// the other.
+function _collectLayerStrokes(li,ld){
+  var strokes=[];
+  userLayers[li].children.forEach(function(c){if(c.data&&c.data.ghostFrame!==undefined)return;if(c instanceof Path&&c.segments.length>0){enforceChannelStrip(ld,c);strokes.push(serP(c));}else if(c instanceof Raster)strokes.push(serR(c));});
+  return strokes;
+}
+// A hand-edited tween frame is promoted to a full keyframe outright rather
+// than staying flagged isInterpolated (feedback: "une keyframe modifié d'une
+// keyframe tween doit devenir une keyframe normal pleine") — but only on a
+// REAL content change, since these save functions also run on plain
+// navigation (goToFrame persists whatever's on screen before switching
+// away); promoting on every run would turn every tween frame into a real
+// keyframe the moment you scrub past it.
+function _maybePromoteInterpolated(f,strokes){
+  if(f.isInterpolated&&!strokesEqual(strokes,f.strokes)){f.isKeyframe=true;f.isInterpolated=false;}
+}
 function saveActiveLayerFrame(){
   window._sceneVersion++;
   var ld=state.layers[state.activeLayerIdx];if(ld.symbolId||ld.nativeVideo||ld.montageId)return;
   _writeBackGhostProxies(state.activeLayerIdx);
   var f=ld.frames[state.currentFrame];
   if(!f.isKeyframe&&!f.isInterpolated)return;
-  var strokes=[];userLayers[state.activeLayerIdx].children.forEach(function(c){if(c.data&&c.data.ghostFrame!==undefined)return;if(c instanceof Path&&c.segments.length>0){enforceChannelStrip(ld,c);strokes.push(serP(c));}else if(c instanceof Raster)strokes.push(serR(c));});
-  // saveActiveLayerFrame also runs on plain navigation (goToFrame calls it
-  // to persist whatever's on screen before switching away) — promoting a
-  // tween frame just because this ran would turn every tween frame into a
-  // real keyframe the moment you scrub past it. Only a REAL content change
-  // counts. Feedback ("une keyframe modifié d'une keyframe tween doit
-  // devenir une keyframe normal pleine"): a hand-edited tween frame is now
-  // promoted to a full keyframe outright, rather than staying flagged
-  // isInterpolated with just an isManualEdit marker — the old behavior
-  // left it eligible to be silently overwritten by the next tween
-  // regeneration unless tweenSkipManual happened to be on.
-  if(f.isInterpolated&&!strokesEqual(strokes,f.strokes)){f.isKeyframe=true;f.isInterpolated=false;}
+  var strokes=_collectLayerStrokes(state.activeLayerIdx,ld);
+  _maybePromoteInterpolated(f,strokes);
   f.strokes=strokes;
 }
 function saveAllLayerFrames(){
   _writeBackGhostProxies(state.activeLayerIdx);
   for(var i=0;i<state.layers.length;i++){if(state.layers[i].symbolId||state.layers[i].nativeVideo||state.layers[i].montageId)continue;var f=state.layers[i].frames[state.currentFrame];if(!f||(!f.isKeyframe&&!f.isInterpolated))continue;
-  var ldi=state.layers[i];
-  var strokes=[];userLayers[i].children.forEach(function(c){if(c.data&&c.data.ghostFrame!==undefined)return;if(c instanceof Path&&c.segments.length>0){enforceChannelStrip(ldi,c);strokes.push(serP(c));}else if(c instanceof Raster)strokes.push(serR(c));});
-  if(f.isInterpolated&&!strokesEqual(strokes,f.strokes)){f.isKeyframe=true;f.isInterpolated=false;}
+  var strokes=_collectLayerStrokes(i,state.layers[i]);
+  _maybePromoteInterpolated(f,strokes);
   f.strokes=strokes;}
 }
 function loadFrame(idx){

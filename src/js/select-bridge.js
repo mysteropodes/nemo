@@ -310,7 +310,7 @@
         if (!e.shiftKey) clearSel();
         state.activeLayerIdx = compHit.layerIdx;
         activateUL(compHit.layerIdx);
-        selectedPaths = userLayers[compHit.layerIdx].children.filter(function (c) { return (c instanceof Path || c instanceof Raster) && !(c.data && (c.data.isLinkedFillCompanion || c.data.isBrushTextureCopy)); });
+        selectedPaths = userLayers[compHit.layerIdx].children.filter(function (c) { return (c instanceof Path || c instanceof Raster) && isSelectablePathChild(c); });
         state.selectedStrokeIndices = [];
         renderArcs(); updateUI();
         window.SMEngineBridge.renderNow();
@@ -339,7 +339,7 @@
         var isDbl2 = _compClick.layerIdx === state.activeLayerIdx && (now3 - _compClick.time < 350);
         _compClick.layerIdx = state.activeLayerIdx; _compClick.time = now3;
         if (!e.shiftKey) clearSel();
-        selectedPaths = userLayers[state.activeLayerIdx].children.filter(function (c) { return (c instanceof Path || c instanceof Raster) && !(c.data && (c.data.isLinkedFillCompanion || c.data.isBrushTextureCopy)); });
+        selectedPaths = userLayers[state.activeLayerIdx].children.filter(function (c) { return (c instanceof Path || c instanceof Raster) && isSelectablePathChild(c); });
         state.selectedStrokeIndices = [];
         mode = selectedPaths.length ? 'move' : null;
         moveStarted = false;
@@ -598,7 +598,7 @@
         // loadFrame() creates brand-new Path objects, so selectedPaths'
         // references to the old (now-removed) ones must be re-pointed.
         loadFrame(state.currentFrame);
-        selectedPaths = userLayers[state.activeLayerIdx].children.filter(function (c) { return (c instanceof Path || c instanceof Raster) && !(c.data && (c.data.isLinkedFillCompanion || c.data.isBrushTextureCopy)); });
+        selectedPaths = userLayers[state.activeLayerIdx].children.filter(function (c) { return (c instanceof Path || c instanceof Raster) && isSelectablePathChild(c); });
       } else {
         // Team review: a handle drag always means a real transform happened
         // (unlike 'move', which can fire on a plain click) — fork every
@@ -629,7 +629,7 @@
           // exclusion fixes). Marquee bounds-intersection would otherwise
           // pick it up as a second, independent hit whenever the box
           // covered both.
-          if (((c instanceof Path && c.segments.length > 0 && (c.strokeColor || c.fillColor)) || c instanceof Raster) && mb.intersects(c.bounds) && !(c.data && (c.data.isLinkedFillCompanion || c.data.isBrushTextureCopy))) {
+          if (((c instanceof Path && c.segments.length > 0 && (c.strokeColor || c.fillColor)) || c instanceof Raster) && mb.intersects(c.bounds) && isSelectablePathChild(c)) {
             // Lasso : le test bounds ne suffit pas (le lasso peut serpenter) —
             // l'item doit avoir son centre DANS le trace, ou le croiser.
             if (lassoPath && !(lassoPath.contains(c.position) || (c instanceof Path && lassoPath.intersects(c)))) return;
@@ -647,7 +647,7 @@
       var mLd = state.layers[state.activeLayerIdx];
       if (mLd && mLd.symbolId) {
         loadFrame(state.currentFrame);
-        selectedPaths = userLayers[state.activeLayerIdx].children.filter(function (c) { return (c instanceof Path || c instanceof Raster) && !(c.data && (c.data.isLinkedFillCompanion || c.data.isBrushTextureCopy)); });
+        selectedPaths = userLayers[state.activeLayerIdx].children.filter(function (c) { return (c instanceof Path || c instanceof Raster) && isSelectablePathChild(c); });
         state.selectedStrokeIndices = [];
       } else {
         // Same fork-on-real-edit guard as xform above, gated on whether a

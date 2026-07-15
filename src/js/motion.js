@@ -1168,6 +1168,21 @@
     // renderLayerList/renderTimeline still run (their targets are hidden,
     // harmless) so switching BACK lands on an up-to-date grid.
     if (window.SMStoryboard) SMStoryboard.setVisible(mode === 'storyboard');
+    // Every right-panel section starts collapsed by design (ui.js) — fine
+    // for 2D's Fill/Stroke (secondary to the canvas), but Motion's own
+    // "Propriétés du calque" section IS the entire point of the mode, so
+    // requiring a manual click on every mode switch was pure friction.
+    // Force it open on every switch INTO Motion (not just the first) —
+    // deliberately doesn't remember a mid-session manual collapse, since
+    // the whole reason to be in Motion mode is to see this panel.
+    if (mode === 'motion') {
+      var mpHdr = document.querySelector('#motion-props-sec .phdr');
+      var mpBody = document.getElementById('motion-props-body');
+      if (mpHdr && mpBody && mpBody.classList.contains('hid')) {
+        mpBody.classList.remove('hid');
+        mpHdr.classList.remove('closed');
+      }
+    }
     renderLayerList(); renderTimeline();
     if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
   }
