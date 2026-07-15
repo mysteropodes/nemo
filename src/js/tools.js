@@ -832,7 +832,21 @@ if(window.__TAURI__&&window.__TAURI__.event&&window.__TAURI__.event.listen){
 // (their picture is a decoder-fed engine texture, not frame strokes), so a
 // stroke drawn here would VANISH on the next frame navigation. A visible
 // refusal beats silent data loss; draw on a normal layer above the video.
-function ensureKeyframe(){var ldk=state.layers[state.activeLayerIdx];if(ldk.nativeVideo){showToast('Calque vidéo — dessine sur un calque normal au-dessus');return;}if(ldk.montageId){showToast('Calque montage — son contenu s\u2019édite dans le StoryBoard');return;}var curF=ldk.frames[state.currentFrame];if(!curF.isKeyframe&&!curF.isInterpolated){curF.isKeyframe=true;curF.strokes=JSON.parse(JSON.stringify(getEffectiveStrokes(state.activeLayerIdx,state.currentFrame)));loadFrame(state.currentFrame);syncLinkedKeyframeFolder(state.activeLayerIdx,state.currentFrame);}}
+// Order bug (found 2026-07 auditing select-bridge.js's transform-box drag,
+// live-reported: "si on est sur une frame d'une keyframe prolongée et que
+// l'on déplace un objet celui-ci revient en place"): getEffectiveStrokes
+// (app.js) short-circuits to `f.strokes` the instant f.isKeyframe is true —
+// it only walks BACK to find the inherited keyframe while isKeyframe is
+// still false. This function used to set curF.isKeyframe=true BEFORE
+// calling getEffectiveStrokes, so the call read curF.strokes back off
+// itself — still the held frame's original EMPTY array, not yet
+// reassigned — instead of the real inherited content, silently freezing an
+// EMPTY keyframe. Confirmed live: a held frame inheriting 1 stroke read
+// getEffectiveStrokes()===1 right up until this function ran, which then
+// promoted it to isKeyframe:true, strokes:[] — the stroke wasn't moved,
+// it was deleted. Must compute the effective content FIRST, while the
+// frame still reads as "not yet a keyframe".
+function ensureKeyframe(){var ldk=state.layers[state.activeLayerIdx];if(ldk.nativeVideo){showToast('Calque vidéo — dessine sur un calque normal au-dessus');return;}if(ldk.montageId){showToast('Calque montage — son contenu s\u2019édite dans le StoryBoard');return;}var curF=ldk.frames[state.currentFrame];if(!curF.isKeyframe&&!curF.isInterpolated){var effStrokes=JSON.parse(JSON.stringify(getEffectiveStrokes(state.activeLayerIdx,state.currentFrame)));curF.isKeyframe=true;curF.strokes=effStrokes;loadFrame(state.currentFrame);syncLinkedKeyframeFolder(state.activeLayerIdx,state.currentFrame);}}
 
 // ---- VECTOR FILL ENGINE ----
 // The fill of an area IS just the closed loop formed by the strokes around
