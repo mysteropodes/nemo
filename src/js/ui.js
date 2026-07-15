@@ -599,8 +599,24 @@
   };
   initOmDrag();
 
-  // Timeline scrubbing
-  var scrubbing=false;
+  // Timeline scrubbing.
+  // Coalesced on rAF: goToFrame is heavy synchronous work (layer save,
+  // audio scrub, frame load kickoff, onion skins, full updateUI) and
+  // mousemove fires several times per display refresh — calling it per
+  // event saturates the main thread and the playhead visibly trails the
+  // mouse (live-caught 2026-07, "le curseur de temps suit au ralenti la
+  // souris"). One rAF applies only the LATEST mouse position, capping the
+  // work at once per refresh while the cursor stays glued to the pointer.
+  var scrubbing=false,_scrubPending=-1,_scrubRaf=0;
+  function _scrubTo(frame){
+    _scrubPending=frame;
+    if(_scrubRaf)return;
+    _scrubRaf=requestAnimationFrame(function(){
+      _scrubRaf=0;
+      var f=_scrubPending;_scrubPending=-1;
+      if(f>=0&&window.SM)window.SM.goToFrame(f);
+    });
+  }
   document.getElementById('frame-hdr').addEventListener('mousedown',function(e){
     var wrap=document.getElementById('fg-wrap');var rect=wrap.getBoundingClientRect();
     var x=e.clientX-rect.left+wrap.scrollLeft;var frame=Math.floor(x/FC);
@@ -610,7 +626,7 @@
   window.addEventListener('mousemove',function(e){
     if(!scrubbing)return;var wrap=document.getElementById('fg-wrap');var rect=wrap.getBoundingClientRect();
     var x=e.clientX-rect.left+wrap.scrollLeft;var frame=Math.max(0,Math.min((window._totalF||24)-1,Math.floor(x/FC)));
-    if(window.SM)window.SM.goToFrame(frame);
+    _scrubTo(frame);
   });
   window.addEventListener('mouseup',function(){scrubbing=false;});
 

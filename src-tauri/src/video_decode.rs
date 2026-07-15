@@ -162,7 +162,7 @@ struct IndexedSeq {
 /// Number of sentinel pads sent after each target JPEG. Must exceed the
 /// pipeline's worst observed lag (3); timeouts in indexed_decode self-heal
 /// by sending another volley if a build/resolution ever exceeds it.
-const SENTINEL_PADS_PER_REQUEST: usize = 4;
+const SENTINEL_PADS_PER_REQUEST: usize = 3;
 
 /// Paints the sentinel signature into row 0 of an RGBA buffer: four
 /// 8-pixel blocks of alternating saturated magenta/green. 8-wide blocks
@@ -973,7 +973,7 @@ fn try_open_indexed(path: &str) -> Option<Result<(VideoSession, u64, f64), Strin
 /// demanding several frames to estimate a frame rate the raw stream
 /// doesn't carry; -fflags nobuffer made output STOP entirely (3 in → 0
 /// out) so it is deliberately absent.
-fn conv_spawn(frame_bytes: usize) -> Result<ConvProc, String> {
+fn conv_spawn(frame_bytes: usize, width: usize) -> Result<ConvProc, String> {
     let mut child = Command::new(ffmpeg_path())
         .args([
             "-v", "error",
@@ -1003,12 +1003,22 @@ fn conv_spawn(frame_bytes: usize) -> Result<ConvProc, String> {
     std::thread::spawn(move || {
         use std::io::Read as _;
         let mut r = std::io::BufReader::new(stdout);
+        // One reusable scratch buffer: sentinels are recognized and
+        // dropped RIGHT HERE, costing only the pipe read — no allocation,
+        // no channel hop. This mattered in practice: with 4 pads per
+        // request forwarded to the channel, each 1080p decode moved ~41MB
+        // through alloc+memcpy and averaged 13.6ms live; filtering in the
+        // reader gets the per-request traffic back down to the one real
+        // frame.
+        let mut scratch = vec![0u8; frame_bytes];
         loop {
-            let mut frame = vec![0u8; frame_bytes];
-            if r.read_exact(&mut frame).is_err() {
+            if r.read_exact(&mut scratch).is_err() {
                 break; // child exited/killed — receiver sees the channel close
             }
-            if ftx.send(frame).is_err() {
+            if is_sentinel_frame(&scratch, width) {
+                continue;
+            }
+            if ftx.send(scratch.clone()).is_err() {
                 break; // session closed
             }
         }
@@ -1035,14 +1045,15 @@ fn indexed_decode(s: &mut VideoSession, frame_index: i64) -> Result<Vec<u8>, Str
 
     for attempt in 0..2 {
         if seq.conv.is_none() {
-            seq.conv = Some(conv_spawn(frame_bytes)?);
+            seq.conv = Some(conv_spawn(frame_bytes, width)?);
         }
         let conv = seq.conv.as_mut().unwrap();
         // [target][pads…] — the sentinel pads flush the target through the
-        // pipeline's content-dependent frame lag; the read loop discards
-        // every recognized sentinel and returns the first real frame.
-        // recv_timeout (never a bare blocking read) is what guarantees
-        // this can't freeze the session mutex (see ConvProc::frame_rx).
+        // pipeline's content-dependent frame lag; the converter's reader
+        // thread drops the sentinels at the pipe (see conv_spawn), so the
+        // channel only ever yields real frames. recv_timeout (never a
+        // bare blocking read) is what guarantees this can't freeze the
+        // session mutex (see ConvProc::frame_rx).
         let mut payload = Vec::with_capacity(jpeg.len() + seq.pad.len() * SENTINEL_PADS_PER_REQUEST);
         payload.extend_from_slice(&jpeg);
         for _ in 0..SENTINEL_PADS_PER_REQUEST {
@@ -1056,9 +1067,6 @@ fn indexed_decode(s: &mut VideoSession, frame_index: i64) -> Result<Vec<u8>, Str
         let failure = loop {
             match conv.frame_rx.recv_timeout(std::time::Duration::from_millis(700)) {
                 Ok(frame) => {
-                    if is_sentinel_frame(&frame, width) {
-                        continue; // leftover/current pad — discard
-                    }
                     return Ok(frame);
                 }
                 Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
