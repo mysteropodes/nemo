@@ -197,10 +197,20 @@
     raster.data.bitmapScatter = scatterPct;
     raster.data.bitmapSeed = seed;
     var cx = minX + w / 2, cy = minY + h / 2;
-    raster.onLoad = function () {
-      raster.position = new Point(cx, cy);
-      raster.size = new Size(w, h);
-    };
+    // Race found live (2026-07, "après le relâchement... pas bonne taille,
+    // disparition des couleurs, impossible de select"): a data: URI often
+    // decodes fast enough that Paper's Raster is ALREADY loaded by the
+    // time this next line runs, so an onLoad handler attached here never
+    // fires — raster.size/.position then silently keep whatever default
+    // Paper assigned (natural pixel size at the origin), not the intended
+    // world-space bounds, which cascades into wrong on-canvas size/
+    // position and broken hit-testing (marquee/click select at the
+    // EXPECTED location misses the raster sitting somewhere else). Fixed
+    // by checking `.loaded` synchronously first — covers both the
+    // already-loaded (data URI, the common case here) and genuinely-async
+    // (rare for a same-process canvas.toDataURL()) cases.
+    var place = function () { raster.position = new Point(cx, cy); raster.size = new Size(w, h); };
+    if (raster.loaded) place(); else raster.onLoad = place;
     return raster;
   }
 

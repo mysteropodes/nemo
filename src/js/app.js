@@ -514,7 +514,16 @@ function relinkBrushCompanions(layer){
 // forgotten at the read site" bug class CLAUDE.md's family-of-bug-#1
 // documents for exactly this file.
 function serR(r){var d={isRaster:true,src:r.data&&r.data.src?r.data.src:r.source,x:r.position.x,y:r.position.y,width:r.bounds.width,height:r.bounds.height,opacity:r.opacity!==undefined?r.opacity:1};if(r.data&&r.data.isBitmapBrush){d.isBitmapBrush=true;d.bitmapTip=r.data.bitmapTip;d.bitmapSize=r.data.bitmapSize;d.bitmapSpacing=r.data.bitmapSpacing;d.bitmapScatter=r.data.bitmapScatter;d.bitmapSeed=r.data.bitmapSeed;}return d;}
-function desR(d,layer,op){var prev=project.activeLayer;layer.activate();var r=new Raster(d.src);r.data.src=d.src;if(d.isBitmapBrush){r.data.isBitmapBrush=true;r.data.bitmapTip=d.bitmapTip;r.data.bitmapSize=d.bitmapSize;r.data.bitmapSpacing=d.bitmapSpacing;r.data.bitmapScatter=d.bitmapScatter;r.data.bitmapSeed=d.bitmapSeed;}r.position=new Point(d.x,d.y);r.opacity=op!==undefined?op:(d.opacity!==undefined?d.opacity:1);var w=d.width,h=d.height;r.onLoad=function(){r.size=new Size(w,h);r.position=new Point(d.x,d.y);};prev.activate();return r;}
+// r.onLoad attached AFTER `new Raster(d.src)` can miss an ALREADY-loaded
+// image (a data: URI, like bitmap-brush.js's baked textures, often decodes
+// fast enough that this races) — same bug bitmap-brush.js's own stamp
+// function had, found live ("pas bonne taille" after releasing a Bitmap
+// Brush stroke): position happened to still look right here (also set
+// synchronously below, before this comment was added), but .size silently
+// kept Paper's default natural-pixel dimensions instead of the intended
+// world-space w/h whenever onLoad never fired. Checking `.loaded` first
+// covers both cases.
+function desR(d,layer,op){var prev=project.activeLayer;layer.activate();var r=new Raster(d.src);r.data.src=d.src;if(d.isBitmapBrush){r.data.isBitmapBrush=true;r.data.bitmapTip=d.bitmapTip;r.data.bitmapSize=d.bitmapSize;r.data.bitmapSpacing=d.bitmapSpacing;r.data.bitmapScatter=d.bitmapScatter;r.data.bitmapSeed=d.bitmapSeed;}r.position=new Point(d.x,d.y);r.opacity=op!==undefined?op:(d.opacity!==undefined?d.opacity:1);var w=d.width,h=d.height;var place=function(){r.size=new Size(w,h);r.position=new Point(d.x,d.y);};if(r.loaded)place();else r.onLoad=place;prev.activate();return r;}
 
 // ---- COMPONENTS / SYMBOLS ----
 // A "component" is a layer whose content lives in its own mini-timeline
