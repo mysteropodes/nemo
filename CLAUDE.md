@@ -193,15 +193,21 @@ flash à l'ouverture (et tout le preview navigateur) montre encore l'ancien num�
 Checklist avant `npm run build` :
 1. Bump `version` dans `package.json` ET `src-tauri/tauri.conf.json` (même valeur).
 2. Bump le fallback statique dans `src/index.html` (`<title>` + `#status-text`).
-3. **OBLIGATOIRE depuis 0.6.0 (moteur vidéo natif)** : après la build, exécuter
-   `python3 scripts/bundle-ffmpeg-dylibs.py "src-tauri/target/release/bundle/macos/Nemo.app"`
-   AVANT de packager/publier. Le binaire est lié aux dylibs ffmpeg de Homebrew (chemins
-   absolus `/opt/homebrew/...`) — sans cette étape, l'app **crash au lancement** chez tout
-   utilisateur sans Homebrew ffmpeg ("dyld: Library not loaded"). Le script copie ~91 dylibs
-   (~75 Mo) dans `Contents/Frameworks/`, réécrit tous les liens en `@rpath` et re-signe.
-   ⚠️ Licence : les dylibs Homebrew incluent x264/x265 (GPL) — acceptable pour la BETA,
-   mais AVANT toute vente il faut une build ffmpeg custom LGPL-only décode-seul
-   (voir l'en-tête du script).
+3. **Étape dylibs devenue INUTILE depuis le décodeur v2 (pipe ffmpeg, 2026-07)** :
+   `scripts/bundle-ffmpeg-dylibs.py` existe toujours mais n'a plus rien à faire — le moteur
+   vidéo natif (`src-tauri/src/video_decode.rs`) ne lie plus aucune lib ffmpeg directement
+   dans le binaire Rust (plus de crate `video-rs`/`ffmpeg-sys-next`). Il pilote désormais le
+   binaire CLI ffmpeg **déjà embarqué** en sous-processus (pipe stdout, résolu au runtime via
+   `current_exe().parent().join("ffmpeg")`) — ce binaire est **statiquement lié** (confirmé via
+   `otool -L` : uniquement des frameworks système, zéro dépendance Homebrew), donc aucun dylib
+   à embarquer, aucun crash au lancement. Vérifié : `otool -L target/release/nemo | grep
+   homebrew` → 0 résultat.
+   ⚠️ **Licence, nuance importante** : le binaire ffmpeg embarqué reste GPL (`ffmpeg -version`
+   confirme `--enable-gpl --enable-libx264 --enable-libx265`). Le piper en sous-processus est
+   de la "simple agrégation" (le pattern standard de tout logiciel de montage commercial qui
+   embarque ffmpeg), nettement plus sain juridiquement que le linkage direct qu'on avait avant
+   — mais ça ne fait pas disparaître la dépendance GPL en soi. Avant toute vente, il faudra
+   toujours une build ffmpeg custom LGPL-only décode-seul si on veut être totalement propre.
 4. Si c'est un vrai changement fonctionnel (pas juste un patch de bug) : lancer
    `./scripts/publish-update.sh "notes"` après la build pour que les installs existantes le
    voient — voir §6 pour le détail des tokens nécessaires.
