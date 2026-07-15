@@ -116,6 +116,18 @@
       }
       segs.push({ strokeId: strokeId, fA: fA, fB: fB, a: a, b: b, isRun: isRun, frames: frames });
     }
+    // Only the segment(s) around the CURRENT playhead frame — live feedback
+    // ("j'ai 2 trajectoires de tween l'ancienne et la nouvelle"): a stroke
+    // that's been re-keyed several times across the layer (kept the same
+    // strokeId across many edits) used to draw EVERY consecutive-keyframe
+    // pair at once, all overlapping on screen regardless of which one the
+    // playhead was anywhere near — confusing as soon as a shape has more
+    // than one tween run in its history. Inclusive on both ends so sitting
+    // exactly ON a shared keyframe (the boundary between two runs) still
+    // shows both the incoming and outgoing segment, matching what you'd
+    // actually want to see/edit right at that transition.
+    var cur = segs.filter(function (s) { return state.currentFrame >= s.fA && state.currentFrame <= s.fB; });
+    if (cur.length) segs = cur;
     return segs.length ? segs : null;
   }
 
