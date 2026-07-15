@@ -211,6 +211,30 @@
         <div class="zoom-pill"><input type="number" id="zoom-scrub" class="scrub" value="100" min="5" max="800" data-step="5">%</div>
       </div>
     </div>
+    <!-- Labs floating panel (2026-07, "panel horizontal flottant ... qu'on
+         pourrait drop partout ... les outils en fonction de l'outil sur
+         lequel on clic") — contextual quick-access to the Labs prototypes
+         relevant to the active tool. Deliberately a SIBLING of #canvas-area,
+         not a child: every drawing-tool bridge (select-bridge.js,
+         draw-bridge.js, shape-bridge.js, pen-bridge.js, eraser-bridge.js...)
+         attaches a capture-phase pointerdown listener directly on
+         #canvas-area/#drawing-canvas and unconditionally intercepts it
+         (stopImmediatePropagation, no target check) whenever its tool is
+         active — found live: a synthetic pointerdown dispatched on
+         #canvas-area itself, with the Select tool active and no drag in
+         progress, never reached a plain listener added straight on that
+         element. As a DESCENDANT of #canvas-area this panel could never
+         receive a real click while any tool was active (capture phase
+         always visits the ancestor first, no way to out-race it from a
+         child); as a sibling, positioned fixed and kept aligned to
+         #canvas-area's own rect by labs-float-panel.js, its pointer events
+         never enter #canvas-area's subtree at all. Starts hidden — shown
+         once labs-float-panel.js confirms there's a relevant, registered
+         Labs prototype for the active tool. -->
+    <div id="labs-float-panel" style="display:none">
+      <div id="labs-float-handle" title="Glisser pour déplacer">⠿</div>
+      <div id="labs-float-icons"></div>
+    </div>
   </div>
 
   <div id="props-panel-resize" title="Glisser pour redimensionner"></div>
@@ -1024,6 +1048,7 @@
 <script src="js/labs/french-curve.js"></script>
 <script src="js/labs/timeline-zoom.js"></script>
 <script src="js/labs/labs-panel.js"></script>
+<script src="js/labs/labs-float-panel.js"></script>
 <script src="js/lottie-preview.js"></script>
 <script src="js/timeline.js"></script>
 <script src="js/i18n.js"></script>

@@ -381,6 +381,7 @@
       var cb = mkCheckbox(on, function (checked) {
         window.SMLabs[checked ? 'enable' : 'disable'](spec.name);
         renderLabsPanel(); // rebuild so inline params show/hide with the toggle
+        if (window.renderLabsFloatPanel) window.renderLabsFloatPanel(); // same toggle, other entry point
       });
       head.appendChild(cb);
       head.appendChild(mkLabel(spec.label, describeOf(spec.name) || spec.hintExtra));

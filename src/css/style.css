@@ -216,6 +216,23 @@ body.mac-overlay-titlebar #app{padding-top:28px;}
 .zoom-pill .zoom-caret{opacity:.4;font-size:9px;}
 #zoom-scrub{width:28px;background:transparent;border:none;color:rgba(236,234,231,.5);font:inherit;padding:0;text-align:right;cursor:ew-resize;-moz-appearance:textfield;}
 #zoom-scrub::-webkit-inner-spin-button{-webkit-appearance:none;}
+/* Labs floating panel (2026-07) — draggable-anywhere horizontal strip of
+   icon toggles, contextual to the active tool (labs-float-panel.js).
+   z-index above the canvas but below any modal (settings-modal etc sit at
+   a higher stack, unaffected). touch-action:none on the handle so drag
+   isn't fought by the browser's own touch-scroll gesture recognition. */
+/* position:fixed, not absolute — this panel is a SIBLING of #canvas-area
+   (see its HTML comment for why), so it has no positioning ancestor of its
+   own; labs-float-panel.js computes left/top in viewport coordinates from
+   #canvas-area's live bounding rect and keeps it clamped there. */
+#labs-float-panel{position:fixed;z-index:6;display:flex;align-items:center;gap:2px;padding:4px;background:var(--panel2);border-radius:9px;box-shadow:0 4px 14px rgba(0,0,0,.35);}
+#labs-float-handle{width:16px;height:26px;display:flex;align-items:center;justify-content:center;color:rgba(236,234,231,.35);cursor:grab;font-size:13px;touch-action:none;user-select:none;}
+#labs-float-handle:active{cursor:grabbing;}
+#labs-float-icons{display:flex;align-items:center;gap:2px;}
+.labs-float-btn{width:26px;height:26px;border:none;border-radius:6px;background:transparent;color:rgba(236,234,231,.7);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .12s,color .12s;}
+.labs-float-btn:hover{background:rgba(255,255,255,.07);color:var(--text);}
+.labs-float-btn.active{background:var(--accent-dim);color:var(--accent-hover);}
+.labs-float-divider{width:1px;height:18px;background:var(--border2);margin:0 3px;flex:none;}
 #zoom-scrub:focus{color:var(--text);outline:none;}
 #zoom-scrub.scrubbing{color:var(--accent-hover);}
 
