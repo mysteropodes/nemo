@@ -79,6 +79,13 @@
     for (var i = 0; i < symbolId.length; i++) h = (h * 31 + symbolId.charCodeAt(i)) >>> 0;
     return PALETTE[h % PALETTE.length];
   }
+  // Chained-instance thumb width scales with duration ("les poignées ne
+  // changent pas... la taille du rectangle" — correct: the card was fixed
+  // at 72px regardless of what trim/stretch did to the underlying data,
+  // so retiming was invisible on the module itself, only readable in the
+  // small text label). Free (unchained) instances keep the CSS default.
+  var THUMB_PXF = 2.4, THUMB_MIN_W = 56;
+  function thumbWidth(duration) { return Math.max(THUMB_MIN_W, Math.round(duration * THUMB_PXF)); }
 
   // ---- DOM ----
   var space = null, world = null;
@@ -350,15 +357,17 @@
     side.appendChild(edit);
     el.appendChild(side);
     var host = chainOf(m);
+    if (host) { ensureRetime(m); card.style.width = thumbWidth(m.duration) + 'px'; }
     var nm = document.createElement('div');
     nm.className = 'sb-name';
     var dName = sym ? sym.name : '(composant supprimé)';
     if (host) {
-      ensureRetime(m);
       var srcLen = m.trimOut - m.trimIn + 1;
-      dName += ' — ' + m.duration + 'f' + (m.duration !== srcLen ? ' ×' + (srcLen / m.duration).toFixed(2) : '');
+      dName += ' — ' + m.duration + 'f';
+      if (m.duration !== srcLen) dName += ' (×' + (srcLen / m.duration).toFixed(2) + ')';
     }
     nm.textContent = dName;
+    nm.title = dName; // full text on hover — the label itself still truncates at max-width
     el.appendChild(nm);
     // Retiming handles only exist while chained ("On y snap, retime les
     // component"): edges = trim (source range + duration together, speed
@@ -389,6 +398,7 @@
               m.duration = Math.max(1, o.duration + (to - o.trimOut));
             }
             nm.textContent = (sym ? sym.name : '?') + ' — ' + m.duration + 'f';
+            card.style.width = thumbWidth(m.duration) + 'px';
             // LIVE feedback ("les poignées devraient pouvoir bouger"):
             // durations feed the ruler's piecewise time map — refresh the
             // cached geometry and the ruler (total + playhead position)
