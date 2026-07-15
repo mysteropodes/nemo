@@ -944,6 +944,18 @@ function generateTweens(){
         };
       }
       return{a:ra,b:alignResampledPair(ra,rb),mi:spec.mi,tex:tex,
+        // Stable identity for every frame this pair generates — the raw A
+        // stroke's own strokeId when it has one, else a synthetic id
+        // that's still constant across the whole gap. Without this,
+        // interpolated strokes were completely anonymous (interpStroke
+        // builds fresh objects, resample drops non-geometry fields), and
+        // any cross-frame consumer that needs to FOLLOW a stroke through
+        // the tween (the Rive export's shape lanes, notably) had nothing
+        // to match on but array position — which the per-frame __zKey
+        // re-sort below deliberately shuffles. Live-caught 2026-07:
+        // multi-stroke tweens exported to Rive with inbetweens morphing
+        // between UNRELATED strokes and mistimed run boundaries.
+        id:(spec.aData&&spec.aData.strokeId)||(spec.bData&&spec.bData.strokeId)||('tw_'+fA+'_'+spec.mi),
         aRank:spec.aIdx/Math.max(1,sA.length-1),bRank:spec.bIdx/Math.max(1,sB.length-1)};
     });
     var gap=fB-fA;
@@ -957,6 +969,7 @@ function generateTweens(){
       var tw=[];
       pairs.forEach(function(pr){
         var sdOut=interpStroke(pr.a,pr.b,t,easFn,fA,fB,pr.mi);
+        sdOut.strokeId=pr.id; // stable per-pair identity (see pairs construction)
         sdOut.__zKey=lerp(pr.aRank,pr.bRank,et2);
         if(pr.tex){
           // carry the anchor's texture identity so a later manual edit of

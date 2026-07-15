@@ -551,10 +551,36 @@
       // to keep, so anchors are exempted from it (their real paint
       // opacity is overridden separately below, from the preset, not
       // read from this deliberately-zeroed field).
-      for(var f0=r.start;f0<=r.end;f0++)framesStrokes0[f0]=getEffectiveStrokes(li0,f0).filter(function(sd){return !sd.isBrushTextureCopy&&(sd.opacity!==0||sd.brushTexturePreset);});
-      var maxSlots0=0;
-      for(f0=r.start;f0<=r.end;f0++)maxSlots0=Math.max(maxSlots0,framesStrokes0[f0].length);
-      slotsInfo.push({li:li0,ld:ld0,framesStrokes:framesStrokes0,maxSlots:maxSlots0});
+      // Slot = LANE keyed on stroke identity, not raw array position.
+      // Nemo's tween generator re-sorts each interpolated frame's strokes
+      // by an eased z-rank (__zKey, tweens.js) and drops faded strokes
+      // below 2% opacity — so with several strokes tweening at once, the
+      // ORDER AND LENGTH of the per-frame stroke array changes from one
+      // inbetween to the next. Position-based matching therefore paired
+      // UNRELATED strokes across frames (live-caught 2026-07: "les
+      // inbetween sont mal timés ainsi que certains traits" — morphs
+      // blended between different strokes, run boundaries landed
+      // mid-tween). Each stroke's strokeId (now stamped on interpolated
+      // strokes too, see tweens.js) pins it to one stable lane for its
+      // whole lifetime; strokes without any id (older pre-stamp
+      // interpolated data) fall back to order-of-appearance among the
+      // anonymous only — exactly the old behavior, no worse.
+      var laneOf0={},laneCount0=0;
+      for(var f0=r.start;f0<=r.end;f0++){
+        var arr0=getEffectiveStrokes(li0,f0).filter(function(sd){return !sd.isBrushTextureCopy&&(sd.opacity!==0||sd.brushTexturePreset);});
+        var row0=[],anon0=0;
+        for(var s0=0;s0<arr0.length;s0++){
+          var sd0=arr0[s0];
+          var key0=sd0.strokeId?('id:'+sd0.strokeId):('anon:'+(anon0++));
+          // Same id twice on one frame (duplicated stroke) — bump to a
+          // suffixed lane rather than silently overwriting the first.
+          while(laneOf0[key0]!==undefined&&row0[laneOf0[key0]]!==undefined)key0+='+';
+          if(laneOf0[key0]===undefined)laneOf0[key0]=laneCount0++;
+          row0[laneOf0[key0]]=sd0;
+        }
+        framesStrokes0[f0]=row0;
+      }
+      slotsInfo.push({li:li0,ld:ld0,framesStrokes:framesStrokes0,maxSlots:laneCount0});
     }
 
     // ---- Pass 1: one named, empty container Shape per (layer,slot) —
@@ -642,10 +668,6 @@
           // the whole animation rather than "hold from here". Bookending
           // both ends whenever the run doesn't already touch them
           // sidesteps the single-keyframe case entirely.
-          var opacityKeys=[];
-          if(run.start>r.start)opacityKeys.push({frame:0,value:0});
-          opacityKeys.push({frame:run.start-r.start,value:1});
-          if(run.end<r.end)opacityKeys.push({frame:run.end-r.start+1,value:0});
           var hasRealStroke=resolveHasRealStroke(framesStrokes,slot,run.start,r.start,r.end);
 
           // Automatic brush-texture wobble — no user step, no per-preset
@@ -666,6 +688,40 @@
             var wp=riveBrushWobbleParams(brushPreset,firstSd.strokeWidth);
             wobble={amp:wp.amp,freqPer100:wp.freqPer100,seed:seed};
           }
+
+          // Opacity keys. Baseline: hold-keyed on/off bookends around the
+          // run. When the stroke's own opacity VARIES within the run (a
+          // tween fading a stroke in/out — Nemo interpolates sd.opacity
+          // per frame), that fade previously never exported at all: paint
+          // alpha was baked once from the run's FIRST frame, so a fading
+          // stroke rendered fully visible until its run ended and then
+          // popped. Varying runs now write one linear opacity key per
+          // frame (and keep paint alpha at 1 so the two don't multiply).
+          // Brush-textured strokes keep the old constant behavior — their
+          // anchor's opacity field is Nemo-internal (see the filter
+          // comment above) and their fades live in the dabs.
+          var opacityKeys=[];
+          if(run.start>r.start)opacityKeys.push({frame:0,value:0,interp:'hold'});
+          var opVaries=false;
+          if(!brushPreset){
+            var opFirst=firstSd.opacity!==undefined?firstSd.opacity:1;
+            for(var fo=run.start+1;fo<=run.end;fo++){
+              var sdo=framesStrokes[fo][slot];
+              var o2=sdo&&sdo.opacity!==undefined?sdo.opacity:1;
+              if(Math.abs(o2-opFirst)>0.01){opVaries=true;break;}
+            }
+          }
+          if(opVaries){
+            for(var fo2=run.start;fo2<=run.end;fo2++){
+              var sdo2=framesStrokes[fo2][slot];
+              opacityKeys.push({frame:fo2-r.start,value:(sdo2&&sdo2.opacity!==undefined?sdo2.opacity:1),interp:'linear'});
+            }
+          }else{
+            opacityKeys.push({frame:run.start-r.start,value:1,interp:'hold'});
+          }
+          if(run.end<r.end)opacityKeys.push({frame:run.end-r.start+1,value:0,interp:'hold'});
+          // Full paint alpha when the shape's own opacity carries the fade.
+          if(opVaries)opacityOverride=1;
 
           if(!useMorph){
             var shapeVal0=lottieShapeValue(firstSd,null);
@@ -822,7 +878,7 @@
       var shape=shapeByName[p.name];
       if(!shape)return; // shape creation silently skipped this one — nothing to key
       p.opacityKeys.forEach(function(k){
-        keyframes.push({objectId:shape.id,propertyKey:18,frame:k.frame,value:k.value,interpolationType:'hold'});
+        keyframes.push({objectId:shape.id,propertyKey:18,frame:k.frame,value:k.value,interpolationType:k.interp||'hold'});
       });
       if(p.morph){
         var vids=vertexIdsForShape(p.name);
