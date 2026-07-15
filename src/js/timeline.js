@@ -3434,6 +3434,20 @@ function onKeyDown(event){
   else if(k==='.'||k===';'){if(state.playing)stopPlay();goToFrame(state.currentFrame+1);}
   else if(k==='x'||k==='X')window.SM.swapStrokeFill();
   else if(k==='t'||k==='T')window.SM.generateTweens();
+  // [ ] brush/eraser size — Photoshop/Procreate/Clip Studio convention,
+  // absent here entirely before this (grepped: no bracket-key handler
+  // anywhere). 1px per press, 5px with Shift; eraser gets its own
+  // state.eraserSize (setEraserSize already clamps at a 2px floor) rather
+  // than state.brushSize so this doesn't cross-affect the two. When the
+  // Select/Subselect tool has a live selection, setBrushSize already
+  // restyles it in place (see its own comment, timeline.js) — bracket
+  // keys inherit that for free.
+  else if(k==='['||k===']'){
+    var sizeStep=(event.shiftKey?5:1)*(k===']'?1:-1);
+    if(state.tool==='eraser')window.SM.setEraserSize(state.eraserSize+sizeStep);
+    else window.SM.setBrushSize(Math.max(1,Math.min(80,state.brushSize+sizeStep)));
+    updateUI();
+  }
   else if(k===' '){event.preventDefault();if(!state.spaceDown){state.spaceDown=true;canvasEl.style.cursor='grab';}}
   else if(k==='Alt'){state.altDown=true;}
   else if(k==='Enter'){event.preventDefault();if(state.tool==='pen'&&_pen.path)finalizePen();else togglePlay();}
