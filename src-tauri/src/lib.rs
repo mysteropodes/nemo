@@ -210,7 +210,8 @@ pub fn run() {
             video_decode::close_video_session,
             video_decode::autobench_config,
             video_decode::autobench_report,
-            video_decode::optimized_media_target
+            video_decode::optimized_media_target,
+            video_decode::create_optimized_media
         ])
         // "Vérifier les mises à jour…" in the app (StrokeMotion) menu — same
         // check the Réglages button and the silent startup check already

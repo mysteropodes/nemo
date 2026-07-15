@@ -108,6 +108,47 @@ struct FfmpegProc {
     next_frame: i64,
 }
 
+/// Persistent JPEG→RGBA converter for INDEXED sessions (see IndexedSeq).
+/// One long-lived ffmpeg child per session: JPEG bytes go in via stdin
+/// (through a dedicated writer thread — writes must never block the
+/// session mutex holder, since a full pipe buffer would deadlock against
+/// our own stdout read), raw RGBA frames come out via stdout. Decoding
+/// any frame in any order costs one pipe round-trip (~2-6ms measured),
+/// with ZERO process respawns — the property that makes random scrubbing
+/// on optimized media flat-cost.
+struct ConvProc {
+    child: Child,
+    /// Sending a JPEG here wakes the writer thread; dropping the sender
+    /// (session close) makes that thread exit and close the child's stdin.
+    jpeg_tx: std::sync::mpsc::Sender<Vec<u8>>,
+    stdout: std::io::BufReader<ChildStdout>,
+}
+
+/// Random-access frame index over a raw MJPEG stream file — the format
+/// this module's create_optimized_media produces (concatenated baseline
+/// JPEGs + a sidecar `.idx` JSON with per-frame byte offsets). Built
+/// because live profiling showed the ONLY remaining scrub cost on
+/// all-intra optimized media was the ~20ms process-spawn tax paid on
+/// every non-sequential jump ("fais en sorte que le scrub soit parfait"):
+/// with byte offsets known up front, any frame is one file read + one
+/// round-trip through the persistent converter, no seeking of any kind.
+struct IndexedSeq {
+    file: std::fs::File,
+    /// count+1 entries — offsets[i]..offsets[i+1] is frame i's JPEG.
+    offsets: Vec<u64>,
+    conv: Option<ConvProc>,
+    /// The smallest frame's JPEG bytes, used as pipeline padding. Measured
+    /// empirically (see conv_spawn): ffmpeg's mjpeg stdin pipeline has a
+    /// fixed TWO-FRAME lag — a frame's rawvideo only comes out after two
+    /// more full JPEGs enter (parser close + probe queue; no flag
+    /// combination removed it, and -fflags nobuffer made it worse). Each
+    /// request therefore sends [target][pad][pad] and reads 3 frames,
+    /// keeping the last. The pad must decode to the SAME dimensions
+    /// (rawvideo framing) — the cheapest same-dims JPEG we're guaranteed
+    /// to have is the stream's own smallest frame.
+    pad: Vec<u8>,
+}
+
 pub struct VideoSession {
     path: String,
     width: u32,
@@ -132,6 +173,10 @@ pub struct VideoSession {
     /// fast scrub fling (arbitrary large jumps), which need opposite
     /// respawn strategies (see the scrub-prefetch comment in decode_at).
     last_foreground_request: i64,
+    /// Some(..) when this session is an indexed optimized-media stream
+    /// (random access, persistent converter — see IndexedSeq). All the
+    /// seek/respawn/readahead machinery above is bypassed entirely.
+    indexed: Option<IndexedSeq>,
     /// Source codec name (lowercase, e.g. "h264", "prores") — lets the JS
     /// side decide whether background media optimization (transcode to
     /// all-intra) is worth it, and gates bidirectional readahead the same
@@ -468,6 +513,18 @@ fn decode_frame_core(s: &mut VideoSession, frame_index: i64) -> Result<(Vec<u8>,
         return Ok((out, false));
     }
 
+    // Indexed optimized media: pure random access via the persistent
+    // converter — no seek, no respawn, no readahead machinery at all.
+    if s.indexed.is_some() {
+        let t0 = std::time::Instant::now();
+        let rgba = indexed_decode(s, frame_index)?;
+        let decode_ms = t0.elapsed().as_secs_f64() * 1000.0;
+        s.last_foreground_request = frame_index;
+        cache_insert(s, frame_index, rgba.clone());
+        eprintln!("[video-decode] frame={frame_index} INDEXED decode={decode_ms:.1}ms");
+        return Ok((rgba, false));
+    }
+
     let t0 = std::time::Instant::now();
     // decode_at reads last_foreground_request to classify this request
     // (step-back vs fling), so it must still hold the PREVIOUS request
@@ -572,9 +629,363 @@ fn parse_hms(s: &str) -> Option<f64> {
     Some(h * 3600.0 + m * 60.0 + sec)
 }
 
+// ---- indexed optimized media (random-access MJPEG stream + sidecar index) ----
+
+/// Walks a raw MJPEG stream (concatenated baseline JPEGs, the exact output
+/// of `ffmpeg -f mjpeg`) and returns the byte offset of every frame's SOI
+/// marker, plus a final sentinel equal to the file length. This is a REAL
+/// JPEG segment parser, not a naive FFD8 byte scan: marker-segment payloads
+/// (DQT/DHT tables) may legally contain any byte pair, so boundaries are
+/// only trusted after structurally walking each image — length-prefixed
+/// segments hopped by their declared size, then the entropy-coded scan
+/// after SOS, where 0xFF is always followed by 0x00 (stuffing) or
+/// 0xD0-0xD7 (restart markers) until a real marker ends the scan.
+fn index_mjpeg_stream(path: &str) -> Result<Vec<u64>, String> {
+    use std::io::BufRead;
+    let f = std::fs::File::open(path).map_err(|e| format!("open {path}: {e}"))?;
+    let len = f.metadata().map_err(|e| e.to_string())?.len();
+    let mut r = std::io::BufReader::with_capacity(1 << 20, f);
+    let mut pos: u64 = 0;
+    let mut offsets: Vec<u64> = Vec::new();
+
+    // Byte-at-a-time reads through the 1MB BufReader: fill_buf/consume by
+    // hand so `pos` tracking stays trivial and exact.
+    fn next_byte(r: &mut std::io::BufReader<std::fs::File>, pos: &mut u64) -> Option<u8> {
+        let buf = r.fill_buf().ok()?;
+        if buf.is_empty() {
+            return None;
+        }
+        let b = buf[0];
+        r.consume(1);
+        *pos += 1;
+        Some(b)
+    }
+    fn skip(r: &mut std::io::BufReader<std::fs::File>, pos: &mut u64, mut n: u64) -> bool {
+        while n > 0 {
+            let buf = match r.fill_buf() {
+                Ok(b) if !b.is_empty() => b,
+                _ => return false,
+            };
+            let take = (buf.len() as u64).min(n) as usize;
+            r.consume(take);
+            *pos += take as u64;
+            n -= take as u64;
+        }
+        true
+    }
+
+    'images: loop {
+        let start = pos;
+        // Expect SOI (or clean EOF between images).
+        let Some(b0) = next_byte(&mut r, &mut pos) else { break };
+        let Some(b1) = next_byte(&mut r, &mut pos) else { break };
+        if b0 != 0xFF || b1 != 0xD8 {
+            return Err(format!("not an MJPEG stream: expected SOI at byte {start}, found {b0:02x}{b1:02x}"));
+        }
+        offsets.push(start);
+        // Walk marker segments.
+        loop {
+            // Marker prefix: one or more 0xFF fill bytes then the marker id.
+            let m;
+            loop {
+                let Some(b) = next_byte(&mut r, &mut pos) else { return Err("truncated JPEG (EOF in marker)".into()) };
+                if b == 0xFF {
+                    loop {
+                        let Some(b2) = next_byte(&mut r, &mut pos) else { return Err("truncated JPEG (EOF after 0xFF)".into()) };
+                        if b2 != 0xFF {
+                            m = b2;
+                            break;
+                        }
+                    }
+                    break;
+                }
+                // Non-FF between segments would be corruption; be strict.
+                return Err(format!("corrupt JPEG segment structure at byte {}", pos - 1));
+            }
+            match m {
+                0xD9 => continue 'images,          // EOI with no scan (degenerate but legal)
+                0x01 | 0xD0..=0xD7 => continue,    // standalone markers, no payload
+                0xDA => {
+                    // SOS: skip its header, then scan entropy-coded data.
+                    let Some(l0) = next_byte(&mut r, &mut pos) else { return Err("truncated SOS".into()) };
+                    let Some(l1) = next_byte(&mut r, &mut pos) else { return Err("truncated SOS".into()) };
+                    let seg_len = u16::from_be_bytes([l0, l1]) as u64;
+                    if seg_len < 2 || !skip(&mut r, &mut pos, seg_len - 2) {
+                        return Err("truncated SOS header".into());
+                    }
+                    loop {
+                        let Some(b) = next_byte(&mut r, &mut pos) else { return Err("truncated JPEG (EOF in scan)".into()) };
+                        if b != 0xFF {
+                            continue;
+                        }
+                        let Some(b2) = next_byte(&mut r, &mut pos) else { return Err("truncated JPEG (EOF in scan marker)".into()) };
+                        match b2 {
+                            0x00 | 0xD0..=0xD7 => continue, // stuffing / restart
+                            0xD9 => continue 'images,       // EOI — frame complete
+                            _ => {
+                                // Another marker inside the scan area means a
+                                // multi-scan (progressive) image; ffmpeg's
+                                // mjpeg encoder emits baseline only, but
+                                // handle it by returning to segment walking.
+                                // Push back is impossible with BufReader, so
+                                // handle the marker inline: length-prefixed
+                                // unless standalone.
+                                if b2 == 0x01 || (0xD0..=0xD7).contains(&b2) {
+                                    continue;
+                                }
+                                let Some(l0) = next_byte(&mut r, &mut pos) else { return Err("truncated segment".into()) };
+                                let Some(l1) = next_byte(&mut r, &mut pos) else { return Err("truncated segment".into()) };
+                                let seg_len = u16::from_be_bytes([l0, l1]) as u64;
+                                if seg_len < 2 || !skip(&mut r, &mut pos, seg_len - 2) {
+                                    return Err("truncated segment payload".into());
+                                }
+                            }
+                        }
+                    }
+                }
+                _ => {
+                    // Length-prefixed segment: APPn, DQT, DHT, SOF0, COM...
+                    let Some(l0) = next_byte(&mut r, &mut pos) else { return Err("truncated segment".into()) };
+                    let Some(l1) = next_byte(&mut r, &mut pos) else { return Err("truncated segment".into()) };
+                    let seg_len = u16::from_be_bytes([l0, l1]) as u64;
+                    if seg_len < 2 || !skip(&mut r, &mut pos, seg_len - 2) {
+                        return Err("truncated segment payload".into());
+                    }
+                }
+            }
+        }
+    }
+    if offsets.is_empty() {
+        return Err("no JPEG frames found in stream".into());
+    }
+    offsets.push(len); // sentinel: frame i = offsets[i]..offsets[i+1]
+    Ok(offsets)
+}
+
+/// Transcode `src` to an indexed optimized-media pair: `target` (raw MJPEG
+/// stream, same `-q:v 3` near-visually-lossless setting the previous .mov
+/// flavor used) and `target + ".idx"` (JSON: fps/width/height/count +
+/// per-frame byte offsets). Tauri-free core, wrapped by the command below.
+fn create_optimized_media_core(src: &str, target: &str) -> Result<(), String> {
+    // Probe the SOURCE for fps (a raw MJPEG stream carries no timing
+    // metadata of its own — the sidecar is the only place it survives).
+    let out = Command::new(ffmpeg_path())
+        .args(["-hide_banner", "-i", src])
+        .output()
+        .map_err(|e| format!("probe spawn: {e}"))?;
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    // Width/height come from the source too: the transcode never rescales,
+    // and the raw MJPEG result can't be re-probed anyway (no Duration line
+    // without a container — the whole reason the sidecar exists).
+    let (width, height, fps, _, _) = parse_probe(&stderr).map_err(|e| format!("probe {src}: {e}"))?;
+
+    let status = Command::new(ffmpeg_path())
+        .args(["-y", "-v", "error", "-nostdin", "-i", src, "-c:v", "mjpeg", "-q:v", "3", "-an", "-f", "mjpeg", target])
+        .status()
+        .map_err(|e| format!("transcode spawn: {e}"))?;
+    if !status.success() {
+        let _ = std::fs::remove_file(target);
+        return Err(format!("transcode failed (exit {status:?})"));
+    }
+
+    let offsets = index_mjpeg_stream(target).inspect_err(|_| {
+        let _ = std::fs::remove_file(target);
+    })?;
+    let count = offsets.len() - 1;
+
+    let idx = serde_json::json!({
+        "fps": fps,
+        "width": width,
+        "height": height,
+        "count": count,
+        "offsets": offsets,
+    });
+    std::fs::write(format!("{target}.idx"), serde_json::to_vec(&idx).map_err(|e| e.to_string())?)
+        .map_err(|e| format!("write idx: {e}"))?;
+    Ok(())
+}
+
+/// If `path` has a sidecar `.idx` (i.e. it's one of OUR optimized-media
+/// streams), open it as an indexed random-access session. Returns None for
+/// ordinary video files so open_session_core falls through to the normal
+/// pipe-decoder path.
+fn try_open_indexed(path: &str) -> Option<Result<(VideoSession, u64, f64), String>> {
+    let idx_path = format!("{path}.idx");
+    if !std::path::Path::new(&idx_path).exists() {
+        return None;
+    }
+    Some((|| {
+        let text = std::fs::read_to_string(&idx_path).map_err(|e| format!("read idx: {e}"))?;
+        let v: serde_json::Value = serde_json::from_str(&text).map_err(|e| format!("parse idx: {e}"))?;
+        let fps = v["fps"].as_f64().ok_or("idx: missing fps")?;
+        let width = v["width"].as_u64().ok_or("idx: missing width")? as u32;
+        let height = v["height"].as_u64().ok_or("idx: missing height")? as u32;
+        let offsets: Vec<u64> = v["offsets"]
+            .as_array()
+            .ok_or("idx: missing offsets")?
+            .iter()
+            .map(|o| o.as_u64().ok_or("idx: bad offset"))
+            .collect::<Result<_, _>>()?;
+        if offsets.len() < 2 || fps <= 0.0 || width == 0 || height == 0 {
+            return Err("idx: invalid contents".into());
+        }
+        let count = (offsets.len() - 1) as u64;
+        let file = std::fs::File::open(path).map_err(|e| format!("open {path}: {e}"))?;
+        // Stale-index guard: the sentinel must equal the current file size.
+        let len = file.metadata().map_err(|e| e.to_string())?.len();
+        if *offsets.last().unwrap() != len {
+            return Err(format!("idx is stale for {path} (sentinel {} != file len {len})", offsets.last().unwrap()));
+        }
+        let duration = count as f64 / fps;
+        // Pipeline padding: the smallest frame in the stream (see
+        // IndexedSeq::pad). Read once at open.
+        let mut file = file;
+        let pad = {
+            use std::io::{Read as _, Seek, SeekFrom};
+            let (mut best_a, mut best_len) = (offsets[0], offsets[1] - offsets[0]);
+            for w in offsets.windows(2) {
+                if w[1] - w[0] < best_len {
+                    best_a = w[0];
+                    best_len = w[1] - w[0];
+                }
+            }
+            let mut buf = vec![0u8; best_len as usize];
+            file.seek(SeekFrom::Start(best_a)).map_err(|e| e.to_string())?;
+            file.read_exact(&mut buf).map_err(|e| format!("read pad frame: {e}"))?;
+            buf
+        };
+        Ok((
+            VideoSession {
+                path: path.to_string(),
+                width,
+                height,
+                fps,
+                frame_bytes: (width as usize) * (height as usize) * 4,
+                frame_count: count as i64,
+                proc: None,
+                cache: std::collections::VecDeque::new(),
+                readahead_active: false,
+                readahead_goal: 0,
+                last_foreground_request: -1,
+                indexed: Some(IndexedSeq { file, offsets, conv: None, pad }),
+                codec: "mjpeg-indexed".into(),
+            },
+            count,
+            duration,
+        ))
+    })())
+}
+
+/// Spawn the persistent JPEG→RGBA converter child for an indexed session.
+/// stdin is fed by a dedicated writer thread (see ConvProc). Flags chosen
+/// empirically against the bundled ffmpeg 8.1 (2026-07 harness): probesize
+/// must be tiny or find_stream_info blocks waiting for input it will never
+/// get; -analyzeduration needs a NONZERO microsecond value (0 means "use
+/// the 5-second default", a trap); -fpsprobesize 0 stops it demanding
+/// several frames to estimate a frame rate the raw stream doesn't carry;
+/// and -fflags nobuffer made output STOP entirely (3 in → 0 out) so it is
+/// deliberately absent. Even so the pipeline keeps a fixed two-frame lag —
+/// see IndexedSeq::pad for the [target][pad][pad] protocol that absorbs
+/// it. The spawn primes the pipe with two pads so every subsequent request
+/// uniformly reads 3 frames and keeps the last.
+fn conv_spawn(pad: &[u8]) -> Result<ConvProc, String> {
+    let mut child = Command::new(ffmpeg_path())
+        .args([
+            "-v", "error",
+            "-probesize", "32", "-fpsprobesize", "0", "-analyzeduration", "1",
+            "-f", "mjpeg", "-i", "-",
+            "-f", "rawvideo", "-pix_fmt", "rgba", "-vsync", "0", "-an", "-",
+        ])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|e| format!("converter spawn ({}): {e}", ffmpeg_path().display()))?;
+    let mut stdin = child.stdin.take().ok_or("converter stdin unavailable")?;
+    let stdout = child.stdout.take().ok_or("converter stdout unavailable")?;
+    let (tx, rx) = std::sync::mpsc::channel::<Vec<u8>>();
+    std::thread::spawn(move || {
+        use std::io::Write;
+        for buf in rx {
+            if stdin.write_all(&buf).is_err() || stdin.flush().is_err() {
+                break;
+            }
+        }
+        // Sender dropped (session closed) or child died: closing stdin here
+        // lets the child drain and exit on its own.
+    });
+    // Prime: two pads in, zero frames out yet — puts the pipeline in the
+    // steady state where each request's 3-frame read pattern holds.
+    let mut primer = Vec::with_capacity(pad.len() * 2);
+    primer.extend_from_slice(pad);
+    primer.extend_from_slice(pad);
+    tx.send(primer).map_err(|e| format!("converter primer: {e}"))?;
+    Ok(ConvProc { child, jpeg_tx: tx, stdout: std::io::BufReader::new(stdout) })
+}
+
+/// Decode one frame of an indexed session: read its JPEG bytes at the
+/// indexed offset, round-trip through the persistent converter. Respawns
+/// the converter once if it died (e.g. killed externally) before failing.
+fn indexed_decode(s: &mut VideoSession, frame_index: i64) -> Result<Vec<u8>, String> {
+    use std::io::{Read as _, Seek, SeekFrom};
+    let frame_bytes = s.frame_bytes;
+    let seq = s.indexed.as_mut().ok_or("not an indexed session")?;
+    let i = frame_index as usize;
+    if i + 1 >= seq.offsets.len() {
+        return Err(format!("frame {frame_index} out of indexed range"));
+    }
+    let (a, b) = (seq.offsets[i], seq.offsets[i + 1]);
+    let mut jpeg = vec![0u8; (b - a) as usize];
+    seq.file.seek(SeekFrom::Start(a)).map_err(|e| e.to_string())?;
+    seq.file.read_exact(&mut jpeg).map_err(|e| format!("read frame {frame_index}: {e}"))?;
+
+    for attempt in 0..2 {
+        if seq.conv.is_none() {
+            seq.conv = Some(conv_spawn(&seq.pad)?);
+        }
+        let conv = seq.conv.as_mut().unwrap();
+        // [target][pad][pad] — the two pads push the target through the
+        // pipeline's fixed two-frame lag (see IndexedSeq::pad). With the
+        // two primer pads sent at spawn, exactly 3 frames come out per
+        // request: pad, pad, target — read all three, return the last.
+        let mut payload = Vec::with_capacity(jpeg.len() + seq.pad.len() * 2);
+        payload.extend_from_slice(&jpeg);
+        payload.extend_from_slice(&seq.pad);
+        payload.extend_from_slice(&seq.pad);
+        if conv.jpeg_tx.send(payload).is_err() {
+            seq.conv = None;
+            continue;
+        }
+        let mut out = vec![0u8; frame_bytes];
+        let result = (|| {
+            conv.stdout.read_exact(&mut out)?; // pad
+            conv.stdout.read_exact(&mut out)?; // pad
+            conv.stdout.read_exact(&mut out) // target
+        })();
+        match result {
+            Ok(()) => return Ok(out),
+            Err(e) => {
+                let _ = conv.child.kill();
+                let _ = conv.child.wait();
+                seq.conv = None;
+                if attempt == 1 {
+                    return Err(format!("indexed decode failed twice for frame {frame_index}: {e}"));
+                }
+            }
+        }
+    }
+    unreachable!()
+}
+
 // Core open logic, tauri-free so `cargo test` can exercise it directly
 // (the #[tauri::command] wrappers below only add State registry plumbing).
 fn open_session_core(path: &str) -> Result<(VideoSession, u64, f64), String> {
+    // Our own indexed optimized-media streams short-circuit the probe
+    // entirely (a raw MJPEG stream has no duration/fps metadata anyway —
+    // the sidecar .idx is the source of truth).
+    if let Some(r) = try_open_indexed(path) {
+        return r;
+    }
     let out = Command::new(ffmpeg_path())
         .args(["-hide_banner", "-i", path])
         .output()
@@ -604,6 +1015,7 @@ fn open_session_core(path: &str) -> Result<(VideoSession, u64, f64), String> {
             readahead_active: false,
             readahead_goal: 0,
             last_foreground_request: -1,
+            indexed: None,
             codec,
         },
         frame_count,
@@ -651,12 +1063,15 @@ pub fn decode_video_frame(
             .cloned()
             .ok_or_else(|| format!("no session {session_id}"))?
     };
-    let result = {
+    let (result, indexed) = {
         let mut s = session_arc.lock().unwrap();
-        decode_frame_core(&mut s, frame_index)
+        let r = decode_frame_core(&mut s, frame_index);
+        (r, s.indexed.is_some())
     };
-    // Warm the cache BEHIND this response (mpv pattern) — unchanged from v1.
-    if result.is_ok() {
+    // Warm the cache BEHIND this response (mpv pattern) — unchanged from
+    // v1. Indexed sessions skip it entirely: every frame is a flat ~2-6ms
+    // random access, so there's nothing for a warming thread to amortize.
+    if result.is_ok() && !indexed {
         spawn_readahead(session_arc, frame_index);
     }
     result.map(|(rgba, _seeked)| Response::new(rgba))
@@ -674,6 +1089,14 @@ pub fn close_video_session(
         if let Some(mut p) = s.proc.take() {
             let _ = p.child.kill();
             let _ = p.child.wait(); // reap — avoid leaking a zombie ffmpeg process on every close
+        }
+        if let Some(seq) = s.indexed.as_mut() {
+            if let Some(mut conv) = seq.conv.take() {
+                // Dropping jpeg_tx (inside conv) ends the writer thread;
+                // kill+reap the persistent converter like any other child.
+                let _ = conv.child.kill();
+                let _ = conv.child.wait();
+            }
         }
     }
     Ok(())
@@ -826,9 +1249,25 @@ pub fn optimized_media_target(path: String) -> Result<(String, bool), String> {
     }
     let dir = std::env::temp_dir().join("nemo-optimized");
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    let target = dir.join(format!("{:016x}.mov", h.finish()));
-    let exists = target.exists();
+    // .mjpeg = the indexed raw-stream format (see create_optimized_media).
+    // Previous .mov-flavored caches are simply ignored and re-created —
+    // the optimized cache is disposable by design.
+    let target = dir.join(format!("{:016x}.mjpeg", h.finish()));
+    // "exists" must mean "usable": the stream without its sidecar index
+    // (e.g. an interrupted transcode) is not.
+    let exists = target.exists() && std::path::Path::new(&format!("{}.idx", target.to_string_lossy())).exists();
     Ok((target.to_string_lossy().to_string(), exists))
+}
+
+/// Transcode a long-GOP source into the indexed optimized-media format
+/// (raw MJPEG stream + .idx sidecar — see create_optimized_media_core).
+/// Async + spawn_blocking: transcodes take seconds to minutes and must not
+/// tie up an IPC worker.
+#[tauri::command]
+pub async fn create_optimized_media(src: String, target: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || create_optimized_media_core(&src, &target))
+        .await
+        .map_err(|e| format!("optimize task panicked: {e}"))?
 }
 
 // ---- headless auto-bench plumbing (unchanged from v1) ----
@@ -1456,6 +1895,103 @@ mod tests {
             let truth = decode_frame_core(&mut s_ref, target).unwrap().0;
             assert_eq!(bytes, truth, "prefetched frame {target} is not byte-identical to a direct decode");
         }
+    }
+
+    // ---- indexed optimized media (the "scrub parfait" pipeline) ----
+
+    fn make_indexed_media() -> String {
+        test_ffmpeg_override();
+        let src = make_test_video(); // 320x240, 60 frames, 30fps
+        let dir = std::env::temp_dir().join("nemo-video-decode-test");
+        let target = dir.join("optimized_indexed.mjpeg");
+        let target_s = target.to_str().unwrap().to_string();
+        if !target.exists() || !std::path::Path::new(&format!("{target_s}.idx")).exists() {
+            create_optimized_media_core(src.to_str().unwrap(), &target_s).unwrap();
+        }
+        target_s
+    }
+
+    #[test]
+    fn optimized_media_transcode_produces_a_valid_index() {
+        let target = make_indexed_media();
+        let idx: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(format!("{target}.idx")).unwrap()).unwrap();
+        assert_eq!(idx["count"].as_u64().unwrap(), 60, "expected one index entry per source frame");
+        assert_eq!(idx["width"].as_u64().unwrap(), 320);
+        assert_eq!(idx["height"].as_u64().unwrap(), 240);
+        assert!((idx["fps"].as_f64().unwrap() - 30.0).abs() < 0.01);
+        let offsets = idx["offsets"].as_array().unwrap();
+        assert_eq!(offsets.len(), 61, "count+1 offsets (sentinel = file length)");
+        let len = std::fs::metadata(&target).unwrap().len();
+        assert_eq!(offsets.last().unwrap().as_u64().unwrap(), len);
+    }
+
+    #[test]
+    fn indexed_session_random_access_never_respawns_and_is_consistent() {
+        let target = make_indexed_media();
+        let (mut s, frame_count, _) = open_session_core_t(&target).unwrap();
+        assert!(s.indexed.is_some(), "session should have opened in indexed mode");
+        assert_eq!(frame_count, 60);
+
+        // Ground truth from a SECOND independent indexed session.
+        let (mut s_ref, _, _) = open_session_core_t(&target).unwrap();
+
+        // Brutal scrub pattern: far jumps, backward runs, repeats.
+        let pattern = [30i64, 5, 59, 0, 42, 41, 40, 12, 57, 3, 30];
+        let mut seen = std::collections::HashMap::new();
+        for &f in &pattern {
+            let (bytes, seeked) = decode_frame_core(&mut s, f).unwrap();
+            assert!(!seeked, "indexed decode of {f} reported a respawn — should be impossible");
+            assert_eq!(bytes.len(), 320 * 240 * 4);
+            let truth = decode_frame_core(&mut s_ref, f).unwrap().0;
+            assert_eq!(bytes, truth, "frame {f} differs between two indexed sessions");
+            seen.insert(f, bytes);
+        }
+        // Distinct frames must differ (testsrc2 has a moving pattern).
+        assert_ne!(seen[&5], seen[&59], "distinct frames decoded identical bytes");
+    }
+
+    #[test]
+    fn indexed_random_seek_cost_is_flat_and_small() {
+        let target = make_indexed_media();
+        let (mut s, _, _) = open_session_core_t(&target).unwrap();
+        decode_frame_core(&mut s, 0).unwrap(); // absorb converter spawn
+        s.cache.clear(); // measure decode, not cache hits
+        let mut times = Vec::new();
+        // Worst-case scrub: alternating far jumps, never sequential.
+        let targets: Vec<i64> = (0..40).map(|i| if i % 2 == 0 { (i * 7) % 60 } else { 59 - ((i * 11) % 60) }).collect();
+        for f in targets {
+            let t0 = std::time::Instant::now();
+            decode_frame_core(&mut s, f).unwrap();
+            times.push(t0.elapsed().as_secs_f64() * 1000.0);
+            s.cache.clear();
+        }
+        times.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        let avg = times.iter().sum::<f64>() / times.len() as f64;
+        let p95 = times[(times.len() as f64 * 0.95) as usize];
+        eprintln!("[perf] indexed random access: avg={avg:.1}ms p95={p95:.1}ms");
+        // Regression guard with headroom (tiny frames decode ~1-3ms; the
+        // property under test is FLAT cost with no respawn spikes).
+        assert!(p95 < 20.0, "indexed random access p95 {p95:.1}ms — respawn-like spikes crept back in");
+    }
+
+    #[test]
+    fn stale_index_is_rejected_not_misread() {
+        let target = make_indexed_media();
+        let stale = std::env::temp_dir().join("nemo-video-decode-test").join("stale_copy.mjpeg");
+        let stale_s = stale.to_str().unwrap().to_string();
+        std::fs::copy(&target, &stale).unwrap();
+        std::fs::copy(format!("{target}.idx"), format!("{stale_s}.idx")).unwrap();
+        // Truncate the stream so the sidecar's sentinel no longer matches.
+        let f = std::fs::OpenOptions::new().write(true).open(&stale).unwrap();
+        let len = f.metadata().unwrap().len();
+        f.set_len(len - 100).unwrap();
+        drop(f);
+        let err = match open_session_core_t(&stale_s) {
+            Err(e) => e,
+            Ok(_) => panic!("stale index was accepted — sentinel check is broken"),
+        };
+        assert!(err.contains("stale"), "expected a stale-index error, got: {err}");
     }
 
     #[test]

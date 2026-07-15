@@ -399,11 +399,13 @@
       var res = await invoke('optimized_media_target', { path: nv.path });
       var target = res[0], exists = res[1];
       if (!exists) {
-        // MJPEG -q:v 3: all-intra, near-visually-lossless for interaction,
-        // very fast to encode AND decode; -an drops audio (the layer's
-        // audio, when it exists, still comes from the original source).
-        var code = await invoke('run_ffmpeg', { args: ['-y', '-i', nv.path, '-c:v', 'mjpeg', '-q:v', '3', '-an', target] });
-        if (code !== 0) throw new Error('transcode exit ' + code);
+        // Indexed optimized media (raw MJPEG stream + .idx offsets sidecar,
+        // built Rust-side): all-intra AND random-access — the decoder keeps
+        // one persistent converter process per session, so ANY frame in ANY
+        // order costs ~2-6ms with zero process respawns (the property that
+        // makes scrubbing flat-cost). -q:v 3 near-visually-lossless; audio
+        // still comes from the original source.
+        await invoke('create_optimized_media', { src: nv.path, target: target });
       }
       // Swap the live session to the optimized copy. Guard against the
       // layer having been deleted/replaced during the transcode.
