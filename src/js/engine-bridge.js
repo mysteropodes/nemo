@@ -390,6 +390,14 @@
       var motionItems = SMMotion.buildOverlayItems();
       if (motionItems.length) layers.push({ items: motionItems.map(function (it) { it.segments = roundSegs(it.segments); return it; }) });
     }
+    // Labs canvas-overlay hook (2026-07) — same guarded, no-op-when-absent
+    // pattern as the SMCamera/SMMotion contributions right above. A single
+    // fan-out point (labs-core.js) rather than one `if` per prototype here,
+    // matching draw-bridge.js's onStrokeCommitted/onPreview hooks.
+    if (window.SMLabs && window.SMLabs.buildCanvasOverlayItems) {
+      var labsOverlayItems = window.SMLabs.buildCanvasOverlayItems();
+      if (labsOverlayItems.length) layers.push({ items: labsOverlayItems.map(function (it) { it.segments = roundSegs(it.segments); return it; }) });
+    }
     if (typeof fillCloseStrokesOverlayItems === 'function') {
       var fillCloseItems = fillCloseStrokesOverlayItems();
       if (fillCloseItems.length) layers.push({ items: fillCloseItems.map(function (it) { it.segments = roundSegs(it.segments); return it; }) });
