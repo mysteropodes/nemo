@@ -667,6 +667,7 @@
       <button class="settings-tab" data-tab="collab" data-i18n="settingsTabCollab">Collaboration</button>
       <button class="settings-tab" data-tab="feedback" data-i18n="settingsTabFeedback">Feedback</button>
       <button class="settings-tab" data-tab="shortcuts" data-i18n="settingsTabShortcuts">Raccourcis</button>
+      <button class="settings-tab" data-tab="labs">Labs</button>
     </div>
     <div class="modal-bdy">
       <div class="settings-pane" data-pane="general">
@@ -753,6 +754,14 @@
         <div class="pr" style="margin-top:10px;gap:6px">
           <button class="pbtn" id="shortcuts-reset" style="flex:1" data-i18n="settingsResetAll">Réinitialiser tout</button>
         </div>
+      </div>
+      <div class="settings-pane" data-pane="labs" style="display:none">
+        <div class="phdr" style="padding:0 0 4px 0;font-size:9px;color:var(--text-dim)">Labs — prototypes d'outils 2D</div>
+        <div style="font-size:10px;color:var(--text-dim);margin-bottom:8px">Essais scoutés contre Umoupen/Callipeg/SketchBook/TVPaint/Toon Boom/Moho/CSP — tous désactivés par défaut, aucun ne touche tes fichiers projet existants. À activer pour tester, à laisser tel quel sinon.</div>
+        <div class="phdr" style="padding:6px 0 4px 0;font-size:9px;color:var(--text-dim)">Outils (rester actif)</div>
+        <div id="labs-tools-list" style="display:flex;flex-direction:column;gap:2px"></div>
+        <div class="phdr" style="padding:14px 0 4px 0;font-size:9px;color:var(--text-dim)">Actions (coup unique, sur la sélection courante)</div>
+        <div id="labs-actions-list" style="display:flex;flex-direction:column;gap:2px"></div>
       </div>
     </div>
   </div>
@@ -1014,6 +1023,7 @@
 <script src="js/labs/vector-sculpt.js"></script>
 <script src="js/labs/french-curve.js"></script>
 <script src="js/labs/timeline-zoom.js"></script>
+<script src="js/labs/labs-panel.js"></script>
 <script src="js/lottie-preview.js"></script>
 <script src="js/timeline.js"></script>
 <script src="js/i18n.js"></script>

@@ -2892,7 +2892,7 @@ function initSettingsModal(){
   var btn=document.getElementById('btn-settings'),modal=document.getElementById('settings-modal');
   if(!btn||!modal)return;
   initSettingsTabs();
-  btn.addEventListener('click',function(){renderShortcutsList();syncProfileFields();syncFolderFields();refreshFeedbackList();modal.style.display='flex';});
+  btn.addEventListener('click',function(){renderShortcutsList();syncProfileFields();syncFolderFields();refreshFeedbackList();if(window.renderLabsPanel)renderLabsPanel();modal.style.display='flex';});
   var topBtn=document.getElementById('project-tabs-settings');
   if(topBtn)topBtn.addEventListener('click',function(){btn.click();});
   var closeBtn=document.getElementById('settings-close');
