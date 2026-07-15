@@ -980,6 +980,40 @@
 <script src="js/export.js"></script>
 <script src="js/rive-export.js"></script>
 <script src="js/ae-camera-export.js"></script>
+<!-- Labs prototypes (docs/feature-scouting.md) — off by default, no core
+     file touches beyond one guarded hook in draw-bridge.js. Curated subset:
+     2D animation tools/UI only (drawing tools, timing/exposure tools,
+     timeline UI) — 3D reference, storyboard mode, import/export formats,
+     VFX/shader bakes, screentone and rig-deform intentionally left out of
+     this wave, see docs/feature-scouting.md for the full catalog. Order
+     matters: labs-core first (registry), then stroke-MUTATING prototypes
+     (predictive) before stroke-COPYING ones (symmetry) so copies reflect
+     the corrected shape. -->
+<script src="js/labs/labs-core.js"></script>
+<script src="js/labs/predictive-stroke.js"></script>
+<script src="js/labs/symmetry-mirror.js"></script>
+<script src="js/labs/multiframe-draw.js"></script>
+<script src="js/labs/lagoon-menu.js"></script>
+<script src="js/labs/pingpong-cycle.js"></script>
+<script src="js/labs/move-to-layer.js"></script>
+<script src="js/labs/canvas-grid.js"></script>
+<script src="js/labs/timeline-markers.js"></script>
+<script src="js/labs/flip-roll.js"></script>
+<script src="js/labs/retime-exposure.js"></script>
+<script src="js/labs/interval-assistant.js"></script>
+<script src="js/labs/xsheet-panel.js"></script>
+<script src="js/labs/out-of-pegs.js"></script>
+<script src="js/labs/mirror-check.js"></script>
+<script src="js/labs/vector-trim.js"></script>
+<script src="js/labs/view-filter.js"></script>
+<script src="js/labs/speed-lines.js"></script>
+<script src="js/labs/reference-fill.js"></script>
+<script src="js/labs/pose-library.js"></script>
+<script src="js/labs/boil-effect.js"></script>
+<script src="js/labs/follow-path.js"></script>
+<script src="js/labs/vector-sculpt.js"></script>
+<script src="js/labs/french-curve.js"></script>
+<script src="js/labs/timeline-zoom.js"></script>
 <script src="js/lottie-preview.js"></script>
 <script src="js/timeline.js"></script>
 <script src="js/i18n.js"></script>
