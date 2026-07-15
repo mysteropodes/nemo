@@ -702,9 +702,16 @@
       if (isPropFiltered(prop) || (_hideUnanimated && !propHasContent(holder, prop))) return;
       var pr = document.createElement('div'); pr.className = 'lrow motion-prop-row';
       var sw = document.createElement('div');
-      sw.className = 'lico motion-stopwatch' + (isAnimated(holder, prop) ? ' on' : '');
-      sw.title = isAnimated(holder, prop) ? 'Désactiver l’animation (fige la valeur actuelle)' : 'Activer l’animation de cette propriété';
-      sw.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2"/><path d="M9 2h6"/></svg>';
+      var swOn = isAnimated(holder, prop);
+      sw.className = 'lico motion-stopwatch' + (swOn ? ' on' : '');
+      sw.title = swOn ? 'Désactiver l’animation (fige la valeur actuelle)' : 'Activer l’animation de cette propriété';
+      // Filled/hollow keyframe diamond instead of a clock icon (2026-07,
+      // "remplace le chronomètre par des keyframe pleine ou vide c'est plus
+      // élégant") — same on/off semantics as before (this row still IS the
+      // animate toggle, distinct from .motion-addkey's per-frame diamond a
+      // few lines down), just a diamond matching that other icon's shape
+      // instead of a stopwatch glyph: filled=animated, hollow outline=static.
+      sw.innerHTML = '<svg viewBox="0 0 24 24" width="12" height="12"><path d="M12 3l9 9-9 9-9-9z" fill="' + (swOn ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2"/></svg>';
       sw.addEventListener('click', function (e) {
         e.stopPropagation(); pushUndo(); toggleAnimated(holder, prop);
         renderLayerList(); renderTimeline();

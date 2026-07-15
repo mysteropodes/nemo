@@ -3470,7 +3470,7 @@ function onKeyDown(event){
   // Select/Subselect tool has a live selection, setBrushSize already
   // restyles it in place (see its own comment, timeline.js) — bracket
   // keys inherit that for free.
-  else if(k==='['||k===']'){
+  else if((k==='['||k===']')&&!event.altKey){
     var sizeStep=(event.shiftKey?5:1)*(k===']'?1:-1);
     if(state.tool==='eraser')window.SM.setEraserSize(state.eraserSize+sizeStep);
     else window.SM.setBrushSize(Math.max(1,Math.min(80,state.brushSize+sizeStep)));
@@ -3513,6 +3513,39 @@ function onKeyDown(event){
   }
   else if(k==='ArrowLeft'){if(state.playing)stopPlay();goToFrame(state.currentFrame-1);}
   else if(k==='ArrowRight'){if(state.playing)stopPlay();goToFrame(state.currentFrame+1);}
+  // Home/End "go to first/last frame" — a near-universal NLE/AE convention
+  // (Home = start of composition, End = end) that had no binding here at
+  // all (grepped: zero 'Home'/'End' handlers before this). AE audit, 2026-07.
+  else if(k==='Home'){if(state.playing)stopPlay();goToFrame(0);}
+  else if(k==='End'){if(state.playing)stopPlay();goToFrame(state.totalFrames-1);}
+  // Alt+[ / Alt+] "trim layer in/out point to current time" (AE convention)
+  // — layer-inout.js already has the full in/out-point system (draggable
+  // bar/handles, layerInPoint/layerOutPoint, app.js) but only via mouse
+  // drag; AE users reach for this shortcut constantly and it was entirely
+  // unbound. Mirrors the exact set/clamp logic layer-inout.js's own drag
+  // handler uses (ld.inPoint clamped below outPoint, and vice versa) so
+  // this can never invert the range. Plain [ ] stay bound to brush/eraser
+  // size (established earlier this session) — Alt is free and unclaimed.
+  else if(event.altKey&&k==='['){
+    var ldIn=state.layers[state.activeLayerIdx];
+    if(ldIn&&!ldIn.symbolId){
+      pushUndo();
+      var curOut=window.layerOutPoint?layerOutPoint(ldIn):(ldIn.outPoint!=null?ldIn.outPoint:state.totalFrames-1);
+      ldIn.inPoint=Math.max(0,Math.min(state.currentFrame,curOut-1));
+      renderTimeline();loadFrame(state.currentFrame);
+      if(window.SMEngineBridge)SMEngineBridge.renderNow();
+    }
+  }
+  else if(event.altKey&&k===']'){
+    var ldOut=state.layers[state.activeLayerIdx];
+    if(ldOut&&!ldOut.symbolId){
+      pushUndo();
+      var curIn=window.layerInPoint?layerInPoint(ldOut):(ldOut.inPoint!=null?ldOut.inPoint:0);
+      ldOut.outPoint=Math.max(curIn+1,Math.min(state.currentFrame,state.totalFrames-1));
+      renderTimeline();loadFrame(state.currentFrame);
+      if(window.SMEngineBridge)SMEngineBridge.renderNow();
+    }
+  }
   else if(k==='Delete'||k==='Backspace'){
     // Pen tool mid-draw: standard Illustrator/Figma "undo the last placed
     // anchor, keep drawing from the one before it" — previously the only
