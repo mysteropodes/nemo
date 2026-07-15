@@ -34,6 +34,7 @@
   var marqueeStart = null;
   var moveStarted = false;
   var draggingArc = null;
+  var arcDragCache = null;
   var ANCHOR_MAP = { nw: 'se', ne: 'sw', sw: 'ne', se: 'nw', n: 's', s: 'n', e: 'w', w: 'e' };
 
   // v17: symGestureAccumulate (app.js) folds each move/scale/rotate tick on
@@ -154,6 +155,11 @@
     if (ah) {
       mode = 'arc';
       draggingArc = ah;
+      // Perf fix 2026-07: compute the (expensive, O(n³) autoMatch) stroke
+      // pairing ONCE here instead of on every pointermove — only the
+      // dragged handle's own position changes during the drag, matches()
+      // is re-decided fresh on drag-end anyway (generateTweens(), onUp).
+      arcDragCache = computeArcMatchState();
       return;
     }
 
@@ -534,7 +540,7 @@
       symGestureAccumulate(new Matrix().scale(stepSx, stepSy, anchor));
     } else if (mode === 'arc') {
       setArcHandle(draggingArc.fA, draggingArc.fB, draggingArc.matchIdx, draggingArc.which, draggingArc.ptA, draggingArc.ptB, pt.x, pt.y);
-      renderArcs();
+      renderArcs(arcDragCache);
     } else if (mode === 'xform-rotate') {
       var ptR = pt;
       if (xformMap) { var ptgR = xformMap.inv(pt.x, pt.y); ptR = new Point(ptgR[0], ptgR[1]); }
@@ -586,6 +592,7 @@
     }
     if (mode === 'arc') {
       draggingArc = null;
+      arcDragCache = null;
       generateTweens();
     } else if (mode === 'xform-scale' || mode === 'xform-rotate') {
       var xLd = state.layers[state.activeLayerIdx];

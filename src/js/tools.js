@@ -3542,7 +3542,7 @@ function onMouseDown(event){
     // unrelated action happened to trigger the next render tick.
     if(window.SMEngineBridge&&window.SMEngineBridge.renderNow)window.SMEngineBridge.renderNow();
   }else if(state.tool==='select'){
-    for(var i=0;i<arcHandles.length;i++){var ah=arcHandles[i];if(event.point.getDistance(ah.handle.position)<14/view.zoom){draggingArc=ah;return;}}draggingArc=null;
+    for(var i=0;i<arcHandles.length;i++){var ah=arcHandles[i];if(event.point.getDistance(ah.handle.position)<14/view.zoom){draggingArc=ah;arcDragCache=computeArcMatchState();return;}}draggingArc=null;
     var bestXh=null,bestXd=9/view.zoom;
     for(var xi=0;xi<xformHandles.length;xi++){var xh=xformHandles[xi];var xd=event.point.getDistance(xh.pos);if(xd<bestXd){bestXd=xd;bestXh=xh;}}
     if(bestXh){
@@ -3871,7 +3871,7 @@ function onMouseDrag(event){
       var prevA=project.activeLayer;marqueeLayer.activate();
       _marquee.rect=new Path.Rectangle({from:new Point(mx1,my1),to:new Point(mx2,my2),strokeColor:'rgba(74,158,255,.9)',strokeWidth:1/view.zoom,dashArray:[4/view.zoom,3/view.zoom],fillColor:new Color(0.29,0.62,1,0.08),insert:true});
       prevA.activate();
-    }else if(draggingArc){setArcHandle(draggingArc.fA,draggingArc.fB,draggingArc.matchIdx,draggingArc.which,draggingArc.ptA,draggingArc.ptB,event.point.x,event.point.y);renderArcs();}
+    }else if(draggingArc){setArcHandle(draggingArc.fA,draggingArc.fB,draggingArc.matchIdx,draggingArc.which,draggingArc.ptA,draggingArc.ptB,event.point.x,event.point.y);renderArcs(arcDragCache);}
     else if(selectedPaths.length>0){
       if(!_moveDragStarted){pushUndo();_moveDragStarted=true;}
       selectedPaths.forEach(function(p){
@@ -4029,7 +4029,7 @@ function onMouseUp(event){
       }
       _marquee.active=false;renderArcs();updateUI();
     }
-    else if(draggingArc){draggingArc=null;generateTweens();}else if(selectedPaths.length>0){
+    else if(draggingArc){draggingArc=null;arcDragCache=null;generateTweens();}else if(selectedPaths.length>0){
       _moveDragStarted=false;
       var mLd2=state.layers[state.activeLayerIdx];
       if(mLd2&&mLd2.symbolId){

@@ -1089,24 +1089,39 @@ function generateTweens(){
 
 // ---- ARCS ----
 var arcHandles=[],draggingArc=null;
-function renderArcs(){
+// Split out of renderArcs so a caller dragging a single arc handle can
+// compute this ONCE at drag-start and reuse it on every pointermove instead
+// of re-running splitTweenables+autoMatch (documented O(n³) Hungarian) on
+// every mouse pixel — perf bug found 2026-07: dragging a handle called the
+// full renderArcs() (recompute + rebuild) per move event, unlike every
+// other continuous-drag path in this app, which defers expensive work.
+// Only the dragged handle's OWN position changes during a drag; which
+// strokes match which never does (that's re-decided by generateTweens()
+// on drag-end, mode==='arc' in select-bridge.js/tools.js).
+function computeArcMatchState(){
+  if(state.tool!=='select'||!state.selectedStrokeIndices.length)return null;
+  var li=state.activeLayerIdx;var ld=state.layers[li];
+  var keys=[];for(var i=0;i<state.totalFrames;i++){if(ld.frames[i].isKeyframe&&ld.frames[i].strokes.length>0)keys.push(i);}
+  if(keys.length<2)return null;
+  var fA=-1,fB=-1;for(var i2=0;i2<keys.length-1;i2++){if(state.currentFrame>=keys[i2]&&state.currentFrame<=keys[i2+1]){fA=keys[i2];fB=keys[i2+1];break;}}
+  if(fA<0)return null;
+  var spA=splitTweenables(ld.frames[fA].strokes),spB=splitTweenables(ld.frames[fB].strokes);
+  var sA=spA.list,sB=spB.list;var matches=autoMatch(sA,sB);if(!matches.length)return null;
+  var sel=state.selectedStrokeIndices;var fm=matches.filter(function(m){return sel.indexOf(spA.orig[m.a])>=0;});if(!fm.length)return null;
+  return {fA:fA,fB:fB,sA:sA,sB:sB,matches:matches,fm:fm};
+}
+function renderArcs(cached){
   arcLayer.removeChildren();arcHandles=[];
   renderNodeHandles();
   renderTransformHandles();
-  if(state.tool!=='select'||!state.selectedStrokeIndices.length)return;
-  var li=state.activeLayerIdx;var ld=state.layers[li];
-  var keys=[];for(var i=0;i<state.totalFrames;i++){if(ld.frames[i].isKeyframe&&ld.frames[i].strokes.length>0)keys.push(i);}
-  if(keys.length<2)return;
-  var fA=-1,fB=-1;for(var i2=0;i2<keys.length-1;i2++){if(state.currentFrame>=keys[i2]&&state.currentFrame<=keys[i2+1]){fA=keys[i2];fB=keys[i2+1];break;}}
-  if(fA<0)return;
   // Same anchors-only filtering as generateTweens (see splitTweenables'
   // comment) — this runs on every selection render, so dab pollution here
   // was ALSO an O(n³) Hungarian on hundreds of entries per click. m.a
   // indexes the filtered list; selectedStrokeIndices index the raw frame
   // array — map back through .orig for the selection check.
-  var spA=splitTweenables(ld.frames[fA].strokes),spB=splitTweenables(ld.frames[fB].strokes);
-  var sA=spA.list,sB=spB.list;var matches=autoMatch(sA,sB);if(!matches.length)return;
-  var sel=state.selectedStrokeIndices;var fm=matches.filter(function(m){return sel.indexOf(spA.orig[m.a])>=0;});if(!fm.length)return;
+  var st=cached||computeArcMatchState();
+  if(!st)return;
+  var fA=st.fA,fB=st.fB,sA=st.sA,sB=st.sB,matches=st.matches,fm=st.fm;
   arcLayer.activate();var cols=['#ff6b6b','#4ecdc4','#ffe66d','#a29bfe','#fd79a8','#00cec9'];var easFn=getEasing();
   // A multi-element selection used to draw every arc at full brightness/
   // width in its own cycling color — with more than a handful selected the
