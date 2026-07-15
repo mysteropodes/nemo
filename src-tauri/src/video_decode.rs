@@ -640,6 +640,22 @@ fn decode_frame_core(s: &mut VideoSession, frame_index: i64) -> Result<(Vec<u8>,
 /// Mutex so session A decoding never blocks session B.
 pub struct VideoSessions(pub Mutex<HashMap<u32, Arc<Mutex<VideoSession>>>>);
 
+/// Recovers from a poisoned lock instead of propagating the panic (audit
+/// finding, 2026-07): plain `.lock().unwrap()` on every video-session
+/// mutex meant a single panic anywhere inside `decode_frame_core` (which
+/// does non-trivial byte-slicing on raw ffmpeg output) while holding a
+/// session's lock would poison it permanently — every subsequent Tauri
+/// command touching that session (or, for the outer HashMap mutex, ALL
+/// sessions) would then itself panic on `.unwrap()`, turning one
+/// transient decode bug into "video dead for the rest of the app's
+/// lifetime". A poisoned mutex's guarded data isn't corrupted by the
+/// mutex itself — only whatever partial write the panicking thread was
+/// mid-way through — so recovering via `into_inner()` and continuing is
+/// strictly better than a cascading permanent failure for this use case.
+fn lock_or_recover<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    m.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
 impl Default for VideoSessions {
     fn default() -> Self {
         VideoSessions(Mutex::new(HashMap::new()))
@@ -1155,7 +1171,7 @@ pub fn open_video_session(
     let (width, height, fps) = (session.width, session.height, session.fps);
     let codec = session.codec.clone();
     let id = NEXT_SESSION_ID.fetch_add(1, Ordering::Relaxed);
-    state.0.lock().unwrap().insert(id, Arc::new(Mutex::new(session)));
+    lock_or_recover(&state.0).insert(id, Arc::new(Mutex::new(session)));
 
     Ok(VideoInfo {
         session_id: id,
@@ -1180,14 +1196,14 @@ pub fn decode_video_frame(
 ) -> Result<Response, String> {
     // Clone the Arc and drop the map lock immediately — unchanged from v1.
     let session_arc = {
-        let sessions = state.0.lock().unwrap();
+        let sessions = lock_or_recover(&state.0);
         sessions
             .get(&session_id)
             .cloned()
             .ok_or_else(|| format!("no session {session_id}"))?
     };
     let (result, indexed) = {
-        let mut s = session_arc.lock().unwrap();
+        let mut s = lock_or_recover(&session_arc);
         let r = decode_frame_core(&mut s, frame_index);
         (r, s.indexed.is_some())
     };
@@ -1205,9 +1221,9 @@ pub fn close_video_session(
     state: tauri::State<'_, VideoSessions>,
     session_id: u32,
 ) -> Result<(), String> {
-    let removed = state.0.lock().unwrap().remove(&session_id);
+    let removed = lock_or_recover(&state.0).remove(&session_id);
     if let Some(arc) = removed {
-        let mut s = arc.lock().unwrap();
+        let mut s = lock_or_recover(&arc);
         s.readahead_active = false; // ask the readahead thread to stop (waits at most one frame read)
         if let Some(mut p) = s.proc.take() {
             let _ = p.child.kill();
@@ -1237,7 +1253,7 @@ pub fn close_video_session(
 /// every codec.
 fn spawn_readahead(arc: Arc<Mutex<VideoSession>>, center: i64) {
     {
-        let mut s = arc.lock().unwrap();
+        let mut s = lock_or_recover(&arc);
         s.readahead_goal = center.min(s.frame_count - 1).max(0);
         if s.readahead_active {
             return;
@@ -1260,7 +1276,7 @@ fn spawn_readahead(arc: Arc<Mutex<VideoSession>>, center: i64) {
         // center means a genuinely new window worth attempting.
         let mut attempted: std::collections::HashSet<i64> = std::collections::HashSet::new();
         loop {
-        let mut s = arc.lock().unwrap();
+        let mut s = lock_or_recover(&arc);
         if !s.readahead_active {
             break;
         }
