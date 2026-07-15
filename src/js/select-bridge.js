@@ -445,6 +445,20 @@
         var curDX = ptS.x - anchor.x, curDY = ptS.y - anchor.y;
         sx = origDX !== 0 ? curDX / origDX : 1;
         sy = origDY !== 0 ? curDY / origDY : 1;
+        // Shift = proportional/aspect-locked scale (UI/UX audit, 2026-07)
+        // — Illustrator/Figma/Photoshop convention on a CORNER handle,
+        // absent entirely before this. Uses the diagonal distance ratio
+        // (direction-agnostic, unlike averaging sx/sy) so it works
+        // identically whichever corner or drag direction; each axis keeps
+        // its own already-computed sign so dragging a corner PAST the
+        // anchor (a legal flip) still flips correctly under lock.
+        if (e.shiftKey) {
+          var origDiag = Math.sqrt(origDX * origDX + origDY * origDY);
+          var curDiag = Math.sqrt(curDX * curDX + curDY * curDY);
+          var uniform = origDiag !== 0 ? curDiag / origDiag : 1;
+          sx = uniform * (sx < 0 ? -1 : 1);
+          sy = uniform * (sy < 0 ? -1 : 1);
+        }
       } else if (dir === 'n' || dir === 's') {
         var origDY2 = xformOrigHandlePos.y - anchor.y, curDY2 = ptS.y - anchor.y;
         sy = origDY2 !== 0 ? curDY2 / origDY2 : 1;
@@ -472,6 +486,13 @@
       if (xformMap) { var ptgR = xformMap.inv(pt.x, pt.y); ptR = new Point(ptgR[0], ptgR[1]); }
       var curAngle = Math.atan2(ptR.y - rotCenter.y, ptR.x - rotCenter.x) * 180 / Math.PI;
       var deltaFromStart = curAngle - rotStartAngle;
+      // Shift = snap to 15° increments of TOTAL rotation from where the
+      // drag started (UI/UX audit, 2026-07) — Illustrator/Figma
+      // convention, absent before this. Snapping deltaFromStart (not the
+      // raw angle) is what makes it land on clean values relative to the
+      // shape's own starting orientation, not clean values in absolute
+      // canvas space.
+      if (e.shiftKey) deltaFromStart = Math.round(deltaFromStart / 15) * 15;
       var stepAngle = deltaFromStart - rotLastAngle;
       selectedPaths.forEach(function (p) {
         p.rotate(stepAngle, rotCenter);
