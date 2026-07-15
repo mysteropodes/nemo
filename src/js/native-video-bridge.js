@@ -335,6 +335,13 @@
       // and let _optimizeLayerMedia regenerate it in the background.
       if (!ld._nvSessionId) {
         var info = null;
+        // Pre-indexed-era (.mov) optimized copies must NOT be reopened —
+        // they'd silently keep the session on the old seek/respawn decode
+        // path (live-caught 2026-07: zero INDEXED decodes in the log
+        // because every layer's persisted optimizedPath predated the
+        // indexed format). Dropping it here routes through the original +
+        // background re-optimize into the indexed .mjpeg flavor.
+        if (nv.optimizedPath && !/\.mjpeg$/.test(nv.optimizedPath)) nv.optimizedPath = null;
         if (nv.optimizedPath) {
           try { info = await open(nv.optimizedPath); }
           catch (e) { nv.optimizedPath = null; }
@@ -393,6 +400,11 @@
     var ld = state.layers[li];
     if (!ld || !ld.nativeVideo) return;
     var nv = ld.nativeVideo;
+    // A pre-indexed-era optimizedPath (.mov flavor) is treated as absent:
+    // it decodes through the old seek/respawn path and misses the whole
+    // point of optimization now (indexed random access). Re-optimize once
+    // into the .mjpeg format; the stale .mov cache file is simply ignored.
+    if (nv.optimizedPath && !/\.mjpeg$/.test(nv.optimizedPath)) nv.optimizedPath = null;
     if (nv.optimizedPath || _isAllIntra(nv.codec) || _optimizing[nv.path]) return;
     _optimizing[nv.path] = true;
     try {
