@@ -898,6 +898,11 @@ function generateTweens(){
     // piece-wise morphs by splitting a merged stroke (see resolveSplitMatches)
     if(unA.length||unB.length)resolveSplitMatches(sA,sB,pairSpecs,unA,unB);
     var fadeOutA=unA.map(function(i){return sA[i];}),fadeInB=unB.map(function(i){return sB[i];});
+    // Same identity-continuity fix as the matched pairs above (see that
+    // comment): a solo fading stroke's id-less keyframe would otherwise
+    // be a different identity from its own generated fade frames.
+    fadeOutA.forEach(function(sd,i2){if(!sd.strokeId)sd.strokeId='twf_'+fA+'_a'+i2;});
+    fadeInB.forEach(function(sd,i2){if(!sd.strokeId)sd.strokeId='twf_'+fB+'_b'+i2;});
     if(!pairSpecs.length&&!fadeOutA.length&&!fadeInB.length)continue;
     // ---- OCCLUSION: stacking order interpolated from real authored data ----
     // The z-order (draw/stack order, front-to-back) of a generated inbetween
@@ -943,19 +948,26 @@ function generateTweens(){
           seed:(fA*7919+spec.mi*131+1)>>>0,
         };
       }
-      return{a:ra,b:alignResampledPair(ra,rb),mi:spec.mi,tex:tex,
-        // Stable identity for every frame this pair generates — the raw A
-        // stroke's own strokeId when it has one, else a synthetic id
-        // that's still constant across the whole gap. Without this,
-        // interpolated strokes were completely anonymous (interpStroke
-        // builds fresh objects, resample drops non-geometry fields), and
-        // any cross-frame consumer that needs to FOLLOW a stroke through
-        // the tween (the Rive export's shape lanes, notably) had nothing
-        // to match on but array position — which the per-frame __zKey
-        // re-sort below deliberately shuffles. Live-caught 2026-07:
-        // multi-stroke tweens exported to Rive with inbetweens morphing
-        // between UNRELATED strokes and mistimed run boundaries.
-        id:(spec.aData&&spec.aData.strokeId)||(spec.bData&&spec.bData.strokeId)||('tw_'+fA+'_'+spec.mi),
+      // Stable identity for every frame this pair generates. Ordinary
+      // hand-drawn strokes usually have NO strokeId at all — it's
+      // assigned lazily only for fill-wall/review purposes (tools.js'
+      // ensureStrokeId) — so a naive "read spec.aData.strokeId, else
+      // synthesize one for the interpolated frames only" left the id-less
+      // KEYFRAME endpoints in a different identity than the interpolated
+      // middle, breaking continuity exactly at the tween boundary (each
+      // keyframe becomes an isolated 1-frame shape, the interpolated span
+      // a separate disconnected one). Live-caught 2026-07 twice: first
+      // "les inbetween sont mal timés" (position-based matching), then
+      // after fixing that, "je ne vois que 3 images" (id-based matching,
+      // but ids didn't reach the keyframes). Fixed by STAMPING the
+      // resolved id back onto spec.aData/bData — splitTweenables doesn't
+      // clone, so these are the live objects sitting in
+      // ld.frames[fA/fB].strokes, and the assignment persists into the
+      // keyframe's own stored data, giving keyframe and every
+      // interpolated frame in between the exact same identity.
+      var pairId=spec.aData.strokeId||spec.bData.strokeId||('tw_'+fA+'_'+spec.mi);
+      spec.aData.strokeId=pairId;spec.bData.strokeId=pairId;
+      return{a:ra,b:alignResampledPair(ra,rb),mi:spec.mi,tex:tex,id:pairId,
         aRank:spec.aIdx/Math.max(1,sA.length-1),bRank:spec.bIdx/Math.max(1,sB.length-1)};
     });
     var gap=fB-fA;
