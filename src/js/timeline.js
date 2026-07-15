@@ -1209,7 +1209,17 @@ function updateSelPropsPanel(){
       // bug, same root cause, re-reported. Both channels now skip this
       // sync entirely for these two path kinds, matching the isVectorBrush
       // exclusion already used for Cap/Join/Dash sync just below.
-      var isBrushShape=ref.data&&(ref.data.isVectorBrush||ref.data.isFillShape);
+      // Texture anchors too (third occurrence of this same bug, 2026-07,
+      // "si j'essaye de redessiner avec le trait brush bitmap il n'apparaît
+      // plus"): a Bitmap Brush or vector-preset anchor carries
+      // strokeColor:null as CAMOUFLAGE (applyBrushTexture/
+      // applyBitmapBrushTexture null it on purpose, remembering the real
+      // color in preTextureStroke) — reading that as "user disabled the
+      // stroke channel" silently turned state.strokeEnabled off the moment
+      // one got selected (e.g. by a subselect node edit), making every
+      // FUTURE stroke invisible and skipping the bitmap-brush branch
+      // entirely.
+      var isBrushShape=ref.data&&(ref.data.isVectorBrush||ref.data.isFillShape||ref.data.bitmapBrushSpec||ref.data.brushTexturePreset||ref.data.isBrushTextureCopy);
       if(!isBrushShape){
         var hasFill=!!ref.fillColor;
         // colorHex8(), not .toCSS(true) — the latter always forces alpha to

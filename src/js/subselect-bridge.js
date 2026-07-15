@@ -186,6 +186,11 @@
       // regenerated at mouseup, so the fill visibly lagged behind the
       // stroke for the whole drag instead of tracking it in real time.
       fillRegenerateLinked(userLayers[state.activeLayerIdx], gp);
+      // Live texture follow for Bitmap Brush anchors — same "at mouseup
+      // only, it visibly lags" complaint as the fill line above, fixed the
+      // same way (rAF-coalesced + in-place re-upload, see liveRestamp's
+      // own comment for why this is cheap where full regenerate isn't).
+      if (gp.data && gp.data.bitmapBrushSpec && window.SMBitmapBrush) SMBitmapBrush.liveRestamp(gp, userLayers[state.activeLayerIdx]);
     } else if (_nodeDrag.active) {
       var sdp = _nodeDrag.path;
       if (sdp.data && sdp.data.isVectorBrush && sdp.data.centerSegments) {
@@ -202,6 +207,8 @@
       }
       renderNodeHandles();
       fillRegenerateLinked(userLayers[state.activeLayerIdx], sdp);
+      // Live texture follow — see the identical call in the group branch.
+      if (sdp.data && sdp.data.bitmapBrushSpec && window.SMBitmapBrush) SMBitmapBrush.liveRestamp(sdp, userLayers[state.activeLayerIdx]);
     }
     lastPt = pt;
     window.SMEngineBridge.renderNow();

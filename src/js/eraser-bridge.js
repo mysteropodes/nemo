@@ -80,6 +80,20 @@
     // cursor is merely near, not squarely on top of.
     var hit = layer.hitTest(pt, { stroke: true, fill: true, tolerance: 0 });
     if (!hit) hit = layer.hitTest(pt, { stroke: true, fill: true, tolerance: Math.max(8, radius) / view.zoom });
+    // Bitmap Brush texture (bitmap-brush.js): the companion raster sits
+    // ABOVE its anchor so it takes the hit — pixel-erase it in place
+    // (raster-app semantics; eraseAtPoint's boolean pipeline would lose
+    // the anchor's .data linkage, see eraseBite's own comment). The
+    // vector-preset dabs need no such branch: they're Paths, the existing
+    // flow below already bites them individually.
+    if (hit && hit.item instanceof Raster && hit.item.data && hit.item.data.isBitmapBrush && hit.item.data.isBrushTextureCopy) {
+      if (window.SMBitmapBrush) {
+        SMBitmapBrush.eraseBite(hit.item, pt, radius, lastErasePt);
+        lastErasePt = pt.clone();
+        updateUI();
+      }
+      return;
+    }
     // instanceof Path AND CompoundPath: eraseAtPoint turns a shape into a
     // CompoundPath the moment a bite creates a hole — an instanceof-Path-only
     // guard silently stopped erasing that same shape any further after the
@@ -171,6 +185,12 @@
     pointerIsDown = false;
     erasing = false;
     lastErasePt = null;
+    // Bitmap Brush bites deferred their (expensive) data.src refresh to
+    // gesture end — flush + persist once here, see eraseBite's comment.
+    if (window.SMBitmapBrush) {
+      SMBitmapBrush.flushEraseDirty(userLayers[state.activeLayerIdx]);
+      saveActiveLayerFrame();
+    }
     window.SMEngineBridge.resume();
     window.SMEngineBridge.renderNow();
   }

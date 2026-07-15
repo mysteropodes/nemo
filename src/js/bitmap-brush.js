@@ -144,55 +144,11 @@
       color: basePath.strokeColor ? colorHex8(basePath.strokeColor) : ((basePath.data && basePath.data.preTextureStroke) || state.strokeColor || '#000000'),
       seed: Math.floor(Math.random() * 0xffffffff),
     };
-    var baseSize = spec.size;
-    var spacing = Math.max(1, baseSize * (spec.spacing / 100));
-    var scatterPx = baseSize * (spec.scatter / 100);
-    var rng = seededRng(spec.seed);
-
-    // World-space bounds from the path's own true bounds, padded for tip
-    // radius (max jitter scale 1.25) + scatter.
-    var pb = basePath.bounds;
-    var pad = baseSize * 1.25 / 2 + scatterPx + 4;
-    var minX = pb.x - pad, minY = pb.y - pad;
-    var w = Math.max(1, pb.width + pad * 2), h = Math.max(1, pb.height + pad * 2);
-
-    // Oversample vs world units for reasonable quality regardless of zoom —
-    // a real "resample at export resolution" step is future work. CLAMPED
-    // to a max texture dimension: found live (zoomed out to 3%, stroke
-    // spanning ~8000 world px) that an unclamped w*2 bake canvas hit
-    // ~16000px wide and the synchronous toDataURL froze the app for 30s+.
-    // World size of a stroke is unbounded (it scales with 1/zoom for the
-    // same hand gesture), so the RESOLUTION must not follow it linearly.
-    var MAX_TEX = 4096;
-    var SCALE = Math.min(2, MAX_TEX / w, MAX_TEX / h);
-    var canvas = document.createElement('canvas');
-    canvas.width = Math.max(1, Math.ceil(w * SCALE)); canvas.height = Math.max(1, Math.ceil(h * SCALE));
-    var ctx = canvas.getContext('2d');
-    var tip = buildTipCanvas(spec.tip, spec.seed);
-
-    // Mask pass: stamp the white/alpha tip along the TRUE curve at fixed
-    // arc-length steps, then tint once via destination-in.
-    var maskCanvas = document.createElement('canvas');
-    maskCanvas.width = canvas.width; maskCanvas.height = canvas.height;
-    var mctx = maskCanvas.getContext('2d');
-    var len = basePath.length;
-    for (var d = 0; d <= len; d += spacing) {
-      var pt = basePath.getPointAt(d);
-      if (!pt) continue;
-      var jx = (rng() - 0.5) * 2 * scatterPx, jy = (rng() - 0.5) * 2 * scatterPx;
-      var s = baseSize * (0.75 + rng() * 0.5);
-      var px = (pt.x + jx - minX) * SCALE, py = (pt.y + jy - minY) * SCALE, ps = s * SCALE;
-      mctx.globalAlpha = spec.opacity;
-      mctx.drawImage(tip, px - ps / 2, py - ps / 2, ps, ps);
-    }
-    ctx.fillStyle = spec.color;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.globalCompositeOperation = 'destination-in';
-    ctx.drawImage(maskCanvas, 0, 0);
-    ctx.globalCompositeOperation = 'source-over';
+    var bake = bakeToCanvas(basePath, spec, null);
 
     // Raster from the canvas ELEMENT — synchronous, no decode wait. The
     // dataURL is still needed as the persistable .data.src string (serR).
+    var canvas = bake.canvas, minX = bake.minX, minY = bake.minY, w = bake.w, h = bake.h;
     var raster = new Raster(canvas);
     raster.data.src = canvas.toDataURL('image/png');
     raster.data.isBrushTextureCopy = true; // rides every existing exclusion/move/relink rule for texture companions
@@ -217,6 +173,142 @@
     basePath.data.brushCompanions = [raster];
     basePath.data.bitmapBrushSpec = spec; // persisted via serP — regenerateBrushTexture re-stamps from this after node edits
     return basePath;
+  }
+
+  // The bake itself, shared by the initial apply, the drag-end regenerate,
+  // and the per-move live restamp — one implementation so the live preview
+  // and the committed texture can never drift apart visually. `reuseCanvas`
+  // (live restamp) draws into an existing canvas element instead of
+  // allocating one per pointermove.
+  function bakeToCanvas(basePath, spec, reuseCanvas) {
+    var baseSize = spec.size;
+    var spacing = Math.max(1, baseSize * (spec.spacing / 100));
+    var scatterPx = baseSize * (spec.scatter / 100);
+    var rng = seededRng(spec.seed);
+
+    // World-space bounds from the path's own true bounds, padded for tip
+    // radius (max jitter scale 1.25) + scatter.
+    var pb = basePath.bounds;
+    var pad = baseSize * 1.25 / 2 + scatterPx + 4;
+    var minX = pb.x - pad, minY = pb.y - pad;
+    var w = Math.max(1, pb.width + pad * 2), h = Math.max(1, pb.height + pad * 2);
+
+    // Oversample vs world units for reasonable quality regardless of zoom —
+    // a real "resample at export resolution" step is future work. CLAMPED
+    // to a max texture dimension: found live (zoomed out to 3%, stroke
+    // spanning ~8000 world px) that an unclamped w*2 bake canvas hit
+    // ~16000px wide and the synchronous toDataURL froze the app for 30s+.
+    // World size of a stroke is unbounded (it scales with 1/zoom for the
+    // same hand gesture), so the RESOLUTION must not follow it linearly.
+    var MAX_TEX = 4096;
+    var SCALE = Math.min(2, MAX_TEX / w, MAX_TEX / h);
+    var canvas = reuseCanvas || document.createElement('canvas');
+    canvas.width = Math.max(1, Math.ceil(w * SCALE)); canvas.height = Math.max(1, Math.ceil(h * SCALE)); // setting width/height also clears a reused canvas
+    var ctx = canvas.getContext('2d');
+    var tip = buildTipCanvas(spec.tip, spec.seed);
+
+    // Mask pass: stamp the white/alpha tip along the TRUE curve at fixed
+    // arc-length steps, then tint once via destination-in.
+    var maskCanvas = document.createElement('canvas');
+    maskCanvas.width = canvas.width; maskCanvas.height = canvas.height;
+    var mctx = maskCanvas.getContext('2d');
+    var len = basePath.length;
+    for (var d = 0; d <= len; d += spacing) {
+      var pt = basePath.getPointAt(d);
+      if (!pt) continue;
+      var jx = (rng() - 0.5) * 2 * scatterPx, jy = (rng() - 0.5) * 2 * scatterPx;
+      var s = baseSize * (0.75 + rng() * 0.5);
+      var px = (pt.x + jx - minX) * SCALE, py = (pt.y + jy - minY) * SCALE, ps = s * SCALE;
+      mctx.globalAlpha = spec.opacity;
+      mctx.drawImage(tip, px - ps / 2, py - ps / 2, ps, ps);
+    }
+    ctx.fillStyle = spec.color;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.globalCompositeOperation = 'destination-in';
+    ctx.drawImage(maskCanvas, 0, 0);
+    ctx.globalCompositeOperation = 'source-over';
+    return { canvas: canvas, minX: minX, minY: minY, w: w, h: h };
+  }
+
+  // Live re-stamp during a subselect node drag ("la ligne texturée ne suit
+  // pas en temps réel, que au relâchement") — re-bakes the companion's
+  // texture from the anchor's CURRENT (mid-drag) geometry on every move,
+  // rAF-coalesced. Three deliberate choices keep this cheap enough for a
+  // 60fps drag where the drag-END regenerate (a full remove+recreate+
+  // toDataURL) is not:
+  // 1. The raster's existing canvas is redrawn in place (no allocation, no
+  //    new Paper item, no undo churn) and its bounds updated.
+  // 2. NO toDataURL — the persistable data.src is only refreshed by the
+  //    full regenerate() at drag end (which replaces the raster anyway).
+  // 3. The engine-side texture is re-uploaded under the SAME image id via
+  //    registerImagePixels — engine.rs's images HashMap insert() OVERWRITES
+  //    an existing key (verified in the Rust source before building this),
+  //    so a long drag re-uploads in place instead of accumulating hundreds
+  //    of orphaned textures in the engine's session-lifetime image cache.
+  var _liveRestampPending = false;
+  function liveRestamp(basePath, layer) {
+    if (!basePath.data || !basePath.data.bitmapBrushSpec || !basePath.data.brushCompanions) return;
+    var raster = basePath.data.brushCompanions[0];
+    if (!raster || raster.removed || !(raster instanceof Raster)) return;
+    if (_liveRestampPending) return;
+    _liveRestampPending = true;
+    requestAnimationFrame(function () {
+      _liveRestampPending = false;
+      if (raster.removed) return;
+      var bake = bakeToCanvas(basePath, basePath.data.bitmapBrushSpec, raster.canvas);
+      raster.position = new Point(bake.minX + bake.w / 2, bake.minY + bake.h / 2);
+      raster.size = new Size(bake.w, bake.h);
+      if (window.SMEngineBridge && raster.data.src) SMEngineBridge.registerImagePixels(raster.data.src, bake.canvas);
+      if (window.SMEngineBridge) SMEngineBridge.renderNow();
+    });
+  }
+
+  // ---- eraser support (v2.1): pixel-erase, raster-app semantics ----
+  // eraseAtPoint (tools.js) can't apply here: its boolean-cut pipeline
+  // replaces the bitten path with fresh geometry that loses .data entirely
+  // (bitmapBrushSpec/brushGroupId gone → orphaned companion). The natural
+  // semantics for a baked bitmap texture is what every raster app does:
+  // erase PIXELS from the texture (destination-out capsule), leave the
+  // anchor's vector geometry intact. Deliberate consequence, not a bug: a
+  // later node edit re-stamps the full texture procedurally, resurrecting
+  // erased areas — same "the texture is derived, the path is the source of
+  // truth" model as everything else in this module.
+  // data.src (the persisted dataURL) intentionally NOT refreshed per bite
+  // (toDataURL per pointermove would be the exact freeze this file's
+  // MAX_TEX clamp comment describes) — bites mark the raster dirty and
+  // flushEraseDirty() refreshes once at gesture end.
+  function eraseBite(raster, worldPt, radius, fromPt) {
+    var cv = raster.canvas;
+    if (!cv || !cv.width) return;
+    var b = raster.bounds;
+    var sx = cv.width / b.width, sy = cv.height / b.height;
+    var ctx = cv.getContext('2d');
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.beginPath();
+    var px = (worldPt.x - b.x) * sx, py = (worldPt.y - b.y) * sy, pr = radius * sx;
+    if (fromPt) {
+      // Capsule from the previous sample — same gap-free continuous-drag
+      // reasoning as buildEraserCapsule (tools.js), just in pixel space.
+      var fx = (fromPt.x - b.x) * sx, fy = (fromPt.y - b.y) * sy;
+      ctx.lineCap = 'round'; ctx.lineWidth = pr * 2;
+      ctx.strokeStyle = '#000';
+      ctx.moveTo(fx, fy); ctx.lineTo(px, py); ctx.stroke();
+    }
+    ctx.arc(px, py, pr, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    raster.data._bmbEraseDirty = true;
+    if (window.SMEngineBridge && raster.data.src) SMEngineBridge.registerImagePixels(raster.data.src, cv);
+  }
+  function flushEraseDirty(layer) {
+    if (!layer) return;
+    layer.children.forEach(function (c) {
+      if (c instanceof Raster && c.data && c.data._bmbEraseDirty && c.canvas) {
+        c.data.src = c.canvas.toDataURL('image/png');
+        delete c.data._bmbEraseDirty;
+      }
+    });
   }
 
   // regenerateBrushTexture's (tools.js) bitmap branch — remove this
@@ -353,6 +445,9 @@
   window.SMBitmapBrush = {
     applyToPath: applyBitmapBrushTexture,
     regenerate: regenerate,
+    liveRestamp: liveRestamp,
+    eraseBite: eraseBite,
+    flushEraseDirty: flushEraseDirty,
     beginLivePreview: beginLivePreview,
     livePreviewMove: livePreviewMove,
     endLivePreview: endLivePreview,
