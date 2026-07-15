@@ -530,6 +530,26 @@
       });
     });
   }
+  // Skew Pro's headline gesture — "Offset"/stagger: each selected bar's
+  // start shifts by an increasing multiple of `step` frames (ordered by
+  // current in-point, so the leftmost bar anchors the group and stays put),
+  // preserving each bar's own duration — the classic cascading-entrance
+  // rig ("layer 1 at frame 0, layer 2 at frame +step, layer 3 at +2*step…").
+  // Distinct from distributeBars (which compresses/expands the WHOLE group
+  // into an even spread across its own existing span) — stagger instead
+  // grows the group's total span outward from its first bar by a fixed,
+  // user-chosen amount per layer.
+  function staggerBars(step) {
+    applyBatch(function (items) {
+      var sorted = items.slice().sort(function (a, b) { return inPointOf(a.ld) - inPointOf(b.ld); });
+      var base = inPointOf(sorted[0].ld);
+      sorted.forEach(function (x, i) {
+        var w = outPointOf(x.ld) - inPointOf(x.ld);
+        var ni = Math.max(0, base + step * i);
+        x.ld.inPoint = ni; x.ld.outPoint = ni + w;
+      });
+    });
+  }
   function selectEveryNth(n) {
     n = Math.max(2, parseInt(n, 10) || 2);
     var sorted = _barSel.slice().sort(function (a, b) { return inPointOf(state.layers[a.li]) - inPointOf(state.layers[b.li]); });
@@ -585,6 +605,7 @@
         menu.push({ label: 'Aligner au centre', action: function () { alignBars('center'); } });
         menu.push({ label: 'Aligner à droite (out)', action: function () { alignBars('right'); } });
         menu.push({ label: 'Distribuer uniformément', action: function () { distributeBars(); } });
+        menu.push({ label: 'Échelonner (stagger)…', action: function () { var v = prompt('Décalage entre calques (frames)', '2'); var step = parseInt(v, 10); if (!isNaN(step) && step !== 0) staggerBars(step); } });
         menu.push({ label: 'Inverser l’ordre (flip)', action: function () { flipBars(); } });
         menu.push({ label: 'Sélectionner 1 sur 2', action: function () { selectEveryNth(2); } });
       }
@@ -619,7 +640,8 @@
 
   window.SMLayerInOut = {
     inPointOf: inPointOf, outPointOf: outPointOf, hasCustomRange: hasCustomRange, buildBar: buildBar, updateBar: updateBar,
-    alignBars: alignBars, distributeBars: distributeBars, flipBars: flipBars, selectEveryNth: selectEveryNth, invertBarSelection: invertBarSelection,
+    alignBars: alignBars, distributeBars: distributeBars, flipBars: flipBars, staggerBars: staggerBars, selectEveryNth: selectEveryNth, invertBarSelection: invertBarSelection,
     getBarSelection: function () { return _barSel.slice(); },
+    setBarSelection: function (sel) { _barSel = sel; refreshBarSelClasses(); },
   };
 })();
