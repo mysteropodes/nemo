@@ -592,6 +592,21 @@
       }
       path.fillColor = state.fillEnabled ? state.fillColor : null;
       path.simplify(state.smoothing);
+    } else if (state.bitmapBrushOn && state.strokeEnabled && window.SMBitmapBrush) {
+      // Bitmap Brush (v1, 2026-07) — parallel category to the vector brush-
+      // texture presets below, see bitmap-brush.js's header comment. Scoped
+      // to this same plain constant-width branch as applyBrushTexture
+      // (vector-brush/fill-brush have their own outline machinery this
+      // isn't built to coexist with either). Produces a real Raster instead
+      // of a Path — every existing consumer (serR/desR, buildSceneJson,
+      // selectedPaths, save/load) already handles Raster with zero changes,
+      // confirmed by grep before writing this — only insertion here is new.
+      var raster = window.SMBitmapBrush.stamp(samples);
+      if (raster) {
+        userLayers[state.activeLayerIdx].addChild(raster);
+        if (state.drawMode === 'behind') userLayers[state.activeLayerIdx].insertChild(0, raster);
+        path = raster; // downstream tagOwner/Labs-hook/saveActiveLayerFrame calls below treat `path` generically
+      }
     } else {
       path = new Path();
       // Left-panel stroke eye honored here too (it always was for the

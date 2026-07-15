@@ -397,6 +397,21 @@
         <div class="pr" title="Re-smooths the SELECTED stroke's existing geometry — unlike Tool Options' Smooth (which only shapes new strokes as you draw), this is a one-shot action you can apply after the fact, repeatedly, to a stroke already on the canvas. Note: a freshly-drawn stroke is already simplified at draw time (Tool Options' Smooth, 10 by default) — applying THIS at the same or lower value won't visibly change anything since it's already fit that tightly; raise it for a visible extra effect."><span class="pl">Smooth</span><input type="number" class="pi scrub" id="p-poststroke-smooth" value="25" min="0" max="80" data-step="1"><button class="pbtn" id="btn-poststroke-smooth">Apply</button></div>
       </div>
     </div>
+    <div class="psec" id="bitmap-brush-sec">
+      <div class="phdr"><span class="ar">☰</span> <span>Bitmap Brush</span></div>
+      <div class="pbdy">
+        <div class="pr" title="Renders this stroke as a stamped raster texture (real bitmap grain) instead of the vector brush above — the geometry Draw captures stays the same, only the OUTPUT becomes an image layer. Existing vector brush presets are untouched (kept for exports like Rive that need real vector dabs) — this is a separate, parallel brush category, not a replacement."><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="p-bitmapbrush-on" style="accent-color:var(--accent)"> Enable (Draw tool)</label></div>
+        <div class="pr"><span class="pl">Tip</span><select class="psel" id="p-bitmap-tip">
+          <option value="soft">Soft Round</option>
+          <option value="grain">Grain</option>
+          <option value="splatter">Splatter</option>
+        </select></div>
+        <div class="pr"><span class="pl">Size</span><input type="number" class="pi scrub" id="p-bitmap-size" value="40" min="4" max="300" data-step="1"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
+        <div class="pr" title="Distance between stamps along the stroke, as a % of tip size — lower = denser/smoother coverage, higher = visible individual dabs"><span class="pl">Spacing</span><input type="number" class="pi scrub" id="p-bitmap-spacing" value="15" min="2" max="100" data-step="1"><span style="font-size:9px;color:var(--text-dim)">%</span></div>
+        <div class="pr" title="Random position/size jitter per stamp — 0 = perfectly even, mechanical dabbing"><span class="pl">Scatter</span><input type="number" class="pi scrub" id="p-bitmap-scatter" value="20" min="0" max="100" data-step="1"><span style="font-size:9px;color:var(--text-dim)">%</span></div>
+        <div class="pr"><span class="pl">Opacity</span><input type="number" class="pi scrub" id="p-bitmap-opacity" value="100" min="5" max="100" data-step="1"><span style="font-size:9px;color:var(--text-dim)">%</span></div>
+      </div>
+    </div>
     <div class="psec" id="tool-opts-sec">
       <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrToolOptions">Tool Options</span></div>
       <div class="pbdy">
@@ -1081,6 +1096,7 @@
 <script src="js/engine-bridge.js"></script>
 <script src="js/perspective-bridge.js"></script>
 <script src="js/viewtools-bridge.js"></script>
+<script src="js/bitmap-brush.js"></script>
 <script src="js/draw-bridge.js"></script>
 <script src="js/select-bridge.js"></script>
 <script src="js/subselect-bridge.js"></script>

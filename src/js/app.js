@@ -507,8 +507,14 @@ function relinkBrushCompanions(layer){
 // import) plus the position/size the user left it at — width/height are
 // re-applied explicitly on load since Raster sources decode async and may
 // briefly report their natural size instead of the saved one.
-function serR(r){return{isRaster:true,src:r.data&&r.data.src?r.data.src:r.source,x:r.position.x,y:r.position.y,width:r.bounds.width,height:r.bounds.height,opacity:r.opacity!==undefined?r.opacity:1};}
-function desR(d,layer,op){var prev=project.activeLayer;layer.activate();var r=new Raster(d.src);r.data.src=d.src;r.position=new Point(d.x,d.y);r.opacity=op!==undefined?op:(d.opacity!==undefined?d.opacity:1);var w=d.width,h=d.height;r.onLoad=function(){r.size=new Size(w,h);r.position=new Point(d.x,d.y);};prev.activate();return r;}
+// isBitmapBrush + its preset metadata (bitmap-brush.js) round-trip through
+// here too — found live: without this, a saved-then-reloaded bitmap-brush
+// stroke still rendered fine (the baked pixels ARE the src) but silently
+// lost the tag marking it as one, same "new tag handled at the write site,
+// forgotten at the read site" bug class CLAUDE.md's family-of-bug-#1
+// documents for exactly this file.
+function serR(r){var d={isRaster:true,src:r.data&&r.data.src?r.data.src:r.source,x:r.position.x,y:r.position.y,width:r.bounds.width,height:r.bounds.height,opacity:r.opacity!==undefined?r.opacity:1};if(r.data&&r.data.isBitmapBrush){d.isBitmapBrush=true;d.bitmapTip=r.data.bitmapTip;d.bitmapSize=r.data.bitmapSize;d.bitmapSpacing=r.data.bitmapSpacing;d.bitmapScatter=r.data.bitmapScatter;d.bitmapSeed=r.data.bitmapSeed;}return d;}
+function desR(d,layer,op){var prev=project.activeLayer;layer.activate();var r=new Raster(d.src);r.data.src=d.src;if(d.isBitmapBrush){r.data.isBitmapBrush=true;r.data.bitmapTip=d.bitmapTip;r.data.bitmapSize=d.bitmapSize;r.data.bitmapSpacing=d.bitmapSpacing;r.data.bitmapScatter=d.bitmapScatter;r.data.bitmapSeed=d.bitmapSeed;}r.position=new Point(d.x,d.y);r.opacity=op!==undefined?op:(d.opacity!==undefined?d.opacity:1);var w=d.width,h=d.height;r.onLoad=function(){r.size=new Size(w,h);r.position=new Point(d.x,d.y);};prev.activate();return r;}
 
 // ---- COMPONENTS / SYMBOLS ----
 // A "component" is a layer whose content lives in its own mini-timeline
