@@ -2845,6 +2845,18 @@ function initTextPopover(){
   var save=document.getElementById('text-apply');if(!save)return;
   save.addEventListener('click',commitText);
   document.getElementById('text-cancel').addEventListener('click',closeTextPopover);
+  // UI/UX audit (2026-07): the popover was mouse-only — no keyboard path
+  // at all (the textarea has no keydown listener, and the app's global
+  // shortcut handler deliberately ignores every TEXTAREA target). Escape
+  // to cancel and Ctrl/Cmd+Enter to place match this app's OWN existing
+  // convention elsewhere (frame/layer rename fields: Enter commits,
+  // Escape cancels, timeline.js). Plain Enter is left alone — this
+  // textarea is explicitly multi-line (commitText splits on '\n'), so
+  // Enter must keep inserting a newline, not submit.
+  document.getElementById('text-input').addEventListener('keydown',function(e){
+    if(e.key==='Escape'){e.stopPropagation();closeTextPopover();}
+    else if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)){e.stopPropagation();e.preventDefault();commitText();}
+  });
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initTextPopover);else initTextPopover();
 window.openTextPopover=openTextPopover;
@@ -3451,7 +3463,18 @@ function onKeyDown(event){
   else if(k===' '){event.preventDefault();if(!state.spaceDown){state.spaceDown=true;canvasEl.style.cursor='grab';}}
   else if(k==='Alt'){state.altDown=true;}
   else if(k==='Enter'){event.preventDefault();if(state.tool==='pen'&&_pen.path)finalizePen();else togglePlay();}
-  else if(k==='Escape'){if(state.tool==='pen'&&_pen.path){if(_pen.previewLine){_pen.previewLine.remove();_pen.previewLine=null;}_pen.path.remove();if(state.undoStack.length)state.undoStack.pop();_pen.path=null;_pen.draggingHandle=false;saveActiveLayerFrame();updateUI();}}
+  else if(k==='Escape'){
+    if(state.tool==='pen'&&_pen.path){if(_pen.previewLine){_pen.previewLine.remove();_pen.previewLine=null;}_pen.path.remove();if(state.undoStack.length)state.undoStack.pop();_pen.path=null;_pen.draggingHandle=false;saveActiveLayerFrame();updateUI();}
+    // UI/UX audit (2026-07): the footer hint has claimed "Échap
+    // Désélectionner" for an object selection, but this handler only ever
+    // covered cancelling a pen tool draw-in-progress — deselecting a
+    // plain Select/Subselect selection had no Escape path at all,
+    // confirmed live via a real dispatched keydown (selection count
+    // unchanged before/after). clearSel() also resets any in-progress
+    // node marquee/xform anchor override, matching what clicking empty
+    // canvas is supposed to do.
+    else if(selectedPaths.length){clearSel();renderArcs();updateUI();}
+  }
   // Arrow-key nudge for the current selection — the statusbar hint has
   // claimed "↑↓←→ Déplacer" whenever something's selected (see
   // statusbarHelpRender below) since that hint was written, but no code
