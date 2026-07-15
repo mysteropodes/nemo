@@ -116,12 +116,33 @@
     var snapped = window.perspectiveSnapPoint(new Point(shapeStart[0], shapeStart[1]), new Point(wx, wy));
     return [snapped.x, snapped.y];
   }
+  // Shift-constrain (2026-07, "8/9 marche pas" — root cause found): this
+  // bridge, NOT tools.js's Paper.js-View onMouseDrag, is the code path
+  // that actually runs for Rect/Ellipse/Line whenever the Rust engine is
+  // enabled (the default, almost always — see shouldIntercept above and
+  // its capture-phase stopImmediatePropagation, which stops tools.js's
+  // handlers from ever seeing the event). The earlier fix in tools.js was
+  // logically correct but dead code in practice — this file never had
+  // any shift-constrain at all. e.shiftKey directly (this is a real
+  // native PointerEvent, not a Paper.js ToolEvent, so no .event unwrap
+  // needed here — unlike tools.js's onMouseDrag). Reuses
+  // constrainSquare/constrainAngle45 (tools.js, global — tools.js loads
+  // before this file in index.html) so both code paths share identical
+  // math, since tools.js's copy is still live for the WASM-unavailable/
+  // engine-off fallback.
+  function constrainEnd(wx, wy) {
+    if (!shapeStart) return [wx, wy];
+    var start = new Point(shapeStart[0], shapeStart[1]);
+    var pt = shapeTool === 'line' ? constrainAngle45(start, new Point(wx, wy)) : constrainSquare(start, new Point(wx, wy));
+    return [pt.x, pt.y];
+  }
   function onMove(e) {
     if (!dragging) return;
     e.stopImmediatePropagation();
     e.preventDefault();
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
     var s = maybeSnap(w[0], w[1]);
+    if (e.shiftKey) s = constrainEnd(s[0], s[1]);
     window.SMEngineBridge.renderWithOverlayItem(overlayItem(s[0], s[1]));
   }
   function onUp(e) {
@@ -132,6 +153,7 @@
     window.SMEngineBridge.resume();
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
     var s = maybeSnap(w[0], w[1]);
+    if (e.shiftKey) s = constrainEnd(s[0], s[1]);
     commitShape(s[0], s[1]);
   }
 

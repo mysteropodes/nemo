@@ -52,7 +52,14 @@
   // closing stroke (fill-bridge.js) — without this exclusion, this
   // capture-phase handler (registered before fill-bridge.js's own) stole
   // every Alt+drag as a canvas rotate before the fill tool ever saw it.
-  function shouldRotate() { return engineOn() && (state.tool === 'rotate' || (state.altDown && ['zoom', 'draw', 'fillbrush', 'fill'].indexOf(state.tool) < 0 && !state.spaceDown)); }
+  // 'eraser' added (2026-07, live feedback: "alt+glisser fait tourner le
+  // canvas pas la taille de la gomme") — eraser-bridge.js got the exact
+  // same Alt+drag resize gesture as draw/fillbrush right after this list
+  // was last touched, but was never added here, so this handler (also
+  // capture-phase, also registered first) kept stealing the gesture
+  // before eraser-bridge.js ever saw it. Same fix as 'fill' above, same
+  // root cause.
+  function shouldRotate() { return engineOn() && (state.tool === 'rotate' || (state.altDown && ['zoom', 'draw', 'fillbrush', 'fill', 'eraser'].indexOf(state.tool) < 0 && !state.spaceDown)); }
 
   function canvasLocal(clientX, clientY) {
     var r = document.getElementById('drawing-canvas').getBoundingClientRect();

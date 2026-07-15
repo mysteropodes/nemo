@@ -93,6 +93,15 @@
         window.SMEngineBridge.renderNow();
         return;
       }
+      // Shift-constrain (2026-07, "8/9 marche pas" — same root cause as
+      // shape-bridge.js: this bridge, not tools.js's Paper.js-View
+      // onMouseDown, is the code path that actually places Pen anchors
+      // whenever the Rust engine is enabled — the earlier tools.js fix
+      // was dead code here too. Anchors are placed by discrete clicks,
+      // not by dragging, so the constrain check belongs at click-time
+      // (onDown), against the path's last placed anchor — not in onMove
+      // like Rect/Ellipse/Line's continuous drag.
+      if (e.shiftKey && _pen.path.segments.length) pt = constrainAngle45(_pen.path.lastSegment.point, pt);
       _pen.path.add(pt);
     }
     draggingHandle = true;

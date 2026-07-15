@@ -94,6 +94,7 @@ function updatePlayhead(){
   document.getElementById('tl-cf').textContent=state.currentFrame+1;
   document.getElementById('info-frame').textContent=state.currentFrame+1;
   document.getElementById('playhead').style.left=(state.currentFrame*FC)+'px';
+  document.getElementById('playhead-flag').textContent=state.currentFrame+1;
   document.querySelectorAll('.fc.cur').forEach(function(el){el.classList.remove('cur');});
   document.querySelectorAll('.fhc.cur').forEach(function(el){el.classList.remove('cur');});
   document.querySelectorAll('.fc[data-frame="'+state.currentFrame+'"]').forEach(function(el){el.classList.add('cur');});
@@ -1504,7 +1505,7 @@ function renderTimeline(){
   // scrollbar. Math.max keeps the line covering a tall/scrolled layer
   // list too (that case was already correct).
   var awrap=document.getElementById('fg-wrap');
-  document.getElementById('playhead').style.left=(state.currentFrame*FC)+'px';document.getElementById('playhead').style.height=Math.max(30+rowCount*ROW_H+camGridRowOffset(),awrap?awrap.clientHeight:0)+'px';
+  document.getElementById('playhead').style.left=(state.currentFrame*FC)+'px';document.getElementById('playhead').style.height=Math.max(30+rowCount*ROW_H+camGridRowOffset(),awrap?awrap.clientHeight:0)+'px';document.getElementById('playhead-flag').textContent=state.currentFrame+1;
   if(window.SMAudio)SMAudio.renderStrip();
 }
 // Builds one row's worth of frame cells for layer `li` into `rowEl` — shared
@@ -3412,29 +3413,28 @@ function onKeyDown(event){
     groupSelectionIntoFolder();
     return;
   }
-  // Ctrl/Cmd+Shift +/-/0 canvas zoom — mouse wheel already zoomed the
-  // canvas (tools.js), but had no keyboard equivalent. Live-caught 2026-07,
-  // "marche pas": plain Ctrl/Cmd+=/-/0 is the OS/WebView's OWN native
-  // page-zoom accelerator (confirmed: no zoom-disabling config anywhere in
-  // src-tauri/tauri.conf.json) — it gets consumed by the WebView shell
-  // BEFORE this page-level keydown handler ever runs, so preventDefault()
-  // here is a no-op against it. My own earlier "verified live" test was a
-  // false positive: CDP-synthesized key events go straight to page JS,
-  // bypassing that native interception layer entirely — a real physical
-  // keypress on the user's own machine does not. +Shift avoids the
-  // collision (not a reserved OS/browser zoom combo); Ctrl+0 alone mirrors
-  // the existing "Fit" button (window.SM.fitCanvas), +/- step by the same
-  // ratio the wheel handler's own Ctrl-modifier path uses.
-  // Round 2, still "marche pas": event.key is layout-dependent. On an
-  // AZERTY keyboard the "-" character sits on its key WITHOUT Shift (so
-  // Shift+that key produces "6", never "-"), while "=" and "0" both
-  // already require Shift to type on AZERTY (so those two happened to
-  // keep working). event.code is the physical key position, identical
-  // across layouts — Minus/Equal/Digit0 are the correct, layout-proof
-  // check regardless of what character the OS resolves them to.
-  if((event.metaKey||event.ctrlKey)&&event.shiftKey&&(event.code==='Equal'||event.code==='NumpadAdd')){event.preventDefault();view.zoom=Math.min(20,view.zoom*1.1);updZoom();renderArcs();if(window.SMEngineBridge)SMEngineBridge.renderNow();return;}
-  if((event.metaKey||event.ctrlKey)&&event.shiftKey&&(event.code==='Minus'||event.code==='NumpadSubtract')){event.preventDefault();view.zoom=Math.max(.05,view.zoom/1.1);updZoom();renderArcs();if(window.SMEngineBridge)SMEngineBridge.renderNow();return;}
-  if((event.metaKey||event.ctrlKey)&&event.shiftKey&&(event.code==='Digit0'||event.code==='Numpad0')){event.preventDefault();window.SM.fitCanvas();return;}
+  // Ctrl/Cmd+Alt +/-/0 canvas zoom — mouse wheel already zoomed the canvas
+  // (tools.js), but had no keyboard equivalent. Three rounds of live
+  // feedback, each collision a different flavor of the same problem:
+  // plain Ctrl+=/-/0 is the base OS/browser page-zoom accelerator;
+  // Ctrl+Shift+=/-/0 (round 2's fix) turned out to be Safari's own
+  // documented ALTERNATE zoom-in accelerator (Shift is how "+" is reached
+  // without a numpad on many layouts, so Shift+= often just IS "+" as far
+  // as the OS/browser's own zoom listener is concerned) — round 2's
+  // report ("13: ça bloque juste le zoom") was the WebView itself
+  // zooming, not this app. Bare +/-/0 (no modifier at all) was
+  // considered and rejected: "+"/"=" is ALREADY bound, unmodified, to
+  // extendExposure(1) a few lines below (real, pre-existing Animate-style
+  // "extend this frame" shortcut) — dropping the modifier would have
+  // silently broken that instead of fixing zoom. Ctrl+Alt is the
+  // remaining safe choice: essentially never reserved by any OS or
+  // browser (unlike Ctrl and Ctrl+Shift, which both are, in different
+  // ways, on different platforms). event.code (Equal/Minus/Digit0 +
+  // Numpad variants), not event.key — still layout-proof against AZERTY,
+  // same reasoning as round 2.
+  if((event.metaKey||event.ctrlKey)&&event.altKey&&(event.code==='Equal'||event.code==='NumpadAdd')){event.preventDefault();view.zoom=Math.min(20,view.zoom*1.1);updZoom();renderArcs();if(window.SMEngineBridge)SMEngineBridge.renderNow();return;}
+  if((event.metaKey||event.ctrlKey)&&event.altKey&&(event.code==='Minus'||event.code==='NumpadSubtract')){event.preventDefault();view.zoom=Math.max(.05,view.zoom/1.1);updZoom();renderArcs();if(window.SMEngineBridge)SMEngineBridge.renderNow();return;}
+  if((event.metaKey||event.ctrlKey)&&event.altKey&&(event.code==='Digit0'||event.code==='Numpad0')){event.preventDefault();window.SM.fitCanvas();return;}
   if(event.target.tagName==='INPUT'||event.target.tagName==='SELECT'||event.target.tagName==='TEXTAREA'||event.target.isContentEditable)return;
   var k=event.key;
   // Motion mode's P/A/R/S/T property-reveal shortcuts (After Effects
