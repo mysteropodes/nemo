@@ -3754,25 +3754,25 @@ document.getElementById('p-fillbrushsize').addEventListener('input',function(){w
 document.getElementById('p-brushpreset').addEventListener('change',function(){window.SM.setBrushPreset(this.value);if(window.BrushPresetPicker)window.BrushPresetPicker.paintButton(this.value);});
 document.getElementById('btn-brushpreset-apply').addEventListener('click',function(){
   var preset=state.brushPreset;
-  var eligible=selectedPaths.filter(function(p){return p instanceof Path&&p.strokeColor&&!(p.data&&(p.data.isVectorBrush||p.data.isFillShape));});
+  // `p.strokeColor` used to gate eligibility — excluded every fill-
+  // camouflaged anchor (a Bitmap Brush stroke with a fill, or any already-
+  // textured anchor with strokeColor nulled by the SAME camouflage
+  // convention) from ever being eligible, silently no-op'ing this button
+  // on exactly the strokes someone would want to convert FROM. Eligible
+  // now: a real stroke (strokeColor truthy) OR an already-textured anchor
+  // (recognizable by its own texture tag, regardless of which kind) — a
+  // plain fill-only shape with neither is still correctly excluded, same
+  // as before.
+  var eligible=selectedPaths.filter(function(p){return p instanceof Path&&!(p.data&&(p.data.isVectorBrush||p.data.isFillShape))&&(p.strokeColor||(p.data&&(p.data.brushTexturePreset||p.data.bitmapBrushSpec)));});
   if(!eligible.length)return;
   pushUndo();
   eligible.forEach(function(p){
-    // Re-applying: drop the OLD companions first (a fresh applyBrushTexture
-    // call only touches `p` itself + inserts new ones — it doesn't know
-    // about or clean up a previous texture's copies, so switching presets
-    // on the same stroke would otherwise leave the old jittered clones
-    // behind underneath the new ones).
-    if(p.data&&p.data.brushCompanions){
-      p.data.brushCompanions.forEach(function(c){c.remove();});
-      p.data.brushCompanions=null;
-      // applyBrushTexture hid the primary (opacity 0 for stroke-only paths,
-      // strokeColor nulled for filled ones — see its own comment) — restore
-      // both remembered values, otherwise switching back to "None" leaves
-      // the stroke permanently invisible / permanently fill-only.
-      if(p.data.preTextureOpacity!==undefined){p.opacity=p.data.preTextureOpacity;delete p.data.preTextureOpacity;}
-      if(p.data.preTextureStroke!==undefined){p.strokeColor=p.data.preTextureStroke;delete p.data.preTextureStroke;}
-    }
+    // Re-applying / converting: strip whatever texture (vector OR bitmap)
+    // this anchor already carries first — stripAnyBrushTexture (app.js)
+    // handles both kinds identically (same camouflage convention), so
+    // switching FROM a Bitmap Brush stroke TO a vector preset here is a
+    // real conversion, not a silent no-op.
+    stripAnyBrushTexture(p);
     if(preset&&preset!=='none')applyBrushTexture(p,preset);
   });
   saveActiveLayerFrame();updateUI();showToast('Brush appliqué à la sélection');

@@ -348,6 +348,13 @@ function serP(p){var isVB=!!(p.data&&p.data.isVectorBrush);var center=isVB&&p.da
   // resurrection hazard, same exemption.
   var isTexAnchor=!!(p.data&&(p.data.brushTexturePreset||p.data.isBrushTextureCopy||p.data.bitmapBrushSpec));
   var bitmapBrushSpec=(p.data&&p.data.bitmapBrushSpec)?p.data.bitmapBrushSpec:undefined;
+  // Real-pressure profile (bitmap-brush.js) — a parallel [x,y,ratio] point
+  // cloud captured from the actual draw gesture, looked up by nearest-
+  // position at bake/regenerate time. Without persisting it, a save/reload
+  // would still show the CURRENT baked pixels fine (they're already in
+  // src) but any FUTURE regenerate (a subselect node edit) would silently
+  // lose pressure shaping and fall back to flat size.
+  var bitmapPressureProfile=(p.data&&p.data.bitmapPressureProfile)?p.data.bitmapPressureProfile:undefined;
   // Same fallback hazard for a Fill/Shadow channel layer (Stroke/Fill/
   // Shadow split, convertLayerToStrokeFillShadowFolder): enforceChannelStrip
   // nulls strokeColor on every non-stroke-channel path on purpose — without
@@ -387,7 +394,7 @@ function serP(p){var isVB=!!(p.data&&p.data.isVectorBrush);var center=isVB&&p.da
   // otherwise every fill-only shape's phantom '#ffffff' gets misread as a
   // real stroke and the shape is wrongly cloned into the Stroke channel too.
   var hasRealStroke=!!p.strokeColor;
-  return{segments:p.segments.map(function(s){return{point:[s.point.x,s.point.y],handleIn:[s.handleIn.x,s.handleIn.y],handleOut:[s.handleOut.x,s.handleOut.y]};}),closed:!!p.closed,strokeColor:(isVB||isNoStrokeChannel||isShadowNoStroke||isTexAnchor&&!p.strokeColor)?null:(p.strokeColor?colorHex8(p.strokeColor):'#ffffff'),hasRealStroke:hasRealStroke,strokeWidth:p.strokeWidth,strokeCap:p.strokeCap||'round',strokeJoin:p.strokeJoin||'round',miterLimit:p.miterLimit,fillColor:p.fillColor?colorHex8(p.fillColor):null,opacity:p.opacity!==undefined?p.opacity:1,dashArray:(p.dashArray&&p.dashArray.length)?p.dashArray.slice():undefined,dashOffset:p.dashOffset,paintOrder:(p.data&&p.data.paintOrder)?p.data.paintOrder:undefined,isVectorBrush:isVB||undefined,centerSegments:center,widthProfile:widthProfile,fillSeed:fillSeed,fillGapPx:fillGapPx,fillWalls:fillWalls,strokeId:strokeId,brushGroupId:brushGroupId,boxAngle:(p.data&&p.data.boxAngle)?p.data.boxAngle:undefined,isBrushTextureCopy:isBrushTextureCopy,brushTexturePreset:brushTexturePreset,bitmapBrushSpec:bitmapBrushSpec,preTextureOpacity:preTextureOpacity,preTextureStroke:preTextureStroke,channelTag:channelTag,ownerId:ownerId,ownerName:ownerName,ownerColor:ownerColor,revisionParentId:revisionParentId,isRevisionGhost:isRevisionGhost,revisionAction:revisionAction};}
+  return{segments:p.segments.map(function(s){return{point:[s.point.x,s.point.y],handleIn:[s.handleIn.x,s.handleIn.y],handleOut:[s.handleOut.x,s.handleOut.y]};}),closed:!!p.closed,strokeColor:(isVB||isNoStrokeChannel||isShadowNoStroke||isTexAnchor&&!p.strokeColor)?null:(p.strokeColor?colorHex8(p.strokeColor):'#ffffff'),hasRealStroke:hasRealStroke,strokeWidth:p.strokeWidth,strokeCap:p.strokeCap||'round',strokeJoin:p.strokeJoin||'round',miterLimit:p.miterLimit,fillColor:p.fillColor?colorHex8(p.fillColor):null,opacity:p.opacity!==undefined?p.opacity:1,dashArray:(p.dashArray&&p.dashArray.length)?p.dashArray.slice():undefined,dashOffset:p.dashOffset,paintOrder:(p.data&&p.data.paintOrder)?p.data.paintOrder:undefined,isVectorBrush:isVB||undefined,centerSegments:center,widthProfile:widthProfile,fillSeed:fillSeed,fillGapPx:fillGapPx,fillWalls:fillWalls,strokeId:strokeId,brushGroupId:brushGroupId,boxAngle:(p.data&&p.data.boxAngle)?p.data.boxAngle:undefined,isBrushTextureCopy:isBrushTextureCopy,brushTexturePreset:brushTexturePreset,bitmapBrushSpec:bitmapBrushSpec,bitmapPressureProfile:bitmapPressureProfile,preTextureOpacity:preTextureOpacity,preTextureStroke:preTextureStroke,channelTag:channelTag,ownerId:ownerId,ownerName:ownerName,ownerColor:ownerColor,revisionParentId:revisionParentId,isRevisionGhost:isRevisionGhost,revisionAction:revisionAction};}
 // `closed` was missing from this round-trip entirely — every path rebuilt
 // via desP() (onion-skin ghosts, tween/inbetween generation, undo/redo
 // snapshots, project load: everything that goes through serP/desP) silently
@@ -414,7 +421,7 @@ function desP(d,layer,op){var prev=project.activeLayer;layer.activate();var p=ne
   // outline it never had ("un trait blanc apparaît autour du fill après
   // ctrl+Z"). Legacy data predating the field (undefined) keeps the old
   // fallback chain untouched.
-  p.strokeColor=d.hasRealStroke===false?null:(d.strokeColor||((d.isVectorBrush||d.brushTexturePreset||d.bitmapBrushSpec||d.isBrushTextureCopy||dNoStrokeChannel||dIsShadowChannel)?null:'#fff'));p.strokeWidth=d.strokeWidth||3;p.strokeCap=d.strokeCap||'round';p.strokeJoin=d.strokeJoin||'round';if(d.miterLimit!==undefined)p.miterLimit=d.miterLimit;if(d.fillColor)p.fillColor=d.fillColor;else p.fillColor=null;p.opacity=op!==undefined?op:(d.opacity!==undefined?d.opacity:1);if(d.dashArray&&d.dashArray.length)p.dashArray=d.dashArray;if(d.dashOffset!==undefined)p.dashOffset=d.dashOffset;if(d.paintOrder){p.data.paintOrder=d.paintOrder;}if(d.isVectorBrush){p.data.isVectorBrush=true;if(d.centerSegments)p.data.centerSegments=d.centerSegments;if(d.widthProfile)p.data.widthProfile=d.widthProfile;}if(d.fillSeed){p.data.fillSeed=d.fillSeed;p.data.fillGapPx=d.fillGapPx;}if(d.fillWalls)p.data.fillWalls=d.fillWalls;if(d.strokeId)p.data.strokeId=d.strokeId;if(d.brushGroupId)p.data.brushGroupId=d.brushGroupId;if(d.boxAngle)p.data.boxAngle=d.boxAngle;if(d.isBrushTextureCopy)p.data.isBrushTextureCopy=true;if(d.brushTexturePreset)p.data.brushTexturePreset=d.brushTexturePreset;if(d.bitmapBrushSpec)p.data.bitmapBrushSpec=d.bitmapBrushSpec;if(d.preTextureOpacity!==undefined)p.data.preTextureOpacity=d.preTextureOpacity;if(d.preTextureStroke!==undefined)p.data.preTextureStroke=d.preTextureStroke;if(d.channelTag)p.data.channelTag=d.channelTag;if(d.ownerId)p.data.ownerId=d.ownerId;if(d.ownerName)p.data.ownerName=d.ownerName;if(d.ownerColor)p.data.ownerColor=d.ownerColor;if(d.revisionParentId)p.data.revisionParentId=d.revisionParentId;if(d.isRevisionGhost)p.data.isRevisionGhost=true;if(d.revisionAction)p.data.revisionAction=d.revisionAction;prev.activate();return p;}
+  p.strokeColor=d.hasRealStroke===false?null:(d.strokeColor||((d.isVectorBrush||d.brushTexturePreset||d.bitmapBrushSpec||d.isBrushTextureCopy||dNoStrokeChannel||dIsShadowChannel)?null:'#fff'));p.strokeWidth=d.strokeWidth||3;p.strokeCap=d.strokeCap||'round';p.strokeJoin=d.strokeJoin||'round';if(d.miterLimit!==undefined)p.miterLimit=d.miterLimit;if(d.fillColor)p.fillColor=d.fillColor;else p.fillColor=null;p.opacity=op!==undefined?op:(d.opacity!==undefined?d.opacity:1);if(d.dashArray&&d.dashArray.length)p.dashArray=d.dashArray;if(d.dashOffset!==undefined)p.dashOffset=d.dashOffset;if(d.paintOrder){p.data.paintOrder=d.paintOrder;}if(d.isVectorBrush){p.data.isVectorBrush=true;if(d.centerSegments)p.data.centerSegments=d.centerSegments;if(d.widthProfile)p.data.widthProfile=d.widthProfile;}if(d.fillSeed){p.data.fillSeed=d.fillSeed;p.data.fillGapPx=d.fillGapPx;}if(d.fillWalls)p.data.fillWalls=d.fillWalls;if(d.strokeId)p.data.strokeId=d.strokeId;if(d.brushGroupId)p.data.brushGroupId=d.brushGroupId;if(d.boxAngle)p.data.boxAngle=d.boxAngle;if(d.isBrushTextureCopy)p.data.isBrushTextureCopy=true;if(d.brushTexturePreset)p.data.brushTexturePreset=d.brushTexturePreset;if(d.bitmapBrushSpec)p.data.bitmapBrushSpec=d.bitmapBrushSpec;if(d.bitmapPressureProfile)p.data.bitmapPressureProfile=d.bitmapPressureProfile;if(d.preTextureOpacity!==undefined)p.data.preTextureOpacity=d.preTextureOpacity;if(d.preTextureStroke!==undefined)p.data.preTextureStroke=d.preTextureStroke;if(d.channelTag)p.data.channelTag=d.channelTag;if(d.ownerId)p.data.ownerId=d.ownerId;if(d.ownerName)p.data.ownerName=d.ownerName;if(d.ownerColor)p.data.ownerColor=d.ownerColor;if(d.revisionParentId)p.data.revisionParentId=d.revisionParentId;if(d.isRevisionGhost)p.data.isRevisionGhost=true;if(d.revisionAction)p.data.revisionAction=d.revisionAction;prev.activate();return p;}
 // Phase 2 (async multi-user sync): merges a remote collaborator's exported
 // project JSON into the CURRENT live document at the data level (state.layers
 // serialized strokes — not live Paper objects), so it works the same whether
@@ -505,6 +512,22 @@ function relinkBrushCompanions(layer){
     if(!primary)return;
     primary.data.brushCompanions=members.filter(function(c){return c!==primary;});
   });
+}
+// Strips ANY brush texture (vector-preset dabs OR Bitmap Brush's raster —
+// same camouflage convention, applyBrushTexture/applyBitmapBrushTexture)
+// off an anchor back to a plain stroke, restoring whatever strokeColor/
+// opacity the camouflage remembered. Shared by both "Apply to selection"
+// buttons (timeline.js's vector-preset one, bitmap-brush.js's own) so
+// switching FROM either kind TO the other, or to no texture, always goes
+// through the same clean strip-then-reapply path instead of two separate
+// half-implementations drifting apart.
+function stripAnyBrushTexture(p){
+  if(!p||!p.data)return;
+  if(p.data.brushCompanions)p.data.brushCompanions.forEach(function(c){c.remove();});
+  p.data.brushCompanions=null;
+  if(p.data.preTextureOpacity!==undefined){p.opacity=p.data.preTextureOpacity;delete p.data.preTextureOpacity;}
+  if(p.data.preTextureStroke!==undefined){p.strokeColor=p.data.preTextureStroke;delete p.data.preTextureStroke;}
+  delete p.data.brushTexturePreset;delete p.data.bitmapBrushSpec;delete p.data.brushGroupId;delete p.data.bitmapPressureProfile;
 }
 // Bitmap import (Section 6 gap): a Raster is stored by its dataURL (fully
 // self-contained in the project JSON, no external file dependency after

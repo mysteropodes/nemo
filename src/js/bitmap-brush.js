@@ -81,6 +81,11 @@
     }
   }
   var TIP_DRAWERS = { soft: drawSoftTip, grain: drawGrainTip, splatter: drawSplatterTip };
+  // ABR-imported tips (importAbr below) — id -> {name, canvas: TIP_SIZE²
+  // grayscale-as-alpha canvas, already normalized at import time}. Kept
+  // separate from TIP_DRAWERS (procedural, seed-varying) since an
+  // imported tip is a fixed bitmap, not a function to invoke with a seed.
+  var customTips = {};
 
   // Deterministic per-stroke RNG (same reasoning as tools.js's seededRng for
   // dab re-stamping on generated tween frames: a fresh Math.random() per
@@ -95,6 +100,7 @@
   }
 
   function buildTipCanvas(tipName, seed) {
+    if (customTips[tipName]) return customTips[tipName].canvas;
     var c = document.createElement('canvas'); c.width = TIP_SIZE; c.height = TIP_SIZE;
     var ctx = c.getContext('2d');
     (TIP_DRAWERS[tipName] || drawSoftTip)(ctx, seed);
@@ -130,7 +136,22 @@
   // - Corner-cutting: walking raw committed segments linearly ignored the
   //   curve handles Paper's simplify() produced; path.getPointAt() walks
   //   the TRUE curve.
-  function applyBitmapBrushTexture(basePath, spec) {
+  // `rawSamples` (optional, draw-bridge.js's own [x,y,widthPx] array for
+  // THIS gesture — tools.js's fallback has none, see its own call site
+  // comment) — real tablet-pressure support ("pression de brush avec
+  // tablet"): each sample's captured width (already pressure-shaped by
+  // widthFor(), draw-bridge.js — Pressure min/max/curve panel settings
+  // all already apply) is normalized against state.brushSize into a
+  // ratio and stored on the anchor as data.bitmapPressure — a parallel
+  // point cloud the stamp walk below looks up by NEAREST position (not
+  // by segment index: simplify() doesn't preserve a 1:1 mapping to raw
+  // samples, but the anchor's simplified geometry stays close to the
+  // original points, so nearest-neighbor gives a good enough per-position
+  // estimate without a precise arc-length remap). A later subselect
+  // reshape leaves this profile stale relative to the NEW geometry —
+  // accepted approximation, same class of shortcut as this file's other
+  // v1/v2 choices, not worth a full re-capture mechanism for.
+  function applyBitmapBrushTexture(basePath, spec, rawSamples) {
     if (!basePath || !basePath.segments || basePath.segments.length < 2) return basePath;
     spec = spec || {
       tip: state.bitmapTip || 'soft',
@@ -142,8 +163,19 @@
       // authoritative ink — state.strokeColor as fallback for a re-apply
       // where camouflage already nulled it and no preTextureStroke exists.
       color: basePath.strokeColor ? colorHex8(basePath.strokeColor) : ((basePath.data && basePath.data.preTextureStroke) || state.strokeColor || '#000000'),
+      pressure: !!state.bitmapPressure,
       seed: Math.floor(Math.random() * 0xffffffff),
     };
+    // Storing the profile only requires fresh raw samples (a real draw
+    // gesture); bakeToCanvas below gates actually USING it on spec.pressure,
+    // so a stale leftover profile from a previous apply is inert, not
+    // wrong, whenever pressure is off — no need to explicitly clear it on
+    // every call (regenerate()/liveRestamp() call this with no rawSamples
+    // at all and must keep relying on the ORIGINAL draw's stored profile).
+    if (rawSamples && rawSamples.length && spec.pressure) {
+      var refSize = state.brushSize || 1;
+      basePath.data.bitmapPressureProfile = rawSamples.map(function (s) { return [s[0], s[1], Math.max(0.2, Math.min(2.5, s[2] / refSize))]; });
+    }
     var bake = bakeToCanvas(basePath, spec, null);
 
     // Raster from the canvas ELEMENT — synchronous, no decode wait. The
@@ -207,21 +239,67 @@
     var ctx = canvas.getContext('2d');
     var tip = buildTipCanvas(spec.tip, spec.seed);
 
-    // Mask pass: stamp the white/alpha tip along the TRUE curve at fixed
-    // arc-length steps, then tint once via destination-in.
+    // Mask pass: stamp the white/alpha tip at fixed arc-length steps, then
+    // tint once via destination-in.
+    //
+    // Walked along the STRAIGHT-LINE polyline through basePath's own
+    // segment points, NOT basePath.getPointAt() (the fitted Bezier curve)
+    // — found live ("double trait quand on tourne la brush dans tous les
+    // sens rapidement"): a sharp zigzag reversal makes Paper's curve-fit
+    // handles overshoot into a small self-intersecting LOOP at the cusp
+    // (confirmed by sampling: walking 20 arc-length units forward along
+    // the curve at a reversal point only advanced the actual on-screen
+    // position ~3px — the curve nearly retraces itself in real space
+    // while arc length keeps climbing), so fixed-arc-length stamping
+    // re-stamped almost the same spot several times right at each turn —
+    // exactly the doubling. The raw segment polyline can't loop (it's
+    // straight lines between the actual drawn points, same shape the
+    // live preview already walks without this problem) at the cost of
+    // ignoring the anchor's curve handles for stamping purposes — texture
+    // placement doesn't need bezier-exact precision, spacing already
+    // jitters it.
     var maskCanvas = document.createElement('canvas');
     maskCanvas.width = canvas.width; maskCanvas.height = canvas.height;
     var mctx = maskCanvas.getContext('2d');
-    var len = basePath.length;
-    for (var d = 0; d <= len; d += spacing) {
-      var pt = basePath.getPointAt(d);
-      if (!pt) continue;
+    var segs = basePath.segments;
+    var acc = 0;
+    // Real tablet pressure ("pression de brush avec tablet"): nearest-
+    // sample lookup into the profile applyBitmapBrushTexture stored from
+    // the actual drawing gesture — see that function's own comment for
+    // why nearest-neighbor, not arc-length remap. O(stamps × samples) —
+    // fine at drawing-gesture scale (dozens to low hundreds of each), not
+    // worth a spatial index for.
+    var profile = spec.pressure ? basePath.data.bitmapPressureProfile : null;
+    var pressureAt = function (x, y) {
+      if (!profile || !profile.length) return 1;
+      var best = profile[0], bestD = Infinity;
+      for (var pi = 0; pi < profile.length; pi++) {
+        var dxp = profile[pi][0] - x, dyp = profile[pi][1] - y, dp = dxp * dxp + dyp * dyp;
+        if (dp < bestD) { bestD = dp; best = profile[pi]; }
+      }
+      return best[2];
+    };
+    var stampAt = function (x, y) {
       var jx = (rng() - 0.5) * 2 * scatterPx, jy = (rng() - 0.5) * 2 * scatterPx;
-      var s = baseSize * (0.75 + rng() * 0.5);
-      var px = (pt.x + jx - minX) * SCALE, py = (pt.y + jy - minY) * SCALE, ps = s * SCALE;
+      var s = baseSize * (0.75 + rng() * 0.5) * pressureAt(x, y);
+      var px = (x + jx - minX) * SCALE, py = (y + jy - minY) * SCALE, ps = s * SCALE;
       mctx.globalAlpha = spec.opacity;
       mctx.drawImage(tip, px - ps / 2, py - ps / 2, ps, ps);
+    };
+    if (segs.length) stampAt(segs[0].point.x, segs[0].point.y);
+    for (var si = 0; si < segs.length - 1; si++) {
+      var a2 = segs[si].point, b2 = segs[si + 1].point;
+      var dx2 = b2.x - a2.x, dy2 = b2.y - a2.y;
+      var segLen2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
+      if (segLen2 < 1e-6) continue;
+      while (acc < segLen2) {
+        var t2 = acc / segLen2;
+        stampAt(a2.x + dx2 * t2, a2.y + dy2 * t2);
+        acc += spacing;
+      }
+      acc -= segLen2;
     }
+    if (basePath.closed && segs.length) stampAt(segs[0].point.x, segs[0].point.y);
     ctx.fillStyle = spec.color;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.globalCompositeOperation = 'destination-in';
@@ -472,6 +550,73 @@
     bindNum('p-bitmap-spacing', 'bitmapSpacing', 15);
     bindNum('p-bitmap-scatter', 'bitmapScatter', 20);
     bindNum('p-bitmap-opacity', 'bitmapOpacity', 100);
+    var pressEl = document.getElementById('p-bitmap-pressure');
+    if (pressEl) { state.bitmapPressure = pressEl.checked; pressEl.addEventListener('change', function () { state.bitmapPressure = this.checked; }); }
+
+    // ---- Apply / Remove to selection ("changer taille, type de brush et
+    // autre paramètre une fois appliqué et dessiné" + "passer d'un brush
+    // vecto à texturé et inversement") — mirrors the vector preset panel's
+    // own "Apply to selection" button (timeline.js) exactly, including
+    // reuse of the SAME shared stripAnyBrushTexture (app.js) so converting
+    // either direction, or just re-editing a bitmap stroke's own
+    // tip/size/spacing/scatter in place, all go through one clean path. ----
+    var applyBtn = document.getElementById('btn-bitmap-apply');
+    if (applyBtn) applyBtn.addEventListener('click', function () {
+      var eligible = selectedPaths.filter(function (p) { return p instanceof Path && !(p.data && (p.data.isVectorBrush || p.data.isFillShape)) && (p.strokeColor || p.fillColor || (p.data && (p.data.brushTexturePreset || p.data.bitmapBrushSpec))); });
+      if (!eligible.length) { if (window.showToast) showToast('Sélectionne au moins un trait'); return; }
+      pushUndo();
+      eligible.forEach(function (p) {
+        stripAnyBrushTexture(p);
+        applyBitmapBrushTexture(p);
+      });
+      saveActiveLayerFrame(); updateUI();
+      if (window.SMEngineBridge) SMEngineBridge.renderNow();
+      if (window.showToast) showToast('Bitmap Brush appliqué à la sélection');
+    });
+    var removeBtn = document.getElementById('btn-bitmap-remove');
+    if (removeBtn) removeBtn.addEventListener('click', function () {
+      var eligible = selectedPaths.filter(function (p) { return p instanceof Path && p.data && (p.data.bitmapBrushSpec || p.data.brushTexturePreset); });
+      if (!eligible.length) { if (window.showToast) showToast('Aucun trait texturé sélectionné'); return; }
+      pushUndo();
+      eligible.forEach(function (p) { stripAnyBrushTexture(p); });
+      saveActiveLayerFrame(); updateUI();
+      if (window.SMEngineBridge) SMEngineBridge.renderNow();
+      if (window.showToast) showToast('Texture retirée');
+    });
+
+    // ---- ABR import ----
+    var abrBtn = document.getElementById('btn-bitmap-import-abr');
+    var abrFile = document.getElementById('bitmap-abr-file');
+    if (abrBtn && abrFile) {
+      abrBtn.addEventListener('click', function () { abrFile.click(); });
+      abrFile.addEventListener('change', function () {
+        var file = this.files && this.files[0];
+        this.value = ''; // allow re-importing the same file name later
+        if (!file || !window.SMAbrImport) return;
+        var reader = new FileReader();
+        reader.onload = function () {
+          var tipsFound;
+          try { tipsFound = window.SMAbrImport.readAbrArrayBuffer(reader.result); }
+          catch (e) { if (window.showToast) showToast('Import .abr échoué : ' + e.message); return; }
+          var tipSel = document.getElementById('p-bitmap-tip');
+          var lastId = null;
+          tipsFound.forEach(function (t, i) {
+            var id = 'abr_' + Date.now().toString(36) + '_' + i;
+            customTips[id] = { name: t.name, canvas: t.canvas };
+            lastId = id;
+            if (tipSel) {
+              var opt = document.createElement('option');
+              opt.value = id; opt.textContent = '📥 ' + t.name;
+              tipSel.appendChild(opt);
+            }
+          });
+          if (tipSel && lastId) { tipSel.value = lastId; state.bitmapTip = lastId; }
+          if (window.showToast) showToast(tipsFound.length + ' tip(s) importé(s) depuis ' + file.name);
+        };
+        reader.onerror = function () { if (window.showToast) showToast('Lecture du fichier .abr échouée'); };
+        reader.readAsArrayBuffer(file);
+      });
+    }
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 

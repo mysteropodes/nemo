@@ -112,6 +112,18 @@
     );
   }
   function isFillBrush() { return state.tool === 'fillbrush'; }
+  // Real tablet pressure ("pression de brush avec tablet") was never
+  // actually COMPUTED for the plain constant-width Draw branch — only
+  // vectorBrush/fillBrush's own width-profile paths called pressureOf() at
+  // all, everything else got a hardcoded 1 (full/max width, no
+  // sensitivity). Bitmap Brush's live-preview code already multiplied by
+  // a `pressureWidthMul` parameter threaded through from here — but it was
+  // silently a no-op the whole time since this returned 1 unconditionally
+  // for that case. Extending the gate to bitmap-brush mode is what
+  // actually turns pressure sensitivity on for it, both live and baked
+  // (samples[i][2] = widthFor(pressure) is what bitmap-brush.js's
+  // applyBitmapBrushTexture reads to build bitmapPressureProfile).
+  function wantsPressure() { return state.vectorBrush || isFillBrush() || (state.bitmapBrushOn && state.strokeEnabled); }
 
   // Mirrors vbPressureOf/vbWidthFor in tools.js, just reading a plain
   // PointerEvent + our own world-space samples instead of Paper's
@@ -325,7 +337,7 @@
     // click point) so the extended path has no visible gap/jump at the
     // seam — mirrors Graphite's should_extend behavior.
     var w = extendTarget ? [extendTarget.path[extendTarget.end === 'first' ? 'firstSegment' : 'lastSegment'].point.x, extendTarget.path[extendTarget.end === 'first' ? 'firstSegment' : 'lastSegment'].point.y] : w0;
-    var pressure = smoothPressure((state.vectorBrush || isFillBrush()) ? pressureOf(e, w) : 1);
+    var pressure = smoothPressure(wantsPressure() ? pressureOf(e, w) : 1);
     if (extendTarget) stabQueue.push(w); // seeds the average AT the seam, not off it
     modeler = null;
     if (modelerLevel() && window.SMStrokeModeler) {
@@ -367,7 +379,7 @@
     // the real, un-averaged motion to feel right) — only the drawn
     // POSITION gets stabilized, matching TVPaint-style "smoothing" where
     // the line itself calms down without pressure lagging behind it.
-    var pressure = smoothPressure((state.vectorBrush || isFillBrush()) ? pressureOf(e, w) : 1);
+    var pressure = smoothPressure(wantsPressure() ? pressureOf(e, w) : 1);
     if (modeler) {
       // The modeler upsamples: one raw input can yield several modeled
       // points. Width is computed per modeled point from its own carried
@@ -418,7 +430,7 @@
     // catch-up behavior Photoshop/Clip Studio's stabilized brushes use.
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
     w = magnetSnap(w);
-    var pressure = smoothPressure((state.vectorBrush || isFillBrush()) ? pressureOf(e, w) : 1);
+    var pressure = smoothPressure(wantsPressure() ? pressureOf(e, w) : 1);
     if (modeler) {
       // The modeler's own end-of-stroke catch-up (physics iterated until
       // the line converges onto the lift-off point) replaces the raw-point
@@ -629,7 +641,7 @@
       // same anchor+companion architecture as applyBrushTexture, just one
       // Raster companion instead of many vector dabs; the path committed
       // above (fill included) stays as the real, subselect-editable anchor.
-      if (state.strokeEnabled && state.bitmapBrushOn && window.SMBitmapBrush) window.SMBitmapBrush.applyToPath(path);
+      if (state.strokeEnabled && state.bitmapBrushOn && window.SMBitmapBrush) window.SMBitmapBrush.applyToPath(path, null, samples);
       else if (state.strokeEnabled && state.brushPreset && state.brushPreset !== 'none') applyBrushTexture(path, state.brushPreset);
       if (state.drawMode === 'behind') {
         userLayers[state.activeLayerIdx].insertChild(0, path);

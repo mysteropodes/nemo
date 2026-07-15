@@ -3980,6 +3980,12 @@ function onMouseUp(event){
       // applyBrushTexture for the EXISTING vector presets (grepped: zero
       // call sites), so no live preview here matches that precedent too.
       currentPath.simplify(state.smoothing);
+      // No per-point pressure available to pass here (unlike draw-bridge.js's
+      // samples array) — this plain constant-width branch never captured it
+      // in this fallback path (only the separate vectorBrush/_vb.widths
+      // path does). Same "dead code when the Rust engine is on, the
+      // default" acceptable-gap precedent as this file's other Bitmap
+      // Brush mirror comments — flat size only here.
       window.SMBitmapBrush.applyToPath(currentPath);
     }else{
       currentPath.simplify(state.smoothing);
