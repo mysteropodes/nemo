@@ -93,22 +93,27 @@
     return { bounds: b, box: box, corners: corners, gCorners: gCorners, map: map, rotPos: rotPos, anchorPos: anchorPos };
   }
 
-  function hitTestHandles(pt) {
+  function hitTestHandles(pt, altHeld) {
     var h = computeHandles();
     if (!h) return null;
     var tol = 9 / view.zoom;
-    // Anchor crosshair — checked FIRST/exclusively: reported "avec alt et
-    // l'outil de sélection il faudrait pouvoir changer le point d'ancrage
-    // de place" was only half-fixed by Alt+click-anywhere (select-bridge.js
-    // onDown below) — the crosshair engine-bridge.js already DRAWS was
-    // never itself a grabbable handle, so there was no way to see it and
-    // drag it directly, only to blind-click elsewhere and check the panel
-    // widget after. A default (center) anchor sits nowhere near a resize
+    // Anchor crosshair — checked FIRST/exclusively, but ONLY while Alt is
+    // held (live feedback 2026-07: "ça peut être confusant quand il faut
+    // déplacer un petit élément" — a small object's own body can fall
+    // within the anchor's hit tolerance, so an unconditional grab there
+    // silently moved the PIVOT instead of the object with no way to tell
+    // which one just happened). Without Alt, a click in that same spot now
+    // falls through to the normal move/marquee logic below — Alt+drag is
+    // otherwise free on the Select tool (viewtools-bridge.js's global
+    // Alt-drag-rotate never reaches here anyway: this file's onDown always
+    // stopImmediatePropagation()s first while the Select tool is active),
+    // so repurposing it for "grab the anchor" doesn't collide with
+    // anything. A default (center) anchor sits nowhere near a resize
     // handle so this never shadows them in the common case; when a preset
     // corner anchor DOES coincide with its own resize handle, grabbing the
-    // anchor is what the user is more likely reaching for right there, so
-    // it wins the tie.
-    if (h.anchorPos) {
+    // anchor (Alt held) is what the user is more likely reaching for right
+    // there, so it still wins that specific tie.
+    if (h.anchorPos && altHeld) {
       var dAnchor = pt.getDistance(h.anchorPos);
       if (dAnchor < tol) return { type: 'anchor' };
     }
@@ -152,7 +157,7 @@
       return;
     }
 
-    var hh = hitTestHandles(pt);
+    var hh = hitTestHandles(pt, e.altKey);
     if (hh && hh.type === 'anchor') {
       // Direct drag of the anchor crosshair — same UI-preference-not-
       // document-edit reasoning as the Alt+click path a bit further down
@@ -163,6 +168,25 @@
     }
     if (hh) {
       pushUndo();
+      // ensureKeyframe() BEFORE any geometry mutation — live feedback
+      // 2026-07: "si on est sur une frame d'une keyframe prolongée et que
+      // l'on déplace un objet celui-ci revient en place". Root cause:
+      // saveActiveLayerFrame() (app.js) is a hard no-op on a plain held
+      // frame (`if(!f.isKeyframe&&!f.isInterpolated)return;`) — the drag
+      // visibly moved the LIVE Paper geometry the whole time, but nothing
+      // ever persisted it, so the very next loadFrame() (any frame nav,
+      // even just scrubbing away and back) silently rebuilt the object at
+      // its old inherited position. draw-bridge.js and every other bridge
+      // already call this before their own first edit; select-bridge.js's
+      // transform gestures never did. ensureKeyframe() calls loadFrame()
+      // internally when it actually promotes the frame, which rebuilds
+      // EVERY Paper item fresh — selectedPaths' object references go stale
+      // the instant that happens, so it must be re-hydrated from
+      // state.selectedStrokeIndices (index-based, survives the rebuild
+      // since loadFrame() reconstructs children in the same stroke order)
+      // before anything below reads/mutates selectedPaths.
+      ensureKeyframe();
+      selectedPaths = state.selectedStrokeIndices.map(function (i) { return userLayers[state.activeLayerIdx].children[i]; }).filter(Boolean);
       var h = computeHandles();
       if (hh.type === 'rotate') {
         mode = 'xform-rotate';
@@ -377,7 +401,10 @@
         var wh = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
         var hpt = new Point(wh[0], wh[1]);
         var hh2 = computeHandles();
-        var isHover = !!(hh2 && hh2.anchorPos && hpt.getDistance(hh2.anchorPos) < 9 / view.zoom);
+        // Alt-gated, matching hitTestHandles' own new requirement — showing
+        // the "grabbable" grow effect without Alt held would visually
+        // promise a drag that onDown won't actually honor.
+        var isHover = !!(e.altKey && hh2 && hh2.anchorPos && hpt.getDistance(hh2.anchorPos) < 9 / view.zoom);
         if (isHover !== state.xformAnchorHovered) {
           state.xformAnchorHovered = isHover;
           window.SMEngineBridge.renderNow();
@@ -422,7 +449,15 @@
       window._sceneVersion++;
       window.SMEngineBridge.renderNow();
     } else if (mode === 'move') {
-      if (!moveStarted) { pushUndo(); moveStarted = true; }
+      // Same ensureKeyframe()+reselect as the scale/rotate grab above (see
+      // its comment) — a plain object-body drag needs it just as much: a
+      // held frame's move was silently discarded the exact same way.
+      if (!moveStarted) {
+        pushUndo();
+        ensureKeyframe();
+        selectedPaths = state.selectedStrokeIndices.map(function (i) { return userLayers[state.activeLayerIdx].children[i]; }).filter(Boolean);
+        moveStarted = true;
+      }
       var delta = pt.subtract(lastPt);
       // Layer under a Motion transform: the pointer moves in RENDERED
       // space, the geometry lives underneath — pull the delta back
