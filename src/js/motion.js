@@ -486,10 +486,21 @@
   // (buildOverlayItems) and the drag handlers below resolve through this so
   // they always agree on the same target and the same pivot-bounds source.
   function activeMotionTarget() {
-    if (state.appMode !== 'motion' || window._motionExpandedLayer == null) return null;
-    var li = window._motionExpandedLayer, ld = state.layers[li];
+    if (state.appMode !== 'motion') return null;
+    // Bug found 2026-07 ("quand tu select un calque ça select pas dans le
+    // canvas"): this used to require window._motionExpandedLayer (a row's
+    // Transform group toggled OPEN) — merely clicking a layer row (setting
+    // state.activeLayerIdx) showed nothing on canvas at all, unlike AE where
+    // clicking a layer immediately shows its anchor/position path. Falling
+    // back to activeLayerIdx when nothing is explicitly expanded keeps the
+    // expanded-layer/expanded-element priority unchanged (an open Transform
+    // group still wins, and still gates element-level focus below) while
+    // fixing the plain single-click case.
+    var li = window._motionExpandedLayer != null ? window._motionExpandedLayer : state.activeLayerIdx;
+    if (li == null) return null;
+    var ld = state.layers[li];
     if (!ld || ld.symbolId || !userLayers[li]) return null;
-    if (window._motionExpandedElement != null) {
+    if (window._motionExpandedLayer != null && window._motionExpandedElement != null) {
       var item = findElementItem(li, window._motionExpandedElement);
       if (item) return { li: li, strokeId: window._motionExpandedElement, holder: ensureElementHolder(ld, window._motionExpandedElement), boundsCenter: item.bounds.center };
       // Element no longer present at this frame (drawing changed) — fall

@@ -390,7 +390,7 @@ window.SM={
     // so the duplicate's strokes carry the SAME ids the original's element
     // motion data is keyed by, a plain deep-copy stays correctly matched.
     if(src.elementMotion)state.layers[ni].elementMotion=JSON.parse(JSON.stringify(src.elementMotion));
-    if(src.inPoint)state.layers[ni].inPoint=src.inPoint;if(src.outPoint!=null)state.layers[ni].outPoint=src.outPoint;activateUL(ni);loadFrame(state.currentFrame);updateUI();},
+    if(src.inPoint!=null)state.layers[ni].inPoint=src.inPoint;if(src.outPoint!=null)state.layers[ni].outPoint=src.outPoint;activateUL(ni);loadFrame(state.currentFrame);updateUI();},
   setActiveLayer:function(idx){if(idx<0||idx>=state.layers.length)return;saveAllLayerFrames();activateUL(idx);clearSel();
     // The camera row is a synthetic pseudo-layer (not a real state.layers
     // entry — see camera.js's renderPanelRow) selected by switching TO the

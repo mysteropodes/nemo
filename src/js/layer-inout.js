@@ -14,13 +14,19 @@
   // layerOutPoint's own default now auto-detects a blank-keyframe tail
   // (see its header comment there) instead of always the full timeline;
   // keeping ONE definition avoids the two drifting apart.
-  function inPointOf(ld) { return window.layerInPoint ? layerInPoint(ld) : (ld.inPoint || 0); }
+  function inPointOf(ld) { return window.layerInPoint ? layerInPoint(ld) : (ld.inPoint != null ? ld.inPoint : 0); }
   function outPointOf(ld) { return window.layerOutPoint ? layerOutPoint(ld) : (ld.outPoint != null ? ld.outPoint : state.totalFrames - 1); }
   // A manually-dragged range OR an auto-detected blank-keyframe trim both
   // count as "not full range" for styling — a naturally-shortened bar
   // (layer stops drawing partway through) should read as visually distinct
   // from the full-timeline default too, not just a manual drag.
-  function hasCustomRange(ld) { return !!(ld.inPoint || ld.outPoint != null || outPointOf(ld) < state.totalFrames - 1); }
+  // `!=null` on ld.inPoint (not `||`, the old check): an explicit drag of
+  // the in-point handle back to exactly frame 0 (overriding a non-zero
+  // auto-detected default) is falsy but still a genuine customization —
+  // the old truthy check silently treated it as "no custom range", so the
+  // bar lost its color tint the instant a user dragged the in-point to 0
+  // (same class of bug as layerInPoint's own `!=null` fix, app.js).
+  function hasCustomRange(ld) { return !!(ld.inPoint != null || ld.outPoint != null || outPointOf(ld) < state.totalFrames - 1); }
 
   // Skew Pro's own timeline (the reference screenshot) colors every layer
   // bar with that layer's OWN assigned color, not one uniform accent tint —
