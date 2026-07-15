@@ -142,13 +142,20 @@
       // tangent handle" silently missed and fell through to reselecting the
       // path or starting a marquee — the actual "can't edit tangents" bug.
       renderNodeHandles();
-    } else if (selectedPaths.length === 1) {
-      // empty-space drag with a path selected: marquee over its anchors
+    } else {
+      // "avoir aussi les rect selection box pour cet outil" (2026-07): a
+      // marquee already existed here, but ONLY once a path was already
+      // the edit target (selectedPaths.length===1) — dragging on empty
+      // space with nothing pre-selected fell through to clearSel() and
+      // did nothing, unlike Illustrator/Figma's Direct Selection tool,
+      // where a marquee box works in one drag with no separate prior
+      // click. Now always starts the marquee; onUp below picks the
+      // target path itself (whichever path's bounds the box overlaps)
+      // when none was already selected, THEN does the same node-
+      // containment test as before.
       _nmq.active = true; _nmq.start = pt.clone(); _nmq.rect = null;
       window.SMEngineBridge.renderNow();
       return;
-    } else {
-      clearSel();
     }
     renderArcs(); updateUI();
     window.SMEngineBridge.renderNow();
@@ -181,7 +188,23 @@
       } else {
         _nodeSel.forEach(function (si) { var sg = gp.segments[si]; if (sg) sg.point = sg.point.add(delta); });
       }
-      renderNodeHandles();
+      // Perf fix (2026-07, "pas très fluide" with thousands of points):
+      // renderNodeHandles() rebuilds EVERY node's Paper.js Path/Circle
+      // display objects from scratch — O(segment count) allocations, on
+      // every single pointermove of the drag. Wasted work whenever the
+      // Rust engine is on (the default): its own overlay
+      // (buildNodeHandleItems, engine-bridge.js) re-reads segment
+      // positions/_nodeSel directly from the live path on every
+      // renderNow() call below, completely independent of nodeLayer's
+      // Paper objects — confirmed by reading it before making this
+      // change. nodeHandles[].pos (built by renderNodeHandles, used for
+      // hit-testing) is only ever read at the START of a NEW click
+      // (onDown), never mid-drag, so it doesn't need to stay fresh DURING
+      // one either — onUp already refreshes it once the drag ends. Only
+      // skipped when the engine is OFF, where nodeLayer's own Paper
+      // objects ARE the visible overlay (the Paper-native fallback has no
+      // other rendering path).
+      if (!window.SMEngineBridge.isEnabled()) renderNodeHandles();
       // Live fill follow: without this, a fill linked to this stroke only
       // regenerated at mouseup, so the fill visibly lagged behind the
       // stroke for the whole drag instead of tracking it in real time.
@@ -205,7 +228,8 @@
         else if (_nodeDrag.type === 'handleOut') { sseg.handleOut = pt.subtract(sseg.point); if (!e.altKey) sseg.handleIn = sseg.handleOut.multiply(-1); }
         else if (_nodeDrag.type === 'handleIn') { sseg.handleIn = pt.subtract(sseg.point); if (!e.altKey) sseg.handleOut = sseg.handleIn.multiply(-1); }
       }
-      renderNodeHandles();
+      // See the identical perf comment in the group-drag branch above.
+      if (!window.SMEngineBridge.isEnabled()) renderNodeHandles();
       fillRegenerateLinked(userLayers[state.activeLayerIdx], sdp);
       // Live texture follow — see the identical call in the group branch.
       if (sdp.data && sdp.data.bitmapBrushSpec && window.SMBitmapBrush) SMBitmapBrush.liveRestamp(sdp, userLayers[state.activeLayerIdx]);
@@ -222,6 +246,22 @@
       if (_nmq.rect) {
         var nmb = _nmq.rect.bounds;
         var npath = nodeEditTargetPath();
+        // No path was already the edit target — pick one from what the
+        // box actually overlaps (topmost, matching project.layers'
+        // back-to-front draw order, same convention select-bridge.js
+        // uses for its own topmost-first hit search) instead of leaving
+        // the drag a no-op.
+        if (!npath) {
+          var layerForPick = userLayers[state.activeLayerIdx];
+          var candidates = layerForPick ? layerForPick.children.filter(function (c) { return c instanceof Path && c.segments && c.segments.length && isSelectablePathChild(c) && c.bounds.intersects(nmb); }) : [];
+          if (candidates.length) {
+            var picked = candidates[candidates.length - 1];
+            clearSel();
+            selectedPaths.push(picked);
+            state.selectedStrokeIndices = selectedPaths.map(getSI).filter(function (i2) { return i2 >= 0; });
+            npath = nodeEditTargetPath();
+          }
+        }
         _nodeSel = [];
         if (npath) {
           var nsegs = nodeEditSegmentsData(npath);
@@ -230,7 +270,7 @@
         _nmq.rect.remove(); _nmq.rect = null;
         if (!_nodeSel.length) clearSel();
       } else { clearSel(); }
-      _nmq.active = false; renderArcs(); updateUI();
+      _nmq.active = false; renderNodeHandles(); renderArcs(); updateUI();
     } else if (_nodeDrag.active) {
       var editedPath = _nodeDrag.path; var editedType = _nodeDrag.type; var editedSegIndex = _nodeDrag.segIndex;
       _nodeDrag.active = false; _nodeDrag.path = null;

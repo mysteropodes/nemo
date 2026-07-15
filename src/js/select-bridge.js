@@ -540,6 +540,16 @@
           scaleCenterSegments(p.data.centerSegments, stepSx, stepSy, anchor.x, anchor.y);
           rebuildVectorBrushOutline(p);
         }
+        // Texture companions (vector-preset dabs OR Bitmap Brush's raster)
+        // never moved with a scale/rotate handle drag before this — only
+        // the plain 'move' translate handler touched them at all. Scaling
+        // them geometrically with the SAME matrix keeps them visually
+        // attached during the drag (cheap); bitmap anchors get a full
+        // crisp re-bake at gesture end (onUp below), same "cheap live,
+        // crisp on release" precedent as the subselect node-drag path.
+        if (p.data && p.data.brushCompanions) {
+          p.data.brushCompanions.forEach(function (c) { if (!c.removed) c.scale(stepSx, stepSy, anchor); });
+        }
       });
       xformLastSx = sx; xformLastSy = sy;
       symGestureAccumulate(new Matrix().scale(stepSx, stepSy, anchor));
@@ -564,6 +574,10 @@
         if (p.data && p.data.isVectorBrush && p.data.centerSegments) {
           rotateCenterSegments(p.data.centerSegments, stepAngle, rotCenter.x, rotCenter.y);
           rebuildVectorBrushOutline(p);
+        }
+        // See the identical companion-transform comment in xform-scale above.
+        if (p.data && p.data.brushCompanions) {
+          p.data.brushCompanions.forEach(function (c) { if (!c.removed) c.rotate(stepAngle, rotCenter); });
         }
       });
       rotLastAngle = deltaFromStart;
@@ -617,6 +631,17 @@
         // foreign-owned item in the gesture before it's persisted.
         selectedPaths.forEach(function (p) { forkIfForeignOwner(p); });
         fillRegenerateLinked(userLayers[state.activeLayerIdx], null);
+        // Bitmap Brush anchors: the live drag above only scaled/rotated the
+        // EXISTING raster companion in place (cheap, matches its geometry
+        // during the drag but stays at its original bake resolution/
+        // stamp density) — re-bake crisp from the anchor's final geometry
+        // once, at gesture end, same "cheap live, crisp on release"
+        // precedent as liveRestamp/regenerate for subselect node edits.
+        if (window.SMBitmapBrush) {
+          selectedPaths.forEach(function (p) {
+            if (p.data && p.data.bitmapBrushSpec) SMBitmapBrush.regenerate(p, userLayers[state.activeLayerIdx]);
+          });
+        }
         saveActiveLayerFrame();
       }
       renderArcs(); updateUI();

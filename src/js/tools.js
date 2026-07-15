@@ -693,7 +693,19 @@ function rotateCenterSegments(segs,angleDeg,cx,cy){
     s.handleOut=rotVec(s.handleOut[0],s.handleOut[1]);
   });
 }
-function clearSel(){selectedPaths=[];state.selectedStrokeIndices=[];_nodeSel=[];state.xformAnchorCustom=null;state.xformAnchorHovered=false;}
+// Bug found live (2026-07, while testing the new subselect marquee-without-
+// pre-selection feature): clearSel() never cleared `nodeHandles` (the
+// module-level hit-test array renderNodeHandles() populates) — a stale
+// entry from whatever was selected BEFORE this clearSel() call could then
+// spuriously match a later click at roughly the same screen position (the
+// subselect onDown hit-test loop trusts nodeHandles unconditionally,
+// with no check that it still corresponds to the CURRENT selection),
+// silently "grabbing" a phantom handle instead of starting a fresh
+// marquee/selection. nodeHandles conceptually can't outlive the
+// selection it was built from, so it's cleared here too — nodeLayer
+// (the Paper-fallback's actual visual dots) already gets wiped by the
+// next real renderNodeHandles() call, no need to touch it here.
+function clearSel(){selectedPaths=[];state.selectedStrokeIndices=[];_nodeSel=[];state.xformAnchorCustom=null;state.xformAnchorHovered=false;if(typeof nodeHandles!=='undefined')nodeHandles=[];}
 function getSI(path){var ch=userLayers[state.activeLayerIdx].children;for(var i=0;i<ch.length;i++){if(ch[i]===path)return i;}return -1;}
 // UI/UX audit (2026-07): the statusbar footer has claimed "⌘/Ctrl+D
 // Dupliquer" for as long as an object selection exists, but NOTHING wired
@@ -3527,11 +3539,12 @@ function onMouseDown(event){
       // nodeHandles (hit-test array) is stale until rebuilt — see the same
       // fix's comment in subselect-bridge.js for the full story.
       renderNodeHandles();
-    }else if(selectedPaths.length===1){
-      // empty-space drag with a path selected: marquee over its anchors
+    }else{
+      // Marquee now always starts here regardless of prior selection — see
+      // subselect-bridge.js's identical fix comment for the full story.
       _nmq.active=true;_nmq.start=event.point.clone();_nmq.rect=null;
       return;
-    }else{clearSel();}
+    }
     renderArcs();updateUI();
   }else if(state.tool==='comment'){
     // Existing pin nearby -> reopen it for editing; otherwise start a new
@@ -3848,6 +3861,7 @@ function onMouseDrag(event){
         selectedPaths.forEach(function(p){
           p.rotate(stepAngle,_xform.center);
           if(p.data&&p.data.isVectorBrush&&p.data.centerSegments){rotateCenterSegments(p.data.centerSegments,stepAngle,_xform.center.x,_xform.center.y);rebuildVectorBrushOutline(p);}
+          if(p.data&&p.data.brushCompanions)p.data.brushCompanions.forEach(function(c){if(!c.removed)c.rotate(stepAngle,_xform.center);});
         });
         _xform.lastAngle=deltaFromStart;
         selectedPaths.forEach(function(p){if(p)p.data.boxAngle=(((p.data&&p.data.boxAngle)||0)+stepAngle)%360;}); // orientation lives on the stroke
@@ -3871,6 +3885,7 @@ function onMouseDrag(event){
         selectedPaths.forEach(function(p){
           p.scale(stepSx,stepSy,anchor);
           if(p.data&&p.data.isVectorBrush&&p.data.centerSegments){scaleCenterSegments(p.data.centerSegments,stepSx,stepSy,anchor.x,anchor.y);rebuildVectorBrushOutline(p);}
+          if(p.data&&p.data.brushCompanions)p.data.brushCompanions.forEach(function(c){if(!c.removed)c.scale(stepSx,stepSy,anchor);});
         });
         _xform.lastSx=sx;_xform.lastSy=sy;
         symGestureAccumulate(new Matrix().scale(stepSx,stepSy,anchor));
@@ -4039,7 +4054,9 @@ function onMouseUp(event){
         selectedPaths=userLayers[state.activeLayerIdx].children.filter(function(c){return (c instanceof Path||c instanceof Raster)&&isSelectablePathChild(c);});
         state.selectedStrokeIndices=[];
       }else{
-        fillRegenerateLinked(userLayers[state.activeLayerIdx],null);saveActiveLayerFrame();
+        fillRegenerateLinked(userLayers[state.activeLayerIdx],null);
+        if(window.SMBitmapBrush)selectedPaths.forEach(function(p){if(p.data&&p.data.bitmapBrushSpec)SMBitmapBrush.regenerate(p,userLayers[state.activeLayerIdx]);});
+        saveActiveLayerFrame();
       }
       renderTransformHandles();renderNodeHandles();updateUI();
     }
@@ -4073,6 +4090,19 @@ function onMouseUp(event){
       if(_nmq.rect){
         var nmb=_nmq.rect.bounds;
         var npath=nodeEditTargetPath();
+        // See subselect-bridge.js's identical fix comment: pick a target
+        // path from what the box overlaps when none was pre-selected.
+        if(!npath){
+          var layerForPick=userLayers[state.activeLayerIdx];
+          var candidates=layerForPick?layerForPick.children.filter(function(c){return c instanceof Path&&c.segments&&c.segments.length&&isSelectablePathChild(c)&&c.bounds.intersects(nmb);}):[];
+          if(candidates.length){
+            var picked=candidates[candidates.length-1];
+            clearSel();
+            selectedPaths.push(picked);
+            state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;});
+            npath=nodeEditTargetPath();
+          }
+        }
         _nodeSel=[];
         if(npath){
           var nsegs=nodeEditSegmentsData(npath);
@@ -4081,7 +4111,7 @@ function onMouseUp(event){
         _nmq.rect.remove();_nmq.rect=null;
         if(!_nodeSel.length)clearSel();
       }else{clearSel();}
-      _nmq.active=false;renderArcs();updateUI();
+      _nmq.active=false;renderNodeHandles();renderArcs();updateUI();
     }
     else if(_nodeDrag.active){var editedPath=_nodeDrag.path;_nodeDrag.active=false;_nodeDrag.path=null;
       fillRegenerateLinked(userLayers[state.activeLayerIdx],editedPath);
