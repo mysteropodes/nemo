@@ -127,6 +127,11 @@ pub struct VideoSession {
     cache: std::collections::VecDeque<(i64, Vec<u8>)>,
     readahead_active: bool,
     readahead_goal: i64,
+    /// Last frame index the FOREGROUND asked for — lets decode_at tell a
+    /// frame-by-frame backward step (previous request minus a few) from a
+    /// fast scrub fling (arbitrary large jumps), which need opposite
+    /// respawn strategies (see the scrub-prefetch comment in decode_at).
+    last_foreground_request: i64,
     /// Source codec name (lowercase, e.g. "h264", "prores") — lets the JS
     /// side decide whether background media optimization (transcode to
     /// all-intra) is worth it, and gates bidirectional readahead the same
@@ -350,17 +355,30 @@ fn decode_at(s: &mut VideoSession, frame_index: i64, caller: &str) -> Result<(Ve
     }
     if origin == frame_index && (s.proc.is_none() || gap_for_diag.is_some_and(|g| !(0..=SMALL_FORWARD_REUSE_TOLERANCE).contains(&g))) {
         eprintln!("[video-decode] DIAG real-respawn: caller={caller} target={frame_index} gap={gap_for_diag:?}");
-        // A real respawn is unavoidable — over-seek by a few frames so the
-        // walk below caches the target's immediate predecessors, making
-        // the next several BACKWARD scrub steps cache hits instead of one
-        // ~23ms respawn each (see scrub_prefetch_for). Costs a handful of
-        // extra sequential decodes (~2ms each at 1080p) on a path that
-        // already pays ~20ms of spawn tax.
+        // A real respawn is unavoidable. If this request is a small
+        // BACKWARD STEP from the previous foreground request (frame-by-
+        // frame arrow-key/wheel scrubbing), over-seek by a few frames so
+        // the walk below caches the target's immediate predecessors —
+        // the next several backward steps become cache hits instead of
+        // one ~23ms respawn each (see scrub_prefetch_for). Costs a few
+        // extra sequential decodes (~2ms each at 1080p) on a path already
+        // paying ~20ms of spawn tax.
+        //
+        // NOT applied to large jumps: live capture 2026-07 ("pour le
+        // scrub c'est pire") showed fast drag-scrubbing jumps 13-120
+        // frames per tick — far outside any prefetch window, so the
+        // prefetch never paid off but its extra decodes taxed EVERY tick.
+        // Large jumps now spawn exactly at the target for minimum
+        // latency; only genuine step-backs get the widened origin.
         // (No "is the process already inside the widened window" check
         // needed: any such position would be a 0..=prefetch forward gap,
         // and prefetch < SMALL_FORWARD_REUSE_TOLERANCE, so the reuse
         // branch above already claimed those.)
-        origin = (frame_index - scrub_prefetch_for(s)).max(0);
+        let prefetch = scrub_prefetch_for(s);
+        let step_back = s.last_foreground_request - frame_index;
+        if caller == "foreground" && step_back > 0 && step_back <= prefetch {
+            origin = (frame_index - prefetch).max(0);
+        }
     }
     let mut backoff: i64 = 0;
     let mut attempts: u32 = 0;
@@ -445,12 +463,17 @@ fn decode_frame_core(s: &mut VideoSession, frame_index: i64) -> Result<(Vec<u8>,
         let (_, bytes) = s.cache.remove(pos).unwrap();
         let out = bytes.clone();
         s.cache.push_front((frame_index, bytes));
+        s.last_foreground_request = frame_index;
         eprintln!("[video-decode] frame={frame_index} CACHE HIT (skipped spawn+decode)");
         return Ok((out, false));
     }
 
     let t0 = std::time::Instant::now();
+    // decode_at reads last_foreground_request to classify this request
+    // (step-back vs fling), so it must still hold the PREVIOUS request
+    // here — updated right after.
     let (rgba, seeked) = decode_at(s, frame_index, "foreground")?;
+    s.last_foreground_request = frame_index;
     let decode_ms = t0.elapsed().as_secs_f64() * 1000.0;
 
     // Populate the cache — structure unchanged from v1, budget now sized
@@ -580,6 +603,7 @@ fn open_session_core(path: &str) -> Result<(VideoSession, u64, f64), String> {
             cache: std::collections::VecDeque::new(),
             readahead_active: false,
             readahead_goal: 0,
+            last_foreground_request: -1,
             codec,
         },
         frame_count,
@@ -1401,21 +1425,32 @@ mod tests {
     // Locks in the scrub-prefetch behavior (live-caught 2026-07, "la
     // lecture est vraiment bien, le scrub moyen": every BACKWARD scrub
     // step paid a full ~23ms respawn per session because the pipe can't
-    // rewind). A respawn now over-seeks by scrub_prefetch_for() frames and
-    // caches the walked window, so the next several backward steps are
-    // cache hits — one respawn amortized over the whole window.
+    // rewind). A respawn for a small BACKWARD STEP (previous request
+    // minus a few — arrow-key/wheel scrubbing) over-seeks by
+    // scrub_prefetch_for() frames and caches the walked window, so the
+    // following backward steps are cache hits — one respawn amortized
+    // over the whole window. Large jumps deliberately do NOT prefetch
+    // (second live capture, "pour le scrub c'est pire": fast drag-scrubs
+    // jump 13-120 frames per tick, so prefetch never paid off there but
+    // its extra decodes taxed every tick).
     #[test]
-    fn backward_scrub_steps_after_a_seek_are_cache_hits() {
+    fn backward_scrub_steps_amortize_into_cache_hits() {
         let path = make_test_video(); // 320x240 → prefetch clamps to 6
         let (mut s, _, _) = open_session_core_t(path.to_str().unwrap()).unwrap();
         let (mut s_ref, _, _) = open_session_core_t(path.to_str().unwrap()).unwrap();
 
-        // Cold seek to 40: pays one respawn, should prefetch 34..39.
+        // Cold seek to 40: a fling (no previous request), spawns exactly
+        // at the target — no prefetch.
         let (_, seeked) = decode_frame_core(&mut s, 40).unwrap();
         assert!(seeked, "cold seek to 40 should be a real spawn");
 
-        // Backward scrub 39, 38, ... 35: all inside the prefetched window.
-        for target in (35..=39).rev() {
+        // First backward STEP (39, one behind the previous request):
+        // pays the one respawn, which prefetches the window behind it.
+        let (_, seeked) = decode_frame_core(&mut s, 39).unwrap();
+        assert!(seeked, "first backward step should be the one real spawn");
+
+        // Following backward steps: all inside the prefetched window.
+        for target in (34..=38).rev() {
             let (bytes, seeked) = decode_frame_core(&mut s, target).unwrap();
             assert!(!seeked, "backward scrub to {target} respawned — prefetch window not cached");
             let truth = decode_frame_core(&mut s_ref, target).unwrap().0;
