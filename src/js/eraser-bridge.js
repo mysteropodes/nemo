@@ -15,6 +15,15 @@
   var pointerIsDown = false; // gesture lifecycle (suspend/resume span)
   var lastErasePt = null; // world Point of the previous erase sample this gesture, or null for the first — fed to eraseAtPoint so it sweeps a continuous capsule instead of a lone circle per move (see eraseAtPoint's own comment for why)
   var lastPenPressure = null; // held across a real-pen gesture — same hold-last-value fix as draw-bridge.js's pressureOf(), for the exact same reason (0/missing samples at lift-off otherwise misread as "max pressure")
+  // Alt+drag resize (2026-07, "10 > pourquoi on utilise pas le même
+  // système que la brush ?") — draw-bridge.js already has this exact
+  // gesture for the pressure brush (Alt+drag = live-preview resize instead
+  // of drawing); the eraser only had bracket keys ([/]), an inconsistency
+  // the user flagged directly. Same mechanics, reusing the eraser's own
+  // hover-circle cursor (setEraserCursor) as the live-size preview instead
+  // of draw-bridge's setPressureCursor — visually it's the same "this is
+  // the circle you're about to erase with" affordance either way.
+  var sizing = false, sizeStartX = 0, sizeStartVal = 0, sizeAnchorW = null;
 
   function shouldIntercept() {
     return (
@@ -95,6 +104,16 @@
     if (!shouldIntercept()) return;
     e.stopImmediatePropagation();
     e.preventDefault();
+    if (e.altKey) {
+      sizing = true;
+      sizeStartX = e.clientX;
+      sizeStartVal = state.eraserSize;
+      sizeAnchorW = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
+      window.SMEngineBridge.suspend();
+      window.SMEngineBridge.setEraserCursor(sizeAnchorW, state.eraserSize / 2);
+      window.SMEngineBridge.renderNow();
+      return;
+    }
     // pushUndo() BEFORE ensureKeyframe(), and unconditionally (not lazily
     // on the first actual hit like before) — see draw-bridge.js's
     // commitStroke comment for why the ordering matters: a single undo must
@@ -115,6 +134,18 @@
     window.SMEngineBridge.renderNow();
   }
   function onMove(e) {
+    if (sizing) {
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      // Same 0.5px-per-px mapping as draw-bridge.js's brush resize — kept
+      // identical on purpose so Alt-drag feels the same across tools.
+      var ns = Math.max(2, sizeStartVal + (e.clientX - sizeStartX) * 0.5);
+      state.eraserSize = ns;
+      var es = document.getElementById('p-erasersize'); if (es) es.value = Math.round(ns);
+      window.SMEngineBridge.setEraserCursor(sizeAnchorW, ns / 2);
+      window.SMEngineBridge.renderNow();
+      return;
+    }
     if (!shouldIntercept()) return;
     e.stopImmediatePropagation();
     e.preventDefault();
@@ -125,6 +156,15 @@
     window.SMEngineBridge.renderNow();
   }
   function onUp(e) {
+    if (sizing) {
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      sizing = false;
+      window.SMEngineBridge.resume();
+      window.SMEngineBridge.renderNow();
+      showToast('Taille de la gomme : ' + Math.round(state.eraserSize) + 'px');
+      return;
+    }
     if (!pointerIsDown) return;
     e.stopImmediatePropagation();
     e.preventDefault();

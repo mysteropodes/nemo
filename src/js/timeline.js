@@ -3425,9 +3425,16 @@ function onKeyDown(event){
   // collision (not a reserved OS/browser zoom combo); Ctrl+0 alone mirrors
   // the existing "Fit" button (window.SM.fitCanvas), +/- step by the same
   // ratio the wheel handler's own Ctrl-modifier path uses.
-  if((event.metaKey||event.ctrlKey)&&event.shiftKey&&(event.key==='='||event.key==='+')){event.preventDefault();view.zoom=Math.min(20,view.zoom*1.1);updZoom();renderArcs();if(window.SMEngineBridge)SMEngineBridge.renderNow();return;}
-  if((event.metaKey||event.ctrlKey)&&event.shiftKey&&event.key==='-'){event.preventDefault();view.zoom=Math.max(.05,view.zoom/1.1);updZoom();renderArcs();if(window.SMEngineBridge)SMEngineBridge.renderNow();return;}
-  if((event.metaKey||event.ctrlKey)&&event.shiftKey&&event.key==='0'){event.preventDefault();window.SM.fitCanvas();return;}
+  // Round 2, still "marche pas": event.key is layout-dependent. On an
+  // AZERTY keyboard the "-" character sits on its key WITHOUT Shift (so
+  // Shift+that key produces "6", never "-"), while "=" and "0" both
+  // already require Shift to type on AZERTY (so those two happened to
+  // keep working). event.code is the physical key position, identical
+  // across layouts — Minus/Equal/Digit0 are the correct, layout-proof
+  // check regardless of what character the OS resolves them to.
+  if((event.metaKey||event.ctrlKey)&&event.shiftKey&&(event.code==='Equal'||event.code==='NumpadAdd')){event.preventDefault();view.zoom=Math.min(20,view.zoom*1.1);updZoom();renderArcs();if(window.SMEngineBridge)SMEngineBridge.renderNow();return;}
+  if((event.metaKey||event.ctrlKey)&&event.shiftKey&&(event.code==='Minus'||event.code==='NumpadSubtract')){event.preventDefault();view.zoom=Math.max(.05,view.zoom/1.1);updZoom();renderArcs();if(window.SMEngineBridge)SMEngineBridge.renderNow();return;}
+  if((event.metaKey||event.ctrlKey)&&event.shiftKey&&(event.code==='Digit0'||event.code==='Numpad0')){event.preventDefault();window.SM.fitCanvas();return;}
   if(event.target.tagName==='INPUT'||event.target.tagName==='SELECT'||event.target.tagName==='TEXTAREA'||event.target.isContentEditable)return;
   var k=event.key;
   // Motion mode's P/A/R/S/T property-reveal shortcuts (After Effects

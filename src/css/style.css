@@ -655,11 +655,13 @@ body.mode-motion .lrow.act{box-shadow:inset 3px 0 0 #4E6FF2,inset 0 0 0 1px rgba
    the cell width visibly offset the marker to the right of the line.
    left:-5px alone still lands 2px off — #playhead has its own
    border-left:2px (the actual line), which shifts ITS content box (where
-   this child positions from left:0) 2px right of the border itself. -7px
-   compensates for that border width so the 10px circle's center lands
-   exactly on the line. transform-origin:center so hover-scale grows
-   symmetrically instead of drifting. */
-#playhead-flag::before{content:"";position:absolute;top:0;left:-7px;width:10px;height:10px;background:var(--accent);border-radius:2px 2px 6px 6px;box-shadow:0 1px 3px rgba(0,0,0,.4);transform-origin:center;transition:transform .1s,background .1s;}
+   this child positions from left:0) 2px right of the border edge.
+   Round 2 ("pas tout à fait, quelques pixels"): -7px aligned the circle's
+   center to the border's LEFT EDGE (x:232), not its own visual middle —
+   a 2px-wide line's middle sits 1px further right (x:233). -6px splits
+   that 2px border width evenly. transform-origin:center so hover-scale
+   grows symmetrically instead of drifting. */
+#playhead-flag::before{content:"";position:absolute;top:0;left:-6px;width:10px;height:10px;background:var(--accent);border-radius:2px 2px 6px 6px;box-shadow:0 1px 3px rgba(0,0,0,.4);transform-origin:center;transition:transform .1s,background .1s;}
 #playhead-flag:hover::before{background:#fff;transform:scale(1.2);}
 .fc.outside-wa{opacity:.35;}
 .fc.sel{background:rgba(74,158,255,.28);box-shadow:inset 0 0 0 1px rgba(74,158,255,.5);}
