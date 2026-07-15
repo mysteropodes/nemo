@@ -394,18 +394,18 @@
           </select>
         </div>
         <div class="pr" id="p-brushpreset-apply-row" style="display:none"><span class="pl"></span><button class="pbtn" id="btn-brushpreset-apply">Apply to selection</button></div>
-        <div class="pr" title="Re-smooths the SELECTED stroke's existing geometry — unlike Tool Options' Smooth (which only shapes new strokes as you draw), this is a one-shot action you can apply after the fact, repeatedly, to a stroke already on the canvas. Note: a freshly-drawn stroke is already simplified at draw time (Tool Options' Smooth, 10 by default) — applying THIS at the same or lower value won't visibly change anything since it's already fit that tightly; raise it for a visible extra effect."><span class="pl">Smooth</span><input type="number" class="pi scrub" id="p-poststroke-smooth" value="25" min="0" max="80" data-step="1"><button class="pbtn" id="btn-poststroke-smooth">Apply</button></div>
-      </div>
-    </div>
-    <div class="psec" id="bitmap-brush-sec">
-      <div class="phdr"><span class="ar">☰</span> <span>Bitmap Brush</span></div>
-      <div class="pbdy">
-        <div class="pr" title="Renders this stroke as a stamped raster texture (real bitmap grain) instead of the vector brush above — the geometry Draw captures stays the same, only the OUTPUT becomes an image layer. Existing vector brush presets are untouched (kept for exports like Rive that need real vector dabs) — this is a separate, parallel brush category, not a replacement."><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="p-bitmapbrush-on" style="accent-color:var(--accent)"> Enable (Draw tool)</label></div>
-        <div class="pr"><span class="pl">Tip</span><select class="psel" id="p-bitmap-tip">
-          <option value="soft">Soft Round</option>
-          <option value="grain">Grain</option>
-          <option value="splatter">Splatter</option>
-        </select></div>
+        <!-- Bitmap Brush, unified into Stroke (2026-07, "que tous soit dans
+             trait unifier... pour plus de cohérence") — was its own separate
+             psec; now sits right below the vector Brush row above, same
+             swatch-button-opens-a-preview-grid pattern (bitmap-tip-picker.js
+             mirrors brush-preset-picker.js exactly) instead of a plain
+             <select>, so choosing a tip finally shows what it looks like
+             before picking it, same as the vector presets already do. -->
+        <div class="pr" title="Renders this stroke as a stamped raster texture (real bitmap grain) instead of the vector Brush above — the geometry Draw captures stays the same, only the OUTPUT becomes an image layer. The vector presets above are untouched (kept for exports like Rive that need real vector dabs) — this is a parallel category, not a replacement."><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="p-bitmapbrush-on" style="accent-color:var(--accent)"> Bitmap Brush (Draw tool)</label></div>
+        <div class="pr" id="p-bitmaptip-row">
+          <span class="pl">Tip</span>
+          <button class="bp-swatch-btn" id="p-bitmaptip-btn" type="button"><canvas id="p-bitmaptip-preview" width="120" height="20"></canvas><span id="p-bitmaptip-label">Soft Round</span></button>
+        </div>
         <div class="pr"><span class="pl">Size</span><input type="number" class="pi scrub" id="p-bitmap-size" value="40" min="4" max="300" data-step="1"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
         <div class="pr" title="Distance between stamps along the stroke, as a % of tip size — lower = denser/smoother coverage, higher = visible individual dabs"><span class="pl">Spacing</span><input type="number" class="pi scrub" id="p-bitmap-spacing" value="15" min="2" max="100" data-step="1"><span style="font-size:9px;color:var(--text-dim)">%</span></div>
         <div class="pr" title="Random position/size jitter per stamp — 0 = perfectly even, mechanical dabbing"><span class="pl">Scatter</span><input type="number" class="pi scrub" id="p-bitmap-scatter" value="20" min="0" max="100" data-step="1"><span style="font-size:9px;color:var(--text-dim)">%</span></div>
@@ -414,6 +414,7 @@
         <div class="pr" title="Import a Photoshop .abr brush file — its tip shape(s) become selectable Tip presets above, alongside the procedural ones"><span class="pl"></span><button class="pbtn" id="btn-bitmap-import-abr" style="flex:1;font-size:10px" type="button">Import .abr tip…</button><input type="file" id="bitmap-abr-file" accept=".abr" style="display:none"></div>
         <div class="pr" title="Re-stamps every selected Bitmap Brush stroke (or converts a selected vector-textured/plain stroke) with the settings above"><span class="pl"></span><button class="pbtn" id="btn-bitmap-apply" style="flex:1;font-size:10px" type="button">Apply to selection</button></div>
         <div class="pr" title="Strips the bitmap texture off every selected stroke, restoring its plain stroke/fill"><span class="pl"></span><button class="pbtn" id="btn-bitmap-remove" style="flex:1;font-size:10px" type="button">Remove from selection</button></div>
+        <div class="pr" title="Re-smooths the SELECTED stroke's existing geometry — unlike Tool Options' Smooth (which only shapes new strokes as you draw), this is a one-shot action you can apply after the fact, repeatedly, to a stroke already on the canvas. Note: a freshly-drawn stroke is already simplified at draw time (Tool Options' Smooth, 10 by default) — applying THIS at the same or lower value won't visibly change anything since it's already fit that tightly; raise it for a visible extra effect."><span class="pl">Smooth</span><input type="number" class="pi scrub" id="p-poststroke-smooth" value="25" min="0" max="80" data-step="1"><button class="pbtn" id="btn-poststroke-smooth">Apply</button></div>
       </div>
     </div>
     <div class="psec" id="tool-opts-sec">
@@ -1102,6 +1103,7 @@
 <script src="js/viewtools-bridge.js"></script>
 <script src="js/abr-import.js"></script>
 <script src="js/bitmap-brush.js"></script>
+<script src="js/bitmap-tip-picker.js"></script>
 <script src="js/draw-bridge.js"></script>
 <script src="js/select-bridge.js"></script>
 <script src="js/subselect-bridge.js"></script>
