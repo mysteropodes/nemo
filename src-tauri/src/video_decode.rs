@@ -122,7 +122,7 @@ pub struct VideoSession {
     frame_count: i64,
     proc: Option<FfmpegProc>,
     /// Recently-decoded frame cache, most-recent-first — unchanged from
-    /// v1 (see FRAME_CACHE_BUDGET_BYTES). Byte-bounded, not frame-count-
+    /// v1 (see cache_budget_for). Byte-bounded, not frame-count-
     /// bounded: frame size varies 8x between 1080p and 4K.
     cache: std::collections::VecDeque<(i64, Vec<u8>)>,
     readahead_active: bool,
@@ -134,13 +134,34 @@ pub struct VideoSession {
     codec: String,
 }
 
-/// ~8 frames of 1080p (66MB) or ~2 frames of 4K (66MB) per session —
-/// unchanged from v1.
-const FRAME_CACHE_BUDGET_BYTES: usize = 66 * 1024 * 1024;
+/// Per-session cache floor/ceiling. v1 used a flat 66MB, which live
+/// profiling (2026-07, "le temps réel n'est pas encore là") exposed as the
+/// next bottleneck once the readahead tug-of-war was fixed: at 1080p a
+/// frame is ~8MB, so a flat 66MB holds ~8 frames — the readahead window
+/// (READAHEAD_DEPTH ahead) exactly fills it, and warming the LAST forward
+/// frame evicts the FIRST one, i.e. precisely the frame the playhead asks
+/// for next. Foreground then misses the cache with the process sitting
+/// ahead (negative gap), paying a full ~25ms respawn nearly every tick —
+/// 522 foreground respawns in one capture, one per session per displayed
+/// frame across 3 videos. The budget is now sized from the session's own
+/// frame_bytes so the full window (current + DEPTH ahead + BACK behind +
+/// slack) always fits: see cache_budget_for().
+const FRAME_CACHE_MIN_BYTES: usize = 66 * 1024 * 1024;
+const FRAME_CACHE_MAX_BYTES: usize = 320 * 1024 * 1024;
 /// How far past the last requested frame the readahead thread decodes,
 /// and how far BEHIND it — unchanged from v1.
 const READAHEAD_DEPTH: i64 = 8;
 const READAHEAD_BACK: i64 = 3;
+
+/// Per-session cache budget: the full readahead window (1 current +
+/// DEPTH forward + BACK back) plus a few frames of slack, clamped to
+/// [66MB, 320MB]. 1080p (~8MB/frame): ~128MB. 4K (~33MB/frame): hits the
+/// 320MB ceiling (~9 frames — window still fits, barely). The ceiling
+/// bounds worst-case memory at ~1GB for 3 simultaneous 4K sessions.
+fn cache_budget_for(frame_bytes: usize) -> usize {
+    let window = (1 + READAHEAD_DEPTH + READAHEAD_BACK) as usize + 4;
+    (frame_bytes * window).clamp(FRAME_CACHE_MIN_BYTES, FRAME_CACHE_MAX_BYTES)
+}
 /// Shared by decode_at (actual reuse decision) and spawn_readahead (peeking
 /// whether a candidate target would cost a respawn, without paying for one).
 const SMALL_FORWARD_REUSE_TOLERANCE: i64 = 12;
@@ -380,10 +401,12 @@ fn decode_frame_core(s: &mut VideoSession, frame_index: i64) -> Result<(Vec<u8>,
     let (rgba, seeked) = decode_at(s, frame_index, "foreground")?;
     let decode_ms = t0.elapsed().as_secs_f64() * 1000.0;
 
-    // Populate the cache — unchanged from v1.
+    // Populate the cache — structure unchanged from v1, budget now sized
+    // per-session from frame_bytes (see cache_budget_for).
+    let budget = cache_budget_for(s.frame_bytes);
     s.cache.push_front((frame_index, rgba.clone()));
     let mut total: usize = s.cache.iter().map(|(_, b)| b.len()).sum();
-    while total > FRAME_CACHE_BUDGET_BYTES && s.cache.len() > 1 {
+    while total > budget && s.cache.len() > 1 {
         if let Some((_, evicted)) = s.cache.pop_back() {
             total -= evicted.len();
         }
@@ -613,7 +636,7 @@ fn spawn_readahead(arc: Arc<Mutex<VideoSession>>, center: i64) {
         // for THIS goal window, even if the cache later evicted them.
         // Without this, a goal that sits still while the session's cache
         // is too small to hold the whole forward+backward window (small
-        // FRAME_CACHE_BUDGET_BYTES relative to per-frame size, e.g. 4K)
+        // the cache budget relative to per-frame size (fixed since — see cache_budget_for), e.g. 4K)
         // thrashes forever: decode backward target A, it evicts B, next
         // pass finds B "missing" and redecodes it, which evicts A, forever
         // — live-caught 2026-07, cycling on 4 targets at ~20-25ms/respawn
@@ -656,8 +679,14 @@ fn spawn_readahead(arc: Arc<Mutex<VideoSession>>, center: i64) {
         // respawn (fresh session, sequential +1 gaps), so nothing here
         // defers them.
         let goal_recently_moving = last_goal_change.elapsed() < std::time::Duration::from_millis(150);
+        // When the clamped budget can't hold the nominal window (4K hits
+        // the 320MB ceiling), cap forward depth so warming never evicts
+        // the frames the playhead is about to ask for — otherwise the
+        // 1080p eviction bug (see cache_budget_for) just reappears at 4K.
+        let frames_that_fit = (cache_budget_for(s.frame_bytes) / s.frame_bytes.max(1)) as i64;
+        let depth = READAHEAD_DEPTH.min((frames_that_fit - 1 - READAHEAD_BACK - 1).max(1));
         let mut target: Option<i64> = None;
-        for d in 1..=READAHEAD_DEPTH {
+        for d in 1..=depth {
             let f = center + d;
             if f < s.frame_count
                 && !attempted.contains(&f)
@@ -692,12 +721,13 @@ fn spawn_readahead(arc: Arc<Mutex<VideoSession>>, center: i64) {
             break;
         };
         attempted.insert(f);
+        let budget = cache_budget_for(s.frame_bytes);
         let decoded = decode_at(&mut s, f, "readahead");
         match decoded {
             Ok((bytes, _seeked)) => {
                 s.cache.push_front((f, bytes));
                 let mut total: usize = s.cache.iter().map(|(_, b)| b.len()).sum();
-                while total > FRAME_CACHE_BUDGET_BYTES && s.cache.len() > 1 {
+                while total > budget && s.cache.len() > 1 {
                     if let Some((_, evicted)) = s.cache.pop_back() {
                         total -= evicted.len();
                     }
@@ -708,7 +738,7 @@ fn spawn_readahead(arc: Arc<Mutex<VideoSession>>, center: i64) {
                 break;
             }
         }
-        if s.cache.iter().map(|(_, b)| b.len()).sum::<usize>() >= FRAME_CACHE_BUDGET_BYTES {
+        if s.cache.iter().map(|(_, b)| b.len()).sum::<usize>() >= budget {
             s.readahead_active = false;
             break;
         }
@@ -1295,7 +1325,7 @@ mod tests {
     // stopped/paused, readahead's own backward-fill was found looping
     // forever: DIAG showed it cycling on 4 targets (71/73/74/75) at
     // 20-25ms/respawn indefinitely with the goal completely static. Root
-    // cause: FRAME_CACHE_BUDGET_BYTES (66MB) can't hold the full
+    // cause: the flat 66MB v1 budget couldn't hold the full
     // READAHEAD_DEPTH+READAHEAD_BACK (11-frame) window at high resolution
     // — decoding one backward frame evicts another, which then reads as
     // "missing" on the next pass and gets redecoded, forever. A 1920x1080
