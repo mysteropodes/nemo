@@ -883,6 +883,37 @@
       await riveCall('reorder_objects',{operations:[{objectId:bgShape.id,order:'sendToBack'}]});
     }
 
+    // Fresh vertex-id lookup for every morph shape, mirroring the
+    // cubicPending fixup a few lines above — and for the exact same
+    // reason. The EARLIER hierarchy tree (fetched right after
+    // riveCreateShapesBatch, used everywhere else in this export) is
+    // stale for a batch-created PointsPath's children: already documented
+    // for the 1-vertex placeholder case, but live-caught 2026-07 ("il
+    // n'y a pas de clés de point of path ou de vertices") proves it's
+    // NOT limited to that — vertexIdsForShape (reading straight from that
+    // same stale tree) returned nothing for every ordinary multi-point
+    // morph path too, silently skipping the ENTIRE vertex-keyframe loop
+    // for ALL 12 morph shapes in one captured export (confirmed via the
+    // DIAG log: 84 total keyframes exactly matches the OPACITY-only count
+    // — zero vertex keyframes were ever even queued client-side). A
+    // fresh query_objects call, issued right before writing keyframes
+    // (as close to "just created" as this export gets), reliably returns
+    // populated children where the earlier batch-creation-time tree did
+    // not.
+    var morphPending=pending.filter(function(p){return p.morph&&shapeByName[p.name]&&pathObjForShape(p.name);});
+    var vidsByShapeName={};
+    if(morphPending.length){
+      var morphPathIds=morphPending.map(function(p){return pathObjForShape(p.name).id;});
+      var mTree=await riveCall('query_objects',{objectIds:morphPathIds,depth:1});
+      var childrenByPathId={};
+      (mTree.objects||[]).forEach(function(o){
+        if(o.types&&o.types.indexOf('PointsPath')>=0)childrenByPathId[o.id]=o.children||[];
+      });
+      morphPending.forEach(function(p){
+        vidsByShapeName[p.name]=childrenByPathId[pathObjForShape(p.name).id]||null;
+      });
+    }
+
     onProgress('Écriture des animations…');
     var keyframes=[];
     var VERT_X=24,VERT_Y=25; // confirmed live via query_property_keys — same for Straight and Cubic vertex types
@@ -893,8 +924,8 @@
         keyframes.push({objectId:shape.id,propertyKey:18,frame:k.frame,value:k.value,interpolationType:k.interp||'hold'});
       });
       if(p.morph){
-        var vids=vertexIdsForShape(p.name);
-        if(vids){
+        var vids=vidsByShapeName[p.name];
+        if(vids&&vids.length){
           for(var f4=p.morph.start;f4<=p.morph.end;f4++){
             var pts=p.morph.pointsByFrame[f4];
             for(var k2=0;k2<vids.length&&k2<pts.length;k2++){
@@ -902,6 +933,8 @@
               keyframes.push({objectId:vids[k2],propertyKey:VERT_Y,frame:f4-r.start,value:pts[k2][1],interpolationType:'linear'});
             }
           }
+        } else {
+          console.log('[rive-export] WARNING: no vertex ids resolved for morph shape',p.name,'— vertex keyframes skipped');
         }
       }
       if(p.translate){
