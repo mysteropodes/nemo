@@ -693,7 +693,7 @@ function rotateCenterSegments(segs,angleDeg,cx,cy){
     s.handleOut=rotVec(s.handleOut[0],s.handleOut[1]);
   });
 }
-function clearSel(){selectedPaths=[];state.selectedStrokeIndices=[];_nodeSel=[];state.xformAnchorCustom=null;}
+function clearSel(){selectedPaths=[];state.selectedStrokeIndices=[];_nodeSel=[];state.xformAnchorCustom=null;state.xformAnchorHovered=false;}
 function getSI(path){var ch=userLayers[state.activeLayerIdx].children;for(var i=0;i<ch.length;i++){if(ch[i]===path)return i;}return -1;}
 // UI/UX audit (2026-07): the statusbar footer has claimed "⌘/Ctrl+D
 // Dupliquer" for as long as an object selection exists, but NOTHING wired
@@ -3462,7 +3462,15 @@ function onMouseDown(event){
       // unconstrained event.point) so holding Shift can never make closing
       // the path near its own start point harder to hit.
       var placePt=event.point;
-      if(event.modifiers.shift)placePt=constrainAngle45(_pen.path.lastSegment.point,event.point);
+      // event.event.shiftKey (native browser event), not event.modifiers.shift
+      // (Paper.js's own tracking) — live-caught 2026-07, "marche pas": this
+      // app's own global keydown handlers (timeline.js onKeyDown et al.)
+      // apparently intercept the Shift keydown before Paper.js's internal
+      // Key-state listener ever sees it, so event.modifiers.shift silently
+      // never reads true. event.event.shiftKey is the proven-reliable
+      // pattern already used elsewhere in this exact file (the Zoom tool's
+      // event.event.altKey, tools.js:3412).
+      if(event.event.shiftKey)placePt=constrainAngle45(_pen.path.lastSegment.point,event.point);
       _pen.path.add(placePt);
     }
     _pen.draggingHandle=true;
@@ -3758,7 +3766,9 @@ function onMouseDrag(event){
     // clean 0/45/90° angle, both routine, high-frequency needs when
     // roughing out a layout or a straight construction line.
     var endPt=event.point;
-    if(event.modifiers.shift){
+    // event.event.shiftKey, not event.modifiers.shift — see the Pen tool's
+    // identical fix a few lines up for the full explanation.
+    if(event.event.shiftKey){
       if(state.tool==='line')endPt=constrainAngle45(shapeStart,event.point);
       else endPt=constrainSquare(shapeStart,event.point);
     }

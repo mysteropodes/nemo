@@ -3412,14 +3412,22 @@ function onKeyDown(event){
     groupSelectionIntoFolder();
     return;
   }
-  // Ctrl/Cmd +/-/0 canvas zoom — mouse wheel already zoomed the canvas
-  // (tools.js), but had no keyboard equivalent; Ctrl+0 mirrors the
-  // existing "Fit" button (window.SM.fitCanvas), +/- step by the same
-  // ratio the wheel handler's own Ctrl-modifier path uses (Fit's own
-  // increment, kept consistent rather than inventing a new one).
-  if((event.metaKey||event.ctrlKey)&&(event.key==='='||event.key==='+')){event.preventDefault();view.zoom=Math.min(20,view.zoom*1.1);updZoom();renderArcs();if(window.SMEngineBridge)SMEngineBridge.renderNow();return;}
-  if((event.metaKey||event.ctrlKey)&&event.key==='-'){event.preventDefault();view.zoom=Math.max(.05,view.zoom/1.1);updZoom();renderArcs();if(window.SMEngineBridge)SMEngineBridge.renderNow();return;}
-  if((event.metaKey||event.ctrlKey)&&event.key==='0'){event.preventDefault();window.SM.fitCanvas();return;}
+  // Ctrl/Cmd+Shift +/-/0 canvas zoom — mouse wheel already zoomed the
+  // canvas (tools.js), but had no keyboard equivalent. Live-caught 2026-07,
+  // "marche pas": plain Ctrl/Cmd+=/-/0 is the OS/WebView's OWN native
+  // page-zoom accelerator (confirmed: no zoom-disabling config anywhere in
+  // src-tauri/tauri.conf.json) — it gets consumed by the WebView shell
+  // BEFORE this page-level keydown handler ever runs, so preventDefault()
+  // here is a no-op against it. My own earlier "verified live" test was a
+  // false positive: CDP-synthesized key events go straight to page JS,
+  // bypassing that native interception layer entirely — a real physical
+  // keypress on the user's own machine does not. +Shift avoids the
+  // collision (not a reserved OS/browser zoom combo); Ctrl+0 alone mirrors
+  // the existing "Fit" button (window.SM.fitCanvas), +/- step by the same
+  // ratio the wheel handler's own Ctrl-modifier path uses.
+  if((event.metaKey||event.ctrlKey)&&event.shiftKey&&(event.key==='='||event.key==='+')){event.preventDefault();view.zoom=Math.min(20,view.zoom*1.1);updZoom();renderArcs();if(window.SMEngineBridge)SMEngineBridge.renderNow();return;}
+  if((event.metaKey||event.ctrlKey)&&event.shiftKey&&event.key==='-'){event.preventDefault();view.zoom=Math.max(.05,view.zoom/1.1);updZoom();renderArcs();if(window.SMEngineBridge)SMEngineBridge.renderNow();return;}
+  if((event.metaKey||event.ctrlKey)&&event.shiftKey&&event.key==='0'){event.preventDefault();window.SM.fitCanvas();return;}
   if(event.target.tagName==='INPUT'||event.target.tagName==='SELECT'||event.target.tagName==='TEXTAREA'||event.target.isContentEditable)return;
   var k=event.key;
   // Motion mode's P/A/R/S/T property-reveal shortcuts (After Effects

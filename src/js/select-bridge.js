@@ -365,7 +365,26 @@
   }
 
   function onMove(e) {
-    if (!mode) return;
+    if (!mode) {
+      // Hover-only pass (not dragging anything) — tracks whether the
+      // pointer sits over the anchor crosshair so engine-bridge.js can draw
+      // it slightly larger, live UX feedback requested 2026-07 ("un petit
+      // hover visible léger scale serait pas mal"). Deliberately does NOT
+      // stopPropagation/preventDefault: this is a passive read, other
+      // tools/listeners must keep working normally while the Select tool
+      // merely hovers with nothing being dragged.
+      if (shouldIntercept() && selectedPaths.length) {
+        var wh = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
+        var hpt = new Point(wh[0], wh[1]);
+        var hh2 = computeHandles();
+        var isHover = !!(hh2 && hh2.anchorPos && hpt.getDistance(hh2.anchorPos) < 9 / view.zoom);
+        if (isHover !== state.xformAnchorHovered) {
+          state.xformAnchorHovered = isHover;
+          window.SMEngineBridge.renderNow();
+        }
+      }
+      return;
+    }
     e.stopImmediatePropagation();
     e.preventDefault();
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);

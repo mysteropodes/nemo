@@ -631,7 +631,11 @@
       // bounds-derived anchors live in the box's de-rotated space.
       var apArr = state.xformAnchorCustom ? [ap0.x, ap0.y] : W(ap0.x, ap0.y);
       var ap = { x: apArr[0], y: apArr[1] };
-      var ar = 8 * zs;
+      // Light hover scale (2026-07, live feedback) — select-bridge.js's
+      // onMove sets state.xformAnchorHovered on a passive hover-only pass
+      // (not an active drag). +25% radius reads as a clear but subtle
+      // "you can grab this" without a jarring size jump.
+      var ar = (state.xformAnchorHovered ? 10 : 8) * zs;
       items.push(circleItem(ap.x, ap.y, ar, null, [74, 158, 255, 255], 1.2 * zs));
       items.push(lineItem([ap.x - ar, ap.y], [ap.x + ar, ap.y], [74, 158, 255, 255], 1 * zs));
       items.push(lineItem([ap.x, ap.y - ar], [ap.x, ap.y + ar], [74, 158, 255, 255], 1 * zs));
