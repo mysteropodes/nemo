@@ -312,6 +312,18 @@ window.SM={
       }else{
         p.simplify(amount);
       }
+      // Re-stamp any texture (vector-preset dabs OR Bitmap Brush's raster)
+      // to follow the just-reshaped geometry — found live (2026-07,
+      // "unifie bien les paramètre de smooth aussi présent pour texture
+      // bitmap"): this function reshaped the anchor but NEVER called
+      // regenerateBrushTexture, so Smooth left a textured stroke's
+      // companion stuck at its pre-Smooth shape — a bitmap texture then
+      // visibly stopped correlating with the (now re-simplified) path,
+      // exactly the reported "la texture ne suit plus le tracé" mismatch.
+      // Same shared dispatcher (tools.js) used by subselect's node-drag
+      // end and the transform box's onUp, not a hand-rolled bitmap-only
+      // check — the vector-preset case had the identical gap.
+      regenerateBrushTexture(p,userLayers[state.activeLayerIdx]);
     });
     fillRegenerateLinked(userLayers[state.activeLayerIdx],null);
     saveActiveLayerFrame();updateUI();
