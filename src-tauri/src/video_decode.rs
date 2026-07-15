@@ -609,6 +609,18 @@ fn spawn_readahead(arc: Arc<Mutex<VideoSession>>, center: i64) {
     std::thread::spawn(move || {
         let mut last_goal: Option<i64> = None;
         let mut last_goal_change = std::time::Instant::now();
+        // Tracks frames this thread has already spent a respawn decoding
+        // for THIS goal window, even if the cache later evicted them.
+        // Without this, a goal that sits still while the session's cache
+        // is too small to hold the whole forward+backward window (small
+        // FRAME_CACHE_BUDGET_BYTES relative to per-frame size, e.g. 4K)
+        // thrashes forever: decode backward target A, it evicts B, next
+        // pass finds B "missing" and redecodes it, which evicts A, forever
+        // — live-caught 2026-07, cycling on 4 targets at ~20-25ms/respawn
+        // with the CPU cost never actually going away once playback
+        // stopped. Cleared whenever the goal actually moves, since a new
+        // center means a genuinely new window worth attempting.
+        let mut attempted: std::collections::HashSet<i64> = std::collections::HashSet::new();
         loop {
         let mut s = arc.lock().unwrap();
         if !s.readahead_active {
@@ -618,6 +630,7 @@ fn spawn_readahead(arc: Arc<Mutex<VideoSession>>, center: i64) {
         if last_goal != Some(center) {
             last_goal = Some(center);
             last_goal_change = std::time::Instant::now();
+            attempted.clear();
         }
         let back = READAHEAD_BACK;
         // Live-caught 2026-07 ("j'ai mis 3 vidéos ça a du mal à lire les 3
@@ -647,6 +660,7 @@ fn spawn_readahead(arc: Arc<Mutex<VideoSession>>, center: i64) {
         for d in 1..=READAHEAD_DEPTH {
             let f = center + d;
             if f < s.frame_count
+                && !attempted.contains(&f)
                 && !s.cache.iter().any(|(i, _)| *i == f)
                 && !(goal_recently_moving && would_need_respawn(&s, f))
             {
@@ -657,7 +671,7 @@ fn spawn_readahead(arc: Arc<Mutex<VideoSession>>, center: i64) {
         if target.is_none() && !goal_recently_moving {
             for d in 1..=back {
                 let f = center - d;
-                if f >= 0 && !s.cache.iter().any(|(i, _)| *i == f) {
+                if f >= 0 && !attempted.contains(&f) && !s.cache.iter().any(|(i, _)| *i == f) {
                     target = Some(f);
                     break;
                 }
@@ -677,6 +691,7 @@ fn spawn_readahead(arc: Arc<Mutex<VideoSession>>, center: i64) {
             s.readahead_active = false;
             break;
         };
+        attempted.insert(f);
         let decoded = decode_at(&mut s, f, "readahead");
         match decoded {
             Ok((bytes, _seeked)) => {
@@ -1272,6 +1287,47 @@ mod tests {
             backward_respawns, 0,
             "readahead's backward-fill fought forward playback and forced the decoder position backward {backward_respawns} times — expected 0 under sustained forward playback"
         );
+    }
+
+    // Reproduces a THIRD live-caught issue in the same investigation
+    // (2026-07, "c'est mieux mais y a encore une marge de manoeuvre" — the
+    // tug-of-war with foreground was fixed, but once playback actually
+    // stopped/paused, readahead's own backward-fill was found looping
+    // forever: DIAG showed it cycling on 4 targets (71/73/74/75) at
+    // 20-25ms/respawn indefinitely with the goal completely static. Root
+    // cause: FRAME_CACHE_BUDGET_BYTES (66MB) can't hold the full
+    // READAHEAD_DEPTH+READAHEAD_BACK (11-frame) window at high resolution
+    // — decoding one backward frame evicts another, which then reads as
+    // "missing" on the next pass and gets redecoded, forever. A 1920x1080
+    // RGBA frame is ~7.9MB, so 11 of them (~87MB) alone exceed the budget,
+    // reproducing the thrash deterministically. The `attempted` set fixes
+    // this by never re-targeting a frame this thread already paid a
+    // respawn for within the current goal window, even if it was since
+    // evicted — so the thread reaches "nothing left to attempt" and goes
+    // idle instead of spinning.
+    #[test]
+    fn readahead_settles_even_when_cache_cannot_hold_the_full_window() {
+        let p = gen_video("thrash_1080p.mp4", "testsrc2=size=1920x1080:rate=30:duration=3", &["-c:v", "libx264", "-pix_fmt", "yuv420p", "-g", "15"]);
+        let (s, _, _) = open_session_core_t(p.to_str().unwrap()).unwrap();
+        let arc = std::sync::Arc::new(Mutex::new(s));
+
+        decode_frame_core(&mut arc.lock().unwrap(), 50).unwrap();
+        spawn_readahead(arc.clone(), 50);
+
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(8);
+        loop {
+            {
+                let s = arc.lock().unwrap();
+                if !s.readahead_active {
+                    break;
+                }
+                assert!(
+                    std::time::Instant::now() < deadline,
+                    "readahead never went idle — still spinning after 8s, cache thrash likely reintroduced"
+                );
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
     }
 
     #[test]
