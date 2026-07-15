@@ -229,7 +229,7 @@ fn read_one_frame(s: &mut VideoSession) -> Result<Vec<u8>, String> {
 /// replacement for v1's numeric "frames walked" count — ffmpeg's own
 /// `-ss`/accurate_seek walk happens inside the child process now, where
 /// we can't observe or bound it directly (see the module doc comment).
-fn decode_at(s: &mut VideoSession, frame_index: i64) -> Result<(Vec<u8>, bool), String> {
+fn decode_at(s: &mut VideoSession, frame_index: i64, caller: &str) -> Result<(Vec<u8>, bool), String> {
     // Tail robustness (ported from v1 — caught live 2026-07, "decode:
     // stream exhausted" aborting scrubs near the end): requesting a frame
     // at/near the tail can hit EOF because frame_count is DERIVED
@@ -258,11 +258,25 @@ fn decode_at(s: &mut VideoSession, frame_index: i64) -> Result<(Vec<u8>, bool), 
     // without per-resolution tuning.
     const SMALL_FORWARD_REUSE_TOLERANCE: i64 = 12;
     let mut origin = frame_index;
+    // DIAG (2026-07 — "j'ai mis 3 vidéos ça a du mal à lire en temps réel"):
+    // reports the gap this decision was based on whenever a REAL respawn is
+    // about to happen (proc exists but the gap exceeded tolerance, or
+    // there's no process at all) — a genuinely bugged first version of this
+    // logged on the CHEAP gap=0 path too (origin ends up equal to
+    // frame_index in that case regardless of whether reuse "did anything",
+    // since there was nothing to skip), which is why the isolated 3-session
+    // Rust repro below looked alarming at a glance but was actually fine
+    // (2.5% respawn rate — see three_simultaneous_sessions_playback_
+    // mostly_avoids_respawns). This version distinguishes the two.
+    let gap_for_diag = s.proc.as_ref().map(|p| frame_index - p.next_frame);
     if let Some(p) = &s.proc {
         let gap = frame_index - p.next_frame;
         if gap >= 0 && gap <= SMALL_FORWARD_REUSE_TOLERANCE {
             origin = p.next_frame;
         }
+    }
+    if origin == frame_index && (s.proc.is_none() || gap_for_diag.is_some_and(|g| !(0..=SMALL_FORWARD_REUSE_TOLERANCE).contains(&g))) {
+        eprintln!("[video-decode] DIAG real-respawn: caller={caller} target={frame_index} gap={gap_for_diag:?}");
     }
     let mut backoff: i64 = 0;
     let mut attempts: u32 = 0;
@@ -346,7 +360,7 @@ fn decode_frame_core(s: &mut VideoSession, frame_index: i64) -> Result<(Vec<u8>,
     }
 
     let t0 = std::time::Instant::now();
-    let (rgba, seeked) = decode_at(s, frame_index)?;
+    let (rgba, seeked) = decode_at(s, frame_index, "foreground")?;
     let decode_ms = t0.elapsed().as_secs_f64() * 1000.0;
 
     // Populate the cache — unchanged from v1.
@@ -603,7 +617,7 @@ fn spawn_readahead(arc: Arc<Mutex<VideoSession>>, center: i64) {
             s.readahead_active = false;
             break;
         };
-        let decoded = decode_at(&mut s, f);
+        let decoded = decode_at(&mut s, f, "readahead");
         match decoded {
             Ok((bytes, _seeked)) => {
                 s.cache.push_front((f, bytes));
@@ -1207,6 +1221,62 @@ mod tests {
             wall < (da + db) * 8 / 10,
             "wall={wall}ms not meaningfully less than sum={}ms — sessions may still be serializing",
             da + db
+        );
+    }
+
+    // Reproduces LIVE report ("j'ai mis 3 vidéos ça a du mal à lire les 3
+    // en temps réel" — log from the running app showed near-EVERY frame
+    // respawning even for 1-frame steps, across 3 simultaneous sessions).
+    // Simulates 3 sessions "playing" together: each tick, all three are
+    // asked for their next sequential frame (mirroring the JS playback
+    // loop's onFrameChanged, which calls every native-video layer once
+    // per tick) with spawn_readahead fired after each — the exact
+    // decode_video_frame command sequence, minus the Tauri IPC layer.
+    #[test]
+    fn three_simultaneous_sessions_playback_mostly_avoids_respawns() {
+        let pa = make_test_video(); // 320x240, 60 frames
+        let pb = gen_video("play3_b.mp4", "testsrc2=size=320x240:rate=30:duration=3", &["-c:v", "libx264", "-pix_fmt", "yuv420p", "-g", "15"]);
+        let pc = gen_video("play3_c.mp4", "testsrc2=size=320x240:rate=30:duration=3", &["-c:v", "libx264", "-pix_fmt", "yuv420p", "-g", "15"]);
+        let (sa, _, _) = open_session_core_t(pa.to_str().unwrap()).unwrap();
+        let (sb, _, _) = open_session_core_t(pb.to_str().unwrap()).unwrap();
+        let (sc, _, _) = open_session_core_t(pc.to_str().unwrap()).unwrap();
+        let sessions = [
+            std::sync::Arc::new(Mutex::new(sa)),
+            std::sync::Arc::new(Mutex::new(sb)),
+            std::sync::Arc::new(Mutex::new(sc)),
+        ];
+
+        let mut respawn_count = 0u32;
+        let mut total = 0u32;
+        for tick in 0..40i64 {
+            for arc in &sessions {
+                let (seeked, cache_hit) = {
+                    let mut s = arc.lock().unwrap();
+                    let hit = s.cache.iter().any(|(idx, _)| *idx == tick);
+                    let seeked = if hit {
+                        let pos = s.cache.iter().position(|(idx, _)| *idx == tick).unwrap();
+                        let entry = s.cache.remove(pos).unwrap();
+                        s.cache.push_front(entry);
+                        false
+                    } else {
+                        decode_at(&mut s, tick, "foreground").unwrap().1
+                    };
+                    (seeked, hit)
+                };
+                total += 1;
+                if seeked {
+                    respawn_count += 1;
+                }
+                if !cache_hit {
+                    spawn_readahead(arc.clone(), tick);
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        eprintln!("[diag] three-session playback: {respawn_count}/{total} requests needed a fresh spawn");
+        assert!(
+            respawn_count <= sessions.len() as u32 * 3,
+            "{respawn_count}/{total} requests respawned — expected steady-state playback to avoid this almost entirely (only early warm-up spawns)"
         );
     }
 
