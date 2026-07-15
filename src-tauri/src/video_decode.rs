@@ -121,7 +121,16 @@ struct ConvProc {
     /// Sending a JPEG here wakes the writer thread; dropping the sender
     /// (session close) makes that thread exit and close the child's stdin.
     jpeg_tx: std::sync::mpsc::Sender<Vec<u8>>,
-    stdout: std::io::BufReader<ChildStdout>,
+    /// Decoded RGBA frames arrive here from a dedicated reader thread —
+    /// receiving THROUGH A CHANNEL (with recv_timeout) instead of a direct
+    /// blocking read is what makes the whole indexed path hang-proof: the
+    /// ffmpeg stdin pipeline's internal frame lag is CONTENT-DEPENDENT
+    /// (measured: 2 frames at 320x240, 3 at 1080p, with hiccups), so any
+    /// protocol that assumes a fixed lag can block forever on a blocking
+    /// read — which is exactly what froze the app on import (live-caught
+    /// 2026-07, "ça plante à l'import des fichiers": first indexed decode
+    /// stuck in read_exact holding the session mutex).
+    frame_rx: std::sync::mpsc::Receiver<Vec<u8>>,
 }
 
 /// Random-access frame index over a raw MJPEG stream file — the format
@@ -137,16 +146,100 @@ struct IndexedSeq {
     /// count+1 entries — offsets[i]..offsets[i+1] is frame i's JPEG.
     offsets: Vec<u64>,
     conv: Option<ConvProc>,
-    /// The smallest frame's JPEG bytes, used as pipeline padding. Measured
-    /// empirically (see conv_spawn): ffmpeg's mjpeg stdin pipeline has a
-    /// fixed TWO-FRAME lag — a frame's rawvideo only comes out after two
-    /// more full JPEGs enter (parser close + probe queue; no flag
-    /// combination removed it, and -fflags nobuffer made it worse). Each
-    /// request therefore sends [target][pad][pad] and reads 3 frames,
-    /// keeping the last. The pad must decode to the SAME dimensions
-    /// (rawvideo framing) — the cheapest same-dims JPEG we're guaranteed
-    /// to have is the stream's own smallest frame.
+    /// Sentinel pad: a same-dimensions JPEG whose decoded pixels carry a
+    /// recognizable signature (see sentinel_pad / is_sentinel_frame),
+    /// generated once at session open. The ffmpeg stdin pipeline won't
+    /// emit a frame until a content-dependent number of FURTHER frames
+    /// enter (measured lag: 2 at 320x240, 3 at 1080p, non-constant — no
+    /// flag combination removes it). Each request therefore chases the
+    /// target with a few sentinel pads and the reader simply DISCARDS
+    /// every sentinel it recognizes, returning the first real frame: no
+    /// lag bookkeeping, self-synchronizing, and immune to the lag
+    /// changing between ffmpeg builds or resolutions.
     pad: Vec<u8>,
+}
+
+/// Number of sentinel pads sent after each target JPEG. Must exceed the
+/// pipeline's worst observed lag (3); timeouts in indexed_decode self-heal
+/// by sending another volley if a build/resolution ever exceeds it.
+const SENTINEL_PADS_PER_REQUEST: usize = 4;
+
+/// Paints the sentinel signature into row 0 of an RGBA buffer: four
+/// 8-pixel blocks of alternating saturated magenta/green. 8-wide blocks
+/// straddle JPEG's chroma subsampling (a 1-pixel alternation would smear
+/// into gray), and block CENTERS are what is_sentinel_frame samples, so
+/// q2 compression noise (±10ish) never gets near the ±80 tolerance.
+fn paint_sentinel_signature(rgba: &mut [u8], width: usize) {
+    for block in 0..4usize {
+        let (r, g, b) = if block % 2 == 0 { (255u8, 0u8, 255u8) } else { (0, 255, 0) };
+        for i in 0..8usize {
+            let x = block * 8 + i;
+            if x >= width {
+                return;
+            }
+            rgba[x * 4] = r;
+            rgba[x * 4 + 1] = g;
+            rgba[x * 4 + 2] = b;
+            rgba[x * 4 + 3] = 255;
+        }
+    }
+}
+
+/// Does this decoded frame carry the sentinel signature? Samples the 4
+/// centers (pixels 3-4 of each 8-pixel block) with a wide ±80 tolerance —
+/// real footage reproducing four alternating fully-saturated magenta/green
+/// blocks within that tolerance in its top-left 32 pixels is not a
+/// realistic false-positive risk for preview media.
+fn is_sentinel_frame(rgba: &[u8], width: usize) -> bool {
+    if width < 32 || rgba.len() < 32 * 4 {
+        return false;
+    }
+    for block in 0..4usize {
+        let (er, eg, eb) = if block % 2 == 0 { (255i32, 0i32, 255i32) } else { (0, 255, 0) };
+        for &x in &[block * 8 + 3, block * 8 + 4] {
+            let p = &rgba[x * 4..x * 4 + 3];
+            if (p[0] as i32 - er).abs() > 80 || (p[1] as i32 - eg).abs() > 80 || (p[2] as i32 - eb).abs() > 80 {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+/// Encode the sentinel pad JPEG at the given dimensions via a one-shot
+/// ffmpeg run (EOF-terminated stdin — the mode with no pipeline-lag
+/// surprises, verified reliable in the harness). Black frame + signature
+/// row: tiny (~5-15KB at 1080p) and near-instant to decode.
+fn sentinel_pad(width: u32, height: u32) -> Result<Vec<u8>, String> {
+    use std::io::Write;
+    let (w, h) = (width as usize, height as usize);
+    let mut raw = vec![0u8; w * h * 4];
+    for px in raw.chunks_exact_mut(4) {
+        px[3] = 255;
+    }
+    paint_sentinel_signature(&mut raw, w);
+    let mut child = Command::new(ffmpeg_path())
+        .args([
+            "-v", "error",
+            "-f", "rawvideo", "-pix_fmt", "rgba", "-s", &format!("{width}x{height}"), "-i", "-",
+            "-frames:v", "1", "-c:v", "mjpeg", "-q:v", "2", "-f", "mjpeg", "-",
+        ])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|e| format!("sentinel encode spawn: {e}"))?;
+    let mut stdin = child.stdin.take().ok_or("sentinel stdin unavailable")?;
+    let writer = std::thread::spawn(move || {
+        let _ = stdin.write_all(&raw);
+        // dropping stdin closes the pipe — EOF terminates the encode
+    });
+    let out = child.wait_with_output().map_err(|e| format!("sentinel encode: {e}"))?;
+    let _ = writer.join();
+    if !out.status.success() || out.stdout.is_empty() {
+        return Err("sentinel encode produced no output".into());
+    }
+    Ok(out.stdout)
 }
 
 pub struct VideoSession {
@@ -829,6 +922,14 @@ fn try_open_indexed(path: &str) -> Option<Result<(VideoSession, u64, f64), Strin
         if offsets.len() < 2 || fps <= 0.0 || width == 0 || height == 0 {
             return Err("idx: invalid contents".into());
         }
+        // The sentinel-pad protocol needs 32 pixels of row 0 for its
+        // signature (see is_sentinel_frame) — sub-32px-wide video is
+        // absurd for real media, but refuse indexed mode honestly rather
+        // than misdetect pads; the JS caller falls back to the original
+        // file on open failure.
+        if width < 32 {
+            return Err(format!("indexed mode unsupported below 32px width (got {width})"));
+        }
         let count = (offsets.len() - 1) as u64;
         let file = std::fs::File::open(path).map_err(|e| format!("open {path}: {e}"))?;
         // Stale-index guard: the sentinel must equal the current file size.
@@ -837,23 +938,9 @@ fn try_open_indexed(path: &str) -> Option<Result<(VideoSession, u64, f64), Strin
             return Err(format!("idx is stale for {path} (sentinel {} != file len {len})", offsets.last().unwrap()));
         }
         let duration = count as f64 / fps;
-        // Pipeline padding: the smallest frame in the stream (see
-        // IndexedSeq::pad). Read once at open.
-        let mut file = file;
-        let pad = {
-            use std::io::{Read as _, Seek, SeekFrom};
-            let (mut best_a, mut best_len) = (offsets[0], offsets[1] - offsets[0]);
-            for w in offsets.windows(2) {
-                if w[1] - w[0] < best_len {
-                    best_a = w[0];
-                    best_len = w[1] - w[0];
-                }
-            }
-            let mut buf = vec![0u8; best_len as usize];
-            file.seek(SeekFrom::Start(best_a)).map_err(|e| e.to_string())?;
-            file.read_exact(&mut buf).map_err(|e| format!("read pad frame: {e}"))?;
-            buf
-        };
+        // Sentinel pipeline padding — see IndexedSeq::pad. Generated once
+        // per open (~20-40ms one-shot encode, amortized over the session).
+        let pad = sentinel_pad(width, height)?;
         Ok((
             VideoSession {
                 path: path.to_string(),
@@ -877,24 +964,22 @@ fn try_open_indexed(path: &str) -> Option<Result<(VideoSession, u64, f64), Strin
 }
 
 /// Spawn the persistent JPEG→RGBA converter child for an indexed session.
-/// stdin is fed by a dedicated writer thread (see ConvProc). Flags chosen
-/// empirically against the bundled ffmpeg 8.1 (2026-07 harness): probesize
-/// must be tiny or find_stream_info blocks waiting for input it will never
-/// get; -analyzeduration needs a NONZERO microsecond value (0 means "use
-/// the 5-second default", a trap); -fpsprobesize 0 stops it demanding
-/// several frames to estimate a frame rate the raw stream doesn't carry;
-/// and -fflags nobuffer made output STOP entirely (3 in → 0 out) so it is
-/// deliberately absent. Even so the pipeline keeps a fixed two-frame lag —
-/// see IndexedSeq::pad for the [target][pad][pad] protocol that absorbs
-/// it. The spawn primes the pipe with two pads so every subsequent request
-/// uniformly reads 3 frames and keeps the last.
-fn conv_spawn(pad: &[u8]) -> Result<ConvProc, String> {
+/// stdin is fed by a dedicated writer thread, stdout drained by a
+/// dedicated reader thread into a channel (see ConvProc for why). Flags
+/// chosen empirically against the bundled ffmpeg 8.1 (2026-07 harness):
+/// probesize must be tiny or find_stream_info blocks waiting for input it
+/// will never get; -analyzeduration needs a NONZERO microsecond value (0
+/// means "use the 5-second default", a trap); -fpsprobesize 0 stops it
+/// demanding several frames to estimate a frame rate the raw stream
+/// doesn't carry; -fflags nobuffer made output STOP entirely (3 in → 0
+/// out) so it is deliberately absent.
+fn conv_spawn(frame_bytes: usize) -> Result<ConvProc, String> {
     let mut child = Command::new(ffmpeg_path())
         .args([
             "-v", "error",
             "-probesize", "32", "-fpsprobesize", "0", "-analyzeduration", "1",
             "-f", "mjpeg", "-i", "-",
-            "-f", "rawvideo", "-pix_fmt", "rgba", "-vsync", "0", "-an", "-",
+            "-f", "rawvideo", "-pix_fmt", "rgba", "-an", "-",
         ])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -914,13 +999,21 @@ fn conv_spawn(pad: &[u8]) -> Result<ConvProc, String> {
         // Sender dropped (session closed) or child died: closing stdin here
         // lets the child drain and exit on its own.
     });
-    // Prime: two pads in, zero frames out yet — puts the pipeline in the
-    // steady state where each request's 3-frame read pattern holds.
-    let mut primer = Vec::with_capacity(pad.len() * 2);
-    primer.extend_from_slice(pad);
-    primer.extend_from_slice(pad);
-    tx.send(primer).map_err(|e| format!("converter primer: {e}"))?;
-    Ok(ConvProc { child, jpeg_tx: tx, stdout: std::io::BufReader::new(stdout) })
+    let (ftx, frx) = std::sync::mpsc::channel::<Vec<u8>>();
+    std::thread::spawn(move || {
+        use std::io::Read as _;
+        let mut r = std::io::BufReader::new(stdout);
+        loop {
+            let mut frame = vec![0u8; frame_bytes];
+            if r.read_exact(&mut frame).is_err() {
+                break; // child exited/killed — receiver sees the channel close
+            }
+            if ftx.send(frame).is_err() {
+                break; // session closed
+            }
+        }
+    });
+    Ok(ConvProc { child, jpeg_tx: tx, frame_rx: frx })
 }
 
 /// Decode one frame of an indexed session: read its JPEG bytes at the
@@ -929,6 +1022,7 @@ fn conv_spawn(pad: &[u8]) -> Result<ConvProc, String> {
 fn indexed_decode(s: &mut VideoSession, frame_index: i64) -> Result<Vec<u8>, String> {
     use std::io::{Read as _, Seek, SeekFrom};
     let frame_bytes = s.frame_bytes;
+    let width = s.width as usize;
     let seq = s.indexed.as_mut().ok_or("not an indexed session")?;
     let i = frame_index as usize;
     if i + 1 >= seq.offsets.len() {
@@ -941,37 +1035,58 @@ fn indexed_decode(s: &mut VideoSession, frame_index: i64) -> Result<Vec<u8>, Str
 
     for attempt in 0..2 {
         if seq.conv.is_none() {
-            seq.conv = Some(conv_spawn(&seq.pad)?);
+            seq.conv = Some(conv_spawn(frame_bytes)?);
         }
         let conv = seq.conv.as_mut().unwrap();
-        // [target][pad][pad] — the two pads push the target through the
-        // pipeline's fixed two-frame lag (see IndexedSeq::pad). With the
-        // two primer pads sent at spawn, exactly 3 frames come out per
-        // request: pad, pad, target — read all three, return the last.
-        let mut payload = Vec::with_capacity(jpeg.len() + seq.pad.len() * 2);
+        // [target][pads…] — the sentinel pads flush the target through the
+        // pipeline's content-dependent frame lag; the read loop discards
+        // every recognized sentinel and returns the first real frame.
+        // recv_timeout (never a bare blocking read) is what guarantees
+        // this can't freeze the session mutex (see ConvProc::frame_rx).
+        let mut payload = Vec::with_capacity(jpeg.len() + seq.pad.len() * SENTINEL_PADS_PER_REQUEST);
         payload.extend_from_slice(&jpeg);
-        payload.extend_from_slice(&seq.pad);
-        payload.extend_from_slice(&seq.pad);
+        for _ in 0..SENTINEL_PADS_PER_REQUEST {
+            payload.extend_from_slice(&seq.pad);
+        }
         if conv.jpeg_tx.send(payload).is_err() {
             seq.conv = None;
             continue;
         }
-        let mut out = vec![0u8; frame_bytes];
-        let result = (|| {
-            conv.stdout.read_exact(&mut out)?; // pad
-            conv.stdout.read_exact(&mut out)?; // pad
-            conv.stdout.read_exact(&mut out) // target
-        })();
-        match result {
-            Ok(()) => return Ok(out),
-            Err(e) => {
-                let _ = conv.child.kill();
-                let _ = conv.child.wait();
-                seq.conv = None;
-                if attempt == 1 {
-                    return Err(format!("indexed decode failed twice for frame {frame_index}: {e}"));
+        let mut extra_volleys = 0u32;
+        let failure = loop {
+            match conv.frame_rx.recv_timeout(std::time::Duration::from_millis(700)) {
+                Ok(frame) => {
+                    if is_sentinel_frame(&frame, width) {
+                        continue; // leftover/current pad — discard
+                    }
+                    return Ok(frame);
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                    if extra_volleys >= 2 {
+                        break "no real frame after 2 extra pad volleys";
+                    }
+                    // Self-heal: the lag exceeded the volley (unseen build/
+                    // resolution combination) — push more pads through.
+                    extra_volleys += 1;
+                    let mut more = Vec::with_capacity(seq.pad.len() * SENTINEL_PADS_PER_REQUEST);
+                    for _ in 0..SENTINEL_PADS_PER_REQUEST {
+                        more.extend_from_slice(&seq.pad);
+                    }
+                    if conv.jpeg_tx.send(more).is_err() {
+                        break "converter writer died";
+                    }
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                    break "converter exited";
                 }
             }
+        };
+        eprintln!("[video-decode] indexed converter reset (frame {frame_index}, attempt {attempt}): {failure}");
+        let _ = conv.child.kill();
+        let _ = conv.child.wait();
+        seq.conv = None;
+        if attempt == 1 {
+            return Err(format!("indexed decode failed twice for frame {frame_index}: {failure}"));
         }
     }
     unreachable!()
