@@ -81,6 +81,6 @@
 
   window.SMLabs.register('pose-library', {
     flag: 'nemo-labs-poses',
-    describe: 'Substitution de dessins (Toon Boom) : savePose(\'nom\') sur une sélection, stampPose(\'nom\',{dx,dy}) la pose sur la frame courante — bouches lip-sync, kits de mains',
+    describe: 'Substitution de dessins : savePose(\'nom\') sur une sélection, stampPose(\'nom\',{dx,dy}) la pose sur la frame courante — bouches lip-sync, kits de mains',
   });
 })();

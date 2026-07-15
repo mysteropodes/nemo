@@ -66,7 +66,7 @@
 
   window.SMLabs.register('flip-roll', {
     flag: 'nemo-labs-flip',
-    describe: 'Rouleau d\'animateur (TVPaint Flip) : maintenir R fait défiler ±N frames autour de la pose, relâcher revient dessus (SMLabs.setFlipSpeed/Span)',
+    describe: 'Rouleau d\'animateur : maintenir R fait défiler ±N frames autour de la pose, relâcher revient dessus (SMLabs.setFlipSpeed/Span)',
     onDisable: stop,
   });
 })();

@@ -130,7 +130,7 @@
 
   window.SMLabs.register('french-curve', {
     flag: 'nemo-labs-frenchcurve',
-    describe: 'Gabarit courbe/ellipse aimanté (SketchBook) : maintenir F + glisser dessine un trait collé au gabarit (SMLabs.setCurveGuide(\'ellipse\'|\'line\', opts))',
+    describe: 'Gabarit courbe/ellipse aimanté : maintenir F + glisser dessine un trait collé au gabarit (SMLabs.setCurveGuide(\'ellipse\'|\'line\', opts))',
     onDisable: function () { armed = false; dragging = false; pts = []; if (guidePath) { guidePath.remove(); guidePath = null; } },
   });
 })();

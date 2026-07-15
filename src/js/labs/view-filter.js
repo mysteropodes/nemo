@@ -35,7 +35,7 @@
 
   window.SMLabs.register('view-filter', {
     flag: 'nemo-labs-viewfilter',
-    describe: 'Contrôle des valeurs (CSP) : SMLabs.setViewFilter(\'values\'|\'contrast\'|\'dim\'|\'none\'|cssFilter) — affichage seulement, le dessin reste intact',
+    describe: 'Contrôle des valeurs : SMLabs.setViewFilter(\'values\'|\'contrast\'|\'dim\'|\'none\'|cssFilter) — affichage seulement, le dessin reste intact',
     onDisable: function () { var t = area(); if (t) t.style.filter = ''; },
   });
 })();

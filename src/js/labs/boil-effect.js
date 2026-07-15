@@ -65,6 +65,6 @@
 
   window.SMLabs.register('boil-effect', {
     flag: 'nemo-labs-boil',
-    describe: 'Ligne bouillante (Moho vector noise) : SMLabs.boil({frames,amplitude}) pose N keyframes-variantes tremblées du dessin courant sur les frames suivantes',
+    describe: 'Ligne bouillante : SMLabs.boil({frames,amplitude}) pose N keyframes-variantes tremblées du dessin courant sur les frames suivantes',
   });
 })();

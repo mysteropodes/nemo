@@ -48,7 +48,7 @@
 
   window.SMLabs.register('out-of-pegs', {
     flag: 'nemo-labs-pegs',
-    describe: 'Out of Pegs (TVPaint) : décale les fantômes onion prev/next pour caler l\'intervalle (SMLabs.setPegOffset(\'prev\',dx,dy), resetPegs())',
+    describe: 'Décalage des fantômes onion : décale les fantômes onion prev/next pour caler l\'intervalle (SMLabs.setPegOffset(\'prev\',dx,dy), resetPegs())',
     onEnable: function () {
       if (!origRenderOS && typeof window.renderOS === 'function') {
         origRenderOS = window.renderOS;

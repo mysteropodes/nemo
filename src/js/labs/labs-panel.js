@@ -85,9 +85,9 @@
   // controls when the tool is currently on (a param the tool ignores while
   // off would be misleading UI).
   var TOOLS = [
-    { name: 'symmetry', label: 'Miroir vertical (SketchBook)' },
+    { name: 'symmetry', label: 'Miroir vertical' },
     {
-      name: 'radial-symmetry', label: 'Miroir radial / mandala (SketchBook)',
+      name: 'radial-symmetry', label: 'Miroir radial / mandala',
       extra: function (c) {
         var n = parseInt(localStorage.getItem('nemo-labs-radial-sectors') || '6', 10);
         var row = subRow();
@@ -98,9 +98,9 @@
         c.appendChild(row);
       },
     },
-    { name: 'predictive-stroke', label: 'Trait prédictif — cercle/ligne/rect (SketchBook)' },
+    { name: 'predictive-stroke', label: 'Trait prédictif — cercle/ligne/rect' },
     {
-      name: 'vector-sculpt', label: 'Sculpt vectoriel — pousser W, lisser W+Shift (Toon Boom/Umoupen)',
+      name: 'vector-sculpt', label: 'Sculpt vectoriel — pousser W, lisser W+Shift',
       extra: function (c) {
         var row = subRow();
         row.appendChild(mkLabel2('Rayon'));
@@ -110,9 +110,9 @@
         c.appendChild(row);
       },
     },
-    { name: 'french-curve', label: 'Gabarit courbe/ellipse aimanté — maintenir F (SketchBook)', hintExtra: 'Gabarit par défaut : ellipse au centre du canvas. Réajustable via SMLabs.setCurveGuide(\'ellipse\'|\'line\', {…}) dans la console.' },
+    { name: 'french-curve', label: 'Gabarit courbe/ellipse aimanté — maintenir F', hintExtra: 'Gabarit par défaut : ellipse au centre du canvas. Réajustable via SMLabs.setCurveGuide(\'ellipse\'|\'line\', {…}) dans la console.' },
     {
-      name: 'canvas-grid', label: 'Grille monde (Umoupen/SketchBook)',
+      name: 'canvas-grid', label: 'Grille monde',
       extra: function (c) {
         var row = subRow();
         row.appendChild(mkLabel2('Pas (px)'));
@@ -123,7 +123,7 @@
       },
     },
     {
-      name: 'view-filter', label: 'Contrôle des valeurs (Clip Studio Paint)',
+      name: 'view-filter', label: 'Contrôle des valeurs',
       extra: function (c) {
         var row = subRow();
         var sel = mkSelect([
@@ -137,7 +137,7 @@
       },
     },
     {
-      name: 'flip-roll', label: 'Rouleau d\'animateur — maintenir R (TVPaint Flip panel)',
+      name: 'flip-roll', label: 'Rouleau d\'animateur — maintenir R',
       extra: function (c) {
         var row = subRow();
         row.appendChild(mkLabel2('Vitesse'));
@@ -151,10 +151,10 @@
         c.appendChild(row);
       },
     },
-    { name: 'mirror-check', label: 'Miroir de contrôle — maintenir M (classique animateur)' },
-    { name: 'lagoon-menu', label: 'Menu radial d\'outils — maintenir Q (SketchBook "Lagoon")' },
+    { name: 'mirror-check', label: 'Miroir de contrôle — maintenir M' },
+    { name: 'lagoon-menu', label: 'Menu radial d\'outils — maintenir Q' },
     {
-      name: 'out-of-pegs', label: 'Décalage des fantômes onion (TVPaint light table)',
+      name: 'out-of-pegs', label: 'Décalage des fantômes onion',
       extra: function (c) {
         var row = subRow();
         var pdx = mkNum(-60, -400, 400, 5, 48), pdy = mkNum(0, -400, 400, 5, 48);
@@ -175,16 +175,16 @@
         });
         row.appendChild(apply); row.appendChild(reset);
         c.appendChild(row);
-        // Apply the sensible TVPaint-style default spread immediately —
-        // enabling this tool with 0/0 offsets is a no-op the user would
-        // otherwise have to discover requires touching two number fields.
+        // Apply a sensible default spread immediately — enabling this tool
+        // with 0/0 offsets is a no-op the user would otherwise have to
+        // discover requires touching two number fields.
         window.SMLabs.setPegOffset('prev', -60, 0);
         window.SMLabs.setPegOffset('next', 60, 0);
       },
     },
-    { name: 'timeline-markers', label: 'Marqueurs de timeline (Callipeg)', hintExtra: 'Clic-droit sur une frame de la timeline pour poser un marqueur nommé/coloré.' },
+    { name: 'timeline-markers', label: 'Marqueurs de timeline', hintExtra: 'Clic-droit sur une frame de la timeline pour poser un marqueur nommé/coloré.' },
     {
-      name: 'timeline-zoom', label: 'Zoom horizontal de la timeline (TVPaint/Harmony/Premiere)',
+      name: 'timeline-zoom', label: 'Zoom horizontal de la timeline',
       extra: function (c) {
         var row = subRow();
         var reset = mkBtn('Réinitialiser le zoom');
@@ -193,8 +193,8 @@
         c.appendChild(row);
       },
     },
-    { name: 'xsheet', label: 'Feuille d\'exposition flottante (TVPaint/Umoupen)' },
-    { name: 'multiframe-draw', label: 'Dessin multi-frames (Umoupen)', hintExtra: 'Sélectionne plusieurs frames dans la timeline avant de dessiner — le trait est tamponné sur chacune.' },
+    { name: 'xsheet', label: 'Feuille d\'exposition flottante' },
+    { name: 'multiframe-draw', label: 'Dessin multi-frames', hintExtra: 'Sélectionne plusieurs frames dans la timeline avant de dessiner — le trait est tamponné sur chacune.' },
   ];
 
   function mkLabel2(text) {
@@ -207,7 +207,7 @@
   // -- one-shot actions: inline params + a button --------------------------
   var ACTIONS = [
     {
-      name: 'move-to-layer', label: 'Déplacer la sélection vers un calque (Umoupen)',
+      name: 'move-to-layer', label: 'Déplacer la sélection vers un calque',
       build: function (row) {
         var sel = document.createElement('select');
         sel.className = 'pi'; sel.style.cssText = 'flex:1;padding:3px 6px;font-size:11px;';
@@ -223,7 +223,7 @@
       },
     },
     {
-      name: 'pingpong-cycle', label: 'Cycle aller-retour sur la plage sélectionnée (Callipeg)',
+      name: 'pingpong-cycle', label: 'Cycle aller-retour sur la plage sélectionnée',
       build: function (row) {
         var n = mkNum(2, 1, 50, 1, 48);
         row.appendChild(n);
@@ -233,7 +233,7 @@
       },
     },
     {
-      name: 'retime-exposure', label: 'Re-caler l\'exposition — ones/twos/threes (TVPaint X-sheet)',
+      name: 'retime-exposure', label: 'Re-caler l\'exposition — ones/twos/threes',
       build: function (row) {
         var sel = mkSelect([{ value: '1', label: 'Ones (1)' }, { value: '2', label: 'Twos (2)' }, { value: '3', label: 'Threes (3)' }, { value: '4', label: '4' }], '2');
         row.appendChild(sel);
@@ -243,7 +243,7 @@
       },
     },
     {
-      name: 'interval-assistant', label: 'Breakdowns éasés entre 2 poses (Callipeg spacing chart)',
+      name: 'interval-assistant', label: 'Breakdowns éasés entre 2 poses',
       build: function (row) {
         var n = mkNum(3, 1, 8, 1, 44);
         row.appendChild(n);
@@ -255,7 +255,7 @@
       },
     },
     {
-      name: 'pose-library', label: 'Bibliothèque de poses / substitution (Toon Boom)',
+      name: 'pose-library', label: 'Bibliothèque de poses / substitution',
       build: function (row) {
         var name = mkText('nom de la pose', 100);
         row.appendChild(name);
@@ -282,7 +282,7 @@
       },
     },
     {
-      name: 'speed-lines', label: 'Lignes de vitesse manga (Clip Studio Paint)',
+      name: 'speed-lines', label: 'Lignes de vitesse',
       build: function (row) {
         var n = mkNum(60, 3, 400, 5, 52);
         row.appendChild(n);
@@ -292,7 +292,7 @@
       },
     },
     {
-      name: 'boil-effect', label: 'Ligne bouillante — vector noise (Moho)',
+      name: 'boil-effect', label: 'Ligne bouillante — bruit vectoriel',
       build: function (row) {
         row.appendChild(mkLabel2('Frames'));
         var f = mkNum(3, 1, 24, 1, 44);
@@ -306,7 +306,7 @@
       },
     },
     {
-      name: 'follow-path', label: 'Bake le long d\'un trait-trajectoire (Moho)',
+      name: 'follow-path', label: 'Bake le long d\'un trait-trajectoire',
       build: function (row) {
         var pathId = null;
         var status = document.createElement('span');
@@ -340,7 +340,7 @@
       },
     },
     {
-      name: 'reference-fill', label: 'Fill multi-calques — ink & paint (Clip Studio)',
+      name: 'reference-fill', label: 'Fill multi-calques — ink & paint',
       build: function (row) {
         var btn = mkBtn('Remplir au curseur');
         btn.title = 'Positionne le curseur sur la zone à remplir, puis clique ce bouton';
@@ -349,7 +349,7 @@
       },
     },
     {
-      name: 'vector-trim', label: 'Gomme vectorielle aux intersections (Clip Studio)',
+      name: 'vector-trim', label: 'Gomme vectorielle aux intersections',
       build: function (row) {
         var btn = mkBtn('Couper au curseur');
         btn.title = 'Positionne le curseur sur le trait à couper, puis clique ce bouton';

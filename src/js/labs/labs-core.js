@@ -54,4 +54,24 @@
       try { p.onStroke(path, layer); } catch (e) { console.warn('[labs] ' + n + ' failed:', e); }
     });
   };
+
+  // Fan-out for draw-bridge.js's LIVE preview hook (2026-07 — the mirror
+  // must be visible while dragging, not only after commitStroke). Each
+  // prototype's onPreview(samples, overlayItemFor) gets the in-progress
+  // raw samples plus a helper that reuses draw-bridge.js's own overlayItem
+  // shaping logic for an alternate samples array (see overlayItemFor's own
+  // comment there) — it returns extra overlay item(s) to render alongside
+  // the real in-progress stroke, or null/undefined for nothing.
+  L.buildDrawPreviewExtras = function (samples, overlayItemFor) {
+    var out = [];
+    Object.keys(protos).forEach(function (n) {
+      var p = protos[n];
+      if (!p.onPreview || !isOn(n)) return;
+      try {
+        var r = p.onPreview(samples, overlayItemFor);
+        if (r) out = out.concat(r);
+      } catch (e) { console.warn('[labs] ' + n + ' preview failed:', e); }
+    });
+    return out;
+  };
 })();

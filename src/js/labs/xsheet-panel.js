@@ -67,7 +67,7 @@
 
   window.SMLabs.register('xsheet', {
     flag: 'nemo-labs-xsheet',
-    describe: 'Feuille d\'exposition flottante (TVPaint X-sheet) : frames × calques, ●=clé ◆=tween │=tenu, clic = aller à la frame',
+    describe: 'Feuille d\'exposition flottante : frames × calques, ●=clé ◆=tween │=tenu, clic = aller à la frame',
     onEnable: function () { observe(); build(); },
     onDisable: function () { if (panel) { panel.remove(); panel = null; } },
   });

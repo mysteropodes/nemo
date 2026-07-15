@@ -274,6 +274,23 @@
     // supprimer"). The live stroke preview itself is feedback enough.
     return [item];
   }
+  // Labs live-preview hook (2026-07, "il faut que la symétrie soit visible
+  // pendant le dessin en direct pas que au relâchement") — symmetry-mirror.js
+  // previously only mirrored at commitStroke (the existing hook below),
+  // meaning the reflection popped in only when the stroke was released.
+  // overlayItem() is a pure function of the module-level `samples` array +
+  // state.*, with no side effects — swapping `samples` for a mirrored/
+  // rotated copy and calling it again reuses its EXACT shaping logic for
+  // all three branches (fill-brush region, pressure-brush ribbon, plain
+  // stroke) instead of a parallel geometry function per branch. Restored
+  // immediately after, so the real drag state is never touched.
+  function overlayItemFor(altSamples) {
+    var backup = samples;
+    samples = altSamples;
+    var r = overlayItem();
+    samples = backup;
+    return r;
+  }
 
   function onDown(e) {
     if (!shouldIntercept()) return;
@@ -356,7 +373,15 @@
       samples.push([w[0], w[1], widthFor(pressure)]);
       if (state.vectorBrush) window.SMEngineBridge.setPressureCursor(w, widthFor(pressure) / 2);
     }
-    window.SMEngineBridge.renderWithOverlayItem(overlayItem());
+    var previewItems = [].concat(overlayItem());
+    // Same guarded, no-op-when-absent pattern as the commitStroke hook
+    // below — window.SMLabs is only present when Labs prototypes are
+    // loaded, and buildDrawPreviewExtras itself no-ops per-prototype
+    // unless that prototype is both registered AND currently on.
+    if (window.SMLabs && window.SMLabs.buildDrawPreviewExtras) {
+      previewItems = previewItems.concat(window.SMLabs.buildDrawPreviewExtras(samples, overlayItemFor));
+    }
+    window.SMEngineBridge.renderWithOverlayItem(previewItems);
   }
   function onUp(e) {
     if (sizing) {

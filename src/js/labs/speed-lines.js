@@ -11,7 +11,7 @@
 (function () {
   window.SMLabs.register('speed-lines', {
     flag: 'nemo-labs-speedlines',
-    describe: 'Lignes de vitesse manga (CSP) : SMLabs.speedLines({cx,cy,count,r0,r1,jitter}) génère un éclat radial de traits ordinaires',
+    describe: 'Lignes de vitesse : SMLabs.speedLines({cx,cy,count,r0,r1,jitter}) génère un éclat radial de traits ordinaires',
   });
 
   window.SMLabs.speedLines = function (opts) {

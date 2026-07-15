@@ -109,6 +109,6 @@
 
   window.SMLabs.register('follow-path', {
     flag: 'nemo-labs-followpath',
-    describe: 'Follow path (Moho) : SMLabs.followPath({pathId,frames,ease}) bake la sélection le long d\'un trait-trajectoire en keyframes successives',
+    describe: 'Bake le long d\'une trajectoire : SMLabs.followPath({pathId,frames,ease}) bake la sélection le long d\'un trait-trajectoire en keyframes successives',
   });
 })();

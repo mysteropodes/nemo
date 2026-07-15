@@ -219,7 +219,7 @@
 
   window.SMLabs.register('timeline-zoom', {
     flag: 'nemo-labs-tlzoom',
-    describe: 'Zoom de la timeline (TVPaint/Harmony/Premiere) : Ctrl/Cmd+molette au-dessus de la grille, scrollbar custom en bas (glisser le corps = pan, glisser un bord = zoom), ou SMLabs.setTimelineZoom(px)/zoomTimelineIn/Out/resetTimelineZoom — mute FC (JS) + --fc (CSS), les deux déjà lus en direct partout, aucun fichier core touché',
+    describe: 'Zoom de la timeline : Ctrl/Cmd+molette au-dessus de la grille, scrollbar custom en bas (glisser le corps = pan, glisser un bord = zoom), ou SMLabs.setTimelineZoom(px)/zoomTimelineIn/Out/resetTimelineZoom — mute FC (JS) + --fc (CSS), les deux déjà lus en direct partout, aucun fichier core touché',
     onEnable: function () {
       ensureScrollbar();
       var saved = parseInt(localStorage.getItem(KEY), 10);

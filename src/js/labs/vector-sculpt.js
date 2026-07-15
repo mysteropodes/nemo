@@ -157,7 +157,7 @@
 
   window.SMLabs.register('vector-sculpt', {
     flag: 'nemo-labs-sculpt',
-    describe: 'Pousse-vecteurs (Toon Boom/Umoupen) : maintenir W + glisser pousse les points sous la brosse (falloff doux), W+Shift lisse ; SMLabs.setSculptRadius(px)',
+    describe: 'Pousse-vecteurs : maintenir W + glisser pousse les points sous la brosse (falloff doux), W+Shift lisse ; SMLabs.setSculptRadius(px)',
     onDisable: function () { armed = false; dragging = false; lastW = null; touched = []; },
   });
 })();

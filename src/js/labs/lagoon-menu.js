@@ -70,7 +70,7 @@
 
   window.SMLabs.register('lagoon-menu', {
     flag: 'nemo-labs-lagoon',
-    describe: 'Menu radial d\'outils autour du curseur sur la touche Q (SketchBook "lagoon")',
+    describe: 'Menu radial d\'outils autour du curseur sur la touche Q ',
     onDisable: close,
   });
 })();

@@ -1,8 +1,8 @@
-// ---- LABS PROTOTYPE — Symmetry drawing (Autodesk SketchBook-style) ----
+// ---- LABS PROTOTYPE — Symmetry drawing ----
 // Two modes, each its own flag (see labs-core.js for the console API):
 //   'symmetry'        — vertical-axis mirror across the canvas center
 //   'radial-symmetry' — N rotated copies around the canvas center
-//                       (SketchBook mandala mode, 2..16 sectors;
+//                       (mandala mode, 2..16 sectors;
 //                       SMLabs.setRadialSectors(n) to change, default 6)
 //
 // Deliberately produces ORDINARY Paths with no data.* tags of their own —
@@ -13,6 +13,13 @@
 // save/export, undo — everything already treats a plain Path correctly.
 // The copies land inside the same commitStroke undo snapshot, so one
 // Cmd+Z reverts original + copies together (verified live).
+//
+// Live preview while drawing (2026-07, "il faut que la symétrie soit
+// visible pendant le dessin en direct pas que au relâchement"): onPreview
+// mirrors/rotates the in-progress `samples` array and hands it to
+// draw-bridge.js's own overlayItem() via overlayItemFor — same shaping
+// logic as the real stroke, so the live reflection looks pixel-identical
+// to what commitStroke will produce, not an approximation.
 (function () {
   function canvasCenter() {
     return new Point(
@@ -44,6 +51,12 @@
       if (!path.segments || !path.segments.length) return;
       mirrorStroke(path);
     },
+    onPreview: function (samples, overlayItemFor) {
+      if (!samples || samples.length < 2) return null;
+      var ax = canvasCenter().x;
+      var mirrored = samples.map(function (s) { return [2 * ax - s[0], s[1], s[2]]; });
+      return overlayItemFor(mirrored);
+    },
   });
 
   // -- radial (mandala) -------------------------------------------------
@@ -71,6 +84,21 @@
         copy.insertAbove(path);
         if (typeof tagOwner === 'function') tagOwner(copy);
       }
+    },
+    onPreview: function (samples, overlayItemFor) {
+      if (!samples || samples.length < 2) return null;
+      var n = sectors(), c = canvasCenter();
+      var out = [];
+      for (var k = 1; k < n; k++) {
+        var ang = k * 2 * Math.PI / n;
+        var cos = Math.cos(ang), sin = Math.sin(ang);
+        var rotated = samples.map(function (s) {
+          var dx = s[0] - c.x, dy = s[1] - c.y;
+          return [c.x + dx * cos - dy * sin, c.y + dx * sin + dy * cos, s[2]];
+        });
+        out = out.concat(overlayItemFor(rotated));
+      }
+      return out;
     },
   });
 
