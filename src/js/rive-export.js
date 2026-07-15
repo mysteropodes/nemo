@@ -638,11 +638,22 @@
     var shapeCounter=0;
 
     onProgress('Préparation des tracés…');
+    // DIAG (2026-07 — "je n'ai toujours que 3 keyframe exporté" / "3 poses
+    // figées, ça saute entre elles"): one line per (layer,slot) run, so a
+    // real export's console shows exactly how many lanes got assigned and
+    // whether each one produced a genuine multi-frame morph (useMorph) or
+    // collapsed to single-frame static poses — the two previous fixes
+    // (identity lanes, then stamping ids back onto keyframes) were both
+    // blind guesses against this same symptom; this makes the next round
+    // data-driven. Safe to leave in — one console.log per run, no
+    // functional effect.
+    slotsInfo.forEach(function(si){console.log('[rive-export] layer',si.li,si.ld.name,'lanes:',si.maxSlots,'range',r.start+'-'+r.end);});
     slotsInfo.forEach(function(si){
       var li=si.li,ld=si.ld,framesStrokes=si.framesStrokes,maxSlots=si.maxSlots;
       for(var slot=0;slot<maxSlots;slot++){
         var containerId=containerIdByKey[li+'_'+slot]||contentArtboardId;
         var countRuns=riveCountRuns(framesStrokes,slot,r.start,r.end);
+        console.log('[rive-export]   slot',slot,'runs:',countRuns.map(function(rn){return rn.start+'-'+rn.end+'(n='+rn.count+')';}).join(', ')||'(none)');
         countRuns.forEach(function(run){
           var firstSd=framesStrokes[run.start][slot];
           // Content geometry never bakes the camera anymore (see the
@@ -655,6 +666,7 @@
             if(riveSignature(framesStrokes[f2][slot])!==sig0){allSame=false;break;}
           }
           var useMorph=(run.end>run.start)&&!allSame;
+          console.log('[rive-export]     run',run.start+'-'+run.end,'useMorph='+useMorph,'allSame='+allSame);
           var name='n'+(shapeCounter++);
           // A shape whose run doesn't start at r.start needs an explicit
           // opacity:0 bookend at frame 0 — confirmed live as a real bug
@@ -934,6 +946,7 @@
       keyframes=keyframes.concat(camKeyframes);
     }
 
+    console.log('[rive-export] TOTAL shapes:',shapeDefs.length,'keyframes:',keyframes.length,'range:',r.start+'-'+r.end);
     onProgress('Terminé.');
     return{ok:true,artboardId:artboardId,artboardName:artboardName,animationId:animationId,shapeCount:shapeDefs.length,keyframeCount:keyframes.length,cameraNested:camActive};
   }
