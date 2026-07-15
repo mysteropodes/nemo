@@ -178,6 +178,41 @@ fn would_need_respawn(s: &VideoSession, target: i64) -> bool {
         None => true,
     }
 }
+
+/// Insert a decoded frame into the session cache (skipping if that index is
+/// already present) and evict oldest entries past the session's budget.
+/// Shared by foreground decode, the readahead thread, and decode_at's
+/// walk-prefetch (see below) so eviction policy lives in exactly one place.
+fn cache_insert(s: &mut VideoSession, idx: i64, bytes: Vec<u8>) {
+    if s.cache.iter().any(|(i, _)| *i == idx) {
+        return;
+    }
+    let budget = cache_budget_for(s.frame_bytes);
+    s.cache.push_front((idx, bytes));
+    let mut total: usize = s.cache.iter().map(|(_, b)| b.len()).sum();
+    while total > budget && s.cache.len() > 1 {
+        if let Some((_, evicted)) = s.cache.pop_back() {
+            total -= evicted.len();
+        }
+    }
+}
+
+/// How many frames BEFORE a respawn target decode_at over-seeks by, so the
+/// walk from origin to target populates the cache with the target's
+/// immediate predecessors. Motivated by live scrub profiling (2026-07, "la
+/// lecture est vraiment bien, le scrub moyen"): backward scrubbing steps
+/// hit a full ~23ms respawn PER STEP per session (67→64→57→56→55 in one
+/// capture, all seeked=true, ×3 videos), because a pipe can't rewind and
+/// each backward step landed just outside whatever the cache held. Spawning
+/// a few frames early converts the NEXT several backward steps into cache
+/// hits — one respawn amortized over `prefetch` scrub steps instead of one
+/// respawn each. Sized from the session's cache capacity so the prefetched
+/// frames never blow the budget (and shrink at 4K where frames are huge):
+/// a third of what fits, clamped to [2, 6].
+fn scrub_prefetch_for(s: &VideoSession) -> i64 {
+    let fit = (cache_budget_for(s.frame_bytes) / s.frame_bytes.max(1)) as i64;
+    (fit / 3).clamp(2, 6)
+}
 /// Tail-of-stream backoff-retry cap — unchanged from v1's spirit (widen
 /// the re-seek origin until it reaches 0), expressed here as a max
 /// number of widening attempts instead of a frame-walk count, since v2
@@ -315,6 +350,17 @@ fn decode_at(s: &mut VideoSession, frame_index: i64, caller: &str) -> Result<(Ve
     }
     if origin == frame_index && (s.proc.is_none() || gap_for_diag.is_some_and(|g| !(0..=SMALL_FORWARD_REUSE_TOLERANCE).contains(&g))) {
         eprintln!("[video-decode] DIAG real-respawn: caller={caller} target={frame_index} gap={gap_for_diag:?}");
+        // A real respawn is unavoidable — over-seek by a few frames so the
+        // walk below caches the target's immediate predecessors, making
+        // the next several BACKWARD scrub steps cache hits instead of one
+        // ~23ms respawn each (see scrub_prefetch_for). Costs a handful of
+        // extra sequential decodes (~2ms each at 1080p) on a path that
+        // already pays ~20ms of spawn tax.
+        // (No "is the process already inside the widened window" check
+        // needed: any such position would be a 0..=prefetch forward gap,
+        // and prefetch < SMALL_FORWARD_REUSE_TOLERANCE, so the reuse
+        // branch above already claimed those.)
+        origin = (frame_index - scrub_prefetch_for(s)).max(0);
     }
     let mut backoff: i64 = 0;
     let mut attempts: u32 = 0;
@@ -346,6 +392,12 @@ fn decode_at(s: &mut VideoSession, frame_index: i64, caller: &str) -> Result<(Ve
                         // spawn regardless).
                         return Ok((bytes, need_spawn));
                     }
+                    // Cache the frames the walk passes through (both the
+                    // scrub-prefetch window and small-forward-reuse skips):
+                    // they're exactly the target's neighbors, i.e. what a
+                    // scrub asks for next. One ~2-8ms memcpy per frame on a
+                    // path already paying spawn tax.
+                    cache_insert(s, cur, bytes.clone());
                     last_good = Some(bytes);
                     cur += 1;
                 }
@@ -402,15 +454,8 @@ fn decode_frame_core(s: &mut VideoSession, frame_index: i64) -> Result<(Vec<u8>,
     let decode_ms = t0.elapsed().as_secs_f64() * 1000.0;
 
     // Populate the cache — structure unchanged from v1, budget now sized
-    // per-session from frame_bytes (see cache_budget_for).
-    let budget = cache_budget_for(s.frame_bytes);
-    s.cache.push_front((frame_index, rgba.clone()));
-    let mut total: usize = s.cache.iter().map(|(_, b)| b.len()).sum();
-    while total > budget && s.cache.len() > 1 {
-        if let Some((_, evicted)) = s.cache.pop_back() {
-            total -= evicted.len();
-        }
-    }
+    // per-session from frame_bytes (see cache_budget_for / cache_insert).
+    cache_insert(s, frame_index, rgba.clone());
 
     eprintln!("[video-decode] frame={frame_index} seeked={seeked} decode={decode_ms:.1}ms");
     Ok((rgba, seeked))
@@ -721,24 +766,17 @@ fn spawn_readahead(arc: Arc<Mutex<VideoSession>>, center: i64) {
             break;
         };
         attempted.insert(f);
-        let budget = cache_budget_for(s.frame_bytes);
         let decoded = decode_at(&mut s, f, "readahead");
         match decoded {
             Ok((bytes, _seeked)) => {
-                s.cache.push_front((f, bytes));
-                let mut total: usize = s.cache.iter().map(|(_, b)| b.len()).sum();
-                while total > budget && s.cache.len() > 1 {
-                    if let Some((_, evicted)) = s.cache.pop_back() {
-                        total -= evicted.len();
-                    }
-                }
+                cache_insert(&mut s, f, bytes);
             }
             Err(_) => {
                 s.readahead_active = false;
                 break;
             }
         }
-        if s.cache.iter().map(|(_, b)| b.len()).sum::<usize>() >= budget {
+        if s.cache.iter().map(|(_, b)| b.len()).sum::<usize>() >= cache_budget_for(s.frame_bytes) {
             s.readahead_active = false;
             break;
         }
@@ -1357,6 +1395,31 @@ mod tests {
                 );
             }
             std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+    }
+
+    // Locks in the scrub-prefetch behavior (live-caught 2026-07, "la
+    // lecture est vraiment bien, le scrub moyen": every BACKWARD scrub
+    // step paid a full ~23ms respawn per session because the pipe can't
+    // rewind). A respawn now over-seeks by scrub_prefetch_for() frames and
+    // caches the walked window, so the next several backward steps are
+    // cache hits — one respawn amortized over the whole window.
+    #[test]
+    fn backward_scrub_steps_after_a_seek_are_cache_hits() {
+        let path = make_test_video(); // 320x240 → prefetch clamps to 6
+        let (mut s, _, _) = open_session_core_t(path.to_str().unwrap()).unwrap();
+        let (mut s_ref, _, _) = open_session_core_t(path.to_str().unwrap()).unwrap();
+
+        // Cold seek to 40: pays one respawn, should prefetch 34..39.
+        let (_, seeked) = decode_frame_core(&mut s, 40).unwrap();
+        assert!(seeked, "cold seek to 40 should be a real spawn");
+
+        // Backward scrub 39, 38, ... 35: all inside the prefetched window.
+        for target in (35..=39).rev() {
+            let (bytes, seeked) = decode_frame_core(&mut s, target).unwrap();
+            assert!(!seeked, "backward scrub to {target} respawned — prefetch window not cached");
+            let truth = decode_frame_core(&mut s_ref, target).unwrap().0;
+            assert_eq!(bytes, truth, "prefetched frame {target} is not byte-identical to a direct decode");
         }
     }
 
