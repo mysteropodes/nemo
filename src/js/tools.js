@@ -1,5 +1,17 @@
 // ---- TOOLS ----
 var currentPath=null,selectedPaths=[],stabQueue=[],shapeStart=null;
+// Shift-constrain helpers for Rectangle/Ellipse/Line (see their onMouseDrag
+// handler) — kept standalone rather than inlined since both the shape and
+// its live drag-preview need the identical constrained endpoint.
+function constrainSquare(start,pt){
+  var dx=pt.x-start.x,dy=pt.y-start.y;var d=Math.max(Math.abs(dx),Math.abs(dy));
+  return new Point(start.x+(dx<0?-d:d),start.y+(dy<0?-d:d));
+}
+function constrainAngle45(start,pt){
+  var dx=pt.x-start.x,dy=pt.y-start.y;var dist=Math.sqrt(dx*dx+dy*dy);
+  var step=Math.PI/4,angle=Math.round(Math.atan2(dy,dx)/step)*step;
+  return new Point(start.x+Math.cos(angle)*dist,start.y+Math.sin(angle)*dist);
+}
 var _moveDragStarted=false;
 var _eraseDragActive=false;
 var _eraseLastPt=null;
@@ -3731,9 +3743,19 @@ function onMouseDrag(event){
     seg.handleOut=delta;seg.handleIn=delta.multiply(-1);
   }else if((state.tool==='line'||state.tool==='rect'||state.tool==='ellipse')&&currentPath&&shapeStart){
     currentPath.remove();
-    if(state.tool==='line'){currentPath=new Path.Line({from:shapeStart,to:event.point,strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,strokeCap:state.strokeCap,fillColor:null,opacity:state.opacity/100});applyStrokeStyle(currentPath);}
-    else if(state.tool==='rect')currentPath=new Path.Rectangle({from:shapeStart,to:event.point,strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,fillColor:state.fillEnabled?state.fillColor:null,opacity:state.opacity/100});
-    else{currentPath=new Path.Ellipse({rectangle:new Rectangle(shapeStart,event.point),strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,fillColor:state.fillEnabled?state.fillColor:null,opacity:state.opacity/100});}
+    // Shift-constrain (UI/UX audit, 2026-07): Illustrator/Figma/Photoshop
+    // convention, absent here entirely before this — Rectangle/Ellipse had
+    // no way to draw a perfect square/circle, Line no way to snap to a
+    // clean 0/45/90° angle, both routine, high-frequency needs when
+    // roughing out a layout or a straight construction line.
+    var endPt=event.point;
+    if(event.modifiers.shift){
+      if(state.tool==='line')endPt=constrainAngle45(shapeStart,event.point);
+      else endPt=constrainSquare(shapeStart,event.point);
+    }
+    if(state.tool==='line'){currentPath=new Path.Line({from:shapeStart,to:endPt,strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,strokeCap:state.strokeCap,fillColor:null,opacity:state.opacity/100});applyStrokeStyle(currentPath);}
+    else if(state.tool==='rect')currentPath=new Path.Rectangle({from:shapeStart,to:endPt,strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,fillColor:state.fillEnabled?state.fillColor:null,opacity:state.opacity/100});
+    else{currentPath=new Path.Ellipse({rectangle:new Rectangle(shapeStart,endPt),strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,fillColor:state.fillEnabled?state.fillColor:null,opacity:state.opacity/100});}
   }else if(state.tool==='subselect'){
     if(_nmq.active){
       var nx1=Math.min(_nmq.start.x,event.point.x),ny1=Math.min(_nmq.start.y,event.point.y);
