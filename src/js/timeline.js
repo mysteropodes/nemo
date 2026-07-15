@@ -3378,6 +3378,26 @@ function onKeyDown(event){
   else if(k==='Alt'){state.altDown=true;}
   else if(k==='Enter'){event.preventDefault();if(state.tool==='pen'&&_pen.path)finalizePen();else togglePlay();}
   else if(k==='Escape'){if(state.tool==='pen'&&_pen.path){if(_pen.previewLine){_pen.previewLine.remove();_pen.previewLine=null;}_pen.path.remove();if(state.undoStack.length)state.undoStack.pop();_pen.path=null;_pen.draggingHandle=false;saveActiveLayerFrame();updateUI();}}
+  // Arrow-key nudge for the current selection — the statusbar hint has
+  // claimed "↑↓←→ Déplacer" whenever something's selected (see
+  // statusbarHelpRender below) since that hint was written, but no code
+  // path ever actually moved anything: ArrowLeft/Right unconditionally
+  // scrubbed the timeline frame instead (below), and ArrowUp/Down did
+  // nothing at all. Live UI/UX audit, 2026-07: confirmed via
+  // document.activeElement + a real drag/nudge test that the hint was
+  // simply false. selectedPaths is guaranteed empty while any tool other
+  // than Select/Subselect is active (timeline.js's own tool-switch
+  // handler clears it), so gating on its length here can't steal arrow
+  // keys from Brush/Pen/etc — only true when the Select tool actually has
+  // something selected, exactly matching when the hint is shown. 1px per
+  // press, 10px with Shift (standard Illustrator/Figma convention).
+  else if(selectedPaths.length&&(k==='ArrowLeft'||k==='ArrowRight'||k==='ArrowUp'||k==='ArrowDown')){
+    event.preventDefault();
+    var nudgeStep=event.shiftKey?10:1;
+    var ndx=k==='ArrowLeft'?-nudgeStep:k==='ArrowRight'?nudgeStep:0;
+    var ndy=k==='ArrowUp'?-nudgeStep:k==='ArrowDown'?nudgeStep:0;
+    selPropsApplyMove(ndx,ndy);
+  }
   else if(k==='ArrowLeft'){if(state.playing)stopPlay();goToFrame(state.currentFrame-1);}
   else if(k==='ArrowRight'){if(state.playing)stopPlay();goToFrame(state.currentFrame+1);}
   else if(k==='Delete'||k==='Backspace'){
