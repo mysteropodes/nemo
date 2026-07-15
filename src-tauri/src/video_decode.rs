@@ -589,12 +589,19 @@ fn spawn_readahead(arc: Arc<Mutex<VideoSession>>, center: i64) {
         }
         s.readahead_active = true;
     }
-    std::thread::spawn(move || loop {
+    std::thread::spawn(move || {
+        let mut last_goal: Option<i64> = None;
+        let mut last_goal_change = std::time::Instant::now();
+        loop {
         let mut s = arc.lock().unwrap();
         if !s.readahead_active {
             break;
         }
         let center = s.readahead_goal;
+        if last_goal != Some(center) {
+            last_goal = Some(center);
+            last_goal_change = std::time::Instant::now();
+        }
         let back = READAHEAD_BACK;
         let mut target: Option<i64> = None;
         for d in 1..=READAHEAD_DEPTH {
@@ -604,7 +611,44 @@ fn spawn_readahead(arc: Arc<Mutex<VideoSession>>, center: i64) {
                 break;
             }
         }
+        // Backward warming exists for scrub-back, not for active forward
+        // playback. Gating on the session's process POSITION doesn't work:
+        // readahead's own forward-fill (just above) legitimately pushes the
+        // process ahead of `center` as part of a single, static-goal pass
+        // (readahead_warms_backward_on_all_intra relies on exactly this —
+        // decode center, then backward-warm center-1..center-back — and a
+        // position-based gate broke it, since the forward-fill above had
+        // already moved the process well past center by the time backward
+        // was considered). The real signal for "don't bother, we're mid
+        // live-playback" is whether `readahead_goal` itself keeps being
+        // externally bumped: spawn_readahead is called once per foreground
+        // tick, so during real ~30fps playback a fresh goal arrives every
+        // ~33ms, while a paused/idle/scrub-settled session leaves the goal
+        // untouched. Live-caught 2026-07 ("j'ai mis 3 vidéos ça a du mal à
+        // lire les 3 en temps réel"): the goal chased forward continuously
+        // during playback, and every stale backward target forced a
+        // respawn (backward gaps never reuse, see decode_at) that
+        // repositioned the process behind the playhead, immediately undone
+        // by the next foreground tick — 15907 readahead respawns vs 580
+        // foreground ones in one captured session. Skipping backward-fill
+        // while the goal has moved within the last 150ms (well above one
+        // playback tick, well below a human pause) breaks that fight
+        // without touching the legitimate static-goal case.
+        let goal_recently_moving = last_goal_change.elapsed() < std::time::Duration::from_millis(150);
         if target.is_none() {
+            if goal_recently_moving {
+                // Forward is fully warmed but the goal is still fresh — don't
+                // give up (that would wrongly end the thread the moment a
+                // single readahead pass's own forward-fill work happens to
+                // finish before 150ms have elapsed, breaking the static-goal
+                // case) and don't force a backward respawn either (that's
+                // the live-playback tug-of-war). Idle briefly and recheck:
+                // a one-shot goal will cross the quiet threshold on its own,
+                // continuous playback will just keep resetting it cheaply.
+                drop(s);
+                std::thread::sleep(std::time::Duration::from_millis(20));
+                continue;
+            }
             for d in 1..=back {
                 let f = center - d;
                 if f >= 0 && !s.cache.iter().any(|(i, _)| *i == f) {
@@ -639,6 +683,7 @@ fn spawn_readahead(arc: Arc<Mutex<VideoSession>>, center: i64) {
         }
         drop(s);
         std::thread::yield_now();
+        }
     });
 }
 
@@ -1161,6 +1206,56 @@ mod tests {
         }
         let (_, seeked) = decode_frame_core(&mut arc.lock().unwrap(), 18).unwrap();
         assert!(!seeked, "backward frame 18 should be a cache hit");
+    }
+
+    // Reproduces the LIVE "3 videos struggle" root cause found 2026-07 via
+    // a real [video-decode] DIAG capture: readahead's backward-fill and
+    // foreground forward decode fighting over the same session's process,
+    // producing an unbounded respawn loop (15907 readahead respawns vs 580
+    // foreground in the captured session). Simulates sustained forward
+    // playback — each tick decodes the next sequential frame (foreground)
+    // and re-triggers readahead at that same center, exactly like the JS
+    // playback loop's onFrameChanged. Before the fix, the readahead thread
+    // would never go idle (constantly finding a "new" backward target as
+    // center advances) and every backward attempt would force a respawn
+    // since the process races ahead under real playback. After the fix, a
+    // process racing more than READAHEAD_BACK frames ahead of the goal
+    // skips backward-fill and the readahead thread goes idle instead of
+    // spinning.
+    #[test]
+    fn readahead_backward_fill_does_not_fight_forward_playback() {
+        let p = gen_video("play_thrash.mp4", "testsrc2=size=320x240:rate=30:duration=4", &["-c:v", "libx264", "-pix_fmt", "yuv420p", "-g", "15"]);
+        let (s, _, _) = open_session_core_t(p.to_str().unwrap()).unwrap();
+        let arc = std::sync::Arc::new(Mutex::new(s));
+
+        let mut backward_respawns = 0u32;
+        for tick in 0..60i64 {
+            let seeked = decode_frame_core(&mut arc.lock().unwrap(), tick).unwrap().1;
+            if seeked {
+                let s = arc.lock().unwrap();
+                if let Some(p) = &s.proc {
+                    if p.next_frame - 1 < tick {
+                        // decoder ended up behind the just-served frame —
+                        // only possible if a backward readahead respawn
+                        // raced in behind foreground's back.
+                        backward_respawns += 1;
+                    }
+                }
+            }
+            spawn_readahead(arc.clone(), tick);
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        // Drain any in-flight readahead thread so it can't keep respawning
+        // after the loop ends and pollute the next test's process list.
+        {
+            let mut s = arc.lock().unwrap();
+            s.readahead_active = false;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+        assert_eq!(
+            backward_respawns, 0,
+            "readahead's backward-fill fought forward playback and forced the decoder position backward {backward_respawns} times — expected 0 under sustained forward playback"
+        );
     }
 
     #[test]
