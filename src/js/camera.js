@@ -341,13 +341,20 @@
     });
     var nm = document.createElement('div'); nm.className = 'lnm'; nm.textContent = 'Caméra'; nm.style.fontWeight = '600';
     row.appendChild(ico); row.appendChild(eye); row.appendChild(nm);
-    row.addEventListener('click', function () { window.SM.setTool('camera'); renderLayerList(); });
+    // renderNow() after setTool('camera') — live feedback: the guides only
+    // reappeared after scrubbing (goToFrame's own render calls elsewhere in
+    // this file mask the gap), not on the click that selects the camera
+    // row itself. buildOverlayItems() now correctly returns guide items the
+    // instant state.tool becomes 'camera' (see its own comment), but
+    // nothing repainted the canvas to actually show them until some other,
+    // unrelated action forced a redraw.
+    row.addEventListener('click', function () { window.SM.setTool('camera'); renderLayerList(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); });
     row.addEventListener('contextmenu', function (e) {
       e.preventDefault();
       // Right-click also switches to the camera tool first (matching a
       // plain click) so segmentLeftKey(state.currentFrame) below resolves
       // against the right context, and the shared editor panel is visible.
-      window.SM.setTool('camera'); renderLayerList();
+      window.SM.setTool('camera'); renderLayerList(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
       window.showContextMenu(e.clientX, e.clientY, [
         { label: 'Modifier la courbe d\'accélération…', action: openCameraEaseEditor },
         { sep: true },
