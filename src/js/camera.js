@@ -149,7 +149,16 @@
   }
   function buildOverlayItems() {
     ensureState();
-    if (!state.cameraLayerOn) return [];
+    // Guides only while the camera pseudo-layer is actually selected
+    // (state.tool==='camera' — see setActiveLayer's own comment, timeline.js:
+    // it's not a real state.layers entry, so "selected" IS "camera tool
+    // active"), not just whenever the camera feature is on at all. Live
+    // feedback: picking a different layer left the dashed key rects/cross/
+    // trajectory guides stuck on screen — setActiveLayer already leaves the
+    // camera TOOL when a real layer is picked, but this function was still
+    // drawing the guides for any tool as long as cameraLayerOn was true; only
+    // the resize/rotate HANDLES further down were gated on the tool.
+    if (!state.cameraLayerOn || state.tool !== 'camera') return [];
     var items = [];
     var zs = 1 / Math.max(0.0001, view.zoom);
     var keyCol = [160, 160, 170, 220];
