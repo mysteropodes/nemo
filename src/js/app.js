@@ -667,6 +667,18 @@ function layerOutPoint(ld){
   var auto=autoOutPointFromBlankKeyframe(ld);
   return auto!=null?auto:state.totalFrames-1;
 }
+// Each branch below does an unconditional early `return`, so if a layer
+// ever ended up with more than one of nativeVideo/montageId/lfsGroup/
+// symbolId set (shouldn't happen — each is assigned by its own distinct,
+// mutually-exclusive creation path: convertLayerToComponent, LFS setup,
+// StoryBoard montage placement, native-video import), the FIRST match in
+// source order wins silently rather than combining or asserting. Audited
+// 2026-07 (code-quality pass): deliberately left as first-match-wins, not
+// a runtime assert — no code path today can actually set two of these on
+// one layer, so an assert would only add a NEW way for an old/migrated
+// project with slightly stray state to crash, for a purely hypothetical
+// benefit. Revisit if a future feature ever legitimately needs to combine
+// two of these flags on the same layer.
 function getEffectiveStrokes(layerIdx,frameIdx){
   var ld=state.layers[layerIdx];if(!ld)return[];
   if((ld.inPoint||ld.outPoint!=null)&&(frameIdx<layerInPoint(ld)||frameIdx>layerOutPoint(ld)))return[];
@@ -727,6 +739,22 @@ function getEffectiveStrokes(layerIdx,frameIdx){
     }
     return out;
   }
+  // Plain layer, the overwhelmingly common case — hot path, called every
+  // frame load/scrub/playback tick for every layer, so deliberately NOT
+  // cloned (unlike the symbolId branch above, which explicitly documents
+  // why it skips cloning too "when it's identity, the common case" — same
+  // perf reasoning CLAUDE.md §5 already went through a whole optimization
+  // pass over). Returns a LIVE reference into the stored frame's own
+  // `strokes` array (current keyframe, or an inherited earlier keyframe's
+  // array via the loop below) — safe only as long as every caller treats
+  // it as read-only or clones before mutating (every current caller does:
+  // loadFrame's desR/desP build NEW Paper objects from it rather than
+  // mutating it in place). A future caller that mutates this return value
+  // directly would corrupt the STORED keyframe — and for the inherited-
+  // frame branch, corrupt the keyframe at frameIdx-i, not the frame the
+  // caller thinks it's touching. Clone with JSON.parse(JSON.stringify(...))
+  // before any in-place mutation, same pattern used everywhere else in
+  // this file that needs an independent copy.
   var f=ld.frames[frameIdx];if(!f)return[];
   if(f.isKeyframe||f.isInterpolated)return f.strokes;
   for(var i=frameIdx-1;i>=0;i--){if(ld.frames[i].isKeyframe)return ld.frames[i].strokes;}
