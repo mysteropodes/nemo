@@ -683,6 +683,82 @@ function rotateCenterSegments(segs,angleDeg,cx,cy){
 }
 function clearSel(){selectedPaths=[];state.selectedStrokeIndices=[];_nodeSel=[];state.xformAnchorCustom=null;}
 function getSI(path){var ch=userLayers[state.activeLayerIdx].children;for(var i=0;i<ch.length;i++){if(ch[i]===path)return i;}return -1;}
+// UI/UX audit (2026-07): the statusbar footer has claimed "⌘/Ctrl+D
+// Dupliquer" for as long as an object selection exists, but NOTHING wired
+// to that combo ever duplicated the selected shape. Ctrl+D had no handler
+// at all (grepped); plain 'd' (no modifier) is duplicateKeyframe — clones
+// the WHOLE layer's current-frame content into a NEW frame and jumps the
+// playhead there, ignoring selectedPaths entirely. Neither is what a user
+// with 1-2 shapes selected reasonably expects from "Dupliquer" in that
+// context. This is the real thing: an in-place copy of exactly the
+// selected object(s), offset slightly so it's visibly distinct from the
+// source, left as the new active selection (every editor's convention).
+// Built on serP/desP (the save/load round-trip) rather than Path.clone()
+// by hand — it's the one code path already proven to correctly carry
+// every field (fill, vector-brush centerline, brush-texture flags...)
+// through a rebuild, so this doesn't need to re-solve that.
+function duplicateSelection(){
+  if(!selectedPaths.length)return;
+  pushUndo();
+  var layer=userLayers[state.activeLayerIdx];
+  var OFFSET=12; // px — small, deliberate nudge so the copy doesn't sit invisibly on top of the source
+  var clones=[];
+  // Brush-texture anchors share a brushGroupId with their dab companions
+  // (tools.js applyBrushTexture / app.js relinkBrushCompanions) — every
+  // duplicated member of a group must land on the SAME fresh id, or
+  // relinkBrushCompanions can't tell the new anchor and its new dabs
+  // apart from the originals.
+  var groupIdMap={};
+  function freshGroupId(oldGid){
+    if(!groupIdMap[oldGid])groupIdMap[oldGid]='bg_'+Date.now()+'_'+Math.floor(Math.random()*1e6)+'_'+Object.keys(groupIdMap).length;
+    return groupIdMap[oldGid];
+  }
+  selectedPaths.forEach(function(p){
+    if(p.data&&p.data.isBrushTextureCopy)return; // dabs ride along with their anchor below, never duplicated as a primary target themselves
+    var d=serP(p);
+    d.strokeId=undefined; // fresh identity below — must NOT alias the source's
+    if(d.brushGroupId)d.brushGroupId=freshGroupId(d.brushGroupId);
+    var clone=desP(d,layer,d.opacity);
+    clone.translate(new Point(OFFSET,OFFSET));
+    ensureStrokeId(clone);
+    if(p.data&&p.data.isVectorBrush&&p.data.centerSegments){
+      clone.data.centerSegments=JSON.parse(JSON.stringify(p.data.centerSegments)).map(function(s){s.point[0]+=OFFSET;s.point[1]+=OFFSET;return s;});
+      // Vector-brush fill backdrop (draw-bridge.js) — regenerated from the
+      // (now-offset) centerline via the same rebuild every other edit to
+      // this stroke type already goes through, rather than hand-cloning
+      // its geometry.
+      if(p.data.linkedFill&&!p.data.linkedFill.removed){
+        var fillClone=new Path();fillClone.fillColor=p.data.linkedFill.fillColor;fillClone.strokeColor=null;fillClone.opacity=p.data.linkedFill.opacity;
+        fillClone.insertBelow(clone);
+        clone.data.linkedFill=fillClone;
+        if(typeof rebuildVectorBrushOutline==='function')rebuildVectorBrushOutline(clone);
+      }
+    }
+    clones.push(clone);
+  });
+  // Dabs of any duplicated brush-texture anchor — cloned the same way,
+  // tagged with the anchor's fresh group id, so relinkBrushCompanions can
+  // regroup them below exactly like it does after a normal frame load.
+  selectedPaths.forEach(function(p){
+    if(!p.data||!p.data.brushGroupId||p.data.isBrushTextureCopy)return;
+    var newGid=groupIdMap[p.data.brushGroupId];if(!newGid)return;
+    (p.data.brushCompanions||[]).forEach(function(dab){
+      if(!dab||dab.removed)return;
+      var dd=serP(dab);
+      dd.brushGroupId=newGid;
+      var dabClone=desP(dd,layer,dd.opacity);
+      dabClone.translate(new Point(OFFSET,OFFSET));
+      clones.push(dabClone);
+    });
+  });
+  if(typeof relinkBrushCompanions==='function')relinkBrushCompanions(layer);
+  if(typeof fillRegenerateLinked==='function')fillRegenerateLinked(layer,null);
+  clearSel();
+  selectedPaths=clones.filter(function(c){return!(c.data&&c.data.isBrushTextureCopy);});
+  state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;});
+  saveActiveLayerFrame();renderArcs();updateUI();
+  if(window.SMEngineBridge)SMEngineBridge.renderNow();
+}
 var canvasEl=document.getElementById('drawing-canvas');
 
 // ---- STYLUS PRESSURE (Pointer Events) ----

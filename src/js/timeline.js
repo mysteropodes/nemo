@@ -3378,6 +3378,17 @@ function onKeyDown(event){
     if(window.SMEngineBridge)SMEngineBridge.renderNow();
     return;
   }
+  // Ctrl/Cmd+D "duplicate the selected object(s)" — see duplicateSelection's
+  // own comment (tools.js) for why this was needed: the footer hint has
+  // claimed this combo for object duplication for a long time, but nothing
+  // was ever wired to it. Plain 'd' (no modifier, handled further down)
+  // stays bound to duplicateKeyframe — a real, distinct, still-useful
+  // action (clones the whole current frame) — untouched.
+  if((event.metaKey||event.ctrlKey)&&(event.key==='d'||event.key==='D')&&selectedPaths.length){
+    event.preventDefault();
+    duplicateSelection();
+    return;
+  }
   // Ctrl/Cmd+G "group into folder" — the action already existed
   // (groupSelectionIntoFolder, right-click menu only) but every other
   // grouping-adjacent action in this app has a keyboard path; this one
