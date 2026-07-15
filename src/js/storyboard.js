@@ -259,7 +259,16 @@
     ruler.style.top = (m.y - RULER_H - 4) + 'px';
     ruler.style.width = g.totalW + 'px';
     var ph = ruler.querySelector('.sb-ph');
-    if (ph) ph.style.left = (frameToPx(m, m.playhead || 0) - g.startX) + 'px';
+    // The playhead at frame f sits at f's LEFT boundary — mathematically
+    // right but visually "ne va pas jusqu'au bout": on a stretched member
+    // (5f over ~180px) the last frame leaves a huge dead zone at the far
+    // right. Editor-pragmatic: the LAST frame pins the marker to the
+    // ruler's extreme right edge.
+    if (ph) {
+      var phF = m.playhead || 0;
+      var px = phF >= g.totalDur - 1 ? g.totalW : (frameToPx(m, phF) - g.startX);
+      ph.style.left = px + 'px';
+    }
     var lbl = ruler.querySelector('.sb-ruler-lbl');
     if (lbl) lbl.textContent = (m.playhead || 0) + ' / ' + g.totalDur + ' f';
   }
@@ -366,6 +375,7 @@
           var stretch = side2 === 'right' && e.altKey;
           var maxLen = symbolDuration(m.symbolId);
           var PXF = 2; // trim gesture scale: 2px per frame — steady, zoom-independent feel
+          var host2 = chainOf(m);
           function mv(ev) {
             var df = Math.round((ev.clientX - startX) / PXF);
             if (stretch) m.duration = Math.max(1, o.duration + df);
@@ -379,6 +389,21 @@
               m.duration = Math.max(1, o.duration + (to - o.trimOut));
             }
             nm.textContent = (sym ? sym.name : '?') + ' — ' + m.duration + 'f';
+            // LIVE feedback ("les poignées devraient pouvoir bouger"):
+            // durations feed the ruler's piecewise time map — refresh the
+            // cached geometry and the ruler (total + playhead position)
+            // while dragging, plus the canvas preview, not just at release.
+            if (host2) {
+              var g2 = _chainGeom[host2.id];
+              if (g2) {
+                var mb2 = g2.members.find(function (x) { return x.id === m.id; });
+                if (mb2) { g2.totalDur += m.duration - mb2.dur; mb2.dur = m.duration; }
+                var tot2 = g2.totalDur;
+                if ((host2.playhead || 0) > Math.max(0, tot2 - 1)) host2.playhead = Math.max(0, tot2 - 1);
+                positionRuler(host2);
+              }
+              updatePreview();
+            }
           }
           function up() {
             document.removeEventListener('pointermove', mv);
@@ -593,6 +618,22 @@
         if (oe) neighbors.push({ x: o.x, y: o.y, w: oe.offsetWidth, h: oe.offsetHeight });
       });
       var moved = false, lastX = e.clientX, lastY = e.clientY, raf = 0, left = false;
+      // Dragging a montage BLOCK moves the WHOLE assembly ("quand on drag
+      // un montage alors ça doit bouger tout l'ensemble") — snapshot every
+      // dependent (chain members, attached sounds, the ruler) with its
+      // offset relative to the block, and carry them in apply().
+      var ensemble = [];
+      if (m.type === 'montage') {
+        var depIds = (m.chain || []).slice();
+        (m.audio || []).forEach(function (a) { depIds.push(a.moduleId); });
+        depIds.forEach(function (did) {
+          var dm = moduleById(did);
+          var de = dm && world.querySelector('[data-sb-id="' + did + '"]');
+          if (dm && de) ensemble.push({ mod: dm, el: de, dx: dm.x - m.x, dy: dm.y - m.y });
+        });
+        var rulerEl = world.querySelector('[data-sb-ruler="' + m.id + '"]');
+        if (rulerEl) ensemble.push({ el: rulerEl, rx: parseFloat(rulerEl.style.left || 0) - m.x, ry: parseFloat(rulerEl.style.top || 0) - m.y });
+      }
       try { el.setPointerCapture(e.pointerId); } catch (err) {}
       el.style.zIndex = 30;
       function apply() {
@@ -627,6 +668,16 @@
         });
         el.style.left = m.x + 'px';
         el.style.top = m.y + 'px';
+        ensemble.forEach(function (d) {
+          if (d.mod) {
+            d.mod.x = m.x + d.dx; d.mod.y = m.y + d.dy;
+            d.el.style.left = d.mod.x + 'px';
+            d.el.style.top = d.mod.y + 'px';
+          } else {
+            d.el.style.left = (m.x + d.rx) + 'px';
+            d.el.style.top = (m.y + d.ry) + 'px';
+          }
+        });
       }
       function mv(ev) {
         lastX = ev.clientX; lastY = ev.clientY;
