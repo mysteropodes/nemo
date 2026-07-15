@@ -3454,7 +3454,16 @@ function onMouseDown(event){
       if(_pen.path.segments.length>1&&event.point.getDistance(first)<tol){
         _pen.path.closed=true;finalizePen();return;
       }
-      _pen.path.add(event.point);
+      // Shift-constrain (UI/UX audit, 2026-07) — Illustrator/Figma pen tool
+      // convention: hold Shift while placing the NEXT anchor to snap its
+      // angle from the PREVIOUS one to the nearest 45°, for clean
+      // horizontal/vertical/diagonal construction lines. Deliberately
+      // computed AFTER the close-loop hit-test above (against the real,
+      // unconstrained event.point) so holding Shift can never make closing
+      // the path near its own start point harder to hit.
+      var placePt=event.point;
+      if(event.modifiers.shift)placePt=constrainAngle45(_pen.path.lastSegment.point,event.point);
+      _pen.path.add(placePt);
     }
     _pen.draggingHandle=true;
   }else if(state.tool==='line'||state.tool==='rect'||state.tool==='ellipse'){
