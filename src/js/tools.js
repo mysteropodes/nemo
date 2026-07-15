@@ -2621,6 +2621,15 @@ function applyBrushTexture(basePath,presetKey){
 // Re-stamps the whole texture from the anchor's current geometry; call on
 // drag-END only (buildBrushDabs is a full rebuild, not cheap per mousemove).
 function regenerateBrushTexture(basePath,layer){
+  // Bitmap Brush anchors re-stamp through their own module (one Raster
+  // companion instead of vector dabs, same stored-seed determinism) — both
+  // existing call sites (subselect drag-end here and in subselect-bridge.js)
+  // funnel through this one function, so branching HERE covers both paths
+  // without either caller knowing bitmap anchors exist.
+  if(basePath.data&&basePath.data.bitmapBrushSpec&&basePath.data.brushGroupId){
+    if(window.SMBitmapBrush)SMBitmapBrush.regenerate(basePath,layer);
+    return;
+  }
   if(!basePath.data||!basePath.data.brushTexturePreset||!basePath.data.brushGroupId)return;
   var gid=basePath.data.brushGroupId;
   for(var i=layer.children.length-1;i>=0;i--){
@@ -3507,10 +3516,13 @@ function onMouseDown(event){
       }
       return;
     }
-    var subHit=layer.hitTest(event.point,{stroke:true,fill:true,tolerance:8/view.zoom});
-    if(subHit&&subHit.item instanceof Path){
+    var subHit=layer.hitTest(event.point,{stroke:true,fill:true,pixel:true,tolerance:8/view.zoom});
+    // Raster companions resolve to their anchor too (Bitmap Brush v2) —
+    // see the same fix's full comment in subselect-bridge.js.
+    if(subHit&&(subHit.item instanceof Path||(subHit.item instanceof Raster&&subHit.item.data&&subHit.item.data.isBrushTextureCopy))){
       clearSel();
       var subTarget=resolveBrushAnchor(subHit.item,layer);
+      if(!(subTarget instanceof Path)){renderArcs();updateUI();return;}
       selectedPaths.push(subTarget);state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;});
       // nodeHandles (hit-test array) is stale until rebuilt — see the same
       // fix's comment in subselect-bridge.js for the full story.
@@ -3960,25 +3972,15 @@ function onMouseUp(event){
     }else if(currentPath.segments.length<2){
       currentPath.remove();if(state.undoStack.length)state.undoStack.pop();
     }else if(state.bitmapBrushOn&&state.strokeEnabled&&window.SMBitmapBrush){
-      // Bitmap Brush's tools.js mirror (2026-07) — this Paper-native
-      // fallback path never called applyBrushTexture for the EXISTING
-      // vector presets either (grepped: zero call sites), so this is
-      // actually the more-complete of the two texture features here, not
-      // an inconsistency with precedent. No live preview in this path —
-      // matches that same precedent (the vector presets have none here
-      // either; live preview is a draw-bridge-only, Rust-engine-only
-      // concept via its own DOM overlay canvas). currentPath.segments
-      // carry the already-smoothed vector centerline Paper itself built
-      // during the drag — reused as the stamp walk's sample points, all
-      // constant-width (this plain, non-vectorBrush path has no
-      // per-point pressure to preserve).
-      var bmpSamples=currentPath.segments.map(function(s){return[s.point.x,s.point.y,state.brushSize];});
-      var raster=window.SMBitmapBrush.stamp(bmpSamples);
-      // NOT popping the undo stack here (unlike the degenerate-stroke
-      // aborts above) — a real Raster is being committed, so the pushUndo()
-      // from this gesture's onMouseDown must stay on the stack or Ctrl+Z
-      // would silently skip over this stroke.
-      if(raster){userLayers[state.activeLayerIdx].addChild(raster);currentPath.remove();currentPath=raster;}
+      // Bitmap Brush's tools.js mirror (v2, 2026-07) — same anchor+
+      // companion call as draw-bridge.js's commitStroke: the plain path
+      // Paper built during the drag stays as the real, subselect-editable
+      // anchor (fill kept, stroke camouflaged inside applyToPath), the
+      // baked texture is its Raster companion. This fallback never called
+      // applyBrushTexture for the EXISTING vector presets (grepped: zero
+      // call sites), so no live preview here matches that precedent too.
+      currentPath.simplify(state.smoothing);
+      window.SMBitmapBrush.applyToPath(currentPath);
     }else{
       currentPath.simplify(state.smoothing);
       if(state.taperEnds){

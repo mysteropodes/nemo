@@ -101,117 +101,139 @@
     return c;
   }
 
-  // Walks the Draw tool's raw [x,y,width] samples at fixed arc-length
-  // spacing, stamps the tip at each point (scattered/sized per settings),
-  // and returns a Raster ready to insert — position/size already set, only
-  // .data tagging + layer insertion are the caller's job.
-  function stampBitmapBrush(samples, opts) {
-    if (samples.length < 2) return null;
-    var tipName = opts.tip, baseSize = opts.size, spacingPct = opts.spacing, scatterPct = opts.scatter, opacity = opts.opacity, color = opts.color, seed = opts.seed;
-    var spacing = Math.max(1, baseSize * (spacingPct / 100));
-    var scatterPx = baseSize * (scatterPct / 100);
-    var rng = seededRng(seed);
-
-    // Bounding box in world coords, padded for tip radius + scatter + a
-    // pressure-width bump (samples' own width channel can widen the tip).
-    var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity, maxW = 0;
-    samples.forEach(function (s) { minX = Math.min(minX, s[0]); maxX = Math.max(maxX, s[0]); minY = Math.min(minY, s[1]); maxY = Math.max(maxY, s[1]); maxW = Math.max(maxW, s[2] || 1); });
-    var pad = baseSize * Math.max(1, maxW) / 2 + scatterPx + 4;
-    minX -= pad; minY -= pad; maxX += pad; maxY += pad;
-    var w = Math.max(1, maxX - minX), h = Math.max(1, maxY - minY);
-
-    // Oversample the raster relative to world units for reasonable quality
-    // regardless of current canvas zoom — a real "resample at export
-    // resolution" step is future work (see proposal doc), this is a fixed,
-    // cheap approximation for v1.
-    var SCALE = 2;
-    var canvas = document.createElement('canvas');
-    canvas.width = Math.ceil(w * SCALE); canvas.height = Math.ceil(h * SCALE);
-    var ctx = canvas.getContext('2d');
-    ctx.fillStyle = color;
-    var tip = buildTipCanvas(tipName, seed);
-
-    // Arc-length walk with linear interpolation of position + pressure width.
-    var acc = 0;
-    var stampAt = function (x, y, wMul) {
-      var jx = (rng() - 0.5) * 2 * scatterPx, jy = (rng() - 0.5) * 2 * scatterPx;
-      var jScale = 0.75 + rng() * 0.5;
-      var size = baseSize * wMul * jScale;
-      var px = (x + jx - minX) * SCALE, py = (y + jy - minY) * SCALE, ps = size * SCALE;
-      ctx.save();
-      ctx.globalAlpha = opacity;
-      ctx.globalCompositeOperation = 'source-over';
-      // Tint the tip's white/alpha mask with the brush color: draw the tip,
-      // then fill-composite the color through it — cheaper than re-drawing
-      // colored procedural shapes per stamp.
-      ctx.drawImage(tip, px - ps / 2, py - ps / 2, ps, ps);
-      ctx.restore();
+  // ---- v2 (2026-07): anchor-path + raster-companion architecture ----
+  // v1 committed the baked Raster ALONE, throwing the vector geometry away
+  // — which broke everything the proposal doc promised ("vector stays the
+  // source of truth"): no subselect (a raster has no nodes), no fill (the
+  // Path that would have carried fillColor never existed), clicks selected
+  // the raster's rectangle instead of the stroke. Reported live: "subselect
+  // ne marche pas... le fond n'apparaît pas". v2 mirrors applyBrushTexture's
+  // (tools.js) proven anchor+companions pattern exactly: the ordinary
+  // vector Path IS committed (fill kept visible, stroke camouflaged via
+  // preTextureStroke/preTextureOpacity, same rules), and the baked texture
+  // is ONE companion Raster tagged isBrushTextureCopy + brushGroupId —
+  // which existing machinery then handles for free: selection exclusion
+  // (isSelectablePathChild), group move, relinkBrushCompanions after every
+  // loadFrame, and regenerateBrushTexture's re-stamp on subselect drag-end.
+  //
+  // Also fixed here vs v1's stamping:
+  // - "1s d'attente après le relâchement": the raster is now created from
+  //   the baked <canvas> ELEMENT directly (synchronous, .loaded is true
+  //   immediately) instead of a PNG data URI that had to be encoded then
+  //   async-decoded back. The dataURL is still computed for .data.src
+  //   (persistence needs a string), but display no longer waits on it.
+  // - "la taille est différente du trait": v1 fed each sample's stored
+  //   width (an ABSOLUTE px value, e.g. brushSize=3) into the stamp size
+  //   as if it were a pressure MULTIPLIER — baking 3x-too-big stamps
+  //   (baseSize 40 × width 3 = 120px) while the live preview correctly
+  //   used ~1. The walk below stamps at the panel's Size directly.
+  // - Corner-cutting: walking raw committed segments linearly ignored the
+  //   curve handles Paper's simplify() produced; path.getPointAt() walks
+  //   the TRUE curve.
+  function applyBitmapBrushTexture(basePath, spec) {
+    if (!basePath || !basePath.segments || basePath.segments.length < 2) return basePath;
+    spec = spec || {
+      tip: state.bitmapTip || 'soft',
+      size: state.bitmapSize || 40,
+      spacing: state.bitmapSpacing != null ? state.bitmapSpacing : 15,
+      scatter: state.bitmapScatter != null ? state.bitmapScatter : 20,
+      opacity: (state.bitmapOpacity != null ? state.bitmapOpacity : 100) / 100,
+      // The anchor's own strokeColor (already a Paper Color here) is the
+      // authoritative ink — state.strokeColor as fallback for a re-apply
+      // where camouflage already nulled it and no preTextureStroke exists.
+      color: basePath.strokeColor ? colorHex8(basePath.strokeColor) : ((basePath.data && basePath.data.preTextureStroke) || state.strokeColor || '#000000'),
+      seed: Math.floor(Math.random() * 0xffffffff),
     };
-    // Two-pass: draw all tip masks to an offscreen alpha buffer, then tint
-    // once — avoids per-stamp compositing cost mattering much at typical
-    // stroke lengths (dozens to low hundreds of stamps, not thousands).
+    var baseSize = spec.size;
+    var spacing = Math.max(1, baseSize * (spec.spacing / 100));
+    var scatterPx = baseSize * (spec.scatter / 100);
+    var rng = seededRng(spec.seed);
+
+    // World-space bounds from the path's own true bounds, padded for tip
+    // radius (max jitter scale 1.25) + scatter.
+    var pb = basePath.bounds;
+    var pad = baseSize * 1.25 / 2 + scatterPx + 4;
+    var minX = pb.x - pad, minY = pb.y - pad;
+    var w = Math.max(1, pb.width + pad * 2), h = Math.max(1, pb.height + pad * 2);
+
+    // Oversample vs world units for reasonable quality regardless of zoom —
+    // a real "resample at export resolution" step is future work. CLAMPED
+    // to a max texture dimension: found live (zoomed out to 3%, stroke
+    // spanning ~8000 world px) that an unclamped w*2 bake canvas hit
+    // ~16000px wide and the synchronous toDataURL froze the app for 30s+.
+    // World size of a stroke is unbounded (it scales with 1/zoom for the
+    // same hand gesture), so the RESOLUTION must not follow it linearly.
+    var MAX_TEX = 4096;
+    var SCALE = Math.min(2, MAX_TEX / w, MAX_TEX / h);
+    var canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.ceil(w * SCALE)); canvas.height = Math.max(1, Math.ceil(h * SCALE));
+    var ctx = canvas.getContext('2d');
+    var tip = buildTipCanvas(spec.tip, spec.seed);
+
+    // Mask pass: stamp the white/alpha tip along the TRUE curve at fixed
+    // arc-length steps, then tint once via destination-in.
     var maskCanvas = document.createElement('canvas');
     maskCanvas.width = canvas.width; maskCanvas.height = canvas.height;
     var mctx = maskCanvas.getContext('2d');
-    var origCtx = ctx; ctx = mctx;
-    for (var i = 0; i < samples.length - 1; i++) {
-      var a = samples[i], b = samples[i + 1];
-      var dx = b[0] - a[0], dy = b[1] - a[1];
-      var segLen = Math.sqrt(dx * dx + dy * dy);
-      if (segLen < 1e-6) continue;
-      while (acc < segLen) {
-        var t = acc / segLen;
-        var x = a[0] + dx * t, y = a[1] + dy * t;
-        var wv = (a[2] || 1) + ((b[2] || 1) - (a[2] || 1)) * t;
-        stampAt(x, y, Math.max(0.2, wv));
-        acc += spacing;
-      }
-      acc -= segLen;
+    var len = basePath.length;
+    for (var d = 0; d <= len; d += spacing) {
+      var pt = basePath.getPointAt(d);
+      if (!pt) continue;
+      var jx = (rng() - 0.5) * 2 * scatterPx, jy = (rng() - 0.5) * 2 * scatterPx;
+      var s = baseSize * (0.75 + rng() * 0.5);
+      var px = (pt.x + jx - minX) * SCALE, py = (pt.y + jy - minY) * SCALE, ps = s * SCALE;
+      mctx.globalAlpha = spec.opacity;
+      mctx.drawImage(tip, px - ps / 2, py - ps / 2, ps, ps);
     }
-    ctx = origCtx;
-    // Tint pass: fill the whole canvas with the brush color, clipped to the
-    // mask's alpha via destination-in.
-    ctx.fillStyle = color;
+    ctx.fillStyle = spec.color;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.globalCompositeOperation = 'destination-in';
     ctx.drawImage(maskCanvas, 0, 0);
     ctx.globalCompositeOperation = 'source-over';
 
-    var dataUrl = canvas.toDataURL('image/png');
-    var raster = new Raster(dataUrl);
-    // Every other Raster-creation site in this app (desR, app.js; the SVG-
-    // sequence import, timeline.js) sets .data.src right after construction
-    // — serR()'s save-path reads THIS field first, falling back to
-    // r.source only if it's unset. Skipping it (as this file did before a
-    // live test caught it) meant the saved/onion-skin round-trip depended
-    // on Paper's own .source getter instead, which produced a Raster whose
-    // .canvas came back 0-width — engine-bridge.js's registerRasterIfNeeded
-    // then threw on ctx.getImageData(0,0,0,0). Matching the established
-    // convention fixes it at the source instead of special-casing the
-    // reader.
-    raster.data.src = dataUrl;
+    // Raster from the canvas ELEMENT — synchronous, no decode wait. The
+    // dataURL is still needed as the persistable .data.src string (serR).
+    var raster = new Raster(canvas);
+    raster.data.src = canvas.toDataURL('image/png');
+    raster.data.isBrushTextureCopy = true; // rides every existing exclusion/move/relink rule for texture companions
     raster.data.isBitmapBrush = true;
-    raster.data.bitmapTip = tipName;
-    raster.data.bitmapSize = baseSize;
-    raster.data.bitmapSpacing = spacingPct;
-    raster.data.bitmapScatter = scatterPct;
-    raster.data.bitmapSeed = seed;
-    var cx = minX + w / 2, cy = minY + h / 2;
-    // Race found live (2026-07, "après le relâchement... pas bonne taille,
-    // disparition des couleurs, impossible de select"): a data: URI often
-    // decodes fast enough that Paper's Raster is ALREADY loaded by the
-    // time this next line runs, so an onLoad handler attached here never
-    // fires — raster.size/.position then silently keep whatever default
-    // Paper assigned (natural pixel size at the origin), not the intended
-    // world-space bounds, which cascades into wrong on-canvas size/
-    // position and broken hit-testing (marquee/click select at the
-    // EXPECTED location misses the raster sitting somewhere else). Fixed
-    // by checking `.loaded` synchronously first — covers both the
-    // already-loaded (data URI, the common case here) and genuinely-async
-    // (rare for a same-process canvas.toDataURL()) cases.
-    var place = function () { raster.position = new Point(cx, cy); raster.size = new Size(w, h); };
-    if (raster.loaded) place(); else raster.onLoad = place;
-    return raster;
+    var gid = basePath.data.brushGroupId || ('bmb' + Date.now().toString(36) + '_' + Math.floor(Math.random() * 1e6));
+    raster.data.brushGroupId = gid;
+    raster.position = new Point(minX + w / 2, minY + h / 2);
+    raster.size = new Size(w, h);
+    raster.insertAbove(basePath);
+
+    // Anchor camouflage — applyBrushTexture's exact rules: with a fill the
+    // path keeps painting it and only the strokeColor goes (remembered);
+    // without one, the whole path goes invisible.
+    if (basePath.fillColor) {
+      if (basePath.data.preTextureStroke === undefined) basePath.data.preTextureStroke = basePath.strokeColor ? colorHex8(basePath.strokeColor) : null;
+      basePath.strokeColor = null;
+    } else {
+      if (basePath.data.preTextureOpacity === undefined) basePath.data.preTextureOpacity = basePath.opacity !== undefined ? basePath.opacity : 1;
+      basePath.opacity = 0;
+    }
+    basePath.data.brushGroupId = gid;
+    basePath.data.brushCompanions = [raster];
+    basePath.data.bitmapBrushSpec = spec; // persisted via serP — regenerateBrushTexture re-stamps from this after node edits
+    return basePath;
+  }
+
+  // regenerateBrushTexture's (tools.js) bitmap branch — remove this
+  // anchor's companions and re-stamp from its CURRENT geometry, reusing
+  // the stored spec (same seed: a re-stamp after a node drag must not make
+  // the texture "boil", same determinism rule as the vector dabs).
+  function regenerate(basePath, layer) {
+    if (!basePath.data || !basePath.data.bitmapBrushSpec) return;
+    var gid = basePath.data.brushGroupId;
+    for (var i = layer.children.length - 1; i >= 0; i--) {
+      var c = layer.children[i];
+      if (c !== basePath && c.data && c.data.isBrushTextureCopy && c.data.brushGroupId === gid) c.remove();
+    }
+    // Re-apply reads color from preTextureStroke (strokeColor is nulled by
+    // now on a fill anchor) or the stored spec — pass the stored spec
+    // through untouched.
+    applyBitmapBrushTexture(basePath, basePath.data.bitmapBrushSpec);
   }
 
   // ---- live drag preview: DOM canvas layered over the Rust canvas,
@@ -329,21 +351,8 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 
   window.SMBitmapBrush = {
-    stamp: function (samples) {
-      return stampBitmapBrush(samples, {
-        tip: state.bitmapTip || 'soft',
-        size: state.bitmapSize || 40,
-        spacing: state.bitmapSpacing != null ? state.bitmapSpacing : 15,
-        scatter: state.bitmapScatter != null ? state.bitmapScatter : 20,
-        opacity: (state.bitmapOpacity != null ? state.bitmapOpacity : 100) / 100,
-        // state.strokeColor is already a plain '#rrggbb'/'#rrggbbaa' CSS
-        // string (set by the color pickers, see timeline.js setStrokeColor)
-        // — NOT a Paper.js Color object, so no colorHex8() conversion here
-        // (that function expects a Paper Color and would throw on a string).
-        color: state.strokeColor || '#000000',
-        seed: Math.floor(Math.random() * 0xffffffff),
-      });
-    },
+    applyToPath: applyBitmapBrushTexture,
+    regenerate: regenerate,
     beginLivePreview: beginLivePreview,
     livePreviewMove: livePreviewMove,
     endLivePreview: endLivePreview,

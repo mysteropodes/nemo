@@ -354,7 +354,12 @@
         if (isDbl2) window.SM.enterSymbol(activeLd.symbolId);
         return;
       }
-      var p = hit.item;
+      // A click landing on a brush-texture companion (vector dab, or Bitmap
+      // Brush v2's raster texture — the anchor under it is stroke-
+      // camouflaged, so the companion is often the only hittable thing)
+      // selects the real anchor, not the companion; moving/deleting a
+      // companion alone would silently desync it from its group.
+      var p = resolveBrushAnchor(hit.item, userLayers[state.activeLayerIdx]);
       var idx2 = selectedPaths.indexOf(p);
       if (e.shiftKey) {
         if (idx2 >= 0) selectedPaths.splice(idx2, 1); else selectedPaths.push(p);

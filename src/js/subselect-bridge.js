@@ -116,10 +116,21 @@
       window.SMEngineBridge.renderNow();
       return;
     }
-    var subHit = layer.hitTest(pt, { stroke: true, fill: true, tolerance: 8 / view.zoom });
-    if (subHit && subHit.item instanceof Path) {
+    var subHit = layer.hitTest(pt, { stroke: true, fill: true, pixel: true, tolerance: 8 / view.zoom });
+    // Raster companions count too (Bitmap Brush v2, bitmap-brush.js): the
+    // visible texture over a bitmap-brush stroke is ONE Raster tagged
+    // isBrushTextureCopy — its anchor path has strokeColor camouflaged to
+    // null, so the stroke hit-test can't land on the anchor directly and
+    // the texture is often the only thing under the cursor. The vector
+    // presets never hit this (their dabs are Paths, already matched);
+    // resolveBrushAnchor maps either kind back to the anchor. The
+    // `instanceof Path` guard on subTarget keeps a plain imported image
+    // (a Raster with NO companion tag, resolved to itself) un-node-editable
+    // as before.
+    if (subHit && (subHit.item instanceof Path || (subHit.item instanceof Raster && subHit.item.data && subHit.item.data.isBrushTextureCopy))) {
       clearSel();
       var subTarget = resolveBrushAnchor(subHit.item, layer);
+      if (!(subTarget instanceof Path)) { window.SMEngineBridge.renderNow(); return; }
       selectedPaths.push(subTarget);
       state.selectedStrokeIndices = selectedPaths.map(getSI).filter(function (i2) { return i2 >= 0; });
       // The Rust mirror redraws the handle overlay fresh from

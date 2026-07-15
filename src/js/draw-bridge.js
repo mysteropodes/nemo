@@ -604,21 +604,6 @@
       }
       path.fillColor = state.fillEnabled ? state.fillColor : null;
       path.simplify(state.smoothing);
-    } else if (state.bitmapBrushOn && state.strokeEnabled && window.SMBitmapBrush) {
-      // Bitmap Brush (v1, 2026-07) — parallel category to the vector brush-
-      // texture presets below, see bitmap-brush.js's header comment. Scoped
-      // to this same plain constant-width branch as applyBrushTexture
-      // (vector-brush/fill-brush have their own outline machinery this
-      // isn't built to coexist with either). Produces a real Raster instead
-      // of a Path — every existing consumer (serR/desR, buildSceneJson,
-      // selectedPaths, save/load) already handles Raster with zero changes,
-      // confirmed by grep before writing this — only insertion here is new.
-      var raster = window.SMBitmapBrush.stamp(samples);
-      if (raster) {
-        userLayers[state.activeLayerIdx].addChild(raster);
-        if (state.drawMode === 'behind') userLayers[state.activeLayerIdx].insertChild(0, raster);
-        path = raster; // downstream tagOwner/Labs-hook/saveActiveLayerFrame calls below treat `path` generically
-      }
     } else {
       path = new Path();
       // Left-panel stroke eye honored here too (it always was for the
@@ -640,7 +625,12 @@
       // comment (tools.js) for how the "texture" is actually achieved in a
       // pure-vector renderer. Skipped when the stroke channel is off — the
       // dabs REPLACE a visible stroke, there's nothing to texture without one.
-      if (state.strokeEnabled && state.brushPreset && state.brushPreset !== 'none') applyBrushTexture(path, state.brushPreset);
+      // Bitmap Brush (v2, bitmap-brush.js) takes priority when enabled —
+      // same anchor+companion architecture as applyBrushTexture, just one
+      // Raster companion instead of many vector dabs; the path committed
+      // above (fill included) stays as the real, subselect-editable anchor.
+      if (state.strokeEnabled && state.bitmapBrushOn && window.SMBitmapBrush) window.SMBitmapBrush.applyToPath(path);
+      else if (state.strokeEnabled && state.brushPreset && state.brushPreset !== 'none') applyBrushTexture(path, state.brushPreset);
       if (state.drawMode === 'behind') {
         userLayers[state.activeLayerIdx].insertChild(0, path);
         // Same re-anchor need as the linkedFill case a few lines up in the
