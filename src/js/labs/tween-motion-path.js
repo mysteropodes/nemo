@@ -35,9 +35,29 @@
   function loadHandles() { try { return JSON.parse(localStorage.getItem(HANDLE_KEY)) || {}; } catch (e) { return {}; } }
   function saveHandles(m) { try { localStorage.setItem(HANDLE_KEY, JSON.stringify(m)); } catch (e) {} }
   function hKey(strokeId, frame) { return strokeId + ':' + frame; }
+  // Raw stored offset — [0,0] means "never dragged", the actual bezier
+  // math default (matching camera.js/motion.js exactly: a straight line
+  // until touched).
   function getHandles(strokeId, frame) {
     var m = loadHandles(), h = m[hKey(strokeId, frame)];
     return { hOut: (h && h.hOut) || [0, 0], hIn: (h && h.hIn) || [0, 0] };
+  }
+  // DISPLAY/hit-test position — live feedback: "je les vois pas ces
+  // poignées". Root cause: at the true [0,0] default, the handle dot sits
+  // exactly ON TOP of the keyframe dot (same position, same size, same
+  // color) — not invisible, just perfectly overlapping and indistinguishable
+  // from it, so there was nothing separate to notice or grab. A quarter of
+  // the way toward the OTHER keyframe is far enough to read as its own
+  // grabbable dot, and — because it's the same fraction on both ends
+  // (0.25 from A, 0.25 from B) — the four bezier control points stay
+  // exactly COLLINEAR, so the curve itself stays visually straight until
+  // the handle is actually dragged away from this default. Once a real
+  // offset is stored, that takes over completely (this default only ever
+  // applies to an UNTOUCHED handle).
+  function displayHandle(strokeId, frame, which, anchor, other) {
+    var raw = getHandles(strokeId, frame)[which];
+    if (raw[0] || raw[1]) return raw;
+    return [(other[0] - anchor[0]) * 0.25, (other[1] - anchor[1]) * 0.25];
   }
   function setHandle(strokeId, frame, which, val) {
     var m = loadHandles(), k = hKey(strokeId, frame);
@@ -110,8 +130,8 @@
 
     segs.forEach(function (seg) {
       var a = seg.a, b = seg.b, fA = seg.fA, fB = seg.fB, strokeId = seg.strokeId, frames = seg.frames;
-      var h = getHandles(strokeId, fA), hOut = h.hOut;
-      var hEnd = getHandles(strokeId, fB), hIn = hEnd.hIn;
+      var hOut = displayHandle(strokeId, fA, 'hOut', a, b);
+      var hIn = displayHandle(strokeId, fB, 'hIn', b, a);
       // Cubic bezier through the two centroids — same construction as
       // camera.js/motion.js's own motion path, straight line when both
       // handles are still [0,0] (the default, matching their behavior).
@@ -174,10 +194,10 @@
     var tol = 10 / view.zoom;
     for (var i = 0; i < segs.length; i++) {
       var seg = segs[i];
-      var hOut = getHandles(seg.strokeId, seg.fA).hOut;
+      var hOut = displayHandle(seg.strokeId, seg.fA, 'hOut', seg.a, seg.b);
       var hx1 = seg.a[0] + hOut[0], hy1 = seg.a[1] + hOut[1];
       if (Math.hypot(pt[0] - hx1, pt[1] - hy1) < tol) return { strokeId: seg.strokeId, frame: seg.fA, which: 'hOut', anchor: seg.a };
-      var hIn = getHandles(seg.strokeId, seg.fB).hIn;
+      var hIn = displayHandle(seg.strokeId, seg.fB, 'hIn', seg.b, seg.a);
       var hx2 = seg.b[0] + hIn[0], hy2 = seg.b[1] + hIn[1];
       if (Math.hypot(pt[0] - hx2, pt[1] - hy2) < tol) return { strokeId: seg.strokeId, frame: seg.fB, which: 'hIn', anchor: seg.b };
     }
