@@ -84,13 +84,34 @@
     // The rotate grip hangs off the box's OWN top edge (its up axis), so
     // it swings around with the object instead of hovering above the AABB.
     var rotPos = WP(b.center.x, b.top - 20 * zs);
-    return { bounds: b, box: box, corners: corners, gCorners: gCorners, map: map, rotPos: rotPos };
+    // World-space position of the anchor/pivot crosshair engine-bridge.js
+    // already DRAWS (buildTransformBoxItems, "AE-style anchor point") —
+    // mirrors that exact same custom-vs-preset mapping so the hit-test
+    // below always agrees with what's actually rendered.
+    var ap0 = (typeof xformAnchorPoint === 'function') ? xformAnchorPoint(b) : null;
+    var anchorPos = ap0 ? (state.xformAnchorCustom ? ap0.clone() : WP(ap0.x, ap0.y)) : null;
+    return { bounds: b, box: box, corners: corners, gCorners: gCorners, map: map, rotPos: rotPos, anchorPos: anchorPos };
   }
 
   function hitTestHandles(pt) {
     var h = computeHandles();
     if (!h) return null;
     var tol = 9 / view.zoom;
+    // Anchor crosshair — checked FIRST/exclusively: reported "avec alt et
+    // l'outil de sélection il faudrait pouvoir changer le point d'ancrage
+    // de place" was only half-fixed by Alt+click-anywhere (select-bridge.js
+    // onDown below) — the crosshair engine-bridge.js already DRAWS was
+    // never itself a grabbable handle, so there was no way to see it and
+    // drag it directly, only to blind-click elsewhere and check the panel
+    // widget after. A default (center) anchor sits nowhere near a resize
+    // handle so this never shadows them in the common case; when a preset
+    // corner anchor DOES coincide with its own resize handle, grabbing the
+    // anchor is what the user is more likely reaching for right there, so
+    // it wins the tie.
+    if (h.anchorPos) {
+      var dAnchor = pt.getDistance(h.anchorPos);
+      if (dAnchor < tol) return { type: 'anchor' };
+    }
     var bestD = tol, best = null;
     var dRot = pt.getDistance(h.rotPos);
     if (dRot < bestD) { bestD = dRot; best = { type: 'rotate' }; }
@@ -132,6 +153,14 @@
     }
 
     var hh = hitTestHandles(pt);
+    if (hh && hh.type === 'anchor') {
+      // Direct drag of the anchor crosshair — same UI-preference-not-
+      // document-edit reasoning as the Alt+click path a bit further down
+      // (no pushUndo, no ensureKeyframe): only state.xformAnchorCustom
+      // changes, geometry is untouched.
+      mode = 'xform-anchor-drag';
+      return;
+    }
     if (hh) {
       pushUndo();
       var h = computeHandles();
@@ -342,7 +371,13 @@
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
     var pt = new Point(w[0], w[1]);
 
-    if (mode === 'marquee') {
+    if (mode === 'xform-anchor-drag') {
+      // Live-follows the pointer — same custom-anchor field the Alt+click
+      // path sets, so every consumer (rotate/scale pivot math, the panel's
+      // 9-dot widget, the drawn crosshair) picks it up identically.
+      state.xformAnchorCustom = [pt.x, pt.y];
+      if (window.renderXformAnchorGrid) window.renderXformAnchorGrid();
+    } else if (mode === 'marquee') {
       var prevA = project.activeLayer;
       marqueeLayer.activate();
       if (_marquee.lasso) {
@@ -461,6 +496,15 @@
       mode = null; nvIdx = -1; nvStartPt = null;
       // One panel/timeline refresh at gesture end (not per tick — the
       // Transform fields and Motion rows re-read motionStatic/keys).
+      updateUI();
+      window.SMEngineBridge.renderNow();
+      return;
+    }
+    if (mode === 'xform-anchor-drag') {
+      // Nothing in the document changed (state.xformAnchorCustom is a UI
+      // preference, same as the Alt+click path) — just stop dragging.
+      mode = null;
+      window.SMEngineBridge.resume();
       updateUI();
       window.SMEngineBridge.renderNow();
       return;
