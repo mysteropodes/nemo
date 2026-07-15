@@ -977,6 +977,10 @@ function exitToScene(){
   userLayers.forEach(function(l){l.opacity=1;});
   state.activeSymbolId=null;_sceneSnapshot=null;
   activateUL(state.activeLayerIdx);drawStage();loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderSymbolTabs)renderSymbolTabs();
+  // StoryBoard instance-module thumbnails are cached per symbolId — drop
+  // the cache entry for whatever was just edited so the next render
+  // re-rasterizes it instead of showing stale pre-edit content.
+  if(window.SMStoryboard&&window.SMStoryboard.invalidateThumb)SMStoryboard.invalidateThumb(symId);
 }
 function closeSymbolTab(symId){
   if(state.activeSymbolId===symId)exitToScene();

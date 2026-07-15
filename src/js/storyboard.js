@@ -87,6 +87,74 @@
   var THUMB_PXF = 2.4, THUMB_MIN_W = 56;
   function thumbWidth(duration) { return Math.max(THUMB_MIN_W, Math.round(duration * THUMB_PXF)); }
 
+  // ---- real instance thumbnails (replaces the flat colored rect) ----
+  // Rendered via Paper's OWN CPU rasterizer (Layer.rasterize — the exact
+  // technique export.js's exportFrameDataURL already uses for PNG export),
+  // not the vello/WASM engine: a dedicated hidden service layer (own layer,
+  // never exportLayer/ghostAllLayer — CLAUDE.md's "don't share a service
+  // layer across unrelated consumers" lesson) filled via desP from the
+  // symbol's resolved strokes, rasterized small, cached as a dataURL.
+  //
+  // Which frame: frame 0 for a free (unchained) instance — cheap, stable,
+  // no re-render cost while scrubbing/playing. For a CHAINED member, the
+  // trim-IN frame instead (the first frame that will actually play) — more
+  // informative than always frame 0, and only changes when a trim/stretch
+  // gesture ends (already a full render()), never on every playhead tick —
+  // a literal "live playhead frame" thumbnail was considered and rejected:
+  // re-rasterizing per rAF during playback for potentially many chained
+  // members would be real, avoidable jank.
+  var _thumbLayer = null, _thumbCache = {}; // "symbolId:frame" -> dataURL
+  function invalidateThumb(symbolId) {
+    Object.keys(_thumbCache).forEach(function (k) { if (k.indexOf(symbolId + ':') === 0) delete _thumbCache[k]; });
+  }
+  function thumbDataUrl(symbolId, frame) {
+    var key = symbolId + ':' + frame;
+    if (_thumbCache[key]) return _thumbCache[key];
+    var sym = state.symbols[symbolId];
+    if (!sym || !window.project) return null;
+    if (!_thumbLayer) {
+      var prevA = project.activeLayer;
+      _thumbLayer = new Layer({ insert: true });
+      _thumbLayer.visible = false; // rasterize() flips this true only for the instant of the call
+      prevA.activate();
+    }
+    var prev = project.activeLayer;
+    _thumbLayer.activate();
+    _thumbLayer.removeChildren();
+    var strokes = symbolStrokesAt(symbolId, frame);
+    strokes.forEach(function (sd) { desP(sd, _thumbLayer); });
+    var url = null;
+    if (_thumbLayer.children.length) {
+      _thumbLayer.visible = true;
+      // Fit the symbol's own bounds into a small fixed thumbnail canvas —
+      // resolution scaled so the LARGER dimension lands near 96px, capped
+      // low (never above 1) since this is a tiny UI thumbnail, not export.
+      var b = _thumbLayer.bounds;
+      if (b.width > 0 && b.height > 0) {
+        var res = Math.min(1, 96 / Math.max(b.width, b.height));
+        var raster = _thumbLayer.rasterize({ resolution: 72 * res, insert: false });
+        url = raster.canvas.toDataURL('image/png');
+        raster.remove();
+      }
+      _thumbLayer.visible = false;
+    }
+    prev.activate();
+    if (url) _thumbCache[key] = url;
+    return url;
+  }
+  function applyThumb(card, m, sym) {
+    if (!sym) return;
+    var host = chainOf(m);
+    var frame = host ? (m.trimIn || 0) : 0;
+    var url = thumbDataUrl(m.symbolId, frame);
+    if (url) {
+      card.style.backgroundImage = 'url(' + url + ')';
+      card.style.backgroundSize = 'contain';
+      card.style.backgroundRepeat = 'no-repeat';
+      card.style.backgroundPosition = 'center';
+    }
+  }
+
   // ---- DOM ----
   var space = null, world = null;
   function ensureDom() {
@@ -345,7 +413,8 @@
     var sym = state.symbols[m.symbolId];
     var card = document.createElement('div');
     card.className = 'sb-thumb';
-    card.style.background = symbolColor(m.symbolId);
+    card.style.background = symbolColor(m.symbolId); // fallback shown until/unless a real render succeeds
+    applyThumb(card, m, sym);
     el.appendChild(card);
     var side = document.createElement('div');
     side.className = 'sb-side';
@@ -990,5 +1059,7 @@
     montageStrokesAt: montageStrokesAt,
     montageTotal: montageTotal,
     montageById: montageById,
+    invalidateThumb: invalidateThumb,
+    thumbDataUrl: thumbDataUrl, // exposed for debug/tests as well as internal reuse
   };
 })();
