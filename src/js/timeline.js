@@ -357,7 +357,30 @@ window.SM={
     window.SM.setStrokeColor(f);
   },
   setFillBrushSize:function(v){state.fillBrushSize=Math.max(1,parseInt(v)||40);},
-  setBrushPreset:function(v){state.brushPreset=v||'none';},
+  setBrushPreset:function(v){state.brushPreset=v||'none';
+    // Every other Trait field (Width/Color/Cap/Join/Style/Dash…) auto-
+    // applies to the current selection the moment it changes — the vector
+    // Brush preset (dynamic dab texture, "brush dynamique") was the one
+    // exception, silently doing nothing until the separate "Apply to
+    // selection" button got clicked (2026-07-17, "les changement de brush
+    // dynamique ne s'applique pas au stroke de la selection"). Reuses the
+    // exact conversion logic that button already had (strip whatever
+    // texture — vector or bitmap — then re-apply the new preset, so
+    // switching presets or converting a Bitmap Brush stroke to a vector
+    // one both just work), just triggered on every preset pick instead of
+    // requiring a second click.
+    if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){
+      var eligible=selectedPaths.filter(function(p){return p instanceof Path&&!(p.data&&(p.data.isVectorBrush||p.data.isFillShape))&&(p.strokeColor||(p.data&&(p.data.brushTexturePreset||p.data.bitmapBrushSpec)));});
+      if(eligible.length){
+        pushUndo();
+        eligible.forEach(function(p){
+          stripAnyBrushTexture(p);
+          if(state.brushPreset&&state.brushPreset!=='none')applyBrushTexture(p,state.brushPreset);
+        });
+        saveActiveLayerFrame();updateUI();
+      }
+    }
+  },
   setSmoothing:function(v){state.smoothing=v;},setStabilizer:function(v){state.stabilizer=parseInt(v);},
   setStrokeCap:function(v){state.strokeCap=v;
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(!(p.data&&p.data.isVectorBrush))p.strokeCap=v;});saveActiveLayerFrame();}},
