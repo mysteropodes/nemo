@@ -190,8 +190,10 @@
       // the instant that happens, so it must be re-hydrated from
       // state.selectedStrokeIndices (index-based, survives the rebuild
       // since loadFrame() reconstructs children in the same stroke order)
-      // before anything below reads/mutates selectedPaths.
-      ensureKeyframe();
+      // before anything below reads/mutates selectedPaths. Skipped in
+      // Motion mode — same reasoning as the 'move' grab below: this
+      // gesture never touches ld.frames content.
+      if (state.appMode !== 'motion') ensureKeyframe();
       selectedPaths = state.selectedStrokeIndices.map(function (i) { return userLayers[state.activeLayerIdx].children[i]; }).filter(Boolean);
       var h = computeHandles();
       if (hh.type === 'rotate') {
@@ -463,9 +465,13 @@
       // Same ensureKeyframe()+reselect as the scale/rotate grab above (see
       // its comment) — a plain object-body drag needs it just as much: a
       // held frame's move was silently discarded the exact same way.
+      // Skipped in Motion mode: this drag never touches ld.frames content
+      // (only ld.motion, below), so promoting the current frame to a real
+      // keyframe here would be a pure unrelated side effect — same
+      // reasoning as the onUp guards for all three modes.
       if (!moveStarted) {
         pushUndo();
-        ensureKeyframe();
+        if (state.appMode !== 'motion') ensureKeyframe();
         selectedPaths = state.selectedStrokeIndices.map(function (i) { return userLayers[state.activeLayerIdx].children[i]; }).filter(Boolean);
         moveStarted = true;
       }
@@ -475,6 +481,31 @@
       // (inverse rotate + inverse scale) or the drag drifts/overshoots.
       var mvMap = (window.SMMotion && SMMotion.layerMotionPointMap) ? SMMotion.layerMotionPointMap(state.activeLayerIdx) : null;
       if (mvMap) { var dv = mvMap.invVec(delta.x, delta.y); delta = new Point(dv[0], dv[1]); }
+      // Motion mode (2026-07-17, "quand on modifie ces properties dans le
+      // canvas ça ne modifie ou ne créer pas de nouvelle clés" — a real
+      // regression from the transform-box fix a few commits back: making
+      // Select genuinely interceptable in Motion mode meant this drag
+      // handler ran too, but it always mutated raw Paper geometry — Motion
+      // mode's whole point is a KEYFRAMED transform on top of untouched
+      // geometry, so a canvas drag here must write into ld.motion instead,
+      // never touch selectedPaths directly (that would double-move: once
+      // via the written key's rendered motionMat, once via the geometry
+      // edit) and must skip symGestureAccumulate below (that's symMatrix,
+      // a component's PLACEMENT transform — a separate, non-keyframed
+      // mechanism; folding this drag into it too would double-apply for a
+      // converted-in-Motion component). Incremental per-tick add (read the
+      // CURRENT value fresh, add this tick's delta, write back) mirrors the
+      // existing geometry code's own per-tick translate(delta) exactly, so
+      // it needs no separate gesture-start baseline to track.
+      if (state.appMode === 'motion') {
+        var mvLi = state.activeLayerIdx;
+        var mvCur = SMMotion.getLayerValue(mvLi, 'position');
+        SMMotion.setLayerValue(mvLi, 'position', [mvCur[0] + delta.x, mvCur[1] + delta.y]);
+        window._sceneVersion++;
+        lastPt = pt;
+        window.SMEngineBridge.renderNow();
+        return;
+      }
       // translate(delta), not position=position.add(delta) — .position is
       // a bounds-CENTER getter/setter, so a move via .position re-derives
       // bounds on every single tick of the drag (many times per gesture)
@@ -534,6 +565,26 @@
       if (Math.abs(sx) < 0.05) sx = sx < 0 ? -0.05 : 0.05;
       if (Math.abs(sy) < 0.05) sy = sy < 0 ? -0.05 : 0.05;
       var stepSx = sx / xformLastSx, stepSy = sy / xformLastSy;
+      // Motion mode: same reasoning as the 'move' branch above — write the
+      // per-tick scale STEP into ld.motion.scale instead of the raw
+      // geometry. Pivot note: the render transform (computeMotionMat)
+      // always scales around bounds-center + the Motion Anchor Point,
+      // never around whichever corner/custom pivot this handle drag used
+      // — matches AE (a layer's Scale always pivots on its own Anchor
+      // Point; repositioning the pivot means moving the anchor, not
+      // grabbing a different handle), so the magnitude here is right even
+      // though xformAnchor/anchor above isn't the pivot that actually ends
+      // up rendering.
+      if (state.appMode === 'motion') {
+        xformLastSx = sx; xformLastSy = sy;
+        var msLi = state.activeLayerIdx;
+        var msCur = SMMotion.getLayerValue(msLi, 'scale');
+        SMMotion.setLayerValue(msLi, 'scale', [msCur[0] * stepSx, msCur[1] * stepSy]);
+        window._sceneVersion++;
+        lastPt = pt;
+        window.SMEngineBridge.renderNow();
+        return;
+      }
       selectedPaths.forEach(function (p) {
         p.scale(stepSx, stepSy, anchor);
         if (p.data && p.data.isVectorBrush && p.data.centerSegments) {
@@ -569,6 +620,21 @@
       // canvas space.
       if (e.shiftKey) deltaFromStart = Math.round(deltaFromStart / 15) * 15;
       var stepAngle = deltaFromStart - rotLastAngle;
+      // Motion mode: same reasoning as 'move'/'xform-scale' above — the
+      // per-tick angle STEP goes into ld.motion.rotation, raw geometry
+      // untouched. Same pivot note as scale: renders around bounds-center
+      // + Motion Anchor Point regardless of which corner/custom pivot this
+      // particular drag rotated around.
+      if (state.appMode === 'motion') {
+        rotLastAngle = deltaFromStart;
+        var mrLi = state.activeLayerIdx;
+        var mrCur = SMMotion.getLayerValue(mrLi, 'rotation');
+        SMMotion.setLayerValue(mrLi, 'rotation', [mrCur[0] + stepAngle]);
+        window._sceneVersion++;
+        lastPt = pt;
+        window.SMEngineBridge.renderNow();
+        return;
+      }
       selectedPaths.forEach(function (p) {
         p.rotate(stepAngle, rotCenter);
         if (p.data && p.data.isVectorBrush && p.data.centerSegments) {
@@ -614,6 +680,23 @@
       arcDragCache = null;
       generateTweens();
     } else if (mode === 'xform-scale' || mode === 'xform-rotate') {
+      // Motion mode: geometry was never touched during this gesture (see
+      // onMove's early-return) — none of the fork/regenerate/save-frame
+      // work below applies to anything this drag actually changed, and
+      // running it anyway risked corrupting whatever frame the playhead
+      // happened to be sitting on (a tween in-between's re-serialized
+      // content can come back byte-different from what's stored even with
+      // nothing genuinely edited — see saveActiveLayerFrame's
+      // _maybePromoteInterpolated — silently flipping it from a generated
+      // inbetween to a real keyframe as a side effect of an unrelated
+      // Motion drag).
+      if (state.appMode === 'motion') {
+        mode = null;
+        updateUI();
+        window.SMEngineBridge.renderNow();
+        window.SMEngineBridge.resume();
+        return;
+      }
       var xLd = state.layers[state.activeLayerIdx];
       if (xLd && xLd.symbolId) {
         // The persistent symMatrix is already updated (symGestureAccumulate
@@ -681,6 +764,17 @@
     } else if (mode === 'move') {
       var didMove = moveStarted;
       moveStarted = false;
+      // Motion mode: same reasoning as the xform-scale/xform-rotate guard
+      // above — this gesture never touched geometry (onMove's early
+      // return), so re-loading/re-saving frame content here would be pure
+      // unrelated side effect risk, not a no-op.
+      if (state.appMode === 'motion') {
+        mode = null;
+        updateUI();
+        window.SMEngineBridge.renderNow();
+        window.SMEngineBridge.resume();
+        return;
+      }
       var mLd = state.layers[state.activeLayerIdx];
       if (mLd && mLd.symbolId) {
         loadFrame(state.currentFrame);
