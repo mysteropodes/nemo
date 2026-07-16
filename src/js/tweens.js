@@ -1072,8 +1072,18 @@ function generateTweens(){
           if(pr.tex.groupId)sdOut.brushGroupId=pr.tex.groupId;
           var mul=pr.tex.side==='a'?(1-et2):pr.tex.side==='b'?et2:1;
           if(mul>0.02){
+            // +1e-4 (not -1e-4): the live/non-tween equivalent always
+            // inserts the texture ABOVE its anchor (dab.insertAbove(basePath),
+            // tools.js) so it draws OVER the anchor's own fill — a lower
+            // __zKey here sorted the dabs BEHIND the anchor instead, so a
+            // generated tween in-between showed the anchor's fill painted
+            // over its own brush texture. Found live (2026-07, screenshot:
+            // "lors des tween le fill passe devant le stroke avec les brush
+            // bitmap") — same bug affected the vector-dab path here, the
+            // bitmap-raster path just below, and the fading-dabs path
+            // further down (pushFade) — all three fixed together.
             dabRecordsForTween(sdOut,pr.tex.preset,pr.tex.color,sdOut.strokeWidth||3,pr.tex.seed,mul)
-              .forEach(function(dr){dr.__zKey=sdOut.__zKey-1e-4;tw.push(dr);});
+              .forEach(function(dr){dr.__zKey=sdOut.__zKey+1e-4;tw.push(dr);});
           }
         }
         if(pr.bmpTex&&window.SMBitmapBrush){
@@ -1087,7 +1097,7 @@ function generateTweens(){
           if(bmul>0.02){
             var specForFrame={tip:pr.bmpTex.spec.tip,size:pr.bmpTex.spec.size,spacing:pr.bmpTex.spec.spacing,scatter:pr.bmpTex.spec.scatter,opacity:pr.bmpTex.spec.opacity,color:pr.bmpTex.spec.color,seed:pr.bmpTex.seed};
             var brec=SMBitmapBrush.recordForTween(sdOut.segments,sdOut.closed,specForFrame,bmul,pr.bmpTex.groupId);
-            if(brec){brec.__zKey=sdOut.__zKey-1e-4;tw.push(brec);}
+            if(brec){brec.__zKey=sdOut.__zKey+1e-4;tw.push(brec);} // see +1e-4 comment above (vector-dab branch)
           }
         }
         tw.push(sdOut);
@@ -1103,7 +1113,7 @@ function generateTweens(){
         if(c.opacity>0.02)tw.push(c);
         var grp=sd.brushTexturePreset&&sd.brushGroupId&&dabsByGroup[sd.brushGroupId];
         if(grp)grp.forEach(function(d){
-          var dc=JSON.parse(JSON.stringify(d));dc.opacity=(dc.opacity!==undefined?dc.opacity:1)*mul;dc.__zKey=rank-1e-4;
+          var dc=JSON.parse(JSON.stringify(d));dc.opacity=(dc.opacity!==undefined?dc.opacity:1)*mul;dc.__zKey=rank+1e-4; // see +1e-4 comment above (vector-dab branch)
           if(dc.opacity>0.02)tw.push(dc);
         });
       }
