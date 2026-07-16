@@ -1759,6 +1759,12 @@
     onUp: onUp,
     handlePropShortcut: handlePropShortcut,
     revealAnimated: handleRevealAnimatedShortcut,
+    // layer-inout.js's own marquee (which covers the layer bar rows AND the
+    // empty grid space below them) forwards its rectangle here in Motion
+    // mode so keyframes get selected from a drag started ANYWHERE in the
+    // timeline, not only from inside a property track's own cells.
+    marqueeSelect: applyMarqueeSelection,
+    clearKeySelection: function () { setKeySel([]); },
     layerElements: layerElements,
     elementLabel: elementLabel,
     distributeKeys: distributeKeys, flipKeys: flipKeys, selectEveryNthKey: selectEveryNthKey, invertKeySelection: invertKeySelection,

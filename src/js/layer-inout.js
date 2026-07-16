@@ -283,14 +283,26 @@
     var y0 = Math.min(_marquee.startY, e.clientY), y1 = Math.max(_marquee.startY, e.clientY);
     var r = _marquee.rectEl;
     r.style.left = x0 + 'px'; r.style.top = y0 + 'px'; r.style.width = (x1 - x0) + 'px'; r.style.height = (y1 - y0) + 'px';
-    if (_marquee.moved) applyMarqueeSelection(x0, y0, x1, y1);
+    if (_marquee.moved) {
+      applyMarqueeSelection(x0, y0, x1, y1);
+      // Motion mode: the same rectangle ALSO selects property keyframes
+      // ("c'est possible d'avoir le drag de sélection avant de select les
+      // clés à partir de n'importe où dans la timeline") — this marquee is
+      // the one that starts from bar rows and the empty grid space, so
+      // without the forward a key-selection drag only worked when started
+      // inside a property track's own cells (motion.js's own marquee).
+      if (state.appMode === 'motion' && window.SMMotion && SMMotion.marqueeSelect) SMMotion.marqueeSelect(x0, y0, x1, y1);
+    }
   }
   function endMarquee() {
     if (!_marquee) return;
     var moved = _marquee.moved;
     _marquee.rectEl.remove();
     _marquee = null;
-    if (!moved) { clearBarSel(); } // plain click on empty space clears selection
+    if (!moved) {
+      clearBarSel(); // plain click on empty space clears selection
+      if (state.appMode === 'motion' && window.SMMotion && SMMotion.clearKeySelection) { SMMotion.clearKeySelection(); if (window.renderTimeline) renderTimeline(); }
+    }
   }
   function clearBarSel() {
     _barSel = [];
