@@ -1703,6 +1703,39 @@
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initModeSwitch); else initModeSwitch();
 
+  // Motion mode: the key-selection marquee starts from ANYWHERE in the
+  // timeline grid — "je ne peux drag que à partir des lignes où y a des
+  // keyframes... dans le canvas je peux drag à partir de n'importe où".
+  // The full-width layer in/out bars used to swallow the mousedown on
+  // their rows (bar-move drag), and the group/element spacer rows had no
+  // handler at all. Capture-phase interception on #fg-wrap (static
+  // element, never rebuilt) fires BEFORE any descendant's own handler, so
+  // one listener covers every row type at once — except the genuinely
+  // interactive targets that keep their own gesture:
+  //   .fc.motion-fc        — track cells (own key-drag/marquee + goToFrame)
+  //   .layer-inout-handle  — the in/out resize brackets
+  //   .layer-inout-key     — per-key ticks on the bar
+  // Deliberate trade-off: dragging a bar's BODY no longer moves the layer
+  // range while in Motion (the handles still resize it, and Animation 2D
+  // keeps the full bar-move gesture) — same priority call as the canvas,
+  // where drag-anywhere marquee wins over object-move unless you grab an
+  // actual object.
+  function initGridMarquee() {
+    var wrap = document.getElementById('fg-wrap');
+    if (!wrap) return;
+    wrap.addEventListener('mousedown', function (e) {
+      if (state.appMode !== 'motion' || e.button !== 0) return;
+      if (e.target.closest('.fc.motion-fc, .layer-inout-handle, .layer-inout-key')) return;
+      // Scrollbar clicks land on the wrap itself but outside its client
+      // area — intercepting them would break scrollbar dragging.
+      var r = wrap.getBoundingClientRect();
+      if (e.clientX > r.left + wrap.clientWidth || e.clientY > r.top + wrap.clientHeight) return;
+      e.stopPropagation(); e.preventDefault();
+      startMarquee(e);
+    }, true);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initGridMarquee); else initGridMarquee();
+
   window.SMMotion = {
     valueAtFrame: valueAtFrame,
     isAnimated: isAnimated,
