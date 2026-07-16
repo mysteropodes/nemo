@@ -47,4 +47,11 @@
 Cette liste est extraite des info-bulles de l'interface — clic-droit ou survol prolongé d'un
 bouton dans Nemo affiche systématiquement son raccourci s'il en a un.
 
-> ❌ **Pas encore disponible** : personnalisation des raccourcis clavier.
+## Personnaliser les raccourcis d'outils
+
+**Réglages → Raccourcis** permet de réassigner les raccourcis des **outils** listés ci-dessus
+(cliquer une touche affichée, puis appuyer sur la nouvelle) — voir
+[Paramètres de l'application](13-parametres-app.md#raccourcis-clavier-personnalisables).
+
+> ❌ **Pas encore disponible** : réassignation des raccourcis de transport (lecture, undo,
+> sauvegarde…) et import de profils de raccourcis depuis d'autres logiciels.

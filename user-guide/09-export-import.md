@@ -46,5 +46,8 @@ complet sans quitter Nemo.
 - **Import .abr tip…** — pointe de pinceau Photoshop, voir
   [Dessiner](03-dessin.md#textures-de-pinceau).
 - **Open Project…** — fichier `.json` de projet Nemo, voir [Démarrage](01-demarrage.md).
+- **Glisser-déposer** — glisser un fichier audio/vidéo/image directement depuis le Finder sur le
+  canevas ou sur la timeline l'importe par le même chemin que le bouton correspondant (piste
+  audio, référence de rotoscopie…) : aucune différence de résultat, juste un raccourci.
 
 > ❌ **Pas encore disponible** : import SVG/AI/EPS, import PSD, import de spritesheets.

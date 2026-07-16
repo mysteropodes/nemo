@@ -23,6 +23,8 @@ avec inbetweening automatique.
 9. [Exporter et importer un projet](09-export-import.md)
 10. [Raccourcis clavier](10-raccourcis.md)
 11. [Ce qui n'est pas encore disponible](11-limitations-connues.md)
+12. [Travailler à plusieurs — profils, sync équipe, corrections, feedback](12-collaboration-equipe.md)
+13. [Paramètres de l'application — langue, mises à jour, raccourcis, Labs](13-parametres-app.md)
 
 ## À qui s'adresse ce guide
 

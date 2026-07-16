@@ -19,6 +19,14 @@ En bas du panneau "Layers" :
 Chaque calque a une pastille de couleur, un œil (visibilité), un cadenas (verrouillage), et un
 bouton **S** (Solo — isoler ce calque).
 
+### Point d'entrée/sortie du calque
+
+Comme dans After Effects, chaque calque peut avoir sa propre plage de visibilité sur la
+timeline principale : une barre glissable sur la ligne du calque, avec deux poignées de
+redimensionnement à ses extrémités, pour le faire apparaître seulement à partir d'une certaine
+frame et/ou disparaître avant la fin. Sans réglage, un calque couvre toute la durée du projet
+(comportement historique inchangé).
+
 ## Frames et keyframes
 
 Nemo distingue trois types de contenu de frame, avec des raccourcis directs sur la timeline :
@@ -40,6 +48,12 @@ keyframes indépendantes, éditables une par une).
 
 Les frames et plages se glissent-déposent directement sur la timeline pour les réorganiser.
 
+### Zoom de la timeline
+
+**Ctrl+molette** sur la timeline zoome/dézoome la grille de frames ; une barre de défilement
+dédiée en bas permet aussi de zoomer en glissant. Pratique sur un projet long pour alterner
+entre vue d'ensemble et édition frame par frame.
+
 ## Lecture
 
 - **Aller à la première/dernière frame**, **frame précédente/suivante**, **Play/Stop (Entrée)**.
@@ -55,4 +69,5 @@ Les frames et plages se glissent-déposent directement sur la timeline pour les 
 - **Ghost select** — sélectionne le contenu de toutes les keyframes pour les transformer
   ensemble.
 - **Vue de révision** — bascule cycliquement Tout / Mes traits / Corrections — utile en contexte
-  d'équipe pour distinguer qui a dessiné quoi.
+  d'équipe pour distinguer qui a dessiné quoi. Détail du workflow accepter/rejeter une correction
+  dans [Travailler à plusieurs](12-collaboration-equipe.md#vue-de-révision-et-corrections).

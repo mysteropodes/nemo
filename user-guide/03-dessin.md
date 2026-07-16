@@ -54,6 +54,28 @@ Deux systèmes de texture coexistent, à ne pas confondre :
   en parallèle (utiles pour un export qui a besoin de vrais traits vectoriels, comme Rive).
 - **Import .abr tip…** — importer une pointe de pinceau Photoshop (`.abr`) comme tampon bitmap.
 
+Les sélecteurs de preset de brush et de pointe Bitmap Brush s'ouvrent en grille d'aperçus
+dessinés en direct (pas de simple liste de noms) — on voit la texture avant de la choisir.
+
+### Éditeur de pinceau (Nib)
+
+Un panneau dédié — dans l'esprit de l'éditeur de pinceau de SketchBook — expose en curseurs
+tous les paramètres qui construisent un preset de pinceau, avec un aperçu qui utilise le vrai
+moteur de rendu (pas une approximation à part). Modifier un preset **intégré** le duplique
+automatiquement en un nouveau preset personnalisé — les presets intégrés restent inchangés,
+même pour les projets qui les utilisent déjà par leur nom.
+
+## Palettes de couleurs
+
+Le panneau Palette fonctionne comme un gestionnaire de bibliothèques de couleurs (à la manière
+de Shade pour After Effects) :
+
+- Plusieurs **palettes nommées**, accessibles par onglets.
+- Glisser-déposer pour réordonner les couleurs à l'intérieur d'une palette.
+- Cliquer un swatch l'applique au Fond ou au Trait ; échanger Fond↔Trait en un clic.
+- **Remplacer dans le calque** — clic sur la couleur source puis sur la couleur cible pour
+  remplacer une couleur par une autre partout dans le calque actif et sa frame courante.
+
 ## Mode Shadow
 
 Une case à cocher "Shadow" (Pinceau/Plume/Formes) tague ce que vous dessinez comme de l'ombre —

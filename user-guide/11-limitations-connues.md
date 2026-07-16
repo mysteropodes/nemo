@@ -16,14 +16,19 @@ la corrige.
   Calques, seulement une liste plate.
 - **Rigging** — pas de pivots/hiérarchie parent-enfant/sliders pour de l'animation à la
   marionnette.
-- **Préréglages d'interface** et **raccourcis clavier personnalisables**.
+- **Préréglages d'interface**.
 - **Import SVG/AI/EPS**, **import PSD**, **spritesheets** (en import — l'export spritesheet
   n'existe pas non plus).
 - **Partage de bibliothèque de médias entre projets**.
 - **Zoom tactile pinch/rotation à deux doigts**.
+- **Synchro P2P en temps réel** — la gestion des contacts existe (voir
+  [Travailler à plusieurs](12-collaboration-equipe.md#contacts-p2p)), mais le transport réseau
+  qui ferait vraiment collaborer deux personnes en direct sur le même fichier n'est pas branché.
 
 ## Partiel
 
+- **Raccourcis clavier personnalisables** — les raccourcis d'outils sont réassignables
+  (Réglages → Raccourcis), pas encore ceux de transport (lecture, undo, sauvegarde…).
 - **Instances de Component** — vitesse et offset de lecture réglables par instance, mais pas
   encore d'override de couleur ou de forme.
 - **Motion, niveau sous-élément** — entrer dans un calque affiche une sous-ligne par élément,

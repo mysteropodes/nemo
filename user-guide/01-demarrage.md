@@ -37,6 +37,14 @@ Cette sauvegarde automatique est un filet de sécurité, **pas un remplacement**
 manuel (**⌘S**) : pensez à sauvegarder votre fichier `.json` régulièrement, surtout avant de
 fermer le projet ou de changer de version.
 
+## Historique des versions
+
+Le bouton **Historique…** (menu principal) ouvre une liste d'instantanés automatiques du
+projet — un nouveau toutes les 30 secondes, conservés au-delà de la seule dernière session.
+Contrairement à "Resume Last Session" (un seul état, celui juste avant fermeture), l'historique
+permet de remonter à un point précis dans le temps. Restaurer un ancien instantané prend
+d'abord un instantané de l'état actuel, donc l'opération reste elle-même annulable.
+
 ## Ouvrir depuis Kitsu
 
 Pour les studios utilisant [Kitsu](https://kitsu.cg-wire.com/) comme outil de suivi de
