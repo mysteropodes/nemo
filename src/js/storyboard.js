@@ -897,6 +897,20 @@
     sb().modules.push({ id: newId(), type: 'instance', symbolId: symbolId, x: Math.round(x), y: Math.round(y) });
     render();
   }
+  // "Synchroniser l'affichage des éléments dans StoryBoard pour tout
+  // nouveau Component" (2026-07, explicit request) — every state.symbols
+  // entry created from Animation2D/Motion (convertLayerToComponent /
+  // convertLayersToComponent, app.js) gets an instance module here
+  // automatically, so it's immediately visible/placeable in the montage
+  // space instead of only reachable by manually right-clicking "Nouvelle
+  // instance". Staggered default grid position (no natural x/y exists yet
+  // for a symbol nobody has dragged anywhere) — loose enough not to stack
+  // new modules exactly on top of each other or existing ones.
+  function addInstanceAuto(symbolId) {
+    var count = sb().modules.filter(function (m) { return m.type === 'instance'; }).length;
+    var x = 40 + (count % 6) * 140, y = 40 + Math.floor(count / 6) * 160;
+    addInstance(symbolId, x, y);
+  }
   function addMontage(x, y) {
     var s = sb();
     var m = { id: newId(), type: 'montage', name: 'Montage ' + (s.modules.filter(function (x2) { return x2.type === 'montage'; }).length + 1), x: Math.round(x), y: Math.round(y), chain: [], audio: [], playhead: 0 };
@@ -1090,6 +1104,7 @@
     setVisible: setVisible,
     render: render,
     addInstance: addInstance,
+    addInstanceAuto: addInstanceAuto,
     addMontage: addMontage,
     getPreviewLayer: getPreviewLayer,
     updatePreview: updatePreview,

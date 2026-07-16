@@ -901,6 +901,7 @@ function convertLayerToComponent(layerIdx){
   var symId=genSymbolId();
   var symLayer={name:'Layer 1',visible:true,locked:false,frames:JSON.parse(JSON.stringify(ld.frames))};
   state.symbols[symId]={name:ld.name+' (Comp)',totalFrames:state.totalFrames,fps:state.fps,layers:[symLayer]};
+  if(window.SMStoryboard)SMStoryboard.addInstanceAuto(symId);
   // 'once' = play through the component's own full defined duration exactly
   // once, then hold the last frame — no looping. Default per explicit
   // request (a freshly-made component shouldn't loop by default; the old
@@ -933,6 +934,7 @@ function convertLayersToComponent(indices){
       elementMotion:src.elementMotion?JSON.parse(JSON.stringify(src.elementMotion)):undefined};
   });
   state.symbols[symId]={name:'Composant',totalFrames:state.totalFrames,fps:state.fps,layers:symLayers};
+  if(window.SMStoryboard)SMStoryboard.addInstanceAuto(symId);
   var insertAt=indices[0];
   for(var k=indices.length-1;k>=0;k--){state.layers.splice(indices[k],1);userLayers.splice(indices[k],1);}
   var newLd={name:'Composant',symbolId:symId,locked:true,visible:true,symPlayMode:'once',symSpeed:1,symPlacedAt:0,symSingleFrame:0,
