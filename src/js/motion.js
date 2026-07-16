@@ -81,13 +81,6 @@
     renderLayerList(); renderTimeline();
     return true;
   }
-  var PROP_ICON = {
-    position: '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/></svg>',
-    anchor: '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M12 4v4M12 16v4M4 12h4M16 12h4"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/></svg>',
-    rotation: '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v5h-5"/></svg>',
-    scale: '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>',
-    opacity: '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18Z" fill="currentColor" stroke="none"/></svg>',
-  };
 
   // ---- easing math: N-point on-curve-waypoint model, deliberate copy of
   // ui.js's shared curve editor (Catmull-Rom tangents -> per-segment cubic
@@ -939,7 +932,7 @@
         if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
       });
       var pnm = document.createElement('div'); pnm.className = 'lnm motion-prop-name';
-      pnm.innerHTML = PROP_ICON[prop] + '<span>' + PROP_LABEL[prop] + '</span>';
+      pnm.innerHTML = '<span>' + PROP_LABEL[prop] + '</span>';
       pr.appendChild(sw); pr.appendChild(pnm);
       var vals = isAnimated(holder, prop) ? valueAtFrame(holder, prop, state.currentFrame) : staticValue(holder, prop);
       var fieldWrap = document.createElement('div'); fieldWrap.className = 'motion-fields';
