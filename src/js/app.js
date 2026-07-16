@@ -540,7 +540,24 @@ function stripAnyBrushTexture(p){
 // lost the tag marking it as one, same "new tag handled at the write site,
 // forgotten at the read site" bug class CLAUDE.md's family-of-bug-#1
 // documents for exactly this file.
-function serR(r){var d={isRaster:true,src:r.data&&r.data.src?r.data.src:r.source,x:r.position.x,y:r.position.y,width:r.bounds.width,height:r.bounds.height,opacity:r.opacity!==undefined?r.opacity:1};if(r.data&&r.data.isBitmapBrush)d.isBitmapBrush=true;
+function serR(r){
+  // Mid-decode race (bug #9, 2026-07): a Raster built by desR() during a
+  // fast scrub may still be `!r.loaded` when saveAllLayerFrames() serializes
+  // it right back out (goToFrame() saves the frame being LEFT before
+  // navigating). Before place() runs (async, in onLoad), r.position/r.bounds
+  // still hold the pre-resize placeholder geometry — reading them here
+  // produced a spurious x/y/width/height divergence from the stored frame
+  // data, which _maybePromoteInterpolated() then read as a real content
+  // change, permanently flipping an untouched tween in-between to
+  // isKeyframe:true (shown green, "modifié"). desR stashes the INTENDED
+  // geometry on r.data synchronously (before the async gap) precisely so
+  // this fallback has something correct to read meanwhile.
+  var pending=r.data&&r.data._pendingGeom;
+  var useX=(!r.loaded&&pending)?pending.x:r.position.x;
+  var useY=(!r.loaded&&pending)?pending.y:r.position.y;
+  var useW=(!r.loaded&&pending)?pending.width:r.bounds.width;
+  var useH=(!r.loaded&&pending)?pending.height:r.bounds.height;
+  var d={isRaster:true,src:r.data&&r.data.src?r.data.src:r.source,x:useX,y:useY,width:useW,height:useH,opacity:r.opacity!==undefined?r.opacity:1};if(r.data&&r.data.isBitmapBrush)d.isBitmapBrush=true;
   // Companion linkage (v2 anchor+companion architecture, bitmap-brush.js):
   // brushGroupId is how relinkBrushCompanions() regroups this raster with
   // its anchor path after desR/desP rebuild everything fresh on loadFrame —
@@ -558,7 +575,13 @@ function serR(r){var d={isRaster:true,src:r.data&&r.data.src?r.data.src:r.source
 // kept Paper's default natural-pixel dimensions instead of the intended
 // world-space w/h whenever onLoad never fired. Checking `.loaded` first
 // covers both cases.
-function desR(d,layer,op){var prev=project.activeLayer;layer.activate();var r=new Raster(d.src);r.data.src=d.src;if(d.isBitmapBrush)r.data.isBitmapBrush=true;if(d.brushGroupId)r.data.brushGroupId=d.brushGroupId;if(d.isBrushTextureCopy)r.data.isBrushTextureCopy=true;r.position=new Point(d.x,d.y);r.opacity=op!==undefined?op:(d.opacity!==undefined?d.opacity:1);var w=d.width,h=d.height;var place=function(){r.size=new Size(w,h);r.position=new Point(d.x,d.y);};
+function desR(d,layer,op){var prev=project.activeLayer;layer.activate();var r=new Raster(d.src);r.data.src=d.src;if(d.isBitmapBrush)r.data.isBitmapBrush=true;if(d.brushGroupId)r.data.brushGroupId=d.brushGroupId;if(d.isBrushTextureCopy)r.data.isBrushTextureCopy=true;r.position=new Point(d.x,d.y);r.opacity=op!==undefined?op:(d.opacity!==undefined?d.opacity:1);var w=d.width,h=d.height;
+  // serR()'s mid-decode fallback reads this — see its own comment. Cleared
+  // once place() actually applies the real geometry so serR immediately
+  // goes back to trusting live r.position/r.bounds afterward (a post-load
+  // drag/edit must still be captured normally).
+  r.data._pendingGeom={x:d.x,y:d.y,width:w,height:h};
+  var place=function(){r.size=new Size(w,h);r.position=new Point(d.x,d.y);r.data._pendingGeom=null;};
   if(r.loaded)place();
   else r.onLoad=function(){
     place();
