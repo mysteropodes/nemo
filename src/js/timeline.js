@@ -137,6 +137,78 @@ function selBounds(){
   return{minL:minL,maxL:maxL,minF:minF,maxF:maxF};
 }
 
+// ---- Tween-span retiming (2026-07-17, "pour des keyframes tween, les
+// keyframe clé A et B, on doit pouvoir les retimer et cela retime les
+// tween et ne laisse des clé ni derrière A, ni devant B") ----
+// moveFrames/moveKeyframe only relocate the KEY cells — the generated
+// in-between (isInterpolated) frames sat untouched at their old
+// positions, so shortening a span left stale tween frames beyond the
+// moved key (the reported orphans), and lengthening left a dead gap.
+// captureTweenInbetweens snapshots each pair's in-betweens BEFORE any
+// frame mutation; retimeTweenSpans then clears every stale in-between
+// across each moved pair's old+new union span and re-lays the captured
+// sequence onto the new span by nearest-normalized-position resampling —
+// the drawings themselves are reused (no re-run of the tween engine, so
+// hand-corrected inbetweens keep their content and isManualEdit flag),
+// only their timing stretches/squashes.
+function captureTweenInbetweens(li,kfs){
+  var ld=state.layers[li],out={};if(!ld)return out;
+  for(var i=0;i<kfs.length-1;i++){
+    var fA=kfs[i],fB=kfs[i+1],list=[];
+    for(var f=fA+1;f<fB;f++){
+      var fr=ld.frames[f];
+      if(fr&&fr.isInterpolated)list.push({frame:f,content:JSON.parse(JSON.stringify(fr))});
+    }
+    if(list.length)out[fA+':'+fB]=list;
+  }
+  return out;
+}
+function retimeTweenSpans(li,pairs,captured){
+  var ld=state.layers[li];if(!ld)return;
+  var todo=[];
+  pairs.forEach(function(pr){
+    if(pr.newFA===pr.fA&&pr.newFB===pr.fB)return;
+    var list=captured[pr.fA+':'+pr.fB];if(!list||!list.length)return;
+    if(pr.newFB-pr.newFA<1)return; // collapsed/reversed span — nothing to lay the sequence onto
+    // another keyframe strictly inside the new span (the key was dragged
+    // past a neighbor): stretching this pair's tweens through it would be
+    // nonsense — leave that pair alone entirely.
+    for(var f=pr.newFA+1;f<pr.newFB;f++)if(ld.frames[f]&&ld.frames[f].isKeyframe)return;
+    todo.push({pr:pr,list:list});
+  });
+  // Phase 1 — clear ALL stale in-betweens first, across each pair's
+  // old+new union, THEN write (phase 2): with a shared key between two
+  // pairs, one pair's union overlaps the neighbor's new span, and a
+  // clear running after that neighbor's write would blank frames it
+  // just laid down.
+  todo.forEach(function(item){
+    var lo=Math.min(item.pr.fA,item.pr.newFA),hi=Math.max(item.pr.fB,item.pr.newFB);
+    for(var f=Math.max(0,lo+1);f<Math.min(state.totalFrames,hi);f++){
+      var fr=ld.frames[f];
+      if(fr&&fr.isInterpolated)ld.frames[f]={strokes:[],isKeyframe:false,isInterpolated:false};
+    }
+  });
+  // Phase 2 — each captured in-between lands at its PROPORTIONAL position
+  // in the new span (one write per original frame, not one per new-span
+  // slot: a sparse pair — say one lone in-between over a long hold —
+  // must stay sparse, not densify into a copy on every frame; found live
+  // on the first version of this function). Squashing collapses
+  // colliding frames onto one slot (later wins); stretching leaves hold
+  // gaps between them — same semantics as retiming drawings in Animate.
+  todo.forEach(function(item){
+    var pr=item.pr,list=item.list;
+    list.forEach(function(ib){
+      var ot=(ib.frame-pr.fA)/(pr.fB-pr.fA);
+      var nf=Math.round(pr.newFA+ot*(pr.newFB-pr.newFA));
+      if(nf<=pr.newFA)nf=pr.newFA+1;
+      if(nf>=pr.newFB)nf=pr.newFB-1;
+      if(nf<0||nf>=state.totalFrames)return;
+      if(ld.frames[nf].isKeyframe)return; // never clobber a real key
+      ld.frames[nf]=JSON.parse(JSON.stringify(ib.content));
+    });
+  });
+}
+
 // ---- API ----
 var PRODUCER_ALLOWED_TOOLS=['hand','zoom','rotate','comment'];
 window.SM={
@@ -480,10 +552,13 @@ window.SM={
       movedFrameMap[s.layer+':'+s.frame]=tf;
     });
     var touchedLayers={};sel.forEach(function(s){touchedLayers[s.layer]=true;});
-    var beforeKeyframes={};
+    var beforeKeyframes={},capturedInbetweens={};
     Object.keys(touchedLayers).forEach(function(lk){
       var li=parseInt(lk,10),ld=state.layers[li];if(!ld)return;
       beforeKeyframes[li]=ld.frames.map(function(f,fi){return f.isKeyframe?fi:null;}).filter(function(x){return x!==null;});
+      // Snapshot each pair's in-betweens BEFORE the blanking/write below —
+      // a moved key can land ON one of them (see retimeTweenSpans).
+      capturedInbetweens[li]=captureTweenInbetweens(li,beforeKeyframes[li]);
     });
     sel.forEach(function(s){
       var ld=state.layers[s.layer];if(!ld)return;
@@ -496,12 +571,15 @@ window.SM={
     });
     Object.keys(beforeKeyframes).forEach(function(lk){
       var li=parseInt(lk,10),kfs=beforeKeyframes[li];
+      var pairs=[];
       for(var i=0;i<kfs.length-1;i++){
         var fA=kfs[i],fB=kfs[i+1];
         var newFA=movedFrameMap[li+':'+fA];newFA=(newFA!==undefined)?newFA:fA;
         var newFB=movedFrameMap[li+':'+fB];newFB=(newFB!==undefined)?newFB:fB;
         rekeyTweenPairData(fA,fB,newFA,newFB);
+        pairs.push({fA:fA,fB:fB,newFA:newFA,newFB:newFB});
       }
+      retimeTweenSpans(li,pairs,capturedInbetweens[li]||{});
     });
     _sel.frames=[];
     data.forEach(function(d){
@@ -594,14 +672,18 @@ window.SM={
     var src=ld.frames[fromFrame];if(!src||!src.isKeyframe)return false;
     pushUndo();saveAllLayerFrames();
     var beforeKfs=ld.frames.map(function(f,fi){return f.isKeyframe?fi:null;}).filter(function(x){return x!==null;});
+    var capturedIb=captureTweenInbetweens(layerIdx,beforeKfs);
     ld.frames[toFrame]={strokes:src.strokes,isKeyframe:true,isInterpolated:false};
     ld.frames[fromFrame]={strokes:[],isKeyframe:false,isInterpolated:false};
+    var mkPairs=[];
     for(var i=0;i<beforeKfs.length-1;i++){
       var fA=beforeKfs[i],fB=beforeKfs[i+1];
       var newFA=fA===fromFrame?toFrame:fA;
       var newFB=fB===fromFrame?toFrame:fB;
       rekeyTweenPairData(fA,fB,newFA,newFB);
+      mkPairs.push({fA:fA,fB:fB,newFA:newFA,newFB:newFB});
     }
+    retimeTweenSpans(layerIdx,mkPairs,capturedIb);
     loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast('Keyframe déplacée → '+(toFrame+1));
     return true;
   },
