@@ -1195,24 +1195,25 @@ function _normStrokeForCompare(sd){
   // strokeColor when absent, so this isn't seen as a real content change.
   n.hasRealStroke=n.hasRealStroke!==undefined?n.hasRealStroke:!!n.strokeColor;
   // isRaster width/height round-trip through Paper.js's Raster.size setter,
-  // which SNAPS to the nearest whole pixel internally (a bitmap can't have
-  // fractional-pixel backing-store dimensions) — confirmed live: feeding it
-  // 616.2382718304713 reads back as exactly 616 via r.bounds.width, every
-  // single time, deterministically, not a timing artifact. A bitmap-brush
-  // tween in-between's stored width/height comes straight out of
-  // interpStroke()'s float lerp (tweens.js) and essentially NEVER lands on
-  // a whole number, so the very first desR()->serR() round-trip (i.e. the
-  // first time the frame is merely navigated away from) always disagreed
-  // with the stored value by a sub-pixel amount — past _numClose()'s 1e-6
-  // tolerance, so _maybePromoteInterpolated() read it as real content and
-  // flipped the frame to a manually-edited keyframe on every single scrub.
-  // Round BOTH sides to the same whole-pixel precision Paper.js actually
-  // renders at so this inherent precision ceiling stops being mistaken for
-  // an edit. r.position (x/y) was checked too and is NOT snapped this way
-  // (sub-micron float noise only, already well inside tolerance).
+  // which snaps to whole pixels internally (a bitmap can't have fractional
+  // backing-store dimensions) — and it FLOORS, never rounds: measured live
+  // on this exact build, 496.6→496, 497.5→497, 100.9→100, systematically.
+  // A bitmap-brush tween in-between's stored width/height comes straight
+  // out of interpStroke()'s float lerp (tweens.js) and essentially never
+  // lands on a whole number, so the very first desR()->serR() round-trip
+  // (= merely scrubbing past the frame) always disagreed with the stored
+  // value — past _numClose()'s 1e-6 tolerance — and
+  // _maybePromoteInterpolated() flipped the untouched frame to a
+  // manually-edited keyframe. First fix here used Math.round and STILL
+  // promoted (caught live by the user, repro: continuous playhead DRAG on
+  // the frame header, not cell-by-cell clicks): any stored fraction ≥ .5
+  // (round 496.6→497) disagrees with Paper's floor (→496) by a full pixel.
+  // Floor BOTH sides — same snap Paper actually applies — so the inherent
+  // precision ceiling can never read as an edit. r.position (x/y) is NOT
+  // snapped this way (float noise only, well inside tolerance).
   if(n.isRaster){
-    if(typeof n.width==='number')n.width=Math.round(n.width);
-    if(typeof n.height==='number')n.height=Math.round(n.height);
+    if(typeof n.width==='number')n.width=Math.floor(n.width);
+    if(typeof n.height==='number')n.height=Math.floor(n.height);
   }
   return n;
 }
