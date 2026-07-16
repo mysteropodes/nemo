@@ -939,6 +939,18 @@ pub async fn create_engine(
     width: u32,
     height: u32,
 ) -> Result<VelloEngine, JsValue> {
+    // Route vello's internal `log` lines to the browser console — added
+    // while chasing the "texture bitmap disparaît au scrub" report
+    // (2026-07-17; turned out to be the async-decode race fixed in desR,
+    // app.js) and KEPT at Warn level: vello only logs at Warn for
+    // genuinely abnormal conditions (e.g. render.rs's "Trying to paint
+    // too large image" coarse-buffer overflow), which used to vanish
+    // silently — the exact kind of signal that made that bug hunt blind.
+    // Bump to Level::Debug locally to also see every image-atlas action
+    // (Created/Resized/Reused, upload/eviction counts). Init can only run
+    // once per wasm module; ignore the error if a second engine is ever
+    // created.
+    let _ = console_log::init_with_level(log::Level::Warn);
     let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
         backends: wgpu::Backends::BROWSER_WEBGPU,
         ..wgpu::InstanceDescriptor::new_without_display_handle()

@@ -25,6 +25,14 @@ geo-booleanop = "0.3"
 # spec/version drift between wgpu 22 (mid-2024) and a much newer browser.
 # 0.9 (wgpu 29) matches the current spec cleanly.
 vello = "0.9"
+# vello reports abnormal render conditions (image-atlas actions, coarse-
+# buffer overflow warnings like render.rs's "Trying to paint too large
+# image") only through the `log` crate — without a logger they vanish
+# silently, which made the 2026-07 "texture bitmap disparaît" hunt blind.
+# console_log routes them to the browser console (Warn level in
+# create_engine; bump to Debug locally for per-frame atlas tracing).
+log = "0.4"
+console_log = "1"
 wasm-bindgen-futures = "0.4"
 # Tiny oneshot channel used to await wgpu's callback-style buffer map_async
 # from an async wasm export (GPU->CPU pixel readback for the export pipeline).
