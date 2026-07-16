@@ -521,6 +521,16 @@ window.SM={
     // here has to explicitly leave it, or its guides/highlight stay stuck
     // on screen with no layer row left looking selected (feedback #5wrip).
     if(state.tool==='camera')window.SM.setTool('select');
+    // Motion mode (2026-07-17, "on ne voit pas la box de transformation à
+    // la selection d'un calque dans motion") : picking a layer row there
+    // almost never happens with the Select tool already active (Motion's
+    // own workflow is click-a-layer-row, not pick-a-tool-first) — same
+    // camera-row precedent just above, forced here too. Without this, the
+    // selection-population block below silently no-op'd (gated on
+    // Select/Subselect) AND buildTransformBoxItems (engine-bridge.js)
+    // hides the box for any other tool, so Motion's layer click looked
+    // completely inert on canvas even though activeLayerIdx did change.
+    if(state.appMode==='motion'&&state.tool!=='select'&&state.tool!=='subselect')window.SM.setTool('select');
     // Selecting a layer shows the selection of ALL its elements on canvas
     // (2026-07-17, "quand on select un calque on voit la selection dans le
     // canvas de tous ces éléments") — clearSel() above used to leave the

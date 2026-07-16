@@ -759,7 +759,17 @@
         _propFilter = null; // fresh "show all" every time the expanded layer changes
         window._motionExpandedElement = null;
         setKeySel([]);
-        state.activeLayerIdx = li;
+        // window.SM.setActiveLayer(li), not a raw state.activeLayerIdx=li —
+        // found live (2026-07-17, "on ne voit pas la box de transformation
+        // à la selection d'un calque dans motion") : this row set the index
+        // directly, bypassing setActiveLayer entirely — its "force Select
+        // tool + populate selectedPaths with the layer's content" fix
+        // (same commit) never ran for Motion's own layer rows, only
+        // Animation 2D's, so clicking a layer here left state.tool at
+        // whatever it was (almost never 'select') and selectedPaths empty
+        // — buildTransformBoxItems (engine-bridge.js) requires BOTH to
+        // show anything, so the box just never appeared.
+        window.SM.setActiveLayer(li);
         renderLayerList(); renderTimeline();
         if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
       });
