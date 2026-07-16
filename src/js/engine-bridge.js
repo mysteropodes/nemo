@@ -207,6 +207,23 @@
       // Pivot = auto bounds center + the layer's Anchor Point offset
       // (motionMat.ax/ay) — see motion.js's layerMotionAt header comment.
       var motionPivot = motionMat ? { x: userLayers[i].bounds.center.x + motionMat.ax, y: userLayers[i].bounds.center.y + motionMat.ay } : null;
+      // Brush-texture companions (isBrushTextureCopy — bitmap raster or
+      // vector dab group) don't get their own Elements row in Motion
+      // (motion.js's layerElements folds them into their anchor's, "merge
+      // trait et fond quand ils font partie d'une même shape") — so at
+      // render time their per-element Motion transform must resolve
+      // through the ANCHOR's strokeId, not their own (which the companion
+      // may not even have, having never been individually keyed). One
+      // pass over children building brushGroupId -> anchor strokeId,
+      // reused below instead of a lookup per companion.
+      var brushAnchorStrokeId = null;
+      for (var bi = 0; bi < children.length; bi++) {
+        var bc = children[bi];
+        if (bc.data && bc.data.brushGroupId && !bc.data.isBrushTextureCopy && bc.data.strokeId) {
+          if (!brushAnchorStrokeId) brushAnchorStrokeId = {};
+          brushAnchorStrokeId[bc.data.brushGroupId] = bc.data.strokeId;
+        }
+      }
       // EXPERIMENTAL (native-video-decode branch): a natively-decoded video
       // layer has NO Paper children — its picture is one image item under a
       // per-layer fixed id ('nv:<i>'), pixels pushed by native-video-bridge's
@@ -252,7 +269,8 @@
         // around this item's OWN bounds (never the whole layer's), matching
         // AE's shape-group-inside-a-layer composition. null in the common
         // case (this item has no per-element motion of its own).
-        var elMat = (window.SMMotion && c.data && c.data.strokeId) ? SMMotion.elementMotionAt(i, c.data.strokeId, state.currentFrame) : null;
+        var cStrokeId = c.data && ((c.data.isBrushTextureCopy && brushAnchorStrokeId && brushAnchorStrokeId[c.data.brushGroupId]) || c.data.strokeId);
+        var elMat = (window.SMMotion && cStrokeId) ? SMMotion.elementMotionAt(i, cStrokeId, state.currentFrame) : null;
         var elPivot = elMat ? { x: c.bounds.center.x + elMat.ax, y: c.bounds.center.y + elMat.ay } : null;
         if (c instanceof Raster) {
           var imageId = registerRasterIfNeeded(c);
