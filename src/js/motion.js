@@ -898,17 +898,43 @@
       var pr = document.createElement('div'); pr.className = 'lrow motion-prop-row';
       var sw = document.createElement('div');
       var swOn = isAnimated(holder, prop);
+      var hasKeyHere = swOn && !!keyAt(holder.motion[prop], state.currentFrame);
+      // Single diamond, three states — merges what used to be two separate
+      // icons (this stopwatch AND a second .motion-addkey diamond appended
+      // after the value fields further down): they always showed the exact
+      // same on/off information twice on the same row, reported as a visual
+      // duplicate ("supprimé la 2e keyframe qui apparait, ça fait doublon").
+      // Not animated at all: hollow, neutral (--text-dark, no .on class).
+      // Animated but no key at the current frame: hollow with the BLUE
+      // outline (.on gives color:accent to the SVG's currentColor stroke,
+      // fill stays none) — signals "this property IS keyframed, just not
+      // right here", the one state the old single stopwatch icon couldn't
+      // show on its own. Animated AND a key sits exactly here: solid blue
+      // fill, same as before.
       sw.className = 'lico motion-stopwatch' + (swOn ? ' on' : '');
-      sw.title = swOn ? 'Désactiver l’animation (fige la valeur actuelle)' : 'Activer l’animation de cette propriété';
-      // Filled/hollow keyframe diamond instead of a clock icon (2026-07,
-      // "remplace le chronomètre par des keyframe pleine ou vide c'est plus
-      // élégant") — same on/off semantics as before (this row still IS the
-      // animate toggle, distinct from .motion-addkey's per-frame diamond a
-      // few lines down), just a diamond matching that other icon's shape
-      // instead of a stopwatch glyph: filled=animated, hollow outline=static.
-      sw.innerHTML = '<svg viewBox="0 0 24 24" width="12" height="12"><path d="M12 3l9 9-9 9-9-9z" fill="' + (swOn ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2"/></svg>';
+      sw.title = !swOn ? 'Activer l’animation de cette propriété' : (hasKeyHere ? 'Retirer la clé à la frame courante' : 'Ajouter une clé à la frame courante');
+      sw.innerHTML = '<svg viewBox="0 0 24 24" width="12" height="12"><path d="M12 3l9 9-9 9-9-9z" fill="' + (hasKeyHere ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2"/></svg>';
       sw.addEventListener('click', function (e) {
-        e.stopPropagation(); pushUndo(); toggleAnimated(holder, prop);
+        e.stopPropagation(); pushUndo();
+        if (!swOn) {
+          toggleAnimated(holder, prop); // OFF->ON: first key at the current frame (see toggleAnimated's own comment)
+        } else if (hasKeyHere) {
+          // Removing the LAST key would drop the property back to its
+          // neutral default — freeze the current value as a static
+          // override instead, exactly like toggleAnimated's own ON->OFF
+          // branch ("switching modes must never silently snap a layer
+          // back to its neutral default", its header comment).
+          if (holder.motion[prop].keys.length === 1) {
+            var fv = valueAtFrame(holder, prop, state.currentFrame);
+            holder.motion[prop] = { keys: [] };
+            if (!holder.motionStatic) holder.motionStatic = {};
+            holder.motionStatic[prop] = fv;
+          } else {
+            removeKeyAtCurrentFrame(holder, prop);
+          }
+        } else {
+          setKeyAtCurrentFrame(holder, prop, valueAtFrame(holder, prop, state.currentFrame));
+        }
         renderLayerList(); renderTimeline();
         if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
       });
@@ -939,45 +965,6 @@
       var unit = document.createElement('span'); unit.className = 'motion-unit'; unit.textContent = PROP_UNIT[prop];
       fieldWrap.appendChild(unit);
       pr.appendChild(fieldWrap);
-      // AE-style keyframe diamond ("possibilité d'ajouter des keyframes
-      // dans le panel de droite", 2026-07 — added HERE in the shared row
-      // builder so the bottom Transform group gets it too, not just the
-      // new right-panel section): only rendered once the property is
-      // animated (stopwatch on — before that, the stopwatch itself IS the
-      // add-first-key action, matching AE where the navigator diamond
-      // only exists on keyframed properties). Filled/highlighted when a
-      // key sits exactly at the current frame; click toggles — add a key
-      // at the current interpolated value, or remove the one that's here.
-      if (isAnimated(holder, prop)) {
-        var hasKeyHere = !!keyAt(holder.motion[prop], state.currentFrame);
-        var dia = document.createElement('div');
-        dia.className = 'lico motion-addkey' + (hasKeyHere ? ' on' : '');
-        dia.title = hasKeyHere ? 'Retirer la clé à la frame courante' : 'Ajouter une clé à la frame courante';
-        dia.innerHTML = '<svg viewBox="0 0 24 24" width="11" height="11"><path d="M12 3l9 9-9 9-9-9z" fill="' + (hasKeyHere ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2"/></svg>';
-        dia.addEventListener('click', function (e) {
-          e.stopPropagation(); pushUndo();
-          if (keyAt(holder.motion[prop], state.currentFrame)) {
-            // Removing the LAST key would drop the property back to its
-            // neutral default — freeze the current value as a static
-            // override instead, exactly like toggleAnimated's own ON→OFF
-            // branch ("switching modes must never silently snap a layer
-            // back to its neutral default", its header comment).
-            if (holder.motion[prop].keys.length === 1) {
-              var fv = valueAtFrame(holder, prop, state.currentFrame);
-              holder.motion[prop] = { keys: [] };
-              if (!holder.motionStatic) holder.motionStatic = {};
-              holder.motionStatic[prop] = fv;
-            } else {
-              removeKeyAtCurrentFrame(holder, prop);
-            }
-          } else {
-            setKeyAtCurrentFrame(holder, prop, valueAtFrame(holder, prop, state.currentFrame));
-          }
-          renderLayerList(); renderTimeline();
-          if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
-        });
-        pr.appendChild(dia);
-      }
       list.appendChild(pr);
     });
   }
@@ -992,6 +979,19 @@
     var strokes = getEffectiveStrokes(li, state.currentFrame) || [];
     var out = [];
     strokes.forEach(function (sd, i) {
+      // A brush-texture companion (bitmap raster or vector dab group, both
+      // tagged isBrushTextureCopy + a brushGroupId shared with their
+      // anchor) is the SAME visual shape as its anchor, not a separate
+      // one — reported live (2026-07, screenshot showing a "Forme 1" +
+      // "Image 2" pair for one hand-drawn stroke): listing it as its own
+      // Elements row let you key it independently of the anchor it's
+      // camouflage-glued to, which just desyncs the texture from the
+      // shape the moment either one alone gets animated. Folded out here;
+      // engine-bridge.js's buildSceneJson resolves the companion's
+      // element-motion through its ANCHOR's strokeId instead of its own,
+      // so animating "the shape" (the one row left) carries the texture
+      // along automatically.
+      if (sd.isBrushTextureCopy) return;
       // Lazily stamp a strokeId onto legacy stroke data that predates this
       // feature (or fillWalls/team-review, the other lazy-assign consumers)
       // — getEffectiveStrokes returns the LIVE array reference for a real

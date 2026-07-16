@@ -423,15 +423,14 @@ body.mac-overlay-titlebar #app{padding-top:28px;}
 .motion-elem-row:hover{background:rgba(255,255,255,.03);}
 .motion-elem-swatch{width:12px;height:12px;border-radius:3px;border:1px solid rgba(255,255,255,.25);flex-shrink:0;}
 .motion-elem-swatch.has-motion{box-shadow:0 0 0 1.5px var(--accent);}
+/* Single diamond per property row, three states (2026-07 — merged with what
+   used to be a second, redundant .motion-addkey diamond further along the
+   same row): neutral/hollow when unanimated, accent-outline hollow when
+   animated but no key at the current frame, accent-filled when a key sits
+   right here (fill vs stroke decided by motion.js's inline SVG markup). */
 .motion-stopwatch{color:var(--text-dark);cursor:pointer;}
 .motion-stopwatch:hover{background:var(--panel3);color:var(--text);}
 .motion-stopwatch.on{color:var(--accent);}
-/* AE-style keyframe diamond on each animated property row (shared row
-   builder, so it shows in BOTH the bottom Transform group and the right
-   panel's mirror) — filled/accent when a key sits at the current frame. */
-.motion-addkey{color:var(--text-dark);cursor:pointer;flex-shrink:0;}
-.motion-addkey:hover{background:var(--panel3);color:var(--text);}
-.motion-addkey.on{color:var(--accent);}
 /* Right-panel "Propriétés du calque" section (motion.js
    renderMotionPropsPanel) — Motion mode only; the rows inside reuse the
    global .lrow/.motion-prop-row styles, which aren't scoped to
