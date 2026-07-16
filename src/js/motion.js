@@ -1395,18 +1395,27 @@
     });
     setKeySel(sel); // also refreshes the selection box (updateKeySelectionBox below)
   }
-  // ---- visible selection box + drag handle (2026-07) ----
-  // Feedback: the hidden Alt+drag-any-diamond stagger gesture (added first)
-  // wasn't discoverable — "j'arrive pas à reproduire... normalement y a une
-  // box qui se forme à la sélection des keyframes pour pouvoir distribuer".
-  // A real bounding box now wraps every selected diamond (2+ keys, spanning
-  // however many tracks/layers), with one handle at its top-center — grab
-  // and drag the HANDLE to stagger, no modifier key required. Alt+drag on a
-  // diamond (added earlier) still works too, kept as a keyboard-only
-  // alternative once you already know the shortcut.
-  var _keySelBoxEl = null, _keySelHandleEl = null;
+  // ---- visible selection box + drag edges (2026-07) ----
+  // Feedback history on this ONE feature: first, the hidden Alt+drag-any-
+  // diamond gesture wasn't discoverable at all ("j'arrive pas à
+  // reproduire..."). Then a small centered handle was added — still wrong:
+  // "ça agit pas du tout pareil dans le gif j'ai juste à glisser la box qui
+  // entoure peu importe où je suis et le haut et le bas de cette box pour
+  // stagger". The reference lets you grab ANYWHERE along the box's top OR
+  // bottom edge, not one small pinpoint target. addStaggerEdges (below)
+  // builds two full-width edge strips instead of a centered pill.
+  function addStaggerEdges(boxEl, onStart) {
+    ['top', 'bottom'].forEach(function (pos) {
+      var edge = document.createElement('div');
+      edge.className = 'motion-keysel-edge motion-keysel-edge-' + pos;
+      edge.title = 'Glisser (n\'importe où sur cette bordure) pour échelonner';
+      edge.addEventListener('mousedown', function (e) { e.stopPropagation(); e.preventDefault(); onStart(e); });
+      boxEl.appendChild(edge);
+    });
+  }
+  var _keySelBoxEl = null;
   function removeKeySelectionBox() {
-    if (_keySelBoxEl) { _keySelBoxEl.remove(); _keySelBoxEl = null; _keySelHandleEl = null; }
+    if (_keySelBoxEl) { _keySelBoxEl.remove(); _keySelBoxEl = null; }
   }
   function updateKeySelectionBox() {
     // A direct multi-layer selection (see below) takes priority — no point
@@ -1423,12 +1432,8 @@
     });
     if (!_keySelBoxEl) {
       _keySelBoxEl = document.createElement('div'); _keySelBoxEl.className = 'motion-keysel-box';
-      _keySelHandleEl = document.createElement('div'); _keySelHandleEl.className = 'motion-keysel-handle';
-      _keySelHandleEl.title = 'Glisser pour échelonner (stagger) — Alt+glisser une clé fait pareil';
-      _keySelBoxEl.appendChild(_keySelHandleEl);
       document.body.appendChild(_keySelBoxEl);
-      _keySelHandleEl.addEventListener('mousedown', function (e) {
-        e.stopPropagation(); e.preventDefault();
+      addStaggerEdges(_keySelBoxEl, function (e) {
         var holderOrder = [];
         _motionKeySel.forEach(function (s) { if (holderOrder.indexOf(s.holder) < 0) holderOrder.push(s.holder); });
         if (holderOrder.length < 2) { if (window.showToast) showToast('Sélectionne des clés sur 2 calques/éléments ou plus pour échelonner'); return; }
@@ -1447,9 +1452,16 @@
   // handle then staggers EVERY animated property's EVERY key for each
   // selected layer together (not just one property/track), matching the
   // reference where a layer's whole keyframe set shifts as one block.
-  var _layerStaggerBoxEl = null, _layerStaggerHandleEl = null;
+  var _layerStaggerBoxEl = null;
   function removeLayerStaggerBox() {
-    if (_layerStaggerBoxEl) { _layerStaggerBoxEl.remove(); _layerStaggerBoxEl = null; _layerStaggerHandleEl = null; }
+    if (_layerStaggerBoxEl) { _layerStaggerBoxEl.remove(); _layerStaggerBoxEl = null; }
+  }
+  function startLayerStaggerDrag(e) {
+    var order = _layerSel.slice().sort(function (a, b) { return a - b; });
+    var holders = order.map(function (li) { return state.layers[li]; }).filter(Boolean);
+    if (holders.length < 2) return;
+    pushUndo();
+    window._motionLayerStaggerDrag = { startX: e.clientX, holders: holders };
   }
   function updateLayerStaggerBox() {
     if (state.appMode !== 'motion' || _layerSel.length < 2) { removeLayerStaggerBox(); return; }
@@ -1458,25 +1470,18 @@
     var gridEl = document.getElementById('frame-grid'); if (!gridEl) { removeLayerStaggerBox(); return; }
     var y0 = Infinity, y1 = -Infinity;
     spacers.forEach(function (s) { var b = s.getBoundingClientRect(); y0 = Math.min(y0, b.top); y1 = Math.max(y1, b.bottom); });
+    // Full grid width, not just a one-frame-wide sliver at the playhead —
+    // "j'ai juste à glisser la box... peu importe où je suis" — the whole
+    // top/bottom edge (addStaggerEdges) needs a genuinely wide box to grab
+    // along, not a narrow strip that's itself hard to land on.
     var gb = gridEl.getBoundingClientRect();
-    var x = gb.left + state.currentFrame * FC - gridEl.scrollLeft;
     if (!_layerStaggerBoxEl) {
       _layerStaggerBoxEl = document.createElement('div'); _layerStaggerBoxEl.className = 'motion-keysel-box';
-      _layerStaggerHandleEl = document.createElement('div'); _layerStaggerHandleEl.className = 'motion-keysel-handle';
-      _layerStaggerHandleEl.title = 'Glisser pour échelonner tous les calques sélectionnés';
-      _layerStaggerBoxEl.appendChild(_layerStaggerHandleEl);
       document.body.appendChild(_layerStaggerBoxEl);
-      _layerStaggerHandleEl.addEventListener('mousedown', function (e) {
-        e.stopPropagation(); e.preventDefault();
-        var order = _layerSel.slice().sort(function (a, b) { return a - b; });
-        var holders = order.map(function (li) { return state.layers[li]; }).filter(Boolean);
-        if (holders.length < 2) return;
-        pushUndo();
-        window._motionLayerStaggerDrag = { startX: e.clientX, holders: holders };
-      });
+      addStaggerEdges(_layerStaggerBoxEl, startLayerStaggerDrag);
     }
-    _layerStaggerBoxEl.style.left = x + 'px'; _layerStaggerBoxEl.style.top = y0 + 'px';
-    _layerStaggerBoxEl.style.width = Math.max(6, FC) + 'px'; _layerStaggerBoxEl.style.height = (y1 - y0) + 'px';
+    _layerStaggerBoxEl.style.left = gb.left + 'px'; _layerStaggerBoxEl.style.top = y0 + 'px';
+    _layerStaggerBoxEl.style.width = gb.width + 'px'; _layerStaggerBoxEl.style.height = (y1 - y0) + 'px';
   }
   // Right-click alternative to dragging the handle — same rank-0-anchor,
   // every-property-together semantics, applied instantly for a typed step

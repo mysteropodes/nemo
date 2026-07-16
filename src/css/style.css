@@ -470,22 +470,23 @@ body:not(.mode-motion) #motion-props-sec{display:none;}
 /* Marquee rectangle (motion.js, screen-fixed since it spans multiple .frow
    rows, unlike per-row overlays elsewhere in this file). */
 .motion-marquee-rect{position:fixed;border:1px solid var(--accent);background:rgba(63,107,245,.15);pointer-events:none;z-index:50;}
-/* Selection box + stagger handle (motion.js updateKeySelectionBox) — wraps
-   every selected keyframe diamond (2+) once a marquee/click selection spans
-   more than one track. Box itself is a pure visual frame (pointer-events
-   none, same screen-fixed positioning as the marquee above); only the
-   handle at top-center is interactive — grab and drag it to stagger. */
+/* Selection box + stagger edges (motion.js updateKeySelectionBox /
+   updateLayerStaggerBox) — wraps the current multi-selection (keyframe
+   diamonds OR whole layers). Box itself is a pure visual frame (pointer-
+   events none, same screen-fixed positioning as the marquee above).
+   Grab target evolved twice on feedback: a hidden Alt+drag gesture wasn't
+   discoverable, then a small centered pill handle was "impossible à
+   attraper" AND didn't match the reference anyway — "j'ai juste à glisser
+   la box qui entoure peu importe où je suis et le haut et le bas de cette
+   box pour stagger". Now: the box's own top AND bottom edges are each a
+   full-width draggable strip (.motion-keysel-edge) — grab anywhere along
+   either one, not a single pinpoint target. */
 .motion-keysel-box{position:fixed;border:1.5px solid var(--accent);pointer-events:none;z-index:51;box-sizing:border-box;}
-/* Handle hit target: the 16x9 visual pill from the first pass turned out
-   impossible to grab reliably (confirmed live — a click 1-2px off center,
-   well within normal mouse precision, missed it entirely and silently did
-   nothing, matching the "la poignée fait rien" report). ::before adds a
-   much larger invisible hit zone (44x32) around the same visible pill,
-   standard small-control affordance pattern — visible size stays compact,
-   actual clickable area doesn't. */
-.motion-keysel-handle{position:absolute;top:-7px;left:50%;transform:translateX(-50%);width:22px;height:13px;border-radius:4px;background:var(--accent);border:1px solid #fff;pointer-events:auto;cursor:ew-resize;box-shadow:0 1px 3px rgba(0,0,0,.4);}
-.motion-keysel-handle::before{content:'';position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:44px;height:32px;}
-.motion-keysel-handle:hover{filter:brightness(1.15);}
+.motion-keysel-edge{position:absolute;left:-4px;right:-4px;height:14px;pointer-events:auto;cursor:ns-resize;}
+.motion-keysel-edge-top{top:-9px;}
+.motion-keysel-edge-bottom{bottom:-9px;}
+.motion-keysel-edge::after{content:'';position:absolute;left:0;right:0;top:50%;height:3px;transform:translateY(-50%);background:var(--accent);border-radius:2px;opacity:.85;}
+.motion-keysel-edge:hover::after{opacity:1;height:4px;}
 .lrow.motion-disabled{cursor:not-allowed;opacity:.45;}
 .lrow.motion-disabled:hover{background:transparent;}
 body.mode-motion #layer-panel{width:260px;}
