@@ -757,6 +757,7 @@
     window._motionEnteredLayer = li;
     window._motionExpandedLayer = null;
     window._motionExpandedElement = null;
+    window._motionEnteredCollapsed = {}; // fresh "all expanded" every entry, see renderEnteredLayer
     window.SM.setActiveLayer(li);
     renderLayerList(); renderTimeline();
     if (window.renderSymbolTabs) renderSymbolTabs();
@@ -772,19 +773,45 @@
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && window._motionEnteredLayer != null) exitEnteredLayer();
   });
+  // Feedback (2026-07): "on devrait plus voir les propriétés du calque dans
+  // lequel on rentre mais chaque shape qui devient un layer avec ses
+  // propriétés à l'intérieur" — the layer's OWN Transform group (Position/
+  // Anchor/etc. of the whole layer) is dropped from this view entirely
+  // (the tab next to "Scene" already identifies which layer you're in, no
+  // need to repeat its properties here); each element instead gets a full
+  // layer-row treatment (color swatch + name + expand arrow, same visual
+  // language as a real layer row / the existing renderElementsList accordion
+  // row) rather than the old plain text sub-header — "ça permet plus de
+  // souplesse" satisfied by making each row independently collapsible
+  // (window._motionEnteredCollapsed, reset fresh on every enterLayer) rather
+  // than the old always-all-expanded layout, while still showing every
+  // shape's row at once (not one-at-a-time like renderElementsList's own
+  // accordion) since that's the whole point of the side-by-side "Layer
+  // Shape 1 / Layer Shape 2" view from the architecture diagram.
   function renderEnteredLayer(list, li) {
     var ld = state.layers[li];
     if (!ld) { exitEnteredLayer(); return; }
+    if (!window._motionEnteredCollapsed) window._motionEnteredCollapsed = {};
     var hdr = document.createElement('div'); hdr.className = 'lrow motion-props-layername';
     hdr.textContent = ld.name || ('Layer ' + (li + 1));
     list.appendChild(hdr);
-    renderTransformGroup(list, ld, 'Transform');
     var els = layerElements(li, ld);
     els.forEach(function (entry, idx) {
-      var shdr = document.createElement('div'); shdr.className = 'lrow motion-group-row';
-      shdr.textContent = elementLabel(entry, idx);
-      list.appendChild(shdr);
-      renderTransformGroup(list, ensureElementHolder(ld, entry.strokeId), 'Transform');
+      var collapsed = !!window._motionEnteredCollapsed[entry.strokeId];
+      var row = document.createElement('div'); row.className = 'lrow motion-elem-row';
+      var arrow = document.createElement('div'); arrow.className = 'lico larrow'; arrow.textContent = collapsed ? '▸' : '▾';
+      var swatch = document.createElement('div'); swatch.className = 'motion-elem-swatch';
+      swatch.style.background = entry.sd.fillColor || entry.sd.strokeColor || 'transparent';
+      if (elementHasMotion(ld, entry.strokeId)) swatch.classList.add('has-motion');
+      var nm = document.createElement('div'); nm.className = 'lnm'; nm.textContent = elementLabel(entry, idx);
+      row.appendChild(arrow); row.appendChild(swatch); row.appendChild(nm);
+      row.addEventListener('click', function () {
+        window._motionEnteredCollapsed[entry.strokeId] = !collapsed;
+        renderLayerList(); renderTimeline();
+        if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+      });
+      list.appendChild(row);
+      if (!collapsed) renderTransformGroup(list, ensureElementHolder(ld, entry.strokeId), 'Transform');
     });
   }
   function renderLayerListMotion(list) {
