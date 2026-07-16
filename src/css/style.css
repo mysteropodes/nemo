@@ -470,6 +470,14 @@ body:not(.mode-motion) #motion-props-sec{display:none;}
 /* Marquee rectangle (motion.js, screen-fixed since it spans multiple .frow
    rows, unlike per-row overlays elsewhere in this file). */
 .motion-marquee-rect{position:fixed;border:1px solid var(--accent);background:rgba(63,107,245,.15);pointer-events:none;z-index:50;}
+/* Selection box + stagger handle (motion.js updateKeySelectionBox) — wraps
+   every selected keyframe diamond (2+) once a marquee/click selection spans
+   more than one track. Box itself is a pure visual frame (pointer-events
+   none, same screen-fixed positioning as the marquee above); only the
+   handle at top-center is interactive — grab and drag it to stagger. */
+.motion-keysel-box{position:fixed;border:1.5px solid var(--accent);pointer-events:none;z-index:51;box-sizing:border-box;}
+.motion-keysel-handle{position:absolute;top:-5px;left:50%;transform:translateX(-50%);width:16px;height:9px;border-radius:3px;background:var(--accent);border:1px solid #fff;pointer-events:auto;cursor:ew-resize;box-shadow:0 1px 3px rgba(0,0,0,.4);}
+.motion-keysel-handle:hover{filter:brightness(1.15);}
 .lrow.motion-disabled{cursor:not-allowed;opacity:.45;}
 .lrow.motion-disabled:hover{background:transparent;}
 body.mode-motion #layer-panel{width:260px;}

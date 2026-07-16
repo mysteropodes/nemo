@@ -1247,6 +1247,12 @@
         });
       }
     });
+    // Re-measure the selection box against the freshly-rebuilt grid —
+    // covers every path that changes _motionKeySel without going through
+    // setKeySel (selectEveryNthKey/invertKeySelection assign it directly),
+    // plus keeps the box tracking selected diamonds that just moved
+    // horizontally (stagger drag calls renderTimeline() every tick).
+    updateKeySelectionBox();
   }
   // ---- multi-select (marquee rectangle) + group drag ----
   // AE convention: drag a selection rectangle over the keyframe
@@ -1258,7 +1264,7 @@
   function isKeySelected(holder, prop, key) {
     return _motionKeySel.some(function (s) { return s.holder === holder && s.prop === prop && s.key === key; });
   }
-  function setKeySel(sel) { _motionKeySel = sel; }
+  function setKeySel(sel) { _motionKeySel = sel; updateKeySelectionBox(); }
   // ---- batch operations on the current keyframe selection (Distribute/
   // Flip/Select Every/Invert Selection — no Align here, unlike layer bars:
   // a keyframe has no duration, "align" doesn't map onto a single point).
@@ -1347,7 +1353,47 @@
         if (key) sel.push({ holder: holder, prop: prop, key: key });
       });
     });
-    setKeySel(sel);
+    setKeySel(sel); // also refreshes the selection box (updateKeySelectionBox below)
+  }
+  // ---- visible selection box + drag handle (2026-07) ----
+  // Feedback: the hidden Alt+drag-any-diamond stagger gesture (added first)
+  // wasn't discoverable — "j'arrive pas à reproduire... normalement y a une
+  // box qui se forme à la sélection des keyframes pour pouvoir distribuer".
+  // A real bounding box now wraps every selected diamond (2+ keys, spanning
+  // however many tracks/layers), with one handle at its top-center — grab
+  // and drag the HANDLE to stagger, no modifier key required. Alt+drag on a
+  // diamond (added earlier) still works too, kept as a keyboard-only
+  // alternative once you already know the shortcut.
+  var _keySelBoxEl = null, _keySelHandleEl = null;
+  function removeKeySelectionBox() {
+    if (_keySelBoxEl) { _keySelBoxEl.remove(); _keySelBoxEl = null; _keySelHandleEl = null; }
+  }
+  function updateKeySelectionBox() {
+    var dias = Array.from(document.querySelectorAll('#frame-grid .motion-key.sel'));
+    if (dias.length < 2) { removeKeySelectionBox(); return; }
+    var x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    dias.forEach(function (d) {
+      var b = d.getBoundingClientRect();
+      x0 = Math.min(x0, b.left); x1 = Math.max(x1, b.right);
+      y0 = Math.min(y0, b.top); y1 = Math.max(y1, b.bottom);
+    });
+    if (!_keySelBoxEl) {
+      _keySelBoxEl = document.createElement('div'); _keySelBoxEl.className = 'motion-keysel-box';
+      _keySelHandleEl = document.createElement('div'); _keySelHandleEl.className = 'motion-keysel-handle';
+      _keySelHandleEl.title = 'Glisser pour échelonner (stagger) — Alt+glisser une clé fait pareil';
+      _keySelBoxEl.appendChild(_keySelHandleEl);
+      document.body.appendChild(_keySelBoxEl);
+      _keySelHandleEl.addEventListener('mousedown', function (e) {
+        e.stopPropagation(); e.preventDefault();
+        var holderOrder = [];
+        _motionKeySel.forEach(function (s) { if (holderOrder.indexOf(s.holder) < 0) holderOrder.push(s.holder); });
+        if (holderOrder.length < 2) { if (window.showToast) showToast('Sélectionne des clés sur 2 calques/éléments ou plus pour échelonner'); return; }
+        pushUndo();
+        window._motionKeyDrag = { stagger: true, startX: e.clientX, keys: _motionKeySel.slice(), holderOrder: holderOrder };
+      });
+    }
+    _keySelBoxEl.style.left = x0 + 'px'; _keySelBoxEl.style.top = y0 + 'px';
+    _keySelBoxEl.style.width = (x1 - x0) + 'px'; _keySelBoxEl.style.height = (y1 - y0) + 'px';
   }
   function updateMarquee(e) {
     if (!_motionMarquee) return;
@@ -1455,6 +1501,7 @@
     // whatever U last revealed.
     if (state.appMode === 'motion' && mode !== 'motion') {
       window._motionRevealedLayers = null;
+      removeKeySelectionBox();
     }
     state.appMode = mode;
     document.querySelectorAll('.app-mode-btn').forEach(function (b) { b.classList.toggle('active', b.dataset.mode === mode); });
