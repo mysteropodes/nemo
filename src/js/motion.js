@@ -247,34 +247,36 @@
   // "manual edit wins" principle CLAUDE.md documents for fill-merge —
   // switching modes must never silently snap a layer back to its neutral
   // default.
-  // Auto-convert to a Component on the FIRST layer-level property edit
-  // (2026-07-17, explicit request: "un calque animé dans motion si il
-  // contient plusieurs élément devient automatiquement un component que
-  // l'on retrouvera dans animation 2D") — only for a genuine LAYER target
-  // (state.layers.indexOf finds it; a per-element holder from
-  // ensureElementHolder is a bare {} never in that array) that isn't
-  // already a component and has 2+ independently selectable elements — a
-  // single-element layer animates fine as itself, no reason to wrap it.
-  // convertLayerToComponent (app.js) mutates `ld` IN PLACE (sets
-  // ld.symbolId, clears ld.frames) rather than replacing the object, so
-  // whatever the caller attaches right after this call still lands on the
-  // correct (now-converted) layer. Shared by BOTH entry points that can
-  // start animating a property — the stopwatch toggle (toggleAnimated) AND
-  // a direct canvas drag (setValue, wired up by select-bridge.js's
-  // Motion-mode drag handling) — found live (2026-07, "le component créé
-  // lors d'une modif de propriété dans motion n'apparaît pas comme
-  // component"): this used to live ONLY inside toggleAnimated, so a
-  // multi-element layer dragged on canvas WITHOUT first clicking the
-  // stopwatch silently kept animating as a plain layer (motionStatic
-  // override, no track, no conversion) — no component was ever created for
-  // exactly the gesture users reach for first. Idempotent (guarded by
-  // `!ld.symbolId`), so calling it on every drag tick is safe — it only
-  // ever actually converts once.
+  // Auto-convert to a Component on the FIRST layer-level property edit.
+  // Originally (2026-07-17) scoped to layers with 2+ elements ("un calque
+  // animé dans motion si il contient plusieurs élément devient
+  // automatiquement un component") — widened 2026-07 to ANY layer,
+  // including a single shape: StoryBoard exclusively works with Components
+  // (§8 CLAUDE.md, "StoryBoard ne manipule QUE des Components"), so a
+  // single-element layer that never converted could animate fine in Motion
+  // but could never be placed in a StoryBoard montage — a real dead end
+  // found live ("j'ai essayé avec une shape dessinné et ça ne créer pas de
+  // component"). The friction this used to avoid (locking a trivial single
+  // shape into a symbol) is now mitigated by the double-click "enter layer
+  // as precomp" navigation (enterLayer/exitEnteredLayer above), so editing
+  // the shape after conversion is one extra click, not a dead end — and
+  // convertComponentToLayer stays available to reverse it.
+  // Guards: only for a genuine LAYER target (state.layers.indexOf finds
+  // it; a per-element holder from ensureElementHolder is a bare {} never
+  // in that array), not already a component. convertLayerToComponent
+  // (app.js) mutates `ld` IN PLACE (sets ld.symbolId, clears ld.frames)
+  // rather than replacing the object, so whatever the caller attaches
+  // right after this call still lands on the correct (now-converted)
+  // layer. Shared by BOTH entry points that can start animating a property
+  // — the stopwatch toggle (toggleAnimated) AND a direct canvas drag
+  // (setValue, wired up by select-bridge.js's Motion-mode drag handling).
+  // Idempotent (guarded by `!ld.symbolId`), so calling it on every drag
+  // tick is safe — it only ever actually converts once.
   function maybeAutoConvertToComponent(ld) {
     var li = state.layers.indexOf(ld);
     if (li >= 0 && !ld.symbolId && userLayers[li]) {
       var elCount = userLayers[li].children.filter(function (c) { return (c instanceof Path || c instanceof Raster) && isSelectablePathChild(c); }).length;
-      if (elCount >= 2) convertLayerToComponent(li);
+      if (elCount >= 1) convertLayerToComponent(li);
     }
   }
   function toggleAnimated(ld, prop) {
