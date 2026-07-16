@@ -48,7 +48,21 @@
 
   function draw() {
     rafId = null;
+    // Motion mode has its own dense grid of UI (transform box, anchor
+    // crosshair, motion path) — the world grid on top of it reads as
+    // visual noise there ("supprimé la grille grise derrière, que pour
+    // motion j'entends" — keep it in Animation 2D, just don't draw it
+    // while in Motion). Doesn't touch the actual SMLabs toggle: switching
+    // back to Animation 2D with the tool still enabled shows it again
+    // immediately, same as before this change.
     if (!window.SMLabs.isOn('canvas-grid')) { if (overlay) overlay.remove(); overlay = null; return; }
+    // lastKey must be invalidated too, not just the overlay removed — the
+    // matrix-key-unchanged fast path a few lines down (`key === lastKey`)
+    // would otherwise think nothing changed on the way BACK to Animation 2D
+    // (same viewport, same step) and skip recreating the overlay this branch
+    // just deleted, leaving the grid permanently gone until something else
+    // (zoom, pan, step change) happened to perturb the key.
+    if (state.appMode === 'motion') { if (overlay) overlay.remove(); overlay = null; lastKey = ''; schedule(); return; }
     var cv = document.getElementById('drawing-canvas');
     if (!cv || !window.SMEngineBridge || !SMEngineBridge.isEnabled || !SMEngineBridge.isEnabled()) { schedule(); return; }
     var m = worldToScreenMatrix();
