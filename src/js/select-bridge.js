@@ -143,6 +143,27 @@
 
   var lastPt = null;
   function onDown(e) {
+    // Motion mode's position-keyframe/spatial-handle canvas dragging
+    // (motion.js's onDown/onDrag/onUp — the bezier-handle motion path,
+    // same gizmo pattern as the camera layer) was originally wired ONLY
+    // into tools.js's own Paper-Tool onMouseDown/Drag/Up — dead code the
+    // moment the Rust engine is on (the default): this file's own onDown
+    // stopImmediatePropagation()s at CAPTURE phase, which never lets
+    // Paper's Tool system (and therefore tools.js's handler) see the event
+    // at all. Found live (2026-07, "ajoute des bezier de controle comme
+    // pour le calque caméra au motion path de position" — the feature
+    // already existed, just never actually reachable). Checked first, tool-
+    // agnostic like tools.js's own placement of this same check — only
+    // consumes the event (returns true) when the click actually lands on a
+    // motion handle/keyframe dot; otherwise falls through unchanged into
+    // this file's own shouldIntercept()-gated logic below.
+    if (state.appMode === 'motion' && window.SMMotion) {
+      var w0 = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
+      if (SMMotion.onDown({ point: new Point(w0[0], w0[1]) })) {
+        e.stopImmediatePropagation(); e.preventDefault();
+        return;
+      }
+    }
     if (!shouldIntercept()) return;
     e.stopImmediatePropagation();
     e.preventDefault();
@@ -421,6 +442,16 @@
   }
 
   function onMove(e) {
+    // See onDown's comment — SMMotion.onDrag no-ops (returns false) unless
+    // its own onDown just started a handle/dot/anchor drag, so this is safe
+    // to probe unconditionally without any extra state of our own.
+    if (state.appMode === 'motion' && window.SMMotion) {
+      var w1 = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
+      if (SMMotion.onDrag({ point: new Point(w1[0], w1[1]) })) {
+        e.stopImmediatePropagation(); e.preventDefault();
+        return;
+      }
+    }
     if (!mode) {
       // Hover-only pass (not dragging anything) — tracks whether the
       // pointer sits over the anchor crosshair so engine-bridge.js can draw
@@ -674,6 +705,14 @@
   }
 
   function onUp(e) {
+    // See onDown's comment — clears _motionDrag if a motion handle/dot/
+    // anchor drag was in progress; no-ops otherwise. Must run even though
+    // this file's own `mode` stays null for a motion-path drag (onDown
+    // never touched it), or _motionDrag would never get released.
+    if (state.appMode === 'motion' && window.SMMotion && SMMotion.onUp()) {
+      e.stopImmediatePropagation(); e.preventDefault();
+      return;
+    }
     if (!mode) return;
     e.stopImmediatePropagation();
     e.preventDefault();
