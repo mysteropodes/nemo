@@ -1135,10 +1135,33 @@
             // the WHOLE group together, one frame-delta shared by all of
             // them; grabbing an unselected key resets the selection to just
             // that one (matches marquee-select's own "click empty = clear"
-            // convention below).
+            // convention below). Alt+drag instead STAGGERS — Skew Pro's
+            // headline "grab and drag to skew" gesture, brought into
+            // Motion's own keyframe timeline (staggerBars, layer-inout.js,
+            // already covers this for layer in/out bars; this is the
+            // missing piece for actual property keyframes). Grouped by
+            // HOLDER (layer or element — not by property track), in the
+            // order each holder was first encountered in the marquee
+            // selection — applyMarqueeSelection above builds that selection
+            // by iterating .motion-track-row in DOCUMENT order, i.e. the
+            // same top-to-bottom visual order the rows render in, so this
+            // naturally matches "top row anchors, lower rows cascade"
+            // without needing a separate sort. Only meaningful across 2+
+            // holders — a selection confined to one layer's own tracks
+            // falls back to the ordinary uniform group move.
             pushUndo();
             if (isKeySelected(ld, prop, key)) {
-              window._motionKeyDrag = { group: true, startX: e.clientX, keys: _motionKeySel.slice() };
+              if (e.altKey && _motionKeySel.length >= 2) {
+                var holderOrder = [];
+                _motionKeySel.forEach(function (s) { if (holderOrder.indexOf(s.holder) < 0) holderOrder.push(s.holder); });
+                if (holderOrder.length >= 2) {
+                  window._motionKeyDrag = { stagger: true, startX: e.clientX, keys: _motionKeySel.slice(), holderOrder: holderOrder };
+                } else {
+                  window._motionKeyDrag = { group: true, startX: e.clientX, keys: _motionKeySel.slice() };
+                }
+              } else {
+                window._motionKeyDrag = { group: true, startX: e.clientX, keys: _motionKeySel.slice() };
+              }
             } else {
               setKeySel([{ holder: ld, prop: prop, key: key }]);
               window._motionKeyDrag = { ld: ld, prop: prop, key: key, startX: e.clientX, startFrame: key.frame };
@@ -1356,6 +1379,34 @@
     updateMarquee(e);
     var d = window._motionKeyDrag; if (!d) return;
     var deltaFrames = Math.round((e.clientX - d.startX) / FC);
+    if (d.stagger) {
+      // Skew Pro's stagger: holder rank 0 (topmost row in the selection)
+      // is the anchor and never moves; holder rank i gets i× the raw drag
+      // delta. Same incremental-tick/re-baseline shape as the uniform
+      // group move below (add THIS tick's small delta, re-baseline startX)
+      // so the accumulated per-holder offset telescopes correctly back to
+      // rank × total-mouse-delta-from-drag-start, without needing to track
+      // each key's original frame separately.
+      if (!deltaFrames) return;
+      var ok = d.keys.every(function (s) {
+        var rank = d.holderOrder.indexOf(s.holder);
+        if (rank <= 0) return true; // anchor holder never moves, never collides
+        var nf = s.key.frame + deltaFrames * rank;
+        if (nf < 0 || nf >= state.totalFrames) return false;
+        var existing = keyAt(s.holder.motion[s.prop], nf);
+        return !existing || existing === s.key;
+      });
+      if (!ok) return;
+      d.keys.forEach(function (s) {
+        var rank = d.holderOrder.indexOf(s.holder);
+        if (rank <= 0) return;
+        s.key.frame += deltaFrames * rank;
+        sortKeys(s.holder.motion[s.prop]);
+      });
+      d.startX = e.clientX;
+      renderTimeline();
+      return;
+    }
     if (d.group) {
       // Whole-group move: compute the delta from ONE reference key (the
       // first), then check EVERY selected key can land there without
