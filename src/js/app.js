@@ -558,7 +558,25 @@ function serR(r){var d={isRaster:true,src:r.data&&r.data.src?r.data.src:r.source
 // kept Paper's default natural-pixel dimensions instead of the intended
 // world-space w/h whenever onLoad never fired. Checking `.loaded` first
 // covers both cases.
-function desR(d,layer,op){var prev=project.activeLayer;layer.activate();var r=new Raster(d.src);r.data.src=d.src;if(d.isBitmapBrush)r.data.isBitmapBrush=true;if(d.brushGroupId)r.data.brushGroupId=d.brushGroupId;if(d.isBrushTextureCopy)r.data.isBrushTextureCopy=true;r.position=new Point(d.x,d.y);r.opacity=op!==undefined?op:(d.opacity!==undefined?d.opacity:1);var w=d.width,h=d.height;var place=function(){r.size=new Size(w,h);r.position=new Point(d.x,d.y);};if(r.loaded)place();else r.onLoad=place;prev.activate();return r;}
+function desR(d,layer,op){var prev=project.activeLayer;layer.activate();var r=new Raster(d.src);r.data.src=d.src;if(d.isBitmapBrush)r.data.isBitmapBrush=true;if(d.brushGroupId)r.data.brushGroupId=d.brushGroupId;if(d.isBrushTextureCopy)r.data.isBrushTextureCopy=true;r.position=new Point(d.x,d.y);r.opacity=op!==undefined?op:(d.opacity!==undefined?d.opacity:1);var w=d.width,h=d.height;var place=function(){r.size=new Size(w,h);r.position=new Point(d.x,d.y);};
+  if(r.loaded)place();
+  else r.onLoad=function(){
+    place();
+    // Found live (2026-07-17, "un scrub dans la timeline fait disparaitre
+    // la texture"): loadFrame() rebuilds EVERY item fresh via desR/desP on
+    // every scrub tick, so a bitmap-brush texture's Raster is a BRAND NEW
+    // object each time — decode is async (Raster.onLoad), and
+    // engine-bridge.js's registerRasterIfNeeded() skips (`continue`, no
+    // retry loop) any raster that isn't `.loaded` yet at serialize time.
+    // A fast scrub reliably outran the decode, so the very frame that
+    // should show the texture rendered without it — and since place()
+    // alone never told the engine anything changed, nothing repainted it
+    // once decode DID finish, so it silently stayed missing instead of
+    // popping back in. Re-render once decode completes so the picture
+    // self-heals instead of depending on the next unrelated repaint.
+    if(window.SMEngineBridge)SMEngineBridge.renderNow();
+  };
+  prev.activate();return r;}
 
 // ---- COMPONENTS / SYMBOLS ----
 // A "component" is a layer whose content lives in its own mini-timeline
