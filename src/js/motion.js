@@ -1173,30 +1173,15 @@
             // the WHOLE group together, one frame-delta shared by all of
             // them; grabbing an unselected key resets the selection to just
             // that one (matches marquee-select's own "click empty = clear"
-            // convention below). Alt+drag instead STAGGERS — a "grab and
-            // drag to skew" gesture, brought into Motion's own keyframe
-            // timeline (staggerBars, layer-inout.js, already covers this
-            // for layer in/out bars; this is the missing piece for actual
-            // property keyframes). Grouped by
-            // HOLDER (layer or element — not by property track), in the
-            // order each holder was first encountered in the marquee
-            // selection — applyMarqueeSelection above builds that selection
-            // by iterating .motion-track-row in DOCUMENT order, i.e. the
-            // same top-to-bottom visual order the rows render in, so this
-            // naturally matches "top row anchors, lower rows cascade"
-            // without needing a separate sort. Only meaningful across 2+
-            // holders — a selection confined to one layer's own tracks
-            // falls back to the ordinary uniform group move.
+            // convention below). Alt+drag instead SKEWS (bottom-edge
+            // semantics: top row anchored, bottom row slides the full drag
+            // distance, in-between rows interpolate — see startSkewDrag),
+            // kept as a shortcut alongside the selection box's own edges.
             pushUndo();
             if (isKeySelected(ld, prop, key)) {
-              if (e.altKey && _motionKeySel.length >= 2) {
-                var holderOrder = [];
-                _motionKeySel.forEach(function (s) { if (holderOrder.indexOf(s.holder) < 0) holderOrder.push(s.holder); });
-                if (holderOrder.length >= 2) {
-                  window._motionKeyDrag = { stagger: true, startX: e.clientX, keys: _motionKeySel.slice(), holderOrder: holderOrder };
-                } else {
-                  window._motionKeyDrag = { group: true, startX: e.clientX, keys: _motionKeySel.slice() };
-                }
+              var skewRows = e.altKey && _motionKeySel.length >= 2 ? buildKeyRows() : null;
+              if (skewRows && skewRows.length >= 2) {
+                window._motionSkewDrag = { startX: e.clientX, mode: 'bottom', rows: skewRows };
               } else {
                 window._motionKeyDrag = { group: true, startX: e.clientX, keys: _motionKeySel.slice() };
               }
@@ -1395,24 +1380,25 @@
     });
     setKeySel(sel); // also refreshes the selection box (updateKeySelectionBox below)
   }
-  // ---- visible selection box: drag edges + drag fill (2026-07) ----
-  // Feedback history on this ONE feature: first, the hidden Alt+drag-any-
-  // diamond gesture wasn't discoverable at all ("j'arrive pas à
-  // reproduire..."). Then a small centered handle was added — still wrong:
-  // "ça agit pas du tout pareil dans le gif j'ai juste à glisser la box qui
-  // entoure peu importe où je suis et le haut et le bas de cette box pour
-  // stagger". Final shape (matches the reference tested live at
-  // goodboy.ninja/try/skew-pro): the box's top AND bottom edges are each a
-  // full-width strip — grab anywhere along either to STAGGER — and the
-  // box's INTERIOR is a grab-cursor surface — drag anywhere inside to MOVE
-  // every selected key together uniformly ("j'ai la hand qui permet de
-  // déplacer partout dans la box").
+  // ---- visible selection box: skew edges + move fill (2026-07) ----
+  // Feedback history on this ONE feature: a hidden Alt+drag gesture wasn't
+  // discoverable; a small centered handle was unclickable AND wrong; full-
+  // width edges with a rank-cascade were closer but still not the
+  // reference's actual SKEW semantics (screenshots provided): dragging the
+  // TOP edge slides the top row by the full drag distance while the BOTTOM
+  // row stays anchored (and vice versa), intermediate rows interpolating
+  // linearly — the keys form the diagonal seen in the screenshots. The
+  // interior is a hand-cursor surface that moves everything uniformly.
+  // All three gestures now go through ONE skew-drag engine (fraction per
+  // row: move=1 everywhere, top=(n-1-r)/(n-1), bottom=r/(n-1)) computing
+  // absolute per-row offsets from each key's ORIGINAL frame at mousedown —
+  // no incremental re-baselining, so fractional rows can't drift.
   function addStaggerEdges(boxEl, onStart) {
     ['top', 'bottom'].forEach(function (pos) {
       var edge = document.createElement('div');
       edge.className = 'motion-keysel-edge motion-keysel-edge-' + pos;
-      edge.title = 'Glisser (n\'importe où sur cette bordure) pour échelonner';
-      edge.addEventListener('mousedown', function (e) { e.stopPropagation(); e.preventDefault(); onStart(e); });
+      edge.title = 'Glisser horizontalement pour skewer les clés (ce bord bouge, l\'autre reste ancré)';
+      edge.addEventListener('mousedown', function (e) { e.stopPropagation(); e.preventDefault(); onStart(e, pos); });
       boxEl.appendChild(edge);
     });
   }
@@ -1420,8 +1406,32 @@
     var fill = document.createElement('div');
     fill.className = 'motion-keysel-fill';
     fill.title = 'Glisser pour déplacer toutes les clés sélectionnées ensemble';
-    fill.addEventListener('mousedown', function (e) { e.stopPropagation(); e.preventDefault(); onStart(e); });
+    fill.addEventListener('mousedown', function (e) { e.stopPropagation(); e.preventDefault(); onStart(e, 'move'); });
     boxEl.appendChild(fill);
+  }
+  // rows: array (ordered top→bottom visually) of arrays of {track, key,
+  // orig}. mode: 'move' | 'top' | 'bottom'.
+  function startSkewDrag(rows, mode, e) {
+    rows = rows.filter(function (r) { return r.length || true; });
+    if (!rows.length) return;
+    pushUndo();
+    window._motionSkewDrag = { startX: e.clientX, mode: mode, rows: rows };
+  }
+  // Key box rows = one row per PROPERTY TRACK holding selected keys, in
+  // rendered (document) order — matches the reference where each visible
+  // track row skews as its own step of the diagonal.
+  function buildKeyRows() {
+    var rows = [];
+    document.querySelectorAll('#frame-grid .motion-track-row').forEach(function (rowEl) {
+      var holder = rowEl._smHolder, prop = rowEl._smProp;
+      if (!holder || !holder.motion || !holder.motion[prop]) return;
+      var entries = [];
+      _motionKeySel.forEach(function (s) {
+        if (s.holder === holder && s.prop === prop) entries.push({ track: holder.motion[prop], key: s.key, orig: s.key.frame });
+      });
+      if (entries.length) rows.push(entries);
+    });
+    return rows;
   }
   var _keySelBoxEl = null;
   function removeKeySelectionBox() {
@@ -1443,16 +1453,11 @@
     if (!_keySelBoxEl) {
       _keySelBoxEl = document.createElement('div'); _keySelBoxEl.className = 'motion-keysel-box';
       document.body.appendChild(_keySelBoxEl);
-      addMoveFill(_keySelBoxEl, function (e) {
-        pushUndo();
-        window._motionKeyDrag = { group: true, startX: e.clientX, keys: _motionKeySel.slice() };
-      });
-      addStaggerEdges(_keySelBoxEl, function (e) {
-        var holderOrder = [];
-        _motionKeySel.forEach(function (s) { if (holderOrder.indexOf(s.holder) < 0) holderOrder.push(s.holder); });
-        if (holderOrder.length < 2) { if (window.showToast) showToast('Sélectionne des clés sur 2 calques/éléments ou plus pour échelonner'); return; }
-        pushUndo();
-        window._motionKeyDrag = { stagger: true, startX: e.clientX, keys: _motionKeySel.slice(), holderOrder: holderOrder };
+      addMoveFill(_keySelBoxEl, function (e, mode) { startSkewDrag(buildKeyRows(), mode, e); });
+      addStaggerEdges(_keySelBoxEl, function (e, mode) {
+        var rows = buildKeyRows();
+        if (rows.length < 2) { if (window.showToast) showToast('Sélectionne des clés sur 2 pistes ou plus pour skewer'); return; }
+        startSkewDrag(rows, mode, e);
       });
     }
     _keySelBoxEl.style.left = x0 + 'px'; _keySelBoxEl.style.top = y0 + 'px';
@@ -1470,21 +1475,34 @@
   function removeLayerStaggerBox() {
     if (_layerStaggerBoxEl) { _layerStaggerBoxEl.remove(); _layerStaggerBoxEl = null; }
   }
-  function startLayerStaggerDrag(e) {
-    var order = _layerSel.slice().sort(function (a, b) { return a - b; });
-    var holders = order.map(function (li) { return state.layers[li]; }).filter(Boolean);
-    if (holders.length < 2) return;
-    pushUndo();
-    window._motionLayerStaggerDrag = { startX: e.clientX, holders: holders };
-  }
-  function startLayerMoveDrag(e) {
-    var holders = _layerSel.map(function (li) { return state.layers[li]; }).filter(Boolean);
-    if (!holders.length) return;
-    pushUndo();
-    // uniform:true → onDragMove shifts EVERY selected layer (rank 0
-    // included) by the same delta, the box-interior "hand" move — vs the
-    // edge drag above where rank 0 anchors and the rest cascade.
-    window._motionLayerStaggerDrag = { startX: e.clientX, holders: holders, uniform: true };
+  // Layer box rows = one row per selected LAYER, ordered by ACTUAL
+  // on-screen vertical position of each layer's timeline row (not by
+  // state.layers index — the layer list renders newest-on-top, so index
+  // order is visually REVERSED; 'top'/'bottom' edge semantics must match
+  // what the user sees, same reason buildKeyRows uses document order).
+  // Each row carries EVERY key of EVERY animated property of that layer —
+  // the whole layer skews as one step. Layers with no Motion keys still
+  // occupy a row so the interpolation fractions match the visual spacing.
+  function buildLayerRows() {
+    var order = _layerSel.slice().sort(function (a, b) {
+      var ra = document.querySelector('#frame-grid .frow[data-layer="' + a + '"]');
+      var rb = document.querySelector('#frame-grid .frow[data-layer="' + b + '"]');
+      if (!ra || !rb) return a - b;
+      return ra.getBoundingClientRect().top - rb.getBoundingClientRect().top;
+    });
+    var rows = [];
+    order.forEach(function (li) {
+      var h = state.layers[li]; if (!h) return;
+      var entries = [];
+      if (h.motion) {
+        PROPS.forEach(function (prop) {
+          var track = h.motion[prop]; if (!track) return;
+          track.keys.forEach(function (k) { entries.push({ track: track, key: k, orig: k.frame }); });
+        });
+      }
+      rows.push(entries);
+    });
+    return rows;
   }
   function updateLayerStaggerBox() {
     if (state.appMode !== 'motion' || _layerSel.length < 2) { removeLayerStaggerBox(); return; }
@@ -1501,8 +1519,12 @@
     if (!_layerStaggerBoxEl) {
       _layerStaggerBoxEl = document.createElement('div'); _layerStaggerBoxEl.className = 'motion-keysel-box';
       document.body.appendChild(_layerStaggerBoxEl);
-      addMoveFill(_layerStaggerBoxEl, startLayerMoveDrag);
-      addStaggerEdges(_layerStaggerBoxEl, startLayerStaggerDrag);
+      addMoveFill(_layerStaggerBoxEl, function (e, mode) { startSkewDrag(buildLayerRows(), mode, e); });
+      addStaggerEdges(_layerStaggerBoxEl, function (e, mode) {
+        var rows = buildLayerRows();
+        if (rows.length < 2) return;
+        startSkewDrag(rows, mode, e);
+      });
     }
     _layerStaggerBoxEl.style.left = gb.left + 'px'; _layerStaggerBoxEl.style.top = y0 + 'px';
     _layerStaggerBoxEl.style.width = gb.width + 'px'; _layerStaggerBoxEl.style.height = (y1 - y0) + 'px';
@@ -1553,73 +1575,45 @@
   // span-end/keyframe drag handlers already in timeline.js).
   function onDragMove(e) {
     updateMarquee(e);
-    var ld2 = window._motionLayerStaggerDrag;
-    if (ld2) {
-      var deltaFrames2 = Math.round((e.clientX - ld2.startX) / FC);
-      if (!deltaFrames2) return;
-      // Every animated PROPERTY's every KEY on a selected layer shifts
-      // together — the whole layer's keyframe set moves as one block.
-      // Edge drag (uniform unset): rank 0 = anchor, never moves, the rest
-      // cascade by rank×delta. Interior "hand" drag (uniform:true): every
-      // layer, rank 0 included, shifts by the same 1×delta.
-      function multOf(rank) { return ld2.uniform ? 1 : rank; }
-      var ok2 = ld2.holders.every(function (h, rank) {
-        var mult = multOf(rank);
-        if (!mult || !h.motion) return true;
-        return PROPS.every(function (prop) {
-          var track = h.motion[prop]; if (!track) return true;
-          return track.keys.every(function (k) {
-            var nf = k.frame + deltaFrames2 * mult;
-            if (nf < 0 || nf >= state.totalFrames) return false;
-            var existing = keyAt(track, nf);
-            return !existing || existing === k;
-          });
+    var sk = window._motionSkewDrag;
+    if (sk) {
+      // One engine for all three box gestures (see startSkewDrag's header):
+      // per-row fraction × TOTAL drag distance, applied to each key's
+      // ORIGINAL frame captured at mousedown — absolute, not incremental,
+      // so fractional middle rows land exactly on round(fraction × total)
+      // with zero drift, and dragging back to the start restores every key
+      // to its exact original frame.
+      var total = (e.clientX - sk.startX) / FC;
+      var n = sk.rows.length;
+      var dragged = [];
+      sk.rows.forEach(function (row) { row.forEach(function (en) { dragged.push(en.key); }); });
+      var plan = [];
+      var ok3 = sk.rows.every(function (row, r) {
+        var f = sk.mode === 'move' || n < 2 ? 1 : (sk.mode === 'top' ? (n - 1 - r) / (n - 1) : r / (n - 1));
+        var d2 = Math.round(total * f);
+        return row.every(function (en) {
+          var nf = en.orig + d2;
+          if (nf < 0 || nf >= state.totalFrames) return false;
+          var existing = keyAt(en.track, nf);
+          // Only an UNdragged key blocks — another dragged key sitting at
+          // nf mid-drag isn't a real collision (it's about to move too).
+          if (existing && existing !== en.key && dragged.indexOf(existing) < 0) return false;
+          plan.push({ key: en.key, track: en.track, nf: nf });
+          return true;
         });
       });
-      if (!ok2) return;
-      ld2.holders.forEach(function (h, rank) {
-        var mult = multOf(rank);
-        if (!mult || !h.motion) return;
-        PROPS.forEach(function (prop) {
-          var track = h.motion[prop]; if (!track) return;
-          track.keys.forEach(function (k) { k.frame += deltaFrames2 * mult; });
-          sortKeys(track);
-        });
+      if (!ok3) return;
+      var touched = [];
+      plan.forEach(function (p) {
+        p.key.frame = p.nf;
+        if (touched.indexOf(p.track) < 0) touched.push(p.track);
       });
-      ld2.startX = e.clientX;
+      touched.forEach(sortKeys);
       renderTimeline();
       return;
     }
     var d = window._motionKeyDrag; if (!d) return;
     var deltaFrames = Math.round((e.clientX - d.startX) / FC);
-    if (d.stagger) {
-      // Stagger: holder rank 0 (topmost row in the selection) is the
-      // anchor and never moves; holder rank i gets i× the raw drag
-      // delta. Same incremental-tick/re-baseline shape as the uniform
-      // group move below (add THIS tick's small delta, re-baseline startX)
-      // so the accumulated per-holder offset telescopes correctly back to
-      // rank × total-mouse-delta-from-drag-start, without needing to track
-      // each key's original frame separately.
-      if (!deltaFrames) return;
-      var ok = d.keys.every(function (s) {
-        var rank = d.holderOrder.indexOf(s.holder);
-        if (rank <= 0) return true; // anchor holder never moves, never collides
-        var nf = s.key.frame + deltaFrames * rank;
-        if (nf < 0 || nf >= state.totalFrames) return false;
-        var existing = keyAt(s.holder.motion[s.prop], nf);
-        return !existing || existing === s.key;
-      });
-      if (!ok) return;
-      d.keys.forEach(function (s) {
-        var rank = d.holderOrder.indexOf(s.holder);
-        if (rank <= 0) return;
-        s.key.frame += deltaFrames * rank;
-        sortKeys(s.holder.motion[s.prop]);
-      });
-      d.startX = e.clientX;
-      renderTimeline();
-      return;
-    }
     if (d.group) {
       // Whole-group move: compute the delta from ONE reference key (the
       // first), then check EVERY selected key can land there without
@@ -1648,7 +1642,7 @@
   }
   function onDragUp() {
     endMarquee();
-    if (window._motionLayerStaggerDrag) { window._motionLayerStaggerDrag = null; if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); return; }
+    if (window._motionSkewDrag) { window._motionSkewDrag = null; if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); return; }
     if (!window._motionKeyDrag) return;
     window._motionKeyDrag = null;
     if (window.SMEngineBridge) window.SMEngineBridge.renderNow();

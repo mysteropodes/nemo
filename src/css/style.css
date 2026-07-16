@@ -488,7 +488,11 @@ body:not(.mode-motion) #motion-props-sec{display:none;}
 .motion-keysel-fill{position:absolute;inset:0;pointer-events:auto;cursor:grab;background:rgba(63,107,245,.07);}
 .motion-keysel-fill:hover{background:rgba(63,107,245,.13);}
 .motion-keysel-fill:active{cursor:grabbing;}
-.motion-keysel-edge{position:absolute;left:-4px;right:-4px;height:14px;pointer-events:auto;cursor:ns-resize;z-index:1;}
+/* ew-resize, not ns-resize — feedback: "l'icon sur le haut et bas montre
+   des fleche à drag vers le haut ou le bas alors que c'est sur le côté" —
+   the skew drag is HORIZONTAL (slides keys left/right along the timeline),
+   the cursor must show sideways arrows. */
+.motion-keysel-edge{position:absolute;left:-4px;right:-4px;height:14px;pointer-events:auto;cursor:ew-resize;z-index:1;}
 .motion-keysel-edge-top{top:-9px;}
 .motion-keysel-edge-bottom{bottom:-9px;}
 .motion-keysel-edge::after{content:'';position:absolute;left:0;right:0;top:50%;height:3px;transform:translateY(-50%);background:var(--accent);border-radius:2px;opacity:.85;}
