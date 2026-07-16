@@ -262,6 +262,23 @@
       if (!ld.motionStatic) ld.motionStatic = {};
       ld.motionStatic[prop] = v;
     } else {
+      // Auto-convert to a Component on the FIRST layer-level key (2026-07-17,
+      // explicit request: "un calque animé dans motion si il contient
+      // plusieurs élément devient automatiquement un component que l'on
+      // retrouvera dans animation 2D") — only for a genuine LAYER target
+      // (state.layers.indexOf finds it; an per-element holder from
+      // ensureElementHolder is a bare {} never in that array) that isn't
+      // already a component and has 2+ independently selectable elements —
+      // a single-element layer animates fine as itself, no reason to wrap
+      // it. convertLayerToComponent (app.js) mutates `ld` IN PLACE
+      // (sets ld.symbolId, clears ld.frames) rather than replacing the
+      // object, so the track this function attaches right below still
+      // lands on the correct (now-converted) layer.
+      var li = state.layers.indexOf(ld);
+      if (li >= 0 && !ld.symbolId && userLayers[li]) {
+        var elCount = userLayers[li].children.filter(function (c) { return (c instanceof Path || c instanceof Raster) && isSelectablePathChild(c); }).length;
+        if (elCount >= 2) convertLayerToComponent(li);
+      }
       var cur = staticValue(ld, prop);
       ensureTrack(ld, prop).keys = [{ frame: state.currentFrame, v: cur, curvePoints: cloneCurvePts(DEFAULT_CURVE), hOut: [0, 0], hIn: [0, 0] }];
     }
@@ -336,12 +353,19 @@
   }
   function layerMotionAt(li, frameIdx) {
     var ld = state.layers[li];
-    // Defense in depth: the UI already blocks expanding a component-instance
-    // layer's Transform group (see renderLayerListMotion), but stale motion
-    // data can still exist (set before the layer became an instance, or
-    // hand-edited into a project file) — never double-apply on top of the
-    // instance's own symMatrix pivot at render time either.
-    if (!ld || ld.symbolId) return null;
+    if (!ld) return null;
+    // Component instances CAN carry a layer-level Motion track (2026-07-17,
+    // "un calque animé dans motion... devient automatiquement un
+    // component") — verified this composes correctly with symMatrix, not
+    // "double-applying" the same transform: getEffectiveStrokes (app.js)
+    // bakes symMatrix into the STROKE DATA at frame-load time (the
+    // instance's placement, AE's "where you dropped the precomp"); this
+    // motionMat is a SEPARATE transform applied by buildSceneJson on top
+    // of the already-placed Paper items at render time (AE's "keyframed
+    // Transform properties ON that precomp layer") — two different,
+    // composable transforms, exactly AE's precomp-layer model. Confirmed
+    // live: rotating/scaling a converted component pivots around its own
+    // bounds+anchor correctly, matches an ordinary layer.
     return computeMotionMat(ld, frameIdx);
   }
   // Nested INSIDE the layer transform (engine-bridge.js/export.js apply this
@@ -591,7 +615,13 @@
     var li = window._motionExpandedLayer != null ? window._motionExpandedLayer : state.activeLayerIdx;
     if (li == null) return null;
     var ld = state.layers[li];
-    if (!ld || ld.symbolId || !userLayers[li]) return null;
+    if (!ld || !userLayers[li]) return null;
+    // Component instances now allow layer-level Motion (see layerMotionAt's
+    // comment) — but per-ELEMENT sub-targeting stays blocked: renderElementsList
+    // never runs for a symbolId row (renderLayerListMotion), so
+    // window._motionExpandedElement can never legitimately be set while
+    // this layer is the expanded one; the `ld.symbolId` guard here would
+    // have been redundant with that, not a second independent gate.
     if (window._motionExpandedLayer != null && window._motionExpandedElement != null) {
       var item = findElementItem(li, window._motionExpandedElement);
       if (item) return { li: li, strokeId: window._motionExpandedElement, holder: ensureElementHolder(ld, window._motionExpandedElement), boundsCenter: item.bounds.center };
@@ -706,21 +736,23 @@
     order.forEach(function (entry) {
       if (entry.type !== 'layer' || entry.hidden) return;
       var li = entry.idx, ld = state.layers[li];
-      // Component instances already have their own placement transform
-      // (symMatrix, dragged on canvas) plus Frame/Speed/Offset — stacking
-      // Motion's keyframed Position/Rotation/Scale on top would pivot around
-      // a DIFFERENT center (userLayers[i].bounds vs symMatrix's own pivot)
-      // and fight the instance panel silently. Same precedent as Ghost All
-      // refusing symbolId layers (timeline.js) — block expansion here rather
-      // than let the two transforms produce confusing, uneditable-looking
-      // results.
+      // Component instances DO now get a layer-level Transform group
+      // (2026-07-17, "un calque animé dans motion... devient
+      // automatiquement un component que l'on retrouvera dans animation
+      // 2D") — composes cleanly with their own symMatrix placement (see
+      // layerMotionAt's comment: two separate, stacking transforms, same
+      // as AE's precomp-layer model), so `isComponent` below no longer
+      // blocks EXPANSION, only the per-ELEMENT sub-list a few lines down
+      // (renderElementsList) — a symbol instance's actual strokes live
+      // inside the symbol's own sub-layer, not addressable as elements of
+      // THIS layer, so per-element motion genuinely has no meaning here.
       var isComponent = !!ld.symbolId;
       var expanded = window._motionExpandedLayer === li;
       var row = document.createElement('div');
-      row.className = 'lrow' + (li === state.activeLayerIdx ? ' act' : '') + (isComponent ? ' motion-disabled' : '');
+      row.className = 'lrow' + (li === state.activeLayerIdx ? ' act' : '');
       row.dataset.layer = li;
-      if (isComponent) row.title = 'Motion mode ne gère pas encore les instances de composant (utilise Frame/Speed/Offset dans le panneau du calque)';
-      var arrow = document.createElement('div'); arrow.className = 'lico larrow'; arrow.textContent = isComponent ? '·' : (expanded ? '▾' : '▸');
+      if (isComponent) row.title = 'Composant — Position/Anchor/Rotation/Scale/Opacity animent l\'instance entière (le contenu interne s\'édite via "Éditer le composant…")';
+      var arrow = document.createElement('div'); arrow.className = 'lico larrow'; arrow.textContent = expanded ? '▾' : '▸';
       row.appendChild(arrow);
       // Same color dot / eye / lock / solo controls as Animation 2D's own
       // layer row (timeline.js's renderLayerList) — Motion mode is a
@@ -754,7 +786,6 @@
         // comment there) so releasing a reorder drag doesn't ALSO toggle
         // this row's Transform-group expansion.
         if (window._layerDragJustEnded) { window._layerDragJustEnded = false; return; }
-        if (isComponent) { state.activeLayerIdx = li; renderLayerList(); return; }
         window._motionExpandedLayer = expanded ? null : li;
         _propFilter = null; // fresh "show all" every time the expanded layer changes
         window._motionExpandedElement = null;
@@ -788,7 +819,11 @@
       list.appendChild(row);
       if (!expanded) return;
       renderTransformGroup(list, ld, 'Transform');
-      renderElementsList(list, li, ld);
+      // Per-element sub-list stays component-exclusive: a symbol instance's
+      // actual strokes live inside the SYMBOL's own sub-layer (edited via
+      // "Éditer le composant…"), not addressable as elements of this outer
+      // layer — only the whole-instance Transform group above applies.
+      if (!isComponent) renderElementsList(list, li, ld);
     });
     // Right-panel mirror of the active layer's Transform group ("il
     // faudrait afficher les properties d'un calque sélectionné et la
@@ -814,11 +849,10 @@
     var nameRow = document.createElement('div');
     nameRow.className = 'motion-props-layername';
     if (!ld) { nameRow.textContent = 'Aucun calque sélectionné'; body.appendChild(nameRow); return; }
-    if (ld.symbolId) {
-      nameRow.textContent = (ld.name || 'Calque') + ' — instance de composant (utilise Frame/Speed/Offset dans le panneau du calque)';
-      body.appendChild(nameRow); return;
-    }
-    nameRow.textContent = ld.name || ('Layer ' + (state.activeLayerIdx + 1));
+    // Component instances get the same Transform group as any layer now
+    // (see renderLayerListMotion's comment) — just a label suffix so it
+    // reads clearly as "the whole instance", not its internal content.
+    nameRow.textContent = (ld.name || ('Layer ' + (state.activeLayerIdx + 1))) + (ld.symbolId ? ' (composant)' : '');
     body.appendChild(nameRow);
     renderTransformGroup(body, ld, 'Transform');
   }
