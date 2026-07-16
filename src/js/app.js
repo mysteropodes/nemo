@@ -277,7 +277,30 @@ function drawStage(){stageLayer.removeChildren();stageLayer.activate();
   new Path.Rectangle({point:[0,0],size:[state.canvasW,state.canvasH],fillColor:state.canvasBg,strokeColor:new Color(0,0,0,.08),strokeWidth:1});
   userLayers[state.activeLayerIdx].activate();}
 drawStage();
-function fitCanvas(){var vw=view.viewSize.width,vh=view.viewSize.height;var z=Math.min(vw*.85/state.canvasW,vh*.85/state.canvasH,3);view.zoom=z;view.center=new Point(state.canvasW/2,state.canvasH/2);state.canvasRotation=0;updZoom();}
+// Found live (2026-07, user console dump from the real Tauri app — never
+// reproduced in the Chrome-based browser preview, only WKWebView): a flood
+// of "null is not an object (evaluating 'this._matrix.inverted()
+// ._transformBounds')" on nearly every mouse move, fitCanvas call, and
+// newProject. Root cause, confirmed against Paper.js's own source
+// (paper-full.min.js): view.zoom=z with z===0 (or NaN) bakes a
+// non-invertible (singular) view matrix — Matrix.inverted() on a singular
+// matrix returns null by design, and getBounds() immediately dereferences
+// that null. z is a ratio of view.viewSize to canvasW/H — exactly 0 when
+// this fires before WKWebView's flex layout has given #canvas-area (and
+// therefore the canvas) a real size, unlike Chrome which apparently
+// settles layout fast enough that the pre-existing 50ms setTimeout below
+// always masked the race there. Once zoom is stuck at 0 every OTHER
+// screen<->project coordinate conversion breaks too (hit-testing, hover),
+// which is why mouse events kept throwing long after the single fitCanvas
+// call that caused it — not four separate bugs, one bad zoom value with a
+// permanent blast radius until a later valid fitCanvas call overwrites it.
+function fitCanvas(){
+  var vw=view.viewSize.width,vh=view.viewSize.height;
+  if(!(vw>0)||!(vh>0)){requestAnimationFrame(fitCanvas);return;}
+  var z=Math.min(vw*.85/state.canvasW,vh*.85/state.canvasH,3);
+  if(!(z>0)){requestAnimationFrame(fitCanvas);return;} // canvasW/H not set yet either — same defensive wait
+  view.zoom=z;view.center=new Point(state.canvasW/2,state.canvasH/2);state.canvasRotation=0;updZoom();
+}
 setTimeout(fitCanvas,50);
 function resetView(){view.zoom=1;view.center=new Point(state.canvasW/2,state.canvasH/2);state.canvasRotation=0;updZoom();}
 function updZoom(){
