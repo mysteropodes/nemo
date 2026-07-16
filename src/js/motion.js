@@ -738,7 +738,60 @@
     inp.addEventListener('mousedown', function (e) { e.stopPropagation(); });
     return inp;
   }
+  // ---- "Enter layer" (2026-07, AE-style precomp navigation — validated on
+  // the StoryBoard/Animation2D/Motion architecture diagram, CLAUDE.md §8):
+  // double-clicking a layer row focuses JUST that layer — its own Transform
+  // group pinned at the top, every one of its elements shown as a full
+  // "Layer Shape N" Transform group below (not the one-at-a-time accordion
+  // renderElementsList already does for the normal list — all of them, at
+  // once, matching the diagram's side-by-side Layer Shape 1/Layer Shape 2
+  // boxes), the rest of the layer list hidden entirely. #motion-back-btn
+  // (index.html, floated over the canvas next to the scene per the explicit
+  // "bouton back à côté de la scène" request) is the way out, plus Escape. ----
+  function enterLayer(li) {
+    if (state.layers[li] && state.layers[li].symbolId) return; // a component's own strokes live in its symbol's sub-layer — nothing here to enter
+    window._motionEnteredLayer = li;
+    window._motionExpandedLayer = null;
+    window._motionExpandedElement = null;
+    window.SM.setActiveLayer(li);
+    renderLayerList(); renderTimeline();
+    if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+  }
+  function exitEnteredLayer() {
+    if (window._motionEnteredLayer == null) return;
+    window._motionEnteredLayer = null;
+    renderLayerList(); renderTimeline();
+    if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+  }
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && window._motionEnteredLayer != null) exitEnteredLayer();
+  });
+  function renderEnteredLayer(list, li) {
+    var ld = state.layers[li];
+    if (!ld) { exitEnteredLayer(); return; }
+    var hdr = document.createElement('div'); hdr.className = 'lrow motion-props-layername';
+    hdr.textContent = ld.name || ('Layer ' + (li + 1));
+    list.appendChild(hdr);
+    renderTransformGroup(list, ld, 'Transform');
+    var els = layerElements(li, ld);
+    els.forEach(function (entry, idx) {
+      var shdr = document.createElement('div'); shdr.className = 'lrow motion-group-row';
+      shdr.textContent = elementLabel(entry, idx);
+      list.appendChild(shdr);
+      renderTransformGroup(list, ensureElementHolder(ld, entry.strokeId), 'Transform');
+    });
+  }
   function renderLayerListMotion(list) {
+    var body = document.body;
+    var backBtn = document.getElementById('motion-back-btn');
+    var entered = window._motionEnteredLayer;
+    if (backBtn) backBtn.style.display = entered != null ? '' : 'none';
+    if (body) body.classList.toggle('motion-layer-entered', entered != null);
+    if (entered != null && state.layers[entered]) {
+      renderEnteredLayer(list, entered);
+      renderMotionPropsPanel();
+      return;
+    }
     var order = (typeof computeLayerRenderOrder === 'function') ? computeLayerRenderOrder() : state.layers.map(function (_l, i) { return { type: 'layer', idx: i }; });
     order.forEach(function (entry) {
       if (entry.type !== 'layer' || entry.hidden) return;
@@ -822,6 +875,10 @@
       row.addEventListener('mousedown', function (e) {
         if (e.button !== 0 || e.target.closest('.lico')) return;
         _layerDrag.active = true; _layerDrag.srcIdx = li; _layerDrag.startY = e.clientY; _layerDrag.moved = false;
+      });
+      row.addEventListener('dblclick', function (e) {
+        if (e.target.closest('.lico')) return;
+        enterLayer(li);
       });
       list.appendChild(row);
       if (!expanded) return;
@@ -1348,6 +1405,19 @@
     // precedent as camera.js's own exitCameraSeg() call when its tool
     // deactivates.
     if (state.appMode === 'motion' && window._curveEditor) window._curveEditor.exitMotionSeg();
+    // Leaving the "entered layer" precomp view along with Motion mode
+    // itself — its back button/body class are Motion-only UI, toggled only
+    // from inside renderLayerListMotion (skipped entirely once appMode
+    // isn't 'motion', per renderLayerList's own dispatch), so they'd
+    // otherwise stay stuck showing after switching to Animation 2D/
+    // StoryBoard — must clear them here directly, not rely on a render
+    // pass that's about to stop happening.
+    if (state.appMode === 'motion' && mode !== 'motion') {
+      window._motionEnteredLayer = null;
+      var backBtn0 = document.getElementById('motion-back-btn');
+      if (backBtn0) backBtn0.style.display = 'none';
+      document.body.classList.remove('motion-layer-entered');
+    }
     state.appMode = mode;
     document.querySelectorAll('.app-mode-btn').forEach(function (b) { b.classList.toggle('active', b.dataset.mode === mode); });
     document.body.classList.toggle('mode-motion', mode === 'motion');
@@ -1379,6 +1449,8 @@
       if (b.disabled) return;
       b.addEventListener('click', function () { setAppMode(b.dataset.mode); });
     });
+    var backBtn = document.getElementById('motion-back-btn');
+    if (backBtn) backBtn.addEventListener('click', exitEnteredLayer);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initModeSwitch); else initModeSwitch();
 
