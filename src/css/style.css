@@ -199,12 +199,7 @@ body.mac-overlay-titlebar #app{padding-top:28px;}
    gets pushed straight off the window edge instead (reported layout bug). */
 #canvas-area{flex:1;min-width:0;min-height:0;position:relative;overflow:hidden;background:var(--panel);}
 #drawing-canvas{width:100%;height:100%;cursor:crosshair;}
-#motion-back-btn{position:absolute;top:14px;left:20px;z-index:6;background:var(--panel3);color:var(--text);border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:5px 11px;font-size:11.5px;font-weight:600;cursor:pointer;}
-#motion-back-btn:hover{background:var(--accent);border-color:var(--accent);}
 #canvas-info{position:absolute;top:16px;left:20px;pointer-events:none;font-size:11.5px;color:rgba(236,234,231,.38);font-weight:500;}
-/* Pushed down out of #motion-back-btn's way while it's shown (motion.js
-   toggles both together) — same top-left corner otherwise. */
-body.motion-layer-entered #canvas-info{top:54px;}
 #canvas-info .fnum{font-size:28px;font-weight:700;letter-spacing:-.5px;color:var(--text);}
 .canvas-info-row{display:flex;align-items:center;gap:6px;}
 .canvas-info-row .badge{margin-left:0;}

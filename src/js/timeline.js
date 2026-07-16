@@ -2686,8 +2686,15 @@ window.addEventListener('mouseup',function(){
 });
 function renderSymbolTabs(){
   var bar=document.getElementById('symbol-tabs');if(!bar)return;bar.innerHTML='';
-  var scene=document.createElement('div');scene.className='sym-tab'+(state.activeSymbolId?'':' act');scene.textContent='Scene';
-  scene.addEventListener('click',function(){if(state.activeSymbolId)window.SM.exitToScene();});
+  // Motion's "enter layer as precomp" (motion.js) is a breadcrumb exactly
+  // like a Component tab conceptually (drilled into a nested scope, need a
+  // way back next to Scene) — reuses this SAME tab strip instead of a
+  // separate floating button, per explicit request ("le bouton retour
+  // devrait être à côté de scène"). Only relevant in Motion mode with no
+  // real symbol entered (the two navigation layers don't nest).
+  var enteredLayerIdx=(state.appMode==='motion'&&!state.activeSymbolId)?window._motionEnteredLayer:null;
+  var scene=document.createElement('div');scene.className='sym-tab'+(state.activeSymbolId||enteredLayerIdx!=null?'':' act');scene.textContent='Scene';
+  scene.addEventListener('click',function(){if(state.activeSymbolId)window.SM.exitToScene();else if(enteredLayerIdx!=null&&window.SMMotion)SMMotion.exitEnteredLayer();});
   bar.appendChild(scene);
   state.openSymbolTabs.forEach(function(symId){
     var sym=state.symbols[symId];if(!sym)return;
@@ -2699,6 +2706,13 @@ function renderSymbolTabs(){
     x.addEventListener('click',function(e){e.stopPropagation();window.SM.closeSymbolTab(symId);});
     bar.appendChild(tab);
   });
+  if(enteredLayerIdx!=null&&state.layers[enteredLayerIdx]){
+    var ld=state.layers[enteredLayerIdx];
+    var ltab=document.createElement('div');ltab.className='sym-tab act';
+    var llabel=document.createElement('span');llabel.textContent=ld.name||('Layer '+(enteredLayerIdx+1));
+    ltab.appendChild(llabel);
+    bar.appendChild(ltab);
+  }
 }
 function updateCompInstancePanel(){
   var sec=document.getElementById('comp-instance-sec');

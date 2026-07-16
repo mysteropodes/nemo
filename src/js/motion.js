@@ -747,9 +747,11 @@
   // "Layer Shape N" Transform group below (not the one-at-a-time accordion
   // renderElementsList already does for the normal list — all of them, at
   // once, matching the diagram's side-by-side Layer Shape 1/Layer Shape 2
-  // boxes), the rest of the layer list hidden entirely. #motion-back-btn
-  // (index.html, floated over the canvas next to the scene per the explicit
-  // "bouton back à côté de la scène" request) is the way out, plus Escape. ----
+  // boxes), the rest of the layer list hidden entirely. The way out is an
+  // extra tab in #symbol-tabs next to "Scene" (renderSymbolTabs, timeline.js
+  // — same breadcrumb strip a real Component tab uses, per explicit request
+  // "le bouton retour devrait être à côté de scène" — a floating button
+  // over the canvas was tried first and replaced by this), plus Escape. ----
   function enterLayer(li) {
     if (state.layers[li] && state.layers[li].symbolId) return; // a component's own strokes live in its symbol's sub-layer — nothing here to enter
     window._motionEnteredLayer = li;
@@ -757,12 +759,14 @@
     window._motionExpandedElement = null;
     window.SM.setActiveLayer(li);
     renderLayerList(); renderTimeline();
+    if (window.renderSymbolTabs) renderSymbolTabs();
     if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
   }
   function exitEnteredLayer() {
     if (window._motionEnteredLayer == null) return;
     window._motionEnteredLayer = null;
     renderLayerList(); renderTimeline();
+    if (window.renderSymbolTabs) renderSymbolTabs();
     if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
   }
   document.addEventListener('keydown', function (e) {
@@ -785,9 +789,7 @@
   }
   function renderLayerListMotion(list) {
     var body = document.body;
-    var backBtn = document.getElementById('motion-back-btn');
     var entered = window._motionEnteredLayer;
-    if (backBtn) backBtn.style.display = entered != null ? '' : 'none';
     if (body) body.classList.toggle('motion-layer-entered', entered != null);
     if (entered != null && state.layers[entered]) {
       renderEnteredLayer(list, entered);
@@ -1408,16 +1410,16 @@
     // deactivates.
     if (state.appMode === 'motion' && window._curveEditor) window._curveEditor.exitMotionSeg();
     // Leaving the "entered layer" precomp view along with Motion mode
-    // itself — its back button/body class are Motion-only UI, toggled only
-    // from inside renderLayerListMotion (skipped entirely once appMode
-    // isn't 'motion', per renderLayerList's own dispatch), so they'd
-    // otherwise stay stuck showing after switching to Animation 2D/
-    // StoryBoard — must clear them here directly, not rely on a render
-    // pass that's about to stop happening.
+    // itself — its body class is Motion-only UI, toggled only from inside
+    // renderLayerListMotion (skipped entirely once appMode isn't 'motion',
+    // per renderLayerList's own dispatch), so it'd otherwise stay stuck
+    // showing after switching to Animation 2D/StoryBoard — must clear it
+    // here directly, not rely on a render pass that's about to stop
+    // happening. The back-navigation tab itself (symbol-tabs, see
+    // renderSymbolTabs in timeline.js) already stops appearing on its own
+    // once state.appMode !== 'motion' — no separate cleanup needed there.
     if (state.appMode === 'motion' && mode !== 'motion') {
       window._motionEnteredLayer = null;
-      var backBtn0 = document.getElementById('motion-back-btn');
-      if (backBtn0) backBtn0.style.display = 'none';
       document.body.classList.remove('motion-layer-entered');
     }
     state.appMode = mode;
@@ -1444,6 +1446,7 @@
       }
     }
     renderLayerList(); renderTimeline();
+    if (window.renderSymbolTabs) renderSymbolTabs();
     if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
   }
   function initModeSwitch() {
@@ -1451,8 +1454,6 @@
       if (b.disabled) return;
       b.addEventListener('click', function () { setAppMode(b.dataset.mode); });
     });
-    var backBtn = document.getElementById('motion-back-btn');
-    if (backBtn) backBtn.addEventListener('click', exitEnteredLayer);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initModeSwitch); else initModeSwitch();
 
@@ -1507,6 +1508,7 @@
     renderLayerListMotion: renderLayerListMotion,
     renderTimelineMotion: renderTimelineMotion,
     setAppMode: setAppMode,
+    exitEnteredLayer: exitEnteredLayer,
     onDown: onDown,
     onDrag: onDrag,
     onUp: onUp,
