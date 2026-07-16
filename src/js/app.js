@@ -949,6 +949,72 @@ function convertLayersToComponent(indices){
   loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderSymbolTabs)renderSymbolTabs();
   showToast('Composant créé avec '+indices.length+' calques');
 }
+// "Release to Layers" (Illustrator-style) — Motion's double-click-a-layer-row
+// gesture (2026-07) EXPLODES the layer into N real top-level layers, one per
+// element, rather than opening an in-place grouped view (explicit reversal
+// of an earlier same-day decision: "affichage seulement" was tried first,
+// the user came back and asked for real separate layers instead).
+//
+// strokeId (motion.js layerElements) is NOT a stable cross-frame shape
+// identity — it's lazily stamped once, on whichever frame Motion's Éléments
+// list last looked at. A classic hand-drawn multi-keyframe layer that was
+// never opened in Motion often has no consistent strokeId from one keyframe
+// to the next. So this splits each keyframe's OWN strokes array by POSITION
+// (index 0..N-2 go 1-for-1 to the first N-1 new layers, everything from
+// index N-1 onward — the "normal" last element plus any surplus — goes to
+// the LAST new layer) rather than by strokeId matching across frames. This
+// never invents or drops content: a keyframe with fewer strokes than
+// reference elements leaves the extra new layers blank at that frame
+// (same as any other blank keyframe); a keyframe with MORE strokes than
+// expected keeps the overflow, just grouped into the last layer instead of
+// losing it.
+//
+// Per-ELEMENT Motion keys (ld.elementMotion[strokeId]) ARE reliable at the
+// reference frame (state.currentFrame, where layerElements() is evaluated)
+// — promoted straight to the new layer's OWN motion/motionStatic, exactly
+// the "répercuter les keyframes sur les layers comme d'habitude" the
+// request called for: a shape already animated individually in Motion
+// keeps that exact animation, now as a normal layer-level track.
+function splitLayerIntoElements(li){
+  if(state.activeSymbolId){showToast('Fermez d\'abord le composant en cours d\'édition');return;}
+  var ld=state.layers[li];if(!ld||ld.symbolId){showToast('Rien à éclater ici');return;}
+  if(!window.SMMotion){return;}
+  var els=SMMotion.layerElements(li,ld);
+  if(!els||els.length<2){showToast('Il faut au moins 2 éléments pour éclater ce calque');return;}
+  saveAllLayerFrames();pushUndo();
+  var n=els.length;
+  var newLayers=[];
+  for(var e=0;e<n;e++){
+    var frames=[];
+    for(var fi=0;fi<ld.frames.length;fi++){
+      var f=ld.frames[fi];
+      if(!f.isKeyframe&&!f.isInterpolated){frames.push({strokes:[],isKeyframe:false,isInterpolated:false});continue;}
+      var strokes=f.strokes||[];
+      var part=(e<n-1)?(strokes[e]?[strokes[e]]:[]):strokes.slice(n-1);
+      frames.push({strokes:JSON.parse(JSON.stringify(part)),isKeyframe:f.isKeyframe,isInterpolated:f.isInterpolated});
+    }
+    var entry=els[e];
+    var emh=ld.elementMotion&&ld.elementMotion[entry.strokeId];
+    newLayers.push({
+      name:(ld.name||'Layer')+' — '+SMMotion.elementLabel(entry,e),
+      visible:true,locked:false,frames:frames,color:nextLayerColor(),
+      motion:(emh&&emh.motion)?JSON.parse(JSON.stringify(emh.motion)):undefined,
+      motionStatic:(emh&&emh.motionStatic)?JSON.parse(JSON.stringify(emh.motionStatic)):undefined,
+    });
+  }
+  var newUls=[];
+  arcLayer.activate();
+  for(var e2=0;e2<n;e2++)newUls.push(new Layer({name:'user-split-'+Date.now()+'-'+e2}));
+  userLayers[li].remove();
+  userLayers.splice.apply(userLayers,[li,1].concat(newUls));
+  userLayers.forEach(function(l){l.insertBelow(arcLayer);});
+  state.layers.splice.apply(state.layers,[li,1].concat(newLayers));
+  state.activeLayerIdx=li;
+  _layerSel=newLayers.map(function(_x,idx){return li+idx;});
+  activateUL(state.activeLayerIdx);
+  loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
+  showToast('Calque éclaté en '+n+' calques');
+}
 // Inverse of convertLayerToComponent: bakes what the component instance
 // actually displays on each main-timeline frame (play mode, speed and
 // single-frame settings included) back into plain layer keyframes, then

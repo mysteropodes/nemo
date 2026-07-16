@@ -281,10 +281,12 @@
   // but could never be placed in a StoryBoard montage — a real dead end
   // found live ("j'ai essayé avec une shape dessinné et ça ne créer pas de
   // component"). The friction this used to avoid (locking a trivial single
-  // shape into a symbol) is now mitigated by the double-click "enter layer
-  // as precomp" navigation (enterLayer/exitEnteredLayer above), so editing
-  // the shape after conversion is one extra click, not a dead end — and
-  // convertComponentToLayer stays available to reverse it.
+  // shape into a symbol) is mitigated by double-clicking the shape ON THE
+  // CANVAS, which already enters the symbol for editing (enterSymbol,
+  // wired in select-bridge.js — a separate, pre-existing mechanism from
+  // Motion's own layer-row double-click, see splitLayerIntoElements below),
+  // so editing the shape after conversion is one extra click, not a dead
+  // end — and convertComponentToLayer stays available to reverse it.
   // Guards: only for a genuine LAYER target (state.layers.indexOf finds
   // it; a per-element holder from ensureElementHolder is a bare {} never
   // in that array), not already a component. convertLayerToComponent
@@ -764,89 +766,18 @@
     inp.addEventListener('mousedown', function (e) { e.stopPropagation(); });
     return inp;
   }
-  // ---- "Enter layer" (2026-07, AE-style precomp navigation — validated on
-  // the StoryBoard/Animation2D/Motion architecture diagram, CLAUDE.md §8):
-  // double-clicking a layer row focuses JUST that layer — its own Transform
-  // group pinned at the top, every one of its elements shown as a full
-  // "Layer Shape N" Transform group below (not the one-at-a-time accordion
-  // renderElementsList already does for the normal list — all of them, at
-  // once, matching the diagram's side-by-side Layer Shape 1/Layer Shape 2
-  // boxes), the rest of the layer list hidden entirely. The way out is an
-  // extra tab in #symbol-tabs next to "Scene" (renderSymbolTabs, timeline.js
-  // — same breadcrumb strip a real Component tab uses, per explicit request
-  // "le bouton retour devrait être à côté de scène" — a floating button
-  // over the canvas was tried first and replaced by this), plus Escape. ----
-  function enterLayer(li) {
-    if (state.layers[li] && state.layers[li].symbolId) return; // a component's own strokes live in its symbol's sub-layer — nothing here to enter
-    window._motionEnteredLayer = li;
-    window._motionExpandedLayer = null;
-    window._motionExpandedElement = null;
-    window._motionEnteredCollapsed = {}; // fresh "all expanded" every entry, see renderEnteredLayer
-    window.SM.setActiveLayer(li);
-    renderLayerList(); renderTimeline();
-    if (window.renderSymbolTabs) renderSymbolTabs();
-    if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
-  }
-  function exitEnteredLayer() {
-    if (window._motionEnteredLayer == null) return;
-    window._motionEnteredLayer = null;
-    renderLayerList(); renderTimeline();
-    if (window.renderSymbolTabs) renderSymbolTabs();
-    if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
-  }
-  document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && window._motionEnteredLayer != null) exitEnteredLayer();
-  });
-  // Feedback (2026-07): "on devrait plus voir les propriétés du calque dans
-  // lequel on rentre mais chaque shape qui devient un layer avec ses
-  // propriétés à l'intérieur" — the layer's OWN Transform group (Position/
-  // Anchor/etc. of the whole layer) is dropped from this view entirely
-  // (the tab next to "Scene" already identifies which layer you're in, no
-  // need to repeat its properties here); each element instead gets a full
-  // layer-row treatment (color swatch + name + expand arrow, same visual
-  // language as a real layer row / the existing renderElementsList accordion
-  // row) rather than the old plain text sub-header — "ça permet plus de
-  // souplesse" satisfied by making each row independently collapsible
-  // (window._motionEnteredCollapsed, reset fresh on every enterLayer) rather
-  // than the old always-all-expanded layout, while still showing every
-  // shape's row at once (not one-at-a-time like renderElementsList's own
-  // accordion) since that's the whole point of the side-by-side "Layer
-  // Shape 1 / Layer Shape 2" view from the architecture diagram.
-  function renderEnteredLayer(list, li) {
-    var ld = state.layers[li];
-    if (!ld) { exitEnteredLayer(); return; }
-    if (!window._motionEnteredCollapsed) window._motionEnteredCollapsed = {};
-    var hdr = document.createElement('div'); hdr.className = 'lrow motion-props-layername';
-    hdr.textContent = ld.name || ('Layer ' + (li + 1));
-    list.appendChild(hdr);
-    var els = layerElements(li, ld);
-    els.forEach(function (entry, idx) {
-      var collapsed = !!window._motionEnteredCollapsed[entry.strokeId];
-      var row = document.createElement('div'); row.className = 'lrow motion-elem-row';
-      var arrow = document.createElement('div'); arrow.className = 'lico larrow'; arrow.textContent = collapsed ? '▸' : '▾';
-      var swatch = document.createElement('div'); swatch.className = 'motion-elem-swatch';
-      swatch.style.background = entry.sd.fillColor || entry.sd.strokeColor || 'transparent';
-      if (elementHasMotion(ld, entry.strokeId)) swatch.classList.add('has-motion');
-      var nm = document.createElement('div'); nm.className = 'lnm'; nm.textContent = elementLabel(entry, idx);
-      row.appendChild(arrow); row.appendChild(swatch); row.appendChild(nm);
-      row.addEventListener('click', function () {
-        window._motionEnteredCollapsed[entry.strokeId] = !collapsed;
-        renderLayerList(); renderTimeline();
-        if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
-      });
-      list.appendChild(row);
-      if (!collapsed) renderTransformGroup(list, ensureElementHolder(ld, entry.strokeId), 'Transform');
-    });
-  }
+  // ---- Double-click a layer row (2026-07) ----
+  // First tried as an "enter layer as precomp" in-place grouped view
+  // (StoryBoard/Animation2D/Motion architecture diagram, CLAUDE.md §8) —
+  // explicitly reversed the same day: "cette ouverture ne doit pas mettre
+  // 2 shape dans un layer mais construite 2 layer séparé avec dans chacune
+  // une shape". Double-click now calls splitLayerIntoElements (app.js,
+  // "Release to Layers"-style: explodes the layer into N real top-level
+  // layers, one per element, each carrying over its own per-element Motion
+  // keys as a normal layer-level track) — nothing left to render specially
+  // here, the layer list's normal per-layer loop just runs again afterward
+  // on the new layers like any other layer change.
   function renderLayerListMotion(list) {
-    var body = document.body;
-    var entered = window._motionEnteredLayer;
-    if (body) body.classList.toggle('motion-layer-entered', entered != null);
-    if (entered != null && state.layers[entered]) {
-      renderEnteredLayer(list, entered);
-      renderMotionPropsPanel();
-      return;
-    }
     var order = (typeof computeLayerRenderOrder === 'function') ? computeLayerRenderOrder() : state.layers.map(function (_l, i) { return { type: 'layer', idx: i }; });
     order.forEach(function (entry) {
       if (entry.type !== 'layer' || entry.hidden) return;
@@ -942,7 +873,7 @@
       });
       row.addEventListener('dblclick', function (e) {
         if (e.target.closest('.lico')) return;
-        enterLayer(li);
+        splitLayerIntoElements(li);
       });
       list.appendChild(row);
       if (!expanded) return;
@@ -1469,19 +1400,12 @@
     // precedent as camera.js's own exitCameraSeg() call when its tool
     // deactivates.
     if (state.appMode === 'motion' && window._curveEditor) window._curveEditor.exitMotionSeg();
-    // Leaving the "entered layer" precomp view along with Motion mode
-    // itself — its body class is Motion-only UI, toggled only from inside
-    // renderLayerListMotion (skipped entirely once appMode isn't 'motion',
-    // per renderLayerList's own dispatch), so it'd otherwise stay stuck
-    // showing after switching to Animation 2D/StoryBoard — must clear it
-    // here directly, not rely on a render pass that's about to stop
-    // happening. The back-navigation tab itself (symbol-tabs, see
-    // renderSymbolTabs in timeline.js) already stops appearing on its own
-    // once state.appMode !== 'motion' — no separate cleanup needed there.
+    // U's multi-layer reveal set (handleRevealAnimatedShortcut) is
+    // Motion-only transient UI state — clear it on the way out so
+    // switching back into Motion later starts fresh rather than reopening
+    // whatever U last revealed.
     if (state.appMode === 'motion' && mode !== 'motion') {
-      window._motionEnteredLayer = null;
       window._motionRevealedLayers = null;
-      document.body.classList.remove('motion-layer-entered');
     }
     state.appMode = mode;
     document.querySelectorAll('.app-mode-btn').forEach(function (b) { b.classList.toggle('active', b.dataset.mode === mode); });
@@ -1569,12 +1493,13 @@
     renderLayerListMotion: renderLayerListMotion,
     renderTimelineMotion: renderTimelineMotion,
     setAppMode: setAppMode,
-    exitEnteredLayer: exitEnteredLayer,
     onDown: onDown,
     onDrag: onDrag,
     onUp: onUp,
     handlePropShortcut: handlePropShortcut,
     revealAnimated: handleRevealAnimatedShortcut,
+    layerElements: layerElements,
+    elementLabel: elementLabel,
     distributeKeys: distributeKeys, flipKeys: flipKeys, selectEveryNthKey: selectEveryNthKey, invertKeySelection: invertKeySelection,
     getKeySelection: function () { return _motionKeySel.slice(); },
     // ui.js's shared curve widget calls this after a motion segment's
