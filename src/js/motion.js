@@ -254,6 +254,36 @@
   // "manual edit wins" principle CLAUDE.md documents for fill-merge —
   // switching modes must never silently snap a layer back to its neutral
   // default.
+  // Auto-convert to a Component on the FIRST layer-level property edit
+  // (2026-07-17, explicit request: "un calque animé dans motion si il
+  // contient plusieurs élément devient automatiquement un component que
+  // l'on retrouvera dans animation 2D") — only for a genuine LAYER target
+  // (state.layers.indexOf finds it; a per-element holder from
+  // ensureElementHolder is a bare {} never in that array) that isn't
+  // already a component and has 2+ independently selectable elements — a
+  // single-element layer animates fine as itself, no reason to wrap it.
+  // convertLayerToComponent (app.js) mutates `ld` IN PLACE (sets
+  // ld.symbolId, clears ld.frames) rather than replacing the object, so
+  // whatever the caller attaches right after this call still lands on the
+  // correct (now-converted) layer. Shared by BOTH entry points that can
+  // start animating a property — the stopwatch toggle (toggleAnimated) AND
+  // a direct canvas drag (setValue, wired up by select-bridge.js's
+  // Motion-mode drag handling) — found live (2026-07, "le component créé
+  // lors d'une modif de propriété dans motion n'apparaît pas comme
+  // component"): this used to live ONLY inside toggleAnimated, so a
+  // multi-element layer dragged on canvas WITHOUT first clicking the
+  // stopwatch silently kept animating as a plain layer (motionStatic
+  // override, no track, no conversion) — no component was ever created for
+  // exactly the gesture users reach for first. Idempotent (guarded by
+  // `!ld.symbolId`), so calling it on every drag tick is safe — it only
+  // ever actually converts once.
+  function maybeAutoConvertToComponent(ld) {
+    var li = state.layers.indexOf(ld);
+    if (li >= 0 && !ld.symbolId && userLayers[li]) {
+      var elCount = userLayers[li].children.filter(function (c) { return (c instanceof Path || c instanceof Raster) && isSelectablePathChild(c); }).length;
+      if (elCount >= 2) convertLayerToComponent(li);
+    }
+  }
   function toggleAnimated(ld, prop) {
     if (isAnimated(ld, prop)) {
       var v = valueAtFrame(ld, prop, state.currentFrame);
@@ -262,23 +292,7 @@
       if (!ld.motionStatic) ld.motionStatic = {};
       ld.motionStatic[prop] = v;
     } else {
-      // Auto-convert to a Component on the FIRST layer-level key (2026-07-17,
-      // explicit request: "un calque animé dans motion si il contient
-      // plusieurs élément devient automatiquement un component que l'on
-      // retrouvera dans animation 2D") — only for a genuine LAYER target
-      // (state.layers.indexOf finds it; an per-element holder from
-      // ensureElementHolder is a bare {} never in that array) that isn't
-      // already a component and has 2+ independently selectable elements —
-      // a single-element layer animates fine as itself, no reason to wrap
-      // it. convertLayerToComponent (app.js) mutates `ld` IN PLACE
-      // (sets ld.symbolId, clears ld.frames) rather than replacing the
-      // object, so the track this function attaches right below still
-      // lands on the correct (now-converted) layer.
-      var li = state.layers.indexOf(ld);
-      if (li >= 0 && !ld.symbolId && userLayers[li]) {
-        var elCount = userLayers[li].children.filter(function (c) { return (c instanceof Path || c instanceof Raster) && isSelectablePathChild(c); }).length;
-        if (elCount >= 2) convertLayerToComponent(li);
-      }
+      maybeAutoConvertToComponent(ld);
       var cur = staticValue(ld, prop);
       ensureTrack(ld, prop).keys = [{ frame: state.currentFrame, v: cur, curvePoints: cloneCurvePts(DEFAULT_CURVE), hOut: [0, 0], hIn: [0, 0] }];
     }
@@ -288,7 +302,7 @@
   // animated, it's just the static override.
   function setValue(ld, prop, values) {
     if (isAnimated(ld, prop)) setKeyAtCurrentFrame(ld, prop, values);
-    else { if (!ld.motionStatic) ld.motionStatic = {}; ld.motionStatic[prop] = values.slice(); }
+    else { maybeAutoConvertToComponent(ld); if (!ld.motionStatic) ld.motionStatic = {}; ld.motionStatic[prop] = values.slice(); }
   }
 
   // ---- render-time transform (engine-bridge.js hook — see header
