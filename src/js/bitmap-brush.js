@@ -267,7 +267,12 @@
     if (!basePath || !basePath.segments || basePath.segments.length < 2) return basePath;
     spec = spec || {
       tip: state.bitmapTip || 'soft',
-      size: state.bitmapSize || 40,
+      // Unified with the vector stroke's own Width (2026-07-17, "la size
+      // et le width du stroke doivent être unifiés pour le bitmap et
+      // vecto") : ONE size field drives both — the dab diameter IS the
+      // stroke width. The panel's separate "Size" row is gone; specs
+      // already applied to existing strokes keep their own stored size.
+      size: state.brushSize || 40,
       spacing: state.bitmapSpacing != null ? state.bitmapSpacing : 15,
       scatter: state.bitmapScatter != null ? state.bitmapScatter : 20,
       opacity: (state.bitmapOpacity != null ? state.bitmapOpacity : 100) / 100,
@@ -625,7 +630,7 @@
     if (!liveCanvas || !liveCtx) return;
     var x = clientX - liveOriginX, y = clientY - liveOriginY;
     var zoom = (window.view && view.zoom) || 1;
-    var baseSize = (state.bitmapSize || 40) * zoom; // approximate world size at current zoom
+    var baseSize = (state.brushSize || 40) * zoom; // unified with the vector Width — approximate world size at current zoom
     var spacing = Math.max(1, baseSize * ((state.bitmapSpacing != null ? state.bitmapSpacing : 15) / 100));
     var scatterPx = baseSize * ((state.bitmapScatter != null ? state.bitmapScatter : 20) / 100);
     var opacity = (state.bitmapOpacity != null ? state.bitmapOpacity : 100) / 100;
@@ -679,7 +684,9 @@
     // reorg pass) — state.bitmapTip's default lives here since this file
     // still owns that state field, the picker only ever writes to it.
     if (state.bitmapTip === undefined) state.bitmapTip = 'soft';
-    bindNum('p-bitmap-size', 'bitmapSize', 40);
+    // 'p-bitmap-size' is GONE from the panel — dab size is unified with
+    // the stroke Width field (p-sw / state.brushSize), see
+    // applyBitmapBrushTexture's spec comment.
     bindNum('p-bitmap-spacing', 'bitmapSpacing', 15);
     bindNum('p-bitmap-scatter', 'bitmapScatter', 20);
     bindNum('p-bitmap-opacity', 'bitmapOpacity', 100);
