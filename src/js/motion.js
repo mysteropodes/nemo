@@ -391,7 +391,67 @@
       { point: [cx, cy + r], handleIn: [-k, 0], handleOut: [k, 0] },
     ];
   }
+  // ---- Unified motion path for a multi-element canvas selection
+  // (2026-07-16, "si on sélectionne plusieurs éléments qui ont
+  // actuellement un motion path individuel alors ils auront un motion
+  // path unifié à partir de la sélection") : with 2+ elements of the
+  // active layer selected on canvas, each carrying its OWN animated
+  // position, the overlay stops drawing N separate paths' worth of
+  // clutter and shows ONE path — selection centroid + the AVERAGE of the
+  // elements' position offsets, one dot per frame keyed on ANY of them.
+  // Dragging a dot moves every selected element's key at that frame by
+  // the same delta (created on the fly at its interpolated value for an
+  // element that has no key there yet), so the group's trajectory is
+  // edited as a single object without merging/destroying the individual
+  // tracks. ----
+  function unifiedMotionTargets() {
+    if (state.appMode !== 'motion') return null;
+    var sel = (typeof selectedPaths !== 'undefined') ? selectedPaths : null;
+    if (!sel || sel.length < 2) return null;
+    var li = state.activeLayerIdx, ld = state.layers[li];
+    if (!ld || ld.symbolId || !userLayers[li]) return null;
+    var seen = {}, out = [], cx = 0, cy = 0, n = 0;
+    sel.forEach(function (p) {
+      if (!p || !p.data || p.parent !== userLayers[li]) return;
+      cx += p.bounds.center.x; cy += p.bounds.center.y; n++;
+      var sid = p.data.strokeId;
+      if (!sid || seen[sid]) return;
+      seen[sid] = true;
+      var h = ld.elementMotion && ld.elementMotion[sid];
+      if (h && h.motion && h.motion.position && h.motion.position.keys.length) out.push({ strokeId: sid, holder: h });
+    });
+    if (out.length < 2 || !n) return null;
+    return { targets: out, centroid: { x: cx / n, y: cy / n } };
+  }
+  function unifiedFrames(targets) {
+    var set = {};
+    targets.forEach(function (t) { t.holder.motion.position.keys.forEach(function (k) { set[k.frame] = true; }); });
+    return Object.keys(set).map(Number).sort(function (a, b) { return a - b; });
+  }
+  function unifiedPointAt(u, frame) {
+    var sx = 0, sy = 0;
+    u.targets.forEach(function (t) { var v = valueAtFrame(t.holder, 'position', frame); sx += v[0]; sy += v[1]; });
+    return { x: u.centroid.x + sx / u.targets.length, y: u.centroid.y + sy / u.targets.length };
+  }
+  function buildUnifiedOverlay(u) {
+    var items = [];
+    var zs = 1 / Math.max(0.0001, view.zoom);
+    var col = [189, 147, 249, 220]; // violet — visibly distinct from the single-target accent-blue path
+    var frames = unifiedFrames(u.targets);
+    if (frames.length < 1) return items;
+    var pts = frames.map(function (f) { return unifiedPointAt(u, f); });
+    if (pts.length > 1) {
+      items.push({ segments: pts.map(function (p) { return { point: [p.x, p.y] }; }), closed: false, fillColor: null, strokeColor: col, strokeWidth: 1.5 * zs, dashPattern: [5 * zs, 4 * zs] });
+    }
+    frames.forEach(function (f, i) {
+      var isCur = f === state.currentFrame;
+      items.push({ segments: circleSegs(pts[i].x, pts[i].y, (isCur ? 6 : 4.5) * zs), closed: true, fillColor: isCur ? [255, 170, 40, 255] : col, strokeColor: [30, 30, 30, 255], strokeWidth: 1.2 * zs });
+    });
+    return items;
+  }
   function buildOverlayItems() {
+    var u = unifiedMotionTargets();
+    if (u) return buildUnifiedOverlay(u); // multi-selection: the unified path replaces the single-target one entirely
     var t = activeMotionTarget();
     if (!t) return [];
     var holder = t.holder, bc = t.boundsCenter;
@@ -529,6 +589,22 @@
     return Math.hypot(pt.x - ax, pt.y - ay) < tol ? { holder: t.holder, bc: t.boundsCenter } : null;
   }
   function onDown(event) {
+    // Unified multi-selection path first — while it's active the overlay
+    // shows ONLY the unified dots (see buildOverlayItems), so the single-
+    // target hit-tests below would grab invisible geometry.
+    var u = unifiedMotionTargets();
+    if (u) {
+      var uFrames = unifiedFrames(u.targets), uTol = 8 / view.zoom;
+      for (var ui = 0; ui < uFrames.length; ui++) {
+        var upt = unifiedPointAt(u, uFrames[ui]);
+        if (Math.hypot(event.point.x - upt.x, event.point.y - upt.y) < uTol) {
+          pushUndo();
+          _motionDrag = { mode: 'unified', u: u, frame: uFrames[ui], last: { x: event.point.x, y: event.point.y } };
+          return true;
+        }
+      }
+      return false;
+    }
     var t = activeMotionTarget();
     if (t) {
       var ap = hitAnchorPoint(event.point, t);
@@ -544,7 +620,23 @@
   }
   function onDrag(event) {
     if (!_motionDrag) return false;
-    if (_motionDrag.mode === 'anchor') {
+    if (_motionDrag.mode === 'unified') {
+      var dx = event.point.x - _motionDrag.last.x, dy = event.point.y - _motionDrag.last.y;
+      _motionDrag.last = { x: event.point.x, y: event.point.y };
+      var uf = _motionDrag.frame;
+      _motionDrag.u.targets.forEach(function (t) {
+        var track = t.holder.motion.position;
+        var k = track.keys.find(function (kk) { return kk.frame === uf; });
+        if (!k) {
+          // no key here yet on THIS element — freeze its interpolated
+          // value as a new key so the group edit doesn't yank its whole
+          // curve, then offset like the others.
+          k = { frame: uf, v: valueAtFrame(t.holder, 'position', uf), curvePoints: cloneCurvePts(DEFAULT_CURVE), hOut: [0, 0], hIn: [0, 0] };
+          track.keys.push(k); sortKeys(track);
+        }
+        k.v[0] += dx; k.v[1] += dy;
+      });
+    } else if (_motionDrag.mode === 'anchor') {
       setValue(_motionDrag.holder, 'anchor', [event.point.x - _motionDrag.bc.x, event.point.y - _motionDrag.bc.y]);
     } else {
       var k = _motionDrag.key;
