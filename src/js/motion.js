@@ -825,12 +825,34 @@
       row.appendChild(solo);
       var nm = document.createElement('div'); nm.className = 'lnm'; nm.textContent = ld.name || ('Layer ' + (li + 1));
       row.appendChild(nm);
-      row.addEventListener('click', function () {
+      row.addEventListener('click', function (e) {
         // A completed drag-drop still fires a trailing native 'click' on
         // mouseup — same guard timeline.js's own layer rows use (see its
         // comment there) so releasing a reorder drag doesn't ALSO toggle
         // this row's Transform-group expansion.
         if (window._layerDragJustEnded) { window._layerDragJustEnded = false; return; }
+        // Cmd/Ctrl-click and Shift-click multi-select — same convention as
+        // Animation 2D's own layer rows (timeline.js renderLayerList), added
+        // here specifically so 2+ layers can be selected DIRECTLY (no need
+        // to expand tracks or marquee individual keyframe diamonds first)
+        // to trigger the stagger box below. Feedback: "je vois pas trop ce
+        // que ça fait ton truc pas aussi intuitif que skew" — the reference
+        // stagger gesture starts from selecting whole LAYERS, not keys.
+        if (e.metaKey || e.ctrlKey) {
+          if (_layerSel.indexOf(state.activeLayerIdx) < 0) _layerSel.push(state.activeLayerIdx);
+          var p = _layerSel.indexOf(li); if (p >= 0) _layerSel.splice(p, 1); else _layerSel.push(li);
+          window.SM.setActiveLayer(li);
+          renderLayerList(); renderTimeline();
+          return;
+        }
+        if (e.shiftKey && _layerSel.length) {
+          var anchor = _layerSel[0]; _layerSel = [];
+          for (var l = Math.min(anchor, li); l <= Math.max(anchor, li); l++) _layerSel.push(l);
+          window.SM.setActiveLayer(li);
+          renderLayerList(); renderTimeline();
+          return;
+        }
+        _layerSel = [];
         // A row can be open via the single-accordion state OR via U's
         // reveal set (or both) — always drop it from the reveal set on
         // click, but only touch the single-accordion value if THIS row is
@@ -1223,7 +1245,7 @@
       if (entry.type !== 'layer' || entry.hidden) return;
       var li = entry.idx, ld = state.layers[li];
       var expanded = isLayerExpanded(li);
-      var spacer = document.createElement('div'); spacer.className = 'frow';
+      var spacer = document.createElement('div'); spacer.className = 'frow'; spacer.dataset.layer = li;
       if (window.SMLayerInOut) SMLayerInOut.buildBar(spacer, li);
       grid.appendChild(spacer);
       if (!expanded) return;
@@ -1253,6 +1275,7 @@
     // plus keeps the box tracking selected diamonds that just moved
     // horizontally (stagger drag calls renderTimeline() every tick).
     updateKeySelectionBox();
+    updateLayerStaggerBox();
   }
   // ---- multi-select (marquee rectangle) + group drag ----
   // AE convention: drag a selection rectangle over the keyframe
@@ -1369,6 +1392,10 @@
     if (_keySelBoxEl) { _keySelBoxEl.remove(); _keySelBoxEl = null; _keySelHandleEl = null; }
   }
   function updateKeySelectionBox() {
+    // A direct multi-layer selection (see below) takes priority — no point
+    // showing both boxes at once, and the layer-level one is the more
+    // direct gesture per the reference ("select layers, drag").
+    if (_layerSel.length >= 2) { removeKeySelectionBox(); return; }
     var dias = Array.from(document.querySelectorAll('#frame-grid .motion-key.sel'));
     if (dias.length < 2) { removeKeySelectionBox(); return; }
     var x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
@@ -1394,6 +1421,45 @@
     }
     _keySelBoxEl.style.left = x0 + 'px'; _keySelBoxEl.style.top = y0 + 'px';
     _keySelBoxEl.style.width = (x1 - x0) + 'px'; _keySelBoxEl.style.height = (y1 - y0) + 'px';
+  }
+  // ---- layer-level stagger (2026-07) ----
+  // Feedback: "je vois pas trop ce que ça fait ton truc pas aussi intuitif
+  // que skew" + a reference GIF showing the real gesture — select whole
+  // LAYERS (Cmd/Shift-click on the rows, wired above), no need to expand
+  // any Transform group or marquee individual keyframe diamonds first. The
+  // handle then staggers EVERY animated property's EVERY key for each
+  // selected layer together (not just one property/track), matching the
+  // reference where a layer's whole keyframe set shifts as one block.
+  var _layerStaggerBoxEl = null, _layerStaggerHandleEl = null;
+  function removeLayerStaggerBox() {
+    if (_layerStaggerBoxEl) { _layerStaggerBoxEl.remove(); _layerStaggerBoxEl = null; _layerStaggerHandleEl = null; }
+  }
+  function updateLayerStaggerBox() {
+    if (state.appMode !== 'motion' || _layerSel.length < 2) { removeLayerStaggerBox(); return; }
+    var spacers = _layerSel.map(function (li) { return document.querySelector('#frame-grid .frow[data-layer="' + li + '"]'); }).filter(Boolean);
+    if (spacers.length < 2) { removeLayerStaggerBox(); return; }
+    var gridEl = document.getElementById('frame-grid'); if (!gridEl) { removeLayerStaggerBox(); return; }
+    var y0 = Infinity, y1 = -Infinity;
+    spacers.forEach(function (s) { var b = s.getBoundingClientRect(); y0 = Math.min(y0, b.top); y1 = Math.max(y1, b.bottom); });
+    var gb = gridEl.getBoundingClientRect();
+    var x = gb.left + state.currentFrame * FC - gridEl.scrollLeft;
+    if (!_layerStaggerBoxEl) {
+      _layerStaggerBoxEl = document.createElement('div'); _layerStaggerBoxEl.className = 'motion-keysel-box';
+      _layerStaggerHandleEl = document.createElement('div'); _layerStaggerHandleEl.className = 'motion-keysel-handle';
+      _layerStaggerHandleEl.title = 'Glisser pour échelonner tous les calques sélectionnés';
+      _layerStaggerBoxEl.appendChild(_layerStaggerHandleEl);
+      document.body.appendChild(_layerStaggerBoxEl);
+      _layerStaggerHandleEl.addEventListener('mousedown', function (e) {
+        e.stopPropagation(); e.preventDefault();
+        var order = _layerSel.slice().sort(function (a, b) { return a - b; });
+        var holders = order.map(function (li) { return state.layers[li]; }).filter(Boolean);
+        if (holders.length < 2) return;
+        pushUndo();
+        window._motionLayerStaggerDrag = { startX: e.clientX, holders: holders };
+      });
+    }
+    _layerStaggerBoxEl.style.left = x + 'px'; _layerStaggerBoxEl.style.top = y0 + 'px';
+    _layerStaggerBoxEl.style.width = Math.max(6, FC) + 'px'; _layerStaggerBoxEl.style.height = (y1 - y0) + 'px';
   }
   function updateMarquee(e) {
     if (!_motionMarquee) return;
@@ -1421,6 +1487,38 @@
   // span-end/keyframe drag handlers already in timeline.js).
   function onDragMove(e) {
     updateMarquee(e);
+    var ld2 = window._motionLayerStaggerDrag;
+    if (ld2) {
+      var deltaFrames2 = Math.round((e.clientX - ld2.startX) / FC);
+      if (!deltaFrames2) return;
+      // Every animated PROPERTY's every KEY on a selected layer shifts
+      // together (rank 0 = anchor, never moves) — the whole layer's
+      // keyframe set staggers as one block, matching the reference.
+      var ok2 = ld2.holders.every(function (h, rank) {
+        if (rank === 0 || !h.motion) return true;
+        return PROPS.every(function (prop) {
+          var track = h.motion[prop]; if (!track) return true;
+          return track.keys.every(function (k) {
+            var nf = k.frame + deltaFrames2 * rank;
+            if (nf < 0 || nf >= state.totalFrames) return false;
+            var existing = keyAt(track, nf);
+            return !existing || existing === k;
+          });
+        });
+      });
+      if (!ok2) return;
+      ld2.holders.forEach(function (h, rank) {
+        if (rank === 0 || !h.motion) return;
+        PROPS.forEach(function (prop) {
+          var track = h.motion[prop]; if (!track) return;
+          track.keys.forEach(function (k) { k.frame += deltaFrames2 * rank; });
+          sortKeys(track);
+        });
+      });
+      ld2.startX = e.clientX;
+      renderTimeline();
+      return;
+    }
     var d = window._motionKeyDrag; if (!d) return;
     var deltaFrames = Math.round((e.clientX - d.startX) / FC);
     if (d.stagger) {
@@ -1479,6 +1577,7 @@
   }
   function onDragUp() {
     endMarquee();
+    if (window._motionLayerStaggerDrag) { window._motionLayerStaggerDrag = null; if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); return; }
     if (!window._motionKeyDrag) return;
     window._motionKeyDrag = null;
     if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
@@ -1502,6 +1601,7 @@
     if (state.appMode === 'motion' && mode !== 'motion') {
       window._motionRevealedLayers = null;
       removeKeySelectionBox();
+      removeLayerStaggerBox();
     }
     state.appMode = mode;
     document.querySelectorAll('.app-mode-btn').forEach(function (b) { b.classList.toggle('active', b.dataset.mode === mode); });
