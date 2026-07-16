@@ -3727,6 +3727,12 @@ function onKeyDown(event){
   // only means "reveal this property" when a layer is selected in its
   // Timeline panel.
   if(state.appMode==='motion'&&window._motionExpandedLayer!=null&&window.SMMotion&&SMMotion.handlePropShortcut(k,event.shiftKey)){event.preventDefault();return;}
+  // AE's "U" — reveal animated properties on the selected layer(s) (or
+  // every layer if none selected), explicit request. Takes priority over
+  // the normal tool shortcuts below for the same reason P/A/R/S/T does
+  // ('u' is otherwise bound to the Line tool, TOOL_SHORTCUTS) — only inside
+  // Motion mode, the Line tool shortcut is untouched everywhere else.
+  if((k==='u'||k==='U')&&state.appMode==='motion'&&window.SMMotion&&SMMotion.revealAnimated()){event.preventDefault();return;}
   if(runToolShortcut(k)){}
   // NLE-style transport: J/K jump to the previous/next real keyframe on the
   // active layer (Premiere/Final Cut convention); ','/'.' step exactly one

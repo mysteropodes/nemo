@@ -81,6 +81,30 @@
     renderLayerList(); renderTimeline();
     return true;
   }
+  // AE's "U" — reveal animated properties on the selected layer(s), or on
+  // EVERY layer if none is selected, per explicit request. Reuses
+  // _hideUnanimated (the existing "Filter Properties" toggle/button just
+  // above) for the "only keyframed/touched properties show" part rather
+  // than inventing a second near-identical filter; the new part is
+  // _motionRevealedLayers, which lets several layers' Transform groups be
+  // open AT ONCE (window._motionExpandedLayer, the older single-row
+  // accordion state used by plain row clicks, only ever holds ONE layer —
+  // additive here, doesn't touch that existing click-to-expand behavior).
+  // isLayerExpanded is the single source of truth both render passes
+  // (renderLayerListMotion's left list AND renderTimelineMotion's right
+  // track grid) must agree on — see CLAUDE.md §3 on why a duplicated
+  // predicate would be a bug waiting to happen.
+  function isLayerExpanded(li) {
+    return window._motionExpandedLayer === li || (window._motionRevealedLayers && window._motionRevealedLayers.indexOf(li) >= 0);
+  }
+  function handleRevealAnimatedShortcut() {
+    if (state.appMode !== 'motion') return false;
+    var targets = (window._layerSel && window._layerSel.length) ? window._layerSel.slice() : state.layers.map(function (_l, i) { return i; });
+    window._motionRevealedLayers = targets;
+    _hideUnanimated = true;
+    renderLayerList(); renderTimeline();
+    return true;
+  }
 
   // ---- easing math: N-point on-curve-waypoint model, deliberate copy of
   // ui.js's shared curve editor (Catmull-Rom tangents -> per-segment cubic
@@ -838,7 +862,7 @@
       // inside the symbol's own sub-layer, not addressable as elements of
       // THIS layer, so per-element motion genuinely has no meaning here.
       var isComponent = !!ld.symbolId;
-      var expanded = window._motionExpandedLayer === li;
+      var expanded = isLayerExpanded(li);
       var row = document.createElement('div');
       row.className = 'lrow' + (li === state.activeLayerIdx ? ' act' : '');
       row.dataset.layer = li;
@@ -877,7 +901,16 @@
         // comment there) so releasing a reorder drag doesn't ALSO toggle
         // this row's Transform-group expansion.
         if (window._layerDragJustEnded) { window._layerDragJustEnded = false; return; }
-        window._motionExpandedLayer = expanded ? null : li;
+        // A row can be open via the single-accordion state OR via U's
+        // reveal set (or both) — always drop it from the reveal set on
+        // click, but only touch the single-accordion value if THIS row is
+        // the one holding it, so clicking a U-revealed row never collapses
+        // some unrelated row that's separately accordion-open.
+        if (window._motionRevealedLayers) {
+          var ri = window._motionRevealedLayers.indexOf(li);
+          if (ri >= 0) window._motionRevealedLayers.splice(ri, 1);
+        }
+        window._motionExpandedLayer = expanded ? (window._motionExpandedLayer === li ? null : window._motionExpandedLayer) : li;
         _propFilter = null; // fresh "show all" every time the expanded layer changes
         window._motionExpandedElement = null;
         setKeySel([]);
@@ -1236,7 +1269,7 @@
     order.forEach(function (entry) {
       if (entry.type !== 'layer' || entry.hidden) return;
       var li = entry.idx, ld = state.layers[li];
-      var expanded = window._motionExpandedLayer === li;
+      var expanded = isLayerExpanded(li);
       var spacer = document.createElement('div'); spacer.className = 'frow';
       if (window.SMLayerInOut) SMLayerInOut.buildBar(spacer, li);
       grid.appendChild(spacer);
@@ -1447,6 +1480,7 @@
     // once state.appMode !== 'motion' — no separate cleanup needed there.
     if (state.appMode === 'motion' && mode !== 'motion') {
       window._motionEnteredLayer = null;
+      window._motionRevealedLayers = null;
       document.body.classList.remove('motion-layer-entered');
     }
     state.appMode = mode;
@@ -1540,6 +1574,7 @@
     onDrag: onDrag,
     onUp: onUp,
     handlePropShortcut: handlePropShortcut,
+    revealAnimated: handleRevealAnimatedShortcut,
     distributeKeys: distributeKeys, flipKeys: flipKeys, selectEveryNthKey: selectEveryNthKey, invertKeySelection: invertKeySelection,
     getKeySelection: function () { return _motionKeySel.slice(); },
     // ui.js's shared curve widget calls this after a motion segment's
