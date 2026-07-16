@@ -847,6 +847,16 @@ function getEffectiveStrokes(layerIdx,frameIdx){
     // here are live references into the SYMBOL'S OWN stored frame data, so
     // transforming in place would permanently corrupt the symbol itself;
     // every stroke is deep-cloned first.
+    // A Component with its own camera keys (set while inside it via
+    // enterSymbol's cameraKeys swap, see §8 CLAUDE.md) bakes that camera's
+    // pan/zoom/roll into its rendered content HERE, at the one chokepoint
+    // every consumer (buildSceneJson, StoryBoard thumbnails, export) already
+    // shares — so the Component's camera move travels with it wherever the
+    // instance is placed, same as its own layers/keyframes/tweens do.
+    if(sym.cameraKeys&&sym.cameraKeys.length&&window.SMCamera){
+      var camM=SMCamera.cameraMatrixAtFrame(sym.cameraKeys,ii,state.canvasW,state.canvasH);
+      if(camM)out=out.map(function(sd){return applyMatrixToStrokeData(JSON.parse(JSON.stringify(sd)),camM);});
+    }
     if(ld.symMatrix){
       var m=symMatrixOf(ld);
       out=out.map(function(sd){return applyMatrixToStrokeData(JSON.parse(JSON.stringify(sd)),m);});
@@ -915,7 +925,13 @@ function convertLayersToComponent(indices){
   if(indices.length<2){convertLayerToComponent(indices[0]!==undefined?indices[0]:state.activeLayerIdx);return;}
   saveAllLayerFrames();pushUndo();
   var symId=genSymbolId();
-  var symLayers=indices.map(function(i){return{name:state.layers[i].name,visible:state.layers[i].visible,locked:false,frames:JSON.parse(JSON.stringify(state.layers[i].frames))};});
+  var symLayers=indices.map(function(i){
+    var src=state.layers[i];
+    return{name:src.name,visible:src.visible,locked:false,frames:JSON.parse(JSON.stringify(src.frames)),
+      motion:src.motion?JSON.parse(JSON.stringify(src.motion)):undefined,
+      motionStatic:src.motionStatic?JSON.parse(JSON.stringify(src.motionStatic)):undefined,
+      elementMotion:src.elementMotion?JSON.parse(JSON.stringify(src.elementMotion)):undefined};
+  });
   state.symbols[symId]={name:'Composant',totalFrames:state.totalFrames,fps:state.fps,layers:symLayers};
   var insertAt=indices[0];
   for(var k=indices.length-1;k>=0;k--){state.layers.splice(indices[k],1);userLayers.splice(indices[k],1);}
@@ -1097,12 +1113,13 @@ function enterSymbol(symId){
   if(state.activeSymbolId){showToast('Composants imbriqués non supportés — fermez le composant courant');return;}
   if(!state.symbols[symId])return;
   saveAllLayerFrames();
-  _sceneSnapshot={layers:state.layers,totalFrames:state.totalFrames,waIn:state.waIn,waOut:state.waOut,activeLayerIdx:state.activeLayerIdx,fps:state.fps,currentFrame:state.currentFrame,userLayers:userLayers};
+  _sceneSnapshot={layers:state.layers,totalFrames:state.totalFrames,waIn:state.waIn,waOut:state.waOut,activeLayerIdx:state.activeLayerIdx,fps:state.fps,currentFrame:state.currentFrame,userLayers:userLayers,cameraKeys:state.cameraKeys};
   userLayers.forEach(function(l){l.opacity=0.25;});
   var sym=state.symbols[symId];
   var symPaperLayers=ensureSymbolPaperLayers(symId);
   symPaperLayers.forEach(function(l){l.visible=true;l.opacity=1;});
   state.layers=sym.layers;state.totalFrames=sym.totalFrames;state.waIn=0;state.waOut=sym.totalFrames-1;
+  state.cameraKeys=sym.cameraKeys||(sym.cameraKeys=[]);
   window._waIn=0;window._waOut=state.waOut;window._totalF=state.totalFrames;
   state.activeLayerIdx=0;state.currentFrame=0;state.fps=sym.fps||state.fps;
   userLayers=symPaperLayers;
@@ -1123,6 +1140,7 @@ function exitToScene(){
   window._waIn=state.waIn;window._waOut=state.waOut;window._totalF=state.totalFrames;
   state.activeLayerIdx=_sceneSnapshot.activeLayerIdx;state.currentFrame=_sceneSnapshot.currentFrame;state.fps=_sceneSnapshot.fps;
   userLayers=_sceneSnapshot.userLayers;
+  state.cameraKeys=_sceneSnapshot.cameraKeys;
   userLayers.forEach(function(l){l.opacity=1;});
   state.activeSymbolId=null;_sceneSnapshot=null;
   activateUL(state.activeLayerIdx);drawStage();loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderSymbolTabs)renderSymbolTabs();

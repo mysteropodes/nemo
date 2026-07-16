@@ -107,9 +107,9 @@
   function invalidateThumb(symbolId) {
     Object.keys(_thumbCache).forEach(function (k) { if (k.indexOf(symbolId + ':') === 0) delete _thumbCache[k]; });
   }
-  function thumbDataUrl(symbolId, frame) {
+  function thumbDataUrl(symbolId, frame, bypassCache) {
     var key = symbolId + ':' + frame;
-    if (_thumbCache[key]) return _thumbCache[key];
+    if (!bypassCache && _thumbCache[key]) return _thumbCache[key];
     var sym = state.symbols[symbolId];
     if (!sym || !window.project) return null;
     if (!_thumbLayer) {
@@ -139,7 +139,7 @@
       _thumbLayer.visible = false;
     }
     prev.activate();
-    if (url) _thumbCache[key] = url;
+    if (url && !bypassCache) _thumbCache[key] = url;
     return url;
   }
   function applyThumb(card, m, sym) {
@@ -153,6 +153,40 @@
       card.style.backgroundRepeat = 'no-repeat';
       card.style.backgroundPosition = 'center';
     }
+  }
+
+  // ---- live hover preview (2026-07) ----
+  // A real playing mini-preview for the card currently under the pointer —
+  // "un vrai aperçu live" per explicit user request, as opposed to the
+  // static frame-0/trim-in thumbnail above. Deliberately scoped to AT MOST
+  // ONE card at a time (never all cards in the grid) — the static-thumbnail
+  // comment above already rejected always-live re-rasterizing on perf
+  // grounds (CLAUDE.md §5); a single rAF loop that stops the instant the
+  // pointer leaves keeps the same cost profile as one hand-scrubbed card.
+  var _livePreview = null; // { raf, card, m, sym, t0 }
+  function stopLivePreview() {
+    if (!_livePreview) return;
+    if (_livePreview.raf) cancelAnimationFrame(_livePreview.raf);
+    var lp = _livePreview;
+    _livePreview = null;
+    if (lp.card && lp.card.isConnected) applyThumb(lp.card, lp.m, lp.sym); // restore static frame
+  }
+  function startLivePreview(card, m, sym) {
+    if (!sym) return;
+    if (_livePreview && _livePreview.card === card) return;
+    stopLivePreview();
+    var total = Math.max(1, sym.totalFrames || 1);
+    var fps = sym.fps || state.fps || 24;
+    var lp = { card: card, m: m, sym: sym, t0: performance.now() };
+    _livePreview = lp;
+    function tick() {
+      if (_livePreview !== lp || !card.isConnected) { if (_livePreview === lp) _livePreview = null; return; }
+      var frame = Math.floor(((performance.now() - lp.t0) / 1000) * fps) % total;
+      var url = thumbDataUrl(m.symbolId, frame, true);
+      if (url) card.style.backgroundImage = 'url(' + url + ')';
+      lp.raf = requestAnimationFrame(tick);
+    }
+    tick();
   }
 
   // ---- DOM ----
@@ -186,6 +220,7 @@
     space.style.display = on ? 'block' : 'none';
     if (!on) {
       stopMontagePlay();
+      stopLivePreview();
       if (previewLayer) previewLayer.removeChildren();
     }
     // The regular timeline chrome shares #tl-content — swap wholesale.
@@ -415,6 +450,8 @@
     card.className = 'sb-thumb';
     card.style.background = symbolColor(m.symbolId); // fallback shown until/unless a real render succeeds
     applyThumb(card, m, sym);
+    card.addEventListener('mouseenter', function () { startLivePreview(card, m, sym); });
+    card.addEventListener('mouseleave', stopLivePreview);
     el.appendChild(card);
     var side = document.createElement('div');
     side.className = 'sb-side';

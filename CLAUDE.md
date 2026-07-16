@@ -266,3 +266,30 @@ placement), pas un flag `ld.symbolId` au niveau du calque entier — donc ça tr
 consommateurs de item-type déjà listés en §1 (saveActiveLayerFrame, getEffectiveStrokes,
 buildSceneJson, select-bridge, Motion element-holders). Chantier à part entière, pas un
 sous-produit du reste de cette section.
+
+**Component "lu par les 3 parties" (construit 2026-07)** : `state.symbols[symId]` est LE
+Component partagé par StoryBoard et Animation2D/Motion — trois lacunes concrètes comblées :
+1. **Fusion multi-calques préserve Motion** : `convertLayersToComponent` (app.js) copie
+   désormais `motion`/`motionStatic`/`elementMotion` de chaque calque source dans le
+   `symLayer` correspondant (avant : silencieusement perdus, famille de bug n°1 du §1).
+   `convertLayerToComponent` (cas 1 calque) n'avait pas ce problème — l'`ld` original reste
+   l'instance et garde son `.motion` propre (transform de l'instance, type precomp AE).
+2. **Caméra par-Component** : `state.cameraKeys` était 100% global. `enterSymbol`/
+   `exitToScene` (app.js) swappent maintenant `state.cameraKeys` vers/depuis
+   `sym.cameraKeys` exactement comme ils swappent déjà `state.layers`/`userLayers` — édition
+   caméra à l'intérieur d'un Component = timeline caméra propre à ce Component, zéro
+   changement dans camera.js (il lit/écrit déjà `state.cameraKeys` en direct). Le rendu
+   compose ce Component-camera dans `getEffectiveStrokes` (app.js, branche `ld.symbolId`) via
+   `SMCamera.cameraMatrixAtFrame(sym.cameraKeys, ii, canvasW, canvasH)` + `applyMatrixToStrokeData`
+   (même helper que `symMatrix`) — donc le mouvement de caméra d'un Component voyage avec
+   l'instance partout où elle est placée (Animation2D, export, StoryBoard).
+   ⚠️ Piège vérifié empiriquement : `Matrix.rotate/scale/translate` (objet Matrix nu) compose
+   en **ajoutant** chaque opération, alors que `Item.rotate/scale/translate` (Layer/Path)
+   compose en **préfixant** — mêmes appels dans le même ordre donnent des résultats DIFFÉRENTS
+   entre les deux. `cameraMatrixAtFrame` doit appeler translate/scale/rotate dans l'ordre
+   INVERSE de la chaîne `applyToExportLayer` pour produire la matrice équivalente — confirmé
+   par test direct dans le Browser pane, pas par lecture de la doc Paper.js.
+3. **Aperçu StoryBoard live** : `thumbDataUrl` accepte un 3e paramètre `bypassCache` ;
+   `storyboard.js` a une boucle rAF (`startLivePreview`/`stopLivePreview`) limitée à LA carte
+   survolée (jamais toutes à la fois — coût déjà rejeté par le commentaire historique de
+   `thumbDataUrl`), qui revient à la vignette statique au `mouseleave`.

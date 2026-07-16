@@ -70,10 +70,12 @@
   // the departing key, hIn on the arriving one — [0,0] defaults collapse
   // to the straight line, so pre-v19 projects behave identically); width
   // (zoom) and rot (roll) lerp along the same eased t.
-  function cameraAtFrame(frame) {
-    ensureState();
-    var ks = state.cameraKeys;
-    if (!ks.length) return null;
+  // Parametrized on an explicit keys array so a track OTHER than the
+  // currently-active state.cameraKeys can be evaluated too (a Component's
+  // own cameraKeys, composited into its instance's render — see app.js
+  // getEffectiveStrokes) without needing to swap state.cameraKeys first.
+  function cameraAtFrameFor(ks, frame) {
+    if (!ks || !ks.length) return null;
     if (frame <= ks[0].frame) return snap(ks[0]);
     var last = ks[ks.length - 1];
     if (frame >= last.frame) return snap(last);
@@ -92,6 +94,32 @@
       }
     }
     return snap(last);
+  }
+  function cameraAtFrame(frame) {
+    ensureState();
+    return cameraAtFrameFor(state.cameraKeys, frame);
+  }
+  // Same composition applyToExportLayer bakes into a live Paper Layer via
+  // rotate/scale/translate calls, expressed instead as a single Matrix so
+  // app.js's getEffectiveStrokes can fold a Component's own camera into its
+  // resolved stroke data (applyMatrixToStrokeData) without instantiating a
+  // Paper Layer on that hot path. One source of truth for the formula —
+  // applyToExportLayer below is rewritten to build the same matrix.
+  function cameraMatrixAtFrame(ks, frameIdx, canvasW, canvasH) {
+    var cam = cameraAtFrameFor(ks, frameIdx);
+    if (!cam) return null;
+    var s = canvasW / cam.w;
+    // Item.rotate/scale/translate (used by applyToExportLayer below) compose
+    // by prepending each op to the item's existing transform, whereas a bare
+    // Matrix's rotate/scale/translate APPEND — confirmed empirically live
+    // (Browser pane test: same call order on a real Layer vs. a standalone
+    // Matrix gave DIFFERENT results; reversing the Matrix call order matched
+    // the real Layer's output exactly). Must issue calls in reverse here.
+    var m = new Matrix(1, 0, 0, 1, 0, 0);
+    m.translate(new Point(canvasW / 2 - cam.x, canvasH / 2 - cam.y));
+    m.scale(s, new Point(cam.x, cam.y));
+    if (cam.rot) m.rotate(-cam.rot, new Point(cam.x, cam.y));
+    return m;
   }
   function setKey(frame, rect) {
     ensureState();
@@ -574,6 +602,8 @@
 
   window.SMCamera = {
     cameraAtFrame: cameraAtFrame,
+    cameraAtFrameFor: cameraAtFrameFor,
+    cameraMatrixAtFrame: cameraMatrixAtFrame,
     keyAt: keyAt,
     setKey: setKey,
     removeKey: removeKey,
