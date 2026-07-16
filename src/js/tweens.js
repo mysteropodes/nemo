@@ -1290,8 +1290,22 @@ function renderOS(){
   // instead of just adding more scene items nobody can see.
   var prevRangeSpan=Math.max(1,cf-state.onionIn);
   var nextRangeSpan=Math.max(1,state.onionOut-cf);
-  for(var fi=cf-1;fi>=state.onionIn&&fi>=0;fi--){var strokes=getEffectiveStrokes(li,fi);if(!strokes.length)continue;var dist=cf-fi;var op=(state.onionPrevOpacity/100)*Math.max(.15,1-(dist/prevRangeSpan)*.85);strokes.forEach(function(sd){if(sd.isBrushTextureCopy||sd.brushTexturePreset)return;if(sd.isRaster){var pr=desR(sd,onionPrevLayer);pr.opacity=op;return;}var p=desP(sd,onionPrevLayer,op);if(state.onionMode==='tinted')p.strokeColor=new Color(1,.3,.3,op);else if(state.onionMode==='outline'){p.fillColor=null;p.strokeColor=new Color(1,.3,.3,op*.8);p.strokeWidth=1;}else p.opacity=op;});}
-  for(var fi2=cf+1;fi2<=state.onionOut&&fi2<state.totalFrames;fi2++){var strokes2=getEffectiveStrokes(li,fi2);if(!strokes2.length)continue;var dist2=fi2-cf;var op2=(state.onionNextOpacity/100)*Math.max(.15,1-(dist2/nextRangeSpan)*.85);strokes2.forEach(function(sd){if(sd.isBrushTextureCopy||sd.brushTexturePreset)return;if(sd.isRaster){var nr=desR(sd,onionNextLayer);nr.opacity=op2;return;}var p=desP(sd,onionNextLayer,op2);if(state.onionMode==='tinted')p.strokeColor=new Color(.3,.55,1,op2);else if(state.onionMode==='outline'){p.fillColor=null;p.strokeColor=new Color(.3,.55,1,op2*.8);p.strokeWidth=1;}else p.opacity=op2;});}
+  // sd.hasRealStroke (serP, app.js) gates the manufactured tint/outline
+  // stroke below — found live (2026-07-17, "il me met un trait bleu
+  // derrière" on a selected Bitmap Brush stroke): a texture-camouflaged
+  // anchor (Bitmap Brush or vector-preset) serializes strokeColor:null on
+  // purpose (the texture companion IS its visible edge, itself correctly
+  // excluded from onion ghosting via isBrushTextureCopy above), but this
+  // code used to force `p.strokeColor = tint` onto EVERY ghost regardless,
+  // resurrecting a solid colored outline nothing in the real artwork has.
+  // Normally invisible (perfectly eclipsed by the live stroke sitting on
+  // top of it), it becomes a visible halo the instant the live stroke's
+  // geometry differs even slightly from the frozen ghost (e.g. mid-drag
+  // width scrub, or simply a keyframe boundary the ghost doesn't share).
+  // Falls back to the plain opacity-only treatment ('default' mode's own
+  // branch) for these — there's no real vector stroke to tint or outline.
+  for(var fi=cf-1;fi>=state.onionIn&&fi>=0;fi--){var strokes=getEffectiveStrokes(li,fi);if(!strokes.length)continue;var dist=cf-fi;var op=(state.onionPrevOpacity/100)*Math.max(.15,1-(dist/prevRangeSpan)*.85);strokes.forEach(function(sd){if(sd.isBrushTextureCopy||sd.brushTexturePreset)return;if(sd.isRaster){var pr=desR(sd,onionPrevLayer);pr.opacity=op;return;}var p=desP(sd,onionPrevLayer,op);if(state.onionMode==='tinted'&&sd.hasRealStroke)p.strokeColor=new Color(1,.3,.3,op);else if(state.onionMode==='outline'&&sd.hasRealStroke){p.fillColor=null;p.strokeColor=new Color(1,.3,.3,op*.8);p.strokeWidth=1;}else p.opacity=op;});}
+  for(var fi2=cf+1;fi2<=state.onionOut&&fi2<state.totalFrames;fi2++){var strokes2=getEffectiveStrokes(li,fi2);if(!strokes2.length)continue;var dist2=fi2-cf;var op2=(state.onionNextOpacity/100)*Math.max(.15,1-(dist2/nextRangeSpan)*.85);strokes2.forEach(function(sd){if(sd.isBrushTextureCopy||sd.brushTexturePreset)return;if(sd.isRaster){var nr=desR(sd,onionNextLayer);nr.opacity=op2;return;}var p=desP(sd,onionNextLayer,op2);if(state.onionMode==='tinted'&&sd.hasRealStroke)p.strokeColor=new Color(.3,.55,1,op2);else if(state.onionMode==='outline'&&sd.hasRealStroke){p.fillColor=null;p.strokeColor=new Color(.3,.55,1,op2*.8);p.strokeWidth=1;}else p.opacity=op2;});}
   userLayers[state.activeLayerIdx].activate();
 }
 

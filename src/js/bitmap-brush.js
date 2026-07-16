@@ -679,7 +679,23 @@
   }
   function init() {
     var onEl = document.getElementById('p-bitmapbrush-on');
-    if (onEl) { state.bitmapBrushOn = false; onEl.addEventListener('change', function () { state.bitmapBrushOn = this.checked; }); }
+    if (onEl) {
+      state.bitmapBrushOn = false;
+      onEl.addEventListener('change', function () {
+        state.bitmapBrushOn = this.checked;
+        // Select/Subselect with a live selection (2026-07-17, "on peut pas
+        // switch avec un stroke vecto") : the checkbox now doubles as the
+        // switch this panel already had buttons for — btn-bitmap-apply/
+        // -remove below — so toggling it with something selected converts
+        // that selection immediately instead of only affecting the NEXT
+        // stroke drawn. Empty selection (or Draw tool active): unchanged,
+        // draw-tool-default-only behavior.
+        if ((state.tool === 'select' || state.tool === 'subselect') && selectedPaths.length) {
+          var btn = document.getElementById(this.checked ? 'btn-bitmap-apply' : 'btn-bitmap-remove');
+          if (btn) btn.click();
+        }
+      });
+    }
     // Tip is now picked via bitmap-tip-picker.js's swatch popover (panel
     // reorg pass) — state.bitmapTip's default lives here since this file
     // still owns that state field, the picker only ever writes to it.

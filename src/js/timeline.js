@@ -296,7 +296,19 @@ window.SM={
           var ratio=peak>0?v/peak:1;
           cs.forEach(function(s){s.width=(s.width||v)*ratio;});
           rebuildVectorBrushOutline(p);
-        }else{p.strokeWidth=v;applyStrokeStyle(p);}
+        }else{
+          p.strokeWidth=v;applyStrokeStyle(p);
+          // Width unification (2026-07-17, "il ne change pas la taille du
+          // trait brush bitmap") : p.strokeWidth above is a NO-OP on a
+          // Bitmap Brush anchor — its visible "stroke" is the dab texture,
+          // sized by bitmapBrushSpec.size, not by the (camouflaged, null-
+          // color) vector stroke. Update the spec and re-bake so Width
+          // actually resizes the dabs, same as it now does at draw time.
+          if(p.data&&p.data.bitmapBrushSpec&&window.SMBitmapBrush){
+            p.data.bitmapBrushSpec.size=v;
+            SMBitmapBrush.regenerate(p,userLayers[state.activeLayerIdx]);
+          }
+        }
       });
       saveActiveLayerFrame();updateUI();
     }},
@@ -1361,6 +1373,32 @@ function updateSelPropsPanel(){
         paintIconGroup('p-paintorder-grp',state.paintOrder);syncMiterLimitEnabled();
         document.getElementById('p-miterlimit').value=state.miterLimit;
         document.getElementById('p-dashoffset').value=state.dashOffset;
+      }
+      // Bitmap Brush panel staleness fix — same "reflect the selection,
+      // don't leave the tool-default stale" convention as Fill/Stroke/Cap
+      // above, applied to the checkbox+fields the user reported as wrong
+      // (2026-07-17, "il ne reconnait pas que c'est une texture bitmap...
+      // la case n'est pas cochée"): p-bitmapbrush-on is a DRAW-TOOL default
+      // (governs future strokes), but it never mirrored what was actually
+      // SELECTED, so a bitmap-textured stroke read as "not bitmap" the
+      // moment you clicked it, and switching it back to vector via
+      // Apply/Remove-to-selection (btn-bitmap-apply/-remove, already wired
+      // for exactly this — see bitmap-brush.js) looked broken because the
+      // checkbox never confirmed which state you were in or landed in.
+      var bmSpec=ref.data&&ref.data.bitmapBrushSpec;
+      var bmChk=document.getElementById('p-bitmapbrush-on');
+      if(bmChk){
+        bmChk.checked=!!bmSpec;state.bitmapBrushOn=!!bmSpec;
+        if(bmSpec){
+          state.bitmapTip=bmSpec.tip;state.bitmapSpacing=bmSpec.spacing;
+          state.bitmapScatter=bmSpec.scatter;state.bitmapOpacity=Math.round(bmSpec.opacity*100);
+          state.bitmapPressure=!!bmSpec.pressure;
+          var spEl=document.getElementById('p-bitmap-spacing');if(spEl)spEl.value=bmSpec.spacing;
+          var scEl=document.getElementById('p-bitmap-scatter');if(scEl)scEl.value=bmSpec.scatter;
+          var opEl=document.getElementById('p-bitmap-opacity');if(opEl)opEl.value=Math.round(bmSpec.opacity*100);
+          var prEl=document.getElementById('p-bitmap-pressure');if(prEl)prEl.checked=!!bmSpec.pressure;
+          if(window.BitmapTipPicker)BitmapTipPicker.paintButton(bmSpec.tip);
+        }
       }
     }
   }
