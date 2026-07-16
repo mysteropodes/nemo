@@ -547,7 +547,17 @@ window.SM={
       var tl=baseL+d.rl,tf=baseF+d.rf;
       if(tl<0||tl>=state.layers.length||tf<0||tf>=state.totalFrames)return;
       if(state.layers[tl].locked)return; // pasting into a locked layer must no-op for that layer, same as any other edit
-      state.layers[tl].frames[tf]=JSON.parse(JSON.stringify(d.content));
+      var pasted=JSON.parse(JSON.stringify(d.content));
+      // A copied TWEEN frame (generated in-between) pastes as a normal
+      // FULL keyframe — explicit request (2026-07-16, "un clé de tween
+      // copier et collé ailleurs devient une keyframe pleine normal") :
+      // le contenu collé verbatim gardait isInterpolated=true, donc la
+      // copie restait affichée/traitée comme un inbetween généré
+      // (badge TWEEN, re-écrasable par la prochaine régénération de
+      // tween) alors qu'un collage est un choix éditorial délibéré —
+      // même principe "manual edit wins" que isManualEdit, en plus fort.
+      if(pasted.isInterpolated){pasted.isInterpolated=false;pasted.isKeyframe=true;delete pasted.isManualEdit;}
+      state.layers[tl].frames[tf]=pasted;
     });
     selClear();
     _sel.clipboard.forEach(function(d){
