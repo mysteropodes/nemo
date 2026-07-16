@@ -211,3 +211,58 @@ Checklist avant `npm run build` :
 4. Si c'est un vrai changement fonctionnel (pas juste un patch de bug) : lancer
    `./scripts/publish-update.sh "notes"` après la build pour que les installs existantes le
    voient — voir §6 pour le détail des tokens nécessaires.
+
+## 8. Logique globale StoryBoard / Animation 2D / Motion (2026-07, validée avec l'utilisateur)
+
+Les 3 modes ne sont PAS trois éditeurs indépendants — ce sont trois vues d'un même document,
+reliées par des règles précises. Toute nouvelle fonctionnalité touchant l'un des trois doit se
+demander comment elle traverse les deux autres. Règles confirmées explicitement par
+l'utilisateur (à ne pas re-décider différemment sans lui reposer la question) :
+
+**StoryBoard ne manipule QUE des Components.** Dès qu'un calque (un "module") est connecté à un
+bloc "Edit module" dans le graphe StoryBoard, il devient automatiquement un Component — même
+règle d'auto-conversion que côté Motion (ci-dessous), déclenchée par un point d'entrée différent.
+Un calque plat (non-Component) ne peut pas être placé/séquencé directement dans un montage
+StoryBoard.
+
+**Animation 2D ↔ Motion, niveau CALQUE : le déclencheur de conversion est la clé, pas le geste.**
+Un calque plat et sa vue Motion sont la MÊME chose tant qu'aucune propriété de NIVEAU CALQUE
+n'a de clé. Dès la première clé posée sur une propriété du calque (Position/Anchor/Rotation/
+Scale/Opacity — que ce soit via le stopwatch OU un drag direct sur le canvas, les deux doivent
+converger vers la même conversion, cf. `maybeAutoConvertToComponent` dans motion.js), le calque
+(s'il contient 2+ éléments sélectionnables) devient un Component. Une clé posée sur une propriété
+d'un SEUL élément (pas le calque entier) NE déclenche PAS cette conversion — c'est la distinction
+layer-holder vs element-holder déjà dans `state.layers.indexOf(ld)` (motion.js).
+
+**Motion, niveau SHAPE : double-clic sur le calque = entrer dedans comme un precomp After
+Effects.** Les propriétés globales (Position/Anchor/Scale/Rotation/Opacité du calque entier)
+restent affichées au-dessus ; en dessous apparaissent des sous-lignes "Layer Shape 1", "Layer
+Shape 2"... une par élément du calque, chacune avec son propre jeu COMPLET de propriétés :
+Position/Anchor/Scale/Rotation/Opacité (comme le calque) PLUS `path` / fill (size+color) /
+stroke (size+color) / brush + brush options. Un bouton "back" à côté de la scène permet de
+ressortir vers le Component parent. **Rien de tout ça n'est encore construit** (PROPS dans
+motion.js ne contient toujours que les 5 propriétés de base, pas de mode "entrer dans le
+calque") — c'est le prochain gros morceau côté Motion, pas une description de l'existant.
+
+**Propriétés étendues (fill/stroke/brush/path) : opt-in, cachées par défaut, activées dans le
+panel de droite — même convention que les propriétés optionnelles de Rive.** Ce ne sont PAS des
+propriétés qui apparaissent automatiquement dans la liste Motion ; l'utilisateur les active
+explicitement quand il en a besoin, exactement comme Rive expose ses propriétés additionnelles.
+
+**Le path est keyable au niveau du VERTEX, dans un menu déroulant, et ça peut se brancher sur le
+moteur de tween existant.** Keyer `path` ne veut pas dire un blob de géométrie opaque : chaque
+vertex du shape a ses propres coordonnées keyables, listées dans un sous-menu déroulant sous
+l'entrée `path` du shape. Le mécanisme d'interpolation entre deux clés de path peut/doit
+réutiliser le moteur de tween d'Animation 2D (`tweens.js`, `interpStroke`/`resamplePairFeatureAware`)
+plutôt que d'inventer un système de morph séparé — cohérent avec le principe déjà appliqué au
+raccord Motion↔tween (le raster Bitmap Brush d'une frame tween, `recordForTween`, suit déjà
+cette logique de réutilisation).
+
+**Non tranché — à reposer explicitement avant de construire** : un calque Animation 2D devrait
+pouvoir contenir PLUSIEURS Components à la fois (pas juste 1 layer = 1 component en 1:1 comme
+aujourd'hui). Ça demande de faire d'une instance de Component un item DANS `ld.frames[i].strokes`
+(un troisième type de stroke aux côtés de `Path`/`isRaster`, avec son propre `symbolId` +
+placement), pas un flag `ld.symbolId` au niveau du calque entier — donc ça traverse tous les
+consommateurs de item-type déjà listés en §1 (saveActiveLayerFrame, getEffectiveStrokes,
+buildSceneJson, select-bridge, Motion element-holders). Chantier à part entière, pas un
+sous-produit du reste de cette section.
