@@ -498,6 +498,21 @@ window.SM={
     // here has to explicitly leave it, or its guides/highlight stay stuck
     // on screen with no layer row left looking selected (feedback #5wrip).
     if(state.tool==='camera')window.SM.setTool('select');
+    // Selecting a layer shows the selection of ALL its elements on canvas
+    // (2026-07-17, "quand on select un calque on voit la selection dans le
+    // canvas de tous ces éléments") — clearSel() above used to leave the
+    // canvas with nothing highlighted, the opposite of what clicking a
+    // layer row means in every layer-based tool (Illustrator/AE: picking a
+    // layer selects its content). Only with Select/Subselect active —
+    // forcing a canvas selection while, say, Draw is the active tool would
+    // fight the next stroke. Same isSelectablePathChild filter every other
+    // "select everything in this layer" call site already uses (marquee-
+    // on-empty-space fallback, component click) — brush-texture dabs/
+    // linkedFill companions excluded, they aren't independently selectable.
+    if((state.tool==='select'||state.tool==='subselect')&&userLayers[idx]){
+      selectedPaths=userLayers[idx].children.filter(function(c){return (c instanceof Path||c instanceof Raster)&&isSelectablePathChild(c);});
+      state.selectedStrokeIndices=[];
+    }
     renderArcs();updateUI();},
   toggleLayerVis:function(idx){state.layers[idx].visible=!state.layers[idx].visible;loadFrame(state.currentFrame);updateUI();},
   toggleLayerLock:function(idx){

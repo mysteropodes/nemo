@@ -475,6 +475,22 @@
     items.push({ segments: [{ point: [ax, ay - 9 * zs] }, { point: [ax, ay + 9 * zs] }], closed: false, fillColor: null, strokeColor: ancCol, strokeWidth: 1.5 * zs });
     items.push({ segments: circleSegs(ax, ay, 6 * zs), closed: true, fillColor: null, strokeColor: ancCol, strokeWidth: 1.5 * zs });
     if (!hasKeys(holder, 'position')) return items;
+    // Position keys store a DELTA translation (computeMotionMat's dx/dy —
+    // [0,0] means "no motion", added on top of the artwork's own drawn
+    // position), never an absolute world point — but this overlay used to
+    // plot the path/dots/handles at the RAW key.v coordinates, i.e. at
+    // world (0,0) for an unmoved key instead of at the object itself.
+    // Found live (2026-07-17, "le motion path doit être placé au point
+    // d'ancrage") : offsetting everything below by the anchor's own
+    // absolute position (ax,ay — bounds center + anchor offset, the exact
+    // point Rotation/Scale already pivot around) makes a fresh/unmoved key
+    // sit exactly ON the anchor crosshair, and the path read as "where the
+    // object goes FROM the anchor", matching computeMotionMat's actual math
+    // instead of drawing in a different coordinate space than the one that
+    // renders. unifiedMotionTargets/buildUnifiedOverlay already summed
+    // position deltas onto a centroid the same delta-aware way — this
+    // brings the single-target view in line with it.
+    var pvx = ax, pvy = ay;
     var track = holder.motion.position;
     var ks = track.keys;
     for (var i = 0; i < ks.length - 1; i++) {
@@ -486,8 +502,8 @@
         var t = s / steps, v = 1 - t;
         pts.push({
           point: [
-            v * v * v * a.v[0] + 3 * v * v * t * (a.v[0] + ho[0]) + 3 * v * t * t * (b.v[0] + hi[0]) + t * t * t * b.v[0],
-            v * v * v * a.v[1] + 3 * v * v * t * (a.v[1] + ho[1]) + 3 * v * t * t * (b.v[1] + hi[1]) + t * t * t * b.v[1],
+            pvx + v * v * v * a.v[0] + 3 * v * v * t * (a.v[0] + ho[0]) + 3 * v * t * t * (b.v[0] + hi[0]) + t * t * t * b.v[0],
+            pvy + v * v * v * a.v[1] + 3 * v * v * t * (a.v[1] + ho[1]) + 3 * v * t * t * (b.v[1] + hi[1]) + t * t * t * b.v[1],
           ],
         });
       }
@@ -495,19 +511,26 @@
     }
     ks.forEach(function (k, ki) {
       var isCur = k.frame === state.currentFrame;
-      items.push({ segments: circleSegs(k.v[0], k.v[1], (isCur ? 6 : 4.5) * zs), closed: true, fillColor: isCur ? [255, 170, 40, 255] : [230, 230, 230, 255], strokeColor: [30, 30, 30, 255], strokeWidth: 1.2 * zs });
+      var kx = pvx + k.v[0], ky = pvy + k.v[1];
+      items.push({ segments: circleSegs(kx, ky, (isCur ? 6 : 4.5) * zs), closed: true, fillColor: isCur ? [255, 170, 40, 255] : [230, 230, 230, 255], strokeColor: [30, 30, 30, 255], strokeWidth: 1.2 * zs });
       // Spatial handles, same discoverable small-dot pattern as camera.js
       var hs = [];
       if (ki < ks.length - 1) hs.push(k.hOut || [0, 0]);
       if (ki > 0) hs.push(k.hIn || [0, 0]);
       hs.forEach(function (h) {
         if (!h[0] && !h[1]) return;
-        var hx = k.v[0] + h[0], hy = k.v[1] + h[1];
-        items.push({ segments: [{ point: [k.v[0], k.v[1]] }, { point: [hx, hy] }], closed: false, fillColor: null, strokeColor: handleCol, strokeWidth: 1 * zs });
+        var hx = kx + h[0], hy = ky + h[1];
+        items.push({ segments: [{ point: [kx, ky] }, { point: [hx, hy] }], closed: false, fillColor: null, strokeColor: handleCol, strokeWidth: 1 * zs });
         items.push({ segments: circleSegs(hx, hy, 4 * zs), closed: true, fillColor: handleCol, strokeColor: [30, 30, 30, 255], strokeWidth: 1 * zs });
       });
     });
     return items;
+  }
+  // Shared by the overlay above and the hit-test/drag code below — the
+  // exact world point a position delta of [0,0] should render/hit-test at.
+  function motionPivotOf(t) {
+    var anc = valueAtFrame(t.holder, 'anchor', state.currentFrame);
+    return { x: t.boundsCenter.x + anc[0], y: t.boundsCenter.y + anc[1] };
   }
 
   // ---- canvas drag: position keyframe dots + spatial handles ----
@@ -519,22 +542,22 @@
   // actually lands on a handle/dot, so an unrelated click falls through
   // unchanged into Select/Draw/etc. below it).
   var _motionDrag = null; // {mode:'point'|'handle', key, which}
-  function hitPositionHandle(pt, ks) {
+  function hitPositionHandle(pt, ks, pv) {
     var tol = 10 / view.zoom;
     for (var i = 0; i < ks.length; i++) {
       var k = ks[i], hs = [];
       if (i < ks.length - 1) hs.push(['hOut', k.hOut || [0, 0]]);
       if (i > 0) hs.push(['hIn', k.hIn || [0, 0]]);
       for (var j = 0; j < hs.length; j++) {
-        var hx = k.v[0] + hs[j][1][0], hy = k.v[1] + hs[j][1][1];
+        var hx = pv.x + k.v[0] + hs[j][1][0], hy = pv.y + k.v[1] + hs[j][1][1];
         if (Math.hypot(pt.x - hx, pt.y - hy) < tol) return { key: k, which: hs[j][0] };
       }
     }
     return null;
   }
-  function hitPositionDot(pt, ks) {
+  function hitPositionDot(pt, ks, pv) {
     var tol = 8 / view.zoom;
-    for (var i = 0; i < ks.length; i++) if (Math.hypot(pt.x - ks[i].v[0], pt.y - ks[i].v[1]) < tol) return ks[i];
+    for (var i = 0; i < ks.length; i++) if (Math.hypot(pt.x - (pv.x + ks[i].v[0]), pt.y - (pv.y + ks[i].v[1])) < tol) return ks[i];
     return null;
   }
   // Finds the LIVE Paper item for a strokeId within a layer (including
@@ -606,16 +629,25 @@
       return false;
     }
     var t = activeMotionTarget();
+    // Position keys/handles checked BEFORE the anchor point (2026-07-17
+    // motion-path-at-anchor fix made this ordering matter): a key at its
+    // default [0,0] delta now draws its dot exactly ON the anchor
+    // crosshair (motionPivotOf) — dragging keyframes is the far more
+    // common gesture, so it wins the overlap; the anchor stays reachable
+    // once a key has been moved away from it (the ordinary case) or by
+    // starting the drag from a few px off-center.
     if (t) {
+      var ks = activePositionKeys();
+      if (ks) {
+        var pv = motionPivotOf(t);
+        var hp = hitPositionHandle(event.point, ks, pv);
+        if (hp) { pushUndo(); _motionDrag = { mode: 'handle', key: hp.key, which: hp.which, pv: pv }; return true; }
+        var pk = hitPositionDot(event.point, ks, pv);
+        if (pk) { pushUndo(); _motionDrag = { mode: 'point', key: pk, pv: pv }; return true; }
+      }
       var ap = hitAnchorPoint(event.point, t);
       if (ap) { pushUndo(); _motionDrag = { mode: 'anchor', holder: ap.holder, bc: ap.bc }; return true; }
     }
-    var ks = activePositionKeys();
-    if (!ks) return false;
-    var hp = hitPositionHandle(event.point, ks);
-    if (hp) { pushUndo(); _motionDrag = { mode: 'handle', key: hp.key, which: hp.which }; return true; }
-    var pk = hitPositionDot(event.point, ks);
-    if (pk) { pushUndo(); _motionDrag = { mode: 'point', key: pk }; return true; }
     return false;
   }
   function onDrag(event) {
@@ -639,9 +671,13 @@
     } else if (_motionDrag.mode === 'anchor') {
       setValue(_motionDrag.holder, 'anchor', [event.point.x - _motionDrag.bc.x, event.point.y - _motionDrag.bc.y]);
     } else {
-      var k = _motionDrag.key;
-      if (_motionDrag.mode === 'handle') k[_motionDrag.which] = [event.point.x - k.v[0], event.point.y - k.v[1]];
-      else { k.v[0] = event.point.x; k.v[1] = event.point.y; }
+      var k = _motionDrag.key, pv = _motionDrag.pv;
+      // Both branches now resolve against the SAME pivot buildOverlayItems
+      // draws from (motionPivotOf — bounds center + anchor offset), so a
+      // key.v of [0,0] drags from exactly where its dot is drawn, matching
+      // computeMotionMat's delta semantics instead of raw world coords.
+      if (_motionDrag.mode === 'handle') k[_motionDrag.which] = [event.point.x - (pv.x + k.v[0]), event.point.y - (pv.y + k.v[1])];
+      else { k.v[0] = event.point.x - pv.x; k.v[1] = event.point.y - pv.y; }
     }
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
     return true;
