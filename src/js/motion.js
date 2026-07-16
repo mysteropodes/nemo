@@ -896,6 +896,23 @@
         if (e.target.closest('.lico')) return;
         splitLayerIntoElements(li);
       });
+      // Discoverability: the Cmd/Ctrl-click multi-select + drag-the-handle
+      // gesture above has no visible affordance until you already know
+      // about it — feedback: "je vois rien... rien n'indique visuellement
+      // qu'il faut Cmd-clic". A right-click offers the same result as a
+      // typed number, same UX convention layer-inout.js's own staggerBars
+      // context-menu entry already uses for layer in/out bars.
+      row.addEventListener('contextmenu', function (e) {
+        if (_layerSel.length < 2 || _layerSel.indexOf(li) < 0 || !window.showContextMenu) return;
+        e.preventDefault(); e.stopPropagation();
+        window.showContextMenu(e.clientX, e.clientY, [
+          { label: 'Échelonner les calques sélectionnés…', action: function () {
+            var v = prompt('Décalage entre calques (frames)', '2');
+            var step = parseInt(v, 10);
+            if (!isNaN(step) && step !== 0) staggerSelectedLayers(step);
+          } },
+        ]);
+      });
       list.appendChild(row);
       if (!expanded) return;
       renderTransformGroup(list, ld, 'Transform');
@@ -1460,6 +1477,26 @@
     }
     _layerStaggerBoxEl.style.left = x + 'px'; _layerStaggerBoxEl.style.top = y0 + 'px';
     _layerStaggerBoxEl.style.width = Math.max(6, FC) + 'px'; _layerStaggerBoxEl.style.height = (y1 - y0) + 'px';
+  }
+  // Right-click alternative to dragging the handle — same rank-0-anchor,
+  // every-property-together semantics, applied instantly for a typed step
+  // instead of a live drag. Ordered by layer index (same as the handle's
+  // own mousedown), so both routes to the same result agree.
+  function staggerSelectedLayers(step) {
+    var order = _layerSel.slice().sort(function (a, b) { return a - b; });
+    var holders = order.map(function (li) { return state.layers[li]; }).filter(Boolean);
+    if (holders.length < 2) return;
+    pushUndo();
+    holders.forEach(function (h, rank) {
+      if (rank === 0 || !h.motion) return;
+      PROPS.forEach(function (prop) {
+        var track = h.motion[prop]; if (!track) return;
+        track.keys.forEach(function (k) { k.frame = Math.max(0, Math.min(state.totalFrames - 1, k.frame + step * rank)); });
+        sortKeys(track);
+      });
+    });
+    renderLayerList(); renderTimeline();
+    if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
   }
   function updateMarquee(e) {
     if (!_motionMarquee) return;
