@@ -525,14 +525,13 @@ body.mode-motion .lrow.act{box-shadow:inset 3px 0 0 #4E6FF2,inset 0 0 0 1px rgba
 .onion-marker.om-in{background:rgba(255,80,80,.7);}
 .onion-marker.om-out{background:rgba(80,140,255,.7);}
 /* Layer in/out point (layer-inout.js, v1 2026-07 — thickened 2026-07 per
-   feedback: too subtle to read at a glance, reference was Skew Pro's own
-   timeline where every layer's bar is a bold, full-height colored block).
-   Full-height translucent fill spanning the layer's visible frame range so
-   the existing keyframe diamonds/dots underneath stay visible through it —
-   always clearly colored (not just on a custom range) so a layer's actual
-   duration always reads instantly, matching every other row in Skew Pro's
-   screenshot being an obviously-colored block regardless of whether it's
-   trimmed. Handles are a solid bracket, always visible (not hover-only). */
+   feedback: too subtle to read at a glance; every layer's bar is now a
+   bold, full-height colored block). Full-height translucent fill spanning
+   the layer's visible frame range so the existing keyframe diamonds/dots
+   underneath stay visible through it — always clearly colored (not just on
+   a custom range) so a layer's actual duration always reads instantly,
+   every row an obviously-colored block regardless of whether it's trimmed.
+   Handles are a solid bracket, always visible (not hover-only). */
 .layer-inout-bar{position:absolute;left:0;top:2px;bottom:2px;background:rgba(63,107,245,.32);border:1px solid rgba(63,107,245,.85);border-radius:3px;cursor:grab;z-index:2;box-sizing:border-box;}
 .layer-inout-bar.full-range{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.28);}
 .layer-inout-bar .layer-inout-handle{position:absolute;top:-1px;bottom:-1px;width:7px;background:var(--io-handle-color,var(--accent));cursor:ew-resize;border-radius:2px;opacity:.85;}

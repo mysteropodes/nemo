@@ -28,10 +28,10 @@
   // (same class of bug as layerInPoint's own `!=null` fix, app.js).
   function hasCustomRange(ld) { return !!(ld.inPoint != null || ld.outPoint != null || outPointOf(ld) < state.totalFrames - 1); }
 
-  // Skew Pro's own timeline (the reference screenshot) colors every layer
-  // bar with that layer's OWN assigned color, not one uniform accent tint —
-  // makes a busy timeline with many layers scannable at a glance. `ld.color`
-  // is already assigned to every layer at creation (app.js nextLayerColor).
+  // Every layer bar is colored with that layer's OWN assigned color, not
+  // one uniform accent tint — makes a busy timeline with many layers
+  // scannable at a glance. `ld.color` is already assigned to every layer
+  // at creation (app.js nextLayerColor).
   function hexToRgba(hex, alpha) {
     hex = (hex || '#3F6BF5').replace('#', '');
     if (hex.length === 3) hex = hex.split('').map(function (c) { return c + c; }).join('');
@@ -460,10 +460,10 @@
     else if (window.renderLayerList) renderLayerList();
   });
 
-  // ---- batch operations on the current bar selection (Skew Pro punch
-  // list: Align/Distribute/Flip/Select Every/Invert Selection) — all
-  // require >=2 selected bars except Invert, which works off whatever's
-  // currently selected (possibly zero). One pushUndo() per operation.
+  // ---- batch operations on the current bar selection (Align/Distribute/
+  // Flip/Select Every/Invert Selection) — all require >=2 selected bars
+  // except Invert, which works off whatever's currently selected (possibly
+  // zero). One pushUndo() per operation.
   function selectedLayers() {
     return _barSel.map(function (s) { return { li: s.li, ld: state.layers[s.li] }; }).filter(function (x) { return x.ld; });
   }
@@ -495,10 +495,7 @@
     });
   }
   // Evenly spaces the selected bars' START points across the group's own
-  // min-in..max-out span, preserving each bar's own duration — covers
-  // Skew Pro's "Distribute" directly; its separate drag-the-selection-edge
-  // "Space" tool is the same underlying idea (even spacing) via a
-  // different gesture, folded into this one button for v1.
+  // min-in..max-out span, preserving each bar's own duration.
   function distributeBars() {
     applyBatch(function (items) {
       var sorted = items.slice().sort(function (a, b) { return inPointOf(a.ld) - inPointOf(b.ld); });
@@ -512,8 +509,7 @@
     });
   }
   // Reverses the temporal ORDER of the selected bars' start points (each
-  // bar keeps its own duration, just swaps which "slot" it occupies) —
-  // Skew Pro's "Flip Horizontally".
+  // bar keeps its own duration, just swaps which "slot" it occupies).
   function flipBars() {
     applyBatch(function (items) {
       var sorted = items.slice().sort(function (a, b) { return inPointOf(a.ld) - inPointOf(b.ld); });
@@ -525,8 +521,8 @@
       });
     });
   }
-  // Skew Pro's headline gesture — "Offset"/stagger: each selected bar's
-  // start shifts by an increasing multiple of `step` frames (ordered by
+  // "Offset"/stagger: each selected bar's start shifts by an increasing
+  // multiple of `step` frames (ordered by
   // current in-point, so the leftmost bar anchors the group and stays put),
   // preserving each bar's own duration — the classic cascading-entrance
   // rig ("layer 1 at frame 0, layer 2 at frame +step, layer 3 at +2*step…").
@@ -554,9 +550,8 @@
   }
   // Selects every layer that HAS a bar row currently rendered and is NOT
   // already selected — inverts within the same universe Box Select draws
-  // its marquee over, matching Skew Pro's own "I" shortcut. Always lands
-  // on 'both' (whole-bar), same as toggleBarSel — inversion isn't tied to
-  // any rectangle geometry either.
+  // its marquee over. Always lands on 'both' (whole-bar), same as
+  // toggleBarSel — inversion isn't tied to any rectangle geometry either.
   function invertBarSelection() {
     var all = [];
     document.querySelectorAll('.layer-inout-bar').forEach(function (bar) {
@@ -591,9 +586,9 @@
       var menu = [
         { label: 'Réinitialiser (pleine durée)', action: function () { if (window.pushUndo) pushUndo(); delete state.layers[li].inPoint; delete state.layers[li].outPoint; if (window.renderTimeline) renderTimeline(); if (window.loadFrame) loadFrame(state.currentFrame); if (window.SMEngineBridge) SMEngineBridge.renderNow(); } },
       ];
-      // Batch ops (Skew Pro punch list) act on the WHOLE current selection,
-      // not just the bar that was right-clicked — offered once >=2 bars are
-      // selected, regardless of which one you right-click.
+      // Batch ops act on the WHOLE current selection, not just the bar
+      // that was right-clicked — offered once >=2 bars are selected,
+      // regardless of which one you right-click.
       if (_barSel.length >= 2) {
         menu.push({ sep: true });
         menu.push({ label: 'Aligner à gauche (in)', action: function () { alignBars('left'); } });

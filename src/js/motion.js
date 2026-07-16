@@ -58,12 +58,11 @@
   // Reset to null (show all) whenever a different layer gets expanded — see
   // the row-click handler in renderLayerListMotion.
   var _propFilter = null;
-  // Skew Pro's "Filter Properties" — hides every property row with no
-  // keyframes at all (both animated-with-a-track AND a plain non-default
-  // static override still count as "has something to show"; only a
-  // completely untouched default-value property gets hidden). Global
-  // toggle (not per-layer/per-group), same one-button-affects-everything
-  // convention as the reference.
+  // "Filter Properties" — hides every property row with no keyframes at
+  // all (both animated-with-a-track AND a plain non-default static
+  // override still count as "has something to show"; only a completely
+  // untouched default-value property gets hidden). Global toggle (not
+  // per-layer/per-group) — one button affects everything.
   var _hideUnanimated = false;
   function propHasContent(holder, prop) { return isAnimated(holder, prop) || !!(holder.motionStatic && holder.motionStatic[prop]); }
   function isPropFiltered(prop) { return !!_propFilter && _propFilter.indexOf(prop) < 0; }
@@ -1135,11 +1134,11 @@
             // the WHOLE group together, one frame-delta shared by all of
             // them; grabbing an unselected key resets the selection to just
             // that one (matches marquee-select's own "click empty = clear"
-            // convention below). Alt+drag instead STAGGERS — Skew Pro's
-            // headline "grab and drag to skew" gesture, brought into
-            // Motion's own keyframe timeline (staggerBars, layer-inout.js,
-            // already covers this for layer in/out bars; this is the
-            // missing piece for actual property keyframes). Grouped by
+            // convention below). Alt+drag instead STAGGERS — a "grab and
+            // drag to skew" gesture, brought into Motion's own keyframe
+            // timeline (staggerBars, layer-inout.js, already covers this
+            // for layer in/out bars; this is the missing piece for actual
+            // property keyframes). Grouped by
             // HOLDER (layer or element — not by property track), in the
             // order each holder was first encountered in the marquee
             // selection — applyMarqueeSelection above builds that selection
@@ -1192,10 +1191,10 @@
             // reached. Renders as a square (see the .hold class above).
             menu.push({ label: key.hold ? 'Retirer le maintien (hold)' : 'Maintenir (hold)', action: function () { pushUndo(); key.hold = !key.hold; renderLayerList(); renderTimeline(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); } });
           }
-          // Batch ops (Skew Pro punch list) act on the WHOLE current
-          // multi-selection, offered regardless of which key/cell was
-          // right-clicked. No Align here (unlike layer bars) — a keyframe
-          // has no duration, "align" doesn't map onto a single point.
+          // Batch ops act on the WHOLE current multi-selection, offered
+          // regardless of which key/cell was right-clicked. No Align here
+          // (unlike layer bars) — a keyframe has no duration, "align"
+          // doesn't map onto a single point.
           if (_motionKeySel.length >= 2) {
             menu.push({ sep: true });
             menu.push({ label: 'Distribuer uniformément', action: distributeKeys });
@@ -1250,7 +1249,7 @@
     });
   }
   // ---- multi-select (marquee rectangle) + group drag ----
-  // AE/Skew Pro convention: drag a selection rectangle over the keyframe
+  // AE convention: drag a selection rectangle over the keyframe
   // grid to select several keys across one or more property tracks at
   // once (position/rotation/scale/... — layer OR element tracks, doesn't
   // matter which), then drag any ONE of the selected diamonds to retime
@@ -1260,10 +1259,10 @@
     return _motionKeySel.some(function (s) { return s.holder === holder && s.prop === prop && s.key === key; });
   }
   function setKeySel(sel) { _motionKeySel = sel; }
-  // ---- batch operations on the current keyframe selection (Skew Pro
-  // punch list: Distribute/Flip/Select Every/Invert Selection — no Align
-  // here, unlike layer bars: a keyframe has no duration, "align" doesn't
-  // map onto a single point). Grouped PER TRACK (holder+prop) first: two
+  // ---- batch operations on the current keyframe selection (Distribute/
+  // Flip/Select Every/Invert Selection — no Align here, unlike layer bars:
+  // a keyframe has no duration, "align" doesn't map onto a single point).
+  // Grouped PER TRACK (holder+prop) first: two
   // selected keys on DIFFERENT properties shouldn't need to avoid
   // colliding with each other, only with other keys on their OWN track.
   function _groupKeySelByTrack() {
@@ -1310,8 +1309,7 @@
     if (window.showToast) showToast(_motionKeySel.length + ' clé(s) sélectionnée(s)');
   }
   // Inverts within whatever tracks are CURRENTLY RENDERED (the same
-  // universe the marquee itself draws over) — matches Skew Pro's own "I"
-  // shortcut semantics.
+  // universe the marquee itself draws over).
   function invertKeySelection() {
     var all = [], prevSel = _motionKeySel;
     document.querySelectorAll('.motion-track-row').forEach(function (rowEl) {
@@ -1380,8 +1378,8 @@
     var d = window._motionKeyDrag; if (!d) return;
     var deltaFrames = Math.round((e.clientX - d.startX) / FC);
     if (d.stagger) {
-      // Skew Pro's stagger: holder rank 0 (topmost row in the selection)
-      // is the anchor and never moves; holder rank i gets i× the raw drag
+      // Stagger: holder rank 0 (topmost row in the selection) is the
+      // anchor and never moves; holder rank i gets i× the raw drag
       // delta. Same incremental-tick/re-baseline shape as the uniform
       // group move below (add THIS tick's small delta, re-baseline startX)
       // so the accumulated per-holder offset telescopes correctly back to
