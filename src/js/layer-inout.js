@@ -46,22 +46,17 @@
     bar.style.width = Math.max(FC, (outF - inF + 1) * FC) + 'px';
     var custom = hasCustomRange(ld);
     bar.classList.toggle('full-range', !custom);
-    // Layer-color tint ONLY on a genuinely trimmed range — feedback: the
-    // full-range (untouched, the overwhelming common case) bar tinting
-    // EVERY layer's row with its own color made Animation 2D's whole
-    // timeline "look nothing like before" at a glance, since that neutral
-    // barely-visible strip is what every layer showed pre-in/out-point-
-    // feature too. Reverting to the CSS .full-range default (plain white,
-    // style.css) for that case — only a layer that's actually trimmed
-    // (manually or via the blank-keyframe auto-detect) gets its own color,
-    // exactly the "stands out because it's different" signal intended.
-    if (custom) {
-      bar.style.background = hexToRgba(ld.color, 0.55);
-      bar.style.borderColor = hexToRgba(ld.color, 0.95);
-    } else {
-      bar.style.background = '';
-      bar.style.borderColor = '';
-    }
+    // Layer-color tint ALWAYS applied now (2026-07-17, explicit request:
+    // "il faut que ça couleur soit déjà appliqué quoi qu'il arrive" — a
+    // layer previously only showed its own color once trimmed, reading as
+    // "you have to move the layer to see its color"). Reverses the
+    // 2026-07 decision below the full-range case used to plainly re-tell:
+    // a fully neutral bar was chosen back then so a busy timeline didn't
+    // tint EVERY row at a glance — kept here as a WEAKER tint (0.22 vs
+    // 0.55 alpha) rather than dropped outright, so the "stands out because
+    // it's trimmed" signal survives alongside the always-on color.
+    bar.style.background = hexToRgba(ld.color, custom ? 0.55 : 0.22);
+    bar.style.borderColor = hexToRgba(ld.color, custom ? 0.95 : 0.5);
     // Bug found 2026-07 ("si hover ou select avec rectangle le in ou
     // outpoint celui ci doit se bleuté"): this used to set the handle's
     // background as an INLINE style, which always wins over any CSS rule
