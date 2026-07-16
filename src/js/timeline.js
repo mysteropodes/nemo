@@ -254,7 +254,11 @@ window.SM={
     canvasEl.style.cursor=cc[t]||'default';
     updatePropsContext();
     if(window.renderLabsFloatPanel)renderLabsFloatPanel();},
-  toggleOnion:function(){state.onionSkin=!state.onionSkin;renderOS();var el=document.getElementById('os-st');el.textContent=state.onionSkin?'ON':'OFF';el.style.color=state.onionSkin?'var(--green)':'var(--text-dim)';var b=document.getElementById('btn-os');if(b)b.classList.toggle('active',state.onionSkin);window.updateOmMarkers(state.currentFrame,state.totalFrames);},
+  toggleOnion:function(){state.onionSkin=!state.onionSkin;renderOS();
+    // Deux badges à tenir en phase : #os-st (popover d'options) et
+    // #os-st-panel (la section Onion Skin du panel droit, mockup 2026-07-17).
+    ['os-st','os-st-panel'].forEach(function(id){var el=document.getElementById(id);if(!el)return;el.textContent=state.onionSkin?'ON':'OFF';el.style.color=state.onionSkin?'var(--green)':'var(--text-dim)';});
+    var b=document.getElementById('btn-os');if(b)b.classList.toggle('active',state.onionSkin);window.updateOmMarkers(state.currentFrame,state.totalFrames);},
   toggleGhostAll:function(){
     state.ghostAllFrames=!state.ghostAllFrames;
     renderOS();
@@ -1175,6 +1179,11 @@ function updatePropsContext(){
   }else if(hasSel){
     ctx='selection';
     show['sel-props-sec']=show['fill-sec']=show['stroke-sec']=show['effects-sec']=true;
+    // Mockup 2026-07-17 (réordonnancement du panel) : Layer (Blend) et
+    // Document restent visibles pendant une sélection, juste sous le bloc
+    // transform — avant, sélectionner un trait les faisait disparaître.
+    show['canvas-sec']=true;
+    show['layer-sec']=!!(state.layers[state.activeLayerIdx]);
     hdrText=selectedPaths.length+(selectedPaths.length>1?' éléments sélectionnés':' élément sélectionné');
   }else if(FILL_STROKE_TOOLS.indexOf(state.tool)>=0){
     ctx='tool:'+state.tool;
@@ -4151,6 +4160,15 @@ document.getElementById('btn-loop').addEventListener('contextmenu',function(e){e
   document.addEventListener('pointerdown',function(e){
     if(pop.style.display!=='none'&&!pop.contains(e.target)&&e.target!==btn)pop.style.display='none';
   });
+  // Section Onion Skin du panel droit (mockup 2026-07-17) : clic sur le
+  // header = même toggle que #btn-os ; le badge #os-st-panel est mis à
+  // jour par toggleOnion. État initial synchronisé ici.
+  var osSec=document.getElementById('onion-sec');
+  if(osSec){
+    osSec.querySelector('.phdr').addEventListener('click',function(){window.SM.toggleOnion();});
+    var badge=document.getElementById('os-st-panel');
+    if(badge){badge.textContent=state.onionSkin?'ON':'OFF';badge.style.color=state.onionSkin?'var(--green)':'var(--text-dim)';}
+  }
 })();
 document.getElementById('p-omode').addEventListener('change',function(){window.SM.setOnionMode(this.value);});
 document.getElementById('p-opop').addEventListener('input',function(){window.SM.setOnionPrevOp(parseInt(this.value));});

@@ -334,6 +334,38 @@
         <div class="pr" style="font-size:9px;color:var(--text-dim)">Déplace/resize le rectangle caméra directement sur le canvas.</div>
       </div>
     </div>
+    <!-- Réordonnancement du panel (2026-07-17, mockup fourni) : Layer et
+         Document remontent juste après le bloc transform/align — même
+         couleurs, seul l'ordre change. Les sections outil contextuelles
+         (Fill/Trait/Options/Effects) restent groupées juste en dessous. -->
+    <div class="psec" id="layer-sec" style="display:none">
+      <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrLayer">Layer</span></div>
+      <div class="pbdy">
+        <!-- Custom dropdown, not a native <select>: hovering each option
+             live-previews the blend mode on the canvas before committing
+             (feedback #17) — impossible with a native select, whose open
+             popup is OS-rendered and fires no per-option hover events.
+             Options + wiring: initBlendDropdown() in timeline.js. -->
+        <div class="pr"><span class="pl">Blend</span><div class="psel" id="p-blendmode" data-value="normal" role="button" tabindex="0" style="cursor:pointer;user-select:none">Normal</div></div>
+        <!-- Track matte (2026-07, scouted from Caddis's Layer.matteMode):
+             this layer's alpha comes from the layer directly ABOVE it
+             (AE convention — implicit source, never picked by id). Same
+             custom-popup pattern as Blend above: initMatteDropdown() in
+             timeline.js. -->
+        <div class="pr"><span class="pl">Matte</span><div class="psel" id="p-mattemode" data-value="none" role="button" tabindex="0" style="cursor:pointer;user-select:none">Aucun</div></div>
+      </div>
+    </div>
+    <div class="psec" id="canvas-sec">
+      <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrDocument">Document</span></div>
+      <div class="pbdy">
+        <div class="pr"><span class="pl">Width</span><input type="number" class="pi" id="p-cw" value="1920" min="1" max="7680"></div>
+        <div class="pr"><span class="pl">Height</span><input type="number" class="pi" id="p-ch" value="1080" min="1" max="4320"></div>
+        <div class="pr"><span class="pl">BG</span><input type="color" id="p-cbg" value="#ffffff" style="width:28px;height:22px;border:none;cursor:pointer;padding:0;"></div>
+        <div class="pr" style="gap:4px"><button class="pbtn" id="btn-fit">Fit</button><button class="pbtn" id="btn-resetv">Reset View</button></div>
+        <div class="pr"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer" title="Hide artwork outside the canvas bounds — off by default, so you can see and work with content that spills over the edge"><input type="checkbox" id="p-clip" style="accent-color:var(--accent)"> Clip to canvas</label></div>
+        <div class="pr"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer" title="Broadcast-safe overlay guides: 90% action-safe / 80% title-safe margins, standard TV/film safe areas"><input type="checkbox" id="p-safety" style="accent-color:var(--accent)"> Safety zones</label></div>
+      </div>
+    </div>
     <div class="psec" id="fill-sec">
       <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrFill">Fill</span></div>
       <div class="pbdy">
@@ -446,34 +478,6 @@
         <div class="pr" style="font-size:9px;color:var(--text-dim)">Coming soon</div>
       </div>
     </div>
-    <div class="psec" id="layer-sec" style="display:none">
-      <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrLayer">Layer</span></div>
-      <div class="pbdy">
-        <!-- Custom dropdown, not a native <select>: hovering each option
-             live-previews the blend mode on the canvas before committing
-             (feedback #17) — impossible with a native select, whose open
-             popup is OS-rendered and fires no per-option hover events.
-             Options + wiring: initBlendDropdown() in timeline.js. -->
-        <div class="pr"><span class="pl">Blend</span><div class="psel" id="p-blendmode" data-value="normal" role="button" tabindex="0" style="cursor:pointer;user-select:none">Normal</div></div>
-        <!-- Track matte (2026-07, scouted from Caddis's Layer.matteMode):
-             this layer's alpha comes from the layer directly ABOVE it
-             (AE convention — implicit source, never picked by id). Same
-             custom-popup pattern as Blend above: initMatteDropdown() in
-             timeline.js. -->
-        <div class="pr"><span class="pl">Matte</span><div class="psel" id="p-mattemode" data-value="none" role="button" tabindex="0" style="cursor:pointer;user-select:none">Aucun</div></div>
-      </div>
-    </div>
-    <div class="psec" id="canvas-sec">
-      <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrDocument">Document</span></div>
-      <div class="pbdy">
-        <div class="pr"><span class="pl">Width</span><input type="number" class="pi" id="p-cw" value="1920" min="1" max="7680"></div>
-        <div class="pr"><span class="pl">Height</span><input type="number" class="pi" id="p-ch" value="1080" min="1" max="4320"></div>
-        <div class="pr"><span class="pl">BG</span><input type="color" id="p-cbg" value="#ffffff" style="width:28px;height:22px;border:none;cursor:pointer;padding:0;"></div>
-        <div class="pr" style="gap:4px"><button class="pbtn" id="btn-fit">Fit</button><button class="pbtn" id="btn-resetv">Reset View</button></div>
-        <div class="pr"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer" title="Hide artwork outside the canvas bounds — off by default, so you can see and work with content that spills over the edge"><input type="checkbox" id="p-clip" style="accent-color:var(--accent)"> Clip to canvas</label></div>
-        <div class="pr"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer" title="Broadcast-safe overlay guides: 90% action-safe / 80% title-safe margins, standard TV/film safe areas"><input type="checkbox" id="p-safety" style="accent-color:var(--accent)"> Safety zones</label></div>
-      </div>
-    </div>
     <div class="psec">
       <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrSwatches">Nuancier</span></div>
       <div class="pbdy">
@@ -580,6 +584,15 @@
         <div class="pr"><button class="pbtn ac" id="btn-comp-enter" style="flex:1">Éditer le composant…</button></div>
         <div class="pr"><button class="pbtn" id="btn-comp-detach" style="flex:1" title="Bake the component's animation back into a normal layer">Décomposer en calque</button></div>
       </div>
+    </div>
+    <!-- Onion Skin en section du panel (mockup 2026-07-17) : header +
+         badge ON/OFF. Clic sur le header = toggle (même action que le
+         bouton timeline #btn-os / touche O) ; les OPTIONS détaillées
+         restent dans le popover #onion-pop (clic-droit sur #btn-os).
+         Le badge est un id distinct de #os-st (celui du popover) —
+         toggleOnion (timeline.js) met à jour les deux. -->
+    <div class="psec" id="onion-sec">
+      <div class="phdr" style="cursor:pointer" title="Clic : activer/désactiver l'onion skin (O). Options détaillées : clic-droit sur le bouton onion de la timeline."><span class="ar">☰</span> <span>Onion Skin</span> <span id="os-st-panel" style="margin-left:auto;margin-right:6px;font-size:9px;color:var(--green)">ON</span></div>
     </div>
     <div class="psec">
       <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrProject">Project</span></div>
