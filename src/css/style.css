@@ -454,7 +454,14 @@ body:not(.mode-motion) #motion-props-sec{display:none;}
 .pi.motion-val{width:34px;padding:2px 3px;font-size:10.5px;border-radius:4px;}
 .motion-unit{color:var(--text-dark);font-size:10px;width:14px;flex-shrink:0;}
 .motion-track-row{position:relative;}
-.fc.motion-fc{cursor:pointer;}
+/* Per-property tracks (Position/Rotation/.../each element's own) are mostly
+   empty space between the sparse diamonds that actually matter — the plain
+   .fc per-frame border-right (shared with Animation 2D's dense frame grid,
+   where it's load-bearing) just reads as a flat grey grid wall here.
+   Reported live with a screenshot ("la grille visuelle de keyframes en gris
+   clair... derrière les keyframes de la timeline"). Motion-only override —
+   .fc alone (Animation 2D's own grid) is untouched. */
+.fc.motion-fc{cursor:pointer;border-right:none;}
 .motion-key{width:9px;height:9px;border-radius:2px;background:#e6e6e6;border:1px solid rgba(0,0,0,.5);transform:rotate(45deg);}
 .motion-key.cur{background:#ffaa28;width:11px;height:11px;}
 .motion-key.sel{background:var(--accent);border-color:#fff;box-shadow:0 0 0 1.5px var(--accent);}
