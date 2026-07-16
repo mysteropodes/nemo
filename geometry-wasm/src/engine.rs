@@ -429,6 +429,24 @@ pub struct VelloEngine {
     // lets vello's own internal resource cache recognize "this is the same
     // image as last frame" and skip re-uploading pixels to the GPU.
     images: std::collections::HashMap<String, vello::peniko::ImageData>,
+    // 1×1 transparent "atlas keepalive" drawn far off-canvas into EVERY
+    // scene (see composite_scene) — works around a vello 0.9 atlas bug
+    // found live (2026-07-17, "trait bitmap brush disparaît après dessin
+    // + scrub", atlas Debug logs): when a resolve pass contains ZERO
+    // images, the image atlas reports 1×1 and render_encoding_coarse
+    // FREES the 2048² GPU atlas texture; when an image reappears next
+    // frame the CPU-side ImageCache still has it resident with
+    // dirty=false, so the regrown atlas texture is brand-new and BLANK
+    // with 0 uploads — the image samples nothing and disappears until
+    // something forces a re-upload. Observed log sequence:
+    //   2048x2048 Created (1 upload) → 1x1 Resized (0) →
+    //   2048x2048 Resized (0 uploads!) → invisible.
+    // A scrub triggers it constantly: each frame change rebuilds Rasters
+    // whose async decode hasn't finished, so scenes momentarily contain
+    // no images. Keeping ONE image alive in every scene pins the atlas
+    // size (growth still goes through vello's bump+repack path, which
+    // correctly re-marks residents dirty) so the texture is never freed.
+    atlas_keepalive: vello::peniko::ImageData,
     // ---- Custom blend compositor (see blend.wgsl's own doc comment for
     // why this exists instead of vello's own push_layer(Mix::X)) ----
     // Fullscreen-triangle pipeline: samples a backdrop + a single layer's
@@ -1068,6 +1086,13 @@ pub async fn create_engine(
         surface_format: format,
         surface_alpha_mode: alpha_mode,
         images: std::collections::HashMap::new(),
+        atlas_keepalive: vello::peniko::ImageData {
+            data: vec![0u8, 0, 0, 0].into(),
+            format: vello::peniko::ImageFormat::Rgba8,
+            alpha_type: vello::peniko::ImageAlphaType::Alpha,
+            width: 1,
+            height: 1,
+        },
         blend_pipeline,
         blend_bind_group_layout,
         blend_sampler,
@@ -1116,6 +1141,18 @@ impl VelloEngine {
     /// accumulator. The source layer itself is then skipped as its own
     /// visible layer (`is_matte_source`) — matching AE, where a matte
     /// source never draws on its own once consumed.
+    /// Pins the vello image atlas by encoding the 1×1 keepalive image far
+    /// off-canvas — see `atlas_keepalive`'s field comment for the bug this
+    /// works around. Must run for EVERY scene the renderer resolves (fast
+    /// path, per-layer blend scenes, matte-source scenes): each
+    /// render_to_texture call is its own resolve pass, and a single
+    /// imageless pass is enough to free the atlas texture.
+    fn push_atlas_keepalive(&self, scene: &mut Scene) {
+        scene.draw_image(
+            &vello::peniko::ImageBrush::new(self.atlas_keepalive.clone()),
+            Affine::translate((-1.0e7, -1.0e7)),
+        );
+    }
     fn composite_scene(&mut self, scene_in: &SceneIn, view_tf: Affine, base_color: Color) -> Result<(), JsValue> {
         let n = scene_in.layers.len();
         let mut is_matte_source = vec![false; n];
@@ -1128,6 +1165,7 @@ impl VelloEngine {
         let has_blend = scene_in.layers.iter().any(|l| mix_mode_index(l.blend_mode.as_deref()) != 0);
         if !has_blend && !has_matte {
             let mut scene = Scene::new();
+            self.push_atlas_keepalive(&mut scene);
             for layer in &scene_in.layers {
                 paint_layer_items(&mut scene, layer, view_tf, &self.images);
             }
@@ -1148,6 +1186,7 @@ impl VelloEngine {
                 continue;
             }
             let mut scene = Scene::new();
+            self.push_atlas_keepalive(&mut scene);
             paint_layer_items(&mut scene, layer, view_tf, &self.images);
             self.renderer
                 .render_to_texture(&self.device, &self.queue, &scene, &self.blend_layer_view, &layer_params)
@@ -1157,6 +1196,7 @@ impl VelloEngine {
                 // i+1 exists whenever matte_mode_of returned Some (see the
                 // is_matte_source precompute above, same condition).
                 let mut matte_scene = Scene::new();
+                self.push_atlas_keepalive(&mut matte_scene);
                 paint_layer_items(&mut matte_scene, &scene_in.layers[i + 1], view_tf, &self.images);
                 self.renderer
                     .render_to_texture(&self.device, &self.queue, &matte_scene, &self.matte_source_view, &layer_params)
