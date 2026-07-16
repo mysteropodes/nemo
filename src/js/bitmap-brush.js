@@ -354,22 +354,29 @@
     // Mask pass: stamp the white/alpha tip at fixed arc-length steps, then
     // tint once via destination-in.
     //
-    // Walked along the STRAIGHT-LINE polyline through basePath's own
-    // segment points, NOT basePath.getPointAt() (the fitted Bezier curve)
-    // — found live ("double trait quand on tourne la brush dans tous les
-    // sens rapidement"): a sharp zigzag reversal makes Paper's curve-fit
-    // handles overshoot into a small self-intersecting LOOP at the cusp
-    // (confirmed by sampling: walking 20 arc-length units forward along
-    // the curve at a reversal point only advanced the actual on-screen
-    // position ~3px — the curve nearly retraces itself in real space
-    // while arc length keeps climbing), so fixed-arc-length stamping
-    // re-stamped almost the same spot several times right at each turn —
-    // exactly the doubling. The raw segment polyline can't loop (it's
-    // straight lines between the actual drawn points, same shape the
-    // live preview already walks without this problem) at the cost of
-    // ignoring the anchor's curve handles for stamping purposes — texture
-    // placement doesn't need bezier-exact precision, spacing already
-    // jitters it.
+    // Walked along the REAL Bezier curves (basePath.curves), with a
+    // minimum EUCLIDEAN distance gate between consecutive stamps — the
+    // synthesis of two bugs that each ruled out the naive versions
+    // (2026-07-16/17):
+    // - Doubling at sharp reversals ("double trait quand on tourne la
+    //   brush rapidement"): a zigzag cusp makes Paper's curve-fit handles
+    //   overshoot into a tiny self-intersecting LOOP — arc length climbs
+    //   ~20 units through it while the on-screen position moves ~3px
+    //   (measured live), so fixed-arc-length stamping re-stamped almost
+    //   the same spot several times at every turn.
+    // - Corner-cutting ("la texture ne suit pas bien le tracé", capture
+    //   du 2026-07-16): the first fix walked the STRAIGHT polyline
+    //   through segment points instead, which physically can't loop —
+    //   but the anchor's fill renders the fitted CURVES, so on any
+    //   curved/simplified path the dab line visibly detached from the
+    //   shape's real edge (cutting across concave arcs, overshooting
+    //   convex ones).
+    // The distance gate keeps curve fidelity AND kills the cusp
+    // re-stamps: inside an overshoot loop every candidate lands within
+    // half a spacing of the previous stamp and is skipped; on any normal
+    // stretch consecutive arc-length steps are ~spacing apart in real
+    // space and always pass. A hairpin tighter than half a spacing loses
+    // a stamp or two instead of doubling — the right trade for a brush.
     var maskCanvas = document.createElement('canvas');
     maskCanvas.width = canvas.width; maskCanvas.height = canvas.height;
     var mctx = maskCanvas.getContext('2d');
@@ -398,20 +405,32 @@
       mctx.globalAlpha = spec.opacity;
       mctx.drawImage(tip, px - ps / 2, py - ps / 2, ps, ps);
     };
-    if (segs.length) stampAt(segs[0].point.x, segs[0].point.y);
-    for (var si = 0; si < segs.length - 1; si++) {
-      var a2 = segs[si].point, b2 = segs[si + 1].point;
-      var dx2 = b2.x - a2.x, dy2 = b2.y - a2.y;
-      var segLen2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
-      if (segLen2 < 1e-6) continue;
-      while (acc < segLen2) {
-        var t2 = acc / segLen2;
-        stampAt(a2.x + dx2 * t2, a2.y + dy2 * t2);
+    var prevSX = null, prevSY = null;
+    var minDistSq = (spacing * 0.5) * (spacing * 0.5);
+    var tryStamp = function (x, y) {
+      if (prevSX !== null) {
+        var gdx = x - prevSX, gdy = y - prevSY;
+        if (gdx * gdx + gdy * gdy < minDistSq) return; // cusp-loop guard, see walk comment above
+      }
+      prevSX = x; prevSY = y;
+      stampAt(x, y);
+    };
+    if (segs.length) tryStamp(segs[0].point.x, segs[0].point.y);
+    // Per-curve arc-length walk (not path.getPointAt(d) over the whole
+    // path, which rescans the curve list from the start on every call —
+    // O(n²) on long strokes, and liveRestamp re-bakes per pointermove).
+    var curves = basePath.curves;
+    for (var ci = 0; ci < curves.length; ci++) {
+      var clen = curves[ci].length;
+      if (clen < 1e-6) continue;
+      while (acc < clen) {
+        var cpt = curves[ci].getPointAt(acc);
+        if (cpt) tryStamp(cpt.x, cpt.y);
         acc += spacing;
       }
-      acc -= segLen2;
+      acc -= clen;
     }
-    if (basePath.closed && segs.length) stampAt(segs[0].point.x, segs[0].point.y);
+    if (basePath.closed && segs.length) tryStamp(segs[0].point.x, segs[0].point.y);
     ctx.fillStyle = spec.color;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.globalCompositeOperation = 'destination-in';
