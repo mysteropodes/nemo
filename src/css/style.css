@@ -322,6 +322,25 @@ body.mac-overlay-titlebar #app{padding-top:28px;}
 .pbtn.ac:hover{background:#5254d9;}
 .fb-tag.active{background:var(--accent);color:#fff;}
 .icon-grp{display:flex;flex:1;background:var(--panel3);border:none;border-radius:7px;overflow:hidden;}
+/* Value boxes/dropdowns/buttons inside the right panel darkened to match
+   (2026-07-17, follow-up to the card/background swap above — "dans les
+   box de value ou de bouton tu n'as pas changé les couleurs par le
+   foncé"): .pi/.psel/.pbtn/.icon-grp all default to --panel3, the
+   LIGHTEST of the three panel tones, everywhere else in the app too
+   (toast, project tabs, media rows, settings…) — same reasoning as the
+   #props-panel/.psec swap, redefining --panel3 itself would reskin
+   those too. --bg (#131215) sits below both panel tones now in use
+   here (--panel2 page bg, --panel card bg), giving a genuinely recessed
+   "inset field" look against the now-lighter cards instead of nearly
+   blending into them. Hover/accent/focus states untouched — #2c2a31,
+   var(--accent) etc. still read as "lighter than resting" against the
+   new darker base, same relative contrast the original design intended. */
+#props-panel .pi{background:var(--bg);}
+#props-panel .pi[type="range"]{background:transparent;}
+#props-panel .psel{background-color:var(--bg);}
+#props-panel .pbtn{background:var(--bg);}
+#props-panel .pbtn.ac{background:var(--accent);}
+#props-panel .icon-grp{background:var(--bg);}
 .icon-btn{flex:1;background:transparent;border:none;border-right:1px solid var(--border);color:var(--text-dim);cursor:pointer;padding:4px 0;display:flex;align-items:center;justify-content:center;}
 .icon-btn:last-child{border-right:none;}
 .icon-btn svg{width:18px;height:14px;display:block;}
