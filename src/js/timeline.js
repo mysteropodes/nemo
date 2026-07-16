@@ -206,6 +206,40 @@ function retimeTweenSpans(li,pairs,captured){
       if(ld.frames[nf].isKeyframe)return; // never clobber a real key
       ld.frames[nf]=JSON.parse(JSON.stringify(ib.content));
     });
+    // Stretching a FULLY-DENSE pair (every original slot was a tween) left
+    // HOLES between the proportionally-relaid frames — N in-betweens laid
+    // onto a longer span can't cover every slot, and phase 1 had already
+    // blanked them. Found live (2026-07, user screenshots: "je bouge la
+    // dernière clé entre les tween, des trucs bizarres apparaissent alors
+    // que je devrais n'avoir que des tween") — the span alternated tween
+    // dots and empty cells, flashing blank at playback. Fill each hole
+    // with a copy of the NEAREST captured in-between (frame-hold "on 2s"
+    // semantics — content-true, no blank flash; hitting Tween regenerates
+    // a smooth interpolation over the new span whenever wanted). Only for
+    // dense pairs: a deliberately sparse pair (one lone in-between over a
+    // long hold) must stay sparse, per this function's original contract.
+    // isManualEdit is stripped from the filled COPIES — the neighbor's
+    // hand-edit protection shouldn't shield machine-made duplicates from a
+    // future Tween regeneration.
+    if(list.length===(pr.fB-pr.fA-1)){
+      for(var nf2=pr.newFA+1;nf2<pr.newFB;nf2++){
+        if(nf2<0||nf2>=state.totalFrames)continue;
+        var fr2=ld.frames[nf2];
+        if(fr2.isKeyframe||fr2.isInterpolated)continue;
+        var t2=(nf2-pr.newFA)/(pr.newFB-pr.newFA);
+        var best=null,bd=Infinity;
+        list.forEach(function(ib){
+          var ot2=(ib.frame-pr.fA)/(pr.fB-pr.fA);
+          var d2=Math.abs(ot2-t2);
+          if(d2<bd){bd=d2;best=ib;}
+        });
+        if(best){
+          var cp=JSON.parse(JSON.stringify(best.content));
+          delete cp.isManualEdit;
+          ld.frames[nf2]=cp;
+        }
+      }
+    }
   });
 }
 
