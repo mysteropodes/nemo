@@ -97,15 +97,24 @@
   // segment instead of one curve applying everywhere. See CLAUDE.md §3 on
   // why this stays a small separate copy rather than a shared import. ----
   var DEFAULT_CURVE = [{ x: 0, y: 0 }, { x: 0.42, y: 0 }, { x: 0.58, y: 1 }, { x: 1, y: 1 }];
-  function cloneCurvePts(pts) { return pts.map(function (p) { return { x: p.x, y: p.y }; }); }
+  // tx/ty preserved: a point's manual tangent override (draggable Alt-
+  // handles in the shared curve editor, ui.js) — stripping them here
+  // reset hand-tuned tangents on every key clone.
+  function cloneCurvePts(pts) { return pts.map(function (p) { var o = { x: p.x, y: p.y }; if (typeof p.tx === 'number') { o.tx = p.tx; o.ty = p.ty || 0; } return o; }); }
   function curveCubicAt(t, a, b, c, d) { var u = 1 - t; return u * u * u * a + 3 * u * u * t * b + 3 * u * t * t * c + t * t * t * d; }
   function curveCubicDerivAt(t, a, b, c, d) { var u = 1 - t; return 3 * u * u * (b - a) + 6 * u * t * (c - b) + 3 * t * t * (d - c); }
+  // Manual tangent override (tx/ty) or derived Catmull-Rom — duplicated
+  // from ui.js's tangentAt (CLAUDE.md §3 pure-math pair, keep in sync).
+  function curveTangentAt(pts, i) {
+    var p = pts[i];
+    if (typeof p.tx === 'number') return { x: p.tx, y: p.ty || 0 };
+    var prev = pts[i - 1] || p, next = pts[i + 1] || p;
+    return { x: (next.x - prev.x) / 2, y: (next.y - prev.y) / 2 };
+  }
   function curveSegCtrl(pts, i) {
     var p0 = pts[i], p3 = pts[i + 1];
-    var prev = pts[i - 1] || p0, next = pts[i + 2] || p3;
-    var t1x = (p3.x - prev.x) / 2, t1y = (p3.y - prev.y) / 2;
-    var t2x = (next.x - p0.x) / 2, t2y = (next.y - p0.y) / 2;
-    return { c1: { x: p0.x + t1x / 3, y: p0.y + t1y / 3 }, c2: { x: p3.x - t2x / 3, y: p3.y - t2y / 3 } };
+    var t1 = curveTangentAt(pts, i), t2 = curveTangentAt(pts, i + 1);
+    return { c1: { x: p0.x + t1.x / 3, y: p0.y + t1.y / 3 }, c2: { x: p3.x - t2.x / 3, y: p3.y - t2.y / 3 } };
   }
   function curveSegFor(pts, x) { var i = 0; while (i < pts.length - 2 && pts[i + 1].x < x) i++; return i; }
   function evalCurvePoints(pts, x) {

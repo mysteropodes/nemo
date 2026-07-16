@@ -12,7 +12,12 @@
 (function(){
   var cvs=document.getElementById('curve-canvas'),ctx=cvs.getContext('2d');
   var W=cvs.width,H=cvs.height,pad=30;
-  function clonePts(pts){return pts.map(function(p){return{x:p.x,y:p.y};});}
+  // tx/ty preserved when present: a point's MANUAL tangent override
+  // (draggable Alt-handles, 2026-07-17 — "impossible de contrôler les
+  // tangentes de point clé dans la courbe d'accélération"). Stripping
+  // them here silently reset every hand-tuned tangent on the very next
+  // preset-match check / setCurve round-trip.
+  function clonePts(pts){return pts.map(function(p){var o={x:p.x,y:p.y};if(typeof p.tx==='number'){o.tx=p.tx;o.ty=p.ty||0;}return o;});}
   var cs={points:[{x:0,y:0},{x:.42,y:0},{x:.58,y:1},{x:1,y:1}]};
   var dragging=null,selected=null,hovering=false,rect=null;
   // Alt/Option reveals the selected point's tangents (feedback #22). The
@@ -113,14 +118,25 @@
 
   function cubicAt(t,a,b,c,d){var u=1-t;return u*u*u*a+3*u*u*t*b+3*u*t*t*c+t*t*t*d;}
   function cubicDerivAt(t,a,b,c,d){var u=1-t;return 3*u*u*(b-a)+6*u*t*(c-b)+3*t*t*(d-c);}
-  // Catmull-Rom tangent at pts[i] (open/clamped at the ends), converted to
-  // the pair of cubic-Bezier control points for the segment [pts[i],pts[i+1]].
+  // Effective tangent at pts[i]: the point's own MANUAL override (tx/ty,
+  // set by dragging its Alt-handles — one symmetric tangent per point,
+  // in/out aligned like a graph editor's "smooth" knot) when present,
+  // otherwise the derived Catmull-Rom (next-prev)/2 the model always
+  // used. Duplicated in motion.js (curveTangentAt) — CLAUDE.md §3 pure-
+  // math pair, keep in sync.
+  function tangentAt(pts,i){
+    var p=pts[i];
+    if(typeof p.tx==='number')return{x:p.tx,y:p.ty||0};
+    var prev=pts[i-1]||p,next=pts[i+1]||p;
+    return{x:(next.x-prev.x)/2,y:(next.y-prev.y)/2};
+  }
+  // Tangent at each knot (manual override or derived Catmull-Rom),
+  // converted to the pair of cubic-Bezier control points for the segment
+  // [pts[i],pts[i+1]].
   function segCtrl(pts,i){
     var p0=pts[i],p3=pts[i+1];
-    var prev=pts[i-1]||p0,next=pts[i+2]||p3;
-    var t1x=(p3.x-prev.x)/2,t1y=(p3.y-prev.y)/2;
-    var t2x=(next.x-p0.x)/2,t2y=(next.y-p0.y)/2;
-    return{c1:{x:p0.x+t1x/3,y:p0.y+t1y/3},c2:{x:p3.x-t2x/3,y:p3.y-t2y/3}};
+    var t1=tangentAt(pts,i),t2=tangentAt(pts,i+1);
+    return{c1:{x:p0.x+t1.x/3,y:p0.y+t1.y/3},c2:{x:p3.x-t2.x/3,y:p3.y-t2.y/3}};
   }
   function segForPts(pts,x){
     var i=0;
@@ -206,19 +222,27 @@
       var col=i3===selected?'#fff':(isEnd?'#bd93f9':'#4a9eff');
       drawH(p.x,p.y,col,yr,isEnd?7:8);
     });
-    // Selected point's derived tangent handles (Alt/Option — see
-    // showTangents above): the same (next-prev)/2 Catmull-Rom tangent
-    // segCtrl feeds the interpolation, split into its in/out thirds.
+    // Selected point's tangent handles (Alt/Option — see showTangents
+    // above): the EFFECTIVE tangent segCtrl feeds the interpolation
+    // (manual override if the point has one, derived Catmull-Rom
+    // otherwise), split into its in/out thirds. No longer read-only
+    // (2026-07-17, "impossible de contrôler les tangentes"): the two
+    // stubs are DRAGGABLE — grabbing one sets the point's tx/ty
+    // override (symmetric, in/out aligned), double-click on the point
+    // clears it back to auto. Manual tangents draw green, derived ones
+    // keep the original orange, so "this knot was hand-tuned" reads at
+    // a glance.
     if(showTangents&&selected!=null&&pts[selected]){
       var sp=pts[selected];
-      var tprev=pts[selected-1]||sp,tnext=pts[selected+1]||sp;
-      var ttx=(tnext.x-tprev.x)/2,tty=(tnext.y-tprev.y)/2;
-      [{x:sp.x-ttx/3,y:sp.y-tty/3},{x:sp.x+ttx/3,y:sp.y+tty/3}].forEach(function(h){
+      var tt=tangentAt(pts,selected);
+      var manual=typeof sp.tx==='number';
+      var hcol=manual?'#50fa7b':'#ffb86c';
+      [{x:sp.x-tt.x/3,y:sp.y-tt.y/3},{x:sp.x+tt.x/3,y:sp.y+tt.y/3}].forEach(function(h){
         var hx=tX(h.x),hy=tY(h.y,yr);
-        ctx.strokeStyle='#ffb86c';ctx.lineWidth=1.2;
+        ctx.strokeStyle=hcol;ctx.lineWidth=1.2;
         ctx.beginPath();ctx.moveTo(tX(sp.x),tY(sp.y,yr));ctx.lineTo(hx,hy);ctx.stroke();
-        ctx.fillStyle='#fff';ctx.fillRect(hx-3,hy-3,6,6);
-        ctx.strokeStyle='#ffb86c';ctx.strokeRect(hx-3,hy-3,6,6);
+        ctx.fillStyle='#fff';ctx.fillRect(hx-4,hy-4,8,8);
+        ctx.strokeStyle=hcol;ctx.strokeRect(hx-4,hy-4,8,8);
       });
     }
     var coordsEl=document.getElementById('curve-coords');
@@ -244,6 +268,9 @@
 
   // Camera-mode drag state — which control handle (0 or 1) is being moved.
   var camDragWhich=null;
+  // Tangent-handle drag state — {idx, dir:+1|-1} while one of the selected
+  // point's two Alt-handle stubs is being dragged, null otherwise.
+  var dragTangent=null;
   cvs.addEventListener('mousedown',function(e){
     rect=cvs.getBoundingClientRect();
     var mx=(e.clientX-rect.left)*(W/rect.width),my=(e.clientY-rect.top)*(H/rect.height);
@@ -255,6 +282,23 @@
       if(window.pushUndo)window.pushUndo(); // camera ease is part of the framing — Cmd+Z restores it too
       camDragWhich=d1<=d2?0:1;
       return;
+    }
+    // Visible tangent stubs get first grab priority — they sit close to
+    // their own point, and hitT would otherwise always win and start a
+    // point-drag instead ("impossible de contrôler les tangentes").
+    if(showTangents&&selected!=null){
+      var spts=activePoints(),sp0=spts[selected];
+      if(sp0){
+        var yrT=yRange(),ttg=tangentAt(spts,selected);
+        var hs=[{dir:-1,x:sp0.x-ttg.x/3,y:sp0.y-ttg.y/3},{dir:1,x:sp0.x+ttg.x/3,y:sp0.y+ttg.y/3}];
+        for(var hi2=0;hi2<hs.length;hi2++){
+          if(Math.hypot(mx-tX(hs[hi2].x),my-tY(hs[hi2].y,yrT))<10){
+            if(window.pushUndo)window.pushUndo(); // one undo per tangent gesture — same convention as the camera handles above
+            dragTangent={idx:selected,dir:hs[hi2].dir};
+            return;
+          }
+        }
+      }
     }
     var hit=hitT(mx,my);
     dragging=hit>=0?hit:null;
@@ -282,6 +326,22 @@
       if(window.SMEngineBridge)window.SMEngineBridge.renderNow();
       return;
     }
+    if(dragTangent){
+      if(!rect)rect=cvs.getBoundingClientRect();
+      var yrt=yRange();
+      var tmx=(e.clientX-rect.left)*(W/rect.width),tmy=(e.clientY-rect.top)*(H/rect.height);
+      var tpts=activePoints(),tp=tpts[dragTangent.idx];
+      if(!tp){dragTangent=null;return;}
+      // handle sits at p + dir*t/3 → t = dir*3*(handle-p). tx clamped
+      // positive: the eval solves x(t)=x by Newton and assumes x is
+      // monotonically increasing along the curve — a backward-pointing
+      // tangent (negative x component) could fold the segment over
+      // itself in x, which has no meaning on a timing axis.
+      var ntx=dragTangent.dir*3*(fX(tmx)-tp.x),nty=dragTangent.dir*3*(fY(tmy,yrt)-tp.y);
+      tp.tx=Math.max(0.001,ntx);tp.ty=nty;
+      draw();pushCurve();
+      return;
+    }
     if(dragging==null)return;
     if(!rect)rect=cvs.getBoundingClientRect();
     var yr=yRange();
@@ -298,12 +358,20 @@
     p.y=Math.max(-1,Math.min(2,ny));
     draw();pushCurve();
   });
-  window.addEventListener('mouseup',function(){dragging=null;camDragWhich=null;});
+  window.addEventListener('mouseup',function(){dragging=null;camDragWhich=null;dragTangent=null;});
   cvs.addEventListener('dblclick',function(e){
     if(isCamMode())return; // camera mode has exactly 2 fixed control points, nothing to add
     rect=cvs.getBoundingClientRect();
     var mx=(e.clientX-rect.left)*(W/rect.width),my=(e.clientY-rect.top)*(H/rect.height);
-    if(hitT(mx,my)>=0)return; // double-click ON a point does nothing extra
+    var dblHit=hitT(mx,my);
+    if(dblHit>=0){
+      // Double-click ON a point: clear its manual tangent override back
+      // to the derived (auto) Catmull-Rom — the escape hatch matching
+      // the drag that set it (green handles turn orange again).
+      var dpts=activePoints(),dp=dpts[dblHit];
+      if(typeof dp.tx==='number'){delete dp.tx;delete dp.ty;selected=dblHit;draw();pushCurve();}
+      return;
+    }
     var yr=yRange();
     var nx=Math.max(.01,Math.min(.99,fX(mx))),ny=fY(my,yr);
     var pts=activePoints();
