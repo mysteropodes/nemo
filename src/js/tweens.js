@@ -1304,7 +1304,13 @@ function renderOS(){
 // per entry (JSON) which at maxUndo=60 stays well within budget.
 function pushUndo(){pushUndoLayers();}
 function layersSnapshotNow(){return{type:'layers',layers:JSON.parse(JSON.stringify(state.layers)),active:state.activeLayerIdx,totalFrames:state.totalFrames,cameraKeys:JSON.parse(JSON.stringify(state.cameraKeys||[]))};}
-function pushUndoLayers(){saveAllLayerFrames();state.undoStack.push(layersSnapshotNow());if(state.undoStack.length>state.maxUndo)state.undoStack.shift();state.redoStack=[];if(window.SMFeedback)SMFeedback.logAction();}
+// window._scrubLiveActive (ui.js, live drag-scrub des champs numériques) :
+// pendant un drag de valeur, les handlers 'change' tournent à CHAQUE tick
+// (reflet temps réel au canvas) et la plupart commencent par pushUndo — un
+// snapshot par tick aurait pollué la pile pour un seul geste. ui.js pousse
+// UN snapshot pré-geste au premier mouvement puis lève ce flag ; ici on
+// no-op tant qu'il est levé (y compris le 'change' final du release).
+function pushUndoLayers(){if(window._scrubLiveActive)return;saveAllLayerFrames();state.undoStack.push(layersSnapshotNow());if(state.undoStack.length>state.maxUndo)state.undoStack.shift();state.redoStack=[];if(window.SMFeedback)SMFeedback.logAction();}
 function restoreLayersSnapshot(s){
   while(userLayers.length>0)userLayers.pop().remove();
   state.layers=[];

@@ -893,12 +893,40 @@
     el.setPointerCapture(e.pointerId);
     e.preventDefault();
   });
+  // Live scrub (2026-07-17, "les valeurs qui se changent en drag doivent
+  // se refléter en temps réel dans le canvas, pas juste au relâchement") :
+  // pendant le drag, on dispatch le VRAI événement 'change' à chaque tick
+  // (coalescé sur rAF — les handlers lourds comme motion.js's scrubField
+  // rebuildent des pans entiers d'UI, inutile de le faire au-delà de
+  // 60Hz), pas seulement au release. Les handlers 'change' existants font
+  // donc leur travail normal (setValue + renderNow + refresh) en continu —
+  // zéro modification champ par champ, tout input.scrub de l'app devient
+  // live d'un coup (panel droit, timeline Motion, partout).
+  //
+  // Contrepartie undo : la plupart de ces handlers commencent par
+  // pushUndo() — un snapshot par tick de drag aurait pollué la pile (des
+  // dizaines d'entrées pour UN geste) et, pire, le snapshot du release
+  // aurait capturé l'état déjà-final (Ctrl+Z = no-op perçu). D'où
+  // window._scrubLiveActive : UN pushUndo réel au premier mouvement du
+  // drag (snapshot pré-geste), puis pushUndoLayers (tweens.js) NO-OP tant
+  // que le flag est levé — y compris pendant le 'change' final du release.
+  // Un geste = une entrée d'undo, qui restaure l'état d'avant le drag.
+  var scrubChangeRaf=0;
+  function dispatchLiveChange(){
+    if(scrubChangeRaf)return;
+    scrubChangeRaf=requestAnimationFrame(function(){
+      scrubChangeRaf=0;
+      if(scrubState&&scrubState.moved)scrubState.el.dispatchEvent(new Event('change',{bubbles:true}));
+    });
+  }
   document.addEventListener('pointermove',function(e){
     if(!scrubState||e.pointerId!==scrubState.pointerId)return;
     var dx=e.clientX-scrubState.startX;
     if(!scrubState.moved){
       if(Math.abs(dx)<3)return;
       scrubState.moved=true;scrubState.el.classList.add('scrubbing');
+      if(window.pushUndo)window.pushUndo(); // snapshot pré-geste, AVANT de lever le flag
+      window._scrubLiveActive=true;
     }
     var step=parseFloat(scrubState.el.dataset.step)||1;
     if(e.shiftKey)step*=0.1;else if(e.altKey)step*=10;
@@ -910,13 +938,18 @@
     var decimals=(String(step).split('.')[1]||'').length;
     scrubState.el.value=decimals?raw.toFixed(decimals):Math.round(raw);
     scrubState.el.dispatchEvent(new Event('input',{bubbles:true}));
+    dispatchLiveChange();
   });
   function endScrub(e){
     if(!scrubState||(e&&e.pointerId!==undefined&&e.pointerId!==scrubState.pointerId))return;
+    if(scrubChangeRaf){cancelAnimationFrame(scrubChangeRaf);scrubChangeRaf=0;}
     if(!scrubState.moved){scrubState.el.focus();scrubState.el.select();}
     else{
       scrubState.el.classList.remove('scrubbing');
+      // 'change' final DANS la fenêtre du flag — son pushUndo interne
+      // reste no-op, voir le commentaire de tête.
       scrubState.el.dispatchEvent(new Event('change',{bubbles:true}));
+      window._scrubLiveActive=false;
     }
     scrubState=null;
   }
@@ -926,5 +959,5 @@
   // needed, but if the pointer capture itself is ever lost/released by the
   // browser without a matching pointerup (e.g. devtools interfering, or the
   // window losing focus mid-drag), don't leave a scrub stuck forever.
-  window.addEventListener('blur',function(){scrubState=null;});
+  window.addEventListener('blur',function(){scrubState=null;window._scrubLiveActive=false;});
 })();
