@@ -480,9 +480,15 @@ body:not(.mode-motion) #motion-props-sec{display:none;}
    la box qui entoure peu importe où je suis et le haut et le bas de cette
    box pour stagger". Now: the box's own top AND bottom edges are each a
    full-width draggable strip (.motion-keysel-edge) — grab anywhere along
-   either one, not a single pinpoint target. */
+   either one — and the interior (.motion-keysel-fill) is a hand-cursor
+   surface that MOVES the whole selection uniformly ("j'ai la hand qui
+   permet de déplacer partout dans la box"), matching the reference's
+   move-inside / skew-on-edges split. */
 .motion-keysel-box{position:fixed;border:1.5px solid var(--accent);pointer-events:none;z-index:51;box-sizing:border-box;}
-.motion-keysel-edge{position:absolute;left:-4px;right:-4px;height:14px;pointer-events:auto;cursor:ns-resize;}
+.motion-keysel-fill{position:absolute;inset:0;pointer-events:auto;cursor:grab;background:rgba(63,107,245,.07);}
+.motion-keysel-fill:hover{background:rgba(63,107,245,.13);}
+.motion-keysel-fill:active{cursor:grabbing;}
+.motion-keysel-edge{position:absolute;left:-4px;right:-4px;height:14px;pointer-events:auto;cursor:ns-resize;z-index:1;}
 .motion-keysel-edge-top{top:-9px;}
 .motion-keysel-edge-bottom{bottom:-9px;}
 .motion-keysel-edge::after{content:'';position:absolute;left:0;right:0;top:50%;height:3px;transform:translateY(-50%);background:var(--accent);border-radius:2px;opacity:.85;}

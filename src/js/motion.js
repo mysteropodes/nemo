@@ -1395,15 +1395,18 @@
     });
     setKeySel(sel); // also refreshes the selection box (updateKeySelectionBox below)
   }
-  // ---- visible selection box + drag edges (2026-07) ----
+  // ---- visible selection box: drag edges + drag fill (2026-07) ----
   // Feedback history on this ONE feature: first, the hidden Alt+drag-any-
   // diamond gesture wasn't discoverable at all ("j'arrive pas à
   // reproduire..."). Then a small centered handle was added — still wrong:
   // "ça agit pas du tout pareil dans le gif j'ai juste à glisser la box qui
   // entoure peu importe où je suis et le haut et le bas de cette box pour
-  // stagger". The reference lets you grab ANYWHERE along the box's top OR
-  // bottom edge, not one small pinpoint target. addStaggerEdges (below)
-  // builds two full-width edge strips instead of a centered pill.
+  // stagger". Final shape (matches the reference tested live at
+  // goodboy.ninja/try/skew-pro): the box's top AND bottom edges are each a
+  // full-width strip — grab anywhere along either to STAGGER — and the
+  // box's INTERIOR is a grab-cursor surface — drag anywhere inside to MOVE
+  // every selected key together uniformly ("j'ai la hand qui permet de
+  // déplacer partout dans la box").
   function addStaggerEdges(boxEl, onStart) {
     ['top', 'bottom'].forEach(function (pos) {
       var edge = document.createElement('div');
@@ -1412,6 +1415,13 @@
       edge.addEventListener('mousedown', function (e) { e.stopPropagation(); e.preventDefault(); onStart(e); });
       boxEl.appendChild(edge);
     });
+  }
+  function addMoveFill(boxEl, onStart) {
+    var fill = document.createElement('div');
+    fill.className = 'motion-keysel-fill';
+    fill.title = 'Glisser pour déplacer toutes les clés sélectionnées ensemble';
+    fill.addEventListener('mousedown', function (e) { e.stopPropagation(); e.preventDefault(); onStart(e); });
+    boxEl.appendChild(fill);
   }
   var _keySelBoxEl = null;
   function removeKeySelectionBox() {
@@ -1433,6 +1443,10 @@
     if (!_keySelBoxEl) {
       _keySelBoxEl = document.createElement('div'); _keySelBoxEl.className = 'motion-keysel-box';
       document.body.appendChild(_keySelBoxEl);
+      addMoveFill(_keySelBoxEl, function (e) {
+        pushUndo();
+        window._motionKeyDrag = { group: true, startX: e.clientX, keys: _motionKeySel.slice() };
+      });
       addStaggerEdges(_keySelBoxEl, function (e) {
         var holderOrder = [];
         _motionKeySel.forEach(function (s) { if (holderOrder.indexOf(s.holder) < 0) holderOrder.push(s.holder); });
@@ -1463,6 +1477,15 @@
     pushUndo();
     window._motionLayerStaggerDrag = { startX: e.clientX, holders: holders };
   }
+  function startLayerMoveDrag(e) {
+    var holders = _layerSel.map(function (li) { return state.layers[li]; }).filter(Boolean);
+    if (!holders.length) return;
+    pushUndo();
+    // uniform:true → onDragMove shifts EVERY selected layer (rank 0
+    // included) by the same delta, the box-interior "hand" move — vs the
+    // edge drag above where rank 0 anchors and the rest cascade.
+    window._motionLayerStaggerDrag = { startX: e.clientX, holders: holders, uniform: true };
+  }
   function updateLayerStaggerBox() {
     if (state.appMode !== 'motion' || _layerSel.length < 2) { removeLayerStaggerBox(); return; }
     var spacers = _layerSel.map(function (li) { return document.querySelector('#frame-grid .frow[data-layer="' + li + '"]'); }).filter(Boolean);
@@ -1478,6 +1501,7 @@
     if (!_layerStaggerBoxEl) {
       _layerStaggerBoxEl = document.createElement('div'); _layerStaggerBoxEl.className = 'motion-keysel-box';
       document.body.appendChild(_layerStaggerBoxEl);
+      addMoveFill(_layerStaggerBoxEl, startLayerMoveDrag);
       addStaggerEdges(_layerStaggerBoxEl, startLayerStaggerDrag);
     }
     _layerStaggerBoxEl.style.left = gb.left + 'px'; _layerStaggerBoxEl.style.top = y0 + 'px';
@@ -1534,14 +1558,18 @@
       var deltaFrames2 = Math.round((e.clientX - ld2.startX) / FC);
       if (!deltaFrames2) return;
       // Every animated PROPERTY's every KEY on a selected layer shifts
-      // together (rank 0 = anchor, never moves) — the whole layer's
-      // keyframe set staggers as one block, matching the reference.
+      // together — the whole layer's keyframe set moves as one block.
+      // Edge drag (uniform unset): rank 0 = anchor, never moves, the rest
+      // cascade by rank×delta. Interior "hand" drag (uniform:true): every
+      // layer, rank 0 included, shifts by the same 1×delta.
+      function multOf(rank) { return ld2.uniform ? 1 : rank; }
       var ok2 = ld2.holders.every(function (h, rank) {
-        if (rank === 0 || !h.motion) return true;
+        var mult = multOf(rank);
+        if (!mult || !h.motion) return true;
         return PROPS.every(function (prop) {
           var track = h.motion[prop]; if (!track) return true;
           return track.keys.every(function (k) {
-            var nf = k.frame + deltaFrames2 * rank;
+            var nf = k.frame + deltaFrames2 * mult;
             if (nf < 0 || nf >= state.totalFrames) return false;
             var existing = keyAt(track, nf);
             return !existing || existing === k;
@@ -1550,10 +1578,11 @@
       });
       if (!ok2) return;
       ld2.holders.forEach(function (h, rank) {
-        if (rank === 0 || !h.motion) return;
+        var mult = multOf(rank);
+        if (!mult || !h.motion) return;
         PROPS.forEach(function (prop) {
           var track = h.motion[prop]; if (!track) return;
-          track.keys.forEach(function (k) { k.frame += deltaFrames2 * rank; });
+          track.keys.forEach(function (k) { k.frame += deltaFrames2 * mult; });
           sortKeys(track);
         });
       });
