@@ -3390,11 +3390,31 @@ function initGithubFeedbackUI(){
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initGithubFeedbackUI);else initGithubFeedbackUI();
 
 function onKeyDown(event){
-  if((event.metaKey||event.ctrlKey)&&event.key==='z'){event.preventDefault();if(event.shiftKey)redo();else undo();return;}
+  // Editing a text/number field: leave Ctrl+Z/X/C/V to the BROWSER's own
+  // in-field behavior (text undo, text cut/copy/paste) instead of
+  // hijacking them app-wide — found live (2026-07-17, "les paramètres de
+  // valeurs de properties doivent aussi pouvoir être ctrl+z"): these
+  // handlers ran unconditionally (the INPUT guard further down only
+  // protects the single-letter shortcuts BELOW it), so typing a value in
+  // a Motion scrub field then hitting Ctrl+Z fired the APP undo against
+  // some earlier action while the field kept the typed-but-uncommitted
+  // text — which then committed anyway on blur. Felt exactly like "undo
+  // doesn't work on property values". Standard pro-app convention (AE,
+  // Figma): field focused → Ctrl+Z is text-level undo; blur/Esc first
+  // for app-level undo. Ctrl+S stays global — native "save page" is
+  // never what anyone wants here.
+  var inField=event.target.tagName==='INPUT'||event.target.tagName==='SELECT'||event.target.tagName==='TEXTAREA'||event.target.isContentEditable;
+  // Enter in a (single-line) field confirms AND releases focus — same
+  // convention as AE/Figma, and the necessary complement to the in-field
+  // Ctrl+Z guard below: without the blur, focus stayed in the field after
+  // Enter, so the very next Ctrl+Z was still treated as text-level undo
+  // instead of undoing the just-committed value.
+  if(event.key==='Enter'&&event.target.tagName==='INPUT'){event.target.blur();return;}
+  if((event.metaKey||event.ctrlKey)&&event.key==='z'){if(inField)return;event.preventDefault();if(event.shiftKey)redo();else undo();return;}
   if((event.metaKey||event.ctrlKey)&&event.key==='s'){event.preventDefault();if(event.shiftKey)window.SMProject.saveAs();else window.SMProject.save();return;}
-  if((event.metaKey||event.ctrlKey)&&event.key==='c'){event.preventDefault();window.SM.copyFrames();return;}
-  if((event.metaKey||event.ctrlKey)&&event.key==='x'){event.preventDefault();window.SM.cutFrames();return;}
-  if((event.metaKey||event.ctrlKey)&&event.key==='v'){event.preventDefault();window.SM.pasteFrames();return;}
+  if((event.metaKey||event.ctrlKey)&&event.key==='c'){if(inField)return;event.preventDefault();window.SM.copyFrames();return;}
+  if((event.metaKey||event.ctrlKey)&&event.key==='x'){if(inField)return;event.preventDefault();window.SM.cutFrames();return;}
+  if((event.metaKey||event.ctrlKey)&&event.key==='v'){if(inField)return;event.preventDefault();window.SM.pasteFrames();return;}
   // UI/UX audit (2026-07): Ctrl/Cmd+A "select all" existed nowhere in the
   // app — a near-universal convention in every creative tool. Selects
   // every path/raster on the ACTIVE layer at the current frame, mirroring
