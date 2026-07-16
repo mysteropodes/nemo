@@ -262,7 +262,26 @@
     // component the instant it was also the active layer (the normal case
     // right after creating one, or an imported video, or whenever the layer
     // panel has it selected).
-    var hit = (activeLdForLock.locked && !activeLdForLock.symbolId) ? null : layer.hitTest(pt, { stroke: true, fill: true, tolerance: 8 / view.zoom });
+    // Motion mode: the layer's VISIBLE position/rotation/scale is a
+    // render-time-only transform (motion.js's computeMotionMat, applied
+    // exclusively inside buildSceneJson — the raw Paper.js geometry
+    // underneath is NEVER moved, by design, so a save can't bake it in).
+    // Hit-testing with the raw pointer therefore missed the shape the
+    // moment any key made its rendered position diverge from where it was
+    // actually drawn — found live (2026-07, "impossible d'ajouter une
+    // troisième keyframe en bougeant le calque dans le canvas"): with 2
+    // keys already offsetting the layer, clicking the shape where it
+    // VISIBLY sits hit nothing; clicking its invisible original (frame-0)
+    // position worked. Map the pointer back through the layer's own Motion
+    // transform first — same inverse already used by the transform-box
+    // handles above (xformMap) — so testing against geometry that never
+    // actually moved uses a point in the space it still lives in.
+    var hitPt = pt;
+    if (state.appMode === 'motion' && window.SMMotion) {
+      var hitMap = SMMotion.layerMotionPointMap(state.activeLayerIdx);
+      if (hitMap) { var hg = hitMap.inv(pt.x, pt.y); hitPt = new Point(hg[0], hg[1]); }
+    }
+    var hit = (activeLdForLock.locked && !activeLdForLock.symbolId) ? null : layer.hitTest(hitPt, { stroke: true, fill: true, tolerance: 8 / view.zoom });
     var hitOtherLayerIdx = -1;
     // If nothing on the active layer, check every OTHER normal (non-
     // component) layer too — clicking a stroke that lives on layer 1 while
