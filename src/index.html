@@ -12,6 +12,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/tutorial.css">
 </head>
 <body>
 <div id="start-screen">
@@ -56,6 +57,15 @@
       <div class="start-row-body">
         <div class="start-card-title">Ouvrir depuis Kitsu…</div>
         <div class="start-card-sub">Se connecter à la production (async, pas de temps réel)</div>
+      </div>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(236,234,231,.3)" stroke-width="1.8" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
+    </div>
+
+    <div class="start-row" id="btn-open-tutorial">
+      <span class="start-card-ico start-card-ico-accent"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.9 6.3L22 9.3l-5 4.9 1.2 7.1L12 17.9 5.8 21.3 7 14.2 2 9.3l7.1-1z"/></svg></span>
+      <div class="start-row-body">
+        <div class="start-card-title">Découvrir Nemo — tutoriel interactif</div>
+        <div class="start-card-sub">Des mini-leçons pas à pas, directement dans l'app</div>
       </div>
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(236,234,231,.3)" stroke-width="1.8" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
     </div>
@@ -114,6 +124,7 @@
        into the canvas column. -->
   <div id="fb-avatars" title="Feedback comments sur ce projet"></div>
   <div id="fb-avatars-pop"></div>
+  <button id="btn-open-tutorial-topbar" title="Découvrir Nemo — tutoriel interactif"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.9 6.3L22 9.3l-5 4.9 1.2 7.1L12 17.9 5.8 21.3 7 14.2 2 9.3l7.1-1z"/></svg></button>
   <button id="project-tabs-settings" title="Réglages"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></button>
 </div>
 <!-- v11: real multi-project tabs — each tab holds its own independent
@@ -1166,5 +1177,6 @@
 <script src="js/eraser-bridge.js"></script>
 <script src="js/fill-bridge.js"></script>
 <script src="js/pen-bridge.js"></script>
+<script src="js/tutorial.js"></script>
 </body>
 </html>
