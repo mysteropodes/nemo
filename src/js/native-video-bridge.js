@@ -864,9 +864,24 @@
       nw: spin(rect.x, rect.y), ne: spin(rect.x + rect.width, rect.y),
       se: spin(rect.x + rect.width, rect.y + rect.height), sw: spin(rect.x, rect.y + rect.height),
     };
+    // Anchor/pivot (2026-07, "pas de point d'ancrage sur les média vidéo")
+    // — reuses the SAME Motion "Anchor Point" the Transform panel's 5 base
+    // fields already expose for every layer (Position/Anchor/Rotation/
+    // Scale/Opacity), rather than a parallel system: displayRect already
+    // offsets the scale/rotate PIVOT by this value when composing the
+    // layer's Motion transform (see computeMotionMat/transformImageRect) —
+    // this just visualizes/drags that exact same pivot on canvas. A pivot
+    // is invariant to whatever scale/rotate happens AROUND it — only the
+    // position translation moves it — so its world position is simply the
+    // canvas-centered rect's own (untransformed) center, plus the anchor
+    // offset, plus the position delta; no spin() needed (unlike the
+    // corners, which genuinely orbit it).
+    var anc = window.SMMotion ? SMMotion.getLayerValue(li, 'anchor') : [0, 0];
+    var pos = window.SMMotion ? SMMotion.getLayerValue(li, 'position') : [0, 0];
+    var anchor = { x: state.canvasW / 2 + anc[0] + pos[0], y: state.canvasH / 2 + anc[1] + pos[1] };
     var zs = 1 / Math.max(0.0001, view.zoom);
     var ringRadius = Math.min(36 * zs, Math.max(rect.width, rect.height) * 0.3);
-    return { rect: rect, center: { x: cx, y: cy }, rotation: rot, corners: corners, ringCenter: { x: cx, y: cy }, ringRadius: ringRadius };
+    return { rect: rect, center: { x: cx, y: cy }, rotation: rot, corners: corners, anchor: anchor, ringCenter: anchor, ringRadius: ringRadius };
   }
 
   // Instant import: opens a session and creates a nativeVideo layer —

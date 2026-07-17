@@ -923,7 +923,11 @@
         if (tb) {
           var nvTol = 9 / view.zoom, nvRingTol = 7 / view.zoom;
           var hh2 = null;
-          if (Math.abs(pt.getDistance(new Point(tb.ringCenter.x, tb.ringCenter.y)) - tb.ringRadius) < nvRingTol) hh2 = { type: 'rotate' };
+          // Anchor crosshair — Alt-gated, checked first, same convention
+          // (and same reason: a small object's own body can otherwise fall
+          // within the hit tolerance) as the path selection's own anchor.
+          if (e.altKey && pt.getDistance(new Point(tb.anchor.x, tb.anchor.y)) < nvTol) hh2 = { type: 'anchor' };
+          if (!hh2 && Math.abs(pt.getDistance(new Point(tb.ringCenter.x, tb.ringCenter.y)) - tb.ringRadius) < nvRingTol) hh2 = { type: 'rotate' };
           if (!hh2) {
             var bestD2 = nvTol;
             Object.keys(tb.corners).forEach(function (k) {
@@ -931,10 +935,15 @@
               if (d2 < bestD2) { bestD2 = d2; hh2 = { type: 'scale' }; }
             });
           }
+          if (hh2 && hh2.type === 'anchor') {
+            mode = 'nv-anchor-drag';
+            nvIdx = window._nvSelectedLayer;
+            return;
+          }
           if (hh2) {
             pushUndo();
             nvIdx = window._nvSelectedLayer;
-            nvPivot = new Point(tb.center.x, tb.center.y);
+            nvPivot = new Point(tb.anchor.x, tb.anchor.y); // pivot = the SAME anchor displayRect already uses for its scale/rotate, not always the box center
             if (hh2.type === 'rotate') {
               mode = 'nv-rotate';
               nvStartAngle = Math.atan2(pt.y - nvPivot.y, pt.x - nvPivot.x) * 180 / Math.PI;
@@ -944,6 +953,15 @@
               nvOrigDist = Math.max(1e-6, pt.getDistance(nvPivot));
               nvStartScale = SMMotion.getLayerValue(nvIdx, 'scale');
             }
+            return;
+          }
+          // Alt+click anywhere on the selected video relocates its anchor
+          // to that exact point — same Illustrator/Figma convention as the
+          // path selection's own Alt+click-anywhere, consuming the click
+          // entirely (no fall-through to reselect/move below).
+          if (e.altKey) {
+            mode = 'nv-anchor-drag';
+            nvIdx = window._nvSelectedLayer;
             return;
           }
         }
@@ -1364,6 +1382,20 @@
       SMMotion.setLayerValue(nvIdx, 'rotation', [nvOrigRot + (nvAng - nvStartAngle)]);
       window._sceneVersion++;
       window.SMEngineBridge.renderNow();
+    } else if (mode === 'nv-anchor-drag') {
+      // Writes the SAME Motion 'anchor' property the Transform panel field
+      // already edits — dragging is just this pivot's world position minus
+      // the layer's current position delta and the canvas-centered rect's
+      // own (untransformed) center, inverting transformBox's own anchor
+      // formula. No pushUndo/keyframe semantics beyond what setLayerValue
+      // already does (static override or auto-keyframe at the playhead,
+      // same as typing in the panel) — this is a document edit (unlike the
+      // path anchor, which is pure session UI state), matching how every
+      // OTHER video gesture here already goes straight through Motion.
+      var nvAncPos = SMMotion.getLayerValue(nvIdx, 'position');
+      SMMotion.setLayerValue(nvIdx, 'anchor', [pt.x - nvAncPos[0] - state.canvasW / 2, pt.y - nvAncPos[1] - state.canvasH / 2]);
+      window._sceneVersion++;
+      window.SMEngineBridge.renderNow();
     } else if (mode === 'move') {
       // Same ensureKeyframe()+reselect as the scale/rotate grab above (see
       // its comment) — a plain object-body drag needs it just as much: a
@@ -1672,7 +1704,7 @@
       window.SMEngineBridge.resume(); window.SMEngineBridge.renderNow();
       return;
     }
-    if (mode === 'nv-drag' || mode === 'nv-scale' || mode === 'nv-rotate') {
+    if (mode === 'nv-drag' || mode === 'nv-scale' || mode === 'nv-rotate' || mode === 'nv-anchor-drag') {
       mode = null; nvIdx = -1; nvStartPt = null; nvPivot = null;
       // One panel/timeline refresh at gesture end (not per tick — the
       // Transform fields and Motion rows re-read motionStatic/keys).
