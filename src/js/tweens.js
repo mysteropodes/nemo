@@ -750,6 +750,35 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
       var mag=Math.sqrt(simT.wRe*simT.wRe+simT.wIm*simT.wIm);
       if(mag>0.15&&mag<8){
         var th=Math.atan2(simT.wIm,simT.wRe);
+        // A large fitted rotation (>90°) can be a mathematical mirage on a
+        // simple shape (a real hand-drawn "bouche qui tourne" bug, mouth
+        // going from a wide flat arc to a tall narrow one): a similarity
+        // transform only has rotation+UNIFORM scale, no independent x/y
+        // stretch, so a pure aspect-ratio change (wide↔tall, no real turn)
+        // gets forced through the rotation term since that's the only knob
+        // available to explain it — verified on the reported case: even the
+        // best-fitting index correspondence found ~159° "rotation" for every
+        // candidate, yet it only cut residual ~12x vs the best NON-rotating
+        // fit (closed-form optimal scale, no theta) — while a genuine
+        // rigid turn (the 90°-rectangle regression test) cuts residual by
+        // ~200x. Below that gap, the "rotation" is more likely an artifact
+        // of the shape's own change than real turning motion, so it's
+        // dropped in favor of the non-rotating fit (mouth still resizes,
+        // just doesn't spin to get there).
+        if(Math.abs(th)>Math.PI/2){
+          var dot=0,aa=0;
+          for(var qi=0;qi<n;qi++){dot+=loA[qi].x*loB[qi].x+loA[qi].y*loB[qi].y;aa+=loA[qi].x*loA[qi].x+loA[qi].y*loA[qi].y;}
+          var s0=aa>1e-9?dot/aa:mag;
+          var resFit=0,resNoRot=0;
+          for(var qi2=0;qi2<n;qi2++){
+            var x=loA[qi2].x,y=loA[qi2].y;
+            var rx=mag*(Math.cos(th)*x-Math.sin(th)*y),ry=mag*(Math.sin(th)*x+Math.cos(th)*y);
+            var dxf=rx-loB[qi2].x,dyf=ry-loB[qi2].y;resFit+=dxf*dxf+dyf*dyf;
+            var dxn=s0*x-loB[qi2].x,dyn=s0*y-loB[qi2].y;resNoRot+=dxn*dxn+dyn*dyn;
+          }
+          var ROTATION_TRUST_RATIO=20;
+          if(resFit*ROTATION_TRUST_RATIO>=resNoRot){th=0;mag=Math.min(3,Math.max(0.33,s0));}
+        }
         if(Math.abs(th)>=0.06)theta=th; // ~3.4° dead-zone
         scaleF=Math.min(3,Math.max(0.33,mag));
       }
