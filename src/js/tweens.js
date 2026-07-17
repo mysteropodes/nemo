@@ -20,15 +20,41 @@ function colorDist(c1,c2){
   var dr=c1.r-c2.r,dg=c1.g-c2.g,db=c1.b-c2.b;
   return Math.sqrt(dr*dr+dg*dg+db*db)/441.6729559300637;
 }
-function strokeType(sd){if(sd.isVectorBrush)return'vb';var hasS=!!sd.strokeColor,hasF=!!sd.fillColor;if(hasS&&hasF)return'both';if(hasF)return'fill';return'stroke';}
+// hasRealStroke is AUTHORITATIVE over strokeColor (app.js's desP already
+// treats it this way — see its own header comment: a path with NO real
+// stroke keeps serP's historical '#ffffff'/'#fff' phantom fallback sitting
+// in the stored field, purely so old data/other code paths that expect a
+// string don't choke, but it must never be read as an actual color).
+// strokeType/strokeFeat used to read sd.strokeColor raw — bug found while
+// stress-testing (2026-07-17): saveAllLayerFrames runs at the START of
+// every generateTweens call, round-tripping whichever keyframe sits at
+// state.currentFrame through desP/serP — a fill-only shape (hasRealStroke:
+// false) that happened to be the CURRENT frame when Tween was pressed came
+// back out with a real-looking '#ffffff' in strokeColor, misclassifying it
+// as type 'both' (typePenalty 0.5, one of the largest single terms) against
+// its own un-round-tripped partner keyframe still correctly typed 'fill' —
+// a pure serialization artifact, not a real difference between the two
+// drawings, silently pushing an otherwise-perfect match toward rejection.
+function realStrokeColor(sd){return sd.hasRealStroke===false?null:sd.strokeColor;}
+function strokeType(sd){if(sd.isVectorBrush)return'vb';var hasS=!!realStrokeColor(sd),hasF=!!sd.fillColor;if(hasS&&hasF)return'both';if(hasF)return'fill';return'stroke';}
 // Pressure-brush strokes are stored as their filled OUTLINE (a closed
 // sausage around the drawn line) — comparing outlines wrecks proximity,
 // curvature and open/closed detection. All geometric features are computed
 // on the actual drawn centerline instead whenever it's available.
 function buildTPFeat(sd){
-  var segs=(sd.isVectorBrush&&sd.centerSegments&&sd.centerSegments.length>1)?sd.centerSegments:sd.segments;
+  var usingCenter=sd.isVectorBrush&&sd.centerSegments&&sd.centerSegments.length>1;
+  var segs=usingCenter?sd.centerSegments:sd.segments;
   var p=new Path({insert:false});
   segs.forEach(function(s){p.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));});
+  // Bug found by stress-testing (2026-07-17): never setting `.closed` here
+  // meant every downstream feature (strokeFeat's 16-point Chamfer samples,
+  // turning-angle profile, centroid, Fourier descriptor) measured a CLOSED
+  // shape's own length short by its implicit closing segment — the same
+  // root cause fixed in resamplePJS/resamplePairFeatureAware, but here it
+  // corrupts the MATCHING COST itself, not just the resample stage. A
+  // vector-brush centerline stays open regardless (it's the drawn stroke,
+  // never a closed loop even when its rendered ribbon outline is).
+  p.closed=!usingCenter&&!!sd.closed;
   return p;
 }
 // Fourier magnitude descriptor of a boundary point sequence — captures
@@ -99,7 +125,7 @@ function strokeFeat(sd){var p=buildTPFeat(sd);var b=p.bounds,len=p.length;var cx
   var usingCenterline=sd.isVectorBrush&&sd.centerSegments&&sd.centerSegments.length>1;
   var isClosed=(!usingCenterline&&typeof sd.closed==='boolean')?sd.closed:closedHeuristic;
   var fourier=fourierDescriptor(pts,cx,cy);
-  p.remove();return{cx:cx,cy:cy,length:len,dirX:dx,dirY:dy,bounds:{x:b.x,y:b.y,w:b.width,h:b.height},shape:shape,pts:pts,turn:turn,closed:isClosed,strokeCol:parseHexColor(sd.strokeColor),fillCol:parseHexColor(sd.fillColor),type:strokeType(sd),fourier:fourier};}
+  p.remove();return{cx:cx,cy:cy,length:len,dirX:dx,dirY:dy,bounds:{x:b.x,y:b.y,w:b.width,h:b.height},shape:shape,pts:pts,turn:turn,closed:isClosed,strokeCol:parseHexColor(realStrokeColor(sd)),fillCol:parseHexColor(sd.fillColor),type:strokeType(sd),fourier:fourier};}
 // Relative position (within the whole frame's own composition bbox) is what
 // actually distinguishes "left eye" from "right eye" — raw absolute centroid
 // distance breaks down whenever the whole drawing translates/scales between
@@ -241,7 +267,13 @@ function hungarian(cost){
 // autoMatchJS below for the reference implementation, kept as the fallback
 // on any WASM failure/absence, same pattern as fill/erase/boolean/shapes.
 function _strokeInJson(sd){
-  return{segments:sd.segments||[],centerSegments:sd.centerSegments,strokeColor:sd.strokeColor||null,fillColor:sd.fillColor||null,isVectorBrush:!!sd.isVectorBrush,closed:!!sd.closed};
+  // realStrokeColor (not raw sd.strokeColor) so the WASM path sees the same
+  // phantom-free color a fill-only shape's OWN JS-side strokeFeat/
+  // strokeType do — otherwise WASM's own stroke_feat (tweenmatch.rs, which
+  // has no concept of hasRealStroke at all) would still see serP's
+  // '#ffffff' fallback and disagree with the JS fallback path on the exact
+  // same input, purely depending on which one happened to run.
+  return{segments:sd.segments||[],centerSegments:sd.centerSegments,strokeColor:realStrokeColor(sd)||null,fillColor:sd.fillColor||null,isVectorBrush:!!sd.isVectorBrush,closed:!!sd.closed};
 }
 function autoMatch(sA,sB){
   if(!sA.length||!sB.length)return[];
@@ -331,7 +363,19 @@ function _resampleStrokeWasm(sd,n){
   }catch(e){console.warn('[geometry-wasm] resample_stroke failed, falling back to JS',e);return null;}
 }
 function resampleP(sd,n){var w=_resampleStrokeWasm(sd,n);if(w)return w;return resamplePJS(sd,n);}
-function resamplePJS(sd,n){var p=new Path({insert:false});sd.segments.forEach(function(s){p.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));});var len=p.length;if(len<1||n<2){p.remove();return sd;}var segs=[];for(var i=0;i<n;i++){var t=i/(n-1);var off=t*len;var pt=p.getPointAt(off);if(!pt)pt=p.getPointAt(len);var tan=p.getTangentAt(off);if(!tan)tan=new Point(1,0);var hl=len/(n-1)/3;segs.push({point:[pt.x,pt.y],handleIn:i===0?[0,0]:[-tan.x*hl,-tan.y*hl],handleOut:i===n-1?[0,0]:[tan.x*hl,tan.y*hl]});}p.remove();return{segments:segs,closed:!!sd.closed,strokeColor:sd.strokeColor,strokeWidth:sd.strokeWidth,strokeCap:sd.strokeCap,strokeJoin:sd.strokeJoin,fillColor:sd.fillColor||null,opacity:sd.opacity!==undefined?sd.opacity:1};}
+// Bug found by stress-testing (2026-07-17): this temp Path used to never
+// get `.closed` set before reading `.length` — for ANY closed shape (the
+// overwhelming majority of drawn fills), Paper.js's own length therefore
+// measured only the OPEN span (last drawn point back to the first), never
+// the implicit closing segment, so every resample fell short of a true
+// full loop by exactly that missing segment's length. Harmless-looking on
+// its own (still n evenly-spaced points), but it silently shifts what each
+// output index actually corresponds to around the loop — and compounds
+// with alignResampledPair's own rotation search (same missing `.closed`
+// bug there, fixed alongside this) to leave a residual few-degrees-to-one-
+// vertex misalignment that showed up as visible self-intersection at the
+// tween's midpoint on shapes needing any rotation correction.
+function resamplePJS(sd,n){var p=new Path({insert:false});sd.segments.forEach(function(s){p.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));});p.closed=!!sd.closed;var len=p.length;if(len<1||n<2){p.remove();return sd;}var segs=[];for(var i=0;i<n;i++){var t=i/(n-1);var off=t*len;var pt=p.getPointAt(off);if(!pt)pt=p.getPointAt(len);var tan=p.getTangentAt(off);if(!tan)tan=new Point(1,0);var hl=len/(n-1)/3;segs.push({point:[pt.x,pt.y],handleIn:i===0?[0,0]:[-tan.x*hl,-tan.y*hl],handleOut:i===n-1?[0,0]:[tan.x*hl,tan.y*hl]});}p.remove();return{segments:segs,closed:!!sd.closed,strokeColor:sd.strokeColor,strokeWidth:sd.strokeWidth,strokeCap:sd.strokeCap,strokeJoin:sd.strokeJoin,fillColor:sd.fillColor||null,opacity:sd.opacity!==undefined?sd.opacity:1};}
 // Centerline-driven variable-width strokes (vector brush / taper) are
 // matched and interpolated via their lean editable centerline + per-anchor
 // widths (data.centerSegments) instead of the dense filled outline that's
@@ -471,11 +515,18 @@ function _sampleAtFractions(p,len,fractions){
 function resamplePairFeatureAware(aData,bData,n,isVB){
   if(n<4){var rfn0=isVB?resampleCenterline:resampleP;return[rfn0(aData,n),rfn0(bData,n)];}
   var segKeyA=isVB?'centerSegments':'segments',segKeyB=segKeyA;
-  var srcA=(isVB&&aData.centerSegments&&aData.centerSegments.length>1)?aData.centerSegments:aData.segments;
-  var srcB=(isVB&&bData.centerSegments&&bData.centerSegments.length>1)?bData.centerSegments:bData.segments;
+  var usingCenterA=isVB&&aData.centerSegments&&aData.centerSegments.length>1;
+  var usingCenterB=isVB&&bData.centerSegments&&bData.centerSegments.length>1;
+  var srcA=usingCenterA?aData.centerSegments:aData.segments;
+  var srcB=usingCenterB?bData.centerSegments:bData.segments;
   if(!srcA||!srcB||srcA.length<2||srcB.length<2){var rfn1=isVB?resampleCenterline:resampleP;return[rfn1(aData,n),rfn1(bData,n)];}
   var pA=new Path({insert:false});srcA.forEach(function(s){pA.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));});
   var pB=new Path({insert:false});srcB.forEach(function(s){pB.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));});
+  // Same missing-`.closed` bug as resamplePJS (see its comment) — a
+  // vector-brush CENTERLINE stays open regardless (it's the drawn stroke
+  // path, never a closed loop even when its rendered ribbon outline is),
+  // matching strokeFeat's own usingCenterline special-case.
+  pA.closed=!usingCenterA&&!!aData.closed;pB.closed=!usingCenterB&&!!bData.closed;
   var lenA=pA.length,lenB=pB.length;
   if(!(lenA>0)||!(lenB>0)){pA.remove();pB.remove();var rfn2=isVB?resampleCenterline:resampleP;return[rfn2(aData,n),rfn2(bData,n)];}
   var fractions=buildSharedFractions(pA,pB,n);
@@ -951,11 +1002,37 @@ function generateTweens(){
     // or a shape that genuinely appears/disappears) cross-fades in place
     // instead of scaling/warping toward an unrelated stroke.
     var MATCH_TH=0.48;
+    // Bug found by stress-testing (2026-07-17): matchSc's dominant terms
+    // (proxT 0.48 + alignT 0.15) are ABSOLUTE-position Chamfer/ordered
+    // distance, normalized by the strokes' own size — so a single shape
+    // that simply moves far between two keys (a thrown ball, a fast pan,
+    // any large but perfectly ordinary motion) climbs past MATCH_TH purely
+    // from distance, with NOTHING else about it changed, and gets treated
+    // as an "appear/disappear" cross-fade instead of an interpolated move.
+    // Confirmed empirically: identical circles moving ~4.5x their own
+    // diameter already exceed 0.48, scale-invariantly (same ratio at every
+    // tested radius) — a very ordinary distance for anime action, not an
+    // edge case. When there is only ONE candidate on EACH side (sA/sB both
+    // length 1), there is zero assignment ambiguity for position to
+    // disambiguate — so a bad score can only mean "moved far" or "genuinely
+    // a different shape/kind", and only the latter is a real reason to
+    // fade. Re-derive just the category signals (type: fill/stroke/both/vb,
+    // and open/closed) directly via strokeFeat and accept regardless of
+    // score unless one of THOSE actually differs — position keeps its full
+    // weight for every case with 2+ candidates on either side, where it's
+    // doing real disambiguation work (which eye is which) that this must
+    // not weaken.
+    var soleCandidates=sA.length===1&&sB.length===1;
     var pairSpecs=[],aMatched={},bMatched={};
     forcedPairs.forEach(function(fp){pairSpecs.push(fp);aMatched[fp.aIdx]=1;bMatched[fp.bIdx]=1;});
     matches.forEach(function(m){
       if(forcedAIdx[m.a]||forcedBIdx[m.b])return; // conflicts with a manual override — drop the auto guess
-      if(m.score<=MATCH_TH){pairSpecs.push({aIdx:m.a,bIdx:m.b,aData:sA[m.a],bData:sB[m.b],mi:matches.indexOf(m),score:m.score});aMatched[m.a]=1;bMatched[m.b]=1;}
+      var accept=m.score<=MATCH_TH;
+      if(!accept&&soleCandidates){
+        var fta=strokeFeat(sA[m.a]),ftb=strokeFeat(sB[m.b]);
+        accept=fta.type===ftb.type&&fta.closed===ftb.closed;
+      }
+      if(accept){pairSpecs.push({aIdx:m.a,bIdx:m.b,aData:sA[m.a],bData:sB[m.b],mi:matches.indexOf(m),score:m.score});aMatched[m.a]=1;bMatched[m.b]=1;}
     });
     var unA=[],unB=[];
     for(var ai=0;ai<sA.length;ai++)if(!aMatched[ai])unA.push(ai);
