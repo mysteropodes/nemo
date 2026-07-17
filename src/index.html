@@ -189,11 +189,13 @@
     </div>
     <div id="canvas-area">
       <canvas id="drawing-canvas" resize></canvas>
-      <!-- Motion mode "enter layer as precomp" (2026-07, AE-style double-
-           click a layer to focus its own Transform + every element's full
-           property set, hiding the rest of the layer list) — the way back
-           out is an extra tab in #symbol-tabs next to "Scene" (renderSymbolTabs,
-           timeline.js), not a separate floating button here anymore. -->
+      <!-- Motion mode "enter Component as precomp" (2026-07-17, AE-style
+           double-click a Component layer to focus state.motionFocusedLayer:
+           every shape's full property set shown at once, see motion.js's
+           renderFocusedLayerList/renderFocusedLayerTimeline). The way back
+           out is an extra "<Layer> (Comp)" tab in #symbol-tabs next to
+           "Scene" (renderSymbolTabs, timeline.js) — no separate floating
+           button here. -->
       <div id="canvas-info">
         <div class="canvas-info-row">
           <span class="fnum" id="info-frame">1</span>

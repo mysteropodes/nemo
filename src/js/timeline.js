@@ -1010,7 +1010,7 @@ window.SM={
     window._waIn=state.waIn;window._waOut=state.waOut;window._totalF=state.totalFrames;
     while(userLayers.length>0)userLayers.pop().remove();state.layers=[];
     Object.keys(_symbolPaperLayers).forEach(function(k){_symbolPaperLayers[k].forEach(function(l){l.remove();});});_symbolPaperLayers={};
-    state.symbols=d.symbols||{};state.openSymbolTabs=[];state.activeSymbolId=null;
+    state.symbols=d.symbols||{};state.openSymbolTabs=[];state.activeSymbolId=null;state.motionFocusedLayer=null;
     d.layers.forEach(function(ld){var idx=createUserLayer(ld.name);state.layers[idx].visible=ld.visible!==false;state.layers[idx].locked=ld.locked||false;state.layers[idx].frames=ld.frames;
       if(ld.blendMode)state.layers[idx].blendMode=ld.blendMode;
       if(ld.matteMode)state.layers[idx].matteMode=ld.matteMode;
@@ -1808,10 +1808,34 @@ function hexToRgbTriplet(hex){
 }
 function renderKeyframeCellsInto(rowEl,li,contentLayerIdxs){
   var ld=state.layers[li];
+  // Component layers (2026-07 fix, "je perd l'affichage des keyframes"):
+  // convertLayerToComponent (app.js) collapses the outer ld.frames to a
+  // single placement stub (CLAUDE.md family-of-bug #1 — the real drawing
+  // data moved into state.symbols[symId].layers[...].frames), so reading
+  // ld.frames here silently showed the markers as gone. Fix: read the
+  // INNER symbol frame this instance resolves to at each outer frame via
+  // resolveSymbolFrameIdx (app.js) — the exact same mapping
+  // getEffectiveStrokes uses at render time — so markers always agree
+  // with what's actually on screen instead of drifting from a second,
+  // reimplemented resolution.
+  var sym=ld.symbolId?state.symbols[ld.symbolId]:null;
+  function symFrameAt(fi){
+    var ii=resolveSymbolFrameIdx(sym,ld,fi);
+    var kf=false,interp=false,manual=false,hasContent=false;
+    sym.layers.forEach(function(symLayer){
+      var f=symLayer&&symLayer.frames[ii];if(!f)return;
+      if(f.isKeyframe){kf=true;if(f.strokes.length)hasContent=true;}
+      else if(f.isInterpolated){interp=true;if(f.isManualEdit)manual=true;if(f.strokes.length)hasContent=true;}
+      else if(f.strokes&&f.strokes.length)hasContent=true;
+    });
+    return{isKeyframe:kf,isInterpolated:interp,isManualEdit:manual,hasContent:hasContent};
+  }
+  function frOf(fi){return sym?symFrameAt(fi):ld.frames[fi];}
   // Normally just this layer's own strokes; when contentLayerIdxs is given
   // (collapsed Stroke/Fill/Shadow head row — see renderTimeline's call
   // site), "full" means ANY sibling channel has content at that frame.
   function hasContentAt(fi){
+    if(sym)return symFrameAt(fi).hasContent;
     if(!contentLayerIdxs)return ld.frames[fi].strokes.length>0;
     return contentLayerIdxs.some(function(idx){var f=state.layers[idx]&&state.layers[idx].frames[fi];return f&&f.strokes.length>0;});
   }
@@ -1824,7 +1848,7 @@ function renderKeyframeCellsInto(rowEl,li,contentLayerIdxs){
     // span reads in the layer's own color, matching the mockup, not a
     // generic gray.
     if(ld.color){cell.style.setProperty('--dot-color',ld.color);cell.style.setProperty('--dot-rgb',hexToRgbTriplet(ld.color));}
-    var fr=ld.frames[fi];
+    var fr=frOf(fi);
     if(fr.isKeyframe){
       var full=hasContentAt(fi);
       var mk=document.createElement('div');mk.className='km '+(full?'fl':'hl');
@@ -1842,10 +1866,10 @@ function renderKeyframeCellsInto(rowEl,li,contentLayerIdxs){
       // extended cell before the next keyframe gets an end-of-span tick
       // — both distinctions Animate shows and this app previously didn't.
       var hc=false,srcFound=false;
-      for(var pi=fi;pi>=0;pi--){if(ld.frames[pi].isKeyframe){hc=hasContentAt(pi);srcFound=true;break;}}
+      for(var pi=fi;pi>=0;pi--){var pfr=frOf(pi);if(pfr.isKeyframe){hc=hasContentAt(pi);srcFound=true;break;}}
       if(srcFound){
         cell.classList.add(hc?'span-full':'span-empty');
-        var nextFr=ld.frames[fi+1];
+        var nextFr=(fi+1<state.totalFrames)?frOf(fi+1):null;
         if(!nextFr||nextFr.isKeyframe||nextFr.isInterpolated)cell.classList.add('span-end');
       }
     }
@@ -2082,6 +2106,28 @@ document.getElementById('frame-grid').addEventListener('mousedown',function(e){
     selToggle(li,fi);selApplyCSS();syncLayerSelFromFrameSel();
     if(li!==state.activeLayerIdx)window.SM.setActiveLayer(li);
     goToFrame(fi);return;
+  }
+
+  // Grabbing a keyframe's own dot directly (2026-07, "petit carré
+  // draggable") starts a MOVE drag on the very first press — no separate
+  // prior click-to-select needed first, matching Animate/AE's keyframe-
+  // diamond drag convention (reuses the exact same _tlDrag/moveFrames
+  // machinery the "drag an already-selected cell" path below already had;
+  // this just skips straight to it when the grab target is the dot).
+  // Scoped to real keyframes (kf-full/kf-empty — not the .td tween tick)
+  // on a NON-Component layer: a Component layer's own ld.frames is just a
+  // placement stub (see renderKeyframeCellsInto's symbolId branch), so
+  // moving it wouldn't relocate any real content — those markers stay
+  // visual-only here, moving the symbol's OWN inner keyframes would need a
+  // dedicated symbol-timeline UI that doesn't exist yet.
+  var grabbedDot=e.target.closest('.km')&&(cell.classList.contains('kf-full')||cell.classList.contains('kf-empty'));
+  var ldForDot=state.layers[li];
+  if(grabbedDot&&ldForDot&&!ldForDot.symbolId){
+    if(!selHas(li,fi)){selClear();selAdd(li,fi);selApplyCSS();syncLayerSelFromFrameSel();}
+    if(li!==state.activeLayerIdx)window.SM.setActiveLayer(li);
+    goToFrame(fi);
+    _tlDrag.active=true;_tlDrag.startL=li;_tlDrag.startF=fi;_tlDrag.moved=false;_tlDrag.ghost=null;_tlDrag.mode='move';
+    return;
   }
 
   // One predictable rule (Animate's): dragging from a cell that was
@@ -2731,8 +2777,14 @@ window.addEventListener('mouseup',function(){
 });
 function renderSymbolTabs(){
   var bar=document.getElementById('symbol-tabs');if(!bar)return;bar.innerHTML='';
-  var scene=document.createElement('div');scene.className='sym-tab'+(state.activeSymbolId?'':' act');scene.textContent='Scene';
-  scene.addEventListener('click',function(){if(state.activeSymbolId)window.SM.exitToScene();});
+  var scene=document.createElement('div');scene.className='sym-tab'+(state.activeSymbolId||state.motionFocusedLayer!=null?'':' act');scene.textContent='Scene';
+  scene.addEventListener('click',function(){
+    if(state.activeSymbolId)window.SM.exitToScene();
+    // Motion's "enter Component as precomp" (motion.js, enterLayerComponentView)
+    // is a lighter sibling of enterSymbol — no scene/timeline fork to undo,
+    // just clear the focus flag and re-render both panels.
+    if(state.motionFocusedLayer!=null){state.motionFocusedLayer=null;renderLayerList();renderTimeline();renderSymbolTabs();}
+  });
   bar.appendChild(scene);
   state.openSymbolTabs.forEach(function(symId){
     var sym=state.symbols[symId];if(!sym)return;
@@ -2744,6 +2796,22 @@ function renderSymbolTabs(){
     x.addEventListener('click',function(e){e.stopPropagation();window.SM.closeSymbolTab(symId);});
     bar.appendChild(tab);
   });
+  // Motion-mode "layer as precomp" focus (2026-07-17) — a separate concept
+  // from openSymbolTabs above (those fork the whole scene via enterSymbol;
+  // this stays on the same timeline, see state.motionFocusedLayer's own
+  // comment in app.js), so it gets its own tab rather than being pushed
+  // into openSymbolTabs.
+  if(state.motionFocusedLayer!=null){
+    var fld=state.layers[state.motionFocusedLayer];
+    if(fld){
+      var ftab=document.createElement('div');ftab.className='sym-tab act';
+      var flabel=document.createElement('span');flabel.textContent=(fld.name||'Layer')+' (Comp)';
+      var fx=document.createElement('span');fx.className='sym-tab-x';fx.textContent='×';
+      ftab.appendChild(flabel);ftab.appendChild(fx);
+      fx.addEventListener('click',function(e){e.stopPropagation();state.motionFocusedLayer=null;renderLayerList();renderTimeline();renderSymbolTabs();});
+      bar.appendChild(ftab);
+    }
+  }
 }
 function updateCompInstancePanel(){
   var sec=document.getElementById('comp-instance-sec');

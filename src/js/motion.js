@@ -405,10 +405,15 @@
   // Nested INSIDE the layer transform (engine-bridge.js/export.js apply this
   // FIRST, pivoted around the item's own bounds, THEN the layer transform on
   // top) — matches AE composing a shape group's transform inside its parent
-  // layer's transform.
+  // layer's transform. Used to unconditionally return null for a Component
+  // layer (`ld.symbolId`) — element Motion was inert the instant a layer
+  // auto-converted, silently discarding whatever per-shape keys already
+  // existed on `ld.elementMotion`. Lifted 2026-07 ("precomp par calque"):
+  // getEffectiveStrokes' ld.symbolId branch (app.js) now applies this
+  // per-stroke, same nesting order as the plain-layer case above.
   function elementMotionAt(li, strokeId, frameIdx) {
     var ld = state.layers[li];
-    if (!ld || ld.symbolId || !ld.elementMotion) return null;
+    if (!ld || !ld.elementMotion) return null;
     return computeMotionMat(ld.elementMotion[strokeId], frameIdx);
   }
   // Transforms one item's already-built segments array (engine-bridge.js's
@@ -903,16 +908,99 @@
   }
   // ---- Double-click a layer row (2026-07) ----
   // First tried as an "enter layer as precomp" in-place grouped view
-  // (StoryBoard/Animation2D/Motion architecture diagram, CLAUDE.md §8) —
-  // explicitly reversed the same day: "cette ouverture ne doit pas mettre
-  // 2 shape dans un layer mais construite 2 layer séparé avec dans chacune
-  // une shape". Double-click now calls splitLayerIntoElements (app.js,
-  // "Release to Layers"-style: explodes the layer into N real top-level
-  // layers, one per element, each carrying over its own per-element Motion
-  // keys as a normal layer-level track) — nothing left to render specially
-  // here, the layer list's normal per-layer loop just runs again afterward
-  // on the new layers like any other layer change.
+  // (StoryBoard/Animation2D/Motion architecture diagram, CLAUDE.md §8),
+  // reversed the same day in favor of splitLayerIntoElements ("Release to
+  // Layers"), then RE-reversed 2026-07-17 ("montage des éléments dans le
+  // component") once a Component layer could actually carry working
+  // per-element Motion (elementMotionAt no longer forces null for
+  // ld.symbolId, see app.js's getEffectiveStrokes) — before that, an "enter
+  // as precomp" view would have shown editable rows with zero visible
+  // effect on the render, which is why it was pulled originally. Now gated
+  // on `ld.symbolId`: a Component layer double-clicks into
+  // `state.motionFocusedLayer` (this file, renderFocusedLayerList /
+  // renderFocusedLayerTimeline below); a plain layer keeps the old
+  // Release-to-Layers split, since there's no "inside" yet.
+  function enterLayerComponentView(li) {
+    var ld = state.layers[li]; if (!ld || !ld.symbolId) return;
+    state.motionFocusedLayer = li;
+    window._motionExpandedElement = null;
+    renderLayerList(); renderTimeline();
+    if (window.renderSymbolTabs) renderSymbolTabs();
+  }
+  function exitLayerComponentView() {
+    state.motionFocusedLayer = null;
+    renderLayerList(); renderTimeline();
+    if (window.renderSymbolTabs) renderSymbolTabs();
+  }
+  // The focused "precomp" view for one Component layer: unlike
+  // renderElementsList's single-accordion (only one element's Transform
+  // group open at a time), here EVERY element shows its full property set
+  // simultaneously — this IS the montage the user asked for, one row per
+  // shape, all visible together (matching the reference sketch of parallel
+  // per-shape tracks). The instance's OWN whole-layer Transform (Position/
+  // Anchor/Rotation/Scale/Opacity of the placed instance, composed with
+  // symMatrix — see layerMotionAt's header comment) stays visible above,
+  // exactly like AE keeps a precomp layer's own Transform available while
+  // you're inside it.
+  function renderFocusedLayerList(list, li) {
+    var ld = state.layers[li];
+    if (!ld || !ld.symbolId) { state.motionFocusedLayer = null; return; }
+    var hdr = document.createElement('div'); hdr.className = 'lrow motion-group-row';
+    hdr.textContent = ld.name || ('Layer ' + (li + 1));
+    list.appendChild(hdr);
+    renderTransformGroup(list, ld, 'Transform (instance)');
+    var els = layerElements(li, ld);
+    if (!els.length) {
+      var empty = document.createElement('div'); empty.className = 'lrow'; empty.style.opacity = '0.6';
+      empty.textContent = 'Aucune forme sur cette frame'; list.appendChild(empty); return;
+    }
+    var elHdr = document.createElement('div'); elHdr.className = 'lrow motion-group-row'; elHdr.textContent = 'Éléments';
+    list.appendChild(elHdr);
+    els.forEach(function (entry, idx) {
+      var row = document.createElement('div'); row.className = 'lrow motion-elem-row';
+      var swatch = document.createElement('div'); swatch.className = 'motion-elem-swatch';
+      swatch.style.background = entry.sd.fillColor || entry.sd.strokeColor || 'transparent';
+      if (elementHasMotion(ld, entry.strokeId)) swatch.classList.add('has-motion');
+      var nm = document.createElement('div'); nm.className = 'lnm'; nm.textContent = elementLabel(entry, idx);
+      row.appendChild(swatch); row.appendChild(nm);
+      list.appendChild(row);
+      renderTransformGroup(list, ensureElementHolder(ld, entry.strokeId), 'Transform');
+    });
+  }
+  // Timeline-grid mirror of renderFocusedLayerList — MUST produce the same
+  // row sequence (same alignment invariant every other panel/grid pair in
+  // this file already depends on, see ROW_H's header comment): a spacer per
+  // list row that isn't itself a keyframe track. Unlike the normal
+  // per-element accordion mirror further below (whose single elSpacer
+  // stands in for BOTH the element's own row and renderTransformGroup's
+  // group-row header — harmless there since at most one element is ever
+  // expanded at once), every element here is always "expanded"
+  // simultaneously, so a missing spacer per element would compound into a
+  // growing drift instead of a single one-off gap — each element gets its
+  // own two spacers (row + group-row) to stay pixel-aligned with
+  // renderFocusedLayerList's row + renderTransformGroup pair.
+  function renderFocusedLayerTimeline(grid, li) {
+    var ld = state.layers[li];
+    if (!ld || !ld.symbolId) return;
+    var hdrSpacer = document.createElement('div'); hdrSpacer.className = 'frow';
+    grid.appendChild(hdrSpacer);
+    var grpSpacer = document.createElement('div'); grpSpacer.className = 'frow';
+    grid.appendChild(grpSpacer);
+    PROPS.forEach(function (prop) { renderTracksFor(grid, ld, prop); });
+    var els = layerElements(li, ld);
+    if (!els.length) return;
+    var elHdrSpacer = document.createElement('div'); elHdrSpacer.className = 'frow';
+    grid.appendChild(elHdrSpacer);
+    els.forEach(function (entry) {
+      var elSpacer = document.createElement('div'); elSpacer.className = 'frow';
+      grid.appendChild(elSpacer);
+      var elGrpSpacer = document.createElement('div'); elGrpSpacer.className = 'frow';
+      grid.appendChild(elGrpSpacer);
+      PROPS.forEach(function (prop) { renderTracksFor(grid, ensureElementHolder(ld, entry.strokeId), prop); });
+    });
+  }
   function renderLayerListMotion(list) {
+    if (state.motionFocusedLayer != null) { renderFocusedLayerList(list, state.motionFocusedLayer); return; }
     var order = (typeof computeLayerRenderOrder === 'function') ? computeLayerRenderOrder() : state.layers.map(function (_l, i) { return { type: 'layer', idx: i }; });
     order.forEach(function (entry) {
       if (entry.type !== 'layer' || entry.hidden) return;
@@ -1030,6 +1118,14 @@
       });
       row.addEventListener('dblclick', function (e) {
         if (e.target.closest('.lico')) return;
+        // Re-reversed 2026-07-17 ("montage des éléments dans le
+        // component") — a Component layer (already converted via its
+        // first Position/etc keyframe, see maybeAutoConvertToComponent)
+        // now DOES have an "enter as precomp" double-click again, but only
+        // once it's a Component: a plain layer with several unrelated
+        // shapes still gets the old Release-to-Layers split, since there's
+        // no "inside" to browse before that first key exists.
+        if (ld.symbolId) { enterLayerComponentView(li); return; }
         splitLayerIntoElements(li);
       });
       // Discoverability: the Cmd/Ctrl-click multi-select + drag-the-handle
@@ -1378,6 +1474,7 @@
     grid.appendChild(row);
   }
   function renderTimelineMotion(grid) {
+    if (state.motionFocusedLayer != null) { renderFocusedLayerTimeline(grid, state.motionFocusedLayer); updateKeySelectionBox(); updateLayerStaggerBox(); return; }
     var order = (typeof computeLayerRenderOrder === 'function') ? computeLayerRenderOrder() : state.layers.map(function (_l, i) { return { type: 'layer', idx: i }; });
     order.forEach(function (entry) {
       if (entry.type !== 'layer' || entry.hidden) return;
