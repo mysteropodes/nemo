@@ -779,16 +779,48 @@ function alignResampledPair(a,b){
   }
   return alignResampledPairJS(a,b);
 }
+// Residual after fitting the best RIGID rotation+scale for a candidate B
+// ordering, instead of alignCost's raw centroid-relative point distance.
+// Found by stress-testing (2026-07-17): a 300x40 rectangle rotated a
+// clean 90° picked the mathematically-optimal-by-alignCost correspondence
+// (confirmed by exhaustive brute-force search — not an alignment-search
+// bug), yet interpStroke's OWN fitSimilarityTransform on that exact
+// correspondence came back mag≈0.34/theta≈-10° instead of the expected
+// mag≈1/theta≈90° — visibly non-rigid, "melting" instead of turning.
+// Root cause: raw point distance has no notion of "does this
+// correspondence read as one coherent rigid motion" — only "are the
+// points numerically close after centering" — and a shape with some
+// rotational/reflective symmetry (any non-square rectangle included) can
+// have MULTIPLE orderings that tie or nearly tie on that measure while
+// only one of them is the "clean turn". Scoring candidates by how well
+// they fit a SINGLE rigid rotation+scale (what interpStroke will actually
+// apply) picks the one that turns instead of the one that merely
+// minimizes raw distance — the traditional "line of force" idea applied
+// to the alignment decision itself, not just the final interpolation.
+function rotationFitResidual(a,b){
+  var n=Math.min(a.segments.length,b.segments.length);
+  var ptsA=[],ptsB=[];
+  for(var i=0;i<n;i++){ptsA.push({x:a.segments[i].point[0],y:a.segments[i].point[1]});ptsB.push({x:b.segments[i].point[0],y:b.segments[i].point[1]});}
+  var t=fitSimilarityTransform(ptsA,ptsB);
+  if(!t)return alignCost(a,b); // degenerate (coincident points) — fall back to plain distance
+  var s=0;
+  for(var i2=0;i2<n;i2++){
+    var q=applySimilarityTransform(t,ptsA[i2].x,ptsA[i2].y);
+    var dx=q.x-ptsB[i2].x,dy=q.y-ptsB[i2].y;
+    s+=dx*dx+dy*dy;
+  }
+  return s;
+}
 function alignResampledPairJS(a,b){
-  var best=b,bestC=alignCost(a,b);
+  var best=b,bestC=rotationFitResidual(a,b);
   var rev=reverseResampled(b);
-  var rc=alignCost(a,rev);if(rc<bestC){bestC=rc;best=rev;}
+  var rc=rotationFitResidual(a,rev);if(rc<bestC){bestC=rc;best=rev;}
   if(resampledIsClosed(a)&&resampledIsClosed(b)){
     [b,rev].forEach(function(base){
       var n=base.segments.length;
       for(var k=1;k<n;k++){
         var cand=rotateResampled(base,k);
-        var c=alignCost(a,cand);
+        var c=rotationFitResidual(a,cand);
         if(c<bestC){bestC=c;best=cand;}
       }
     });

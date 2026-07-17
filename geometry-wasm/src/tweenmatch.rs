@@ -108,13 +108,28 @@ impl PathSampler {
     }
 }
 
+// Bug found by stress-testing (2026-07-17): never calling `close_path()`
+// here meant every downstream feature (stroke_feat's dense samples,
+// turning-angle profile, centroid, Fourier descriptor — AND
+// resample_stroke_inner's own resampling, which shares this same path
+// builder) measured a CLOSED shape's own length short by its implicit
+// closing segment — the same root cause fixed in tweens.js's
+// buildTPFeat/resamplePJS/resamplePairFeatureAware, but here it's the
+// WASM path real users actually hit (tried before the JS fallback). A
+// vector-brush centerline stays open regardless (it's the drawn stroke,
+// never a closed loop even when its rendered ribbon outline is) — mirrors
+// stroke_feat's own `is_vb(s)` exemption a few lines below.
 fn build_feat_path(s: &StrokeIn) -> BezPath {
     let mut path = BezPath::new();
-    if is_vb(s) {
+    let vb = is_vb(s);
+    if vb {
         let cs = s.center_segments.as_ref().unwrap();
         add_segs(&mut path, cs.iter().map(|c| (c.point, c.handle_in, c.handle_out)));
     } else {
         add_segs(&mut path, s.segments.iter().map(|c| (c.point, c.handle_in, c.handle_out)));
+        if s.closed {
+            path.close_path();
+        }
     }
     path
 }
@@ -769,6 +784,42 @@ fn rotate_resampled(r: &ResampledOut, k: usize) -> ResampledOut {
     ResampledOut { segments, widths, is_vector_brush: r.is_vector_brush, stroke_color: r.stroke_color.clone(), fill_color: r.fill_color.clone() }
 }
 
+// Residual after fitting the best RIGID rotation+scale for a candidate B
+// ordering, instead of align_cost's raw centroid-relative point distance
+// — verbatim port of tweens.js's rotationFitResidual (2026-07-17 fix).
+// Found by stress-testing: a 300x40 rectangle rotated a clean 90° picked
+// the mathematically-optimal-by-align_cost correspondence (confirmed by
+// exhaustive brute-force search — not a search bug), yet the fitted
+// rotation on that exact correspondence came back mag≈0.34/theta≈-10°
+// instead of the expected mag≈1/theta≈90° — visibly non-rigid, "melting"
+// instead of turning. Raw point distance has no notion of "does this
+// correspondence read as one coherent rigid motion" — only "are the
+// points numerically close after centering" — and a shape with some
+// rotational/reflective symmetry (any non-square rectangle included) can
+// have multiple orderings that tie or nearly tie on that measure while
+// only one of them is the clean turn. Scoring candidates by how well they
+// fit a single rigid rotation+scale (what interpStroke/interp_stroke will
+// actually apply) picks the one that turns instead of the one that merely
+// minimizes raw distance.
+fn rotation_fit_residual(a: &ResampledOut, b: &ResampledOut) -> f64 {
+    let n = a.segments.len().min(b.segments.len());
+    let pts_a: Vec<(f64, f64)> = a.segments[..n].iter().map(|s| (s.point[0], s.point[1])).collect();
+    let pts_b: Vec<(f64, f64)> = b.segments[..n].iter().map(|s| (s.point[0], s.point[1])).collect();
+    match fit_similarity_transform(&pts_a, &pts_b) {
+        None => align_cost(a, b), // degenerate (coincident points) — fall back to plain distance
+        Some(t) => {
+            let mut sum = 0.0;
+            for i in 0..n {
+                let (qx, qy) = apply_similarity_transform(&t, pts_a[i].0, pts_a[i].1);
+                let dx = qx - pts_b[i].0;
+                let dy = qy - pts_b[i].1;
+                sum += dx * dx + dy * dy;
+            }
+            sum
+        }
+    }
+}
+
 #[wasm_bindgen]
 pub fn align_pair(a_json: &str, b_json: &str) -> Result<String, JsValue> {
     let a: ResampledJsonIn = serde_json::from_str(a_json).map_err(|e| JsValue::from_str(&e.to_string()))?;
@@ -776,9 +827,9 @@ pub fn align_pair(a_json: &str, b_json: &str) -> Result<String, JsValue> {
     let a = a.into_out();
     let b = b.into_out();
     let mut best = b.clone();
-    let mut best_cost = align_cost(&a, &b);
+    let mut best_cost = rotation_fit_residual(&a, &b);
     let rev = reverse_resampled(&b);
-    let rc = align_cost(&a, &rev);
+    let rc = rotation_fit_residual(&a, &rev);
     if rc < best_cost {
         best_cost = rc;
         best = rev.clone();
@@ -788,7 +839,7 @@ pub fn align_pair(a_json: &str, b_json: &str) -> Result<String, JsValue> {
             let n = base.segments.len();
             for k in 1..n {
                 let cand = rotate_resampled(base, k);
-                let c = align_cost(&a, &cand);
+                let c = rotation_fit_residual(&a, &cand);
                 if c < best_cost {
                     best_cost = c;
                     best = cand;
