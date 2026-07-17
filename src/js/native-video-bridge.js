@@ -129,6 +129,22 @@
       lastFrameIndex: -1,
       pending: [],
     };
+    // Probe decode of frame 0 BEFORE reporting success — a browser can
+    // pass webCodecsAvailable() and even isConfigSupported() yet have a
+    // decoder that produces neither output nor errors (seen live in a
+    // sandboxed Electron preview with the media-decode service disabled).
+    // Failing HERE makes importAsLayer throw before any layer exists, so
+    // images.js's caller falls back cleanly to the classic JPEG import
+    // instead of leaving a layer that will never render anything. Costs
+    // one frame decode (~ms) in a working browser; the decoded frame
+    // stays warm for the immediately-following thumbnail/first-sync.
+    try {
+      await _decodeWebFrame(webSessions[sessionId], 0);
+      webSessions[sessionId].lastFrameIndex = -1; // let the first real request re-decode from a clean baseline
+    } catch (e) {
+      delete webSessions[sessionId];
+      throw e;
+    }
     return {
       session_id: sessionId,
       width: track.video.width,
@@ -206,9 +222,27 @@
     // single time (found live testing this exact bridge). Waiting on the
     // output callback directly needs no flush and keeps the decoder
     // reusable across calls.
+    //
+    // Bounded wait, never infinite — same philosophy as the Rust side's
+    // recv_timeout(700ms) on its converter channel: a decoder that
+    // produces neither output nor an error (seen live in a sandboxed
+    // Electron preview where the media-decode service is disabled) would
+    // otherwise hang this await forever, freezing whatever awaited it
+    // (importAsLayer's thumbnail, every frame sync). On timeout the
+    // decoder is torn down so the NEXT attempt starts from a clean
+    // cold-seek state instead of feeding a wedged instance.
     await new Promise(function (resolve, reject) {
       if (ws.pending.length >= need) { resolve(); return; }
-      ws.waiter = { count: need, resolve: resolve, reject: reject };
+      var timer = setTimeout(function () {
+        if (ws.waiter && ws.waiter.resolve === wrappedResolve) ws.waiter = null;
+        if (ws.decoder && ws.decoder.state !== 'closed') { try { ws.decoder.close(); } catch (e2) { /* already closing */ } }
+        ws.decoder = null;
+        ws.lastFrameIndex = -1;
+        reject(new Error('décodeur WebCodecs muet (aucune image en 4s) — décodage vidéo probablement indisponible dans ce navigateur'));
+      }, 4000);
+      function wrappedResolve() { clearTimeout(timer); resolve(); }
+      function wrappedReject(e) { clearTimeout(timer); reject(e); }
+      ws.waiter = { count: need, resolve: wrappedResolve, reject: wrappedReject };
     });
     ws.lastFrameIndex = frameIndex;
     var frames = ws.pending;
@@ -429,7 +463,16 @@
   // size varies 8x between 1080p and 4K), Map insertion order = LRU.
   var JS_CACHE_BUDGET = 64 * 1024 * 1024; // ~7 frames @1080p per layer
   function onFrameChanged(frame) {
-    if (!tauriOk()) return;
+    // No blanket tauriOk() gate anymore (2026-07, "la vidéo ne lit pas
+    // dans le canvas") — this early-return predated the WebCodecs backend
+    // and silently disabled ALL frame syncing in a plain browser, so a
+    // web-imported layer rendered nothing: the scene JSON's image item
+    // only appears once registerImageRaw has uploaded a frame under
+    // 'nv:<li>' (see engine-bridge.js's registeredImageIds check), which
+    // only ever happens through this sync path. The per-layer loop below
+    // is backend-agnostic (frameBytes dispatches per session); a Tauri-only
+    // layer in a browser (loaded project) just fails its lazy re-open with
+    // a console error, same as any other unreachable source.
     for (var i = 0; i < state.layers.length; i++) {
       if (state.layers[i].nativeVideo) _layerFrameSync(i, frame);
     }
@@ -556,6 +599,18 @@
       // the OS purged it from the temp cache, fall back to the original
       // and let _optimizeLayerMedia regenerate it in the background.
       if (!ld._nvSessionId) {
+        // A web (File/Blob) session can't lazily re-open: nv.path is just
+        // the display name (no durable file handle survives a reload —
+        // see importAsLayer's own comment), and falling through to open()
+        // would throw the misleading "requires the Tauri app" error on
+        // EVERY frame change. Fail once, visibly, then stay quiet.
+        if (nv.isWeb) {
+          if (!st.webReopenWarned) {
+            st.webReopenWarned = true;
+            if (window.showToast) showToast('Vidéo "' + nv.path + '" : source non rechargeable après un rechargement de page — réimporte le fichier.', 'warn');
+          }
+          return;
+        }
         var info = null;
         // Pre-indexed-era (.mov) optimized copies must NOT be reopened —
         // they'd silently keep the session on the old seek/respawn decode
