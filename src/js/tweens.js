@@ -989,6 +989,35 @@ function extractStrokePiece(sd,f0,f1){
   if(isVB)return{segments:[],isVectorBrush:true,centerSegments:segs,strokeColor:null,fillColor:sd.fillColor||null,opacity:sd.opacity!==undefined?sd.opacity:1};
   return{segments:segs,strokeColor:sd.strokeColor,strokeWidth:sd.strokeWidth,strokeCap:sd.strokeCap,strokeJoin:sd.strokeJoin,fillColor:null,opacity:sd.opacity!==undefined?sd.opacity:1};
 }
+// Manual counterpart to resolveSplitMatches' own tryDirection('B') piece-
+// cutting (same extractStrokePiece-at-cumulative-length-fractions recipe),
+// but for a USER-CONFIRMED split rather than a heuristic guess — no score
+// gating needed, the user already knows these parts belong together (the
+// "Réparer le tween" tool, below). Splits `mergedData` into
+// partsData.length pieces, ordered by where each part projects onto
+// mergedData's own path (not partsData's array order — the user may click
+// the pieces in either order), each piece's length proportional to its
+// corresponding part's own length.
+function splitMergedIntoOrderedPieces(mergedData,partsData){
+  var feats=partsData.map(strokeFeat);
+  var sumLen=0;feats.forEach(function(f){sumLen+=f.length;});
+  var mp=buildTPFeat(mergedData);
+  var withLoc=partsData.map(function(pd,i){
+    var f=feats[i];
+    var loc=mp.getNearestLocation(new Point(f.cx,f.cy));
+    return{part:pd,len:f.length,off:loc?loc.offset:i};
+  }).sort(function(x,y){return x.off-y.off;});
+  mp.remove();
+  var fr=[],acc=0;
+  for(var i=0;i<withLoc.length-1;i++){acc+=withLoc[i].len;fr.push(Math.min(0.95,Math.max(0.05,acc/Math.max(1,sumLen))));}
+  var pieces=[],prevF=0;
+  for(var i2=0;i2<withLoc.length;i2++){
+    var f1=i2<fr.length?fr[i2]:1;
+    pieces.push({part:withLoc[i2].part,piece:extractStrokePiece(mergedData,prevF,f1)});
+    prevF=f1;
+  }
+  return pieces;
+}
 function boundsOverlapLoose(b1,b2){
   var m=Math.max(20,Math.min(Math.max(b1.w,b1.h),Math.max(b2.w,b2.h))*0.3);
   return b1.x-m<b2.x+b2.w&&b2.x-m<b1.x+b1.w&&b1.y-m<b2.y+b2.h&&b2.y-m<b1.y+b1.h;
@@ -1125,6 +1154,36 @@ function generateTweens(){
     var overrides=(state.tweenOverrides&&state.tweenOverrides[ovKey])||[];
     var forcedAIdx={},forcedBIdx={},forcedPairs=[];
     overrides.forEach(function(ov){
+      // Multi-source override (Réparer le tween, tw-reassign — a single
+      // artist-intended line saved as 2+ separate strokes, e.g. "trait uni
+      // qui se mélange avec les cheveux"): ov.aIds is an array instead of
+      // the plain ov.aId. Split the ONE target B stroke into that many
+      // pieces (splitMergedIntoOrderedPieces — same recipe as
+      // resolveSplitMatches' own automatic piece-cutting, just user-
+      // confirmed instead of heuristically detected) so each selected A
+      // stroke gets its own correctly-ordered slice of B to morph into,
+      // instead of every A candidate competing for the whole B stroke.
+      if(ov.aIds){
+        var aIdxs=[];
+        ov.aIds.forEach(function(id){for(var ii=0;ii<sA.length;ii++)if(sA[ii].strokeId===id&&aIdxs.indexOf(ii)<0){aIdxs.push(ii);break;}});
+        var bIdx0=-1;for(var jj=0;jj<sB.length;jj++)if(sB[jj].strokeId===ov.bId){bIdx0=jj;break;}
+        if(!aIdxs.length||bIdx0<0||forcedBIdx[bIdx0])return;
+        aIdxs=aIdxs.filter(function(ai){return!forcedAIdx[ai];});
+        if(!aIdxs.length)return;
+        forcedBIdx[bIdx0]=1;
+        if(aIdxs.length===1){
+          forcedAIdx[aIdxs[0]]=1;
+          forcedPairs.push({aIdx:aIdxs[0],bIdx:bIdx0,aData:sA[aIdxs[0]],bData:sB[bIdx0],mi:-1-forcedPairs.length,score:0,forced:true});
+          return;
+        }
+        var pieces=splitMergedIntoOrderedPieces(sB[bIdx0],aIdxs.map(function(ai){return sA[ai];}));
+        pieces.forEach(function(pc){
+          var ai=sA.indexOf(pc.part);
+          forcedAIdx[ai]=1;
+          forcedPairs.push({aIdx:ai,bIdx:bIdx0,aData:sA[ai],bData:pc.piece,mi:-1-forcedPairs.length,score:0,forced:true,isPiece:true});
+        });
+        return;
+      }
       var aIdx=-1,bIdx=-1;
       // Check BOTH stored ids on BOTH sides, not just ov.aId on A / ov.bId
       // on B — found live testing tween-arc handles (any drag re-triggers
@@ -1627,7 +1686,16 @@ var cur={frame:state.currentFrame,layers:[]};for(var i=0;i<state.layers.length;i
 // (tools.js) and a simple capture-phase click intercept registered on
 // `document`, same pattern ui.js already uses to steal a click before any
 // per-tool bridge (draw/select/etc, all on #canvas-area) sees it.
-var _reassign={active:false,step:0,layer:-1,frameA:-1,frameB:-1,aId:null};
+// aIds (2026-07-18): a stroke drawn as one continuous line but saved as
+// 2+ separate objects (pen lifted mid-line, or split by an earlier edit —
+// "trait uni qui se mélange avec les cheveux") had no way to be pointed
+// out as a UNIT: step 1 used to force exactly one A element. Now every
+// click on keyframe A during step 1 ADDS to the set (instead of
+// immediately advancing) — Enter confirms the set and moves to step 2,
+// so a single click + Enter reproduces the old one-element flow exactly,
+// and clicking 2-3 pieces first lets `generateTweens` split the ONE
+// target B stroke to match, via splitMergedIntoOrderedPieces above.
+var _reassign={active:false,step:0,layer:-1,frameA:-1,frameB:-1,aIds:[]};
 function reassignStatusEl(){return document.getElementById('tw-reassign-status');}
 function reassignSetStatus(msg){
   var el=reassignStatusEl();if(!el)return;
@@ -1635,7 +1703,7 @@ function reassignSetStatus(msg){
 }
 function cancelReassign(silent){
   if(!_reassign.active)return;
-  _reassign.active=false;_reassign.step=0;_reassign.aId=null;
+  _reassign.active=false;_reassign.step=0;_reassign.aIds=[];
   reassignSetStatus(null);
   if(!silent)showToast('Réattribution annulée');
 }
@@ -1649,9 +1717,18 @@ function startReassign(){
   var fB=-1;
   for(var j=fA+1;j<state.totalFrames;j++){if(ld.frames[j].isKeyframe){fB=j;break;}}
   if(fB<0){showToast('Cette keyframe n\'a pas de keyframe suivante à réattribuer');return;}
-  _reassign.active=true;_reassign.step=1;_reassign.layer=li;_reassign.frameA=fA;_reassign.frameB=fB;_reassign.aId=null;
-  reassignSetStatus('1/2 — Cliquez l\'élément sur la keyframe '+(fA+1)+' (départ)');
+  _reassign.active=true;_reassign.step=1;_reassign.layer=li;_reassign.frameA=fA;_reassign.frameB=fB;_reassign.aIds=[];
+  reassignSetStatus('1/2 — Cliquez l\'élément de départ (plusieurs si un même trait a été séparé), puis Entrée');
   showToast('Cliquez l\'élément de départ sur le canvas');
+}
+function confirmReassignStep1(){
+  if(!_reassign.active||_reassign.step!==1)return;
+  if(!_reassign.aIds.length){showToast('Cliquez au moins un élément avant de valider');return;}
+  saveActiveLayerFrame();
+  _reassign.step=2;
+  goToFrame(_reassign.frameB);
+  reassignSetStatus('2/2 — Cliquez l\'élément correspondant sur la keyframe '+(_reassign.frameB+1));
+  showToast('Cliquez l\'élément correspondant sur la keyframe suivante');
 }
 function reassignHandleClick(pt){
   if(!_reassign.active)return false;
@@ -1667,11 +1744,8 @@ function reassignHandleClick(pt){
   var target=resolveBrushAnchor(hit.item,layer);
   var sid=ensureStrokeId(target);
   if(_reassign.step===1){
-    _reassign.aId=sid;_reassign.step=2;
-    saveActiveLayerFrame();
-    goToFrame(_reassign.frameB);
-    reassignSetStatus('2/2 — Cliquez l\'élément correspondant sur la keyframe '+(_reassign.frameB+1));
-    showToast('Cliquez l\'élément correspondant sur la keyframe suivante');
+    if(_reassign.aIds.indexOf(sid)<0)_reassign.aIds.push(sid);
+    reassignSetStatus('1/2 — '+_reassign.aIds.length+' élément(s) sélectionné(s). Cliquez-en d\'autres si ce trait a été séparé, ou appuyez sur Entrée');
     return true;
   }
   // step 2
@@ -1681,8 +1755,11 @@ function reassignHandleClick(pt){
   // replace any earlier override touching either side of this pair — one
   // strokeId can't sensibly be forced into two different correspondences
   // for the same keyframe pair
-  state.tweenOverrides[key]=list.filter(function(ov){return ov.aId!==_reassign.aId&&ov.bId!==sid;});
-  state.tweenOverrides[key].push({aId:_reassign.aId,bId:sid});
+  state.tweenOverrides[key]=list.filter(function(ov){
+    var ovA=ov.aIds||[ov.aId];
+    return ovA.indexOf(_reassign.aIds[0])<0&&_reassign.aIds.every(function(id){return ovA.indexOf(id)<0;})&&ov.bId!==sid;
+  });
+  state.tweenOverrides[key].push(_reassign.aIds.length===1?{aId:_reassign.aIds[0],bId:sid}:{aIds:_reassign.aIds.slice(),bId:sid});
   var doneA=_reassign.frameA;
   cancelReassign(true);
   // regenerate just this span: select the origin keyframe so generateTweens'
@@ -1703,7 +1780,18 @@ document.addEventListener('pointerdown',function(e){
   if(!pt)return;
   if(reassignHandleClick(pt)){e.stopImmediatePropagation();e.preventDefault();}
 },true);
-document.addEventListener('keydown',function(e){if(e.key==='Escape'&&_reassign.active)cancelReassign();},true);
+document.addEventListener('keydown',function(e){
+  if(!_reassign.active)return;
+  if(e.key==='Escape'){cancelReassign();return;}
+  // stopPropagation, not just preventDefault: timeline.js's own global
+  // keydown handler (document.addEventListener('keydown',onKeyDown) with
+  // no capture flag, i.e. bubble phase — this listener runs first since
+  // it's capture:true) binds bare Enter to togglePlay(). Found live: a
+  // synthetic Enter to confirm step 1 also started playback, because
+  // preventDefault alone only blocks the browser's own default action, not
+  // sibling listeners further down the same dispatch.
+  if(e.key==='Enter'&&_reassign.step===1){e.preventDefault();e.stopPropagation();confirmReassignStep1();}
+},true);
 function initReassignUI(){
   var btn=document.getElementById('btn-tw-reassign');
   if(btn)btn.addEventListener('click',startReassign);
