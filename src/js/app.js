@@ -144,13 +144,6 @@ var state={
   refMedia:null, // rotoscopy reference {type:'video'|'imageseq'|'image',...} — reference-bridge.js
   mediaLibrary:[], // {id,name,kind:'image'|'video',thumb,layerName} — browsable catalog of imports, media-library.js
   symbols:{},activeSymbolId:null,openSymbolTabs:[],
-  // Motion mode "enter Component as precomp" (2026-07-17): a layer index,
-  // NOT a symId — unlike activeSymbolId/enterSymbol this never forks
-  // totalFrames/waIn/waOut/fps/cameraKeys/userLayers, it just tells
-  // motion.js's renderLayerListMotion/renderTimelineMotion to show one
-  // focused layer's per-shape montage instead of the normal layer list, on
-  // the SAME outer timeline. See motion.js's enterLayerComponentView.
-  motionFocusedLayer:null,
   // Layer folders: purely organizational metadata, not a real tree — each
   // layer optionally carries ld.folderId pointing into this map. Keeping
   // state.layers/userLayers as the same flat, 1:1-indexed arrays every

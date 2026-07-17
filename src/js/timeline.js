@@ -1010,7 +1010,7 @@ window.SM={
     window._waIn=state.waIn;window._waOut=state.waOut;window._totalF=state.totalFrames;
     while(userLayers.length>0)userLayers.pop().remove();state.layers=[];
     Object.keys(_symbolPaperLayers).forEach(function(k){_symbolPaperLayers[k].forEach(function(l){l.remove();});});_symbolPaperLayers={};
-    state.symbols=d.symbols||{};state.openSymbolTabs=[];state.activeSymbolId=null;state.motionFocusedLayer=null;
+    state.symbols=d.symbols||{};state.openSymbolTabs=[];state.activeSymbolId=null;
     d.layers.forEach(function(ld){var idx=createUserLayer(ld.name);state.layers[idx].visible=ld.visible!==false;state.layers[idx].locked=ld.locked||false;state.layers[idx].frames=ld.frames;
       if(ld.blendMode)state.layers[idx].blendMode=ld.blendMode;
       if(ld.matteMode)state.layers[idx].matteMode=ld.matteMode;
@@ -2777,14 +2777,8 @@ window.addEventListener('mouseup',function(){
 });
 function renderSymbolTabs(){
   var bar=document.getElementById('symbol-tabs');if(!bar)return;bar.innerHTML='';
-  var scene=document.createElement('div');scene.className='sym-tab'+(state.activeSymbolId||state.motionFocusedLayer!=null?'':' act');scene.textContent='Scene';
-  scene.addEventListener('click',function(){
-    if(state.activeSymbolId)window.SM.exitToScene();
-    // Motion's "enter Component as precomp" (motion.js, enterLayerComponentView)
-    // is a lighter sibling of enterSymbol — no scene/timeline fork to undo,
-    // just clear the focus flag and re-render both panels.
-    if(state.motionFocusedLayer!=null){state.motionFocusedLayer=null;renderLayerList();renderTimeline();renderSymbolTabs();}
-  });
+  var scene=document.createElement('div');scene.className='sym-tab'+(state.activeSymbolId?'':' act');scene.textContent='Scene';
+  scene.addEventListener('click',function(){if(state.activeSymbolId)window.SM.exitToScene();});
   bar.appendChild(scene);
   state.openSymbolTabs.forEach(function(symId){
     var sym=state.symbols[symId];if(!sym)return;
@@ -2796,22 +2790,6 @@ function renderSymbolTabs(){
     x.addEventListener('click',function(e){e.stopPropagation();window.SM.closeSymbolTab(symId);});
     bar.appendChild(tab);
   });
-  // Motion-mode "layer as precomp" focus (2026-07-17) — a separate concept
-  // from openSymbolTabs above (those fork the whole scene via enterSymbol;
-  // this stays on the same timeline, see state.motionFocusedLayer's own
-  // comment in app.js), so it gets its own tab rather than being pushed
-  // into openSymbolTabs.
-  if(state.motionFocusedLayer!=null){
-    var fld=state.layers[state.motionFocusedLayer];
-    if(fld){
-      var ftab=document.createElement('div');ftab.className='sym-tab act';
-      var flabel=document.createElement('span');flabel.textContent=(fld.name||'Layer')+' (Comp)';
-      var fx=document.createElement('span');fx.className='sym-tab-x';fx.textContent='×';
-      ftab.appendChild(flabel);ftab.appendChild(fx);
-      fx.addEventListener('click',function(e){e.stopPropagation();state.motionFocusedLayer=null;renderLayerList();renderTimeline();renderSymbolTabs();});
-      bar.appendChild(ftab);
-    }
-  }
 }
 function updateCompInstancePanel(){
   var sec=document.getElementById('comp-instance-sec');

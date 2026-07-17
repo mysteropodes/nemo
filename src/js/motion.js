@@ -913,42 +913,39 @@
   // Layers"), then RE-reversed 2026-07-17 ("montage des éléments dans le
   // component") once a Component layer could actually carry working
   // per-element Motion (elementMotionAt no longer forces null for
-  // ld.symbolId, see app.js's getEffectiveStrokes) — before that, an "enter
-  // as precomp" view would have shown editable rows with zero visible
-  // effect on the render, which is why it was pulled originally. Now gated
-  // on `ld.symbolId`: a Component layer double-clicks into
-  // `state.motionFocusedLayer` (this file, renderFocusedLayerList /
-  // renderFocusedLayerTimeline below); a plain layer keeps the old
+  // ld.symbolId, see app.js's getEffectiveStrokes). First attempt at the
+  // re-reversal built a parallel lightweight "focus" mechanism (its own
+  // state field + its own tab) — dropped the same day ("un component et
+  // une precomp c'est un peu la même chose") in favor of just calling the
+  // REAL enterSymbol (app.js) a Component layer already has via
+  // Animation2D's own dblclick-to-enter-symbol (timeline.js) — same tab
+  // (openSymbolTabs/renderSymbolTabs), same "Scene" tab to come back, zero
+  // new state. Only gated on `ld.symbolId`: a plain layer keeps the old
   // Release-to-Layers split, since there's no "inside" yet.
-  function enterLayerComponentView(li) {
+  function enterComponentLayer(li) {
     var ld = state.layers[li]; if (!ld || !ld.symbolId) return;
-    state.motionFocusedLayer = li;
-    window._motionExpandedElement = null;
-    renderLayerList(); renderTimeline();
-    if (window.renderSymbolTabs) renderSymbolTabs();
+    if (window.SM && window.SM.enterSymbol) window.SM.enterSymbol(ld.symbolId);
   }
-  function exitLayerComponentView() {
-    state.motionFocusedLayer = null;
-    renderLayerList(); renderTimeline();
-    if (window.renderSymbolTabs) renderSymbolTabs();
-  }
-  // The focused "precomp" view for one Component layer: unlike
-  // renderElementsList's single-accordion (only one element's Transform
-  // group open at a time), here EVERY element shows its full property set
-  // simultaneously — this IS the montage the user asked for, one row per
-  // shape, all visible together (matching the reference sketch of parallel
-  // per-shape tracks). The instance's OWN whole-layer Transform (Position/
-  // Anchor/Rotation/Scale/Opacity of the placed instance, composed with
-  // symMatrix — see layerMotionAt's header comment) stays visible above,
-  // exactly like AE keeps a precomp layer's own Transform available while
-  // you're inside it.
-  function renderFocusedLayerList(list, li) {
+  // Motion's view of a symbol's own layer(s) once inside it (state.
+  // activeSymbolId set — see renderLayerListMotion/renderTimelineMotion's
+  // branch below): unlike the normal per-layer accordion (one element's
+  // Transform group open at a time, renderElementsList), every element
+  // shows its full property set simultaneously here — this IS the montage
+  // the user asked for ("un component et une precomp c'est la même
+  // chose... on ouvre le component pour afficher le montage des éléments
+  // et shape"), one row per shape, all visible together. `ld` here is one
+  // of the ENTERED symbol's own layers (sym.layers, e.g. "Layer 1" from
+  // convertLayerToComponent) — a plain layer object with no symbolId of
+  // its own, so there's no Component-ness to gate on here; that check
+  // already happened at the call site (renderLayerListMotion) via
+  // state.activeSymbolId.
+  function renderSymbolLayerMotionList(list, li) {
     var ld = state.layers[li];
-    if (!ld || !ld.symbolId) { state.motionFocusedLayer = null; return; }
+    if (!ld) return;
     var hdr = document.createElement('div'); hdr.className = 'lrow motion-group-row';
     hdr.textContent = ld.name || ('Layer ' + (li + 1));
     list.appendChild(hdr);
-    renderTransformGroup(list, ld, 'Transform (instance)');
+    renderTransformGroup(list, ld, 'Transform');
     var els = layerElements(li, ld);
     if (!els.length) {
       var empty = document.createElement('div'); empty.className = 'lrow'; empty.style.opacity = '0.6';
@@ -967,21 +964,21 @@
       renderTransformGroup(list, ensureElementHolder(ld, entry.strokeId), 'Transform');
     });
   }
-  // Timeline-grid mirror of renderFocusedLayerList — MUST produce the same
-  // row sequence (same alignment invariant every other panel/grid pair in
-  // this file already depends on, see ROW_H's header comment): a spacer per
-  // list row that isn't itself a keyframe track. Unlike the normal
-  // per-element accordion mirror further below (whose single elSpacer
-  // stands in for BOTH the element's own row and renderTransformGroup's
-  // group-row header — harmless there since at most one element is ever
-  // expanded at once), every element here is always "expanded"
-  // simultaneously, so a missing spacer per element would compound into a
-  // growing drift instead of a single one-off gap — each element gets its
-  // own two spacers (row + group-row) to stay pixel-aligned with
-  // renderFocusedLayerList's row + renderTransformGroup pair.
-  function renderFocusedLayerTimeline(grid, li) {
+  // Timeline-grid mirror of renderSymbolLayerMotionList — MUST produce the
+  // same row sequence (same alignment invariant every other panel/grid
+  // pair in this file already depends on, see ROW_H's header comment): a
+  // spacer per list row that isn't itself a keyframe track. Unlike the
+  // normal per-element accordion mirror further below (whose single
+  // elSpacer stands in for BOTH the element's own row and
+  // renderTransformGroup's group-row header — harmless there since at most
+  // one element is ever expanded at once), every element here is always
+  // "expanded" simultaneously, so a missing spacer per element would
+  // compound into a growing drift instead of a single one-off gap — each
+  // element gets its own two spacers (row + group-row) to stay
+  // pixel-aligned with renderSymbolLayerMotionList's row + Transform pair.
+  function renderSymbolLayerMotionTimeline(grid, li) {
     var ld = state.layers[li];
-    if (!ld || !ld.symbolId) return;
+    if (!ld) return;
     var hdrSpacer = document.createElement('div'); hdrSpacer.className = 'frow';
     grid.appendChild(hdrSpacer);
     var grpSpacer = document.createElement('div'); grpSpacer.className = 'frow';
@@ -1000,7 +997,16 @@
     });
   }
   function renderLayerListMotion(list) {
-    if (state.motionFocusedLayer != null) { renderFocusedLayerList(list, state.motionFocusedLayer); return; }
+    // Inside a Component (state.activeSymbolId, entered via
+    // enterComponentLayer's dblclick below OR Animation2D's own
+    // dblclick-to-enter-symbol): state.layers IS the symbol's own
+    // layers now — show every one of them with its full per-shape
+    // montage instead of the normal collapsible accordion.
+    if (state.activeSymbolId) {
+      var symOrder = (typeof computeLayerRenderOrder === 'function') ? computeLayerRenderOrder() : state.layers.map(function (_l, i) { return { type: 'layer', idx: i }; });
+      symOrder.forEach(function (entry) { if (entry.type !== 'layer' || entry.hidden) return; renderSymbolLayerMotionList(list, entry.idx); });
+      return;
+    }
     var order = (typeof computeLayerRenderOrder === 'function') ? computeLayerRenderOrder() : state.layers.map(function (_l, i) { return { type: 'layer', idx: i }; });
     order.forEach(function (entry) {
       if (entry.type !== 'layer' || entry.hidden) return;
@@ -1125,7 +1131,7 @@
         // once it's a Component: a plain layer with several unrelated
         // shapes still gets the old Release-to-Layers split, since there's
         // no "inside" to browse before that first key exists.
-        if (ld.symbolId) { enterLayerComponentView(li); return; }
+        if (ld.symbolId) { enterComponentLayer(li); return; }
         splitLayerIntoElements(li);
       });
       // Discoverability: the Cmd/Ctrl-click multi-select + drag-the-handle
@@ -1474,7 +1480,12 @@
     grid.appendChild(row);
   }
   function renderTimelineMotion(grid) {
-    if (state.motionFocusedLayer != null) { renderFocusedLayerTimeline(grid, state.motionFocusedLayer); updateKeySelectionBox(); updateLayerStaggerBox(); return; }
+    if (state.activeSymbolId) {
+      var symOrder = (typeof computeLayerRenderOrder === 'function') ? computeLayerRenderOrder() : state.layers.map(function (_l, i) { return { type: 'layer', idx: i }; });
+      symOrder.forEach(function (entry) { if (entry.type !== 'layer' || entry.hidden) return; renderSymbolLayerMotionTimeline(grid, entry.idx); });
+      updateKeySelectionBox(); updateLayerStaggerBox();
+      return;
+    }
     var order = (typeof computeLayerRenderOrder === 'function') ? computeLayerRenderOrder() : state.layers.map(function (_l, i) { return { type: 'layer', idx: i }; });
     order.forEach(function (entry) {
       if (entry.type !== 'layer' || entry.hidden) return;
