@@ -1106,11 +1106,18 @@
       list.appendChild(row);
       if (!expanded) return;
       renderTransformGroup(list, ld, 'Transform');
-      // Per-element sub-list stays component-exclusive: a symbol instance's
-      // actual strokes live inside the SYMBOL's own sub-layer (edited via
-      // "Éditer le composant…"), not addressable as elements of this outer
-      // layer — only the whole-instance Transform group above applies.
-      if (!isComponent) renderElementsList(list, li, ld);
+      // Per-element sub-list used to be component-exclusive ("a symbol
+      // instance's actual strokes live inside the SYMBOL's own sub-layer,
+      // not addressable as elements of this outer layer") — true only
+      // while elementMotionAt forced null for ld.symbolId. Since that's
+      // lifted (getEffectiveStrokes' ld.symbolId branch now applies
+      // per-shape elementMotion in addition to the instance's own
+      // placement, 2026-07-17 "precomp par calque"), layerElements/
+      // ensureElementHolder work correctly for a Component instance too —
+      // showing Éléments here lets a single shape inside a placed
+      // instance be animated right from the Scene view, without needing
+      // to double-click all the way into the component first.
+      renderElementsList(list, li, ld);
     });
     // Right-panel mirror of the active layer's Transform group ("il
     // faudrait afficher les properties d'un calque sélectionné et la
