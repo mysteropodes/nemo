@@ -1043,7 +1043,18 @@ function generateTweens(){
       forcedAIdx[aIdx]=1;forcedBIdx[bIdx]=1;
       forcedPairs.push({aIdx:aIdx,bIdx:bIdx,aData:sA[aIdx],bData:sB[bIdx],mi:-1-forcedPairs.length,score:0,forced:true});
     });
-    var matches=autoMatch(sA,sB);if(!matches.length&&!forcedPairs.length)continue;
+    // Pre-existing bug found by stress-testing (2026-07-17): this used to
+    // `continue` whenever autoMatch returned ZERO pairs (and no forced
+    // overrides) — i.e. exactly when the two keyframes' drawings are so
+    // different that the augmented Hungarian sent EVERY stroke to a fade
+    // dummy (a full cut-away: small shape top-left key A, unrelated big
+    // shape bottom-right key B). Skipping the span meant NO inbetweens at
+    // all were generated — not even the cross-fade that unmatched strokes
+    // are supposed to get — silently leaving whatever frames were there
+    // before. Only skip when there is genuinely nothing to tween on either
+    // side; zero matches with real strokes still flows through so the
+    // fade-out/fade-in machinery below does its job.
+    var matches=autoMatch(sA,sB);if(!sA.length&&!sB.length&&!forcedPairs.length)continue;
     // Only morph plausible pairs. A stroke whose best assignment still
     // scores badly (no real counterpart in the other key — count mismatch,
     // or a shape that genuinely appears/disappears) cross-fades in place
@@ -1059,27 +1070,39 @@ function generateTweens(){
     // Confirmed empirically: identical circles moving ~4.5x their own
     // diameter already exceed 0.48, scale-invariantly (same ratio at every
     // tested radius) — a very ordinary distance for anime action, not an
-    // edge case. When there is only ONE candidate on EACH side (sA/sB both
-    // length 1), there is zero assignment ambiguity for position to
-    // disambiguate — so a bad score can only mean "moved far" or "genuinely
-    // a different shape/kind", and only the latter is a real reason to
-    // fade. Re-derive just the category signals (type: fill/stroke/both/vb,
-    // and open/closed) directly via strokeFeat and accept regardless of
-    // score unless one of THOSE actually differs — position keeps its full
-    // weight for every case with 2+ candidates on either side, where it's
-    // doing real disambiguation work (which eye is which) that this must
-    // not weaken.
-    var soleCandidates=sA.length===1&&sB.length===1;
+    // edge case. Generalized (same session, character-pose test): a raised
+    // ARM — one long stroke pivoting ~90° around its shoulder with some
+    // foreshortening, THE textbook limb motion — scored 0.739 while the
+    // character's other 5 strokes all matched confidently, so the arm
+    // cross-faded while the rest of the body moved. The Hungarian had
+    // paired arm↔arm; only the threshold vetoed it. Whenever a rejected
+    // Hungarian pair's two members are BOTH still unmatched after the
+    // threshold pass (in the 1-stroke-per-frame case that's trivially
+    // true — the original soleCandidates form of this fix), there is no
+    // competing candidate the position score could be protecting: fading
+    // is strictly worse than following the assignment the global optimum
+    // already chose — traditional inbetweening prefers motion over a
+    // dissolve whenever the strokes are plausibly the same object. "Same
+    // object" is gated on the identity signals (type, open/closed, and no
+    // hard color clash — same test as matchSc's colorPenalty), NOT on
+    // distance. Position keeps its full weight wherever 2+ candidates
+    // actually compete.
     var pairSpecs=[],aMatched={},bMatched={};
     forcedPairs.forEach(function(fp){pairSpecs.push(fp);aMatched[fp.aIdx]=1;bMatched[fp.bIdx]=1;});
     matches.forEach(function(m){
       if(forcedAIdx[m.a]||forcedBIdx[m.b])return; // conflicts with a manual override — drop the auto guess
-      var accept=m.score<=MATCH_TH;
-      if(!accept&&soleCandidates){
-        var fta=strokeFeat(sA[m.a]),ftb=strokeFeat(sB[m.b]);
-        accept=fta.type===ftb.type&&fta.closed===ftb.closed;
+      if(m.score<=MATCH_TH){pairSpecs.push({aIdx:m.a,bIdx:m.b,aData:sA[m.a],bData:sB[m.b],mi:matches.indexOf(m),score:m.score});aMatched[m.a]=1;bMatched[m.b]=1;}
+    });
+    // Second chance for mutually-leftover Hungarian pairs (see comment above).
+    matches.forEach(function(m){
+      if(m.score<=MATCH_TH)return; // already handled by the first pass
+      if(forcedAIdx[m.a]||forcedBIdx[m.b])return;
+      if(aMatched[m.a]||bMatched[m.b])return; // one side already claimed — real ambiguity, let it fade
+      var fta=strokeFeat(sA[m.a]),ftb=strokeFeat(sB[m.b]);
+      var clash=(fta.fillCol&&ftb.fillCol&&colorDist(fta.fillCol,ftb.fillCol)>0.35)||(fta.strokeCol&&ftb.strokeCol&&colorDist(fta.strokeCol,ftb.strokeCol)>0.35);
+      if(fta.type===ftb.type&&fta.closed===ftb.closed&&!clash){
+        pairSpecs.push({aIdx:m.a,bIdx:m.b,aData:sA[m.a],bData:sB[m.b],mi:matches.indexOf(m),score:m.score});aMatched[m.a]=1;bMatched[m.b]=1;
       }
-      if(accept){pairSpecs.push({aIdx:m.a,bIdx:m.b,aData:sA[m.a],bData:sB[m.b],mi:matches.indexOf(m),score:m.score});aMatched[m.a]=1;bMatched[m.b]=1;}
     });
     var unA=[],unB=[];
     for(var ai=0;ai<sA.length;ai++)if(!aMatched[ai])unA.push(ai);
