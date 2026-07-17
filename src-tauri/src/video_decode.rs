@@ -573,7 +573,19 @@ fn decode_at(s: &mut VideoSession, frame_index: i64, caller: &str) -> Result<(Ve
                     eprintln!(
                         "[video-decode] tail retry: re-seeking to {origin} for target {frame_index} ({e})"
                     );
-                    s.proc = None; // force respawn at the new origin next outer pass
+                    // Reap before dropping — every OTHER site that replaces
+                    // s.proc (spawn_at, close_video_session) kills+waits
+                    // first; this one didn't, leaking a zombie ffmpeg child
+                    // per tail-retry. Repeated scrubbing near a clip's end
+                    // (this branch fires on every retry) accumulated
+                    // defunct processes until Command::spawn started
+                    // failing under process/FD-table pressure — the likely
+                    // cause of "bug de crash lors de scrub" after sustained
+                    // end-of-clip scrubbing.
+                    if let Some(mut p) = s.proc.take() {
+                        let _ = p.child.kill();
+                        let _ = p.child.wait();
+                    }
                     break;
                 }
             }
