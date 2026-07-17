@@ -405,10 +405,15 @@
   // Nested INSIDE the layer transform (engine-bridge.js/export.js apply this
   // FIRST, pivoted around the item's own bounds, THEN the layer transform on
   // top) — matches AE composing a shape group's transform inside its parent
-  // layer's transform.
+  // layer's transform. Used to unconditionally return null for a Component
+  // layer (`ld.symbolId`) — element Motion was inert the instant a layer
+  // auto-converted, silently discarding whatever per-shape keys already
+  // existed on `ld.elementMotion`. Lifted 2026-07 ("precomp par calque"):
+  // getEffectiveStrokes' ld.symbolId branch (app.js) now applies this
+  // per-stroke, same nesting order as the plain-layer case above.
   function elementMotionAt(li, strokeId, frameIdx) {
     var ld = state.layers[li];
-    if (!ld || ld.symbolId || !ld.elementMotion) return null;
+    if (!ld || !ld.elementMotion) return null;
     return computeMotionMat(ld.elementMotion[strokeId], frameIdx);
   }
   // Transforms one item's already-built segments array (engine-bridge.js's
@@ -638,8 +643,47 @@
   // that case) — layerMotionPointMap itself returns null until at least one
   // property is non-default, which would make the box invisible on a
   // perfectly ordinary not-yet-animated layer.
+  // A Component instance's Motion box must stay the SAME size/position for
+  // its whole duration (2026-07-17, "le bounding box du layer component
+  // doit être le même pour toute la durée du calque... prendre en compte
+  // tous les éléments dans la durée pour avoir les bounding box max") —
+  // without this, userLayers[li].bounds (below) only ever reflects
+  // whatever ONE frame's content getEffectiveStrokes/loadFrame happened to
+  // load, so the box visibly jumped/resized every time the scrub crossed a
+  // keyframe with different shapes. Unions every frame's effective strokes
+  // across the layer's own visible range (layerInPoint..layerOutPoint —
+  // the SAME range the layer is ever shown on, app.js), building bounds
+  // per stroke the same way getEffectiveStrokes' own elementMotionAt
+  // branch already does (a throwaway Path so curved segments' real extent
+  // counts, not just anchor points), reduced with unionBounds (tweens.js,
+  // a plain generic min/max reducer already used for per-frame feature
+  // bounds — reused here across frames instead). No cache: this is
+  // Motion-overlay code for whichever ONE layer is currently selected/
+  // expanded, not the hot per-frame render pipeline (CLAUDE.md §5), and a
+  // component's own duration is typically a small slice of the timeline.
+  function symbolUnionBounds(li) {
+    var ld = state.layers[li];
+    if (!ld || !ld.symbolId) return null;
+    var inF = layerInPoint(ld), outF = layerOutPoint(ld);
+    var feats = [];
+    for (var f = inF; f <= outF; f++) {
+      getEffectiveStrokes(li, f).forEach(function (sd) {
+        if (sd.isRaster) { feats.push({ bounds: { x: sd.x - sd.width / 2, y: sd.y - sd.height / 2, w: sd.width, h: sd.height } }); return; }
+        if (!sd.segments || !sd.segments.length) return;
+        var tmp = new Path({ insert: false });
+        for (var si = 0; si < sd.segments.length; si++) { var s = sd.segments[si]; tmp.add(new Segment(new Point(s.point[0], s.point[1]), new Point(s.handleIn[0], s.handleIn[1]), new Point(s.handleOut[0], s.handleOut[1]))); }
+        if (sd.closed) tmp.closed = true;
+        var b = tmp.bounds;
+        feats.push({ bounds: { x: b.x, y: b.y, w: b.width, h: b.height } });
+      });
+    }
+    if (!feats.length) return null;
+    var u = unionBounds(feats);
+    return new Rectangle(u.x, u.y, u.w, u.h);
+  }
   function motionBoxGeom(t) {
-    var lb = userLayers[t.li] && userLayers[t.li].bounds;
+    var ld = state.layers[t.li];
+    var lb = (ld && ld.symbolId) ? symbolUnionBounds(t.li) : (userLayers[t.li] && userLayers[t.li].bounds);
     if (!lb) return null;
     var anc = valueAtFrame(t.holder, 'anchor', state.currentFrame);
     var pos = valueAtFrame(t.holder, 'position', state.currentFrame);
@@ -755,18 +799,26 @@
     var ld = state.layers[li];
     if (!ld || !userLayers[li]) return null;
     // Component instances now allow layer-level Motion (see layerMotionAt's
-    // comment) — but per-ELEMENT sub-targeting stays blocked: renderElementsList
-    // never runs for a symbolId row (renderLayerListMotion), so
-    // window._motionExpandedElement can never legitimately be set while
-    // this layer is the expanded one; the `ld.symbolId` guard here would
-    // have been redundant with that, not a second independent gate.
+    // comment) — per-ELEMENT sub-targeting on a Component layer now works
+    // too (renderElementsList lifted its symbolId guard 2026-07-17, so a
+    // shape inside a placed instance can be animated straight from the
+    // Scene view). Its pivot still comes from the LIVE item's own current
+    // bounds (item.bounds.center below) — only the whole-LAYER case
+    // (return at the bottom) needed the fixed-across-duration union, since
+    // a single element's own gizmo is expected to hug whatever it looks
+    // like THIS frame, same as any element's box always has.
     if (window._motionExpandedLayer != null && window._motionExpandedElement != null) {
       var item = findElementItem(li, window._motionExpandedElement);
       if (item) return { li: li, strokeId: window._motionExpandedElement, holder: ensureElementHolder(ld, window._motionExpandedElement), boundsCenter: item.bounds.center };
       // Element no longer present at this frame (drawing changed) — fall
       // back to the layer rather than silently drawing nothing.
     }
-    return { li: li, strokeId: null, holder: ld, boundsCenter: userLayers[li].bounds.center };
+    // Component layers use symbolUnionBounds' fixed-for-the-whole-duration
+    // center here too, so the gizmo's PIVOT doesn't jump around alongside
+    // its box (motionBoxGeom, above) as the scrub crosses different
+    // keyframes.
+    var ub = ld.symbolId ? symbolUnionBounds(li) : null;
+    return { li: li, strokeId: null, holder: ld, boundsCenter: (ub || userLayers[li].bounds).center };
   }
   function activePositionKeys() {
     var t = activeMotionTarget();
@@ -903,16 +955,57 @@
   }
   // ---- Double-click a layer row (2026-07) ----
   // First tried as an "enter layer as precomp" in-place grouped view
-  // (StoryBoard/Animation2D/Motion architecture diagram, CLAUDE.md §8) —
-  // explicitly reversed the same day: "cette ouverture ne doit pas mettre
-  // 2 shape dans un layer mais construite 2 layer séparé avec dans chacune
-  // une shape". Double-click now calls splitLayerIntoElements (app.js,
-  // "Release to Layers"-style: explodes the layer into N real top-level
-  // layers, one per element, each carrying over its own per-element Motion
-  // keys as a normal layer-level track) — nothing left to render specially
-  // here, the layer list's normal per-layer loop just runs again afterward
-  // on the new layers like any other layer change.
+  // (StoryBoard/Animation2D/Motion architecture diagram, CLAUDE.md §8),
+  // reversed the same day in favor of splitLayerIntoElements ("Release to
+  // Layers"), then RE-reversed 2026-07-17 ("montage des éléments dans le
+  // component") once a Component layer could actually carry working
+  // per-element Motion (elementMotionAt no longer forces null for
+  // ld.symbolId, see app.js's getEffectiveStrokes). Two rendering attempts
+  // followed: first a lightweight parallel "focus" mechanism (own state +
+  // own tab, dropped the same day for enterSymbol reuse — "un component et
+  // une precomp c'est la même chose"), then a nested "Transform (instance)
+  // > Éléments > Forme N (own Transform)" montage view — ALSO dropped
+  // ("j'ai pas... plusieurs calques séparés... comme avant", pointing at a
+  // screenshot of splitLayerIntoElements' own flat "Layer 1 — Forme N"
+  // result). Landed on: double-click just calls enterSymbol (real tab,
+  // real "Scene" back-button, zero new state), then SILENTLY auto-runs
+  // splitLayerIntoElementsCore on every qualifying layer inside the
+  // entered symbol — turning the single merged "Layer 1" into N real
+  // separate layers, each with its own real timeline bar. From there the
+  // NORMAL Motion layer list/timeline (unmodified) already renders exactly
+  // the wanted result; no montage-specific rendering code needed at all.
+  // Only gated on `ld.symbolId`: a plain layer keeps the old
+  // Release-to-Layers split, since there's no "inside" yet.
+  function enterComponentLayer(li) {
+    var ld = state.layers[li]; if (!ld || !ld.symbolId) return;
+    var sym = state.symbols[ld.symbolId];
+    // enterSymbol (app.js) always resets currentFrame to 0 — fine for its
+    // other caller (Animation2D's own dblclick-to-enter-symbol), but here
+    // it silently hid every shape whenever the symbol's OWN frame 0
+    // happens to be blank (bug found live, "je ne vois plus le montage...
+    // comme avant" — a component that starts drawing partway through its
+    // timeline is a completely normal case, not an edge case). Resolve
+    // which inner frame the instance was ALREADY showing at the outer
+    // playhead (same resolveSymbolFrameIdx mapping getEffectiveStrokes
+    // uses to render it) and jump there right after entering.
+    var targetFrame = sym ? resolveSymbolFrameIdx(sym, ld, state.currentFrame) : 0;
+    if (window.SM && window.SM.enterSymbol) window.SM.enterSymbol(ld.symbolId);
+    if (sym) goToFrame(Math.max(0, Math.min(sym.totalFrames - 1, targetFrame)));
+    // Auto-split every entered layer that still bundles 2+ shapes — highest
+    // index first so each splice (replacing 1 layer with N) never shifts
+    // an index this loop hasn't visited yet.
+    if (window.SM && window.SM.splitLayerIntoElementsCore) {
+      for (var i = state.layers.length - 1; i >= 0; i--) window.SM.splitLayerIntoElementsCore(i, { silent: true });
+    }
+  }
   function renderLayerListMotion(list) {
+    // Inside a Component (state.activeSymbolId, entered via
+    // enterComponentLayer's dblclick below OR Animation2D's own
+    // dblclick-to-enter-symbol): state.layers IS the symbol's own layers
+    // now — enterComponentLayer already auto-split any multi-shape layer
+    // into N real separate ones, so the normal per-layer rendering below
+    // (unmodified) already shows exactly the wanted result, no special
+    // case needed here.
     var order = (typeof computeLayerRenderOrder === 'function') ? computeLayerRenderOrder() : state.layers.map(function (_l, i) { return { type: 'layer', idx: i }; });
     order.forEach(function (entry) {
       if (entry.type !== 'layer' || entry.hidden) return;
@@ -1030,6 +1123,14 @@
       });
       row.addEventListener('dblclick', function (e) {
         if (e.target.closest('.lico')) return;
+        // Re-reversed 2026-07-17 ("montage des éléments dans le
+        // component") — a Component layer (already converted via its
+        // first Position/etc keyframe, see maybeAutoConvertToComponent)
+        // now DOES have an "enter as precomp" double-click again, but only
+        // once it's a Component: a plain layer with several unrelated
+        // shapes still gets the old Release-to-Layers split, since there's
+        // no "inside" to browse before that first key exists.
+        if (ld.symbolId) { enterComponentLayer(li); return; }
         splitLayerIntoElements(li);
       });
       // Discoverability: the Cmd/Ctrl-click multi-select + drag-the-handle
@@ -1052,11 +1153,18 @@
       list.appendChild(row);
       if (!expanded) return;
       renderTransformGroup(list, ld, 'Transform');
-      // Per-element sub-list stays component-exclusive: a symbol instance's
-      // actual strokes live inside the SYMBOL's own sub-layer (edited via
-      // "Éditer le composant…"), not addressable as elements of this outer
-      // layer — only the whole-instance Transform group above applies.
-      if (!isComponent) renderElementsList(list, li, ld);
+      // Per-element sub-list used to be component-exclusive ("a symbol
+      // instance's actual strokes live inside the SYMBOL's own sub-layer,
+      // not addressable as elements of this outer layer") — true only
+      // while elementMotionAt forced null for ld.symbolId. Since that's
+      // lifted (getEffectiveStrokes' ld.symbolId branch now applies
+      // per-shape elementMotion in addition to the instance's own
+      // placement, 2026-07-17 "precomp par calque"), layerElements/
+      // ensureElementHolder work correctly for a Component instance too —
+      // showing Éléments here lets a single shape inside a placed
+      // instance be animated right from the Scene view, without needing
+      // to double-click all the way into the component first.
+      renderElementsList(list, li, ld);
     });
     // Right-panel mirror of the active layer's Transform group ("il
     // faudrait afficher les properties d'un calque sélectionné et la
