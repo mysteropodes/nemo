@@ -924,7 +924,20 @@
   // Release-to-Layers split, since there's no "inside" yet.
   function enterComponentLayer(li) {
     var ld = state.layers[li]; if (!ld || !ld.symbolId) return;
+    var sym = state.symbols[ld.symbolId];
+    // enterSymbol (app.js) always resets currentFrame to 0 — fine for its
+    // other caller (Animation2D's own dblclick-to-enter-symbol), but here
+    // it silently hid the whole per-shape montage whenever the symbol's
+    // OWN frame 0 happens to be blank (bug found live, "je ne vois plus le
+    // montage... comme avant" — a component that starts drawing partway
+    // through its timeline is a completely normal case, not an edge case).
+    // Resolve which inner frame the instance was ALREADY showing at the
+    // outer playhead (same resolveSymbolFrameIdx mapping getEffectiveStrokes
+    // uses to render it) and jump there right after entering, so the
+    // montage opens on the frame you were actually looking at.
+    var targetFrame = sym ? resolveSymbolFrameIdx(sym, ld, state.currentFrame) : 0;
     if (window.SM && window.SM.enterSymbol) window.SM.enterSymbol(ld.symbolId);
+    if (sym) goToFrame(Math.max(0, Math.min(sym.totalFrames - 1, targetFrame)));
   }
   // Motion's view of a symbol's own layer(s) once inside it (state.
   // activeSymbolId set — see renderLayerListMotion/renderTimelineMotion's
