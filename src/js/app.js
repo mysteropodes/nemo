@@ -862,6 +862,35 @@ function getEffectiveStrokes(layerIdx,frameIdx){
       if(sf.isKeyframe||sf.isInterpolated){out=out.concat(sf.strokes);return;}
       for(var k=ii-1;k>=0;k--){if(symLayer.frames[k].isKeyframe){out=out.concat(symLayer.frames[k].strokes);break;}}
     });
+    // Element-level Motion (2026-07, "precomp par calque"): a per-shape
+    // animated Position/Anchor/Rotation/Scale/Opacity INSIDE this component
+    // instance — same descriptor and nesting order exportBuildFrame
+    // (export.js) already uses for plain layers (elMat applied first,
+    // pivoted around the STROKE's own bounds+anchor, before any outer/
+    // instance-level transform). Reused here via a throwaway Path since
+    // these are still raw stroke-data dicts (loadFrame builds the real
+    // Paper items from this function's return value, not before it).
+    // elementMotionAt used to always return null for a ld.symbolId layer —
+    // lifted in motion.js alongside this change.
+    if(window.SMMotion){
+      out=out.map(function(sd){
+        if(sd.isRaster||!sd.strokeId)return sd;
+        var elMat=SMMotion.elementMotionAt(layerIdx,sd.strokeId,frameIdx);
+        if(!elMat)return sd;
+        var sd2=JSON.parse(JSON.stringify(sd));
+        var tmp=new Path({insert:false});
+        for(var si=0;si<sd2.segments.length;si++){var s=sd2.segments[si];tmp.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));}
+        if(sd2.closed)tmp.closed=true;
+        var epc=tmp.bounds.center;
+        var elPivot=new Point(epc.x+elMat.ax,epc.y+elMat.ay);
+        tmp.scale(elMat.sx,elMat.sy,elPivot);
+        tmp.rotate(elMat.rot,elPivot);
+        tmp.translate(elMat.dx,elMat.dy);
+        sd2.segments=tmp.segments.map(function(s){return{point:[s.point.x,s.point.y],handleIn:[s.handleIn.x,s.handleIn.y],handleOut:[s.handleOut.x,s.handleOut.y]};});
+        sd2.opacity=(sd2.opacity!==undefined?sd2.opacity:1)*elMat.op;
+        return sd2;
+      });
+    }
     // The instance transform (symMatrixOf) — skip entirely (and the clone
     // it requires) when it's identity, the common case. Strokes returned
     // here are live references into the SYMBOL'S OWN stored frame data, so
@@ -997,11 +1026,28 @@ function convertLayersToComponent(indices){
 // keeps that exact animation, now as a normal layer-level track.
 function splitLayerIntoElements(li){
   if(state.activeSymbolId){showToast('Fermez d\'abord le composant en cours d\'édition');return;}
-  var ld=state.layers[li];if(!ld||ld.symbolId){showToast('Rien à éclater ici');return;}
-  if(!window.SMMotion){return;}
+  splitLayerIntoElementsCore(li);
+}
+// Core split, no activeSymbolId guard — reused by enterComponentLayer
+// (motion.js) to SILENTLY auto-split a Component's own single layer into
+// one real layer per shape the moment you enter it (2026-07-17, "je devrais
+// avoir plusieurs calques séparés montés en fonction des keyframes" — the
+// user confirmed the exact visual/structural target is this same flat
+// "Layer 1 — Forme N" real-layers-with-real-bars result, not a nested
+// montage view). Safe to call while state.activeSymbolId is set: this
+// function only ever touches state.layers/userLayers, which by then ARE
+// the entered symbol's own arrays (enterSymbol already swapped them) —
+// same "current document" convention every other layer-editing function in
+// this file already relies on. Idempotent from the caller's perspective:
+// once split, each resulting layer has exactly 1 element, so a later
+// re-entry's auto-split pass no-ops via the `els.length<2` guard below.
+function splitLayerIntoElementsCore(li,opts){
+  var silent=!!(opts&&opts.silent);
+  var ld=state.layers[li];if(!ld||ld.symbolId){if(!silent)showToast('Rien à éclater ici');return false;}
+  if(!window.SMMotion)return false;
   var els=SMMotion.layerElements(li,ld);
-  if(!els||els.length<2){showToast('Il faut au moins 2 éléments pour éclater ce calque');return;}
-  saveAllLayerFrames();pushUndo();
+  if(!els||els.length<2){if(!silent)showToast('Il faut au moins 2 éléments pour éclater ce calque');return false;}
+  saveAllLayerFrames();if(!silent)pushUndo();
   var n=els.length;
   var newLayers=[];
   for(var e=0;e<n;e++){
@@ -1033,7 +1079,8 @@ function splitLayerIntoElements(li){
   _layerSel=newLayers.map(function(_x,idx){return li+idx;});
   activateUL(state.activeLayerIdx);
   loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
-  showToast('Calque éclaté en '+n+' calques');
+  if(!silent)showToast('Calque éclaté en '+n+' calques');
+  return true;
 }
 // Inverse of convertLayerToComponent: bakes what the component instance
 // actually displays on each main-timeline frame (play mode, speed and

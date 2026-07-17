@@ -824,8 +824,13 @@ body.mode-motion .lrow.act{box-shadow:inset 3px 0 0 #4E6FF2,inset 0 0 0 1px rgba
    the "skip manually-edited frames" option respected. */
 .fc.tw-manual{background:rgba(90,247,142,.20);}
 .fc .km{width:9px;height:9px;border-radius:50%;position:absolute;z-index:1;}.fc .km:hover{transform:scale(1.4);transition:transform .1s;}
-.fc .km.fl{background:var(--dot-color,var(--key-color));box-shadow:0 0 0 1px rgba(0,0,0,.35);}
-.fc .km.hl{border:1.5px solid var(--dot-color,var(--key-color));background:transparent;}
+/* Real keyframe markers (fl/hl) are small squares, not circles (2026-07,
+   "petit carré draggable") — distinguishes an actually-draggable keyframe
+   dot from the plain round tween tick (.td below, never draggable) at a
+   glance, and doubles as the visual cue that grabbing it moves the key
+   (see timeline.js's frame-grid mousedown handler). */
+.fc .km.fl{background:var(--dot-color,var(--key-color));box-shadow:0 0 0 1px rgba(0,0,0,.35);border-radius:2px;cursor:grab;}
+.fc .km.hl{border:1.5px solid var(--dot-color,var(--key-color));background:transparent;border-radius:2px;cursor:grab;}
 .fc .km.td{background:var(--accent);width:5px;height:5px;}
 .fc .km.td.manual{background:var(--green);}
 #playhead{position:absolute;top:0;width:var(--fc);pointer-events:none;z-index:5;border-left:2px solid var(--accent);background:rgba(74,158,255,.08);}

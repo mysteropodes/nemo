@@ -189,11 +189,16 @@
     </div>
     <div id="canvas-area">
       <canvas id="drawing-canvas" resize></canvas>
-      <!-- Motion mode "enter layer as precomp" (2026-07, AE-style double-
-           click a layer to focus its own Transform + every element's full
-           property set, hiding the rest of the layer list) — the way back
-           out is an extra tab in #symbol-tabs next to "Scene" (renderSymbolTabs,
-           timeline.js), not a separate floating button here anymore. -->
+      <!-- Motion mode "enter Component as precomp" (2026-07-17): double-
+           clicking a Component layer in Motion (motion.js's
+           enterComponentLayer) just calls the REAL enterSymbol (app.js) —
+           the same one Animation2D's own dblclick-to-enter-symbol already
+           uses ("un component et une precomp c'est la même chose"), so it
+           gets the same #symbol-tabs tab + "Scene" tab to come back, no
+           separate state/tab of its own. Once inside, Motion shows every
+           shape's full property set at once (renderSymbolLayerMotionList/
+           renderSymbolLayerMotionTimeline, motion.js) instead of the
+           normal one-layer accordion. -->
       <div id="canvas-info">
         <div class="canvas-info-row">
           <span class="fnum" id="info-frame">1</span>

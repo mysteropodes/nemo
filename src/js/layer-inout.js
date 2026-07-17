@@ -349,6 +349,17 @@
     var ld = state.layers[li]; if (!ld) return;
     if (e.shiftKey || e.metaKey || e.ctrlKey) { toggleBarSel(li); return; } // select-only, no drag
     if (window.pushUndo) pushUndo(); // one undo step for the whole drag, not one per mousemove
+    // Flush any live canvas content into ld.frames BEFORE this drag starts
+    // touching ld.inPoint/outPoint — mousemove below updates those live,
+    // per frame (so the visible range shrinks WHILE dragging), which makes
+    // getEffectiveStrokes' in/out gate hide the source frame's content
+    // from the canvas for the REST of the drag. Saving now, while the
+    // canvas still faithfully reflects the undragged state, is what lets
+    // shiftLayerFrames (app.js/timeline.js, called at drop for a retiming
+    // drag) safely skip re-deriving from a canvas the drag itself has
+    // since made unreliable (bug found live: content was vanishing
+    // entirely instead of moving — see shiftLayerFrames' own comment).
+    if (window.saveAllLayerFrames) saveAllLayerFrames();
     // Grabbing ANY part of an already-selected bar (body OR an edge handle)
     // moves/trims the whole group together — feedback: "je ne peux pas
     // select les inpoint ou outpoint avec le rect de select + drag" (an
@@ -436,25 +447,37 @@
     var d = _drag; _drag = null;
     // Feedback: "il faudrait pouvoir select des in et/out point de calque
     // avec keyframe pour les déplacer ensemble" — a whole-bar BODY move
-    // (type:'both') now retimes the layer's actual keyframe content along
-    // with the visibility window, via window.SM.shiftLayerFrames
-    // (timeline.js). Applied ONCE here at drop, not live per mousemove —
-    // 'in'/'out' (pure trim) drags deliberately do NOT retime content,
-    // same distinction After Effects/Premiere make between moving a clip
-    // and trimming its head/tail. pushUndo() already happened once at
-    // drag START (onDown) — shiftLayerFrames itself takes no further undo
-    // snapshot, so a whole group move still collapses into one undo step.
-    if (d.type === 'both' && window.SM && window.SM.shiftLayerFrames) {
+    // (type:'both') retimes the layer's actual keyframe content along with
+    // the visibility window, via window.SM.shiftLayerFrames (timeline.js).
+    // Applied ONCE here at drop, not live per mousemove.
+    //
+    // INSIDE a component (state.activeSymbolId — 2026-07-17, "je suis dans
+    // le component, ça m'affiche le montage de toute ces formes... si je
+    // modifie les calque en drag... ça doit modifier les montage de ceux
+    // si, c'est comme un precomp"): the IN handle ALSO retimes (shifts
+    // where the shape's content starts — a single split-out shape layer is
+    // just one held span, not pre-recorded footage with earlier frames
+    // hidden past the edge, so "trim the in point" and "retime the start"
+    // are the same operation here). The OUT handle deliberately stays a
+    // pure clip/trim (ld.outPoint only, no shiftLayerFrames): trimming the
+    // tail shorter never needs to MOVE anything — the existing visibility
+    // window already does exactly that — and re-deriving from the live
+    // canvas after an out-drag hit the same content-loss bug an in-drag
+    // did (see shiftLayerFrames' own comment) for zero benefit, since
+    // there's nothing to shift.
+    var retimes = d.type !== 'out' && (d.type === 'both' || !!state.activeSymbolId);
+    if (retimes && window.SM && window.SM.shiftLayerFrames) {
+      var dxOf = function (ld, orig) { return inPointOf(ld) - orig.origIn; };
       if (d.group) {
         d.members.forEach(function (m) {
           var mld = state.layers[m.li]; if (!mld) return;
-          var dx = inPointOf(mld) - m.origIn;
+          var dx = dxOf(mld, m);
           if (dx) window.SM.shiftLayerFrames(m.li, dx);
         });
       } else {
         var ld = state.layers[d.li];
         if (ld) {
-          var dx2 = inPointOf(ld) - d.origIn;
+          var dx2 = dxOf(ld, d);
           if (dx2) window.SM.shiftLayerFrames(d.li, dx2);
         }
       }
