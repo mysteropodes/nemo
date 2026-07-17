@@ -345,7 +345,7 @@ function autoMatchJS(sA,sB){
   var ptsA=seeds.map(function(s){return{x:fA[s.a].cx,y:fA[s.a].cy};});
   var ptsB=seeds.map(function(s){return{x:fB[s.b].cx,y:fB[s.b].cy};});
   var transform=fitSimilarityTransform(ptsA,ptsB);
-  if(!transform)return matches;
+  if(!transform)return uncrossMatches(matches,fA,fB);
   // the fitted motion (force line) is applied to every A stroke's actual
   // sample points, so pass 2's proximity measures "how far is this line
   // from where the drawing's motion says it should be" — not raw distance
@@ -354,7 +354,51 @@ function autoMatchJS(sA,sB){
   var assign2=hungarian(cost2);
   var matches2=[];
   for(var a4=0;a4<n;a4++){var b4=assign2[a4];if(b4!==undefined&&b4>=0&&b4<m)matches2.push({a:a4,b:b4,score:cost2[a4][b4]});}
-  return matches2;
+  return uncrossMatches(matches2,fA,fB);
+}
+// ---- trajectory uncrossing (2026-07-17, "les yeux s'inversent") ----
+// Found on a real hand-drawn animation: two nearly-identical eye strokes
+// ~40px apart, whole face shifting diagonally between keys — the crossed
+// assignment's total point distance (161px) was within 3% of the correct
+// one (157px), so neither the Hungarian nor the force-line pass could
+// tell them apart, and the eyes traded places mid-tween. The signal a
+// human inbetweener uses here isn't proximity at all: two motion
+// trajectories that CROSS each other, for strokes this similar, are
+// almost always a matching error — cel features keep their spatial
+// arrangement. Post-pass: for every pair of matches whose straight-line
+// centroid trajectories intersect, try swapping the B partners; accept
+// the swap when it doesn't cost meaningfully more than the crossed
+// version (small tolerance in favor of uncrossing — near-ties are
+// exactly the ambiguous case this exists for). A GENUINE crossing (the
+// red/blue balls passing each other) survives: swapping there hits the
+// color-clash/type penalties, far above the tolerance. Sweeps until
+// stable (bounded) since one swap can uncross/cross a third trajectory.
+function _segsIntersect(p1,p2,p3,p4){
+  function ccw(a,b,c){return (c.y-a.y)*(b.x-a.x)>(b.y-a.y)*(c.x-a.x);}
+  return ccw(p1,p3,p4)!==ccw(p2,p3,p4)&&ccw(p1,p2,p3)!==ccw(p1,p2,p4);
+}
+var UNCROSS_TOL=0.08;
+function uncrossMatches(ms,fA,fB){
+  if(ms.length<2)return ms;
+  for(var sweep=0;sweep<4;sweep++){
+    var swapped=false;
+    for(var i=0;i<ms.length;i++)for(var j=i+1;j<ms.length;j++){
+      var m1=ms[i],m2=ms[j];
+      var a1={x:fA[m1.a].cx,y:fA[m1.a].cy},b1={x:fB[m1.b].cx,y:fB[m1.b].cy};
+      var a2={x:fA[m2.a].cx,y:fA[m2.a].cy},b2={x:fB[m2.b].cx,y:fB[m2.b].cy};
+      if(!_segsIntersect(a1,b1,a2,b2))continue;
+      var cur=matchSc(fA[m1.a],fB[m1.b],m1.a===m1.b)+matchSc(fA[m2.a],fB[m2.b],m2.a===m2.b);
+      var swp=matchSc(fA[m1.a],fB[m2.b],m1.a===m2.b)+matchSc(fA[m2.a],fB[m1.b],m2.a===m1.b);
+      if(swp<=cur+UNCROSS_TOL){
+        var tmp=m1.b;m1.b=m2.b;m2.b=tmp;
+        m1.score=matchSc(fA[m1.a],fB[m1.b],m1.a===m1.b);
+        m2.score=matchSc(fA[m2.a],fB[m2.b],m2.a===m2.b);
+        swapped=true;
+      }
+    }
+    if(!swapped)break;
+  }
+  return ms;
 }
 
 // ---- INTERPOLATION ----

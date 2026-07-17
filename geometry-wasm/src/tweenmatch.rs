@@ -608,7 +608,10 @@ pub(crate) fn auto_match_inner(sa: &[StrokeIn], sb: &[StrokeIn]) -> Vec<MatchOut
     let pts_b: Vec<(f64, f64)> = seeds.iter().map(|s| (fb[s.b].cx, fb[s.b].cy)).collect();
     let transform = match fit_similarity_transform(&pts_a, &pts_b) {
         Some(t) => t,
-        None => return matches,
+        None => {
+            uncross_matches(&mut matches, &fa, &fb, match_norm);
+            return matches;
+        }
     };
 
     let pts_t: Vec<Vec<(f64, f64)>> = fa
@@ -624,7 +627,59 @@ pub(crate) fn auto_match_inner(sa: &[StrokeIn], sb: &[StrokeIn]) -> Vec<MatchOut
             matches2.push(MatchOut { a, b: b as usize, score: cost2[a][b as usize] });
         }
     }
+    uncross_matches(&mut matches2, &fa, &fb, match_norm);
     matches2
+}
+
+// ---- trajectory uncrossing — verbatim port of tweens.js's uncrossMatches
+// (2026-07-17, "les yeux s'inversent"; see the JS comment for the full
+// rationale): two nearly-identical strokes whose straight-line centroid
+// trajectories intersect are almost always a matching error (cel features
+// keep their spatial arrangement) — swap the B partners when the swapped
+// pairing doesn't cost meaningfully more than the crossed one. A genuine
+// crossing (different-colored objects passing) survives via the
+// color-clash/type penalties, far above the tolerance.
+fn segs_intersect(p1: (f64, f64), p2: (f64, f64), p3: (f64, f64), p4: (f64, f64)) -> bool {
+    fn ccw(a: (f64, f64), b: (f64, f64), c: (f64, f64)) -> bool {
+        (c.1 - a.1) * (b.0 - a.0) > (b.1 - a.1) * (c.0 - a.0)
+    }
+    ccw(p1, p3, p4) != ccw(p2, p3, p4) && ccw(p1, p2, p3) != ccw(p1, p2, p4)
+}
+const UNCROSS_TOL: f64 = 0.08;
+fn uncross_matches(ms: &mut [MatchOut], fa: &[Feat], fb: &[Feat], match_norm: f64) {
+    if ms.len() < 2 {
+        return;
+    }
+    for _sweep in 0..4 {
+        let mut swapped = false;
+        for i in 0..ms.len() {
+            for j in (i + 1)..ms.len() {
+                let (m1a, m1b) = (ms[i].a, ms[i].b);
+                let (m2a, m2b) = (ms[j].a, ms[j].b);
+                let a1 = (fa[m1a].cx, fa[m1a].cy);
+                let b1 = (fb[m1b].cx, fb[m1b].cy);
+                let a2 = (fa[m2a].cx, fa[m2a].cy);
+                let b2 = (fb[m2b].cx, fb[m2b].cy);
+                if !segs_intersect(a1, b1, a2, b2) {
+                    continue;
+                }
+                let cur = match_sc(&fa[m1a], &fb[m1b], m1a == m1b, None, match_norm)
+                    + match_sc(&fa[m2a], &fb[m2b], m2a == m2b, None, match_norm);
+                let swp = match_sc(&fa[m1a], &fb[m2b], m1a == m2b, None, match_norm)
+                    + match_sc(&fa[m2a], &fb[m1b], m2a == m1b, None, match_norm);
+                if swp <= cur + UNCROSS_TOL {
+                    ms[i].b = m2b;
+                    ms[j].b = m1b;
+                    ms[i].score = match_sc(&fa[m1a], &fb[m2b], m1a == m2b, None, match_norm);
+                    ms[j].score = match_sc(&fa[m2a], &fb[m1b], m2a == m1b, None, match_norm);
+                    swapped = true;
+                }
+            }
+        }
+        if !swapped {
+            break;
+        }
+    }
 }
 
 #[wasm_bindgen]
