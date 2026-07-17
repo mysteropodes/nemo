@@ -12,13 +12,80 @@
 (function () {
   var POLL_MS = 220;
 
+  // ---- Measurement helpers + a step factory that's hard to get wrong ---
+  // Bug found live in testing (2026-07-17): a couple of 'state' steps
+  // checked an ABSOLUTE condition ("isKeyframe is true", "children.length
+  // > 0") instead of a CHANGE from a baseline captured when the step
+  // started. Whenever that absolute condition already happened to be true
+  // for an unrelated reason (a fresh layer's frame 0 is already a keyframe
+  // by definition; the active layer already had content left over from a
+  // previous step/module), the step silently passed without the user
+  // doing anything. `stateIncreaseStep` is the fix made structural: every
+  // step built with it snapshots `measure(win)` in `before()` and only
+  // fires once `measure(win)` has genuinely moved past that snapshot by at
+  // least `minIncrease` — so a step can never complete on state that
+  // predates it. Use this factory for every new "did a count go up" step
+  // instead of writing an ad-hoc check by hand.
+  function activeLayer(win) {
+    var ul = win.userLayers, st = win.state;
+    return (ul && st) ? ul[st.activeLayerIdx] : null;
+  }
+  function activeLayerData(win) {
+    var st = win.state;
+    return (st && st.layers) ? st.layers[st.activeLayerIdx] : null;
+  }
+  function measureStrokeCount(win) {
+    var l = activeLayer(win);
+    return (l && l.children) ? l.children.length : 0;
+  }
+  function measureLayerCount(win) {
+    return (win.state && win.state.layers) ? win.state.layers.length : 0;
+  }
+  function measureCurrentFrame(win) {
+    return (win.state && win.state.currentFrame) || 0;
+  }
+  function measureKeyframeCount(win) {
+    var ld = activeLayerData(win); if (!ld || !ld.frames) return 0;
+    var n = 0; for (var i = 0; i < ld.frames.length; i++) if (ld.frames[i] && ld.frames[i].isKeyframe) n++;
+    return n;
+  }
+  function measureInterpolatedCount(win) {
+    var ld = activeLayerData(win); if (!ld || !ld.frames) return 0;
+    var n = 0; for (var i = 0; i < ld.frames.length; i++) if (ld.frames[i] && ld.frames[i].isInterpolated) n++;
+    return n;
+  }
+
+  function stateIncreaseStep(cfg) {
+    var minInc = cfg.minIncrease || 1;
+    return {
+      type: 'state', target: cfg.target, title: cfg.title, body: cfg.body, hint: cfg.hint || 'À toi de jouer…',
+      before: function (win) { win.__tutBaseline = cfg.measure(win); },
+      check: function (win) { return cfg.measure(win) >= win.__tutBaseline + minInc; }
+    };
+  }
+
+  // For a toggle/boolean rather than a monotonic counter — a fresh project
+  // can start with the flag already true (e.g. onionSkin defaults to true,
+  // see app.js's initial `state`), so "wait for it to become true" is the
+  // exact same premature-pass trap as the counter steps above. Require an
+  // actual CHANGE from whatever it was when the step started instead.
+  function stateChangedStep(cfg) {
+    return {
+      type: 'state', target: cfg.target, title: cfg.title, body: cfg.body, hint: cfg.hint || 'À toi de jouer…',
+      before: function (win) { win.__tutBaseline = cfg.measure(win); },
+      check: function (win) { return cfg.measure(win) !== win.__tutBaseline; }
+    };
+  }
+
   // ---- Module content ------------------------------------------------
   // Each step is one of:
   //   {type:'info', title, body}                         — just a "Suivant" button
   //   {type:'click', target, title, body}                 — real click on `target` (CSS selector)
   //   {type:'state', target, title, body, hint, check}    — check(win) polled until true;
   //                                                          `target` (optional) is only used
-  //                                                          to aim the spotlight
+  //                                                          to aim the spotlight. Prefer
+  //                                                          stateIncreaseStep() over writing
+  //                                                          this by hand — see comment above.
   var MODULES = [
     {
       id: 'draw',
@@ -29,16 +96,10 @@
       steps: [
         { type: 'info', title: 'Bienvenue dans Nemo', body: 'On va dessiner un premier trait ensemble. À chaque étape, fais vraiment le geste demandé — le tutoriel avance tout seul dès que c\'est fait.' },
         { type: 'click', target: '.tool-btn[data-tool="draw"]', title: 'Choisis le Pinceau', body: 'Clique sur l\'outil Pinceau dans la barre de gauche (raccourci B).' },
-        {
-          type: 'state', target: '#drawing-canvas', title: 'Dessine un trait', body: 'Clique-glisse sur le canevas blanc pour tracer un trait, comme au crayon.', hint: 'En attente de ton trait…',
-          check: function (win) {
-            var ul = win.userLayers, st = win.state;
-            if (!ul || !st) return false;
-            var l = ul[st.activeLayerIdx];
-            return !!(l && l.children && l.children.length > (win.__tutStrokeStart || 0));
-          },
-          before: function (win) { win.__tutStrokeStart = (win.userLayers && win.userLayers[win.state.activeLayerIdx] && win.userLayers[win.state.activeLayerIdx].children.length) || 0; }
-        },
+        stateIncreaseStep({
+          target: '#drawing-canvas', title: 'Dessine un trait', body: 'Clique-glisse sur le canevas blanc pour tracer un trait, comme au crayon.', hint: 'En attente de ton trait…',
+          measure: measureStrokeCount
+        }),
         { type: 'click', target: '#stroke-well', title: 'Change la couleur du trait', body: 'Clique le carré de couleur du Trait pour ouvrir le sélecteur, choisis une teinte.' },
         { type: 'info', title: 'Bien joué !', body: 'Tu sais dessiner un trait et changer sa couleur. La suite du chapitre "Dessiner" du guide utilisateur détaille tous les autres outils (plume, formes, gomme…).' }
       ]
@@ -51,33 +112,16 @@
       time: '2 min',
       steps: [
         { type: 'info', title: 'Calques et timeline', body: 'Un calque contient une série de frames. Une "keyframe" est une frame où tu as vraiment dessiné quelque chose de nouveau — c\'est ce sur quoi l\'interpolation automatique s\'appuie.' },
-        {
-          type: 'click', target: '#btn-al', title: 'Ajoute un calque', body: 'Clique le bouton "+" en bas du panneau Calques, à gauche de la timeline.'
-        },
-        {
-          type: 'state', title: 'Vérification…', body: 'Le nouveau calque doit apparaître dans la liste.', hint: 'Un instant…',
-          check: function (win) { return !!(win.state && win.state.layers && win.state.layers.length >= (win.__tutLayerStart || 2)); },
-          before: function (win) { win.__tutLayerStart = ((win.state && win.state.layers && win.state.layers.length) || 1) + 1; }
-        },
-        {
-          // A brand-new layer's frame 0 is already a keyframe by definition
-          // (it's the layer's own starting content) — asking for F6 while
-          // still sitting on frame 0 would pass instantly without the user
-          // pressing anything. Move off frame 0 first so isKeyframe is
-          // genuinely false until F6 is pressed for real.
-          type: 'state', title: 'Avance de quelques frames', body: 'Clique "Frame suivante" 2 ou 3 fois pour te placer plus loin dans la timeline.', hint: 'En attente…',
-          check: function (win) { return !!(win.state && win.state.currentFrame >= (win.__tutFrameStart || 2)); },
-          before: function (win) { win.__tutFrameStart = ((win.state && win.state.currentFrame) || 0) + 2; }
-        },
-        {
-          type: 'state', title: 'Insère une image-clé', body: 'Appuie sur la touche F6 de ton clavier pour transformer la frame actuelle en keyframe.', hint: 'En attente de F6…',
-          check: function (win) {
-            var st = win.state; if (!st || !st.layers) return false;
-            var ld = st.layers[st.activeLayerIdx];
-            var fr = ld && ld.frames && ld.frames[st.currentFrame];
-            return !!(fr && fr.isKeyframe);
-          }
-        },
+        { type: 'click', target: '#btn-al', title: 'Ajoute un calque', body: 'Clique le bouton "+" en bas du panneau Calques, à gauche de la timeline.' },
+        stateIncreaseStep({ title: 'Vérification…', body: 'Le nouveau calque doit apparaître dans la liste.', hint: 'Un instant…', measure: measureLayerCount }),
+        stateIncreaseStep({
+          title: 'Avance de quelques frames', body: 'Clique "Frame suivante" 2 ou 3 fois pour te placer plus loin dans la timeline.', hint: 'En attente…',
+          measure: measureCurrentFrame, minIncrease: 2
+        }),
+        stateIncreaseStep({
+          title: 'Insère une image-clé', body: 'Appuie sur la touche F6 de ton clavier pour transformer la frame actuelle en keyframe.', hint: 'En attente de F6…',
+          measure: measureKeyframeCount
+        }),
         { type: 'info', title: 'Bien joué !', body: 'Tu as un nouveau calque et une keyframe posée. Le chapitre "Calques et timeline" du guide couvre F5/F7, le drag & drop de frames, et le clic-droit sur la timeline.' }
       ]
     },
@@ -89,41 +133,58 @@
       time: '3 min',
       steps: [
         { type: 'info', title: 'Le tween automatique', body: 'Pose deux keyframes avec un dessin différent, puis laisse Nemo générer les frames intermédiaires tout seul. C\'est le cœur de Nemo.' },
-        {
-          type: 'state', title: 'Avance de quelques frames', body: 'Clique "Frame suivante" plusieurs fois (ou glisse le curseur) pour te placer 5 à 10 frames plus loin.', hint: 'En attente…',
-          check: function (win) { return !!(win.state && win.state.currentFrame >= (win.__tutTweenStartFrame || 5)); },
-          before: function (win) { win.__tutTweenStartFrame = ((win.state && win.state.currentFrame) || 0) + 5; }
-        },
-        {
-          type: 'state', target: '#drawing-canvas', title: 'Dessine un second trait, différent du premier', body: 'Même geste qu\'au premier module — mais dessine autre chose, pour que le tween ait quelque chose à interpoler.',
-          hint: 'En attente de ton trait…',
-          check: function (win) {
-            var ul = win.userLayers, st = win.state;
-            if (!ul || !st) return false;
-            var l = ul[st.activeLayerIdx];
-            return !!(l && l.children && l.children.length > 0);
-          }
-        },
-        {
-          type: 'state', title: 'Pose la seconde keyframe', body: 'Appuie sur F6 pour figer ce dessin comme keyframe.', hint: 'En attente de F6…',
-          check: function (win) {
-            var st = win.state; if (!st || !st.layers) return false;
-            var ld = st.layers[st.activeLayerIdx];
-            var fr = ld && ld.frames && ld.frames[st.currentFrame];
-            return !!(fr && fr.isKeyframe);
-          }
-        },
-        {
-          type: 'state', title: 'Lance le tween', body: 'Appuie sur la touche T pour interpoler automatiquement entre les deux keyframes.', hint: 'En attente de T…',
-          check: function (win) {
-            var st = win.state; if (!st || !st.layers) return false;
-            var ld = st.layers[st.activeLayerIdx];
-            if (!ld || !ld.frames) return false;
-            for (var i = 0; i < ld.frames.length; i++) if (ld.frames[i] && ld.frames[i].isInterpolated) return true;
-            return false;
-          }
-        },
+        // generateTweens() (tweens.js) only counts a frame as a valid tween
+        // anchor when `isKeyframe && strokes.length>0` — a keyframe with
+        // NOTHING drawn on it (frame 0 of a fresh layer, by default) does
+        // not count, so with only the second keyframe drawn there's still
+        // only 1 real anchor and T silently no-ops ("Il faut au moins 2
+        // keyframes dessinées" toast). Found live in testing — draw the
+        // FIRST keyframe for real before moving on, don't just assume the
+        // untouched frame 0 counts as one.
+        stateIncreaseStep({
+          target: '#drawing-canvas', title: 'Dessine une première forme', body: 'Clique-glisse sur le canevas pour dessiner quelque chose sur cette première keyframe.',
+          hint: 'En attente de ton trait…', measure: measureStrokeCount
+        }),
+        stateIncreaseStep({
+          title: 'Avance de quelques frames', body: 'Clique "Frame suivante" plusieurs fois (ou glisse le curseur) pour te placer 5 à 10 frames plus loin.', hint: 'En attente…',
+          measure: measureCurrentFrame, minIncrease: 5
+        }),
+        // F6 BEFORE drawing, not after: Nemo only ever saves ce qui est
+        // dessiné sur une frame qui EST DÉJÀ une keyframe (ou interpolée) —
+        // saveActiveLayerFrame() (app.js) bail out silently sinon
+        // (`if(!f.isKeyframe&&!f.isInterpolated)return;`). Dessiner d'abord
+        // puis appuyer F6 ensuite semblait marcher à l'écran (Paper.js
+        // affiche le trait pendant qu'on dessine) mais se faisait
+        // silencieusement effacer au prochain rechargement de frame —
+        // trouvé en testant en direct, pas en lisant le code. Poser la
+        // keyframe D'ABORD reproduit le vrai flux de travail de Nemo.
+        stateIncreaseStep({ title: 'Pose une nouvelle keyframe', body: 'Appuie sur F6 pour créer une nouvelle keyframe ici — c\'est elle que tu vas dessiner.', hint: 'En attente de F6…', measure: measureKeyframeCount }),
+        stateIncreaseStep({
+          target: '#drawing-canvas', title: 'Dessine un second trait, différent du premier', body: 'Même geste qu\'au premier module — mais dessine autre chose, pour que le tween ait quelque chose à interpoler.',
+          hint: 'En attente de ton trait…', measure: measureStrokeCount
+        }),
+        stateIncreaseStep({ title: 'Lance le tween', body: 'Appuie sur la touche T pour interpoler automatiquement entre les deux keyframes.', hint: 'En attente de T…', measure: measureInterpolatedCount }),
         { type: 'info', title: 'Bravo, premier tween !', body: 'Regarde la timeline : les frames entre tes deux keyframes sont maintenant interpolées. Le chapitre "Interpolation automatique" du guide couvre l\'éditeur de courbes et l\'onion skin.' }
+      ]
+    },
+    {
+      id: 'onion',
+      icon: '4',
+      title: 'Onion skin',
+      desc: 'Voir les frames voisines en transparence',
+      time: '1 min',
+      steps: [
+        { type: 'info', title: 'Voir à travers les frames', body: 'L\'onion skin affiche les frames voisines en transparence par-dessus la frame actuelle — pratique pour juger un mouvement sans jouer l\'animation. Il est activé par défaut sur un nouveau projet ; on va vérifier que tu sais où le couper/rallumer.' },
+        // onionSkin defaults to true (app.js) on a fresh project — "wait
+        // for it to become true" would pass instantly with no click at
+        // all. stateChangedStep requires an actual toggle, whichever
+        // direction it goes.
+        stateChangedStep({
+          target: '#btn-os', title: 'Bascule l\'onion skin', body: 'Clique le bouton onion skin dans la timeline (ou la touche O) pour le couper, puis reclique pour le rallumer.', hint: 'En attente…',
+          measure: function (win) { return !!(win.state && win.state.onionSkin); }
+        }),
+        { type: 'click', target: '#btn-nf', title: 'Change de frame', body: 'Clique "Frame suivante" pour voir les frames voisines apparaître en fantôme.' },
+        { type: 'info', title: 'Bien joué !', body: 'Le chapitre "Interpolation automatique" du guide détaille les marqueurs de plage et le mode contours seuls.' }
       ]
     }
   ];
