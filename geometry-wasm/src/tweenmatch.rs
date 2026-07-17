@@ -858,26 +858,36 @@ fn rotation_fit_residual(a: &ResampledOut, b: &ResampledOut) -> f64 {
     }
 }
 
+// The rotation-fit criterion is CLOSED-shapes-only — verbatim port of
+// alignResampledPairJS's 2026-07-17 fix (see the JS comment): for a
+// near-straight OPEN stroke, reversing the point order is geometrically
+// indistinguishable from a ~180° rotation, so the rotation-fit residual
+// "explained" reversals with a perfect half-spin and eyebrows twirled
+// -145°..-165° for no reason on a real hand-drawn face. Open strokes use
+// the plain raw-distance test; closed loops keep the rotation-fit
+// criterion (the 90°-rectangle / rotated-start-star fix).
 #[wasm_bindgen]
 pub fn align_pair(a_json: &str, b_json: &str) -> Result<String, JsValue> {
     let a: ResampledJsonIn = serde_json::from_str(a_json).map_err(|e| JsValue::from_str(&e.to_string()))?;
     let b: ResampledJsonIn = serde_json::from_str(b_json).map_err(|e| JsValue::from_str(&e.to_string()))?;
     let a = a.into_out();
     let b = b.into_out();
+    let closed = resampled_is_closed(&a) && resampled_is_closed(&b);
+    let cost_fn = if closed { rotation_fit_residual } else { align_cost };
     let mut best = b.clone();
-    let mut best_cost = rotation_fit_residual(&a, &b);
+    let mut best_cost = cost_fn(&a, &b);
     let rev = reverse_resampled(&b);
-    let rc = rotation_fit_residual(&a, &rev);
+    let rc = cost_fn(&a, &rev);
     if rc < best_cost {
         best_cost = rc;
         best = rev.clone();
     }
-    if resampled_is_closed(&a) && resampled_is_closed(&b) {
+    if closed {
         for base in [&b, &rev] {
             let n = base.segments.len();
             for k in 1..n {
                 let cand = rotate_resampled(base, k);
-                let c = rotation_fit_residual(&a, &cand);
+                let c = cost_fn(&a, &cand);
                 if c < best_cost {
                     best_cost = c;
                     best = cand;

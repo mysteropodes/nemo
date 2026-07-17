@@ -847,16 +847,31 @@ function rotationFitResidual(a,b){
   }
   return s;
 }
+// The rotation-fit criterion is CLOSED-shapes-only (2026-07-17, found on
+// a real hand-drawn face): for a near-straight OPEN stroke (eyebrow,
+// eyelid), reversing the point order is geometrically indistinguishable
+// from a ~180° rotation — so judging candidates by residual-after-fitting-
+// a-rotation "explains" the reversed ordering with a perfect half-spin
+// (residual ≈0) and prefers it over the honest as-is ordering (whose small
+// residual is just hand-drawn wobble). interpStroke then faithfully plays
+// that fitted spin: eyebrows visibly twirled -145°..-165° for no reason.
+// Open strokes go back to the plain raw-distance test (reversal must be
+// justified by actual geometry); closed loops keep the rotation-fit
+// criterion — there the cyclic candidates are all the SAME loop retraced,
+// spin-vs-shift ambiguity is real, and it's what fixed the 90°-rectangle
+// and rotated-start-star cases.
 function alignResampledPairJS(a,b){
-  var best=b,bestC=rotationFitResidual(a,b);
+  var closed=resampledIsClosed(a)&&resampledIsClosed(b);
+  var costFn=closed?rotationFitResidual:alignCost;
+  var best=b,bestC=costFn(a,b);
   var rev=reverseResampled(b);
-  var rc=rotationFitResidual(a,rev);if(rc<bestC){bestC=rc;best=rev;}
-  if(resampledIsClosed(a)&&resampledIsClosed(b)){
+  var rc=costFn(a,rev);if(rc<bestC){bestC=rc;best=rev;}
+  if(closed){
     [b,rev].forEach(function(base){
       var n=base.segments.length;
       for(var k=1;k<n;k++){
         var cand=rotateResampled(base,k);
-        var c=rotationFitResidual(a,cand);
+        var c=costFn(a,cand);
         if(c<bestC){bestC=c;best=cand;}
       }
     });
