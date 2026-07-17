@@ -2922,6 +2922,7 @@ function rebuildVectorBrushOutline(path){
   var outline=buildVariableWidthPath(pts,widths);
   if(outline){
     path.segments=outline.segments;path.closed=true;outline.remove();
+    applyBrushKeyline(path); // re-derive from current fillColor/width — see app.js
     // Fill Brush's whole point is to draw a genuine filled SHAPE — a clean
     // editable path with a handful of real bezier anchors/tangent handles,
     // the same as a hand-plotted Pen path — not a dense point-cloud ribbon
@@ -3494,6 +3495,7 @@ function onMouseDown(event){
       _vbLastPenPressure=null;_vbSmoothedPressure=null;stabQueue=[event.point.clone()];_vb.pts=[event.point.clone()];_vb.widths=[vbPressureOf(event)];_vb.lastT=Date.now();_vb.lastPt=event.point.clone();
       currentPath=new Path();currentPath.fillColor=state.strokeEnabled?state.strokeColor:state.fillColor;currentPath.strokeColor=null;currentPath.opacity=state.opacity/100;
       currentPath.data.isVectorBrush=true;
+      applyBrushKeyline(currentPath); // visual separation from any nearby stroke — see app.js
     }else{
       // Stroke eye honored for the brush (was shape-tools-only) — stroke
       // OFF + fill ON draws a fill-only path, mirroring draw-bridge.js.
