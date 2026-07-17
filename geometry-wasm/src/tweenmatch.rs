@@ -403,9 +403,29 @@ fn match_sc(fa: &Feat, fb: &Feat, same_index: bool, a_pts_override: Option<&[(f6
     let sz_d = (a_area - b_area).abs() / a_area.max(b_area).max(1.0);
     let col_d = (color_dist(&fa.stroke_col, &fb.stroke_col) + color_dist(&fa.fill_col, &fb.fill_col)) / 2.0;
     let type_penalty = if fa.stype != fb.stype { 0.5 } else { 0.0 };
+    // HARD color-identity penalty — verbatim port of matchSc's colorPenalty
+    // (tweens.js, 2026-07-17): a clearly-different hue on the same channel
+    // gets the same flat-penalty treatment a type mismatch already has, so
+    // two same-shape strokes of different colors crossing paths follow
+    // their color identity instead of standing still and hue-swapping at
+    // the tween midpoint. See the JS comment for the full rationale.
+    let fill_clash = fa.fill_col.is_some() && fb.fill_col.is_some() && color_dist(&fa.fill_col, &fb.fill_col) > 0.35;
+    let stroke_clash = fa.stroke_col.is_some() && fb.stroke_col.is_some() && color_dist(&fa.stroke_col, &fb.stroke_col) > 0.35;
+    let color_penalty = if fill_clash || stroke_clash { 0.4 } else { 0.0 };
     let idx_bonus = if same_index { -0.03 } else { 0.0 };
 
-    prox_t * 0.48 + align_t * 0.15 + curve_t * 0.12 + four_d * 0.10 + rel * 0.10 + sz_d * 0.06 + col_d * 0.15 + type_penalty + ratio_pen + closed_pen + idx_bonus
+    prox_t * 0.48
+        + align_t * 0.15
+        + curve_t * 0.12
+        + four_d * 0.10
+        + rel * 0.10
+        + sz_d * 0.06
+        + col_d * 0.15
+        + type_penalty
+        + color_penalty
+        + ratio_pen
+        + closed_pen
+        + idx_bonus
 }
 
 // ---- "force line" similarity transform (fitSimilarityTransform) ----

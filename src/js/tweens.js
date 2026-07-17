@@ -195,8 +195,23 @@ function matchSc(fA,fB,sameIndex,aPtsOverride){
   var szD=Math.abs(aArea-bArea)/Math.max(1,Math.max(aArea,bArea));
   var colD=(colorDist(fA.strokeCol,fB.strokeCol)+colorDist(fA.fillCol,fB.fillCol))/2;
   var typePenalty=fA.type!==fB.type?0.5:0;
+  // HARD color-identity penalty (2026-07-17, production stress-test) —
+  // the file's own header comment already states "a stroke's color is what
+  // a viewer actually reads as its identity", but colD's soft 0.15 weight
+  // couldn't enforce it: two same-shape balls of DIFFERENT colors crossing
+  // paths (a hand passing in front of a face — everyday cel animation)
+  // matched by POSITION instead (proximity's 0.48 dwarfs a full-scale
+  // color clash at 0.604*0.15≈0.09), so both balls stood perfectly still
+  // and hard-swapped colors at the tween midpoint instead of crossing.
+  // A clearly-different hue on the same channel gets the same flat-penalty
+  // treatment a type mismatch already has — 0.4, big enough to make any
+  // plausible-motion pairing win, while small hue drift (shading tweaks
+  // between keys, <0.35 normalized) stays penalty-free.
+  var fillClash=fA.fillCol&&fB.fillCol&&colorDist(fA.fillCol,fB.fillCol)>0.35;
+  var strokeClash=fA.strokeCol&&fB.strokeCol&&colorDist(fA.strokeCol,fB.strokeCol)>0.35;
+  var colorPenalty=(fillClash||strokeClash)?0.4:0;
   var idxBonus=sameIndex?-0.03:0;
-  return proxT*.48+alignT*.15+curveT*.12+fourD*.10+rel*.10+szD*.06+colD*.15+typePenalty+ratioPen+closedPen+idxBonus;
+  return proxT*.48+alignT*.15+curveT*.12+fourD*.10+rel*.10+szD*.06+colD*.15+typePenalty+colorPenalty+ratioPen+closedPen+idxBonus;
 }
 // "Force line" motion model: eyes, chin, and other small close-together
 // features are exactly where independent per-stroke shape/position matching
