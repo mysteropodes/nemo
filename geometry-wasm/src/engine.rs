@@ -83,6 +83,14 @@ pub(crate) struct ImageRef {
     pub(crate) height: f64,
     #[serde(default = "default_opacity")]
     pub(crate) opacity: f32,
+    // Rotation in DEGREES around the rect's own center (2026-07 — image
+    // items previously had no rotation at all, the "known v1 limitation"
+    // noted in motion.js transformImageRect: a rotated imported image or
+    // native-video layer silently rendered axis-aligned). Degrees, not
+    // radians, matching every other rotation value in the JS scene
+    // pipeline (Paper.js and motion.js are degree-based throughout).
+    #[serde(default)]
+    pub(crate) rotation: f64,
 }
 fn default_opacity() -> f32 {
     1.0
@@ -913,7 +921,17 @@ fn paint_layer_items(
             if let Some(image_data) = images.get(&img_ref.image_id) {
                 let sx = img_ref.width / image_data.width as f64;
                 let sy = img_ref.height / image_data.height as f64;
-                let place = Affine::translate((img_ref.x, img_ref.y)) * Affine::scale_non_uniform(sx, sy);
+                let mut place = Affine::translate((img_ref.x, img_ref.y)) * Affine::scale_non_uniform(sx, sy);
+                if img_ref.rotation != 0.0 {
+                    // Spin around the DISPLAY rect's center (x,y is its
+                    // top-left) — the same pivot convention the JS side's
+                    // transformImageRect/serialization uses.
+                    let (cx, cy) = (img_ref.x + img_ref.width / 2.0, img_ref.y + img_ref.height / 2.0);
+                    place = Affine::translate((cx, cy))
+                        * Affine::rotate(img_ref.rotation.to_radians())
+                        * Affine::translate((-cx, -cy))
+                        * place;
+                }
                 let brush = vello::peniko::ImageBrush::new(image_data.clone()).multiply_alpha(img_ref.opacity);
                 scene.draw_image(&brush, view_tf * place);
             }

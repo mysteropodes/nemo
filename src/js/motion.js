@@ -426,15 +426,27 @@
       return out;
     });
   }
-  // Transforms a raster item's on-canvas rect. v1 scope: scale + translate
-  // only (skips rotation for images — the axis-aligned {x,y,width,height}
-  // the renderer expects has no rotation field; rare case since almost all
-  // Nemo content is vector strokes, noted as a known v1 limitation).
+  // Transforms a raster item's on-canvas rect. Full transform since
+  // 2026-07 ("une vidéo ou image est un objet comme les autres") — the
+  // renderer's image item now carries a `rotation` field (degrees around
+  // the rect's own center, engine.rs ImageRef), so this composes rotation
+  // too instead of the old scale+translate-only v1: the rect's center
+  // ORBITS the pivot by m.rot (same rotPt math transformSegments uses for
+  // vector points) and the item's own spin accumulates into .rotation.
+  // Input rb may itself carry a rotation (imported image already rotated,
+  // or chained element+layer Motion passes) — composed additively, the
+  // 2D-rotation group being commutative in angle.
   function transformImageRect(rb, pivot, m) {
     var cx = rb.x + rb.width / 2, cy = rb.y + rb.height / 2;
     var ncx = pivot.x + (cx - pivot.x) * m.sx + m.dx, ncy = pivot.y + (cy - pivot.y) * m.sy + m.dy;
+    if (m.rot) {
+      // Orbit around the pivot — dx/dy translation applies AFTER the spin,
+      // matching transformSegments' own order (scale, rotate, translate).
+      var orbited = rotPt(ncx - m.dx, ncy - m.dy, pivot.x, pivot.y, m.rot);
+      ncx = orbited[0] + m.dx; ncy = orbited[1] + m.dy;
+    }
     var w = rb.width * m.sx, h = rb.height * m.sy;
-    return { x: ncx - w / 2, y: ncy - h / 2, width: w, height: h };
+    return { x: ncx - w / 2, y: ncy - h / 2, width: w, height: h, rotation: (rb.rotation || 0) + (m.rot || 0) };
   }
 
   // ---- canvas overlay: the position motion path for the layer(s)

@@ -753,6 +753,33 @@
     return rect;
   }
 
+  // Transform-box geometry for a selected video layer (2026-07, "une vidéo
+  // ou image est un objet comme les autres") — ONE shared computation for
+  // both the drawn gizmo (engine-bridge buildTransformBoxItems' nv branch)
+  // and the gesture hit-testing (select-bridge), so they can never
+  // silently disagree (same discipline as motionHandlePositions/
+  // computeHandles). Returns null when the layer isn't a video. Corners
+  // are the DISPLAY rect's, spun around its center by the rect's own
+  // rotation (displayRect composes the layer's Motion rotation into
+  // rect.rotation since transformImageRect carries it); ring radius
+  // matches the path-selection ring's own small-and-screen-constant
+  // formula exactly.
+  function transformBox(li) {
+    var rect = displayRect(li);
+    if (!rect) return null;
+    var cx = rect.x + rect.width / 2, cy = rect.y + rect.height / 2;
+    var rot = rect.rotation || 0;
+    var a = rot * Math.PI / 180, cos = Math.cos(a), sin = Math.sin(a);
+    function spin(x, y) { var dx = x - cx, dy = y - cy; return { x: cx + dx * cos - dy * sin, y: cy + dx * sin + dy * cos }; }
+    var corners = {
+      nw: spin(rect.x, rect.y), ne: spin(rect.x + rect.width, rect.y),
+      se: spin(rect.x + rect.width, rect.y + rect.height), sw: spin(rect.x, rect.y + rect.height),
+    };
+    var zs = 1 / Math.max(0.0001, view.zoom);
+    var ringRadius = Math.min(36 * zs, Math.max(rect.width, rect.height) * 0.3);
+    return { rect: rect, center: { x: cx, y: cy }, rotation: rot, corners: corners, ringCenter: { x: cx, y: cy }, ringRadius: ringRadius };
+  }
+
   // Instant import: opens a session and creates a nativeVideo layer —
   // called by images.js's Vidéo… button, either with a filesystem path
   // string (Tauri) or a File/Blob from the browser's file picker (no
@@ -849,6 +876,7 @@
     importAsLayer: importAsLayer,
     onFrameChanged: onFrameChanged,
     displayRect: displayRect,
+    transformBox: transformBox,
     stats: stats,
     _refSync: _refSync,
     sessions: function () { return Object.assign({}, sessions); },

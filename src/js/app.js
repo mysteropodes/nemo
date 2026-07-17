@@ -585,11 +585,19 @@ function serR(r){
   // geometry on r.data synchronously (before the async gap) precisely so
   // this fallback has something correct to read meanwhile.
   var pending=r.data&&r.data._pendingGeom;
+  // Rotation-aware sizing (2026-07, images join the transform box): once
+  // the select tool's rotate ring has spun a raster, r.bounds is the
+  // INFLATED axis-aligned envelope — the honest display size is the
+  // un-rotated natural size × |scaling| (same math as engine-bridge's
+  // rasterImageRect), with the spin saved separately in d.rotation.
+  // Unrotated rasters keep the historical bounds read untouched.
+  var rot=(!r.loaded&&pending)?(pending.rotation||0):((r.matrix&&r.matrix.rotation)||0);
   var useX=(!r.loaded&&pending)?pending.x:r.position.x;
   var useY=(!r.loaded&&pending)?pending.y:r.position.y;
-  var useW=(!r.loaded&&pending)?pending.width:r.bounds.width;
-  var useH=(!r.loaded&&pending)?pending.height:r.bounds.height;
+  var useW=(!r.loaded&&pending)?pending.width:(rot?Math.abs(r.scaling.x)*r.width:r.bounds.width);
+  var useH=(!r.loaded&&pending)?pending.height:(rot?Math.abs(r.scaling.y)*r.height:r.bounds.height);
   var d={isRaster:true,src:r.data&&r.data.src?r.data.src:r.source,x:useX,y:useY,width:useW,height:useH,opacity:r.opacity!==undefined?r.opacity:1};if(r.data&&r.data.isBitmapBrush)d.isBitmapBrush=true;
+  if(rot)d.rotation=rot;
   // Companion linkage (v2 anchor+companion architecture, bitmap-brush.js):
   // brushGroupId is how relinkBrushCompanions() regroups this raster with
   // its anchor path after desR/desP rebuild everything fresh on loadFrame —
@@ -612,8 +620,11 @@ function desR(d,layer,op){var prev=project.activeLayer;layer.activate();var r=ne
   // once place() actually applies the real geometry so serR immediately
   // goes back to trusting live r.position/r.bounds afterward (a post-load
   // drag/edit must still be captured normally).
-  r.data._pendingGeom={x:d.x,y:d.y,width:w,height:h};
-  var place=function(){r.size=new Size(w,h);r.position=new Point(d.x,d.y);r.data._pendingGeom=null;};
+  r.data._pendingGeom={x:d.x,y:d.y,width:w,height:h,rotation:d.rotation||0};
+  // Rotation applied AFTER size+position (the raster is a fresh un-rotated
+  // object here) — r.rotate's default pivot is r.position, i.e. the rect
+  // center, matching serR's decomposition and the engine's own draw pivot.
+  var place=function(){r.size=new Size(w,h);r.position=new Point(d.x,d.y);if(d.rotation)r.rotate(d.rotation);r.data._pendingGeom=null;};
   if(r.loaded)place();
   else r.onLoad=function(){
     place();

@@ -605,6 +605,21 @@ export function fill_find(input_json) {
  * Returns a JSON `{layerIndex,itemIndex,kind}` for the topmost hit item
  * (last layer, last item within it, scanned first — matches draw order:
  * last-drawn is topmost), or the literal string `"null"` for no hit.
+ *
+ * NOT a drop-in for select-bridge.js's click/marquee hit-testing — that
+ * caller does far more than "which item is under the point": locked-layer
+ * skip (except a symbol/component layer, which must still hit as one
+ * rigid whole), cross-layer active-layer switching when the hit lands on
+ * a non-active layer, a component-layer fallback scan
+ * (hitTestComponentLayers) with its own double-click-to-enter-symbol
+ * timing, and node/handle-level hits (hitTestHandles, for the node-edit
+ * tool) that this function has no concept of at all — it only knows
+ * fill/stroke containment over a static scene snapshot. Wiring this in
+ * would mean re-implementing all of that business logic here too, not
+ * just swapping the geometry test. Verified unused as of the 2026-07-13
+ * optimization pass (grep across src/js/*.js found zero callers) — no
+ * measured slowness in select-bridge.js's current Paper.js hitTest() to
+ * justify the port either, per the same pass.
  * @param {string} scene_json
  * @param {number} x
  * @param {number} y

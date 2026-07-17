@@ -127,6 +127,23 @@
     return id;
   }
 
+  // A Raster's DISPLAY rect + its own rotation, for the engine's image
+  // item (2026-07 — image items now carry `rotation`, engine.rs ImageRef).
+  // c.bounds is the AXIS-ALIGNED envelope: correct while the raster is
+  // unrotated, but wrong (inflated) the moment the select tool's rotate
+  // ring spins it — the un-rotated rect must come from position/size/
+  // scaling instead, with the spin reported separately. Paper's own
+  // matrix decomposition (`matrix.rotation`, degrees) is the source of
+  // truth for the accumulated angle; scaling is abs()'d since a mirror
+  // flip (negative scale) isn't representable in the rect+angle model —
+  // known simplification, same class as registerRasterIfNeeded's own.
+  function rasterImageRect(c) {
+    var rot = (c.matrix && c.matrix.rotation) || 0;
+    if (!rot) { var rb = c.bounds; return { x: rb.x, y: rb.y, width: rb.width, height: rb.height, rotation: 0 }; }
+    var sw = Math.abs(c.scaling.x) * c.width, sh = Math.abs(c.scaling.y) * c.height;
+    return { x: c.position.x - sw / 2, y: c.position.y - sh / 2, width: sw, height: sh, rotation: rot };
+  }
+
   // `skipVolatile` (renderWithOverlayItem only): leaves out the three
   // per-pointermove cursor overlays (pressure/eraser/pen-preview) so the
   // rest of the scene can be CACHED across the moves of one drag — those
@@ -248,7 +265,7 @@
             nvRect = SMMotion.transformImageRect(nvRect, nvPivot, nvMat);
             nvOp *= nvMat.op;
           }
-          items.push({ image: { imageId: 'nv:' + i, x: nvRect.x, y: nvRect.y, width: nvRect.width, height: nvRect.height, opacity: nvOp } });
+          items.push({ image: { imageId: 'nv:' + i, x: nvRect.x, y: nvRect.y, width: nvRect.width, height: nvRect.height, opacity: nvOp, rotation: nvRect.rotation || 0 } });
         }
       }
       for (var s = 0; s < children.length; s++) {
@@ -275,12 +292,12 @@
         if (c instanceof Raster) {
           var imageId = registerRasterIfNeeded(c);
           if (!imageId) continue;
-          var rb = c.bounds; // display rect — Paper's Raster is center-positioned, bounds gives top-left directly
+          var rb = rasterImageRect(c); // un-rotated display rect + the raster's own spin (see helper)
           var imgOp = c.opacity !== undefined ? c.opacity : 1;
           if (elMat) { rb = SMMotion.transformImageRect(rb, elPivot, elMat); imgOp *= elMat.op; }
           if (motionMat) { rb = SMMotion.transformImageRect(rb, motionPivot, motionMat); imgOp *= motionMat.op; }
           items.push({
-            image: { imageId: imageId, x: rb.x, y: rb.y, width: rb.width, height: rb.height, opacity: imgOp },
+            image: { imageId: imageId, x: rb.x, y: rb.y, width: rb.width, height: rb.height, opacity: imgOp, rotation: rb.rotation || 0 },
           });
           continue;
         }
@@ -456,8 +473,8 @@
       if (c instanceof Raster) {
         var imageId = registerRasterIfNeeded(c);
         if (imageId) {
-          var rb = c.bounds;
-          items.push({ image: { imageId: imageId, x: rb.x, y: rb.y, width: rb.width, height: rb.height, opacity: c.opacity !== undefined ? c.opacity : 1 } });
+          var rb = rasterImageRect(c); // same rotation-aware rect as buildSceneJson's own Raster branch
+          items.push({ image: { imageId: imageId, x: rb.x, y: rb.y, width: rb.width, height: rb.height, opacity: c.opacity !== undefined ? c.opacity : 1, rotation: rb.rotation || 0 } });
         }
         return;
       }
@@ -602,7 +619,33 @@
   // type yet, so the dashed outline/marquee border render as solid instead —
   // a cosmetic gap, not a functional one, until dashing is added engine-side.
   function buildTransformBoxItems() {
-    if (state.tool !== 'select' || !selectedPaths.length || typeof orientedSelBox !== 'function') return [];
+    if (state.tool !== 'select') return [];
+    // Selected native-video layer (2026-07, "une vidéo est un objet comme
+    // les autres") — same visual language as the path gizmo below (blue
+    // outline, white corner squares, rotate ring), geometry from the ONE
+    // shared SMNativeVideo.transformBox select-bridge also hit-tests, so
+    // grabbed == drawn by construction. Videos have no edge-midpoint
+    // handles (uniform corner scale only) and no anchor crosshair (their
+    // pivot is the rect center by displayRect's own convention).
+    if (window._nvSelectedLayer != null && window.SMNativeVideo && SMNativeVideo.transformBox) {
+      var nvLd = state.layers[window._nvSelectedLayer];
+      var nvTb = (nvLd && nvLd.nativeVideo) ? SMNativeVideo.transformBox(window._nvSelectedLayer) : null;
+      if (nvTb) {
+        var nzs = 1 / view.zoom;
+        var nvItems = [];
+        var nvC = [nvTb.corners.nw, nvTb.corners.ne, nvTb.corners.se, nvTb.corners.sw];
+        for (var nvI = 0; nvI < 4; nvI++) {
+          var pA = nvC[nvI], pB = nvC[(nvI + 1) % 4];
+          nvItems.push(lineItem([pA.x, pA.y], [pB.x, pB.y], [74, 158, 255, 204], 1 * nzs));
+        }
+        nvC.forEach(function (p) {
+          nvItems.push(rectItem(p.x, p.y, 3.5 * nzs, [255, 255, 255, 255], [74, 158, 255, 255], 1.2 * nzs));
+        });
+        nvItems.push(circleItem(nvTb.ringCenter.x, nvTb.ringCenter.y, nvTb.ringRadius, null, [74, 158, 255, 160], 1 * nzs));
+        return nvItems;
+      }
+    }
+    if (!selectedPaths.length || typeof orientedSelBox !== 'function') return [];
     // Oriented box (tools.js orientedSelBox — "les boîtes de transformation
     // ne tournent pas avec l'objet quand on rotate"): everything below is
     // computed in the box's de-rotated space then mapped to world through

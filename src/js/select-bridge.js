@@ -21,13 +21,21 @@
 // rotate transform box with opposite-corner anchoring, and group move are
 // all ported too.
 (function () {
-  var mode = null; // 'xform-scale' | 'xform-rotate' | 'marquee' | 'move' | 'arc' | 'nv-drag' | null
-  // Native-video footage gesture (experimental branch): drag moves the
-  // footage, Shift+drag scales it uniformly (vertical motion), both writing
-  // through SMMotion.setLayerValue — static override when the property's
-  // stopwatch is off, auto-keyframe at the playhead when it's on, exactly
-  // like typing in the Transform panel fields.
+  var mode = null; // 'xform-scale' | 'xform-rotate' | 'marquee' | 'move' | 'arc' | 'nv-drag' | 'nv-scale' | 'nv-rotate' | null
+  // Native-video footage gestures (2026-07, "une vidéo est un objet comme
+  // les autres"): clicking a video layer SELECTS it (window._nvSelectedLayer,
+  // read by engine-bridge's buildTransformBoxItems to draw the same
+  // box+corners+ring gizmo paths get) — drag inside moves it, corner
+  // handles scale (uniform), the ring rotates. All three write through
+  // SMMotion.setLayerValue — static override when the property's stopwatch
+  // is off, auto-keyframe at the playhead when it's on, exactly like
+  // typing in the Transform panel fields. (Shift+drag's historical
+  // scale-by-vertical-motion gesture is retired: corner handles replace it.)
   var nvIdx = -1, nvStartPt = null, nvStartPos = null, nvStartScale = null, nvScaleMode = false, nvMoved = false;
+  var nvPivot = null, nvOrigDist = 1, nvStartAngle = 0, nvOrigRot = 0;
+  function nvClearSelection() {
+    if (window._nvSelectedLayer != null) { window._nvSelectedLayer = null; }
+  }
   var xformDir = null, xformAnchor = null, xformOrigHandlePos = null, xformLastSx = 1, xformLastSy = 1;
   var xformMap = null; // geometry<->rendered-world mapper when the active layer has a Motion transform
   var rotCenter = null, rotStartAngle = 0, rotLastAngle = 0;
@@ -421,27 +429,76 @@
     }
 
     if (!hit) {
+      // Selected video's transform handles FIRST (2026-07, full gizmo —
+      // corners scale, ring rotates), before any body hit-test: the ring
+      // sits OUTSIDE the display rect, so the point-in-rect walk below
+      // would never reach it. Geometry comes from the same
+      // SMNativeVideo.transformBox engine-bridge draws from, so grabbed ==
+      // drawn by construction.
+      if (window._nvSelectedLayer != null && window.SMNativeVideo && window.SMMotion) {
+        var selLd = state.layers[window._nvSelectedLayer];
+        var tb = (selLd && selLd.nativeVideo) ? SMNativeVideo.transformBox(window._nvSelectedLayer) : null;
+        if (tb) {
+          var nvTol = 9 / view.zoom, nvRingTol = 7 / view.zoom;
+          var hh2 = null;
+          if (Math.abs(pt.getDistance(new Point(tb.ringCenter.x, tb.ringCenter.y)) - tb.ringRadius) < nvRingTol) hh2 = { type: 'rotate' };
+          if (!hh2) {
+            var bestD2 = nvTol;
+            Object.keys(tb.corners).forEach(function (k) {
+              var d2 = pt.getDistance(new Point(tb.corners[k].x, tb.corners[k].y));
+              if (d2 < bestD2) { bestD2 = d2; hh2 = { type: 'scale' }; }
+            });
+          }
+          if (hh2) {
+            pushUndo();
+            nvIdx = window._nvSelectedLayer;
+            nvPivot = new Point(tb.center.x, tb.center.y);
+            if (hh2.type === 'rotate') {
+              mode = 'nv-rotate';
+              nvStartAngle = Math.atan2(pt.y - nvPivot.y, pt.x - nvPivot.x) * 180 / Math.PI;
+              nvOrigRot = SMMotion.getLayerValue(nvIdx, 'rotation')[0];
+            } else {
+              mode = 'nv-scale';
+              nvOrigDist = Math.max(1e-6, pt.getDistance(nvPivot));
+              nvStartScale = SMMotion.getLayerValue(nvIdx, 'scale');
+            }
+            return;
+          }
+        }
+      }
       // Native video footage: click inside a visible video layer's display
-      // rect (topmost first) starts a footage transform gesture. Runs only
+      // rect (topmost first) selects it + starts a move gesture. Runs only
       // when no stroke was hit — drawings sit ON TOP of footage, so a
-      // stroke click must keep selecting the stroke.
+      // stroke click must keep selecting the stroke. Rotation-aware: the
+      // point is spun BACK around the rect center by the rect's own
+      // rotation before the axis-aligned containment check (the rect
+      // renders rotated since the image items grew a rotation field).
       var nvHit = -1;
       if (window.SMNativeVideo && window.SMMotion) {
         for (var nvi = state.layers.length - 1; nvi >= 0; nvi--) {
           var nld = state.layers[nvi];
           if (!nld || !nld.nativeVideo || !nld.visible || nld.locked) continue;
           var nvr = SMNativeVideo.displayRect(nvi);
-          if (nvr && pt.x >= nvr.x && pt.x <= nvr.x + nvr.width && pt.y >= nvr.y && pt.y <= nvr.y + nvr.height) { nvHit = nvi; break; }
+          if (!nvr) continue;
+          var tpx = pt.x, tpy = pt.y;
+          if (nvr.rotation) {
+            var ncx = nvr.x + nvr.width / 2, ncy = nvr.y + nvr.height / 2;
+            var na = -nvr.rotation * Math.PI / 180, nc = Math.cos(na), ns = Math.sin(na);
+            var ndx = pt.x - ncx, ndy = pt.y - ncy;
+            tpx = ncx + ndx * nc - ndy * ns; tpy = ncy + ndx * ns + ndy * nc;
+          }
+          if (tpx >= nvr.x && tpx <= nvr.x + nvr.width && tpy >= nvr.y && tpy <= nvr.y + nvr.height) { nvHit = nvi; break; }
         }
       }
       if (nvHit >= 0) {
         if (!e.shiftKey) clearSel();
         state.activeLayerIdx = nvHit;
         activateUL(nvHit);
+        window._nvSelectedLayer = nvHit; // gizmo drawn by buildTransformBoxItems' nv branch
         mode = 'nv-drag';
         nvIdx = nvHit;
         nvStartPt = pt.clone();
-        nvScaleMode = !!e.shiftKey;
+        nvScaleMode = false; // corner handles replaced the historical Shift+drag scale gesture
         nvStartPos = SMMotion.getLayerValue(nvHit, 'position');
         nvStartScale = SMMotion.getLayerValue(nvHit, 'scale');
         nvMoved = false;
@@ -449,6 +506,7 @@
         window.SMEngineBridge.renderNow();
         return;
       }
+      nvClearSelection(); // clicked empty canvas/another target — video deselects like any object would
       var compHit = hitTestComponentLayers(pt);
       if (compHit) {
         var now2 = Date.now();
@@ -469,6 +527,7 @@
     }
 
     if (hit && (hit.item instanceof Path || hit.item instanceof Raster)) {
+      nvClearSelection(); // selecting a stroke/image deselects any selected video, like any selection change
       if (hitOtherLayerIdx >= 0) {
         state.activeLayerIdx = hitOtherLayerIdx;
         activateUL(hitOtherLayerIdx);
@@ -624,14 +683,21 @@
     } else if (mode === 'nv-drag') {
       if (!nvMoved) { pushUndo(); nvMoved = true; }
       var nvd = pt.subtract(nvStartPt);
-      if (nvScaleMode) {
-        // Vertical drag scales uniformly around the current pivot: up =
-        // bigger. 200 world units per doubling feels right at canvas scale.
-        var nvf = Math.max(0.05, 1 - nvd.y / 200);
-        SMMotion.setLayerValue(nvIdx, 'scale', [nvStartScale[0] * nvf, nvStartScale[1] * nvf]);
-      } else {
-        SMMotion.setLayerValue(nvIdx, 'position', [nvStartPos[0] + nvd.x, nvStartPos[1] + nvd.y]);
-      }
+      SMMotion.setLayerValue(nvIdx, 'position', [nvStartPos[0] + nvd.x, nvStartPos[1] + nvd.y]);
+      window._sceneVersion++;
+      window.SMEngineBridge.renderNow();
+    } else if (mode === 'nv-scale') {
+      // Uniform corner scale around the box center — same ratio-of-
+      // distances math as Motion mode's motionScale (recomputed from the
+      // FIXED drag-start baseline every tick; setLayerValue writes an
+      // absolute value, so no compounding drift).
+      var nvRatio = pt.getDistance(nvPivot) / nvOrigDist;
+      SMMotion.setLayerValue(nvIdx, 'scale', [nvStartScale[0] * nvRatio, nvStartScale[1] * nvRatio]);
+      window._sceneVersion++;
+      window.SMEngineBridge.renderNow();
+    } else if (mode === 'nv-rotate') {
+      var nvAng = Math.atan2(pt.y - nvPivot.y, pt.x - nvPivot.x) * 180 / Math.PI;
+      SMMotion.setLayerValue(nvIdx, 'rotation', [nvOrigRot + (nvAng - nvStartAngle)]);
       window._sceneVersion++;
       window.SMEngineBridge.renderNow();
     } else if (mode === 'move') {
@@ -839,8 +905,8 @@
     if (!mode) return;
     e.stopImmediatePropagation();
     e.preventDefault();
-    if (mode === 'nv-drag') {
-      mode = null; nvIdx = -1; nvStartPt = null;
+    if (mode === 'nv-drag' || mode === 'nv-scale' || mode === 'nv-rotate') {
+      mode = null; nvIdx = -1; nvStartPt = null; nvPivot = null;
       // One panel/timeline refresh at gesture end (not per tick — the
       // Transform fields and Motion rows re-read motionStatic/keys).
       updateUI();
