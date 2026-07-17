@@ -34,7 +34,6 @@
   var samples = []; // [x,y,width]
   var lastMoveT = 0, lastWorldPt = null;
   var lastPenPressure = null; // held across a real-pen gesture, see pressureOf()
-  var extendTarget = null; // {path, end:'first'|'last'} — set at pointerdown when starting near an open path's endpoint
   // state.stabilizer (position-averaging while drawing) used to only exist
   // in tools.js's Paper-native onMouseDrag mirror — dead code in practice,
   // since this engine-bridge path is what actually runs whenever the Rust
@@ -79,29 +78,6 @@
     if (smoothedPressure == null) { smoothedPressure = p; return p; }
     smoothedPressure += (p - smoothedPressure) * PRESSURE_SMOOTH_ALPHA;
     return smoothedPressure;
-  }
-
-  // Graphite's Freehand tool auto-continues an open path when you start a
-  // new stroke near one of its endpoints, instead of always creating a
-  // fresh object. Only the plain constant-width stroke mode (not vector
-  // brush / fillbrush, whose centerline data isn't a simple point list to
-  // splice) supports this — same tolerance convention as the Pen tool's
-  // own close-path snap (10px screen radius, tools.js/pen-bridge.js).
-  function findOpenEndpointNear(worldPt) {
-    if (state.vectorBrush || isFillBrush()) return null;
-    var layer = userLayers[state.activeLayerIdx];
-    if (!layer || layer.locked) return null;
-    var tol = 10 / view.zoom;
-    var pt = new Point(worldPt[0], worldPt[1]);
-    var best = null, bestD = tol;
-    layer.children.forEach(function (p) {
-      if (!(p instanceof Path) || p.closed || !p.segments || p.segments.length < 2) return;
-      if (p.data && (p.data.isVectorBrush || p.data.isFillShape)) return;
-      var df = pt.getDistance(p.firstSegment.point), dl = pt.getDistance(p.lastSegment.point);
-      if (df < bestD) { bestD = df; best = { path: p, end: 'first' }; }
-      if (dl < bestD) { bestD = dl; best = { path: p, end: 'last' }; }
-    });
-    return best;
   }
 
   function shouldIntercept() {
@@ -323,8 +299,7 @@
     lastMoveT = 0; lastWorldPt = null; lastPenPressure = null;
     stabQueue = []; smoothedPressure = null;
     var w0 = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
-    extendTarget = findOpenEndpointNear(w0);
-    if (!extendTarget) w0 = magnetSnap(w0);
+    w0 = magnetSnap(w0);
     // engine-bridge.js's own tick() loop keeps running unconditionally in
     // the background (it's not started/stopped per-drag) — without
     // suspending it here, it races renderWithOverlayItem below on every
@@ -333,12 +308,8 @@
     // story — this was the actual cause of "the stroke isn't visible while
     // drawing", not a resize/canvas-size issue).
     window.SMEngineBridge.suspend();
-    // Snap the very first sample onto the target endpoint (not the raw
-    // click point) so the extended path has no visible gap/jump at the
-    // seam — mirrors Graphite's should_extend behavior.
-    var w = extendTarget ? [extendTarget.path[extendTarget.end === 'first' ? 'firstSegment' : 'lastSegment'].point.x, extendTarget.path[extendTarget.end === 'first' ? 'firstSegment' : 'lastSegment'].point.y] : w0;
+    var w = w0;
     var pressure = smoothPressure(wantsPressure() ? pressureOf(e, w) : 1);
-    if (extendTarget) stabQueue.push(w); // seeds the average AT the seam, not off it
     modeler = null;
     if (modelerLevel() && window.SMStrokeModeler) {
       // unitScale = view.zoom at stroke start: the wobble speed thresholds
@@ -515,8 +486,8 @@
       // centerline-editing mode (which would otherwise let you drag a
       // handful of centerline anchors but never touch the outline's own
       // points directly — not what a filled shape's nodes should behave
-      // like). isFillShape stays (still needed by findOpenEndpointNear's
-      // exclusion guard in draw-bridge.js/pen-bridge.js).
+      // like). isFillShape stays (still needed by pen-bridge.js's own
+      // close-path/endpoint-snap exclusion guard).
       delete path.data.isVectorBrush;
       delete path.data.centerSegments;
       delete path.data.widthProfile;
@@ -602,20 +573,6 @@
       // that it accepts a widthProfile, wire it up here too so a preset
       // actually applies to pressure strokes at draw time.
       if (state.brushPreset && state.brushPreset !== 'none') applyBrushTexture(path, state.brushPreset);
-    } else if (extendTarget) {
-      // Auto-continue: splice the new samples onto the existing open path's
-      // endpoint instead of creating a separate object.
-      path = extendTarget.path;
-      var newPts = samples.map(function (s) { return new Segment(new Point(s[0], s[1])); });
-      if (extendTarget.end === 'last') {
-        newPts.slice(1).forEach(function (seg) { path.add(seg); });
-      } else {
-        // Prepending onto the start: insert in reverse order (excluding the
-        // duplicate anchor sample) so the new points read start-to-end.
-        newPts.slice(1).reverse().forEach(function (seg) { path.insertSegments(0, [seg]); });
-      }
-      path.fillColor = state.fillEnabled ? state.fillColor : null;
-      path.simplify(state.smoothing);
     } else {
       path = new Path();
       // Left-panel stroke eye honored here too (it always was for the
@@ -658,10 +615,9 @@
     // Labs prototype hook (docs/feature-scouting.md) — no-op unless
     // window.SMLabs is loaded AND the relevant prototype's own flag is on.
     // Deliberately a single guarded call at the one point every
-    // commitStroke branch (including extendTarget) funnels through,
-    // rather than a change per-branch — keeps this file's own logic
-    // untouched when Labs is off.
-    if (window.SMLabs && window.SMLabs.onStrokeCommitted && path && !extendTarget) window.SMLabs.onStrokeCommitted(path, userLayers[state.activeLayerIdx]);
+    // commitStroke branch funnels through, rather than a change per-branch
+    // — keeps this file's own logic untouched when Labs is off.
+    if (window.SMLabs && window.SMLabs.onStrokeCommitted && path) window.SMLabs.onStrokeCommitted(path, userLayers[state.activeLayerIdx]);
     saveActiveLayerFrame();
     // Stale-onion-ghost fix (see select-bridge.js's commit paths for the
     // full explanation) — a fresh stroke on a held frame can be exactly
@@ -669,7 +625,6 @@
     renderOS();
     updateUI();
     samples = [];
-    extendTarget = null;
   }
 
   // Escape aborts the in-progress stroke without committing it — same
@@ -680,7 +635,6 @@
     if (e.key !== 'Escape' || !dragging) return;
     dragging = false;
     samples = [];
-    extendTarget = null;
     if (window.SMBitmapBrush) window.SMBitmapBrush.endLivePreview();
     window.SMEngineBridge.resume();
     window.SMEngineBridge.renderNow();
