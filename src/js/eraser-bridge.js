@@ -191,6 +191,15 @@
       SMBitmapBrush.flushEraseDirty(userLayers[state.activeLayerIdx]);
       saveActiveLayerFrame();
     }
+    // Stale-onion-ghost fix (same family as select-bridge.js/subselect-
+    // bridge.js) — once per erase GESTURE, not per sample: onionPrevLayer/
+    // onionNextLayer are a snapshot cache never rebuilt by an edit commit,
+    // only by frame nav/layer changes. Deliberately placed here (onUp) and
+    // not in onMove's per-sample saveActiveLayerFrame() above — renderOS()
+    // rebuilds by walking every layer's onion-range frames, too expensive
+    // to run at stylus sampling rate (same reasoning as this file's own
+    // deferred Bitmap Brush refresh just above).
+    renderOS();
     window.SMEngineBridge.resume();
     window.SMEngineBridge.renderNow();
   }

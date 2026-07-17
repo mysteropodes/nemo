@@ -642,21 +642,18 @@
       var p = corners[k];
       items.push(rectItem(p[0], p[1], 3.5 * zs, [255, 255, 255, 255], [74, 158, 255, 255], 1.2 * zs));
     });
-    var rotOff = 20 * zs;
-    var topCenter = W(midX, b.top);
-    var rotPos = W(midX, b.top - rotOff);
-    items.push(lineItem(topCenter, rotPos, [74, 158, 255, 204], 1 * zs));
-    items.push(circleItem(rotPos[0], rotPos[1], 5 * zs, [255, 255, 255, 255], [74, 158, 255, 255], 1.2 * zs));
     // Anchor/pivot marker (redesign 2026-07-09, AE-style anchor point) — a
     // small ringed crosshair AT the point rotation actually pivots around
     // (tools.js xformAnchorPoint), so a non-center anchor is visible on the
     // shape itself, not just as an abstract dot in the side panel widget.
+    // Computed BEFORE the rotate ring below since the ring is centered here.
+    var ap = { x: corners.n[0], y: b.top }; // fallback if xformAnchorPoint is unavailable
     if (typeof xformAnchorPoint === 'function') {
       var ap0 = xformAnchorPoint(b);
       // A custom pivot (Alt+click) is ALREADY a world point — only the
       // bounds-derived anchors live in the box's de-rotated space.
       var apArr = state.xformAnchorCustom ? [ap0.x, ap0.y] : W(ap0.x, ap0.y);
-      var ap = { x: apArr[0], y: apArr[1] };
+      ap = { x: apArr[0], y: apArr[1] };
       // Light hover scale (2026-07, live feedback) — select-bridge.js's
       // onMove sets state.xformAnchorHovered on a passive hover-only pass
       // (not an active drag). +25% radius reads as a clear but subtle
@@ -666,6 +663,21 @@
       items.push(lineItem([ap.x - ar, ap.y], [ap.x + ar, ap.y], [74, 158, 255, 255], 1 * zs));
       items.push(lineItem([ap.x, ap.y - ar], [ap.x, ap.y + ar], [74, 158, 255, 255], 1 * zs));
     }
+    // Rotate RING (2026-07, replaces the old tiny offset stem+dot handle —
+    // live feedback: hard to notice, only grabbable from one exact spot).
+    // Centered on the anchor/pivot. Small and mostly size-INDEPENDENT (per
+    // user mockup — a small ring near the pivot, not one that grows to
+    // enclose the whole selection); must match select-bridge.js's
+    // computeHandles ringRadius formula exactly, or the drawn ring and the
+    // hit-testable one would disagree.
+    var ringRadius = Math.min(36 * zs, Math.max(b.width, b.height) * 0.3);
+    // Light hover grow (2026-07, same "you can grab this" pattern as the
+    // anchor crosshair's own hover scale just above) — state.xformRingHovered
+    // set by select-bridge.js's passive hover-only pointermove pass; only
+    // the DRAWN radius grows, not the hit-test one (computeHandles), same
+    // treatment as the anchor dot.
+    var ringDrawRadius = ringRadius + (state.xformRingHovered ? 4 : 0) * zs;
+    items.push(circleItem(ap.x, ap.y, ringDrawRadius, null, [74, 158, 255, 160], 1 * zs));
     return items;
   }
   function buildMarqueeItems() {

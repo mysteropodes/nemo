@@ -1075,7 +1075,7 @@ window.SM={
 // from state each time updateUI runs rather than tracking each writer.
 function syncDocFields(){
   var els={'p-cw':state.canvasW,'p-ch':state.canvasH,'p-cbg':state.canvasBg,'tl-fps':state.fps,'tl-total':state.totalFrames,
-    'proj-w':state.canvasW,'proj-h':state.canvasH,'proj-fps':state.fps,'proj-frames':state.totalFrames};
+    'proj-fps':state.fps,'proj-frames':state.totalFrames};
   Object.keys(els).forEach(function(id){var el=document.getElementById(id);if(el&&document.activeElement!==el)el.value=els[id];});
 }
 function updateUI(){
@@ -1166,7 +1166,7 @@ function openPropsSection(id){
 // > the active tool's own help > the original generic frame cheat-sheet
 // as the fallback with nothing more specific going on.
 var TOOL_HELP={
-  select:{desc:'Sélection — clique ou entoure pour sélectionner, glisse les poignées pour transformer.',sc:[['V','Outil'],['Shift+clic','Ajouter'],['Suppr','Effacer']]},
+  select:{desc:'Sélection — clique ou entoure pour sélectionner, glisse les poignées pour transformer.',sc:[['V','Outil'],['Shift+clic','Ajouter'],['Alt+glisser','Déplacer l\'ancrage'],['Suppr','Effacer']]},
   subselect:{desc:'Sous-sélection — édite les points d\'ancrage et leurs tangentes.',sc:[['A','Outil'],['Alt+clic','Casser tangente']]},
   fsselect:{desc:'Sélection fill/stroke — clique une zone remplie ou un segment de trait précis.',sc:[['Shift+clic','Ajouter']]},
   draw:{desc:'Pinceau — dessine un trait.',sc:[['B','Outil'],['Alt+glisser','Taille'],['[ ]','Taille ±']]},
@@ -1399,6 +1399,24 @@ function updateSelPropsPanel(){
     // the existing selection).
     var ref=selectedPaths[0];
     if(ref){
+      // Restore the rotate/scale anchor from the (re)selected stroke's OWN
+      // data (2026-07, "la position du point d'ancrage n'est pas mise en
+      // mémoire si je désélectionne et resélectionne l'élément") —
+      // state.xformAnchorKey/Custom is otherwise just session UI state,
+      // reset to center by clearSel() on every new selection. Only applied
+      // when every selected stroke agrees on the SAME saved anchor (same
+      // "mixed selection falls back to the default" convention as
+      // selBoxAngleOf/orientedSelBox above) — a multi-selection with
+      // differing per-stroke anchors has no single honest pivot to show.
+      var refAnchorKey=ref.data&&ref.data.xformAnchorKey,refAnchorCustom=ref.data&&ref.data.xformAnchorCustom;
+      var anchorsAgree=selectedPaths.every(function(p){
+        if(refAnchorCustom)return p.data&&p.data.xformAnchorCustom&&p.data.xformAnchorCustom[0]===refAnchorCustom[0]&&p.data.xformAnchorCustom[1]===refAnchorCustom[1];
+        return (p.data&&p.data.xformAnchorKey)===refAnchorKey;
+      });
+      if(anchorsAgree&&refAnchorCustom){state.xformAnchorCustom=refAnchorCustom.slice();state.xformAnchorKey='mc';}
+      else if(anchorsAgree&&refAnchorKey){state.xformAnchorKey=refAnchorKey;state.xformAnchorCustom=null;}
+      else{state.xformAnchorKey='mc';state.xformAnchorCustom=null;}
+      if(window.renderXformAnchorGrid)renderXformAnchorGrid();
       // Pressure-brush ribbons and fill-brush shapes are ALWAYS
       // fillColor:<ink color>/strokeColor:null by construction (they paint
       // via fillColor only — see draw-bridge.js's commitStroke): ref.fillColor
@@ -1644,6 +1662,25 @@ function renderTimeline(){
   // across. Sizing it explicitly to match fixes the seam.
   var barsRow=document.getElementById('bars-row');
   if(barsRow)barsRow.style.width=(state.totalFrames*FC)+'px';
+  // Bug found 2026-07 ("le highlight d'un layer selectionné ne va pas
+  // jusqu'au bout de la timeline") — same root cause family as #bars-row
+  // above, one level down: #frame-grid is `flex-direction:column`, so
+  // WIDTH is its CROSS axis, not its main axis. A column flex container's
+  // auto cross-size follows normal BLOCK sizing (fill the containing
+  // block, i.e. #fg-wrap's ~viewport width) — unlike #frame-hdr
+  // (flex-direction:row, width IS the main axis, where flexbox's own
+  // auto-sizing naturally fits the summed .fhc children, no JS needed).
+  // Every `.frow` row then gets stretched (align-items:stretch, the flex
+  // default) to that SAME too-narrow width, even though its own .fc
+  // children total state.totalFrames*FC — the cells still render past the
+  // row's box edge (visible overflow, so the grid itself LOOKS complete),
+  // but a `.frow`'s own background (.frow.act's selected-layer tint,
+  // .frow.camrow, etc.) only paints within that box, so it visibly cuts
+  // off wherever the viewport happened to end at last layout, not at the
+  // timeline's real end. Confirmed live: `.frow.act` measured exactly
+  // #fg-wrap's clientWidth instead of state.totalFrames*FC before this
+  // fix. Sized explicitly here, exactly like #bars-row above it.
+  grid.style.width=(state.totalFrames*FC)+'px';
   // Bug found 2026-07 ("la barre de scroll doit pouvoir aller d'un bout à
   // l'autre... pas d'offset derrière"): the custom zoom scrollbar
   // (timeline-zoom.js) sizes its thumb off state.totalFrames but only
@@ -1670,6 +1707,14 @@ function renderTimeline(){
     if(window.SMMotion)SMMotion.renderTimelineMotion(grid);
     var mph=document.getElementById('playhead');
     mph.style.left=(state.currentFrame*FC)+'px';
+    // Bug found 2026-07 ("la valeur de frame ne change pas dans motion"):
+    // this branch positioned the playhead LINE but never touched
+    // #playhead-flag's own text — only the Animation 2D branch further
+    // down (unreachable here, this branch `return`s first) sets
+    // `playhead-flag.textContent`. The line moved correctly on scrub, but
+    // the little frame-number pill on it stayed frozen at whatever it
+    // last showed in Animation 2D.
+    document.getElementById('playhead-flag').textContent=state.currentFrame+1;
     // Bug found 2026-07 ("le curseur de temps devrait descendre jusqu'au
     // niveau de la scroll bar en bas"): grid.scrollHeight only covers the
     // RENDERED content — with few tracks that's shorter than #fg-wrap's
@@ -3610,6 +3655,23 @@ function initGithubFeedbackUI(){
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initGithubFeedbackUI);else initGithubFeedbackUI();
 
+// Design audit 2026-07 (feedback: "ajoute les raccourcis b et n comme
+// after pour ajuster le in et out point du work area"): B/N are ALREADY
+// TOOL_SHORTCUTS ('draw'/'fillbrush') here, unlike real AE where those
+// letters are free — so the work-area override below only fires while the
+// pointer is actually over the timeline (this flag), same "contextual
+// override, tool shortcut untouched everywhere else" idea as the
+// Motion-only P/A/R/S/T/U overrides in onKeyDown, just hover-gated instead
+// of mode-gated since work area is a timeline-wide concept (Animation 2D
+// AND Motion), not specific to one mode/layer-expanded state.
+var _pointerOverTimeline=false;
+(function(){
+  var wrap=document.getElementById('fg-wrap');
+  if(!wrap)return;
+  wrap.addEventListener('pointerenter',function(){_pointerOverTimeline=true;});
+  wrap.addEventListener('pointerleave',function(){_pointerOverTimeline=false;});
+})();
+
 function onKeyDown(event){
   // Editing a text/number field: leave Ctrl+Z/X/C/V to the BROWSER's own
   // in-field behavior (text undo, text cut/copy/paste) instead of
@@ -3719,6 +3781,26 @@ function onKeyDown(event){
   // ('u' is otherwise bound to the Line tool, TOOL_SHORTCUTS) — only inside
   // Motion mode, the Line tool shortcut is untouched everywhere else.
   if((k==='u'||k==='U')&&state.appMode==='motion'&&window.SMMotion&&SMMotion.revealAnimated()){event.preventDefault();return;}
+  // AE's B/N — "Set Work Area Start/End" at the current frame. See the
+  // _pointerOverTimeline comment above this function for why this is
+  // hover-scoped rather than global (unlike real AE, these letters are
+  // already real tool shortcuts here). Same clamp rules as dragging
+  // #wa-bar's own handles (ui.js initWaDrag) — in can't cross past
+  // out-1 and vice versa.
+  if((k==='b'||k==='B')&&_pointerOverTimeline){
+    event.preventDefault();
+    var curOut=(state.waOut!=null)?state.waOut:state.totalFrames-1;
+    state.waIn=Math.max(0,Math.min(state.currentFrame,curOut-1));
+    if(window.updateWaBar)updateWaBar();
+    return;
+  }
+  if((k==='n'||k==='N')&&_pointerOverTimeline){
+    event.preventDefault();
+    var curIn=(state.waIn!=null)?state.waIn:0;
+    state.waOut=Math.min(state.totalFrames-1,Math.max(state.currentFrame,curIn+1));
+    if(window.updateWaBar)updateWaBar();
+    return;
+  }
   if(runToolShortcut(k)){}
   // NLE-style transport: J/K jump to the previous/next real keyframe on the
   // active layer (Premiere/Final Cut convention); ','/'.' step exactly one
@@ -3992,6 +4074,11 @@ document.querySelectorAll('#xform-anchor-grid .xa-dot').forEach(function(btn){
     e.stopPropagation();
     state.xformAnchorKey=btn.dataset.key;
     state.xformAnchorCustom=null; // explicit preset pick always wins back over a custom point
+    // Persist per-stroke (2026-07, same fix as select-bridge.js's canvas
+    // Alt-drag path) so picking a preset here ALSO survives a deselect+
+    // reselect, not just the canvas gesture.
+    selectedPaths.forEach(function(p){if(p&&p.data){p.data.xformAnchorKey=btn.dataset.key;delete p.data.xformAnchorCustom;}});
+    if(selectedPaths.length)saveActiveLayerFrame();
     renderXformAnchorGrid();
     if(window.renderTransformHandles)renderTransformHandles();
     if(window.SMEngineBridge)SMEngineBridge.renderNow();
@@ -4193,11 +4280,10 @@ var MATTE_MODE_LABELS={none:'Aucun',alpha:'Alpha',alphaInverted:'Alpha (inversé
   // preview, click-commit, Escape-revert) is identical everywhere it opens.
   window.openMatteDropdownAt=open;
 })();
-// Same canvas/fps/frame-count controls, duplicated in the Project panel —
-// both sets write through the same SM.setCanvasSize/setFps/setTotalFrames
-// so either one stays in sync via syncDocFields().
-document.getElementById('proj-w').addEventListener('change',function(){window.SM.setCanvasSize(parseInt(this.value),state.canvasH);});
-document.getElementById('proj-h').addEventListener('change',function(){window.SM.setCanvasSize(state.canvasW,parseInt(this.value));});
+// FPS/Frames now live in the Document section (canvas-sec) alongside
+// Width/Height (p-cw/p-ch below) — the old separate proj-w/proj-h duplicate
+// pair was removed (audit 2026-07-17); syncDocFields() still keeps these
+// two ids in sync with state.
 document.getElementById('proj-fps').addEventListener('change',function(){window.SM.setFps(parseInt(this.value));});
 document.getElementById('proj-frames').addEventListener('change',function(){window.SM.setTotalFrames(parseInt(this.value));});
 document.getElementById('btn-fit').addEventListener('click',function(){window.SM.fitCanvas();});

@@ -36,6 +36,16 @@
   var draggingArc = null;
   var arcDragCache = null;
   var ANCHOR_MAP = { nw: 'se', ne: 'sw', sw: 'ne', se: 'nw', n: 's', s: 'n', e: 'w', w: 'e' };
+  // Cursor feedback on handle hover (2026-07) — Figma/Illustrator/tldraw all
+  // swap the cursor for the handle under the pointer BEFORE the user commits
+  // to a drag, so the drag's effect is legible ahead of time. Nemo's canvas
+  // cursor was previously a static per-tool value (see timeline.js's `cc`
+  // map) with no per-handle feedback at all.
+  var HANDLE_CURSORS = { nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize', n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize' };
+  // No native CSS rotate cursor exists — a small curved-arrow glyph, drawn
+  // white-on-black for contrast against either a light or dark canvas
+  // background, with the hotspot at its visual center (11,11 of a 22x22 svg).
+  var ROTATE_CURSOR = "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='22' height='22' viewBox='0 0 22 22'><path d='M4 11a7 7 0 1 1 2.1 5' fill='none' stroke='black' stroke-width='3.2' stroke-linecap='round'/><path d='M4 11a7 7 0 1 1 2.1 5' fill='none' stroke='white' stroke-width='1.6' stroke-linecap='round'/><path d='M3 15.5 4 11l4 2.2Z' fill='black'/><path d='M3.6 15 4.3 11.6l3 1.7Z' fill='white'/></svg>\") 11 11, grab";
 
   // v17: symGestureAccumulate (app.js) folds each move/scale/rotate tick on
   // a component's whole-instance selection into the layer's persistent
@@ -82,16 +92,80 @@
       n: WP(b.center.x, b.top), s: WP(b.center.x, b.bottom),
       e: WP(b.right, b.center.y), w: WP(b.left, b.center.y),
     };
-    // The rotate grip hangs off the box's OWN top edge (its up axis), so
-    // it swings around with the object instead of hovering above the AABB.
-    var rotPos = WP(b.center.x, b.top - 20 * zs);
     // World-space position of the anchor/pivot crosshair engine-bridge.js
     // already DRAWS (buildTransformBoxItems, "AE-style anchor point") —
     // mirrors that exact same custom-vs-preset mapping so the hit-test
     // below always agrees with what's actually rendered.
     var ap0 = (typeof xformAnchorPoint === 'function') ? xformAnchorPoint(b) : null;
     var anchorPos = ap0 ? (state.xformAnchorCustom ? ap0.clone() : WP(ap0.x, ap0.y)) : null;
-    return { bounds: b, box: box, corners: corners, gCorners: gCorners, map: map, rotPos: rotPos, anchorPos: anchorPos };
+    // Rotate RING (2026-07, replacing the old tiny offset stem+dot handle) —
+    // live feedback: a single small grip above the box was easy to miss and
+    // didn't read as "rotate" the way a full ring around the selection does
+    // (Godot/Blender-style 2D gizmo). Centered on the anchor/pivot (so it
+    // stays correct once the anchor's been moved off-center, not just the
+    // box's own middle) — draggable from ANYWHERE along its circumference,
+    // not one small fixed point. Small and mostly size-INDEPENDENT (a fixed
+    // screen-space radius, like the corner handles' own 3.5*zs), per user
+    // mockup: a small ring tucked near the pivot, not one that grows to
+    // enclose the whole selection — the box/half-dimension-based radius
+    // tried first was still "gigantesque" on anything but a small object.
+    // Shrinks below that fixed size only for a genuinely small selection,
+    // so it never grows past the corner-scale handles' own distance.
+    var ringCenter = anchorPos || WP(b.center.x, b.center.y);
+    var ringRadius = Math.min(36 * zs, Math.max(b.width, b.height) * 0.3);
+    return { bounds: b, box: box, corners: corners, gCorners: gCorners, map: map, ringCenter: ringCenter, ringRadius: ringRadius, anchorPos: anchorPos };
+  }
+
+  // Shift+Alt-drag anchor snapping (2026-07, "ça pourrait snap sur les
+  // corners du bounding box ?") — reuses the SAME 9-point preset grid the
+  // Properties panel's anchor widget already offers (tl/tc/tr/ml/mc/mr/bl/
+  // bc/br, tools.js XFORM_ANCHOR_PROP), not a separate corners-only special
+  // case, so a Shift-snapped anchor behaves exactly like picking that same
+  // preset from the panel — including rotating/scaling WITH the box
+  // afterward, unlike a free (Alt-drag-without-Shift) custom anchor, which
+  // is a fixed world point by design (see xformAnchorPoint's own comment).
+  function presetAnchorWorldPoints(h) {
+    function WP(x, y) { var g = selBoxPt(x, y, h.box); if (!h.map) return g; var w = h.map.fwd(g.x, g.y); return new Point(w[0], w[1]); }
+    var pts = {};
+    Object.keys(XFORM_ANCHOR_PROP).forEach(function (k) {
+      var local = h.bounds[XFORM_ANCHOR_PROP[k]];
+      pts[k] = WP(local.x, local.y);
+    });
+    return pts;
+  }
+  function nearestAnchorPresetKey(pt) {
+    var h = computeHandles();
+    if (!h) return null;
+    var pts = presetAnchorWorldPoints(h);
+    var bestK = null, bestD = Infinity;
+    Object.keys(pts).forEach(function (k) {
+      var d = pt.getDistance(pts[k]);
+      if (d < bestD) { bestD = d; bestK = k; }
+    });
+    return bestK;
+  }
+  // Shared by both anchor-drag entry points (onDown's Alt+click-anywhere
+  // and onMove's continued 'xform-anchor-drag') so Shift behaves
+  // identically whether it was already held at mousedown or pressed mid-drag.
+  // Also stamps the choice onto every selected stroke's own data (2026-07,
+  // "la position du point d'ancrage n'est pas mise en mémoire si je
+  // désélectionne et resélectionne l'élément") — state.xformAnchorKey/
+  // Custom alone is session UI state, wiped by clearSel() on every new
+  // selection; persisting per-stroke (serP/desP, same pattern as boxAngle)
+  // lets it survive a deselect+reselect (restored in timeline.js's
+  // updateSelPropsPanel). The actual saveActiveLayerFrame() happens once,
+  // at onUp — cheap field writes here, no need to persist mid-drag.
+  function placeAnchorAt(pt, snapToPreset) {
+    if (snapToPreset) {
+      var k = nearestAnchorPresetKey(pt);
+      if (k) {
+        state.xformAnchorKey = k; state.xformAnchorCustom = null;
+        selectedPaths.forEach(function (p) { if (p && p.data) { p.data.xformAnchorKey = k; delete p.data.xformAnchorCustom; } });
+        return;
+      }
+    }
+    state.xformAnchorCustom = [pt.x, pt.y];
+    selectedPaths.forEach(function (p) { if (p && p.data) { p.data.xformAnchorCustom = [pt.x, pt.y]; delete p.data.xformAnchorKey; } });
   }
 
   function hitTestHandles(pt, altHeld) {
@@ -118,9 +192,12 @@
       var dAnchor = pt.getDistance(h.anchorPos);
       if (dAnchor < tol) return { type: 'anchor' };
     }
+    // Ring band test — anywhere within ~7px of the circumference counts,
+    // not just a single point, checked before the corners since the 16px
+    // margin baked into ringRadius already keeps it clear of them.
+    var ringTol = 7 / view.zoom;
+    if (Math.abs(pt.getDistance(h.ringCenter) - h.ringRadius) < ringTol) return { type: 'rotate' };
     var bestD = tol, best = null;
-    var dRot = pt.getDistance(h.rotPos);
-    if (dRot < bestD) { bestD = dRot; best = { type: 'rotate' }; }
     Object.keys(h.corners).forEach(function (k) {
       var d = pt.getDistance(h.corners[k]);
       if (d < bestD) { bestD = d; best = { type: 'scale', dir: k }; }
@@ -143,6 +220,16 @@
 
   var lastPt = null;
   function onDown(e) {
+    // Right/middle-click never drives select/marquee/move/Motion-drag — a
+    // pre-existing gap (no button check at all) that used to go unnoticed
+    // since a right-click did nothing visible either way; surfaced once
+    // onContext (below) gave right-click a real, DIFFERENT job. Without
+    // this, a right-click landing just off the shape would run the normal
+    // click-miss path (clearSel() + start a marquee) a split second before
+    // 'contextmenu' fires, wiping the very selection the context menu was
+    // about to act on. Left as a no-op here (no stopPropagation) so
+    // 'contextmenu' fires completely normally afterward.
+    if (e.button !== undefined && e.button !== 0) return;
     // Motion mode's position-keyframe/spatial-handle canvas dragging
     // (motion.js's onDown/onDrag/onUp — the bezier-handle motion path,
     // same gizmo pattern as the camera layer) was originally wired ONLY
@@ -257,10 +344,22 @@
     // entirely consumed by placing the anchor, matching how the reference
     // apps behave (an Alt+click never ALSO reselects or starts a drag).
     if (e.altKey && selectedPaths.length) {
-      state.xformAnchorCustom = [pt.x, pt.y];
+      placeAnchorAt(pt, e.shiftKey);
       if (window.renderXformAnchorGrid) renderXformAnchorGrid();
       window.SMEngineBridge.resume();
       window.SMEngineBridge.renderNow();
+      // Continue as a live drag (2026-07 fix, "alt+glisser le point
+      // d'ancrage fait tourner le canvas"): this branch used to teleport
+      // the anchor once and return with `mode` still null — onMove's
+      // no-active-mode path never stopPropagation()s, so every following
+      // pointermove (mouse still down) fell through untouched to
+      // viewtools-bridge.js's own global "Alt+drag = rotate the canvas
+      // view" shortcut instead. Setting mode here makes the rest of the
+      // gesture go through the SAME 'xform-anchor-drag' handling as
+      // starting exactly on the crosshair (onMove line ~490ish), which
+      // does stop propagation — the anchor now follows the pointer for
+      // the whole drag instead of only snapping once at mousedown.
+      mode = 'xform-anchor-drag';
       return;
     }
 
@@ -472,6 +571,28 @@
           state.xformAnchorHovered = isHover;
           window.SMEngineBridge.renderNow();
         }
+        // Cursor feedback: skipped while Alt is held (that's the anchor-hover
+        // state above; hitTestHandles would otherwise report a coincident
+        // resize/rotate handle underneath it and show the wrong cursor).
+        var hoverHit = e.altKey ? null : hitTestHandles(hpt, false);
+        var nextCursor = hoverHit && hoverHit.type === 'scale' ? (HANDLE_CURSORS[hoverHit.dir] || 'default')
+          : hoverHit && hoverHit.type === 'rotate' ? ROTATE_CURSOR
+          : 'default';
+        if (canvasEl.dataset.xformCursor !== nextCursor) {
+          canvasEl.style.cursor = nextCursor;
+          canvasEl.dataset.xformCursor = nextCursor;
+        }
+        // Rotate-ring hover grow (2026-07, "le rond de rotation peut un peu
+        // grossir au roll hover") — same light "you can grab this" pattern
+        // as the anchor crosshair's own xformAnchorHovered just above.
+        var isRingHover = !!(hoverHit && hoverHit.type === 'rotate');
+        if (isRingHover !== state.xformRingHovered) {
+          state.xformRingHovered = isRingHover;
+          window.SMEngineBridge.renderNow();
+        }
+      } else if (canvasEl.dataset.xformCursor) {
+        canvasEl.style.cursor = 'default';
+        delete canvasEl.dataset.xformCursor;
       }
       return;
     }
@@ -481,10 +602,12 @@
     var pt = new Point(w[0], w[1]);
 
     if (mode === 'xform-anchor-drag') {
-      // Live-follows the pointer — same custom-anchor field the Alt+click
-      // path sets, so every consumer (rotate/scale pivot math, the panel's
-      // 9-dot widget, the drawn crosshair) picks it up identically.
-      state.xformAnchorCustom = [pt.x, pt.y];
+      // Live-follows the pointer — Shift held snaps to the nearest of the
+      // 9 preset points (tl/tc/tr/ml/mc/mr/bl/bc/br) instead of a free
+      // custom point, checked continuously so toggling Shift mid-drag
+      // switches modes immediately, matching every other Shift-to-snap
+      // drag convention in the app.
+      placeAnchorAt(pt, e.shiftKey);
       if (window.renderXformAnchorGrid) window.renderXformAnchorGrid();
     } else if (mode === 'marquee') {
       var prevA = project.activeLayer;
@@ -725,8 +848,14 @@
       return;
     }
     if (mode === 'xform-anchor-drag') {
-      // Nothing in the document changed (state.xformAnchorCustom is a UI
-      // preference, same as the Alt+click path) — just stop dragging.
+      // Geometry itself is untouched (state.xformAnchorCustom/Key is a UI
+      // preference, same as ever) — but placeAnchorAt() now also stamps
+      // the choice onto each selected stroke's OWN data (2026-07, so it
+      // survives a deselect+reselect), and that per-stroke write needs one
+      // saveActiveLayerFrame() to actually reach the frame's persisted
+      // JSON, or it would only live on the in-memory Paper object until
+      // the next loadFrame() silently discarded it.
+      saveActiveLayerFrame();
       mode = null;
       window.SMEngineBridge.resume();
       updateUI();
@@ -784,6 +913,20 @@
           });
         }
         saveActiveLayerFrame();
+        // Reported "trace fantôme" bug (root cause #2, distinct from the
+        // team-review fork gated above): onionPrevLayer/onionNextLayer
+        // (tweens.js renderOS()) are a snapshot cache, only ever rebuilt on
+        // frame nav/layer/project changes — never on a select-tool commit.
+        // A held (non-keyframe) frame's onion ghost is generated from
+        // getEffectiveStrokes(), which falls back to THIS frame's content
+        // when nothing overrides it — so scaling/rotating an object here
+        // left every onion-visible neighbor frame showing it at its
+        // PRE-drag position/size, indistinguishable from a real duplicate
+        // at reduced opacity. Reproduced on a brand-new project (onion skin
+        // defaults on) with a single keyframe: drag once, a desaturated
+        // copy of the object remains at the old spot until some unrelated
+        // action (frame nav, toggling onion) happens to call renderOS().
+        renderOS();
       }
       renderArcs(); updateUI();
     } else if (mode === 'marquee') {
@@ -847,11 +990,126 @@
         if (didMove) selectedPaths.forEach(function (p) { forkIfForeignOwner(p); });
         fillRegenerateLinked(userLayers[state.activeLayerIdx], null);
         saveActiveLayerFrame();
+        // Same stale-onion-ghost fix as the xform-scale/xform-rotate branch
+        // above — a plain move commits through this branch too.
+        if (didMove) renderOS();
       }
     }
     mode = null;
     window.SMEngineBridge.renderNow();
     window.SMEngineBridge.resume();
+  }
+
+  // Right-click menu on a canvas object (2026-07) — previously nonexistent:
+  // right-clicking a shape did nothing (no listener anywhere on
+  // #canvas-area/#drawing-canvas), so the OS/browser's own menu showed
+  // instead. Reuses window.showContextMenu (ui.js), the same builder every
+  // other right-click menu in the app (layer rows, frame grid, keyframes)
+  // already goes through — same {label,shortcut,action,sep} item shape,
+  // same flat-list-with-dividers convention Figma/Rive/AE all use for an
+  // object-level menu (see UX research: Illustrator's flyout-heavy approach
+  // only pays off past ~10 items, not warranted here yet).
+  function onContext(e) {
+    if (!shouldIntercept()) return;
+    var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
+    var pt = new Point(w[0], w[1]);
+    var layer = userLayers[state.activeLayerIdx];
+    var activeLdForLock = state.layers[state.activeLayerIdx];
+    // Same hit-testing as onDown (motion-transform-aware point, component-
+    // layer whole-instance click, brush-anchor resolution) so right-click
+    // selects exactly what a left-click would.
+    var hitPt = pt;
+    if (state.appMode === 'motion' && window.SMMotion) {
+      var hitMap = SMMotion.layerMotionPointMap(state.activeLayerIdx);
+      if (hitMap) { var hg = hitMap.inv(pt.x, pt.y); hitPt = new Point(hg[0], hg[1]); }
+    }
+    var hit = (activeLdForLock.locked && !activeLdForLock.symbolId) ? null : layer.hitTest(hitPt, { stroke: true, fill: true, tolerance: 8 / view.zoom });
+    var clickedPath = null;
+    if (hit && (hit.item instanceof Path || hit.item instanceof Raster)) {
+      clickedPath = resolveBrushAnchor(hit.item, layer);
+    } else {
+      var compHit = hitTestComponentLayers(pt);
+      if (compHit) {
+        state.activeLayerIdx = compHit.layerIdx; activateUL(compHit.layerIdx);
+        selectedPaths = userLayers[compHit.layerIdx].children.filter(function (c) { return (c instanceof Path || c instanceof Raster) && isSelectablePathChild(c); });
+        state.selectedStrokeIndices = selectedPaths.map(getSI).filter(function (i) { return i >= 0; });
+        renderArcs(); updateUI(); window.SMEngineBridge.renderNow();
+      }
+    }
+    // Right-click an item already part of the current multi-selection keeps
+    // the whole selection (matches Figma/Illustrator); right-clicking
+    // anything else replaces it with just that item, same as a plain click.
+    if (clickedPath && selectedPaths.indexOf(clickedPath) < 0) {
+      clearSel();
+      selectedPaths.push(clickedPath);
+      state.selectedStrokeIndices = selectedPaths.map(getSI).filter(function (i) { return i >= 0; });
+      renderArcs(); updateUI(); window.SMEngineBridge.renderNow();
+    }
+    if (!selectedPaths.length) return; // empty canvas — let the native menu show, nothing to act on yet
+    e.preventDefault(); e.stopImmediatePropagation();
+    var multi = selectedPaths.length > 1;
+    var p0 = selectedPaths[0];
+    var isDeleteGhost = !multi && p0.data && p0.data.isRevisionGhost && p0.data.revisionAction === 'delete';
+    var isActiveRevision = !multi && p0.data && p0.data.revisionParentId && !p0.data.isRevisionGhost;
+    var items = [
+      { label: 'Dupliquer', shortcut: '⌘D', action: function () { duplicateSelection(); } },
+      { label: multi ? 'Supprimer la sélection' : 'Supprimer', shortcut: 'Suppr', action: function () { window.SM.deleteSelStrokes(); } },
+      { sep: true },
+      {
+        label: 'Premier plan', action: function () {
+          pushUndo();
+          selectedPaths.forEach(function (p) { p.bringToFront(); });
+          saveActiveLayerFrame(); window.SMEngineBridge.renderNow();
+        }
+      },
+      {
+        label: 'Arrière-plan', action: function () {
+          pushUndo();
+          // Reverse order so the visual stacking order among the selected
+          // items themselves is preserved once they're all sent to the back.
+          for (var i = selectedPaths.length - 1; i >= 0; i--) selectedPaths[i].sendToBack();
+          saveActiveLayerFrame(); window.SMEngineBridge.renderNow();
+        }
+      },
+      { sep: true },
+      // Quick reset for the rotate/scale pivot (2026-07, "comment change
+      // t'on l'anchor point de place ?" — the drag gesture itself is
+      // Alt+drag the anchor crosshair, or Alt+click anywhere on the
+      // selection to relocate it there; this menu item is the fast way
+      // back to the default without having to Alt+click precisely on the
+      // shape's own center).
+      {
+        label: 'Centrer le point d\'ancrage', action: function () {
+          state.xformAnchorCustom = null; state.xformAnchorKey = 'mc';
+          selectedPaths.forEach(function (p) { if (p && p.data) { p.data.xformAnchorKey = 'mc'; delete p.data.xformAnchorCustom; } });
+          saveActiveLayerFrame();
+          if (window.renderXformAnchorGrid) renderXformAnchorGrid();
+          updateUI(); window.SMEngineBridge.renderNow();
+        }
+      },
+    ];
+    if (isActiveRevision || isDeleteGhost) {
+      // Same actions as the Properties-panel Accept/Reject buttons
+      // (timeline.js updateRevisionPanel) — surfacing them here too so a
+      // reviewer doesn't have to hunt for the panel just to resolve a
+      // correction they just right-clicked.
+      items.push({ sep: true });
+      items.push({
+        label: 'Accepter la correction', action: function () {
+          pushUndo();
+          if (isDeleteGhost) acceptDeleteRevision(p0); else acceptRevision(p0, userLayers[state.activeLayerIdx]);
+          clearSel(); saveActiveLayerFrame(); updateUI();
+        }
+      });
+      items.push({
+        label: 'Rejeter la correction', action: function () {
+          pushUndo();
+          if (isDeleteGhost) rejectDeleteRevision(p0); else rejectRevision(p0, userLayers[state.activeLayerIdx]);
+          clearSel(); saveActiveLayerFrame(); updateUI();
+        }
+      });
+    }
+    window.showContextMenu(e.clientX, e.clientY, items);
   }
 
   function init() {
@@ -860,6 +1118,7 @@
     target.addEventListener('pointermove', onMove, { capture: true });
     target.addEventListener('pointerup', onUp, { capture: true });
     target.addEventListener('pointercancel', onUp, { capture: true });
+    target.addEventListener('contextmenu', onContext, { capture: true });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();

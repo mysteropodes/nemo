@@ -668,11 +668,20 @@ function renderTransformHandles(){
     new Path.Rectangle({center:pos,size:[7*zs,7*zs],fillColor:'#ffffff',strokeColor:'#4a9eff',strokeWidth:1.2*zs,insert:true});
     xformHandles.push({type:'scale',dir:k,pos:pos});
   });
-  var rotOff=20*zs;
-  var rotPos=selBoxPt(b.center.x,b.top-rotOff,box);
-  new Path.Line({from:corners.n,to:rotPos,strokeColor:'rgba(74,158,255,.8)',strokeWidth:1*zs,insert:true});
-  new Path.Circle({center:rotPos,radius:5*zs,fillColor:'#ffffff',strokeColor:'#4a9eff',strokeWidth:1.2*zs,insert:true});
-  xformHandles.push({type:'rotate',pos:rotPos});
+  // Rotate RING (2026-07, replaces the old tiny offset stem+dot handle —
+  // same formula as select-bridge.js's computeHandles/engine-bridge.js's
+  // buildTransformBoxItems, mirrored here for the Paper-native fallback
+  // path so both renderers stay visually identical).
+  var apPt=(typeof xformAnchorPoint==='function')?xformAnchorPoint(b):b.center;
+  // A custom pivot (Alt+click) is ALREADY a world point (xformAnchorPoint's
+  // own early-return) — only the bounds-derived preset anchors live in the
+  // box's de-rotated space and need selBoxPt's mapping.
+  var ringCenter=state.xformAnchorCustom?apPt.clone():selBoxPt(apPt.x,apPt.y,box);
+  // Small and mostly size-independent (per user mockup), not scaled to the
+  // selection's own bounds — "le cercle de rotation devrait être plus petit".
+  var ringRadius=Math.min(36*zs,Math.max(b.width,b.height)*0.3);
+  new Path.Circle({center:ringCenter,radius:ringRadius,strokeColor:'rgba(74,158,255,.63)',strokeWidth:1*zs,insert:true});
+  xformHandles.push({type:'rotate',center:ringCenter,radius:ringRadius});
   userLayers[state.activeLayerIdx].activate();
 }
 function scaleCenterSegments(segs,sx,sy,cx,cy){
@@ -705,7 +714,7 @@ function rotateCenterSegments(segs,angleDeg,cx,cy){
 // selection it was built from, so it's cleared here too — nodeLayer
 // (the Paper-fallback's actual visual dots) already gets wiped by the
 // next real renderNodeHandles() call, no need to touch it here.
-function clearSel(){selectedPaths=[];state.selectedStrokeIndices=[];_nodeSel=[];state.xformAnchorCustom=null;state.xformAnchorHovered=false;if(typeof nodeHandles!=='undefined')nodeHandles=[];}
+function clearSel(){selectedPaths=[];state.selectedStrokeIndices=[];_nodeSel=[];state.xformAnchorCustom=null;state.xformAnchorHovered=false;state.xformRingHovered=false;if(typeof nodeHandles!=='undefined')nodeHandles=[];}
 function getSI(path){var ch=userLayers[state.activeLayerIdx].children;for(var i=0;i<ch.length;i++){if(ch[i]===path)return i;}return -1;}
 // UI/UX audit (2026-07): the statusbar footer has claimed "⌘/Ctrl+D
 // Dupliquer" for as long as an object selection exists, but NOTHING wired
@@ -933,6 +942,18 @@ function findPreEditStrokeData(strokeId){
   }
   return null;
 }
+// Team review only protects against real collaborators — gated on this
+// project actually having a shared sync folder configured (Réglages ›
+// Collab). Without it, a mismatched ownerId is just local identity drift
+// (localStorage cleared, preview reopened on a fresh origin/port — see
+// nemo/CLAUDE.md §4 — or the project file opened on another machine solo)
+// with nobody else's work to protect. Reported bug: every select-drag of a
+// pre-existing object was silently spawning a permanent 35%-opacity ghost
+// at its old position ("trace fantôme") purely from this kind of drift,
+// since ownerId mismatches were treated as a foreign edit unconditionally.
+function isTeamCollabActive(){
+  return !!(window.SMProject&&window.SMProject.getSyncFolder&&window.SMProject.getSyncFolder());
+}
 // The core review mechanic: editing a stroke someone ELSE owns doesn't
 // silently overwrite their work — it freezes their pre-edit version as a
 // "ghost" (data.isRevisionGhost, rendered desaturated, excluded from
@@ -945,6 +966,14 @@ function forkIfForeignOwner(path){
   if(!path||!path.data||!path.data.ownerId||!state.userProfile)return path;
   if(path.data.ownerId===state.userProfile.id)return path;
   if(path.data.isRevisionGhost)return path;
+  if(!isTeamCollabActive()){
+    // No shared folder for this project — silently reclaim ownership
+    // instead of forking, same treatment as the supervisor branch below.
+    path.data.ownerId=state.userProfile.id;
+    path.data.ownerName=state.userProfile.name;
+    path.data.ownerColor=state.userProfile.color;
+    return path;
+  }
   // RBAC (Phase 3): a supervisor has editorial authority over any layer and
   // edits in place, no fork/ghost — the review safety-net is for ordinary
   // peer-to-peer edits (an animator touching another animator's stroke),
@@ -996,6 +1025,7 @@ function markDeleteAsRevision(path){
   if(path.data.ownerId===state.userProfile.id)return false;
   if(path.data.isRevisionGhost)return false;
   if(state.userProfile.role==='supervisor')return false; // deletes outright, like their own content
+  if(!isTeamCollabActive())return false; // no shared folder — delete outright, same as forkIfForeignOwner's reclaim
   path.data.isRevisionGhost=true;
   path.data.revisionAction='delete';
   path.data.preRevisionOpacity=path.opacity!==undefined?path.opacity:1;
@@ -3569,7 +3599,18 @@ function onMouseDown(event){
   }else if(state.tool==='select'){
     for(var i=0;i<arcHandles.length;i++){var ah=arcHandles[i];if(event.point.getDistance(ah.handle.position)<14/view.zoom){draggingArc=ah;arcDragCache=computeArcMatchState();return;}}draggingArc=null;
     var bestXh=null,bestXd=9/view.zoom;
-    for(var xi=0;xi<xformHandles.length;xi++){var xh=xformHandles[xi];var xd=event.point.getDistance(xh.pos);if(xd<bestXd){bestXd=xd;bestXh=xh;}}
+    // Ring band check first (2026-07): a 'rotate' entry now stores
+    // {center,radius} instead of a single pos — anywhere within ~7px of
+    // the circumference counts, matching select-bridge.js's ring hit-test.
+    var ringTol=7/view.zoom;
+    for(var xi=0;xi<xformHandles.length;xi++){
+      var xh=xformHandles[xi];
+      if(xh.type==='rotate'){
+        if(Math.abs(event.point.getDistance(xh.center)-xh.radius)<ringTol){bestXh=xh;break;}
+        continue;
+      }
+      var xd=event.point.getDistance(xh.pos);if(xd<bestXd){bestXd=xd;bestXh=xh;}
+    }
     if(bestXh){
       pushUndo();
       var xb=xformSelBounds();

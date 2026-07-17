@@ -59,7 +59,14 @@
   // capture-phase, also registered first) kept stealing the gesture
   // before eraser-bridge.js ever saw it. Same fix as 'fill' above, same
   // root cause.
-  function shouldRotate() { return engineOn() && (state.tool === 'rotate' || (state.altDown && ['zoom', 'draw', 'fillbrush', 'fill', 'eraser'].indexOf(state.tool) < 0 && !state.spaceDown)); }
+  // 'select' added (2026-07, "alt+glisser le point d'ancrage fait tourner
+  // le canvas") — select-bridge.js's Alt+drag now has its own meaning
+  // (relocate the rotate/scale anchor and keep it following the pointer),
+  // same recurring root cause as 'fill'/'eraser' above: this handler is
+  // capture-phase AND registered before select-bridge.js in index.html, so
+  // it stole the gesture regardless of what select-bridge.js's own onDown
+  // did with the SAME pointerdown/pointermove events.
+  function shouldRotate() { return engineOn() && (state.tool === 'rotate' || (state.altDown && ['zoom', 'draw', 'fillbrush', 'fill', 'eraser', 'select'].indexOf(state.tool) < 0 && !state.spaceDown)); }
 
   function canvasLocal(clientX, clientY) {
     var r = document.getElementById('drawing-canvas').getBoundingClientRect();

@@ -188,6 +188,8 @@
       tagOwner(path);
     }
     saveActiveLayerFrame();
+    // Stale-onion-ghost fix (see select-bridge.js's commit paths).
+    renderOS();
     updateUI();
     shapeStart = null; shapeTool = null;
   }

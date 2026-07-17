@@ -532,6 +532,33 @@
     items.push({ segments: [{ point: [ax - 9 * zs, ay] }, { point: [ax + 9 * zs, ay] }], closed: false, fillColor: null, strokeColor: ancCol, strokeWidth: 1.5 * zs });
     items.push({ segments: [{ point: [ax, ay - 9 * zs] }, { point: [ax, ay + 9 * zs] }], closed: false, fillColor: null, strokeColor: ancCol, strokeWidth: 1.5 * zs });
     items.push({ segments: circleSegs(ax, ay, 6 * zs), closed: true, fillColor: null, strokeColor: ancCol, strokeWidth: 1.5 * zs });
+    // Scale/rotate transform box (2026-07) — Motion mode previously had NO
+    // on-canvas affordance for Scale/Rotation at all, only this anchor
+    // crosshair and the position motion-path dots below: scaling/rotating a
+    // layer required typing into the Properties panel's numeric fields with
+    // no visual handle equivalent, a real inconsistency with Animation 2D's
+    // full 8-handle box (bounding-box UX audit, 2026-07). Reuses the exact
+    // same corner-square/rotate-stem visual language and blue accent color
+    // as engine-bridge.js's buildTransformBoxItems() for cross-mode
+    // coherence — same box, drawn via motionHandlePositions()/motionBoxGeom()
+    // (which fold in the layer's OWN current position/anchor/rotation/scale,
+    // so the box always sits exactly where the object renders THIS frame).
+    var mh = motionHandlePositions(t);
+    if (mh) {
+      var boxCol = [74, 158, 255, 204];
+      var lb = mh.g.bounds;
+      var bc1 = mh.g.fwd(lb.left, lb.top), bc2 = mh.g.fwd(lb.right, lb.top), bc3 = mh.g.fwd(lb.right, lb.bottom), bc4 = mh.g.fwd(lb.left, lb.bottom);
+      [[bc1, bc2], [bc2, bc3], [bc3, bc4], [bc4, bc1]].forEach(function (seg) {
+        items.push({ segments: [{ point: [seg[0].x, seg[0].y] }, { point: [seg[1].x, seg[1].y] }], closed: false, fillColor: null, strokeColor: boxCol, strokeWidth: 1 * zs });
+      });
+      [mh.corners.nw, mh.corners.ne, mh.corners.se, mh.corners.sw].forEach(function (p) {
+        var hs = 3.5 * zs;
+        items.push({ segments: [{ point: [p.x - hs, p.y - hs] }, { point: [p.x + hs, p.y - hs] }, { point: [p.x + hs, p.y + hs] }, { point: [p.x - hs, p.y + hs] }], closed: true, fillColor: [255, 255, 255, 255], strokeColor: [74, 158, 255, 255], strokeWidth: 1.2 * zs });
+      });
+      // Rotate ring (see motionHandlePositions) — full circumference is the
+      // grab target, not one small point.
+      items.push({ segments: circleSegs(mh.ringCenter.x, mh.ringCenter.y, mh.ringRadius), closed: true, fillColor: null, strokeColor: [74, 158, 255, 160], strokeWidth: 1 * zs });
+    }
     if (!hasKeys(holder, 'position')) return items;
     // Position keys store a DELTA translation (computeMotionMat's dx/dy —
     // [0,0] means "no motion", added on top of the artwork's own drawn
@@ -589,6 +616,71 @@
   function motionPivotOf(t) {
     var anc = valueAtFrame(t.holder, 'anchor', state.currentFrame);
     return { x: t.boundsCenter.x + anc[0], y: t.boundsCenter.y + anc[1] };
+  }
+  // Geometry-space bounds + the target's own current position/anchor/
+  // rotation/scale, folded into a single fwd(x,y) mapper — same formula as
+  // layerMotionPointMap's `fwd` (and computeMotionMat's semantics: Rotation/
+  // Scale pivot around bounds-center+anchor, Position is a plain translation
+  // added on top) but usable even when the target has no motion tracks at
+  // all yet (valueAtFrame/staticValue already return the neutral defaults in
+  // that case) — layerMotionPointMap itself returns null until at least one
+  // property is non-default, which would make the box invisible on a
+  // perfectly ordinary not-yet-animated layer.
+  function motionBoxGeom(t) {
+    var lb = userLayers[t.li] && userLayers[t.li].bounds;
+    if (!lb) return null;
+    var anc = valueAtFrame(t.holder, 'anchor', state.currentFrame);
+    var pos = valueAtFrame(t.holder, 'position', state.currentFrame);
+    var rot = valueAtFrame(t.holder, 'rotation', state.currentFrame)[0];
+    var scl = valueAtFrame(t.holder, 'scale', state.currentFrame);
+    var px = t.boundsCenter.x + anc[0], py = t.boundsCenter.y + anc[1];
+    var r = rot * Math.PI / 180, c = Math.cos(r), s = Math.sin(r);
+    var sx = scl[0] / 100, sy = scl[1] / 100;
+    function fwd(x, y) {
+      var lx = (x - px) * sx, ly = (y - py) * sy;
+      return { x: px + lx * c - ly * s + pos[0], y: py + lx * s + ly * c + pos[1] };
+    }
+    return { bounds: lb, pivot: fwd(px, py), rot: rot, scl: scl, fwd: fwd };
+  }
+  // World-space positions of the scale-box corners + the rotate handle
+  // (offset outward from the box's own top-center along whatever direction
+  // that edge currently renders at, so it swings around with rotation
+  // instead of always hovering "above" in screen space) — shared by the
+  // overlay drawer and the hit-tester so they can never silently disagree.
+  function motionHandlePositions(t) {
+    var g = motionBoxGeom(t);
+    if (!g) return null;
+    var b = g.bounds;
+    var corners = { nw: g.fwd(b.left, b.top), ne: g.fwd(b.right, b.top), se: g.fwd(b.right, b.bottom), sw: g.fwd(b.left, b.bottom) };
+    var zs = 1 / Math.max(0.0001, view.zoom);
+    // Rotate RING (2026-07, replacing the tiny offset stem+dot — same
+    // change/formula as select-bridge.js's computeHandles and
+    // engine-bridge.js's buildTransformBoxItems, mirrored here for visual/
+    // interaction coherence between Animation 2D and Motion). Centered on
+    // the pivot. Small and mostly size-independent (per user mockup),
+    // capped relative to the box's scaled larger half-dimension (scaled by
+    // the layer's own current Scale, since rotation alone doesn't change
+    // size) only so it shrinks gracefully on a genuinely small selection.
+    var ringRadius = Math.min(36 * zs, Math.max(b.width * (g.scl[0] / 100), b.height * (g.scl[1] / 100)) * 0.3);
+    return { g: g, corners: corners, ringCenter: g.pivot, ringRadius: ringRadius };
+  }
+  // Ring band test first (anywhere within ~7px of the circumference, not
+  // one fixed point), then nearest-wins over the corners — same convention
+  // as select-bridge.js's hitTestHandles. Kept as a scoped v1 to UNIFORM
+  // corner-scale only (no per-axis edge handles yet), the highest-value
+  // slice of the gap since it's what was completely missing before.
+  function hitMotionBoxHandle(pt, t) {
+    var h = motionHandlePositions(t);
+    if (!h) return null;
+    var zs = 1 / Math.max(0.0001, view.zoom);
+    var ringTol = 7 * zs;
+    if (Math.abs(Math.hypot(pt.x - h.ringCenter.x, pt.y - h.ringCenter.y) - h.ringRadius) < ringTol) return { type: 'rotate' };
+    var tol = 9 * zs, bestD = tol, best = null;
+    Object.keys(h.corners).forEach(function (k) {
+      var d = Math.hypot(pt.x - h.corners[k].x, pt.y - h.corners[k].y);
+      if (d < bestD) { bestD = d; best = { type: 'scale', dir: k }; }
+    });
+    return best;
   }
 
   // ---- canvas drag: position keyframe dots + spatial handles ----
@@ -701,6 +793,24 @@
     // once a key has been moved away from it (the ordinary case) or by
     // starting the drag from a few px off-center.
     if (t) {
+      // Scale/rotate box handles checked FIRST — same priority order as
+      // Animation 2D's own hitTestHandles (select-bridge.js): a corner/
+      // rotate grab is a deliberate, precise action, so it should win any
+      // rare overlap with a position dot/anchor rather than the reverse.
+      var boxHit = hitMotionBoxHandle(event.point, t);
+      if (boxHit) {
+        pushUndo();
+        var g = motionBoxGeom(t);
+        if (boxHit.type === 'rotate') {
+          var startAngle = Math.atan2(event.point.y - g.pivot.y, event.point.x - g.pivot.x) * 180 / Math.PI;
+          _motionDrag = { mode: 'motionRotate', t: t, pivot: g.pivot, startAngle: startAngle, origRot: g.rot };
+        } else {
+          var corner = motionHandlePositions(t).corners[boxHit.dir];
+          var origDist = Math.hypot(corner.x - g.pivot.x, corner.y - g.pivot.y) || 1;
+          _motionDrag = { mode: 'motionScale', t: t, pivot: g.pivot, origDist: origDist, origScale: g.scl.slice() };
+        }
+        return true;
+      }
       var ks = activePositionKeys();
       if (ks) {
         var pv = motionPivotOf(t);
@@ -734,6 +844,20 @@
       });
     } else if (_motionDrag.mode === 'anchor') {
       setValue(_motionDrag.holder, 'anchor', [event.point.x - _motionDrag.bc.x, event.point.y - _motionDrag.bc.y]);
+    } else if (_motionDrag.mode === 'motionRotate') {
+      // Recomputed from the FIXED drag-start baseline every tick (not
+      // incrementally accumulated) — setValue always writes an absolute
+      // value, so there's no risk of compounding drift the way raw Paper.js
+      // geometry mutation would need to guard against.
+      var ang = Math.atan2(event.point.y - _motionDrag.pivot.y, event.point.x - _motionDrag.pivot.x) * 180 / Math.PI;
+      setValue(_motionDrag.t.holder, 'rotation', [_motionDrag.origRot + (ang - _motionDrag.startAngle)]);
+    } else if (_motionDrag.mode === 'motionScale') {
+      // v1 scope: uniform scale only (both axes move by the same ratio) —
+      // no per-edge single-axis handles yet, matching this increment's
+      // corner-only hit-test.
+      var dist = Math.hypot(event.point.x - _motionDrag.pivot.x, event.point.y - _motionDrag.pivot.y);
+      var ratio = dist / _motionDrag.origDist;
+      setValue(_motionDrag.t.holder, 'scale', [_motionDrag.origScale[0] * ratio, _motionDrag.origScale[1] * ratio]);
     } else {
       var k = _motionDrag.key, pv = _motionDrag.pv;
       // Both branches now resolve against the SAME pivot buildOverlayItems
@@ -1715,17 +1839,48 @@
   //   .fc.motion-fc        — track cells (own key-drag/marquee + goToFrame)
   //   .layer-inout-handle  — the in/out resize brackets
   //   .layer-inout-key     — per-key ticks on the bar
-  // Deliberate trade-off: dragging a bar's BODY no longer moves the layer
-  // range while in Motion (the handles still resize it, and Animation 2D
-  // keeps the full bar-move gesture) — same priority call as the canvas,
-  // where drag-anywhere marquee wins over object-move unless you grab an
-  // actual object.
+  //   #frame-hdr           — the numbered ruler (click/drag-to-scrub,
+  //                          ui.js) — bug found 2026-07 (feedback:
+  //                          "impossible de scrubber le curseur de temps"
+  //                          in Motion): the ruler was never in this
+  //                          exemption list, so THIS capture listener
+  //                          stopPropagation()'d every ruler click before
+  //                          it ever reached ui.js's own #frame-hdr
+  //                          mousedown handler — scrubbing silently did
+  //                          nothing in Motion mode specifically (Animation
+  //                          2D never runs this listener at all, the
+  //                          state.appMode!=='motion' guard above skips it
+  //                          entirely, which is exactly why the ruler
+  //                          worked fine there and nowhere else).
+  //   #playhead-flag        — the draggable playhead handle (ui.js) has
+  //                          this same "never exempted" bug — its own
+  //                          mousedown handler lives in the BUBBLE phase,
+  //                          strictly later than this capture listener, so
+  //                          it was just as silently swallowed.
+  //   #bars-row             — work-area (#wa-bar/.wa-handle) and onion
+  //                          skin range (.onion-marker/#onion-bar) both
+  //                          have their own drag gestures (ui.js) that hit
+  //                          the exact same capture-order problem — none
+  //                          of those elements were exempted either.
+  //   .layer-inout-bar       — REVERSED 2026-07 (feedback: "impossible de
+  //                          déplacer/drag un calque dans le temps"): this
+  //                          used to be a deliberate exclusion (bar-BODY
+  //                          drag intentionally lost to the marquee, only
+  //                          its handles kept their own gesture — see the
+  //                          old note below, kept for history). Explicit
+  //                          follow-up feedback wants moving a layer's
+  //                          whole timing back — same "keeps its own
+  //                          gesture" treatment as its own handles now.
+  // (historical) Deliberate trade-off: dragging a bar's BODY no longer
+  // moved the layer range while in Motion — same priority call as the
+  // canvas, where drag-anywhere marquee wins over object-move unless you
+  // grab an actual object. Superseded by the entry above.
   function initGridMarquee() {
     var wrap = document.getElementById('fg-wrap');
     if (!wrap) return;
     wrap.addEventListener('mousedown', function (e) {
       if (state.appMode !== 'motion' || e.button !== 0) return;
-      if (e.target.closest('.fc.motion-fc, .layer-inout-handle, .layer-inout-key')) return;
+      if (e.target.closest('.fc.motion-fc, .layer-inout-handle, .layer-inout-key, .layer-inout-bar, #frame-hdr, #playhead-flag, #bars-row')) return;
       // Scrollbar clicks land on the wrap itself but outside its client
       // area — intercepting them would break scrollbar dragging.
       var r = wrap.getBoundingClientRect();

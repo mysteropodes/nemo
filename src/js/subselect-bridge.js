@@ -296,7 +296,14 @@
       forkIfForeignOwner(editedPath);
       fillRegenerateLinked(userLayers[state.activeLayerIdx], editedPath);
       regenerateBrushTexture(editedPath, userLayers[state.activeLayerIdx]);
-      saveActiveLayerFrame(); renderNodeHandles(); updateUI();
+      saveActiveLayerFrame();
+      // Same stale-onion-ghost fix as select-bridge.js's xform/move commits
+      // — onionPrevLayer/onionNextLayer are a snapshot cache never rebuilt
+      // by a node-edit commit, so a held neighbor frame kept ghosting this
+      // path at its pre-edit shape until an unrelated frame-nav/onion
+      // toggle happened to call renderOS().
+      renderOS();
+      renderNodeHandles(); updateUI();
     }
     window.SMEngineBridge.renderNow();
     window.SMEngineBridge.resume();

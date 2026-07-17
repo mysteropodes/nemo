@@ -663,6 +663,10 @@
     // untouched when Labs is off.
     if (window.SMLabs && window.SMLabs.onStrokeCommitted && path && !extendTarget) window.SMLabs.onStrokeCommitted(path, userLayers[state.activeLayerIdx]);
     saveActiveLayerFrame();
+    // Stale-onion-ghost fix (see select-bridge.js's commit paths for the
+    // full explanation) — a fresh stroke on a held frame can be exactly
+    // what an onion-visible neighbor frame was about to inherit.
+    renderOS();
     updateUI();
     samples = [];
     extendTarget = null;

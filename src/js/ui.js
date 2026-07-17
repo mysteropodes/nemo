@@ -616,6 +616,22 @@
     var inF=(window.state&&state.waIn!=null)?state.waIn:(window._waIn||0);
     var outF=(window.state&&state.waOut!=null)?state.waOut:(window._waOut||23);
     bar.style.left=(inF*FC)+'px';bar.style.width=((outF-inF+1)*FC)+'px';
+    // Design audit 2026-07, round 2 (feedback: "un highlight dans la zone
+    // de previz"): #wa-tint mirrors this same left/width down through the
+    // actual scrub/preview area (#frame-grid), a second time — updateWaBar
+    // was already the single choke point every code path (drag, project
+    // load, frame insert/delete, zoom) runs through to keep #wa-bar synced,
+    // so piggybacking here keeps the tint synced for free instead of
+    // hunting down every call site a second time.
+    var tint=document.getElementById('wa-tint');
+    if(tint){
+      tint.style.left=bar.style.left;tint.style.width=bar.style.width;
+      var grid=document.getElementById('frame-grid'),wrap=document.getElementById('fg-wrap');
+      if(grid&&wrap){
+        tint.style.top=grid.offsetTop+'px';
+        tint.style.height=Math.max(grid.scrollHeight,wrap.clientHeight-grid.offsetTop)+'px';
+      }
+    }
   };
   window._waIn=0;window._waOut=23;window._totalF=24;
   initWaDrag();
@@ -623,7 +639,15 @@
   function updateOnionBar(){
     var omIn=document.getElementById('om-in'),omOut=document.getElementById('om-out'),bar=document.getElementById('onion-bar');
     var inF=parseInt(omIn.dataset.frame||0),outF=parseInt(omOut.dataset.frame||23);
-    bar.style.left=(inF*FC)+'px';bar.style.width=Math.max(FC,(outF-inF+1)*FC)+'px';
+    // Design audit 2026-07 (feedback: "la barre gradient dépasse les in/out
+    // point"): left/width used to be computed off the FRAME grid (inF*FC,
+    // a full extra cell added via +1) with no relation to where the actual
+    // .om-in/.om-out markers render (left:frame*FC+3, width:4px — see
+    // updateOmMarkers below) — the bar's right edge landed a whole cell
+    // past the out marker's own right edge. Now solved from the markers'
+    // own geometry instead of re-deriving it: starts exactly at om-in's
+    // left edge, ends exactly at om-out's right edge.
+    bar.style.left=(inF*FC+3)+'px';bar.style.width=((outF-inF)*FC+4)+'px';
   }
   function initOmDrag(){
     var omIn=document.getElementById('om-in'),omOut=document.getElementById('om-out');
@@ -745,6 +769,19 @@
     ctxEl=m;
   };
   window.addEventListener('mousedown',function(e){if(ctxEl&&!ctxEl.contains(e.target))closeCtxMenu();});
+  // Canvas fix (2026-07, "le menu clic droit ne disparaît pas quand on
+  // clique ailleurs"): the 'mousedown' listener above never fires when the
+  // outside click lands on the canvas — every canvas tool bridge
+  // (select-bridge.js etc.) intercepts 'pointerdown' at CAPTURE phase and
+  // calls e.preventDefault(), which suppresses the browser's synthesized
+  // legacy 'mousedown' compatibility event entirely. A capture-phase
+  // listener on `document` for 'pointerdown' itself fires BEFORE any
+  // capture listener on a descendant element (capture runs document→
+  // target), so this always sees the click first regardless of what a
+  // bridge does with it afterward — and it deliberately never calls
+  // stopPropagation, so it's a passive dismiss-if-open check, not something
+  // that could shadow any tool's own interception.
+  document.addEventListener('pointerdown',function(e){if(ctxEl&&!ctxEl.contains(e.target))closeCtxMenu();},true);
   window.addEventListener('scroll',closeCtxMenu,true);
   window.addEventListener('keydown',function(e){if(e.key==='Escape')closeCtxMenu();});
 
