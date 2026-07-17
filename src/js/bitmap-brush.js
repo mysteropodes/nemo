@@ -681,8 +681,14 @@
     var onEl = document.getElementById('p-bitmapbrush-on');
     if (onEl) {
       state.bitmapBrushOn = false;
+      // Sous-rangées (Tip/Spacing/Scatter/Opacity/Pressure/Import/Apply/
+      // Remove) repliées derrière cette checkbox — audit panel droit
+      // 2026-07-17, elles n'ont de sens que si Bitmap Brush est activé.
+      var rowsEl = document.getElementById('p-bitmapbrush-rows');
+      if (rowsEl) rowsEl.style.display = onEl.checked ? 'block' : 'none';
       onEl.addEventListener('change', function () {
         state.bitmapBrushOn = this.checked;
+        if (rowsEl) rowsEl.style.display = this.checked ? 'block' : 'none';
         // Select/Subselect with a live selection (2026-07-17, "on peut pas
         // switch avec un stroke vecto") : the checkbox now doubles as the
         // switch this panel already had buttons for — btn-bitmap-apply/

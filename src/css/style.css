@@ -462,7 +462,12 @@ body:not(.mode-motion) #motion-props-sec{display:none;}
    clair... derrière les keyframes de la timeline"). Motion-only override —
    .fc alone (Animation 2D's own grid) is untouched. */
 .fc.motion-fc{cursor:pointer;border-right:none;}
-.motion-key{width:9px;height:9px;border-radius:2px;background:#e6e6e6;border:1px solid rgba(0,0,0,.5);transform:rotate(45deg);}
+/* Design audit 2026-07: added a soft dark halo (box-shadow, not a bigger
+   border — Motion mode shrinks this to 7px via body.mode-motion below, no
+   room to spare) so an unselected/non-current key stays readable sitting
+   on top of the accent-tinted connection bar (trackRowHtml, motion.js)
+   instead of partly blending into it. */
+.motion-key{width:9px;height:9px;border-radius:2px;background:#e6e6e6;border:1px solid rgba(0,0,0,.5);box-shadow:0 0 0 1.5px rgba(0,0,0,.35);transform:rotate(45deg);}
 .motion-key.cur{background:#ffaa28;width:11px;height:11px;}
 .motion-key.sel{background:var(--accent);border-color:#fff;box-shadow:0 0 0 1.5px var(--accent);}
 .motion-key.hold{border-radius:1px;transform:rotate(0deg);}
@@ -543,14 +548,73 @@ body.mode-motion .lrow.act{box-shadow:inset 3px 0 0 #4E6FF2,inset 0 0 0 1px rgba
 #layer-ctrls .material-symbols-rounded{font-size:13px;}
 #layer-ctrls svg{width:13px;height:13px;display:block;}
 #fg-wrap{flex:1;overflow:auto;position:relative;}
-#bars-row{height:16px;display:flex;position:relative;flex-shrink:0;background:var(--bg);}
-#wa-bar{position:absolute;top:0;height:8px;background:rgba(74,158,255,.3);border-radius:2px;cursor:grab;z-index:3;}
-#wa-bar .wa-handle{position:absolute;top:0;width:6px;height:8px;background:var(--accent);cursor:ew-resize;border-radius:2px;}
+/* Design audit 2026-07, round 2 (feedback: "le work area ressemble trop à
+   un calque" — the boxed/bordered/purple v1 read as another layer bar, not
+   a lightweight timeline indicator; "le ruler au dessus" — the numbered
+   ruler should be the dominant top strip, this a thin echo under it, not a
+   competing band above it. #frame-hdr now comes FIRST in the DOM
+   (index.html) — this strip is `sticky`, offset by #frame-hdr's own
+   height (kept in sync below), so the two stay stacked ruler-then-strip
+   through any vertical scroll instead of just the ruler staying pinned.
+   Round 3 (feedback: "l'onion skin pourrait être en dessous de work area"):
+   this strip now holds TWO stacked sub-rows instead of one — work area on
+   top, onion skin range below it — see the two blocks below.
+   Round 4 (feedback: "double la hauteur du work area"): #wa-bar's own
+   height doubled 6px->12px, which pushed the onion sub-row further down
+   and this row's own total height up 16px->22px to still fit both without
+   crowding (y 1-13 work area, y 15-21 onion, see each block's own top).
+   ⚠️ ALIGNMENT: #layer-panel's "Layers" header (index.html, inline
+   height:42px) MUST stay equal to #frame-hdr's height + this row's height
+   (20+22 here) — that combined height is what #frame-grid's rows align
+   against on the OTHER side of the panel split. Change one, change all
+   three together or every layer row drifts out of sync with its timeline
+   row (confirmed this was already the exact bug introduced in round 2:
+   30px header vs a then-26px combined strip). */
+/* Round 5 (feedback: "le fond derrière ruler, work area, onion skin
+   devrait être noir comme derrière 'Layers' en dessous de Scene") —
+   --panel2 (darker) instead of --panel, matching the "Layers" header
+   strip (index.html, inline style) exactly, so the two headers either
+   side of the panel split read as the same dark strip instead of two
+   different tones. */
+#bars-row{height:22px;display:flex;position:sticky;top:20px;flex-shrink:0;background:var(--panel2);z-index:2;}
+/* Back to --accent (the app's one existing "this is active/selected/
+   playhead" blue) instead of the v1 --purple experiment — feedback was
+   that a whole separate hue read as its own distinct UI concept (i.e. a
+   layer), when work-area is meant to feel like a lighter-weight variant of
+   the SAME timeline-position language the playhead already uses, not a
+   new one. No border/box-sizing/border-radius box anymore — a flat wash,
+   nothing for the eye to read as "a bar sitting on top of the timeline". */
+#wa-bar{position:absolute;top:1px;height:12px;background:rgba(63,107,245,.22);cursor:grab;z-index:3;}
+/* Handles thinned 7px->3px (feedback: "poignées plus fines") and the
+   white hover ring removed (feedback: "pas de liseré blanc autour") —
+   opacity/brightness alone now carries the hover feedback, same restrained
+   language the ruler's own ticks use. top:0/bottom:0 here fill the PARENT
+   #wa-bar's own box exactly (it's the nearest positioned ancestor), so
+   they track whatever top/height #wa-bar has above without needing their
+   own copy of those values. */
+#wa-bar .wa-handle{position:absolute;top:0;bottom:0;width:3px;background:var(--accent);cursor:ew-resize;opacity:.75;}
+#wa-bar .wa-handle:hover{opacity:1;}
 #wa-bar .wa-handle.left{left:0;}
 #wa-bar .wa-handle.right{right:0;}
-.onion-marker{position:absolute;top:9px;width:8px;height:6px;border-radius:2px;cursor:ew-resize;z-index:4;}
-.onion-marker.om-in{background:rgba(255,80,80,.7);}
-.onion-marker.om-out{background:rgba(80,140,255,.7);}
+/* Second echo of the same in/out range, INSIDE the actual scrub/preview
+   area (#frame-grid) rather than only in the thin top strip — feedback:
+   "un highlight dans la zone de previz". Position/size mirrored from
+   #wa-bar by updateWaBar() (ui.js). pointer-events:none: purely a visual
+   read, dragging still only happens on the real #wa-bar above. */
+#wa-tint{position:absolute;left:0;pointer-events:none;z-index:1;background:rgba(63,107,245,.05);border-left:1px solid rgba(63,107,245,.3);border-right:1px solid rgba(63,107,245,.3);box-sizing:border-box;}
+/* Onion skin range markers — moved to the LOWER sub-row of #bars-row (was
+   sharing the same y-band as #wa-bar, top:2px, which is also why the two
+   used to visually merge into one confusing strip) and shrunk from an
+   8×6px rounded pill to a plain 4px sliver, same flat-rectangle language
+   as #wa-bar's own handles instead of reading as a separate, chunkier
+   widget. Red/blue kept — it's the one place in the timeline that still
+   needs to distinguish "in" from "out" by color alone since, unlike work
+   area, there's no bracket shape doing that job. top re-derived each round
+   #wa-bar's own height changes (round 4: 15px, right under #wa-bar's new
+   1-13 span) — see #bars-row's own comment for the current numbers. */
+.onion-marker{position:absolute;top:15px;width:4px;height:6px;cursor:ew-resize;z-index:4;}
+.onion-marker.om-in{background:rgba(255,80,80,.75);}
+.onion-marker.om-out{background:rgba(80,140,255,.75);}
 /* Layer in/out point (layer-inout.js, v1 2026-07 — thickened 2026-07 per
    feedback: too subtle to read at a glance; every layer's bar is now a
    bold, full-height colored block). Full-height translucent fill spanning
@@ -604,23 +668,50 @@ body.mode-motion .lrow.act{box-shadow:inset 3px 0 0 #4E6FF2,inset 0 0 0 1px rgba
    .layer-inout-key above). */
 .layer-inout-bar .layer-inout-seg-gap{position:absolute;top:0;bottom:0;background:var(--panel);opacity:.82;pointer-events:none;z-index:1;}
 .layer-inout-bar .layer-inout-segdot{position:absolute;top:50%;width:7px;height:7px;margin:-3.5px 0 0 -3.5px;border-radius:50%;background:transparent;border:1.5px solid #fff;pointer-events:none;z-index:4;}
-/* Bug found 2026-07 ("j'ai une barre au dessus de ses inpoint et outpoint
-   de l'onion skin qui devrait être au même niveau"): top:2px put the bar
-   in the upper half of #bars-row while .onion-marker sits at top:9px —
-   visually two different rows instead of one. Now matches the markers'
-   own top/height exactly so the bar and its in/out handles read as one
-   aligned control. */
-#onion-bar{position:absolute;top:9px;height:6px;background:linear-gradient(90deg,rgba(255,80,80,.35),rgba(80,140,255,.35));border-radius:2px;pointer-events:none;z-index:2;}
+/* Kept at the exact same top/height as .onion-marker above (both moved to
+   #bars-row's lower sub-row together, round 3 of the audit, then shifted
+   again in round 4 when #wa-bar's own height doubled) so the gradient bar
+   and its in/out markers still read as one aligned control. */
+#onion-bar{position:absolute;top:15px;height:6px;background:linear-gradient(90deg,rgba(255,80,80,.35),rgba(80,140,255,.35));border-radius:2px;pointer-events:none;z-index:2;}
 /* v4: the mockup's frame ruler sits flush in the SAME --panel tone as the
    frame grid below it (just a hairline border-bottom) — it previously used
    --panel2 here, which read as a separate lighter bar boxed above the
    timeline instead of blending straight into it. */
-#frame-hdr{display:flex;height:14px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--panel);position:sticky;top:0;z-index:2;cursor:pointer;}
-.fhc{width:var(--fc);min-width:var(--fc);font-size:8px;color:var(--text-dark);display:flex;align-items:center;justify-content:center;position:relative;}
+/* Design audit 2026-07, round 3 (feedback: "ruler un peu petite en
+   hauteur"): 16px→20px, on top of the round-1 14px→16px bump — gives the
+   per-frame ticks below real room to be visible instead of squeezed into
+   a couple of leftover px under the numerals.
+   ⚠️ ALIGNMENT: #bars-row's `top` (above) and #layer-panel's "Layers"
+   header (index.html, inline height) both key off this exact value —
+   see the big comment on #bars-row for the full chain.
+   Round 5: background --panel2 (darker), matching the "Layers" header —
+   see #bars-row's own round-5 note, same reasoning applies here. */
+#frame-hdr{display:flex;height:20px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--panel2);position:sticky;top:0;z-index:2;cursor:pointer;}
+/* 8px→9px (round 1): was the smallest text anywhere in the app (Motion's
+   own property rows run 10.5px). padding-top (not the old `top:-1px`
+   nudge, which fought align-items:center) now reserves clear room below
+   the text for the taller round-3 tick marks instead of the two visually
+   colliding at this row's old, tighter height. */
+.fhc{width:var(--fc);min-width:var(--fc);font-size:9px;color:var(--text-dark);display:flex;align-items:flex-start;justify-content:center;padding-top:3px;box-sizing:border-box;position:relative;}
 .fhc:nth-child(5n){color:var(--text-dim);}
+/* Real tick marks (round 1 finding: the ruler previously had NO physical
+   graduation at all, only a text-color change every 5th cell). Three
+   tiers, tallest/brightest wins on a coincidence (CSS specificity alone
+   handles that: .sec has 2 classes, :nth-child(5n) has 1 class + a
+   pseudo-class, the plain per-frame rule has 1 class — no !important or
+   explicit override needed):
+     - every frame:  round 3 bumped from 2px/.07 to 4px/.16 (feedback:
+       "indicateur de frame pas assez visible") — the round-2 version all
+       but disappeared once actually seen live; still clearly the lightest
+       of the three tiers, just no longer invisible.
+     - every 5th:    6px/.32 — the mid-level landmark.
+     - each second:  tallest/brightest (::before below) — the label
+       ("1s"/"2s") already gets the same priority treatment. */
+.fhc::before{content:'';position:absolute;left:0;bottom:0;width:1px;height:4px;background:rgba(255,255,255,.16);}
+.fhc:nth-child(5n)::before{height:6px;background:rgba(255,255,255,.32);}
 .fhc.cur{color:var(--accent);font-weight:700;}
-.fhc.sec{color:var(--accent);font-weight:700;font-size:7.5px;}
-.fhc.sec::before{content:'';position:absolute;left:0;top:0;bottom:-2px;width:1px;background:var(--border2);}
+.fhc.sec{color:var(--accent);font-weight:700;font-size:8.5px;}
+.fhc.sec::before{content:'';position:absolute;left:0;top:0;bottom:-2px;width:1px;background:rgba(255,255,255,.3);}
 #frame-grid{display:flex;flex-direction:column;}
 /* Must stay in lockstep with .lrow's height (28px, v3 redesign) — the layer
    name column (#layer-panel) and the frame grid (#fg-wrap) are separate

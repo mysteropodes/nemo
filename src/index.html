@@ -363,8 +363,10 @@
     <div class="psec" id="canvas-sec">
       <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrDocument">Document</span></div>
       <div class="pbdy">
-        <div class="pr"><span class="pl">Width</span><input type="number" class="pi" id="p-cw" value="1920" min="1" max="7680"></div>
-        <div class="pr"><span class="pl">Height</span><input type="number" class="pi" id="p-ch" value="1080" min="1" max="4320"></div>
+        <div class="pr"><span class="pl">Width</span><input type="number" class="pi scrub" id="p-cw" value="1920" min="1" max="7680" data-step="1"></div>
+        <div class="pr"><span class="pl">Height</span><input type="number" class="pi scrub" id="p-ch" value="1080" min="1" max="4320" data-step="1"></div>
+        <div class="pr"><span class="pl">FPS</span><input type="number" class="pi scrub" id="proj-fps" value="12" min="1" max="60" data-step="1"></div>
+        <div class="pr"><span class="pl">Frames</span><input type="number" class="pi scrub" id="proj-frames" value="24" min="1" max="999" data-step="1"></div>
         <div class="pr"><span class="pl">BG</span><input type="color" id="p-cbg" value="#ffffff" style="width:28px;height:22px;border:none;cursor:pointer;padding:0;"></div>
         <div class="pr" style="gap:4px"><button class="pbtn" id="btn-fit">Fit</button><button class="pbtn" id="btn-resetv">Reset View</button></div>
         <div class="pr"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer" title="Hide artwork outside the canvas bounds — off by default, so you can see and work with content that spills over the edge"><input type="checkbox" id="p-clip" style="accent-color:var(--accent)"> Clip to canvas</label></div>
@@ -439,6 +441,12 @@
              <select>, so choosing a tip finally shows what it looks like
              before picking it, same as the vector presets already do. -->
         <div class="pr" title="Renders this stroke as a stamped raster texture (real bitmap grain) instead of the vector Brush above — the geometry Draw captures stays the same, only the OUTPUT becomes an image layer. The vector presets above are untouched (kept for exports like Rive that need real vector dabs) — this is a parallel category, not a replacement."><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="p-bitmapbrush-on" style="accent-color:var(--accent)"> Bitmap Brush (Draw tool)</label></div>
+        <!-- Sous-rangées Bitmap Brush repliées derrière la checkbox
+             ci-dessus (audit panel droit 2026-07-17) : 8 lignes de réglages
+             n'ont de sens que si Bitmap Brush est activé — masquées par
+             défaut (checkbox off), togglées par toggleBitmapBrushRows() en
+             plus de son ancien rôle purement fonctionnel (ui.js). -->
+        <div id="p-bitmapbrush-rows" style="display:none">
         <div class="pr" id="p-bitmaptip-row">
           <span class="pl">Tip</span>
           <button class="bp-swatch-btn" id="p-bitmaptip-btn" type="button"><canvas id="p-bitmaptip-preview" width="120" height="20"></canvas><span id="p-bitmaptip-label">Soft Round</span></button>
@@ -453,6 +461,7 @@
         <div class="pr" title="Import a Photoshop .abr brush file — its tip shape(s) become selectable Tip presets above, alongside the procedural ones"><span class="pl"></span><button class="pbtn" id="btn-bitmap-import-abr" style="flex:1;font-size:10px" type="button">Import .abr tip…</button><input type="file" id="bitmap-abr-file" accept=".abr" style="display:none"></div>
         <div class="pr" title="Re-stamps every selected Bitmap Brush stroke (or converts a selected vector-textured/plain stroke) with the settings above"><span class="pl"></span><button class="pbtn" id="btn-bitmap-apply" style="flex:1;font-size:10px" type="button">Apply to selection</button></div>
         <div class="pr" title="Strips the bitmap texture off every selected stroke, restoring its plain stroke/fill"><span class="pl"></span><button class="pbtn" id="btn-bitmap-remove" style="flex:1;font-size:10px" type="button">Remove from selection</button></div>
+        </div>
         <div class="pr" title="Re-smooths the SELECTED stroke's existing geometry — unlike Tool Options' Smooth (which only shapes new strokes as you draw), this is a one-shot action you can apply after the fact, repeatedly, to a stroke already on the canvas. Note: a freshly-drawn stroke is already simplified at draw time (Tool Options' Smooth, 10 by default) — applying THIS at the same or lower value won't visibly change anything since it's already fit that tightly; raise it for a visible extra effect."><span class="pl">Smooth</span><input type="number" class="pi scrub" id="p-poststroke-smooth" value="25" min="0" max="80" data-step="1"><button class="pbtn" id="btn-poststroke-smooth">Apply</button></div>
       </div>
     </div>
@@ -626,11 +635,11 @@
         </div>
         <input type="file" id="file-input" accept=".json" style="display:none">
         <div class="pr" style="gap:4px"><button class="pbtn" id="btn-export" style="flex:1"><span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle">&#xe2c6;</span> Export…</button></div>
-        <div class="phdr" style="padding-top:10px;font-size:9px;color:var(--text-dim)">Document</div>
-        <div class="pr"><span class="pl">Width</span><input type="number" class="pi scrub" id="proj-w" value="1920" min="1" max="7680" data-step="1"></div>
-        <div class="pr"><span class="pl">Height</span><input type="number" class="pi scrub" id="proj-h" value="1080" min="1" max="4320" data-step="1"></div>
-        <div class="pr"><span class="pl">FPS</span><input type="number" class="pi scrub" id="proj-fps" value="12" min="1" max="60" data-step="1"></div>
-        <div class="pr"><span class="pl">Frames</span><input type="number" class="pi scrub" id="proj-frames" value="24" min="1" max="999" data-step="1"></div>
+        <!-- Document (Width/Height/FPS/Frames) fusionné dans la section
+             "Document" du panel (canvas-sec, en haut) — feedback audit
+             2026-07-17 : deux jeux de champs séparés pour la même taille de
+             canvas, resynchronisés seulement par le tick de rendu. FPS/Frames
+             gardent leurs ids proj-fps/proj-frames (juste déplacés). -->
         <div class="phdr" style="padding-top:10px;font-size:9px;color:var(--text-dim)">Import</div>
         <div class="pr" style="gap:4px"><button class="pbtn" id="btn-import-img" style="flex:1" title="Import bitmap image(s) — a numbered sequence (frame001.png, frame002.png…) auto-detects into a new animated layer, one image per frame"><span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle">&#xe410;</span> Import Image(s)…</button></div>
         <input type="file" id="image-input" accept="image/*" multiple style="display:none">
@@ -995,7 +1004,12 @@
   </div>
   <div id="tl-content">
     <div id="layer-panel">
-      <div style="height:30px;border-bottom:1px solid var(--border);background:var(--panel2);display:flex;align-items:center;padding:0 6px;font-size:9px;color:var(--text-dim)">Layers</div>
+      <!-- Design audit 2026-07: height MUST stay equal to #frame-hdr +
+           #bars-row's combined height (style.css) — this header sits above
+           #layer-list the same way frame-hdr+bars-row sit above
+           #frame-grid on the timeline side, and it's that match that keeps
+           every .lrow lined up with its .frow across the panel split. -->
+      <div style="height:42px;border-bottom:1px solid var(--border);background:var(--panel2);display:flex;align-items:center;padding:0 6px;font-size:9px;color:var(--text-dim)">Layers</div>
       <div id="layer-list"></div>
       <div id="layer-ctrls">
         <button id="btn-al" title="New layer"><span class="material-symbols-rounded">&#xe145;</span></button>
@@ -1016,14 +1030,31 @@
     </div>
     <div id="layer-panel-resize" title="Drag to resize the layers panel"></div>
     <div id="fg-wrap">
+      <!-- Design audit 2026-07 (feedback: "le ruler au dessus"): #frame-hdr
+           (the numbered ruler) now comes FIRST in both DOM and stacking —
+           #bars-row is a thin sticky strip directly under it (see
+           #bars-row's `top` in style.css, offset by #frame-hdr's own
+           height) instead of floating above the ruler as its own competing
+           band. Order was previously bars-row → frame-hdr; swapped here,
+           not just visually — grid.offsetTop/etc. read live layout so
+           nothing downstream needed updating for the swap itself. -->
+      <div id="frame-hdr"></div>
       <div id="bars-row">
         <div id="onion-bar"></div>
         <div id="wa-bar"><div class="wa-handle left"></div><div class="wa-handle right"></div></div>
         <div class="onion-marker om-in" id="om-in" title="Onion skin start marker"></div>
         <div class="onion-marker om-out" id="om-out" title="Onion skin end marker"></div>
       </div>
-      <div id="frame-hdr"></div>
       <div id="frame-grid"></div>
+      <!-- Feedback: work area used to only be a bar in the top strip
+           ("ressemble trop à un calque") — this is a second, taller
+           translucent wash that extends the SAME in/out range down through
+           the actual scrub/preview area (the frame-grid), so the active
+           range reads as a soft highlight behind the content instead of a
+           boxed widget floating above it. Position/size mirrored from
+           #wa-bar by updateWaBar() (ui.js), pointer-events:none — purely a
+           visual echo, all the real dragging still happens on #wa-bar. -->
+      <div id="wa-tint"></div>
       <div id="audio-strip" style="display:none"></div>
       <!-- UI/UX audit (2026-07): the playhead itself is pointer-events:none
            (style.css) so clicks pass through to the ruler/frame cells below
