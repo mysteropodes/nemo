@@ -610,6 +610,7 @@ window.SM={
   convertLFSGroupToLayer:function(){convertLFSGroupToLayer(state.activeLayerIdx);},
   propagateLFSFill:function(which){propagateLFSFill(state.activeLayerIdx,which);},
   enterSymbol:function(symId){enterSymbol(symId);},
+  splitLayerIntoElementsCore:function(li,opts){return splitLayerIntoElementsCore(li,opts);},
   exitToScene:function(){exitToScene();},
   closeSymbolTab:function(symId){closeSymbolTab(symId);},
   setSymbolPlayMode:function(v){var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.symbolId)return;ld.symPlayMode=v;loadFrame(state.currentFrame);renderOS();updateUI();},

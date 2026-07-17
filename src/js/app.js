@@ -1026,11 +1026,28 @@ function convertLayersToComponent(indices){
 // keeps that exact animation, now as a normal layer-level track.
 function splitLayerIntoElements(li){
   if(state.activeSymbolId){showToast('Fermez d\'abord le composant en cours d\'édition');return;}
-  var ld=state.layers[li];if(!ld||ld.symbolId){showToast('Rien à éclater ici');return;}
-  if(!window.SMMotion){return;}
+  splitLayerIntoElementsCore(li);
+}
+// Core split, no activeSymbolId guard — reused by enterComponentLayer
+// (motion.js) to SILENTLY auto-split a Component's own single layer into
+// one real layer per shape the moment you enter it (2026-07-17, "je devrais
+// avoir plusieurs calques séparés montés en fonction des keyframes" — the
+// user confirmed the exact visual/structural target is this same flat
+// "Layer 1 — Forme N" real-layers-with-real-bars result, not a nested
+// montage view). Safe to call while state.activeSymbolId is set: this
+// function only ever touches state.layers/userLayers, which by then ARE
+// the entered symbol's own arrays (enterSymbol already swapped them) —
+// same "current document" convention every other layer-editing function in
+// this file already relies on. Idempotent from the caller's perspective:
+// once split, each resulting layer has exactly 1 element, so a later
+// re-entry's auto-split pass no-ops via the `els.length<2` guard below.
+function splitLayerIntoElementsCore(li,opts){
+  var silent=!!(opts&&opts.silent);
+  var ld=state.layers[li];if(!ld||ld.symbolId){if(!silent)showToast('Rien à éclater ici');return false;}
+  if(!window.SMMotion)return false;
   var els=SMMotion.layerElements(li,ld);
-  if(!els||els.length<2){showToast('Il faut au moins 2 éléments pour éclater ce calque');return;}
-  saveAllLayerFrames();pushUndo();
+  if(!els||els.length<2){if(!silent)showToast('Il faut au moins 2 éléments pour éclater ce calque');return false;}
+  saveAllLayerFrames();if(!silent)pushUndo();
   var n=els.length;
   var newLayers=[];
   for(var e=0;e<n;e++){
@@ -1062,7 +1079,8 @@ function splitLayerIntoElements(li){
   _layerSel=newLayers.map(function(_x,idx){return li+idx;});
   activateUL(state.activeLayerIdx);
   loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
-  showToast('Calque éclaté en '+n+' calques');
+  if(!silent)showToast('Calque éclaté en '+n+' calques');
+  return true;
 }
 // Inverse of convertLayerToComponent: bakes what the component instance
 // actually displays on each main-timeline frame (play mode, speed and

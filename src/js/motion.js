@@ -913,149 +913,52 @@
   // Layers"), then RE-reversed 2026-07-17 ("montage des éléments dans le
   // component") once a Component layer could actually carry working
   // per-element Motion (elementMotionAt no longer forces null for
-  // ld.symbolId, see app.js's getEffectiveStrokes). First attempt at the
-  // re-reversal built a parallel lightweight "focus" mechanism (its own
-  // state field + its own tab) — dropped the same day ("un component et
-  // une precomp c'est un peu la même chose") in favor of just calling the
-  // REAL enterSymbol (app.js) a Component layer already has via
-  // Animation2D's own dblclick-to-enter-symbol (timeline.js) — same tab
-  // (openSymbolTabs/renderSymbolTabs), same "Scene" tab to come back, zero
-  // new state. Only gated on `ld.symbolId`: a plain layer keeps the old
+  // ld.symbolId, see app.js's getEffectiveStrokes). Two rendering attempts
+  // followed: first a lightweight parallel "focus" mechanism (own state +
+  // own tab, dropped the same day for enterSymbol reuse — "un component et
+  // une precomp c'est la même chose"), then a nested "Transform (instance)
+  // > Éléments > Forme N (own Transform)" montage view — ALSO dropped
+  // ("j'ai pas... plusieurs calques séparés... comme avant", pointing at a
+  // screenshot of splitLayerIntoElements' own flat "Layer 1 — Forme N"
+  // result). Landed on: double-click just calls enterSymbol (real tab,
+  // real "Scene" back-button, zero new state), then SILENTLY auto-runs
+  // splitLayerIntoElementsCore on every qualifying layer inside the
+  // entered symbol — turning the single merged "Layer 1" into N real
+  // separate layers, each with its own real timeline bar. From there the
+  // NORMAL Motion layer list/timeline (unmodified) already renders exactly
+  // the wanted result; no montage-specific rendering code needed at all.
+  // Only gated on `ld.symbolId`: a plain layer keeps the old
   // Release-to-Layers split, since there's no "inside" yet.
   function enterComponentLayer(li) {
     var ld = state.layers[li]; if (!ld || !ld.symbolId) return;
     var sym = state.symbols[ld.symbolId];
     // enterSymbol (app.js) always resets currentFrame to 0 — fine for its
     // other caller (Animation2D's own dblclick-to-enter-symbol), but here
-    // it silently hid the whole per-shape montage whenever the symbol's
-    // OWN frame 0 happens to be blank (bug found live, "je ne vois plus le
-    // montage... comme avant" — a component that starts drawing partway
-    // through its timeline is a completely normal case, not an edge case).
-    // Resolve which inner frame the instance was ALREADY showing at the
-    // outer playhead (same resolveSymbolFrameIdx mapping getEffectiveStrokes
-    // uses to render it) and jump there right after entering, so the
-    // montage opens on the frame you were actually looking at.
+    // it silently hid every shape whenever the symbol's OWN frame 0
+    // happens to be blank (bug found live, "je ne vois plus le montage...
+    // comme avant" — a component that starts drawing partway through its
+    // timeline is a completely normal case, not an edge case). Resolve
+    // which inner frame the instance was ALREADY showing at the outer
+    // playhead (same resolveSymbolFrameIdx mapping getEffectiveStrokes
+    // uses to render it) and jump there right after entering.
     var targetFrame = sym ? resolveSymbolFrameIdx(sym, ld, state.currentFrame) : 0;
     if (window.SM && window.SM.enterSymbol) window.SM.enterSymbol(ld.symbolId);
     if (sym) goToFrame(Math.max(0, Math.min(sym.totalFrames - 1, targetFrame)));
-  }
-  // Motion's view of a symbol's own layer(s) once inside it (state.
-  // activeSymbolId set — see renderLayerListMotion/renderTimelineMotion's
-  // branch below): unlike the normal per-layer accordion (one element's
-  // Transform group open at a time, renderElementsList), every element
-  // shows its full property set simultaneously here — this IS the montage
-  // the user asked for ("un component et une precomp c'est la même
-  // chose... on ouvre le component pour afficher le montage des éléments
-  // et shape"), one row per shape, all visible together. `ld` here is one
-  // of the ENTERED symbol's own layers (sym.layers, e.g. "Layer 1" from
-  // convertLayerToComponent) — a plain layer object with no symbolId of
-  // its own, so there's no Component-ness to gate on here; that check
-  // already happened at the call site (renderLayerListMotion) via
-  // state.activeSymbolId.
-  function renderSymbolLayerMotionList(list, li) {
-    var ld = state.layers[li];
-    if (!ld) return;
-    var hdr = document.createElement('div'); hdr.className = 'lrow motion-group-row';
-    hdr.textContent = ld.name || ('Layer ' + (li + 1));
-    list.appendChild(hdr);
-    renderTransformGroup(list, ld, 'Transform');
-    var els = layerElements(li, ld);
-    if (!els.length) {
-      var empty = document.createElement('div'); empty.className = 'lrow'; empty.style.opacity = '0.6';
-      empty.textContent = 'Aucune forme sur cette frame'; list.appendChild(empty); return;
+    // Auto-split every entered layer that still bundles 2+ shapes — highest
+    // index first so each splice (replacing 1 layer with N) never shifts
+    // an index this loop hasn't visited yet.
+    if (window.SM && window.SM.splitLayerIntoElementsCore) {
+      for (var i = state.layers.length - 1; i >= 0; i--) window.SM.splitLayerIntoElementsCore(i, { silent: true });
     }
-    var elHdr = document.createElement('div'); elHdr.className = 'lrow motion-group-row'; elHdr.textContent = 'Éléments';
-    list.appendChild(elHdr);
-    els.forEach(function (entry, idx) {
-      var row = document.createElement('div'); row.className = 'lrow motion-elem-row';
-      var swatch = document.createElement('div'); swatch.className = 'motion-elem-swatch';
-      swatch.style.background = entry.sd.fillColor || entry.sd.strokeColor || 'transparent';
-      if (elementHasMotion(ld, entry.strokeId)) swatch.classList.add('has-motion');
-      var nm = document.createElement('div'); nm.className = 'lnm'; nm.textContent = elementLabel(entry, idx);
-      row.appendChild(swatch); row.appendChild(nm);
-      list.appendChild(row);
-      renderTransformGroup(list, ensureElementHolder(ld, entry.strokeId), 'Transform');
-    });
-  }
-  // Timeline-grid mirror of renderSymbolLayerMotionList — MUST produce the
-  // same row sequence (same alignment invariant every other panel/grid
-  // pair in this file already depends on, see ROW_H's header comment): a
-  // spacer per list row that isn't itself a keyframe track. Unlike the
-  // normal per-element accordion mirror further below (whose single
-  // elSpacer stands in for BOTH the element's own row and
-  // renderTransformGroup's group-row header — harmless there since at most
-  // one element is ever expanded at once), every element here is always
-  // "expanded" simultaneously, so a missing spacer per element would
-  // compound into a growing drift instead of a single one-off gap — each
-  // element gets its own two spacers (row + group-row) to stay
-  // pixel-aligned with renderSymbolLayerMotionList's row + Transform pair.
-  // Which contiguous frame range(s) a given shape (strokeId) actually
-  // appears in, scanning getEffectiveStrokes across the WHOLE timeline —
-  // there's no independent per-shape timing stored anywhere to just read
-  // off (a shape's presence is entirely a side-effect of the parent
-  // layer's own keyframe/held-frame structure), so this is the only way to
-  // answer "when does this shape exist" for the montage's own bars.
-  function elementPresenceRanges(li, strokeId) {
-    var ranges = [], curStart = -1;
-    for (var f = 0; f < state.totalFrames; f++) {
-      var present = getEffectiveStrokes(li, f).some(function (sd) { return sd.strokeId === strokeId; });
-      if (present && curStart < 0) curStart = f;
-      else if (!present && curStart >= 0) { ranges.push([curStart, f - 1]); curStart = -1; }
-    }
-    if (curStart >= 0) ranges.push([curStart, state.totalFrames - 1]);
-    return ranges;
-  }
-  // Read-only "existence" bar per shape in the montage — deliberately NOT
-  // layer-inout.js's buildBar (that drags a REAL layer's ld.inPoint/
-  // outPoint; a shape isn't a real layer, there's nothing of its own to
-  // persist a drag against). Same visual language (.layer-inout-bar) so a
-  // multi-shape montage reads as a real "layer montage" at a glance — the
-  // reference sketch's parallel bars of different lengths — even though
-  // the timing itself is derived, not stored.
-  function buildElementPresenceBar(row, li, strokeId, colorHex) {
-    row.style.position = 'relative';
-    elementPresenceRanges(li, strokeId).forEach(function (r) {
-      var bar = document.createElement('div'); bar.className = 'layer-inout-bar full-range';
-      bar.style.left = (r[0] * FC) + 'px';
-      bar.style.width = Math.max(FC, (r[1] - r[0] + 1) * FC) + 'px';
-      bar.style.cursor = 'default';
-      if (colorHex) { bar.style.background = colorHex; bar.style.opacity = '0.4'; bar.style.borderColor = colorHex; }
-      row.appendChild(bar);
-    });
-  }
-  function renderSymbolLayerMotionTimeline(grid, li) {
-    var ld = state.layers[li];
-    if (!ld) return;
-    var hdrSpacer = document.createElement('div'); hdrSpacer.className = 'frow'; hdrSpacer.dataset.layer = li;
-    if (window.SMLayerInOut) SMLayerInOut.buildBar(hdrSpacer, li);
-    grid.appendChild(hdrSpacer);
-    var grpSpacer = document.createElement('div'); grpSpacer.className = 'frow';
-    grid.appendChild(grpSpacer);
-    PROPS.forEach(function (prop) { renderTracksFor(grid, ld, prop); });
-    var els = layerElements(li, ld);
-    if (!els.length) return;
-    var elHdrSpacer = document.createElement('div'); elHdrSpacer.className = 'frow';
-    grid.appendChild(elHdrSpacer);
-    els.forEach(function (entry) {
-      var elSpacer = document.createElement('div'); elSpacer.className = 'frow';
-      buildElementPresenceBar(elSpacer, li, entry.strokeId, entry.sd.fillColor || entry.sd.strokeColor);
-      grid.appendChild(elSpacer);
-      var elGrpSpacer = document.createElement('div'); elGrpSpacer.className = 'frow';
-      grid.appendChild(elGrpSpacer);
-      PROPS.forEach(function (prop) { renderTracksFor(grid, ensureElementHolder(ld, entry.strokeId), prop); });
-    });
   }
   function renderLayerListMotion(list) {
     // Inside a Component (state.activeSymbolId, entered via
     // enterComponentLayer's dblclick below OR Animation2D's own
-    // dblclick-to-enter-symbol): state.layers IS the symbol's own
-    // layers now — show every one of them with its full per-shape
-    // montage instead of the normal collapsible accordion.
-    if (state.activeSymbolId) {
-      var symOrder = (typeof computeLayerRenderOrder === 'function') ? computeLayerRenderOrder() : state.layers.map(function (_l, i) { return { type: 'layer', idx: i }; });
-      symOrder.forEach(function (entry) { if (entry.type !== 'layer' || entry.hidden) return; renderSymbolLayerMotionList(list, entry.idx); });
-      return;
-    }
+    // dblclick-to-enter-symbol): state.layers IS the symbol's own layers
+    // now — enterComponentLayer already auto-split any multi-shape layer
+    // into N real separate ones, so the normal per-layer rendering below
+    // (unmodified) already shows exactly the wanted result, no special
+    // case needed here.
     var order = (typeof computeLayerRenderOrder === 'function') ? computeLayerRenderOrder() : state.layers.map(function (_l, i) { return { type: 'layer', idx: i }; });
     order.forEach(function (entry) {
       if (entry.type !== 'layer' || entry.hidden) return;
@@ -1529,12 +1432,6 @@
     grid.appendChild(row);
   }
   function renderTimelineMotion(grid) {
-    if (state.activeSymbolId) {
-      var symOrder = (typeof computeLayerRenderOrder === 'function') ? computeLayerRenderOrder() : state.layers.map(function (_l, i) { return { type: 'layer', idx: i }; });
-      symOrder.forEach(function (entry) { if (entry.type !== 'layer' || entry.hidden) return; renderSymbolLayerMotionTimeline(grid, entry.idx); });
-      updateKeySelectionBox(); updateLayerStaggerBox();
-      return;
-    }
     var order = (typeof computeLayerRenderOrder === 'function') ? computeLayerRenderOrder() : state.layers.map(function (_l, i) { return { type: 'layer', idx: i }; });
     order.forEach(function (entry) {
       if (entry.type !== 'layer' || entry.hidden) return;
