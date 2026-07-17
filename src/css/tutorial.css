@@ -1,0 +1,63 @@
+/* ---- Interactive tutorial overlay (Flash-4-style "Lessons") ---- */
+
+#btn-open-tutorial-topbar{flex:none;width:24px;height:24px;border-radius:6px;background:transparent;border:none;color:rgba(236,234,231,.45);cursor:pointer;display:flex;align-items:center;justify-content:center;}
+#btn-open-tutorial-topbar:hover{background:var(--panel3);color:var(--accent-hover);}
+
+#tut-spotlight{
+  position:fixed;pointer-events:none;z-index:5000;
+  border-radius:10px;
+  box-shadow:0 0 0 9999px rgba(6,5,8,.68),0 0 0 2px var(--accent),0 0 18px 2px var(--accent-hover);
+  transition:top .28s cubic-bezier(.4,0,.2,1),left .28s cubic-bezier(.4,0,.2,1),
+             width .28s cubic-bezier(.4,0,.2,1),height .28s cubic-bezier(.4,0,.2,1),
+             opacity .2s;
+  opacity:0;
+}
+#tut-spotlight.on{opacity:1;}
+#tut-spotlight.no-target{
+  /* whole-screen dim, no cutout — used for pure "info" steps */
+  box-shadow:0 0 0 9999px rgba(6,5,8,.55);
+}
+
+#tut-tooltip{
+  position:fixed;z-index:5001;width:280px;
+  background:var(--panel);border:1px solid var(--border2);border-radius:10px;
+  box-shadow:0 12px 32px rgba(0,0,0,.5);
+  padding:14px 14px 12px;color:var(--text);
+  opacity:0;transform:translateY(4px);
+  transition:opacity .2s,transform .2s,top .28s cubic-bezier(.4,0,.2,1),left .28s cubic-bezier(.4,0,.2,1);
+  pointer-events:none;
+}
+#tut-tooltip.on{opacity:1;transform:translateY(0);pointer-events:auto;}
+
+#tut-tooltip .tut-progress{font-size:9px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-dim);margin-bottom:6px;}
+#tut-tooltip .tut-title{font-size:13px;font-weight:600;margin-bottom:6px;}
+#tut-tooltip .tut-body{font-size:11px;line-height:1.5;color:var(--text-dim);margin-bottom:10px;}
+#tut-tooltip .tut-hint{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--accent-hover);margin-bottom:10px;}
+#tut-tooltip .tut-hint .tut-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:tut-pulse 1.1s ease-in-out infinite;flex:none;}
+@keyframes tut-pulse{0%,100%{opacity:.35;transform:scale(.85);}50%{opacity:1;transform:scale(1.15);}}
+#tut-tooltip .tut-actions{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+#tut-tooltip .tut-next{background:var(--accent);color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:11px;font-weight:600;cursor:pointer;}
+#tut-tooltip .tut-next:hover{background:var(--accent-hover);}
+#tut-tooltip .tut-skip{background:none;border:none;color:var(--text-dim);font-size:10px;cursor:pointer;padding:4px;}
+#tut-tooltip .tut-skip:hover{color:var(--text);}
+#tut-tooltip .tut-close{position:absolute;top:8px;right:10px;background:none;border:none;color:var(--text-dim);font-size:14px;cursor:pointer;line-height:1;pointer-events:auto;}
+#tut-tooltip .tut-close:hover{color:var(--text);}
+
+/* ---- Module launcher modal ---- */
+/* Opened from the start screen (#start-screen, z-index:500) via its own
+   row, same reason #kitsu-modal overrides the default .modal-overlay
+   z-index:200 — see style.css's comment above #kitsu-modal. */
+#tut-launcher{z-index:600;}
+#tut-launcher.modal-overlay .modal-box{width:420px;}
+#tut-launcher .tut-mod-list{display:flex;flex-direction:column;gap:8px;}
+#tut-launcher .tut-mod{
+  display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;
+  background:var(--panel3);border:1px solid var(--border);cursor:pointer;text-align:left;
+}
+#tut-launcher .tut-mod:hover{border-color:var(--accent);}
+#tut-launcher .tut-mod-ico{flex:none;width:28px;height:28px;border-radius:6px;background:var(--accent-dim);color:var(--accent-hover);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;}
+#tut-launcher .tut-mod.done .tut-mod-ico{background:rgba(63,245,120,.16);color:#5fe08a;}
+#tut-launcher .tut-mod-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;text-align:left;}
+#tut-launcher .tut-mod-title{font-size:12px;font-weight:600;display:block;}
+#tut-launcher .tut-mod-desc{font-size:10px;color:var(--text-dim);display:block;}
+#tut-launcher .tut-mod-time{flex:none;font-size:9px;color:var(--text-dim);}
