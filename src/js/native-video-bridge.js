@@ -435,7 +435,15 @@
       if (window.showToast) showToast('Média optimisé : ' + (nv.path.split('/').pop()) + ' — scrub instantané');
       if (window.loadFrame) loadFrame(state.currentFrame);
     } catch (e) {
+      // Was silent (console.warn only) — a failure here means this video
+      // stays on the slow non-optimized decode path FOREVER (nothing else
+      // ever retries it), which reads to the user as "import/scrub isn't
+      // instant anymore" with zero visible explanation ("j'ai plus l'import
+      // instantané", 2026-07, no error toast seen). Surfacing it doesn't
+      // fix the underlying transcode failure, but at least makes it
+      // diagnosable without opening devtools.
       console.warn('[native-video] optimization skipped for ' + nv.path + ':', e && e.message || e);
+      if (window.showToast) showToast('Optimisation vidéo échouée pour ' + (nv.path.split('/').pop()) + ' (scrub restera plus lent) — ' + (e && e.message || e), 'warn');
     } finally {
       delete _optimizing[nv.path];
     }
