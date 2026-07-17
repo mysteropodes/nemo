@@ -801,10 +801,23 @@ window.SM={
   // drag — an extra pushUndo here would split one user drag into several
   // undo steps. Caller is responsible for the final loadFrame/render pass
   // too, same reasoning.
+  //
+  // Bug found live 2026-07-17 ("ça ne retime pas la forme, ça n'agit pas
+  // vraiment"): this used to call saveAllLayerFrames() here too, AFTER the
+  // drag had already committed ld.inPoint/outPoint (mousemove sets those
+  // live, per-frame, so the visible range shrinks WHILE dragging — see
+  // layer-inout.js's own "must reflect the new range live" comment). By
+  // the time THIS function ran (at drop), getEffectiveStrokes' in/out gate
+  // (app.js) had already hidden the source frame's content from the LIVE
+  // Paper canvas, so saveAllLayerFrames() re-collected an now-EMPTY canvas
+  // straight into ld.frames — permanently wiping the very content this
+  // function is supposed to carry forward, before the shift loop below
+  // ever got to read it. The caller already saved everything it needs to
+  // BEFORE starting the drag (see onDown, layer-inout.js) — no reason to
+  // re-derive from a canvas the drag itself has since made unreliable.
   shiftLayerFrames:function(layerIdx,dx){
     var ld=state.layers[layerIdx];if(!ld||ld.locked||!dx)return false;
     var total=state.totalFrames;
-    saveAllLayerFrames();
     var beforeKfs=ld.frames.map(function(f,fi){return f.isKeyframe?fi:null;}).filter(function(x){return x!==null;});
     var newFrames=[];
     for(var i=0;i<total;i++)newFrames.push({strokes:[],isKeyframe:false,isInterpolated:false});
