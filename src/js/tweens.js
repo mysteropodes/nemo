@@ -20,15 +20,41 @@ function colorDist(c1,c2){
   var dr=c1.r-c2.r,dg=c1.g-c2.g,db=c1.b-c2.b;
   return Math.sqrt(dr*dr+dg*dg+db*db)/441.6729559300637;
 }
-function strokeType(sd){if(sd.isVectorBrush)return'vb';var hasS=!!sd.strokeColor,hasF=!!sd.fillColor;if(hasS&&hasF)return'both';if(hasF)return'fill';return'stroke';}
+// hasRealStroke is AUTHORITATIVE over strokeColor (app.js's desP already
+// treats it this way — see its own header comment: a path with NO real
+// stroke keeps serP's historical '#ffffff'/'#fff' phantom fallback sitting
+// in the stored field, purely so old data/other code paths that expect a
+// string don't choke, but it must never be read as an actual color).
+// strokeType/strokeFeat used to read sd.strokeColor raw — bug found while
+// stress-testing (2026-07-17): saveAllLayerFrames runs at the START of
+// every generateTweens call, round-tripping whichever keyframe sits at
+// state.currentFrame through desP/serP — a fill-only shape (hasRealStroke:
+// false) that happened to be the CURRENT frame when Tween was pressed came
+// back out with a real-looking '#ffffff' in strokeColor, misclassifying it
+// as type 'both' (typePenalty 0.5, one of the largest single terms) against
+// its own un-round-tripped partner keyframe still correctly typed 'fill' —
+// a pure serialization artifact, not a real difference between the two
+// drawings, silently pushing an otherwise-perfect match toward rejection.
+function realStrokeColor(sd){return sd.hasRealStroke===false?null:sd.strokeColor;}
+function strokeType(sd){if(sd.isVectorBrush)return'vb';var hasS=!!realStrokeColor(sd),hasF=!!sd.fillColor;if(hasS&&hasF)return'both';if(hasF)return'fill';return'stroke';}
 // Pressure-brush strokes are stored as their filled OUTLINE (a closed
 // sausage around the drawn line) — comparing outlines wrecks proximity,
 // curvature and open/closed detection. All geometric features are computed
 // on the actual drawn centerline instead whenever it's available.
 function buildTPFeat(sd){
-  var segs=(sd.isVectorBrush&&sd.centerSegments&&sd.centerSegments.length>1)?sd.centerSegments:sd.segments;
+  var usingCenter=sd.isVectorBrush&&sd.centerSegments&&sd.centerSegments.length>1;
+  var segs=usingCenter?sd.centerSegments:sd.segments;
   var p=new Path({insert:false});
   segs.forEach(function(s){p.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));});
+  // Bug found by stress-testing (2026-07-17): never setting `.closed` here
+  // meant every downstream feature (strokeFeat's 16-point Chamfer samples,
+  // turning-angle profile, centroid, Fourier descriptor) measured a CLOSED
+  // shape's own length short by its implicit closing segment — the same
+  // root cause fixed in resamplePJS/resamplePairFeatureAware, but here it
+  // corrupts the MATCHING COST itself, not just the resample stage. A
+  // vector-brush centerline stays open regardless (it's the drawn stroke,
+  // never a closed loop even when its rendered ribbon outline is).
+  p.closed=!usingCenter&&!!sd.closed;
   return p;
 }
 // Fourier magnitude descriptor of a boundary point sequence — captures
@@ -99,7 +125,7 @@ function strokeFeat(sd){var p=buildTPFeat(sd);var b=p.bounds,len=p.length;var cx
   var usingCenterline=sd.isVectorBrush&&sd.centerSegments&&sd.centerSegments.length>1;
   var isClosed=(!usingCenterline&&typeof sd.closed==='boolean')?sd.closed:closedHeuristic;
   var fourier=fourierDescriptor(pts,cx,cy);
-  p.remove();return{cx:cx,cy:cy,length:len,dirX:dx,dirY:dy,bounds:{x:b.x,y:b.y,w:b.width,h:b.height},shape:shape,pts:pts,turn:turn,closed:isClosed,strokeCol:parseHexColor(sd.strokeColor),fillCol:parseHexColor(sd.fillColor),type:strokeType(sd),fourier:fourier};}
+  p.remove();return{cx:cx,cy:cy,length:len,dirX:dx,dirY:dy,bounds:{x:b.x,y:b.y,w:b.width,h:b.height},shape:shape,pts:pts,turn:turn,closed:isClosed,strokeCol:parseHexColor(realStrokeColor(sd)),fillCol:parseHexColor(sd.fillColor),type:strokeType(sd),fourier:fourier};}
 // Relative position (within the whole frame's own composition bbox) is what
 // actually distinguishes "left eye" from "right eye" — raw absolute centroid
 // distance breaks down whenever the whole drawing translates/scales between
@@ -169,8 +195,23 @@ function matchSc(fA,fB,sameIndex,aPtsOverride){
   var szD=Math.abs(aArea-bArea)/Math.max(1,Math.max(aArea,bArea));
   var colD=(colorDist(fA.strokeCol,fB.strokeCol)+colorDist(fA.fillCol,fB.fillCol))/2;
   var typePenalty=fA.type!==fB.type?0.5:0;
+  // HARD color-identity penalty (2026-07-17, production stress-test) —
+  // the file's own header comment already states "a stroke's color is what
+  // a viewer actually reads as its identity", but colD's soft 0.15 weight
+  // couldn't enforce it: two same-shape balls of DIFFERENT colors crossing
+  // paths (a hand passing in front of a face — everyday cel animation)
+  // matched by POSITION instead (proximity's 0.48 dwarfs a full-scale
+  // color clash at 0.604*0.15≈0.09), so both balls stood perfectly still
+  // and hard-swapped colors at the tween midpoint instead of crossing.
+  // A clearly-different hue on the same channel gets the same flat-penalty
+  // treatment a type mismatch already has — 0.4, big enough to make any
+  // plausible-motion pairing win, while small hue drift (shading tweaks
+  // between keys, <0.35 normalized) stays penalty-free.
+  var fillClash=fA.fillCol&&fB.fillCol&&colorDist(fA.fillCol,fB.fillCol)>0.35;
+  var strokeClash=fA.strokeCol&&fB.strokeCol&&colorDist(fA.strokeCol,fB.strokeCol)>0.35;
+  var colorPenalty=(fillClash||strokeClash)?0.4:0;
   var idxBonus=sameIndex?-0.03:0;
-  return proxT*.48+alignT*.15+curveT*.12+fourD*.10+rel*.10+szD*.06+colD*.15+typePenalty+ratioPen+closedPen+idxBonus;
+  return proxT*.48+alignT*.15+curveT*.12+fourD*.10+rel*.10+szD*.06+colD*.15+typePenalty+colorPenalty+ratioPen+closedPen+idxBonus;
 }
 // "Force line" motion model: eyes, chin, and other small close-together
 // features are exactly where independent per-stroke shape/position matching
@@ -241,7 +282,13 @@ function hungarian(cost){
 // autoMatchJS below for the reference implementation, kept as the fallback
 // on any WASM failure/absence, same pattern as fill/erase/boolean/shapes.
 function _strokeInJson(sd){
-  return{segments:sd.segments||[],centerSegments:sd.centerSegments,strokeColor:sd.strokeColor||null,fillColor:sd.fillColor||null,isVectorBrush:!!sd.isVectorBrush,closed:!!sd.closed};
+  // realStrokeColor (not raw sd.strokeColor) so the WASM path sees the same
+  // phantom-free color a fill-only shape's OWN JS-side strokeFeat/
+  // strokeType do — otherwise WASM's own stroke_feat (tweenmatch.rs, which
+  // has no concept of hasRealStroke at all) would still see serP's
+  // '#ffffff' fallback and disagree with the JS fallback path on the exact
+  // same input, purely depending on which one happened to run.
+  return{segments:sd.segments||[],centerSegments:sd.centerSegments,strokeColor:realStrokeColor(sd)||null,fillColor:sd.fillColor||null,isVectorBrush:!!sd.isVectorBrush,closed:!!sd.closed};
 }
 function autoMatch(sA,sB){
   if(!sA.length||!sB.length)return[];
@@ -298,7 +345,7 @@ function autoMatchJS(sA,sB){
   var ptsA=seeds.map(function(s){return{x:fA[s.a].cx,y:fA[s.a].cy};});
   var ptsB=seeds.map(function(s){return{x:fB[s.b].cx,y:fB[s.b].cy};});
   var transform=fitSimilarityTransform(ptsA,ptsB);
-  if(!transform)return matches;
+  if(!transform)return uncrossMatches(matches,fA,fB);
   // the fitted motion (force line) is applied to every A stroke's actual
   // sample points, so pass 2's proximity measures "how far is this line
   // from where the drawing's motion says it should be" — not raw distance
@@ -307,7 +354,51 @@ function autoMatchJS(sA,sB){
   var assign2=hungarian(cost2);
   var matches2=[];
   for(var a4=0;a4<n;a4++){var b4=assign2[a4];if(b4!==undefined&&b4>=0&&b4<m)matches2.push({a:a4,b:b4,score:cost2[a4][b4]});}
-  return matches2;
+  return uncrossMatches(matches2,fA,fB);
+}
+// ---- trajectory uncrossing (2026-07-17, "les yeux s'inversent") ----
+// Found on a real hand-drawn animation: two nearly-identical eye strokes
+// ~40px apart, whole face shifting diagonally between keys — the crossed
+// assignment's total point distance (161px) was within 3% of the correct
+// one (157px), so neither the Hungarian nor the force-line pass could
+// tell them apart, and the eyes traded places mid-tween. The signal a
+// human inbetweener uses here isn't proximity at all: two motion
+// trajectories that CROSS each other, for strokes this similar, are
+// almost always a matching error — cel features keep their spatial
+// arrangement. Post-pass: for every pair of matches whose straight-line
+// centroid trajectories intersect, try swapping the B partners; accept
+// the swap when it doesn't cost meaningfully more than the crossed
+// version (small tolerance in favor of uncrossing — near-ties are
+// exactly the ambiguous case this exists for). A GENUINE crossing (the
+// red/blue balls passing each other) survives: swapping there hits the
+// color-clash/type penalties, far above the tolerance. Sweeps until
+// stable (bounded) since one swap can uncross/cross a third trajectory.
+function _segsIntersect(p1,p2,p3,p4){
+  function ccw(a,b,c){return (c.y-a.y)*(b.x-a.x)>(b.y-a.y)*(c.x-a.x);}
+  return ccw(p1,p3,p4)!==ccw(p2,p3,p4)&&ccw(p1,p2,p3)!==ccw(p1,p2,p4);
+}
+var UNCROSS_TOL=0.08;
+function uncrossMatches(ms,fA,fB){
+  if(ms.length<2)return ms;
+  for(var sweep=0;sweep<4;sweep++){
+    var swapped=false;
+    for(var i=0;i<ms.length;i++)for(var j=i+1;j<ms.length;j++){
+      var m1=ms[i],m2=ms[j];
+      var a1={x:fA[m1.a].cx,y:fA[m1.a].cy},b1={x:fB[m1.b].cx,y:fB[m1.b].cy};
+      var a2={x:fA[m2.a].cx,y:fA[m2.a].cy},b2={x:fB[m2.b].cx,y:fB[m2.b].cy};
+      if(!_segsIntersect(a1,b1,a2,b2))continue;
+      var cur=matchSc(fA[m1.a],fB[m1.b],m1.a===m1.b)+matchSc(fA[m2.a],fB[m2.b],m2.a===m2.b);
+      var swp=matchSc(fA[m1.a],fB[m2.b],m1.a===m2.b)+matchSc(fA[m2.a],fB[m1.b],m2.a===m1.b);
+      if(swp<=cur+UNCROSS_TOL){
+        var tmp=m1.b;m1.b=m2.b;m2.b=tmp;
+        m1.score=matchSc(fA[m1.a],fB[m1.b],m1.a===m1.b);
+        m2.score=matchSc(fA[m2.a],fB[m2.b],m2.a===m2.b);
+        swapped=true;
+      }
+    }
+    if(!swapped)break;
+  }
+  return ms;
 }
 
 // ---- INTERPOLATION ----
@@ -331,7 +422,19 @@ function _resampleStrokeWasm(sd,n){
   }catch(e){console.warn('[geometry-wasm] resample_stroke failed, falling back to JS',e);return null;}
 }
 function resampleP(sd,n){var w=_resampleStrokeWasm(sd,n);if(w)return w;return resamplePJS(sd,n);}
-function resamplePJS(sd,n){var p=new Path({insert:false});sd.segments.forEach(function(s){p.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));});var len=p.length;if(len<1||n<2){p.remove();return sd;}var segs=[];for(var i=0;i<n;i++){var t=i/(n-1);var off=t*len;var pt=p.getPointAt(off);if(!pt)pt=p.getPointAt(len);var tan=p.getTangentAt(off);if(!tan)tan=new Point(1,0);var hl=len/(n-1)/3;segs.push({point:[pt.x,pt.y],handleIn:i===0?[0,0]:[-tan.x*hl,-tan.y*hl],handleOut:i===n-1?[0,0]:[tan.x*hl,tan.y*hl]});}p.remove();return{segments:segs,closed:!!sd.closed,strokeColor:sd.strokeColor,strokeWidth:sd.strokeWidth,strokeCap:sd.strokeCap,strokeJoin:sd.strokeJoin,fillColor:sd.fillColor||null,opacity:sd.opacity!==undefined?sd.opacity:1};}
+// Bug found by stress-testing (2026-07-17): this temp Path used to never
+// get `.closed` set before reading `.length` — for ANY closed shape (the
+// overwhelming majority of drawn fills), Paper.js's own length therefore
+// measured only the OPEN span (last drawn point back to the first), never
+// the implicit closing segment, so every resample fell short of a true
+// full loop by exactly that missing segment's length. Harmless-looking on
+// its own (still n evenly-spaced points), but it silently shifts what each
+// output index actually corresponds to around the loop — and compounds
+// with alignResampledPair's own rotation search (same missing `.closed`
+// bug there, fixed alongside this) to leave a residual few-degrees-to-one-
+// vertex misalignment that showed up as visible self-intersection at the
+// tween's midpoint on shapes needing any rotation correction.
+function resamplePJS(sd,n){var p=new Path({insert:false});sd.segments.forEach(function(s){p.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));});p.closed=!!sd.closed;var len=p.length;if(len<1||n<2){p.remove();return sd;}var segs=[];for(var i=0;i<n;i++){var t=i/(n-1);var off=t*len;var pt=p.getPointAt(off);if(!pt)pt=p.getPointAt(len);var tan=p.getTangentAt(off);if(!tan)tan=new Point(1,0);var hl=len/(n-1)/3;segs.push({point:[pt.x,pt.y],handleIn:i===0?[0,0]:[-tan.x*hl,-tan.y*hl],handleOut:i===n-1?[0,0]:[tan.x*hl,tan.y*hl]});}p.remove();return{segments:segs,closed:!!sd.closed,strokeColor:sd.strokeColor,strokeWidth:sd.strokeWidth,strokeCap:sd.strokeCap,strokeJoin:sd.strokeJoin,fillColor:sd.fillColor||null,opacity:sd.opacity!==undefined?sd.opacity:1};}
 // Centerline-driven variable-width strokes (vector brush / taper) are
 // matched and interpolated via their lean editable centerline + per-anchor
 // widths (data.centerSegments) instead of the dense filled outline that's
@@ -471,11 +574,18 @@ function _sampleAtFractions(p,len,fractions){
 function resamplePairFeatureAware(aData,bData,n,isVB){
   if(n<4){var rfn0=isVB?resampleCenterline:resampleP;return[rfn0(aData,n),rfn0(bData,n)];}
   var segKeyA=isVB?'centerSegments':'segments',segKeyB=segKeyA;
-  var srcA=(isVB&&aData.centerSegments&&aData.centerSegments.length>1)?aData.centerSegments:aData.segments;
-  var srcB=(isVB&&bData.centerSegments&&bData.centerSegments.length>1)?bData.centerSegments:bData.segments;
+  var usingCenterA=isVB&&aData.centerSegments&&aData.centerSegments.length>1;
+  var usingCenterB=isVB&&bData.centerSegments&&bData.centerSegments.length>1;
+  var srcA=usingCenterA?aData.centerSegments:aData.segments;
+  var srcB=usingCenterB?bData.centerSegments:bData.segments;
   if(!srcA||!srcB||srcA.length<2||srcB.length<2){var rfn1=isVB?resampleCenterline:resampleP;return[rfn1(aData,n),rfn1(bData,n)];}
   var pA=new Path({insert:false});srcA.forEach(function(s){pA.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));});
   var pB=new Path({insert:false});srcB.forEach(function(s){pB.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));});
+  // Same missing-`.closed` bug as resamplePJS (see its comment) — a
+  // vector-brush CENTERLINE stays open regardless (it's the drawn stroke
+  // path, never a closed loop even when its rendered ribbon outline is),
+  // matching strokeFeat's own usingCenterline special-case.
+  pA.closed=!usingCenterA&&!!aData.closed;pB.closed=!usingCenterB&&!!bData.closed;
   var lenA=pA.length,lenB=pB.length;
   if(!(lenA>0)||!(lenB>0)){pA.remove();pB.remove();var rfn2=isVB?resampleCenterline:resampleP;return[rfn2(aData,n),rfn2(bData,n)];}
   var fractions=buildSharedFractions(pA,pB,n);
@@ -683,13 +793,34 @@ function rotateResampled(r,k){
   if(r.widths)out.widths=r.widths.slice(k).concat(r.widths.slice(0,k));
   return out;
 }
+// Gates whether alignResampledPair's cyclic-rotation search runs.
+// Loosened 2026-07-17 (bug found on a REAL hand-drawn animation, not a
+// synthetic test): a hand-drawn head outline is a nearly-closed LOOP left
+// open by a small pen gap (~7% of its own diagonal here), and typically
+// drawn starting at a DIFFERENT point around the loop in each keyframe.
+// The old 5%-of-diagonal gap test said "open" → only reversal was ever
+// tried → index 0 lerped to index 0 with a large angular offset around the
+// loop → interpStroke's rigid fit read that offset as a spurious ~80°
+// whole-head ROTATION, visibly knotting/spinning the outline mid-tween.
+// New test: near-closed = endpoint gap under 15% of the diagonal AND total
+// polyline length over 1.5x the diagonal (a genuine loop wraps around —
+// its arc length is well above its own bbox diagonal; an open arc like a
+// mouth line ~1.4x, a straight stroke ~1.0x, so those keep reversal-only
+// alignment). Rotating a near-closed OPEN stroke's seam around the loop
+// makes the small pen gap travel to a different spot on the inbetweens —
+// a far smaller artifact than the spin it prevents, and the keyframes
+// themselves are never touched.
 function resampledIsClosed(r){
   var s=r.segments;if(s.length<4)return false;
   var minx=Infinity,miny=Infinity,maxx=-Infinity,maxy=-Infinity;
   s.forEach(function(sg){minx=Math.min(minx,sg.point[0]);miny=Math.min(miny,sg.point[1]);maxx=Math.max(maxx,sg.point[0]);maxy=Math.max(maxy,sg.point[1]);});
   var diag2=(maxx-minx)*(maxx-minx)+(maxy-miny)*(maxy-miny);
   var dx=s[0].point[0]-s[s.length-1].point[0],dy=s[0].point[1]-s[s.length-1].point[1];
-  return dx*dx+dy*dy<Math.max(1,diag2)*0.0025;
+  var gap2=dx*dx+dy*dy;
+  if(gap2>=Math.max(1,diag2)*0.0225)return false; // 0.15^2 of the diagonal
+  var polyLen=0;
+  for(var i=1;i<s.length;i++){var ddx=s[i].point[0]-s[i-1].point[0],ddy=s[i].point[1]-s[i-1].point[1];polyLen+=Math.sqrt(ddx*ddx+ddy*ddy);}
+  return polyLen*polyLen>diag2*2.25; // length > 1.5x diagonal — real loops only
 }
 function alignCost(a,b){
   var n=Math.min(a.segments.length,b.segments.length);
@@ -728,16 +859,63 @@ function alignResampledPair(a,b){
   }
   return alignResampledPairJS(a,b);
 }
+// Residual after fitting the best RIGID rotation+scale for a candidate B
+// ordering, instead of alignCost's raw centroid-relative point distance.
+// Found by stress-testing (2026-07-17): a 300x40 rectangle rotated a
+// clean 90° picked the mathematically-optimal-by-alignCost correspondence
+// (confirmed by exhaustive brute-force search — not an alignment-search
+// bug), yet interpStroke's OWN fitSimilarityTransform on that exact
+// correspondence came back mag≈0.34/theta≈-10° instead of the expected
+// mag≈1/theta≈90° — visibly non-rigid, "melting" instead of turning.
+// Root cause: raw point distance has no notion of "does this
+// correspondence read as one coherent rigid motion" — only "are the
+// points numerically close after centering" — and a shape with some
+// rotational/reflective symmetry (any non-square rectangle included) can
+// have MULTIPLE orderings that tie or nearly tie on that measure while
+// only one of them is the "clean turn". Scoring candidates by how well
+// they fit a SINGLE rigid rotation+scale (what interpStroke will actually
+// apply) picks the one that turns instead of the one that merely
+// minimizes raw distance — the traditional "line of force" idea applied
+// to the alignment decision itself, not just the final interpolation.
+function rotationFitResidual(a,b){
+  var n=Math.min(a.segments.length,b.segments.length);
+  var ptsA=[],ptsB=[];
+  for(var i=0;i<n;i++){ptsA.push({x:a.segments[i].point[0],y:a.segments[i].point[1]});ptsB.push({x:b.segments[i].point[0],y:b.segments[i].point[1]});}
+  var t=fitSimilarityTransform(ptsA,ptsB);
+  if(!t)return alignCost(a,b); // degenerate (coincident points) — fall back to plain distance
+  var s=0;
+  for(var i2=0;i2<n;i2++){
+    var q=applySimilarityTransform(t,ptsA[i2].x,ptsA[i2].y);
+    var dx=q.x-ptsB[i2].x,dy=q.y-ptsB[i2].y;
+    s+=dx*dx+dy*dy;
+  }
+  return s;
+}
+// The rotation-fit criterion is CLOSED-shapes-only (2026-07-17, found on
+// a real hand-drawn face): for a near-straight OPEN stroke (eyebrow,
+// eyelid), reversing the point order is geometrically indistinguishable
+// from a ~180° rotation — so judging candidates by residual-after-fitting-
+// a-rotation "explains" the reversed ordering with a perfect half-spin
+// (residual ≈0) and prefers it over the honest as-is ordering (whose small
+// residual is just hand-drawn wobble). interpStroke then faithfully plays
+// that fitted spin: eyebrows visibly twirled -145°..-165° for no reason.
+// Open strokes go back to the plain raw-distance test (reversal must be
+// justified by actual geometry); closed loops keep the rotation-fit
+// criterion — there the cyclic candidates are all the SAME loop retraced,
+// spin-vs-shift ambiguity is real, and it's what fixed the 90°-rectangle
+// and rotated-start-star cases.
 function alignResampledPairJS(a,b){
-  var best=b,bestC=alignCost(a,b);
+  var closed=resampledIsClosed(a)&&resampledIsClosed(b);
+  var costFn=closed?rotationFitResidual:alignCost;
+  var best=b,bestC=costFn(a,b);
   var rev=reverseResampled(b);
-  var rc=alignCost(a,rev);if(rc<bestC){bestC=rc;best=rev;}
-  if(resampledIsClosed(a)&&resampledIsClosed(b)){
+  var rc=costFn(a,rev);if(rc<bestC){bestC=rc;best=rev;}
+  if(closed){
     [b,rev].forEach(function(base){
       var n=base.segments.length;
       for(var k=1;k<n;k++){
         var cand=rotateResampled(base,k);
-        var c=alignCost(a,cand);
+        var c=costFn(a,cand);
         if(c<bestC){bestC=c;best=cand;}
       }
     });
@@ -945,17 +1123,66 @@ function generateTweens(){
       forcedAIdx[aIdx]=1;forcedBIdx[bIdx]=1;
       forcedPairs.push({aIdx:aIdx,bIdx:bIdx,aData:sA[aIdx],bData:sB[bIdx],mi:-1-forcedPairs.length,score:0,forced:true});
     });
-    var matches=autoMatch(sA,sB);if(!matches.length&&!forcedPairs.length)continue;
+    // Pre-existing bug found by stress-testing (2026-07-17): this used to
+    // `continue` whenever autoMatch returned ZERO pairs (and no forced
+    // overrides) — i.e. exactly when the two keyframes' drawings are so
+    // different that the augmented Hungarian sent EVERY stroke to a fade
+    // dummy (a full cut-away: small shape top-left key A, unrelated big
+    // shape bottom-right key B). Skipping the span meant NO inbetweens at
+    // all were generated — not even the cross-fade that unmatched strokes
+    // are supposed to get — silently leaving whatever frames were there
+    // before. Only skip when there is genuinely nothing to tween on either
+    // side; zero matches with real strokes still flows through so the
+    // fade-out/fade-in machinery below does its job.
+    var matches=autoMatch(sA,sB);if(!sA.length&&!sB.length&&!forcedPairs.length)continue;
     // Only morph plausible pairs. A stroke whose best assignment still
     // scores badly (no real counterpart in the other key — count mismatch,
     // or a shape that genuinely appears/disappears) cross-fades in place
     // instead of scaling/warping toward an unrelated stroke.
     var MATCH_TH=0.48;
+    // Bug found by stress-testing (2026-07-17): matchSc's dominant terms
+    // (proxT 0.48 + alignT 0.15) are ABSOLUTE-position Chamfer/ordered
+    // distance, normalized by the strokes' own size — so a single shape
+    // that simply moves far between two keys (a thrown ball, a fast pan,
+    // any large but perfectly ordinary motion) climbs past MATCH_TH purely
+    // from distance, with NOTHING else about it changed, and gets treated
+    // as an "appear/disappear" cross-fade instead of an interpolated move.
+    // Confirmed empirically: identical circles moving ~4.5x their own
+    // diameter already exceed 0.48, scale-invariantly (same ratio at every
+    // tested radius) — a very ordinary distance for anime action, not an
+    // edge case. Generalized (same session, character-pose test): a raised
+    // ARM — one long stroke pivoting ~90° around its shoulder with some
+    // foreshortening, THE textbook limb motion — scored 0.739 while the
+    // character's other 5 strokes all matched confidently, so the arm
+    // cross-faded while the rest of the body moved. The Hungarian had
+    // paired arm↔arm; only the threshold vetoed it. Whenever a rejected
+    // Hungarian pair's two members are BOTH still unmatched after the
+    // threshold pass (in the 1-stroke-per-frame case that's trivially
+    // true — the original soleCandidates form of this fix), there is no
+    // competing candidate the position score could be protecting: fading
+    // is strictly worse than following the assignment the global optimum
+    // already chose — traditional inbetweening prefers motion over a
+    // dissolve whenever the strokes are plausibly the same object. "Same
+    // object" is gated on the identity signals (type, open/closed, and no
+    // hard color clash — same test as matchSc's colorPenalty), NOT on
+    // distance. Position keeps its full weight wherever 2+ candidates
+    // actually compete.
     var pairSpecs=[],aMatched={},bMatched={};
     forcedPairs.forEach(function(fp){pairSpecs.push(fp);aMatched[fp.aIdx]=1;bMatched[fp.bIdx]=1;});
     matches.forEach(function(m){
       if(forcedAIdx[m.a]||forcedBIdx[m.b])return; // conflicts with a manual override — drop the auto guess
       if(m.score<=MATCH_TH){pairSpecs.push({aIdx:m.a,bIdx:m.b,aData:sA[m.a],bData:sB[m.b],mi:matches.indexOf(m),score:m.score});aMatched[m.a]=1;bMatched[m.b]=1;}
+    });
+    // Second chance for mutually-leftover Hungarian pairs (see comment above).
+    matches.forEach(function(m){
+      if(m.score<=MATCH_TH)return; // already handled by the first pass
+      if(forcedAIdx[m.a]||forcedBIdx[m.b])return;
+      if(aMatched[m.a]||bMatched[m.b])return; // one side already claimed — real ambiguity, let it fade
+      var fta=strokeFeat(sA[m.a]),ftb=strokeFeat(sB[m.b]);
+      var clash=(fta.fillCol&&ftb.fillCol&&colorDist(fta.fillCol,ftb.fillCol)>0.35)||(fta.strokeCol&&ftb.strokeCol&&colorDist(fta.strokeCol,ftb.strokeCol)>0.35);
+      if(fta.type===ftb.type&&fta.closed===ftb.closed&&!clash){
+        pairSpecs.push({aIdx:m.a,bIdx:m.b,aData:sA[m.a],bData:sB[m.b],mi:matches.indexOf(m),score:m.score});aMatched[m.a]=1;bMatched[m.b]=1;
+      }
     });
     var unA=[],unB=[];
     for(var ai=0;ai<sA.length;ai++)if(!aMatched[ai])unA.push(ai);

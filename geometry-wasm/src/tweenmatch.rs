@@ -108,13 +108,28 @@ impl PathSampler {
     }
 }
 
+// Bug found by stress-testing (2026-07-17): never calling `close_path()`
+// here meant every downstream feature (stroke_feat's dense samples,
+// turning-angle profile, centroid, Fourier descriptor — AND
+// resample_stroke_inner's own resampling, which shares this same path
+// builder) measured a CLOSED shape's own length short by its implicit
+// closing segment — the same root cause fixed in tweens.js's
+// buildTPFeat/resamplePJS/resamplePairFeatureAware, but here it's the
+// WASM path real users actually hit (tried before the JS fallback). A
+// vector-brush centerline stays open regardless (it's the drawn stroke,
+// never a closed loop even when its rendered ribbon outline is) — mirrors
+// stroke_feat's own `is_vb(s)` exemption a few lines below.
 fn build_feat_path(s: &StrokeIn) -> BezPath {
     let mut path = BezPath::new();
-    if is_vb(s) {
+    let vb = is_vb(s);
+    if vb {
         let cs = s.center_segments.as_ref().unwrap();
         add_segs(&mut path, cs.iter().map(|c| (c.point, c.handle_in, c.handle_out)));
     } else {
         add_segs(&mut path, s.segments.iter().map(|c| (c.point, c.handle_in, c.handle_out)));
+        if s.closed {
+            path.close_path();
+        }
     }
     path
 }
@@ -388,9 +403,29 @@ fn match_sc(fa: &Feat, fb: &Feat, same_index: bool, a_pts_override: Option<&[(f6
     let sz_d = (a_area - b_area).abs() / a_area.max(b_area).max(1.0);
     let col_d = (color_dist(&fa.stroke_col, &fb.stroke_col) + color_dist(&fa.fill_col, &fb.fill_col)) / 2.0;
     let type_penalty = if fa.stype != fb.stype { 0.5 } else { 0.0 };
+    // HARD color-identity penalty — verbatim port of matchSc's colorPenalty
+    // (tweens.js, 2026-07-17): a clearly-different hue on the same channel
+    // gets the same flat-penalty treatment a type mismatch already has, so
+    // two same-shape strokes of different colors crossing paths follow
+    // their color identity instead of standing still and hue-swapping at
+    // the tween midpoint. See the JS comment for the full rationale.
+    let fill_clash = fa.fill_col.is_some() && fb.fill_col.is_some() && color_dist(&fa.fill_col, &fb.fill_col) > 0.35;
+    let stroke_clash = fa.stroke_col.is_some() && fb.stroke_col.is_some() && color_dist(&fa.stroke_col, &fb.stroke_col) > 0.35;
+    let color_penalty = if fill_clash || stroke_clash { 0.4 } else { 0.0 };
     let idx_bonus = if same_index { -0.03 } else { 0.0 };
 
-    prox_t * 0.48 + align_t * 0.15 + curve_t * 0.12 + four_d * 0.10 + rel * 0.10 + sz_d * 0.06 + col_d * 0.15 + type_penalty + ratio_pen + closed_pen + idx_bonus
+    prox_t * 0.48
+        + align_t * 0.15
+        + curve_t * 0.12
+        + four_d * 0.10
+        + rel * 0.10
+        + sz_d * 0.06
+        + col_d * 0.15
+        + type_penalty
+        + color_penalty
+        + ratio_pen
+        + closed_pen
+        + idx_bonus
 }
 
 // ---- "force line" similarity transform (fitSimilarityTransform) ----
@@ -573,7 +608,10 @@ pub(crate) fn auto_match_inner(sa: &[StrokeIn], sb: &[StrokeIn]) -> Vec<MatchOut
     let pts_b: Vec<(f64, f64)> = seeds.iter().map(|s| (fb[s.b].cx, fb[s.b].cy)).collect();
     let transform = match fit_similarity_transform(&pts_a, &pts_b) {
         Some(t) => t,
-        None => return matches,
+        None => {
+            uncross_matches(&mut matches, &fa, &fb, match_norm);
+            return matches;
+        }
     };
 
     let pts_t: Vec<Vec<(f64, f64)>> = fa
@@ -589,7 +627,59 @@ pub(crate) fn auto_match_inner(sa: &[StrokeIn], sb: &[StrokeIn]) -> Vec<MatchOut
             matches2.push(MatchOut { a, b: b as usize, score: cost2[a][b as usize] });
         }
     }
+    uncross_matches(&mut matches2, &fa, &fb, match_norm);
     matches2
+}
+
+// ---- trajectory uncrossing — verbatim port of tweens.js's uncrossMatches
+// (2026-07-17, "les yeux s'inversent"; see the JS comment for the full
+// rationale): two nearly-identical strokes whose straight-line centroid
+// trajectories intersect are almost always a matching error (cel features
+// keep their spatial arrangement) — swap the B partners when the swapped
+// pairing doesn't cost meaningfully more than the crossed one. A genuine
+// crossing (different-colored objects passing) survives via the
+// color-clash/type penalties, far above the tolerance.
+fn segs_intersect(p1: (f64, f64), p2: (f64, f64), p3: (f64, f64), p4: (f64, f64)) -> bool {
+    fn ccw(a: (f64, f64), b: (f64, f64), c: (f64, f64)) -> bool {
+        (c.1 - a.1) * (b.0 - a.0) > (b.1 - a.1) * (c.0 - a.0)
+    }
+    ccw(p1, p3, p4) != ccw(p2, p3, p4) && ccw(p1, p2, p3) != ccw(p1, p2, p4)
+}
+const UNCROSS_TOL: f64 = 0.08;
+fn uncross_matches(ms: &mut [MatchOut], fa: &[Feat], fb: &[Feat], match_norm: f64) {
+    if ms.len() < 2 {
+        return;
+    }
+    for _sweep in 0..4 {
+        let mut swapped = false;
+        for i in 0..ms.len() {
+            for j in (i + 1)..ms.len() {
+                let (m1a, m1b) = (ms[i].a, ms[i].b);
+                let (m2a, m2b) = (ms[j].a, ms[j].b);
+                let a1 = (fa[m1a].cx, fa[m1a].cy);
+                let b1 = (fb[m1b].cx, fb[m1b].cy);
+                let a2 = (fa[m2a].cx, fa[m2a].cy);
+                let b2 = (fb[m2b].cx, fb[m2b].cy);
+                if !segs_intersect(a1, b1, a2, b2) {
+                    continue;
+                }
+                let cur = match_sc(&fa[m1a], &fb[m1b], m1a == m1b, None, match_norm)
+                    + match_sc(&fa[m2a], &fb[m2b], m2a == m2b, None, match_norm);
+                let swp = match_sc(&fa[m1a], &fb[m2b], m1a == m2b, None, match_norm)
+                    + match_sc(&fa[m2a], &fb[m1b], m2a == m1b, None, match_norm);
+                if swp <= cur + UNCROSS_TOL {
+                    ms[i].b = m2b;
+                    ms[j].b = m1b;
+                    ms[i].score = match_sc(&fa[m1a], &fb[m2b], m1a == m2b, None, match_norm);
+                    ms[j].score = match_sc(&fa[m2a], &fb[m1b], m2a == m1b, None, match_norm);
+                    swapped = true;
+                }
+            }
+        }
+        if !swapped {
+            break;
+        }
+    }
 }
 
 #[wasm_bindgen]
@@ -706,6 +796,15 @@ pub fn resample_stroke(stroke_json: &str, n: usize) -> Result<String, JsValue> {
 }
 
 // ---- alignResampledPair (reverse / cyclic-rotate search) ----
+// Loosened 2026-07-17 — verbatim port of tweens.js's resampledIsClosed
+// near-closed test (see the JS comment for the full rationale): a
+// hand-drawn head outline is a nearly-closed loop left open by a small pen
+// gap and typically drawn from a different start point in each keyframe —
+// the old 5%-of-diagonal gap test kept the cyclic-rotation search off for
+// it, and the resulting index offset read as a spurious ~80° whole-head
+// rotation, knotting the outline mid-tween. Near-closed = endpoint gap
+// under 15% of the diagonal AND polyline length over 1.5x the diagonal
+// (real loops only — open arcs and straight strokes stay reversal-only).
 fn resampled_is_closed(r: &ResampledOut) -> bool {
     let s = &r.segments;
     if s.len() < 4 {
@@ -720,7 +819,16 @@ fn resampled_is_closed(r: &ResampledOut) -> bool {
     }
     let diag2 = (maxx - minx).powi(2) + (maxy - miny).powi(2);
     let (dx, dy) = (s[0].point[0] - s[s.len() - 1].point[0], s[0].point[1] - s[s.len() - 1].point[1]);
-    dx * dx + dy * dy < diag2.max(1.0) * 0.0025
+    let gap2 = dx * dx + dy * dy;
+    if gap2 >= diag2.max(1.0) * 0.0225 {
+        return false; // 0.15^2 of the diagonal
+    }
+    let mut poly_len = 0.0;
+    for i in 1..s.len() {
+        let (ddx, ddy) = (s[i].point[0] - s[i - 1].point[0], s[i].point[1] - s[i - 1].point[1]);
+        poly_len += (ddx * ddx + ddy * ddy).sqrt();
+    }
+    poly_len * poly_len > diag2 * 2.25 // length > 1.5x diagonal — real loops only
 }
 fn align_cost(a: &ResampledOut, b: &ResampledOut) -> f64 {
     let n = a.segments.len().min(b.segments.len());
@@ -769,26 +877,72 @@ fn rotate_resampled(r: &ResampledOut, k: usize) -> ResampledOut {
     ResampledOut { segments, widths, is_vector_brush: r.is_vector_brush, stroke_color: r.stroke_color.clone(), fill_color: r.fill_color.clone() }
 }
 
+// Residual after fitting the best RIGID rotation+scale for a candidate B
+// ordering, instead of align_cost's raw centroid-relative point distance
+// — verbatim port of tweens.js's rotationFitResidual (2026-07-17 fix).
+// Found by stress-testing: a 300x40 rectangle rotated a clean 90° picked
+// the mathematically-optimal-by-align_cost correspondence (confirmed by
+// exhaustive brute-force search — not a search bug), yet the fitted
+// rotation on that exact correspondence came back mag≈0.34/theta≈-10°
+// instead of the expected mag≈1/theta≈90° — visibly non-rigid, "melting"
+// instead of turning. Raw point distance has no notion of "does this
+// correspondence read as one coherent rigid motion" — only "are the
+// points numerically close after centering" — and a shape with some
+// rotational/reflective symmetry (any non-square rectangle included) can
+// have multiple orderings that tie or nearly tie on that measure while
+// only one of them is the clean turn. Scoring candidates by how well they
+// fit a single rigid rotation+scale (what interpStroke/interp_stroke will
+// actually apply) picks the one that turns instead of the one that merely
+// minimizes raw distance.
+fn rotation_fit_residual(a: &ResampledOut, b: &ResampledOut) -> f64 {
+    let n = a.segments.len().min(b.segments.len());
+    let pts_a: Vec<(f64, f64)> = a.segments[..n].iter().map(|s| (s.point[0], s.point[1])).collect();
+    let pts_b: Vec<(f64, f64)> = b.segments[..n].iter().map(|s| (s.point[0], s.point[1])).collect();
+    match fit_similarity_transform(&pts_a, &pts_b) {
+        None => align_cost(a, b), // degenerate (coincident points) — fall back to plain distance
+        Some(t) => {
+            let mut sum = 0.0;
+            for i in 0..n {
+                let (qx, qy) = apply_similarity_transform(&t, pts_a[i].0, pts_a[i].1);
+                let dx = qx - pts_b[i].0;
+                let dy = qy - pts_b[i].1;
+                sum += dx * dx + dy * dy;
+            }
+            sum
+        }
+    }
+}
+
+// The rotation-fit criterion is CLOSED-shapes-only — verbatim port of
+// alignResampledPairJS's 2026-07-17 fix (see the JS comment): for a
+// near-straight OPEN stroke, reversing the point order is geometrically
+// indistinguishable from a ~180° rotation, so the rotation-fit residual
+// "explained" reversals with a perfect half-spin and eyebrows twirled
+// -145°..-165° for no reason on a real hand-drawn face. Open strokes use
+// the plain raw-distance test; closed loops keep the rotation-fit
+// criterion (the 90°-rectangle / rotated-start-star fix).
 #[wasm_bindgen]
 pub fn align_pair(a_json: &str, b_json: &str) -> Result<String, JsValue> {
     let a: ResampledJsonIn = serde_json::from_str(a_json).map_err(|e| JsValue::from_str(&e.to_string()))?;
     let b: ResampledJsonIn = serde_json::from_str(b_json).map_err(|e| JsValue::from_str(&e.to_string()))?;
     let a = a.into_out();
     let b = b.into_out();
+    let closed = resampled_is_closed(&a) && resampled_is_closed(&b);
+    let cost_fn = if closed { rotation_fit_residual } else { align_cost };
     let mut best = b.clone();
-    let mut best_cost = align_cost(&a, &b);
+    let mut best_cost = cost_fn(&a, &b);
     let rev = reverse_resampled(&b);
-    let rc = align_cost(&a, &rev);
+    let rc = cost_fn(&a, &rev);
     if rc < best_cost {
         best_cost = rc;
         best = rev.clone();
     }
-    if resampled_is_closed(&a) && resampled_is_closed(&b) {
+    if closed {
         for base in [&b, &rev] {
             let n = base.segments.len();
             for k in 1..n {
                 let cand = rotate_resampled(base, k);
-                let c = align_cost(&a, &cand);
+                let c = cost_fn(&a, &cand);
                 if c < best_cost {
                     best_cost = c;
                     best = cand;
