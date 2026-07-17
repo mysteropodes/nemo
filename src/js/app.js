@@ -340,6 +340,38 @@ function colorHex8(c){
 // tag (CLAUDE.md's own example) can't be added to one call site and
 // forgotten in the other twelve.
 function isSelectablePathChild(c){return !(c.data&&(c.data.isLinkedFillCompanion||c.data.isBrushTextureCopy));}
+// Pressure-brush ribbons are filled shapes with no real stroke (strokeColor
+// null, hasRealStroke false — see below) — two same-color strokes drawn
+// touching/overlapping had no visible seam and read as one fused trait
+// ("quand on fait un trait à côté d'un autre ils se joignent"). This hairline
+// is a pure RENDER detail: a live Paper.js strokeColor set directly on the
+// ribbon Path so buildSceneJson (engine-bridge.js) picks it up like any
+// other item, but never serialized as the real strokeColor field and never
+// flipping hasRealStroke (see serP's isVB override just below) — so tween
+// matching/export/onion-skin, all gated on hasRealStroke rather than raw
+// strokeColor, keep treating these strokes exactly as before.
+function brushKeylineColor(fillColor){
+  if(!fillColor)return null;
+  return new Color({hue:fillColor.hue,saturation:Math.min(1,fillColor.saturation*1.15),brightness:Math.max(0,fillColor.brightness*0.6),alpha:0.45});
+}
+function brushKeylineWidth(centerSegments){
+  if(!centerSegments||!centerSegments.length)return 1;
+  var sum=0,n=0;
+  centerSegments.forEach(function(s){if(typeof s.width==='number'){sum+=s.width;n++;}});
+  var avg=n?sum/n:6;
+  return Math.min(2.5,Math.max(0.4,avg*0.12));
+}
+function applyBrushKeyline(p){
+  // isFillShape excludes the separate Fill Brush tool (tools.js) — that one
+  // is meant to pour continuous, seamlessly-blending regions on purpose
+  // (same reason fillMergeSameColor/applyFillBrushPlacement treat it
+  // differently from the stroke-only pressure brush); only the plain
+  // stroke-brush ribbon gets the visual-separation hairline.
+  if(!p.data||!p.data.isVectorBrush||p.data.isBrushTextureCopy||p.data.isFillShape)return;
+  var kl=brushKeylineColor(p.fillColor);
+  if(!kl)return;
+  p.strokeColor=kl;p.strokeWidth=brushKeylineWidth(p.data.centerSegments);p.strokeCap='round';p.strokeJoin='round';
+}
 function serP(p){var isVB=!!(p.data&&p.data.isVectorBrush);var center=isVB&&p.data.centerSegments?p.data.centerSegments:undefined;
   var widthProfile=isVB&&p.data.widthProfile?p.data.widthProfile:undefined;
   var fillSeed=(p.data&&p.data.fillSeed)?p.data.fillSeed:undefined,fillGapPx=(p.data&&p.data.fillGapPx!==undefined)?p.data.fillGapPx:undefined;
@@ -416,8 +448,16 @@ function serP(p){var isVB=!!(p.data&&p.data.isVectorBrush);var center=isVB&&p.da
   // items into the Stroke vs Fill channel) must read THIS, not strokeColor —
   // otherwise every fill-only shape's phantom '#ffffff' gets misread as a
   // real stroke and the shape is wrongly cloned into the Stroke channel too.
-  var hasRealStroke=!!p.strokeColor;
-  return{segments:p.segments.map(function(s){return{point:[s.point.x,s.point.y],handleIn:[s.handleIn.x,s.handleIn.y],handleOut:[s.handleOut.x,s.handleOut.y]};}),closed:!!p.closed,strokeColor:(isVB||isNoStrokeChannel||isShadowNoStroke||isTexAnchor&&!p.strokeColor)?null:(p.strokeColor?colorHex8(p.strokeColor):'#ffffff'),hasRealStroke:hasRealStroke,strokeWidth:p.strokeWidth,strokeCap:p.strokeCap||'round',strokeJoin:p.strokeJoin||'round',miterLimit:p.miterLimit,fillColor:p.fillColor?colorHex8(p.fillColor):null,opacity:p.opacity!==undefined?p.opacity:1,dashArray:(p.dashArray&&p.dashArray.length)?p.dashArray.slice():undefined,dashOffset:p.dashOffset,paintOrder:(p.data&&p.data.paintOrder)?p.data.paintOrder:undefined,isVectorBrush:isVB||undefined,centerSegments:center,widthProfile:widthProfile,fillSeed:fillSeed,fillGapPx:fillGapPx,fillWalls:fillWalls,strokeId:strokeId,brushGroupId:brushGroupId,boxAngle:(p.data&&p.data.boxAngle)?p.data.boxAngle:undefined,
+  // Vector-brush ribbons carry a cosmetic hairline (brushKeylineColor, tools.js)
+  // so two same-color strokes drawn touching/overlapping stay visually
+  // distinguishable — it's a live Paper.js strokeColor, but purely a render
+  // detail, never a real drawn stroke. isVB forces hasRealStroke false
+  // regardless of that cosmetic value, so tween matching/export/onion-skin
+  // (all gated on hasRealStroke, never raw strokeColor — see realStrokeColor()
+  // in tweens.js) keep treating these strokes as fill-only, exactly as before
+  // this cosmetic hairline existed.
+  var hasRealStroke=isVB?false:!!p.strokeColor;
+  return{segments:p.segments.map(function(s){return{point:[s.point.x,s.point.y],handleIn:[s.handleIn.x,s.handleIn.y],handleOut:[s.handleOut.x,s.handleOut.y]};}),closed:!!p.closed,strokeColor:(isVB||isNoStrokeChannel||isShadowNoStroke||isTexAnchor&&!p.strokeColor)?null:(p.strokeColor?colorHex8(p.strokeColor):'#ffffff'),hasRealStroke:hasRealStroke,strokeWidth:p.strokeWidth,strokeCap:p.strokeCap||'round',strokeJoin:p.strokeJoin||'round',miterLimit:p.miterLimit,fillColor:p.fillColor?colorHex8(p.fillColor):null,opacity:p.opacity!==undefined?p.opacity:1,dashArray:(p.dashArray&&p.dashArray.length)?p.dashArray.slice():undefined,dashOffset:p.dashOffset,paintOrder:(p.data&&p.data.paintOrder)?p.data.paintOrder:undefined,isVectorBrush:isVB||undefined,isFillShape:(p.data&&p.data.isFillShape)?true:undefined,centerSegments:center,widthProfile:widthProfile,fillSeed:fillSeed,fillGapPx:fillGapPx,fillWalls:fillWalls,strokeId:strokeId,brushGroupId:brushGroupId,boxAngle:(p.data&&p.data.boxAngle)?p.data.boxAngle:undefined,
   // Rotate/scale anchor choice (2026-07, "la position du point d'ancrage
   // n'est pas mise en mémoire si je désélectionne et resélectionne
   // l'élément") — same persistence pattern as boxAngle right above: was
@@ -453,7 +493,7 @@ function desP(d,layer,op){var prev=project.activeLayer;layer.activate();var p=ne
   // outline it never had ("un trait blanc apparaît autour du fill après
   // ctrl+Z"). Legacy data predating the field (undefined) keeps the old
   // fallback chain untouched.
-  p.strokeColor=d.hasRealStroke===false?null:(d.strokeColor||((d.isVectorBrush||d.brushTexturePreset||d.bitmapBrushSpec||d.isBrushTextureCopy||dNoStrokeChannel||dIsShadowChannel)?null:'#fff'));p.strokeWidth=d.strokeWidth||3;p.strokeCap=d.strokeCap||'round';p.strokeJoin=d.strokeJoin||'round';if(d.miterLimit!==undefined)p.miterLimit=d.miterLimit;if(d.fillColor)p.fillColor=d.fillColor;else p.fillColor=null;p.opacity=op!==undefined?op:(d.opacity!==undefined?d.opacity:1);if(d.dashArray&&d.dashArray.length)p.dashArray=d.dashArray;if(d.dashOffset!==undefined)p.dashOffset=d.dashOffset;if(d.paintOrder){p.data.paintOrder=d.paintOrder;}if(d.isVectorBrush){p.data.isVectorBrush=true;if(d.centerSegments)p.data.centerSegments=d.centerSegments;if(d.widthProfile)p.data.widthProfile=d.widthProfile;}if(d.fillSeed){p.data.fillSeed=d.fillSeed;p.data.fillGapPx=d.fillGapPx;}if(d.fillWalls)p.data.fillWalls=d.fillWalls;if(d.strokeId)p.data.strokeId=d.strokeId;if(d.brushGroupId)p.data.brushGroupId=d.brushGroupId;if(d.boxAngle)p.data.boxAngle=d.boxAngle;if(d.xformAnchorKey)p.data.xformAnchorKey=d.xformAnchorKey;if(d.xformAnchorCustom)p.data.xformAnchorCustom=d.xformAnchorCustom;if(d.isBrushTextureCopy)p.data.isBrushTextureCopy=true;if(d.brushTexturePreset)p.data.brushTexturePreset=d.brushTexturePreset;if(d.bitmapBrushSpec)p.data.bitmapBrushSpec=d.bitmapBrushSpec;if(d.bitmapPressureProfile)p.data.bitmapPressureProfile=d.bitmapPressureProfile;if(d.preTextureOpacity!==undefined)p.data.preTextureOpacity=d.preTextureOpacity;if(d.preTextureStroke!==undefined)p.data.preTextureStroke=d.preTextureStroke;if(d.channelTag)p.data.channelTag=d.channelTag;if(d.ownerId)p.data.ownerId=d.ownerId;if(d.ownerName)p.data.ownerName=d.ownerName;if(d.ownerColor)p.data.ownerColor=d.ownerColor;if(d.revisionParentId)p.data.revisionParentId=d.revisionParentId;if(d.isRevisionGhost)p.data.isRevisionGhost=true;if(d.revisionAction)p.data.revisionAction=d.revisionAction;prev.activate();return p;}
+  p.strokeColor=d.hasRealStroke===false?null:(d.strokeColor||((d.isVectorBrush||d.brushTexturePreset||d.bitmapBrushSpec||d.isBrushTextureCopy||dNoStrokeChannel||dIsShadowChannel)?null:'#fff'));p.strokeWidth=d.strokeWidth||3;p.strokeCap=d.strokeCap||'round';p.strokeJoin=d.strokeJoin||'round';if(d.miterLimit!==undefined)p.miterLimit=d.miterLimit;if(d.fillColor)p.fillColor=d.fillColor;else p.fillColor=null;p.opacity=op!==undefined?op:(d.opacity!==undefined?d.opacity:1);if(d.dashArray&&d.dashArray.length)p.dashArray=d.dashArray;if(d.dashOffset!==undefined)p.dashOffset=d.dashOffset;if(d.paintOrder){p.data.paintOrder=d.paintOrder;}if(d.isVectorBrush){p.data.isVectorBrush=true;if(d.centerSegments)p.data.centerSegments=d.centerSegments;if(d.widthProfile)p.data.widthProfile=d.widthProfile;if(d.isFillShape)p.data.isFillShape=true;applyBrushKeyline(p);}if(d.fillSeed){p.data.fillSeed=d.fillSeed;p.data.fillGapPx=d.fillGapPx;}if(d.fillWalls)p.data.fillWalls=d.fillWalls;if(d.strokeId)p.data.strokeId=d.strokeId;if(d.brushGroupId)p.data.brushGroupId=d.brushGroupId;if(d.boxAngle)p.data.boxAngle=d.boxAngle;if(d.xformAnchorKey)p.data.xformAnchorKey=d.xformAnchorKey;if(d.xformAnchorCustom)p.data.xformAnchorCustom=d.xformAnchorCustom;if(d.isBrushTextureCopy)p.data.isBrushTextureCopy=true;if(d.brushTexturePreset)p.data.brushTexturePreset=d.brushTexturePreset;if(d.bitmapBrushSpec)p.data.bitmapBrushSpec=d.bitmapBrushSpec;if(d.bitmapPressureProfile)p.data.bitmapPressureProfile=d.bitmapPressureProfile;if(d.preTextureOpacity!==undefined)p.data.preTextureOpacity=d.preTextureOpacity;if(d.preTextureStroke!==undefined)p.data.preTextureStroke=d.preTextureStroke;if(d.channelTag)p.data.channelTag=d.channelTag;if(d.ownerId)p.data.ownerId=d.ownerId;if(d.ownerName)p.data.ownerName=d.ownerName;if(d.ownerColor)p.data.ownerColor=d.ownerColor;if(d.revisionParentId)p.data.revisionParentId=d.revisionParentId;if(d.isRevisionGhost)p.data.isRevisionGhost=true;if(d.revisionAction)p.data.revisionAction=d.revisionAction;prev.activate();return p;}
 // Phase 2 (async multi-user sync): merges a remote collaborator's exported
 // project JSON into the CURRENT live document at the data level (state.layers
 // serialized strokes — not live Paper objects), so it works the same whether
