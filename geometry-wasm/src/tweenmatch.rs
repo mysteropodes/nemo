@@ -741,6 +741,15 @@ pub fn resample_stroke(stroke_json: &str, n: usize) -> Result<String, JsValue> {
 }
 
 // ---- alignResampledPair (reverse / cyclic-rotate search) ----
+// Loosened 2026-07-17 — verbatim port of tweens.js's resampledIsClosed
+// near-closed test (see the JS comment for the full rationale): a
+// hand-drawn head outline is a nearly-closed loop left open by a small pen
+// gap and typically drawn from a different start point in each keyframe —
+// the old 5%-of-diagonal gap test kept the cyclic-rotation search off for
+// it, and the resulting index offset read as a spurious ~80° whole-head
+// rotation, knotting the outline mid-tween. Near-closed = endpoint gap
+// under 15% of the diagonal AND polyline length over 1.5x the diagonal
+// (real loops only — open arcs and straight strokes stay reversal-only).
 fn resampled_is_closed(r: &ResampledOut) -> bool {
     let s = &r.segments;
     if s.len() < 4 {
@@ -755,7 +764,16 @@ fn resampled_is_closed(r: &ResampledOut) -> bool {
     }
     let diag2 = (maxx - minx).powi(2) + (maxy - miny).powi(2);
     let (dx, dy) = (s[0].point[0] - s[s.len() - 1].point[0], s[0].point[1] - s[s.len() - 1].point[1]);
-    dx * dx + dy * dy < diag2.max(1.0) * 0.0025
+    let gap2 = dx * dx + dy * dy;
+    if gap2 >= diag2.max(1.0) * 0.0225 {
+        return false; // 0.15^2 of the diagonal
+    }
+    let mut poly_len = 0.0;
+    for i in 1..s.len() {
+        let (ddx, ddy) = (s[i].point[0] - s[i - 1].point[0], s[i].point[1] - s[i - 1].point[1]);
+        poly_len += (ddx * ddx + ddy * ddy).sqrt();
+    }
+    poly_len * poly_len > diag2 * 2.25 // length > 1.5x diagonal — real loops only
 }
 fn align_cost(a: &ResampledOut, b: &ResampledOut) -> f64 {
     let n = a.segments.len().min(b.segments.len());

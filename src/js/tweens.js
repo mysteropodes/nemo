@@ -749,13 +749,34 @@ function rotateResampled(r,k){
   if(r.widths)out.widths=r.widths.slice(k).concat(r.widths.slice(0,k));
   return out;
 }
+// Gates whether alignResampledPair's cyclic-rotation search runs.
+// Loosened 2026-07-17 (bug found on a REAL hand-drawn animation, not a
+// synthetic test): a hand-drawn head outline is a nearly-closed LOOP left
+// open by a small pen gap (~7% of its own diagonal here), and typically
+// drawn starting at a DIFFERENT point around the loop in each keyframe.
+// The old 5%-of-diagonal gap test said "open" → only reversal was ever
+// tried → index 0 lerped to index 0 with a large angular offset around the
+// loop → interpStroke's rigid fit read that offset as a spurious ~80°
+// whole-head ROTATION, visibly knotting/spinning the outline mid-tween.
+// New test: near-closed = endpoint gap under 15% of the diagonal AND total
+// polyline length over 1.5x the diagonal (a genuine loop wraps around —
+// its arc length is well above its own bbox diagonal; an open arc like a
+// mouth line ~1.4x, a straight stroke ~1.0x, so those keep reversal-only
+// alignment). Rotating a near-closed OPEN stroke's seam around the loop
+// makes the small pen gap travel to a different spot on the inbetweens —
+// a far smaller artifact than the spin it prevents, and the keyframes
+// themselves are never touched.
 function resampledIsClosed(r){
   var s=r.segments;if(s.length<4)return false;
   var minx=Infinity,miny=Infinity,maxx=-Infinity,maxy=-Infinity;
   s.forEach(function(sg){minx=Math.min(minx,sg.point[0]);miny=Math.min(miny,sg.point[1]);maxx=Math.max(maxx,sg.point[0]);maxy=Math.max(maxy,sg.point[1]);});
   var diag2=(maxx-minx)*(maxx-minx)+(maxy-miny)*(maxy-miny);
   var dx=s[0].point[0]-s[s.length-1].point[0],dy=s[0].point[1]-s[s.length-1].point[1];
-  return dx*dx+dy*dy<Math.max(1,diag2)*0.0025;
+  var gap2=dx*dx+dy*dy;
+  if(gap2>=Math.max(1,diag2)*0.0225)return false; // 0.15^2 of the diagonal
+  var polyLen=0;
+  for(var i=1;i<s.length;i++){var ddx=s[i].point[0]-s[i-1].point[0],ddy=s[i].point[1]-s[i-1].point[1];polyLen+=Math.sqrt(ddx*ddx+ddy*ddy);}
+  return polyLen*polyLen>diag2*2.25; // length > 1.5x diagonal — real loops only
 }
 function alignCost(a,b){
   var n=Math.min(a.segments.length,b.segments.length);
