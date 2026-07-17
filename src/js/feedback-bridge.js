@@ -127,7 +127,15 @@
   }
   function lsKey() { return 'nemo-feedback-' + projectKey(); }
   function lsReadAll() { try { return JSON.parse(localStorage.getItem(lsKey()) || '[]'); } catch (e) { return []; } }
-  function lsWriteAll(list) { try { localStorage.setItem(lsKey(), JSON.stringify(list)); } catch (e) {} }
+  // No try/catch here (unlike lsReadAll) — a write failure (most likely
+  // QuotaExceededError: a screenshot-bearing entry list can genuinely blow
+  // past the ~5-10MB per-origin localStorage limit, since this is the ONLY
+  // durable store in a browser-preview session with no dev server reachable)
+  // must propagate up through writeLocal()'s unwrapped `await` to
+  // submitFeedback's caller, so the UI's existing .catch shows "Échec de
+  // l'enregistrement du feedback" instead of the false-positive success
+  // toast — a report entered, "saved", then silently gone with the tab.
+  function lsWriteAll(list) { localStorage.setItem(lsKey(), JSON.stringify(list)); }
 
   var _devServerChecked = null;
   async function devServerAvailable() {
