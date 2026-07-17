@@ -989,10 +989,45 @@
   // compound into a growing drift instead of a single one-off gap — each
   // element gets its own two spacers (row + group-row) to stay
   // pixel-aligned with renderSymbolLayerMotionList's row + Transform pair.
+  // Which contiguous frame range(s) a given shape (strokeId) actually
+  // appears in, scanning getEffectiveStrokes across the WHOLE timeline —
+  // there's no independent per-shape timing stored anywhere to just read
+  // off (a shape's presence is entirely a side-effect of the parent
+  // layer's own keyframe/held-frame structure), so this is the only way to
+  // answer "when does this shape exist" for the montage's own bars.
+  function elementPresenceRanges(li, strokeId) {
+    var ranges = [], curStart = -1;
+    for (var f = 0; f < state.totalFrames; f++) {
+      var present = getEffectiveStrokes(li, f).some(function (sd) { return sd.strokeId === strokeId; });
+      if (present && curStart < 0) curStart = f;
+      else if (!present && curStart >= 0) { ranges.push([curStart, f - 1]); curStart = -1; }
+    }
+    if (curStart >= 0) ranges.push([curStart, state.totalFrames - 1]);
+    return ranges;
+  }
+  // Read-only "existence" bar per shape in the montage — deliberately NOT
+  // layer-inout.js's buildBar (that drags a REAL layer's ld.inPoint/
+  // outPoint; a shape isn't a real layer, there's nothing of its own to
+  // persist a drag against). Same visual language (.layer-inout-bar) so a
+  // multi-shape montage reads as a real "layer montage" at a glance — the
+  // reference sketch's parallel bars of different lengths — even though
+  // the timing itself is derived, not stored.
+  function buildElementPresenceBar(row, li, strokeId, colorHex) {
+    row.style.position = 'relative';
+    elementPresenceRanges(li, strokeId).forEach(function (r) {
+      var bar = document.createElement('div'); bar.className = 'layer-inout-bar full-range';
+      bar.style.left = (r[0] * FC) + 'px';
+      bar.style.width = Math.max(FC, (r[1] - r[0] + 1) * FC) + 'px';
+      bar.style.cursor = 'default';
+      if (colorHex) { bar.style.background = colorHex; bar.style.opacity = '0.4'; bar.style.borderColor = colorHex; }
+      row.appendChild(bar);
+    });
+  }
   function renderSymbolLayerMotionTimeline(grid, li) {
     var ld = state.layers[li];
     if (!ld) return;
-    var hdrSpacer = document.createElement('div'); hdrSpacer.className = 'frow';
+    var hdrSpacer = document.createElement('div'); hdrSpacer.className = 'frow'; hdrSpacer.dataset.layer = li;
+    if (window.SMLayerInOut) SMLayerInOut.buildBar(hdrSpacer, li);
     grid.appendChild(hdrSpacer);
     var grpSpacer = document.createElement('div'); grpSpacer.className = 'frow';
     grid.appendChild(grpSpacer);
@@ -1003,6 +1038,7 @@
     grid.appendChild(elHdrSpacer);
     els.forEach(function (entry) {
       var elSpacer = document.createElement('div'); elSpacer.className = 'frow';
+      buildElementPresenceBar(elSpacer, li, entry.strokeId, entry.sd.fillColor || entry.sd.strokeColor);
       grid.appendChild(elSpacer);
       var elGrpSpacer = document.createElement('div'); elGrpSpacer.className = 'frow';
       grid.appendChild(elGrpSpacer);
