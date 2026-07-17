@@ -234,15 +234,28 @@ converger vers la même conversion, cf. `maybeAutoConvertToComponent` dans motio
 d'un SEUL élément (pas le calque entier) NE déclenche PAS cette conversion — c'est la distinction
 layer-holder vs element-holder déjà dans `state.layers.indexOf(ld)` (motion.js).
 
-**Motion, niveau SHAPE : double-clic sur le calque = entrer dedans comme un precomp After
-Effects.** Les propriétés globales (Position/Anchor/Scale/Rotation/Opacité du calque entier)
-restent affichées au-dessus ; en dessous apparaissent des sous-lignes "Layer Shape 1", "Layer
-Shape 2"... une par élément du calque, chacune avec son propre jeu COMPLET de propriétés :
-Position/Anchor/Scale/Rotation/Opacité (comme le calque) PLUS `path` / fill (size+color) /
-stroke (size+color) / brush + brush options. Un bouton "back" à côté de la scène permet de
-ressortir vers le Component parent. **Rien de tout ça n'est encore construit** (PROPS dans
-motion.js ne contient toujours que les 5 propriétés de base, pas de mode "entrer dans le
-calque") — c'est le prochain gros morceau côté Motion, pas une description de l'existant.
+**Motion, niveau SHAPE : double-clic sur un calque Component = entrer dedans comme un precomp
+After Effects (construit 2026-07-17).** Décision re-tranchée avec l'utilisateur après un premier
+essai imbriqué ("Layer 1 > Éléments > Forme N avec son propre Transform") jugé pas assez proche
+du besoin réel — capture à l'appui, ce qui est voulu est le résultat PLAT de "Release to Layers"
+(`splitLayerIntoElements`) : un vrai calque séparé par forme, nommé `"<Layer> — Forme N"`, chacun
+avec sa vraie barre de présence sur la timeline (icônes eye/lock/solo normales, PAS de sous-lignes
+imbriquées). `enterComponentLayer` (motion.js) : appelle `enterSymbol` (vrai onglet + "Scene" pour
+revenir, zéro état parallèle), saute à la frame interne résolue (`resolveSymbolFrameIdx`, pour ne
+pas atterrir sur une frame 0 vide du symbole), puis auto-éclate SILENCIEUSEMENT
+(`splitLayerIntoElementsCore(li,{silent:true})`, app.js) chaque calque du symbole qui contient
+encore 2+ formes — idempotent, un calque déjà éclaté n'a plus qu'un seul élément. À partir de là,
+le rendu Motion normal (accordéon, barres réelles) affiche directement le résultat voulu, sans
+code de montage spécifique. Prérequis découvert en construisant ceci : `elementMotionAt`
+(motion.js) forçait `null` pour tout calque Component — levé (getEffectiveStrokes applique
+maintenant l'animation par-forme en plus du placement de l'instance), sinon animer une forme
+individuellement n'aurait aujourd'hui aucun effet visuel.
+
+**Propriétés étendues par forme (fill/stroke/brush/path) : toujours pas construites.** Une fois
+éclatée en calque séparé, chaque "Forme N" n'a que les 5 propriétés de base
+(Position/Anchor/Scale/Rotation/Opacité) comme n'importe quel calque normal — pas encore
+`path`/fill/stroke/brush en plus. Reste un chantier futur si le besoin se confirme, pas un
+sous-produit de ce qui vient d'être construit.
 
 **Propriétés étendues (fill/stroke/brush/path) : opt-in, cachées par défaut, activées dans le
 panel de droite — même convention que les propriétés optionnelles de Rive.** Ce ne sont PAS des
