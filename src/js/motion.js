@@ -643,8 +643,47 @@
   // that case) — layerMotionPointMap itself returns null until at least one
   // property is non-default, which would make the box invisible on a
   // perfectly ordinary not-yet-animated layer.
+  // A Component instance's Motion box must stay the SAME size/position for
+  // its whole duration (2026-07-17, "le bounding box du layer component
+  // doit être le même pour toute la durée du calque... prendre en compte
+  // tous les éléments dans la durée pour avoir les bounding box max") —
+  // without this, userLayers[li].bounds (below) only ever reflects
+  // whatever ONE frame's content getEffectiveStrokes/loadFrame happened to
+  // load, so the box visibly jumped/resized every time the scrub crossed a
+  // keyframe with different shapes. Unions every frame's effective strokes
+  // across the layer's own visible range (layerInPoint..layerOutPoint —
+  // the SAME range the layer is ever shown on, app.js), building bounds
+  // per stroke the same way getEffectiveStrokes' own elementMotionAt
+  // branch already does (a throwaway Path so curved segments' real extent
+  // counts, not just anchor points), reduced with unionBounds (tweens.js,
+  // a plain generic min/max reducer already used for per-frame feature
+  // bounds — reused here across frames instead). No cache: this is
+  // Motion-overlay code for whichever ONE layer is currently selected/
+  // expanded, not the hot per-frame render pipeline (CLAUDE.md §5), and a
+  // component's own duration is typically a small slice of the timeline.
+  function symbolUnionBounds(li) {
+    var ld = state.layers[li];
+    if (!ld || !ld.symbolId) return null;
+    var inF = layerInPoint(ld), outF = layerOutPoint(ld);
+    var feats = [];
+    for (var f = inF; f <= outF; f++) {
+      getEffectiveStrokes(li, f).forEach(function (sd) {
+        if (sd.isRaster) { feats.push({ bounds: { x: sd.x - sd.width / 2, y: sd.y - sd.height / 2, w: sd.width, h: sd.height } }); return; }
+        if (!sd.segments || !sd.segments.length) return;
+        var tmp = new Path({ insert: false });
+        for (var si = 0; si < sd.segments.length; si++) { var s = sd.segments[si]; tmp.add(new Segment(new Point(s.point[0], s.point[1]), new Point(s.handleIn[0], s.handleIn[1]), new Point(s.handleOut[0], s.handleOut[1]))); }
+        if (sd.closed) tmp.closed = true;
+        var b = tmp.bounds;
+        feats.push({ bounds: { x: b.x, y: b.y, w: b.width, h: b.height } });
+      });
+    }
+    if (!feats.length) return null;
+    var u = unionBounds(feats);
+    return new Rectangle(u.x, u.y, u.w, u.h);
+  }
   function motionBoxGeom(t) {
-    var lb = userLayers[t.li] && userLayers[t.li].bounds;
+    var ld = state.layers[t.li];
+    var lb = (ld && ld.symbolId) ? symbolUnionBounds(t.li) : (userLayers[t.li] && userLayers[t.li].bounds);
     if (!lb) return null;
     var anc = valueAtFrame(t.holder, 'anchor', state.currentFrame);
     var pos = valueAtFrame(t.holder, 'position', state.currentFrame);
@@ -760,18 +799,26 @@
     var ld = state.layers[li];
     if (!ld || !userLayers[li]) return null;
     // Component instances now allow layer-level Motion (see layerMotionAt's
-    // comment) — but per-ELEMENT sub-targeting stays blocked: renderElementsList
-    // never runs for a symbolId row (renderLayerListMotion), so
-    // window._motionExpandedElement can never legitimately be set while
-    // this layer is the expanded one; the `ld.symbolId` guard here would
-    // have been redundant with that, not a second independent gate.
+    // comment) — per-ELEMENT sub-targeting on a Component layer now works
+    // too (renderElementsList lifted its symbolId guard 2026-07-17, so a
+    // shape inside a placed instance can be animated straight from the
+    // Scene view). Its pivot still comes from the LIVE item's own current
+    // bounds (item.bounds.center below) — only the whole-LAYER case
+    // (return at the bottom) needed the fixed-across-duration union, since
+    // a single element's own gizmo is expected to hug whatever it looks
+    // like THIS frame, same as any element's box always has.
     if (window._motionExpandedLayer != null && window._motionExpandedElement != null) {
       var item = findElementItem(li, window._motionExpandedElement);
       if (item) return { li: li, strokeId: window._motionExpandedElement, holder: ensureElementHolder(ld, window._motionExpandedElement), boundsCenter: item.bounds.center };
       // Element no longer present at this frame (drawing changed) — fall
       // back to the layer rather than silently drawing nothing.
     }
-    return { li: li, strokeId: null, holder: ld, boundsCenter: userLayers[li].bounds.center };
+    // Component layers use symbolUnionBounds' fixed-for-the-whole-duration
+    // center here too, so the gizmo's PIVOT doesn't jump around alongside
+    // its box (motionBoxGeom, above) as the scrub crosses different
+    // keyframes.
+    var ub = ld.symbolId ? symbolUnionBounds(li) : null;
+    return { li: li, strokeId: null, holder: ld, boundsCenter: (ub || userLayers[li].bounds).center };
   }
   function activePositionKeys() {
     var t = activeMotionTarget();
