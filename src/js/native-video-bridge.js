@@ -1,13 +1,20 @@
 // ---- NATIVE VIDEO BRIDGE (EXPERIMENTAL, 2026-07) ----
-// experimental/native-video-decode branch only. JS side of
-// src-tauri/src/video_decode.rs: opens a decode session on a video FILE
-// (kept closed over its original bytes — no import-time JPEG baking),
-// requests single frames as raw RGBA8 over binary IPC, and feeds them
-// straight into the GPU texture cache via SMEngineBridge.registerImageRaw
-// (zero canvas round-trips — see that function's comment).
+// experimental/native-video-decode branch only. Opens a decode session on
+// a video FILE (kept closed over its original bytes — no import-time JPEG
+// baking), requests single frames as raw RGBA8, and feeds them straight
+// into the GPU texture cache via SMEngineBridge.registerImageRaw (zero
+// canvas round-trips — see that function's comment).
 //
-// Tauri-only by construction (native decoder lives in the Tauri process);
-// every entry point no-ops with a clear error in plain-browser preview.
+// TWO independent backends, dispatched on by open()/frameBytes()/close()
+// below (see the "WebCodecs backend" comment right after the Tauri
+// helpers): under Tauri, src-tauri/src/video_decode.rs over binary IPC
+// (open_video_session/decode_video_frame/close_video_session) — unchanged
+// from before. In a plain browser (no Tauri), MP4Box.js + WebCodecs
+// VideoDecoder instead — added 2026-07 ("comment fait piximov/pikimov par
+// exemple" — the browser-only improvement, the Tauri path was explicitly
+// left alone). Every consumer past this dispatch layer (importAsLayer,
+// displayRect, the JS-side cache/prefetch, _optimizeLayerMedia) works
+// unmodified against either backend.
 //
 // Includes an instrumented benchmark (SMNativeVideo.bench) because the
 // whole point of this branch is measuring whether the architecture holds
@@ -17,20 +24,229 @@
   function tauriOk() { return typeof window.__TAURI__ !== 'undefined'; }
   function invoke(cmd, args) { return window.__TAURI__.core.invoke(cmd, args); }
 
-  // sessionId -> {width, height, fps, frameCount, durationSeconds}
+  // ---- WebCodecs backend (2026-07, browser-only — no Tauri) ----
+  // "seulement pour la version navigateur, on utilise ce que l'on a là pour
+  // tauri": the Tauri path above (ffmpeg subprocess, open_video_session/
+  // decode_video_frame/close_video_session) is UNTOUCHED. This is a second,
+  // independent backend for when window.__TAURI__ doesn't exist, so
+  // open()/frameBytes()/close() below dispatch to whichever one applies —
+  // every consumer further down this file (importAsLayer, displayRect,
+  // the JS-side cache/prefetch in _layerFrameSync, _optimizeLayerMedia)
+  // works unmodified against either backend, since both resolve to the
+  // exact same shapes (open -> {session_id,width,height,fps,frame_count,
+  // duration,codec}, frameBytes -> Uint8Array of width*height*4 RGBA).
+  //
+  // Demuxing (MP4Box.js, vendored src/js/mp4box.all.min.js, GPAC/BSD —
+  // WebCodecs itself only decodes elementary streams, it has no container
+  // parser) extracts every sample + the avcC/hvcC codec description up
+  // front, whole-file-in-memory (matches how the app already reads a File
+  // — no network-streaming case to support here; fine for a typical
+  // imported clip, not built for hours-long footage). Per-frame decode
+  // then mirrors the Rust side's own optimization: a sequential request
+  // (frameIndex === last+1) continues feeding the SAME still-configured
+  // VideoDecoder instead of a cold reset-to-keyframe, exactly like
+  // decode_at/spawn_at reusing a running ffmpeg process for a forward walk.
+  //
+  // Known gap vs the Tauri backend: no background "optimize to all-intra"
+  // step exists here (that's a whole VideoEncoder re-mux, out of scope for
+  // this pass) — every seek pays the source's own GOP-sized decode cost,
+  // same as Tauri's non-optimized fallback path. _optimizeLayerMedia below
+  // no-ops for a web session accordingly (nv.isWeb guard).
+  function webCodecsAvailable() { return typeof window.VideoDecoder !== 'undefined' && typeof window.MP4Box !== 'undefined'; }
+  var webSessions = {}; // 'web-N' -> internal decode state (see openWeb)
+  var _webSessionCounter = 0;
+
+  // The avcC/hvcC/vpcC/av1C box's own payload, minus its [size][fourcc]
+  // header — exactly what VideoDecoderConfig.description wants. MP4Box
+  // parses it into a live box object with its own .write(stream) — there's
+  // no public "just give me the raw bytes" accessor, so re-serializing via
+  // its own DataStream and slicing off the 8-byte box header is the
+  // standard extraction path (same one every WebCodecs+MP4Box demo uses).
+  function _extractCodecDescription(mp4boxfile, trackId) {
+    var trak = mp4boxfile.getTrackById(trackId);
+    var entry = trak && trak.mdia && trak.mdia.minf.stbl.stsd.entries[0];
+    var box = entry && (entry.avcC || entry.hvcC || entry.vpcC || entry.av1C);
+    if (!box) return undefined;
+    var DS = window.MP4Box.DataStream || window.DataStream;
+    var stream = new DS(undefined, 0, DS.BIG_ENDIAN);
+    box.write(stream);
+    return new Uint8Array(stream.buffer, 8);
+  }
+
+  // Demux the whole file: resolves {track, samples, description}. `track`
+  // is MP4Box's own onReady videoTracks[0] entry (width/height/codec/
+  // timescale/duration); `samples` is every demuxed sample (data/cts/dts/
+  // is_sync/duration), sorted into presentation order — frame N in this
+  // app's sense is samples[N] in THAT order, not decode order.
+  function _demux(file) {
+    return new Promise(function (resolve, reject) {
+      var mp4boxfile = window.MP4Box.createFile();
+      var samples = [];
+      var track = null, description;
+      mp4boxfile.onError = function (e) { reject(new Error('mp4box: ' + e)); };
+      mp4boxfile.onReady = function (info) {
+        track = info.videoTracks && info.videoTracks[0];
+        if (!track) { reject(new Error('aucune piste vidéo trouvée dans ce fichier')); return; }
+        description = _extractCodecDescription(mp4boxfile, track.id);
+        mp4boxfile.setExtractionOptions(track.id, null, { nbSamples: Infinity });
+        mp4boxfile.onSamples = function (id, ref, s) { samples = samples.concat(s); };
+        mp4boxfile.start();
+      };
+      file.arrayBuffer().then(function (buf) {
+        buf.fileStart = 0;
+        mp4boxfile.appendBuffer(buf);
+        mp4boxfile.flush();
+        // onReady/onSamples run synchronously inside flush() for a whole-
+        // file (non-streamed) buffer — resolving on the next microtask
+        // lets any already-queued onSamples calls land first.
+        setTimeout(function () {
+          if (!track) { reject(new Error('mp4box: infos de piste jamais reçues')); return; }
+          samples.sort(function (a, b) { return a.cts - b.cts; });
+          resolve({ track: track, samples: samples, description: description });
+        }, 0);
+      }).catch(reject);
+    });
+  }
+
+  async function openWeb(file) {
+    if (!webCodecsAvailable()) throw new Error('décodage vidéo navigateur indisponible (WebCodecs ou mp4box.js manquant)');
+    var d = await _demux(file);
+    var track = d.track;
+    var timescale = track.timescale || (track.movie_timescale || 1);
+    var durationSeconds = (track.duration && timescale) ? track.duration / timescale : 0;
+    var frameCount = d.samples.length;
+    var fps = (frameCount && durationSeconds) ? frameCount / durationSeconds : 24;
+    var sessionId = 'web-' + (++_webSessionCounter);
+    webSessions[sessionId] = {
+      samples: d.samples,
+      description: d.description,
+      codec: track.codec,
+      width: track.video.width,
+      height: track.video.height,
+      fps: fps,
+      frameCount: frameCount,
+      decoder: null,
+      lastFrameIndex: -1,
+      pending: [],
+    };
+    return {
+      session_id: sessionId,
+      width: track.video.width,
+      height: track.video.height,
+      fps: fps,
+      frame_count: frameCount,
+      duration: durationSeconds,
+      codec: track.codec,
+    };
+  }
+
+  // A VideoFrame's internal pixel layout (I420/NV12/etc.) isn't guaranteed
+  // convertible to RGBA via copyTo() on every browser — drawImage() DOES
+  // accept a VideoFrame directly per spec (CanvasImageSource) regardless
+  // of its internal format, so drawing to a plain 2D canvas + getImageData
+  // is the portable choice here, at the cost of one GPU->CPU readback per
+  // frame (same cost class the Tauri path already pays over its IPC
+  // boundary, just a different transport).
+  function _videoFrameToRgba(frame) {
+    var w = frame.displayWidth || frame.codedWidth, h = frame.displayHeight || frame.codedHeight;
+    var canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    var ctx = canvas.getContext('2d');
+    ctx.drawImage(frame, 0, 0, w, h);
+    return new Uint8Array(ctx.getImageData(0, 0, w, h).data.buffer);
+  }
+
+  // A fresh VideoDecoder for a cold seek/reset — pending outputs collect
+  // in ws.pending; ws.waiter (set per in-flight _decodeWebFrame call) is
+  // how that call knows enough of them have arrived without ever calling
+  // flush() (see _decodeWebFrame's own comment for why flush() specifically
+  // can't be used here).
+  function _makeWebDecoder(ws) {
+    ws.pending = [];
+    ws.waiter = null;
+    ws.decoder = new VideoDecoder({
+      output: function (frame) {
+        ws.pending.push(frame);
+        if (ws.waiter && ws.pending.length >= ws.waiter.count) { var w = ws.waiter; ws.waiter = null; w.resolve(); }
+      },
+      error: function (e) {
+        console.error('[web-video] decoder error', e);
+        if (ws.waiter) { var w = ws.waiter; ws.waiter = null; w.reject(e); }
+      },
+    });
+    ws.decoder.configure({ codec: ws.codec, codedWidth: ws.width, codedHeight: ws.height, description: ws.description });
+  }
+
+  async function _decodeWebFrame(ws, frameIndex) {
+    if (frameIndex < 0 || frameIndex >= ws.samples.length) throw new Error('frame index hors limites');
+    var startIdx = frameIndex;
+    if (ws.decoder && ws.decoder.state === 'configured' && frameIndex === ws.lastFrameIndex + 1) {
+      // Sequential continuation — feed just the new sample onto the SAME
+      // still-open decoder instead of a cold reset-to-keyframe (mirrors
+      // decode_at/spawn_at reusing a running ffmpeg process on the Rust
+      // side, same reasoning: a fresh restart-from-keyframe for every
+      // single forward step would pay full GOP-decode cost every time).
+      // ws.pending was already drained+closed at the end of the PREVIOUS
+      // call below, so it's empty here — no explicit reset needed.
+    } else {
+      if (ws.decoder && ws.decoder.state !== 'closed') { try { ws.decoder.close(); } catch (e) { /* already closing */ } }
+      while (startIdx > 0 && !ws.samples[startIdx].is_sync) startIdx--;
+      _makeWebDecoder(ws);
+    }
+    var need = frameIndex - startIdx + 1;
+    for (var i = startIdx; i <= frameIndex; i++) {
+      var s = ws.samples[i];
+      ws.decoder.decode(new EncodedVideoChunk({ type: s.is_sync ? 'key' : 'delta', timestamp: s.cts, duration: s.duration, data: s.data }));
+    }
+    // Deliberately NOT decoder.flush() — flush() drains AND resets the
+    // decode context in at least Chrome's implementation, so the VERY
+    // NEXT decode() call after one would need to start with a keyframe
+    // again ("A key frame is required after configure() or flush()"),
+    // silently defeating the sequential-continuation path above every
+    // single time (found live testing this exact bridge). Waiting on the
+    // output callback directly needs no flush and keeps the decoder
+    // reusable across calls.
+    await new Promise(function (resolve, reject) {
+      if (ws.pending.length >= need) { resolve(); return; }
+      ws.waiter = { count: need, resolve: resolve, reject: reject };
+    });
+    ws.lastFrameIndex = frameIndex;
+    var frames = ws.pending;
+    if (!frames.length) throw new Error('le décodeur n\'a produit aucune image');
+    var target = frames[frames.length - 1];
+    var rgba = _videoFrameToRgba(target);
+    frames.forEach(function (f) { if (!f.closed) { try { f.close(); } catch (e) { /* already closed */ } } });
+    ws.pending = [];
+    return rgba;
+  }
+
+  function _sourceName(source) { return (source instanceof Blob) ? (source.name || 'video') : source.split('/').pop(); }
+
+  // sessionId -> {width, height, fps, frameCount, durationSeconds} (Tauri sessions only — web sessions live in webSessions)
   var sessions = {};
 
-  async function open(path) {
+  async function open(source) {
+    if (source instanceof Blob) {
+      var infoWeb = await openWeb(source);
+      sessions[infoWeb.session_id] = infoWeb;
+      return infoWeb;
+    }
     if (!tauriOk()) throw new Error('native video decode requires the Tauri app (no sidecar in browser preview)');
-    var info = await invoke('open_video_session', { path: path });
+    var info = await invoke('open_video_session', { path: source });
     sessions[info.session_id] = info;
     return info;
   }
 
-  // Resolves to a Uint8Array of width*height*4 RGBA bytes.
-  // tauri::ipc::Response arrives as an ArrayBuffer — one structured-clone
-  // copy across the IPC boundary, no JSON/base64 anywhere.
+  // Resolves to a Uint8Array of width*height*4 RGBA bytes — same shape for
+  // both backends. tauri::ipc::Response arrives as an ArrayBuffer (one
+  // structured-clone copy across the IPC boundary, no JSON/base64); the
+  // web backend produces the same shape via _decodeWebFrame/getImageData.
   async function frameBytes(sessionId, frameIndex) {
+    if (String(sessionId).indexOf('web-') === 0) {
+      var ws = webSessions[sessionId];
+      if (!ws) throw new Error('unknown web session ' + sessionId);
+      return await _decodeWebFrame(ws, frameIndex);
+    }
     var buf = await invoke('decode_video_frame', { sessionId: sessionId, frameIndex: frameIndex });
     return new Uint8Array(buf);
   }
@@ -53,6 +269,12 @@
 
   async function close(sessionId) {
     delete sessions[sessionId];
+    if (String(sessionId).indexOf('web-') === 0) {
+      var ws = webSessions[sessionId];
+      if (ws && ws.decoder && ws.decoder.state !== 'closed') { try { ws.decoder.close(); } catch (e) { /* already closing */ } }
+      delete webSessions[sessionId];
+      return;
+    }
     if (tauriOk()) await invoke('close_video_session', { sessionId: sessionId });
   }
 
@@ -400,6 +622,11 @@
     var ld = state.layers[li];
     if (!ld || !ld.nativeVideo) return;
     var nv = ld.nativeVideo;
+    // No browser-side equivalent yet (would need a VideoEncoder re-mux
+    // pass, out of scope for this pass) — a web session keeps paying its
+    // source's own GOP-sized seek cost, same as Tauri's non-optimized
+    // fallback. See native-video-bridge.js's own header comment.
+    if (nv.isWeb) return;
     // A pre-indexed-era optimizedPath (.mov flavor) is treated as absent:
     // it decodes through the old seek/respawn path and misses the whole
     // point of optimization now (indexed random access). Re-optimize once
@@ -472,19 +699,30 @@
   }
 
   // Instant import: opens a session and creates a nativeVideo layer —
-  // called by images.js's Vidéo… button (Tauri path) on this branch.
-  // Returns the layer index. A small canvas-drawn thumbnail of frame 0
-  // is produced for the media library (the ONLY canvas use here — the
-  // render path itself never touches one).
-  async function importAsLayer(path) {
-    var info = await open(path);
+  // called by images.js's Vidéo… button, either with a filesystem path
+  // string (Tauri) or a File/Blob from the browser's file picker (no
+  // Tauri — see open()'s own dispatch). Returns the layer index. A small
+  // canvas-drawn thumbnail of frame 0 is produced for the media library
+  // (the ONLY canvas use here in the Tauri path — the render path itself
+  // never touches one; the web backend's own decode already round-trips
+  // through a canvas internally, see _videoFrameToRgba).
+  async function importAsLayer(source) {
+    var info = await open(source);
     if (window.saveAllLayerFrames) saveAllLayerFrames();
     if (window.pushUndoLayers) pushUndoLayers();
-    var name = path.split('/').pop().replace(/\.[^.]+$/, '');
+    var name = _sourceName(source).replace(/\.[^.]+$/, '');
     var idx = createUserLayer(name);
     var ld = state.layers[idx];
+    var isWeb = source instanceof Blob;
     ld.nativeVideo = {
-      path: path,
+      // A File/Blob can't survive JSON.stringify (project save) — stored
+      // only as the display name for a web session, never as something a
+      // reload could re-open (browsers have no durable file handle for
+      // this without the separate File System Access API). Re-importing
+      // after a reload is expected/required for a web session; the Tauri
+      // path's real filesystem path keeps working across reloads as before.
+      path: isWeb ? name : source,
+      isWeb: isWeb,
       fps: info.fps,
       frameCount: Number(info.frame_count),
       width: info.width,

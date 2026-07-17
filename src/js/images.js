@@ -299,6 +299,17 @@
     showToast('Vidéo importée : '+frames.filter(function(f){return f.strokes.length;}).length+' images sur le calque "'+prefix+'"');
   }
   async function importVideoFile(file){
+    // WebCodecs instant-import path (2026-07, browser-only — the Tauri
+    // path above this function is untouched): same "instant import + live
+    // scrub" architecture as native-video-bridge.js's Tauri backend, just
+    // demuxed/decoded via MP4Box.js + VideoDecoder instead of a piped
+    // ffmpeg subprocess. Falls through to the old bake-every-frame-as-JPEG
+    // importer below for anything it can't handle (unsupported container/
+    // codec, or a browser without WebCodecs — e.g. older Firefox).
+    if(window.SMNativeVideo){
+      try{await SMNativeVideo.importAsLayer(file);return;}
+      catch(e){showToast('Décodeur WebCodecs indisponible ('+(e&&e.message||e)+') — import classique…');}
+    }
     showToast('Décodage de la vidéo…');
     var blobUrl=URL.createObjectURL(file);
     try{
