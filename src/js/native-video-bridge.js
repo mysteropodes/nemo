@@ -750,6 +750,14 @@
       var pivot = { x: rect.x + rect.width / 2 + mm.ax, y: rect.y + rect.height / 2 + mm.ay };
       rect = SMMotion.transformImageRect(rect, pivot, mm);
     }
+    // Layer parenting (2026-07): ancestor chain applied outermost, same
+    // composition order as buildSceneJson/exportBuildFrame — shared by both
+    // the drawn gizmo and select-bridge's gesture hit-testing since both
+    // consume displayRect().
+    if (window.SMMotion) {
+      var pChain = SMMotion.parentChainMats(li, state.currentFrame);
+      for (var pci = 0; pci < pChain.length; pci++) rect = SMMotion.transformImageRect(rect, pChain[pci].pivot, pChain[pci].mat);
+    }
     return rect;
   }
 
