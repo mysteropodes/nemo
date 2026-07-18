@@ -1124,7 +1124,7 @@ function updateUI(){
   document.getElementById('info-sel').textContent=state.tool==='select'&&selectedPaths.length>0?selectedPaths.length+' selected':'';
   window._totalF=state.totalFrames;window._waIn=state.waIn;window._waOut=state.waOut;window._curFrame=state.currentFrame;
   window.updateWaBar();window.updateOmMarkers(state.currentFrame,state.totalFrames);
-  renderTimeline();renderLayerList();updateCompInstancePanel();updateSelPropsPanel();updateFsSelPanel();updateRevisionPanel();updatePropsContext();
+  renderTimeline();renderLayerList();updateCompInstancePanel();updateSelPropsPanel();updateFsSelPanel();updateRevisionPanel();updateTextActionsPanel();updatePropsContext();
 }
 // Team review Accept/Reject panel — shown when exactly one selected item is
 // either an active (non-ghost) revision (data.revisionParentId) or a
@@ -3470,17 +3470,14 @@ function openTextPopoverForEdit(raster){
   var ta=document.getElementById('text-input');ta.focus();ta.select();
 }
 function closeTextPopover(){var pop=document.getElementById('text-popover');if(pop)pop.style.display='none';_textPendingPt=null;_textPendingBox=null;_textEditingRaster=null;}
-function commitText(){
-  var txt=document.getElementById('text-input').value;
-  if(!txt.trim()||(!_textPendingPt&&!_textPendingBox&&!_textEditingRaster)){closeTextPopover();return;}
-  var size=parseInt(document.getElementById('text-size').value,10)||48;
-  var font=document.getElementById('text-font').value||'sans-serif';
-  var align=document.getElementById('text-align').value||'left';
-  var colorInp=document.getElementById('text-color');
-  var color=(colorInp&&colorInp.value)||state.strokeColor||'#000000';
-  var fixedWidthWorld=_textPendingBox?_textPendingBox.width:null;
+// Shared layout pass (2026-07) — used by BOTH commitText's flattened bake
+// AND splitTextIntoCharacters' per-character split, so a split always
+// matches the flattened text pixel-for-pixel (same wrap decisions, same
+// per-line x for the chosen alignment) instead of drifting from a second,
+// slightly-different implementation of the same word-wrap.
+function computeTextLayout(text,font,size,fixedWidthWorld){
   var SS=2; // supersample factor for offscreen bake, unchanged from before
-  var lines=txt.split('\n');
+  var lines=text.split('\n');
   var off=document.createElement('canvas');
   var octx=off.getContext('2d');
   octx.font=size*SS+'px '+font;
@@ -3509,11 +3506,29 @@ function commitText(){
   else wrapped.forEach(function(l){wMax=Math.max(wMax,octx.measureText(l).width);});
   off.width=Math.ceil(wMax)+16;off.height=Math.ceil(wrapped.length*lineH)+16;
   octx=off.getContext('2d'); // resizing the canvas resets its context/state
-  octx.font=size*SS+'px '+font;octx.fillStyle=color;octx.textBaseline='top';
+  octx.font=size*SS+'px '+font;octx.textBaseline='top';
+  return {off:off,octx:octx,wrapped:wrapped,lineH:lineH,SS:SS};
+}
+function lineDrawX(off,octx,line,align){
+  var tw=octx.measureText(line).width;
+  if(align==='center')return(off.width-tw)/2;
+  if(align==='right')return off.width-8-tw;
+  return 8;
+}
+function commitText(){
+  var txt=document.getElementById('text-input').value;
+  if(!txt.trim()||(!_textPendingPt&&!_textPendingBox&&!_textEditingRaster)){closeTextPopover();return;}
+  var size=parseInt(document.getElementById('text-size').value,10)||48;
+  var font=document.getElementById('text-font').value||'sans-serif';
+  var align=document.getElementById('text-align').value||'left';
+  var colorInp=document.getElementById('text-color');
+  var color=(colorInp&&colorInp.value)||state.strokeColor||'#000000';
+  var fixedWidthWorld=_textPendingBox?_textPendingBox.width:null;
+  var L=computeTextLayout(txt,font,size,fixedWidthWorld);
+  var off=L.off,octx=L.octx,wrapped=L.wrapped,lineH=L.lineH,SS=L.SS;
+  octx.fillStyle=color;
   wrapped.forEach(function(l,i){
-    var tw=octx.measureText(l).width,x=8;
-    if(align==='center')x=(off.width-tw)/2;else if(align==='right')x=off.width-8-tw;
-    octx.fillText(l,x,8+i*lineH);
+    octx.fillText(l,lineDrawX(off,octx,l,align),8+i*lineH);
   });
   var url=off.toDataURL('image/png');
   pushUndo();
@@ -3563,6 +3578,97 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 window.openTextPopover=openTextPopover;
 window.openTextPopoverForBox=openTextPopoverForBox;
 window.openTextPopoverForEdit=openTextPopoverForEdit;
+// ---- Per-character split ("Découper par caractère", 2026-07) ----
+// Modern text animation, Nemo-style: rather than inventing a parallel
+// "text animator" system (AE's per-property character-range groups), a
+// split text block becomes ORDINARY per-character Raster items sharing a
+// textGroupId (same "stable id groups members, not a new item type/class"
+// pattern already established for Cmd+G groups, group-bridge.js) — each
+// character is then a normal Motion Element (layerElements/elementMotion,
+// already generic over any stroke) and can carry its own keys AND its own
+// expression (motion.js's holder.expressions), so "stagger a wiggle across
+// every letter" needs zero new animation machinery, just N ordinary
+// elements + N expressions. Deliberately irreversible once split (same
+// "Release to Layers" precedent as splitLayerIntoElements, CLAUDE.md §8) —
+// re-editing the ORIGINAL sentence after a split isn't supported; that's
+// a one-way "commit to per-character" action, not a live toggle.
+function splitTextIntoCharacters(raster){
+  var d=raster.data;
+  if(!d||!d.isText||d.isTextChar||!raster.parent)return;
+  var layer=raster.parent;
+  var topLeft=raster.bounds.topLeft.clone();
+  var insertIdx=layer.children.indexOf(raster);
+  var L=computeTextLayout(d.text||'',d.font||'sans-serif',d.size||48,d.fixedWidth||null);
+  var off=L.off,octx=L.octx,wrapped=L.wrapped,lineH=L.lineH,SS=L.SS;
+  var color=d.color||'#000000';
+  var textGroupId='txt'+Date.now().toString(36)+'_'+Math.floor(Math.random()*1e6);
+  // Count non-whitespace chars up front so the async onLoad callbacks know
+  // when EVERY character has actually finished decoding before the single
+  // shared saveActiveLayerFrame()/renderNow() at the end — saving right
+  // after the synchronous creation loop would persist each Raster's
+  // pre-onLoad placeholder geometry (0×0 at the origin) instead of its
+  // real position, same race serR's own _pendingGeom comment (app.js)
+  // warns about for a single raster, multiplied by every character here.
+  var totalChars=0;
+  wrapped.forEach(function(line){line.split('').forEach(function(ch){if(ch.trim()!=='')totalChars++;});});
+  if(!totalChars)return;
+  pushUndo();
+  var loaded=0;
+  var newRasters=[];
+  function onOneLoaded(){
+    loaded++;
+    if(loaded>=totalChars){
+      newRasters.forEach(function(cr){tagOwner(cr);});
+      saveActiveLayerFrame();updateUI();
+      if(window.SMEngineBridge)window.SMEngineBridge.renderNow();
+    }
+  }
+  var prev=project.activeLayer;layer.activate();
+  wrapped.forEach(function(line,li){
+    if(!line)return;
+    var startX=lineDrawX(off,octx,line,d.align||'left');
+    var cursor=startX;
+    line.split('').forEach(function(ch){
+      var chW=octx.measureText(ch).width;
+      if(ch.trim()===''){cursor+=chW;return;}
+      var co=document.createElement('canvas');
+      co.width=Math.ceil(chW)+8;co.height=Math.ceil(lineH);
+      var cctx=co.getContext('2d');
+      cctx.font=(d.size||48)*SS+'px '+(d.font||'sans-serif');cctx.fillStyle=color;cctx.textBaseline='top';
+      cctx.fillText(ch,4,0);
+      var curl=co.toDataURL('image/png');
+      var cr=new Raster(curl);
+      cr.data.src=curl;cr.data.isText=true;cr.data.isTextChar=true;cr.data.textGroupId=textGroupId;
+      cr.data.text=ch;cr.data.font=d.font||'sans-serif';cr.data.size=d.size||48;cr.data.color=color;
+      cr.insertAbove(raster);
+      (function(cr,cursorX,lineIdx,coW,coH){
+        cr.onLoad=function(){
+          cr.size=new Size(coW/SS,coH/SS);
+          cr.position=topLeft.add(new Point(cursorX/SS+cr.size.width/2,lineIdx*lineH/SS+cr.size.height/2));
+          onOneLoaded();
+        };
+      })(cr,cursor,li,co.width,co.height);
+      newRasters.push(cr);
+      cursor+=chW;
+    });
+  });
+  prev.activate();
+  raster.remove();
+}
+window.splitTextIntoCharacters=splitTextIntoCharacters;
+// Contextual panel (mirrors updateRevisionPanel's exact shape/precedent) —
+// shown only when exactly one selected item is a whole (not already-split)
+// text block.
+function updateTextActionsPanel(){
+  var sec=document.getElementById('text-actions-sec');
+  if(!sec)return;
+  var p=(state.tool==='select'&&selectedPaths.length===1)?selectedPaths[0]:null;
+  var isWholeText=!!(p&&p.data&&p.data.isText&&!p.data.isTextChar);
+  sec.style.display=isWholeText?'':'none';
+  if(isWholeText){
+    document.getElementById('btn-text-split-chars').onclick=function(){splitTextIntoCharacters(p);};
+  }
+}
 function initCycleAndPropagate(){
   var cyc=document.getElementById('btn-cycle');
   if(cyc)cyc.addEventListener('click',function(){
