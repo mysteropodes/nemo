@@ -46,13 +46,23 @@
   function isMotionMode(){return !!motionEaseSeg;}
   var MOTION_DEFAULT_CURVE=[{x:0,y:0},{x:.42,y:0},{x:.58,y:1},{x:1,y:1}];
   function motionCurve(){return motionEaseSeg.curvePoints||(motionEaseSeg.curvePoints=clonePts(MOTION_DEFAULT_CURVE));}
-  // The points array actually being viewed/edited right now — motion-segment
-  // mode if active, otherwise the tween's own global curve. Every point-
-  // editing code path below (hit-test, drag, add/delete, presets) reads/
-  // writes through this instead of `cs.points` directly, so camera mode
-  // stays the only thing with genuinely separate rendering/interaction.
-  function activePoints(){return isMotionMode()?motionCurve():cs.points;}
-  function setActivePoints(pts){if(isMotionMode())motionEaseSeg.curvePoints=pts;else cs.points=pts;}
+  // Tween-pair points-based ease mode (2026-07, "easing par paire de clé,
+  // complémentaire au système actuel") — same on-curve-waypoint model,
+  // scoped to ONE keyframe pair (state.tweenEasing[layer:fA-fB].points)
+  // instead of the tween's global state.easingCurve, which stays the
+  // fallback for any pair that never got its own curve. Mutually exclusive
+  // with camera/motion mode, same pattern as those two.
+  var tweenEaseSeg=null,tweenEaseLabel='';
+  function isTweenSegMode(){return !!tweenEaseSeg;}
+  function tweenSegCurve(){return tweenEaseSeg.points||(tweenEaseSeg.points=clonePts(cs.points));}
+  // The points array actually being viewed/edited right now — motion- or
+  // tween-segment mode if active, otherwise the tween's own global curve.
+  // Every point-editing code path below (hit-test, drag, add/delete,
+  // presets) reads/writes through this instead of `cs.points` directly, so
+  // camera mode stays the only thing with genuinely separate rendering/
+  // interaction.
+  function activePoints(){return isMotionMode()?motionCurve():isTweenSegMode()?tweenSegCurve():cs.points;}
+  function setActivePoints(pts){if(isMotionMode())motionEaseSeg.curvePoints=pts;else if(isTweenSegMode())tweenEaseSeg.points=pts;else cs.points=pts;}
   // A small easing gallery (After Effects/GreenSock-style grid of named
   // curve families, each in/out/inout where that makes sense) — through-
   // point approximations of their usual off-curve-handle shapes, since the
@@ -209,7 +219,7 @@
     // global evalCurve/cs.points), everything else about the rendering is
     // shared with the tween's own curve view.
     ctx.strokeStyle='#4a9eff';ctx.lineWidth=2.5;ctx.beginPath();
-    var evalFn=isMotionMode()?function(x){return evalPointsCurve(pts,x);}:evalCurve;
+    var evalFn=(isMotionMode()||isTweenSegMode())?function(x){return evalPointsCurve(pts,x);}:evalCurve;
     ctx.moveTo(tX(0),tY(evalFn(0),yr));
     var N=100;for(var s=1;s<=N;s++){var xx=s/N;ctx.lineTo(tX(xx),tY(evalFn(xx),yr));}
     ctx.stroke();
@@ -246,7 +256,7 @@
       });
     }
     var coordsEl=document.getElementById('curve-coords');
-    if(coordsEl)coordsEl.textContent=isMotionMode()?motionEaseLabel:(pts.length+' points');
+    if(coordsEl)coordsEl.textContent=isMotionMode()?motionEaseLabel:isTweenSegMode()?tweenEaseLabel:(pts.length+' points');
   }
   function drawH(nx,ny,c,yr,r){ctx.beginPath();ctx.arc(tX(nx),tY(ny,yr),r,0,Math.PI*2);ctx.fillStyle=c;ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.stroke();}
   function hitT(mx,my){
@@ -263,6 +273,7 @@
   // onEaseSegChanged hook (if present) picks up the repaint instead.
   function pushCurve(){
     if(isMotionMode()){if(window.SMMotion&&window.SMMotion.onEaseSegChanged)window.SMMotion.onEaseSegChanged();return;}
+    if(isTweenSegMode()){if(window.onTweenEaseSegChanged)window.onTweenEaseSegChanged();return;}
     if(window.SM)window.SM.setCurve(clonePts(cs.points));upP();
   }
 
@@ -472,6 +483,11 @@
 
   window._curveEditor={
     evalCurve:evalCurve,
+    // Pure evaluator for an arbitrary points array — used at TWEEN
+    // GENERATION time (tweens.js getEasingForPair), independent of whether
+    // this widget is even open/editing that pair right now (evalCurve/
+    // activePoints only reflect whatever's currently being VIEWED).
+    evalPointsCurve:evalPointsCurve,
     getState:function(){return cs;},
     setState:function(s){
       // Backward-compat: projects saved before this rewrite stored
@@ -486,7 +502,7 @@
     // Clears motion mode too — only one "currently edited segment" at a
     // time on this one shared canvas.
     editCameraSeg:function(seg,label){
-      motionEaseSeg=null;
+      motionEaseSeg=null;tweenEaseSeg=null;
       camEaseSeg=seg;camEaseLabel=label||'';
       if(window.openPropsSection)window.openPropsSection('easing-sec');
       draw();
@@ -500,7 +516,7 @@
     // lazily created/mutated in place, same live-reference contract
     // editCameraSeg already has for `.ease`).
     editMotionSeg:function(seg,label){
-      camEaseSeg=null;
+      camEaseSeg=null;tweenEaseSeg=null;
       motionEaseSeg=seg;motionEaseLabel=label||'';
       selected=null;
       if(window.openPropsSection)window.openPropsSection('easing-sec');
@@ -510,8 +526,25 @@
       if(!motionEaseSeg)return;
       motionEaseSeg=null;draw();
     },
+    // Tween-pair points-based ease editing — see tweenEaseSeg above. `seg`
+    // is state.tweenEasing[key] itself (created on demand by the caller,
+    // tweens.js), its `.points` lazily filled in by tweenSegCurve() above
+    // (cloned from the CURRENT global curve, not a fixed default — editing
+    // a pair for the first time starts from what it already looks like).
+    editTweenSeg:function(seg,label){
+      camEaseSeg=null;motionEaseSeg=null;
+      tweenEaseSeg=seg;tweenEaseLabel=label||'';
+      selected=null;
+      if(window.openPropsSection)window.openPropsSection('easing-sec');
+      draw();
+    },
+    exitTweenSeg:function(){
+      if(!tweenEaseSeg)return;
+      tweenEaseSeg=null;draw();
+    },
     isCameraMode:isCamMode,
-    isMotionMode:isMotionMode
+    isMotionMode:isMotionMode,
+    isTweenSegMode:isTweenSegMode
   };
   setTimeout(draw,100);
 })();

@@ -641,6 +641,48 @@ function outlineFromCenterSegs(segs){
   return outSegs;
 }
 function getEasing(){if(window._curveEditor)return window._curveEditor.evalCurve;return function(t){return t;};}
+// Per-keyframe-pair override (state.tweenEasing), falling back to the
+// global curve (getEasing()) for any pair that never got its own —
+// COMPLEMENTS the global curve, doesn't replace it. evalPointsCurve is the
+// pure evaluator (ui.js) — independent of whatever the curve widget
+// happens to be showing right now, unlike evalCurve/activePoints which
+// only reflect the currently-open view.
+function getEasingForPair(li,fA,fB){
+  var key=li+':'+fA+'-'+fB;
+  var custom=state.tweenEasing&&state.tweenEasing[key];
+  if(custom&&custom.points&&custom.points.length&&window._curveEditor&&window._curveEditor.evalPointsCurve){
+    var pts=custom.points;
+    return function(t){return window._curveEditor.evalPointsCurve(pts,t);};
+  }
+  return getEasing();
+}
+// Opens the shared curve widget pointed at ONE keyframe pair's own easing
+// (state.tweenEasing[key]) instead of the global curve — mirrors camera.js/
+// motion.js's editCameraSeg/editMotionSeg (right-click a segment → edit
+// just its own curve). Called from timeline.js's frame-grid context menu
+// and from clicking a per-pair curve strip when state.showTweenCurves is
+// on (see renderTweenCurveStrips, timeline.js).
+function openTweenEaseEditor(li,fA,fB){
+  var key=li+':'+fA+'-'+fB;
+  if(!state.tweenEasing)state.tweenEasing={};
+  var seg=state.tweenEasing[key]=state.tweenEasing[key]||{};
+  window._tweenEaseCtx={li:li,fA:fA,fB:fB};
+  if(window._curveEditor)window._curveEditor.editTweenSeg(seg,'Tween : clé '+(fA+1)+' → '+(fB+1));
+}
+// ui.js's pushCurve() calls this (isTweenSegMode branch) whenever a point
+// is added/moved/deleted on a per-pair curve — regenerates just that span,
+// same restrictTo-by-selection mechanism generateTweens already uses for
+// the "Réattribuer un inbetween" tool.
+window.onTweenEaseSegChanged=function(){
+  var ctx=window._tweenEaseCtx;
+  if(!ctx)return;
+  selClear();selAdd(ctx.li,ctx.fA);
+  generateTweens();
+  selClear();
+  if(state.activeLayerIdx===ctx.li)renderOS();
+  updateUI();
+  if(window.renderTweenCurveStrips)window.renderTweenCurveStrips();
+};
 function lerp(a,b,t){return a+(b-a)*t;}function lerpV(a,b,t){return[lerp(a[0],b[0],t),lerp(a[1],b[1],t)];}
 function arcKey(fA,fB,i){return fA+'-'+fB+'-'+i;}
 // Cubic bezier through ptA/ptB with independent OUT (leaving A) and IN
@@ -1138,10 +1180,12 @@ function generateTweens(){
     selOnLayer.forEach(function(fi0){for(var pi=fi0;pi>=0;pi--){if(ld.frames[pi].isKeyframe){restrictTo[pi]=true;break;}}});
   }
   pushUndoLayers();
-  var easFn=getEasing();var resN=state.resamplePts;var step=state.tweenStep;var total=0;
+  var resN=state.resamplePts;var step=state.tweenStep;var total=0;
   for(var ki=0;ki<keys.length-1;ki++){
     var fA=keys[ki],fB=keys[ki+1];
     if(restrictTo&&!restrictTo[fA])continue;
+    // Per-pair override (complements the global curve, see getEasingForPair)
+    var easFn=getEasingForPair(li,fA,fB);
     var sAsplit=splitTweenables(ld.frames[fA].strokes),sBsplit=splitTweenables(ld.frames[fB].strokes);
     var sA=sAsplit.list,sB=sBsplit.list;
     // v16: manual pairing overrides (state.tweenOverrides) take priority
@@ -1502,7 +1546,7 @@ function renderArcs(cached){
   var st=cached||computeArcMatchState();
   if(!st)return;
   var fA=st.fA,fB=st.fB,sA=st.sA,sB=st.sB,matches=st.matches,fm=st.fm;
-  arcLayer.activate();var cols=['#ff6b6b','#4ecdc4','#ffe66d','#a29bfe','#fd79a8','#00cec9'];var easFn=getEasing();
+  arcLayer.activate();var cols=['#ff6b6b','#4ecdc4','#ffe66d','#a29bfe','#fd79a8','#00cec9'];var easFn=getEasingForPair(state.activeLayerIdx,fA,fB);
   // A multi-element selection used to draw every arc at full brightness/
   // width in its own cycling color — with more than a handful selected the
   // dashed lines and endpoint dots pile on top of each other into an
