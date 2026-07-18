@@ -16,20 +16,55 @@
   // aren't tied to a canvas tool at all, so they're deliberately absent
   // here — they stay Réglages-only.
   var TOOL_CONTEXT = {
-    // 'symmetry'/'radial-symmetry' promoted out of Labs (2026-07) — now the
-    // "Symmetry Guide" toolbar tool + right-panel section, permanently
-    // reachable (not just while Draw/Fill Brush is active), so they no
-    // longer need a slot here.
-    draw: ['predictive-stroke', 'multiframe-draw', 'canvas-grid', 'view-filter'],
-    fillbrush: ['canvas-grid', 'view-filter'],
-    pen: ['french-curve', 'canvas-grid', 'view-filter'],
-    line: ['french-curve', 'canvas-grid'],
-    rect: ['canvas-grid', 'view-filter'],
-    ellipse: ['french-curve', 'canvas-grid'],
+    // 'symmetry' (promoted out of Labs, 2026-07) and 'perspective' (already
+    // a real shipped feature, never in Labs at all) are BOTH permanently
+    // reachable via their own toolbar button + right-panel section — but
+    // "permanently reachable" turned out to mean "invisible unless you
+    // already know to scroll the right panel" in practice (feedback:
+    // "j'arrive pas à comprendre les outils que tu as mis en place... les
+    // avoir dans la barre flottante quand on utilise l'outil brush"). Both
+    // are real `state.*`-backed features, not Labs prototypes — see
+    // REAL_FEATURES below for how this panel treats them as first-class
+    // entries alongside the localStorage-flag-based Labs ones.
+    draw: ['symmetry', 'perspective', 'predictive-stroke', 'multiframe-draw', 'canvas-grid', 'view-filter'],
+    fillbrush: ['symmetry', 'perspective', 'canvas-grid', 'view-filter'],
+    pen: ['symmetry', 'perspective', 'french-curve', 'canvas-grid', 'view-filter'],
+    line: ['symmetry', 'perspective', 'french-curve', 'canvas-grid'],
+    rect: ['symmetry', 'canvas-grid', 'view-filter'],
+    ellipse: ['symmetry', 'french-curve', 'canvas-grid'],
     eraser: ['out-of-pegs', 'canvas-grid'],
     select: ['vector-sculpt', 'canvas-grid'],
     subselect: ['vector-sculpt'],
     hand: ['canvas-grid'],
+  };
+  // Real `state.*`-backed features (NOT Labs prototypes — no localStorage
+  // flag, no SMLabs.register) shown in this same strip. isOn/toggle read
+  // and write the actual app state directly and keep the right-panel
+  // checkbox (#p-sym-on/#p-persp-on) in sync, so toggling from either place
+  // never desyncs the other — same "two entry points, one truth" principle
+  // the Labs toggle button already follows for renderLabsPanel().
+  var REAL_FEATURES = {
+    symmetry: {
+      isOn: function () { return !!(window.state && state.symmetryEnabled); },
+      toggle: function () {
+        state.symmetryEnabled = !state.symmetryEnabled;
+        if (state.symmetryEnabled) {
+          if (window.ensureSymmetryAxis) window.ensureSymmetryAxis();
+          if (window.ensureSymmetryRadialCenter) window.ensureSymmetryRadialCenter();
+        }
+        var cb = document.getElementById('p-sym-on'); if (cb) cb.checked = state.symmetryEnabled;
+        if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+      },
+    },
+    perspective: {
+      isOn: function () { return !!(window.state && state.perspectiveEnabled); },
+      toggle: function () {
+        state.perspectiveEnabled = !state.perspectiveEnabled;
+        if (state.perspectiveEnabled && window.ensurePerspectiveVPs) window.ensurePerspectiveVPs();
+        var cb = document.getElementById('p-persp-on'); if (cb) cb.checked = state.perspectiveEnabled;
+        if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+      },
+    },
   };
   // Tools armed by a held key regardless of the active tool (flip-roll=R,
   // mirror-check=M, lagoon-menu=Q) — always available, shown after a
@@ -38,6 +73,8 @@
   var ALWAYS = ['flip-roll', 'mirror-check', 'lagoon-menu'];
 
   var SHORT_NAME = {
+    'symmetry': 'Guide de symétrie / mandala',
+    'perspective': 'Guide de perspective',
     'predictive-stroke': 'Trait prédictif',
     'multiframe-draw': 'Dessin multi-frames',
     'canvas-grid': 'Grille',
@@ -57,6 +94,10 @@
   // stroke-based line art, which read as a different, thinner icon
   // language. Rebuilt every icon as a solid silhouette to match.
   var ICONS = {
+    // Same "split by an axis" language as the toolbar button (index.html),
+    // simplified/solid-filled to match this strip's icon set.
+    'symmetry': '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><rect x="11" y="2" width="2" height="20" rx="1"/><path d="M9 6L3 12L9 18Z"/><path d="M15 6L21 12L15 18Z"/></svg>',
+    'perspective': '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><circle cx="12" cy="6" r="2"/><path d="M12 6L2 22h4L12 10l6 12h4Z"/><path d="M2 22L12 6l10 16" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".5"/></svg>',
     'predictive-stroke': '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M12 2l1.2 3.8L17 7l-3.8 1.2L12 12l-1.2-3.8L7 7l3.8-1.2L12 2z"/><path d="M19 13l.6 1.9L21.5 15.5l-1.9.6L19 18l-.6-1.9L16.5 15.5l1.9-.6L19 13z"/><path d="M5 15l.5 1.5L7 17l-1.5.5L5 19l-.5-1.5L3 17l1.5-.5L5 15z"/></svg>',
     'multiframe-draw': '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M12 2L22 7L12 12L2 7Z"/><path d="M2 12L12 17L22 12L22 14L12 19L2 14Z" opacity=".55"/></svg>',
     'canvas-grid': '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>',
@@ -90,9 +131,15 @@
     return isNaN(n) ? p.def : n;
   }
 
+  // A name is "available" (gets a button at all) if it's either a
+  // registered Labs prototype OR one of the real state-backed
+  // REAL_FEATURES above — the two are otherwise treated identically by
+  // everything below (same button, same active-state highlight).
   function buildGroup(names, registered) {
-    return names.filter(function (n) { return registered.hasOwnProperty(n); });
+    return names.filter(function (n) { return registered.hasOwnProperty(n) || REAL_FEATURES.hasOwnProperty(n); });
   }
+  var SYM_MODES = ['y', 'x', 'free', 'radial'];
+  var SYM_MODE_LABEL = { y: 'Y', x: 'X', free: 'Libre', radial: 'Radial' };
 
   function renderLabsFloatPanel() {
     var panel = document.getElementById('labs-float-panel');
@@ -101,6 +148,10 @@
     if (!panel || !iconsWrap || !paramsWrap || !window.SMLabs || !window.state) return;
     var registered = {};
     SMLabs.list().forEach(function (p) { registered[p.name] = p.on; });
+    // REAL_FEATURES entries override/augment the Labs `on` reading with
+    // their own live state check — done here, once, rather than special-
+    // casing every reader below.
+    Object.keys(REAL_FEATURES).forEach(function (n) { registered[n] = REAL_FEATURES[n].isOn(); });
     var ctx = buildGroup(TOOL_CONTEXT[state.tool] || [], registered);
     var always = buildGroup(ALWAYS.filter(function (n) { return ctx.indexOf(n) < 0; }), registered);
     if (!ctx.length && !always.length) { panel.style.display = 'none'; return; }
@@ -113,7 +164,8 @@
       btn.title = SHORT_NAME[n] || n;
       btn.innerHTML = ICONS[n] || '';
       btn.addEventListener('click', function () {
-        window.SMLabs.toggle(n);
+        if (REAL_FEATURES[n]) REAL_FEATURES[n].toggle();
+        else window.SMLabs.toggle(n);
         renderLabsFloatPanel();
         // Keep Réglages > Labs in sync if it happens to be open at the
         // same time — same checkbox state, two entry points.
@@ -130,9 +182,52 @@
     always.forEach(addBtn);
 
     // Params row: one stepper pill per numeric knob, for every currently-
-    // shown tool that's both ON and has a PARAMS entry.
+    // shown tool that's both ON and has a PARAMS entry — PLUS a hand-built
+    // pair of pills for Symmetry (mode cycle + conditional sector count),
+    // which don't fit PARAMS' "one localStorage-backed number" shape since
+    // mode is a string cycle and both fields live on `state`, not
+    // localStorage.
     paramsWrap.innerHTML = '';
     var anyParams = false;
+    if (registered.symmetry) {
+      anyParams = true;
+      var modePill = document.createElement('div'); modePill.className = 'labs-float-stepper';
+      var modeLbl = document.createElement('span'); modeLbl.className = 'lfs-label'; modeLbl.textContent = 'Mode';
+      var modePrev = document.createElement('button'); modePrev.className = 'lfs-btn'; modePrev.textContent = '−';
+      var modeVal = document.createElement('span'); modeVal.className = 'lfs-val';
+      var modeNext = document.createElement('button'); modeNext.className = 'lfs-btn'; modeNext.textContent = '+';
+      function cycleMode(dir) {
+        var i = SYM_MODES.indexOf(state.symmetryMode);
+        var next = SYM_MODES[(i + dir + SYM_MODES.length) % SYM_MODES.length];
+        if (window.setSymmetryMode) window.setSymmetryMode(next);
+        var sel = document.getElementById('p-sym-mode'); if (sel) sel.value = next;
+        if (window.syncSymmetryPanelVisibility) window.syncSymmetryPanelVisibility();
+        modeVal.textContent = SYM_MODE_LABEL[next];
+        renderLabsFloatPanel(); // sectors pill needs to appear/disappear when entering/leaving radial
+      }
+      modeVal.textContent = SYM_MODE_LABEL[state.symmetryMode] || state.symmetryMode;
+      modePrev.addEventListener('click', function () { cycleMode(-1); });
+      modeNext.addEventListener('click', function () { cycleMode(1); });
+      modePill.appendChild(modeLbl); modePill.appendChild(modePrev); modePill.appendChild(modeVal); modePill.appendChild(modeNext);
+      paramsWrap.appendChild(modePill);
+      if (state.symmetryMode === 'radial') {
+        var secPill = document.createElement('div'); secPill.className = 'labs-float-stepper';
+        var secLbl = document.createElement('span'); secLbl.className = 'lfs-label'; secLbl.textContent = 'Secteurs';
+        var secMinus = document.createElement('button'); secMinus.className = 'lfs-btn'; secMinus.textContent = '−';
+        var secVal = document.createElement('span'); secVal.className = 'lfs-val'; secVal.textContent = state.symmetryRadialSectors;
+        var secPlus = document.createElement('button'); secPlus.className = 'lfs-btn'; secPlus.textContent = '+';
+        function setSectors(v) {
+          state.symmetryRadialSectors = Math.max(2, Math.min(24, v));
+          secVal.textContent = state.symmetryRadialSectors;
+          var inp = document.getElementById('p-sym-sectors'); if (inp) inp.value = state.symmetryRadialSectors;
+          if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+        }
+        secMinus.addEventListener('click', function () { setSectors(state.symmetryRadialSectors - 1); });
+        secPlus.addEventListener('click', function () { setSectors(state.symmetryRadialSectors + 1); });
+        secPill.appendChild(secLbl); secPill.appendChild(secMinus); secPill.appendChild(secVal); secPill.appendChild(secPlus);
+        paramsWrap.appendChild(secPill);
+      }
+    }
     shown.forEach(function (n) {
       if (!registered[n] || !PARAMS[n]) return;
       PARAMS[n].forEach(function (p) {
