@@ -391,6 +391,16 @@
             closed: !!sd.closed,
             fillColor: cssColorToRgba(c.fillColor ? c.fillColor.toCSS(true) : null, op),
           };
+          // Extended per-shape property: Fill color (2026-07) — overrides
+          // the item's own painted color with its element holder's
+          // 'fillColor' track, [r,g,b,a] 0-255, the exact shape
+          // cssColorToRgba above already produces — never touched unless
+          // the user actually keyed/set it (elementFillColorAt returns
+          // null otherwise, see its own comment in motion.js).
+          if (window.SMMotion && cStrokeId) {
+            var fcOverride = SMMotion.elementFillColorAt(i, cStrokeId, state.currentFrame);
+            if (fcOverride) item.fillColor = fcOverride;
+          }
           // Gradient fill (2026-07) — takes priority over the flat fillColor
           // above on the Rust side (geometry-wasm's paint_fill), same
           // "richer field wins" precedent as centerline/image. Anchor points
