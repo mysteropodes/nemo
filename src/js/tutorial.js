@@ -54,6 +54,31 @@
     var n = 0; for (var i = 0; i < ld.frames.length; i++) if (ld.frames[i] && ld.frames[i].isInterpolated) n++;
     return n;
   }
+  // Generic "did the geometry change at all" fingerprint — covers edits
+  // that DON'T add/remove a child (moving a shape, recoloring an existing
+  // fill, partially erasing a path leaves the same item with different
+  // segments). A raw JSON length is a cheap, good-enough proxy: virtually
+  // any real edit (position, color, segment count) changes the serialized
+  // length. Never used as the ONLY signal for something that's supposed to
+  // create a brand-new item — use measureStrokeCount (stateIncreaseStep)
+  // for that instead.
+  function measureLayerFingerprint(win) {
+    var l = activeLayer(win);
+    try { return (l && l.exportJSON) ? String(l.exportJSON({ asString: true })).length : 0; }
+    catch (e) { return 0; }
+  }
+  function measureLayersLength(win) { return measureLayerCount(win); }
+  function measureSymbolCount(win) {
+    var st = win.state;
+    return (st && st.symbols) ? Object.keys(st.symbols).length : 0;
+  }
+  function measureCameraKeyCount(win) {
+    return (win.state && win.state.cameraKeys) ? win.state.cameraKeys.length : 0;
+  }
+  function measureMotionPositionKeyCount(win) {
+    var ld = activeLayerData(win);
+    return (ld && ld.motion && ld.motion.position && ld.motion.position.keys) ? ld.motion.position.keys.length : 0;
+  }
 
   function stateIncreaseStep(cfg) {
     var minInc = cfg.minIncrease || 1;
@@ -185,6 +210,139 @@
         }),
         { type: 'click', target: '#btn-nf', title: 'Change de frame', body: 'Clique "Frame suivante" pour voir les frames voisines apparaître en fantôme.' },
         { type: 'info', title: 'Bien joué !', body: 'Le chapitre "Interpolation automatique" du guide détaille les marqueurs de plage et le mode contours seuls.' }
+      ]
+    },
+    {
+      id: 'shapes',
+      icon: '5',
+      title: 'Formes, remplissage et gomme',
+      desc: 'Rectangle, pot de peinture, gomme',
+      time: '2 min',
+      steps: [
+        { type: 'info', title: 'Au-delà du pinceau', body: 'Rectangle, Ellipse, Pot de peinture, Gomme — les outils de base pour construire des formes propres plutôt qu\'à main levée.' },
+        { type: 'click', target: '.tool-btn[data-tool="rect"]', title: 'Choisis le Rectangle', body: 'Clique sur l\'outil Rectangle dans la barre de gauche (raccourci R).' },
+        stateIncreaseStep({
+          target: '#drawing-canvas', title: 'Dessine un rectangle', body: 'Clique-glisse en diagonale sur le canevas pour tracer un rectangle.',
+          hint: 'En attente de ta forme…', measure: measureStrokeCount
+        }),
+        { type: 'click', target: '.tool-btn[data-tool="fill"]', title: 'Choisis le Pot de peinture', body: 'Clique sur l\'outil Pot de peinture (raccourci G).' },
+        { type: 'click', target: '#fill-well', title: 'Change la couleur de fond', body: 'Clique le carré de couleur du Fond pour ouvrir le sélecteur, choisis une autre teinte.' },
+        // Rect ships with fillEnabled:true by default (app.js), so the
+        // rectangle is ALREADY filled the moment it's drawn — clicking
+        // inside it with the bucket hits the "recolor in place" branch
+        // (tools.js), not "insert a brand-new filled path". A raw
+        // children.length check would never move. The fingerprint catches
+        // the recolor either way, whichever branch actually ran.
+        stateChangedStep({
+          target: '#drawing-canvas', title: 'Remplis le rectangle', body: 'Clique à l\'intérieur du rectangle pour appliquer la nouvelle couleur.',
+          hint: 'En attente de ton clic…', measure: measureLayerFingerprint
+        }),
+        { type: 'click', target: '.tool-btn[data-tool="eraser"]', title: 'Choisis la Gomme', body: 'Clique sur l\'outil Gomme (raccourci E).' },
+        stateChangedStep({
+          target: '#drawing-canvas', title: 'Efface un morceau du rectangle', body: 'Clique-glisse sur un bord du rectangle pour en effacer une partie.',
+          hint: 'En attente de ton geste…', measure: measureLayerFingerprint
+        }),
+        { type: 'info', title: 'Bien joué !', body: 'La Pipette (I) prélève une couleur existante sur le canevas — pratique pour rester cohérent d\'une frame à l\'autre. Le chapitre "Dessiner" du guide couvre aussi les opérations booléennes (union/soustraction).' }
+      ]
+    },
+    {
+      id: 'select',
+      icon: '6',
+      title: 'Sélection et transformation',
+      desc: 'Déplacer et redimensionner une forme',
+      time: '1 min',
+      steps: [
+        { type: 'info', title: 'Revenir sur ce qui existe déjà', body: 'L\'outil Sélection sert à reprendre une forme après coup — la déplacer, la redimensionner, la faire pivoter — sans devoir la redessiner.' },
+        { type: 'click', target: '.tool-btn[data-tool="select"]', title: 'Choisis la Sélection', body: 'Clique sur l\'outil Sélection dans la barre de gauche (raccourci V).' },
+        stateChangedStep({
+          target: '#drawing-canvas', title: 'Déplace une forme', body: 'Clique sur un trait ou une forme dessinée puis fais-la glisser ailleurs sur le canevas.',
+          hint: 'En attente de ton geste…', measure: measureLayerFingerprint
+        }),
+        { type: 'info', title: 'Bien joué !', body: 'Les poignées aux coins redimensionnent, celle au-dessus fait pivoter. Le panneau de droite (Position/Size/Rotate) permet aussi de saisir des valeurs exactes au clavier.' }
+      ]
+    },
+    {
+      id: 'motion',
+      icon: '7',
+      title: 'Motion — animer une propriété',
+      desc: 'Position, rotation, échelle par keyframes',
+      time: '2 min',
+      steps: [
+        { type: 'info', title: 'Animer sans redessiner', body: 'Le mode Motion anime des PROPRIÉTÉS (position, rotation, échelle, opacité) par keyframes, façon After Effects — complémentaire du dessin frame par frame.' },
+        { type: 'click', target: '.app-mode-btn[data-mode="motion"]', title: 'Passe en mode Motion', body: 'Clique l\'onglet "Motion" en haut de l\'écran.' },
+        // The very first stopwatch icon in the Motion panel is Position —
+        // PROPS' own declared order (motion.js) — since the transform-group
+        // row for the active layer renders before any per-element rows.
+        stateIncreaseStep({
+          target: '.motion-stopwatch', title: 'Active l\'animation de Position', body: 'Clique le petit losange à côté de "Position" dans le panneau Motion pour poser une première clé.',
+          hint: 'En attente…', measure: measureMotionPositionKeyCount
+        }),
+        stateIncreaseStep({
+          title: 'Avance de quelques frames', body: 'Clique "Frame suivante" plusieurs fois pour te placer plus loin.', hint: 'En attente…',
+          measure: measureCurrentFrame, minIncrease: 5
+        }),
+        stateChangedStep({
+          target: '#drawing-canvas', title: 'Déplace le calque', body: 'Fais glisser le calque sur le canevas — une nouvelle clé de Position se crée automatiquement ici, à cette frame.',
+          hint: 'En attente de ton geste…', measure: measureMotionPositionKeyCount
+        }),
+        { type: 'info', title: 'Bien joué !', body: 'Rejoue (Entrée) pour voir le calque bouger entre les deux clés. Un calque avec 2 éléments ou plus devient automatiquement un Component dès qu\'une propriété de calque est keyée — voir le module suivant.' }
+      ]
+    },
+    {
+      id: 'component',
+      icon: '8',
+      title: 'Components et StoryBoard',
+      desc: 'Réutiliser un calque comme un symbole',
+      time: '2 min',
+      steps: [
+        { type: 'info', title: 'Un calque réutilisable', body: 'Un Component est un calque transformé en symbole réutilisable — comme un symbole Flash/Animate. StoryBoard, le montage nodal de Nemo, ne manipule QUE des Components.' },
+        { type: 'click', target: '.app-mode-btn[data-mode="anim2d"]', title: 'Reviens en Animation 2D', body: 'Clique l\'onglet "Animation 2D" en haut de l\'écran.' },
+        // Convert-to-component (app.js) early-returns with just a toast on a
+        // layer that's ALREADY a component (`if(!ld||ld.symbolId)return`) —
+        // e.g. right after the Motion module, whose own exercise can
+        // auto-convert the layer. Adding a guaranteed-fresh, never-yet-a-
+        // component layer here makes this step work regardless of what a
+        // previous module left the project in, instead of silently getting
+        // stuck waiting for a click that will never do anything.
+        stateIncreaseStep({ target: '#btn-al', title: 'Ajoute un calque neuf', body: 'Clique le bouton "+" en bas du panneau Calques — on part d\'un calque tout neuf pour cet exercice.', hint: 'En attente…', measure: measureLayerCount }),
+        stateIncreaseStep({
+          target: '#btn-comp', title: 'Convertis le calque en Component', body: 'Clique le bouton losange ◈ en bas du panneau Calques ("Convert layer to component").',
+          hint: 'En attente…', measure: measureSymbolCount
+        }),
+        { type: 'click', target: '.app-mode-btn[data-mode="storyboard"]', title: 'Ouvre le StoryBoard', body: 'Clique l\'onglet "StoryBoard" en haut de l\'écran — c\'est là que les Components se montent en séquence.' },
+        { type: 'info', title: 'Bien joué !', body: 'Le chapitre "Components et StoryBoard" du guide couvre les instances (vitesse/offset propres à chacune) et le montage nodal complet.' }
+      ]
+    },
+    {
+      id: 'camera',
+      icon: '9',
+      title: 'Caméra',
+      desc: 'Cadrage animé (zoom/pan)',
+      time: '1 min',
+      steps: [
+        { type: 'info', title: 'Une caméra virtuelle', body: 'Un calque caméra anime le cadrage (zoom/pan/rotation) par-dessus toute la scène, avec des courbes de Bézier — comme dans TVPaint ou Callipeg.' },
+        stateChangedStep({
+          target: '#btn-camera', title: 'Ajoute un calque caméra', body: 'Clique le bouton caméra en bas du panneau Calques.', hint: 'En attente…',
+          measure: function (win) { return !!(win.state && win.state.cameraLayerOn); }
+        }),
+        { type: 'info', title: 'Bien joué !', body: 'Le calque caméra sélectionné, glisse un cadre sur le canevas pour poser une clé de cadrage — chaque frame où tu ajustes le cadre en pose une nouvelle. Le chapitre "Caméra, audio et médias" du guide détaille l\'éditeur de courbe dédié.' }
+      ]
+    },
+    {
+      id: 'media',
+      icon: '10',
+      title: 'Audio et médias',
+      desc: 'Importer un son, une image, une vidéo',
+      time: '1 min',
+      // File-driven features (a real file picker/drag-drop) aren't
+      // something this sandboxed tutorial can hand a real file to — these
+      // steps stay click-only (real clicks on the real buttons, no state
+      // polling) rather than pretending to validate an import that never
+      // happens. Still real navigation, just not gated on a file result.
+      steps: [
+        { type: 'info', title: 'Faire entrer du contenu externe', body: 'Nemo importe de l\'audio, des images (dont des séquences numérotées) et de la vidéo — chacune devient une piste ou un calque animé.' },
+        { type: 'click', target: '#btn-audio', title: 'Ouvre l\'import audio', body: 'Clique le bouton note de musique en bas du panneau Calques pour voir le sélecteur de fichier s\'ouvrir.' },
+        { type: 'info', title: 'Bien joué !', body: 'Import Image(s)…/Import Video… vivent dans le menu principal. Le chapitre "Caméra, audio et médias" du guide couvre la bibliothèque de médias et la référence vidéo pour la rotoscopie.' }
       ]
     }
   ];
