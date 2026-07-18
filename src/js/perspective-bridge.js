@@ -243,6 +243,37 @@
     return best;
   }
   window.perspectiveFindGuideRayNear = findGuideRayNear;
+  // Angle-based freehand lock (2026-07 — feedback: "dans sketchbook tu fais
+  // tes traits n'importe où ils vont suivre la perspective" — the PROXIMITY
+  // lock above (findGuideRayNear) only fires when the stroke STARTS within
+  // LOCK_TOLERANCE_PX of an already-drawn guide ray, which is exactly the
+  // opposite of Sketchbook's own behavior: there, the guide's ANGLE from a
+  // vanishing point is what matters, not the stroke's distance from any
+  // drawn line — you can start a stroke anywhere on the canvas and, once
+  // its direction reads as "aimed at a VP," it locks onto that VP's ray.
+  // Mirrors snapToVP's angle math above (same SNAP_DEG, same "closest VP
+  // direction wins" logic) but returns a {px,py,dx,dy} ray struct usable by
+  // projectOnRay/draw-bridge.js's guideConstrain, instead of a single
+  // projected point — draw-bridge.js calls this once dragLen has crossed a
+  // few pixels (see its own guideLockDecided comment for why the decision
+  // can't happen at pointerdown, before any direction is known at all).
+  function findVPRayByAngle(start, currentPt) {
+    if (!state.perspectiveEnabled) return null;
+    var dx = currentPt.x - start.x, dy = currentPt.y - start.y;
+    var dragAngle = Math.atan2(dy, dx);
+    var vps = ensurePerspectiveVPs();
+    var best = null, bestDiff = SNAP_DEG * Math.PI / 180;
+    vps.forEach(function (vp) {
+      var vx = vp.x - start.x, vy = vp.y - start.y;
+      var vlen = Math.hypot(vx, vy);
+      if (vlen < 1) return; // start point sits ON the VP — no meaningful direction to compare against
+      var vAngle = Math.atan2(vy, vx);
+      var diff = Math.abs(Math.atan2(Math.sin(dragAngle - vAngle), Math.cos(dragAngle - vAngle)));
+      if (diff < bestDiff) { bestDiff = diff; best = { px: start.x, py: start.y, dx: vx / vlen, dy: vy / vlen }; }
+    });
+    return best;
+  }
+  window.perspectiveFindVPRayByAngle = findVPRayByAngle;
   function projectOnRay(worldPt, ray) {
     var vx = worldPt.x - ray.px, vy = worldPt.y - ray.py;
     var t = vx * ray.dx + vy * ray.dy;
