@@ -4238,7 +4238,7 @@ function onViewDoubleClick(event){
   if(state.tool==='select'||state.tool==='text'){
     var textLayer=userLayers[state.activeLayerIdx];
     var textHit=textLayer.hitTest(event.point,{fill:true,stroke:true,tolerance:4/view.zoom});
-    if(textHit&&textHit.item instanceof Raster&&textHit.item.data&&textHit.item.data.isText){
+    if(textHit&&textHit.item instanceof Raster&&textHit.item.data&&textHit.item.data.isText&&!textHit.item.data.isTextChar){
       if(window.openTextPopoverForEdit)openTextPopoverForEdit(textHit.item);
       return;
     }
