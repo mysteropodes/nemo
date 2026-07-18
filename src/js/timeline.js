@@ -1827,10 +1827,9 @@ function renderTimeline(){
 // getEasingForPair tweens.js itself uses) along the bottom of every layer
 // row, for each tween span (a keyframe pair with at least one generated
 // isInterpolated frame between them). Clicking a segment's own strip opens
-// the shared curve widget pointed at just that pair (openTweenEaseEditor),
-// same right-click-a-segment idea as camera/motion, just click-to-open
-// since the strip IS the segment here (no separate context-menu item
-// needed once the strip's own visible below the layer).
+// a floating draggable-point editor right there (openTweenCurveInset,
+// below) — a real distinct editing surface under the layer, not the tiny
+// fixed right-panel widget, per explicit request.
 function layerKeyframeList(li){
   var ld=state.layers[li];if(!ld)return[];
   var keys=[];
@@ -1883,12 +1882,156 @@ function renderTweenCurveStrips(){
       poly.setAttribute('stroke-width',custom?'2':'1.2');
       poly.style.cursor='pointer';
       poly.style.pointerEvents='stroke';
-      poly.addEventListener('click',(function(l,a,b){return function(e){e.stopPropagation();openTweenEaseEditor(l,a,b);};})(li,fA,fB));
+      // The thin strip is just an indicator — clicking it opens a proper
+      // draggable-point editor right there, floating over the timeline
+      // (not the small fixed panel far away on the right), per explicit
+      // request: "une partie distincte qui s'ouvre dessous... par un
+      // encart qui apparaît", with points easy to grab and drag directly.
+      poly.addEventListener('click',(function(l,a,b,r){return function(e){
+        e.stopPropagation();
+        var rowRect=r.getBoundingClientRect();
+        openTweenCurveInset(l,a,b,rowRect.left+a*FC,rowRect.bottom);
+      };})(li,fA,fB,row));
       svg.appendChild(poly);
     }
   });
 }
 window.renderTweenCurveStrips=renderTweenCurveStrips;
+// ---- FLOATING INLINE CURVE EDITOR ("encart") for one tween span ----
+// A self-contained draggable-point curve editor (independent of the
+// shared #curve-canvas singleton in ui.js, which can only show ONE curve
+// at a time and lives in a fixed right-panel spot) — appended to
+// document.body so it truly floats ON TOP of the timeline regardless of
+// #frame-grid's own scroll/overflow clipping, anchored right where the
+// clicked tween segment is. Same underlying data (state.tweenEasing) and
+// evaluator (evalPointsCurve) as the main widget, so both stay in sync;
+// this is just a second, quicker editing surface for in-place tweaks.
+var _tweenCurveInset=null;
+function closeTweenCurveInset(){
+  if(!_tweenCurveInset)return;
+  document.removeEventListener('pointerdown',_tweenCurveInset.outsideHandler,true);
+  _tweenCurveInset.el.remove();
+  _tweenCurveInset=null;
+}
+function openTweenCurveInset(li,fA,fB,anchorX,anchorY){
+  closeTweenCurveInset();
+  var key=li+':'+fA+'-'+fB;
+  if(!state.tweenEasing)state.tweenEasing={};
+  var seg=state.tweenEasing[key]=state.tweenEasing[key]||{};
+  if(!seg.points||!seg.points.length){
+    // Starts from whatever curve is CURRENTLY effective for this pair
+    // (global fallback), not a hardcoded default — same convention as
+    // ui.js's tweenSegCurve().
+    var base=(window._curveEditor&&window._curveEditor.getState().points)||[{x:0,y:0},{x:.42,y:0},{x:.58,y:1},{x:1,y:1}];
+    seg.points=base.map(function(p){return{x:p.x,y:p.y};});
+  }
+  var W=280,H=118,pad=14,svgW=W-16,svgH=H-38;
+  var left=Math.max(4,Math.min(window.innerWidth-W-4,anchorX));
+  var top=Math.max(4,Math.min(window.innerHeight-H-4,anchorY));
+  var box=document.createElement('div');
+  box.className='tw-curve-inset';
+  box.style.cssText='position:fixed;left:'+Math.round(left)+'px;top:'+Math.round(top)+'px;width:'+W+'px;background:#181c24;border:1px solid #334155;border-radius:6px;box-shadow:0 6px 24px rgba(0,0,0,.55);z-index:5000;padding:8px;box-sizing:border-box;font-family:inherit;';
+  box.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
+    +'<span style="font-size:10px;color:#9ca3af">Tween '+(fA+1)+' → '+(fB+1)+'</span>'
+    +'<div style="display:flex;gap:8px;align-items:center">'
+    +'<button class="tw-ci-reset" style="background:none;border:none;color:#9ca3af;cursor:pointer;font-size:9px;text-decoration:underline;padding:0" title="Revenir à la courbe globale pour cette paire">réinitialiser</button>'
+    +'<button class="tw-ci-close" style="background:none;border:none;color:#9ca3af;cursor:pointer;font-size:14px;line-height:1;padding:0" title="Fermer">✕</button>'
+    +'</div></div>';
+  box.querySelector('.tw-ci-close').addEventListener('click',function(e){e.stopPropagation();closeTweenCurveInset();});
+  box.querySelector('.tw-ci-reset').addEventListener('click',function(e){
+    e.stopPropagation();
+    delete state.tweenEasing[key];
+    closeTweenCurveInset();
+    onTweenPairCurveChanged(li,fA);
+  });
+  var svgNS='http://www.w3.org/2000/svg';
+  var svg=document.createElementNS(svgNS,'svg');
+  svg.setAttribute('width',svgW);svg.setAttribute('height',svgH);
+  svg.style.cssText='display:block;background:#0d1117;border-radius:4px;cursor:crosshair;touch-action:none;';
+  box.appendChild(svg);
+  document.body.appendChild(box);
+
+  function toSX(px){return pad+px*(svgW-2*pad);}
+  function toSY(py){return svgH-pad-py*(svgH-2*pad);}
+  function fromSX(sx){return Math.max(0,Math.min(1,(sx-pad)/(svgW-2*pad)));}
+  function fromSY(sy){return Math.max(-0.3,Math.min(1.3,(svgH-pad-sy)/(svgH-2*pad)));}
+
+  function redraw(){
+    while(svg.firstChild)svg.removeChild(svg.firstChild);
+    [0,1].forEach(function(v){
+      var l=document.createElementNS(svgNS,'line');
+      l.setAttribute('x1',pad);l.setAttribute('x2',svgW-pad);l.setAttribute('y1',toSY(v));l.setAttribute('y2',toSY(v));
+      l.setAttribute('stroke','#334155');l.setAttribute('stroke-dasharray','3,3');
+      svg.appendChild(l);
+    });
+    var pts=seg.points;
+    var poly=document.createElementNS(svgNS,'polyline');
+    var N=48,ptsStr=[];
+    for(var s=0;s<=N;s++){var t=s/N;var yv=window._curveEditor?window._curveEditor.evalPointsCurve(pts,t):t;ptsStr.push(toSX(t)+','+toSY(yv));}
+    poly.setAttribute('points',ptsStr.join(' '));
+    poly.setAttribute('fill','none');poly.setAttribute('stroke','#4a9eff');poly.setAttribute('stroke-width','2');
+    svg.appendChild(poly);
+    pts.forEach(function(p,i){
+      var c=document.createElementNS(svgNS,'circle');
+      c.setAttribute('cx',toSX(p.x));c.setAttribute('cy',toSY(p.y));c.setAttribute('r',5.5);
+      c.setAttribute('fill','#fff');c.setAttribute('stroke','#4a9eff');c.setAttribute('stroke-width','2');
+      c.style.cursor='grab';
+      c.addEventListener('pointerdown',function(e){
+        e.stopPropagation();e.preventDefault();
+        c.setPointerCapture(e.pointerId);
+        function move(ev){
+          var r=svg.getBoundingClientRect();
+          var nx=fromSX(ev.clientX-r.left),ny=fromSY(ev.clientY-r.top);
+          if(i===0)nx=0;else if(i===pts.length-1)nx=1;
+          else{nx=Math.max(pts[i-1].x+0.001,Math.min(pts[i+1].x-0.001,nx));}
+          p.x=nx;p.y=ny;
+          redraw();
+          scheduleRegen();
+        }
+        function up(ev){c.releasePointerCapture(ev.pointerId);svg.removeEventListener('pointermove',move);svg.removeEventListener('pointerup',up);regenNow();}
+        svg.addEventListener('pointermove',move);svg.addEventListener('pointerup',up);
+      });
+      c.addEventListener('dblclick',function(e){
+        e.stopPropagation();
+        if(i>0&&i<pts.length-1&&pts.length>2){pts.splice(i,1);redraw();regenNow();}
+      });
+      svg.appendChild(c);
+    });
+  }
+  // Regenerating the tween on every single pointermove tick during a drag
+  // would re-run autoMatch/interpStroke dozens of times per second for no
+  // visible benefit (the drag preview only needs the CURVE redrawn live —
+  // regen only needs to happen once the point settles). Debounced instead
+  // of per-move, then a final regenNow() on pointerup guarantees the last
+  // position is always applied even if the debounce hasn't fired yet.
+  var regenTimer=null;
+  function scheduleRegen(){clearTimeout(regenTimer);regenTimer=setTimeout(regenNow,120);}
+  function regenNow(){clearTimeout(regenTimer);onTweenPairCurveChanged(li,fA);}
+  svg.addEventListener('click',function(e){
+    if(e.target!==svg)return;
+    var r=svg.getBoundingClientRect();
+    var nx=fromSX(e.clientX-r.left),ny=fromSY(e.clientY-r.top);
+    var pts=seg.points,idx=pts.length;
+    for(var i2=0;i2<pts.length;i2++)if(pts[i2].x>nx){idx=i2;break;}
+    pts.splice(idx,0,{x:nx,y:ny});
+    redraw();regenNow();
+  });
+  redraw();
+  var outsideHandler=function(e){if(!box.contains(e.target))closeTweenCurveInset();};
+  setTimeout(function(){document.addEventListener('pointerdown',outsideHandler,true);},0);
+  _tweenCurveInset={el:box,outsideHandler:outsideHandler};
+}
+// Shared by the inset above and (indirectly, same data) the main widget's
+// tween-seg mode — regenerate just this span and refresh every display
+// that could be showing it (strips, onion, arcs).
+function onTweenPairCurveChanged(li,fA){
+  selClear();selAdd(li,fA);
+  generateTweens();
+  selClear();
+  if(state.activeLayerIdx===li)renderOS();
+  updateUI();
+  renderTweenCurveStrips();
+}
 // Builds one row's worth of frame cells for layer `li` into `rowEl` — shared
 // by the normal per-layer row and a collapsed folder's representative row
 // (see renderTimeline() above) so both stay pixel-identical.
@@ -2316,12 +2459,12 @@ document.getElementById('frame-grid').addEventListener('contextmenu',function(e)
   goToFrame(fi);
   var hasClip=!!(_sel.clipboard&&_sel.clipboard.length);
   // If this cell sits inside (or starts) a tween span, offer to edit JUST
-  // that pair's easing curve (openTweenEaseEditor, tweens.js) — same idea
-  // as the tween-curve-strip's own click-to-edit, reachable even with
+  // that pair's easing curve (openTweenCurveInset) — same idea as the
+  // tween-curve-strip's own click-to-edit, reachable even with
   // state.showTweenCurves off.
   var twKeys=layerKeyframeList(li),twPair=null;
   for(var tki=0;tki<twKeys.length-1;tki++){if(fi>=twKeys[tki]&&fi<=twKeys[tki+1]){twPair={a:twKeys[tki],b:twKeys[tki+1]};break;}}
-  var twMenuItems=twPair?[{label:'Éditer la courbe de ce tween…',action:function(){openTweenEaseEditor(li,twPair.a,twPair.b);}},{sep:true}]:[];
+  var twMenuItems=twPair?[{label:'Éditer la courbe de ce tween…',action:function(){openTweenCurveInset(li,twPair.a,twPair.b,e.clientX,e.clientY);}},{sep:true}]:[];
   window.showContextMenu(e.clientX,e.clientY,twMenuItems.concat([
     {label:'Copier',shortcut:'⌘C',action:function(){window.SM.copyFrames();}},
     {label:'Couper',shortcut:'⌘X',action:function(){window.SM.cutFrames();}},
