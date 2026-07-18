@@ -37,6 +37,17 @@
   // this replaced a pure per-point magnet). Set once at pointerdown, held
   // for the whole gesture, cleared at pointerup.
   var lockedGuideRay = null;
+  // Angle-based lock (2026-07 — feedback: "dans sketchbook tu fais tes
+  // traits n'importe où ils vont suivre la perspective"): unlike the
+  // proximity lock above (decided instantly at pointerdown, since distance-
+  // to-a-drawn-line is already known from a single point), the ANGLE lock
+  // needs a couple of pixels of real drag before a direction even exists to
+  // compare against a vanishing point — guideStartPt is the gesture's true
+  // (unconstrained) first point, guideLockDecided flips true the moment
+  // EITHER kind of lock has been resolved (found a ray, or confirmed none
+  // applies), so the angle check only ever runs once per gesture, not on
+  // every subsequent sample.
+  var guideStartPt = null, guideLockDecided = false;
   var lastMoveT = 0, lastWorldPt = null;
   var lastPenPressure = null; // held across a real-pen gesture, see pressureOf()
   // state.stabilizer (position-averaging while drawing) used to only exist
@@ -190,7 +201,22 @@
   // magnetSnap when nothing was close enough to lock at the start (so a
   // stroke drawn nowhere near the guide still behaves exactly as before).
   function guideConstrain(w, isStart) {
-    if (isStart) lockedGuideRay = window.perspectiveFindGuideRayNear ? window.perspectiveFindGuideRayNear(new Point(w[0], w[1])) : null;
+    if (isStart) {
+      guideStartPt = new Point(w[0], w[1]);
+      // Proximity lock still applies IMMEDIATELY when the stroke starts
+      // right on a drawn ray (or the horizon) — a single point is already
+      // enough distance-to-line info, no need to wait for a direction.
+      lockedGuideRay = window.perspectiveFindGuideRayNear ? window.perspectiveFindGuideRayNear(guideStartPt) : null;
+      guideLockDecided = !!lockedGuideRay;
+    } else if (!guideLockDecided && guideStartPt) {
+      var curPt = new Point(w[0], w[1]);
+      // Needs real direction before the angle check means anything — same
+      // 4px-of-drag floor snapToVP itself uses (perspective-bridge.js).
+      if (curPt.getDistance(guideStartPt) >= 4) {
+        lockedGuideRay = window.perspectiveFindVPRayByAngle ? window.perspectiveFindVPRayByAngle(guideStartPt, curPt) : null;
+        guideLockDecided = true; // decided either way — never re-checked again this gesture, so a stroke that isn't aimed at any VP just draws free for its whole length, not just its first few px
+      }
+    }
     if (lockedGuideRay && window.perspectiveProjectOnRay) {
       var p = window.perspectiveProjectOnRay(new Point(w[0], w[1]), lockedGuideRay);
       return [p.x, p.y];
@@ -430,7 +456,7 @@
     // catch-up behavior Photoshop/Clip Studio's stabilized brushes use.
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
     w = guideConstrain(w, false);
-    lockedGuideRay = null; // stroke over — next pointerdown re-evaluates from scratch
+    lockedGuideRay = null; guideStartPt = null; guideLockDecided = false; // stroke over — next pointerdown re-evaluates from scratch
     var pressure = smoothPressure(wantsPressure() ? pressureOf(e, w) : 1);
     if (modeler) {
       // The modeler's own end-of-stroke catch-up (physics iterated until
