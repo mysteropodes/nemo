@@ -88,6 +88,15 @@
       strokeColor: sc, strokeWidth: state.brushSize,
     };
   }
+  // Symmetry guide (symmetry-bridge.js) live preview — same idea as
+  // draw-bridge.js's overlayItemFor, but for this file's own item shape
+  // (see mirrorSceneItem's header comment for why it's a separate entry
+  // point). Returns [primary] when Symmetry is off/no-op, so every caller
+  // can just always concat this in.
+  function withSymmetryPreview(item) {
+    if (!window.SMSymmetry) return [item];
+    return [item].concat(window.SMSymmetry.mirrorSceneItem(item));
+  }
 
   function onDown(e) {
     if (!shouldIntercept()) return;
@@ -103,7 +112,7 @@
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
     shapeStart = [w[0], w[1]];
     window.SMEngineBridge.suspend();
-    window.SMEngineBridge.renderWithOverlayItem(overlayItem(w[0], w[1]));
+    window.SMEngineBridge.renderWithOverlayItem(withSymmetryPreview(overlayItem(w[0], w[1])));
   }
   // Perspective-guide snapping (perspective-bridge.js) only makes sense for
   // the Line tool — a straight ruler line drawn roughly toward a vanishing
@@ -143,7 +152,7 @@
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
     var s = maybeSnap(w[0], w[1]);
     if (e.shiftKey) s = constrainEnd(s[0], s[1]);
-    window.SMEngineBridge.renderWithOverlayItem(overlayItem(s[0], s[1]));
+    window.SMEngineBridge.renderWithOverlayItem(withSymmetryPreview(overlayItem(s[0], s[1])));
   }
   function onUp(e) {
     if (!dragging) return;
@@ -186,6 +195,12 @@
     } else {
       if (state.shadowMode) path.data.channelTag = 'shadow';
       tagOwner(path);
+      // Symmetry guide (symmetry-bridge.js, 2026-07): promoted from
+      // brush-only to also cover Line/Rect/Ellipse — this IS the commit
+      // path that actually runs whenever the Rust engine is on (see
+      // maybeSnap's own comment above), so leaving this file out would
+      // have left Symmetry silently brush-only in practice.
+      if (window.SMSymmetry && window.SMSymmetry.onStrokeCommitted) window.SMSymmetry.onStrokeCommitted(path, layer);
     }
     saveActiveLayerFrame();
     // Stale-onion-ghost fix (see select-bridge.js's commit paths).
