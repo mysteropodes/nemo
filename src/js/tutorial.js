@@ -469,6 +469,64 @@
     return (table && table[fr]) || fr;
   }
 
+  // ---- Small inline SVG illustrations for a few "info" steps -----------
+  // Pure shape/motion, no text baked in — never needs a T() entry, never
+  // goes stale across a language switch. SMIL <animate> for geometry
+  // (rx/ry/cy/cx — the thing it was actually designed for, reliable across
+  // Tauri's webview and every browser this tutorial runs in) rather than
+  // CSS transform keyframes, which would need transform-origin gymnastics
+  // to keep a squashed ball's contact point anchored to the ground line.
+  var ILLUS = {
+    // Squash & Stretch: a ball falls, squashes flat on impact (volume
+    // preserved — wider as it flattens), then stretches tall on rebound
+    // before settling back to a normal circle. Loops.
+    squashStretch:
+      '<svg viewBox="0 0 160 90" aria-hidden="true">' +
+      '<line x1="8" y1="78" x2="152" y2="78" stroke="currentColor" stroke-width="2" opacity="0.3"/>' +
+      '<ellipse cx="80" fill="var(--accent)">' +
+      '<animate attributeName="cy" values="15;58;70;70;52;15" keyTimes="0;0.35;0.45;0.55;0.65;1" dur="1.6s" repeatCount="indefinite"/>' +
+      '<animate attributeName="rx" values="12;12;19;19;9;12" keyTimes="0;0.35;0.45;0.55;0.65;1" dur="1.6s" repeatCount="indefinite"/>' +
+      '<animate attributeName="ry" values="12;12;6;6;17;12" keyTimes="0;0.35;0.45;0.55;0.65;1" dur="1.6s" repeatCount="indefinite"/>' +
+      '</ellipse></svg>',
+    // Timing/spacing diagram: the classic animator's spacing chart — dots
+    // clustered near both ends, spread apart in the middle, is exactly
+    // what "slow in/slow out" looks like as still positions. The moving
+    // dot above retraces the same non-uniform spacing so the static
+    // diagram and the motion read as the same idea from two angles.
+    timingSpacing:
+      '<svg viewBox="0 0 160 40" aria-hidden="true">' +
+      '<line x1="8" y1="30" x2="152" y2="30" stroke="currentColor" stroke-width="1" opacity="0.25"/>' +
+      '<g fill="currentColor" opacity="0.6">' +
+      '<circle cx="10" cy="30" r="2.5"/><circle cx="11" cy="30" r="2.5"/><circle cx="19" cy="30" r="2.5"/>' +
+      '<circle cx="40" cy="30" r="2.5"/><circle cx="80" cy="30" r="2.5"/><circle cx="121" cy="30" r="2.5"/>' +
+      '<circle cx="141" cy="30" r="2.5"/><circle cx="149" cy="30" r="2.5"/><circle cx="150" cy="30" r="2.5"/>' +
+      '</g>' +
+      '<circle cy="12" r="5" fill="var(--accent)">' +
+      '<animate attributeName="cx" values="10;11;19;40;80;121;141;149;150;149;141;121;80;40;19;11;10" dur="3.2s" repeatCount="indefinite"/>' +
+      '</circle></svg>',
+    // Symmetry: a curve draws itself on the left (stroke-dashoffset), its
+    // mirror fades in on the right shortly after — echoes the real
+    // guide's own behavior (draw once, get a mirrored copy for free).
+    symmetry:
+      '<svg viewBox="0 0 140 70" aria-hidden="true">' +
+      '<line x1="70" y1="6" x2="70" y2="64" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 3" opacity="0.3"/>' +
+      '<path d="M60,55 Q40,40 50,20 Q55,10 65,12" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" stroke-dasharray="80" stroke-dashoffset="80">' +
+      '<animate attributeName="stroke-dashoffset" values="80;80;0;0;0" keyTimes="0;0.08;0.5;0.9;1" dur="2.6s" repeatCount="indefinite"/>' +
+      '</path>' +
+      '<path d="M80,55 Q100,40 90,20 Q85,10 75,12" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" opacity="0">' +
+      '<animate attributeName="opacity" values="0;0;0;1;1" keyTimes="0;0.5;0.6;0.85;1" dur="2.6s" repeatCount="indefinite"/>' +
+      '</path></svg>',
+    // Onion skin: two faded "ghost" frames (before/after) sandwiching a
+    // solid current frame — the exact stack the real feature overlays on
+    // the canvas, just abstracted to plain shapes instead of a drawing.
+    onionSkin:
+      '<svg viewBox="0 0 140 70" aria-hidden="true">' +
+      '<circle cx="45" cy="35" r="18" fill="none" stroke="currentColor" stroke-width="2.5" opacity="0.25"/>' +
+      '<circle cx="70" cy="35" r="18" fill="none" stroke="var(--accent)" stroke-width="3"/>' +
+      '<circle cx="95" cy="35" r="18" fill="none" stroke="currentColor" stroke-width="2.5" opacity="0.25"/>' +
+      '</svg>'
+  };
+
   // ---- Module content ------------------------------------------------
   // Each step is one of:
   //   {type:'info', title, body}                         — just a "Suivant" button
@@ -580,7 +638,7 @@
       desc: 'Voir les frames voisines en transparence',
       time: '1 min',
       steps: [
-        { type: 'info', title: 'Voir à travers les frames', body: 'L\'onion skin affiche les frames voisines en transparence par-dessus la frame actuelle — pratique pour juger un mouvement sans jouer l\'animation. Il est activé par défaut sur un nouveau projet ; on va vérifier que tu sais où le couper/rallumer.' },
+        { type: 'info', title: 'Voir à travers les frames', illustration: ILLUS.onionSkin, body: 'L\'onion skin affiche les frames voisines en transparence par-dessus la frame actuelle — pratique pour juger un mouvement sans jouer l\'animation. Il est activé par défaut sur un nouveau projet ; on va vérifier que tu sais où le couper/rallumer.' },
         // onionSkin defaults to true (app.js) on a fresh project — "wait
         // for it to become true" would pass instantly with no click at
         // all. stateChangedStep requires an actual toggle, whichever
@@ -953,7 +1011,7 @@
       desc: 'Dessiner en miroir (ou en mandala)',
       time: '1 min',
       steps: [
-        { type: 'info', title: 'Dessiner en miroir', body: 'Le guide de symétrie duplique chaque trait dessiné (avec n\'importe quel outil de dessin libre) en miroir — vertical, horizontal, à un angle libre, ou en rosace radiale façon mandala.' },
+        { type: 'info', title: 'Dessiner en miroir', illustration: ILLUS.symmetry, body: 'Le guide de symétrie duplique chaque trait dessiné (avec n\'importe quel outil de dessin libre) en miroir — vertical, horizontal, à un angle libre, ou en rosace radiale façon mandala.' },
         {
           type: 'state', target: '#phdr-symmetry', title: 'Ouvre la section "Symmetry Guide"', body: 'Clique l\'en-tête "Symmetry Guide" dans le panneau de droite pour la déplier, si besoin.',
           hint: 'En attente…',
@@ -1100,7 +1158,7 @@
         // Définition alignée sur la source de référence des 12 principes de
         // l'animation (Frank Thomas & Ollie Johnston, "The Illusion of
         // Life", 1981 — résumé fiable : https://en.wikipedia.org/wiki/Twelve_basic_principles_of_animation).
-        { type: 'info', title: 'Le principe le plus important', body: 'Squash & Stretch donne l\'illusion de poids et de souplesse : un objet qui s\'écrase à l\'impact puis s\'étire en rebondissant paraît vivant. Règle d\'or : le VOLUME reste constant — ce qui s\'aplatit dans un sens s\'élargit dans l\'autre.' },
+        { type: 'info', title: 'Le principe le plus important', illustration: ILLUS.squashStretch, body: 'Squash & Stretch donne l\'illusion de poids et de souplesse : un objet qui s\'écrase à l\'impact puis s\'étire en rebondissant paraît vivant. Règle d\'or : le VOLUME reste constant — ce qui s\'aplatit dans un sens s\'élargit dans l\'autre.' },
         { type: 'click', target: '.tool-btn[data-tool="ellipse"]', title: 'Choisis l\'Ellipse', body: 'Clique sur l\'outil Ellipse — on va animer une balle qui rebondit.' },
         stateIncreaseStep({ target: '#drawing-canvas', title: 'Dessine une balle', body: 'Clique-glisse pour tracer un cercle — c\'est la pose de départ (en l\'air, forme normale).', hint: 'En attente de ta forme…', measure: measureStrokeCount }),
         { type: 'click', target: '.tool-btn[data-tool="select"]', title: 'Choisis la Sélection', body: 'Clique sur l\'outil Sélection (raccourci V).' },
@@ -1124,7 +1182,7 @@
       desc: 'Éditer la courbe entre deux keyframes',
       time: '2 min',
       steps: [
-        { type: 'info', title: 'Rien ne bouge à vitesse constante', body: 'Dans la vraie vie, un mouvement accélère au départ et ralentit à l\'arrivée ("Slow In / Slow Out") — plus de dessins intermédiaires proches des poses de départ/arrivée, moins au milieu. Nemo génère ça automatiquement, mais tu peux régler précisément la courbe.' },
+        { type: 'info', title: 'Rien ne bouge à vitesse constante', illustration: ILLUS.timingSpacing, body: 'Dans la vraie vie, un mouvement accélère au départ et ralentit à l\'arrivée ("Slow In / Slow Out") — plus de dessins intermédiaires proches des poses de départ/arrivée, moins au milieu. Nemo génère ça automatiquement, mais tu peux régler précisément la courbe.' },
         // Bug trouvé en testant en direct (2026-07-18) : sans ce clic
         // explicite, un outil laissé actif par un module précédent (ex.
         // Sélection, après le module Effets) fait que le "clique-glisse"
@@ -1227,6 +1285,10 @@
       '<button class="tut-close" title="' + T('Quitter le tutoriel') + '">&times;</button>' +
       '<div class="tut-progress">' + T(mod.title) + ' — ' + T('étape') + ' ' + (active.stepIdx + 1) + '/' + mod.steps.length + '</div>' +
       '<div class="tut-title">' + T(step.title) + '</div>' +
+      // Illustration is raw SVG, deliberately NOT run through T() — it's
+      // markup, not a translatable string, and every one of these is
+      // language-agnostic (shapes/motion, no text baked in).
+      (step.illustration ? '<div class="tut-illus-wrap">' + step.illustration + '</div>' : '') +
       '<div class="tut-body">' + T(step.body) + '</div>' +
       (step.type !== 'info' ? '<div class="tut-hint"><span class="tut-dot"></span>' + T(step.hint || 'À toi de jouer…') + '</div>' : '') +
       '<div class="tut-actions">' +
