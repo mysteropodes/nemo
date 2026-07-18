@@ -586,7 +586,10 @@
       path.opacity = state.opacity / 100;
       applyStrokeStyle(path);
       samples.forEach(function (s) { path.add(new Point(s[0], s[1])); });
-      path.simplify(state.smoothing);
+      // Paper.js's simplify(t) does `t||2.5` internally — 0 silently falls
+      // back to its default tolerance, not a true no-op (tools.js's
+      // simplifyIfNeeded, shared across every "Smooth" call site).
+      simplifyIfNeeded(path,state.smoothing);
       // Brush preset texture (Chalk/Charcoal/Pencil) — only for this plain
       // constant-width mode, not vector-brush or fill-brush, which have
       // their own width-profile/outline machinery this jittered-copies
