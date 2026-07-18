@@ -64,6 +64,22 @@
 #tut-launcher .tut-mod-list{display:flex;flex-direction:column;gap:6px;}
 #tut-launcher .tut-launcher-intro{font-size:11px;color:var(--text-dim);margin-bottom:6px;}
 
+/* Search: always visible above the list, regardless of which screen is
+   showing — typing flattens results across every category (see
+   renderSearchResults in tutorial.js); clearing it restores whatever
+   screen was active before. Explicit color:var(--text) on the input
+   itself — a bare <input> would otherwise inherit the platform's default
+   (often near-black) text color instead of the app's light theme,
+   rendering invisible on this dark background. */
+#tut-launcher .tut-launcher-search-wrap{position:relative;flex:none;padding:0 14px 10px;}
+#tut-launcher .tut-launcher-search-ico{position:absolute;left:24px;top:50%;transform:translateY(-50%);color:var(--text-dim);pointer-events:none;}
+#tut-launcher .tut-launcher-search{
+  width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);
+  border-radius:7px;padding:7px 10px 7px 30px;font-size:12px;color:var(--text);outline:none;
+}
+#tut-launcher .tut-launcher-search::placeholder{color:var(--text-dim);}
+#tut-launcher .tut-launcher-search:focus{border-color:var(--accent);}
+
 /* Back arrow, left of the title — hidden on the top-level category screen,
    shown once a category has been opened. A real drill-down menu (category
    list -> tap one -> its modules on a fresh screen -> back arrow returns),
