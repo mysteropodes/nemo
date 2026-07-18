@@ -918,7 +918,7 @@ window.SM={
     var sceneWaIn=inSym?_sceneSnapshot.waIn:state.waIn;
     var sceneWaOut=inSym?_sceneSnapshot.waOut:state.waOut;
     return JSON.stringify({version:13,totalFrames:sceneTotal,fps:sceneFps,canvasW:state.canvasW,canvasH:state.canvasH,canvasBg:state.canvasBg,waIn:sceneWaIn,waOut:sceneWaOut,
-      layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color,motion:l.motion,motionStatic:l.motionStatic,elementMotion:l.elementMotion,inPoint:l.inPoint,outPoint:l.outPoint,nativeVideo:l.nativeVideo,matteMode:l.matteMode,montageId:l.montageId};}),
+      layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color,motion:l.motion,motionStatic:l.motionStatic,elementMotion:l.elementMotion,inPoint:l.inPoint,outPoint:l.outPoint,nativeVideo:l.nativeVideo,matteMode:l.matteMode,blurRadius:l.blurRadius,montageId:l.montageId};}),
       layerFolders:state.layerFolders,layerLinkGroups:state.layerLinkGroups,
       // StoryBoard node space (2026-07) — plain data by construction (no
       // runtime-only fields live in state.storyboard, see storyboard.js's
@@ -1037,6 +1037,7 @@ window.SM={
     d.layers.forEach(function(ld){var idx=createUserLayer(ld.name);state.layers[idx].visible=ld.visible!==false;state.layers[idx].locked=ld.locked||false;state.layers[idx].frames=ld.frames;
       if(ld.blendMode)state.layers[idx].blendMode=ld.blendMode;
       if(ld.matteMode)state.layers[idx].matteMode=ld.matteMode;
+      if(ld.blurRadius)state.layers[idx].blurRadius=ld.blurRadius;
       if(ld.symbolId){state.layers[idx].symbolId=ld.symbolId;state.layers[idx].symPlayMode=ld.symPlayMode||'loop';state.layers[idx].symSpeed=ld.symSpeed||1;state.layers[idx].symPlacedAt=ld.symPlacedAt||0;state.layers[idx].symSingleFrame=ld.symSingleFrame||0;if(ld.symMatrix)state.layers[idx].symMatrix=ld.symMatrix;}
       if(ld.lfsGroup){state.layers[idx].lfsGroup=true;state.layers[idx].lfsIds=ld.lfsIds;state.layers[idx].lfsSettings=ld.lfsSettings;}
       if(ld.folderId)state.layers[idx].folderId=ld.folderId;
@@ -1355,6 +1356,12 @@ function updatePropsContext(){
     var mv=state.layers[state.activeLayerIdx].matteMode||'none';
     matteSel.dataset.value=mv;
     matteSel.textContent=(typeof MATTE_MODE_LABELS!=='undefined'&&MATTE_MODE_LABELS[mv])||mv;
+  }
+  // Feather/blur (2026-07, blur.wgsl) — same "sync every updatePropsContext
+  // call" reasoning as Blend/Matte just above.
+  var blurInp=document.getElementById('p-blur');
+  if(blurInp&&state.layers[state.activeLayerIdx]){
+    blurInp.value=state.layers[state.activeLayerIdx].blurRadius||0;
   }
   var hdrEl=document.getElementById('props-context-hdr');if(hdrEl)hdrEl.textContent=hdrText;
   Object.keys(show).forEach(function(id){var sec=document.getElementById(id);if(sec)sec.style.display=show[id]?'block':'none';});
@@ -4451,6 +4458,7 @@ document.getElementById('p-ch').addEventListener('change',function(){window.SM.s
 document.getElementById('p-cbg').addEventListener('input',function(){window.SM.setCanvasBg(this.value);});
 document.getElementById('p-clip').addEventListener('change',function(){window.SM.setCanvasClip(this.checked);});
 document.getElementById('p-safety').addEventListener('change',function(){window.SM.setSafetyZones(this.checked);});
+document.getElementById('p-blur').addEventListener('input',function(){var ld=state.layers[state.activeLayerIdx];if(!ld)return;pushUndo();ld.blurRadius=Math.max(0,parseFloat(this.value)||0);saveActiveLayerFrame();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
 document.getElementById('p-persp-on').addEventListener('change',function(){state.perspectiveEnabled=this.checked;if(this.checked&&window.ensurePerspectiveVPs)window.ensurePerspectiveVPs();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
 document.getElementById('p-persp-mode').addEventListener('change',function(){if(window.setPerspectiveMode)window.setPerspectiveMode(this.value);});
 document.getElementById('p-persp-density').addEventListener('input',function(){state.perspectiveDensity=parseInt(this.value)||24;if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});

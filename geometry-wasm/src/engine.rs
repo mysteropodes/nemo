@@ -27,6 +27,16 @@ pub(crate) struct ItemIn {
     pub(crate) fill_color: Option<[u8; 4]>,
     #[serde(default)]
     pub(crate) stroke_color: Option<[u8; 4]>,
+    // Gradient fill (2026-07) — takes priority over `fill_color` when
+    // present (same "richer field wins" precedent as `centerline` over
+    // `segments`, and `image` over both). World-space anchor points, same
+    // convention as `segments`' own coordinates — NOT yet composed with a
+    // Motion transform (motion.js's elMat/motionMat/parentChain only ever
+    // touch `segments`/`centerline`/`image` today), a known v1 limitation:
+    // an animated shape's gradient stays anchored to its ORIGINAL position
+    // instead of riding along with the shape's Motion keyframes.
+    #[serde(default)]
+    pub(crate) fill_gradient: Option<GradientIn>,
     #[serde(default = "default_stroke_width")]
     pub(crate) stroke_width: f64,
     // Stroke style detail (Properties panel Cap/Join/Miter Limit/Dash/Paint
@@ -97,6 +107,28 @@ fn default_opacity() -> f32 {
 }
 #[derive(Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
+pub(crate) struct GradientStopIn {
+    pub(crate) offset: f32,
+    pub(crate) color: [u8; 4],
+}
+#[derive(Deserialize, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct GradientIn {
+    // "linear" (default) | "radial" — anything else falls back to linear,
+    // same forgiving-default spirit as mix_mode_index/matte_mode_of.
+    pub(crate) kind: String,
+    pub(crate) from: [f64; 2],
+    // Linear: the gradient's end point. Radial: a point on the gradient's
+    // outer edge — its distance from `from` (the center) is the radius.
+    // One shared shape for both kinds rather than a radius-only radial
+    // variant, so the JS side's "drag a handle to set direction/size" gizmo
+    // (same interaction for either kind) doesn't need a kind-specific
+    // payload shape.
+    pub(crate) to: [f64; 2],
+    pub(crate) stops: Vec<GradientStopIn>,
+}
+#[derive(Deserialize, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct SegIn {
     pub(crate) point: [f64; 2],
     #[serde(default)]
@@ -131,6 +163,16 @@ pub(crate) struct LayerIn {
     // composite_scene skips painting it as its own visible layer.
     #[serde(default)]
     pub(crate) matte_mode: Option<String>,
+    // Layer-level Gaussian-ish blur/feather (2026-07) — same "isolated
+    // per-layer texture + custom fullscreen-pass" architecture as blend_mode/
+    // matte_mode above (see blur.wgsl's doc comment and composite_scene's
+    // blur handling), not a vello-native primitive (kurbo/peniko have no
+    // generic blur brush). In world/CSS pixels at the CURRENT zoom — same
+    // "screen-space, not document-space" convention already used for e.g.
+    // handle sizes (motion.js), since a blur radius that scaled with zoom
+    // would make a shape look sharper just from zooming out.
+    #[serde(default)]
+    pub(crate) blur_radius: Option<f32>,
 }
 
 // FIXED (was "KNOWN BROKEN, v17 investigation" — see git history for the
@@ -277,6 +319,23 @@ pub(crate) fn build_bezpath(item: &ItemIn) -> Option<BezPath> {
 }
 fn color_from(c: [u8; 4]) -> Color {
     Color::from_rgba8(c[0], c[1], c[2], c[3])
+}
+/// Builds a peniko `Gradient` brush from a `GradientIn` — `None` only when
+/// there are fewer than 2 stops (a gradient with 0-1 stops has no ramp to
+/// draw; caller falls back to `fill_color`/no-fill, same as any other
+/// malformed-input case in this file).
+fn gradient_brush(g: &GradientIn) -> Option<vello::peniko::Gradient> {
+    if g.stops.len() < 2 {
+        return None;
+    }
+    let stops: Vec<(f32, Color)> = g.stops.iter().map(|s| (s.offset, color_from(s.color))).collect();
+    let gradient = if g.kind == "radial" {
+        let radius = ((g.to[0] - g.from[0]).powi(2) + (g.to[1] - g.from[1]).powi(2)).sqrt() as f32;
+        vello::peniko::Gradient::new_radial((g.from[0], g.from[1]), radius.max(0.01))
+    } else {
+        vello::peniko::Gradient::new_linear((g.from[0], g.from[1]), (g.to[0], g.to[1]))
+    };
+    Some(gradient.with_stops(stops.as_slice()))
 }
 fn cap_from(name: &str) -> vello::kurbo::Cap {
     match name {
@@ -499,6 +558,18 @@ pub struct VelloEngine {
     matte_source_view: wgpu::TextureView,
     matte_result_tex: wgpu::Texture,
     matte_result_view: wgpu::TextureView,
+    // ---- Feather/blur compositor (blur.wgsl, see composite_scene's blur
+    // handling and blur.wgsl's own doc comment) ----
+    // blur_result reuses matte_result's exact texture shape (RENDER_ATTACHMENT
+    // | TEXTURE_BINDING, our own fragment shader writes it) — same
+    // create_matte_result_texture() constructor, just a second instance, not
+    // worth a parallel same-shaped function.
+    blur_pipeline: wgpu::RenderPipeline,
+    blur_bind_group_layout: wgpu::BindGroupLayout,
+    blur_sampler: wgpu::Sampler,
+    blur_uniform_buf: wgpu::Buffer,
+    blur_result_tex: wgpu::Texture,
+    blur_result_view: wgpu::TextureView,
 }
 
 // ---- Blend compositor plumbing (see blend.wgsl's doc comment) ----
@@ -824,6 +895,149 @@ fn matte_mode_of(s: Option<&str>) -> Option<(u32, bool)> {
     }
 }
 
+// ---- Feather/blur compositor plumbing (see blur.wgsl's doc comment) ----
+fn create_blur_pipeline(device: &wgpu::Device) -> (wgpu::RenderPipeline, wgpu::BindGroupLayout, wgpu::Sampler, wgpu::Buffer) {
+    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        label: Some("blur-compositor"),
+        source: wgpu::ShaderSource::Wgsl(include_str!("blur.wgsl").into()),
+    });
+    // One texture + sampler + uniform (matte/blend need two textures for
+    // their two-input formulas; blur only ever reads its own single source).
+    let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some("blur-bind-group-layout"),
+        entries: &[
+            wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Texture {
+                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                    multisampled: false,
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 1,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 2,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            },
+        ],
+    });
+    let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+        label: Some("blur-pipeline-layout"),
+        bind_group_layouts: &[Some(&bind_group_layout)],
+        immediate_size: 0,
+    });
+    let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        label: Some("blur-pipeline"),
+        layout: Some(&pipeline_layout),
+        vertex: wgpu::VertexState {
+            module: &shader,
+            entry_point: Some("vs_main"),
+            buffers: &[],
+            compilation_options: Default::default(),
+        },
+        fragment: Some(wgpu::FragmentState {
+            module: &shader,
+            entry_point: Some("fs_main"),
+            targets: &[Some(wgpu::ColorTargetState {
+                format: BLEND_SCRATCH_FORMAT,
+                blend: None,
+                write_mask: wgpu::ColorWrites::ALL,
+            })],
+            compilation_options: Default::default(),
+        }),
+        primitive: wgpu::PrimitiveState::default(),
+        depth_stencil: None,
+        multisample: wgpu::MultisampleState::default(),
+        multiview_mask: None,
+        cache: None,
+    });
+    // Linear filtering (unlike matte's Nearest — blur specifically WANTS
+    // the GPU's bilinear interpolation between the 81 sample points, it's
+    // part of how the softening reads smoothly rather than in visible rings).
+    let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+        label: Some("blur-sampler"),
+        address_mode_u: wgpu::AddressMode::ClampToEdge,
+        address_mode_v: wgpu::AddressMode::ClampToEdge,
+        mag_filter: wgpu::FilterMode::Linear,
+        min_filter: wgpu::FilterMode::Linear,
+        ..Default::default()
+    });
+    // 16 bytes: radius_px (f32) + tex_w (f32) + tex_h (f32) + padding — see
+    // blur.wgsl's Params.
+    let uniform_buf = device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("blur-params"),
+        size: 16,
+        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    });
+    (pipeline, bind_group_layout, sampler, uniform_buf)
+}
+
+/// Runs blur.wgsl: writes a blurred copy of `source_view` into `target_view`.
+/// Mirrors matte_pass/composite_pass's shape.
+#[allow(clippy::too_many_arguments)]
+fn blur_pass(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    pipeline: &wgpu::RenderPipeline,
+    bind_group_layout: &wgpu::BindGroupLayout,
+    sampler: &wgpu::Sampler,
+    uniform_buf: &wgpu::Buffer,
+    source_view: &wgpu::TextureView,
+    radius_px: f32,
+    width: u32,
+    height: u32,
+    target_view: &wgpu::TextureView,
+) {
+    let mut payload = [0u8; 16];
+    payload[0..4].copy_from_slice(&radius_px.to_le_bytes());
+    payload[4..8].copy_from_slice(&(width as f32).to_le_bytes());
+    payload[8..12].copy_from_slice(&(height as f32).to_le_bytes());
+    queue.write_buffer(uniform_buf, 0, &payload);
+    let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("blur-bind-group"),
+        layout: bind_group_layout,
+        entries: &[
+            wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(source_view) },
+            wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::Sampler(sampler) },
+            wgpu::BindGroupEntry { binding: 2, resource: uniform_buf.as_entire_binding() },
+        ],
+    });
+    let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("blur-composite") });
+    {
+        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("blur-composite-pass"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: target_view,
+                resolve_target: None,
+                ops: wgpu::Operations { load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT), store: wgpu::StoreOp::Store },
+                depth_slice: None,
+            })],
+            depth_stencil_attachment: None,
+            timestamp_writes: None,
+            occlusion_query_set: None,
+            multiview_mask: None,
+        });
+        pass.set_pipeline(pipeline);
+        pass.set_bind_group(0, &bind_group, &[]);
+        pass.draw(0..3, 0..1);
+    }
+    queue.submit(Some(encoder.finish()));
+}
+
 fn wgpu_color_from(c: Color) -> wgpu::Color {
     let rgba = c.to_rgba8();
     wgpu::Color { r: rgba.r as f64 / 255.0, g: rgba.g as f64 / 255.0, b: rgba.b as f64 / 255.0, a: rgba.a as f64 / 255.0 }
@@ -942,7 +1156,9 @@ fn paint_layer_items(
             None => continue,
         };
         let paint_fill = |scene: &mut Scene| {
-            if let Some(fc) = item.fill_color {
+            if let Some(grad) = item.fill_gradient.as_ref().and_then(gradient_brush) {
+                scene.fill(vello::peniko::Fill::NonZero, view_tf, &grad, None, &bez);
+            } else if let Some(fc) = item.fill_color {
                 scene.fill(vello::peniko::Fill::NonZero, view_tf, color_from(fc), None, &bez);
             }
         };
@@ -1088,6 +1304,8 @@ pub async fn create_engine(
     let (matte_pipeline, matte_bind_group_layout, matte_sampler, matte_uniform_buf) = create_matte_pipeline(&device);
     let (matte_source_tex, matte_source_view) = create_blend_layer_texture(&device, width, height);
     let (matte_result_tex, matte_result_view) = create_matte_result_texture(&device, width, height);
+    let (blur_pipeline, blur_bind_group_layout, blur_sampler, blur_uniform_buf) = create_blur_pipeline(&device);
+    let (blur_result_tex, blur_result_view) = create_matte_result_texture(&device, width, height);
 
     Ok(VelloEngine {
         surface,
@@ -1129,6 +1347,12 @@ pub async fn create_engine(
         matte_source_view,
         matte_result_tex,
         matte_result_view,
+        blur_pipeline,
+        blur_bind_group_layout,
+        blur_sampler,
+        blur_uniform_buf,
+        blur_result_tex,
+        blur_result_view,
     })
 }
 
@@ -1181,7 +1405,8 @@ impl VelloEngine {
         }
         let has_matte = is_matte_source.iter().any(|&b| b);
         let has_blend = scene_in.layers.iter().any(|l| mix_mode_index(l.blend_mode.as_deref()) != 0);
-        if !has_blend && !has_matte {
+        let has_blur = scene_in.layers.iter().any(|l| l.blur_radius.unwrap_or(0.0) > 0.0);
+        if !has_blend && !has_matte && !has_blur {
             let mut scene = Scene::new();
             self.push_atlas_keepalive(&mut scene);
             for layer in &scene_in.layers {
@@ -1210,7 +1435,7 @@ impl VelloEngine {
                 .render_to_texture(&self.device, &self.queue, &scene, &self.blend_layer_view, &layer_params)
                 .map_err(|e| JsValue::from_str(&format!("render_to_texture failed: {e:?}")))?;
 
-            let source_view: &wgpu::TextureView = if let Some((mode, invert)) = matte_mode_of(layer.matte_mode.as_deref()) {
+            let mut source_view: &wgpu::TextureView = if let Some((mode, invert)) = matte_mode_of(layer.matte_mode.as_deref()) {
                 // i+1 exists whenever matte_mode_of returned Some (see the
                 // is_matte_source precompute above, same condition).
                 let mut matte_scene = Scene::new();
@@ -1236,6 +1461,27 @@ impl VelloEngine {
             } else {
                 &self.blend_layer_view
             };
+            // Feather/blur (blur.wgsl) — runs AFTER matte (so a matted
+            // layer's edge softens too, not just its raw content) and
+            // BEFORE the blend/composite pass, so a blurred layer's soft
+            // edges participate correctly in whatever blend mode it has.
+            let radius = layer.blur_radius.unwrap_or(0.0);
+            if radius > 0.0 {
+                blur_pass(
+                    &self.device,
+                    &self.queue,
+                    &self.blur_pipeline,
+                    &self.blur_bind_group_layout,
+                    &self.blur_sampler,
+                    &self.blur_uniform_buf,
+                    source_view,
+                    radius,
+                    self.width,
+                    self.height,
+                    &self.blur_result_view,
+                );
+                source_view = &self.blur_result_view;
+            }
 
             let mode = mix_mode_index(layer.blend_mode.as_deref());
             let (backdrop_view, target_view) =
@@ -1524,6 +1770,9 @@ impl VelloEngine {
         let (matte_result_tex, matte_result_view) = create_matte_result_texture(&self.device, width, height);
         self.matte_result_tex = matte_result_tex;
         self.matte_result_view = matte_result_view;
+        let (blur_result_tex, blur_result_view) = create_matte_result_texture(&self.device, width, height);
+        self.blur_result_tex = blur_result_tex;
+        self.blur_result_view = blur_result_view;
     }
 
     /// Uploads (or re-uploads, if already cached under this id) an image's
