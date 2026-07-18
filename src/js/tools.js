@@ -2825,10 +2825,18 @@ function widthAtFrac(profile,frac){
   var lt=(frac-a.t)/span;
   return a.width+(b.width-a.width)*lt;
 }
+// Paper.js's own Path.simplify(t) does `t||2.5` internally — passing
+// exactly 0 is indistinguishable from passing nothing at all, so it
+// silently re-fits with the DEFAULT tolerance (2.5) instead of truly
+// zero. Every call site that forwards the user's "Smooth" slider must
+// skip the call entirely at 0 rather than pass 0 through — there's no
+// tolerance value that makes Paper.js's fitter a true no-op. Bug found
+// live: "à 0 il n'y a aucun smooth" — confirmed it wasn't the case before.
+function simplifyIfNeeded(path,amount){if(amount>0)path.simplify(amount);}
 function buildCenterSegmentsFromRawStroke(rawPts,rawWidths,smoothingAmt){
   var raw=new Path({insert:false});
   rawPts.forEach(function(p){raw.add(p);});
-  raw.simplify(smoothingAmt!==undefined?smoothingAmt:state.smoothing);
+  simplifyIfNeeded(raw,smoothingAmt!==undefined?smoothingAmt:state.smoothing);
   var segs=raw.segments.map(function(seg){
     var best=0,bd=Infinity;
     for(var i=0;i<rawPts.length;i++){var d=seg.point.getDistance(rawPts[i]);if(d<bd){bd=d;best=i;}}
@@ -4037,7 +4045,7 @@ function onMouseUp(event){
       // baked texture is its Raster companion. This fallback never called
       // applyBrushTexture for the EXISTING vector presets (grepped: zero
       // call sites), so no live preview here matches that precedent too.
-      currentPath.simplify(state.smoothing);
+      simplifyIfNeeded(currentPath,state.smoothing);
       // No per-point pressure available to pass here (unlike draw-bridge.js's
       // samples array) — this plain constant-width branch never captured it
       // in this fallback path (only the separate vectorBrush/_vb.widths
@@ -4046,7 +4054,7 @@ function onMouseUp(event){
       // Brush mirror comments — flat size only here.
       window.SMBitmapBrush.applyToPath(currentPath);
     }else{
-      currentPath.simplify(state.smoothing);
+      simplifyIfNeeded(currentPath,state.smoothing);
       if(state.taperEnds){
         var cs2=buildCenterSegmentsFromPath(currentPath,function(frac){return taperWidthAtFrac(frac,state.brushSize,0.18);});
         var outline=new Path({insert:false});
