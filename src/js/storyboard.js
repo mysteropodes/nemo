@@ -122,7 +122,14 @@
     _thumbLayer.activate();
     _thumbLayer.removeChildren();
     var strokes = symbolStrokesAt(symbolId, frame);
-    strokes.forEach(function (sd) { desP(sd, _thumbLayer); });
+    // isRaster (imported image) items have no `.segments` — desP assumes
+    // Path-shaped data and throws (`d.segments.length` undefined) the
+    // moment a Component/symbol placed in StoryBoard contains an imported
+    // image. Same family-of-bug-#1 miss as everywhere else in this
+    // codebase that iterates a layer's strokes without a per-type branch
+    // (CLAUDE.md §1) — found live via a real crash while batch-testing
+    // image import, not a synthetic case.
+    strokes.forEach(function (sd) { if (sd.isRaster) desR(sd, _thumbLayer); else desP(sd, _thumbLayer); });
     var url = null;
     if (_thumbLayer.children.length) {
       _thumbLayer.visible = true;
@@ -596,7 +603,7 @@
     previewLayer.removeChildren();
     if (m && chainMods(m).length) {
       var strokes = montageStrokesAt(m, m.playhead || 0);
-      strokes.forEach(function (sd) { desP(sd, previewLayer); });
+      strokes.forEach(function (sd) { if (sd.isRaster) desR(sd, previewLayer); else desP(sd, previewLayer); });
     }
     window._sceneVersion++;
     if (window.SMEngineBridge && SMEngineBridge.isEnabled()) SMEngineBridge.renderNow();
