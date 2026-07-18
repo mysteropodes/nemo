@@ -58,39 +58,35 @@
    z-index:200 — see style.css's comment above #kitsu-modal. */
 #tut-launcher{z-index:600;}
 #tut-launcher.modal-overlay .modal-box{width:420px;max-height:86vh;display:flex;flex-direction:column;}
+#tut-launcher .modal-hdr{gap:8px;}
+#tut-launcher #tut-launcher-title{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 #tut-launcher .modal-bdy{overflow-y:auto;max-height:calc(86vh - 50px);}
 #tut-launcher .tut-mod-list{display:flex;flex-direction:column;gap:6px;}
+#tut-launcher .tut-launcher-intro{font-size:11px;color:var(--text-dim);margin-bottom:6px;}
 
-/* Accordion category header — a real button, not just a label, since it's
-   now the click target that expands/collapses its group. */
+/* Back arrow, left of the title — hidden on the top-level category screen,
+   shown once a category has been opened. A real drill-down menu (category
+   list -> tap one -> its modules on a fresh screen -> back arrow returns),
+   not an inline accordion — the two screens replace each other's content
+   in #tut-mod-list rather than expanding/collapsing in place. */
+#tut-launcher .tut-launcher-back{
+  flex:none;width:22px;height:22px;border-radius:6px;background:none;border:none;
+  color:var(--text-dim);cursor:pointer;display:flex;align-items:center;justify-content:center;
+}
+#tut-launcher .tut-launcher-back:hover{background:var(--panel3);color:var(--text);}
+
+/* Category screen — one row per category, whole row navigates in. */
 #tut-launcher .tut-cat-hdr{
-  display:flex;align-items:center;gap:8px;width:100%;
+  display:flex;align-items:center;gap:10px;width:100%;
   background:var(--panel3);border:1px solid var(--border);border-radius:8px;
-  padding:9px 12px;cursor:pointer;text-align:left;
-  font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text);
+  padding:11px 12px;cursor:pointer;text-align:left;
+  font-size:12px;font-weight:600;color:var(--text);
 }
 #tut-launcher .tut-cat-hdr:hover{border-color:var(--accent);}
-#tut-launcher .tut-cat-hdr.open{border-radius:8px 8px 0 0;border-bottom-color:transparent;}
-#tut-launcher .tut-cat-chevron{flex:none;display:flex;color:var(--text-dim);transition:transform .18s ease;}
-#tut-launcher .tut-cat-hdr.open .tut-cat-chevron{transform:rotate(90deg);color:var(--accent-hover);}
 #tut-launcher .tut-cat-name{flex:1;}
-#tut-launcher .tut-cat-count{flex:none;font-size:9px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--text-dim);background:var(--panel2);border-radius:10px;padding:2px 7px;}
+#tut-launcher .tut-cat-count{flex:none;font-size:9px;font-weight:600;color:var(--text-dim);background:var(--panel2);border-radius:10px;padding:2px 7px;}
+#tut-launcher .tut-cat-chevron{flex:none;display:flex;color:var(--text-dim);}
 
-/* Module list for one category — collapses to zero height instead of
-   display:none so the open/close transition can animate. grid-template-rows
-   0fr->1fr on the OUTER wrapper (a single grid item, .tut-cat-inner) is the
-   standard trick for animating to/from an unknown content height (max-height
-   would need a hardcoded guess); the actual module buttons live inside
-   .tut-cat-inner with normal flex layout, not as direct grid children. */
-#tut-launcher .tut-cat-body{
-  display:grid;grid-template-rows:1fr;
-  background:var(--panel3);border:1px solid var(--border);border-top:none;border-radius:0 0 8px 8px;
-  margin-top:-6px;
-  transition:grid-template-rows .18s ease,opacity .18s ease;
-  opacity:1;
-}
-#tut-launcher .tut-cat-body.collapsed{grid-template-rows:0fr;opacity:0;border:none;margin-top:0;}
-#tut-launcher .tut-cat-inner{display:flex;flex-direction:column;gap:6px;padding:8px;min-height:0;overflow:hidden;}
 #tut-launcher .tut-mod{
   display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;
   background:var(--panel2);border:1px solid var(--border);cursor:pointer;text-align:left;
