@@ -372,6 +372,20 @@
             closed: !!sd.closed,
             fillColor: cssColorToRgba(c.fillColor ? c.fillColor.toCSS(true) : null, op),
           };
+          // Gradient fill (2026-07) — takes priority over the flat fillColor
+          // above on the Rust side (geometry-wasm's paint_fill), same
+          // "richer field wins" precedent as centerline/image. Anchor points
+          // are absolute world coordinates authored once when the gradient
+          // is applied (see palette-panel.js's gradient editor) — NOT yet
+          // re-projected through elMat/motionMat/parentChain, a known v1
+          // limitation (documented on ItemIn.fill_gradient in engine.rs too).
+          if (c.data && c.data.fillGradient) {
+            var fg = c.data.fillGradient;
+            item.fillGradient = {
+              kind: fg.kind, from: fg.from, to: fg.to,
+              stops: fg.stops.map(function (s) { return { offset: s.offset, color: cssColorToRgba(s.color, op) || [0, 0, 0, 0] }; }),
+            };
+          }
           var sc = cssColorToRgba(c.strokeColor ? c.strokeColor.toCSS(true) : null, op);
           if (sc) {
             item.strokeColor = sc;
@@ -396,7 +410,11 @@
       // by engine.rs's composite_scene which also SKIPS painting the
       // source layer as its own visible content once it's consumed.
       var mm = state.layers[i].matteMode;
-      layers.push({ items: items, blendMode: (bm && bm !== 'normal') ? bm : undefined, matteMode: (mm && mm !== 'none') ? mm : undefined });
+      // Feather/blur (2026-07, blur.wgsl — see geometry-wasm/src/engine.rs's
+      // composite_scene) — same "plain per-layer field, undefined = off"
+      // shape as blendMode/matteMode above.
+      var br = state.layers[i].blurRadius;
+      layers.push({ items: items, blendMode: (bm && bm !== 'normal') ? bm : undefined, matteMode: (mm && mm !== 'none') ? mm : undefined, blurRadius: (br && br > 0) ? br : undefined });
     }
     // artboard background as the bottom item of a synthetic bottom layer,
     // mirroring drawStage()'s background rect
