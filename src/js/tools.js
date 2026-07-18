@@ -3472,9 +3472,15 @@ function finalizePen(){
     p.remove();
     if(state.shadowMode)outline.data.channelTag='shadow';
     tagOwner(outline);
+    if(window.SMSymmetry&&window.SMSymmetry.onStrokeCommitted)window.SMSymmetry.onStrokeCommitted(outline,userLayers[state.activeLayerIdx]);
   }else{
     if(state.shadowMode)_pen.path.data.channelTag='shadow';
     tagOwner(_pen.path);
+    // Symmetry guide (symmetry-bridge.js, 2026-07): promoted from brush-only
+    // to also cover the Pen tool — same single guarded call as
+    // draw-bridge.js's commitStroke, right before the frame is saved so the
+    // mirrored/rotated copy shares the same undo snapshot.
+    if(window.SMSymmetry&&window.SMSymmetry.onStrokeCommitted)window.SMSymmetry.onStrokeCommitted(_pen.path,userLayers[state.activeLayerIdx]);
   }
   _pen.path=null;_pen.draggingHandle=false;
   saveActiveLayerFrame();updateUI();
@@ -4094,6 +4100,7 @@ function onMouseUp(event){
     else{
       if(state.shadowMode)currentPath.data.channelTag='shadow';
       tagOwner(currentPath);
+      if(window.SMSymmetry&&window.SMSymmetry.onStrokeCommitted)window.SMSymmetry.onStrokeCommitted(currentPath,userLayers[state.activeLayerIdx]);
     }
     currentPath=null;shapeStart=null;saveActiveLayerFrame();updateUI();
   }else if(state.tool==='select'){
