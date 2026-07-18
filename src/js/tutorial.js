@@ -489,6 +489,53 @@
         { type: 'click', target: '#btn-history', title: 'Ouvre l\'historique', body: 'Clique "Historique…" dans le panneau de droite (section Projet).' },
         { type: 'info', title: 'Bien joué !', body: 'Restaurer un ancien instantané prend d\'abord un instantané de l\'état actuel — l\'opération reste donc elle-même annulable.' }
       ]
+    },
+    {
+      id: 'perspective',
+      category: 'Dessiner',
+      icon: '16',
+      title: 'Guide de perspective',
+      desc: 'Placer des points de fuite',
+      time: '1 min',
+      steps: [
+        { type: 'info', title: 'Dessiner en perspective', body: 'Le guide de perspective affiche une grille de points de fuite et aimante l\'outil Ligne dessus, depuis n\'importe quel outil.' },
+        { type: 'click', target: '.tool-btn[data-tool="perspective"]', title: 'Choisis l\'outil Perspective', body: 'Clique sur l\'outil Perspective dans la barre de gauche.' },
+        {
+          type: 'state', target: '#phdr-perspective', title: 'Ouvre la section "Perspective Guide"', body: 'Clique l\'en-tête "Perspective Guide" dans le panneau de droite pour la déplier, si besoin.',
+          hint: 'En attente…',
+          check: function (win) { var el = win.document.getElementById('p-persp-on'); return !!(el && el.getBoundingClientRect().height > 0); }
+        },
+        stateChangedStep({
+          target: '#p-persp-on', title: 'Active le guide', body: 'Coche "Enabled" pour afficher la grille de points de fuite sur le canevas.', hint: 'En attente…',
+          measure: function (win) { var el = win.document.getElementById('p-persp-on'); return el ? el.checked : false; }
+        }),
+        { type: 'click', target: '.tool-btn[data-tool="line"]', title: 'Choisis la Ligne', body: 'Clique sur l\'outil Ligne (raccourci U) — il va s\'aimanter aux points de fuite.' },
+        stateIncreaseStep({
+          target: '#drawing-canvas', title: 'Trace une ligne', body: 'Clique-glisse sur le canevas — la ligne s\'oriente vers un point de fuite.',
+          hint: 'En attente de ton trait…', measure: measureStrokeCount
+        }),
+        { type: 'info', title: 'Bien joué !', body: '1/2/3 points de fuite selon le mode choisi. "Lock vanishing points" évite de les déplacer par erreur en dessinant près d\'eux.' }
+      ]
+    },
+    {
+      id: 'collab',
+      category: 'Réglages',
+      icon: '17',
+      title: 'Profil et travail d\'équipe',
+      desc: 'Se présenter, dossier partagé',
+      time: '1 min',
+      steps: [
+        { type: 'info', title: 'Travailler à plusieurs', body: 'Ton profil (nom + couleur) distingue tes traits de ceux d\'un autre profil qui corrige ton travail. La Sync équipe publie/récupère les modifs via un dossier partagé (Drive, kDrive…), sans temps réel.' },
+        { type: 'click', target: '#project-tabs-settings', title: 'Ouvre les Réglages', body: 'Clique l\'icône en forme de roue crantée en haut de l\'écran.' },
+        stateIncreaseStep({
+          target: '#profile-name', title: 'Indique ton nom', body: 'Tape ton nom dans le champ "Nom" de la section Profil.', hint: 'En attente de ta saisie…',
+          measure: function (win) { var el = win.document.getElementById('profile-name'); return el ? el.value.length : 0; }
+        }),
+        { type: 'click', target: '.settings-tab[data-tab="collab"]', title: 'Ouvre l\'onglet Collaboration', body: 'Clique l\'onglet "Collaboration" en haut de la fenêtre de Réglages.' },
+        { type: 'click', target: '#sync-choose-folder', title: 'Regarde le bouton "Choisir…"', body: 'Clique "Choisir…" pour voir comment on désigne un dossier partagé (nécessite l\'app desktop — un simple message s\'affiche ici en preview navigateur).' },
+        { type: 'click', target: '#settings-close', title: 'Ferme les Réglages', body: 'Clique la croix pour refermer la fenêtre.' },
+        { type: 'info', title: 'Bien joué !', body: 'Le chapitre "Travailler à plusieurs" du guide couvre aussi les corrections à Accepter/Rejeter et le feedback d\'équipe.' }
+      ]
     }
   ];
 
@@ -666,6 +713,14 @@
   // Nemo would want: draw first, then animate, then organize/output.
   var CATEGORY_ORDER = ['Dessiner', 'Calques et animation', 'Organisation', 'Médias', 'Réglages'];
 
+  // Accordion open/closed state, keyed by category name — lives for the
+  // whole session (module-level, not per openLauncher() call) so
+  // re-opening the launcher remembers what you had open, same as any
+  // normal accordion UI. Nothing open on first run: with 15+ modules
+  // across 5 categories, showing everything at once defeats the point of
+  // grouping them in the first place.
+  var openCats = {};
+
   function renderLauncherList() {
     var list = $('#tut-mod-list'); if (!list) return;
     var done = loadDone();
@@ -678,11 +733,23 @@
     var cats = CATEGORY_ORDER.filter(function (c) { return byCat[c]; })
       .concat(Object.keys(byCat).filter(function (c) { return CATEGORY_ORDER.indexOf(c) === -1; }));
     cats.forEach(function (cat) {
-      var hdr = document.createElement('div');
-      hdr.className = 'tut-cat-hdr';
-      hdr.textContent = cat;
-      list.appendChild(hdr);
-      byCat[cat].forEach(function (m) {
+      var mods = byCat[cat];
+      var doneCount = mods.filter(function (m) { return done.indexOf(m.id) !== -1; }).length;
+      var isOpen = !!openCats[cat];
+
+      var hdr = document.createElement('button');
+      hdr.className = 'tut-cat-hdr' + (isOpen ? ' open' : '');
+      hdr.type = 'button';
+      hdr.innerHTML =
+        '<span class="tut-cat-chevron">' + chevronSvg() + '</span>' +
+        '<span class="tut-cat-name">' + cat + '</span>' +
+        '<span class="tut-cat-count">' + doneCount + '/' + mods.length + '</span>';
+      var body = document.createElement('div');
+      body.className = 'tut-cat-body' + (isOpen ? '' : ' collapsed');
+      var inner = document.createElement('div');
+      inner.className = 'tut-cat-inner';
+      body.appendChild(inner);
+      mods.forEach(function (m) {
         var isDone = done.indexOf(m.id) !== -1;
         var btn = document.createElement('button');
         btn.className = 'tut-mod' + (isDone ? ' done' : '');
@@ -694,9 +761,20 @@
           '</span>' +
           '<span class="tut-mod-time">' + m.time + '</span>';
         btn.addEventListener('click', function () { startModule(m.id); });
-        list.appendChild(btn);
+        inner.appendChild(btn);
       });
+      hdr.addEventListener('click', function () {
+        openCats[cat] = !openCats[cat];
+        hdr.classList.toggle('open', openCats[cat]);
+        body.classList.toggle('collapsed', !openCats[cat]);
+      });
+      list.appendChild(hdr);
+      list.appendChild(body);
     });
+  }
+
+  function chevronSvg() {
+    return '<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>';
   }
 
   function openLauncher() {
