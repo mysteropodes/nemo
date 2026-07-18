@@ -145,9 +145,20 @@ var state={
   // VPs are stored in WORLD coordinates so they pan/zoom/rotate with the
   // canvas like any other reference geometry, not screen-fixed.
   perspectiveEnabled:false,
-  perspectiveMode:'2pt', // '1pt' | '2pt' | '3pt'
+  perspectiveMode:'2pt', // '1pt' | '2pt' | '3pt' | 'fisheye'
   perspectiveDensity:24, // guide lines radiating from each vanishing point
   perspectiveVPs:null, // lazily seeded to sane defaults for canvasW/H on first enable — see ensurePerspectiveVPs() in perspective-bridge.js
+  // Symmetry drawing guide (Sketchbook-style, 2026-07) — same "persists
+  // across tool switches once enabled, only DRAGGING the axis needs the
+  // dedicated tool" convention as perspectiveEnabled above. Promoted from
+  // the earlier Labs prototype (src/js/labs/symmetry-mirror.js, now
+  // removed) into a real shipped feature — see symmetry-bridge.js.
+  symmetryEnabled:false,
+  symmetryMode:'y', // 'y' | 'x' | 'free' | 'radial'
+  symmetryAxis:null, // {x1,y1,x2,y2} world coords, the mirror line's endpoints — y/x/free modes; lazily seeded, see ensureSymmetryAxis() in symmetry-bridge.js
+  symmetryRadialCenter:null, // {x,y} world coords — radial (mandala) mode only
+  symmetryRadialSectors:6,
+  symmetryExtend:true, // true = a stroke may freely cross the axis (default); false = it's clipped the instant it crosses, so original+mirror never overlap at the fold
   audioTracks:[], // {name,dataB64,offsetFrames,volume,muted} — playback/waveform in audio-bridge.js
   xformAnchorKey:'mc', // rotate/scale pivot preset (9-dot widget) — tl/tc/tr/ml/mc/mr/bl/bc/br, see tools.js xformAnchorPoint
   xformAnchorCustom:null, // [x,y] world-space override from Alt+click (select-bridge.js) — takes priority over xformAnchorKey when set

@@ -471,6 +471,8 @@
     if (safetyItems.length) layers.push({ items: safetyItems });
     var perspectiveItems = window.buildPerspectiveGuideItems ? window.buildPerspectiveGuideItems() : [];
     if (perspectiveItems.length) layers.push({ items: perspectiveItems });
+    var symmetryItems = window.buildSymmetryGuideItems ? window.buildSymmetryGuideItems() : [];
+    if (symmetryItems.length) layers.push({ items: symmetryItems });
     return JSON.stringify({ layers: layers });
   }
 
