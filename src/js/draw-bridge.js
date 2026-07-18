@@ -375,6 +375,14 @@
     if (window.SMLabs && window.SMLabs.buildDrawPreviewExtras) {
       previewItems = previewItems.concat(window.SMLabs.buildDrawPreviewExtras(samples, overlayItemFor));
     }
+    // Symmetry guide (symmetry-bridge.js, 2026-07) — same live-preview seam
+    // as the SMLabs call just above (reuses overlayItemFor to shape the
+    // mirrored/rotated samples exactly like the real stroke), promoted out
+    // of Labs into its own guarded, always-present hook since it's a real
+    // shipped feature now, not a prototype.
+    if (window.SMSymmetry && window.SMSymmetry.onPreview) {
+      previewItems = previewItems.concat(window.SMSymmetry.onPreview(samples, overlayItemFor));
+    }
     window.SMEngineBridge.renderWithOverlayItem(previewItems);
   }
   function onUp(e) {
@@ -621,6 +629,11 @@
     // commitStroke branch funnels through, rather than a change per-branch
     // — keeps this file's own logic untouched when Labs is off.
     if (window.SMLabs && window.SMLabs.onStrokeCommitted && path) window.SMLabs.onStrokeCommitted(path, userLayers[state.activeLayerIdx]);
+    // Symmetry guide (symmetry-bridge.js) — same single guarded call point
+    // as the SMLabs hook just above, right before the frame is saved so the
+    // mirrored/rotated copies are part of the same undo snapshot as the
+    // original stroke.
+    if (window.SMSymmetry && window.SMSymmetry.onStrokeCommitted && path) window.SMSymmetry.onStrokeCommitted(path, userLayers[state.activeLayerIdx]);
     saveActiveLayerFrame();
     // Stale-onion-ghost fix (see select-bridge.js's commit paths for the
     // full explanation) — a fresh stroke on a held frame can be exactly

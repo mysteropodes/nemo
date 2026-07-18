@@ -55,6 +55,7 @@
     state.activePaletteIdx=0;
     state.customBrushPresets={};
     state.perspectiveEnabled=false;state.perspectiveMode='2pt';state.perspectiveDensity=24;state.perspectiveVPs=null;
+    state.symmetryEnabled=false;state.symmetryMode='y';state.symmetryAxis=null;state.symmetryRadialCenter=null;state.symmetryRadialSectors=6;state.symmetryExtend=true;
     state.audioTracks=[];if(window.SMAudio)SMAudio.reload();
     state.refMedia=null;if(window.SMReference)SMReference.reload();
     state.mediaLibrary=[];if(window.SMMediaLibrary)SMMediaLibrary.reload();

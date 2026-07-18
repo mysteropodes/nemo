@@ -23,7 +23,13 @@
   function defaultVPs(mode) {
     var w = state.canvasW, h = state.canvasH;
     var cx = w / 2, cy = h / 2;
-    if (mode === '1pt') return [{ x: cx, y: cy, locked: false }];
+    // Fisheye (2026-07, Sketchbook-style barrel-lens grid): a single eye
+    // point, same as 1pt — buildPerspectiveGuideItems below adds concentric
+    // rings around it instead of just straight rays, and every existing
+    // snap function (both angle-snap and magnetic) already works unchanged
+    // since they only ever care about "rays from a VP", which a fisheye VP
+    // still has.
+    if (mode === '1pt' || mode === 'fisheye') return [{ x: cx, y: cy, locked: false }];
     if (mode === '3pt') return [
       { x: cx - w * 0.6, y: cy - h * 0.15, locked: false },
       { x: cx + w * 0.6, y: cy - h * 0.15, locked: false },
@@ -68,6 +74,25 @@
         });
       }
     });
+    // Fisheye's extra rings — a handful of concentric circles around the
+    // single eye point, approximating the "radial + concentric" read of a
+    // barrel-lens guide (not true spherical-projection math, just the same
+    // visual language: straight rays + rings bowing around a center).
+    if (state.perspectiveMode === 'fisheye' && vps.length) {
+      var eye = vps[0];
+      var maxR = Math.max(state.canvasW, state.canvasH) * 0.75;
+      var ringCount = 5;
+      for (var ri = 1; ri <= ringCount; ri++) {
+        var r = (ri / ringCount) * maxR;
+        var segs = [];
+        var ringPts = 32;
+        for (var pi = 0; pi <= ringPts; pi++) {
+          var pa = (pi / ringPts) * Math.PI * 2;
+          segs.push({ point: [eye.x + Math.cos(pa) * r, eye.y + Math.sin(pa) * r] });
+        }
+        items.push({ segments: segs, closed: true, fillColor: null, strokeColor: col, strokeWidth: 1, strokeCap: 'butt' });
+      }
+    }
     // Horizon (eye-level line) through the first two VPs, 2pt/3pt only —
     // a single VP has no second point to define a line through.
     if (vps.length >= 2) {
