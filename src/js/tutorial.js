@@ -373,6 +373,91 @@
     ["Aucun module ne correspond à ta recherche.", "No module matches your search.", "Ningún módulo coincide con tu búsqueda.", "検索に一致するモジュールがありません。"],
     ["étape", "step", "paso", "ステップ"],
     ["Module \"%s\" terminé ✓", "Module \"%s\" completed ✓", "Módulo \"%s\" completado ✓", "「%s」モジュール完了 ✓"],
+    ["Guide de symétrie", "Symmetry Guide", "Guía de simetría", "シンメトリーガイド"],
+    ["Dessiner en miroir (ou en mandala)", "Draw mirrored (or as a mandala)", "Dibujar en espejo (o como mandala)", "ミラーで描く（マンダラも）"],
+    ["Dessiner en miroir", "Drawing mirrored", "Dibujar en espejo", "ミラーで描く"],
+    ["Le guide de symétrie duplique chaque trait dessiné (avec n'importe quel outil de dessin libre) en miroir — vertical, horizontal, à un angle libre, ou en rosace radiale façon mandala.", "The symmetry guide duplicates every stroke drawn (with any freehand tool) as a mirror — vertical, horizontal, a free angle, or a radial rosette like a mandala.", "La guía de simetría duplica cada trazo dibujado (con cualquier herramienta de dibujo libre) en espejo — vertical, horizontal, en ángulo libre, o en rosetón radial tipo mandala.", "シンメトリーガイドは、フリーハンドツールで描いたすべての線を鏡写しに複製します — 垂直、水平、自由角度、またはマンダラのような放射状のロゼット。"],
+    ["Ouvre la section \"Symmetry Guide\"", "Open the \"Symmetry Guide\" section", "Abre la sección \"Symmetry Guide\"", "「Symmetry Guide」セクションを開く"],
+    ["Clique l'en-tête \"Symmetry Guide\" dans le panneau de droite pour la déplier, si besoin.", "Click the \"Symmetry Guide\" header in the right panel to expand it, if needed.", "Haz clic en el encabezado \"Symmetry Guide\" del panel derecho para desplegarla, si hace falta.", "必要であれば、右パネルの「Symmetry Guide」の見出しをクリックして開いてください。"],
+    ["Active la symétrie", "Turn on symmetry", "Activa la simetría", "シンメトリーを有効にする"],
+    ["Coche \"Enabled\" pour activer le guide.", "Check \"Enabled\" to turn the guide on.", "Marca \"Enabled\" para activar la guía.", "「Enabled」にチェックを入れてガイドを有効にします。"],
+    ["Clique sur l'outil Pinceau — la symétrie ne duplique que le dessin libre, pas les formes (Rectangle, Ellipse…).", "Click the Brush tool — symmetry only duplicates freehand drawing, not shapes (Rectangle, Ellipse…).", "Haz clic en la herramienta Pincel — la simetría solo duplica el dibujo libre, no las formas (Rectángulo, Elipse…).", "ブラシツールをクリックしてください — シンメトリーはフリーハンドの線だけを複製し、図形（長方形、楕円など）は対象外です。"],
+    ["Clique-glisse sur le canevas — un second trait, sa copie miroir, doit apparaître automatiquement de l'autre côté de l'axe.", "Click-drag on the canvas — a second stroke, its mirror copy, should appear automatically on the other side of the axis.", "Haz clic y arrastra sobre el lienzo — un segundo trazo, su copia en espejo, debería aparecer automáticamente al otro lado del eje.", "キャンバス上でクリック＆ドラッグしてください — 軸の反対側に、鏡写しのコピーとなる2本目の線が自動で現れるはずです。"],
+    ["Mode \"Radial (mandala)\" duplique en rosace autour d'un centre (nombre de secteurs réglable). Sélectionne l'outil ⧗ pour faire glisser l'axe (ou le centre en Radial) où tu veux.", "\"Radial (mandala)\" mode duplicates in a rosette around a center (sector count adjustable). Select the ⧗ tool to drag the axis (or the center in Radial mode) wherever you want.", "El modo \"Radial (mandala)\" duplica en rosetón alrededor de un centro (número de sectores ajustable). Selecciona la herramienta ⧗ para arrastrar el eje (o el centro en modo Radial) donde quieras.", "「Radial (mandala)」モードは中心の周りにロゼット状に複製します（セクター数は調整可能）。⧗ツールを選ぶと、軸（Radialモードでは中心）を好きな位置にドラッグできます。"],
+    ["Sous-sélection", "Subselect", "Subselección", "サブセレクト"],
+    ["Éditer les points d'ancrage d'un trait", "Edit a stroke's anchor points", "Editar los puntos de anclaje de un trazo", "線のアンカーポイントを編集する"],
+    ["Éditer un point à la fois", "Edit one point at a time", "Editar un punto a la vez", "一点ずつ編集する"],
+    ["La Sous-sélection reprend les points d'ancrage et les tangentes d'un trait déjà dessiné — pour corriger une courbe sans devoir la redessiner entièrement.", "Subselect takes hold of an already-drawn stroke's anchor points and tangents — to fix a curve without redrawing it entirely.", "La Subselección toma los puntos de anclaje y las tangentes de un trazo ya dibujado — para corregir una curva sin tener que redibujarla por completo.", "サブセレクトは、すでに描かれた線のアンカーポイントとタンジェントを操作します — 曲線を全部描き直さずに修正できます。"],
+    ["Clique sur l'outil Rectangle (raccourci R) — on va éditer ses coins ensuite.", "Click the Rectangle tool (shortcut R) — we'll edit its corners next.", "Haz clic en la herramienta Rectángulo (atajo R) — a continuación editaremos sus esquinas.", "長方形ツール（ショートカットR）をクリックしてください — 次にその角を編集します。"],
+    ["Clique-glisse pour tracer un rectangle.", "Click-drag to draw a rectangle.", "Haz clic y arrastra para trazar un rectángulo.", "クリック＆ドラッグで長方形を描いてください。"],
+    ["Choisis la Sous-sélection", "Choose Subselect", "Elige la Subselección", "サブセレクトを選ぶ"],
+    ["Clique sur l'outil Sous-sélection dans la barre de gauche (raccourci A).", "Click the Subselect tool in the left toolbar (shortcut A).", "Haz clic en la herramienta Subselección en la barra izquierda (atajo A).", "左側のツールバーでサブセレクトツールをクリックしてください（ショートカットA）。"],
+    ["Déplace un coin du rectangle", "Move a corner of the rectangle", "Mueve una esquina del rectángulo", "長方形の角を動かす"],
+    ["Clique sur un point d'ancrage (un coin) du rectangle puis fais-le glisser — juste ce point bouge, pas toute la forme.", "Click an anchor point (a corner) of the rectangle then drag it — only that point moves, not the whole shape.", "Haz clic en un punto de anclaje (una esquina) del rectángulo y luego arrástralo — solo se mueve ese punto, no toda la forma.", "長方形のアンカーポイント（角）をクリックしてドラッグしてください — その点だけが動き、形全体は動きません。"],
+    ["Un double-clic sur un point d'ancrage bascule entre angle vif et courbe (tangentes). Le chapitre \"Dessiner\" du guide détaille l'édition des tangentes.", "Double-clicking an anchor point toggles between a sharp corner and a curve (tangents). The \"Draw\" chapter of the guide covers tangent editing in detail.", "Un doble clic en un punto de anclaje alterna entre ángulo vivo y curva (tangentes). El capítulo \"Dibujar\" de la guía detalla la edición de tangentes.", "アンカーポイントをダブルクリックすると、鋭角と曲線（タンジェント）が切り替わります。ガイドの「描く」の章でタンジェント編集を詳しく解説しています。"],
+    ["Sélection Fond/Trait", "Fill/Stroke Select", "Selección Relleno/Trazo", "塗り/線 選択"],
+    ["Choisir juste le fond ou juste le trait", "Choose just the fill or just the stroke", "Elegir solo el relleno o solo el trazo", "塗りだけ、または線だけを選ぶ"],
+    ["Fond et trait, indépendamment", "Fill and stroke, independently", "Relleno y trazo, de forma independiente", "塗りと線を別々に"],
+    ["La Sélection classique attrape toute la forme d'un coup. Fill/Stroke Select ne prend QUE le fond ou QUE le trait — pratique pour recolorer une seule des deux parties sans toucher à l'autre.", "Regular Select grabs the whole shape at once. Fill/Stroke Select takes ONLY the fill or ONLY the stroke — handy for recoloring just one of the two without touching the other.", "La Selección clásica agarra toda la forma de golpe. Fill/Stroke Select toma SOLO el relleno o SOLO el trazo — práctico para recolorear una sola de las dos partes sin tocar la otra.", "通常の選択ツールは形全体を一度に選びます。Fill/Stroke Selectは塗りだけ、または線だけを選択します — 片方だけ色を変えたいときに便利です。"],
+    ["Clique-glisse pour tracer un rectangle — il a déjà un fond ET un trait par défaut.", "Click-drag to draw a rectangle — it already has both a fill AND a stroke by default.", "Haz clic y arrastra para trazar un rectángulo — ya tiene relleno Y trazo por defecto.", "クリック＆ドラッグで長方形を描いてください — デフォルトですでに塗りと線の両方があります。"],
+    ["Choisis Fill/Stroke Select", "Choose Fill/Stroke Select", "Elige Fill/Stroke Select", "Fill/Stroke Selectを選ぶ"],
+    ["Clique sur l'outil Fill/Stroke Select dans la barre de gauche (raccourci M).", "Click the Fill/Stroke Select tool in the left toolbar (shortcut M).", "Haz clic en la herramienta Fill/Stroke Select en la barra izquierda (atajo M).", "左側のツールバーでFill/Stroke Selectツールをクリックしてください（ショートカットM）。"],
+    ["Clique sur le fond du rectangle", "Click the rectangle's fill", "Haz clic en el relleno del rectángulo", "長方形の塗りをクリックする"],
+    ["Clique à l'intérieur du rectangle pour sélectionner juste son fond (pas le contour).", "Click inside the rectangle to select just its fill (not the outline).", "Haz clic dentro del rectángulo para seleccionar solo su relleno (no el contorno).", "長方形の内側をクリックして、塗りだけを選択してください（輪郭は含みません）。"],
+    ["Maj+clic sur le contour sélectionne le trait au lieu du fond. Une fois sélectionné, change sa couleur via les carrés Fond/Trait habituels — seule cette partie change.", "Shift+click on the outline selects the stroke instead of the fill. Once selected, change its color via the usual Fill/Stroke swatches — only that part changes.", "Mayús+clic en el contorno selecciona el trazo en lugar del relleno. Una vez seleccionado, cambia su color con los cuadros habituales de Relleno/Trazo — solo cambia esa parte.", "輪郭をShift+クリックすると、塗りの代わりに線が選択されます。選択したら、いつもの塗り/線のカラースウォッチで色を変更してください — その部分だけが変わります。"],
+    ["Effets — dégradé de fond", "Effects — gradient fill", "Efectos — degradado de relleno", "エフェクト — グラデーション塗り"],
+    ["Fond en dégradé plutôt qu'une couleur unie", "A gradient fill instead of a flat color", "Relleno en degradado en lugar de un color liso", "単色ではなくグラデーションの塗り"],
+    ["Un fond en dégradé", "A gradient fill", "Un relleno en degradado", "グラデーションの塗り"],
+    ["Le panneau Effets applique un dégradé (2 couleurs, linéaire ou radial) au fond de la sélection actuelle — une alternative à la couleur unie du carré Fond.", "The Effects panel applies a gradient (2 colors, linear or radial) to the current selection's fill — an alternative to the Fill swatch's flat color.", "El panel Efectos aplica un degradado (2 colores, lineal o radial) al relleno de la selección actual — una alternativa al color liso del cuadro Relleno.", "エフェクトパネルは、現在の選択範囲の塗りにグラデーション（2色、線形または放射状）を適用します — 塗りスウォッチの単色に代わる選択肢です。"],
+    ["Sélectionne le rectangle", "Select the rectangle", "Selecciona el rectángulo", "長方形を選択する"],
+    ["Clique sur le rectangle pour le sélectionner — le dégradé s'applique à la sélection active.", "Click the rectangle to select it — the gradient applies to the active selection.", "Haz clic en el rectángulo para seleccionarlo — el degradado se aplica a la selección activa.", "長方形をクリックして選択してください — グラデーションはアクティブな選択範囲に適用されます。"],
+    ["Ouvre la section \"Effects\"", "Open the \"Effects\" section", "Abre la sección \"Effects\"", "「Effects」セクションを開く"],
+    ["Clique l'en-tête \"Effects\" dans le panneau de droite pour la déplier, si besoin.", "Click the \"Effects\" header in the right panel to expand it, if needed.", "Haz clic en el encabezado \"Effects\" del panel derecho para desplegarlo, si hace falta.", "必要であれば、右パネルの「Effects」の見出しをクリックして開いてください。"],
+    ["Active le dégradé", "Turn on the gradient", "Activa el degradado", "グラデーションを有効にする"],
+    ["Coche \"Dégradé de fill\" — le fond du rectangle sélectionné passe immédiatement en dégradé rouge/bleu par défaut.", "Check \"Gradient fill\" — the selected rectangle's fill immediately switches to a default red/blue gradient.", "Marca \"Dégradé de fill\" — el relleno del rectángulo seleccionado pasa de inmediato a un degradado rojo/azul por defecto.", "「Dégradé de fill」にチェックを入れると、選択した長方形の塗りが即座にデフォルトの赤/青グラデーションになります。"],
+    ["Change le type", "Change the type", "Cambia el tipo", "タイプを変更する"],
+    ["Passe de \"Linéaire\" à \"Radial\" dans le menu déroulant Type pour voir la différence.", "Switch from \"Linear\" to \"Radial\" in the Type dropdown to see the difference.", "Cambia de \"Linéaire\" a \"Radial\" en el menú desplegable Tipo para ver la diferencia.", "Typeのドロップダウンで「Linéaire」から「Radial」に切り替えて、違いを見てください。"],
+    ["Les deux pastilles de couleur choisissent les teintes du dégradé, l'angle règle sa direction (mode linéaire). \"Appliquer à la sélection\" reprend l'effet si tu changes de sélection.", "The two color swatches choose the gradient's hues, the angle sets its direction (linear mode). \"Apply to selection\" reapplies the effect if you change the selection.", "Las dos pastillas de color eligen los tonos del degradado, el ángulo ajusta su dirección (modo lineal). \"Aplicar a la selección\" reaplica el efecto si cambias de selección.", "2つのカラースウォッチでグラデーションの色を選び、角度で方向を調整します（線形モード時）。「Appliquer à la sélection」は、選択範囲を変えたときに効果を再適用します。"],
+    ["Référence (roto)", "Reference (roto)", "Referencia (roto)", "リファレンス（ロト）"],
+    ["Vidéo ou image comme calque de référence", "A video or image as a reference layer", "Vídeo o imagen como capa de referencia", "動画や画像をリファレンスレイヤーとして使う"],
+    ["Dessiner par-dessus une référence", "Drawing over a reference", "Dibujar sobre una referencia", "リファレンスの上に描く"],
+    ["La Référence affiche une vidéo, une séquence d'images ou une image fixe SOUS ton dessin, pour la rotoscopie — elle suit la frame courante et n'est jamais exportée.", "Reference shows a video, an image sequence, or a still image UNDER your drawing, for rotoscoping — it follows the current frame and is never exported.", "La Referencia muestra un vídeo, una secuencia de imágenes o una imagen fija DEBAJO de tu dibujo, para rotoscopia — sigue el fotograma actual y nunca se exporta.", "リファレンスは、動画・画像シーケンス・静止画をロトスコープ用に描画の下に表示します — 現在のフレームに追従し、書き出しには含まれません。"],
+    ["Ouvre la section \"Référence (roto)\"", "Open the \"Reference (roto)\" section", "Abre la sección \"Referencia (roto)\"", "「Référence (roto)」セクションを開く"],
+    ["Clique l'en-tête \"Référence (roto)\" dans le panneau de droite pour la déplier, si besoin.", "Click the \"Reference (roto)\" header in the right panel to expand it, if needed.", "Haz clic en el encabezado \"Referencia (roto)\" del panel derecho para desplegarla, si hace falta.", "必要であれば、右パネルの「Référence (roto)」の見出しをクリックして開いてください。"],
+    ["Regarde le bouton \"Importer…\"", "Look at the \"Import…\" button", "Mira el botón \"Importar…\"", "「Importer…」ボタンを見る"],
+    ["Clique \"Importer…\" pour voir le sélecteur de fichier s'ouvrir (vidéo, séquence d'images, ou image seule).", "Click \"Import…\" to see the file picker open (video, image sequence, or a single image).", "Haz clic en \"Importar…\" para ver cómo se abre el selector de archivo (vídeo, secuencia de imágenes, o una sola imagen).", "「Importer…」をクリックすると、ファイル選択ダイアログが開きます（動画、画像シーケンス、または単一画像）。"],
+    ["Repère le réglage Opacity", "Spot the Opacity setting", "Ubica el ajuste Opacity", "Opacity設定を確認する"],
+    ["Ce curseur règle la transparence de la référence une fois importée, pour qu'elle ne gêne pas ton dessin par-dessus.", "This slider sets the reference's transparency once imported, so it doesn't get in the way of your drawing on top.", "Este control ajusta la transparencia de la referencia una vez importada, para que no estorbe tu dibujo por encima.", "このスライダーは、インポート後のリファレンスの透明度を調整し、上に描く線の邪魔にならないようにします。"],
+    ["\"Offset\" décale la frame de départ de la référence par rapport à la timeline — utile si ta vidéo ne commence pas au même instant que ton animation.", "\"Offset\" shifts the reference's starting frame relative to the timeline — useful if your video doesn't start at the same moment as your animation.", "\"Offset\" desplaza el fotograma de inicio de la referencia respecto a la timeline — útil si tu vídeo no empieza en el mismo instante que tu animación.", "「Offset」は、タイムラインに対するリファレンスの開始フレームをずらします — 動画とアニメーションの開始タイミングが異なる場合に便利です。"],
+    ["Principes d'animation", "Animation Principles", "Principios de animación", "アニメーションの原則"],
+    ["Squash & Stretch", "Squash & Stretch", "Squash & Stretch", "スクワッシュ＆ストレッチ"],
+    ["Donner du poids et de la souplesse", "Giving weight and flexibility", "Dar peso y flexibilidad", "重さとしなやかさを与える"],
+    ["Le principe le plus important", "The most important principle", "El principio más importante", "最も重要な原則"],
+    ["Squash & Stretch donne l'illusion de poids et de souplesse : un objet qui s'écrase à l'impact puis s'étire en rebondissant paraît vivant. Règle d'or : le VOLUME reste constant — ce qui s'aplatit dans un sens s'élargit dans l'autre.", "Squash & Stretch creates the illusion of weight and flexibility: an object that squashes on impact then stretches as it rebounds feels alive. Golden rule: VOLUME stays constant — what flattens in one direction widens in the other.", "Squash & Stretch da la ilusión de peso y flexibilidad: un objeto que se aplasta al impactar y luego se estira al rebotar parece vivo. Regla de oro: el VOLUMEN se mantiene constante — lo que se aplana en un sentido se ensancha en el otro.", "スクワッシュ＆ストレッチは、重さとしなやかさの錯覚を生み出します。衝突で潰れ、跳ね返りで伸びる物体は生き生きと見えます。黄金律：体積は一定に保たれます — 一方向に潰れたら、もう一方向に広がります。"],
+    ["Choisis l'Ellipse", "Choose Ellipse", "Elige la Elipse", "楕円を選ぶ"],
+    ["Clique sur l'outil Ellipse — on va animer une balle qui rebondit.", "Click the Ellipse tool — we're going to animate a bouncing ball.", "Haz clic en la herramienta Elipse — vamos a animar una pelota que rebota.", "楕円ツールをクリックしてください — バウンドするボールをアニメーションします。"],
+    ["Dessine une balle", "Draw a ball", "Dibuja una pelota", "ボールを描く"],
+    ["Clique-glisse pour tracer un cercle — c'est la pose de départ (en l'air, forme normale).", "Click-drag to draw a circle — this is the starting pose (in the air, normal shape).", "Haz clic y arrastra para trazar un círculo — es la pose inicial (en el aire, forma normal).", "クリック＆ドラッグで円を描いてください — これが開始ポーズです（空中、通常の形）。"],
+    ["Clique \"Frame suivante\" plusieurs fois pour te placer au moment de l'impact au sol.", "Click \"Next frame\" a few times to reach the moment of impact with the ground.", "Haz clic en \"Frame suivante\" varias veces para llegar al momento del impacto contra el suelo.", "「Frame suivante」を何度かクリックして、地面に着地する瞬間まで進んでください。"],
+    ["Pose une keyframe d'impact", "Set an impact keyframe", "Coloca un fotograma clave de impacto", "衝突のキーフレームを打つ"],
+    ["Appuie sur F6 pour créer une nouvelle keyframe ici — la pose écrasée.", "Press F6 to create a new keyframe here — the squashed pose.", "Pulsa F6 para crear un nuevo fotograma clave aquí — la pose aplastada.", "F6を押してここに新しいキーフレームを作成してください — 潰れたポーズです。"],
+    ["Écrase la balle (Squash)", "Squash the ball", "Aplasta la pelota (Squash)", "ボールを潰す（Squash）"],
+    ["Sélectionne la balle puis fais glisser une poignée de coin pour l'aplatir verticalement — elle doit s'élargir horizontalement pour garder le même volume visuel.", "Select the ball then drag a corner handle to flatten it vertically — it should widen horizontally to keep the same visual volume.", "Selecciona la pelota y luego arrastra un tirador de esquina para aplastarla verticalmente — debe ensancharse horizontalmente para mantener el mismo volumen visual.", "ボールを選択し、角のハンドルをドラッグして縦につぶしてください — 同じ視覚的な体積を保つため、横に広がるはずです。"],
+    ["Pour le rebond (Stretch), pose une keyframe juste après l'impact et étire la balle verticalement en l'amincissant — l'inverse exact de l'écrasement. Génère le tween (T) entre les poses pour voir l'élasticité prendre vie.", "For the rebound (Stretch), set a keyframe right after impact and stretch the ball vertically while thinning it — the exact opposite of the squash. Generate the tween (T) between the poses to see the elasticity come alive.", "Para el rebote (Stretch), coloca un fotograma clave justo después del impacto y estira la pelota verticalmente adelgazándola — lo opuesto exacto al aplastamiento. Genera el tween (T) entre las poses para ver la elasticidad cobrar vida.", "跳ね返り（Stretch）では、衝突直後にキーフレームを打ち、ボールを縦に伸ばして細くしてください — Squashの正反対です。ポーズ間でトゥイーン（T）を生成すると、弾力が生き生きと表現されます。"],
+    ["Timing — accélération et décélération", "Timing — acceleration and deceleration", "Timing — aceleración y desaceleración", "タイミング — 加速と減速"],
+    ["Éditer la courbe entre deux keyframes", "Editing the curve between two keyframes", "Editar la curva entre dos fotogramas clave", "2つのキーフレーム間のカーブを編集する"],
+    ["Rien ne bouge à vitesse constante", "Nothing moves at a constant speed", "Nada se mueve a velocidad constante", "一定の速度で動くものは何もない"],
+    ["Dans la vraie vie, un mouvement accélère au départ et ralentit à l'arrivée (\"Slow In / Slow Out\") — plus de dessins intermédiaires proches des poses de départ/arrivée, moins au milieu. Nemo génère ça automatiquement, mais tu peux régler précisément la courbe.", "In real life, a movement accelerates at the start and slows down at the end (\"Slow In / Slow Out\") — more in-between drawings near the start/end poses, fewer in the middle. Nemo generates this automatically, but you can fine-tune the curve.", "En la vida real, un movimiento acelera al principio y desacelera al final (\"Slow In / Slow Out\") — más dibujos intermedios cerca de las poses de inicio/fin, menos en el medio. Nemo genera esto automáticamente, pero puedes ajustar la curva con precisión.", "現実の動きは、始まりで加速し、終わりで減速します（「Slow In / Slow Out」）— 開始・終了のポーズ付近には中割りが多く、中間では少なくなります。Nemoはこれを自動で生成しますが、カーブを細かく調整することもできます。"],
+    ["Clique \"Frame suivante\" plusieurs fois pour te placer 5 à 10 frames plus loin.", "Click \"Next frame\" a few times to move 5 to 10 frames forward.", "Haz clic en \"Frame suivante\" varias veces para avanzar entre 5 y 10 fotogramas.", "「Frame suivante」を何度かクリックして、5〜10フレーム先に進んでください。"],
+    ["Appuie sur F6 pour créer une nouvelle keyframe ici.", "Press F6 to create a new keyframe here.", "Pulsa F6 para crear un nuevo fotograma clave aquí.", "F6を押してここに新しいキーフレームを作成してください。"],
+    ["Dessine autre chose, pour que le tween ait quelque chose à interpoler.", "Draw something different, so the tween has something to interpolate.", "Dibuja algo distinto, para que el tween tenga algo que interpolar.", "違うものを描いてください — トゥイーンが補間する対象を持てるようにするためです。"],
+    ["Clique une case interpolée de la timeline", "Click an interpolated cell in the timeline", "Haz clic en una casilla interpolada de la timeline", "タイムラインの補間セルをクリックする"],
+    ["Clique directement sur une case de la timeline entre tes deux keyframes (une case \"tween\") — la courbe d'accélération s'affiche alors automatiquement dans le panneau de droite.", "Click directly on a timeline cell between your two keyframes (a \"tween\" cell) — the easing curve then appears automatically in the right panel.", "Haz clic directamente en una casilla de la timeline entre tus dos fotogramas clave (una casilla \"tween\") — la curva de aceleración aparece entonces automáticamente en el panel derecho.", "2つのキーフレームの間にあるタイムラインのセル（「tween」セル）を直接クリックしてください — すると右パネルにイージングカーブが自動的に表示されます。"],
+    ["Édite la courbe", "Edit the curve", "Edita la curva", "カーブを編集する"],
+    ["Clique-glisse un point de la courbe — l'incliner change le rythme de l'interpolation entre les deux poses (pentu = rapide, plat = lent).", "Click-drag a point on the curve — tilting it changes the pace of the interpolation between the two poses (steep = fast, flat = slow).", "Haz clic y arrastra un punto de la curva — inclinarlo cambia el ritmo de la interpolación entre las dos poses (empinado = rápido, plano = lento).", "カーブ上の点をクリック＆ドラッグしてください — 傾きを変えると、2つのポーズ間の補間の速さが変わります（急＝速い、平坦＝遅い）。"],
+    ["Une courbe qui part plat et finit pentue = démarrage lent, arrivée rapide (Slow In). L'inverse = Slow Out. \"+ Enregistrer preset\" garde une courbe personnalisée pour la réutiliser ailleurs.", "A curve that starts flat and ends steep = slow start, fast arrival (Slow In). The reverse = Slow Out. \"+ Save preset\" keeps a custom curve to reuse elsewhere.", "Una curva que empieza plana y termina empinada = inicio lento, llegada rápida (Slow In). Lo contrario = Slow Out. \"+ Enregistrer preset\" guarda una curva personalizada para reutilizarla en otro sitio.", "平坦に始まり急になるカーブ＝ゆっくり始まり速く到達（Slow In）。逆はSlow Outです。「+ Enregistrer preset」で、カスタムカーブを保存して他の場所でも再利用できます。"],
+    ["Clique sur l'outil Pinceau — on va dessiner deux poses à interpoler.", "Click the Brush tool — we're going to draw two poses to interpolate.", "Haz clic en la herramienta Pincel — vamos a dibujar dos poses para interpolar.", "ブラシツールをクリックしてください — 補間する2つのポーズを描きます。"],
+    ["Clique sur l'outil Pinceau — on va poser deux keyframes à interpoler.", "Click the Brush tool — we're going to set two keyframes to interpolate.", "Haz clic en la herramienta Pincel — vamos a colocar dos fotogramas clave para interpolar.", "ブラシツールをクリックしてください — 補間する2つのキーフレームを打ちます。"],
   ]);
   // Named T (not tt) — renderStep()'s local `tt` variable holds the tooltip
   // DOM element and would otherwise shadow a same-named lookup function.
@@ -443,6 +528,16 @@
       time: '3 min',
       steps: [
         { type: 'info', title: 'Le tween automatique', body: 'Pose deux keyframes avec un dessin différent, puis laisse Nemo générer les frames intermédiaires tout seul. C\'est le cœur de Nemo.' },
+        // Bug trouvé en testant le nouveau module 'timing-easing' (2026-07-18,
+        // même séquence de setup copiée depuis ce module) : sans ce clic
+        // explicite, un outil laissé actif par un module précédent (ex.
+        // Sélection) fait que le "clique-glisse" suivant déplace une forme
+        // existante au lieu d'en dessiner une nouvelle — measureStrokeCount
+        // ne bouge jamais, l'étape reste bloquée pour de vrai. Latent depuis
+        // la création de ce module, jamais remarqué car il tourne
+        // habituellement tôt dans une session fraîche (Pinceau déjà actif
+        // par défaut).
+        { type: 'click', target: '.tool-btn[data-tool="draw"]', title: 'Choisis le Pinceau', body: 'Clique sur l\'outil Pinceau — on va poser deux keyframes à interpoler.' },
         // generateTweens() (tweens.js) only counts a frame as a valid tween
         // anchor when `isKeyframe && strokes.length>0` — a keyframe with
         // NOTHING drawn on it (frame 0 of a fresh layer, by default) does
@@ -849,6 +944,229 @@
         { type: 'click', target: '#export-close', title: 'Ferme la fenêtre', body: 'Clique la croix — on ne lance pas un vrai export ici, juste la découverte de la fenêtre.' },
         { type: 'info', title: 'Bien joué !', body: 'Le bouton "Exporter" (en bas de la fenêtre) lance le vrai rendu — image par image pour PNG/TIFF, ou en pilotant ffmpeg pour GIF/MP4/ProRes. Le chapitre "Export" du guide détaille chaque format.' }
       ]
+    },
+    {
+      id: 'symmetry',
+      category: 'Dessiner',
+      icon: '19',
+      title: 'Guide de symétrie',
+      desc: 'Dessiner en miroir (ou en mandala)',
+      time: '1 min',
+      steps: [
+        { type: 'info', title: 'Dessiner en miroir', body: 'Le guide de symétrie duplique chaque trait dessiné (avec n\'importe quel outil de dessin libre) en miroir — vertical, horizontal, à un angle libre, ou en rosace radiale façon mandala.' },
+        {
+          type: 'state', target: '#phdr-symmetry', title: 'Ouvre la section "Symmetry Guide"', body: 'Clique l\'en-tête "Symmetry Guide" dans le panneau de droite pour la déplier, si besoin.',
+          hint: 'En attente…',
+          check: function (win) { var el = win.document.getElementById('p-sym-on'); return !!(el && el.getBoundingClientRect().height > 0); }
+        },
+        stateChangedStep({
+          target: '#p-sym-on', title: 'Active la symétrie', body: 'Coche "Enabled" pour activer le guide.', hint: 'En attente…',
+          measure: function (win) { var el = win.document.getElementById('p-sym-on'); return el ? el.checked : false; }
+        }),
+        { type: 'click', target: '.tool-btn[data-tool="draw"]', title: 'Choisis le Pinceau', body: 'Clique sur l\'outil Pinceau — la symétrie ne duplique que le dessin libre, pas les formes (Rectangle, Ellipse…).' },
+        // onStrokeCommitted() (symmetry-bridge.js) insère le clone miroir
+        // directement dans le calque, comme un second Path indépendant —
+        // un seul trait dessiné doit donc faire +2 sur measureStrokeCount
+        // (l'original ET sa copie), pas +1.
+        stateIncreaseStep({
+          target: '#drawing-canvas', title: 'Dessine un trait', body: 'Clique-glisse sur le canevas — un second trait, sa copie miroir, doit apparaître automatiquement de l\'autre côté de l\'axe.',
+          hint: 'En attente de ton trait…', measure: measureStrokeCount, minIncrease: 2
+        }),
+        { type: 'info', title: 'Bien joué !', body: 'Mode "Radial (mandala)" duplique en rosace autour d\'un centre (nombre de secteurs réglable). Sélectionne l\'outil ⧗ pour faire glisser l\'axe (ou le centre en Radial) où tu veux.' }
+      ]
+    },
+    {
+      id: 'subselect',
+      category: 'Dessiner',
+      icon: '20',
+      title: 'Sous-sélection',
+      desc: 'Éditer les points d\'ancrage d\'un trait',
+      time: '1 min',
+      steps: [
+        { type: 'info', title: 'Éditer un point à la fois', body: 'La Sous-sélection reprend les points d\'ancrage et les tangentes d\'un trait déjà dessiné — pour corriger une courbe sans devoir la redessiner entièrement.' },
+        { type: 'click', target: '.tool-btn[data-tool="rect"]', title: 'Choisis le Rectangle', body: 'Clique sur l\'outil Rectangle (raccourci R) — on va éditer ses coins ensuite.' },
+        stateIncreaseStep({ target: '#drawing-canvas', title: 'Dessine un rectangle', body: 'Clique-glisse pour tracer un rectangle.', hint: 'En attente de ta forme…', measure: measureStrokeCount }),
+        { type: 'click', target: '.tool-btn[data-tool="subselect"]', title: 'Choisis la Sous-sélection', body: 'Clique sur l\'outil Sous-sélection dans la barre de gauche (raccourci A).' },
+        // Un drag de noeud mute path.segments EN PLACE (subselect-bridge.js)
+        // — aucun enfant ajouté/retiré, measureStrokeCount ne bougerait
+        // jamais. Bug trouvé en testant en direct (2026-07-18) :
+        // measureLayerFingerprint (exportJSON DU CALQUE) ne capte PAS cette
+        // mutation — Layer.exportJSON() de Paper.js renvoie une longueur
+        // identique avant/après un vrai drag de noeud confirmé (segments
+        // effectivement déplacés, vérifié directement sur l'objet), alors
+        // que le MÊME exportJSON appelé sur le Path sélectionné reflète le
+        // changement instantanément. Mesurer le path sélectionné, pas le
+        // calque entier — leçon à retenir pour toute future édition
+        // in-place d'un item déjà existant (par opposition à une
+        // insertion/suppression, où le calque suffit).
+        stateChangedStep({
+          target: '#drawing-canvas', title: 'Déplace un coin du rectangle', body: 'Clique sur un point d\'ancrage (un coin) du rectangle puis fais-le glisser — juste ce point bouge, pas toute la forme.',
+          hint: 'En attente de ton geste…',
+          measure: function (win) {
+            var sp = win.selectedPaths;
+            return (sp && sp[0] && sp[0].exportJSON) ? sp[0].exportJSON({ asString: true }) : measureLayerFingerprint(win);
+          }
+        }),
+        { type: 'info', title: 'Bien joué !', body: 'Un double-clic sur un point d\'ancrage bascule entre angle vif et courbe (tangentes). Le chapitre "Dessiner" du guide détaille l\'édition des tangentes.' }
+      ]
+    },
+    {
+      id: 'fsselect',
+      category: 'Dessiner',
+      icon: '21',
+      title: 'Sélection Fond/Trait',
+      desc: 'Choisir juste le fond ou juste le trait',
+      time: '1 min',
+      steps: [
+        { type: 'info', title: 'Fond et trait, indépendamment', body: 'La Sélection classique attrape toute la forme d\'un coup. Fill/Stroke Select ne prend QUE le fond ou QUE le trait — pratique pour recolorer une seule des deux parties sans toucher à l\'autre.' },
+        { type: 'click', target: '.tool-btn[data-tool="rect"]', title: 'Choisis le Rectangle', body: 'Clique sur l\'outil Rectangle (raccourci R).' },
+        stateIncreaseStep({ target: '#drawing-canvas', title: 'Dessine un rectangle', body: 'Clique-glisse pour tracer un rectangle — il a déjà un fond ET un trait par défaut.', hint: 'En attente de ta forme…', measure: measureStrokeCount }),
+        { type: 'click', target: '.tool-btn[data-tool="fsselect"]', title: 'Choisis Fill/Stroke Select', body: 'Clique sur l\'outil Fill/Stroke Select dans la barre de gauche (raccourci M).' },
+        // Un clic fsselect ne mute RIEN dans le calque (tools.js) — juste
+        // une variable globale `_fsSel` ({path, kind:'fill'|'stroke'}).
+        // measureLayerFingerprint ne bougerait jamais ; _fsSel est le seul
+        // signal réel qu'une sélection indépendante a eu lieu.
+        stateChangedStep({
+          target: '#drawing-canvas', title: 'Clique sur le fond du rectangle', body: 'Clique à l\'intérieur du rectangle pour sélectionner juste son fond (pas le contour).',
+          hint: 'En attente de ton clic…', measure: function (win) { return win._fsSel ? win._fsSel.kind : null; }
+        }),
+        { type: 'info', title: 'Bien joué !', body: 'Maj+clic sur le contour sélectionne le trait au lieu du fond. Une fois sélectionné, change sa couleur via les carrés Fond/Trait habituels — seule cette partie change.' }
+      ]
+    },
+    {
+      id: 'effects',
+      category: 'Dessiner',
+      icon: '22',
+      title: 'Effets — dégradé de fond',
+      desc: 'Fond en dégradé plutôt qu\'une couleur unie',
+      time: '1 min',
+      steps: [
+        { type: 'info', title: 'Un fond en dégradé', body: 'Le panneau Effets applique un dégradé (2 couleurs, linéaire ou radial) au fond de la sélection actuelle — une alternative à la couleur unie du carré Fond.' },
+        { type: 'click', target: '.tool-btn[data-tool="rect"]', title: 'Choisis le Rectangle', body: 'Clique sur l\'outil Rectangle (raccourci R).' },
+        stateIncreaseStep({ target: '#drawing-canvas', title: 'Dessine un rectangle', body: 'Clique-glisse pour tracer un rectangle.', hint: 'En attente de ta forme…', measure: measureStrokeCount }),
+        { type: 'click', target: '.tool-btn[data-tool="select"]', title: 'Choisis la Sélection', body: 'Clique sur l\'outil Sélection (raccourci V).' },
+        { type: 'click', target: '#drawing-canvas', title: 'Sélectionne le rectangle', body: 'Clique sur le rectangle pour le sélectionner — le dégradé s\'applique à la sélection active.' },
+        {
+          type: 'state', target: '#phdr-effects', title: 'Ouvre la section "Effects"', body: 'Clique l\'en-tête "Effects" dans le panneau de droite pour la déplier, si besoin.',
+          hint: 'En attente…',
+          check: function (win) { var el = win.document.getElementById('p-grad-on'); return !!(el && el.getBoundingClientRect().height > 0); }
+        },
+        // Cocher #p-grad-on APPLIQUE déjà le dégradé tout de suite s'il y a
+        // une sélection (gradient-bridge.js) — pas besoin d'un clic
+        // supplémentaire sur "Appliquer" pour que l'effet soit réel.
+        // p.data.fillGradient est posé sur le path sélectionné, jamais un
+        // champ state.* global.
+        stateChangedStep({
+          target: '#p-grad-on', title: 'Active le dégradé', body: 'Coche "Dégradé de fill" — le fond du rectangle sélectionné passe immédiatement en dégradé rouge/bleu par défaut.',
+          hint: 'En attente…',
+          measure: function (win) { var sp = win.selectedPaths; return !!(sp && sp[0] && sp[0].data && sp[0].data.fillGradient); }
+        }),
+        { type: 'click', target: '#p-grad-kind', title: 'Change le type', body: 'Passe de "Linéaire" à "Radial" dans le menu déroulant Type pour voir la différence.' },
+        { type: 'info', title: 'Bien joué !', body: 'Les deux pastilles de couleur choisissent les teintes du dégradé, l\'angle règle sa direction (mode linéaire). "Appliquer à la sélection" reprend l\'effet si tu changes de sélection.' }
+      ]
+    },
+    {
+      id: 'reference',
+      category: 'Médias',
+      icon: '23',
+      title: 'Référence (roto)',
+      desc: 'Vidéo ou image comme calque de référence',
+      time: '1 min',
+      // Comme le module Audio/médias : un vrai import a besoin d'un vrai
+      // fichier que ce tutoriel sandboxé ne peut pas fournir. On reste au
+      // niveau navigation réelle — ouvrir la section, voir le bouton
+      // d'import, voir les réglages une fois qu'une référence existe —
+      // sans jamais prétendre valider un import qui n'a pas lieu.
+      steps: [
+        { type: 'info', title: 'Dessiner par-dessus une référence', body: 'La Référence affiche une vidéo, une séquence d\'images ou une image fixe SOUS ton dessin, pour la rotoscopie — elle suit la frame courante et n\'est jamais exportée.' },
+        {
+          type: 'state', target: '#phdr-reference', title: 'Ouvre la section "Référence (roto)"', body: 'Clique l\'en-tête "Référence (roto)" dans le panneau de droite pour la déplier, si besoin.',
+          hint: 'En attente…',
+          check: function (win) { var el = win.document.getElementById('btn-ref-import'); return !!(el && el.getBoundingClientRect().height > 0); }
+        },
+        { type: 'click', target: '#btn-ref-import', title: 'Regarde le bouton "Importer…"', body: 'Clique "Importer…" pour voir le sélecteur de fichier s\'ouvrir (vidéo, séquence d\'images, ou image seule).' },
+        { type: 'click', target: '#p-ref-opacity', title: 'Repère le réglage Opacity', body: 'Ce curseur règle la transparence de la référence une fois importée, pour qu\'elle ne gêne pas ton dessin par-dessus.' },
+        { type: 'info', title: 'Bien joué !', body: '"Offset" décale la frame de départ de la référence par rapport à la timeline — utile si ta vidéo ne commence pas au même instant que ton animation.' }
+      ]
+    },
+    {
+      id: 'squash-stretch',
+      category: 'Principes d\'animation',
+      icon: '24',
+      title: 'Squash & Stretch',
+      desc: 'Donner du poids et de la souplesse',
+      time: '2 min',
+      steps: [
+        // Définition alignée sur la source de référence des 12 principes de
+        // l'animation (Frank Thomas & Ollie Johnston, "The Illusion of
+        // Life", 1981 — résumé fiable : https://en.wikipedia.org/wiki/Twelve_basic_principles_of_animation).
+        { type: 'info', title: 'Le principe le plus important', body: 'Squash & Stretch donne l\'illusion de poids et de souplesse : un objet qui s\'écrase à l\'impact puis s\'étire en rebondissant paraît vivant. Règle d\'or : le VOLUME reste constant — ce qui s\'aplatit dans un sens s\'élargit dans l\'autre.' },
+        { type: 'click', target: '.tool-btn[data-tool="ellipse"]', title: 'Choisis l\'Ellipse', body: 'Clique sur l\'outil Ellipse — on va animer une balle qui rebondit.' },
+        stateIncreaseStep({ target: '#drawing-canvas', title: 'Dessine une balle', body: 'Clique-glisse pour tracer un cercle — c\'est la pose de départ (en l\'air, forme normale).', hint: 'En attente de ta forme…', measure: measureStrokeCount }),
+        { type: 'click', target: '.tool-btn[data-tool="select"]', title: 'Choisis la Sélection', body: 'Clique sur l\'outil Sélection (raccourci V).' },
+        stateIncreaseStep({
+          title: 'Avance de quelques frames', body: 'Clique "Frame suivante" plusieurs fois pour te placer au moment de l\'impact au sol.', hint: 'En attente…',
+          measure: measureCurrentFrame, minIncrease: 3
+        }),
+        stateIncreaseStep({ title: 'Pose une keyframe d\'impact', body: 'Appuie sur F6 pour créer une nouvelle keyframe ici — la pose écrasée.', hint: 'En attente de F6…', measure: measureKeyframeCount }),
+        stateChangedStep({
+          target: '#drawing-canvas', title: 'Écrase la balle (Squash)', body: 'Sélectionne la balle puis fais glisser une poignée de coin pour l\'aplatir verticalement — elle doit s\'élargir horizontalement pour garder le même volume visuel.',
+          hint: 'En attente de ton geste…', measure: measureLayerFingerprint
+        }),
+        { type: 'info', title: 'Bien joué !', body: 'Pour le rebond (Stretch), pose une keyframe juste après l\'impact et étire la balle verticalement en l\'amincissant — l\'inverse exact de l\'écrasement. Génère le tween (T) entre les poses pour voir l\'élasticité prendre vie.' }
+      ]
+    },
+    {
+      id: 'timing-easing',
+      category: 'Principes d\'animation',
+      icon: '25',
+      title: 'Timing — accélération et décélération',
+      desc: 'Éditer la courbe entre deux keyframes',
+      time: '2 min',
+      steps: [
+        { type: 'info', title: 'Rien ne bouge à vitesse constante', body: 'Dans la vraie vie, un mouvement accélère au départ et ralentit à l\'arrivée ("Slow In / Slow Out") — plus de dessins intermédiaires proches des poses de départ/arrivée, moins au milieu. Nemo génère ça automatiquement, mais tu peux régler précisément la courbe.' },
+        // Bug trouvé en testant en direct (2026-07-18) : sans ce clic
+        // explicite, un outil laissé actif par un module précédent (ex.
+        // Sélection, après le module Effets) fait que le "clique-glisse"
+        // suivant déplace une forme existante au lieu d'en dessiner une
+        // nouvelle — measureStrokeCount ne bouge jamais, l'étape reste
+        // bloquée pour de vrai. Même piège latent dans le module 'tween'
+        // d'origine, qui suppose lui aussi le Pinceau déjà actif.
+        { type: 'click', target: '.tool-btn[data-tool="draw"]', title: 'Choisis le Pinceau', body: 'Clique sur l\'outil Pinceau — on va dessiner deux poses à interpoler.' },
+        stateIncreaseStep({
+          target: '#drawing-canvas', title: 'Dessine une première forme', body: 'Clique-glisse sur le canevas pour dessiner quelque chose sur cette première keyframe.',
+          hint: 'En attente de ton trait…', measure: measureStrokeCount
+        }),
+        stateIncreaseStep({
+          title: 'Avance de quelques frames', body: 'Clique "Frame suivante" plusieurs fois pour te placer 5 à 10 frames plus loin.', hint: 'En attente…',
+          measure: measureCurrentFrame, minIncrease: 5
+        }),
+        stateIncreaseStep({ title: 'Pose une nouvelle keyframe', body: 'Appuie sur F6 pour créer une nouvelle keyframe ici.', hint: 'En attente de F6…', measure: measureKeyframeCount }),
+        stateIncreaseStep({
+          target: '#drawing-canvas', title: 'Dessine un second trait, différent du premier', body: 'Dessine autre chose, pour que le tween ait quelque chose à interpoler.',
+          hint: 'En attente de ton trait…', measure: measureStrokeCount
+        }),
+        stateIncreaseStep({ title: 'Lance le tween', body: 'Appuie sur la touche T pour interpoler automatiquement entre les deux keyframes.', hint: 'En attente de T…', measure: measureInterpolatedCount }),
+        {
+          // openPropsSection('easing-sec') s'auto-déclenche en cliquant une
+          // case de la timeline qui EST interpolée (mousedown handler sur
+          // #frame-grid, timeline.js) — testé en direct : les boutons
+          // Frame suivante/précédente (#btn-nf/#btn-pf) changent bien
+          // state.currentFrame mais NE PASSENT PAS par ce handler, donc ne
+          // déclenchent jamais l'ouverture automatique. Piège trouvé en
+          // testant, corrigé en demandant un vrai clic sur la case plutôt
+          // que sur les boutons de transport.
+          type: 'state', target: '#frame-grid', title: 'Clique une case interpolée de la timeline', body: 'Clique directement sur une case de la timeline entre tes deux keyframes (une case "tween") — la courbe d\'accélération s\'affiche alors automatiquement dans le panneau de droite.',
+          hint: 'En attente…',
+          check: function (win) { var el = win.document.getElementById('curve-canvas'); return !!(el && el.getBoundingClientRect().height > 0); }
+        },
+        stateChangedStep({
+          target: '#curve-canvas', title: 'Édite la courbe', body: 'Clique-glisse un point de la courbe — l\'incliner change le rythme de l\'interpolation entre les deux poses (pentu = rapide, plat = lent).',
+          hint: 'En attente de ton geste…',
+          measure: function (win) { return JSON.stringify(win.state && win.state.easingCurve && win.state.easingCurve.points); }
+        }),
+        { type: 'info', title: 'Bien joué !', body: 'Une courbe qui part plat et finit pentue = démarrage lent, arrivée rapide (Slow In). L\'inverse = Slow Out. "+ Enregistrer preset" garde une courbe personnalisée pour la réutiliser ailleurs.' }
+      ]
     }
   ];
 
@@ -1031,7 +1349,7 @@
   // Categories render in this fixed order (not alphabetical, not
   // MODULES-array order) — roughly the order someone actually learning
   // Nemo would want: draw first, then animate, then organize/output.
-  var CATEGORY_ORDER = ['Dessiner', 'Calques et animation', 'Organisation', 'Médias', 'Réglages'];
+  var CATEGORY_ORDER = ['Dessiner', 'Calques et animation', 'Principes d\'animation', 'Organisation', 'Médias', 'Réglages'];
 
   // A real two-screen menu, not an inline accordion: the launcher opens on
   // a list of CATEGORIES only (icon + count, no modules shown yet);
