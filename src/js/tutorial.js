@@ -371,6 +371,10 @@
     ["Retour", "Back", "Atrás", "戻る"],
     ["Rechercher un module…", "Search a module…", "Buscar un módulo…", "モジュールを検索…"],
     ["Aucun module ne correspond à ta recherche.", "No module matches your search.", "Ningún módulo coincide con tu búsqueda.", "検索に一致するモジュールがありません。"],
+    ["Une question sur Nemo ?", "A question about Nemo?", "¿Una pregunta sobre Nemo?", "Nemoについて質問はありますか？"],
+    ["Chercher une réponse", "Search for an answer", "Buscar una respuesta", "回答を検索"],
+    ["Aucune réponse trouvée — essaie de reformuler, ou explore les catégories ci-dessus.", "No answer found — try rephrasing, or browse the categories above.", "No se encontró respuesta — intenta reformular, o explora las categorías de arriba.", "回答が見つかりませんでした — 言い方を変えるか、上のカテゴリーを見てみてください。"],
+    ["Ouvrir le module", "Open the module", "Abrir el módulo", "モジュールを開く"],
     ["étape", "step", "paso", "ステップ"],
     ["Module \"%s\" terminé ✓", "Module \"%s\" completed ✓", "Módulo \"%s\" completado ✓", "「%s」モジュール完了 ✓"],
     ["Guide de symétrie", "Symmetry Guide", "Guía de simetría", "シンメトリーガイド"],
@@ -1512,11 +1516,20 @@
       '</div>' +
       '<div class="modal-bdy">' +
       '<div class="tut-mod-list" id="tut-mod-list"></div>' +
-      '</div></div>';
+      '</div>' +
+      '<div class="tut-ask-wrap">' +
+      '<div class="tut-ask-answer" id="tut-ask-answer" style="display:none"></div>' +
+      '<div class="tut-ask-row">' +
+      '<input type="text" id="tut-ask-input" class="tut-ask-input" placeholder="' + T('Une question sur Nemo ?') + '">' +
+      '<button class="tut-ask-btn" id="tut-ask-btn" title="' + T('Chercher une réponse') + '"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>' +
+      '</div></div>' +
+      '</div>';
     document.body.appendChild(modal);
     modal.querySelector('#tut-launcher-close').addEventListener('click', closeLauncher);
     modal.querySelector('#tut-launcher-back').addEventListener('click', function () { renderCategoryScreen(); });
     modal.querySelector('#tut-launcher-search').addEventListener('input', onSearchInput);
+    modal.querySelector('#tut-ask-btn').addEventListener('click', runAsk);
+    modal.querySelector('#tut-ask-input').addEventListener('keydown', function (e) { if (e.key === 'Enter') runAsk(); });
     modal.addEventListener('mousedown', function (e) { if (e.target === modal) closeLauncher(); });
     return modal;
   }
@@ -1554,6 +1567,7 @@
   function renderCategoryScreen() {
     lastScreenCat = null;
     var si = $('#tut-launcher-search'); if (si) si.placeholder = T('Rechercher un module…');
+    var ai = $('#tut-ask-input'); if (ai) ai.placeholder = T('Une question sur Nemo ?');
     var list = $('#tut-mod-list'); if (!list) return;
     $('#tut-launcher-title').textContent = T('Découvrir Nemo');
     $('#tut-launcher-back').style.display = 'none';
@@ -1645,6 +1659,80 @@
     else { renderCategoryScreen(); }
   }
 
+  // ---- "Une question ?" — keyword search over the tutorial's own content,
+  // NOT an LLM: every module step's title/body is already a hand-written,
+  // accurate explanation of one specific piece of the app, so scoring
+  // keyword overlap against that corpus and surfacing the best-matching
+  // step is a cheap, offline, zero-cost way to answer "how do I..." /
+  // "what is..." questions without needing a network call or an API key
+  // embedded in a distributed binary (see CLAUDE.md §6 on why a bundled
+  // secret is a real risk — the same reasoning would apply to a bundled
+  // LLM key). Explicitly scoped small: no fuzzy matching, no synonyms,
+  // just token overlap — good enough for a "am I in the right module?"
+  // nudge, not a real conversation.
+  var QA_STOPWORDS = {
+    'les': 1, 'des': 1, 'une': 1, 'un': 1, 'le': 1, 'la': 1, 'du': 1, 'de': 1, 'et': 1, 'ou': 1,
+    'est': 1, 'sont': 1, 'pour': 1, 'avec': 1, 'dans': 1, 'sur': 1, 'que': 1, 'qui': 1, 'ce': 1,
+    'ces': 1, 'mon': 1, 'ma': 1, 'mes': 1, 'ton': 1, 'ta': 1, 'tes': 1, 'comment': 1, 'pourquoi': 1,
+    'quoi': 1, 'quel': 1, 'quelle': 1, 'faire': 1, 'fais': 1, 'peux': 1, 'veux': 1, 'nemo': 1,
+    'the': 1, 'and': 1, 'for': 1, 'with': 1, 'how': 1, 'what': 1, 'does': 1, 'can': 1, 'you': 1
+  };
+  // Strips accents (NFD-decompose, drop the combining marks) so "opacité"
+  // and a query typed as "opacite" (no accent — common when typing fast,
+  // or on a non-French keyboard) match each other. MUST be applied to
+  // BOTH the query tokens AND the corpus text being searched — found live
+  // in testing: applying it only to the query left every accented corpus
+  // word (most of them, this content is French) permanently unmatchable
+  // against its own unaccented query form.
+  function qaStrip(str) { return (str || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+  function qaTokenize(str) {
+    return qaStrip(str).split(/[^a-z0-9]+/).filter(function (t) { return t.length > 2 && !QA_STOPWORDS[t]; });
+  }
+  function buildQACorpus() {
+    var entries = [];
+    MODULES.forEach(function (m) {
+      m.steps.forEach(function (s) {
+        if (!s.body) return;
+        entries.push({ moduleId: m.id, moduleTitle: m.title, title: s.title || m.title, body: s.body });
+      });
+    });
+    return entries;
+  }
+  function answerQuestion(query) {
+    var qTokens = qaTokenize(query);
+    if (!qTokens.length) return null;
+    var best = null, bestScore = 0;
+    buildQACorpus().forEach(function (e) {
+      var titleText = qaStrip(T(e.title) + ' ' + e.title);
+      var bodyText = qaStrip(T(e.body) + ' ' + e.body);
+      var score = 0;
+      qTokens.forEach(function (t) {
+        if (titleText.indexOf(t) !== -1) score += 3;
+        if (bodyText.indexOf(t) !== -1) score += 1;
+      });
+      if (score > bestScore) { bestScore = score; best = e; }
+    });
+    return bestScore > 0 ? best : null;
+  }
+  function runAsk() {
+    var input = $('#tut-ask-input'), box = $('#tut-ask-answer');
+    if (!input || !box) return;
+    var q = input.value.trim();
+    if (!q) { box.style.display = 'none'; return; }
+    var hit = answerQuestion(q);
+    if (!hit) {
+      box.innerHTML = '<div class="tut-ask-empty">' + T('Aucune réponse trouvée — essaie de reformuler, ou explore les catégories ci-dessus.') + '</div>';
+    } else {
+      box.innerHTML =
+        '<div class="tut-ask-title">' + T(hit.title) + '</div>' +
+        '<div class="tut-ask-body">' + T(hit.body) + '</div>' +
+        '<button class="tut-ask-open" id="tut-ask-open-btn">' + T('Ouvrir le module') + ' — ' + T(hit.moduleTitle) + '</button>';
+      var openBtn = box.querySelector('#tut-ask-open-btn');
+      if (openBtn) openBtn.addEventListener('click', function () { startModule(hit.moduleId); });
+    }
+    box.style.display = 'block';
+  }
+
   function chevronSvg() {
     return '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>';
   }
@@ -1652,6 +1740,8 @@
   function openLauncher() {
     ensureLauncher();
     var si = $('#tut-launcher-search'); if (si) si.value = '';
+    var ai = $('#tut-ask-input'); if (ai) ai.value = '';
+    var aa = $('#tut-ask-answer'); if (aa) { aa.style.display = 'none'; aa.innerHTML = ''; }
     renderCategoryScreen();
     $('#tut-launcher').style.display = 'flex';
   }

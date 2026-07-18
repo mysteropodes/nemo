@@ -74,7 +74,12 @@
 #tut-launcher.modal-overlay .modal-box{width:420px;max-height:86vh;display:flex;flex-direction:column;}
 #tut-launcher .modal-hdr{gap:8px;}
 #tut-launcher #tut-launcher-title{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-#tut-launcher .modal-bdy{overflow-y:auto;max-height:calc(86vh - 50px);}
+/* flex:1 + min-height:0 (not a hardcoded max-height calc) so this fills
+   whatever space is left after the header/search/ask-footer — adding the
+   "Une question ?" footer below would otherwise push the modal taller
+   than modal-box's own max-height:86vh instead of just scrolling the
+   list, cutting the footer off-screen. */
+#tut-launcher .modal-bdy{flex:1;min-height:0;overflow-y:auto;}
 #tut-launcher .tut-mod-list{display:flex;flex-direction:column;gap:6px;}
 #tut-launcher .tut-launcher-intro{font-size:11px;color:var(--text-dim);margin-bottom:6px;}
 
@@ -93,6 +98,39 @@
 }
 #tut-launcher .tut-launcher-search::placeholder{color:var(--text-dim);}
 #tut-launcher .tut-launcher-search:focus{border-color:var(--accent);}
+
+/* "Une question ?" — a small keyword-search Q&A box pinned below the
+   module list (outside .modal-bdy's own scroll area, so it stays visible
+   no matter how far the list is scrolled). Not an LLM: scores keyword
+   overlap against every step's own title/body (already hand-written,
+   accurate content) and surfaces the best match — see the long comment
+   above answerQuestion() in tutorial.js for why. Same
+   never-hardcode-a-color discipline as the search input above. */
+#tut-launcher .tut-ask-wrap{flex:none;border-top:1px solid var(--border);padding:10px 14px;background:var(--panel);}
+#tut-launcher .tut-ask-row{display:flex;gap:6px;}
+#tut-launcher .tut-ask-input{
+  flex:1;min-width:0;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);
+  border-radius:7px;padding:7px 10px;font-size:12px;color:var(--text);outline:none;
+}
+#tut-launcher .tut-ask-input::placeholder{color:var(--text-dim);}
+#tut-launcher .tut-ask-input:focus{border-color:var(--accent);}
+#tut-launcher .tut-ask-btn{
+  flex:none;width:32px;border-radius:7px;background:var(--accent);color:#fff;border:none;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+}
+#tut-launcher .tut-ask-btn:hover{background:var(--accent-hover);}
+#tut-launcher .tut-ask-answer{
+  margin-bottom:8px;padding:10px;background:var(--panel2);border:1px solid var(--border);
+  border-radius:8px;color:var(--text);
+}
+#tut-launcher .tut-ask-title{font-size:12px;font-weight:600;margin-bottom:4px;}
+#tut-launcher .tut-ask-body{font-size:11px;line-height:1.5;color:var(--text-dim);margin-bottom:8px;}
+#tut-launcher .tut-ask-empty{font-size:11px;color:var(--text-dim);}
+#tut-launcher .tut-ask-open{
+  background:var(--accent-dim);color:var(--accent-hover);border:none;border-radius:6px;
+  padding:6px 10px;font-size:11px;font-weight:600;cursor:pointer;
+}
+#tut-launcher .tut-ask-open:hover{background:var(--accent);color:#fff;}
 
 /* Back arrow, left of the title — hidden on the top-level category screen,
    shown once a category has been opened. A real drill-down menu (category
