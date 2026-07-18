@@ -451,6 +451,12 @@ body.mac-overlay-titlebar #app{padding-top:28px;}
 body:not(.mode-motion) #motion-props-sec{display:none;}
 .motion-props-layername{padding:4px 8px 6px;font-size:11px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 #motion-props-body .lrow{height:24px;font-size:10.5px;cursor:default;}
+/* The expression editor row must grow to fit its textarea — an ID-scoped
+   selector (specificity 1-0-1) beats the plain-class .motion-expr-editor
+   {height:auto} override below it, which is why fixing that lower rule
+   alone wasn't enough (still 24px/clipped when rendered inside this right-
+   panel mirror specifically). */
+#motion-props-body .lrow.motion-expr-editor{height:auto;}
 .motion-prop-name{display:flex;align-items:center;gap:5px;flex:1;color:var(--text-dim);}
 .motion-prop-name svg{flex-shrink:0;}
 .motion-fields{display:flex;align-items:center;gap:3px;flex-shrink:0;}
@@ -527,6 +533,17 @@ body.mode-motion #layer-panel{width:260px;}
    sync point; changing one without the other reintroduces the panel/grid
    misalignment this was explicitly built to avoid. */
 body.mode-motion .lrow{height:22px;font-size:10.5px;}
+/* The expression editor (checkbox + textarea, appended as a .lrow so it
+   slots into the same list flow) is NOT a fixed-height grid row like every
+   other .lrow above — it needs to grow to fit its textarea, same as
+   .motion-expr-editor{height:auto} already declares outside Motion mode.
+   Without this override, the higher-specificity 22px rule above clips the
+   whole editor to a sliver in Motion mode: the "Activer l'expression"
+   checkbox is visible but the textarea to actually type into is squashed
+   to nothing — reported as "impossible d'y voir quelquechose... ça ouvre
+   plus grand la partie expression pour écrire" (comparing to how After
+   Effects opens a real writable box, not a hairline). */
+body.mode-motion .lrow.motion-expr-editor{height:auto;}
 body.mode-motion .frow{height:22px;}
 body.mode-motion .fc{height:22px;}
 body.mode-motion .lico{width:16px;height:16px;}
