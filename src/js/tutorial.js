@@ -79,11 +79,17 @@
     var ld = activeLayerData(win);
     return (ld && ld.motion && ld.motion.position && ld.motion.position.keys) ? ld.motion.position.keys.length : 0;
   }
+  function measureTextInputLength(win) {
+    var el = win.document.getElementById('text-input');
+    return el ? el.value.length : 0;
+  }
+  function measureFillColor(win) { return (win.state && win.state.fillColor) || ''; }
+  function measureStrokeColor(win) { return (win.state && win.state.strokeColor) || ''; }
 
   function stateIncreaseStep(cfg) {
     var minInc = cfg.minIncrease || 1;
     return {
-      type: 'state', target: cfg.target, title: cfg.title, body: cfg.body, hint: cfg.hint || 'À toi de jouer…',
+      type: 'state', target: cfg.target, title: cfg.title, body: cfg.body, hint: cfg.hint || 'À toi de jouer…', pinCorner: cfg.pinCorner,
       before: function (win) { win.__tutBaseline = cfg.measure(win); },
       check: function (win) { return cfg.measure(win) >= win.__tutBaseline + minInc; }
     };
@@ -114,6 +120,7 @@
   var MODULES = [
     {
       id: 'draw',
+      category: 'Dessiner',
       icon: '1',
       title: 'Premier trait',
       desc: 'Le pinceau, les couleurs, dessiner une forme',
@@ -131,6 +138,7 @@
     },
     {
       id: 'layers',
+      category: 'Calques et animation',
       icon: '2',
       title: 'Calques et images-clés',
       desc: 'Ajouter un calque, poser une keyframe',
@@ -152,6 +160,7 @@
     },
     {
       id: 'tween',
+      category: 'Calques et animation',
       icon: '3',
       title: 'Interpolation automatique',
       desc: 'Deux keyframes, un tween généré tout seul',
@@ -194,6 +203,7 @@
     },
     {
       id: 'onion',
+      category: 'Calques et animation',
       icon: '4',
       title: 'Onion skin',
       desc: 'Voir les frames voisines en transparence',
@@ -214,6 +224,7 @@
     },
     {
       id: 'shapes',
+      category: 'Dessiner',
       icon: '5',
       title: 'Formes, remplissage et gomme',
       desc: 'Rectangle, pot de peinture, gomme',
@@ -247,6 +258,7 @@
     },
     {
       id: 'select',
+      category: 'Dessiner',
       icon: '6',
       title: 'Sélection et transformation',
       desc: 'Déplacer et redimensionner une forme',
@@ -263,6 +275,7 @@
     },
     {
       id: 'motion',
+      category: 'Calques et animation',
       icon: '7',
       title: 'Motion — animer une propriété',
       desc: 'Position, rotation, échelle par keyframes',
@@ -290,6 +303,7 @@
     },
     {
       id: 'component',
+      category: 'Organisation',
       icon: '8',
       title: 'Components et StoryBoard',
       desc: 'Réutiliser un calque comme un symbole',
@@ -315,6 +329,7 @@
     },
     {
       id: 'camera',
+      category: 'Organisation',
       icon: '9',
       title: 'Caméra',
       desc: 'Cadrage animé (zoom/pan)',
@@ -330,6 +345,7 @@
     },
     {
       id: 'media',
+      category: 'Médias',
       icon: '10',
       title: 'Audio et médias',
       desc: 'Importer un son, une image, une vidéo',
@@ -343,6 +359,135 @@
         { type: 'info', title: 'Faire entrer du contenu externe', body: 'Nemo importe de l\'audio, des images (dont des séquences numérotées) et de la vidéo — chacune devient une piste ou un calque animé.' },
         { type: 'click', target: '#btn-audio', title: 'Ouvre l\'import audio', body: 'Clique le bouton note de musique en bas du panneau Calques pour voir le sélecteur de fichier s\'ouvrir.' },
         { type: 'info', title: 'Bien joué !', body: 'Import Image(s)…/Import Video… vivent dans le menu principal. Le chapitre "Caméra, audio et médias" du guide couvre la bibliothèque de médias et la référence vidéo pour la rotoscopie.' }
+      ]
+    },
+    {
+      id: 'text',
+      category: 'Dessiner',
+      icon: '11',
+      title: 'Texte et pipette',
+      desc: 'Poser du texte, prélever une couleur',
+      time: '2 min',
+      steps: [
+        { type: 'info', title: 'Texte et pipette', body: 'Le texte se pose comme une image (rendu, pas éditable ensuite) — pour du texte permanent façon titrage. La pipette prélève une couleur déjà présente sur le canevas.' },
+        // Draw a real colored Path FIRST — the eyedropper only ever reads
+        // from `item instanceof Path` (tools.js), never a Raster. Text is
+        // rendered as a Raster, so trying to eyedropper the text itself
+        // would never do anything, no matter how precisely it's clicked —
+        // found live in testing, the step just sat there forever.
+        { type: 'click', target: '.tool-btn[data-tool="rect"]', title: 'Choisis le Rectangle', body: 'Clique sur l\'outil Rectangle (raccourci R) — on va se donner une couleur à prélever tout à l\'heure.' },
+        // Change the stroke color BEFORE drawing — a fresh project's
+        // rectangle would otherwise carry the exact default stroke/fill
+        // (#000000/#ff0000), identical to state.strokeColor/fillColor
+        // already. The eyedropper step further down measures whether
+        // strokeColor CHANGES after picking — picking a color that's
+        // already active is indistinguishable from picking nothing at
+        // all, so that step would wait forever. Found live in testing.
+        { type: 'click', target: '#stroke-well', title: 'Choisis une couleur de trait inhabituelle', body: 'Clique le carré de couleur du Trait et choisis une teinte qui n\'est pas déjà utilisée.' },
+        stateIncreaseStep({ target: '#drawing-canvas', title: 'Dessine un rectangle', body: 'Clique-glisse sur le canevas pour tracer un rectangle.', hint: 'En attente de ta forme…', measure: measureStrokeCount }),
+        { type: 'click', target: '.tool-btn[data-tool="text"]', title: 'Choisis le Texte', body: 'Clique sur l\'outil Texte dans la barre de gauche.' },
+        { type: 'click', target: '#drawing-canvas', title: 'Clique sur le canevas', body: 'Clique où poser le texte — une petite fenêtre de saisie apparaît.' },
+        stateIncreaseStep({
+          target: '#text-input', title: 'Écris quelque chose', body: 'Tape un mot ou deux dans le champ de texte qui vient de s\'ouvrir.',
+          hint: 'En attente de ta saisie…', measure: measureTextInputLength, pinCorner: 'top-right'
+        }),
+        stateIncreaseStep({ target: '#text-apply', title: 'Valide le texte', body: 'Clique "Apply" (ou Ctrl/Cmd+Entrée) pour poser le texte sur le canevas.', hint: 'En attente…', measure: measureStrokeCount, pinCorner: 'top-right' }),
+        { type: 'click', target: '.tool-btn[data-tool="eyedropper"]', title: 'Choisis la Pipette', body: 'Clique sur l\'outil Pipette dans la barre de gauche (raccourci I).' },
+        stateChangedStep({
+          target: '#drawing-canvas', title: 'Prélève une couleur', body: 'Clique sur le rectangle (pas le texte — la pipette ne lit pas les images) pour reprendre sa couleur comme couleur de trait active.',
+          hint: 'En attente de ton clic…', measure: measureStrokeColor
+        }),
+        { type: 'info', title: 'Bien joué !', body: 'Le chapitre "Dessiner" du guide utilisateur détaille les options de police et de taille du texte.' }
+      ]
+    },
+    {
+      id: 'palette',
+      category: 'Dessiner',
+      icon: '12',
+      title: 'Palette de couleurs',
+      desc: 'Réutiliser des couleurs déjà choisies',
+      time: '1 min',
+      steps: [
+        { type: 'info', title: 'Une bibliothèque de couleurs', body: 'Le panneau Palette garde des couleurs prêtes à réutiliser — plusieurs palettes nommées, glisser-déposer pour réordonner, clic pour appliquer.' },
+        stateChangedStep({
+          target: '#palette-grid', title: 'Applique une couleur de palette', body: 'Clique une des pastilles de couleur — elle devient la couleur de Fond active (Shift+clic pour le Trait).',
+          hint: 'En attente de ton clic…', measure: measureFillColor
+        }),
+        { type: 'click', target: '#btn-palette-swap', title: 'Échange Fond et Trait', body: 'Clique le bouton ⇄ pour inverser les couleurs de Fond et de Trait.' },
+        { type: 'info', title: 'Bien joué !', body: 'Clic-droit sur une pastille propose "Remplacer dans le calque…" — pratique pour recolorer tous les traits d\'une teinte en une fois. Le "+" au-dessus des palettes en crée une nouvelle.' }
+      ]
+    },
+    {
+      id: 'boolean',
+      category: 'Dessiner',
+      icon: '13',
+      title: 'Opérations booléennes',
+      desc: 'Fusionner deux formes en une seule',
+      time: '2 min',
+      steps: [
+        { type: 'info', title: 'Combiner des formes', body: 'Union, soustraction, intersection, exclusion — combine plusieurs formes sélectionnées en une seule, plutôt que de redessiner à la main.' },
+        { type: 'click', target: '.tool-btn[data-tool="rect"]', title: 'Choisis le Rectangle', body: 'Clique sur l\'outil Rectangle (raccourci R).' },
+        stateIncreaseStep({ target: '#drawing-canvas', title: 'Dessine un premier rectangle', body: 'Clique-glisse pour tracer un premier rectangle.', hint: 'En attente…', measure: measureStrokeCount }),
+        stateIncreaseStep({
+          target: '#drawing-canvas', title: 'Dessine un second rectangle, qui chevauche le premier', body: 'Trace un second rectangle qui recouvre partiellement le premier.',
+          hint: 'En attente…', measure: measureStrokeCount
+        }),
+        { type: 'click', target: '.tool-btn[data-tool="select"]', title: 'Choisis la Sélection', body: 'Clique sur l\'outil Sélection (raccourci V).' },
+        {
+          // A marquee drag has to start on EMPTY canvas — starting on top
+          // of a shape moves it instead (see the Sélection module). The
+          // two rectangles were drawn in the canvas's upper-left area, so
+          // a drag from further down/right stays empty long enough to
+          // start a real rubber-band selection.
+          type: 'click', target: '#drawing-canvas', title: 'Entoure les deux formes', body: 'Clique-glisse depuis une zone vide du canevas pour entourer les deux rectangles et les sélectionner ensemble.'
+        },
+        // Union REDUCES the child count (2 shapes -> 1 merged path) —
+        // stateIncreaseStep only ever fires on an increase, so negate the
+        // count instead of writing a third, near-duplicate factory just
+        // for the one decreasing case in this whole file.
+        stateIncreaseStep({
+          target: '#btn-bool-unite', title: 'Fusionne (Union)', body: 'Clique le bouton Union dans le panneau de droite pour fusionner les deux formes en une seule.',
+          hint: 'En attente…', measure: function (win) { return -measureStrokeCount(win); }, minIncrease: 1
+        }),
+        { type: 'info', title: 'Bien joué !', body: 'Soustraction, Intersection et Exclusion suivent le même principe, juste à côté du bouton Union.' }
+      ]
+    },
+    {
+      id: 'settings',
+      category: 'Réglages',
+      icon: '14',
+      title: 'Réglages et raccourcis',
+      desc: 'Langue, raccourcis, mises à jour',
+      time: '1 min',
+      steps: [
+        { type: 'info', title: 'Personnaliser l\'app', body: 'Réglages regroupe la langue, ton profil, la collaboration, les raccourcis clavier et les prototypes expérimentaux (Labs).' },
+        { type: 'click', target: '#project-tabs-settings', title: 'Ouvre les Réglages', body: 'Clique l\'icône en forme de roue crantée en haut de l\'écran.' },
+        stateChangedStep({
+          target: '#settings-language', title: 'Change la langue', body: 'Choisis une autre langue dans le menu déroulant — l\'interface change instantanément.',
+          hint: 'En attente…', measure: function (win) { var el = win.document.getElementById('settings-language'); return el ? el.value : ''; }
+        }),
+        { type: 'click', target: '.settings-tab[data-tab="shortcuts"]', title: 'Ouvre l\'onglet Raccourcis', body: 'Clique l\'onglet "Raccourcis" en haut de la fenêtre de Réglages.' },
+        { type: 'click', target: '#settings-close', title: 'Ferme les Réglages', body: 'Clique la croix pour refermer la fenêtre.' },
+        { type: 'info', title: 'Bien joué !', body: 'Le chapitre "Paramètres de l\'application" du guide couvre aussi Collaboration, Feedback et Labs.' }
+      ]
+    },
+    {
+      id: 'history',
+      category: 'Réglages',
+      icon: '15',
+      title: 'Historique de versions',
+      desc: 'Revenir à un état antérieur',
+      time: '1 min',
+      steps: [
+        { type: 'info', title: 'Remonter dans le temps', body: 'Nemo prend un instantané automatique toutes les 30 secondes — récupérable même après un crash, pas seulement la dernière session.' },
+        // The "Project" section (right panel) starts COLLAPSED by default
+        // (.pbdy has the .hid class on load) — #btn-history is 0x0 and
+        // unclickable until its header is opened. Found live: the spotlight
+        // highlighted nothing, because getBoundingClientRect() on a
+        // display:none descendant is legitimately zero.
+        { type: 'click', target: '#phdr-project', title: 'Ouvre la section "Project"', body: 'Clique l\'en-tête "Project" dans le panneau de droite pour la déplier.' },
+        { type: 'click', target: '#btn-history', title: 'Ouvre l\'historique', body: 'Clique "Historique…" dans le panneau de droite (section Projet).' },
+        { type: 'info', title: 'Bien joué !', body: 'Restaurer un ancien instantané prend d\'abord un instantané de l\'état actuel — l\'opération reste donc elle-même annulable.' }
       ]
     }
   ];
@@ -416,7 +561,17 @@
     requestAnimationFrame(function () {
       var tw = tt.offsetWidth, th = tt.offsetHeight;
       var top, left;
-      if (rect) {
+      // Some app popovers (the text tool's input box) open AT the click
+      // point, which can land anywhere on the canvas — the normal
+      // "position near the spotlighted rect" logic then has no reliable
+      // free side and can end up overlapping the very field the step
+      // asks the user to type into (found live: tooltip fully covering
+      // #text-input, blocking it since the tooltip sits on top and has
+      // pointer-events:auto). pinCorner sidesteps the guesswork for a
+      // step like that — always a fixed, known-clear corner.
+      if (step.pinCorner === 'top-right') {
+        top = 16; left = window.innerWidth - tw - 16;
+      } else if (rect) {
         var spaceBelow = window.innerHeight - rect.bottom;
         if (spaceBelow > th + 24) { top = rect.bottom + 16; } else { top = Math.max(12, rect.top - th - 16); }
         left = Math.min(window.innerWidth - tw - 16, Math.max(16, rect.left));
@@ -506,23 +661,41 @@
     return modal;
   }
 
+  // Categories render in this fixed order (not alphabetical, not
+  // MODULES-array order) — roughly the order someone actually learning
+  // Nemo would want: draw first, then animate, then organize/output.
+  var CATEGORY_ORDER = ['Dessiner', 'Calques et animation', 'Organisation', 'Médias', 'Réglages'];
+
   function renderLauncherList() {
     var list = $('#tut-mod-list'); if (!list) return;
     var done = loadDone();
     list.innerHTML = '';
+    var byCat = {};
     MODULES.forEach(function (m) {
-      var isDone = done.indexOf(m.id) !== -1;
-      var btn = document.createElement('button');
-      btn.className = 'tut-mod' + (isDone ? ' done' : '');
-      btn.innerHTML =
-        '<span class="tut-mod-ico">' + (isDone ? '✓' : m.icon) + '</span>' +
-        '<span class="tut-mod-body">' +
-        '<span class="tut-mod-title">' + m.title + '</span>' +
-        '<span class="tut-mod-desc">' + m.desc + '</span>' +
-        '</span>' +
-        '<span class="tut-mod-time">' + m.time + '</span>';
-      btn.addEventListener('click', function () { startModule(m.id); });
-      list.appendChild(btn);
+      var cat = m.category || 'Autres';
+      (byCat[cat] || (byCat[cat] = [])).push(m);
+    });
+    var cats = CATEGORY_ORDER.filter(function (c) { return byCat[c]; })
+      .concat(Object.keys(byCat).filter(function (c) { return CATEGORY_ORDER.indexOf(c) === -1; }));
+    cats.forEach(function (cat) {
+      var hdr = document.createElement('div');
+      hdr.className = 'tut-cat-hdr';
+      hdr.textContent = cat;
+      list.appendChild(hdr);
+      byCat[cat].forEach(function (m) {
+        var isDone = done.indexOf(m.id) !== -1;
+        var btn = document.createElement('button');
+        btn.className = 'tut-mod' + (isDone ? ' done' : '');
+        btn.innerHTML =
+          '<span class="tut-mod-ico">' + (isDone ? '✓' : m.icon) + '</span>' +
+          '<span class="tut-mod-body">' +
+          '<span class="tut-mod-title">' + m.title + '</span>' +
+          '<span class="tut-mod-desc">' + m.desc + '</span>' +
+          '</span>' +
+          '<span class="tut-mod-time">' + m.time + '</span>';
+        btn.addEventListener('click', function () { startModule(m.id); });
+        list.appendChild(btn);
+      });
     });
   }
 
