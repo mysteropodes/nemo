@@ -185,13 +185,19 @@ pub(crate) struct LayerIn {
     // shape while its effect still applies.
     #[serde(default)]
     pub(crate) is_effect_layer: Option<bool>,
-    // "blur" | "colorAdjust" — which WGSL pass composite_scene dispatches
-    // to. Unrecognized/None falls back to "blur" (see composite_scene).
+    // "blur" | "colorAdjust" | "vignette" | "glow" — which WGSL pass(es)
+    // composite_scene dispatches to. Unrecognized/None falls back to "blur"
+    // (see composite_scene).
     #[serde(default)]
     pub(crate) effect_type: Option<String>,
-    // Generic params, meaning depends on effect_type: blur -> p1=radius_px
-    // (p2 unused); colorAdjust -> p1=brightness (-1..1 additive), p2=contrast
-    // (-1..1, pivots around mid-gray) — see color_adjust.wgsl.
+    // Generic params, meaning depends on effect_type:
+    //  - blur: p1=radius_px (p2 unused)
+    //  - colorAdjust: p1=brightness (-1..1 additive), p2=contrast (-1..1,
+    //    pivots around mid-gray) — see color_adjust.wgsl
+    //  - vignette: p1=strength (0..1), p2=radius (0..1, where the darkening
+    //    starts) — see vignette.wgsl
+    //  - glow: p1=blur radius_px (p2 unused) — reuses blur_pass + the
+    //    ordinary "screen" blend mode, no dedicated shader
     #[serde(default)]
     pub(crate) effect_p1: Option<f32>,
     #[serde(default)]
@@ -603,6 +609,13 @@ pub struct VelloEngine {
     color_bind_group_layout: wgpu::BindGroupLayout,
     color_sampler: wgpu::Sampler,
     color_uniform_buf: wgpu::Buffer,
+    // "glow" effectType needs no pipeline of its own — it reuses blur_pass
+    // (into blur_result_view as scratch) followed by composite_pass in
+    // "screen" mode, both already wired for other purposes.
+    vignette_pipeline: wgpu::RenderPipeline,
+    vignette_bind_group_layout: wgpu::BindGroupLayout,
+    vignette_sampler: wgpu::Sampler,
+    vignette_uniform_buf: wgpu::Buffer,
 }
 
 // ---- Blend compositor plumbing (see blend.wgsl's doc comment) ----
@@ -1209,6 +1222,146 @@ fn color_adjust_pass(
     queue.submit(Some(encoder.finish()));
 }
 
+/// Vignette pipeline — identical single-texture-input shape as
+/// create_color_adjust_pipeline, just a different shader/uniform payload
+/// (see vignette.wgsl). Mirrored rather than parameterized/shared, same
+/// "blur_pass and color_adjust_pass are already near-identical duplicates"
+/// precedent already established in this file.
+fn create_vignette_pipeline(device: &wgpu::Device) -> (wgpu::RenderPipeline, wgpu::BindGroupLayout, wgpu::Sampler, wgpu::Buffer) {
+    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        label: Some("vignette-compositor"),
+        source: wgpu::ShaderSource::Wgsl(include_str!("vignette.wgsl").into()),
+    });
+    let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some("vignette-bind-group-layout"),
+        entries: &[
+            wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Texture {
+                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                    multisampled: false,
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 1,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 2,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            },
+        ],
+    });
+    let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+        label: Some("vignette-pipeline-layout"),
+        bind_group_layouts: &[Some(&bind_group_layout)],
+        immediate_size: 0,
+    });
+    let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        label: Some("vignette-pipeline"),
+        layout: Some(&pipeline_layout),
+        vertex: wgpu::VertexState {
+            module: &shader,
+            entry_point: Some("vs_main"),
+            buffers: &[],
+            compilation_options: Default::default(),
+        },
+        fragment: Some(wgpu::FragmentState {
+            module: &shader,
+            entry_point: Some("fs_main"),
+            targets: &[Some(wgpu::ColorTargetState {
+                format: BLEND_SCRATCH_FORMAT,
+                blend: None,
+                write_mask: wgpu::ColorWrites::ALL,
+            })],
+            compilation_options: Default::default(),
+        }),
+        primitive: wgpu::PrimitiveState::default(),
+        depth_stencil: None,
+        multisample: wgpu::MultisampleState::default(),
+        multiview_mask: None,
+        cache: None,
+    });
+    let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+        label: Some("vignette-sampler"),
+        address_mode_u: wgpu::AddressMode::ClampToEdge,
+        address_mode_v: wgpu::AddressMode::ClampToEdge,
+        mag_filter: wgpu::FilterMode::Linear,
+        min_filter: wgpu::FilterMode::Linear,
+        ..Default::default()
+    });
+    // 16 bytes: strength (f32) + radius (f32) + 2 padding floats — see
+    // vignette.wgsl's Params.
+    let uniform_buf = device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("vignette-params"),
+        size: 16,
+        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    });
+    (pipeline, bind_group_layout, sampler, uniform_buf)
+}
+
+/// Runs vignette.wgsl: writes a vignetted copy of `source_view` into
+/// `target_view`. Mirrors color_adjust_pass's shape (same 2-float payload).
+#[allow(clippy::too_many_arguments)]
+fn vignette_pass(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    pipeline: &wgpu::RenderPipeline,
+    bind_group_layout: &wgpu::BindGroupLayout,
+    sampler: &wgpu::Sampler,
+    uniform_buf: &wgpu::Buffer,
+    source_view: &wgpu::TextureView,
+    strength: f32,
+    radius: f32,
+    target_view: &wgpu::TextureView,
+) {
+    let mut payload = [0u8; 16];
+    payload[0..4].copy_from_slice(&strength.to_le_bytes());
+    payload[4..8].copy_from_slice(&radius.to_le_bytes());
+    queue.write_buffer(uniform_buf, 0, &payload);
+    let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("vignette-bind-group"),
+        layout: bind_group_layout,
+        entries: &[
+            wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(source_view) },
+            wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::Sampler(sampler) },
+            wgpu::BindGroupEntry { binding: 2, resource: uniform_buf.as_entire_binding() },
+        ],
+    });
+    let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("vignette-composite") });
+    {
+        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("vignette-composite-pass"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: target_view,
+                resolve_target: None,
+                ops: wgpu::Operations { load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT), store: wgpu::StoreOp::Store },
+                depth_slice: None,
+            })],
+            depth_stencil_attachment: None,
+            timestamp_writes: None,
+            occlusion_query_set: None,
+            multiview_mask: None,
+        });
+        pass.set_pipeline(pipeline);
+        pass.set_bind_group(0, &bind_group, &[]);
+        pass.draw(0..3, 0..1);
+    }
+    queue.submit(Some(encoder.finish()));
+}
+
 fn wgpu_color_from(c: Color) -> wgpu::Color {
     let rgba = c.to_rgba8();
     wgpu::Color { r: rgba.r as f64 / 255.0, g: rgba.g as f64 / 255.0, b: rgba.b as f64 / 255.0, a: rgba.a as f64 / 255.0 }
@@ -1478,6 +1631,7 @@ pub async fn create_engine(
     let (blur_pipeline, blur_bind_group_layout, blur_sampler, blur_uniform_buf) = create_blur_pipeline(&device);
     let (blur_result_tex, blur_result_view) = create_matte_result_texture(&device, width, height);
     let (color_pipeline, color_bind_group_layout, color_sampler, color_uniform_buf) = create_color_adjust_pipeline(&device);
+    let (vignette_pipeline, vignette_bind_group_layout, vignette_sampler, vignette_uniform_buf) = create_vignette_pipeline(&device);
 
     Ok(VelloEngine {
         surface,
@@ -1529,6 +1683,10 @@ pub async fn create_engine(
         color_bind_group_layout,
         color_sampler,
         color_uniform_buf,
+        vignette_pipeline,
+        vignette_bind_group_layout,
+        vignette_sampler,
+        vignette_uniform_buf,
     })
 }
 
@@ -1631,6 +1789,55 @@ impl VelloEngine {
                             backdrop_view,
                             layer.effect_p1.unwrap_or(0.0),
                             layer.effect_p2.unwrap_or(0.0),
+                            target_view,
+                        );
+                    }
+                    Some("vignette") => {
+                        vignette_pass(
+                            &self.device,
+                            &self.queue,
+                            &self.vignette_pipeline,
+                            &self.vignette_bind_group_layout,
+                            &self.vignette_sampler,
+                            &self.vignette_uniform_buf,
+                            backdrop_view,
+                            layer.effect_p1.unwrap_or(0.5),
+                            layer.effect_p2.unwrap_or(0.4),
+                            target_view,
+                        );
+                    }
+                    Some("glow") => {
+                        // Bloom: blur a copy of everything below into the
+                        // shared blur-scratch texture, then screen-blend it
+                        // back on top of the UNBLURRED original — reuses
+                        // blur_pass (effect_p1 = radius_px) and the ordinary
+                        // layer compositor's own "screen" blend mode
+                        // (mix_mode_index), rather than a new WGSL shader:
+                        // this effect is just two existing passes chained,
+                        // no new pixel math needed.
+                        blur_pass(
+                            &self.device,
+                            &self.queue,
+                            &self.blur_pipeline,
+                            &self.blur_bind_group_layout,
+                            &self.blur_sampler,
+                            &self.blur_uniform_buf,
+                            backdrop_view,
+                            layer.effect_p1.unwrap_or(16.0),
+                            self.width,
+                            self.height,
+                            &self.blur_result_view,
+                        );
+                        composite_pass(
+                            &self.device,
+                            &self.queue,
+                            &self.blend_pipeline,
+                            &self.blend_bind_group_layout,
+                            &self.blend_sampler,
+                            &self.blend_uniform_buf,
+                            backdrop_view,
+                            &self.blur_result_view,
+                            2, // "screen" — see mix_mode_index
                             target_view,
                         );
                     }

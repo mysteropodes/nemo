@@ -2943,7 +2943,7 @@ function renderLayerList(){
     // icon font is subsetted and silently renders blank for un-included
     // codepoints, see the lock-icon fix comment further up this function).
     if(ld.isNullLayer){var nlb=document.createElement('div');nlb.className='lico comp-badge';nlb.title='Calque Null — jamais rendu, sert de pivot/parent pour d’autres calques';nlb.innerHTML='<span style="font-size:11px;line-height:1;font-weight:700">⊘</span>';row.appendChild(nlb);}
-    if(ld.isEffectLayer){var fxb=document.createElement('div');fxb.className='lico comp-badge';fxb.title='Calque d’effet — '+(ld.effectType==='colorAdjust'?'Teinte/Contraste':'Flou')+' appliqué à tout ce qui est en dessous';fxb.innerHTML='<span style="font-size:9px;line-height:1;font-weight:700">FX</span>';row.appendChild(fxb);}
+    if(ld.isEffectLayer){var fxLabels={blur:'Flou',colorAdjust:'Teinte/Contraste',vignette:'Vignette',glow:'Glow'};var fxb=document.createElement('div');fxb.className='lico comp-badge';fxb.title='Calque d’effet — '+(fxLabels[ld.effectType]||'Flou')+' appliqué à tout ce qui est en dessous';fxb.innerHTML='<span style="font-size:9px;line-height:1;font-weight:700">FX</span>';row.appendChild(fxb);}
     if(ld.channel){var chLabel=ld.channel==='stroke'?'Tr':ld.channel==='fill'?'Pl':'Om';var chb=document.createElement('div');chb.className='lico comp-badge';chb.title='Calque '+(ld.channel==='stroke'?'Trait':ld.channel==='fill'?'Plein':'Ombre')+' (Stroke/Fill/Shadow) — calque normal, keyframes liées';chb.innerHTML='<span style="font-size:9px;line-height:1;font-weight:700">'+chLabel+'</span>';row.appendChild(chb);}
     // Track matte badge (2026-07) — the Blend/Matte dropdowns only surface
     // in the right panel's Document fallback context (nothing selected,
@@ -3777,6 +3777,16 @@ function updateTextActionsPanel(){
 // Rust shader's Params expects -1..1, so the two multiply/divide by 100 at
 // the JS<->engine boundary (see color_adjust.wgsl's own Params doc comment
 // for the -1..1 contract).
+// Effect types added 2026-07: vignette (strength 0-1/radius 0-1, shown as
+// 0-100 in the UI) and glow (reuses the SAME p-effect-radius row as blur —
+// both are "p1 = blur radius_px", see engine.rs's composite_scene comment
+// on why glow needs no dedicated shader).
+var EFFECT_ROWS_BY_TYPE={
+  blur:['p-effect-blur-row'],
+  glow:['p-effect-blur-row'],
+  colorAdjust:['p-effect-brightness-row','p-effect-contrast-row'],
+  vignette:['p-effect-vig-strength-row','p-effect-vig-radius-row'],
+};
 function updateEffectLayerPanel(){
   var sec=document.getElementById('effect-layer-sec');
   if(!sec)return;
@@ -3785,14 +3795,18 @@ function updateEffectLayerPanel(){
   sec.style.display=isEffect?'':'none';
   if(!isEffect)return;
   var typeSel=document.getElementById('p-effect-type');
-  typeSel.value=ld.effectType||'blur';
+  var type=ld.effectType||'blur';
+  typeSel.value=type;
   document.getElementById('p-effect-radius').value=ld.effectP1!==undefined?ld.effectP1:8;
   document.getElementById('p-effect-brightness').value=Math.round((ld.effectP1||0)*100);
   document.getElementById('p-effect-contrast').value=Math.round((ld.effectP2||0)*100);
-  var isBlur=typeSel.value==='blur';
-  document.getElementById('p-effect-blur-row').style.display=isBlur?'':'none';
-  document.getElementById('p-effect-brightness-row').style.display=isBlur?'none':'';
-  document.getElementById('p-effect-contrast-row').style.display=isBlur?'none':'';
+  document.getElementById('p-effect-vig-strength').value=Math.round((ld.effectP1!==undefined?ld.effectP1:0.5)*100);
+  document.getElementById('p-effect-vig-radius').value=Math.round((ld.effectP2!==undefined?ld.effectP2:0.4)*100);
+  var shown=EFFECT_ROWS_BY_TYPE[type]||EFFECT_ROWS_BY_TYPE.blur;
+  ['p-effect-blur-row','p-effect-brightness-row','p-effect-contrast-row','p-effect-vig-strength-row','p-effect-vig-radius-row'].forEach(function(id){
+    var row=document.getElementById(id);
+    if(row)row.style.display=shown.indexOf(id)>=0?'':'none';
+  });
 }
 function initCycleAndPropagate(){
   var cyc=document.getElementById('btn-cycle');
@@ -4806,10 +4820,15 @@ document.getElementById('p-safety').addEventListener('change',function(){window.
 document.getElementById('p-blur').addEventListener('input',function(){var ld=state.layers[state.activeLayerIdx];if(!ld)return;pushUndo();ld.blurRadius=Math.max(0,parseFloat(this.value)||0);saveActiveLayerFrame();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
 // Effect layer panel (2026-07, Motion) — see updateEffectLayerPanel's own
 // comment for the -100..100 (UI) <-> -1..1 (Rust color_adjust.wgsl) scale.
-document.getElementById('p-effect-type').addEventListener('change',function(){var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.isEffectLayer)return;pushUndo();ld.effectType=this.value;ld.effectP1=ld.effectType==='blur'?8:0;ld.effectP2=0;updateEffectLayerPanel();saveActiveLayerFrame();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
+// Defaults per effect type on switching — chosen so each type shows an
+// immediately visible (if subtle) result rather than looking like a no-op.
+var EFFECT_DEFAULTS={blur:[8,0],glow:[16,0],colorAdjust:[0,0],vignette:[0.5,0.4]};
+document.getElementById('p-effect-type').addEventListener('change',function(){var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.isEffectLayer)return;pushUndo();ld.effectType=this.value;var d=EFFECT_DEFAULTS[ld.effectType]||[0,0];ld.effectP1=d[0];ld.effectP2=d[1];updateEffectLayerPanel();saveActiveLayerFrame();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
 document.getElementById('p-effect-radius').addEventListener('input',function(){var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.isEffectLayer)return;pushUndo();ld.effectP1=Math.max(0,parseFloat(this.value)||0);saveActiveLayerFrame();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
 document.getElementById('p-effect-brightness').addEventListener('input',function(){var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.isEffectLayer)return;pushUndo();ld.effectP1=(parseFloat(this.value)||0)/100;saveActiveLayerFrame();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
 document.getElementById('p-effect-contrast').addEventListener('input',function(){var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.isEffectLayer)return;pushUndo();ld.effectP2=(parseFloat(this.value)||0)/100;saveActiveLayerFrame();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
+document.getElementById('p-effect-vig-strength').addEventListener('input',function(){var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.isEffectLayer)return;pushUndo();ld.effectP1=Math.max(0,Math.min(1,(parseFloat(this.value)||0)/100));saveActiveLayerFrame();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
+document.getElementById('p-effect-vig-radius').addEventListener('input',function(){var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.isEffectLayer)return;pushUndo();ld.effectP2=Math.max(0,Math.min(0.95,(parseFloat(this.value)||0)/100));saveActiveLayerFrame();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
 document.getElementById('p-persp-on').addEventListener('change',function(){state.perspectiveEnabled=this.checked;if(this.checked){if(window.ensurePerspectiveVPs)window.ensurePerspectiveVPs();window.SM.setTool('perspective');}if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
 document.getElementById('p-persp-mode').addEventListener('change',function(){if(window.setPerspectiveMode)window.setPerspectiveMode(this.value);});
 document.getElementById('p-persp-density').addEventListener('input',function(){state.perspectiveDensity=parseInt(this.value)||24;if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
