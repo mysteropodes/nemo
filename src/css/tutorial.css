@@ -27,7 +27,16 @@
   transition:opacity .2s,transform .2s,top .28s cubic-bezier(.4,0,.2,1),left .28s cubic-bezier(.4,0,.2,1);
   pointer-events:none;
 }
-#tut-tooltip.on{opacity:1;transform:translateY(0);pointer-events:auto;}
+/* pointer-events stays none on the tooltip BOX itself even once visible —
+   only re-enabled on its actual buttons below. A 'state' step's spotlight
+   target is often the whole canvas (e.g. "draw a rectangle"); the tooltip
+   renders somewhere inside/adjacent to that same huge rect no matter which
+   side it picks, and a solid auto-pointer-events panel there would swallow
+   the very drag gesture the step is asking for — found live in testing,
+   a click/drag that started under the tooltip never reached the canvas
+   underneath it at all. */
+#tut-tooltip.on{opacity:1;transform:translateY(0);}
+#tut-tooltip .tut-next,#tut-tooltip .tut-skip{pointer-events:auto;}
 
 #tut-tooltip .tut-progress{font-size:9px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-dim);margin-bottom:6px;}
 #tut-tooltip .tut-title{font-size:13px;font-weight:600;margin-bottom:6px;}
@@ -48,8 +57,11 @@
    row, same reason #kitsu-modal overrides the default .modal-overlay
    z-index:200 — see style.css's comment above #kitsu-modal. */
 #tut-launcher{z-index:600;}
-#tut-launcher.modal-overlay .modal-box{width:420px;}
+#tut-launcher.modal-overlay .modal-box{width:420px;max-height:86vh;display:flex;flex-direction:column;}
+#tut-launcher .modal-bdy{overflow-y:auto;max-height:calc(86vh - 50px);}
 #tut-launcher .tut-mod-list{display:flex;flex-direction:column;gap:8px;}
+#tut-launcher .tut-cat-hdr{font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-dim);margin:10px 0 -2px;}
+#tut-launcher .tut-cat-hdr:first-child{margin-top:0;}
 #tut-launcher .tut-mod{
   display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;
   background:var(--panel3);border:1px solid var(--border);cursor:pointer;text-align:left;
