@@ -1,5 +1,5 @@
 // ---- Interactive tutorial ("Découvrir Nemo") ----
-// Flash 4/5-style in-app lessons: a spotlight highlights a REAL UI element,
+// In-app lessons: a spotlight highlights a REAL UI element,
 // a tooltip explains what to do, and the step only advances once the user
 // actually did it — either a real click on the target (event delegation)
 // or a real state change polled straight off the live app state (global
@@ -333,7 +333,7 @@
     ["Nemo prend un instantané automatique toutes les 30 secondes — récupérable même après un crash, pas seulement la dernière session.", "Nemo takes an automatic snapshot every 30 seconds — recoverable even after a crash, not just the last session.", "Nemo toma una instantánea automática cada 30 segundos — recuperable incluso después de un fallo, no solo de la última sesión.", "Nemoは30秒ごとに自動スナップショットを取得します — クラッシュ後でも、直前のセッションだけでなく復元できます。"],
     ["On va dessiner un premier trait ensemble. À chaque étape, fais vraiment le geste demandé — le tutoriel avance tout seul dès que c'est fait.", "Let's draw a first stroke together. At each step, actually perform the requested action — the tutorial advances on its own once it's done.", "Vamos a dibujar un primer trazo juntos. En cada paso, realiza de verdad la acción pedida — el tutorial avanza solo en cuanto lo hagas.", "一緒に最初の一筆を描いてみましょう。各ステップで実際に指示された操作を行うと、チュートリアルは自動的に進みます。"],
     ["Ouvre le menu déroulant \"Format\" et choisis \"Lottie\" pour voir la fenêtre s'adapter (les options d'échelle disparaissent, un aperçu scrubbable s'ouvrira après export).", "Open the \"Format\" dropdown and choose \"Lottie\" to see the window adapt (the scale options disappear, a scrubbable preview will open after export).", "Abre el menú desplegable \"Format\" y elige \"Lottie\" para ver cómo se adapta la ventana (las opciones de escala desaparecen, se abrirá una vista previa navegable tras la exportación).", "Formatドロップダウンを開いて「Lottie」を選ぶと、ウィンドウが変化するのがわかります（スケールオプションが消え、書き出し後にスクラブ可能なプレビューが開きます）。"],
-    ["Pose deux keyframes avec un dessin différent, puis laisse Nemo générer les frames intermédiaires tout seul. C'est le cœur de Nemo.", "Set two keyframes with different drawings, then let Nemo generate the in-between frames on its own. This is the heart of Nemo.", "Coloca dos fotogramas clave con un dibujo diferente, y deja que Nemo genere solo los fotogramas intermedios. Este es el corazón de Nemo.", "異なる絵を持つ2つのキーフレームを打ち、あとはNemoに中割りフレームを自動生成させます。これがNemoの核心機能です。"],
+    ["Pose deux keyframes avec un dessin différent, puis laisse Nemo générer les frames intermédiaires tout seul, en faisant correspondre chaque trait d'une pose à son équivalent dans l'autre — l'interpolation vectorielle au cœur de Nemo.", "Set two keyframes with different drawings, then let Nemo generate the in-between frames on its own, matching each stroke in one pose to its equivalent in the other — the vector interpolation at the heart of Nemo.", "Coloca dos fotogramas clave con un dibujo diferente, y deja que Nemo genere solo los fotogramas intermedios, haciendo corresponder cada trazo de una pose con su equivalente en la otra — la interpolación vectorial que es el corazón de Nemo.", "異なる絵を持つ2つのキーフレームを打ち、あとはNemoに中割りフレームを自動生成させます。一方のポーズの各線をもう一方の対応する線に対応づける処理です — これがNemoの核心にあるベクター補間です。"],
     ["Rectangle, Ellipse, Pot de peinture, Gomme — les outils de base pour construire des formes propres plutôt qu'à main levée.", "Rectangle, Ellipse, Paint Bucket, Eraser — the basic tools for building clean shapes rather than freehand.", "Rectángulo, Elipse, Bote de pintura, Borrador — las herramientas básicas para construir formas limpias en lugar de a mano alzada.", "長方形、楕円、塗りつぶし、消しゴム — 手描きではなくきれいな図形を作るための基本ツールです。"],
     ["Regarde la timeline : les frames entre tes deux keyframes sont maintenant interpolées. Le chapitre \"Interpolation automatique\" du guide couvre l'éditeur de courbes et l'onion skin.", "Look at the timeline: the frames between your two keyframes are now interpolated. The \"Automatic tweening\" chapter of the guide covers the curve editor and onion skin.", "Mira la línea de tiempo: los fotogramas entre tus dos fotogramas clave ahora están interpolados. El capítulo \"Interpolación automática\" de la guía cubre el editor de curvas y el onion skin.", "タイムラインを見てください：2つのキーフレームの間のフレームが補間されました。ガイドの「自動トゥイーン」の章でカーブエディタとオニオンスキンを解説しています。"],
     ["Rejoue (Entrée) pour voir le calque bouger entre les deux clés. Un calque avec 2 éléments ou plus devient automatiquement un Component dès qu'une propriété de calque est keyée — voir le module suivant.", "Play back (Enter) to see the layer move between the two keys. A layer with 2 or more elements automatically becomes a Component as soon as a layer property is keyed — see the next module.", "Reproduce (Intro) para ver la capa moverse entre las dos claves. Una capa con 2 o más elementos se convierte automáticamente en un Componente en cuanto se keyea una propiedad de la capa — ver el siguiente módulo.", "再生（Enter）して、レイヤーが2つのキーの間で動くのを確認しましょう。要素が2つ以上あるレイヤーは、レイヤープロパティにキーが打たれると自動的にコンポーネントになります — 次のモジュールを参照。"],
@@ -347,10 +347,10 @@
     ["Trace un second rectangle qui recouvre partiellement le premier.", "Draw a second rectangle that partially overlaps the first.", "Traza un segundo rectángulo que se superponga parcialmente al primero.", "最初の長方形と一部重なるように2つ目の長方形を描きます。"],
     ["Tu as un nouveau calque et une keyframe posée. Le chapitre \"Calques et timeline\" du guide couvre F5/F7, le drag & drop de frames, et le clic-droit sur la timeline.", "You now have a new layer and a keyframe set. The \"Layers and timeline\" chapter of the guide covers F5/F7, drag & drop of frames, and right-click on the timeline.", "Ahora tienes una capa nueva y un fotograma clave colocado. El capítulo \"Capas y línea de tiempo\" de la guía cubre F5/F7, el arrastrar y soltar fotogramas, y el clic derecho en la línea de tiempo.", "新しいレイヤーとキーフレームができました。ガイドの「レイヤーとタイムライン」の章で、F5/F7、フレームのドラッグ&ドロップ、タイムラインの右クリックを解説しています。"],
     ["Tu sais dessiner un trait et changer sa couleur. La suite du chapitre \"Dessiner\" du guide utilisateur détaille tous les autres outils (plume, formes, gomme…).", "You now know how to draw a stroke and change its color. The rest of the \"Draw\" chapter of the user guide details all the other tools (pen, shapes, eraser…).", "Ya sabes dibujar un trazo y cambiar su color. El resto del capítulo \"Dibujar\" de la guía de usuario detalla todas las demás herramientas (pluma, formas, borrador…).", "これで線を描いて色を変える方法がわかりました。ユーザーガイドの「描く」の章の続きで、他のすべてのツール（ペン、図形、消しゴムなど）を詳しく解説しています。"],
-    ["Un Component est un calque transformé en symbole réutilisable — comme un symbole Flash/Animate. StoryBoard, le montage nodal de Nemo, ne manipule QUE des Components.", "A Component is a layer turned into a reusable symbol — like a Flash/Animate symbol. StoryBoard, Nemo's node-based editing, only ever works with Components.", "Un Componente es una capa convertida en símbolo reutilizable — como un símbolo de Flash/Animate. StoryBoard, el montaje nodal de Nemo, SOLO manipula Componentes.", "コンポーネントとは、レイヤーを再利用可能なシンボルに変換したものです — Flash/Animateのシンボルのようなものです。Nemoのノードベース編集であるストーリーボードは、コンポーネントのみを扱います。"],
+    ["Un Component est un calque transformé en symbole réutilisable : tu peux en placer plusieurs instances dans ton animation, chacune avec sa propre vitesse ou son propre décalage temporel, sans dupliquer le dessin original. StoryBoard, le montage nodal de Nemo, ne manipule QUE des Components.", "A Component is a layer turned into a reusable symbol: you can place multiple instances of it in your animation, each with its own speed or time offset, without duplicating the original drawing. StoryBoard, Nemo's node-based editing, only ever works with Components.", "Un Componente es una capa convertida en símbolo reutilizable: puedes colocar varias instancias de él en tu animación, cada una con su propia velocidad o desfase temporal, sin duplicar el dibujo original. StoryBoard, el montaje nodal de Nemo, SOLO manipula Componentes.", "コンポーネントとは、レイヤーを再利用可能なシンボルに変換したものです。アニメーション内に複数のインスタンスを配置でき、それぞれに独自の速度や時間オフセットを設定できます — 元の作画を複製する必要はありません。Nemoのノードベース編集であるストーリーボードは、コンポーネントのみを扱います。"],
     ["Un calque caméra anime le cadrage (zoom/pan/rotation) par-dessus toute la scène, avec des courbes de Bézier — comme dans TVPaint ou Callipeg.", "A camera layer animates the framing (zoom/pan/rotation) over the whole scene, with Bézier curves — like in TVPaint or Callipeg.", "Una capa de cámara anima el encuadre (zoom/paneo/rotación) sobre toda la escena, con curvas de Bézier — como en TVPaint o Callipeg.", "カメラレイヤーはシーン全体に対してベジェ曲線でカメラワーク（ズーム/パン/回転）をアニメーションします — TVPaintやCallipegのように。"],
     ["Un calque contient une série de frames. Une \"keyframe\" est une frame où tu as vraiment dessiné quelque chose de nouveau — c'est ce sur quoi l'interpolation automatique s'appuie.", "A layer contains a series of frames. A \"keyframe\" is a frame where you actually drew something new — that's what automatic tweening relies on.", "Una capa contiene una serie de fotogramas. Un \"fotograma clave\" es un fotograma en el que realmente dibujaste algo nuevo — es en lo que se basa la interpolación automática.", "レイヤーには一連のフレームが含まれます。「キーフレーム」とは、実際に新しく何かを描いたフレームのことです — これが自動トゥイーンの基盤になります。"],
-    ["Union, soustraction, intersection, exclusion — combine plusieurs formes sélectionnées en une seule, plutôt que de redessiner à la main.", "Union, subtract, intersect, exclude — combine several selected shapes into one, instead of redrawing by hand.", "Unión, sustracción, intersección, exclusión — combina varias formas seleccionadas en una sola, en lugar de volver a dibujar a mano.", "結合、減算、交差、除外 — 選択した複数の形をひとつに合成でき、手で描き直す必要がありません。"],
+    ["Union, soustraction, intersection, exclusion — combine plusieurs formes sélectionnées en une seule, plutôt que de redessiner à la main. Union fusionne les contours, Soustraction retire une forme d'une autre, Intersection ne garde que la zone commune, Exclusion ne garde que ce qui ne se chevauche pas.", "Union, subtract, intersect, exclude — combine several selected shapes into one, instead of redrawing by hand. Union merges the outlines, Subtract removes one shape from another, Intersect keeps only the shared area, Exclude keeps only what doesn't overlap.", "Unión, sustracción, intersección, exclusión — combina varias formas seleccionadas en una sola, en lugar de volver a dibujar a mano. Unión fusiona los contornos, Sustracción quita una forma de otra, Intersección conserva solo la zona común, Exclusión conserva solo lo que no se superpone.", "結合、減算、交差、除外 — 選択した複数の形をひとつに合成でき、手で描き直す必要がありません。結合は輪郭を統合し、減算は一方の形からもう一方を取り除き、交差は重なった部分だけを残し、除外は重ならない部分だけを残します。"],
     ["En attente de F6…", "Waiting for F6…", "Esperando F6…", "F6の入力待ち…"],
     ["En attente de T…", "Waiting for T…", "Esperando T…", "Tの入力待ち…"],
     ["En attente de ta forme…", "Waiting for your shape…", "Esperando tu forma…", "図形の入力待ち…"],
@@ -367,7 +367,7 @@
     ["Terminer", "Finish", "Finalizar", "終了"],
     ["Suivant", "Next", "Siguiente", "次へ"],
     ["Découvrir Nemo", "Discover Nemo", "Descubrir Nemo", "Nemoを発見する"],
-    ["Des mini-leçons pas à pas, directement dans l'app — comme les tutoriels intégrés de Flash. Choisis une catégorie, puis un module ; tu peux quitter à tout moment.", "Step-by-step mini-lessons, right inside the app — like Flash's built-in tutorials. Choose a category, then a module; you can leave at any time.", "Mini-lecciones paso a paso, directamente en la app — como los tutoriales integrados de Flash. Elige una categoría, luego un módulo; puedes salir en cualquier momento.", "アプリ内で完結するステップバイステップのミニレッスン — Flashの内蔵チュートリアルのようなものです。カテゴリーを選び、次にモジュールを選んでください。いつでも終了できます。"],
+    ["Des mini-leçons pas à pas, directement dans l'app, sans jamais quitter ton projet. Choisis une catégorie, puis un module ; tu peux quitter à tout moment.", "Step-by-step mini-lessons, right inside the app, without ever leaving your project. Choose a category, then a module; you can leave at any time.", "Mini-lecciones paso a paso, directamente en la app, sin salir nunca de tu proyecto. Elige una categoría, luego un módulo; puedes salir en cualquier momento.", "プロジェクトを離れることなく、アプリ内で完結するステップバイステップのミニレッスンです。カテゴリーを選び、次にモジュールを選んでください。いつでも終了できます。"],
     ["Retour", "Back", "Atrás", "戻る"],
     ["Rechercher un module…", "Search a module…", "Buscar un módulo…", "モジュールを検索…"],
     ["Aucun module ne correspond à ta recherche.", "No module matches your search.", "Ningún módulo coincide con tu búsqueda.", "検索に一致するモジュールがありません。"],
@@ -558,7 +558,28 @@
       '<circle cx="80" cy="14" r="8" fill="var(--accent)"><animate attributeName="opacity" values="0.55;1;0.55" dur="2.4s" repeatCount="indefinite"/></circle>' +
       '<circle cx="30" cy="90" r="8" fill="var(--accent)"><animate attributeName="opacity" values="0.55;1;0.55" dur="2.4s" begin="0.8s" repeatCount="indefinite"/></circle>' +
       '<circle cx="130" cy="90" r="8" fill="var(--accent)"><animate attributeName="opacity" values="0.55;1;0.55" dur="2.4s" begin="1.6s" repeatCount="indefinite"/></circle>' +
-      '</svg>'
+      '</svg>',
+    // Auto-tween: two solid "keyframe" blocks with a ripple of dots
+    // between them fading in and out in sequence — the in-between frames
+    // Nemo generates on its own between two poses you actually drew.
+    tween:
+      '<svg viewBox="0 0 160 50" aria-hidden="true">' +
+      '<rect x="10" y="10" width="20" height="20" rx="3" fill="var(--accent)"/>' +
+      '<rect x="130" y="10" width="20" height="20" rx="3" fill="var(--accent)"/>' +
+      '<circle cx="55" cy="20" r="4" fill="currentColor" opacity="0.15"><animate attributeName="opacity" values="0.15;0.75;0.15" dur="1.8s" repeatCount="indefinite"/></circle>' +
+      '<circle cx="80" cy="20" r="4" fill="currentColor" opacity="0.15"><animate attributeName="opacity" values="0.15;0.75;0.15" dur="1.8s" begin="0.3s" repeatCount="indefinite"/></circle>' +
+      '<circle cx="105" cy="20" r="4" fill="currentColor" opacity="0.15"><animate attributeName="opacity" values="0.15;0.75;0.15" dur="1.8s" begin="0.6s" repeatCount="indefinite"/></circle>' +
+      '</svg>',
+    // Boolean union: two overlapping shapes, their shared seam fading out
+    // — reads as "two things becoming one", without needing to actually
+    // simulate a real union operation in SVG.
+    booleanUnion:
+      '<svg viewBox="0 0 140 70" aria-hidden="true">' +
+      '<circle cx="55" cy="35" r="24" fill="var(--accent)" opacity="0.55"/>' +
+      '<circle cx="85" cy="35" r="24" fill="var(--accent)" opacity="0.55"/>' +
+      '<path d="M69,14 A24,24 0 0 1 69,56" fill="none" stroke="currentColor" stroke-width="1.5">' +
+      '<animate attributeName="opacity" values="0.5;0.5;0;0;0.5" keyTimes="0;0.35;0.55;0.85;1" dur="2.4s" repeatCount="indefinite"/>' +
+      '</path></svg>'
   };
 
   // ---- Module content ------------------------------------------------
@@ -646,7 +667,10 @@
       desc: 'Deux keyframes, un tween généré tout seul',
       time: '3 min',
       steps: [
-        { type: 'info', title: 'Le tween automatique', body: 'Pose deux keyframes avec un dessin différent, puis laisse Nemo générer les frames intermédiaires tout seul. C\'est le cœur de Nemo.' },
+        {
+          type: 'info', title: 'Le tween automatique', illustration: ILLUS.tween,
+          body: 'Pose deux keyframes avec un dessin différent, puis laisse Nemo générer les frames intermédiaires tout seul, en faisant correspondre chaque trait d\'une pose à son équivalent dans l\'autre — l\'interpolation vectorielle au cœur de Nemo.'
+        },
         // Bug trouvé en testant le nouveau module 'timing-easing' (2026-07-18,
         // même séquence de setup copiée depuis ce module) : sans ce clic
         // explicite, un outil laissé actif par un module précédent (ex.
@@ -799,7 +823,7 @@
       desc: 'Réutiliser un calque comme un symbole',
       time: '2 min',
       steps: [
-        { type: 'info', title: 'Un calque réutilisable', body: 'Un Component est un calque transformé en symbole réutilisable — comme un symbole Flash/Animate. StoryBoard, le montage nodal de Nemo, ne manipule QUE des Components.' },
+        { type: 'info', title: 'Un calque réutilisable', body: 'Un Component est un calque transformé en symbole réutilisable : tu peux en placer plusieurs instances dans ton animation, chacune avec sa propre vitesse ou son propre décalage temporel, sans dupliquer le dessin original. StoryBoard, le montage nodal de Nemo, ne manipule QUE des Components.' },
         { type: 'click', target: '.app-mode-btn[data-mode="anim2d"]', title: 'Reviens en Animation 2D', body: 'Clique l\'onglet "Animation 2D" en haut de l\'écran.' },
         // Convert-to-component (app.js) early-returns with just a toast on a
         // layer that's ALREADY a component (`if(!ld||ld.symbolId)return`) —
@@ -915,7 +939,10 @@
       desc: 'Fusionner deux formes en une seule',
       time: '2 min',
       steps: [
-        { type: 'info', title: 'Combiner des formes', body: 'Union, soustraction, intersection, exclusion — combine plusieurs formes sélectionnées en une seule, plutôt que de redessiner à la main.' },
+        {
+          type: 'info', title: 'Combiner des formes', illustration: ILLUS.booleanUnion,
+          body: 'Union, soustraction, intersection, exclusion — combine plusieurs formes sélectionnées en une seule, plutôt que de redessiner à la main. Union fusionne les contours, Soustraction retire une forme d\'une autre, Intersection ne garde que la zone commune, Exclusion ne garde que ce qui ne se chevauche pas.'
+        },
         { type: 'click', target: '.tool-btn[data-tool="rect"]', title: 'Choisis le Rectangle', body: 'Clique sur l\'outil Rectangle (raccourci R).' },
         stateIncreaseStep({ target: '#drawing-canvas', title: 'Dessine un premier rectangle', body: 'Clique-glisse pour tracer un premier rectangle.', hint: 'En attente…', measure: measureStrokeCount }),
         stateIncreaseStep({
@@ -1321,6 +1348,50 @@
     return r;
   }
 
+  // Picks a tooltip position that (a) stays fully inside the viewport and
+  // (b) never overlaps the spotlighted rect, trying below/above/right/left
+  // in that order (natural reading order first). The old version only
+  // ever tried above-vs-below and always pinned `left` to the rect's own
+  // left edge — for a WIDE target (most steps spotlight `#drawing-canvas`,
+  // which spans nearly the full width/height of the screen) that meant
+  // the "above" branch could land the tooltip at the very top of the
+  // viewport, still deep inside the same huge rect it was supposed to
+  // avoid — found live from a user report with a screenshot, not
+  // something a quick glance at the code would have caught. This version
+  // explicitly rejects any candidate that intersects the rect; only once
+  // NONE of the four sides has room (a target covering nearly the whole
+  // screen) does it fall back to a fixed corner, same idea as the
+  // existing per-step `pinCorner` opt-in but now automatic for every step
+  // instead of needing to be requested by hand.
+  function positionTooltip(tw, th, rect, pinCorner) {
+    var vw = window.innerWidth, vh = window.innerHeight, pad = 16;
+    if (pinCorner === 'top-right') return { top: pad, left: vw - tw - pad };
+    if (!rect) return { top: vh / 2 - th / 2, left: vw / 2 - tw / 2 };
+
+    function inViewport(top, left) { return left >= pad && top >= pad && left + tw <= vw - pad && top + th <= vh - pad; }
+    function overlaps(top, left) { return left < rect.right && left + tw > rect.left && top < rect.bottom && top + th > rect.top; }
+
+    var candidates = [
+      { top: rect.bottom + pad, left: Math.min(vw - tw - pad, Math.max(pad, rect.left)) }, // below
+      { top: rect.top - th - pad, left: Math.min(vw - tw - pad, Math.max(pad, rect.left)) }, // above
+      { top: Math.min(vh - th - pad, Math.max(pad, rect.top)), left: rect.right + pad }, // right
+      { top: Math.min(vh - th - pad, Math.max(pad, rect.top)), left: rect.left - tw - pad } // left
+    ];
+    for (var i = 0; i < candidates.length; i++) {
+      var c = candidates[i];
+      if (inViewport(c.top, c.left) && !overlaps(c.top, c.left)) return c;
+    }
+    // Nothing fits cleanly — the target covers most of the screen (e.g. the
+    // whole canvas). Pin to whichever corner is farthest from the rect's
+    // own center, which at least minimizes how much of the tooltip sits
+    // over the busiest part of the target.
+    var cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
+    return {
+      top: cy < vh / 2 ? vh - th - pad : pad,
+      left: cx < vw / 2 ? vw - tw - pad : pad
+    };
+  }
+
   function renderStep() {
     stopStepListeners();
     var mod = active.module, step = mod.steps[active.stepIdx];
@@ -1360,27 +1431,8 @@
     // Position the tooltip near the spotlight (or centered if none)
     tt.classList.add('on');
     requestAnimationFrame(function () {
-      var tw = tt.offsetWidth, th = tt.offsetHeight;
-      var top, left;
-      // Some app popovers (the text tool's input box) open AT the click
-      // point, which can land anywhere on the canvas — the normal
-      // "position near the spotlighted rect" logic then has no reliable
-      // free side and can end up overlapping the very field the step
-      // asks the user to type into (found live: tooltip fully covering
-      // #text-input, blocking it since the tooltip sits on top and has
-      // pointer-events:auto). pinCorner sidesteps the guesswork for a
-      // step like that — always a fixed, known-clear corner.
-      if (step.pinCorner === 'top-right') {
-        top = 16; left = window.innerWidth - tw - 16;
-      } else if (rect) {
-        var spaceBelow = window.innerHeight - rect.bottom;
-        if (spaceBelow > th + 24) { top = rect.bottom + 16; } else { top = Math.max(12, rect.top - th - 16); }
-        left = Math.min(window.innerWidth - tw - 16, Math.max(16, rect.left));
-      } else {
-        top = window.innerHeight / 2 - th / 2;
-        left = window.innerWidth / 2 - tw / 2;
-      }
-      tt.style.top = top + 'px'; tt.style.left = left + 'px';
+      var pos = positionTooltip(tt.offsetWidth, tt.offsetHeight, rect, step.pinCorner);
+      tt.style.top = pos.top + 'px'; tt.style.left = pos.left + 'px';
     });
 
     tt.querySelector('.tut-close').addEventListener('click', stopTutorial);
@@ -1511,7 +1563,7 @@
     list.innerHTML = '';
     var intro = document.createElement('div');
     intro.className = 'tut-launcher-intro';
-    intro.textContent = T('Des mini-leçons pas à pas, directement dans l\'app — comme les tutoriels intégrés de Flash. Choisis une catégorie, puis un module ; tu peux quitter à tout moment.');
+    intro.textContent = T('Des mini-leçons pas à pas, directement dans l\'app, sans jamais quitter ton projet. Choisis une catégorie, puis un module ; tu peux quitter à tout moment.');
     list.appendChild(intro);
     g.cats.forEach(function (cat) {
       var mods = g.byCat[cat];

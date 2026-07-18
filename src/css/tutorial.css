@@ -1,4 +1,4 @@
-/* ---- Interactive tutorial overlay (Flash-4-style "Lessons") ---- */
+/* ---- Interactive tutorial overlay ("Lessons") ---- */
 
 #btn-open-tutorial-topbar{flex:none;width:24px;height:24px;border-radius:6px;background:transparent;border:none;color:rgba(236,234,231,.45);cursor:pointer;display:flex;align-items:center;justify-content:center;}
 #btn-open-tutorial-topbar:hover{background:var(--panel3);color:var(--accent-hover);}
