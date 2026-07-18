@@ -536,6 +536,43 @@
         { type: 'click', target: '#settings-close', title: 'Ferme les Réglages', body: 'Clique la croix pour refermer la fenêtre.' },
         { type: 'info', title: 'Bien joué !', body: 'Le chapitre "Travailler à plusieurs" du guide couvre aussi les corrections à Accepter/Rejeter et le feedback d\'équipe.' }
       ]
+    },
+    {
+      id: 'export',
+      category: 'Médias',
+      icon: '18',
+      title: 'Exporter',
+      desc: 'Ouvrir la fenêtre d\'export, choisir un format',
+      time: '1 min',
+      // A real export writes to disk via une boîte de dialogue Tauri
+      // native — pas quelque chose que ce tutoriel sandboxé peut piloter
+      // ni vérifier (voir exportTauriAvailable(), export.js). Le module
+      // reste donc volontairement au niveau "ouvrir/configurer" : chaque
+      // étape est un vrai clic/changement réel sur la vraie fenêtre
+      // d'export, sans jamais cliquer "Exporter" pour de vrai.
+      // #btn-export vit dans le panneau de droite, section "Projet" —
+      // COLLAPSÉE par défaut (même piège que #btn-history, voir module
+      // 'history' plus haut). Étape tolérante façon 'perspective' : si la
+      // section est déjà ouverte (ex. module Historique fait juste avant
+      // dans la même session), un re-clic sur son en-tête la refermerait —
+      // on attend juste que le bouton devienne visible, qu'il ait fallu
+      // cliquer ou non.
+      steps: [
+        { type: 'info', title: 'Sortir ton animation', body: 'Nemo exporte en PNG/TIFF/GIF/MP4/ProRes, en SVG, en Lottie (JSON animé) ou en projet Rive/After Effects — un seul bouton, plusieurs formats.' },
+        {
+          type: 'state', target: '#phdr-project', title: 'Ouvre la section "Projet"', body: 'Clique l\'en-tête "Projet" dans le panneau de droite pour la déplier, si besoin.',
+          hint: 'En attente…',
+          check: function (win) { var el = win.document.getElementById('btn-export'); return !!(el && el.getBoundingClientRect().height > 0); }
+        },
+        { type: 'click', target: '#btn-export', title: 'Ouvre la fenêtre d\'export', body: 'Clique "Export…" dans le panneau de droite (section Projet).' },
+        stateChangedStep({
+          target: '#exp-format', title: 'Choisis un format', body: 'Ouvre le menu déroulant "Format" et choisis "Lottie" pour voir la fenêtre s\'adapter (les options d\'échelle disparaissent, un aperçu scrubbable s\'ouvrira après export).',
+          hint: 'En attente de ton choix…', measure: function (win) { var el = win.document.getElementById('exp-format'); return el ? el.value : ''; }
+        }),
+        { type: 'click', target: '#exp-range', title: 'Choisis la plage à exporter', body: 'Sélectionne "Zone de travail" ou "Toute la timeline" selon ce que tu veux sortir.' },
+        { type: 'click', target: '#export-close', title: 'Ferme la fenêtre', body: 'Clique la croix — on ne lance pas un vrai export ici, juste la découverte de la fenêtre.' },
+        { type: 'info', title: 'Bien joué !', body: 'Le bouton "Exporter" (en bas de la fenêtre) lance le vrai rendu — image par image pour PNG/TIFF, ou en pilotant ffmpeg pour GIF/MP4/ProRes. Le chapitre "Export" du guide détaille chaque format.' }
+      ]
     }
   ];
 
