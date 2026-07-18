@@ -958,9 +958,10 @@
   <textarea id="text-input" rows="2" placeholder="Ton texte..." style="width:100%;resize:vertical;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:12px;padding:5px;box-sizing:border-box"></textarea>
   <div class="pr" style="margin-top:6px;gap:6px">
     <input type="number" id="text-size" value="48" min="8" max="400" style="width:52px" class="pi" title="Taille (px)">
-    <select id="text-font" class="psel" style="flex:1">
+    <select id="text-font" class="psel" style="flex:1" title="Les options « (vecteur) » produisent de vraies formes vectorielles éditables au lieu d’une image">
       <option value="sans-serif">Sans</option><option value="serif">Serif</option><option value="monospace">Mono</option><option value="Manrope">Manrope</option>
       <option value="Georgia">Georgia</option><option value="'Times New Roman'">Times</option><option value="'Courier New'">Courier</option><option value="Verdana">Verdana</option>
+      <option value="vector:Roboto-Regular">Roboto (vecteur)</option><option value="vector:Roboto-Bold">Roboto Gras (vecteur)</option>
     </select>
     <input type="color" id="text-color" value="#000000" style="width:26px;height:24px;padding:0;border:1px solid var(--border);border-radius:5px;background:none" title="Couleur">
   </div>
@@ -1148,6 +1149,8 @@
 <script src="js/tweens.js"></script>
 <script src="js/stroke-modeler.js"></script>
 <script src="js/tools.js"></script>
+<script src="js/opentype.min.js"></script>
+<script src="js/vector-text-bridge.js"></script>
 <script src="js/brush-preset-picker.js"></script>
 <script src="js/brush-editor.js"></script>
 <script src="js/export.js"></script>

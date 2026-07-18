@@ -3474,9 +3474,16 @@ function openTextPopoverForBox(topLeft,widthWorld){
 // keeps the box's fixedWidth (if any) so re-wrapping behaves the same way.
 function openTextPopoverForEdit(raster){
   _textPendingPt=null;_textEditingRaster=raster;
-  _textPendingBox=raster.data.fixedWidth?{topLeft:raster.bounds.topLeft.clone(),width:raster.data.fixedWidth}:null;
-  resetTextPopoverFields(raster.data.text,raster.data.size,raster.data.font,raster.data.color,raster.data.align);
-  positionTextPopover(raster.bounds.topLeft);
+  // A vector-text root's group can span multiple glyph Paths whose combined
+  // bounds is wider than any single one — use the whole group's bounds
+  // (vectorTextGroupMembers), not just the root Path's own, so a re-edit
+  // popover positions/wraps against the block's REAL current footprint.
+  var isVectorRoot=!!(raster.data&&raster.data.isVectorText&&raster.data.isTextRoot);
+  var groupBounds=isVectorRoot?window.SMVectorText.vectorTextGroupMembers(raster).reduce(function(b,p){return b?b.unite(p.bounds):p.bounds.clone();},null):raster.bounds;
+  _textPendingBox=raster.data.fixedWidth?{topLeft:groupBounds.topLeft.clone(),width:raster.data.fixedWidth}:null;
+  var fontValue=isVectorRoot?('vector:'+raster.data.vectorFont):raster.data.font;
+  resetTextPopoverFields(raster.data.text,raster.data.size,fontValue,raster.data.color,raster.data.align);
+  positionTextPopover(groupBounds.topLeft);
   var ta=document.getElementById('text-input');ta.focus();ta.select();
 }
 function closeTextPopover(){var pop=document.getElementById('text-popover');if(pop)pop.style.display='none';_textPendingPt=null;_textPendingBox=null;_textEditingRaster=null;}
@@ -3532,6 +3539,36 @@ function lineDrawX(off,octx,line,align){
   if(align==='right')return off.width-8-tw;
   return 8;
 }
+// Vector text (2026-07) — "vector:<fontKey>" is the #text-font select's
+// escape hatch into real glyph outlines (vector-text-bridge.js) instead of
+// a Canvas2D bake. Kept as its own function (not woven into commitText's
+// raster branch) since it's async (font fetch) and its "editing" case is
+// remove-all-members-then-rebuild rather than reassign-one-Raster's-source.
+function commitVectorText(txt,fontKey,size,align,color,fixedWidthWorld){
+  var editingRoot=(_textEditingRaster&&_textEditingRaster.parent&&_textEditingRaster.data&&_textEditingRaster.data.isTextRoot)?_textEditingRaster:null;
+  var topLeft;
+  if(editingRoot)topLeft=window.SMVectorText.vectorTextGroupMembers(editingRoot).reduce(function(b,p){return b?b.unite(p.bounds):p.bounds.clone();},null).topLeft.clone();
+  else if(_textPendingBox)topLeft=_textPendingBox.topLeft.clone();
+  // Point-click placement anchors its TOP-LEFT at the click point (unlike
+  // raster point-text, which centers there) — matches Illustrator's own
+  // point-text tool, and there's no pre-existing raster-mode convention to
+  // stay consistent with since this is a separate placement mode.
+  else topLeft=_textPendingPt.clone();
+  var layer=userLayers[state.activeLayerIdx];
+  var ldForTag=state.layers[state.activeLayerIdx];
+  var wasEmpty=layer.children.length===0;
+  pushUndo();
+  if(editingRoot)window.SMVectorText.vectorTextGroupMembers(editingRoot).forEach(function(p){p.remove();});
+  else if(wasEmpty&&!ldForTag.isTextLayer)ldForTag.isTextLayer=true;
+  closeTextPopover();
+  window.SMVectorText.buildVectorTextGroup(txt,fontKey,size,color,align,fixedWidthWorld,topLeft,layer).then(function(){
+    saveActiveLayerFrame();updateUI();
+    if(window.SMEngineBridge)window.SMEngineBridge.renderNow();
+  }).catch(function(e){
+    console.warn('[vector-text] build failed',e);
+    showToast('Texte vectoriel : échec du chargement de la police');
+  });
+}
 function commitText(){
   var txt=document.getElementById('text-input').value;
   if(!txt.trim()||(!_textPendingPt&&!_textPendingBox&&!_textEditingRaster)){closeTextPopover();return;}
@@ -3541,6 +3578,10 @@ function commitText(){
   var colorInp=document.getElementById('text-color');
   var color=(colorInp&&colorInp.value)||state.strokeColor||'#000000';
   var fixedWidthWorld=_textPendingBox?_textPendingBox.width:null;
+  if(font.indexOf('vector:')===0){
+    commitVectorText(txt,font.slice(7),size,align,color,fixedWidthWorld);
+    return;
+  }
   var L=computeTextLayout(txt,font,size,fixedWidthWorld);
   var off=L.off,octx=L.octx,wrapped=L.wrapped,lineH=L.lineH,SS=L.SS;
   octx.fillStyle=color;
@@ -3689,7 +3730,10 @@ function updateTextActionsPanel(){
   var sec=document.getElementById('text-actions-sec');
   if(!sec)return;
   var p=(state.tool==='select'&&selectedPaths.length===1)?selectedPaths[0]:null;
-  var isWholeText=!!(p&&p.data&&p.data.isText&&!p.data.isTextChar);
+  // Vector text is excluded: every glyph is already its own Path/element —
+  // there's nothing to "split", it's per-character-animatable from the
+  // moment it's placed (see vector-text-bridge.js's own header comment).
+  var isWholeText=!!(p&&p.data&&p.data.isText&&!p.data.isTextChar&&!p.data.isVectorText);
   sec.style.display=isWholeText?'':'none';
   if(isWholeText){
     document.getElementById('btn-text-split-chars').onclick=function(){splitTextIntoCharacters(p);};

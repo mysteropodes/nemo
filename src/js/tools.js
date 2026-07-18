@@ -4242,6 +4242,16 @@ function onViewDoubleClick(event){
       if(window.openTextPopoverForEdit)openTextPopoverForEdit(textHit.item);
       return;
     }
+    // Vector text (2026-07) — any glyph Path of a placed block carries
+    // isVectorText+groupId, but only the group's FIRST Path carries the
+    // full metadata (isTextRoot) openTextPopoverForEdit needs; a click can
+    // land on any glyph, so find its root sibling before re-opening.
+    if(textHit&&textHit.item instanceof Path&&textHit.item.data&&textHit.item.data.isVectorText){
+      var vtGid=textHit.item.data.groupId;
+      var vtRoot=textLayer.children.filter(function(c){return c.data&&c.data.groupId===vtGid&&c.data.isTextRoot;})[0];
+      if(vtRoot&&window.openTextPopoverForEdit)openTextPopoverForEdit(vtRoot);
+      return;
+    }
   }
   if(state.tool!=='select')return;
   var layer=userLayers[state.activeLayerIdx];
