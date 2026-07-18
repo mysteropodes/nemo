@@ -190,6 +190,58 @@
   }
   window.perspectiveSnapPointMagnetic = nearestGuideProjection;
 
+  // Hard directional lock (2026-07 — feedback: "la contrainte par rapport
+  // aux guides est légère... ça dépend comment on fait notre trait mais il
+  // peut partir dans une autre direction que le guide"). nearestGuideProjection
+  // above is a per-POINT proximity magnet: it only pulls a sample onto a
+  // guide line while that exact sample is within MAGNET_PX, so a stroke that
+  // starts near a ray but then wanders away keeps drawing free-hand instead
+  // of staying on the ray — not how Sketchbook's Perspective Guide actually
+  // behaves once a stroke commits to a vanishing point. These two functions
+  // let draw-bridge.js instead LOCK a whole stroke onto whichever ray is
+  // closest at pointerdown (generous LOCK_TOLERANCE_PX, wider than the
+  // per-point magnet's own, since committing to a direction should be easy
+  // to trigger deliberately) and hard-project every subsequent point onto
+  // that SAME ray for the rest of the gesture, regardless of how far the
+  // hand later strays from it — matching a ruler-against-the-guide feel.
+  // A stroke that starts far from every ray still draws completely free, by
+  // design (not "near the guide" at all is a real, common intent).
+  var LOCK_TOLERANCE_PX = 40;
+  function findGuideRayNear(worldPt) {
+    if (!state.perspectiveEnabled) return null;
+    var vps = ensurePerspectiveVPs();
+    if (!vps.length) return null;
+    var tol = LOCK_TOLERANCE_PX / view.zoom;
+    var best = null, bestDist = tol;
+    function tryLine(px, py, dx, dy) {
+      var vx = worldPt.x - px, vy = worldPt.y - py;
+      var t = vx * dx + vy * dy;
+      var projx = px + dx * t, projy = py + dy * t;
+      var dist = Math.hypot(worldPt.x - projx, worldPt.y - projy);
+      if (dist < bestDist) { bestDist = dist; best = { px: px, py: py, dx: dx, dy: dy }; }
+    }
+    var n = Math.max(4, state.perspectiveDensity | 0);
+    vps.forEach(function (vp) {
+      for (var i = 0; i < n; i++) {
+        var a = (i / n) * Math.PI * 2;
+        tryLine(vp.x, vp.y, Math.cos(a), Math.sin(a));
+      }
+    });
+    if (vps.length >= 2) {
+      var dx = vps[1].x - vps[0].x, dy = vps[1].y - vps[0].y;
+      var len = Math.hypot(dx, dy) || 1;
+      tryLine(vps[0].x, vps[0].y, dx / len, dy / len);
+    }
+    return best;
+  }
+  window.perspectiveFindGuideRayNear = findGuideRayNear;
+  function projectOnRay(worldPt, ray) {
+    var vx = worldPt.x - ray.px, vy = worldPt.y - ray.py;
+    var t = vx * ray.dx + vy * ray.dy;
+    return new Point(ray.px + ray.dx * t, ray.py + ray.dy * t);
+  }
+  window.perspectiveProjectOnRay = projectOnRay;
+
   // ---- Tool interaction: drag a vanishing point, OR drag the horizon line
   // to move the whole guide at once (Sketchbook lets you reposition the
   // entire fan by dragging the eye-level line, not just one VP at a time).

@@ -514,22 +514,20 @@
     <div class="psec" id="effects-sec">
       <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrEffects">Effects</span></div>
       <div class="pbdy">
-        <!-- Gradient fill (2026-07) — applies to the current selection's
-             fillColor (Select tool), same target as Fill's own color swatch
-             above. Two stops + linear/radial + an angle (linear only,
-             ignored/hidden for radial) — direction/size are computed from
-             the selection's own bounding box at that angle, no on-canvas
-             drag-handle gizmo in this first version (see
-             gradient-bridge.js's own header comment). -->
-        <div class="pr"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer" title="Applique un dégradé au fill de la sélection actuelle (outil Sélection)"><input type="checkbox" id="p-grad-on" style="accent-color:var(--accent)"> Dégradé de fill</label></div>
-        <div class="pr" id="p-grad-controls" style="display:none">
-          <span class="pl">Stops</span>
-          <input type="color" id="p-grad-c1" value="#ff0000" style="width:24px;height:22px;border:none;cursor:pointer;padding:0;">
-          <input type="color" id="p-grad-c2" value="#0000ff" style="width:24px;height:22px;border:none;cursor:pointer;padding:0;">
-        </div>
+        <!-- Gradient fill (2026-07, Illustrator/Rive-style) — applies to
+             the SINGLE currently selected shape's fill (Select tool). The
+             from/to endpoints AND each stop's position along the line are
+             edited by dragging the on-canvas gizmo directly (gradient-
+             bridge.js's own pointerdown/move/up, same pattern as
+             perspective-bridge.js/symmetry-bridge.js's guide dragging) —
+             this panel only edits STOP COLORS/count and Linear vs Radial,
+             deliberately no angle/position number fields now that dragging
+             covers that directly. -->
+        <div class="pr"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer" title="Applique un dégradé au fill de la sélection actuelle (une seule forme à la fois, outil Sélection)"><input type="checkbox" id="p-grad-on" style="accent-color:var(--accent)"> Dégradé de fill</label></div>
         <div class="pr" id="p-grad-kind-row" style="display:none"><span class="pl">Type</span><select class="psel" id="p-grad-kind"><option value="linear" selected>Linéaire</option><option value="radial">Radial</option></select></div>
-        <div class="pr" id="p-grad-angle-row" style="display:none"><span class="pl">Angle</span><input type="number" class="pi scrub" id="p-grad-angle" value="0" min="-360" max="360" data-step="5"><span style="font-size:9px;color:var(--text-dim)">°</span></div>
-        <div class="pr" id="p-grad-apply-row" style="display:none;gap:4px"><button class="pbtn" id="btn-grad-apply" style="flex:1">Appliquer à la sélection</button></div>
+        <div id="p-grad-stops-list" style="display:none"></div>
+        <div class="pr" id="p-grad-addstop-row" style="display:none;gap:4px"><button class="pbtn" id="btn-grad-add-stop" style="flex:1">+ Stop</button></div>
+        <div class="pr" id="p-grad-hint-row" style="display:none;font-size:9px;color:var(--text-dim)">Glissez le carré/rond sur le canevas pour repositionner le dégradé, glissez un losange pour déplacer un stop.</div>
       </div>
     </div>
     <div class="psec">
