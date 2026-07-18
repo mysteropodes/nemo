@@ -4051,6 +4051,29 @@ function onKeyDown(event){
     duplicateSelection();
     return;
   }
+  // Ctrl/Cmd+G "group selected CANVAS objects" (2026-07, feedback: "mettre
+  // en place les groupes, avec command+g, select les éléments et ça permet
+  // d'avoir... une seule boite de transformation") — takes priority over
+  // the PRE-EXISTING layer-panel "group into folder" binding just below
+  // when there's an actual canvas selection, since Select-tool grouping is
+  // the more central/expected meaning of Cmd+G. Falls through to the
+  // folder-grouping behavior unchanged when there's no canvas selection
+  // (e.g. 2+ layers selected in the layer list instead) — group-bridge.js's
+  // own groupSelection() already no-ops+toasts on <2 selectedPaths, so this
+  // guard just decides which of the two "group" actions gets first refusal.
+  if((event.metaKey||event.ctrlKey)&&(event.key==='g'||event.key==='G')&&!event.shiftKey&&window.selectedPaths&&selectedPaths.length>=2){
+    event.preventDefault();
+    if(window.SMGroup)SMGroup.groupSelection();
+    return;
+  }
+  // Ctrl/Cmd+Shift+G "ungroup" — free shortcut (unused elsewhere), only
+  // acts when the current canvas selection actually has grouped members;
+  // otherwise falls through (currently nothing else claims this combo).
+  if((event.metaKey||event.ctrlKey)&&(event.key==='g'||event.key==='G')&&event.shiftKey&&window.selectedPaths&&selectedPaths.length){
+    event.preventDefault();
+    if(window.SMGroup)SMGroup.ungroupSelection();
+    return;
+  }
   // Ctrl/Cmd+G "group into folder" — the action already existed
   // (groupSelectionIntoFolder, right-click menu only) but every other
   // grouping-adjacent action in this app has a keyboard path; this one

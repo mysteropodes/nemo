@@ -26,8 +26,8 @@
     // are real `state.*`-backed features, not Labs prototypes — see
     // REAL_FEATURES below for how this panel treats them as first-class
     // entries alongside the localStorage-flag-based Labs ones.
-    draw: ['symmetry', 'perspective', 'predictive-stroke', 'multiframe-draw', 'canvas-grid', 'view-filter'],
-    fillbrush: ['symmetry', 'perspective', 'canvas-grid', 'view-filter'],
+    draw: ['brush-menu', 'symmetry', 'perspective', 'predictive-stroke', 'multiframe-draw', 'canvas-grid', 'view-filter'],
+    fillbrush: ['brush-menu', 'symmetry', 'perspective', 'canvas-grid', 'view-filter'],
     pen: ['symmetry', 'perspective', 'french-curve', 'canvas-grid', 'view-filter'],
     line: ['symmetry', 'perspective', 'french-curve', 'canvas-grid'],
     rect: ['symmetry', 'canvas-grid', 'view-filter'],
@@ -80,6 +80,19 @@
       },
     },
   };
+  // Non-toggle entries — a plain action button (opens a popover) rather
+  // than an on/off switch, so `registered[n]`/`addBtn` below treat it
+  // differently: `isActive` decides the `.active` highlight (whether the
+  // popover happens to be open right now) and `onClick` just runs the
+  // action instead of flipping a boolean. Currently only the Brush menu
+  // (brush-menu-bridge.js, 2026-07 — "un menu... avec toute les brush et
+  // des paramètre... 2 onglet vecto et bitmap").
+  var ACTIONS = {
+    'brush-menu': {
+      isActive: function () { return !!(window.BrushMenu && window.BrushMenu.isOpen()); },
+      onClick: function (btn) { if (window.BrushMenu) window.BrushMenu.toggle(btn); },
+    },
+  };
   // Tools armed by a held key regardless of the active tool (flip-roll=R,
   // mirror-check=M, lagoon-menu=Q) — always available, shown after a
   // divider so they read as a separate "always on hand" group rather than
@@ -87,6 +100,7 @@
   var ALWAYS = ['flip-roll', 'mirror-check', 'lagoon-menu'];
 
   var SHORT_NAME = {
+    'brush-menu': 'Brosses (vecteur/bitmap)',
     'symmetry': 'Guide de symétrie / mandala',
     'perspective': 'Guide de perspective',
     'predictive-stroke': 'Trait prédictif',
@@ -108,6 +122,7 @@
   // stroke-based line art, which read as a different, thinner icon
   // language. Rebuilt every icon as a solid silhouette to match.
   var ICONS = {
+    'brush-menu': '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M19.4 2.6c.8.8.8 2 0 2.8L9.5 15.3l-4-4L15.4 1.4c.8-.8 2-.8 2.8 0z" opacity=".85"/><path d="M8.3 12.4l3.3 3.3-1.4 1.4c-1.8 1.8-6.4 2-6.4 2s.2-4.6 2-6.4z"/></svg>',
     // Same "split by an axis" language as the toolbar button (index.html),
     // simplified/solid-filled to match this strip's icon set.
     'symmetry': '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><rect x="11" y="2" width="2" height="20" rx="1"/><path d="M9 6L3 12L9 18Z"/><path d="M15 6L21 12L15 18Z"/></svg>',
@@ -146,11 +161,11 @@
   }
 
   // A name is "available" (gets a button at all) if it's either a
-  // registered Labs prototype OR one of the real state-backed
-  // REAL_FEATURES above — the two are otherwise treated identically by
-  // everything below (same button, same active-state highlight).
+  // registered Labs prototype, one of the real state-backed REAL_FEATURES,
+  // or a plain ACTIONS entry — all three are otherwise treated identically
+  // by everything below (same button, same active-state highlight).
   function buildGroup(names, registered) {
-    return names.filter(function (n) { return registered.hasOwnProperty(n) || REAL_FEATURES.hasOwnProperty(n); });
+    return names.filter(function (n) { return registered.hasOwnProperty(n) || REAL_FEATURES.hasOwnProperty(n) || ACTIONS.hasOwnProperty(n); });
   }
   var SYM_MODES = ['y', 'x', 'free', 'radial'];
   var SYM_MODE_LABEL = { y: 'Y', x: 'X', free: 'Libre', radial: 'Radial' };
@@ -166,6 +181,7 @@
     // their own live state check — done here, once, rather than special-
     // casing every reader below.
     Object.keys(REAL_FEATURES).forEach(function (n) { registered[n] = REAL_FEATURES[n].isOn(); });
+    Object.keys(ACTIONS).forEach(function (n) { registered[n] = ACTIONS[n].isActive(); });
     var ctx = buildGroup(TOOL_CONTEXT[state.tool] || [], registered);
     var always = buildGroup(ALWAYS.filter(function (n) { return ctx.indexOf(n) < 0; }), registered);
     if (!ctx.length && !always.length) { panel.style.display = 'none'; return; }
@@ -178,6 +194,12 @@
       btn.title = SHORT_NAME[n] || n;
       btn.innerHTML = ICONS[n] || '';
       btn.addEventListener('click', function () {
+        // ACTIONS entries manage their own re-render (BrushMenu.toggle
+        // calls renderLabsFloatPanel itself once the popover's open/closed
+        // state is settled) — skip the generic renderLabsFloatPanel() call
+        // below for those so a just-opened popover's own button doesn't
+        // get redrawn (and re-bound) out from under an in-flight click.
+        if (ACTIONS[n]) { ACTIONS[n].onClick(btn); return; }
         if (REAL_FEATURES[n]) REAL_FEATURES[n].toggle();
         else window.SMLabs.toggle(n);
         renderLabsFloatPanel();
