@@ -1395,6 +1395,21 @@ function updatePropsContext(){
   }
   if(window.renderGradientPanel)window.renderGradientPanel();
   var hdrEl=document.getElementById('props-context-hdr');if(hdrEl)hdrEl.textContent=hdrText;
+  // Motion mode: none of these 2D-drawing-tool sections apply (no active
+  // Fill/Stroke/Draw tool, no canvas marquee selection in the Animation 2D
+  // sense) — they were rendering unconditionally via this same inline
+  // display:block regardless of state.appMode, which is what buried
+  // #motion-props-sec (the ONLY section actually relevant in Motion mode,
+  // and the one containing the ƒx expression buttons) ~1375px down the
+  // right panel behind Fill/Stroke/Tool Options/etc. Reported as "toujours
+  // pas d'endroit où mettre les expressions" even after the local
+  // scroll-into-view fix (PR #48) — that fix only handled scrolling WITHIN
+  // an already-visible section, not this much bigger burial problem.
+  // layer-sec (Blend/Matte/Flou) is spared: those are genuine per-layer
+  // properties still meaningful while animating, not a drawing-tool panel.
+  if(state.appMode==='motion'){
+    show['sel-props-sec']=show['fill-sec']=show['stroke-sec']=show['tool-opts-sec']=show['effects-sec']=show['canvas-sec']=false;
+  }
   Object.keys(show).forEach(function(id){var sec=document.getElementById(id);if(sec)sec.style.display=show[id]?'block':'none';});
   // state.drawMode (Front/Behind) has no effect on Fill Brush — it's always
   // inserted at the back regardless (see draw-bridge.js/tools.js commit) —
