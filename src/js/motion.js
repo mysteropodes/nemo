@@ -874,6 +874,32 @@
       // grab target, not one small point.
       items.push({ segments: circleSegs(mh.ringCenter.x, mh.ringCenter.y, mh.ringRadius), closed: true, fillColor: null, strokeColor: [74, 158, 255, 160], strokeWidth: 1 * zs });
     }
+    // Per-vertex handles (2026-07 — closes the actual gap CLAUDE.md §8
+    // flagged: the "Path" accordion (renderPathVertexGroup) already let you
+    // ARM a vertex's stopwatch, but nothing ever let you actually MOVE a
+    // vertex and have that register as its vtxN track value — arming an
+    // untouched vertex just keyed the same [0,0] offset forever, so nothing
+    // ever appeared to morph. Only drawn while that element's Path group is
+    // expanded (window._motionExpandedPathHolder — same single-accordion
+    // state renderPathVertexGroup itself reads), and only for an ELEMENT
+    // target (t.strokeId set) — a whole LAYER has no single segments array
+    // to offer vertices from.
+    if (t.strokeId && window._motionExpandedPathHolder === holder) {
+      var vItem = findElementItem(t.li, t.strokeId);
+      if (vItem && vItem.segments && mh) {
+        var vg = mh.g, vertCol = [190, 130, 240, 255];
+        vItem.segments.forEach(function (seg, vi) {
+          var voff = valueAtFrame(holder, 'vtx' + vi, state.currentFrame);
+          var localX = seg.point.x + (voff[0] || 0), localY = seg.point.y + (voff[1] || 0);
+          var wp = vg.fwd(localX, localY);
+          var vhs = 4.5 * zs;
+          items.push({
+            segments: [{ point: [wp.x - vhs, wp.y] }, { point: [wp.x, wp.y - vhs] }, { point: [wp.x + vhs, wp.y] }, { point: [wp.x, wp.y + vhs] }],
+            closed: true, fillColor: vertCol, strokeColor: [30, 30, 30, 255], strokeWidth: 1 * zs,
+          });
+        });
+      }
+    }
     if (!hasKeys(holder, 'position')) return items;
     // Position keys store a DELTA translation (computeMotionMat's dx/dy —
     // [0,0] means "no motion", added on top of the artwork's own drawn
@@ -994,7 +1020,18 @@
       var lx = (x - px) * sx, ly = (y - py) * sy;
       return { x: px + lx * c - ly * s + pos[0], y: py + lx * s + ly * c + pos[1] };
     }
-    return { bounds: lb, pivot: fwd(px, py), rot: rot, scl: scl, fwd: fwd };
+    // Inverse of fwd — world point back to the shape's own local space.
+    // [c -s; s c] is a pure rotation matrix, so its inverse is just its
+    // transpose ([c s; -s c]); added for vertex dragging (buildOverlayItems'
+    // vertex dots / onDown/onDrag's 'vertex' mode below), which needs to go
+    // world->local to recover the vertex's LOCAL offset from wherever the
+    // mouse currently is in world space.
+    function inv(wx, wy) {
+      var ux = wx - pos[0] - px, uy = wy - pos[1] - py;
+      var lx = ux * c + uy * s, ly = -ux * s + uy * c;
+      return { x: lx / sx + px, y: ly / sy + py };
+    }
+    return { bounds: lb, pivot: fwd(px, py), rot: rot, scl: scl, fwd: fwd, inv: inv };
   }
   // World-space positions of the scale-box corners + the rotate handle
   // (offset outward from the box's own top-center along whatever direction
@@ -1147,6 +1184,27 @@
       return false;
     }
     var t = activeMotionTarget();
+    // Vertex handles (2026-07) checked FIRST, before the box/position/anchor
+    // hit-tests below — once the Path group is expanded the user's whole
+    // focus is on a specific vertex, so a vertex dot must win any incidental
+    // overlap with the (usually much larger) scale/rotate box.
+    if (t && t.strokeId && window._motionExpandedPathHolder === t.holder) {
+      var vItem2 = findElementItem(t.li, t.strokeId);
+      var vg2 = motionBoxGeom(t);
+      if (vItem2 && vItem2.segments && vg2) {
+        var vTol = 9 / view.zoom;
+        for (var vi2 = 0; vi2 < vItem2.segments.length; vi2++) {
+          var seg2 = vItem2.segments[vi2];
+          var voff2 = valueAtFrame(t.holder, 'vtx' + vi2, state.currentFrame);
+          var wp2 = vg2.fwd(seg2.point.x + (voff2[0] || 0), seg2.point.y + (voff2[1] || 0));
+          if (Math.hypot(event.point.x - wp2.x, event.point.y - wp2.y) < vTol) {
+            pushUndo();
+            _motionDrag = { mode: 'vertex', t: t, vi: vi2, basePt: { x: seg2.point.x, y: seg2.point.y } };
+            return true;
+          }
+        }
+      }
+    }
     // Position keys/handles checked BEFORE the anchor point (2026-07-17
     // motion-path-at-anchor fix made this ordering matter): a key at its
     // default [0,0] delta now draws its dot exactly ON the anchor
@@ -1188,6 +1246,21 @@
   }
   function onDrag(event) {
     if (!_motionDrag) return false;
+    if (_motionDrag.mode === 'vertex') {
+      // World -> local via the SAME position/rotation/scale pipeline the
+      // vertex dot itself was drawn through (motionBoxGeom's fwd/inv are
+      // exact inverses) — recomputed fresh each tick since the shape's own
+      // position/rotation/scale could themselves be scrubbing concurrently
+      // (dragging a vertex while the playhead moves, or a running preview).
+      var vg = motionBoxGeom(_motionDrag.t);
+      if (vg) {
+        var local = vg.inv(event.point.x, event.point.y);
+        var dx = local.x - _motionDrag.basePt.x, dy = local.y - _motionDrag.basePt.y;
+        setValue(_motionDrag.t.holder, 'vtx' + _motionDrag.vi, [dx, dy]);
+      }
+      if (window.SMEngineBridge) SMEngineBridge.renderNow();
+      return true;
+    }
     if (_motionDrag.mode === 'unified') {
       var dx = event.point.x - _motionDrag.last.x, dy = event.point.y - _motionDrag.last.y;
       _motionDrag.last = { x: event.point.x, y: event.point.y };
