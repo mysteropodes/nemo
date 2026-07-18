@@ -115,6 +115,16 @@ var state={
   // keyframe B, overriding the auto-matcher for that one pair when it
   // misidentifies correspondence (large shape change, size change).
   tweenOverrides:{},
+  // Per-keyframe-pair easing override — {layer+':'+fA+'-'+fB: {points:[...]}}.
+  // COMPLEMENTS state.easingCurve, never replaces it: a pair with no entry
+  // here just falls back to the global curve (getEasingForPair, tweens.js).
+  // Same on-curve-waypoint shape as easingCurve/motion's curvePoints, so
+  // the one shared widget (_curveEditor.editTweenSeg, ui.js) edits it too.
+  tweenEasing:{},
+  // Timeline toggle (per-project, not per-layer) — show/hide the inline
+  // mini-curve strip under every layer that has at least one tween span.
+  // Purely a display preference; never affects generateTweens() output.
+  showTweenCurves:false,
   selectedStrokeIndices:[],
   undoStack:[],redoStack:[],maxUndo:60,
   // Session-only, deliberately NEVER included in exportJSON()'s field list

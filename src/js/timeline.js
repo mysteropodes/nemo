@@ -293,6 +293,14 @@ window.SM={
     // #os-st-panel (la section Onion Skin du panel droit, mockup 2026-07-17).
     ['os-st','os-st-panel'].forEach(function(id){var el=document.getElementById(id);if(!el)return;el.textContent=state.onionSkin?'ON':'OFF';el.style.color=state.onionSkin?'var(--green)':'var(--text-dim)';});
     var b=document.getElementById('btn-os');if(b)b.classList.toggle('active',state.onionSkin);window.updateOmMarkers(state.currentFrame,state.totalFrames);},
+  // Pure display toggle (complements the global/per-pair easing system,
+  // never affects generateTweens' output) — mini curve strips under every
+  // layer row that has at least one tween span, see renderTweenCurveStrips.
+  toggleTweenCurves:function(){
+    state.showTweenCurves=!state.showTweenCurves;
+    var b=document.getElementById('btn-tween-curves');if(b)b.classList.toggle('active',state.showTweenCurves);
+    renderTweenCurveStrips();
+  },
   toggleGhostAll:function(){
     state.ghostAllFrames=!state.ghostAllFrames;
     renderOS();
@@ -924,7 +932,7 @@ window.SM={
       mediaLibrary:(state.mediaLibrary||[]).map(function(m){return{id:m.id,name:m.name,kind:m.kind,thumb:m.thumb,layerName:m.layerName};}),
       perspectiveEnabled:state.perspectiveEnabled,perspectiveMode:state.perspectiveMode,perspectiveDensity:state.perspectiveDensity,perspectiveVPs:state.perspectiveVPs,
       motionArcs:state.motionArcs,easingCurve:state.easingCurve,resamplePts:state.resamplePts,tweenStep:state.tweenStep,
-      tweenOverrides:state.tweenOverrides,comments:state.comments||[],
+      tweenOverrides:state.tweenOverrides,tweenEasing:state.tweenEasing||{},comments:state.comments||[],
       cameraKeys:state.cameraKeys||[],cameraLayerOn:!!state.cameraLayerOn});
   },
   mergeRemoteSnapshot:function(remoteData,remoteProfile){return mergeRemoteSnapshot(remoteData,remoteProfile);},
@@ -1046,7 +1054,7 @@ window.SM={
       state.layers[idx].color=ld.color||nextLayerColor();
       ld.frames.forEach(function(f){if(!f.isInterpolated)f.isInterpolated=false;});while(state.layers[idx].frames.length<state.totalFrames)state.layers[idx].frames.push({strokes:[],isKeyframe:false,isInterpolated:false});});
     state.layerFolders=d.layerFolders||{};state.layerLinkGroups=d.layerLinkGroups||{};
-    state.motionArcs=d.motionArcs||{};state.tweenOverrides=d.tweenOverrides||{};if(d.easingCurve){state.easingCurve=d.easingCurve;if(window._curveEditor)window._curveEditor.setState(d.easingCurve);}
+    state.motionArcs=d.motionArcs||{};state.tweenOverrides=d.tweenOverrides||{};state.tweenEasing=d.tweenEasing||{};if(d.easingCurve){state.easingCurve=d.easingCurve;if(window._curveEditor)window._curveEditor.setState(d.easingCurve);}
     state.comments=d.comments||[];
     if(typeof refreshFbAvatars==='function')refreshFbAvatars(); // avatar stack mirrors state.comments — resync on project import
     state.cameraKeys=d.cameraKeys||[];state.cameraLayerOn=!!d.cameraLayerOn;state.cameraView=false;
@@ -1810,7 +1818,77 @@ function renderTimeline(){
   var awrap=document.getElementById('fg-wrap');
   document.getElementById('playhead').style.left=(state.currentFrame*FC)+'px';document.getElementById('playhead').style.height=Math.max(30+rowCount*ROW_H+camGridRowOffset(),awrap?awrap.clientHeight:0)+'px';document.getElementById('playhead-flag').textContent=state.currentFrame+1;
   if(window.SMAudio)SMAudio.renderStrip();
+  renderTweenCurveStrips();
 }
+// ---- TWEEN EASING CURVE STRIPS (toggle: btn-tween-curves) ----
+// Purely additive display, complements the global/per-pair easing system —
+// never touched by generateTweens(). A thin sparkline of the EFFECTIVE
+// curve (per-pair override if one exists, else the global fallback — same
+// getEasingForPair tweens.js itself uses) along the bottom of every layer
+// row, for each tween span (a keyframe pair with at least one generated
+// isInterpolated frame between them). Clicking a segment's own strip opens
+// the shared curve widget pointed at just that pair (openTweenEaseEditor),
+// same right-click-a-segment idea as camera/motion, just click-to-open
+// since the strip IS the segment here (no separate context-menu item
+// needed once the strip's own visible below the layer).
+function layerKeyframeList(li){
+  var ld=state.layers[li];if(!ld)return[];
+  var keys=[];
+  for(var i=0;i<state.totalFrames;i++)if(ld.frames[i]&&ld.frames[i].isKeyframe)keys.push(i);
+  return keys;
+}
+function renderTweenCurveStrips(){
+  var grid=document.getElementById('frame-grid');
+  if(!grid)return;
+  var old=grid.querySelectorAll('.tw-curve-strip');
+  for(var oi=0;oi<old.length;oi++)old[oi].remove();
+  if(!state.showTweenCurves)return;
+  var rows=grid.querySelectorAll('.frow');
+  rows.forEach(function(row){
+    var firstCell=row.querySelector('.fc');
+    if(!firstCell||firstCell.dataset.layer===undefined)return;
+    var li=parseInt(firstCell.dataset.layer);
+    if(isNaN(li)||!state.layers[li])return;
+    var ld=state.layers[li];
+    var keys=layerKeyframeList(li);
+    if(keys.length<2)return;
+    var STRIP_H=8;
+    var svg=null;
+    for(var k=0;k<keys.length-1;k++){
+      var fA=keys[k],fB=keys[k+1];
+      var hasTween=false;
+      for(var fi=fA+1;fi<fB;fi++){if(ld.frames[fi]&&ld.frames[fi].isInterpolated){hasTween=true;break;}}
+      if(!hasTween)continue;
+      if(!svg){
+        svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+        svg.setAttribute('class','tw-curve-strip');
+        svg.style.cssText='position:absolute;left:0;bottom:0;width:'+(state.totalFrames*FC)+'px;height:'+STRIP_H+'px;pointer-events:none;';
+        row.style.position='relative';
+        row.appendChild(svg);
+      }
+      var evalFn=getEasingForPair(li,fA,fB);
+      var x0=fA*FC,w=(fB-fA)*FC;
+      var N=Math.max(4,Math.min(24,fB-fA));
+      var pts=[];
+      for(var s=0;s<=N;s++){
+        var t=s/N;
+        var y=Math.max(0,Math.min(1,evalFn(t)));
+        pts.push((x0+t*w).toFixed(1)+','+(STRIP_H-1-y*(STRIP_H-2)).toFixed(1));
+      }
+      var custom=!!(state.tweenEasing&&state.tweenEasing[li+':'+fA+'-'+fB]&&state.tweenEasing[li+':'+fA+'-'+fB].points);
+      var poly=document.createElementNS('http://www.w3.org/2000/svg','polyline');
+      poly.setAttribute('points',pts.join(' '));
+      poly.setAttribute('fill','none');
+      poly.setAttribute('stroke',custom?'#4a9eff':'rgba(255,255,255,.35)');
+      poly.setAttribute('stroke-width',custom?'2':'1.2');
+      poly.style.cursor='pointer';
+      poly.style.pointerEvents='stroke';
+      poly.addEventListener('click',(function(l,a,b){return function(e){e.stopPropagation();openTweenEaseEditor(l,a,b);};})(li,fA,fB));
+      svg.appendChild(poly);
+    }
+  });
+}
+window.renderTweenCurveStrips=renderTweenCurveStrips;
 // Builds one row's worth of frame cells for layer `li` into `rowEl` — shared
 // by the normal per-layer row and a collapsed folder's representative row
 // (see renderTimeline() above) so both stay pixel-identical.
@@ -2237,7 +2315,14 @@ document.getElementById('frame-grid').addEventListener('contextmenu',function(e)
   if(li!==state.activeLayerIdx)window.SM.setActiveLayer(li);
   goToFrame(fi);
   var hasClip=!!(_sel.clipboard&&_sel.clipboard.length);
-  window.showContextMenu(e.clientX,e.clientY,[
+  // If this cell sits inside (or starts) a tween span, offer to edit JUST
+  // that pair's easing curve (openTweenEaseEditor, tweens.js) — same idea
+  // as the tween-curve-strip's own click-to-edit, reachable even with
+  // state.showTweenCurves off.
+  var twKeys=layerKeyframeList(li),twPair=null;
+  for(var tki=0;tki<twKeys.length-1;tki++){if(fi>=twKeys[tki]&&fi<=twKeys[tki+1]){twPair={a:twKeys[tki],b:twKeys[tki+1]};break;}}
+  var twMenuItems=twPair?[{label:'Éditer la courbe de ce tween…',action:function(){openTweenEaseEditor(li,twPair.a,twPair.b);}},{sep:true}]:[];
+  window.showContextMenu(e.clientX,e.clientY,twMenuItems.concat([
     {label:'Copier',shortcut:'⌘C',action:function(){window.SM.copyFrames();}},
     {label:'Couper',shortcut:'⌘X',action:function(){window.SM.cutFrames();}},
     {label:'Coller',shortcut:'⌘V',disabled:!hasClip,action:function(){window.SM.pasteFrames();}},
@@ -2258,7 +2343,7 @@ document.getElementById('frame-grid').addEventListener('contextmenu',function(e)
     {label:'Générer / refaire le tween',shortcut:'T',action:function(){window.SM.generateTweens();}},
     {sep:true},
     {label:'Supprimer les images',action:function(){window.SM.removeFrameSpan();}},
-  ]);
+  ]));
 });
 
 document.getElementById('frame-grid').addEventListener('mousemove',function(e){
@@ -4370,6 +4455,7 @@ document.getElementById('p-skipmanual').addEventListener('change',function(){sta
 document.getElementById('btn-tw').addEventListener('click',function(){window.SM.generateTweens();});
 document.getElementById('btn-os').addEventListener('click',function(){window.SM.toggleOnion();});
 document.getElementById('btn-ghost-all').addEventListener('click',function(){window.SM.toggleGhostAll();});
+document.getElementById('btn-tween-curves').addEventListener('click',function(){window.SM.toggleTweenCurves();});
 document.getElementById('btn-ghost-select').addEventListener('click',function(){selectGhostAll();});
 // Team review view filter — cycles All -> Mine -> Corrections, purely a
 // render-time filter in engine-bridge.js's buildSceneJson (never touches

@@ -46,7 +46,7 @@
     var defFrames=Math.max(1,Math.round(cfg.fps*5));
     state.totalFrames=defFrames;state.waIn=0;state.waOut=defFrames-1;
     window._waIn=0;window._waOut=defFrames-1;window._totalF=defFrames;
-    state.motionArcs={};state.tweenOverrides={};state.currentFrame=0;
+    state.motionArcs={};state.tweenOverrides={};state.tweenEasing={};state.currentFrame=0;
     // Viewport/UI state, not document content — reset the same way
     // fitCanvas()/resetView() already do, so a new project doesn't silently
     // inherit the previous project's stage rotation.
