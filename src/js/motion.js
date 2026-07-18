@@ -161,7 +161,14 @@
   function keyAt(track, frame) { return track.keys.find(function (k) { return k.frame === frame; }) || null; }
   function staticValue(ld, prop) {
     var st = ld.motionStatic && ld.motionStatic[prop];
-    return st ? st.slice() : PROP_DEFAULT[prop].slice();
+    if (st) return st.slice();
+    // Per-vertex Path properties (prop = 'vtx0','vtx1',... — see
+    // applyPathVertexOffsets below) aren't in the fixed PROPS list, so they
+    // have no PROP_DEFAULT entry; they're offsets on top of the base
+    // geometry, so [0,0] (no offset) is the correct neutral default,
+    // exactly like PROP_DEFAULT.position would be if it existed there.
+    var def = PROP_DEFAULT[prop];
+    return def ? def.slice() : [0, 0];
   }
 
   // The value of `prop` on layer `ld` at `frame` — exact key, interpolated,
@@ -499,6 +506,50 @@
     var ld = state.layers[li];
     if (!ld || !ld.elementMotion) return null;
     return computeMotionMat(ld.elementMotion[strokeId], frameIdx);
+  }
+  // Path property, per-vertex (2026-07, "les properties de path dans motion
+  // dont les vertices peuvent être animé séparément"): reuses the EXACT
+  // same holder/track machinery as the 5 base Transform properties
+  // (valueAtFrame/isAnimated/toggleAnimated/setKeyAtCurrentFrame/
+  // trackRowHtml, all already generic over any `prop` string, not hardcoded
+  // to PROPS) — a vertex is just a dynamically-named prop ('vtx0','vtx1',…)
+  // on the SAME element holder (ld.elementMotion[strokeId]) a shape's own
+  // Transform group already lives on, so it's one more sub-track dict,
+  // never a parallel system. Each vtxN track holds a 2D [dx,dy] OFFSET
+  // added to that vertex's base point — NOT an absolute position — so an
+  // un-keyed vertex (the overwhelmingly common case) costs one cheap
+  // isAnimated/motionStatic lookup returning [0,0], never touching the
+  // segment. See staticValue's [0,0] fallback for props with no
+  // PROP_DEFAULT entry (vtxN never has one, by design).
+  function hasPathVertexMotion(holder) {
+    if (!holder) return false;
+    var k;
+    if (holder.motion) for (k in holder.motion) if (k.indexOf('vtx') === 0 && holder.motion[k].keys.length) return true;
+    if (holder.motionStatic) for (k in holder.motionStatic) if (k.indexOf('vtx') === 0) return true;
+    return false;
+  }
+  // Applied to an item's already-serialized segments (engine-bridge.js's
+  // buildSceneJson AND export.js's exportBuildFrame both call this) BEFORE
+  // elMat/motionMat/parentChain — per-vertex geometry is the innermost
+  // layer of the composition stack, exactly like a shape's own path data
+  // is the innermost input to any AE-style transform chain built on top of
+  // it. `holder` is the element's own holder (ensureElementHolder result);
+  // null/no-vertex-motion is the fast, zero-cost common path.
+  function applyPathVertexOffsets(segments, holder, frameIdx) {
+    if (!hasPathVertexMotion(holder)) return segments;
+    return segments.map(function (s, i) {
+      var off = valueAtFrame(holder, 'vtx' + i, frameIdx);
+      if (!off[0] && !off[1]) return s;
+      return { point: [s.point[0] + off[0], s.point[1] + off[1]], handleIn: s.handleIn, handleOut: s.handleOut };
+    });
+  }
+  // Resolves the element holder from (li, strokeId) itself, same
+  // encapsulation elementMotionAt already gives callers — engine-bridge.js/
+  // export.js never need to know ld.elementMotion is where this lives.
+  function applyPathVertexOffsetsFor(li, strokeId, segments, frameIdx) {
+    var ld = state.layers[li];
+    if (!ld || !ld.elementMotion || !strokeId) return segments;
+    return applyPathVertexOffsets(segments, ld.elementMotion[strokeId], frameIdx);
   }
   // Transforms one item's already-built segments array (engine-bridge.js's
   // {point,handleIn,handleOut} triples, handles as RELATIVE offsets — see
@@ -1478,7 +1529,79 @@
       list.appendChild(row);
       if (!expanded) return;
       renderTransformGroup(list, ensureElementHolder(ld, entry.strokeId), 'Transform (élément)');
+      // Path property (2026-07): opt-in extended property, hidden unless
+      // the element actually has vertex geometry (a Raster/image entry
+      // never does) — same "hidden by default, opt-in" convention CLAUDE.md
+      // §8 documents for fill/stroke/brush extended properties.
+      if (!entry.sd.isRaster && entry.sd.segments && entry.sd.segments.length) {
+        renderPathVertexGroup(list, ensureElementHolder(ld, entry.strokeId), entry.sd.segments.length);
+      }
     });
+  }
+  // "Path" group — one row per vertex, each independently keyable (2026-07,
+  // "les properties de path dont les vertices peuvent être animé
+  // séparément on doit voir cette propriété"). Single-accordion per holder
+  // (window._motionExpandedPathHolder), same pattern as
+  // window._motionExpandedElement one level up. Mirrored in
+  // renderTimelineMotion below — MUST stay in exact sync (same expand
+  // condition, same vertex count) or the panel/grid rows desync (ROW_H's
+  // own header comment already warns about this class of bug for the base
+  // Transform rows).
+  function isPathGroupExpanded(holder) { return window._motionExpandedPathHolder === holder; }
+  function renderPathVertexGroup(list, holder, vertexCount) {
+    var grp = document.createElement('div'); grp.className = 'lrow motion-group-row';
+    var arrow = document.createElement('span'); arrow.className = 'lico larrow'; arrow.textContent = isPathGroupExpanded(holder) ? '▾' : '▸';
+    var label = document.createElement('span'); label.textContent = 'Path';
+    grp.appendChild(arrow); grp.appendChild(label);
+    grp.addEventListener('click', function (e) {
+      e.stopPropagation();
+      window._motionExpandedPathHolder = isPathGroupExpanded(holder) ? null : holder;
+      renderLayerList(); renderTimeline();
+    });
+    list.appendChild(grp);
+    if (!isPathGroupExpanded(holder)) return;
+    for (var vi = 0; vi < vertexCount; vi++) renderVertexRow(list, holder, vi);
+  }
+  // A vertex row is a lean version of renderTransformGroup's own per-prop
+  // row — single stopwatch (same 3-state convention: hollow/blue-outline/
+  // solid-blue) driving the SAME generic toggleAnimated/setKeyAtCurrentFrame/
+  // removeKeyAtCurrentFrame machinery the 5 base properties use, just with
+  // prop='vtx'+vi instead of one of PROPS. No numeric value fields here
+  // (unlike Position/Scale/etc.) — a vertex offset is set by DRAGGING the
+  // vertex on canvas (select-bridge, not built here), the stopwatch only
+  // arms/disarms keyframing and jumps to/removes a key at the playhead.
+  function renderVertexRow(list, holder, vi) {
+    var prop = 'vtx' + vi;
+    var row = document.createElement('div'); row.className = 'lrow motion-prop-row motion-vertex-row';
+    var sw = document.createElement('div');
+    var swOn = isAnimated(holder, prop);
+    var hasKeyHere = swOn && !!keyAt(holder.motion[prop], state.currentFrame);
+    sw.className = 'lico motion-stopwatch' + (swOn ? ' on' : '');
+    sw.title = !swOn ? 'Activer l’animation de ce vertex' : (hasKeyHere ? 'Retirer la clé à la frame courante' : 'Ajouter une clé à la frame courante');
+    sw.innerHTML = '<svg viewBox="0 0 24 24" width="12" height="12"><path d="M12 3l9 9-9 9-9-9z" fill="' + (hasKeyHere ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2"/></svg>';
+    sw.addEventListener('click', function (e) {
+      e.stopPropagation(); pushUndo();
+      if (!swOn) {
+        toggleAnimated(holder, prop);
+      } else if (hasKeyHere) {
+        if (holder.motion[prop].keys.length === 1) {
+          var fv = valueAtFrame(holder, prop, state.currentFrame);
+          holder.motion[prop] = { keys: [] };
+          if (!holder.motionStatic) holder.motionStatic = {};
+          holder.motionStatic[prop] = fv;
+        } else {
+          removeKeyAtCurrentFrame(holder, prop);
+        }
+      } else {
+        setKeyAtCurrentFrame(holder, prop, valueAtFrame(holder, prop, state.currentFrame));
+      }
+      renderLayerList(); renderTimeline();
+      if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+    });
+    row.appendChild(sw);
+    var nm = document.createElement('div'); nm.className = 'lnm'; nm.textContent = 'Vertex ' + (vi + 1);
+    row.appendChild(nm);
+    list.appendChild(row);
   }
 
   // ---- Motion mode UI: keyframe tracks (mirrors the layer list's rows) ----
@@ -1632,7 +1755,18 @@
           var elSpacer = document.createElement('div'); elSpacer.className = 'frow';
           grid.appendChild(elSpacer);
           if (!elExpanded) return;
-          PROPS.forEach(function (prop) { renderTracksFor(grid, ensureElementHolder(ld, entry.strokeId), prop); });
+          var elHolder = ensureElementHolder(ld, entry.strokeId);
+          PROPS.forEach(function (prop) { renderTracksFor(grid, elHolder, prop); });
+          // Path group (mirrors renderElementsList's renderPathVertexGroup
+          // exactly — same expand condition, same vertex count, same
+          // spacer-then-rows shape as the Transform group just above).
+          if (!entry.sd.isRaster && entry.sd.segments && entry.sd.segments.length) {
+            var pathHdrSpacer = document.createElement('div'); pathHdrSpacer.className = 'frow';
+            grid.appendChild(pathHdrSpacer);
+            if (isPathGroupExpanded(elHolder)) {
+              for (var vi = 0; vi < entry.sd.segments.length; vi++) renderTracksFor(grid, elHolder, 'vtx' + vi);
+            }
+          }
         });
       }
     });
@@ -2185,6 +2319,7 @@
     parentChainMats: parentChainMats,
     applyParentChainToSegments: applyParentChainToSegments,
     applyParentChainToImageRect: applyParentChainToImageRect,
+    applyPathVertexOffsetsFor: applyPathVertexOffsetsFor,
     buildOverlayItems: buildOverlayItems,
     renderLayerListMotion: renderLayerListMotion,
     renderTimelineMotion: renderTimelineMotion,

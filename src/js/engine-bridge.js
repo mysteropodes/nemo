@@ -334,6 +334,13 @@
         else continue;
         subPaths.forEach(function (sub) {
           var sd = serP(sub);
+          // Path property, per-vertex (motion.js's applyPathVertexOffsetsFor,
+          // 2026-07): innermost layer of the transform stack, applied to the
+          // raw geometry BEFORE elMat — a vertex offset is authored in the
+          // shape's OWN local space, same as elMat's own pivot is computed
+          // from `c.bounds` (the pre-offset bounds), matching AE's model
+          // where a path's own points are edited before any transform.
+          if (window.SMMotion && cStrokeId) sd.segments = SMMotion.applyPathVertexOffsetsFor(i, cStrokeId, sd.segments, state.currentFrame);
           if (elMat) sd.segments = SMMotion.transformSegments(sd.segments, elPivot, elMat);
           if (motionMat) sd.segments = SMMotion.transformSegments(sd.segments, motionPivot, motionMat);
           for (var pc2 = 0; pc2 < parentChain.length; pc2++) sd.segments = SMMotion.transformSegments(sd.segments, parentChain[pc2].pivot, parentChain[pc2].mat);
