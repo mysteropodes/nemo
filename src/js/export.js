@@ -58,6 +58,17 @@ function exportBuildFrame(frameIdx,alpha){
       // imported image already triggered it), surfaced now because Bitmap
       // Brush adds a Raster companion to nearly every textured stroke.
       var p=sd.isRaster?desR(sd,L,sd.opacity!==undefined?sd.opacity:1):desP(sd,L,sd.opacity!==undefined?sd.opacity:1);
+      // Path property, per-vertex (motion.js's applyPathVertexOffsetsFor,
+      // 2026-07): innermost transform — applied directly to `p`'s own
+      // segments before elMat's pivot is even read from p.bounds, same
+      // ordering as buildSceneJson's engine-bridge.js branch.
+      if(!sd.isRaster&&window.SMMotion&&sd.strokeId){
+        var vtxSegs=SMMotion.applyPathVertexOffsetsFor(li,sd.strokeId,sd.segments,frameIdx);
+        for(var vsi=0;vsi<p.segments.length&&vsi<vtxSegs.length;vsi++){
+          p.segments[vsi].point.x=vtxSegs[vsi].point[0];
+          p.segments[vsi].point.y=vtxSegs[vsi].point[1];
+        }
+      }
       // Element-level Motion target (2026-07): applied FIRST, pivoted
       // around THIS stroke's own just-built bounds (not the whole layer's)
       // — see motion.js's elementMotionAt header comment. sd.strokeId is
