@@ -431,6 +431,19 @@ body.mac-overlay-titlebar #app{padding-top:28px;}
 .motion-stopwatch{color:var(--text-dark);cursor:pointer;}
 .motion-stopwatch:hover{background:var(--panel3);color:var(--text);}
 .motion-stopwatch.on{color:var(--accent);}
+/* ƒx expression toggle (2026-07) — sits right after the stopwatch, same
+   hollow/on visual language: neutral when no expression, accent when one is
+   enabled, red when it's enabled but currently throwing (lastError set),
+   so a broken expression is visible on the row itself, not just in a log. */
+.motion-expr-btn{color:var(--text-dark);cursor:pointer;}
+.motion-expr-btn:hover{background:var(--panel3);color:var(--text);}
+.motion-expr-btn.on{color:var(--accent);}
+.motion-expr-btn.err{color:var(--red);}
+.motion-expr-editor{height:auto;flex-direction:column;align-items:stretch;gap:4px;padding:6px 8px 8px 30px;cursor:default;background:rgba(255,255,255,.02);}
+.motion-expr-toggle{display:flex;align-items:center;gap:5px;font-size:10.5px;color:var(--text-dim);cursor:pointer;}
+.motion-expr-code{width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;padding:6px;resize:vertical;}
+.motion-expr-code:focus{outline:none;border-color:var(--accent);}
+.motion-expr-error{font-size:10px;color:var(--red);white-space:pre-wrap;}
 /* Right-panel "Propriétés du calque" section (motion.js
    renderMotionPropsPanel) — Motion mode only; the rows inside reuse the
    global .lrow/.motion-prop-row styles, which aren't scoped to
