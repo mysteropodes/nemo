@@ -2597,6 +2597,12 @@
         mpHdr.classList.remove('closed');
       }
     }
+    // The 2D-tool sections (Fill/Stroke/Tool Options/Effects/Document) stay
+    // visible via updatePropsContext()'s own inline display:block unless
+    // re-run right now — without this, switching into Motion still shows
+    // whatever tool context was active in 2D mode, burying the section
+    // above (which contains the expression buttons) far down the panel.
+    if (window.updatePropsContext) window.updatePropsContext();
     renderLayerList(); renderTimeline();
     if (window.renderSymbolTabs) renderSymbolTabs();
     if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
