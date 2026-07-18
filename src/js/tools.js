@@ -1,5 +1,6 @@
 // ---- TOOLS ----
 var currentPath=null,selectedPaths=[],stabQueue=[],shapeStart=null;
+var _textDragStart=null,_textDragRect=null;
 // Shift-constrain helpers for Rectangle/Ellipse/Line (see their onMouseDrag
 // handler) — kept standalone rather than inlined since both the shape and
 // its live drag-preview need the identical constrained endpoint.
@@ -3603,7 +3604,12 @@ function onMouseDown(event){
   }else if(state.tool==='camera'){
     if(window.SMCamera)SMCamera.onDown(event);
   }else if(state.tool==='text'){
-    if(window.openTextPopover)openTextPopover(event.point);
+    // A plain click still opens the point-text popover immediately (see
+    // onMouseUp's companion branch — a click-with-no-drag never enters the
+    // preview-rectangle path below, matching pre-2026-07 behavior exactly).
+    // A drag defines an area-text box instead (Illustrator "type in a box"),
+    // finalized in onMouseUp once the drag distance is known.
+    _textDragStart=event.point.clone();
   }else if(state.tool==='fsselect'){
     _fsSel=fsHitTest(event.point,layer);
     updateUI();
@@ -3871,6 +3877,21 @@ function onMouseDrag(event){
     if(state.tool==='line'){currentPath=new Path.Line({from:shapeStart,to:endPt,strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,strokeCap:state.strokeCap,fillColor:null,opacity:state.opacity/100});applyStrokeStyle(currentPath);}
     else if(state.tool==='rect')currentPath=new Path.Rectangle({from:shapeStart,to:endPt,strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,fillColor:state.fillEnabled?state.fillColor:null,opacity:state.opacity/100});
     else{currentPath=new Path.Ellipse({rectangle:new Rectangle(shapeStart,endPt),strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,fillColor:state.fillEnabled?state.fillColor:null,opacity:state.opacity/100});}
+  }else if(state.tool==='text'&&_textDragStart){
+    // Drag guide rectangle — purely visual (marqueeLayer, never inserted
+    // into real content), same pattern as the subselect marquee just below.
+    // Only x matters for the actual box (wrapping is width-only, no fixed-
+    // height clipping in this implementation); a nominal height is drawn
+    // just so the drag reads as "defining a box" rather than a stray line.
+    if(_textDragRect){_textDragRect.remove();_textDragRect=null;}
+    var twv=Math.abs(event.point.x-_textDragStart.x);
+    if(twv>4/view.zoom){
+      var tx1=Math.min(_textDragStart.x,event.point.x),ty1=Math.min(_textDragStart.y,event.point.y);
+      var tx2=Math.max(_textDragStart.x,event.point.x);
+      var prevTxt=project.activeLayer;marqueeLayer.activate();
+      _textDragRect=new Path.Rectangle({from:new Point(tx1,ty1),to:new Point(tx2,ty1+60/view.zoom),strokeColor:'rgba(255,184,108,.9)',strokeWidth:1/view.zoom,dashArray:[4/view.zoom,3/view.zoom],fillColor:new Color(1,0.72,0.42,0.06),insert:true});
+      prevTxt.activate();
+    }
   }else if(state.tool==='subselect'){
     if(_nmq.active){
       var nx1=Math.min(_nmq.start.x,event.point.x),ny1=Math.min(_nmq.start.y,event.point.y);
@@ -4095,6 +4116,14 @@ function onMouseUp(event){
     _vb.pts=[];_vb.widths=[];currentPath=null;stabQueue=[];saveActiveLayerFrame();updateUI();
   }else if(state.tool==='pen'){
     _pen.draggingHandle=false;
+  }else if(state.tool==='text'&&_textDragStart){
+    if(_textDragRect){_textDragRect.remove();_textDragRect=null;}
+    var textDragWidth=Math.abs(event.point.x-_textDragStart.x);
+    if(textDragWidth>20/view.zoom){
+      var textTopLeft=new Point(Math.min(_textDragStart.x,event.point.x),Math.min(_textDragStart.y,event.point.y));
+      if(window.openTextPopoverForBox)openTextPopoverForBox(textTopLeft,textDragWidth);
+    }else if(window.openTextPopover)openTextPopover(_textDragStart);
+    _textDragStart=null;
   }else if((state.tool==='line'||state.tool==='rect'||state.tool==='ellipse')&&currentPath){
     if(shapeStart&&event.point.getDistance(shapeStart)<2){currentPath.remove();if(state.undoStack.length)state.undoStack.pop();}
     else{
@@ -4203,6 +4232,17 @@ function onMouseMoveTool(event){
 // heuristic: any stroke-only path whose bounds intersect the fill's bounds
 // is assumed to be part of its outline.
 function onViewDoubleClick(event){
+  // Re-edit a placed text block in place (2026-07 rework) — checked before
+  // the select-only guard below since double-clicking with the Text tool
+  // itself active must also work, not just Select.
+  if(state.tool==='select'||state.tool==='text'){
+    var textLayer=userLayers[state.activeLayerIdx];
+    var textHit=textLayer.hitTest(event.point,{fill:true,stroke:true,tolerance:4/view.zoom});
+    if(textHit&&textHit.item instanceof Raster&&textHit.item.data&&textHit.item.data.isText){
+      if(window.openTextPopoverForEdit)openTextPopoverForEdit(textHit.item);
+      return;
+    }
+  }
   if(state.tool!=='select')return;
   var layer=userLayers[state.activeLayerIdx];
   var hit=layer.hitTest(event.point,{fill:true,tolerance:4/view.zoom});
