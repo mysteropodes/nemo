@@ -670,6 +670,26 @@
     if (!ld || !ld.elementMotion) return null;
     return computeMotionMat(ld.elementMotion[strokeId], frameIdx);
   }
+  // Extended per-shape property: Fill color (2026-07 — audit gap
+  // "propriétés étendues par forme... reste un chantier futur"). First
+  // slice of that "chantier": a shape's own `fillColor` becomes just
+  // another 'fillColor' track on its element holder, [r,g,b,a] 0-255 (the
+  // SAME array shape buildSceneJson's cssColorToRgba already produces —
+  // no conversion needed at render time, just an override), reusing every
+  // bit of the existing generic keyframe/interpolation machinery (a color
+  // track is dimension-agnostic to valueAtFrame/setKeyAtCurrentFrame —
+  // confirmed already true for vtxN's 2D offsets, equally true for 4
+  // channels). Returns null (never overriding the item's own painted
+  // color) unless the user has actually keyed or set a static override —
+  // same "opt-in, never automatic" contract as vtxN.
+  function elementFillColorAt(li, strokeId, frameIdx) {
+    var ld = state.layers[li];
+    if (!ld || !ld.elementMotion) return null;
+    var holder = ld.elementMotion[strokeId];
+    if (!holder) return null;
+    if (!hasKeys(holder, 'fillColor') && !(holder.motionStatic && holder.motionStatic.fillColor)) return null;
+    return valueAtFrame(holder, 'fillColor', frameIdx);
+  }
   // Path property, per-vertex (2026-07, "les properties de path dans motion
   // dont les vertices peuvent être animé séparément"): reuses the EXACT
   // same holder/track machinery as the 5 base Transform properties
@@ -1846,7 +1866,84 @@
       if (!entry.sd.isRaster && entry.sd.segments && entry.sd.segments.length) {
         renderPathVertexGroup(list, ensureElementHolder(ld, entry.strokeId), entry.sd.segments.length);
       }
+      // Fill color (2026-07): opt-in extended property, hidden unless the
+      // element actually has a fill — same convention as Path above.
+      if (entry.sd.fillColor) {
+        renderFillColorRow(list, ensureElementHolder(ld, entry.strokeId), entry.sd.fillColor);
+      }
     });
+  }
+  // Reads a hex6/hex8 string into an [r,g,b,a] 0-255 array — the SAME shape
+  // buildSceneJson's cssColorToRgba already produces for the live render,
+  // so a keyed fillColor value needs zero conversion at render time.
+  function hexToRgba255(hex) {
+    var h = (hex || '#000000').replace('#', '');
+    var r = parseInt(h.substr(0, 2), 16) || 0, g = parseInt(h.substr(2, 2), 16) || 0, b = parseInt(h.substr(4, 2), 16) || 0;
+    var a = h.length >= 8 ? parseInt(h.substr(6, 2), 16) : 255;
+    return [r, g, b, isNaN(a) ? 255 : a];
+  }
+  function rgba255ToHex(v) {
+    function h2(n) { return Math.max(0, Math.min(255, Math.round(n || 0))).toString(16).padStart(2, '0'); }
+    return '#' + h2(v[0]) + h2(v[1]) + h2(v[2]) + h2(v[3] !== undefined ? v[3] : 255);
+  }
+  // Single row (not an accordion group — one color, nothing to expand),
+  // same stopwatch/keying contract as renderVertexRow but with a color
+  // swatch instead of numeric scrub fields. Opens the SAME color-picker
+  // popover the layer-color dot uses elsewhere (timeline.js).
+  function renderFillColorRow(list, holder, currentFillColorHex) {
+    var prop = 'fillColor';
+    var row = document.createElement('div'); row.className = 'lrow motion-prop-row';
+    var sw = document.createElement('div');
+    var swOn = isAnimated(holder, prop);
+    var hasKeyHere = swOn && !!keyAt(holder.motion[prop], state.currentFrame);
+    sw.className = 'lico motion-stopwatch' + (swOn ? ' on' : '');
+    sw.title = !swOn ? 'Activer l’animation du fill' : (hasKeyHere ? 'Retirer la clé à la frame courante' : 'Ajouter une clé à la frame courante');
+    sw.innerHTML = '<svg viewBox="0 0 24 24" width="12" height="12"><path d="M12 3l9 9-9 9-9-9z" fill="' + (hasKeyHere ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2"/></svg>';
+    function currentRgba() {
+      if (hasKeys(holder, prop)) return valueAtFrame(holder, prop, state.currentFrame);
+      if (holder.motionStatic && holder.motionStatic[prop]) return holder.motionStatic[prop];
+      return hexToRgba255(currentFillColorHex);
+    }
+    sw.addEventListener('click', function (e) {
+      e.stopPropagation(); pushUndo();
+      if (!swOn) {
+        if (!holder.motionStatic) holder.motionStatic = {};
+        if (!holder.motionStatic[prop]) holder.motionStatic[prop] = hexToRgba255(currentFillColorHex);
+        toggleAnimated(holder, prop);
+      } else if (hasKeyHere) {
+        if (holder.motion[prop].keys.length === 1) {
+          var fv = valueAtFrame(holder, prop, state.currentFrame);
+          holder.motion[prop] = { keys: [] };
+          if (!holder.motionStatic) holder.motionStatic = {};
+          holder.motionStatic[prop] = fv;
+        } else {
+          removeKeyAtCurrentFrame(holder, prop);
+        }
+      } else {
+        setKeyAtCurrentFrame(holder, prop, valueAtFrame(holder, prop, state.currentFrame));
+      }
+      renderLayerList(); renderTimeline();
+      if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+    });
+    var nm = document.createElement('div'); nm.className = 'lnm'; nm.textContent = 'Fill';
+    var swatch = document.createElement('div');
+    swatch.style.cssText = 'width:16px;height:16px;border-radius:3px;border:1px solid var(--border2);cursor:pointer;margin-left:auto;';
+    var rgba = currentRgba();
+    swatch.style.background = 'rgba(' + rgba[0] + ',' + rgba[1] + ',' + rgba[2] + ',' + ((rgba[3] !== undefined ? rgba[3] : 255) / 255) + ')';
+    swatch.title = 'Couleur de fill de cette forme';
+    swatch.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (!window.openLayerColorSwatches) return;
+      openLayerColorSwatches(swatch, rgba255ToHex(currentRgba()), function (hex) {
+        pushUndo();
+        var v = hexToRgba255(hex);
+        setValue(holder, prop, v);
+        renderLayerList(); renderTimeline();
+        if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+      });
+    });
+    row.appendChild(sw); row.appendChild(nm); row.appendChild(swatch);
+    list.appendChild(row);
   }
   // "Path" group — one row per vertex, each independently keyable (2026-07,
   // "les properties de path dont les vertices peuvent être animé
@@ -2621,6 +2718,7 @@
     setLayerValue: function (li, prop, vals) { var ld = state.layers[li]; if (ld) setValue(ld, prop, vals); },
     layerMotionAt: layerMotionAt,
     elementMotionAt: elementMotionAt,
+    elementFillColorAt: elementFillColorAt,
     transformSegments: transformSegments,
     transformImageRect: transformImageRect,
     ensureLayerUid: ensureLayerUid,
