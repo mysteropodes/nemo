@@ -58,6 +58,17 @@ function exportBuildFrame(frameIdx,alpha){
       // imported image already triggered it), surfaced now because Bitmap
       // Brush adds a Raster companion to nearly every textured stroke.
       var p=sd.isRaster?desR(sd,L,sd.opacity!==undefined?sd.opacity:1):desP(sd,L,sd.opacity!==undefined?sd.opacity:1);
+      // Gradient fill (2026-07) — Paper.js has native Gradient support, so
+      // export/preview through THIS (pure-Paper.js) path gets a real
+      // gradient for free, unlike the Rust/vello live-canvas path which
+      // needed its own ItemIn.fillGradient + peniko::Gradient plumbing
+      // (engine-bridge.js/geometry-wasm). Overrides desP's flat fillColor.
+      if(!sd.isRaster&&sd.fillGradient){
+        var fg=sd.fillGradient;
+        var stops=fg.stops.map(function(s){return [s.color,s.offset];});
+        var grad=new Gradient(stops,fg.kind==='radial');
+        p.fillColor=new Color(grad,new Point(fg.from[0],fg.from[1]),new Point(fg.to[0],fg.to[1]));
+      }
       // Path property, per-vertex (motion.js's applyPathVertexOffsetsFor,
       // 2026-07): innermost transform — applied directly to `p`'s own
       // segments before elMat's pivot is even read from p.bounds, same

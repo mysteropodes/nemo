@@ -377,6 +377,10 @@
              custom-popup pattern as Blend above: initMatteDropdown() in
              timeline.js. -->
         <div class="pr"><span class="pl">Matte</span><div class="psel" id="p-mattemode" data-value="none" role="button" tabindex="0" style="cursor:pointer;user-select:none">Aucun</div></div>
+        <!-- Feather/blur (2026-07, blur.wgsl) — layer-level, same
+             "plain per-layer field" convention as Blend/Matte above.
+             0 = off (the vast majority of layers), no GPU cost. -->
+        <div class="pr"><span class="pl">Flou</span><input type="number" class="pi scrub" id="p-blur" value="0" min="0" max="100" data-step="1" title="Flou gaussien (approx.) appliqué à tout le calque, en pixels"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
       </div>
     </div>
     <div class="psec" id="canvas-sec">
@@ -510,7 +514,22 @@
     <div class="psec" id="effects-sec">
       <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrEffects">Effects</span></div>
       <div class="pbdy">
-        <div class="pr" style="font-size:9px;color:var(--text-dim)">Coming soon</div>
+        <!-- Gradient fill (2026-07) — applies to the current selection's
+             fillColor (Select tool), same target as Fill's own color swatch
+             above. Two stops + linear/radial + an angle (linear only,
+             ignored/hidden for radial) — direction/size are computed from
+             the selection's own bounding box at that angle, no on-canvas
+             drag-handle gizmo in this first version (see
+             gradient-bridge.js's own header comment). -->
+        <div class="pr"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer" title="Applique un dégradé au fill de la sélection actuelle (outil Sélection)"><input type="checkbox" id="p-grad-on" style="accent-color:var(--accent)"> Dégradé de fill</label></div>
+        <div class="pr" id="p-grad-controls" style="display:none">
+          <span class="pl">Stops</span>
+          <input type="color" id="p-grad-c1" value="#ff0000" style="width:24px;height:22px;border:none;cursor:pointer;padding:0;">
+          <input type="color" id="p-grad-c2" value="#0000ff" style="width:24px;height:22px;border:none;cursor:pointer;padding:0;">
+        </div>
+        <div class="pr" id="p-grad-kind-row" style="display:none"><span class="pl">Type</span><select class="psel" id="p-grad-kind"><option value="linear" selected>Linéaire</option><option value="radial">Radial</option></select></div>
+        <div class="pr" id="p-grad-angle-row" style="display:none"><span class="pl">Angle</span><input type="number" class="pi scrub" id="p-grad-angle" value="0" min="-360" max="360" data-step="5"><span style="font-size:9px;color:var(--text-dim)">°</span></div>
+        <div class="pr" id="p-grad-apply-row" style="display:none;gap:4px"><button class="pbtn" id="btn-grad-apply" style="flex:1">Appliquer à la sélection</button></div>
       </div>
     </div>
     <div class="psec">
@@ -1186,6 +1205,7 @@
 <script src="js/engine-bridge.js"></script>
 <script src="js/perspective-bridge.js"></script>
 <script src="js/symmetry-bridge.js"></script>
+<script src="js/gradient-bridge.js"></script>
 <script src="js/viewtools-bridge.js"></script>
 <script src="js/abr-import.js"></script>
 <script src="js/bitmap-brush.js"></script>
