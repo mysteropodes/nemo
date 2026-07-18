@@ -59,6 +59,20 @@
     container.appendChild(row);
     return inp;
   }
+  function selectRow(container, label, value, options, onChange) {
+    var row = document.createElement('div'); row.className = 'pr';
+    var lbl = document.createElement('span'); lbl.className = 'pl'; lbl.textContent = label;
+    var sel = document.createElement('select'); sel.className = 'psel';
+    options.forEach(function (o) {
+      var opt = document.createElement('option'); opt.value = o.value; opt.textContent = o.label;
+      if (String(o.value) === String(value)) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    sel.addEventListener('change', function () { onChange(this.value); });
+    row.appendChild(lbl); row.appendChild(sel);
+    container.appendChild(row);
+    return sel;
+  }
   // Drives an EXISTING right-panel input by id and fires its real event —
   // rather than duplicating each input's own state-setting logic here
   // (risking drift if that logic ever changes), this sets the value/checked
@@ -73,7 +87,42 @@
     el.dispatchEvent(new Event(eventType, { bubbles: true }));
   }
 
-  function buildVectorTab(container) {
+  // ---- Params header (2026-07 relayout) ----
+  // Feedback: "garde les options en header pas tout en bas des brush" — the
+  // Taille/Lissage row used to be appended AFTER every preset grid, inside
+  // the SAME scrolling column, so a long preset list scrolled it out of
+  // view entirely. Split in two: buildVectorParams/buildBitmapParams build
+  // a STICKY header block (never scrolls, appended once, above the grid),
+  // while buildVectorGrid/buildBitmapGrid build ONLY the scrollable preset
+  // grid — selecting a preset now only rebuilds the grid container (to
+  // move the .active highlight), not the whole popover, so the header
+  // never flickers/rebuilds on a plain preset click either.
+  // Also answers "y a t'il pas plus d'option ?" — Stabilizer, Pressure
+  // brush, and Taper ends are the most relevant "brush feel" settings that
+  // existed elsewhere in the right panel but were never mirrored here.
+  function buildVectorParams(params) {
+    numRow(params, 'Taille', state.brushSize || 3, 1, 300, 1, function (v) { driveOriginal('p-sw', v, false, 'change'); });
+    numRow(params, 'Lissage', state.smoothing || 0, 0, 60, 1, function (v) { driveOriginal('p-smooth', v, false, 'input'); });
+    selectRow(params, 'Stabilisateur', state.stabilizer !== undefined ? state.stabilizer : 2, [
+      { value: 0, label: 'Off' }, { value: 1, label: 'Low' }, { value: 2, label: 'Medium' }, { value: 3, label: 'High' },
+      { value: 4, label: 'Plume — légère' }, { value: 5, label: 'Plume — moyenne' }, { value: 6, label: 'Plume — forte' },
+    ], function (v) { driveOriginal('p-stab', v, false, 'change'); });
+    checkRow(params, 'Pressure brush', !!state.vectorBrush, function (v) { driveOriginal('p-vecbrush', v, true, 'change'); });
+    checkRow(params, 'Taper ends', !!state.taperEnds, function (v) { driveOriginal('p-taper', v, true, 'change'); });
+  }
+  function buildBitmapParams(params) {
+    checkRow(params, 'Bitmap Brush actif', !!state.bitmapBrushOn, function (v) { driveOriginal('p-bitmapbrush-on', v, true, 'change'); });
+    numRow(params, 'Taille', state.brushSize || 3, 1, 300, 1, function (v) { driveOriginal('p-sw', v, false, 'change'); });
+    numRow(params, 'Espacement', state.bitmapSpacing !== undefined ? state.bitmapSpacing : 15, 2, 100, 1, function (v) { driveOriginal('p-bitmap-spacing', v, false, 'input'); });
+    numRow(params, 'Dispersion', state.bitmapScatter !== undefined ? state.bitmapScatter : 20, 0, 100, 1, function (v) { driveOriginal('p-bitmap-scatter', v, false, 'input'); });
+    numRow(params, 'Opacité', state.bitmapOpacity !== undefined ? state.bitmapOpacity : 100, 5, 100, 1, function (v) { driveOriginal('p-bitmap-opacity', v, false, 'input'); });
+    checkRow(params, 'Pression (tablette)', state.bitmapPressure !== false, function (v) { driveOriginal('p-bitmap-pressure', v, true, 'change'); });
+    selectRow(params, 'Stabilisateur', state.stabilizer !== undefined ? state.stabilizer : 2, [
+      { value: 0, label: 'Off' }, { value: 1, label: 'Low' }, { value: 2, label: 'Medium' }, { value: 3, label: 'High' },
+      { value: 4, label: 'Plume — légère' }, { value: 5, label: 'Plume — moyenne' }, { value: 6, label: 'Plume — forte' },
+    ], function (v) { driveOriginal('p-stab', v, false, 'change'); });
+  }
+  function buildVectorGrid(container) {
     container.innerHTML = ''; // rebuilt on every selection (to move the .active highlight) — must replace, not append
     if (!window.BrushPresetPicker || !window.BrushPresetPicker.groups) {
       container.innerHTML = '<div class="bp-group-label">Indisponible</div>';
@@ -86,7 +135,7 @@
       var grid = document.createElement('div'); grid.className = 'bp-grid';
       g.keys.forEach(function (k) { grid.appendChild(makeBrushItem(k, k === current, function (key) {
         window.BrushPresetPicker.selectPreset(key);
-        buildVectorTab(container); // rebuild to move the .active highlight
+        buildVectorGrid(container); // rebuild the GRID only (to move the .active highlight) — the params header above is untouched
       })); });
       container.appendChild(grid);
     });
@@ -97,14 +146,10 @@
       var cgrid = document.createElement('div'); cgrid.className = 'bp-grid';
       custom.forEach(function (k) { cgrid.appendChild(makeBrushItem(k, k === current, function (key) {
         window.BrushPresetPicker.selectPreset(key);
-        buildVectorTab(container);
+        buildVectorGrid(container);
       })); });
       container.appendChild(cgrid);
     }
-    var params = document.createElement('div'); params.className = 'brush-menu-params';
-    numRow(params, 'Taille', state.brushSize || 3, 1, 300, 1, function (v) { driveOriginal('p-sw', v, false, 'change'); });
-    numRow(params, 'Lissage', state.smoothing || 0, 0, 60, 1, function (v) { driveOriginal('p-smooth', v, false, 'input'); });
-    container.appendChild(params);
   }
   function makeBrushItem(key, active, onSelect) {
     var btn = document.createElement('button');
@@ -117,13 +162,12 @@
     return btn;
   }
 
-  function buildBitmapTab(container) {
+  function buildBitmapGrid(container) {
     container.innerHTML = ''; // rebuilt on every selection (to move the .active highlight) — must replace, not append
     if (!window.SMBitmapBrush || !window.BitmapTipPicker) {
       container.innerHTML = '<div class="bp-group-label">Bitmap Brush indisponible</div>';
       return;
     }
-    checkRow(container, 'Bitmap Brush actif', !!state.bitmapBrushOn, function (v) { driveOriginal('p-bitmapbrush-on', v, true, 'change'); });
     var current = state.bitmapTip || 'soft';
     window.SMBitmapBrush.tipGroups().forEach(function (g) {
       var label = document.createElement('div'); label.className = 'bp-group-label'; label.textContent = g.label;
@@ -131,7 +175,7 @@
       var grid = document.createElement('div'); grid.className = 'bp-grid';
       g.keys.forEach(function (k) { grid.appendChild(makeTipItem(k, k === current, function (key) {
         window.BitmapTipPicker.selectTip(key);
-        buildBitmapTab(container);
+        buildBitmapGrid(container);
       })); });
       container.appendChild(grid);
     });
@@ -142,17 +186,10 @@
       var cgrid = document.createElement('div'); cgrid.className = 'bp-grid';
       custom.forEach(function (k) { cgrid.appendChild(makeTipItem(k, k === current, function (key) {
         window.BitmapTipPicker.selectTip(key);
-        buildBitmapTab(container);
+        buildBitmapGrid(container);
       })); });
       container.appendChild(cgrid);
     }
-    var params = document.createElement('div'); params.className = 'brush-menu-params';
-    numRow(params, 'Taille', state.brushSize || 3, 1, 300, 1, function (v) { driveOriginal('p-sw', v, false, 'change'); });
-    numRow(params, 'Espacement', state.bitmapSpacing !== undefined ? state.bitmapSpacing : 15, 2, 100, 1, function (v) { driveOriginal('p-bitmap-spacing', v, false, 'input'); });
-    numRow(params, 'Dispersion', state.bitmapScatter !== undefined ? state.bitmapScatter : 20, 0, 100, 1, function (v) { driveOriginal('p-bitmap-scatter', v, false, 'input'); });
-    numRow(params, 'Opacité', state.bitmapOpacity !== undefined ? state.bitmapOpacity : 100, 5, 100, 1, function (v) { driveOriginal('p-bitmap-opacity', v, false, 'input'); });
-    checkRow(params, 'Pression (tablette)', state.bitmapPressure !== false, function (v) { driveOriginal('p-bitmap-pressure', v, true, 'change'); });
-    container.appendChild(params);
   }
   function makeTipItem(key, active, onSelect) {
     var btn = document.createElement('button');
@@ -174,9 +211,12 @@
     bmpTab.addEventListener('click', function () { currentTab = 'bitmap'; buildContent(el); });
     tabs.appendChild(vecTab); tabs.appendChild(bmpTab);
     el.appendChild(tabs);
-    var body = document.createElement('div');
-    el.appendChild(body);
-    if (currentTab === 'vector') buildVectorTab(body); else buildBitmapTab(body);
+    var params = document.createElement('div'); params.className = 'brush-menu-params';
+    el.appendChild(params);
+    var grid = document.createElement('div'); grid.className = 'brush-menu-scroll';
+    el.appendChild(grid);
+    if (currentTab === 'vector') { buildVectorParams(params); buildVectorGrid(grid); }
+    else { buildBitmapParams(params); buildBitmapGrid(grid); }
   }
 
   function toggle(anchorEl) {
