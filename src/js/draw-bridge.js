@@ -32,6 +32,11 @@
   // Alt-drag-to-rotate explicitly cedes Alt to the brushes for this.
   var sizing = false, sizeStartX = 0, sizeStartVal = 0, sizeAnchorW = null;
   var samples = []; // [x,y,width]
+  // Perspective guide hard-lock (2026-07, perspective-bridge.js's
+  // findGuideRayNear/projectOnRay — see their own header comment for why
+  // this replaced a pure per-point magnet). Set once at pointerdown, held
+  // for the whole gesture, cleared at pointerup.
+  var lockedGuideRay = null;
   var lastMoveT = 0, lastWorldPt = null;
   var lastPenPressure = null; // held across a real-pen gesture, see pressureOf()
   // state.stabilizer (position-averaging while drawing) used to only exist
@@ -176,6 +181,22 @@
     var snapped = window.perspectiveSnapPointMagnetic(new Point(w[0], w[1]));
     return snapped ? [snapped.x, snapped.y] : w;
   }
+  // Hard directional lock (2026-07, perspective-bridge.js's
+  // findGuideRayNear/projectOnRay) — call this instead of magnetSnap at
+  // every point of a Draw/Fillbrush stroke. Locks onto whichever guide ray
+  // is closest at the VERY FIRST call of a gesture (pointerdown) and then
+  // hard-projects every later point onto that same ray for the rest of the
+  // stroke, regardless of distance — falls back to the old per-point
+  // magnetSnap when nothing was close enough to lock at the start (so a
+  // stroke drawn nowhere near the guide still behaves exactly as before).
+  function guideConstrain(w, isStart) {
+    if (isStart) lockedGuideRay = window.perspectiveFindGuideRayNear ? window.perspectiveFindGuideRayNear(new Point(w[0], w[1])) : null;
+    if (lockedGuideRay && window.perspectiveProjectOnRay) {
+      var p = window.perspectiveProjectOnRay(new Point(w[0], w[1]), lockedGuideRay);
+      return [p.x, p.y];
+    }
+    return magnetSnap(w);
+  }
   function hexToRgba(css, opacityPct) {
     if (!css) return null;
     var h = css.replace('#', '');
@@ -299,7 +320,7 @@
     lastMoveT = 0; lastWorldPt = null; lastPenPressure = null;
     stabQueue = []; smoothedPressure = null;
     var w0 = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
-    w0 = magnetSnap(w0);
+    w0 = guideConstrain(w0, true);
     // engine-bridge.js's own tick() loop keeps running unconditionally in
     // the background (it's not started/stopped per-drag) — without
     // suspending it here, it races renderWithOverlayItem below on every
@@ -345,7 +366,7 @@
     e.stopImmediatePropagation();
     e.preventDefault();
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
-    w = magnetSnap(w);
+    w = guideConstrain(w, false);
     // Pressure is read from the RAW point (speed-fallback pressure needs
     // the real, un-averaged motion to feel right) — only the drawn
     // POSITION gets stabilized, matching TVPaint-style "smoothing" where
@@ -408,7 +429,8 @@
     // at the true release position so the line always reaches it, same
     // catch-up behavior Photoshop/Clip Studio's stabilized brushes use.
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
-    w = magnetSnap(w);
+    w = guideConstrain(w, false);
+    lockedGuideRay = null; // stroke over — next pointerdown re-evaluates from scratch
     var pressure = smoothPressure(wantsPressure() ? pressureOf(e, w) : 1);
     if (modeler) {
       // The modeler's own end-of-stroke catch-up (physics iterated until

@@ -1363,6 +1363,7 @@ function updatePropsContext(){
   if(blurInp&&state.layers[state.activeLayerIdx]){
     blurInp.value=state.layers[state.activeLayerIdx].blurRadius||0;
   }
+  if(window.renderGradientPanel)window.renderGradientPanel();
   var hdrEl=document.getElementById('props-context-hdr');if(hdrEl)hdrEl.textContent=hdrText;
   Object.keys(show).forEach(function(id){var sec=document.getElementById(id);if(sec)sec.style.display=show[id]?'block':'none';});
   // state.drawMode (Front/Behind) has no effect on Fill Brush — it's always
@@ -4459,7 +4460,7 @@ document.getElementById('p-cbg').addEventListener('input',function(){window.SM.s
 document.getElementById('p-clip').addEventListener('change',function(){window.SM.setCanvasClip(this.checked);});
 document.getElementById('p-safety').addEventListener('change',function(){window.SM.setSafetyZones(this.checked);});
 document.getElementById('p-blur').addEventListener('input',function(){var ld=state.layers[state.activeLayerIdx];if(!ld)return;pushUndo();ld.blurRadius=Math.max(0,parseFloat(this.value)||0);saveActiveLayerFrame();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
-document.getElementById('p-persp-on').addEventListener('change',function(){state.perspectiveEnabled=this.checked;if(this.checked&&window.ensurePerspectiveVPs)window.ensurePerspectiveVPs();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
+document.getElementById('p-persp-on').addEventListener('change',function(){state.perspectiveEnabled=this.checked;if(this.checked){if(window.ensurePerspectiveVPs)window.ensurePerspectiveVPs();window.SM.setTool('perspective');}if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
 document.getElementById('p-persp-mode').addEventListener('change',function(){if(window.setPerspectiveMode)window.setPerspectiveMode(this.value);});
 document.getElementById('p-persp-density').addEventListener('input',function(){state.perspectiveDensity=parseInt(this.value)||24;if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
 document.getElementById('p-persp-lock').addEventListener('change',function(){var locked=this.checked;(window.ensurePerspectiveVPs?window.ensurePerspectiveVPs():[]).forEach(function(vp){vp.locked=locked;});if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
@@ -4474,7 +4475,7 @@ window.syncSymmetryPanelVisibility=function(){
   var row=document.getElementById('p-sym-sectors-row');
   if(row)row.style.display=state.symmetryMode==='radial'?'':'none';
 };
-document.getElementById('p-sym-on').addEventListener('change',function(){state.symmetryEnabled=this.checked;if(this.checked&&window.ensureSymmetryAxis)window.ensureSymmetryAxis();if(this.checked&&window.ensureSymmetryRadialCenter)window.ensureSymmetryRadialCenter();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
+document.getElementById('p-sym-on').addEventListener('change',function(){state.symmetryEnabled=this.checked;if(this.checked){if(window.ensureSymmetryAxis)window.ensureSymmetryAxis();if(window.ensureSymmetryRadialCenter)window.ensureSymmetryRadialCenter();window.SM.setTool('symmetry');}if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
 document.getElementById('p-sym-mode').addEventListener('change',function(){if(window.setSymmetryMode)window.setSymmetryMode(this.value);window.syncSymmetryPanelVisibility();});
 document.getElementById('p-sym-sectors').addEventListener('input',function(){state.symmetryRadialSectors=Math.max(2,Math.min(24,parseInt(this.value)||6));if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
 document.getElementById('p-sym-extend').addEventListener('change',function(){state.symmetryExtend=this.checked;});
