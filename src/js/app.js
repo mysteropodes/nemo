@@ -500,7 +500,22 @@ function serP(p){var isVB=!!(p.data&&p.data.isVectorBrush);var center=isVB&&p.da
   fillGradient:(p.data&&p.data.fillGradient)?p.data.fillGradient:undefined,
   // Group membership (2026-07, group-bridge.js's Cmd+G) — a stable id
   // shared by every member, same pattern as strokeId/brushGroupId above.
-  groupId:(p.data&&p.data.groupId)?p.data.groupId:undefined};}
+  groupId:(p.data&&p.data.groupId)?p.data.groupId:undefined,
+  // Vector text (2026-07, vector-text-bridge.js) — a placed block is just
+  // ordinary Paths sharing groupId (above); isVectorText/vectorChar mark
+  // every glyph, isTextRoot+the rest are ONLY set on the group's first
+  // Path (the one openTextPopoverForEdit/commitVectorText look for when
+  // re-editing or persisting the block's original string/font/layout).
+  isVectorText:(p.data&&p.data.isVectorText)?true:undefined,
+  vectorChar:(p.data&&p.data.vectorChar)?p.data.vectorChar:undefined,
+  isText:(p.data&&p.data.isText)?true:undefined,
+  isTextRoot:(p.data&&p.data.isTextRoot)?true:undefined,
+  text:(p.data&&p.data.isTextRoot)?p.data.text:undefined,
+  vectorFont:(p.data&&p.data.isTextRoot)?p.data.vectorFont:undefined,
+  textSize:(p.data&&p.data.isTextRoot)?p.data.size:undefined,
+  textColor:(p.data&&p.data.isTextRoot)?p.data.color:undefined,
+  textAlign:(p.data&&p.data.isTextRoot)?p.data.align:undefined,
+  textFixedWidth:(p.data&&p.data.isTextRoot&&p.data.fixedWidth)?p.data.fixedWidth:undefined};}
 // `closed` was missing from this round-trip entirely — every path rebuilt
 // via desP() (onion-skin ghosts, tween/inbetween generation, undo/redo
 // snapshots, project load: everything that goes through serP/desP) silently
@@ -527,7 +542,10 @@ function desP(d,layer,op){var prev=project.activeLayer;layer.activate();var p=ne
   // outline it never had ("un trait blanc apparaît autour du fill après
   // ctrl+Z"). Legacy data predating the field (undefined) keeps the old
   // fallback chain untouched.
-  p.strokeColor=d.hasRealStroke===false?null:(d.strokeColor||((d.isVectorBrush||d.brushTexturePreset||d.bitmapBrushSpec||d.isBrushTextureCopy||dNoStrokeChannel||dIsShadowChannel)?null:'#fff'));p.strokeWidth=d.strokeWidth||3;p.strokeCap=d.strokeCap||'round';p.strokeJoin=d.strokeJoin||'round';if(d.miterLimit!==undefined)p.miterLimit=d.miterLimit;if(d.fillColor)p.fillColor=d.fillColor;else p.fillColor=null;p.opacity=op!==undefined?op:(d.opacity!==undefined?d.opacity:1);if(d.dashArray&&d.dashArray.length)p.dashArray=d.dashArray;if(d.dashOffset!==undefined)p.dashOffset=d.dashOffset;if(d.paintOrder){p.data.paintOrder=d.paintOrder;}if(d.isVectorBrush){p.data.isVectorBrush=true;if(d.centerSegments)p.data.centerSegments=d.centerSegments;if(d.widthProfile)p.data.widthProfile=d.widthProfile;if(d.isFillShape)p.data.isFillShape=true;applyBrushKeyline(p);}if(d.fillSeed){p.data.fillSeed=d.fillSeed;p.data.fillGapPx=d.fillGapPx;}if(d.fillWalls)p.data.fillWalls=d.fillWalls;if(d.strokeId)p.data.strokeId=d.strokeId;if(d.brushGroupId)p.data.brushGroupId=d.brushGroupId;if(d.boxAngle)p.data.boxAngle=d.boxAngle;if(d.xformAnchorKey)p.data.xformAnchorKey=d.xformAnchorKey;if(d.xformAnchorCustom)p.data.xformAnchorCustom=d.xformAnchorCustom;if(d.isBrushTextureCopy)p.data.isBrushTextureCopy=true;if(d.brushTexturePreset)p.data.brushTexturePreset=d.brushTexturePreset;if(d.bitmapBrushSpec)p.data.bitmapBrushSpec=d.bitmapBrushSpec;if(d.bitmapPressureProfile)p.data.bitmapPressureProfile=d.bitmapPressureProfile;if(d.preTextureOpacity!==undefined)p.data.preTextureOpacity=d.preTextureOpacity;if(d.preTextureStroke!==undefined)p.data.preTextureStroke=d.preTextureStroke;if(d.channelTag)p.data.channelTag=d.channelTag;if(d.ownerId)p.data.ownerId=d.ownerId;if(d.ownerName)p.data.ownerName=d.ownerName;if(d.ownerColor)p.data.ownerColor=d.ownerColor;if(d.revisionParentId)p.data.revisionParentId=d.revisionParentId;if(d.isRevisionGhost)p.data.isRevisionGhost=true;if(d.revisionAction)p.data.revisionAction=d.revisionAction;if(d.fillGradient)p.data.fillGradient=d.fillGradient;if(d.groupId)p.data.groupId=d.groupId;prev.activate();return p;}
+  p.strokeColor=d.hasRealStroke===false?null:(d.strokeColor||((d.isVectorBrush||d.brushTexturePreset||d.bitmapBrushSpec||d.isBrushTextureCopy||dNoStrokeChannel||dIsShadowChannel)?null:'#fff'));p.strokeWidth=d.strokeWidth||3;p.strokeCap=d.strokeCap||'round';p.strokeJoin=d.strokeJoin||'round';if(d.miterLimit!==undefined)p.miterLimit=d.miterLimit;if(d.fillColor)p.fillColor=d.fillColor;else p.fillColor=null;p.opacity=op!==undefined?op:(d.opacity!==undefined?d.opacity:1);if(d.dashArray&&d.dashArray.length)p.dashArray=d.dashArray;if(d.dashOffset!==undefined)p.dashOffset=d.dashOffset;if(d.paintOrder){p.data.paintOrder=d.paintOrder;}if(d.isVectorBrush){p.data.isVectorBrush=true;if(d.centerSegments)p.data.centerSegments=d.centerSegments;if(d.widthProfile)p.data.widthProfile=d.widthProfile;if(d.isFillShape)p.data.isFillShape=true;applyBrushKeyline(p);}if(d.fillSeed){p.data.fillSeed=d.fillSeed;p.data.fillGapPx=d.fillGapPx;}if(d.fillWalls)p.data.fillWalls=d.fillWalls;if(d.strokeId)p.data.strokeId=d.strokeId;if(d.brushGroupId)p.data.brushGroupId=d.brushGroupId;if(d.boxAngle)p.data.boxAngle=d.boxAngle;if(d.xformAnchorKey)p.data.xformAnchorKey=d.xformAnchorKey;if(d.xformAnchorCustom)p.data.xformAnchorCustom=d.xformAnchorCustom;if(d.isBrushTextureCopy)p.data.isBrushTextureCopy=true;if(d.brushTexturePreset)p.data.brushTexturePreset=d.brushTexturePreset;if(d.bitmapBrushSpec)p.data.bitmapBrushSpec=d.bitmapBrushSpec;if(d.bitmapPressureProfile)p.data.bitmapPressureProfile=d.bitmapPressureProfile;if(d.preTextureOpacity!==undefined)p.data.preTextureOpacity=d.preTextureOpacity;if(d.preTextureStroke!==undefined)p.data.preTextureStroke=d.preTextureStroke;if(d.channelTag)p.data.channelTag=d.channelTag;if(d.ownerId)p.data.ownerId=d.ownerId;if(d.ownerName)p.data.ownerName=d.ownerName;if(d.ownerColor)p.data.ownerColor=d.ownerColor;if(d.revisionParentId)p.data.revisionParentId=d.revisionParentId;if(d.isRevisionGhost)p.data.isRevisionGhost=true;if(d.revisionAction)p.data.revisionAction=d.revisionAction;if(d.fillGradient)p.data.fillGradient=d.fillGradient;if(d.groupId)p.data.groupId=d.groupId;
+  if(d.isVectorText)p.data.isVectorText=true;if(d.vectorChar)p.data.vectorChar=d.vectorChar;if(d.isText)p.data.isText=true;
+  if(d.isTextRoot){p.data.isTextRoot=true;p.data.text=d.text||'';p.data.vectorFont=d.vectorFont||'Roboto-Regular';p.data.size=d.textSize||48;p.data.color=d.textColor||'#000000';p.data.align=d.textAlign||'left';if(d.textFixedWidth)p.data.fixedWidth=d.textFixedWidth;}
+  prev.activate();return p;}
 // Phase 2 (async multi-user sync): merges a remote collaborator's exported
 // project JSON into the CURRENT live document at the data level (state.layers
 // serialized strokes — not live Paper objects), so it works the same whether
