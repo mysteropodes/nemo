@@ -46,6 +46,21 @@
   function isMotionMode(){return !!motionEaseSeg;}
   var MOTION_DEFAULT_CURVE=[{x:0,y:0},{x:.42,y:0},{x:.58,y:1},{x:1,y:1}];
   function motionCurve(){return motionEaseSeg.curvePoints||(motionEaseSeg.curvePoints=clonePts(MOTION_DEFAULT_CURVE));}
+  // Brush pressure-response curve (2026-07 — audit gap "aucun éditeur de
+  // courbe de pression dédié"): same on-curve-waypoint model as the other
+  // two modes, but global (one curve, not per-segment/per-key) and stored
+  // in state.pressureCurvePoints so it saves with the project like any
+  // other brush setting. Starts as a straight line (x==y, matching the old
+  // 'linear' preset's behavior) the first time it's opened — the existing
+  // #p-pcurve dropdown's formula presets (sqrt/cbrt/pow2/pow3) still work
+  // exactly as before and take priority over this until the user actually
+  // drags a point here (tools.js's applyPressureCurve checks
+  // state.pressureCurvePoints first, falls back to the formula switch
+  // otherwise — see its own comment).
+  var pressureEaseActive=false;
+  function isPressureMode(){return pressureEaseActive;}
+  var PRESSURE_DEFAULT_CURVE=[{x:0,y:0},{x:1,y:1}];
+  function pressureCurve(){if(!state.pressureCurvePoints)state.pressureCurvePoints=clonePts(PRESSURE_DEFAULT_CURVE);return state.pressureCurvePoints;}
   // The points array actually being viewed/edited right now — motion-
   // segment mode if active, otherwise the tween's own global curve. Every
   // point-editing code path below (hit-test, drag, add/delete, presets)
@@ -57,8 +72,8 @@
   // independently of whatever this singleton widget happens to be
   // showing, which this widget's one-curve-at-a-time model can't do. Only
   // evalPointsCurve below is shared between the two.)
-  function activePoints(){return isMotionMode()?motionCurve():cs.points;}
-  function setActivePoints(pts){if(isMotionMode())motionEaseSeg.curvePoints=pts;else cs.points=pts;}
+  function activePoints(){return isMotionMode()?motionCurve():(isPressureMode()?pressureCurve():cs.points);}
+  function setActivePoints(pts){if(isMotionMode())motionEaseSeg.curvePoints=pts;else if(isPressureMode())state.pressureCurvePoints=pts;else cs.points=pts;}
   // A small easing gallery (After Effects/GreenSock-style grid of named
   // curve families, each in/out/inout where that makes sense) — through-
   // point approximations of their usual off-curve-handle shapes, since the
@@ -215,7 +230,7 @@
     // global evalCurve/cs.points), everything else about the rendering is
     // shared with the tween's own curve view.
     ctx.strokeStyle='#4a9eff';ctx.lineWidth=2.5;ctx.beginPath();
-    var evalFn=isMotionMode()?function(x){return evalPointsCurve(pts,x);}:evalCurve;
+    var evalFn=(isMotionMode()||isPressureMode())?function(x){return evalPointsCurve(pts,x);}:evalCurve;
     ctx.moveTo(tX(0),tY(evalFn(0),yr));
     var N=100;for(var s=1;s<=N;s++){var xx=s/N;ctx.lineTo(tX(xx),tY(evalFn(xx),yr));}
     ctx.stroke();
@@ -269,6 +284,12 @@
   // onEaseSegChanged hook (if present) picks up the repaint instead.
   function pushCurve(){
     if(isMotionMode()){if(window.SMMotion&&window.SMMotion.onEaseSegChanged)window.SMMotion.onEaseSegChanged();return;}
+    // Pressure mode: state.pressureCurvePoints is already mutated in place
+    // (setActivePoints/dragging write straight into it) — nothing else to
+    // persist, applyPressureCurve (tools.js) reads it live on every stroke
+    // sample. No pushUndo/undo-stack entry either, same as the tween/camera
+    // curve's own convention (a brush SETTING, not document content).
+    if(isPressureMode())return;
     if(window.SM)window.SM.setCurve(clonePts(cs.points));upP();
   }
 
@@ -497,7 +518,7 @@
     // Clears motion mode too — only one "currently edited segment" at a
     // time on this one shared canvas.
     editCameraSeg:function(seg,label){
-      motionEaseSeg=null;
+      motionEaseSeg=null;pressureEaseActive=false;
       camEaseSeg=seg;camEaseLabel=label||'';
       if(window.openPropsSection)window.openPropsSection('easing-sec');
       draw();
@@ -511,7 +532,7 @@
     // lazily created/mutated in place, same live-reference contract
     // editCameraSeg already has for `.ease`).
     editMotionSeg:function(seg,label){
-      camEaseSeg=null;
+      camEaseSeg=null;pressureEaseActive=false;
       motionEaseSeg=seg;motionEaseLabel=label||'';
       selected=null;
       if(window.openPropsSection)window.openPropsSection('easing-sec');
@@ -521,9 +542,32 @@
       if(!motionEaseSeg)return;
       motionEaseSeg=null;draw();
     },
+    // Pressure-curve editing (2026-07, audit gap "aucun éditeur de courbe
+    // de pression dédié") — see pressureEaseActive/pressureCurve above.
+    // Global, no `seg`/label param needed (there's only ever one).
+    editPressureCurve:function(){
+      camEaseSeg=null;motionEaseSeg=null;
+      pressureEaseActive=true;selected=null;
+      if(window.openPropsSection)window.openPropsSection('easing-sec');
+      draw();
+    },
+    exitPressureCurve:function(){
+      if(!pressureEaseActive)return;
+      pressureEaseActive=false;draw();
+    },
     isCameraMode:isCamMode,
-    isMotionMode:isMotionMode
+    isMotionMode:isMotionMode,
+    isPressureMode:isPressureMode
   };
+  // Pure function of an explicit points array (no closure state touched) —
+  // exposed globally so tools.js's applyPressureCurve can evaluate
+  // state.pressureCurvePoints without duplicating this math a 3rd time
+  // (motion.js already has its own copy for curvePoints, per that file's
+  // own "CLAUDE.md §3 pure-math pair, keep in sync" comment; this is a
+  // deliberate 2nd copy for the exact same reason — a plain evaluator, not
+  // an editor, so it's cheap to keep in sync as long as nothing here goes
+  // near the curve MATH again without checking this too).
+  window.evalEasingPoints=evalPointsCurve;
   setTimeout(draw,100);
 })();
 

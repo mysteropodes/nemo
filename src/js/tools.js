@@ -3428,6 +3428,13 @@ function vbPressureOf(event){
 // widthFor (draw-bridge.js, Rust-engine path) and vbWidthFor below (legacy
 // Paper.js path) — per this file's own duplication-hazard convention.
 function applyPressureCurve(p){
+  // Custom curve (2026-07, ui.js's editPressureCurve/pressureCurve) takes
+  // priority the moment it exists — set only once the user actually opens
+  // the dedicated curve editor and drags a point; the formula presets
+  // below stay the default/fallback and remain fully functional on their
+  // own (picking one from the dropdown clears pressureCurvePoints, see
+  // its own change handler, timeline.js).
+  if(state.pressureCurvePoints&&window.evalEasingPoints)return window.evalEasingPoints(state.pressureCurvePoints,p);
   switch(state.pressureCurve){
     case 'sqrt':return Math.sqrt(p);
     case 'cbrt':return Math.cbrt(p);
