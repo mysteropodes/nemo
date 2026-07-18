@@ -3412,47 +3412,134 @@ function initCommentPopover(){
   },true);
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initCommentPopover);else initCommentPopover();
-// ---- Outil texte (v19) ----
+// ---- Outil texte (v20, 2026-07 rework) ----
 // Le moteur Rust ne rasterise pas de glyphes : le texte est rendu une fois
 // dans un canvas offscreen (2x pour la nettete) puis insere comme Raster —
 // le pipeline image existant (serR/desR, registerImagePixels) fait tout le
-// reste (persistance, rendu, selection/deplacement via l'outil V).
-var _textPendingPt=null;
-function openTextPopover(worldPt){
-  _textPendingPt=worldPt.clone();
+// reste (persistance, rendu, selection/deplacement via l'outil V). Ce qui a
+// change (Figma/Illustrator-style) : (1) un simple clic pose du "point text"
+// (largeur auto, inchange), un DRAG pose une boite de largeur fixe ("area
+// text") avec retour a la ligne automatique ; (2) double-clic sur un bloc de
+// texte existant rouvre le popover pre-rempli et RE-BAKE en place (source du
+// Raster remplacee via .source, meme identite d'item, meme position
+// d'ancrage haut-gauche) au lieu de forcer supprimer/retaper ; (3) couleur et
+// alignement sont maintenant des champs du popover, pas figes sur
+// state.strokeColor au moment du clic ; (4) text/font/size/color/align/
+// fixedWidth persistent sur r.data et via serR/desR (app.js) — avant cette
+// session, isText lui-meme ne survivait meme pas a un save/reload.
+var _textPendingPt=null,_textPendingBox=null,_textEditingRaster=null;
+function positionTextPopover(worldPt){
   var pop=document.getElementById('text-popover');if(!pop)return;
   var v=view.projectToView(worldPt);
   var cr=document.getElementById('drawing-canvas').getBoundingClientRect();
   pop.style.display='block';
   pop.style.left=Math.min(window.innerWidth-240,Math.max(4,cr.left+v.x+10))+'px';
-  pop.style.top=Math.min(window.innerHeight-180,Math.max(4,cr.top+v.y+10))+'px';
-  var ta=document.getElementById('text-input');ta.value='';ta.focus();
+  pop.style.top=Math.min(window.innerHeight-220,Math.max(4,cr.top+v.y+10))+'px';
 }
-function closeTextPopover(){var pop=document.getElementById('text-popover');if(pop)pop.style.display='none';_textPendingPt=null;}
+function resetTextPopoverFields(text,size,font,color,align){
+  document.getElementById('text-input').value=text||'';
+  document.getElementById('text-size').value=size||48;
+  document.getElementById('text-font').value=font||'sans-serif';
+  document.getElementById('text-align').value=align||'left';
+  var colorInp=document.getElementById('text-color');if(colorInp)colorInp.value=color||state.strokeColor||'#000000';
+}
+function openTextPopover(worldPt){
+  _textPendingPt=worldPt.clone();_textPendingBox=null;_textEditingRaster=null;
+  resetTextPopoverFields();
+  positionTextPopover(worldPt);
+  document.getElementById('text-input').focus();
+}
+// Drag-to-place area text (Illustrator "type in a box") — widthWorld is in
+// world units (same space as x/y/width/height everywhere else in this
+// codebase), wrapping happens in commitText once the actual font/size are
+// known (they aren't yet at drag time).
+function openTextPopoverForBox(topLeft,widthWorld){
+  _textPendingPt=null;_textPendingBox={topLeft:topLeft.clone(),width:widthWorld};_textEditingRaster=null;
+  resetTextPopoverFields();
+  positionTextPopover(topLeft);
+  document.getElementById('text-input').focus();
+}
+// Re-edit an existing text raster (double-click, onViewDoubleClick in
+// tools.js) — prefills every field from what was persisted on r.data and
+// keeps the box's fixedWidth (if any) so re-wrapping behaves the same way.
+function openTextPopoverForEdit(raster){
+  _textPendingPt=null;_textEditingRaster=raster;
+  _textPendingBox=raster.data.fixedWidth?{topLeft:raster.bounds.topLeft.clone(),width:raster.data.fixedWidth}:null;
+  resetTextPopoverFields(raster.data.text,raster.data.size,raster.data.font,raster.data.color,raster.data.align);
+  positionTextPopover(raster.bounds.topLeft);
+  var ta=document.getElementById('text-input');ta.focus();ta.select();
+}
+function closeTextPopover(){var pop=document.getElementById('text-popover');if(pop)pop.style.display='none';_textPendingPt=null;_textPendingBox=null;_textEditingRaster=null;}
 function commitText(){
   var txt=document.getElementById('text-input').value;
-  if(!txt.trim()||!_textPendingPt){closeTextPopover();return;}
+  if(!txt.trim()||(!_textPendingPt&&!_textPendingBox&&!_textEditingRaster)){closeTextPopover();return;}
   var size=parseInt(document.getElementById('text-size').value,10)||48;
   var font=document.getElementById('text-font').value||'sans-serif';
-  var color=state.strokeColor||'#000';
+  var align=document.getElementById('text-align').value||'left';
+  var colorInp=document.getElementById('text-color');
+  var color=(colorInp&&colorInp.value)||state.strokeColor||'#000000';
+  var fixedWidthWorld=_textPendingBox?_textPendingBox.width:null;
+  var SS=2; // supersample factor for offscreen bake, unchanged from before
   var lines=txt.split('\n');
   var off=document.createElement('canvas');
   var octx=off.getContext('2d');
-  octx.font=size*2+'px '+font;
-  var wMax=1;lines.forEach(function(l){wMax=Math.max(wMax,octx.measureText(l).width);});
-  off.width=Math.ceil(wMax)+8;off.height=lines.length*size*2*1.25+8;
-  octx=off.getContext('2d');
-  octx.font=size*2+'px '+font;octx.fillStyle=color;octx.textBaseline='top';
-  lines.forEach(function(l,i){octx.fillText(l,4,4+i*size*2*1.25);});
+  octx.font=size*SS+'px '+font;
+  var lineH=size*SS*1.25;
+  var fixedWidthPx=fixedWidthWorld?Math.max(20,fixedWidthWorld*SS):null;
+  var wrapped=[];
+  if(fixedWidthPx){
+    // Greedy word-wrap at the fixed pixel width (minus padding) — Figma/
+    // Illustrator area-text behavior. Point text (fixedWidthPx null) keeps
+    // the original one-line-per-input-line, auto-width behavior untouched.
+    lines.forEach(function(l){
+      if(l===''){wrapped.push('');return;}
+      var words=l.split(' ');var cur='';
+      words.forEach(function(w){
+        var test=cur?cur+' '+w:w;
+        if(cur&&octx.measureText(test).width>fixedWidthPx-16){wrapped.push(cur);cur=w;}
+        else cur=test;
+      });
+      wrapped.push(cur);
+    });
+  }else{
+    wrapped=lines;
+  }
+  var wMax=1;
+  if(fixedWidthPx)wMax=fixedWidthPx;
+  else wrapped.forEach(function(l){wMax=Math.max(wMax,octx.measureText(l).width);});
+  off.width=Math.ceil(wMax)+16;off.height=Math.ceil(wrapped.length*lineH)+16;
+  octx=off.getContext('2d'); // resizing the canvas resets its context/state
+  octx.font=size*SS+'px '+font;octx.fillStyle=color;octx.textBaseline='top';
+  wrapped.forEach(function(l,i){
+    var tw=octx.measureText(l).width,x=8;
+    if(align==='center')x=(off.width-tw)/2;else if(align==='right')x=off.width-8-tw;
+    octx.fillText(l,x,8+i*lineH);
+  });
   var url=off.toDataURL('image/png');
   pushUndo();
-  var layer=userLayers[state.activeLayerIdx];
-  var prev=project.activeLayer;layer.activate();
-  var r=new Raster(url);
-  r.data.src=url;r.data.isText=true;
-  var pt=_textPendingPt;
-  r.onLoad=function(){r.size=new Size(off.width/2,off.height/2);r.position=pt;saveActiveLayerFrame();updateUI();if(window.SMEngineBridge){if(r.canvas)SMEngineBridge.registerImagePixels&&0;SMEngineBridge.renderNow();}};
-  prev.activate();
+  var textMeta={text:txt,font:font,size:size,color:color,align:align,fixedWidth:fixedWidthWorld||null};
+  if(_textEditingRaster&&_textEditingRaster.parent){
+    var r=_textEditingRaster;
+    var topLeft=r.bounds.topLeft.clone(); // re-bake keeps its top-left anchor fixed, doesn't re-center on the old click point
+    r.data.isText=true;r.data.src=url;
+    r.data.text=textMeta.text;r.data.font=textMeta.font;r.data.size=textMeta.size;r.data.color=textMeta.color;r.data.align=textMeta.align;r.data.fixedWidth=textMeta.fixedWidth;
+    r.onLoad=function(){r.size=new Size(off.width/SS,off.height/SS);r.position=topLeft.add(new Point(r.size.width/2,r.size.height/2));saveActiveLayerFrame();updateUI();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();};
+    r.source=url; // reassigning .source keeps the same item identity (index/parent/references) — just reloads the bitmap, same pattern as any other Raster edit-in-place in this codebase
+  }else{
+    var layer=userLayers[state.activeLayerIdx];
+    var prev=project.activeLayer;layer.activate();
+    var r2=new Raster(url);
+    r2.data.src=url;r2.data.isText=true;
+    r2.data.text=textMeta.text;r2.data.font=textMeta.font;r2.data.size=textMeta.size;r2.data.color=textMeta.color;r2.data.align=textMeta.align;r2.data.fixedWidth=textMeta.fixedWidth;
+    var pt=_textPendingBox?_textPendingBox.topLeft.clone():_textPendingPt;
+    var isBox=!!_textPendingBox;
+    r2.onLoad=function(){
+      r2.size=new Size(off.width/SS,off.height/SS);
+      r2.position=isBox?pt.add(new Point(r2.size.width/2,r2.size.height/2)):pt;
+      saveActiveLayerFrame();updateUI();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();
+    };
+    prev.activate();
+  }
   closeTextPopover();
 }
 function initTextPopover(){
@@ -3474,6 +3561,8 @@ function initTextPopover(){
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initTextPopover);else initTextPopover();
 window.openTextPopover=openTextPopover;
+window.openTextPopoverForBox=openTextPopoverForBox;
+window.openTextPopoverForEdit=openTextPopoverForEdit;
 function initCycleAndPropagate(){
   var cyc=document.getElementById('btn-cycle');
   if(cyc)cyc.addEventListener('click',function(){

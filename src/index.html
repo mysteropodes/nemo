@@ -950,9 +950,16 @@
 <div id="text-popover" style="display:none;position:absolute;z-index:200;width:230px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);padding:8px">
   <textarea id="text-input" rows="2" placeholder="Ton texte..." style="width:100%;resize:vertical;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:12px;padding:5px;box-sizing:border-box"></textarea>
   <div class="pr" style="margin-top:6px;gap:6px">
-    <input type="number" id="text-size" value="48" min="8" max="400" style="width:56px" class="pi" title="Taille (px)">
+    <input type="number" id="text-size" value="48" min="8" max="400" style="width:52px" class="pi" title="Taille (px)">
     <select id="text-font" class="psel" style="flex:1">
       <option value="sans-serif">Sans</option><option value="serif">Serif</option><option value="monospace">Mono</option><option value="Manrope">Manrope</option>
+      <option value="Georgia">Georgia</option><option value="'Times New Roman'">Times</option><option value="'Courier New'">Courier</option><option value="Verdana">Verdana</option>
+    </select>
+    <input type="color" id="text-color" value="#000000" style="width:26px;height:24px;padding:0;border:1px solid var(--border);border-radius:5px;background:none" title="Couleur">
+  </div>
+  <div class="pr" style="margin-top:6px;gap:6px">
+    <select id="text-align" class="psel" style="flex:1" title="Alignement">
+      <option value="left">Gauche</option><option value="center">Centre</option><option value="right">Droite</option>
     </select>
   </div>
   <div class="pr" style="margin-top:6px;gap:6px">
