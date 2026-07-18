@@ -491,6 +491,8 @@
     if (perspectiveItems.length) layers.push({ items: perspectiveItems });
     var symmetryItems = window.buildSymmetryGuideItems ? window.buildSymmetryGuideItems() : [];
     if (symmetryItems.length) layers.push({ items: symmetryItems });
+    var gradientGizmoItems = window.buildGradientGizmoItems ? window.buildGradientGizmoItems() : [];
+    if (gradientGizmoItems.length) layers.push({ items: gradientGizmoItems });
     return JSON.stringify({ layers: layers });
   }
 

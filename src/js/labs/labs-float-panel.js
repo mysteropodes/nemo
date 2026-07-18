@@ -51,6 +51,16 @@
         if (state.symmetryEnabled) {
           if (window.ensureSymmetryAxis) window.ensureSymmetryAxis();
           if (window.ensureSymmetryRadialCenter) window.ensureSymmetryRadialCenter();
+          // Feedback: "on ne peut pas changer l'emplacement des points/
+          // guides" — turning the guide on from HERE used to leave
+          // state.tool at whatever it was (almost always Draw/Fillbrush),
+          // so the axis appeared but nothing you clicked on it did
+          // anything: dragging is gated on state.tool==='symmetry' (see
+          // symmetry-bridge.js's shouldEdit). Jumping into that tool the
+          // instant the guide turns on means the very first thing the user
+          // can do is drag it into place, no separate "now click the tiny
+          // toolbar icon" step required.
+          if (window.SM && window.SM.setTool) window.SM.setTool('symmetry');
         }
         var cb = document.getElementById('p-sym-on'); if (cb) cb.checked = state.symmetryEnabled;
         if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
@@ -60,7 +70,11 @@
       isOn: function () { return !!(window.state && state.perspectiveEnabled); },
       toggle: function () {
         state.perspectiveEnabled = !state.perspectiveEnabled;
-        if (state.perspectiveEnabled && window.ensurePerspectiveVPs) window.ensurePerspectiveVPs();
+        if (state.perspectiveEnabled) {
+          if (window.ensurePerspectiveVPs) window.ensurePerspectiveVPs();
+          // Same reasoning as symmetry's toggle above.
+          if (window.SM && window.SM.setTool) window.SM.setTool('perspective');
+        }
         var cb = document.getElementById('p-persp-on'); if (cb) cb.checked = state.perspectiveEnabled;
         if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
       },
