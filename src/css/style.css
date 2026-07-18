@@ -712,7 +712,17 @@ body.mode-motion .lrow.act{box-shadow:inset 3px 0 0 #4E6FF2,inset 0 0 0 1px rgba
 .fhc.cur{color:var(--accent);font-weight:700;}
 .fhc.sec{color:var(--accent);font-weight:700;font-size:8.5px;}
 .fhc.sec::before{content:'';position:absolute;left:0;top:0;bottom:-2px;width:1px;background:rgba(255,255,255,.3);}
-#frame-grid{display:flex;flex-direction:column;}
+/* position+z-index gives #frame-grid its OWN stacking context, so any
+   z-index set on its descendants (Motion's per-row .layer-inout-bar,
+   layer-inout.js — inline `position:relative` with no z-index of its own,
+   which does NOT form a stacking context by itself) stays CONTAINED here
+   instead of bubbling up to compete directly against #frame-hdr/#bars-row
+   (z-index:2 each, sticky, meant to stay pinned on top while scrolling).
+   Without this, a scrolled-past layer row painted over the ruler/onion/
+   work-area bars — confirmed live: elementFromPoint() over #bars-row hit
+   a .layer-inout-bar instead. z-index:1 (below frame-hdr/bars-row's 2) so
+   this box itself never outranks them either. */
+#frame-grid{display:flex;flex-direction:column;position:relative;z-index:1;}
 /* Must stay in lockstep with .lrow's height (28px, v3 redesign) — the layer
    name column (#layer-panel) and the frame grid (#fg-wrap) are separate
    flex columns rendered independently, so any mismatch between .lrow's and
