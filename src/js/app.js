@@ -935,6 +935,10 @@ function getEffectiveStrokes(layerIdx,frameIdx){
   // no vector strokes at all — its picture is an engine-side image item
   // (buildSceneJson, engine-bridge.js), not frame data.
   if(ld.nativeVideo)return[];
+  // Null/Effect layer (2026-07, Motion) — never have real content by
+  // design (see SM.addNullLayer/addEffectLayer's own comments); same
+  // "no strokes to speak of" early-return as nativeVideo above.
+  if(ld.isNullLayer||ld.isEffectLayer)return[];
   // StoryBoard montage layer (storyboard.js, 2026-07): the layer's content
   // at frame f IS the montage's resolved frame (looping) — the montage
   // stays the single source of truth, edits in the node space show up
@@ -1565,7 +1569,7 @@ function _maybePromoteInterpolated(f,strokes){
 }
 function saveActiveLayerFrame(){
   window._sceneVersion++;
-  var ld=state.layers[state.activeLayerIdx];if(ld.symbolId||ld.nativeVideo||ld.montageId)return;
+  var ld=state.layers[state.activeLayerIdx];if(ld.symbolId||ld.nativeVideo||ld.montageId||ld.isNullLayer||ld.isEffectLayer)return;
   _writeBackGhostProxies(state.activeLayerIdx);
   var f=ld.frames[state.currentFrame];
   if(!f.isKeyframe&&!f.isInterpolated)return;
@@ -1575,7 +1579,7 @@ function saveActiveLayerFrame(){
 }
 function saveAllLayerFrames(){
   _writeBackGhostProxies(state.activeLayerIdx);
-  for(var i=0;i<state.layers.length;i++){if(state.layers[i].symbolId||state.layers[i].nativeVideo||state.layers[i].montageId)continue;var f=state.layers[i].frames[state.currentFrame];if(!f||(!f.isKeyframe&&!f.isInterpolated))continue;
+  for(var i=0;i<state.layers.length;i++){if(state.layers[i].symbolId||state.layers[i].nativeVideo||state.layers[i].montageId||state.layers[i].isNullLayer||state.layers[i].isEffectLayer)continue;var f=state.layers[i].frames[state.currentFrame];if(!f||(!f.isKeyframe&&!f.isInterpolated))continue;
   var strokes=_collectLayerStrokes(i,state.layers[i]);
   _maybePromoteInterpolated(f,strokes);
   f.strokes=strokes;}

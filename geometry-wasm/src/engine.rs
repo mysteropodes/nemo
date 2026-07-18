@@ -173,6 +173,29 @@ pub(crate) struct LayerIn {
     // would make a shape look sharper just from zooming out.
     #[serde(default)]
     pub(crate) blur_radius: Option<f32>,
+    // Adjustment/effect layer (2026-07, Motion) — an AE-style layer with no
+    // painted content of its own whose effect applies to EVERYTHING BELOW
+    // it in the stack instead of just itself. Unlike blur_radius/matte_mode
+    // above (which only ever transform THIS layer's own isolated render),
+    // composite_scene reads the running accumulator (the composite of
+    // every layer so far) as this pass's source and writes the result back
+    // as the new accumulator state — see composite_scene's is_effect_layer
+    // branch. `items` is ignored entirely for this layer (never painted),
+    // matching AE's own "Adjustment Layer" toggle hiding the layer's own
+    // shape while its effect still applies.
+    #[serde(default)]
+    pub(crate) is_effect_layer: Option<bool>,
+    // "blur" | "colorAdjust" — which WGSL pass composite_scene dispatches
+    // to. Unrecognized/None falls back to "blur" (see composite_scene).
+    #[serde(default)]
+    pub(crate) effect_type: Option<String>,
+    // Generic params, meaning depends on effect_type: blur -> p1=radius_px
+    // (p2 unused); colorAdjust -> p1=brightness (-1..1 additive), p2=contrast
+    // (-1..1, pivots around mid-gray) — see color_adjust.wgsl.
+    #[serde(default)]
+    pub(crate) effect_p1: Option<f32>,
+    #[serde(default)]
+    pub(crate) effect_p2: Option<f32>,
 }
 
 // FIXED (was "KNOWN BROKEN, v17 investigation" — see git history for the
@@ -570,6 +593,16 @@ pub struct VelloEngine {
     blur_uniform_buf: wgpu::Buffer,
     blur_result_tex: wgpu::Texture,
     blur_result_view: wgpu::TextureView,
+    // ---- Effect (adjustment) layers (2026-07) — color_adjust.wgsl. No
+    // result_tex/view of its own: unlike blur_result above (used for a
+    // per-layer blur that still needs to flow into the ordinary composite/
+    // blend step afterward), an effect layer's pass writes DIRECTLY into
+    // whichever blend_accum_a/b view is the ping-pong's next target — see
+    // composite_scene's is_effect_layer branch.
+    color_pipeline: wgpu::RenderPipeline,
+    color_bind_group_layout: wgpu::BindGroupLayout,
+    color_sampler: wgpu::Sampler,
+    color_uniform_buf: wgpu::Buffer,
 }
 
 // ---- Blend compositor plumbing (see blend.wgsl's doc comment) ----
@@ -1038,6 +1071,144 @@ fn blur_pass(
     queue.submit(Some(encoder.finish()));
 }
 
+/// Brightness/contrast pipeline for effect (adjustment) layers — same
+/// single-texture-input shape as create_blur_pipeline, just a different
+/// shader/uniform payload (see color_adjust.wgsl).
+fn create_color_adjust_pipeline(device: &wgpu::Device) -> (wgpu::RenderPipeline, wgpu::BindGroupLayout, wgpu::Sampler, wgpu::Buffer) {
+    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        label: Some("color-adjust-compositor"),
+        source: wgpu::ShaderSource::Wgsl(include_str!("color_adjust.wgsl").into()),
+    });
+    let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some("color-adjust-bind-group-layout"),
+        entries: &[
+            wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Texture {
+                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                    multisampled: false,
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 1,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 2,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            },
+        ],
+    });
+    let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+        label: Some("color-adjust-pipeline-layout"),
+        bind_group_layouts: &[Some(&bind_group_layout)],
+        immediate_size: 0,
+    });
+    let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        label: Some("color-adjust-pipeline"),
+        layout: Some(&pipeline_layout),
+        vertex: wgpu::VertexState {
+            module: &shader,
+            entry_point: Some("vs_main"),
+            buffers: &[],
+            compilation_options: Default::default(),
+        },
+        fragment: Some(wgpu::FragmentState {
+            module: &shader,
+            entry_point: Some("fs_main"),
+            targets: &[Some(wgpu::ColorTargetState {
+                format: BLEND_SCRATCH_FORMAT,
+                blend: None,
+                write_mask: wgpu::ColorWrites::ALL,
+            })],
+            compilation_options: Default::default(),
+        }),
+        primitive: wgpu::PrimitiveState::default(),
+        depth_stencil: None,
+        multisample: wgpu::MultisampleState::default(),
+        multiview_mask: None,
+        cache: None,
+    });
+    let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+        label: Some("color-adjust-sampler"),
+        address_mode_u: wgpu::AddressMode::ClampToEdge,
+        address_mode_v: wgpu::AddressMode::ClampToEdge,
+        mag_filter: wgpu::FilterMode::Linear,
+        min_filter: wgpu::FilterMode::Linear,
+        ..Default::default()
+    });
+    // 16 bytes: brightness (f32) + contrast (f32) + 2 padding floats — see
+    // color_adjust.wgsl's Params.
+    let uniform_buf = device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("color-adjust-params"),
+        size: 16,
+        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    });
+    (pipeline, bind_group_layout, sampler, uniform_buf)
+}
+
+/// Runs color_adjust.wgsl: writes a brightness/contrast-adjusted copy of
+/// `source_view` into `target_view`. Mirrors blur_pass's shape.
+#[allow(clippy::too_many_arguments)]
+fn color_adjust_pass(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    pipeline: &wgpu::RenderPipeline,
+    bind_group_layout: &wgpu::BindGroupLayout,
+    sampler: &wgpu::Sampler,
+    uniform_buf: &wgpu::Buffer,
+    source_view: &wgpu::TextureView,
+    brightness: f32,
+    contrast: f32,
+    target_view: &wgpu::TextureView,
+) {
+    let mut payload = [0u8; 16];
+    payload[0..4].copy_from_slice(&brightness.to_le_bytes());
+    payload[4..8].copy_from_slice(&contrast.to_le_bytes());
+    queue.write_buffer(uniform_buf, 0, &payload);
+    let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("color-adjust-bind-group"),
+        layout: bind_group_layout,
+        entries: &[
+            wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(source_view) },
+            wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::Sampler(sampler) },
+            wgpu::BindGroupEntry { binding: 2, resource: uniform_buf.as_entire_binding() },
+        ],
+    });
+    let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("color-adjust-composite") });
+    {
+        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("color-adjust-composite-pass"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: target_view,
+                resolve_target: None,
+                ops: wgpu::Operations { load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT), store: wgpu::StoreOp::Store },
+                depth_slice: None,
+            })],
+            depth_stencil_attachment: None,
+            timestamp_writes: None,
+            occlusion_query_set: None,
+            multiview_mask: None,
+        });
+        pass.set_pipeline(pipeline);
+        pass.set_bind_group(0, &bind_group, &[]);
+        pass.draw(0..3, 0..1);
+    }
+    queue.submit(Some(encoder.finish()));
+}
+
 fn wgpu_color_from(c: Color) -> wgpu::Color {
     let rgba = c.to_rgba8();
     wgpu::Color { r: rgba.r as f64 / 255.0, g: rgba.g as f64 / 255.0, b: rgba.b as f64 / 255.0, a: rgba.a as f64 / 255.0 }
@@ -1306,6 +1477,7 @@ pub async fn create_engine(
     let (matte_result_tex, matte_result_view) = create_matte_result_texture(&device, width, height);
     let (blur_pipeline, blur_bind_group_layout, blur_sampler, blur_uniform_buf) = create_blur_pipeline(&device);
     let (blur_result_tex, blur_result_view) = create_matte_result_texture(&device, width, height);
+    let (color_pipeline, color_bind_group_layout, color_sampler, color_uniform_buf) = create_color_adjust_pipeline(&device);
 
     Ok(VelloEngine {
         surface,
@@ -1353,6 +1525,10 @@ pub async fn create_engine(
         blur_uniform_buf,
         blur_result_tex,
         blur_result_view,
+        color_pipeline,
+        color_bind_group_layout,
+        color_sampler,
+        color_uniform_buf,
     })
 }
 
@@ -1406,7 +1582,8 @@ impl VelloEngine {
         let has_matte = is_matte_source.iter().any(|&b| b);
         let has_blend = scene_in.layers.iter().any(|l| mix_mode_index(l.blend_mode.as_deref()) != 0);
         let has_blur = scene_in.layers.iter().any(|l| l.blur_radius.unwrap_or(0.0) > 0.0);
-        if !has_blend && !has_matte && !has_blur {
+        let has_effect = scene_in.layers.iter().any(|l| l.is_effect_layer.unwrap_or(false));
+        if !has_blend && !has_matte && !has_blur && !has_effect {
             let mut scene = Scene::new();
             self.push_atlas_keepalive(&mut scene);
             for layer in &scene_in.layers {
@@ -1426,6 +1603,57 @@ impl VelloEngine {
             // Consumed as a matte source by the layer below it — doesn't
             // paint as its own visible layer (AE convention).
             if is_matte_source[i] {
+                continue;
+            }
+            // Effect (adjustment) layer — unlike every other branch here,
+            // this one never paints its own items at all: it reads the
+            // RUNNING ACCUMULATOR (everything composited so far, i.e.
+            // "everything below" since layers are processed bottom-up) as
+            // its source and writes the graded/blurred result back as the
+            // new accumulator state, exactly like flipping accum_is_a for
+            // an ordinary layer — just with a color/blur pass instead of
+            // paint_layer_items+composite_pass in between.
+            if layer.is_effect_layer.unwrap_or(false) {
+                let (backdrop_view, target_view) = if accum_is_a {
+                    (&self.blend_accum_a_view, &self.blend_accum_b_view)
+                } else {
+                    (&self.blend_accum_b_view, &self.blend_accum_a_view)
+                };
+                match layer.effect_type.as_deref() {
+                    Some("colorAdjust") => {
+                        color_adjust_pass(
+                            &self.device,
+                            &self.queue,
+                            &self.color_pipeline,
+                            &self.color_bind_group_layout,
+                            &self.color_sampler,
+                            &self.color_uniform_buf,
+                            backdrop_view,
+                            layer.effect_p1.unwrap_or(0.0),
+                            layer.effect_p2.unwrap_or(0.0),
+                            target_view,
+                        );
+                    }
+                    _ => {
+                        // Default/"blur" — reuses blur_pass verbatim, just
+                        // fed the accumulator instead of one layer's own
+                        // isolated render.
+                        blur_pass(
+                            &self.device,
+                            &self.queue,
+                            &self.blur_pipeline,
+                            &self.blur_bind_group_layout,
+                            &self.blur_sampler,
+                            &self.blur_uniform_buf,
+                            backdrop_view,
+                            layer.effect_p1.unwrap_or(0.0),
+                            self.width,
+                            self.height,
+                            target_view,
+                        );
+                    }
+                }
+                accum_is_a = !accum_is_a;
                 continue;
             }
             let mut scene = Scene::new();
