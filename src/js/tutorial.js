@@ -458,6 +458,21 @@
     ["Une courbe qui part plat et finit pentue = démarrage lent, arrivée rapide (Slow In). L'inverse = Slow Out. \"+ Enregistrer preset\" garde une courbe personnalisée pour la réutiliser ailleurs.", "A curve that starts flat and ends steep = slow start, fast arrival (Slow In). The reverse = Slow Out. \"+ Save preset\" keeps a custom curve to reuse elsewhere.", "Una curva que empieza plana y termina empinada = inicio lento, llegada rápida (Slow In). Lo contrario = Slow Out. \"+ Enregistrer preset\" guarda una curva personalizada para reutilizarla en otro sitio.", "平坦に始まり急になるカーブ＝ゆっくり始まり速く到達（Slow In）。逆はSlow Outです。「+ Enregistrer preset」で、カスタムカーブを保存して他の場所でも再利用できます。"],
     ["Clique sur l'outil Pinceau — on va dessiner deux poses à interpoler.", "Click the Brush tool — we're going to draw two poses to interpolate.", "Haz clic en la herramienta Pincel — vamos a dibujar dos poses para interpolar.", "ブラシツールをクリックしてください — 補間する2つのポーズを描きます。"],
     ["Clique sur l'outil Pinceau — on va poser deux keyframes à interpoler.", "Click the Brush tool — we're going to set two keyframes to interpolate.", "Haz clic en la herramienta Pincel — vamos a colocar dos fotogramas clave para interpolar.", "ブラシツールをクリックしてください — 補間する2つのキーフレームを打ちます。"],
+    ["Vue d'ensemble", "Overview", "Vista general", "概要"],
+    ["Les 3 vues de Nemo", "Nemo's 3 views", "Las 3 vistas de Nemo", "Nemoの3つのビュー"],
+    ["StoryBoard, Animation 2D, Motion — un seul document", "StoryBoard, Animation 2D, Motion — one single document", "StoryBoard, Animation 2D, Motion — un solo documento", "StoryBoard、Animation 2D、Motion — 単一のドキュメント"],
+    ["Un document, trois vues", "One document, three views", "Un documento, tres vistas", "1つのドキュメント、3つのビュー"],
+    ["StoryBoard, Animation 2D et Motion ne sont PAS trois éditeurs séparés — ce sont trois façons de regarder le MÊME document. Un calque dessiné dans l'un existe partout ailleurs, pas besoin d'exporter ou de dupliquer quoi que ce soit d'un mode à l'autre.", "StoryBoard, Animation 2D and Motion are NOT three separate editors — they're three ways of looking at the SAME document. A layer drawn in one exists everywhere else too, no need to export or duplicate anything between modes.", "StoryBoard, Animation 2D y Motion NO son tres editores separados — son tres formas de mirar el MISMO documento. Una capa dibujada en uno existe en todos los demás, sin necesidad de exportar ni duplicar nada entre modos.", "StoryBoard、Animation 2D、Motionは3つの別々のエディタではありません — 同じドキュメントを見る3つの方法です。どれか1つで描いたレイヤーは他のすべてに存在し、モード間でエクスポートや複製をする必要はありません。"],
+    ["Animation 2D — la base", "Animation 2D — the foundation", "Animation 2D — la base", "Animation 2D — 基盤"],
+    ["Clique l'onglet \"Animation 2D\". C'est ici que vit le dessin frame par frame : chaque calque est une pile de frames et de keyframes. Tous les autres modes lisent ces mêmes calques.", "Click the \"Animation 2D\" tab. This is where frame-by-frame drawing lives: every layer is a stack of frames and keyframes. Every other mode reads those same layers.", "Haz clic en la pestaña \"Animation 2D\". Aquí vive el dibujo fotograma a fotograma: cada capa es una pila de fotogramas y fotogramas clave. Todos los demás modos leen esas mismas capas.", "「Animation 2D」タブをクリックしてください。ここがコマ撮り作画の本拠地です — 各レイヤーはフレームとキーフレームの積み重ねです。他のすべてのモードはこの同じレイヤーを読み取ります。"],
+    ["Motion — animer sans redessiner", "Motion — animate without redrawing", "Motion — animar sin redibujar", "Motion — 描き直さずにアニメーションする"],
+    ["Clique l'onglet \"Motion\". Il anime des PROPRIÉTÉS (position, rotation, échelle, opacité) par keyframes, façon After Effects — sur les MÊMES calques qu'en Animation 2D, sans dupliquer le dessin.", "Click the \"Motion\" tab. It animates PROPERTIES (position, rotation, scale, opacity) via keyframes, After Effects style — on the SAME layers as Animation 2D, without duplicating the drawing.", "Haz clic en la pestaña \"Motion\". Anima PROPIEDADES (posición, rotación, escala, opacidad) por fotogramas clave, al estilo After Effects — sobre las MISMAS capas que en Animation 2D, sin duplicar el dibujo.", "「Motion」タブをクリックしてください。After Effectsのように、キーフレームでプロパティ（位置・回転・拡大縮小・不透明度）をアニメーションします — Animation 2Dと同じレイヤー上で、作画を複製することなく。"],
+    ["Le déclic vers un Component", "The trigger into a Component", "El disparador hacia un Component", "Componentへの転換点"],
+    ["Dès qu'une propriété de calque ENTIER est keyée en Motion (pas juste un élément isolé), Nemo convertit automatiquement ce calque en Component — un symbole réutilisable. C'est le pont entre \"animer une pose\" et \"monter une séquence\".", "As soon as a WHOLE-layer property is keyed in Motion (not just a single isolated element), Nemo automatically converts that layer into a Component — a reusable symbol. It's the bridge between \"animating a pose\" and \"assembling a sequence\".", "En cuanto se keyea una propiedad de capa ENTERA en Motion (no solo un elemento aislado), Nemo convierte automáticamente esa capa en un Component — un símbolo reutilizable. Es el puente entre \"animar una pose\" y \"montar una secuencia\".", "Motionでレイヤー全体のプロパティにキーが打たれると（単一の要素だけでなく）、Nemoはそのレイヤーを自動的にComponent（再利用可能なシンボル）に変換します。これが「ポーズをアニメーションする」ことと「シーケンスを組み立てる」ことの架け橋です。"],
+    ["StoryBoard — assembler la séquence", "StoryBoard — assembling the sequence", "StoryBoard — montar la secuencia", "StoryBoard — シーケンスを組み立てる"],
+    ["Clique l'onglet \"StoryBoard\". Ce montage nodal ne manipule QUE des Components — il assemble en séquence ce qui a été dessiné et animé dans les deux autres vues, avec ses propres instances (vitesse/offset).", "Click the \"StoryBoard\" tab. This nodal editor manipulates ONLY Components — it sequences what was drawn and animated in the other two views, with its own instances (speed/offset).", "Haz clic en la pestaña \"StoryBoard\". Este montaje nodal manipula SOLO Components — secuencia lo que se dibujó y animó en las otras dos vistas, con sus propias instancias (velocidad/offset).", "「StoryBoard」タブをクリックしてください。このノードエディタはComponentだけを扱います — 他の2つのビューで描画・アニメーションされたものを、それぞれ独自のインスタンス（速度/オフセット）でシーケンスに組み立てます。"],
+    ["Le flux complet", "The full flow", "El flujo completo", "全体の流れ"],
+    ["En pratique : tu dessines en Animation 2D → tu animes les propriétés en Motion → tu assembles la séquence en StoryBoard — le tout sur un seul document, en aller-retour permanent entre les trois vues. Les modules \"Motion\" et \"Components et StoryBoard\" plus bas détaillent chacun en profondeur.", "In practice: you draw in Animation 2D → you animate properties in Motion → you assemble the sequence in StoryBoard — all on a single document, moving back and forth between the three views constantly. The \"Motion\" and \"Components and StoryBoard\" modules further down cover each in depth.", "En la práctica: dibujas en Animation 2D → animas propiedades en Motion → montas la secuencia en StoryBoard — todo sobre un único documento, yendo y viniendo constantemente entre las tres vistas. Los módulos \"Motion\" y \"Components et StoryBoard\" más abajo detallan cada uno en profundidad.", "実際には：Animation 2Dで描く → Motionでプロパティをアニメーションする → StoryBoardでシーケンスを組み立てる — すべて単一のドキュメント上で、3つのビューを絶えず行き来しながら進めます。下にある「Motion」と「Components et StoryBoard」の各モジュールで、それぞれをさらに詳しく扱います。"],
   ]);
   // Named T (not tt) — renderStep()'s local `tt` variable holds the tooltip
   // DOM element and would otherwise shadow a same-named lookup function.
@@ -524,6 +539,25 @@
       '<circle cx="45" cy="35" r="18" fill="none" stroke="currentColor" stroke-width="2.5" opacity="0.25"/>' +
       '<circle cx="70" cy="35" r="18" fill="none" stroke="var(--accent)" stroke-width="3"/>' +
       '<circle cx="95" cy="35" r="18" fill="none" stroke="currentColor" stroke-width="2.5" opacity="0.25"/>' +
+      '</svg>',
+    // Overview: one shared document (the little page icon in the middle)
+    // with three views orbiting it — StoryBoard/Animation2D/Motion aren't
+    // separate files, they're three lenses on the SAME data (CLAUDE.md
+    // §8). Dashed spokes + a staggered pulse on each node stand in for
+    // "connected, taking turns", deliberately wordless like every other
+    // illustration here.
+    threeViews:
+      '<svg viewBox="0 0 160 110" aria-hidden="true">' +
+      '<g stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 4" opacity="0.35">' +
+      '<line x1="80" y1="55" x2="80" y2="22"/><line x1="80" y1="55" x2="34" y2="88"/><line x1="80" y1="55" x2="126" y2="88"/>' +
+      '</g>' +
+      '<rect x="68" y="42" width="24" height="30" rx="3" fill="none" stroke="currentColor" stroke-width="2" opacity="0.6"/>' +
+      '<g stroke="currentColor" stroke-width="1.5" opacity="0.5">' +
+      '<line x1="72" y1="50" x2="88" y2="50"/><line x1="72" y1="56" x2="88" y2="56"/><line x1="72" y1="62" x2="84" y2="62"/>' +
+      '</g>' +
+      '<circle cx="80" cy="14" r="8" fill="var(--accent)"><animate attributeName="opacity" values="0.55;1;0.55" dur="2.4s" repeatCount="indefinite"/></circle>' +
+      '<circle cx="30" cy="90" r="8" fill="var(--accent)"><animate attributeName="opacity" values="0.55;1;0.55" dur="2.4s" begin="0.8s" repeatCount="indefinite"/></circle>' +
+      '<circle cx="130" cy="90" r="8" fill="var(--accent)"><animate attributeName="opacity" values="0.55;1;0.55" dur="2.4s" begin="1.6s" repeatCount="indefinite"/></circle>' +
       '</svg>'
   };
 
@@ -537,6 +571,33 @@
   //                                                          stateIncreaseStep() over writing
   //                                                          this by hand — see comment above.
   var MODULES = [
+    {
+      id: 'overview',
+      category: 'Vue d\'ensemble',
+      icon: '0',
+      title: 'Les 3 vues de Nemo',
+      desc: 'StoryBoard, Animation 2D, Motion — un seul document',
+      time: '2 min',
+      // Purement conceptuel, volontairement léger sur les clics réels —
+      // le but est de faire comprendre l'ARCHITECTURE avant de plonger
+      // dans les outils (les modules Motion et Components/StoryBoard plus
+      // bas couvrent déjà l'usage pratique en détail). Contenu aligné sur
+      // CLAUDE.md §8 : les 3 modes ne sont pas 3 éditeurs indépendants,
+      // ce sont 3 vues d'un même document, avec des règles de bascule
+      // précises entre elles — à ne pas re-décrire différemment sans
+      // reposer la question à l'utilisateur si ça évolue.
+      steps: [
+        {
+          type: 'info', title: 'Un document, trois vues', illustration: ILLUS.threeViews,
+          body: 'StoryBoard, Animation 2D et Motion ne sont PAS trois éditeurs séparés — ce sont trois façons de regarder le MÊME document. Un calque dessiné dans l\'un existe partout ailleurs, pas besoin d\'exporter ou de dupliquer quoi que ce soit d\'un mode à l\'autre.'
+        },
+        { type: 'click', target: '.app-mode-btn[data-mode="anim2d"]', title: 'Animation 2D — la base', body: 'Clique l\'onglet "Animation 2D". C\'est ici que vit le dessin frame par frame : chaque calque est une pile de frames et de keyframes. Tous les autres modes lisent ces mêmes calques.' },
+        { type: 'click', target: '.app-mode-btn[data-mode="motion"]', title: 'Motion — animer sans redessiner', body: 'Clique l\'onglet "Motion". Il anime des PROPRIÉTÉS (position, rotation, échelle, opacité) par keyframes, façon After Effects — sur les MÊMES calques qu\'en Animation 2D, sans dupliquer le dessin.' },
+        { type: 'info', title: 'Le déclic vers un Component', body: 'Dès qu\'une propriété de calque ENTIER est keyée en Motion (pas juste un élément isolé), Nemo convertit automatiquement ce calque en Component — un symbole réutilisable. C\'est le pont entre "animer une pose" et "monter une séquence".' },
+        { type: 'click', target: '.app-mode-btn[data-mode="storyboard"]', title: 'StoryBoard — assembler la séquence', body: 'Clique l\'onglet "StoryBoard". Ce montage nodal ne manipule QUE des Components — il assemble en séquence ce qui a été dessiné et animé dans les deux autres vues, avec ses propres instances (vitesse/offset).' },
+        { type: 'info', title: 'Le flux complet', body: 'En pratique : tu dessines en Animation 2D → tu animes les propriétés en Motion → tu assembles la séquence en StoryBoard — le tout sur un seul document, en aller-retour permanent entre les trois vues. Les modules "Motion" et "Components et StoryBoard" plus bas détaillent chacun en profondeur.' }
+      ]
+    },
     {
       id: 'draw',
       category: 'Dessiner',
@@ -1411,7 +1472,7 @@
   // Categories render in this fixed order (not alphabetical, not
   // MODULES-array order) — roughly the order someone actually learning
   // Nemo would want: draw first, then animate, then organize/output.
-  var CATEGORY_ORDER = ['Dessiner', 'Calques et animation', 'Principes d\'animation', 'Organisation', 'Médias', 'Réglages'];
+  var CATEGORY_ORDER = ['Vue d\'ensemble', 'Dessiner', 'Calques et animation', 'Principes d\'animation', 'Organisation', 'Médias', 'Réglages'];
 
   // A real two-screen menu, not an inline accordion: the launcher opens on
   // a list of CATEGORIES only (icon + count, no modules shown yet);
