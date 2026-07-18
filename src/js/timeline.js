@@ -918,7 +918,7 @@ window.SM={
     var sceneWaIn=inSym?_sceneSnapshot.waIn:state.waIn;
     var sceneWaOut=inSym?_sceneSnapshot.waOut:state.waOut;
     return JSON.stringify({version:13,totalFrames:sceneTotal,fps:sceneFps,canvasW:state.canvasW,canvasH:state.canvasH,canvasBg:state.canvasBg,waIn:sceneWaIn,waOut:sceneWaOut,
-      layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color,motion:l.motion,motionStatic:l.motionStatic,elementMotion:l.elementMotion,inPoint:l.inPoint,outPoint:l.outPoint,nativeVideo:l.nativeVideo,matteMode:l.matteMode,blurRadius:l.blurRadius,montageId:l.montageId,expressions:l.expressions};}),
+      layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color,motion:l.motion,motionStatic:l.motionStatic,elementMotion:l.elementMotion,inPoint:l.inPoint,outPoint:l.outPoint,nativeVideo:l.nativeVideo,matteMode:l.matteMode,blurRadius:l.blurRadius,montageId:l.montageId,expressions:l.expressions,isTextLayer:l.isTextLayer};}),
       layerFolders:state.layerFolders,layerLinkGroups:state.layerLinkGroups,
       // StoryBoard node space (2026-07) — plain data by construction (no
       // runtime-only fields live in state.storyboard, see storyboard.js's
@@ -1039,6 +1039,7 @@ window.SM={
       if(ld.matteMode)state.layers[idx].matteMode=ld.matteMode;
       if(ld.blurRadius)state.layers[idx].blurRadius=ld.blurRadius;
       if(ld.expressions)state.layers[idx].expressions=ld.expressions;
+      if(ld.isTextLayer)state.layers[idx].isTextLayer=true;
       if(ld.symbolId){state.layers[idx].symbolId=ld.symbolId;state.layers[idx].symPlayMode=ld.symPlayMode||'loop';state.layers[idx].symSpeed=ld.symSpeed||1;state.layers[idx].symPlacedAt=ld.symPlacedAt||0;state.layers[idx].symSingleFrame=ld.symSingleFrame||0;if(ld.symMatrix)state.layers[idx].symMatrix=ld.symMatrix;}
       if(ld.lfsGroup){state.layers[idx].lfsGroup=true;state.layers[idx].lfsIds=ld.lfsIds;state.layers[idx].lfsSettings=ld.lfsSettings;}
       if(ld.folderId)state.layers[idx].folderId=ld.folderId;
@@ -2906,6 +2907,14 @@ function renderLayerList(){
     // the Solo 'S' badge's own single-letter convention would need 2
     // letters here anyway since Fill/Shadow both start differently in FR).
     if(ld.montageId){var mtb=document.createElement('div');mtb.className='lico comp-badge';mtb.title='Calque montage (StoryBoard) — contenu piloté par le montage \u00ab '+ld.name+' \u00bb, s\u2019édite dans l\u2019onglet StoryBoard';mtb.innerHTML='<span style="font-size:9px;line-height:1;font-weight:700">MT</span>';row.appendChild(mtb);}
+    // Text layer badge (2026-07) -- ld.isTextLayer, same "layer-level flag,
+    // not a new item type" precedent as symbolId/lfsGroup/montageId above:
+    // it distinguishes the layer visually/structurally without touching
+    // any layer.children consumer (CLAUDE.md family of bug n1 never
+    // applies here -- a text layer's items are still ordinary Rasters).
+    // Auto-set the first time text lands on an empty layer (commitText,
+    // "Outil texte" section) or explicitly via the layer row's context menu.
+    if(ld.isTextLayer){var txb=document.createElement('div');txb.className='lico comp-badge';txb.title='Calque de texte';txb.innerHTML='<span style="font-size:11px;line-height:1;font-weight:700">T</span>';row.appendChild(txb);}
     if(ld.channel){var chLabel=ld.channel==='stroke'?'Tr':ld.channel==='fill'?'Pl':'Om';var chb=document.createElement('div');chb.className='lico comp-badge';chb.title='Calque '+(ld.channel==='stroke'?'Trait':ld.channel==='fill'?'Plein':'Ombre')+' (Stroke/Fill/Shadow) — calque normal, keyframes liées';chb.innerHTML='<span style="font-size:9px;line-height:1;font-weight:700">'+chLabel+'</span>';row.appendChild(chb);}
     // Track matte badge (2026-07) — the Blend/Matte dropdowns only surface
     // in the right panel's Document fallback context (nothing selected,
@@ -2972,6 +2981,7 @@ function renderLayerList(){
         {label:'Supprimer le calque',action:function(){window.SM.deleteLayer();}},
         {sep:true},
         {label:'Renommer',action:function(){startLayerRename(idx4);}},
+        {label:l4.isTextLayer?'Retirer le marquage « calque de texte »':'Marquer comme calque de texte',action:function(){l4.isTextLayer=!l4.isTextLayer;renderLayerList();}},
         {label:'Grouper en dossier',disabled:_layerSel.length<2,action:function(){groupSelectionIntoFolder();}},
         {label:'Retirer du dossier',disabled:!l4.folderId,action:function(){delete l4.folderId;renderLayerList();renderTimeline();}},
         {label:'Convertir en composant',disabled:!!l4.symbolId||!!l4.lfsGroup,action:function(){window.SM.convertActiveLayerToComponent();}},
@@ -3476,7 +3486,14 @@ function closeTextPopover(){var pop=document.getElementById('text-popover');if(p
 // per-line x for the chosen alignment) instead of drifting from a second,
 // slightly-different implementation of the same word-wrap.
 function computeTextLayout(text,font,size,fixedWidthWorld){
-  var SS=2; // supersample factor for offscreen bake, unchanged from before
+  // Supersample factor for the offscreen bake — bumped from 2 to 3 (2026-07):
+  // since this text is still fundamentally a raster (real vector glyph
+  // rendering would need font-shaping work in the Rust/vello engine, out of
+  // scope this session), the only lever available for "doesn't look
+  // blurry when the user zooms in or exports large" is baking at a higher
+  // fixed resolution up front — cheap (a few more KB per text PNG) for a
+  // real crispness win at anything up to ~3x view zoom.
+  var SS=3;
   var lines=text.split('\n');
   var off=document.createElement('canvas');
   var octx=off.getContext('2d');
@@ -3542,6 +3559,15 @@ function commitText(){
     r.source=url; // reassigning .source keeps the same item identity (index/parent/references) — just reloads the bitmap, same pattern as any other Raster edit-in-place in this codebase
   }else{
     var layer=userLayers[state.activeLayerIdx];
+    // Auto-tag as a text layer (2026-07) — same "auto-convert on first
+    // qualifying action" precedent as Motion's own layer->Component
+    // conversion (CLAUDE.md §8): the FIRST text placed onto an otherwise
+    // empty layer marks it, never overriding a layer the user already
+    // filled with other content (that layer just gets a normal text item
+    // mixed in, no auto-tag — matches "a text layer's items are still
+    // ordinary Rasters", nothing here restricts what else can go on one).
+    var ldForTag=state.layers[state.activeLayerIdx];
+    if(layer.children.length===0&&!ldForTag.isTextLayer)ldForTag.isTextLayer=true;
     var prev=project.activeLayer;layer.activate();
     var r2=new Raster(url);
     r2.data.src=url;r2.data.isText=true;
