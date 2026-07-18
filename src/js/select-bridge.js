@@ -560,9 +560,15 @@
       // selects the real anchor, not the companion; moving/deleting a
       // companion alone would silently desync it from its group.
       var p = resolveBrushAnchor(hit.item, userLayers[state.activeLayerIdx]);
+      // Group (group-bridge.js, 2026-07): clicking any ONE member selects
+      // every sibling sharing its groupId — membersOf returns `[p]`
+      // unchanged when it isn't grouped, so this is a no-op widening for
+      // the (overwhelmingly common) ungrouped case.
+      var clickedSet = window.SMGroup ? SMGroup.membersOf(p, userLayers[state.activeLayerIdx]) : [p];
       var idx2 = selectedPaths.indexOf(p);
       if (e.shiftKey) {
-        if (idx2 >= 0) selectedPaths.splice(idx2, 1); else selectedPaths.push(p);
+        if (idx2 >= 0) clickedSet.forEach(function (m) { var mi = selectedPaths.indexOf(m); if (mi >= 0) selectedPaths.splice(mi, 1); });
+        else clickedSet.forEach(function (m) { if (selectedPaths.indexOf(m) < 0) selectedPaths.push(m); });
       } else if (idx2 < 0) {
         // Clicking a NEW item without shift replaces the selection — but
         // clicking one already part of a multi-selection must NOT clear the
@@ -572,7 +578,7 @@
         // reported "transform works but moving several selected elements
         // doesn't".
         clearSel();
-        selectedPaths.push(p);
+        clickedSet.forEach(function (m) { selectedPaths.push(m); });
       }
       state.selectedStrokeIndices = selectedPaths.map(getSI).filter(function (i2) { return i2 >= 0; });
       mode = selectedPaths.length ? 'move' : null;
@@ -1107,7 +1113,8 @@
     // anything else replaces it with just that item, same as a plain click.
     if (clickedPath && selectedPaths.indexOf(clickedPath) < 0) {
       clearSel();
-      selectedPaths.push(clickedPath);
+      var rcSet = window.SMGroup ? SMGroup.membersOf(clickedPath, layer) : [clickedPath];
+      rcSet.forEach(function (m) { selectedPaths.push(m); });
       state.selectedStrokeIndices = selectedPaths.map(getSI).filter(function (i) { return i >= 0; });
       renderArcs(); updateUI(); window.SMEngineBridge.renderNow();
     }
@@ -1117,10 +1124,17 @@
     var p0 = selectedPaths[0];
     var isDeleteGhost = !multi && p0.data && p0.data.isRevisionGhost && p0.data.revisionAction === 'delete';
     var isActiveRevision = !multi && p0.data && p0.data.revisionParentId && !p0.data.isRevisionGhost;
+    var isGrouped = !multi && p0.data && p0.data.groupId;
     var items = [
       { label: 'Dupliquer', shortcut: '⌘D', action: function () { duplicateSelection(); } },
       { label: multi ? 'Supprimer la sélection' : 'Supprimer', shortcut: 'Suppr', action: function () { window.SM.deleteSelStrokes(); } },
       { sep: true },
+    ];
+    if (multi || isGrouped) {
+      items.push({ label: isGrouped ? 'Dissocier' : 'Grouper', shortcut: isGrouped ? '⇧⌘G' : '⌘G', action: function () { if (window.SMGroup) { if (isGrouped) SMGroup.ungroupSelection(); else SMGroup.groupSelection(); } } });
+      items.push({ sep: true });
+    }
+    items = items.concat([
       {
         label: 'Premier plan', action: function () {
           pushUndo();
@@ -1153,7 +1167,7 @@
           updateUI(); window.SMEngineBridge.renderNow();
         }
       },
-    ];
+    ]);
     if (isActiveRevision || isDeleteGhost) {
       // Same actions as the Properties-panel Accept/Reject buttons
       // (timeline.js updateRevisionPanel) — surfacing them here too so a
