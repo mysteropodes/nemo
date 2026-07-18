@@ -221,7 +221,12 @@ function nextLayerColor(){return LAYER_COLOR_PALETTE[state.layers.length%LAYER_C
 function createUserLayer(name){
   arcLayer.activate();var l=new Layer({name:'user-'+userLayers.length});l.insertBelow(arcLayer);userLayers.push(l);
   var frames=[];for(var i=0;i<state.totalFrames;i++)frames.push({strokes:[],isKeyframe:i===0,isInterpolated:false});
-  state.layers.push({id:state.layers.length,name:name,visible:true,locked:false,frames:frames,color:nextLayerColor()});
+  // layerUid: stable identity for parenting (motion.js's setLayerParent/
+  // parentChainMats) — a raw array index would silently repoint at the
+  // wrong layer the moment reorderLayer/delete/duplicate splices
+  // state.layers. parentLayerUid stays null (no parent) until the user
+  // picks one in the Motion properties panel.
+  state.layers.push({id:state.layers.length,name:name,visible:true,locked:false,frames:frames,color:nextLayerColor(),layerUid:'ly_'+Date.now().toString(36)+'_'+Math.floor(Math.random()*1e6),parentLayerUid:null});
   return state.layers.length-1;
 }
 createUserLayer('Layer 1');

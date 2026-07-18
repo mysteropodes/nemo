@@ -224,6 +224,13 @@
       // Pivot = auto bounds center + the layer's Anchor Point offset
       // (motionMat.ax/ay) — see motion.js's layerMotionAt header comment.
       var motionPivot = motionMat ? { x: userLayers[i].bounds.center.x + motionMat.ax, y: userLayers[i].bounds.center.y + motionMat.ay } : null;
+      // Layer parenting (motion.js's parentLayerUid/parentChainMats,
+      // 2026-07): every ancestor's OWN layer-level transform, immediate
+      // parent first — applied AFTER this layer's own motionMat, same
+      // nesting order as elMat-then-motionMat above one level further out.
+      // Empty array (the common case, no parent) makes the per-item loop
+      // below a no-op cost.
+      var parentChain = window.SMMotion ? SMMotion.parentChainMats(i, state.currentFrame) : [];
       // Brush-texture companions (isBrushTextureCopy — bitmap raster or
       // vector dab group) don't get their own Elements row in Motion
       // (motion.js's layerElements folds them into their anchor's, "merge
@@ -265,6 +272,8 @@
             nvRect = SMMotion.transformImageRect(nvRect, nvPivot, nvMat);
             nvOp *= nvMat.op;
           }
+          var nvChain = SMMotion.parentChainMats(i, state.currentFrame);
+          for (var nvpc = 0; nvpc < nvChain.length; nvpc++) { nvRect = SMMotion.transformImageRect(nvRect, nvChain[nvpc].pivot, nvChain[nvpc].mat); nvOp *= nvChain[nvpc].mat.op; }
           items.push({ image: { imageId: 'nv:' + i, x: nvRect.x, y: nvRect.y, width: nvRect.width, height: nvRect.height, opacity: nvOp, rotation: nvRect.rotation || 0 } });
         }
       }
@@ -296,6 +305,7 @@
           var imgOp = c.opacity !== undefined ? c.opacity : 1;
           if (elMat) { rb = SMMotion.transformImageRect(rb, elPivot, elMat); imgOp *= elMat.op; }
           if (motionMat) { rb = SMMotion.transformImageRect(rb, motionPivot, motionMat); imgOp *= motionMat.op; }
+          for (var pc = 0; pc < parentChain.length; pc++) { rb = SMMotion.transformImageRect(rb, parentChain[pc].pivot, parentChain[pc].mat); imgOp *= parentChain[pc].mat.op; }
           items.push({
             image: { imageId: imageId, x: rb.x, y: rb.y, width: rb.width, height: rb.height, opacity: imgOp, rotation: rb.rotation || 0 },
           });
@@ -326,12 +336,15 @@
           var sd = serP(sub);
           if (elMat) sd.segments = SMMotion.transformSegments(sd.segments, elPivot, elMat);
           if (motionMat) sd.segments = SMMotion.transformSegments(sd.segments, motionPivot, motionMat);
+          for (var pc2 = 0; pc2 < parentChain.length; pc2++) sd.segments = SMMotion.transformSegments(sd.segments, parentChain[pc2].pivot, parentChain[pc2].mat);
           var op = c.opacity !== undefined ? c.opacity : 1;
           if (elMat) op *= elMat.op;
           if (motionMat) op *= motionMat.op;
+          for (var pc3 = 0; pc3 < parentChain.length; pc3++) op *= parentChain[pc3].mat.op;
           var strokeScale = 1;
           if (elMat) strokeScale *= (Math.abs(elMat.sx) + Math.abs(elMat.sy)) / 2;
           if (motionMat) strokeScale *= (Math.abs(motionMat.sx) + Math.abs(motionMat.sy)) / 2;
+          for (var pc4 = 0; pc4 < parentChain.length; pc4++) strokeScale *= (Math.abs(parentChain[pc4].mat.sx) + Math.abs(parentChain[pc4].mat.sy)) / 2;
           // The path's OWN closed flag (now correctly carried by serP(),
           // see app.js), NOT "has a fillColor" — that heuristic sent an
           // unwanted closing stroke segment across any OPEN path that also
