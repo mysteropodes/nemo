@@ -284,7 +284,7 @@ window.SM={
     state.tool=t;renderArcs();
     if(_camToolChanged)renderTimeline();
     document.querySelectorAll('.tool-btn').forEach(function(b){b.classList.toggle('active',b.dataset.tool===t);});
-    var cc={draw:'crosshair',pen:'crosshair',line:'crosshair',rect:'crosshair',ellipse:'crosshair',select:'default',subselect:'default',fsselect:'default',comment:'crosshair',camera:'move',text:'text',eraser:'pointer',fill:'crosshair',fillbrush:'crosshair',eyedropper:'crosshair',hand:'grab',zoom:'zoom-in',rotate:'grab',perspective:'crosshair'};
+    var cc={draw:'crosshair',pen:'crosshair',line:'crosshair',rect:'crosshair',ellipse:'crosshair',select:'default',subselect:'default',fsselect:'default',comment:'crosshair',camera:'move',text:'text',eraser:'pointer',fill:'crosshair',fillbrush:'crosshair',eyedropper:'crosshair',hand:'grab',zoom:'zoom-in',rotate:'grab',perspective:'crosshair',symmetry:'crosshair'};
     canvasEl.style.cursor=cc[t]||'default';
     updatePropsContext();
     if(window.renderLabsFloatPanel)renderLabsFloatPanel();},
@@ -931,6 +931,7 @@ window.SM={
       refMedia:state.refMedia?{type:state.refMedia.type,name:state.refMedia.name,src:state.refMedia.src,frames:state.refMedia.frames,opacity:state.refMedia.opacity,visible:state.refMedia.visible,offsetFrames:state.refMedia.offsetFrames||0}:null,
       mediaLibrary:(state.mediaLibrary||[]).map(function(m){return{id:m.id,name:m.name,kind:m.kind,thumb:m.thumb,layerName:m.layerName};}),
       perspectiveEnabled:state.perspectiveEnabled,perspectiveMode:state.perspectiveMode,perspectiveDensity:state.perspectiveDensity,perspectiveVPs:state.perspectiveVPs,
+      symmetryEnabled:state.symmetryEnabled,symmetryMode:state.symmetryMode,symmetryAxis:state.symmetryAxis,symmetryRadialCenter:state.symmetryRadialCenter,symmetryRadialSectors:state.symmetryRadialSectors,symmetryExtend:state.symmetryExtend,
       motionArcs:state.motionArcs,easingCurve:state.easingCurve,resamplePts:state.resamplePts,tweenStep:state.tweenStep,
       tweenOverrides:state.tweenOverrides,tweenEasing:state.tweenEasing||{},comments:state.comments||[],
       cameraKeys:state.cameraKeys||[],cameraLayerOn:!!state.cameraLayerOn});
@@ -1082,6 +1083,12 @@ window.SM={
     var perspOnCb=document.getElementById('p-persp-on');if(perspOnCb)perspOnCb.checked=state.perspectiveEnabled;
     var perspModeSel=document.getElementById('p-persp-mode');if(perspModeSel)perspModeSel.value=state.perspectiveMode;
     var perspDensityInp=document.getElementById('p-persp-density');if(perspDensityInp)perspDensityInp.value=state.perspectiveDensity;
+    state.symmetryEnabled=d.symmetryEnabled||false;state.symmetryMode=d.symmetryMode||'y';state.symmetryAxis=d.symmetryAxis||null;state.symmetryRadialCenter=d.symmetryRadialCenter||null;state.symmetryRadialSectors=d.symmetryRadialSectors||6;state.symmetryExtend=d.symmetryExtend!==undefined?d.symmetryExtend:true;
+    var symOnCb=document.getElementById('p-sym-on');if(symOnCb)symOnCb.checked=state.symmetryEnabled;
+    var symModeSel=document.getElementById('p-sym-mode');if(symModeSel)symModeSel.value=state.symmetryMode;
+    var symSectorsInp=document.getElementById('p-sym-sectors');if(symSectorsInp)symSectorsInp.value=state.symmetryRadialSectors;
+    var symExtendCb=document.getElementById('p-sym-extend');if(symExtendCb)symExtendCb.checked=state.symmetryExtend;
+    if(window.syncSymmetryPanelVisibility)window.syncSymmetryPanelVisibility();
     if(window.renderPaletteGrid)window.renderPaletteGrid();
     if(d.resamplePts)state.resamplePts=d.resamplePts;if(d.tweenStep)state.tweenStep=d.tweenStep;
     state.currentFrame=0;state.activeLayerIdx=0;activateUL(0);drawStage();loadFrame(0);renderOS();renderArcs();updateUI();renderSymbolTabs();
@@ -4449,6 +4456,22 @@ document.getElementById('p-persp-mode').addEventListener('change',function(){if(
 document.getElementById('p-persp-density').addEventListener('input',function(){state.perspectiveDensity=parseInt(this.value)||24;if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
 document.getElementById('p-persp-lock').addEventListener('change',function(){var locked=this.checked;(window.ensurePerspectiveVPs?window.ensurePerspectiveVPs():[]).forEach(function(vp){vp.locked=locked;});if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
 document.getElementById('btn-persp-reset').addEventListener('click',function(){if(window.resetPerspectiveVPs)window.resetPerspectiveVPs();});
+// Symmetry guide (symmetry-bridge.js) — same wiring shape as the Perspective
+// block just above. Sectors row only makes sense in Radial mode, hence the
+// visibility toggle — kept as its own named function (not inline) so
+// timeline.js's own loadProject() can call it too after restoring
+// state.symmetryMode from a save, otherwise a project saved mid-Radial-mode
+// would reopen with the field hidden until the user touched the dropdown.
+window.syncSymmetryPanelVisibility=function(){
+  var row=document.getElementById('p-sym-sectors-row');
+  if(row)row.style.display=state.symmetryMode==='radial'?'':'none';
+};
+document.getElementById('p-sym-on').addEventListener('change',function(){state.symmetryEnabled=this.checked;if(this.checked&&window.ensureSymmetryAxis)window.ensureSymmetryAxis();if(this.checked&&window.ensureSymmetryRadialCenter)window.ensureSymmetryRadialCenter();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
+document.getElementById('p-sym-mode').addEventListener('change',function(){if(window.setSymmetryMode)window.setSymmetryMode(this.value);window.syncSymmetryPanelVisibility();});
+document.getElementById('p-sym-sectors').addEventListener('input',function(){state.symmetryRadialSectors=Math.max(2,Math.min(24,parseInt(this.value)||6));if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
+document.getElementById('p-sym-extend').addEventListener('change',function(){state.symmetryExtend=this.checked;});
+document.getElementById('btn-sym-reset').addEventListener('click',function(){if(window.resetSymmetryGuide)window.resetSymmetryGuide();});
+window.syncSymmetryPanelVisibility();
 // Custom blend-mode dropdown (feedback #17): hovering an option in the open
 // list applies that blend mode to the active layer IMMEDIATELY as a live
 // canvas preview; clicking commits it (with undo), while closing any other

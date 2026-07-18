@@ -16,8 +16,12 @@
   // aren't tied to a canvas tool at all, so they're deliberately absent
   // here — they stay Réglages-only.
   var TOOL_CONTEXT = {
-    draw: ['symmetry', 'radial-symmetry', 'predictive-stroke', 'multiframe-draw', 'canvas-grid', 'view-filter'],
-    fillbrush: ['symmetry', 'radial-symmetry', 'canvas-grid', 'view-filter'],
+    // 'symmetry'/'radial-symmetry' promoted out of Labs (2026-07) — now the
+    // "Symmetry Guide" toolbar tool + right-panel section, permanently
+    // reachable (not just while Draw/Fill Brush is active), so they no
+    // longer need a slot here.
+    draw: ['predictive-stroke', 'multiframe-draw', 'canvas-grid', 'view-filter'],
+    fillbrush: ['canvas-grid', 'view-filter'],
     pen: ['french-curve', 'canvas-grid', 'view-filter'],
     line: ['french-curve', 'canvas-grid'],
     rect: ['canvas-grid', 'view-filter'],
@@ -34,8 +38,6 @@
   var ALWAYS = ['flip-roll', 'mirror-check', 'lagoon-menu'];
 
   var SHORT_NAME = {
-    'symmetry': 'Miroir vertical',
-    'radial-symmetry': 'Miroir radial (mandala)',
     'predictive-stroke': 'Trait prédictif',
     'multiframe-draw': 'Dessin multi-frames',
     'canvas-grid': 'Grille',
@@ -55,8 +57,6 @@
   // stroke-based line art, which read as a different, thinner icon
   // language. Rebuilt every icon as a solid silhouette to match.
   var ICONS = {
-    symmetry: '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><rect x="11" y="2" width="2" height="20" rx="1"/><path d="M9 6L3 12L9 18Z"/><path d="M15 6L21 12L15 18Z"/></svg>',
-    'radial-symmetry': '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><circle cx="12" cy="12" r="2.6"/><rect x="10.8" y="1.5" width="2.4" height="7" rx="1.2"/><rect x="10.8" y="1.5" width="2.4" height="7" rx="1.2" transform="rotate(60 12 12)"/><rect x="10.8" y="1.5" width="2.4" height="7" rx="1.2" transform="rotate(120 12 12)"/><rect x="10.8" y="1.5" width="2.4" height="7" rx="1.2" transform="rotate(180 12 12)"/><rect x="10.8" y="1.5" width="2.4" height="7" rx="1.2" transform="rotate(240 12 12)"/><rect x="10.8" y="1.5" width="2.4" height="7" rx="1.2" transform="rotate(300 12 12)"/></svg>',
     'predictive-stroke': '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M12 2l1.2 3.8L17 7l-3.8 1.2L12 12l-1.2-3.8L7 7l3.8-1.2L12 2z"/><path d="M19 13l.6 1.9L21.5 15.5l-1.9.6L19 18l-.6-1.9L16.5 15.5l1.9-.6L19 13z"/><path d="M5 15l.5 1.5L7 17l-1.5.5L5 19l-.5-1.5L3 17l1.5-.5L5 15z"/></svg>',
     'multiframe-draw': '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M12 2L22 7L12 12L2 7Z"/><path d="M2 12L12 17L22 12L22 14L12 19L2 14Z" opacity=".55"/></svg>',
     'canvas-grid': '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>',
@@ -78,7 +78,6 @@
   // numbers) stay Réglages/console-only, a stepper pair or quad would be
   // more UI than this compact strip should carry.
   var PARAMS = {
-    'radial-symmetry': [{ key: 'nemo-labs-radial-sectors', label: 'Secteurs', def: 6, min: 2, max: 16, step: 1, set: function (v) { window.SMLabs.setRadialSectors(v); } }],
     'vector-sculpt': [{ key: 'nemo-labs-sculpt-radius', label: 'Rayon', def: 60, min: 8, max: 400, step: 10, set: function (v) { window.SMLabs.setSculptRadius(v); } }],
     'canvas-grid': [{ key: 'nemo-labs-grid-step', label: 'Pas', def: 100, min: 4, max: 500, step: 10, set: function (v) { window.SMLabs.setGridStep(v); } }],
     'flip-roll': [

@@ -85,19 +85,9 @@
   // controls when the tool is currently on (a param the tool ignores while
   // off would be misleading UI).
   var TOOLS = [
-    { name: 'symmetry', label: 'Miroir vertical' },
-    {
-      name: 'radial-symmetry', label: 'Miroir radial / mandala',
-      extra: function (c) {
-        var n = parseInt(localStorage.getItem('nemo-labs-radial-sectors') || '6', 10);
-        var row = subRow();
-        row.appendChild(mkLabel2('Secteurs'));
-        var inp = mkNum(n, 2, 16, 1, 46);
-        inp.addEventListener('change', function () { window.SMLabs.setRadialSectors(parseInt(inp.value, 10)); });
-        row.appendChild(inp);
-        c.appendChild(row);
-      },
-    },
+    // 'symmetry'/'radial-symmetry' promoted out of Labs (2026-07) into a
+    // real shipped feature — see src/js/symmetry-bridge.js and the
+    // "Symmetry Guide" section of the right panel + toolbar button.
     { name: 'predictive-stroke', label: 'Trait prédictif — cercle/ligne/rect' },
     {
       name: 'vector-sculpt', label: 'Sculpt vectoriel — pousser W, lisser W+Shift',

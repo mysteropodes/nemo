@@ -163,6 +163,9 @@
     <!-- Vanishing-point icon (horizon + converging rays) instead of the old
          abstract ◇, which read as nothing in particular (feedback #21). -->
     <button class="tool-btn" data-tool="perspective" data-i18n-title="toolPerspective" title="Perspective guide — drag vanishing points to place them. Once enabled, the Line tool snaps toward them from any tool."><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 6h20"/><circle cx="12" cy="6" r="1.7" fill="currentColor" stroke="none"/><path d="M12 6 4 20M12 6l8 14M12 6v14"/></svg></button>
+    <!-- Symmetry guide icon: a mirrored pair of shapes split by an axis
+         line, distinct from perspective's fan-of-rays icon just above. -->
+    <button class="tool-btn" data-tool="symmetry" data-i18n-title="toolSymmetry" title="Symmetry guide — Y/X/free-angle mirror or radial mandala. Drag the axis (its endpoints in Free mode, or the center in Radial mode) to reposition it. Draw with any tool once enabled."><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2v20" stroke-dasharray="2.5 2.5"/><path d="M12 5 5 8v8l7 3" stroke-linejoin="round"/><path d="M12 5l7 3v8l-7 3" stroke-linejoin="round"/></svg></button>
     <div class="tool-sep"></div>
     <!-- v10 (mockup redesign): stroke swatch (colored ring) stacked ABOVE
          the fill swatch (solid rounded square), each with its own round
@@ -533,11 +536,22 @@
       <div class="phdr" id="phdr-perspective"><span class="ar">☰</span> <span data-i18n="hdrPerspective">Perspective Guide</span></div>
       <div class="pbdy">
         <div class="pr"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer" title="Shows the vanishing-point grid and snaps the Line tool toward it, from any tool"><input type="checkbox" id="p-persp-on" style="accent-color:var(--accent)"> Enabled</label></div>
-        <div class="pr"><span class="pl">Mode</span><select class="psel" id="p-persp-mode"><option value="1pt">1 point</option><option value="2pt" selected>2 points</option><option value="3pt">3 points</option></select></div>
+        <div class="pr"><span class="pl">Mode</span><select class="psel" id="p-persp-mode"><option value="1pt">1 point</option><option value="2pt" selected>2 points</option><option value="3pt">3 points</option><option value="fisheye">Fisheye</option></select></div>
         <div class="pr"><span class="pl">Density</span><input type="number" class="pi scrub" id="p-persp-density" value="24" min="4" max="72" data-step="2"></div>
         <div class="pr"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer" title="Prevents dragging any vanishing point with the Perspective tool"><input type="checkbox" id="p-persp-lock" style="accent-color:var(--accent)"> Lock vanishing points</label></div>
         <div class="pr" style="gap:4px"><button class="pbtn" id="btn-persp-reset">Reset positions</button></div>
         <div class="pr" style="font-size:9px;color:var(--text-dim)">Select the ◇ tool to drag vanishing points. Draw a Line roughly toward one to snap onto it.</div>
+      </div>
+    </div>
+    <div class="psec">
+      <div class="phdr" id="phdr-symmetry"><span class="ar">☰</span> <span data-i18n="hdrSymmetry">Symmetry Guide</span></div>
+      <div class="pbdy">
+        <div class="pr"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer" title="Mirrors (or rotates, in Radial mode) every stroke drawn with any tool"><input type="checkbox" id="p-sym-on" style="accent-color:var(--accent)"> Enabled</label></div>
+        <div class="pr"><span class="pl">Mode</span><select class="psel" id="p-sym-mode"><option value="y" selected>Vertical (Y)</option><option value="x">Horizontal (X)</option><option value="free">Free angle</option><option value="radial">Radial (mandala)</option></select></div>
+        <div class="pr" id="p-sym-sectors-row" style="display:none"><span class="pl">Sectors</span><input type="number" class="pi scrub" id="p-sym-sectors" value="6" min="2" max="24" data-step="1"></div>
+        <div class="pr"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer" title="Off: a stroke crossing the axis is cut right at it, so it and its mirror never overlap at the fold"><input type="checkbox" id="p-sym-extend" checked style="accent-color:var(--accent)"> Extend strokes across the axis</label></div>
+        <div class="pr" style="gap:4px"><button class="pbtn" id="btn-sym-reset">Reset position</button></div>
+        <div class="pr" style="font-size:9px;color:var(--text-dim)">Select the ⧗ tool to drag the axis (its ends in Free mode, or the center in Radial mode). Draw with any tool once enabled.</div>
       </div>
     </div>
     <div class="psec" id="ref-sec">
@@ -1119,7 +1133,6 @@
      the corrected shape. -->
 <script src="js/labs/labs-core.js"></script>
 <script src="js/labs/predictive-stroke.js"></script>
-<script src="js/labs/symmetry-mirror.js"></script>
 <script src="js/labs/multiframe-draw.js"></script>
 <script src="js/labs/lagoon-menu.js"></script>
 <script src="js/labs/pingpong-cycle.js"></script>
@@ -1172,6 +1185,7 @@
 <script type="module" src="js/geometry-wasm-loader.js"></script>
 <script src="js/engine-bridge.js"></script>
 <script src="js/perspective-bridge.js"></script>
+<script src="js/symmetry-bridge.js"></script>
 <script src="js/viewtools-bridge.js"></script>
 <script src="js/abr-import.js"></script>
 <script src="js/bitmap-brush.js"></script>
