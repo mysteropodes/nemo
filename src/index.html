@@ -353,6 +353,16 @@
         <div class="pr"><button class="pbtn ac" id="btn-text-split-chars" style="flex:1">Découper par caractère</button></div>
       </div>
     </div>
+    <div class="psec" id="effect-layer-sec" style="display:none">
+      <div class="phdr"><span class="ar">☰</span> <span>Calque d’effet</span></div>
+      <div class="pbdy">
+        <div class="pr" style="font-size:10px;color:var(--text-dim)">Appliqué à tout ce qui est en dessous de ce calque dans la pile (comme un Adjustment Layer After Effects).</div>
+        <div class="pr"><span class="pl">Type</span><select class="psel" id="p-effect-type"><option value="blur">Flou</option><option value="colorAdjust">Teinte / Contraste</option></select></div>
+        <div class="pr" id="p-effect-blur-row"><span class="pl">Rayon</span><input type="number" class="pi scrub" id="p-effect-radius" value="8" min="0" max="200" data-step="1"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
+        <div class="pr" id="p-effect-brightness-row" style="display:none"><span class="pl">Luminosité</span><input type="number" class="pi scrub" id="p-effect-brightness" value="0" min="-100" max="100" data-step="1"></div>
+        <div class="pr" id="p-effect-contrast-row" style="display:none"><span class="pl">Contraste</span><input type="number" class="pi scrub" id="p-effect-contrast" value="0" min="-100" max="100" data-step="1"></div>
+      </div>
+    </div>
     <div class="psec" id="camera-sec" style="display:none">
       <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrCamera">Caméra</span></div>
       <div class="pbdy">

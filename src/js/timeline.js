@@ -516,6 +516,27 @@ window.SM={
   setWorkArea:function(inF,outF){state.waIn=inF;state.waOut=outF;},
   setTotalFrames:function(v){v=Math.max(1,Math.min(999,v));saveAllLayerFrames();for(var i=0;i<state.layers.length;i++){while(state.layers[i].frames.length<v)state.layers[i].frames.push({strokes:[],isKeyframe:false,isInterpolated:false});}state.totalFrames=v;window._totalF=v;if(state.waOut>=v)state.waOut=v-1;window._waOut=state.waOut;if(state.currentFrame>=v)goToFrame(v-1);updateUI();},
   addLayer:function(){saveAllLayerFrames();pushUndoLayers();var idx=createUserLayer(nextLayerName());activateUL(idx);loadFrame(state.currentFrame);updateUI();},
+  // Null layer (2026-07, Motion) — AE's "Null Object": exists purely as a
+  // parenting/pivot target for other layers (SMMotion's existing
+  // parentLayerUid/parentChainMats — a Null is just any other layer as far
+  // as that mechanism cares), never rendered itself. isNullLayer is the
+  // ONLY thing distinguishing it from a normal empty layer; engine-bridge.js's
+  // buildSceneJson short-circuits it to items:[] before any of the normal
+  // per-layer work, and it's added to the SAME "no real content" guard list
+  // as symbolId/nativeVideo/montageId in saveActiveLayerFrame/
+  // saveAllLayerFrames/getEffectiveStrokes (app.js) so nothing ever tries
+  // to read/write strokes on it.
+  addNullLayer:function(){saveAllLayerFrames();pushUndoLayers();var idx=createUserLayer(nextLayerName().replace(/^Layer/,'Null'));state.layers[idx].isNullLayer=true;activateUL(idx);loadFrame(state.currentFrame);updateUI();},
+  // Effect (adjustment) layer (2026-07, Motion) — AE's "Adjustment Layer":
+  // no painted content of its own (frames/strokes ignored on purpose,
+  // same as a Null layer), but its effectType/effectP1/effectP2 apply to
+  // EVERYTHING BELOW IT in the stack via engine.rs's composite_scene
+  // (color_adjust.wgsl / reused blur.wgsl) — see that function's
+  // is_effect_layer branch and engine-bridge.js's buildSceneJson for the
+  // full JS<->Rust wire contract. Defaults to a mild blur so placing one
+  // has an immediately visible (if subtle) effect rather than looking
+  // like a no-op.
+  addEffectLayer:function(){saveAllLayerFrames();pushUndoLayers();var idx=createUserLayer(nextLayerName().replace(/^Layer/,'Effet'));state.layers[idx].isEffectLayer=true;state.layers[idx].effectType='blur';state.layers[idx].effectP1=8;state.layers[idx].effectP2=0;activateUL(idx);loadFrame(state.currentFrame);updateUI();},
   deleteLayer:function(){
     // The camera row isn't in state.layers (synthetic pseudo-layer, see
     // camera.js) — the generic layer-panel trash button silently did
@@ -918,7 +939,7 @@ window.SM={
     var sceneWaIn=inSym?_sceneSnapshot.waIn:state.waIn;
     var sceneWaOut=inSym?_sceneSnapshot.waOut:state.waOut;
     return JSON.stringify({version:13,totalFrames:sceneTotal,fps:sceneFps,canvasW:state.canvasW,canvasH:state.canvasH,canvasBg:state.canvasBg,waIn:sceneWaIn,waOut:sceneWaOut,
-      layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color,motion:l.motion,motionStatic:l.motionStatic,elementMotion:l.elementMotion,inPoint:l.inPoint,outPoint:l.outPoint,nativeVideo:l.nativeVideo,matteMode:l.matteMode,blurRadius:l.blurRadius,montageId:l.montageId,expressions:l.expressions,isTextLayer:l.isTextLayer};}),
+      layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color,motion:l.motion,motionStatic:l.motionStatic,elementMotion:l.elementMotion,inPoint:l.inPoint,outPoint:l.outPoint,nativeVideo:l.nativeVideo,matteMode:l.matteMode,blurRadius:l.blurRadius,montageId:l.montageId,expressions:l.expressions,isTextLayer:l.isTextLayer,isNullLayer:l.isNullLayer,isEffectLayer:l.isEffectLayer,effectType:l.effectType,effectP1:l.effectP1,effectP2:l.effectP2};}),
       layerFolders:state.layerFolders,layerLinkGroups:state.layerLinkGroups,
       // StoryBoard node space (2026-07) — plain data by construction (no
       // runtime-only fields live in state.storyboard, see storyboard.js's
@@ -1040,6 +1061,8 @@ window.SM={
       if(ld.blurRadius)state.layers[idx].blurRadius=ld.blurRadius;
       if(ld.expressions)state.layers[idx].expressions=ld.expressions;
       if(ld.isTextLayer)state.layers[idx].isTextLayer=true;
+      if(ld.isNullLayer)state.layers[idx].isNullLayer=true;
+      if(ld.isEffectLayer){state.layers[idx].isEffectLayer=true;state.layers[idx].effectType=ld.effectType||'blur';state.layers[idx].effectP1=ld.effectP1;state.layers[idx].effectP2=ld.effectP2;}
       if(ld.symbolId){state.layers[idx].symbolId=ld.symbolId;state.layers[idx].symPlayMode=ld.symPlayMode||'loop';state.layers[idx].symSpeed=ld.symSpeed||1;state.layers[idx].symPlacedAt=ld.symPlacedAt||0;state.layers[idx].symSingleFrame=ld.symSingleFrame||0;if(ld.symMatrix)state.layers[idx].symMatrix=ld.symMatrix;}
       if(ld.lfsGroup){state.layers[idx].lfsGroup=true;state.layers[idx].lfsIds=ld.lfsIds;state.layers[idx].lfsSettings=ld.lfsSettings;}
       if(ld.folderId)state.layers[idx].folderId=ld.folderId;
@@ -1125,7 +1148,7 @@ function updateUI(){
   document.getElementById('info-sel').textContent=state.tool==='select'&&selectedPaths.length>0?selectedPaths.length+' selected':'';
   window._totalF=state.totalFrames;window._waIn=state.waIn;window._waOut=state.waOut;window._curFrame=state.currentFrame;
   window.updateWaBar();window.updateOmMarkers(state.currentFrame,state.totalFrames);
-  renderTimeline();renderLayerList();updateCompInstancePanel();updateSelPropsPanel();updateFsSelPanel();updateRevisionPanel();updateTextActionsPanel();updatePropsContext();
+  renderTimeline();renderLayerList();updateCompInstancePanel();updateSelPropsPanel();updateFsSelPanel();updateRevisionPanel();updateTextActionsPanel();updateEffectLayerPanel();updatePropsContext();
 }
 // Team review Accept/Reject panel — shown when exactly one selected item is
 // either an active (non-ghost) revision (data.revisionParentId) or a
@@ -2915,6 +2938,12 @@ function renderLayerList(){
     // Auto-set the first time text lands on an empty layer (commitText,
     // "Outil texte" section) or explicitly via the layer row's context menu.
     if(ld.isTextLayer){var txb=document.createElement('div');txb.className='lico comp-badge';txb.title='Calque de texte';txb.innerHTML='<span style="font-size:11px;line-height:1;font-weight:700">T</span>';row.appendChild(txb);}
+    // Null / Effect layer badges (2026-07, Motion) — same "lico comp-badge"
+    // text-glyph convention as every badge above (this project's embedded
+    // icon font is subsetted and silently renders blank for un-included
+    // codepoints, see the lock-icon fix comment further up this function).
+    if(ld.isNullLayer){var nlb=document.createElement('div');nlb.className='lico comp-badge';nlb.title='Calque Null — jamais rendu, sert de pivot/parent pour d’autres calques';nlb.innerHTML='<span style="font-size:11px;line-height:1;font-weight:700">⊘</span>';row.appendChild(nlb);}
+    if(ld.isEffectLayer){var fxb=document.createElement('div');fxb.className='lico comp-badge';fxb.title='Calque d’effet — '+(ld.effectType==='colorAdjust'?'Teinte/Contraste':'Flou')+' appliqué à tout ce qui est en dessous';fxb.innerHTML='<span style="font-size:9px;line-height:1;font-weight:700">FX</span>';row.appendChild(fxb);}
     if(ld.channel){var chLabel=ld.channel==='stroke'?'Tr':ld.channel==='fill'?'Pl':'Om';var chb=document.createElement('div');chb.className='lico comp-badge';chb.title='Calque '+(ld.channel==='stroke'?'Trait':ld.channel==='fill'?'Plein':'Ombre')+' (Stroke/Fill/Shadow) — calque normal, keyframes liées';chb.innerHTML='<span style="font-size:9px;line-height:1;font-weight:700">'+chLabel+'</span>';row.appendChild(chb);}
     // Track matte badge (2026-07) — the Blend/Matte dropdowns only surface
     // in the right panel's Document fallback context (nothing selected,
@@ -2977,6 +3006,8 @@ function renderLayerList(){
       var l4=state.layers[idx4];
       window.showContextMenu(e.clientX,e.clientY,[
         {label:'Insérer un calque',action:function(){window.SM.addLayer();}},
+        {label:'Insérer un calque Null',action:function(){window.SM.addNullLayer();}},
+        {label:'Insérer un calque d’effet',action:function(){window.SM.addEffectLayer();}},
         {label:'Dupliquer le calque',action:function(){window.SM.duplicateLayer();}},
         {label:'Supprimer le calque',action:function(){window.SM.deleteLayer();}},
         {sep:true},
@@ -3738,6 +3769,30 @@ function updateTextActionsPanel(){
   if(isWholeText){
     document.getElementById('btn-text-split-chars').onclick=function(){splitTextIntoCharacters(p);};
   }
+}
+// Effect (adjustment) layer panel (2026-07, Motion) — shown whenever the
+// ACTIVE layer (not the canvas selection, unlike text-actions-sec above:
+// an effect layer has no selectable content of its own) is isEffectLayer.
+// UI brightness/contrast are shown in the familiar -100..100 range; the
+// Rust shader's Params expects -1..1, so the two multiply/divide by 100 at
+// the JS<->engine boundary (see color_adjust.wgsl's own Params doc comment
+// for the -1..1 contract).
+function updateEffectLayerPanel(){
+  var sec=document.getElementById('effect-layer-sec');
+  if(!sec)return;
+  var ld=state.layers[state.activeLayerIdx];
+  var isEffect=!!(ld&&ld.isEffectLayer);
+  sec.style.display=isEffect?'':'none';
+  if(!isEffect)return;
+  var typeSel=document.getElementById('p-effect-type');
+  typeSel.value=ld.effectType||'blur';
+  document.getElementById('p-effect-radius').value=ld.effectP1!==undefined?ld.effectP1:8;
+  document.getElementById('p-effect-brightness').value=Math.round((ld.effectP1||0)*100);
+  document.getElementById('p-effect-contrast').value=Math.round((ld.effectP2||0)*100);
+  var isBlur=typeSel.value==='blur';
+  document.getElementById('p-effect-blur-row').style.display=isBlur?'':'none';
+  document.getElementById('p-effect-brightness-row').style.display=isBlur?'none':'';
+  document.getElementById('p-effect-contrast-row').style.display=isBlur?'none':'';
 }
 function initCycleAndPropagate(){
   var cyc=document.getElementById('btn-cycle');
@@ -4749,6 +4804,12 @@ document.getElementById('p-cbg').addEventListener('input',function(){window.SM.s
 document.getElementById('p-clip').addEventListener('change',function(){window.SM.setCanvasClip(this.checked);});
 document.getElementById('p-safety').addEventListener('change',function(){window.SM.setSafetyZones(this.checked);});
 document.getElementById('p-blur').addEventListener('input',function(){var ld=state.layers[state.activeLayerIdx];if(!ld)return;pushUndo();ld.blurRadius=Math.max(0,parseFloat(this.value)||0);saveActiveLayerFrame();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
+// Effect layer panel (2026-07, Motion) — see updateEffectLayerPanel's own
+// comment for the -100..100 (UI) <-> -1..1 (Rust color_adjust.wgsl) scale.
+document.getElementById('p-effect-type').addEventListener('change',function(){var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.isEffectLayer)return;pushUndo();ld.effectType=this.value;ld.effectP1=ld.effectType==='blur'?8:0;ld.effectP2=0;updateEffectLayerPanel();saveActiveLayerFrame();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
+document.getElementById('p-effect-radius').addEventListener('input',function(){var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.isEffectLayer)return;pushUndo();ld.effectP1=Math.max(0,parseFloat(this.value)||0);saveActiveLayerFrame();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
+document.getElementById('p-effect-brightness').addEventListener('input',function(){var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.isEffectLayer)return;pushUndo();ld.effectP1=(parseFloat(this.value)||0)/100;saveActiveLayerFrame();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
+document.getElementById('p-effect-contrast').addEventListener('input',function(){var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.isEffectLayer)return;pushUndo();ld.effectP2=(parseFloat(this.value)||0)/100;saveActiveLayerFrame();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
 document.getElementById('p-persp-on').addEventListener('change',function(){state.perspectiveEnabled=this.checked;if(this.checked){if(window.ensurePerspectiveVPs)window.ensurePerspectiveVPs();window.SM.setTool('perspective');}if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
 document.getElementById('p-persp-mode').addEventListener('change',function(){if(window.setPerspectiveMode)window.setPerspectiveMode(this.value);});
 document.getElementById('p-persp-density').addEventListener('input',function(){state.perspectiveDensity=parseInt(this.value)||24;if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
