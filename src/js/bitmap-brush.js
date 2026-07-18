@@ -671,11 +671,40 @@
 
   // ---- panel wiring — plain state fields, same convention as every other
   // scrub/select input in this app (ui.js) ----
-  function bindNum(id, key, def) {
+  // Bug found live (2026-07): unlike Width (setBrushSize, timeline.js —
+  // rescales every SELECTED stroke, not just future ones) and the Bitmap
+  // tip/on-off toggle just above (which explicitly convert the current
+  // selection), Spacing/Scatter/Opacity/Pressure only ever wrote to
+  // state.bitmapSpacing/etc — the DEFAULT for the next stroke — leaving an
+  // already-drawn, currently-selected bitmap stroke completely unaffected
+  // ("si je change spacing, scatter, opacity ça ne change rien à la
+  // sélection"). bindNum now ALSO patches every selected path's own
+  // data.bitmapBrushSpec and calls regenerate() to re-stamp it immediately,
+  // same pushUndo-on-every-event-but-coalesced-during-a-drag contract as
+  // setBrushSize/p-blur elsewhere (window._scrubLiveActive absorbs the
+  // per-tick pushUndo() calls into one pre-gesture snapshot, ui.js).
+  // specKey is the corresponding data.bitmapBrushSpec property name;
+  // toSpec converts the panel's displayed value into the units the spec
+  // actually stores (opacity is 0-100 in the UI, 0-1 in the spec).
+  function bindNum(id, key, def, specKey, toSpec) {
     var el = document.getElementById(id); if (!el) return;
     state[key] = def;
-    el.addEventListener('change', function () { state[key] = parseFloat(this.value) || def; });
-    el.addEventListener('input', function () { state[key] = parseFloat(this.value) || def; });
+    function apply() {
+      var v = parseFloat(this.value) || def;
+      state[key] = v;
+      if (!specKey) return;
+      if (!(state.tool === 'select' || state.tool === 'subselect') || !selectedPaths.length) return;
+      var targets = selectedPaths.filter(function (p) { return p.data && p.data.bitmapBrushSpec; });
+      if (!targets.length) return;
+      pushUndo();
+      var specVal = toSpec ? toSpec(v) : v;
+      var layer = userLayers[state.activeLayerIdx];
+      targets.forEach(function (p) { p.data.bitmapBrushSpec[specKey] = specVal; regenerate(p, layer); });
+      saveActiveLayerFrame();
+      if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+    }
+    el.addEventListener('change', apply);
+    el.addEventListener('input', apply);
   }
   function init() {
     var onEl = document.getElementById('p-bitmapbrush-on');
@@ -709,11 +738,31 @@
     // 'p-bitmap-size' is GONE from the panel — dab size is unified with
     // the stroke Width field (p-sw / state.brushSize), see
     // applyBitmapBrushTexture's spec comment.
-    bindNum('p-bitmap-spacing', 'bitmapSpacing', 15);
-    bindNum('p-bitmap-scatter', 'bitmapScatter', 20);
-    bindNum('p-bitmap-opacity', 'bitmapOpacity', 100);
+    bindNum('p-bitmap-spacing', 'bitmapSpacing', 15, 'spacing');
+    bindNum('p-bitmap-scatter', 'bitmapScatter', 20, 'scatter');
+    bindNum('p-bitmap-opacity', 'bitmapOpacity', 100, 'opacity', function (v) { return v / 100; });
     var pressEl = document.getElementById('p-bitmap-pressure');
-    if (pressEl) { state.bitmapPressure = pressEl.checked; pressEl.addEventListener('change', function () { state.bitmapPressure = this.checked; }); }
+    if (pressEl) {
+      state.bitmapPressure = pressEl.checked;
+      pressEl.addEventListener('change', function () {
+        state.bitmapPressure = this.checked;
+        // Same "also patch the current selection" fix as spacing/scatter/
+        // opacity above — pressure toggling a stroke's own spec needs a
+        // full re-stamp (a stroke baked with pressure=false has no
+        // bitmapPressureProfile shaping to fall back on, so toggling it
+        // back on regenerates flat-width dabs until the stroke is redrawn —
+        // an acceptable, pre-existing limitation of the profile itself,
+        // not something this fix introduces).
+        if (!(state.tool === 'select' || state.tool === 'subselect') || !selectedPaths.length) return;
+        var targets = selectedPaths.filter(function (p) { return p.data && p.data.bitmapBrushSpec; });
+        if (!targets.length) return;
+        pushUndo();
+        var layer = userLayers[state.activeLayerIdx];
+        targets.forEach(function (p) { p.data.bitmapBrushSpec.pressure = state.bitmapPressure; regenerate(p, layer); });
+        saveActiveLayerFrame();
+        if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+      });
+    }
 
     // ---- Apply / Remove to selection ("changer taille, type de brush et
     // autre paramètre une fois appliqué et dessiné" + "passer d'un brush
