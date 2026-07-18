@@ -1612,7 +1612,22 @@
         e.stopPropagation();
         var already = window._exprEditorOpen && window._exprEditorOpen.holder === holder && window._exprEditorOpen.prop === prop;
         window._exprEditorOpen = already ? null : { holder: holder, prop: prop };
+        // Bug found live (2026-07 — "pas compris où est ce qu'elle sont
+        // écrite"): both containers this row can render into (#layer-list's
+        // bottom Transform group, #motion-props-body's right-panel mirror)
+        // are small fixed-height scrolling panels with no visible scrollbar
+        // affordance — clicking ƒx opened the editor exactly as designed,
+        // but the newly-inserted textarea routinely landed BELOW the
+        // already-scrolled viewport of that panel, reading as "nothing
+        // happened". Scroll the container the user actually clicked in (not
+        // its sibling mirror, which may not even be visible) so the editor
+        // is guaranteed on-screen the instant it opens.
+        var container = exprBtn.closest('#layer-list, #motion-props-body');
         renderLayerList(); renderTimeline();
+        if (container && !already) {
+          var editorRow = container.querySelector('.motion-expr-editor');
+          if (editorRow) editorRow.scrollIntoView({ block: 'nearest' });
+        }
       });
       pr.appendChild(sw); pr.appendChild(exprBtn); pr.appendChild(pnm);
       var vals = isAnimated(holder, prop) ? valueAtFrame(holder, prop, state.currentFrame) : staticValue(holder, prop);
