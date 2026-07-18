@@ -369,6 +369,8 @@
     ["Découvrir Nemo", "Discover Nemo", "Descubrir Nemo", "Nemoを発見する"],
     ["Des mini-leçons pas à pas, directement dans l'app — comme les tutoriels intégrés de Flash. Choisis une catégorie, puis un module ; tu peux quitter à tout moment.", "Step-by-step mini-lessons, right inside the app — like Flash's built-in tutorials. Choose a category, then a module; you can leave at any time.", "Mini-lecciones paso a paso, directamente en la app — como los tutoriales integrados de Flash. Elige una categoría, luego un módulo; puedes salir en cualquier momento.", "アプリ内で完結するステップバイステップのミニレッスン — Flashの内蔵チュートリアルのようなものです。カテゴリーを選び、次にモジュールを選んでください。いつでも終了できます。"],
     ["Retour", "Back", "Atrás", "戻る"],
+    ["Rechercher un module…", "Search a module…", "Buscar un módulo…", "モジュールを検索…"],
+    ["Aucun module ne correspond à ta recherche.", "No module matches your search.", "Ningún módulo coincide con tu búsqueda.", "検索に一致するモジュールがありません。"],
     ["étape", "step", "paso", "ステップ"],
     ["Module \"%s\" terminé ✓", "Module \"%s\" completed ✓", "Módulo \"%s\" completado ✓", "「%s」モジュール完了 ✓"],
   ]);
@@ -1011,12 +1013,17 @@
       '<div class="modal-hdr">' +
       '<button class="tut-launcher-back" id="tut-launcher-back" style="display:none" title="' + T('Retour') + '"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg></button>' +
       '<span id="tut-launcher-title">' + T('Découvrir Nemo') + '</span> <button class="modal-x" id="tut-launcher-close">&times;</button></div>' +
+      '<div class="tut-launcher-search-wrap">' +
+      '<svg class="tut-launcher-search-ico" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>' +
+      '<input type="text" id="tut-launcher-search" class="tut-launcher-search" placeholder="' + T('Rechercher un module…') + '">' +
+      '</div>' +
       '<div class="modal-bdy">' +
       '<div class="tut-mod-list" id="tut-mod-list"></div>' +
       '</div></div>';
     document.body.appendChild(modal);
     modal.querySelector('#tut-launcher-close').addEventListener('click', closeLauncher);
     modal.querySelector('#tut-launcher-back').addEventListener('click', function () { renderCategoryScreen(); });
+    modal.querySelector('#tut-launcher-search').addEventListener('input', onSearchInput);
     modal.addEventListener('mousedown', function (e) { if (e.target === modal) closeLauncher(); });
     return modal;
   }
@@ -1044,7 +1051,16 @@
     return { byCat: byCat, cats: cats };
   }
 
+  // Tracks which screen to return to once the search box is cleared —
+  // null means the top-level category list, a category name means that
+  // category's module screen. Only set by the two NORMAL render paths
+  // below (never by renderSearchResults itself), so clearing an active
+  // search always restores wherever the user actually was.
+  var lastScreenCat = null;
+
   function renderCategoryScreen() {
+    lastScreenCat = null;
+    var si = $('#tut-launcher-search'); if (si) si.placeholder = T('Rechercher un module…');
     var list = $('#tut-mod-list'); if (!list) return;
     $('#tut-launcher-title').textContent = T('Découvrir Nemo');
     $('#tut-launcher-back').style.display = 'none';
@@ -1072,6 +1088,7 @@
   }
 
   function renderModuleScreen(cat) {
+    lastScreenCat = cat;
     var list = $('#tut-mod-list'); if (!list) return;
     var g = groupByCategory();
     var mods = g.byCat[cat] || [];
@@ -1080,6 +1097,13 @@
     $('#tut-launcher-back').style.display = 'flex';
     $('#tut-launcher-back').title = T('Retour');
     list.innerHTML = '';
+    renderModuleRows(list, mods, done, false);
+  }
+
+  // Shared row-rendering for both a category's module list and search
+  // results — search results additionally show which category each hit
+  // belongs to, since it flattens across all of them.
+  function renderModuleRows(list, mods, done, showCategory) {
     mods.forEach(function (m) {
       var isDone = done.indexOf(m.id) !== -1;
       var btn = document.createElement('button');
@@ -1088,12 +1112,44 @@
         '<span class="tut-mod-ico">' + (isDone ? '✓' : m.icon) + '</span>' +
         '<span class="tut-mod-body">' +
         '<span class="tut-mod-title">' + T(m.title) + '</span>' +
-        '<span class="tut-mod-desc">' + T(m.desc) + '</span>' +
+        '<span class="tut-mod-desc">' + T(m.desc) + (showCategory ? ' · ' + T(m.category) : '') + '</span>' +
         '</span>' +
         '<span class="tut-mod-time">' + T(m.time) + '</span>';
       btn.addEventListener('click', function () { startModule(m.id); });
       list.appendChild(btn);
     });
+  }
+
+  // Flattens across every category — matches against both the currently
+  // displayed language's title/description AND the raw French source (so
+  // a search still works before a translation exists for a given string,
+  // or if the user is typing in a different language than the UI).
+  function renderSearchResults(query) {
+    var list = $('#tut-mod-list'); if (!list) return;
+    $('#tut-launcher-title').textContent = T('Découvrir Nemo');
+    $('#tut-launcher-back').style.display = 'none';
+    var done = loadDone();
+    var q = query.trim().toLowerCase();
+    var results = MODULES.filter(function (m) {
+      var hay = (T(m.title) + ' ' + T(m.desc) + ' ' + m.title + ' ' + m.desc).toLowerCase();
+      return hay.indexOf(q) !== -1;
+    });
+    list.innerHTML = '';
+    if (!results.length) {
+      var empty = document.createElement('div');
+      empty.className = 'tut-launcher-intro';
+      empty.textContent = T('Aucun module ne correspond à ta recherche.');
+      list.appendChild(empty);
+      return;
+    }
+    renderModuleRows(list, results, done, true);
+  }
+
+  function onSearchInput(e) {
+    var q = e.target.value;
+    if (q.trim()) { renderSearchResults(q); }
+    else if (lastScreenCat) { renderModuleScreen(lastScreenCat); }
+    else { renderCategoryScreen(); }
   }
 
   function chevronSvg() {
@@ -1102,6 +1158,7 @@
 
   function openLauncher() {
     ensureLauncher();
+    var si = $('#tut-launcher-search'); if (si) si.value = '';
     renderCategoryScreen();
     $('#tut-launcher').style.display = 'flex';
   }
