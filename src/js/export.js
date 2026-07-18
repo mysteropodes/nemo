@@ -43,6 +43,10 @@ function exportBuildFrame(frameIdx,alpha){
     var motionMat=(window.SMMotion&&strokes.length)?SMMotion.layerMotionAt(li,frameIdx):null;
     // Pivot = auto bounds center + Anchor Point offset (motionMat.ax/ay).
     var motionPivot=motionMat?new Point(userLayers[li].bounds.center.x+motionMat.ax,userLayers[li].bounds.center.y+motionMat.ay):null;
+    // Layer parenting (2026-07, motion.js): each ancestor's own motion matrix
+    // applied outermost, same composition order as buildSceneJson
+    // (engine-bridge.js) — see motion.js's parentChainMats header comment.
+    var parentChain=window.SMMotion?SMMotion.parentChainMats(li,frameIdx):[];
     strokes.forEach(function(sd){
       // Raster strokes (isRaster: imported images, SVG-sequence frames,
       // and Bitmap Brush's texture companions, bitmap-brush.js) went
@@ -74,6 +78,14 @@ function exportBuildFrame(frameIdx,alpha){
         p.translate(motionMat.dx,motionMat.dy);
         p.opacity=p.opacity*motionMat.op;
         if(p.strokeWidth)p.strokeWidth*=(Math.abs(motionMat.sx)+Math.abs(motionMat.sy))/2;
+      }
+      for(var pci=0;pci<parentChain.length;pci++){
+        var pc=parentChain[pci];
+        p.scale(pc.mat.sx,pc.mat.sy,pc.pivot);
+        p.rotate(pc.mat.rot,pc.pivot);
+        p.translate(pc.mat.dx,pc.mat.dy);
+        p.opacity=p.opacity*pc.mat.op;
+        if(p.strokeWidth)p.strokeWidth*=(Math.abs(pc.mat.sx)+Math.abs(pc.mat.sy))/2;
       }
     });
   }

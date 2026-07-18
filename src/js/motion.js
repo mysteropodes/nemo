@@ -402,6 +402,90 @@
     // bounds+anchor correctly, matches an ordinary layer.
     return computeMotionMat(ld, frameIdx);
   }
+  // ---- LAYER PARENTING (2026-07, "parentage de calque comme dans After
+  // Effects, changeable en properties d'animation") ----
+  // A parent reference is stored by a STABLE uid (ld.parentLayerUid), never
+  // a raw array index — state.layers gets spliced on reorder/delete/
+  // duplicate (reorderLayer, app.js), which would silently repoint a
+  // parent at the WRONG layer (or itself) if indices were stored directly.
+  // ensureLayerUid lazily assigns a uid to layers saved before this
+  // feature existed, same lazy-assign contract layerElements() already
+  // has for strokeId.
+  function ensureLayerUid(ld) {
+    if (!ld.layerUid) ld.layerUid = 'ly_' + Date.now().toString(36) + '_' + Math.floor(Math.random() * 1e6);
+    return ld.layerUid;
+  }
+  function findLayerIndexByUid(uid) {
+    if (!uid) return -1;
+    for (var i = 0; i < state.layers.length; i++) if (state.layers[i].layerUid === uid) return i;
+    return -1;
+  }
+  function setLayerParent(li, parentUid) {
+    var ld = state.layers[li];
+    if (!ld) return;
+    if (parentUid) {
+      // Refuse to create a cycle (A parents B parents A) — walk the
+      // CANDIDATE parent's own chain; if `li` (by uid) appears in it,
+      // this assignment would loop. Same visited-set guard as
+      // parentChainMats below, applied up front instead of just capping
+      // depth at read time, so the UI never silently accepts a cycle.
+      var uid = ensureLayerUid(ld);
+      var cur = parentUid, visited = {}, guard = 0;
+      while (cur && !visited[cur] && guard++ < 256) {
+        if (cur === uid) { if (window.showToast) showToast('Parentage refusé : créerait une boucle'); return; }
+        visited[cur] = true;
+        var idx = findLayerIndexByUid(cur);
+        cur = idx >= 0 ? state.layers[idx].parentLayerUid : null;
+      }
+    }
+    ld.parentLayerUid = parentUid || null;
+    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+  }
+  // Every ANCESTOR's own layer-level Motion transform, immediate parent
+  // first — engine-bridge.js/export.js apply the layer's OWN motionMat,
+  // THEN walk this chain applying each ancestor's transform on top, each
+  // pivoted around ITS OWN bounds+anchor (exactly how layerMotionAt's own
+  // pivot already works, just one level per ancestor) — composes exactly
+  // like AE's parent chain: a child inherits its parent's WHOLE effective
+  // transform, not just a copy of one property. visited-by-index guards
+  // against a cycle that predates setLayerParent's own refusal (e.g. a
+  // project file edited by hand, or a parent later deleted and its uid
+  // reused by coincidence — extremely unlikely but a hard guard costs
+  // nothing here).
+  function parentChainMats(li, frameIdx) {
+    var mats = [];
+    var ld = state.layers[li];
+    if (!ld) return mats;
+    var visited = {};
+    visited[li] = true;
+    var curUid = ld.parentLayerUid;
+    var guard = 0;
+    while (curUid && guard++ < 64) {
+      var idx = findLayerIndexByUid(curUid);
+      if (idx < 0 || visited[idx]) break;
+      visited[idx] = true;
+      var m = computeMotionMat(state.layers[idx], frameIdx);
+      if (m && userLayers[idx] && userLayers[idx].bounds) {
+        mats.push({ mat: m, pivot: { x: userLayers[idx].bounds.center.x + m.ax, y: userLayers[idx].bounds.center.y + m.ay } });
+      }
+      curUid = state.layers[idx].parentLayerUid;
+    }
+    return mats;
+  }
+  function applyParentChainToSegments(segments, li, frameIdx) {
+    var chain = parentChainMats(li, frameIdx);
+    for (var k = 0; k < chain.length; k++) segments = transformSegments(segments, chain[k].pivot, chain[k].mat);
+    return segments;
+  }
+  // Returns {rect, opacityMul} — opacity composes multiplicatively across
+  // the whole chain same as engine-bridge.js already does for elMat/
+  // motionMat on one item.
+  function applyParentChainToImageRect(rect, li, frameIdx) {
+    var chain = parentChainMats(li, frameIdx);
+    var opMul = 1;
+    for (var k = 0; k < chain.length; k++) { rect = transformImageRect(rect, chain[k].pivot, chain[k].mat); opMul *= chain[k].mat.op; }
+    return { rect: rect, opacityMul: opMul };
+  }
   // Nested INSIDE the layer transform (engine-bridge.js/export.js apply this
   // FIRST, pivoted around the item's own bounds, THEN the layer transform on
   // top) — matches AE composing a shape group's transform inside its parent
@@ -1195,7 +1279,44 @@
     // reads clearly as "the whole instance", not its internal content.
     nameRow.textContent = (ld.name || ('Layer ' + (state.activeLayerIdx + 1))) + (ld.symbolId ? ' (composant)' : '');
     body.appendChild(nameRow);
+    renderParentRow(body, ld, state.activeLayerIdx);
     renderTransformGroup(body, ld, 'Transform');
+  }
+  // Layer parenting (2026-07, "gestion de parentage de calque dans motion
+  // comme dans after, avec la possibilité de changer de parent en
+  // properties d'animation"): a single dropdown in the properties panel,
+  // AE's own "Parent & Link" column reimagined as a row here since Motion's
+  // right panel is already per-property, not per-layer-columns. Writes
+  // through setLayerParent (cycle-checked) so this is the ONLY UI entry
+  // point — the data model (ld.parentLayerUid) + composition math
+  // (parentChainMats, wired into engine-bridge.js/export.js/
+  // native-video-bridge.js) already existed before this row, but were
+  // otherwise completely inert from the user's side.
+  function renderParentRow(body, ld, li) {
+    var row = document.createElement('div'); row.className = 'lrow motion-prop-row';
+    var label = document.createElement('span'); label.textContent = 'Parent'; label.style.minWidth = '70px';
+    row.appendChild(label);
+    var sel = document.createElement('select'); sel.className = 'motion-parent-select'; sel.style.flex = '1';
+    var noneOpt = document.createElement('option'); noneOpt.value = ''; noneOpt.textContent = 'Aucun (parentage libre)';
+    sel.appendChild(noneOpt);
+    state.layers.forEach(function (other, oi) {
+      if (oi === li) return; // can't parent a layer to itself
+      var opt = document.createElement('option');
+      opt.value = ensureLayerUid(other);
+      opt.textContent = other.name || ('Layer ' + (oi + 1));
+      if (ld.parentLayerUid && ld.parentLayerUid === opt.value) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    if (!ld.parentLayerUid) noneOpt.selected = true;
+    sel.addEventListener('mousedown', function (e) { e.stopPropagation(); });
+    sel.addEventListener('click', function (e) { e.stopPropagation(); });
+    sel.addEventListener('change', function (e) {
+      e.stopPropagation(); pushUndo();
+      setLayerParent(li, sel.value || null);
+      renderLayerList(); renderTimeline();
+    });
+    row.appendChild(sel);
+    body.appendChild(row);
   }
   // Shared by the layer's own Transform group AND each element's — both are
   // just "a holder with .motion/.motionStatic", see the header comment on
@@ -2058,6 +2179,12 @@
     elementMotionAt: elementMotionAt,
     transformSegments: transformSegments,
     transformImageRect: transformImageRect,
+    ensureLayerUid: ensureLayerUid,
+    findLayerIndexByUid: findLayerIndexByUid,
+    setLayerParent: setLayerParent,
+    parentChainMats: parentChainMats,
+    applyParentChainToSegments: applyParentChainToSegments,
+    applyParentChainToImageRect: applyParentChainToImageRect,
     buildOverlayItems: buildOverlayItems,
     renderLayerListMotion: renderLayerListMotion,
     renderTimelineMotion: renderTimelineMotion,
