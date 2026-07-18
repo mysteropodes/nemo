@@ -697,13 +697,15 @@
     modal.style.display = 'none';
     modal.innerHTML =
       '<div class="modal-box">' +
-      '<div class="modal-hdr"><span>Découvrir Nemo</span> <button class="modal-x" id="tut-launcher-close">&times;</button></div>' +
+      '<div class="modal-hdr">' +
+      '<button class="tut-launcher-back" id="tut-launcher-back" style="display:none" title="Retour"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg></button>' +
+      '<span id="tut-launcher-title">Découvrir Nemo</span> <button class="modal-x" id="tut-launcher-close">&times;</button></div>' +
       '<div class="modal-bdy">' +
-      '<div style="font-size:11px;color:var(--text-dim);margin-bottom:12px">Des mini-leçons pas à pas, directement dans l\'app — comme les tutoriels intégrés de Flash. Choisis un module ; tu peux quitter à tout moment.</div>' +
       '<div class="tut-mod-list" id="tut-mod-list"></div>' +
       '</div></div>';
     document.body.appendChild(modal);
     modal.querySelector('#tut-launcher-close').addEventListener('click', closeLauncher);
+    modal.querySelector('#tut-launcher-back').addEventListener('click', function () { renderCategoryScreen(); });
     modal.addEventListener('mousedown', function (e) { if (e.target === modal) closeLauncher(); });
     return modal;
   }
@@ -713,18 +715,14 @@
   // Nemo would want: draw first, then animate, then organize/output.
   var CATEGORY_ORDER = ['Dessiner', 'Calques et animation', 'Organisation', 'Médias', 'Réglages'];
 
-  // Accordion open/closed state, keyed by category name — lives for the
-  // whole session (module-level, not per openLauncher() call) so
-  // re-opening the launcher remembers what you had open, same as any
-  // normal accordion UI. Nothing open on first run: with 15+ modules
-  // across 5 categories, showing everything at once defeats the point of
-  // grouping them in the first place.
-  var openCats = {};
-
-  function renderLauncherList() {
-    var list = $('#tut-mod-list'); if (!list) return;
-    var done = loadDone();
-    list.innerHTML = '';
+  // A real two-screen menu, not an inline accordion: the launcher opens on
+  // a list of CATEGORIES only (icon + count, no modules shown yet);
+  // clicking one navigates into a second screen listing just that
+  // category's modules, with a back arrow (in the modal header) to return
+  // to the category list. Matches how a phone Settings app drills down,
+  // per explicit request — a first version that expanded categories inline
+  // in the same list wasn't what was asked for.
+  function groupByCategory() {
     var byCat = {};
     MODULES.forEach(function (m) {
       var cat = m.category || 'Autres';
@@ -732,54 +730,66 @@
     });
     var cats = CATEGORY_ORDER.filter(function (c) { return byCat[c]; })
       .concat(Object.keys(byCat).filter(function (c) { return CATEGORY_ORDER.indexOf(c) === -1; }));
-    cats.forEach(function (cat) {
-      var mods = byCat[cat];
-      var doneCount = mods.filter(function (m) { return done.indexOf(m.id) !== -1; }).length;
-      var isOpen = !!openCats[cat];
+    return { byCat: byCat, cats: cats };
+  }
 
-      var hdr = document.createElement('button');
-      hdr.className = 'tut-cat-hdr' + (isOpen ? ' open' : '');
-      hdr.type = 'button';
-      hdr.innerHTML =
-        '<span class="tut-cat-chevron">' + chevronSvg() + '</span>' +
+  function renderCategoryScreen() {
+    var list = $('#tut-mod-list'); if (!list) return;
+    $('#tut-launcher-title').textContent = 'Découvrir Nemo';
+    $('#tut-launcher-back').style.display = 'none';
+    var done = loadDone();
+    var g = groupByCategory();
+    list.innerHTML = '';
+    var intro = document.createElement('div');
+    intro.className = 'tut-launcher-intro';
+    intro.textContent = 'Des mini-leçons pas à pas, directement dans l\'app — comme les tutoriels intégrés de Flash. Choisis une catégorie, puis un module ; tu peux quitter à tout moment.';
+    list.appendChild(intro);
+    g.cats.forEach(function (cat) {
+      var mods = g.byCat[cat];
+      var doneCount = mods.filter(function (m) { return done.indexOf(m.id) !== -1; }).length;
+      var btn = document.createElement('button');
+      btn.className = 'tut-cat-hdr';
+      btn.type = 'button';
+      btn.innerHTML =
         '<span class="tut-cat-name">' + cat + '</span>' +
-        '<span class="tut-cat-count">' + doneCount + '/' + mods.length + '</span>';
-      var body = document.createElement('div');
-      body.className = 'tut-cat-body' + (isOpen ? '' : ' collapsed');
-      var inner = document.createElement('div');
-      inner.className = 'tut-cat-inner';
-      body.appendChild(inner);
-      mods.forEach(function (m) {
-        var isDone = done.indexOf(m.id) !== -1;
-        var btn = document.createElement('button');
-        btn.className = 'tut-mod' + (isDone ? ' done' : '');
-        btn.innerHTML =
-          '<span class="tut-mod-ico">' + (isDone ? '✓' : m.icon) + '</span>' +
-          '<span class="tut-mod-body">' +
-          '<span class="tut-mod-title">' + m.title + '</span>' +
-          '<span class="tut-mod-desc">' + m.desc + '</span>' +
-          '</span>' +
-          '<span class="tut-mod-time">' + m.time + '</span>';
-        btn.addEventListener('click', function () { startModule(m.id); });
-        inner.appendChild(btn);
-      });
-      hdr.addEventListener('click', function () {
-        openCats[cat] = !openCats[cat];
-        hdr.classList.toggle('open', openCats[cat]);
-        body.classList.toggle('collapsed', !openCats[cat]);
-      });
-      list.appendChild(hdr);
-      list.appendChild(body);
+        '<span class="tut-cat-count">' + doneCount + '/' + mods.length + '</span>' +
+        '<span class="tut-cat-chevron">' + chevronSvg() + '</span>';
+      btn.addEventListener('click', function () { renderModuleScreen(cat); });
+      list.appendChild(btn);
+    });
+  }
+
+  function renderModuleScreen(cat) {
+    var list = $('#tut-mod-list'); if (!list) return;
+    var g = groupByCategory();
+    var mods = g.byCat[cat] || [];
+    var done = loadDone();
+    $('#tut-launcher-title').textContent = cat;
+    $('#tut-launcher-back').style.display = 'flex';
+    list.innerHTML = '';
+    mods.forEach(function (m) {
+      var isDone = done.indexOf(m.id) !== -1;
+      var btn = document.createElement('button');
+      btn.className = 'tut-mod' + (isDone ? ' done' : '');
+      btn.innerHTML =
+        '<span class="tut-mod-ico">' + (isDone ? '✓' : m.icon) + '</span>' +
+        '<span class="tut-mod-body">' +
+        '<span class="tut-mod-title">' + m.title + '</span>' +
+        '<span class="tut-mod-desc">' + m.desc + '</span>' +
+        '</span>' +
+        '<span class="tut-mod-time">' + m.time + '</span>';
+      btn.addEventListener('click', function () { startModule(m.id); });
+      list.appendChild(btn);
     });
   }
 
   function chevronSvg() {
-    return '<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>';
+    return '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>';
   }
 
   function openLauncher() {
     ensureLauncher();
-    renderLauncherList();
+    renderCategoryScreen();
     $('#tut-launcher').style.display = 'flex';
   }
   function closeLauncher() { var m = $('#tut-launcher'); if (m) m.style.display = 'none'; }
