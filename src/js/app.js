@@ -682,6 +682,17 @@ function serR(r){
   // Group membership (2026-07, group-bridge.js's Cmd+G) — same stable id
   // as serP's own groupId, so a group can freely mix Path and Raster members.
   if(r.data&&r.data.groupId)d.groupId=r.data.groupId;
+  // Text tool (2026-07 rework) — isText/text/font/size/color/align/fixedWidth
+  // are the ONLY way a re-baked-to-PNG text block stays re-editable (double-
+  // click via openTextPopoverForEdit, timeline.js) instead of degrading into
+  // an indistinguishable plain imported raster after one save/reload — the
+  // exact gap flagged by this session's own text-tool audit. fixedWidth is
+  // world-space (matches x/y/width/height's own units), null for point text.
+  if(r.data&&r.data.isText){
+    d.isText=true;d.text=r.data.text||'';d.font=r.data.font||'sans-serif';
+    d.size=r.data.size||48;d.color=r.data.color||'#000000';d.align=r.data.align||'left';
+    if(r.data.fixedWidth)d.fixedWidth=r.data.fixedWidth;
+  }
   return d;}
 // r.onLoad attached AFTER `new Raster(d.src)` can miss an ALREADY-loaded
 // image (a data: URI, like bitmap-brush.js's baked textures, often decodes
@@ -692,7 +703,9 @@ function serR(r){
 // kept Paper's default natural-pixel dimensions instead of the intended
 // world-space w/h whenever onLoad never fired. Checking `.loaded` first
 // covers both cases.
-function desR(d,layer,op){var prev=project.activeLayer;layer.activate();var r=new Raster(d.src);r.data.src=d.src;if(d.isBitmapBrush)r.data.isBitmapBrush=true;if(d.brushGroupId)r.data.brushGroupId=d.brushGroupId;if(d.isBrushTextureCopy)r.data.isBrushTextureCopy=true;if(d.groupId)r.data.groupId=d.groupId;r.position=new Point(d.x,d.y);r.opacity=op!==undefined?op:(d.opacity!==undefined?d.opacity:1);var w=d.width,h=d.height;
+function desR(d,layer,op){var prev=project.activeLayer;layer.activate();var r=new Raster(d.src);r.data.src=d.src;if(d.isBitmapBrush)r.data.isBitmapBrush=true;if(d.brushGroupId)r.data.brushGroupId=d.brushGroupId;if(d.isBrushTextureCopy)r.data.isBrushTextureCopy=true;if(d.groupId)r.data.groupId=d.groupId;
+  if(d.isText){r.data.isText=true;r.data.text=d.text||'';r.data.font=d.font||'sans-serif';r.data.size=d.size||48;r.data.color=d.color||'#000000';r.data.align=d.align||'left';if(d.fixedWidth)r.data.fixedWidth=d.fixedWidth;}
+  r.position=new Point(d.x,d.y);r.opacity=op!==undefined?op:(d.opacity!==undefined?d.opacity:1);var w=d.width,h=d.height;
   // serR()'s mid-decode fallback reads this — see its own comment. Cleared
   // once place() actually applies the real geometry so serR immediately
   // goes back to trusting live r.position/r.bounds afterward (a post-load
