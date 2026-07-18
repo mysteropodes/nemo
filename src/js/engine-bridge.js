@@ -211,6 +211,25 @@
     } else
     for (var i = 0; i < state.layers.length; i++) {
       if (!layerIsEffectivelyVisible(i) || !userLayers[i]) { layers.push({ items: [] }); continue; }
+      // Null layer (2026-07, Motion) — pure organizational/pivot layer,
+      // never painted (AE's "Null Object"), same "no content, no paint"
+      // shape as an invisible layer above, but still emitted as its OWN
+      // stack slot (unlike an invisible layer it's never actually hidden —
+      // other layers can still parent to it via SMMotion's existing
+      // parentLayerUid/parentChainMats mechanism, which only needs the
+      // layer to exist at some index, not to draw anything).
+      if (state.layers[i].isNullLayer) { layers.push({ items: [] }); continue; }
+      // Effect (adjustment) layer (2026-07, Motion) — never paints its own
+      // content either (ld.frames/strokes are ignored on purpose, matching
+      // AE's "Adjustment Layer" toggle), but DOES carry isEffectLayer/
+      // effectType/effectP1/effectP2 so engine.rs's composite_scene applies
+      // its WGSL pass to everything already composited below it — see
+      // that function's is_effect_layer branch for the full rationale.
+      if (state.layers[i].isEffectLayer) {
+        var eff = state.layers[i];
+        layers.push({ items: [], isEffectLayer: true, effectType: eff.effectType || 'blur', effectP1: eff.effectP1, effectP2: eff.effectP2 });
+        continue;
+      }
       var children = userLayers[i].children;
       var items = [];
       // Motion mode (motion.js): a keyed position/rotation/scale/opacity
