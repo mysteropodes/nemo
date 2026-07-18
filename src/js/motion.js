@@ -174,7 +174,7 @@
   // The value of `prop` on layer `ld` at `frame` — exact key, interpolated,
   // clamped outside the keyed range, the static override, or the neutral
   // default. Always returns an array (length 1 or 2, per PROP_DIM).
-  function valueAtFrame(ld, prop, frame) {
+  function rawValueAtFrame(ld, prop, frame) {
     var track = ld.motion && ld.motion[prop];
     if (!track || !track.keys.length) return staticValue(ld, prop);
     var ks = track.keys;
@@ -210,6 +210,169 @@
       }
     }
     return last.v.slice();
+  }
+
+  // ---- Expression engine (2026-07) — a modernized take on AE's per-
+  // property expressions. Same "opt-in extended mode on the SAME holder"
+  // principle as everything else in this file (a holder's .expressions is
+  // a THIRD mode next to keyframed/static, not a parallel system) — see
+  // this session's audit for the full AE-comparison rationale. Key
+  // differences from AE, all deliberate:
+  //   - Sandbox: `new Function` with an EXPLICIT, closed parameter list
+  //     (time/frame/value/layer/wiggle/loopOut) — no access to window/
+  //     document/state, unlike AE's unrestricted ExtendScript.
+  //   - Stable references: layer(uid) takes the SAME layerUid this
+  //     session's parenting feature already introduced — never a display
+  //     name, so renaming a layer can never silently break an expression
+  //     (AE's #1 real-world footgun).
+  //   - Deterministic wiggle: seeded per-holder-per-property (ensureExprSeed
+  //     below), never raw Math.random() — same discipline this codebase's
+  //     seededRng (tools.js) already applies to brush-texture dabs, so a
+  //     given frame renders identically every time (preview AND export),
+  //     unlike AE's wiggle() which can re-seed unpredictably.
+  //   - Errors never break the render: a throwing expression falls back to
+  //     the underlying keyframed/static value (computed BEFORE the
+  //     expression runs, passed in as `value`) and records `lastError` for
+  //     the UI to show as a small badge on just that property row — never
+  //     a whole-scene failure the way AE's red expression icon can cascade.
+  //   - Compiled once per (holder,prop), cached until the code string
+  //     changes — not re-parsed every frame.
+  function ensureExpr(holder, prop) {
+    if (!holder.expressions) holder.expressions = {};
+    if (!holder.expressions[prop]) holder.expressions[prop] = { code: '', enabled: false, lastError: null };
+    return holder.expressions[prop];
+  }
+  function hasExpr(holder, prop) { return !!(holder.expressions && holder.expressions[prop] && holder.expressions[prop].enabled && holder.expressions[prop].code); }
+  // Stable per-holder random seed for wiggle() — NOT persisted (deliberately
+  // absent from serP/serR's field list, see app.js), so it's only stable
+  // WITHIN a session; a reload reseeds. A fully save-stable seed would need
+  // threading through serP/desP same as strokeId, a reasonable follow-up if
+  // "wiggle looks different after reopening the project" is ever reported,
+  // but not needed for this MVP (the shape of the motion is what matters,
+  // not bit-for-bit identical noise across sessions).
+  function ensureExprSeed(holder) {
+    if (holder._exprSeed === undefined) holder._exprSeed = Math.floor(Math.random() * 1e9);
+    return holder._exprSeed;
+  }
+  // Tiny deterministic hash noise (not cryptographic, doesn't need to be) —
+  // same value for the same (seed, x) every time, smoothly interpolated so
+  // wiggle() reads as continuous motion rather than a stepped random walk.
+  function hashNoise1D(seed, x) {
+    var i = Math.floor(x), f = x - i;
+    function h(n) { var v = Math.sin(n * 12.9898 + seed * 78.233) * 43758.5453; return v - Math.floor(v); }
+    var a = h(i), b = h(i + 1);
+    var t = f * f * (3 - 2 * f); // smoothstep
+    return a + (b - a) * t;
+  }
+  function makeWiggle(seed, dim) {
+    // Independent noise per dimension (offsetting the seed) so a 2D
+    // property's X/Y wiggle don't move in lockstep along a diagonal line.
+    return function (freqPerSec, amp, octaves) {
+      var t = (state.currentFrame / (state.fps || 24));
+      var n = 0, amp2 = 1, freq2 = 1, norm = 0;
+      octaves = Math.max(1, octaves || 1);
+      for (var o = 0; o < octaves; o++) {
+        n += (hashNoise1D(seed + dim * 101 + o * 977, t * freqPerSec * freq2) - 0.5) * 2 * amp2;
+        norm += amp2; amp2 *= 0.5; freq2 *= 2;
+      }
+      return (n / norm) * amp;
+    };
+  }
+  // loopOut() — cycles `frame` back into this SAME property's own keyed
+  // range once playback runs past its last key, AE's loopOut('cycle')
+  // equivalent. No-op (returns the un-looped raw value) if the property
+  // has fewer than 2 keys — nothing to loop.
+  function loopOutRaw(holder, prop, frame) {
+    var track = holder.motion && holder.motion[prop];
+    if (!track || track.keys.length < 2) return rawValueAtFrame(holder, prop, frame);
+    var first = track.keys[0].frame, last = track.keys[track.keys.length - 1].frame;
+    var span = last - first;
+    if (span <= 0 || frame <= last) return rawValueAtFrame(holder, prop, frame);
+    var wrapped = first + ((frame - first) % span);
+    return rawValueAtFrame(holder, prop, wrapped);
+  }
+  // Read-only snapshot of another layer's CURRENT effective values, keyed
+  // by its stable layerUid (never a display name) — the only inter-item
+  // reference an expression can make in this MVP (element-level references
+  // are a natural follow-up once this proves out).
+  function layerSnapshot(uid, frame) {
+    var idx = findLayerIndexByUid(uid);
+    if (idx < 0) return null;
+    var ld2 = state.layers[idx];
+    return {
+      position: valueAtFrame(ld2, 'position', frame),
+      anchor: valueAtFrame(ld2, 'anchor', frame),
+      rotation: valueAtFrame(ld2, 'rotation', frame)[0],
+      scale: valueAtFrame(ld2, 'scale', frame),
+      opacity: valueAtFrame(ld2, 'opacity', frame)[0],
+    };
+  }
+  function compiledFnFor(holder, prop) {
+    var ex = holder.expressions[prop];
+    if (holder._exprCompiled && holder._exprCompiled[prop] && holder._exprCompiled[prop].code === ex.code) {
+      return holder._exprCompiled[prop].fn;
+    }
+    var fn;
+    try {
+      // eslint-disable-next-line no-new-func
+      fn = new Function('time', 'frame', 'value', 'layer', 'wiggle', 'loopOut', '"use strict";\nreturn (\n' + ex.code + '\n);');
+      ex.lastError = null;
+    } catch (e) {
+      fn = null;
+      ex.lastError = 'Erreur de syntaxe : ' + e.message;
+    }
+    if (!holder._exprCompiled) holder._exprCompiled = {};
+    holder._exprCompiled[prop] = { code: ex.code, fn: fn };
+    return fn;
+  }
+  // Normalizes an expression's return value to the array shape PROP_DIM
+  // expects — a 1D property (rotation/opacity) may return a bare number,
+  // a 2D one (position/anchor/scale) a bare [x,y] array or, forgivingly, a
+  // bare number applied to both dimensions.
+  function normalizeExprResult(result, prop) {
+    var dim = PROP_DIM[prop];
+    if (Array.isArray(result)) {
+      if (result.length >= dim) return result.slice(0, dim);
+      if (result.length === 1 && dim === 2) return [result[0], result[0]];
+      return null;
+    }
+    if (typeof result === 'number' && !isNaN(result)) return dim === 1 ? [result] : [result, result];
+    return null;
+  }
+  function evalExpressionFor(holder, prop, frame, rawValue) {
+    var ex = holder.expressions[prop];
+    var fn = compiledFnFor(holder, prop);
+    if (!fn) return null;
+    var seed = ensureExprSeed(holder);
+    try {
+      var result = fn(
+        frame / (state.fps || 24),
+        frame,
+        rawValue.length === 1 ? rawValue[0] : rawValue.slice(),
+        function (uid) { return layerSnapshot(uid, frame); },
+        makeWiggle(seed, prop === 'rotation' || prop === 'opacity' ? 0 : 0),
+        function () { return loopOutRaw(holder, prop, frame); }
+      );
+      var normalized = normalizeExprResult(result, prop);
+      if (normalized === null) { ex.lastError = 'L’expression doit retourner un nombre' + (PROP_DIM[prop] === 2 ? ' ou un tableau [x,y]' : '') + '.'; return null; }
+      ex.lastError = null;
+      return normalized;
+    } catch (e) {
+      ex.lastError = 'Erreur : ' + e.message;
+      return null;
+    }
+  }
+  // Public wrapper — the ONE new branch on top of the pre-existing
+  // rawValueAtFrame, checked first so an enabled-with-error expression
+  // still falls through to the exact keyframed/static value it would have
+  // shown before expressions existed (never a blank/NaN/frozen property).
+  function valueAtFrame(ld, prop, frame) {
+    var raw = rawValueAtFrame(ld, prop, frame);
+    if (hasExpr(ld, prop)) {
+      var evaluated = evalExpressionFor(ld, prop, frame, raw);
+      if (evaluated !== null) return evaluated;
+    }
+    return raw;
   }
   // The segment whose ease governs `frame` (its LEFT key) — same contract
   // as camera.js's segmentLeftKey, generalized to any track.
@@ -1439,7 +1602,19 @@
       });
       var pnm = document.createElement('div'); pnm.className = 'lnm motion-prop-name';
       pnm.innerHTML = '<span>' + PROP_LABEL[prop] + '</span>';
-      pr.appendChild(sw); pr.appendChild(pnm);
+      var exprOn = holder.expressions && holder.expressions[prop] && holder.expressions[prop].enabled;
+      var exprErr = holder.expressions && holder.expressions[prop] && holder.expressions[prop].lastError;
+      var exprBtn = document.createElement('div');
+      exprBtn.className = 'lico motion-expr-btn' + (exprOn ? ' on' : '') + (exprErr ? ' err' : '');
+      exprBtn.title = exprErr ? ('Expression en erreur : ' + exprErr) : (exprOn ? 'Expression active — clic pour éditer' : 'Ajouter une expression sur cette propriété');
+      exprBtn.innerHTML = '<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 4c-2 0-3 1.2-3 3v10c0 2-1 3-3 3M16 4c2 0 3 1.2 3 3v10c0 2 1 3 3 3M9 12h6"/></svg>';
+      exprBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var already = window._exprEditorOpen && window._exprEditorOpen.holder === holder && window._exprEditorOpen.prop === prop;
+        window._exprEditorOpen = already ? null : { holder: holder, prop: prop };
+        renderLayerList(); renderTimeline();
+      });
+      pr.appendChild(sw); pr.appendChild(exprBtn); pr.appendChild(pnm);
       var vals = isAnimated(holder, prop) ? valueAtFrame(holder, prop, state.currentFrame) : staticValue(holder, prop);
       var fieldWrap = document.createElement('div'); fieldWrap.className = 'motion-fields';
       for (var d = 0; d < PROP_DIM[prop]; d++) {
@@ -1465,7 +1640,54 @@
       fieldWrap.appendChild(unit);
       pr.appendChild(fieldWrap);
       list.appendChild(pr);
+      if (window._exprEditorOpen && window._exprEditorOpen.holder === holder && window._exprEditorOpen.prop === prop) {
+        list.appendChild(buildExprEditorRow(holder, prop));
+      }
     });
+  }
+  // Inline expression editor — appended right after its property's row when
+  // toggled open via the ƒx button, same single-accordion convention as
+  // _motionExpandedLayer/_motionExpandedElement/_motionExpandedPathHolder
+  // elsewhere in this file (only one open at a time, tracked on window so a
+  // full re-render can restore which one).
+  function buildExprEditorRow(holder, prop) {
+    var expr = ensureExpr(holder, prop);
+    var row = document.createElement('div'); row.className = 'lrow motion-expr-editor';
+    var head = document.createElement('label'); head.className = 'motion-expr-toggle';
+    var cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !!expr.enabled;
+    cb.addEventListener('change', function () {
+      pushUndo();
+      expr.enabled = cb.checked;
+      if (typeof saveActiveLayerFrame === 'function') saveActiveLayerFrame();
+      renderLayerList(); renderTimeline();
+      if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+    });
+    head.appendChild(cb);
+    head.appendChild(document.createTextNode(' Activer l’expression'));
+    row.appendChild(head);
+    var ta = document.createElement('textarea'); ta.className = 'motion-expr-code';
+    ta.value = expr.code; ta.spellcheck = false; ta.rows = 3;
+    ta.placeholder = 'value + wiggle(2, 10)';
+    function commit() {
+      if (ta.value === expr.code) return;
+      pushUndo();
+      expr.code = ta.value;
+      expr.lastError = null;
+      if (holder._exprCompiled) delete holder._exprCompiled[prop];
+      if (typeof saveActiveLayerFrame === 'function') saveActiveLayerFrame();
+      if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+    }
+    ta.addEventListener('blur', commit);
+    ta.addEventListener('keydown', function (e) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { commit(); e.preventDefault(); ta.blur(); }
+      if (e.key === 'Escape') { ta.value = expr.code; ta.blur(); }
+    });
+    row.appendChild(ta);
+    if (expr.lastError) {
+      var errEl = document.createElement('div'); errEl.className = 'motion-expr-error'; errEl.textContent = expr.lastError;
+      row.appendChild(errEl);
+    }
+    return row;
   }
   // Every unique element (stroke) visible in the layer at the CURRENT frame
   // — "Éléments", AE shape-group style, listed under the layer's own
