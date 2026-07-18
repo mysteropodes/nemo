@@ -1889,9 +1889,8 @@ function renderTweenCurveStrips(){
       // encart qui apparaît", with points easy to grab and drag directly.
       poly.addEventListener('click',(function(l,a,b,r){return function(e){
         e.stopPropagation();
-        var rowRect=r.getBoundingClientRect();
-        openTweenCurveInset(l,a,b,rowRect.left+a*FC,rowRect.bottom);
-      };})(li,fA,fB,row));
+        openTweenCurveInset(l,a,b);
+      };})(li,fA,fB));
       svg.appendChild(poly);
     }
   });
@@ -1913,25 +1912,45 @@ function closeTweenCurveInset(){
   _tweenCurveInset.el.remove();
   _tweenCurveInset=null;
 }
-function openTweenCurveInset(li,fA,fB,anchorX,anchorY){
+// Finds the DOM row for layer `li` in the frame-grid — used to align the
+// inset to the tween span's actual on-screen position (not a fixed popup
+// size dropped near a click point, per explicit follow-up: "il faut
+// vraiment que ça soit une partie distincte qui s'ouvre dessous... par un
+// encart", with the reference screenshot showing the curve box spanning
+// EXACTLY the keyframe-to-keyframe width, right under that layer's row).
+function findLayerRow(li){
+  var rows=document.querySelectorAll('#frame-grid .frow');
+  for(var i=0;i<rows.length;i++){
+    var fc=rows[i].querySelector('.fc');
+    if(fc&&parseInt(fc.dataset.layer,10)===li)return rows[i];
+  }
+  return null;
+}
+function openTweenCurveInset(li,fA,fB){
   closeTweenCurveInset();
+  var row=findLayerRow(li);
+  if(!row)return;
   var key=li+':'+fA+'-'+fB;
   if(!state.tweenEasing)state.tweenEasing={};
   var seg=state.tweenEasing[key]=state.tweenEasing[key]||{};
   if(!seg.points||!seg.points.length){
     // Starts from whatever curve is CURRENTLY effective for this pair
     // (global fallback), not a hardcoded default — same convention as
-    // ui.js's tweenSegCurve().
+    // ui.js's tweenSegCurve() used before this rewrite.
     var base=(window._curveEditor&&window._curveEditor.getState().points)||[{x:0,y:0},{x:.42,y:0},{x:.58,y:1},{x:1,y:1}];
     seg.points=base.map(function(p){return{x:p.x,y:p.y};});
   }
-  var W=280,H=118,pad=14,svgW=W-16,svgH=H-38;
-  var left=Math.max(4,Math.min(window.innerWidth-W-4,anchorX));
-  var top=Math.max(4,Math.min(window.innerHeight-H-4,anchorY));
+  var rowRect=row.getBoundingClientRect();
+  var HDR=20,pad=10;
+  var W=Math.max(140,(fB-fA)*FC);
+  var H=110;
+  var left=Math.max(4,Math.min(window.innerWidth-W-4,rowRect.left+fA*FC));
+  var top=rowRect.bottom+2;
+  var svgW=W-2*pad,svgH=H-HDR-pad;
   var box=document.createElement('div');
   box.className='tw-curve-inset';
-  box.style.cssText='position:fixed;left:'+Math.round(left)+'px;top:'+Math.round(top)+'px;width:'+W+'px;background:#181c24;border:1px solid #334155;border-radius:6px;box-shadow:0 6px 24px rgba(0,0,0,.55);z-index:5000;padding:8px;box-sizing:border-box;font-family:inherit;';
-  box.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
+  box.style.cssText='position:fixed;left:'+Math.round(left)+'px;top:'+Math.round(top)+'px;width:'+W+'px;height:'+H+'px;background:rgba(13,17,23,.85);border:2px solid #4a9eff;border-radius:3px;box-shadow:0 6px 24px rgba(0,0,0,.55);z-index:5000;padding:'+pad+'px;box-sizing:border-box;font-family:inherit;';
+  box.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;height:'+HDR+'px">'
     +'<span style="font-size:10px;color:#9ca3af">Tween '+(fA+1)+' → '+(fB+1)+'</span>'
     +'<div style="display:flex;gap:8px;align-items:center">'
     +'<button class="tw-ci-reset" style="background:none;border:none;color:#9ca3af;cursor:pointer;font-size:9px;text-decoration:underline;padding:0" title="Revenir à la courbe globale pour cette paire">réinitialiser</button>'
@@ -1947,20 +1966,21 @@ function openTweenCurveInset(li,fA,fB,anchorX,anchorY){
   var svgNS='http://www.w3.org/2000/svg';
   var svg=document.createElementNS(svgNS,'svg');
   svg.setAttribute('width',svgW);svg.setAttribute('height',svgH);
-  svg.style.cssText='display:block;background:#0d1117;border-radius:4px;cursor:crosshair;touch-action:none;';
+  svg.style.cssText='display:block;cursor:crosshair;touch-action:none;';
   box.appendChild(svg);
   document.body.appendChild(box);
 
-  function toSX(px){return pad+px*(svgW-2*pad);}
-  function toSY(py){return svgH-pad-py*(svgH-2*pad);}
-  function fromSX(sx){return Math.max(0,Math.min(1,(sx-pad)/(svgW-2*pad)));}
-  function fromSY(sy){return Math.max(-0.3,Math.min(1.3,(svgH-pad-sy)/(svgH-2*pad)));}
+  var ipad=6;
+  function toSX(px){return ipad+px*(svgW-2*ipad);}
+  function toSY(py){return svgH-ipad-py*(svgH-2*ipad);}
+  function fromSX(sx){return Math.max(0,Math.min(1,(sx-ipad)/(svgW-2*ipad)));}
+  function fromSY(sy){return Math.max(-0.3,Math.min(1.3,(svgH-ipad-sy)/(svgH-2*ipad)));}
 
   function redraw(){
     while(svg.firstChild)svg.removeChild(svg.firstChild);
     [0,1].forEach(function(v){
       var l=document.createElementNS(svgNS,'line');
-      l.setAttribute('x1',pad);l.setAttribute('x2',svgW-pad);l.setAttribute('y1',toSY(v));l.setAttribute('y2',toSY(v));
+      l.setAttribute('x1',ipad);l.setAttribute('x2',svgW-ipad);l.setAttribute('y1',toSY(v));l.setAttribute('y2',toSY(v));
       l.setAttribute('stroke','#334155');l.setAttribute('stroke-dasharray','3,3');
       svg.appendChild(l);
     });
@@ -2464,7 +2484,7 @@ document.getElementById('frame-grid').addEventListener('contextmenu',function(e)
   // state.showTweenCurves off.
   var twKeys=layerKeyframeList(li),twPair=null;
   for(var tki=0;tki<twKeys.length-1;tki++){if(fi>=twKeys[tki]&&fi<=twKeys[tki+1]){twPair={a:twKeys[tki],b:twKeys[tki+1]};break;}}
-  var twMenuItems=twPair?[{label:'Éditer la courbe de ce tween…',action:function(){openTweenCurveInset(li,twPair.a,twPair.b,e.clientX,e.clientY);}},{sep:true}]:[];
+  var twMenuItems=twPair?[{label:'Éditer la courbe de ce tween…',action:function(){openTweenCurveInset(li,twPair.a,twPair.b);}},{sep:true}]:[];
   window.showContextMenu(e.clientX,e.clientY,twMenuItems.concat([
     {label:'Copier',shortcut:'⌘C',action:function(){window.SM.copyFrames();}},
     {label:'Couper',shortcut:'⌘X',action:function(){window.SM.cutFrames();}},
