@@ -219,7 +219,49 @@
     mirrored.insertAbove(path);
     if (typeof tagOwner === 'function') tagOwner(mirrored);
   }
-  window.SMSymmetry = { onPreview: onPreview, onStrokeCommitted: onStrokeCommitted };
+  // Same mirror/rotate math as onPreview/onStrokeCommitted above, but for a
+  // single already-built scene-item object ({segments,closed,fillColor,
+  // strokeColor,strokeWidth} — the Rust ItemIn wire shape) instead of a
+  // [x,y,width] samples array or a live Paper Path. shape-bridge.js's Line/
+  // Rect/Ellipse live preview builds exactly this kind of item directly
+  // (no samples array, no Paper Path to clone), so it needs its own entry
+  // point rather than reusing onPreview/onStrokeCommitted verbatim.
+  // "Stop at axis" clipping intentionally doesn't apply here — clipping a
+  // whole closed Rect/Ellipse mid-shape isn't a meaningful operation the
+  // way it is for a freehand line; skipped for scene items on purpose.
+  function transformSceneItemPoints(segments, fn) {
+    return segments.map(function (s) {
+      var p = fn(s.point[0], s.point[1]);
+      var out = { point: [p.x, p.y] };
+      if (s.handleIn) { var hi = fn(s.handleIn[0], s.handleIn[1], true); out.handleIn = [hi.x, hi.y]; }
+      if (s.handleOut) { var ho = fn(s.handleOut[0], s.handleOut[1], true); out.handleOut = [ho.x, ho.y]; }
+      return out;
+    });
+  }
+  function mirrorSceneItem(item) {
+    if (!state.symmetryEnabled || !item || !item.segments) return [];
+    if (state.symmetryMode === 'radial') {
+      var c = ensureSymmetryRadialCenter();
+      var n = sectorCount();
+      var out = [];
+      for (var k = 1; k < n; k++) {
+        var ang = k * 2 * Math.PI / n, cos = Math.cos(ang), sin = Math.sin(ang);
+        var segs = transformSceneItemPoints(item.segments, function (x, y, isVec) {
+          if (isVec) return { x: x * cos - y * sin, y: x * sin + y * cos };
+          var dx = x - c.x, dy = y - c.y;
+          return { x: c.x + dx * cos - dy * sin, y: c.y + dx * sin + dy * cos };
+        });
+        out.push({ segments: segs, closed: item.closed, fillColor: item.fillColor, strokeColor: item.strokeColor, strokeWidth: item.strokeWidth });
+      }
+      return out;
+    }
+    var axis = ensureSymmetryAxis();
+    var segs2 = transformSceneItemPoints(item.segments, function (x, y, isVec) {
+      return isVec ? reflectVector(x, y, axis) : reflectPoint(x, y, axis);
+    });
+    return [{ segments: segs2, closed: item.closed, fillColor: item.fillColor, strokeColor: item.strokeColor, strokeWidth: item.strokeWidth }];
+  }
+  window.SMSymmetry = { onPreview: onPreview, onStrokeCommitted: onStrokeCommitted, mirrorSceneItem: mirrorSceneItem };
 
   // ---- tool interaction: drag an axis endpoint (Free mode), drag the
   // whole axis (Y/X translate it perpendicular to itself, Free translates
