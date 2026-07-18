@@ -656,33 +656,6 @@ function getEasingForPair(li,fA,fB){
   }
   return getEasing();
 }
-// Opens the shared curve widget pointed at ONE keyframe pair's own easing
-// (state.tweenEasing[key]) instead of the global curve — mirrors camera.js/
-// motion.js's editCameraSeg/editMotionSeg (right-click a segment → edit
-// just its own curve). Called from timeline.js's frame-grid context menu
-// and from clicking a per-pair curve strip when state.showTweenCurves is
-// on (see renderTweenCurveStrips, timeline.js).
-function openTweenEaseEditor(li,fA,fB){
-  var key=li+':'+fA+'-'+fB;
-  if(!state.tweenEasing)state.tweenEasing={};
-  var seg=state.tweenEasing[key]=state.tweenEasing[key]||{};
-  window._tweenEaseCtx={li:li,fA:fA,fB:fB};
-  if(window._curveEditor)window._curveEditor.editTweenSeg(seg,'Tween : clé '+(fA+1)+' → '+(fB+1));
-}
-// ui.js's pushCurve() calls this (isTweenSegMode branch) whenever a point
-// is added/moved/deleted on a per-pair curve — regenerates just that span,
-// same restrictTo-by-selection mechanism generateTweens already uses for
-// the "Réattribuer un inbetween" tool.
-window.onTweenEaseSegChanged=function(){
-  var ctx=window._tweenEaseCtx;
-  if(!ctx)return;
-  selClear();selAdd(ctx.li,ctx.fA);
-  generateTweens();
-  selClear();
-  if(state.activeLayerIdx===ctx.li)renderOS();
-  updateUI();
-  if(window.renderTweenCurveStrips)window.renderTweenCurveStrips();
-};
 function lerp(a,b,t){return a+(b-a)*t;}function lerpV(a,b,t){return[lerp(a[0],b[0],t),lerp(a[1],b[1],t)];}
 function arcKey(fA,fB,i){return fA+'-'+fB+'-'+i;}
 // Cubic bezier through ptA/ptB with independent OUT (leaving A) and IN
