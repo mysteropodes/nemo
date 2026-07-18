@@ -127,11 +127,21 @@
     var reach = Math.max(state.canvasW, state.canvasH) * 4;
     var col = [230, 90, 200, 130];
     var handleCol = [230, 120, 210, 255];
-    function diamond(x, y, s, filled) {
-      items.push({
-        segments: [{ point: [x, y - s] }, { point: [x + s, y] }, { point: [x, y + s] }, { point: [x - s, y] }],
-        closed: true, fillColor: filled ? handleCol : null, strokeColor: handleCol, strokeWidth: 1.5,
-      });
+    // Draggable-point handle, Sketchbook-style (feedback: "dans sketchbook
+    // on a des points que l'on peut déplacer... regarde bien sketchbook") —
+    // a ring + filled center dot, not the small diamond this used to be.
+    // Bigger and rounder reads unambiguously as "a grabbable point", the
+    // exact same visual language Sketchbook's own guide handles use.
+    function ringHandle(x, y, r) {
+      var outer = [], inner = [];
+      var innerR = r * 0.4;
+      for (var i = 0; i < 16; i++) {
+        var a = (i / 16) * Math.PI * 2;
+        outer.push({ point: [x + Math.cos(a) * r, y + Math.sin(a) * r] });
+        inner.push({ point: [x + Math.cos(a) * innerR, y + Math.sin(a) * innerR] });
+      }
+      items.push({ segments: outer, closed: true, fillColor: [15, 20, 30, 160], strokeColor: handleCol, strokeWidth: 2 });
+      items.push({ segments: inner, closed: true, fillColor: handleCol, strokeColor: null });
     }
     if (state.symmetryMode === 'radial') {
       var c = ensureSymmetryRadialCenter();
@@ -143,7 +153,7 @@
           closed: false, fillColor: null, strokeColor: col, strokeWidth: 1, strokeCap: 'butt',
         });
       }
-      diamond(c.x, c.y, 6, true);
+      ringHandle(c.x, c.y, 9);
     } else {
       var axis = ensureSymmetryAxis();
       var d = axisDir(axis);
@@ -152,8 +162,17 @@
         segments: [{ point: [mx - d.ux * reach, my - d.uy * reach] }, { point: [mx + d.ux * reach, my + d.uy * reach] }],
         closed: false, fillColor: null, strokeColor: col, strokeWidth: 1.4, strokeCap: 'butt',
       });
-      diamond(axis.x1, axis.y1, 6, false);
-      diamond(axis.x2, axis.y2, 6, false);
+      // One handle per draggable point: both endpoints in Free mode (each
+      // independently grabbable), but Y/X only really has ONE meaningful
+      // drag point — the whole-axis translate — so a single handle at the
+      // visible midpoint reads more like Sketchbook's own Y/X guide (one
+      // ring on the line, not two at its off-screen-reaching ends).
+      if (state.symmetryMode === 'free') {
+        ringHandle(axis.x1, axis.y1, 7);
+        ringHandle(axis.x2, axis.y2, 7);
+      } else {
+        ringHandle(mx, my, 9);
+      }
     }
     return items;
   }

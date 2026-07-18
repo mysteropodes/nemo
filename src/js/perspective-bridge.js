@@ -104,17 +104,25 @@
         closed: false, fillColor: null, strokeColor: [255, 200, 80, 130], strokeWidth: 1.4, strokeCap: 'butt',
       });
     }
-    // VP markers themselves — small diamonds, filled if locked (matches
-    // Sketchbook's locked/unlocked visual distinction) so it's obvious at a
-    // glance which points can still be dragged.
+    // VP markers themselves — draggable-point handles, Sketchbook-style
+    // (feedback: "dans sketchbook on a des points que l'on peut
+    // déplacer... regarde bien sketchbook" — a ring + filled center dot
+    // reads unambiguously as "grab me", replacing the small diamond this
+    // used to be). Locked VPs swap the center dot for a solid fill of the
+    // ring itself, keeping Sketchbook's own locked/unlocked distinction.
     vps.forEach(function (vp) {
-      var s = 6;
+      var r = 9, innerR = r * 0.4, outer = [], inner = [];
+      for (var i = 0; i < 16; i++) {
+        var a = (i / 16) * Math.PI * 2;
+        outer.push({ point: [vp.x + Math.cos(a) * r, vp.y + Math.sin(a) * r] });
+        inner.push({ point: [vp.x + Math.cos(a) * innerR, vp.y + Math.sin(a) * innerR] });
+      }
       items.push({
-        segments: [{ point: [vp.x, vp.y - s] }, { point: [vp.x + s, vp.y] }, { point: [vp.x, vp.y + s] }, { point: [vp.x - s, vp.y] }],
-        closed: true,
-        fillColor: vp.locked ? [255, 120, 80, 220] : null,
-        strokeColor: [255, 150, 100, 255], strokeWidth: 1.5,
+        segments: outer, closed: true,
+        fillColor: vp.locked ? [255, 120, 80, 200] : [15, 20, 30, 160],
+        strokeColor: [255, 150, 100, 255], strokeWidth: 2,
       });
+      items.push({ segments: inner, closed: true, fillColor: [255, 150, 100, 255], strokeColor: null });
     });
     return items;
   }
