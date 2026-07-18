@@ -212,7 +212,13 @@
     };
   }
 
-  window.BrushPresetPicker = { open: open, paintButton: paintButton, drawPreview: drawPreview, labelFor: labelFor, selectPreset: selectPreset };
+  window.BrushPresetPicker = {
+    open: open, paintButton: paintButton, drawPreview: drawPreview, labelFor: labelFor, selectPreset: selectPreset,
+    // Exposed for brush-menu-bridge.js's own big two-tab picker (2026-07) —
+    // reuses this file's exact catalog/preview/select logic rather than
+    // keeping a second copy that could drift out of sync.
+    groups: builtinGroups, customKeys: customKeys,
+  };
 
   function init() {
     var btn = document.getElementById('p-brushpreset-btn');
