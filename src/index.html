@@ -716,6 +716,12 @@
              opacity like anything else, no separate "video layer" concept. -->
         <div class="pr" style="gap:4px"><button class="pbtn" id="btn-import-video" style="flex:1" title="Import a video — decoded to one image per frame at the project's fps and dropped onto a new animated layer, same as an image sequence"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="vertical-align:middle"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="M17 10.5l4-2.5v8l-4-2.5z"/></svg> Import Video…</button></div>
         <input type="file" id="video-input" accept="video/*" style="display:none">
+        <!-- PSD import (2026-07, audit gap "pas d'import/export PSD") — read-
+             only import, one Nemo layer per PSD layer (flat top-level layers
+             only, see psd-import-bridge.js's own scope note re: groups/text/
+             smart objects). No PSD export/write-back. -->
+        <div class="pr" style="gap:4px"><button class="pbtn" id="btn-import-psd" style="flex:1" title="Importe un fichier Photoshop .psd — un calque Nemo par calque PSD (image aplatie), les groupes sont aplatis en calques individuels"><span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle">&#xe2c8;</span> Import PSD (calques)…</button></div>
+        <input type="file" id="psd-input" accept=".psd" style="display:none">
       </div>
     </div>
   </div>
@@ -1228,6 +1234,7 @@
 <script src="js/updater-bridge.js"></script>
 <script src="js/kitsu.js"></script>
 <script src="js/images.js"></script>
+<script src="js/psd-import-bridge.js"></script>
 <script src="js/media-library.js"></script>
 <script type="module" src="js/geometry-wasm-loader.js"></script>
 <script src="js/engine-bridge.js"></script>
