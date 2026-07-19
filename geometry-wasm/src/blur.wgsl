@@ -1,18 +1,29 @@
-// Layer-level feather/blur pass (2026-07) — same fullscreen-triangle shape
-// as blend.wgsl/matte.wgsl (see blend.wgsl's own doc comment for why a
+// Layer-level feather/blur pass (2026-07, rewritten 2026-07 for quality —
+// feedback: "le flou n'est pas de bonne qualité") — same fullscreen-triangle
+// shape as blend.wgsl/matte.wgsl (see blend.wgsl's own doc comment for why a
 // custom pass exists at all: vello/kurbo have no generic "blur this layer"
 // brush or primitive). Reads one layer's own isolated render (already
 // composited/matted by the time composite_scene calls this) and writes a
 // blurred copy, which is what actually gets fed into blend.wgsl's
 // composite_pass afterward.
 //
-// Fixed 9x9 sample grid (NOT a true unbounded-radius Gaussian) — WGSL wants
-// statically-bounded loops, and this is meant as a soft feather effect, not
-// a large-radius depth-of-field look. Larger `radius_px` spreads the same 81
-// samples further apart rather than adding more of them, so quality degrades
-// gracefully (softer but slightly less smooth) as radius grows instead of
-// costing more GPU time — an acceptable v1 tradeoff over a true separable
-// Gaussian (which would need two passes + an intermediate texture).
+// SEPARABLE two-pass Gaussian (run this shader once with dir=(1,0), then
+// again with dir=(0,1) on the first pass's output — see engine.rs's
+// blur_pass call sites, each now issues the pair) — replaces a single-pass
+// fixed 9x9=81-tap 2D kernel that looked blocky/banded at anything but small
+// radii. Root cause of the old artifact: its sample SPACING scaled with
+// radius_px while the tap COUNT stayed fixed at 9 per axis, so at e.g.
+// radius=50px samples ended up ~12px apart with nothing in between ever
+// sampled — a classic undersampled-kernel look, exactly the blockiness in
+// the reported screenshot. This version keeps sample spacing fixed at 1
+// texel (KERNEL_HALF=16, 33 taps) and derives a REAL Gaussian sigma from
+// radius_px (sigma = radius_px/3, the standard "practical cutoff ≈ 3σ"
+// convention), so the weight curve is evaluated at the sample's actual
+// physical offset rather than merely its index in the loop — dense,
+// gap-free coverage for any radius up to ~48px (3×16) per pass, matching
+// how separable Gaussian blurs are implemented in Graphite/most real-time
+// engines (two 1D passes instead of one 2D pass, which is also ~2.5x
+// cheaper here: 2×33=66 taps total vs the old 81).
 //
 // Premultiplies before averaging, un-premultiplies after (straight alpha in,
 // straight alpha out, matching every other pass here) — blurring straight
@@ -46,30 +57,35 @@ struct Params {
     radius_px: f32,
     tex_w: f32,
     tex_h: f32,
+    dir_x: f32,
+    dir_y: f32,
     _pad0: f32,
+    _pad1: f32,
+    _pad2: f32,
 };
 @group(0) @binding(2) var<uniform> params: Params;
 
-const KERNEL_HALF: i32 = 4; // 9x9 grid
+const KERNEL_HALF: i32 = 16; // 33 taps, 1-texel spacing along `dir`
 
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let texel = vec2<f32>(1.0 / params.tex_w, 1.0 / params.tex_h);
-    let step = max(params.radius_px, 0.0) / f32(KERNEL_HALF);
+    let dir = vec2<f32>(params.dir_x, params.dir_y);
+    // sigma ≈ radius/3 (practical Gaussian cutoff), floored so radius=0
+    // degenerates to an all-weight-on-center passthrough instead of a 0/0.
+    let sigma = max(params.radius_px / 3.0, 0.0001);
+    let two_sigma2 = 2.0 * sigma * sigma;
     var color_sum = vec3<f32>(0.0);
     var alpha_sum = 0.0;
     var wsum = 0.0;
-    let sigma2 = f32(KERNEL_HALF) * f32(KERNEL_HALF) * 0.5 + 0.001;
-    for (var y = -KERNEL_HALF; y <= KERNEL_HALF; y = y + 1) {
-        for (var x = -KERNEL_HALF; x <= KERNEL_HALF; x = x + 1) {
-            let offset = vec2<f32>(f32(x), f32(y)) * step * texel;
-            let d2 = f32(x * x + y * y);
-            let w = exp(-d2 / sigma2);
-            let s = textureSample(src_tex, tex_sampler, in.uv + offset);
-            color_sum = color_sum + s.rgb * s.a * w;
-            alpha_sum = alpha_sum + s.a * w;
-            wsum = wsum + w;
-        }
+    for (var i = -KERNEL_HALF; i <= KERNEL_HALF; i = i + 1) {
+        let offset_texels = f32(i);
+        let w = exp(-(offset_texels * offset_texels) / two_sigma2);
+        let offset = dir * offset_texels * texel;
+        let s = textureSample(src_tex, tex_sampler, in.uv + offset);
+        color_sum = color_sum + s.rgb * s.a * w;
+        alpha_sum = alpha_sum + s.a * w;
+        wsum = wsum + w;
     }
     let out_alpha = alpha_sum / max(wsum, 0.0001);
     let out_color = color_sum / max(alpha_sum, 0.0001);
