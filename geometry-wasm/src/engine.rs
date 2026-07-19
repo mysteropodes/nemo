@@ -2111,11 +2111,15 @@ impl VelloEngine {
                 };
                 let default_p2 = match eff.effect_type.as_str() {
                     "scanlines" => 0.5,
-                    "groundShadow" => 0.75,
+                    // kept in sync with EFFECT_DEFAULTS.groundShadow in
+                    // effects-panel.js — ground=75%/length=1 left the
+                    // shadow's reachable source band far from a typical
+                    // centered shape, making it look broken by default.
+                    "groundShadow" => 0.62,
                     _ => 0.0,
                 };
-                let default_p3 = if eff.effect_type == "groundShadow" { 1.0 } else { 0.0 };
-                let default_p4 = if eff.effect_type == "groundShadow" { 0.5 } else { 0.0 };
+                let default_p3 = if eff.effect_type == "groundShadow" { 0.6 } else { 0.0 };
+                let default_p4 = if eff.effect_type == "groundShadow" { 0.65 } else { 0.0 };
                 simple_fx_pass(
                     &self.device, &self.queue, &self.simple_fx_pipeline, &self.simple_fx_bind_group_layout, &self.simple_fx_sampler, &self.simple_fx_uniform_buf,
                     source, effect_id,
