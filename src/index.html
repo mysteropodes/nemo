@@ -447,8 +447,17 @@
     <div class="psec" id="canvas-sec">
       <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrDocument">Document</span></div>
       <div class="pbdy">
-        <div class="pr"><span class="pl">Width</span><input type="number" class="pi scrub" id="p-cw" value="1920" min="1" max="7680" data-step="1"></div>
-        <div class="pr"><span class="pl">Height</span><input type="number" class="pi scrub" id="p-ch" value="1080" min="1" max="4320" data-step="1"></div>
+        <!-- Figma-style paired dimensions row (feedback 2026-07: "des
+             tailles ou position sur une seule ligne") — W/H share one row
+             with a proportion-lock toggle between them (btn-dims-lock,
+             timeline.js) instead of two full rows each with their own
+             text label; locking remembers the W/H ratio at lock-time and
+             keeps it while either field changes. -->
+        <div class="pr dims-row">
+          <span class="pl" style="min-width:14px">W</span><input type="number" class="pi scrub" id="p-cw" value="1920" min="1" max="7680" data-step="1">
+          <button class="dims-lock-btn" id="btn-dims-lock" type="button" title="Lier largeur/hauteur (garder les proportions)"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 12a3 3 0 0 0 4.5 2.6L16 12.1a3 3 0 0 0-4.2-4.2"/><path d="M15 12a3 3 0 0 0-4.5-2.6L8 11.9a3 3 0 0 0 4.2 4.2"/></svg></button>
+          <span class="pl" style="min-width:14px">H</span><input type="number" class="pi scrub" id="p-ch" value="1080" min="1" max="4320" data-step="1">
+        </div>
         <div class="pr"><span class="pl">FPS</span><input type="number" class="pi scrub" id="proj-fps" value="12" min="1" max="60" data-step="1"></div>
         <div class="pr"><span class="pl">Frames</span><input type="number" class="pi scrub" id="proj-frames" value="24" min="1" max="999" data-step="1"></div>
         <div class="pr"><span class="pl">BG</span><input type="color" id="p-cbg" value="#ffffff" style="width:28px;height:22px;border:none;cursor:pointer;padding:0;"></div>
@@ -460,17 +469,56 @@
     <div class="psec" id="fill-sec">
       <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrFill">Fill</span></div>
       <div class="pbdy">
-        <div class="pr"><span class="pl">Color</span><div class="cw-mini" id="pm-fill" style="background:transparent" title="Click to pick a color, double-click to toggle fill on/off"><input type="color" id="pm-fill-c" value="#ff0000"></div><input type="checkbox" id="p-fill-on" style="display:none"></div>
-        <div class="pr"><span class="pl">Opacity</span><input type="number" class="pi scrub" id="p-opacity" value="100" min="5" max="100" data-step="1"></div>
+        <!-- Figma-style single-line color row (feedback 2026-07: "les
+             couleurs ça peut être un système comme [Figma]") — swatch,
+             editable hex text, opacity, and an eye toggle to
+             enable/disable, all on one row instead of two stacked rows
+             with full-word labels. #p-fill-hex is a NEW plain-text field
+             (wireColorHexField, timeline.js) — editable independently of
+             the swatch's own popover, exactly like Figma's own hex box.
+             #fill-enable-toggle is a NEW inline eye (setFillEnabled
+             already had a guarded slot for this id, unused until now — see
+             its own comment). No "remove" icon like Figma's paint list:
+             Nemo has exactly one fill per shape, not a stack, so eye-off
+             already covers "no fill" — a remove button would have nothing
+             real to do. -->
+        <div class="pr color-row">
+          <div class="cw-mini" id="pm-fill" style="background:transparent" title="Click to pick a color, double-click to toggle fill on/off"><input type="color" id="pm-fill-c" value="#ff0000"></div>
+          <input type="checkbox" id="p-fill-on" style="display:none">
+          <input type="text" class="pi color-hex-input" id="p-fill-hex" value="FF0000" maxlength="9" spellcheck="false" title="Code hex — tape pour changer">
+          <input type="number" class="pi color-opacity-input" id="p-opacity" value="100" min="5" max="100" data-step="1">
+          <span class="color-pct">%</span>
+          <div class="lico color-eye-toggle" id="fill-enable-toggle" title="Enable/disable fill"></div>
+        </div>
         <div class="pr"><button class="pbtn" id="btn-propagate-color" style="flex:1;font-size:10px" title="Applique la couleur du trait/fill selectionne a toutes ses occurrences sur toutes les frames (ink &amp; paint)">Propager la couleur a toutes les frames</button></div>
       </div>
     </div>
     <div class="psec" id="stroke-sec">
       <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrStroke">Stroke</span></div>
       <div class="pbdy">
-        <div class="pr"><span class="pl">Color</span><div class="cw-mini" id="pm-stroke" style="background:#000"><input type="color" id="pm-stroke-c" value="#000000"></div></div>
-        <div class="pr"><span class="pl">Width</span><input type="number" class="pi scrub" id="p-sw" value="3" min="1" max="300" data-step="1" title="Stroke width (px) — pilote aussi la taille des dabs du Bitmap Brush"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
-        <div class="pr"><span class="pl">Style</span><select class="psel" id="p-strokestyle"><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option></select></div>
+        <!-- Same color-row pattern as Fill above. Stroke has no separate
+             per-object "opacity" field the way Fill does — the closest
+             equivalent Figma concept (paint opacity, distinct from a
+             layer's own Opacity) maps onto the stroke COLOR's own alpha
+             byte here (#p-stroke-alpha, NEW — reads/writes the hex8 alpha
+             channel via the SAME .dataset.hex8 convention CLAUDE.md §2
+             documents for every other alpha color in this codebase). -->
+        <div class="pr color-row">
+          <div class="cw-mini" id="pm-stroke" style="background:#000"><input type="color" id="pm-stroke-c" value="#000000"></div>
+          <input type="text" class="pi color-hex-input" id="p-stroke-hex" value="000000" maxlength="9" spellcheck="false" title="Code hex — tape pour changer">
+          <input type="number" class="pi color-opacity-input" id="p-stroke-alpha" value="100" min="0" max="100" data-step="1" title="Opacité du trait (alpha de la couleur)">
+          <span class="color-pct">%</span>
+          <div class="lico color-eye-toggle" id="stroke-enable-toggle" title="Enable/disable stroke"></div>
+        </div>
+        <!-- Width+Style paired on one row (feedback: "des tailles ou
+             position sur une seule ligne") — Cap/Join stay on their own
+             rows below: each is already a 3-button icon group, and this
+             panel is only 280px wide — cramming two of those plus two
+             labels onto one row would just look cluttered, not cleaner. -->
+        <div class="pr">
+          <span class="pl">Width</span><input type="number" class="pi scrub" id="p-sw" value="3" min="1" max="300" data-step="1" title="Stroke width (px) — pilote aussi la taille des dabs du Bitmap Brush" style="flex:0 0 56px">
+          <select class="psel" id="p-strokestyle" style="flex:1"><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option></select>
+        </div>
         <div class="pr"><span class="pl">Cap</span><div class="icon-grp" id="p-cap-grp" data-value="round">
           <button class="icon-btn" data-value="round" title="Round"><svg viewBox="0 0 24 10"><line x1="4" y1="5" x2="20" y2="5" stroke="currentColor" stroke-width="6" stroke-linecap="round"/></svg></button>
           <button class="icon-btn" data-value="butt" title="Butt"><svg viewBox="0 0 24 10"><line x1="4" y1="5" x2="20" y2="5" stroke="currentColor" stroke-width="6" stroke-linecap="butt"/></svg></button>
