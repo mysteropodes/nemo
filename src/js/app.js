@@ -79,7 +79,10 @@ var state={
   totalFrames:24,currentFrame:0,fps:12,playing:false,loopPlayback:true,pingPongPlayback:false,playDir:1,
   tool:'draw',
   appMode:'anim2d', // 'anim2d' | 'motion' | 'storyboard' — see #app-mode-switch (index.html) / motion.js
-  onionSkin:true,onionPrevOpacity:30,onionNextOpacity:30,onionMode:'tinted',
+  // Off by default (feedback 2026-07: "désactive l'onion skin par default")
+  // — #btn-os's own static HTML class updated to match (index.html), so
+  // there's no flash of an "active" toolbar icon before this state loads.
+  onionSkin:false,onionPrevOpacity:30,onionNextOpacity:30,onionMode:'tinted',
   onionIn:0,onionOut:23,
   brushSize:3,fillBrushSize:40,strokeColor:'#000000',fillColor:'#ff0000',fillEnabled:true,strokeEnabled:true,shadowMode:false,brushPreset:'none',
   smoothing:10,stabilizer:2,strokeCap:'round',strokeJoin:'round',opacity:100,

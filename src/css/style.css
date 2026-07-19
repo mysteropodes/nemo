@@ -387,6 +387,11 @@ input[type="checkbox"]:disabled{opacity:.4;cursor:not-allowed;}
 #blend-pop .blend-opt:hover,#matte-pop .blend-opt:hover{background:var(--accent-dim);color:var(--accent-hover);}
 #blend-pop .blend-opt.sel,#matte-pop .blend-opt.sel{background:var(--panel3);font-weight:600;}
 .pbtn{background:var(--panel3);border:none;color:rgba(236,234,231,.75);border-radius:6px;padding:6px 8px;font-size:12px;font-weight:600;cursor:pointer;transition:background .15s,color .15s;}
+/* Icon-only .pbtn variant (2026-07) — square instead of text-padded, icon
+   centered; the title tooltip carries the label, same as every .tool-btn
+   in the left toolbar. */
+.icon-only-btn{width:30px;height:30px;padding:0;display:flex;align-items:center;justify-content:center;flex:none;}
+.icon-only-btn svg{display:block;}
 .pbtn:hover{background:#2c2a31;color:var(--text);}
 .pbtn.ac{background:var(--accent);border-color:var(--accent);color:#fff;}
 .pbtn.ac:hover{background:#5254d9;}
