@@ -812,6 +812,7 @@
     items.forEach(function(it){
       if(it.sep){var s=document.createElement('div');s.className='ctx-sep';m.appendChild(s);return;}
       var row=document.createElement('div');row.className='ctx-item'+(it.disabled?' disabled':'');
+      if(it.id)row.id=it.id;
       var lbl=document.createElement('span');lbl.textContent=it.label;row.appendChild(lbl);
       if(it.shortcut){var sc=document.createElement('span');sc.className='ctx-sc';sc.textContent=it.shortcut;row.appendChild(sc);}
       if(!it.disabled)row.addEventListener('click',function(e){e.stopPropagation();closeCtxMenu();it.action();});

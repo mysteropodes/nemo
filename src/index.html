@@ -687,52 +687,32 @@
     <div class="psec" id="onion-sec">
       <div class="phdr" style="cursor:pointer" title="Clic : activer/désactiver l'onion skin (O). Options détaillées : clic-droit sur le bouton onion de la timeline."><span class="ar">☰</span> <span>Onion Skin</span> <span id="os-st-panel" style="margin-left:auto;margin-right:6px;font-size:9px;color:var(--green)">ON</span></div>
     </div>
-    <div class="psec">
-      <div class="phdr" id="phdr-project"><span class="ar">☰</span> <span data-i18n="hdrProject">Project</span></div>
-      <div class="pbdy">
-        <div class="pr" id="proj-current" style="font-size:9px;color:var(--text-dim)" title="Currently open project">Untitled (not saved)</div>
-        <div class="pr" style="gap:4px">
-          <button class="pbtn ac" id="btn-save" style="flex:1" title="Save (⌘S) — writes to the current file, or Save As if none yet"><span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle">&#xe161;</span> Save</button>
-          <button class="pbtn" id="btn-saveas" title="Save As…"><span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle">&#xe161;</span></button>
-        </div>
-        <div class="pr" style="gap:4px">
-          <button class="pbtn" id="btn-open" style="flex:1"><span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle">&#xe2c8;</span> Open…</button>
-          <button class="pbtn" id="btn-new" style="flex:1"><span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle">&#xe145;</span> New…</button>
-        </div>
-        <div class="pr" style="gap:4px">
-          <button class="pbtn" id="btn-kitsu-open" style="flex:1" title="Ouvrir un shot depuis la production Kitsu"><span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle">&#xe80b;</span> Depuis Kitsu…</button>
-        </div>
-        <div class="pr" style="gap:4px">
-          <button class="pbtn" id="btn-history" style="flex:1" title="Historique des versions — un instantané automatique toutes les 30s, récupérable même après un crash"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2"/><path d="M5 3 2 6"/><path d="M2 6h4"/></svg> Historique…</button>
-          <button class="pbtn" id="btn-settings" title="Réglages — raccourcis clavier"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></button>
-        </div>
-        <div class="pr" id="kitsu-shot-row" style="font-size:9px;color:var(--text-dim);display:none"></div>
-        <div class="pr" id="kitsu-publish-row" style="gap:4px;display:none">
-          <button class="pbtn ac" id="btn-kitsu-publish" style="flex:1" title="Rend un MP4, l'envoie sur la tâche du shot et passe le statut en révision">Publier vers Kitsu</button>
-        </div>
-        <input type="file" id="file-input" accept=".json" style="display:none">
-        <div class="pr" style="gap:4px"><button class="pbtn" id="btn-export" style="flex:1"><span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle">&#xe2c6;</span> Export…</button></div>
-        <!-- Document (Width/Height/FPS/Frames) fusionné dans la section
-             "Document" du panel (canvas-sec, en haut) — feedback audit
-             2026-07-17 : deux jeux de champs séparés pour la même taille de
-             canvas, resynchronisés seulement par le tick de rendu. FPS/Frames
-             gardent leurs ids proj-fps/proj-frames (juste déplacés). -->
-        <div class="phdr" style="padding-top:10px;font-size:9px;color:var(--text-dim)">Import</div>
-        <div class="pr" style="gap:4px"><button class="pbtn" id="btn-import-img" style="flex:1" title="Import bitmap image(s) — a numbered sequence (frame001.png, frame002.png…) auto-detects into a new animated layer, one image per frame"><span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle">&#xe410;</span> Import Image(s)…</button></div>
-        <input type="file" id="image-input" accept="image/*" multiple style="display:none">
-        <!-- v14: video import decodes to a per-frame image sequence and
-             lands on a normal layer via the same isRaster pipeline as
-             Import Image(s) above — real layer, transformable/scalable/
-             opacity like anything else, no separate "video layer" concept. -->
-        <div class="pr" style="gap:4px"><button class="pbtn" id="btn-import-video" style="flex:1" title="Import a video — decoded to one image per frame at the project's fps and dropped onto a new animated layer, same as an image sequence"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="vertical-align:middle"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="M17 10.5l4-2.5v8l-4-2.5z"/></svg> Import Video…</button></div>
-        <input type="file" id="video-input" accept="video/*" style="display:none">
-        <!-- PSD import (2026-07, audit gap "pas d'import/export PSD") — read-
-             only import, one Nemo layer per PSD layer (flat top-level layers
-             only, see psd-import-bridge.js's own scope note re: groups/text/
-             smart objects). No PSD export/write-back. -->
-        <div class="pr" style="gap:4px"><button class="pbtn" id="btn-import-psd" style="flex:1" title="Importe un fichier Photoshop .psd — un calque Nemo par calque PSD (image aplatie), les groupes sont aplatis en calques individuels"><span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle">&#xe2c8;</span> Import PSD (calques)…</button></div>
-        <input type="file" id="psd-input" accept=".psd" style="display:none">
-      </div>
+    <!-- Ex-section "Projet" du panel de droite, supprimee (feedback 2026-07:
+         "l'onglet projet n'est plus utile on retrouve tous ces elements dans
+         le burger menu") -- tout ce qu'elle contenait est maintenant dans le
+         menu burger (#app-menu-btn, initAppMenu dans timeline.js), y compris
+         Depuis Kitsu/Historique/Import PSD qui n'y etaient pas encore. Les
+         boutons/inputs reels restent ici, caches : le menu leur envoie un
+         vrai .click() (clickEl(id)) plutot que de dupliquer leur logique, et
+         les modules tutoriel 'history'/'export' cliquent maintenant le menu
+         burger reel au lieu de cette section (voir tutorial.js). -->
+    <div id="legacy-project-actions" style="display:none">
+      <button id="btn-save"></button>
+      <button id="btn-saveas"></button>
+      <button id="btn-open"></button>
+      <button id="btn-new"></button>
+      <button id="btn-kitsu-open"></button>
+      <button id="btn-history"></button>
+      <button id="btn-settings"></button>
+      <button id="btn-kitsu-publish"></button>
+      <input type="file" id="file-input" accept=".json">
+      <button id="btn-export"></button>
+      <button id="btn-import-img"></button>
+      <input type="file" id="image-input" accept="image/*" multiple>
+      <button id="btn-import-video"></button>
+      <input type="file" id="video-input" accept="video/*">
+      <button id="btn-import-psd"></button>
+      <input type="file" id="psd-input" accept=".psd">
     </div>
   </div>
 </div>
