@@ -145,7 +145,6 @@
        persisted to localStorage. Same drag-handle idiom as the Labs
        floating panel's own #labs-float-handle. -->
   <div id="tools-panel">
-    <div id="tools-panel-handle" class="tools-dock-handle" title="Glisser pour déplacer le panneau d'outils">⠿</div>
     <button class="tool-btn" data-tool="select" data-i18n-title="toolSelect" title="Selection / Transform (V)"><svg viewBox="0 0 24 24" width="17" height="17"><rect x="2.5" y="2.5" width="12" height="12" rx="0.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="2.4 2"/><rect x="1.3" y="1.3" width="2.4" height="2.4" fill="currentColor"/><rect x="12.3" y="1.3" width="2.4" height="2.4" fill="currentColor"/><rect x="1.3" y="12.3" width="2.4" height="2.4" fill="currentColor"/><rect x="12.3" y="12.3" width="2.4" height="2.4" fill="currentColor"/><path d="M11 9l8.5 5.2-4.3 0.9L13.2 19z" fill="currentColor"/></svg><span class="sk">V</span></button>
     <button class="tool-btn" data-tool="subselect" data-i18n-title="toolSubselect" title="Subselection — points &amp; tangents (A)"><svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor"><path d="M5 3l14 8-6 1.3L11 20z"/></svg><span class="sk">A</span></button>
     <!-- v18: independent fill/stroke selection, Animate merge-drawing style —
@@ -209,6 +208,12 @@
          dessous sélection fond/trait") — without it the group ran straight
          into the panel's bottom edge with nothing marking its end. -->
     <div class="tool-sep"></div>
+    <!-- Drag handle moved to the bottom (feedback 2026-07: "le bouton de
+         drag ... pourrait être tout en bas plutôt que tout en haut") — was
+         the first child; now the last. Purely a DOM-order move, no CSS/JS
+         change needed (tools-panel-dock.js finds it by id regardless of
+         position, and its docked-row sizing rules don't depend on order). -->
+    <div id="tools-panel-handle" class="tools-dock-handle" title="Glisser pour déplacer le panneau d'outils">⠿</div>
   </div>
 
   <div id="tools-panel-resize" title="Glisser pour redimensionner"></div>
