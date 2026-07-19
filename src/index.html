@@ -510,8 +510,18 @@
     <div class="psec" id="tool-opts-sec">
       <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrToolOptions">Tool Options</span></div>
       <div class="pbdy">
-        <div class="pr"><span class="pl">Smooth</span><input type="number" class="pi scrub" id="p-smooth" value="10" min="0" max="60" data-step="1"></div>
-        <div class="pr"><span class="pl">Stabilizer</span><select class="psel" id="p-stab" title="Off/Low/Medium/High : moyenne glissante classique. Plume : modèle physique ressort-amortisseur (Google ink-stroke-modeler, comme rnote) — lisse le flux d’entrée en direct sans détruire la géométrie, rattrape la pointe au relâcher"><option value="0">Off</option><option value="1">Low</option><option value="2" selected>Medium</option><option value="3">High</option><option value="4">Plume — légère</option><option value="5">Plume — moyenne</option><option value="6">Plume — forte</option></select></div>
+        <!-- Ordre volontairement calé sur le pipeline réel (Stabilizer agit
+             EN DIRECT pendant le tracé, Smooth simplifie la courbe APRÈS
+             coup) — étaient dans l'ordre inverse, ce qui + les deux mots
+             "lissage" a fait croire que Smooth=0 devait suffire à obtenir
+             un trait 100% brut ("le smooth de la brush à 0 smooth
+             toujours"). Ce ne sont PAS deux réglages du même lissage : à
+             Smooth=0 + Stabilizer sur autre chose que Off, le tracé reste
+             visiblement adouci — vérifié: un zigzag identique perd ~1/3 de
+             son amplitude avec Stabilizer=Medium même à Smooth=0. Pour un
+             trait vraiment brut, Stabilizer doit AUSSI être sur "Off". -->
+        <div class="pr"><span class="pl">Stabilizer</span><select class="psel" id="p-stab" title="Lisse la POSITION en direct pendant que tu dessines (corrige le tremblement de la main) — agit AVANT que le trait soit posé, indépendamment de Smooth ci-dessous. Off/Low/Medium/High : moyenne glissante classique. Plume : modèle physique ressort-amortisseur (Google ink-stroke-modeler, comme rnote), rattrape la pointe au relâcher. Mets ça sur Off si tu veux un tracé qui suit ta main au pixel près."><option value="0">Off</option><option value="1">Low</option><option value="2" selected>Medium</option><option value="3">High</option><option value="4">Plume — légère</option><option value="5">Plume — moyenne</option><option value="6">Plume — forte</option></select></div>
+        <div class="pr"><span class="pl">Smooth</span><input type="number" class="pi scrub" id="p-smooth" value="10" min="0" max="60" data-step="1" title="Simplifie la courbe APRÈS coup (moins de points, tracé plus économe) — n'a aucun effet sur le tremblement pendant le dessin, c'est le Stabilizer ci-dessus qui s'en charge. À 0 : le nombre de points n'est pas réduit, mais le trait peut rester visiblement adouci si le Stabilizer est activé."></div>
         <div class="pr" id="p-drawmode-row"><span class="pl">Draw mode</span><select class="psel" id="p-drawmode" title="Front = new strokes on top, Behind = new strokes under existing artwork"><option value="front">Front</option><option value="behind">Behind</option></select></div>
         <div class="pr" id="p-fillbrushmode-row" style="display:none"><span class="pl">Placement</span><div class="icon-grp" id="p-fillbrushmode-grp" data-value="above">
           <button class="icon-btn" data-value="above" title="Above — on top of existing fills"><svg viewBox="0 0 20 20"><rect x="7" y="2" width="11" height="11" rx="2" fill="currentColor" opacity=".35"/><rect x="2" y="6" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button>

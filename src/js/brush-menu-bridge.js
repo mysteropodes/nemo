@@ -37,8 +37,8 @@
   // ---- shared param-row builder — a `.pr`/`.pl`/`.pi` row identical in
   // markup to the ones already in index.html's right panel, so it's
   // visually indistinguishable from the rest of the app's own controls.
-  function numRow(container, label, value, min, max, step, onChange) {
-    var row = document.createElement('div'); row.className = 'pr';
+  function numRow(container, label, value, min, max, step, onChange, title) {
+    var row = document.createElement('div'); row.className = 'pr'; if (title) row.title = title;
     var lbl = document.createElement('span'); lbl.className = 'pl'; lbl.textContent = label;
     var inp = document.createElement('input');
     inp.type = 'number'; inp.className = 'pi scrub'; inp.value = value; inp.min = min; inp.max = max; inp.step = step;
@@ -59,8 +59,8 @@
     container.appendChild(row);
     return inp;
   }
-  function selectRow(container, label, value, options, onChange) {
-    var row = document.createElement('div'); row.className = 'pr';
+  function selectRow(container, label, value, options, onChange, title) {
+    var row = document.createElement('div'); row.className = 'pr'; if (title) row.title = title;
     var lbl = document.createElement('span'); lbl.className = 'pl'; lbl.textContent = label;
     var sel = document.createElement('select'); sel.className = 'psel';
     options.forEach(function (o) {
@@ -100,13 +100,23 @@
   // Also answers "y a t'il pas plus d'option ?" — Stabilizer, Pressure
   // brush, and Taper ends are the most relevant "brush feel" settings that
   // existed elsewhere in the right panel but were never mirrored here.
+  // Ordre/tooltips alignés sur index.html (Tool Options) — feedback "le
+  // smooth de la brush à 0 smooth toujours" : Stabilisateur (lisse la
+  // POSITION en direct, agit AVANT que le trait soit posé) et Lissage
+  // (simplifie la courbe APRÈS coup) sont deux mécanismes indépendants qui
+  // se ressemblent trop par leur nom seul — mesuré : un zigzag à Lissage=0
+  // perd encore ~1/3 de son amplitude si Stabilisateur=Medium. D'où
+  // Stabilisateur en premier (ordre du pipeline réel) + tooltips explicites
+  // ici aussi, ce panneau dupliquant les mêmes contrôles.
+  var STAB_TITLE = 'Lisse la POSITION en direct pendant que tu dessines (corrige le tremblement de la main) — agit AVANT que le trait soit posé, indépendamment de Lissage ci-dessous. Mets ça sur Off si tu veux un tracé qui suit ta main au pixel près.';
+  var SMOOTH_TITLE = 'Simplifie la courbe APRÈS coup (moins de points) — n\'a aucun effet sur le tremblement pendant le dessin, c\'est le Stabilisateur ci-dessus qui s\'en charge. À 0, le trait peut rester visiblement adouci si le Stabilisateur est activé.';
   function buildVectorParams(params) {
     numRow(params, 'Taille', state.brushSize || 3, 1, 300, 1, function (v) { driveOriginal('p-sw', v, false, 'change'); });
-    numRow(params, 'Lissage', state.smoothing || 0, 0, 60, 1, function (v) { driveOriginal('p-smooth', v, false, 'input'); });
     selectRow(params, 'Stabilisateur', state.stabilizer !== undefined ? state.stabilizer : 2, [
       { value: 0, label: 'Off' }, { value: 1, label: 'Low' }, { value: 2, label: 'Medium' }, { value: 3, label: 'High' },
       { value: 4, label: 'Plume — légère' }, { value: 5, label: 'Plume — moyenne' }, { value: 6, label: 'Plume — forte' },
-    ], function (v) { driveOriginal('p-stab', v, false, 'change'); });
+    ], function (v) { driveOriginal('p-stab', v, false, 'change'); }, STAB_TITLE);
+    numRow(params, 'Lissage', state.smoothing || 0, 0, 60, 1, function (v) { driveOriginal('p-smooth', v, false, 'input'); }, SMOOTH_TITLE);
     checkRow(params, 'Pressure brush', !!state.vectorBrush, function (v) { driveOriginal('p-vecbrush', v, true, 'change'); });
     checkRow(params, 'Taper ends', !!state.taperEnds, function (v) { driveOriginal('p-taper', v, true, 'change'); });
   }
@@ -120,7 +130,7 @@
     selectRow(params, 'Stabilisateur', state.stabilizer !== undefined ? state.stabilizer : 2, [
       { value: 0, label: 'Off' }, { value: 1, label: 'Low' }, { value: 2, label: 'Medium' }, { value: 3, label: 'High' },
       { value: 4, label: 'Plume — légère' }, { value: 5, label: 'Plume — moyenne' }, { value: 6, label: 'Plume — forte' },
-    ], function (v) { driveOriginal('p-stab', v, false, 'change'); });
+    ], function (v) { driveOriginal('p-stab', v, false, 'change'); }, STAB_TITLE);
   }
   function buildVectorGrid(container) {
     container.innerHTML = ''; // rebuilt on every selection (to move the .active highlight) — must replace, not append
