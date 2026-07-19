@@ -813,9 +813,26 @@
     return items;
   }
   function buildMarqueeItems() {
-    if (!_marquee.active || !_marquee.rect) return [];
-    var b = _marquee.rect.bounds;
-    return [boundsRectItem(b.left, b.top, b.right, b.bottom, [74, 158, 255, 20], [74, 158, 255, 230], 1 / view.zoom)];
+    if (_marquee.active && _marquee.rect) {
+      var b = _marquee.rect.bounds;
+      return [boundsRectItem(b.left, b.top, b.right, b.bottom, [74, 158, 255, 20], [74, 158, 255, 230], 1 / view.zoom)];
+    }
+    // Subselect tool's own node-marquee (_nmq, subselect-bridge.js/tools.js)
+    // was never drawn when the Rust engine is on (the default) — its rect IS
+    // built in Paper.js (marqueeLayer) and the underlying vertex-selection
+    // math works fine either way, but nothing here ever read _nmq to put it
+    // in the rendered scene, so the drag box itself was completely invisible
+    // on screen (found live, "le rec de sélection avec l'outil subselect
+    // n'est pas présent" — reproduced by dispatching a real pointer drag and
+    // confirming _nodeSel populated correctly with zero visual feedback).
+    // Orange (matching _nmq.rect's own Paper-native styling, 'rgba(255,184,
+    // 108,...)') rather than the Select tool's blue, so the two marquees
+    // stay visually distinct.
+    if (_nmq.active && _nmq.rect) {
+      var nb = _nmq.rect.bounds;
+      return [boundsRectItem(nb.left, nb.top, nb.right, nb.bottom, [255, 184, 108, 20], [255, 184, 108, 230], 1 / view.zoom)];
+    }
+    return [];
   }
   // Fill/Stroke Select tool (v18, tools.js _fsSel) — a fill selection gets
   // a filled orange highlight tracing the SAME geometry (Animate's dotted-
