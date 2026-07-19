@@ -23,7 +23,10 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--gutter);color:
   white-space:nowrap;word-wrap:normal;direction:ltr;-webkit-font-feature-settings:'liga';
   -webkit-font-smoothing:antialiased;font-variation-settings:'FILL' 0,'wght' 300,'GRAD' 0,'opsz' 20;}
 #app{display:flex;flex-direction:column;height:100vh;box-sizing:border-box;background:var(--gutter);padding:8px;gap:8px;}
-#top-area{flex:1;display:flex;overflow:hidden;min-height:0;gap:8px;}
+/* position:relative — positioning ancestor for the dockable tools panel's
+   top/right/bottom overlay modes (tools-panel-dock.js) and their drop-zone
+   overlay, both anchored with position:absolute against this box. */
+#top-area{flex:1;display:flex;overflow:hidden;min-height:0;gap:8px;position:relative;}
 /* App-wide top bar (2026-07 redesign): burger menu + app-mode segmented
    switcher, full width, above everything (tools panel, canvas, right
    panel alike) — distinct from #project-tabs-bar, which is scoped to the
@@ -127,6 +130,44 @@ body.mac-overlay-titlebar #app{padding-top:28px;}
    indicator is deliberately NOT the whole gap lighting up (too heavy —
    user feedback): a small vertically-centered rounded pill via ::after,
    while the full 8px×full-height div stays the grab/hit area. */
+/* Dockable tools panel (2026-07) — default stays exactly the left-column
+   layout above. Right dock stays fully IN-FLOW (just reordered to the end
+   of #top-area's flex row via `order`) so canvas-col/props-panel naturally
+   share the remaining space with zero overlap. Top/bottom can't do the
+   same trick (they'd need to span perpendicular to #top-area's own row
+   axis, which would mean restructuring canvas-col+props-panel under a
+   shared wrapper) — those float as a position:absolute overlay instead,
+   compensated by matching padding on canvas-col/props-panel (below) so
+   the project-tabs bar and top-of-canvas content never end up hidden
+   underneath it (confirmed live: without the padding, #project-tabs-bar
+   sat exactly under the floated bar, unclickable). */
+.tools-dock-handle{width:100%;height:14px;display:flex;align-items:center;justify-content:center;color:rgba(236,234,231,.3);cursor:grab;font-size:11px;touch-action:none;user-select:none;flex:none;}
+.tools-dock-handle:hover{color:rgba(236,234,231,.6);}
+.tools-dock-handle:active{cursor:grabbing;}
+#tools-panel.tools-dock-right{order:99;}
+#tools-panel.tools-dock-top,#tools-panel.tools-dock-bottom{
+  position:absolute;z-index:20;box-shadow:0 2px 16px rgba(0,0,0,.45);border-radius:8px;
+  top:auto;bottom:auto;left:8px;right:8px;width:auto;height:50px;
+  flex-direction:row;align-items:center;padding:0 10px;overflow-x:auto;overflow-y:hidden;
+}
+#tools-panel.tools-dock-top{top:0;}
+#tools-panel.tools-dock-bottom{bottom:0;}
+#tools-panel.tools-dock-top .tools-dock-handle,#tools-panel.tools-dock-bottom .tools-dock-handle{width:14px;height:100%;}
+#tools-panel.tools-dock-top .tool-sep,#tools-panel.tools-dock-bottom .tool-sep{width:1px;height:24px;margin:0 4px;}
+#tools-panel.tools-dock-top .color-wells,#tools-panel.tools-dock-bottom .color-wells{flex-direction:row;margin-top:0;margin-left:auto;padding-bottom:0;}
+body.tools-dock-top-active #canvas-col,body.tools-dock-top-active #props-panel{padding-top:58px;box-sizing:border-box;}
+body.tools-dock-bottom-active #canvas-col,body.tools-dock-bottom-active #props-panel{padding-bottom:58px;box-sizing:border-box;}
+/* Resize handle only makes sense for the default left dock — hidden the
+   moment the panel floats elsewhere (canvas-col grows into its place). */
+body.tools-docked-away #tools-panel-resize{display:none;}
+/* Drop-zone overlay shown only while actively dragging the handle. */
+#tools-dock-zones{position:absolute;inset:0;z-index:50;pointer-events:none;}
+.tools-dock-zone{position:absolute;background:rgba(63,107,245,.06);border:2px dashed rgba(63,107,245,.25);border-radius:6px;pointer-events:auto;transition:background .1s,border-color .1s;}
+.tools-dock-zone.active{background:var(--accent-dim);border-color:var(--accent);}
+.tools-dock-zone-left{left:4px;top:4px;bottom:4px;width:64px;}
+.tools-dock-zone-right{right:4px;top:4px;bottom:4px;width:64px;}
+.tools-dock-zone-top{left:76px;right:76px;top:4px;height:64px;}
+.tools-dock-zone-bottom{left:76px;right:76px;bottom:4px;height:64px;}
 #tools-panel-resize,#props-panel-resize{width:8px;margin:0 -8px;cursor:ew-resize;background:transparent;flex-shrink:0;z-index:5;position:relative;}
 #tools-panel-resize::after,#props-panel-resize::after{content:'';position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:3px;height:44px;border-radius:99px;background:transparent;transition:background .15s;}
 #tools-panel-resize:hover::after,#tools-panel-resize.active::after,
