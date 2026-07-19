@@ -185,9 +185,11 @@ pub(crate) struct LayerIn {
     // shape while its effect still applies.
     #[serde(default)]
     pub(crate) is_effect_layer: Option<bool>,
-    // "blur" | "colorAdjust" | "vignette" | "glow" — which WGSL pass(es)
-    // composite_scene dispatches to. Unrecognized/None falls back to "blur"
-    // (see composite_scene).
+    // "blur" | "colorAdjust" | "vignette" | "glow" | one of the simple_fx.wgsl
+    // effects (sepia/invert/grayscale/posterize/pixelate/
+    // chromaticAberration/scanlines/grain/sharpen/edgeDetect) — which WGSL
+    // pass(es) composite_scene dispatches to. Unrecognized/None falls back
+    // to "blur" (see composite_scene).
     #[serde(default)]
     pub(crate) effect_type: Option<String>,
     // Generic params, meaning depends on effect_type:
@@ -198,6 +200,15 @@ pub(crate) struct LayerIn {
     //    starts) — see vignette.wgsl
     //  - glow: p1=blur radius_px (p2 unused) — reuses blur_pass + the
     //    ordinary "screen" blend mode, no dedicated shader
+    //  - sepia/invert/grayscale: no params
+    //  - posterize: p1=levels (2..32)
+    //  - pixelate: p1=block size px
+    //  - chromaticAberration: p1=strength px
+    //  - scanlines: p1=frequency, p2=darkness (0..1)
+    //  - grain: p1=intensity (0..1)
+    //  - sharpen: p1=amount
+    //  - edgeDetect: p1=gradient-magnitude multiplier
+    //  (see simple_fx.wgsl's own Params doc comment)
     #[serde(default)]
     pub(crate) effect_p1: Option<f32>,
     #[serde(default)]
@@ -623,6 +634,15 @@ pub struct VelloEngine {
     vignette_bind_group_layout: wgpu::BindGroupLayout,
     vignette_sampler: wgpu::Sampler,
     vignette_uniform_buf: wgpu::Buffer,
+    // ---- Simple single-pass effect library (2026-07) — simple_fx.wgsl.
+    // ONE shared pipeline for all 10 effect_ids (see that file's own doc
+    // comment for why these, unlike blur/vignette/color_adjust, don't get
+    // one pipeline each) — same "writes directly into the ping-pong
+    // accumulator" contract as color_pipeline/vignette_pipeline above.
+    simple_fx_pipeline: wgpu::RenderPipeline,
+    simple_fx_bind_group_layout: wgpu::BindGroupLayout,
+    simple_fx_sampler: wgpu::Sampler,
+    simple_fx_uniform_buf: wgpu::Buffer,
 }
 
 // ---- Blend compositor plumbing (see blend.wgsl's doc comment) ----
@@ -1360,6 +1380,151 @@ fn create_vignette_pipeline(device: &wgpu::Device) -> (wgpu::RenderPipeline, wgp
     (pipeline, bind_group_layout, sampler, uniform_buf)
 }
 
+/// Simple-effect-library pipeline (simple_fx.wgsl) — one shared pipeline for
+/// all 10 effect_ids; identical single-texture-input shape as
+/// create_vignette_pipeline, just a wider (8-float) uniform payload so one
+/// Params struct can carry every effect's own p1/p2/p3 + resolution/time.
+fn create_simple_fx_pipeline(device: &wgpu::Device) -> (wgpu::RenderPipeline, wgpu::BindGroupLayout, wgpu::Sampler, wgpu::Buffer) {
+    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        label: Some("simple-fx-compositor"),
+        source: wgpu::ShaderSource::Wgsl(include_str!("simple_fx.wgsl").into()),
+    });
+    let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some("simple-fx-bind-group-layout"),
+        entries: &[
+            wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Texture {
+                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                    multisampled: false,
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 1,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 2,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            },
+        ],
+    });
+    let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+        label: Some("simple-fx-pipeline-layout"),
+        bind_group_layouts: &[Some(&bind_group_layout)],
+        immediate_size: 0,
+    });
+    let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        label: Some("simple-fx-pipeline"),
+        layout: Some(&pipeline_layout),
+        vertex: wgpu::VertexState {
+            module: &shader,
+            entry_point: Some("vs_main"),
+            buffers: &[],
+            compilation_options: Default::default(),
+        },
+        fragment: Some(wgpu::FragmentState {
+            module: &shader,
+            entry_point: Some("fs_main"),
+            targets: &[Some(wgpu::ColorTargetState {
+                format: BLEND_SCRATCH_FORMAT,
+                blend: None,
+                write_mask: wgpu::ColorWrites::ALL,
+            })],
+            compilation_options: Default::default(),
+        }),
+        primitive: wgpu::PrimitiveState::default(),
+        depth_stencil: None,
+        multisample: wgpu::MultisampleState::default(),
+        multiview_mask: None,
+        cache: None,
+    });
+    let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+        label: Some("simple-fx-sampler"),
+        address_mode_u: wgpu::AddressMode::ClampToEdge,
+        address_mode_v: wgpu::AddressMode::ClampToEdge,
+        mag_filter: wgpu::FilterMode::Linear,
+        min_filter: wgpu::FilterMode::Linear,
+        ..Default::default()
+    });
+    // 32 bytes: effect_id, p1, p2, p3, tex_w, tex_h, time, pad — see
+    // simple_fx.wgsl's Params.
+    let uniform_buf = device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("simple-fx-params"),
+        size: 32,
+        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    });
+    (pipeline, bind_group_layout, sampler, uniform_buf)
+}
+
+/// Runs simple_fx.wgsl: writes the selected effect_id's transform of
+/// `source_view` into `target_view`.
+#[allow(clippy::too_many_arguments)]
+fn simple_fx_pass(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    pipeline: &wgpu::RenderPipeline,
+    bind_group_layout: &wgpu::BindGroupLayout,
+    sampler: &wgpu::Sampler,
+    uniform_buf: &wgpu::Buffer,
+    source_view: &wgpu::TextureView,
+    effect_id: f32,
+    p1: f32,
+    p2: f32,
+    tex_w: f32,
+    tex_h: f32,
+    target_view: &wgpu::TextureView,
+) {
+    let mut payload = [0u8; 32];
+    payload[0..4].copy_from_slice(&effect_id.to_le_bytes());
+    payload[4..8].copy_from_slice(&p1.to_le_bytes());
+    payload[8..12].copy_from_slice(&p2.to_le_bytes());
+    payload[16..20].copy_from_slice(&tex_w.to_le_bytes());
+    payload[20..24].copy_from_slice(&tex_h.to_le_bytes());
+    queue.write_buffer(uniform_buf, 0, &payload);
+    let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("simple-fx-bind-group"),
+        layout: bind_group_layout,
+        entries: &[
+            wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(source_view) },
+            wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::Sampler(sampler) },
+            wgpu::BindGroupEntry { binding: 2, resource: uniform_buf.as_entire_binding() },
+        ],
+    });
+    let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("simple-fx-composite") });
+    {
+        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("simple-fx-composite-pass"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: target_view,
+                resolve_target: None,
+                ops: wgpu::Operations { load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT), store: wgpu::StoreOp::Store },
+                depth_slice: None,
+            })],
+            depth_stencil_attachment: None,
+            timestamp_writes: None,
+            occlusion_query_set: None,
+            multiview_mask: None,
+        });
+        pass.set_pipeline(pipeline);
+        pass.set_bind_group(0, &bind_group, &[]);
+        pass.draw(0..3, 0..1);
+    }
+    queue.submit(Some(encoder.finish()));
+}
+
 /// Runs vignette.wgsl: writes a vignetted copy of `source_view` into
 /// `target_view`. Mirrors color_adjust_pass's shape (same 2-float payload).
 #[allow(clippy::too_many_arguments)]
@@ -1681,6 +1846,7 @@ pub async fn create_engine(
     let (blur_scratch_tex, blur_scratch_view) = create_matte_result_texture(&device, width, height);
     let (color_pipeline, color_bind_group_layout, color_sampler, color_uniform_buf) = create_color_adjust_pipeline(&device);
     let (vignette_pipeline, vignette_bind_group_layout, vignette_sampler, vignette_uniform_buf) = create_vignette_pipeline(&device);
+    let (simple_fx_pipeline, simple_fx_bind_group_layout, simple_fx_sampler, simple_fx_uniform_buf) = create_simple_fx_pipeline(&device);
 
     Ok(VelloEngine {
         surface,
@@ -1738,6 +1904,10 @@ pub async fn create_engine(
         vignette_bind_group_layout,
         vignette_sampler,
         vignette_uniform_buf,
+        simple_fx_pipeline,
+        simple_fx_bind_group_layout,
+        simple_fx_sampler,
+        simple_fx_uniform_buf,
     })
 }
 
@@ -1890,6 +2060,47 @@ impl VelloEngine {
                             backdrop_view,
                             &self.blur_result_view,
                             2, // "screen" — see mix_mode_index
+                            target_view,
+                        );
+                    }
+                    Some(simple_name @ ("sepia" | "invert" | "grayscale" | "posterize" | "pixelate"
+                        | "chromaticAberration" | "scanlines" | "grain" | "sharpen" | "edgeDetect")) => {
+                        let effect_id = match simple_name {
+                            "sepia" => 0.0,
+                            "invert" => 1.0,
+                            "grayscale" => 2.0,
+                            "posterize" => 3.0,
+                            "pixelate" => 4.0,
+                            "chromaticAberration" => 5.0,
+                            "scanlines" => 6.0,
+                            "grain" => 7.0,
+                            "sharpen" => 8.0,
+                            _ => 9.0, // "edgeDetect"
+                        };
+                        let default_p1 = match simple_name {
+                            "posterize" => 6.0,
+                            "pixelate" => 16.0,
+                            "chromaticAberration" => 4.0,
+                            "scanlines" => 240.0,
+                            "grain" => 0.08,
+                            "sharpen" => 0.5,
+                            "edgeDetect" => 4.0,
+                            _ => 0.0,
+                        };
+                        let default_p2 = if simple_name == "scanlines" { 0.5 } else { 0.0 };
+                        simple_fx_pass(
+                            &self.device,
+                            &self.queue,
+                            &self.simple_fx_pipeline,
+                            &self.simple_fx_bind_group_layout,
+                            &self.simple_fx_sampler,
+                            &self.simple_fx_uniform_buf,
+                            backdrop_view,
+                            effect_id,
+                            layer.effect_p1.unwrap_or(default_p1),
+                            layer.effect_p2.unwrap_or(default_p2),
+                            self.width as f32,
+                            self.height as f32,
                             target_view,
                         );
                     }
