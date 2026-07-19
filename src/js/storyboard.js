@@ -140,7 +140,19 @@
       if (b.width > 0 && b.height > 0) {
         var res = Math.min(1, 96 / Math.max(b.width, b.height));
         var raster = _thumbLayer.rasterize({ resolution: 72 * res, insert: false });
-        url = raster.canvas.toDataURL('image/png');
+        // Composite onto the real document background (feedback 2026-07:
+        // "la vignette de preview faut prendre le fond du canvas derrière
+        // les éléments affichés") — rasterize() alone gives a transparent
+        // PNG, so a component's actual silhouette showed straight through
+        // to the track's own hashed symbolColor CSS background instead of
+        // looking like a real frame of footage.
+        var bgCanvas = document.createElement('canvas');
+        bgCanvas.width = raster.canvas.width; bgCanvas.height = raster.canvas.height;
+        var bgCtx = bgCanvas.getContext('2d');
+        bgCtx.fillStyle = state.canvasBg || '#ffffff';
+        bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
+        bgCtx.drawImage(raster.canvas, 0, 0);
+        url = bgCanvas.toDataURL('image/png');
         raster.remove();
       }
       _thumbLayer.visible = false;
@@ -838,7 +850,20 @@
       var menu = [];
       if (m.type === 'instance') {
         menu.push({ label: 'Éditer l’animation', action: function () { openSymbol(m); } });
-        if (chainOf(m)) {
+        var host3 = chainOf(m);
+        if (host3) {
+          // Split-at-playhead (feedback 2026-07: "faut vraiment que ça
+          // fonctionne comme une timeline de montage vidéo") — was only
+          // implemented for sound modules (splitSound) before; instance/
+          // video clips had no way to cut. Enabled only when the montage's
+          // playhead currently lands strictly inside THIS member (a real
+          // cut point), same guard splitSound's own menu item uses.
+          var cut = chainSplitPoint(host3, m);
+          if (cut != null) {
+            menu.push({ label: 'Scinder au lecteur', action: function () { splitChainClip(host3, m, cut); } });
+          } else {
+            menu.push({ label: 'Scinder (placez le lecteur dans ce clip)', disabled: true, action: function () {} });
+          }
           menu.push({ label: 'Réinitialiser le retiming', action: function () { m.trimIn = 0; m.trimOut = symbolDuration(m.symbolId) - 1; m.duration = m.trimOut + 1; render(); updatePreview(); } });
           menu.push({ label: 'Détacher du montage', action: function () { leaveAnyChain(m); m.y += 110; render(); updatePreview(); } });
         }
@@ -1080,6 +1105,52 @@
     if (_audioBuffers[m.id]) _audioBuffers[right.id] = _audioBuffers[m.id];
     s.modules.push(right);
     render();
+  }
+
+  // Splitting a chained instance/video clip (2026-07, feedback: "faut
+  // vraiment que ça fonctionne comme une timeline de montage vidéo") —
+  // the montage-timeline analog of splitSound above, for the OTHER kind
+  // of clip in a chain. Returns the LOCAL frame (0-based, within `mod`'s
+  // own duration) where host.playhead currently falls, or null if the
+  // playhead isn't strictly inside this member (nothing to cut there —
+  // same "can't split at the very edge" guard splitSound's own context-
+  // menu item enforces via m.cursorSec).
+  function chainSplitPoint(host, mod) {
+    var mods = chainMods(host), acc = 0, f = host.playhead || 0;
+    for (var i = 0; i < mods.length; i++) {
+      var mb = mods[i];
+      ensureRetime(mb);
+      if (f < acc + mb.duration) {
+        if (mb.id !== mod.id) return null; // playhead is inside a DIFFERENT member
+        var local = f - acc;
+        return (local > 0 && local < mb.duration) ? local : null;
+      }
+      acc += mb.duration;
+    }
+    return null;
+  }
+  // Cuts `mod` at local frame `local` into two chained members: `mod`
+  // itself is shortened in place, a new instance module is inserted right
+  // after it in host.chain with the remaining source range. Preserves
+  // `mod`'s current speed (duration/sourceLen ratio) on BOTH pieces rather
+  // than assuming 1:1 — a stretched (Alt+drag-retimed) clip splits into two
+  // still-stretched clips at the same speed, not a jump cut in tempo.
+  function splitChainClip(host, mod, local) {
+    ensureRetime(mod);
+    var srcLen = mod.trimOut - mod.trimIn + 1;
+    var speed = mod.duration / srcLen;
+    var leftSrcLen = Math.min(srcLen - 1, Math.max(1, Math.round(local / speed)));
+    var newMod = {
+      id: newId(), type: 'instance', symbolId: mod.symbolId,
+      x: mod.x, y: mod.y,
+      trimIn: mod.trimIn + leftSrcLen, trimOut: mod.trimOut,
+      duration: mod.duration - local,
+    };
+    mod.trimOut = mod.trimIn + leftSrcLen - 1;
+    mod.duration = local;
+    sb().modules.push(newMod);
+    host.chain.splice(host.chain.indexOf(mod.id) + 1, 0, newMod.id);
+    render(); updatePreview();
   }
 
   function montageById(id) {

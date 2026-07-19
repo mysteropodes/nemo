@@ -152,7 +152,10 @@
     var cv = document.createElement('canvas');
     cv.width = w; cv.height = h;
     var ctx = cv.getContext('2d');
-    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h);
+    // Match the real document background (feedback 2026-07: "la vignette
+    // de preview faut prendre le fond du canvas derrière les éléments
+    // affichés") — was hardcoded white regardless of state.canvasBg.
+    ctx.fillStyle = state.canvasBg || '#fff'; ctx.fillRect(0, 0, w, h);
     var cw = state.canvasW || 1920, ch = state.canvasH || 1080;
     var scale = Math.min(w / cw, h / ch) * (window.devicePixelRatio || 1);
     try {
