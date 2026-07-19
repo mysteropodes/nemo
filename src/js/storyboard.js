@@ -569,7 +569,11 @@
   function renderMontageBlock(m) {
     var el = document.createElement('div');
     el.className = 'sb-module sb-montageblock' + (sb().activeMontageId === m.id ? ' active' : '');
-    el.title = m.name + ' — glissez des instances contre son bord droit pour monter';
+    el.title = m.name + ' — glissez des instances contre son bord droit pour monter (double-clic: entrer dans le montage)';
+    // "Entrer" (2026-07): opens a combined Motion/Animation 2D timeline made
+    // of the chain's real components in sequence, so their layers can be
+    // modified directly — see enterMontageView (app.js).
+    el.addEventListener('dblclick', function (e) { e.stopPropagation(); if (window.SM && window.SM.enterMontageView) window.SM.enterMontageView(m.id); });
     el.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 5v14M17 5v14M3 10h4M3 14h4M17 10h4M17 14h4"/></svg>';
     var play = document.createElement('span');
     play.className = 'sb-play sb-block-play';
@@ -1197,6 +1201,11 @@
     montageStrokesAt: montageStrokesAt,
     montageTotal: montageTotal,
     montageById: montageById,
+    // Ordered chain members with retiming resolved (ensureRetime already
+    // called) — exposed for enterMontageView (app.js) to build one
+    // Component-instance layer per member without duplicating the chain-
+    // walk/retiming logic montageStrokesAt already owns.
+    chainModsForView: function (m) { return chainMods(m).map(function (mod) { ensureRetime(mod); return mod; }); },
     invalidateThumb: invalidateThumb,
     thumbDataUrl: thumbDataUrl, // exposed for debug/tests as well as internal reuse
   };
