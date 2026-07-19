@@ -508,6 +508,99 @@ function nodeEditSegmentsData(path){
   if(path.data&&path.data.isVectorBrush&&path.data.centerSegments)return path.data.centerSegments;
   return path.segments.map(function(s){return{point:[s.point.x,s.point.y],handleIn:[s.handleIn.x,s.handleIn.y],handleOut:[s.handleOut.x,s.handleOut.y]};});
 }
+// ---- Subselect Position/Size/Rotation panel (2026-07, "la position du
+// panneau doivent driver les vertices... pareil pour size... et rotation
+// aussi") — the right panel's transform fields always read/wrote the
+// WHOLE selected path's bounds (xformSelBounds/selPropsApplyMove/Scale/
+// Rotate below), even under the Subselect tool with individual vertices
+// picked out of _nodeSel. These are the vertex-scoped equivalents,
+// dispatched to from timeline.js's wireLiveXformField wrappers whenever
+// state.tool==='subselect'&&_nodeSel.length — same real Rectangle return
+// shape as xformSelBounds() (so xformAnchorPoint/.topLeft etc. all still
+// work unchanged) and the same commit tail (saveActiveLayerFrame/
+// renderNodeHandles/renderArcs/updateUI) subselect-bridge.js's own drag
+// handlers already use at gesture end.
+function nodeSelBounds(){
+  var path=nodeEditTargetPath();
+  if(!path||!_nodeSel.length)return null;
+  var segs=nodeEditSegmentsData(path);
+  var minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  _nodeSel.forEach(function(i){
+    var s=segs[i];if(!s)return;
+    var x=s.point[0],y=s.point[1];
+    if(x<minX)minX=x;if(x>maxX)maxX=x;
+    if(y<minY)minY=y;if(y>maxY)maxY=y;
+  });
+  if(minX===Infinity)return null;
+  return new Rectangle(minX,minY,maxX-minX,maxY-minY);
+}
+function nodeSelCommitTail(path){
+  fillRegenerateLinked(userLayers[state.activeLayerIdx],path);
+  if(path.data&&path.data.bitmapBrushSpec&&window.SMBitmapBrush)SMBitmapBrush.regenerate(path,userLayers[state.activeLayerIdx]);
+  saveActiveLayerFrame();
+  if(window.renderNodeHandles)renderNodeHandles();
+  renderArcs();updateUI();
+  if(window.SMEngineBridge)SMEngineBridge.renderNow();
+}
+function nodeSelApplyMove(dx,dy,skipUndo){
+  var path=nodeEditTargetPath();
+  if((!dx&&!dy)||!path||!_nodeSel.length)return;
+  if(!skipUndo)pushUndo();
+  if(path.data&&path.data.isVectorBrush&&path.data.centerSegments){
+    _nodeSel.forEach(function(i){var cs=path.data.centerSegments[i];if(cs)cs.point=[cs.point[0]+dx,cs.point[1]+dy];});
+    rebuildVectorBrushOutline(path);
+  }else{
+    _nodeSel.forEach(function(i){var sg=path.segments[i];if(sg)sg.point=sg.point.add(new Point(dx,dy));});
+  }
+  nodeSelCommitTail(path);
+}
+function nodeSelApplyScale(sx,sy,anchor,skipUndo){
+  var path=nodeEditTargetPath();
+  if((sx===1&&sy===1)||!path||!_nodeSel.length)return;
+  if(!skipUndo)pushUndo();
+  if(path.data&&path.data.isVectorBrush&&path.data.centerSegments){
+    _nodeSel.forEach(function(i){
+      var cs=path.data.centerSegments[i];if(!cs)return;
+      cs.point=[anchor.x+(cs.point[0]-anchor.x)*sx,anchor.y+(cs.point[1]-anchor.y)*sy];
+    });
+    rebuildVectorBrushOutline(path);
+  }else{
+    _nodeSel.forEach(function(i){
+      var sg=path.segments[i];if(!sg)return;
+      var p=sg.point;
+      sg.point=new Point(anchor.x+(p.x-anchor.x)*sx,anchor.y+(p.y-anchor.y)*sy);
+      // Handles are RELATIVE offset vectors (Paper.js convention) — a
+      // non-uniform scale scales each axis of the vector directly, no
+      // anchor math needed since they're already relative to the point.
+      if(sg.handleIn)sg.handleIn=new Point(sg.handleIn.x*sx,sg.handleIn.y*sy);
+      if(sg.handleOut)sg.handleOut=new Point(sg.handleOut.x*sx,sg.handleOut.y*sy);
+    });
+  }
+  nodeSelCommitTail(path);
+}
+function nodeSelApplyRotate(deltaDeg,center,skipUndo){
+  var path=nodeEditTargetPath();
+  if(!deltaDeg||!path||!_nodeSel.length)return;
+  if(!skipUndo)pushUndo();
+  var rad=deltaDeg*Math.PI/180,cos=Math.cos(rad),sin=Math.sin(rad);
+  function rotPt(x,y){var dx=x-center.x,dy=y-center.y;return[center.x+dx*cos-dy*sin,center.y+dx*sin+dy*cos];}
+  function rotVec(x,y){return[x*cos-y*sin,x*sin+y*cos];}
+  if(path.data&&path.data.isVectorBrush&&path.data.centerSegments){
+    _nodeSel.forEach(function(i){var cs=path.data.centerSegments[i];if(cs)cs.point=rotPt(cs.point[0],cs.point[1]);});
+    rebuildVectorBrushOutline(path);
+  }else{
+    _nodeSel.forEach(function(i){
+      var sg=path.segments[i];if(!sg)return;
+      var np=rotPt(sg.point.x,sg.point.y);
+      sg.point=new Point(np[0],np[1]);
+      // Handles are relative vectors too — rotate the vector itself, no
+      // center needed (same reasoning as the scale branch above).
+      if(sg.handleIn){var nh=rotVec(sg.handleIn.x,sg.handleIn.y);sg.handleIn=new Point(nh[0],nh[1]);}
+      if(sg.handleOut){var nh2=rotVec(sg.handleOut.x,sg.handleOut.y);sg.handleOut=new Point(nh2[0],nh2[1]);}
+    });
+  }
+  nodeSelCommitTail(path);
+}
 function renderNodeHandles(){
   nodeLayer.removeChildren();nodeHandles=[];
   var path=nodeEditTargetPath();if(!path)return;

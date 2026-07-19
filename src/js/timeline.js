@@ -1381,7 +1381,12 @@ function updatePropsContext(){
     // Mockup 2026-07-17 (réordonnancement du panel) : Layer (Blend) et
     // Document restent visibles pendant une sélection, juste sous le bloc
     // transform — avant, sélectionner un trait les faisait disparaître.
-    show['canvas-sec']=true;
+    // EXCEPT the Subselect tool (2026-07, "avec subselection le panneau
+    // document n'a pas besoin d'être ouvert") — editing individual vertices
+    // has no use for canvas W/H/FPS/BG, and the panel real estate is more
+    // useful given over to the Position/Size/Rotation-of-selected-vertices
+    // fields (updateSelPropsPanel) that section sits right above.
+    show['canvas-sec']=state.tool!=='subselect';
     show['layer-sec']=!!(state.layers[state.activeLayerIdx]);
     hdrText=selectedPaths.length+(selectedPaths.length>1?' éléments sélectionnés':' élément sélectionné');
   }else if(FILL_STROKE_TOOLS.indexOf(state.tool)>=0){
@@ -1506,7 +1511,11 @@ function updatePropsContext(){
 // updatePropsContext(), called separately.
 function updateSelPropsPanel(){
   if((state.tool!=='select'&&state.tool!=='subselect')||!selectedPaths.length){_selPropsSig='';return;}
-  var b=xformSelBounds();if(!b)return;
+  // Subselect + vertices picked: show/drive THEIR bounds, not the whole
+  // path's (activeXformBounds/Vertex mode, wired further down alongside
+  // wireLiveXformField) — 2026-07, "la position du panneau doivent driver
+  // les vertices".
+  var b=activeXformBounds();if(!b)return;
   // Align toolbar only makes sense with 2+ objects (nothing to align a
   // single selection AGAINST) — toggled every call, not gated behind the
   // signature-change check below, since it only depends on count.
@@ -4893,11 +4902,22 @@ function wireLiveXformField(id,apply){
   el.addEventListener('input',function(){apply(this,started);started=true;});
   el.addEventListener('change',function(){started=false;});
 }
-wireLiveXformField('sp-x',function(el,started){var b=xformSelBounds();if(!b)return;selPropsApplyMove((parseFloat(el.value)||0)-b.x,0,started);});
-wireLiveXformField('sp-y',function(el,started){var b=xformSelBounds();if(!b)return;selPropsApplyMove(0,(parseFloat(el.value)||0)-b.y,started);});
-wireLiveXformField('sp-w',function(el,started){var b=xformSelBounds();if(!b||b.width<0.01)return;var nv=Math.max(0.01,parseFloat(el.value)||b.width);selPropsApplyScale(nv/b.width,1,b.topLeft,started);});
-wireLiveXformField('sp-h',function(el,started){var b=xformSelBounds();if(!b||b.height<0.01)return;var nv=Math.max(0.01,parseFloat(el.value)||b.height);selPropsApplyScale(1,nv/b.height,b.topLeft,started);});
-wireLiveXformField('sp-rot',function(el,started){var b=xformSelBounds();if(!b)return;var nv=parseFloat(el.value)||0;var delta=nv-(state.selRotAccum||0);state.selRotAccum=nv;selPropsApplyRotate(delta,xformAnchorPoint(b),started);});
+// Subselect tool + at least one vertex picked (_nodeSel) drives THOSE
+// vertices' bounds/move/scale/rotate instead of the whole path's — 2026-07,
+// "la position du panneau doivent driver les vertices... pareil pour size
+// ... et rotation aussi". Falls back to the existing whole-selection
+// behavior for every other case (Select tool, or Subselect with nothing
+// vertex-picked yet — same as before this change).
+function activeXformVertexMode(){return state.tool==='subselect'&&_nodeSel.length>0;}
+function activeXformBounds(){return activeXformVertexMode()?nodeSelBounds():xformSelBounds();}
+function activeXformApplyMove(dx,dy,skipUndo){if(activeXformVertexMode())nodeSelApplyMove(dx,dy,skipUndo);else selPropsApplyMove(dx,dy,skipUndo);}
+function activeXformApplyScale(sx,sy,anchor,skipUndo){if(activeXformVertexMode())nodeSelApplyScale(sx,sy,anchor,skipUndo);else selPropsApplyScale(sx,sy,anchor,skipUndo);}
+function activeXformApplyRotate(deltaDeg,center,skipUndo){if(activeXformVertexMode())nodeSelApplyRotate(deltaDeg,center,skipUndo);else selPropsApplyRotate(deltaDeg,center,skipUndo);}
+wireLiveXformField('sp-x',function(el,started){var b=activeXformBounds();if(!b)return;activeXformApplyMove((parseFloat(el.value)||0)-b.x,0,started);});
+wireLiveXformField('sp-y',function(el,started){var b=activeXformBounds();if(!b)return;activeXformApplyMove(0,(parseFloat(el.value)||0)-b.y,started);});
+wireLiveXformField('sp-w',function(el,started){var b=activeXformBounds();if(!b||b.width<0.01)return;var nv=Math.max(0.01,parseFloat(el.value)||b.width);activeXformApplyScale(nv/b.width,1,b.topLeft,started);});
+wireLiveXformField('sp-h',function(el,started){var b=activeXformBounds();if(!b||b.height<0.01)return;var nv=Math.max(0.01,parseFloat(el.value)||b.height);activeXformApplyScale(1,nv/b.height,b.topLeft,started);});
+wireLiveXformField('sp-rot',function(el,started){var b=activeXformBounds();if(!b)return;var nv=parseFloat(el.value)||0;var delta=nv-(state.selRotAccum||0);state.selRotAccum=nv;activeXformApplyRotate(delta,xformAnchorPoint(b),started);});
 // Anchor-point (pivot) picker — see tools.js xformAnchorPoint's own comment.
 // Clicking a dot just changes WHICH point future rotations pivot around
 // (state.xformAnchorKey); it doesn't move anything on its own, so no
