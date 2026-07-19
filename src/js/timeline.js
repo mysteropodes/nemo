@@ -1111,15 +1111,7 @@ window.SM={
     state.mediaLibrary=d.mediaLibrary||[];
     if(window.SMMediaLibrary)SMMediaLibrary.reload();
     state.perspectiveEnabled=d.perspectiveEnabled||false;state.perspectiveMode=d.perspectiveMode||'2pt';state.perspectiveDensity=d.perspectiveDensity||24;state.perspectiveVPs=d.perspectiveVPs||null;
-    var perspOnCb=document.getElementById('p-persp-on');if(perspOnCb)perspOnCb.checked=state.perspectiveEnabled;
-    var perspModeSel=document.getElementById('p-persp-mode');if(perspModeSel)perspModeSel.value=state.perspectiveMode;
-    var perspDensityInp=document.getElementById('p-persp-density');if(perspDensityInp)perspDensityInp.value=state.perspectiveDensity;
     state.symmetryEnabled=d.symmetryEnabled||false;state.symmetryMode=d.symmetryMode||'y';state.symmetryAxis=d.symmetryAxis||null;state.symmetryRadialCenter=d.symmetryRadialCenter||null;state.symmetryRadialSectors=d.symmetryRadialSectors||6;state.symmetryExtend=d.symmetryExtend!==undefined?d.symmetryExtend:true;
-    var symOnCb=document.getElementById('p-sym-on');if(symOnCb)symOnCb.checked=state.symmetryEnabled;
-    var symModeSel=document.getElementById('p-sym-mode');if(symModeSel)symModeSel.value=state.symmetryMode;
-    var symSectorsInp=document.getElementById('p-sym-sectors');if(symSectorsInp)symSectorsInp.value=state.symmetryRadialSectors;
-    var symExtendCb=document.getElementById('p-sym-extend');if(symExtendCb)symExtendCb.checked=state.symmetryExtend;
-    if(window.syncSymmetryPanelVisibility)window.syncSymmetryPanelVisibility();
     if(window.renderPaletteGrid)window.renderPaletteGrid();
     if(d.resamplePts)state.resamplePts=d.resamplePts;if(d.tweenStep)state.tweenStep=d.tweenStep;
     state.currentFrame=0;state.activeLayerIdx=0;activateUL(0);drawStage();loadFrame(0);renderOS();renderArcs();updateUI();renderSymbolTabs();
@@ -4870,27 +4862,15 @@ document.getElementById('p-effect-brightness').addEventListener('input',function
 document.getElementById('p-effect-contrast').addEventListener('input',function(){var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.isEffectLayer)return;pushUndo();ld.effectP2=(parseFloat(this.value)||0)/100;saveActiveLayerFrame();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
 document.getElementById('p-effect-vig-strength').addEventListener('input',function(){var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.isEffectLayer)return;pushUndo();ld.effectP1=Math.max(0,Math.min(1,(parseFloat(this.value)||0)/100));saveActiveLayerFrame();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
 document.getElementById('p-effect-vig-radius').addEventListener('input',function(){var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.isEffectLayer)return;pushUndo();ld.effectP2=Math.max(0,Math.min(0.95,(parseFloat(this.value)||0)/100));saveActiveLayerFrame();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
-document.getElementById('p-persp-on').addEventListener('change',function(){state.perspectiveEnabled=this.checked;if(this.checked){if(window.ensurePerspectiveVPs)window.ensurePerspectiveVPs();window.SM.setTool('perspective');}if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
-document.getElementById('p-persp-mode').addEventListener('change',function(){if(window.setPerspectiveMode)window.setPerspectiveMode(this.value);});
-document.getElementById('p-persp-density').addEventListener('input',function(){state.perspectiveDensity=parseInt(this.value)||24;if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
-document.getElementById('p-persp-lock').addEventListener('change',function(){var locked=this.checked;(window.ensurePerspectiveVPs?window.ensurePerspectiveVPs():[]).forEach(function(vp){vp.locked=locked;});if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
-document.getElementById('btn-persp-reset').addEventListener('click',function(){if(window.resetPerspectiveVPs)window.resetPerspectiveVPs();});
-// Symmetry guide (symmetry-bridge.js) — same wiring shape as the Perspective
-// block just above. Sectors row only makes sense in Radial mode, hence the
-// visibility toggle — kept as its own named function (not inline) so
-// timeline.js's own loadProject() can call it too after restoring
-// state.symmetryMode from a save, otherwise a project saved mid-Radial-mode
-// would reopen with the field hidden until the user touched the dropdown.
-window.syncSymmetryPanelVisibility=function(){
-  var row=document.getElementById('p-sym-sectors-row');
-  if(row)row.style.display=state.symmetryMode==='radial'?'':'none';
-};
-document.getElementById('p-sym-on').addEventListener('change',function(){state.symmetryEnabled=this.checked;if(this.checked){if(window.ensureSymmetryAxis)window.ensureSymmetryAxis();if(window.ensureSymmetryRadialCenter)window.ensureSymmetryRadialCenter();window.SM.setTool('symmetry');}if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
-document.getElementById('p-sym-mode').addEventListener('change',function(){if(window.setSymmetryMode)window.setSymmetryMode(this.value);window.syncSymmetryPanelVisibility();});
-document.getElementById('p-sym-sectors').addEventListener('input',function(){state.symmetryRadialSectors=Math.max(2,Math.min(24,parseInt(this.value)||6));if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
-document.getElementById('p-sym-extend').addEventListener('change',function(){state.symmetryExtend=this.checked;});
-document.getElementById('btn-sym-reset').addEventListener('click',function(){if(window.resetSymmetryGuide)window.resetSymmetryGuide();});
-window.syncSymmetryPanelVisibility();
+// Perspective/Symmetry Guide (feedback 2026-07: "les onglet guide symétrie
+// et perspective n'ont plus lieu d'être, les options doivent être gérées au
+// niveau du panneau flottant") — the right-panel section these ids used to
+// live in is gone; every control (on/off, mode, density/sectors, lock/
+// extend, reset) now lives in the Labs floating panel (labs-float-panel.js)
+// instead, reading/writing the same state.* fields directly. Kept as a
+// no-op stub (rather than deleted outright) since labs-float-panel.js's
+// cycleMode still calls it after a Symmetry mode change.
+window.syncSymmetryPanelVisibility=function(){};
 // Custom blend-mode dropdown (feedback #17): hovering an option in the open
 // list applies that blend mode to the active layer IMMEDIATELY as a live
 // canvas preview; clicking commits it (with undo), while closing any other

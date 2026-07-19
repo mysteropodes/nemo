@@ -1019,17 +1019,19 @@
       time: '1 min',
       steps: [
         { type: 'info', title: 'Dessiner en perspective', body: 'Le guide de perspective affiche une grille de points de fuite et aimante l\'outil Ligne dessus, depuis n\'importe quel outil.' },
-        { type: 'click', target: '.tool-btn[data-tool="perspective"]', title: 'Choisis l\'outil Perspective', body: 'Clique sur l\'outil Perspective dans la barre de gauche.' },
-        {
-          type: 'state', target: '#phdr-perspective', title: 'Ouvre la section "Perspective Guide"', body: 'Clique l\'en-tête "Perspective Guide" dans le panneau de droite pour la déplier, si besoin.',
-          hint: 'En attente…',
-          check: function (win) { var el = win.document.getElementById('p-persp-on'); return !!(el && el.getBoundingClientRect().height > 0); }
-        },
+        // Perspective/Symmetry n'ont plus leur propre section droite
+        // (feedback 2026-07: "les onglet guide symétrie et perspective
+        // n'ont plus lieu d'être, les options doivent être gérées au
+        // niveau du panneau flottant") — leur toggle vit maintenant dans
+        // le panneau flottant Labs, qui n'apparaît QUE pour certains
+        // outils (pas l'outil Perspective/Symmetry lui-même — voir
+        // TOOL_CONTEXT, labs-float-panel.js). L'outil Ligne l'affiche.
+        { type: 'click', target: '.tool-btn[data-tool="line"]', title: 'Choisis la Ligne', body: 'Clique sur l\'outil Ligne (raccourci U) — le panneau flottant au-dessus du canevas propose alors le guide de Perspective.' },
         stateChangedStep({
-          target: '#p-persp-on', title: 'Active le guide', body: 'Coche "Enabled" pour afficher la grille de points de fuite sur le canevas.', hint: 'En attente…',
-          measure: function (win) { var el = win.document.getElementById('p-persp-on'); return el ? el.checked : false; }
+          target: '.labs-float-btn[title="Guide de perspective"]', title: 'Active le guide', body: 'Clique l\'icône Perspective dans le panneau flottant pour afficher la grille de points de fuite.', hint: 'En attente…',
+          measure: function (win) { return !!(win.state && win.state.perspectiveEnabled); }
         }),
-        { type: 'click', target: '.tool-btn[data-tool="line"]', title: 'Choisis la Ligne', body: 'Clique sur l\'outil Ligne (raccourci U) — il va s\'aimanter aux points de fuite.' },
+        { type: 'click', target: '.tool-btn[data-tool="line"]', title: 'Reviens à la Ligne', body: 'Activer le guide t\'a basculé sur l\'outil Perspective (pour placer les points de fuite) — reclique Ligne pour tracer un trait qui s\'y aimante.' },
         stateIncreaseStep({
           target: '#drawing-canvas', title: 'Trace une ligne', body: 'Clique-glisse sur le canevas — la ligne s\'oriente vers un point de fuite.',
           hint: 'En attente de ton trait…', measure: measureStrokeCount
@@ -1096,16 +1098,16 @@
       time: '1 min',
       steps: [
         { type: 'info', title: 'Dessiner en miroir', illustration: ILLUS.symmetry, body: 'Le guide de symétrie duplique chaque trait dessiné (avec n\'importe quel outil de dessin libre) en miroir — vertical, horizontal, à un angle libre, ou en rosace radiale façon mandala.' },
-        {
-          type: 'state', target: '#phdr-symmetry', title: 'Ouvre la section "Symmetry Guide"', body: 'Clique l\'en-tête "Symmetry Guide" dans le panneau de droite pour la déplier, si besoin.',
-          hint: 'En attente…',
-          check: function (win) { var el = win.document.getElementById('p-sym-on'); return !!(el && el.getBoundingClientRect().height > 0); }
-        },
+        // Symmetry/Perspective n'ont plus leur propre section droite
+        // (feedback 2026-07, voir le module 'perspective' juste au-dessus)
+        // — leur toggle vit dans le panneau flottant Labs, qui apparaît
+        // pour l'outil Pinceau.
+        { type: 'click', target: '.tool-btn[data-tool="draw"]', title: 'Choisis le Pinceau', body: 'Clique sur l\'outil Pinceau — le panneau flottant au-dessus du canevas propose alors le guide de Symétrie. La symétrie ne duplique que le dessin libre, pas les formes (Rectangle, Ellipse…).' },
         stateChangedStep({
-          target: '#p-sym-on', title: 'Active la symétrie', body: 'Coche "Enabled" pour activer le guide.', hint: 'En attente…',
-          measure: function (win) { var el = win.document.getElementById('p-sym-on'); return el ? el.checked : false; }
+          target: '.labs-float-btn[title="Guide de symétrie / mandala"]', title: 'Active la symétrie', body: 'Clique l\'icône Symétrie dans le panneau flottant pour activer le guide.', hint: 'En attente…',
+          measure: function (win) { return !!(win.state && win.state.symmetryEnabled); }
         }),
-        { type: 'click', target: '.tool-btn[data-tool="draw"]', title: 'Choisis le Pinceau', body: 'Clique sur l\'outil Pinceau — la symétrie ne duplique que le dessin libre, pas les formes (Rectangle, Ellipse…).' },
+        { type: 'click', target: '.tool-btn[data-tool="draw"]', title: 'Reviens au Pinceau', body: 'Activer le guide t\'a basculé sur l\'outil Symétrie (pour placer l\'axe) — reclique Pinceau pour dessiner.' },
         // onStrokeCommitted() (symmetry-bridge.js) insère le clone miroir
         // directement dans le calque, comme un second Path indépendant —
         // un seul trait dessiné doit donc faire +2 sur measureStrokeCount
@@ -1219,10 +1221,14 @@
       // niveau navigation réelle — ouvrir la section, voir le bouton
       // d'import, voir les réglages une fois qu'une référence existe —
       // sans jamais prétendre valider un import qui n'a pas lieu.
+      // La Référence n'a plus sa propre section (feedback 2026-07: "doit
+      // être géré par le panneau calque en fonction de la sélection de
+      // l'élément") — ses contrôles vivent maintenant dans #layer-sec
+      // (Blend/Matte/Flou), visible dès qu'un calque est actif.
       steps: [
         { type: 'info', title: 'Dessiner par-dessus une référence', body: 'La Référence affiche une vidéo, une séquence d\'images ou une image fixe SOUS ton dessin, pour la rotoscopie — elle suit la frame courante et n\'est jamais exportée.' },
         {
-          type: 'state', target: '#phdr-reference', title: 'Ouvre la section "Référence (roto)"', body: 'Clique l\'en-tête "Référence (roto)" dans le panneau de droite pour la déplier, si besoin.',
+          type: 'state', target: '#layer-sec .phdr', title: 'Ouvre la section "Layer"', body: 'Clique l\'en-tête "Layer" dans le panneau de droite pour la déplier, si besoin.',
           hint: 'En attente…',
           check: function (win) { var el = win.document.getElementById('btn-ref-import'); return !!(el && el.getBoundingClientRect().height > 0); }
         },

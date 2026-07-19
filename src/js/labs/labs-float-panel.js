@@ -168,6 +168,8 @@
     return names.filter(function (n) { return registered.hasOwnProperty(n) || REAL_FEATURES.hasOwnProperty(n) || ACTIONS.hasOwnProperty(n); });
   }
   var SYM_MODES = ['y', 'x', 'free', 'radial'];
+  var PERSP_MODES = ['1pt', '2pt', '3pt', 'fisheye'];
+  var PERSP_MODE_LABEL = { '1pt': '1pt', '2pt': '2pt', '3pt': '3pt', fisheye: 'Fisheye' };
   var SYM_MODE_LABEL = { y: 'Y', x: 'X', free: 'Libre', radial: 'Radial' };
 
   function renderLabsFloatPanel() {
@@ -263,6 +265,82 @@
         secPill.appendChild(secLbl); secPill.appendChild(secMinus); secPill.appendChild(secVal); secPill.appendChild(secPlus);
         paramsWrap.appendChild(secPill);
       }
+      // Extend/Reset (2026-07): moved here from the now-removed right-panel
+      // "Symmetry Guide" section (feedback: "les onglet guide symétrie et
+      // perspective n'ont plus lieu d'être, les options doivent être gérées
+      // au niveau du panneau flottant") — same wide-toggle-pill/action-pill
+      // shape as Perspective's own Lock/Reset just below.
+      var extPill = document.createElement('div'); extPill.className = 'labs-float-stepper';
+      var extBtn = document.createElement('button'); extBtn.className = 'lfs-btn wide' + (state.symmetryExtend ? ' on' : '');
+      extBtn.textContent = 'Extend'; extBtn.title = "Off: a stroke crossing the axis is cut right at it, so it and its mirror never overlap at the fold";
+      extBtn.addEventListener('click', function () {
+        state.symmetryExtend = !state.symmetryExtend;
+        extBtn.classList.toggle('on', state.symmetryExtend);
+      });
+      extPill.appendChild(extBtn);
+      paramsWrap.appendChild(extPill);
+      var symResetPill = document.createElement('div'); symResetPill.className = 'labs-float-stepper';
+      var symResetBtn = document.createElement('button'); symResetBtn.className = 'lfs-btn wide';
+      symResetBtn.textContent = 'Reset'; symResetBtn.title = 'Reset position';
+      symResetBtn.addEventListener('click', function () { if (window.resetSymmetryGuide) window.resetSymmetryGuide(); });
+      symResetPill.appendChild(symResetBtn);
+      paramsWrap.appendChild(symResetPill);
+    }
+    if (registered.perspective) {
+      // Mode/Density/Lock/Reset (2026-07): moved here from the removed
+      // right-panel "Perspective Guide" section (same feedback as
+      // Symmetry's Extend/Reset above) — only on/off was mirrored here
+      // before, so this panel had no Mode control at all yet either.
+      anyParams = true;
+      var pModePill = document.createElement('div'); pModePill.className = 'labs-float-stepper';
+      var pModeLbl = document.createElement('span'); pModeLbl.className = 'lfs-label'; pModeLbl.textContent = 'Mode';
+      var pModePrev = document.createElement('button'); pModePrev.className = 'lfs-btn'; pModePrev.textContent = '−';
+      var pModeVal = document.createElement('span'); pModeVal.className = 'lfs-val';
+      var pModeNext = document.createElement('button'); pModeNext.className = 'lfs-btn'; pModeNext.textContent = '+';
+      function cyclePerspMode(dir) {
+        var i = PERSP_MODES.indexOf(state.perspectiveMode);
+        var next = PERSP_MODES[(i + dir + PERSP_MODES.length) % PERSP_MODES.length];
+        if (window.setPerspectiveMode) window.setPerspectiveMode(next);
+        pModeVal.textContent = PERSP_MODE_LABEL[next];
+      }
+      pModeVal.textContent = PERSP_MODE_LABEL[state.perspectiveMode] || state.perspectiveMode;
+      pModePrev.addEventListener('click', function () { cyclePerspMode(-1); });
+      pModeNext.addEventListener('click', function () { cyclePerspMode(1); });
+      pModePill.appendChild(pModeLbl); pModePill.appendChild(pModePrev); pModePill.appendChild(pModeVal); pModePill.appendChild(pModeNext);
+      paramsWrap.appendChild(pModePill);
+      var densPill = document.createElement('div'); densPill.className = 'labs-float-stepper';
+      var densLbl = document.createElement('span'); densLbl.className = 'lfs-label'; densLbl.textContent = 'Densité';
+      var densMinus = document.createElement('button'); densMinus.className = 'lfs-btn'; densMinus.textContent = '−';
+      var densVal = document.createElement('span'); densVal.className = 'lfs-val'; densVal.textContent = state.perspectiveDensity;
+      var densPlus = document.createElement('button'); densPlus.className = 'lfs-btn'; densPlus.textContent = '+';
+      function setDensity(v) {
+        state.perspectiveDensity = Math.max(4, Math.min(72, v));
+        densVal.textContent = state.perspectiveDensity;
+        if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+      }
+      densMinus.addEventListener('click', function () { setDensity(state.perspectiveDensity - 2); });
+      densPlus.addEventListener('click', function () { setDensity(state.perspectiveDensity + 2); });
+      densPill.appendChild(densLbl); densPill.appendChild(densMinus); densPill.appendChild(densVal); densPill.appendChild(densPlus);
+      paramsWrap.appendChild(densPill);
+      var lockPill = document.createElement('div'); lockPill.className = 'labs-float-stepper';
+      var lockBtn = document.createElement('button'); lockBtn.className = 'lfs-btn wide';
+      lockBtn.textContent = 'Lock'; lockBtn.title = 'Prevents dragging any vanishing point with the Perspective tool';
+      var vpsNow = window.ensurePerspectiveVPs ? window.ensurePerspectiveVPs() : [];
+      lockBtn.classList.toggle('on', !!(vpsNow.length && vpsNow.every(function (vp) { return vp.locked; })));
+      lockBtn.addEventListener('click', function () {
+        var locked = !lockBtn.classList.contains('on');
+        (window.ensurePerspectiveVPs ? window.ensurePerspectiveVPs() : []).forEach(function (vp) { vp.locked = locked; });
+        lockBtn.classList.toggle('on', locked);
+        if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+      });
+      lockPill.appendChild(lockBtn);
+      paramsWrap.appendChild(lockPill);
+      var perspResetPill = document.createElement('div'); perspResetPill.className = 'labs-float-stepper';
+      var perspResetBtn = document.createElement('button'); perspResetBtn.className = 'lfs-btn wide';
+      perspResetBtn.textContent = 'Reset'; perspResetBtn.title = 'Reset positions';
+      perspResetBtn.addEventListener('click', function () { if (window.resetPerspectiveVPs) window.resetPerspectiveVPs(); });
+      perspResetPill.appendChild(perspResetBtn);
+      paramsWrap.appendChild(perspResetPill);
     }
     shown.forEach(function (n) {
       if (!registered[n] || !PARAMS[n]) return;
