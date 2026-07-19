@@ -551,7 +551,7 @@ window.SM={
   // full JS<->Rust wire contract. Defaults to a mild blur so placing one
   // has an immediately visible (if subtle) effect rather than looking
   // like a no-op.
-  addEffectLayer:function(){saveAllLayerFrames();pushUndoLayers();var idx=createUserLayer(nextLayerName().replace(/^Layer/,'Effet'));state.layers[idx].isEffectLayer=true;state.layers[idx].effectType='blur';state.layers[idx].effectP1=8;state.layers[idx].effectP2=0;activateUL(idx);loadFrame(state.currentFrame);updateUI();},
+  addEffectLayer:function(){saveAllLayerFrames();pushUndoLayers();var idx=createUserLayer(nextLayerName().replace(/^Layer/,'Effet'));state.layers[idx].isEffectLayer=true;state.layers[idx].effects=[];activateUL(idx);loadFrame(state.currentFrame);updateUI();},
   deleteLayer:function(){
     // The camera row isn't in state.layers (synthetic pseudo-layer, see
     // camera.js) — the generic layer-panel trash button silently did
@@ -954,7 +954,7 @@ window.SM={
     var sceneWaIn=inSym?_sceneSnapshot.waIn:state.waIn;
     var sceneWaOut=inSym?_sceneSnapshot.waOut:state.waOut;
     return JSON.stringify({version:13,totalFrames:sceneTotal,fps:sceneFps,canvasW:state.canvasW,canvasH:state.canvasH,canvasBg:state.canvasBg,waIn:sceneWaIn,waOut:sceneWaOut,
-      layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color,motion:l.motion,motionStatic:l.motionStatic,elementMotion:l.elementMotion,inPoint:l.inPoint,outPoint:l.outPoint,nativeVideo:l.nativeVideo,matteMode:l.matteMode,blurRadius:l.blurRadius,montageId:l.montageId,expressions:l.expressions,isTextLayer:l.isTextLayer,isNullLayer:l.isNullLayer,isEffectLayer:l.isEffectLayer,effectType:l.effectType,effectP1:l.effectP1,effectP2:l.effectP2,gshadowSkew:l.gshadowSkew,gshadowGroundY:l.gshadowGroundY,gshadowLength:l.gshadowLength,gshadowOpacity:l.gshadowOpacity};}),
+      layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color,motion:l.motion,motionStatic:l.motionStatic,elementMotion:l.elementMotion,inPoint:l.inPoint,outPoint:l.outPoint,nativeVideo:l.nativeVideo,matteMode:l.matteMode,montageId:l.montageId,expressions:l.expressions,isTextLayer:l.isTextLayer,isNullLayer:l.isNullLayer,isEffectLayer:l.isEffectLayer,effects:l.effects};}),
       layerFolders:state.layerFolders,layerLinkGroups:state.layerLinkGroups,
       // StoryBoard node space (2026-07) — plain data by construction (no
       // runtime-only fields live in state.storyboard, see storyboard.js's
@@ -1073,12 +1073,11 @@ window.SM={
     d.layers.forEach(function(ld){var idx=createUserLayer(ld.name);state.layers[idx].visible=ld.visible!==false;state.layers[idx].locked=ld.locked||false;state.layers[idx].frames=ld.frames;
       if(ld.blendMode)state.layers[idx].blendMode=ld.blendMode;
       if(ld.matteMode)state.layers[idx].matteMode=ld.matteMode;
-      if(ld.blurRadius)state.layers[idx].blurRadius=ld.blurRadius;
       if(ld.expressions)state.layers[idx].expressions=ld.expressions;
       if(ld.isTextLayer)state.layers[idx].isTextLayer=true;
       if(ld.isNullLayer)state.layers[idx].isNullLayer=true;
-      if(ld.isEffectLayer){state.layers[idx].isEffectLayer=true;state.layers[idx].effectType=ld.effectType||'blur';state.layers[idx].effectP1=ld.effectP1;state.layers[idx].effectP2=ld.effectP2;}
-      state.layers[idx].gshadowSkew=ld.gshadowSkew;state.layers[idx].gshadowGroundY=ld.gshadowGroundY;state.layers[idx].gshadowLength=ld.gshadowLength;state.layers[idx].gshadowOpacity=ld.gshadowOpacity;
+      if(ld.isEffectLayer){state.layers[idx].isEffectLayer=true;}
+      state.layers[idx].effects=ld.effects||[];
       if(ld.symbolId){state.layers[idx].symbolId=ld.symbolId;state.layers[idx].symPlayMode=ld.symPlayMode||'loop';state.layers[idx].symSpeed=ld.symSpeed||1;state.layers[idx].symPlacedAt=ld.symPlacedAt||0;state.layers[idx].symSingleFrame=ld.symSingleFrame||0;if(ld.symMatrix)state.layers[idx].symMatrix=ld.symMatrix;}
       if(ld.lfsGroup){state.layers[idx].lfsGroup=true;state.layers[idx].lfsIds=ld.lfsIds;state.layers[idx].lfsSettings=ld.lfsSettings;}
       if(ld.folderId)state.layers[idx].folderId=ld.folderId;
@@ -1156,7 +1155,7 @@ function updateUI(){
   document.getElementById('info-sel').textContent=state.tool==='select'&&selectedPaths.length>0?selectedPaths.length+' '+SM.t('selCountSuffix'):'';
   window._totalF=state.totalFrames;window._waIn=state.waIn;window._waOut=state.waOut;window._curFrame=state.currentFrame;
   window.updateWaBar();window.updateOmMarkers(state.currentFrame,state.totalFrames);
-  renderTimeline();renderLayerList();updateCompInstancePanel();updateSelPropsPanel();updateFsSelPanel();updateRevisionPanel();updateTextActionsPanel();updateEffectLayerPanel();updatePropsContext();
+  renderTimeline();renderLayerList();updateCompInstancePanel();updateSelPropsPanel();updateFsSelPanel();updateRevisionPanel();updateTextActionsPanel();if(window.updateEffectsPanel)window.updateEffectsPanel();updatePropsContext();
 }
 // Team review Accept/Reject panel — shown when exactly one selected item is
 // either an active (non-ghost) revision (data.revisionParentId) or a
@@ -1398,27 +1397,8 @@ function updatePropsContext(){
     matteSel.dataset.value=mv;
     matteSel.textContent=(typeof MATTE_MODE_LABELS!=='undefined'&&MATTE_MODE_LABELS[mv])||mv;
   }
-  // Feather/blur (2026-07, blur.wgsl) — same "sync every updatePropsContext
-  // call" reasoning as Blend/Matte just above.
-  var blurInp=document.getElementById('p-blur');
-  if(blurInp&&state.layers[state.activeLayerIdx]){
-    blurInp.value=state.layers[state.activeLayerIdx].blurRadius||0;
-  }
-  // Ground/cast shadow (2026-07) — same sync-on-every-context-switch
-  // reasoning as Flou just above; the extra Sol/Longueur/Inclinaison row
-  // only shows once opacity>0 (mirrors EFFECT_ROWS_BY_TYPE's show/hide
-  // convention elsewhere in this file, just for a single per-layer row).
-  var gsLd=state.layers[state.activeLayerIdx];
-  var gsOpInp=document.getElementById('p-gshadow-opacity');
-  if(gsOpInp&&gsLd){
-    var gsOp=gsLd.gshadowOpacity||0;
-    gsOpInp.value=Math.round(gsOp*100);
-    document.getElementById('p-gshadow-ground').value=Math.round((gsLd.gshadowGroundY!==undefined?gsLd.gshadowGroundY:0.75)*100);
-    document.getElementById('p-gshadow-length').value=gsLd.gshadowLength!==undefined?gsLd.gshadowLength:1;
-    document.getElementById('p-gshadow-skew').value=gsLd.gshadowSkew!==undefined?gsLd.gshadowSkew:0;
-    var moreRow=document.getElementById('p-gshadow-more-row');
-    if(moreRow)moreRow.style.display=gsOp>0?'':'none';
-  }
+  // Flou/Ombre au sol sync moved into effects-panel.js's unified Effects
+  // stack (2026-07 rewrite) — see updateEffectsPanel, hooked via updateUI.
   if(window.renderGradientPanel)window.renderGradientPanel();
   var hdrEl=document.getElementById('props-context-hdr');if(hdrEl)hdrEl.textContent=hdrText;
   // Motion mode: none of these 2D-drawing-tool sections apply (no active
@@ -2989,7 +2969,12 @@ function renderLayerList(){
     // icon font is subsetted and silently renders blank for un-included
     // codepoints, see the lock-icon fix comment further up this function).
     if(ld.isNullLayer){var nlb=document.createElement('div');nlb.className='lico comp-badge';nlb.title='Calque Null — jamais rendu, sert de pivot/parent pour d’autres calques';nlb.innerHTML='<span style="font-size:11px;line-height:1;font-weight:700">⊘</span>';row.appendChild(nlb);}
-    if(ld.isEffectLayer){var fxLabels=window.EFFECT_LABELS||{blur:'Flou',colorAdjust:'Teinte/Contraste',vignette:'Vignette',glow:'Glow'};var fxb=document.createElement('div');fxb.className='lico comp-badge';fxb.title='Calque d’effet — '+(fxLabels[ld.effectType]||'Flou')+' appliqué à tout ce qui est en dessous';fxb.innerHTML='<span style="font-size:9px;line-height:1;font-weight:700">FX</span>';row.appendChild(fxb);}
+    if(ld.isEffectLayer){
+      var fxLabels=window.EFFECT_LABELS||{};
+      var enabledFx=(ld.effects||[]).filter(function(e){return e.enabled;});
+      var fxDesc=enabledFx.length?enabledFx.map(function(e){return fxLabels[e.type]||e.type;}).join(', '):'aucun effet';
+      var fxb=document.createElement('div');fxb.className='lico comp-badge';fxb.title='Calque d’effet — '+fxDesc+' — appliqué à tout ce qui est en dessous';fxb.innerHTML='<span style="font-size:9px;line-height:1;font-weight:700">FX</span>';row.appendChild(fxb);
+    }
     if(ld.channel){var chLabel=ld.channel==='stroke'?'Tr':ld.channel==='fill'?'Pl':'Om';var chb=document.createElement('div');chb.className='lico comp-badge';chb.title='Calque '+(ld.channel==='stroke'?'Trait':ld.channel==='fill'?'Plein':'Ombre')+' (Stroke/Fill/Shadow) — calque normal, keyframes liées';chb.innerHTML='<span style="font-size:9px;line-height:1;font-weight:700">'+chLabel+'</span>';row.appendChild(chb);}
     // Track matte badge (2026-07) — the Blend/Matte dropdowns only surface
     // in the right panel's Document fallback context (nothing selected,
@@ -3816,66 +3801,10 @@ function updateTextActionsPanel(){
     document.getElementById('btn-text-split-chars').onclick=function(){splitTextIntoCharacters(p);};
   }
 }
-// Effect (adjustment) layer panel (2026-07, Motion) — shown whenever the
-// ACTIVE layer (not the canvas selection, unlike text-actions-sec above:
-// an effect layer has no selectable content of its own) is isEffectLayer.
-// UI brightness/contrast are shown in the familiar -100..100 range; the
-// Rust shader's Params expects -1..1, so the two multiply/divide by 100 at
-// the JS<->engine boundary (see color_adjust.wgsl's own Params doc comment
-// for the -1..1 contract).
-// Effect types added 2026-07: vignette (strength 0-1/radius 0-1, shown as
-// 0-100 in the UI) and glow (reuses the SAME p-effect-radius row as blur —
-// both are "p1 = blur radius_px", see engine.rs's composite_scene comment
-// on why glow needs no dedicated shader).
-var EFFECT_ROWS_BY_TYPE={
-  blur:['p-effect-blur-row'],
-  glow:['p-effect-blur-row'],
-  colorAdjust:['p-effect-brightness-row','p-effect-contrast-row'],
-  vignette:['p-effect-vig-strength-row','p-effect-vig-radius-row'],
-};
-var ALL_EFFECT_ROW_IDS=['p-effect-blur-row','p-effect-brightness-row','p-effect-contrast-row','p-effect-vig-strength-row','p-effect-vig-radius-row','p-effect-generic1-row','p-effect-generic2-row'];
-function updateEffectLayerPanel(){
-  var sec=document.getElementById('effect-layer-sec');
-  if(!sec)return;
-  var ld=state.layers[state.activeLayerIdx];
-  var isEffect=!!(ld&&ld.isEffectLayer);
-  sec.style.display=isEffect?'':'none';
-  if(!isEffect)return;
-  var typeSel=document.getElementById('p-effect-type');
-  var type=ld.effectType||'blur';
-  typeSel.value=type;
-  document.getElementById('p-effect-radius').value=ld.effectP1!==undefined?ld.effectP1:8;
-  document.getElementById('p-effect-brightness').value=Math.round((ld.effectP1||0)*100);
-  document.getElementById('p-effect-contrast').value=Math.round((ld.effectP2||0)*100);
-  document.getElementById('p-effect-vig-strength').value=Math.round((ld.effectP1!==undefined?ld.effectP1:0.5)*100);
-  document.getElementById('p-effect-vig-radius').value=Math.round((ld.effectP2!==undefined?ld.effectP2:0.4)*100);
-  var genericRowIds=[];
-  var genericCfg=EFFECT_GENERIC_PARAMS[type]||[];
-  genericCfg.forEach(function(cfg,i){
-    var rowId='p-effect-generic'+(i+1)+'-row';
-    genericRowIds.push(rowId);
-    var stored=cfg.key==='p1'?ld.effectP1:ld.effectP2;
-    var def=(EFFECT_DEFAULTS[type]||[0,0])[cfg.key==='p1'?0:1];
-    document.getElementById('p-effect-generic'+(i+1)).value=Math.round(((stored!==undefined?stored:def)*cfg.scale)*100)/100;
-    document.getElementById('p-effect-generic'+(i+1)).min=cfg.min;
-    document.getElementById('p-effect-generic'+(i+1)).max=cfg.max;
-    document.getElementById('p-effect-generic'+(i+1)).dataset.step=cfg.step;
-    document.getElementById('p-effect-generic'+(i+1)+'-label').textContent=cfg.label;
-    document.getElementById('p-effect-generic'+(i+1)+'-unit').textContent=cfg.unit||'';
-  });
-  var shown=(EFFECT_ROWS_BY_TYPE[type]||[]).concat(genericRowIds);
-  ALL_EFFECT_ROW_IDS.forEach(function(id){
-    var row=document.getElementById(id);
-    if(row)row.style.display=shown.indexOf(id)>=0?'':'none';
-  });
-  // Highlight the active tile in the preview grid built by initEffectFxGrid.
-  var grid=document.getElementById('p-effect-grid');
-  if(grid){
-    Array.prototype.forEach.call(grid.children,function(tile){
-      tile.classList.toggle('active',tile.dataset.fxType===type);
-    });
-  }
-}
+// Effects stack panel (2026-07 rewrite) — see effects-panel.js; the
+// separate #effect-layer-sec-specific rendering that used to live here
+// has been replaced by that file's unified updateEffectsPanel(), shared
+// with ordinary layers.
 function initCycleAndPropagate(){
   var cyc=document.getElementById('btn-cycle');
   if(cyc)cyc.addEventListener('click',function(){
@@ -4989,91 +4918,8 @@ document.getElementById('p-ch').addEventListener('change',function(){window.SM.s
 document.getElementById('p-cbg').addEventListener('input',function(){window.SM.setCanvasBg(this.value);});
 document.getElementById('p-clip').addEventListener('change',function(){window.SM.setCanvasClip(this.checked);});
 document.getElementById('p-safety').addEventListener('change',function(){window.SM.setSafetyZones(this.checked);});
-document.getElementById('p-blur').addEventListener('input',function(){var ld=state.layers[state.activeLayerIdx];if(!ld)return;pushUndo();ld.blurRadius=Math.max(0,parseFloat(this.value)||0);saveActiveLayerFrame();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
-// Ground/cast shadow (2026-07, feedback: "un effet wgsl qui fasse ça" +
-// AviUtl2 GroundShadow2_S link) — per-layer, mirrors the Flou wiring just
-// above. gshadowOpacity<=0 is the off-switch (updatePropsContext hides the
-// extra Sol/Longueur/Inclinaison row in that state).
-document.getElementById('p-gshadow-opacity').addEventListener('input',function(){var ld=state.layers[state.activeLayerIdx];if(!ld)return;pushUndo();ld.gshadowOpacity=Math.max(0,Math.min(1,(parseFloat(this.value)||0)/100));var row=document.getElementById('p-gshadow-more-row');if(row)row.style.display=ld.gshadowOpacity>0?'':'none';saveActiveLayerFrame();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
-document.getElementById('p-gshadow-ground').addEventListener('input',function(){var ld=state.layers[state.activeLayerIdx];if(!ld)return;pushUndo();ld.gshadowGroundY=Math.max(0,Math.min(1,(parseFloat(this.value)||0)/100));saveActiveLayerFrame();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
-document.getElementById('p-gshadow-length').addEventListener('input',function(){var ld=state.layers[state.activeLayerIdx];if(!ld)return;pushUndo();ld.gshadowLength=Math.max(0.1,parseFloat(this.value)||1);saveActiveLayerFrame();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
-document.getElementById('p-gshadow-skew').addEventListener('input',function(){var ld=state.layers[state.activeLayerIdx];if(!ld)return;pushUndo();ld.gshadowSkew=parseFloat(this.value)||0;saveActiveLayerFrame();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
-// Effect layer panel (2026-07, Motion) — see updateEffectLayerPanel's own
-// comment for the -100..100 (UI) <-> -1..1 (Rust color_adjust.wgsl) scale.
-// Defaults per effect type on switching — chosen so each type shows an
-// immediately visible (if subtle) result rather than looking like a no-op.
-var EFFECT_DEFAULTS={blur:[8,0],glow:[16,0],colorAdjust:[0,0],vignette:[0.5,0.4],
-  sepia:[0,0],invert:[0,0],grayscale:[0,0],posterize:[6,0],pixelate:[16,0],
-  chromaticAberration:[4,0],scanlines:[240,0.5],grain:[0.08,0],sharpen:[0.5,0],edgeDetect:[4,0]};
-// Titles shown on the effect-preview tiles AND the layer-list "FX" badge
-// tooltip (updateEffectLayerPanel/renderLayerList's fxLabels both read this
-// single map now instead of keeping two copies in sync).
-var EFFECT_LABELS={blur:'Flou',colorAdjust:'Teinte/Contraste',vignette:'Vignette',glow:'Glow',
-  sepia:'Sépia',invert:'Inverser',grayscale:'Niveaux de gris',posterize:'Postériser',
-  pixelate:'Pixelliser',chromaticAberration:'Aberration chromatique',scanlines:'Lignes de balayage',
-  grain:'Grain film',sharpen:'Netteté',edgeDetect:'Détection de contours'};
-var EFFECT_TILE_ORDER=['blur','colorAdjust','vignette','glow','sepia','invert','grayscale','posterize','pixelate','chromaticAberration','scanlines','grain','sharpen','edgeDetect'];
-// Generic 2-slot param config for the 10 simple_fx.wgsl effects (blur/
-// colorAdjust/vignette keep their own dedicated rows, unchanged) — each
-// entry: {key:'p1'|'p2', label, min, max, step, scale, unit}. `scale`
-// divides the UI value down to the stored effect_p (e.g. a 0-100 UI
-// percentage stored as 0-1) — same convention as brightness/contrast/
-// vig-strength above, just data-driven instead of one listener per field.
-var EFFECT_GENERIC_PARAMS={
-  posterize:[{key:'p1',label:'Niveaux',min:2,max:32,step:1,scale:1,unit:''}],
-  pixelate:[{key:'p1',label:'Taille bloc',min:2,max:64,step:1,scale:1,unit:'px'}],
-  chromaticAberration:[{key:'p1',label:'Intensité',min:0,max:20,step:1,scale:1,unit:'px'}],
-  scanlines:[{key:'p1',label:'Fréquence',min:20,max:480,step:10,scale:1,unit:''},{key:'p2',label:'Intensité',min:0,max:100,step:1,scale:100,unit:'%'}],
-  grain:[{key:'p1',label:'Intensité',min:0,max:100,step:1,scale:100,unit:'%'}],
-  sharpen:[{key:'p1',label:'Intensité',min:0,max:200,step:1,scale:100,unit:'%'}],
-  edgeDetect:[{key:'p1',label:'Intensité',min:0,max:20,step:1,scale:1,unit:''}],
-};
-function setEffectType(newType){
-  var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.isEffectLayer)return;
-  pushUndo();ld.effectType=newType;var d=EFFECT_DEFAULTS[newType]||[0,0];ld.effectP1=d[0];ld.effectP2=d[1];
-  var sel=document.getElementById('p-effect-type');if(sel)sel.value=newType;
-  updateEffectLayerPanel();saveActiveLayerFrame();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();
-}
-document.getElementById('p-effect-type').addEventListener('change',function(){setEffectType(this.value);});
-document.getElementById('p-effect-radius').addEventListener('input',function(){var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.isEffectLayer)return;pushUndo();ld.effectP1=Math.max(0,parseFloat(this.value)||0);saveActiveLayerFrame();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
-document.getElementById('p-effect-brightness').addEventListener('input',function(){var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.isEffectLayer)return;pushUndo();ld.effectP1=(parseFloat(this.value)||0)/100;saveActiveLayerFrame();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
-document.getElementById('p-effect-contrast').addEventListener('input',function(){var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.isEffectLayer)return;pushUndo();ld.effectP2=(parseFloat(this.value)||0)/100;saveActiveLayerFrame();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
-document.getElementById('p-effect-vig-strength').addEventListener('input',function(){var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.isEffectLayer)return;pushUndo();ld.effectP1=Math.max(0,Math.min(1,(parseFloat(this.value)||0)/100));saveActiveLayerFrame();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
-document.getElementById('p-effect-vig-radius').addEventListener('input',function(){var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.isEffectLayer)return;pushUndo();ld.effectP2=Math.max(0,Math.min(0.95,(parseFloat(this.value)||0)/100));saveActiveLayerFrame();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
-// Generic param rows (posterize/pixelate/chromaticAberration/scanlines/
-// grain/sharpen/edgeDetect) — one pair of listeners shared by all of them;
-// which stored field (effectP1/P2) and which scale applies is looked up
-// from EFFECT_GENERIC_PARAMS by the CURRENT effect type at input time.
-function wireGenericParamInput(rowIndex, inputId){
-  document.getElementById(inputId).addEventListener('input',function(){
-    var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.isEffectLayer)return;
-    var cfg=(EFFECT_GENERIC_PARAMS[ld.effectType]||[])[rowIndex];if(!cfg)return;
-    pushUndo();
-    var raw=(parseFloat(this.value)||0)/cfg.scale;
-    if(cfg.key==='p1')ld.effectP1=raw;else ld.effectP2=raw;
-    saveActiveLayerFrame();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();
-  });
-}
-wireGenericParamInput(0,'p-effect-generic1');
-wireGenericParamInput(1,'p-effect-generic2');
-// Builds the visual preview grid once at startup — tiles are static (same
-// 14 for every effect layer), only the .active class and generic-row
-// visibility change per-selection (done in updateEffectLayerPanel).
-function initEffectFxGrid(){
-  var grid=document.getElementById('p-effect-grid');
-  if(!grid||grid.childElementCount)return;
-  EFFECT_TILE_ORDER.forEach(function(type){
-    var tile=document.createElement('div');
-    tile.className='fx-tile';tile.dataset.fxType=type;
-    tile.title=EFFECT_LABELS[type]||type;
-    var prev=document.createElement('div');prev.className='fx-preview fx-prev-'+type;
-    var label=document.createElement('div');label.className='fx-title';label.textContent=EFFECT_LABELS[type]||type;
-    tile.appendChild(prev);tile.appendChild(label);
-    tile.addEventListener('click',function(){setEffectType(type);});
-    grid.appendChild(tile);
-  });
-}
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initEffectFxGrid);else initEffectFxGrid();
+// Flou/Ombre au sol/effect-layer type/param wiring all moved into
+// effects-panel.js's unified Effects stack (2026-07 rewrite).
 // Perspective/Symmetry Guide (feedback 2026-07: "les onglet guide symétrie
 // et perspective n'ont plus lieu d'être, les options doivent être gérées au
 // niveau du panneau flottant") — the right-panel section these ids used to

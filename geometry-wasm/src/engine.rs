@@ -163,77 +163,74 @@ pub(crate) struct LayerIn {
     // composite_scene skips painting it as its own visible layer.
     #[serde(default)]
     pub(crate) matte_mode: Option<String>,
-    // Layer-level Gaussian-ish blur/feather (2026-07) — same "isolated
-    // per-layer texture + custom fullscreen-pass" architecture as blend_mode/
-    // matte_mode above (see blur.wgsl's doc comment and composite_scene's
-    // blur handling), not a vello-native primitive (kurbo/peniko have no
-    // generic blur brush). In world/CSS pixels at the CURRENT zoom — same
-    // "screen-space, not document-space" convention already used for e.g.
-    // handle sizes (motion.js), since a blur radius that scaled with zoom
-    // would make a shape look sharper just from zooming out.
-    #[serde(default)]
-    pub(crate) blur_radius: Option<f32>,
-    // Layer-level ground/cast shadow (2026-07, feedback: "un effet wgsl qui
-    // fasse ça" — a 2D analog of the AviUtl2 GroundShadow2_S script). Same
-    // "isolated per-layer texture + custom fullscreen-pass" shape as
-    // blur_radius above, run on this SAME source_view right after blur (see
-    // composite_scene) — deliberately NOT an effect/adjustment-layer type
-    // like blur/vignette/glow: those operate on the flattened accumulator,
-    // which this engine seeds with an OPAQUE base color up front, so alpha
-    // can no longer tell "this shape" apart from "empty background" once
-    // flattened — a shadow needs the shape's OWN true alpha silhouette,
-    // which only exists before that flattening. See simple_fx.wgsl's
-    // EFFECT_GROUND_SHADOW doc comment for the projection math.
-    // gshadow_opacity.unwrap_or(0.0) <= 0.0 is this feature's off-switch,
-    // same "0 = disabled, no GPU cost" convention as blur_radius.
-    #[serde(default)]
-    pub(crate) gshadow_skew: Option<f32>,
-    #[serde(default)]
-    pub(crate) gshadow_ground_y: Option<f32>,
-    #[serde(default)]
-    pub(crate) gshadow_length: Option<f32>,
-    #[serde(default)]
-    pub(crate) gshadow_opacity: Option<f32>,
     // Adjustment/effect layer (2026-07, Motion) — an AE-style layer with no
-    // painted content of its own whose effect applies to EVERYTHING BELOW
-    // it in the stack instead of just itself. Unlike blur_radius/matte_mode
-    // above (which only ever transform THIS layer's own isolated render),
-    // composite_scene reads the running accumulator (the composite of
-    // every layer so far) as this pass's source and writes the result back
-    // as the new accumulator state — see composite_scene's is_effect_layer
-    // branch. `items` is ignored entirely for this layer (never painted),
-    // matching AE's own "Adjustment Layer" toggle hiding the layer's own
-    // shape while its effect still applies.
+    // painted content of its own whose EFFECTS STACK (below) applies to
+    // EVERYTHING BELOW it in the layer stack instead of just itself.
+    // Unlike an ordinary layer's `effects` (which only ever transform THIS
+    // layer's own isolated render), composite_scene reads the running
+    // accumulator (the composite of every layer so far) as the stack's
+    // source and writes the result back as the new accumulator state — see
+    // composite_scene's is_effect_layer branch. `items` is ignored entirely
+    // for this layer (never painted), matching AE's own "Adjustment Layer"
+    // toggle hiding the layer's own shape while its effects still apply.
     #[serde(default)]
     pub(crate) is_effect_layer: Option<bool>,
-    // "blur" | "colorAdjust" | "vignette" | "glow" | one of the simple_fx.wgsl
-    // effects (sepia/invert/grayscale/posterize/pixelate/
-    // chromaticAberration/scanlines/grain/sharpen/edgeDetect) — which WGSL
-    // pass(es) composite_scene dispatches to. Unrecognized/None falls back
-    // to "blur" (see composite_scene).
+    // Effects stack (2026-07 rewrite — was a handful of fixed fields:
+    // blur_radius/gshadow_*/effect_type/effect_p1/effect_p2, one value each,
+    // one effect per layer max). Now a proper AE-style stack: any number of
+    // effects, each independently toggleable, applied in order. Ordinary
+    // layers run this on their OWN isolated alpha (see composite_scene's
+    // per-layer loop, right after matte); effect/adjustment layers
+    // (is_effect_layer=true) run it on the flattened accumulator instead —
+    // same apply_effect_stack function either way, just fed a different
+    // source texture, since each pass function only cares about whatever
+    // texture it's given.
+    //
+    // IMPORTANT asymmetry this implies: "groundShadow" needs the shape's
+    // OWN true alpha silhouette (transparent where there's no content) to
+    // produce a correctly-shaped shadow — but this engine seeds the
+    // ACCUMULATOR with an OPAQUE base color up front (composite_scene's
+    // clear_texture call), so alpha can no longer tell "shape" from "empty
+    // background" once flattened (confirmed by direct pixel-probing during
+    // development). Adding "groundShadow" to an effect/adjustment layer's
+    // stack is therefore a no-op-looking full-canvas darken, not a
+    // silhouette shadow — the JS-side "Add Effect" menu accordingly only
+    // offers it for ordinary layers, mirroring AE's own real distinction
+    // between a plain Effect (works anywhere) and a shape-aware Layer Style
+    // like Drop Shadow (per-layer only).
     #[serde(default)]
-    pub(crate) effect_type: Option<String>,
-    // Generic params, meaning depends on effect_type:
-    //  - blur: p1=radius_px (p2 unused)
-    //  - colorAdjust: p1=brightness (-1..1 additive), p2=contrast (-1..1,
-    //    pivots around mid-gray) — see color_adjust.wgsl
-    //  - vignette: p1=strength (0..1), p2=radius (0..1, where the darkening
-    //    starts) — see vignette.wgsl
-    //  - glow: p1=blur radius_px (p2 unused) — reuses blur_pass + the
-    //    ordinary "screen" blend mode, no dedicated shader
-    //  - sepia/invert/grayscale: no params
-    //  - posterize: p1=levels (2..32)
-    //  - pixelate: p1=block size px
-    //  - chromaticAberration: p1=strength px
-    //  - scanlines: p1=frequency, p2=darkness (0..1)
-    //  - grain: p1=intensity (0..1)
-    //  - sharpen: p1=amount
-    //  - edgeDetect: p1=gradient-magnitude multiplier
-    //  (see simple_fx.wgsl's own Params doc comment)
+    pub(crate) effects: Vec<EffectIn>,
+}
+
+#[derive(Deserialize, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct EffectIn {
+    // "blur" | "colorAdjust" | "vignette" | "glow" | "groundShadow" | one of
+    // the simple_fx.wgsl effects (sepia/invert/grayscale/posterize/
+    // pixelate/chromaticAberration/scanlines/grain/sharpen/edgeDetect).
+    // Unrecognized falls back to "blur" (see run_one_effect).
     #[serde(default)]
-    pub(crate) effect_p1: Option<f32>,
+    pub(crate) effect_type: String,
+    // Per-instance on/off toggle (the little eye icon in the Effects list)
+    // — kept distinct from removing the entry so a disabled effect's
+    // params aren't lost. Disabled entries are skipped entirely in
+    // apply_effect_stack, same "off = no GPU cost" convention the old
+    // single-field version had via 0-valued radius/opacity.
     #[serde(default)]
-    pub(crate) effect_p2: Option<f32>,
+    pub(crate) enabled: bool,
+    // Generic params, meaning depends on effect_type — see simple_fx.wgsl's
+    // Params doc comment and each pass function's own doc comment for the
+    // exact mapping (unchanged from the old effect_p1..p4/gshadow_* fields,
+    // just renamed to a flat p1..p4 per stack entry instead of one set of
+    // fields per layer).
+    #[serde(default)]
+    pub(crate) p1: Option<f32>,
+    #[serde(default)]
+    pub(crate) p2: Option<f32>,
+    #[serde(default)]
+    pub(crate) p3: Option<f32>,
+    #[serde(default)]
+    pub(crate) p4: Option<f32>,
 }
 
 // FIXED (was "KNOWN BROKEN, v17 investigation" — see git history for the
@@ -664,6 +661,18 @@ pub struct VelloEngine {
     simple_fx_bind_group_layout: wgpu::BindGroupLayout,
     simple_fx_sampler: wgpu::Sampler,
     simple_fx_uniform_buf: wgpu::Buffer,
+    // ---- Effects stack ping-pong scratch (2026-07 rewrite) — dedicated
+    // pair, distinct from blur_pass's OWN internal blur_scratch_view: a
+    // multi-effect stack that includes "blur" would otherwise alias reads
+    // and writes on the same texture (blur_pass reads `source_view` and
+    // uses blur_scratch_view as ITS OWN intermediate — if the outer stack's
+    // ping-pong also happened to BE blur_scratch_view, the horizontal
+    // sub-pass would read and write the same texture in one pass, which is
+    // a WebGPU validation error). See apply_effect_stack's doc comment.
+    effect_stack_a_tex: wgpu::Texture,
+    effect_stack_a_view: wgpu::TextureView,
+    effect_stack_b_tex: wgpu::Texture,
+    effect_stack_b_view: wgpu::TextureView,
 }
 
 // ---- Blend compositor plumbing (see blend.wgsl's doc comment) ----
@@ -1872,6 +1881,8 @@ pub async fn create_engine(
     let (color_pipeline, color_bind_group_layout, color_sampler, color_uniform_buf) = create_color_adjust_pipeline(&device);
     let (vignette_pipeline, vignette_bind_group_layout, vignette_sampler, vignette_uniform_buf) = create_vignette_pipeline(&device);
     let (simple_fx_pipeline, simple_fx_bind_group_layout, simple_fx_sampler, simple_fx_uniform_buf) = create_simple_fx_pipeline(&device);
+    let (effect_stack_a_tex, effect_stack_a_view) = create_blend_accum_texture(&device, width, height, "effect-stack-a");
+    let (effect_stack_b_tex, effect_stack_b_view) = create_blend_accum_texture(&device, width, height, "effect-stack-b");
 
     Ok(VelloEngine {
         surface,
@@ -1933,6 +1944,10 @@ pub async fn create_engine(
         simple_fx_bind_group_layout,
         simple_fx_sampler,
         simple_fx_uniform_buf,
+        effect_stack_a_tex,
+        effect_stack_a_view,
+        effect_stack_b_tex,
+        effect_stack_b_view,
     })
 }
 
@@ -1975,6 +1990,111 @@ impl VelloEngine {
             Affine::translate((-1.0e7, -1.0e7)),
         );
     }
+    /// Dispatches ONE effects-stack entry: `source` in, transformed pixels
+    /// into `target`. `&self` only (no mutation) — every *_pass helper takes
+    /// its device/queue/pipeline as already-split borrowed params, so this
+    /// never needs `&mut self`, which is what lets apply_effect_stack below
+    /// hold multiple `&self.effect_stack_*_view` borrows across a loop
+    /// without fighting the borrow checker.
+    fn run_one_effect(&self, eff: &EffectIn, source: &wgpu::TextureView, target: &wgpu::TextureView) {
+        match eff.effect_type.as_str() {
+            "colorAdjust" => color_adjust_pass(
+                &self.device, &self.queue, &self.color_pipeline, &self.color_bind_group_layout, &self.color_sampler, &self.color_uniform_buf,
+                source, eff.p1.unwrap_or(0.0), eff.p2.unwrap_or(0.0), target,
+            ),
+            "vignette" => vignette_pass(
+                &self.device, &self.queue, &self.vignette_pipeline, &self.vignette_bind_group_layout, &self.vignette_sampler, &self.vignette_uniform_buf,
+                source, eff.p1.unwrap_or(0.5), eff.p2.unwrap_or(0.4), target,
+            ),
+            "glow" => {
+                // Bloom: blur a copy into the shared blur-scratch/result
+                // pair (private to blur_pass, distinct from this stack's
+                // own ping-pong — see effect_stack_a/b_view's doc comment),
+                // then screen-blend it back on top of the UNBLURRED
+                // `source` — reuses blur_pass + the ordinary layer
+                // compositor's "screen" blend mode rather than a new shader.
+                blur_pass(
+                    &self.device, &self.queue, &self.blur_pipeline, &self.blur_bind_group_layout, &self.blur_sampler, &self.blur_uniform_buf,
+                    source, eff.p1.unwrap_or(16.0), self.width, self.height, &self.blur_scratch_view, &self.blur_result_view,
+                );
+                composite_pass(
+                    &self.device, &self.queue, &self.blend_pipeline, &self.blend_bind_group_layout, &self.blend_sampler, &self.blend_uniform_buf,
+                    source, &self.blur_result_view, 2, target,
+                );
+            }
+            "sepia" | "invert" | "grayscale" | "posterize" | "pixelate" | "chromaticAberration" | "scanlines" | "grain" | "sharpen" | "edgeDetect" | "groundShadow" => {
+                let effect_id = match eff.effect_type.as_str() {
+                    "sepia" => 0.0,
+                    "invert" => 1.0,
+                    "grayscale" => 2.0,
+                    "posterize" => 3.0,
+                    "pixelate" => 4.0,
+                    "chromaticAberration" => 5.0,
+                    "scanlines" => 6.0,
+                    "grain" => 7.0,
+                    "sharpen" => 8.0,
+                    "edgeDetect" => 9.0,
+                    _ => 10.0, // "groundShadow"
+                };
+                let default_p1 = match eff.effect_type.as_str() {
+                    "posterize" => 6.0,
+                    "pixelate" => 16.0,
+                    "chromaticAberration" => 4.0,
+                    "scanlines" => 240.0,
+                    "grain" => 0.08,
+                    "sharpen" => 0.5,
+                    "edgeDetect" => 4.0,
+                    "groundShadow" => 0.0,
+                    _ => 0.0,
+                };
+                let default_p2 = match eff.effect_type.as_str() {
+                    "scanlines" => 0.5,
+                    "groundShadow" => 0.75,
+                    _ => 0.0,
+                };
+                let default_p3 = if eff.effect_type == "groundShadow" { 1.0 } else { 0.0 };
+                let default_p4 = if eff.effect_type == "groundShadow" { 0.5 } else { 0.0 };
+                simple_fx_pass(
+                    &self.device, &self.queue, &self.simple_fx_pipeline, &self.simple_fx_bind_group_layout, &self.simple_fx_sampler, &self.simple_fx_uniform_buf,
+                    source, effect_id,
+                    eff.p1.unwrap_or(default_p1), eff.p2.unwrap_or(default_p2), eff.p3.unwrap_or(default_p3), eff.p4.unwrap_or(default_p4),
+                    self.width as f32, self.height as f32, target,
+                );
+            }
+            _ => {
+                // Default/"blur" — reuses blur_pass verbatim.
+                blur_pass(
+                    &self.device, &self.queue, &self.blur_pipeline, &self.blur_bind_group_layout, &self.blur_sampler, &self.blur_uniform_buf,
+                    source, eff.p1.unwrap_or(0.0), self.width, self.height, &self.blur_scratch_view, target,
+                );
+            }
+        }
+    }
+
+    /// Runs every ENABLED entry in `effects`, in order, on `initial_source`,
+    /// ping-ponging between effect_stack_a_view/effect_stack_b_view.
+    /// Returns true if the final result landed in effect_stack_a_view,
+    /// false if effect_stack_b_view — callers re-point their own
+    /// `source_view`/`target_view` locals accordingly (mirrors the existing
+    /// "source_view = &self.blur_result_view" convention elsewhere in this
+    /// file). Caller must check `effects.iter().any(|e| e.enabled)` first
+    /// and skip calling this entirely when false (cheap early-exit, same
+    /// "0 = disabled, no GPU cost" convention the old single-field version
+    /// had via 0-valued radius/opacity) — this function assumes at least
+    /// one enabled entry exists.
+    fn apply_effect_stack(&self, initial_source: &wgpu::TextureView, effects: &[EffectIn]) -> bool {
+        let enabled: Vec<&EffectIn> = effects.iter().filter(|e| e.enabled).collect();
+        let mut current: &wgpu::TextureView = initial_source;
+        let mut use_a = true;
+        for eff in &enabled {
+            let target: &wgpu::TextureView = if use_a { &self.effect_stack_a_view } else { &self.effect_stack_b_view };
+            self.run_one_effect(eff, current, target);
+            current = target;
+            use_a = !use_a;
+        }
+        !use_a
+    }
+
     fn composite_scene(&mut self, scene_in: &SceneIn, view_tf: Affine, base_color: Color) -> Result<(), JsValue> {
         let n = scene_in.layers.len();
         let mut is_matte_source = vec![false; n];
@@ -1985,10 +2105,9 @@ impl VelloEngine {
         }
         let has_matte = is_matte_source.iter().any(|&b| b);
         let has_blend = scene_in.layers.iter().any(|l| mix_mode_index(l.blend_mode.as_deref()) != 0);
-        let has_blur = scene_in.layers.iter().any(|l| l.blur_radius.unwrap_or(0.0) > 0.0);
+        let has_effects_stack = scene_in.layers.iter().any(|l| l.effects.iter().any(|e| e.enabled));
         let has_effect = scene_in.layers.iter().any(|l| l.is_effect_layer.unwrap_or(false));
-        let has_gshadow = scene_in.layers.iter().any(|l| l.gshadow_opacity.unwrap_or(0.0) > 0.0);
-        if !has_blend && !has_matte && !has_blur && !has_effect && !has_gshadow {
+        if !has_blend && !has_matte && !has_effects_stack && !has_effect {
             let mut scene = Scene::new();
             self.push_atlas_keepalive(&mut scene);
             for layer in &scene_in.layers {
@@ -2019,138 +2138,31 @@ impl VelloEngine {
             // an ordinary layer — just with a color/blur pass instead of
             // paint_layer_items+composite_pass in between.
             if layer.is_effect_layer.unwrap_or(false) {
-                let (backdrop_view, target_view) = if accum_is_a {
-                    (&self.blend_accum_a_view, &self.blend_accum_b_view)
+                let backdrop_view = if accum_is_a { &self.blend_accum_a_view } else { &self.blend_accum_b_view };
+                if layer.effects.iter().any(|e| e.enabled) {
+                    let in_a = self.apply_effect_stack(backdrop_view, &layer.effects);
+                    let result_tex = if in_a { &self.effect_stack_a_tex } else { &self.effect_stack_b_tex };
+                    let target_tex = if accum_is_a { &self.blend_accum_b } else { &self.blend_accum_a };
+                    let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("effect-stack-to-accum-copy") });
+                    encoder.copy_texture_to_texture(
+                        result_tex.as_image_copy(),
+                        target_tex.as_image_copy(),
+                        wgpu::Extent3d { width: self.width, height: self.height, depth_or_array_layers: 1 },
+                    );
+                    self.queue.submit(Some(encoder.finish()));
                 } else {
-                    (&self.blend_accum_b_view, &self.blend_accum_a_view)
-                };
-                match layer.effect_type.as_deref() {
-                    Some("colorAdjust") => {
-                        color_adjust_pass(
-                            &self.device,
-                            &self.queue,
-                            &self.color_pipeline,
-                            &self.color_bind_group_layout,
-                            &self.color_sampler,
-                            &self.color_uniform_buf,
-                            backdrop_view,
-                            layer.effect_p1.unwrap_or(0.0),
-                            layer.effect_p2.unwrap_or(0.0),
-                            target_view,
-                        );
-                    }
-                    Some("vignette") => {
-                        vignette_pass(
-                            &self.device,
-                            &self.queue,
-                            &self.vignette_pipeline,
-                            &self.vignette_bind_group_layout,
-                            &self.vignette_sampler,
-                            &self.vignette_uniform_buf,
-                            backdrop_view,
-                            layer.effect_p1.unwrap_or(0.5),
-                            layer.effect_p2.unwrap_or(0.4),
-                            target_view,
-                        );
-                    }
-                    Some("glow") => {
-                        // Bloom: blur a copy of everything below into the
-                        // shared blur-scratch texture, then screen-blend it
-                        // back on top of the UNBLURRED original — reuses
-                        // blur_pass (effect_p1 = radius_px) and the ordinary
-                        // layer compositor's own "screen" blend mode
-                        // (mix_mode_index), rather than a new WGSL shader:
-                        // this effect is just two existing passes chained,
-                        // no new pixel math needed.
-                        blur_pass(
-                            &self.device,
-                            &self.queue,
-                            &self.blur_pipeline,
-                            &self.blur_bind_group_layout,
-                            &self.blur_sampler,
-                            &self.blur_uniform_buf,
-                            backdrop_view,
-                            layer.effect_p1.unwrap_or(16.0),
-                            self.width,
-                            self.height,
-                            &self.blur_scratch_view,
-                            &self.blur_result_view,
-                        );
-                        composite_pass(
-                            &self.device,
-                            &self.queue,
-                            &self.blend_pipeline,
-                            &self.blend_bind_group_layout,
-                            &self.blend_sampler,
-                            &self.blend_uniform_buf,
-                            backdrop_view,
-                            &self.blur_result_view,
-                            2, // "screen" — see mix_mode_index
-                            target_view,
-                        );
-                    }
-                    Some(simple_name @ ("sepia" | "invert" | "grayscale" | "posterize" | "pixelate"
-                        | "chromaticAberration" | "scanlines" | "grain" | "sharpen" | "edgeDetect")) => {
-                        let effect_id = match simple_name {
-                            "sepia" => 0.0,
-                            "invert" => 1.0,
-                            "grayscale" => 2.0,
-                            "posterize" => 3.0,
-                            "pixelate" => 4.0,
-                            "chromaticAberration" => 5.0,
-                            "scanlines" => 6.0,
-                            "grain" => 7.0,
-                            "sharpen" => 8.0,
-                            _ => 9.0, // "edgeDetect"
-                        };
-                        let default_p1 = match simple_name {
-                            "posterize" => 6.0,
-                            "pixelate" => 16.0,
-                            "chromaticAberration" => 4.0,
-                            "scanlines" => 240.0,
-                            "grain" => 0.08,
-                            "sharpen" => 0.5,
-                            "edgeDetect" => 4.0,
-                            _ => 0.0,
-                        };
-                        let default_p2 = if simple_name == "scanlines" { 0.5 } else { 0.0 };
-                        simple_fx_pass(
-                            &self.device,
-                            &self.queue,
-                            &self.simple_fx_pipeline,
-                            &self.simple_fx_bind_group_layout,
-                            &self.simple_fx_sampler,
-                            &self.simple_fx_uniform_buf,
-                            backdrop_view,
-                            effect_id,
-                            layer.effect_p1.unwrap_or(default_p1),
-                            layer.effect_p2.unwrap_or(default_p2),
-                            0.0,
-                            0.0,
-                            self.width as f32,
-                            self.height as f32,
-                            target_view,
-                        );
-                    }
-                    _ => {
-                        // Default/"blur" — reuses blur_pass verbatim, just
-                        // fed the accumulator instead of one layer's own
-                        // isolated render.
-                        blur_pass(
-                            &self.device,
-                            &self.queue,
-                            &self.blur_pipeline,
-                            &self.blur_bind_group_layout,
-                            &self.blur_sampler,
-                            &self.blur_uniform_buf,
-                            backdrop_view,
-                            layer.effect_p1.unwrap_or(0.0),
-                            self.width,
-                            self.height,
-                            &self.blur_scratch_view,
-                            target_view,
-                        );
-                    }
+                    // No enabled effects on this adjustment layer — pass
+                    // the backdrop through unchanged (matches AE: a layer
+                    // with every effect disabled/deleted is a no-op).
+                    let backdrop_tex = if accum_is_a { &self.blend_accum_a } else { &self.blend_accum_b };
+                    let target_tex = if accum_is_a { &self.blend_accum_b } else { &self.blend_accum_a };
+                    let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("effect-stack-passthrough-copy") });
+                    encoder.copy_texture_to_texture(
+                        backdrop_tex.as_image_copy(),
+                        target_tex.as_image_copy(),
+                        wgpu::Extent3d { width: self.width, height: self.height, depth_or_array_layers: 1 },
+                    );
+                    self.queue.submit(Some(encoder.finish()));
                 }
                 accum_is_a = !accum_is_a;
                 continue;
@@ -2188,56 +2200,16 @@ impl VelloEngine {
             } else {
                 &self.blend_layer_view
             };
-            // Feather/blur (blur.wgsl) — runs AFTER matte (so a matted
-            // layer's edge softens too, not just its raw content) and
-            // BEFORE the blend/composite pass, so a blurred layer's soft
-            // edges participate correctly in whatever blend mode it has.
-            let radius = layer.blur_radius.unwrap_or(0.0);
-            if radius > 0.0 {
-                blur_pass(
-                    &self.device,
-                    &self.queue,
-                    &self.blur_pipeline,
-                    &self.blur_bind_group_layout,
-                    &self.blur_sampler,
-                    &self.blur_uniform_buf,
-                    source_view,
-                    radius,
-                    self.width,
-                    self.height,
-                    &self.blur_scratch_view,
-                    &self.blur_result_view,
-                );
-                source_view = &self.blur_result_view;
-            }
-
-            // Ground/cast shadow (simple_fx.wgsl, EFFECT_GROUND_SHADOW) —
-            // runs on THIS layer's own isolated alpha (real transparency,
-            // unlike the flattened accumulator — see LayerIn::gshadow_*'s
-            // doc comment for why this can't be an adjustment-layer type).
-            // Writes into blur_scratch_view, safe to reuse here: blur_pass
-            // above (if it ran) already finished consuming it as scratch,
-            // and it's otherwise untouched this frame.
-            let gshadow_opacity = layer.gshadow_opacity.unwrap_or(0.0);
-            if gshadow_opacity > 0.0 {
-                simple_fx_pass(
-                    &self.device,
-                    &self.queue,
-                    &self.simple_fx_pipeline,
-                    &self.simple_fx_bind_group_layout,
-                    &self.simple_fx_sampler,
-                    &self.simple_fx_uniform_buf,
-                    source_view,
-                    10.0,
-                    layer.gshadow_skew.unwrap_or(0.0),
-                    layer.gshadow_ground_y.unwrap_or(0.75),
-                    layer.gshadow_length.unwrap_or(1.0),
-                    gshadow_opacity,
-                    self.width as f32,
-                    self.height as f32,
-                    &self.blur_scratch_view,
-                );
-                source_view = &self.blur_scratch_view;
+            // Effects stack (2026-07 rewrite) — runs on THIS layer's own
+            // isolated alpha (real transparency), AFTER matte (so a matted
+            // layer's edge softens/shadows too, not just its raw content)
+            // and BEFORE the blend/composite pass, so an effect's output
+            // participates correctly in whatever blend mode this layer has.
+            // See LayerIn::effects' doc comment for why this differs from
+            // the accumulator an effect/adjustment layer's stack runs on.
+            if layer.effects.iter().any(|e| e.enabled) {
+                let in_a = self.apply_effect_stack(source_view, &layer.effects);
+                source_view = if in_a { &self.effect_stack_a_view } else { &self.effect_stack_b_view };
             }
 
             let mode = mix_mode_index(layer.blend_mode.as_deref());
@@ -2533,6 +2505,12 @@ impl VelloEngine {
         let (blur_scratch_tex, blur_scratch_view) = create_matte_result_texture(&self.device, width, height);
         self.blur_scratch_tex = blur_scratch_tex;
         self.blur_scratch_view = blur_scratch_view;
+        let (effect_stack_a_tex, effect_stack_a_view) = create_blend_accum_texture(&self.device, width, height, "effect-stack-a");
+        self.effect_stack_a_tex = effect_stack_a_tex;
+        self.effect_stack_a_view = effect_stack_a_view;
+        let (effect_stack_b_tex, effect_stack_b_view) = create_blend_accum_texture(&self.device, width, height, "effect-stack-b");
+        self.effect_stack_b_tex = effect_stack_b_tex;
+        self.effect_stack_b_view = effect_stack_b_view;
     }
 
     /// Uploads (or re-uploads, if already cached under this id) an image's

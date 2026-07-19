@@ -196,6 +196,18 @@
     return true;
   }
 
+  // Converts a layer's `effects` array (JS shape: {type, enabled, p1..p4},
+  // built by effects-panel.js) into the Rust-facing shape (EffectIn,
+  // engine.rs: {effectType, enabled, p1..p4} — camelCase via
+  // #[serde(rename_all = "camelCase")]). Shared by both the ordinary-layer
+  // and effect/adjustment-layer push sites below — same stack, same wire
+  // shape, only the SOURCE texture composite_scene runs it on differs.
+  function sceneEffectsOf(ld) {
+    return (ld.effects || []).map(function (e) {
+      return { effectType: e.type, enabled: !!e.enabled, p1: e.p1, p2: e.p2, p3: e.p3, p4: e.p4 };
+    });
+  }
+
   function buildSceneJson(skipVolatile) {
     var layers = [];
     // StoryBoard montage preview (storyboard.js, 2026-07): when the node
@@ -219,15 +231,14 @@
       // parentLayerUid/parentChainMats mechanism, which only needs the
       // layer to exist at some index, not to draw anything).
       if (state.layers[i].isNullLayer) { layers.push({ items: [] }); continue; }
-      // Effect (adjustment) layer (2026-07, Motion) — never paints its own
-      // content either (ld.frames/strokes are ignored on purpose, matching
-      // AE's "Adjustment Layer" toggle), but DOES carry isEffectLayer/
-      // effectType/effectP1/effectP2 so engine.rs's composite_scene applies
-      // its WGSL pass to everything already composited below it — see
-      // that function's is_effect_layer branch for the full rationale.
+      // Effect (adjustment) layer (2026-07, Motion; effects stack rewrite
+      // 2026-07) — never paints its own content either (ld.frames/strokes
+      // are ignored on purpose, matching AE's "Adjustment Layer" toggle),
+      // but DOES carry isEffectLayer + its `effects` stack so engine.rs's
+      // composite_scene applies each enabled entry to everything already
+      // composited below it — see that function's is_effect_layer branch.
       if (state.layers[i].isEffectLayer) {
-        var eff = state.layers[i];
-        layers.push({ items: [], isEffectLayer: true, effectType: eff.effectType || 'blur', effectP1: eff.effectP1, effectP2: eff.effectP2 });
+        layers.push({ items: [], isEffectLayer: true, effects: sceneEffectsOf(state.layers[i]) });
         continue;
       }
       var children = userLayers[i].children;
@@ -439,21 +450,11 @@
       // by engine.rs's composite_scene which also SKIPS painting the
       // source layer as its own visible content once it's consumed.
       var mm = state.layers[i].matteMode;
-      // Feather/blur (2026-07, blur.wgsl — see geometry-wasm/src/engine.rs's
-      // composite_scene) — same "plain per-layer field, undefined = off"
-      // shape as blendMode/matteMode above.
-      var br = state.layers[i].blurRadius;
-      // Ground/cast shadow (2026-07) — same "plain per-layer field,
-      // undefined = off" shape as blurRadius above; gshadowOpacity<=0 is
-      // the off-switch (see engine.rs's LayerIn::gshadow_* doc comment for
-      // why this runs per-layer, not as an effect/adjustment layer).
-      var gsOp = state.layers[i].gshadowOpacity;
-      var gsOn = gsOp && gsOp > 0;
-      layers.push({ items: items, blendMode: (bm && bm !== 'normal') ? bm : undefined, matteMode: (mm && mm !== 'none') ? mm : undefined, blurRadius: (br && br > 0) ? br : undefined,
-        gshadowSkew: gsOn ? state.layers[i].gshadowSkew : undefined,
-        gshadowGroundY: gsOn ? state.layers[i].gshadowGroundY : undefined,
-        gshadowLength: gsOn ? state.layers[i].gshadowLength : undefined,
-        gshadowOpacity: gsOn ? gsOp : undefined });
+      // Effects stack (2026-07 rewrite — was separate blurRadius/gshadow_*
+      // fields) — runs on THIS layer's own isolated alpha (see
+      // geometry-wasm/src/engine.rs's LayerIn::effects doc comment).
+      layers.push({ items: items, blendMode: (bm && bm !== 'normal') ? bm : undefined, matteMode: (mm && mm !== 'none') ? mm : undefined,
+        effects: sceneEffectsOf(state.layers[i]) });
     }
     // artboard background as the bottom item of a synthetic bottom layer,
     // mirroring drawStage()'s background rect
