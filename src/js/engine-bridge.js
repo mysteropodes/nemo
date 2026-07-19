@@ -1245,6 +1245,13 @@
     paperCanvas.parentNode.insertBefore(rustCanvas, paperCanvas.nextSibling);
     try {
       engine = await window.GeometryWasm.create_engine(rustCanvas, engineW, engineH);
+      // Custom WGSL effects (2026-07) — the wasm engine is a fresh instance
+      // every time it's (re-)created, so any project-defined custom
+      // effects already sitting in state.customEffects (e.g. "Resume Last
+      // Session"/autosave restore, which may load data BEFORE this ever
+      // runs) need to be re-registered now, or their pipelines simply
+      // won't exist yet and run_one_effect's "custom:" branch would no-op.
+      if (window.registerAllCustomEffects) window.registerAllCustomEffects();
       if (window.ResizeObserver) {
         resizeObserver = new ResizeObserver(handleResize);
         resizeObserver.observe(paperCanvas);
@@ -1458,6 +1465,10 @@
     setPenPreview: setPenPreview,
     registerImagePixels: registerImagePixels,
     registerImageRaw: registerImageRaw,
+    // Custom WGSL effects (2026-07) — see custom-effects.js's own
+    // registerAllCustomEffects for why every definition gets re-sent here
+    // on load/engine-(re)creation, not just when first authored.
+    registerCustomEffect: function (key, fsBody) { if (engine) engine.register_custom_effect(key, fsBody); },
     hasImage: function (id) { return !!registeredImageIds[id]; },
     // Call suspend() at the start of an intercepted drag and resume() at the
     // end — see the `suspended` var above for why: without this, tick()'s

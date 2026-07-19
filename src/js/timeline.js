@@ -961,6 +961,11 @@ window.SM={
       // own data-model comment), so a wholesale copy is safe.
       storyboard:state.storyboard||null,
       symbols:state.symbols,palettes:state.palettes,activePaletteIdx:state.activePaletteIdx,customBrushPresets:state.customBrushPresets,
+      // Custom WGSL effects (2026-07, feedback: "la possibilité d'ajouter
+      // ses propres effets wgsl") — project-wide like symbols/palettes
+      // above (not per-layer), since one definition can be applied to any
+      // number of layers' effects stacks by referencing its id.
+      customEffects:state.customEffects,
       // audio: only the persistable fields — _buffer/_peaksCanvas/_srcNode
       // are live runtime objects that must never hit JSON
       audioTracks:(state.audioTracks||[]).map(function(t){return{name:t.name,dataB64:t.dataB64,offsetFrames:t.offsetFrames||0,volume:t.volume!==undefined?t.volume:1,muted:!!t.muted};}),
@@ -1070,6 +1075,8 @@ window.SM={
     while(userLayers.length>0)userLayers.pop().remove();state.layers=[];
     Object.keys(_symbolPaperLayers).forEach(function(k){_symbolPaperLayers[k].forEach(function(l){l.remove();});});_symbolPaperLayers={};
     state.symbols=d.symbols||{};state.openSymbolTabs=[];state.activeSymbolId=null;
+    state.customEffects=d.customEffects||[];
+    if(window.registerAllCustomEffects)window.registerAllCustomEffects();
     d.layers.forEach(function(ld){var idx=createUserLayer(ld.name);state.layers[idx].visible=ld.visible!==false;state.layers[idx].locked=ld.locked||false;state.layers[idx].frames=ld.frames;
       if(ld.blendMode)state.layers[idx].blendMode=ld.blendMode;
       if(ld.matteMode)state.layers[idx].matteMode=ld.matteMode;

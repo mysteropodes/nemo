@@ -88,6 +88,27 @@
 
   function activeLayer() { return state.layers[state.activeLayerIdx]; }
 
+  // Custom WGSL effects (custom-effects.js) live in state.customEffects,
+  // not in the static tables above — these three helpers fall back to a
+  // definition lookup whenever `type` is a "custom:<id>" string, so the
+  // rest of this file (param rows, row labels, defaults on add) treats a
+  // custom effect exactly like a built-in one without a parallel code path.
+  function isCustomEffect(type) { return typeof type === 'string' && type.indexOf('custom:') === 0; }
+  function customDefFor(type) { return isCustomEffect(type) && window.customEffectDef ? window.customEffectDef(type.slice(7)) : null; }
+  function labelFor(type) {
+    var cd = customDefFor(type);
+    return cd ? cd.name : (EFFECT_LABELS[type] || type);
+  }
+  function paramConfigFor(type) {
+    var cd = customDefFor(type);
+    return cd ? cd.params : (EFFECT_PARAM_CONFIG[type] || []);
+  }
+  function defaultsArrFor(type) {
+    var cd = customDefFor(type);
+    if (cd) return cd.params.map(function (p) { return p.min; }).concat([0, 0, 0, 0]).slice(0, 4);
+    return EFFECT_DEFAULTS[type] || [0, 0, 0, 0];
+  }
+
   function renderAddMenu(isAdjustment) {
     var sel = document.getElementById('p-add-effect');
     if (!sel) return;
@@ -103,17 +124,31 @@
       });
       sel.appendChild(group);
     });
+    // Custom shaders (2026-07) — user-authored effects saved in
+    // state.customEffects, plus a fixed entry to open the authoring modal.
+    var customGroup = document.createElement('optgroup');
+    customGroup.label = 'Custom';
+    (state.customEffects || []).forEach(function (c) {
+      var opt = document.createElement('option');
+      opt.value = 'custom:' + c.id; opt.textContent = c.name;
+      customGroup.appendChild(opt);
+    });
+    var newOpt = document.createElement('option');
+    newOpt.value = '__new_custom__'; newOpt.textContent = '+ New custom shader…';
+    customGroup.appendChild(newOpt);
+    sel.appendChild(customGroup);
   }
 
   function addEffect(type) {
     var ld = activeLayer(); if (!ld) return;
     pushUndo();
     if (!ld.effects) ld.effects = [];
-    var d = EFFECT_DEFAULTS[type] || [0, 0, 0, 0];
+    var d = defaultsArrFor(type);
     ld.effects.push({ type: type, enabled: true, p1: d[0], p2: d[1], p3: d[2], p4: d[3] });
     expandedIdx = ld.effects.length - 1; // open the new one immediately
     saveActiveLayerFrame(); renderEffectsSection(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
   }
+  window.addEffectToActiveLayer = addEffect; // custom-effects.js calls this right after authoring a brand-new shader
   function toggleEnabled(idx) {
     var ld = activeLayer(); if (!ld || !ld.effects || !ld.effects[idx]) return;
     pushUndo();
@@ -135,7 +170,7 @@
   }
 
   function renderParamsFor(row, idx, eff) {
-    var cfg = EFFECT_PARAM_CONFIG[eff.type] || [];
+    var cfg = paramConfigFor(eff.type);
     var wrap = document.createElement('div');
     wrap.className = 'fx-row-params';
     if (!cfg.length) {
@@ -151,11 +186,11 @@
       input.type = 'number'; input.className = 'pi scrub';
       input.min = p.min; input.max = p.max; input.dataset.step = p.step;
       var stored = eff[p.key];
-      var def = (EFFECT_DEFAULTS[eff.type] || [0, 0, 0, 0])[{ p1: 0, p2: 1, p3: 2, p4: 3 }[p.key]];
-      input.value = Math.round(((stored !== undefined ? stored : def) * p.scale) * 100) / 100;
+      var def = defaultsArrFor(eff.type)[{ p1: 0, p2: 1, p3: 2, p4: 3 }[p.key]];
+      input.value = Math.round(((stored !== undefined ? stored : def) * (p.scale || 1)) * 100) / 100;
       var unit = document.createElement('span');
       unit.style.cssText = 'font-size:9px;color:var(--text-dim)'; unit.textContent = p.unit || '';
-      input.addEventListener('input', function () { setParam(idx, p.key, (parseFloat(this.value) || 0) / p.scale); });
+      input.addEventListener('input', function () { setParam(idx, p.key, (parseFloat(this.value) || 0) / (p.scale || 1)); });
       input.addEventListener('click', function (e) { e.stopPropagation(); });
       line.appendChild(label); line.appendChild(input); line.appendChild(unit);
       wrap.appendChild(line);
@@ -177,10 +212,22 @@
       eye.title = eff.enabled ? 'Désactiver' : 'Activer';
       eye.addEventListener('click', function (e) { e.stopPropagation(); toggleEnabled(idx); });
       var name = document.createElement('span'); name.className = 'fx-row-name';
-      name.textContent = EFFECT_LABELS[eff.type] || eff.type;
+      name.textContent = labelFor(eff.type);
+      row.appendChild(eye); row.appendChild(name);
+      // Edit the shader source (custom effects only — built-ins have no
+      // source to edit, just params, already reachable by expanding the row).
+      if (isCustomEffect(eff.type)) {
+        var edit = document.createElement('div'); edit.className = 'fx-row-del'; edit.textContent = '✎'; edit.title = 'Modifier le shader';
+        edit.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var def = customDefFor(eff.type);
+          if (def && window.openCustomEffectEditor) window.openCustomEffectEditor(def);
+        });
+        row.appendChild(edit);
+      }
       var del = document.createElement('div'); del.className = 'fx-row-del'; del.textContent = '×'; del.title = 'Supprimer';
       del.addEventListener('click', function (e) { e.stopPropagation(); deleteEffect(idx); });
-      row.appendChild(eye); row.appendChild(name); row.appendChild(del);
+      row.appendChild(del);
       row.addEventListener('click', function () {
         expandedIdx = expandedIdx === idx ? -1 : idx;
         renderEffectsList();
@@ -213,6 +260,7 @@
     var addSel = document.getElementById('p-add-effect');
     if (addSel) addSel.addEventListener('change', function () {
       var type = this.value; this.value = '';
+      if (type === '__new_custom__') { if (window.openCustomEffectEditor) window.openCustomEffectEditor(null); return; }
       if (type) addEffect(type);
     });
   }

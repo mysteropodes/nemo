@@ -33,6 +33,35 @@ export class VelloEngine {
      */
     has_image(id: string): boolean;
     /**
+     * Registers (or re-registers, if `key` already exists — e.g. the
+     * author just edited the source) a user-authored custom WGSL effect
+     * (2026-07, feedback: "la possibilité d'ajouter ses propres effets
+     * wgsl et leur paramètre correspondant") — `key` is a JS-chosen stable
+     * id (e.g. "custom:<uuid>") later used as an EffectIn.effect_type,
+     * `fs_body` is ONLY the body of the fragment shader (a sequence of
+     * WGSL statements ending in `return vec4<f32>(...)`), wrapped here
+     * into a full document that already declares the standard fullscreen-
+     * triangle vertex shader, the texture/sampler/Params bindings, and
+     * three convenience locals every author can use without re-deriving
+     * them: `uv` (0..1), `src` (the pixel already sampled at `uv`), and
+     * `texel` (1 texel in UV units, for neighbor-sampling effects). Same
+     * `Params{effect_id,p1,p2,p3,tex_w,tex_h,time,p4}` layout as
+     * simple_fx.wgsl, so an author's `params.p1`..`params.p4` map 1:1 onto
+     * the SAME p1..p4 fields the stack UI's generic param editor already
+     * writes for every other effect type — no separate wiring needed on
+     * the JS side for a custom effect's parameters.
+     *
+     * Compiling arbitrary author-supplied WGSL at runtime is safe here:
+     * this crate only ever targets the web/WebGPU wgpu backend (built via
+     * `wasm-pack build --target web`), where shader compilation is the
+     * BROWSER's own WebGPU implementation doing the work — invalid WGSL
+     * produces a normal asynchronous validation error via the browser's
+     * uncaptured-error mechanism (the SAME "wgpu uncaptured error" console
+     * messages every other shader bug in this file already produces),
+     * never a Rust panic or a corrupted wasm instance.
+     */
+    register_custom_effect(key: string, fs_body: string): void;
+    /**
      * Uploads (or re-uploads, if already cached under this id) an image's
      * raw RGBA8 pixels, keyed by a caller-chosen stable `id` — JS calls this
      * ONCE per distinct image (e.g. keyed by the Raster's own data URL) and
@@ -211,6 +240,7 @@ export interface InitOutput {
     readonly velloengine_get_selection: (a: number) => [number, number, number, number];
     readonly velloengine_gizmo_handles: (a: number, b: number, c: number) => [number, number, number, number];
     readonly velloengine_has_image: (a: number, b: number, c: number) => number;
+    readonly velloengine_register_custom_effect: (a: number, b: number, c: number, d: number, e: number) => [number, number];
     readonly velloengine_register_image: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number];
     readonly velloengine_render: (a: number, b: number, c: number) => [number, number];
     readonly velloengine_render_to_pixels: (a: number, b: number, c: number) => any;
@@ -225,20 +255,20 @@ export interface InitOutput {
     readonly auto_match: (a: number, b: number, c: number, d: number) => [number, number, number, number];
     readonly resample_stroke: (a: number, b: number, c: number) => [number, number, number, number];
     readonly fill_find: (a: number, b: number) => [number, number, number, number];
-    readonly boolean_op: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
-    readonly effective_frame_index: (a: number, b: number, c: number) => [number, number, number];
-    readonly erase_at_point: (a: number, b: number) => [number, number, number, number];
-    readonly hit_test: (a: number, b: number, c: number, d: number, e: number) => [number, number, number, number];
-    readonly resolve_symbol_frame: (a: number, b: number, c: number) => [number, number, number];
-    readonly __wbg_strokemodeler_free: (a: number, b: number) => void;
-    readonly ellipse_segments: (a: number, b: number, c: number, d: number) => [number, number];
     readonly interp_stroke: (a: number, b: number) => [number, number, number, number];
+    readonly __wbg_strokemodeler_free: (a: number, b: number) => void;
+    readonly effective_frame_index: (a: number, b: number, c: number) => [number, number, number];
+    readonly ellipse_segments: (a: number, b: number, c: number, d: number) => [number, number];
     readonly line_segments: (a: number, b: number, c: number, d: number) => [number, number];
     readonly rect_segments: (a: number, b: number, c: number, d: number) => [number, number];
+    readonly resolve_symbol_frame: (a: number, b: number, c: number) => [number, number, number];
     readonly strokemodeler_down: (a: number, b: number, c: number, d: number, e: number) => [number, number];
     readonly strokemodeler_move: (a: number, b: number, c: number, d: number, e: number) => [number, number];
     readonly strokemodeler_new: (a: number, b: number) => number;
     readonly strokemodeler_up: (a: number, b: number, c: number, d: number, e: number) => [number, number];
+    readonly boolean_op: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
+    readonly erase_at_point: (a: number, b: number) => [number, number, number, number];
+    readonly hit_test: (a: number, b: number, c: number, d: number, e: number) => [number, number, number, number];
     readonly wasm_bindgen__convert__closures_____invoke__h4177160f1dac6248: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen__convert__closures_____invoke__h49909fab4bc066b4: (a: number, b: number, c: any, d: any) => void;
     readonly wasm_bindgen__convert__closures_____invoke__h29bfc5eda1199406: (a: number, b: number, c: any) => void;
