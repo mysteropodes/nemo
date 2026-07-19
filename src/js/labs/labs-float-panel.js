@@ -122,11 +122,21 @@
   // stroke-based line art, which read as a different, thinner icon
   // language. Rebuilt every icon as a solid silhouette to match.
   var ICONS = {
-    'brush-menu': '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M19.4 2.6c.8.8.8 2 0 2.8L9.5 15.3l-4-4L15.4 1.4c.8-.8 2-.8 2.8 0z" opacity=".85"/><path d="M8.3 12.4l3.3 3.3-1.4 1.4c-1.8 1.8-6.4 2-6.4 2s.2-4.6 2-6.4z"/></svg>',
-    // Same "split by an axis" language as the toolbar button (index.html),
-    // simplified/solid-filled to match this strip's icon set.
-    'symmetry': '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><rect x="11" y="2" width="2" height="20" rx="1"/><path d="M9 6L3 12L9 18Z"/><path d="M15 6L21 12L15 18Z"/></svg>',
-    'perspective': '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><circle cx="12" cy="6" r="2"/><path d="M12 6L2 22h4L12 10l6 12h4Z"/><path d="M2 22L12 6l10 16" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".5"/></svg>',
+    // Reuses the EXACT same glyph as the main Brush/Draw tool button in the
+    // left toolbar (index.html, data-tool="draw") — feedback 2026-07:
+    // "certaines icônes comme les guides ou brush du panneau flottant ne
+    // sont pas très claires". Same concept, same icon, so it reads as
+    // recognizable on sight instead of a new abstract shape to learn.
+    'brush-menu': '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M7 14c-1.66 0-3 1.34-3 3 0 1.31-1.16 2-2 2 .92 1.22 2.49 2 4 2 2.21 0 4-1.79 4-4 0-1.66-1.34-3-3-3z"/><path d="M20.71 4.63l-1.34-1.34a1 1 0 00-1.41 0L9 12.25 11.75 15l8.96-8.96a1 1 0 000-1.41z"/></svg>',
+    // Redrawn (2026-07, same "not very clear" feedback) as two solid
+    // mirrored blocks either side of the axis instead of two thin
+    // triangles — reads unambiguously as "mirror" even at 15px, where the
+    // old triangle pair tended to blur into a single arrow-like shape.
+    'symmetry': '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><rect x="11" y="2" width="2" height="20" rx="1" opacity=".45"/><path d="M9 4H4a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h5z"/><path d="M15 4h5a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-5z" opacity=".55"/></svg>',
+    // Redrawn as a square frame with diagonals converging on a center
+    // vanishing point — the standard "perspective grid" glyph used by
+    // most design tools, clearer than the old horizon-line-plus-rays shape.
+    'perspective': '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="1"/><path d="M3 3l8.5 8.5M21 3l-8.5 8.5M3 21l8.5-8.5M21 21l-8.5-8.5"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/></svg>',
     'predictive-stroke': '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M12 2l1.2 3.8L17 7l-3.8 1.2L12 12l-1.2-3.8L7 7l3.8-1.2L12 2z"/><path d="M19 13l.6 1.9L21.5 15.5l-1.9.6L19 18l-.6-1.9L16.5 15.5l1.9-.6L19 13z"/><path d="M5 15l.5 1.5L7 17l-1.5.5L5 19l-.5-1.5L3 17l1.5-.5L5 15z"/></svg>',
     'multiframe-draw': '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M12 2L22 7L12 12L2 7Z"/><path d="M2 12L12 17L22 12L22 14L12 19L2 14Z" opacity=".55"/></svg>',
     'canvas-grid': '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>',

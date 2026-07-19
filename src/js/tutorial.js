@@ -1233,7 +1233,7 @@
           check: function (win) { var el = win.document.getElementById('btn-ref-import'); return !!(el && el.getBoundingClientRect().height > 0); }
         },
         { type: 'click', target: '#btn-ref-import', title: 'Regarde le bouton "Importer…"', body: 'Clique "Importer…" pour voir le sélecteur de fichier s\'ouvrir (vidéo, séquence d\'images, ou image seule).' },
-        { type: 'click', target: '#p-ref-opacity', title: 'Repère le réglage Opacity', body: 'Ce curseur règle la transparence de la référence une fois importée, pour qu\'elle ne gêne pas ton dessin par-dessus.' },
+        { type: 'click', target: '#p-ref-opacity', title: 'Repère le réglage Opacity', body: 'Ce champ (glisse pour changer, ou clique pour taper une valeur) règle la transparence de la référence une fois importée, pour qu\'elle ne gêne pas ton dessin par-dessus.' },
         { type: 'info', title: 'Bien joué !', body: '"Offset" décale la frame de départ de la référence par rapport à la timeline — utile si ta vidéo ne commence pas au même instant que ton animation.' }
       ]
     },
