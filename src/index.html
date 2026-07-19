@@ -132,7 +132,14 @@
      the outgoing tab and imports the incoming one via the same JSON
      export/import already used for file save/open. -->
 <div id="top-area">
+  <!-- Dockable tools panel (2026-07, "ajoute la possibilité en drag du
+       panel de réorganiser la position du panel gauche en haut/à droite/
+       en bas") — dragging #tools-panel-handle over one of the 4 edge drop
+       zones (tools-panel-dock.js) re-docks the whole panel there, choice
+       persisted to localStorage. Same drag-handle idiom as the Labs
+       floating panel's own #labs-float-handle. -->
   <div id="tools-panel">
+    <div id="tools-panel-handle" class="tools-dock-handle" title="Glisser pour déplacer le panneau d'outils">⠿</div>
     <button class="tool-btn" data-tool="select" data-i18n-title="toolSelect" title="Selection / Transform (V)"><svg viewBox="0 0 24 24" width="17" height="17"><rect x="2.5" y="2.5" width="12" height="12" rx="0.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="2.4 2"/><rect x="1.3" y="1.3" width="2.4" height="2.4" fill="currentColor"/><rect x="12.3" y="1.3" width="2.4" height="2.4" fill="currentColor"/><rect x="1.3" y="12.3" width="2.4" height="2.4" fill="currentColor"/><rect x="12.3" y="12.3" width="2.4" height="2.4" fill="currentColor"/><path d="M11 9l8.5 5.2-4.3 0.9L13.2 19z" fill="currentColor"/></svg><span class="sk">V</span></button>
     <button class="tool-btn" data-tool="subselect" data-i18n-title="toolSubselect" title="Subselection — points &amp; tangents (A)"><svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor"><path d="M5 3l14 8-6 1.3L11 20z"/></svg><span class="sk">A</span></button>
     <!-- v18: independent fill/stroke selection, Animate merge-drawing style —
@@ -1188,6 +1195,7 @@
 <script src="js/labs/timeline-zoom.js"></script>
 <script src="js/labs/labs-panel.js"></script>
 <script src="js/labs/labs-float-panel.js"></script>
+<script src="js/tools-panel-dock.js"></script>
 <script src="js/lottie-preview.js"></script>
 <script src="js/timeline.js"></script>
 <script src="js/i18n.js"></script>
