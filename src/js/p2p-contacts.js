@@ -106,7 +106,7 @@
     if (!state.p2pContacts.length) {
       var empty = document.createElement('div');
       empty.style.cssText = 'font-size:9px;color:var(--text-dim);padding:4px 0;';
-      empty.textContent = 'Aucun contact — colle un code d’invitation ci-dessus.';
+      empty.textContent = window.SM.t('p2pNoContacts');
       list.appendChild(empty);
       return;
     }
@@ -115,7 +115,7 @@
       row.style.cssText = 'display:flex;align-items:center;gap:6px;padding:5px 6px;border-radius:5px;background:var(--panel3);';
       var dot = document.createElement('div');
       dot.style.cssText = 'width:7px;height:7px;border-radius:50%;flex-shrink:0;background:' + (c.status === 'connected' ? '#4caf50' : '#888');
-      dot.title = c.status === 'connected' ? 'Connecté' : 'En attente — transport P2P pas encore actif';
+      dot.title = c.status === 'connected' ? window.SM.t('p2pConnected') : window.SM.t('p2pWaiting');
       var nm = document.createElement('div');
       nm.style.cssText = 'flex:1;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
       nm.textContent = c.displayName;

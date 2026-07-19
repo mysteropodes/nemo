@@ -129,13 +129,13 @@
     var hdr = document.getElementById('selected-colors-hdr');
     if (!body) return;
     var hasSel = !!(window.selectedPaths && selectedPaths.length);
-    if (hdr) hdr.textContent = hasSel ? 'Selected Colors' : 'All Project Colors';
+    if (hdr) hdr.textContent = SM.t(hasSel ? 'hdrSelectedColors' : 'hdrAllProjectColors');
     var list = computeUsedColors();
     body.innerHTML = '';
     if (!list.length) {
       var empty = document.createElement('div');
       empty.className = 'pr'; empty.style.cssText = 'font-size:9px;color:var(--text-dim)';
-      empty.textContent = 'Aucune couleur';
+      empty.textContent = SM.t('noColorSelected');
       body.appendChild(empty);
       return;
     }
