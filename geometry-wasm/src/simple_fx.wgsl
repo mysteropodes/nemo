@@ -60,6 +60,9 @@ const EFFECT_GRAIN: f32 = 7.0;
 const EFFECT_SHARPEN: f32 = 8.0;
 const EFFECT_EDGE_DETECT: f32 = 9.0;
 const EFFECT_GROUND_SHADOW: f32 = 10.0;
+const EFFECT_CONTOUR_BRUT: f32 = 11.0;
+const EFFECT_THRESHOLD: f32 = 12.0;
+const EFFECT_HALFTONE: f32 = 13.0;
 
 // Standard Rec.601 luminance weights — appears identically across every
 // grayscale/luminance tutorial, public-domain-level constant.
@@ -207,11 +210,76 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         return vec4<f32>(out_rgb, out_a);
     }
 
+    if (id == EFFECT_CONTOUR_BRUT) {
+        // Hand-drawn/sketchy outline traced along the layer's own alpha
+        // silhouette — same isolated-alpha requirement and layerOnly
+        // placement as EFFECT_GROUND_SHADOW (see its comment above for why
+        // this only works pre-composite). Samples a jittered ring around
+        // each pixel; a mix of inside/outside alpha in that ring means the
+        // pixel sits near the silhouette boundary, so it gets tinted —
+        // `roughness` randomizes each tap's radius so the traced line
+        // wobbles like a rough hand-drawn stroke instead of a clean circle.
+        //
+        // p1 = épaisseur (ring radius, px)
+        // p2 = rugosité (per-tap radius jitter, 0..1)
+        // p3 = luminosité du trait (0=noir..1=blanc)
+        // p4 = opacité
+        let src = textureSample(src_tex, tex_sampler, in.uv);
+        let thickness = max(params.p1, 0.5);
+        let roughness = clamp(params.p2, 0.0, 1.0);
+        let taps = 12;
+        var minA = 1.0;
+        var maxA = 0.0;
+        for (var i = 0; i < taps; i = i + 1) {
+            let ang = f32(i) / f32(taps) * 6.28318;
+            let jitter = 1.0 + (hash(in.uv * f32(i + 1) + params.time) - 0.5) * roughness;
+            let offs = vec2<f32>(cos(ang), sin(ang)) * thickness * jitter * texel;
+            let s = textureSample(src_tex, tex_sampler, in.uv + offs);
+            minA = min(minA, s.a);
+            maxA = max(maxA, s.a);
+        }
+        let edge = clamp((maxA - minA) * 2.0, 0.0, 1.0);
+        let tint = clamp(params.p3, 0.0, 1.0);
+        let outline_a = edge * clamp(params.p4, 0.0, 1.0);
+        let out_rgb = mix(src.rgb, vec3<f32>(tint), outline_a);
+        let out_a = max(src.a, outline_a);
+        return vec4<f32>(out_rgb, out_a);
+    }
+
+    if (id == EFFECT_HALFTONE) {
+        // Classic dot-screen: sample the color at each grid cell's CENTER
+        // (not the current pixel) so every pixel within a cell agrees on
+        // one dot size/luminance, then draw a black dot whose radius grows
+        // as that cell's luminance drops (dark region → big dot → looks
+        // darker overall, the standard halftone illusion).
+        //
+        // p1 = taille cellule (px)
+        // p2 = intensité (max dot radius as a fraction of the cell, 0..1)
+        let cell = max(params.p1, 2.0);
+        let px = in.uv * vec2<f32>(params.tex_w, params.tex_h);
+        let cellIdx = floor(px / cell);
+        let cellPos = (px - cellIdx * cell) / cell - vec2<f32>(0.5);
+        let cellCenterUv = (cellIdx + vec2<f32>(0.5)) * cell / vec2<f32>(params.tex_w, params.tex_h);
+        let s = textureSample(src_tex, tex_sampler, cellCenterUv);
+        let l = luma(s.rgb);
+        let radius = (1.0 - l) * 0.5 * clamp(params.p2, 0.0, 1.0);
+        let inDot = length(cellPos) < radius;
+        let out_rgb = select(vec3<f32>(1.0), vec3<f32>(0.0), inDot);
+        return vec4<f32>(out_rgb, s.a);
+    }
+
     // Everything below is a plain per-pixel color remap — single sample.
     let src = textureSample(src_tex, tex_sampler, in.uv);
     var rgb = src.rgb;
 
-    if (id == EFFECT_SEPIA) {
+    if (id == EFFECT_THRESHOLD) {
+        // Hard (or softened) black/white luminance cutoff.
+        // p1 = seuil (0..1), p2 = adoucissement (smoothstep half-width)
+        let threshold = clamp(params.p1, 0.0, 1.0);
+        let soft = max(params.p2, 0.0001);
+        let l = luma(rgb);
+        rgb = vec3<f32>(smoothstep(threshold - soft, threshold + soft, l));
+    } else if (id == EFFECT_SEPIA) {
         // Standard sepia transform matrix — identical constants across
         // every independent sepia-shader tutorial.
         let r = dot(rgb, vec3<f32>(0.393, 0.769, 0.189));

@@ -186,18 +186,19 @@ pub(crate) struct LayerIn {
     // source texture, since each pass function only cares about whatever
     // texture it's given.
     //
-    // IMPORTANT asymmetry this implies: "groundShadow" needs the shape's
-    // OWN true alpha silhouette (transparent where there's no content) to
-    // produce a correctly-shaped shadow — but this engine seeds the
-    // ACCUMULATOR with an OPAQUE base color up front (composite_scene's
-    // clear_texture call), so alpha can no longer tell "shape" from "empty
-    // background" once flattened (confirmed by direct pixel-probing during
-    // development). Adding "groundShadow" to an effect/adjustment layer's
-    // stack is therefore a no-op-looking full-canvas darken, not a
-    // silhouette shadow — the JS-side "Add Effect" menu accordingly only
-    // offers it for ordinary layers, mirroring AE's own real distinction
-    // between a plain Effect (works anywhere) and a shape-aware Layer Style
-    // like Drop Shadow (per-layer only).
+    // IMPORTANT asymmetry this implies: "groundShadow" AND "contourBrut"
+    // both need the shape's OWN true alpha silhouette (transparent where
+    // there's no content) to produce a correctly-shaped result — but this
+    // engine seeds the ACCUMULATOR with an OPAQUE base color up front
+    // (composite_scene's clear_texture call), so alpha can no longer tell
+    // "shape" from "empty background" once flattened (confirmed by direct
+    // pixel-probing during development). Adding either to an effect/
+    // adjustment layer's stack is therefore a no-op-looking full-canvas
+    // darken/outline, not a silhouette-aware result — the JS-side "Add
+    // Effect" menu accordingly only offers them for ordinary layers,
+    // mirroring AE's own real distinction between a plain Effect (works
+    // anywhere) and a shape-aware Layer Style like Drop Shadow/Stroke
+    // (per-layer only).
     #[serde(default)]
     pub(crate) effects: Vec<EffectIn>,
 }
@@ -2084,7 +2085,7 @@ impl VelloEngine {
                     source, &self.blur_result_view, 2, target,
                 );
             }
-            "sepia" | "invert" | "grayscale" | "posterize" | "pixelate" | "chromaticAberration" | "scanlines" | "grain" | "sharpen" | "edgeDetect" | "groundShadow" => {
+            "sepia" | "invert" | "grayscale" | "posterize" | "pixelate" | "chromaticAberration" | "scanlines" | "grain" | "sharpen" | "edgeDetect" | "groundShadow" | "contourBrut" | "threshold" | "halftone" => {
                 let effect_id = match eff.effect_type.as_str() {
                     "sepia" => 0.0,
                     "invert" => 1.0,
@@ -2096,7 +2097,10 @@ impl VelloEngine {
                     "grain" => 7.0,
                     "sharpen" => 8.0,
                     "edgeDetect" => 9.0,
-                    _ => 10.0, // "groundShadow"
+                    "groundShadow" => 10.0,
+                    "contourBrut" => 11.0,
+                    "threshold" => 12.0,
+                    _ => 13.0, // "halftone"
                 };
                 let default_p1 = match eff.effect_type.as_str() {
                     "posterize" => 6.0,
@@ -2107,6 +2111,9 @@ impl VelloEngine {
                     "sharpen" => 0.5,
                     "edgeDetect" => 4.0,
                     "groundShadow" => 0.0,
+                    "contourBrut" => 3.0,
+                    "threshold" => 0.5,
+                    "halftone" => 10.0,
                     _ => 0.0,
                 };
                 let default_p2 = match eff.effect_type.as_str() {
@@ -2116,10 +2123,17 @@ impl VelloEngine {
                     // shadow's reachable source band far from a typical
                     // centered shape, making it look broken by default.
                     "groundShadow" => 0.62,
+                    "contourBrut" => 0.4,
+                    "threshold" => 0.08,
+                    "halftone" => 0.9,
                     _ => 0.0,
                 };
                 let default_p3 = if eff.effect_type == "groundShadow" { 0.6 } else { 0.0 };
-                let default_p4 = if eff.effect_type == "groundShadow" { 0.65 } else { 0.0 };
+                let default_p4 = match eff.effect_type.as_str() {
+                    "groundShadow" => 0.65,
+                    "contourBrut" => 0.9,
+                    _ => 0.0,
+                };
                 simple_fx_pass(
                     &self.device, &self.queue, &self.simple_fx_pipeline, &self.simple_fx_bind_group_layout, &self.simple_fx_sampler, &self.simple_fx_uniform_buf,
                     source, effect_id,
