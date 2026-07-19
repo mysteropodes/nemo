@@ -572,6 +572,11 @@
           <span class="pl" data-i18n="fieldWidth2">Width</span><input type="number" class="pi scrub" id="p-sw" value="3" min="1" max="300" data-step="1" data-i18n-title="strokeWidthTitle" title="Stroke width (px) — pilote aussi la taille des dabs du Bitmap Brush" style="flex:0 0 56px">
           <select class="psel" id="p-strokestyle" style="flex:1"><option value="solid" data-i18n="styleSolid">Solid</option><option value="dashed" data-i18n="styleDashed">Dashed</option><option value="dotted" data-i18n="styleDotted">Dotted</option></select>
         </div>
+        <!-- Smooth moved right below Width (feedback 2026-07: "le smooth
+             doit aller en dessous de Width") — was much further down, past
+             Brush/Bitmap Brush. No more Apply button either (see its own
+             input's comment / timeline.js) — applies live on change. -->
+        <div class="pr" data-i18n-title="poststrokeSmoothTitle" title="Re-smooths the SELECTED stroke's existing geometry — unlike Tool Options' Smooth (which only shapes new strokes as you draw), this is a one-shot action you can apply after the fact, repeatedly, to a stroke already on the canvas. Note: a freshly-drawn stroke is already simplified at draw time (Tool Options' Smooth, 10 by default) — applying THIS at the same or lower value won't visibly change anything since it's already fit that tightly; raise it for a visible extra effect."><span class="pl" data-i18n="fieldSmooth">Smooth</span><input type="number" class="pi scrub" id="p-poststroke-smooth" value="25" min="0" max="80" data-step="1"></div>
         <div class="pr"><span class="pl" data-i18n="fieldCap">Cap</span><div class="icon-grp" id="p-cap-grp" data-value="round">
           <button class="icon-btn" data-value="round" data-i18n-title="capRound" title="Round"><svg viewBox="0 0 24 10"><line x1="4" y1="5" x2="20" y2="5" stroke="currentColor" stroke-width="6" stroke-linecap="round"/></svg></button>
           <button class="icon-btn" data-value="butt" data-i18n-title="capButt" title="Butt"><svg viewBox="0 0 24 10"><line x1="4" y1="5" x2="20" y2="5" stroke="currentColor" stroke-width="6" stroke-linecap="butt"/></svg></button>
@@ -647,7 +652,6 @@
         <div class="pr" data-i18n-title="bitmapApplyTitle" title="Re-stamps every selected Bitmap Brush stroke (or converts a selected vector-textured/plain stroke) with the settings above"><span class="pl"></span><button class="pbtn" id="btn-bitmap-apply" style="flex:1;font-size:10px" type="button" data-i18n="btnApplySelection">Apply to selection</button></div>
         <div class="pr" data-i18n-title="bitmapRemoveTitle" title="Strips the bitmap texture off every selected stroke, restoring its plain stroke/fill"><span class="pl"></span><button class="pbtn" id="btn-bitmap-remove" style="flex:1;font-size:10px" type="button" data-i18n="btnRemoveSelection">Remove from selection</button></div>
         </div>
-        <div class="pr" data-i18n-title="poststrokeSmoothTitle" title="Re-smooths the SELECTED stroke's existing geometry — unlike Tool Options' Smooth (which only shapes new strokes as you draw), this is a one-shot action you can apply after the fact, repeatedly, to a stroke already on the canvas. Note: a freshly-drawn stroke is already simplified at draw time (Tool Options' Smooth, 10 by default) — applying THIS at the same or lower value won't visibly change anything since it's already fit that tightly; raise it for a visible extra effect."><span class="pl" data-i18n="fieldSmooth">Smooth</span><input type="number" class="pi scrub" id="p-poststroke-smooth" value="25" min="0" max="80" data-step="1"><button class="pbtn" id="btn-poststroke-smooth" data-i18n="btnApply">Apply</button></div>
       </div>
     </div>
     <!-- Selected Colors (2026-07, "un nouvel onglet de gestion des couleurs

@@ -461,7 +461,18 @@ window.SM={
   smoothSelectedStroke:function(amount){
     if(!((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length))return;
     amount=Math.max(0,parseFloat(amount)||0);
-    pushUndo();
+    // No Apply button anymore (2026-07: "plus besoin du bouton apply pour
+    // smooth, il le fait directement quand on change de valeur") — wired to
+    // the field's own 'change' event instead, which the scrub mechanism
+    // (ui.js) ALSO dispatches repeatedly WHILE dragging (coalesced per
+    // frame, not just at release) — its OWN pushUndo() already fires once
+    // at the start of that drag (ui.js's pointermove handler), so calling
+    // pushUndo() again here on every one of those live ticks would spam
+    // the undo stack with one throwaway entry per frame instead of a
+    // single "before Smooth" snapshot. Skip ONLY this call's own snapshot
+    // while a scrub is live; a plain typed value + Enter/blur (no scrub
+    // involved, flag never set) still gets its own real undo step here.
+    if(!window._scrubLiveActive)pushUndo();
     selectedPaths.forEach(function(p){
       if(p.data&&p.data.isVectorBrush&&p.data.centerSegments&&p.data.centerSegments.length>1){
         var raw=p.data.centerSegments.map(function(s){return new Point(s.point[0],s.point[1]);});
@@ -4820,7 +4831,13 @@ document.getElementById('p-stab').addEventListener('change',function(){window.SM
 document.getElementById('p-strokestyle').addEventListener('change',function(){window.SM.setStrokeStyle(this.value);});
 document.getElementById('p-miterlimit').addEventListener('change',function(){window.SM.setMiterLimit(this.value);});
 document.getElementById('p-dashoffset').addEventListener('change',function(){window.SM.setDashOffset(this.value);});
-document.getElementById('btn-poststroke-smooth').addEventListener('click',function(){window.SM.smoothSelectedStroke(document.getElementById('p-poststroke-smooth').value);});
+// "Apply" button removed (2026-07: "plus besoin du bouton apply pour
+// smooth, il le fait directement quand on change de valeur") — the field
+// applies live on its own 'change' (fires on type+Enter/blur, and on the
+// scrub drag's own coalesced/final dispatches — see smoothSelectedStroke's
+// own comment for why its internal pushUndo() is skipped during a live
+// scrub instead of double-snapshotting).
+document.getElementById('p-poststroke-smooth').addEventListener('change',function(){window.SM.smoothSelectedStroke(this.value);});
 // Icon-button groups (Cap/Join/Paint Order) — clicking a button selects it
 // (single-choice, like a radio group) and calls the matching SM setter.
 // `data-value` on the wrapper always mirrors the currently-selected
