@@ -501,6 +501,10 @@ input[type="checkbox"]:disabled{opacity:.4;cursor:not-allowed;}
 .fx-prev-groundShadow{background:linear-gradient(to bottom,#dfe6f0 0%,#dfe6f0 62%,#aab4c4 62%,#aab4c4 100%);}
 .fx-prev-groundShadow::after{content:'';position:absolute;left:30%;top:14%;width:22%;height:38%;background:#556;border-radius:3px 3px 0 0;}
 .fx-prev-groundShadow::before{content:'';position:absolute;left:38%;top:58%;width:46%;height:16%;background:rgba(0,0,0,.45);border-radius:50%;filter:blur(1px);transform:skewX(-25deg);}
+.fx-prev-contourBrut{background:var(--panel3);}
+.fx-prev-contourBrut::after{content:'';position:absolute;inset:3px;border:1.5px dashed rgba(236,234,231,.65);border-radius:3px 5px 4px 6px/4px 3px 6px 4px;}
+.fx-prev-threshold{background:linear-gradient(90deg,#050505 50%,#f5f5f5 50%);}
+.fx-prev-halftone{background-color:#fff;background-image:radial-gradient(circle,#111 38%,transparent 40%),radial-gradient(circle,#111 38%,transparent 40%);background-size:6px 6px,6px 6px;background-position:0 0,3px 3px;}
 /* Figma-style paired W/H row (Document, 2026-07) — a small link icon
    between the two fields toggles proportion-lock (tools-panel-dock.js
    sibling pattern: JS toggles .on, CSS just reflects it). */
