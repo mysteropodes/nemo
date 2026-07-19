@@ -25,6 +25,12 @@
     el.textContent=currentPath?(currentName+' — '+currentPath):(currentName+' (not saved)');
     el.title=currentPath||'';
   }
+  // Used by the burger menu (timeline.js initAppMenu) now that the old
+  // right-panel "Projet" section (and its #proj-current row) is gone —
+  // same text updateCurrentLabel used to write there.
+  function getCurrentLabel(){
+    return currentPath?(currentName+' — '+currentPath):(currentName+' (not saved)');
+  }
 
   function baseName(path){
     var parts=path.split(/[\\/]/);var f=parts[parts.length-1]||path;
@@ -342,7 +348,7 @@
     // feedback-bridge.js's local + shared feedback storage keys off, so a
     // feedback thread and this project's own history/sync folders always
     // agree on which project they belong to without re-deriving the logic.
-    getProjectKey:historyKey,profileDir:profileDir,isDirty:isDirty,markSaved:function(){try{markSaved(window.SM.exportJSON());}catch(e){}}};
+    getProjectKey:historyKey,profileDir:profileDir,isDirty:isDirty,markSaved:function(){try{markSaved(window.SM.exportJSON());}catch(e){}},getCurrentLabel:getCurrentLabel};
 
   // ---- Close-with-unsaved-work guard ----
   // Cmd+Q / window-close with unsaved changes asked NOTHING before this —
