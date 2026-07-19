@@ -122,6 +122,12 @@
   <!-- Feedback avatars + settings gear stay pinned to the top bar (their
        pre-redesign position) instead of following the project tabs down
        into the canvas column. -->
+  <!-- Comment tool, moved here from the left tools panel (feedback
+       2026-07: "réorganisation des boutons dans le panel gauche" — right
+       next to the feedback avatars it already pins comments alongside).
+       Same .tool-btn class, same data-tool wiring — the click handler is a
+       global querySelectorAll('.tool-btn'), location-independent. -->
+  <button class="tool-btn" id="topbar-comment-btn" data-tool="comment" data-i18n-title="toolComment" title="Comment — click the canvas to pin a note (C)"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M20 2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4l4 4 4-4h4a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2z"/></svg><span class="sk">C</span></button>
   <div id="fb-avatars" title="Feedback comments sur ce projet"></div>
   <div id="fb-avatars-pop"></div>
   <button id="btn-open-tutorial-topbar" title="Découvrir Nemo — tutoriel interactif"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>
@@ -163,16 +169,22 @@
     <button class="tool-btn" data-tool="fill" data-i18n-title="toolFill" title="Paint bucket — click an enclosed area to fill it (G)"><span class="material-symbols-rounded">&#xe23a;</span><span class="sk">G</span></button>
     <button class="tool-btn" data-tool="eyedropper" data-i18n-title="toolEyedropper" title="Eyedropper (I)"><span class="material-symbols-rounded">&#xe3b8;</span><span class="sk">I</span></button>
     <div class="tool-sep"></div>
-    <button class="tool-btn" data-tool="comment" data-i18n-title="toolComment" title="Comment — click the canvas to pin a note (C)"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M20 2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4l4 4 4-4h4a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2z"/></svg><span class="sk">C</span></button>
+    <!-- Comment moved to #app-topbar (feedback 2026-07 — "réorganisation
+         des boutons dans le panel gauche") — .tool-btn click wiring is a
+         global document.querySelectorAll('.tool-btn'), location-
+         independent, so the same element works unchanged wherever it
+         lives; see #app-topbar below for its new home near the avatar. -->
     <button class="tool-btn" data-tool="hand" data-i18n-title="toolHand" title="Hand — pan the canvas (H or Space)"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M20.5 5A1.5 1.5 0 0 0 19 6.5V11h-1V4.5a1.5 1.5 0 0 0-3 0V11h-1V3.5a1.5 1.5 0 0 0-3 0V11h-1V5.5a1.5 1.5 0 0 0-3 0v10.81l-2.22-3.6a1.504 1.504 0 1 0-2.56 1.58l3.31 5.34A5 5 0 0 0 9.78 22H17a5 5 0 0 0 5-5V6.5A1.5 1.5 0 0 0 20.5 5Z"/></svg><span class="sk">H</span></button>
     <button class="tool-btn" data-tool="zoom" data-i18n-title="toolZoom" title="Zoom — click to zoom in, Alt+click to zoom out (Z)"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.35-4.35" stroke-linecap="round"/></svg><span class="sk">Z</span></button>
     <button class="tool-btn" data-tool="rotate" data-i18n-title="toolRotate" title="Rotate canvas — drag to spin the stage around its center. Also works as Alt+drag from any other tool."><span style="font-size:15px;line-height:1">&#x21bb;</span></button>
-    <!-- Vanishing-point icon (horizon + converging rays) instead of the old
-         abstract ◇, which read as nothing in particular (feedback #21). -->
-    <button class="tool-btn" data-tool="perspective" data-i18n-title="toolPerspective" title="Perspective guide — drag vanishing points to place them. Once enabled, the Line tool snaps toward them from any tool."><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 6h20"/><circle cx="12" cy="6" r="1.7" fill="currentColor" stroke="none"/><path d="M12 6 4 20M12 6l8 14M12 6v14"/></svg></button>
-    <!-- Symmetry guide icon: a mirrored pair of shapes split by an axis
-         line, distinct from perspective's fan-of-rays icon just above. -->
-    <button class="tool-btn" data-tool="symmetry" data-i18n-title="toolSymmetry" title="Symmetry guide — Y/X/free-angle mirror or radial mandala. Drag the axis (its endpoints in Free mode, or the center in Radial mode) to reposition it. Draw with any tool once enabled."><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2v20" stroke-dasharray="2.5 2.5"/><path d="M12 5 5 8v8l7 3" stroke-linejoin="round"/><path d="M12 5l7 3v8l-7 3" stroke-linejoin="round"/></svg></button>
+    <!-- Perspective/Symmetry tool buttons removed (feedback 2026-07: "tu
+         n'as pas enlevé les boutons de perspective et symétrie dans la
+         barre gauche" — a follow-up to the right-panel section removal
+         earlier) — both tools stay fully functional, entered exclusively
+         via the Labs floating panel's toggle (REAL_FEATURES.toggle already
+         calls window.SM.setTool('perspective'/'symmetry') the moment its
+         guide turns on), matching "les options doivent être gérées au
+         niveau du panneau flottant". -->
     <div class="tool-sep"></div>
     <!-- v10 (mockup redesign): stroke swatch (colored ring) stacked ABOVE
          the fill swatch (solid rounded square), each with its own round

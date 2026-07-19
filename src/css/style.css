@@ -34,6 +34,15 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--gutter);color:
 #app-topbar{flex:none;height:34px;display:flex;align-items:center;gap:10px;padding:0 10px;background:var(--panel2);border-radius:8px;}
 #app-menu-btn{flex:none;width:26px;height:26px;border-radius:6px;background:transparent;border:none;color:var(--text-dim);cursor:pointer;display:flex;align-items:center;justify-content:center;}
 #app-menu-btn:hover{background:var(--panel3);color:var(--text);}
+/* Comment tool button, relocated from the left tools panel into the top
+   bar (feedback 2026-07) — same .tool-btn/.active styling elsewhere still
+   applies (so it still highlights while the Comment tool is selected),
+   just sized down to match its new compact neighbors (avatar/help/
+   settings) instead of the left panel's larger 34px icons. The shortcut
+   badge (.sk, a small "C") only makes sense against the left panel's
+   taller buttons — dropped here, the title tooltip already says "(C)". */
+#topbar-comment-btn{width:26px;height:26px;flex:none;}
+#topbar-comment-btn .sk{display:none;}
 #app-mode-switch{display:flex;align-items:center;gap:2px;background:var(--bg);border-radius:7px;padding:2px;}
 .app-mode-btn{flex:none;border:none;background:transparent;color:var(--text-dim);font-size:11px;font-weight:500;padding:5px 12px;border-radius:5px;cursor:pointer;}
 .app-mode-btn:hover:not(:disabled){color:var(--text);}
@@ -144,7 +153,6 @@ body.mac-overlay-titlebar #app{padding-top:28px;}
 .tools-dock-handle{width:100%;height:14px;display:flex;align-items:center;justify-content:center;color:rgba(236,234,231,.3);cursor:grab;font-size:11px;touch-action:none;user-select:none;flex:none;}
 .tools-dock-handle:hover{color:rgba(236,234,231,.6);}
 .tools-dock-handle:active{cursor:grabbing;}
-#tools-panel.tools-dock-right{order:99;}
 #tools-panel.tools-dock-top,#tools-panel.tools-dock-bottom{
   position:absolute;z-index:20;box-shadow:0 2px 16px rgba(0,0,0,.45);border-radius:8px;
   top:auto;bottom:auto;left:8px;right:8px;width:auto;height:50px;
