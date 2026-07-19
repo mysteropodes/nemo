@@ -149,7 +149,7 @@
       hexInput.type = 'text'; hexInput.className = 'pi color-hex-input'; hexInput.spellcheck = false; hexInput.maxLength = 9;
       hexInput.value = hexDisplayValue(entry.hex);
       var opacityInput = document.createElement('input');
-      opacityInput.type = 'number'; opacityInput.className = 'pi color-opacity-input'; opacityInput.min = 0; opacityInput.max = 100;
+      opacityInput.type = 'number'; opacityInput.className = 'pi scrub color-opacity-input'; opacityInput.min = 0; opacityInput.max = 100; opacityInput.dataset.step = '1';
       opacityInput.value = alphaPctFromHex(entry.hex);
       var pct = document.createElement('span'); pct.className = 'color-pct'; pct.textContent = '%';
       var selBtn = document.createElement('div'); selBtn.className = 'lico color-select-btn'; selBtn.title = 'Sélectionner les formes de cette couleur (calque/frame actifs)';

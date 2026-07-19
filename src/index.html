@@ -536,11 +536,14 @@
           <div class="cw-mini" id="pm-fill" style="background:transparent" data-i18n-title="fillSwatchTitle" title="Click to pick a color, double-click to toggle fill on/off"><input type="color" id="pm-fill-c" value="#ff0000"></div>
           <input type="checkbox" id="p-fill-on" style="display:none">
           <input type="text" class="pi color-hex-input" id="p-fill-hex" value="FF0000" maxlength="9" spellcheck="false" data-i18n-title="hexInputTitle" title="Code hex — tape pour changer">
-          <input type="number" class="pi color-opacity-input" id="p-opacity" value="100" min="5" max="100" data-step="1">
+          <input type="number" class="pi scrub color-opacity-input" id="p-opacity" value="100" min="5" max="100" data-step="1">
           <span class="color-pct">%</span>
           <div class="lico color-eye-toggle" id="fill-enable-toggle" data-i18n-title="fillEnableTitle" title="Enable/disable fill"></div>
         </div>
-        <div class="pr"><button class="pbtn" id="btn-propagate-color" style="flex:1;font-size:10px" data-i18n-title="propagateColorTitle" title="Applique la couleur du trait/fill selectionne a toutes ses occurrences sur toutes les frames (ink &amp; paint)" data-i18n="propagateColorBtn">Propager la couleur a toutes les frames</button></div>
+        <!-- "Propager la couleur…" button removed (feedback 2026-07: "pas
+             besoin du bouton propagate color, on verra ça d'un moteur
+             séparé") — a dedicated cross-frame color-propagation engine is
+             planned separately; this manual one-shot button is retired. -->
       </div>
     </div>
     <div class="psec" id="stroke-sec">
@@ -556,7 +559,7 @@
         <div class="pr color-row">
           <div class="cw-mini" id="pm-stroke" style="background:#000"><input type="color" id="pm-stroke-c" value="#000000"></div>
           <input type="text" class="pi color-hex-input" id="p-stroke-hex" value="000000" maxlength="9" spellcheck="false" data-i18n-title="hexInputTitle" title="Code hex — tape pour changer">
-          <input type="number" class="pi color-opacity-input" id="p-stroke-alpha" value="100" min="0" max="100" data-step="1" data-i18n-title="strokeAlphaTitle" title="Opacité du trait (alpha de la couleur)">
+          <input type="number" class="pi scrub color-opacity-input" id="p-stroke-alpha" value="100" min="0" max="100" data-step="1" data-i18n-title="strokeAlphaTitle" title="Opacité du trait (alpha de la couleur)">
           <span class="color-pct">%</span>
           <div class="lico color-eye-toggle" id="stroke-enable-toggle" data-i18n-title="strokeEnableTitle" title="Enable/disable stroke"></div>
         </div>
@@ -805,8 +808,8 @@
       <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrComponentInstance">Component Instance</span></div>
       <div class="pbdy">
         <div class="pr"><span class="pl" data-i18n="fieldPlayback">Playback</span><select class="psel" id="comp-playmode"><option value="loop" data-i18n="playbackLoop">Loop</option><option value="pingpong" data-i18n="playbackPingPong">Ping-Pong</option><option value="once" data-i18n="playbackOnce">Play Once</option><option value="single" data-i18n="playbackSingle">Single Frame</option></select></div>
-        <div class="pr" id="comp-singleframe-row"><span class="pl" data-i18n="fieldFrame">Frame</span><input type="number" class="pi" id="comp-singleframe" value="0" min="0"></div>
-        <div class="pr"><span class="pl" data-i18n="fieldSpeed">Speed</span><input type="number" class="pi" id="comp-speed" value="1" min="0.1" max="8" step="0.1"></div>
+        <div class="pr" id="comp-singleframe-row"><span class="pl" data-i18n="fieldFrame">Frame</span><input type="number" class="pi scrub" id="comp-singleframe" value="0" min="0" data-step="1"></div>
+        <div class="pr"><span class="pl" data-i18n="fieldSpeed">Speed</span><input type="number" class="pi scrub" id="comp-speed" value="1" min="0.1" max="8" step="0.1" data-step="0.1"></div>
         <div class="pr"><span class="pl" data-i18n="fieldOffset">Offset</span><input type="number" class="pi scrub" id="comp-offset" value="0" data-step="1" data-i18n-title="compOffsetTitle" title="Main-timeline frame at which this instance's own timeline starts"></div>
         <div class="pr" style="flex-direction:column;align-items:stretch;gap:3px">
           <span class="pl" style="font-size:9px" data-i18n="fieldFrames">Frames</span>
@@ -889,9 +892,9 @@
         </select>
       </div>
       <div class="pr" id="exp-size-row" style="display:none"><span class="pl" style="width:90px" data-i18n="fieldSize2">Taille</span>
-        <input type="number" class="pi" id="exp-w" min="1" max="16384" style="width:70px">
+        <input type="number" class="pi scrub" id="exp-w" min="1" max="16384" style="width:70px" data-step="1">
         <span style="font-size:9px;color:var(--text-dim)">×</span>
-        <input type="number" class="pi" id="exp-h" min="1" max="16384" style="width:70px">
+        <input type="number" class="pi scrub" id="exp-h" min="1" max="16384" style="width:70px" data-step="1">
         <span style="font-size:9px;color:var(--text-dim)">px</span>
       </div>
       <div class="pr" id="exp-alpha-row" data-i18n-title="expAlphaTitle" title="Fond transparent au lieu de la couleur BG du document — n'affecte pas les formats qui ne supportent pas la transparence (MP4, GIF)"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="exp-alpha" style="accent-color:var(--accent)"> <span data-i18n="expAlphaLabel">Fond transparent (alpha)</span></label></div>
@@ -1101,7 +1104,7 @@
 <div id="text-popover" style="display:none;position:absolute;z-index:200;width:230px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);padding:8px">
   <textarea id="text-input" rows="2" placeholder="Ton texte..." data-i18n-placeholder="textInputPh" style="width:100%;resize:vertical;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:12px;padding:5px;box-sizing:border-box"></textarea>
   <div class="pr" style="margin-top:6px;gap:6px">
-    <input type="number" id="text-size" value="48" min="8" max="400" style="width:52px" class="pi" data-i18n-title="textSizeTitle" title="Taille (px)">
+    <input type="number" id="text-size" value="48" min="8" max="400" style="width:52px" class="pi scrub" data-step="1" data-i18n-title="textSizeTitle" title="Taille (px)">
     <select id="text-font" class="psel" style="flex:1" data-i18n-title="textFontTitle" title="Les options « (vecteur) » produisent de vraies formes vectorielles éditables au lieu d’une image">
       <option value="sans-serif">Sans</option><option value="serif">Serif</option><option value="monospace">Mono</option><option value="Manrope">Manrope</option>
       <option value="Georgia">Georgia</option><option value="'Times New Roman'">Times</option><option value="'Courier New'">Courier</option><option value="Verdana">Verdana</option>
@@ -1196,8 +1199,8 @@
     <button class="tb active" id="btn-loop" data-i18n-title="btnLoopTitle" title="Loop playback (work area) — right-click for ping-pong"><span style="font-size:14px;line-height:1">&#x21bb;</span></button>
     <span style="width:1px;height:20px;background:var(--border2);flex:none"></span>
     <div class="ti">
-      <span data-i18n="fieldFPS">FPS</span><input type="number" id="tl-fps" value="12" min="1" max="60">
-      <span style="margin-left:6px" data-i18n="fieldFrames2">Frames</span><input type="number" id="tl-total" value="24" min="1" max="999">
+      <span data-i18n="fieldFPS">FPS</span><input type="number" class="scrub" id="tl-fps" value="12" min="1" max="60" data-step="1">
+      <span style="margin-left:6px" data-i18n="fieldFrames2">Frames</span><input type="number" class="scrub" id="tl-total" value="24" min="1" max="999" data-step="1">
     </div>
     <span style="width:1px;height:20px;background:var(--border2);flex:none"></span>
     <button class="tb" id="btn-os" data-i18n-title="btnOnionTitle" title="Onion skin on/off (O)"><span class="material-symbols-rounded" style="font-size:16px">&#xe53b;</span></button>

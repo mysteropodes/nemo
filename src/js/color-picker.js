@@ -87,7 +87,7 @@
       '<div class="cp-fields">' +
       '<label>Hex<input class="cp-hex" type="text" maxlength="9"></label>' +
       '<div class="cp-rgb-row">' +
-      '<input class="cp-r" type="number" min="0" max="255" title="R"><input class="cp-g" type="number" min="0" max="255" title="G"><input class="cp-b" type="number" min="0" max="255" title="B"><input class="cp-a" type="number" min="0" max="100" title="Alpha %">' +
+      '<input class="cp-r scrub" type="number" min="0" max="255" data-step="1" title="R"><input class="cp-g scrub" type="number" min="0" max="255" data-step="1" title="G"><input class="cp-b scrub" type="number" min="0" max="255" data-step="1" title="B"><input class="cp-a scrub" type="number" min="0" max="100" data-step="1" title="Alpha %">' +
       '</div></div></div>' +
       '<div class="cp-swatch-row">' +
       '<button class="cp-swatch cp-swatch-none" title="None"></button>' +
