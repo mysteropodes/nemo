@@ -27,11 +27,25 @@
   // before every meaningful mutation) — consecutive same-tool/same-frame
   // calls collapse into one entry with a running count, so a long freehand
   // drag or a burst of clicks doesn't flood the trail with duplicates.
-  function logAction() {
+  //
+  // Optional `explicitTool` (2026-07, "récupère des données exploitable
+  // pour résoudre les soucis"): StoryBoard (storyboard.js) and audio
+  // tracks (audio-bridge.js) mutate state that ISN'T part of
+  // layersSnapshotNow()'s undo snapshot (state.storyboard/state.audioTracks
+  // aren't captured there), so they can't route through pushUndoLayers —
+  // there'd be nothing real for undo to restore. Rather than leave those
+  // two subsystems invisible to the log entirely, their own call sites log
+  // directly with a descriptive string ("storyboard:addInstance",
+  // "audio:deleteTrack", ...) instead of falling back to state.tool, which
+  // would otherwise record whatever DRAWING tool happened to be selected —
+  // misleading, not just uninformative, for an action that has nothing to
+  // do with it. Every pre-existing call site (via pushUndoLayers) keeps
+  // passing nothing and gets state.tool exactly as before.
+  function logAction(explicitTool) {
     if (!state.actionLog) state.actionLog = [];
     var ld = state.layers[state.activeLayerIdx];
     var last = state.actionLog[state.actionLog.length - 1];
-    var tool = state.tool, frame = state.currentFrame, layerName = ld ? ld.name : null;
+    var tool = explicitTool || state.tool, frame = state.currentFrame, layerName = ld ? ld.name : null;
     if (last && last.tool === tool && last.frame === frame && last.layer === layerName) {
       last.count = (last.count || 1) + 1;
       last.t = Date.now();

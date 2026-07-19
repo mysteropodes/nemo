@@ -26,6 +26,14 @@
   }
 
   function tracks() { return state.audioTracks || (state.audioTracks = []); }
+  // Feedback action log (2026-07, "récupère des données exploitable pour
+  // résoudre les soucis") — state.audioTracks isn't part of
+  // layersSnapshotNow()'s undo snapshot, so these mutations can't route
+  // through pushUndoLayers; logging directly is the only way an audio-track
+  // edit shows up in a feedback report's action trail. See feedback-
+  // bridge.js's logAction() doc comment for why an explicit string is
+  // passed instead of relying on state.tool.
+  function logAudio(action) { if (window.SMFeedback) SMFeedback.logAction('audio:' + action); }
 
   // ---- decoding + waveform peaks ----
   function dataURLToArrayBuffer(dataURL) {
@@ -128,6 +136,7 @@
         function up() {
           document.removeEventListener('pointermove', mv);
           document.removeEventListener('pointerup', up);
+          logAudio('offset');
           renderStrip();
         }
         document.addEventListener('pointermove', mv);
@@ -189,6 +198,7 @@
       mute.addEventListener('click', function (e) {
         e.stopPropagation();
         track.muted = !track.muted;
+        logAudio('mute');
         if (state.playing) restartAt(state.currentFrame);
         renderStrip();
       });
@@ -205,7 +215,7 @@
         input.style.cssText = 'width:100%;background:var(--bg);border:1px solid var(--accent);color:var(--text);font-size:11px;border-radius:4px;padding:1px 4px;outline:none;';
         nm.innerHTML = ''; nm.appendChild(input); input.focus(); input.select();
         var done = false;
-        function commit() { if (done) return; done = true; var v = input.value.trim(); if (v) track.name = v; renderStrip(); }
+        function commit() { if (done) return; done = true; var v = input.value.trim(); if (v) { track.name = v; logAudio('rename'); } renderStrip(); }
         input.addEventListener('keydown', function (ev) { ev.stopPropagation(); if (ev.key === 'Enter') commit(); else if (ev.key === 'Escape') { done = true; renderStrip(); } });
         input.addEventListener('blur', commit);
         input.addEventListener('mousedown', function (e2) { e2.stopPropagation(); });
@@ -222,6 +232,7 @@
         track.volume = vol.value / 100;
         if (track._gainNode) track._gainNode.gain.value = track.muted ? 0 : track.volume;
       });
+      vol.addEventListener('change', function () { logAudio('volume'); });
       row.appendChild(vol);
 
       var del = document.createElement('div');
@@ -230,6 +241,7 @@
         e.stopPropagation();
         stopTrack(track);
         tracks().splice(ti, 1);
+        logAudio('deleteTrack');
         renderStrip();
       });
       row.appendChild(del);
@@ -269,6 +281,7 @@
   function addTrackFromDataURL(name, dataURL) {
     var track = { name: name, dataB64: dataURL, offsetFrames: 0, volume: 1, muted: false };
     tracks().push(track);
+    logAudio('import');
     if (dataURL.length > 8 * 1024 * 1024) {
       showToast('Audio volumineux : préférer mp3/ogg (l’autosave navigateur peut ne plus suivre)');
     }

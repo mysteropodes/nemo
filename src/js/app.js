@@ -1392,6 +1392,16 @@ function enterSymbol(symId){
   if(state.activeSymbolId){showToast('Composants imbriqués non supportés — fermez le composant courant');return;}
   if(!state.symbols[symId])return;
   saveAllLayerFrames();
+  // "double clic sur un component le bounding box de la selection reste"
+  // (2026-07) — a selection made in the OUTER scene stayed in
+  // `selectedPaths` across this document-context swap; buildTransformBoxItems
+  // (engine-bridge.js) only checks selectedPaths.length, not which document
+  // is active, so it kept drawing a stale box/handles for items that still
+  // exist (just dimmed to opacity 0.25 below) but belong to a scene that's
+  // no longer the active one. Same fix applied on the way back out
+  // (exitToScene) and for StoryBoard's own document swap (enterMontageView/
+  // exitMontageView).
+  if(typeof clearSel==='function')clearSel();
   _sceneSnapshot={layers:state.layers,totalFrames:state.totalFrames,waIn:state.waIn,waOut:state.waOut,activeLayerIdx:state.activeLayerIdx,fps:state.fps,currentFrame:state.currentFrame,userLayers:userLayers,cameraKeys:state.cameraKeys};
   userLayers.forEach(function(l){l.opacity=0.25;});
   var sym=state.symbols[symId];
@@ -1409,6 +1419,7 @@ function enterSymbol(symId){
 function exitToScene(){
   if(!state.activeSymbolId||!_sceneSnapshot)return;
   saveAllLayerFrames();
+  if(typeof clearSel==='function')clearSel(); // see enterSymbol's own comment — same stale-selection risk in reverse
   var symId=state.activeSymbolId;
   // totalFrames/fps are primitives copied into state at enterSymbol() time,
   // not a live binding back to state.symbols[symId] — write them back now
@@ -1461,6 +1472,7 @@ function enterMontageView(montageId){
   var mods=SMStoryboard.chainModsForView(m);
   if(!mods.length){showToast('Montage vide — accrochez des instances contre son bloc d\'abord');return;}
   saveAllLayerFrames();
+  if(typeof clearSel==='function')clearSel(); // see enterSymbol's own comment — same document-swap stale-selection risk
   _montageViewSnapshot={layers:state.layers,totalFrames:state.totalFrames,waIn:state.waIn,waOut:state.waOut,activeLayerIdx:state.activeLayerIdx,fps:state.fps,currentFrame:state.currentFrame,userLayers:userLayers,cameraKeys:state.cameraKeys};
   userLayers.forEach(function(l){l.opacity=0.25;});
   var total=SMStoryboard.montageTotal(m);
@@ -1500,6 +1512,7 @@ function exitMontageView(){
   if(!state.activeMontageViewId||!_montageViewSnapshot)return;
   if(state.activeSymbolId){showToast('Fermez d\'abord le composant en cours d\'édition');return;}
   saveAllLayerFrames();
+  if(typeof clearSel==='function')clearSel(); // see enterSymbol's own comment
   userLayers.forEach(function(l){l.remove();});
   state.layers=_montageViewSnapshot.layers;state.totalFrames=_montageViewSnapshot.totalFrames;state.waIn=_montageViewSnapshot.waIn;state.waOut=_montageViewSnapshot.waOut;
   window._waIn=state.waIn;window._waOut=state.waOut;window._totalF=state.totalFrames;
