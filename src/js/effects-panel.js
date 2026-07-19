@@ -332,11 +332,11 @@
       // listener might be intercepted, and rotates via CSS to show state.
       var chevron = document.createElement('div'); chevron.className = 'fx-row-chevron';
       chevron.innerHTML = '<svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg>';
-      chevron.title = expandedIdx === idx ? 'Replier' : 'Déplier';
+      chevron.title = window.SM.t(expandedIdx === idx ? 'fxCollapse' : 'fxExpand');
       chevron.addEventListener('click', function (e) { e.stopPropagation(); expandedIdx = expandedIdx === idx ? -1 : idx; renderEffectsList(); });
       var eye = document.createElement('div'); eye.className = 'fx-row-eye';
       eye.innerHTML = eff.enabled ? ICON_EYE : ICON_EYE_OFF;
-      eye.title = eff.enabled ? 'Désactiver' : 'Activer';
+      eye.title = window.SM.t(eff.enabled ? 'fxDisable' : 'fxEnable');
       eye.addEventListener('click', function (e) { e.stopPropagation(); toggleEnabled(idx); });
       var name = document.createElement('span'); name.className = 'fx-row-name';
       name.textContent = labelFor(eff.type);
@@ -344,7 +344,7 @@
       // Edit the shader source (custom effects only — built-ins have no
       // source to edit, just params, already reachable by expanding the row).
       if (isCustomEffect(eff.type)) {
-        var edit = document.createElement('div'); edit.className = 'fx-row-del'; edit.textContent = '✎'; edit.title = 'Modifier le shader';
+        var edit = document.createElement('div'); edit.className = 'fx-row-del'; edit.textContent = '✎'; edit.title = window.SM.t('fxEditShader');
         edit.addEventListener('click', function (e) {
           e.stopPropagation();
           var def = customDefFor(eff.type);
@@ -352,7 +352,7 @@
         });
         row.appendChild(edit);
       }
-      var del = document.createElement('div'); del.className = 'fx-row-del'; del.textContent = '×'; del.title = 'Supprimer';
+      var del = document.createElement('div'); del.className = 'fx-row-del'; del.textContent = '×'; del.title = window.SM.t('fxDelete');
       del.addEventListener('click', function (e) { e.stopPropagation(); deleteEffect(idx); });
       row.appendChild(del);
       row.addEventListener('click', function () {
