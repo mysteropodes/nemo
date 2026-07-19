@@ -35,10 +35,22 @@
 
   // world = A·screen + b, probed off the live engine viewport. Inverting
   // gives screen = A⁻¹·(world - b); ctx.setTransform takes that directly.
-  function worldToScreenMatrix() {
-    var o = SMEngineBridge.screenToWorld(0, 0);
-    var x = SMEngineBridge.screenToWorld(1, 0);
-    var y = SMEngineBridge.screenToWorld(0, 1);
+  // Probes MUST be taken at (r.left,r.top)-relative client coords, not
+  // (0,0) — screenToWorld (engine-bridge.js) reads clientX/Y relative to
+  // the BROWSER WINDOW, then internally subtracts the canvas's own
+  // getBoundingClientRect() offset; probing at literal (0,0) therefore
+  // encodes "world position under the window's top-left corner," not
+  // "under the overlay canvas's own top-left" — which is where this
+  // matrix actually gets applied (ctx.setTransform on the overlay's own
+  // local device-pixel space, draw()). The mismatch is a constant offset
+  // exactly equal to the canvas's on-page position, i.e. always wrong
+  // whenever a topbar/side panel pushes the canvas off the window origin
+  // (always) — found live, "quand on affiche la grille (bleu) celle-ci
+  // est mal alignée avec le canvas".
+  function worldToScreenMatrix(r) {
+    var o = SMEngineBridge.screenToWorld(r.left, r.top);
+    var x = SMEngineBridge.screenToWorld(r.left + 1, r.top);
+    var y = SMEngineBridge.screenToWorld(r.left, r.top + 1);
     var a = x[0] - o[0], b = x[1] - o[1], c = y[0] - o[0], d = y[1] - o[1];
     var det = a * d - b * c;
     if (Math.abs(det) < 1e-12) return null;
@@ -65,9 +77,9 @@
     if (state.appMode === 'motion') { if (overlay) overlay.remove(); overlay = null; lastKey = ''; schedule(); return; }
     var cv = document.getElementById('drawing-canvas');
     if (!cv || !window.SMEngineBridge || !SMEngineBridge.isEnabled || !SMEngineBridge.isEnabled()) { schedule(); return; }
-    var m = worldToScreenMatrix();
-    if (!m) { schedule(); return; }
     var r = cv.getBoundingClientRect();
+    var m = worldToScreenMatrix(r);
+    if (!m) { schedule(); return; }
     var step = gridStep();
     var key = [m.a, m.b, m.c, m.d, m.e, m.f, r.width, r.height, step].join(',');
     if (key === lastKey) { schedule(); return; }
@@ -86,9 +98,9 @@
     var ctx = ov.getContext('2d');
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, ov.width, ov.height);
-    // screenToWorld probes use CLIENT coords relative to the canvas rect —
-    // matrix maps world→client-offset-from-rect; overlay sits exactly on
-    // the rect, so no extra offset term, just the dpr scale.
+    // worldToScreenMatrix's probes are now taken AT (r.left,r.top) (see its
+    // own comment), so this matrix already maps world → overlay-local
+    // device px directly — no extra offset term, just the dpr scale.
     ctx.setTransform(m.a * dpr, m.b * dpr, m.c * dpr, m.d * dpr, m.e * dpr, m.f * dpr);
 
     // Visible world bbox = transformed screen corners.
