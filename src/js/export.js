@@ -211,13 +211,36 @@ async function exportRunFfmpeg(args,onProgress){
   }
 }
 
+// Any layer with an enabled effect anywhere in the project — mirrors
+// engine.rs's own has_effects_stack check (composite_scene). Cheap: no
+// layer in the overwhelming common case (no effects used) short-circuits
+// on the very first layer.
+function exportHasActiveEffects(){
+  return state.layers.some(function(ld){return ld.effects&&ld.effects.some(function(e){return e.enabled;});});
+}
 // ---- PNG sequence rendering to a working directory (shared by raster exports) ----
 async function exportRenderPNGsToDir(dir,start,end,scale,onProgress,alpha){
-  for(var f=start,i=1;f<=end;f++,i++){
-    var url=exportFrameDataURL(f,scale,alpha);
-    var bytes=exportDataURLToBytes(url);
-    await exportWriteBytes(dir+'/frame_'+pad4(i)+'.png',bytes);
-    if(onProgress)onProgress(i,end-start+1);
+  // Effects (blur/vignette/glow/ground shadow/...) only ever rendered in
+  // the live GPU preview — exportFrameDataURL rasterizes straight from
+  // Paper.js's vector data, with no route through the WGPU effect stack at
+  // all (feedback 2026-07: "vérifie que le rendu temps réel marche bien
+  // avec les effets" surfaced this gap). When the project actually uses an
+  // effect, route every frame through the engine instead so the export
+  // matches what the user sees on screen — see engine-bridge.js's
+  // beginEffectsExport/renderFrameToPixelsPNG/endEffectsExport.
+  // Scale>1 (supersampled export) isn't supported on this path yet, so it
+  // only kicks in at the default scale — see renderFrameToPixelsPNG's own
+  // comment for why.
+  var useFx=(scale===1||!scale)&&exportHasActiveEffects()&&window.SMEngineBridge&&window.SMEngineBridge.beginEffectsExport();
+  try{
+    for(var f=start,i=1;f<=end;f++,i++){
+      var url=useFx?await SMEngineBridge.renderFrameToPixelsPNG(f):exportFrameDataURL(f,scale,alpha);
+      var bytes=exportDataURLToBytes(url);
+      await exportWriteBytes(dir+'/frame_'+pad4(i)+'.png',bytes);
+      if(onProgress)onProgress(i,end-start+1);
+    }
+  }finally{
+    if(useFx)SMEngineBridge.endEffectsExport();
   }
 }
 

@@ -1453,6 +1453,61 @@
     lastSceneVersion = window._sceneVersion;
   }
 
+  // ---- Effects-aware frame export (2026-07) ----
+  // Ordinary export (exportFrameDataURL, export.js) rasterizes straight
+  // from Paper.js's own vector data — correct and fast, but bypasses the
+  // WGPU effect stack entirely, so a project using any effect (blur/
+  // vignette/glow/ground shadow/contour/threshold/halftone/...) never saw
+  // them in its exported PNG/video (feedback 2026-07: "vérifie que le
+  // rendu temps réel marche bien avec les effets" surfaced this — the live
+  // preview worked fine, but effects turned out to be preview-only).
+  //
+  // This renders ONE frame through the SAME engine + buildSceneJson the
+  // live preview already uses (reusing loadFrame/buildSceneJson keeps this
+  // a single source of truth for scene content — no second parallel
+  // per-stroke-transform implementation to drift out of sync with, the
+  // exact family-of-bug-#1 risk this codebase explicitly warns against),
+  // at the document's own resolution and zoom=1 — NOT whatever the
+  // on-screen viewport happens to be sized/zoomed to, since effect pixel
+  // params are now zoom-scaled (see run_one_effect, engine.rs) and must
+  // match the true document size to look right in the export.
+  //
+  // Scope limitation: unlike exportFrameDataURL, this path doesn't support
+  // a supersampling `scale` factor — export.js only takes it for scale=1
+  // when routing through here. Revisit if higher-res effect exports are
+  // ever needed.
+  var _fxExportSavedFrame = null, _fxExportSavedEngineW = 0, _fxExportSavedEngineH = 0;
+  function beginEffectsExport() {
+    if (!engine) return false;
+    suspended = true; // same gate suspend() sets — see tick()'s own check
+    _fxExportSavedFrame = state.currentFrame;
+    _fxExportSavedEngineW = engineW; _fxExportSavedEngineH = engineH;
+    return true;
+  }
+  async function renderFrameToPixelsPNG(frameIdx) {
+    var cw = state.canvasW, ch = state.canvasH;
+    engine.resize(cw, ch);
+    engine.set_viewport(0, 0, 1, 0, cw / 2, ch / 2);
+    loadFrame(frameIdx);
+    var json = buildSceneJson(true);
+    var bytes = await engine.render_to_pixels(json);
+    var imgData = new ImageData(new Uint8ClampedArray(bytes.buffer, bytes.byteOffset, bytes.byteLength), cw, ch);
+    var off = document.createElement('canvas'); off.width = cw; off.height = ch;
+    off.getContext('2d').putImageData(imgData, 0, 0);
+    return off.toDataURL('image/png');
+  }
+  function endEffectsExport() {
+    if (_fxExportSavedFrame === null) return;
+    loadFrame(_fxExportSavedFrame);
+    if (_fxExportSavedEngineW && _fxExportSavedEngineH) engine.resize(_fxExportSavedEngineW, _fxExportSavedEngineH);
+    syncViewport();
+    lastSceneJson = ''; // force a full re-render at the restored size/viewport
+    suspended = false;
+    invalidateOverlayBase();
+    renderNow();
+    _fxExportSavedFrame = null;
+  }
+
   window.SMEngineBridge = {
     setEnabled: setEnabled,
     isEnabled: function () { return enabled; },
@@ -1480,6 +1535,13 @@
       invalidateOverlayBase();
       if (overlayRafId) { cancelAnimationFrame(overlayRafId); overlayRafId = 0; pendingOverlayItem = null; }
     },
+    // Effects-aware frame export (2026-07) — see the functions' own
+    // comments above. beginEffectsExport/endEffectsExport bracket a whole
+    // export run (called once each); renderFrameToPixelsPNG is called once
+    // per exported frame in between.
+    beginEffectsExport: beginEffectsExport,
+    renderFrameToPixelsPNG: renderFrameToPixelsPNG,
+    endEffectsExport: endEffectsExport,
   };
 
   // Rust/vello is now the default renderer (no more opt-in checkbox) — per
