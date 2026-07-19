@@ -493,6 +493,22 @@
     ["Déplie ses réglages", "Expand its settings", "Despliega sus ajustes", "設定を展開する"],
     ["Clique la ligne de l'effet ajouté pour dérouler ses paramètres — chacun se glisse ou se tape, comme les autres champs numériques de Nemo.", "Click the added effect's row to unfold its parameters — each one drags or types in, like every other numeric field in Nemo.", "Haz clic en la fila del efecto añadido para desplegar sus parámetros — cada uno se arrastra o se escribe, como cualquier otro campo numérico de Nemo.", "追加したエフェクトの行をクリックしてパラメータを展開してください — Nemoの他の数値フィールドと同様に、ドラッグまたは入力で変更できます。"],
     ["L'œil active/désactive l'effet, le × le supprime, et l'ordre de la liste compte (chaque effet s'applique sur le résultat du précédent). \"Contours\" et \"Ombres\" ne s'appliquent qu'au calque entier — et \"Custom\" te laisse écrire ton propre shader WGSL.", "The eye toggles the effect on/off, the × removes it, and list order matters (each effect applies on top of the previous one's result). \"Contours\" and \"Shadows\" only apply to the whole layer — and \"Custom\" lets you write your own WGSL shader.", "El ojo activa/desactiva el efecto, la × lo elimina, y el orden de la lista importa (cada efecto se aplica sobre el resultado del anterior). \"Contornos\" y \"Sombras\" solo se aplican a toda la capa — y \"Custom\" te permite escribir tu propio shader WGSL.", "目のアイコンでエフェクトのオン/オフを切り替え、×で削除できます。また、リストの順序が重要です（各エフェクトは前のエフェクトの結果に適用されます）。「輪郭」と「影」はレイヤー全体にのみ適用されます — そして「カスタム」では独自のWGSLシェーダーを書くことができます。"],
+    ["Commentaire & Feedback", "Comment & Feedback", "Comentario y Feedback", "コメント＆フィードバック"],
+    ["Épingle une note, envoie ton retour à l'équipe", "Pin a note, send your feedback to the team", "Fija una nota, envía tu feedback al equipo", "ノートを固定し、チームにフィードバックを送る"],
+    ["Merci de prendre 2 minutes !", "Thanks for taking 2 minutes!", "¡Gracias por dedicar 2 minutos!", "2分のお時間をありがとうございます！"],
+    ["Ce petit tuto te présente l'outil Commentaire, la meilleure façon de nous faire remonter un bug, une idée ou un avis pendant que tu utilises Nemo — merci d'avance pour ces 2 minutes, tes retours nous aident directement à faire évoluer l'app. Il ne s'affichera plus automatiquement après cette fois, mais tu le retrouveras toujours dans le menu d'aide (?).", "This short tutorial introduces the Comment tool, the best way to send us a bug, an idea, or feedback while you're using Nemo — thanks in advance for these 2 minutes, your feedback directly helps us improve the app. It won't show up automatically again after this, but you'll always find it in the help menu (?).", "Este breve tutorial te presenta la herramienta Comentario, la mejor forma de enviarnos un error, una idea o una opinión mientras usas Nemo — gracias de antemano por estos 2 minutos, tu feedback nos ayuda directamente a mejorar la app. No volverá a aparecer automáticamente después de esta vez, pero siempre lo encontrarás en el menú de ayuda (?).", "この短いチュートリアルでは、Nemoを使用中にバグやアイデア、感想を送る最良の方法であるコメントツールを紹介します — 2分間のお時間をあらかじめありがとうございます、あなたのフィードバックはアプリの改善に直接役立ちます。今回限りで自動的には表示されなくなりますが、ヘルプメニュー（?）からいつでも見つけられます。"],
+    ["Choisis l'outil Commentaire", "Choose the Comment tool", "Elige la herramienta Comentario", "コメントツールを選択"],
+    ["Clique sur l'outil Commentaire (raccourci C).", "Click the Comment tool (shortcut C).", "Haz clic en la herramienta Comentario (atajo C).", "コメントツールをクリックしてください（ショートカットC）。"],
+    ["Épingle une note", "Pin a note", "Fija una nota", "ノートを固定する"],
+    ["Clique n'importe où sur le canevas pour poser une note à cet endroit précis.", "Click anywhere on the canvas to place a note at that exact spot.", "Haz clic en cualquier lugar del lienzo para colocar una nota en ese punto exacto.", "キャンバスの任意の場所をクリックして、その正確な位置にノートを配置してください。"],
+    ["Écris ta remarque", "Write your note", "Escribe tu comentario", "コメントを書く"],
+    ["Tape quelques mots — un bug rencontré, une idée, ou juste ton avis.", "Type a few words — a bug you ran into, an idea, or just your opinion.", "Escribe unas palabras — un error que encontraste, una idea, o simplemente tu opinión.", "いくつかの言葉を入力してください — 遭遇したバグ、アイデア、または単なる感想。"],
+    ["Tag ta remarque", "Tag your note", "Etiqueta tu comentario", "コメントにタグを付ける"],
+    ["Clique un tag (bug/perf/idée/polish) pour classer ta remarque — utile pour trier les retours plus tard. Tu peux aussi glisser une capture d'écran, ou cliquer \"Enregistrer les actions\" pour capturer précisément ce que tu faisais juste avant.", "Click a tag (bug/perf/idea/polish) to categorize your note — useful for sorting feedback later. You can also drag in a screenshot, or click \"Record actions\" to precisely capture what you were doing just before.", "Haz clic en una etiqueta (bug/perf/idea/polish) para clasificar tu comentario — útil para ordenar el feedback más tarde. También puedes arrastrar una captura de pantalla, o hacer clic en \"Grabar acciones\" para capturar con precisión lo que estabas haciendo justo antes.", "タグ（bug/perf/idea/polish）をクリックしてコメントを分類してください — 後でフィードバックを整理するのに便利です。スクリーンショットをドラッグしたり、「操作を記録」をクリックして直前に何をしていたかを正確にキャプチャすることもできます。"],
+    ["Envoie ton feedback", "Send your feedback", "Envía tu feedback", "フィードバックを送信"],
+    ["Clique \"Enregistrer comme feedback\" — contrairement à \"Enregistrer\" (un commentaire d'équipe classique, qui reste dans le projet), ceci part dans un espace de debug séparé, jamais dans ton fichier projet, lu uniquement par l'équipe pour améliorer Nemo.", "Click \"Save as feedback\" — unlike \"Save\" (a regular team comment, which stays in the project), this goes to a separate debug space, never into your project file, read only by the team to improve Nemo.", "Haz clic en \"Guardar como feedback\" — a diferencia de \"Guardar\" (un comentario de equipo normal, que permanece en el proyecto), esto va a un espacio de depuración separado, nunca a tu archivo de proyecto, leído solo por el equipo para mejorar Nemo.", "「フィードバックとして保存」をクリックしてください — 「保存」（プロジェクト内に残る通常のチームコメント）とは異なり、これは別のデバッグ用スペースに送られ、プロジェクトファイルには一切含まれず、Nemoを改善するためにチームのみが読みます。"],
+    ["Merci encore !", "Thanks again!", "¡Gracias de nuevo!", "改めてありがとうございます！"],
+    ["C'est tout — chaque retour compte pour améliorer Nemo. Tu retrouveras ce tuto et tous les autres à tout moment dans le menu d'aide (?) en haut de l'écran.", "That's it — every bit of feedback helps improve Nemo. You'll find this tutorial and all the others any time in the help menu (?) at the top of the screen.", "Eso es todo — cada feedback ayuda a mejorar Nemo. Encontrarás este tutorial y todos los demás en cualquier momento en el menú de ayuda (?) en la parte superior de la pantalla.", "以上です — すべてのフィードバックがNemoの改善に役立ちます。この チュートリアルや他のすべてのチュートリアルは、画面上部のヘルプメニュー（?）からいつでも見つけられます。"],
   ]);
   // Named T (not tt) — renderStep()'s local `tt` variable holds the tooltip
   // DOM element and would otherwise shadow a same-named lookup function.
@@ -1075,6 +1091,37 @@
       ]
     },
     {
+      // Auto-lancé une seule fois au tout premier lancement de l'app (voir
+      // maybeAutoStartWelcome() plus bas) — separate localStorage flag
+      // ('nemo-tut-feedback-shown') from nemo-tutorial-done, donc "vu" ≠
+      // "terminé" (skip compte comme vu, on ne relance jamais deux fois).
+      // Reste accessible normalement depuis le menu d'aide comme les autres.
+      id: 'feedback-welcome',
+      category: 'Réglages',
+      icon: '27',
+      title: 'Commentaire & Feedback',
+      desc: 'Épingle une note, envoie ton retour à l\'équipe',
+      time: '2 min',
+      steps: [
+        { type: 'info', title: 'Merci de prendre 2 minutes !', body: 'Ce petit tuto te présente l\'outil Commentaire, la meilleure façon de nous faire remonter un bug, une idée ou un avis pendant que tu utilises Nemo — merci d\'avance pour ces 2 minutes, tes retours nous aident directement à faire évoluer l\'app. Il ne s\'affichera plus automatiquement après cette fois, mais tu le retrouveras toujours dans le menu d\'aide (?).' },
+        { type: 'click', target: '.tool-btn[data-tool="comment"]', title: 'Choisis l\'outil Commentaire', body: 'Clique sur l\'outil Commentaire (raccourci C).' },
+        { type: 'click', target: '#drawing-canvas', title: 'Épingle une note', body: 'Clique n\'importe où sur le canevas pour poser une note à cet endroit précis.' },
+        stateIncreaseStep({
+          target: '#comment-text', title: 'Écris ta remarque', body: 'Tape quelques mots — un bug rencontré, une idée, ou juste ton avis.', hint: 'En attente de ta saisie…',
+          measure: function (win) { var el = win.document.getElementById('comment-text'); return el ? el.value.length : 0; }
+        }),
+        // Deliberately a real click INSIDE the popover, not an 'info' step —
+        // #comment-popover closes on any click outside itself (timeline.js's
+        // own outside-click listener), and an 'info' step's "Next" button
+        // always renders outside that popover's DOM subtree. An 'info' step
+        // here would silently close the popover out from under the rest of
+        // this module, orphaning the "Envoie ton feedback" step below.
+        { type: 'click', target: '.fb-tag', title: 'Tag ta remarque', body: 'Clique un tag (bug/perf/idée/polish) pour classer ta remarque — utile pour trier les retours plus tard. Tu peux aussi glisser une capture d\'écran, ou cliquer "Enregistrer les actions" pour capturer précisément ce que tu faisais juste avant.' },
+        { type: 'click', target: '#comment-save-feedback', title: 'Envoie ton feedback', body: 'Clique "Enregistrer comme feedback" — contrairement à "Enregistrer" (un commentaire d\'équipe classique, qui reste dans le projet), ceci part dans un espace de debug séparé, jamais dans ton fichier projet, lu uniquement par l\'équipe pour améliorer Nemo.' },
+        { type: 'info', title: 'Merci encore !', body: 'C\'est tout — chaque retour compte pour améliorer Nemo. Tu retrouveras ce tuto et tous les autres à tout moment dans le menu d\'aide (?) en haut de l\'écran.' }
+      ]
+    },
+    {
       id: 'export',
       category: 'Médias',
       icon: '18',
@@ -1376,6 +1423,15 @@
       if (d.indexOf(id) === -1) { d.push(id); localStorage.setItem('nemo-tutorial-done', JSON.stringify(d)); }
     } catch (e) {}
   }
+
+  // "Seen" (feedback-welcome auto-launch) is deliberately a SEPARATE flag
+  // from nemo-tutorial-done above: skipping the auto-launched module still
+  // counts as seen (never auto-fires twice), whereas nemo-tutorial-done
+  // only flips on actually finishing all its steps — the launcher's own
+  // ✓ badge should keep reflecting real completion, not just exposure.
+  var FIRST_LAUNCH_SEEN_KEY = 'nemo-tut-feedback-shown';
+  function markFirstLaunchSeen() { try { localStorage.setItem(FIRST_LAUNCH_SEEN_KEY, '1'); } catch (e) {} }
+  function isFirstLaunchSeen() { try { return !!localStorage.getItem(FIRST_LAUNCH_SEEN_KEY); } catch (e) { return true; } }
 
   // ---- Runtime state ----------------------------------------------------
   var active = null; // {module, stepIdx, pollTimer, clickHandler}
@@ -1795,6 +1851,26 @@
   }
   function closeLauncher() { var m = $('#tut-launcher'); if (m) m.style.display = 'none'; }
 
+  // ---- First-launch auto-start (feedback-welcome, once ever) -----------
+  // Polls for the start screen closing (a project becoming active) rather
+  // than hooking project.js's hideStartScreen() directly — same
+  // decoupled-by-polling philosophy as the rest of this file (see header
+  // comment): this module never patches or wraps existing app code, it
+  // only ever reads state/DOM. Fires at most once per browser profile —
+  // markFirstLaunchSeen() is called the instant it launches, before the
+  // user has done anything inside it, so skipping never re-triggers it.
+  function maybeAutoStartWelcome() {
+    if (isFirstLaunchSeen()) return;
+    var startScreen = document.getElementById('start-screen');
+    if (!startScreen) return;
+    var timer = setInterval(function () {
+      if (!startScreen.classList.contains('hid')) return;
+      clearInterval(timer);
+      markFirstLaunchSeen();
+      startModule('feedback-welcome');
+    }, 400);
+  }
+
   // ---- Entry point wiring ----------------------------------------------
   document.addEventListener('DOMContentLoaded', function () {
     ['btn-open-tutorial', 'btn-open-tutorial-topbar'].forEach(function (id) {
@@ -1804,6 +1880,7 @@
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape' && active) stopTutorial();
     });
+    maybeAutoStartWelcome();
   });
 
   window.SMTutorial = { open: openLauncher, start: startModule, stop: stopTutorial, MODULES: MODULES };
