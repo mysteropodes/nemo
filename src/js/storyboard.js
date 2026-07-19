@@ -70,22 +70,24 @@
   function newId() { var s = sb(); return 'sbm' + (s.nextId++); }
   function moduleById(id) { return sb().modules.find(function (x) { return x.id === id; }) || null; }
 
-  // Stable per-symbol color (the mock shows plain colored rects as the
-  // instance preview) — hash the symbol id onto a fixed pleasant palette
-  // so every instance of the same component shares a color.
-  var PALETTE = ['#c0504d', '#4f81bd', '#4bac7e', '#8064a2', '#d19a3f', '#5e6ad2', '#9f5fa8', '#3f9aa8'];
-  function symbolColor(symbolId) {
-    var h = 0;
-    for (var i = 0; i < symbolId.length; i++) h = (h * 31 + symbolId.charCodeAt(i)) >>> 0;
-    return PALETTE[h % PALETTE.length];
-  }
   // Chained-instance thumb width scales with duration ("les poignées ne
   // changent pas... la taille du rectangle" — correct: the card was fixed
   // at 72px regardless of what trim/stretch did to the underlying data,
   // so retiming was invisible on the module itself, only readable in the
-  // small text label). Free (unchained) instances keep the CSS default.
-  var THUMB_PXF = 2.4, THUMB_MIN_W = 56;
+  // small text label). Free (unchained) instances get their width from
+  // freeThumbWidth (canvas-ratio) instead.
+  var THUMB_H = 48, THUMB_PXF = 2.4, THUMB_MIN_W = 56;
   function thumbWidth(duration) { return Math.max(THUMB_MIN_W, Math.round(duration * THUMB_PXF)); }
+  // Free (unchained) instance card width: match the DOCUMENT canvas' own
+  // aspect ratio at a fixed card height, so the real thumbnail fills the
+  // card edge-to-edge with no letterbox (feedback 2026-07: "pas la peine
+  // de faire un rectangle de couleur ... la vignette au ratio du canvas").
+  // Clamped so an extreme aspect ratio (very tall/wide canvas) can't blow
+  // up the card into an unusable sliver or a huge strip.
+  function freeThumbWidth() {
+    var cw = state.canvasW || 16, ch = state.canvasH || 9;
+    return Math.max(36, Math.min(140, Math.round(THUMB_H * (cw / ch))));
+  }
 
   // ---- real instance thumbnails (replaces the flat colored rect) ----
   // Rendered via Paper's OWN CPU rasterizer (Layer.rasterize — the exact
@@ -131,30 +133,35 @@
     // image import, not a synthetic case.
     strokes.forEach(function (sd) { if (sd.isRaster) desR(sd, _thumbLayer); else desP(sd, _thumbLayer); });
     var url = null;
-    if (_thumbLayer.children.length) {
+    var cw = state.canvasW || 1, ch = state.canvasH || 1;
+    if (_thumbLayer.children.length && cw > 0 && ch > 0) {
       _thumbLayer.visible = true;
-      // Fit the symbol's own bounds into a small fixed thumbnail canvas —
-      // resolution scaled so the LARGER dimension lands near 96px, capped
-      // low (never above 1) since this is a tiny UI thumbnail, not export.
+      // Frame the thumbnail at the DOCUMENT canvas' own aspect ratio, not
+      // a tight crop around the shape's bbox (feedback 2026-07: "pas la
+      // peine de faire un rectangle de couleur ... juste la couleur du
+      // canvas, la vignette au ratio du canvas") — a tight bbox crop left
+      // the hashed per-symbol CSS background color showing as letterbox
+      // bars around the contained image, which read as a random-colored
+      // rect rather than "a frame of this document". Larger side capped
+      // near 96px, same budget as before.
+      var res = Math.min(1, 96 / Math.max(cw, ch));
+      var bgCanvas = document.createElement('canvas');
+      bgCanvas.width = Math.max(1, Math.round(cw * res));
+      bgCanvas.height = Math.max(1, Math.round(ch * res));
+      var bgCtx = bgCanvas.getContext('2d');
+      bgCtx.fillStyle = state.canvasBg || '#ffffff';
+      bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
       var b = _thumbLayer.bounds;
       if (b.width > 0 && b.height > 0) {
-        var res = Math.min(1, 96 / Math.max(b.width, b.height));
         var raster = _thumbLayer.rasterize({ resolution: 72 * res, insert: false });
-        // Composite onto the real document background (feedback 2026-07:
-        // "la vignette de preview faut prendre le fond du canvas derrière
-        // les éléments affichés") — rasterize() alone gives a transparent
-        // PNG, so a component's actual silhouette showed straight through
-        // to the track's own hashed symbolColor CSS background instead of
-        // looking like a real frame of footage.
-        var bgCanvas = document.createElement('canvas');
-        bgCanvas.width = raster.canvas.width; bgCanvas.height = raster.canvas.height;
-        var bgCtx = bgCanvas.getContext('2d');
-        bgCtx.fillStyle = state.canvasBg || '#ffffff';
-        bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
-        bgCtx.drawImage(raster.canvas, 0, 0);
-        url = bgCanvas.toDataURL('image/png');
+        // b.x/b.y/b.width/b.height are in absolute document coordinates
+        // (same space canvasW/canvasH describe), so scaling by the same
+        // `res` used for the background places the shape at its true
+        // position within the canvas-ratio frame instead of re-centering it.
+        bgCtx.drawImage(raster.canvas, b.x * res, b.y * res, b.width * res, b.height * res);
         raster.remove();
       }
+      url = bgCanvas.toDataURL('image/png');
       _thumbLayer.visible = false;
     }
     prev.activate();
@@ -467,7 +474,8 @@
     var sym = state.symbols[m.symbolId];
     var card = document.createElement('div');
     card.className = 'sb-thumb';
-    card.style.background = symbolColor(m.symbolId); // fallback shown until/unless a real render succeeds
+    card.style.background = state.canvasBg || '#ffffff'; // fallback shown until/unless a real render succeeds
+    card.style.width = freeThumbWidth() + 'px';
     applyThumb(card, m, sym);
     card.addEventListener('mouseenter', function () { startLivePreview(card, m, sym); });
     card.addEventListener('mouseleave', stopLivePreview);
