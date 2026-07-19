@@ -554,11 +554,12 @@
     }
     var isKey = !!keyAt(state.currentFrame);
     var addBtn = document.getElementById('btn-cam-addkey');
-    if (addBtn) addBtn.textContent = isKey ? 'Supprimer la clé (frame ' + (state.currentFrame + 1) + ')' : 'Ajouter une clé (frame ' + (state.currentFrame + 1) + ')';
+    if (addBtn) addBtn.textContent = (isKey ? window.SM.t('camKeyRemove') : window.SM.t('camKeyAdd')).replace('{n}', state.currentFrame + 1);
     var info = document.getElementById('cam-key-info');
     if (info) {
       var cam = cameraAtFrame(state.currentFrame);
-      info.textContent = state.cameraKeys.length + ' clé(s)' + (cam ? ' — ' + Math.round(cam.w) + '×' + Math.round(cam.w * aspect()) + ' @ ' + Math.round(cam.x) + ',' + Math.round(cam.y) : '');
+      var n = state.cameraKeys.length;
+      info.textContent = window.SM.t(n === 1 ? 'camKeyCountOne' : 'camKeyCountOther').replace('{n}', n) + (cam ? ' — ' + Math.round(cam.w) + '×' + Math.round(cam.w * aspect()) + ' @ ' + Math.round(cam.x) + ',' + Math.round(cam.y) : '');
     }
     var editBtn = document.getElementById('btn-cam-ease-edit');
     var seg = segmentLeftKey(state.currentFrame);
