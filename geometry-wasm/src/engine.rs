@@ -673,6 +673,21 @@ pub struct VelloEngine {
     effect_stack_a_view: wgpu::TextureView,
     effect_stack_b_tex: wgpu::Texture,
     effect_stack_b_view: wgpu::TextureView,
+    // ---- User-authored custom WGSL effects (2026-07, feedback: "la
+    // possibilité d'ajouter ses propres effets wgsl et leur paramètre
+    // correspondant") — each entry is a full pipeline built at RUNTIME from
+    // JS-supplied fragment-shader source, reusing simple_fx_bind_group_layout
+    // (same texture+sampler+Params(32-byte) contract every built-in effect
+    // already uses) so it drops into apply_effect_stack/run_one_effect
+    // exactly like any built-in effect_type — just keyed by a JS-chosen
+    // string id (e.g. "custom:<uuid>") instead of a hardcoded match arm.
+    // See register_custom_effect's own doc comment for why compiling
+    // arbitrary WGSL at runtime is safe here (no unsafe/native FFI
+    // involved — worst case is a normal WebGPU validation error, reported
+    // async via the browser's own uncaptured-error mechanism, same as any
+    // other shader bug in this file; it can't corrupt or crash the wasm
+    // instance).
+    custom_effect_pipelines: std::collections::HashMap<String, wgpu::RenderPipeline>,
 }
 
 // ---- Blend compositor plumbing (see blend.wgsl's doc comment) ----
@@ -1499,6 +1514,52 @@ fn create_simple_fx_pipeline(device: &wgpu::Device) -> (wgpu::RenderPipeline, wg
     (pipeline, bind_group_layout, sampler, uniform_buf)
 }
 
+/// Builds a pipeline for a user-authored custom effect (2026-07) from a
+/// FULL WGSL source string — reuses the EXACT bind-group-layout
+/// (texture@0, sampler@1, Params-uniform@2) `bind_group_layout` already
+/// describes, so it can be driven by the same simple_fx_pass function as
+/// every built-in effect, just with a different pipeline reference. The
+/// caller (register_custom_effect) is responsible for wrapping the user's
+/// fragment-shader BODY into this full document — see that function's own
+/// doc comment for the template (vs_main/bindings/Params are always the
+/// same regardless of author, only fs_main's body is user-supplied).
+fn create_custom_effect_pipeline(device: &wgpu::Device, bind_group_layout: &wgpu::BindGroupLayout, wgsl_source: &str) -> wgpu::RenderPipeline {
+    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        label: Some("custom-fx-compositor"),
+        source: wgpu::ShaderSource::Wgsl(wgsl_source.to_string().into()),
+    });
+    let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+        label: Some("custom-fx-pipeline-layout"),
+        bind_group_layouts: &[Some(bind_group_layout)],
+        immediate_size: 0,
+    });
+    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        label: Some("custom-fx-pipeline"),
+        layout: Some(&pipeline_layout),
+        vertex: wgpu::VertexState {
+            module: &shader,
+            entry_point: Some("vs_main"),
+            buffers: &[],
+            compilation_options: Default::default(),
+        },
+        fragment: Some(wgpu::FragmentState {
+            module: &shader,
+            entry_point: Some("fs_main"),
+            targets: &[Some(wgpu::ColorTargetState {
+                format: BLEND_SCRATCH_FORMAT,
+                blend: None,
+                write_mask: wgpu::ColorWrites::ALL,
+            })],
+            compilation_options: Default::default(),
+        }),
+        primitive: wgpu::PrimitiveState::default(),
+        depth_stencil: None,
+        multisample: wgpu::MultisampleState::default(),
+        multiview_mask: None,
+        cache: None,
+    })
+}
+
 /// Runs simple_fx.wgsl: writes the selected effect_id's transform of
 /// `source_view` into `target_view`.
 #[allow(clippy::too_many_arguments)]
@@ -1948,6 +2009,7 @@ pub async fn create_engine(
         effect_stack_a_view,
         effect_stack_b_tex,
         effect_stack_b_view,
+        custom_effect_pipelines: std::collections::HashMap::new(),
     })
 }
 
@@ -2060,6 +2122,27 @@ impl VelloEngine {
                     eff.p1.unwrap_or(default_p1), eff.p2.unwrap_or(default_p2), eff.p3.unwrap_or(default_p3), eff.p4.unwrap_or(default_p4),
                     self.width as f32, self.height as f32, target,
                 );
+            }
+            _ if eff.effect_type.starts_with("custom:") => {
+                // User-authored WGSL effect (register_custom_effect) — same
+                // simple_fx_pass call shape as every built-in simple_fx
+                // effect, just with a dynamically-looked-up pipeline
+                // instead of self.simple_fx_pipeline. If the pipeline isn't
+                // registered yet (e.g. a project was just loaded and JS
+                // hasn't re-called register_custom_effect for its saved
+                // custom effects this session yet), this is a no-op —
+                // `target` is left whatever it already held. JS is expected
+                // to register every custom effect immediately on load,
+                // before the first render(), so this window is effectively
+                // never observed in practice.
+                if let Some(pipeline) = self.custom_effect_pipelines.get(&eff.effect_type) {
+                    simple_fx_pass(
+                        &self.device, &self.queue, pipeline, &self.simple_fx_bind_group_layout, &self.simple_fx_sampler, &self.simple_fx_uniform_buf,
+                        source, 0.0,
+                        eff.p1.unwrap_or(0.0), eff.p2.unwrap_or(0.0), eff.p3.unwrap_or(0.0), eff.p4.unwrap_or(0.0),
+                        self.width as f32, self.height as f32, target,
+                    );
+                }
             }
             _ => {
                 // Default/"blur" — reuses blur_pass verbatim.
@@ -2511,6 +2594,41 @@ impl VelloEngine {
         let (effect_stack_b_tex, effect_stack_b_view) = create_blend_accum_texture(&self.device, width, height, "effect-stack-b");
         self.effect_stack_b_tex = effect_stack_b_tex;
         self.effect_stack_b_view = effect_stack_b_view;
+    }
+
+    /// Registers (or re-registers, if `key` already exists — e.g. the
+    /// author just edited the source) a user-authored custom WGSL effect
+    /// (2026-07, feedback: "la possibilité d'ajouter ses propres effets
+    /// wgsl et leur paramètre correspondant") — `key` is a JS-chosen stable
+    /// id (e.g. "custom:<uuid>") later used as an EffectIn.effect_type,
+    /// `fs_body` is ONLY the body of the fragment shader (a sequence of
+    /// WGSL statements ending in `return vec4<f32>(...)`), wrapped here
+    /// into a full document that already declares the standard fullscreen-
+    /// triangle vertex shader, the texture/sampler/Params bindings, and
+    /// three convenience locals every author can use without re-deriving
+    /// them: `uv` (0..1), `src` (the pixel already sampled at `uv`), and
+    /// `texel` (1 texel in UV units, for neighbor-sampling effects). Same
+    /// `Params{effect_id,p1,p2,p3,tex_w,tex_h,time,p4}` layout as
+    /// simple_fx.wgsl, so an author's `params.p1`..`params.p4` map 1:1 onto
+    /// the SAME p1..p4 fields the stack UI's generic param editor already
+    /// writes for every other effect type — no separate wiring needed on
+    /// the JS side for a custom effect's parameters.
+    ///
+    /// Compiling arbitrary author-supplied WGSL at runtime is safe here:
+    /// this crate only ever targets the web/WebGPU wgpu backend (built via
+    /// `wasm-pack build --target web`), where shader compilation is the
+    /// BROWSER's own WebGPU implementation doing the work — invalid WGSL
+    /// produces a normal asynchronous validation error via the browser's
+    /// uncaptured-error mechanism (the SAME "wgpu uncaptured error" console
+    /// messages every other shader bug in this file already produces),
+    /// never a Rust panic or a corrupted wasm instance.
+    pub fn register_custom_effect(&mut self, key: String, fs_body: String) -> Result<(), JsValue> {
+        let source = format!(
+            "struct VsOut {{\n    @builtin(position) pos: vec4<f32>,\n    @location(0) uv: vec2<f32>,\n}};\n\n@vertex\nfn vs_main(@builtin(vertex_index) vid: u32) -> VsOut {{\n    var positions = array<vec2<f32>, 3>(\n        vec2<f32>(-1.0, -1.0),\n        vec2<f32>(3.0, -1.0),\n        vec2<f32>(-1.0, 3.0),\n    );\n    let p = positions[vid];\n    var out: VsOut;\n    out.pos = vec4<f32>(p, 0.0, 1.0);\n    out.uv = vec2<f32>(p.x * 0.5 + 0.5, 1.0 - (p.y * 0.5 + 0.5));\n    return out;\n}}\n\n@group(0) @binding(0) var src_tex: texture_2d<f32>;\n@group(0) @binding(1) var tex_sampler: sampler;\n\nstruct Params {{\n    effect_id: f32,\n    p1: f32,\n    p2: f32,\n    p3: f32,\n    tex_w: f32,\n    tex_h: f32,\n    time: f32,\n    p4: f32,\n}};\n@group(0) @binding(2) var<uniform> params: Params;\n\n@fragment\nfn fs_main(in: VsOut) -> @location(0) vec4<f32> {{\n    let uv = in.uv;\n    let texel = vec2<f32>(1.0 / max(params.tex_w, 1.0), 1.0 / max(params.tex_h, 1.0));\n    let src = textureSample(src_tex, tex_sampler, uv);\n{fs_body}\n}}\n"
+        );
+        let pipeline = create_custom_effect_pipeline(&self.device, &self.simple_fx_bind_group_layout, &source);
+        self.custom_effect_pipelines.insert(key, pipeline);
+        Ok(())
     }
 
     /// Uploads (or re-uploads, if already cached under this id) an image's
