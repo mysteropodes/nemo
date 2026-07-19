@@ -686,51 +686,111 @@
   // specKey is the corresponding data.bitmapBrushSpec property name;
   // toSpec converts the panel's displayed value into the units the spec
   // actually stores (opacity is 0-100 in the UI, 0-1 in the spec).
-  function bindNum(id, key, def, specKey, toSpec) {
-    var el = document.getElementById(id); if (!el) return;
-    state[key] = def;
-    function apply() {
-      var v = parseFloat(this.value) || def;
-      state[key] = v;
-      if (!specKey) return;
-      if (!(state.tool === 'select' || state.tool === 'subselect') || !selectedPaths.length) return;
-      var targets = selectedPaths.filter(function (p) { return p.data && p.data.bitmapBrushSpec; });
-      if (!targets.length) return;
-      pushUndo();
-      var specVal = toSpec ? toSpec(v) : v;
-      var layer = userLayers[state.activeLayerIdx];
-      targets.forEach(function (p) { p.data.bitmapBrushSpec[specKey] = specVal; regenerate(p, layer); });
-      saveActiveLayerFrame();
-      if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
-    }
-    el.addEventListener('change', apply);
-    el.addEventListener('input', apply);
+  // Pure state+live-selection setter (no DOM dependency) — was the guts of
+  // an element's 'change'/'input' handler; the Stroke panel's own
+  // #p-bitmap-spacing/-scatter/-opacity/-pressure inputs are gone (2026-07
+  // harmonization, moved to the floating Brush panel), so this is now
+  // called directly by that panel's own mirrored number inputs
+  // (brush-menu-bridge.js) instead of via bindNum's removed element.
+  function setBitmapNumericState(key, v, specKey, toSpec) {
+    state[key] = v;
+    if (!specKey) return;
+    if (!(state.tool === 'select' || state.tool === 'subselect') || !selectedPaths.length) return;
+    var targets = selectedPaths.filter(function (p) { return p.data && p.data.bitmapBrushSpec; });
+    if (!targets.length) return;
+    pushUndo();
+    var specVal = toSpec ? toSpec(v) : v;
+    var layer = userLayers[state.activeLayerIdx];
+    targets.forEach(function (p) { p.data.bitmapBrushSpec[specKey] = specVal; regenerate(p, layer); });
+    saveActiveLayerFrame();
+    if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
   }
-  function init() {
-    var onEl = document.getElementById('p-bitmapbrush-on');
-    if (onEl) {
-      state.bitmapBrushOn = false;
-      // Sous-rangées (Tip/Spacing/Scatter/Opacity/Pressure/Import/Apply/
-      // Remove) repliées derrière cette checkbox — audit panel droit
-      // 2026-07-17, elles n'ont de sens que si Bitmap Brush est activé.
-      var rowsEl = document.getElementById('p-bitmapbrush-rows');
-      if (rowsEl) rowsEl.style.display = onEl.checked ? 'block' : 'none';
-      onEl.addEventListener('change', function () {
-        state.bitmapBrushOn = this.checked;
-        if (rowsEl) rowsEl.style.display = this.checked ? 'block' : 'none';
-        // Select/Subselect with a live selection (2026-07-17, "on peut pas
-        // switch avec un stroke vecto") : the checkbox now doubles as the
-        // switch this panel already had buttons for — btn-bitmap-apply/
-        // -remove below — so toggling it with something selected converts
-        // that selection immediately instead of only affecting the NEXT
-        // stroke drawn. Empty selection (or Draw tool active): unchanged,
-        // draw-tool-default-only behavior.
-        if ((state.tool === 'select' || state.tool === 'subselect') && selectedPaths.length) {
-          var btn = document.getElementById(this.checked ? 'btn-bitmap-apply' : 'btn-bitmap-remove');
-          if (btn) btn.click();
-        }
-      });
+  // Kept for any element that might still exist in some other build/layout
+  // — a no-op today (id never resolves), but harmless, and it's what seeds
+  // state[key]'s default now that the Stroke-panel elements are gone.
+  function bindNum(id, key, def, specKey, toSpec) {
+    state[key] = def;
+    var el = document.getElementById(id); if (!el) return;
+    el.addEventListener('change', function () { setBitmapNumericState(key, parseFloat(this.value) || def, specKey, toSpec); });
+    el.addEventListener('input', function () { setBitmapNumericState(key, parseFloat(this.value) || def, specKey, toSpec); });
+  }
+  window.SM.setBitmapSpacing = function (v) { setBitmapNumericState('bitmapSpacing', v, 'spacing'); };
+  window.SM.setBitmapScatter = function (v) { setBitmapNumericState('bitmapScatter', v, 'scatter'); };
+  window.SM.setBitmapOpacity = function (v) { setBitmapNumericState('bitmapOpacity', v, 'opacity', function (x) { return x / 100; }); };
+  // Same "also patch the current selection" pattern as setBitmapNumericState
+  // above — pressure toggling a stroke's own spec needs a full re-stamp (a
+  // stroke baked with pressure=false has no bitmapPressureProfile shaping to
+  // fall back on, so toggling it back on regenerates flat-width dabs until
+  // the stroke is redrawn — an acceptable, pre-existing limitation of the
+  // profile itself, not something this introduces).
+  function setBitmapPressure(checked) {
+    state.bitmapPressure = checked;
+    if (!(state.tool === 'select' || state.tool === 'subselect') || !selectedPaths.length) return;
+    var targets = selectedPaths.filter(function (p) { return p.data && p.data.bitmapBrushSpec; });
+    if (!targets.length) return;
+    pushUndo();
+    var layer = userLayers[state.activeLayerIdx];
+    targets.forEach(function (p) { p.data.bitmapBrushSpec.pressure = checked; regenerate(p, layer); });
+    saveActiveLayerFrame();
+    if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+  }
+  window.SM.setBitmapPressure = setBitmapPressure;
+  // Toggles Bitmap Brush on/off — was the Stroke panel's #p-bitmapbrush-on
+  // checkbox's own change handler; that checkbox (and its whole sub-row
+  // section) is gone (2026-07 harmonization, moved out to the floating
+  // Brush panel's Bitmap tab, which already mirrored every one of these
+  // controls) — this is now a plain function the floating panel
+  // (brush-menu-bridge.js) calls directly, since there's no longer a DOM
+  // checkbox here to own the change event at all.
+  // Apply / Remove to selection ("changer taille, type de brush et autre
+  // paramètre une fois appliqué et dessiné" + "passer d'un brush vecto à
+  // texturé et inversement") — mirrors applyVectorBrushToSelection
+  // (timeline.js) exactly, including reuse of the SAME shared
+  // stripAnyBrushTexture (app.js) so converting either direction, or just
+  // re-editing a bitmap stroke's own tip/size/spacing/scatter in place, all
+  // go through one clean path. Were the Stroke panel's own
+  // #btn-bitmap-apply/-remove click handlers; now plain functions the
+  // floating Brush panel (brush-menu-bridge.js) and setBitmapBrushOn below
+  // both call directly, since there's no longer a button here at all.
+  function applyBitmapBrushToSelection() {
+    var eligible = selectedPaths.filter(function (p) { return p instanceof Path && !(p.data && (p.data.isVectorBrush || p.data.isFillShape)) && (p.strokeColor || p.fillColor || (p.data && (p.data.brushTexturePreset || p.data.bitmapBrushSpec))); });
+    if (!eligible.length) { if (window.showToast) showToast('Sélectionne au moins un trait'); return; }
+    pushUndo();
+    eligible.forEach(function (p) {
+      stripAnyBrushTexture(p);
+      applyBitmapBrushTexture(p);
+    });
+    saveActiveLayerFrame(); updateUI();
+    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+    if (window.showToast) showToast('Bitmap Brush appliqué à la sélection');
+  }
+  function removeBitmapBrushFromSelection() {
+    var eligible = selectedPaths.filter(function (p) { return p instanceof Path && p.data && (p.data.bitmapBrushSpec || p.data.brushTexturePreset); });
+    if (!eligible.length) { if (window.showToast) showToast('Aucun trait texturé sélectionné'); return; }
+    pushUndo();
+    eligible.forEach(function (p) { stripAnyBrushTexture(p); });
+    saveActiveLayerFrame(); updateUI();
+    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+    if (window.showToast) showToast('Texture retirée');
+  }
+  window.SM.applyBitmapBrushToSelection = applyBitmapBrushToSelection;
+  window.SM.removeBitmapBrushFromSelection = removeBitmapBrushFromSelection;
+  function setBitmapBrushOn(on) {
+    state.bitmapBrushOn = !!on;
+    // Select/Subselect with a live selection (2026-07-17, "on peut pas
+    // switch avec un stroke vecto") : toggling doubles as the switch
+    // applyBitmapBrushToSelection/removeBitmapBrushFromSelection below
+    // provide — so toggling it with something selected converts that
+    // selection immediately instead of only affecting the NEXT stroke
+    // drawn. Empty selection (or Draw tool active): unchanged, draw-tool-
+    // default-only behavior.
+    if ((state.tool === 'select' || state.tool === 'subselect') && selectedPaths.length) {
+      if (on) applyBitmapBrushToSelection(); else removeBitmapBrushFromSelection();
     }
+  }
+  window.SM.setBitmapBrushOn = setBitmapBrushOn;
+  function init() {
+    state.bitmapBrushOn = false;
     // Tip is now picked via bitmap-tip-picker.js's swatch popover (panel
     // reorg pass) — state.bitmapTip's default lives here since this file
     // still owns that state field, the picker only ever writes to it.
@@ -741,90 +801,40 @@
     bindNum('p-bitmap-spacing', 'bitmapSpacing', 15, 'spacing');
     bindNum('p-bitmap-scatter', 'bitmapScatter', 20, 'scatter');
     bindNum('p-bitmap-opacity', 'bitmapOpacity', 100, 'opacity', function (v) { return v / 100; });
+    state.bitmapPressure = true;
     var pressEl = document.getElementById('p-bitmap-pressure');
-    if (pressEl) {
-      state.bitmapPressure = pressEl.checked;
-      pressEl.addEventListener('change', function () {
-        state.bitmapPressure = this.checked;
-        // Same "also patch the current selection" fix as spacing/scatter/
-        // opacity above — pressure toggling a stroke's own spec needs a
-        // full re-stamp (a stroke baked with pressure=false has no
-        // bitmapPressureProfile shaping to fall back on, so toggling it
-        // back on regenerates flat-width dabs until the stroke is redrawn —
-        // an acceptable, pre-existing limitation of the profile itself,
-        // not something this fix introduces).
-        if (!(state.tool === 'select' || state.tool === 'subselect') || !selectedPaths.length) return;
-        var targets = selectedPaths.filter(function (p) { return p.data && p.data.bitmapBrushSpec; });
-        if (!targets.length) return;
-        pushUndo();
-        var layer = userLayers[state.activeLayerIdx];
-        targets.forEach(function (p) { p.data.bitmapBrushSpec.pressure = state.bitmapPressure; regenerate(p, layer); });
-        saveActiveLayerFrame();
-        if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
-      });
-    }
-
-    // ---- Apply / Remove to selection ("changer taille, type de brush et
-    // autre paramètre une fois appliqué et dessiné" + "passer d'un brush
-    // vecto à texturé et inversement") — mirrors the vector preset panel's
-    // own "Apply to selection" button (timeline.js) exactly, including
-    // reuse of the SAME shared stripAnyBrushTexture (app.js) so converting
-    // either direction, or just re-editing a bitmap stroke's own
-    // tip/size/spacing/scatter in place, all go through one clean path. ----
-    var applyBtn = document.getElementById('btn-bitmap-apply');
-    if (applyBtn) applyBtn.addEventListener('click', function () {
-      var eligible = selectedPaths.filter(function (p) { return p instanceof Path && !(p.data && (p.data.isVectorBrush || p.data.isFillShape)) && (p.strokeColor || p.fillColor || (p.data && (p.data.brushTexturePreset || p.data.bitmapBrushSpec))); });
-      if (!eligible.length) { if (window.showToast) showToast('Sélectionne au moins un trait'); return; }
-      pushUndo();
-      eligible.forEach(function (p) {
-        stripAnyBrushTexture(p);
-        applyBitmapBrushTexture(p);
-      });
-      saveActiveLayerFrame(); updateUI();
-      if (window.SMEngineBridge) SMEngineBridge.renderNow();
-      if (window.showToast) showToast('Bitmap Brush appliqué à la sélection');
-    });
-    var removeBtn = document.getElementById('btn-bitmap-remove');
-    if (removeBtn) removeBtn.addEventListener('click', function () {
-      var eligible = selectedPaths.filter(function (p) { return p instanceof Path && p.data && (p.data.bitmapBrushSpec || p.data.brushTexturePreset); });
-      if (!eligible.length) { if (window.showToast) showToast('Aucun trait texturé sélectionné'); return; }
-      pushUndo();
-      eligible.forEach(function (p) { stripAnyBrushTexture(p); });
-      saveActiveLayerFrame(); updateUI();
-      if (window.SMEngineBridge) SMEngineBridge.renderNow();
-      if (window.showToast) showToast('Texture retirée');
-    });
+    if (pressEl) { state.bitmapPressure = pressEl.checked; pressEl.addEventListener('change', function () { setBitmapPressure(this.checked); }); }
 
     // ---- ABR import ----
-    var abrBtn = document.getElementById('btn-bitmap-import-abr');
-    var abrFile = document.getElementById('bitmap-abr-file');
-    if (abrBtn && abrFile) {
-      abrBtn.addEventListener('click', function () { abrFile.click(); });
-      abrFile.addEventListener('change', function () {
-        var file = this.files && this.files[0];
-        this.value = ''; // allow re-importing the same file name later
-        if (!file || !window.SMAbrImport) return;
-        var reader = new FileReader();
-        reader.onload = function () {
-          var tipsFound;
-          try { tipsFound = window.SMAbrImport.readAbrArrayBuffer(reader.result); }
-          catch (e) { if (window.showToast) showToast('Import .abr échoué : ' + e.message); return; }
-          var lastId = null;
-          tipsFound.forEach(function (t, i) {
-            var id = 'abr_' + Date.now().toString(36) + '_' + i;
-            customTips[id] = { name: t.name, canvas: t.canvas };
-            lastId = id;
-          });
-          // Picker swatch (bitmap-tip-picker.js) owns the visible label/
-          // preview now — select the just-imported tip and repaint it.
-          if (lastId) { state.bitmapTip = lastId; if (window.BitmapTipPicker) window.BitmapTipPicker.paintButton(lastId); }
-          if (window.showToast) showToast(tipsFound.length + ' tip(s) importé(s) depuis ' + file.name);
-        };
-        reader.onerror = function () { if (window.showToast) showToast('Lecture du fichier .abr échouée'); };
-        reader.readAsArrayBuffer(file);
-      });
-    }
+    // The Stroke panel's own #btn-bitmap-import-abr button + hidden
+    // #bitmap-abr-file input are gone (2026-07 harmonization) — the actual
+    // import logic is now importAbrFile() below (module scope, takes a
+    // File directly, no dependency on a specific <input> element), exposed
+    // via window.SM so the floating Brush panel (brush-menu-bridge.js) can
+    // create its own button + file input and call it.
   }
+  function importAbrFile(file) {
+    if (!file || !window.SMAbrImport) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      var tipsFound;
+      try { tipsFound = window.SMAbrImport.readAbrArrayBuffer(reader.result); }
+      catch (e) { if (window.showToast) showToast('Import .abr échoué : ' + e.message); return; }
+      var lastId = null;
+      tipsFound.forEach(function (t, i) {
+        var id = 'abr_' + Date.now().toString(36) + '_' + i;
+        customTips[id] = { name: t.name, canvas: t.canvas };
+        lastId = id;
+      });
+      // Picker swatch (bitmap-tip-picker.js) owns the visible label/
+      // preview now — select the just-imported tip and repaint it.
+      if (lastId) { state.bitmapTip = lastId; if (window.BitmapTipPicker) window.BitmapTipPicker.paintButton(lastId); }
+      if (window.showToast) showToast(tipsFound.length + ' tip(s) importé(s) depuis ' + file.name);
+    };
+    reader.onerror = function () { if (window.showToast) showToast('Lecture du fichier .abr échouée'); };
+    reader.readAsArrayBuffer(file);
+  }
+  window.SM.importAbrFile = importAbrFile;
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 
   window.SMBitmapBrush = {

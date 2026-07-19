@@ -622,36 +622,20 @@
             </optgroup>
           </select>
         </div>
-        <div class="pr" id="p-brushpreset-apply-row" style="display:none"><span class="pl"></span><button class="pbtn" id="btn-brushpreset-apply" data-i18n="btnApplySelection">Apply to selection</button></div>
-        <!-- Bitmap Brush, unified into Stroke (2026-07, "que tous soit dans
-             trait unifier... pour plus de cohérence") — was its own separate
-             psec; now sits right below the vector Brush row above, same
-             swatch-button-opens-a-preview-grid pattern (bitmap-tip-picker.js
-             mirrors brush-preset-picker.js exactly) instead of a plain
-             <select>, so choosing a tip finally shows what it looks like
-             before picking it, same as the vector presets already do. -->
-        <div class="pr" data-i18n-title="bitmapBrushRowTitle" title="Renders this stroke as a stamped raster texture (real bitmap grain) instead of the vector Brush above — the geometry Draw captures stays the same, only the OUTPUT becomes an image layer. The vector presets above are untouched (kept for exports like Rive that need real vector dabs) — this is a parallel category, not a replacement."><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="p-bitmapbrush-on" style="accent-color:var(--accent)"> <span data-i18n="bitmapBrushLabel">Bitmap Brush (Draw tool)</span></label></div>
-        <!-- Sous-rangées Bitmap Brush repliées derrière la checkbox
-             ci-dessus (audit panel droit 2026-07-17) : 8 lignes de réglages
-             n'ont de sens que si Bitmap Brush est activé — masquées par
-             défaut (checkbox off), togglées par toggleBitmapBrushRows() en
-             plus de son ancien rôle purement fonctionnel (ui.js). -->
-        <div id="p-bitmapbrush-rows" style="display:none">
-        <div class="pr" id="p-bitmaptip-row">
-          <span class="pl" data-i18n="fieldTip">Tip</span>
-          <button class="bp-swatch-btn" id="p-bitmaptip-btn" type="button"><canvas id="p-bitmaptip-preview" width="120" height="20"></canvas><span id="p-bitmaptip-label" data-i18n="tipSoftRound">Soft Round</span></button>
-        </div>
-        <!-- La row "Size" du Bitmap Brush a été retirée (2026-07-17) : la
-             taille des dabs est unifiée avec le Width du Trait (p-sw) —
-             un seul champ pilote l'épaisseur, vecto comme bitmap. -->
-        <div class="pr" data-i18n-title="bitmapSpacingTitle" title="Distance between stamps along the stroke, as a % of tip size — lower = denser/smoother coverage, higher = visible individual dabs"><span class="pl" data-i18n="fieldSpacing">Spacing</span><input type="number" class="pi scrub" id="p-bitmap-spacing" value="15" min="2" max="100" data-step="1"><span style="font-size:9px;color:var(--text-dim)">%</span></div>
-        <div class="pr" data-i18n-title="bitmapScatterTitle" title="Random position/size jitter per stamp — 0 = perfectly even, mechanical dabbing"><span class="pl" data-i18n="fieldScatter">Scatter</span><input type="number" class="pi scrub" id="p-bitmap-scatter" value="20" min="0" max="100" data-step="1"><span style="font-size:9px;color:var(--text-dim)">%</span></div>
-        <div class="pr"><span class="pl" data-i18n="fieldOpacity">Opacity</span><input type="number" class="pi scrub" id="p-bitmap-opacity" value="100" min="5" max="100" data-step="1"><span style="font-size:9px;color:var(--text-dim)">%</span></div>
-        <div class="pr" data-i18n-title="bitmapPressureTitle" title="Modulates stamp size by real tablet pen pressure, captured while drawing — Draw tool only, ignored for shapes/other tools"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="p-bitmap-pressure" style="accent-color:var(--accent)" checked> <span data-i18n="bitmapPressureLabel">Pressure (tablet)</span></label></div>
-        <div class="pr" data-i18n-title="bitmapImportAbrTitle" title="Import a Photoshop .abr brush file — its tip shape(s) become selectable Tip presets above, alongside the procedural ones"><span class="pl"></span><button class="pbtn" id="btn-bitmap-import-abr" style="flex:1;font-size:10px" type="button" data-i18n="bitmapImportAbrBtn">Import .abr tip…</button><input type="file" id="bitmap-abr-file" accept=".abr" style="display:none"></div>
-        <div class="pr" data-i18n-title="bitmapApplyTitle" title="Re-stamps every selected Bitmap Brush stroke (or converts a selected vector-textured/plain stroke) with the settings above"><span class="pl"></span><button class="pbtn" id="btn-bitmap-apply" style="flex:1;font-size:10px" type="button" data-i18n="btnApplySelection">Apply to selection</button></div>
-        <div class="pr" data-i18n-title="bitmapRemoveTitle" title="Strips the bitmap texture off every selected stroke, restoring its plain stroke/fill"><span class="pl"></span><button class="pbtn" id="btn-bitmap-remove" style="flex:1;font-size:10px" type="button" data-i18n="btnRemoveSelection">Remove from selection</button></div>
-        </div>
+        <!-- "Apply to selection" button and the whole Bitmap Brush section
+             (checkbox + Tip/Spacing/Scatter/Opacity/Pressure/Import .abr/
+             Apply/Remove rows) moved OUT of Stroke (2026-07, harmonization
+             pass — "que tous soit dans le panneau flottant Brush, la
+             checkbox Bitmap Brush entièrement"): the floating Brush panel
+             (brush-menu-bridge.js, opened from the Draw/Fill-Brush tools'
+             own floating strip) already mirrors every one of these controls
+             in its Bitmap tab, so this row and the whole bitmap block below
+             were pure duplication once that panel existed. Picking a preset/
+             tip there now auto-applies to the current selection directly
+             (window.SM.applyVectorBrushToSelection/applyBitmapBrushToSelection,
+             timeline.js/bitmap-brush.js) instead of needing a separate
+             button click here — the floating panel is the sole source of
+             truth for both vector and bitmap brush settings now. -->
       </div>
     </div>
     <!-- Selected Colors (2026-07, "un nouvel onglet de gestion des couleurs

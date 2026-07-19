@@ -27,12 +27,91 @@
 
   function closePopover() {
     if (!popover) return;
+    // A live hover-preview (see below) must never survive the popover
+    // closing some OTHER way than a plain mouseleave (outside click,
+    // Escape, re-toggle) — none of those fire the swatch's own mouseleave,
+    // so without this an uncommitted preview (no pushUndo, no
+    // saveActiveLayerFrame) could linger applied to the live Paper objects.
+    revertBrushPreview();
     popover.remove();
     popover = null;
     if (closeHandlers) { closeHandlers(); closeHandlers = null; }
     if (window.renderLabsFloatPanel) renderLabsFloatPanel();
   }
   function isOpen() { return !!popover; }
+
+  // ---- Hover-preview (2026-07, "un hover en preview sur le canvas comme
+  // pour le blend-mode des calques") — mirrors initBlendDropdown's own
+  // applyPreview/revert pattern (timeline.js): apply live on mouseenter, no
+  // undo/save; revert to the pre-hover snapshot on mouseleave. Unlike a
+  // blend-mode string, a brush/tip is a STRUCTURAL edit (creates/removes
+  // companion dab objects via stripAnyBrushTexture/applyBrushTexture), so
+  // "revert" means re-running that same strip+apply pair against a snapshot
+  // of each path's ORIGINAL texture (preset key or full bitmapSpec object),
+  // not just restoring a scalar.
+  var _previewSnapshot = null;
+  function eligiblePathsForPreview() {
+    if (!(state.tool === 'select' || state.tool === 'subselect') || !selectedPaths.length) return [];
+    return selectedPaths.filter(function (p) { return p instanceof Path && !(p.data && (p.data.isVectorBrush || p.data.isFillShape)); });
+  }
+  function beginBrushPreview() {
+    if (_previewSnapshot) return;
+    _previewSnapshot = eligiblePathsForPreview().map(function (p) {
+      return {
+        p: p,
+        preset: (p.data && p.data.brushTexturePreset) || null,
+        bitmapSpec: (p.data && p.data.bitmapBrushSpec) ? JSON.parse(JSON.stringify(p.data.bitmapBrushSpec)) : null,
+      };
+    });
+  }
+  function previewVectorBrush(key) {
+    beginBrushPreview();
+    if (!_previewSnapshot.length) return;
+    _previewSnapshot.forEach(function (rec) {
+      stripAnyBrushTexture(rec.p);
+      if (key && key !== 'none') applyBrushTexture(rec.p, key);
+    });
+    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+  }
+  // Explicit spec (not the current-selection default applyBitmapBrushTexture
+  // would otherwise fall back to) so hovering TIP B while TIP A is actually
+  // selected previews B, not a no-op re-application of A — mirrors that
+  // function's own default-spec shape (bitmap-brush.js) intentionally.
+  function previewBitmapBrush(tipKey) {
+    beginBrushPreview();
+    if (!_previewSnapshot.length) return;
+    _previewSnapshot.forEach(function (rec) {
+      var p = rec.p;
+      var spec = {
+        tip: tipKey,
+        size: state.brushSize || 40,
+        spacing: state.bitmapSpacing != null ? state.bitmapSpacing : 15,
+        scatter: state.bitmapScatter != null ? state.bitmapScatter : 20,
+        opacity: (state.bitmapOpacity != null ? state.bitmapOpacity : 100) / 100,
+        color: p.strokeColor ? colorHex8(p.strokeColor) : ((p.data && p.data.preTextureStroke) || state.strokeColor || '#000000'),
+        pressure: !!state.bitmapPressure,
+        seed: Math.floor(Math.random() * 0xffffffff),
+      };
+      stripAnyBrushTexture(p);
+      applyBitmapBrushTexture(p, spec);
+    });
+    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+  }
+  function revertBrushPreview() {
+    if (!_previewSnapshot) return;
+    _previewSnapshot.forEach(function (rec) {
+      stripAnyBrushTexture(rec.p);
+      if (rec.bitmapSpec) applyBitmapBrushTexture(rec.p, rec.bitmapSpec);
+      else if (rec.preset) applyBrushTexture(rec.p, rec.preset);
+    });
+    _previewSnapshot = null;
+    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+  }
+  // Called right before a REAL commit (a swatch click) — the preview must
+  // be undone first so the commit's own pushUndo() snapshots the true
+  // pre-hover state, not the already-mutated preview (else Ctrl+Z would
+  // restore to the hovered-but-not-chosen brush instead of the original).
+  function commitBrushPreview() { revertBrushPreview(); }
 
   // ---- shared param-row builder — a `.pr`/`.pl`/`.pi` row identical in
   // markup to the ones already in index.html's right panel, so it's
@@ -121,16 +200,42 @@
     checkRow(params, 'Taper ends', !!state.taperEnds, function (v) { driveOriginal('p-taper', v, true, 'change'); });
   }
   function buildBitmapParams(params) {
-    checkRow(params, 'Bitmap Brush actif', !!state.bitmapBrushOn, function (v) { driveOriginal('p-bitmapbrush-on', v, true, 'change'); });
+    // The Stroke panel's #p-bitmapbrush-on checkbox is gone (2026-07
+    // harmonization — this floating panel is the sole owner of
+    // state.bitmapBrushOn now), so this calls window.SM.setBitmapBrushOn
+    // directly instead of driving a hidden original element that no longer
+    // exists.
+    checkRow(params, 'Bitmap Brush actif', !!state.bitmapBrushOn, function (v) { if (window.SM && window.SM.setBitmapBrushOn) window.SM.setBitmapBrushOn(v); });
     numRow(params, 'Taille', state.brushSize || 3, 1, 300, 1, function (v) { driveOriginal('p-sw', v, false, 'change'); });
-    numRow(params, 'Espacement', state.bitmapSpacing !== undefined ? state.bitmapSpacing : 15, 2, 100, 1, function (v) { driveOriginal('p-bitmap-spacing', v, false, 'input'); });
-    numRow(params, 'Dispersion', state.bitmapScatter !== undefined ? state.bitmapScatter : 20, 0, 100, 1, function (v) { driveOriginal('p-bitmap-scatter', v, false, 'input'); });
-    numRow(params, 'Opacité', state.bitmapOpacity !== undefined ? state.bitmapOpacity : 100, 5, 100, 1, function (v) { driveOriginal('p-bitmap-opacity', v, false, 'input'); });
-    checkRow(params, 'Pression (tablette)', state.bitmapPressure !== false, function (v) { driveOriginal('p-bitmap-pressure', v, true, 'change'); });
+    // Spacing/Scatter/Opacity/Pressure no longer have a Stroke-panel element
+    // to drive at all (removed, 2026-07 harmonization) — call
+    // bitmap-brush.js's own state+live-selection setters directly instead of
+    // routing through driveOriginal (which would now silently no-op).
+    numRow(params, 'Espacement', state.bitmapSpacing !== undefined ? state.bitmapSpacing : 15, 2, 100, 1, function (v) { if (window.SM && window.SM.setBitmapSpacing) window.SM.setBitmapSpacing(v); });
+    numRow(params, 'Dispersion', state.bitmapScatter !== undefined ? state.bitmapScatter : 20, 0, 100, 1, function (v) { if (window.SM && window.SM.setBitmapScatter) window.SM.setBitmapScatter(v); });
+    numRow(params, 'Opacité', state.bitmapOpacity !== undefined ? state.bitmapOpacity : 100, 5, 100, 1, function (v) { if (window.SM && window.SM.setBitmapOpacity) window.SM.setBitmapOpacity(v); });
+    checkRow(params, 'Pression (tablette)', state.bitmapPressure !== false, function (v) { if (window.SM && window.SM.setBitmapPressure) window.SM.setBitmapPressure(v); });
     selectRow(params, 'Stabilisateur', state.stabilizer !== undefined ? state.stabilizer : 2, [
       { value: 0, label: 'Off' }, { value: 1, label: 'Low' }, { value: 2, label: 'Medium' }, { value: 3, label: 'High' },
       { value: 4, label: 'Plume — légère' }, { value: 5, label: 'Plume — moyenne' }, { value: 6, label: 'Plume — forte' },
     ], function (v) { driveOriginal('p-stab', v, false, 'change'); }, STAB_TITLE);
+    // Import .abr — was the Stroke panel's own button + hidden file input
+    // (2026-07 harmonization, removed along with the rest of that section);
+    // the actual parsing logic lives in bitmap-brush.js's importAbrFile
+    // (exposed via window.SM), this just needs its own button+input pair
+    // since there's nowhere else left to click it from.
+    var abrRow = document.createElement('div'); abrRow.className = 'pr';
+    var abrLbl = document.createElement('span'); abrLbl.className = 'pl';
+    var abrBtn = document.createElement('button'); abrBtn.className = 'pbtn'; abrBtn.style.cssText = 'flex:1;font-size:10px'; abrBtn.type = 'button'; abrBtn.textContent = 'Import .abr tip…';
+    var abrFile = document.createElement('input'); abrFile.type = 'file'; abrFile.accept = '.abr'; abrFile.style.display = 'none';
+    abrBtn.addEventListener('click', function () { abrFile.click(); });
+    abrFile.addEventListener('change', function () {
+      var file = this.files && this.files[0];
+      this.value = ''; // allow re-importing the same file name later
+      if (window.SM && window.SM.importAbrFile) window.SM.importAbrFile(file);
+    });
+    abrRow.appendChild(abrLbl); abrRow.appendChild(abrBtn); abrRow.appendChild(abrFile);
+    params.appendChild(abrRow);
   }
   function buildVectorGrid(container) {
     container.innerHTML = ''; // rebuilt on every selection (to move the .active highlight) — must replace, not append
@@ -144,6 +249,13 @@
       container.appendChild(label);
       var grid = document.createElement('div'); grid.className = 'bp-grid';
       g.keys.forEach(function (k) { grid.appendChild(makeBrushItem(k, k === current, function (key) {
+        commitBrushPreview();
+        // NOT window.SM.applyVectorBrushToSelection(key) too — selectPreset
+        // (brush-preset-picker.js) already retroactively re-textures the
+        // current selection itself (its own pushUndo included); calling
+        // both double-applies (two undo entries for one click, redundant
+        // re-stamp with a fresh random seed each time — caught via a live
+        // undoStack-length check, not just visually).
         window.BrushPresetPicker.selectPreset(key);
         buildVectorGrid(container); // rebuild the GRID only (to move the .active highlight) — the params header above is untouched
       })); });
@@ -155,6 +267,13 @@
       container.appendChild(clabel);
       var cgrid = document.createElement('div'); cgrid.className = 'bp-grid';
       custom.forEach(function (k) { cgrid.appendChild(makeBrushItem(k, k === current, function (key) {
+        commitBrushPreview();
+        // NOT window.SM.applyVectorBrushToSelection(key) too — selectPreset
+        // (brush-preset-picker.js) already retroactively re-textures the
+        // current selection itself (its own pushUndo included); calling
+        // both double-applies (two undo entries for one click, redundant
+        // re-stamp with a fresh random seed each time — caught via a live
+        // undoStack-length check, not just visually).
         window.BrushPresetPicker.selectPreset(key);
         buildVectorGrid(container);
       })); });
@@ -169,6 +288,8 @@
     btn.appendChild(canvas); btn.appendChild(span);
     window.BrushPresetPicker.drawPreview(canvas, key);
     btn.addEventListener('click', function () { onSelect(key); });
+    btn.addEventListener('mouseenter', function () { previewVectorBrush(key); });
+    btn.addEventListener('mouseleave', function () { revertBrushPreview(); });
     return btn;
   }
 
@@ -184,7 +305,9 @@
       container.appendChild(label);
       var grid = document.createElement('div'); grid.className = 'bp-grid';
       g.keys.forEach(function (k) { grid.appendChild(makeTipItem(k, k === current, function (key) {
+        commitBrushPreview();
         window.BitmapTipPicker.selectTip(key);
+        if (window.SM && window.SM.applyBitmapBrushToSelection) window.SM.applyBitmapBrushToSelection();
         buildBitmapGrid(container);
       })); });
       container.appendChild(grid);
@@ -195,7 +318,9 @@
       container.appendChild(clabel);
       var cgrid = document.createElement('div'); cgrid.className = 'bp-grid';
       custom.forEach(function (k) { cgrid.appendChild(makeTipItem(k, k === current, function (key) {
+        commitBrushPreview();
         window.BitmapTipPicker.selectTip(key);
+        if (window.SM && window.SM.applyBitmapBrushToSelection) window.SM.applyBitmapBrushToSelection();
         buildBitmapGrid(container);
       })); });
       container.appendChild(cgrid);
@@ -209,6 +334,8 @@
     btn.appendChild(canvas); btn.appendChild(span);
     window.BitmapTipPicker.drawPreview(canvas, key);
     btn.addEventListener('click', function () { onSelect(key); });
+    btn.addEventListener('mouseenter', function () { previewBitmapBrush(key); });
+    btn.addEventListener('mouseleave', function () { revertBrushPreview(); });
     return btn;
   }
 
