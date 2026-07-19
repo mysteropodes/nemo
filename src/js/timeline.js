@@ -305,7 +305,11 @@ window.SM={
     state.ghostAllFrames=!state.ghostAllFrames;
     renderOS();
     var b=document.getElementById('btn-ghost-all');if(b)b.classList.toggle('active',state.ghostAllFrames);
-    var sb=document.getElementById('btn-ghost-select');if(sb)sb.disabled=!state.ghostAllFrames;
+    // btn-ghost-select no longer gets disabled here (2026-07) — it now
+    // self-enables Ghost All on demand (selectGhostAll's own comment), so
+    // leaving it clickable either way is correct; disabling it made it
+    // silently inert with no visual cue at all (no .tb:disabled CSS rule
+    // existed), which is exactly what read as "ne marche pas".
     if(!state.ghostAllFrames)clearGhostSelection();
     updateUI();
   },
@@ -1686,7 +1690,17 @@ function updateFsSelPanel(){
 // edits get routed back to each proxy's own frame instead of the current one).
 var _ghostProxyActive=false;
 function selectGhostAll(){
-  if(!state.ghostAllFrames)return;
+  // Used to silently no-op unless Ghost All (btn-ghost-all) had already
+  // been turned on first — an invisible prerequisite (the button looked
+  // identically clickable either way, `disabled` had no CSS styling of its
+  // own) that read as "le bouton n'a pas l'air de marcher" (2026-07). Now
+  // self-enables Ghost All instead of requiring that separate step —
+  // same side effects toggleGhostAll's own "turning on" branch has.
+  if(!state.ghostAllFrames){
+    state.ghostAllFrames=true;
+    renderOS();
+    var gb=document.getElementById('btn-ghost-all');if(gb)gb.classList.add('active');
+  }
   window.SM.setTool('select');
   var li=state.activeLayerIdx,cf=state.currentFrame;
   var ld=state.layers[li];if(!ld||ld.symbolId){showToast('Ghost All ne fonctionne pas sur un composant');return;}
