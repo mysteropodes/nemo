@@ -49,7 +49,15 @@
     edgeDetect: [{ key: 'p1', label: 'Intensité', min: 0, max: 20, step: 1, scale: 1, unit: '' }],
     groundShadow: [
       { key: 'p1', label: 'Inclinaison', min: -3, max: 3, step: 0.05, scale: 1, unit: '' },
-      { key: 'p2', label: 'Sol (Y)', min: 0, max: 100, step: 1, scale: 100, unit: '%' },
+      // max capped at 90 (not 100) — feedback: "l'effet ombre au sol ne
+      // marche pas j'ai l'impression". At 100% the ground line sits
+      // exactly on the canvas' last row, leaving ZERO room below it for
+      // the shadow to render into (the math is correct — y is never >
+      // ground_y when ground_y is the frame's own bottom edge — but it
+      // LOOKS broken: the slider still moves, nothing ever appears).
+      // Capping at 90 guarantees at least a sliver of canvas is always
+      // available for the shadow, regardless of Longueur.
+      { key: 'p2', label: 'Sol (Y)', min: 0, max: 90, step: 1, scale: 100, unit: '%' },
       { key: 'p3', label: 'Longueur', min: 0.1, max: 4, step: 0.05, scale: 1, unit: '×' },
       { key: 'p4', label: 'Opacité', min: 0, max: 100, step: 1, scale: 100, unit: '%' },
     ],
@@ -58,7 +66,16 @@
     blur: [8, 0, 0, 0], colorAdjust: [0, 0, 0, 0], vignette: [0.5, 0.4, 0, 0], glow: [16, 0, 0, 0],
     sepia: [0, 0, 0, 0], invert: [0, 0, 0, 0], grayscale: [0, 0, 0, 0], posterize: [6, 0, 0, 0],
     pixelate: [16, 0, 0, 0], chromaticAberration: [4, 0, 0, 0], scanlines: [240, 0.5, 0, 0],
-    grain: [0.08, 0, 0, 0], sharpen: [0.5, 0, 0, 0], edgeDetect: [4, 0, 0, 0], groundShadow: [0, 0.75, 1, 0.5],
+    grain: [0.08, 0, 0, 0], sharpen: [0.5, 0, 0, 0], edgeDetect: [4, 0, 0, 0],
+    // groundShadow default was [0, 0.75, 1, 0.5] — at ground=75%/length=1 the
+    // shader's inverse-mapped source row only reaches sy≈ground-(1-ground)
+    // ≈49.7% of canvas height, right at the edge of most centered shapes'
+    // own bottom edge: the shadow existed but was a near-invisible sliver
+    // (root cause of "l'effet ombre au sol ne marche pas j'ai l'impression").
+    // Lower ground + shorter length reach much further up the source
+    // regardless of exact shape position, so the effect is visible the
+    // moment it's added instead of requiring manual tuning to find it.
+    groundShadow: [0, 0.62, 0.6, 0.65],
   };
   // Also read by renderLayerList's FX badge (timeline.js) via window.EFFECT_LABELS.
   var EFFECT_LABELS = {
@@ -109,35 +126,89 @@
     return EFFECT_DEFAULTS[type] || [0, 0, 0, 0];
   }
 
-  function renderAddMenu(isAdjustment) {
-    var sel = document.getElementById('p-add-effect');
-    if (!sel) return;
-    sel.innerHTML = '<option value="">+ Add Effect…</option>';
+  // Categorized flyout menu with preview thumbnails (2026-07 rewrite —
+  // feedback: "on a pas de préviz vignette et de sous menu. Pense bien
+  // l'architecture ui qui marcherait le mieux"). Replaces the plain
+  // <select>+<optgroup> (functional but no visual preview and no real
+  // nested-menu structure) with a two-level flyout matching how AE/most
+  // desktop apps present a categorized "Add Effect" menu: a category list
+  // that opens a submenu of preview tiles (small CSS-approximation
+  // thumbnail + label) to the side. Built FRESH every time it's opened
+  // (not cached) since which categories/custom effects are available can
+  // change between opens (adjustment vs ordinary layer, a shader just
+  // authored, etc).
+  var addMenuEl = null, subMenuEl = null;
+  function closeAddMenu() {
+    if (addMenuEl) { addMenuEl.remove(); addMenuEl = null; }
+    if (subMenuEl) { subMenuEl.remove(); subMenuEl = null; }
+  }
+  function openSubmenu(anchorEl, items) {
+    if (subMenuEl) { subMenuEl.remove(); subMenuEl = null; }
+    var sub = document.createElement('div');
+    sub.className = 'fx-submenu';
+    items.forEach(function (item) {
+      var row = document.createElement('div');
+      row.className = 'fx-submenu-item';
+      var prev = document.createElement('div');
+      prev.className = 'fx-prev' + (item.preview ? ' fx-prev-' + item.preview : ' fx-prev-generic');
+      var lbl = document.createElement('span'); lbl.textContent = item.label;
+      row.appendChild(prev); row.appendChild(lbl);
+      row.addEventListener('click', function (e) { e.stopPropagation(); closeAddMenu(); item.action(); });
+      sub.appendChild(row);
+    });
+    document.body.appendChild(sub);
+    var r = anchorEl.getBoundingClientRect();
+    var sw = sub.offsetWidth, sh = sub.offsetHeight;
+    var left = r.right + 2;
+    if (left + sw > window.innerWidth - 4) left = r.left - sw - 2;
+    var top = Math.min(r.top, window.innerHeight - sh - 4);
+    sub.style.left = left + 'px'; sub.style.top = top + 'px';
+    subMenuEl = sub;
+  }
+  function openAddMenu(anchorEl, isAdjustment) {
+    closeAddMenu();
+    var menu = document.createElement('div');
+    menu.className = 'fx-addmenu';
     EFFECT_CATEGORIES.forEach(function (cat) {
       if (isAdjustment && cat.layerOnly) return;
-      var group = document.createElement('optgroup');
-      group.label = cat.label;
-      cat.types.forEach(function (type) {
-        var opt = document.createElement('option');
-        opt.value = type; opt.textContent = EFFECT_LABELS[type] || type;
-        group.appendChild(opt);
-      });
-      sel.appendChild(group);
+      var row = document.createElement('div');
+      row.className = 'fx-addmenu-cat';
+      row.innerHTML = '<span>' + cat.label + '</span><span class="fx-addmenu-arrow">›</span>';
+      var open = function () {
+        openSubmenu(row, cat.types.map(function (type) {
+          return { label: EFFECT_LABELS[type] || type, preview: type, action: function () { addEffect(type); } };
+        }));
+      };
+      row.addEventListener('mouseenter', open);
+      row.addEventListener('click', function (e) { e.stopPropagation(); open(); });
+      menu.appendChild(row);
     });
     // Custom shaders (2026-07) — user-authored effects saved in
     // state.customEffects, plus a fixed entry to open the authoring modal.
-    var customGroup = document.createElement('optgroup');
-    customGroup.label = 'Custom';
-    (state.customEffects || []).forEach(function (c) {
-      var opt = document.createElement('option');
-      opt.value = 'custom:' + c.id; opt.textContent = c.name;
-      customGroup.appendChild(opt);
-    });
-    var newOpt = document.createElement('option');
-    newOpt.value = '__new_custom__'; newOpt.textContent = '+ New custom shader…';
-    customGroup.appendChild(newOpt);
-    sel.appendChild(customGroup);
+    var customRow = document.createElement('div');
+    customRow.className = 'fx-addmenu-cat';
+    customRow.innerHTML = '<span>Custom</span><span class="fx-addmenu-arrow">›</span>';
+    var openCustom = function () {
+      var items = (state.customEffects || []).map(function (c) {
+        return { label: c.name, preview: null, action: function () { addEffect('custom:' + c.id); } };
+      });
+      items.push({ label: '+ New custom shader…', preview: null, action: function () { if (window.openCustomEffectEditor) window.openCustomEffectEditor(null); } });
+      openSubmenu(customRow, items);
+    };
+    customRow.addEventListener('mouseenter', openCustom);
+    customRow.addEventListener('click', function (e) { e.stopPropagation(); openCustom(); });
+    menu.appendChild(customRow);
+    document.body.appendChild(menu);
+    var r = anchorEl.getBoundingClientRect();
+    var mw = menu.offsetWidth, mh = menu.offsetHeight;
+    menu.style.left = Math.min(r.left, window.innerWidth - mw - 4) + 'px';
+    menu.style.top = Math.min(r.bottom + 2, window.innerHeight - mh - 4) + 'px';
+    addMenuEl = menu;
   }
+  document.addEventListener('pointerdown', function (e) {
+    if (addMenuEl && !addMenuEl.contains(e.target) && (!subMenuEl || !subMenuEl.contains(e.target)) && e.target.id !== 'p-add-effect-btn') closeAddMenu();
+  }, true);
+  window.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeAddMenu(); });
 
   function addEffect(type) {
     var ld = activeLayer(); if (!ld) return;
@@ -207,13 +278,23 @@
     effects.forEach(function (eff, idx) {
       var row = document.createElement('div');
       row.className = 'fx-row' + (eff.enabled ? '' : ' disabled') + (expandedIdx === idx ? ' expanded' : '');
+      // Explicit disclosure chevron (feedback: "faudrait pouvoir déplier
+      // ou replier les paramètre de l'effet") — the whole row already
+      // toggled its own param panel on click, but with no visual cue that
+      // it's expandable/collapsible at all. Own click handler (not just
+      // relying on the row's) so it works even where the row's own
+      // listener might be intercepted, and rotates via CSS to show state.
+      var chevron = document.createElement('div'); chevron.className = 'fx-row-chevron';
+      chevron.innerHTML = '<svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg>';
+      chevron.title = expandedIdx === idx ? 'Replier' : 'Déplier';
+      chevron.addEventListener('click', function (e) { e.stopPropagation(); expandedIdx = expandedIdx === idx ? -1 : idx; renderEffectsList(); });
       var eye = document.createElement('div'); eye.className = 'fx-row-eye';
       eye.innerHTML = eff.enabled ? ICON_EYE : ICON_EYE_OFF;
       eye.title = eff.enabled ? 'Désactiver' : 'Activer';
       eye.addEventListener('click', function (e) { e.stopPropagation(); toggleEnabled(idx); });
       var name = document.createElement('span'); name.className = 'fx-row-name';
       name.textContent = labelFor(eff.type);
-      row.appendChild(eye); row.appendChild(name);
+      row.appendChild(chevron); row.appendChild(eye); row.appendChild(name);
       // Edit the shader source (custom effects only — built-ins have no
       // source to edit, just params, already reachable by expanding the row).
       if (isCustomEffect(eff.type)) {
@@ -249,7 +330,6 @@
     if (!applicable) return;
     var hint = document.getElementById('effects-adj-hint');
     if (hint) hint.style.display = ld.isEffectLayer ? '' : 'none';
-    renderAddMenu(!!ld.isEffectLayer);
     renderEffectsList();
   }
   window.updateEffectsPanel = renderEffectsSection;
@@ -257,11 +337,11 @@
   function init() {
     var sec = document.getElementById('effects-stack-sec');
     if (!sec) return;
-    var addSel = document.getElementById('p-add-effect');
-    if (addSel) addSel.addEventListener('change', function () {
-      var type = this.value; this.value = '';
-      if (type === '__new_custom__') { if (window.openCustomEffectEditor) window.openCustomEffectEditor(null); return; }
-      if (type) addEffect(type);
+    var addBtn = document.getElementById('p-add-effect-btn');
+    if (addBtn) addBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var ld = activeLayer();
+      openAddMenu(addBtn, !!(ld && ld.isEffectLayer));
     });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
