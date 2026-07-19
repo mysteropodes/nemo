@@ -180,7 +180,7 @@
 
       var mute = document.createElement('div');
       mute.className = 'lico' + (track.muted ? ' off' : '');
-      mute.title = track.muted ? 'Réactiver' : 'Couper';
+      mute.title = window.SM.t(track.muted ? 'audioUnmute' : 'audioMute');
       // Flat monochrome SVGs, not emoji — matches every other .lico icon in
       // the layer panel (feedback: "encore des icon non flat").
       mute.innerHTML = track.muted
@@ -197,7 +197,7 @@
       var nm = document.createElement('div');
       nm.className = 'lnm';
       nm.textContent = track.name;
-      nm.title = 'Double-clic pour renommer';
+      nm.title = window.SM.t('audioDblClickRename');
       row.appendChild(nm);
       row.addEventListener('dblclick', function (e) {
         if (e.target !== nm) return;
@@ -225,7 +225,7 @@
       row.appendChild(vol);
 
       var del = document.createElement('div');
-      del.className = 'lico'; del.textContent = '×'; del.title = 'Supprimer la piste';
+      del.className = 'lico'; del.textContent = '×'; del.title = window.SM.t('audioDeleteTrack');
       del.addEventListener('click', function (e) {
         e.stopPropagation();
         stopTrack(track);

@@ -954,7 +954,7 @@ window.SM={
     var sceneWaIn=inSym?_sceneSnapshot.waIn:state.waIn;
     var sceneWaOut=inSym?_sceneSnapshot.waOut:state.waOut;
     return JSON.stringify({version:13,totalFrames:sceneTotal,fps:sceneFps,canvasW:state.canvasW,canvasH:state.canvasH,canvasBg:state.canvasBg,waIn:sceneWaIn,waOut:sceneWaOut,
-      layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color,motion:l.motion,motionStatic:l.motionStatic,elementMotion:l.elementMotion,inPoint:l.inPoint,outPoint:l.outPoint,nativeVideo:l.nativeVideo,matteMode:l.matteMode,blurRadius:l.blurRadius,montageId:l.montageId,expressions:l.expressions,isTextLayer:l.isTextLayer,isNullLayer:l.isNullLayer,isEffectLayer:l.isEffectLayer,effectType:l.effectType,effectP1:l.effectP1,effectP2:l.effectP2};}),
+      layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color,motion:l.motion,motionStatic:l.motionStatic,elementMotion:l.elementMotion,inPoint:l.inPoint,outPoint:l.outPoint,nativeVideo:l.nativeVideo,matteMode:l.matteMode,blurRadius:l.blurRadius,montageId:l.montageId,expressions:l.expressions,isTextLayer:l.isTextLayer,isNullLayer:l.isNullLayer,isEffectLayer:l.isEffectLayer,effectType:l.effectType,effectP1:l.effectP1,effectP2:l.effectP2,gshadowSkew:l.gshadowSkew,gshadowGroundY:l.gshadowGroundY,gshadowLength:l.gshadowLength,gshadowOpacity:l.gshadowOpacity};}),
       layerFolders:state.layerFolders,layerLinkGroups:state.layerLinkGroups,
       // StoryBoard node space (2026-07) — plain data by construction (no
       // runtime-only fields live in state.storyboard, see storyboard.js's
@@ -1078,6 +1078,7 @@ window.SM={
       if(ld.isTextLayer)state.layers[idx].isTextLayer=true;
       if(ld.isNullLayer)state.layers[idx].isNullLayer=true;
       if(ld.isEffectLayer){state.layers[idx].isEffectLayer=true;state.layers[idx].effectType=ld.effectType||'blur';state.layers[idx].effectP1=ld.effectP1;state.layers[idx].effectP2=ld.effectP2;}
+      state.layers[idx].gshadowSkew=ld.gshadowSkew;state.layers[idx].gshadowGroundY=ld.gshadowGroundY;state.layers[idx].gshadowLength=ld.gshadowLength;state.layers[idx].gshadowOpacity=ld.gshadowOpacity;
       if(ld.symbolId){state.layers[idx].symbolId=ld.symbolId;state.layers[idx].symPlayMode=ld.symPlayMode||'loop';state.layers[idx].symSpeed=ld.symSpeed||1;state.layers[idx].symPlacedAt=ld.symPlacedAt||0;state.layers[idx].symSingleFrame=ld.symSingleFrame||0;if(ld.symMatrix)state.layers[idx].symMatrix=ld.symMatrix;}
       if(ld.lfsGroup){state.layers[idx].lfsGroup=true;state.layers[idx].lfsIds=ld.lfsIds;state.layers[idx].lfsSettings=ld.lfsSettings;}
       if(ld.folderId)state.layers[idx].folderId=ld.folderId;
@@ -1402,6 +1403,21 @@ function updatePropsContext(){
   var blurInp=document.getElementById('p-blur');
   if(blurInp&&state.layers[state.activeLayerIdx]){
     blurInp.value=state.layers[state.activeLayerIdx].blurRadius||0;
+  }
+  // Ground/cast shadow (2026-07) — same sync-on-every-context-switch
+  // reasoning as Flou just above; the extra Sol/Longueur/Inclinaison row
+  // only shows once opacity>0 (mirrors EFFECT_ROWS_BY_TYPE's show/hide
+  // convention elsewhere in this file, just for a single per-layer row).
+  var gsLd=state.layers[state.activeLayerIdx];
+  var gsOpInp=document.getElementById('p-gshadow-opacity');
+  if(gsOpInp&&gsLd){
+    var gsOp=gsLd.gshadowOpacity||0;
+    gsOpInp.value=Math.round(gsOp*100);
+    document.getElementById('p-gshadow-ground').value=Math.round((gsLd.gshadowGroundY!==undefined?gsLd.gshadowGroundY:0.75)*100);
+    document.getElementById('p-gshadow-length').value=gsLd.gshadowLength!==undefined?gsLd.gshadowLength:1;
+    document.getElementById('p-gshadow-skew').value=gsLd.gshadowSkew!==undefined?gsLd.gshadowSkew:0;
+    var moreRow=document.getElementById('p-gshadow-more-row');
+    if(moreRow)moreRow.style.display=gsOp>0?'':'none';
   }
   if(window.renderGradientPanel)window.renderGradientPanel();
   var hdrEl=document.getElementById('props-context-hdr');if(hdrEl)hdrEl.textContent=hdrText;
@@ -4974,6 +4990,14 @@ document.getElementById('p-cbg').addEventListener('input',function(){window.SM.s
 document.getElementById('p-clip').addEventListener('change',function(){window.SM.setCanvasClip(this.checked);});
 document.getElementById('p-safety').addEventListener('change',function(){window.SM.setSafetyZones(this.checked);});
 document.getElementById('p-blur').addEventListener('input',function(){var ld=state.layers[state.activeLayerIdx];if(!ld)return;pushUndo();ld.blurRadius=Math.max(0,parseFloat(this.value)||0);saveActiveLayerFrame();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
+// Ground/cast shadow (2026-07, feedback: "un effet wgsl qui fasse ça" +
+// AviUtl2 GroundShadow2_S link) — per-layer, mirrors the Flou wiring just
+// above. gshadowOpacity<=0 is the off-switch (updatePropsContext hides the
+// extra Sol/Longueur/Inclinaison row in that state).
+document.getElementById('p-gshadow-opacity').addEventListener('input',function(){var ld=state.layers[state.activeLayerIdx];if(!ld)return;pushUndo();ld.gshadowOpacity=Math.max(0,Math.min(1,(parseFloat(this.value)||0)/100));var row=document.getElementById('p-gshadow-more-row');if(row)row.style.display=ld.gshadowOpacity>0?'':'none';saveActiveLayerFrame();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
+document.getElementById('p-gshadow-ground').addEventListener('input',function(){var ld=state.layers[state.activeLayerIdx];if(!ld)return;pushUndo();ld.gshadowGroundY=Math.max(0,Math.min(1,(parseFloat(this.value)||0)/100));saveActiveLayerFrame();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
+document.getElementById('p-gshadow-length').addEventListener('input',function(){var ld=state.layers[state.activeLayerIdx];if(!ld)return;pushUndo();ld.gshadowLength=Math.max(0.1,parseFloat(this.value)||1);saveActiveLayerFrame();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
+document.getElementById('p-gshadow-skew').addEventListener('input',function(){var ld=state.layers[state.activeLayerIdx];if(!ld)return;pushUndo();ld.gshadowSkew=parseFloat(this.value)||0;saveActiveLayerFrame();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
 // Effect layer panel (2026-07, Motion) — see updateEffectLayerPanel's own
 // comment for the -100..100 (UI) <-> -1..1 (Rust color_adjust.wgsl) scale.
 // Defaults per effect type on switching — chosen so each type shows an
@@ -5373,7 +5397,7 @@ document.getElementById('comp-offset').addEventListener('change',function(){wind
 
   document.getElementById('btn-export').addEventListener('click',function(){
     if(!window.SMExport.isAvailable()){
-      showToast('Export complet disponible uniquement dans l\'app Nemo (Tauri)');
+      showToast(SM.t('exportTauriOnly'));
     }
     updateScaleVisibility();
     progEl.style.display='none';progEl.textContent='';
@@ -5388,21 +5412,21 @@ document.getElementById('comp-offset').addEventListener('change',function(){wind
     var scale=currentExportScale();
     var alpha=ALPHA_FORMATS.indexOf(fmtSel.value)>=0&&document.getElementById('exp-alpha').checked;
     var opts={start:range.start,end:range.end,scale:scale,alpha:alpha,fps:state.fps,
-      onProgress:function(i,n){progEl.style.display='block';progEl.textContent='Rendu image '+i+'/'+n+'…';},
+      onProgress:function(i,n){progEl.style.display='block';progEl.textContent=SM.t('exportRenderingFrame').replace('{i}',i).replace('{n}',n);},
       onFfmpeg:function(line){progEl.style.display='block';progEl.textContent=line.substring(0,80);},
       onRiveProgress:function(msg){progEl.style.display='block';progEl.textContent=msg;}};
-    runBtn.disabled=true;progEl.style.display='block';progEl.textContent='Préparation…';
+    runBtn.disabled=true;progEl.style.display='block';progEl.textContent=SM.t('exportPreparing');
     try{
       var fn={svg:'exportSVGSequence',png:'exportPNGSequence',tiff:'exportTIFFSequence',gif:'exportGIF',mp4:'exportMP4',prores:'exportProRes',lottie:'exportLottie',rive:'exportRive','ae-camera':'exportAECamera'}[fmtSel.value];
       var res=await window.SMExport[fn](opts);
-      if(res.cancelled){progEl.textContent='Annulé';}
+      if(res.cancelled){progEl.textContent=SM.t('exportCancelled');}
       else if(res.ok){
-        progEl.textContent='Terminé ✓';
-        var aeCamMsg='Script caméra exporté ('+res.keyCount+' clé(s))'+
-          (res.kitsu?(res.kitsu.ok?' — envoyé sur Kitsu':' — échec envoi Kitsu: '+res.kitsu.error):'');
-        var doneMsg=fmtSel.value==='rive'?('Exporté vers l\'artboard Rive "'+res.artboardName+'"')
+        progEl.textContent=SM.t('exportDone');
+        var aeCamMsg=SM.t('exportAeCamMsg').replace('{n}',res.keyCount)+
+          (res.kitsu?(res.kitsu.ok?SM.t('exportAeCamKitsuOk'):SM.t('exportAeCamKitsuFail').replace('{e}',res.kitsu.error)):'');
+        var doneMsg=fmtSel.value==='rive'?SM.t('exportRiveDone').replace('{name}',res.artboardName)
           :fmtSel.value==='ae-camera'?aeCamMsg
-          :'Export terminé';
+          :SM.t('exportGenericDone');
         showToast(doneMsg);
         // Lottie JSON gets its own preview instead of auto-closing straight
         // away — a bad export (empty/misplaced shapes) is otherwise silent
@@ -5414,9 +5438,9 @@ document.getElementById('comp-offset').addEventListener('change',function(){wind
           setTimeout(function(){modal.style.display='none';},900);
         }
       }
-      else{progEl.textContent='Erreur: '+(res.error||'inconnue');}
+      else{progEl.textContent=SM.t('exportError').replace('{e}',res.error||SM.t('exportErrorUnknown'));}
     }catch(err){
-      progEl.textContent='Erreur: '+(err&&err.message?err.message:err);
+      progEl.textContent=SM.t('exportError').replace('{e}',err&&err.message?err.message:err);
     }finally{
       runBtn.disabled=false;
     }

@@ -173,6 +173,27 @@ pub(crate) struct LayerIn {
     // would make a shape look sharper just from zooming out.
     #[serde(default)]
     pub(crate) blur_radius: Option<f32>,
+    // Layer-level ground/cast shadow (2026-07, feedback: "un effet wgsl qui
+    // fasse ça" — a 2D analog of the AviUtl2 GroundShadow2_S script). Same
+    // "isolated per-layer texture + custom fullscreen-pass" shape as
+    // blur_radius above, run on this SAME source_view right after blur (see
+    // composite_scene) — deliberately NOT an effect/adjustment-layer type
+    // like blur/vignette/glow: those operate on the flattened accumulator,
+    // which this engine seeds with an OPAQUE base color up front, so alpha
+    // can no longer tell "this shape" apart from "empty background" once
+    // flattened — a shadow needs the shape's OWN true alpha silhouette,
+    // which only exists before that flattening. See simple_fx.wgsl's
+    // EFFECT_GROUND_SHADOW doc comment for the projection math.
+    // gshadow_opacity.unwrap_or(0.0) <= 0.0 is this feature's off-switch,
+    // same "0 = disabled, no GPU cost" convention as blur_radius.
+    #[serde(default)]
+    pub(crate) gshadow_skew: Option<f32>,
+    #[serde(default)]
+    pub(crate) gshadow_ground_y: Option<f32>,
+    #[serde(default)]
+    pub(crate) gshadow_length: Option<f32>,
+    #[serde(default)]
+    pub(crate) gshadow_opacity: Option<f32>,
     // Adjustment/effect layer (2026-07, Motion) — an AE-style layer with no
     // painted content of its own whose effect applies to EVERYTHING BELOW
     // it in the stack instead of just itself. Unlike blur_radius/matte_mode
@@ -1483,6 +1504,8 @@ fn simple_fx_pass(
     effect_id: f32,
     p1: f32,
     p2: f32,
+    p3: f32,
+    p4: f32,
     tex_w: f32,
     tex_h: f32,
     target_view: &wgpu::TextureView,
@@ -1491,8 +1514,10 @@ fn simple_fx_pass(
     payload[0..4].copy_from_slice(&effect_id.to_le_bytes());
     payload[4..8].copy_from_slice(&p1.to_le_bytes());
     payload[8..12].copy_from_slice(&p2.to_le_bytes());
+    payload[12..16].copy_from_slice(&p3.to_le_bytes());
     payload[16..20].copy_from_slice(&tex_w.to_le_bytes());
     payload[20..24].copy_from_slice(&tex_h.to_le_bytes());
+    payload[28..32].copy_from_slice(&p4.to_le_bytes());
     queue.write_buffer(uniform_buf, 0, &payload);
     let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("simple-fx-bind-group"),
@@ -1962,7 +1987,8 @@ impl VelloEngine {
         let has_blend = scene_in.layers.iter().any(|l| mix_mode_index(l.blend_mode.as_deref()) != 0);
         let has_blur = scene_in.layers.iter().any(|l| l.blur_radius.unwrap_or(0.0) > 0.0);
         let has_effect = scene_in.layers.iter().any(|l| l.is_effect_layer.unwrap_or(false));
-        if !has_blend && !has_matte && !has_blur && !has_effect {
+        let has_gshadow = scene_in.layers.iter().any(|l| l.gshadow_opacity.unwrap_or(0.0) > 0.0);
+        if !has_blend && !has_matte && !has_blur && !has_effect && !has_gshadow {
             let mut scene = Scene::new();
             self.push_atlas_keepalive(&mut scene);
             for layer in &scene_in.layers {
@@ -2099,6 +2125,8 @@ impl VelloEngine {
                             effect_id,
                             layer.effect_p1.unwrap_or(default_p1),
                             layer.effect_p2.unwrap_or(default_p2),
+                            0.0,
+                            0.0,
                             self.width as f32,
                             self.height as f32,
                             target_view,
@@ -2181,6 +2209,35 @@ impl VelloEngine {
                     &self.blur_result_view,
                 );
                 source_view = &self.blur_result_view;
+            }
+
+            // Ground/cast shadow (simple_fx.wgsl, EFFECT_GROUND_SHADOW) —
+            // runs on THIS layer's own isolated alpha (real transparency,
+            // unlike the flattened accumulator — see LayerIn::gshadow_*'s
+            // doc comment for why this can't be an adjustment-layer type).
+            // Writes into blur_scratch_view, safe to reuse here: blur_pass
+            // above (if it ran) already finished consuming it as scratch,
+            // and it's otherwise untouched this frame.
+            let gshadow_opacity = layer.gshadow_opacity.unwrap_or(0.0);
+            if gshadow_opacity > 0.0 {
+                simple_fx_pass(
+                    &self.device,
+                    &self.queue,
+                    &self.simple_fx_pipeline,
+                    &self.simple_fx_bind_group_layout,
+                    &self.simple_fx_sampler,
+                    &self.simple_fx_uniform_buf,
+                    source_view,
+                    10.0,
+                    layer.gshadow_skew.unwrap_or(0.0),
+                    layer.gshadow_ground_y.unwrap_or(0.75),
+                    layer.gshadow_length.unwrap_or(1.0),
+                    gshadow_opacity,
+                    self.width as f32,
+                    self.height as f32,
+                    &self.blur_scratch_view,
+                );
+                source_view = &self.blur_scratch_view;
             }
 
             let mode = mix_mode_index(layer.blend_mode.as_deref());
