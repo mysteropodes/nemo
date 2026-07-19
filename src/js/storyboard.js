@@ -551,6 +551,7 @@
           function up() {
             document.removeEventListener('pointermove', mv);
             document.removeEventListener('pointerup', up);
+            logSb(stretch ? 'stretch' : 'trim');
             render(); updatePreview();
           }
           document.addEventListener('pointermove', mv);
@@ -846,6 +847,7 @@
         // snap-join: instance → chain row; sound → under-chain audio lane;
         // montage blocks never join anything.
         var joined = tryJoinChain(m, 0, 0) || tryJoinAudio(m);
+        logSb('moveModule');
         render();
         if (joined) updatePreview();
       }
@@ -876,12 +878,12 @@
           } else {
             menu.push({ label: 'Scinder (placez le lecteur dans ce clip)', disabled: true, action: function () {} });
           }
-          menu.push({ label: 'Réinitialiser le retiming', action: function () { m.trimIn = 0; m.trimOut = symbolDuration(m.symbolId) - 1; m.duration = m.trimOut + 1; render(); updatePreview(); } });
-          menu.push({ label: 'Détacher du montage', action: function () { leaveAnyChain(m); m.y += 110; render(); updatePreview(); } });
+          menu.push({ label: 'Réinitialiser le retiming', action: function () { logSb('resetRetime'); m.trimIn = 0; m.trimOut = symbolDuration(m.symbolId) - 1; m.duration = m.trimOut + 1; render(); updatePreview(); } });
+          menu.push({ label: 'Détacher du montage', action: function () { logSb('detach'); leaveAnyChain(m); m.y += 110; render(); updatePreview(); } });
         }
       }
       if (m.type === 'montage') {
-        menu.push({ label: 'Renommer', action: function () { var v = prompt('Nom du montage', m.name); if (v) { m.name = v; render(); } } });
+        menu.push({ label: 'Renommer', action: function () { var v = prompt('Nom du montage', m.name); if (v) { logSb('rename'); m.name = v; render(); } } });
         // The link between the three modes: a montage becomes a LAYER in
         // Animation 2D/Motion (spec: "apparaîtra comme un layer dans les
         // autres timelines"). The montage stays the source of truth —
@@ -890,9 +892,9 @@
         menu.push({ label: 'Placer comme calque dans Animation 2D', action: function () { placeMontageAsLayer(m); } });
       }
       if (m.type === 'sound' && audioHostOf(m)) {
-        menu.push({ label: 'Détacher du montage', action: function () { leaveAnyChain(m); m.y += 60; render(); } });
+        menu.push({ label: 'Détacher du montage', action: function () { logSb('detach'); leaveAnyChain(m); m.y += 60; render(); } });
       }
-      menu.push({ label: 'Supprimer le module', action: function () { leaveAnyChain(m); var s = sb(); s.modules.splice(s.modules.indexOf(m), 1); if (s.activeMontageId === m.id) s.activeMontageId = null; render(); } });
+      menu.push({ label: 'Supprimer le module', action: function () { logSb('deleteModule'); leaveAnyChain(m); var s = sb(); s.modules.splice(s.modules.indexOf(m), 1); if (s.activeMontageId === m.id) s.activeMontageId = null; render(); } });
       window.showContextMenu(e.clientX, e.clientY, menu);
     });
   }
@@ -937,8 +939,19 @@
     });
   }
 
+  // Feedback action log (2026-07, "récupère des données exploitable pour
+  // résoudre les soucis") — state.storyboard isn't part of
+  // layersSnapshotNow()'s undo snapshot, so these mutations can't route
+  // through pushUndoLayers (nothing for undo to actually restore); logging
+  // directly here is the only way a StoryBoard edit shows up in a feedback
+  // report's action trail at all. See feedback-bridge.js's logAction() doc
+  // comment for why this passes an explicit string instead of relying on
+  // state.tool (StoryBoard mode has no meaningful "drawing tool" active).
+  function logSb(action) { if (window.SMFeedback) SMFeedback.logAction('storyboard:' + action); }
+
   function addInstance(symbolId, x, y) {
     sb().modules.push({ id: newId(), type: 'instance', symbolId: symbolId, x: Math.round(x), y: Math.round(y) });
+    logSb('addInstance');
     render();
   }
   // "Synchroniser l'affichage des éléments dans StoryBoard pour tout
@@ -960,6 +973,7 @@
     var m = { id: newId(), type: 'montage', name: 'Montage ' + (s.modules.filter(function (x2) { return x2.type === 'montage'; }).length + 1), x: Math.round(x), y: Math.round(y), chain: [], audio: [], playhead: 0 };
     s.modules.push(m);
     s.activeMontageId = m.id;
+    logSb('addMontage');
     render();
     return m;
   }
@@ -1103,8 +1117,8 @@
       } else {
         menu.push({ label: 'Scinder (cliquer la forme d’onde pour placer le point)', disabled: true, action: function () {} });
       }
-      if (audioHostOf(m)) menu.push({ label: 'Détacher du montage', action: function () { leaveAnyChain(m); m.y += 60; render(); } });
-      menu.push({ label: 'Supprimer le module', action: function () { leaveAnyChain(m); var s = sb(); s.modules.splice(s.modules.indexOf(m), 1); render(); } });
+      if (audioHostOf(m)) menu.push({ label: 'Détacher du montage', action: function () { logSb('detach'); leaveAnyChain(m); m.y += 60; render(); } });
+      menu.push({ label: 'Supprimer le module', action: function () { logSb('deleteModule'); leaveAnyChain(m); var s = sb(); s.modules.splice(s.modules.indexOf(m), 1); render(); } });
       window.showContextMenu(e.clientX, e.clientY, menu);
     });
     return el;
@@ -1116,6 +1130,7 @@
     m.cursorSec = null;
     if (_audioBuffers[m.id]) _audioBuffers[right.id] = _audioBuffers[m.id];
     s.modules.push(right);
+    logSb('splitSound');
     render();
   }
 
@@ -1162,6 +1177,7 @@
     mod.duration = local;
     sb().modules.push(newMod);
     host.chain.splice(host.chain.indexOf(mod.id) + 1, 0, newMod.id);
+    logSb('splitChainClip');
     render(); updatePreview();
   }
 
