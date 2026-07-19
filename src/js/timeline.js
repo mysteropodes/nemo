@@ -2965,7 +2965,7 @@ function renderLayerList(){
     // icon font is subsetted and silently renders blank for un-included
     // codepoints, see the lock-icon fix comment further up this function).
     if(ld.isNullLayer){var nlb=document.createElement('div');nlb.className='lico comp-badge';nlb.title='Calque Null — jamais rendu, sert de pivot/parent pour d’autres calques';nlb.innerHTML='<span style="font-size:11px;line-height:1;font-weight:700">⊘</span>';row.appendChild(nlb);}
-    if(ld.isEffectLayer){var fxLabels={blur:'Flou',colorAdjust:'Teinte/Contraste',vignette:'Vignette',glow:'Glow'};var fxb=document.createElement('div');fxb.className='lico comp-badge';fxb.title='Calque d’effet — '+(fxLabels[ld.effectType]||'Flou')+' appliqué à tout ce qui est en dessous';fxb.innerHTML='<span style="font-size:9px;line-height:1;font-weight:700">FX</span>';row.appendChild(fxb);}
+    if(ld.isEffectLayer){var fxLabels=window.EFFECT_LABELS||{blur:'Flou',colorAdjust:'Teinte/Contraste',vignette:'Vignette',glow:'Glow'};var fxb=document.createElement('div');fxb.className='lico comp-badge';fxb.title='Calque d’effet — '+(fxLabels[ld.effectType]||'Flou')+' appliqué à tout ce qui est en dessous';fxb.innerHTML='<span style="font-size:9px;line-height:1;font-weight:700">FX</span>';row.appendChild(fxb);}
     if(ld.channel){var chLabel=ld.channel==='stroke'?'Tr':ld.channel==='fill'?'Pl':'Om';var chb=document.createElement('div');chb.className='lico comp-badge';chb.title='Calque '+(ld.channel==='stroke'?'Trait':ld.channel==='fill'?'Plein':'Ombre')+' (Stroke/Fill/Shadow) — calque normal, keyframes liées';chb.innerHTML='<span style="font-size:9px;line-height:1;font-weight:700">'+chLabel+'</span>';row.appendChild(chb);}
     // Track matte badge (2026-07) — the Blend/Matte dropdowns only surface
     // in the right panel's Document fallback context (nothing selected,
@@ -3809,6 +3809,7 @@ var EFFECT_ROWS_BY_TYPE={
   colorAdjust:['p-effect-brightness-row','p-effect-contrast-row'],
   vignette:['p-effect-vig-strength-row','p-effect-vig-radius-row'],
 };
+var ALL_EFFECT_ROW_IDS=['p-effect-blur-row','p-effect-brightness-row','p-effect-contrast-row','p-effect-vig-strength-row','p-effect-vig-radius-row','p-effect-generic1-row','p-effect-generic2-row'];
 function updateEffectLayerPanel(){
   var sec=document.getElementById('effect-layer-sec');
   if(!sec)return;
@@ -3824,11 +3825,32 @@ function updateEffectLayerPanel(){
   document.getElementById('p-effect-contrast').value=Math.round((ld.effectP2||0)*100);
   document.getElementById('p-effect-vig-strength').value=Math.round((ld.effectP1!==undefined?ld.effectP1:0.5)*100);
   document.getElementById('p-effect-vig-radius').value=Math.round((ld.effectP2!==undefined?ld.effectP2:0.4)*100);
-  var shown=EFFECT_ROWS_BY_TYPE[type]||EFFECT_ROWS_BY_TYPE.blur;
-  ['p-effect-blur-row','p-effect-brightness-row','p-effect-contrast-row','p-effect-vig-strength-row','p-effect-vig-radius-row'].forEach(function(id){
+  var genericRowIds=[];
+  var genericCfg=EFFECT_GENERIC_PARAMS[type]||[];
+  genericCfg.forEach(function(cfg,i){
+    var rowId='p-effect-generic'+(i+1)+'-row';
+    genericRowIds.push(rowId);
+    var stored=cfg.key==='p1'?ld.effectP1:ld.effectP2;
+    var def=(EFFECT_DEFAULTS[type]||[0,0])[cfg.key==='p1'?0:1];
+    document.getElementById('p-effect-generic'+(i+1)).value=Math.round(((stored!==undefined?stored:def)*cfg.scale)*100)/100;
+    document.getElementById('p-effect-generic'+(i+1)).min=cfg.min;
+    document.getElementById('p-effect-generic'+(i+1)).max=cfg.max;
+    document.getElementById('p-effect-generic'+(i+1)).dataset.step=cfg.step;
+    document.getElementById('p-effect-generic'+(i+1)+'-label').textContent=cfg.label;
+    document.getElementById('p-effect-generic'+(i+1)+'-unit').textContent=cfg.unit||'';
+  });
+  var shown=(EFFECT_ROWS_BY_TYPE[type]||[]).concat(genericRowIds);
+  ALL_EFFECT_ROW_IDS.forEach(function(id){
     var row=document.getElementById(id);
     if(row)row.style.display=shown.indexOf(id)>=0?'':'none';
   });
+  // Highlight the active tile in the preview grid built by initEffectFxGrid.
+  var grid=document.getElementById('p-effect-grid');
+  if(grid){
+    Array.prototype.forEach.call(grid.children,function(tile){
+      tile.classList.toggle('active',tile.dataset.fxType===type);
+    });
+  }
 }
 function initCycleAndPropagate(){
   var cyc=document.getElementById('btn-cycle');
@@ -4947,13 +4969,78 @@ document.getElementById('p-blur').addEventListener('input',function(){var ld=sta
 // comment for the -100..100 (UI) <-> -1..1 (Rust color_adjust.wgsl) scale.
 // Defaults per effect type on switching — chosen so each type shows an
 // immediately visible (if subtle) result rather than looking like a no-op.
-var EFFECT_DEFAULTS={blur:[8,0],glow:[16,0],colorAdjust:[0,0],vignette:[0.5,0.4]};
-document.getElementById('p-effect-type').addEventListener('change',function(){var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.isEffectLayer)return;pushUndo();ld.effectType=this.value;var d=EFFECT_DEFAULTS[ld.effectType]||[0,0];ld.effectP1=d[0];ld.effectP2=d[1];updateEffectLayerPanel();saveActiveLayerFrame();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
+var EFFECT_DEFAULTS={blur:[8,0],glow:[16,0],colorAdjust:[0,0],vignette:[0.5,0.4],
+  sepia:[0,0],invert:[0,0],grayscale:[0,0],posterize:[6,0],pixelate:[16,0],
+  chromaticAberration:[4,0],scanlines:[240,0.5],grain:[0.08,0],sharpen:[0.5,0],edgeDetect:[4,0]};
+// Titles shown on the effect-preview tiles AND the layer-list "FX" badge
+// tooltip (updateEffectLayerPanel/renderLayerList's fxLabels both read this
+// single map now instead of keeping two copies in sync).
+var EFFECT_LABELS={blur:'Flou',colorAdjust:'Teinte/Contraste',vignette:'Vignette',glow:'Glow',
+  sepia:'Sépia',invert:'Inverser',grayscale:'Niveaux de gris',posterize:'Postériser',
+  pixelate:'Pixelliser',chromaticAberration:'Aberration chromatique',scanlines:'Lignes de balayage',
+  grain:'Grain film',sharpen:'Netteté',edgeDetect:'Détection de contours'};
+var EFFECT_TILE_ORDER=['blur','colorAdjust','vignette','glow','sepia','invert','grayscale','posterize','pixelate','chromaticAberration','scanlines','grain','sharpen','edgeDetect'];
+// Generic 2-slot param config for the 10 simple_fx.wgsl effects (blur/
+// colorAdjust/vignette keep their own dedicated rows, unchanged) — each
+// entry: {key:'p1'|'p2', label, min, max, step, scale, unit}. `scale`
+// divides the UI value down to the stored effect_p (e.g. a 0-100 UI
+// percentage stored as 0-1) — same convention as brightness/contrast/
+// vig-strength above, just data-driven instead of one listener per field.
+var EFFECT_GENERIC_PARAMS={
+  posterize:[{key:'p1',label:'Niveaux',min:2,max:32,step:1,scale:1,unit:''}],
+  pixelate:[{key:'p1',label:'Taille bloc',min:2,max:64,step:1,scale:1,unit:'px'}],
+  chromaticAberration:[{key:'p1',label:'Intensité',min:0,max:20,step:1,scale:1,unit:'px'}],
+  scanlines:[{key:'p1',label:'Fréquence',min:20,max:480,step:10,scale:1,unit:''},{key:'p2',label:'Intensité',min:0,max:100,step:1,scale:100,unit:'%'}],
+  grain:[{key:'p1',label:'Intensité',min:0,max:100,step:1,scale:100,unit:'%'}],
+  sharpen:[{key:'p1',label:'Intensité',min:0,max:200,step:1,scale:100,unit:'%'}],
+  edgeDetect:[{key:'p1',label:'Intensité',min:0,max:20,step:1,scale:1,unit:''}],
+};
+function setEffectType(newType){
+  var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.isEffectLayer)return;
+  pushUndo();ld.effectType=newType;var d=EFFECT_DEFAULTS[newType]||[0,0];ld.effectP1=d[0];ld.effectP2=d[1];
+  var sel=document.getElementById('p-effect-type');if(sel)sel.value=newType;
+  updateEffectLayerPanel();saveActiveLayerFrame();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();
+}
+document.getElementById('p-effect-type').addEventListener('change',function(){setEffectType(this.value);});
 document.getElementById('p-effect-radius').addEventListener('input',function(){var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.isEffectLayer)return;pushUndo();ld.effectP1=Math.max(0,parseFloat(this.value)||0);saveActiveLayerFrame();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
 document.getElementById('p-effect-brightness').addEventListener('input',function(){var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.isEffectLayer)return;pushUndo();ld.effectP1=(parseFloat(this.value)||0)/100;saveActiveLayerFrame();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
 document.getElementById('p-effect-contrast').addEventListener('input',function(){var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.isEffectLayer)return;pushUndo();ld.effectP2=(parseFloat(this.value)||0)/100;saveActiveLayerFrame();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
 document.getElementById('p-effect-vig-strength').addEventListener('input',function(){var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.isEffectLayer)return;pushUndo();ld.effectP1=Math.max(0,Math.min(1,(parseFloat(this.value)||0)/100));saveActiveLayerFrame();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
 document.getElementById('p-effect-vig-radius').addEventListener('input',function(){var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.isEffectLayer)return;pushUndo();ld.effectP2=Math.max(0,Math.min(0.95,(parseFloat(this.value)||0)/100));saveActiveLayerFrame();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();});
+// Generic param rows (posterize/pixelate/chromaticAberration/scanlines/
+// grain/sharpen/edgeDetect) — one pair of listeners shared by all of them;
+// which stored field (effectP1/P2) and which scale applies is looked up
+// from EFFECT_GENERIC_PARAMS by the CURRENT effect type at input time.
+function wireGenericParamInput(rowIndex, inputId){
+  document.getElementById(inputId).addEventListener('input',function(){
+    var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.isEffectLayer)return;
+    var cfg=(EFFECT_GENERIC_PARAMS[ld.effectType]||[])[rowIndex];if(!cfg)return;
+    pushUndo();
+    var raw=(parseFloat(this.value)||0)/cfg.scale;
+    if(cfg.key==='p1')ld.effectP1=raw;else ld.effectP2=raw;
+    saveActiveLayerFrame();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();
+  });
+}
+wireGenericParamInput(0,'p-effect-generic1');
+wireGenericParamInput(1,'p-effect-generic2');
+// Builds the visual preview grid once at startup — tiles are static (same
+// 14 for every effect layer), only the .active class and generic-row
+// visibility change per-selection (done in updateEffectLayerPanel).
+function initEffectFxGrid(){
+  var grid=document.getElementById('p-effect-grid');
+  if(!grid||grid.childElementCount)return;
+  EFFECT_TILE_ORDER.forEach(function(type){
+    var tile=document.createElement('div');
+    tile.className='fx-tile';tile.dataset.fxType=type;
+    tile.title=EFFECT_LABELS[type]||type;
+    var prev=document.createElement('div');prev.className='fx-preview fx-prev-'+type;
+    var label=document.createElement('div');label.className='fx-title';label.textContent=EFFECT_LABELS[type]||type;
+    tile.appendChild(prev);tile.appendChild(label);
+    tile.addEventListener('click',function(){setEffectType(type);});
+    grid.appendChild(tile);
+  });
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initEffectFxGrid);else initEffectFxGrid();
 // Perspective/Symmetry Guide (feedback 2026-07: "les onglet guide symétrie
 // et perspective n'ont plus lieu d'être, les options doivent être gérées au
 // niveau du panneau flottant") — the right-panel section these ids used to
