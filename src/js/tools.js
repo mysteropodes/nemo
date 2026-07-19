@@ -715,7 +715,18 @@ function rotateCenterSegments(segs,angleDeg,cx,cy){
 // selection it was built from, so it's cleared here too — nodeLayer
 // (the Paper-fallback's actual visual dots) already gets wiped by the
 // next real renderNodeHandles() call, no need to touch it here.
-function clearSel(){selectedPaths=[];state.selectedStrokeIndices=[];_nodeSel=[];state.xformAnchorCustom=null;state.xformAnchorHovered=false;state.xformRingHovered=false;if(typeof nodeHandles!=='undefined')nodeHandles=[];}
+function clearSel(){selectedPaths=[];state.selectedStrokeIndices=[];_nodeSel=[];state.xformAnchorCustom=null;state.xformAnchorHovered=false;state.xformRingHovered=false;if(typeof nodeHandles!=='undefined')nodeHandles=[];
+  // 2026-07 ("si on clic dans le canvas sans rien sélectionner il ne faut
+  // pas afficher les options de calque, ce n'est que si on sélectionne des
+  // calques dans la timeline"): drop the "an explicit timeline layer click
+  // is why layer-sec is showing" flag every time selection resets — clicking
+  // empty canvas (which routes through here, select-bridge.js) falls back
+  // to the fallback 'document' context in updatePropsContext(), which
+  // should then hide layer-sec instead of defaulting to the last-active
+  // layer. setActiveLayer (timeline.js) sets the flag back to true right
+  // after ITS OWN clearSel() call, so clicking a layer row still works.
+  if(typeof window!=='undefined')window._layerActiveExplicit=false;
+}
 function getSI(path){var ch=userLayers[state.activeLayerIdx].children;for(var i=0;i<ch.length;i++){if(ch[i]===path)return i;}return -1;}
 // UI/UX audit (2026-07): the statusbar footer has claimed "⌘/Ctrl+D
 // Dupliquer" for as long as an object selection exists, but NOTHING wired
