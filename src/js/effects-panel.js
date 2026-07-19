@@ -47,6 +47,22 @@
     grain: [{ key: 'p1', label: 'Intensité', min: 0, max: 100, step: 1, scale: 100, unit: '%' }],
     sharpen: [{ key: 'p1', label: 'Intensité', min: 0, max: 200, step: 1, scale: 100, unit: '%' }],
     edgeDetect: [{ key: 'p1', label: 'Intensité', min: 0, max: 20, step: 1, scale: 1, unit: '' }],
+    threshold: [
+      { key: 'p1', label: 'Seuil', min: 0, max: 100, step: 1, scale: 100, unit: '%' },
+      { key: 'p2', label: 'Adoucissement', min: 0, max: 50, step: 1, scale: 100, unit: '%' },
+    ],
+    halftone: [
+      { key: 'p1', label: 'Taille cellule', min: 2, max: 40, step: 1, scale: 1, unit: 'px' },
+      { key: 'p2', label: 'Intensité', min: 0, max: 100, step: 1, scale: 100, unit: '%' },
+    ],
+    // layerOnly (see EFFECT_CATEGORIES) — needs the layer's own isolated
+    // alpha silhouette, same constraint as groundShadow below.
+    contourBrut: [
+      { key: 'p1', label: 'Épaisseur', min: 0.5, max: 20, step: 0.5, scale: 1, unit: 'px' },
+      { key: 'p2', label: 'Rugosité', min: 0, max: 100, step: 1, scale: 100, unit: '%' },
+      { key: 'p3', label: 'Luminosité', min: 0, max: 100, step: 1, scale: 100, unit: '%' },
+      { key: 'p4', label: 'Opacité', min: 0, max: 100, step: 1, scale: 100, unit: '%' },
+    ],
     groundShadow: [
       { key: 'p1', label: 'Inclinaison', min: -3, max: 3, step: 0.05, scale: 1, unit: '' },
       // max capped at 90 (not 100) — feedback: "l'effet ombre au sol ne
@@ -67,6 +83,7 @@
     sepia: [0, 0, 0, 0], invert: [0, 0, 0, 0], grayscale: [0, 0, 0, 0], posterize: [6, 0, 0, 0],
     pixelate: [16, 0, 0, 0], chromaticAberration: [4, 0, 0, 0], scanlines: [240, 0.5, 0, 0],
     grain: [0.08, 0, 0, 0], sharpen: [0.5, 0, 0, 0], edgeDetect: [4, 0, 0, 0],
+    threshold: [0.5, 0.08, 0, 0], halftone: [10, 0.9, 0, 0], contourBrut: [3, 0.4, 0, 0.9],
     // groundShadow default was [0, 0.75, 1, 0.5] — at ground=75%/length=1 the
     // shader's inverse-mapped source row only reaches sy≈ground-(1-ground)
     // ≈49.7% of canvas height, right at the edge of most centered shapes'
@@ -83,21 +100,21 @@
     sepia: 'Sépia', invert: 'Inverser', grayscale: 'Niveaux de gris', posterize: 'Postériser',
     pixelate: 'Pixelliser', chromaticAberration: 'Aberration chromatique', scanlines: 'Lignes de balayage',
     grain: 'Grain film', sharpen: 'Netteté', edgeDetect: 'Détection de contours', groundShadow: 'Ombre au sol',
+    threshold: 'Seuil (N&B)', halftone: 'Trame (halftone)', contourBrut: 'Contour brut',
   };
   window.EFFECT_LABELS = EFFECT_LABELS;
   // Grouped like After Effects' own Effects menu (Blur & Sharpen, Color
-  // Correction, Stylize, Distort, Generate) — rendered as a native
-  // <select>+<optgroup> rather than a custom cascading menu (feedback:
-  // "organisé les effets dans des menu"): far less UI surface to build/
-  // test reliably while still giving the categorized-menu structure asked
-  // for. `layerOnly` categories (groundShadow) are omitted from the menu
+  // Correction, Stylize, Distort, Generate) — rendered as a categorized
+  // flyout with a preview swatch per effect (buildAddEffectMenu below).
+  // `layerOnly` categories (Ombres, Contours) are omitted from the menu
   // entirely for effect/adjustment layers — see engine.rs's LayerIn::effects
-  // doc comment for why that effect only makes sense per-layer.
+  // doc comment for why those effects only make sense per-layer.
   var EFFECT_CATEGORIES = [
     { label: 'Flou & Netteté', types: ['blur', 'sharpen'] },
-    { label: 'Couleur', types: ['colorAdjust', 'grayscale', 'sepia', 'posterize', 'invert'] },
-    { label: 'Stylisation', types: ['vignette', 'glow', 'edgeDetect', 'grain', 'scanlines'] },
+    { label: 'Couleur', types: ['colorAdjust', 'grayscale', 'sepia', 'posterize', 'invert', 'threshold'] },
+    { label: 'Stylisation', types: ['vignette', 'glow', 'edgeDetect', 'grain', 'scanlines', 'halftone'] },
     { label: 'Distorsion', types: ['pixelate', 'chromaticAberration'] },
+    { label: 'Contours', types: ['contourBrut'], layerOnly: true },
     { label: 'Ombres', types: ['groundShadow'], layerOnly: true },
   ];
 
