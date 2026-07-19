@@ -623,6 +623,25 @@
         <div class="pr" title="Re-smooths the SELECTED stroke's existing geometry — unlike Tool Options' Smooth (which only shapes new strokes as you draw), this is a one-shot action you can apply after the fact, repeatedly, to a stroke already on the canvas. Note: a freshly-drawn stroke is already simplified at draw time (Tool Options' Smooth, 10 by default) — applying THIS at the same or lower value won't visibly change anything since it's already fit that tightly; raise it for a visible extra effect."><span class="pl">Smooth</span><input type="number" class="pi scrub" id="p-poststroke-smooth" value="25" min="0" max="80" data-step="1"><button class="pbtn" id="btn-poststroke-smooth">Apply</button></div>
       </div>
     </div>
+    <!-- Selected Colors (2026-07, "un nouvel onglet de gestion des couleurs
+         en fonction de ce que l'on sélectionne ou si on sélectionne rien on
+         voit toutes les couleurs dans le projet") — always visible, driven
+         by color-manager.js. Selection non-empty: colors used by the
+         current selection. Nothing selected: every distinct color used
+         anywhere in the project (scanned from the persisted frame data,
+         not live Paper.js objects — see color-manager.js's own header
+         comment). Editing a row's hex/opacity batch-recolors every
+         instance of that exact color (selection-scoped if there IS a
+         selection, project-wide otherwise); the crosshair icon selects
+         the matching shapes on the CURRENT layer/frame (cross-frame/
+         cross-layer selection isn't a thing this app's selection model
+         supports elsewhere either). -->
+    <div class="psec" id="selected-colors-sec">
+      <div class="phdr"><span class="ar">☰</span> <span id="selected-colors-hdr">Selected Colors</span></div>
+      <div class="pbdy" id="selected-colors-body">
+        <div class="pr" style="font-size:9px;color:var(--text-dim)" id="selected-colors-empty">Aucune couleur</div>
+      </div>
+    </div>
     <div class="psec" id="tool-opts-sec">
       <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrToolOptions">Tool Options</span></div>
       <div class="pbdy">
@@ -1312,6 +1331,7 @@
 <script src="js/storyboard.js"></script>
 <script src="js/drop-import.js"></script>
 <script src="js/palette-panel.js"></script>
+<script src="js/color-manager.js"></script>
 <script src="js/project.js"></script>
 <script src="js/feedback-bridge.js"></script>
 <script src="js/updater-bridge.js"></script>
