@@ -438,6 +438,37 @@ input[type="checkbox"]:disabled{opacity:.4;cursor:not-allowed;}
 .color-select-btn{flex:none;cursor:pointer;color:rgba(236,234,231,.5);width:20px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:5px;}
 .color-select-btn:hover{background:rgba(255,255,255,.08);color:var(--text);}
 .color-select-btn svg{display:block;}
+/* Effect-library preview grid (2026-07, feedback: "des aperçu des effets
+   avec leur titre") — each tile is a small CSS-filter/gradient-trick
+   approximation of the actual WGSL effect (not a live GPU render — cheap,
+   always in sync, good enough as a visual identifier at this size) plus a
+   title underneath. Tiles built by initEffectFxGrid() (timeline.js). */
+.fx-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:2px 0;}
+.fx-tile{cursor:pointer;border:1px solid var(--border2);border-radius:6px;padding:4px;display:flex;flex-direction:column;align-items:center;gap:4px;background:var(--panel3);}
+.fx-tile:hover{border-color:rgba(255,255,255,.25);}
+.fx-tile.active{border-color:var(--accent,#5b8dfc);box-shadow:0 0 0 1px var(--accent,#5b8dfc) inset;}
+.fx-preview{width:100%;aspect-ratio:4/3;border-radius:4px;overflow:hidden;position:relative;background:linear-gradient(135deg,#ff6b57 0%,#f4c542 45%,#5b8dfc 100%);}
+.fx-title{font-size:8.5px;line-height:1.15;color:var(--text-dim);text-align:center;}
+.fx-tile.active .fx-title{color:var(--text);}
+/* Per-effect visual approximations — pure CSS, no per-frame cost. */
+.fx-prev-blur{filter:blur(2px);}
+.fx-prev-colorAdjust{filter:contrast(1.35) brightness(1.1);}
+.fx-prev-vignette{box-shadow:inset 0 0 10px 4px rgba(0,0,0,.75);}
+.fx-prev-glow{filter:saturate(1.6) brightness(1.15) blur(.4px);box-shadow:0 0 6px 1px rgba(255,220,150,.6) inset;}
+.fx-prev-sepia{filter:sepia(1) saturate(1.4);}
+.fx-prev-invert{filter:invert(1);}
+.fx-prev-grayscale{filter:grayscale(1);}
+.fx-prev-posterize{filter:contrast(1.6) saturate(1.8) brightness(1.05);}
+.fx-prev-pixelate{background-size:400% 400%;image-rendering:pixelated;filter:contrast(1.1);}
+.fx-prev-chromaticAberration{background:linear-gradient(135deg,#ff3b3b 0%,#f4c542 45%,#3ba0ff 100%);filter:contrast(1.05);}
+.fx-prev-chromaticAberration::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,0,60,.5),transparent 55%,rgba(0,180,255,.5));mix-blend-mode:screen;transform:translateX(2px);}
+.fx-prev-scanlines::after{content:'';position:absolute;inset:0;background:repeating-linear-gradient(to bottom,rgba(0,0,0,.55) 0,rgba(0,0,0,.55) 1px,transparent 1px,transparent 3px);}
+.fx-prev-grain{filter:contrast(1.1) brightness(.95);}
+.fx-prev-grain::after{content:'';position:absolute;inset:0;opacity:.5;background-image:radial-gradient(rgba(255,255,255,.9) .5px,transparent .5px),radial-gradient(rgba(0,0,0,.9) .5px,transparent .5px);background-size:3px 3px,4px 4px;background-position:0 0,1.5px 2px;}
+.fx-prev-sharpen{filter:contrast(1.5) saturate(1.3);}
+.fx-prev-sharpen::after{content:'';position:absolute;inset:0;box-shadow:inset 0 0 0 1px rgba(255,255,255,.4);}
+.fx-prev-edgeDetect{background:#0a0a0a;}
+.fx-prev-edgeDetect::after{content:'';position:absolute;inset:8% 20%;border:1.5px solid #eee;border-radius:2px;opacity:.85;}
 /* Figma-style paired W/H row (Document, 2026-07) — a small link icon
    between the two fields toggles proportion-lock (tools-panel-dock.js
    sibling pattern: JS toggles .on, CSS just reflects it). */
