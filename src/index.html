@@ -405,9 +405,13 @@
       <div class="pbdy">
         <div class="pr" id="effects-adj-hint" style="font-size:10px;color:var(--text-dim);display:none" data-i18n="effectLayerDesc">Appliqué à tout ce qui est en dessous de ce calque dans la pile (comme un Adjustment Layer After Effects).</div>
         <div id="effects-list"></div>
-        <div class="pr">
-          <select class="psel" id="p-add-effect"><option value="">+ Add Effect…</option></select>
-        </div>
+        <!-- Categorized flyout with preview thumbnails (feedback 2026-07:
+             "on a pas de préviz vignette et de sous menu. Pense bien
+             l'architecture ui qui marcherait le mieux") — replaces the
+             plain <select>+<optgroup>; built entirely by effects-panel.js
+             (buildAddEffectMenu) so no per-category/per-effect markup
+             lives in this file. -->
+        <div class="pr"><button class="pbtn" id="p-add-effect-btn" style="flex:1">+ Add Effect…</button></div>
       </div>
     </div>
     <div class="psec" id="camera-sec" style="display:none">
