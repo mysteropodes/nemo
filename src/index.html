@@ -382,33 +382,32 @@
         <div class="pr"><button class="pbtn ac" id="btn-text-split-chars" style="flex:1" data-i18n="textSplitBtn">Découper par caractère</button></div>
       </div>
     </div>
-    <div class="psec" id="effect-layer-sec" style="display:none">
-      <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrEffectLayer">Calque d’effet</span></div>
+    <!-- Effects stack (2026-07 rewrite, feedback: "organisé les effets dans
+         des menu" + "voir les effet appliqué au calque... et voir les
+         paramètre de ces effets") — ONE shared "Effects" list for BOTH
+         ordinary layers (runs on that layer's own isolated alpha — Flou/
+         Ombre au sol/etc used to be separate fixed fields here) AND effect/
+         adjustment layers (runs on the accumulator — used to be the old
+         "Calque d'effet" single-select+grid). Everything below is built
+         dynamically by effects-panel.js from ld.effects (an array of
+         {type, enabled, p1..p4}) — no per-effect-type markup lives in this
+         file anymore; a new effect type only needs an entry in that file's
+         EFFECT_PARAM_CONFIG/EFFECT_CATEGORIES tables. Reuses the existing
+         hdrEffects/effectLayerDesc i18n keys (already translated en/fr/ja/es
+         for the old Calque d'effet / gradient-fill sections) since this
+         header/hint say the exact same thing. -->
+    <!-- NOTE: id is "effects-stack-sec", NOT "effects-sec" — an unrelated
+         pre-existing gradient-fill section already claims id="effects-sec"
+         (search index.html for "Dégradé de fill") — a genuine ID
+         collision found during testing, not a naming preference. -->
+    <div class="psec" id="effects-stack-sec" style="display:none">
+      <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrEffects">Effects</span></div>
       <div class="pbdy">
-        <div class="pr" style="font-size:10px;color:var(--text-dim)" data-i18n="effectLayerDesc">Appliqué à tout ce qui est en dessous de ce calque dans la pile (comme un Adjustment Layer After Effects).</div>
-        <!-- Visual preview grid (2026-07, feedback: "des aperçu des effets
-             avec leur titre") — replaces the plain <select>; the select
-             itself stays in the DOM but hidden, kept as the single source
-             of truth every existing listener already reads/writes (see
-             EFFECT_DEFAULTS' change handler, timeline.js) so tile clicks
-             just set .value + dispatch 'change' rather than duplicating
-             that logic. Tiles themselves are built by initEffectFxGrid()
-             (timeline.js) from EFFECT_LIBRARY, not hardcoded here. -->
-        <select class="psel" id="p-effect-type" style="display:none"><option value="blur">Flou</option><option value="colorAdjust">Teinte / Contraste</option><option value="vignette">Vignette</option><option value="glow">Glow</option><option value="sepia">Sépia</option><option value="invert">Inverser</option><option value="grayscale">Niveaux de gris</option><option value="posterize">Postériser</option><option value="pixelate">Pixelliser</option><option value="chromaticAberration">Aberration chromatique</option><option value="scanlines">Lignes de balayage</option><option value="grain">Grain film</option><option value="sharpen">Netteté</option><option value="edgeDetect">Détection de contours</option></select>
-        <div class="pr fx-grid" id="p-effect-grid"></div>
-        <div class="pr" id="p-effect-blur-row"><span class="pl" data-i18n="fieldRadius">Rayon</span><input type="number" class="pi scrub" id="p-effect-radius" value="8" min="0" max="200" data-step="1"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
-        <div class="pr" id="p-effect-brightness-row" style="display:none"><span class="pl" data-i18n="fieldBrightness">Luminosité</span><input type="number" class="pi scrub" id="p-effect-brightness" value="0" min="-100" max="100" data-step="1"></div>
-        <div class="pr" id="p-effect-contrast-row" style="display:none"><span class="pl" data-i18n="fieldContrast">Contraste</span><input type="number" class="pi scrub" id="p-effect-contrast" value="0" min="-100" max="100" data-step="1"></div>
-        <div class="pr" id="p-effect-vig-strength-row" style="display:none"><span class="pl" data-i18n="fieldIntensity">Intensité</span><input type="number" class="pi scrub" id="p-effect-vig-strength" value="50" min="0" max="100" data-step="1"></div>
-        <div class="pr" id="p-effect-vig-radius-row" style="display:none"><span class="pl" data-i18n="fieldExtent">Étendue</span><input type="number" class="pi scrub" id="p-effect-vig-radius" value="40" min="0" max="95" data-step="1"></div>
-        <!-- Generic 2-slot param row set, shared by all 10 simple_fx.wgsl
-             effects instead of one dedicated row pair per effect — labels/
-             min/max/step/unit are set dynamically per effect type by
-             updateEffectLayerPanel (timeline.js), same convention as the
-             blur/color/vignette rows above but collapsed to avoid ~14 more
-             near-identical markup blocks. -->
-        <div class="pr" id="p-effect-generic1-row" style="display:none"><span class="pl" id="p-effect-generic1-label">Param 1</span><input type="number" class="pi scrub" id="p-effect-generic1" value="0" data-step="1"><span style="font-size:9px;color:var(--text-dim)" id="p-effect-generic1-unit"></span></div>
-        <div class="pr" id="p-effect-generic2-row" style="display:none"><span class="pl" id="p-effect-generic2-label">Param 2</span><input type="number" class="pi scrub" id="p-effect-generic2" value="0" data-step="1"><span style="font-size:9px;color:var(--text-dim)" id="p-effect-generic2-unit"></span></div>
+        <div class="pr" id="effects-adj-hint" style="font-size:10px;color:var(--text-dim);display:none" data-i18n="effectLayerDesc">Appliqué à tout ce qui est en dessous de ce calque dans la pile (comme un Adjustment Layer After Effects).</div>
+        <div id="effects-list"></div>
+        <div class="pr">
+          <select class="psel" id="p-add-effect"><option value="">+ Add Effect…</option></select>
+        </div>
       </div>
     </div>
     <div class="psec" id="camera-sec" style="display:none">
@@ -442,23 +441,9 @@
              custom-popup pattern as Blend above: initMatteDropdown() in
              timeline.js. -->
         <div class="pr"><span class="pl" data-i18n="fieldMatte">Matte</span><div class="psel" id="p-mattemode" data-value="none" role="button" tabindex="0" style="cursor:pointer;user-select:none" data-i18n="matteNone">Aucun</div></div>
-        <!-- Feather/blur (2026-07, blur.wgsl) — layer-level, same
-             "plain per-layer field" convention as Blend/Matte above.
-             0 = off (the vast majority of layers), no GPU cost. -->
-        <div class="pr"><span class="pl" data-i18n="fieldBlur">Flou</span><input type="number" class="pi scrub" id="p-blur" value="0" min="0" max="100" data-step="1" data-i18n-title="fieldBlurTitle" title="Flou gaussien (approx.) appliqué à tout le calque, en pixels"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
-        <!-- Ground/cast shadow (2026-07, feedback: "un effet wgsl qui fasse
-             ça" + lien AviUtl2 GroundShadow2_S) — per-layer, same convention
-             as Flou above (0% opacity = off, no GPU cost). Runs on THIS
-             layer's own isolated alpha — see engine.rs's LayerIn::gshadow_*
-             doc comment for why this can't be an effect/adjustment layer
-             like Vignette/Glow. -->
-        <div class="pr"><span class="pl" data-i18n="fieldGroundShadow">Ombre sol</span><input type="number" class="pi scrub" id="p-gshadow-opacity" value="0" min="0" max="100" data-step="1" data-i18n-title="gshadowOpacityTitle" title="Opacité de l'ombre projetée au sol — 0 = désactivé"><span style="font-size:9px;color:var(--text-dim)">%</span></div>
-        <div class="pr" id="p-gshadow-more-row" style="display:none;gap:4px">
-          <span class="pl" data-i18n="fieldGroundLenSkew">Sol / Long. / Incl.</span>
-          <input type="number" class="pi scrub" id="p-gshadow-ground" value="75" min="0" max="100" data-step="1" data-i18n-title="gshadowGroundTitle" title="Position verticale du sol (% de la hauteur du document)" style="width:44px">
-          <input type="number" class="pi scrub" id="p-gshadow-length" value="1" min="0.1" max="4" data-step="0.05" data-i18n-title="gshadowLengthTitle" title="Longueur de l'ombre projetée" style="width:44px">
-          <input type="number" class="pi scrub" id="p-gshadow-skew" value="0" min="-3" max="3" data-step="0.05" data-i18n-title="gshadowSkewTitle" title="Inclinaison (direction de la lumière)" style="width:44px">
-        </div>
+        <!-- Flou/Ombre au sol/etc. moved into the shared #effects-stack-sec
+             stack above (2026-07 rewrite) — no longer dedicated fields
+             here, see that section's own doc comment. -->
         <!-- Référence (roto) — déplacée ici depuis sa propre section
              toujours-visible (feedback 2026-07: "référence (roto) onglet
              n'a plus lieu d'être doit être géré par le panneau calque en
@@ -1362,6 +1347,7 @@
 <script src="js/drop-import.js"></script>
 <script src="js/palette-panel.js"></script>
 <script src="js/color-manager.js"></script>
+<script src="js/effects-panel.js"></script>
 <script src="js/project.js"></script>
 <script src="js/feedback-bridge.js"></script>
 <script src="js/updater-bridge.js"></script>
