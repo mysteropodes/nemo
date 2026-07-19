@@ -433,13 +433,13 @@
     if (loginBtn) loginBtn.addEventListener('click', function () {
       loginError(null);
       var url = el('kitsu-url').value.trim(), email = el('kitsu-email').value.trim(), pass = el('kitsu-password').value;
-      if (!url || !email || !pass) { loginError('Renseigne l\'URL, l\'email et le mot de passe'); return; }
-      loginBtn.disabled = true; loginBtn.textContent = 'Connexion…';
+      if (!url || !email || !pass) { loginError(window.SM.t('kitsuLoginMissingFields')); return; }
+      loginBtn.disabled = true; loginBtn.textContent = window.SM.t('kitsuConnecting');
       window.SMKitsu.login(url, email, pass).then(function () {
-        loginBtn.disabled = false; loginBtn.textContent = 'Se connecter';
+        loginBtn.disabled = false; loginBtn.textContent = window.SM.t('btnLogin');
         showStep('browse'); loadProjects();
       }).catch(function (e) {
-        loginBtn.disabled = false; loginBtn.textContent = 'Se connecter';
+        loginBtn.disabled = false; loginBtn.textContent = window.SM.t('btnLogin');
         loginError(e.message);
       });
     });
@@ -452,13 +452,13 @@
     if (publishBtn) publishBtn.addEventListener('click', function () {
       publishBtn.disabled = true; var origText = publishBtn.textContent;
       window.SMKitsu.publish(function (phase) {
-        publishBtn.textContent = phase === 'render' ? 'Rendu MP4…' : phase === 'upload' ? 'Envoi…' : origText;
+        publishBtn.textContent = phase === 'render' ? window.SM.t('kitsuPublishRenderPhase') : phase === 'upload' ? window.SM.t('kitsuPublishUploadPhase') : origText;
       }).then(function (res) {
         publishBtn.disabled = false; publishBtn.textContent = origText;
-        showToast('Publié sur Kitsu : ' + res.version + (res.statusChanged ? ' — statut mis à jour' : ''));
+        showToast(window.SM.t('kitsuPublishSuccess').replace('{v}', res.version) + (res.statusChanged ? window.SM.t('kitsuPublishStatusChanged') : ''));
       }).catch(function (e) {
         publishBtn.disabled = false; publishBtn.textContent = origText;
-        showToast('Échec de la publication : ' + e.message);
+        showToast(window.SM.t('kitsuPublishError').replace('{e}', e.message));
       });
     });
 

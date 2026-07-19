@@ -1434,13 +1434,13 @@
         openLayerColorSwatches(cdot, ld.color || '#8b8b9e', function (hex) { ld.color = hex; cdot.style.setProperty('--dot-color', hex); renderTimeline(); });
       });
       row.appendChild(cdot);
-      var eye = document.createElement('div'); eye.className = 'lico' + (ld.visible ? '' : ' off'); eye.title = 'Show / hide layer'; eye.innerHTML = ld.visible ? ICO_EYE : ICO_EYE_CLOSED;
+      var eye = document.createElement('div'); eye.className = 'lico' + (ld.visible ? '' : ' off'); eye.title = SM.t('layerEyeTitle'); eye.innerHTML = ld.visible ? ICO_EYE : ICO_EYE_CLOSED;
       eye.addEventListener('click', function (e) { e.stopPropagation(); window.SM.toggleLayerVis(li); });
       row.appendChild(eye);
-      var lock = document.createElement('div'); lock.className = 'lico' + (ld.locked ? '' : ' off'); lock.title = 'Lock / unlock layer'; lock.innerHTML = ld.locked ? ICO_LOCK : ICO_UNLOCK;
+      var lock = document.createElement('div'); lock.className = 'lico' + (ld.locked ? '' : ' off'); lock.title = SM.t('layerLockTitle'); lock.innerHTML = ld.locked ? ICO_LOCK : ICO_UNLOCK;
       lock.addEventListener('click', function (e) { e.stopPropagation(); window.SM.toggleLayerLock(li); });
       row.appendChild(lock);
-      var solo = document.createElement('div'); solo.className = 'lico solo-btn' + (ld.solo ? ' on' : ' off'); solo.title = 'Solo layer (hide all others)'; solo.textContent = 'S';
+      var solo = document.createElement('div'); solo.className = 'lico solo-btn' + (ld.solo ? ' on' : ' off'); solo.title = SM.t('layerSoloTitle'); solo.textContent = 'S';
       solo.addEventListener('click', function (e) { e.stopPropagation(); window.SM.toggleLayerSolo(li); });
       row.appendChild(solo);
       var nm = document.createElement('div'); nm.className = 'lnm'; nm.textContent = ld.name || ('Layer ' + (li + 1));
@@ -1580,7 +1580,7 @@
     var ld = state.layers[state.activeLayerIdx];
     var nameRow = document.createElement('div');
     nameRow.className = 'motion-props-layername';
-    if (!ld) { nameRow.textContent = 'Aucun calque sélectionné'; body.appendChild(nameRow); return; }
+    if (!ld) { nameRow.textContent = SM.t('noLayerSelected'); body.appendChild(nameRow); return; }
     // Component instances get the same Transform group as any layer now
     // (see renderLayerListMotion's comment) — just a label suffix so it
     // reads clearly as "the whole instance", not its internal content.
@@ -1625,6 +1625,12 @@
     row.appendChild(sel);
     body.appendChild(row);
   }
+  // Shared by all three stopwatch icons (Transform group properties, fill
+  // color row, vertex row) — same three-state title logic, only the "off"
+  // wording differs per target (property/fill/vertex).
+  function stopwatchTitle(offKey, swOn, hasKeyHere) {
+    return !swOn ? SM.t(offKey) : (hasKeyHere ? SM.t('motionKeyRemove') : SM.t('motionKeyAdd'));
+  }
   // Shared by the layer's own Transform group AND each element's — both are
   // just "a holder with .motion/.motionStatic", see the header comment on
   // ensureElementHolder. `refreshDeep` is called after any structural change
@@ -1635,7 +1641,7 @@
     var grpLabel = document.createElement('span'); grpLabel.textContent = groupLabel;
     grp.appendChild(grpLabel);
     var filterBtn = document.createElement('span'); filterBtn.className = 'motion-filter-btn' + (_hideUnanimated ? ' on' : '');
-    filterBtn.title = _hideUnanimated ? 'Afficher toutes les propriétés' : 'N’afficher que les propriétés animées';
+    filterBtn.title = SM.t(_hideUnanimated ? 'motionFilterShowAll' : 'motionFilterHideUnanimated');
     filterBtn.innerHTML = '<svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></svg>';
     filterBtn.addEventListener('click', function (e) {
       e.stopPropagation();
@@ -1667,7 +1673,7 @@
       // show on its own. Animated AND a key sits exactly here: solid blue
       // fill, same as before.
       sw.className = 'lico motion-stopwatch' + (swOn ? ' on' : '');
-      sw.title = !swOn ? 'Activer l’animation de cette propriété' : (hasKeyHere ? 'Retirer la clé à la frame courante' : 'Ajouter une clé à la frame courante');
+      sw.title = stopwatchTitle('motionAnimateProp', swOn, hasKeyHere);
       sw.innerHTML = '<svg viewBox="0 0 24 24" width="12" height="12"><path d="M12 3l9 9-9 9-9-9z" fill="' + (hasKeyHere ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2"/></svg>';
       sw.addEventListener('click', function (e) {
         e.stopPropagation(); pushUndo();
@@ -1897,7 +1903,7 @@
     var swOn = isAnimated(holder, prop);
     var hasKeyHere = swOn && !!keyAt(holder.motion[prop], state.currentFrame);
     sw.className = 'lico motion-stopwatch' + (swOn ? ' on' : '');
-    sw.title = !swOn ? 'Activer l’animation du fill' : (hasKeyHere ? 'Retirer la clé à la frame courante' : 'Ajouter une clé à la frame courante');
+    sw.title = stopwatchTitle('motionAnimateFill', swOn, hasKeyHere);
     sw.innerHTML = '<svg viewBox="0 0 24 24" width="12" height="12"><path d="M12 3l9 9-9 9-9-9z" fill="' + (hasKeyHere ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2"/></svg>';
     function currentRgba() {
       if (hasKeys(holder, prop)) return valueAtFrame(holder, prop, state.currentFrame);
@@ -1984,7 +1990,7 @@
     var swOn = isAnimated(holder, prop);
     var hasKeyHere = swOn && !!keyAt(holder.motion[prop], state.currentFrame);
     sw.className = 'lico motion-stopwatch' + (swOn ? ' on' : '');
-    sw.title = !swOn ? 'Activer l’animation de ce vertex' : (hasKeyHere ? 'Retirer la clé à la frame courante' : 'Ajouter une clé à la frame courante');
+    sw.title = stopwatchTitle('motionAnimateVertex', swOn, hasKeyHere);
     sw.innerHTML = '<svg viewBox="0 0 24 24" width="12" height="12"><path d="M12 3l9 9-9 9-9-9z" fill="' + (hasKeyHere ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2"/></svg>';
     sw.addEventListener('click', function (e) {
       e.stopPropagation(); pushUndo();

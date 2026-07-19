@@ -42,8 +42,8 @@
       // is the one channel guaranteed visible regardless of what panel is
       // open — plus it's the only sign of life during the download itself.
       var total = 0, received = 0;
-      showToast('Téléchargement de la mise à jour…');
-      if (statusEl) statusEl.textContent = 'Téléchargement…';
+      showToast(window.SM.t('updaterDownloading'));
+      if (statusEl) statusEl.textContent = window.SM.t('updaterDownloadingShort');
       await update.downloadAndInstall(function (ev) {
         if (ev.event === 'Started') {
           total = ev.data.contentLength || 0;
@@ -51,53 +51,53 @@
           received += ev.data.chunkLength || 0;
           if (total > 0) {
             var pct = Math.min(100, Math.round(received / total * 100));
-            if (statusEl) statusEl.textContent = 'Téléchargement… ' + pct + '%';
+            if (statusEl) statusEl.textContent = window.SM.t('updaterDownloadingPct').replace('{pct}', pct);
           }
         } else if (ev.event === 'Finished') {
-          if (statusEl) statusEl.textContent = 'Installation…';
+          if (statusEl) statusEl.textContent = window.SM.t('updaterInstalling');
         }
       });
-      if (statusEl) statusEl.textContent = 'Installée — v' + update.version;
+      if (statusEl) statusEl.textContent = window.SM.t('updaterInstalledStatus').replace('{v}', update.version);
       // Offer to relaunch right now instead of leaving the user to
       // stumble onto the new version number later (which is how this got
       // reported as "did nothing" the first time — the update HAD worked,
       // there was just no visible confirmation and no easy way to actually
       // pick up the new build besides quitting and reopening by hand).
       var restartNow = tauriOk() && window.__TAURI__.process
-        ? await window.__TAURI__.dialog.confirm('Mise à jour installée (v' + update.version + '). Redémarrer Nemo maintenant ?', { title: 'Mise à jour installée' })
+        ? await window.__TAURI__.dialog.confirm(window.SM.t('updaterRestartConfirm').replace('{v}', update.version), { title: window.SM.t('updaterRestartConfirmTitle') })
         : false;
       if (restartNow) {
         await window.__TAURI__.process.relaunch();
       } else {
-        showToast('Mise à jour v' + update.version + ' installée — redémarre Nemo pour l\'utiliser');
+        showToast(window.SM.t('updaterInstalledToast').replace('{v}', update.version));
       }
     } catch (e) {
       console.warn('[updater] install failed', e);
-      if (statusEl) statusEl.textContent = 'Échec de l\'installation.';
+      if (statusEl) statusEl.textContent = window.SM.t('updaterInstallFailedStatus');
       // The raw Rust error (e.g. "TargetsNotFound", "signature mismatch",
       // an HTTP status) used to be swallowed — this was the ONLY thing
       // shown to the user ("Échec de l'installation"), no way to tell
       // auth/network/signature/target-mismatch apart without devtools,
       // which a release build doesn't even expose. Always show it now.
-      showToast('Échec de l\'installation — ' + (e && e.message ? e.message : e));
+      showToast(window.SM.t('updaterInstallFailedToast').replace('{e}', e && e.message ? e.message : e));
     }
   }
 
   async function checkForUpdate(silent) {
     var btn = document.getElementById('app-check-update');
     var statusEl = document.getElementById('app-update-status');
-    if (!tauriOk()) { if (!silent) showToast('Updater indisponible (pas dans l\'app native)'); return; }
+    if (!tauriOk()) { if (!silent) showToast(window.SM.t('updaterUnavailable')); return; }
     if (btn) { btn.disabled = true; }
-    if (statusEl && !silent) statusEl.innerHTML = 'Recherche…';
+    if (statusEl && !silent) statusEl.innerHTML = window.SM.t('updaterSearching');
     try {
       var update = await window.__TAURI__.updater.check();
       if (!update) {
-        if (statusEl) statusEl.innerHTML = 'Version <span id="app-version-txt"></span> — à jour';
+        if (statusEl) statusEl.innerHTML = window.SM.t('updaterUpToDateStatus');
         showVersion();
-        if (!silent) showToast('Aucune mise à jour disponible');
+        if (!silent) showToast(window.SM.t('updaterNoUpdateToast'));
       } else {
-        var msg = 'Nouvelle version ' + update.version + ' disponible' + (update.body ? ('\n\n' + update.body) : '') + '\n\nInstaller maintenant ?';
-        if (statusEl) statusEl.textContent = 'Version ' + update.version + ' disponible';
+        var msg = window.SM.t('updaterNewVersionMsg').replace('{v}', update.version).replace('{body}', update.body ? ('\n\n' + update.body) : '');
+        if (statusEl) statusEl.textContent = window.SM.t('updaterNewVersionStatus').replace('{v}', update.version);
         // Plain window.confirm() is intercepted inside the Tauri webview and
         // routed to a deprecated/missing plugin command ("dialog.confirm not
         // allowed. Command not found") — worse, it returns a Promise, not a
@@ -105,14 +105,14 @@
         // was always truthy (a Promise object) and installed unconditionally
         // regardless of what the user actually clicked. The real, supported,
         // Promise<boolean> API is window.__TAURI__.dialog.confirm().
-        var proceed = await window.__TAURI__.dialog.confirm(msg, { title: 'Mise à jour disponible' });
+        var proceed = await window.__TAURI__.dialog.confirm(msg, { title: window.SM.t('updaterAvailableDialogTitle') });
         if (proceed) await doInstall(update, statusEl);
       }
     } catch (e) {
       console.warn('[updater] check failed', e);
       var detail = (e && e.message) ? e.message : String(e);
-      if (statusEl) statusEl.textContent = 'Échec de la vérification — ' + detail;
-      if (!silent) showToast('Échec de la vérification — ' + detail);
+      if (statusEl) statusEl.textContent = window.SM.t('updaterCheckFailedStatus').replace('{e}', detail);
+      if (!silent) showToast(window.SM.t('updaterCheckFailedToast').replace('{e}', detail));
     }
     if (btn) btn.disabled = false;
   }
@@ -137,9 +137,9 @@
     var btn = macBtn();
     if (!btn) return;
     btn.className = state ? ('state-' + state) : '';
-    if (state === 'available') { btn.title = 'Update'; btn.innerHTML = ICON_DOWNLOAD; }
+    if (state === 'available') { btn.title = window.SM.t('updaterMacUpdateTitle'); btn.innerHTML = ICON_DOWNLOAD; }
     else if (state === 'downloading') { btn.title = ''; btn.innerHTML = ICON_SPINNER; }
-    else if (state === 'installed') { btn.title = 'Reopen'; btn.innerHTML = ICON_REOPEN; }
+    else if (state === 'installed') { btn.title = window.SM.t('updaterMacReopenTitle'); btn.innerHTML = ICON_REOPEN; }
     else { btn.title = ''; btn.innerHTML = ''; }
   }
   async function macBtnDownload() {
@@ -149,11 +149,11 @@
     try {
       await update.downloadAndInstall(function () {}); // progress not surfaced on this compact icon — the Réglages panel's own status line (doInstall) already covers that for the manual-check flow
       macBtnSetState('installed');
-      showToast('Mise à jour v' + update.version + ' installée');
+      showToast(window.SM.t('updaterMacInstalledToast').replace('{v}', update.version));
     } catch (e) {
       console.warn('[updater] mac titlebar install failed', e);
       macBtnSetState('available'); // let them retry rather than getting stuck on a dead spinner
-      showToast('Échec de l\'installation — ' + (e && e.message ? e.message : e));
+      showToast(window.SM.t('updaterInstallFailedToast').replace('{e}', e && e.message ? e.message : e));
     }
   }
   function initMacUpdateButton() {
