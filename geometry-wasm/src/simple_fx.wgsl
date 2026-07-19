@@ -45,7 +45,7 @@ struct Params {
     tex_w: f32,
     tex_h: f32,
     time: f32,
-    _pad0: f32,
+    p4: f32, // was _pad0 — first effect to need a 4th slot is EFFECT_GROUND_SHADOW
 };
 @group(0) @binding(2) var<uniform> params: Params;
 
@@ -59,6 +59,7 @@ const EFFECT_SCANLINES: f32 = 6.0;
 const EFFECT_GRAIN: f32 = 7.0;
 const EFFECT_SHARPEN: f32 = 8.0;
 const EFFECT_EDGE_DETECT: f32 = 9.0;
+const EFFECT_GROUND_SHADOW: f32 = 10.0;
 
 // Standard Rec.601 luminance weights — appears identically across every
 // grayscale/luminance tutorial, public-domain-level constant.
@@ -129,6 +130,81 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         let mag = clamp(sqrt(gx * gx + gy * gy) * params.p1, 0.0, 1.0);
         let src = textureSample(src_tex, tex_sampler, in.uv);
         return vec4<f32>(vec3<f32>(mag), src.a);
+    }
+
+    if (id == EFFECT_GROUND_SHADOW) {
+        // Fake 2D "cast shadow onto the ground" — scoped-down analog of the
+        // referenced AviUtl2 GroundShadow2_S script's full 3D ground-plane
+        // projection (light angle + ground plane + camera → perspective
+        // transform of the object). A full 3D re-derivation isn't a good
+        // fit for a single 2D fragment pass, so this reimplements the same
+        // VISUAL result — a skewed, foreshortened silhouette trailing away
+        // from a ground line — via the classic 2D "oblique cast shadow"
+        // construction (the same shadow-skew trick used in CSS/Photoshop
+        // layer-style cast shadows): a point at height h above the ground
+        // line maps to a shadow point offset horizontally by h*skew and
+        // pushed down past the ground line by h*length_scale. Rendered by
+        // INVERSE-mapping each output pixel below the ground line back to
+        // the source silhouette that would cast a shadow there, so this
+        // stays a single forward raster pass with no separate geometry step.
+        //
+        // p1 = skew (shadow horizontal shear per unit height, e.g. light
+        //      azimuth direction — mirrors the reference's "Light Slope")
+        // p2 = ground_y, normalized 0..1 (mirrors "Ground Position")
+        // p3 = length_scale (vertical stretch of the projected shadow —
+        //      mirrors "Light Angle": shallower light = larger value)
+        // p4 = opacity (mirrors "Shadow Opacity"; shadow color is fixed
+        //      black — no color param in this simplified pass)
+        // NOTE: every textureSample below runs UNCONDITIONALLY (no branch
+        // on a per-pixel/data-dependent value gates them) — WGSL requires
+        // texture sampling to stay in uniform control flow, and branching
+        // on `src.a`/`in_bounds` (both derived from a per-pixel sample)
+        // before another textureSample call is a validation error (naga:
+        // "must only be called from uniform control flow"). All the
+        // conditional LOGIC below is done with select()/clamp() arithmetic
+        // instead of `if`, and the tap loop has a compile-time-constant
+        // trip count, so nothing here is actually branch-gated.
+        let src = textureSample(src_tex, tex_sampler, in.uv);
+        let ground_y = params.p2 * params.tex_h;
+        let y = in.uv.y * params.tex_h;
+        let h = max((y - ground_y) / max(params.p3, 0.0001), 0.0);
+        let sy = ground_y - h;
+        let sx = in.uv.x * params.tex_w - h * params.p1;
+        let in_bounds = sy >= 0.0 && sy < params.tex_h && sx >= 0.0 && sx < params.tex_w;
+        let src_uv = vec2<f32>(sx / params.tex_w, sy / params.tex_h);
+        // Conic blur approximation (reference's "Conic Blur": softness
+        // grows with object-to-ground distance) — average a handful of
+        // taps spread proportionally to h instead of exposing a 5th
+        // dedicated blur param (already at the 4-slot limit here).
+        let blur_texels = clamp(h * 0.06, 0.0, 10.0);
+        var a_sum = 0.0;
+        let taps = 5;
+        for (var i = 0; i < taps; i = i + 1) {
+            let jitter = (f32(i) / f32(taps - 1) - 0.5) * 2.0 * blur_texels;
+            let tap_uv = src_uv + vec2<f32>(jitter * texel.x, 0.0);
+            a_sum = a_sum + textureSample(src_tex, tex_sampler, tap_uv).a;
+        }
+        let valid_shadow_area = y > ground_y && params.p3 > 0.0001 && in_bounds;
+        let shadow_a = select(0.0, (a_sum / f32(taps)) * clamp(params.p4, 0.0, 1.0), valid_shadow_area);
+        // Foreground always wins over its own shadow. IMPORTANT: this only
+        // produces a correct silhouette-shaped shadow when `src` is this
+        // ONE layer's own ISOLATED render (real alpha: transparent where
+        // there's no content, opaque/partial only where the shape actually
+        // is) — see engine.rs's call site, which runs this on the per-layer
+        // `blend_layer_view`/`blur_result_view` BEFORE that layer is
+        // composited onto the rest of the scene. Running this on an
+        // already-flattened accumulator would NOT work: this engine seeds
+        // the accumulator with an OPAQUE base color up front (composite_
+        // scene's clear_texture call), so every pixel already has alpha=1
+        // there regardless of whether real content is present — alpha
+        // alone can no longer distinguish "shape" from "empty background"
+        // once flattened (confirmed by direct pixel-probing during
+        // development: sampled alpha was ~1.0 everywhere, not just over
+        // the shape).
+        let is_fg = src.a > 0.01;
+        let out_rgb = select(vec3<f32>(0.0), src.rgb, is_fg);
+        let out_a = select(shadow_a, src.a, is_fg);
+        return vec4<f32>(out_rgb, out_a);
     }
 
     // Everything below is a plain per-pixel color remap — single sample.

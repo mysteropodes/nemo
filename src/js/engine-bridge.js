@@ -443,7 +443,17 @@
       // composite_scene) — same "plain per-layer field, undefined = off"
       // shape as blendMode/matteMode above.
       var br = state.layers[i].blurRadius;
-      layers.push({ items: items, blendMode: (bm && bm !== 'normal') ? bm : undefined, matteMode: (mm && mm !== 'none') ? mm : undefined, blurRadius: (br && br > 0) ? br : undefined });
+      // Ground/cast shadow (2026-07) — same "plain per-layer field,
+      // undefined = off" shape as blurRadius above; gshadowOpacity<=0 is
+      // the off-switch (see engine.rs's LayerIn::gshadow_* doc comment for
+      // why this runs per-layer, not as an effect/adjustment layer).
+      var gsOp = state.layers[i].gshadowOpacity;
+      var gsOn = gsOp && gsOp > 0;
+      layers.push({ items: items, blendMode: (bm && bm !== 'normal') ? bm : undefined, matteMode: (mm && mm !== 'none') ? mm : undefined, blurRadius: (br && br > 0) ? br : undefined,
+        gshadowSkew: gsOn ? state.layers[i].gshadowSkew : undefined,
+        gshadowGroundY: gsOn ? state.layers[i].gshadowGroundY : undefined,
+        gshadowLength: gsOn ? state.layers[i].gshadowLength : undefined,
+        gshadowOpacity: gsOn ? gsOp : undefined });
     }
     // artboard background as the bottom item of a synthetic bottom layer,
     // mirroring drawStage()'s background rect
