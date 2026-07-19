@@ -38,6 +38,19 @@
   }
   var xformDir = null, xformAnchor = null, xformOrigHandlePos = null, xformLastSx = 1, xformLastSy = 1;
   var xformMap = null; // geometry<->rendered-world mapper when the active layer has a Motion transform
+  // Ctrl+drag corner = free-transform DISTORT pins (2026-07, "avec l'outil
+  // de sélection si on fait ctrl il ne faudrait pas le menu droit mais des
+  // pin de transformation libre pour modifier la sélection" — confirmed
+  // with the user: Photoshop/AE-style corner-pin distort, the dragged
+  // corner moves independently while the other 3 stay put, producing a
+  // genuine perspective quad instead of a rectangle). Unlike xform-scale
+  // (which mutates geometry incrementally, tick-relative-to-last-tick),
+  // distort needs the ORIGINAL (pre-gesture) point positions every tick —
+  // a projective map isn't composable step-by-step the way a uniform
+  // scale factor is — so distortSegs snapshots every segment's point/
+  // handleIn/handleOut once at gesture start and every subsequent tick
+  // re-derives the full transform from that same fixed snapshot.
+  var distortDir = null, distortSrcQuad = null, distortSegs = null;
   var rotCenter = null, rotStartAngle = 0, rotLastAngle = 0;
   var marqueeStart = null;
   var moveStarted = false;
@@ -213,6 +226,96 @@
     return best;
   }
 
+  // ---- Free-transform distort (Ctrl+drag a corner pin) ----
+  // Inverts P = nw + u*ex + v*ey for (u,v) — valid because the SOURCE box
+  // is always a plain (possibly rotated) rectangle, i.e. an affine image of
+  // the unit square, never itself distorted yet.
+  function rectUVSolver(nw, ne, sw) {
+    var exx = ne.x - nw.x, exy = ne.y - nw.y;
+    var eyx = sw.x - nw.x, eyy = sw.y - nw.y;
+    var det = exx * eyy - eyx * exy;
+    if (Math.abs(det) < 1e-9) det = det < 0 ? -1e-9 : 1e-9;
+    return function (x, y) {
+      var px = x - nw.x, py = y - nw.y;
+      return { u: (px * eyy - py * eyx) / det, v: (exx * py - exy * px) / det };
+    };
+  }
+  // Classic Heckbert (1989) unit-square -> general-quad projective mapping:
+  // (0,0)->p0, (1,0)->p1, (1,1)->p2, (0,1)->p3. The destination corner the
+  // user is dragging can make this quad genuinely non-planar/non-convex-
+  // rectangular (that's the whole point of a distort), so this is a real
+  // perspective divide, not a bilinear/affine shortcut.
+  function unitSquareToQuad(p0, p1, p2, p3) {
+    var x0 = p0.x, y0 = p0.y, x1 = p1.x, y1 = p1.y, x2 = p2.x, y2 = p2.y, x3 = p3.x, y3 = p3.y;
+    var dx1 = x1 - x2, dx2 = x3 - x2, dx3 = x0 - x1 + x2 - x3;
+    var dy1 = y1 - y2, dy2 = y3 - y2, dy3 = y0 - y1 + y2 - y3;
+    var a, b, c, d, e, f, g, hh;
+    if (Math.abs(dx3) < 1e-9 && Math.abs(dy3) < 1e-9) {
+      a = x1 - x0; b = x2 - x1; c = x0;
+      d = y1 - y0; e = y2 - y1; f = y0;
+      g = 0; hh = 0;
+    } else {
+      var den = dx1 * dy2 - dx2 * dy1;
+      if (Math.abs(den) < 1e-9) den = den < 0 ? -1e-9 : 1e-9;
+      g = (dx3 * dy2 - dx2 * dy3) / den;
+      hh = (dx1 * dy3 - dx3 * dy1) / den;
+      a = x1 - x0 + g * x1; b = x3 - x0 + hh * x3; c = x0;
+      d = y1 - y0 + g * y1; e = y3 - y0 + hh * y3; f = y0;
+    }
+    return function (u, v) {
+      var den2 = g * u + hh * v + 1;
+      if (Math.abs(den2) < 1e-9) den2 = den2 < 0 ? -1e-9 : 1e-9;
+      return { x: (a * u + b * v + c) / den2, y: (d * u + e * v + f) / den2 };
+    };
+  }
+  // Snapshot every segment's point/handleIn/handleOut ONCE at gesture start
+  // (recurses into CompoundPath children — see CLAUDE.md §1, a boolean
+  // result or an erase can leave a CompoundPath in the selection and it is
+  // NOT a Path subclass, so `.segments` isn't there directly).
+  function collectDistortSegs(item, out) {
+    if (item.segments) {
+      item.segments.forEach(function (seg) {
+        out.push({
+          seg: seg, pt: [seg.point.x, seg.point.y],
+          hi: seg.handleIn ? [seg.handleIn.x, seg.handleIn.y] : null,
+          ho: seg.handleOut ? [seg.handleOut.x, seg.handleOut.y] : null,
+        });
+      });
+    } else if (item.children) {
+      item.children.forEach(function (c) { collectDistortSegs(c, out); });
+    }
+  }
+  // Only a corner pin on a plain (non-Motion, non-Component) selection is
+  // eligible — a Component instance's whole-rigid-body placement folds into
+  // symMatrix (symGestureAccumulate), an affine-only accumulator that can't
+  // represent a perspective distort, and Motion mode never touches raw
+  // geometry at all (see the 'move'/'xform-scale' Motion-mode early-returns
+  // elsewhere in this file) — both are out of scope for this gesture rather
+  // than silently producing a wrong result.
+  function distortEligibleCornerAt(pt) {
+    if (!selectedPaths.length || state.appMode === 'motion') return null;
+    var ld = state.layers[state.activeLayerIdx];
+    if (ld && ld.symbolId) return null;
+    var hh = hitTestHandles(pt, false);
+    if (hh && hh.type === 'scale' && (hh.dir === 'nw' || hh.dir === 'ne' || hh.dir === 'sw' || hh.dir === 'se')) return hh.dir;
+    return null;
+  }
+  function beginDistort(dir) {
+    pushUndo();
+    ensureKeyframe();
+    selectedPaths = state.selectedStrokeIndices.map(function (i) { return userLayers[state.activeLayerIdx].children[i]; }).filter(Boolean);
+    var h = computeHandles();
+    if (!h) return false;
+    distortDir = dir;
+    distortSrcQuad = { nw: h.gCorners.nw.clone(), ne: h.gCorners.ne.clone(), se: h.gCorners.se.clone(), sw: h.gCorners.sw.clone() };
+    xformMap = h.map;
+    distortSegs = [];
+    selectedPaths.forEach(function (p) { collectDistortSegs(p, distortSegs); });
+    mode = 'xform-distort';
+    window.SMEngineBridge.renderNow();
+    return true;
+  }
+
   // Tween motion-arc handle hit-test: checked FIRST, before the transform
   // box, matching tools.js's own onMouseDown priority order — reads the
   // same `arcHandles` global renderArcs() (in tweens.js) populates, so it
@@ -286,6 +389,10 @@
       // (no pushUndo, no ensureKeyframe): only state.xformAnchorCustom
       // changes, geometry is untouched.
       mode = 'xform-anchor-drag';
+      return;
+    }
+    if (hh && e.ctrlKey && hh.type === 'scale' && (hh.dir === 'nw' || hh.dir === 'ne' || hh.dir === 'sw' || hh.dir === 'se') && distortEligibleCornerAt(pt) === hh.dir) {
+      beginDistort(hh.dir);
       return;
     }
     if (hh) {
@@ -866,6 +973,29 @@
       });
       xformLastSx = sx; xformLastSy = sy;
       symGestureAccumulate(new Matrix().scale(stepSx, stepSy, anchor));
+    } else if (mode === 'xform-distort') {
+      var ptD = pt;
+      if (xformMap) { var ptgD = xformMap.inv(pt.x, pt.y); ptD = new Point(ptgD[0], ptgD[1]); }
+      var dstQuad = { nw: distortSrcQuad.nw, ne: distortSrcQuad.ne, se: distortSrcQuad.se, sw: distortSrcQuad.sw };
+      dstQuad[distortDir] = ptD;
+      var srcUV = rectUVSolver(distortSrcQuad.nw, distortSrcQuad.ne, distortSrcQuad.sw);
+      var dstFwd = unitSquareToQuad(dstQuad.nw, dstQuad.ne, dstQuad.se, dstQuad.sw);
+      distortSegs.forEach(function (rec) {
+        var uv = srcUV(rec.pt[0], rec.pt[1]);
+        var np = dstFwd(uv.u, uv.v);
+        rec.seg.point = new Point(np.x, np.y);
+        if (rec.hi) {
+          var uvHi = srcUV(rec.pt[0] + rec.hi[0], rec.pt[1] + rec.hi[1]);
+          var nhi = dstFwd(uvHi.u, uvHi.v);
+          rec.seg.handleIn = new Point(nhi.x - np.x, nhi.y - np.y);
+        }
+        if (rec.ho) {
+          var uvHo = srcUV(rec.pt[0] + rec.ho[0], rec.pt[1] + rec.ho[1]);
+          var nho = dstFwd(uvHo.u, uvHo.v);
+          rec.seg.handleOut = new Point(nho.x - np.x, nho.y - np.y);
+        }
+      });
+      window.SMEngineBridge.renderNow();
     } else if (mode === 'arc') {
       setArcHandle(draggingArc.fA, draggingArc.fB, draggingArc.matchIdx, draggingArc.which, draggingArc.ptA, draggingArc.ptB, pt.x, pt.y);
       renderArcs(arcDragCache);
@@ -1018,6 +1148,13 @@
         renderOS();
       }
       renderArcs(); updateUI();
+    } else if (mode === 'xform-distort') {
+      selectedPaths.forEach(function (p) { forkIfForeignOwner(p); });
+      fillRegenerateLinked(userLayers[state.activeLayerIdx], null);
+      saveActiveLayerFrame();
+      renderOS();
+      renderArcs(); updateUI();
+      distortDir = null; distortSrcQuad = null; distortSegs = null;
     } else if (mode === 'marquee') {
       if (_marquee.rect) {
         var mb = _marquee.rect.bounds;
@@ -1102,6 +1239,25 @@
     if (!shouldIntercept()) return;
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
     var pt = new Point(w[0], w[1]);
+    // Ctrl+click free-transform distort (see beginDistort's own comment) —
+    // on macOS/WebKit a Ctrl+click is the OS-level secondary-click
+    // affordance, so the browser dispatches 'contextmenu' for it same as an
+    // actual right-click; there is no separate JS-visible signal to hook
+    // earlier than this. Checked independently of onDown's own ctrl+corner
+    // branch (not just a flag it sets) because the exact mousedown/
+    // contextmenu firing order for a Ctrl+click varies by platform/webview
+    // version — this guard covers the gesture whether or not a pointerdown
+    // ever reached onDown first.
+    if (mode === 'xform-distort') { e.preventDefault(); e.stopImmediatePropagation(); return; }
+    if (e.ctrlKey) {
+      var distortDirAt = distortEligibleCornerAt(pt);
+      if (distortDirAt) {
+        e.preventDefault(); e.stopImmediatePropagation();
+        window.SMEngineBridge.suspend();
+        beginDistort(distortDirAt);
+        return;
+      }
+    }
     var layer = userLayers[state.activeLayerIdx];
     var activeLdForLock = state.layers[state.activeLayerIdx];
     // Same hit-testing as onDown (motion-transform-aware point, component-
