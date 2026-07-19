@@ -599,6 +599,13 @@ pub struct VelloEngine {
     blur_uniform_buf: wgpu::Buffer,
     blur_result_tex: wgpu::Texture,
     blur_result_view: wgpu::TextureView,
+    // Intermediate texture for the horizontal pass's output before the
+    // vertical pass reads it (2026-07, separable 2-pass blur rewrite) —
+    // distinct from blur_result_tex/view, which every call site still uses
+    // to hold the FINAL blurred result (or, for "glow", as blur_pass's own
+    // scratch before the screen-blend composite — unrelated to this one).
+    blur_scratch_tex: wgpu::Texture,
+    blur_scratch_view: wgpu::TextureView,
     // ---- Effect (adjustment) layers (2026-07) — color_adjust.wgsl. No
     // result_tex/view of its own: unlike blur_result above (used for a
     // per-layer blur that still needs to flow into the ordinary composite/
@@ -1021,21 +1028,25 @@ fn create_blur_pipeline(device: &wgpu::Device) -> (wgpu::RenderPipeline, wgpu::B
         min_filter: wgpu::FilterMode::Linear,
         ..Default::default()
     });
-    // 16 bytes: radius_px (f32) + tex_w (f32) + tex_h (f32) + padding — see
-    // blur.wgsl's Params.
+    // 32 bytes: radius_px, tex_w, tex_h, dir_x, dir_y, + 3 padding floats —
+    // see blur.wgsl's Params (grew from 16 bytes when the pass became
+    // separable and needed a blur-direction vector for the H/V passes).
     let uniform_buf = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("blur-params"),
-        size: 16,
+        size: 32,
         usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         mapped_at_creation: false,
     });
     (pipeline, bind_group_layout, sampler, uniform_buf)
 }
 
-/// Runs blur.wgsl: writes a blurred copy of `source_view` into `target_view`.
-/// Mirrors matte_pass/composite_pass's shape.
+/// Runs blur.wgsl ONCE, along a single axis (`dir_x`/`dir_y`, a unit vector —
+/// (1,0) for horizontal, (0,1) for vertical): writes a blurred copy of
+/// `source_view` into `target_view`. Mirrors matte_pass/composite_pass's
+/// shape. Not called directly outside this file — see `blur_pass` below,
+/// which chains two of these (H then V) into the real separable blur.
 #[allow(clippy::too_many_arguments)]
-fn blur_pass(
+fn blur_pass_1d(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
     pipeline: &wgpu::RenderPipeline,
@@ -1046,12 +1057,16 @@ fn blur_pass(
     radius_px: f32,
     width: u32,
     height: u32,
+    dir_x: f32,
+    dir_y: f32,
     target_view: &wgpu::TextureView,
 ) {
-    let mut payload = [0u8; 16];
+    let mut payload = [0u8; 32];
     payload[0..4].copy_from_slice(&radius_px.to_le_bytes());
     payload[4..8].copy_from_slice(&(width as f32).to_le_bytes());
     payload[8..12].copy_from_slice(&(height as f32).to_le_bytes());
+    payload[12..16].copy_from_slice(&dir_x.to_le_bytes());
+    payload[16..20].copy_from_slice(&dir_y.to_le_bytes());
     queue.write_buffer(uniform_buf, 0, &payload);
     let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("blur-bind-group"),
@@ -1082,6 +1097,39 @@ fn blur_pass(
         pass.draw(0..3, 0..1);
     }
     queue.submit(Some(encoder.finish()));
+}
+
+/// Real entry point (2026-07 rewrite — see blur.wgsl's own header comment
+/// for why this became two passes): runs a horizontal blur_pass_1d from
+/// `source_view` into `scratch_view`, then a vertical one from
+/// `scratch_view` into `target_view`. `scratch_view` must be a texture
+/// distinct from both `source_view` and `target_view` (the engine's
+/// `blur_scratch_view` field exists exactly for this). Same call shape as
+/// the old single-pass version plus one extra scratch-texture argument, so
+/// every call site just threads that through.
+#[allow(clippy::too_many_arguments)]
+fn blur_pass(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    pipeline: &wgpu::RenderPipeline,
+    bind_group_layout: &wgpu::BindGroupLayout,
+    sampler: &wgpu::Sampler,
+    uniform_buf: &wgpu::Buffer,
+    source_view: &wgpu::TextureView,
+    radius_px: f32,
+    width: u32,
+    height: u32,
+    scratch_view: &wgpu::TextureView,
+    target_view: &wgpu::TextureView,
+) {
+    blur_pass_1d(
+        device, queue, pipeline, bind_group_layout, sampler, uniform_buf,
+        source_view, radius_px, width, height, 1.0, 0.0, scratch_view,
+    );
+    blur_pass_1d(
+        device, queue, pipeline, bind_group_layout, sampler, uniform_buf,
+        scratch_view, radius_px, width, height, 0.0, 1.0, target_view,
+    );
 }
 
 /// Brightness/contrast pipeline for effect (adjustment) layers — same
@@ -1630,6 +1678,7 @@ pub async fn create_engine(
     let (matte_result_tex, matte_result_view) = create_matte_result_texture(&device, width, height);
     let (blur_pipeline, blur_bind_group_layout, blur_sampler, blur_uniform_buf) = create_blur_pipeline(&device);
     let (blur_result_tex, blur_result_view) = create_matte_result_texture(&device, width, height);
+    let (blur_scratch_tex, blur_scratch_view) = create_matte_result_texture(&device, width, height);
     let (color_pipeline, color_bind_group_layout, color_sampler, color_uniform_buf) = create_color_adjust_pipeline(&device);
     let (vignette_pipeline, vignette_bind_group_layout, vignette_sampler, vignette_uniform_buf) = create_vignette_pipeline(&device);
 
@@ -1679,6 +1728,8 @@ pub async fn create_engine(
         blur_uniform_buf,
         blur_result_tex,
         blur_result_view,
+        blur_scratch_tex,
+        blur_scratch_view,
         color_pipeline,
         color_bind_group_layout,
         color_sampler,
@@ -1826,6 +1877,7 @@ impl VelloEngine {
                             layer.effect_p1.unwrap_or(16.0),
                             self.width,
                             self.height,
+                            &self.blur_scratch_view,
                             &self.blur_result_view,
                         );
                         composite_pass(
@@ -1856,6 +1908,7 @@ impl VelloEngine {
                             layer.effect_p1.unwrap_or(0.0),
                             self.width,
                             self.height,
+                            &self.blur_scratch_view,
                             target_view,
                         );
                     }
@@ -1913,6 +1966,7 @@ impl VelloEngine {
                     radius,
                     self.width,
                     self.height,
+                    &self.blur_scratch_view,
                     &self.blur_result_view,
                 );
                 source_view = &self.blur_result_view;
@@ -2208,6 +2262,9 @@ impl VelloEngine {
         let (blur_result_tex, blur_result_view) = create_matte_result_texture(&self.device, width, height);
         self.blur_result_tex = blur_result_tex;
         self.blur_result_view = blur_result_view;
+        let (blur_scratch_tex, blur_scratch_view) = create_matte_result_texture(&self.device, width, height);
+        self.blur_scratch_tex = blur_scratch_tex;
+        self.blur_scratch_view = blur_scratch_view;
     }
 
     /// Uploads (or re-uploads, if already cached under this id) an image's
