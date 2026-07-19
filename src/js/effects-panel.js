@@ -122,6 +122,35 @@
 
   function activeLayer() { return state.layers[state.activeLayerIdx]; }
 
+  // Per-ELEMENT effects (2026-07, "possible de différencié les effet par
+  // éléments sélectionné si j'applique un effet sur un élément select alors
+  // il ne s'applique sur celui-ci") — same singleTarget() convention
+  // gradient-bridge.js already established for "exactly one shape selected
+  // with Select/Subselect": whenever that's true, the Effects panel targets
+  // THAT element's own effects (p.data.effects, serP/desP-persisted,
+  // engine.rs's ItemIn.effects) instead of the whole layer's. Falls back to
+  // the layer the moment 0 or 2+ elements are selected, or a non-select
+  // tool is active — no separate manual toggle, matches gradient-bridge's
+  // own automatic-by-selection precedent.
+  function singleSelectedElement() {
+    if ((state.tool !== 'select' && state.tool !== 'subselect') || !window.selectedPaths || selectedPaths.length !== 1) return null;
+    var p = selectedPaths[0];
+    return (p instanceof Path || p instanceof CompoundPath) ? p : null;
+  }
+  // Returns {obj, isElement, item?} — `obj` is whichever plain object
+  // actually carries the `effects` array (a layer, or a selected element's
+  // `.data`), so every effects-list function below reads/writes through
+  // `obj.effects` uniformly without needing its own element/layer branch.
+  function effectsTarget() {
+    var el = singleSelectedElement();
+    if (el) {
+      if (!el.data) el.data = {};
+      return { obj: el.data, isElement: true, item: el };
+    }
+    var ld = activeLayer();
+    return ld ? { obj: ld, isElement: false } : null;
+  }
+
   // Custom WGSL effects (custom-effects.js) live in state.customEffects,
   // not in the static tables above — these three helpers fall back to a
   // definition lookup whenever `type` is a "custom:<id>" string, so the
@@ -228,32 +257,32 @@
   window.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeAddMenu(); });
 
   function addEffect(type) {
-    var ld = activeLayer(); if (!ld) return;
+    var t = effectsTarget(); if (!t) return;
     pushUndo();
-    if (!ld.effects) ld.effects = [];
+    if (!t.obj.effects) t.obj.effects = [];
     var d = defaultsArrFor(type);
-    ld.effects.push({ type: type, enabled: true, p1: d[0], p2: d[1], p3: d[2], p4: d[3] });
-    expandedIdx = ld.effects.length - 1; // open the new one immediately
+    t.obj.effects.push({ type: type, enabled: true, p1: d[0], p2: d[1], p3: d[2], p4: d[3] });
+    expandedIdx = t.obj.effects.length - 1; // open the new one immediately
     saveActiveLayerFrame(); renderEffectsSection(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
   }
   window.addEffectToActiveLayer = addEffect; // custom-effects.js calls this right after authoring a brand-new shader
   function toggleEnabled(idx) {
-    var ld = activeLayer(); if (!ld || !ld.effects || !ld.effects[idx]) return;
+    var t = effectsTarget(); if (!t || !t.obj.effects || !t.obj.effects[idx]) return;
     pushUndo();
-    ld.effects[idx].enabled = !ld.effects[idx].enabled;
+    t.obj.effects[idx].enabled = !t.obj.effects[idx].enabled;
     saveActiveLayerFrame(); renderEffectsSection(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
   }
   function deleteEffect(idx) {
-    var ld = activeLayer(); if (!ld || !ld.effects) return;
+    var t = effectsTarget(); if (!t || !t.obj.effects) return;
     pushUndo();
-    ld.effects.splice(idx, 1);
+    t.obj.effects.splice(idx, 1);
     if (expandedIdx === idx) expandedIdx = -1; else if (expandedIdx > idx) expandedIdx--;
     saveActiveLayerFrame(); renderEffectsSection(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
   }
   function setParam(idx, key, raw) {
-    var ld = activeLayer(); if (!ld || !ld.effects || !ld.effects[idx]) return;
+    var t = effectsTarget(); if (!t || !t.obj.effects || !t.obj.effects[idx]) return;
     pushUndo();
-    ld.effects[idx][key] = raw;
+    t.obj.effects[idx][key] = raw;
     saveActiveLayerFrame(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
   }
 
@@ -290,8 +319,8 @@
     var list = document.getElementById('effects-list');
     if (!list) return;
     list.innerHTML = '';
-    var ld = activeLayer();
-    var effects = (ld && ld.effects) || [];
+    var t = effectsTarget();
+    var effects = (t && t.obj.effects) || [];
     effects.forEach(function (eff, idx) {
       var row = document.createElement('div');
       row.className = 'fx-row' + (eff.enabled ? '' : ' disabled') + (expandedIdx === idx ? ' expanded' : '');
@@ -347,6 +376,8 @@
     if (!applicable) return;
     var hint = document.getElementById('effects-adj-hint');
     if (hint) hint.style.display = ld.isEffectLayer ? '' : 'none';
+    var targetHint = document.getElementById('effects-target-hint');
+    if (targetHint) targetHint.style.display = singleSelectedElement() ? '' : 'none';
     renderEffectsList();
   }
   window.updateEffectsPanel = renderEffectsSection;

@@ -78,6 +78,15 @@ pub(crate) struct ItemIn {
     // for anything beyond a tiny thumbnail.
     #[serde(default)]
     pub(crate) image: Option<ImageRef>,
+    // Per-ELEMENT effects (2026-07, "possible de différencié les effet par
+    // éléments sélectionné si j'applique un effet sur un élément select
+    // alors il ne s'applique sur celui-ci") — same shape/semantics as
+    // LayerIn::effects, just scoped to this one item instead of the whole
+    // layer. Empty (the overwhelming common case) for every item that
+    // never had a per-element effect applied — see
+    // paint_layer_with_element_effects for how a non-empty one is handled.
+    #[serde(default)]
+    pub(crate) effects: Vec<EffectIn>,
 }
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -674,6 +683,23 @@ pub struct VelloEngine {
     effect_stack_a_view: wgpu::TextureView,
     effect_stack_b_tex: wgpu::Texture,
     effect_stack_b_view: wgpu::TextureView,
+    // ---- Per-ELEMENT effects ping-pong (2026-07, "possible de différencié
+    // les effet par éléments sélectionné") — ACCUMULATES a layer's own
+    // paint order across multiple item-groups when at least one item
+    // carries its own effects stack (paint_layer_with_element_effects):
+    // each group (a run of plain items, or one effect-processed item) gets
+    // composited onto whichever of this pair is CURRENT, ping-ponging to
+    // the other, so by the time every group has been painted the final
+    // view holds the whole layer exactly as if every item had painted into
+    // one ordinary Scene — just with the effected item(s) isolated and
+    // processed along the way. Distinct from effect_stack_a/b (that pair
+    // is apply_effect_stack's OWN internal ping-pong for chaining an
+    // item's/layer's multiple effects; aliasing the two would corrupt
+    // whichever runs while the other still holds a pending read).
+    element_build_a_tex: wgpu::Texture,
+    element_build_a_view: wgpu::TextureView,
+    element_build_b_tex: wgpu::Texture,
+    element_build_b_view: wgpu::TextureView,
     // ---- User-authored custom WGSL effects (2026-07, feedback: "la
     // possibilité d'ajouter ses propres effets wgsl et leur paramètre
     // correspondant") — each entry is a full pipeline built at RUNTIME from
@@ -705,7 +731,17 @@ fn create_blend_layer_texture(device: &wgpu::Device, width: u32, height: u32) ->
         // vello's render_to_texture writes via a compute pipeline, hence
         // STORAGE_BINDING (matches self.offscreen's own usage flags) —
         // TEXTURE_BINDING lets the blend shader sample it as `source_tex`.
-        usage: wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::TEXTURE_BINDING,
+        // COPY_DST/COPY_SRC (2026-07, per-element effects):
+        // paint_layer_with_element_effects' final step copies the
+        // assembled result straight into this texture (reused as
+        // blend_layer_view's own backing store, DST), and a plain
+        // (non-effected) run copies straight OUT of it as that run's
+        // result (SRC) when it's the very first run in the layer — without
+        // both flags either copy is a WebGPU validation error.
+        usage: wgpu::TextureUsages::STORAGE_BINDING
+            | wgpu::TextureUsages::TEXTURE_BINDING
+            | wgpu::TextureUsages::COPY_DST
+            | wgpu::TextureUsages::COPY_SRC,
         view_formats: &[],
     });
     let view = tex.create_view(&wgpu::TextureViewDescriptor::default());
@@ -1752,18 +1788,21 @@ fn composite_pass(
     queue.submit(Some(encoder.finish()));
 }
 
-/// Paints one layer's items into `scene` — the exact same per-item logic
+/// Paints a slice of items into `scene` — the exact same per-item logic
 /// render()/render_to_pixels() always used, factored out so the ordinary
 /// (fast, no-blend) path and the per-layer isolated-texture blend path
 /// both go through one implementation (CLAUDE.md §3: duplicated render
-/// logic drifting out of sync is the recurring bug class here).
+/// logic drifting out of sync is the recurring bug class here). Takes a
+/// slice rather than `&LayerIn` so paint_layer_with_element_effects can
+/// paint just a RUN of one layer's items (the items between/around a
+/// per-element-effect item) without needing a fake LayerIn wrapper.
 fn paint_layer_items(
     scene: &mut Scene,
-    layer: &LayerIn,
+    items: &[ItemIn],
     view_tf: Affine,
     images: &std::collections::HashMap<String, vello::peniko::ImageData>,
 ) {
-    for item in &layer.items {
+    for item in items {
         if let Some(img_ref) = &item.image {
             if let Some(image_data) = images.get(&img_ref.image_id) {
                 let sx = img_ref.width / image_data.width as f64;
@@ -1945,6 +1984,8 @@ pub async fn create_engine(
     let (simple_fx_pipeline, simple_fx_bind_group_layout, simple_fx_sampler, simple_fx_uniform_buf) = create_simple_fx_pipeline(&device);
     let (effect_stack_a_tex, effect_stack_a_view) = create_blend_accum_texture(&device, width, height, "effect-stack-a");
     let (effect_stack_b_tex, effect_stack_b_view) = create_blend_accum_texture(&device, width, height, "effect-stack-b");
+    let (element_build_a_tex, element_build_a_view) = create_blend_accum_texture(&device, width, height, "element-build-a");
+    let (element_build_b_tex, element_build_b_view) = create_blend_accum_texture(&device, width, height, "element-build-b");
 
     Ok(VelloEngine {
         surface,
@@ -2010,6 +2051,10 @@ pub async fn create_engine(
         effect_stack_a_view,
         effect_stack_b_tex,
         effect_stack_b_view,
+        element_build_a_tex,
+        element_build_a_view,
+        element_build_b_tex,
+        element_build_b_view,
         custom_effect_pipelines: std::collections::HashMap::new(),
     })
 }
@@ -2224,6 +2269,92 @@ impl VelloEngine {
         !use_a
     }
 
+    /// Paints one layer whose items include at least one with its OWN
+    /// effects stack (2026-07, "possible de différencié les effet par
+    /// éléments sélectionné") — leaves the fully-composited result in
+    /// self.blend_layer_view, the exact same contract the plain
+    /// paint_layer_items+render_to_texture call this replaces already had,
+    /// so the rest of composite_scene (matte, layer-level effects stack,
+    /// blend composite) stays completely unaware anything special happened.
+    ///
+    /// Splits the layer's items into ordered RUNS — a run is either a
+    /// stretch of consecutive plain items, or a single item that has its
+    /// own effects — and paints/composites each run in turn onto
+    /// element_build_a/b (ping-ponging), preserving the layer's original
+    /// paint order exactly as if every item had painted into one ordinary
+    /// Scene. A plain run is rendered straight into blend_layer_view
+    /// (reused here as scratch — safe because apply_effect_stack below
+    /// only reads it as a one-shot `source`, never after starting its own
+    /// separate effect_stack_a/b ping-pong) and composited unchanged; an
+    /// effected item is ALSO rendered alone into blend_layer_view first,
+    /// then run through apply_effect_stack (that function's own ping-pong,
+    /// effect_stack_a/b — distinct textures, no aliasing with
+    /// element_build_a/b) before being composited.
+    fn paint_layer_with_element_effects(&mut self, layer: &LayerIn, view_tf: Affine) -> Result<(), JsValue> {
+        let layer_params = RenderParams { base_color: Color::TRANSPARENT, width: self.width, height: self.height, antialiasing_method: AaConfig::Area };
+        let n = layer.items.len();
+        clear_texture(&self.device, &self.queue, &self.element_build_a_view, wgpu::Color::TRANSPARENT);
+        let mut accum_is_a = true;
+        let mut first_run = true;
+        let mut i = 0;
+        while i < n {
+            let has_fx = layer.items[i].effects.iter().any(|e| e.enabled);
+            let end = if has_fx {
+                i + 1
+            } else {
+                let mut j = i + 1;
+                while j < n && !layer.items[j].effects.iter().any(|e| e.enabled) {
+                    j += 1;
+                }
+                j
+            };
+            let mut scene = Scene::new();
+            self.push_atlas_keepalive(&mut scene);
+            paint_layer_items(&mut scene, &layer.items[i..end], view_tf, &self.images);
+            self.renderer
+                .render_to_texture(&self.device, &self.queue, &scene, &self.blend_layer_view, &layer_params)
+                .map_err(|e| JsValue::from_str(&format!("render_to_texture failed: {e:?}")))?;
+            let (run_source, run_source_tex): (&wgpu::TextureView, &wgpu::Texture) = if has_fx {
+                let in_a = self.apply_effect_stack(&self.blend_layer_view, &layer.items[i].effects);
+                if in_a { (&self.effect_stack_a_view, &self.effect_stack_a_tex) } else { (&self.effect_stack_b_view, &self.effect_stack_b_tex) }
+            } else {
+                (&self.blend_layer_view, &self.blend_layer_tex)
+            };
+            if first_run {
+                // First run: nothing to composite ONTO yet — element_build_a
+                // is already cleared to transparent above, so just copy
+                // this run's own result in as the starting accumulator.
+                let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("element-fx-first-run-copy") });
+                let dst_tex = if accum_is_a { &self.element_build_a_tex } else { &self.element_build_b_tex };
+                encoder.copy_texture_to_texture(
+                    run_source_tex.as_image_copy(),
+                    dst_tex.as_image_copy(),
+                    wgpu::Extent3d { width: self.width, height: self.height, depth_or_array_layers: 1 },
+                );
+                self.queue.submit(Some(encoder.finish()));
+                first_run = false;
+            } else {
+                let (backdrop_view, target_view) =
+                    if accum_is_a { (&self.element_build_a_view, &self.element_build_b_view) } else { (&self.element_build_b_view, &self.element_build_a_view) };
+                composite_pass(
+                    &self.device, &self.queue, &self.blend_pipeline, &self.blend_bind_group_layout, &self.blend_sampler, &self.blend_uniform_buf,
+                    backdrop_view, run_source, 0, target_view,
+                );
+                accum_is_a = !accum_is_a;
+            }
+            i = end;
+        }
+        let final_tex = if accum_is_a { &self.element_build_a_tex } else { &self.element_build_b_tex };
+        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("element-fx-final-copy") });
+        encoder.copy_texture_to_texture(
+            final_tex.as_image_copy(),
+            self.blend_layer_tex.as_image_copy(),
+            wgpu::Extent3d { width: self.width, height: self.height, depth_or_array_layers: 1 },
+        );
+        self.queue.submit(Some(encoder.finish()));
+        Ok(())
+    }
+
     fn composite_scene(&mut self, scene_in: &SceneIn, view_tf: Affine, base_color: Color) -> Result<(), JsValue> {
         let n = scene_in.layers.len();
         let mut is_matte_source = vec![false; n];
@@ -2234,13 +2365,15 @@ impl VelloEngine {
         }
         let has_matte = is_matte_source.iter().any(|&b| b);
         let has_blend = scene_in.layers.iter().any(|l| mix_mode_index(l.blend_mode.as_deref()) != 0);
-        let has_effects_stack = scene_in.layers.iter().any(|l| l.effects.iter().any(|e| e.enabled));
+        let has_effects_stack = scene_in.layers.iter().any(|l| {
+            l.effects.iter().any(|e| e.enabled) || l.items.iter().any(|it| it.effects.iter().any(|e| e.enabled))
+        });
         let has_effect = scene_in.layers.iter().any(|l| l.is_effect_layer.unwrap_or(false));
         if !has_blend && !has_matte && !has_effects_stack && !has_effect {
             let mut scene = Scene::new();
             self.push_atlas_keepalive(&mut scene);
             for layer in &scene_in.layers {
-                paint_layer_items(&mut scene, layer, view_tf, &self.images);
+                paint_layer_items(&mut scene, &layer.items, view_tf, &self.images);
             }
             let params = RenderParams { base_color, width: self.width, height: self.height, antialiasing_method: AaConfig::Area };
             self.renderer
@@ -2296,19 +2429,23 @@ impl VelloEngine {
                 accum_is_a = !accum_is_a;
                 continue;
             }
-            let mut scene = Scene::new();
-            self.push_atlas_keepalive(&mut scene);
-            paint_layer_items(&mut scene, layer, view_tf, &self.images);
-            self.renderer
-                .render_to_texture(&self.device, &self.queue, &scene, &self.blend_layer_view, &layer_params)
-                .map_err(|e| JsValue::from_str(&format!("render_to_texture failed: {e:?}")))?;
+            if layer.items.iter().any(|it| it.effects.iter().any(|e| e.enabled)) {
+                self.paint_layer_with_element_effects(layer, view_tf)?;
+            } else {
+                let mut scene = Scene::new();
+                self.push_atlas_keepalive(&mut scene);
+                paint_layer_items(&mut scene, &layer.items, view_tf, &self.images);
+                self.renderer
+                    .render_to_texture(&self.device, &self.queue, &scene, &self.blend_layer_view, &layer_params)
+                    .map_err(|e| JsValue::from_str(&format!("render_to_texture failed: {e:?}")))?;
+            }
 
             let mut source_view: &wgpu::TextureView = if let Some((mode, invert)) = matte_mode_of(layer.matte_mode.as_deref()) {
                 // i+1 exists whenever matte_mode_of returned Some (see the
                 // is_matte_source precompute above, same condition).
                 let mut matte_scene = Scene::new();
                 self.push_atlas_keepalive(&mut matte_scene);
-                paint_layer_items(&mut matte_scene, &scene_in.layers[i + 1], view_tf, &self.images);
+                paint_layer_items(&mut matte_scene, &scene_in.layers[i + 1].items, view_tf, &self.images);
                 self.renderer
                     .render_to_texture(&self.device, &self.queue, &matte_scene, &self.matte_source_view, &layer_params)
                     .map_err(|e| JsValue::from_str(&format!("render_to_texture failed: {e:?}")))?;
@@ -2640,6 +2777,12 @@ impl VelloEngine {
         let (effect_stack_b_tex, effect_stack_b_view) = create_blend_accum_texture(&self.device, width, height, "effect-stack-b");
         self.effect_stack_b_tex = effect_stack_b_tex;
         self.effect_stack_b_view = effect_stack_b_view;
+        let (element_build_a_tex, element_build_a_view) = create_blend_accum_texture(&self.device, width, height, "element-build-a");
+        self.element_build_a_tex = element_build_a_tex;
+        self.element_build_a_view = element_build_a_view;
+        let (element_build_b_tex, element_build_b_view) = create_blend_accum_texture(&self.device, width, height, "element-build-b");
+        self.element_build_b_tex = element_build_b_tex;
+        self.element_build_b_view = element_build_b_view;
     }
 
     /// Registers (or re-registers, if `key` already exists — e.g. the
