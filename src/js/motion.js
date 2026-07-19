@@ -2135,6 +2135,26 @@
     var row = document.createElement('div'); row.className = 'frow motion-track-row';
     trackRowHtml(holder, prop, row);
     grid.appendChild(row);
+    // Bug found live (2026-07 — "problème d'alignement de clé par rapport
+    // aux properties"): renderTransformGroup (the #layer-list/#motion-props-
+    // body panel) inserts an EXTRA row right here when this prop's ƒx
+    // expression editor is open (buildExprEditorRow) — this grid side never
+    // had an equivalent row, so every row below the open editor silently
+    // shifted down by one relative to its own keyframe track, exactly the
+    // "same alignment-invariant" class of bug ROW_H's header comment warns
+    // about. The editor is a variable-height textarea (not a fixed ROW_H
+    // row like everything else here), so instead of hardcoding a height,
+    // read the ACTUAL rendered height off #layer-list's copy — it always
+    // exists whenever this flag is set (renderTransformGroup renders it
+    // into every container it's called for, panel AND mirror alike), and
+    // renderLayerList() always runs before renderTimeline() in every call
+    // site in this file, so it's guaranteed already up to date by now.
+    if (window._exprEditorOpen && window._exprEditorOpen.holder === holder && window._exprEditorOpen.prop === prop) {
+      var refRow = document.querySelector('#layer-list .motion-expr-editor');
+      var spacer = document.createElement('div'); spacer.className = 'frow motion-track-spacer';
+      spacer.style.height = (refRow ? refRow.getBoundingClientRect().height : 90) + 'px';
+      grid.appendChild(spacer);
+    }
   }
   function renderTimelineMotion(grid) {
     var order = (typeof computeLayerRenderOrder === 'function') ? computeLayerRenderOrder() : state.layers.map(function (_l, i) { return { type: 'layer', idx: i }; });
@@ -2163,6 +2183,20 @@
           grid.appendChild(elSpacer);
           if (!elExpanded) return;
           var elHolder = ensureElementHolder(ld, entry.strokeId);
+          // Bug found live (2026-07 — "problème d'alignement de clé par
+          // rapport aux properties"): renderElementsList calls
+          // renderTransformGroup(list, elHolder, 'Transform (élément)') here,
+          // which appends its OWN group-header row before looping PROPS —
+          // this grid side went straight into PROPS.forEach with no matching
+          // header spacer, so every row of THIS element (and everything
+          // after it) was permanently off by one from its own keyframe
+          // track. Confirmed via a single-snapshot DOM measurement: grid's
+          // row at this position had class 'motion-track-row' (a real
+          // track) while list's had 'motion-group-row' (a header) — same
+          // "extra row on one side only" bug class as the Fill-row fix
+          // above, just at the element level instead of the shape level.
+          var elGrpSpacer = document.createElement('div'); elGrpSpacer.className = 'frow';
+          grid.appendChild(elGrpSpacer);
           PROPS.forEach(function (prop) { renderTracksFor(grid, elHolder, prop); });
           // Path group (mirrors renderElementsList's renderPathVertexGroup
           // exactly — same expand condition, same vertex count, same
@@ -2174,6 +2208,14 @@
               for (var vi = 0; vi < entry.sd.segments.length; vi++) renderTracksFor(grid, elHolder, 'vtx' + vi);
             }
           }
+          // Fill color (mirrors renderElementsList's renderFillColorRow call
+          // exactly — same condition). Bug found live (2026-07 —
+          // "problème d'alignement de clé par rapport aux properties"):
+          // this call was missing entirely, so #layer-list had one MORE row
+          // than #frame-grid for any shape with a fill — every row further
+          // down (a later Forme's own Transform/Path/Fill rows) drifted out
+          // of alignment with its own keyframe track from that point on.
+          if (entry.sd.fillColor) renderTracksFor(grid, elHolder, 'fillColor');
         });
       }
     });
