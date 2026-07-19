@@ -25,46 +25,52 @@
   // the UI-displayed value down to the stored p1..p4 value (e.g. a 0-100
   // UI percentage stored as 0-1) — same convention used throughout this
   // app's other numeric fields (brightness/contrast/opacity, etc).
+  // `label` holds an i18n KEY (not resolved text) — this config object is
+  // built once at script-parse time, before i18n.js's initLanguage() has
+  // even run (DOMContentLoaded), so baking window.SM.t() results in here
+  // would freeze every param label to i18n's pre-init 'fr' fallback
+  // regardless of the user's actual saved language. Resolved via
+  // window.SM.t(p.label) at render time instead (renderParamsFor below).
   var EFFECT_PARAM_CONFIG = {
-    blur: [{ key: 'p1', label: 'Rayon', min: 0, max: 200, step: 1, scale: 1, unit: 'px' }],
+    blur: [{ key: 'p1', label: 'fxParamRadius', min: 0, max: 200, step: 1, scale: 1, unit: 'px' }],
     colorAdjust: [
-      { key: 'p1', label: 'Luminosité', min: -100, max: 100, step: 1, scale: 100, unit: '' },
-      { key: 'p2', label: 'Contraste', min: -100, max: 100, step: 1, scale: 100, unit: '' },
+      { key: 'p1', label: 'fxParamBrightness', min: -100, max: 100, step: 1, scale: 100, unit: '' },
+      { key: 'p2', label: 'fxParamContrast', min: -100, max: 100, step: 1, scale: 100, unit: '' },
     ],
     vignette: [
-      { key: 'p1', label: 'Intensité', min: 0, max: 100, step: 1, scale: 100, unit: '%' },
-      { key: 'p2', label: 'Étendue', min: 0, max: 95, step: 1, scale: 100, unit: '%' },
+      { key: 'p1', label: 'fxParamIntensity', min: 0, max: 100, step: 1, scale: 100, unit: '%' },
+      { key: 'p2', label: 'fxParamSpread', min: 0, max: 95, step: 1, scale: 100, unit: '%' },
     ],
-    glow: [{ key: 'p1', label: 'Rayon', min: 0, max: 200, step: 1, scale: 1, unit: 'px' }],
+    glow: [{ key: 'p1', label: 'fxParamRadius', min: 0, max: 200, step: 1, scale: 1, unit: 'px' }],
     sepia: [], invert: [], grayscale: [],
-    posterize: [{ key: 'p1', label: 'Niveaux', min: 2, max: 32, step: 1, scale: 1, unit: '' }],
-    pixelate: [{ key: 'p1', label: 'Taille bloc', min: 2, max: 64, step: 1, scale: 1, unit: 'px' }],
-    chromaticAberration: [{ key: 'p1', label: 'Intensité', min: 0, max: 20, step: 1, scale: 1, unit: 'px' }],
+    posterize: [{ key: 'p1', label: 'fxParamLevels', min: 2, max: 32, step: 1, scale: 1, unit: '' }],
+    pixelate: [{ key: 'p1', label: 'fxParamBlockSize', min: 2, max: 64, step: 1, scale: 1, unit: 'px' }],
+    chromaticAberration: [{ key: 'p1', label: 'fxParamIntensity', min: 0, max: 20, step: 1, scale: 1, unit: 'px' }],
     scanlines: [
-      { key: 'p1', label: 'Fréquence', min: 20, max: 480, step: 10, scale: 1, unit: '' },
-      { key: 'p2', label: 'Intensité', min: 0, max: 100, step: 1, scale: 100, unit: '%' },
+      { key: 'p1', label: 'fxParamFrequency', min: 20, max: 480, step: 10, scale: 1, unit: '' },
+      { key: 'p2', label: 'fxParamIntensity', min: 0, max: 100, step: 1, scale: 100, unit: '%' },
     ],
-    grain: [{ key: 'p1', label: 'Intensité', min: 0, max: 100, step: 1, scale: 100, unit: '%' }],
-    sharpen: [{ key: 'p1', label: 'Intensité', min: 0, max: 200, step: 1, scale: 100, unit: '%' }],
-    edgeDetect: [{ key: 'p1', label: 'Intensité', min: 0, max: 20, step: 1, scale: 1, unit: '' }],
+    grain: [{ key: 'p1', label: 'fxParamIntensity', min: 0, max: 100, step: 1, scale: 100, unit: '%' }],
+    sharpen: [{ key: 'p1', label: 'fxParamIntensity', min: 0, max: 200, step: 1, scale: 100, unit: '%' }],
+    edgeDetect: [{ key: 'p1', label: 'fxParamIntensity', min: 0, max: 20, step: 1, scale: 1, unit: '' }],
     threshold: [
-      { key: 'p1', label: 'Seuil', min: 0, max: 100, step: 1, scale: 100, unit: '%' },
-      { key: 'p2', label: 'Adoucissement', min: 0, max: 50, step: 1, scale: 100, unit: '%' },
+      { key: 'p1', label: 'fxParamThreshold', min: 0, max: 100, step: 1, scale: 100, unit: '%' },
+      { key: 'p2', label: 'fxParamSoftness', min: 0, max: 50, step: 1, scale: 100, unit: '%' },
     ],
     halftone: [
-      { key: 'p1', label: 'Taille cellule', min: 2, max: 40, step: 1, scale: 1, unit: 'px' },
-      { key: 'p2', label: 'Intensité', min: 0, max: 100, step: 1, scale: 100, unit: '%' },
+      { key: 'p1', label: 'fxParamCellSize', min: 2, max: 40, step: 1, scale: 1, unit: 'px' },
+      { key: 'p2', label: 'fxParamIntensity', min: 0, max: 100, step: 1, scale: 100, unit: '%' },
     ],
     // layerOnly (see EFFECT_CATEGORIES) — needs the layer's own isolated
     // alpha silhouette, same constraint as groundShadow below.
     contourBrut: [
-      { key: 'p1', label: 'Épaisseur', min: 0.5, max: 20, step: 0.5, scale: 1, unit: 'px' },
-      { key: 'p2', label: 'Rugosité', min: 0, max: 100, step: 1, scale: 100, unit: '%' },
-      { key: 'p3', label: 'Luminosité', min: 0, max: 100, step: 1, scale: 100, unit: '%' },
-      { key: 'p4', label: 'Opacité', min: 0, max: 100, step: 1, scale: 100, unit: '%' },
+      { key: 'p1', label: 'fxParamThickness', min: 0.5, max: 20, step: 0.5, scale: 1, unit: 'px' },
+      { key: 'p2', label: 'fxParamRoughness', min: 0, max: 100, step: 1, scale: 100, unit: '%' },
+      { key: 'p3', label: 'fxParamBrightness', min: 0, max: 100, step: 1, scale: 100, unit: '%' },
+      { key: 'p4', label: 'fxParamOpacity', min: 0, max: 100, step: 1, scale: 100, unit: '%' },
     ],
     groundShadow: [
-      { key: 'p1', label: 'Inclinaison', min: -3, max: 3, step: 0.05, scale: 1, unit: '' },
+      { key: 'p1', label: 'fxParamTilt', min: -3, max: 3, step: 0.05, scale: 1, unit: '' },
       // max capped at 90 (not 100) — feedback: "l'effet ombre au sol ne
       // marche pas j'ai l'impression". At 100% the ground line sits
       // exactly on the canvas' last row, leaving ZERO room below it for
@@ -73,9 +79,9 @@
       // LOOKS broken: the slider still moves, nothing ever appears).
       // Capping at 90 guarantees at least a sliver of canvas is always
       // available for the shadow, regardless of Longueur.
-      { key: 'p2', label: 'Sol (Y)', min: 0, max: 90, step: 1, scale: 100, unit: '%' },
-      { key: 'p3', label: 'Longueur', min: 0.1, max: 4, step: 0.05, scale: 1, unit: '×' },
-      { key: 'p4', label: 'Opacité', min: 0, max: 100, step: 1, scale: 100, unit: '%' },
+      { key: 'p2', label: 'fxParamGroundY', min: 0, max: 90, step: 1, scale: 100, unit: '%' },
+      { key: 'p3', label: 'fxParamLength', min: 0.1, max: 4, step: 0.05, scale: 1, unit: '×' },
+      { key: 'p4', label: 'fxParamOpacity', min: 0, max: 100, step: 1, scale: 100, unit: '%' },
     ],
   };
   var EFFECT_DEFAULTS = {
@@ -94,28 +100,41 @@
     // moment it's added instead of requiring manual tuning to find it.
     groundShadow: [0, 0.62, 0.6, 0.65],
   };
-  // Also read by renderLayerList's FX badge (timeline.js) via window.EFFECT_LABELS.
-  var EFFECT_LABELS = {
-    blur: 'Flou', colorAdjust: 'Teinte/Contraste', vignette: 'Vignette', glow: 'Glow',
-    sepia: 'Sépia', invert: 'Inverser', grayscale: 'Niveaux de gris', posterize: 'Postériser',
-    pixelate: 'Pixelliser', chromaticAberration: 'Aberration chromatique', scanlines: 'Lignes de balayage',
-    grain: 'Grain film', sharpen: 'Netteté', edgeDetect: 'Détection de contours', groundShadow: 'Ombre au sol',
-    threshold: 'Seuil (N&B)', halftone: 'Trame (halftone)', contourBrut: 'Contour brut',
+  // Effect type -> i18n key (not resolved text, same reasoning as
+  // EFFECT_PARAM_CONFIG's `label` above). Also read by renderLayerList's FX
+  // badge (timeline.js) via window.EFFECT_LABELS — exposed as a Proxy so
+  // that consumer's plain `fxLabels[type]` property reads stay a live
+  // lookup (resolved in the CURRENT language at access time) rather than a
+  // snapshot frozen at whatever language was active when this script parsed.
+  var EFFECT_LABEL_KEYS = {
+    blur: 'fxTypeBlur', colorAdjust: 'fxTypeColorAdjust', vignette: 'fxTypeVignette', glow: 'fxTypeGlow',
+    sepia: 'fxTypeSepia', invert: 'fxTypeInvert', grayscale: 'fxTypeGrayscale', posterize: 'fxTypePosterize',
+    pixelate: 'fxTypePixelate', chromaticAberration: 'fxTypeChromaticAberration', scanlines: 'fxTypeScanlines',
+    grain: 'fxTypeGrain', sharpen: 'fxTypeSharpen', edgeDetect: 'fxTypeEdgeDetect', groundShadow: 'fxTypeGroundShadow',
+    threshold: 'fxTypeThreshold', halftone: 'fxTypeHalftone', contourBrut: 'fxTypeContourBrut',
   };
+  var EFFECT_LABELS = new Proxy({}, {
+    get: function (target, type) {
+      var key = EFFECT_LABEL_KEYS[type];
+      return key ? window.SM.t(key) : undefined;
+    },
+  });
   window.EFFECT_LABELS = EFFECT_LABELS;
   // Grouped like After Effects' own Effects menu (Blur & Sharpen, Color
   // Correction, Stylize, Distort, Generate) — rendered as a categorized
   // flyout with a preview swatch per effect (buildAddEffectMenu below).
   // `layerOnly` categories (Ombres, Contours) are omitted from the menu
   // entirely for effect/adjustment layers — see engine.rs's LayerIn::effects
-  // doc comment for why those effects only make sense per-layer.
+  // doc comment for why those effects only make sense per-layer. `label` is
+  // an i18n key, resolved at render time in openAddMenu (same reasoning as
+  // EFFECT_PARAM_CONFIG's `label` above).
   var EFFECT_CATEGORIES = [
-    { label: 'Flou & Netteté', types: ['blur', 'sharpen'] },
-    { label: 'Couleur', types: ['colorAdjust', 'grayscale', 'sepia', 'posterize', 'invert', 'threshold'] },
-    { label: 'Stylisation', types: ['vignette', 'glow', 'edgeDetect', 'grain', 'scanlines', 'halftone'] },
-    { label: 'Distorsion', types: ['pixelate', 'chromaticAberration'] },
-    { label: 'Contours', types: ['contourBrut'], layerOnly: true },
-    { label: 'Ombres', types: ['groundShadow'], layerOnly: true },
+    { label: 'fxCatBlurSharpen', types: ['blur', 'sharpen'] },
+    { label: 'fxCatColor', types: ['colorAdjust', 'grayscale', 'sepia', 'posterize', 'invert', 'threshold'] },
+    { label: 'fxCatStylize', types: ['vignette', 'glow', 'edgeDetect', 'grain', 'scanlines', 'halftone'] },
+    { label: 'fxCatDistort', types: ['pixelate', 'chromaticAberration'] },
+    { label: 'fxCatContours', types: ['contourBrut'], layerOnly: true },
+    { label: 'fxCatShadows', types: ['groundShadow'], layerOnly: true },
   ];
 
   var expandedIdx = -1; // which row (if any) is showing its param editor
@@ -219,7 +238,7 @@
       if (isAdjustment && cat.layerOnly) return;
       var row = document.createElement('div');
       row.className = 'fx-addmenu-cat';
-      row.innerHTML = '<span>' + cat.label + '</span><span class="fx-addmenu-arrow">›</span>';
+      row.innerHTML = '<span>' + window.SM.t(cat.label) + '</span><span class="fx-addmenu-arrow">›</span>';
       var open = function () {
         openSubmenu(row, cat.types.map(function (type) {
           return { label: EFFECT_LABELS[type] || type, preview: type, action: function () { addEffect(type); } };
@@ -233,7 +252,7 @@
     // state.customEffects, plus a fixed entry to open the authoring modal.
     var customRow = document.createElement('div');
     customRow.className = 'fx-addmenu-cat';
-    customRow.innerHTML = '<span>Custom</span><span class="fx-addmenu-arrow">›</span>';
+    customRow.innerHTML = '<span>' + window.SM.t('fxCatCustom') + '</span><span class="fx-addmenu-arrow">›</span>';
     var openCustom = function () {
       var items = (state.customEffects || []).map(function (c) {
         return { label: c.name, preview: null, action: function () { addEffect('custom:' + c.id); } };
@@ -298,7 +317,7 @@
     }
     cfg.forEach(function (p) {
       var line = document.createElement('div'); line.className = 'fx-row-param';
-      var label = document.createElement('span'); label.className = 'pl'; label.textContent = p.label;
+      var label = document.createElement('span'); label.className = 'pl'; label.textContent = window.SM.t(p.label);
       var input = document.createElement('input');
       input.type = 'number'; input.className = 'pi scrub';
       input.min = p.min; input.max = p.max; input.dataset.step = p.step;
