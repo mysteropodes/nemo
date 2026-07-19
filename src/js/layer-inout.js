@@ -137,7 +137,7 @@
     segs.forEach(function (seg) {
       var dot = document.createElement('div'); dot.className = 'layer-inout-segdot';
       dot.style.left = ((seg.end - inF) * FC) + 'px';
-      dot.title = 'Keyframe vide — frame ' + (seg.end + 1);
+      dot.title = window.SM.t('layerInoutEmptyKeyTitle').replace('{n}', seg.end + 1);
       bar.appendChild(dot);
     });
   }
@@ -168,7 +168,7 @@
         var tick = document.createElement('div');
         tick.className = 'layer-inout-key';
         tick.style.left = ((frameIdx - inF) * FC) + 'px';
-        tick.title = 'Keyframe — frame ' + (frameIdx + 1) + ' (glisser pour retimer)';
+        tick.title = window.SM.t('layerInoutKeyTitle').replace('{n}', frameIdx + 1);
         bar.appendChild(tick);
         tick.addEventListener('mousedown', function (e) { onKeyDown(li, row, bar, tick, frameIdx, e); });
       })(f);

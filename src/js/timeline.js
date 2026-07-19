@@ -317,7 +317,7 @@ window.SM={
   // wants a plain wrap-to-start loop keeps that as the default single
   // click. Ping-pong only has an effect while loop itself is on (see
   // startPlay's interval) — implied on when picked, doesn't force loop off.
-  togglePingPongPlayback:function(){state.pingPongPlayback=!state.pingPongPlayback;if(state.pingPongPlayback)state.loopPlayback=true;var b=document.getElementById('btn-loop');if(b){b.classList.toggle('active',state.loopPlayback);b.classList.toggle('pingpong',state.pingPongPlayback);b.title=state.pingPongPlayback?'Loop playback — ping-pong (clic droit pour désactiver)':'Loop playback (work area) — clic droit pour ping-pong';}showToast(state.pingPongPlayback?'Lecture ping-pong activée':'Lecture ping-pong désactivée');},
+  togglePingPongPlayback:function(){state.pingPongPlayback=!state.pingPongPlayback;if(state.pingPongPlayback)state.loopPlayback=true;var b=document.getElementById('btn-loop');if(b){b.classList.toggle('active',state.loopPlayback);b.classList.toggle('pingpong',state.pingPongPlayback);b.title=SM.t(state.pingPongPlayback?'loopPingPongTitle':'loopWorkAreaTitle');}showToast(SM.t(state.pingPongPlayback?'toastPingPongOn':'toastPingPongOff'));},
   setPointType:setPointType,booleanOp:booleanOp,
   generateTweens:generateTweens,insertFrame:insertFrame,insertKeyframe:insertKeyframe,insertBlankKeyframe:insertBlankKeyframe,removeFrame:removeFrame,
   clearKeyframe:clearKeyframe,convertToKeyframes:convertToKeyframes,removeFrameSpan:removeFrameSpan,duplicateSelectedFrames:duplicateSelectedFrames,
@@ -1144,7 +1144,7 @@ function updateUI(){
   syncDocFields();
   var strokes=getEffectiveStrokes(state.activeLayerIdx,state.currentFrame);
   document.getElementById('info-frame').textContent=state.currentFrame+1;
-  document.getElementById('info-strokes').textContent=strokes.length+' trait'+(strokes.length!==1?'s':'');
+  document.getElementById('info-strokes').textContent=(window.SM&&SM.t?SM.t(strokes.length===1?'strokeCountOne':'strokeCountOther'):(strokes.length+' trait'+(strokes.length!==1?'s':''))).replace('{n}',strokes.length);
   document.getElementById('tl-cf').textContent=state.currentFrame+1;
   document.getElementById('tl-tf').textContent=state.totalFrames;
   var f=state.layers[state.activeLayerIdx].frames[state.currentFrame];
@@ -1152,7 +1152,7 @@ function updateUI(){
   if(f&&f.isKeyframe){badge.style.display='inline-block';badge.className='badge key';badge.textContent='KEY';}
   else if(f&&f.isInterpolated){badge.style.display='inline-block';badge.className='badge tw';badge.textContent='TWEEN';}
   else badge.style.display='none';
-  document.getElementById('info-sel').textContent=state.tool==='select'&&selectedPaths.length>0?selectedPaths.length+' selected':'';
+  document.getElementById('info-sel').textContent=state.tool==='select'&&selectedPaths.length>0?selectedPaths.length+' '+SM.t('selCountSuffix'):'';
   window._totalF=state.totalFrames;window._waIn=state.waIn;window._waOut=state.waOut;window._curFrame=state.currentFrame;
   window.updateWaBar();window.updateOmMarkers(state.currentFrame,state.totalFrames);
   renderTimeline();renderLayerList();updateCompInstancePanel();updateSelPropsPanel();updateFsSelPanel();updateRevisionPanel();updateTextActionsPanel();updateEffectLayerPanel();updatePropsContext();
@@ -1227,27 +1227,31 @@ function openPropsSection(id){
 // first: a canvas selection (shape/point) > a timeline keyframe selection
 // > the active tool's own help > the original generic frame cheat-sheet
 // as the fallback with nothing more specific going on.
-var TOOL_HELP={
-  select:{desc:'Sélection — clique ou entoure pour sélectionner, glisse les poignées pour transformer.',sc:[['V','Outil'],['Shift+clic','Ajouter'],['Alt+glisser','Déplacer l\'ancrage'],['Suppr','Effacer']]},
-  subselect:{desc:'Sous-sélection — édite les points d\'ancrage et leurs tangentes.',sc:[['A','Outil'],['Alt+clic','Casser tangente']]},
-  fsselect:{desc:'Sélection fill/stroke — clique une zone remplie ou un segment de trait précis.',sc:[['Shift+clic','Ajouter']]},
-  draw:{desc:'Pinceau — dessine un trait.',sc:[['B','Outil'],['Alt+glisser','Taille'],['[ ]','Taille ±']]},
-  pen:{desc:'Plume — place des ancres, glisse pour une poignée de courbe.',sc:[['P','Outil'],['Clic','Ancre'],['Échap','Terminer']]},
-  line:{desc:'Ligne — glisse pour tracer un segment droit.',sc:[['Shift','Angle 45°']]},
-  rect:{desc:'Rectangle — glisse pour dessiner.',sc:[['Shift','Carré']]},
-  ellipse:{desc:'Ellipse — glisse pour dessiner.',sc:[['Shift','Cercle']]},
-  fill:{desc:'Pot de peinture — clique une zone fermée pour la remplir.',sc:[['Alt+glisser','Trait de fermeture'],['Shift+clic','Retirer le fill'],['Échap','Annuler le trait']]},
-  fillbrush:{desc:'Pinceau de remplissage — peint directement une forme pleine, sans contour.',sc:[]},
-  eraser:{desc:'Gomme — glisse sur un trait ou un fill pour effacer une zone.',sc:[['E','Outil'],['[ ]','Taille ±']]},
-  eyedropper:{desc:'Pipette — clique une couleur du canvas pour la prélever.',sc:[['I','Outil']]},
-  hand:{desc:'Main — glisse pour déplacer la vue.',sc:[['Espace','Maintenir temporairement']]},
-  zoom:{desc:'Zoom — clique pour zoomer, Alt+clic pour dézoomer.',sc:[['Z','Outil']]},
-  rotate:{desc:'Rotation de la vue — glisse pour tourner le canvas (pas le contenu).',sc:[['Alt+glisser','Sur un autre outil']]},
-  camera:{desc:'Caméra — glisse le cadre pour cadrer, clic-droit pour la courbe d\'accélération.',sc:[['Clic-droit','Courbe d\'easing']]},
-  comment:{desc:'Commentaire — clique pour laisser une note à cet endroit.',sc:[]},
-  text:{desc:'Texte — clique pour placer un champ de texte.',sc:[]},
-  perspective:{desc:'Guide de perspective.',sc:[]},
-};
+function getToolHelp(tool){
+  var tt=(window.SM&&SM.t)?SM.t:function(k){return k;};
+  var TOOL_HELP={
+    select:{desc:tt('thSelectDesc'),sc:[['V',tt('thTool')],['Shift+clic',tt('thAdd')],['Alt+glisser',tt('thMoveAnchor')],['Suppr',tt('thErase')]]},
+    subselect:{desc:tt('thSubselectDesc'),sc:[['A',tt('thTool')],['Alt+clic',tt('thBreakTangent')]]},
+    fsselect:{desc:tt('thFsselectDesc'),sc:[['Shift+clic',tt('thAdd')]]},
+    draw:{desc:tt('thDrawDesc'),sc:[['B',tt('thTool')],['Alt+glisser',tt('thSize')],['[ ]',tt('thSizePlusMinus')]]},
+    pen:{desc:tt('thPenDesc'),sc:[['P',tt('thTool')],['Clic',tt('thAnchor')],['Échap',tt('thFinish')]]},
+    line:{desc:tt('thLineDesc'),sc:[['Shift',tt('thAngle45')]]},
+    rect:{desc:tt('thRectDesc'),sc:[['Shift',tt('thSquare')]]},
+    ellipse:{desc:tt('thEllipseDesc'),sc:[['Shift',tt('thCircle')]]},
+    fill:{desc:tt('thFillDesc'),sc:[['Alt+glisser',tt('thClosingStroke')],['Shift+clic',tt('thRemoveFill')],['Échap',tt('thCancelStroke')]]},
+    fillbrush:{desc:tt('thFillbrushDesc'),sc:[]},
+    eraser:{desc:tt('thEraserDesc'),sc:[['E',tt('thTool')],['[ ]',tt('thSizePlusMinus')]]},
+    eyedropper:{desc:tt('thEyedropperDesc'),sc:[['I',tt('thTool')]]},
+    hand:{desc:tt('thHandDesc'),sc:[['Espace',tt('thHoldTemp')]]},
+    zoom:{desc:tt('thZoomDesc'),sc:[['Z',tt('thTool')]]},
+    rotate:{desc:tt('thRotateDesc'),sc:[['Alt+glisser',tt('thOnOtherTool')]]},
+    camera:{desc:tt('thCameraDesc'),sc:[['Clic-droit',tt('thEasingCurve')]]},
+    comment:{desc:tt('thCommentDesc'),sc:[]},
+    text:{desc:tt('thTextDesc'),sc:[]},
+    perspective:{desc:tt('thPerspectiveDesc'),sc:[]},
+  };
+  return TOOL_HELP[tool];
+}
 function statusbarHelpRender(desc,sc){
   var el=document.getElementById('statusbar-help');
   if(!el)return;
@@ -1255,30 +1259,34 @@ function statusbarHelpRender(desc,sc){
   html+=sc.map(function(pair){return '<span class="sc">'+pair[0]+'</span>'+pair[1];}).join(' ');
   el.innerHTML=html;
 }
-var STATUSBAR_DEFAULT_SC=[['F5','Frame'],['F6','Key'],['F7','Blank'],['T','Tween'],['D','Dupli'],['F','Flip'],['X','Mirror'],['Enter','Play']];
+function getStatusbarDefaultSc(){
+  var tt=(window.SM&&SM.t)?SM.t:function(k){return k;};
+  return [['F5',tt('scFrame')],['F6',tt('scKey')],['F7',tt('scBlank')],['T',tt('scTween')],['D',tt('scDupli')],['F',tt('scFlip')],['X',tt('scMirror')],['Enter',tt('scPlay')]];
+}
 function updateStatusBarHelp(){
+  var tt=(window.SM&&SM.t)?SM.t:function(k){return k;};
   // 1. A canvas element is selected (select/subselect) — most specific.
   if((state.tool==='select'||state.tool==='subselect')&&typeof selectedPaths!=='undefined'&&selectedPaths.length>0){
     var n=selectedPaths.length;
-    statusbarHelpRender(n+(n>1?' éléments sélectionnés':' élément sélectionné')+' —',[['Suppr','Effacer'],['⌘/Ctrl+D','Dupliquer'],['↑↓←→','Déplacer'],['Échap','Désélectionner']]);
+    statusbarHelpRender(n+' '+tt(n>1?'thElementsSelected':'thElementSelected')+' —',[['Suppr',tt('thErase')],['⌘/Ctrl+D',tt('thDuplicate')],['↑↓←→',tt('thMove')],['Échap',tt('thDeselect')]]);
     return;
   }
   // 2. fsselect has an active fill/stroke pick.
   if(state.tool==='fsselect'&&typeof _fsSel!=='undefined'&&_fsSel){
-    statusbarHelpRender((_fsSel.kind==='stroke'?'Stroke':'Fill')+' sélectionné(e) —',[['Suppr','Effacer'],['Échap','Désélectionner']]);
+    statusbarHelpRender(tt(_fsSel.kind==='stroke'?'hdrStroke':'hdrFill')+' '+tt('thSelected')+' —',[['Suppr',tt('thErase')],['Échap',tt('thDeselect')]]);
     return;
   }
   // 3. A timeline keyframe cell (or span) is selected.
   if(typeof _sel!=='undefined'&&_sel.frames&&_sel.frames.length>0){
     var kn=_sel.frames.length;
-    statusbarHelpRender(kn+(kn>1?' images-clés sélectionnées':' image-clé sélectionnée')+' —',[['F6','Key'],['F7','Blank'],['T','Tween'],['D','Dupli'],['F','Flip'],['X','Mirror'],['Suppr','Effacer']]);
+    statusbarHelpRender(kn+' '+tt(kn>1?'thKeyframesSelected':'thKeyframeSelected')+' —',[['F6',tt('scKey')],['F7',tt('scBlank')],['T',tt('scTween')],['D',tt('scDupli')],['F',tt('scFlip')],['X',tt('scMirror')],['Suppr',tt('thErase')]]);
     return;
   }
   // 4. The active tool's own help.
-  var help=TOOL_HELP[state.tool];
+  var help=getToolHelp(state.tool);
   if(help){statusbarHelpRender(help.desc,help.sc);return;}
   // 5. Nothing more specific — original generic frame cheat-sheet.
-  statusbarHelpRender('',STATUSBAR_DEFAULT_SC);
+  statusbarHelpRender('',getStatusbarDefaultSc());
 }
 // Hovering a right-panel control (or timeline/layer toolbar button) shows
 // its native `title` in the status bar too — those tooltips already exist
@@ -1586,7 +1594,7 @@ function updateSelPropsPanel(){
       }
     }
   }
-  document.getElementById('sel-count').textContent=selectedPaths.length+(selectedPaths.length>1?' selected':' item');
+  document.getElementById('sel-count').textContent=selectedPaths.length+' '+SM.t(selectedPaths.length>1?'selCountSuffix':'selCountItemSuffix');
   var ax=document.activeElement;
   if(ax!==document.getElementById('sp-x'))document.getElementById('sp-x').value=Math.round(b.x);
   if(ax!==document.getElementById('sp-y'))document.getElementById('sp-y').value=Math.round(b.y);
@@ -3246,7 +3254,7 @@ function renderShortcutsList(){
     var keyBtn=document.createElement('button');
     keyBtn.className='pbtn';keyBtn.style.cssText='min-width:60px;font-family:monospace;text-transform:uppercase;';
     keyBtn.textContent=shortcutKeyFor(s.action);
-    keyBtn.title='Cliquer puis appuyer sur une touche';
+    keyBtn.title=SM.t('shortcutClickThenPressTitle');
     keyBtn.addEventListener('click',function(){
       keyBtn.textContent='…';keyBtn.classList.add('ac');
       function capture(ev){
@@ -3255,7 +3263,7 @@ function renderShortcutsList(){
         else{
           // reject a key already bound to a different tool action
           var clash=TOOL_SHORTCUTS.find(function(o){return o.action!==s.action&&shortcutKeyFor(o.action)===ev.key.toLowerCase();});
-          if(clash){showToast('Touche déjà utilisée par « '+clash.label+' »');keyBtn.textContent=shortcutKeyFor(s.action);}
+          if(clash){showToast(SM.t('shortcutKeyClashToast').replace('{label}',clash.label));keyBtn.textContent=shortcutKeyFor(s.action);}
           else{setShortcutKey(s.action,ev.key);keyBtn.textContent=ev.key.toLowerCase();}
         }
         keyBtn.classList.remove('ac');
@@ -3314,11 +3322,11 @@ function updateRecordUI(){
   var btn=document.getElementById('comment-record'),status=document.getElementById('comment-record-status');
   if(!btn)return;
   if(_recording){
-    btn.textContent='⏹ Arrêter l\'enregistrement';
+    btn.textContent=SM.t('commentStopRecordBtn');
     btn.classList.add('ac');
     if(status){status.style.display='block';status.textContent='🔴 Enregistrement en cours — change d\'outil et reproduis le problème, puis reviens ici cliquer Stop.';}
   }else{
-    btn.textContent='⏺ Enregistrer les actions';
+    btn.textContent=SM.t('commentRecordBtn');
     btn.classList.remove('ac');
     if(status){
       if(_recordedActionTrail||_recordedClickTrail){
@@ -3950,6 +3958,7 @@ function initAppMenu(){
   function clickEl(id){var el=document.getElementById(id);if(el)el.click();}
   btn.addEventListener('click',function(e){
     e.stopPropagation();
+    var tt=(window.SM&&SM.t)?SM.t:function(k){return k;};
     var r=btn.getBoundingClientRect();
     var items=[
       // Live current-project label (feedback 2026-07: the right-panel
@@ -3957,27 +3966,27 @@ function initAppMenu(){
       // in it either already had an entry here or is added below. This
       // disabled row replaces its old #proj-current text readout, the one
       // thing in that section with no action of its own.
-      {label:(window.SMProject&&window.SMProject.getCurrentLabel)?window.SMProject.getCurrentLabel():'Untitled (not saved)',disabled:true},
+      {label:(window.SMProject&&window.SMProject.getCurrentLabel)?window.SMProject.getCurrentLabel():tt('menuUntitledNotSaved'),disabled:true},
       {sep:true},
-      {label:'Nouveau projet',shortcut:'⌘N',action:function(){clickEl('project-tab-add');}},
-      {label:'Ouvrir…',shortcut:'⌘O',action:function(){if(window.SMProject)window.SMProject.open();}},
-      {label:'Enregistrer',shortcut:'⌘S',action:function(){if(window.SMProject)window.SMProject.save();}},
-      {label:'Enregistrer sous…',shortcut:'⇧⌘S',action:function(){if(window.SMProject)window.SMProject.saveAs();}},
-      {label:'Depuis Kitsu…',id:'ctx-kitsu-open',action:function(){clickEl('btn-kitsu-open');}},
-      {label:'Historique des versions…',id:'ctx-history',action:function(){clickEl('btn-history');}},
+      {label:tt('menuNewProject'),shortcut:'⌘N',action:function(){clickEl('project-tab-add');}},
+      {label:tt('menuOpen'),shortcut:'⌘O',action:function(){if(window.SMProject)window.SMProject.open();}},
+      {label:tt('menuSave'),shortcut:'⌘S',action:function(){if(window.SMProject)window.SMProject.save();}},
+      {label:tt('menuSaveAs'),shortcut:'⇧⌘S',action:function(){if(window.SMProject)window.SMProject.saveAs();}},
+      {label:tt('menuFromKitsu'),id:'ctx-kitsu-open',action:function(){clickEl('btn-kitsu-open');}},
+      {label:tt('menuVersionHistory'),id:'ctx-history',action:function(){clickEl('btn-history');}},
       {sep:true},
-      {label:'Importer image(s)…',action:function(){clickEl('btn-import-img');}},
-      {label:'Importer vidéo…',action:function(){clickEl('btn-import-video');}},
-      {label:'Importer PSD (calques)…',id:'ctx-import-psd',action:function(){clickEl('btn-import-psd');}},
-      {label:'Exporter…',id:'ctx-export',action:function(){clickEl('btn-export');}},
+      {label:tt('menuImportImg'),action:function(){clickEl('btn-import-img');}},
+      {label:tt('menuImportVideo'),action:function(){clickEl('btn-import-video');}},
+      {label:tt('menuImportPsd'),id:'ctx-import-psd',action:function(){clickEl('btn-import-psd');}},
+      {label:tt('menuExport'),id:'ctx-export',action:function(){clickEl('btn-export');}},
       {sep:true},
-      {label:'Réglages',action:function(){clickEl('btn-settings');}},
-      {label:'Raccourcis clavier',action:function(){
+      {label:tt('menuSettings'),action:function(){clickEl('btn-settings');}},
+      {label:tt('menuKeyboardShortcuts'),action:function(){
         clickEl('btn-settings');
         var t=document.querySelector('#settings-tabs .settings-tab[data-tab="shortcuts"]');
         if(t)t.click();
       }},
-      {label:'À propos de Nemo',action:function(){
+      {label:tt('menuAboutNemo'),action:function(){
         clickEl('btn-settings');
         var t=document.querySelector('#settings-tabs .settings-tab[data-tab="updates"]');
         if(t)t.click();
@@ -3990,7 +3999,7 @@ function initAppMenu(){
     var ks=window.SMKitsu&&window.SMKitsu.getCurrentShot&&window.SMKitsu.getCurrentShot();
     if(ks){
       items.splice(1,0,{label:'Kitsu: '+ks.projectName+(ks.sequenceName?' / '+ks.sequenceName:'')+' / '+ks.shotName+(ks.taskName?' ('+ks.taskName+')':''),disabled:true});
-      items.splice(2,0,{label:'Publier vers Kitsu',id:'ctx-kitsu-publish',action:function(){clickEl('btn-kitsu-publish');}});
+      items.splice(2,0,{label:tt('menuPublishToKitsu'),id:'ctx-kitsu-publish',action:function(){clickEl('btn-kitsu-publish');}});
     }
     window.showContextMenu(r.left,r.bottom+4,items);
   });

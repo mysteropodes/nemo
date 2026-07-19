@@ -520,7 +520,7 @@
     var wrap=document.getElementById('start-recent-list');if(!wrap)return;
     var list=getRecents();
     wrap.innerHTML='';
-    if(!list.length){wrap.innerHTML='<div class="start-empty">No recent projects yet</div>';return;}
+    if(!list.length){wrap.innerHTML='<div class="start-empty">'+window.SM.t('startNoRecents')+'</div>';return;}
     list.forEach(function(r){
       var row=document.createElement('div');row.className='start-recent-row';
       var icon=document.createElement('span');icon.className='start-recent-dot';
@@ -530,7 +530,7 @@
       var dims=r.canvasW?(r.canvasW+'×'+r.canvasH+' · '+r.fps+'fps · '):'';
       meta.textContent=dims+new Date(r.lastOpened).toLocaleDateString();
       info.appendChild(nm);info.appendChild(meta);
-      var x=document.createElement('div');x.className='start-recent-x';x.textContent='×';x.title='Remove from list';
+      var x=document.createElement('div');x.className='start-recent-x';x.textContent='×';x.title=window.SM.t('startRemoveFromList');
       x.addEventListener('click',function(e){e.stopPropagation();removeRecent(r.path);renderRecents();});
       row.appendChild(icon);row.appendChild(info);row.appendChild(x);
       row.addEventListener('click',function(){openPath(r.path);});

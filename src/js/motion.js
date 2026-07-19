@@ -1434,13 +1434,13 @@
         openLayerColorSwatches(cdot, ld.color || '#8b8b9e', function (hex) { ld.color = hex; cdot.style.setProperty('--dot-color', hex); renderTimeline(); });
       });
       row.appendChild(cdot);
-      var eye = document.createElement('div'); eye.className = 'lico' + (ld.visible ? '' : ' off'); eye.title = 'Show / hide layer'; eye.innerHTML = ld.visible ? ICO_EYE : ICO_EYE_CLOSED;
+      var eye = document.createElement('div'); eye.className = 'lico' + (ld.visible ? '' : ' off'); eye.title = SM.t('layerEyeTitle'); eye.innerHTML = ld.visible ? ICO_EYE : ICO_EYE_CLOSED;
       eye.addEventListener('click', function (e) { e.stopPropagation(); window.SM.toggleLayerVis(li); });
       row.appendChild(eye);
-      var lock = document.createElement('div'); lock.className = 'lico' + (ld.locked ? '' : ' off'); lock.title = 'Lock / unlock layer'; lock.innerHTML = ld.locked ? ICO_LOCK : ICO_UNLOCK;
+      var lock = document.createElement('div'); lock.className = 'lico' + (ld.locked ? '' : ' off'); lock.title = SM.t('layerLockTitle'); lock.innerHTML = ld.locked ? ICO_LOCK : ICO_UNLOCK;
       lock.addEventListener('click', function (e) { e.stopPropagation(); window.SM.toggleLayerLock(li); });
       row.appendChild(lock);
-      var solo = document.createElement('div'); solo.className = 'lico solo-btn' + (ld.solo ? ' on' : ' off'); solo.title = 'Solo layer (hide all others)'; solo.textContent = 'S';
+      var solo = document.createElement('div'); solo.className = 'lico solo-btn' + (ld.solo ? ' on' : ' off'); solo.title = SM.t('layerSoloTitle'); solo.textContent = 'S';
       solo.addEventListener('click', function (e) { e.stopPropagation(); window.SM.toggleLayerSolo(li); });
       row.appendChild(solo);
       var nm = document.createElement('div'); nm.className = 'lnm'; nm.textContent = ld.name || ('Layer ' + (li + 1));
@@ -1580,7 +1580,7 @@
     var ld = state.layers[state.activeLayerIdx];
     var nameRow = document.createElement('div');
     nameRow.className = 'motion-props-layername';
-    if (!ld) { nameRow.textContent = 'Aucun calque sélectionné'; body.appendChild(nameRow); return; }
+    if (!ld) { nameRow.textContent = SM.t('noLayerSelected'); body.appendChild(nameRow); return; }
     // Component instances get the same Transform group as any layer now
     // (see renderLayerListMotion's comment) — just a label suffix so it
     // reads clearly as "the whole instance", not its internal content.
