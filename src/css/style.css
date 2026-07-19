@@ -17,7 +17,18 @@
   --tool-size:36px;--fc:30px;
 }
 html,body{width:100%;height:100%;overflow:hidden;background:var(--gutter);color:var(--text);
-  font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;user-select:none;font-size:13px;-webkit-font-smoothing:antialiased;}
+  font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  /* -webkit-user-select alongside the unprefixed property (2026-07,
+     "avec l'outil de sélection quand on essaye de drag un menu ça
+     sélectionne plein de texte") — Nemo ships as a Tauri app, rendered by
+     WKWebView (WebKit) on macOS; WebKit's drag-selection code path has a
+     long-documented history of needing the vendor-prefixed property even
+     where the unprefixed one already works for click-based selection, so
+     relying on user-select alone left a real gap specifically on that
+     platform (not reproducible in a Chromium-based dev/automation
+     browser, which already honored the unprefixed property everywhere
+     tested). */
+  -webkit-user-select:none;user-select:none;font-size:13px;-webkit-font-smoothing:antialiased;}
 .material-symbols-rounded{font-family:'Material Symbols Rounded';font-weight:normal;font-style:normal;
   font-size:20px;line-height:1;letter-spacing:normal;text-transform:none;display:inline-block;
   white-space:nowrap;word-wrap:normal;direction:ltr;-webkit-font-feature-settings:'liga';
