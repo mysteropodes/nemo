@@ -2060,6 +2060,25 @@ impl VelloEngine {
     /// hold multiple `&self.effect_stack_*_view` borrows across a loop
     /// without fighting the borrow checker.
     fn run_one_effect(&self, eff: &EffectIn, source: &wgpu::TextureView, target: &wgpu::TextureView) {
+        // Every PIXEL-space effect parameter below (blur/glow radius,
+        // pixelate block size, chromatic-aberration offset, contour
+        // thickness, halftone cell size) is applied to the raster AFTER
+        // view_tf (pan/zoom/rotation) already baked the current zoom into
+        // the composited scene — so a fixed "8px" radius is 8 SCREEN
+        // pixels regardless of zoom, meaning the SAME setting looks
+        // relatively thinner/weaker at high zoom (content grew, effect
+        // didn't) and relatively thicker/stronger at low zoom (content
+        // shrank, effect didn't) — feedback 2026-07: "normal que les
+        // effets change de size en fonction du zoom ?" (no, it wasn't).
+        // Scaling every such parameter by the current zoom makes the
+        // effect a fixed size relative to the DOCUMENT instead of the
+        // screen, exactly like every other zoom-invariant editor
+        // convention already in this app (see gizmo_handles' own
+        // `24.0 / self.viewport.zoom` for the inverse case — a handle
+        // that must NOT grow with zoom). Not applied to custom: WGSL
+        // effects below — p1..p4 there have no fixed meaning this
+        // function could assume is a pixel size.
+        let z = self.viewport.zoom.max(0.0001) as f32;
         match eff.effect_type.as_str() {
             "colorAdjust" => color_adjust_pass(
                 &self.device, &self.queue, &self.color_pipeline, &self.color_bind_group_layout, &self.color_sampler, &self.color_uniform_buf,
@@ -2078,7 +2097,7 @@ impl VelloEngine {
                 // compositor's "screen" blend mode rather than a new shader.
                 blur_pass(
                     &self.device, &self.queue, &self.blur_pipeline, &self.blur_bind_group_layout, &self.blur_sampler, &self.blur_uniform_buf,
-                    source, eff.p1.unwrap_or(16.0), self.width, self.height, &self.blur_scratch_view, &self.blur_result_view,
+                    source, eff.p1.unwrap_or(16.0) * z, self.width, self.height, &self.blur_scratch_view, &self.blur_result_view,
                 );
                 composite_pass(
                     &self.device, &self.queue, &self.blend_pipeline, &self.blend_bind_group_layout, &self.blend_sampler, &self.blend_uniform_buf,
@@ -2134,12 +2153,21 @@ impl VelloEngine {
                     "contourBrut" => 0.9,
                     _ => 0.0,
                 };
-                simple_fx_pass(
-                    &self.device, &self.queue, &self.simple_fx_pipeline, &self.simple_fx_bind_group_layout, &self.simple_fx_sampler, &self.simple_fx_uniform_buf,
-                    source, effect_id,
-                    eff.p1.unwrap_or(default_p1), eff.p2.unwrap_or(default_p2), eff.p3.unwrap_or(default_p3), eff.p4.unwrap_or(default_p4),
-                    self.width as f32, self.height as f32, target,
-                );
+                {
+                    // p1 is a pixel SIZE (block/offset/thickness/cell) for
+                    // these four — everyone else's p1 is already a unit-less
+                    // ratio/level/intensity that shouldn't scale with zoom.
+                    let mut p1 = eff.p1.unwrap_or(default_p1);
+                    if matches!(eff.effect_type.as_str(), "pixelate" | "chromaticAberration" | "contourBrut" | "halftone") {
+                        p1 *= z;
+                    }
+                    simple_fx_pass(
+                        &self.device, &self.queue, &self.simple_fx_pipeline, &self.simple_fx_bind_group_layout, &self.simple_fx_sampler, &self.simple_fx_uniform_buf,
+                        source, effect_id,
+                        p1, eff.p2.unwrap_or(default_p2), eff.p3.unwrap_or(default_p3), eff.p4.unwrap_or(default_p4),
+                        self.width as f32, self.height as f32, target,
+                    );
+                }
             }
             _ if eff.effect_type.starts_with("custom:") => {
                 // User-authored WGSL effect (register_custom_effect) — same
@@ -2166,7 +2194,7 @@ impl VelloEngine {
                 // Default/"blur" — reuses blur_pass verbatim.
                 blur_pass(
                     &self.device, &self.queue, &self.blur_pipeline, &self.blur_bind_group_layout, &self.blur_sampler, &self.blur_uniform_buf,
-                    source, eff.p1.unwrap_or(0.0), self.width, self.height, &self.blur_scratch_view, target,
+                    source, eff.p1.unwrap_or(0.0) * z, self.width, self.height, &self.blur_scratch_view, target,
                 );
             }
         }
