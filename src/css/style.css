@@ -403,6 +403,11 @@ input[type="checkbox"]:disabled{opacity:.4;cursor:not-allowed;}
    in the left toolbar. */
 .icon-only-btn{width:30px;height:30px;padding:0;display:flex;align-items:center;justify-content:center;flex:none;}
 .icon-only-btn svg{display:block;}
+/* Toggle state for icon-only buttons used as on/off switches (2026-07 —
+   Clip to canvas/Safety zones converted from checkboxes) — same "tint the
+   icon, don't fully invert" convention as .tb.active elsewhere, so a
+   toggled icon button reads as "on" without looking like an accent CTA. */
+.icon-only-btn.active{color:var(--accent-hover);background:var(--accent-dim);}
 .pbtn:hover{background:#2c2a31;color:var(--text);}
 .pbtn.ac{background:var(--accent);border-color:var(--accent);color:#fff;}
 .pbtn.ac:hover{background:#5254d9;}

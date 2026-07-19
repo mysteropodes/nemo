@@ -508,12 +508,19 @@
              convention as every .tool-btn in the left toolbar (icon-only,
              no visible text, ui.js's shared instant-tooltip system covers
              discoverability). -->
+        <!-- Clip to canvas / Safety zones converted from checkboxes to icon
+             toggle buttons, joining Fit/Reset View in one horizontal row
+             (2026-07: "possible d'avoir plutôt des bouton icon pour les 2
+             checkbox et d'aligner tout les icon à l'horizontal") — same
+             icon-only + tooltip-carries-the-label convention as Fit/Reset
+             View just above, .active toggled on click like every other
+             toggle button in this app (btn-ghost-all, btn-loop, etc.). -->
         <div class="pr" style="gap:4px">
           <button class="pbtn icon-only-btn" id="btn-fit" data-i18n-title="btnFitTitle" title="Fit — fit the canvas to the viewport"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M3 16v3a2 2 0 0 0 2 2h3"/></svg></button>
           <button class="pbtn icon-only-btn" id="btn-resetv" data-i18n-title="btnResetViewTitle" title="Reset View — restore zoom/pan/rotation to default"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 1 3 6.7"/><path d="M3 21v-5h5"/></svg></button>
+          <button class="pbtn icon-only-btn" id="btn-clip" data-i18n-title="clipCanvasTitle" title="Clip to canvas — hide artwork outside the canvas bounds (off by default, so you can see and work with content that spills over the edge)"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/></svg></button>
+          <button class="pbtn icon-only-btn" id="btn-safety" data-i18n-title="safetyZonesTitle" title="Safety zones — broadcast-safe overlay guides (90% action-safe / 80% title-safe margins, standard TV/film safe areas)"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="1"/><rect x="7" y="8" width="10" height="8" rx="1"/></svg></button>
         </div>
-        <div class="pr"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer" data-i18n-title="clipCanvasTitle" title="Hide artwork outside the canvas bounds — off by default, so you can see and work with content that spills over the edge"><input type="checkbox" id="p-clip" style="accent-color:var(--accent)"> <span data-i18n="clipCanvasLabel">Clip to canvas</span></label></div>
-        <div class="pr"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer" data-i18n-title="safetyZonesTitle" title="Broadcast-safe overlay guides: 90% action-safe / 80% title-safe margins, standard TV/film safe areas"><input type="checkbox" id="p-safety" style="accent-color:var(--accent)"> <span data-i18n="safetyZonesLabel">Safety zones</span></label></div>
       </div>
     </div>
     <div class="psec" id="fill-sec">
