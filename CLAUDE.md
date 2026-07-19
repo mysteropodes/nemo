@@ -337,3 +337,24 @@ mutuellement. Règles à suivre **sans qu'on ait besoin de le redemander** :
   signature), jamais partagés même avec un collaborateur de confiance. Pour du dev normal,
   des valeurs placeholder (`STROKEMOTION_FEEDBACK_TOKEN=dev-placeholder
   STROKEMOTION_UPDATER_TOKEN=dev-placeholder`) suffisent à compiler et lancer `npm run dev`.
+
+## 10. Tout champ numérique doit supporter le "scrub" (glisser pour changer la valeur)
+
+Convention établie : cliquer-glisser horizontalement sur un champ numérique change sa valeur
+(vs. clic simple = curseur texte pour taper), avec Shift = pas ×0.1 et Alt = pas ×10. Mécanisme
+unique, délégué au niveau `document` (`ui.js`, écoute `pointerdown`/`pointermove`/`pointerup`
+globale, pas un binding par élément) — **le seul déclencheur est la classe littérale `scrub`
+sur l'`<input>`** (`class="pi scrub"` en général, `data-step="…"` optionnel, retombe sur `1`
+sinon). Comme la détection est déléguée, un champ créé dynamiquement plus tard (popover, ligne
+de tableau) devient scrubbable dès qu'on lui donne cette classe — aucun ré-enregistrement
+nécessaire.
+
+**Tout nouveau champ numérique (`type="number"`) doit avoir la classe `scrub`**, que ce soit
+statique dans `index.html` ou créé en JS (`input.className = 'pi scrub'`). Oubli trouvé et
+corrigé 2026-07 (feedback : "on peut pas slide en draguant les value... fait ça pour toute
+option où l'on a des values à changer") sur `#p-opacity`, `#p-stroke-alpha`, les champs RGBA
+du color-picker, l'opacité par swatch du color-manager, le stop de dégradé, `#comp-singleframe`/
+`#comp-speed`, `#exp-w`/`#exp-h`, `#text-size`, `#tl-fps`/`#tl-total` — tous avaient un `class="pi"`
+(ou rien) sans le token `scrub`, donc silencieusement non-scrubbables malgré un `data-step` par
+ailleurs correct. Un `type="range"` natif (slider) n'a pas besoin de cette classe — c'est un
+mécanisme d'interaction différent, déjà équivalent en pratique (glisser le curseur).

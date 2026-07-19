@@ -77,7 +77,7 @@
         saveActiveLayerFrame(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
       });
       var offInp = document.createElement('input');
-      offInp.type = 'number'; offInp.className = 'pi'; offInp.min = 0; offInp.max = 100; offInp.step = 1;
+      offInp.type = 'number'; offInp.className = 'pi scrub'; offInp.min = 0; offInp.max = 100; offInp.step = 1; offInp.dataset.step = '1';
       offInp.style.width = '48px';
       offInp.value = Math.round(stop.offset * 100);
       offInp.addEventListener('change', function () {
