@@ -118,8 +118,34 @@
     markSaved(json);
     try{localStorage.setItem('nemo-auto',json);}catch(e){}
   }
+  // ---- Browser-mode save (2026-07, "ajoute la possibilité de save un
+  // projet en mode web aussi") — no Tauri fs/dialog to write a real path
+  // to, so Save/Save As both trigger a browser file download of the exact
+  // same JSON a desktop save would write (same format, re-openable via
+  // Open's own existing browser fallback — file-input's change handler
+  // above already reads it back with importJSON). There's no silent
+  // "overwrite the same file" concept in a browser without the File System
+  // Access API (not universally supported, and out of scope here) — every
+  // browser-mode save is effectively a Save As, a fresh download the user
+  // places themselves.
+  function downloadJson(filename,json){
+    var blob=new Blob([json],{type:'application/json'});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');
+    a.href=url;a.download=filename;
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+    setTimeout(function(){URL.revokeObjectURL(url);},1000);
+  }
+  function saveAsDownload(){
+    saveAllLayerFrames();
+    var json=window.SM.exportJSON();
+    downloadJson((currentName||'Untitled')+'.json',json);
+    markSaved(json);
+    try{localStorage.setItem('nemo-auto',json);}catch(e){}
+    showToast('Téléchargé : '+currentName+'.json');
+  }
   async function saveAs(){
-    if(!tauriOk()){showToast('Save As requires the desktop app');return;}
+    if(!tauriOk()){saveAsDownload();return;}
     saveAllLayerFrames();
     var path=await window.__TAURI__.dialog.save({title:'Save Project As',defaultPath:currentName+'.json',filters:[{name:'Nemo Project',extensions:['json']}]});
     if(!path)return;
@@ -132,8 +158,8 @@
     showToast('Saved: '+baseName(path));
   }
   async function save(){
+    if(!tauriOk()){saveAsDownload();return;}
     if(!currentPath){await saveAs();return;}
-    if(!tauriOk()){showToast('Save requires the desktop app');return;}
     saveAllLayerFrames();
     try{await writeProjectTo(currentPath);}
     catch(e){showToast('ÉCHEC de la sauvegarde : '+(e&&e.message||e));throw e;}
