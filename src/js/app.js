@@ -168,6 +168,7 @@ var state={
   refMedia:null, // rotoscopy reference {type:'video'|'imageseq'|'image',...} — reference-bridge.js
   mediaLibrary:[], // {id,name,kind:'image'|'video',thumb,layerName} — browsable catalog of imports, media-library.js
   symbols:{},activeSymbolId:null,openSymbolTabs:[],
+  activeMontageViewId:null, // StoryBoard montage currently entered (enterMontageView) — see app.js
   // Layer folders: purely organizational metadata, not a real tree — each
   // layer optionally carries ld.folderId pointing into this map. Keeping
   // state.layers/userLayers as the same flat, 1:1-indexed arrays every
@@ -834,7 +835,20 @@ function resolveSymbolFrameIdx(sym,layer,mainFrameIdx){
   var elapsed=Math.max(0,(mainFrameIdx-(layer.symPlacedAt||0)))*(layer.symSpeed||1);
   var total=Math.max(1,sym.totalFrames);
   if(layer.symPlayMode==='single')return Math.min(total-1,Math.max(0,Math.floor(layer.symSingleFrame||0)));
-  if(layer.symPlayMode==='once')return Math.min(total-1,Math.floor(elapsed));
+  if(layer.symPlayMode==='once'){
+    // symTrimIn/symTrimOut are optional (default: play the WHOLE symbol
+    // from frame 0, unchanged behavior for every pre-existing Component-
+    // instance layer) — only enterMontageView (app.js) sets them, so a
+    // montage segment plays back exactly the source range the StoryBoard
+    // chain member was trimmed to (storyboard.js's own montageStrokesAt
+    // formula: trimIn + floor(local*srcLen/duration), reproduced here via
+    // symSpeed=srcLen/duration + symPlacedAt=that member's montage-local
+    // start frame), holding at trimOut instead of rolling into unrelated
+    // symbol frames beyond the trimmed range.
+    var trimIn=layer.symTrimIn||0;
+    var trimOut=(layer.symTrimOut!=null)?layer.symTrimOut:total-1;
+    return Math.min(trimOut,trimIn+Math.floor(elapsed));
+  }
   if(layer.symPlayMode==='pingpong'){
     if(total<2)return 0;
     var cycle=(total-1)*2;
@@ -1056,6 +1070,7 @@ function getEffectiveStrokes(layerIdx,frameIdx){
   return [];
 }
 var _symbolPaperLayers={},_sceneSnapshot=null;
+var _montageViewSnapshot=null; // enterMontageView/exitMontageView — see below
 function ensureSymbolPaperLayers(symId){
   if(_symbolPaperLayers[symId])return _symbolPaperLayers[symId];
   var sym=state.symbols[symId];var arr=[];
@@ -1410,6 +1425,83 @@ function closeSymbolTab(symId){
   if(state.activeSymbolId===symId)exitToScene();
   var idx=state.openSymbolTabs.indexOf(symId);if(idx>=0)state.openSymbolTabs.splice(idx,1);
   if(window.renderSymbolTabs)renderSymbolTabs();
+}
+// StoryBoard "entrer dans le montage" (2026-07: "si on rentre dans montage
+// cela affiche les layers de component avec le bon montage de layer afin
+// de le modifier"). Builds a temporary scene made of real Component-
+// instance layers — one per chain member, in chain order — so the montage
+// view is a normal Motion/Animation2D timeline the user already knows how
+// to read (segments = layer bars), with zero new rendering path: each
+// segment IS a real `ld.symbolId` layer, so Motion's existing "double-click
+// a Component layer enters it" (enterComponentLayer/enterSymbol) works on
+// a segment completely unmodified — no nested-nesting special-casing
+// needed, since entering a REAL symbol from here just treats "the montage
+// view's synthetic layers" as the scene to snapshot/restore, exactly like
+// it would any other scene.
+//
+// Each segment's symPlacedAt/symSpeed reproduce storyboard.js's own
+// montageStrokesAt formula exactly (symPlacedAt = that member's montage-
+// local start frame, symSpeed = srcLen/duration), and symTrimIn/symTrimOut
+// (resolveSymbolFrameIdx above) carry the member's own trim range so a
+// mid-clip trim shows correctly instead of always starting the symbol's
+// own frame 0.
+function enterMontageView(montageId){
+  if(state.activeSymbolId){showToast('Fermez d\'abord le composant en cours d\'édition');return;}
+  if(state.activeMontageViewId===montageId)return;
+  if(state.activeMontageViewId){showToast('Fermez d\'abord le montage en cours d\'édition');return;}
+  if(!window.SMStoryboard)return;
+  var m=SMStoryboard.montageById(montageId);if(!m)return;
+  var mods=SMStoryboard.chainModsForView(m);
+  if(!mods.length){showToast('Montage vide — accrochez des instances contre son bloc d\'abord');return;}
+  saveAllLayerFrames();
+  _montageViewSnapshot={layers:state.layers,totalFrames:state.totalFrames,waIn:state.waIn,waOut:state.waOut,activeLayerIdx:state.activeLayerIdx,fps:state.fps,currentFrame:state.currentFrame,userLayers:userLayers,cameraKeys:state.cameraKeys};
+  userLayers.forEach(function(l){l.opacity=0.25;});
+  var total=SMStoryboard.montageTotal(m);
+  var newLayers=[],newUls=[],acc=0;
+  arcLayer.activate();
+  mods.forEach(function(mod){
+    var sym=state.symbols[mod.symbolId];
+    var srcLen=mod.trimOut-mod.trimIn+1;
+    var frames=[];for(var i=0;i<total;i++)frames.push({strokes:[],isKeyframe:i===0,isInterpolated:false});
+    newLayers.push({
+      name:(sym?sym.name:'Composant')+' — montage',
+      symbolId:mod.symbolId,locked:true,visible:true,
+      symPlayMode:'once',symSpeed:srcLen/mod.duration,symPlacedAt:acc,
+      symTrimIn:mod.trimIn,symTrimOut:mod.trimOut,symSingleFrame:0,
+      // Explicit in/out so Motion's layer bar shows this segment's own
+      // [acc, acc+duration) span instead of defaulting to the full
+      // combined timeline (layerOutPoint's auto-detect skips symbolId
+      // layers entirely, so leaving these unset would draw every segment
+      // as one full-width bar) — this also makes getEffectiveStrokes hide
+      // the layer outside its own window for free (same inPoint/outPoint
+      // early-return every other layer already goes through).
+      inPoint:acc,outPoint:acc+mod.duration-1,
+      frames:frames,
+    });
+    newUls.push(new Layer({name:'montageview-'+montageId+'-'+newUls.length}));
+    acc+=mod.duration;
+  });
+  state.layers=newLayers;state.totalFrames=total;state.waIn=0;state.waOut=total-1;
+  window._waIn=0;window._waOut=state.waOut;window._totalF=state.totalFrames;
+  state.activeLayerIdx=0;state.currentFrame=0;
+  userLayers=newUls;
+  userLayers.forEach(function(l){l.insertBelow(arcLayer);l.visible=true;});
+  state.activeMontageViewId=montageId;
+  activateUL(0);drawStage();loadFrame(0);renderOS();renderArcs();updateUI();if(window.renderSymbolTabs)renderSymbolTabs();
+}
+function exitMontageView(){
+  if(!state.activeMontageViewId||!_montageViewSnapshot)return;
+  if(state.activeSymbolId){showToast('Fermez d\'abord le composant en cours d\'édition');return;}
+  saveAllLayerFrames();
+  userLayers.forEach(function(l){l.remove();});
+  state.layers=_montageViewSnapshot.layers;state.totalFrames=_montageViewSnapshot.totalFrames;state.waIn=_montageViewSnapshot.waIn;state.waOut=_montageViewSnapshot.waOut;
+  window._waIn=state.waIn;window._waOut=state.waOut;window._totalF=state.totalFrames;
+  state.activeLayerIdx=_montageViewSnapshot.activeLayerIdx;state.currentFrame=_montageViewSnapshot.currentFrame;state.fps=_montageViewSnapshot.fps;
+  userLayers=_montageViewSnapshot.userLayers;
+  state.cameraKeys=_montageViewSnapshot.cameraKeys;
+  userLayers.forEach(function(l){l.opacity=1;});
+  state.activeMontageViewId=null;_montageViewSnapshot=null;
+  activateUL(state.activeLayerIdx);drawStage();loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderSymbolTabs)renderSymbolTabs();
 }
 
 // Cheap "did anything change" signal for engine-bridge.js's tick() loop,

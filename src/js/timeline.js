@@ -657,6 +657,8 @@ window.SM={
   splitLayerIntoElementsCore:function(li,opts){return splitLayerIntoElementsCore(li,opts);},
   exitToScene:function(){exitToScene();},
   closeSymbolTab:function(symId){closeSymbolTab(symId);},
+  enterMontageView:function(montageId){enterMontageView(montageId);},
+  exitMontageView:function(){exitMontageView();},
   setSymbolPlayMode:function(v){var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.symbolId)return;ld.symPlayMode=v;loadFrame(state.currentFrame);renderOS();updateUI();},
   setSymbolSpeed:function(v){var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.symbolId)return;ld.symSpeed=Math.max(0.1,parseFloat(v)||1);loadFrame(state.currentFrame);renderOS();updateUI();},
   setSymbolSingleFrame:function(v){var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.symbolId)return;ld.symSingleFrame=Math.max(0,parseInt(v)||0);loadFrame(state.currentFrame);renderOS();updateUI();},
@@ -946,13 +948,27 @@ window.SM={
     // state.layers IS the symbol's own layers array (shared reference), so
     // saveAllLayerFrames keeps state.symbols current, and the scene's real
     // layers are read from the snapshot taken by enterSymbol.
+    //
+    // Same problem, same fix, for a StoryBoard montage view (2026-07,
+    // enterMontageView/app.js): while active, state.layers is a SYNTHETIC
+    // per-segment scene built for editing, not the real top-level document
+    // — saving it wholesale would silently overwrite the real scene's own
+    // layer arrangement with the montage's segments the moment autosave's
+    // 30s tick fires while a montage is open. Checked BEFORE activeSymbolId
+    // deliberately: entering a component FROM WITHIN a montage view (a
+    // supported nested case) leaves both flags set, and _sceneSnapshot in
+    // that case only unwinds one level (back to the montage view's own
+    // synthetic scene) — _montageViewSnapshot is the one that actually
+    // holds the real document.
     saveAllLayerFrames();
-    var inSym=!!(state.activeSymbolId&&_sceneSnapshot);
-    var sceneLayers=inSym?_sceneSnapshot.layers:state.layers;
-    var sceneTotal=inSym?_sceneSnapshot.totalFrames:state.totalFrames;
-    var sceneFps=inSym?_sceneSnapshot.fps:state.fps;
-    var sceneWaIn=inSym?_sceneSnapshot.waIn:state.waIn;
-    var sceneWaOut=inSym?_sceneSnapshot.waOut:state.waOut;
+    var inMontage=!!(state.activeMontageViewId&&_montageViewSnapshot);
+    var inSym=!inMontage&&!!(state.activeSymbolId&&_sceneSnapshot);
+    var srcSnap=inMontage?_montageViewSnapshot:(inSym?_sceneSnapshot:null);
+    var sceneLayers=srcSnap?srcSnap.layers:state.layers;
+    var sceneTotal=srcSnap?srcSnap.totalFrames:state.totalFrames;
+    var sceneFps=srcSnap?srcSnap.fps:state.fps;
+    var sceneWaIn=srcSnap?srcSnap.waIn:state.waIn;
+    var sceneWaOut=srcSnap?srcSnap.waOut:state.waOut;
     return JSON.stringify({version:13,totalFrames:sceneTotal,fps:sceneFps,canvasW:state.canvasW,canvasH:state.canvasH,canvasBg:state.canvasBg,waIn:sceneWaIn,waOut:sceneWaOut,
       layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color,motion:l.motion,motionStatic:l.motionStatic,elementMotion:l.elementMotion,inPoint:l.inPoint,outPoint:l.outPoint,nativeVideo:l.nativeVideo,matteMode:l.matteMode,montageId:l.montageId,expressions:l.expressions,isTextLayer:l.isTextLayer,isNullLayer:l.isNullLayer,isEffectLayer:l.isEffectLayer,effects:l.effects};}),
       layerFolders:state.layerFolders,layerLinkGroups:state.layerLinkGroups,
@@ -3134,9 +3150,26 @@ window.addEventListener('mouseup',function(){
 });
 function renderSymbolTabs(){
   var bar=document.getElementById('symbol-tabs');if(!bar)return;bar.innerHTML='';
-  var scene=document.createElement('div');scene.className='sym-tab'+(state.activeSymbolId?'':' act');scene.textContent='Scene';
-  scene.addEventListener('click',function(){if(state.activeSymbolId)window.SM.exitToScene();});
+  var scene=document.createElement('div');scene.className='sym-tab'+((state.activeSymbolId||state.activeMontageViewId)?'':' act');scene.textContent='Scene';
+  scene.addEventListener('click',function(){
+    if(state.activeSymbolId)window.SM.exitToScene();
+    else if(state.activeMontageViewId)window.SM.exitMontageView();
+  });
   bar.appendChild(scene);
+  // StoryBoard "entrer dans le montage" (2026-07) — a montage view sits
+  // BETWEEN Scene and any real component entered from within it (breadcrumb:
+  // Scene > Montage > Composant). Not part of openSymbolTabs — at most one
+  // montage view is active at a time, no multi-tab list needed.
+  if(state.activeMontageViewId){
+    var mtg=window.SMStoryboard&&window.SMStoryboard.montageById(state.activeMontageViewId);
+    var mtab=document.createElement('div');mtab.className='sym-tab'+(state.activeSymbolId?'':' act');
+    var mlabel=document.createElement('span');mlabel.textContent=(mtg?mtg.name:'Montage')+' (montage)';
+    var mx=document.createElement('span');mx.className='sym-tab-x';mx.textContent='×';
+    mtab.appendChild(mlabel);mtab.appendChild(mx);
+    mtab.addEventListener('click',function(e){if(e.target===mx)return;if(state.activeSymbolId)window.SM.exitToScene();});
+    mx.addEventListener('click',function(e){e.stopPropagation();if(state.activeSymbolId)window.SM.exitToScene();window.SM.exitMontageView();});
+    bar.appendChild(mtab);
+  }
   state.openSymbolTabs.forEach(function(symId){
     var sym=state.symbols[symId];if(!sym)return;
     var tab=document.createElement('div');tab.className='sym-tab'+(state.activeSymbolId===symId?' act':'');
