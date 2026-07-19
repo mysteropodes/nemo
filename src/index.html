@@ -446,6 +446,19 @@
              "plain per-layer field" convention as Blend/Matte above.
              0 = off (the vast majority of layers), no GPU cost. -->
         <div class="pr"><span class="pl" data-i18n="fieldBlur">Flou</span><input type="number" class="pi scrub" id="p-blur" value="0" min="0" max="100" data-step="1" data-i18n-title="fieldBlurTitle" title="Flou gaussien (approx.) appliqué à tout le calque, en pixels"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
+        <!-- Ground/cast shadow (2026-07, feedback: "un effet wgsl qui fasse
+             ça" + lien AviUtl2 GroundShadow2_S) — per-layer, same convention
+             as Flou above (0% opacity = off, no GPU cost). Runs on THIS
+             layer's own isolated alpha — see engine.rs's LayerIn::gshadow_*
+             doc comment for why this can't be an effect/adjustment layer
+             like Vignette/Glow. -->
+        <div class="pr"><span class="pl" data-i18n="fieldGroundShadow">Ombre sol</span><input type="number" class="pi scrub" id="p-gshadow-opacity" value="0" min="0" max="100" data-step="1" data-i18n-title="gshadowOpacityTitle" title="Opacité de l'ombre projetée au sol — 0 = désactivé"><span style="font-size:9px;color:var(--text-dim)">%</span></div>
+        <div class="pr" id="p-gshadow-more-row" style="display:none;gap:4px">
+          <span class="pl" data-i18n="fieldGroundLenSkew">Sol / Long. / Incl.</span>
+          <input type="number" class="pi scrub" id="p-gshadow-ground" value="75" min="0" max="100" data-step="1" data-i18n-title="gshadowGroundTitle" title="Position verticale du sol (% de la hauteur du document)" style="width:44px">
+          <input type="number" class="pi scrub" id="p-gshadow-length" value="1" min="0.1" max="4" data-step="0.05" data-i18n-title="gshadowLengthTitle" title="Longueur de l'ombre projetée" style="width:44px">
+          <input type="number" class="pi scrub" id="p-gshadow-skew" value="0" min="-3" max="3" data-step="0.05" data-i18n-title="gshadowSkewTitle" title="Inclinaison (direction de la lumière)" style="width:44px">
+        </div>
         <!-- Référence (roto) — déplacée ici depuis sa propre section
              toujours-visible (feedback 2026-07: "référence (roto) onglet
              n'a plus lieu d'être doit être géré par le panneau calque en
