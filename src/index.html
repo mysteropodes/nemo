@@ -1191,7 +1191,14 @@
          spacer. -->
     <div id="symbol-tabs"><div class="sym-tab act" data-sym="" data-i18n="sceneTab">Scene</div></div>
     <div style="flex:1"></div>
-    <div class="ti"><b id="tl-cf">1</b> / <span id="tl-tf">24</span></div>
+    <!-- tl-cf: draggable current-frame field (2026-07, "rendre la frame
+         1/120 draggable") — a real scrub input like tl-fps/tl-total below,
+         not a plain <b>; its value/max are kept in sync with
+         state.currentFrame/totalFrames wherever they were textContent-set
+         before (updatePlayhead/updateUI, timeline.js), and a 'change'
+         listener drives goToFrame(). tl-tf (the total) stays a plain
+         <span> — its own value is already editable via #tl-total. -->
+    <div class="ti"><input type="number" class="scrub" id="tl-cf" min="1" value="1" data-step="1" style="width:32px;font-weight:600"> / <span id="tl-tf">24</span></div>
     <button class="tb" id="btn-ff" data-i18n-title="btnFirstFrameTitle" title="Go to first frame"><span class="material-symbols-rounded">&#xe045;</span></button>
     <button class="tb" id="btn-pf" data-i18n-title="btnPrevFrameTitle" title="Previous frame"><span class="material-symbols-rounded">&#xe5cb;</span></button>
     <button class="tb" id="btn-play" data-i18n-title="btnPlayTitle" title="Play / Stop (Enter)"><span class="material-symbols-rounded">&#xe037;</span></button>
