@@ -370,6 +370,15 @@
           if (def && window.openCustomEffectEditor) window.openCustomEffectEditor(def);
         });
         row.appendChild(edit);
+        // Right-click on the row itself opens the same editor (2026-07 —
+        // the pencil icon was the ONLY entry point, easy to miss at that
+        // size) — same code path as the pencil's own click handler above,
+        // not a second way to open something different.
+        row.addEventListener('contextmenu', function (e) {
+          e.preventDefault(); e.stopPropagation();
+          var def = customDefFor(eff.type);
+          if (def && window.openCustomEffectEditor) window.openCustomEffectEditor(def);
+        });
       }
       var del = document.createElement('div'); del.className = 'fx-row-del'; del.textContent = '×'; del.title = window.SM.t('fxDelete');
       del.addEventListener('click', function (e) { e.stopPropagation(); deleteEffect(idx); });
