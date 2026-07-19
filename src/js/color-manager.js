@@ -42,20 +42,32 @@
         if (p.strokeColor) addColor(map, colorHex8(p.strokeColor));
       });
     } else {
-      (state.layers || []).forEach(function (ld) {
-        (ld.frames || []).forEach(function (fr) {
-          (fr.strokes || []).forEach(function (sd) {
-            if (sd.fillColor) addColor(map, sd.fillColor);
-            // serP() (app.js) writes strokeColor:'#ffffff' as a legacy
-            // fallback even when the shape has NO real stroke — hasRealStroke
-            // is the authoritative flag (CLAUDE.md §1's own documented
-            // gotcha). Without this check, every plain filled-only shape
-            // added a phantom white "stroke color" to the list.
-            var hasStroke = sd.hasRealStroke !== undefined ? sd.hasRealStroke : !!sd.strokeColor;
-            if (hasStroke && sd.strokeColor) addColor(map, sd.strokeColor);
-          });
+      // Context colors (2026-07, "si on sélectionne rien on voit toutes les
+      // couleurs dans le projet" — replaced by the active layer/canvas/
+      // entered-component context instead of a project-wide scan). Scoped to
+      // the ACTIVE layer's CURRENT frame only, not every layer×frame in
+      // state.layers — already transparently scoped to an entered
+      // component's own layers too, since enterSymbol() (app.js) swaps
+      // state.layers/userLayers wholesale for the duration, so this reads
+      // the symbol's own content without any extra branching here.
+      var ld = state.layers && state.layers[state.activeLayerIdx];
+      var fr = ld && ld.frames && ld.frames[state.currentFrame];
+      if (fr) {
+        (fr.strokes || []).forEach(function (sd) {
+          if (sd.fillColor) addColor(map, sd.fillColor);
+          // serP() (app.js) writes strokeColor:'#ffffff' as a legacy
+          // fallback even when the shape has NO real stroke — hasRealStroke
+          // is the authoritative flag (CLAUDE.md §1's own documented
+          // gotcha). Without this check, every plain filled-only shape
+          // added a phantom white "stroke color" to the list.
+          var hasStroke = sd.hasRealStroke !== undefined ? sd.hasRealStroke : !!sd.strokeColor;
+          if (hasStroke && sd.strokeColor) addColor(map, sd.strokeColor);
         });
-      });
+      }
+      // Canvas background — a real, visible "color in context" even on a
+      // completely empty frame, which the old project-wide scan never
+      // surfaced at all (it only ever looked at stroke/fill data).
+      if (window.state && state.canvasBg) addColor(map, state.canvasBg);
     }
     return Object.keys(map).map(function (k) { return map[k]; }).sort(function (a, b) { return b.count - a.count; });
   }
@@ -73,31 +85,42 @@
       });
       saveActiveLayerFrame();
     } else {
-      state.layers.forEach(function (ld) {
-        (ld.frames || []).forEach(function (fr) {
-          (fr.strokes || []).forEach(function (sd) {
-            if (sd.fillColor && sd.fillColor.toUpperCase() === oldNorm) sd.fillColor = newHex;
-            // Same hasRealStroke guard as computeUsedColors above — without
-            // it, recoloring away from the fallback white would WRITE a
-            // brand new visible strokeColor onto shapes that never had one
-            // (hasRealStroke would still read false, but strokeColor would
-            // no longer be the recognizable '#ffffff' sentinel either),
-            // corrupting persisted data on next load.
-            var hasStroke = sd.hasRealStroke !== undefined ? sd.hasRealStroke : !!sd.strokeColor;
-            if (hasStroke && sd.strokeColor && sd.strokeColor.toUpperCase() === oldNorm) sd.strokeColor = newHex;
-          });
+      // Scoped to the active layer only now, matching computeUsedColors'
+      // own narrowed scope above (2026-07) — recoloring a row the panel
+      // labels as "this layer's colors" silently touching every OTHER
+      // layer in the whole project would contradict what's actually shown.
+      var ld = state.layers[state.activeLayerIdx];
+      (ld.frames || []).forEach(function (fr) {
+        (fr.strokes || []).forEach(function (sd) {
+          if (sd.fillColor && sd.fillColor.toUpperCase() === oldNorm) sd.fillColor = newHex;
+          // Same hasRealStroke guard as computeUsedColors above — without
+          // it, recoloring away from the fallback white would WRITE a
+          // brand new visible strokeColor onto shapes that never had one
+          // (hasRealStroke would still read false, but strokeColor would
+          // no longer be the recognizable '#ffffff' sentinel either),
+          // corrupting persisted data on next load.
+          var hasStroke = sd.hasRealStroke !== undefined ? sd.hasRealStroke : !!sd.strokeColor;
+          if (hasStroke && sd.strokeColor && sd.strokeColor.toUpperCase() === oldNorm) sd.strokeColor = newHex;
         });
       });
       // Persisted data alone wouldn't show up until the frame reloads —
-      // also patch every currently-live canvas layer so the change is
+      // also patch the currently-live active canvas layer so the change is
       // visible immediately, same reasoning as Propager la couleur's own
       // "live objects need their own pass, persisted data isn't enough".
-      (window.userLayers || []).forEach(function (layer) {
-        layer.children.forEach(function (item) {
+      var liveLayer = (window.userLayers || [])[state.activeLayerIdx];
+      if (liveLayer) {
+        liveLayer.children.forEach(function (item) {
           if (item.fillColor && colorHex8(item.fillColor).toUpperCase() === oldNorm) item.fillColor = newHex;
           if (item.strokeColor && colorHex8(item.strokeColor).toUpperCase() === oldNorm) item.strokeColor = newHex;
         });
-      });
+      }
+      // Canvas background isn't a Paper.js item color — matched/updated
+      // separately since computeUsedColors now surfaces it as its own row.
+      // SM.setCanvasBg (not a direct state.canvasBg write) so drawStage()/
+      // syncDocFields() actually repaint the canvas and the Document
+      // panel's own BG swatch instead of going stale until some unrelated
+      // update happens to touch them.
+      if (window.state && state.canvasBg && state.canvasBg.toUpperCase() === oldNorm && window.SM && SM.setCanvasBg) SM.setCanvasBg(newHex);
     }
     updateUI();
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
@@ -129,7 +152,7 @@
     var hdr = document.getElementById('selected-colors-hdr');
     if (!body) return;
     var hasSel = !!(window.selectedPaths && selectedPaths.length);
-    if (hdr) hdr.textContent = SM.t(hasSel ? 'hdrSelectedColors' : 'hdrAllProjectColors');
+    if (hdr) hdr.textContent = SM.t(hasSel ? 'hdrSelectedColors' : 'hdrLayerColors');
     var list = computeUsedColors();
     body.innerHTML = '';
     if (!list.length) {
@@ -184,6 +207,27 @@
   }
   window.updateSelectedColorsPanel = updateSelectedColorsPanelIfVisible;
 
+  // Auto-expand on selection (2026-07, "auto-expand on selection") — a
+  // fresh 0→non-empty transition of selectedPaths force-opens the section
+  // exactly once, reusing the same .closed/.hid toggle updatePropsContext
+  // (timeline.js) already uses to force-open OTHER sections on a context
+  // change. Doesn't re-collapse it when the selection empties again (a
+  // user who explicitly collapsed it back shouldn't have it keep popping
+  // open every single click) — tracked via _hadSel so this only fires on
+  // the actual empty→non-empty edge, not every updateUI() tick.
+  var _hadSel = false;
+  function autoExpandOnSelection() {
+    var hasSelNow = !!(window.selectedPaths && selectedPaths.length);
+    if (hasSelNow && !_hadSel) {
+      var sec = document.getElementById('selected-colors-sec');
+      if (sec) {
+        var h = sec.querySelector('.phdr'), b = sec.querySelector('.pbdy');
+        if (h && b) { h.classList.remove('closed'); b.classList.remove('hid'); }
+      }
+    }
+    _hadSel = hasSelNow;
+  }
+
   function init() {
     var sec = document.getElementById('selected-colors-sec');
     if (!sec) return;
@@ -202,6 +246,10 @@
     if (typeof origUpdateUI === 'function') {
       window.updateUI = function () {
         origUpdateUI.apply(this, arguments);
+        autoExpandOnSelection();
+        // Must run AFTER autoExpandOnSelection (which may just have
+        // removed .hid this same tick) so a fresh selection's colors
+        // render immediately instead of waiting for the NEXT updateUI().
         updateSelectedColorsPanelIfVisible();
       };
     }
