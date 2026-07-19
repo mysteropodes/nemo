@@ -2564,6 +2564,14 @@
       });
       touched.forEach(sortKeys);
       renderTimeline();
+      // Live stage feedback (2026-07: "un component ne bouge pas en temps
+      // réel quand on drag" — the timeline diamond tracked the cursor via
+      // renderTimeline() above, but the interpolated value AT THE CURRENT
+      // PLAYHEAD only changed on mouseup, since nothing re-rendered the
+      // stage until onDragUp's own renderNow(). Every sibling drag
+      // (onDrag's canvas gizmo, layer-inout.js's bar drag) already
+      // re-renders on every move — this was the one gap.
+      if (window.SMEngineBridge) SMEngineBridge.renderNow();
       return;
     }
     var d = window._motionKeyDrag; if (!d) return;
@@ -2585,6 +2593,7 @@
       d.keys.forEach(function (s) { s.key.frame += deltaFrames; sortKeys(s.holder.motion[s.prop]); });
       d.startX = e.clientX; // re-baseline so the next move is a fresh delta from here
       renderTimeline();
+      if (window.SMEngineBridge) SMEngineBridge.renderNow(); // live stage feedback — see skew-drag branch's own comment above
       return;
     }
     var nf = Math.max(0, Math.min(state.totalFrames - 1, d.startFrame + deltaFrames));
@@ -2593,6 +2602,7 @@
     if (keyAt(track, nf)) return; // don't stomp an existing key
     d.key.frame = nf; sortKeys(track);
     renderTimeline();
+    if (window.SMEngineBridge) SMEngineBridge.renderNow(); // live stage feedback — see skew-drag branch's own comment above
   }
   function onDragUp() {
     endMarquee();

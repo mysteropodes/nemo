@@ -580,7 +580,7 @@
       ensureState();
       if (!state.cameraLayerOn) {
         state.cameraLayerOn = true;
-        if (!state.cameraKeys.length) setKey(0, defaultRect());
+        if (!state.cameraKeys.length) { pushUndo(); setKey(0, defaultRect()); }
         renderLayerList(); renderTimeline();
       }
       window.SM.setTool(state.tool === 'camera' ? 'select' : 'camera');
@@ -588,8 +588,16 @@
       updateCameraPanel();
       if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
     });
+    // pushUndo() here (2026-07: "récupère des données exploitable pour
+    // résoudre les soucis" — the feedback action log/undo stack was
+    // silently skipping this button entirely, unlike a camera keyframe
+    // added/removed by DRAGGING, which already calls pushUndo() via
+    // onDown further down this file) — cameraKeys IS part of
+    // layersSnapshotNow()'s undo snapshot, so this was a real gap, not a
+    // structural exclusion like StoryBoard/audio below.
     var addKey = document.getElementById('btn-cam-addkey');
     if (addKey) addKey.addEventListener('click', function () {
+      pushUndo();
       var f = state.currentFrame;
       if (keyAt(f)) removeKey(f);
       else setKey(f, cameraAtFrame(f) || defaultRect());
