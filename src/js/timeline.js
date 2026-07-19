@@ -356,6 +356,12 @@ window.SM={
     }},
   setStrokeColor:function(v){state.strokeColor=v;document.getElementById('stroke-well').style.background=v;document.getElementById('pm-stroke').style.background=v;
     ['color-stroke','pm-stroke-c'].forEach(function(id){var el=document.getElementById(id);el.value=v;el.dataset.hex8=v;});
+    // Figma-style inline hex/alpha fields (2026-07) — see setFillColor's
+    // own comment; alphaPctFromHex reads the hex8 alpha byte (defaults to
+    // 100 when absent/opaque, same "#rrggbb == fully opaque" convention
+    // color-picker.js's hexToAlpha already uses).
+    var shex=document.getElementById('p-stroke-hex');if(shex&&document.activeElement!==shex)shex.value=hexDisplayValue(v);
+    var salpha=document.getElementById('p-stroke-alpha');if(salpha&&document.activeElement!==salpha)salpha.value=alphaPctFromHex(v);
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(p.data&&p.data.isVectorBrush)p.fillColor=v;else if(p.strokeColor)p.strokeColor=v;});saveActiveLayerFrame();updateUI();}
     // Fill/Stroke Select tool: recolor ONLY the clicked aspect — a 'stroke'
     // selection here means strokeColor, never touches fillColor even on a
@@ -367,10 +373,14 @@ window.SM={
     // the .none overlay (red diagonal) is what actually communicates "off".
     document.getElementById('fill-well').style.background=v;document.getElementById('pm-fill').style.background=v;
     ['color-fill','pm-fill-c'].forEach(function(id){var el=document.getElementById(id);el.value=v;el.dataset.hex8=v;});
+    // Figma-style inline hex field (2026-07) — kept in sync with every
+    // other write path to this color (popover, eyedropper, project load),
+    // not just this function's own callers.
+    var fhex=document.getElementById('p-fill-hex');if(fhex&&document.activeElement!==fhex)fhex.value=hexDisplayValue(v);
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(p.fillColor)p.fillColor=v;});saveActiveLayerFrame();updateUI();}
     else if(state.tool==='fsselect'&&_fsSel&&(_fsSel.kind==='fill'||_fsSel.kind==='fillregion')){pushUndo();if(_fsSel.kind==='fillregion')_fsSel=fsRealizeFillRegion(_fsSel,userLayers[state.activeLayerIdx]);_fsSel.path.fillColor=v;saveActiveLayerFrame();updateUI();}},
   setFillEnabled:function(v){state.fillEnabled=v;var fw=document.getElementById('fill-well'),pf=document.getElementById('pm-fill');fw.classList.toggle('none',!v);pf.classList.toggle('none',!v);document.getElementById('p-fill-on').checked=v;
-    var ft=document.getElementById('fill-enable-toggle');if(ft)ft.classList.toggle('off',!v);
+    var ft=document.getElementById('fill-enable-toggle');if(ft){ft.classList.toggle('off',!v);ft.innerHTML=v?ICO_EYE:ICO_EYE_CLOSED;}
     var ftlp=document.getElementById('fill-enable-toggle-lp');if(ftlp){ftlp.classList.toggle('off',!v);ftlp.innerHTML=v?ICO_EYE:ICO_EYE_CLOSED;}
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(p.data&&p.data.isVectorBrush)return;p.fillColor=v?state.fillColor:null;});saveActiveLayerFrame();updateUI();}
     else if(state.tool==='fsselect'&&_fsSel&&(_fsSel.kind==='fill'||_fsSel.kind==='fillregion')){pushUndo();if(_fsSel.kind==='fillregion')_fsSel=fsRealizeFillRegion(_fsSel,userLayers[state.activeLayerIdx]);_fsSel.path.fillColor=v?state.fillColor:null;if(!v){fsUnlinkFillRegen(_fsSel.path);if(!_fsSel.path.strokeColor){_fsSel.path.remove();fsClearSel();}}saveActiveLayerFrame();updateUI();}},
@@ -379,7 +389,7 @@ window.SM={
   // the quick phdr toggle button since disabling stroke without it required
   // opening the color popover and hunting for "None".
   setStrokeEnabled:function(v){state.strokeEnabled=v;
-    var st=document.getElementById('stroke-enable-toggle');if(st)st.classList.toggle('off',!v);
+    var st=document.getElementById('stroke-enable-toggle');if(st){st.classList.toggle('off',!v);st.innerHTML=v?ICO_EYE:ICO_EYE_CLOSED;}
     var stlp=document.getElementById('stroke-enable-toggle-lp');if(stlp){stlp.classList.toggle('off',!v);stlp.innerHTML=v?ICO_EYE:ICO_EYE_CLOSED;}
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(p.data&&p.data.isVectorBrush)return;p.strokeColor=v?state.strokeColor:null;});saveActiveLayerFrame();updateUI();}
     // fsselect's 'stroke' selection can be just a bounded segment (between
@@ -4692,6 +4702,88 @@ document.getElementById('fill-enable-toggle-lp').addEventListener('click',functi
 document.getElementById('stroke-enable-toggle-lp').addEventListener('click',function(){window.SM.setStrokeEnabled(!state.strokeEnabled);});
 document.getElementById('color-stroke').addEventListener('input',function(){window.SM.setStrokeColor(this.dataset.hex8||this.value);if(!state.strokeEnabled)window.SM.setStrokeEnabled(true);});
 document.getElementById('pm-stroke-c').addEventListener('input',function(){var v=this.dataset.hex8||this.value;window.SM.setStrokeColor(v);document.getElementById('color-stroke').value=v;document.getElementById('color-stroke').dataset.hex8=v;if(!state.strokeEnabled)window.SM.setStrokeEnabled(true);});
+// Figma-style color row (2026-07, "les couleurs ça peut être un système
+// comme [Figma]") — inline eye toggles + editable hex/alpha text fields
+// right in the Fill/Stroke rows, alongside the existing swatch popover.
+document.getElementById('fill-enable-toggle').addEventListener('click',function(){window.SM.setFillEnabled(!state.fillEnabled);});
+document.getElementById('stroke-enable-toggle').addEventListener('click',function(){window.SM.setStrokeEnabled(!state.strokeEnabled);});
+// Formats a color for the inline hex text field: no '#', uppercase, and
+// the alpha byte dropped when it's just FF (fully opaque) — showing
+// "FF0000FF" for a plain opaque red would read as broken/unexpected to
+// anyone not already thinking in hex8.
+function hexDisplayValue(hex){
+  var h=(hex||'#000000').replace('#','');
+  if(h.length===8&&h.slice(6).toUpperCase()==='FF')h=h.slice(0,6);
+  return h.toUpperCase();
+}
+// Reads the alpha byte (if present) as a 0-100 percentage, same "#rrggbb
+// == fully opaque" convention color-picker.js's own hexToAlpha uses.
+function alphaPctFromHex(hex){
+  var h=(hex||'').replace('#','');
+  if(h.length!==8)return 100;
+  return Math.round((parseInt(h.slice(6,8),16)||0)/255*100);
+}
+// Parses a typed hex string (with or without '#', 3/6/8 digits) into a
+// normalized '#rrggbb'/'#rrggbbaa' string, or null if it's not valid yet
+// (mid-typing) — shared by both hex fields below.
+function parseHexInput(raw){
+  var h=(raw||'').trim().replace(/^#/,'');
+  if(/^[0-9a-fA-F]{3}$/.test(h))return '#'+h.split('').map(function(c){return c+c;}).join('').toUpperCase();
+  if(/^[0-9a-fA-F]{6}$/.test(h)||/^[0-9a-fA-F]{8}$/.test(h))return '#'+h.toUpperCase();
+  return null;
+}
+document.getElementById('p-fill-hex').addEventListener('change',function(){
+  var hex=parseHexInput(this.value);
+  if(!hex){this.value=hexDisplayValue(state.fillColor);return;}
+  window.SM.setFillColor(hex);
+  if(!state.fillEnabled)window.SM.setFillEnabled(true);
+});
+document.getElementById('p-stroke-hex').addEventListener('change',function(){
+  var hex=parseHexInput(this.value);
+  if(!hex){this.value=hexDisplayValue(state.strokeColor);return;}
+  window.SM.setStrokeColor(hex);
+  if(!state.strokeEnabled)window.SM.setStrokeEnabled(true);
+});
+// Stroke's own alpha (2026-07) — Stroke has no separate per-object
+// "opacity" field the way Fill does (#p-opacity), so its Figma-style
+// opacity% box writes straight into the stroke COLOR's own hex8 alpha
+// byte instead, keeping RGB untouched.
+document.getElementById('p-stroke-alpha').addEventListener('input',function(){
+  var pct=Math.max(0,Math.min(100,parseInt(this.value)||0));
+  var rgb=(state.strokeColor||'#000000').replace('#','').slice(0,6);
+  var a=Math.round(pct/100*255).toString(16).padStart(2,'0').toUpperCase();
+  window.SM.setStrokeColor('#'+rgb+(pct<100?a:''));
+  if(!state.strokeEnabled)window.SM.setStrokeEnabled(true);
+});
+['p-fill-hex','p-stroke-hex'].forEach(function(id){
+  var el=document.getElementById(id);
+  el.addEventListener('keydown',function(e){if(e.key==='Enter')this.blur();});
+});
+// Document Dimensions proportion-lock (2026-07, "des tailles ou position
+// sur une seule ligne") — remembers the W/H ratio at the moment it's
+// switched ON; while locked, editing either field scales the other to
+// preserve that ratio. Off by default (matches the pre-existing behavior
+// of W/H being fully independent).
+var _dimsLockRatio=null;
+document.getElementById('btn-dims-lock').addEventListener('click',function(){
+  var on=!this.classList.contains('on');
+  this.classList.toggle('on',on);
+  _dimsLockRatio=on?(state.canvasW/state.canvasH):null;
+});
+document.getElementById('p-cw').addEventListener('input',function(){
+  if(_dimsLockRatio){
+    var h=Math.max(1,Math.round(parseFloat(this.value)/_dimsLockRatio));
+    document.getElementById('p-ch').value=h;
+    window.SM.setCanvasSize(parseInt(this.value)||1,h);
+  }
+});
+document.getElementById('p-ch').addEventListener('input',function(){
+  if(_dimsLockRatio){
+    var w=Math.max(1,Math.round(parseFloat(this.value)*_dimsLockRatio));
+    document.getElementById('p-cw').value=w;
+    window.SM.setCanvasSize(w,parseInt(this.value)||1);
+  }
+});
 // Paint the panel's fill swatch from the actual starting state.fillColor/
 // fillEnabled on load — without this it sits at whatever background the
 // static HTML happened to have (transparent) until the user touches it.
