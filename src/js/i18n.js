@@ -156,7 +156,11 @@
   function initLanguage(){
     var saved=null;
     try{saved=localStorage.getItem('nemo-lang');}catch(e){}
-    state.language=(saved&&LANGS.indexOf(saved)>=0)?saved:(state.language||'fr');
+    // Default language is English (feedback 2026-07: "met l'app en anglais
+    // par default") — a saved localStorage choice (any language, French
+    // included) still always wins; this only changes what a brand-new
+    // install/browser profile sees before ever touching Réglages.
+    state.language=(saved&&LANGS.indexOf(saved)>=0)?saved:(state.language||'en');
     applyI18n();
     var sel=document.getElementById('settings-language');
     if(sel)sel.addEventListener('change',function(){setLanguage(this.value);});
