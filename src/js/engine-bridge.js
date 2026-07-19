@@ -439,6 +439,13 @@
             }
           }
           if (c.data && c.data.paintOrder) item.paintOrder = c.data.paintOrder;
+          // Per-element effects (2026-07, effects-panel.js — "possible de
+          // différencié les effet par éléments sélectionné") — same
+          // {effectType,enabled,p1..p4}[] shape sceneEffectsOf already
+          // normalizes ld.effects into, just scoped to this one item. See
+          // engine.rs's paint_layer_items for how an item carrying this is
+          // isolated and effect-processed on its own within the layer.
+          if (c.data && c.data.effects && c.data.effects.length) item.effects = sceneEffectsOf(c.data);
           items.push(item);
         });
       }

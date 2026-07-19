@@ -404,6 +404,11 @@
       <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrEffects">Effects</span></div>
       <div class="pbdy">
         <div class="pr" id="effects-adj-hint" style="font-size:10px;color:var(--text-dim);display:none" data-i18n="effectLayerDesc">Appliqué à tout ce qui est en dessous de ce calque dans la pile (comme un Adjustment Layer After Effects).</div>
+        <!-- Per-element targeting (2026-07: "possible de différencié les
+             effet par éléments sélectionné") — shown only while exactly one
+             shape is selected, so it's clear "+ Add Effect" is about to
+             scope to that element instead of the whole layer. -->
+        <div class="pr" id="effects-target-hint" style="font-size:10px;color:var(--accent);display:none">Élément sélectionné — l'effet s'appliquera juste à lui.</div>
         <div id="effects-list"></div>
         <!-- Categorized flyout with preview thumbnails (feedback 2026-07:
              "on a pas de préviz vignette et de sous menu. Pense bien
