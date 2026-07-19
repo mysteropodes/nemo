@@ -3927,15 +3927,25 @@ function initAppMenu(){
   btn.addEventListener('click',function(e){
     e.stopPropagation();
     var r=btn.getBoundingClientRect();
-    window.showContextMenu(r.left,r.bottom+4,[
+    var items=[
+      // Live current-project label (feedback 2026-07: the right-panel
+      // "Projet" section was pure duplication of this menu — everything
+      // in it either already had an entry here or is added below. This
+      // disabled row replaces its old #proj-current text readout, the one
+      // thing in that section with no action of its own.
+      {label:(window.SMProject&&window.SMProject.getCurrentLabel)?window.SMProject.getCurrentLabel():'Untitled (not saved)',disabled:true},
+      {sep:true},
       {label:'Nouveau projet',shortcut:'⌘N',action:function(){clickEl('project-tab-add');}},
       {label:'Ouvrir…',shortcut:'⌘O',action:function(){if(window.SMProject)window.SMProject.open();}},
       {label:'Enregistrer',shortcut:'⌘S',action:function(){if(window.SMProject)window.SMProject.save();}},
       {label:'Enregistrer sous…',shortcut:'⇧⌘S',action:function(){if(window.SMProject)window.SMProject.saveAs();}},
+      {label:'Depuis Kitsu…',id:'ctx-kitsu-open',action:function(){clickEl('btn-kitsu-open');}},
+      {label:'Historique des versions…',id:'ctx-history',action:function(){clickEl('btn-history');}},
       {sep:true},
       {label:'Importer image(s)…',action:function(){clickEl('btn-import-img');}},
       {label:'Importer vidéo…',action:function(){clickEl('btn-import-video');}},
-      {label:'Exporter…',action:function(){clickEl('btn-export');}},
+      {label:'Importer PSD (calques)…',id:'ctx-import-psd',action:function(){clickEl('btn-import-psd');}},
+      {label:'Exporter…',id:'ctx-export',action:function(){clickEl('btn-export');}},
       {sep:true},
       {label:'Réglages',action:function(){clickEl('btn-settings');}},
       {label:'Raccourcis clavier',action:function(){
@@ -3948,7 +3958,17 @@ function initAppMenu(){
         var t=document.querySelector('#settings-tabs .settings-tab[data-tab="updates"]');
         if(t)t.click();
       }}
-    ]);
+    ];
+    // Kitsu publish only makes sense once a shot is actually open — mirrors
+    // the old kitsu-shot-row/kitsu-publish-row's own show/hide condition
+    // (kitsu.js's updateKitsuShotUI), just decided fresh at menu-open time
+    // instead of a persistent DOM row kept in sync.
+    var ks=window.SMKitsu&&window.SMKitsu.getCurrentShot&&window.SMKitsu.getCurrentShot();
+    if(ks){
+      items.splice(1,0,{label:'Kitsu: '+ks.projectName+(ks.sequenceName?' / '+ks.sequenceName:'')+' / '+ks.shotName+(ks.taskName?' ('+ks.taskName+')':''),disabled:true});
+      items.splice(2,0,{label:'Publier vers Kitsu',id:'ctx-kitsu-publish',action:function(){clickEl('btn-kitsu-publish');}});
+    }
+    window.showContextMenu(r.left,r.bottom+4,items);
   });
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initAppMenu);else initAppMenu();

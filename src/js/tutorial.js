@@ -254,15 +254,16 @@
     ["Clic-droit sur une pastille propose \"Remplacer dans le calque…\" — pratique pour recolorer tous les traits d'une teinte en une fois. Le \"+\" au-dessus des palettes en crée une nouvelle.", "Right-clicking a swatch offers \"Replace in layer…\" — handy for recoloring every stroke of one shade at once. The \"+\" above the palettes creates a new one.", "Clic derecho en una muestra ofrece \"Reemplazar en la capa…\" — práctico para recolorear todos los trazos de un tono a la vez. El \"+\" encima de las paletas crea una nueva.", "スウォッチを右クリックすると「レイヤー内で置換…」が表示されます — 同じ色のすべての線を一括で塗り替えるのに便利です。パレット上部の「+」で新しいパレットを作成できます。"],
     ["Clique \"Apply\" (ou Ctrl/Cmd+Entrée) pour poser le texte sur le canevas.", "Click \"Apply\" (or Ctrl/Cmd+Enter) to place the text on the canvas.", "Haz clic en \"Apply\" (o Ctrl/Cmd+Intro) para colocar el texto en el lienzo.", "「Apply」（またはCtrl/Cmd+Enter）をクリックしてテキストをキャンバスに配置します。"],
     ["Clique \"Choisir…\" pour voir comment on désigne un dossier partagé (nécessite l'app desktop — un simple message s'affiche ici en preview navigateur).", "Click \"Choose…\" to see how a shared folder is designated (requires the desktop app — just a message shows here in the browser preview).", "Haz clic en \"Elegir…\" para ver cómo se designa una carpeta compartida (requiere la app de escritorio — aquí en la vista previa del navegador solo se muestra un mensaje).", "「選択…」をクリックして共有フォルダの指定方法を確認します（デスクトップアプリが必要 — このブラウザプレビューでは単純なメッセージが表示されるだけです）。"],
-    ["Clique \"Export…\" dans le panneau de droite (section Projet).", "Click \"Export…\" in the right panel (Project section).", "Haz clic en \"Export…\" en el panel derecho (sección Proyecto).", "右パネルの「Export…」をクリック（Projetセクション内）。"],
+    ["Clique \"Exporter…\" dans le menu.", "Click \"Export…\" in the menu.", "Haz clic en \"Exportar…\" en el menú.", "メニューの「Exporter…」をクリックします。"],
     ["Clique \"Frame suivante\" 2 ou 3 fois pour te placer plus loin dans la timeline.", "Click \"Next frame\" 2 or 3 times to move further along the timeline.", "Haz clic en \"Siguiente fotograma\" 2 o 3 veces para avanzar en la línea de tiempo.", "「次のフレーム」を2〜3回クリックして、タイムラインの先へ進みます。"],
     ["Clique \"Frame suivante\" plusieurs fois (ou glisse le curseur) pour te placer 5 à 10 frames plus loin.", "Click \"Next frame\" several times (or drag the playhead) to move 5 to 10 frames further.", "Haz clic en \"Siguiente fotograma\" varias veces (o arrastra el cursor) para avanzar de 5 a 10 fotogramas.", "「次のフレーム」を何度かクリック（またはカーソルをドラッグ）して5〜10フレーム先へ進みます。"],
     ["Clique \"Frame suivante\" plusieurs fois pour te placer plus loin.", "Click \"Next frame\" several times to move further along.", "Haz clic en \"Siguiente fotograma\" varias veces para avanzar.", "「次のフレーム」を何度かクリックして先へ進みます。"],
     ["Clique \"Frame suivante\" pour voir les frames voisines apparaître en fantôme.", "Click \"Next frame\" to see the neighboring frames appear as ghosts.", "Haz clic en \"Siguiente fotograma\" para ver los fotogramas vecinos aparecer como fantasmas.", "「次のフレーム」をクリックすると、前後のフレームが半透明の残像として表示されます。"],
-    ["Clique \"Historique…\" dans le panneau de droite (section Projet).", "Click \"History…\" in the right panel (Project section).", "Haz clic en \"Historial…\" en el panel derecho (sección Proyecto).", "右パネルの「Historique…」をクリック（Projetセクション内）。"],
+    ["Clique \"Historique des versions…\" dans le menu.", "Click \"Version history…\" in the menu.", "Haz clic en \"Historial de versiones…\" en el menú.", "メニューの「Historique des versions…」をクリックします。"],
     ["Clique l'en-tête \"Perspective Guide\" dans le panneau de droite pour la déplier, si besoin.", "Click the \"Perspective Guide\" header in the right panel to expand it, if needed.", "Haz clic en el encabezado \"Perspective Guide\" del panel derecho para desplegarlo, si es necesario.", "必要であれば、右パネルの「Perspective Guide」見出しをクリックして開きます。"],
     ["Clique l'en-tête \"Project\" dans le panneau de droite pour la déplier.", "Click the \"Project\" header in the right panel to expand it.", "Haz clic en el encabezado \"Project\" del panel derecho para desplegarlo.", "右パネルの「Project」見出しをクリックして開きます。"],
     ["Clique l'en-tête \"Projet\" dans le panneau de droite pour la déplier, si besoin.", "Click the \"Project\" header in the right panel to expand it, if needed.", "Haz clic en el encabezado \"Proyecto\" del panel derecho para desplegarlo, si es necesario.", "必要であれば、右パネルの「Projet」見出しをクリックして開きます。"],
+    ["Clique l'icône ☰ en haut à gauche.", "Click the ☰ icon at the top left.", "Haz clic en el icono ☰ en la parte superior izquierda.", "左上の☰アイコンをクリックします。"],
     ["Clique l'icône en forme de roue crantée en haut de l'écran.", "Click the gear icon at the top of the screen.", "Haz clic en el icono de engranaje en la parte superior de la pantalla.", "画面上部の歯車アイコンをクリックします。"],
     ["Clique l'onglet \"Animation 2D\" en haut de l'écran.", "Click the \"Animation 2D\" tab at the top of the screen.", "Haz clic en la pestaña \"Animation 2D\" en la parte superior de la pantalla.", "画面上部の「Animation 2D」タブをクリックします。"],
     ["Clique l'onglet \"Collaboration\" en haut de la fenêtre de Réglages.", "Click the \"Collaboration\" tab at the top of the Settings window.", "Haz clic en la pestaña \"Collaboration\" en la parte superior de la ventana de Ajustes.", "設定ウィンドウ上部の「Collaboration」タブをクリックします。"],
@@ -1001,13 +1002,11 @@
       time: '1 min',
       steps: [
         { type: 'info', title: 'Remonter dans le temps', body: 'Nemo prend un instantané automatique toutes les 30 secondes — récupérable même après un crash, pas seulement la dernière session.' },
-        // The "Project" section (right panel) starts COLLAPSED by default
-        // (.pbdy has the .hid class on load) — #btn-history is 0x0 and
-        // unclickable until its header is opened. Found live: the spotlight
-        // highlighted nothing, because getBoundingClientRect() on a
-        // display:none descendant is legitimately zero.
-        { type: 'click', target: '#phdr-project', title: 'Ouvre la section "Project"', body: 'Clique l\'en-tête "Project" dans le panneau de droite pour la déplier.' },
-        { type: 'click', target: '#btn-history', title: 'Ouvre l\'historique', body: 'Clique "Historique…" dans le panneau de droite (section Projet).' },
+        // The old "Project" right-panel section is gone (feedback 2026-07 —
+        // duplicated the burger menu) — #btn-history now lives hidden in
+        // #legacy-project-actions, only reachable through the real menu.
+        { type: 'click', target: '#app-menu-btn', title: 'Ouvre le menu', body: 'Clique l\'icône ☰ en haut à gauche.' },
+        { type: 'click', target: '#ctx-history', title: 'Ouvre l\'historique', body: 'Clique "Historique des versions…" dans le menu.' },
         { type: 'info', title: 'Bien joué !', body: 'Restaurer un ancien instantané prend d\'abord un instantané de l\'état actuel — l\'opération reste donc elle-même annulable.' }
       ]
     },
@@ -1071,21 +1070,14 @@
       // reste donc volontairement au niveau "ouvrir/configurer" : chaque
       // étape est un vrai clic/changement réel sur la vraie fenêtre
       // d'export, sans jamais cliquer "Exporter" pour de vrai.
-      // #btn-export vit dans le panneau de droite, section "Projet" —
-      // COLLAPSÉE par défaut (même piège que #btn-history, voir module
-      // 'history' plus haut). Étape tolérante façon 'perspective' : si la
-      // section est déjà ouverte (ex. module Historique fait juste avant
-      // dans la même session), un re-clic sur son en-tête la refermerait —
-      // on attend juste que le bouton devienne visible, qu'il ait fallu
-      // cliquer ou non.
+      // #btn-export vit désormais caché dans #legacy-project-actions
+      // (l'ancienne section "Projet" du panel de droite a été supprimée,
+      // feedback 2026-07 — dupliquait le menu burger) — seul accès réel :
+      // le menu burger, comme le module 'history' juste au-dessus.
       steps: [
         { type: 'info', title: 'Sortir ton animation', body: 'Nemo exporte en PNG/TIFF/GIF/MP4/ProRes, en SVG, en Lottie (JSON animé) ou en projet Rive/After Effects — un seul bouton, plusieurs formats.' },
-        {
-          type: 'state', target: '#phdr-project', title: 'Ouvre la section "Projet"', body: 'Clique l\'en-tête "Projet" dans le panneau de droite pour la déplier, si besoin.',
-          hint: 'En attente…',
-          check: function (win) { var el = win.document.getElementById('btn-export'); return !!(el && el.getBoundingClientRect().height > 0); }
-        },
-        { type: 'click', target: '#btn-export', title: 'Ouvre la fenêtre d\'export', body: 'Clique "Export…" dans le panneau de droite (section Projet).' },
+        { type: 'click', target: '#app-menu-btn', title: 'Ouvre le menu', body: 'Clique l\'icône ☰ en haut à gauche.' },
+        { type: 'click', target: '#ctx-export', title: 'Ouvre la fenêtre d\'export', body: 'Clique "Exporter…" dans le menu.' },
         stateChangedStep({
           target: '#exp-format', title: 'Choisis un format', body: 'Ouvre le menu déroulant "Format" et choisis "Lottie" pour voir la fenêtre s\'adapter (les options d\'échelle disparaissent, un aperçu scrubbable s\'ouvrira après export).',
           hint: 'En attente de ton choix…', measure: function (win) { var el = win.document.getElementById('exp-format'); return el ? el.value : ''; }
