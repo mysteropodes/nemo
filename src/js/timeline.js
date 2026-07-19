@@ -5231,18 +5231,25 @@ function setOnionSpan(prev,next){
   window.SM.setOnionRange(inF,outF);
   window.updateOmMarkers(cf,state.totalFrames);
 }
-document.getElementById('btn-os-range').addEventListener('click',function(e){
-  e.stopPropagation();
-  var r=this.getBoundingClientRect();
-  window.showContextMenu(r.left,r.top-160,[
-    {label:'Onion ±1',action:function(){setOnionSpan(1,1);}},
-    {label:'Onion ±2',action:function(){setOnionSpan(2,2);}},
-    {label:'Onion ±5',action:function(){setOnionSpan(5,5);}},
-    {label:'Toutes les images',action:function(){setOnionSpan(-1,-1);}},
-    {sep:true},
-    {label:(window._omFollow?'✓ ':'')+'Marqueurs suivent le curseur',action:function(){window._omFollow=!window._omFollow;window.updateOmMarkers(state.currentFrame,state.totalFrames);}},
-  ]);
-});
+// Marker-range presets — folded into the onion-skin right-click popover
+// (#onion-pop) from the now-removed separate "Modify onion markers"
+// (#btn-os-range) toolbar button/dropdown (2026-07, "les options de ce
+// bouton là doivent aller dans le clic droit du bouton onion skin et donc
+// plus besoin de celui-ci"). Same setOnionSpan()/_omFollow logic as
+// before, just plain buttons/checkbox inside the popover instead of a
+// second showContextMenu dropdown.
+document.getElementById('om-span-1').addEventListener('click',function(){setOnionSpan(1,1);});
+document.getElementById('om-span-2').addEventListener('click',function(){setOnionSpan(2,2);});
+document.getElementById('om-span-5').addEventListener('click',function(){setOnionSpan(5,5);});
+document.getElementById('om-span-all').addEventListener('click',function(){setOnionSpan(-1,-1);});
+var omFollowChk=document.getElementById('p-om-follow');
+if(omFollowChk){
+  omFollowChk.checked=!!window._omFollow;
+  omFollowChk.addEventListener('change',function(){
+    window._omFollow=this.checked;
+    window.updateOmMarkers(state.currentFrame,state.totalFrames);
+  });
+}
 document.getElementById('btn-loop').addEventListener('click',function(){window.SM.toggleLoopPlayback();});
 document.getElementById('btn-loop').addEventListener('contextmenu',function(e){e.preventDefault();window.SM.togglePingPongPlayback();});
 // Onion Skin options popover (feedback #23): right-click on the timeline's

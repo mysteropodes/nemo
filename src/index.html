@@ -1121,7 +1121,20 @@
   <div class="pr" style="font-size:9px;color:var(--text-dim);margin-bottom:6px" data-i18n="onionDragHint">Glisser les marqueurs rouge/bleu sur la timeline</div>
   <div class="pr" style="margin-bottom:6px"><span class="pl" data-i18n="fieldMode">Mode</span><select class="psel" id="p-omode"><option value="tinted" data-i18n="omodeTinted">Tinted</option><option value="original" data-i18n="omodeOriginal">Original</option><option value="outline" data-i18n="omodeOutline">Outline</option></select></div>
   <div class="pr" style="margin-bottom:6px"><span class="pl" data-i18n="fieldPrevOp">Prev Op</span><input type="number" class="pi scrub" id="p-opop" value="30" min="5" max="80" data-step="1"></div>
-  <div class="pr"><span class="pl" data-i18n="fieldNextOp">Next Op</span><input type="number" class="pi scrub" id="p-onop" value="30" min="5" max="80" data-step="1"></div>
+  <div class="pr" style="margin-bottom:6px"><span class="pl" data-i18n="fieldNextOp">Next Op</span><input type="number" class="pi scrub" id="p-onop" value="30" min="5" max="80" data-step="1"></div>
+  <!-- Marker-range presets, folded in from the now-removed separate
+       "Modify onion markers" (#btn-os-range) toolbar button (2026-07,
+       "les options de ce bouton là doivent aller dans le clic droit du
+       bouton onion skin et donc plus besoin de celui-ci") — same
+       setOnionSpan()/_omFollow logic, just reachable from this one popover
+       instead of a second dropdown. -->
+  <div class="pr" style="margin-bottom:6px;gap:4px">
+    <button type="button" class="pbtn" id="om-span-1" style="flex:1;font-size:9px;padding:4px 2px">±1</button>
+    <button type="button" class="pbtn" id="om-span-2" style="flex:1;font-size:9px;padding:4px 2px">±2</button>
+    <button type="button" class="pbtn" id="om-span-5" style="flex:1;font-size:9px;padding:4px 2px">±5</button>
+    <button type="button" class="pbtn" id="om-span-all" style="flex:1;font-size:9px;padding:4px 2px" data-i18n="onionSpanAll">Tout</button>
+  </div>
+  <div class="pr"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="p-om-follow" style="accent-color:var(--accent)"> <span data-i18n="onionFollowLabel">Marqueurs suivent le curseur</span></label></div>
 </div>
 <div id="comment-popover" style="display:none;position:absolute;z-index:200;width:240px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);padding:8px">
   <div id="comment-author-row" style="font-size:10px;color:var(--text-dim);margin-bottom:4px"></div>
@@ -1193,7 +1206,9 @@
     <span style="width:1px;height:20px;background:var(--border2);flex:none"></span>
     <button class="tb" id="btn-os" data-i18n-title="btnOnionTitle" title="Onion skin on/off (O)"><span class="material-symbols-rounded" style="font-size:16px">&#xe53b;</span></button>
     <button class="tb" id="btn-os-outline" data-i18n-title="btnOnionOutlineTitle" title="Onion skin outlines only"><span style="font-size:13px;line-height:1">&#x25ad;</span></button>
-    <button class="tb" id="btn-os-range" data-i18n-title="btnOnionRangeTitle" title="Modify onion markers"><span style="font-size:11px;line-height:1">&#x25be;</span></button>
+    <!-- "Modify onion markers" (#btn-os-range) removed (2026-07) — its
+         marker-range presets moved into the onion-skin button's own
+         right-click popover (#onion-pop), see that popover's own comment. -->
     <button class="tb" id="btn-ghost-all" data-i18n-title="btnGhostAllTitle" title="Ghost all keyframes — shows every keyframe of the active layer at once" style="margin-left:4px"><span style="font-size:13px;line-height:1">&#x2637;</span></button>
     <button class="tb" id="btn-ghost-select" data-i18n-title="btnGhostSelectTitle" title="Select all keyframes' content to move/transform together"><span style="font-size:12px;line-height:1">&#x2725;</span></button>
     <button class="tb" id="btn-revision-view" data-i18n-title="btnRevisionViewTitle" title="Vue de révision — cycle Tout / Mes traits / Corrections" style="margin-left:4px;width:auto;padding:0 8px;font-size:10px" data-i18n="revisionViewAll">Tout</button>
