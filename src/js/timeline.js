@@ -1486,8 +1486,6 @@ function updatePropsContext(){
   var eligibleSel=hasSel&&selectedPaths.every(function(p){return p instanceof Path&&p.strokeColor&&!(p.data&&(p.data.isVectorBrush||p.data.isFillShape));});
   var brushPresetRow=document.getElementById('p-brushpreset-row');
   if(brushPresetRow)brushPresetRow.style.display=(state.tool==='draw'||eligibleSel)?'flex':'none';
-  var brushApplyRow=document.getElementById('p-brushpreset-apply-row');
-  if(brushApplyRow)brushApplyRow.style.display=eligibleSel?'flex':'none';
   // Only auto-(re)expand sections on an actual context CHANGE — every
   // updateUI() tick calls this, and forcing every visible section back open
   // on each call would fight a user who deliberately collapsed one while
@@ -1612,20 +1610,21 @@ function updateSelPropsPanel(){
       // Apply/Remove-to-selection (btn-bitmap-apply/-remove, already wired
       // for exactly this — see bitmap-brush.js) looked broken because the
       // checkbox never confirmed which state you were in or landed in.
+      // Bitmap Brush controls moved OUT of the Stroke panel entirely
+      // (2026-07 harmonization — see index.html's own comment where that
+      // section used to live): the state.* writes below no longer have a
+      // Stroke-panel checkbox/fields to also mirror into, but they still
+      // need to run unconditionally — the floating Brush panel
+      // (brush-menu-bridge.js) reads these same state fields fresh every
+      // time it's opened, so keeping them in sync with the actual selection
+      // is still exactly as necessary as before, just with no DOM element
+      // here to gate on.
       var bmSpec=ref.data&&ref.data.bitmapBrushSpec;
-      var bmChk=document.getElementById('p-bitmapbrush-on');
-      if(bmChk){
-        bmChk.checked=!!bmSpec;state.bitmapBrushOn=!!bmSpec;
-        if(bmSpec){
-          state.bitmapTip=bmSpec.tip;state.bitmapSpacing=bmSpec.spacing;
-          state.bitmapScatter=bmSpec.scatter;state.bitmapOpacity=Math.round(bmSpec.opacity*100);
-          state.bitmapPressure=!!bmSpec.pressure;
-          var spEl=document.getElementById('p-bitmap-spacing');if(spEl)spEl.value=bmSpec.spacing;
-          var scEl=document.getElementById('p-bitmap-scatter');if(scEl)scEl.value=bmSpec.scatter;
-          var opEl=document.getElementById('p-bitmap-opacity');if(opEl)opEl.value=Math.round(bmSpec.opacity*100);
-          var prEl=document.getElementById('p-bitmap-pressure');if(prEl)prEl.checked=!!bmSpec.pressure;
-          if(window.BitmapTipPicker)BitmapTipPicker.paintButton(bmSpec.tip);
-        }
+      state.bitmapBrushOn=!!bmSpec;
+      if(bmSpec){
+        state.bitmapTip=bmSpec.tip;state.bitmapSpacing=bmSpec.spacing;
+        state.bitmapScatter=bmSpec.scatter;state.bitmapOpacity=Math.round(bmSpec.opacity*100);
+        state.bitmapPressure=!!bmSpec.pressure;
       }
     }
   }
@@ -4941,8 +4940,14 @@ document.getElementById('btn-bool-exclude').addEventListener('click',function(){
 document.getElementById('p-erasersize').addEventListener('input',function(){window.SM.setEraserSize(this.value);});
 document.getElementById('p-fillbrushsize').addEventListener('input',function(){window.SM.setFillBrushSize(this.value);});
 document.getElementById('p-brushpreset').addEventListener('change',function(){window.SM.setBrushPreset(this.value);if(window.BrushPresetPicker)window.BrushPresetPicker.paintButton(this.value);});
-document.getElementById('btn-brushpreset-apply').addEventListener('click',function(){
-  var preset=state.brushPreset;
+// Applies a vector brush preset to the current selection — was wired to a
+// dedicated "Apply to selection" button in the Stroke panel; that button
+// (and its Bitmap Brush counterpart) is gone (2026-07 harmonization, moved
+// out to the floating Brush panel), so this is now a plain function the
+// floating panel (brush-menu-bridge.js) calls directly the moment a preset
+// swatch is clicked — same eligibility/strip/apply logic as before, just
+// callable from more than one caller.
+function applyVectorBrushToSelection(preset){
   // `p.strokeColor` used to gate eligibility — excluded every fill-
   // camouflaged anchor (a Bitmap Brush stroke with a fill, or any already-
   // textured anchor with strokeColor nulled by the SAME camouflage
@@ -4965,7 +4970,8 @@ document.getElementById('btn-brushpreset-apply').addEventListener('click',functi
     if(preset&&preset!=='none')applyBrushTexture(p,preset);
   });
   saveActiveLayerFrame();updateUI();showToast('Brush appliqué à la sélection');
-});
+}
+window.SM.applyVectorBrushToSelection=applyVectorBrushToSelection;
 if(window.BrushPresetPicker)window.BrushPresetPicker.paintButton(state.brushPreset);
 document.getElementById('p-drawmode').addEventListener('change',function(){window.SM.setDrawMode(this.value);});
 document.getElementById('p-pmin').addEventListener('input',function(){window.SM.setPressureMin(this.value);});

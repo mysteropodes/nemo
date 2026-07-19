@@ -33,8 +33,16 @@
     rect: ['symmetry', 'canvas-grid', 'view-filter'],
     ellipse: ['symmetry', 'french-curve', 'canvas-grid'],
     eraser: ['out-of-pegs', 'canvas-grid'],
-    select: ['vector-sculpt', 'canvas-grid'],
-    subselect: ['vector-sculpt'],
+    // 'brush-menu' added here (2026-07, Stroke-panel brush harmonization):
+    // applying/converting a vector or bitmap brush texture on an EXISTING
+    // selection (Select/Subselect tool, nothing being drawn) used to go
+    // through the Stroke panel's own "Apply to selection" button/Bitmap
+    // Brush checkbox — both removed in favor of the floating Brush panel
+    // auto-applying on preset click (see brush-menu-bridge.js). Without an
+    // entry here that panel's button never appears outside Draw/Fillbrush,
+    // making that whole apply-to-selection path unreachable.
+    select: ['brush-menu', 'vector-sculpt', 'canvas-grid'],
+    subselect: ['brush-menu', 'vector-sculpt'],
     hand: ['canvas-grid'],
   };
   // Real `state.*`-backed features (NOT Labs prototypes — no localStorage

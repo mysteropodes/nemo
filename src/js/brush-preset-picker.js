@@ -113,33 +113,21 @@
   // existed. The <select> still exists in the DOM for anything that reads
   // its markup, but is no longer the source of truth.
   function selectPreset(key) {
+    // setBrushPreset (timeline.js, SM.setBrushPreset) ALREADY retroactively
+    // re-textures the current selection itself (own pushUndo/
+    // stripAnyBrushTexture+applyBrushTexture/saveActiveLayerFrame, added
+    // 2026-07-17 — "les changement de brush dynamique ne s'applique pas au
+    // stroke de la selection") — this function used to ALSO do its own,
+    // essentially identical, retroactive-apply block on top of that,
+    // silently double-applying (two undo entries, two re-stamps with a
+    // fresh random seed each) every time a preset was picked from this
+    // popover with an eligible selection active. Found via the floating
+    // Brush panel's own preset grid (brush-menu-bridge.js, 2026-07
+    // harmonization pass) calling this same function — caught by checking
+    // state.undoStack.length after a single click, not just eyeballing the
+    // result, which is why it went unnoticed this long.
     if (window.SM) window.SM.setBrushPreset(key);
     paintButton(key);
-    // Also retroactively re-texture whatever's currently selected (feedback:
-    // "impossible d'appliquer une brush preset à postériori") — plain
-    // constant-width strokes AND pressure (isVectorBrush) ribbons now that
-    // applyBrushTexture can size dabs off a widthProfile instead of one
-    // fixed strokeWidth. isFillShape/isBrushTextureCopy items still have no
-    // applicable dab-placement model and stay excluded.
-    if (typeof selectedPaths !== 'undefined' && selectedPaths.length && typeof applyOrChangeBrushTexture === 'function') {
-      var layer = window.userLayers && window.userLayers[state.activeLayerIdx];
-      if (layer) {
-        var touched = 0;
-        if (typeof pushUndo === 'function') pushUndo();
-        selectedPaths.forEach(function (p) {
-          var isPressureRibbon = !!(p.data && p.data.isVectorBrush && p.data.centerSegments && p.data.widthProfile);
-          if (!isPressureRibbon && !p.strokeColor && !(p.data && p.data.preTextureStroke !== undefined) && !(p.data && p.data.preTextureOpacity !== undefined)) return;
-          if (p.data && (p.data.isFillShape || p.data.isBrushTextureCopy)) return;
-          applyOrChangeBrushTexture(p, layer, key);
-          touched++;
-        });
-        if (touched) {
-          if (typeof saveActiveLayerFrame === 'function') saveActiveLayerFrame();
-          if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
-          if (typeof showToast === 'function') showToast(touched + ' trait(s) retexturé(s)');
-        }
-      }
-    }
   }
 
   function open(anchorEl, currentKey, onSelect) {
