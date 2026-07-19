@@ -433,6 +433,11 @@ input[type="checkbox"]:disabled{opacity:.4;cursor:not-allowed;}
 .color-eye-toggle:hover{background:rgba(255,255,255,.08);color:var(--text);}
 .color-eye-toggle.off{color:var(--text-dark);}
 .color-eye-toggle svg{width:15px;height:15px;display:block;}
+/* Selected Colors panel (2026-07) — crosshair "select shapes with this
+   color" button, same sizing/hover language as .color-eye-toggle. */
+.color-select-btn{flex:none;cursor:pointer;color:rgba(236,234,231,.5);width:20px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:5px;}
+.color-select-btn:hover{background:rgba(255,255,255,.08);color:var(--text);}
+.color-select-btn svg{display:block;}
 /* Figma-style paired W/H row (Document, 2026-07) — a small link icon
    between the two fields toggles proportion-lock (tools-panel-dock.js
    sibling pattern: JS toggles .on, CSS just reflects it). */
