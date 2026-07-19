@@ -91,7 +91,8 @@ function togglePlay(){if(state.playing)stopPlay();else startPlay();}
 
 function updatePlayhead(){
   if(window.SMCamera){SMCamera.applyCameraView();if(window.updateCameraPanel)updateCameraPanel();}
-  document.getElementById('tl-cf').textContent=state.currentFrame+1;
+  var tlCfEl0=document.getElementById('tl-cf');
+  if(document.activeElement!==tlCfEl0)tlCfEl0.value=state.currentFrame+1;
   document.getElementById('info-frame').textContent=state.currentFrame+1;
   document.getElementById('playhead').style.left=(state.currentFrame*FC)+'px';
   document.getElementById('playhead-flag').textContent=state.currentFrame+1;
@@ -1184,7 +1185,9 @@ function updateUI(){
   var strokes=getEffectiveStrokes(state.activeLayerIdx,state.currentFrame);
   document.getElementById('info-frame').textContent=state.currentFrame+1;
   document.getElementById('info-strokes').textContent=(window.SM&&SM.t?SM.t(strokes.length===1?'strokeCountOne':'strokeCountOther'):(strokes.length+' trait'+(strokes.length!==1?'s':''))).replace('{n}',strokes.length);
-  document.getElementById('tl-cf').textContent=state.currentFrame+1;
+  var tlCfEl=document.getElementById('tl-cf');
+  if(document.activeElement!==tlCfEl)tlCfEl.value=state.currentFrame+1;
+  tlCfEl.max=state.totalFrames;
   document.getElementById('tl-tf').textContent=state.totalFrames;
   var f=state.layers[state.activeLayerIdx].frames[state.currentFrame];
   var badge=document.getElementById('info-badge');
@@ -5290,6 +5293,17 @@ document.getElementById('btn-nf').addEventListener('click',function(){if(state.p
 document.getElementById('btn-lf').addEventListener('click',function(){if(state.playing)stopPlay();goToFrame(state.waOut);});
 document.getElementById('tl-fps').addEventListener('change',function(){window.SM.setFps(parseInt(this.value));});
 document.getElementById('tl-total').addEventListener('change',function(){window.SM.setTotalFrames(parseInt(this.value));});
+// tl-cf drag/type-to-scrub through frames (2026-07, "rendre la frame 1/120
+// draggable") — goToFrame() itself no-ops silently on an out-of-range
+// index (app.js) rather than clamping, so clamp here first or a
+// drag-past-the-end would leave the input showing a stale/invalid number
+// nothing ever applied.
+document.getElementById('tl-cf').addEventListener('change',function(){
+  var v=Math.max(1,Math.min(state.totalFrames,parseInt(this.value)||1));
+  this.value=v;
+  if(state.playing)stopPlay();
+  goToFrame(v-1);
+});
 document.getElementById('btn-al').addEventListener('click',function(){window.SM.addLayer();});
 document.getElementById('btn-dl').addEventListener('click',function(){window.SM.deleteLayer();});
 document.getElementById('btn-dupl').addEventListener('click',function(){window.SM.duplicateLayer();});
