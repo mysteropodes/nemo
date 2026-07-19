@@ -9,9 +9,22 @@
 
   function applyDock(pos) {
     var panel = document.getElementById('tools-panel');
-    if (!panel) return;
+    var area = document.getElementById('top-area');
+    if (!panel || !area) return;
     DOCKS.forEach(function (d) { panel.classList.remove('tools-dock-' + d); });
     if (pos !== 'left') panel.classList.add('tools-dock-' + pos);
+    // Right dock stays fully in-flow (no CSS order trick — that landed the
+    // panel PAST #props-panel, at the outer screen edge, when the actual
+    // ask was "entre le canvas et le menu droite": tucked between
+    // #canvas-col and #props-panel, same spot a real docking app like
+    // Krita/Photoshop would put it). Always reset to the natural default
+    // (first child) before deciding where it really belongs, so this stays
+    // idempotent regardless of which dock we're coming from.
+    if (area.firstChild !== panel) area.insertBefore(panel, area.firstChild);
+    if (pos === 'right') {
+      var propsResize = document.getElementById('props-panel-resize');
+      if (propsResize) area.insertBefore(panel, propsResize);
+    }
     // Hides #tools-panel-resize (only meaningful for the left dock) and
     // lets #canvas-col/#props-panel reclaim the space the panel isn't
     // occupying in the flex flow anymore once docked elsewhere.
