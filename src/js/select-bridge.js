@@ -773,7 +773,24 @@
         if (p.data && p.data.brushCompanions) {
           p.data.brushCompanions.forEach(function (c) { if (!c.removed) c.translate(delta); });
         }
+        // Custom anchor point (2026-07: "on déplace un point d'ancrage avec
+        // alt et l'on bouge l'objet après ... celui-ci ne se déplace pas
+        // avec l'objet") — xformAnchorCustom is stored as an ABSOLUTE
+        // world-space [x,y] (placeAnchorAt, above), not derived from the
+        // shape's bounds like the 9-dot preset anchor is, so it must be
+        // translated explicitly here or it's left stranded at its old
+        // position the moment the shape moves out from under it.
+        if (p.data && p.data.xformAnchorCustom) {
+          p.data.xformAnchorCustom = [p.data.xformAnchorCustom[0] + delta.x, p.data.xformAnchorCustom[1] + delta.y];
+        }
       });
+      // Same fix for the session-level anchor (state.xformAnchorCustom) the
+      // on-canvas crosshair/gizmo actually reads (tools.js's xformAnchorPoint)
+      // — a single global value, translated once per move tick rather than
+      // once per selected path.
+      if (state.xformAnchorCustom) {
+        state.xformAnchorCustom = [state.xformAnchorCustom[0] + delta.x, state.xformAnchorCustom[1] + delta.y];
+      }
       symGestureAccumulate(new Matrix().translate(delta));
     } else if (mode === 'xform-scale') {
       // Geometry-space pointer (NOT reassigning pt — lastPt at the end of
