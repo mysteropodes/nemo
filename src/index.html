@@ -386,12 +386,29 @@
       <div class="phdr"><span class="ar">☰</span> <span>Calque d’effet</span></div>
       <div class="pbdy">
         <div class="pr" style="font-size:10px;color:var(--text-dim)">Appliqué à tout ce qui est en dessous de ce calque dans la pile (comme un Adjustment Layer After Effects).</div>
-        <div class="pr"><span class="pl">Type</span><select class="psel" id="p-effect-type"><option value="blur">Flou</option><option value="colorAdjust">Teinte / Contraste</option><option value="vignette">Vignette</option><option value="glow">Glow</option></select></div>
+        <!-- Visual preview grid (2026-07, feedback: "des aperçu des effets
+             avec leur titre") — replaces the plain <select>; the select
+             itself stays in the DOM but hidden, kept as the single source
+             of truth every existing listener already reads/writes (see
+             EFFECT_DEFAULTS' change handler, timeline.js) so tile clicks
+             just set .value + dispatch 'change' rather than duplicating
+             that logic. Tiles themselves are built by initEffectFxGrid()
+             (timeline.js) from EFFECT_LIBRARY, not hardcoded here. -->
+        <select class="psel" id="p-effect-type" style="display:none"><option value="blur">Flou</option><option value="colorAdjust">Teinte / Contraste</option><option value="vignette">Vignette</option><option value="glow">Glow</option><option value="sepia">Sépia</option><option value="invert">Inverser</option><option value="grayscale">Niveaux de gris</option><option value="posterize">Postériser</option><option value="pixelate">Pixelliser</option><option value="chromaticAberration">Aberration chromatique</option><option value="scanlines">Lignes de balayage</option><option value="grain">Grain film</option><option value="sharpen">Netteté</option><option value="edgeDetect">Détection de contours</option></select>
+        <div class="pr fx-grid" id="p-effect-grid"></div>
         <div class="pr" id="p-effect-blur-row"><span class="pl">Rayon</span><input type="number" class="pi scrub" id="p-effect-radius" value="8" min="0" max="200" data-step="1"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
         <div class="pr" id="p-effect-brightness-row" style="display:none"><span class="pl">Luminosité</span><input type="number" class="pi scrub" id="p-effect-brightness" value="0" min="-100" max="100" data-step="1"></div>
         <div class="pr" id="p-effect-contrast-row" style="display:none"><span class="pl">Contraste</span><input type="number" class="pi scrub" id="p-effect-contrast" value="0" min="-100" max="100" data-step="1"></div>
         <div class="pr" id="p-effect-vig-strength-row" style="display:none"><span class="pl">Intensité</span><input type="number" class="pi scrub" id="p-effect-vig-strength" value="50" min="0" max="100" data-step="1"></div>
         <div class="pr" id="p-effect-vig-radius-row" style="display:none"><span class="pl">Étendue</span><input type="number" class="pi scrub" id="p-effect-vig-radius" value="40" min="0" max="95" data-step="1"></div>
+        <!-- Generic 2-slot param row set, shared by all 10 simple_fx.wgsl
+             effects instead of one dedicated row pair per effect — labels/
+             min/max/step/unit are set dynamically per effect type by
+             updateEffectLayerPanel (timeline.js), same convention as the
+             blur/color/vignette rows above but collapsed to avoid ~14 more
+             near-identical markup blocks. -->
+        <div class="pr" id="p-effect-generic1-row" style="display:none"><span class="pl" id="p-effect-generic1-label">Param 1</span><input type="number" class="pi scrub" id="p-effect-generic1" value="0" data-step="1"><span style="font-size:9px;color:var(--text-dim)" id="p-effect-generic1-unit"></span></div>
+        <div class="pr" id="p-effect-generic2-row" style="display:none"><span class="pl" id="p-effect-generic2-label">Param 2</span><input type="number" class="pi scrub" id="p-effect-generic2" value="0" data-step="1"><span style="font-size:9px;color:var(--text-dim)" id="p-effect-generic2-unit"></span></div>
       </div>
     </div>
     <div class="psec" id="camera-sec" style="display:none">
