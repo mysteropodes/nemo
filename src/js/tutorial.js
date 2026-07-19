@@ -85,6 +85,10 @@
   }
   function measureFillColor(win) { return (win.state && win.state.fillColor) || ''; }
   function measureStrokeColor(win) { return (win.state && win.state.strokeColor) || ''; }
+  function measureLayerEffectsCount(win) {
+    var ld = activeLayerData(win);
+    return (ld && ld.effects) ? ld.effects.length : 0;
+  }
 
   function stateIncreaseStep(cfg) {
     var minInc = cfg.minIncrease || 1;
@@ -478,6 +482,17 @@
     ["Clique l'onglet \"StoryBoard\". Ce montage nodal ne manipule QUE des Components — il assemble en séquence ce qui a été dessiné et animé dans les deux autres vues, avec ses propres instances (vitesse/offset).", "Click the \"StoryBoard\" tab. This nodal editor manipulates ONLY Components — it sequences what was drawn and animated in the other two views, with its own instances (speed/offset).", "Haz clic en la pestaña \"StoryBoard\". Este montaje nodal manipula SOLO Components — secuencia lo que se dibujó y animó en las otras dos vistas, con sus propias instancias (velocidad/offset).", "「StoryBoard」タブをクリックしてください。このノードエディタはComponentだけを扱います — 他の2つのビューで描画・アニメーションされたものを、それぞれ独自のインスタンス（速度/オフセット）でシーケンスに組み立てます。"],
     ["Le flux complet", "The full flow", "El flujo completo", "全体の流れ"],
     ["En pratique : tu dessines en Animation 2D → tu animes les propriétés en Motion → tu assembles la séquence en StoryBoard — le tout sur un seul document, en aller-retour permanent entre les trois vues. Les modules \"Motion\" et \"Components et StoryBoard\" plus bas détaillent chacun en profondeur.", "In practice: you draw in Animation 2D → you animate properties in Motion → you assemble the sequence in StoryBoard — all on a single document, moving back and forth between the three views constantly. The \"Motion\" and \"Components and StoryBoard\" modules further down cover each in depth.", "En la práctica: dibujas en Animation 2D → animas propiedades en Motion → montas la secuencia en StoryBoard — todo sobre un único documento, yendo y viniendo constantemente entre las tres vistas. Los módulos \"Motion\" y \"Components et StoryBoard\" más abajo detallan cada uno en profundidad.", "実際には：Animation 2Dで描く → Motionでプロパティをアニメーションする → StoryBoardでシーケンスを組み立てる — すべて単一のドキュメント上で、3つのビューを絶えず行き来しながら進めます。下にある「Motion」と「Components et StoryBoard」の各モジュールで、それぞれをさらに詳しく扱います。"],
+    ["Effets — flou, vignette, glow…", "Effects — blur, vignette, glow…", "Efectos — desenfoque, viñeta, glow…", "エフェクト — ぼかし、ビネット、グロー…"],
+    ["Empile des effets visuels sur un calque ou un élément", "Stack visual effects on a layer or an element", "Apila efectos visuales en una capa o un elemento", "レイヤーや要素にビジュアルエフェクトを重ねる"],
+    ["Un empilement d'effets, sur tout calque", "A stack of effects, on any layer", "Un conjunto de efectos, en cualquier capa", "どのレイヤーにも効果を重ねる"],
+    ["Le panneau Effects ajoute flou, vignette, glow, grain, pixelisation, ombre au sol et bien d'autres — empilables, réordonnables, sur n'importe quel calque ou juste un élément sélectionné.", "The Effects panel adds blur, vignette, glow, grain, pixelation, ground shadow and many more — stackable, reorderable, on any layer or just a selected element.", "El panel Effects añade desenfoque, viñeta, glow, grano, pixelado, sombra de suelo y muchos más — apilables, reordenables, en cualquier capa o solo en un elemento seleccionado.", "Effectsパネルでは、ぼかし、ビネット、グロー、グレイン、モザイク、地面の影など多数のエフェクトを追加できます — 重ね合わせ可能・並べ替え可能で、どのレイヤーにも、選択した要素だけにも適用できます。"],
+["Clique-glisse pour tracer un rectangle — l'effet s'appliquera à ce calque.", "Click-drag to draw a rectangle — the effect will apply to this layer.", "Haz clic y arrastra para dibujar un rectángulo — el efecto se aplicará a esta capa.", "クリック＆ドラッグで長方形を描いてください — このレイヤーにエフェクトが適用されます。"],
+    ["Ajoute un effet", "Add an effect", "Añade un efecto", "エフェクトを追加"],
+    ["Clique \"+ Add Effect…\", survole une catégorie (Flou & Netteté, Couleur, Stylisation, Distorsion…) puis clique un effet dans le sous-menu — n'importe lequel, par exemple Vignette.", "Click \"+ Add Effect…\", hover a category (Blur & Sharpen, Color, Stylize, Distortion…) then click an effect in the submenu — any one, e.g. Vignette.", "Haz clic en \"+ Add Effect…\", pasa el cursor sobre una categoría (Desenfoque y Nitidez, Color, Estilización, Distorsión…) y luego haz clic en un efecto del submenú — cualquiera, por ejemplo Viñeta.", "「+ Add Effect…」をクリックし、カテゴリー（ぼかしとシャープ、色、スタイライズ、ディストーションなど）にカーソルを合わせてから、サブメニューでエフェクトをクリックしてください — どれでも構いません、例えばビネット。"],
+    ["En attente d'un effet…", "Waiting for an effect…", "Esperando un efecto…", "エフェクトを待っています…"],
+    ["Déplie ses réglages", "Expand its settings", "Despliega sus ajustes", "設定を展開する"],
+    ["Clique la ligne de l'effet ajouté pour dérouler ses paramètres — chacun se glisse ou se tape, comme les autres champs numériques de Nemo.", "Click the added effect's row to unfold its parameters — each one drags or types in, like every other numeric field in Nemo.", "Haz clic en la fila del efecto añadido para desplegar sus parámetros — cada uno se arrastra o se escribe, como cualquier otro campo numérico de Nemo.", "追加したエフェクトの行をクリックしてパラメータを展開してください — Nemoの他の数値フィールドと同様に、ドラッグまたは入力で変更できます。"],
+    ["L'œil active/désactive l'effet, le × le supprime, et l'ordre de la liste compte (chaque effet s'applique sur le résultat du précédent). \"Contours\" et \"Ombres\" ne s'appliquent qu'au calque entier — et \"Custom\" te laisse écrire ton propre shader WGSL.", "The eye toggles the effect on/off, the × removes it, and list order matters (each effect applies on top of the previous one's result). \"Contours\" and \"Shadows\" only apply to the whole layer — and \"Custom\" lets you write your own WGSL shader.", "El ojo activa/desactiva el efecto, la × lo elimina, y el orden de la lista importa (cada efecto se aplica sobre el resultado del anterior). \"Contornos\" y \"Sombras\" solo se aplican a toda la capa — y \"Custom\" te permite escribir tu propio shader WGSL.", "目のアイコンでエフェクトのオン/オフを切り替え、×で削除できます。また、リストの順序が重要です（各エフェクトは前のエフェクトの結果に適用されます）。「輪郭」と「影」はレイヤー全体にのみ適用されます — そして「カスタム」では独自のWGSLシェーダーを書くことができます。"],
   ]);
   // Named T (not tt) — renderStep()'s local `tt` variable holds the tooltip
   // DOM element and would otherwise shadow a same-named lookup function.
@@ -1207,6 +1222,41 @@
         }),
         { type: 'click', target: '#p-grad-kind', title: 'Change le type', body: 'Passe de "Linéaire" à "Radial" dans le menu déroulant Type pour voir la différence.' },
         { type: 'info', title: 'Bien joué !', body: 'Les deux pastilles de couleur choisissent les teintes du dégradé, l\'angle règle sa direction (mode linéaire). "Appliquer à la sélection" reprend l\'effet si tu changes de sélection.' }
+      ]
+    },
+    {
+      id: 'fx-stack',
+      category: 'Dessiner',
+      icon: '26',
+      title: 'Effets — flou, vignette, glow…',
+      desc: 'Empile des effets visuels sur un calque ou un élément',
+      time: '2 min',
+      // Le panneau Effects (effects-panel.js, réécrit 2026-07) remplace
+      // l'ancien "Calque d'effet" à sélection unique + les champs fixes
+      // Flou/Ombre au sol : UNE liste d'effets empilables, disponible sur
+      // n'importe quel calque (ou juste un élément si un seul est
+      // sélectionné, cf. singleSelectedElement()). Les lignes de la
+      // catégorie/sous-menu flyout sont reconstruites à chaque ouverture
+      // (pas d'id stable par effet) — on mesure donc directement
+      // ld.effects.length plutôt que de scripter un clic sur un effet
+      // précis, même philosophie que stateIncreaseStep pour le dégradé
+      // ci-dessus.
+      steps: [
+        { type: 'info', title: 'Un empilement d\'effets, sur tout calque', body: 'Le panneau Effects ajoute flou, vignette, glow, grain, pixelisation, ombre au sol et bien d\'autres — empilables, réordonnables, sur n\'importe quel calque ou juste un élément sélectionné.' },
+        { type: 'click', target: '.tool-btn[data-tool="rect"]', title: 'Choisis le Rectangle', body: 'Clique sur l\'outil Rectangle (raccourci R).' },
+        stateIncreaseStep({ target: '#drawing-canvas', title: 'Dessine un rectangle', body: 'Clique-glisse pour tracer un rectangle — l\'effet s\'appliquera à ce calque.', hint: 'En attente de ta forme…', measure: measureStrokeCount }),
+        { type: 'click', target: '.tool-btn[data-tool="select"]', title: 'Choisis la Sélection', body: 'Clique sur l\'outil Sélection (raccourci V).' },
+        {
+          type: 'state', target: '#effects-stack-sec .phdr', title: 'Ouvre la section "Effects"', body: 'Clique l\'en-tête "Effects" dans le panneau de droite pour la déplier, si besoin.',
+          hint: 'En attente…',
+          check: function (win) { var el = win.document.getElementById('p-add-effect-btn'); return !!(el && el.getBoundingClientRect().height > 0); }
+        },
+        stateIncreaseStep({
+          target: '#p-add-effect-btn', title: 'Ajoute un effet', body: 'Clique "+ Add Effect…", survole une catégorie (Flou & Netteté, Couleur, Stylisation, Distorsion…) puis clique un effet dans le sous-menu — n\'importe lequel, par exemple Vignette.',
+          hint: 'En attente d\'un effet…', measure: measureLayerEffectsCount
+        }),
+        { type: 'click', target: '.fx-row', title: 'Déplie ses réglages', body: 'Clique la ligne de l\'effet ajouté pour dérouler ses paramètres — chacun se glisse ou se tape, comme les autres champs numériques de Nemo.' },
+        { type: 'info', title: 'Bien joué !', body: 'L\'œil active/désactive l\'effet, le × le supprime, et l\'ordre de la liste compte (chaque effet s\'applique sur le résultat du précédent). "Contours" et "Ombres" ne s\'appliquent qu\'au calque entier — et "Custom" te laisse écrire ton propre shader WGSL.' }
       ]
     },
     {
