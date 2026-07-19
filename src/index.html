@@ -400,6 +400,24 @@
              "plain per-layer field" convention as Blend/Matte above.
              0 = off (the vast majority of layers), no GPU cost. -->
         <div class="pr"><span class="pl">Flou</span><input type="number" class="pi scrub" id="p-blur" value="0" min="0" max="100" data-step="1" title="Flou gaussien (approx.) appliqué à tout le calque, en pixels"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
+        <!-- Référence (roto) — déplacée ici depuis sa propre section
+             toujours-visible (feedback 2026-07: "référence (roto) onglet
+             n'a plus lieu d'être doit être géré par le panneau calque en
+             fonction de la sélection de l'élément") : reste une référence
+             GLOBALE au projet (state.refMedia, reference-bridge.js — un
+             seul clip de roto, pas par-calque), mais son contrôle ne
+             s'affiche plus que dans le contexte du panneau Layer,
+             c'est-à-dire quand un calque est sélectionné, via la même
+             condition que Blend/Matte/Flou ci-dessus. -->
+        <div class="pr" style="gap:4px;margin-top:6px">
+          <button class="pbtn" id="btn-ref-import" title="Importer une vidéo, une séquence d'images (sélection multiple) ou une image seule comme référence de rotoscopie">Référence…</button>
+          <button class="pbtn" id="btn-ref-remove" disabled>Retirer</button>
+          <input type="file" id="ref-file-input" accept="video/*,image/*" multiple style="display:none">
+        </div>
+        <div class="pr" style="font-size:9px;color:var(--text-dim)" id="p-ref-name">Aucune référence</div>
+        <div class="pr"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="p-ref-on"> Visible</label></div>
+        <div class="pr"><span class="pl">Opacity</span><input type="range" id="p-ref-opacity" min="5" max="100" value="50" style="flex:1"></div>
+        <div class="pr"><span class="pl">Offset</span><input type="number" class="pi scrub" id="p-ref-offset" value="0" data-step="1" title="Frame de la timeline où la référence démarre"></div>
       </div>
     </div>
     <div class="psec" id="canvas-sec">
@@ -579,43 +597,16 @@
         </div>
       </div>
     </div>
-    <div class="psec">
-      <div class="phdr" id="phdr-perspective"><span class="ar">☰</span> <span data-i18n="hdrPerspective">Perspective Guide</span></div>
-      <div class="pbdy">
-        <div class="pr"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer" title="Shows the vanishing-point grid and snaps the Line tool toward it, from any tool"><input type="checkbox" id="p-persp-on" style="accent-color:var(--accent)"> Enabled</label></div>
-        <div class="pr"><span class="pl">Mode</span><select class="psel" id="p-persp-mode"><option value="1pt">1 point</option><option value="2pt" selected>2 points</option><option value="3pt">3 points</option><option value="fisheye">Fisheye</option></select></div>
-        <div class="pr"><span class="pl">Density</span><input type="number" class="pi scrub" id="p-persp-density" value="24" min="4" max="72" data-step="2"></div>
-        <div class="pr"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer" title="Prevents dragging any vanishing point with the Perspective tool"><input type="checkbox" id="p-persp-lock" style="accent-color:var(--accent)"> Lock vanishing points</label></div>
-        <div class="pr" style="gap:4px"><button class="pbtn" id="btn-persp-reset">Reset positions</button></div>
-        <div class="pr" style="font-size:9px;color:var(--text-dim)">Select the ◇ tool to drag vanishing points. Draw a Line roughly toward one to snap onto it.</div>
-      </div>
-    </div>
-    <div class="psec">
-      <div class="phdr" id="phdr-symmetry"><span class="ar">☰</span> <span data-i18n="hdrSymmetry">Symmetry Guide</span></div>
-      <div class="pbdy">
-        <div class="pr"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer" title="Mirrors (or rotates, in Radial mode) every stroke drawn with any tool"><input type="checkbox" id="p-sym-on" style="accent-color:var(--accent)"> Enabled</label></div>
-        <div class="pr"><span class="pl">Mode</span><select class="psel" id="p-sym-mode"><option value="y" selected>Vertical (Y)</option><option value="x">Horizontal (X)</option><option value="free">Free angle</option><option value="radial">Radial (mandala)</option></select></div>
-        <div class="pr" id="p-sym-sectors-row" style="display:none"><span class="pl">Sectors</span><input type="number" class="pi scrub" id="p-sym-sectors" value="6" min="2" max="24" data-step="1"></div>
-        <div class="pr"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer" title="Off: a stroke crossing the axis is cut right at it, so it and its mirror never overlap at the fold"><input type="checkbox" id="p-sym-extend" checked style="accent-color:var(--accent)"> Extend strokes across the axis</label></div>
-        <div class="pr" style="gap:4px"><button class="pbtn" id="btn-sym-reset">Reset position</button></div>
-        <div class="pr" style="font-size:9px;color:var(--text-dim)">Select the ⧗ tool to drag the axis (its ends in Free mode, or the center in Radial mode). Draw with any tool once enabled.</div>
-      </div>
-    </div>
-    <div class="psec" id="ref-sec">
-      <div class="phdr" id="phdr-reference"><span class="ar">☰</span> <span data-i18n="hdrReference">Référence (roto)</span></div>
-      <div class="pbdy">
-        <div class="pr" style="gap:4px">
-          <button class="pbtn" id="btn-ref-import" title="Importer une vidéo, une séquence d'images (sélection multiple) ou une image seule comme référence de rotoscopie">Importer…</button>
-          <button class="pbtn" id="btn-ref-remove" disabled>Retirer</button>
-          <input type="file" id="ref-file-input" accept="video/*,image/*" multiple style="display:none">
-        </div>
-        <div class="pr" style="font-size:9px;color:var(--text-dim)" id="p-ref-name">Aucune référence</div>
-        <div class="pr"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="p-ref-on" style="accent-color:var(--accent)"> Visible</label></div>
-        <div class="pr"><span class="pl">Opacity</span><input type="range" id="p-ref-opacity" min="5" max="100" value="50" style="flex:1"></div>
-        <div class="pr"><span class="pl">Offset</span><input type="number" class="pi scrub" id="p-ref-offset" value="0" data-step="1" title="Frame de la timeline où la référence démarre"></div>
-        <div class="pr" style="font-size:9px;color:var(--text-dim)">S'affiche sous le dessin, suit la frame courante (vidéo/séquence). Jamais exportée.</div>
-      </div>
-    </div>
+    <!-- Perspective/Symmetry Guide sections removed (feedback 2026-07:
+         "on en a plus besoin ici car ils sont dans le menu flottant") --
+         every control (on/off, mode, density/sectors, lock/extend, reset)
+         now lives in the Labs floating panel (labs-float-panel.js), which
+         already mirrored on/off + mode before this and gained the rest
+         (Density/Lock/Reset, Extend/Reset) alongside this removal so
+         nothing was lost, just relocated. -->
+    <!-- Reference (roto) section removed — its controls moved into
+         #layer-sec above (feedback 2026-07: "doit être géré par le
+         panneau calque en fonction de la sélection de l'élément"). -->
     <!-- Motion mode only (hidden otherwise via body:not(.mode-motion),
          style.css) — the active layer's Transform properties mirrored into
          the right panel, populated by motion.js renderMotionPropsPanel(). -->
@@ -678,15 +669,12 @@
         <div class="pr"><button class="pbtn" id="btn-comp-detach" style="flex:1" title="Bake the component's animation back into a normal layer">Décomposer en calque</button></div>
       </div>
     </div>
-    <!-- Onion Skin en section du panel (mockup 2026-07-17) : header +
-         badge ON/OFF. Clic sur le header = toggle (même action que le
-         bouton timeline #btn-os / touche O) ; les OPTIONS détaillées
-         restent dans le popover #onion-pop (clic-droit sur #btn-os).
-         Le badge est un id distinct de #os-st (celui du popover) —
-         toggleOnion (timeline.js) met à jour les deux. -->
-    <div class="psec" id="onion-sec">
-      <div class="phdr" style="cursor:pointer" title="Clic : activer/désactiver l'onion skin (O). Options détaillées : clic-droit sur le bouton onion de la timeline."><span class="ar">☰</span> <span>Onion Skin</span> <span id="os-st-panel" style="margin-left:auto;margin-right:6px;font-size:9px;color:var(--green)">ON</span></div>
-    </div>
+    <!-- Onion Skin right-panel section removed (feedback 2026-07: "plus
+         besoin de l'onglet onion skin dans le panneau droit tout se fait
+         sur le bouton de la timeline") — it was purely a redundant toggle
+         mirror of #btn-os anyway (mockup 2026-07-17's own comment already
+         said as much); the toolbar button + its right-click popover
+         (#onion-pop) remain the one real entry point. -->
     <!-- Ex-section "Projet" du panel de droite, supprimee (feedback 2026-07:
          "l'onglet projet n'est plus utile on retrouve tous ces elements dans
          le burger menu") -- tout ce qu'elle contenait est maintenant dans le
