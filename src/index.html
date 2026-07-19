@@ -461,15 +461,19 @@
       <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrDocument">Document</span></div>
       <div class="pbdy">
         <!-- Figma-style paired dimensions row (feedback 2026-07: "des
-             tailles ou position sur une seule ligne") — W/H share one row
-             with a proportion-lock toggle between them (btn-dims-lock,
-             timeline.js) instead of two full rows each with their own
-             text label; locking remembers the W/H ratio at lock-time and
-             keeps it while either field changes. -->
+             tailles ou position sur une seule ligne") — W/H on one row;
+             the proportion-lock toggle (btn-dims-lock, timeline.js) sits
+             at the far right, not wedged between the two fields (feedback
+             follow-up: "l'icon de lien devrait être tout à droite") —
+             locking remembers the W/H ratio at lock-time and keeps it
+             while either field changes. Redrawn as a standard chain-link
+             glyph (was two abstract interlocking arcs, reported as "pas
+             très clair") — the same link/unlink icon shape used
+             everywhere for this exact concept. -->
         <div class="pr dims-row">
           <span class="pl" style="min-width:14px">W</span><input type="number" class="pi scrub" id="p-cw" value="1920" min="1" max="7680" data-step="1">
-          <button class="dims-lock-btn" id="btn-dims-lock" type="button" title="Lier largeur/hauteur (garder les proportions)"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 12a3 3 0 0 0 4.5 2.6L16 12.1a3 3 0 0 0-4.2-4.2"/><path d="M15 12a3 3 0 0 0-4.5-2.6L8 11.9a3 3 0 0 0 4.2 4.2"/></svg></button>
           <span class="pl" style="min-width:14px">H</span><input type="number" class="pi scrub" id="p-ch" value="1080" min="1" max="4320" data-step="1">
+          <button class="dims-lock-btn" id="btn-dims-lock" type="button" title="Lier largeur/hauteur (garder les proportions)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></button>
         </div>
         <div class="pr"><span class="pl">FPS</span><input type="number" class="pi scrub" id="proj-fps" value="12" min="1" max="60" data-step="1"></div>
         <div class="pr"><span class="pl">Frames</span><input type="number" class="pi scrub" id="proj-frames" value="24" min="1" max="999" data-step="1"></div>
