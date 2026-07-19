@@ -1179,6 +1179,12 @@ function syncDocFields(){
   var els={'p-cw':state.canvasW,'p-ch':state.canvasH,'p-cbg':state.canvasBg,'tl-fps':state.fps,'tl-total':state.totalFrames,
     'proj-fps':state.fps,'proj-frames':state.totalFrames};
   Object.keys(els).forEach(function(id){var el=document.getElementById(id);if(el&&document.activeElement!==el)el.value=els[id];});
+  // Clip to canvas / Safety zones icon-toggle buttons (2026-07, replaced
+  // checkboxes — see index.html's own comment) — synced here alongside
+  // every other Document field so a project load/undo restores their
+  // visible state too, not just the click handler's own toggle.
+  var clipBtn=document.getElementById('btn-clip');if(clipBtn)clipBtn.classList.toggle('active',!!state.canvasClip);
+  var safetyBtn=document.getElementById('btn-safety');if(safetyBtn)safetyBtn.classList.toggle('active',!!state.safetyZones);
 }
 function updateUI(){
   syncDocFields();
@@ -5021,8 +5027,8 @@ document.getElementById('p-shadowmode').addEventListener('change',function(){win
 document.getElementById('p-cw').addEventListener('change',function(){window.SM.setCanvasSize(parseInt(this.value),state.canvasH);});
 document.getElementById('p-ch').addEventListener('change',function(){window.SM.setCanvasSize(state.canvasW,parseInt(this.value));});
 document.getElementById('p-cbg').addEventListener('input',function(){window.SM.setCanvasBg(this.value);});
-document.getElementById('p-clip').addEventListener('change',function(){window.SM.setCanvasClip(this.checked);});
-document.getElementById('p-safety').addEventListener('change',function(){window.SM.setSafetyZones(this.checked);});
+document.getElementById('btn-clip').addEventListener('click',function(){window.SM.setCanvasClip(!state.canvasClip);this.classList.toggle('active',state.canvasClip);});
+document.getElementById('btn-safety').addEventListener('click',function(){window.SM.setSafetyZones(!state.safetyZones);this.classList.toggle('active',state.safetyZones);});
 // Flou/Ombre au sol/effect-layer type/param wiring all moved into
 // effects-panel.js's unified Effects stack (2026-07 rewrite).
 // Perspective/Symmetry Guide (feedback 2026-07: "les onglet guide symétrie
