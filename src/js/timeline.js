@@ -604,6 +604,7 @@ window.SM={
     if(src.elementMotion)state.layers[ni].elementMotion=JSON.parse(JSON.stringify(src.elementMotion));
     if(src.inPoint!=null)state.layers[ni].inPoint=src.inPoint;if(src.outPoint!=null)state.layers[ni].outPoint=src.outPoint;activateUL(ni);loadFrame(state.currentFrame);updateUI();},
   setActiveLayer:function(idx){if(idx<0||idx>=state.layers.length)return;saveAllLayerFrames();activateUL(idx);clearSel();
+    window._layerActiveExplicit=true; // see clearSel()'s own comment — an explicit timeline row click, not a canvas deselect
     // The camera row is a synthetic pseudo-layer (not a real state.layers
     // entry — see camera.js's renderPanelRow) selected by switching TO the
     // camera tool, never by an activeLayerIdx change; picking a real layer
@@ -1399,13 +1400,17 @@ function updatePropsContext(){
   }else{
     ctx='document';
     show['canvas-sec']=true;
-    // Nothing selected on canvas — the right panel falls back to Document,
-    // which is also the natural place to surface the clicked layer's own
-    // properties (Blend Mode). state.activeLayerIdx is already whatever
-    // layer was last clicked in the layer list (setActiveLayer runs on
-    // every row click), so this needs no separate "layer panel selection"
-    // tracking of its own.
-    show['layer-sec']=!!(state.layers[state.activeLayerIdx]);
+    // Nothing selected on canvas — the right panel falls back to Document.
+    // Layer-sec (Blend Mode etc.) only joins it if the CURRENT activeLayerIdx
+    // was reached by an explicit click on a layer row in the timeline
+    // (window._layerActiveExplicit, set by setActiveLayer/cleared by
+    // clearSel() — tools.js) — 2026-07: "si on clic dans le canvas sans
+    // rien sélectionner il ne faut pas afficher les options de calque, ce
+    // n'est que si on sélectionne des calques dans la timeline". Before
+    // this flag, activeLayerIdx being ALWAYS a valid index (never "none")
+    // meant this branch showed the last-active layer's properties even
+    // right after deselecting everything on canvas.
+    show['layer-sec']=!!window._layerActiveExplicit&&!!(state.layers[state.activeLayerIdx]);
     hdrText='Document';
   }
   // p-blendmode sync moved OUT of the 'document' branch above: it only ran
