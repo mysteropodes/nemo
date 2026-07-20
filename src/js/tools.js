@@ -3939,31 +3939,45 @@ function _mergeHoleIntoExterior(extSegs,holeSegs){
 // to within 0.3% (the removed loops really were negligible slivers).
 function _eraseDegenerateSelfLoops(path){
   if(!path||!path.segments)return;
-  var changed=true,guard=0,anySpliced=false;
+  // Distance-based (not rounded-key) revisit detection: two of Paper's own
+  // union() outputs from the SAME real junction routinely land a fraction
+  // of a px apart (confirmed live: 0.28px — computed by two independent
+  // sources, a wraparound seam and a fresh anchor), which a naive
+  // round-to-0.1px hash key can put in two DIFFERENT buckets and miss
+  // entirely. 1.5px is well under anything a real drawn detail would ever
+  // need two distinct anchors that close together for.
+  var REVISIT_TOL=1.5;
+  var changed=true,guard=0;
   while(changed&&guard<5000){
     changed=false;guard++;
-    var segs=path.segments,n=segs.length,seen={};
+    var segs=path.segments,n=segs.length;
     for(var i=0;i<n;i++){
-      var key=Math.round(segs[i].point.x*10)+','+Math.round(segs[i].point.y*10);
-      if(seen[key]!==undefined){
-        path.removeSegments(seen[key]+1,i+1);
-        changed=true;anySpliced=true;
-        break;
+      for(var j=0;j<i;j++){
+        if(segs[i].point.getDistance(segs[j].point)<=REVISIT_TOL){
+          path.removeSegments(j+1,i+1);
+          changed=true;
+          break;
+        }
       }
-      seen[key]=i;
+      if(changed)break;
     }
   }
-  // The kept "first visit" anchor at each splice keeps ITS OWN original
-  // handleOut — which was aimed at the (now-removed) start of the detour,
-  // not at whatever real neighbor the splice just reconnected it to.
-  // Confirmed live (2026-07, "la vertice extérieur... perdent leur
-  // tangent"): that stale handle survives completely unchanged, producing
-  // a visible kink exactly at every splice point even though the anchor's
-  // POSITION never moved. Re-fitting the whole path once, only if anything
-  // was actually spliced, recomputes every handle from the real (now
-  // clipper-noise-free) neighbor positions — same technique
-  // buildClosedRingOutline's own offset curves already use.
-  if(anySpliced)path.smooth({type:'continuous'});
+  // Even with every exact/near revisit spliced out, Paper's boolean unite()
+  // still routinely leaves the surviving anchors themselves oddly spaced
+  // (a coarse, partly-flattened polygon rather than a fair curve) — a
+  // plain `.smooth()` refit only straightens handles from whatever point
+  // positions are already there, so unevenly-spaced anchors can still fit
+  // into visibly kinked tangents (confirmed live: 2026-07, "la vertice
+  // extérieur... perdent leur tangent" persisted on a real merged shape
+  // even after the splice+smooth pass, with NO exact revisit for this
+  // dedup to catch at all). `.simplify()` — a proper Douglas-Peucker +
+  // least-squares bezier refit, same tolerance already used for Fill Brush
+  // shapes elsewhere (rebuildVectorBrushOutline) — both re-fits smooth
+  // tangents AND collapses the unevenly-spaced anchors that cause them,
+  // unconditionally (safe/idempotent on an already-clean shape too, not
+  // gated on whether a revisit was actually spliced like the old
+  // smooth()-only pass was).
+  path.simplify(2.5);
 }
 // strokeInfo (optional, 2026-07 — "l'eraser supprime le stroke entier"):
 // every branch below used to hardcode strokeColor=null on its island(s),
