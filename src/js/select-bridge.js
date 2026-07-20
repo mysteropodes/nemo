@@ -392,7 +392,11 @@
       return;
     }
     if (hh && e.ctrlKey && hh.type === 'scale' && (hh.dir === 'nw' || hh.dir === 'ne' || hh.dir === 'sw' || hh.dir === 'se') && distortEligibleCornerAt(pt) === hh.dir) {
-      beginDistort(hh.dir);
+      // If beginDistort() fails (computeHandles() returned null), `mode`
+      // stays null — onUp()'s `if (!mode) return;` would then skip the
+      // resume() at its tail entirely, leaving the engine suspended forever
+      // (suspend() already ran a few lines above, unconditionally).
+      if (!beginDistort(hh.dir)) window.SMEngineBridge.resume();
       return;
     }
     if (hh) {
@@ -1151,6 +1155,16 @@
     } else if (mode === 'xform-distort') {
       selectedPaths.forEach(function (p) { forkIfForeignOwner(p); });
       fillRegenerateLinked(userLayers[state.activeLayerIdx], null);
+      // Same re-bake as the xform-scale/xform-rotate tail above — a corner-pin
+      // distort warps the path's own segments live, but never touched the
+      // bitmap-brush raster companion (not a simple scale/rotate, so onMove
+      // above leaves it untouched during the drag); without this it stays
+      // frozen at its pre-distort shape forever on that stroke.
+      if (window.SMBitmapBrush) {
+        selectedPaths.forEach(function (p) {
+          if (p.data && p.data.bitmapBrushSpec) SMBitmapBrush.regenerate(p, userLayers[state.activeLayerIdx]);
+        });
+      }
       saveActiveLayerFrame();
       renderOS();
       renderArcs(); updateUI();
@@ -1254,7 +1268,10 @@
       if (distortDirAt) {
         e.preventDefault(); e.stopImmediatePropagation();
         window.SMEngineBridge.suspend();
-        beginDistort(distortDirAt);
+        // Same guard as onDown's ctrl+corner branch — resume immediately on
+        // failure instead of relying on an onUp that will never fire (this
+        // is a synthetic-mode contextmenu path, no real onUp gesture follows).
+        if (!beginDistort(distortDirAt)) window.SMEngineBridge.resume();
         return;
       }
     }

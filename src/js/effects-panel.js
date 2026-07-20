@@ -353,10 +353,15 @@
       chevron.innerHTML = '<svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg>';
       chevron.title = window.SM.t(expandedIdx === idx ? 'fxCollapse' : 'fxExpand');
       chevron.addEventListener('click', function (e) { e.stopPropagation(); expandedIdx = expandedIdx === idx ? -1 : idx; renderEffectsList(); });
+      // Right-click on a child control must not bubble into the row's own
+      // contextmenu listener below (opens the shader editor) — a right-click
+      // on the chevron/eye/delete should do nothing, not surprise-open it.
+      chevron.addEventListener('contextmenu', function (e) { e.stopPropagation(); });
       var eye = document.createElement('div'); eye.className = 'fx-row-eye';
       eye.innerHTML = eff.enabled ? ICON_EYE : ICON_EYE_OFF;
       eye.title = window.SM.t(eff.enabled ? 'fxDisable' : 'fxEnable');
       eye.addEventListener('click', function (e) { e.stopPropagation(); toggleEnabled(idx); });
+      eye.addEventListener('contextmenu', function (e) { e.stopPropagation(); });
       var name = document.createElement('span'); name.className = 'fx-row-name';
       name.textContent = labelFor(eff.type);
       row.appendChild(chevron); row.appendChild(eye); row.appendChild(name);
@@ -369,6 +374,7 @@
           var def = customDefFor(eff.type);
           if (def && window.openCustomEffectEditor) window.openCustomEffectEditor(def);
         });
+        edit.addEventListener('contextmenu', function (e) { e.stopPropagation(); });
         row.appendChild(edit);
         // Right-click on the row itself opens the same editor (2026-07 —
         // the pencil icon was the ONLY entry point, easy to miss at that
@@ -382,6 +388,7 @@
       }
       var del = document.createElement('div'); del.className = 'fx-row-del'; del.textContent = '×'; del.title = window.SM.t('fxDelete');
       del.addEventListener('click', function (e) { e.stopPropagation(); deleteEffect(idx); });
+      del.addEventListener('contextmenu', function (e) { e.stopPropagation(); });
       row.appendChild(del);
       row.addEventListener('click', function () {
         expandedIdx = expandedIdx === idx ? -1 : idx;

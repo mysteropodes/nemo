@@ -1218,7 +1218,7 @@
          before (updatePlayhead/updateUI, timeline.js), and a 'change'
          listener drives goToFrame(). tl-tf (the total) stays a plain
          <span> — its own value is already editable via #tl-total. -->
-    <div class="ti"><input type="number" class="scrub" id="tl-cf" min="1" value="1" data-step="1" style="width:32px;font-weight:600"> / <span id="tl-tf">24</span></div>
+    <div class="ti"><input type="number" class="scrub" id="tl-cf" min="1" value="1" data-step="1" data-nav-only="1" style="width:32px;font-weight:600"> / <span id="tl-tf">24</span></div>
     <button class="tb" id="btn-ff" data-i18n-title="btnFirstFrameTitle" title="Go to first frame"><span class="material-symbols-rounded">&#xe045;</span></button>
     <button class="tb" id="btn-pf" data-i18n-title="btnPrevFrameTitle" title="Previous frame"><span class="material-symbols-rounded">&#xe5cb;</span></button>
     <button class="tb" id="btn-play" data-i18n-title="btnPlayTitle" title="Play / Stop (Enter)"><span class="material-symbols-rounded">&#xe037;</span></button>
