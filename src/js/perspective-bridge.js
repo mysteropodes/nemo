@@ -287,7 +287,14 @@
   // Locked VPs stay put even during a whole-guide drag.
   var dragging = null; // the VP object currently being dragged, or null
   var draggingWhole = null; // {startX,startY,orig:[{x,y}...]} or null
-  function shouldEdit() { return engineOn() && state.tool === 'perspective'; }
+  // Broadened 2026-07 — same reasoning as symmetry-bridge.js's own
+  // shouldEdit (feedback: "garder l'outil brush sélectionné et pouvoir
+  // modifier les guides dans le canvas quand même"): dragging a VP/horizon
+  // handle no longer requires switching into the dedicated 'perspective'
+  // tool, just the guide being enabled — safe since onDown only claims an
+  // explicit hit-test hit and this file loads before every drawing-tool
+  // bridge.
+  function shouldEdit() { return engineOn() && (state.tool === 'perspective' || state.perspectiveEnabled); }
   function hitVP(worldPt) {
     var vps = ensurePerspectiveVPs();
     var tol = 12 / view.zoom;
@@ -312,12 +319,18 @@
   }
   function onDown(e) {
     if (!shouldEdit()) return;
-    e.stopImmediatePropagation(); e.preventDefault();
+    // Only claim the event on an ACTUAL hit — same fix as
+    // symmetry-bridge.js's own onDown (see its comment): calling
+    // stopImmediatePropagation/preventDefault unconditionally here was safe
+    // while shouldEdit() required actually being in the dedicated
+    // 'perspective' tool, but broke ordinary drawing entirely once
+    // shouldEdit() could also be true during Draw/Fill Brush.
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
     var wp = new Point(w[0], w[1]);
     dragging = hitVP(wp);
-    if (dragging) { window.SMEngineBridge.suspend(); return; }
+    if (dragging) { e.stopImmediatePropagation(); e.preventDefault(); window.SMEngineBridge.suspend(); return; }
     if (hitHorizon(wp)) {
+      e.stopImmediatePropagation(); e.preventDefault();
       draggingWhole = { startX: wp.x, startY: wp.y, orig: ensurePerspectiveVPs().map(function (v) { return { x: v.x, y: v.y }; }) };
       window.SMEngineBridge.suspend();
     }
