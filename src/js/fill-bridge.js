@@ -94,6 +94,20 @@
       showToast('Aucune zone fermée ici');
       return;
     }
+    // Recolor-in-place (see fillFindExistingMatch's comment, tools.js) —
+    // same check as tools.js's own 'fill' branch, duplicated here since
+    // this bridge is a separate click handler, not a shared code path.
+    var existingMatch = fillFindExistingMatch(layer, res.path);
+    if (existingMatch) {
+      res.path.remove();
+      existingMatch.fillColor = state.fillColor;
+      existingMatch.opacity = state.opacity / 100;
+      saveActiveLayerFrame();
+      updateUI();
+      showToast('Couleur remplacée');
+      window.SMEngineBridge.renderNow();
+      return;
+    }
     // Same Animate-style stacking as tools.js's own 'fill' branch — see
     // fillInsertIndexFor's comment (tools.js): above the topmost fill
     // covering the click point, so the new fill is actually visible.

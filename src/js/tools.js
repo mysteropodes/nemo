@@ -1678,6 +1678,38 @@ function _strokeBetween(layer,p1,p2){
   }
   return false;
 }
+// Recolor-in-place (2026-07, Umoupen-parity pass — "le remplacement de fill
+// existant par une autre couleur avec le pot de peinture crée un nouveau
+// fill alors qu'il faut juste remplacer la couleur parfois"). fillCollectWalls
+// deliberately re-opens every closed fill's own outline as a wall (its own
+// long comment) specifically so a click bounded partly by an existing
+// shape's outline can still retrace a hybrid region — but the everyday
+// "just recolor what I clicked on" case (no new subdividing strokes drawn
+// at all) also goes through that same path: fillVectorFind re-derives that
+// exact shape's own boundary, and the caller then stacked a brand-new Path
+// with identical geometry ON TOP of the original instead of recognizing
+// "this IS that shape". Detected here cheaply (matching area + bounds
+// within a tight tolerance) rather than an expensive boolean-op comparison
+// per candidate — a genuinely different, smaller sub-region (new strokes
+// actually subdividing the area) will never match and still gets its own
+// new shape exactly as before; only a full, unmodified re-trace of an
+// existing shape's own outline is redirected to a plain recolor.
+function fillFindExistingMatch(layer,path){
+  var area=Math.abs(path.area),b=path.bounds;
+  if(!(area>0))return null;
+  var best=null,bestDiff=Infinity;
+  for(var i=0;i<layer.children.length;i++){
+    var c=layer.children[i];
+    if(!(c instanceof Path||c instanceof CompoundPath)||!c.fillColor)continue;
+    if(c.data&&(c.data.isLinkedFillCompanion||c.data.isBrushTextureCopy))continue;
+    var cb=c.bounds;
+    if(Math.abs(cb.x-b.x)>1||Math.abs(cb.y-b.y)>1||Math.abs(cb.width-b.width)>1||Math.abs(cb.height-b.height)>1)continue;
+    var diff=Math.abs(Math.abs(c.area)-area);
+    if(diff>Math.max(1,area*0.01))continue; // >1% area difference -> a genuinely different region
+    if(diff<bestDiff){bestDiff=diff;best=c;}
+  }
+  return best;
+}
 // preserveFillShapes (2026-07, "les bords extérieurs du fill brush une fois
 // le pot de peinture appliqué change de forme comme si des vecteurs
 // avaient bougé"): Paper.js's .unite() always re-emits a BRAND NEW point
@@ -2329,6 +2361,63 @@ function fillLoopSelfIntersects(chainPath){
   for(var i=0;i<n;i++)pts.push(chainPath.getPointAt((i/n)*len));
   return fillPolySelfIntersects(pts);
 }
+// Physically cuts each open wall at every exact crossing point
+// (_computeExactCrossings — the SAME Paper.js getIntersections() math the
+// WASM path already feeds to Rust's find_crossings/build_graph) via
+// Path#splitAt, turning "one long wall that happens to cross another" into
+// several shorter walls with REAL endpoints sitting at the crossing. This
+// is the JS-side fix for fillVectorFindJS being a "stale peer" of
+// build_graph/fill.rs (see fillVectorFind's own comment on the diamond/
+// losange bug): fillBuildGraph only ever merges wall ENDPOINTS into graph
+// nodes (never mid-curve crossings), so a region bounded purely by two
+// strokes crossing each other with no shared/nearby endpoints was
+// structurally unfindable in JS even though the WASM path already handled
+// it correctly. Splitting here needs NO change to fillBuildGraph/
+// fillTraceLoop at all — the two walls' independently-computed crossing
+// points coincide (same real intersection, just computed once per wall by
+// _computeExactCrossings), well within fillBuildGraph's own joinEps
+// endpoint-merge tolerance, so they naturally fold into one shared node.
+function _splitWallsAtCrossings(opens){
+  var crossings=_computeExactCrossings(opens);
+  var byWall={};
+  crossings.forEach(function(c){(byWall[c.wall]=byWall[c.wall]||[]).push(c.frac);});
+  var result=[];
+  opens.forEach(function(w,i){
+    var fracs=byWall[i];
+    if(!fracs||!fracs.length){result.push(w);return;}
+    var totalLen=w.length;
+    var offsets=fracs.map(function(f){return f*totalLen;}).filter(function(o){return o>0.05&&o<totalLen-0.05;});
+    offsets=Array.from(new Set(offsets.map(function(o){return Math.round(o*1000)/1000;}))).sort(function(a,b){return a-b;});
+    if(!offsets.length){result.push(w);return;}
+    var remaining=w,consumed=0;
+    offsets.forEach(function(absOffset){
+      var localOffset=absOffset-consumed;
+      if(localOffset<=0.05||localOffset>=remaining.length-0.05)return;
+      var piece=remaining.splitAt(localOffset);
+      if(!piece)return;
+      // splitAt's new cut anchor keeps a SYMMETRIC handle pair on both
+      // sides (as if the original curve still continued straight through)
+      // — correct for what splitAt is usually used for (re-joining the
+      // pieces back into the same curve later), but wrong here: `remaining`
+      // truly ENDS at this cut and `piece` truly STARTS here, nothing
+      // continues past either tip. Left alone, fillBuildPathFromSeq's
+      // addSegments later stitches these two pieces' cut-anchors together
+      // as two back-to-back duplicate-point segments, one with a stray
+      // handleOut and the other a stray handleIn both still pointing PAST
+      // the shared point — a small spike/self-crossing right at the seam
+      // (confirmed live: a clean two-arc lens between two crossings traced
+      // as self-intersecting until this was flattened). Zeroing the
+      // dangling handle on each side removes the phantom continuation
+      // while leaving each piece's OWN real curve shape untouched.
+      remaining.lastSegment.handleOut=new Point(0,0);
+      piece.firstSegment.handleIn=new Point(0,0);
+      result.push(remaining);
+      remaining=piece;consumed=absOffset;
+    });
+    result.push(remaining);
+  });
+  return result;
+}
 function fillVectorFindJS(clickPt,gapThr,layer,excludePath,onlyIds){
   var walls=fillCollectWalls(layer,excludePath,onlyIds);
   var candidates=[]; // {chainPath, area, fromClosedWall}
@@ -2344,8 +2433,9 @@ function fillVectorFindJS(clickPt,gapThr,layer,excludePath,onlyIds){
     // reported diamond-artifact fill.
     if(area>=1&&fillPointInPoly(clickPt,pts)&&!fillLoopSelfIntersects(w))candidates.push({chainPath:w,area:area,fromClosedWall:true});
   });
-  if(walls.open.length){
-    var graph=fillBuildGraph(walls.open,gapThr);
+  var splitOpen=walls.open.length?_splitWallsAtCrossings(walls.open):walls.open;
+  if(splitOpen.length){
+    var graph=fillBuildGraph(splitOpen,gapThr);
     var maxSteps=graph.edges.length*2+8;
     // Exhaustive planar-face enumeration, not a capped sample of arbitrary
     // seeds. fillTraceLoop's "always take the sharpest turn" rule is
@@ -2374,10 +2464,10 @@ function fillVectorFindJS(clickPt,gapThr,layer,excludePath,onlyIds){
           var key=seedEdge.idx+':'+startNode+':'+turnSign;
           if(visited[key])return;
           visited[key]=true;
-          var seq=fillTraceLoop(graph,walls.open,startNode,seedEdge,turnSign,maxSteps);
+          var seq=fillTraceLoop(graph,splitOpen,startNode,seedEdge,turnSign,maxSteps);
           if(!seq||seq.length<2)return;
           seq.forEach(function(hop){visited[hop.edge.idx+':'+hop.from+':'+turnSign]=true;});
-          var chainPath=fillBuildPathFromSeq(graph,walls.open,seq);
+          var chainPath=fillBuildPathFromSeq(graph,splitOpen,seq);
           var pts=chainPath.segments.map(function(sg){return sg.point;});
           var area=fillPolyArea(pts);
           if(area<1||!fillPointInPoly(clickPt,pts)||fillLoopSelfIntersects(chainPath)){chainPath.remove();return;}
@@ -2388,7 +2478,7 @@ function fillVectorFindJS(clickPt,gapThr,layer,excludePath,onlyIds){
     }
   }
   if(!candidates.length){
-    walls.open.forEach(function(w){w.remove();});walls.closed.forEach(function(w){w.remove();});
+    splitOpen.forEach(function(w){w.remove();});walls.closed.forEach(function(w){w.remove();});
     return null;
   }
   // the smallest enclosing loop wins (the innermost face touching the
@@ -2396,7 +2486,7 @@ function fillVectorFindJS(clickPt,gapThr,layer,excludePath,onlyIds){
   candidates.sort(function(a,b){return a.area-b.area;});
   var winner=candidates[0];
   candidates.slice(1).forEach(function(c){if(!c.fromClosedWall)c.chainPath.remove();});
-  walls.open.forEach(function(w){w.remove();});
+  splitOpen.forEach(function(w){w.remove();});
   walls.closed.forEach(function(w){if(w!==winner.chainPath)w.remove();});
   winner.chainPath.closed=true;
   // JS fallback doesn't track which specific walls made the loop — a
@@ -4356,6 +4446,12 @@ function onMouseDown(event){
         saveActiveLayerFrame();updateUI();showToast('Couleur remplacée');return;
       }
       showToast('Aucune zone fermée ici');return;
+    }
+    var existingMatch=fillFindExistingMatch(layer,res.path);
+    if(existingMatch){
+      res.path.remove();
+      existingMatch.fillColor=state.fillColor;existingMatch.opacity=state.opacity/100;
+      saveActiveLayerFrame();updateUI();showToast('Couleur remplacée');return;
     }
     layer.insertChild(fillInsertIndexFor(layer,event.point,res.path),res.path);
     res.path.fillColor=state.fillColor;res.path.strokeColor=null;res.path.opacity=state.opacity/100;
