@@ -208,6 +208,36 @@ function fsFindFillRegion(fillPath,pt,layer){
     other.remove();
     return{regionPath:chosen,cutter:c,boundaryStart:(chosen===regionA?o1:o2),boundaryEnd:(chosen===regionA?o2:o1),cutterA:co1,cutterB:co2};
   }
+  // Fallback: a fill whose own OUTLINE self-intersects, with no separate
+  // stroke object anywhere nearby to act as a cutter ("une ouverture sans
+  // stroke et des intersection" — 2026-07 feedback: "il ne sélectionne pas
+  // la partie fill avec intersection mais l'ensemble"). The loop above only
+  // ever looks for a DIFFERENT path to split against; it never asked
+  // fillVectorFind (the paint-bucket tool's own wall/self-crossing tracer,
+  // which already explicitly excludes a self-intersecting whole shape from
+  // winning as its own candidate — see fill.rs's poly_self_intersects) to
+  // isolate just the clicked lobe. Reusing that shared engine instead of a
+  // second region algorithm, per this repo's own duplication-hazard
+  // convention.
+  //
+  // Only attempted when fillPath actually self-intersects — Path#area is a
+  // plain shoelace sum, which nets out near ZERO for a self-intersecting
+  // outline (opposite-winding lobes cancel each other out), so comparing it
+  // against the traced lobe's area to detect "did this really split
+  // something" is unusable here (tried that first, it broke — a real bowtie
+  // fill's own .area came back ~0, making even a correct ~half-size lobe
+  // look "not smaller"). Trusting fillVectorFind unconditionally once
+  // self-intersection is confirmed is safe: the whole self-intersecting
+  // shape is disqualified from ever winning as its own candidate inside
+  // fill.rs, so any result it returns here is necessarily a genuine
+  // sub-lobe, never a same-size re-find of fillPath itself.
+  var selfIx=null;
+  try{selfIx=fillPath.getIntersections(fillPath);}catch(e){selfIx=null;}
+  if(selfIx&&selfIx.length&&typeof fillVectorFind==='function'){
+    var selfRes=null;
+    try{selfRes=fillVectorFind(pt,layer,null,undefined,null);}catch(e){selfRes=null;}
+    if(selfRes&&selfRes.path)return{regionPath:selfRes.path,selfTrace:true,clickPt:[pt.x,pt.y]};
+  }
   return null;
 }
 // DESTRUCTIVE: turns a still-virtual 'fillregion' selection into two real,
@@ -219,6 +249,32 @@ function fsFindFillRegion(fillPath,pt,layer){
 function fsRealizeFillRegion(sel,layer){
   var fillPath=sel.path;
   var idx=layer.children.indexOf(fillPath);
+  if(sel.selfTrace){
+    var traced=null;
+    try{traced=fillVectorFind(new Point(sel.clickPt[0],sel.clickPt[1]),layer,null,undefined,null);}catch(e){traced=null;}
+    var lobe=traced&&traced.path,rest=null;
+    if(lobe){try{rest=fillPath.subtract(lobe,{insert:false});}catch(e){rest=null;}}
+    if(!lobe||!rest||!((rest instanceof CompoundPath&&rest.children.length)||(rest.segments&&rest.segments.length))){
+      // Geometry changed since selection — same staleness bail every other
+      // branch here already uses rather than leave a half-edit.
+      if(lobe)lobe.remove();if(rest)rest.remove();
+      return{path:fillPath,kind:'fill'};
+    }
+    lobe.fillColor=fillPath.fillColor;lobe.strokeWidth=fillPath.strokeWidth;
+    lobe.strokeColor=null; // matches this branch's own precondition (fillPath has no stroke — see this function's header comment)
+    fsUnlinkFillRegen(lobe);
+    layer.insertChild(idx,lobe);
+    // rest can legitimately come back as a CompoundPath (the self-crossing
+    // outline's OTHER half, subtracted against a self-intersecting operand
+    // — Paper.js's own boolean ops have no obligation to return a single
+    // simple contour there) — insertBooleanResult (this file, used
+    // everywhere else a boolean op's result needs inserting) already knows
+    // how to explode that into independent flat Paths rather than this
+    // branch needing its own second copy of that logic.
+    insertBooleanResult(layer,idx,rest,fillPath.fillColor,fillPath.opacity);
+    fillPath.remove();
+    return{path:lobe,kind:'fill'};
+  }
   if(sel.boolCut){
     var inside,outside;
     try{inside=fillPath.intersect(sel.cutter,{insert:false});outside=fillPath.subtract(sel.cutter,{insert:false});}
@@ -301,6 +357,7 @@ function fsHitTest(pt,layer){
       var region=fsFindFillRegion(fp,pt,layer);
       if(region){
         region.regionPath.remove();
+        if(region.selfTrace)return{path:fp,kind:'fillregion',selfTrace:true,clickPt:region.clickPt};
         if(region.boolCut)return{path:fp,kind:'fillregion',boolCut:true,cutter:region.cutter,inside:region.inside};
         return{path:fp,kind:'fillregion',boundaryStart:region.boundaryStart,boundaryEnd:region.boundaryEnd,cutter:region.cutter,cutterA:region.cutterA,cutterB:region.cutterB};
       }
@@ -318,6 +375,14 @@ function fsHighlightPath(sel){
   if(!sel)return null;
   if(sel.kind==='fill')return sel.path.clone({insert:false,deep:false});
   if(sel.kind==='fillregion'){
+    if(sel.selfTrace){
+      var selfHi=null;
+      try{selfHi=fillVectorFind(new Point(sel.clickPt[0],sel.clickPt[1]),sel.path.parent,null,undefined,null);}catch(e){selfHi=null;}
+      if(!selfHi||!selfHi.path)return sel.path.clone({insert:false,deep:false}); // geometry changed since selection
+      var out2=selfHi.path.clone({insert:false,deep:false});
+      selfHi.path.remove();
+      return out2;
+    }
     if(sel.boolCut){
       var boolRegion;
       try{boolRegion=sel.inside?sel.path.intersect(sel.cutter,{insert:false}):sel.path.subtract(sel.cutter,{insert:false});}
@@ -3899,7 +3964,16 @@ function onMouseDown(event){
     // silently no-opped (hit-test still found it, but the type check
     // rejected it), matching the reported "sometimes erases, sometimes
     // not" — it worked until the first bite, then stopped for that shape.
-    var hit2=layer.hitTest(event.point,{stroke:true,fill:true,tolerance:Math.max(8,state.eraserSize/2)/view.zoom});
+    // Exact (zero-tolerance) hit wins first, same fix as eraser-bridge.js's
+    // eraseAt() — this native Paper.js path is the fallback used whenever
+    // the Rust engine isn't enabled, and never got that fix (2026-07
+    // feedback: "l'outil eraser... s'arrête alors que je drag encore" — a
+    // stray leftover fragment well within the radius-derived tolerance but
+    // outside the visible cursor circle can steal the hit from the shape
+    // actually under the cursor, reading as "erases the whole fill in one
+    // go" then "stops responding" once nearby fragments run out).
+    var hit2=layer.hitTest(event.point,{stroke:true,fill:true,tolerance:0});
+    if(!hit2)hit2=layer.hitTest(event.point,{stroke:true,fill:true,tolerance:Math.max(8,state.eraserSize/2)/view.zoom});
     if(hit2&&(hit2.item instanceof Path||hit2.item instanceof CompoundPath)&&(hit2.item.strokeColor||hit2.item.fillColor||(hit2.item.data&&hit2.item.data.isVectorBrush))){
       _eraseDragActive=true;
       var erasedItem2=hit2.item;
@@ -4167,7 +4241,10 @@ function onMouseDrag(event){
     var erasedAny=false;
     for(var esi=1;esi<=steps;esi++){
       var subPt=fromP.add(event.point.subtract(fromP).multiply(esi/steps));
-      var hit=layer2e.hitTest(subPt,{stroke:true,fill:true,tolerance:Math.max(8,state.eraserSize/2)/view.zoom});
+      // Exact-hit-first — same fix as onMouseDown's own eraser hitTest just
+      // above (see its comment).
+      var hit=layer2e.hitTest(subPt,{stroke:true,fill:true,tolerance:0});
+      if(!hit)hit=layer2e.hitTest(subPt,{stroke:true,fill:true,tolerance:Math.max(8,state.eraserSize/2)/view.zoom});
       if(hit&&(hit.item instanceof Path||hit.item instanceof CompoundPath)&&(hit.item.strokeColor||hit.item.fillColor||(hit.item.data&&hit.item.data.isVectorBrush))){
         if(!_eraseDragActive){pushUndo();_eraseDragActive=true;}
         eraseAtPoint(hit.item,subPt,state.eraserSize/2,_eraseLastPt);
