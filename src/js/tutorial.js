@@ -1229,12 +1229,13 @@
         stateIncreaseStep({ target: '#drawing-canvas', title: 'Dessine un rectangle', body: 'Clique-glisse pour tracer un rectangle — il a déjà un fond ET un trait par défaut.', hint: 'En attente de ta forme…', measure: measureStrokeCount }),
         { type: 'click', target: '.tool-btn[data-tool="fsselect"]', title: 'Choisis Fill/Stroke Select', body: 'Clique sur l\'outil Fill/Stroke Select dans la barre de gauche (raccourci M).' },
         // Un clic fsselect ne mute RIEN dans le calque (tools.js) — juste
-        // une variable globale `_fsSel` ({path, kind:'fill'|'stroke'}).
-        // measureLayerFingerprint ne bougerait jamais ; _fsSel est le seul
-        // signal réel qu'une sélection indépendante a eu lieu.
+        // une variable globale `_fsSel` (tableau multi-select depuis 2026-07,
+        // chaque entrée {path, kind:'fill'|'stroke'}). measureLayerFingerprint
+        // ne bougerait jamais ; _fsSel est le seul signal réel qu'une
+        // sélection indépendante a eu lieu.
         stateChangedStep({
           target: '#drawing-canvas', title: 'Clique sur le fond du rectangle', body: 'Clique à l\'intérieur du rectangle pour sélectionner juste son fond (pas le contour).',
-          hint: 'En attente de ton clic…', measure: function (win) { return win._fsSel ? win._fsSel.kind : null; }
+          hint: 'En attente de ton clic…', measure: function (win) { return (win._fsSel && win._fsSel.length) ? win._fsSel[win._fsSel.length - 1].kind : null; }
         }),
         { type: 'info', title: 'Bien joué !', body: 'Maj+clic sur le contour sélectionne le trait au lieu du fond. Une fois sélectionné, change sa couleur via les carrés Fond/Trait habituels — seule cette partie change.' }
       ]

@@ -50,8 +50,68 @@ function hitTestComponentLayers(point){
 // computes those crossing points live (Paper's getIntersections) and
 // scopes the selection (and, on Delete, an ACTUAL path split) to just that
 // bounded arc — the rest of the stroke and any fill are left untouched.
-var _fsSel=null; // {path, kind:'fill'|'stroke', segStart, segEnd, closed} | null
-function fsClearSel(){_fsSel=null;}
+// Multi-select array (2026-07, "impossible de faire de la multiselection
+// avec fill/stroke select + shift... lasso et rectangle") — each entry is
+// {path, kind:'fill'|'stroke'|'fillregion', segStart, segEnd, closed}, same
+// shape fsHitTest always returned; single-select is just the length-1 case.
+var _fsSel=[];
+function fsClearSel(){_fsSel=[];}
+// Last-touched entry — every place that used to read _fsSel.kind/.path
+// directly for a SINGLE-value display (panel color swatch, header text)
+// keeps doing that against this one, while actions (recolor/delete/opacity)
+// loop over the whole _fsSel array.
+function fsPrimarySel(){return _fsSel.length?_fsSel[_fsSel.length-1]:null;}
+// Raw pointermove/pointerup listeners for the fsselect marquee/lasso
+// (2026-07) — NOT Paper.js Tool's own onMouseDrag/onMouseUp (the branches
+// below still handle those, for when the Rust engine is off and Paper's
+// own Tool event loop runs normally). Confirmed live: with the engine on
+// (the default), Paper's Tool onMouseDrag/onMouseUp never fire at all for
+// a real drag gesture on this tool (view.autoUpdate=false likely stops
+// Paper's own queued-event dispatch loop) — onMouseDown still fires fine
+// (that's what starts the marquee/lasso below), but nothing ever grew or
+// resolved it, so a drag-select silently did nothing. select-bridge.js's
+// OWN marquee for the Select tool sidesteps this entirely by never
+// depending on Paper's Tool system in the first place (raw DOM listeners
+// throughout) — mirrored here rather than fighting Paper's dead event
+// loop. Harmless alongside the Paper-Tool branches below when the engine
+// IS off: whichever resolves first clears _marquee.active, making the
+// other a no-op.
+document.addEventListener('pointermove',function(e){
+  if(!(_marquee.active&&_marquee.mode==='fsselect')||!window.SMEngineBridge)return;
+  var w=window.SMEngineBridge.screenToWorld(e.clientX,e.clientY);
+  var pt=new Point(w[0],w[1]);
+  var prevA=project.activeLayer;marqueeLayer.activate();
+  if(_marquee.lasso){
+    if(!_marquee.rect)_marquee.rect=new Path({segments:[_marquee.start],closed:false,strokeColor:'rgba(74,158,255,.9)',strokeWidth:1/view.zoom,dashArray:[4/view.zoom,3/view.zoom],fillColor:new Color(0.29,0.62,1,0.08),insert:true});
+    _marquee.rect.add(pt);
+  }else{
+    var mx1=Math.min(_marquee.start.x,pt.x),my1=Math.min(_marquee.start.y,pt.y);
+    var mx2=Math.max(_marquee.start.x,pt.x),my2=Math.max(_marquee.start.y,pt.y);
+    if(_marquee.rect)_marquee.rect.remove();
+    _marquee.rect=new Path.Rectangle({from:new Point(mx1,my1),to:new Point(mx2,my2),strokeColor:'rgba(74,158,255,.9)',strokeWidth:1/view.zoom,dashArray:[4/view.zoom,3/view.zoom],fillColor:new Color(0.29,0.62,1,0.08),insert:true});
+  }
+  prevA.activate();
+  if(window.SMEngineBridge.renderNow)window.SMEngineBridge.renderNow();
+},{capture:true});
+document.addEventListener('pointerup',function(e){
+  if(!(_marquee.active&&_marquee.mode==='fsselect'))return;
+  if(_marquee.rect){
+    var mbf=_marquee.rect.bounds;
+    var lassoF=null;
+    if(_marquee.lasso&&_marquee.rect.segments.length>2){_marquee.rect.closePath();lassoF=_marquee.rect;}
+    var layerF=userLayers[state.activeLayerIdx];
+    layerF.children.forEach(function(c){
+      if(!(c instanceof Path)||c.segments.length===0||!(c.strokeColor||c.fillColor))return;
+      if(!mbf.intersects(c.bounds))return;
+      if(lassoF&&!(lassoF.contains(c.position)||lassoF.intersects(c)))return;
+      if(_fsSel.some(function(s){return s.path===c;}))return; // already selected — Shift+lasso over the same shape twice shouldn't duplicate it
+      _fsSel.push(c.fillColor?{path:c,kind:'fill'}:{path:c,kind:'stroke',segStart:0,segEnd:c.length,closed:c.closed});
+    });
+    _marquee.rect.remove();_marquee.rect=null;_marquee.mode=null;
+  }
+  _marquee.active=false;renderArcs();updateUI();
+  if(window.SMEngineBridge&&window.SMEngineBridge.renderNow)window.SMEngineBridge.renderNow();
+},{capture:true});
 // Every OTHER path in the same layer, plus this path's own self-crossings
 // — each contributes its crossing points as offsets (0..path.length)
 // along `path`'s own parametrization.
@@ -429,21 +489,23 @@ function fsUnlinkFillRegen(p){
   delete p.data.fillSeed;delete p.data.fillWalls;delete p.data.fillGapPx;
 }
 function fsApplyDelete(){
-  if(!_fsSel)return;
+  if(!_fsSel.length)return;
   pushUndo();
   var layer=userLayers[state.activeLayerIdx];
-  if(_fsSel.kind==='fillregion')_fsSel=fsRealizeFillRegion(_fsSel,layer);
-  if(_fsSel.kind==='fill'){
-    var p=_fsSel.path;
-    fsUnlinkFillRegen(p);
-    if(!markDeleteAsRevision(p)){ // foreign-owned fill: ghosted in place, keep its color so the ghost still reads correctly
-      p.fillColor=null;
-      if(!p.strokeColor)p.remove();
+  _fsSel.slice().forEach(function(sel){
+    if(sel.kind==='fillregion')sel=fsRealizeFillRegion(sel,layer);
+    if(sel.kind==='fill'){
+      var p=sel.path;
+      fsUnlinkFillRegen(p);
+      if(!markDeleteAsRevision(p)){ // foreign-owned fill: ghosted in place, keep its color so the ghost still reads correctly
+        p.fillColor=null;
+        if(!p.strokeColor)p.remove();
+      }
+      saveActiveLayerFrame();
+    }else{
+      fsDeleteSegment(sel,layer);
     }
-    saveActiveLayerFrame();
-  }else{
-    fsDeleteSegment(_fsSel,layer);
-  }
+  });
   fsClearSel();
   renderArcs();updateUI();
 }
@@ -3833,7 +3895,33 @@ function onMouseDown(event){
     // finalized in onMouseUp once the drag distance is known.
     _textDragStart=event.point.clone();
   }else if(state.tool==='fsselect'){
-    _fsSel=fsHitTest(event.point,layer);
+    var fsHit=fsHitTest(event.point,layer);
+    // event.event.shiftKey/altKey (native event), not event.modifiers.shift/alt
+    // (Paper.js's own tracking) -- same proven-reliable pattern the Pen tool
+    // and Zoom tool already use in this exact file: this app's own global
+    // keydown handlers intercept the key before Paper's internal listener
+    // ever sees it, so event.modifiers silently never reads true here.
+    if(fsHit){
+      // Shift toggles this hit in/out of the multi-selection (2026-07,
+      // "impossible de faire de la multiselection avec fill/stroke select
+      // + shift") — a plain click still replaces the whole selection with
+      // just this one hit, same as before.
+      if(event.event.shiftKey){
+        var fsExistIdx=_fsSel.findIndex(function(s){return s.path===fsHit.path&&s.kind===fsHit.kind;});
+        if(fsExistIdx>=0)_fsSel.splice(fsExistIdx,1);else _fsSel.push(fsHit);
+      }else{
+        _fsSel=[fsHit];
+      }
+    }else{
+      if(!event.event.shiftKey)fsClearSel();
+      // Clicked empty canvas: start a rubber-band marquee (Alt held = a
+      // freehand lasso instead) — same feedback, "il faudrait les outils
+      // de lasso et rectangle de selection pour cet outil". Reuses the
+      // Select tool's own _marquee state/rendering below (tagged with
+      // .mode so onMouseUp knows to resolve it into _fsSel instead of
+      // selectedPaths), rather than a second marquee implementation.
+      _marquee.active=true;_marquee.start=event.point.clone();_marquee.rect=null;_marquee.lasso=!!event.event.altKey;_marquee.mode='fsselect';
+    }
     updateUI();
     // A plain click-to-select mutates no layer content, so it never bumps
     // window._sceneVersion (saveActiveLayerFrame/loadFrame's job) — without
@@ -4201,11 +4289,18 @@ function onMouseDrag(event){
       }
       renderTransformHandles();
     }else if(_marquee.active){
-      var mx1=Math.min(_marquee.start.x,event.point.x),my1=Math.min(_marquee.start.y,event.point.y);
-      var mx2=Math.max(_marquee.start.x,event.point.x),my2=Math.max(_marquee.start.y,event.point.y);
-      if(_marquee.rect)_marquee.rect.remove();
       var prevA=project.activeLayer;marqueeLayer.activate();
-      _marquee.rect=new Path.Rectangle({from:new Point(mx1,my1),to:new Point(mx2,my2),strokeColor:'rgba(74,158,255,.9)',strokeWidth:1/view.zoom,dashArray:[4/view.zoom,3/view.zoom],fillColor:new Color(0.29,0.62,1,0.08),insert:true});
+      if(_marquee.lasso){
+        // Freehand lasso (Alt-held drag) — grows an open Path point-by-point,
+        // same convention select-bridge.js's own lasso already uses.
+        if(!_marquee.rect)_marquee.rect=new Path({segments:[_marquee.start],closed:false,strokeColor:'rgba(74,158,255,.9)',strokeWidth:1/view.zoom,dashArray:[4/view.zoom,3/view.zoom],fillColor:new Color(0.29,0.62,1,0.08),insert:true});
+        _marquee.rect.add(event.point);
+      }else{
+        var mx1=Math.min(_marquee.start.x,event.point.x),my1=Math.min(_marquee.start.y,event.point.y);
+        var mx2=Math.max(_marquee.start.x,event.point.x),my2=Math.max(_marquee.start.y,event.point.y);
+        if(_marquee.rect)_marquee.rect.remove();
+        _marquee.rect=new Path.Rectangle({from:new Point(mx1,my1),to:new Point(mx2,my2),strokeColor:'rgba(74,158,255,.9)',strokeWidth:1/view.zoom,dashArray:[4/view.zoom,3/view.zoom],fillColor:new Color(0.29,0.62,1,0.08),insert:true});
+      }
       prevA.activate();
     }else if(draggingArc){setArcHandle(draggingArc.fA,draggingArc.fB,draggingArc.matchIdx,draggingArc.which,draggingArc.ptA,draggingArc.ptB,event.point.x,event.point.y);renderArcs(arcDragCache);}
     else if(selectedPaths.length>0){
@@ -4380,6 +4475,24 @@ function onMouseUp(event){
         saveActiveLayerFrame();
       }
       renderTransformHandles();renderNodeHandles();updateUI();
+    }
+    else if(_marquee.active&&_marquee.mode==='fsselect'){
+      if(_marquee.rect){
+        var mbf=_marquee.rect.bounds;
+        var lassoF=null;
+        if(_marquee.lasso&&_marquee.rect.segments.length>2){_marquee.rect.closePath();lassoF=_marquee.rect;}
+        var layerF=userLayers[state.activeLayerIdx];
+        layerF.children.forEach(function(c){
+          if(!(c instanceof Path)||c.segments.length===0||!(c.strokeColor||c.fillColor))return;
+          if(!mbf.intersects(c.bounds))return;
+          if(lassoF&&!(lassoF.contains(c.position)||lassoF.intersects(c)))return;
+          if(_fsSel.some(function(s){return s.path===c;}))return; // already selected — Shift+lasso over the same shape twice shouldn't duplicate it
+          _fsSel.push(c.fillColor?{path:c,kind:'fill'}:{path:c,kind:'stroke',segStart:0,segEnd:c.length,closed:c.closed});
+        });
+        _marquee.rect.remove();_marquee.rect=null;_marquee.mode=null;
+      }
+      _marquee.active=false;renderArcs();updateUI();
+      if(window.SMEngineBridge&&window.SMEngineBridge.renderNow)window.SMEngineBridge.renderNow();
     }
     else if(_marquee.active){
       if(_marquee.rect){
