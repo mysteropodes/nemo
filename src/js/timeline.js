@@ -1514,7 +1514,17 @@ function updatePropsContext(){
   // selection of ONLY plain strokes is required for the row to make sense
   // during selection; it's unconditionally shown for the Draw tool itself
   // since it just sets the default for the NEXT stroke.
-  var eligibleSel=hasSel&&selectedPaths.every(function(p){return p instanceof Path&&p.strokeColor&&!(p.data&&(p.data.isVectorBrush||p.data.isFillShape));});
+  // 2026-07 feedback ("une fois une brush selectionné/appliqué et modifié
+  // dans le panel de droit > stroke, le menu déroulant... disparaît"):
+  // applying a brush texture to a filled anchor deliberately nulls its
+  // strokeColor (applyBrushTexture, tools.js — data.preTextureStroke keeps
+  // the original for restoration). Requiring p.strokeColor here made this
+  // row hide itself the moment ANY Stroke-panel edit re-ran updateUI(),
+  // even though the path is still a legitimate, already-textured brush
+  // stroke — check data.preTextureStroke as an alternate signal that a
+  // stroke used to live here (or still does, for the no-fill invisible-
+  // anchor case via data.preTextureOpacity).
+  var eligibleSel=hasSel&&selectedPaths.every(function(p){return p instanceof Path&&(p.strokeColor||(p.data&&(p.data.preTextureStroke!==undefined||p.data.preTextureOpacity!==undefined)))&&!(p.data&&(p.data.isVectorBrush||p.data.isFillShape));});
   var brushPresetRow=document.getElementById('p-brushpreset-row');
   if(brushPresetRow)brushPresetRow.style.display=(state.tool==='draw'||eligibleSel)?'flex':'none';
   // Only auto-(re)expand sections on an actual context CHANGE — every

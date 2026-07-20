@@ -1379,6 +1379,18 @@
           updateUI(); window.SMEngineBridge.renderNow();
         }
       },
+      { sep: true },
+      {
+        // 2026-07 feedback ("tween seulement des éléments select... laisser
+        // les autres éléments non tween"): per-element opt-out of the
+        // auto-tween matcher (splitTweenables, tweens.js), toggled here
+        // rather than a stopwatch/keyframe-level setting since several
+        // elements of the SAME keyframe can now be tweened or not,
+        // independently. Label reflects current state — "activer" flips
+        // back to normal tweening if every selected item is already held.
+        label: selectedPaths.every(function (p) { return p.data && p.data.noTween; }) ? 'Réactiver le tween' : 'Ne pas tweener la sélection',
+        action: function () { toggleNoTweenForSelection(); }
+      },
     ]);
     if (isActiveRevision || isDeleteGhost) {
       // Same actions as the Properties-panel Accept/Reject buttons
@@ -1404,6 +1416,47 @@
     window.showContextMenu(e.clientX, e.clientY, items);
   }
 
+  // 2026-07 feedback ("tween seulement des éléments select... laisser les
+  // autres éléments non tween... plusieurs éléments d'une même keyframe
+  // peuvent être tween ou pas") — per-element tween opt-out, wired to the
+  // context-menu item above. Sets data.noTween (persisted via serP/desP,
+  // app.js) on the live selection, then propagates the SAME flag value to
+  // the nearest keyframe on each side sharing the same data.strokeId —
+  // without this, splitTweenables (tweens.js) would exclude only ONE side
+  // of the pair from matching, leaving its counterpart to fade in/out as
+  // an unmatched stroke instead of staying frozen (a visible ghost
+  // duplicate on top of the held copy).
+  function toggleNoTweenForSelection() {
+    if (!selectedPaths.length) return;
+    pushUndo();
+    var newVal = !selectedPaths.every(function (p) { return p.data && p.data.noTween; });
+    var li = state.activeLayerIdx, ld = state.layers[li], cf = state.currentFrame;
+    var ids = [];
+    selectedPaths.forEach(function (p) {
+      if (!(p instanceof Path)) return;
+      ensureStrokeId(p);
+      if (newVal) p.data.noTween = true; else delete p.data.noTween;
+      if (p.data && p.data.strokeId) ids.push(p.data.strokeId);
+    });
+    saveActiveLayerFrame();
+    function propagate(dir) {
+      if (!ids.length) return;
+      for (var fi = cf + dir; fi >= 0 && fi < state.totalFrames; fi += dir) {
+        var fr = ld.frames[fi];
+        if (!fr) continue;
+        if (fr.strokes && fr.strokes.length) {
+          fr.strokes.forEach(function (sd) {
+            if (sd.strokeId && ids.indexOf(sd.strokeId) >= 0) { if (newVal) sd.noTween = true; else delete sd.noTween; }
+          });
+        }
+        if (fr.isKeyframe) break; // stop at the first keyframe reached — that's the pair boundary
+      }
+    }
+    propagate(-1); propagate(1);
+    if (window.SM && window.SM.generateTweens) window.SM.generateTweens();
+    updateUI(); window.SMEngineBridge.renderNow();
+  }
+
   // Read-only peek for engine-bridge.js's buildTransformBoxItems (2026-07
   // feedback: "la bounding box ne reflete pas cette transformation") — lets
   // the gizmo draw the ACTUAL live-distorted quad instead of the static
@@ -1412,6 +1465,7 @@
     getDistortState: function () {
       return mode === 'xform-distort' ? { dir: distortDir, quad: distortDstQuad } : null;
     },
+    toggleNoTweenForSelection: toggleNoTweenForSelection,
   };
 
   function init() {
