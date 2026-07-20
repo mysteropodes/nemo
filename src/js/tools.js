@@ -1447,10 +1447,36 @@ function fillConsumeCloseStrokes(wallIds){
 // (ensureStrokeId, tools.js, is a no-op once data.strokeId already exists)
 // so the result's wallIds can be traced back to exactly which queued
 // closing stroke(s) were actually used — see fillConsumeCloseStrokes.
+// Snap each point of the hand-drawn Alt+drag closing line onto nearby REAL
+// ink (any existing stroke/fill boundary, never another temp-close line)
+// when it runs close enough — the closing gesture is meant to bridge a
+// genuine GAP, not to redraw the shape's own edge, but a freehand Alt+drag
+// can easily wander well away from the real curve it's running alongside
+// (2026-07 feedback: "il n'est pas attaché au stroke alors que celui-ci le
+// touche" — confirmed live, a fill boundary sitting up to 228px off the
+// real ink at one point because the closing line itself drifted that far).
+// Pulling each sample onto the nearest real wall point within SNAP_TOL
+// keeps the closing line hugging visible ink wherever it passes near some,
+// while leaving it untouched wherever it's genuinely crossing open space
+// (nothing within tolerance there, so it stays exactly as drawn).
+var FILL_CLOSE_SNAP_TOL=18;
 function fillMaterializeTempCloseStrokes(layer){
+  var realWalls=layer.children.filter(function(c){
+    return c instanceof Path&&(c.strokeColor||c.fillColor||(c.data&&c.data.isVectorBrush))&&!(c.data&&c.data.isFillTempClose)&&c.segments.length>=2;
+  });
   return _fillCloseStrokes.map(function(entry){
     var p=new Path({strokeColor:'#000000',strokeWidth:1,fillColor:null});
-    entry.points.forEach(function(pt){p.add(new Point(pt[0],pt[1]));});
+    entry.points.forEach(function(pt){
+      var pos=new Point(pt[0],pt[1]);
+      var best=null,bestD=FILL_CLOSE_SNAP_TOL;
+      realWalls.forEach(function(w){
+        var np=w.getNearestPoint(pos);
+        if(!np)return;
+        var d=pos.getDistance(np);
+        if(d<bestD){bestD=d;best=np;}
+      });
+      p.add(best||pos);
+    });
     p.data.strokeId=entry.id;
     p.data.isFillTempClose=true;
     layer.addChild(p);
