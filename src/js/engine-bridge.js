@@ -320,6 +320,14 @@
         } else if (state.revisionView === 'revisions') {
           if (!(c.data && (c.data.isRevisionGhost || c.data.revisionParentId))) continue;
         }
+        // Shadow Brush guide-line visibility (timeline.js's
+        // toggleShadowGuides) — a shadow-tagged item's whole purpose is to
+        // disappear once it's done its job as a fill-boundary guide (see
+        // shadow-brush-bridge.js's header comment), so this is a live
+        // render-only filter, same shape as the revisionView one just
+        // above: geometry/document data is untouched, only what goes into
+        // THIS render is affected.
+        if (!state.showShadowGuides && c.data && c.data.channelTag === 'shadow') continue;
         // Element-level Motion target (2026-07): a strokeId-scoped transform
         // nested INSIDE the layer's own — applied FIRST below, pivoted
         // around this item's OWN bounds (never the whole layer's), matching
@@ -555,6 +563,10 @@
   function onionLayerItems(layer) {
     var items = [];
     layer.children.forEach(function (c) {
+      // Same Shadow Brush guide-line filter as buildSceneJson() above — an
+      // onion-skin/Ghost-All ghost of a shadow-tagged guide line shouldn't
+      // reappear just because the CURRENT frame's own copy got hidden.
+      if (!state.showShadowGuides && c.data && c.data.channelTag === 'shadow') return;
       // Same Raster handling as buildSceneJson() above — an imported image/
       // video-frame ghosted onto the onion-skin layer (desR, tweens.js
       // renderOS) was silently dropped here, same "new item type not

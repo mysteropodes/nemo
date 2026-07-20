@@ -321,6 +321,19 @@ window.SM={
     if(!state.ghostAllFrames)clearGhostSelection();
     updateUI();
   },
+  // Shadow Brush guide-line visibility (2026-07, shadow-brush-bridge.js) —
+  // a single view-only switch (like onionSkin, never persisted to the
+  // project file) that hides every data.channelTag==='shadow' item across
+  // ALL layers/components/the current frame at once, so guide lines drawn
+  // for the Stroke/Fill/Shadow layer-separation workflow can be checked-off
+  // before a final look without touching the document itself. Consumed at
+  // render time by engine-bridge.js's buildSceneJson (main per-frame scene)
+  // and onionLayerItems (onion skin + Ghost-All, which share that reader).
+  toggleShadowGuides:function(){
+    state.showShadowGuides=!state.showShadowGuides;
+    var b=document.getElementById('btn-shadow-guides');if(b)b.classList.toggle('active',state.showShadowGuides);
+    if(window.SMEngineBridge)SMEngineBridge.renderNow();
+  },
   selectGhostAll:selectGhostAll,
   toggleLoopPlayback:function(){state.loopPlayback=!state.loopPlayback;var b=document.getElementById('btn-loop');if(b)b.classList.toggle('active',state.loopPlayback);},
   // Right-click btn-loop (feedback: "quand on clic sur le lecture loop...
@@ -1001,6 +1014,7 @@ window.SM={
       // own data-model comment), so a wholesale copy is safe.
       storyboard:state.storyboard||null,
       symbols:state.symbols,palettes:state.palettes,activePaletteIdx:state.activePaletteIdx,customBrushPresets:state.customBrushPresets,
+      shadowPalette:state.shadowPalette,shadowActiveId:state.shadowActiveId,
       // Custom WGSL effects (2026-07, feedback: "la possibilité d'ajouter
       // ses propres effets wgsl") — project-wide like symbols/palettes
       // above (not per-layer), since one definition can be applied to any
@@ -1160,6 +1174,8 @@ window.SM={
     else if(d.colorPalette)state.palettes=[{id:'p0',name:'Palette 1',colors:d.colorPalette}];
     else state.palettes=[{id:'p0',name:'Palette 1',colors:['#000000','#ffffff','#ff0000','#ff8800','#ffee00','#00cc44','#0088ff','#8833ff']}];
     state.activePaletteIdx=d.activePaletteIdx||0;
+    state.shadowPalette=(d.shadowPalette&&d.shadowPalette.length)?d.shadowPalette:[{id:'sh1',color:'#3b4a6b'},{id:'sh2',color:'#6b3b4a'},{id:'sh3',color:'#3b6b5a'},{id:'sh4',color:'#6b5a3b'},{id:'sh5',color:'#4a3b6b'},{id:'sh6',color:'#555555'}];
+    state.shadowActiveId=d.shadowActiveId||state.shadowPalette[0].id;
     state.customBrushPresets=d.customBrushPresets||{};
     state.audioTracks=d.audioTracks||[];
     if(window.SMAudio)SMAudio.reload();
@@ -5266,6 +5282,7 @@ document.getElementById('btn-os').addEventListener('click',function(){window.SM.
 document.getElementById('btn-ghost-all').addEventListener('click',function(){window.SM.toggleGhostAll();});
 document.getElementById('btn-tween-curves').addEventListener('click',function(){window.SM.toggleTweenCurves();});
 document.getElementById('btn-ghost-select').addEventListener('click',function(){selectGhostAll();});
+document.getElementById('btn-shadow-guides').addEventListener('click',function(){window.SM.toggleShadowGuides();});
 // Team review view filter — cycles All -> Mine -> Corrections, purely a
 // render-time filter in engine-bridge.js's buildSceneJson (never touches
 // the document), so switching is instant and always reversible.
@@ -5441,6 +5458,11 @@ document.getElementById('comp-offset').addEventListener('change',function(){wind
     var range=(rangeSel.value==='all')?{start:0,end:state.totalFrames-1}:{start:state.waIn,end:state.waOut};
     var scale=currentExportScale();
     var alpha=ALPHA_FORMATS.indexOf(fmtSel.value)>=0&&document.getElementById('exp-alpha').checked;
+    // Read straight into state (not passed through opts like alpha/scale)
+    // since export.js's exportBuildFrame/Lottie stroke filters both read
+    // state.exportIncludeShadowGuides directly — simplest way to reach
+    // both without threading a new param through every exportXxx function.
+    state.exportIncludeShadowGuides=document.getElementById('exp-include-shadow').checked;
     var opts={start:range.start,end:range.end,scale:scale,alpha:alpha,fps:state.fps,
       onProgress:function(i,n){progEl.style.display='block';progEl.textContent=SM.t('exportRenderingFrame').replace('{i}',i).replace('{n}',n);},
       onFfmpeg:function(line){progEl.style.display='block';progEl.textContent=line.substring(0,80);},

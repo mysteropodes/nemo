@@ -32,6 +32,11 @@ function exportBuildFrame(frameIdx,alpha){
   for(var li=0;li<state.layers.length;li++){
     var ld=state.layers[li];if(!ld.visible)continue;
     var strokes=getEffectiveStrokes(li,frameIdx);
+    // Shadow Brush guide lines (2026-07) — their whole purpose is to
+    // disappear once they've delimited a fill area (see shadow-brush-
+    // bridge.js's header comment); default OFF so a fresh export doesn't
+    // need this unchecked every time just to get a clean render.
+    if(!state.exportIncludeShadowGuides)strokes=strokes.filter(function(sd){return sd.channelTag!=='shadow';});
     // Motion mode (motion.js): unlike buildSceneJson (engine-bridge.js),
     // exportBuildFrame merges every original layer's strokes straight into
     // the ONE shared throwaway `L`, so there's no per-layer Paper object left
@@ -385,7 +390,7 @@ function lottieBuild(start,end){
     // dab companions are UNAFFECTED — they're real Paths with segments,
     // same as before.
     var framesStrokes=[];
-    for(var f=start;f<=end;f++)framesStrokes[f]=getEffectiveStrokes(li,f).filter(function(sd){return sd.opacity!==0&&!sd.isRaster;});
+    for(var f=start;f<=end;f++)framesStrokes[f]=getEffectiveStrokes(li,f).filter(function(sd){return sd.opacity!==0&&!sd.isRaster&&(state.exportIncludeShadowGuides||sd.channelTag!=='shadow');});
 
     // figure out the max stroke-slot count and, for each slot, the
     // contiguous frame runs where that slot exists (count stable)

@@ -1204,6 +1204,11 @@ body.mode-motion .lrow.act{box-shadow:inset 3px 0 0 #4E6FF2,inset 0 0 0 1px rgba
 .brush-menu-scroll{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:2px;min-height:80px;}
 .brush-menu-pop .bp-item canvas{width:130px;height:22px;}
 
+/* SHADOW BRUSH popover (2026-07, shadow-brush-bridge.js) — small swatch
+   picker, same .ctx-menu shell as brush-menu-pop but sized to its content
+   instead of that one's fixed 300px catalog width. */
+.shadow-brush-pop{width:auto;padding:8px;display:flex;flex-direction:column;gap:4px;}
+
 /* BRUSH EDITOR PANEL */
 .bp-editor-pop{width:320px;padding:12px;display:flex;flex-direction:column;gap:6px;}
 .bpe-preview-wrap{background:var(--panel3);border-radius:4px;padding:4px;}
