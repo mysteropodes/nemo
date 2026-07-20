@@ -3422,6 +3422,14 @@ function eraseAtPoint(path,worldPt,radius,fromPt){
   var idx=layer.children.indexOf(path);
   var target=path;
   var isVB=!!(path.data&&path.data.isVectorBrush);
+  // Captured BEFORE any ribbon-expansion/replace below mutates or discards
+  // `path` — this is what redraws a visible border around the eroded
+  // result instead of silently dropping it (see insertBooleanResult's own
+  // strokeInfo comment). Null for a genuine fill-only path (nothing to
+  // restore, correctly stays borderless) and for vector-brush ink (its
+  // fillColor already IS the visible ink, strokeColor is never the real
+  // border there).
+  var origStrokeInfo=(!isVB&&path.strokeColor)?{color:path.strokeColor,width:path.strokeWidth,cap:path.strokeCap,join:path.strokeJoin}:null;
   // A CLOSED path with BOTH a fill AND a visible stroke (the default for
   // almost anything drawn — fillEnabled defaults true) used to skip this
   // whole branch and erase only the interior fill polygon, then unconditionally
@@ -3521,13 +3529,15 @@ function eraseAtPoint(path,worldPt,radius,fromPt){
   }
   var hasArea=result&&((result.children&&result.children.length)||(result.segments&&result.segments.length));
   if(hasArea){
-    result.fillColor=col;result.strokeColor=null;result.opacity=op;
+    result.fillColor=col;result.opacity=op;
     // A notch cut through a pressure-brush stroke's middle no longer has a
-    // single consistent centerline, so it becomes a plain filled shape from
-    // here on (still fully colorable/selectable/erasable, just not
-    // re-editable as a tapered centerline) — the same tradeoff Illustrator
-    // makes when you erase into a live stroke.
-    insertBooleanResult(layer,Math.min(tIdx,layer.children.length),result,col,op);
+    // single consistent centerline (still fully colorable/selectable/
+    // erasable, just not re-editable as a tapered centerline) — but it DOES
+    // keep a plain outline at the original color/width around whatever
+    // silhouette is left (origStrokeInfo, captured above before any
+    // ribbon-expansion), rather than silently losing its border on the
+    // first touch ("l'eraser supprime le stroke entier", 2026-07).
+    insertBooleanResult(layer,Math.min(tIdx,layer.children.length),result,col,op,origStrokeInfo);
   }else if(result)result.remove();
 }
 // Inserts the result of a Paper.js/WASM boolean op (subtract/unite/
@@ -3588,7 +3598,23 @@ function _mergeHoleIntoExterior(extSegs,holeSegs){
   for(var k2=pair.i+1;k2<extSegs.length;k2++)out.push(extSegs[k2]);
   return out;
 }
-function insertBooleanResult(layer,insertAt,result,fillColor,opacity){
+// strokeInfo (optional, 2026-07 — "l'eraser supprime le stroke entier"):
+// every branch below used to hardcode strokeColor=null on its island(s),
+// on the assumption a boolean-op result never has a meaningful outline to
+// keep (true for a plain fill union/intersect). eraseAtPoint's own erase
+// result is the one caller where that's wrong: the source path DID have a
+// real visible strokeColor before erasing, and losing it entirely on the
+// very first touch (instead of just notching the fill) reads as "the
+// eraser deletes the whole border". Pass {color,width,cap,join} to redraw
+// a stroke of the ORIGINAL color/width around whatever silhouette is left
+// (can't preserve a tapered centerline through an arbitrary bite, but a
+// plain outline at the same width/color is the closest visual match) —
+// every other caller omits it and keeps the old strokeColor=null default.
+function insertBooleanResult(layer,insertAt,result,fillColor,opacity,strokeInfo){
+  function applyStroke(isl){
+    if(strokeInfo&&strokeInfo.color){isl.strokeColor=strokeInfo.color;isl.strokeWidth=strokeInfo.width;isl.strokeCap=strokeInfo.cap;isl.strokeJoin=strokeInfo.join;}
+    else isl.strokeColor=null;
+  }
   if(!(result instanceof CompoundPath)){
     // Every OTHER branch below applies fillColor/opacity/strokeColor=null
     // to its island(s) — this simplest one (the op produced one seamless
@@ -3598,7 +3624,7 @@ function insertBooleanResult(layer,insertAt,result,fillColor,opacity){
     // unite()/etc (typically nothing — confirmed live: fillColor came back
     // null even though a color was explicitly passed in).
     if(fillColor!==undefined)result.fillColor=fillColor;
-    result.strokeColor=null;
+    applyStroke(result);
     if(opacity!==undefined)result.opacity=opacity;
     layer.insertChild(insertAt,result);
     return[result];
@@ -3617,7 +3643,7 @@ function insertBooleanResult(layer,insertAt,result,fillColor,opacity){
     flat.forEach(function(isl){isl.remove();});
     flat.forEach(function(isl,k){
       if(fillColor!==undefined)isl.fillColor=fillColor;
-      isl.strokeColor=null;
+      applyStroke(isl);
       if(opacity!==undefined)isl.opacity=opacity;
       layer.insertChild(insertAt+k,isl);
     });
@@ -3642,7 +3668,7 @@ function insertBooleanResult(layer,insertAt,result,fillColor,opacity){
   });
   islands.forEach(function(isl,k){
     if(fillColor!==undefined)isl.fillColor=fillColor;
-    isl.strokeColor=null;
+    applyStroke(isl);
     if(opacity!==undefined)isl.opacity=opacity;
     layer.insertChild(insertAt+k,isl);
   });
