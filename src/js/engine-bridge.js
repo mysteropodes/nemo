@@ -959,26 +959,32 @@
     return out;
   }
   function buildFSSelectionItems() {
-    if (state.tool !== 'fsselect' || !_fsSel || typeof fsHighlightPath !== 'function') return [];
-    var hl = fsHighlightPath(_fsSel);
-    if (!hl || !hl.segments || !hl.segments.length) { if (hl) hl.remove(); return []; }
-    var segs = hl.segments.map(function (s) { return { point: [s.point.x, s.point.y], handleIn: [s.handleIn.x, s.handleIn.y], handleOut: [s.handleOut.x, s.handleOut.y] }; });
-    var closed = !!hl.closed;
-    var zs = 1 / view.zoom;
-    if (_fsSel.kind === 'fill' || _fsSel.kind === 'fillregion') {
-      var hatchLines = closed ? fsHatchClipLines(hl, 9 * zs, 45) : [];
-      hl.remove();
-      var items = [{ segments: roundSegs(segs), closed: closed, fillColor: [255, 152, 0, 45], strokeColor: [255, 152, 0, 230], strokeWidth: 2 * zs, dashPattern: [4 * zs, 3 * zs] }];
-      hatchLines.forEach(function (ln) {
-        items.push({
-          segments: [{ point: [ln[0], ln[1]], handleIn: [0, 0], handleOut: [0, 0] }, { point: [ln[2], ln[3]], handleIn: [0, 0], handleOut: [0, 0] }],
-          closed: false, fillColor: null, strokeColor: [255, 152, 0, 150], strokeWidth: 1 * zs,
+    if (state.tool !== 'fsselect' || !_fsSel || !_fsSel.length || typeof fsHighlightPath !== 'function') return [];
+    // Multi-select (2026-07) — draw every selected entry's own highlight,
+    // not just one.
+    var out = [];
+    _fsSel.forEach(function (sel) {
+      var hl = fsHighlightPath(sel);
+      if (!hl || !hl.segments || !hl.segments.length) { if (hl) hl.remove(); return; }
+      var segs = hl.segments.map(function (s) { return { point: [s.point.x, s.point.y], handleIn: [s.handleIn.x, s.handleIn.y], handleOut: [s.handleOut.x, s.handleOut.y] }; });
+      var closed = !!hl.closed;
+      var zs = 1 / view.zoom;
+      if (sel.kind === 'fill' || sel.kind === 'fillregion') {
+        var hatchLines = closed ? fsHatchClipLines(hl, 9 * zs, 45) : [];
+        hl.remove();
+        out.push({ segments: roundSegs(segs), closed: closed, fillColor: [255, 152, 0, 45], strokeColor: [255, 152, 0, 230], strokeWidth: 2 * zs, dashPattern: [4 * zs, 3 * zs] });
+        hatchLines.forEach(function (ln) {
+          out.push({
+            segments: [{ point: [ln[0], ln[1]], handleIn: [0, 0], handleOut: [0, 0] }, { point: [ln[2], ln[3]], handleIn: [0, 0], handleOut: [0, 0] }],
+            closed: false, fillColor: null, strokeColor: [255, 152, 0, 150], strokeWidth: 1 * zs,
+          });
         });
-      });
-      return items;
-    }
-    hl.remove();
-    return [{ segments: roundSegs(segs), closed: closed, fillColor: null, strokeColor: [255, 152, 0, 230], strokeWidth: (( _fsSel.path.strokeWidth || 2) + 4) * zs, dashPattern: [5 * zs, 4 * zs] }];
+      } else {
+        hl.remove();
+        out.push({ segments: roundSegs(segs), closed: closed, fillColor: null, strokeColor: [255, 152, 0, 230], strokeWidth: ((sel.path.strokeWidth || 2) + 4) * zs, dashPattern: [5 * zs, 4 * zs] });
+      }
+    });
+    return out;
   }
 
   // Set by eraser-bridge.js on every pointermove while the Eraser tool is
