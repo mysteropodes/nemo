@@ -1876,7 +1876,17 @@ function goToFrame(idx){
 // insert. Only a TARGETED layer gets the real splice at cf+1, pushing its
 // own later keyframes right by one — exactly where the cursor sits.
 function insertFrame(){
-  var targets=(typeof _layerSel!=='undefined'&&_layerSel.length)?_layerSel.slice():state.layers.map(function(_ld,i){return i;});
+  var explicitSel=(typeof _layerSel!=='undefined'&&_layerSel.length);
+  var targets=explicitSel?_layerSel.slice():state.layers.map(function(_ld,i){return i;});
+  // 2026-07 feedback: "on a encore la possibilité de modifier les keyframe
+  // dans la timeline quand celui-ci est lock" — a locked layer must never
+  // get the real splice-at-cursor, only the harmless length-pad every
+  // OTHER non-targeted layer already gets (see this function's own header
+  // comment). An explicit selection of ONLY locked layer(s) has nothing
+  // left to insert into, so it aborts with a toast instead of silently
+  // becoming a no-op "insert into every layer" fallback.
+  targets=targets.filter(function(i){return !state.layers[i].locked;});
+  if(explicitSel&&!targets.length){showToast('Calque verrouillé');return;}
   pushUndoLayers();
   var cf=state.currentFrame;
   for(var i=0;i<state.layers.length;i++){
