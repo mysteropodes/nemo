@@ -43,6 +43,14 @@
     // making that whole apply-to-selection path unreachable.
     select: ['brush-menu', 'vector-sculpt', 'canvas-grid'],
     subselect: ['brush-menu', 'vector-sculpt'],
+    // 2026-07 feedback ("impossible de faire de faire des multiselection
+    // avec fill/stroke select + shift... il faudrait afficher les outils de
+    // lasso et rectangle de selection pour cette outil"): the marquee/lasso
+    // drag itself was built (tools.js, Shift+click / Alt-drag) but only as a
+    // hidden modifier-key convention — no VISIBLE way to pick a mode, which
+    // is what was actually asked for. These two entries give it real toggle
+    // buttons, same pattern as everything else in this panel.
+    fsselect: ['fs-select-rect', 'fs-select-lasso'],
     hand: ['canvas-grid'],
   };
   // Real `state.*`-backed features (NOT Labs prototypes — no localStorage
@@ -97,6 +105,19 @@
       isActive: function () { return !!(window.BrushMenu && window.BrushMenu.isOpen()); },
       onClick: function (btn) { if (window.BrushMenu) window.BrushMenu.toggle(btn); },
     },
+    // Fill/Stroke Select's marquee mode picker — mutually exclusive with
+    // 'fs-select-lasso' below (isActive reflects state.fsSelectMode, default
+    // 'rect'). tools.js reads state.fsSelectMode when starting a marquee on
+    // empty-canvas click; Alt still works as a one-off override of whichever
+    // mode is picked here (see the fsselect onMouseDown branch, tools.js).
+    'fs-select-rect': {
+      isActive: function () { return !(window.state && state.fsSelectMode === 'lasso'); },
+      onClick: function () { if (window.state) state.fsSelectMode = 'rect'; renderLabsFloatPanel(); },
+    },
+    'fs-select-lasso': {
+      isActive: function () { return !!(window.state && state.fsSelectMode === 'lasso'); },
+      onClick: function () { if (window.state) state.fsSelectMode = 'lasso'; renderLabsFloatPanel(); },
+    },
   };
   // Tools armed by a held key regardless of the active tool (flip-roll=R,
   // mirror-check=M, lagoon-menu=Q) — always available, shown after a
@@ -118,6 +139,8 @@
     'flip-roll': "Rouleau d'animateur (maintenir R)",
     'mirror-check': 'Miroir de contrôle (maintenir M)',
     'lagoon-menu': "Menu radial d'outils (maintenir Q)",
+    'fs-select-rect': 'Sélection rectangle (Fill/Stroke Select)',
+    'fs-select-lasso': 'Sélection lasso (Fill/Stroke Select) — Alt+glisser inverse temporairement',
   };
 
   // Solid/filled icons (2026-07, "les icônes ne sont pas trop flat design
@@ -152,6 +175,11 @@
     'flip-roll': '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M17 1l4 4-4 4V6.5H8a4.5 4.5 0 00-4.5 4.5H1.5A7 7 0 018.5 4H17V1z"/><path d="M7 23l-4-4 4-4v3.5h9A4.5 4.5 0 0020.5 14H23a7 7 0 01-7 7H7v2z"/></svg>',
     'mirror-check': '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M9 6L3 12L9 18V14H15V18L21 12L15 6V10H9Z"/></svg>',
     'lagoon-menu': '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M12 12V3A9 9 0 0119.8 7.5Z"/><path d="M12 12L19.8 7.5A9 9 0 0119.8 16.5Z" opacity=".65"/><path d="M12 12L19.8 16.5A9 9 0 014.2 16.5Z" opacity=".4"/><path d="M12 12L4.2 16.5A9 9 0 0112 3V12Z" opacity=".2"/></svg>',
+    // Dashed rectangle = the marquee shape itself, same visual language as
+    // the app's own marquee overlay (dashed stroke, translucent fill).
+    'fs-select-rect': '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="5" width="16" height="14" rx="1" stroke-dasharray="3.2 2.4"/></svg>',
+    // Freehand wavy loop = lasso, distinct silhouette from the rectangle.
+    'fs-select-lasso': '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3c-4.5 0-8 2.7-8 6.5 0 3 2.3 5.3 5.6 6.1L8 20l2.2-1.1c.6.1 1.2.1 1.8.1 4.5 0 8-2.7 8-6.5S16.5 3 12 3z" stroke-dasharray="2.6 2.2"/></svg>',
   };
 
   // Adjustable-parameter tools get a second row below the icon strip
