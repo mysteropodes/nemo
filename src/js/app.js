@@ -146,7 +146,18 @@ var state={
   exportIncludeShadowGuides:false,
   customBrushPresets:{}, // user-saved procedural brush presets, keyed by generated id — see brush-editor.js
   layers:[],activeLayerIdx:0,
-  motionArcs:{},easingCurve:{points:[{x:0,y:0},{x:.42,y:0},{x:.58,y:1},{x:1,y:1}]},
+  // Default tween easing (2026-07 fix, "le moteur tween gère mal des
+  // intervalles"): the old default points {.42,0}/{.58,1} were CSS
+  // cubic-bezier(.42,0,.58,1) CONTROL points pasted in as-is — but
+  // evalPointsCurve (ui.js) treats points as ON-CURVE knots of a
+  // Catmull-Rom-tangent spline, so that default actually meant "y stays 0
+  // until x=.42, cliff to 1 by x=.58, flat after" plus spline under/
+  // overshoot on the outer segments (measured live: eased t of -0.074 and
+  // 1.074, and adjacent inbetweens jumping 0.02 -> 0.98). On any span with
+  // several inbetweens the motion visibly parked, teleported mid-span,
+  // then parked again. These are ui.js's own 'ease-in-out' PRESET knots —
+  // the same curve family, expressed correctly for this evaluator.
+  motionArcs:{},easingCurve:{points:[{x:0,y:0},{x:.3,y:.05},{x:.7,y:.95},{x:1,y:1}]},
   // v16: manual inbetween/tween reassignment — {layer+':'+fA+'-'+fB: [{aId,bId},...]}
   // forces autoMatch (tweens.js generateTweens) to pair a specific stroke
   // (by stable data.strokeId) on keyframe A with a specific stroke on
@@ -1639,6 +1650,22 @@ function _normStrokeForCompare(sd){
   // hasRealStroke consumer (isTexAnchor branch above): derive it from
   // strokeColor when absent, so this isn't seen as a real content change.
   n.hasRealStroke=n.hasRealStroke!==undefined?n.hasRealStroke:!!n.strokeColor;
+  // Keyline fields of a pressure-brush ribbon are DERIVED, not stored
+  // content: desP() calls applyBrushKeyline() on every load, which
+  // recomputes strokeColor/strokeWidth/cap/join from fillColor +
+  // centerSegments (fractional width, e.g. 0.53). A generated tween
+  // frame's stored record meanwhile has whatever its producer left there
+  // (typically nothing -> normalized to 3 above). Comparing a recomputed
+  // cache against a stale stored copy is a guaranteed phantom diff —
+  // confirmed live 2026-07 ("des clés tween qui deviennent vertes... un
+  // bug qui revient sans cesse"): merely scrubbing past a tween frame of
+  // pressure-brush strokes promoted it to a full keyframe every time,
+  // via _maybePromoteInterpolated seeing strokeWidth 3 vs 0.53. Neutralize
+  // exactly the fields applyBrushKeyline owns, under exactly its own
+  // applicability condition (see that function's guard in this file).
+  if(n.isVectorBrush&&!n.isBrushTextureCopy&&!n.isFillShape){
+    n.strokeColor='__keyline__';n.strokeWidth=0;n.strokeCap='round';n.strokeJoin='round';n.hasRealStroke='__keyline__';
+  }
   // isRaster width/height round-trip through Paper.js's Raster.size setter,
   // which snaps to whole pixels internally (a bitmap can't have fractional
   // backing-store dimensions) — and it FLOORS, never rounds: measured live

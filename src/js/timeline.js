@@ -1158,7 +1158,21 @@ window.SM={
       state.layers[idx].color=ld.color||nextLayerColor();
       ld.frames.forEach(function(f){if(!f.isInterpolated)f.isInterpolated=false;});while(state.layers[idx].frames.length<state.totalFrames)state.layers[idx].frames.push({strokes:[],isKeyframe:false,isInterpolated:false});});
     state.layerFolders=d.layerFolders||{};state.layerLinkGroups=d.layerLinkGroups||{};
-    state.motionArcs=d.motionArcs||{};state.tweenOverrides=d.tweenOverrides||{};state.tweenEasing=d.tweenEasing||{};if(d.easingCurve){state.easingCurve=d.easingCurve;if(window._curveEditor)window._curveEditor.setState(d.easingCurve);}
+    state.motionArcs=d.motionArcs||{};state.tweenOverrides=d.tweenOverrides||{};state.tweenEasing=d.tweenEasing||{};
+    // Migration (2026-07): the old shipped DEFAULT easing points
+    // ({.42,0}/{.58,1} — CSS control values misread as on-curve knots, a
+    // park/teleport/park cliff, see app.js's easingCurve comment) were
+    // never a deliberate user choice — any project still carrying exactly
+    // that default gets the corrected one. A curve the user actually
+    // edited (any other point set) is left untouched.
+    if(d.easingCurve){
+      var _ec=d.easingCurve,_ep=_ec.points;
+      var _isOldDefault=_ep&&_ep.length===4&&_ep.every(function(p){return typeof p.tx!=='number';})&&
+        Math.abs(_ep[0].x)<1e-6&&Math.abs(_ep[0].y)<1e-6&&Math.abs(_ep[1].x-0.42)<1e-6&&Math.abs(_ep[1].y)<1e-6&&
+        Math.abs(_ep[2].x-0.58)<1e-6&&Math.abs(_ep[2].y-1)<1e-6&&Math.abs(_ep[3].x-1)<1e-6&&Math.abs(_ep[3].y-1)<1e-6;
+      if(_isOldDefault)_ec={points:[{x:0,y:0},{x:.3,y:.05},{x:.7,y:.95},{x:1,y:1}]};
+      state.easingCurve=_ec;if(window._curveEditor)window._curveEditor.setState(_ec);
+    }
     state.comments=d.comments||[];
     if(typeof refreshFbAvatars==='function')refreshFbAvatars(); // avatar stack mirrors state.comments — resync on project import
     state.cameraKeys=d.cameraKeys||[];state.cameraLayerOn=!!d.cameraLayerOn;state.cameraView=false;

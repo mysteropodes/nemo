@@ -119,13 +119,26 @@
   function cloneCurvePts(pts) { return pts.map(function (p) { var o = { x: p.x, y: p.y }; if (typeof p.tx === 'number') { o.tx = p.tx; o.ty = p.ty || 0; } return o; }); }
   function curveCubicAt(t, a, b, c, d) { var u = 1 - t; return u * u * u * a + 3 * u * u * t * b + 3 * u * t * t * c + t * t * t * d; }
   function curveCubicDerivAt(t, a, b, c, d) { var u = 1 - t; return 3 * u * u * (b - a) + 6 * u * t * (c - b) + 3 * t * t * (d - c); }
-  // Manual tangent override (tx/ty) or derived Catmull-Rom — duplicated
-  // from ui.js's tangentAt (CLAUDE.md §3 pure-math pair, keep in sync).
+  // Manual tangent override (tx/ty) or derived monotone-limited tangent —
+  // duplicated from ui.js's tangentAt (CLAUDE.md §3 pure-math pair, keep
+  // in sync — see that copy's comment for the Fritsch–Carlson rationale).
   function curveTangentAt(pts, i) {
     var p = pts[i];
     if (typeof p.tx === 'number') return { x: p.tx, y: p.ty || 0 };
     var prev = pts[i - 1] || p, next = pts[i + 1] || p;
-    return { x: (next.x - prev.x) / 2, y: (next.y - prev.y) / 2 };
+    var tx = (next.x - prev.x) / 2;
+    var dx0 = p.x - prev.x, dx1 = next.x - p.x;
+    var s0 = dx0 > 1e-9 ? (p.y - prev.y) / dx0 : 0, s1 = dx1 > 1e-9 ? (next.y - p.y) / dx1 : 0;
+    var m;
+    if (prev === p) m = s1;
+    else if (next === p) m = s0;
+    else if (s0 * s1 <= 0) m = 0;
+    else {
+      m = (s0 + s1) / 2;
+      var lim = 3 * Math.min(Math.abs(s0), Math.abs(s1));
+      if (Math.abs(m) > lim) m = (m > 0 ? 1 : -1) * lim;
+    }
+    return { x: tx, y: m * tx };
   }
   function curveSegCtrl(pts, i) {
     var p0 = pts[i], p3 = pts[i + 1];

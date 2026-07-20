@@ -149,7 +149,31 @@
     var p=pts[i];
     if(typeof p.tx==='number')return{x:p.tx,y:p.ty||0};
     var prev=pts[i-1]||p,next=pts[i+1]||p;
-    return{x:(next.x-prev.x)/2,y:(next.y-prev.y)/2};
+    var tx=(next.x-prev.x)/2;
+    // Monotone-limited derived tangent (Fritsch–Carlson), replacing the
+    // raw Catmull-Rom (next-prev)/2 y-component (2026-07, "le moteur tween
+    // gère mal des intervalles"): raw C-R at a knot whose two secants
+    // disagree in slope over/undershoots the segment — measured live, a
+    // monotone-intent easing curve evaluated to -0.074 (motion running
+    // BACKWARD before starting) and 1.074. F-C's classic recipe: flat
+    // tangent at any local extremum (secant signs differ), else the
+    // average slope clamped to 3x the shallower secant — deliberate
+    // overshoot still works exactly as before, since back/elastic/bounce
+    // presets place their KNOTS outside [0,1] rather than relying on
+    // spline overshoot. Endpoints keep the one-sided secant (identical to
+    // the old formula there, where prev===p or next===p).
+    var dx0=p.x-prev.x,dx1=next.x-p.x;
+    var s0=dx0>1e-9?(p.y-prev.y)/dx0:0,s1=dx1>1e-9?(next.y-p.y)/dx1:0;
+    var m;
+    if(prev===p)m=s1;
+    else if(next===p)m=s0;
+    else if(s0*s1<=0)m=0;
+    else{
+      m=(s0+s1)/2;
+      var lim=3*Math.min(Math.abs(s0),Math.abs(s1));
+      if(Math.abs(m)>lim)m=(m>0?1:-1)*lim;
+    }
+    return{x:tx,y:m*tx};
   }
   // Tangent at each knot (manual override or derived Catmull-Rom),
   // converted to the pair of cubic-Bezier control points for the segment
