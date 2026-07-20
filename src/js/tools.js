@@ -1659,6 +1659,28 @@ function fillMergeSameColor(layer,newFill){
         ||(c.interiorPoint&&newFill.contains(c.interiorPoint))
         ||(newFill.interiorPoint&&c.contains(newFill.interiorPoint));
     }catch(e){}
+    // Near-miss tolerance (2026-07, "je remplis la forme [avec le pot de
+    // peinture], il ne l'a remplis pas complétement et n'en fait pas une
+    // seule forme"): fillVectorFind's traced boundary (paint bucket) can
+    // sit a hairline inside an existing shape's true edge — invisible on
+    // screen (graph-tracing flatten/refine tolerance, tools.js's own
+    // fillVectorFind comments) but enough to fail Paper.js's strict
+    // curve-intersection/contains test above, silently leaving two
+    // same-color fills unmerged with a technically-there seam. Falls back
+    // to a real nearest-point distance check before giving up — samples
+    // points along newFill's own curves (cheap, no dense flatten) and
+    // checks how close the OTHER shape's boundary gets to each.
+    if(!touches){
+      try{
+        var TOL=3,curves=newFill.curves;
+        for(var ci=0;ci<curves.length&&!touches;ci++){
+          var sp=curves[ci].getPointAt(0,true);
+          if(!sp)continue;
+          var np=c.getNearestPoint(sp);
+          if(np&&np.getDistance(sp)<TOL)touches=true;
+        }
+      }catch(e){}
+    }
     if(touches)absorbed.push(c);
   });
   if(!absorbed.length)return newFill;
@@ -4492,9 +4514,34 @@ function onMouseUp(event){
       currentPath.data.centerSegments=fbCs;
       currentPath.data.widthProfile=fbCs.widthProfile;
       rebuildVectorBrushOutline(currentPath);
+      // Drop the centerline/width-profile scaffolding once the outline is
+      // built — mirrors draw-bridge.js's own commit (its comment: "once
+      // built, drop the isVectorBrush/centerSegments/widthProfile linkage
+      // entirely"). Missing here (this Paper-Tool fallback path never had
+      // it) left a COMMITTED Fill Brush shape still tagged as if it were a
+      // live centerline+width ribbon — fillWallPath (paint bucket's wall
+      // tracer) treats that tag as "use the CENTERLINE, not the true
+      // outline", so filling next to one of these shapes traced a
+      // boundary offset half a stroke-width INSIDE the real ink edge,
+      // leaving a visible gap and never touching the ring closely enough
+      // for fillMergeSameColor to fuse them into one shape. isFillShape
+      // stays (still needed by pen-bridge.js's close-path/endpoint-snap
+      // exclusion guard).
+      delete currentPath.data.isVectorBrush;
+      delete currentPath.data.centerSegments;
+      delete currentPath.data.widthProfile;
       // Placement (Above/Below/Merge) — see applyFillBrushPlacement's own
       // comment; replaces the old unconditional "always at the back".
       currentPath=applyFillBrushPlacement(currentPath,userLayers[state.activeLayerIdx]);
+      // 2026-07 feedback ("plusieurs coup de pinceau avec la même couleur
+      // doivent merger automatiquement") — Placement's own 'merge' option
+      // unions with whatever fill it happens to overlap regardless of
+      // color (see applyFillBrushPlacement); genuine same-color fusion
+      // already exists (fillMergeSameColor, used by the paint bucket) but
+      // was never called from the Fill Brush's own commit. Wired in here
+      // unconditionally so consecutive same-color strokes merge into one
+      // shape no matter which Placement mode is active.
+      if(currentPath)currentPath=fillMergeSameColor(userLayers[state.activeLayerIdx],currentPath)||currentPath;
       if(currentPath&&state.shadowMode)currentPath.data.channelTag='shadow';
       if(currentPath)tagOwner(currentPath);
     }
