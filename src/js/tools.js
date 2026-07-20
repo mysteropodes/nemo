@@ -103,8 +103,25 @@ document.addEventListener('pointerup',function(e){
     layerF.children.forEach(function(c){
       if(!(c instanceof Path)||c.segments.length===0||!(c.strokeColor||c.fillColor))return;
       if(!mbf.intersects(c.bounds))return;
-      if(lassoF&&!(lassoF.contains(c.position)||lassoF.intersects(c)))return;
       if(_fsSel.some(function(s){return s.path===c;}))return; // already selected — Shift+lasso over the same shape twice shouldn't duplicate it
+      if(lassoF&&!lassoF.contains(c.position)){
+        if(!lassoF.intersects(c))return;
+        // 2026-07 feedback ("le lasso... selectionne toute la forme au lieu
+        // de la partie delimitee, comme dans Photoshop/Animate") — the
+        // lasso's outline crosses this fill WITHOUT enclosing its center:
+        // carve just the overlapping sub-region (reusing the exact same
+        // boolCut fillregion machinery fsFindFillRegion/fsRealizeFillRegion/
+        // fsHighlightPath already use for a manual cutter path) instead of
+        // selecting the whole shape. A stroke-only shape has no fill
+        // polygon to intersect against — keep the prior whole-stroke
+        // fallback for that case (segment-based lasso cutting isn't built).
+        if(c.fillColor){
+          _fsSel.push({path:c,kind:'fillregion',boolCut:true,cutter:lassoF.clone({insert:false}),inside:true});
+        }else{
+          _fsSel.push({path:c,kind:'stroke',segStart:0,segEnd:c.length,closed:c.closed});
+        }
+        return;
+      }
       _fsSel.push(c.fillColor?{path:c,kind:'fill'}:{path:c,kind:'stroke',segStart:0,segEnd:c.length,closed:c.closed});
     });
     _marquee.rect.remove();_marquee.rect=null;_marquee.mode=null;
@@ -4524,8 +4541,18 @@ function onMouseUp(event){
         layerF.children.forEach(function(c){
           if(!(c instanceof Path)||c.segments.length===0||!(c.strokeColor||c.fillColor))return;
           if(!mbf.intersects(c.bounds))return;
-          if(lassoF&&!(lassoF.contains(c.position)||lassoF.intersects(c)))return;
           if(_fsSel.some(function(s){return s.path===c;}))return; // already selected — Shift+lasso over the same shape twice shouldn't duplicate it
+          if(lassoF&&!lassoF.contains(c.position)){
+            if(!lassoF.intersects(c))return;
+            // Same sub-region carving as the raw pointerup listener above
+            // (engine-on path) — see its comment for the full rationale.
+            if(c.fillColor){
+              _fsSel.push({path:c,kind:'fillregion',boolCut:true,cutter:lassoF.clone({insert:false}),inside:true});
+            }else{
+              _fsSel.push({path:c,kind:'stroke',segStart:0,segEnd:c.length,closed:c.closed});
+            }
+            return;
+          }
           _fsSel.push(c.fillColor?{path:c,kind:'fill'}:{path:c,kind:'stroke',segStart:0,segEnd:c.length,closed:c.closed});
         });
         _marquee.rect.remove();_marquee.rect=null;_marquee.mode=null;
