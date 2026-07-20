@@ -3422,14 +3422,6 @@ function eraseAtPoint(path,worldPt,radius,fromPt){
   var idx=layer.children.indexOf(path);
   var target=path;
   var isVB=!!(path.data&&path.data.isVectorBrush);
-  // An OPEN path has zero real fill area no matter what fillColor says —
-  // since Draw-tool strokes now get a fillColor by default (fillEnabled
-  // defaults true), an open hand-drawn line can reach here with
-  // path.fillColor set but path.closed===false. Subtracting directly
-  // against that degenerate zero-area "fill" always empties out, which
-  // deleted the ENTIRE stroke on any erase touch instead of notching it.
-  // Still expand to a proper capsule/ribbon whenever the path isn't closed.
-  //
   // A CLOSED path with BOTH a fill AND a visible stroke (the default for
   // almost anything drawn — fillEnabled defaults true) used to skip this
   // whole branch and erase only the interior fill polygon, then unconditionally
@@ -3440,36 +3432,47 @@ function eraseAtPoint(path,worldPt,radius,fromPt){
   // whenever there IS a strokeColor, always expand it into real ink geometry
   // and UNION it with the existing fill first, so the border becomes part of
   // the erasable area instead of being discarded outright.
-  // 2026-07 feedback: "sur une forme non fermé et dessiné avec brush, si
-  // j'utilise la gomme sur fill celui-ci est supprimé totalement au lieu
-  // d'avoir la brush qui mange la forme" — the guard above only expanded an
-  // open path into real ink geometry when it ALSO had a strokeColor; a
-  // strokeless open fill (Draw tool with Stroke off) skipped it entirely and
-  // fell straight to the degenerate-zero-area subtract this whole comment
-  // block already describes, deleting the entire shape on first touch.
-  if(!isVB&&(path.strokeColor||(!path.closed&&path.fillColor))){
-    var expanded=eraseExpandStrokeToFill(path);
-    if(expanded){
-      // eraseExpandStrokeToFill always paints the expansion from
-      // path.strokeColor (the normal case); a strokeless open fill has none,
-      // so borrow path.fillColor instead — same visible color the erased
-      // result should end up filled with either way.
-      if(!path.strokeColor)expanded.fillColor=path.fillColor;
-      if(path.fillColor&&path.closed){
-        var fillCopy=path.clone({insert:false});
-        fillCopy.strokeColor=null;
-        var merged=fillCopy.unite(expanded,{insert:false});
-        fillCopy.remove();expanded.remove();
-        merged.fillColor=path.fillColor;merged.opacity=path.opacity;
-        layer.insertChild(idx,merged);
-        path.remove();
-        target=merged;
-      }else{
-        layer.insertChild(idx,expanded);
-        path.remove();
-        target=expanded;
-      }
-    }else if(!path.fillColor||!path.closed){
+  //
+  // An OPEN path needs the SAME treatment for its stroke ink (a bare open
+  // contour has zero fill area of its own by Paper.js's own boolean-op
+  // rules), but NOT for its fill: Paper.js implicitly closes an open path
+  // to render its fillColor (that's the only reason "Draw tool, Stroke
+  // off, unclosed shape" shows any visible fill at all) — 2026-07 bug,
+  // found live: the first fix here ("sur une forme non fermé et dessiné
+  // avec brush, si j'utilise la gomme sur fill celui-ci est supprimé
+  // totalement") treated that implicit-close fill as "degenerate zero
+  // area" and rerouted it through eraseExpandStrokeToFill(), which rebuilds
+  // a synthetic ribbon only `strokeWidth`/`brushSize` wide along the
+  // CENTERLINE — nowhere near the real filled interior of a wide freehand
+  // blob, so the very first erase sample replaced the whole visible shape
+  // with that near-invisible sliver. Fixed properly below: a strokeless
+  // open fill uses a closed=true CLONE of its own boundary (the real
+  // implicit-close polygon Paper.js already renders) instead of a
+  // synthetic ribbon; the stroke ribbon (when there IS a strokeColor) and
+  // this fill polygon are computed independently, then unioned if both
+  // exist — same fillColor||strokeColor color-precedence for the result.
+  if(!isVB&&(path.strokeColor||!path.closed)){
+    var strokeGeom=path.strokeColor?eraseExpandStrokeToFill(path):null;
+    var fillGeom=null;
+    if(path.fillColor){
+      fillGeom=path.clone({insert:false});
+      fillGeom.closed=true;
+      fillGeom.strokeColor=null;
+    }
+    var combined=null;
+    if(strokeGeom&&fillGeom){
+      combined=fillGeom.unite(strokeGeom,{insert:false});
+      fillGeom.remove();strokeGeom.remove();
+    }else{
+      combined=strokeGeom||fillGeom;
+    }
+    if(combined){
+      combined.fillColor=path.fillColor||path.strokeColor;
+      combined.opacity=path.opacity;
+      layer.insertChild(idx,combined);
+      path.remove();
+      target=combined;
+    }else{
       return;
     }
   }
@@ -3914,13 +3917,19 @@ function onMouseDown(event){
       }
     }else{
       if(!event.event.shiftKey)fsClearSel();
-      // Clicked empty canvas: start a rubber-band marquee (Alt held = a
-      // freehand lasso instead) — same feedback, "il faudrait les outils
-      // de lasso et rectangle de selection pour cet outil". Reuses the
-      // Select tool's own _marquee state/rendering below (tagged with
-      // .mode so onMouseUp knows to resolve it into _fsSel instead of
-      // selectedPaths), rather than a second marquee implementation.
-      _marquee.active=true;_marquee.start=event.point.clone();_marquee.rect=null;_marquee.lasso=!!event.event.altKey;_marquee.mode='fsselect';
+      // Clicked empty canvas: start a rubber-band marquee (Alt held =
+      // temporarily flips to/from lasso) — same feedback, "il faudrait les
+      // outils de lasso et rectangle de selection pour cet outil". The
+      // default mode (rect vs lasso) is set via the two dedicated buttons
+      // in the Labs floating panel (labs-float-panel.js, state.fsSelectMode,
+      // 2026-07: original ask was for VISIBLE buttons, not just a hidden
+      // Alt-modifier convention) — Alt still works as a one-off override of
+      // whichever mode is currently selected. Reuses the Select tool's own
+      // _marquee state/rendering below (tagged with .mode so onMouseUp
+      // knows to resolve it into _fsSel instead of selectedPaths), rather
+      // than a second marquee implementation.
+      var fsWantLasso=state.fsSelectMode==='lasso';
+      _marquee.active=true;_marquee.start=event.point.clone();_marquee.rect=null;_marquee.lasso=event.event.altKey?!fsWantLasso:fsWantLasso;_marquee.mode='fsselect';
     }
     updateUI();
     // A plain click-to-select mutates no layer content, so it never bumps
