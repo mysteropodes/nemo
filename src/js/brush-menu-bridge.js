@@ -313,6 +313,18 @@
       g.keys.forEach(function (k) { grid.appendChild(makeTipItem(k, k === current, function (key) {
         commitBrushPreview();
         window.BitmapTipPicker.selectTip(key);
+        // 2026-07 feedback: "si je select une brush bitmap celle-ci n'est
+        // pas appliqué après quand je dessine" — selectTip only records
+        // WHICH tip a future bitmap stroke would use; it never turned
+        // bitmap-brush mode itself on (nor vector-brush off, which draw-
+        // bridge.js requires be off for bitmap texture to apply at all —
+        // see its own `!state.vectorBrush` gate). Picking a tip from this
+        // gallery is the user's clear signal they want to draw with IT
+        // next, not just retexture whatever's currently selected.
+        if (window.SM) {
+          if (window.SM.setBitmapBrushOn) window.SM.setBitmapBrushOn(true);
+          if (window.SM.setVectorBrush) window.SM.setVectorBrush(false);
+        }
         if (window.SM && window.SM.applyBitmapBrushToSelection) window.SM.applyBitmapBrushToSelection();
         buildBitmapGrid(container);
       })); });
@@ -326,6 +338,18 @@
       custom.forEach(function (k) { cgrid.appendChild(makeTipItem(k, k === current, function (key) {
         commitBrushPreview();
         window.BitmapTipPicker.selectTip(key);
+        // 2026-07 feedback: "si je select une brush bitmap celle-ci n'est
+        // pas appliqué après quand je dessine" — selectTip only records
+        // WHICH tip a future bitmap stroke would use; it never turned
+        // bitmap-brush mode itself on (nor vector-brush off, which draw-
+        // bridge.js requires be off for bitmap texture to apply at all —
+        // see its own `!state.vectorBrush` gate). Picking a tip from this
+        // gallery is the user's clear signal they want to draw with IT
+        // next, not just retexture whatever's currently selected.
+        if (window.SM) {
+          if (window.SM.setBitmapBrushOn) window.SM.setBitmapBrushOn(true);
+          if (window.SM.setVectorBrush) window.SM.setVectorBrush(false);
+        }
         if (window.SM && window.SM.applyBitmapBrushToSelection) window.SM.applyBitmapBrushToSelection();
         buildBitmapGrid(container);
       })); });
