@@ -761,12 +761,31 @@ function renderTransformHandles(){
   var box=orientedSelBox();if(!box)return;
   var b=box.b;
   xformLayer.activate();var zs=1/view.zoom;
+  // Live corner-pin distort (2026-07 feedback: "la bounding box ne reflete
+  // pas cette transformation") — same live-quad treatment as
+  // engine-bridge.js's buildTransformBoxItems, mirrored here for the
+  // Paper-native fallback path (see that function's own parity comment).
+  var liveDistort=window.SMSelectBridge&&SMSelectBridge.getDistortState();
+  if(liveDistort&&liveDistort.quad){
+    var dq=liveDistort.quad;
+    var dPath=new Path({segments:[dq.nw,dq.ne,dq.se,dq.sw],closed:true,strokeColor:'rgba(74,158,255,.8)',strokeWidth:1*zs,dashArray:[4*zs,3*zs],insert:true});
+    ['nw','ne','se','sw'].forEach(function(k){
+      var pos=dq[k],isActive=k===liveDistort.dir;
+      new Path.Rectangle({center:pos,size:[(isActive?9:7)*zs,(isActive?9:7)*zs],fillColor:'#ffffff',strokeColor:isActive?'#ff9f0a':'#4a9eff',strokeWidth:1.2*zs,insert:true});
+      xformHandles.push({type:'scale',dir:k,pos:pos});
+    });
+    return;
+  }
   var boxRect=new Path.Rectangle({rectangle:b,strokeColor:'rgba(74,158,255,.8)',strokeWidth:1*zs,dashArray:[4*zs,3*zs],insert:true});
   if(box.angle)boxRect.rotate(box.angle,box.pivot);
   var corners={nw:selBoxPt(b.left,b.top,box),ne:selBoxPt(b.right,b.top,box),sw:selBoxPt(b.left,b.bottom,box),se:selBoxPt(b.right,b.bottom,box),n:selBoxPt(b.center.x,b.top,box),s:selBoxPt(b.center.x,b.bottom,box),e:selBoxPt(b.right,b.center.y,box),w:selBoxPt(b.left,b.center.y,box)};
   Object.keys(corners).forEach(function(k){
     var pos=corners[k];
-    new Path.Rectangle({center:pos,size:[7*zs,7*zs],fillColor:'#ffffff',strokeColor:'#4a9eff',strokeWidth:1.2*zs,insert:true});
+    // Ctrl-hover corner-pin affordance — same accent as the active-drag
+    // highlight above, shown before any drag starts (see select-bridge.js's
+    // onMove hover pass for state.xformDistortHoverDir).
+    var isDistortHover=state.xformDistortHoverDir===k;
+    new Path.Rectangle({center:pos,size:[(isDistortHover?9:7)*zs,(isDistortHover?9:7)*zs],fillColor:'#ffffff',strokeColor:isDistortHover?'#ff9f0a':'#4a9eff',strokeWidth:1.2*zs,insert:true});
     xformHandles.push({type:'scale',dir:k,pos:pos});
   });
   // Rotate RING (2026-07, replaces the old tiny offset stem+dot handle —

@@ -328,7 +328,12 @@
                edge-to-edge and visually fuse. -->
           <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px">
             <div class="pr"><span class="pl" data-i18n="fieldPosition">Position</span><input type="number" class="pi scrub" id="sp-x" value="0" data-step="1" data-i18n-title="titleDragX" title="X — drag to scrub, click to type"><input type="number" class="pi scrub" id="sp-y" value="0" data-step="1" data-i18n-title="titleDragY" title="Y — drag to scrub, click to type"></div>
-            <div class="pr"><span class="pl" data-i18n="fieldSize">Size</span><input type="number" class="pi scrub" id="sp-w" value="0" min="1" data-step="1" data-i18n-title="fieldWidth" title="Width"><input type="number" class="pi scrub" id="sp-h" value="0" min="1" data-step="1" data-i18n-title="fieldHeight" title="Height"></div>
+            <!-- Proportion lock (2026-07 feedback: "il manque le cadenas sur
+                 le size pour lier les 2") — same dims-lock-btn as the
+                 Document panel's own W/H lock (index.html above), reused
+                 as-is since it's already generic (see btn-sp-size-lock's
+                 wiring in timeline.js). -->
+            <div class="pr dims-row"><span class="pl" data-i18n="fieldSize">Size</span><input type="number" class="pi scrub" id="sp-w" value="0" min="1" data-step="1" data-i18n-title="fieldWidth" title="Width"><input type="number" class="pi scrub" id="sp-h" value="0" min="1" data-step="1" data-i18n-title="fieldHeight" title="Height"><button class="dims-lock-btn" id="btn-sp-size-lock" type="button" data-i18n-title="dimsLockTitle" title="Lier largeur/hauteur (garder les proportions)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></button></div>
             <div class="pr"><span class="pl" data-i18n="fieldRotate">Rotate</span><input type="number" class="pi scrub" id="sp-rot" value="0" data-step="1" data-i18n-title="titleRotateSel" title="Rotation relative to selection state (degrees)"><span style="font-size:9px;color:var(--text-dim)">°</span></div>
           </div>
           <!-- Anchor point (pivot) picker — redesign 2026-07-09, AE-style
@@ -510,7 +515,16 @@
           <span class="pl">FPS</span><input type="number" class="pi scrub" id="proj-fps" value="12" min="1" max="60" data-step="1">
           <span class="pl">Frames</span><input type="number" class="pi scrub" id="proj-frames" value="24" min="1" max="999" data-step="1">
         </div>
-        <div class="pr"><span class="pl">BG</span><input type="color" id="p-cbg" value="#ffffff" style="width:28px;height:22px;border:none;cursor:pointer;padding:0;"></div>
+        <!-- dims-row (2026-07 feedback: "aligner les icônes avec bg") — BG's
+             label used the default .pl (min-width:50px), pushing its swatch
+             ~40px further right than every sibling row's value column (W/H,
+             FPS/Frames, all dims-row). The icon row below had no label at
+             all, so it started flush at the row's own left edge instead —
+             neither one lined up with the other. dims-row shrinks BG's
+             label to its natural width; the icon row gets an identical
+             (hidden) "BG" label as a spacer so its buttons start at the
+             EXACT same x as the swatch above, not a guessed margin. -->
+        <div class="pr dims-row"><span class="pl">BG</span><input type="color" id="p-cbg" value="#ffffff" style="width:28px;height:22px;border:none;cursor:pointer;padding:0;"></div>
         <!-- Icon buttons instead of text (feedback 2026-07: "les boutons
              avec un texte est-ce qu'ils peuvent avoir un bouton icon
              plutôt que texte") — tooltip (title) carries the label, same
@@ -524,7 +538,8 @@
              icon-only + tooltip-carries-the-label convention as Fit/Reset
              View just above, .active toggled on click like every other
              toggle button in this app (btn-ghost-all, btn-loop, etc.). -->
-        <div class="pr" style="gap:4px">
+        <div class="pr dims-row" style="gap:4px">
+          <span class="pl" style="visibility:hidden" aria-hidden="true">BG</span>
           <button class="pbtn icon-only-btn" id="btn-fit" data-i18n-title="btnFitTitle" title="Fit — fit the canvas to the viewport"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M3 16v3a2 2 0 0 0 2 2h3"/></svg></button>
           <button class="pbtn icon-only-btn" id="btn-resetv" data-i18n-title="btnResetViewTitle" title="Reset View — restore zoom/pan/rotation to default"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 1 3 6.7"/><path d="M3 21v-5h5"/></svg></button>
           <button class="pbtn icon-only-btn" id="btn-clip" data-i18n-title="clipCanvasTitle" title="Clip to canvas — hide artwork outside the canvas bounds (off by default, so you can see and work with content that spills over the edge)"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/></svg></button>

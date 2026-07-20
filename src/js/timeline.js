@@ -4945,8 +4945,39 @@ function activeXformApplyScale(sx,sy,anchor,skipUndo){if(activeXformVertexMode()
 function activeXformApplyRotate(deltaDeg,center,skipUndo){if(activeXformVertexMode())nodeSelApplyRotate(deltaDeg,center,skipUndo);else selPropsApplyRotate(deltaDeg,center,skipUndo);}
 wireLiveXformField('sp-x',function(el,started){var b=activeXformBounds();if(!b)return;activeXformApplyMove((parseFloat(el.value)||0)-b.x,0,started);});
 wireLiveXformField('sp-y',function(el,started){var b=activeXformBounds();if(!b)return;activeXformApplyMove(0,(parseFloat(el.value)||0)-b.y,started);});
-wireLiveXformField('sp-w',function(el,started){var b=activeXformBounds();if(!b||b.width<0.01)return;var nv=Math.max(0.01,parseFloat(el.value)||b.width);activeXformApplyScale(nv/b.width,1,b.topLeft,started);});
-wireLiveXformField('sp-h',function(el,started){var b=activeXformBounds();if(!b||b.height<0.01)return;var nv=Math.max(0.01,parseFloat(el.value)||b.height);activeXformApplyScale(1,nv/b.height,b.topLeft,started);});
+// Proportion lock (2026-07, "il manque le cadenas sur le size pour lier
+// les 2") — same on/off toggle convention as btn-dims-lock (Document
+// panel's W/H), but applies the SAME scale factor to both axes in one
+// activeXformApplyScale call (a true uniform transform) rather than
+// deriving one field from a remembered ratio like the canvas-size lock
+// does — simpler here since both fields already read live bounds.
+var _spSizeLockOn=false;
+document.getElementById('btn-sp-size-lock').addEventListener('click',function(){
+  _spSizeLockOn=!this.classList.contains('on');
+  this.classList.toggle('on',_spSizeLockOn);
+});
+wireLiveXformField('sp-w',function(el,started){
+  var b=activeXformBounds();if(!b||b.width<0.01)return;
+  var nv=Math.max(0.01,parseFloat(el.value)||b.width);
+  var sx=nv/b.width;
+  if(_spSizeLockOn&&b.height>=0.01){
+    document.getElementById('sp-h').value=Math.round(b.height*sx);
+    activeXformApplyScale(sx,sx,b.topLeft,started);
+  }else{
+    activeXformApplyScale(sx,1,b.topLeft,started);
+  }
+});
+wireLiveXformField('sp-h',function(el,started){
+  var b=activeXformBounds();if(!b||b.height<0.01)return;
+  var nv=Math.max(0.01,parseFloat(el.value)||b.height);
+  var sy=nv/b.height;
+  if(_spSizeLockOn&&b.width>=0.01){
+    document.getElementById('sp-w').value=Math.round(b.width*sy);
+    activeXformApplyScale(sy,sy,b.topLeft,started);
+  }else{
+    activeXformApplyScale(1,sy,b.topLeft,started);
+  }
+});
 wireLiveXformField('sp-rot',function(el,started){var b=activeXformBounds();if(!b)return;var nv=parseFloat(el.value)||0;var delta=nv-(state.selRotAccum||0);state.selRotAccum=nv;activeXformApplyRotate(delta,xformAnchorPoint(b),started);});
 // Anchor-point (pivot) picker — see tools.js xformAnchorPoint's own comment.
 // Clicking a dot just changes WHICH point future rotations pivot around

@@ -51,6 +51,12 @@
   // handleIn/handleOut once at gesture start and every subsequent tick
   // re-derives the full transform from that same fixed snapshot.
   var distortDir = null, distortSrcQuad = null, distortSegs = null;
+  // Live quad during an active drag (2026-07 feedback: "la bounding box ne
+  // reflete pas cette transformation") — engine-bridge.js's
+  // buildTransformBoxItems reads this via SMSelectBridge.getDistortState()
+  // to draw the ACTUAL warped quad instead of the static pre-distort
+  // rectangle while dragging.
+  var distortDstQuad = null;
   var rotCenter = null, rotStartAngle = 0, rotLastAngle = 0;
   var marqueeStart = null;
   var moveStarted = false;
@@ -308,6 +314,7 @@
     if (!h) return false;
     distortDir = dir;
     distortSrcQuad = { nw: h.gCorners.nw.clone(), ne: h.gCorners.ne.clone(), se: h.gCorners.se.clone(), sw: h.gCorners.sw.clone() };
+    distortDstQuad = distortSrcQuad; // no drag yet — starts equal to the source quad
     xformMap = h.map;
     distortSegs = [];
     selectedPaths.forEach(function (p) { collectDistortSegs(p, distortSegs); });
@@ -766,9 +773,23 @@
           state.xformRingHovered = isRingHover;
           window.SMEngineBridge.renderNow();
         }
-      } else if (canvasEl.dataset.xformCursor) {
-        canvasEl.style.cursor = 'default';
-        delete canvasEl.dataset.xformCursor;
+        // Ctrl-hover corner-pin affordance (2026-07 feedback: "qd ctrl est
+        // appuyé voir une différence visuelle sur les corner") — passive,
+        // same pattern as xformAnchorHovered/xformRingHovered above: lets
+        // engine-bridge.js's buildTransformBoxItems recolor the ONE corner
+        // that a Ctrl+drag from here would actually distort, before any
+        // drag starts.
+        var distortHoverDir = e.ctrlKey ? distortEligibleCornerAt(hpt) : null;
+        if (distortHoverDir !== (state.xformDistortHoverDir || null)) {
+          state.xformDistortHoverDir = distortHoverDir;
+          window.SMEngineBridge.renderNow();
+        }
+      } else {
+        if (canvasEl.dataset.xformCursor) {
+          canvasEl.style.cursor = 'default';
+          delete canvasEl.dataset.xformCursor;
+        }
+        if (state.xformDistortHoverDir) { state.xformDistortHoverDir = null; window.SMEngineBridge.renderNow(); }
       }
       return;
     }
@@ -982,6 +1003,7 @@
       if (xformMap) { var ptgD = xformMap.inv(pt.x, pt.y); ptD = new Point(ptgD[0], ptgD[1]); }
       var dstQuad = { nw: distortSrcQuad.nw, ne: distortSrcQuad.ne, se: distortSrcQuad.se, sw: distortSrcQuad.sw };
       dstQuad[distortDir] = ptD;
+      distortDstQuad = dstQuad;
       var srcUV = rectUVSolver(distortSrcQuad.nw, distortSrcQuad.ne, distortSrcQuad.sw);
       var dstFwd = unitSquareToQuad(dstQuad.nw, dstQuad.ne, dstQuad.se, dstQuad.sw);
       distortSegs.forEach(function (rec) {
@@ -1168,7 +1190,7 @@
       saveActiveLayerFrame();
       renderOS();
       renderArcs(); updateUI();
-      distortDir = null; distortSrcQuad = null; distortSegs = null;
+      distortDir = null; distortSrcQuad = null; distortSegs = null; distortDstQuad = null;
     } else if (mode === 'marquee') {
       if (_marquee.rect) {
         var mb = _marquee.rect.bounds;
@@ -1381,6 +1403,16 @@
     }
     window.showContextMenu(e.clientX, e.clientY, items);
   }
+
+  // Read-only peek for engine-bridge.js's buildTransformBoxItems (2026-07
+  // feedback: "la bounding box ne reflete pas cette transformation") — lets
+  // the gizmo draw the ACTUAL live-distorted quad instead of the static
+  // pre-distort rectangle while a corner-pin drag is in progress.
+  window.SMSelectBridge = {
+    getDistortState: function () {
+      return mode === 'xform-distort' ? { dir: distortDir, quad: distortDstQuad } : null;
+    },
+  };
 
   function init() {
     var target = document.getElementById('canvas-area') || document.getElementById('drawing-canvas');
