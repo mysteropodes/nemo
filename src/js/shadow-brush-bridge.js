@@ -30,7 +30,7 @@
 
   function palette() {
     if (!state.shadowPalette || !state.shadowPalette.length) {
-      state.shadowPalette = [{ id: 'sh1', color: '#3b4a6b' }, { id: 'sh2', color: '#6b3b4a' }, { id: 'sh3', color: '#3b6b5a' }, { id: 'sh4', color: '#6b5a3b' }, { id: 'sh5', color: '#4a3b6b' }, { id: 'sh6', color: '#555555' }];
+      state.shadowPalette = [{ id: 'sh1', color: '#ff3355' }, { id: 'sh2', color: '#ff8800' }, { id: 'sh3', color: '#ffdd00' }, { id: 'sh4', color: '#22cc55' }, { id: 'sh5', color: '#2288ff' }, { id: 'sh6', color: '#aa33ff' }];
     }
     return state.shadowPalette;
   }
