@@ -18,8 +18,43 @@
   var popover = null, closeHandlers = null;
   var demoPath = null; // built lazily once Paper.js is ready, reused for every preview render
 
+  // Hover-preview on the CANVAS (2026-07 feedback: "on ne voit pas les
+  // brush en direct... il faut le même [que le menu flottant]") — same
+  // apply-live-on-mouseenter/revert-on-mouseleave pattern as the floating
+  // Brush Menu's own preview (brush-menu-bridge.js), reusing the same
+  // truly-global helpers (stripAnyBrushTexture/applyBrushTexture, both
+  // declared outside any IIFE) rather than a second copy of that logic.
+  var _hoverSnapshot = null;
+  function eligibleHoverPaths() {
+    if (!(window.state && (state.tool === 'select' || state.tool === 'subselect')) || !window.selectedPaths || !selectedPaths.length) return [];
+    return selectedPaths.filter(function (p) { return p instanceof Path && !(p.data && (p.data.isVectorBrush || p.data.isFillShape)); });
+  }
+  function beginHoverPreview() {
+    if (_hoverSnapshot) return;
+    _hoverSnapshot = eligibleHoverPaths().map(function (p) { return { p: p, preset: (p.data && p.data.brushTexturePreset) || null }; });
+  }
+  function hoverPreview(key) {
+    beginHoverPreview();
+    if (!_hoverSnapshot.length) return;
+    _hoverSnapshot.forEach(function (rec) {
+      stripAnyBrushTexture(rec.p);
+      if (key && key !== 'none') applyBrushTexture(rec.p, key);
+    });
+    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+  }
+  function revertHoverPreview() {
+    if (!_hoverSnapshot) return;
+    _hoverSnapshot.forEach(function (rec) {
+      stripAnyBrushTexture(rec.p);
+      if (rec.preset) applyBrushTexture(rec.p, rec.preset);
+    });
+    _hoverSnapshot = null;
+    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+  }
+
   function closePopover() {
     if (!popover) return;
+    revertHoverPreview();
     popover.remove();
     popover = null;
     if (closeHandlers) { closeHandlers(); closeHandlers = null; }
@@ -160,10 +195,22 @@
 
     el.querySelectorAll('.bp-item').forEach(function (btn) {
       drawPreview(btn.querySelector('canvas'), btn.dataset.key);
+      btn.addEventListener('mouseenter', function () { hoverPreview(btn.dataset.key); });
+      btn.addEventListener('mouseleave', function () { revertHoverPreview(); });
       btn.addEventListener('click', function (e) {
         if (e.target.classList.contains('bp-item-del')) return;
+        // Revert the hover preview BEFORE the real commit — onSelect's own
+        // pushUndo (via setBrushPreset) must snapshot the true pre-hover
+        // state, not the already-mutated preview, or Ctrl+Z would restore
+        // to the hovered-but-not-picked brush instead of the original.
+        revertHoverPreview();
         onSelect(btn.dataset.key);
-        closePopover();
+        // Stay open (2026-07 feedback: "il faut le même [que le menu
+        // flottant]... celui-ci disparait une fois que l'on a select une
+        // brush") — same convention as the floating Brush Menu's own grid,
+        // which only re-highlights the active item instead of closing, so
+        // several presets can be tried/compared in one popover visit.
+        el.querySelectorAll('.bp-item').forEach(function (b) { b.classList.toggle('active', b.dataset.key === btn.dataset.key); });
       });
     });
     el.querySelectorAll('.bp-item-del').forEach(function (delBtn) {
