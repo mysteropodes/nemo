@@ -3073,7 +3073,15 @@ function rebuildVectorBrushOutline(path){
     // every edit. Only fill-brush shapes get this extra simplify pass,
     // right here in the single choke point every edit (scale/rotate/node-
     // drag) already funnels through, so it stays smooth after edits too.
-    if(path.data&&path.data.isFillShape)path.simplify(2.5);
+    // simplifyIfNeeded (not a bare path.simplify(2.5)) — 2026-07 feedback:
+    // "quand je mets stabilizer à 0 et smooth à 0, j'ai l'impression qu'il y
+    // a encore une passe de smooth". This hardcoded 2.5 tolerance ran
+    // UNCONDITIONALLY regardless of state.smoothing, so a Fill Brush shape
+    // always got re-fit even with Smooth explicitly set to 0 — same
+    // Paper.js `t||2.5` footgun simplifyIfNeeded's own comment already
+    // documents (passing 0 silently falls back to the default tolerance,
+    // so the guard has to skip the call entirely, not pass 0 through).
+    if(path.data&&path.data.isFillShape)simplifyIfNeeded(path,state.smoothing);
   }
 }
 
@@ -3305,9 +3313,21 @@ function eraseAtPoint(path,worldPt,radius,fromPt){
   // whenever there IS a strokeColor, always expand it into real ink geometry
   // and UNION it with the existing fill first, so the border becomes part of
   // the erasable area instead of being discarded outright.
-  if(!isVB&&path.strokeColor){
+  // 2026-07 feedback: "sur une forme non fermé et dessiné avec brush, si
+  // j'utilise la gomme sur fill celui-ci est supprimé totalement au lieu
+  // d'avoir la brush qui mange la forme" — the guard above only expanded an
+  // open path into real ink geometry when it ALSO had a strokeColor; a
+  // strokeless open fill (Draw tool with Stroke off) skipped it entirely and
+  // fell straight to the degenerate-zero-area subtract this whole comment
+  // block already describes, deleting the entire shape on first touch.
+  if(!isVB&&(path.strokeColor||(!path.closed&&path.fillColor))){
     var expanded=eraseExpandStrokeToFill(path);
     if(expanded){
+      // eraseExpandStrokeToFill always paints the expansion from
+      // path.strokeColor (the normal case); a strokeless open fill has none,
+      // so borrow path.fillColor instead — same visible color the erased
+      // result should end up filled with either way.
+      if(!path.strokeColor)expanded.fillColor=path.fillColor;
       if(path.fillColor&&path.closed){
         var fillCopy=path.clone({insert:false});
         fillCopy.strokeColor=null;

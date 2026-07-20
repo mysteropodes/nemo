@@ -59,16 +59,13 @@
         if (state.symmetryEnabled) {
           if (window.ensureSymmetryAxis) window.ensureSymmetryAxis();
           if (window.ensureSymmetryRadialCenter) window.ensureSymmetryRadialCenter();
-          // Feedback: "on ne peut pas changer l'emplacement des points/
-          // guides" — turning the guide on from HERE used to leave
-          // state.tool at whatever it was (almost always Draw/Fillbrush),
-          // so the axis appeared but nothing you clicked on it did
-          // anything: dragging is gated on state.tool==='symmetry' (see
-          // symmetry-bridge.js's shouldEdit). Jumping into that tool the
-          // instant the guide turns on means the very first thing the user
-          // can do is drag it into place, no separate "now click the tiny
-          // toolbar icon" step required.
-          if (window.SM && window.SM.setTool) window.SM.setTool('symmetry');
+          // No longer force-switches into the 'symmetry' tool (2026-07
+          // feedback: "je perds la sélection de l'outil brush... les
+          // boutons du menu flottant disparaissent") — symmetry-bridge.js's
+          // shouldEdit no longer requires actually BEING in that tool, just
+          // the guide being enabled, so the axis is draggable immediately
+          // from whatever tool (Brush, Fill Brush...) is already active,
+          // and the floating panel (keyed off the CURRENT tool) stays put.
         }
         var cb = document.getElementById('p-sym-on'); if (cb) cb.checked = state.symmetryEnabled;
         if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
@@ -80,8 +77,8 @@
         state.perspectiveEnabled = !state.perspectiveEnabled;
         if (state.perspectiveEnabled) {
           if (window.ensurePerspectiveVPs) window.ensurePerspectiveVPs();
-          // Same reasoning as symmetry's toggle above.
-          if (window.SM && window.SM.setTool) window.SM.setTool('perspective');
+          // No longer force-switches tool — same reasoning as symmetry's
+          // toggle above.
         }
         var cb = document.getElementById('p-persp-on'); if (cb) cb.checked = state.perspectiveEnabled;
         if (window.SMEngineBridge) window.SMEngineBridge.renderNow();

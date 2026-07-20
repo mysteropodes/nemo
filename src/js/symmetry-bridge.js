@@ -289,7 +289,19 @@
   var draggingEndpoint = null; // 'p1' | 'p2' | null
   var draggingWhole = null; // {startX,startY,orig:{x1,y1,x2,y2}} | null
   var draggingCenter = false;
-  function shouldEdit() { return engineOn() && state.tool === 'symmetry'; }
+  // Broadened 2026-07 (feedback: "quand j'utilise brush et clic sur les
+  // boutons de guides je perds la sélection de l'outil brush... il faudrait
+  // garder l'outil brush sélectionné et pouvoir modifier les guides dans le
+  // canvas quand même") — dragging the axis/endpoints/center no longer
+  // requires actually switching into the dedicated 'symmetry' tool, just
+  // the guide being enabled. Safe regardless of which tool is active: this
+  // file's onDown/onMove/onUp only ever act on an explicit hit-test hit
+  // (hitEndpoint/hitAxisLine/hitCenter) and fall through untouched on a
+  // miss, and load BEFORE every drawing-tool bridge (draw-bridge.js,
+  // pen-bridge.js, shape-bridge.js — see index.html's script order), so a
+  // real hit is always claimed here first, before that tool's own onDown
+  // ever sees the event.
+  function shouldEdit() { return engineOn() && (state.tool === 'symmetry' || state.symmetryEnabled); }
   function hitEndpoint(worldPt, axis) {
     var tol = 12 / view.zoom;
     if (Math.hypot(axis.x1 - worldPt.x, axis.y1 - worldPt.y) < tol) return 'p1';
@@ -310,20 +322,31 @@
   }
   function onDown(e) {
     if (!shouldEdit()) return;
-    e.stopImmediatePropagation(); e.preventDefault();
+    // stopImmediatePropagation/preventDefault only on an ACTUAL hit, not on
+    // every shouldEdit()-true pointerdown — 2026-07 regression found while
+    // verifying the broadened shouldEdit() above (see its own comment):
+    // this used to fire unconditionally right here, which was harmless
+    // when shouldEdit() required actually BEING in the dedicated 'symmetry'
+    // tool (nothing else needed the event then anyway), but now that
+    // shouldEdit() can be true while Draw/Fill Brush is active, doing this
+    // before the hit-test swallowed EVERY click on the canvas the instant
+    // the guide was enabled — not just clicks on the guide itself — which
+    // silently broke ordinary drawing. Confirmed live: drawing off-axis
+    // committed 0 strokes with the guide on vs 1 with it off, same drag.
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
     var wp = new Point(w[0], w[1]);
     if (state.symmetryMode === 'radial') {
       var c = ensureSymmetryRadialCenter();
-      if (hitCenter(wp, c)) { draggingCenter = true; window.SMEngineBridge.suspend(); }
+      if (hitCenter(wp, c)) { e.stopImmediatePropagation(); e.preventDefault(); draggingCenter = true; window.SMEngineBridge.suspend(); }
       return;
     }
     var axis = ensureSymmetryAxis();
     if (state.symmetryMode === 'free') {
       var hit = hitEndpoint(wp, axis);
-      if (hit) { draggingEndpoint = hit; window.SMEngineBridge.suspend(); return; }
+      if (hit) { e.stopImmediatePropagation(); e.preventDefault(); draggingEndpoint = hit; window.SMEngineBridge.suspend(); return; }
     }
     if (hitAxisLine(wp, axis)) {
+      e.stopImmediatePropagation(); e.preventDefault();
       draggingWhole = { startX: wp.x, startY: wp.y, orig: { x1: axis.x1, y1: axis.y1, x2: axis.x2, y2: axis.y2 } };
       window.SMEngineBridge.suspend();
     }
