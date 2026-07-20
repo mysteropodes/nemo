@@ -1381,15 +1381,19 @@
       },
       { sep: true },
       {
-        // 2026-07 feedback ("tween seulement des éléments select... laisser
-        // les autres éléments non tween"): per-element opt-out of the
-        // auto-tween matcher (splitTweenables, tweens.js), toggled here
-        // rather than a stopwatch/keyframe-level setting since several
-        // elements of the SAME keyframe can now be tweened or not,
-        // independently. Label reflects current state — "activer" flips
-        // back to normal tweening if every selected item is already held.
-        label: selectedPaths.every(function (p) { return p.data && p.data.noTween; }) ? 'Réactiver le tween' : 'Ne pas tweener la sélection',
-        action: function () { toggleNoTweenForSelection(); }
+        // 2026-07 feedback ("tween seulement des éléments select... avec le
+        // clic droit sur les éléments select" — corrected after an inverted
+        // first attempt, "le but n'était pas d'empêcher au clic droit le
+        // tween... mais de justement tween la sélection"): per-element
+        // tween OPT-IN, toggled here rather than a stopwatch/keyframe-level
+        // setting since several elements of the SAME keyframe can be
+        // tweened or not, independently. This does NOT change the default
+        // behavior anywhere else — a keyframe pair only enters "manual"
+        // mode the first time this is used on it, and reverts to fully
+        // automatic once no element in it is flagged anymore (see
+        // toggleTweenOnForSelection). Label reflects current state.
+        label: selectedPaths.every(function (p) { return p.data && p.data.tweenOn; }) ? 'Retirer du tween' : 'Tweener la sélection',
+        action: function () { toggleTweenOnForSelection(); }
       },
     ]);
     if (isActiveRevision || isDeleteGhost) {
@@ -1416,29 +1420,39 @@
     window.showContextMenu(e.clientX, e.clientY, items);
   }
 
-  // 2026-07 feedback ("tween seulement des éléments select... laisser les
-  // autres éléments non tween... plusieurs éléments d'une même keyframe
-  // peuvent être tween ou pas") — per-element tween opt-out, wired to the
-  // context-menu item above. Sets data.noTween (persisted via serP/desP,
-  // app.js) on the live selection, then propagates the SAME flag value to
-  // the nearest keyframe on each side sharing the same data.strokeId —
-  // without this, splitTweenables (tweens.js) would exclude only ONE side
-  // of the pair from matching, leaving its counterpart to fade in/out as
-  // an unmatched stroke instead of staying frozen (a visible ghost
-  // duplicate on top of the held copy).
-  function toggleNoTweenForSelection() {
+  // 2026-07 feedback ("tween seulement des éléments select... avec le clic
+  // droit sur les éléments select et laisser les autres non tween...
+  // plusieurs éléments d'une même keyframe peuvent être tween ou pas") —
+  // per-element tween OPT-IN, wired to the context-menu item above. Sets
+  // data.tweenOn (persisted via serP/desP, app.js) on the live selection,
+  // propagates the SAME flag value to the nearest keyframe on each side
+  // sharing the same data.strokeId (without this, splitTweenables,
+  // tweens.js, would only see the flag on ONE side of the pair, leaving
+  // its counterpart to fade in/out as an unmatched stroke instead of
+  // staying frozen), then flips ld.frames[<keyframe>].tweenManualMode ON
+  // for any bracketing keyframe that now has at least one flagged stroke,
+  // or back OFF if none do anymore — this is what keeps the feature "à
+  // part, activable au besoin" (per the user's explicit choice): a
+  // keyframe pair nobody ever right-clicks here behaves EXACTLY as before,
+  // full auto-match, zero change in behavior.
+  function toggleTweenOnForSelection() {
     if (!selectedPaths.length) return;
     pushUndo();
-    var newVal = !selectedPaths.every(function (p) { return p.data && p.data.noTween; });
+    var newVal = !selectedPaths.every(function (p) { return p.data && p.data.tweenOn; });
     var li = state.activeLayerIdx, ld = state.layers[li], cf = state.currentFrame;
     var ids = [];
     selectedPaths.forEach(function (p) {
       if (!(p instanceof Path)) return;
       ensureStrokeId(p);
-      if (newVal) p.data.noTween = true; else delete p.data.noTween;
+      if (newVal) p.data.tweenOn = true; else delete p.data.tweenOn;
       if (p.data && p.data.strokeId) ids.push(p.data.strokeId);
     });
     saveActiveLayerFrame();
+    function recomputeManualMode(fi) {
+      var fr = ld.frames[fi];
+      if (!fr || !fr.isKeyframe) return;
+      fr.tweenManualMode = !!(fr.strokes && fr.strokes.some(function (sd) { return sd.tweenOn; }));
+    }
     function propagate(dir) {
       if (!ids.length) return;
       for (var fi = cf + dir; fi >= 0 && fi < state.totalFrames; fi += dir) {
@@ -1446,12 +1460,13 @@
         if (!fr) continue;
         if (fr.strokes && fr.strokes.length) {
           fr.strokes.forEach(function (sd) {
-            if (sd.strokeId && ids.indexOf(sd.strokeId) >= 0) { if (newVal) sd.noTween = true; else delete sd.noTween; }
+            if (sd.strokeId && ids.indexOf(sd.strokeId) >= 0) { if (newVal) sd.tweenOn = true; else delete sd.tweenOn; }
           });
         }
-        if (fr.isKeyframe) break; // stop at the first keyframe reached — that's the pair boundary
+        if (fr.isKeyframe) { recomputeManualMode(fi); break; } // stop at the first keyframe reached — that's the pair boundary
       }
     }
+    recomputeManualMode(cf); // cf itself, if it's a keyframe (the ids we just set live there)
     propagate(-1); propagate(1);
     if (window.SM && window.SM.generateTweens) window.SM.generateTweens();
     updateUI(); window.SMEngineBridge.renderNow();
@@ -1465,7 +1480,7 @@
     getDistortState: function () {
       return mode === 'xform-distort' ? { dir: distortDir, quad: distortDstQuad } : null;
     },
-    toggleNoTweenForSelection: toggleNoTweenForSelection,
+    toggleTweenOnForSelection: toggleTweenOnForSelection,
   };
 
   function init() {
