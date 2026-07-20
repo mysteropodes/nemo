@@ -1852,6 +1852,9 @@ function convertLayerToStrokeFillShadowFolder(layerIdx){
 }
 function goToFrame(idx){
   if(idx<0||idx>=state.totalFrames)return;
+  // Already on this frame (e.g. a live-scrub tick that re-dispatched 'change'
+  // without the value actually moving) — avoid a redundant save+reload pass.
+  if(idx===state.currentFrame)return;
   saveAllLayerFrames();state.currentFrame=idx;window._curFrame=idx;
   if(window.SMAudio&&!state.playing)SMAudio.scrubAt(idx); // scrub audio au deplacement du playhead (v19)
   loadFrame(idx);if(!state.playing){renderOS();renderArcs();updateUI();}else{updatePlayhead();}

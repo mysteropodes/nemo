@@ -37,7 +37,14 @@ function advancePlayFrame(cur){
   }
   return next;
 }
-function startPlay(){if(state.playing)return;state.playing=true;state.playDir=1;
+function startPlay(){if(state.playing)return;
+  // A brush-menu hover-preview mutates live paths with no pushUndo/save (see
+  // brush-menu-bridge.js) — if playback starts while one is active, the next
+  // frame change's saveAllLayerFrames() would bake the uncommitted preview
+  // into persisted frame data. Close the popover (its close() already
+  // reverts any live preview) before playback can advance a frame.
+  if(window.BrushMenu&&window.BrushMenu.isOpen())window.BrushMenu.close();
+  state.playing=true;state.playDir=1;
   document.getElementById('btn-play').innerHTML='<span class="material-symbols-rounded">\u{e034}</span>';
   document.getElementById('btn-play').classList.add('playing');
   if(window.SMAudio)SMAudio.onPlayStart(state.currentFrame);
@@ -1705,14 +1712,14 @@ function selectGhostAll(){
   // own) that read as "le bouton n'a pas l'air de marcher" (2026-07). Now
   // self-enables Ghost All instead of requiring that separate step —
   // same side effects toggleGhostAll's own "turning on" branch has.
+  var li=state.activeLayerIdx,cf=state.currentFrame;
+  var ld=state.layers[li];if(!ld||ld.symbolId){showToast('Ghost All ne fonctionne pas sur un composant');return;}
   if(!state.ghostAllFrames){
     state.ghostAllFrames=true;
     renderOS();
     var gb=document.getElementById('btn-ghost-all');if(gb)gb.classList.add('active');
   }
   window.SM.setTool('select');
-  var li=state.activeLayerIdx,cf=state.currentFrame;
-  var ld=state.layers[li];if(!ld||ld.symbolId){showToast('Ghost All ne fonctionne pas sur un composant');return;}
   var layer=userLayers[li];
   pushUndo();
   var count=0,frameCount=0;
