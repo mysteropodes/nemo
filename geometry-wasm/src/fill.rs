@@ -445,6 +445,30 @@ fn build_graph(
             }
             edge_pts.push(p1);
 
+            // Coincident-duplicate guard (2026-07, kept in sync with the JS
+            // fillBuildGraph — see its comment): duplicated wall geometry is
+            // STRUCTURAL in this app (a paint-bucket fill's outline retraces
+            // the stroke centerlines it was traced against, so adjacent
+            // fills + the original stroke put 2-3 identical copies of the
+            // same arc into the wall set). Two same-geometry edges between
+            // the same node pair form a degenerate two-edge "lens" the
+            // sharpest-turn walk orbits forever. Midpoint comparison keeps
+            // genuine two-arc lenses (different arcs between the same
+            // nodes — the diamond case) while dropping exact copies.
+            let mid_new = edge_pts[edge_pts.len() / 2];
+            let dup = edges.iter().any(|pe| {
+                if pe.kind != EdgeType::Stroke {
+                    return false;
+                }
+                if !((pe.a == a && pe.b == b) || (pe.a == b && pe.b == a)) {
+                    return false;
+                }
+                let mid_old = pe.pts[pe.pts.len() / 2];
+                mid_old.dist(mid_new) <= join_eps.max(1.5)
+            });
+            if dup {
+                continue;
+            }
             edges.push(Edge { kind: EdgeType::Stroke, stroke_idx: wi, frac_a: f0, frac_b: f1, pts: edge_pts, a, b });
         }
     }
@@ -456,6 +480,28 @@ fn build_graph(
             if d > join_eps && d <= gap_thr {
                 edges.push(Edge { kind: EdgeType::Gap, stroke_idx: 0, frac_a: 0.0, frac_b: 0.0, pts: Vec::new(), a: i, b: j });
             }
+        }
+    }
+    // Spur pruning (2026-07, Umoupen-parity — kept in sync with the JS
+    // fillBuildGraph, see its comment for the full story): iteratively drop
+    // every edge with a degree-1 endpoint. A dangling stroke tail — the
+    // natural overshoot past the last crossing in any hand-drawn
+    // intersection — can never bound a face, but trace_loop walks INTO it
+    // and dies at the tip (best_edge? -> None), killing the whole face
+    // trace. Confirmed live: on a dense real drawing no interior face was
+    // ever traced; the bucket silently fell back to the whole surrounding
+    // closed wall. Umoupen's triangulation sidesteps this by construction;
+    // pruning is the graph-world equivalent.
+    loop {
+        let mut degree = vec![0usize; nodes.len()];
+        for e in &edges {
+            degree[e.a] += 1;
+            degree[e.b] += 1;
+        }
+        let before = edges.len();
+        edges.retain(|e| degree[e.a] >= 2 && degree[e.b] >= 2);
+        if edges.len() == before {
+            break;
         }
     }
     for (idx, e) in edges.iter().enumerate() {
@@ -578,6 +624,13 @@ fn trace_loop(
     let mut cur_edge = first_edge;
     let mut to_node = if edges[cur_edge].a == cur_node { edges[cur_edge].b } else { edges[cur_edge].a };
     seq.push(Hop { edge_idx: cur_edge, from: cur_node, to: to_node });
+    // Rho-orbit abort (2026-07, kept in sync with fillTraceLoop/tools.js —
+    // see its comment): a walk that re-traverses a DIRECTED half-edge has
+    // merged into a cycle that never includes start_node (possible when
+    // node clustering / near-parallel edges make two arrivals pick the
+    // same exit) — abort immediately instead of spinning to max_steps.
+    let mut seen_he: std::collections::HashSet<(usize, usize)> = std::collections::HashSet::new();
+    seen_he.insert((cur_edge, cur_node));
     let mut steps = 0;
     while to_node != start_node {
         steps += 1;
@@ -609,6 +662,9 @@ fn trace_loop(
         }
         let best_edge = best_edge?;
         let next_node = if edges[best_edge].a == to_node { edges[best_edge].b } else { edges[best_edge].a };
+        if !seen_he.insert((best_edge, to_node)) {
+            return None; // merged into a foreign orbit — see comment above
+        }
         seq.push(Hop { edge_idx: best_edge, from: to_node, to: next_node });
         cur_node = to_node;
         cur_edge = best_edge;
