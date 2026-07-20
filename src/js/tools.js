@@ -2390,6 +2390,21 @@ function applyStrokeStyle(p){
 // pressure-stroke pipeline (see research notes in conversation).
 function buildVariableWidthPath(pts,widths){
   if(pts.length<2)return null;
+  // Closed-gesture detection: the artist's stroke came back near its own
+  // start (a ring/loop, e.g. tracing a circle to paint-bucket the middle
+  // later) rather than two genuinely separate open ends. Requires BOTH a
+  // tight start/end gap AND enough total travel that this isn't just a
+  // tiny jittery dot landing back on itself. See buildClosedRingOutline's
+  // own comment for why this needs a dedicated code path at all.
+  var avgW=0;for(var awi=0;awi<widths.length;awi++)avgW+=widths[awi];avgW/=widths.length;
+  if(pts.length>=8){
+    var travel=0;for(var tli=1;tli<pts.length;tli++)travel+=pts[tli].getDistance(pts[tli-1]);
+    var closeThresh=Math.max(6,avgW*0.6);
+    if(pts[0].getDistance(pts[pts.length-1])<closeThresh&&travel>avgW*3){
+      var ring=buildClosedRingOutline(pts,widths,avgW);
+      if(ring)return ring;
+    }
+  }
   var left=[],right=[],tangents=[];
   for(var i=0;i<pts.length;i++){
     var tangent;
@@ -2458,6 +2473,83 @@ function buildVariableWidthPath(pts,widths){
   outline.closed=true;
   leftPath.remove();rightPath.remove();
   return outline;
+}
+// Closed-gesture variant of the sweep above. The open-stroke sweep forces
+// two round end-caps at the start/end points — fine for a real open stroke,
+// but when those two points are actually the SAME spot (a ring/loop gesture,
+// e.g. tracing a circle with the Fill/Pressure brush intending to
+// paint-bucket the middle afterwards), the two caps bridge the outer and
+// inner offsets with a half-stroke-width blob right at the closure. That
+// seam is exactly what was forcing the paint bucket's escalating gap
+// tolerance (FILL_GAP_STEPS) to kick in, producing a fill boundary visibly
+// offset from the true inner edge (2026-07 feedback: red ring + hatched/
+// gapped fill overlay screenshots).
+// Fix: build the outer and inner offsets as their OWN closed loops (no caps
+// needed at all — there's no open end) and derive the ribbon via a boolean
+// subtract, same principle as Umoupen's mesh-silhouette fill approach (the
+// dev's own publicly-released source, see conversation): don't stitch an
+// offset polyline's own literal endpoints, let geometry produce the true
+// annulus instead. The subtract's hole is then folded back into a SINGLE
+// flat Path (same zero-width-slit technique insertBooleanResult already
+// uses via _mergeHoleIntoExterior/_polyClosestPair for real boolean holes)
+// so every existing caller of buildVariableWidthPath keeps working
+// unchanged — this ribbon's edges are smoothed beziers though, not
+// insertBooleanResult's straight WASM polygons, so handleIn/handleOut are
+// preserved through the merge instead of being dropped.
+function buildClosedRingOutline(pts,widths,avgW){
+  var n0=pts.length;
+  var loopPts=pts,loopWidths=widths;
+  // Trim a near-duplicate closing point (pen came back within a fraction of
+  // the average width of its own start) so the loop doesn't carry a
+  // degenerate near-zero-length final segment.
+  if(pts[0].getDistance(pts[n0-1])<Math.max(1,avgW*0.15)&&n0>3){
+    loopPts=pts.slice(0,n0-1);loopWidths=widths.slice(0,n0-1);
+  }
+  var n=loopPts.length;
+  if(n<4)return null;
+  var left=[],right=[];
+  for(var i=0;i<n;i++){
+    var prevI=(i-1+n)%n,nextI=(i+1)%n;
+    var tangent=loopPts[nextI].subtract(loopPts[prevI]);
+    if(tangent.length<0.0001)tangent=new Point(1,0);
+    tangent=tangent.normalize();
+    var normal=new Point(-tangent.y,tangent.x);
+    var hw=Math.max(0.3,loopWidths[i]/2);
+    left.push(loopPts[i].add(normal.multiply(hw)));
+    right.push(loopPts[i].subtract(normal.multiply(hw)));
+  }
+  var leftPath=new Path({insert:false,segments:left,closed:true});
+  leftPath.smooth({type:'continuous'});
+  var rightPath=new Path({insert:false,segments:right,closed:true});
+  rightPath.smooth({type:'continuous'});
+  var outer=Math.abs(leftPath.area)>=Math.abs(rightPath.area)?leftPath:rightPath;
+  var inner=outer===leftPath?rightPath:leftPath;
+  var boolResult=null;
+  try{boolResult=outer.subtract(inner,{insert:false});}catch(e){boolResult=null;}
+  if(!boolResult||!(boolResult instanceof CompoundPath)||boolResult.children.length<2){
+    // Degenerate case (brush width comparable to the loop's own radius —
+    // the inner offset self-crosses and collapses to nothing): no real
+    // hole to cut, a plain filled blob from the outer loop alone is the
+    // correct result.
+    var fallback=outer.clone({insert:false});
+    fallback.closed=true;
+    leftPath.remove();rightPath.remove();
+    if(boolResult&&!(boolResult instanceof CompoundPath))boolResult.remove();
+    return fallback;
+  }
+  var extChild=boolResult.children.reduce(function(a,b){return Math.abs(a.area)>=Math.abs(b.area)?a:b;});
+  var holeChild=boolResult.children.filter(function(c){return c!==extChild;})[0];
+  var extSegs=extChild.segments,holeSegs=holeChild.segments;
+  var pair=_polyClosestPair(extSegs.map(function(s){return s.point;}),holeSegs.map(function(s){return s.point;}));
+  var merged=new Path({insert:false});
+  for(var k=0;k<=pair.i;k++){var s=extSegs[k];merged.add(new Segment(s.point,s.handleIn,s.handleOut));}
+  for(var h=0;h<=holeSegs.length;h++){var hs=holeSegs[(pair.j+h)%holeSegs.length];merged.add(new Segment(hs.point,hs.handleIn,hs.handleOut));}
+  var backSeg=extSegs[pair.i];
+  merged.add(new Segment(backSeg.point,backSeg.handleIn,backSeg.handleOut));
+  for(var k2=pair.i+1;k2<extSegs.length;k2++){var s2=extSegs[k2];merged.add(new Segment(s2.point,s2.handleIn,s2.handleOut));}
+  merged.closed=true;
+  leftPath.remove();rightPath.remove();boolResult.remove();
+  return merged;
 }
 // Places a freshly-committed Fill Brush stroke per state.fillBrushMode —
 // shared by draw-bridge.js and tools.js's own legacy commit so the three
