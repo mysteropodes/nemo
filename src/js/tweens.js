@@ -1110,21 +1110,33 @@ function resolveSplitMatches(sA,sB,pairSpecs,unA,unB){
 // centerline (dabRecordsForTween below) with a per-pair SEEDED rng so the
 // texture sticks to the morphing stroke instead of re-rolling (boiling)
 // on every frame.
-function splitTweenables(strokes){
+// manualMode (2026-07, "tween seulement des éléments select... avec le clic
+// droit sur les éléments select" — the RIGHT direction after an inverted
+// first attempt): a keyframe pair is normally fully-automatic (every
+// non-dab stroke participates in autoMatch, matching this function's
+// behavior for years). manualMode flips that for ONE specific pair
+// (ld.frames[fA].tweenManualMode, set by select-bridge.js's
+// toggleTweenOnForSelection the first time the artist opts an element IN)
+// — only strokes flagged data.tweenOn/sd.tweenOn via that right-click
+// action participate; everything else on that pair is held static instead
+// of auto-matching, letting several elements of the same keyframe be
+// tweened or not independently. manualMode is per-pair and self-reverting
+// (toggleTweenOnForSelection turns it back off once no stroke in the frame
+// is flagged anymore) — every OTHER keyframe pair in the project, and this
+// function's behavior for anyone who never uses the feature, is completely
+// unchanged.
+function splitTweenables(strokes,manualMode){
   var list=[],orig=[],dabsByGroup={},held=[];
   strokes.forEach(function(sd,i){
     if(sd.isBrushTextureCopy){
       if(sd.brushGroupId)(dabsByGroup[sd.brushGroupId]=dabsByGroup[sd.brushGroupId]||[]).push(sd);
       return;
     }
-    // 2026-07 feedback ("tween seulement des éléments select... laisser les
-    // autres non tween") — a stroke flagged data.noTween/sd.noTween
-    // (select-bridge.js's toggleNoTweenForSelection) is excluded from the
-    // matcher exactly like dabs above, but for the opposite reason: dabs
-    // are re-stamped fresh each frame, a held stroke is copied UNCHANGED
-    // into every generated inbetween (generateTweens' emit loop) instead
-    // of participating in autoMatch/interpStroke at all.
-    if(sd.noTween){held.push(sd);return;}
+    // A held stroke is copied UNCHANGED into every generated inbetween
+    // (generateTweens' emit loop) instead of participating in
+    // autoMatch/interpStroke at all — dabs above are re-stamped fresh each
+    // frame instead, a different mechanism for a different reason.
+    if(manualMode&&!sd.tweenOn){held.push(sd);return;}
     list.push(sd);orig.push(i);
   });
   return{list:list,orig:orig,dabsByGroup:dabsByGroup,held:held};
@@ -1167,7 +1179,8 @@ function generateTweens(){
     if(restrictTo&&!restrictTo[fA])continue;
     // Per-pair override (complements the global curve, see getEasingForPair)
     var easFn=getEasingForPair(li,fA,fB);
-    var sAsplit=splitTweenables(ld.frames[fA].strokes),sBsplit=splitTweenables(ld.frames[fB].strokes);
+    var manualMode=!!ld.frames[fA].tweenManualMode;
+    var sAsplit=splitTweenables(ld.frames[fA].strokes,manualMode),sBsplit=splitTweenables(ld.frames[fB].strokes,manualMode);
     var sA=sAsplit.list,sB=sBsplit.list;
     // v16: manual pairing overrides (state.tweenOverrides) take priority
     // over autoMatch for this specific keyframe pair — resolved here by
@@ -1459,14 +1472,16 @@ function generateTweens(){
       }
       fadeOutA.forEach(function(sd,fi2){pushFade(sd,unA[fi2]/Math.max(1,sA.length-1),1-et2,sAsplit.dabsByGroup);});
       fadeInB.forEach(function(sd,fi2){pushFade(sd,unB[fi2]/Math.max(1,sB.length-1),et2,sBsplit.dabsByGroup);});
-      // Per-element tween opt-out (2026-07): held strokes are copied
-      // UNCHANGED into every interpolated frame, at full opacity, instead
-      // of being matched/interpolated. Only sAsplit.held is used, not
-      // sBsplit.held — toggleNoTweenForSelection (select-bridge.js)
-      // propagates the SAME flag to both keyframe A and B's copy of a
-      // strokeId specifically so sBsplit already excludes it from B's OWN
-      // matcher (no bogus fade-in), NOT so both sides get emitted here —
-      // emitting both would draw two overlapping copies of the same shape.
+      // Per-element manual tween mode (2026-07): when this pair is in
+      // manual mode (ld.frames[fA].tweenManualMode), any stroke NOT
+      // flagged data.tweenOn is held — copied UNCHANGED into every
+      // interpolated frame, at full opacity, instead of being matched/
+      // interpolated. Only sAsplit.held is used, not sBsplit.held —
+      // toggleTweenOnForSelection (select-bridge.js) propagates the SAME
+      // flag to both keyframe A and B's copy of a strokeId specifically so
+      // sBsplit already excludes an unflagged stroke from B's OWN matcher
+      // (no bogus fade-in), NOT so both sides get emitted here — emitting
+      // both would draw two overlapping copies of the same shape.
       sAsplit.held.forEach(function(sd,hi){
         var c=JSON.parse(JSON.stringify(sd));c.__zKey=hi/Math.max(1,sAsplit.held.length-1);
         tw.push(c);
@@ -1497,7 +1512,8 @@ function computeArcMatchState(){
   if(keys.length<2)return null;
   var fA=-1,fB=-1;for(var i2=0;i2<keys.length-1;i2++){if(state.currentFrame>=keys[i2]&&state.currentFrame<=keys[i2+1]){fA=keys[i2];fB=keys[i2+1];break;}}
   if(fA<0)return null;
-  var spA=splitTweenables(ld.frames[fA].strokes),spB=splitTweenables(ld.frames[fB].strokes);
+  var manualMode=!!ld.frames[fA].tweenManualMode;
+  var spA=splitTweenables(ld.frames[fA].strokes,manualMode),spB=splitTweenables(ld.frames[fB].strokes,manualMode);
   var sA=spA.list,sB=spB.list;
   // v16: replicate generateTweens' forced-pair resolution (state.tweenOverrides)
   // here so a forced pair gets the SAME negative matchIdx in both places —
