@@ -87,8 +87,18 @@ var state={
   brushSize:3,fillBrushSize:40,strokeColor:'#000000',fillColor:'#ff0000',fillEnabled:true,strokeEnabled:true,shadowMode:false,brushPreset:'none',
   smoothing:10,stabilizer:2,strokeCap:'round',strokeJoin:'round',opacity:100,
   miterLimit:10,dashOffset:0,paintOrder:'fillFirst',
-  strokeStyle:'solid',vectorBrush:false,taperEnds:false,
-  drawMode:'front',fillBrushMode:'below',pressureMin:30,pressureMax:170,pressureInvert:false,pressureCurve:'linear',
+  // 2026-07 feedback ("dans Moho je peux commencer un trait tout fin et
+  // finir tout fin ou finir gros et inversement, en fonction de la
+  // pression"): the plain Draw tool used to ignore stylus pressure for
+  // width entirely unless this checkbox was manually enabled every
+  // session, and even then P.min=30 meant a light touch never got
+  // genuinely thin. Pressure-driven width is now the Draw tool's default
+  // feel (matching Moho/other pro apps out of the box); P.min dropped to
+  // 5 so a feather-light touch can taper close to a point instead of
+  // floor-ing at 30% width. Purely a default — both remain user-editable
+  // (checkbox + P.min field, right panel) same as before.
+  strokeStyle:'solid',vectorBrush:true,taperEnds:false,
+  drawMode:'front',fillBrushMode:'below',pressureMin:5,pressureMax:170,pressureInvert:false,pressureCurve:'linear',
   // eraseAtPoint() already does a REAL vector boolean subtract (Paper.js
   // .subtract() / Rust erase_at_point), not item.remove() — verified by
   // reading it end to end. The "gomme supprime des objets entiers" report
