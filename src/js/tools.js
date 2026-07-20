@@ -1757,7 +1757,20 @@ function fillMergeSameColor(layer,newFill,allowFillShapeAbsorb){
   layer.children.forEach(function(c){
     if(c===newFill||!(c instanceof Path)||!c.closed||!c.fillColor||c.strokeColor)return;
     if(c.data&&(c.data.isVectorBrush||c.data.isLinkedFillCompanion||c.data.isBrushTextureCopy||c.data.isRevisionGhost||c.data.ghostFrame!==undefined))return;
-    if(!allowFillShapeAbsorb&&c.data&&c.data.isFillShape)return;
+    if(c.data&&c.data.isFillShape){
+      // Still excluded by default (preserveFillShapes, above) — UNLESS this
+      // exact Fill Brush shape's own boundary was one of the walls the
+      // paint bucket traced against to build newFill (data.fillWalls,
+      // stamped on newFill just before this call). That's the "patching a
+      // gap in THIS shape's own unclosed loop" case (2026-07 feedback:
+      // "le fill ne se merge pas complet avec le fill brush" — a Fill
+      // Brush ring gesture that didn't quite close, painted-bucket-filled
+      // via Alt+drag) — genuinely the same intended shape, not just an
+      // adjacent neighbor it happens to border, so absorbing it here is
+      // completing the shape rather than reshaping an unrelated one.
+      var tracedAgainstThis=newFill.data&&newFill.data.fillWalls&&c.data.strokeId&&newFill.data.fillWalls.indexOf(c.data.strokeId)>=0;
+      if(!allowFillShapeAbsorb&&!tracedAgainstThis)return;
+    }
     if(colorHex8(c.fillColor)!==col)return;
     if(!c.bounds.intersects(newFill.bounds))return;
     if(_strokeBetween(layer,newFill.interiorPoint,c.interiorPoint))return;
