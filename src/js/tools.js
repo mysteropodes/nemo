@@ -3740,12 +3740,31 @@ var _vb={pts:[],widths:[],lastT:0,lastPt:null};
 // native path is only a fallback (the engine is on by default), but the two
 // must stay in phase per this file's own duplication-hazard convention, or
 // falling back here mid-session would visibly change how a stroke feels.
-var _vbSmoothedPressure=null;
-function vbSmoothPressure(p){
-  if(_vbSmoothedPressure==null){_vbSmoothedPressure=p;return p;}
-  _vbSmoothedPressure+=(p-_vbSmoothedPressure)*0.45;
-  return _vbSmoothedPressure;
+// One Euro Filter (2026-07, replaces a fixed 0.45-alpha exponential moving
+// average — see draw-bridge.js's own copy of this exact comment for the
+// full "moins naturel qu'un logiciel pro" rationale and tuning caveat).
+function _vbMakeOneEuroFilter(mincutoff,beta,dcutoff){
+  var xPrev=null,dxPrev=0,tPrev=null;
+  function alpha(cutoff,dt){var tau=1/(2*Math.PI*cutoff);return 1/(1+tau/dt);}
+  return function(x,tMs){
+    if(xPrev==null){xPrev=x;tPrev=tMs;dxPrev=0;return x;}
+    var dt=Math.max(0.001,(tMs-tPrev)/1000);
+    tPrev=tMs;
+    var dx=(x-xPrev)/dt;
+    dxPrev=dxPrev+alpha(dcutoff,dt)*(dx-dxPrev);
+    var cutoff=mincutoff+beta*Math.abs(dxPrev);
+    var result=xPrev+alpha(cutoff,dt)*(x-xPrev);
+    xPrev=result;
+    return result;
+  };
 }
+// Tuned constants MUST match draw-bridge.js's own copy exactly (see that
+// file's comment for the empirical tuning rationale) — this is the
+// engine-off fallback, per this file's own duplication-hazard convention.
+var _VB_PRESSURE_MINCUTOFF=1.0,_VB_PRESSURE_BETA=20,_VB_PRESSURE_DCUTOFF=1.0;
+var _vbPressureFilter=_vbMakeOneEuroFilter(_VB_PRESSURE_MINCUTOFF,_VB_PRESSURE_BETA,_VB_PRESSURE_DCUTOFF);
+function _vbResetPressureFilter(){_vbPressureFilter=_vbMakeOneEuroFilter(_VB_PRESSURE_MINCUTOFF,_VB_PRESSURE_BETA,_VB_PRESSURE_DCUTOFF);}
+function vbSmoothPressure(p){return _vbPressureFilter(p,Date.now());}
 function vbStabilizePoint(pt){
   var stab=state.stabilizer;
   if(!stab){stabQueue.length=0;return pt;}
@@ -3878,7 +3897,7 @@ function onMouseDown(event){
     if(!state.strokeEnabled&&!state.fillEnabled){showToast('Stroke et Fill désactivés — rien à dessiner');return;}
     pushUndo();ensureKeyframe();layer.activate();
     if(state.vectorBrush){
-      _vbLastPenPressure=null;_vbSmoothedPressure=null;stabQueue=[event.point.clone()];_vb.pts=[event.point.clone()];_vb.widths=[vbPressureOf(event)];_vb.lastT=Date.now();_vb.lastPt=event.point.clone();
+      _vbLastPenPressure=null;_vbResetPressureFilter();stabQueue=[event.point.clone()];_vb.pts=[event.point.clone()];_vb.widths=[vbPressureOf(event)];_vb.lastT=Date.now();_vb.lastPt=event.point.clone();
       currentPath=new Path();currentPath.fillColor=state.strokeEnabled?state.strokeColor:state.fillColor;currentPath.strokeColor=null;currentPath.opacity=state.opacity/100;
       currentPath.data.isVectorBrush=true;
       applyBrushKeyline(currentPath); // visual separation from any nearby stroke — see app.js
