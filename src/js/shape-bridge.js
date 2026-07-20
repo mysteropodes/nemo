@@ -193,7 +193,7 @@
       path.remove();
       if (state.undoStack.length) state.undoStack.pop();
     } else {
-      if (state.shadowMode) path.data.channelTag = 'shadow';
+      if (state.shadowMode) applyShadowBrushTag(path);
       tagOwner(path);
       // Symmetry guide (symmetry-bridge.js, 2026-07): promoted from
       // brush-only to also cover Line/Rect/Ellipse — this IS the commit

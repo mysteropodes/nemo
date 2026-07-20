@@ -551,6 +551,12 @@
     var layer = userLayers[state.activeLayerIdx];
     layer.activate();
     var path;
+    // Set true only by the "fill seul" branch below — its committed path
+    // has neither isVectorBrush nor isFillShape (a plain closed fill, no
+    // ribbon scaffolding survives it), so applyShadowBrushTag can't infer
+    // "ink lives in fillColor" from data flags alone the way it does for
+    // every other branch.
+    var shadowPreferFill = false;
     if (isFillBrush()) {
       var fbPts = samples.map(function (s) { return new Point(s[0], s[1]); });
       var fbWidths = samples.map(function (s) { return s[2]; });
@@ -583,24 +589,35 @@
       delete path.data.isVectorBrush;
       delete path.data.centerSegments;
       delete path.data.widthProfile;
-      // Placement (Above/Below/Merge) — see applyFillBrushPlacement's own
-      // comment; replaces the old unconditional "always at the back". The
-      // return value MUST be captured: 'merge' mode, when it finds an
-      // overlapping fill, removes `path` entirely and returns a NEW united
-      // path (insertBooleanResult) — this call site never captured that
-      // before, so tagOwner/SMLabs/SMSymmetry hooks a few lines down were
-      // silently operating on the stale, already-removed original instead
-      // of the real merged result.
-      path = applyFillBrushPlacement(path, userLayers[state.activeLayerIdx]);
-      // 2026-07 feedback ("plusieurs coup de pinceau avec la même couleur
-      // doivent merger automatiquement") — Placement's own 'merge' option
-      // unions with whatever fill it happens to overlap regardless of
-      // color; genuine same-color fusion already exists
-      // (fillMergeSameColor, used by the paint bucket) but was never
-      // called from the Fill Brush's own commit. Wired in here
-      // unconditionally so consecutive same-color strokes merge into one
-      // shape no matter which Placement mode is active.
-      if (path) path = fillMergeSameColor(userLayers[state.activeLayerIdx], path, true) || path;
+      if (state.shadowMode) {
+        // A shadow guide stroke must never auto-merge/unite with whatever
+        // real artwork happens to sit underneath it — both
+        // applyFillBrushPlacement's 'merge' mode and fillMergeSameColor
+        // below unite with an overlapping fill REGARDLESS of color, which
+        // would silently fuse a guide-only shape into real content. Tag
+        // it and skip both instead (same fix as tools.js's own legacy
+        // Fill Brush commit path).
+        applyShadowBrushTag(path);
+      } else {
+        // Placement (Above/Below/Merge) — see applyFillBrushPlacement's own
+        // comment; replaces the old unconditional "always at the back". The
+        // return value MUST be captured: 'merge' mode, when it finds an
+        // overlapping fill, removes `path` entirely and returns a NEW united
+        // path (insertBooleanResult) — this call site never captured that
+        // before, so tagOwner/SMLabs/SMSymmetry hooks a few lines down were
+        // silently operating on the stale, already-removed original instead
+        // of the real merged result.
+        path = applyFillBrushPlacement(path, userLayers[state.activeLayerIdx]);
+        // 2026-07 feedback ("plusieurs coup de pinceau avec la même couleur
+        // doivent merger automatiquement") — Placement's own 'merge' option
+        // unions with whatever fill it happens to overlap regardless of
+        // color; genuine same-color fusion already exists
+        // (fillMergeSameColor, used by the paint bucket) but was never
+        // called from the Fill Brush's own commit. Wired in here
+        // unconditionally so consecutive same-color strokes merge into one
+        // shape no matter which Placement mode is active.
+        if (path) path = fillMergeSameColor(userLayers[state.activeLayerIdx], path, true) || path;
+      }
     } else if (state.vectorBrush && !state.strokeEnabled) {
       // Stroke eye OFF + Fill ON: the pressure ribbon IS the stroke, so
       // drawing "fill seul" means committing only the region enclosed by
@@ -617,6 +634,7 @@
       path.fillColor = state.fillColor;
       path.strokeColor = null;
       path.opacity = state.opacity / 100;
+      shadowPreferFill = true;
       if (state.drawMode === 'behind') userLayers[state.activeLayerIdx].insertChild(0, path);
     } else if (state.vectorBrush) {
       var pts = samples.map(function (s) { return new Point(s[0], s[1]); });
@@ -720,7 +738,11 @@
         }
       }
     }
-    if (state.shadowMode && path) path.data.channelTag = 'shadow';
+    // Fill Brush's own branch above already tags+recolors (and skips
+    // placement/merge entirely) when shadowMode is on, before this point —
+    // calling applyShadowBrushTag a second time here is harmless (same
+    // swatch, same result) but skip the redundant re-set for that one case.
+    if (state.shadowMode && path && !isFillBrush()) applyShadowBrushTag(path, shadowPreferFill);
     if (path) tagOwner(path);
     // Labs prototype hook (docs/feature-scouting.md) — no-op unless
     // window.SMLabs is loaded AND the relevant prototype's own flag is on.

@@ -932,6 +932,7 @@
         <span style="font-size:9px;color:var(--text-dim)">px</span>
       </div>
       <div class="pr" id="exp-alpha-row" data-i18n-title="expAlphaTitle" title="Fond transparent au lieu de la couleur BG du document — n'affecte pas les formats qui ne supportent pas la transparence (MP4, GIF)"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="exp-alpha" style="accent-color:var(--accent)"> <span data-i18n="expAlphaLabel">Fond transparent (alpha)</span></label></div>
+      <div class="pr" id="exp-include-shadow-row" title="Inclure les lignes de guide Shadow Brush dans l'export — normalement désactivé, ces lignes ne sont qu'un guide pour délimiter un fill, pas du dessin final"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="exp-include-shadow" style="accent-color:var(--accent)"> <span data-i18n="expIncludeShadowLabel">Inclure les lignes de guide Shadow</span></label></div>
       <div id="exp-progress" style="display:none;font-size:11px;color:var(--text-dim);margin-top:6px"></div>
       <div class="pr" style="margin-top:10px;gap:6px">
         <button class="pbtn ac" id="exp-run" style="flex:1" data-i18n="btnExportRun">Exporter</button>
@@ -1264,6 +1265,14 @@
          right-click popover (#onion-pop), see that popover's own comment. -->
     <button class="tb" id="btn-ghost-all" data-i18n-title="btnGhostAllTitle" title="Ghost all keyframes — shows every keyframe of the active layer at once" style="margin-left:4px"><span style="font-size:13px;line-height:1">&#x2637;</span></button>
     <button class="tb" id="btn-ghost-select" data-i18n-title="btnGhostSelectTitle" title="Select all keyframes' content to move/transform together"><span style="font-size:12px;line-height:1">&#x2725;</span></button>
+    <!-- Shadow Brush guide-line visibility (2026-07) — hides every
+         data.channelTag==='shadow' item across ALL layers/components at
+         once (timeline.js's toggleShadowGuides), so guide lines drawn for
+         the Stroke/Fill/Shadow layer-separation workflow can be checked
+         off before a final look, without touching the document itself.
+         Same icon as the Shadow Brush floating-panel button (labs-float-
+         panel.js) so it reads as the same concept in both places. -->
+    <button class="tb active" id="btn-shadow-guides" data-i18n-title="btnShadowGuidesTitle" title="Afficher/masquer les lignes de guide Shadow sur tous les calques et composants" style="margin-left:4px"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M20.25 19.5h-9.44l7.724-7.715L21 9.31a1.49 1.49 0 0 0 0-2.119l-4.19-4.19a1.51 1.51 0 0 0-2.12 0L3.44 14.25A1.492 1.492 0 0 0 3 15.31v4.19A1.5 1.5 0 0 0 4.5 21h15.75a.75.75 0 1 0 0-1.5ZM4.5 15.31l9-9 4.19 4.19-9 9H4.5v-4.19Z"/></svg></button>
     <button class="tb" id="btn-revision-view" data-i18n-title="btnRevisionViewTitle" title="Vue de révision — cycle Tout / Mes traits / Corrections" style="margin-left:4px;width:auto;padding:0 8px;font-size:10px" data-i18n="revisionViewAll">Tout</button>
     <button class="tb" id="btn-cycle" data-i18n-title="btnCycleTitle" title="Cycle — repete N fois la plage de frames selectionnee (walk cycles)" style="margin-left:4px"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></button>
     <button class="tb" id="btn-tween-curves" data-i18n-title="btnTweenCurvesTitle" title="Afficher/masquer les courbes d'easing sous les calques avec tween — clic sur un segment pour l'éditer individuellement" style="margin-left:4px"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17c3 0 3-10 6-10s3 10 6 10 3-8 6-8"/></svg></button>
@@ -1434,6 +1443,7 @@
 <script src="js/bitmap-brush.js"></script>
 <script src="js/bitmap-tip-picker.js"></script>
 <script src="js/brush-menu-bridge.js"></script>
+<script src="js/shadow-brush-bridge.js"></script>
 <script src="js/draw-bridge.js"></script>
 <script src="js/group-bridge.js"></script>
 <script src="js/select-bridge.js"></script>

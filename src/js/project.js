@@ -59,6 +59,8 @@
     state.canvasRotation=0;
     state.palettes=[{id:'p0',name:'Palette 1',colors:['#000000','#ffffff','#ff0000','#ff8800','#ffee00','#00cc44','#0088ff','#8833ff']}];
     state.activePaletteIdx=0;
+    state.shadowPalette=[{id:'sh1',color:'#3b4a6b'},{id:'sh2',color:'#6b3b4a'},{id:'sh3',color:'#3b6b5a'},{id:'sh4',color:'#6b5a3b'},{id:'sh5',color:'#4a3b6b'},{id:'sh6',color:'#555555'}];
+    state.shadowActiveId='sh1';state.shadowMode=false;
     state.customBrushPresets={};
     state.perspectiveEnabled=false;state.perspectiveMode='2pt';state.perspectiveDensity=24;state.perspectiveVPs=null;
     state.symmetryEnabled=false;state.symmetryMode='y';state.symmetryAxis=null;state.symmetryRadialCenter=null;state.symmetryRadialSectors=6;state.symmetryExtend=true;
