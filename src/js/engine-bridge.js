@@ -845,6 +845,20 @@
   }
   function buildMarqueeItems() {
     if (_marquee.active && _marquee.rect) {
+      // 2026-07 ("le lasso... pendant le drag j'ai le rect de selection box
+      // pas une selection visuelle libre même si après le relâchement j'ai
+      // bien ma forme dessinée de select") — this always drew the
+      // marquee's BOUNDING BOX (.bounds) regardless of its actual shape,
+      // for BOTH select-bridge's own Alt-drag lasso and fsselect's
+      // toggle-driven one (both share this one live-overlay chokepoint) —
+      // never updated when lasso mode was added. The final hit-test
+      // resolution (tools.js/select-bridge.js pointerup) already reads the
+      // real freehand segments correctly; only this live preview collapsed
+      // it to a rectangle. Serialize the actual traced points instead.
+      if (_marquee.lasso && _marquee.rect.segments.length > 1) {
+        var lassoPts = _marquee.rect.segments.map(function (s) { return { point: [s.point.x, s.point.y] }; });
+        return [{ segments: roundSegs(lassoPts), closed: false, fillColor: [74, 158, 255, 20], strokeColor: [74, 158, 255, 230], strokeWidth: 1 / view.zoom }];
+      }
       var b = _marquee.rect.bounds;
       return [boundsRectItem(b.left, b.top, b.right, b.bottom, [74, 158, 255, 20], [74, 158, 255, 230], 1 / view.zoom)];
     }
