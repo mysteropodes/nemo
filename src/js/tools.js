@@ -1519,6 +1519,16 @@ function fillCollectWalls(layer,excludePath,onlyIds){
       ring.closed=false;
       var rf=ring.firstSegment;
       ring.add(new Segment(rf.point.clone(),rf.handleIn.clone(),new Point(0,0)));
+      // The first anchor's handleIn belonged to the (now removed) closing
+      // curve — the appended seam segment above already took a copy as ITS
+      // incoming tangent, so on the first anchor it's stale. Leaving it
+      // made any face whose boundary passes THROUGH the seam node carry a
+      // zero-length curve with a wild backward handle right at the seam — a
+      // spike that flagged the whole face as self-intersecting (confirmed
+      // live: a chord-split circle's left half, whose boundary crosses the
+      // ring seam, was rejected every time while the seam-free right half
+      // worked).
+      rf.handleIn=new Point(0,0);
       open.push(ring);openSrc.push(sid);
     }
     else{open.push(w);openSrc.push(sid);}
@@ -1540,12 +1550,62 @@ function fillBuildGraph(opens,gapThr){
   opens.forEach(function(s,i){
     var a=findOrCreateNode(s.firstSegment.point);
     var b=findOrCreateNode(s.lastSegment.point);
+    // Self-loop guard (mirrors build_graph/fill.rs's own a==b `continue`,
+    // which the JS side never had — found live on a dense arrangement):
+    // a micro sub-wall left by two near-coincident crossing cuts has both
+    // endpoints inside one joinEps cluster; as an a===b edge it's always
+    // "available" at that node without ever LEAVING it, trapping the
+    // sharpest-turn walk until maxSteps kills the trace — 358 of 763 seed
+    // walks returned null and no real face survived on the reported scene.
+    if(a===b)return;
+    // Coincident-duplicate guard (2026-07, found live, kept in sync with
+    // build_graph/fill.rs): duplicated wall geometry is STRUCTURAL in this
+    // app — a paint-bucket fill's outline literally retraces the stroke
+    // centerlines it was traced against (fillVectorFind), so two adjacent
+    // fills plus the original stroke put 2-3 identical copies of the same
+    // boundary arc into the wall set. Two same-geometry edges between the
+    // same node pair form a degenerate two-edge "lens" face the
+    // sharpest-turn walk falls into and orbits forever (confirmed live: a
+    // 4-hop rogue cycle of two duplicated arc pairs absorbed EVERY trace on
+    // the reported scene). Midpoint comparison keeps genuine two-arc
+    // lenses (different arcs between the same nodes — the diamond/losange
+    // case, which must stay traceable) while dropping exact copies.
+    var sm=s.getPointAt(s.length/2);
+    for(var d0=0;d0<edges.length;d0++){
+      var pe=edges[d0];
+      if(pe.type!=='stroke')continue;
+      if(!((pe.a===a&&pe.b===b)||(pe.a===b&&pe.b===a)))continue;
+      var pm=opens[pe.strokeIdx].getPointAt(opens[pe.strokeIdx].length/2);
+      if(pm&&sm&&pm.getDistance(sm)<=Math.max(1.5,joinEps))return;
+    }
     edges.push({type:'stroke',strokeIdx:i,a:a,b:b,length:s.length});
   });
   for(var i=0;i<nodes.length;i++){
     for(var j=i+1;j<nodes.length;j++){
       var d=nodes[i].pt.getDistance(nodes[j].pt);
       if(d>joinEps&&d<=gapThr)edges.push({type:'gap',a:i,b:j,length:d});
+    }
+  }
+  // Spur pruning (2026-07, Umoupen-parity — kept in sync with
+  // build_graph/fill.rs): iteratively drop every edge with a degree-1
+  // endpoint until none remain. A dangling stroke tail — the natural
+  // overshoot past the last crossing in ANY hand-drawn intersection, plus
+  // whole strokes that connect to nothing — can never bound a face, but
+  // the sharpest-turn walk doesn't know that: it happily walks INTO the
+  // spur and dies at its tip (`if(!bestEdge)return null`), killing the
+  // whole face trace. Confirmed live on a dense real drawing: every trace
+  // seeded from a genuine interior face hit some spur within 5-16 hops and
+  // returned null — NO real face was ever found, the paint bucket fell
+  // back to whatever whole closed wall contained the click. Umoupen's
+  // triangulation sidesteps this by construction (dangling segments don't
+  // close triangles); pruning is the graph-world equivalent.
+  var pruned=true;
+  while(pruned){
+    pruned=false;
+    var degree={};
+    edges.forEach(function(e){degree[e.a]=(degree[e.a]||0)+1;degree[e.b]=(degree[e.b]||0)+1;});
+    for(var k=edges.length-1;k>=0;k--){
+      if(degree[edges[k].a]<2||degree[edges[k].b]<2){edges.splice(k,1);pruned=true;}
     }
   }
   edges.forEach(function(e,idx){e.idx=idx;nodes[e.a].edges.push(idx);nodes[e.b].edges.push(idx);});
@@ -1584,6 +1644,16 @@ function fillTraceLoop(graph,opens,startNode,firstEdge,turnSign,maxSteps){
   var curNode=startNode,curEdge=firstEdge;
   var toNode=curEdge.a===curNode?curEdge.b:curEdge.a;
   seq.push({edge:curEdge,from:curNode,to:toNode});
+  // Rho-orbit abort (2026-07, kept in sync with trace_loop/fill.rs): with
+  // perfectly consistent per-node angular ordering the sharpest-turn
+  // successor is a permutation and every orbit returns to its start — but
+  // real node-clustered graphs (joinEps merging, near-parallel edges at
+  // shallow-angle crossings) can make two different arrivals pick the same
+  // exit, so a walk can merge into a cycle that never includes startNode
+  // and spin until maxSteps. Detecting a repeated DIRECTED half-edge
+  // proves the orbit is closed without the start — abort immediately
+  // instead of burning the remaining steps.
+  var seenHE={};seenHE[curEdge.idx+'_'+curNode]=true;
   var steps=0;
   while(toNode!==startNode){
     steps++;if(steps>maxSteps)return null;
@@ -1603,6 +1673,9 @@ function fillTraceLoop(graph,opens,startNode,firstEdge,turnSign,maxSteps){
     }
     if(!bestEdge)return null;
     var nextNode=bestEdge.a===toNode?bestEdge.b:bestEdge.a;
+    var heKey=bestEdge.idx+'_'+toNode;
+    if(seenHE[heKey])return null; // merged into a foreign orbit — see comment above
+    seenHE[heKey]=true;
     seq.push({edge:bestEdge,from:toNode,to:nextNode});
     curNode=toNode;curEdge=bestEdge;toNode=nextNode;
   }
@@ -2042,7 +2115,7 @@ function _wallSegments(w){
 // BOTH walls the same precise point/fractions removes that mismatch
 // entirely. kurbo has no general bezier-bezier intersection primitive, so
 // this one seam stays JS-side deliberately (see fill.rs's own doc comment).
-function _computeExactCrossings(opens){
+function _computeExactCrossings(opens,tJunctionTol){
   var crossings=[];
   for(var i=0;i<opens.length;i++){
     for(var j=i+1;j<opens.length;j++){
@@ -2078,7 +2151,67 @@ function _computeExactCrossings(opens){
       crossings.push({wall:i,frac:loc.intersection.offset/opens[i].length,pt:pt});
     });
   }
-  return crossings;
+  // T-junction welds (2026-07, Umoupen-parity — "les intersections faites
+  // avec l'outil shadow brush ne sont pas prises en compte par le pot de
+  // peinture"): a stroke whose ENDPOINT lands on (or a hair short of) the
+  // MIDDLE of another wall — the classic way to subdivide a region with a
+  // partition line, and exactly what Shadow Brush guide lines do — never
+  // produced a graph junction: getIntersections above only reports true
+  // transversal crossings, and the graph's endpoint-join/gap-edge machinery
+  // only ever connects endpoints to OTHER ENDPOINTS, never to the middle of
+  // a wall. Confirmed live: a partition line ending ~1px inside a closed
+  // region's boundary left the face unsplit — both sides of the line filled
+  // as one identical region. Fix: cut the OTHER wall at the endpoint's
+  // nearest-point projection whenever it's within tJunctionTol. That cut
+  // becomes a real graph NODE, and the EXISTING machinery does the rest —
+  // an exact touch merges with the endpoint via node clustering (join_eps),
+  // a small gap connects via a normal gap edge at whatever gapThr
+  // escalation step covers it. No new edge type, no Rust change (crossings
+  // are computed here and handed to build_graph/fill.rs as-is; a degree-2
+  // cut node on an unrelated wall is traced straight through, harmless).
+  if(tJunctionTol>0){
+    for(var wi=0;wi<opens.length;wi++){
+      [opens[wi].firstSegment.point,opens[wi].lastSegment.point].forEach(function(ep){
+        for(var wj=0;wj<opens.length;wj++){
+          if(wj===wi)continue;
+          var loc=opens[wj].getNearestLocation(ep);
+          if(!loc)continue;
+          var d=loc.point.getDistance(ep);
+          if(d>tJunctionTol)continue;
+          var frac=loc.offset/opens[wj].length;
+          // Projections landing at the other wall's own ends are already
+          // endpoint-to-endpoint cases the existing join/gap logic covers.
+          if(frac<0.001||frac>0.999)continue;
+          crossings.push({wall:wj,frac:frac,pt:[loc.point.x,loc.point.y]});
+        }
+      });
+    }
+  }
+  // Collapse near-duplicate cuts on the same wall (2026-07, found live on a
+  // dense ~185-crossing arrangement): three strokes crossing pairwise near
+  // one point report 2-3 crossings a fraction of a px apart on the same
+  // wall (fracs like 0.557 vs 0.558) — each becomes its own cut, producing
+  // micro sub-edges whose two endpoints then cluster into the SAME graph
+  // node downstream. In fill.rs that degenerate edge is dropped by its
+  // a==b guard; the JS fillBuildGraph gained the same guard alongside this
+  // fix — but dropping the noise ONCE here at the shared source keeps both
+  // consumers' graphs clean AND identical, instead of each side sanitizing
+  // (or forgetting to sanitize) independently. 0.75px: well under joinEps'
+  // 1.5 floor, so two cuts this close were always going to be one node.
+  var byWallDedup={};
+  crossings.forEach(function(c){(byWallDedup[c.wall]=byWallDedup[c.wall]||[]).push(c);});
+  var deduped=[];
+  Object.keys(byWallDedup).forEach(function(wk){
+    var list=byWallDedup[wk],len=opens[wk].length;
+    list.sort(function(a,b){return a.frac-b.frac;});
+    var kept=[];
+    list.forEach(function(c){
+      if(kept.length&&(c.frac-kept[kept.length-1].frac)*len<0.75)return;
+      kept.push(c);
+    });
+    kept.forEach(function(c){deduped.push(c);});
+  });
+  return deduped;
 }
 function fillVectorFindWasm(clickPt,gapThr,layer,excludePath,onlyIds){
   var walls=fillCollectWalls(layer,excludePath,onlyIds);
@@ -2086,7 +2219,12 @@ function fillVectorFindWasm(clickPt,gapThr,layer,excludePath,onlyIds){
     openWalls:walls.open.map(function(w){return{segments:_wallSegments(w)};}),
     closedWalls:walls.closed.map(function(w){return{segments:_wallSegments(w)};}),
     gapThr:gapThr,click:[clickPt.x,clickPt.y],
-    crossings:_computeExactCrossings(walls.open),
+    // T-junction tolerance floors at 6px so an exact/near touch welds even
+    // on the very first gapThr=0 pass (via node clustering) instead of
+    // waiting for escalation; beyond that it tracks gapThr so a farther
+    // endpoint-to-mid-wall gap bridges at the same escalation step an
+    // endpoint-to-endpoint gap of the same size would.
+    crossings:_computeExactCrossings(walls.open,Math.max(6,gapThr)),
   };
   var res=JSON.parse(window.GeometryWasm.fill_find(JSON.stringify(input)));
   if(res.kind==='notFound'){
@@ -2467,8 +2605,8 @@ function fillLoopSelfIntersects(chainPath){
 // points coincide (same real intersection, just computed once per wall by
 // _computeExactCrossings), well within fillBuildGraph's own joinEps
 // endpoint-merge tolerance, so they naturally fold into one shared node.
-function _splitWallsAtCrossings(opens){
-  var crossings=_computeExactCrossings(opens);
+function _splitWallsAtCrossings(opens,tJunctionTol){
+  var crossings=_computeExactCrossings(opens,tJunctionTol);
   var byWall={};
   crossings.forEach(function(c){(byWall[c.wall]=byWall[c.wall]||[]).push(c.frac);});
   var result=[];
@@ -2512,8 +2650,16 @@ function fillVectorFindJS(clickPt,gapThr,layer,excludePath,onlyIds){
   var walls=fillCollectWalls(layer,excludePath,onlyIds);
   var candidates=[]; // {chainPath, area, fromClosedWall}
   walls.closed.forEach(function(w){
-    var pts=w.segments.map(function(sg){return sg.point;});
-    var area=fillPolyArea(pts);
+    // Real curve area/containment (Paper's own bezier math), NOT the
+    // anchor-point polygon approximations (fillPolyArea/fillPointInPoly) —
+    // a 4-anchor Path.Circle's anchor polygon is a SQUARE with ~2/3 of the
+    // circle's true area, which made a genuine sub-face (chord + half-arc)
+    // TIE with the whole circle on approximated area and lose to it on
+    // sort order (confirmed live: a chord-split circle recolored the whole
+    // circle on one side and correctly half-filled the other). The Rust
+    // path never had this bug: it measures flattened polylines at 0.75px
+    // tolerance, which tracks the real curve closely.
+    var area=Math.abs(w.area);
     // A hand-drawn "closed" wall isn't guaranteed to be a simple ring — an
     // organic stroke that loops back near its own earlier run can
     // self-cross exactly like a traced loop can (fillLoopSelfIntersects).
@@ -2521,9 +2667,9 @@ function fillVectorFindJS(clickPt,gapThr,layer,excludePath,onlyIds){
     // Best::Closed there had no guard either, and was confirmed (live,
     // against the reporter's real drawing) to be exactly what won the
     // reported diamond-artifact fill.
-    if(area>=1&&fillPointInPoly(clickPt,pts)&&!fillLoopSelfIntersects(w))candidates.push({chainPath:w,area:area,fromClosedWall:true});
+    if(area>=1&&w.contains(clickPt)&&!fillLoopSelfIntersects(w))candidates.push({chainPath:w,area:area,fromClosedWall:true});
   });
-  var splitOpen=walls.open.length?_splitWallsAtCrossings(walls.open):walls.open;
+  var splitOpen=walls.open.length?_splitWallsAtCrossings(walls.open,Math.max(6,gapThr)):walls.open;
   if(splitOpen.length){
     var graph=fillBuildGraph(splitOpen,gapThr);
     var maxSteps=graph.edges.length*2+8;
@@ -2558,9 +2704,11 @@ function fillVectorFindJS(clickPt,gapThr,layer,excludePath,onlyIds){
           if(!seq||seq.length<2)return;
           seq.forEach(function(hop){visited[hop.edge.idx+':'+hop.from+':'+turnSign]=true;});
           var chainPath=fillBuildPathFromSeq(graph,splitOpen,seq);
-          var pts=chainPath.segments.map(function(sg){return sg.point;});
-          var area=fillPolyArea(pts);
-          if(area<1||!fillPointInPoly(clickPt,pts)||fillLoopSelfIntersects(chainPath)){chainPath.remove();return;}
+          // Real curve area/containment — see the closed-wall loop's
+          // comment above for why the anchor-polygon approximations are
+          // not good enough to rank candidates against each other.
+          var area=Math.abs(chainPath.area);
+          if(area<1||!chainPath.contains(clickPt)||fillLoopSelfIntersects(chainPath)){chainPath.remove();return;}
           var usedGap=seq.some(function(h){return h.edge.type==='gap';});
           candidates.push({chainPath:chainPath,area:area,fromClosedWall:false,usedGap:usedGap});
         });
