@@ -1054,7 +1054,16 @@ body.mode-motion .lrow.act{box-shadow:inset 3px 0 0 #4E6FF2,inset 0 0 0 1px rgba
 .fc .km.hl{border:1.5px solid var(--dot-color,var(--key-color));background:transparent;border-radius:2px;cursor:grab;}
 .fc .km.td{background:var(--accent);width:5px;height:5px;}
 .fc .km.td.manual{background:var(--green);}
-#playhead{position:absolute;top:0;width:var(--fc);pointer-events:none;z-index:5;border-left:2px solid var(--accent);background:rgba(74,158,255,.08);}
+/* WKWebView (Tauri) bug found 2026-07: without a forced compositing layer,
+   this element's z-index:5 sometimes doesn't win over the sticky
+   #frame-hdr/#bars-row (z-index:2) — #playhead-flag renders behind their
+   opaque background and is invisible, EXCEPT right after any window
+   resize/relayout (confirmed live: opening devtools, which resizes the
+   webview, made the flag reappear correctly). transform:translateZ(0)
+   forces #playhead onto its own GPU layer so WebKit paints it above the
+   sticky siblings consistently, with no functional change in Chrome/other
+   browsers (already correct there). */
+#playhead{position:absolute;top:0;width:var(--fc);pointer-events:none;z-index:5;border-left:2px solid var(--accent);background:rgba(74,158,255,.08);transform:translateZ(0);}
 /* UI/UX audit (2026-07): a small flag/triangle handle sitting in the
    bars-row (top 16px of #fg-wrap, above the ruler) — the one part of the
    playhead's height that isn't already covered by frame cells, so it
