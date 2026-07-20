@@ -3430,36 +3430,32 @@ function eraseAtPoint(path,worldPt,radius,fromPt){
   // fillColor already IS the visible ink, strokeColor is never the real
   // border there).
   var origStrokeInfo=(!isVB&&path.strokeColor)?{color:path.strokeColor,width:path.strokeWidth,cap:path.strokeCap,join:path.strokeJoin}:null;
-  // A CLOSED path with BOTH a fill AND a visible stroke (the default for
-  // almost anything drawn — fillEnabled defaults true) used to skip this
-  // whole branch and erase only the interior fill polygon, then unconditionally
-  // null out strokeColor on the result below. Since a Path can only carry one
-  // strokeColor for its whole outline, that didn't "notch" the border where
-  // touched — it deleted the visible stroke everywhere on the shape in one
-  // touch, which read as "the eraser deletes the whole stroke+fill". Fix:
-  // whenever there IS a strokeColor, always expand it into real ink geometry
-  // and UNION it with the existing fill first, so the border becomes part of
-  // the erasable area instead of being discarded outright.
+  // eraseExpandStrokeToFill/buildVariableWidthPath builds a ribbon by
+  // flattening the path into a plain point SEQUENCE and sweeping a width
+  // along it — built for an OPEN stroke's centerline, with no concept of
+  // wrapping back around a closed loop. 2026-07 bug, found live: routing a
+  // CLOSED path (the default for almost anything drawn — fillEnabled
+  // defaults true, a closed shape's stroke traces the exact same contour
+  // as its own fill) through this ribbon-builder exploded a shape with any
+  // real curvature/concavity into a self-intersecting chaotic mess instead
+  // of a clean notch (screenshot: comma-shaped green fill → tangle of
+  // stray lines radiating from the erase point). A CLOSED path never
+  // needs this at all — Paper.js already gives it well-defined area, so
+  // erasing directly against its own polygon (whatever fillColor is set,
+  // borrowing strokeColor as a stand-in on a fill-less closed loop) is
+  // both correct AND simpler; the stroke that was ON it (origStrokeInfo,
+  // captured above) gets redrawn around the resulting notched boundary by
+  // insertBooleanResult below, same as ever.
   //
-  // An OPEN path needs the SAME treatment for its stroke ink (a bare open
-  // contour has zero fill area of its own by Paper.js's own boolean-op
-  // rules), but NOT for its fill: Paper.js implicitly closes an open path
-  // to render its fillColor (that's the only reason "Draw tool, Stroke
-  // off, unclosed shape" shows any visible fill at all) — 2026-07 bug,
-  // found live: the first fix here ("sur une forme non fermé et dessiné
-  // avec brush, si j'utilise la gomme sur fill celui-ci est supprimé
-  // totalement") treated that implicit-close fill as "degenerate zero
-  // area" and rerouted it through eraseExpandStrokeToFill(), which rebuilds
-  // a synthetic ribbon only `strokeWidth`/`brushSize` wide along the
-  // CENTERLINE — nowhere near the real filled interior of a wide freehand
-  // blob, so the very first erase sample replaced the whole visible shape
-  // with that near-invisible sliver. Fixed properly below: a strokeless
-  // open fill uses a closed=true CLONE of its own boundary (the real
-  // implicit-close polygon Paper.js already renders) instead of a
-  // synthetic ribbon; the stroke ribbon (when there IS a strokeColor) and
-  // this fill polygon are computed independently, then unioned if both
-  // exist — same fillColor||strokeColor color-precedence for the result.
-  if(!isVB&&(path.strokeColor||!path.closed)){
+  // The ribbon/closed-clone machinery below is ONLY for an OPEN path,
+  // which genuinely has no area of its own to subtract against directly:
+  // its stroke (if any) needs real ink geometry, and Paper.js implicitly
+  // closes an open path with a straight line to render its fillColor (that
+  // implicit closure is what a closed=true CLONE reproduces — NOT the
+  // synthetic ribbon, which was the earlier, now-fixed version of this
+  // same bug: "sur une forme non fermé... si j'utilise la gomme sur fill
+  // celui-ci est supprimé totalement").
+  if(!isVB&&!path.closed){
     var strokeGeom=path.strokeColor?eraseExpandStrokeToFill(path):null;
     var fillGeom=null;
     if(path.fillColor){
@@ -3483,6 +3479,14 @@ function eraseAtPoint(path,worldPt,radius,fromPt){
     }else{
       return;
     }
+  }else if(!isVB&&path.closed&&!path.fillColor&&path.strokeColor){
+    // Closed but fill-less (a decorative stroke-only loop, Fill off): no
+    // fill polygon to erase against — borrow strokeColor as a temporary
+    // fillColor so the subtract below has real area to work with. The
+    // path is about to be removed and replaced by the subtract result
+    // either way (see target.remove() further down), so mutating it here
+    // directly is safe.
+    target.fillColor=path.strokeColor;
   }
   if(!target.fillColor)return;
   var col=target.fillColor,op=target.opacity;
