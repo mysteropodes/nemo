@@ -295,6 +295,17 @@
            knob, built/shown by labs-float-panel.js only when relevant. -->
       <div id="labs-float-params" style="display:none"></div>
     </div>
+    <!-- Tween reassign badge (2026-07, "un bouton pour réassigné le tween à
+         un autre ID sur la frame suivante"): a small pill sitting next to
+         the selection's bounding box, positioned in JS (updateReassignBadge,
+         tweens.js) via view.projectToView — same sibling-of-#canvas-area +
+         position:fixed convention as #labs-float-panel just above, for the
+         same reason (never enters #canvas-area's subtree, so no per-tool
+         bridge needs to know about it). Green = this selection has a tween
+         to the next keyframe, click it to jump there and start a
+         reassignment; yellow = a reassignment is pending, click confirms
+         the currently-selected element as the new target. -->
+    <div id="tween-reassign-badge" style="display:none"></div>
   </div>
 
   <div id="props-panel-resize" data-i18n-title="dragToResize" title="Glisser pour redimensionner"></div>

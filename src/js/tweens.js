@@ -1528,6 +1528,7 @@ function computeArcMatchState(){
   return {fA:fA,fB:fB,sA:sA,sB:sB,matches:matches,fm:fm};
 }
 function renderArcs(cached){
+  updateReassignBadge();
   arcLayer.removeChildren();arcHandles=[];
   renderNodeHandles();
   renderTransformHandles();
@@ -1756,6 +1757,7 @@ function cancelReassign(silent){
   if(!_reassign.active)return;
   _reassign.active=false;_reassign.step=0;_reassign.aIds=[];
   reassignSetStatus(null);
+  hideReassignBadge();
   if(!silent)showToast('Réattribution annulée');
 }
 function startReassign(){
@@ -1846,6 +1848,89 @@ document.addEventListener('keydown',function(e){
 function initReassignUI(){
   var btn=document.getElementById('btn-tw-reassign');
   if(btn)btn.addEventListener('click',startReassign);
+  var badge=document.getElementById('tween-reassign-badge');
+  if(badge)badge.addEventListener('click',function(e){e.stopPropagation();e.preventDefault();if(_reassignBadgeAction)_reassignBadgeAction();});
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initReassignUI);else initReassignUI();
+
+// ---- Reassign badge (2026-07, "un bouton pour réassigné le tween à un
+// autre ID sur la frame suivante") — a discoverable, bounding-box-anchored
+// alternative to the #btn-tw-reassign + raw-canvas-click flow above (which
+// still works unchanged; this is just a second entry point onto the SAME
+// _reassign state machine/state.tweenOverrides data). Green: the current
+// single selection has an active tween pair to the next keyframe — click
+// jumps there and arms step 2. Yellow: step 2 is pending — click confirms
+// whatever's currently selected as the new target, same effect as clicking
+// the shape directly (reassignHandleClick's step-2 branch), just a more
+// discoverable explicit action instead of an invisible click-anywhere.
+var _reassignBadgeAction=null;
+function reassignBadgeEl(){return document.getElementById('tween-reassign-badge');}
+function hideReassignBadge(){var el=reassignBadgeEl();if(el)el.style.display='none';_reassignBadgeAction=null;}
+// Purely cosmetic: strokeId is a long opaque string, not meaningful shown
+// verbatim on a small pill — hashed down to a short 3-digit label so the
+// SAME element keeps the SAME label across renders/frames.
+function shortIdLabel(strokeId){
+  var h=0;for(var i=0;i<strokeId.length;i++){h=((h<<5)-h+strokeId.charCodeAt(i))|0;}
+  return String(Math.abs(h)%900+100);
+}
+function positionReassignBadge(worldBounds,label,color){
+  var el=reassignBadgeEl();if(!el)return;
+  var canvas=document.getElementById('drawing-canvas');if(!canvas)return;
+  var rect=canvas.getBoundingClientRect();
+  var tr=view.projectToView(new Point(worldBounds.right,worldBounds.top));
+  el.textContent='Id:'+label;
+  el.className=color;
+  el.style.display='block';
+  el.style.left=(rect.left+tr.x+8)+'px';
+  el.style.top=(rect.top+tr.y-10)+'px';
+}
+function updateReassignBadge(){
+  var el=reassignBadgeEl();if(!el)return;
+  if(_reassign.active&&_reassign.step===2){
+    // Guards against a STALE selectedPaths[0] left over from before the
+    // jump to frameB — loadFrame(fB) rebuilds the layer's children from
+    // scratch, so the old (pre-jump) Path is still `instanceof Path` but no
+    // longer actually IN the layer; without this check the badge could
+    // render using a detached object's frozen bounds instead of staying
+    // hidden until the artist picks a real target on the new frame.
+    var liveLayer=userLayers[state.activeLayerIdx];
+    if(state.activeLayerIdx!==_reassign.layer||state.currentFrame!==_reassign.frameB||selectedPaths.length!==1||!(selectedPaths[0]instanceof Path)||liveLayer.children.indexOf(selectedPaths[0])<0){hideReassignBadge();return;}
+    var p=selectedPaths[0];
+    positionReassignBadge(p.bounds,shortIdLabel(_reassign.aIds[0]||''),'yellow');
+    _reassignBadgeAction=function(){
+      var target=selectedPaths[0];if(!target)return;
+      var sid=ensureStrokeId(target);
+      saveActiveLayerFrame();
+      var li=_reassign.layer;
+      var key=li+':'+_reassign.frameA+'-'+_reassign.frameB;
+      var list=state.tweenOverrides[key]=state.tweenOverrides[key]||[];
+      state.tweenOverrides[key]=list.filter(function(ov){
+        var ovA=ov.aIds||[ov.aId];
+        return _reassign.aIds.every(function(id){return ovA.indexOf(id)<0;})&&ov.bId!==sid;
+      });
+      state.tweenOverrides[key].push(_reassign.aIds.length===1?{aId:_reassign.aIds[0],bId:sid}:{aIds:_reassign.aIds.slice(),bId:sid});
+      var doneA=_reassign.frameA;
+      cancelReassign(true);
+      selClear();selAdd(li,doneA);
+      generateTweens();
+      selClear();
+      showToast('Inbetween réattribué');
+    };
+    return;
+  }
+  if(_reassign.active){hideReassignBadge();return;} // mid legacy step-1 multi-click flow -- avoid a stale green badge underneath
+  var st=computeArcMatchState();
+  if(!st||st.fm.length!==1||selectedPaths.length!==1||!(selectedPaths[0]instanceof Path)||userLayers[state.activeLayerIdx].children.indexOf(selectedPaths[0])<0){hideReassignBadge();return;}
+  var m=st.fm[0],sd=st.sA[m.a],p2=selectedPaths[0];
+  var aStrokeId=sd.strokeId||ensureStrokeId(p2);
+  var fA=st.fA,fB=st.fB;
+  positionReassignBadge(p2.bounds,shortIdLabel(aStrokeId),'green');
+  _reassignBadgeAction=function(){
+    saveAllLayerFrames();
+    _reassign.active=true;_reassign.step=2;_reassign.layer=state.activeLayerIdx;_reassign.frameA=fA;_reassign.frameB=fB;_reassign.aIds=[aStrokeId];
+    goToFrame(fB);
+    reassignSetStatus('2/2 — Cliquez l\'élément correspondant sur la keyframe '+(fB+1)+' (ou sélectionnez-le puis cliquez le bouton jaune)');
+    showToast('Sélectionnez l\'élément correspondant, puis cliquez le bouton jaune');
+  };
+}
 

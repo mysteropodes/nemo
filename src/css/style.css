@@ -297,6 +297,14 @@ body.tools-docked-away #tools-panel-resize{display:none;}
 .labs-float-btn:hover{background:rgba(255,255,255,.09);color:var(--text);}
 .labs-float-btn.active{background:var(--accent-dim);color:var(--accent-hover);}
 .labs-float-divider{width:1px;height:18px;background:var(--border2);margin:0 3px;flex:none;}
+/* Tween reassign badge (2026-07) — pill positioned in JS (updateReassignBadge,
+   tweens.js), right at the selection's bounding-box corner. green = has a
+   tween, click to start reassigning; yellow = reassignment pending, click
+   confirms the current selection as the new target. */
+#tween-reassign-badge{position:fixed;z-index:7;padding:2px 7px;border-radius:10px;font:600 10px/1.6 var(--font-mono,monospace);color:#111;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.4);white-space:nowrap;transition:transform .08s;}
+#tween-reassign-badge:hover{transform:scale(1.08);}
+#tween-reassign-badge.green{background:#4ade80;}
+#tween-reassign-badge.yellow{background:#facc15;}
 /* Params row — [-] value [+] steppers, one pill per adjustable param,
    styled after the reference floating panel (dark rounded pill, minus/
    value/plus in one flat strip). */
