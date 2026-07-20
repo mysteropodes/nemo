@@ -1111,15 +1111,23 @@ function resolveSplitMatches(sA,sB,pairSpecs,unA,unB){
 // texture sticks to the morphing stroke instead of re-rolling (boiling)
 // on every frame.
 function splitTweenables(strokes){
-  var list=[],orig=[],dabsByGroup={};
+  var list=[],orig=[],dabsByGroup={},held=[];
   strokes.forEach(function(sd,i){
     if(sd.isBrushTextureCopy){
       if(sd.brushGroupId)(dabsByGroup[sd.brushGroupId]=dabsByGroup[sd.brushGroupId]||[]).push(sd);
       return;
     }
+    // 2026-07 feedback ("tween seulement des éléments select... laisser les
+    // autres non tween") — a stroke flagged data.noTween/sd.noTween
+    // (select-bridge.js's toggleNoTweenForSelection) is excluded from the
+    // matcher exactly like dabs above, but for the opposite reason: dabs
+    // are re-stamped fresh each frame, a held stroke is copied UNCHANGED
+    // into every generated inbetween (generateTweens' emit loop) instead
+    // of participating in autoMatch/interpStroke at all.
+    if(sd.noTween){held.push(sd);return;}
     list.push(sd);orig.push(i);
   });
-  return{list:list,orig:orig,dabsByGroup:dabsByGroup};
+  return{list:list,orig:orig,dabsByGroup:dabsByGroup,held:held};
 }
 function dabRecordsForTween(rec,presetKey,colorHexStr,baseWidth,seed,opacityMul){
   var preset=resolveBrushPreset(presetKey);
@@ -1451,6 +1459,18 @@ function generateTweens(){
       }
       fadeOutA.forEach(function(sd,fi2){pushFade(sd,unA[fi2]/Math.max(1,sA.length-1),1-et2,sAsplit.dabsByGroup);});
       fadeInB.forEach(function(sd,fi2){pushFade(sd,unB[fi2]/Math.max(1,sB.length-1),et2,sBsplit.dabsByGroup);});
+      // Per-element tween opt-out (2026-07): held strokes are copied
+      // UNCHANGED into every interpolated frame, at full opacity, instead
+      // of being matched/interpolated. Only sAsplit.held is used, not
+      // sBsplit.held — toggleNoTweenForSelection (select-bridge.js)
+      // propagates the SAME flag to both keyframe A and B's copy of a
+      // strokeId specifically so sBsplit already excludes it from B's OWN
+      // matcher (no bogus fade-in), NOT so both sides get emitted here —
+      // emitting both would draw two overlapping copies of the same shape.
+      sAsplit.held.forEach(function(sd,hi){
+        var c=JSON.parse(JSON.stringify(sd));c.__zKey=hi/Math.max(1,sAsplit.held.length-1);
+        tw.push(c);
+      });
       tw.sort(function(x,y){return x.__zKey-y.__zKey;});
       tw.forEach(function(s){delete s.__zKey;});
       ld.frames[fi]={strokes:tw,isInterpolated:true,isKeyframe:false};total++;
@@ -1646,8 +1666,22 @@ function renderOS(){
   // width scrub, or simply a keyframe boundary the ghost doesn't share).
   // Falls back to the plain opacity-only treatment ('default' mode's own
   // branch) for these — there's no real vector stroke to tint or outline.
-  for(var fi=cf-1;fi>=state.onionIn&&fi>=0;fi--){var strokes=getEffectiveStrokes(li,fi);if(!strokes.length)continue;var dist=cf-fi;var op=(state.onionPrevOpacity/100)*Math.max(.15,1-(dist/prevRangeSpan)*.85);strokes.forEach(function(sd){if(sd.isBrushTextureCopy||sd.brushTexturePreset)return;if(sd.isRaster){var pr=desR(sd,onionPrevLayer);pr.opacity=op;return;}var p=desP(sd,onionPrevLayer,op);if(state.onionMode==='tinted'&&sd.hasRealStroke)p.strokeColor=new Color(1,.3,.3,op);else if(state.onionMode==='outline'&&sd.hasRealStroke){p.fillColor=null;p.strokeColor=new Color(1,.3,.3,op*.8);p.strokeWidth=1;}else p.opacity=op;});}
-  for(var fi2=cf+1;fi2<=state.onionOut&&fi2<state.totalFrames;fi2++){var strokes2=getEffectiveStrokes(li,fi2);if(!strokes2.length)continue;var dist2=fi2-cf;var op2=(state.onionNextOpacity/100)*Math.max(.15,1-(dist2/nextRangeSpan)*.85);strokes2.forEach(function(sd){if(sd.isBrushTextureCopy||sd.brushTexturePreset)return;if(sd.isRaster){var nr=desR(sd,onionNextLayer);nr.opacity=op2;return;}var p=desP(sd,onionNextLayer,op2);if(state.onionMode==='tinted'&&sd.hasRealStroke)p.strokeColor=new Color(.3,.55,1,op2);else if(state.onionMode==='outline'&&sd.hasRealStroke){p.fillColor=null;p.strokeColor=new Color(.3,.55,1,op2*.8);p.strokeWidth=1;}else p.opacity=op2;});}
+  // 2026-07 feedback ("l'onion skin outline only n'a pas l'air de marcher
+  // pour toutes les frames"): the tinted/outline branches below were gated
+  // on sd.hasRealStroke ALONE, so a genuine fill-only shape (Fill Brush
+  // result, or a Draw-tool stroke with Stroke off) always fell to the
+  // opacity-only 'else' — shown as a normal filled ghost even in "outline
+  // only" mode, while plain-stroke items in the SAME frame correctly
+  // outlined; across a scene with a mix of item types this reads as
+  // "doesn't work for some frames". Widened to `sd.hasRealStroke||
+  // sd.fillColor` — safe here specifically because brush-textured anchors
+  // (the ONE case the halo-bug comment above warns about: fillColor set,
+  // hasRealStroke false, same shape) are already filtered out by the
+  // isBrushTextureCopy/brushTexturePreset return above, so anything
+  // reaching this line with a fillColor and no real stroke is a genuine
+  // plain fill shape, not a texture-camouflaged one.
+  for(var fi=cf-1;fi>=state.onionIn&&fi>=0;fi--){var strokes=getEffectiveStrokes(li,fi);if(!strokes.length)continue;var dist=cf-fi;var op=(state.onionPrevOpacity/100)*Math.max(.15,1-(dist/prevRangeSpan)*.85);strokes.forEach(function(sd){if(sd.isBrushTextureCopy||sd.brushTexturePreset)return;if(sd.isRaster){var pr=desR(sd,onionPrevLayer);pr.opacity=op;return;}var p=desP(sd,onionPrevLayer,op);var canTint=sd.hasRealStroke||sd.fillColor;if(state.onionMode==='tinted'&&canTint)p.strokeColor=new Color(1,.3,.3,op);else if(state.onionMode==='outline'&&canTint){p.fillColor=null;p.strokeColor=new Color(1,.3,.3,op*.8);p.strokeWidth=1;}else p.opacity=op;});}
+  for(var fi2=cf+1;fi2<=state.onionOut&&fi2<state.totalFrames;fi2++){var strokes2=getEffectiveStrokes(li,fi2);if(!strokes2.length)continue;var dist2=fi2-cf;var op2=(state.onionNextOpacity/100)*Math.max(.15,1-(dist2/nextRangeSpan)*.85);strokes2.forEach(function(sd){if(sd.isBrushTextureCopy||sd.brushTexturePreset)return;if(sd.isRaster){var nr=desR(sd,onionNextLayer);nr.opacity=op2;return;}var p=desP(sd,onionNextLayer,op2);var canTint2=sd.hasRealStroke||sd.fillColor;if(state.onionMode==='tinted'&&canTint2)p.strokeColor=new Color(.3,.55,1,op2);else if(state.onionMode==='outline'&&canTint2){p.fillColor=null;p.strokeColor=new Color(.3,.55,1,op2*.8);p.strokeWidth=1;}else p.opacity=op2;});}
   userLayers[state.activeLayerIdx].activate();
 }
 
