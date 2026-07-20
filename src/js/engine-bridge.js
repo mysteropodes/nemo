@@ -752,6 +752,32 @@
     // through the same map.
     var nvMap = (window.SMMotion && SMMotion.layerMotionPointMap) ? SMMotion.layerMotionPointMap(state.activeLayerIdx) : null;
     function W(x, y) { var p = selBoxPt(x, y, box); if (nvMap) { var w = nvMap.fwd(p.x, p.y); return w; } return [p.x, p.y]; }
+    // Live corner-pin distort (2026-07 feedback: "la bounding box ne
+    // reflete pas cette transformation") — select-bridge.js's distortSrcQuad/
+    // distortDstQuad are already past selBoxPt (geometry space, same as the
+    // dragged segments themselves), so only the Motion map (not selBoxPt
+    // again) still needs applying. Draws the ACTUAL warped quad + only its
+    // 4 corners (no edge-midpoints/anchor/rotate-ring — none are meaningful
+    // mid-perspective-warp) instead of the static pre-distort rectangle,
+    // and highlights the corner actually being dragged.
+    var liveDistort = window.SMSelectBridge && SMSelectBridge.getDistortState();
+    if (liveDistort && liveDistort.quad) {
+      function WG(pt) { return nvMap ? nvMap.fwd(pt.x, pt.y) : [pt.x, pt.y]; }
+      var dq = liveDistort.quad;
+      var dc = { nw: WG(dq.nw), ne: WG(dq.ne), se: WG(dq.se), sw: WG(dq.sw) };
+      var dItems = [
+        lineItem(dc.nw, dc.ne, [74, 158, 255, 204], 1 * zs),
+        lineItem(dc.ne, dc.se, [74, 158, 255, 204], 1 * zs),
+        lineItem(dc.se, dc.sw, [74, 158, 255, 204], 1 * zs),
+        lineItem(dc.sw, dc.nw, [74, 158, 255, 204], 1 * zs),
+      ];
+      Object.keys(dc).forEach(function (k) {
+        var isActive = k === liveDistort.dir;
+        var p = dc[k];
+        dItems.push(rectItem(p[0], p[1], (isActive ? 4.5 : 3.5) * zs, [255, 255, 255, 255], isActive ? [255, 159, 10, 255] : [74, 158, 255, 255], 1.2 * zs));
+      });
+      return dItems;
+    }
     if (!box.angle && !(nvMap && nvMap.mat.rot)) {
       // no rotation anywhere — but position/scale from Motion still apply
       var tl = W(b.left, b.top), br = W(b.right, b.bottom);
@@ -772,7 +798,12 @@
     };
     Object.keys(corners).forEach(function (k) {
       var p = corners[k];
-      items.push(rectItem(p[0], p[1], 3.5 * zs, [255, 255, 255, 255], [74, 158, 255, 255], 1.2 * zs));
+      // Ctrl-hover corner-pin affordance (2026-07 feedback: "qd ctrl est
+      // appuyé voir une différence visuelle sur les corner") — same accent
+      // color as the active-drag highlight above, shown BEFORE any drag
+      // starts so the user knows which corner Ctrl+drag would distort.
+      var isDistortHover = state.xformDistortHoverDir === k;
+      items.push(rectItem(p[0], p[1], (isDistortHover ? 4.5 : 3.5) * zs, [255, 255, 255, 255], isDistortHover ? [255, 159, 10, 255] : [74, 158, 255, 255], 1.2 * zs));
     });
     // Anchor/pivot marker (redesign 2026-07-09, AE-style anchor point) — a
     // small ringed crosshair AT the point rotation actually pivots around

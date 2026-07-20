@@ -93,7 +93,13 @@
         seed: Math.floor(Math.random() * 0xffffffff),
       };
       stripAnyBrushTexture(p);
-      applyBitmapBrushTexture(p, spec);
+      // applyBitmapBrushTexture is local to bitmap-brush.js's own IIFE, not
+      // a global like applyBrushTexture (tools.js) — calling it bare here
+      // threw a ReferenceError, silently killing the hover preview for
+      // every bitmap tip (2026-07 feedback: "on ne voit pas les brush en
+      // direct"). window.SMBitmapBrush.applyToPath is that same function,
+      // exposed for exactly this kind of external caller.
+      window.SMBitmapBrush.applyToPath(p, spec);
     });
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
   }
@@ -101,7 +107,7 @@
     if (!_previewSnapshot) return;
     _previewSnapshot.forEach(function (rec) {
       stripAnyBrushTexture(rec.p);
-      if (rec.bitmapSpec) applyBitmapBrushTexture(rec.p, rec.bitmapSpec);
+      if (rec.bitmapSpec) window.SMBitmapBrush.applyToPath(rec.p, rec.bitmapSpec);
       else if (rec.preset) applyBrushTexture(rec.p, rec.preset);
     });
     _previewSnapshot = null;
