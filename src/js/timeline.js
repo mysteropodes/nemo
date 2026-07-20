@@ -378,7 +378,7 @@ window.SM={
     // Fill/Stroke Select tool: recolor ONLY the clicked aspect — a 'stroke'
     // selection here means strokeColor, never touches fillColor even on a
     // combined shape (that's the whole point of this tool vs plain Select).
-    else if(state.tool==='fsselect'&&_fsSel&&_fsSel.kind==='stroke'){pushUndo();var arc=fsRealizeStrokeSegment(_fsSel,userLayers[state.activeLayerIdx]);_fsSel={path:arc,kind:'stroke',segStart:0,segEnd:arc.length,closed:arc.closed};arc.strokeColor=v;saveActiveLayerFrame();updateUI();}},
+    else if(state.tool==='fsselect'&&_fsSel.some(function(s){return s.kind==='stroke';})){pushUndo();_fsSel=_fsSel.map(function(sel){if(sel.kind!=='stroke')return sel;var arc=fsRealizeStrokeSegment(sel,userLayers[state.activeLayerIdx]);arc.strokeColor=v;return{path:arc,kind:'stroke',segStart:0,segEnd:arc.length,closed:arc.closed};});saveActiveLayerFrame();updateUI();}},
   setFillColor:function(v){state.fillColor=v;
     // Background is written unconditionally (even while fill is disabled) so
     // the swatch shows the last-picked color as soon as fill is re-enabled —
@@ -390,12 +390,12 @@ window.SM={
     // not just this function's own callers.
     var fhex=document.getElementById('p-fill-hex');if(fhex&&document.activeElement!==fhex)fhex.value=hexDisplayValue(v);
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(p.fillColor)p.fillColor=v;});saveActiveLayerFrame();updateUI();}
-    else if(state.tool==='fsselect'&&_fsSel&&(_fsSel.kind==='fill'||_fsSel.kind==='fillregion')){pushUndo();if(_fsSel.kind==='fillregion')_fsSel=fsRealizeFillRegion(_fsSel,userLayers[state.activeLayerIdx]);_fsSel.path.fillColor=v;saveActiveLayerFrame();updateUI();}},
+    else if(state.tool==='fsselect'&&_fsSel.some(function(s){return s.kind==='fill'||s.kind==='fillregion';})){pushUndo();_fsSel=_fsSel.map(function(sel){if(sel.kind!=='fill'&&sel.kind!=='fillregion')return sel;if(sel.kind==='fillregion')sel=fsRealizeFillRegion(sel,userLayers[state.activeLayerIdx]);sel.path.fillColor=v;return sel;});saveActiveLayerFrame();updateUI();}},
   setFillEnabled:function(v){state.fillEnabled=v;var fw=document.getElementById('fill-well'),pf=document.getElementById('pm-fill');fw.classList.toggle('none',!v);pf.classList.toggle('none',!v);document.getElementById('p-fill-on').checked=v;
     var ft=document.getElementById('fill-enable-toggle');if(ft){ft.classList.toggle('off',!v);ft.innerHTML=v?ICO_EYE:ICO_EYE_CLOSED;}
     var ftlp=document.getElementById('fill-enable-toggle-lp');if(ftlp){ftlp.classList.toggle('off',!v);ftlp.innerHTML=v?ICO_EYE:ICO_EYE_CLOSED;}
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(p.data&&p.data.isVectorBrush)return;p.fillColor=v?state.fillColor:null;});saveActiveLayerFrame();updateUI();}
-    else if(state.tool==='fsselect'&&_fsSel&&(_fsSel.kind==='fill'||_fsSel.kind==='fillregion')){pushUndo();if(_fsSel.kind==='fillregion')_fsSel=fsRealizeFillRegion(_fsSel,userLayers[state.activeLayerIdx]);_fsSel.path.fillColor=v?state.fillColor:null;if(!v){fsUnlinkFillRegen(_fsSel.path);if(!_fsSel.path.strokeColor){_fsSel.path.remove();fsClearSel();}}saveActiveLayerFrame();updateUI();}},
+    else if(state.tool==='fsselect'&&_fsSel.some(function(s){return s.kind==='fill'||s.kind==='fillregion';})){pushUndo();_fsSel=_fsSel.map(function(sel){if(sel.kind!=='fill'&&sel.kind!=='fillregion')return sel;if(sel.kind==='fillregion')sel=fsRealizeFillRegion(sel,userLayers[state.activeLayerIdx]);sel.path.fillColor=v?state.fillColor:null;if(!v){fsUnlinkFillRegen(sel.path);if(!sel.path.strokeColor){sel.path.remove();return null;}}return sel;}).filter(Boolean);saveActiveLayerFrame();updateUI();}},
   // Mirrors setFillEnabled exactly, for the Stroke side — didn't exist
   // before (Stroke had no on/off concept, only a color), added alongside
   // the quick phdr toggle button since disabling stroke without it required
@@ -409,7 +409,7 @@ window.SM={
     // means the same real split-and-remove fsApplyDelete's Delete key does.
     // No re-enable path: once a segment is split out there's nothing left
     // to flip back on, and the stroke-sec panel disappears with _fsSel.
-    else if(state.tool==='fsselect'&&_fsSel&&_fsSel.kind==='stroke'&&!v){pushUndo();fsDeleteSegment(_fsSel,userLayers[state.activeLayerIdx]);fsClearSel();renderArcs();updateUI();}},
+    else if(state.tool==='fsselect'&&_fsSel.some(function(s){return s.kind==='stroke';})&&!v){pushUndo();_fsSel=_fsSel.filter(function(sel){if(sel.kind!=='stroke')return true;fsDeleteSegment(sel,userLayers[state.activeLayerIdx]);return false;});renderArcs();updateUI();}},
   // Illustrator's "X" swap — exchanges the stroke and fill colors (tool
   // defaults, and the current selection's actual colors if select/subselect
   // is active, since setStrokeColor/setFillColor already apply to
@@ -1056,10 +1056,11 @@ window.SM={
   // la sequence en un clic, facon CTG TVPaint).
   propagateColorAllFrames:function(){
     var sid=null,fillHex=null,strokeHex=null;
-    if(state.tool==='fsselect'&&_fsSel&&_fsSel.path&&_fsSel.path.data){
-      sid=_fsSel.path.data.strokeId;
-      if(_fsSel.kind==='stroke'&&_fsSel.path.strokeColor)strokeHex=colorHex8(_fsSel.path.strokeColor);
-      else if(_fsSel.path.fillColor)fillHex=colorHex8(_fsSel.path.fillColor);
+    var fsPrimPCA=fsPrimarySel();
+    if(state.tool==='fsselect'&&fsPrimPCA&&fsPrimPCA.path&&fsPrimPCA.path.data){
+      sid=fsPrimPCA.path.data.strokeId;
+      if(fsPrimPCA.kind==='stroke'&&fsPrimPCA.path.strokeColor)strokeHex=colorHex8(fsPrimPCA.path.strokeColor);
+      else if(fsPrimPCA.path.fillColor)fillHex=colorHex8(fsPrimPCA.path.fillColor);
     }else if(selectedPaths.length===1&&selectedPaths[0].data){
       var p0=selectedPaths[0];sid=p0.data.strokeId;
       if(p0.fillColor)fillHex=colorHex8(p0.fillColor);
@@ -1327,8 +1328,10 @@ function updateStatusBarHelp(){
     return;
   }
   // 2. fsselect has an active fill/stroke pick.
-  if(state.tool==='fsselect'&&typeof _fsSel!=='undefined'&&_fsSel){
-    statusbarHelpRender(tt(_fsSel.kind==='stroke'?'hdrStroke':'hdrFill')+' '+tt('thSelected')+' —',[['Suppr',tt('thErase')],['Échap',tt('thDeselect')]]);
+  if(state.tool==='fsselect'&&typeof _fsSel!=='undefined'&&_fsSel.length){
+    var fsPrimSB=fsPrimarySel();
+    var fsCountSB=_fsSel.length>1?' ('+_fsSel.length+')':'';
+    statusbarHelpRender(tt(fsPrimSB.kind==='stroke'?'hdrStroke':'hdrFill')+fsCountSB+' '+tt('thSelected')+' —',[['Suppr',tt('thErase')],['Échap',tt('thDeselect')]]);
     return;
   }
   // 3. A timeline keyframe cell (or span) is selected.
@@ -1385,16 +1388,19 @@ function updatePropsContext(){
   var hasSel=(state.tool==='select'||state.tool==='subselect')&&selectedPaths.length>0;
   var ctx,hdrText;
   var show={'sel-props-sec':false,'fill-sec':false,'stroke-sec':false,'tool-opts-sec':false,'effects-sec':false,'canvas-sec':false,'layer-sec':false};
-  if(state.tool==='fsselect'&&_fsSel){
-    // Only the ONE clicked aspect's panel shows — no Position/Size (this
-    // tool doesn't offer transform, Select already owns that) and no
-    // Effects (blend mode lives on the layer, not a fill/stroke aspect).
+  if(state.tool==='fsselect'&&_fsSel.length){
+    // Multi-select (2026-07): show BOTH sections if the selection mixes
+    // fill and stroke picks — no Position/Size (this tool doesn't offer
+    // transform, Select already owns that) and no Effects (blend mode
+    // lives on the layer, not a fill/stroke aspect).
     ctx='fsselect';
-    show['fill-sec']=_fsSel.kind==='fill'||_fsSel.kind==='fillregion';
-    show['stroke-sec']=_fsSel.kind==='stroke';
-    var fsSegLabel=_fsSel.kind==='stroke'&&!(_fsSel.segStart===0&&_fsSel.segEnd===_fsSel.path.length)?' (segment)':'';
-    var fsFillLabel=_fsSel.kind==='fillregion'?' (région)':'';
-    hdrText=(_fsSel.kind==='stroke'?'Stroke'+fsSegLabel:'Fill'+fsFillLabel)+' sélectionné(e)';
+    show['fill-sec']=_fsSel.some(function(s){return s.kind==='fill'||s.kind==='fillregion';});
+    show['stroke-sec']=_fsSel.some(function(s){return s.kind==='stroke';});
+    var fsPrimPC=fsPrimarySel();
+    var fsSegLabel=fsPrimPC.kind==='stroke'&&!(fsPrimPC.segStart===0&&fsPrimPC.segEnd===fsPrimPC.path.length)?' (segment)':'';
+    var fsFillLabel=fsPrimPC.kind==='fillregion'?' (région)':'';
+    var fsCountPC=_fsSel.length>1?' ('+_fsSel.length+')':'';
+    hdrText=(fsPrimPC.kind==='stroke'?'Stroke'+fsSegLabel:'Fill'+fsFillLabel)+fsCountPC+' sélectionné(e)';
   }else if(hasSel){
     ctx='selection';
     show['sel-props-sec']=show['fill-sec']=show['stroke-sec']=show['effects-sec']=true;
@@ -1672,8 +1678,9 @@ function updateSelPropsPanel(){
 // NOT go through setFillColor/setStrokeColor, which would re-apply back
 // onto the selection and turn a read into a write).
 function updateFsSelPanel(){
-  if(state.tool!=='fsselect'||!_fsSel)return;
-  var p=_fsSel.path;
+  if(state.tool!=='fsselect'||!_fsSel.length)return;
+  var _fsSel0=fsPrimarySel();
+  var p=_fsSel0.path;
   var ftog=document.getElementById('fill-enable-toggle'),stog=document.getElementById('stroke-enable-toggle');
   // Pressure-brush ribbons and fill-brush shapes are ALWAYS fillColor:<ink>/
   // strokeColor:null by construction (draw-bridge.js commitStroke) — same
@@ -1681,7 +1688,7 @@ function updateFsSelPanel(){
   // reason: their fillColor being set is NOT a signal that the Fill/Stroke
   // eyes were actually on at draw time.
   var isBrushShape=p.data&&(p.data.isVectorBrush||p.data.isFillShape);
-  if((_fsSel.kind==='fill'||_fsSel.kind==='fillregion')&&p.fillColor&&!isBrushShape){
+  if((_fsSel0.kind==='fill'||_fsSel0.kind==='fillregion')&&p.fillColor&&!isBrushShape){
     var fc=colorHex8(p.fillColor);
     document.getElementById('fill-well').style.background=fc;document.getElementById('pm-fill').style.background=fc;
     ['color-fill','pm-fill-c'].forEach(function(id){var el=document.getElementById(id);if(el){el.value=fc;el.dataset.hex8=fc;}});
@@ -1693,7 +1700,7 @@ function updateFsSelPanel(){
     // conflits" on Fill/Stroke enabled state). Now both move together.
     state.fillEnabled=true;
     if(ftog)ftog.classList.remove('off');
-  }else if(_fsSel.kind==='stroke'&&p.strokeColor){
+  }else if(_fsSel0.kind==='stroke'&&p.strokeColor){
     var sc=colorHex8(p.strokeColor);
     document.getElementById('stroke-well').style.background=sc;document.getElementById('pm-stroke').style.background=sc;
     ['color-stroke','pm-stroke-c'].forEach(function(id){var el=document.getElementById(id);if(el){el.value=sc;el.dataset.hex8=sc;}});
@@ -4707,7 +4714,7 @@ function onKeyDown(event){
       saveActiveLayerFrame();updateUI();
     }
     else if(_sel.frames.length>0){event.preventDefault();window.SM.deleteSelectedFrames();}
-    else if(state.tool==='fsselect'&&_fsSel){event.preventDefault();fsApplyDelete();}
+    else if(state.tool==='fsselect'&&_fsSel.length){event.preventDefault();fsApplyDelete();}
     // Subselect: Delete removes just the selected anchor(s) from the path
     // and lets the curve reflow through the remaining points (Illustrator/
     // Figma convention) — previously had NO handler at all here, so Delete
