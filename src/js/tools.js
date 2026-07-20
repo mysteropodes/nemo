@@ -1729,12 +1729,35 @@ function fillFindExistingMatch(layer,path){
     if(!(c instanceof Path||c instanceof CompoundPath)||!c.fillColor)continue;
     if(c.data&&(c.data.isLinkedFillCompanion||c.data.isBrushTextureCopy))continue;
     var cb=c.bounds;
-    if(Math.abs(cb.x-b.x)>1||Math.abs(cb.y-b.y)>1||Math.abs(cb.width-b.width)>1||Math.abs(cb.height-b.height)>1)continue;
+    // Tolerance loosened 1px/1% -> 4px/4% (2026-07, "impossible de mettre
+    // un fill... ça déforme complètement la forme"): a re-trace of the
+    // SAME shape can drift more than 1% from a prior simplify()/smooth()
+    // pass (this exact fill's own _eraseDegenerateSelfLoops cleanup, or an
+    // earlier commit's Fill-Brush simplify), narrowly missing this match
+    // and falling through to fillMergeSameColor's `.unite()` — which is
+    // numerically unsafe for two near-identical overlapping polygons
+    // (confirmed directly: a shape unioned with its own clone produced 23
+    // garbage fragments). Catching the near-identical case here, before
+    // any union is ever attempted, is the safest place to stop it.
+    if(Math.abs(cb.x-b.x)>4||Math.abs(cb.y-b.y)>4||Math.abs(cb.width-b.width)>4||Math.abs(cb.height-b.height)>4)continue;
     var diff=Math.abs(Math.abs(c.area)-area);
-    if(diff>Math.max(1,area*0.01))continue; // >1% area difference -> a genuinely different region
+    if(diff>Math.max(4,area*0.04))continue; // >4% area difference -> a genuinely different region
     if(diff<bestDiff){bestDiff=diff;best=c;}
   }
   return best;
+}
+// Shared "is this basically the same shape" test (bounds+area proxy, no
+// boolean op involved) — used both by fillMergeSameColor's own defense-in-
+// depth check (see its call site's comment) and available for any future
+// caller needing the same near-identical guard.
+function _isNearIdenticalArea(a,b){
+  var areaA=Math.abs(a.area),areaB=Math.abs(b.area);
+  if(!(areaA>0)||!(areaB>0))return false;
+  var maxArea=Math.max(areaA,areaB);
+  if(Math.abs(areaA-areaB)>Math.max(4,maxArea*0.04))return false;
+  var ba=a.bounds,bb=b.bounds;
+  var tol=Math.max(4,Math.max(ba.width,ba.height)*0.04);
+  return Math.abs(ba.x-bb.x)<=tol&&Math.abs(ba.y-bb.y)<=tol&&Math.abs(ba.width-bb.width)<=tol&&Math.abs(ba.height-bb.height)<=tol;
 }
 // preserveFillShapes (2026-07, "les bords extérieurs du fill brush une fois
 // le pot de peinture appliqué change de forme comme si des vecteurs
@@ -1817,15 +1840,37 @@ function fillMergeSameColor(layer,newFill,allowFillShapeAbsorb){
     (p.data.fillWalls||[]).forEach(function(id){if(mergedWallIds.indexOf(id)<0)mergedWallIds.push(id);});
     if(p.data.fillGapPx>mergedGapPx)mergedGapPx=p.data.fillGapPx;
   });
-  var acc=newFill;
+  var acc=newFill,nearIdentical=null;
   absorbed.forEach(function(c){
+    // Near-identical to the ORIGINAL newFill (not the evolving acc — a
+    // candidate can be near-identical to newFill itself even after acc has
+    // already grown from an earlier union in this same loop): re-clicking
+    // fill on an already-filled area, when fillFindExistingMatch's tighter
+    // upstream tolerance narrowly misses (a hairline of drift from an
+    // earlier simplify/smooth pass), reaches here with newFill essentially
+    // duplicating an existing same-color shape. Uniting two NEAR-IDENTICAL
+    // overlapping polygons is numerically unsafe in Paper.js's clipper —
+    // confirmed directly this session: unioning a shape with its own exact
+    // clone produced 23 garbage fragments, not one clean shape. `c` already
+    // covers essentially the same area newFill does, so it contributes
+    // nothing new to union anyway — just drop the redundant duplicate
+    // instead of ever feeding this pair through unite() (2026-07: "impossible
+    // de mettre un fill... ça déforme complètement la forme").
+    if(_isNearIdenticalArea(newFill,c)){nearIdentical=nearIdentical||c;return;}
     var u=null;
     try{u=acc.unite(c,{insert:false});}catch(e){}
     if(!u)return; // degenerate geometry — leave this one unmerged rather than fail the whole fill
     if(acc!==newFill)acc.remove();
     acc=u;
   });
-  if(acc===newFill)return newFill; // every unite failed — nothing changed
+  if(acc===newFill){
+    // Every real candidate was either a failed unite or a near-identical
+    // duplicate — if it was the latter, the existing shape already covers
+    // this area; discard the fragile new trace and keep it, rather than
+    // leaving two redundant overlapping copies in the layer.
+    if(nearIdentical){newFill.remove();return nearIdentical;}
+    return newFill; // every unite failed — nothing changed
+  }
   // Strip clipper-noise self-touching revisits before this goes anywhere
   // else (insertBooleanResult below, or a FUTURE merge/regeneration pass
   // that would otherwise unite() this already-messy result again and
