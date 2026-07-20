@@ -1179,8 +1179,18 @@ function generateTweens(){
     if(restrictTo&&!restrictTo[fA])continue;
     // Per-pair override (complements the global curve, see getEasingForPair)
     var easFn=getEasingForPair(li,fA,fB);
+    // 2026-07 feedback ("si je clic droit sur ma sélection et que je tween
+    // il ne va pas faire le tween avec les formes correspondantes de la
+    // frame suivante... comme quand il détecte chaque forme"): manualMode
+    // only restricts the A side's candidate pool (which strokes are even
+    // ELIGIBLE to start a tween) — B always offers its FULL candidate set,
+    // exactly like a normal full auto-tween, so autoMatch's own Hungarian
+    // matching can still automatically find the right corresponding shape
+    // at B. Requiring the SAME strokeId to already exist at B (this
+    // function's first attempt) defeated the whole point of automatic
+    // shape detection.
     var manualMode=!!ld.frames[fA].tweenManualMode;
-    var sAsplit=splitTweenables(ld.frames[fA].strokes,manualMode),sBsplit=splitTweenables(ld.frames[fB].strokes,manualMode);
+    var sAsplit=splitTweenables(ld.frames[fA].strokes,manualMode),sBsplit=splitTweenables(ld.frames[fB].strokes,false);
     var sA=sAsplit.list,sB=sBsplit.list;
     // v16: manual pairing overrides (state.tweenOverrides) take priority
     // over autoMatch for this specific keyframe pair — resolved here by
@@ -1512,8 +1522,10 @@ function computeArcMatchState(){
   if(keys.length<2)return null;
   var fA=-1,fB=-1;for(var i2=0;i2<keys.length-1;i2++){if(state.currentFrame>=keys[i2]&&state.currentFrame<=keys[i2+1]){fA=keys[i2];fB=keys[i2+1];break;}}
   if(fA<0)return null;
+  // manualMode only restricts A's candidate pool — see generateTweens' own
+  // comment on this exact split for why B always stays unrestricted.
   var manualMode=!!ld.frames[fA].tweenManualMode;
-  var spA=splitTweenables(ld.frames[fA].strokes,manualMode),spB=splitTweenables(ld.frames[fB].strokes,manualMode);
+  var spA=splitTweenables(ld.frames[fA].strokes,manualMode),spB=splitTweenables(ld.frames[fB].strokes,false);
   var sA=spA.list,sB=spB.list;
   // v16: replicate generateTweens' forced-pair resolution (state.tweenOverrides)
   // here so a forced pair gets the SAME negative matchIdx in both places —
