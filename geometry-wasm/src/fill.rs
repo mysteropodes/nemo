@@ -644,10 +644,32 @@ fn loop_points(nodes: &[Node], edges: &[Edge], seq: &[Hop]) -> Vec<Vec2> {
 // Path#getLocationAt/splitAt — now done once, here, with kurbo.
 fn resample_result(open_samplers: &[PathSampler], nodes: &[Node], edges: &[Edge], seq: &[Hop]) -> Vec<Vec2> {
     let mut pts: Vec<Vec2> = Vec::new();
+    // Every hop boundary is the SAME real-world node (a crossing or a real
+    // wall endpoint), but each hop's own end sample is computed by a
+    // DIFFERENT independent source — a Gap hop's boundary is the node's own
+    // stored (union-find-averaged) position, while a Stroke hop's boundary
+    // is resampled fresh from ITS wall's own PathSampler at that node's
+    // frac. These never land bit-identical, only very close — pushing BOTH
+    // (the previous hop's last point AND the next hop's first point)
+    // creates a near-zero-length "phantom edge" sandwiched between the two
+    // real edges either side of it, and floating-point noise in that
+    // degenerate edge's direction can flip poly_self_intersects' cross-
+    // product sign test, false-flagging a perfectly simple loop as self-
+    // intersecting (confirmed live: a clean two-arc lens between two
+    // crossings, the coarse loop_points() check already accepted it, but
+    // this fine resample duplicated the closing node from two different
+    // samplers ~0.02px apart and that alone tripped the self-intersection
+    // reject). Skipping a new hop's very first sample whenever it's
+    // (nearly) the same point already at the end of `pts` collapses that
+    // phantom edge to nothing, leaving one clean shared vertex instead.
+    const SEAM_EPS: f64 = 0.1;
     for hop in seq {
         let e = &edges[hop.edge_idx];
         if e.kind == EdgeType::Gap {
-            pts.push(nodes[hop.to].pt);
+            let p = nodes[hop.to].pt;
+            if pts.last().map_or(true, |last: &Vec2| last.dist(p) > SEAM_EPS) {
+                pts.push(p);
+            }
             continue;
         }
         let sampler = &open_samplers[e.stroke_idx];
@@ -667,7 +689,22 @@ fn resample_result(open_samplers: &[PathSampler], nodes: &[Node], edges: &[Edge]
         for si in 0..=n_samples {
             let t = si as f64 / n_samples as f64;
             let d = da + (db - da) * t;
-            pts.push(sampler.point_at(d));
+            let p = sampler.point_at(d);
+            if si == 0 && pts.last().map_or(false, |last: &Vec2| last.dist(p) <= SEAM_EPS) {
+                continue;
+            }
+            pts.push(p);
+        }
+    }
+    // Same phantom-edge fix at the wrap-around seam (poly_area/
+    // poly_self_intersects treat `pts` as implicitly closed, last point
+    // back to first) — the loop's very last sample and its very first
+    // sample are the same real node too, from two more independent
+    // samplers/sources.
+    if pts.len() > 2 {
+        let first = pts[0];
+        if pts[pts.len() - 1].dist(first) <= SEAM_EPS {
+            pts.pop();
         }
     }
     pts
