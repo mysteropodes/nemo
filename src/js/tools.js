@@ -1643,13 +1643,28 @@ function _strokeBetween(layer,p1,p2){
   }
   return false;
 }
-function fillMergeSameColor(layer,newFill){
+// preserveFillShapes (2026-07, "les bords extérieurs du fill brush une fois
+// le pot de peinture appliqué change de forme comme si des vecteurs
+// avaient bougé"): Paper.js's .unite() always re-emits a BRAND NEW point
+// set for the WHOLE resulting boundary, never just the touched region —
+// there's no way to union two shapes and keep one side's anchors byte-
+// identical. That's an acceptable, even wanted, trade-off when the Fill
+// Brush tool merges a fresh stroke into the PREVIOUS one it's still
+// actively drawing (both are transient, about-to-settle geometry) — but
+// NOT when the paint bucket, well after the fact, absorbs an
+// already-finished, hand-authored Fill Brush shape it merely happens to
+// border: the artist doesn't expect that shape's far, untouched outer
+// edge to visibly reshape just because they filled next to it. Pass
+// true from the Fill Brush's own commit call sites (unchanged behavior);
+// pass false (or omit) from the paint bucket's call site.
+function fillMergeSameColor(layer,newFill,allowFillShapeAbsorb){
   if(!newFill||!newFill.fillColor)return newFill;
   var col=colorHex8(newFill.fillColor);
   var absorbed=[];
   layer.children.forEach(function(c){
     if(c===newFill||!(c instanceof Path)||!c.closed||!c.fillColor||c.strokeColor)return;
     if(c.data&&(c.data.isVectorBrush||c.data.isLinkedFillCompanion||c.data.isBrushTextureCopy||c.data.isRevisionGhost||c.data.ghostFrame!==undefined))return;
+    if(!allowFillShapeAbsorb&&c.data&&c.data.isFillShape)return;
     if(colorHex8(c.fillColor)!==col)return;
     if(!c.bounds.intersects(newFill.bounds))return;
     if(_strokeBetween(layer,newFill.interiorPoint,c.interiorPoint))return;
@@ -4203,7 +4218,10 @@ function onMouseDown(event){
     res.path.data.fillSeed=[event.point.x,event.point.y];
     res.path.data.fillGapPx=res.gapPx;
     if(res.wallIds&&res.wallIds.length)res.path.data.fillWalls=res.wallIds;
-    fillMergeSameColor(layer,res.path); // Animate merge-drawing — see the helper's comment
+    // allowFillShapeAbsorb omitted (falsy) — the paint bucket should never
+    // reshape an already-finished, hand-authored Fill Brush shape it
+    // merely borders (see fillMergeSameColor's own comment).
+    fillMergeSameColor(layer,res.path);
     saveActiveLayerFrame();updateUI();showToast('Fill appliqué');
   }else if(state.tool==='fillbrush'){
     if(state.layers[state.activeLayerIdx].locked)return;pushUndo();ensureKeyframe();layer.activate();
@@ -4541,7 +4559,7 @@ function onMouseUp(event){
       // was never called from the Fill Brush's own commit. Wired in here
       // unconditionally so consecutive same-color strokes merge into one
       // shape no matter which Placement mode is active.
-      if(currentPath)currentPath=fillMergeSameColor(userLayers[state.activeLayerIdx],currentPath)||currentPath;
+      if(currentPath)currentPath=fillMergeSameColor(userLayers[state.activeLayerIdx],currentPath,true)||currentPath;
       if(currentPath&&state.shadowMode)currentPath.data.channelTag='shadow';
       if(currentPath)tagOwner(currentPath);
     }

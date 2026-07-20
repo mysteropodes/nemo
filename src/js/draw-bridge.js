@@ -564,7 +564,7 @@
       // called from the Fill Brush's own commit. Wired in here
       // unconditionally so consecutive same-color strokes merge into one
       // shape no matter which Placement mode is active.
-      if (path) path = fillMergeSameColor(userLayers[state.activeLayerIdx], path) || path;
+      if (path) path = fillMergeSameColor(userLayers[state.activeLayerIdx], path, true) || path;
     } else if (state.vectorBrush && !state.strokeEnabled) {
       // Stroke eye OFF + Fill ON: the pressure ribbon IS the stroke, so
       // drawing "fill seul" means committing only the region enclosed by
