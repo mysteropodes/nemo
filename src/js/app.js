@@ -126,9 +126,13 @@ var state={
   // above: each swatch carries a stable `id` (not just a hex value) so a
   // stroke can be tagged data.shadowSwatchId and stay attributable to "this
   // named shadow bucket" even if the swatch's own color is edited later.
-  // 6 defaults (muted tones, easy to tell apart against most artwork) —
-  // user-extendable via the "+" swatch in the popover.
-  shadowPalette:[{id:'sh1',color:'#3b4a6b'},{id:'sh2',color:'#6b3b4a'},{id:'sh3',color:'#3b6b5a'},{id:'sh4',color:'#6b5a3b'},{id:'sh5',color:'#4a3b6b'},{id:'sh6',color:'#555555'}],
+  // 6 defaults — bright/saturated (2026-07: the original muted tones read
+  // as too close to ordinary linework at a glance; a guide line's whole
+  // point is to stand out unmistakably from the real drawing) — same vivid
+  // rainbow family as the main palette's own defaults just above, so it
+  // reads as "this app's vivid-color convention", not a separate look.
+  // User-extendable via the "+" swatch in the popover.
+  shadowPalette:[{id:'sh1',color:'#ff3355'},{id:'sh2',color:'#ff8800'},{id:'sh3',color:'#ffdd00'},{id:'sh4',color:'#22cc55'},{id:'sh5',color:'#2288ff'},{id:'sh6',color:'#aa33ff'}],
   shadowActiveId:'sh1',
   // Live-view-only (like onionSkin, never persisted to the project file):
   // hides every data.channelTag==='shadow' item across ALL layers/

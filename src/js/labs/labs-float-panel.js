@@ -26,12 +26,24 @@
     // are real `state.*`-backed features, not Labs prototypes — see
     // REAL_FEATURES below for how this panel treats them as first-class
     // entries alongside the localStorage-flag-based Labs ones.
+    // 'shadow-brush' added to every tool whose OWN commit code respects
+    // state.shadowMode (tools.js/draw-bridge.js: Draw, Pen, Fill Brush,
+    // Line/Rect/Ellipse all check it) — not just Draw. Before this, arming
+    // Shadow Mode from Draw then switching to any of these silently kept
+    // recoloring/tagging everything drawn there with ZERO visible
+    // indicator in that tool's own context (2026-07: "pourquoi... ça change
+    // de couleur au relâchement" — traced to exactly this: the mode was
+    // still armed from earlier Draw-tool testing, with no way to notice
+    // from Fill Brush's own panel). Line/Rect/Ellipse had it worst: those
+    // three aren't even in TOOL_OPTS_TOOLS, so the right-panel checkbox
+    // never showed for them either — this floating button was their ONLY
+    // possible indicator, and it was missing too.
     draw: ['brush-menu', 'shadow-brush', 'symmetry', 'perspective', 'predictive-stroke', 'multiframe-draw', 'canvas-grid', 'view-filter'],
-    fillbrush: ['brush-menu', 'symmetry', 'perspective', 'canvas-grid', 'view-filter'],
-    pen: ['symmetry', 'perspective', 'french-curve', 'canvas-grid', 'view-filter'],
-    line: ['symmetry', 'perspective', 'french-curve', 'canvas-grid'],
-    rect: ['symmetry', 'canvas-grid', 'view-filter'],
-    ellipse: ['symmetry', 'french-curve', 'canvas-grid'],
+    fillbrush: ['brush-menu', 'shadow-brush', 'symmetry', 'perspective', 'canvas-grid', 'view-filter'],
+    pen: ['shadow-brush', 'symmetry', 'perspective', 'french-curve', 'canvas-grid', 'view-filter'],
+    line: ['shadow-brush', 'symmetry', 'perspective', 'french-curve', 'canvas-grid'],
+    rect: ['shadow-brush', 'symmetry', 'canvas-grid', 'view-filter'],
+    ellipse: ['shadow-brush', 'symmetry', 'french-curve', 'canvas-grid'],
     eraser: ['out-of-pegs', 'canvas-grid'],
     // 'brush-menu' added here (2026-07, Stroke-panel brush harmonization):
     // applying/converting a vector or bitmap brush texture on an EXISTING
