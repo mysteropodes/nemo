@@ -1018,7 +1018,10 @@
     if(!scrubState.moved){
       if(Math.abs(dx)<3)return;
       scrubState.moved=true;scrubState.el.classList.add('scrubbing');
-      if(window.pushUndo)window.pushUndo(); // snapshot pré-geste, AVANT de lever le flag
+      // data-nav-only (tl-cf) : le champ ne fait QUE naviguer (goToFrame),
+      // aucune édition de document — un pushUndo ici ne ferait que polluer
+      // la pile d'un snapshot identique et vider le redo pour rien.
+      if(window.pushUndo&&!scrubState.el.dataset.navOnly)window.pushUndo(); // snapshot pré-geste, AVANT de lever le flag
       window._scrubLiveActive=true;
     }
     var step=parseFloat(scrubState.el.dataset.step)||1;

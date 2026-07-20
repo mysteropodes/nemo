@@ -535,9 +535,16 @@ function nodeSelBounds(){
   return new Rectangle(minX,minY,maxX-minX,maxY-minY);
 }
 function nodeSelCommitTail(path){
+  // Same commit sequence as subselect-bridge.js's own node-edit tail (the
+  // sibling gesture for the same kind of vertex edit) — forking/texture
+  // regen/onion-refresh were missing here, so a vertex drag through THIS
+  // path silently skipped all three while the other path handled them.
+  forkIfForeignOwner(path);
   fillRegenerateLinked(userLayers[state.activeLayerIdx],path);
+  if(window.regenerateBrushTexture)regenerateBrushTexture(path,userLayers[state.activeLayerIdx]);
   if(path.data&&path.data.bitmapBrushSpec&&window.SMBitmapBrush)SMBitmapBrush.regenerate(path,userLayers[state.activeLayerIdx]);
   saveActiveLayerFrame();
+  renderOS();
   if(window.renderNodeHandles)renderNodeHandles();
   renderArcs();updateUI();
   if(window.SMEngineBridge)SMEngineBridge.renderNow();
