@@ -1187,6 +1187,41 @@ function ensureStrokeId(p){
 // cloning whatever the path's CURRENT — already mutated by the very edit
 // being forked — geometry happened to be, producing a ghost with the wrong
 // (post-edit) shape instead of the original.
+// Shadow Brush (2026-07, shadow-brush-bridge.js) — every state.shadowMode
+// commit site used to just stamp data.channelTag='shadow' and otherwise
+// draw with whatever the normal Stroke/Fill color happened to be. Now that
+// there's a dedicated small palette for this (state.shadowPalette, each
+// swatch with a stable id), the same tag also needs the ACTIVE swatch's
+// color (not the global strokeColor) and its id (data.shadowSwatchId, so a
+// future step can group/recolor "all guide lines for this shadow bucket"
+// even after the swatch's own color is edited). Pure guide lines have no
+// fill — delimiting the eventual fill is the whole point (see the paint-
+// bucket workflow the bridge's header comment describes), so fillColor is
+// explicitly cleared here too.
+function applyShadowBrushTag(p,preferFill){
+  if(!p)return;
+  p.data=p.data||{};
+  p.data.channelTag='shadow';
+  if(window.SMShadowBrush){
+    var sw=window.SMShadowBrush.activeSwatch();
+    // A vector-brush/tapered-outline path OR a committed Fill Brush shape
+    // (isFillShape — isVectorBrush is deliberately deleted from these right
+    // after commit, see the Fill Brush commit comment just above this
+    // file's fillWallPath-gap fix, but isFillShape stays) represents its
+    // ink via fillColor (strokeColor null); a plain Pen/Draw/Shape path
+    // represents it via strokeColor instead. draw-bridge.js's "fill seul"
+    // ribbon-enclosed branch (Stroke off + Fill on) is a THIRD case — a
+    // plain closed fill path with neither flag set — so callers that know
+    // their path is fill-ink-only despite lacking either flag pass
+    // preferFill explicitly rather than being silently misdetected as a
+    // stroke-ink path. Whichever is the actual ink channel gets the swatch
+    // color; the OTHER is explicitly cleared so nothing stray (e.g. a
+    // leftover state.fillColor) shows through.
+    if(preferFill||p.data.isVectorBrush||p.data.isFillShape){p.fillColor=sw.color;p.strokeColor=null;}
+    else{p.strokeColor=sw.color;p.fillColor=null;}
+    p.data.shadowSwatchId=sw.id;
+  }
+}
 function tagOwner(p){
   if(!p||!p.data||!state.userProfile)return;
   p.data.ownerId=state.userProfile.id;
@@ -3953,11 +3988,11 @@ function finalizePen(){
     rebuildVectorBrushOutline(outline);
     outline.insertAbove(p);
     p.remove();
-    if(state.shadowMode)outline.data.channelTag='shadow';
+    if(state.shadowMode)applyShadowBrushTag(outline);
     tagOwner(outline);
     if(window.SMSymmetry&&window.SMSymmetry.onStrokeCommitted)window.SMSymmetry.onStrokeCommitted(outline,userLayers[state.activeLayerIdx]);
   }else{
-    if(state.shadowMode)_pen.path.data.channelTag='shadow';
+    if(state.shadowMode)applyShadowBrushTag(_pen.path);
     tagOwner(_pen.path);
     // Symmetry guide (symmetry-bridge.js, 2026-07): promoted from brush-only
     // to also cover the Pen tool — same single guarded call as
@@ -4631,7 +4666,7 @@ function onMouseUp(event){
     // Animate's "Paint behind": the finished stroke slips under everything
     // already on the layer instead of stacking on top.
     if(currentPath&&state.drawMode==='behind')userLayers[state.activeLayerIdx].insertChild(0,currentPath);
-    if(currentPath&&state.shadowMode)currentPath.data.channelTag='shadow';
+    if(currentPath&&state.shadowMode)applyShadowBrushTag(currentPath);
     if(currentPath)tagOwner(currentPath);
     currentPath=null;stabQueue=[];saveActiveLayerFrame();updateUI();
   }else if(state.tool==='fillbrush'&&currentPath){
@@ -4659,19 +4694,29 @@ function onMouseUp(event){
       delete currentPath.data.isVectorBrush;
       delete currentPath.data.centerSegments;
       delete currentPath.data.widthProfile;
-      // Placement (Above/Below/Merge) — see applyFillBrushPlacement's own
-      // comment; replaces the old unconditional "always at the back".
-      currentPath=applyFillBrushPlacement(currentPath,userLayers[state.activeLayerIdx]);
-      // 2026-07 feedback ("plusieurs coup de pinceau avec la même couleur
-      // doivent merger automatiquement") — Placement's own 'merge' option
-      // unions with whatever fill it happens to overlap regardless of
-      // color (see applyFillBrushPlacement); genuine same-color fusion
-      // already exists (fillMergeSameColor, used by the paint bucket) but
-      // was never called from the Fill Brush's own commit. Wired in here
-      // unconditionally so consecutive same-color strokes merge into one
-      // shape no matter which Placement mode is active.
-      if(currentPath)currentPath=fillMergeSameColor(userLayers[state.activeLayerIdx],currentPath,true)||currentPath;
-      if(currentPath&&state.shadowMode)currentPath.data.channelTag='shadow';
+      if(state.shadowMode){
+        // A shadow guide stroke must never auto-merge/unite with whatever
+        // real artwork happens to sit underneath it — both
+        // applyFillBrushPlacement's 'merge' mode and fillMergeSameColor
+        // below unite with an overlapping fill REGARDLESS of color, which
+        // would silently fuse a guide-only shape into real content the
+        // moment it's tagged/recolored. Tag+recolor happens BEFORE either,
+        // and both are skipped entirely for this stroke.
+        applyShadowBrushTag(currentPath);
+      }else{
+        // Placement (Above/Below/Merge) — see applyFillBrushPlacement's own
+        // comment; replaces the old unconditional "always at the back".
+        currentPath=applyFillBrushPlacement(currentPath,userLayers[state.activeLayerIdx]);
+        // 2026-07 feedback ("plusieurs coup de pinceau avec la même couleur
+        // doivent merger automatiquement") — Placement's own 'merge' option
+        // unions with whatever fill it happens to overlap regardless of
+        // color (see applyFillBrushPlacement); genuine same-color fusion
+        // already exists (fillMergeSameColor, used by the paint bucket) but
+        // was never called from the Fill Brush's own commit. Wired in here
+        // unconditionally so consecutive same-color strokes merge into one
+        // shape no matter which Placement mode is active.
+        if(currentPath)currentPath=fillMergeSameColor(userLayers[state.activeLayerIdx],currentPath,true)||currentPath;
+      }
       if(currentPath)tagOwner(currentPath);
     }
     _vb.pts=[];_vb.widths=[];currentPath=null;stabQueue=[];saveActiveLayerFrame();updateUI();
@@ -4688,7 +4733,7 @@ function onMouseUp(event){
   }else if((state.tool==='line'||state.tool==='rect'||state.tool==='ellipse')&&currentPath){
     if(shapeStart&&event.point.getDistance(shapeStart)<2){currentPath.remove();if(state.undoStack.length)state.undoStack.pop();}
     else{
-      if(state.shadowMode)currentPath.data.channelTag='shadow';
+      if(state.shadowMode)applyShadowBrushTag(currentPath);
       tagOwner(currentPath);
       if(window.SMSymmetry&&window.SMSymmetry.onStrokeCommitted)window.SMSymmetry.onStrokeCommitted(currentPath,userLayers[state.activeLayerIdx]);
     }

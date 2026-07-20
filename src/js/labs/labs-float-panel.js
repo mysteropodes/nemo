@@ -26,7 +26,7 @@
     // are real `state.*`-backed features, not Labs prototypes — see
     // REAL_FEATURES below for how this panel treats them as first-class
     // entries alongside the localStorage-flag-based Labs ones.
-    draw: ['brush-menu', 'symmetry', 'perspective', 'predictive-stroke', 'multiframe-draw', 'canvas-grid', 'view-filter'],
+    draw: ['brush-menu', 'shadow-brush', 'symmetry', 'perspective', 'predictive-stroke', 'multiframe-draw', 'canvas-grid', 'view-filter'],
     fillbrush: ['brush-menu', 'symmetry', 'perspective', 'canvas-grid', 'view-filter'],
     pen: ['symmetry', 'perspective', 'french-curve', 'canvas-grid', 'view-filter'],
     line: ['symmetry', 'perspective', 'french-curve', 'canvas-grid'],
@@ -105,6 +105,18 @@
       isActive: function () { return !!(window.BrushMenu && window.BrushMenu.isOpen()); },
       onClick: function (btn) { if (window.BrushMenu) window.BrushMenu.toggle(btn); },
     },
+    // Shadow Brush (2026-07, shadow-brush-bridge.js) — a guide-line brush
+    // for the Stroke/Fill/Shadow layer-separation workflow, dedicated
+    // colors+ids picked from its own small popover. `.active` reflects
+    // state.shadowMode itself (armed), not just "popover happens to be
+    // open" — the two ACTIONS above only ever mean the latter, but this one
+    // needs to read as "on" for as long as the mode stays armed, since a
+    // single click on an already-armed button disarms it immediately
+    // instead of reopening the picker (see the bridge's own toggle()).
+    'shadow-brush': {
+      isActive: function () { return !!(window.SMShadowBrush && window.SMShadowBrush.isArmed()); },
+      onClick: function (btn) { if (window.SMShadowBrush) window.SMShadowBrush.toggle(btn); },
+    },
     // Fill/Stroke Select's marquee mode picker — mutually exclusive with
     // 'fs-select-lasso' below (isActive reflects state.fsSelectMode, default
     // 'rect'). tools.js reads state.fsSelectMode when starting a marquee on
@@ -127,6 +139,7 @@
 
   var SHORT_NAME = {
     'brush-menu': 'Brosses (vecteur/bitmap)',
+    'shadow-brush': 'Shadow Brush (lignes de délimitation, calque Shadow)',
     'symmetry': 'Guide de symétrie / mandala',
     'perspective': 'Guide de perspective',
     'predictive-stroke': 'Trait prédictif',
@@ -156,6 +169,7 @@
     // sont pas très claires". Same concept, same icon, so it reads as
     // recognizable on sight instead of a new abstract shape to learn.
     'brush-menu': '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M7 14c-1.66 0-3 1.34-3 3 0 1.31-1.16 2-2 2 .92 1.22 2.49 2 4 2 2.21 0 4-1.79 4-4 0-1.66-1.34-3-3-3z"/><path d="M20.71 4.63l-1.34-1.34a1 1 0 00-1.41 0L9 12.25 11.75 15l8.96-8.96a1 1 0 000-1.41z"/></svg>',
+    'shadow-brush': '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M20.25 19.5h-9.44l7.724-7.715L21 9.31a1.49 1.49 0 0 0 0-2.119l-4.19-4.19a1.51 1.51 0 0 0-2.12 0L3.44 14.25A1.492 1.492 0 0 0 3 15.31v4.19A1.5 1.5 0 0 0 4.5 21h15.75a.75.75 0 1 0 0-1.5ZM4.5 15.31l9-9 4.19 4.19-9 9H4.5v-4.19Z"/></svg>',
     // Redrawn (2026-07, same "not very clear" feedback) as two solid
     // mirrored blocks either side of the axis instead of two thin
     // triangles — reads unambiguously as "mirror" even at 15px, where the

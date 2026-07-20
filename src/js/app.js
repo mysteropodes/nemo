@@ -119,6 +119,27 @@ var state={
   // migration comment; never written to going forward.
   palettes:[{id:'p0',name:'Palette 1',colors:['#000000','#ffffff','#ff0000','#ff8800','#ffee00','#00cc44','#0088ff','#8833ff']}],
   activePaletteIdx:0,
+  // Shadow Brush (2026-07, shadow-brush-bridge.js) — a dedicated guide-line
+  // brush for the existing Stroke/Fill/Shadow layer-separation workflow
+  // (state.shadowMode/data.channelTag='shadow', already wired in
+  // Draw/Pen/Shape's commit paths). Distinct from the main color palette
+  // above: each swatch carries a stable `id` (not just a hex value) so a
+  // stroke can be tagged data.shadowSwatchId and stay attributable to "this
+  // named shadow bucket" even if the swatch's own color is edited later.
+  // 6 defaults (muted tones, easy to tell apart against most artwork) —
+  // user-extendable via the "+" swatch in the popover.
+  shadowPalette:[{id:'sh1',color:'#3b4a6b'},{id:'sh2',color:'#6b3b4a'},{id:'sh3',color:'#3b6b5a'},{id:'sh4',color:'#6b5a3b'},{id:'sh5',color:'#4a3b6b'},{id:'sh6',color:'#555555'}],
+  shadowActiveId:'sh1',
+  // Live-view-only (like onionSkin, never persisted to the project file):
+  // hides every data.channelTag==='shadow' item across ALL layers/
+  // components at once, so the guide lines can be checked-off before a
+  // final look/export without touching the actual document content.
+  showShadowGuides:true,
+  // Export-time equivalent, OFF by default — a shadow guide line's entire
+  // purpose is to disappear once its enclosed area is filled (see the
+  // module's own header comment), so a fresh project shouldn't need this
+  // turned on just to get a clean render.
+  exportIncludeShadowGuides:false,
   customBrushPresets:{}, // user-saved procedural brush presets, keyed by generated id — see brush-editor.js
   layers:[],activeLayerIdx:0,
   motionArcs:{},easingCurve:{points:[{x:0,y:0},{x:.42,y:0},{x:.58,y:1},{x:1,y:1}]},
