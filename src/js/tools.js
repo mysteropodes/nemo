@@ -3939,7 +3939,7 @@ function _mergeHoleIntoExterior(extSegs,holeSegs){
 // to within 0.3% (the removed loops really were negligible slivers).
 function _eraseDegenerateSelfLoops(path){
   if(!path||!path.segments)return;
-  var changed=true,guard=0;
+  var changed=true,guard=0,anySpliced=false;
   while(changed&&guard<5000){
     changed=false;guard++;
     var segs=path.segments,n=segs.length,seen={};
@@ -3947,12 +3947,23 @@ function _eraseDegenerateSelfLoops(path){
       var key=Math.round(segs[i].point.x*10)+','+Math.round(segs[i].point.y*10);
       if(seen[key]!==undefined){
         path.removeSegments(seen[key]+1,i+1);
-        changed=true;
+        changed=true;anySpliced=true;
         break;
       }
       seen[key]=i;
     }
   }
+  // The kept "first visit" anchor at each splice keeps ITS OWN original
+  // handleOut — which was aimed at the (now-removed) start of the detour,
+  // not at whatever real neighbor the splice just reconnected it to.
+  // Confirmed live (2026-07, "la vertice extérieur... perdent leur
+  // tangent"): that stale handle survives completely unchanged, producing
+  // a visible kink exactly at every splice point even though the anchor's
+  // POSITION never moved. Re-fitting the whole path once, only if anything
+  // was actually spliced, recomputes every handle from the real (now
+  // clipper-noise-free) neighbor positions — same technique
+  // buildClosedRingOutline's own offset curves already use.
+  if(anySpliced)path.smooth({type:'continuous'});
 }
 // strokeInfo (optional, 2026-07 — "l'eraser supprime le stroke entier"):
 // every branch below used to hardcode strokeColor=null on its island(s),
