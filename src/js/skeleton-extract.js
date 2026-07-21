@@ -129,7 +129,106 @@
     // an acceptable trade — not a concern the fill-rule branch above needs
     // to special-case.
     mask = fillEnclosedHoles(mask, rw, rh);
-    return { mask: mask, rw: rw, rh: rh, bounds: bounds, scale: scale };
+    // 2026-07 follow-up feedback (screenshots: an arm drawn as TWO separate
+    // outline strokes that never touch, expected skeleton = ONE centerline
+    // running down the middle BETWEEN them, like the hand-annotated green
+    // line) — hole-filling alone can't help there: nothing is enclosed when
+    // the outline strokes leave open gaps, so each stroke still got its own
+    // skeleton track. Morphological CLOSING bridges those gaps: dilate the
+    // ink by a radius proportional to the raster size (merging strokes
+    // whose separation is under ~2x that radius into one solid blob), fill
+    // the now-enclosed interior, then erode back by the same radius so the
+    // silhouette returns to its true footprint. Union with the original ink
+    // afterward — erosion would otherwise eat isolated thin strokes
+    // entirely. Distance-transform based (two-pass Chebyshev), so cost is
+    // O(pixels) regardless of the radius.
+    // Only OUTLINE-STYLE drawings get this treatment — detected by ink
+    // coverage: thin strokes/ribbons cover a small fraction of their own
+    // bounding box, while a genuinely solid filled shape (a star, a blob)
+    // covers a lot of it and must NOT be closed (closing would fill the
+    // notches between a star's arms and corrupt its true skeleton).
+    var inkArea = 0;
+    for (var ia = 0; ia < rw * rh; ia++) inkArea += mask[ia];
+    var isOutlineStyle = inkArea / (rw * rh) < 0.25;
+    if (!isOutlineStyle) return { mask: mask, rw: rw, rh: rh, bounds: bounds, scale: scale };
+    // The radius is ADAPTIVE, found by watching the closed AREA as the
+    // radius grows: while the outline's openings are still unbridged,
+    // closing returns roughly just the ink (erosion undoes dilation); the
+    // moment the last opening bridges, the interior floods solid and the
+    // area JUMPS, then plateaus. Pick the smallest candidate on that
+    // plateau (no later candidate grows it >10% more). Simple connectivity
+    // was tried first and failed — the reporter's two arm outlines already
+    // touch at the V's bottom, so "make it one component" was satisfied at
+    // a tiny radius that bridged nothing.
+    var distToInk = chebyshevDist(mask, rw, rh);
+    var minDim = Math.min(rw, rh);
+    var candidates = [0.02, 0.04, 0.06, 0.09, 0.13, 0.18, 0.25].map(function (f) {
+      return Math.max(2, Math.round(minDim * f));
+    });
+    var masks = candidates.map(function (r) { return closeMask(distToInk, rw, rh, r); });
+    var areas = masks.map(function (m) { var a = 0; for (var i = 0; i < m.length; i++) a += m[i]; return a; });
+    var pick = candidates.length - 1;
+    for (var c = 0; c < candidates.length; c++) {
+      var plateau = true;
+      for (var j = c + 1; j < candidates.length; j++) {
+        if (areas[j] > areas[c] * 1.10) { plateau = false; break; }
+      }
+      if (plateau) { pick = c; break; }
+    }
+    var closed = masks[pick];
+    for (var ci = 0; ci < rw * rh; ci++) if (mask[ci]) closed[ci] = 1;
+    return { mask: closed, rw: rw, rh: rh, bounds: bounds, scale: scale };
+  }
+
+  // Chebyshev distance to the nearest SET pixel of `src` (two-pass chamfer).
+  function chebyshevDist(src, rw, rh) {
+    var INF = 1 << 29;
+    var d = new Int32Array(rw * rh);
+    var x, y, i, best;
+    for (i = 0; i < rw * rh; i++) d[i] = src[i] ? 0 : INF;
+    for (y = 0; y < rh; y++) for (x = 0; x < rw; x++) {
+      i = y * rw + x;
+      if (!d[i]) continue;
+      best = d[i];
+      if (x > 0 && d[i - 1] + 1 < best) best = d[i - 1] + 1;
+      if (y > 0) {
+        if (d[i - rw] + 1 < best) best = d[i - rw] + 1;
+        if (x > 0 && d[i - rw - 1] + 1 < best) best = d[i - rw - 1] + 1;
+        if (x < rw - 1 && d[i - rw + 1] + 1 < best) best = d[i - rw + 1] + 1;
+      }
+      d[i] = best;
+    }
+    for (y = rh - 1; y >= 0; y--) for (x = rw - 1; x >= 0; x--) {
+      i = y * rw + x;
+      if (!d[i]) continue;
+      best = d[i];
+      if (x < rw - 1 && d[i + 1] + 1 < best) best = d[i + 1] + 1;
+      if (y < rh - 1) {
+        if (d[i + rw] + 1 < best) best = d[i + rw] + 1;
+        if (x < rw - 1 && d[i + rw + 1] + 1 < best) best = d[i + rw + 1] + 1;
+        if (x > 0 && d[i + rw - 1] + 1 < best) best = d[i + rw - 1] + 1;
+      }
+      d[i] = best;
+    }
+    return d;
+  }
+
+  // `distToInk` is the ink distance transform of the original mask,
+  // precomputed by the caller (shared with smallestMergingRadius).
+  function closeMask(distToInk, rw, rh, r) {
+    // Dilate: everything within r of ink becomes ink.
+    var dilated = new Uint8Array(rw * rh);
+    for (var i = 0; i < rw * rh; i++) dilated[i] = distToInk[i] <= r ? 1 : 0;
+    // Fill interiors the dilation just enclosed.
+    dilated = fillEnclosedHoles(dilated, rw, rh);
+    // Erode back: keep only pixels at least r away from the (filled) blob's
+    // background, restoring the true footprint of solid regions.
+    var bg = new Uint8Array(rw * rh);
+    for (var b = 0; b < rw * rh; b++) bg[b] = dilated[b] ? 0 : 1;
+    var distToBg = chebyshevDist(bg, rw, rh);
+    var out = new Uint8Array(rw * rh);
+    for (var o = 0; o < rw * rh; o++) out[o] = (dilated[o] && distToBg[o] > r) ? 1 : 0;
+    return out;
   }
 
   function fillEnclosedHoles(mask, rw, rh) {
