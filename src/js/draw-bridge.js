@@ -691,6 +691,18 @@
         fillPath.opacity = state.opacity / 100;
         fillPath.insertBelow(path);
         path.data.linkedFill = fillPath;
+        // Stable id alongside the live reference (2026-07 — same
+        // brushGroupId/relinkBrushCompanions pattern this file's own
+        // CLAUDE.md documents): a live Path reference can't survive a JSON
+        // round-trip. Without this, isLinkedFillCompanion/linkedFill were
+        // BOTH silently dropped by every save — confirmed live: after one
+        // save/reload the backdrop fill came back as an ordinary
+        // independent path (re-triggering the exact marquee "parallax"
+        // double-move bug the isLinkedFillCompanion tag exists to prevent)
+        // and the ribbon's own data.linkedFill reference was simply gone,
+        // breaking rebuildVectorBrushOutline's re-sync on the next edit.
+        path.data.linkedFillId = ensureStrokeId({data:{}}); // fresh id, not the ribbon's own strokeId (independent lifecycle)
+        fillPath.data.linkedFillId = path.data.linkedFillId;
         // Reverse tag — marquee-select (select-bridge.js) iterates every
         // Path in the layer independently and had no way to recognize a
         // linkedFill backdrop as "not its own selectable thing, always
