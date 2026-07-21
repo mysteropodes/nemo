@@ -737,6 +737,92 @@ function rekeyTweenPairData(fA,fB,newFA,newFB){
 // wheel spoke — makes the shape visibly warp/flatten through its own
 // center instead of appearing to rotate).
 function rotScalePt(px,py,ang,scale){var c=Math.cos(ang),s=Math.sin(ang);return[scale*(px*c-py*s),scale*(px*s+py*c)];}
+// ---- INTRINSIC (edge-length + turning-angle) INTERPOLATION ----
+// Sederberg-style "physically based" 2D shape blending: instead of lerping
+// vertex POSITIONS (which cuts corners — a bending stroke's interpolated
+// midframes are shorter than either keyframe, the classic elbow-shrink),
+// interpolate the shape's INTRINSIC parameters: each edge's length and each
+// vertex's turning angle, then reconstruct the polyline by integrating.
+// A limb bending at a joint keeps its arc length through the whole tween
+// (measured on the elbow test: linear dipped to 189.5/200 at midpoint; the
+// worse the fold, the worse linear gets, up to passing through itself).
+// Used as a CORRECTION, not a replacement — see interpStroke below: the
+// linear+rigid-fit result stays authoritative whenever it preserves length
+// (translations, rigid rotations, gentle morphs measure deficit≈0 and are
+// bit-identical to before); the intrinsic reconstruction blends in only in
+// proportion to the measured arc-length deficit, plus a hard override when
+// the linear inbetween SELF-INTERSECTS while neither keyframe does (a
+// shape "knotting" mid-tween is never right). Both gates go to zero at the
+// endpoints by construction, so keyframes are never altered.
+function _wrapPI(a){while(a>Math.PI)a-=2*Math.PI;while(a<-Math.PI)a+=2*Math.PI;return a;}
+function _segPolyLen(segs){var L=0;for(var i=1;i<segs.length;i++){var dx=segs[i].point[0]-segs[i-1].point[0],dy=segs[i].point[1]-segs[i-1].point[1];L+=Math.sqrt(dx*dx+dy*dy);}return L;}
+// Polyline self-intersection on the sample points (handles ignored — at
+// resamplePts density the polyline is a faithful proxy). O(n²) segment
+// pairs, adjacent pairs skipped. Pairs sharing an endpoint are skipped
+// explicitly (_nearPt): a closed resample duplicates its first/last point,
+// and the seam pair (segment 0 vs segment n-1) meets AT that shared point —
+// _segsIntersect's strict ccw test is unreliable exactly there (float
+// noise on near-collinear neighbors), measured as a systematic false
+// positive on every closed circle, which would have permanently disarmed
+// the self-crossing guard for closed shapes (both keyframes "self-
+// intersect" → guard never fires).
+function _nearPt(ax,ay,bx,by){var dx=ax-bx,dy=ay-by;return dx*dx+dy*dy<1e-9;}
+function _segsSelfIntersect(segs){
+  var n=segs.length-1;
+  if(n<3)return false;
+  for(var i=0;i<n;i++){
+    var p1={x:segs[i].point[0],y:segs[i].point[1]},p2={x:segs[i+1].point[0],y:segs[i+1].point[1]};
+    for(var j=i+2;j<n;j++){
+      var p3={x:segs[j].point[0],y:segs[j].point[1]},p4={x:segs[j+1].point[0],y:segs[j+1].point[1]};
+      if(_nearPt(p1.x,p1.y,p3.x,p3.y)||_nearPt(p1.x,p1.y,p4.x,p4.y)||_nearPt(p2.x,p2.y,p3.x,p3.y)||_nearPt(p2.x,p2.y,p4.x,p4.y))continue;
+      if(_segsIntersect(p1,p2,p3,p4))return true;
+    }
+  }
+  return false;
+}
+function _intrinsicSegs(rA,rB,et,cx2,cy2,closed){
+  var A=rA.segments,B=rB.segments,n=Math.min(A.length,B.length);
+  if(n<3)return null;
+  // Interpolate: first edge's absolute direction takes the shortest signed
+  // way (this carries the shape's global rotation, replacing the rigid fit
+  // for the blended-in portion); every subsequent edge interpolates its
+  // TURNING relative to the previous edge, so each local bend opens/closes
+  // independently of the global spin. Edge lengths lerp directly — that's
+  // the whole length-preservation property.
+  var lens=[],dirs=[],prevA=0,prevB=0,dir=0;
+  for(var i=1;i<n;i++){
+    var ax=A[i].point[0]-A[i-1].point[0],ay=A[i].point[1]-A[i-1].point[1];
+    var bx=B[i].point[0]-B[i-1].point[0],by=B[i].point[1]-B[i-1].point[1];
+    var aa=Math.atan2(ay,ax),ab=Math.atan2(by,bx);
+    if(i===1)dir=aa+_wrapPI(ab-aa)*et;
+    else dir+=lerp(_wrapPI(aa-prevA),_wrapPI(ab-prevB),et);
+    prevA=aa;prevB=ab;
+    lens.push(lerp(Math.sqrt(ax*ax+ay*ay),Math.sqrt(bx*bx+by*by),et));dirs.push(dir);
+  }
+  var m=lens.length;
+  var pts=[[0,0]];
+  for(var e=0;e<m;e++)pts.push([pts[e][0]+lens[e]*Math.cos(dirs[e]),pts[e][1]+lens[e]*Math.sin(dirs[e])]);
+  // Closed loops: mid-tween the integrated walk doesn't land exactly back
+  // on its start — distribute the closure error along arc length
+  // (Sederberg's fix). Zero at t=0/1 since both keyframes close exactly.
+  if(closed){
+    var ex=pts[m][0]-pts[0][0],ey=pts[m][1]-pts[0][1];
+    var total=0;for(var q=0;q<m;q++)total+=lens[q];
+    if(total>1e-9){var acc=0;for(var p5=1;p5<=m;p5++){acc+=lens[p5-1];var f=acc/total;pts[p5][0]-=ex*f;pts[p5][1]-=ey*f;}}
+  }
+  // Center on centroid, then place on the same arc-path position (cx2,cy2)
+  // the linear result uses — motion-arc handles keep working identically.
+  var mx=0,my=0;for(var c=0;c<n;c++){mx+=pts[c][0];my+=pts[c][1];}mx/=n;my/=n;
+  var out=[];
+  for(var s2=0;s2<n;s2++){
+    // handles from the incoming/outgoing edge vectors (independent in/out —
+    // preserves corners instead of central-averaging them round)
+    var hIn=s2>0?[-(pts[s2][0]-pts[s2-1][0])/3,-(pts[s2][1]-pts[s2-1][1])/3]:[0,0];
+    var hOut=s2<m?[(pts[s2+1][0]-pts[s2][0])/3,(pts[s2+1][1]-pts[s2][1])/3]:[0,0];
+    out.push({point:[pts[s2][0]-mx+cx2,pts[s2][1]-my+cy2],handleIn:hIn,handleOut:hOut});
+  }
+  return out;
+}
 function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
   var et=easFn(t);var n=Math.min(rA.segments.length,rB.segments.length);var segs=[];
   var cxA=0,cyA=0,cxB=0,cyB=0;for(var i=0;i<n;i++){cxA+=rA.segments[i].point[0];cyA+=rA.segments[i].point[1];cxB+=rB.segments[i].point[0];cyB+=rB.segments[i].point[1];}cxA/=n;cyA/=n;cxB/=n;cyB/=n;
@@ -807,6 +893,38 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
     var hiF=rotScalePt(sA.handleIn[0],sA.handleIn[1],thetaT,scaleT),hiB=rotScalePt(sB.handleIn[0],sB.handleIn[1],thetaB,scaleB);
     var hoF=rotScalePt(sA.handleOut[0],sA.handleOut[1],thetaT,scaleT),hoB=rotScalePt(sB.handleOut[0],sB.handleOut[1],thetaB,scaleB);
     segs.push({point:[cx2+lerp(fwd[0],bwd[0],et),cy2+lerp(fwd[1],bwd[1],et)],handleIn:[lerp(hiF[0],hiB[0],et),lerp(hiF[1],hiB[1],et)],handleOut:[lerp(hoF[0],hoB[0],et),lerp(hoF[1],hoB[1],et)]});}
+  // ---- intrinsic correction (see _intrinsicSegs) ----
+  // Gate 1 (graduated): measured arc-length deficit of the linear result
+  // vs the lerped keyframe lengths — 0 below 2% (translations, rigid
+  // rotations and gentle morphs stay bit-identical to the historical
+  // output), full weight at 10%+ (a real fold). Gate 2 (hard): the linear
+  // inbetween self-intersects while neither keyframe does. Both are
+  // continuous in t (deficit→0 and self-cross→false near the endpoints),
+  // so the correction can never pop on/off between adjacent frames.
+  // Keyframe-length/self-cross probes are cached on the resampled pair
+  // objects — same objects across every frame of the span.
+  if(n>=5){
+    if(rA._twLen===undefined){rA._twLen=_segPolyLen(rA.segments);rA._twSelfX=_segsSelfIntersect(rA.segments);}
+    if(rB._twLen===undefined){rB._twLen=_segPolyLen(rB.segments);rB._twSelfX=_segsSelfIntersect(rB.segments);}
+    var Lexp=lerp(rA._twLen,rB._twLen,et);
+    // |error|, not just shrink: a fold-onto-itself confuses the rigid fit
+    // into OVERSHOOTING arc length (measured 215/200 on the 10° V-fold —
+    // excess is exactly as wrong as deficit; an honest morph's length
+    // lerps). Ramp: dead below 1.5% (hand wobble / resample noise), full
+    // at 7% — the plain 90° elbow measures ~5.25%, worth a strong fix.
+    var lenErr=Lexp>1e-6?Math.abs(Lexp-_segPolyLen(segs))/Lexp:0;
+    var iw=Math.max(0,Math.min(1,(lenErr-0.015)/0.055));
+    if(iw<1&&!rA._twSelfX&&!rB._twSelfX&&_segsSelfIntersect(segs))iw=1;
+    if(iw>0.001){
+      var iSegs=_intrinsicSegs(rA,rB,et,cx2,cy2,et<.5?!!rA.closed:!!rB.closed);
+      if(iSegs)for(var wi3=0;wi3<n;wi3++){
+        var LS=segs[wi3],IS=iSegs[wi3];
+        LS.point=[lerp(LS.point[0],IS.point[0],iw),lerp(LS.point[1],IS.point[1],iw)];
+        LS.handleIn=[lerp(LS.handleIn[0],IS.handleIn[0],iw),lerp(LS.handleIn[1],IS.handleIn[1],iw)];
+        LS.handleOut=[lerp(LS.handleOut[0],IS.handleOut[0],iw),lerp(LS.handleOut[1],IS.handleOut[1],iw)];
+      }
+    }
+  }
   if(rA.isVectorBrush&&rB.isVectorBrush){
     var widths=[];for(var w=0;w<n;w++)widths.push(lerp(rA.widths[w]||1,rB.widths[w]||1,et));
     var centerSegs=segs.map(function(s,idx){return{point:s.point,handleIn:s.handleIn,handleOut:s.handleOut,width:widths[idx]};});
@@ -1141,6 +1259,61 @@ function splitTweenables(strokes,manualMode){
   });
   return{list:list,orig:orig,dabsByGroup:dabsByGroup,held:held};
 }
+// ---- APPEAR/DISAPPEAR: trim (retract / draw-on) instead of ghost-fade ----
+// 2026-07 feedback ("les formes qui ne sont plus là d'une frame à une autre
+// qu'il faut trim") — an unmatched stroke used to cross-fade in place,
+// leaving ghostly semi-transparent linework across the whole span (cel
+// animation never shows half-transparent ink). Open LINEWORK now trims
+// instead: a disappearing stroke retracts progressively along its own arc
+// length (un-draws itself), an appearing one draws on — at full opacity
+// throughout, so no ghost ever shows. Junction-aware: if exactly one of the
+// stroke's endpoints touches ink that PERSISTS through the span (a hair
+// strand rooted on a persisting head, a fold line attached to a sleeve),
+// the attached end is the anchor and the FREE end is what retracts/grows —
+// matching how an artist would actually add/remove the line. Fade remains
+// for everything trim can't express: closed loops, filled shapes, textured
+// anchors (their dab machinery is fade-based), rasters.
+function _vanishPlanFor(sd,others){
+  if(sd.brushTexturePreset||sd.bitmapBrushSpec||sd.isRaster)return{mode:'fade'};
+  var isVB=!!(sd.isVectorBrush&&sd.centerSegments&&sd.centerSegments.length>1);
+  if(!isVB&&(sd.closed||sd.fillColor))return{mode:'fade'};
+  var segs=isVB?sd.centerSegments:sd.segments;
+  if(!segs||segs.length<2)return{mode:'fade'};
+  var p0=segs[0].point,p1=segs[segs.length-1].point;
+  var tol=Math.max(9,(sd.strokeWidth||3)*2);
+  var a0=false,a1=false;
+  for(var i=0;i<others.length&&!(a0&&a1);i++){
+    var o=others[i];
+    var osegs=(o.isVectorBrush&&o.centerSegments&&o.centerSegments.length>1)?o.centerSegments:o.segments;
+    if(o.isRaster||!osegs||osegs.length<2)continue;
+    var op=buildTPFeat(o);
+    if(!a0){var l0=op.getNearestLocation(new Point(p0[0],p0[1]));if(l0&&l0.distance<=tol)a0=true;}
+    if(!a1){var l1=op.getNearestLocation(new Point(p1[0],p1[1]));if(l1&&l1.distance<=tol)a1=true;}
+    op.remove();
+  }
+  // Only-end-attached → anchor the end (start retracts). Everything else —
+  // start-attached, both, or free-floating — anchors the start: for a free
+  // stroke that's "un-draw from the last-drawn end", the natural default
+  // since segment order IS drawing order for hand-drawn strokes.
+  return{mode:'trim',anchor:(a1&&!a0)?'end':'start'};
+}
+// extractStrokePiece already cuts any stroke (plain or centerline) at two
+// arc-length fractions — reused verbatim; this just restores the rendering
+// fields a standalone frame record needs (the split-matching caller feeds
+// its pieces through resample/interp instead, which re-derives them).
+function _trimmedStroke(sd,f0,f1){
+  var piece=extractStrokePiece(sd,f0,f1);
+  if(piece.isVectorBrush&&piece.centerSegments){
+    piece.segments=outlineFromCenterSegs(piece.centerSegments);
+    piece.closed=true;
+    piece.fillColor=sd.fillColor||null;
+    piece.strokeWidth=sd.strokeWidth;
+  }else{
+    piece.hasRealStroke=sd.hasRealStroke;
+  }
+  piece.strokeId=sd.strokeId;
+  return piece;
+}
 function dabRecordsForTween(rec,presetKey,colorHexStr,baseWidth,seed,opacityMul){
   var preset=resolveBrushPreset(presetKey);
   if(!preset)return[];
@@ -1333,6 +1506,13 @@ function generateTweens(){
     fadeOutA.forEach(function(sd,i2){if(!sd.strokeId)sd.strokeId='twf_'+fA+'_a'+i2;});
     fadeInB.forEach(function(sd,i2){if(!sd.strokeId)sd.strokeId='twf_'+fB+'_b'+i2;});
     if(!pairSpecs.length&&!fadeOutA.length&&!fadeInB.length)continue;
+    // Trim-vs-fade plans, computed ONCE per span (see _vanishPlanFor). The
+    // junction anchors are the strokes that persist through the span:
+    // every matched pair's own keyframe stroke, plus held strokes.
+    var persistA=pairSpecs.map(function(sp){return sp.aData;}).concat(sAsplit.held);
+    var persistB=pairSpecs.map(function(sp){return sp.bData;}).concat(sBsplit.held);
+    var outPlans=fadeOutA.map(function(sd){return _vanishPlanFor(sd,persistA);});
+    var inPlans=fadeInB.map(function(sd){return _vanishPlanFor(sd,persistB);});
     // ---- OCCLUSION: stacking order interpolated from real authored data ----
     // The z-order (draw/stack order, front-to-back) of a generated inbetween
     // used to be frozen on whatever order pairSpecs happened to iterate in —
@@ -1480,8 +1660,24 @@ function generateTweens(){
           if(dc.opacity>0.02)tw.push(dc);
         });
       }
-      fadeOutA.forEach(function(sd,fi2){pushFade(sd,unA[fi2]/Math.max(1,sA.length-1),1-et2,sAsplit.dabsByGroup);});
-      fadeInB.forEach(function(sd,fi2){pushFade(sd,unB[fi2]/Math.max(1,sB.length-1),et2,sBsplit.dabsByGroup);});
+      // keep = how much of the stroke is still present (1=full, 0=gone) —
+      // trim shows the [anchored] sub-stroke at FULL opacity, fade is the
+      // legacy opacity ramp (see _vanishPlanFor for which strokes get
+      // which). Clamped: an overshooting easing curve (back/elastic) can
+      // push et2 outside [0,1].
+      function pushVanish(sd,plan,rank,keep,dabsByGroup){
+        keep=Math.max(0,Math.min(1,keep));
+        if(plan.mode==='trim'){
+          if(keep<=0.02)return;
+          if(keep>=0.999){var full=JSON.parse(JSON.stringify(sd));full.__zKey=rank;tw.push(full);return;}
+          var pc=_trimmedStroke(sd,plan.anchor==='end'?1-keep:0,plan.anchor==='end'?1:keep);
+          pc.__zKey=rank;tw.push(pc);
+          return;
+        }
+        pushFade(sd,rank,keep,dabsByGroup);
+      }
+      fadeOutA.forEach(function(sd,fi2){pushVanish(sd,outPlans[fi2],unA[fi2]/Math.max(1,sA.length-1),1-et2,sAsplit.dabsByGroup);});
+      fadeInB.forEach(function(sd,fi2){pushVanish(sd,inPlans[fi2],unB[fi2]/Math.max(1,sB.length-1),et2,sBsplit.dabsByGroup);});
       // Per-element manual tween mode (2026-07): when this pair is in
       // manual mode (ld.frames[fA].tweenManualMode), any stroke NOT
       // flagged data.tweenOn is held — copied UNCHANGED into every
