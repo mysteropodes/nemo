@@ -203,6 +203,7 @@ struct Feat {
     pts: Vec<(f64, f64)>,
     turn: Vec<f64>,
     closed: bool,
+    closed_is_guess: bool,
     stroke_col: Option<(f64, f64, f64)>,
     fill_col: Option<(f64, f64, f64)>,
     stype: &'static str,
@@ -304,6 +305,11 @@ fn stroke_feat(s: &StrokeIn) -> Feat {
     // closed) rather than the always-closed rendered ribbon outline s.closed
     // refers to.
     let closed = if !is_vb(s) { s.closed } else { closed_heuristic };
+    // A vector-brush centerline's closed flag is a geometric GUESS (the
+    // heuristic above), not ground truth — two hand-drawn versions of the
+    // same limb can flip it (measured on a real animation: the same arm
+    // redrawn between keys read open in one key, closed in the other).
+    let closed_is_guess = is_vb(s);
     let fourier = fourier_descriptor(&pts, cx, cy);
 
     Feat {
@@ -316,6 +322,7 @@ fn stroke_feat(s: &StrokeIn) -> Feat {
         pts,
         turn,
         closed,
+        closed_is_guess,
         stroke_col: parse_hex_color(&s.stroke_color),
         fill_col: parse_hex_color(&s.fill_color),
         stype: stroke_type(s),
@@ -398,7 +405,17 @@ fn match_sc(fa: &Feat, fb: &Feat, same_index: bool, a_pts_override: Option<&[(f6
     let rel = (rdx * rdx + rdy * rdy).sqrt().min(1.0);
     let len_ratio = fa.length.max(fb.length) / fa.length.min(fb.length).max(1.0);
     let ratio_pen = if len_ratio > 2.0 { ((len_ratio - 2.0) * 0.35).min(0.7) } else { 0.0 };
-    let closed_pen = if fa.closed != fb.closed { 0.35 } else { 0.0 };
+    // 0.35 only when BOTH flags are ground truth (plain strokes' real
+    // sd.closed). When either side is a heuristic guess (vector-brush
+    // centerline), a disagreement is as likely a drawing accident as a real
+    // topological difference — measured live: the SAME arm redrawn between
+    // two keys scored 0.551 (rejected at the 0.48 threshold) purely from
+    // this penalty, leaving the limb to fade/trim as two unrelated strokes
+    // instead of swinging. Softened to a nudge there; every other cost
+    // term still separates genuinely-different shapes.
+    let closed_pen = if fa.closed != fb.closed {
+        if fa.closed_is_guess || fb.closed_is_guess { 0.12 } else { 0.35 }
+    } else { 0.0 };
     let (a_area, b_area) = (fa.bounds.width() * fa.bounds.height(), fb.bounds.width() * fb.bounds.height());
     let sz_d = (a_area - b_area).abs() / a_area.max(b_area).max(1.0);
     let col_d = (color_dist(&fa.stroke_col, &fb.stroke_col) + color_dist(&fa.fill_col, &fb.fill_col)) / 2.0;
