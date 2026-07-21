@@ -37,7 +37,9 @@
   // (each is filled into the same canvas in turn, so overlapping/adjacent
   // shapes merge into one silhouette), producing ONE shared skeleton that
   // every selected shape's vertices can then bind against.
-  function rasterizeShape(pathOrPaths, maxDim) {
+  // `closeRadiusDoc` (optional): manual closing radius in DOCUMENT px from
+  // the Tool Options "Fusion" field — 0/undefined = automatic heuristic.
+  function rasterizeShape(pathOrPaths, maxDim, closeRadiusDoc) {
     maxDim = maxDim || 512;
     var paths = Array.isArray(pathOrPaths) ? pathOrPaths : [pathOrPaths];
     var bounds = null;
@@ -129,6 +131,23 @@
     // an acceptable trade — not a concern the fill-rule branch above needs
     // to special-case.
     mask = fillEnclosedHoles(mask, rw, rh);
+    // Manual override first (Tool Options "Fusion" field, in document px —
+    // converted to raster px here): when the artist sets an explicit
+    // closing radius, apply it unconditionally, bypassing both the
+    // outline-style detection and the automatic radius search below. The
+    // auto heuristic cannot always separate "the arm's thickness" from
+    // "the V's open mouth" on real drawings whose corridor width varies a
+    // lot along its length (2026-07: the reporter's drawing closed only at
+    // the narrow elbow, leaving the rest of the corridor split) — a live
+    // scrubbable radius lets the artist dial the fusion until the skeleton
+    // reads right, same philosophy as the Handles/tolerance field.
+    if (closeRadiusDoc && closeRadiusDoc > 0) {
+      var manualR = Math.max(1, Math.round(closeRadiusDoc * scale));
+      var manualDist = chebyshevDist(mask, rw, rh);
+      var manualClosed = closeMask(manualDist, rw, rh, manualR);
+      for (var mi = 0; mi < rw * rh; mi++) if (mask[mi]) manualClosed[mi] = 1;
+      return { mask: manualClosed, rw: rw, rh: rh, bounds: bounds, scale: scale };
+    }
     // 2026-07 follow-up feedback (screenshots: an arm drawn as TWO separate
     // outline strokes that never touch, expected skeleton = ONE centerline
     // running down the middle BETWEEN them, like the hand-annotated green
@@ -640,7 +659,7 @@
     if (combined.width < 2 || combined.height < 2) return null;
     var maxDim = opts.maxDim || 512;
     var tolerance = opts.tolerance !== undefined ? opts.tolerance : 2;
-    var raster = rasterizeShape(paths, maxDim);
+    var raster = rasterizeShape(paths, maxDim, opts.closeRadius);
     var thinned = zhangSuenThin(raster.mask, raster.rw, raster.rh);
     var graph = traceSkeletonGraph(thinned, raster.rw, raster.rh);
     if (!graph.nodes.length) return null;

@@ -166,8 +166,12 @@
     // higher decimates more aggressively (fewer, sparser points). Read at
     // generation time, like every other Tool Options field in this app.
     var tolerance=(typeof state!=='undefined'&&state.shapperTolerance)?state.shapperTolerance:2;
+    // Tool Options' "Fusion" field — manual closing radius in DOCUMENT px
+    // (0 = the automatic first-area-jump heuristic). skeleton-extract
+    // converts to raster px via its own scale.
+    var fusion=(typeof state!=='undefined'&&state.shapperFusion)?state.shapperFusion:0;
     var skeleton;
-    try{skeleton=window.SMSkeleton.extractSkeleton(paths,{maxDim:512,tolerance:tolerance});}
+    try{skeleton=window.SMSkeleton.extractSkeleton(paths,{maxDim:512,tolerance:tolerance,closeRadius:fusion});}
     catch(e){console.error('Shapper extractSkeleton failed',e);if(window.showToast)showToast('Échec de l\'extraction du squelette');return;}
     if(!skeleton||!skeleton.nodes.length){if(window.showToast)showToast('Squelette introuvable pour cette sélection');return;}
     var boneGraph=buildBoneGraph(skeleton);

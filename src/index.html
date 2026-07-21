@@ -995,6 +995,14 @@
                points. Read at the moment "Generate Skeleton" runs (like any
                other Tool Options field here), not live on existing rigs. -->
           <div class="pr"><span class="pl" data-i18n="shapperToleranceLabel">Poignées</span><input type="number" class="pi scrub" id="p-shapper-tolerance" value="2" min="0.5" max="20" step="0.5" data-step="0.5" data-i18n-title="shapperToleranceTitle" title="Tolérance de simplification du squelette — plus bas = plus de poignées (plus de détail), plus haut = moins de poignées (squelette plus simple)"></div>
+          <!-- Fusion (2026-07): closing radius in document px for merging
+               nearby outline strokes into one solid silhouette before
+               skeletonizing. 0 = automatic (first-area-jump heuristic in
+               skeleton-extract.js) — exposed because the auto guess cannot
+               always separate "the arm's thickness" from "the V's open
+               mouth" on real drawings whose corridor width varies a lot
+               along its length; the artist dials it live instead. -->
+          <div class="pr"><span class="pl" data-i18n="shapperFusionLabel">Fusion</span><input type="number" class="pi scrub" id="p-shapper-fusion" value="0" min="0" max="200" step="2" data-step="2" data-i18n-title="shapperFusionTitle" title="Rayon de fusion des traits (px) — les traits plus proches que ~2x cette valeur fusionnent en une seule forme pleine avant l'extraction du squelette. 0 = automatique"></div>
           <div class="pr"><button class="pbtn" id="btn-shapper-generate" style="flex:1" data-i18n-title="shapperGenerateTitle" title="Rasterise la forme sélectionnée, en extrait un squelette (Zhang-Suen + fit de courbe) et le transforme en points de contrôle déplaçables" data-i18n="shapperGenerateBtn">Générer le squelette</button></div>
           <div class="pr"><button class="pbtn" id="btn-shapper-commit" style="flex:1" data-i18n-title="shapperCommitTitle" title="Fige la pose actuelle dans cette frame (undo-able, comme n'importe quelle autre modification)" data-i18n="shapperCommitBtn">Valider la pose</button></div>
           <div class="pr" style="font-size:9px;color:var(--text-dim)" data-i18n="shapperHint">Sélectionnez une forme, générez son squelette, puis glissez un point pour la déformer.</div>

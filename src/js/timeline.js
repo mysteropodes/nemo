@@ -8320,6 +8320,11 @@ document.getElementById('p-shapper-tolerance').addEventListener('input',function
   // already selected, so dragging the value regenerates the rig live.
   if(window.SMShapper&&typeof selectedPaths!=='undefined'&&selectedPaths.length)window.SMShapper.generateForSelection();
 });
+document.getElementById('p-shapper-fusion').addEventListener('input',function(){
+  state.shapperFusion=parseFloat(this.value)||0;
+  // Same live-regeneration convention as the tolerance field just above.
+  if(window.SMShapper&&typeof selectedPaths!=='undefined'&&selectedPaths.length)window.SMShapper.generateForSelection();
+});
 document.getElementById('p-fillbrushsize').addEventListener('input',function(){window.SM.setFillBrushSize(this.value);});
 document.getElementById('p-brushpreset').addEventListener('change',function(){window.SM.setBrushPreset(this.value);if(window.BrushPresetPicker)window.BrushPresetPicker.paintButton(this.value);});
 // Applies a vector brush preset to the current selection — was wired to a
