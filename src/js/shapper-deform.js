@@ -126,21 +126,19 @@
   // Deforms EVERY bound path (a multi-shape rig binds each selected shape's
   // vertices against the same shared bone graph — see generateForSelection).
   //
-  // Split model, settled over three feedback rounds:
-  //   POSITIONS — pure translation blend: vertex = w-blended (bone position
-  //   + CONSTANT bind offset). Strictly "un drive de vertices": dragging a
-  //   bone moves only the vertices bound to it, exactly by the blend of its
-  //   displacement — nothing can flip, and nothing far from the drag moves.
-  //   (Rotating offsets — even with Shapper's own ordered-chain chord — let
-  //   one dragged bone swing the chord of its NEIGHBORS too, orbiting
-  //   distant vertices around bones that never moved: "la déformation
-  //   déforme aussi le trait pas juste les vertices".)
-  //   TANGENTS — rotated by the local chord delta (Shapper's Formule B,
-  //   atan2(next-prev) over the ordered chain, blended per influence): the
-  //   bezier handles turn with the chain's local bend, so ink CURVES around
-  //   a fold instead of staying frozen at bind orientation — the part of
-  //   Shapper's rotation system that acts on the stroke's direction without
-  //   displacing any vertex.
+  // Full Shapper "Formule B" (computeDeformTS in the real Shapper source),
+  // per influencing bone:
+  //   ra = normalize(currentChordAngle - bindChordAngle)   (ordered chain)
+  //   vertex     += w * (bonePos + rotate(bindOffset, ra))
+  //   handleIn/Out += w * rotate(bindTangent, ra)
+  // Offsets AND tangents rotate with the chain's local bend — the flesh
+  // turns around the bone like in Shapper. History note: an interim build
+  // dropped the offset rotation because drags seemed to warp distant ink —
+  // that warp was actually the pre-welding bone topology (criss-cross
+  // chains binding vertices to spatially DISTANT bones, see the unlimited
+  // cross-stroke bridge commit); on a clean welded spine, chain neighbors
+  // are spatially adjacent, so chord deltas — and therefore rotations —
+  // stay local to the drag (verified: far-vertex displacement stays 0).
   function deformAll(){
     if(!_rig)return;
     var curPos=_rig.curPos;
@@ -157,10 +155,11 @@
         var bd=binds[vi];
         if(!bd)continue;
         var A=curPos[bd.a],B=curPos[bd.b];
-        var nx=bd.wA*(A.x+bd.offA.x)+bd.wB*(B.x+bd.offB.x);
-        var ny=bd.wA*(A.y+bd.offA.y)+bd.wB*(B.y+bd.offB.y);
         var raA=normalizeAngle(curAngle[bd.a]-_rig.bindAngle[bd.a]);
         var raB=normalizeAngle(curAngle[bd.b]-_rig.bindAngle[bd.b]);
+        var roA=rotateVec(bd.offA,raA),roB=rotateVec(bd.offB,raB);
+        var nx=bd.wA*(A.x+roA.x)+bd.wB*(B.x+roB.x);
+        var ny=bd.wA*(A.y+roA.y)+bd.wB*(B.y+roB.y);
         var hiA=rotateVec(bd.handleIn,raA),hiB=rotateVec(bd.handleIn,raB);
         var hoA=rotateVec(bd.handleOut,raA),hoB=rotateVec(bd.handleOut,raB);
         segs[vi].point=new Point(nx,ny);
