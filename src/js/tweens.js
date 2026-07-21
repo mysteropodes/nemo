@@ -1723,13 +1723,24 @@ function renderOS(){
 // per entry (JSON) which at maxUndo=60 stays well within budget.
 function pushUndo(){pushUndoLayers();}
 function layersSnapshotNow(){return{type:'layers',layers:JSON.parse(JSON.stringify(state.layers)),active:state.activeLayerIdx,totalFrames:state.totalFrames,cameraKeys:JSON.parse(JSON.stringify(state.cameraKeys||[]))};}
+// Human-readable description of "what's about to happen", captured at the
+// SAME moment as the snapshot (pushUndoLayers runs before the mutation it
+// guards, so this reflects the active tool/frame/layer context of the
+// upcoming action, not a parsed diff). Reuses TOOL_LABELS (timeline.js,
+// global) rather than a second tool→name map. Feeds history-panel.js only —
+// never persisted (see undoLabels' own comment in app.js).
+function _actionLabelNow(){
+  var tool=state.tool||'?';
+  var ld=state.layers&&state.layers[state.activeLayerIdx];
+  return{label:(window.TOOL_LABELS&&TOOL_LABELS[tool])||tool,tool:tool,frame:state.currentFrame||0,layer:ld?ld.name:'',t:Date.now()};
+}
 // window._scrubLiveActive (ui.js, live drag-scrub des champs numériques) :
 // pendant un drag de valeur, les handlers 'change' tournent à CHAQUE tick
 // (reflet temps réel au canvas) et la plupart commencent par pushUndo — un
 // snapshot par tick aurait pollué la pile pour un seul geste. ui.js pousse
 // UN snapshot pré-geste au premier mouvement puis lève ce flag ; ici on
 // no-op tant qu'il est levé (y compris le 'change' final du release).
-function pushUndoLayers(){if(window._scrubLiveActive)return;saveAllLayerFrames();state.undoStack.push(layersSnapshotNow());if(state.undoStack.length>state.maxUndo)state.undoStack.shift();state.redoStack=[];if(window.SMFeedback)SMFeedback.logAction();
+function pushUndoLayers(){if(window._scrubLiveActive)return;saveAllLayerFrames();state.undoStack.push(layersSnapshotNow());state.undoLabels.push(_actionLabelNow());if(state.undoStack.length>state.maxUndo){state.undoStack.shift();state.undoLabels.shift();}state.redoStack=[];state.redoLabels=[];if(window.SMFeedback)SMFeedback.logAction();if(window.renderHistoryPanelIfOpen)renderHistoryPanelIfOpen();
   // See _maybePromoteInterpolated's own comment (app.js) — this is the
   // SAME choke point SMFeedback.logAction() right above already trusts as
   // "a real content-mutating action happened" (its own doc comment: "only
@@ -1757,12 +1768,12 @@ function restoreLayersSnapshot(s){
   loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
   if(window.SMCamera&&window.updateCameraPanel){updateCameraPanel();}
 }
-function undo(){if(!state.undoStack.length){showToast('Rien à annuler');return;}var s=state.undoStack.pop();
-if(s.type==='layers'){state.redoStack.push(layersSnapshotNow());restoreLayersSnapshot(s);return;}
-var cur={frame:state.currentFrame,layers:[]};for(var i=0;i<state.layers.length;i++){var f=state.layers[i].frames[state.currentFrame];cur.layers.push({strokes:JSON.parse(JSON.stringify(f.strokes)),isKeyframe:f.isKeyframe,isInterpolated:f.isInterpolated});}state.redoStack.push(cur);for(var i2=0;i2<s.layers.length&&i2<state.layers.length;i2++){var tf=state.layers[i2].frames[s.frame];tf.strokes=s.layers[i2].strokes;tf.isKeyframe=s.layers[i2].isKeyframe;tf.isInterpolated=s.layers[i2].isInterpolated;}if(s.frame!==state.currentFrame)state.currentFrame=s.frame;loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();}
-function redo(){if(!state.redoStack.length){showToast('Rien à refaire');return;}var s=state.redoStack.pop();
-if(s.type==='layers'){state.undoStack.push(layersSnapshotNow());restoreLayersSnapshot(s);return;}
-var cur={frame:state.currentFrame,layers:[]};for(var i=0;i<state.layers.length;i++){var f=state.layers[i].frames[state.currentFrame];cur.layers.push({strokes:JSON.parse(JSON.stringify(f.strokes)),isKeyframe:f.isKeyframe,isInterpolated:f.isInterpolated});}state.undoStack.push(cur);for(var i2=0;i2<s.layers.length&&i2<state.layers.length;i2++){var tf=state.layers[i2].frames[s.frame];tf.strokes=s.layers[i2].strokes;tf.isKeyframe=s.layers[i2].isKeyframe;tf.isInterpolated=s.layers[i2].isInterpolated;}if(s.frame!==state.currentFrame)state.currentFrame=s.frame;loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();}
+function undo(){if(!state.undoStack.length){showToast('Rien à annuler');return;}var s=state.undoStack.pop();var sl=state.undoLabels.pop()||_actionLabelNow();
+if(s.type==='layers'){state.redoStack.push(layersSnapshotNow());state.redoLabels.push(sl);restoreLayersSnapshot(s);if(window.renderHistoryPanelIfOpen)renderHistoryPanelIfOpen();return;}
+var cur={frame:state.currentFrame,layers:[]};for(var i=0;i<state.layers.length;i++){var f=state.layers[i].frames[state.currentFrame];cur.layers.push({strokes:JSON.parse(JSON.stringify(f.strokes)),isKeyframe:f.isKeyframe,isInterpolated:f.isInterpolated});}state.redoStack.push(cur);state.redoLabels.push(sl);for(var i2=0;i2<s.layers.length&&i2<state.layers.length;i2++){var tf=state.layers[i2].frames[s.frame];tf.strokes=s.layers[i2].strokes;tf.isKeyframe=s.layers[i2].isKeyframe;tf.isInterpolated=s.layers[i2].isInterpolated;}if(s.frame!==state.currentFrame)state.currentFrame=s.frame;loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderHistoryPanelIfOpen)renderHistoryPanelIfOpen();}
+function redo(){if(!state.redoStack.length){showToast('Rien à refaire');return;}var s=state.redoStack.pop();var sl=state.redoLabels.pop()||_actionLabelNow();
+if(s.type==='layers'){state.undoStack.push(layersSnapshotNow());state.undoLabels.push(sl);restoreLayersSnapshot(s);if(window.renderHistoryPanelIfOpen)renderHistoryPanelIfOpen();return;}
+var cur={frame:state.currentFrame,layers:[]};for(var i=0;i<state.layers.length;i++){var f=state.layers[i].frames[state.currentFrame];cur.layers.push({strokes:JSON.parse(JSON.stringify(f.strokes)),isKeyframe:f.isKeyframe,isInterpolated:f.isInterpolated});}state.undoStack.push(cur);state.undoLabels.push(sl);for(var i2=0;i2<s.layers.length&&i2<state.layers.length;i2++){var tf=state.layers[i2].frames[s.frame];tf.strokes=s.layers[i2].strokes;tf.isKeyframe=s.layers[i2].isKeyframe;tf.isInterpolated=s.layers[i2].isInterpolated;}if(s.frame!==state.currentFrame)state.currentFrame=s.frame;loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderHistoryPanelIfOpen)renderHistoryPanelIfOpen();}
 
 // ---- MANUAL INBETWEEN REASSIGNMENT (v16) ----
 // autoMatch (top of this file) sometimes misidentifies correspondence when
