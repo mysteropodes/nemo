@@ -1741,8 +1741,21 @@ function _collectLayerStrokes(li,ld){
 // navigation (goToFrame persists whatever's on screen before switching
 // away); promoting on every run would turn every tween frame into a real
 // keyframe the moment you scrub past it.
+// Structural fix (2026-07, "une keyframe des tween est devenue verte...
+// un bug qui revient sans cesse"): the !strokesEqual comparison alone can
+// never be a safe promotion trigger, because it silently depends on the
+// serP->desP round-trip being byte-idempotent for EVERY stroke type — and
+// every new derived/defaulted field breaks that for one producer or
+// another (keyline widths, raster size floors, hasRealStroke, miterLimit —
+// see _normStrokeForCompare's growing list of patches for exactly this).
+// Promotion now ALSO requires window._tweenFrameDirty — set by
+// pushUndoLayers (tweens.js), the single choke point every real mutating
+// action already goes through, and cleared on every loadFrame — so pure
+// navigation/scrubbing can never promote no matter what phantom diff a
+// future field introduces. The strokesEqual check stays as the second
+// gate so a no-op action (tool click that aborted) doesn't promote either.
 function _maybePromoteInterpolated(f,strokes){
-  if(f.isInterpolated&&!strokesEqual(strokes,f.strokes)){f.isKeyframe=true;f.isInterpolated=false;}
+  if(window._tweenFrameDirty&&f.isInterpolated&&!strokesEqual(strokes,f.strokes)){f.isKeyframe=true;f.isInterpolated=false;}
 }
 function saveActiveLayerFrame(){
   window._sceneVersion++;
@@ -1763,6 +1776,13 @@ function saveAllLayerFrames(){
 }
 function loadFrame(idx){
   window._sceneVersion++;
+  // See _maybePromoteInterpolated's own comment — loadFrame is the one
+  // choke point every frame navigation (scrub, playback, goToFrame) goes
+  // through, same reasoning as the SMReference hook right below. Cleared
+  // here so scrubbing OFF a frame never carries a stale "dirty" flag onto
+  // whatever gets saved on the way out; pushUndoLayers sets it fresh the
+  // moment a real action actually happens.
+  window._tweenFrameDirty=false;
   // Rotoscopy reference follows the playhead (video seek / sequence frame
   // pick) — loadFrame is the one choke point every frame change goes
   // through, scrub and playback alike.
