@@ -23,7 +23,7 @@
 // live-reference trap documented in CLAUDE.md §1.
 (function(){
   'use strict';
-  var _rig=null; // {paths, skeleton, boneGraph, bindsByPath, curPos}
+  var _rig=null; // {paths, skeleton, boneGraph, bindsByPath, curPos, bindAngle}
   var _dragId=null;
 
   function dist2(ax,ay,bx,by){var dx=ax-bx,dy=ay-by;return dx*dx+dy*dy;}
@@ -41,8 +41,19 @@
       var id=pts.length;pts.push({id:id,x:x,y:y});idOf[k]=id;return id;
     }
     var edges=[];var neighbors={};
+    // Ordered chains — one per branch, mirroring Shapper's masks: its bone
+    // angle formula reads the PREVIOUS/NEXT vertex of the ordered mask
+    // chain (getBoneAngle_B, main.tsx), so each bone needs a canonical
+    // (chain, index) home. A junction bone shared by several branches
+    // keeps the first chain that contains it.
+    var chains=[];var chainRef={};
     skeleton.branches.forEach(function(b){
       var ids=b.segments.map(function(s){return getId(s.point[0],s.point[1]);});
+      var chainIdx=chains.length;
+      chains.push(ids);
+      ids.forEach(function(id,ii){
+        if(chainRef[id]===undefined)chainRef[id]={chain:chainIdx,idx:ii};
+      });
       for(var i=0;i<ids.length-1;i++){
         var a=ids[i],c=ids[i+1];
         if(a===c)continue;
@@ -51,8 +62,30 @@
         (neighbors[c]=neighbors[c]||[]).push(a);
       }
     });
-    return {points:pts,edges:edges,neighbors:neighbors};
+    return {points:pts,edges:edges,neighbors:neighbors,chains:chains,chainRef:chainRef};
   }
+
+  // Shapper's bone angle, "Formule B" (getBoneAngle_B / the AE expression
+  // generateShapeExpressionB in the real Shapper source): the direction of
+  // the CHORD through the bone's ordered-chain neighbors —
+  // atan2(next - prev), with prev/next clamped at the chain's ends. Read
+  // against whatever positions function is passed (bind positions at bind
+  // time, curPos during a drag). Ordered-chain chords are what makes the
+  // rotation stable: unlike an unordered graph-neighbor average (tried,
+  // flipped geometry inside out), the chord direction moves continuously
+  // with the points and only rotates as much as the chain actually bends.
+  function boneChordAngle(boneGraph,boneId,posOf){
+    var ref=boneGraph.chainRef[boneId];
+    if(!ref)return 0;
+    var chain=boneGraph.chains[ref.chain];
+    if(chain.length<2)return 0;
+    var prev=posOf(chain[Math.max(ref.idx-1,0)]);
+    var next=posOf(chain[Math.min(ref.idx+1,chain.length-1)]);
+    return Math.atan2(next.y-prev.y,next.x-prev.x);
+  }
+
+  function normalizeAngle(a){return ((a+Math.PI)%(2*Math.PI)+2*Math.PI)%(2*Math.PI)-Math.PI;}
+  function rotateVec(v,a){var c=Math.cos(a),s=Math.sin(a);return{x:v.x*c-v.y*s,y:v.x*s+v.y*c};}
 
   function pointToSeg(px,py,ax,ay,bx,by){
     var dx=bx-ax,dy=by-ay;
@@ -93,21 +126,24 @@
   // Deforms EVERY bound path (a multi-shape rig binds each selected shape's
   // vertices against the same shared bone graph — see generateForSelection).
   //
-  // TRANSLATION-ONLY blend (2026-07 feedback: "les poignées ne doivent que
-  // faire driver les vertex comme dans Shapper" — after a screenshot of
-  // flipped/inverted vertices): the first port also applied a per-bone
-  // ROTATION (chord-angle delta since bind, ported from Shapper's AE
-  // expression). But a bone's chord angle — the averaged direction toward
-  // its graph neighbors — is unstable on this tool's auto-extracted
-  // skeletons: at junctions, or whenever a drag swings a neighbor past the
-  // bone, the average flips up to 180° and the rotated offsets turn the
-  // geometry inside out ("retournement des vertex"). Handles now purely
-  // DRIVE their vertices: each vertex = weight-blended (bone position +
-  // constant bind offset), handles kept at bind orientation. Stable by
-  // construction — an offset can never rotate, so nothing can flip.
+  // Faithful port of Shapper's computeDeformTS "Formule B" (2026-07
+  // feedback round-trip: a first port averaged UNORDERED graph-neighbor
+  // directions and flipped geometry inside out; a translation-only interim
+  // fixed the flips but dropped the rotation system entirely — "tu as
+  // oublié les tangentes et le système de rotation que l'on drive dans
+  // Shapper par rapport au point précédent"). Per influencing bone:
+  //   ra = normalize(currentChordAngle - bindChordAngle)   (ordered chain)
+  //   vertex += w * (bonePos + rotate(bindOffset, ra))
+  //   handleIn/Out += w * rotate(bindTangent, ra)
+  // — offsets AND bezier tangents rotate with the chain's local bend, so a
+  // bent arm curves its ink instead of shearing it, and the ordered-chain
+  // chord keeps the rotation continuous (no flips).
   function deformAll(){
     if(!_rig)return;
     var curPos=_rig.curPos;
+    var posOf=function(id){return curPos[id];};
+    var curAngle={};
+    _rig.boneGraph.points.forEach(function(p){curAngle[p.id]=boneChordAngle(_rig.boneGraph,p.id,posOf);});
     _rig.paths.forEach(function(path,pi){
       var binds=_rig.bindsByPath[pi];
       // Path shape changed elsewhere (another tool edited it) since bind —
@@ -118,11 +154,16 @@
         var bd=binds[vi];
         if(!bd)continue;
         var A=curPos[bd.a],B=curPos[bd.b];
-        var nx=bd.wA*(A.x+bd.offA.x)+bd.wB*(B.x+bd.offB.x);
-        var ny=bd.wA*(A.y+bd.offA.y)+bd.wB*(B.y+bd.offB.y);
+        var raA=normalizeAngle(curAngle[bd.a]-_rig.bindAngle[bd.a]);
+        var raB=normalizeAngle(curAngle[bd.b]-_rig.bindAngle[bd.b]);
+        var roA=rotateVec(bd.offA,raA),roB=rotateVec(bd.offB,raB);
+        var nx=bd.wA*(A.x+roA.x)+bd.wB*(B.x+roB.x);
+        var ny=bd.wA*(A.y+roA.y)+bd.wB*(B.y+roB.y);
+        var hiA=rotateVec(bd.handleIn,raA),hiB=rotateVec(bd.handleIn,raB);
+        var hoA=rotateVec(bd.handleOut,raA),hoB=rotateVec(bd.handleOut,raB);
         segs[vi].point=new Point(nx,ny);
-        segs[vi].handleIn=new Point(bd.handleIn.x,bd.handleIn.y);
-        segs[vi].handleOut=new Point(bd.handleOut.x,bd.handleOut.y);
+        segs[vi].handleIn=new Point(bd.wA*hiA.x+bd.wB*hiB.x,bd.wA*hiA.y+bd.wB*hiB.y);
+        segs[vi].handleOut=new Point(bd.wA*hoA.x+bd.wB*hoB.x,bd.wA*hoA.y+bd.wB*hoB.y);
       }
     });
   }
@@ -213,7 +254,12 @@
     var bindsByPath=paths.map(function(p){return bindPathToBones(p,boneGraph);});
     var curPos={};
     boneGraph.points.forEach(function(p){curPos[p.id]={x:p.x,y:p.y};});
-    _rig={paths:paths,skeleton:skeleton,boneGraph:boneGraph,bindsByPath:bindsByPath,curPos:curPos};
+    // Bind-time chord angle per bone (Shapper's o.rotationAngle) — the
+    // deform rotates each bind offset/tangent by (current - bind).
+    var posOf=function(id){return curPos[id];};
+    var bindAngle={};
+    boneGraph.points.forEach(function(p){bindAngle[p.id]=boneChordAngle(boneGraph,p.id,posOf);});
+    _rig={paths:paths,skeleton:skeleton,boneGraph:boneGraph,bindsByPath:bindsByPath,curPos:curPos,bindAngle:bindAngle};
     _dragId=null;
     if(window.SMEngineBridge)window.SMEngineBridge.renderNow();
     if(window.showToast)showToast('Squelette généré — '+paths.length+' forme(s), '+boneGraph.points.length+' points, '+((performance.now()-t0)|0)+'ms');
