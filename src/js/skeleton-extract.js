@@ -69,6 +69,24 @@
       // cap/join. The thinning step below then finds the true centerline of
       // that ribbon, same as it would for any genuinely filled shape.
       var hasFill = !!path.fillColor;
+      // VECTOR-driven closed-outline detection (2026-07 feedback: "pourquoi
+      // tu ne prends pas en compte plutôt les vertices" — use the path's own
+      // vertex data, which we have, instead of raster-side guessing): a
+      // stroke whose two ENDPOINTS nearly meet is an outline the artist
+      // drew around a region — its interior IS the intended shape, and the
+      // implicit closing chord (first->last) is exactly the right bridge.
+      // Filling such a path directly gives the delimited region with zero
+      // heuristics. Only a genuinely OPEN line (endpoints far apart, e.g. a
+      // single arm stroke) is rasterized as its ribbon alone, leaving the
+      // morphological fusion below to merge it with its neighbors.
+      var outlineClosed = false;
+      if (!hasFill && path.segments && path.segments.length >= 3) {
+        if (path.closed) outlineClosed = true;
+        else {
+          var endGap = path.firstSegment.point.getDistance(path.lastSegment.point);
+          outlineClosed = endGap < Math.max((path.strokeWidth || 2) * 3, path.length * 0.1);
+        }
+      }
       // Path.getPathData() gives an SVG-path-like string Paper.js itself can
       // produce; simplest robust route here is walking path.segments/curves
       // directly via Path2D from the exported SVG path data.
@@ -82,6 +100,10 @@
           ctx.lineCap = path.strokeCap || 'round';
           ctx.lineJoin = path.strokeJoin || 'round';
           ctx.stroke(p2d);
+          // 'evenodd', not 'nonzero', for the implicit outline fill — a
+          // hand-drawn outline routinely self-crosses (finger loops), and
+          // nonzero winding can cancel those regions back to empty.
+          if (outlineClosed) ctx.fill(p2d, 'evenodd');
         }
       } else {
         // Fallback: sample the path's own curves as a polygon (loses holes on
@@ -100,6 +122,7 @@
           ctx.lineCap = path.strokeCap || 'round';
           ctx.lineJoin = path.strokeJoin || 'round';
           ctx.stroke();
+          if (outlineClosed) { ctx.closePath(); ctx.fill('evenodd'); }
         }
       }
     });
