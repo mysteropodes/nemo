@@ -781,6 +781,58 @@ function _segPolyLen(segs){var L=0;for(var i=1;i<segs.length;i++){var dx=segs[i]
 // the self-crossing guard for closed shapes (both keyframes "self-
 // intersect" → guard never fires).
 function _nearPt(ax,ay,bx,by){var dx=ax-bx,dy=ay-by;return dx*dx+dy*dy<1e-9;}
+// ---- STROKE-STYLE CARRY-THROUGH ("même style de trait sur chaque tween") ----
+// The resample stage (resampleP/resamplePairFeatureAware) only copies the
+// core fields (strokeColor/Width/Cap/Join, fillColor, opacity) — every
+// OTHER style attribute serP persists and desP faithfully re-applies was
+// silently dropped from generated inbetweens: a dashed/dotted stroke's
+// tweens rendered SOLID, a gradient fill fell back to its flat fillColor,
+// paintOrder flipped to default, miterLimit reset, per-element effects
+// vanished, a Shadow-Brush guide lost its channelTag (turning into a
+// permanent normal stroke on every inbetween), and hasRealStroke was lost
+// (letting serP's phantom '#ffffff' render as a real white contour on
+// fill-only shapes mid-tween). Numeric fields lerp (dashOffset,
+// miterLimit; gradients lerp geometry+stops when both sides share the
+// same structure); discrete fields switch at the halfway point — the same
+// convention interpStroke already uses for strokeColor/fillColor.
+function _lerpHexColor(a,b,t){
+  var pa=parseHexColor(a),pb=parseHexColor(b);
+  if(!pa||!pb)return t<.5?a:b;
+  function aOf(h){h=String(h).replace('#','');return h.length===8?parseInt(h.substr(6,2),16):255;}
+  var al=Math.round(lerp(aOf(a),aOf(b),t));
+  function h2(v){v=Math.max(0,Math.min(255,Math.round(v)));var s=v.toString(16);return s.length<2?'0'+s:s;}
+  return '#'+h2(lerp(pa.r,pb.r,t))+h2(lerp(pa.g,pb.g,t))+h2(lerp(pa.b,pb.b,t))+(al<255?h2(al):'');
+}
+function _carryTweenStyle(out,srcA,srcB,et){
+  srcA=srcA||{};srcB=srcB||{};
+  var near=et<.5?srcA:srcB;
+  if(near.dashArray&&near.dashArray.length)out.dashArray=near.dashArray.slice();
+  var doA=srcA.dashOffset,doB=srcB.dashOffset;
+  if(doA!==undefined||doB!==undefined)out.dashOffset=(typeof doA==='number'&&typeof doB==='number')?lerp(doA,doB,et):(et<.5?doA:doB);
+  var mlA=srcA.miterLimit,mlB=srcB.miterLimit;
+  if(mlA!==undefined||mlB!==undefined)out.miterLimit=(typeof mlA==='number'&&typeof mlB==='number')?lerp(mlA,mlB,et):(et<.5?mlA:mlB);
+  if(near.paintOrder)out.paintOrder=near.paintOrder;
+  if(near.channelTag)out.channelTag=near.channelTag;
+  if(near.groupId)out.groupId=near.groupId;
+  if(near.effects&&near.effects.length)out.effects=JSON.parse(JSON.stringify(near.effects));
+  if(near.hasRealStroke!==undefined)out.hasRealStroke=near.hasRealStroke;
+  var gA=srcA.fillGradient,gB=srcB.fillGradient;
+  if(gA&&gB&&gA.kind===gB.kind&&gA.stops&&gB.stops&&gA.stops.length===gB.stops.length){
+    out.fillGradient={kind:gA.kind,
+      from:[lerp(gA.from[0],gB.from[0],et),lerp(gA.from[1],gB.from[1],et)],
+      to:[lerp(gA.to[0],gB.to[0],et),lerp(gA.to[1],gB.to[1],et)],
+      stops:gA.stops.map(function(s,i){return{offset:lerp(s.offset,gB.stops[i].offset,et),color:_lerpHexColor(s.color,gB.stops[i].color,et)};})};
+  }else if(gA||gB){var g=et<.5?gA:gB;if(g)out.fillGradient=JSON.parse(JSON.stringify(g));}
+  return out;
+}
+// Polyline length straight off stroke DATA (centerline preferred, same
+// dispatch as buildTPFeat) — cheap probe for the adaptive resample budget.
+function _strokeDataPolyLen(sd){
+  var segs=(sd.isVectorBrush&&sd.centerSegments&&sd.centerSegments.length>1)?sd.centerSegments:sd.segments;
+  if(!segs||segs.length<2)return 0;
+  var L=0;for(var i=1;i<segs.length;i++)L+=Math.hypot(segs[i].point[0]-segs[i-1].point[0],segs[i].point[1]-segs[i-1].point[1]);
+  return L;
+}
 function _segsSelfIntersect(segs){
   var n=segs.length-1;
   if(n<3)return false;
@@ -970,13 +1022,13 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
   if(rA.isVectorBrush&&rB.isVectorBrush){
     var widths=[];for(var w=0;w<n;w++)widths.push(lerp(rA.widths[w]||1,rB.widths[w]||1,et));
     var centerSegs=segs.map(function(s,idx){return{point:s.point,handleIn:s.handleIn,handleOut:s.handleOut,width:widths[idx]};});
-    return{segments:outlineFromCenterSegs(centerSegs),closed:true,strokeColor:null,strokeWidth:lerp(rA.strokeWidth||3,rB.strokeWidth||3,et),strokeCap:rA.strokeCap||'round',strokeJoin:rA.strokeJoin||'round',fillColor:et<.5?(rA.fillColor||null):(rB.fillColor||null),opacity:lerp(rA.opacity!==undefined?rA.opacity:1,rB.opacity!==undefined?rB.opacity:1,et),isVectorBrush:true,centerSegments:centerSegs};
+    return _carryTweenStyle({segments:outlineFromCenterSegs(centerSegs),closed:true,strokeColor:null,strokeWidth:lerp(rA.strokeWidth||3,rB.strokeWidth||3,et),strokeCap:rA.strokeCap||'round',strokeJoin:rA.strokeJoin||'round',fillColor:et<.5?(rA.fillColor||null):(rB.fillColor||null),opacity:lerp(rA.opacity!==undefined?rA.opacity:1,rB.opacity!==undefined?rB.opacity:1,et),isVectorBrush:true,centerSegments:centerSegs},rA._src,rB._src,et);
   }
   // A closed shape tweening into another closed shape should stay closed
   // throughout — matches the same "switch at the halfway point" convention
   // already used for strokeColor/fillColor a few lines up, rather than
   // trying to blend "closedness" itself (not a numeric quantity).
-  return{segments:segs,closed:et<.5?!!rA.closed:!!rB.closed,strokeColor:et<.5?rA.strokeColor:rB.strokeColor,strokeWidth:lerp(rA.strokeWidth||3,rB.strokeWidth||3,et),strokeCap:rA.strokeCap||'round',strokeJoin:rA.strokeJoin||'round',fillColor:et<.5?(rA.fillColor||null):(rB.fillColor||null),opacity:lerp(rA.opacity!==undefined?rA.opacity:1,rB.opacity!==undefined?rB.opacity:1,et)};
+  return _carryTweenStyle({segments:segs,closed:et<.5?!!rA.closed:!!rB.closed,strokeColor:et<.5?rA.strokeColor:rB.strokeColor,strokeWidth:lerp(rA.strokeWidth||3,rB.strokeWidth||3,et),strokeCap:rA.strokeCap||'round',strokeJoin:rA.strokeJoin||'round',fillColor:et<.5?(rA.fillColor||null):(rB.fillColor||null),opacity:lerp(rA.opacity!==undefined?rA.opacity:1,rB.opacity!==undefined?rB.opacity:1,et)},rA._src,rB._src,et);
 }
 // ---- RESAMPLED-PAIR ALIGNMENT ----
 // Even with a correct match, interpolating point i of A toward point i of B
@@ -1135,12 +1187,12 @@ function alignResampledPairJS(a,b){
 // fractions, and pairs each piece with its stroke. Only strokes that
 // actually need it are deconstructed, and only inside the generated
 // inbetweens — the keyframes themselves are never modified.
-function extractStrokePiece(sd,f0,f1){
+function extractStrokePiece(sd,f0,f1,nOverride){
   var isVB=!!(sd.isVectorBrush&&sd.centerSegments&&sd.centerSegments.length>1);
   var srcSegs=isVB?sd.centerSegments:sd.segments;
   var p=new Path({insert:false});
   srcSegs.forEach(function(sg){p.add(new Segment(new Point(sg.point[0],sg.point[1]),new Point(sg.handleIn[0],sg.handleIn[1]),new Point(sg.handleOut[0],sg.handleOut[1])));});
-  var len=p.length,n=24;
+  var len=p.length,n=nOverride||24;
   var segLens=[0];
   if(isVB)for(var wi2=1;wi2<srcSegs.length;wi2++)segLens.push(segLens[wi2-1]+Math.sqrt(Math.pow(srcSegs[wi2].point[0]-srcSegs[wi2-1].point[0],2)+Math.pow(srcSegs[wi2].point[1]-srcSegs[wi2-1].point[1],2)));
   var totalW=segLens[segLens.length-1]||1;
@@ -1344,7 +1396,12 @@ function _vanishPlanFor(sd,others){
 // fields a standalone frame record needs (the split-matching caller feeds
 // its pieces through resample/interp instead, which re-derives them).
 function _trimmedStroke(sd,f0,f1){
-  var piece=extractStrokePiece(sd,f0,f1);
+  // Adaptive budget, same rationale as the matched pairs' adaptN (see
+  // generateTweens): a long stroke trimmed at 24 fixed samples loses its
+  // hand-drawn character mid-retraction — ~one sample per 8px of the
+  // piece actually kept, floor 16, capped for cost.
+  var n=Math.max(16,Math.min(100,Math.round(_strokeDataPolyLen(sd)*Math.max(0,f1-f0)/8)));
+  var piece=extractStrokePiece(sd,f0,f1,n);
   if(piece.isVectorBrush&&piece.centerSegments){
     piece.segments=outlineFromCenterSegs(piece.centerSegments);
     piece.closed=true;
@@ -1353,6 +1410,12 @@ function _trimmedStroke(sd,f0,f1){
   }else{
     piece.hasRealStroke=sd.hasRealStroke;
   }
+  // Style carry-through — same fields _carryTweenStyle moves onto matched
+  // pairs' inbetweens (dash/miter/paintOrder/channelTag/effects/gradient/
+  // group), read here straight from the vanishing stroke itself.
+  ['dashArray','dashOffset','miterLimit','paintOrder','channelTag','groupId','effects','fillGradient'].forEach(function(k){
+    if(sd[k]!==undefined)piece[k]=JSON.parse(JSON.stringify(sd[k]));
+  });
   piece.strokeId=sd.strokeId;
   return piece;
 }
@@ -1587,8 +1650,20 @@ function generateTweens(){
       // resamplePairFeatureAware's own comment. Falls back internally to
       // the old independent uniform resampleP/resampleCenterline for
       // degenerate inputs (very low resN, missing centerline data, etc.).
-      var rpair=resamplePairFeatureAware(spec.aData,spec.bData,resN,isVB);
+      //
+      // ADAPTIVE point budget ("même style de trait" feedback): resN
+      // (default 50) is a fine budget for a short stroke, but a long one —
+      // a 1600px arm ring at 50 samples = one point every 32px — gets its
+      // hand-drawn wobble/character silently splined away, so inbetweens
+      // read noticeably SMOOTHER than the keyframes around them. Scale the
+      // budget with the longer stroke's own arc length (~one sample per
+      // 8px, capped at 150 for cost), never below the user's resN setting.
+      var adaptN=Math.max(resN,Math.min(150,Math.round(Math.max(_strokeDataPolyLen(spec.aData),_strokeDataPolyLen(spec.bData))/8)));
+      var rpair=resamplePairFeatureAware(spec.aData,spec.bData,adaptN,isVB);
       var ra=rpair[0],rb=rpair[1];
+      // Original keyframe stroke records, for style carry-through
+      // (_carryTweenStyle) — the resampled records only hold core fields.
+      ra._src=spec.aData;
       // Brush-texture metadata for re-stamping the dabs on every generated
       // frame (see splitTweenables' comment). texSide tracks WHICH keyframe
       // is textured so a textured→plain morph fades the texture out rather
@@ -1639,7 +1714,12 @@ function generateTweens(){
       // interpolated frame in between the exact same identity.
       var pairId=spec.aData.strokeId||spec.bData.strokeId||('tw_'+fA+'_'+spec.mi);
       spec.aData.strokeId=pairId;spec.bData.strokeId=pairId;
-      return{a:ra,b:alignResampledPair(ra,rb),mi:spec.mi,tex:tex,bmpTex:bmpTex,id:pairId,
+      // _src set AFTER alignment: the wasm align path rebuilds its output
+      // object from JSON, so a field attached to rb before the call would
+      // be silently dropped on exactly the (default) wasm path.
+      var rbAligned=alignResampledPair(ra,rb);
+      rbAligned._src=spec.bData;
+      return{a:ra,b:rbAligned,mi:spec.mi,tex:tex,bmpTex:bmpTex,id:pairId,
         aRank:spec.aIdx/Math.max(1,sA.length-1),bRank:spec.bIdx/Math.max(1,sB.length-1)};
     });
     var gap=fB-fA;
