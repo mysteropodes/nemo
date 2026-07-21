@@ -200,25 +200,89 @@
     return best;
   }
 
+  // Multi-point selection (2026-07 feedback: "on peut select à la manière
+  // du lasso plusieurs points et les bouger ensemble") — freehand lasso
+  // over empty canvas selects every bone inside the drawn polygon;
+  // grabbing any SELECTED bone then drags the whole set rigidly (each
+  // bone keeps its offset from the grab point), the SSD deform following.
+  var _selIds={};      // boneId -> true
+  var _lasso=null;     // {pts:[{x,y},...]} while a lasso drag is running
+  var _groupStart=null;// boneId -> {x,y} at drag start (group drag only)
+  var _dragStartPt=null;
+
+  function selectionCount(){var n=0;for(var k in _selIds)n++;return n;}
+
+  function pointInPolygon(px,py,pts){
+    var inside=false;
+    for(var i=0,j=pts.length-1;i<pts.length;j=i++){
+      var xi=pts[i].x,yi=pts[i].y,xj=pts[j].x,yj=pts[j].y;
+      if(((yi>py)!==(yj>py))&&(px<(xj-xi)*(py-yi)/(yj-yi)+xi))inside=!inside;
+    }
+    return inside;
+  }
+
   function onDown(event){
     if(!_rig)return false;
     var radius=10/view.zoom;
     var id=nearestBoneAt(event.point,radius);
-    if(id===null)return false;
-    if(typeof pushUndo==='function')pushUndo();
-    _dragId=id;
+    if(id!==null){
+      if(typeof pushUndo==='function')pushUndo();
+      _dragId=id;
+      _dragStartPt={x:event.point.x,y:event.point.y};
+      if(_selIds[id]&&selectionCount()>1){
+        _groupStart={};
+        for(var k in _selIds)_groupStart[k]={x:_rig.curPos[k].x,y:_rig.curPos[k].y};
+      }else{
+        // Grabbing an unselected bone drops any prior lasso selection —
+        // same "click replaces selection" convention as the Select tool.
+        _selIds={};_selIds[id]=true;_groupStart=null;
+      }
+      return true;
+    }
+    return false;
+  }
+  // Called by tools.js's shapper branch AFTER its own shape hit-test came
+  // up empty — clicking directly ON a shape must still re-pick it (and
+  // rebuild the rig), so the lasso only owns genuinely empty canvas.
+  function startLasso(pt){
+    if(!_rig)return false;
+    _lasso={pts:[{x:pt.x,y:pt.y}]};
     return true;
   }
   function onDrag(event){
+    if(_lasso){
+      _lasso.pts.push({x:event.point.x,y:event.point.y});
+      if(window.SMEngineBridge)window.SMEngineBridge.renderNow();
+      return true;
+    }
     if(_dragId===null||!_rig)return false;
-    _rig.curPos[_dragId]={x:event.point.x,y:event.point.y};
+    if(_groupStart){
+      var dx=event.point.x-_dragStartPt.x,dy=event.point.y-_dragStartPt.y;
+      for(var k in _groupStart)_rig.curPos[k]={x:_groupStart[k].x+dx,y:_groupStart[k].y+dy};
+    }else{
+      _rig.curPos[_dragId]={x:event.point.x,y:event.point.y};
+    }
     deformAll();
     if(window.SMEngineBridge)window.SMEngineBridge.renderNow();
     return true;
   }
   function onUp(){
+    if(_lasso){
+      if(_lasso.pts.length>=3&&_rig){
+        _selIds={};
+        _rig.boneGraph.points.forEach(function(p){
+          var cp=_rig.curPos[p.id];
+          if(pointInPolygon(cp.x,cp.y,_lasso.pts))_selIds[p.id]=true;
+        });
+        var n=selectionCount();
+        if(window.showToast&&n)showToast(n+' point(s) sélectionné(s)');
+      }
+      _lasso=null;
+      if(window.SMEngineBridge)window.SMEngineBridge.renderNow();
+      return true;
+    }
     if(_dragId===null)return false;
-    _dragId=null;
+    _dragId=null;_groupStart=null;_dragStartPt=null;
     if(window.SMEngineBridge)window.SMEngineBridge.renderNow();
     return true;
   }
@@ -230,7 +294,7 @@
     if(window.showToast)showToast('Pose commitée sur cette frame');
   }
 
-  function clearRig(){_rig=null;_dragId=null;}
+  function clearRig(){_rig=null;_dragId=null;_selIds={};_lasso=null;_groupStart=null;_dragStartPt=null;}
   function isActive(){return !!_rig;}
 
   function octagon(cx,cy,r,fillColor,strokeColor,strokeWidth){
@@ -250,6 +314,11 @@
   // never showed up on screen.
   function buildOverlayItems(){
     if(!_rig||typeof view==='undefined')return[];
+    // Rig data survives tool switches (2026-07: "le skeleton est enregistré
+    // ainsi que ses positions si on revient sur l'outil") — but its handles
+    // only SHOW while the Shapper tool is active, like every other tool's
+    // own gizmos.
+    if(typeof state!=='undefined'&&state.tool!=='shapper')return[];
     var zs=1/Math.max(0.0001,view.zoom);
     var items=[];
     _rig.boneGraph.edges.forEach(function(e){
@@ -260,15 +329,19 @@
       var cp=_rig.curPos[p.id];
       var r=4.5*zs;
       var isDragging=(_dragId===p.id);
-      var col=isDragging?[255,210,0,255]:[80,220,120,240];
+      var col=isDragging?[255,210,0,255]:(_selIds[p.id]?[255,150,40,255]:[80,220,120,240]);
       items.push(octagon(cp.x,cp.y,r,col,[20,20,20,220],1.2*zs));
     });
+    if(_lasso&&_lasso.pts.length>1){
+      items.push({segments:_lasso.pts.map(function(q){return{point:[q.x,q.y]};}),closed:false,fillColor:[255,150,40,18],strokeColor:[255,150,40,230],strokeWidth:1.2*zs,dashPattern:[5*zs,4*zs]});
+    }
     return items;
   }
 
   window.SMShapper={
     generateForSelection:generateForSelection,
     onDown:onDown,onDrag:onDrag,onUp:onUp,
+    startLasso:startLasso,
     commitPose:commitPose,
     clearRig:clearRig,
     isActive:isActive,

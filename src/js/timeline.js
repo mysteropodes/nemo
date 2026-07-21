@@ -388,12 +388,6 @@ window.SM={
       if(_fillCloseDrag){_fillCloseDrag=null;if(window.SMEngineBridge)window.SMEngineBridge.resume();}
       _fillCloseStrokes=[];
     }
-    // Session-only rig state (M2) — discard it on leaving the tool, same
-    // "tool change tidies up transient state" convention as the eraser
-    // cursor/pen path a few lines up. M3 will persist a committed rig, but
-    // an uncommitted in-progress drag is meant to be as disposable as any
-    // other tool's live preview.
-    if(t!=='shapper'&&window.SMShapper)window.SMShapper.clearRig();
     // Camera row's frame-grid twin (SMCamera.renderGridRow) sizes itself
     // (compact vs full height + speed-curve SVG) off state.tool==='camera',
     // same condition as the layer-panel row (SMCamera.renderPanelRow) — but
@@ -404,6 +398,18 @@ window.SM={
     // aussi avec la partie keyframes... afficher les easing comme avant").
     var _camToolChanged=(t==='camera')!==(state.tool==='camera');
     state.tool=t;renderArcs();
+    // Shapper rig SURVIVES tool switches (2026-07 feedback: "le skeleton
+    // est enregistré ainsi que ses positions si on revient sur l'outil") —
+    // no clearRig on leave anymore; buildOverlayItems (shapper-deform.js)
+    // hides the handles itself while another tool is active, and
+    // re-entering finds the rig exactly where it was left. Entering with a
+    // selection but NO rig auto-generates (same feedback: "generate
+    // skeleton s'applique automatiquement à la sélection quand on clique
+    // sur le bouton shapper intelligence"). AFTER state.tool=t so the
+    // freshly generated overlay passes buildOverlayItems' own tool gate.
+    if(t==='shapper'&&window.SMShapper&&!window.SMShapper.isActive()&&typeof selectedPaths!=='undefined'&&selectedPaths.length){
+      window.SMShapper.generateForSelection();
+    }
     if(_camToolChanged)renderTimeline();
     document.querySelectorAll('.tool-btn').forEach(function(b){b.classList.toggle('active',b.dataset.tool===t);});
     if(window.SMShapeGroup)SMShapeGroup.ensureFront(t);

@@ -37,8 +37,57 @@
   // (each is filled into the same canvas in turn, so overlapping/adjacent
   // shapes merge into one silhouette), producing ONE shared skeleton that
   // every selected shape's vertices can then bind against.
-  // `closeRadiusDoc` (optional): manual closing radius in DOCUMENT px from
-  // the Tool Options "Fusion" field — 0/undefined = automatic heuristic.
+  // Sample-based nearest point on `path` to document point `pt` — same
+  // "walk getPointAt in N steps" pattern the fallback polygon rasterizer
+  // below already uses, reused here so bridging needs no new Paper.js API.
+  function nearestPointOnPath(path, pt, samples) {
+    samples = samples || 150;
+    var len = path.length;
+    if (len <= 0) return { point: path.firstSegment.point, dist: pt.getDistance(path.firstSegment.point) };
+    var best = null, bestD2 = Infinity;
+    for (var i = 0; i <= samples; i++) {
+      var p = path.getPointAt(Math.min(len, (i / samples) * len));
+      var dx = p.x - pt.x, dy = p.y - pt.y, d2 = dx * dx + dy * dy;
+      if (d2 < bestD2) { bestD2 = d2; best = p; }
+    }
+    return { point: best, dist: Math.sqrt(bestD2) };
+  }
+
+  // LOCAL fusion by endpoint proximity (2026-07 feedback: "il faudrait des
+  // conditions... fusion locale par proximité d'extrémités" — a global
+  // closing radius bridges ANY two strokes that pass near each other
+  // anywhere in the sketch, including two lines that happen to run close
+  // together well before their real convergence, not just the joint the
+  // artist intends; tried and reverted, see git history). This instead
+  // only bridges from a stroke's own ENDPOINT to the nearest point on
+  // ANOTHER stroke — the actual artist gesture "this line's tip continues
+  // that one" — leaving two strokes' interiors alone even when they pass
+  // close together (a V's legs, a corridor's parallel walls), since
+  // neither stroke actually TERMINATES there.
+  function computeEndpointBridges(paths, radiusDoc) {
+    var bridges = [];
+    for (var i = 0; i < paths.length; i++) {
+      var p = paths[i];
+      if (p.fillColor || p.closed || !p.segments || p.segments.length < 2) continue;
+      var ends = [p.firstSegment.point, p.lastSegment.point];
+      for (var e = 0; e < ends.length; e++) {
+        var ep = ends[e];
+        var bestPt = null, bestDist = Infinity, bestW = p.strokeWidth || 2;
+        for (var j = 0; j < paths.length; j++) {
+          if (j === i) continue;
+          var res = nearestPointOnPath(paths[j], ep);
+          if (res.dist < bestDist) { bestDist = res.dist; bestPt = res.point; bestW = Math.max(p.strokeWidth || 2, paths[j].strokeWidth || 2); }
+        }
+        if (bestPt && bestDist > 1 && bestDist <= radiusDoc) bridges.push({ from: ep, to: bestPt, width: bestW });
+      }
+    }
+    return bridges;
+  }
+
+  // `closeRadiusDoc` (optional): endpoint-bridge search radius in DOCUMENT
+  // px from the Tool Options "Fusion" field — 0/undefined = automatic
+  // default (just enough to weld hairline gaps between successive brush
+  // strokes of the same contour, proportional to their own width).
   function rasterizeShape(pathOrPaths, maxDim, closeRadiusDoc) {
     maxDim = maxDim || 512;
     var paths = Array.isArray(pathOrPaths) ? pathOrPaths : [pathOrPaths];
@@ -55,6 +104,10 @@
     ctx.save();
     ctx.translate(-bounds.x * scale, -bounds.y * scale);
     ctx.scale(scale, scale);
+    var strokeWidths = paths.filter(function (p) { return !p.fillColor; }).map(function (p) { return p.strokeWidth || 2; });
+    var avgSW = strokeWidths.length ? strokeWidths.reduce(function (a, b) { return a + b; }, 0) / strokeWidths.length : 4;
+    var bridgeR = (closeRadiusDoc && closeRadiusDoc > 0) ? closeRadiusDoc : Math.max(10, avgSW * 3);
+    var bridges = computeEndpointBridges(paths, bridgeR);
     paths.forEach(function (path) {
       ctx.beginPath();
       // A stroke-only shape (fillColor null — a plain hand-drawn line, e.g.
@@ -156,6 +209,17 @@
         }
       }
     });
+    // Draw the endpoint bridges as plain ink segments — once welded, any
+    // ring they complete gets its interior flooded by fillEnclosedHoles
+    // below, exactly like ink the artist drew themselves.
+    ctx.lineCap = 'round';
+    bridges.forEach(function (br) {
+      ctx.beginPath();
+      ctx.lineWidth = Math.max(3, br.width);
+      ctx.moveTo(br.from.x, br.from.y);
+      ctx.lineTo(br.to.x, br.to.y);
+      ctx.stroke();
+    });
     ctx.restore();
     var img = ctx.getImageData(0, 0, rw, rh);
     var mask = new Uint8Array(rw * rh);
@@ -184,177 +248,7 @@
     // an acceptable trade — not a concern the fill-rule branch above needs
     // to special-case.
     mask = fillEnclosedHoles(mask, rw, rh);
-    // Hairline-gap SEAL (2026-07 feedback, screenshot: a contour drawn in
-    // several brush strokes — the usual way artists draw — left tiny
-    // interstices between successive strokes, so the ring never enclosed
-    // anything, hole-filling had nothing to fill, and the skeleton hugged
-    // the contour band instead of the interior). Unconditionally close
-    // with a SMALL radius (~8 document px) so near-touching contour
-    // strokes weld into a sealed ring whose interior then floods solid via
-    // the closing's own hole-fill. 8px is deliberately far below the
-    // smallest deliberate inter-stroke spacing seen in real drawings
-    // (two parallel arm outlines sit 40-100px apart) — those still go
-    // through the adaptive/manual fusion below, this only welds joints.
-    var sealR = Math.max(2, Math.round(8 * scale));
-    var sealDist = chebyshevDist(mask, rw, rh);
-    var sealed = closeMask(sealDist, rw, rh, sealR);
-    for (var si = 0; si < rw * rh; si++) if (mask[si]) sealed[si] = 1;
-    mask = fillEnclosedHoles(sealed, rw, rh);
-    // Manual override first (Tool Options "Fusion" field, in document px —
-    // converted to raster px here): when the artist sets an explicit
-    // closing radius, apply it unconditionally, bypassing both the
-    // outline-style detection and the automatic radius search below. The
-    // auto heuristic cannot always separate "the arm's thickness" from
-    // "the V's open mouth" on real drawings whose corridor width varies a
-    // lot along its length (2026-07: the reporter's drawing closed only at
-    // the narrow elbow, leaving the rest of the corridor split) — a live
-    // scrubbable radius lets the artist dial the fusion until the skeleton
-    // reads right, same philosophy as the Handles/tolerance field.
-    if (closeRadiusDoc && closeRadiusDoc > 0) {
-      var manualR = Math.max(1, Math.round(closeRadiusDoc * scale));
-      var manualDist = chebyshevDist(mask, rw, rh);
-      var manualClosed = closeMask(manualDist, rw, rh, manualR);
-      for (var mi = 0; mi < rw * rh; mi++) if (mask[mi]) manualClosed[mi] = 1;
-      return { mask: manualClosed, rw: rw, rh: rh, bounds: bounds, scale: scale };
-    }
-    // 2026-07 follow-up feedback (screenshots: an arm drawn as TWO separate
-    // outline strokes that never touch, expected skeleton = ONE centerline
-    // running down the middle BETWEEN them, like the hand-annotated green
-    // line) — hole-filling alone can't help there: nothing is enclosed when
-    // the outline strokes leave open gaps, so each stroke still got its own
-    // skeleton track. Morphological CLOSING bridges those gaps: dilate the
-    // ink by a radius proportional to the raster size (merging strokes
-    // whose separation is under ~2x that radius into one solid blob), fill
-    // the now-enclosed interior, then erode back by the same radius so the
-    // silhouette returns to its true footprint. Union with the original ink
-    // afterward — erosion would otherwise eat isolated thin strokes
-    // entirely. Distance-transform based (two-pass Chebyshev), so cost is
-    // O(pixels) regardless of the radius.
-    // Only OUTLINE-STYLE drawings get this treatment — detected by the
-    // ink's LOCAL THICKNESS (max distance from an ink pixel to the nearest
-    // background), not by ink coverage of the bounding box. Coverage was
-    // the first attempt and misfired (2026-07 screenshot: a SOLID filled
-    // V-arm covers only ~20% of its own bbox, so it was treated as an
-    // outline drawing and the closing bridged the V's concave mouth — the
-    // skeleton made junctions OUTSIDE the shape's boundary instead of
-    // following the delimited path, per the blue annotated outline). A
-    // solid shape is THICK somewhere (its body's half-width); outline
-    // strokes/ribbons are uniformly thin (a few px of half-width). A shape
-    // that's already solid needs no closing at all — thinning it directly
-    // yields a skeleton that stays inside its true boundary.
-    var inkArea = 0;
-    for (var ia = 0; ia < rw * rh; ia++) inkArea += mask[ia];
-    var bgm = new Uint8Array(rw * rh);
-    for (var bi = 0; bi < rw * rh; bi++) bgm[bi] = mask[bi] ? 0 : 1;
-    var distToBg = chebyshevDist(bgm, rw, rh);
-    var solidThreshold = Math.max(6, Math.round(Math.min(rw, rh) * 0.03));
-    // "Thick cores" = ink deeper than the solid threshold — the body of any
-    // genuinely solid region. If they exist AND all remaining thin ink sits
-    // NEAR them (boundary bands, small appendages), the drawing is solid:
-    // skip fusion so concavities (a V's mouth) stay open. But if a
-    // meaningful share of thin ink lies FAR from every thick core, those
-    // are free-standing outline ribbons that still need fusing (2026-07
-    // mixed case: a multi-stroke contour whose right-arm loop sealed into
-    // a solid body while the left arm's corridor stayed open — the old
-    // any-thick-pixel-skips-everything test left the left arm split).
-    var thickCore = new Uint8Array(rw * rh);
-    var hasThick = false;
-    for (var ti = 0; ti < rw * rh; ti++) {
-      if (mask[ti] && distToBg[ti] > solidThreshold) { thickCore[ti] = 1; hasThick = true; }
-    }
-    if (hasThick) {
-      var distToThick = chebyshevDist(thickCore, rw, rh);
-      var farThinInk = 0;
-      var farLimit = solidThreshold * 3;
-      for (var fi = 0; fi < rw * rh; fi++) {
-        if (mask[fi] && distToThick[fi] > farLimit) farThinInk++;
-      }
-      if (farThinInk < inkArea * 0.10) return { mask: mask, rw: rw, rh: rh, bounds: bounds, scale: scale };
-    }
-    // The radius is ADAPTIVE, found by watching the closed AREA as the
-    // radius grows: while the outline's openings are still unbridged,
-    // closing returns roughly just the ink (erosion undoes dilation); the
-    // moment an opening bridges, the enclosed interior floods solid and
-    // the area JUMPS. Pick the FIRST significant jump — that's the narrow
-    // body corridor between the outline strokes (the arm's thickness)
-    // snapping closed. Two earlier criteria failed on real drawings:
-    // smallest-radius-to-connectivity (the outlines already touch at the
-    // V's bottom, satisfied at a tiny radius that bridged nothing), and
-    // last-jump/plateau (2026-07 follow-up screenshot: it also bridged the
-    // WIDE opening of the V — the concave mouth between the two arm
-    // segments — so the skeleton cut straight across the concavity instead
-    // of following the elbow like the blue annotated line; the mouth is a
-    // concavity of the intended shape, not shape interior, and must stay
-    // open).
-    var distToInk = chebyshevDist(mask, rw, rh);
-    var minDim = Math.min(rw, rh);
-    var candidates = [0.02, 0.04, 0.06, 0.09, 0.13, 0.18, 0.25].map(function (f) {
-      return Math.max(2, Math.round(minDim * f));
-    });
-    var masks = candidates.map(function (r) { return closeMask(distToInk, rw, rh, r); });
-    var areas = masks.map(function (m) { var a = 0; for (var i = 0; i < m.length; i++) a += m[i]; return a; });
-    // First candidate that captured a significant interior: noticeably more
-    // than the raw ink, by both a relative factor and an absolute floor (the
-    // absolute floor keeps tiny rounding gains at small radii from counting
-    // as "the corridor closed").
-    var pick = 0;
-    for (var c = 0; c < candidates.length; c++) {
-      if (areas[c] >= inkArea * 1.3 && (areas[c] - inkArea) >= rw * rh * 0.02) { pick = c; break; }
-    }
-    var closed = masks[pick];
-    for (var ci = 0; ci < rw * rh; ci++) if (mask[ci]) closed[ci] = 1;
-    return { mask: closed, rw: rw, rh: rh, bounds: bounds, scale: scale };
-  }
-
-  // Chebyshev distance to the nearest SET pixel of `src` (two-pass chamfer).
-  function chebyshevDist(src, rw, rh) {
-    var INF = 1 << 29;
-    var d = new Int32Array(rw * rh);
-    var x, y, i, best;
-    for (i = 0; i < rw * rh; i++) d[i] = src[i] ? 0 : INF;
-    for (y = 0; y < rh; y++) for (x = 0; x < rw; x++) {
-      i = y * rw + x;
-      if (!d[i]) continue;
-      best = d[i];
-      if (x > 0 && d[i - 1] + 1 < best) best = d[i - 1] + 1;
-      if (y > 0) {
-        if (d[i - rw] + 1 < best) best = d[i - rw] + 1;
-        if (x > 0 && d[i - rw - 1] + 1 < best) best = d[i - rw - 1] + 1;
-        if (x < rw - 1 && d[i - rw + 1] + 1 < best) best = d[i - rw + 1] + 1;
-      }
-      d[i] = best;
-    }
-    for (y = rh - 1; y >= 0; y--) for (x = rw - 1; x >= 0; x--) {
-      i = y * rw + x;
-      if (!d[i]) continue;
-      best = d[i];
-      if (x < rw - 1 && d[i + 1] + 1 < best) best = d[i + 1] + 1;
-      if (y < rh - 1) {
-        if (d[i + rw] + 1 < best) best = d[i + rw] + 1;
-        if (x < rw - 1 && d[i + rw + 1] + 1 < best) best = d[i + rw + 1] + 1;
-        if (x > 0 && d[i + rw - 1] + 1 < best) best = d[i + rw - 1] + 1;
-      }
-      d[i] = best;
-    }
-    return d;
-  }
-
-  // `distToInk` is the ink distance transform of the original mask,
-  // precomputed by the caller (shared with smallestMergingRadius).
-  function closeMask(distToInk, rw, rh, r) {
-    // Dilate: everything within r of ink becomes ink.
-    var dilated = new Uint8Array(rw * rh);
-    for (var i = 0; i < rw * rh; i++) dilated[i] = distToInk[i] <= r ? 1 : 0;
-    // Fill interiors the dilation just enclosed.
-    dilated = fillEnclosedHoles(dilated, rw, rh);
-    // Erode back: keep only pixels at least r away from the (filled) blob's
-    // background, restoring the true footprint of solid regions.
-    var bg = new Uint8Array(rw * rh);
-    for (var b = 0; b < rw * rh; b++) bg[b] = dilated[b] ? 0 : 1;
-    var distToBg = chebyshevDist(bg, rw, rh);
-    var out = new Uint8Array(rw * rh);
-    for (var o = 0; o < rw * rh; o++) out[o] = (dilated[o] && distToBg[o] > r) ? 1 : 0;
-    return out;
+    return { mask: mask, rw: rw, rh: rh, bounds: bounds, scale: scale };
   }
 
   function fillEnclosedHoles(mask, rw, rh) {

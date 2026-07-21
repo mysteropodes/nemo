@@ -6211,9 +6211,15 @@ function onMouseDown(event){
         }
         state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;});
         // Selection changed — any existing rig was bound to the OLD
-        // selection, so it's stale now (Generate Skeleton must be
-        // re-clicked for the new pick).
-        if(window.SMShapper)window.SMShapper.clearRig();
+        // selection, so it's stale: clear it and immediately regenerate on
+        // the fresh pick (2026-07 feedback: skeleton generation is
+        // automatic on selection, no button press required).
+        if(window.SMShapper){window.SMShapper.clearRig();window.SMShapper.generateForSelection();}
+      }else if(window.SMShapper&&window.SMShapper.isActive()&&!event.event.shiftKey&&window.SMShapper.startLasso(event.point)){
+        // Empty canvas with a live rig: freehand lasso over the bone
+        // points (multi-select, then drag any selected point to move the
+        // whole set — 2026-07 feedback). Shape re-picking stays available
+        // by clicking directly ON a shape (branch above).
       }else{
         if(!event.event.shiftKey){selectedPaths.length=0;if(window.SMShapper)window.SMShapper.clearRig();}
         _marquee.active=true;_marquee.start=event.point.clone();_marquee.rect=null;_marquee.mode='shapper';
@@ -6494,6 +6500,9 @@ function onMouseUp(event){
         _marquee.rect.remove();_marquee.rect=null;_marquee.mode=null;
       }
       _marquee.active=false;renderArcs();updateUI();
+      // Marquee made a fresh selection inside the tool — skeleton
+      // generation is automatic (2026-07 feedback), no button press.
+      if(window.SMShapper&&selectedPaths.length)window.SMShapper.generateForSelection();
     }
     return;
   }
