@@ -154,12 +154,18 @@
     // The radius is ADAPTIVE, found by watching the closed AREA as the
     // radius grows: while the outline's openings are still unbridged,
     // closing returns roughly just the ink (erosion undoes dilation); the
-    // moment the last opening bridges, the interior floods solid and the
-    // area JUMPS, then plateaus. Pick the smallest candidate on that
-    // plateau (no later candidate grows it >10% more). Simple connectivity
-    // was tried first and failed — the reporter's two arm outlines already
-    // touch at the V's bottom, so "make it one component" was satisfied at
-    // a tiny radius that bridged nothing.
+    // moment an opening bridges, the enclosed interior floods solid and
+    // the area JUMPS. Pick the FIRST significant jump — that's the narrow
+    // body corridor between the outline strokes (the arm's thickness)
+    // snapping closed. Two earlier criteria failed on real drawings:
+    // smallest-radius-to-connectivity (the outlines already touch at the
+    // V's bottom, satisfied at a tiny radius that bridged nothing), and
+    // last-jump/plateau (2026-07 follow-up screenshot: it also bridged the
+    // WIDE opening of the V — the concave mouth between the two arm
+    // segments — so the skeleton cut straight across the concavity instead
+    // of following the elbow like the blue annotated line; the mouth is a
+    // concavity of the intended shape, not shape interior, and must stay
+    // open).
     var distToInk = chebyshevDist(mask, rw, rh);
     var minDim = Math.min(rw, rh);
     var candidates = [0.02, 0.04, 0.06, 0.09, 0.13, 0.18, 0.25].map(function (f) {
@@ -167,13 +173,13 @@
     });
     var masks = candidates.map(function (r) { return closeMask(distToInk, rw, rh, r); });
     var areas = masks.map(function (m) { var a = 0; for (var i = 0; i < m.length; i++) a += m[i]; return a; });
-    var pick = candidates.length - 1;
+    // First candidate that captured a significant interior: noticeably more
+    // than the raw ink, by both a relative factor and an absolute floor (the
+    // absolute floor keeps tiny rounding gains at small radii from counting
+    // as "the corridor closed").
+    var pick = 0;
     for (var c = 0; c < candidates.length; c++) {
-      var plateau = true;
-      for (var j = c + 1; j < candidates.length; j++) {
-        if (areas[j] > areas[c] * 1.10) { plateau = false; break; }
-      }
-      if (plateau) { pick = c; break; }
+      if (areas[c] >= inkArea * 1.3 && (areas[c] - inkArea) >= rw * rh * 0.02) { pick = c; break; }
     }
     var closed = masks[pick];
     for (var ci = 0; ci < rw * rh; ci++) if (mask[ci]) closed[ci] = 1;
