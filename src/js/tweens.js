@@ -1729,7 +1729,17 @@ function layersSnapshotNow(){return{type:'layers',layers:JSON.parse(JSON.stringi
 // snapshot par tick aurait pollué la pile pour un seul geste. ui.js pousse
 // UN snapshot pré-geste au premier mouvement puis lève ce flag ; ici on
 // no-op tant qu'il est levé (y compris le 'change' final du release).
-function pushUndoLayers(){if(window._scrubLiveActive)return;saveAllLayerFrames();state.undoStack.push(layersSnapshotNow());if(state.undoStack.length>state.maxUndo)state.undoStack.shift();state.redoStack=[];if(window.SMFeedback)SMFeedback.logAction();}
+function pushUndoLayers(){if(window._scrubLiveActive)return;saveAllLayerFrames();state.undoStack.push(layersSnapshotNow());if(state.undoStack.length>state.maxUndo)state.undoStack.shift();state.redoStack=[];if(window.SMFeedback)SMFeedback.logAction();
+  // See _maybePromoteInterpolated's own comment (app.js) — this is the
+  // SAME choke point SMFeedback.logAction() right above already trusts as
+  // "a real content-mutating action happened" (its own doc comment: "only
+  // fires for actual content mutations"), reused here so a scrub-only
+  // save can never promote a tween frame no matter what future field
+  // desP()/serP() disagree on. Cleared by loadFrame the moment ANY frame
+  // finishes being left (this action's own save already ran above, before
+  // this line, so setting it here — for the NEXT save — is correct).
+  window._tweenFrameDirty=true;
+}
 function restoreLayersSnapshot(s){
   while(userLayers.length>0)userLayers.pop().remove();
   state.layers=[];
