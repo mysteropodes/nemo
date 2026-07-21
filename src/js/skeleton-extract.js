@@ -40,16 +40,24 @@
   // Sample-based nearest point on `path` to document point `pt` — same
   // "walk getPointAt in N steps" pattern the fallback polygon rasterizer
   // below already uses, reused here so bridging needs no new Paper.js API.
-  function nearestPointOnPath(path, pt, samples) {
+  // `excludeArc` (optional): {center, span} in arc-length — samples whose
+  // arc position falls within `span` of `center` are skipped. Used for
+  // SELF-bridging (an endpoint reconnecting to its own stroke's body): the
+  // stroke near the tip is trivially the nearest point, so that stretch
+  // must be excluded for the search to find the far side it loops back to.
+  function nearestPointOnPath(path, pt, samples, excludeArc) {
     samples = samples || 150;
     var len = path.length;
     if (len <= 0) return { point: path.firstSegment.point, dist: pt.getDistance(path.firstSegment.point) };
     var best = null, bestD2 = Infinity;
     for (var i = 0; i <= samples; i++) {
-      var p = path.getPointAt(Math.min(len, (i / samples) * len));
+      var arc = Math.min(len, (i / samples) * len);
+      if (excludeArc && Math.abs(arc - excludeArc.center) < excludeArc.span) continue;
+      var p = path.getPointAt(arc);
       var dx = p.x - pt.x, dy = p.y - pt.y, d2 = dx * dx + dy * dy;
       if (d2 < bestD2) { bestD2 = d2; best = p; }
     }
+    if (!best) return { point: path.firstSegment.point, dist: Infinity };
     return { point: best, dist: Math.sqrt(bestD2) };
   }
 
@@ -74,8 +82,20 @@
         var ep = ends[e];
         var bestPt = null, bestDist = Infinity, bestW = p.strokeWidth || 2;
         for (var j = 0; j < paths.length; j++) {
-          if (j === i) continue;
-          var res = nearestPointOnPath(paths[j], ep);
+          var res;
+          if (j === i) {
+            // SELF-bridge (2026-07 follow-up: a contour drawn as ONE stroke
+            // whose ends nearly meet got no bridge at all — j===i was
+            // skipped outright — so the ring never closed and the skeleton
+            // hugged the band). The tip may reconnect to its own stroke's
+            // body (closing the outline, or a hand loop returning to the
+            // wrist) — exclude the 25% of arc adjacent to this endpoint so
+            // the search finds the far side it loops back to, not itself.
+            var endArc = (e === 0) ? 0 : p.length;
+            res = nearestPointOnPath(p, ep, 150, { center: endArc, span: p.length * 0.25 });
+          } else {
+            res = nearestPointOnPath(paths[j], ep);
+          }
           if (res.dist < bestDist) { bestDist = res.dist; bestPt = res.point; bestW = Math.max(p.strokeWidth || 2, paths[j].strokeWidth || 2); }
         }
         if (bestPt && bestDist > 1 && bestDist <= radiusDoc) bridges.push({ from: ep, to: bestPt, width: bestW });

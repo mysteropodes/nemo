@@ -143,13 +143,62 @@
     });
   }
 
+  // Companion expansion (2026-07 feedback: "le fill non attaché à la
+  // stroke" — clicking a drawing picks ONE path, typically the outline
+  // stroke on top, but the artist means the whole drawing: the paint-
+  // bucket fill underneath must deform with it, and its solid interior is
+  // also what makes the skeleton run through the middle instead of along
+  // the contour band). Pull in same-layer companions of the selection:
+  //   - exact links both ways: a fill's data.fillWalls lists the
+  //     data.strokeId of the wall strokes it was traced against
+  //     (fillVectorFindRaster, tools.js) — selecting either side rigs
+  //     both;
+  //   - geometric overlap fallback (fills made without wall links): a
+  //     path whose bbox intersection covers >=80% of the smaller of the
+  //     two bboxes is the same drawing (a fill under its outline), while
+  //     unrelated art standing nearby overlaps far less.
+  function expandForRig(paths){
+    if(typeof userLayers==='undefined'||typeof state==='undefined')return paths;
+    var layer=userLayers[state.activeLayerIdx];
+    if(!layer)return paths;
+    var out=paths.slice();
+    var wallIds={};var strokeIds={};
+    paths.forEach(function(p){
+      if(!p.data)return;
+      if(p.data.strokeId)strokeIds[p.data.strokeId]=true;
+      if(p.data.fillWalls)p.data.fillWalls.forEach(function(w){wallIds[w]=true;});
+    });
+    layer.children.forEach(function(c){
+      if(out.indexOf(c)>=0)return;
+      if(!(c instanceof Path)||c.segments.length<3)return;
+      var linked=false;
+      if(c.data){
+        if(c.data.fillWalls&&c.data.fillWalls.some(function(w){return strokeIds[w];}))linked=true;
+        if(c.data.strokeId&&wallIds[c.data.strokeId])linked=true;
+      }
+      if(!linked){
+        linked=paths.some(function(p){
+          var ib=c.bounds.intersect(p.bounds);
+          if(ib.width<=0||ib.height<=0)return false;
+          var ia=ib.width*ib.height;
+          var minA=Math.min(c.bounds.width*c.bounds.height,p.bounds.width*p.bounds.height);
+          return minA>0&&ia>=minA*0.8;
+        });
+      }
+      if(linked)out.push(c);
+    });
+    return out;
+  }
+
   // Accepts 1+ selected shapes (2026-07 fix: "je n'arrive pas à select un
   // ensemble... ni un seul élément" — the tool previously hard-required
   // exactly one path, and offered no way to pick a shape while already
   // inside the tool, see the onDown click/marquee handling below). Multiple
   // shapes bind against ONE shared skeleton extracted from their combined
   // silhouette (skeleton-extract.js's extractSkeleton now accepts an array),
-  // so a multi-part character can be posed as a single rig.
+  // so a multi-part character can be posed as a single rig — and the
+  // selection is auto-expanded with linked/overlapping companions (fill
+  // under outline), see expandForRig above.
   function generateForSelection(){
     if(typeof selectedPaths==='undefined'||!selectedPaths.length){
       if(window.showToast)showToast('Sélectionnez au moins une forme pour générer son squelette');
@@ -160,6 +209,7 @@
       if(window.showToast)showToast('Sélectionnez au moins une forme (3 points ou plus) pour générer son squelette');
       return;
     }
+    paths=expandForRig(paths);
     var t0=performance.now();
     // Tool Options' "Poignées" field (index.html) — lower tolerance keeps
     // the fitted curve closer to the raw pixel chain (more control points),
