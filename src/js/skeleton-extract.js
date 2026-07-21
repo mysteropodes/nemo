@@ -154,6 +154,22 @@
     // an acceptable trade — not a concern the fill-rule branch above needs
     // to special-case.
     mask = fillEnclosedHoles(mask, rw, rh);
+    // Hairline-gap SEAL (2026-07 feedback, screenshot: a contour drawn in
+    // several brush strokes — the usual way artists draw — left tiny
+    // interstices between successive strokes, so the ring never enclosed
+    // anything, hole-filling had nothing to fill, and the skeleton hugged
+    // the contour band instead of the interior). Unconditionally close
+    // with a SMALL radius (~8 document px) so near-touching contour
+    // strokes weld into a sealed ring whose interior then floods solid via
+    // the closing's own hole-fill. 8px is deliberately far below the
+    // smallest deliberate inter-stroke spacing seen in real drawings
+    // (two parallel arm outlines sit 40-100px apart) — those still go
+    // through the adaptive/manual fusion below, this only welds joints.
+    var sealR = Math.max(2, Math.round(8 * scale));
+    var sealDist = chebyshevDist(mask, rw, rh);
+    var sealed = closeMask(sealDist, rw, rh, sealR);
+    for (var si = 0; si < rw * rh; si++) if (mask[si]) sealed[si] = 1;
+    mask = fillEnclosedHoles(sealed, rw, rh);
     // Manual override first (Tool Options "Fusion" field, in document px —
     // converted to raster px here): when the artist sets an explicit
     // closing radius, apply it unconditionally, bypassing both the
@@ -201,10 +217,30 @@
     var bgm = new Uint8Array(rw * rh);
     for (var bi = 0; bi < rw * rh; bi++) bgm[bi] = mask[bi] ? 0 : 1;
     var distToBg = chebyshevDist(bgm, rw, rh);
-    var maxThickness = 0;
-    for (var ti = 0; ti < rw * rh; ti++) if (mask[ti] && distToBg[ti] > maxThickness) maxThickness = distToBg[ti];
     var solidThreshold = Math.max(6, Math.round(Math.min(rw, rh) * 0.03));
-    if (maxThickness > solidThreshold) return { mask: mask, rw: rw, rh: rh, bounds: bounds, scale: scale };
+    // "Thick cores" = ink deeper than the solid threshold — the body of any
+    // genuinely solid region. If they exist AND all remaining thin ink sits
+    // NEAR them (boundary bands, small appendages), the drawing is solid:
+    // skip fusion so concavities (a V's mouth) stay open. But if a
+    // meaningful share of thin ink lies FAR from every thick core, those
+    // are free-standing outline ribbons that still need fusing (2026-07
+    // mixed case: a multi-stroke contour whose right-arm loop sealed into
+    // a solid body while the left arm's corridor stayed open — the old
+    // any-thick-pixel-skips-everything test left the left arm split).
+    var thickCore = new Uint8Array(rw * rh);
+    var hasThick = false;
+    for (var ti = 0; ti < rw * rh; ti++) {
+      if (mask[ti] && distToBg[ti] > solidThreshold) { thickCore[ti] = 1; hasThick = true; }
+    }
+    if (hasThick) {
+      var distToThick = chebyshevDist(thickCore, rw, rh);
+      var farThinInk = 0;
+      var farLimit = solidThreshold * 3;
+      for (var fi = 0; fi < rw * rh; fi++) {
+        if (mask[fi] && distToThick[fi] > farLimit) farThinInk++;
+      }
+      if (farThinInk < inkArea * 0.10) return { mask: mask, rw: rw, rh: rh, bounds: bounds, scale: scale };
+    }
     // The radius is ADAPTIVE, found by watching the closed AREA as the
     // radius grows: while the outline's openings are still unbridged,
     // closing returns roughly just the ink (erosion undoes dilation); the
