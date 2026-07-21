@@ -124,8 +124,15 @@ function strokeFeat(sd){var p=buildTPFeat(sd);var b=p.bounds,len=p.length;var cx
   // "closed", silently matching it against real closed loops).
   var usingCenterline=sd.isVectorBrush&&sd.centerSegments&&sd.centerSegments.length>1;
   var isClosed=(!usingCenterline&&typeof sd.closed==='boolean')?sd.closed:closedHeuristic;
+  // Whether isClosed came from the geometric GUESS above rather than the
+  // stored ground-truth flag — a vector-brush centerline's closedness is
+  // always heuristic, and two hand-drawn versions of the same limb can flip
+  // it (measured live: the same arm redrawn between two keys read open in
+  // one key, closed in the other). matchSc and generateTweens' rescue pass
+  // both treat a guessed flag as soft evidence, not identity.
+  var closedIsGuess=usingCenterline||typeof sd.closed!=='boolean';
   var fourier=fourierDescriptor(pts,cx,cy);
-  p.remove();return{cx:cx,cy:cy,length:len,dirX:dx,dirY:dy,bounds:{x:b.x,y:b.y,w:b.width,h:b.height},shape:shape,pts:pts,turn:turn,closed:isClosed,strokeCol:parseHexColor(realStrokeColor(sd)),fillCol:parseHexColor(sd.fillColor),type:strokeType(sd),fourier:fourier};}
+  p.remove();return{cx:cx,cy:cy,length:len,dirX:dx,dirY:dy,bounds:{x:b.x,y:b.y,w:b.width,h:b.height},shape:shape,pts:pts,turn:turn,closed:isClosed,closedIsGuess:closedIsGuess,strokeCol:parseHexColor(realStrokeColor(sd)),fillCol:parseHexColor(sd.fillColor),type:strokeType(sd),fourier:fourier};}
 // Relative position (within the whole frame's own composition bbox) is what
 // actually distinguishes "left eye" from "right eye" — raw absolute centroid
 // distance breaks down whenever the whole drawing translates/scales between
@@ -190,7 +197,14 @@ function matchSc(fA,fB,sameIndex,aPtsOverride){
   var rdx=fA.relX-fB.relX,rdy=fA.relY-fB.relY;var rel=Math.min(1,Math.sqrt(rdx*rdx+rdy*rdy));
   var lenRatio=Math.max(fA.length,fB.length)/Math.max(1,Math.min(fA.length,fB.length));
   var ratioPen=lenRatio>2?Math.min(0.7,(lenRatio-2)*0.35):0;
-  var closedPen=fA.closed!==fB.closed?0.35:0;
+  // 0.35 only when BOTH closed flags are ground truth. When either side is
+  // a heuristic guess (vector-brush centerline — see strokeFeat's
+  // closedIsGuess), a disagreement is as likely a drawing accident as a
+  // real topological difference — measured live: the SAME arm redrawn
+  // between two keys scored 0.551 (rejected at the 0.48 threshold) purely
+  // from this penalty, so the limb faded/trimmed as two unrelated strokes
+  // instead of swinging. Mirrored in tweenmatch.rs (closed_pen).
+  var closedPen=fA.closed!==fB.closed?((fA.closedIsGuess||fB.closedIsGuess)?0.12:0.35):0;
   var aArea=fA.bounds.w*fA.bounds.h,bArea=fB.bounds.w*fB.bounds.h;
   var szD=Math.abs(aArea-bArea)/Math.max(1,Math.max(aArea,bArea));
   var colD=(colorDist(fA.strokeCol,fB.strokeCol)+colorDist(fA.fillCol,fB.fillCol))/2;
@@ -1489,7 +1503,12 @@ function generateTweens(){
       if(aMatched[m.a]||bMatched[m.b])return; // one side already claimed — real ambiguity, let it fade
       var fta=strokeFeat(sA[m.a]),ftb=strokeFeat(sB[m.b]);
       var clash=(fta.fillCol&&ftb.fillCol&&colorDist(fta.fillCol,ftb.fillCol)>0.35)||(fta.strokeCol&&ftb.strokeCol&&colorDist(fta.strokeCol,ftb.strokeCol)>0.35);
-      if(fta.type===ftb.type&&fta.closed===ftb.closed&&!clash){
+      // closed-flag agreement only counts as an identity veto when both
+      // flags are ground truth — a guessed flag (VB centerline) flipping
+      // between two drawings of the same limb must not block the rescue
+      // (same rationale as matchSc's softened closedPen above).
+      var closedOk=fta.closed===ftb.closed||fta.closedIsGuess||ftb.closedIsGuess;
+      if(fta.type===ftb.type&&closedOk&&!clash){
         pairSpecs.push({aIdx:m.a,bIdx:m.b,aData:sA[m.a],bData:sB[m.b],mi:matches.indexOf(m),score:m.score});aMatched[m.a]=1;bMatched[m.b]=1;
       }
     });
