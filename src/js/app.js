@@ -176,6 +176,11 @@ var state={
   showTweenCurves:false,
   selectedStrokeIndices:[],
   undoStack:[],redoStack:[],maxUndo:60,
+  // Parallel to undoStack/redoStack (same indices, same push/pop/shift ops
+  // — kept in sync by hand in tweens.js, never derived) — human-readable
+  // {label,tool,frame,layer,t} describing each snapshot, for the History
+  // Panel (history-panel.js). Session-only like the stacks themselves.
+  undoLabels:[],redoLabels:[],
   // Session-only, deliberately NEVER included in exportJSON()'s field list
   // (see that function) — a rolling human-readable trail of what the user
   // actually DID, feeding the feedback/debug-log system (feedback-bridge.js)
