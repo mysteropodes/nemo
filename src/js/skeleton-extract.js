@@ -161,15 +161,27 @@
     // afterward — erosion would otherwise eat isolated thin strokes
     // entirely. Distance-transform based (two-pass Chebyshev), so cost is
     // O(pixels) regardless of the radius.
-    // Only OUTLINE-STYLE drawings get this treatment — detected by ink
-    // coverage: thin strokes/ribbons cover a small fraction of their own
-    // bounding box, while a genuinely solid filled shape (a star, a blob)
-    // covers a lot of it and must NOT be closed (closing would fill the
-    // notches between a star's arms and corrupt its true skeleton).
+    // Only OUTLINE-STYLE drawings get this treatment — detected by the
+    // ink's LOCAL THICKNESS (max distance from an ink pixel to the nearest
+    // background), not by ink coverage of the bounding box. Coverage was
+    // the first attempt and misfired (2026-07 screenshot: a SOLID filled
+    // V-arm covers only ~20% of its own bbox, so it was treated as an
+    // outline drawing and the closing bridged the V's concave mouth — the
+    // skeleton made junctions OUTSIDE the shape's boundary instead of
+    // following the delimited path, per the blue annotated outline). A
+    // solid shape is THICK somewhere (its body's half-width); outline
+    // strokes/ribbons are uniformly thin (a few px of half-width). A shape
+    // that's already solid needs no closing at all — thinning it directly
+    // yields a skeleton that stays inside its true boundary.
     var inkArea = 0;
     for (var ia = 0; ia < rw * rh; ia++) inkArea += mask[ia];
-    var isOutlineStyle = inkArea / (rw * rh) < 0.25;
-    if (!isOutlineStyle) return { mask: mask, rw: rw, rh: rh, bounds: bounds, scale: scale };
+    var bgm = new Uint8Array(rw * rh);
+    for (var bi = 0; bi < rw * rh; bi++) bgm[bi] = mask[bi] ? 0 : 1;
+    var distToBg = chebyshevDist(bgm, rw, rh);
+    var maxThickness = 0;
+    for (var ti = 0; ti < rw * rh; ti++) if (mask[ti] && distToBg[ti] > maxThickness) maxThickness = distToBg[ti];
+    var solidThreshold = Math.max(6, Math.round(Math.min(rw, rh) * 0.03));
+    if (maxThickness > solidThreshold) return { mask: mask, rw: rw, rh: rh, bounds: bounds, scale: scale };
     // The radius is ADAPTIVE, found by watching the closed AREA as the
     // radius grows: while the outline's openings are still unbridged,
     // closing returns roughly just the ink (erosion undoes dilation); the
