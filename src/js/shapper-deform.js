@@ -23,7 +23,7 @@
 // live-reference trap documented in CLAUDE.md §1.
 (function(){
   'use strict';
-  var _rig=null; // {path, skeleton, boneGraph, binds, curPos, bindDir}
+  var _rig=null; // {paths, skeleton, boneGraph, bindsByPath, curPos}
   var _dragId=null;
 
   function dist2(ax,ay,bx,by){var dx=ax-bx,dy=ay-by;return dx*dx+dy*dy;}
@@ -52,24 +52,6 @@
       }
     });
     return {points:pts,edges:edges,neighbors:neighbors};
-  }
-
-  // A bone's orientation = the average direction toward its graph neighbors,
-  // evaluated against whatever position function is passed in (bind-time
-  // positions at bind, current positions during deform) — this is what makes
-  // rotation propagate through a junction with 3+ neighbors, not just a
-  // simple 2-neighbor chain.
-  function boneDirection(boneGraph,boneId,posOf){
-    var nbrs=boneGraph.neighbors[boneId]||[];
-    if(!nbrs.length)return 0;
-    var p=posOf(boneId);
-    var sx=0,sy=0;
-    for(var i=0;i<nbrs.length;i++){
-      var q=posOf(nbrs[i]);
-      var d=Math.atan2(q.y-p.y,q.x-p.x);
-      sx+=Math.cos(d);sy+=Math.sin(d);
-    }
-    return Math.atan2(sy,sx);
   }
 
   function pointToSeg(px,py,ax,ay,bx,by){
@@ -108,17 +90,24 @@
     return binds;
   }
 
-  function rotateVec(v,a){var c=Math.cos(a),s=Math.sin(a);return{x:v.x*c-v.y*s,y:v.x*s+v.y*c};}
-
   // Deforms EVERY bound path (a multi-shape rig binds each selected shape's
   // vertices against the same shared bone graph — see generateForSelection).
+  //
+  // TRANSLATION-ONLY blend (2026-07 feedback: "les poignées ne doivent que
+  // faire driver les vertex comme dans Shapper" — after a screenshot of
+  // flipped/inverted vertices): the first port also applied a per-bone
+  // ROTATION (chord-angle delta since bind, ported from Shapper's AE
+  // expression). But a bone's chord angle — the averaged direction toward
+  // its graph neighbors — is unstable on this tool's auto-extracted
+  // skeletons: at junctions, or whenever a drag swings a neighbor past the
+  // bone, the average flips up to 180° and the rotated offsets turn the
+  // geometry inside out ("retournement des vertex"). Handles now purely
+  // DRIVE their vertices: each vertex = weight-blended (bone position +
+  // constant bind offset), handles kept at bind orientation. Stable by
+  // construction — an offset can never rotate, so nothing can flip.
   function deformAll(){
     if(!_rig)return;
-    var boneGraph=_rig.boneGraph;
     var curPos=_rig.curPos;
-    var posOf=function(id){return curPos[id];};
-    var curDir={};
-    for(var i=0;i<boneGraph.points.length;i++)curDir[i]=boneDirection(boneGraph,i,posOf);
     _rig.paths.forEach(function(path,pi){
       var binds=_rig.bindsByPath[pi];
       // Path shape changed elsewhere (another tool edited it) since bind —
@@ -129,16 +118,11 @@
         var bd=binds[vi];
         if(!bd)continue;
         var A=curPos[bd.a],B=curPos[bd.b];
-        var dA=curDir[bd.a]-_rig.bindDir[bd.a];
-        var dB=curDir[bd.b]-_rig.bindDir[bd.b];
-        var posA=rotateVec(bd.offA,dA);posA.x+=A.x;posA.y+=A.y;
-        var posB=rotateVec(bd.offB,dB);posB.x+=B.x;posB.y+=B.y;
-        var nx=bd.wA*posA.x+bd.wB*posB.x,ny=bd.wA*posA.y+bd.wB*posB.y;
-        var hAngle=Math.atan2(bd.wA*Math.sin(dA)+bd.wB*Math.sin(dB),bd.wA*Math.cos(dA)+bd.wB*Math.cos(dB));
-        var hin=rotateVec(bd.handleIn,hAngle),hout=rotateVec(bd.handleOut,hAngle);
+        var nx=bd.wA*(A.x+bd.offA.x)+bd.wB*(B.x+bd.offB.x);
+        var ny=bd.wA*(A.y+bd.offA.y)+bd.wB*(B.y+bd.offB.y);
         segs[vi].point=new Point(nx,ny);
-        segs[vi].handleIn=new Point(hin.x,hin.y);
-        segs[vi].handleOut=new Point(hout.x,hout.y);
+        segs[vi].handleIn=new Point(bd.handleIn.x,bd.handleIn.y);
+        segs[vi].handleOut=new Point(bd.handleOut.x,bd.handleOut.y);
       }
     });
   }
@@ -229,10 +213,7 @@
     var bindsByPath=paths.map(function(p){return bindPathToBones(p,boneGraph);});
     var curPos={};
     boneGraph.points.forEach(function(p){curPos[p.id]={x:p.x,y:p.y};});
-    var posOf=function(id){return curPos[id];};
-    var bindDir={};
-    boneGraph.points.forEach(function(p){bindDir[p.id]=boneDirection(boneGraph,p.id,posOf);});
-    _rig={paths:paths,skeleton:skeleton,boneGraph:boneGraph,bindsByPath:bindsByPath,curPos:curPos,bindDir:bindDir};
+    _rig={paths:paths,skeleton:skeleton,boneGraph:boneGraph,bindsByPath:bindsByPath,curPos:curPos};
     _dragId=null;
     if(window.SMEngineBridge)window.SMEngineBridge.renderNow();
     if(window.showToast)showToast('Squelette généré — '+paths.length+' forme(s), '+boneGraph.points.length+' points, '+((performance.now()-t0)|0)+'ms');
