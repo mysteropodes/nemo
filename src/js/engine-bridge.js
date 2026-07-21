@@ -2071,6 +2071,10 @@
       if (symmetryItems.length) layers.push({ items: symmetryItems });
       var gradientGizmoItems = window.buildGradientGizmoItems ? window.buildGradientGizmoItems() : [];
       if (gradientGizmoItems.length) layers.push({ items: gradientGizmoItems });
+      if (window.SMShapper) {
+        var shapperItems = SMShapper.buildOverlayItems();
+        if (shapperItems.length) layers.push({ items: shapperItems.map(function (it) { it.segments = roundSegs(it.segments); return it; }) });
+      }
     }
     // Track matte source resolution (uid-based, 2026-07-31) — runs LAST,
     // after every unshift/splice above, so layers.indexOf gives the final

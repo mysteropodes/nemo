@@ -366,7 +366,13 @@ window.SM={
       showToast((window.SM&&SM.t)?SM.t('rigFrozenToast'):'Rig tool — in development, not yet available in this build');
       return;
     }
-    if(t!=='select'&&t!=='subselect'&&t!=='rig')clearSel();if(t!=='fsselect')fsClearSel();if(t!=='pen'&&_pen.path)finalizePen();if(t!=='rig'&&typeof _rigDraw!=='undefined'&&_rigDraw.path&&window.SMRig)window.SMRig.finalizeRigBone();if(t!=='eraser'&&typeof _eraserCursor!=='undefined'&&_eraserCursor){_eraserCursor.remove();_eraserCursor=null;}if(t!=='select'&&window.SMSelectBridge)window.SMSelectBridge.cancelMarquee();
+    // Shapper Intelligence (2026-07) joins select/subselect/rig in this
+    // exemption — its whole workflow is "select a shape with Select, THEN
+    // switch to this tool and click Generate Skeleton", so clearing
+    // selectedPaths on entry would make that flow impossible (Generate
+    // Skeleton reads selectedPaths directly, same as every other
+    // tool-acts-on-selection convention in this file).
+    if(t!=='select'&&t!=='subselect'&&t!=='rig'&&t!=='shapper')clearSel();if(t!=='fsselect')fsClearSel();if(t!=='pen'&&_pen.path)finalizePen();if(t!=='rig'&&typeof _rigDraw!=='undefined'&&_rigDraw.path&&window.SMRig)window.SMRig.finalizeRigBone();if(t!=='eraser'&&typeof _eraserCursor!=='undefined'&&_eraserCursor){_eraserCursor.remove();_eraserCursor=null;}if(t!=='select'&&window.SMSelectBridge)window.SMSelectBridge.cancelMarquee();
     // Picking a tool always means "I'm done with the timeline frame
     // selection" — leaving it selected made the status bar keep showing
     // keyframe shortcuts instead of the newly-picked tool's help.
@@ -382,6 +388,12 @@ window.SM={
       if(_fillCloseDrag){_fillCloseDrag=null;if(window.SMEngineBridge)window.SMEngineBridge.resume();}
       _fillCloseStrokes=[];
     }
+    // Session-only rig state (M2) — discard it on leaving the tool, same
+    // "tool change tidies up transient state" convention as the eraser
+    // cursor/pen path a few lines up. M3 will persist a committed rig, but
+    // an uncommitted in-progress drag is meant to be as disposable as any
+    // other tool's live preview.
+    if(t!=='shapper'&&window.SMShapper)window.SMShapper.clearRig();
     // Camera row's frame-grid twin (SMCamera.renderGridRow) sizes itself
     // (compact vs full height + speed-curve SVG) off state.tool==='camera',
     // same condition as the layer-panel row (SMCamera.renderPanelRow) — but
@@ -395,7 +407,7 @@ window.SM={
     if(_camToolChanged)renderTimeline();
     document.querySelectorAll('.tool-btn').forEach(function(b){b.classList.toggle('active',b.dataset.tool===t);});
     if(window.SMShapeGroup)SMShapeGroup.ensureFront(t);
-    var cc={draw:'crosshair',pen:'crosshair',line:'crosshair',rect:'crosshair',ellipse:'crosshair',speechbubble:'crosshair',star:'crosshair',select:'default',subselect:'default',fsselect:'default',comment:'crosshair',camera:'move',text:'text',eraser:'pointer',fill:'crosshair',fillbrush:'crosshair',eyedropper:'crosshair',hand:'grab',zoom:'zoom-in',rotate:'grab',perspective:'crosshair',symmetry:'crosshair',rig:'crosshair'};
+    var cc={draw:'crosshair',pen:'crosshair',line:'crosshair',rect:'crosshair',ellipse:'crosshair',speechbubble:'crosshair',star:'crosshair',select:'default',subselect:'default',fsselect:'default',comment:'crosshair',camera:'move',text:'text',eraser:'pointer',fill:'crosshair',fillbrush:'crosshair',eyedropper:'crosshair',hand:'grab',zoom:'zoom-in',rotate:'grab',perspective:'crosshair',symmetry:'crosshair',rig:'crosshair',shapper:'crosshair'};
     canvasEl.style.cursor=cc[t]||'default';
     // Brush texture presets (Chalk/Charcoal/Pencil…) stamp dabs along a
     // discrete centerline — Fill Brush commits a filled OUTLINE shape from
@@ -2497,6 +2509,10 @@ function updatePropsContext(){
     // language correctly. thElementsSelected/thElementSelected already
     // existed in i18n.js for all 4 locales, just never wired up here.
     hdrText=selectedPaths.length+' '+((window.SM&&SM.t)?SM.t(selectedPaths.length>1?'thElementsSelected':'thElementSelected'):(selectedPaths.length>1?'elements selected':'element selected'));
+  }else if(state.tool==='shapper'){
+    ctx='tool:shapper';
+    show['tool-opts-sec']=true;
+    hdrText=(window.SM&&SM.t)?SM.t('toolShapper')+' — '+SM.t('hdrToolOptions'):'Shapper Intelligence — Options';
   }else if(FILL_STROKE_TOOLS.indexOf(state.tool)>=0){
     ctx='tool:'+state.tool;
     // Fill Brush never touches strokeColor at all (it paints a genuine
@@ -2610,6 +2626,14 @@ function updatePropsContext(){
   if(taperRow)taperRow.style.display=isFillBrush?'none':'flex';
   var fbSizeRow=document.getElementById('p-fillbrushsize-row');
   if(fbSizeRow)fbSizeRow.style.display=isFillBrush?'flex':'none';
+  // Shapper Intelligence's two rows (Generate Skeleton / Commit Pose) live in
+  // their own wrapper so this unrelated tool doesn't need every draw/pen/
+  // eraser row above individually hidden — see index.html's tool-opts-shapper
+  // comment for why.
+  var isShapper=state.tool==='shapper';
+  var shWrap=document.getElementById('tool-opts-shapper'),dlWrap=document.getElementById('tool-opts-drawlike');
+  if(shWrap)shWrap.style.display=isShapper?'block':'none';
+  if(dlWrap)dlWrap.style.display=isShapper?'none':'block';
   // Brush presets apply to Draw's plain constant-width commit path (see
   // draw-bridge.js's commitStroke) AND, now, retroactively to an already-
   // drawn plain stroke via "Apply to selection" below — but not to a
@@ -5786,6 +5810,11 @@ var TOOL_SHORTCUTS=[
   // quietly became a crosshair — found by the same audit, fixed by
   // deleting the binding rather than re-adding a button the UI review
   // that removed it explicitly didn't want back.
+  // 'j', not 's' (rebase conflict, 2026-08): Shapper's own branch picked
+  // 's' before Rig existed and also claimed it — Rig landed first, so
+  // Shapper gets the next free arbitrary letter instead of fighting over
+  // the same binding.
+  {action:'shapper',key:'j',label:'Shapper Intelligence'},
 ];
 var _shortcutOverrides=null;
 function shortcutOverrides(){
@@ -8280,6 +8309,8 @@ wireBoolBtn('btn-bool-subtract','subtract');
 wireBoolBtn('btn-bool-intersect','intersect');
 wireBoolBtn('btn-bool-exclude','exclude');
 document.getElementById('p-erasersize').addEventListener('input',function(){window.SM.setEraserSize(this.value);});
+document.getElementById('btn-shapper-generate').addEventListener('click',function(){if(window.SMShapper)window.SMShapper.generateForSelection();});
+document.getElementById('btn-shapper-commit').addEventListener('click',function(){if(window.SMShapper)window.SMShapper.commitPose();});
 document.getElementById('p-fillbrushsize').addEventListener('input',function(){window.SM.setFillBrushSize(this.value);});
 document.getElementById('p-brushpreset').addEventListener('change',function(){window.SM.setBrushPreset(this.value);if(window.BrushPresetPicker)window.BrushPresetPicker.paintButton(this.value);});
 // Applies a vector brush preset to the current selection — was wired to a

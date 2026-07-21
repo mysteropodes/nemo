@@ -6190,12 +6190,15 @@ function onMouseDown(event){
       }
       if(ep.strokeWidth){state.brushSize=ep.strokeWidth;document.getElementById('p-sw').value=Math.round(ep.strokeWidth);}
       showToast('Color picked');}
+  }else if(state.tool==='shapper'){
+    if(window.SMShapper)window.SMShapper.onDown(event);
   }
 }
 function onMouseDrag(event){
   if(state.playing)return;
   if(state.isPanning||state.spaceDown){var dx=event.event.movementX||0;var dy=event.event.movementY||0;view.center=view.center.subtract(new Point(dx,dy).divide(view.zoom));return;}
   if(state.tool==='camera'){if(window.SMCamera)SMCamera.onDrag(event);return;}
+  if(state.tool==='shapper'){if(window.SMShapper)SMShapper.onDrag(event);return;}
   if(state.appMode==='motion'&&window.SMMotion&&SMMotion.onDrag(event))return;
   if(state.tool==='draw'){
     if(!currentPath)return;
@@ -6436,6 +6439,7 @@ function onMouseDrag(event){
 function onMouseUp(event){
   if(state.isPanning){state.isPanning=false;return;}if(state.playing)return;
   if(state.tool==='camera'){if(window.SMCamera)SMCamera.onUp(event);return;}
+  if(state.tool==='shapper'){if(window.SMShapper)SMShapper.onUp(event);return;}
   if(state.appMode==='motion'&&window.SMMotion&&SMMotion.onUp(event))return;
   _eraseDragActive=false;_eraseLastPt=null;
   if(state.tool==='fill'&&_fillCloseDrag){
