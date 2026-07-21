@@ -53,7 +53,6 @@
     ctx.save();
     ctx.translate(-bounds.x * scale, -bounds.y * scale);
     ctx.scale(scale, scale);
-    var anyStrokeOnly = false;
     paths.forEach(function (path) {
       ctx.beginPath();
       // A stroke-only shape (fillColor null — a plain hand-drawn line, e.g.
@@ -77,7 +76,6 @@
         if (hasFill) {
           ctx.fill(p2d, path.getFillRule ? path.getFillRule() : 'nonzero');
         } else {
-          anyStrokeOnly = true;
           ctx.lineWidth = Math.max(1, path.strokeWidth || 2);
           ctx.lineCap = path.strokeCap || 'round';
           ctx.lineJoin = path.strokeJoin || 'round';
@@ -96,7 +94,6 @@
           ctx.closePath();
           ctx.fill();
         } else {
-          anyStrokeOnly = true;
           ctx.lineWidth = Math.max(1, path.strokeWidth || 2);
           ctx.lineCap = path.strokeCap || 'round';
           ctx.lineJoin = path.strokeJoin || 'round';
@@ -119,10 +116,19 @@
     // reachable from outside stays background), then anything still 0
     // afterward is enclosed by ink on all sides — promote it to foreground,
     // exactly matching "treat the doodle as if it were a solid filled shape."
-    // Only needed when a stroke-only path contributed to this raster — a
-    // genuinely filled CompoundPath's hole (a real donut/ring shape) is
-    // legitimate and must NOT be silently erased.
-    if (anyStrokeOnly) mask = fillEnclosedHoles(mask, rw, rh);
+    // Unconditional, not just for the stroke-only (anyStrokeOnly) branch —
+    // this exact same hole can appear on an already-FILLED path too: the
+    // default vector/pressure brush (draw-bridge.js, `state.vectorBrush`)
+    // builds a proper filled ribbon, but a stroke that loops back near
+    // itself can wind in a CANCELING direction under the 'nonzero' fill rule
+    // (ctx.fill above), leaving the loop's interior unfilled the same way —
+    // confirmed live: a filled self-crossing test path still needed this
+    // pass, the anyStrokeOnly-gated version left it untouched. This tool's
+    // whole purpose is "treat the drawing as one solid rig-able silhouette,"
+    // so a rare deliberate donut/ring CompoundPath losing its hole here is
+    // an acceptable trade — not a concern the fill-rule branch above needs
+    // to special-case.
+    mask = fillEnclosedHoles(mask, rw, rh);
     return { mask: mask, rw: rw, rh: rh, bounds: bounds, scale: scale };
   }
 
