@@ -1039,6 +1039,12 @@ function duplicateSelection(){
         var fillClone=new Path();fillClone.fillColor=p.data.linkedFill.fillColor;fillClone.strokeColor=null;fillClone.opacity=p.data.linkedFill.opacity;
         fillClone.insertBelow(clone);
         clone.data.linkedFill=fillClone;
+        // Fresh stable id pair (see draw-bridge.js's own comment) — must NOT
+        // reuse the source's linkedFillId, same reasoning as strokeId a few
+        // lines up (freshly-duplicated content is a distinct stroke).
+        clone.data.linkedFillId=ensureStrokeId({data:{}});
+        fillClone.data.isLinkedFillCompanion=true;
+        fillClone.data.linkedFillId=clone.data.linkedFillId;
         if(typeof rebuildVectorBrushOutline==='function')rebuildVectorBrushOutline(clone);
       }
     }

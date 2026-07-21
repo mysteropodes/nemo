@@ -457,6 +457,21 @@ function serP(p){var isVB=!!(p.data&&p.data.isVectorBrush);var center=isVB&&p.da
   var widthProfile=isVB&&p.data.widthProfile?p.data.widthProfile:undefined;
   var fillSeed=(p.data&&p.data.fillSeed)?p.data.fillSeed:undefined,fillGapPx=(p.data&&p.data.fillGapPx!==undefined)?p.data.fillGapPx:undefined;
   var fillWalls=(p.data&&p.data.fillWalls&&p.data.fillWalls.length)?p.data.fillWalls:undefined,strokeId=(p.data&&p.data.strokeId)?p.data.strokeId:undefined;
+  // fillSeeds (PLURAL — a same-color merge tracking multiple original click
+  // points, tools.js's fillMergeSameColor) was never round-tripped at all —
+  // only the singular fillSeed was, so a multi-seed merged fill's
+  // auto-regen-on-edit tracking silently lost every seed but the first one
+  // on the very next save/reload. Confirmed live (round-trip test):
+  // fillSeeds absent after saveActiveLayerFrame despite being set.
+  var fillSeeds=(p.data&&p.data.fillSeeds&&p.data.fillSeeds.length)?p.data.fillSeeds:undefined;
+  // Vector-brush fill backdrop pairing (draw-bridge.js) — see that file's
+  // own comment on linkedFillId for the full "live reference can't survive
+  // JSON" story; isLinkedFillCompanion alone (without the id) was ALSO
+  // silently dropped, letting a save/reload resurrect the backdrop as an
+  // independently-selectable path (the marquee "parallax" double-move bug
+  // that flag exists specifically to prevent).
+  var isLinkedFillCompanion=(p.data&&p.data.isLinkedFillCompanion)?true:undefined;
+  var linkedFillId=(p.data&&p.data.linkedFillId)?p.data.linkedFillId:undefined;
   // Brush-texture-preset companions (tools.js applyBrushTexture) — a live
   // `data.brushCompanions` array of Path OBJECT references can't survive a
   // JSON round-trip; brushGroupId is what relinkBrushCompanions() (below)
@@ -525,6 +540,13 @@ function serP(p){var isVB=!!(p.data&&p.data.isVectorBrush);var center=isVB&&p.da
   var revisionParentId=(p.data&&p.data.revisionParentId)?p.data.revisionParentId:undefined;
   var isRevisionGhost=(p.data&&p.data.isRevisionGhost)?true:undefined;
   var revisionAction=(p.data&&p.data.revisionAction)?p.data.revisionAction:undefined;
+  // The ghost's exact pre-fork opacity (forkIfForeignOwner/markDeleteAsRevision,
+  // tools.js — "so Reject can restore it exactly, not just guess 1") was
+  // never round-tripped: a revision ghost survives a save (it's a normal
+  // layer child) but rejectRevision/rejectDeleteRevision fall back to a
+  // hardcoded 1 once this is gone, silently restoring the WRONG opacity
+  // for any stroke that wasn't originally fully opaque. Confirmed live.
+  var preRevisionOpacity=(p.data&&p.data.preRevisionOpacity!==undefined)?p.data.preRevisionOpacity:undefined;
   // hasRealStroke records whether p ACTUALLY had a stroke color before the
   // '#ffffff' fallback below (kept for legacy/rendering reasons — see the
   // colorHex8/serP comments above) papers over that with a non-null string.
@@ -542,7 +564,7 @@ function serP(p){var isVB=!!(p.data&&p.data.isVectorBrush);var center=isVB&&p.da
   // in tweens.js) keep treating these strokes as fill-only, exactly as before
   // this cosmetic hairline existed.
   var hasRealStroke=isVB?false:!!p.strokeColor;
-  return{segments:p.segments.map(function(s){return{point:[s.point.x,s.point.y],handleIn:[s.handleIn.x,s.handleIn.y],handleOut:[s.handleOut.x,s.handleOut.y]};}),closed:!!p.closed,strokeColor:(isVB||isNoStrokeChannel||isShadowNoStroke||isTexAnchor&&!p.strokeColor)?null:(p.strokeColor?colorHex8(p.strokeColor):'#ffffff'),hasRealStroke:hasRealStroke,strokeWidth:p.strokeWidth,strokeCap:p.strokeCap||'round',strokeJoin:p.strokeJoin||'round',miterLimit:p.miterLimit,fillColor:p.fillColor?colorHex8(p.fillColor):null,opacity:p.opacity!==undefined?p.opacity:1,dashArray:(p.dashArray&&p.dashArray.length)?p.dashArray.slice():undefined,dashOffset:p.dashOffset,paintOrder:(p.data&&p.data.paintOrder)?p.data.paintOrder:undefined,isVectorBrush:isVB||undefined,isFillShape:(p.data&&p.data.isFillShape)?true:undefined,centerSegments:center,widthProfile:widthProfile,fillSeed:fillSeed,fillGapPx:fillGapPx,fillWalls:fillWalls,strokeId:strokeId,brushGroupId:brushGroupId,tweenOn:(p.data&&p.data.tweenOn)?true:undefined,boxAngle:(p.data&&p.data.boxAngle)?p.data.boxAngle:undefined,
+  return{segments:p.segments.map(function(s){return{point:[s.point.x,s.point.y],handleIn:[s.handleIn.x,s.handleIn.y],handleOut:[s.handleOut.x,s.handleOut.y]};}),closed:!!p.closed,strokeColor:(isVB||isNoStrokeChannel||isShadowNoStroke||isTexAnchor&&!p.strokeColor)?null:(p.strokeColor?colorHex8(p.strokeColor):'#ffffff'),hasRealStroke:hasRealStroke,strokeWidth:p.strokeWidth,strokeCap:p.strokeCap||'round',strokeJoin:p.strokeJoin||'round',miterLimit:p.miterLimit,fillColor:p.fillColor?colorHex8(p.fillColor):null,opacity:p.opacity!==undefined?p.opacity:1,dashArray:(p.dashArray&&p.dashArray.length)?p.dashArray.slice():undefined,dashOffset:p.dashOffset,paintOrder:(p.data&&p.data.paintOrder)?p.data.paintOrder:undefined,isVectorBrush:isVB||undefined,isFillShape:(p.data&&p.data.isFillShape)?true:undefined,centerSegments:center,widthProfile:widthProfile,fillSeed:fillSeed,fillSeeds:fillSeeds,fillGapPx:fillGapPx,fillWalls:fillWalls,strokeId:strokeId,brushGroupId:brushGroupId,isLinkedFillCompanion:isLinkedFillCompanion,linkedFillId:linkedFillId,tweenOn:(p.data&&p.data.tweenOn)?true:undefined,boxAngle:(p.data&&p.data.boxAngle)?p.data.boxAngle:undefined,
   // Rotate/scale anchor choice (2026-07, "la position du point d'ancrage
   // n'est pas mise en mémoire si je désélectionne et resélectionne
   // l'élément") — same persistence pattern as boxAngle right above: was
@@ -551,7 +573,7 @@ function serP(p){var isVB=!!(p.data&&p.data.isVectorBrush);var center=isVB&&p.da
   // remembering what the artist last picked for THIS stroke specifically.
   xformAnchorKey:(p.data&&p.data.xformAnchorKey)?p.data.xformAnchorKey:undefined,
   xformAnchorCustom:(p.data&&p.data.xformAnchorCustom)?p.data.xformAnchorCustom:undefined,
-  isBrushTextureCopy:isBrushTextureCopy,brushTexturePreset:brushTexturePreset,bitmapBrushSpec:bitmapBrushSpec,bitmapPressureProfile:bitmapPressureProfile,preTextureOpacity:preTextureOpacity,preTextureStroke:preTextureStroke,channelTag:channelTag,shadowSwatchId:shadowSwatchId,ownerId:ownerId,ownerName:ownerName,ownerColor:ownerColor,revisionParentId:revisionParentId,isRevisionGhost:isRevisionGhost,revisionAction:revisionAction,
+  isBrushTextureCopy:isBrushTextureCopy,brushTexturePreset:brushTexturePreset,bitmapBrushSpec:bitmapBrushSpec,bitmapPressureProfile:bitmapPressureProfile,preTextureOpacity:preTextureOpacity,preTextureStroke:preTextureStroke,channelTag:channelTag,shadowSwatchId:shadowSwatchId,ownerId:ownerId,ownerName:ownerName,ownerColor:ownerColor,revisionParentId:revisionParentId,isRevisionGhost:isRevisionGhost,revisionAction:revisionAction,preRevisionOpacity:preRevisionOpacity,
   // Gradient fill (2026-07, palette-panel.js's gradient editor) — {kind:
   // 'linear'|'radial', from:[x,y], to:[x,y], stops:[{offset,color}]}, world
   // coordinates, plain data so it round-trips through JSON like any other
@@ -608,7 +630,7 @@ function desP(d,layer,op){var prev=project.activeLayer;layer.activate();var p=ne
   // outline it never had ("un trait blanc apparaît autour du fill après
   // ctrl+Z"). Legacy data predating the field (undefined) keeps the old
   // fallback chain untouched.
-  p.strokeColor=d.hasRealStroke===false?null:(d.strokeColor||((d.isVectorBrush||d.brushTexturePreset||d.bitmapBrushSpec||d.isBrushTextureCopy||dNoStrokeChannel||dIsShadowChannel)?null:'#fff'));p.strokeWidth=d.strokeWidth||3;p.strokeCap=d.strokeCap||'round';p.strokeJoin=d.strokeJoin||'round';if(d.miterLimit!==undefined)p.miterLimit=d.miterLimit;if(d.fillColor)p.fillColor=d.fillColor;else p.fillColor=null;p.opacity=op!==undefined?op:(d.opacity!==undefined?d.opacity:1);if(d.dashArray&&d.dashArray.length)p.dashArray=d.dashArray;if(d.dashOffset!==undefined)p.dashOffset=d.dashOffset;if(d.paintOrder){p.data.paintOrder=d.paintOrder;}if(d.isVectorBrush){p.data.isVectorBrush=true;if(d.centerSegments)p.data.centerSegments=d.centerSegments;if(d.widthProfile)p.data.widthProfile=d.widthProfile;if(d.isFillShape)p.data.isFillShape=true;applyBrushKeyline(p);}if(d.fillSeed){p.data.fillSeed=d.fillSeed;p.data.fillGapPx=d.fillGapPx;}if(d.fillWalls)p.data.fillWalls=d.fillWalls;if(d.strokeId)p.data.strokeId=d.strokeId;if(d.brushGroupId)p.data.brushGroupId=d.brushGroupId;if(d.tweenOn)p.data.tweenOn=true;if(d.boxAngle)p.data.boxAngle=d.boxAngle;if(d.xformAnchorKey)p.data.xformAnchorKey=d.xformAnchorKey;if(d.xformAnchorCustom)p.data.xformAnchorCustom=d.xformAnchorCustom;if(d.isBrushTextureCopy)p.data.isBrushTextureCopy=true;if(d.brushTexturePreset)p.data.brushTexturePreset=d.brushTexturePreset;if(d.bitmapBrushSpec)p.data.bitmapBrushSpec=d.bitmapBrushSpec;if(d.bitmapPressureProfile)p.data.bitmapPressureProfile=d.bitmapPressureProfile;if(d.preTextureOpacity!==undefined)p.data.preTextureOpacity=d.preTextureOpacity;if(d.preTextureStroke!==undefined)p.data.preTextureStroke=d.preTextureStroke;if(d.channelTag)p.data.channelTag=d.channelTag;if(d.shadowSwatchId)p.data.shadowSwatchId=d.shadowSwatchId;if(d.ownerId)p.data.ownerId=d.ownerId;if(d.ownerName)p.data.ownerName=d.ownerName;if(d.ownerColor)p.data.ownerColor=d.ownerColor;if(d.revisionParentId)p.data.revisionParentId=d.revisionParentId;if(d.isRevisionGhost)p.data.isRevisionGhost=true;if(d.revisionAction)p.data.revisionAction=d.revisionAction;if(d.fillGradient)p.data.fillGradient=d.fillGradient;if(d.groupId)p.data.groupId=d.groupId;if(d.effects&&d.effects.length)p.data.effects=d.effects;
+  p.strokeColor=d.hasRealStroke===false?null:(d.strokeColor||((d.isVectorBrush||d.brushTexturePreset||d.bitmapBrushSpec||d.isBrushTextureCopy||dNoStrokeChannel||dIsShadowChannel)?null:'#fff'));p.strokeWidth=d.strokeWidth||3;p.strokeCap=d.strokeCap||'round';p.strokeJoin=d.strokeJoin||'round';if(d.miterLimit!==undefined)p.miterLimit=d.miterLimit;if(d.fillColor)p.fillColor=d.fillColor;else p.fillColor=null;p.opacity=op!==undefined?op:(d.opacity!==undefined?d.opacity:1);if(d.dashArray&&d.dashArray.length)p.dashArray=d.dashArray;if(d.dashOffset!==undefined)p.dashOffset=d.dashOffset;if(d.paintOrder){p.data.paintOrder=d.paintOrder;}if(d.isVectorBrush){p.data.isVectorBrush=true;if(d.centerSegments)p.data.centerSegments=d.centerSegments;if(d.widthProfile)p.data.widthProfile=d.widthProfile;if(d.isFillShape)p.data.isFillShape=true;applyBrushKeyline(p);}if(d.fillSeed){p.data.fillSeed=d.fillSeed;p.data.fillGapPx=d.fillGapPx;}if(d.fillSeeds&&d.fillSeeds.length)p.data.fillSeeds=d.fillSeeds;if(d.fillWalls)p.data.fillWalls=d.fillWalls;if(d.strokeId)p.data.strokeId=d.strokeId;if(d.brushGroupId)p.data.brushGroupId=d.brushGroupId;if(d.isLinkedFillCompanion)p.data.isLinkedFillCompanion=true;if(d.linkedFillId)p.data.linkedFillId=d.linkedFillId;if(d.tweenOn)p.data.tweenOn=true;if(d.boxAngle)p.data.boxAngle=d.boxAngle;if(d.xformAnchorKey)p.data.xformAnchorKey=d.xformAnchorKey;if(d.xformAnchorCustom)p.data.xformAnchorCustom=d.xformAnchorCustom;if(d.isBrushTextureCopy)p.data.isBrushTextureCopy=true;if(d.brushTexturePreset)p.data.brushTexturePreset=d.brushTexturePreset;if(d.bitmapBrushSpec)p.data.bitmapBrushSpec=d.bitmapBrushSpec;if(d.bitmapPressureProfile)p.data.bitmapPressureProfile=d.bitmapPressureProfile;if(d.preTextureOpacity!==undefined)p.data.preTextureOpacity=d.preTextureOpacity;if(d.preTextureStroke!==undefined)p.data.preTextureStroke=d.preTextureStroke;if(d.channelTag)p.data.channelTag=d.channelTag;if(d.shadowSwatchId)p.data.shadowSwatchId=d.shadowSwatchId;if(d.ownerId)p.data.ownerId=d.ownerId;if(d.ownerName)p.data.ownerName=d.ownerName;if(d.ownerColor)p.data.ownerColor=d.ownerColor;if(d.revisionParentId)p.data.revisionParentId=d.revisionParentId;if(d.isRevisionGhost)p.data.isRevisionGhost=true;if(d.revisionAction)p.data.revisionAction=d.revisionAction;if(d.preRevisionOpacity!==undefined)p.data.preRevisionOpacity=d.preRevisionOpacity;if(d.fillGradient)p.data.fillGradient=d.fillGradient;if(d.groupId)p.data.groupId=d.groupId;if(d.effects&&d.effects.length)p.data.effects=d.effects;
   if(d.isVectorText)p.data.isVectorText=true;if(d.vectorChar)p.data.vectorChar=d.vectorChar;if(d.isText)p.data.isText=true;
   if(d.isTextRoot){p.data.isTextRoot=true;p.data.text=d.text||'';p.data.vectorFont=d.vectorFont||'Roboto-Regular';p.data.size=d.textSize||48;p.data.color=d.textColor||'#000000';p.data.align=d.textAlign||'left';if(d.textFixedWidth)p.data.fixedWidth=d.textFixedWidth;}
   prev.activate();return p;}
@@ -701,6 +723,27 @@ function relinkBrushCompanions(layer){
     var primary=members.filter(function(c){return!(c.data&&c.data.isBrushTextureCopy);})[0];
     if(!primary)return;
     primary.data.brushCompanions=members.filter(function(c){return c!==primary;});
+  });
+}
+// Same "live reference can't survive JSON, stable id + relink" pattern as
+// relinkBrushCompanions just above, for a vector-brush ribbon's fill
+// backdrop (draw-bridge.js's linkedFillId) — re-establishes
+// ribbon.data.linkedFill after every layer rebuild (desP only restores the
+// id-based tags, never the live pairing itself). Without this, every
+// rebuildVectorBrushOutline call after a save/reload/undo silently stopped
+// re-syncing the backdrop's shape to the ribbon's (the exact "fill pas
+// attaché au stroke" desync draw-bridge.js's own comment already names).
+function relinkLinkedFills(layer){
+  if(!layer)return;
+  var byId={};
+  layer.children.forEach(function(c){
+    if(c.data&&c.data.isLinkedFillCompanion&&c.data.linkedFillId)byId[c.data.linkedFillId]=c;
+  });
+  layer.children.forEach(function(c){
+    var lid=c.data&&c.data.linkedFillId;
+    if(!lid||(c.data&&c.data.isLinkedFillCompanion))return; // only the ribbon side looks its pair up
+    var fill=byId[lid];
+    if(fill&&!fill.removed)c.data.linkedFill=fill;
   });
 }
 // Strips ANY brush texture (vector-preset dabs OR Bitmap Brush's raster —
@@ -1824,7 +1867,7 @@ function loadFrame(idx){
   // against the correctly-stored interpolated value permanently flagged
   // untouched inbetweens as "manually edited" the moment you navigated
   // through them.
-  var strokes=getEffectiveStrokes(i,idx);strokes.forEach(function(sd){if(sd.isRaster)desR(sd,userLayers[i]);else desP(sd,userLayers[i]);});relinkBrushCompanions(userLayers[i]);}
+  var strokes=getEffectiveStrokes(i,idx);strokes.forEach(function(sd){if(sd.isRaster)desR(sd,userLayers[i]);else desP(sd,userLayers[i]);});relinkBrushCompanions(userLayers[i]);relinkLinkedFills(userLayers[i]);}
   userLayers[state.activeLayerIdx].activate();
   // Vue caméra (v18) : loadFrame est LE point de passage de tout changement
   // de frame (scrub, lecture, goToFrame) — même raison que le hook
