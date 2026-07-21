@@ -72,7 +72,15 @@
   // that one" — leaving two strokes' interiors alone even when they pass
   // close together (a V's legs, a corridor's parallel walls), since
   // neither stroke actually TERMINATES there.
-  function computeEndpointBridges(paths, radiusDoc) {
+  // `selfRadiusDoc`: cap for SELF-bridges (a tip reconnecting to its own
+  // stroke). `crossRadiusDoc`: cap for bridges to OTHER strokes — pass
+  // Infinity to always weld the selection into one silhouette (2026-07
+  // feedback: "une forme sans fill... il faudrait juste fermer
+  // virtuellement les gaps pour le calcul de bone" — selecting several
+  // strokes for one rig IS the statement that they form one shape, so
+  // their tips always connect, however wide the gaps; the skeleton then
+  // computes on the same solid silhouette a filled version would give).
+  function computeEndpointBridges(paths, selfRadiusDoc, crossRadiusDoc) {
     var bridges = [];
     for (var i = 0; i < paths.length; i++) {
       var p = paths[i];
@@ -80,9 +88,9 @@
       var ends = [p.firstSegment.point, p.lastSegment.point];
       for (var e = 0; e < ends.length; e++) {
         var ep = ends[e];
-        var bestPt = null, bestDist = Infinity, bestW = p.strokeWidth || 2;
+        var bestPt = null, bestDist = Infinity, bestW = p.strokeWidth || 2, bestLimit = 0;
         for (var j = 0; j < paths.length; j++) {
-          var res;
+          var res, limit;
           if (j === i) {
             // SELF-bridge (2026-07 follow-up: a contour drawn as ONE stroke
             // whose ends nearly meet got no bridge at all — j===i was
@@ -91,23 +99,29 @@
             // body (closing the outline, or a hand loop returning to the
             // wrist) — exclude the 25% of arc adjacent to this endpoint so
             // the search finds the far side it loops back to, not itself.
+            // Kept CAPPED (unlike cross-stroke bridges): an uncapped self-
+            // bridge would close every plain V-shaped line into a triangle.
             var endArc = (e === 0) ? 0 : p.length;
             res = nearestPointOnPath(p, ep, 150, { center: endArc, span: p.length * 0.25 });
+            limit = selfRadiusDoc;
           } else {
             res = nearestPointOnPath(paths[j], ep);
+            limit = crossRadiusDoc;
           }
-          if (res.dist < bestDist) { bestDist = res.dist; bestPt = res.point; bestW = Math.max(p.strokeWidth || 2, paths[j].strokeWidth || 2); }
+          if (res.dist < bestDist) { bestDist = res.dist; bestPt = res.point; bestW = Math.max(p.strokeWidth || 2, paths[j].strokeWidth || 2); bestLimit = limit; }
         }
-        if (bestPt && bestDist > 1 && bestDist <= radiusDoc) bridges.push({ from: ep, to: bestPt, width: bestW });
+        if (bestPt && bestDist > 1 && bestDist <= bestLimit) bridges.push({ from: ep, to: bestPt, width: bestW });
       }
     }
     return bridges;
   }
 
-  // `closeRadiusDoc` (optional): endpoint-bridge search radius in DOCUMENT
-  // px from the Tool Options "Fusion" field — 0/undefined = automatic
-  // default (just enough to weld hairline gaps between successive brush
-  // strokes of the same contour, proportional to their own width).
+  // `closeRadiusDoc` (optional): endpoint-bridge cap in DOCUMENT px from
+  // the Tool Options "Fusion" field. 0/undefined = automatic: cross-stroke
+  // bridges UNLIMITED (a multi-stroke selection always welds into one
+  // silhouette — the selection is the grouping intent), self-bridges
+  // capped near the stroke's own width. A manual value caps BOTH (the
+  // escape hatch when two selected strokes must NOT connect).
   function rasterizeShape(pathOrPaths, maxDim, closeRadiusDoc) {
     maxDim = maxDim || 512;
     var paths = Array.isArray(pathOrPaths) ? pathOrPaths : [pathOrPaths];
@@ -126,8 +140,10 @@
     ctx.scale(scale, scale);
     var strokeWidths = paths.filter(function (p) { return !p.fillColor; }).map(function (p) { return p.strokeWidth || 2; });
     var avgSW = strokeWidths.length ? strokeWidths.reduce(function (a, b) { return a + b; }, 0) / strokeWidths.length : 4;
-    var bridgeR = (closeRadiusDoc && closeRadiusDoc > 0) ? closeRadiusDoc : Math.max(10, avgSW * 3);
-    var bridges = computeEndpointBridges(paths, bridgeR);
+    var manual = closeRadiusDoc && closeRadiusDoc > 0;
+    var selfR = manual ? closeRadiusDoc : Math.max(10, avgSW * 3);
+    var crossR = manual ? closeRadiusDoc : Infinity;
+    var bridges = computeEndpointBridges(paths, selfR, crossR);
     paths.forEach(function (path) {
       ctx.beginPath();
       // A stroke-only shape (fillColor null — a plain hand-drawn line, e.g.

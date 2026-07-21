@@ -126,18 +126,21 @@
   // Deforms EVERY bound path (a multi-shape rig binds each selected shape's
   // vertices against the same shared bone graph — see generateForSelection).
   //
-  // Faithful port of Shapper's computeDeformTS "Formule B" (2026-07
-  // feedback round-trip: a first port averaged UNORDERED graph-neighbor
-  // directions and flipped geometry inside out; a translation-only interim
-  // fixed the flips but dropped the rotation system entirely — "tu as
-  // oublié les tangentes et le système de rotation que l'on drive dans
-  // Shapper par rapport au point précédent"). Per influencing bone:
-  //   ra = normalize(currentChordAngle - bindChordAngle)   (ordered chain)
-  //   vertex += w * (bonePos + rotate(bindOffset, ra))
-  //   handleIn/Out += w * rotate(bindTangent, ra)
-  // — offsets AND bezier tangents rotate with the chain's local bend, so a
-  // bent arm curves its ink instead of shearing it, and the ordered-chain
-  // chord keeps the rotation continuous (no flips).
+  // Split model, settled over three feedback rounds:
+  //   POSITIONS — pure translation blend: vertex = w-blended (bone position
+  //   + CONSTANT bind offset). Strictly "un drive de vertices": dragging a
+  //   bone moves only the vertices bound to it, exactly by the blend of its
+  //   displacement — nothing can flip, and nothing far from the drag moves.
+  //   (Rotating offsets — even with Shapper's own ordered-chain chord — let
+  //   one dragged bone swing the chord of its NEIGHBORS too, orbiting
+  //   distant vertices around bones that never moved: "la déformation
+  //   déforme aussi le trait pas juste les vertices".)
+  //   TANGENTS — rotated by the local chord delta (Shapper's Formule B,
+  //   atan2(next-prev) over the ordered chain, blended per influence): the
+  //   bezier handles turn with the chain's local bend, so ink CURVES around
+  //   a fold instead of staying frozen at bind orientation — the part of
+  //   Shapper's rotation system that acts on the stroke's direction without
+  //   displacing any vertex.
   function deformAll(){
     if(!_rig)return;
     var curPos=_rig.curPos;
@@ -154,11 +157,10 @@
         var bd=binds[vi];
         if(!bd)continue;
         var A=curPos[bd.a],B=curPos[bd.b];
+        var nx=bd.wA*(A.x+bd.offA.x)+bd.wB*(B.x+bd.offB.x);
+        var ny=bd.wA*(A.y+bd.offA.y)+bd.wB*(B.y+bd.offB.y);
         var raA=normalizeAngle(curAngle[bd.a]-_rig.bindAngle[bd.a]);
         var raB=normalizeAngle(curAngle[bd.b]-_rig.bindAngle[bd.b]);
-        var roA=rotateVec(bd.offA,raA),roB=rotateVec(bd.offB,raB);
-        var nx=bd.wA*(A.x+roA.x)+bd.wB*(B.x+roB.x);
-        var ny=bd.wA*(A.y+roA.y)+bd.wB*(B.y+roB.y);
         var hiA=rotateVec(bd.handleIn,raA),hiB=rotateVec(bd.handleIn,raB);
         var hoA=rotateVec(bd.handleOut,raA),hoB=rotateVec(bd.handleOut,raB);
         segs[vi].point=new Point(nx,ny);
