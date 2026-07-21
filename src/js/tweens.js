@@ -929,6 +929,34 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
     var lenErr=Lexp>1e-6?Math.abs(Lexp-_segPolyLen(segs))/Lexp:0;
     var iw=Math.max(0,Math.min(1,(lenErr-0.015)/0.055));
     if(iw<1&&!rA._twSelfX&&!rB._twSelfX&&_segsSelfIntersect(segs))iw=1;
+    // CORRESPONDENCE-TRUST factor (2026-07, "encore un bras hyper
+    // déformé"): the intrinsic reconstruction integrates lerped turning
+    // angles, so it's only as good as the index correspondence between the
+    // two shapes. On a complex multi-lobed contour (a hand with spread
+    // fingers ring-drawn in one stroke, waving between two poses) the
+    // aligned correspondence maps finger to non-finger — measured 41° MEAN
+    // per-vertex turning disagreement vs ≤11° on every clean case (elbow
+    // 2°, V-fold 3°, S-flip 11°) — and integrating those mismatched
+    // angles BALLOONS the inbetween (bbox wider than either keyframe,
+    // 866px vs 768/760) even though its arc length is perfect. Linear, for
+    // all its corner-cutting, stays bounded by construction. Trust ramps
+    // 1→0 over 15°→30° mean disagreement, scaling BOTH gates (a garbage
+    // correspondence can't credibly fix a self-crossing either), so
+    // unreliable pairs simply keep the historical linear behavior.
+    if(iw>0.001){
+      if(rA._twTurnTrust===undefined){
+        var sumTd=0,cntTd=0,pvA=null,pvB=null;
+        for(var ti2=1;ti2<n;ti2++){
+          var taA=Math.atan2(rA.segments[ti2].point[1]-rA.segments[ti2-1].point[1],rA.segments[ti2].point[0]-rA.segments[ti2-1].point[0]);
+          var taB=Math.atan2(rB.segments[ti2].point[1]-rB.segments[ti2-1].point[1],rB.segments[ti2].point[0]-rB.segments[ti2-1].point[0]);
+          if(pvA!==null){sumTd+=Math.abs(_wrapPI(_wrapPI(taA-pvA)-_wrapPI(taB-pvB)));cntTd++;}
+          pvA=taA;pvB=taB;
+        }
+        var meanTd=cntTd?sumTd/cntTd:0; // radians; 15°=0.262, 30°=0.524
+        rA._twTurnTrust=Math.max(0,Math.min(1,(0.524-meanTd)/(0.524-0.262)));
+      }
+      iw*=rA._twTurnTrust;
+    }
     if(iw>0.001){
       var iSegs=_intrinsicSegs(rA,rB,et,cx2,cy2,et<.5?!!rA.closed:!!rB.closed);
       if(iSegs)for(var wi3=0;wi3<n;wi3++){
