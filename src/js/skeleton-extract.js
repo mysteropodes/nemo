@@ -53,6 +53,7 @@
     ctx.save();
     ctx.translate(-bounds.x * scale, -bounds.y * scale);
     ctx.scale(scale, scale);
+    var anyStrokeOnly = false;
     paths.forEach(function (path) {
       ctx.beginPath();
       // A stroke-only shape (fillColor null — a plain hand-drawn line, e.g.
@@ -76,6 +77,7 @@
         if (hasFill) {
           ctx.fill(p2d, path.getFillRule ? path.getFillRule() : 'nonzero');
         } else {
+          anyStrokeOnly = true;
           ctx.lineWidth = Math.max(1, path.strokeWidth || 2);
           ctx.lineCap = path.strokeCap || 'round';
           ctx.lineJoin = path.strokeJoin || 'round';
@@ -94,6 +96,7 @@
           ctx.closePath();
           ctx.fill();
         } else {
+          anyStrokeOnly = true;
           ctx.lineWidth = Math.max(1, path.strokeWidth || 2);
           ctx.lineCap = path.strokeCap || 'round';
           ctx.lineJoin = path.strokeJoin || 'round';
@@ -105,7 +108,44 @@
     var img = ctx.getImageData(0, 0, rw, rh);
     var mask = new Uint8Array(rw * rh);
     for (var px = 0; px < rw * rh; px++) mask[px] = img.data[px * 4 + 3] > 60 ? 1 : 0;
+    // 2026-07 feedback (screenshot: a hand doodle's finger loops came back as
+    // hollow RINGS — confirmed by directly sampling the raster mask, each
+    // loop's interior pixel read 0/background). A single continuous pen
+    // stroke that loops back near itself (a "finger") only paints its own
+    // ribbon — the area it encloses stays empty, so thinning that ring finds
+    // the ring's OWN centerline (a closed loop tracing the loop), not a
+    // simple spine through a solid finger shape. Close every such hole: flood
+    // -fill from the raster's OUTER border first (background genuinely
+    // reachable from outside stays background), then anything still 0
+    // afterward is enclosed by ink on all sides — promote it to foreground,
+    // exactly matching "treat the doodle as if it were a solid filled shape."
+    // Only needed when a stroke-only path contributed to this raster — a
+    // genuinely filled CompoundPath's hole (a real donut/ring shape) is
+    // legitimate and must NOT be silently erased.
+    if (anyStrokeOnly) mask = fillEnclosedHoles(mask, rw, rh);
     return { mask: mask, rw: rw, rh: rh, bounds: bounds, scale: scale };
+  }
+
+  function fillEnclosedHoles(mask, rw, rh) {
+    var reachable = new Uint8Array(rw * rh);
+    var stack = [];
+    function seed(x, y) {
+      var idx = y * rw + x;
+      if (mask[idx] === 0 && !reachable[idx]) { reachable[idx] = 1; stack.push(idx); }
+    }
+    for (var x = 0; x < rw; x++) { seed(x, 0); seed(x, rh - 1); }
+    for (var y = 0; y < rh; y++) { seed(0, y); seed(rw - 1, y); }
+    while (stack.length) {
+      var idx = stack.pop();
+      var x = idx % rw, y = (idx / rw) | 0;
+      if (x > 0) seed(x - 1, y);
+      if (x < rw - 1) seed(x + 1, y);
+      if (y > 0) seed(x, y - 1);
+      if (y < rh - 1) seed(x, y + 1);
+    }
+    var result = new Uint8Array(mask);
+    for (var i = 0; i < rw * rh; i++) if (mask[i] === 0 && !reachable[i]) result[i] = 1;
+    return result;
   }
 
   // ---- Step 2: Zhang-Suen thinning --------------------------------------

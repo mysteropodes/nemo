@@ -8311,7 +8311,15 @@ wireBoolBtn('btn-bool-exclude','exclude');
 document.getElementById('p-erasersize').addEventListener('input',function(){window.SM.setEraserSize(this.value);});
 document.getElementById('btn-shapper-generate').addEventListener('click',function(){if(window.SMShapper)window.SMShapper.generateForSelection();});
 document.getElementById('btn-shapper-commit').addEventListener('click',function(){if(window.SMShapper)window.SMShapper.commitPose();});
-document.getElementById('p-shapper-tolerance').addEventListener('input',function(){state.shapperTolerance=parseFloat(this.value)||2;});
+document.getElementById('p-shapper-tolerance').addEventListener('input',function(){
+  state.shapperTolerance=parseFloat(this.value)||2;
+  // 2026-07 feedback ("la tolérance ne change rien en changeant la valeur en
+  // direct") — scrubbing this field (it's a .scrub input, CLAUDE.md §10)
+  // reads as a live control, but it only ever took effect on the NEXT
+  // Generate Skeleton click. Re-generate immediately whenever a shape is
+  // already selected, so dragging the value regenerates the rig live.
+  if(window.SMShapper&&typeof selectedPaths!=='undefined'&&selectedPaths.length)window.SMShapper.generateForSelection();
+});
 document.getElementById('p-fillbrushsize').addEventListener('input',function(){window.SM.setFillBrushSize(this.value);});
 document.getElementById('p-brushpreset').addEventListener('change',function(){window.SM.setBrushPreset(this.value);if(window.BrushPresetPicker)window.BrushPresetPicker.paintButton(this.value);});
 // Applies a vector brush preset to the current selection — was wired to a
