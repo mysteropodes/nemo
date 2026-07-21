@@ -195,6 +195,28 @@
       lastPenPressure = _stylus.force;
       return _stylus.force;
     }
+    // Some tablet drivers emulate a "pressure-sensitive mouse" instead of a
+    // proper HID pen device: confirmed live (2026-07, feedback "je perds la
+    // pression") — a real stylus whose EVERY pointerdown/move reported
+    // pointerType:'mouse', never 'pen', while e.pressure still carried
+    // genuine fine-grained analog values (0.007, 0.35, 0.6…), captured via
+    // a raw-event logger in the browser preview. The pointerType==='pen'
+    // gate above rejected all of it, silently degrading every stroke to
+    // the speed heuristic below. tools.js's own vbPressureOf (legacy
+    // Paper.js fallback) already guards this exact case correctly — a
+    // genuine plain mouse (no pressure hardware) is spec-mandated to
+    // report EXACTLY 0.5 while pressed, never anything else, so excluding
+    // just that one constant is enough to keep trusting a real mouse's
+    // absence of pressure without also rejecting a mislabeled real device.
+    // This bridge (the primary path whenever the Rust engine is on, i.e.
+    // almost always) never had this fallback — dropped during the C7
+    // cutover port from tools.js, the exact "duplicated pipeline drifted
+    // out of sync" failure this file's own header comment warns about.
+    if (typeof e.pressure === 'number' && e.pressure > 0 && e.pressure !== 0.5) {
+      lastPenPressure = Math.min(1, e.pressure);
+      return lastPenPressure;
+    }
+    if (lastPenPressure != null) return lastPenPressure;
     var now = Date.now();
     var dt = Math.max(8, now - (lastMoveT || now));
     lastMoveT = now;
