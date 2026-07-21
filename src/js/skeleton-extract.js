@@ -86,6 +86,36 @@
           var endGap = path.firstSegment.point.getDistance(path.lastSegment.point);
           outlineClosed = endGap < Math.max((path.strokeWidth || 2) * 3, path.length * 0.1);
         }
+        // Doubling-back detection (2026-07 feedback: "on voit que c'est une
+        // forme non fermée, donc calculer ça avec la fermeture... avec les
+        // coordonnées de vertices on pourrait vraiment définir la ligne
+        // centrale dans la forme"): an OUTLINE stroke travels out along one
+        // side of the shape and back along the other — most of its arc has
+        // a far-in-arc-length counterpart running nearby in space (the two
+        // sides of the limb, one body-thickness apart). A CENTERLINE stroke
+        // (a plain V-shaped line) only self-approaches around its elbow.
+        // Sample the path and measure what fraction of points have a
+        // far-arc neighbor within ~8% of the shape's size: high fraction =
+        // outline (close it via the implicit chord and fill, even when the
+        // endpoint gap is large), low = genuine line (keep it a ribbon).
+        if (!outlineClosed) {
+          var NS = 48;
+          var samples = [];
+          for (var siP = 0; siP < NS; siP++) samples.push(path.getPointAt(path.length * (siP + 0.5) / NS));
+          var sizeRef = Math.max(path.bounds.width, path.bounds.height);
+          var nearD = Math.max((path.strokeWidth || 2) * 4, sizeRef * 0.08);
+          var nearD2 = nearD * nearD;
+          var minArcSep = Math.floor(NS * 0.3);
+          var withNeighbor = 0;
+          for (var ai = 0; ai < NS; ai++) {
+            for (var aj = 0; aj < NS; aj++) {
+              if (Math.abs(ai - aj) < minArcSep) continue;
+              var ddx = samples[ai].x - samples[aj].x, ddy = samples[ai].y - samples[aj].y;
+              if (ddx * ddx + ddy * ddy < nearD2) { withNeighbor++; break; }
+            }
+          }
+          outlineClosed = withNeighbor / NS > 0.55;
+        }
       }
       // Path.getPathData() gives an SVG-path-like string Paper.js itself can
       // produce; simplest robust route here is walking path.segments/curves
