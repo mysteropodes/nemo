@@ -125,6 +125,28 @@ body.mac-overlay-titlebar #app{padding-top:28px;}
 #fb-avatars-pop .fb-pop-status{font-size:9px;padding:1px 5px;border-radius:3px;background:var(--panel3);}
 #fb-avatars-pop .fb-pop-status.resolved{color:#7cd992;}
 #fb-avatars-pop .fb-pop-empty{padding:12px 8px;color:var(--text-dim);font-size:11px;text-align:center;}
+/* History Panel (2026-07) — same trigger-button + fixed popover pattern as
+   #fb-avatars/#fb-avatars-pop just above. Lists state.undoStack (past) then
+   the current position then state.redoStack (available redo, dimmed) —
+   see history-panel.js. */
+#history-btn{flex:none;width:24px;height:24px;border-radius:6px;background:transparent;border:none;color:rgba(236,234,231,.45);cursor:pointer;display:flex;align-items:center;justify-content:center;}
+#history-btn:hover{background:var(--panel3);color:var(--accent-hover);}
+#history-pop{display:none;position:fixed;width:280px;max-height:420px;overflow-y:auto;background:var(--panel2);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:600;padding:6px;}
+#history-pop.open{display:block;}
+#history-pop .hist-item{display:flex;gap:8px;align-items:center;padding:7px 8px;border-radius:6px;font-size:11px;cursor:pointer;color:var(--text);}
+#history-pop .hist-item:hover{background:var(--panel3);}
+#history-pop .hist-item.future{opacity:.4;}
+#history-pop .hist-item.current{background:var(--panel3);cursor:default;}
+#history-pop .hist-item.current:hover{background:var(--panel3);}
+#history-pop .hist-dot{flex:none;width:6px;height:6px;border-radius:50%;background:var(--text-dim);}
+#history-pop .hist-item.current .hist-dot{background:var(--accent-hover);}
+#history-pop .hist-body{flex:1;min-width:0;}
+#history-pop .hist-label{color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+#history-pop .hist-meta{color:var(--text-dim);font-size:10px;margin-top:1px;}
+#history-pop .hist-empty{padding:12px 8px;color:var(--text-dim);font-size:11px;text-align:center;}
+#history-pop .hist-header{display:flex;align-items:center;justify-content:space-between;padding:2px 4px 8px;color:var(--text-dim);font-size:10px;text-transform:uppercase;letter-spacing:.03em;}
+#history-pop .hist-clear{cursor:pointer;color:var(--text-dim);}
+#history-pop .hist-clear:hover{color:var(--text);}
 .project-tab{flex:none;display:flex;align-items:center;gap:9px;height:100%;padding:0;background:transparent;border-radius:0;font-size:12.5px;font-weight:500;color:rgba(236,234,231,.35);cursor:pointer;max-width:180px;user-select:none;}
 .project-tab:hover{color:rgba(236,234,231,.7);}
 .project-tab.act{background:transparent;color:var(--text);font-weight:600;}

@@ -130,6 +130,13 @@
   <button class="tool-btn" id="topbar-comment-btn" data-tool="comment" data-i18n-title="toolComment" title="Comment — click the canvas to pin a note (C)"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M20 2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4l4 4 4-4h4a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2z"/></svg><span class="sk">C</span></button>
   <div id="fb-avatars" data-i18n-title="fbAvatarsTitle" title="Feedback comments sur ce projet"></div>
   <div id="fb-avatars-pop"></div>
+  <!-- History Panel (2026-07, feedback: "Créer un panel d'historique") —
+       read+jump view over state.undoStack/redoStack (tweens.js), a session-
+       only list of every pushUndoLayers() snapshot. Same trigger-button +
+       fixed-position-popover pattern as #fb-avatars/#fb-avatars-pop above;
+       see history-panel.js. -->
+  <button id="history-btn" data-i18n-title="historyBtnTitle" title="Historique — annuler/rétablir en un clic"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 8v5l3 2"/></svg></button>
+  <div id="history-pop"></div>
   <button id="btn-open-tutorial-topbar" data-i18n-title="startTutTitle" title="Découvrir Nemo — tutoriel interactif"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>
   <button id="project-tabs-settings" data-i18n-title="settingsTitle" title="Réglages"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></button>
 </div>
@@ -1428,6 +1435,7 @@
 <script src="js/custom-effects.js"></script>
 <script src="js/project.js"></script>
 <script src="js/feedback-bridge.js"></script>
+<script src="js/history-panel.js"></script>
 <script src="js/updater-bridge.js"></script>
 <script src="js/kitsu.js"></script>
 <script src="js/images.js"></script>
