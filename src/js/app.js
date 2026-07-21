@@ -1762,9 +1762,22 @@ function _collectLayerStrokes(li,ld){
 function _maybePromoteInterpolated(f,strokes){
   if(window._tweenFrameDirty&&f.isInterpolated&&!strokesEqual(strokes,f.strokes)){f.isKeyframe=true;f.isInterpolated=false;}
 }
+// Both save functions MUST skip layers that aren't effectively visible
+// (hidden eye, or non-soloed while another layer is soloed) — loadFrame
+// deliberately leaves those layers' LIVE Paper layers EMPTY
+// (removeChildren + continue, see layerIsEffectivelyVisible there), so
+// "saving" one reads an empty live layer and OVERWRITES the frame's real
+// stored strokes with []. Confirmed live (2026-07, the reported "des
+// pertes d'images après plusieurs actions" data loss): hide a layer with
+// content, navigate anywhere (loadFrame empties it), then ANY action that
+// saves (every pushUndoLayers — so every draw/erase/edit — plus
+// generateTweens) silently wiped the hidden layer's current-frame content.
+// The stored frame data is the source of truth for an unpopulated live
+// layer — leave it alone.
 function saveActiveLayerFrame(){
   window._sceneVersion++;
   var ld=state.layers[state.activeLayerIdx];if(ld.symbolId||ld.nativeVideo||ld.montageId||ld.isNullLayer||ld.isEffectLayer)return;
+  if(!layerIsEffectivelyVisible(state.activeLayerIdx))return;
   _writeBackGhostProxies(state.activeLayerIdx);
   var f=ld.frames[state.currentFrame];
   if(!f.isKeyframe&&!f.isInterpolated)return;
@@ -1774,7 +1787,9 @@ function saveActiveLayerFrame(){
 }
 function saveAllLayerFrames(){
   _writeBackGhostProxies(state.activeLayerIdx);
-  for(var i=0;i<state.layers.length;i++){if(state.layers[i].symbolId||state.layers[i].nativeVideo||state.layers[i].montageId||state.layers[i].isNullLayer||state.layers[i].isEffectLayer)continue;var f=state.layers[i].frames[state.currentFrame];if(!f||(!f.isKeyframe&&!f.isInterpolated))continue;
+  for(var i=0;i<state.layers.length;i++){if(state.layers[i].symbolId||state.layers[i].nativeVideo||state.layers[i].montageId||state.layers[i].isNullLayer||state.layers[i].isEffectLayer)continue;
+  if(!layerIsEffectivelyVisible(i))continue;
+  var f=state.layers[i].frames[state.currentFrame];if(!f||(!f.isKeyframe&&!f.isInterpolated))continue;
   var strokes=_collectLayerStrokes(i,state.layers[i]);
   _maybePromoteInterpolated(f,strokes);
   f.strokes=strokes;}
