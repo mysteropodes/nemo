@@ -55,13 +55,32 @@
     ctx.scale(scale, scale);
     paths.forEach(function (path) {
       ctx.beginPath();
+      // A stroke-only shape (fillColor null — a plain hand-drawn line, e.g.
+      // an arm/hand doodle with Stroke Only) has no interior to fill: filling
+      // its raw path data treats it as an implicit closed polygon (a straight
+      // chord from the last point back to the first), producing a degenerate
+      // silhouette that has nothing to do with the visible ink. 2026-07
+      // feedback (screenshot: a hand/arm outline where the desired skeleton
+      // should run down the MIDDLE of the drawn line, not along some bogus
+      // fill of its endpoints) — rasterize the STROKE'S OWN RIBBON instead,
+      // as if the ink itself were the fill, by stroking with its real width/
+      // cap/join. The thinning step below then finds the true centerline of
+      // that ribbon, same as it would for any genuinely filled shape.
+      var hasFill = !!path.fillColor;
       // Path.getPathData() gives an SVG-path-like string Paper.js itself can
       // produce; simplest robust route here is walking path.segments/curves
       // directly via Path2D from the exported SVG path data.
       var svgPath = path.exportSVG ? path.exportSVG().getAttribute('d') : null;
       if (svgPath) {
         var p2d = new Path2D(svgPath);
-        ctx.fill(p2d, path.getFillRule ? path.getFillRule() : 'nonzero');
+        if (hasFill) {
+          ctx.fill(p2d, path.getFillRule ? path.getFillRule() : 'nonzero');
+        } else {
+          ctx.lineWidth = Math.max(1, path.strokeWidth || 2);
+          ctx.lineCap = path.strokeCap || 'round';
+          ctx.lineJoin = path.strokeJoin || 'round';
+          ctx.stroke(p2d);
+        }
       } else {
         // Fallback: sample the path's own curves as a polygon (loses holes on
         // a CompoundPath, but never crashes).
@@ -71,8 +90,15 @@
           var pt = path.getPointAt(Math.min(len, (i / n) * len));
           ctx.lineTo(pt.x, pt.y);
         }
-        ctx.closePath();
-        ctx.fill();
+        if (hasFill) {
+          ctx.closePath();
+          ctx.fill();
+        } else {
+          ctx.lineWidth = Math.max(1, path.strokeWidth || 2);
+          ctx.lineCap = path.strokeCap || 'round';
+          ctx.lineJoin = path.strokeJoin || 'round';
+          ctx.stroke();
+        }
       }
     });
     ctx.restore();

@@ -8311,6 +8311,7 @@ wireBoolBtn('btn-bool-exclude','exclude');
 document.getElementById('p-erasersize').addEventListener('input',function(){window.SM.setEraserSize(this.value);});
 document.getElementById('btn-shapper-generate').addEventListener('click',function(){if(window.SMShapper)window.SMShapper.generateForSelection();});
 document.getElementById('btn-shapper-commit').addEventListener('click',function(){if(window.SMShapper)window.SMShapper.commitPose();});
+document.getElementById('p-shapper-tolerance').addEventListener('input',function(){state.shapperTolerance=parseFloat(this.value)||2;});
 document.getElementById('p-fillbrushsize').addEventListener('input',function(){window.SM.setFillBrushSize(this.value);});
 document.getElementById('p-brushpreset').addEventListener('change',function(){window.SM.setBrushPreset(this.value);if(window.BrushPresetPicker)window.BrushPresetPicker.paintButton(this.value);});
 // Applies a vector brush preset to the current selection — was wired to a

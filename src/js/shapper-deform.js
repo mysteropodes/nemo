@@ -161,8 +161,13 @@
       return;
     }
     var t0=performance.now();
+    // Tool Options' "Poignées" field (index.html) — lower tolerance keeps
+    // the fitted curve closer to the raw pixel chain (more control points),
+    // higher decimates more aggressively (fewer, sparser points). Read at
+    // generation time, like every other Tool Options field in this app.
+    var tolerance=(typeof state!=='undefined'&&state.shapperTolerance)?state.shapperTolerance:2;
     var skeleton;
-    try{skeleton=window.SMSkeleton.extractSkeleton(paths,{maxDim:512,tolerance:2});}
+    try{skeleton=window.SMSkeleton.extractSkeleton(paths,{maxDim:512,tolerance:tolerance});}
     catch(e){console.error('Shapper extractSkeleton failed',e);if(window.showToast)showToast('Échec de l\'extraction du squelette');return;}
     if(!skeleton||!skeleton.nodes.length){if(window.showToast)showToast('Squelette introuvable pour cette sélection');return;}
     var boneGraph=buildBoneGraph(skeleton);
