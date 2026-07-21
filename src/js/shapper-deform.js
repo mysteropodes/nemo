@@ -110,59 +110,73 @@
 
   function rotateVec(v,a){var c=Math.cos(a),s=Math.sin(a);return{x:v.x*c-v.y*s,y:v.x*s+v.y*c};}
 
-  function deformPath(){
+  // Deforms EVERY bound path (a multi-shape rig binds each selected shape's
+  // vertices against the same shared bone graph — see generateForSelection).
+  function deformAll(){
     if(!_rig)return;
-    var path=_rig.path;
-    // Path shape changed elsewhere (another tool edited it) since bind —
-    // bail out silently rather than deform the wrong vertex count.
-    if(!path||path.segments.length!==_rig.binds.length)return;
     var boneGraph=_rig.boneGraph;
     var curPos=_rig.curPos;
     var posOf=function(id){return curPos[id];};
     var curDir={};
     for(var i=0;i<boneGraph.points.length;i++)curDir[i]=boneDirection(boneGraph,i,posOf);
-    var segs=path.segments;
-    for(var vi=0;vi<segs.length;vi++){
-      var bd=_rig.binds[vi];
-      if(!bd)continue;
-      var A=curPos[bd.a],B=curPos[bd.b];
-      var dA=curDir[bd.a]-_rig.bindDir[bd.a];
-      var dB=curDir[bd.b]-_rig.bindDir[bd.b];
-      var posA=rotateVec(bd.offA,dA);posA.x+=A.x;posA.y+=A.y;
-      var posB=rotateVec(bd.offB,dB);posB.x+=B.x;posB.y+=B.y;
-      var nx=bd.wA*posA.x+bd.wB*posB.x,ny=bd.wA*posA.y+bd.wB*posB.y;
-      var hAngle=Math.atan2(bd.wA*Math.sin(dA)+bd.wB*Math.sin(dB),bd.wA*Math.cos(dA)+bd.wB*Math.cos(dB));
-      var hin=rotateVec(bd.handleIn,hAngle),hout=rotateVec(bd.handleOut,hAngle);
-      segs[vi].point=new Point(nx,ny);
-      segs[vi].handleIn=new Point(hin.x,hin.y);
-      segs[vi].handleOut=new Point(hout.x,hout.y);
-    }
+    _rig.paths.forEach(function(path,pi){
+      var binds=_rig.bindsByPath[pi];
+      // Path shape changed elsewhere (another tool edited it) since bind —
+      // skip THIS path rather than bail out of the whole rig.
+      if(!path||path.segments.length!==binds.length)return;
+      var segs=path.segments;
+      for(var vi=0;vi<segs.length;vi++){
+        var bd=binds[vi];
+        if(!bd)continue;
+        var A=curPos[bd.a],B=curPos[bd.b];
+        var dA=curDir[bd.a]-_rig.bindDir[bd.a];
+        var dB=curDir[bd.b]-_rig.bindDir[bd.b];
+        var posA=rotateVec(bd.offA,dA);posA.x+=A.x;posA.y+=A.y;
+        var posB=rotateVec(bd.offB,dB);posB.x+=B.x;posB.y+=B.y;
+        var nx=bd.wA*posA.x+bd.wB*posB.x,ny=bd.wA*posA.y+bd.wB*posB.y;
+        var hAngle=Math.atan2(bd.wA*Math.sin(dA)+bd.wB*Math.sin(dB),bd.wA*Math.cos(dA)+bd.wB*Math.cos(dB));
+        var hin=rotateVec(bd.handleIn,hAngle),hout=rotateVec(bd.handleOut,hAngle);
+        segs[vi].point=new Point(nx,ny);
+        segs[vi].handleIn=new Point(hin.x,hin.y);
+        segs[vi].handleOut=new Point(hout.x,hout.y);
+      }
+    });
   }
 
+  // Accepts 1+ selected shapes (2026-07 fix: "je n'arrive pas à select un
+  // ensemble... ni un seul élément" — the tool previously hard-required
+  // exactly one path, and offered no way to pick a shape while already
+  // inside the tool, see the onDown click/marquee handling below). Multiple
+  // shapes bind against ONE shared skeleton extracted from their combined
+  // silhouette (skeleton-extract.js's extractSkeleton now accepts an array),
+  // so a multi-part character can be posed as a single rig.
   function generateForSelection(){
-    if(typeof selectedPaths==='undefined'||selectedPaths.length!==1||!(selectedPaths[0] instanceof Path)){
-      if(window.showToast)showToast('Sélectionnez une seule forme pour générer son squelette');
+    if(typeof selectedPaths==='undefined'||!selectedPaths.length){
+      if(window.showToast)showToast('Sélectionnez au moins une forme pour générer son squelette');
       return;
     }
-    var path=selectedPaths[0];
-    if(path.segments.length<3){if(window.showToast)showToast('Forme trop simple pour un squelette');return;}
+    var paths=selectedPaths.filter(function(p){return p instanceof Path&&p.segments.length>=3;});
+    if(!paths.length){
+      if(window.showToast)showToast('Sélectionnez au moins une forme (3 points ou plus) pour générer son squelette');
+      return;
+    }
     var t0=performance.now();
     var skeleton;
-    try{skeleton=window.SMSkeleton.extractSkeleton(path,{maxDim:512,tolerance:2});}
+    try{skeleton=window.SMSkeleton.extractSkeleton(paths,{maxDim:512,tolerance:2});}
     catch(e){console.error('Shapper extractSkeleton failed',e);if(window.showToast)showToast('Échec de l\'extraction du squelette');return;}
-    if(!skeleton||!skeleton.nodes.length){if(window.showToast)showToast('Squelette introuvable pour cette forme');return;}
+    if(!skeleton||!skeleton.nodes.length){if(window.showToast)showToast('Squelette introuvable pour cette sélection');return;}
     var boneGraph=buildBoneGraph(skeleton);
     if(boneGraph.points.length<2){if(window.showToast)showToast('Squelette trop simple pour être riggé');return;}
-    var binds=bindPathToBones(path,boneGraph);
+    var bindsByPath=paths.map(function(p){return bindPathToBones(p,boneGraph);});
     var curPos={};
     boneGraph.points.forEach(function(p){curPos[p.id]={x:p.x,y:p.y};});
     var posOf=function(id){return curPos[id];};
     var bindDir={};
     boneGraph.points.forEach(function(p){bindDir[p.id]=boneDirection(boneGraph,p.id,posOf);});
-    _rig={path:path,skeleton:skeleton,boneGraph:boneGraph,binds:binds,curPos:curPos,bindDir:bindDir};
+    _rig={paths:paths,skeleton:skeleton,boneGraph:boneGraph,bindsByPath:bindsByPath,curPos:curPos,bindDir:bindDir};
     _dragId=null;
     if(window.SMEngineBridge)window.SMEngineBridge.renderNow();
-    if(window.showToast)showToast('Squelette généré — '+boneGraph.points.length+' points, '+((performance.now()-t0)|0)+'ms');
+    if(window.showToast)showToast('Squelette généré — '+paths.length+' forme(s), '+boneGraph.points.length+' points, '+((performance.now()-t0)|0)+'ms');
   }
 
   function nearestBoneAt(pt,radius){
@@ -189,7 +203,7 @@
   function onDrag(event){
     if(_dragId===null||!_rig)return false;
     _rig.curPos[_dragId]={x:event.point.x,y:event.point.y};
-    deformPath();
+    deformAll();
     if(window.SMEngineBridge)window.SMEngineBridge.renderNow();
     return true;
   }

@@ -31,9 +31,18 @@
   // scaled-canvas -> fill pattern, just filling the TARGET shape itself
   // (not tracing wall outlines around it) since we need its solid interior,
   // not an enclosed empty region.
-  function rasterizeShape(path, maxDim) {
+  // Accepts either a single Path/CompoundPath or an ARRAY of them — a
+  // multi-shape selection (2026-07: "je n'arrive pas à select un ensemble...
+  // pour faire le skeleton") rasterizes as the UNION of every shape's fill
+  // (each is filled into the same canvas in turn, so overlapping/adjacent
+  // shapes merge into one silhouette), producing ONE shared skeleton that
+  // every selected shape's vertices can then bind against.
+  function rasterizeShape(pathOrPaths, maxDim) {
     maxDim = maxDim || 512;
-    var bounds = path.bounds.clone().expand(4);
+    var paths = Array.isArray(pathOrPaths) ? pathOrPaths : [pathOrPaths];
+    var bounds = null;
+    paths.forEach(function (p) { bounds = bounds ? bounds.unite(p.bounds) : p.bounds.clone(); });
+    bounds = bounds.expand(4);
     var scale = Math.min(1, maxDim / Math.max(bounds.width, bounds.height, 1));
     var rw = Math.max(1, Math.round(bounds.width * scale));
     var rh = Math.max(1, Math.round(bounds.height * scale));
@@ -44,26 +53,28 @@
     ctx.save();
     ctx.translate(-bounds.x * scale, -bounds.y * scale);
     ctx.scale(scale, scale);
-    ctx.beginPath();
-    // Path.getPathData() gives an SVG-path-like string Paper.js itself can
-    // produce; simplest robust route here is walking path.segments/curves
-    // directly via Path2D from the exported SVG path data.
-    var svgPath = path.exportSVG ? path.exportSVG().getAttribute('d') : null;
-    if (svgPath) {
-      var p2d = new Path2D(svgPath);
-      ctx.fill(p2d, path.getFillRule ? path.getFillRule() : 'nonzero');
-    } else {
-      // Fallback: sample the path's own curves as a polygon (loses holes on
-      // a CompoundPath, but never crashes).
-      ctx.moveTo(path.firstSegment.point.x, path.firstSegment.point.y);
-      var len = path.length, n = Math.max(8, Math.min(2000, Math.ceil(len / 2)));
-      for (var i = 1; i <= n; i++) {
-        var pt = path.getPointAt(Math.min(len, (i / n) * len));
-        ctx.lineTo(pt.x, pt.y);
+    paths.forEach(function (path) {
+      ctx.beginPath();
+      // Path.getPathData() gives an SVG-path-like string Paper.js itself can
+      // produce; simplest robust route here is walking path.segments/curves
+      // directly via Path2D from the exported SVG path data.
+      var svgPath = path.exportSVG ? path.exportSVG().getAttribute('d') : null;
+      if (svgPath) {
+        var p2d = new Path2D(svgPath);
+        ctx.fill(p2d, path.getFillRule ? path.getFillRule() : 'nonzero');
+      } else {
+        // Fallback: sample the path's own curves as a polygon (loses holes on
+        // a CompoundPath, but never crashes).
+        ctx.moveTo(path.firstSegment.point.x, path.firstSegment.point.y);
+        var len = path.length, n = Math.max(8, Math.min(2000, Math.ceil(len / 2)));
+        for (var i = 1; i <= n; i++) {
+          var pt = path.getPointAt(Math.min(len, (i / n) * len));
+          ctx.lineTo(pt.x, pt.y);
+        }
+        ctx.closePath();
+        ctx.fill();
       }
-      ctx.closePath();
-      ctx.fill();
-    }
+    });
     ctx.restore();
     var img = ctx.getImageData(0, 0, rw, rh);
     var mask = new Uint8Array(rw * rh);
@@ -438,12 +449,21 @@
   // `nodes[].x/y` are in DOCUMENT coordinates (already un-scaled from the
   // raster back through `bounds`/`scale`) so callers never need to touch
   // the rasterization internals.
-  function extractSkeleton(path, opts) {
+  // pathOrPaths: a single Path/CompoundPath, or an array of them (a
+  // multi-shape selection) — see rasterizeShape's comment above.
+  function extractSkeleton(pathOrPaths, opts) {
     opts = opts || {};
-    if (!path || !path.bounds || path.bounds.width < 2 || path.bounds.height < 2) return null;
+    var paths = Array.isArray(pathOrPaths) ? pathOrPaths : [pathOrPaths];
+    if (!paths.length) return null;
+    var combined = null;
+    for (var pi = 0; pi < paths.length; pi++) {
+      if (!paths[pi] || !paths[pi].bounds) return null;
+      combined = combined ? combined.unite(paths[pi].bounds) : paths[pi].bounds.clone();
+    }
+    if (combined.width < 2 || combined.height < 2) return null;
     var maxDim = opts.maxDim || 512;
     var tolerance = opts.tolerance !== undefined ? opts.tolerance : 2;
-    var raster = rasterizeShape(path, maxDim);
+    var raster = rasterizeShape(paths, maxDim);
     var thinned = zhangSuenThin(raster.mask, raster.rw, raster.rh);
     var graph = traceSkeletonGraph(thinned, raster.rw, raster.rh);
     if (!graph.nodes.length) return null;

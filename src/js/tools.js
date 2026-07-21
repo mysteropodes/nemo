@@ -6191,14 +6191,53 @@ function onMouseDown(event){
       if(ep.strokeWidth){state.brushSize=ep.strokeWidth;document.getElementById('p-sw').value=Math.round(ep.strokeWidth);}
       showToast('Color picked');}
   }else if(state.tool==='shapper'){
-    if(window.SMShapper)window.SMShapper.onDown(event);
+    // 2026-07 fix ("je n'arrive pas à select un ensemble... ni un seul
+    // élément pour faire le skeleton") — this tool used to ONLY hit-test
+    // bone handles, silently ignoring any click that missed one. It now
+    // falls through to the same click/shift-click/marquee pattern the
+    // Select tool uses (lines above) whenever no bone was grabbed, so a
+    // shape can be picked (or a set of shapes marquee-selected) WITHOUT
+    // leaving this tool. generateForSelection (shapper-deform.js) accepts
+    // 1+ selected shapes, binding them all to one shared skeleton.
+    var shBoneHit=window.SMShapper&&window.SMShapper.onDown(event);
+    if(!shBoneHit){
+      var shHit=layer.hitTest(event.point,{stroke:true,fill:true,tolerance:8/view.zoom});
+      if(shHit&&(shHit.item instanceof Path||shHit.item instanceof CompoundPath)){
+        var shP=shHit.item;var shIdx=selectedPaths.indexOf(shP);
+        if(event.event.shiftKey){
+          if(shIdx>=0)selectedPaths.splice(shIdx,1);else selectedPaths.push(shP);
+        }else if(shIdx<0){
+          selectedPaths.length=0;selectedPaths.push(shP);
+        }
+        state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;});
+        // Selection changed — any existing rig was bound to the OLD
+        // selection, so it's stale now (Generate Skeleton must be
+        // re-clicked for the new pick).
+        if(window.SMShapper)window.SMShapper.clearRig();
+      }else{
+        if(!event.event.shiftKey){selectedPaths.length=0;if(window.SMShapper)window.SMShapper.clearRig();}
+        _marquee.active=true;_marquee.start=event.point.clone();_marquee.rect=null;_marquee.mode='shapper';
+      }
+      renderArcs();updateUI();
+    }
   }
 }
 function onMouseDrag(event){
   if(state.playing)return;
   if(state.isPanning||state.spaceDown){var dx=event.event.movementX||0;var dy=event.event.movementY||0;view.center=view.center.subtract(new Point(dx,dy).divide(view.zoom));return;}
   if(state.tool==='camera'){if(window.SMCamera)SMCamera.onDrag(event);return;}
-  if(state.tool==='shapper'){if(window.SMShapper)SMShapper.onDrag(event);return;}
+  if(state.tool==='shapper'){
+    if(window.SMShapper&&SMShapper.onDrag(event))return;
+    if(_marquee.active){
+      var shPrevA=project.activeLayer;marqueeLayer.activate();
+      var shMx1=Math.min(_marquee.start.x,event.point.x),shMy1=Math.min(_marquee.start.y,event.point.y);
+      var shMx2=Math.max(_marquee.start.x,event.point.x),shMy2=Math.max(_marquee.start.y,event.point.y);
+      if(_marquee.rect)_marquee.rect.remove();
+      _marquee.rect=new Path.Rectangle({from:new Point(shMx1,shMy1),to:new Point(shMx2,shMy2),strokeColor:'rgba(74,158,255,.9)',strokeWidth:1/view.zoom,dashArray:[4/view.zoom,3/view.zoom],fillColor:new Color(0.29,0.62,1,0.08),insert:true});
+      shPrevA.activate();
+    }
+    return;
+  }
   if(state.appMode==='motion'&&window.SMMotion&&SMMotion.onDrag(event))return;
   if(state.tool==='draw'){
     if(!currentPath)return;
@@ -6439,7 +6478,25 @@ function onMouseDrag(event){
 function onMouseUp(event){
   if(state.isPanning){state.isPanning=false;return;}if(state.playing)return;
   if(state.tool==='camera'){if(window.SMCamera)SMCamera.onUp(event);return;}
-  if(state.tool==='shapper'){if(window.SMShapper)SMShapper.onUp(event);return;}
+  if(state.tool==='shapper'){
+    if(window.SMShapper&&SMShapper.onUp(event))return;
+    if(_marquee.active&&_marquee.mode==='shapper'){
+      if(_marquee.rect){
+        var shMb=_marquee.rect.bounds;
+        var shLayer=userLayers[state.activeLayerIdx];
+        shLayer.children.forEach(function(c){
+          var shEligible=(c instanceof Path&&c.segments.length>0&&(c.strokeColor||c.fillColor))||(c instanceof CompoundPath&&(c.strokeColor||c.fillColor));
+          if(shEligible&&shMb.intersects(c.bounds)){
+            if(selectedPaths.indexOf(c)<0)selectedPaths.push(c);
+          }
+        });
+        state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;});
+        _marquee.rect.remove();_marquee.rect=null;_marquee.mode=null;
+      }
+      _marquee.active=false;renderArcs();updateUI();
+    }
+    return;
+  }
   if(state.appMode==='motion'&&window.SMMotion&&SMMotion.onUp(event))return;
   _eraseDragActive=false;_eraseLastPt=null;
   if(state.tool==='fill'&&_fillCloseDrag){
