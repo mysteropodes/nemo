@@ -670,7 +670,24 @@ function _sampleAtFractions(p,len,fractions){
     var off=fractions[i]*len;
     var pt=p.getPointAt(off);if(!pt)pt=p.getPointAt(len);
     var tan=p.getTangentAt(off);if(!tan)tan=new Point(1,0);
-    var hl=len/Math.max(1,fractions.length-1)/3;
+    // LOCAL handle length (2026-07, "artefact de trait... bump" — visible
+    // kink reported live on a DTW-correspondence stroke): the old formula
+    // divided the WHOLE stroke's arc length evenly across every point
+    // regardless of where fractions[i] actually sits relative to its
+    // neighbors — only correct when `fractions` is uniform. DTW/landmark
+    // correspondence deliberately ISN'T uniform (a fold earns more
+    // samples than a straight run), so wherever local point density ran
+    // denser than the stroke's global average, the old fixed handle
+    // overshot and rendered as a visible bump. Handle length is now the
+    // ACTUAL local gap to each neighbor (Catmull-Rom style — averaged
+    // from both sides at an interior point), so it shrinks exactly where
+    // points are packed together and grows where they're sparse, instead
+    // of an average that's wrong almost everywhere fractions isn't
+    // uniform. Reduces to the exact old formula when fractions IS
+    // uniform (nextOff-prevOff = 2·len/(n-1) there, /6 undoes the ×2).
+    var prevOff=i>0?fractions[i-1]*len:off;
+    var nextOff=i<fractions.length-1?fractions[i+1]*len:off;
+    var hl=Math.max(0.01,nextOff-prevOff)/6;
     segs.push({point:[pt.x,pt.y],handleIn:i===0?[0,0]:[-tan.x*hl,-tan.y*hl],handleOut:i===fractions.length-1?[0,0]:[tan.x*hl,tan.y*hl]});
   }
   return segs;
