@@ -208,7 +208,16 @@
     });
   }
 
-  function buildSceneJson(skipVolatile) {
+  // excludeGhosts (2026-07 audit): the live editing view legitimately wants
+  // review ghosts visible under the default 'all' revisionView (a reviewer
+  // needs to SEE a frozen ghost to click Accept/Reject on it) — this must
+  // stay false for every normal render call. Export paths (renderFrameToPixelsPNG,
+  // the effects-enabled export route) need the opposite: a rendered file
+  // should never contain a ghost regardless of the current viewing mode,
+  // same invariant export.js's own exportBuildFrame already enforces for
+  // the plain (non-effects) export path — this closes the same gap for the
+  // WGPU-effects one, which reuses this function instead of exportBuildFrame.
+  function buildSceneJson(skipVolatile, excludeGhosts) {
     var layers = [];
     // StoryBoard montage preview (storyboard.js, 2026-07): when the node
     // space has an active montage, the canvas shows THAT montage's frame
@@ -315,7 +324,9 @@
         // so review attention lands only on ghosts + active corrections.
         // Geometry is untouched either way — this only decides what goes
         // into THIS render, never mutates the document.
-        if (state.revisionView === 'mine') {
+        if (excludeGhosts) {
+          if (c.data && c.data.isRevisionGhost) continue;
+        } else if (state.revisionView === 'mine') {
           if (c.data && c.data.ownerId && state.userProfile && c.data.ownerId !== state.userProfile.id) continue;
         } else if (state.revisionView === 'revisions') {
           if (!(c.data && (c.data.isRevisionGhost || c.data.revisionParentId))) continue;
@@ -1576,7 +1587,7 @@
     engine.resize(cw, ch);
     engine.set_viewport(0, 0, 1, 0, cw / 2, ch / 2);
     loadFrame(frameIdx);
-    var json = buildSceneJson(true);
+    var json = buildSceneJson(true, true);
     var bytes = await engine.render_to_pixels(json);
     var imgData = new ImageData(new Uint8ClampedArray(bytes.buffer, bytes.byteOffset, bytes.byteLength), cw, ch);
     var off = document.createElement('canvas'); off.width = cw; off.height = ch;
