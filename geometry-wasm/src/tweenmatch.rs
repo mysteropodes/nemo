@@ -404,7 +404,15 @@ fn match_sc(fa: &Feat, fb: &Feat, same_index: bool, a_pts_override: Option<&[(f6
     let (rdx, rdy) = (fa.rel_x - fb.rel_x, fa.rel_y - fb.rel_y);
     let rel = (rdx * rdx + rdy * rdy).sqrt().min(1.0);
     let len_ratio = fa.length.max(fb.length) / fa.length.min(fb.length).max(1.0);
-    let ratio_pen = if len_ratio > 2.0 { ((len_ratio - 2.0) * 0.35).min(0.7) } else { 0.0 };
+    // Recalibrated 2026-07 — verbatim port of tweens.js's ratioPen (see the
+    // JS comment for the measured rationale): ramp from 1.6 instead of 2.0,
+    // gated on >15px absolute difference so micro-stroke pen noise stays
+    // exempt.
+    let ratio_pen = if len_ratio > 1.6 && (fa.length - fb.length).abs() > 15.0 {
+        ((len_ratio - 1.6) * 0.5).min(0.7)
+    } else {
+        0.0
+    };
     // 0.35 only when BOTH flags are ground truth (plain strokes' real
     // sd.closed). When either side is a heuristic guess (vector-brush
     // centerline), a disagreement is as likely a drawing accident as a real
