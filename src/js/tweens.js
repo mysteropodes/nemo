@@ -1338,10 +1338,30 @@ function resolveSplitMatches(sA,sB,pairSpecs,unA,unB){
 // function's behavior for anyone who never uses the feature, is completely
 // unchanged.
 function splitTweenables(strokes,manualMode){
-  var list=[],orig=[],dabsByGroup={},held=[];
+  var list=[],orig=[],dabsByGroup={},held=[],backdropsById={};
   strokes.forEach(function(sd,i){
     if(sd.isBrushTextureCopy){
       if(sd.brushGroupId)(dabsByGroup[sd.brushGroupId]=dabsByGroup[sd.brushGroupId]||[]).push(sd);
+      return;
+    }
+    // Vector-brush FILL BACKDROP (data.linkedFill/linkedFillId, draw-
+    // bridge.js's Pressure-brush-with-Fill-enabled path) — excluded from
+    // independent matching for the same reason dabs are: it's not
+    // independent content, it's a rendering companion of its ribbon
+    // (rebuildVectorBrushOutline keeps it curve-fitted to the LIVE
+    // centerline on every edit). Letting autoMatch pair it on its own gave
+    // it a completely separate resample/alignment/rotation search from its
+    // ribbon — nothing then guaranteed the two stayed visually attached
+    // mid-tween (found live: "le fill suit pas le stroke", confirmed the
+    // backdrop and ribbon can drift apart by several px at the midframe
+    // even on a simple synthetic bend, more on a real hand-drawn curve
+    // whose smoothed backdrop and raw centerline aren't identical point
+    // sets to begin with). Regenerated fresh from the ribbon's own
+    // INTERPOLATED centerline every frame instead (generateTweens' pairs
+    // loop + emit loop) — same "single source of truth" principle as the
+    // live-edit path, just applied per generated frame.
+    if(sd.isLinkedFillCompanion){
+      if(sd.linkedFillId)backdropsById[sd.linkedFillId]=sd;
       return;
     }
     // A held stroke is copied UNCHANGED into every generated inbetween
@@ -1351,7 +1371,15 @@ function splitTweenables(strokes,manualMode){
     if(manualMode&&!sd.tweenOn){held.push(sd);return;}
     list.push(sd);orig.push(i);
   });
-  return{list:list,orig:orig,dabsByGroup:dabsByGroup,held:held};
+  return{list:list,orig:orig,dabsByGroup:dabsByGroup,held:held,backdropsById:backdropsById};
+}
+// Plain closed fill built directly from a ribbon's centerline anchors (no
+// width offset) — mirrors rebuildVectorBrushOutline's own backdrop sync
+// (tools.js: `linkedFill.segments = center.segments.map(...)`) so a
+// generated inbetween's backdrop is geometrically identical in kind to
+// what a live edit would produce, not an approximation.
+function _backdropFromCenterSegs(centerSegs,fillColor,opacity){
+  return{segments:centerSegs.map(function(s){return{point:s.point,handleIn:s.handleIn,handleOut:s.handleOut};}),closed:true,strokeColor:null,fillColor:fillColor,opacity:opacity,hasRealStroke:false};
 }
 // ---- APPEAR/DISAPPEAR: trim (retract / draw-on) instead of ghost-fade ----
 // 2026-07 feedback ("les formes qui ne sont plus là d'une frame à une autre
@@ -1719,7 +1747,22 @@ function generateTweens(){
       // be silently dropped on exactly the (default) wasm path.
       var rbAligned=alignResampledPair(ra,rb);
       rbAligned._src=spec.bData;
-      return{a:ra,b:rbAligned,mi:spec.mi,tex:tex,bmpTex:bmpTex,id:pairId,
+      // Fill-backdrop companion (see splitTweenables' own comment) — when
+      // either keyframe's ribbon carries a linkedFillId, regenerate the
+      // backdrop from THIS pair's own interpolated centerline every frame
+      // instead of matching/interpolating it independently. A side with no
+      // backdrop (Fill wasn't enabled there) contributes opacity 0, so a
+      // toggle mid-span fades the fill in/out naturally through the same
+      // lerp rather than needing special-case handling.
+      var aBd=spec.aData.linkedFillId?sAsplit.backdropsById[spec.aData.linkedFillId]:null;
+      var bBd=spec.bData.linkedFillId?sBsplit.backdropsById[spec.bData.linkedFillId]:null;
+      var backdrop=(aBd||bBd)?{
+        aFill:(aBd&&aBd.fillColor)||(bBd&&bBd.fillColor)||null,
+        bFill:(bBd&&bBd.fillColor)||(aBd&&aBd.fillColor)||null,
+        aOp:aBd?(aBd.opacity!==undefined?aBd.opacity:1):0,
+        bOp:bBd?(bBd.opacity!==undefined?bBd.opacity:1):0,
+      }:null;
+      return{a:ra,b:rbAligned,mi:spec.mi,tex:tex,bmpTex:bmpTex,id:pairId,backdrop:backdrop,
         aRank:spec.aIdx/Math.max(1,sA.length-1),bRank:spec.bIdx/Math.max(1,sB.length-1)};
     });
     var gap=fB-fA;
@@ -1735,6 +1778,19 @@ function generateTweens(){
         var sdOut=interpStroke(pr.a,pr.b,t,easFn,fA,fB,pr.mi);
         sdOut.strokeId=pr.id; // stable per-pair identity (see pairs construction)
         sdOut.__zKey=lerp(pr.aRank,pr.bRank,et2);
+        // Fill backdrop, regenerated from THIS frame's own interpolated
+        // centerline (see splitTweenables' comment + this pair's own
+        // construction above) — always geometrically attached to its
+        // ribbon by construction, never independently matched/aligned.
+        // Below the ribbon (-1e-4), mirroring insertBelow at draw time.
+        if(pr.backdrop&&sdOut.centerSegments){
+          var bdOp=lerp(pr.backdrop.aOp,pr.backdrop.bOp,et2);
+          if(bdOp>0.02){
+            var bd=_backdropFromCenterSegs(sdOut.centerSegments,et2<.5?pr.backdrop.aFill:pr.backdrop.bFill,bdOp);
+            bd.__zKey=sdOut.__zKey-1e-4;bd.strokeId=sdOut.strokeId+'_bd';
+            tw.push(bd);
+          }
+        }
         if(pr.tex){
           // carry the anchor's texture identity so a later manual edit of
           // this frame keeps behaving as a textured group
@@ -1778,7 +1834,22 @@ function generateTweens(){
       // appearing one stays wherever it'll be stacked in B). A textured
       // fader's own record may be invisible (opacity-0 anchor) — its dabs
       // (cloned from the source frame, opacity-scaled) are what fades.
-      function pushFade(sd,rank,mul,dabsByGroup){
+      // Fill-backdrop companion for a VANISHING ribbon (see splitTweenables'
+      // comment + the matched-pair backdrop just above) — same "regenerate
+      // from the anchor's own current centerline" principle, applied to
+      // whatever geometry this fade/trim pass just produced for sd itself,
+      // so a disappearing filled pressure-brush stroke retracts/fades with
+      // its fill still attached instead of the fill going independently
+      // ghostly or vanishing at a different rate.
+      function pushBackdropFor(sd,geomSrc,rank,opacityMul,backdropsById){
+        var bd0=sd.linkedFillId&&backdropsById[sd.linkedFillId];
+        if(!bd0||!geomSrc||!geomSrc.centerSegments)return;
+        var op=(bd0.opacity!==undefined?bd0.opacity:1)*opacityMul;
+        if(op<=0.02)return;
+        var bd=_backdropFromCenterSegs(geomSrc.centerSegments,bd0.fillColor,op);
+        bd.__zKey=rank-1e-4;tw.push(bd);
+      }
+      function pushFade(sd,rank,mul,dabsByGroup,backdropsById){
         var c=JSON.parse(JSON.stringify(sd));c.opacity=(c.opacity!==undefined?c.opacity:1)*mul;c.__zKey=rank;
         if(c.opacity>0.02)tw.push(c);
         var grp=sd.brushTexturePreset&&sd.brushGroupId&&dabsByGroup[sd.brushGroupId];
@@ -1786,25 +1857,27 @@ function generateTweens(){
           var dc=JSON.parse(JSON.stringify(d));dc.opacity=(dc.opacity!==undefined?dc.opacity:1)*mul;dc.__zKey=rank+1e-4; // see +1e-4 comment above (vector-dab branch)
           if(dc.opacity>0.02)tw.push(dc);
         });
+        if(backdropsById)pushBackdropFor(sd,sd,rank,mul,backdropsById);
       }
       // keep = how much of the stroke is still present (1=full, 0=gone) —
       // trim shows the [anchored] sub-stroke at FULL opacity, fade is the
       // legacy opacity ramp (see _vanishPlanFor for which strokes get
       // which). Clamped: an overshooting easing curve (back/elastic) can
       // push et2 outside [0,1].
-      function pushVanish(sd,plan,rank,keep,dabsByGroup){
+      function pushVanish(sd,plan,rank,keep,dabsByGroup,backdropsById){
         keep=Math.max(0,Math.min(1,keep));
         if(plan.mode==='trim'){
           if(keep<=0.02)return;
-          if(keep>=0.999){var full=JSON.parse(JSON.stringify(sd));full.__zKey=rank;tw.push(full);return;}
+          if(keep>=0.999){var full=JSON.parse(JSON.stringify(sd));full.__zKey=rank;tw.push(full);if(backdropsById)pushBackdropFor(sd,full,rank,1,backdropsById);return;}
           var pc=_trimmedStroke(sd,plan.anchor==='end'?1-keep:0,plan.anchor==='end'?1:keep);
           pc.__zKey=rank;tw.push(pc);
+          if(backdropsById)pushBackdropFor(sd,pc,rank,1,backdropsById);
           return;
         }
-        pushFade(sd,rank,keep,dabsByGroup);
+        pushFade(sd,rank,keep,dabsByGroup,backdropsById);
       }
-      fadeOutA.forEach(function(sd,fi2){pushVanish(sd,outPlans[fi2],unA[fi2]/Math.max(1,sA.length-1),1-et2,sAsplit.dabsByGroup);});
-      fadeInB.forEach(function(sd,fi2){pushVanish(sd,inPlans[fi2],unB[fi2]/Math.max(1,sB.length-1),et2,sBsplit.dabsByGroup);});
+      fadeOutA.forEach(function(sd,fi2){pushVanish(sd,outPlans[fi2],unA[fi2]/Math.max(1,sA.length-1),1-et2,sAsplit.dabsByGroup,sAsplit.backdropsById);});
+      fadeInB.forEach(function(sd,fi2){pushVanish(sd,inPlans[fi2],unB[fi2]/Math.max(1,sB.length-1),et2,sBsplit.dabsByGroup,sBsplit.backdropsById);});
       // Per-element manual tween mode (2026-07): when this pair is in
       // manual mode (ld.frames[fA].tweenManualMode), any stroke NOT
       // flagged data.tweenOn is held — copied UNCHANGED into every
