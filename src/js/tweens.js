@@ -1,3 +1,16 @@
+// ---- TWEEN ENGINE FEATURE FLAGS (2026-07) ----
+// Cyril: "possibilité de revenir sur ou/et l'autre" — each of the two
+// 2026-07 additions below (curvature-aware DTW cost, fold-correction
+// pass) can be independently switched off for A/B comparison or a quick
+// rollback without touching the surrounding logic or reverting a commit.
+// Curvature-DTW measured a real regression on testD's own motivating
+// pointing-arm pair (crossings 6→9-12, MLS's win lost entirely) even
+// after cutting its weight 0.2→0.08 — a coarse ≤90-point curvature
+// estimate is noisy enough on a hand-drawn stroke's sharpest bend that it
+// misdirects the warping path more often than it helps. Off by default,
+// left in for Cyril to flip on and compare — see the flag comment below.
+var TW_CURVATURE_DTW=false;
+var TW_CORRECTION_PASS=true;
 // ---- MATCHING ----
 function buildTP(sd){var p=new Path({insert:false});sd.segments.forEach(function(s){p.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));});return p;}
 // A stroke's color and fill/stroke "type" are what a viewer actually reads
@@ -852,6 +865,28 @@ function _dtwCorrespondence(pA,lenA,pB,lenB,n){
     var tb=pB.getTangentAt(offB);
     ptsB.push({x:pb.x,y:pb.y});tanB.push(tb?Math.atan2(tb.y,tb.x):0);
   }
+  // Curvature at each grid sample (2026-07, Cyril: "reconnaissance de
+  // point de courbure afin de mieux identifier les points qui doivent se
+  // retrouver aux mêmes endroits de courbure"): arc-length-NORMALIZED
+  // curvature (Δtangent/Δs), not the raw per-vertex turning angle used
+  // elsewhere in this file (candScore's fold-angle term, MLS handle
+  // placement) — those are fine as a local tie-breaker on an ALREADY
+  // n-point-resampled stroke where spacing is roughly uniform, but here
+  // the grid step ds is a genuine per-shape constant (lenA/(gK-1),
+  // lenB/(gK-1)), so normalizing by it makes the signal comparable
+  // between two shapes even if their raw sampling density differs.
+  var dsA=lenA/(gK-1),dsB=lenB/(gK-1);
+  var curvA=new Array(gK),curvB=new Array(gK);
+  for(var ka=0;ka<gK;ka++){
+    var prevA=tanA[ka>0?ka-1:ka],nextA=tanA[ka<gK-1?ka+1:ka];
+    var spanA=(ka>0&&ka<gK-1)?2*dsA:dsA;
+    curvA[ka]=_wrapPI(nextA-prevA)/Math.max(1e-6,spanA);
+  }
+  for(var kb=0;kb<gK;kb++){
+    var prevB=tanB[kb>0?kb-1:kb],nextB=tanB[kb<gK-1?kb+1:kb];
+    var spanB=(kb>0&&kb<gK-1)?2*dsB:dsB;
+    curvB[kb]=_wrapPI(nextB-prevB)/Math.max(1e-6,spanB);
+  }
   // Rigid motion the correspondence should agree with — same 32-probe
   // whole-stroke fit _matchLandmarks seeds from (already order-consistent:
   // resamplePairFeatureAware's early-orientation pass runs before this).
@@ -863,7 +898,13 @@ function _dtwCorrespondence(pA,lenA,pB,lenB,n){
     var dx=predA[i].x-ptsB[j].x,dy=predA[i].y-ptsB[j].y;
     var posC=Math.hypot(dx,dy)/normScale;
     var ad=Math.abs(_wrapPI(tanA[i]-tanB[j]))/Math.PI; // 0..1
-    return posC+0.35*ad;
+    // Curvature agreement — kept a MODEST tie-breaker (like the tangent
+    // term above), never allowed to outweigh position: a wrist curl and a
+    // shoulder bend can share similar curvature by coincidence, exactly
+    // the "noodle ballooning" failure this file's own history note above
+    // already warns a curvature-only cost falls into.
+    var cc=TW_CURVATURE_DTW?Math.min(1,Math.abs(curvA[i]-curvB[j])*normScale):0;
+    return posC+0.35*ad+0.08*cc;
   }
   // Classic DTW DP: monotonic path from (0,0) to (gK-1,gK-1), each step
   // advances i, j, or both — a plateau (several j's per i or vice versa)
@@ -1617,6 +1658,62 @@ function buildMLSSegs(rA,rB,per,etv){
   }
   return o;
 }
+// ---- FOLD-CORRECTION PASS (2026-07) ----
+// Cyril: "une passe de correction qui regarde si le tween respecte bien
+// les écarts de formes faites et remodule aussi" — a genuine SECOND pass
+// on the winning candidate, not just picking the best of several fixed
+// ones (what the tangle-strategy arbitration in interpStroke already
+// does). Classic ARAP alternates a LOCAL step (fit per-cell rotations)
+// and a GLOBAL step (solve positions honoring those rotations) to
+// convergence; this is a lightweight surrogate for that global step — a
+// bounded, damped nudge of each genuine fold vertex (rA._twFoldW, the
+// same signal the arbitration's own fold-angle score already trusts)
+// toward the turning angle its OWN two keyframes agree on AT THIS et
+// (rA._twFoldThA/_twFoldThB, cached once per pair — see where they're
+// set, right after _foldW above), re-measuring self-crossings after
+// every round and discarding the round outright if it made tangling
+// WORSE — verify, then commit, never applied blind.
+//
+// Endpoint-exactness note: at et=0/et=1 the winning candidate already
+// reproduces rA/rB exactly (by construction, verified across every
+// canonical fixture), so the "actual" turn measured here already equals
+// thetaA[i]/thetaB[i] to float precision — delta comes out ~0 and the
+// 0.01rad skip threshold below no-ops the correction at both ends, same
+// guarantee as every other candidate.
+function _applyFoldCorrection(segs,rA,et){
+  if(!TW_CORRECTION_PASS)return segs;
+  var thA=rA._twFoldThA,thB=rA._twFoldThB,w=rA._twFoldW;
+  if(!thA)return segs;
+  var n2=segs.length;
+  var baseX=_segsSelfXCount(segs);
+  var cur=segs;
+  var ITERS=2,DAMP=0.5,MAXROT=0.26; // ~15° cap — small deliberate nudges only
+  for(var it=0;it<ITERS;it++){
+    var next=null,changed=false;
+    for(var i=1;i<n2-1;i++){
+      var wv=w[i];
+      if(!wv||wv<0.35)continue; // ~20°+ turn only — genuine corners, not noise (same bar as the scoring term)
+      var expTheta=thA[i]+_wrapPI(thB[i]-thA[i])*et;
+      var p0=cur[i-1].point,p1=cur[i].point,p2=cur[i+1].point;
+      var a1=Math.atan2(p1[1]-p0[1],p1[0]-p0[0]),a2=Math.atan2(p2[1]-p1[1],p2[0]-p1[0]);
+      var actual=_wrapPI(a2-a1);
+      var delta=_wrapPI(expTheta-actual)*DAMP;
+      if(delta>MAXROT)delta=MAXROT;else if(delta<-MAXROT)delta=-MAXROT;
+      if(Math.abs(delta)<0.01)continue;
+      if(!next)next=cur.map(function(s){return{point:s.point.slice(),handleIn:s.handleIn.slice(),handleOut:s.handleOut.slice()};});
+      var mx=(p0[0]+p2[0])/2,my=(p0[1]+p2[1])/2;
+      var dx=p1[0]-mx,dy=p1[1]-my;
+      var cs=Math.cos(delta),sn=Math.sin(delta);
+      next[i].point=[mx+dx*cs-dy*sn,my+dx*sn+dy*cs];
+      changed=true;
+    }
+    if(!changed)break;
+    var newX=_segsSelfXCount(next);
+    if(newX>baseX)break; // this round tangled more than the uncorrected baseline — stop, keep the last accepted state
+    cur=next;
+  }
+  return cur;
+}
 function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
   var et=easFn(t);var n=Math.min(rA.segments.length,rB.segments.length);var segs=[];
   var cxA=0,cyA=0,cxB=0,cyB=0;for(var i=0;i<n;i++){cxA+=rA.segments[i].point[0];cyA+=rA.segments[i].point[1];cxB+=rB.segments[i].point[0];cyB+=rB.segments[i].point[1];}cxA/=n;cyA/=n;cxB/=n;cyB/=n;
@@ -2083,11 +2180,24 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
             var _foldExp=null,_foldW=null;
             if(n>=5){
               _foldExp=new Array(n);_foldW=new Array(n);
+              // Raw per-keyframe turn arrays, cached on rA (2026-07, fold-
+              // correction pass): _foldExp above is the expected turn at a
+              // FIXED et=0.5, only good for this scoring pass. The
+              // correction pass runs at whatever et the CURRENT frame
+              // actually needs, so it needs thetaA[i]/thetaB[i] themselves
+              // to circular-lerp at arbitrary et — computed once here
+              // (same loop, no extra cost) and cached because this whole
+              // block only runs ONCE per pair (guarded by
+              // rA._twIwProbe===undefined below), while the correction
+              // pass runs on every frame this pair generates.
+              rA._twFoldThA=new Array(n);rA._twFoldThB=new Array(n);
               for(var fi7=1;fi7<n-1;fi7++){
                 var thA7=turnAngle(rA.segments,fi7),thB7=turnAngle(rB.segments,fi7);
                 _foldExp[fi7]=thA7+_wrapPI(thB7-thA7)*0.5;
                 _foldW[fi7]=Math.max(Math.abs(thA7),Math.abs(thB7));
+                rA._twFoldThA[fi7]=thA7;rA._twFoldThB[fi7]=thB7;
               }
+              rA._twFoldW=_foldW;
             }
             function foldAngleErr(mid){
               if(!_foldExp)return 0;
@@ -2189,6 +2299,7 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
       }
     }
   }
+  segs=_applyFoldCorrection(segs,rA,et);
   if(rA.isVectorBrush&&rB.isVectorBrush){
     var widths=[];for(var w=0;w<n;w++)widths.push(lerp(rA.widths[w]||1,rB.widths[w]||1,et));
     var centerSegs=segs.map(function(s,idx){return{point:s.point,handleIn:s.handleIn,handleOut:s.handleOut,width:widths[idx]};});
