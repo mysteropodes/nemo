@@ -768,6 +768,118 @@ function _matchLandmarks(pA,lenA,pB,lenB,maxFeatures){
   for(var k=1;k<pairs.length;k++)if(pairs[k].fracB<=pairs[k-1].fracB)return null;
   return pairs;
 }
+// ---- DTW (dynamic time warping) FULL-CURVE CORRESPONDENCE (2026-07) ----
+// The keystone upgrade over chikara-sen: landmarks above match a SPARSE set
+// of detected corners, then re-parametrize piecewise-linearly between them —
+// every non-corner point still gets its correspondence by blind arc-length
+// interpolation. Cyril's diagnosis, live: "le moteur se permet d'inverser
+// le trait pendant l'intervalle... ça manque d'intelligence de distinction
+// de forme, même de pli qu'on retrouve par la suite même si c'est pas le
+// même nombre de vertices" — what's missing is a correspondence computed
+// over EVERY point, not just corners, that can't invert by construction.
+// DTW is exactly that: given two point sequences, its dynamic-programming
+// warping path is monotonic by definition (i and j each only ever advance
+// forward), so a direction flip mid-stroke is structurally impossible —
+// and it naturally handles unequal vertex/feature counts (a plateau in the
+// path lets several samples on the fold-heavy side map to one on the other).
+//
+// Historical note (see this section's header comment above): a turning-
+// angle-ONLY DTW cost was tried earlier and did NOT fix the reported
+// "noodle" ballooning — local curvature agreement alone still let far-apart
+// regions match if their bend happened to look similar (a wrist curl
+// matching a shoulder bend). The cost here is POSITION-dominant instead
+// (mirrors matchSc's own proximity-is-dominant design, and _matchLandmarks'
+// residual-against-fitted-motion test): each candidate pairing is scored by
+// how far B's point lands from where the stroke's own fitted rigid motion
+// predicts A's point should go, with local tangent-angle disagreement as a
+// secondary tie-breaker — so the correspondence follows the drawing's real
+// motion, with shape only refining ambiguous ties, not driving the match.
+//
+// Runs as the PRIMARY correspondence (tried before landmarks); landmarks
+// and the plain shared-fraction grid remain as the fallback cascade for
+// whatever DTW can't handle (too few samples, no coherent rigid motion,
+// zero-length input) — Cyril: "garde quand même l'heuristique de côté ou
+// même d'appoint".
+function _dtwCorrespondence(pA,lenA,pB,lenB,n){
+  if(!(lenA>0)||!(lenB>0))return null;
+  var gK=Math.max(16,Math.min(90,n)); // DP grid resolution — independent of n, capped for O(gK²) cost
+  var ptsA=[],ptsB=[],tanA=[],tanB=[];
+  for(var i=0;i<gK;i++){
+    var off=lenA*i/(gK-1);
+    var p=pA.getPointAt(off)||pA.lastSegment.point;
+    var t=pA.getTangentAt(off);
+    ptsA.push({x:p.x,y:p.y});tanA.push(t?Math.atan2(t.y,t.x):0);
+  }
+  for(var j=0;j<gK;j++){
+    var offB=lenB*j/(gK-1);
+    var pb=pB.getPointAt(offB)||pB.lastSegment.point;
+    var tb=pB.getTangentAt(offB);
+    ptsB.push({x:pb.x,y:pb.y});tanB.push(tb?Math.atan2(tb.y,tb.x):0);
+  }
+  // Rigid motion the correspondence should agree with — same 32-probe
+  // whole-stroke fit _matchLandmarks seeds from (already order-consistent:
+  // resamplePairFeatureAware's early-orientation pass runs before this).
+  var transform=fitSimilarityTransform(ptsA,ptsB);
+  if(!transform)return null;
+  var predA=ptsA.map(function(p){return applySimilarityTransform(transform,p.x,p.y);});
+  var normScale=Math.max(1,(lenA+lenB)/2*0.25); // "far" ≈ a quarter of the stroke's own length
+  function cost(i,j){
+    var dx=predA[i].x-ptsB[j].x,dy=predA[i].y-ptsB[j].y;
+    var posC=Math.hypot(dx,dy)/normScale;
+    var ad=Math.abs(_wrapPI(tanA[i]-tanB[j]))/Math.PI; // 0..1
+    return posC+0.35*ad;
+  }
+  // Classic DTW DP: monotonic path from (0,0) to (gK-1,gK-1), each step
+  // advances i, j, or both — a plateau (several j's per i or vice versa)
+  // is exactly a fold eating more of one side's perimeter than the other.
+  var D=new Float64Array(gK*gK);var BP=new Uint8Array(gK*gK); // 0=diag,1=up(i-1),2=left(j-1)
+  var IDX=function(i,j){return i*gK+j;};
+  D[0]=cost(0,0);
+  for(var i2=1;i2<gK;i2++){D[IDX(i2,0)]=D[IDX(i2-1,0)]+cost(i2,0);BP[IDX(i2,0)]=1;}
+  for(var j2=1;j2<gK;j2++){D[IDX(0,j2)]=D[IDX(0,j2-1)]+cost(0,j2);BP[IDX(0,j2)]=2;}
+  for(var i3=1;i3<gK;i3++){
+    for(var j3=1;j3<gK;j3++){
+      var c=cost(i3,j3);
+      var dd=D[IDX(i3-1,j3-1)],du=D[IDX(i3-1,j3)],dl=D[IDX(i3,j3-1)];
+      if(dd<=du&&dd<=dl){D[IDX(i3,j3)]=dd+c;BP[IDX(i3,j3)]=0;}
+      else if(du<=dl){D[IDX(i3,j3)]=du+c;BP[IDX(i3,j3)]=1;}
+      else{D[IDX(i3,j3)]=dl+c;BP[IDX(i3,j3)]=2;}
+    }
+  }
+  // Backtrack to the path, then resample it to exactly n output points,
+  // evenly spaced by average arc-length PROGRESS (fracA+fracB)/2 — same
+  // distribution principle as _landmarkFractions, just driven by the full
+  // per-vertex path instead of only the matched-landmark stops.
+  var path=[];var pi=gK-1,pj=gK-1;
+  path.push([pi,pj]);
+  while(pi>0||pj>0){
+    var mv=BP[IDX(pi,pj)];
+    if(pi===0)mv=2;else if(pj===0)mv=1;
+    if(mv===0){pi--;pj--;}else if(mv===1)pi--;else pj--;
+    path.push([pi,pj]);
+  }
+  path.reverse();
+  var prog=path.map(function(pr){return (pr[0]/(gK-1)+pr[1]/(gK-1))/2;});
+  var fracA=[0],fracB=[0];
+  var pk=0;
+  for(var oi2=1;oi2<n-1;oi2++){
+    var target=oi2/(n-1);
+    while(pk<prog.length-2&&prog[pk+1]<target)pk++;
+    var p0=prog[pk],p1=prog[pk+1]!==undefined?prog[pk+1]:p0;
+    var lt=p1>p0?(target-p0)/(p1-p0):0;
+    var a0=path[pk][0]/(gK-1),a1=(path[pk+1]||path[pk])[0]/(gK-1);
+    var b0=path[pk][1]/(gK-1),b1=(path[pk+1]||path[pk])[1]/(gK-1);
+    fracA.push(a0+(a1-a0)*lt);fracB.push(b0+(b1-b0)*lt);
+  }
+  fracA.push(1);fracB.push(1);
+  // Monotonicity is guaranteed by construction, but guard against float
+  // fuzz at a plateau boundary before handing this to _sampleAtFractions.
+  for(var mi=1;mi<n;mi++){
+    if(fracA[mi]<fracA[mi-1])fracA[mi]=fracA[mi-1];
+    if(fracB[mi]<fracB[mi-1])fracB[mi]=fracB[mi-1];
+  }
+  return{fracA:fracA,fracB:fracB};
+}
 // Turns matched landmarks into TWO fraction lists (length n each, same
 // LENGTH so interpStroke's index-paired lerp still works, but the VALUES
 // at a given index can now differ between A and B) — piecewise-linear
@@ -865,27 +977,143 @@ function resamplePairFeatureAware(aData,bData,n,isVB){
       pB.closed=false;
       lenB=pB.length;
     }
+  }else{
+    // CLOSED-LOOP early start alignment (2026-07, same "resolve orientation
+    // before any correspondence is built" principle as the open-stroke
+    // case above, extended to cyclic shapes): a closed vector-brush
+    // centerline's index 0 is just wherever the artist happened to start
+    // drawing — nothing guarantees it sits at the same anatomical point in
+    // both keyframes. DTW below has no notion of "the loop wraps"; without
+    // this it silently assumed pA's start already corresponds to pB's
+    // start. Coarse search (12 rotation offsets ×
+    // reversed/direct, 32-point probe each — cheap, same cost class as the
+    // open-stroke test above) picks the (direction, start-offset) minimizing
+    // centroid-relative squared distance, exactly alignResampledPairJS's
+    // own rotationFitResidual search but run once here BEFORE sampling so
+    // every downstream correspondence stage (DTW, landmarks, plain grid)
+    // agrees on where B "starts" instead of only the final safety-net
+    // alignment (which reorders already-sampled points and would desync
+    // whatever correspondence was built against the old order).
+    var _cK=32,_cRot=12;
+    var _cPA=[];for(var ci=0;ci<_cK;ci++){var cpa=pA.getPointAt(lenA*ci/_cK)||pA.lastSegment.point;_cPA.push(cpa);}
+    var _ccax=0,_ccay=0;for(var ci2=0;ci2<_cK;ci2++){_ccax+=_cPA[ci2].x;_ccay+=_cPA[ci2].y;}_ccax/=_cK;_ccay/=_cK;
+    var _bestCost=Infinity,_bestRev=false,_bestOff=0;
+    [false,true].forEach(function(rev){
+      for(var ro=0;ro<_cRot;ro++){
+        var offFrac=ro/_cRot;
+        var cbx=0,cby=0,cpts=[];
+        for(var ci3=0;ci3<_cK;ci3++){
+          var tfrac=offFrac+(rev?-(ci3/_cK):(ci3/_cK));
+          tfrac=((tfrac%1)+1)%1;
+          var cpb=pB.getPointAt(lenB*tfrac)||pB.lastSegment.point;
+          cpts.push(cpb);cbx+=cpb.x;cby+=cpb.y;
+        }
+        cbx/=_cK;cby/=_cK;
+        var s=0;
+        for(var ci4=0;ci4<_cK;ci4++){
+          var dxA=_cPA[ci4].x-_ccax,dyA=_cPA[ci4].y-_ccay;
+          var dxB=cpts[ci4].x-cbx,dyB=cpts[ci4].y-cby;
+          s+=(dxA-dxB)*(dxA-dxB)+(dyA-dyB)*(dyA-dyB);
+        }
+        if(s<_bestCost){_bestCost=s;_bestRev=rev;_bestOff=offFrac;}
+      }
+    });
+    if(_bestRev||_bestOff>0.001){
+      bReversed=_bestRev;
+      // Width lookup into the PRE-rebuild centerline (arc-length fraction,
+      // same convention widthsAtSparse already uses) — the rebuilt array
+      // below only carries fresh geometry; without this every rebuilt
+      // point would silently lose its recorded brush width.
+      var _origSrcB=srcB,_origLenB=0,_origSegLens=[0];
+      for(var wi3=1;wi3<_origSrcB.length;wi3++){_origLenB+=Math.hypot(_origSrcB[wi3].point[0]-_origSrcB[wi3-1].point[0],_origSrcB[wi3].point[1]-_origSrcB[wi3-1].point[1]);_origSegLens.push(_origLenB);}
+      function _widthAtOrigFrac(fr){
+        var target=fr*(_origLenB||1);
+        var wi4=0;while(wi4<_origSegLens.length-2&&_origSegLens[wi4+1]<target)wi4++;
+        var span=Math.max(0.0001,_origSegLens[wi4+1]-_origSegLens[wi4]);
+        var lt2=Math.min(1,Math.max(0,(target-_origSegLens[wi4])/span));
+        var w0=_origSrcB[wi4].width!==undefined?_origSrcB[wi4].width:1;
+        var w1=(_origSrcB[wi4+1]&&_origSrcB[wi4+1].width!==undefined)?_origSrcB[wi4+1].width:w0;
+        return w0+(w1-w0)*lt2;
+      }
+      var _rebuilt=[];
+      for(var ni=0;ni<_cK;ni++){
+        var tf2=_bestOff+(_bestRev?-(ni/_cK):(ni/_cK));
+        tf2=((tf2%1)+1)%1;
+        var np=pB.getPointAt(lenB*tf2)||pB.lastSegment.point;
+        var nt=pB.getTangentAt(lenB*tf2)||new Point(1,0);
+        var nhl=lenB/_cK/3;
+        _rebuilt.push({point:[np.x,np.y],handleIn:[-nt.x*nhl,-nt.y*nhl],handleOut:[nt.x*nhl,nt.y*nhl],width:_widthAtOrigFrac(tf2)});
+      }
+      srcB=_rebuilt;
+      pB.remove();
+      pB=new Path({insert:false});srcB.forEach(function(s){pB.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));});
+      pB.closed=true;
+      lenB=pB.length;
+    }
   }
   var fractions=buildSharedFractions(pA,pB,n);
   var fractionsB=fractions; // default: identical to A's (today's behavior)
-  // Try the landmark (chikara-sen) correspondence — only for a real budget
-  // of samples (below this a piecewise re-parametrization has no room to
-  // do anything useful) and only replaces `fractions`/`fractionsB` when it
-  // actually produces a full-length, valid pair of lists; every failure
-  // mode (too few landmarks, no coherent transform, a real cyclic reorder,
-  // rounding drift) falls straight back to the shared-fraction default
-  // above, so a shape this doesn't apply to (a circle, a straight line, a
-  // rigid rotation/translation already handled well) is untouched.
+  // Correspondence cascade (2026-07, "je cherche le meilleur moteur pour
+  // ça, c'est la clé de voûte de l'app"): DTW (full per-vertex, monotonic
+  // by construction — see _dtwCorrespondence's own header) is now the
+  // PRIMARY correspondence; chikara-sen landmarks and the plain shared-
+  // fraction grid above remain as a heuristic fallback cascade for
+  // whatever DTW can't handle. Every stage only replaces `fractions`/
+  // `fractionsB` on success, so a shape none of this applies to (a circle,
+  // a straight line, a rigid rotation already handled well) still falls
+  // through to the untouched uniform grid.
+  var _uniformFractions=fractions; // the plain grid, kept as an arbitration candidate below
   if(n>=10){
-    var maxFeat=Math.max(2,Math.min(8,Math.floor(n/8)));
-    var landmarks=_matchLandmarks(pA,lenA,pB,lenB,maxFeat);
-    if(landmarks){
-      var lf=_landmarkFractions(landmarks,n);
-      if(lf){fractions=lf.fracA;fractionsB=lf.fracB;}
+    var dtw=_dtwCorrespondence(pA,lenA,pB,lenB,n);
+    if(dtw){
+      fractions=dtw.fracA;fractionsB=dtw.fracB;
+    }else{
+      var maxFeat=Math.max(2,Math.min(8,Math.floor(n/8)));
+      var landmarks=_matchLandmarks(pA,lenA,pB,lenB,maxFeat);
+      if(landmarks){
+        var lf=_landmarkFractions(landmarks,n);
+        if(lf){fractions=lf.fracA;fractionsB=lf.fracB;}
+      }
     }
   }
   var segsA=_sampleAtFractions(pA,lenA,fractions);
   var segsB=_sampleAtFractions(pB,lenB,fractionsB);
+  // FINAL EMPIRICAL ARBITRATION (2026-07, "ça manque encore d'intelligence
+  // de distinction de forme" — the visual check Cyril asked for): even a
+  // monotonic-by-construction DTW path can pick a globally bad alignment
+  // on a shape whose deformation is too large for any correspondence to
+  // stay smooth (measured on a re-drawn closed hand: min per-vertex
+  // motion 65px, 2208 pairwise crossings among the A[i]→B[i] motion
+  // lines — de-rotating didn't help, so it's the correspondence itself,
+  // not the rigid blend downstream). Direct, cheap measurement: count how
+  // many of those motion lines cross EACH OTHER for the winning candidate
+  // vs the plain uniform grid (always available, always monotonic in the
+  // most boring possible way) — whichever tangles less wins. Ties (or
+  // n too large to afford the O(n²) check — capped, this is a last-
+  // resort safety net, not the primary decision) keep the richer
+  // candidate, matching every other probe in this file.
+  if(fractions!==_uniformFractions&&n>=5&&n<=200){
+    function _motionLineX(ptsA2,ptsB2){
+      var c=0;
+      for(var mi2=0;mi2<n;mi2++){
+        for(var mj2=mi2+3;mj2<n;mj2++){
+          var a1=ptsA2[mi2],b1=ptsB2[mi2],a2=ptsA2[mj2],b2=ptsB2[mj2];
+          function ccwM(a,b,cc){return (cc[1]-a[1])*(b[0]-a[0])>(b[1]-a[1])*(cc[0]-a[0]);}
+          if(ccwM(a1,a2,b2)!==ccwM(b1,a2,b2)&&ccwM(a1,b1,a2)!==ccwM(a1,b1,b2))c++;
+        }
+      }
+      return c;
+    }
+    var curA=segsA.map(function(s){return s.point;}),curB=segsB.map(function(s){return s.point;});
+    var xCur=_motionLineX(curA,curB);
+    if(xCur>0){
+      var uniA=_sampleAtFractions(pA,lenA,_uniformFractions),uniB=_sampleAtFractions(pB,lenB,_uniformFractions);
+      var xUni=_motionLineX(uniA.map(function(s){return s.point;}),uniB.map(function(s){return s.point;}));
+      if(xUni<xCur*0.85){ // uniform must be MEANINGFULLY better, not just tied — keep the richer correspondence otherwise
+        segsA=uniA;segsB=uniB;fractions=_uniformFractions;fractionsB=_uniformFractions;
+      }
+    }
+  }
   var ra,rb;
   if(isVB){
     function widthsAtSparse(srcSegs,total,fracs){
@@ -1298,6 +1526,50 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
         var sepRatio=centroidDist/Math.max(1,avgR);
         var rotTrust=Math.max(0,Math.min(1,1-(sepRatio-0.6)/1.4));
         theta*=rotTrust;
+        // EMPIRICAL rotation-crossing check (2026-07, closed-shape tangle
+        // — a re-drawn hand pair measured 13 self-crossings across the
+        // span with no safety net catching it): the geometric damping
+        // above (centroid-separation ratio) doesn't measure actual self-
+        // crossing — a closed shape whose vertices sit unevenly around
+        // its own centroid can still tangle under a "trusted" rotation,
+        // and this pair never even reaches the tangle-strategy probe
+        // further down (that one's gated on intrinsic weight, which
+        // CORRESPONDENCE-TRUST already zeroed here — turnTrust 0,
+        // mean per-vertex disagreement too high to trust the fold
+        // reconstruction at all, pure rigid+linear is genuinely the
+        // best available candidate, it just still crosses). Cached once
+        // per pair: build the SAME fwd/bwd rigid blend at 5 et samples
+        // with vs without theta, count crossings above the keys' own
+        // baseline, and fully zero theta if de-rotating measurably helps
+        // — binary, not graduated, because this is a direct measurement
+        // of the failure (unlike sepRatio's indirect proxy), not a
+        // heuristic that needs a soft ramp to avoid false positives.
+        if(rA._twRotXDamp===undefined){
+          rA._twRotXDamp=1;
+          if(theta!==0&&n>=5){
+            (function(){
+              function buildAt(etv,th2){
+                var thT2=th2*etv,scT2=lerp(1,scaleF,etv),thB2=thT2-th2,scB2=lerp(scaleF>1e-6?1/scaleF:1,1,etv);
+                var cxx=cxA+(cxB-cxA)*etv,cyy=cyA+(cyB-cyA)*etv;
+                var o=[];
+                for(var bi5=0;bi5<n;bi5++){
+                  var fwd5=rotScalePt(rA.segments[bi5].point[0]-cxA,rA.segments[bi5].point[1]-cyA,thT2,scT2);
+                  var bwd5=rotScalePt(rB.segments[bi5].point[0]-cxB,rB.segments[bi5].point[1]-cyB,thB2,scB2);
+                  o.push({point:[cxx+lerp(fwd5[0],bwd5[0],etv),cyy+lerp(fwd5[1],bwd5[1],etv)]});
+                }
+                return o;
+              }
+              var baseX=Math.max(_segsSelfXCount(rA.segments),_segsSelfXCount(rB.segments));
+              var withX=0,withoutX=0;
+              [0.15,0.35,0.5,0.65,0.85].forEach(function(etp){
+                withX+=Math.max(0,_segsSelfXCount(buildAt(etp,theta))-baseX);
+                withoutX+=Math.max(0,_segsSelfXCount(buildAt(etp,0))-baseX);
+              });
+              if(withX>withoutX)rA._twRotXDamp=0;
+            })();
+          }
+        }
+        theta*=rA._twRotXDamp;
       }
     }
   }
