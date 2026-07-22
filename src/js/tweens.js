@@ -368,8 +368,48 @@ function autoMatchJS(sA,sB){
   if(!transform)return uncrossMatches(matches,fA,fB);
   // the fitted motion (force line) is applied to every A stroke's actual
   // sample points, so pass 2's proximity measures "how far is this line
-  // from where the drawing's motion says it should be" — not raw distance
-  var ptsT=fA.map(function(f){return f.pts.map(function(pt){var q=applySimilarityTransform(transform,pt[0],pt[1]);return[q.x,q.y];});});
+  // from where the drawing's motion says it should be" — not raw distance.
+  //
+  // LOCAL motion model (2026-07, "mauvaise reconnaissance de trait" on a
+  // full character: arms swinging wide + head tilting back): ONE global
+  // similarity transform is dominated by whichever strokes are biggest/
+  // most confident (the arms/torso), so every region moving differently
+  // (the face) gets mispredicted, and its small same-looking features
+  // chain-mismatch (measured: hair→nose, nose→mouth, mouth→chin cascade,
+  // each individual score mediocre-but-passing while the correct pairing
+  // scored strictly better in raw cost — the bad global prediction is
+  // what inverted the ranking). Character animation is articulated —
+  // there is no single rigid motion. Fix: per-stroke local transform
+  // fitted on the K nearest seed pairs (by centroid distance in A), so
+  // an arm stroke is predicted by arm-region motion and a face stroke by
+  // face-region motion. K=4 gives a well-determined similarity fit (2
+  // points minimum, 4 gives redundancy against one bad seed) while
+  // staying local; the global fit remains as fallback when a local one
+  // is degenerate, and for tiny seed sets (<=K) where "local" would just
+  // be the same as global anyway.
+  var K_LOCAL=4;
+  var ptsT=fA.map(function(f,ai){
+    var tf=transform;
+    if(seeds.length>K_LOCAL){
+      var near=seeds.slice().sort(function(s1,s2){
+        var d1=Math.pow(fA[s1.a].cx-f.cx,2)+Math.pow(fA[s1.a].cy-f.cy,2);
+        var d2=Math.pow(fA[s2.a].cx-f.cx,2)+Math.pow(fA[s2.a].cy-f.cy,2);
+        return d1-d2;
+      }).slice(0,K_LOCAL);
+      var lA=near.map(function(s){return{x:fA[s.a].cx,y:fA[s.a].cy};});
+      var lB=near.map(function(s){return{x:fB[s.b].cx,y:fB[s.b].cy};});
+      var lt=fitSimilarityTransform(lA,lB);
+      if(lt){
+        // A local fit from few points can go wild (huge scale/spin from
+        // near-degenerate geometry) — sanity-bound it against the global
+        // fit and fall back when implausible, same spirit as interpStroke's
+        // own mag window.
+        var lmag=Math.sqrt(lt.wRe*lt.wRe+lt.wIm*lt.wIm);
+        if(lmag>0.15&&lmag<8)tf=lt;
+      }
+    }
+    return f.pts.map(function(pt){var q=applySimilarityTransform(tf,pt[0],pt[1]);return[q.x,q.y];});
+  });
   var cost2=buildCost(ptsT);
   var assign2=hungarian(cost2);
   var matches2=[];
