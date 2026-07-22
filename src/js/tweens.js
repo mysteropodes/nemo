@@ -1395,14 +1395,47 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
               return o;
             }
             var base=Math.max(_segsSelfXCount(rA.segments),_segsSelfXCount(rB.segments));
-            var xBlend=_segsSelfXCount(mix5(sm.map(function(v){return iwPeak*v;})));
-            var xUnif=_segsSelfXCount(mix5(iwPeak));
-            var xLin=_segsSelfXCount(probeLin5);
-            var eBlend=Math.max(0,xBlend-base),eUnif=Math.max(0,xUnif-base),eLin=Math.max(0,xLin-base);
-            if(eBlend>eUnif||eBlend>eLin){
-              if(eUnif<=eLin)rA._twLocalTrust=null;      // uniform intrinsic
-              else rA._twIwProbe=0;                       // pure linear
+            // Composite score, not crossings alone (2026-07, "des rotations
+            // inattendues frame 21" — same-day follow-up): on an arm drawn
+            // as an out-and-back contour (shoulder→hand→shoulder), the
+            // uniform-intrinsic candidate crossed NOTHING at the probe yet
+            // spun the whole stroke wildly off course — chord angle 9° at
+            // the midframe where the keys' own chords (55°→92°) demand
+            // ~74°, and 1082px wide vs 496/639 in the keys. Crossings
+            // can't see that failure mode. Each candidate now also pays
+            // for (a) chord-angle deviation from the keys' interpolated
+            // chord — the direct measure of "unexpected rotation" — and
+            // (b) arc-length error vs the lerped key lengths — the direct
+            // measure of stretch/shrink (this is also exactly what the
+            // intrinsic correction is FOR, so the blend keeps winning
+            // wherever it genuinely preserves length: the folding-arm
+            // case measures blend 7.7% vs linear 21% here and stays
+            // blend). Weights, calibrated on the reported pair: chord
+            // drift is perceptually the worst failure (a limb visibly
+            // rotating the wrong way reads as broken even at correct
+            // length), so 30° of drift ≡ 20% length error ≡ 1/10th of a
+            // crossing — measured: uniform-intrinsic (65° drift, 0% len)
+            // must lose to pure linear (0° drift, 15% len), while the
+            // folding-arm blend (few-degree drift, 7.7% len) must still
+            // beat ITS linear (0° drift, 21% len). Near-ties (<0.05) keep
+            // the richer strategy so clean pairs stay bit-identical.
+            function chord5(segs5){var a5=segs5[0].point,b5=segs5[segs5.length-1].point;return Math.atan2(b5[1]-a5[1],b5[0]-a5[0]);}
+            var chordExp=(function(){
+              var cA5=chord5(rA.segments),cB5=chord5(rB.segments);
+              return cA5+_wrapPI(cB5-cA5)*0.5;
+            })();
+            function candScore(segs5){
+              var exX=Math.max(0,_segsSelfXCount(segs5)-base);
+              var cd=Math.abs(_wrapPI(chord5(segs5)-chordExp));
+              var ld5=Lexp5>1e-6?Math.abs(_segPolyLen(segs5)-Lexp5)/Lexp5:0;
+              return exX*10+cd/(Math.PI/6)+ld5*5;
             }
+            var blendSegs5=mix5(sm.map(function(v){return iwPeak*v;}));
+            var scB5c=candScore(blendSegs5),scU5=candScore(mix5(iwPeak)),scL5=candScore(probeLin5);
+            var best=Math.min(scB5c,scU5,scL5);
+            if(scB5c-best<0.05){/* keep per-vertex blend */}
+            else if(scU5-best<0.05)rA._twLocalTrust=null;  // uniform intrinsic
+            else rA._twIwProbe=0;                          // pure linear
           }
         }
       }
