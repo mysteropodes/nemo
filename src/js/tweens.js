@@ -1046,6 +1046,25 @@ function _segsSelfIntersect(segs){
   }
   return false;
 }
+// Full crossing COUNT (same adjacency/endpoint exclusions as the boolean
+// test above) — the tangle-strategy probe needs "how badly does this
+// candidate cross" relative to the keyframes' own legitimate crossings
+// (a hand drawn as a loop over its arm crosses ONCE in the keys
+// themselves), not just "does it cross at all".
+function _segsSelfXCount(segs){
+  var n=segs.length-1;
+  if(n<3)return 0;
+  var c=0;
+  for(var i=0;i<n;i++){
+    var p1={x:segs[i].point[0],y:segs[i].point[1]},p2={x:segs[i+1].point[0],y:segs[i+1].point[1]};
+    for(var j=i+2;j<n;j++){
+      var p3={x:segs[j].point[0],y:segs[j].point[1]},p4={x:segs[j+1].point[0],y:segs[j+1].point[1]};
+      if(_nearPt(p1.x,p1.y,p3.x,p3.y)||_nearPt(p1.x,p1.y,p4.x,p4.y)||_nearPt(p2.x,p2.y,p3.x,p3.y)||_nearPt(p2.x,p2.y,p4.x,p4.y))continue;
+      if(_segsIntersect(p1,p2,p3,p4))c++;
+    }
+  }
+  return c;
+}
 function _intrinsicSegs(rA,rB,et,cx2,cy2,closed){
   var A=rA.segments,B=rB.segments,n=Math.min(A.length,B.length);
   if(n<3)return null;
@@ -1334,6 +1353,57 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
             sm[si]=acc/wsum;
           }
           rA._twLocalTrust=sm;
+          // ---- TANGLE-STRATEGY PROBE (2026-07, "des formes qui se
+          // tiennent pas dans leur forme" — arm-with-hand-loop stroke
+          // tangling mid-tween): blending intrinsic and linear PER-VERTEX
+          // mixes two geometrically incompatible curves, and a partial
+          // mix can self-cross even where neither pure curve does
+          // (measured on the reported stroke, crossings summed over 5
+          // sample frames: per-vertex blend 17, uniform intrinsic 5, pure
+          // linear 2 — keys themselves 0 and 1). So the per-vertex blend
+          // is now a CANDIDATE, not a given: at this same et=0.5 probe,
+          // count self-crossings of all three strategies and keep the
+          // least-crossing one for the whole pair (ties keep the richer
+          // strategy: blend over uniform over linear). Baseline is the
+          // keys' own crossing count — a hand drawn as a loop over its
+          // arm legitimately crosses once in the keys, and no strategy
+          // should be punished for preserving it.
+          if(rA._twTurnTrust===undefined){
+            var sumTd0=0,cntTd0=0,pvA0=null,pvB0=null;
+            for(var tp=1;tp<n;tp++){
+              var taA0=Math.atan2(rA.segments[tp].point[1]-rA.segments[tp-1].point[1],rA.segments[tp].point[0]-rA.segments[tp-1].point[0]);
+              var taB0=Math.atan2(rB.segments[tp].point[1]-rB.segments[tp-1].point[1],rB.segments[tp].point[0]-rB.segments[tp-1].point[0]);
+              if(pvA0!==null){sumTd0+=Math.abs(_wrapPI(_wrapPI(taA0-pvA0)-_wrapPI(taB0-pvB0)));cntTd0++;}
+              pvA0=taA0;pvB0=taB0;
+            }
+            var meanTd0=cntTd0?sumTd0/cntTd0:0;
+            rA._twTurnTrust=Math.max(0,Math.min(1,(0.524-meanTd0)/(0.524-0.262)));
+          }
+          var iwPeak=iwP*rA._twTurnTrust;
+          if(iwPeak>0.001){
+            // Same frame for both candidates (mixing needs it): rebuild
+            // the linear probe recentered on the pair midpoint probeI5
+            // itself used. Crossing counts are translation-invariant, so
+            // the exact recenter point is irrelevant to the verdict.
+            var probeLin5=buildLinearSegs(0.5,thT5,scT5,thB5,scB5,cx2m,cy2m);
+            function mix5(w){
+              var o=[];
+              for(var mi5=0;mi5<n;mi5++){
+                var wv=typeof w==='number'?w:w[mi5];
+                o.push({point:[lerp(probeLin5[mi5].point[0],probeI5[mi5].point[0],wv),lerp(probeLin5[mi5].point[1],probeI5[mi5].point[1],wv)]});
+              }
+              return o;
+            }
+            var base=Math.max(_segsSelfXCount(rA.segments),_segsSelfXCount(rB.segments));
+            var xBlend=_segsSelfXCount(mix5(sm.map(function(v){return iwPeak*v;})));
+            var xUnif=_segsSelfXCount(mix5(iwPeak));
+            var xLin=_segsSelfXCount(probeLin5);
+            var eBlend=Math.max(0,xBlend-base),eUnif=Math.max(0,xUnif-base),eLin=Math.max(0,xLin-base);
+            if(eBlend>eUnif||eBlend>eLin){
+              if(eUnif<=eLin)rA._twLocalTrust=null;      // uniform intrinsic
+              else rA._twIwProbe=0;                       // pure linear
+            }
+          }
         }
       }
     }
