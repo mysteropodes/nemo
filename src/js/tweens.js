@@ -607,7 +607,7 @@ function resamplePairFeatureAware(aData,bData,n,isVB){
   var segsB=_sampleAtFractions(pB,lenB,fractions);
   var ra,rb;
   if(isVB){
-    function widthsAt(srcSegs,total){
+    function widthsAtSparse(srcSegs,total){
       var segLens=[0];for(var i=1;i<srcSegs.length;i++)segLens.push(segLens[i-1]+new Point(srcSegs[i].point[0],srcSegs[i].point[1]).getDistance(new Point(srcSegs[i-1].point[0],srcSegs[i-1].point[1])));
       var tot=segLens[segLens.length-1]||1;
       return fractions.map(function(t){
@@ -618,8 +618,27 @@ function resamplePairFeatureAware(aData,bData,n,isVB){
         return srcSegs[wi].width+(srcSegs[wi+1].width-srcSegs[wi].width)*lt;
       });
     }
-    ra={segments:segsA,widths:widthsAt(srcA,lenA),isVectorBrush:true,strokeColor:null,fillColor:aData.fillColor||null,opacity:aData.opacity!==undefined?aData.opacity:1};
-    rb={segments:segsB,widths:widthsAt(srcB,lenB),isVectorBrush:true,strokeColor:null,fillColor:bData.fillColor||null,opacity:bData.opacity!==undefined?bData.opacity:1};
+    // Prefer the DENSE raw-pressure profile over sparse centerline-anchor
+    // widths — same fix, same reasoning as rebuildVectorBrushOutline's own
+    // (tools.js, buildWidthProfile's comment): Paper's simplify() can leave
+    // a stroke's editable centerline with very few anchors, so interpolating
+    // ONLY between them discards most of the recorded pressure curve. A
+    // live-drawn keyframe already renders from this profile (widthAtFrac);
+    // a generated inbetween never consulted it at all — found live
+    // ("le bras est moins épais [aux clés]... l'intervalle" thicker than
+    // both keyframes): measured via rendered outline area/length, a real
+    // arm stroke's own keyframes render ~4.06-4.57px average width while
+    // the sparse-only inbetween rendered ~4.66-4.77px — thicker than
+    // EITHER keyframe, because the sparse anchor interpolation misses the
+    // narrower dips the dense profile actually recorded. widthAtFrac's `t`
+    // domain (raw-sample arc-length fraction) is already exactly the same
+    // convention as `fractions` here, so no conversion is needed.
+    function widthsAt(sdData,srcSegs,total){
+      if(sdData.widthProfile&&sdData.widthProfile.length>1)return fractions.map(function(t){return widthAtFrac(sdData.widthProfile,t);});
+      return widthsAtSparse(srcSegs,total);
+    }
+    ra={segments:segsA,widths:widthsAt(aData,srcA,lenA),isVectorBrush:true,strokeColor:null,fillColor:aData.fillColor||null,opacity:aData.opacity!==undefined?aData.opacity:1};
+    rb={segments:segsB,widths:widthsAt(bData,srcB,lenB),isVectorBrush:true,strokeColor:null,fillColor:bData.fillColor||null,opacity:bData.opacity!==undefined?bData.opacity:1};
   }else{
     ra={segments:segsA,closed:!!aData.closed,strokeColor:aData.strokeColor,strokeWidth:aData.strokeWidth,strokeCap:aData.strokeCap,strokeJoin:aData.strokeJoin,fillColor:aData.fillColor||null,opacity:aData.opacity!==undefined?aData.opacity:1};
     rb={segments:segsB,closed:!!bData.closed,strokeColor:bData.strokeColor,strokeWidth:bData.strokeWidth,strokeCap:bData.strokeCap,strokeJoin:bData.strokeJoin,fillColor:bData.fillColor||null,opacity:bData.opacity!==undefined?bData.opacity:1};
