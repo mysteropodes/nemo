@@ -2887,6 +2887,18 @@ function dabRecordsForTween(rec,presetKey,colorHexStr,baseWidth,seed,opacityMul)
     return{segments:segs,closed:true,strokeColor:null,fillColor:colorHexStr,opacity:op,isBrushTextureCopy:true,brushGroupId:rec.brushGroupId};
   });
 }
+// Renames any stroke past the FIRST one in `strokes` that shares a
+// strokeId already claimed earlier in the SAME array — see the call
+// site's comment for why this can happen and why it matters.
+function _dedupeFrameStrokeIds(strokes,frameIdx){
+  var seen={};
+  for(var i=0;i<strokes.length;i++){
+    var sd=strokes[i];
+    if(!sd.strokeId)continue;
+    if(seen[sd.strokeId]){sd.strokeId='twdup_'+frameIdx+'_'+i;}
+    else seen[sd.strokeId]=1;
+  }
+}
 function generateTweens(){
   saveAllLayerFrames();var li=state.activeLayerIdx;var ld=state.layers[li];
   var keys=[];for(var i=0;i<state.totalFrames;i++){if(ld.frames[i].isKeyframe&&ld.frames[i].strokes.length>0)keys.push(i);}
@@ -2921,6 +2933,18 @@ function generateTweens(){
     // function's first attempt) defeated the whole point of automatic
     // shape detection.
     var manualMode=!!ld.frames[fA].tweenManualMode;
+    // Self-healing identity guard (2026-07, live-reported: a KEYFRAME's
+    // own stored strokes already had the SAME strokeId duplicated across
+    // 2 different strokes on a fresh reload, no override involved — a
+    // corruption baked in by an EARLIER generateTweens() run, before the
+    // fadeOutA/fadeInB collision guard below existed). Deduping here, on
+    // the raw keyframe data, BEFORE it feeds sA/sB, both prevents THIS
+    // span's matching from reading an already-ambiguous identity and
+    // self-heals whatever an old run already corrupted — every id-keyed
+    // lookup (continuity, the reassign tool, motion arcs) only ever sees
+    // a strokeId that resolves to exactly one stroke in the frame.
+    _dedupeFrameStrokeIds(ld.frames[fA].strokes,fA);
+    _dedupeFrameStrokeIds(ld.frames[fB].strokes,fB);
     var sAsplit=splitTweenables(ld.frames[fA].strokes,manualMode),sBsplit=splitTweenables(ld.frames[fB].strokes,false);
     var sA=sAsplit.list,sB=sBsplit.list;
     // v16: manual pairing overrides (state.tweenOverrides) take priority
@@ -3080,11 +3104,37 @@ function generateTweens(){
     // piece-wise morphs by splitting a merged stroke (see resolveSplitMatches)
     if(unA.length||unB.length)resolveSplitMatches(sA,sB,pairSpecs,unA,unB);
     var fadeOutA=unA.map(function(i){return sA[i];}),fadeInB=unB.map(function(i){return sB[i];});
+    // Identity-COLLISION guard (2026-07, live-reported: 2 real frames
+    // showed a duplicate strokeId on two visually unrelated strokes). A
+    // manual reassign override (state.tweenOverrides) re-stamps its
+    // B-side stroke with the A-side's id — but that exact id can ALREADY
+    // belong to some OTHER, unrelated stroke that this span left
+    // unmatched (fading in/out with its own pre-existing identity
+    // untouched, since the id-less fallback below is a no-op on a stroke
+    // that already has ONE — just not a UNIQUE one anymore). Nothing used
+    // to check for that: two different strokes in the same rendered
+    // frame silently ended up sharing one strokeId, and every id-keyed
+    // lookup downstream (continuity, the reassign tool itself, motion
+    // arcs) picks whichever one it finds first — exactly the "il se
+    // trompe sur la version d'avant" symptom. Precompute the SET of ids
+    // pairSpecs are about to stamp (same formula as the stamping loop
+    // below) and rename any fading stroke that already holds one of them
+    // — a collision is just as much an identity problem as having no id.
+    var pendingPairIds={};
+    pairSpecs.forEach(function(sp){
+      pendingPairIds[sp.aData.strokeId||sp.bData.strokeId||('tw_'+fA+'_'+sp.mi)]=1;
+    });
     // Same identity-continuity fix as the matched pairs above (see that
     // comment): a solo fading stroke's id-less keyframe would otherwise
     // be a different identity from its own generated fade frames.
-    fadeOutA.forEach(function(sd,i2){if(!sd.strokeId)sd.strokeId='twf_'+fA+'_a'+i2;});
-    fadeInB.forEach(function(sd,i2){if(!sd.strokeId)sd.strokeId='twf_'+fB+'_b'+i2;});
+    fadeOutA.forEach(function(sd,i2){
+      if(sd.strokeId&&pendingPairIds[sd.strokeId])sd.strokeId='twc_'+fA+'_a'+i2;
+      if(!sd.strokeId)sd.strokeId='twf_'+fA+'_a'+i2;
+    });
+    fadeInB.forEach(function(sd,i2){
+      if(sd.strokeId&&pendingPairIds[sd.strokeId])sd.strokeId='twc_'+fB+'_b'+i2;
+      if(!sd.strokeId)sd.strokeId='twf_'+fB+'_b'+i2;
+    });
     if(!pairSpecs.length&&!fadeOutA.length&&!fadeInB.length)continue;
     // Trim-vs-fade plans, computed ONCE per span (see _vanishPlanFor). The
     // junction anchors are the strokes that persist through the span:
