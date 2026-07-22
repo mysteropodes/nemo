@@ -1183,6 +1183,67 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
       var iwP=Math.max(0,Math.min(1,(lenErr5-0.015)/0.055));
       if(iwP<1&&!rA._twSelfX&&!rB._twSelfX&&_segsSelfIntersect(probeSegs))iwP=1;
       rA._twIwProbe=iwP;
+      // PER-VERTEX local trust (2026-07, "encore aller retour" — the mean
+      // turning-trust above missed this: a hand/limb-wide MEAN disagreement
+      // can look fine — 150-vertex stroke, global mean well under 15° —
+      // while a short run of vertices next to one bad correspondence
+      // "kink" (measured: two edges at 44°/61° local disagreement,
+      // isolated in an otherwise near-0° neighborhood) still integrates
+      // into a real cumulative drift for THAT stretch. The tell isn't
+      // disagreement in isolation, it's disagreement relative to how far
+      // the vertex actually needs to go: a vertex whose own A→B net
+      // displacement is small but whose intrinsic reconstruction excursion
+      // (distance from the straight A↔B midpoint, probed at the same
+      // fixed et=0.5 reference as iwP above) is LARGE in comparison is
+      // being dragged through a wide loop only to return — and since iw is
+      // a zero-at-both-ends envelope in et, "dragged out then back" is
+      // exactly what reads as aller-retour. A genuine fold moves every
+      // vertex a comparable amount (excursion≈netDisp, ratio~1); measured
+      // on the reported case: the affected run sat at ratio 1.2-4.5×,
+      // cleanly separated from the rest of the same stroke (≤1.0×).
+      // Absolute-frame throughout (unlike the translation-invariant probes
+      // above) since excursion-vs-netDisp is NOT translation-invariant —
+      // recentered on the pair's own fixed midpoint, not the real per-
+      // frame cx2/cy2, so this stays a once-per-pair constant like iwP.
+      rA._twLocalTrust=null;
+      if(iwP>0.001){
+        var cx2m=(cxA+cxB)/2,cy2m=(cyA+cyB)/2;
+        var probeI5=_intrinsicSegs(rA,rB,0.5,cx2m,cy2m,!!rA.closed);
+        if(probeI5){
+          var lt=new Array(n);
+          for(var lv=0;lv<n;lv++){
+            var pAv=rA.segments[lv].point,pBv=rB.segments[lv].point;
+            var dxv=pBv[0]-pAv[0],dyv=pBv[1]-pAv[1];
+            var netD=Math.hypot(dxv,dyv);
+            var refMx=(pAv[0]+pBv[0])/2,refMy=(pAv[1]+pBv[1])/2;
+            var exc=Math.hypot(probeI5[lv].point[0]-refMx,probeI5[lv].point[1]-refMy);
+            var ratio=exc/Math.max(netD,2);
+            var magTrust=Math.max(0,Math.min(1,(2.2-ratio)/(2.2-1.0)));
+            // Second, complementary tell: a vertex with a SUBSTANTIAL net
+            // A→B travel can still pass the magnitude check above (its
+            // excursion is proportionally reasonable) yet still overshoot
+            // PAST B or undershoot BEHIND A along its own direction of
+            // travel — measured on a second reported vertex: netD 44px
+            // (real, sizeable motion), excursion only 0.77x that (would
+            // pass the ratio gate alone), but its progress fraction along
+            // the A→B axis at the et=0.5 probe was 1.23-2.4 (i.e. 23-140%
+            // PAST the destination) for several consecutive vertices — the
+            // envelope's forced return to exactly B at t=1 then reads as a
+            // rush-past-and-correct. Good (non-reversing) strokes measured
+            // tightly within s∈[0.17,0.7] here; comfort zone [0,1] with a
+            // 0.3 ramp gives real bends slack without missing this case.
+            var axialTrust=1;
+            if(netD>=2){
+              var ux=dxv/netD,uy=dyv/netD;
+              var s=((probeI5[lv].point[0]-pAv[0])*ux+(probeI5[lv].point[1]-pAv[1])*uy)/netD;
+              var excess=Math.max(0,-s,s-1);
+              axialTrust=Math.max(0,Math.min(1,1-excess/0.3));
+            }
+            lt[lv]=Math.min(magTrust,axialTrust);
+          }
+          rA._twLocalTrust=lt;
+        }
+      }
     }
     // Smooth, zero-at-both-ends envelope in et (matches the endpoint-exact
     // guarantee even more strictly than the old per-frame measure did;
@@ -1218,11 +1279,14 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
     }
     if(iw>0.001){
       var iSegs=_intrinsicSegs(rA,rB,et,cx2,cy2,et<.5?!!rA.closed:!!rB.closed);
+      var lTrust=rA._twLocalTrust;
       if(iSegs)for(var wi3=0;wi3<n;wi3++){
+        var iwv=lTrust?iw*lTrust[wi3]:iw;
+        if(iwv<=0.001)continue;
         var LS=segs[wi3],IS=iSegs[wi3];
-        LS.point=[lerp(LS.point[0],IS.point[0],iw),lerp(LS.point[1],IS.point[1],iw)];
-        LS.handleIn=[lerp(LS.handleIn[0],IS.handleIn[0],iw),lerp(LS.handleIn[1],IS.handleIn[1],iw)];
-        LS.handleOut=[lerp(LS.handleOut[0],IS.handleOut[0],iw),lerp(LS.handleOut[1],IS.handleOut[1],iw)];
+        LS.point=[lerp(LS.point[0],IS.point[0],iwv),lerp(LS.point[1],IS.point[1],iwv)];
+        LS.handleIn=[lerp(LS.handleIn[0],IS.handleIn[0],iwv),lerp(LS.handleIn[1],IS.handleIn[1],iwv)];
+        LS.handleOut=[lerp(LS.handleOut[0],IS.handleOut[0],iwv),lerp(LS.handleOut[1],IS.handleOut[1],iwv)];
       }
     }
   }
