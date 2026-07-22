@@ -202,7 +202,16 @@ function matchSc(fA,fB,sameIndex,aPtsOverride){
   // 4. secondary cues & hard penalties
   var rdx=fA.relX-fB.relX,rdy=fA.relY-fB.relY;var rel=Math.min(1,Math.sqrt(rdx*rdx+rdy*rdy));
   var lenRatio=Math.max(fA.length,fB.length)/Math.max(1,Math.min(fA.length,fB.length));
-  var ratioPen=lenRatio>2?Math.min(0.7,(lenRatio-2)*0.35):0;
+  // Arc-length identity penalty, recalibrated 2026-07 (testB, the mouth
+  // "X" artifact): a 28px neck tick stole the 57px mouth's match (ratio
+  // 2.05) from the true 52px mouth (ratio 1.10) on proximity alone — the
+  // old ramp only started ABOVE 2.0 so 2.05 cost a meaningless 0.014.
+  // Measured across every legitimate pair of the same file: all sit at
+  // ratio ≤1.29, so a 1.6 threshold has wide margin. The absolute-
+  // difference gate (>15px) keeps micro-strokes exempt: two hand-drawn
+  // eye dots measured 7px vs 15px (ratio 2.04!) — at that size the ratio
+  // is pure pen noise, and cel features that small legitimately jitter.
+  var ratioPen=(lenRatio>1.6&&Math.abs(fA.length-fB.length)>15)?Math.min(0.7,(lenRatio-1.6)*0.5):0;
   // 0.35 only when BOTH closed flags are ground truth. When either side is
   // a heuristic guess (vector-brush centerline — see strokeFeat's
   // closedIsGuess), a disagreement is as likely a drawing accident as a
@@ -1287,7 +1296,44 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
             }
             lt[lv]=Math.min(magTrust,axialTrust);
           }
-          rA._twLocalTrust=lt;
+          // SPATIAL SMOOTHING (2026-07, "les bras sont complètement
+          // déformés... beaucoup moins bien qu'hier" — regression caught
+          // same-day): raw lt flips 1→0 within 2-3 vertices (measured
+          // [1,1,.95,.58,.11,0,0...] on the reported stroke). Each vertex
+          // then blends toward a DIFFERENT curve (intrinsic vs linear),
+          // so the hard boundary physically tears the inbetween — the
+          // trusted run follows the fold, its neighbor doesn't, and the
+          // seam reads as a broken elbow (measured: max local turn angle
+          // 62°→104° on the reported arm with the raw array; back to 62°
+          // — the no-trust baseline — smoothed). Two passes: (1) min-
+          // erode over ±1 so one lone trusted vertex inside a bad run
+          // can't spike AND an isolated bad vertex keeps real suppression
+          // after the blur dilutes it (measured: erode+blur kills all 3
+          // residual reversing vertices on the reported file, blur alone
+          // leaves 1), then (2) a triangular blur (radius 3 — swept 3/5/
+          // n:16: radius 3 costs the least arc-length corner-cutting,
+          // 7.7% vs 8.6% on the reported arm, with the kink equally
+          // fixed) so the blend weight ramps over a real stretch of the
+          // stroke instead of cliff-dropping between neighbors.
+          var er=new Array(n);
+          for(var ei=0;ei<n;ei++){
+            var mn=lt[ei];
+            if(ei>0&&lt[ei-1]<mn)mn=lt[ei-1];
+            if(ei<n-1&&lt[ei+1]<mn)mn=lt[ei+1];
+            er[ei]=mn;
+          }
+          var rad=3;
+          var sm=new Array(n);
+          for(var si=0;si<n;si++){
+            var acc=0,wsum=0;
+            for(var di=-rad;di<=rad;di++){
+              var j=si+di;if(j<0||j>=n)continue;
+              var w=rad+1-Math.abs(di);
+              acc+=er[j]*w;wsum+=w;
+            }
+            sm[si]=acc/wsum;
+          }
+          rA._twLocalTrust=sm;
         }
       }
     }
