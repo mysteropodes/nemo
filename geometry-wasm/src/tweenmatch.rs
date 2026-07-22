@@ -631,9 +631,41 @@ pub(crate) fn auto_match_inner(sa: &[StrokeIn], sb: &[StrokeIn]) -> Vec<MatchOut
         }
     };
 
+    // LOCAL motion model — verbatim port of tweens.js's autoMatchJS pass-2
+    // K-nearest-seeds refinement (2026-07, "mauvaise reconnaissance de
+    // trait"; see the JS comment for the full rationale): one global
+    // similarity transform is dominated by the biggest/most confident
+    // strokes, mispredicting every region that moves differently (a head
+    // tilting while the arms swing) and chain-mismatching its small
+    // features. Per-stroke transform fitted on the K=4 nearest seed pairs
+    // instead, global fit kept as fallback for degenerate/implausible
+    // local fits and tiny seed sets.
+    const K_LOCAL: usize = 4;
     let pts_t: Vec<Vec<(f64, f64)>> = fa
         .iter()
-        .map(|f| f.pts.iter().map(|p| apply_similarity_transform(&transform, p.0, p.1)).collect())
+        .map(|f| {
+            let mut tf = &transform;
+            let local_tf;
+            if seeds.len() > K_LOCAL {
+                let mut near: Vec<&MatchOut> = seeds.iter().collect();
+                near.sort_by(|s1, s2| {
+                    let d1 = (fa[s1.a].cx - f.cx).powi(2) + (fa[s1.a].cy - f.cy).powi(2);
+                    let d2 = (fa[s2.a].cx - f.cx).powi(2) + (fa[s2.a].cy - f.cy).powi(2);
+                    d1.total_cmp(&d2)
+                });
+                near.truncate(K_LOCAL);
+                let la: Vec<(f64, f64)> = near.iter().map(|s| (fa[s.a].cx, fa[s.a].cy)).collect();
+                let lb: Vec<(f64, f64)> = near.iter().map(|s| (fb[s.b].cx, fb[s.b].cy)).collect();
+                if let Some(lt) = fit_similarity_transform(&la, &lb) {
+                    let lmag = (lt.w_re * lt.w_re + lt.w_im * lt.w_im).sqrt();
+                    if lmag > 0.15 && lmag < 8.0 {
+                        local_tf = lt;
+                        tf = &local_tf;
+                    }
+                }
+            }
+            f.pts.iter().map(|p| apply_similarity_transform(tf, p.0, p.1)).collect()
+        })
         .collect();
     let cost2 = build_cost(Some(&pts_t));
     let assign2 = hungarian(&cost2);
