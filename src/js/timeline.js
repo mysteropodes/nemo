@@ -781,6 +781,7 @@ window.SM={
       _sel.clipboard.push({rl:s.layer-b.minL,rf:s.frame-b.minF,content:JSON.parse(JSON.stringify(ld.frames[s.frame]))});
     });
     _sel.clipOp='copy';
+    if(typeof window!=='undefined')window._lastClipKind='frames';
     showToast('Copié ('+_sel.frames.length+' frames)');
   },
   cutFrames:function(){
@@ -796,6 +797,7 @@ window.SM={
       ld.frames[s.frame]={strokes:[],isKeyframe:false,isInterpolated:false};
     });
     _sel.clipOp='cut';
+    if(typeof window!=='undefined')window._lastClipKind='frames';
     selClear();loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
     showToast('Coupé ('+_sel.clipboard.length+' frames)');
   },
@@ -4512,9 +4514,24 @@ function onKeyDown(event){
   if(event.key==='Enter'&&event.target.tagName==='INPUT'){event.target.blur();return;}
   if((event.metaKey||event.ctrlKey)&&event.key==='z'){if(inField)return;event.preventDefault();if(event.shiftKey)redo();else undo();return;}
   if((event.metaKey||event.ctrlKey)&&event.key==='s'){event.preventDefault();if(event.shiftKey)window.SMProject.saveAs();else window.SMProject.save();return;}
-  if((event.metaKey||event.ctrlKey)&&event.key==='c'){if(inField)return;event.preventDefault();window.SM.copyFrames();return;}
-  if((event.metaKey||event.ctrlKey)&&event.key==='x'){if(inField)return;event.preventDefault();window.SM.cutFrames();return;}
-  if((event.metaKey||event.ctrlKey)&&event.key==='v'){if(inField)return;event.preventDefault();window.SM.pasteFrames();return;}
+  // ⌘C/⌘X/⌘V routes to whichever clipboard is relevant: a live canvas shape
+  // selection (selectedPaths, Select/Subselect tool) takes priority over a
+  // timeline keyframe-cell selection (_sel.frames) when BOTH happen to be
+  // non-empty — matches how ⌘D (duplicate, below) and Delete already treat
+  // a canvas selection as the more specific/intentional one. Paste has no
+  // "current selection" to disambiguate from, so it follows whichever
+  // clipboard was filled most recently (2026-07, "vérifie que copier/
+  // couper/coller existe pour tous les éléments... les keyframes" — canvas
+  // shapes had NO copy/cut/paste at all before this, only keyframes did).
+  if((event.metaKey||event.ctrlKey)&&event.key==='c'){if(inField)return;event.preventDefault();if(selectedPaths.length)copySelection();else window.SM.copyFrames();return;}
+  if((event.metaKey||event.ctrlKey)&&event.key==='x'){if(inField)return;event.preventDefault();if(selectedPaths.length)cutSelection();else window.SM.cutFrames();return;}
+  if((event.metaKey||event.ctrlKey)&&event.key==='v'){if(inField)return;event.preventDefault();
+    if(window._lastClipKind==='canvas'&&_canvasClip&&_canvasClip.snaps.length)pasteSelection();
+    else if(window._lastClipKind==='frames'&&_sel.clipboard&&_sel.clipboard.length)window.SM.pasteFrames();
+    else if(_canvasClip&&_canvasClip.snaps.length)pasteSelection();
+    else window.SM.pasteFrames();
+    return;
+  }
   // UI/UX audit (2026-07): Ctrl/Cmd+A "select all" existed nowhere in the
   // app — a near-universal convention in every creative tool. Selects
   // every path/raster on the ACTIVE layer at the current frame, mirroring
