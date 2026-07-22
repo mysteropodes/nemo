@@ -609,7 +609,26 @@ function detectFeatureFractions(paperPath,maxFeatures){
     if(turn[m]>=prev&&turn[m]>=next)feats.push({t:(m+1)/STEPS,mag:turn[m]});
   }
   feats.sort(function(a,b){return b.mag-a.mag;});
-  return feats.slice(0,maxFeatures).map(function(f){return f.t;}).sort(function(a,b){return a-b;});
+  // ARC-SPACED non-maximum suppression (2026-07, "un pli se forme qu'il
+  // faut identifier et positionner tout le long de l'inter"): strongest-
+  // first with no spacing rule, a scribbly HAND eats every landmark slot
+  // (measured on the reported arm: all 8 landed within frac 0.57-0.76 —
+  // the hand — while the ELBOW, the one corner that actually travels,
+  // got none, so the fold could never be re-synchronized). Greedy
+  // strongest-first with a minimum arc separation spreads the budget
+  // along the whole stroke: the hand keeps its 2-3 sharpest corners and
+  // the elbow finally gets a slot. Separation of half an even split
+  // still lets two GENUINE nearby corners both in (a zigzag), it only
+  // blocks piles.
+  var minSep=0.5/Math.max(2,maxFeatures);
+  var picked=[];
+  for(var fi2=0;fi2<feats.length&&picked.length<maxFeatures;fi2++){
+    var cand=feats[fi2];
+    var ok=true;
+    for(var pj=0;pj<picked.length;pj++)if(Math.abs(picked[pj].t-cand.t)<minSep){ok=false;break;}
+    if(ok)picked.push(cand);
+  }
+  return picked.map(function(f){return f.t;}).sort(function(a,b){return a-b;});
 }
 // Builds ONE shared t-fraction list (length n) from the union of A's and
 // B's detected feature fractions, snapping the nearest uniform grid index
@@ -686,19 +705,26 @@ function _matchLandmarks(pA,lenA,pB,lenB,maxFeatures){
   var ptsA=featsA.map(function(f){var p=pA.getPointAt(f*lenA);return p?{x:p.x,y:p.y}:null;});
   var ptsB=featsB.map(function(f){var p=pB.getPointAt(f*lenB);return p?{x:p.x,y:p.y}:null;});
   if(ptsA.indexOf(null)>=0||ptsB.indexOf(null)>=0)return null;
-  // Pass 1 (seed): rank-order pairing — detectFeatureFractions already
-  // returns each side's landmarks sorted by arc-length position, so this
-  // assumes corners appear in the same relative ORDER in both poses (true
-  // for a bending limb's own corners; a genuine reorder just means pass 2's
-  // residual gate below rejects most/all pairs and this bails to null,
-  // deferring to the existing shared-fraction path exactly as before).
+  // Pass 1 (seed): fit the stroke's OWN global motion from 32 uniform
+  // arc-length probes of the two paths — not from the corners themselves.
+  // The original rank-order corner seed (i-th A corner ↔ interpolated
+  // i-th B corner) degenerates whenever the two sides detect different
+  // corner sets: measured on the reported pointing arm (5 vs 4 corners,
+  // sets only partially overlapping), the seed fit collapsed to scale
+  // 0.15 / rotation 174° — under which EVERY pairing's residual passed
+  // the gate, the Hungarian assigned corners arbitrarily, and the
+  // monotonicity check then (rightly) bailed the whole landmark pass to
+  // null, losing the elbow. Uniform whole-stroke probes always exist,
+  // are already order-consistent (the early-orientation pass upstream
+  // fixed the drawing direction), and capture the limb's real motion.
   var m=Math.min(ptsA.length,ptsB.length);
-  var seedA=[],seedB=[];
-  for(var i=0;i<m;i++){
-    seedA.push(ptsA[Math.round(i*(ptsA.length-1)/Math.max(1,m-1))]);
-    seedB.push(ptsB[Math.round(i*(ptsB.length-1)/Math.max(1,m-1))]);
+  var _gK=32,_gA=[],_gB=[];
+  for(var gi=0;gi<_gK;gi++){
+    var gpa=pA.getPointAt(lenA*gi/(_gK-1))||pA.lastSegment.point;
+    var gpb=pB.getPointAt(lenB*gi/(_gK-1))||pB.lastSegment.point;
+    _gA.push({x:gpa.x,y:gpa.y});_gB.push({x:gpb.x,y:gpb.y});
   }
-  var transform=fitSimilarityTransform(seedA,seedB);
+  var transform=fitSimilarityTransform(_gA,_gB);
   if(!transform)return null;
   // Pass 2: re-score EVERY (i,j) by residual after the fitted transform —
   // the "does this pairing agree with the drawing's overall motion"
@@ -725,7 +751,16 @@ function _matchLandmarks(pA,lenA,pB,lenB,maxFeatures){
     var q2=applySimilarityTransform(transform,ptsA[a2].x,ptsA[a2].y);
     if(Math.hypot(q2.x-ptsB[b2].x,q2.y-ptsB[b2].y)<=maxOkDist)pairs.push({fracA:featsA[a2],fracB:featsB[b2]});
   }
-  if(pairs.length<2)return null;
+  // ONE matched landmark is enough (2026-07, "un pli qu'il faut
+  // identifier et positionner tout le long de l'inter"): on the reported
+  // pointing arm, the ELBOW was the only corner whose pairing survived
+  // the residual gate (the hand's corners move too non-rigidly for the
+  // global fit — residuals 125-174 vs the 66 ceiling) — and one elbow
+  // pair is exactly the fold re-synchronization this exists for
+  // (_landmarkFractions handles a single pair as two independent spans,
+  // start→elbow and elbow→end). The old ≥2 gate threw away the elbow
+  // with the rest.
+  if(pairs.length<1)return null;
   pairs.sort(function(x,y){return x.fracA-y.fracA;});
   // A genuine cyclic reorder (not just a missing/extra landmark) breaks the
   // "one coherent motion" premise this whole approach rests on — bail
@@ -787,6 +822,50 @@ function resamplePairFeatureAware(aData,bData,n,isVB){
   pA.closed=!usingCenterA&&!!aData.closed;pB.closed=!usingCenterB&&!!bData.closed;
   var lenA=pA.length,lenB=pB.length;
   if(!(lenA>0)||!(lenB>0)){pA.remove();pB.remove();var rfn2=isVB?resampleCenterline:resampleP;return[rfn2(aData,n),rfn2(bData,n)];}
+  // EARLY ORIENTATION (2026-07, "bras à gauche qui change de sens pendant
+  // l'inter" + "un pli qu'il faut positionner tout le long"): the drawing
+  // direction of B was only ever resolved AFTER this function, by
+  // alignResampledPair reversing the RESAMPLED points — which destroys
+  // whatever correspondence the landmark pass below built (each fracB
+  // then reads the geometry from the wrong end), and feeds _matchLandmarks
+  // a B whose along-the-stroke rank order is backwards, so the elbow
+  // corner can't pair with its counterpart in the first place (measured
+  // on the reported pointing arm, drawn shoulder→hand in one key and
+  // hand→shoulder in the other: landmarks degenerated to fracA===fracB,
+  // midframe arc length collapsed 47%). Decide the reversal HERE, on the
+  // raw geometry, before any fraction is placed: 32 uniform probes per
+  // side, centroid-relative squared distance, direct vs reversed — the
+  // exact test alignResampledPair applies later, which then simply
+  // confirms the already-correct orientation for open strokes. Closed
+  // loops keep their existing cyclic-rotation handling downstream.
+  var bReversed=false;
+  if(!pB.closed){
+    var _oPA=[],_oPB=[],_oK=32;
+    for(var oi=0;oi<_oK;oi++){
+      var oa=pA.getPointAt(lenA*oi/(_oK-1))||pA.lastSegment.point;
+      var ob=pB.getPointAt(lenB*oi/(_oK-1))||pB.lastSegment.point;
+      _oPA.push(oa);_oPB.push(ob);
+    }
+    var _cax=0,_cay=0,_cbx=0,_cby=0;
+    for(var oj=0;oj<_oK;oj++){_cax+=_oPA[oj].x;_cay+=_oPA[oj].y;_cbx+=_oPB[oj].x;_cby+=_oPB[oj].y;}
+    _cax/=_oK;_cay/=_oK;_cbx/=_oK;_cby/=_oK;
+    var _cd=0,_cr=0;
+    for(var ok=0;ok<_oK;ok++){
+      var ax=_oPA[ok].x-_cax,ay=_oPA[ok].y-_cay;
+      var bxD=_oPB[ok].x-_cbx,byD=_oPB[ok].y-_cby;
+      var bxR=_oPB[_oK-1-ok].x-_cbx,byR=_oPB[_oK-1-ok].y-_cby;
+      _cd+=(ax-bxD)*(ax-bxD)+(ay-byD)*(ay-byD);
+      _cr+=(ax-bxR)*(ax-bxR)+(ay-byR)*(ay-byR);
+    }
+    if(_cr<_cd){
+      bReversed=true;
+      srcB=srcB.slice().reverse().map(function(s){return{point:s.point,handleIn:s.handleOut,handleOut:s.handleIn,width:s.width};});
+      pB.remove();
+      pB=new Path({insert:false});srcB.forEach(function(s){pB.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));});
+      pB.closed=false;
+      lenB=pB.length;
+    }
+  }
   var fractions=buildSharedFractions(pA,pB,n);
   var fractionsB=fractions; // default: identical to A's (today's behavior)
   // Try the landmark (chikara-sen) correspondence — only for a real budget
@@ -835,12 +914,17 @@ function resamplePairFeatureAware(aData,bData,n,isVB){
     // narrower dips the dense profile actually recorded. widthAtFrac's `t`
     // domain (raw-sample arc-length fraction) is already exactly the same
     // convention as `fractions` here, so no conversion is needed.
-    function widthsAt(sdData,srcSegs,total,fracs){
-      if(sdData.widthProfile&&sdData.widthProfile.length>1)return fracs.map(function(t){return widthAtFrac(sdData.widthProfile,t);});
+    function widthsAt(sdData,srcSegs,total,fracs,rev){
+      // The dense pressure profile is indexed by the RAW drawing's own
+      // arc-length fraction — when B was flipped by the early-orientation
+      // pass above, a resample fraction t reads the profile at 1-t. The
+      // sparse fallback needs no conversion: srcSegs is already the
+      // flipped array, widths riding along with their anchors.
+      if(sdData.widthProfile&&sdData.widthProfile.length>1)return fracs.map(function(t){return widthAtFrac(sdData.widthProfile,rev?1-t:t);});
       return widthsAtSparse(srcSegs,total,fracs);
     }
-    ra={segments:segsA,widths:widthsAt(aData,srcA,lenA,fractions),isVectorBrush:true,strokeColor:null,fillColor:aData.fillColor||null,opacity:aData.opacity!==undefined?aData.opacity:1};
-    rb={segments:segsB,widths:widthsAt(bData,srcB,lenB,fractionsB),isVectorBrush:true,strokeColor:null,fillColor:bData.fillColor||null,opacity:bData.opacity!==undefined?bData.opacity:1};
+    ra={segments:segsA,widths:widthsAt(aData,srcA,lenA,fractions,false),isVectorBrush:true,strokeColor:null,fillColor:aData.fillColor||null,opacity:aData.opacity!==undefined?aData.opacity:1};
+    rb={segments:segsB,widths:widthsAt(bData,srcB,lenB,fractionsB,bReversed),isVectorBrush:true,strokeColor:null,fillColor:bData.fillColor||null,opacity:bData.opacity!==undefined?bData.opacity:1};
   }else{
     ra={segments:segsA,closed:!!aData.closed,strokeColor:aData.strokeColor,strokeWidth:aData.strokeWidth,strokeCap:aData.strokeCap,strokeJoin:aData.strokeJoin,fillColor:aData.fillColor||null,opacity:aData.opacity!==undefined?aData.opacity:1};
     rb={segments:segsB,closed:!!bData.closed,strokeColor:bData.strokeColor,strokeWidth:bData.strokeWidth,strokeCap:bData.strokeCap,strokeJoin:bData.strokeJoin,fillColor:bData.fillColor||null,opacity:bData.opacity!==undefined?bData.opacity:1};
