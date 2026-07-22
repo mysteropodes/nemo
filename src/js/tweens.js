@@ -458,7 +458,28 @@ function uncrossMatches(ms,fA,fB){
       if(!_segsIntersect(a1,b1,a2,b2))continue;
       var cur=matchSc(fA[m1.a],fB[m1.b],m1.a===m1.b)+matchSc(fA[m2.a],fB[m2.b],m2.a===m2.b);
       var swp=matchSc(fA[m1.a],fB[m2.b],m1.a===m2.b)+matchSc(fA[m2.a],fB[m1.b],m2.a===m1.b);
-      if(swp<=cur+UNCROSS_TOL){
+      // NEAR-TWIN widened tolerance (2026-07, "un oeil est mal reconnu
+      // par rapport à l'autre — identification par rapport au
+      // placement"): two eyes on a head that shifted -70px matched
+      // crossed (each eye to the OTHER's new position) and the swap
+      // missed the 0.08 tolerance by 0.026 (swapped 0.866 vs crossed
+      // 0.76+0.08) — absolute proximity outvoted left-stays-left. When
+      // all four strokes are near-twins (same type both sides, length
+      // ratio <1.5 within each side's pair), crossing trajectories are
+      // near-certain matching error — cel features preserve their
+      // spatial arrangement — so the uncross gets a much wider benefit
+      // of the doubt. Genuinely-crossing distinct objects stay protected
+      // by the color-clash/type penalties (0.4+, above even this).
+      // Same micro-stroke exemption as matchSc's ratioPen: two hand-drawn
+      // eye ticks measured 21px vs 13px (ratio 1.6 — pure pen noise at
+      // that size), so a small ABSOLUTE difference also qualifies as twin.
+      var lr1=Math.max(fA[m1.a].length,fA[m2.a].length)/Math.max(1,Math.min(fA[m1.a].length,fA[m2.a].length));
+      var lr2=Math.max(fB[m1.b].length,fB[m2.b].length)/Math.max(1,Math.min(fB[m1.b].length,fB[m2.b].length));
+      var twin1=lr1<1.5||Math.abs(fA[m1.a].length-fA[m2.a].length)<15;
+      var twin2=lr2<1.5||Math.abs(fB[m1.b].length-fB[m2.b].length)<15;
+      var twins=fA[m1.a].type===fA[m2.a].type&&fB[m1.b].type===fB[m2.b].type&&twin1&&twin2;
+      var tol=twins?0.25:UNCROSS_TOL;
+      if(swp<=cur+tol){
         var tmp=m1.b;m1.b=m2.b;m2.b=tmp;
         m1.score=matchSc(fA[m1.a],fB[m1.b],m1.a===m1.b);
         m2.score=matchSc(fA[m2.a],fB[m2.b],m2.a===m2.b);
@@ -1381,19 +1402,6 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
           }
           var iwPeak=iwP*rA._twTurnTrust;
           if(iwPeak>0.001){
-            // Same frame for both candidates (mixing needs it): rebuild
-            // the linear probe recentered on the pair midpoint probeI5
-            // itself used. Crossing counts are translation-invariant, so
-            // the exact recenter point is irrelevant to the verdict.
-            var probeLin5=buildLinearSegs(0.5,thT5,scT5,thB5,scB5,cx2m,cy2m);
-            function mix5(w){
-              var o=[];
-              for(var mi5=0;mi5<n;mi5++){
-                var wv=typeof w==='number'?w:w[mi5];
-                o.push({point:[lerp(probeLin5[mi5].point[0],probeI5[mi5].point[0],wv),lerp(probeLin5[mi5].point[1],probeI5[mi5].point[1],wv)]});
-              }
-              return o;
-            }
             var base=Math.max(_segsSelfXCount(rA.segments),_segsSelfXCount(rB.segments));
             // Composite score, not crossings alone (2026-07, "des rotations
             // inattendues frame 21" — same-day follow-up): on an arm drawn
@@ -1424,14 +1432,62 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
               var cA5=chord5(rA.segments),cB5=chord5(rB.segments);
               return cA5+_wrapPI(cB5-cA5)*0.5;
             })();
-            function candScore(segs5){
-              var exX=Math.max(0,_segsSelfXCount(segs5)-base);
-              var cd=Math.abs(_wrapPI(chord5(segs5)-chordExp));
-              var ld5=Lexp5>1e-6?Math.abs(_segPolyLen(segs5)-Lexp5)/Lexp5:0;
-              return exX*10+cd/(Math.PI/6)+ld5*5;
+            // BACKTRACK term (2026-07, "sur le haut du bras à droite les
+            // shapes font des aller-retour"): a candidate can be clean at
+            // the midframe on every measure above yet still drag vertices
+            // OUT and BACK over the span — the reported shoulder moved
+            // 21px backward then 43px forward under uniform-intrinsic
+            // while crossing nothing and holding chord/length perfectly
+            // at et=0.5. That failure only shows in a TRAJECTORY, so each
+            // candidate is now built at five et samples (real envelope,
+            // real interpolated recenter — translation must be included
+            // or purely-carried motion reads as false backtrack) plus the
+            // two key endpoints, and pays for the total distance its
+            // vertices travel in reverse. Sampling at the same five et
+            // means crossings are also caught anywhere in the span now,
+            // not only at the midframe.
+            var ETS=[0.15,0.35,0.5,0.65,0.85];
+            var candTraj={b:[rA.segments],u:[rA.segments],l:[rA.segments]};
+            var midIdx=2;
+            var chordMid={},lenMid={};
+            ETS.forEach(function(ets_,ei){
+              var thTs=theta*ets_,scTs=lerp(1,scaleF,ets_),thBs=thTs-theta,scBs=lerp(scaleF>1e-6?1/scaleF:1,1,ets_);
+              var cxs=cxA+(cxB-cxA)*ets_,cys=cyA+(cyB-cyA)*ets_;
+              var linS=buildLinearSegs(ets_,thTs,scTs,thBs,scBs,cxs,cys);
+              var intrS=_intrinsicSegs(rA,rB,ets_,cxs,cys,ets_<.5?!!rA.closed:!!rB.closed);
+              var iwS=iwPeak*Math.sin(Math.PI*ets_);
+              function mixS(w){
+                var o=[];
+                for(var mi5=0;mi5<n;mi5++){
+                  var wv=(typeof w==='number'?w:w[mi5])*iwS;
+                  o.push({point:intrS?[lerp(linS[mi5].point[0],intrS[mi5].point[0],wv),lerp(linS[mi5].point[1],intrS[mi5].point[1],wv)]:linS[mi5].point});
+                }
+                return o;
+              }
+              candTraj.b.push(mixS(sm));
+              candTraj.u.push(mixS(1));
+              candTraj.l.push(linS);
+            });
+            candTraj.b.push(rB.segments);candTraj.u.push(rB.segments);candTraj.l.push(rB.segments);
+            function candScore(traj){
+              var exX=0;
+              for(var st=1;st<traj.length-1;st++)exX+=Math.max(0,_segsSelfXCount(traj[st])-base);
+              var mid=traj[midIdx+1];
+              var cd=Math.abs(_wrapPI(chord5(mid)-chordExp));
+              var ld5=Lexp5>1e-6?Math.abs(_segPolyLen(mid)-Lexp5)/Lexp5:0;
+              var back=0;
+              for(var pi5=0;pi5<n;pi5++){
+                for(var st2=1;st2<traj.length-1;st2++){
+                  var p0=traj[st2-1][pi5].point,p1=traj[st2][pi5].point,p2=traj[st2+1][pi5].point;
+                  var v1x=p1[0]-p0[0],v1y=p1[1]-p0[1],v2x=p2[0]-p1[0],v2y=p2[1]-p1[1];
+                  var l1=Math.hypot(v1x,v1y),l2=Math.hypot(v2x,v2y);
+                  if(l1<0.3||l2<0.3)continue;
+                  if((v1x*v2x+v1y*v2y)/(l1*l2)<-0.3)back+=l2;
+                }
+              }
+              return exX*10+cd/(Math.PI/6)+ld5*5+back/(n*0.8);
             }
-            var blendSegs5=mix5(sm.map(function(v){return iwPeak*v;}));
-            var scB5c=candScore(blendSegs5),scU5=candScore(mix5(iwPeak)),scL5=candScore(probeLin5);
+            var scB5c=candScore(candTraj.b),scU5=candScore(candTraj.u),scL5=candScore(candTraj.l);
             var best=Math.min(scB5c,scU5,scL5);
             if(scB5c-best<0.05){/* keep per-vertex blend */}
             else if(scU5-best<0.05)rA._twLocalTrust=null;  // uniform intrinsic

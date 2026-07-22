@@ -724,7 +724,19 @@ fn uncross_matches(ms: &mut [MatchOut], fa: &[Feat], fb: &[Feat], match_norm: f6
                     + match_sc(&fa[m2a], &fb[m2b], m2a == m2b, None, match_norm);
                 let swp = match_sc(&fa[m1a], &fb[m2b], m1a == m2b, None, match_norm)
                     + match_sc(&fa[m2a], &fb[m1b], m2a == m1b, None, match_norm);
-                if swp <= cur + UNCROSS_TOL {
+                // Near-twin widened tolerance — verbatim port of tweens.js's
+                // uncrossMatches (2026-07, "un oeil est mal reconnu"; see the
+                // JS comment for the measured rationale).
+                let lr1 = fa[m1a].length.max(fa[m2a].length) / fa[m1a].length.min(fa[m2a].length).max(1.0);
+                let lr2 = fb[m1b].length.max(fb[m2b].length) / fb[m1b].length.min(fb[m2b].length).max(1.0);
+                let twin1 = lr1 < 1.5 || (fa[m1a].length - fa[m2a].length).abs() < 15.0;
+                let twin2 = lr2 < 1.5 || (fb[m1b].length - fb[m2b].length).abs() < 15.0;
+                let twins = fa[m1a].stype == fa[m2a].stype
+                    && fb[m1b].stype == fb[m2b].stype
+                    && twin1
+                    && twin2;
+                let tol = if twins { 0.25 } else { UNCROSS_TOL };
+                if swp <= cur + tol {
                     ms[i].b = m2b;
                     ms[j].b = m1b;
                     ms[i].score = match_sc(&fa[m1a], &fb[m2b], m1a == m2b, None, match_norm);
