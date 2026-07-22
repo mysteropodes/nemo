@@ -1988,8 +1988,25 @@ function generateTweens(){
       if(m.score<=MATCH_TH){pairSpecs.push({aIdx:m.a,bIdx:m.b,aData:sA[m.a],bData:sB[m.b],mi:matches.indexOf(m),score:m.score});aMatched[m.a]=1;bMatched[m.b]=1;}
     });
     // Second chance for mutually-leftover Hungarian pairs (see comment above).
+    // BOUNDED (2026-07, "grosses déformations... j'ai fait différentes
+    // animations sur la même timeline"): the rescue exists for ONE limb
+    // whose big-but-ordinary motion pushed it past MATCH_TH (the raised
+    // arm measured 0.739) — it must NOT fire across a hard CUT between two
+    // unrelated drawings sharing a timeline. Measured on the reported
+    // file's cut (13 strokes → 1): the leftover pair scored 0.85, and
+    // rescuing it warped an arm into the next scene's first stroke while
+    // 12 siblings faded around it. Two independent guards, both derived
+    // from measured cases, either one blocks: (1) absolute ceiling 0.78
+    // (legitimate rescued limb 0.739 < 0.78 < aberrant cut 0.85); (2) a
+    // heavily-unbalanced stroke count (3x+) says "different drawing, most
+    // of one side HAS to vanish" — there a rescue needs near-threshold
+    // confidence (MATCH_TH+0.1), not benefit-of-the-doubt.
+    var RESCUE_CEIL=0.78;
+    var cntRatio=Math.max(sA.length,sB.length)/Math.max(1,Math.min(sA.length,sB.length));
+    var rescueCeil=cntRatio>=3?MATCH_TH+0.1:RESCUE_CEIL;
     matches.forEach(function(m){
       if(m.score<=MATCH_TH)return; // already handled by the first pass
+      if(m.score>rescueCeil)return; // beyond any plausible same-object motion — fade/trim instead
       if(forcedAIdx[m.a]||forcedBIdx[m.b])return;
       if(aMatched[m.a]||bMatched[m.b])return; // one side already claimed — real ambiguity, let it fade
       var fta=strokeFeat(sA[m.a]),ftb=strokeFeat(sB[m.b]);
