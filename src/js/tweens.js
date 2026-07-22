@@ -1650,6 +1650,43 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
       var lenErr5=Lexp5>1e-6?Math.abs(Lexp5-_segPolyLen(probeSegs))/Lexp5:0;
       var iwP=Math.max(0,Math.min(1,(lenErr5-0.015)/0.055));
       if(iwP<1&&!rA._twSelfX&&!rB._twSelfX&&_segsSelfIntersect(probeSegs))iwP=1;
+      // WINDOWED local deficit (2026-07, "un pli qu'on retrouve sur la clé
+      // suivante" se perd pendant l'inter — a detailed fold on a LONG
+      // stroke): the whole-stroke lenErr5 above dilutes a real local
+      // collapse into insignificance — measured on a reported fist/finger
+      // detail sitting on a ~1600px arm outline: whole-stroke lenErr5
+      // only 1.2% (under the 1.5% dead zone, iwP stayed exactly 0, no
+      // correction ever engaged), while a handful of ~15-vertex windows
+      // covering just the fingers ran 4%+ short. A long straight run
+      // elsewhere on the SAME stroke needs no correction and shouldn't
+      // trigger one on its own account — this only fires from an actual
+      // LOCAL deficit, and even then only opens the door: the existing
+      // per-vertex local-trust/turn-trust gates below still decide which
+      // vertices actually receive the correction, so this can't reproduce
+      // the old whole-limb-ballooning failure the global gate was built
+      // to prevent (2026-07, "encore un bras hyper déformé").
+      if(iwP<1&&n>=20){
+        var winW=Math.max(8,Math.round(n*0.1));
+        var worstWinErr=0;
+        for(var wi5=0;wi5+winW<n;wi5+=Math.max(2,Math.round(winW/3))){
+          var wEnd=wi5+winW;
+          var wLA=0,wLB=0,wLP=0;
+          for(var wj=wi5+1;wj<=wEnd;wj++){
+            wLA+=Math.hypot(rA.segments[wj].point[0]-rA.segments[wj-1].point[0],rA.segments[wj].point[1]-rA.segments[wj-1].point[1]);
+            wLB+=Math.hypot(rB.segments[wj].point[0]-rB.segments[wj-1].point[0],rB.segments[wj].point[1]-rB.segments[wj-1].point[1]);
+            wLP+=Math.hypot(probeSegs[wj].point[0]-probeSegs[wj-1].point[0],probeSegs[wj].point[1]-probeSegs[wj-1].point[1]);
+          }
+          var wExp=(wLA+wLB)/2;
+          if(wExp<3)continue;
+          var wErr=Math.abs(wExp-wLP)/wExp;
+          if(wErr>worstWinErr)worstWinErr=wErr;
+        }
+        // Same dead-zone/full-weight shape as the whole-stroke ramp, just
+        // a tighter window (local detail needs a smaller absolute % to
+        // read as "collapsed" than the whole stroke does).
+        var iwPWin=Math.max(0,Math.min(1,(worstWinErr-0.02)/0.05));
+        if(iwPWin>iwP)iwP=iwPWin;
+      }
       rA._twIwProbe=iwP;
       // PER-VERTEX local trust (2026-07, "encore aller retour" — the mean
       // turning-trust above missed this: a hand/limb-wide MEAN disagreement
