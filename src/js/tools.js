@@ -1005,15 +1005,37 @@ function getSI(path){var ch=userLayers[state.activeLayerIdx].children;for(var i=
 // by hand — it's the one code path already proven to correctly carry
 // every field (fill, vector-brush centerline, brush-texture flags...)
 // through a rebuild, so this doesn't need to re-solve that.
-function duplicateSelection(){
-  if(!selectedPaths.length)return;
-  pushUndo();
-  var layer=userLayers[state.activeLayerIdx];
-  var OFFSET=12; // px — small, deliberate nudge so the copy doesn't sit invisibly on top of the source
+// Snapshot a LIVE path into plain data a clone can be rebuilt from later —
+// possibly much later, on a different frame/layer than the source ever
+// existed on (copySelection/pasteSelection below). Captures the two things
+// serP() alone can't round-trip because they're live object references
+// (data.linkedFill, data.brushCompanions), same reasoning as app.js's own
+// linkedFillId/brushGroupId comments. Returns null for a dab (isBrushTextureCopy)
+// — it rides along with its anchor via the anchor's own snapshot, never a
+// primary target itself.
+function _snapshotForClone(p){
+  if(p.data&&p.data.isBrushTextureCopy)return null;
+  var snap={d:serP(p)};
+  if(p.data&&p.data.isVectorBrush&&p.data.linkedFill&&!p.data.linkedFill.removed){
+    snap.vbLinkedFill={fillColor:p.data.linkedFill.fillColor,opacity:p.data.linkedFill.opacity};
+  }
+  if(p.data&&p.data.brushGroupId){
+    snap.dabs=(p.data.brushCompanions||[]).filter(function(dab){return dab&&!dab.removed;}).map(serP);
+  }
+  return snap;
+}
+// Rebuild live Path clones from _snapshotForClone() output into `layer`,
+// offset by `offset` px on both axes (0 = paste exactly in place). Shared by
+// duplicateSelection (snapshots taken and materialized in the same call) and
+// copySelection/pasteSelection (snapshots persisted in between, possibly
+// across a frame/layer change) — a single code path so brush-texture dabs
+// and vector-brush fill backdrops can't drift out of sync between the two
+// features (see CLAUDE.md §1's "family of bug #1").
+function _materializeClones(snaps,layer,offset){
   var clones=[];
   // Brush-texture anchors share a brushGroupId with their dab companions
   // (tools.js applyBrushTexture / app.js relinkBrushCompanions) — every
-  // duplicated member of a group must land on the SAME fresh id, or
+  // cloned member of a group must land on the SAME fresh id, or
   // relinkBrushCompanions can't tell the new anchor and its new dabs
   // apart from the originals.
   var groupIdMap={};
@@ -1021,27 +1043,26 @@ function duplicateSelection(){
     if(!groupIdMap[oldGid])groupIdMap[oldGid]='bg_'+Date.now()+'_'+Math.floor(Math.random()*1e6)+'_'+Object.keys(groupIdMap).length;
     return groupIdMap[oldGid];
   }
-  selectedPaths.forEach(function(p){
-    if(p.data&&p.data.isBrushTextureCopy)return; // dabs ride along with their anchor below, never duplicated as a primary target themselves
-    var d=serP(p);
+  snaps.forEach(function(snap){
+    var d=JSON.parse(JSON.stringify(snap.d));
     d.strokeId=undefined; // fresh identity below — must NOT alias the source's
     if(d.brushGroupId)d.brushGroupId=freshGroupId(d.brushGroupId);
     var clone=desP(d,layer,d.opacity);
-    clone.translate(new Point(OFFSET,OFFSET));
+    if(offset)clone.translate(new Point(offset,offset));
     ensureStrokeId(clone);
-    if(p.data&&p.data.isVectorBrush&&p.data.centerSegments){
-      clone.data.centerSegments=JSON.parse(JSON.stringify(p.data.centerSegments)).map(function(s){s.point[0]+=OFFSET;s.point[1]+=OFFSET;return s;});
+    if(d.isVectorBrush&&d.centerSegments){
+      clone.data.centerSegments=JSON.parse(JSON.stringify(d.centerSegments)).map(function(s){if(offset){s.point[0]+=offset;s.point[1]+=offset;}return s;});
       // Vector-brush fill backdrop (draw-bridge.js) — regenerated from the
       // (now-offset) centerline via the same rebuild every other edit to
       // this stroke type already goes through, rather than hand-cloning
       // its geometry.
-      if(p.data.linkedFill&&!p.data.linkedFill.removed){
-        var fillClone=new Path();fillClone.fillColor=p.data.linkedFill.fillColor;fillClone.strokeColor=null;fillClone.opacity=p.data.linkedFill.opacity;
+      if(snap.vbLinkedFill){
+        var fillClone=new Path();fillClone.fillColor=snap.vbLinkedFill.fillColor;fillClone.strokeColor=null;fillClone.opacity=snap.vbLinkedFill.opacity;
         fillClone.insertBelow(clone);
         clone.data.linkedFill=fillClone;
         // Fresh stable id pair (see draw-bridge.js's own comment) — must NOT
         // reuse the source's linkedFillId, same reasoning as strokeId a few
-        // lines up (freshly-duplicated content is a distinct stroke).
+        // lines up (freshly-cloned content is a distinct stroke).
         clone.data.linkedFillId=ensureStrokeId({data:{}});
         fillClone.data.isLinkedFillCompanion=true;
         fillClone.data.linkedFillId=clone.data.linkedFillId;
@@ -1050,28 +1071,75 @@ function duplicateSelection(){
     }
     clones.push(clone);
   });
-  // Dabs of any duplicated brush-texture anchor — cloned the same way,
-  // tagged with the anchor's fresh group id, so relinkBrushCompanions can
-  // regroup them below exactly like it does after a normal frame load.
-  selectedPaths.forEach(function(p){
-    if(!p.data||!p.data.brushGroupId||p.data.isBrushTextureCopy)return;
-    var newGid=groupIdMap[p.data.brushGroupId];if(!newGid)return;
-    (p.data.brushCompanions||[]).forEach(function(dab){
-      if(!dab||dab.removed)return;
-      var dd=serP(dab);
+  // Dabs of any cloned brush-texture anchor — cloned the same way, tagged
+  // with the anchor's fresh group id, so relinkBrushCompanions can regroup
+  // them below exactly like it does after a normal frame load.
+  snaps.forEach(function(snap){
+    if(!snap.dabs||!snap.dabs.length)return;
+    var newGid=groupIdMap[snap.d.brushGroupId];if(!newGid)return;
+    snap.dabs.forEach(function(dabD){
+      var dd=JSON.parse(JSON.stringify(dabD));
       dd.brushGroupId=newGid;
       var dabClone=desP(dd,layer,dd.opacity);
-      dabClone.translate(new Point(OFFSET,OFFSET));
+      if(offset)dabClone.translate(new Point(offset,offset));
       clones.push(dabClone);
     });
   });
   if(typeof relinkBrushCompanions==='function')relinkBrushCompanions(layer);
   if(typeof fillRegenerateLinked==='function')fillRegenerateLinked(layer,null);
+  return clones;
+}
+function duplicateSelection(){
+  if(!selectedPaths.length)return;
+  pushUndo();
+  var layer=userLayers[state.activeLayerIdx];
+  var snaps=selectedPaths.map(_snapshotForClone).filter(Boolean);
+  var clones=_materializeClones(snaps,layer,12); // px — small, deliberate nudge so the copy doesn't sit invisibly on top of the source
   clearSel();
   selectedPaths=clones.filter(function(c){return!(c.data&&c.data.isBrushTextureCopy);});
   state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;});
   saveActiveLayerFrame();renderArcs();updateUI();
   if(window.SMEngineBridge)SMEngineBridge.renderNow();
+}
+// ---- CANVAS ELEMENT COPY / CUT / PASTE (2026-07) ----
+// UI/UX audit: ⌘C/⌘X/⌘V existed ONLY for timeline keyframes (copyFrames/
+// cutFrames/pasteFrames, timeline.js) — there was no way to copy a shape
+// selection at all, only duplicateSelection's immediate in-place clone
+// (⌘D). Built on the same _snapshotForClone/_materializeClones pair so a
+// brush-textured or linked-fill stroke behaves identically whether it's
+// duplicated, copied, or cut — one clone path, not two that can drift
+// apart (see CLAUDE.md §1). The clipboard remembers WHERE it was copied
+// from so pasteSelection can tell "same frame" (offset, so the paste is
+// visibly distinct from the source, matching duplicateSelection) from
+// "different frame/layer" (paste exactly in place — there's no source
+// directly underneath to be confused with).
+var _canvasClip=null; // {snaps, layerIdx, frameIdx}
+function copySelection(){
+  if(!selectedPaths.length)return;
+  var snaps=selectedPaths.map(_snapshotForClone).filter(Boolean);
+  if(!snaps.length)return;
+  _canvasClip={snaps:snaps,layerIdx:state.activeLayerIdx,frameIdx:state.currentFrame};
+  if(typeof window!=='undefined')window._lastClipKind='canvas';
+  showToast('Copié ('+snaps.length+')');
+}
+function cutSelection(){
+  if(!selectedPaths.length)return;
+  copySelection();
+  window.SM.deleteSelStrokes(); // pushes its own undo entry
+  showToast('Coupé ('+_canvasClip.snaps.length+')');
+}
+function pasteSelection(){
+  if(!_canvasClip||!_canvasClip.snaps.length){showToast('Rien à coller');return;}
+  pushUndo();
+  var layer=userLayers[state.activeLayerIdx];
+  var samePlace=(_canvasClip.layerIdx===state.activeLayerIdx&&_canvasClip.frameIdx===state.currentFrame);
+  var clones=_materializeClones(_canvasClip.snaps,layer,samePlace?12:0);
+  clearSel();
+  selectedPaths=clones.filter(function(c){return!(c.data&&c.data.isBrushTextureCopy);});
+  state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;});
+  saveActiveLayerFrame();renderArcs();updateUI();
+  if(window.SMEngineBridge)SMEngineBridge.renderNow();
+  showToast('Collé ('+clones.filter(function(c){return!(c.data&&c.data.isBrushTextureCopy);}).length+')');
 }
 var canvasEl=document.getElementById('drawing-canvas');
 
