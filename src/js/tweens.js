@@ -3054,6 +3054,23 @@ function generateTweens(){
       for(var ii=0;ii<sA.length;ii++)if(sA[ii].strokeId===ov.aId||sA[ii].strokeId===ov.bId){aIdx=ii;break;}
       for(var jj=0;jj<sB.length;jj++)if(sB[jj].strokeId===ov.bId||sB[jj].strokeId===ov.aId){bIdx=jj;break;}
       if(aIdx<0||bIdx<0||forcedAIdx[aIdx]||forcedBIdx[bIdx])return;
+      // Stale/ambiguous-override guard (2026-07, live-reported cascade: a
+      // hooked shape at one stroke AND an unrelated stroke silently
+      // falling back to fade at another, both traced to the SAME override).
+      // ov.bId is meant to identify ONE specific B-side stroke, but ids get
+      // reused across UNRELATED strokes over a file's history (every other
+      // 2026-07 fix in this function exists because of exactly that) — if
+      // ov.bId ALSO happens to be some OTHER A-side stroke's own natural,
+      // unrelated identity, this override is stealing that other stroke's
+      // rightful B-side partner out from under it, forcing it into a worse
+      // fallback match (confirmed live: removing the stale override let
+      // BOTH strokes auto-match cleanly with zero unmatched/fading strokes
+      // and zero self-tangling). Skip the whole override in that case
+      // rather than silently mis-resolving it — auto-match still runs.
+      var bIdCollision=false;
+      for(var ci=0;ci<sA.length;ci++)if(ci!==aIdx&&sA[ci].strokeId===ov.bId){bIdCollision=true;break;}
+      if(!bIdCollision)for(var ci2=0;ci2<sB.length;ci2++)if(ci2!==bIdx&&sB[ci2].strokeId===ov.aId){bIdCollision=true;break;}
+      if(bIdCollision)return;
       forcedAIdx[aIdx]=1;forcedBIdx[bIdx]=1;
       forcedPairs.push({aIdx:aIdx,bIdx:bIdx,aData:sA[aIdx],bData:sB[bIdx],mi:-1-forcedPairs.length,score:0,forced:true});
     });
