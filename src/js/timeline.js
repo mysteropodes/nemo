@@ -1778,6 +1778,12 @@ function selectGhostAll(){
     frameCount++;
     fr.strokes.forEach(function(sd){
       if(sd.isRaster)return;
+      // A frozen review ghost (revision-bridge.js) is a static "before"
+      // record, never meant to move — without this it became a live,
+      // draggable proxy right alongside real content (2026-07 audit),
+      // unlike select-bridge.js's own ghost-vs-active-revision handling
+      // elsewhere, which always treats ghosts as non-interactive.
+      if(sd.isRevisionGhost)return;
       var p=desP(sd,layer);
       p.data.ghostFrame=fi;
       count++;

@@ -36,7 +36,13 @@ function colorDist(c1,c2){
 // a pure serialization artifact, not a real difference between the two
 // drawings, silently pushing an otherwise-perfect match toward rejection.
 function realStrokeColor(sd){return sd.hasRealStroke===false?null:sd.strokeColor;}
-function strokeType(sd){if(sd.isVectorBrush)return'vb';var hasS=!!realStrokeColor(sd),hasF=!!sd.fillColor;if(hasS&&hasF)return'both';if(hasF)return'fill';return'stroke';}
+// 2026-07 audit: must match Rust's is_vb()/stroke_type() (tweenmatch.rs)
+// EXACTLY — matchSc's type_penalty (one of the largest single cost terms)
+// otherwise scores the identical stroke pair differently depending on
+// whether the WASM auto_match path or this JS fallback happens to run,
+// a silent divergence for any isVectorBrush:true stroke whose
+// centerSegments is missing or ≤1 point (degenerate/partial recording).
+function strokeType(sd){if(sd.isVectorBrush&&sd.centerSegments&&sd.centerSegments.length>1)return'vb';var hasS=!!realStrokeColor(sd),hasF=!!sd.fillColor;if(hasS&&hasF)return'both';if(hasF)return'fill';return'stroke';}
 // Pressure-brush strokes are stored as their filled OUTLINE (a closed
 // sausage around the drawn line) — comparing outlines wrecks proximity,
 // curvature and open/closed detection. All geometric features are computed
@@ -1635,6 +1641,15 @@ function splitTweenables(strokes,manualMode){
       if(sd.linkedFillId)backdropsById[sd.linkedFillId]=sd;
       return;
     }
+    // Team review ghost (revision-bridge.js): a frozen "before" record
+    // belonging to THIS keyframe only — never matched into a tween (would
+    // morph a static historical snapshot into whatever the next keyframe
+    // is) and never `held` either (held content repeats UNCHANGED into
+    // every generated inbetween of the whole span, which would smear one
+    // frame's frozen ghost across the entire span instead of leaving it
+    // where the reviewer left it). 2026-07 audit: no exclusion existed here
+    // at all, unlike the dab/backdrop cases just above.
+    if(sd.isRevisionGhost)return;
     // A held stroke is copied UNCHANGED into every generated inbetween
     // (generateTweens' emit loop) instead of participating in
     // autoMatch/interpStroke at all — dabs above are re-stamped fresh each
