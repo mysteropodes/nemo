@@ -1496,20 +1496,69 @@ function _intrinsicSegs(rA,rB,et,cx2,cy2,closed){
 // has to explain a finger's.
 //
 // Handles are a SUBSET of the already-corresponded points (not all n —
-// O(n·H) instead of O(n²), cheap: n≤150, H≤24 measured under 2ms), evenly
-// spread by arc-length so coverage stays uniform regardless of where the
-// correspondence stage placed its own density. Weight kernel is the
-// standard MLS inverse-square falloff, distance measured along rA's own
-// arc length (index-paired with rB, so the SAME metric weights both the
-// forward-from-A and backward-from-B fits — deliberately, so the two
-// stay consistent with each other instead of drifting apart under two
+// O(n·H) instead of O(n²), cheap: n≤150, H≤24 measured under 2ms): a
+// uniform-by-index baseline for full coverage, TOPPED UP with extra
+// handles at detected corners (2026-07) so a region with several tight
+// folds close together isn't left as under-sampled as a straight run —
+// see _mlsHandleIndices' own comment. Weight kernel is the standard MLS
+// inverse-square falloff, distance measured along rA's own arc length
+// (index-paired with rB, so the SAME metric weights both the forward-
+// from-A and backward-from-B fits — deliberately, so the two stay
+// consistent with each other instead of drifting apart under two
 // unrelated distance metrics).
-function _mlsHandleIndices(n){
+// Baseline: up to 24 handles spread uniformly by INDEX (full coverage, no
+// gap can go handle-less even on a featureless curve) — SAME total budget
+// as before, so this never loses resolution vs. the plain-uniform version.
+function _mlsHandleIndices(rA,rB){
+  var n=Math.min(rA.segments.length,rB.segments.length);
   var H=Math.min(24,n);
   var seen={},handleIdx=[];
   for(var h=0;h<H;h++){
     var ix=Math.round(h*(n-1)/Math.max(1,H-1));
     if(!seen[ix]){seen[ix]=1;handleIdx.push(ix);}
+  }
+  // Corner-anchored handles (2026-07, "poignées ancrées sur les points de
+  // repère"): plain uniform spacing can land its nearest sample a few
+  // vertices AWAY from an actual fold, blurring MLS's local fit exactly
+  // where precision matters most. Rather than ADDING extra handles (tried
+  // first, measured: it shrank the effective uniform coverage for the
+  // same total budget and cost the confirmed testD win), each detected
+  // corner SNAPS its single nearest existing uniform handle onto itself —
+  // same total handle count, same coverage guarantee, just relocated to
+  // sit exactly on the fold instead of near it. "Corner" = cross-keyframe
+  // agreement (max turn at this vertex in EITHER rA or rB — the same
+  // signal candScore's fold-angle term trusts), snapped strongest-first so
+  // two nearby corners can't both claim the same handle.
+  if(n>=5){
+    var cum=[0];for(var ci=1;ci<n;ci++)cum.push(cum[ci-1]+Math.hypot(rA.segments[ci].point[0]-rA.segments[ci-1].point[0],rA.segments[ci].point[1]-rA.segments[ci-1].point[1]));
+    function turnMag(pts,i){
+      var p0=pts[i-1].point,p1=pts[i].point,p2=pts[i+1].point;
+      var a1=Math.atan2(p1[1]-p0[1],p1[0]-p0[0]),a2=Math.atan2(p2[1]-p1[1],p2[0]-p1[0]);
+      return Math.abs(_wrapPI(a2-a1));
+    }
+    var corners=[];
+    for(var ii=1;ii<n-1;ii++){
+      var m=Math.max(turnMag(rA.segments,ii),turnMag(rB.segments,ii));
+      if(m>0.5)corners.push({i:ii,m:m});
+    }
+    corners.sort(function(a,b){return b.m-a.m;});
+    var claimed={};
+    for(var cj=0;cj<corners.length;cj++){
+      var cand=corners[cj].i;
+      if(seen[cand])continue; // already a handle
+      var bestHk=-1,bestD=Infinity;
+      for(var hk=0;hk<handleIdx.length;hk++){
+        if(claimed[hk])continue; // this handle already snapped to a stronger corner
+        var d=Math.abs(cum[cand]-cum[handleIdx[hk]]);
+        if(d<bestD){bestD=d;bestHk=hk;}
+      }
+      if(bestHk<0)continue;
+      claimed[bestHk]=1;
+      delete seen[handleIdx[bestHk]];
+      handleIdx[bestHk]=cand;
+      seen[cand]=1;
+    }
+    handleIdx.sort(function(a,b){return a-b;});
   }
   return handleIdx;
 }
@@ -1518,7 +1567,7 @@ function _mlsHandleIndices(n){
 // current et via buildMLSSegs below.
 function _fitMLSPerVertex(rA,rB){
   var n=Math.min(rA.segments.length,rB.segments.length);
-  var handleIdx=_mlsHandleIndices(n);
+  var handleIdx=_mlsHandleIndices(rA,rB);
   var H=handleIdx.length;
   if(H<3)return null;
   var cum=[0];for(var i=1;i<n;i++)cum.push(cum[i-1]+Math.hypot(rA.segments[i].point[0]-rA.segments[i-1].point[0],rA.segments[i].point[1]-rA.segments[i-1].point[1]));
