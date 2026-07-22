@@ -580,6 +580,115 @@ function _sampleAtFractions(p,len,fractions){
   }
   return segs;
 }
+// ---- CHIKARA-SEN (line-of-force) LANDMARK CORRESPONDENCE (2026-07) ----
+// User-proposed, from the traditional Japanese inbetweening technique: an
+// animator identifies anatomically-equivalent points between two poses
+// (a knuckle in key A, the SAME knuckle in key B) and draws a straight
+// "force line" between them — the inbetween follows that line, not a
+// generic nearest-point or same-arc-length-fraction guess. This is the
+// missing piece behind a real failure mode found this session (a hand-
+// drawn arm+hand silhouette ballooning into a "noodle" mid-tween, DTW-on-
+// turning-angle didn't fix it either): buildSharedFractions/
+// _sampleAtFractions apply the SAME fraction list to BOTH A and B, which
+// silently assumes a landmark sits at the same arc-length % of the
+// perimeter in both poses — false whenever a fold (the hand/finger detail
+// here) eats a different SHARE of the stroke between poses. detectFeature-
+// Fractions already finds each shape's OWN corners; what was missing is
+// matching A's corners to B's corners the way an animator would — by which
+// pairing reads as ONE COHERENT motion, not by raw distance — then letting
+// A and B's fraction lists DIFFER at the matched landmarks so each anchored
+// segment gets re-parametrized independently on each side.
+//
+// Same 2-pass "force line" motion-model recipe autoMatchJS already uses at
+// the STROKE-matching level (fitSimilarityTransform seeded from a naive
+// guess, then re-score every candidate pair by residual against the fitted
+// transform, Hungarian-assign) — applied here one level down, to a single
+// stroke's own landmarks instead of a frame's whole set of strokes.
+function _matchLandmarks(pA,lenA,pB,lenB,maxFeatures){
+  var featsA=detectFeatureFractions(pA,maxFeatures),featsB=detectFeatureFractions(pB,maxFeatures);
+  if(featsA.length<2||featsB.length<2)return null;
+  var ptsA=featsA.map(function(f){var p=pA.getPointAt(f*lenA);return p?{x:p.x,y:p.y}:null;});
+  var ptsB=featsB.map(function(f){var p=pB.getPointAt(f*lenB);return p?{x:p.x,y:p.y}:null;});
+  if(ptsA.indexOf(null)>=0||ptsB.indexOf(null)>=0)return null;
+  // Pass 1 (seed): rank-order pairing — detectFeatureFractions already
+  // returns each side's landmarks sorted by arc-length position, so this
+  // assumes corners appear in the same relative ORDER in both poses (true
+  // for a bending limb's own corners; a genuine reorder just means pass 2's
+  // residual gate below rejects most/all pairs and this bails to null,
+  // deferring to the existing shared-fraction path exactly as before).
+  var m=Math.min(ptsA.length,ptsB.length);
+  var seedA=[],seedB=[];
+  for(var i=0;i<m;i++){
+    seedA.push(ptsA[Math.round(i*(ptsA.length-1)/Math.max(1,m-1))]);
+    seedB.push(ptsB[Math.round(i*(ptsB.length-1)/Math.max(1,m-1))]);
+  }
+  var transform=fitSimilarityTransform(seedA,seedB);
+  if(!transform)return null;
+  // Pass 2: re-score EVERY (i,j) by residual after the fitted transform —
+  // the "does this pairing agree with the drawing's overall motion"
+  // question — augmented with dummy rows/cols so a landmark with no honest
+  // match (appeared/disappeared, e.g. a finger only visible in one pose)
+  // can opt out instead of being forced onto the nearest wrong point.
+  var n2=ptsA.length,o=ptsB.length,N=n2+o;
+  var maxOkDist=Math.max(24,0.4*Math.max(lenA,lenB)/Math.max(1,m));
+  var cost=[];
+  for(var a=0;a<N;a++){
+    var row=[];
+    for(var b=0;b<N;b++){
+      if(a<n2&&b<o){var q=applySimilarityTransform(transform,ptsA[a].x,ptsA[a].y);row.push(Math.hypot(q.x-ptsB[b].x,q.y-ptsB[b].y));}
+      else if(a>=n2&&b>=o)row.push(0);
+      else row.push(maxOkDist);
+    }
+    cost.push(row);
+  }
+  var assign=hungarian(cost);
+  var pairs=[];
+  for(var a2=0;a2<n2;a2++){
+    var b2=assign[a2];
+    if(b2===undefined||b2<0||b2>=o)continue;
+    var q2=applySimilarityTransform(transform,ptsA[a2].x,ptsA[a2].y);
+    if(Math.hypot(q2.x-ptsB[b2].x,q2.y-ptsB[b2].y)<=maxOkDist)pairs.push({fracA:featsA[a2],fracB:featsB[b2]});
+  }
+  if(pairs.length<2)return null;
+  pairs.sort(function(x,y){return x.fracA-y.fracA;});
+  // A genuine cyclic reorder (not just a missing/extra landmark) breaks the
+  // "one coherent motion" premise this whole approach rests on — bail
+  // rather than build crossed, self-tangling segments.
+  for(var k=1;k<pairs.length;k++)if(pairs[k].fracB<=pairs[k-1].fracB)return null;
+  return pairs;
+}
+// Turns matched landmarks into TWO fraction lists (length n each, same
+// LENGTH so interpStroke's index-paired lerp still works, but the VALUES
+// at a given index can now differ between A and B) — piecewise-linear
+// re-parametrization: between two consecutive matched landmarks (plus the
+// implicit start/end pair), A's own span and B's own span are each split
+// independently, so the fold that ate a different % of the perimeter in
+// each pose no longer drags unrelated points into the same sample. Segment
+// sample budget is proportional to the AVERAGE of A's and B's own span
+// length, so a segment that's short on both sides doesn't hog points.
+function _landmarkFractions(landmarks,n){
+  var stops=[{a:0,b:0}].concat(landmarks).concat([{a:1,b:1}]).map(function(s){return{a:s.fracA!==undefined?s.fracA:s.a,b:s.fracB!==undefined?s.fracB:s.b};});
+  stops=stops.filter(function(s,i){return i===0||i===stops.length-1||(s.a>0.02&&s.a<0.98);});
+  if(stops.length<3)return null; // every landmark got filtered as too-close-to-an-endpoint
+  var segLens=[];
+  for(var i=1;i<stops.length;i++)segLens.push(Math.max(0.0001,((stops[i].a-stops[i-1].a)+(stops[i].b-stops[i-1].b))/2));
+  var total=segLens.reduce(function(s,v){return s+v;},0);
+  var raw=segLens.map(function(l){return l/total*(n-1);});
+  var counts=raw.map(function(v){return Math.max(1,Math.round(v));});
+  var sum=counts.reduce(function(s,v){return s+v;},0);
+  counts[counts.length-1]+=(n-1-sum);
+  if(counts[counts.length-1]<1)return null; // rounding drift ate the last segment — bail, caller falls back
+  var fracA=[0],fracB=[0];
+  for(var s=0;s<counts.length;s++){
+    var a0=stops[s].a,a1=stops[s+1].a,b0=stops[s].b,b1=stops[s+1].b;
+    for(var k=1;k<=counts[s];k++){
+      var lt=k/counts[s];
+      fracA.push(a0+(a1-a0)*lt);fracB.push(b0+(b1-b0)*lt);
+    }
+  }
+  if(fracA.length!==n)return null;
+  return{fracA:fracA,fracB:fracB};
+}
 // Feature-aware replacement for the plain `rfn(spec.aData,resN)` /
 // `rfn(spec.bData,resN)` independent-resample pair used to build each
 // matched pair's interpolation input (generateTweens) — same output shape
@@ -603,14 +712,31 @@ function resamplePairFeatureAware(aData,bData,n,isVB){
   var lenA=pA.length,lenB=pB.length;
   if(!(lenA>0)||!(lenB>0)){pA.remove();pB.remove();var rfn2=isVB?resampleCenterline:resampleP;return[rfn2(aData,n),rfn2(bData,n)];}
   var fractions=buildSharedFractions(pA,pB,n);
+  var fractionsB=fractions; // default: identical to A's (today's behavior)
+  // Try the landmark (chikara-sen) correspondence — only for a real budget
+  // of samples (below this a piecewise re-parametrization has no room to
+  // do anything useful) and only replaces `fractions`/`fractionsB` when it
+  // actually produces a full-length, valid pair of lists; every failure
+  // mode (too few landmarks, no coherent transform, a real cyclic reorder,
+  // rounding drift) falls straight back to the shared-fraction default
+  // above, so a shape this doesn't apply to (a circle, a straight line, a
+  // rigid rotation/translation already handled well) is untouched.
+  if(n>=10){
+    var maxFeat=Math.max(2,Math.min(8,Math.floor(n/8)));
+    var landmarks=_matchLandmarks(pA,lenA,pB,lenB,maxFeat);
+    if(landmarks){
+      var lf=_landmarkFractions(landmarks,n);
+      if(lf){fractions=lf.fracA;fractionsB=lf.fracB;}
+    }
+  }
   var segsA=_sampleAtFractions(pA,lenA,fractions);
-  var segsB=_sampleAtFractions(pB,lenB,fractions);
+  var segsB=_sampleAtFractions(pB,lenB,fractionsB);
   var ra,rb;
   if(isVB){
-    function widthsAtSparse(srcSegs,total){
+    function widthsAtSparse(srcSegs,total,fracs){
       var segLens=[0];for(var i=1;i<srcSegs.length;i++)segLens.push(segLens[i-1]+new Point(srcSegs[i].point[0],srcSegs[i].point[1]).getDistance(new Point(srcSegs[i-1].point[0],srcSegs[i-1].point[1])));
       var tot=segLens[segLens.length-1]||1;
-      return fractions.map(function(t){
+      return fracs.map(function(t){
         var targetLen=t*tot;
         var wi=0;while(wi<segLens.length-2&&segLens[wi+1]<targetLen)wi++;
         var span=Math.max(0.0001,segLens[wi+1]-segLens[wi]);
@@ -633,12 +759,12 @@ function resamplePairFeatureAware(aData,bData,n,isVB){
     // narrower dips the dense profile actually recorded. widthAtFrac's `t`
     // domain (raw-sample arc-length fraction) is already exactly the same
     // convention as `fractions` here, so no conversion is needed.
-    function widthsAt(sdData,srcSegs,total){
-      if(sdData.widthProfile&&sdData.widthProfile.length>1)return fractions.map(function(t){return widthAtFrac(sdData.widthProfile,t);});
-      return widthsAtSparse(srcSegs,total);
+    function widthsAt(sdData,srcSegs,total,fracs){
+      if(sdData.widthProfile&&sdData.widthProfile.length>1)return fracs.map(function(t){return widthAtFrac(sdData.widthProfile,t);});
+      return widthsAtSparse(srcSegs,total,fracs);
     }
-    ra={segments:segsA,widths:widthsAt(aData,srcA,lenA),isVectorBrush:true,strokeColor:null,fillColor:aData.fillColor||null,opacity:aData.opacity!==undefined?aData.opacity:1};
-    rb={segments:segsB,widths:widthsAt(bData,srcB,lenB),isVectorBrush:true,strokeColor:null,fillColor:bData.fillColor||null,opacity:bData.opacity!==undefined?bData.opacity:1};
+    ra={segments:segsA,widths:widthsAt(aData,srcA,lenA,fractions),isVectorBrush:true,strokeColor:null,fillColor:aData.fillColor||null,opacity:aData.opacity!==undefined?aData.opacity:1};
+    rb={segments:segsB,widths:widthsAt(bData,srcB,lenB,fractionsB),isVectorBrush:true,strokeColor:null,fillColor:bData.fillColor||null,opacity:bData.opacity!==undefined?bData.opacity:1};
   }else{
     ra={segments:segsA,closed:!!aData.closed,strokeColor:aData.strokeColor,strokeWidth:aData.strokeWidth,strokeCap:aData.strokeCap,strokeJoin:aData.strokeJoin,fillColor:aData.fillColor||null,opacity:aData.opacity!==undefined?aData.opacity:1};
     rb={segments:segsB,closed:!!bData.closed,strokeColor:bData.strokeColor,strokeWidth:bData.strokeWidth,strokeCap:bData.strokeCap,strokeJoin:bData.strokeJoin,fillColor:bData.fillColor||null,opacity:bData.opacity!==undefined?bData.opacity:1};
