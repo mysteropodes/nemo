@@ -2685,7 +2685,22 @@ function resolveSplitMatches(sA,sB,pairSpecs,unA,unB){
       var curPair=null;
       for(var pi=0;pi<pairSpecs.length;pi++){var ps=pairSpecs[pi];if((mergedSide==='B'?ps.bIdx:ps.aIdx)===mi2&&!ps.isPiece){curPair=ps;break;}}
       var cand=unParts.filter(function(i){var f=featParts[i];return f.type!=='fill'&&boundsOverlapLoose(f.bounds,fm.bounds);});
-      if(curPair)cand=cand.concat([mergedSide==='B'?curPair.aIdx:curPair.bIdx]);
+      // curPair's own stroke needs the SAME type/closed filter as every
+      // other candidate above (2026-07, live-reported hooked/pinched
+      // artifact on a vector-brush fill shape): extractStrokePiece always
+      // returns an OPEN arc (no `closed` field at all — a fraction of a
+      // path has no natural closing edge), so splicing a CLOSED fill
+      // shape in as one of the pieces forces interpStroke to blend a
+      // looping shape against a linear one — the correspondence has no
+      // sane way to reconcile "wraps around" with "has two free ends",
+      // and the result is exactly this kind of self-tangling sliver. The
+      // unParts-sourced candidates already reject fill/closed; curPair
+      // was being concatenated in unconditionally, missing that same gate.
+      if(curPair){
+        var curIdx=mergedSide==='B'?curPair.aIdx:curPair.bIdx;
+        var curFeat=featParts[curIdx];
+        if(curFeat.type!=='fill'&&!curFeat.closed)cand=cand.concat([curIdx]);
+      }
       if(cand.length<2||cand.length>3)continue;
       var sumLen=0;cand.forEach(function(i){sumLen+=featParts[i].length;});
       if(sumLen<fm.length*0.55||sumLen>fm.length*1.7)continue;
@@ -2708,6 +2723,34 @@ function resolveSplitMatches(sA,sB,pairSpecs,unA,unB){
         var sc=mergedSide==='B'?matchSc(featParts[ordered[oi2].idx],pf,false):matchSc(pf,featParts[ordered[oi2].idx],false);
         pieces.push(piece);scores.push(sc);
         if(sc>0.48)ok=false;
+        // Geometric self-consistency (2026-07, live-reported hooked/
+        // pinched artifact): a piece can score fine as a STATIC shape
+        // match (matchSc only compares silhouettes) while still being a
+        // malformed FRAGMENT — extractStrokePiece samples uniformly by
+        // fraction of the MERGED stroke's total length, so if the merged
+        // source has a sharp direction reversal (an artist's stroke that
+        // doubles back on itself) landing inside this piece's own
+        // fraction range, the piece inherits that reversal verbatim.
+        // Interpolating TOWARD a piece whose own path already folds back
+        // on itself is exactly what produced the hook (confirmed live:
+        // the SAME pair matched as a single whole stroke, no split,
+        // tweens perfectly cleanly — only the split piece is malformed).
+        // Reject the whole split if any piece's own path backtracks more
+        // than ~25% of its own start-to-end chord length.
+        var pieceSegs=piece.centerSegments||piece.segments;
+        if(pieceSegs&&pieceSegs.length>=3){
+          var pFirst=pieceSegs[0].point,pLast=pieceSegs[pieceSegs.length-1].point;
+          var chordLen=Math.hypot(pLast[0]-pFirst[0],pLast[1]-pFirst[1]);
+          if(chordLen>1){
+            var ux=(pLast[0]-pFirst[0])/chordLen,uy=(pLast[1]-pFirst[1])/chordLen;
+            var maxProj=-Infinity,worstBack=0;
+            for(var pj=0;pj<pieceSegs.length;pj++){
+              var proj=(pieceSegs[pj].point[0]-pFirst[0])*ux+(pieceSegs[pj].point[1]-pFirst[1])*uy;
+              if(proj>maxProj)maxProj=proj;else if(maxProj-proj>worstBack)worstBack=maxProj-proj;
+            }
+            if(worstBack>chordLen*0.25)ok=false;
+          }
+        }
       }
       if(!ok)continue;
       var avg=scores.reduce(function(a,b){return a+b;},0)/scores.length;
