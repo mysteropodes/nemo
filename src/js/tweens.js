@@ -1093,39 +1093,101 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
         }
         if(Math.abs(th)>=0.06)theta=th; // ~3.4° dead-zone
         scaleF=Math.min(3,Math.max(0.33,mag));
+        // Damp the rotation when the two centroids sit far apart relative
+        // to the shape's own size (2026-07, "des lignes de force font des
+        // aller-retour" — part of the same fix as the iw-probe stabilizer
+        // below; that one alone wasn't enough, confirmed live: disabling
+        // rotation ENTIRELY also independently removed a residual
+        // reversal the intrinsic-only fix didn't reach). fwd rotates
+        // around cxA, bwd rotates around cxB — two DIFFERENT pivots, only
+        // ever recentered onto the same final point (cx2) AFTER the lerp.
+        // When the pivots are close (a shape spinning near its own place —
+        // the 90°-rectangle regression case measures ~0 here), fwd's and
+        // bwd's arcs are nearly the same arc and blend cleanly. When far
+        // apart (a limb SWINGING to a new position, not spinning in
+        // place — measured on the reported case: centroids 146px apart,
+        // avg point radius ~105px, ratio ~1.4), fwd's arc (around A's old
+        // spot) and bwd's arc (around B's new spot) are geometrically
+        // different curves; scalar-lerping two different curves can
+        // produce a combined path that isn't itself monotonic in any
+        // direction even though et and each individual arc are. Ramp:
+        // full rotation kept below a 0.6x size:separation ratio, fully
+        // suppressed above 2x (falls back to the straight lerp path,
+        // still shape-correct via the intrinsic correction above).
+        var avgR=0;for(var ri=0;ri<n;ri++)avgR+=(Math.hypot(loA[ri].x,loA[ri].y)+Math.hypot(loB[ri].x,loB[ri].y))/2;avgR/=n;
+        var centroidDist=Math.hypot(cxB-cxA,cyB-cyA);
+        var sepRatio=centroidDist/Math.max(1,avgR);
+        var rotTrust=Math.max(0,Math.min(1,1-(sepRatio-0.6)/1.4));
+        theta*=rotTrust;
       }
     }
   }
   var thetaT=theta*et,scaleT=lerp(1,scaleF,et);
   var thetaB=thetaT-theta,scaleB=lerp(scaleF>1e-6?1/scaleF:1,1,et);
-  for(var i2=0;i2<n;i2++){var sA=rA.segments[i2],sB=rB.segments[i2];
-    var fwd=rotScalePt(sA.point[0]-cxA,sA.point[1]-cyA,thetaT,scaleT);
-    var bwd=rotScalePt(sB.point[0]-cxB,sB.point[1]-cyB,thetaB,scaleB);
-    var hiF=rotScalePt(sA.handleIn[0],sA.handleIn[1],thetaT,scaleT),hiB=rotScalePt(sB.handleIn[0],sB.handleIn[1],thetaB,scaleB);
-    var hoF=rotScalePt(sA.handleOut[0],sA.handleOut[1],thetaT,scaleT),hoB=rotScalePt(sB.handleOut[0],sB.handleOut[1],thetaB,scaleB);
-    segs.push({point:[cx2+lerp(fwd[0],bwd[0],et),cy2+lerp(fwd[1],bwd[1],et)],handleIn:[lerp(hiF[0],hiB[0],et),lerp(hiF[1],hiB[1],et)],handleOut:[lerp(hoF[0],hoB[0],et),lerp(hoF[1],hoB[1],et)]});}
+  // Factored out (2026-07, "des lignes de force font des aller-retour" —
+  // see the iw-probe comment below for the full story) so the SAME blend
+  // math can be evaluated at a fixed reference et, not just the real
+  // per-frame one, without duplicating the loop body.
+  function buildLinearSegs(etv,thT,scT,thB,scB,cxx,cyy){
+    var o=[];
+    for(var i2=0;i2<n;i2++){var sA=rA.segments[i2],sB=rB.segments[i2];
+      var fwd=rotScalePt(sA.point[0]-cxA,sA.point[1]-cyA,thT,scT);
+      var bwd=rotScalePt(sB.point[0]-cxB,sB.point[1]-cyB,thB,scB);
+      var hiF=rotScalePt(sA.handleIn[0],sA.handleIn[1],thT,scT),hiB=rotScalePt(sB.handleIn[0],sB.handleIn[1],thB,scB);
+      var hoF=rotScalePt(sA.handleOut[0],sA.handleOut[1],thT,scT),hoB=rotScalePt(sB.handleOut[0],sB.handleOut[1],thB,scB);
+      o.push({point:[cxx+lerp(fwd[0],bwd[0],etv),cyy+lerp(fwd[1],bwd[1],etv)],handleIn:[lerp(hiF[0],hiB[0],etv),lerp(hiF[1],hiB[1],etv)],handleOut:[lerp(hoF[0],hoB[0],etv),lerp(hoF[1],hoB[1],etv)]});
+    }
+    return o;
+  }
+  segs=buildLinearSegs(et,thetaT,scaleT,thetaB,scaleB,cx2,cy2);
   // ---- intrinsic correction (see _intrinsicSegs) ----
-  // Gate 1 (graduated): measured arc-length deficit of the linear result
-  // vs the lerped keyframe lengths — 0 below 2% (translations, rigid
-  // rotations and gentle morphs stay bit-identical to the historical
-  // output), full weight at 10%+ (a real fold). Gate 2 (hard): the linear
-  // inbetween self-intersects while neither keyframe does. Both are
-  // continuous in t (deficit→0 and self-cross→false near the endpoints),
-  // so the correction can never pop on/off between adjacent frames.
-  // Keyframe-length/self-cross probes are cached on the resampled pair
-  // objects — same objects across every frame of the span.
+  // Gate 1 (graduated): arc-length deficit of the linear result vs the
+  // lerped keyframe lengths — 0 below 2% (translations, rigid rotations
+  // and gentle morphs stay bit-identical to the historical output), full
+  // weight at 10%+ (a real fold). Gate 2 (hard): the linear inbetween
+  // self-intersects while neither keyframe does.
+  //
+  // Both gates are now measured ONCE per pair, at a FIXED et=0.5 probe,
+  // not re-measured from THIS frame's own linear geometry on every call.
+  // Found live ("des lignes de force font des aller-retour", traced to a
+  // specific point reversing direction mid-span): fwd arcs around cxA,
+  // bwd arcs around cxB — two DIFFERENT pivots — so segs' own arc length
+  // is NOT guaranteed monotonic in et (scalar-lerping two differently-
+  // pivoted arcs can shrink then grow then shrink again). Re-measuring the
+  // deficit from that noisy length every frame let iw cross the activation
+  // threshold in one direction then back within a couple of frames,
+  // snapping the blend ~0→1→0 and dragging points toward the intrinsic
+  // path then back — confirmed by direct trajectory tracing (the reversal
+  // vanished with intrinsic correction disabled entirely) and by ruling
+  // out the self-intersect override specifically (removing IT alone
+  // changed nothing — the graduated deficit measure was noisy on its own).
+  // A single et=0.5 probe is representative of the worst typical fold-
+  // induced deficit for THIS pair and, being pair-constant, can only vary
+  // per-frame through the smooth envelope below — never through re-
+  // measured noise. (Translation doesn't affect arc length or self-
+  // intersection, so the probe's own recentering point is irrelevant —
+  // passed as 0,0.)
   if(n>=5){
     if(rA._twLen===undefined){rA._twLen=_segPolyLen(rA.segments);rA._twSelfX=_segsSelfIntersect(rA.segments);}
     if(rB._twLen===undefined){rB._twLen=_segPolyLen(rB.segments);rB._twSelfX=_segsSelfIntersect(rB.segments);}
-    var Lexp=lerp(rA._twLen,rB._twLen,et);
-    // |error|, not just shrink: a fold-onto-itself confuses the rigid fit
-    // into OVERSHOOTING arc length (measured 215/200 on the 10° V-fold —
-    // excess is exactly as wrong as deficit; an honest morph's length
-    // lerps). Ramp: dead below 1.5% (hand wobble / resample noise), full
-    // at 7% — the plain 90° elbow measures ~5.25%, worth a strong fix.
-    var lenErr=Lexp>1e-6?Math.abs(Lexp-_segPolyLen(segs))/Lexp:0;
-    var iw=Math.max(0,Math.min(1,(lenErr-0.015)/0.055));
-    if(iw<1&&!rA._twSelfX&&!rB._twSelfX&&_segsSelfIntersect(segs))iw=1;
+    if(rA._twIwProbe===undefined){
+      var thT5=theta*0.5,scT5=lerp(1,scaleF,0.5),thB5=thT5-theta,scB5=lerp(scaleF>1e-6?1/scaleF:1,1,0.5);
+      var probeSegs=buildLinearSegs(0.5,thT5,scT5,thB5,scB5,0,0);
+      var Lexp5=lerp(rA._twLen,rB._twLen,0.5);
+      // |error|, not just shrink: a fold-onto-itself confuses the rigid
+      // fit into OVERSHOOTING arc length (measured 215/200 on the 10°
+      // V-fold — excess is exactly as wrong as deficit; an honest morph's
+      // length lerps). Ramp: dead below 1.5% (hand wobble / resample
+      // noise), full at 7% — the plain 90° elbow measures ~5.25%.
+      var lenErr5=Lexp5>1e-6?Math.abs(Lexp5-_segPolyLen(probeSegs))/Lexp5:0;
+      var iwP=Math.max(0,Math.min(1,(lenErr5-0.015)/0.055));
+      if(iwP<1&&!rA._twSelfX&&!rB._twSelfX&&_segsSelfIntersect(probeSegs))iwP=1;
+      rA._twIwProbe=iwP;
+    }
+    // Smooth, zero-at-both-ends envelope in et (matches the endpoint-exact
+    // guarantee even more strictly than the old per-frame measure did;
+    // peaks where the probe above was measured).
+    var iw=rA._twIwProbe*Math.sin(Math.PI*Math.max(0,Math.min(1,et)));
     // CORRESPONDENCE-TRUST factor (2026-07, "encore un bras hyper
     // déformé"): the intrinsic reconstruction integrates lerped turning
     // angles, so it's only as good as the index correspondence between the
