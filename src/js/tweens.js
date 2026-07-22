@@ -267,6 +267,25 @@ function fitSimilarityTransform(ptsA,ptsB){
   if(den<1e-6)return null;
   return{wRe:numRe/den,wIm:numIm/den,ca:ca,cb:cb};
 }
+// Weighted variant (2026-07, MLS-style local rigid engine below) — same
+// closed-form complex-number fit, generalized with a per-point weight so
+// it reduces to fitSimilarityTransform exactly when every weight is 1.
+function fitSimilarityTransformWeighted(ptsA,ptsB,weights){
+  var n=ptsA.length;if(n<2)return null;
+  var wsum=0,cax=0,cay=0,cbx=0,cby=0;
+  for(var i=0;i<n;i++){var w=weights[i];wsum+=w;cax+=w*ptsA[i].x;cay+=w*ptsA[i].y;cbx+=w*ptsB[i].x;cby+=w*ptsB[i].y;}
+  if(wsum<1e-9)return null;
+  cax/=wsum;cay/=wsum;cbx/=wsum;cby/=wsum;
+  var numRe=0,numIm=0,den=0;
+  for(var i2=0;i2<n;i2++){
+    var w2=weights[i2];
+    var ax=ptsA[i2].x-cax,ay=ptsA[i2].y-cay;
+    var bx=ptsB[i2].x-cbx,by=ptsB[i2].y-cby;
+    numRe+=w2*(ax*bx+ay*by);numIm+=w2*(ax*by-ay*bx);den+=w2*(ax*ax+ay*ay);
+  }
+  if(den<1e-6)return null;
+  return{wRe:numRe/den,wIm:numIm/den,ca:{x:cax,y:cay},cb:{x:cbx,y:cby}};
+}
 function applySimilarityTransform(t,x,y){
   var dx=x-t.ca.x,dy=y-t.ca.y;
   var rx=t.wRe*dx-t.wIm*dy,ry=t.wIm*dx+t.wRe*dy;
@@ -1458,6 +1477,97 @@ function _intrinsicSegs(rA,rB,et,cx2,cy2,closed){
   }
   return out;
 }
+// ---- MLS-STYLE LOCALLY-WEIGHTED RIGID DEFORMATION (2026-07) ----
+// Third interpolation engine, alongside the whole-stroke rigid blend
+// (buildLinearSegs, inside interpStroke) and the intrinsic arc-length/
+// turning-angle reconstruction (_intrinsicSegs above) — kept as genuine
+// alternative candidates in the tangle-strategy arbitration, not a
+// replacement (Cyril: "garde les 2 autres moteurs... si on doit switch...
+// coupler si besoin"). Where the whole-stroke fit forces ONE rotation+
+// scale onto every vertex regardless of how far it sits from the fit's
+// own best-explained region (Cyril's diagnosis, live: "des plis qui
+// deviennent bizarres parce qu'éloignés" — a fold far from the dominant
+// motion the global fit picked up has no local say in its own transform),
+// this fits a SEPARATE rotation+scale per vertex from nearby correspondence
+// pairs, weighted by distance — Moving Least Squares rigid deformation
+// (Schaefer/McPhail/Warren 2006's image-deformation technique, applied
+// here to a stroke's own DTW-corresponded points as handles instead of
+// artist-placed control points). A shoulder's own local motion no longer
+// has to explain a finger's.
+//
+// Handles are a SUBSET of the already-corresponded points (not all n —
+// O(n·H) instead of O(n²), cheap: n≤150, H≤24 measured under 2ms), evenly
+// spread by arc-length so coverage stays uniform regardless of where the
+// correspondence stage placed its own density. Weight kernel is the
+// standard MLS inverse-square falloff, distance measured along rA's own
+// arc length (index-paired with rB, so the SAME metric weights both the
+// forward-from-A and backward-from-B fits — deliberately, so the two
+// stay consistent with each other instead of drifting apart under two
+// unrelated distance metrics).
+function _mlsHandleIndices(n){
+  var H=Math.min(24,n);
+  var seen={},handleIdx=[];
+  for(var h=0;h<H;h++){
+    var ix=Math.round(h*(n-1)/Math.max(1,H-1));
+    if(!seen[ix]){seen[ix]=1;handleIdx.push(ix);}
+  }
+  return handleIdx;
+}
+// Per-vertex weighted similarity fit, meant to be cached ONCE per pair
+// (like _twIwProbe) — not re-fit every frame, only re-EVALUATED at the
+// current et via buildMLSSegs below.
+function _fitMLSPerVertex(rA,rB){
+  var n=Math.min(rA.segments.length,rB.segments.length);
+  var handleIdx=_mlsHandleIndices(n);
+  var H=handleIdx.length;
+  if(H<3)return null;
+  var cum=[0];for(var i=1;i<n;i++)cum.push(cum[i-1]+Math.hypot(rA.segments[i].point[0]-rA.segments[i-1].point[0],rA.segments[i].point[1]-rA.segments[i-1].point[1]));
+  var totalLen=cum[n-1]||1;
+  var sigma=Math.max(1,totalLen/H*0.75); // ~3/4 of the average handle gap
+  var handlesA=handleIdx.map(function(ix){return {x:rA.segments[ix].point[0],y:rA.segments[ix].point[1]};});
+  var handlesB=handleIdx.map(function(ix){return {x:rB.segments[ix].point[0],y:rB.segments[ix].point[1]};});
+  var per=new Array(n);
+  for(var qi=0;qi<n;qi++){
+    var w=new Array(H);
+    for(var h2=0;h2<H;h2++){
+      var d=Math.abs(cum[qi]-cum[handleIdx[h2]]);
+      w[h2]=1/((d*d)/(sigma*sigma)+0.01);
+    }
+    var t=fitSimilarityTransformWeighted(handlesA,handlesB,w);
+    if(!t){
+      // Degenerate (near-zero variance under these weights) — identity
+      // fallback keeps this vertex on a straight lerp instead of blowing
+      // up, same spirit as fitSimilarityTransform's own null-guard above.
+      per[qi]={theta:0,scale:1,pcx:rA.segments[qi].point[0],pcy:rA.segments[qi].point[1],qcx:rB.segments[qi].point[0],qcy:rB.segments[qi].point[1]};
+      continue;
+    }
+    var mag=Math.sqrt(t.wRe*t.wRe+t.wIm*t.wIm);
+    var th=Math.atan2(t.wIm,t.wRe);
+    per[qi]={theta:(mag>0.1&&mag<10)?th:0,scale:Math.min(3,Math.max(0.33,mag||1)),pcx:t.ca.x,pcy:t.ca.y,qcx:t.cb.x,qcy:t.cb.y};
+  }
+  return per;
+}
+// Evaluates the MLS candidate at a given et — same fwd(A)/bwd(B) blend
+// SHAPE as buildLinearSegs (identity transform at each side's own
+// boundary), so it's endpoint-exact by the identical construction, just
+// with a PER-VERTEX theta/scale/pivot from _fitMLSPerVertex instead of
+// one shared set for the whole stroke.
+function buildMLSSegs(rA,rB,per,etv){
+  var n=per.length,o=new Array(n);
+  for(var i=0;i<n;i++){
+    var pv=per[i];
+    var invScale=pv.scale>1e-6?1/pv.scale:1;
+    var thT=pv.theta*etv,scT=1+(pv.scale-1)*etv;
+    var thB=thT-pv.theta,scB=invScale+(1-invScale)*etv;
+    var sA=rA.segments[i],sB=rB.segments[i];
+    var fwd=rotScalePt(sA.point[0]-pv.pcx,sA.point[1]-pv.pcy,thT,scT);
+    var bwd=rotScalePt(sB.point[0]-pv.qcx,sB.point[1]-pv.qcy,thB,scB);
+    var hiF=rotScalePt(sA.handleIn[0],sA.handleIn[1],thT,scT),hiB=rotScalePt(sB.handleIn[0],sB.handleIn[1],thB,scB);
+    var hoF=rotScalePt(sA.handleOut[0],sA.handleOut[1],thT,scT),hoB=rotScalePt(sB.handleOut[0],sB.handleOut[1],thB,scB);
+    o[i]={point:[lerp(pv.pcx+fwd[0],pv.qcx+bwd[0],etv),lerp(pv.pcy+fwd[1],pv.qcy+bwd[1],etv)],handleIn:[lerp(hiF[0],hiB[0],etv),lerp(hiF[1],hiB[1],etv)],handleOut:[lerp(hoF[0],hoB[0],etv),lerp(hoF[1],hoB[1],etv)]};
+  }
+  return o;
+}
 function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
   var et=easFn(t);var n=Math.min(rA.segments.length,rB.segments.length);var segs=[];
   var cxA=0,cyA=0,cxB=0,cyB=0;for(var i=0;i<n;i++){cxA+=rA.segments[i].point[0];cyA+=rA.segments[i].point[1];cxB+=rB.segments[i].point[0];cyB+=rB.segments[i].point[1];}cxA/=n;cyA/=n;cxB/=n;cyB/=n;
@@ -1858,6 +1968,15 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
             // not only at the midframe.
             var ETS=[0.15,0.35,0.5,0.65,0.85];
             var candTraj={b:[rA.segments],u:[rA.segments],l:[rA.segments]};
+            // MLS local-rigid (2026-07, "des plis qui deviennent bizarres
+            // parce qu'éloignés" — see _fitMLSPerVertex's own header): a
+            // FOURTH candidate, evaluated by the exact same scoring as the
+            // three existing ones so the arbitration can pick whichever
+            // actually performs best on THIS pair — "switch" per Cyril's
+            // request, not a replacement (blend/uniform/linear are fully
+            // intact above and still win whenever they score better).
+            var mlsPerV=_fitMLSPerVertex(rA,rB);
+            if(mlsPerV)candTraj.m=[rA.segments];
             var midIdx=2;
             var chordMid={},lenMid={};
             ETS.forEach(function(ets_,ei){
@@ -1877,8 +1996,62 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
               candTraj.b.push(mixS(sm));
               candTraj.u.push(mixS(1));
               candTraj.l.push(linS);
+              if(mlsPerV)candTraj.m.push(buildMLSSegs(rA,rB,mlsPerV,ets_));
             });
             candTraj.b.push(rB.segments);candTraj.u.push(rB.segments);candTraj.l.push(rB.segments);
+            if(mlsPerV)candTraj.m.push(rB.segments);
+            // FOLD-CORRESPONDENCE term (2026-07, giving the MLS candidate a
+            // fair trial without fighting the existing intrinsic
+            // correction): chord/length above are inherently GLOBAL
+            // metrics — a single whole-stroke rigid fit is, by definition,
+            // the best possible explanation of the global chord and total
+            // length, so it always looks best by those two measures alone,
+            // even when a fold far from that fit's own dominant region is
+            // locally wrong (exactly Cyril's "des plis qui deviennent
+            // bizarres parce qu'éloignés"). A first attempt here scored
+            // local segment-LENGTH deviation from the raw per-window
+            // average of rA/rB — measured, it flipped the already-fixed
+            // (PR167) arm/fold pair from blend to plain linear/rigid,
+            // because a fold's length legitimately deviates from that
+            // naive average AT the fold — that's what preserving it looks
+            // like, not an error. TURNING ANGLE at each vertex doesn't
+            // have that problem: rA.segments[i]/rB.segments[i] are already
+            // the same vertex by DTW/landmark correspondence (Cyril's own
+            // diagnosis — "peut être que les tangentes ne sont pas prises
+            // en compte"), so wherever BOTH keyframes show a real
+            // corner/fold at index i, the expected mid-turn is a direct
+            // circular lerp of the two keyframes' own turn there — a
+            // candidate that reproduces it is preserving the fold, one
+            // that doesn't (flattens it, or turns the wrong way) is
+            // exactly the visible artifact reported. Flat regions (no
+            // corner in either keyframe) are excluded so noise/wobble
+            // doesn't drown out genuine folds.
+            function turnAngle(pts,i){
+              var p0=pts[i-1].point,p1=pts[i].point,p2=pts[i+1].point;
+              var a1=Math.atan2(p1[1]-p0[1],p1[0]-p0[0]),a2=Math.atan2(p2[1]-p1[1],p2[0]-p1[0]);
+              return _wrapPI(a2-a1);
+            }
+            var _foldExp=null,_foldW=null;
+            if(n>=5){
+              _foldExp=new Array(n);_foldW=new Array(n);
+              for(var fi7=1;fi7<n-1;fi7++){
+                var thA7=turnAngle(rA.segments,fi7),thB7=turnAngle(rB.segments,fi7);
+                _foldExp[fi7]=thA7+_wrapPI(thB7-thA7)*0.5;
+                _foldW[fi7]=Math.max(Math.abs(thA7),Math.abs(thB7));
+              }
+            }
+            function foldAngleErr(mid){
+              if(!_foldExp)return 0;
+              var wsum=1e-6,esum=0;
+              for(var fi8=1;fi8<n-1;fi8++){
+                var w8=_foldW[fi8];
+                if(w8<0.35)continue; // ~20°+ turn only — genuine corners, not noise
+                var thM=turnAngle(mid,fi8);
+                esum+=w8*Math.abs(_wrapPI(thM-_foldExp[fi8]));
+                wsum+=w8;
+              }
+              return esum/wsum; // radians
+            }
             function candScore(traj){
               var exX=0;
               for(var st=1;st<traj.length-1;st++)exX+=Math.max(0,_segsSelfXCount(traj[st])-base);
@@ -1895,17 +2068,33 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
                   if((v1x*v2x+v1y*v2y)/(l1*l2)<-0.3)back+=l2;
                 }
               }
-              return exX*10+cd/(Math.PI/6)+ld5*5+back/(n*0.8);
+              var foldErr=foldAngleErr(mid);
+              // Same units/weight as the chord-drift term above (30° of
+              // fold-angle error ≡ 1 point, matching "30° of drift ≡ 20%
+              // length error ≡ 1/10th of a crossing" calibration already
+              // established for cd/ld5/back).
+              return exX*10+cd/(Math.PI/6)+ld5*5+back/(n*0.8)+foldErr/(Math.PI/6);
             }
             var scB5c=candScore(candTraj.b),scU5=candScore(candTraj.u),scL5=candScore(candTraj.l);
-            var best=Math.min(scB5c,scU5,scL5);
+            var scM5=mlsPerV?candScore(candTraj.m):Infinity;
+            var best=Math.min(scB5c,scU5,scL5,scM5);
+            rA._twUseMLS=null;
             if(scB5c-best<0.05){/* keep per-vertex blend */}
             else if(scU5-best<0.05)rA._twLocalTrust=null;  // uniform intrinsic
+            else if(scM5-best<0.05){rA._twIwProbe=0;rA._twUseMLS=mlsPerV;} // MLS local-rigid (standalone, no intrinsic layered on top — see "coupler" note on buildMLSSegs' own candidate)
             else rA._twIwProbe=0;                          // pure linear
           }
         }
       }
     }
+    // MLS local-rigid won the arbitration above (once-per-pair decision,
+    // cached on rA._twUseMLS) — override the whole-stroke rigid `segs`
+    // with the per-vertex version at the REAL current et. rA._twIwProbe
+    // was set to 0 alongside the decision, so the intrinsic-blend block
+    // right below is a no-op here (iw stays 0) — MLS stands on its own
+    // when selected, per Cyril's "switch" framing; coupling it with the
+    // intrinsic correction too is a possible follow-up, not built yet.
+    if(rA._twUseMLS)segs=buildMLSSegs(rA,rB,rA._twUseMLS,et);
     // Smooth, zero-at-both-ends envelope in et (matches the endpoint-exact
     // guarantee even more strictly than the old per-frame measure did;
     // peaks where the probe above was measured).
