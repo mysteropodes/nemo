@@ -1330,14 +1330,30 @@
       state.selectedStrokeIndices = selectedPaths.map(getSI).filter(function (i) { return i >= 0; });
       renderArcs(); updateUI(); window.SMEngineBridge.renderNow();
     }
-    if (!selectedPaths.length) return; // empty canvas — let the native menu show, nothing to act on yet
+    if (!selectedPaths.length) {
+      // Empty canvas: nothing to duplicate/delete, but a right-click here is
+      // still the standard place to offer Paste (2026-07, "vérifie que
+      // copier/couper/coller existe pour tous les éléments") — only shown
+      // when there's actually something in the canvas clipboard, otherwise
+      // fall through to the native menu exactly as before.
+      if (!(_canvasClip && _canvasClip.snaps && _canvasClip.snaps.length)) return;
+      e.preventDefault(); e.stopImmediatePropagation();
+      window.showContextMenu(e.clientX, e.clientY, [
+        { label: 'Coller', shortcut: '⌘V', action: function () { pasteSelection(); } },
+      ]);
+      return;
+    }
     e.preventDefault(); e.stopImmediatePropagation();
     var multi = selectedPaths.length > 1;
     var p0 = selectedPaths[0];
     var isDeleteGhost = !multi && p0.data && p0.data.isRevisionGhost && p0.data.revisionAction === 'delete';
     var isActiveRevision = !multi && p0.data && p0.data.revisionParentId && !p0.data.isRevisionGhost;
     var isGrouped = !multi && p0.data && p0.data.groupId;
+    var hasCanvasClip = !!(_canvasClip && _canvasClip.snaps && _canvasClip.snaps.length);
     var items = [
+      { label: 'Copier', shortcut: '⌘C', action: function () { copySelection(); } },
+      { label: 'Couper', shortcut: '⌘X', action: function () { cutSelection(); } },
+      { label: 'Coller', shortcut: '⌘V', disabled: !hasCanvasClip, action: function () { pasteSelection(); } },
       { label: 'Dupliquer', shortcut: '⌘D', action: function () { duplicateSelection(); } },
       { label: multi ? 'Supprimer la sélection' : 'Supprimer', shortcut: 'Suppr', action: function () { window.SM.deleteSelStrokes(); } },
       { sep: true },
