@@ -11,6 +11,7 @@
 // left in for Cyril to flip on and compare — see the flag comment below.
 var TW_CURVATURE_DTW=false;
 var TW_CORRECTION_PASS=true;
+var TW_POINT_REDUCTION=true;
 // ---- MATCHING ----
 function buildTP(sd){var p=new Path({insert:false});sd.segments.forEach(function(s){p.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));});return p;}
 // A stroke's color and fill/stroke "type" are what a viewer actually reads
@@ -1689,30 +1690,163 @@ function _applyFoldCorrection(segs,rA,et){
   var cur=segs;
   var ITERS=2,DAMP=0.5,MAXROT=0.26; // ~15° cap — small deliberate nudges only
   for(var it=0;it<ITERS;it++){
-    var next=null,changed=false;
+    var raw=new Array(n2);
     for(var i=1;i<n2-1;i++){
       var wv=w[i];
-      if(!wv||wv<0.35)continue; // ~20°+ turn only — genuine corners, not noise (same bar as the scoring term)
+      if(!wv||wv<0.35){raw[i]=0;continue;} // ~20°+ turn only — genuine corners, not noise (same bar as the scoring term)
       var expTheta=thA[i]+_wrapPI(thB[i]-thA[i])*et;
       var p0=cur[i-1].point,p1=cur[i].point,p2=cur[i+1].point;
       var a1=Math.atan2(p1[1]-p0[1],p1[0]-p0[0]),a2=Math.atan2(p2[1]-p1[1],p2[0]-p1[0]);
       var actual=_wrapPI(a2-a1);
-      var delta=_wrapPI(expTheta-actual)*DAMP;
-      if(delta>MAXROT)delta=MAXROT;else if(delta<-MAXROT)delta=-MAXROT;
-      if(Math.abs(delta)<0.01)continue;
-      if(!next)next=cur.map(function(s){return{point:s.point.slice(),handleIn:s.handleIn.slice(),handleOut:s.handleOut.slice()};});
-      var mx=(p0[0]+p2[0])/2,my=(p0[1]+p2[1])/2;
-      var dx=p1[0]-mx,dy=p1[1]-my;
-      var cs=Math.cos(delta),sn=Math.sin(delta);
-      next[i].point=[mx+dx*cs-dy*sn,my+dx*sn+dy*cs];
-      changed=true;
+      var d=_wrapPI(expTheta-actual)*DAMP;
+      if(d>MAXROT)d=MAXROT;else if(d<-MAXROT)d=-MAXROT;
+      raw[i]=d;
+    }
+    raw[0]=0;raw[n2-1]=0;
+    // Smooth the raw per-vertex correction across its 2 immediate
+    // neighbors (2026-07, live-reported "cassure" artifact): a single
+    // vertex's turning angle is a noisy 3-point measurement on a hand-
+    // drawn stroke — correcting it ALONE, with its neighbors left
+    // untouched, reads as a sharp spike popped out of an otherwise smooth
+    // curve. Tapering the same correction into 2 flanking vertices (a
+    // 25%/50%/25% kernel) means a real, wide corner still gets corrected
+    // (its own strong raw delta dominates the sum), but a single noisy
+    // outlier gets diluted into an unnoticeable ripple instead of a kink.
+    var sm=new Array(n2),changed=false;
+    for(var i2=1;i2<n2-1;i2++){
+      var v=raw[i2]*0.5+(i2>1?raw[i2-1]*0.25:0)+(i2<n2-2?raw[i2+1]*0.25:0);
+      sm[i2]=v;
+      if(Math.abs(v)>=0.01)changed=true;
     }
     if(!changed)break;
+    var next=cur.map(function(s){return{point:s.point.slice(),handleIn:s.handleIn.slice(),handleOut:s.handleOut.slice()};});
+    for(var i3=1;i3<n2-1;i3++){
+      var d3=sm[i3];
+      if(Math.abs(d3)<0.01)continue;
+      var p0b=cur[i3-1].point,p1b=cur[i3].point,p2b=cur[i3+1].point;
+      var mx=(p0b[0]+p2b[0])/2,my=(p0b[1]+p2b[1])/2;
+      var dx=p1b[0]-mx,dy=p1b[1]-my;
+      var cs=Math.cos(d3),sn=Math.sin(d3);
+      next[i3].point=[mx+dx*cs-dy*sn,my+dx*sn+dy*cs];
+    }
     var newX=_segsSelfXCount(next);
     if(newX>baseX)break; // this round tangled more than the uncorrected baseline — stop, keep the last accepted state
     cur=next;
   }
   return cur;
+}
+// ---- POINT-REDUCTION PASS (2026-07) ----
+// Cyril: "j'ai encore beaucoup de point de vertex par rapport à mes
+// dessins originaux... peut être avoir une réduction des points" — the
+// correspondence stage deliberately resamples both keyframes to a FINE
+// shared point count (up to 150, adaptive to arc length) so DTW/fold
+// matching has enough resolution to work with; that resolution has no
+// reason to survive into the rendered OUTPUT, where it reads as
+// noticeably smoother/more "computed" than the artist's own hand-drawn
+// density. Runs ONCE per pair (cached on rA._twKeepIdx, same pattern as
+// every other per-pair decision in this file) — the SAME retained index
+// set is reused for every frame in the span, so the point count never
+// jitters frame-to-frame. A genuine fold/corner (rA._twFoldW, the same
+// signal the correction pass and MLS handle-snapping already trust) is
+// PROTECTED from removal, so simplification can never erase it.
+//
+// Vector-brush ribbons are excluded (see the call site) — their width
+// channel is indexed 1:1 with the centerline, and reducing one without
+// the other would desync stroke tapering; a separate pass if that's ever
+// wanted.
+//
+// Algorithm: Visvalingam-Whyatt (repeatedly drop the point whose removal
+// changes the polyline LEAST — twice the triangle area formed with its
+// current neighbors, the standard measure of a point's visual
+// contribution), scored against BOTH keyframes and taking the max, so a
+// point insignificant in A's pose but a real corner in B's isn't dropped.
+function _decimateKeepIndices(rA,rB,targetN){
+  var n=Math.min(rA.segments.length,rB.segments.length);
+  if(targetN>=n)return null;
+  var w=rA._twFoldW;
+  var prev=new Array(n),next=new Array(n),alive=new Array(n);
+  for(var i=0;i<n;i++){prev[i]=i-1;next[i]=i+1;alive[i]=true;}
+  var protect=new Array(n);
+  for(var i2=0;i2<n;i2++)protect[i2]=(i2===0||i2===n-1)||(w&&w[i2]>=0.35);
+  function area(pts,pi,ci,ni){
+    var p0=pts[pi].point,p1=pts[ci].point,p2=pts[ni].point;
+    return Math.abs((p1[0]-p0[0])*(p2[1]-p0[1])-(p2[0]-p0[0])*(p1[1]-p0[1]));
+  }
+  var remaining=n;
+  while(remaining>targetN){
+    var worstI=-1,worstScore=Infinity;
+    for(var i3=1;i3<n-1;i3++){
+      if(!alive[i3]||protect[i3])continue;
+      var pi=prev[i3],ni=next[i3];
+      var score=Math.max(area(rA.segments,pi,i3,ni),area(rB.segments,pi,i3,ni));
+      if(score<worstScore){worstScore=score;worstI=i3;}
+    }
+    if(worstI<0)break; // nothing left to remove without touching a protected corner
+    alive[worstI]=false;
+    next[prev[worstI]]=next[worstI];
+    prev[next[worstI]]=prev[worstI];
+    remaining--;
+  }
+  var idx=[];for(var i4=0;i4<n;i4++)if(alive[i4])idx.push(i4);
+  return idx;
+}
+// Rebuilds smooth Catmull-Rom-style handles for the reduced point set —
+// the OLD handles were sized for the dense pre-reduction spacing and
+// would badly overshoot the new, sparser gaps.
+function _reduceSegs(segs,keepIdx){
+  var m=keepIdx.length,out=new Array(m);
+  for(var k=0;k<m;k++){
+    var idx=keepIdx[k];
+    var p1=segs[idx].point;
+    var pPrev=k>0?segs[keepIdx[k-1]].point:p1;
+    var pNext=k<m-1?segs[keepIdx[k+1]].point:p1;
+    var tx=pNext[0]-pPrev[0],ty=pNext[1]-pPrev[1];
+    var tlen=Math.hypot(tx,ty)||1;
+    tx/=tlen;ty/=tlen;
+    var distPrev=k>0?Math.hypot(p1[0]-pPrev[0],p1[1]-pPrev[1]):0;
+    var distNext=k<m-1?Math.hypot(pNext[0]-p1[0],pNext[1]-p1[1]):0;
+    out[k]={point:p1,handleIn:k===0?[0,0]:[-tx*distPrev/3,-ty*distPrev/3],handleOut:k===m-1?[0,0]:[tx*distNext/3,ty*distNext/3]};
+  }
+  return out;
+}
+// Safety check (2026-07, live-reported regression: reduction introduced
+// self-crossings on a stroke that had NONE at full resolution): removing
+// points can change a polyline's self-intersection topology either way —
+// a locally-wiggly run that keeps two far-apart regions from touching
+// can get straightened into a crossing. Since the kept-index SET is a
+// single per-pair decision reused for the whole span (needed so point
+// count doesn't jitter frame-to-frame), it can't be verified/rejected
+// per-frame the way the correction pass verifies every round — instead,
+// probe it eagerly with a cheap LINEAR proxy (plain lerp of rA/rB's own
+// points, not the full MLS/blend pipeline) at a few et samples across the
+// span; reject the whole reduction for this pair if it's worse anywhere.
+function _reductionIsSafe(rA,rB,keepIdx,n0){
+  var PROBES=[0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]; // dense — a cheap linear proxy, one-time per pair
+  for(var p=0;p<PROBES.length;p++){
+    var et=PROBES[p],full=new Array(n0);
+    for(var i=0;i<n0;i++){
+      var pa=rA.segments[i].point,pb=rB.segments[i].point;
+      full[i]={point:[lerp(pa[0],pb[0],et),lerp(pa[1],pb[1],et)]};
+    }
+    var red=new Array(keepIdx.length);
+    for(var k=0;k<keepIdx.length;k++)red[k]=full[keepIdx[k]];
+    if(_segsSelfXCount(red)>_segsSelfXCount(full))return false;
+  }
+  return true;
+}
+function _applyPointReduction(segs,rA,rB){
+  if(!TW_POINT_REDUCTION)return segs;
+  if(rA._twKeepIdx===undefined){
+    rA._twKeepIdx=null;
+    if(rA._src&&rB._src){
+      var n0=Math.min(rA.segments.length,rB.segments.length);
+      var origN=Math.round(((rA._src.segments||[]).length+(rB._src.segments||[]).length)/2);
+      var cand=_decimateKeepIndices(rA,rB,Math.max(10,origN));
+      if(cand&&_reductionIsSafe(rA,rB,cand,n0))rA._twKeepIdx=cand;
+    }
+  }
+  if(!rA._twKeepIdx)return segs;
+  return _reduceSegs(segs,rA._twKeepIdx);
 }
 function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
   var et=easFn(t);var n=Math.min(rA.segments.length,rB.segments.length);var segs=[];
@@ -2300,6 +2434,7 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
     }
   }
   segs=_applyFoldCorrection(segs,rA,et);
+  if(!(rA.isVectorBrush&&rB.isVectorBrush))segs=_applyPointReduction(segs,rA,rB);
   if(rA.isVectorBrush&&rB.isVectorBrush){
     var widths=[];for(var w=0;w<n;w++)widths.push(lerp(rA.widths[w]||1,rB.widths[w]||1,et));
     var centerSegs=segs.map(function(s,idx){return{point:s.point,handleIn:s.handleIn,handleOut:s.handleOut,width:widths[idx]};});
