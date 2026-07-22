@@ -1096,7 +1096,7 @@ function duplicateSelection(){
   var snaps=selectedPaths.map(_snapshotForClone).filter(Boolean);
   var clones=_materializeClones(snaps,layer,12); // px — small, deliberate nudge so the copy doesn't sit invisibly on top of the source
   clearSel();
-  selectedPaths=clones.filter(function(c){return!(c.data&&c.data.isBrushTextureCopy);});
+  selectedPaths=clones.filter(isSelectablePathChild);
   state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;});
   saveActiveLayerFrame();renderArcs();updateUI();
   if(window.SMEngineBridge)SMEngineBridge.renderNow();
@@ -1135,11 +1135,11 @@ function pasteSelection(){
   var samePlace=(_canvasClip.layerIdx===state.activeLayerIdx&&_canvasClip.frameIdx===state.currentFrame);
   var clones=_materializeClones(_canvasClip.snaps,layer,samePlace?12:0);
   clearSel();
-  selectedPaths=clones.filter(function(c){return!(c.data&&c.data.isBrushTextureCopy);});
+  selectedPaths=clones.filter(isSelectablePathChild);
   state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;});
   saveActiveLayerFrame();renderArcs();updateUI();
   if(window.SMEngineBridge)SMEngineBridge.renderNow();
-  showToast('Collé ('+clones.filter(function(c){return!(c.data&&c.data.isBrushTextureCopy);}).length+')');
+  showToast('Collé ('+clones.filter(isSelectablePathChild).length+')');
 }
 var canvasEl=document.getElementById('drawing-canvas');
 

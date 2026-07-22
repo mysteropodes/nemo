@@ -32,6 +32,18 @@ function exportBuildFrame(frameIdx,alpha){
   for(var li=0;li<state.layers.length;li++){
     var ld=state.layers[li];if(!ld.visible)continue;
     var strokes=getEffectiveStrokes(li,frameIdx);
+    // Team review ghosts (revision-bridge.js): a frozen "before" copy a
+    // reviewer's correction leaves behind, meant to stay visible ON-CANVAS
+    // (so Accept/Reject has something to act on) but never in a rendered
+    // output — tools.js explicitly documents this exclusion ("ghost …
+    // excluded from export — see engine-bridge.js/export.js") yet nothing
+    // here actually implemented it (2026-07 audit: confirmed live, a ghost
+    // was baked straight into the exported PNG). getEffectiveStrokes()
+    // itself must NOT filter these — the live canvas/review UI reads
+    // through the same function and needs the ghost to render for the
+    // reviewer to interact with; the exclusion belongs here, at every
+    // actual output path, not at the shared read.
+    strokes=strokes.filter(function(sd){return!sd.isRevisionGhost;});
     // Shadow Brush guide lines (2026-07) — their whole purpose is to
     // disappear once they've delimited a fill area (see shadow-brush-
     // bridge.js's header comment); default OFF so a fresh export doesn't
@@ -390,7 +402,7 @@ function lottieBuild(start,end){
     // dab companions are UNAFFECTED — they're real Paths with segments,
     // same as before.
     var framesStrokes=[];
-    for(var f=start;f<=end;f++)framesStrokes[f]=getEffectiveStrokes(li,f).filter(function(sd){return sd.opacity!==0&&!sd.isRaster&&(state.exportIncludeShadowGuides||sd.channelTag!=='shadow');});
+    for(var f=start;f<=end;f++)framesStrokes[f]=getEffectiveStrokes(li,f).filter(function(sd){return sd.opacity!==0&&!sd.isRaster&&!sd.isRevisionGhost&&(state.exportIncludeShadowGuides||sd.channelTag!=='shadow');});
 
     // figure out the max stroke-slot count and, for each slot, the
     // contiguous frame runs where that slot exists (count stable)
