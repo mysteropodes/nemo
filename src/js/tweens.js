@@ -3224,6 +3224,69 @@ function generateTweens(){
     // generated frame — so a restack between keyframes crosses smoothly
     // in-between (typically right around the shape's own halfway point)
     // instead of freezing on A then popping to B on the last frame.
+    // ---- ORDER-COHERENCE PASS (2026-07) ----
+    // Cyril, live: two small nearby strokes (a fold/seam detail on each
+    // side of an arm) whose id-based correspondence swaps their left-
+    // right order between keyframes — each stroke tweens smoothly to its
+    // OWN target, but since the two targets are on opposite sides of
+    // where they started, the paths necessarily cross mid-span. Cyril's
+    // own proposal: "une passe qui regarde si c'est cohérent et fait le
+    // bon assignement" — for two CANDIDATE pairs whose A→B motion
+    // segments actually cross, check whether swapping which B-side
+    // stroke each A-side stroke connects to would (a) uncross them and
+    // (b) still be an equally plausible shape match. Deliberately
+    // conservative: a genuinely intended crossing (two limbs swapping
+    // places on purpose) survives untouched whenever the swapped match
+    // would be clearly worse — this only fires when the alternative
+    // pairing is a comparably good substitute, which is exactly the
+    // "these two are easily confused" case it exists for. Pieces and
+    // forced (manual-override) pairs are excluded — their correspondence
+    // isn't a free choice to begin with.
+    function _ocCentroid(sd){
+      var segs=(sd.centerSegments&&sd.centerSegments.length>1)?sd.centerSegments:sd.segments;
+      var cx=0,cy=0,n=segs.length;
+      for(var oi=0;oi<n;oi++){cx+=segs[oi].point[0];cy+=segs[oi].point[1];}
+      return[cx/Math.max(1,n),cy/Math.max(1,n)];
+    }
+    function _ocSegsCross(p1,p2,p3,p4){
+      function cr(o,a,b){return(a[0]-o[0])*(b[1]-o[1])-(a[1]-o[1])*(b[0]-o[0]);}
+      var d1=cr(p3,p4,p1),d2=cr(p3,p4,p2),d3=cr(p1,p2,p3),d4=cr(p1,p2,p4);
+      return((d1>0&&d2<0)||(d1<0&&d2>0))&&((d3>0&&d4<0)||(d3<0&&d4>0));
+    }
+    // Trimmed shape-similarity cost — proximity (chamfer) + length ratio
+    // + type/color, deliberately WITHOUT matchSc's whole-frame-relative-
+    // position term (not meaningful here: both candidates are already
+    // known to be near each other, that's how they became candidates).
+    function _ocCost(fX,fY){
+      var K=Math.min(fX.pts.length,fY.pts.length),sumXY=0,sumYX=0;
+      for(var i=0;i<K;i++){var best=1e18;for(var j=0;j<K;j++){var dx=fX.pts[i][0]-fY.pts[j][0],dy=fX.pts[i][1]-fY.pts[j][1];var d=dx*dx+dy*dy;if(d<best)best=d;}sumXY+=Math.sqrt(best);}
+      for(var j2=0;j2<K;j2++){var best2=1e18;for(var i2=0;i2<K;i2++){var dx2=fX.pts[i2][0]-fY.pts[j2][0],dy2=fX.pts[i2][1]-fY.pts[j2][1];var d2=dx2*dx2+dy2*dy2;if(d2<best2)best2=d2;}sumYX+=Math.sqrt(best2);}
+      var scale=Math.sqrt(fX.bounds.w*fX.bounds.w+fX.bounds.h*fX.bounds.h)+Math.sqrt(fY.bounds.w*fY.bounds.w+fY.bounds.h*fY.bounds.h);
+      var cham=(sumXY+sumYX)/(2*K)/Math.max(1,scale*0.5);
+      var lenRatio=Math.max(fX.length,fY.length)/Math.max(1,Math.min(fX.length,fY.length));
+      var typePenalty=fX.type!==fY.type?0.5:0;
+      var colD=(colorDist(fX.strokeCol,fY.strokeCol)+colorDist(fX.fillCol,fY.fillCol))/2;
+      return cham+Math.max(0,lenRatio-1.3)*0.3+typePenalty+colD*0.3;
+    }
+    var _ocCandidates=pairSpecs.filter(function(p){return!p.isPiece&&!p.forced;});
+    var _ocFeatA={},_ocFeatB={};
+    _ocCandidates.forEach(function(p,idx){_ocFeatA[idx]=strokeFeat(p.aData);_ocFeatB[idx]=strokeFeat(p.bData);});
+    for(var oc1=0;oc1<_ocCandidates.length;oc1++){
+      for(var oc2=oc1+1;oc2<_ocCandidates.length;oc2++){
+        var ocP=_ocCandidates[oc1],ocQ=_ocCandidates[oc2];
+        var pA=_ocCentroid(ocP.aData),pB=_ocCentroid(ocP.bData);
+        var qA=_ocCentroid(ocQ.aData),qB=_ocCentroid(ocQ.bData);
+        if(!_ocSegsCross(pA,pB,qA,qB))continue;
+        if(_ocSegsCross(pA,qB,qA,pB))continue; // swap still crosses — not a simple order inversion
+        var curCost=_ocCost(_ocFeatA[oc1],_ocFeatB[oc1])+_ocCost(_ocFeatA[oc2],_ocFeatB[oc2]);
+        var swapCost=_ocCost(_ocFeatA[oc1],_ocFeatB[oc2])+_ocCost(_ocFeatA[oc2],_ocFeatB[oc1]);
+        if(swapCost>curCost+0.15)continue; // meaningfully worse — likely a real intended crossing, leave it
+        var tmpData=ocP.bData,tmpIdx=ocP.bIdx;
+        ocP.bData=ocQ.bData;ocP.bIdx=ocQ.bIdx;
+        ocQ.bData=tmpData;ocQ.bIdx=tmpIdx;
+        _ocFeatB[oc1]=strokeFeat(ocP.bData);_ocFeatB[oc2]=strokeFeat(ocQ.bData);
+      }
+    }
     var pairs=pairSpecs.map(function(spec){
       var isVB=!!(spec.aData.isVectorBrush&&spec.bData.isVectorBrush);
       // Feature-aware (corner/cusp-biased) shared resampling — see
