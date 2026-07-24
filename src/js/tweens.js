@@ -2375,6 +2375,50 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
               }
               return esum/wsum; // radians
             }
+            // RIPPLE, measured on the POLYLINE only (2026-07, live: "les lignes
+            // sont saccadées par des points en retard sur d'autres et ne
+            // préservent pas la courbure générale des lignes de force").
+            // Counts how often the vertex chain reverses its direction of
+            // bending, per 100px — i.e. fine back-and-forth wobble, which
+            // every other term here is blind to: it needs no actual crossing,
+            // no chord drift, no length error, no reverse travel, and leaves
+            // genuine corners alone. Deliberately polyline-only (handles
+            // ignored) because the candidates are not built alike — the
+            // intrinsic-blend ones carry positions only while linear/MLS carry
+            // handles too, so anything reading handles would compare a raw
+            // polyline against a smooth bezier and be biased, which is exactly
+            // how a first attempt at this term went wrong. Positions are the
+            // one basis all four share honestly.
+            //
+            // Measured at the midframe on three reported strokes (flips/100px,
+            // keyframes' own level in brackets): intrinsic 2.87 [2.95/2.33],
+            // linear 3.19, MLS 3.58 — and 2.93 [2.94/2.43] / 4.03 / 4.36, and
+            // 3.47 [3.50/2.64] / 4.33 / 5.13. The ordering is consistent:
+            // MLS's per-vertex independent fits ripple most, the intrinsic
+            // reconstruction sits right at what the artist actually drew.
+            function ripPoly(segs){
+              var m2=segs.length;
+              if(m2<8)return 0;
+              var tt=[],L2=0,q;
+              for(q=1;q<m2;q++)L2+=Math.hypot(segs[q].point[0]-segs[q-1].point[0],segs[q].point[1]-segs[q-1].point[1]);
+              if(!(L2>0))return 0;
+              for(q=1;q<m2-1;q++){
+                var y1=Math.atan2(segs[q].point[1]-segs[q-1].point[1],segs[q].point[0]-segs[q-1].point[0]);
+                var y2=Math.atan2(segs[q+1].point[1]-segs[q].point[1],segs[q+1].point[0]-segs[q].point[0]);
+                tt.push(_wrapPI(y2-y1)*180/Math.PI);
+              }
+              var fl=0,pr=0;
+              for(q=1;q<tt.length-1;q++){
+                var h2=tt[q]-(tt[q-1]+tt[q+1])/2;
+                if((h2>0.15&&pr<-0.15)||(h2<-0.15&&pr>0.15))fl++;
+                if(Math.abs(h2)>0.15)pr=h2;
+              }
+              return(fl/L2)*100;
+            }
+            // Allowance: the wobblier of the two keyframes. A candidate is only
+            // charged for ripple it INVENTS, so a genuinely shaky hand-drawn
+            // line is never penalised for staying faithful to itself.
+            var ripAllow=Math.max(ripPoly(rA.segments),ripPoly(rB.segments));
             function candScore(traj){
               var exX=0;
               for(var st=1;st<traj.length-1;st++)exX+=Math.max(0,_segsSelfXCount(traj[st])-base);
@@ -2396,7 +2440,20 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
               // fold-angle error ≡ 1 point, matching "30° of drift ≡ 20%
               // length error ≡ 1/10th of a crossing" calibration already
               // established for cd/ld5/back).
-              return exX*10+cd/(Math.PI/6)+ld5*5+back/(n*0.8)+foldErr/(Math.PI/6);
+              // Weight 0.15, calibrated by sweeping it against two things that
+              // must BOTH hold: the reported jagged arm (testC, span 0-14) has
+              // to stop choosing MLS, and testD's pointing-arm fold — the case
+              // Cyril judged "parfait" — has to keep choosing it. Measured:
+              // at 0 nothing changes (arm stays at 5.05 flips/100px); from
+              // 0.05 to 0.25 the arm drops to 3.19 while testD keeps its MLS
+              // win; at 0.4 testD loses it too. 0.15 sits in the middle of
+              // that stable window rather than on either edge. Deliberately
+              // small — a full flip/100px of invented ripple costs about half
+              // as much as 30deg of chord drift, so this settles near-ties
+              // and never overrides a real fold or crossing verdict (worth
+              // 1.0 and 10.0 respectively).
+              var ripExcess=Math.max(0,ripPoly(mid)-ripAllow);
+              return exX*10+cd/(Math.PI/6)+ld5*5+back/(n*0.8)+foldErr/(Math.PI/6)+ripExcess*0.15;
             }
             var scB5c=candScore(candTraj.b),scU5=candScore(candTraj.u),scL5=candScore(candTraj.l);
             var scM5=mlsPerV?candScore(candTraj.m):Infinity;
