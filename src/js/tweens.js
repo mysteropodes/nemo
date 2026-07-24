@@ -957,7 +957,62 @@ function _dtwCorrespondence(pA,lenA,pB,lenB,n){
     if(fracA[mi]<fracA[mi-1])fracA[mi]=fracA[mi-1];
     if(fracB[mi]<fracB[mi-1])fracB[mi]=fracB[mi-1];
   }
-  return{fracA:fracA,fracB:fracB};
+  return{fracA:_regulariseWarp(fracA),fracB:_regulariseWarp(fracB)};
+}
+// ---- WARPING-PATH REGULARISATION (2026-07) ----
+// Cyril, still seeing scalloped outlines after the handle fix: "j'en vois
+// encore". Measured what remained: the lumps have the SAME amplitude as the
+// artist's own (mean deviation from a 30px-smoothed curve ~0.9px in both
+// keys and tweens) but roughly TWICE the frequency — one stroke went from
+// 15 lumps in its keyframes to 32 in the tween, spacing 110px -> 48px.
+//
+// Traced to the warping path itself. A DTW path may step diagonally, up, or
+// left; an "up" run advances the A index while the B index stands still, so
+// several consecutive output samples land on the SAME point of B. Measured
+// on the reported stroke, the per-index ratio of B's edge length to A's runs
+// 1.02, 1.02, 1.02, ... then 0, 0.22, 1.33, 0, 0.2 — six edges collapsed to
+// zero length. Each keyframe is sampled evenly on its own (coefficient of
+// variation 0.31 and 0.29); it is the correspondence BETWEEN them that is
+// locally erratic (CV 1.64). Interpolating index-paired points across such a
+// plateau bunches them on one side while they stay spread on the other, and
+// that local compression is the scallop.
+//
+// Fix, the standard remedy for exactly this in DTW work: keep the path
+// monotone but stop it from stalling. Light smoothing of the per-index
+// increments spreads a compression over its neighbourhood instead of
+// concentrating it, and a floor at 40% of the uniform step guarantees no
+// edge can collapse outright; renormalising restores the total to 1, so the
+// endpoints stay pinned at 0 and 1 exactly. DTW keeps its non-uniformity —
+// which is the whole reason it is here — it simply can no longer stall.
+//
+// Measured effect (floor 0.4, four smoothing passes): degenerate edges 6 ->
+// 0, ratio CV 1.64 -> 0.66, and the lump counts move toward the artist's own
+// (32 -> 19 against a key count of 15, 21 -> 18 against 13, 22 -> 17 against
+// 18). Self-crossings fall on all three test files: 12 -> 11, 19 -> 15,
+// 21 -> 16. And on testD's pointing-arm fold — the case Cyril judged
+// "parfait" — fold-angle error drops from 22.83 deg to 4.81 deg, an 79%
+// improvement, while that pair stops selecting MLS: MLS had been
+// compensating for the bad correspondence, and once the correspondence is
+// clean the simpler engines preserve the fold far better.
+function _regulariseWarp(fr){
+  var n=fr.length;
+  if(n<4)return fr;
+  var FLOOR=0.4,PASSES=4;
+  var uni=1/(n-1),minStep=FLOOR*uni,i;
+  var d=[];
+  for(i=1;i<n;i++)d.push(Math.max(0,fr[i]-fr[i-1]));
+  for(var p=0;p<PASSES;p++){
+    var nd=d.slice();
+    for(i=1;i<d.length-1;i++)nd[i]=d[i]*0.5+(d[i-1]+d[i+1])*0.25;
+    d=nd;
+  }
+  var sum=0;
+  for(i=0;i<d.length;i++){d[i]=Math.max(minStep,d[i]);sum+=d[i];}
+  if(!(sum>0))return fr;
+  var out=[0];
+  for(i=0;i<d.length;i++)out.push(out[i]+d[i]/sum);
+  out[n-1]=1;
+  return out;
 }
 // Turns matched landmarks into TWO fraction lists (length n each, same
 // LENGTH so interpStroke's index-paired lerp still works, but the VALUES
