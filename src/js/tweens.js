@@ -12,6 +12,7 @@
 var TW_CURVATURE_DTW=false;
 var TW_CORRECTION_PASS=true;
 var TW_POINT_REDUCTION=true;
+var TW_HANDLE_REHARMONISE=true;
 // ---- MATCHING ----
 function buildTP(sd){var p=new Path({insert:false});sd.segments.forEach(function(s){p.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));});return p;}
 // A stroke's color and fill/stroke "type" are what a viewer actually reads
@@ -1681,6 +1682,155 @@ function buildMLSSegs(rA,rB,per,etv){
 // thetaA[i]/thetaB[i] to float precision — delta comes out ~0 and the
 // 0.01rad skip threshold below no-ops the correction at both ends, same
 // guarantee as every other candidate.
+// ---- HANDLE RE-HARMONISATION (2026-07) ----
+// Cyril, on the generated arm still showing bumps after several rounds:
+// "il n'a pas respecté les courbures du dessin tout le long".
+//
+// Root cause, and it is common to EVERY engine here rather than specific to
+// one — which is why ten separate attempts aimed at individual engines all
+// missed it. Each engine RELOCATES the vertices (intrinsic reintegration,
+// MLS's per-vertex transforms, the fold-correction nudges) but the bezier
+// handles keep coming from the linear A/B blend. The handles then point in
+// directions that no longer agree with the polyline the engine actually
+// produced, so the rendered curve serpentines between vertices that are
+// themselves perfectly placed.
+//
+// The measurement that isolates it — ripple of the POLYLINE versus ripple
+// of the RENDERED curve, same interpolated frame (flips per 100px):
+//
+//   stroke        polyline   rendered    the artist's own key
+//   smrw2qlvl       4.34       24.75            4.31
+//   smrw2qdg8       3.22       13.74            3.18
+//   smrw2r2rm       3.48       14.34            3.82
+//
+// The vertices are already at the artist's own smoothness; all of the visible
+// damage is in the curve drawn between them. That also explains, in
+// retrospect, why smoothing the OUTPUT made things worse (it moved vertices
+// that were already correct), why smoothing MLS's fitted parameters did
+// nothing (wrong layer), and why a polyline-based ripple term could not see
+// this stroke at all.
+//
+// Fix: rebuild every handle from the polyline that came out, keeping the
+// relationship the artist's own handle had with its own edge — its length as
+// a FRACTION of that edge, and its ANGULAR OFFSET from it — interpolated
+// between what A and B each had. One pass, at the end, so all four engines
+// benefit at once and none of them has to be rewritten. Folds are untouched:
+// vertex positions are not modified here, only the curve drawn through them.
+//
+// Endpoint-exact by construction: at et=0 the output polyline IS A's (every
+// engine reduces to identity there), and the interpolated relation is A's own,
+// so each handle is rebuilt to exactly what it was; same at et=1 for B.
+// Ripple of the RENDERED curve (handles included), sampled by arc length:
+// bend-direction reversals per 100px. Comparable across point densities.
+function _renderedRipple(segs,closed){
+  if(!segs||segs.length<6)return 0;
+  var p=new Path({insert:false}),i;
+  for(i=0;i<segs.length;i++){
+    var s=segs[i],hi=s.handleIn||[0,0],ho=s.handleOut||[0,0];
+    p.add(new Segment(new Point(s.point[0],s.point[1]),new Point(hi[0],hi[1]),new Point(ho[0],ho[1])));
+  }
+  if(closed)p.closed=true;
+  var L=p.length;
+  if(!(L>0)){p.remove();return 0;}
+  var N=Math.max(30,Math.min(1500,Math.round(L/3)));
+  var pts=[];
+  for(i=0;i<=N;i++){var q=p.getPointAt(L*i/N);if(q)pts.push([q.x,q.y]);}
+  p.remove();
+  if(pts.length<6)return 0;
+  var t=[];
+  for(i=1;i<pts.length-1;i++){
+    var a1=Math.atan2(pts[i][1]-pts[i-1][1],pts[i][0]-pts[i-1][0]);
+    var a2=Math.atan2(pts[i+1][1]-pts[i][1],pts[i+1][0]-pts[i][0]);
+    t.push(_wrapPI(a2-a1)*180/Math.PI);
+  }
+  var fl=0,pr=0;
+  for(i=1;i<t.length-1;i++){
+    var h=t[i]-(t[i-1]+t[i+1])/2;
+    if((h>0.15&&pr<-0.15)||(h<-0.15&&pr>0.15))fl++;
+    if(Math.abs(h)>0.15)pr=h;
+  }
+  return(fl/L)*100;
+}
+function _reharmoniseHandles(segs,rA,rB,et){
+  if(!TW_HANDLE_REHARMONISE)return segs;
+  var A=rA.segments,B=rB.segments;
+  var n=segs.length;
+  if(n<3||A.length!==n||B.length!==n)return segs;
+  // Verify, then apply — never apply blind. Rebuilding handles is the right
+  // move only where the engine's own handles have drifted out of agreement
+  // with the vertices it produced; where they are already consistent it
+  // costs fidelity. Measured while building this: applying it
+  // unconditionally rescued the badly-mismatched stroke (21.4 -> 6.2) but
+  // degraded two that were already fine (3.2 -> 5.9 and 5.1 -> 8.6). So the
+  // decision is made once per pair, on the real geometry, by building both
+  // and keeping whichever renders smoother — the same verify-then-commit
+  // discipline the fold-correction and point-reduction passes already use.
+  // Decided PER FRAME, not cached on the pair. Every other per-pair verdict
+  // in this file builds its own fixed sample set and is therefore
+  // independent of which frame happens to be generated first; this one is
+  // not, because it can only judge the handles the engine actually emitted.
+  // Caching it cost exactly that: the first call of a span arrives at
+  // et≈0.01, a hair away from keyframe A where nothing is wrong yet, so the
+  // verdict was "no" and froze there for the whole span — measured, the
+  // badly-drifted stroke stayed at 21.4 with the pass enabled. Re-judging
+  // each frame is the same verify-then-commit discipline the fold-correction
+  // pass already applies per round, and it cannot pick wrong for a frame
+  // because it compares the two candidates for THAT frame.
+  //
+  // The margin matters as much as the direction. Ratio of re-harmonised
+  // ripple to original, measured at et 0.15/0.35/0.5/0.65/0.85: the stroke
+  // whose handles had really drifted sits at 0.37/0.32/0.32/0.29/0.33, while
+  // two whose handles were already fine sit at 1.24/1.31/1.25/1.48/1.17 and
+  // 1.12/1.21/1.32/1.19/1.09. Each ratio is stable in et and the groups are
+  // separated by more than 3x, so requiring a substantial win (30% better)
+  // both picks the right strokes and leaves no room for the verdict to flip
+  // mid-span and pop.
+  var closedProbe=et<.5?!!rA.closed:!!rB.closed;
+  var before=_renderedRipple(segs,closedProbe);
+  if(!(before>0.01))return segs;
+  var probe=_reharmoniseCore(segs,A,B,et);
+  return _renderedRipple(probe,closedProbe)<before*0.7?probe:segs;
+}
+function _reharmoniseCore(segs,A,B,et){
+  var n=segs.length;
+  // A handle expressed relative to the edge it spans: [lengthAsFractionOfEdge,
+  // angleOffsetFromEdge]. null when the edge is degenerate and the relation is
+  // undefined — those keep whatever handle they already had.
+  function rel(h,ex,ey){
+    var el=Math.hypot(ex,ey);
+    if(!(el>1e-9))return null;
+    var hl=Math.hypot(h[0],h[1]);
+    if(!(hl>1e-9))return[0,0];
+    return[hl/el,_wrapPI(Math.atan2(h[1],h[0])-Math.atan2(ey,ex))];
+  }
+  var out=new Array(n),i;
+  for(i=0;i<n;i++)out[i]={point:segs[i].point.slice(),handleIn:segs[i].handleIn.slice(),handleOut:segs[i].handleOut.slice()};
+  for(i=0;i<n;i++){
+    if(i<n-1){
+      var ra=rel(A[i].handleOut,A[i+1].point[0]-A[i].point[0],A[i+1].point[1]-A[i].point[1]);
+      var rb=rel(B[i].handleOut,B[i+1].point[0]-B[i].point[0],B[i+1].point[1]-B[i].point[1]);
+      var ox=segs[i+1].point[0]-segs[i].point[0],oy=segs[i+1].point[1]-segs[i].point[1];
+      var ol=Math.hypot(ox,oy);
+      if(ra&&rb&&ol>1e-9){
+        var f=ra[0]+(rb[0]-ra[0])*et,o=ra[1]+_wrapPI(rb[1]-ra[1])*et;
+        var ang=Math.atan2(oy,ox)+o;
+        out[i].handleOut=[Math.cos(ang)*ol*f,Math.sin(ang)*ol*f];
+      }
+    }
+    if(i>0){
+      var ra2=rel(A[i].handleIn,A[i].point[0]-A[i-1].point[0],A[i].point[1]-A[i-1].point[1]);
+      var rb2=rel(B[i].handleIn,B[i].point[0]-B[i-1].point[0],B[i].point[1]-B[i-1].point[1]);
+      var ox2=segs[i].point[0]-segs[i-1].point[0],oy2=segs[i].point[1]-segs[i-1].point[1];
+      var ol2=Math.hypot(ox2,oy2);
+      if(ra2&&rb2&&ol2>1e-9){
+        var f2=ra2[0]+(rb2[0]-ra2[0])*et,o2=ra2[1]+_wrapPI(rb2[1]-ra2[1])*et;
+        var ang2=Math.atan2(oy2,ox2)+o2;
+        out[i].handleIn=[Math.cos(ang2)*ol2*f2,Math.sin(ang2)*ol2*f2];
+      }
+    }
+  }
+  return out;
+}
 function _applyFoldCorrection(segs,rA,et){
   if(!TW_CORRECTION_PASS)return segs;
   var thA=rA._twFoldThA,thB=rA._twFoldThB,w=rA._twFoldW;
@@ -2521,6 +2671,9 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
     }
   }
   segs=_applyFoldCorrection(segs,rA,et);
+  // Runs after EVERY pass that moves vertices, and before reduction (which
+  // rebuilds handles for its own, sparser point set anyway).
+  segs=_reharmoniseHandles(segs,rA,rB,et);
   if(!(rA.isVectorBrush&&rB.isVectorBrush))segs=_applyPointReduction(segs,rA,rB);
   if(rA.isVectorBrush&&rB.isVectorBrush){
     var widths=[];for(var w=0;w<n;w++)widths.push(lerp(rA.widths[w]||1,rB.widths[w]||1,et));
