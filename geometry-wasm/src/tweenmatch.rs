@@ -920,6 +920,47 @@ fn align_cost(a: &ResampledOut, b: &ResampledOut) -> f64 {
     }
     sum
 }
+// Verbatim port of alignTurnDisagreement (tweens.js) — see that function's
+// comment for the measurements and reasoning. Both cost functions above judge
+// a candidate ordering only on where its points land, never on whether index i
+// sits on the same FEATURE in both strokes. On a stroke whose ends come back
+// near each other (an arm outline drawn as one loop), every cyclic rotation
+// becomes a candidate and rotation_fit_residual will buy a small positional
+// gain with a correspondence that pairs elbow against wrist — which the
+// interpolation then detects itself (_twTurnTrust) and reacts to by disabling
+// the intrinsic reconstruction entirely. Scaling the residual by this keeps
+// the factor dimensionless, so it behaves the same on a 20px eye and a 1600px
+// arm, and lets position decide freely among orderings that read as the same
+// shape.
+fn wrap_pi(mut d: f64) -> f64 {
+    // Mirror of _wrapPI (tweens.js): fold an angle difference into (-pi, pi].
+    while d > std::f64::consts::PI {
+        d -= 2.0 * std::f64::consts::PI;
+    }
+    while d < -std::f64::consts::PI {
+        d += 2.0 * std::f64::consts::PI;
+    }
+    d
+}
+fn align_turn_disagreement(a: &ResampledOut, b: &ResampledOut) -> f64 {
+    let m = a.segments.len().min(b.segments.len());
+    let (mut sum, mut cnt) = (0.0, 0usize);
+    let (mut pv_a, mut pv_b) = (f64::NAN, f64::NAN);
+    for i in 1..m {
+        let t_a = (a.segments[i].point[1] - a.segments[i - 1].point[1])
+            .atan2(a.segments[i].point[0] - a.segments[i - 1].point[0]);
+        let t_b = (b.segments[i].point[1] - b.segments[i - 1].point[1])
+            .atan2(b.segments[i].point[0] - b.segments[i - 1].point[0]);
+        if !pv_a.is_nan() {
+            sum += wrap_pi(wrap_pi(t_a - pv_a) - wrap_pi(t_b - pv_b)).abs();
+            cnt += 1;
+        }
+        pv_a = t_a;
+        pv_b = t_b;
+    }
+    if cnt > 0 { sum / cnt as f64 } else { 0.0 } // mean per-vertex turning disagreement, radians
+}
+const ALIGN_TURN_W: f64 = 1.5;
 fn reverse_resampled(r: &ResampledOut) -> ResampledOut {
     let mut segments: Vec<SegOut> =
         r.segments.iter().rev().map(|s| SegOut { point: s.point, handle_in: s.handle_out, handle_out: s.handle_in }).collect();
@@ -997,7 +1038,9 @@ pub fn align_pair(a_json: &str, b_json: &str) -> Result<String, JsValue> {
     let a = a.into_out();
     let b = b.into_out();
     let closed = resampled_is_closed(&a) && resampled_is_closed(&b);
-    let cost_fn = if closed { rotation_fit_residual } else { align_cost };
+    let base_fn = if closed { rotation_fit_residual } else { align_cost };
+    let cost_fn =
+        |x: &ResampledOut, y: &ResampledOut| base_fn(x, y) * (1.0 + ALIGN_TURN_W * align_turn_disagreement(x, y));
     let mut best = b.clone();
     let mut best_cost = cost_fn(&a, &b);
     let rev = reverse_resampled(&b);
