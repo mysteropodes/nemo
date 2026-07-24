@@ -2871,9 +2871,68 @@ function rotationFitResidual(a,b){
 // criterion — there the cyclic candidates are all the SAME loop retraced,
 // spin-vs-shift ambiguity is real, and it's what fixed the 90°-rectangle
 // and rotated-start-star cases.
+// TURNING-AGREEMENT FACTOR (2026-07). Cyril, on testD: "des retournements de
+// traits et mauvais assignement d'intervalle entre les clés... le bout du
+// trait devrait intervaller de l'un à l'autre".
+//
+// Both cost functions above judge a candidate ordering purely on WHERE its
+// points land. Neither asks the question interpStroke cares about most:
+// does index i sit on the same FEATURE in both strokes? For a stroke whose
+// two ends come back near each other — an arm outline drawn as one loop is
+// the common case — resampledIsClosed calls it closed, so every cyclic
+// rotation of B becomes a candidate, and rotationFitResidual (invariant to
+// rotation by construction) is happy to buy a small positional gain with a
+// correspondence that pairs elbow against wrist.
+//
+// That trade is not merely suboptimal, it is self-defeating, because
+// interpStroke measures the very same disagreement further down
+// (_twTurnTrust) and switches the intrinsic reconstruction OFF when the
+// correspondence looks untrustworthy. Measured on the reported right arm
+// (smrw3w2yt_6_, testD span 0-14), over all 152 candidate orderings:
+//
+//   candidate                      position residual   turn disagreement
+//   rotation 42  (what was chosen)      51881                36.9 deg
+//   rotation 0   (identity)             64550                13.9 deg
+//
+// A 20% position gain was bought at the price of the entire engine: 36.9 deg
+// is past the 30 deg cutoff, so _twTurnTrust collapsed to 0, the intrinsic
+// pass was disabled outright, and the pair fell back to plain linear blending
+// — which is what produced the visible fold. The identity ordering scores
+// trust 1.0.
+//
+// So the cost is SCALED by turning agreement rather than having a term added
+// to it: multiplicative keeps it dimensionless against a residual measured in
+// px², so it behaves the same on a 20px eye and a 1600px arm. Among orderings
+// that read as the same shape it still lets position decide; it only refuses
+// to trade away the correspondence itself.
+//
+// Weight: the flip on the case above happens between 0.8 and 0.9, and the
+// result is then bit-identical from 0.9 all the way to 30 (swept) — 1.5 sits
+// well inside that plateau rather than on its edge.
+//
+// Effect, mean/worst fold-angle error over the pairs of each key span,
+// measured on the real vector-brush code path (isVB=true, centerline):
+//   testD 0-14   28.93/168.46 deg -> 1.77/9.27   (-94%)
+//   testC 0-14, 16-31            unchanged, bit-identical
+//   testB 0-13, 17-24            unchanged, bit-identical
+// Healthy pairs are untouched: the factor only bites where a candidate was
+// winning on position while destroying the correspondence.
+function alignTurnDisagreement(a,b){
+  var m=Math.min(a.segments.length,b.segments.length);
+  var sum=0,cnt=0,pvA=null,pvB=null;
+  for(var i=1;i<m;i++){
+    var tA=Math.atan2(a.segments[i].point[1]-a.segments[i-1].point[1],a.segments[i].point[0]-a.segments[i-1].point[0]);
+    var tB=Math.atan2(b.segments[i].point[1]-b.segments[i-1].point[1],b.segments[i].point[0]-b.segments[i-1].point[0]);
+    if(pvA!==null){sum+=Math.abs(_wrapPI(_wrapPI(tA-pvA)-_wrapPI(tB-pvB)));cnt++;}
+    pvA=tA;pvB=tB;
+  }
+  return cnt?sum/cnt:0; // mean per-vertex turning disagreement, radians
+}
+var ALIGN_TURN_W=1.5;
 function alignResampledPairJS(a,b){
   var closed=resampledIsClosed(a)&&resampledIsClosed(b);
-  var costFn=closed?rotationFitResidual:alignCost;
+  var baseFn=closed?rotationFitResidual:alignCost;
+  var costFn=function(x,y){return baseFn(x,y)*(1+ALIGN_TURN_W*alignTurnDisagreement(x,y));};
   var best=b,bestC=costFn(a,b);
   var rev=reverseResampled(b);
   var rc=costFn(a,rev);if(rc<bestC){bestC=rc;best=rev;}
