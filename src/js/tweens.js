@@ -1820,8 +1820,37 @@ function _reduceSegs(segs,keepIdx){
 // probe it eagerly with a cheap LINEAR proxy (plain lerp of rA/rB's own
 // points, not the full MLS/blend pipeline) at a few et samples across the
 // span; reject the whole reduction for this pair if it's worse anywhere.
+// High-frequency curvature roughness: how far each vertex's turning angle
+// sits from the mean of its two neighbours, averaged. A smooth curve
+// (hand-drawn or interpolated) scores near zero; a polyline with vertices
+// stepping out of line with their neighbours — exactly the "saccadé /
+// points en retard" look — scores high. Returns radians.
+function _segsHFRoughness(segs){
+  var n=segs.length;if(n<5)return 0;
+  var t=[];
+  for(var i=1;i<n-1;i++){
+    var p0=segs[i-1].point,p1=segs[i].point,p2=segs[i+1].point;
+    var a1=Math.atan2(p1[1]-p0[1],p1[0]-p0[0]),a2=Math.atan2(p2[1]-p1[1],p2[0]-p1[0]);
+    t.push(_wrapPI(a2-a1));
+  }
+  var acc=0,cnt=0;
+  for(var j=1;j<t.length-1;j++){acc+=Math.abs(t[j]-(t[j-1]+t[j+1])/2);cnt++;}
+  return cnt?acc/cnt:0;
+}
 function _reductionIsSafe(rA,rB,keepIdx,n0){
   var PROBES=[0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]; // dense — a cheap linear proxy, one-time per pair
+  // Curvature budget (2026-07, live-reported "les lignes sont saccadées
+  // par des points en retard... ne préservent pas la courbure générale"):
+  // decimation is allowed to simplify, never to ANGULARIZE. Measured on
+  // the reported file, the unguarded reduction turned a 116-point stroke
+  // whose keyframes score 4.3° into a 20-point one scoring 37.6° — nearly
+  // 10x rougher than anything the artist actually drew. The allowance is
+  // whatever roughness already exists in the source material (both keys
+  // and the un-reduced blend), plus half a degree of slack so a
+  // genuinely-straight stroke collapsing to a few points isn't rejected
+  // over imperceptible sub-degree noise.
+  var ROUGH_SLACK=0.5*Math.PI/180;
+  var allow=Math.max(_segsHFRoughness(rA.segments),_segsHFRoughness(rB.segments));
   for(var p=0;p<PROBES.length;p++){
     var et=PROBES[p],full=new Array(n0);
     for(var i=0;i<n0;i++){
@@ -1831,6 +1860,7 @@ function _reductionIsSafe(rA,rB,keepIdx,n0){
     var red=new Array(keepIdx.length);
     for(var k=0;k<keepIdx.length;k++)red[k]=full[keepIdx[k]];
     if(_segsSelfXCount(red)>_segsSelfXCount(full))return false;
+    if(_segsHFRoughness(red)>Math.max(allow,_segsHFRoughness(full))+ROUGH_SLACK)return false;
   }
   return true;
 }
