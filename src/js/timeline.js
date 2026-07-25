@@ -1870,7 +1870,32 @@ function camGridRowOffset(){
   return r?r.getBoundingClientRect().height:0;
 }
 
+// Every render below empties #frame-grid / #layer-list with innerHTML='',
+// which drops both containers' scroll position to 0 — and since a render
+// fires after almost every edit (a bar drag, a keyframe move, a property
+// change), the timeline kept snapping back to the top mid-gesture.
+// Reported 2026-07-25 with before/after screenshots: "je déplace les out
+// point de calque et là tout descend d'un coup, il faut laisser en place".
+// Horizontal scroll had the same problem, just less visible because the
+// jump only shows once you've scrolled along the timeline.
+//
+// Captured before the wipe, restored after the content is back — the
+// restore has to run while the new rows already give the container its
+// full scrollHeight, or the assignment is clamped to a stale (smaller)
+// maximum and quietly lands short.
+function _tlScrollSnapshot(){
+  var wrap=document.getElementById('fg-wrap'),panel=document.getElementById('layer-list');
+  return {wrap:wrap,panel:panel,
+    top:wrap?wrap.scrollTop:0,left:wrap?wrap.scrollLeft:0,
+    panelTop:panel?panel.scrollTop:0};
+}
+function _tlScrollRestore(s){
+  if(!s)return;
+  if(s.wrap){s.wrap.scrollTop=s.top;s.wrap.scrollLeft=s.left;}
+  if(s.panel)s.panel.scrollTop=s.panelTop;
+}
 function renderTimeline(){
+  var _scroll=_tlScrollSnapshot();
   var hdr=document.getElementById('frame-hdr'),grid=document.getElementById('frame-grid');hdr.innerHTML='';grid.innerHTML='';
   var fps=Math.max(1,state.fps);
   for(var i=0;i<state.totalFrames;i++){
@@ -2051,6 +2076,7 @@ function renderTimeline(){
     document.getElementById('frame-grid').style.visibility='hidden';
     SMMotionGraph.render();
   }
+  _tlScrollRestore(_scroll);
 }
 // ---- TWEEN EASING CURVE STRIPS (toggle: btn-tween-curves) ----
 // Purely additive display, complements the global/per-pair easing system —
@@ -3207,13 +3233,14 @@ function paintFillSwatches(v){
   var fhex=document.getElementById('p-fill-hex');if(fhex&&document.activeElement!==fhex)fhex.value=hexDisplayValue(v);
 }
 function renderLayerList(){
+  var _scroll=_tlScrollSnapshot(); // see _tlScrollSnapshot — same wipe, same jump
   var list=document.getElementById('layer-list');list.innerHTML='';
   // Motion mode: expandable Transform property rows instead of the plain
   // per-layer row list — see motion.js's own header comment for why this
   // is a full early return rather than a branch woven through the rest of
   // this function (folders/link-groups/components have no meaning yet in
   // Motion mode's v1 scope).
-  if(state.appMode==='motion'){if(window.SMMotion)SMMotion.renderLayerListMotion(list);return;}
+  if(state.appMode==='motion'){if(window.SMMotion)SMMotion.renderLayerListMotion(list);_tlScrollRestore(_scroll);return;}
   if(window.SMCamera)SMCamera.renderPanelRow(list);
   var order=computeLayerRenderOrder();
   order.forEach(function(entry){
@@ -3443,6 +3470,7 @@ function renderLayerList(){
   // and interactively a layer row: name + mute + volume live here now
   // instead of overlapping the waveform strip in the frame grid.
   if(window.SMAudio)window.SMAudio.renderStrip();
+  _tlScrollRestore(_scroll);
 }
 // Manual mouse-based drag-to-reorder (kept consistent with the frame grid's
 // custom drag rather than HTML5 draggable, which behaves inconsistently
