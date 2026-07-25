@@ -1883,6 +1883,31 @@ function camGridRowOffset(){
 // restore has to run while the new rows already give the container its
 // full scrollHeight, or the assignment is clamped to a stale (smaller)
 // maximum and quietly lands short.
+// #playhead is position:absolute inside #fg-wrap, so it scrolls WITH the
+// content: as soon as you scrolled down, its top edge — and with it the
+// numbered flag that is the whole grab affordance — slid up out of the
+// viewport, and the line looked cut short (2026-07-25: "le timecursor
+// disparaît quand on scroll", with a before/after screenshot).
+// Pinning it to the viewport instead: top follows scrollTop, height is the
+// visible height, so the flag always sits at the ruler and the line always
+// spans exactly what you can see. Only the VERTICAL axis — `left` stays
+// content-relative (currentFrame*FC), which is what makes it scroll
+// correctly sideways with the frames it points at.
+function syncPlayheadToViewport(){
+  var wrap=document.getElementById('fg-wrap'),ph=document.getElementById('playhead');
+  if(!wrap||!ph)return;
+  ph.style.top=wrap.scrollTop+'px';
+  ph.style.height=Math.max(0,wrap.clientHeight)+'px';
+}
+(function bindPlayheadScrollSync(){
+  function bind(){
+    var wrap=document.getElementById('fg-wrap');
+    if(!wrap)return;
+    wrap.addEventListener('scroll',syncPlayheadToViewport);
+    syncPlayheadToViewport();
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind);else bind();
+})();
 function _tlScrollSnapshot(){
   var wrap=document.getElementById('fg-wrap'),panel=document.getElementById('layer-list');
   return {wrap:wrap,panel:panel,
@@ -2078,14 +2103,7 @@ function renderTimeline(){
   // list too (that case was already correct).
   var awrap=document.getElementById('fg-wrap');
   document.getElementById('playhead').style.left=(state.currentFrame*FC)+'px';
-  // Fallback height = the wrap's own viewport, so the scrub line always
-  // reaches the bottom of the visible area even with few rows. It briefly
-  // stopped doing that (2026-07-25, "la barre verticale de scrubbing a
-  // complètement été remontée") while #fg-wrap carried a margin-bottom to
-  // clear the button band — the viewport shrank, and so did this. The band
-  // is now a separate strip (#fg-hscroll) outside the wrap, so the viewport
-  // is whole again and no correction belongs here.
-  document.getElementById('playhead').style.height=Math.max(30+rowCount*ROW_H+camGridRowOffset(),awrap?awrap.clientHeight:0)+'px';
+  syncPlayheadToViewport();
   document.getElementById('playhead-flag').textContent=state.currentFrame+1;
   if(window.SMAudio)SMAudio.renderStrip();
   renderTweenCurveStrips();

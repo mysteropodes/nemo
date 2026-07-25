@@ -344,6 +344,14 @@
   // initWaDrag: window-level mousemove/mouseup, not a per-drag add/remove
   // pair) — only one bar (or group) can be dragged at a time anyway.
   var _drag = null; // {li, row, type:'in'|'out'|'both', startX, origIn, origOut} | {group:true, type:'in'|'out'|'both', startX, members:[{li,row,origIn,origOut}]}
+  // Keyframes selected when a bar drag STARTS travel with it — the same
+  // rectangle now selects bars and keys together (see layer-inout's own
+  // marquee forward), so "move the in point and take these keys along" is
+  // the natural next gesture. Captured at mousedown because the drag
+  // re-renders the grid, and a re-render rebuilds the key diamonds.
+  function keySelNow() {
+    return (window.SMMotion && SMMotion.getKeySelection) ? SMMotion.getKeySelection() : [];
+  }
   function onDown(li, row, type, e) {
     e.stopPropagation(); e.preventDefault();
     var ld = state.layers[li]; if (!ld) return;
@@ -373,10 +381,10 @@
         if (!mld || !mrow) return null;
         return { li: s.li, row: mrow, origIn: inPointOf(mld), origOut: outPointOf(mld) };
       }).filter(Boolean);
-      _drag = { group: true, type: type, startX: e.clientX, members: members, alt: !!e.altKey };
+      _drag = { group: true, type: type, startX: e.clientX, members: members, alt: !!e.altKey, keySel: keySelNow() };
       return;
     }
-    _drag = { li: li, row: row, type: type, startX: e.clientX, origIn: inPointOf(ld), origOut: outPointOf(ld), alt: !!e.altKey };
+    _drag = { li: li, row: row, type: type, startX: e.clientX, origIn: inPointOf(ld), origOut: outPointOf(ld), alt: !!e.altKey, keySel: keySelNow() };
   }
   document.addEventListener('mousemove', function (e) {
     updateMarquee(e);
@@ -479,12 +487,49 @@
     // silently ignored.
     var defaultRetimes = d.type !== 'out' && (d.type === 'both' || !!state.activeSymbolId);
     var altHeld = !!(d.alt || (upEv && upEv.altKey));
+    // Alt has ONE meaning at a time, decided by whether keys were picked:
+    //   - no selection -> it inverts the layer-wide default above
+    //   - a selection  -> it means "leave those keys where they are", and
+    //     must NOT also flip the layer-wide default, or the keys the user
+    //     just asked to leave alone would be moved by that pass instead
+    //     (measured: an Alt in-drag with 2 keys selected moved them -11
+    //     anyway, through shiftLayerMotionKeys).
+    var hasKeySel = !!(d.keySel && d.keySel.length);
     if (altHeld && d.type === 'out') {
       if (window.showToast) showToast('Rogner la fin ne déplace jamais les keyframes — utilise le point d\'entrée ou le corps de la barre');
     }
-    var retimes = (altHeld && d.type !== 'out') ? !defaultRetimes : defaultRetimes;
-    if (altHeld && d.type !== 'out' && window.showToast) {
+    var retimes = (altHeld && !hasKeySel && d.type !== 'out') ? !defaultRetimes : defaultRetimes;
+    if (altHeld && !hasKeySel && d.type !== 'out' && window.showToast) {
       showToast(retimes ? 'Keyframes déplacées avec le calque' : 'Fenêtre de visibilité seule — keyframes laissées en place');
+    }
+    if (altHeld && hasKeySel && window.showToast) showToast('Keyframes sélectionnées laissées en place');
+    // An explicit keyframe selection travels with the handle, whatever the
+    // handle's own retime default is (2026-07-25: "il faut pouvoir bouger
+    // les in/out point de calque avec les keyframes selectionnées aussi").
+    // Deliberately NOT gated on `retimes`: that flag encodes what should
+    // happen to the layer's OWN content when nothing was picked — an IN
+    // trim outside a component leaves it alone — but picking keys is an
+    // instruction, and it would be silently ignored otherwise (measured:
+    // the in point moved 29 -> 40 while the selected key stayed at 22).
+    // Alt still means "leave the keyframes where they are", so it opts out.
+    var selDx = 0;
+    if (hasKeySel && !altHeld) {
+      if (d.group) {
+        // Every member moved by the same delta — read it off the first one
+        // that actually moved.
+        d.members.some(function (m) {
+          var mld = state.layers[m.li]; if (!mld) return false;
+          selDx = (d.type === 'out' ? outPointOf(mld) - m.origOut : inPointOf(mld) - m.origIn);
+          return !!selDx;
+        });
+      } else {
+        var sld = state.layers[d.li];
+        if (sld) selDx = (d.type === 'out' ? outPointOf(sld) - d.origOut : inPointOf(sld) - d.origIn);
+      }
+      if (selDx && window.SMMotion && SMMotion.shiftKeySelection) {
+        SMMotion.shiftKeySelection(d.keySel, selDx);
+        if (window.showToast) showToast(d.keySel.length + ' keyframe(s) déplacée(s) avec le calque');
+      }
     }
     if (retimes && window.SM && window.SM.shiftLayerFrames) {
       var dxOf = function (ld, orig) { return inPointOf(ld) - orig.origIn; };
@@ -493,9 +538,26 @@
       // which used to stay put (2026-07-25): the layer landed on new frames
       // still animating on its old schedule. Both, or the retime is only
       // half done.
+      // An explicit keyframe selection WINS over the layer-wide shift: if
+      // the user picked keys, those are the ones that move, and moving them
+      // twice (once here, once via the layer-wide pass) would double the
+      // offset. Layers with no selected key still shift wholesale.
+      var selLayers = {};
+      (d.keySel || []).forEach(function (s) {
+        var i = state.layers.indexOf(s.holder);
+        if (i >= 0) selLayers[i] = 1;
+        else state.layers.forEach(function (ld2, li2) {
+          // per-element holder: find the layer that owns it
+          if (ld2.elementMotion) Object.keys(ld2.elementMotion).forEach(function (k) { if (ld2.elementMotion[k] === s.holder) selLayers[li2] = 1; });
+        });
+      });
       var retimeOne = function (li, dx) {
         if (!dx) return;
         window.SM.shiftLayerFrames(li, dx);
+        // With an explicit selection, the layer-wide key pass is off entirely:
+        // the picked keys are the ones that move (or, under Alt, the ones that
+        // deliberately don't) — sweeping the rest along would contradict both.
+        if (hasKeySel) return;
         if (window.SMMotion && SMMotion.shiftLayerMotionKeys) SMMotion.shiftLayerMotionKeys(li, dx);
       };
       if (d.group) {

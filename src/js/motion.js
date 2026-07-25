@@ -3356,6 +3356,29 @@
     elementLabel: elementLabel,
     distributeKeys: distributeKeys, flipKeys: flipKeys, selectEveryNthKey: selectEveryNthKey, invertKeySelection: invertKeySelection,
     getKeySelection: function () { return _motionKeySel.slice(); },
+    // Move an explicit set of keys by dx frames — used by layer-inout.js so
+    // that dragging a layer's in/out point carries the SELECTED keyframes
+    // with it (2026-07-25: "il faut pouvoir bouger les in/out point de
+    // calque avec les keyframes selectionnées aussi"). Takes the selection
+    // captured at drag START, not the live one: the drag itself re-renders
+    // the grid, and a re-render rebuilds the diamonds.
+    shiftKeySelection: function (sel, dx) {
+      if (!sel || !sel.length || !dx) return false;
+      var total = state.totalFrames, tracks = [];
+      sel.forEach(function (s) {
+        if (!s || !s.key) return;
+        s.key.frame = Math.max(0, Math.min(total - 1, s.key.frame + dx));
+        var t = s.holder && s.holder.motion && s.holder.motion[s.prop];
+        if (t && tracks.indexOf(t) < 0) tracks.push(t);
+      });
+      // Clamping at the edges can stack two keys on one frame — same
+      // collapse rule as shiftLayerMotionKeys, keeping the earliest.
+      tracks.forEach(function (t) {
+        sortKeys(t);
+        for (var i = t.keys.length - 1; i > 0; i--) if (t.keys[i].frame === t.keys[i - 1].frame) t.keys.splice(i, 1);
+      });
+      return true;
+    },
     // Lets the graph editor drive the SAME selection the track view uses, so
     // clicking a point on a curve lights up its diamond and makes F9 / Delete
     // / copy behave identically from either view. Without this the two views
