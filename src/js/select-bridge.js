@@ -1433,6 +1433,23 @@
         }
       });
     }
+    // Stroke profiles (Sander van Dijk 6.2). Offered on any selection that
+    // holds at least one open path: a profile turns a flat stroke into a
+    // variable-width filled ribbon, which is also what makes a gradient run
+    // ALONG the stroke rather than across it (his 6.3, free once the stroke
+    // is a fill).
+    var profilable = (window.selectedPaths || []).some(function (p) { return p && p.segments && p.segments.length >= 2; });
+    if (profilable) {
+      items.push({ sep: true });
+      items.push({ label: 'Profil de contour :', disabled: true, action: function () {} });
+      [['taper-both', '   • effilé aux deux bouts'],
+       ['taper-in', '   • effilé au début'],
+       ['taper-out', '   • effilé à la fin'],
+       ['bulge', '   • renflé au centre'],
+       ['even', '   • épaisseur constante (ruban)']].forEach(function (o) {
+        items.push({ label: o[1], action: function () { window.SM.applyStrokeProfile(o[0]); } });
+      });
+    }
     window.showContextMenu(e.clientX, e.clientY, items);
   }
 

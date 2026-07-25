@@ -787,6 +787,19 @@ window.SM={
   renameLayer:function(idx,n){state.layers[idx].name=n;updateUI();},
   reorderLayer:function(fromIdx,toIdx){reorderLayer(fromIdx,toIdx);},
   reorderLayersBatch:function(fromIndices,toIdx){reorderLayersBatch(fromIndices,toIdx);},
+  // Stroke profiles (van Dijk 6.2). Acts on the current canvas selection;
+  // one undo step for the whole batch, like every other selection command.
+  applyStrokeProfile:function(kind){
+    var paths=(window.selectedPaths||[]).filter(function(p){return p&&p.segments;});
+    if(!paths.length){showToast('Sélectionne un ou plusieurs traits');return;}
+    pushUndo();
+    var done=0,skipped=0;
+    paths.forEach(function(p){ if(applyStrokeProfileToPath(p,kind))done++; else skipped++; });
+    saveActiveLayerFrame();
+    loadFrame(state.currentFrame);updateUI();
+    if(window.SMEngineBridge)SMEngineBridge.renderNow();
+    showToast(done?(done+' trait(s) profilé(s)'+(skipped?' — '+skipped+' ignoré(s)':'')):'Aucun trait convertible dans la sélection');
+  },
   convertActiveLayerToComponent:function(){
     if(_layerSel.length>1)convertLayersToComponent(_layerSel);
     else convertLayerToComponent(state.activeLayerIdx);

@@ -3719,6 +3719,86 @@ function applyTaperToCenterSegments(segs,taperFrac){
 // Rebuilds the visible filled outline of a centerline-driven path from its
 // current data.centerSegments + per-anchor widths. Call after any edit to
 // the centerline (node drag) or after generating an interpolated frame.
+// ---- STROKE PROFILES (Sander van Dijk 6.2 "Taper Shape Layer Strokes",
+// 6.3 "Stroke Gradients", 2026-07-26) ----------------------------------
+// AE can only stroke a path at ONE width, so he asks for tapering and for
+// gradients that run ALONG a stroke rather than across it. Nemo already has
+// both capabilities — they are what the pressure brush is made of: a
+// centreline (data.centerSegments, each anchor carrying its own width) that
+// rebuildVectorBrushOutline turns into a FILLED ribbon. What was missing is
+// a way to put an existing path into that machinery after the fact.
+//
+// So 6.2 is a conversion, and 6.3 comes free with it: once the stroke is a
+// filled outline, the gradient system that already paints fills paints it
+// along the ribbon, with no renderer change at all.
+function strokeProfileWidthFn(kind, base) {
+  var floor = taperFloorWidth();
+  var span = Math.max(0, base - floor);
+  switch (kind) {
+    // Ramp lengths differ on purpose: a single-ended taper reads better
+    // over a longer run, a double-ended one has to leave a body in between.
+    case 'taper-in':   return function (t) { return floor + span * Math.min(1, t / 0.35); };
+    case 'taper-out':  return function (t) { return floor + span * Math.min(1, (1 - t) / 0.35); };
+    case 'taper-both': return function (t) { return taperWidthAtFrac(t, base, 0.18); };
+    case 'bulge':      return function (t) { return floor + span * Math.sin(Math.PI * Math.min(1, Math.max(0, t))); };
+    case 'even':       return function () { return base; };
+    default:           return function () { return base; };
+  }
+}
+// Applies a width profile to ONE path, in place. In place matters: the path
+// keeps its identity, so strokeId (tween matching), groupId, channelTag,
+// ownerId, its z-order and every other data.* tag survive untouched — the
+// exact "new item type handled in one reader but not the others" risk
+// CLAUDE.md §1 warns about, avoided by never creating a new item.
+function applyStrokeProfileToPath(path, kind, baseOverride) {
+  if (!path || !(path instanceof Path)) return false; // CompoundPath: no single centreline
+  if (!path.segments || path.segments.length < 2) return false;
+  var already = !!(path.data && path.data.isVectorBrush && path.data.centerSegments && path.data.centerSegments.length > 1);
+  var base = baseOverride || (already ? (path.data.profileBase || state.brushSize) : (path.strokeWidth || state.brushSize));
+  var fn = strokeProfileWidthFn(kind, base);
+  // The profile has to go into the DENSE widthProfile, not only into the
+  // per-anchor widths. rebuildVectorBrushOutline interpolates linearly
+  // BETWEEN anchors, so on a 2-anchor path (a straight line drawn with the
+  // Line tool — the most obvious thing to taper) a taper-both would set both
+  // ends to the floor width and the interpolation would make the whole
+  // stroke a hairline: the taper is not just invisible, it eats the stroke.
+  // Measured before this fix: widths [0.6, 0.6] for a base of 3, and `bulge`
+  // came out identical to `taper-both`.
+  function denseProfile(f) {
+    var out = [], N = 64;
+    for (var i = 0; i <= N; i++) { var t = i / N; out.push({ t: t, width: f(t) }); }
+    return out;
+  }
+  if (already) {
+    // Re-profile the EXISTING centreline. Re-deriving it from path.segments
+    // would be wrong: those are the outline by now, not the centreline.
+    var cs = path.data.centerSegments;
+    var lens = [0];
+    for (var i = 1; i < cs.length; i++) lens.push(lens[i - 1] + new Point(cs[i].point).getDistance(new Point(cs[i - 1].point)));
+    var total = lens[lens.length - 1] || 1;
+    cs.forEach(function (sg, i2) { sg.width = fn(lens[i2] / total); });
+    path.data.widthProfile = denseProfile(fn);
+  } else {
+    var ink = path.strokeColor || path.fillColor;
+    if (!ink) return false; // nothing to paint the ribbon with
+    // buildCenterSegmentsFromPath always writes a numeric .width — several
+    // readers (scaleCenterSegments, setBrushSize, resample) index .width
+    // with no default and would produce NaN geometry without it.
+    path.data.centerSegments = buildCenterSegmentsFromPath(path, fn);
+    path.data.widthProfile = denseProfile(fn);
+    path.data.isVectorBrush = true;
+    // The ribbon is FILLED. serP forces strokeColor to null for any
+    // isVectorBrush item and desP nulls the fill when it is falsy, so an
+    // ink left in strokeColor would come back invisible after one
+    // save/reload — the failure is delayed, which is what makes it nasty.
+    path.fillColor = ink;
+    path.strokeColor = null;
+  }
+  path.data.profileBase = base;
+  path.data.strokeProfile = kind;
+  rebuildVectorBrushOutline(path); // synchronous: nothing else ever calls it
+  return true;
+}
 function rebuildVectorBrushOutline(path){
   var cs=path.data&&path.data.centerSegments;
   if(!cs||cs.length<2)return;
