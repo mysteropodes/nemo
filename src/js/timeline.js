@@ -1934,6 +1934,17 @@ function renderTimeline(){
   // across. Sizing it explicitly to match fixes the seam.
   var barsRow=document.getElementById('bars-row');
   if(barsRow)barsRow.style.width=(state.totalFrames*FC)+'px';
+  // #frame-hdr needs the SAME explicit width, for the same reason — the
+  // comment above claimed flexbox sized it from its .fhc children, but it
+  // is a flex-direction:column CHILD of #fg-wrap, so its width is its CROSS
+  // axis and follows the container, not the content. Measured: 779px box
+  // around 844px of cells. The ruler's own background therefore stopped
+  // partway across, and whatever sits behind it showed through at ruler
+  // height once scrolled — reported 2026-07-25 as "des layers qui
+  // apparaissent au niveau des rulers de timing en haut à droite". Exactly
+  // the #bars-row and #frame-grid bug, in the one place it was assumed not
+  // to apply.
+  hdr.style.width=(state.totalFrames*FC)+'px';
   // Bug found 2026-07 ("le highlight d'un layer selectionné ne va pas
   // jusqu'au bout de la timeline") — same root cause family as #bars-row
   // above, one level down: #frame-grid is `flex-direction:column`, so

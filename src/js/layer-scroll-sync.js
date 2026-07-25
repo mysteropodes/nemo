@@ -50,33 +50,7 @@
     // own 'scroll' event, which would otherwise bounce back and forth.
     var syncing = false;
 
-    // ---- horizontal: #fg-hscroll, the strip down in the bottom band ----
-    // #fg-wrap's own horizontal bar is suppressed in CSS: it would be drawn
-    // at the bottom of the scroll VIEWPORT, and that viewport has to stop at
-    // the separator line so the grid shows exactly the rows the layer panel
-    // does. The strip below the line carries it instead, mirrored both ways
-    // and kept as wide as the grid's content.
-    var hs = document.getElementById('fg-hscroll');
-    var hsInner = document.getElementById('fg-hscroll-inner');
-    var hSyncing = false;
-    function syncWidth() {
-      if (!hsInner) return;
-      var w = grid.scrollWidth;
-      if (hsInner._w !== w) { hsInner._w = w; hsInner.style.width = w + 'px'; }
-    }
-    if (hs && hsInner) {
-      hs.addEventListener('scroll', function () {
-        if (hSyncing) return; hSyncing = true;
-        grid.scrollLeft = hs.scrollLeft; hSyncing = false;
-      });
-      grid.addEventListener('scroll', function () {
-        if (hSyncing) return; hSyncing = true;
-        hs.scrollLeft = grid.scrollLeft; hSyncing = false;
-      });
-    }
-
     function equalize() {
-      syncWidth();
       // Zero it first so the measurement below reads the CONTENT's own
       // height rather than last call's compensation (idempotent).
       spacer.style.height = '0px';
