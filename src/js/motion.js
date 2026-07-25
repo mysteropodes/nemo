@@ -53,10 +53,25 @@
     if (holder && holder.timeRemap) return PROPS.concat(['timeRemap']);
     return PROPS;
   }
+  // THE track resolver (2026-07-26). Every transform property's track lives
+  // in holder.motion[prop] — except timeRemap, which predates its own row
+  // here and lives at ld.timeRemap (enableTimeRemap; consumed by app.js's
+  // resolveSymbolFrameIdx, exported/imported as its own layer field). Found
+  // live: the Time Remap row rendered with ZERO keys — every panel/grid
+  // site resolved `holder.motion['timeRemap']` (undefined), so the two keys
+  // enableTimeRemap creates were invisible, unclickable, undraggable. Any
+  // code that can meet prop === 'timeRemap' (everything inside a propsFor
+  // loop, every _motionKeySel consumer) MUST resolve through this — reading
+  // holder.motion[prop] directly is only safe in PROPS-only loops.
+  function trackFor(holder, prop) {
+    if (!holder) return null;
+    if (prop === 'timeRemap') return holder.timeRemap || null;
+    return (holder.motion && holder.motion[prop]) || null;
+  }
   var PROP_LABEL = { position: 'Position', anchor: 'Anchor Point', rotation: 'Rotation', scale: 'Scale', opacity: 'Opacity', timeRemap: 'Time Remap' };
   var PROP_DIM = { position: 2, anchor: 2, rotation: 1, scale: 2, opacity: 1, timeRemap: 1 };
   var PROP_UNIT = { position: 'px', anchor: 'px', rotation: '°', scale: '%', opacity: '%', timeRemap: 'f' };
-  var PROP_DEFAULT = { position: [0, 0], anchor: [0, 0], rotation: [0], scale: [100, 100], opacity: [100] };
+  var PROP_DEFAULT = { position: [0, 0], anchor: [0, 0], rotation: [0], scale: [100, 100], opacity: [100], timeRemap: [0] };
   // AE's own shortcuts: P/A/R/S/T reveal just that property's row. Kept as
   // a lookup table (not hardcoded in the keydown handler) so the property
   // list and its shortcuts can't silently drift apart.
@@ -225,7 +240,7 @@
     pushUndo();
     var n = 0;
     sel.forEach(function (s) {
-      var track = s.holder && s.holder.motion && s.holder.motion[s.prop];
+      var track = trackFor(s.holder, s.prop);
       if (!track) return;
       if (kind === 'hold') { s.key.hold = !s.key.hold; n++; return; }
       var outPts = kind === 'linear' ? CURVE_LINEAR : (kind === 'easeIn' ? CURVE_EASE_IN : (kind === 'easeOut' ? CURVE_EASE_OUT : CURVE_EASE));
@@ -257,7 +272,7 @@
     if (!sel || !sel.length || !delta) return 0;
     var groups = {};
     sel.forEach(function (s) {
-      var track = s.holder && s.holder.motion && s.holder.motion[s.prop];
+      var track = trackFor(s.holder, s.prop);
       if (!track) return;
       var id = (s.holder.uid || state.layers.indexOf(s.holder)) + '|' + s.prop;
       (groups[id] || (groups[id] = { track: track, keys: [] })).keys.push(s.key);
@@ -290,7 +305,7 @@
     pushUndo();
     var n = 0;
     sel.forEach(function (s) {
-      var track = s.holder && s.holder.motion && s.holder.motion[s.prop];
+      var track = trackFor(s.holder, s.prop);
       if (!track) return;
       var i = track.keys.indexOf(s.key);
       if (i >= 0) { track.keys.splice(i, 1); n++; }
@@ -396,11 +411,14 @@
   // state.layers[i].motionStatic = {position:[x,y], ...} for a property
   // that has a non-default value but ISN'T keyframed (stopwatch off) ----
   function ensureTrack(ld, prop) {
+    // timeRemap's track is NOT in ld.motion (see trackFor) — creating
+    // ld.motion.timeRemap here would make a shadow track no evaluator reads.
+    if (prop === 'timeRemap') { if (!ld.timeRemap) ld.timeRemap = { keys: [] }; return ld.timeRemap; }
     if (!ld.motion) ld.motion = {};
     if (!ld.motion[prop]) ld.motion[prop] = { keys: [] };
     return ld.motion[prop];
   }
-  function hasKeys(ld, prop) { return !!(ld.motion && ld.motion[prop] && ld.motion[prop].keys.length); }
+  function hasKeys(ld, prop) { var t = trackFor(ld, prop); return !!(t && t.keys && t.keys.length); }
   function isAnimated(ld, prop) { return hasKeys(ld, prop); }
   function sortKeys(track) { track.keys.sort(function (a, b) { return a.frame - b.frame; }); }
   function keyAt(track, frame) { return track.keys.find(function (k) { return k.frame === frame; }) || null; }
@@ -445,7 +463,7 @@
     return last.v[0];
   }
   function rawValueAtFrame(ld, prop, frame) {
-    var track = ld.motion && ld.motion[prop];
+    var track = trackFor(ld, prop);
     if (!track || !track.keys.length) return staticValue(ld, prop);
     var ks = track.keys;
     if (frame <= ks[0].frame) return ks[0].v.slice();
@@ -553,7 +571,7 @@
   // equivalent. No-op (returns the un-looped raw value) if the property
   // has fewer than 2 keys — nothing to loop.
   function loopOutRaw(holder, prop, frame) {
-    var track = holder.motion && holder.motion[prop];
+    var track = trackFor(holder, prop);
     if (!track || track.keys.length < 2) return rawValueAtFrame(holder, prop, frame);
     var first = track.keys[0].frame, last = track.keys[track.keys.length - 1].frame;
     var span = last - first;
@@ -673,7 +691,7 @@
   // global tween curve. Dragging/adding/deleting points in the widget
   // mutates `seg.curvePoints` in place.
   function openMotionEaseEditor(ld, prop) {
-    var track = ld.motion && ld.motion[prop];
+    var track = trackFor(ld, prop);
     if (!track || !track.keys.length) { if (window.showToast) showToast('Anime d’abord ' + PROP_LABEL[prop] + ' (icône chrono) pour avoir une courbe'); return; }
     // Auto-create the missing second key — explicit request ("créer les
     // clés manquantes si il le faut"): a single-key track has nothing to
@@ -710,7 +728,7 @@
     return keyAt(track, state.currentFrame);
   }
   function removeKeyAtCurrentFrame(ld, prop) {
-    var track = ld.motion && ld.motion[prop];
+    var track = trackFor(ld, prop);
     if (!track) return;
     var i = track.keys.findIndex(function (k) { return k.frame === state.currentFrame; });
     if (i >= 0) track.keys.splice(i, 1);
@@ -756,6 +774,15 @@
     }
   }
   function toggleAnimated(ld, prop) {
+    // The Time Remap row's stopwatch IS the remap switch (AE behavior) —
+    // there is no "static timeRemap" fallback to freeze into, the feature
+    // is either on (track exists) or off (field deleted, default playback).
+    if (prop === 'timeRemap') {
+      var tli = state.layers.indexOf(ld);
+      if (tli < 0) return;
+      ld.timeRemap ? disableTimeRemap(tli) : enableTimeRemap(tli);
+      return;
+    }
     if (isAnimated(ld, prop)) {
       var v = valueAtFrame(ld, prop, state.currentFrame);
       if (!ld.motion) ld.motion = {};
@@ -2177,7 +2204,7 @@
       pr._smHolder = holder; pr._smProp = prop;
       var sw = document.createElement('div');
       var swOn = isAnimated(holder, prop);
-      var hasKeyHere = swOn && !!keyAt(holder.motion[prop], state.currentFrame);
+      var hasKeyHere = swOn && !!keyAt(trackFor(holder, prop), state.currentFrame);
       // Single diamond, three states — merges what used to be two separate
       // icons (this stopwatch AND a second .motion-addkey diamond appended
       // after the value fields further down): they always showed the exact
@@ -2197,6 +2224,14 @@
         e.stopPropagation(); pushUndo();
         if (!swOn) {
           toggleAnimated(holder, prop); // OFF->ON: first key at the current frame (see toggleAnimated's own comment)
+        } else if (prop === 'timeRemap') {
+          // No static-freeze fallback for timeRemap (see toggleAnimated) —
+          // with a key here, removing down to one key is fine, but killing
+          // the LAST pair means "turn remapping off", which has its own
+          // proper off-switch.
+          if (hasKeyHere && trackFor(holder, prop).keys.length > 1) removeKeyAtCurrentFrame(holder, prop);
+          else if (hasKeyHere) toggleAnimated(holder, prop);
+          else setKeyAtCurrentFrame(holder, prop, valueAtFrame(holder, prop, state.currentFrame));
         } else if (hasKeyHere) {
           // Removing the LAST key would drop the property back to its
           // neutral default — freeze the current value as a static
@@ -2726,7 +2761,7 @@
     // holder/prop does this row belong to" from a DOM hit-test without
     // threading extra state through render calls).
     rowEl._smHolder = ld; rowEl._smProp = prop;
-    var track = ld.motion && ld.motion[prop];
+    var track = trackFor(ld, prop);
     var w = state.totalFrames * FC;
     var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('width', w); svg.setAttribute('height', ROW_H);
@@ -2827,10 +2862,10 @@
         c.addEventListener('contextmenu', function (e) {
           e.preventDefault(); e.stopPropagation();
           goToFrame(frameIdx);
-          var track = ld.motion && ld.motion[prop];
+          var track = trackFor(ld, prop);
           var menu = [
             key
-              ? { label: 'Supprimer cette clé', action: function () { pushUndo(); var tr = ld.motion[prop]; tr.keys.splice(tr.keys.indexOf(key), 1); renderTimeline(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); } }
+              ? { label: 'Supprimer cette clé', action: function () { pushUndo(); var tr = trackFor(ld, prop); tr.keys.splice(tr.keys.indexOf(key), 1); renderTimeline(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); } }
               : { label: 'Ajouter une clé ici', action: function () { pushUndo(); setKeyAtCurrentFrame(ld, prop, isAnimated(ld, prop) ? valueAtFrame(ld, prop, frameIdx) : staticValue(ld, prop)); renderLayerList(); renderTimeline(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); } },
           ];
           if (track && track.keys.length) {
@@ -3026,7 +3061,7 @@
       var first = sorted[0].frame, last = sorted[sorted.length - 1].frame;
       var step = (last - first) / (sorted.length - 1);
       sorted.forEach(function (k, i) { k.frame = Math.round(first + step * i); });
-      sortKeys(g.holder.motion[g.prop]);
+      sortKeys(trackFor(g.holder, g.prop));
     });
     renderTimeline();
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
@@ -3039,7 +3074,7 @@
       var sorted = g.items.slice().sort(function (a, b) { return a.frame - b.frame; });
       var slots = sorted.map(function (k) { return k.frame; }).reverse();
       sorted.forEach(function (k, i) { k.frame = slots[i]; });
-      sortKeys(g.holder.motion[g.prop]);
+      sortKeys(trackFor(g.holder, g.prop));
     });
     renderTimeline();
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
@@ -3086,7 +3121,7 @@
     var added = 0, skipped = 0, fresh = [];
     _groupKeySelByTrack().forEach(function (g) {
       if (g.items.length < 2) return;
-      var track = g.holder.motion && g.holder.motion[g.prop];
+      var track = trackFor(g.holder, g.prop);
       if (!track) return;
       var sorted = g.items.slice().sort(function (a, b) { return a.frame - b.frame; });
       for (var i = 0; i < sorted.length - 1; i++) {
@@ -3129,7 +3164,7 @@
     var all = [], prevSel = _motionKeySel;
     document.querySelectorAll('.motion-track-row').forEach(function (rowEl) {
       var holder = rowEl._smHolder, prop = rowEl._smProp;
-      var track = holder && holder.motion && holder.motion[prop];
+      var track = trackFor(holder, prop);
       if (!track) return;
       track.keys.forEach(function (k) { all.push({ holder: holder, prop: prop, key: k }); });
     });
@@ -3157,7 +3192,7 @@
         if (!hit) return;
         var cell = dia.parentElement;
         var frame = parseInt(cell.dataset.frame, 10);
-        var track = holder.motion && holder.motion[prop];
+        var track = trackFor(holder, prop);
         var key = track ? keyAt(track, frame) : null;
         if (key) sel.push({ holder: holder, prop: prop, key: key });
       });
@@ -3241,10 +3276,11 @@
     var rows = [];
     document.querySelectorAll('#frame-grid .motion-track-row').forEach(function (rowEl) {
       var holder = rowEl._smHolder, prop = rowEl._smProp;
-      if (!holder || !holder.motion || !holder.motion[prop]) return;
+      var bkTrack = trackFor(holder, prop);
+      if (!bkTrack) return;
       var entries = [];
       _motionKeySel.forEach(function (s) {
-        if (s.holder === holder && s.prop === prop) entries.push({ track: holder.motion[prop], key: s.key, orig: s.key.frame });
+        if (s.holder === holder && s.prop === prop) entries.push({ track: bkTrack, key: s.key, orig: s.key.frame });
       });
       if (entries.length) rows.push(entries);
     });
@@ -3353,12 +3389,10 @@
     order.forEach(function (li) {
       var h = state.layers[li]; if (!h) return;
       var entries = [];
-      if (h.motion) {
-        PROPS.forEach(function (prop) {
-          var track = h.motion[prop]; if (!track) return;
-          track.keys.forEach(function (k) { entries.push({ track: track, key: k, orig: k.frame }); });
-        });
-      }
+      propsFor(h).forEach(function (prop) {
+        var track = trackFor(h, prop); if (!track) return;
+        track.keys.forEach(function (k) { entries.push({ track: track, key: k, orig: k.frame }); });
+      });
       rows.push(entries);
     });
     return rows;
@@ -3415,9 +3449,9 @@
       var sf0 = Infinity, sf1 = -Infinity;
       _layerSel.forEach(function (li) {
         var h = state.layers[li];
-        if (!h || !h.motion) return;
-        PROPS.forEach(function (prop) {
-          var t = h.motion[prop]; if (!t) return;
+        if (!h) return;
+        propsFor(h).forEach(function (prop) {
+          var t = trackFor(h, prop); if (!t) return;
           t.keys.forEach(function (k) { sf0 = Math.min(sf0, k.frame); sf1 = Math.max(sf1, k.frame); });
         });
       });
@@ -3518,6 +3552,11 @@
       PROPS.forEach(function (prop) { shiftTrack(h.motion[prop]); });
     }
     shiftHolder(ld);
+    // timeRemap lives OUTSIDE ld.motion (see trackFor) — without this, a
+    // bar drag on a remapped component layer retimed the drawings and every
+    // transform key but left the remap curve at the old frames (the exact
+    // §1 shape this function's own header comment warns about).
+    shiftTrack(ld.timeRemap);
     if (ld.elementMotion) Object.keys(ld.elementMotion).forEach(function (id) { shiftHolder(ld.elementMotion[id]); });
     if (ld.effects) ld.effects.forEach(function (eff) {
       if (eff && eff.keys) Object.keys(eff.keys).forEach(function (p) { shiftTrack(eff.keys[p]); });
@@ -3534,9 +3573,9 @@
     if (holders.length < 2) return;
     pushUndo();
     holders.forEach(function (h, rank) {
-      if (rank === 0 || !h.motion) return;
-      PROPS.forEach(function (prop) {
-        var track = h.motion[prop]; if (!track) return;
+      if (rank === 0) return;
+      propsFor(h).forEach(function (prop) {
+        var track = trackFor(h, prop); if (!track) return;
         track.keys.forEach(function (k) { k.frame = Math.max(0, Math.min(state.totalFrames - 1, k.frame + step * rank)); });
         sortKeys(track);
       });
@@ -3672,11 +3711,11 @@
       var ok = d.keys.every(function (s) {
         var nf = s.key.frame + deltaFrames;
         if (nf < 0 || nf >= state.totalFrames) return false;
-        var existing = keyAt(s.holder.motion[s.prop], nf);
+        var existing = keyAt(trackFor(s.holder, s.prop), nf);
         return !existing || existing === s.key;
       });
       if (!ok) return;
-      d.keys.forEach(function (s) { s.key.frame += deltaFrames; sortKeys(s.holder.motion[s.prop]); });
+      d.keys.forEach(function (s) { s.key.frame += deltaFrames; sortKeys(trackFor(s.holder, s.prop)); });
       d.startX = e.clientX; // re-baseline so the next move is a fresh delta from here
       renderTimeline();
       if (window.SMEngineBridge) SMEngineBridge.renderNow(); // live stage feedback — see skew-drag branch's own comment above
@@ -3684,7 +3723,7 @@
     }
     var nf = Math.max(0, Math.min(state.totalFrames - 1, d.startFrame + deltaFrames));
     if (nf === d.key.frame) return;
-    var track = d.ld.motion[d.prop];
+    var track = trackFor(d.ld, d.prop);
     if (keyAt(track, nf)) return; // don't stomp an existing key
     d.key.frame = nf; sortKeys(track);
     renderTimeline();
@@ -3944,7 +3983,7 @@
       sel.forEach(function (s) {
         if (!s || !s.key) return;
         s.key.frame = Math.max(0, Math.min(total - 1, s.key.frame + dx));
-        var t = s.holder && s.holder.motion && s.holder.motion[s.prop];
+        var t = trackFor(s.holder, s.prop);
         if (t && tracks.indexOf(t) < 0) tracks.push(t);
       });
       // Clamping at the edges can stack two keys on one frame — same
