@@ -1876,7 +1876,20 @@ function renderTimeline(){
     // Second-boundary ticks (Animate-style ruler: "1s"/"2s" labels take
     // priority over the plain every-5-frames tick when they land on the
     // same cell) — gives a time-based read of the timeline, not just frames.
-    if((i+1)%fps===0){c.classList.add('sec');c.textContent=Math.round((i+1)/fps)+'s';}
+    // `i` is the 0-BASED frame index, and frame index 0 is time zero — so one
+    // second is at index `fps`, not `fps-1` (2026-07-25). The old
+    // `(i+1)%fps===0` marked one frame early at every boundary: at 24fps "1s"
+    // sat on index 23, which is 23/24 = 0.958s.
+    //
+    // It was the only place in the app that read time that way. Every other
+    // frame-to-seconds conversion — the camera export, video import, and
+    // reference-bridge's own video seek — uses frame/fps, so the ruler was
+    // announcing "1s" at the exact frame where the reference video would be
+    // parked at 0.958s. Anyone timing to that reference was off by a frame.
+    //
+    // The plain every-5 tick keeps showing the 1-based frame NUMBER (i+1),
+    // which is what the rest of the UI displays — that part was never wrong.
+    if(i>0&&i%fps===0){c.classList.add('sec');c.textContent=Math.round(i/fps)+'s';}
     else if((i+1)%5===0)c.textContent=i+1;
     hdr.appendChild(c);
   }
