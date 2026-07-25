@@ -373,10 +373,10 @@
         if (!mld || !mrow) return null;
         return { li: s.li, row: mrow, origIn: inPointOf(mld), origOut: outPointOf(mld) };
       }).filter(Boolean);
-      _drag = { group: true, type: type, startX: e.clientX, members: members };
+      _drag = { group: true, type: type, startX: e.clientX, members: members, alt: !!e.altKey };
       return;
     }
-    _drag = { li: li, row: row, type: type, startX: e.clientX, origIn: inPointOf(ld), origOut: outPointOf(ld) };
+    _drag = { li: li, row: row, type: type, startX: e.clientX, origIn: inPointOf(ld), origOut: outPointOf(ld), alt: !!e.altKey };
   }
   document.addEventListener('mousemove', function (e) {
     updateMarquee(e);
@@ -441,7 +441,7 @@
     if (window.loadFrame) loadFrame(state.currentFrame);
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
   });
-  document.addEventListener('mouseup', function () {
+  document.addEventListener('mouseup', function (upEv) {
     endMarquee();
     if (!_drag) return;
     var d = _drag; _drag = null;
@@ -465,21 +465,47 @@
     // canvas after an out-drag hit the same content-loss bug an in-drag
     // did (see shiftLayerFrames' own comment) for zero benefit, since
     // there's nothing to shift.
-    var retimes = d.type !== 'out' && (d.type === 'both' || !!state.activeSymbolId);
+    // Whether the keyframes travel with the trim used to be entirely
+    // hardcoded by handle type, with no way to ask for the other one —
+    // 2026-07-25: "la sélection multiple de inpoint ou outpoint AVEC SANS
+    // les keyframes". Alt inverts the default, held at mousedown or still
+    // held at drop (either reads as intent), and applies to the WHOLE
+    // multi-bar selection since the group branch shares this code path.
+    //
+    // Not offered on the OUT handle: shortening the tail has nothing to
+    // move — the visibility window already hides what's past it, and the
+    // shift computed below is derived from the IN point, so an out-drag
+    // would compute dx=0 and do nothing anyway. Said out loud rather than
+    // silently ignored.
+    var defaultRetimes = d.type !== 'out' && (d.type === 'both' || !!state.activeSymbolId);
+    var altHeld = !!(d.alt || (upEv && upEv.altKey));
+    if (altHeld && d.type === 'out') {
+      if (window.showToast) showToast('Rogner la fin ne déplace jamais les keyframes — utilise le point d\'entrée ou le corps de la barre');
+    }
+    var retimes = (altHeld && d.type !== 'out') ? !defaultRetimes : defaultRetimes;
+    if (altHeld && d.type !== 'out' && window.showToast) {
+      showToast(retimes ? 'Keyframes déplacées avec le calque' : 'Fenêtre de visibilité seule — keyframes laissées en place');
+    }
     if (retimes && window.SM && window.SM.shiftLayerFrames) {
       var dxOf = function (ld, orig) { return inPointOf(ld) - orig.origIn; };
+      // shiftLayerFrames moves the DRAWN content (ld.frames) only —
+      // SMMotion.shiftLayerMotionKeys moves the property/effect keyframes,
+      // which used to stay put (2026-07-25): the layer landed on new frames
+      // still animating on its old schedule. Both, or the retime is only
+      // half done.
+      var retimeOne = function (li, dx) {
+        if (!dx) return;
+        window.SM.shiftLayerFrames(li, dx);
+        if (window.SMMotion && SMMotion.shiftLayerMotionKeys) SMMotion.shiftLayerMotionKeys(li, dx);
+      };
       if (d.group) {
         d.members.forEach(function (m) {
           var mld = state.layers[m.li]; if (!mld) return;
-          var dx = dxOf(mld, m);
-          if (dx) window.SM.shiftLayerFrames(m.li, dx);
+          retimeOne(m.li, dxOf(mld, m));
         });
       } else {
         var ld = state.layers[d.li];
-        if (ld) {
-          var dx2 = dxOf(ld, d);
-          if (dx2) window.SM.shiftLayerFrames(d.li, dx2);
-        }
+        if (ld) retimeOne(d.li, dxOf(ld, d));
       }
       if (window.loadFrame) loadFrame(state.currentFrame);
       if (window.SMEngineBridge) SMEngineBridge.renderNow();
@@ -607,6 +633,12 @@
     var bar = document.createElement('div'); bar.className = 'layer-inout-bar' + (selPartOf(li) === 'both' ? ' sel' : '');
     var hleft = document.createElement('div'); hleft.className = 'layer-inout-handle left';
     var hright = document.createElement('div'); hright.className = 'layer-inout-handle right';
+    // The Alt modifier is the only affordance for "with / without the
+    // keyframes" (2026-07-25), so it has to be written down somewhere the
+    // user will actually meet it — on the handle itself.
+    hleft.title = 'Point d\'entrée — glisser pour rogner. Alt+glisser : emmener aussi les keyframes.\nAvec plusieurs barres sélectionnées, toute la sélection suit.';
+    hright.title = 'Point de sortie — glisser pour rogner (les keyframes ne bougent pas : rogner la fin ne déplace rien).';
+    bar.title = 'Glisser le corps : déplace le calque ET ses keyframes. Alt+glisser : déplacer la fenêtre de visibilité seule, keyframes en place.';
     bar.appendChild(hleft); bar.appendChild(hright);
     row.appendChild(bar);
     updateBar(row, li);

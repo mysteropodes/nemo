@@ -2771,6 +2771,21 @@
     if (_layerSel.length >= 2) { removeKeySelectionBox(); return; }
     var dias = Array.from(document.querySelectorAll('#frame-grid .motion-key.sel'));
     if (dias.length < 2) { removeKeySelectionBox(); return; }
+    // The box only earns its place on keys stacked across SEVERAL property
+    // tracks (2026-07-25: "quand on select sur une seule propriété des
+    // keyframes pas besoin de la box c'est pour plusieurs keyframes les
+    // unes en dessous des autres"). Its whole point is the cross-row
+    // gestures — skew is literally undefined on one row (its own handler
+    // refuses under 2 rows), so on a single property the box was pure
+    // overlay: it covered the keys, hid the diamonds it was drawn around,
+    // and intercepted clicks meant for them. Keys on one track are already
+    // draggable as a group by grabbing any one of them.
+    var rowsHit = [];
+    dias.forEach(function (d) {
+      var row = d.closest('.motion-track-row');
+      if (row && rowsHit.indexOf(row) < 0) rowsHit.push(row);
+    });
+    if (rowsHit.length < 2) { removeKeySelectionBox(); return; }
     var x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
     dias.forEach(function (d) {
       var b = d.getBoundingClientRect();
@@ -2874,6 +2889,20 @@
       _layerStaggerBoxEl = document.createElement('div'); _layerStaggerBoxEl.className = 'motion-keysel-box';
       document.body.appendChild(_layerStaggerBoxEl);
       addMoveFill(_layerStaggerBoxEl, function (e, mode) { startSkewDrag(buildLayerRows(), mode, e); });
+      // Space on the LAYER box, which is where the reference actually
+      // demonstrates it ("select layers across multiple rows, drag from the
+      // right edge to space them out"): spreads the selected layers' keys
+      // apart in time with the opposite edge anchored. Same per-key factor
+      // as the key box — a layer's keys sit at their own frames, so a layer
+      // early in the span moves little and a late one moves a lot, which is
+      // exactly the spread.
+      addSpaceEdges(_layerStaggerBoxEl, function (e, mode) {
+        var rows = buildLayerRows();
+        var f0 = Infinity, f1 = -Infinity;
+        rows.forEach(function (r) { r.forEach(function (en) { f0 = Math.min(f0, en.orig); f1 = Math.max(f1, en.orig); }); });
+        if (!(f1 > f0)) { if (window.showToast) showToast('Il faut des clés sur au moins 2 frames différentes pour les espacer'); return; }
+        startSkewDrag(rows, mode, e);
+      });
       addStaggerEdges(_layerStaggerBoxEl, function (e, mode) {
         var rows = buildLayerRows();
         if (rows.length < 2) return;
@@ -2882,6 +2911,76 @@
     }
     _layerStaggerBoxEl.style.left = gb.left + 'px'; _layerStaggerBoxEl.style.top = y0 + 'px';
     _layerStaggerBoxEl.style.width = gb.width + 'px'; _layerStaggerBoxEl.style.height = (y1 - y0) + 'px';
+    // The box deliberately spans the FULL grid width so the skew edges can
+    // be grabbed anywhere along the row ("j'ai juste à glisser la box…
+    // peu importe où je suis"). That puts its own left/right extremities
+    // thousands of pixels off-screen, which would make the Space handles
+    // unreachable in practice (measured: right edge at x≈2926 on an 800px
+    // view). So pin them to the selection's KEY SPAN instead of the box's
+    // geometry — which is also where they belong conceptually: the handles
+    // sit exactly where the content starts and ends, like the key box's do.
+    var el = _layerStaggerBoxEl.querySelector('.motion-keysel-edge-left');
+    var er = _layerStaggerBoxEl.querySelector('.motion-keysel-edge-right');
+    if (el && er) {
+      var sf0 = Infinity, sf1 = -Infinity;
+      _layerSel.forEach(function (li) {
+        var h = state.layers[li];
+        if (!h || !h.motion) return;
+        PROPS.forEach(function (prop) {
+          var t = h.motion[prop]; if (!t) return;
+          t.keys.forEach(function (k) { sf0 = Math.min(sf0, k.frame); sf1 = Math.max(sf1, k.frame); });
+        });
+      });
+      if (sf1 > sf0) {
+        el.style.display = ''; er.style.display = '';
+        el.style.left = (sf0 * FC - 7) + 'px'; el.style.right = 'auto';
+        er.style.left = (sf1 * FC + FC - 7) + 'px'; er.style.right = 'auto';
+      } else {
+        // One frame (or no keys at all) — nothing to spread, and a handle
+        // that silently does nothing is worse than no handle.
+        el.style.display = 'none'; er.style.display = 'none';
+      }
+    }
+  }
+  // Retime every keyframe a layer owns by dx frames. The counterpart to
+  // SM.shiftLayerFrames (timeline.js), which moves only ld.frames — the
+  // DRAWN content. Found 2026-07-25 while testing the in/out handles: a bar
+  // drag in Motion moved the artwork and the visibility window but left the
+  // Position/Rotation/Scale/Opacity keys exactly where they were, so the
+  // layer arrived somewhere new still animating on the old schedule. In
+  // Motion "the keyframes" means these, so "déplacer le calque avec ses
+  // keyframes" was only ever half true.
+  //
+  // Covers all three holders a layer can carry keys in — its own motion,
+  // each per-element holder, and each effect's parameter tracks (the
+  // effects panel keeps them in eff.keys[param].keys, see
+  // effects-panel.js's ensureParamTrack). Missing any one of them is the
+  // CLAUDE.md §1 shape of bug: retimed in one reader, stale in the others.
+  function shiftLayerMotionKeys(li, dx) {
+    var ld = state.layers[li];
+    if (!ld || !dx) return false;
+    var total = state.totalFrames, touched = false;
+    // A key pushed past either end is CLAMPED, not dropped (dropping would
+    // silently destroy animation the user can't see going). Clamping can
+    // land two keys on the same frame, so collapse exact duplicates
+    // afterwards, keeping the earliest-listed one.
+    function shiftTrack(t) {
+      if (!t || !t.keys || !t.keys.length) return;
+      t.keys.forEach(function (k) { k.frame = Math.max(0, Math.min(total - 1, k.frame + dx)); });
+      t.keys.sort(function (a, b) { return a.frame - b.frame; });
+      for (var i = t.keys.length - 1; i > 0; i--) if (t.keys[i].frame === t.keys[i - 1].frame) t.keys.splice(i, 1);
+      touched = true;
+    }
+    function shiftHolder(h) {
+      if (!h || !h.motion) return;
+      PROPS.forEach(function (prop) { shiftTrack(h.motion[prop]); });
+    }
+    shiftHolder(ld);
+    if (ld.elementMotion) Object.keys(ld.elementMotion).forEach(function (id) { shiftHolder(ld.elementMotion[id]); });
+    if (ld.effects) ld.effects.forEach(function (eff) {
+      if (eff && eff.keys) Object.keys(eff.keys).forEach(function (p) { shiftTrack(eff.keys[p]); });
+    });
+    return touched;
   }
   // Right-click alternative to dragging the handle — same rank-0-anchor,
   // every-property-together semantics, applied instantly for a typed step
@@ -3214,6 +3313,7 @@
     ensureLayerUid: ensureLayerUid,
     findLayerIndexByUid: findLayerIndexByUid,
     setLayerParent: setLayerParent,
+    shiftLayerMotionKeys: shiftLayerMotionKeys,
     parentChainMats: parentChainMats,
     applyParentChainToSegments: applyParentChainToSegments,
     applyParentChainToImageRect: applyParentChainToImageRect,
