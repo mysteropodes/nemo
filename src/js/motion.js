@@ -114,6 +114,35 @@
     renderLayerList(); renderTimeline();
     return true;
   }
+  // E / M — the siblings of U (Van Dijk 5.1: "e = reveal Effect, m = reveal
+  // Masks"). Same reveal-set mechanism, only the predicate changes: instead
+  // of "layers with animated properties", the layers that actually carry an
+  // effects stack, or a matte. Both narrow the LIST rather than filtering
+  // properties, because in Nemo effects and mattes are per-layer, not
+  // per-property.
+  function revealByLayerPredicate(pred, emptyMsg) {
+    if (state.appMode !== 'motion') return false;
+    var pool = (window._layerSel && window._layerSel.length) ? window._layerSel.slice() : state.layers.map(function (_l, i) { return i; });
+    var targets = pool.filter(function (li) { var ld = state.layers[li]; return ld && pred(ld); });
+    if (!targets.length) { if (window.showToast) showToast(emptyMsg); return true; }
+    window._motionRevealedLayers = targets;
+    // Deliberately NOT _hideUnanimated: you want to SEE the properties of
+    // the effect-bearing layers, not only the ones that happen to be keyed.
+    _hideUnanimated = false;
+    renderLayerList(); renderTimeline();
+    if (window.showToast) showToast(targets.length + ' calque(s) révélé(s)');
+    return true;
+  }
+  function handleRevealEffectsShortcut() {
+    return revealByLayerPredicate(
+      function (ld) { return (ld.effects && ld.effects.length) || ld.effectsFrom || ld.isEffectLayer; },
+      'Aucun calque ne porte d\u2019effet');
+  }
+  function handleRevealMattesShortcut() {
+    return revealByLayerPredicate(
+      function (ld) { return ld.matteMode && ld.matteMode !== 'none'; },
+      'Aucun calque n\u2019utilise de matte');
+  }
 
   // ---- easing math: N-point on-curve-waypoint model, deliberate copy of
   // ui.js's shared curve editor (Catmull-Rom tangents -> per-segment cubic
@@ -1986,6 +2015,11 @@
     propsFor(holder).forEach(function (prop) {
       if (isPropFiltered(prop) || (_hideUnanimated && !propHasContent(holder, prop))) return;
       var pr = document.createElement('div'); pr.className = 'lrow motion-prop-row';
+      // Same identity tags the grid's track rows carry (renderTracksFor) —
+      // without them the expression pickwhip could only be dropped on the
+      // grid side, which is the half you are NOT looking at while writing
+      // an expression in the panel.
+      pr._smHolder = holder; pr._smProp = prop;
       var sw = document.createElement('div');
       var swOn = isAnimated(holder, prop);
       var hasKeyHere = swOn && !!keyAt(holder.motion[prop], state.currentFrame);
@@ -2132,9 +2166,38 @@
       window.SMMotion.setExprGlobals(v);
     });
     row.appendChild(glob);
+    // ---- code pane (Van Dijk 7.5) ------------------------------------
+    // A 3-row bare textarea was fine when an expression was one line; it
+    // stops being fine the moment people actually write in it, which is his
+    // whole point ("expressions... have taken on a more dominant role").
+    // A gutter of line numbers scrolled in lockstep with the textarea, the
+    // failing line highlighted, and a drag-to-resize grip — no external
+    // editor dependency, which would be a lot of weight for this.
+    var pane = document.createElement('div'); pane.className = 'motion-expr-pane';
+    var gutter = document.createElement('div'); gutter.className = 'motion-expr-gutter';
     var ta = document.createElement('textarea'); ta.className = 'motion-expr-code';
-    ta.value = expr.code; ta.spellcheck = false; ta.rows = 3;
+    ta.value = expr.code; ta.spellcheck = false;
     ta.placeholder = 'value + wiggle(2, 10)';
+    pane.appendChild(gutter); pane.appendChild(ta);
+    // The line number the error points at, when the message carries one.
+    // new Function() reports positions against the wrapper we build in
+    // compiledFnFor, not against the user's own text, so only a number we
+    // can actually trust is used — no guessing at an offset.
+    function errorLine() {
+      if (!expr.lastError) return -1;
+      var mm = /(?:ligne|line)\s*(\d+)/i.exec(expr.lastError);
+      return mm ? parseInt(mm[1], 10) : -1;
+    }
+    function paintGutter() {
+      var n = (ta.value.split('\n').length) || 1;
+      var el = errorLine();
+      var html = '';
+      for (var i = 1; i <= n; i++) html += '<span' + (i === el ? ' class="err"' : '') + '>' + i + '</span>';
+      gutter.innerHTML = html;
+      gutter.scrollTop = ta.scrollTop;
+    }
+    ta.addEventListener('scroll', function () { gutter.scrollTop = ta.scrollTop; });
+    ta.addEventListener('input', paintGutter);
     function commit() {
       if (ta.value === expr.code) return;
       pushUndo();
@@ -2147,14 +2210,139 @@
     ta.addEventListener('blur', commit);
     ta.addEventListener('keydown', function (e) {
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { commit(); e.preventDefault(); ta.blur(); }
-      if (e.key === 'Escape') { ta.value = expr.code; ta.blur(); }
+      if (e.key === 'Escape') { ta.value = expr.code; paintGutter(); ta.blur(); }
+      // Tab indents instead of leaving the field — in a code box, losing
+      // focus on Tab is never what you meant.
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        var s = ta.selectionStart, en = ta.selectionEnd;
+        ta.value = ta.value.slice(0, s) + '  ' + ta.value.slice(en);
+        ta.selectionStart = ta.selectionEnd = s + 2;
+        paintGutter();
+      }
     });
-    row.appendChild(ta);
+    // Resize grip. CRITICAL (CLAUDE.md §11): the frame grid mirrors this
+    // row's REAL height to keep its own rows aligned — so every height
+    // change has to re-render the timeline, or the two panels drift apart
+    // by exactly the amount the editor grew.
+    var grip = document.createElement('div'); grip.className = 'motion-expr-grip';
+    grip.title = 'Glisser pour redimensionner l\u2019éditeur';
+    grip.addEventListener('mousedown', function (e) {
+      e.preventDefault(); e.stopPropagation();
+      var startY = e.clientY, startH = ta.offsetHeight;
+      function mv(ev) {
+        ta.style.height = Math.max(38, Math.min(420, startH + (ev.clientY - startY))) + 'px';
+        gutter.style.height = ta.style.height;
+      }
+      function up() {
+        document.removeEventListener('mousemove', mv);
+        document.removeEventListener('mouseup', up);
+        expr.editorHeight = parseInt(ta.style.height, 10) || undefined;
+        renderTimeline(); // re-reserve the matching height on the grid side
+      }
+      document.addEventListener('mousemove', mv);
+      document.addEventListener('mouseup', up);
+    });
+    pane.appendChild(grip);
+    if (expr.editorHeight) { ta.style.height = expr.editorHeight + 'px'; gutter.style.height = expr.editorHeight + 'px'; }
+    row.appendChild(pane);
+    paintGutter();
     if (expr.lastError) {
       var errEl = document.createElement('div'); errEl.className = 'motion-expr-error'; errEl.textContent = expr.lastError;
       row.appendChild(errEl);
     }
+    // ---- pickwhip (Van Dijk 7.3) -------------------------------------
+    // Drag onto another property row to write its reference into the code;
+    // Alt-drag CLONES that property's own expression instead — his exact
+    // request ("clone the Expression itself rather than the value it
+    // returns"), which is what stops duplicated code from having to be
+    // updated in N places.
+    var whip = document.createElement('span');
+    whip.className = 'motion-expr-whip';
+    whip.title = 'Glisser sur une autre propriété : insère sa référence.\nAlt+glisser : clone SON expression.';
+    whip.addEventListener('mousedown', function (e) { startExprPickwhip(holder, prop, ta, commit, whip, e); });
+    head.appendChild(whip);
     return row;
+  }
+  // Rubber-band pickwhip for expressions. Deliberately the same shape as
+  // startParentPickwhip (timeline.js) — same line, same highlighted target,
+  // same Escape-cancels — so the two gestures feel like one idea; only the
+  // drop target differs (property rows here, layer rows there).
+  function startExprPickwhip(holder, prop, ta, commit, fromEl, ev) {
+    ev.stopPropagation(); ev.preventDefault();
+    var r0 = fromEl.getBoundingClientRect();
+    var ox = r0.left + r0.width / 2, oy = r0.top + r0.height / 2;
+    var line = document.createElement('div'); line.className = 'lpick-line';
+    document.body.appendChild(line);
+    var hover = null;
+    function paint(x, y) {
+      var dx = x - ox, dy = y - oy;
+      line.style.left = ox + 'px'; line.style.top = oy + 'px';
+      line.style.width = Math.sqrt(dx * dx + dy * dy) + 'px';
+      line.style.transform = 'rotate(' + Math.atan2(dy, dx) + 'rad)';
+    }
+    // A property row knows its holder/prop through the same _smHolder/_smProp
+    // tags the grid rows carry; the PANEL rows carry them too (set below in
+    // renderTransformGroup) so either side can be dropped on.
+    function targetUnder(x, y) {
+      var el = document.elementFromPoint(x, y); if (!el || !el.closest) return null;
+      var row = el.closest('.motion-prop-row, .motion-track-row');
+      if (!row || !row._smHolder || !row._smProp) return null;
+      if (row._smHolder === holder && row._smProp === prop) return null; // itself
+      return { row: row, holder: row._smHolder, prop: row._smProp };
+    }
+    function onMove(e) {
+      paint(e.clientX, e.clientY);
+      var t = targetUnder(e.clientX, e.clientY);
+      if (hover && (!t || t.row !== hover.row)) hover.row.classList.remove('pick-target');
+      if (t && (!hover || t.row !== hover.row)) t.row.classList.add('pick-target');
+      hover = t;
+    }
+    function cleanup() {
+      document.removeEventListener('mousemove', onMove, true);
+      document.removeEventListener('mouseup', onUp, true);
+      document.removeEventListener('keydown', onKey, true);
+      if (hover) hover.row.classList.remove('pick-target');
+      line.remove();
+    }
+    function onUp(e) {
+      var t = targetUnder(e.clientX, e.clientY);
+      var alt = !!e.altKey;
+      cleanup();
+      if (!t) return;
+      var text;
+      if (alt) {
+        // Clone the source's OWN expression. Nothing to clone is worth
+        // saying out loud rather than silently inserting an empty string.
+        var srcEx = t.holder.expressions && t.holder.expressions[t.prop];
+        if (!srcEx || !srcEx.code) { if (window.showToast) showToast('Cette propriété n\u2019a pas d\u2019expression à cloner'); return; }
+        text = srcEx.code;
+      } else {
+        var li = state.layers.indexOf(t.holder);
+        // A per-element holder isn't in state.layers — reference its OWNER
+        // layer, which is what the sandbox's layer() can actually resolve.
+        if (li < 0) state.layers.forEach(function (ld2, i2) {
+          if (ld2.elementMotion) Object.keys(ld2.elementMotion).forEach(function (k) { if (ld2.elementMotion[k] === t.holder) li = i2; });
+        });
+        if (li < 0) { if (window.showToast) showToast('Propriété non référençable'); return; }
+        text = 'layer("' + ensureLayerUid(state.layers[li]) + '").' + t.prop;
+      }
+      // Insert at the caret rather than replacing: a pickwhip is usually
+      // used mid-expression (`value + <here>`), not on an empty box.
+      var s = ta.selectionStart != null ? ta.selectionStart : ta.value.length;
+      var en = ta.selectionEnd != null ? ta.selectionEnd : s;
+      ta.value = ta.value.slice(0, s) + text + ta.value.slice(en);
+      ta.selectionStart = ta.selectionEnd = s + text.length;
+      ta.dispatchEvent(new Event('input'));
+      commit();
+      renderLayerList(); renderTimeline();
+      if (window.showToast) showToast(alt ? 'Expression clonée' : 'Référence insérée');
+    }
+    function onKey(e) { if (e.key === 'Escape') cleanup(); }
+    document.addEventListener('mousemove', onMove, true);
+    document.addEventListener('mouseup', onUp, true);
+    document.addEventListener('keydown', onKey, true);
+    paint(ev.clientX, ev.clientY);
   }
   // Every unique element (stroke) visible in the layer at the CURRENT frame
   // — "Éléments", AE shape-group style, listed under the layer's own
@@ -3577,6 +3765,8 @@
     onUp: onUp,
     handlePropShortcut: handlePropShortcut,
     revealAnimated: handleRevealAnimatedShortcut,
+    revealEffects: handleRevealEffectsShortcut,
+    revealMattes: handleRevealMattesShortcut,
     // layer-inout.js's own marquee (which covers the layer bar rows AND the
     // empty grid space below them) forwards its rectangle here in Motion
     // mode so keyframes get selected from a drag started ANYWHERE in the
