@@ -4524,6 +4524,31 @@ var _pointerOverTimeline=false;
   wrap.addEventListener('pointerleave',function(){_pointerOverTimeline=false;});
 })();
 
+// Walks the layer list AS DISPLAYED, not state.layers order: the panel renders
+// highest index first (computeLayerRenderOrder counts down), and members of a
+// collapsed folder carry hidden:true and must be stepped over — otherwise
+// PageDown would appear to do nothing while it moved onto a row that isn't on
+// screen. dir -1 goes up the panel, +1 goes down.
+function stepActiveLayer(dir){
+  var idxs;
+  if(typeof computeLayerRenderOrder==='function'){
+    idxs=computeLayerRenderOrder()
+      .filter(function(e){return e.type==='layer'&&!e.hidden;})
+      .map(function(e){return e.idx;});
+  }else{
+    idxs=[];for(var i=state.layers.length-1;i>=0;i--)idxs.push(i);
+  }
+  if(idxs.length<2)return false;
+  var pos=idxs.indexOf(state.activeLayerIdx);
+  if(pos<0)pos=0;
+  var np=pos+dir;
+  if(np<0||np>=idxs.length)return false; // already at the end — stop, don't wrap
+  // Goes through the app's own layer-activation path rather than assigning
+  // activeLayerIdx directly: that one also saves the outgoing layer's frame,
+  // clears the selection, and unsticks the camera row (see setActiveLayer).
+  window.SM.setActiveLayer(idxs[np]);
+  return true;
+}
 function onKeyDown(event){
   // Editing a text/number field: leave Ctrl+Z/X/C/V to the BROWSER's own
   // in-field behavior (text undo, text cut/copy/paste) instead of
@@ -4812,6 +4837,14 @@ function onKeyDown(event){
   // Home/End "go to first/last frame" — a near-universal NLE/AE convention
   // (Home = start of composition, End = end) that had no binding here at
   // all (grepped: zero 'Home'/'End' handlers before this). AE audit, 2026-07.
+  // PageUp / PageDown — step the active layer up/down the panel (2026-07-25).
+  // Changing the active layer is one of the most frequent actions in any
+  // multi-layer drawing app (rough here, clean there, background below) and
+  // had NO keyboard path at all: Alt+arrows, Ctrl+arrows, PageUp/PageDown and
+  // Alt+[ ] were all verified inert for it. Alt+[ / Alt+] are taken (AE
+  // in/out-point trim) and plain [ ] are brush size, so PageUp/PageDown —
+  // entirely unclaimed here, and Krita's own binding for exactly this.
+  else if(k==='PageUp'||k==='PageDown'){event.preventDefault();stepActiveLayer(k==='PageUp'?-1:1);}
   else if(k==='Home'){if(state.playing)stopPlay();goToFrame(0);}
   else if(k==='End'){if(state.playing)stopPlay();goToFrame(state.totalFrames-1);}
   // Alt+[ / Alt+] "trim layer in/out point to current time" (AE convention)
