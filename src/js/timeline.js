@@ -1204,6 +1204,10 @@ window.SM={
     state.symmetryEnabled=d.symmetryEnabled||false;state.symmetryMode=d.symmetryMode||'y';state.symmetryAxis=d.symmetryAxis||null;state.symmetryRadialCenter=d.symmetryRadialCenter||null;state.symmetryRadialSectors=d.symmetryRadialSectors||6;state.symmetryExtend=d.symmetryExtend!==undefined?d.symmetryExtend:true;
     if(window.renderPaletteGrid)window.renderPaletteGrid();
     if(d.resamplePts)state.resamplePts=d.resamplePts;if(d.tweenStep)state.tweenStep=d.tweenStep;
+    // Repair motion keyframes saved with the step-shaped default ease before
+    // 2026-07-25 — see DEFAULT_CURVE in motion.js. Only keys still carrying
+    // that exact array are touched, so a hand-tuned curve is never rewritten.
+    if(window.SMMotion&&SMMotion.migrateLegacyCurves)SMMotion.migrateLegacyCurves();
     state.currentFrame=0;state.activeLayerIdx=0;activateUL(0);drawStage();loadFrame(0);renderOS();renderArcs();updateUI();renderSymbolTabs();
     syncDocFields();
     if(!silent)showToast('Projet chargé');}catch(e){showToast('Erreur: '+e.message);}},
@@ -4529,9 +4533,16 @@ function onKeyDown(event){
   // clipboard was filled most recently (2026-07, "vérifie que copier/
   // couper/coller existe pour tous les éléments... les keyframes" — canvas
   // shapes had NO copy/cut/paste at all before this, only keyframes did).
-  if((event.metaKey||event.ctrlKey)&&event.key==='c'){if(inField)return;event.preventDefault();if(selectedPaths.length)copySelection();else window.SM.copyFrames();return;}
+  // A Motion keyframe selection is the most specific thing ⌘C can mean, so it
+  // wins over shapes and frame cells — same "more specific selection wins"
+  // rule the shape-vs-frame split below already follows. Gated on there BEING
+  // a keyframe selection, so ⌘C is unchanged everywhere else.
+  if((event.metaKey||event.ctrlKey)&&event.key==='c'){if(inField)return;event.preventDefault();
+    if(state.appMode==='motion'&&window.SMMotion&&SMMotion.hasKeySelection&&SMMotion.hasKeySelection()){SMMotion.copySelectedKeys();return;}
+    if(selectedPaths.length)copySelection();else window.SM.copyFrames();return;}
   if((event.metaKey||event.ctrlKey)&&event.key==='x'){if(inField)return;event.preventDefault();if(selectedPaths.length)cutSelection();else window.SM.cutFrames();return;}
   if((event.metaKey||event.ctrlKey)&&event.key==='v'){if(inField)return;event.preventDefault();
+    if(state.appMode==='motion'&&window.SMMotion&&SMMotion.hasKeyClipboard&&SMMotion.hasKeyClipboard()){SMMotion.pasteKeys();return;}
     if(window._lastClipKind==='canvas'&&_canvasClip&&_canvasClip.snaps.length)pasteSelection();
     else if(window._lastClipKind==='frames'&&_sel.clipboard&&_sel.clipboard.length)window.SM.pasteFrames();
     else if(_canvasClip&&_canvasClip.snaps.length)pasteSelection();
@@ -4644,6 +4655,33 @@ function onKeyDown(event){
   // ('u' is otherwise bound to the Line tool, TOOL_SHORTCUTS) — only inside
   // Motion mode, the Line tool shortcut is untouched everywhere else.
   if((k==='u'||k==='U')&&state.appMode==='motion'&&window.SMMotion&&SMMotion.revealAnimated()){event.preventDefault();return;}
+  // ---- Motion keyframe keyboard layer (2026-07-25) ----
+  // The Motion timeline already had drag-retime, marquee multi-select, hold,
+  // distribute/flip/select-every-2nd and a per-segment ease editor — but every
+  // one of them was reachable ONLY by right-click. After Effects is
+  // keyboard-first for exactly these operations, which is most of what "a real
+  // AE timeline" means in daily use, so they get the AE bindings here.
+  //
+  // Every branch is gated on an actual keyframe selection, so with nothing
+  // selected these keys keep their existing meanings untouched — Delete still
+  // deletes canvas objects, arrows still step the playhead, Cmd+C/V still route
+  // to shapes or frame cells.
+  if(state.appMode==='motion'&&window.SMMotion&&SMMotion.hasKeySelection&&SMMotion.hasKeySelection()){
+    // F9 / Shift+F9 / Cmd+Shift+F9 — Easy Ease, Easy Ease In, Easy Ease Out.
+    if(k==='F9'){event.preventDefault();SMMotion.applyEasyEase(event.shiftKey?((event.metaKey||event.ctrlKey)?'easeOut':'easeIn'):'ease');return;}
+    // Ctrl/Cmd+Alt+K — linear (AE has no single default binding for this; K is
+    // free here and reads as "keyframe interpolation").
+    if((event.metaKey||event.ctrlKey)&&event.altKey&&(k==='k'||k==='K')){event.preventDefault();SMMotion.setKeyInterp('linear');return;}
+    // Ctrl/Cmd+Alt+H — toggle hold, AE's own binding.
+    if((event.metaKey||event.ctrlKey)&&event.altKey&&(k==='h'||k==='H')){event.preventDefault();SMMotion.setKeyInterp('hold');return;}
+    if(k==='Delete'||k==='Backspace'){event.preventDefault();SMMotion.deleteSelectedKeys();return;}
+    // Alt+Left/Right nudges the SELECTED KEYS in time; bare arrows keep moving
+    // the playhead, which is the distinction AE draws too.
+    if(event.altKey&&(k==='ArrowLeft'||k==='ArrowRight')){event.preventDefault();SMMotion.nudgeSelectedKeys(k==='ArrowRight'?1:-1);return;}
+    // ⌘C/⌘V are claimed much earlier in this handler (they must be, to sit
+    // alongside the shape and frame-cell clipboards) — the Motion branch lives
+    // there, not here.
+  }
   // AE's B/N — "Set Work Area Start/End" at the current frame. See the
   // _pointerOverTimeline comment above this function for why this is
   // hover-scoped rather than global (unlike real AE, these letters are

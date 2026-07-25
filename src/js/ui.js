@@ -44,7 +44,10 @@
   // with camera mode (editMotionSeg/editCameraSeg each clear the other).
   var motionEaseSeg=null,motionEaseLabel='';
   function isMotionMode(){return !!motionEaseSeg;}
-  var MOTION_DEFAULT_CURVE=[{x:0,y:0},{x:.42,y:0},{x:.58,y:1},{x:1,y:1}];
+  // MUST stay identical to DEFAULT_CURVE in motion.js (CLAUDE.md §3 duplicate
+  // pair) — see that copy for why the old CSS-cubic-bezier numbers produced a
+  // step instead of an ease once read as on-curve waypoints.
+  var MOTION_DEFAULT_CURVE=[{x:0,y:0},{x:.25,y:.156},{x:.5,y:.5},{x:.75,y:.844},{x:1,y:1}];
   function motionCurve(){return motionEaseSeg.curvePoints||(motionEaseSeg.curvePoints=clonePts(MOTION_DEFAULT_CURVE));}
   // Brush pressure-response curve (2026-07 — audit gap "aucun éditeur de
   // courbe de pression dédié"): same on-curve-waypoint model as the other
