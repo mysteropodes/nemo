@@ -1330,7 +1330,7 @@ function getToolHelp(tool){
     fillbrush:{desc:tt('thFillbrushDesc'),sc:[]},
     eraser:{desc:tt('thEraserDesc'),sc:[['E',tt('thTool')],['[ ]',tt('thSizePlusMinus')]]},
     eyedropper:{desc:tt('thEyedropperDesc'),sc:[['I',tt('thTool')]]},
-    hand:{desc:tt('thHandDesc'),sc:[['Espace',tt('thHoldTemp')]]},
+    hand:{desc:tt('thHandDesc'),sc:[['Espace',tt('thHoldTemp')],['Espace',tt('thTapPlay')]]},
     zoom:{desc:tt('thZoomDesc'),sc:[['Z',tt('thTool')]]},
     rotate:{desc:tt('thRotateDesc'),sc:[['Alt+glisser',tt('thOnOtherTool')]]},
     camera:{desc:tt('thCameraDesc'),sc:[['Clic-droit',tt('thEasingCurve')]]},
@@ -4690,7 +4690,25 @@ function onKeyDown(event){
     else window.SM.setBrushSize(Math.max(1,Math.min(80,state.brushSize+sizeStep)));
     updateUI();
   }
-  else if(k===' '){event.preventDefault();if(!state.spaceDown){state.spaceDown=true;canvasEl.style.cursor='grab';}}
+  // SPACE — tap plays, hold pans (2026-07-25, "les choses basiques qui
+  // manquent... la barre espace qui fait play par exemple"). Nemo is both a
+  // drawing app and an animation app, and the two conventions collide head-on:
+  // Space is the temporary Hand in Photoshop/Procreate/Krita/Clip Studio, and
+  // play/pause in After Effects/Premiere/TVPaint/Blender. After Effects
+  // resolves it by gesture rather than by picking a side — hold and drag to
+  // pan the comp, tap and release to play — so both live on the same key with
+  // no mode and nothing to learn. Same resolution here: this handler only ever
+  // ARMS the pan (unchanged behaviour); onKeyUp decides, from whether a drag
+  // actually happened and how long the key was held, whether it was a tap.
+  else if(k===' '){
+    event.preventDefault();
+    if(!state.spaceDown){
+      state.spaceDown=true;
+      state._spaceAt=(window.performance&&performance.now)?performance.now():Date.now();
+      state.spaceUsedForPan=false;
+      canvasEl.style.cursor='grab';
+    }
+  }
   else if(k==='Alt'){state.altDown=true;}
   else if(k==='Enter'){event.preventDefault();if(state.tool==='pen'&&_pen.path)finalizePen();else togglePlay();}
   else if(k==='Escape'){
@@ -4818,7 +4836,30 @@ function onKeyDown(event){
   else if(k==='x'||k==='X'){if(event.shiftKey)window.SM.flipVertical();else window.SM.flipHorizontal();}
   else if(k==='+'||k==='='){window.SM.extendExposure(1);}
 }
-function onKeyUp(event){if(event.key===' '){state.spaceDown=false;state.isPanning=false;var cc={draw:'crosshair',pen:'crosshair',line:'crosshair',rect:'crosshair',ellipse:'crosshair',select:'default',subselect:'default',eraser:'pointer',fill:'crosshair',fillbrush:'crosshair',eyedropper:'crosshair',hand:'grab',zoom:'zoom-in',rotate:'grab',perspective:'crosshair'};canvasEl.style.cursor=cc[state.tool]||'default';}else if(event.key==='Alt'){state.altDown=false;}}
+// Longest hold still read as a tap. Generous enough to survive a slow
+// keypress, short enough that parking a thumb on Space to pan and thinking
+// better of it never starts playback.
+var SPACE_TAP_MS=250;
+function onKeyUp(event){if(event.key===' '){
+  // wasDown gates the whole thing: onKeyDown returns before its Space branch
+  // whenever a field has focus, so without this a Space typed into a text
+  // input would still reach here and start playback on release.
+  var wasDown=state.spaceDown;
+  var held=((window.performance&&performance.now)?performance.now():Date.now())-(state._spaceAt||0);
+  var tapped=wasDown&&!state.spaceUsedForPan&&held<SPACE_TAP_MS;
+  state.spaceDown=false;state.isPanning=false;state.spaceUsedForPan=false;
+  var cc={draw:'crosshair',pen:'crosshair',line:'crosshair',rect:'crosshair',ellipse:'crosshair',select:'default',subselect:'default',eraser:'pointer',fill:'crosshair',fillbrush:'crosshair',eyedropper:'crosshair',hand:'grab',zoom:'zoom-in',rotate:'grab',perspective:'crosshair'};canvasEl.style.cursor=cc[state.tool]||'default';
+  // Mid-path the Pen tool owns Enter/Escape to finish or cancel; starting
+  // playback under it would strand a half-drawn path, so Space stays inert
+  // there — the one place the tap gesture is suppressed.
+  if(tapped&&!(state.tool==='pen'&&_pen.path))togglePlay();
+}else if(event.key==='Alt'){state.altDown=false;}}
+// One capture-phase listener marks "the Space hold was actually used", rather
+// than touching either pan implementation: panning lives in BOTH tools.js
+// (Paper.js path) and viewtools-bridge.js (Rust engine path), and any pointer
+// press while Space is held belongs to the pan gesture whether or not it ends
+// up moving far enough to shift the view.
+document.addEventListener('pointerdown',function(){if(state.spaceDown)state.spaceUsedForPan=true;},true);
 
 document.addEventListener('keydown',onKeyDown);document.addEventListener('keyup',onKeyUp);
 document.querySelectorAll('.tool-btn').forEach(function(b){b.addEventListener('click',function(){window.SM.setTool(this.dataset.tool);});});
