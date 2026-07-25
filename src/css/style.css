@@ -1608,3 +1608,17 @@ body.mode-motion .lrow.act{box-shadow:inset 3px 0 0 #4E6FF2,inset 0 0 0 1px rgba
 .tl-marker-label{position:absolute;left:7px;top:-9px;font-size:9px;line-height:1;
   color:var(--text);background:rgba(0,0,0,.55);padding:1px 4px;border-radius:3px;
   white-space:nowrap;pointer-events:none;}
+
+/* ---- BPM GUIDES (2026-07-25) ----------------------------------------- */
+/* Full-height hairlines inside #frame-grid, behind every row's content
+   (z-index 0 against .frow's own stacking) so they read as a grid you align
+   TO rather than another layer of chrome on top. */
+.bpm-line{position:absolute;top:0;bottom:0;width:1px;background:rgba(255,255,255,.07);
+  pointer-events:none;z-index:0;}
+.bpm-line.bpm-bar{background:rgba(120,180,255,.22);width:1px;}
+
+/* Work-area duration read-out — centred, non-interactive so the bar keeps
+   its whole surface draggable. */
+.wa-dur{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  font-size:9px;line-height:1;color:rgba(255,255,255,.72);white-space:nowrap;
+  pointer-events:none;text-shadow:0 1px 2px rgba(0,0,0,.6);}

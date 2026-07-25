@@ -612,6 +612,33 @@ window.SM={
   },
   // Standing "keyframes follow this edge" lock (Van Dijk 2.2). Stored per
   // layer so it survives the session and needs no modifier at drag time.
+  // "Trim Comp to Work Area" (Van Dijk 1.3). Drops everything outside the
+  // work area and re-bases frame 0 on its start — layers, keyframes, markers
+  // and the camera all shift together, or the trim would silently desync the
+  // very things that were timed against it.
+  trimToWorkArea:function(){
+    var inF=state.waIn||0,outF=(state.waOut!=null?state.waOut:state.totalFrames-1);
+    if(outF<=inF){showToast('Zone de travail trop courte');return;}
+    if(inF===0&&outF===state.totalFrames-1){showToast('La zone de travail couvre déjà tout');return;}
+    saveAllLayerFrames();pushUndoLayers();
+    var n=outF-inF+1;
+    state.layers.forEach(function(ld,li){
+      ld.frames=ld.frames.slice(inF,outF+1);
+      while(ld.frames.length<n)ld.frames.push({strokes:[],isKeyframe:false,isInterpolated:false});
+      if(ld.inPoint!=null)ld.inPoint=Math.max(0,ld.inPoint-inF);
+      if(ld.outPoint!=null)ld.outPoint=Math.max(0,Math.min(n-1,ld.outPoint-inF));
+      if(ld.markers)ld.markers=ld.markers.map(function(m){return{frame:m.frame-inF,name:m.name,color:m.color};}).filter(function(m){return m.frame>=0&&m.frame<n;});
+      if(window.SMMotion&&SMMotion.shiftLayerMotionKeys)SMMotion.shiftLayerMotionKeys(li,-inF);
+    });
+    if(state.markers)state.markers=state.markers.map(function(m){return{frame:m.frame-inF,name:m.name,color:m.color};}).filter(function(m){return m.frame>=0&&m.frame<n;});
+    if(state.cameraKeys)state.cameraKeys=state.cameraKeys.map(function(k){var c2=JSON.parse(JSON.stringify(k));c2.frame=k.frame-inF;return c2;}).filter(function(k){return k.frame>=0&&k.frame<n;});
+    state.totalFrames=n;window._totalF=n;
+    state.waIn=0;state.waOut=n-1;window._waIn=0;window._waOut=n-1;
+    state.currentFrame=Math.max(0,Math.min(n-1,state.currentFrame-inF));
+    loadFrame(state.currentFrame);renderLayerList();renderTimeline();updateUI();
+    if(window.updateWaBar)updateWaBar();
+    showToast('Composition réduite à la zone de travail ('+n+' frames)');
+  },
   setLayerKeyLock:function(li,mode){
     var ld=state.layers[li==null?state.activeLayerIdx:li];if(!ld)return;
     pushUndo();
@@ -1097,7 +1124,8 @@ window.SM={
       cameraKeys:state.cameraKeys||[],cameraLayerOn:!!state.cameraLayerOn,
       // Comp markers (markers.js) — pure annotation, but losing them on save
       // would make the feature pointless.
-      markers:state.markers||[],shyEnabled:!!state.shyEnabled});
+      markers:state.markers||[],shyEnabled:!!state.shyEnabled,
+      bpm:state.bpm,bpmOffset:state.bpmOffset,bpmShow:!!state.bpmShow});
   },
   mergeRemoteSnapshot:function(remoteData,remoteProfile){return mergeRemoteSnapshot(remoteData,remoteProfile);},
   // Cycles (v19) : repete N fois la plage de frames selectionnee (walk
@@ -1249,6 +1277,7 @@ window.SM={
     state.comments=d.comments||[];
     state.markers=d.markers||[];
     state.shyEnabled=!!d.shyEnabled;
+    state.bpm=d.bpm!=null?d.bpm:120;state.bpmOffset=d.bpmOffset||0;state.bpmShow=!!d.bpmShow;
     if(typeof refreshFbAvatars==='function')refreshFbAvatars(); // avatar stack mirrors state.comments — resync on project import
     state.cameraKeys=d.cameraKeys||[];state.cameraLayerOn=!!d.cameraLayerOn;state.cameraView=false;
     // Explicit fallback to the app default, not just "leave whatever was
@@ -2181,6 +2210,7 @@ function renderTimeline(){
   document.getElementById('playhead-flag').textContent=state.currentFrame+1;
   // Markers are overlays on rows this function just rebuilt — re-attach.
   if(window.SMMarkers)SMMarkers.render();
+  if(window.SMBpm)SMBpm.render();
   if(window.SMAudio)SMAudio.renderStrip();
   renderTweenCurveStrips();
   // renderTimeline() wipes #frame-grid, so the graph editor — which hides that

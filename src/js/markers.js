@@ -193,6 +193,10 @@
           { sep: true },
           { label: 'Repère suivant  (Maj+→)', action: function () { gotoAdjacent(1); } },
           { label: 'Repère précédent  (Maj+←)', action: function () { gotoAdjacent(-1); } },
+          { sep: true },
+          { label: 'Grille BPM…', action: function () { if (window.SMBpm) SMBpm.openSettings(); } },
+          { label: 'Réduire la composition à la zone de travail', action: function () { if (window.SM && SM.trimToWorkArea) SM.trimToWorkArea(); } },
+          { sep: true },
           { label: 'Supprimer tous les repères', disabled: !compMarkers().length, action: function () {
             if (window.pushUndo) pushUndo();
             state.markers = [];
