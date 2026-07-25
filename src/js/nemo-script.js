@@ -153,6 +153,74 @@
                strokeColor: s.strokeColor || null, fillColor: s.fillColor || null };
     });
   };
+  // ---- effects ----
+  // Reads and writes go through SMEffectKeys (effects-panel.js) rather than
+  // touching the key objects here: one definition of the shape, so a script
+  // and the effects panel can never disagree about what a key looks like.
+  function Effect(li, i) { this._li = li; this._i = i; }
+  Effect.prototype._e = function () {
+    var fx = (state.layers[this._li].effects || [])[this._i];
+    if (!fx) fail('aucun effet à l\'index ' + this._i);
+    return fx;
+  };
+  Object.defineProperty(Effect.prototype, 'type', { get: function () { return this._e().type; } });
+  Object.defineProperty(Effect.prototype, 'enabled', {
+    get: function () { return !!this._e().enabled; },
+    set: function (v) { this._e().enabled = !!v; if (window.updateEffectsPanel) updateEffectsPanel(); }
+  });
+  Effect.prototype.params = function () {
+    return window.SMEffectKeys ? SMEffectKeys.paramNames(this._e().type) : [];
+  };
+  Effect.prototype.get = function (param, frame) {
+    var f = frame == null ? state.currentFrame : frame;
+    return window.SMEffectKeys ? SMEffectKeys.valueAt(this._e(), param, f) : this._e()[param];
+  };
+  Effect.prototype.set = function (param, value) {
+    note('effect.set ' + param);
+    this._e()[param] = value;
+    return this;
+  };
+  Effect.prototype.key = function (param, frame, value, ease) {
+    note('effect.key ' + param + ' @' + frame);
+    var curve = EASES[ease || 'smooth'];
+    if (!curve) fail('ease inconnu « ' + ease + ' » (attendu : ' + Object.keys(EASES).join(', ') + ')');
+    if (!window.SMEffectKeys) fail('panneau d\'effets indisponible');
+    SMEffectKeys.setKey(this._e(), param, frame, value, JSON.parse(JSON.stringify(curve)));
+    return this;
+  };
+  Effect.prototype.keys = function (param) {
+    var trk = (this._e().keys || {})[param];
+    return trk ? trk.keys.map(function (k) { return { frame: k.frame, value: k.v[0] }; }) : [];
+  };
+  Effect.prototype.remove = function () {
+    var fx = state.layers[this._li].effects;
+    if (fx) fx.splice(this._i, 1);
+    if (window.updateEffectsPanel) updateEffectsPanel();
+  };
+  Layer.prototype.effects = function () {
+    var li = this.index;
+    return (this._ld().effects || []).map(function (_e, i) { return new Effect(li, i); });
+  };
+  Layer.prototype.addEffect = function (type) {
+    note('addEffect ' + type);
+    var ld = this._ld();
+    // Validate BEFORE creating: the panel's adder accepts any string, so an
+    // unknown type used to produce an effect the renderer cannot draw — silent
+    // nonsense instead of an error.
+    var valid = window.SMEffectKeys ? SMEffectKeys.types() : null;
+    if (valid && valid.indexOf(type) < 0) {
+      fail('type d\'effet inconnu « ' + type + ' » (attendu : ' + valid.join(', ') + ')');
+    }
+    var prev = state.activeLayerIdx;
+    // Goes through the panel's own adder so the effect gets its real defaults
+    // for its type, rather than a hand-built object that would be missing them.
+    window.SM.setActiveLayer(this.index);
+    if (!window.addEffectToActiveLayer) fail('panneau d\'effets indisponible');
+    addEffectToActiveLayer(type);
+    window.SM.setActiveLayer(prev);
+    if (!ld.effects || !ld.effects.length) fail('l\'effet « ' + type + ' » n\'a pas pu être créé');
+    return new Effect(this.index, ld.effects.length - 1);
+  };
   Layer.prototype.select = function () { window.SM.setActiveLayer(this.index); return this; };
   Layer.prototype.remove = function () { window.SM.setActiveLayer(this.index); window.SM.deleteLayer(); };
   Layer.prototype.duplicate = function () {
@@ -227,7 +295,9 @@
           layer: ['name', 'visible', 'locked', 'parent', 'inFrame', 'outFrame',
                   'get(prop,frame)', 'set(prop,value)', 'key(prop,frame,value,ease)',
                   'hold(prop,frame)', 'keys(prop)', 'clearKeys(prop)', 'strokes(frame)',
-                  'select()', 'duplicate()', 'remove()'],
+                  'effects()', 'addEffect(type)', 'select()', 'duplicate()', 'remove()'],
+          effect: ['type', 'enabled', 'params()', 'get(param,frame)', 'set(param,value)',
+                   'key(param,frame,value,ease)', 'keys(param)', 'remove()'],
           nemo: ['fps', 'width', 'height', 'frameCount', 'frame', 'layerCount',
                  'layer(nameOrIndex)', 'layers()', 'activeLayer()', 'addLayer(name)',
                  'addPivot(name)', 'goToFrame(f)', 'isKeyframe(li,f)', 'toast(msg)',
