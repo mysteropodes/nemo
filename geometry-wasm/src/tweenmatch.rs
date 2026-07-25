@@ -703,6 +703,20 @@ fn segs_intersect(p1: (f64, f64), p2: (f64, f64), p3: (f64, f64), p4: (f64, f64)
     ccw(p1, p3, p4) != ccw(p2, p3, p4) && ccw(p1, p2, p3) != ccw(p1, p2, p4)
 }
 const UNCROSS_TOL: f64 = 0.08;
+// Port of _orderReversed (tweens.js) — true when the vector joining two A
+// features points more than 120 deg away from the vector joining their
+// assigned B counterparts, i.e. the pair traded places.
+const ORDER_ANCHOR: f64 = 0.25;
+fn order_reversed(a1: (f64, f64), a2: (f64, f64), b1: (f64, f64), b2: (f64, f64)) -> bool {
+    let (ax, ay) = (a2.0 - a1.0, a2.1 - a1.1);
+    let (bx, by) = (b2.0 - b1.0, b2.1 - b1.1);
+    let la = (ax * ax + ay * ay).sqrt();
+    let lb = (bx * bx + by * by).sqrt();
+    if la < 1e-6 || lb < 1e-6 {
+        return false;
+    }
+    (ax * bx + ay * by) / (la * lb) < -0.5
+}
 fn uncross_matches(ms: &mut [MatchOut], fa: &[Feat], fb: &[Feat], match_norm: f64) {
     if ms.len() < 2 {
         return;
@@ -717,13 +731,6 @@ fn uncross_matches(ms: &mut [MatchOut], fa: &[Feat], fb: &[Feat], match_norm: f6
                 let b1 = (fb[m1b].cx, fb[m1b].cy);
                 let a2 = (fa[m2a].cx, fa[m2a].cy);
                 let b2 = (fb[m2b].cx, fb[m2b].cy);
-                if !segs_intersect(a1, b1, a2, b2) {
-                    continue;
-                }
-                let cur = match_sc(&fa[m1a], &fb[m1b], m1a == m1b, None, match_norm)
-                    + match_sc(&fa[m2a], &fb[m2b], m2a == m2b, None, match_norm);
-                let swp = match_sc(&fa[m1a], &fb[m2b], m1a == m2b, None, match_norm)
-                    + match_sc(&fa[m2a], &fb[m1b], m2a == m1b, None, match_norm);
                 // Near-twin widened tolerance — verbatim port of tweens.js's
                 // uncrossMatches (2026-07, "un oeil est mal reconnu"; see the
                 // JS comment for the measured rationale).
@@ -735,6 +742,24 @@ fn uncross_matches(ms: &mut [MatchOut], fa: &[Feat], fb: &[Feat], match_norm: f6
                     && fb[m1b].stype == fb[m2b].stype
                     && twin1
                     && twin2;
+                // Order-reversal gate — port of _orderReversed (tweens.js); see
+                // that comment for the measured tie that motivated it, and for
+                // why ORDER_ANCHOR guards it. The crossing test alone is blind
+                // when the motion exceeds the spacing between two features: the
+                // trajectories then run parallel however badly they are
+                // swapped. The anchor stops this indirect signal from
+                // overriding an assignment that already has strong direct
+                // evidence.
+                let cur1 = match_sc(&fa[m1a], &fb[m1b], m1a == m1b, None, match_norm);
+                let cur2 = match_sc(&fa[m2a], &fb[m2b], m2a == m2b, None, match_norm);
+                if !segs_intersect(a1, b1, a2, b2)
+                    && !(twins && cur1.min(cur2) > ORDER_ANCHOR && order_reversed(a1, a2, b1, b2))
+                {
+                    continue;
+                }
+                let cur = cur1 + cur2;
+                let swp = match_sc(&fa[m1a], &fb[m2b], m1a == m2b, None, match_norm)
+                    + match_sc(&fa[m2a], &fb[m1b], m2a == m1b, None, match_norm);
                 let tol = if twins { 0.25 } else { UNCROSS_TOL };
                 if swp <= cur + tol {
                     ms[i].b = m2b;

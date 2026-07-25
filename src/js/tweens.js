@@ -13,6 +13,24 @@ var TW_CURVATURE_DTW=false;
 var TW_CORRECTION_PASS=true;
 var TW_POINT_REDUCTION=true;
 var TW_HANDLE_REHARMONISE=true;
+// Weight of candScore's fold-back term (see foldBackFrac). OFF by default:
+// it was built first, to make the arbitration reject the folding candidate,
+// and it does — but only by falling back to a candidate that is worse in
+// other ways. Measured while calibrating it: at the weight needed to clear
+// testD's fold it also fired on testB, trading 3 folded edges for 9 extra
+// self-crossings, and the usable window was 5..10 rather than a plateau.
+// TW_INTRINSIC_ANCHOR then removed the fold at its source, so the arbitration
+// no longer has to choose between two bad candidates and this term has
+// nothing left to do. Kept, at 0, as a diagnostic and as a guard if a future
+// engine reintroduces the failure mode.
+var TW_FOLDBACK_W=0;
+// Fraction of a stroke's edges that must reverse before the flat charge
+// applies — below this it is pen noise on one or two short edges.
+var FOLDBACK_MIN=0.02;
+// Span pin for the intrinsic reconstruction on OPEN strokes — see
+// _intrinsicSegs' `else` branch. Set false to restore forward-only
+// integration.
+var TW_INTRINSIC_ANCHOR=true;
 // ---- MATCHING ----
 function buildTP(sd){var p=new Path({insert:false});sd.segments.forEach(function(s){p.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));});return p;}
 // A stroke's color and fill/stroke "type" are what a viewer actually reads
@@ -481,6 +499,33 @@ function _segsIntersect(p1,p2,p3,p4){
   return ccw(p1,p3,p4)!==ccw(p2,p3,p4)&&ccw(p1,p2,p3)!==ccw(p1,p2,p4);
 }
 var UNCROSS_TOL=0.08;
+// ORDER REVERSAL (2026-07, "problèmes d'assignements au niveau des yeux").
+// The crossing test above is blind whenever the MOTION is larger than the
+// SPACING between the two features: both trajectories then run parallel and
+// never intersect, however badly they are swapped. Measured on testD, the two
+// eyes 32px apart on a head that travelled ~80px right:
+//
+//   assignment   trajectories cross?   total centroid travel
+//   crossed             no                    170.7 px
+//   correct             no                    170.7 px
+//
+// An EXACT tie — the four points form a parallelogram, so no proximity-based
+// measure can ever separate them, and the Hungarian's arbitrary tie-break
+// decided which eye went where. What does separate them is arrangement: the
+// vector from the left eye to the right eye is (30,-5) in A, and the chosen
+// assignment maps it to (-36,16) — a reversal. Cel features keep their spatial
+// order, so a reversal between two near-twins is a matching error even when
+// nothing crosses. Restricted to near-twins (the `twins` test below) because
+// that is where proximity genuinely ties; distinct strokes stay governed by
+// the crossing test and the cost comparison alone. The 120 deg threshold
+// leaves a wide band of honest shear/rotation untouched.
+var ORDER_ANCHOR=0.25;
+function _orderReversed(a1,a2,b1,b2){
+  var ax=a2.x-a1.x,ay=a2.y-a1.y,bx=b2.x-b1.x,by=b2.y-b1.y;
+  var la=Math.sqrt(ax*ax+ay*ay),lb=Math.sqrt(bx*bx+by*by);
+  if(la<1e-6||lb<1e-6)return false;
+  return (ax*bx+ay*by)/(la*lb)<-0.5;
+}
 function uncrossMatches(ms,fA,fB){
   if(ms.length<2)return ms;
   for(var sweep=0;sweep<4;sweep++){
@@ -489,8 +534,25 @@ function uncrossMatches(ms,fA,fB){
       var m1=ms[i],m2=ms[j];
       var a1={x:fA[m1.a].cx,y:fA[m1.a].cy},b1={x:fB[m1.b].cx,y:fB[m1.b].cy};
       var a2={x:fA[m2.a].cx,y:fA[m2.a].cy},b2={x:fB[m2.b].cx,y:fB[m2.b].cy};
-      if(!_segsIntersect(a1,b1,a2,b2))continue;
-      var cur=matchSc(fA[m1.a],fB[m1.b],m1.a===m1.b)+matchSc(fA[m2.a],fB[m2.b],m2.a===m2.b);
+      var lr1x=Math.max(fA[m1.a].length,fA[m2.a].length)/Math.max(1,Math.min(fA[m1.a].length,fA[m2.a].length));
+      var lr2x=Math.max(fB[m1.b].length,fB[m2.b].length)/Math.max(1,Math.min(fB[m1.b].length,fB[m2.b].length));
+      var twinsX=fA[m1.a].type===fA[m2.a].type&&fB[m1.b].type===fB[m2.b].type
+        &&(lr1x<1.5||Math.abs(fA[m1.a].length-fA[m2.a].length)<15)
+        &&(lr2x<1.5||Math.abs(fB[m1.b].length-fB[m2.b].length)<15);
+      var cur1=matchSc(fA[m1.a],fB[m1.b],m1.a===m1.b),cur2=matchSc(fA[m2.a],fB[m2.b],m2.a===m2.b);
+      // An order reversal is INDIRECT evidence — much weaker than a geometric
+      // crossing — so it must not override an assignment that already has
+      // strong direct evidence behind it. Measured on the two cases that
+      // decide this gate (individual matchSc, lower is better):
+      //   testD eyes, must swap:      0.444 / 0.580  — both mediocre, tied
+      //   testC 16/17, must NOT swap: 0.121 / 0.371  — one near-certain
+      // The 0.121 pairing is two centroids 17px apart; swapping it produced
+      // two mediocre 84px/77px pairings for the same total travel. Anchoring
+      // on the BEST current score separates the two by 3.7x, rather than the
+      // tolerance route where they sit 0.034 vs 0.070 apart — a knife edge.
+      if(!_segsIntersect(a1,b1,a2,b2)
+        &&!(twinsX&&Math.min(cur1,cur2)>ORDER_ANCHOR&&_orderReversed(a1,a2,b1,b2)))continue;
+      var cur=cur1+cur2;
       var swp=matchSc(fA[m1.a],fB[m2.b],m1.a===m2.b)+matchSc(fA[m2.a],fB[m1.b],m2.a===m1.b);
       // NEAR-TWIN widened tolerance (2026-07, "un oeil est mal reconnu
       // par rapport à l'autre — identification par rapport au
@@ -507,12 +569,7 @@ function uncrossMatches(ms,fA,fB){
       // Same micro-stroke exemption as matchSc's ratioPen: two hand-drawn
       // eye ticks measured 21px vs 13px (ratio 1.6 — pure pen noise at
       // that size), so a small ABSOLUTE difference also qualifies as twin.
-      var lr1=Math.max(fA[m1.a].length,fA[m2.a].length)/Math.max(1,Math.min(fA[m1.a].length,fA[m2.a].length));
-      var lr2=Math.max(fB[m1.b].length,fB[m2.b].length)/Math.max(1,Math.min(fB[m1.b].length,fB[m2.b].length));
-      var twin1=lr1<1.5||Math.abs(fA[m1.a].length-fA[m2.a].length)<15;
-      var twin2=lr2<1.5||Math.abs(fB[m1.b].length-fB[m2.b].length)<15;
-      var twins=fA[m1.a].type===fA[m2.a].type&&fB[m1.b].type===fB[m2.b].type&&twin1&&twin2;
-      var tol=twins?0.25:UNCROSS_TOL;
+      var tol=twinsX?0.25:UNCROSS_TOL;
       if(swp<=cur+tol){
         var tmp=m1.b;m1.b=m2.b;m2.b=tmp;
         m1.score=matchSc(fA[m1.a],fB[m1.b],m1.a===m1.b);
@@ -1532,7 +1589,11 @@ function _segsSelfXCount(segs){
   }
   return c;
 }
-function _intrinsicSegs(rA,rB,et,cx2,cy2,closed){
+// `anchor` (optional) is the rigid-blend result for the SAME et — the
+// candidate the intrinsic reconstruction is an alternative to. When supplied,
+// an open stroke's walk has its span pinned to the anchor's span, with the
+// residual distributed along arc length. See the `else` branch below for why.
+function _intrinsicSegs(rA,rB,et,cx2,cy2,closed,anchor){
   var A=rA.segments,B=rB.segments,n=Math.min(A.length,B.length);
   if(n<3)return null;
   // Interpolate: first edge's absolute direction takes the shortest signed
@@ -1561,6 +1622,33 @@ function _intrinsicSegs(rA,rB,et,cx2,cy2,closed){
     var ex=pts[m][0]-pts[0][0],ey=pts[m][1]-pts[0][1];
     var total=0;for(var q=0;q<m;q++)total+=lens[q];
     if(total>1e-9){var acc=0;for(var p5=1;p5<=m;p5++){acc+=lens[p5-1];var f=acc/total;pts[p5][0]-=ex*f;pts[p5][1]-=ey*f;}}
+  }else if(TW_INTRINSIC_ANCHOR&&anchor&&anchor.length===n){
+    // OPEN strokes (2026-07-25, "le bras à gauche dont les sommets ont l'air
+    // de s'inverser"). A closed loop gets the correction just above because it
+    // has a known constraint — the walk must return to its start. An open
+    // stroke had none, so the walk was anchored only at index 0 and every
+    // per-edge angle error compounded monotonically along the arc. Measured on
+    // the reported left arm (79 points): the correspondence was sound in
+    // arc-length terms (max 7% drift) but disagreed sharply on local curvature
+    // at scattered indices (134 deg, 94 deg, 85 deg...), and integrating those
+    // swung a contiguous 42% of the stroke out and back through itself —
+    // 32 of 78 edges pointing backwards at the midframe.
+    //
+    // The constraint an open stroke DOES have: its two endpoints are
+    // corresponded vertices, so the rigid blend already knows where they
+    // belong, independently of any integration. Pin the walk's span to that
+    // and distribute the residual along arc length — same construction as the
+    // closure fix, and it cannot disturb endpoint exactness because at et=0
+    // and et=1 the walk reproduces its own keyframe and the anchor is that
+    // same keyframe, so the residual is identically zero.
+    //
+    // Deliberately pins the SPAN (end minus start) rather than both absolute
+    // positions: the recentring below already places the result, and pinning
+    // positions would fight the arc-path translation the motion handles apply.
+    var wx=(anchor[n-1].point[0]-anchor[0].point[0])-(pts[m][0]-pts[0][0]);
+    var wy=(anchor[n-1].point[1]-anchor[0].point[1])-(pts[m][1]-pts[0][1]);
+    var totO=0;for(var qo=0;qo<m;qo++)totO+=lens[qo];
+    if(totO>1e-9){var accO=0;for(var po=1;po<=m;po++){accO+=lens[po-1];var fo=accO/totO;pts[po][0]+=wx*fo;pts[po][1]+=wy*fo;}}
   }
   // Center on centroid, then place on the same arc-path position (cx2,cy2)
   // the linear result uses — motion-arc handles keep working identically.
@@ -2498,7 +2586,7 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
               var thTs=theta*ets_,scTs=lerp(1,scaleF,ets_),thBs=thTs-theta,scBs=lerp(scaleF>1e-6?1/scaleF:1,1,ets_);
               var cxs=cxA+(cxB-cxA)*ets_,cys=cyA+(cyB-cyA)*ets_;
               var linS=buildLinearSegs(ets_,thTs,scTs,thBs,scBs,cxs,cys);
-              var intrS=_intrinsicSegs(rA,rB,ets_,cxs,cys,ets_<.5?!!rA.closed:!!rB.closed);
+              var intrS=_intrinsicSegs(rA,rB,ets_,cxs,cys,ets_<.5?!!rA.closed:!!rB.closed,linS);
               var iwS=iwPeak*Math.sin(Math.PI*ets_);
               function mixS(w){
                 var o=[];
@@ -2624,6 +2712,40 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
             // charged for ripple it INVENTS, so a genuinely shaky hand-drawn
             // line is never penalised for staying faithful to itself.
             var ripAllow=Math.max(ripPoly(rA.segments),ripPoly(rB.segments));
+            // FOLD-BACK (2026-07, "le bras à gauche dont les sommets ont
+            // l'air de s'inverser"). Every other term here is blind to a
+            // stroke that doubles back ALONG ITSELF: the reversed run lies on
+            // top of the outgoing run, so it registers no self-crossing, the
+            // chord and arc length barely move, and the turning angles are
+            // locally plausible. Measured on the reported left arm
+            // (A1->B1, testD span 0-14, 79 points): edges 26..58 — a
+            // contiguous 42% of the stroke — kept healthy lengths in both
+            // keyframes (8.3px and 7.6px) yet collapsed to 2.2px and pointed
+            // BACKWARDS in the inbetween. Forcing each engine on that pair:
+            //   pure linear      0 flipped edges
+            //   intrinsic       33 flipped edges   <- what the arbitration chose
+            // The intrinsic reconstruction integrates lerped turning angles,
+            // so a partly-wrong correspondence makes it curl the stroke into a
+            // loop; nothing in the score noticed.
+            //
+            // An edge that opposes the SAME edge in BOTH keyframes was asked
+            // for by neither, so this is a defect signal with no legitimate
+            // interpretation — unlike ripple or chord drift, which trade off
+            // against faithfulness. Hence a heavy weight: a fold is closer to
+            // a self-crossing (10) than to a stylistic wobble.
+            function foldBackFrac(mid){
+              var fl=0,tot=0;
+              for(var fb=0;fb<n-1;fb++){
+                var axf=rA.segments[fb+1].point[0]-rA.segments[fb].point[0],ayf=rA.segments[fb+1].point[1]-rA.segments[fb].point[1];
+                var bxf=rB.segments[fb+1].point[0]-rB.segments[fb].point[0],byf=rB.segments[fb+1].point[1]-rB.segments[fb].point[1];
+                var mxf=mid[fb+1].point[0]-mid[fb].point[0],myf=mid[fb+1].point[1]-mid[fb].point[1];
+                var laf=Math.sqrt(axf*axf+ayf*ayf),lbf=Math.sqrt(bxf*bxf+byf*byf),lmf=Math.sqrt(mxf*mxf+myf*myf);
+                if(laf<0.5||lbf<0.5||lmf<0.5)continue;
+                tot++;
+                if((axf*mxf+ayf*myf)/(laf*lmf)<-0.2&&(bxf*mxf+byf*myf)/(lbf*lmf)<-0.2)fl++;
+              }
+              return tot?fl/tot:0;
+            }
             function candScore(traj){
               var exX=0;
               for(var st=1;st<traj.length-1;st++)exX+=Math.max(0,_segsSelfXCount(traj[st])-base);
@@ -2658,10 +2780,29 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
               // and never overrides a real fold or crossing verdict (worth
               // 1.0 and 10.0 respectively).
               var ripExcess=Math.max(0,ripPoly(mid)-ripAllow);
-              return exX*10+cd/(Math.PI/6)+ld5*5+back/(n*0.8)+foldErr/(Math.PI/6)+ripExcess*0.15;
+              // Fold-back is a DISQUALIFIER, not a trade-off. Measured on the
+              // reported left arm, candidate scores before this term:
+              //   uniform intrinsic 17.93 (41% of edges folded)  <- was chosen
+              //   pure linear       44.91 ( 0% folded)
+              // The intrinsic candidate wins by 27 points because it preserves
+              // arc length, which is exactly what it exists for — a limb that
+              // bends shortens badly under linear blending. But no amount of
+              // length fidelity redeems a stroke that doubles back through
+              // itself, so a proportional penalty is the wrong shape: it would
+              // have to out-weigh a legitimate 27-point advantage, and then it
+              // would dominate everything else too. A flat charge as soon as a
+              // meaningful fraction folds, plus a small proportional part so
+              // the least-folded still wins when every candidate folds.
+              var fbFrac=foldBackFrac(mid);
+              var fbPen=fbFrac>FOLDBACK_MIN?TW_FOLDBACK_W*(3+fbFrac*10):0;
+              return exX*10+cd/(Math.PI/6)+ld5*5+back/(n*0.8)+foldErr/(Math.PI/6)+ripExcess*0.15+fbPen;
             }
             var scB5c=candScore(candTraj.b),scU5=candScore(candTraj.u),scL5=candScore(candTraj.l);
             var scM5=mlsPerV?candScore(candTraj.m):Infinity;
+            if(window.__TW_DEBUG_SCORES)rA._twDbgScores={
+              b:scB5c,u:scU5,l:scL5,m:scM5,
+              fb:{b:foldBackFrac(candTraj.b[midIdx+1]),u:foldBackFrac(candTraj.u[midIdx+1]),
+                  l:foldBackFrac(candTraj.l[midIdx+1]),m:mlsPerV?foldBackFrac(candTraj.m[midIdx+1]):null}};
             var best=Math.min(scB5c,scU5,scL5,scM5);
             rA._twUseMLS=null;
             if(scB5c-best<0.05){/* keep per-vertex blend */}
@@ -2713,7 +2854,10 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
       iw*=rA._twTurnTrust;
     }
     if(iw>0.001){
-      var iSegs=_intrinsicSegs(rA,rB,et,cx2,cy2,et<.5?!!rA.closed:!!rB.closed);
+      // `segs` here is the rigid-blend result at this same et — the anchor the
+      // open-stroke span pin needs (see _intrinsicSegs). MLS never reaches this
+      // branch: selecting it sets _twIwProbe to 0, so iw is 0.
+      var iSegs=_intrinsicSegs(rA,rB,et,cx2,cy2,et<.5?!!rA.closed:!!rB.closed,segs);
       var lTrust=rA._twLocalTrust;
       if(iSegs)for(var wi3=0;wi3<n;wi3++){
         var iwv=lTrust?iw*lTrust[wi3]:iw;
