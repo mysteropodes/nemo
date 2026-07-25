@@ -240,8 +240,11 @@
       alert: function (m) { if (window.showToast) showToast(String(m)); note('alert: ' + m); },
       writeLn: function (m) { note('writeLn: ' + m); },
       $: { writeln: function (m) { note('$.writeln: ' + m); }, engineName: 'nemo', level: 0 },
-      Window: function () { nyi('ScriptUI (Window)'); },
-      Panel: function () { nyi('ScriptUI (Panel)'); },
+      // Real ScriptUI (aescript-ui.js) — most aescripts tools ARE a palette,
+      // so refusing here would have limited the bridge to the minority of
+      // scripts with no interface.
+      Window: window.SMScriptUI ? window.SMScriptUI.Window : function () { nyi('ScriptUI (Window)'); },
+      Panel: window.SMScriptUI ? window.SMScriptUI.Panel : function () { nyi('ScriptUI (Panel)'); },
       File: function () { nyi('File I/O'); },
       Folder: function () { nyi('Folder I/O'); }
     };
@@ -349,7 +352,8 @@
         comp: ['name', 'width', 'height', 'frameRate', 'frameDuration', 'duration', 'numLayers', 'time', 'layers(i)', 'layers.byName()', 'layers.addNull()', 'selectedLayers'],
         app: ['project.activeItem', 'project.item()', 'beginUndoGroup()', 'endUndoGroup()', 'version'],
         globals: ['alert()', '$.writeln()'],
-        notSupported: ['ScriptUI (Window/Panel)', 'File/Folder I/O', 'expressions', 'render queue', 'addSolid/addText', 'executeCommand']
+        scriptUI: ['Window (palette/dialog)', 'group', 'panel', 'button', 'statictext', 'edittext', 'checkbox', 'radiobutton', 'dropdownlist', 'listbox', 'slider', 'progressbar', 'orientation/alignChildren/spacing/margins', 'onClick/onChange/onChanging'],
+        notSupported: ['File/Folder I/O', 'expressions', 'render queue', 'addSolid/addText', 'executeCommand', 'absolute-bounds layout']
       };
     }
   };

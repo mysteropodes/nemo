@@ -1501,3 +1501,29 @@ body.mode-motion .lrow.act{box-shadow:inset 3px 0 0 #4E6FF2,inset 0 0 0 1px rgba
 .phdr .fx-count{margin-left:auto;background:var(--accent);color:#fff;border-radius:8px;
   min-width:15px;height:15px;line-height:15px;text-align:center;font-size:9px;
   font-weight:700;padding:0 4px;}
+
+/* ---- ScriptUI palettes (aescript-ui.js) ----
+   A real floating window so an AE tool's own interface is usable here. Styled
+   as the app's own panels rather than mimicking ScriptUI's OS look — it lives
+   inside Nemo, so it should read as part of it. */
+.sui-window{position:fixed;z-index:400;background:var(--panel2);border:1px solid var(--border2);
+  border-radius:8px;box-shadow:0 12px 40px rgba(0,0,0,.55);min-width:180px;font-size:11px;color:var(--text);}
+.sui-titlebar{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:6px 8px;border-bottom:1px solid var(--border);cursor:move;font-weight:600;user-select:none;}
+.sui-close{background:none;border:none;color:var(--text-dim);font-size:15px;line-height:1;cursor:pointer;padding:0 2px;}
+.sui-close:hover{color:var(--text);}
+.sui-body{display:flex;flex-direction:column;gap:6px;padding:8px;}
+.sui-group{display:flex;flex-direction:column;gap:6px;}
+.sui-panel{display:flex;flex-direction:column;gap:6px;padding:8px;border:1px solid var(--border);border-radius:6px;}
+.sui-panel-title{font-size:9px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.4px;}
+.sui-btn{background:var(--panel);border:1px solid var(--border2);color:var(--text);
+  border-radius:5px;padding:5px 10px;cursor:pointer;font-size:11px;}
+.sui-btn:hover{border-color:var(--accent);color:#fff;}
+.sui-text{color:var(--text-dim);}
+.sui-input{background:var(--panel);border:1px solid var(--border);color:var(--text);
+  border-radius:4px;padding:4px 6px;font-size:11px;min-width:60px;}
+.sui-select{background:var(--panel);border:1px solid var(--border);color:var(--text);
+  border-radius:4px;padding:4px 6px;font-size:11px;}
+.sui-check{display:flex;align-items:center;gap:5px;cursor:pointer;}
+.sui-slider{width:100%;}
+.sui-progress{width:100%;height:6px;}
