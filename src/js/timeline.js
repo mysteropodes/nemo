@@ -4207,6 +4207,12 @@ function initAppMenu(){
       {label:tt('menuSave'),shortcut:'⌘S',action:function(){if(window.SMProject)window.SMProject.save();}},
       {label:tt('menuSaveAs'),shortcut:'⇧⌘S',action:function(){if(window.SMProject)window.SMProject.saveAs();}},
       {label:tt('menuFromKitsu'),id:'ctx-kitsu-open',action:function(){clickEl('btn-kitsu-open');}},
+      // Nemo's own extensibility (nemo-script.js / nemo-plugin.js) — this
+      // app's model in this app's vocabulary, so it ships.
+      {label:'Ouvrir un script Nemo (.js)…',id:'ctx-nemo-script',
+        action:function(){if(window.SMScript)SMScript.openFile();}},
+      {label:'Ouvrir un plugin Nemo (.zip)…',id:'ctx-nemo-plugin',
+        action:function(){if(window.SMPlugin)SMPlugin.openFile();}},
       {label:tt('menuVersionHistory'),id:'ctx-history',action:function(){clickEl('btn-history');}},
       {sep:true},
       {label:tt('menuImportImg'),action:function(){clickEl('btn-import-img');}},
