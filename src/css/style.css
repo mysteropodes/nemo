@@ -1634,3 +1634,9 @@ body.mode-motion .lrow.act{box-shadow:inset 3px 0 0 #4E6FF2,inset 0 0 0 1px rgba
 .motion-key-vel{position:absolute;left:14px;top:-2px;transform:rotate(-45deg);
   font-size:8.5px;line-height:1;color:var(--text-dim);background:rgba(0,0,0,.6);
   padding:1px 3px;border-radius:3px;white-space:nowrap;pointer-events:none;}
+
+/* Expression row extras (Van Dijk 7.2 / 7.4) */
+.motion-expr-raw{margin-left:10px;font-size:9.5px;color:var(--text-dim);}
+.motion-expr-glob{margin-left:auto;font-size:9.5px;padding:2px 7px;border-radius:4px;
+  border:1px solid var(--border);background:var(--panel2);color:var(--text-dim);cursor:pointer;}
+.motion-expr-glob:hover{color:var(--text);border-color:var(--border2);}

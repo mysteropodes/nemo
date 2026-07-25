@@ -1147,7 +1147,8 @@ window.SM={
       // would make the feature pointless.
       markers:state.markers||[],shyEnabled:!!state.shyEnabled,
       bpm:state.bpm,bpmOffset:state.bpmOffset,bpmShow:!!state.bpmShow,
-      motionBlurOn:!!state.motionBlurOn,motionBlurSamples:state.motionBlurSamples,motionBlurShutter:state.motionBlurShutter});
+      motionBlurOn:!!state.motionBlurOn,motionBlurSamples:state.motionBlurSamples,motionBlurShutter:state.motionBlurShutter,
+      exprGlobals:state.exprGlobals||''});
   },
   mergeRemoteSnapshot:function(remoteData,remoteProfile){return mergeRemoteSnapshot(remoteData,remoteProfile);},
   // Cycles (v19) : repete N fois la plage de frames selectionnee (walk
@@ -1300,6 +1301,7 @@ window.SM={
     state.markers=d.markers||[];
     state.shyEnabled=!!d.shyEnabled;
     state.bpm=d.bpm!=null?d.bpm:120;state.bpmOffset=d.bpmOffset||0;state.bpmShow=!!d.bpmShow;
+    state.exprGlobals=d.exprGlobals||'';
     state.motionBlurOn=!!d.motionBlurOn;state.motionBlurSamples=d.motionBlurSamples||6;state.motionBlurShutter=d.motionBlurShutter!=null?d.motionBlurShutter:0.5;
     if(typeof refreshFbAvatars==='function')refreshFbAvatars(); // avatar stack mirrors state.comments — resync on project import
     state.cameraKeys=d.cameraKeys||[];state.cameraLayerOn=!!d.cameraLayerOn;state.cameraView=false;

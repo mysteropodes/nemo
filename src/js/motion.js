@@ -548,22 +548,33 @@
       opacity: valueAtFrame(ld2, 'opacity', frame)[0],
     };
   }
+  // Project-wide expression preamble (Van Dijk 7.2, "set global variables":
+  // define something once and use it from every expression instead of
+  // retyping it). Plain statements — `var k = 12;` — evaluated in the same
+  // scope as the expression body, so anything it declares is in scope.
+  // Cached against BOTH the expression's code and the preamble, so editing
+  // the preamble recompiles every expression rather than silently leaving
+  // stale ones behind.
+  function exprGlobals() { return state.exprGlobals || ''; }
   function compiledFnFor(holder, prop) {
     var ex = holder.expressions[prop];
-    if (holder._exprCompiled && holder._exprCompiled[prop] && holder._exprCompiled[prop].code === ex.code) {
+    var pre = exprGlobals();
+    if (holder._exprCompiled && holder._exprCompiled[prop] && holder._exprCompiled[prop].code === ex.code
+        && holder._exprCompiled[prop].pre === pre) {
       return holder._exprCompiled[prop].fn;
     }
     var fn;
     try {
       // eslint-disable-next-line no-new-func
-      fn = new Function('time', 'frame', 'value', 'layer', 'wiggle', 'loopOut', '"use strict";\nreturn (\n' + ex.code + '\n);');
+      fn = new Function('time', 'frame', 'value', 'layer', 'wiggle', 'loopOut',
+        '"use strict";\n' + (pre ? pre + '\n' : '') + 'return (\n' + ex.code + '\n);');
       ex.lastError = null;
     } catch (e) {
       fn = null;
-      ex.lastError = 'Erreur de syntaxe : ' + e.message;
+      ex.lastError = 'Erreur de syntaxe : ' + e.message + (pre ? ' (variables globales incluses)' : '');
     }
     if (!holder._exprCompiled) holder._exprCompiled = {};
-    holder._exprCompiled[prop] = { code: ex.code, fn: fn };
+    holder._exprCompiled[prop] = { code: ex.code, pre: pre, fn: fn };
     return fn;
   }
   // Normalizes an expression's return value to the array shape PROP_DIM
@@ -2081,6 +2092,30 @@
     head.appendChild(cb);
     head.appendChild(document.createTextNode(' Activer l’expression'));
     row.appendChild(head);
+    // The value the property WOULD have without the expression (Van Dijk
+    // 7.4). With an expression on, the field above shows the RESULT, and
+    // the underlying keyframed value becomes invisible — you end up
+    // disabling the expression just to see what you are driving.
+    var rawWrap = document.createElement('span');
+    rawWrap.className = 'motion-expr-raw';
+    var raw = rawValueAtFrame(holder, prop, state.currentFrame);
+    rawWrap.textContent = 'sans expression : ' + raw.map(function (n) { return Math.round(n * 100) / 100; }).join(', ') + ' ' + (PROP_UNIT[prop] || '');
+    rawWrap.title = 'Valeur de la propriété avant application de l’expression, à la frame courante';
+    row.appendChild(rawWrap);
+    // Project-wide preamble (7.2) — reachable from the same place you write
+    // the expression that uses it, rather than a settings panel away.
+    var glob = document.createElement('button');
+    glob.className = 'motion-expr-glob';
+    glob.textContent = exprGlobals() ? 'Variables globales ✓' : 'Variables globales…';
+    glob.title = 'Code exécuté avant CHAQUE expression du projet — déclare ici ce que tu réutilises partout';
+    glob.addEventListener('click', function (e) {
+      e.preventDefault(); e.stopPropagation();
+      var v = prompt('Variables globales — exécutées avant chaque expression\nex : var beat = 60 / 120 * ' + (state.fps || 24) + ';', exprGlobals());
+      if (v === null) return;
+      pushUndo();
+      window.SMMotion.setExprGlobals(v);
+    });
+    row.appendChild(glob);
     var ta = document.createElement('textarea'); ta.className = 'motion-expr-code';
     ta.value = expr.code; ta.spellcheck = false; ta.rows = 3;
     ta.placeholder = 'value + wiggle(2, 10)';
@@ -3479,6 +3514,22 @@
     findLayerIndexByUid: findLayerIndexByUid,
     setLayerParent: setLayerParent,
     shiftLayerMotionKeys: shiftLayerMotionKeys,
+    exprGlobals: exprGlobals,
+    setExprGlobals: function (code) {
+      state.exprGlobals = code || '';
+      // Drop every cached compile: they were built with the OLD preamble.
+      state.layers.forEach(function (l) {
+        delete l._exprCompiled;
+        if (l.elementMotion) Object.keys(l.elementMotion).forEach(function (k) { delete l.elementMotion[k]._exprCompiled; });
+      });
+      renderLayerList(); renderTimeline();
+      if (window.SMEngineBridge) SMEngineBridge.renderNow();
+    },
+    // The value a property WOULD have without its expression (Van Dijk 7.4,
+    // "show the unaffected value of the property"). rawValueAtFrame is the
+    // pre-expression path by construction — valueAtFrame is the one that
+    // layers the expression on top — so this cannot drift from it.
+    rawValueAtFrame: function (holder, prop, frame) { return rawValueAtFrame(holder, prop, frame); },
     enableTimeRemap: enableTimeRemap,
     disableTimeRemap: disableTimeRemap,
     timeRemapValue: timeRemapValue,
