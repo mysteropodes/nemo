@@ -1322,6 +1322,11 @@
       </div>
     </div>
     <div id="layer-panel-resize" data-i18n-title="layerPanelResizeTitle" title="Drag to resize the layers panel"></div>
+    <!-- Column: the scrolling grid, then the horizontal-scroll strip that
+         sits in the bottom band (see #fg-hscroll below). A wrapper rather
+         than an absolutely-positioned strip so it inherits the grid's width
+         automatically — the layer panel next to it is user-resizable. -->
+    <div id="fg-col">
     <div id="fg-wrap">
       <!-- Design audit 2026-07 (feedback: "le ruler au dessus"): #frame-hdr
            (the numbered ruler) now comes FIRST in both DOM and stacking —
@@ -1362,6 +1367,17 @@
            already uses. -->
       <div id="playhead"><div id="playhead-flag" data-i18n-title="playheadFlagTitle" title="Glisse pour te déplacer dans le temps"></div></div>
     </div>
+    <!-- Horizontal scroll lives in its OWN strip, in the same bottom band
+         as the layer panel's +/camera/trash buttons and below the separator
+         line (2026-07-25: "tu aurais pu mettre la scroll bar sous le trait
+         orange, là tu manges de l'espace inutile"). It can't be #fg-wrap's
+         own scrollbar: that one is drawn at the bottom edge of the SCROLL
+         VIEWPORT, and the viewport has to stop at the line so the grid
+         shows exactly the rows the layer panel does. A separate strip, kept
+         in sync both ways (ui.js), puts the bar in the band that was
+         already there and otherwise empty. -->
+    <div id="fg-hscroll"><div id="fg-hscroll-inner"></div></div>
+  </div>
   </div>
 </div>
 

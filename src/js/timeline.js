@@ -2066,7 +2066,16 @@ function renderTimeline(){
   // scrollbar. Math.max keeps the line covering a tall/scrolled layer
   // list too (that case was already correct).
   var awrap=document.getElementById('fg-wrap');
-  document.getElementById('playhead').style.left=(state.currentFrame*FC)+'px';document.getElementById('playhead').style.height=Math.max(30+rowCount*ROW_H+camGridRowOffset(),awrap?awrap.clientHeight:0)+'px';document.getElementById('playhead-flag').textContent=state.currentFrame+1;
+  document.getElementById('playhead').style.left=(state.currentFrame*FC)+'px';
+  // Fallback height = the wrap's own viewport, so the scrub line always
+  // reaches the bottom of the visible area even with few rows. It briefly
+  // stopped doing that (2026-07-25, "la barre verticale de scrubbing a
+  // complètement été remontée") while #fg-wrap carried a margin-bottom to
+  // clear the button band — the viewport shrank, and so did this. The band
+  // is now a separate strip (#fg-hscroll) outside the wrap, so the viewport
+  // is whole again and no correction belongs here.
+  document.getElementById('playhead').style.height=Math.max(30+rowCount*ROW_H+camGridRowOffset(),awrap?awrap.clientHeight:0)+'px';
+  document.getElementById('playhead-flag').textContent=state.currentFrame+1;
   if(window.SMAudio)SMAudio.renderStrip();
   renderTweenCurveStrips();
   // renderTimeline() wipes #frame-grid, so the graph editor — which hides that

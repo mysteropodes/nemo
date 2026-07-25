@@ -596,13 +596,7 @@ input[type="checkbox"]:disabled{opacity:.4;cursor:not-allowed;}
 #layer-panel{width:220px;flex-shrink:0;background:#1a1920;border-right:1px solid rgba(0,0,0,.5);display:flex;flex-direction:column;}
 #layer-panel-resize{width:4px;cursor:ew-resize;background:var(--border);flex-shrink:0;}
 #layer-panel-resize:hover,#layer-panel-resize.active{background:var(--accent);}
-/* padding-bottom, matching #frame-grid's: macOS draws the horizontal
-   scrollbar as an OVERLAY with zero layout height, right at #fg-wrap's
-   bottom edge — so it sat on top of the last row. Shortening both VIEWPORTS
-   doesn't help (the rows just end lower with it); the 10px has to go on the
-   scrollable CONTENT, on BOTH sides, so the bar gets a lane of its own and
-   the last row still lines up across the two panels at full scroll. */
-#layer-list{flex:1;overflow-y:auto;padding-bottom:10px;}
+#layer-list{flex:1;overflow-y:auto;}
 .lrow{display:flex;align-items:center;height:34px;padding:0 6px;border-bottom:1px solid rgba(255,255,255,.035);cursor:pointer;gap:3px;font-size:11.5px;}
 /* Camera layer row (v18): same 34px rhythm as .lrow/.frow so the panel and
    grid stay perfectly aligned; a warm accent to read as "not a draw layer". */
@@ -811,25 +805,45 @@ body.mode-motion .lrow.act{box-shadow:inset 3px 0 0 #4E6FF2,inset 0 0 0 1px rgba
 #layer-ctrls button:hover{background:#2c2a31;color:var(--text);}
 #layer-ctrls .material-symbols-rounded{font-size:13px;}
 #layer-ctrls svg{width:13px;height:13px;display:block;}
-/* margin-bottom matches #layer-ctrls' 40px height (2026-07-25: "les boutons
-   d'ajout à gauche sont plus haut que la scroll bar, et celle-ci est
-   transparente"). The grid's viewport used to run 40px LOWER than
-   #layer-list's — the panel gives that strip to its +/camera/trash buttons,
-   the grid gave it to more rows — so the last rows were drawn with no name
-   beside them, and the horizontal scrollbar floated over them as a macOS
-   overlay. Ending the grid where the list ends makes the two show exactly
-   the same rows, puts the scrollbar on the same line as the buttons, and as
-   a bonus makes both scroll ranges equal on their own (layer-scroll-sync's
-   spacer computes to 0 instead of 40). */
-#fg-wrap{flex:1;overflow:auto;position:relative;margin-bottom:40px;}
-/* macOS draws overlay scrollbars that stay invisible until you scroll —
-   fine over a document, useless over a timeline where the bar IS the
-   position indicator. Force a real, always-visible one. */
-#fg-wrap::-webkit-scrollbar{height:10px;width:10px;}
+/* The grid's viewport runs 40px LOWER than #layer-list's, because the panel
+   gives that bottom strip to its +/camera/trash buttons while the grid has
+   no equivalent chrome. That used to mean the last rows were drawn with no
+   name beside them, and the macOS overlay scrollbar floated on top of them
+   (2026-07-25: "les boutons d'ajout à gauche sont plus haut que la scroll
+   bar, et celle-ci est transparente").
+   Two things had to be true at once, and reserving a lane INSIDE the grid
+   satisfied neither: the grid must stop at the separator line (so both
+   panels show the same rows), and the scroll bar must sit BELOW that line
+   in the band the buttons already occupy ("tu aurais pu mettre la scroll
+   bar sous le trait orange, là tu manges de l'espace inutile"). A viewport
+   can only draw its own scrollbar at its own edge, so the bar is no longer
+   the grid's: #fg-hscroll is a separate strip in the band, mirrored both
+   ways (layer-scroll-sync.js). */
+#fg-col{flex:1;display:flex;flex-direction:column;min-width:0;}
+/* #fg-wrap fills #fg-col above the strip, so its viewport ends exactly
+   where #layer-list's does — the two panels always show the same rows. */
+#fg-wrap{flex:1;overflow:auto;position:relative;min-height:0;}
+/* The grid's OWN horizontal bar is suppressed — #fg-hscroll below is the
+   real one, down in the bottom band. The vertical one stays (and is styled
+   here, because macOS overlay scrollbars stay invisible until you scroll,
+   which is useless on a timeline where the bar doubles as a position
+   indicator). */
+#fg-wrap::-webkit-scrollbar:horizontal{height:0;}
+#fg-wrap::-webkit-scrollbar{width:10px;}
 #fg-wrap::-webkit-scrollbar-track{background:rgba(0,0,0,.32);border-radius:5px;}
 #fg-wrap::-webkit-scrollbar-thumb{background:rgba(255,255,255,.22);border-radius:5px;border:2px solid transparent;background-clip:content-box;}
 #fg-wrap::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.38);background-clip:content-box;}
 #fg-wrap::-webkit-scrollbar-corner{background:transparent;}
+/* Same 40px height as #layer-ctrls next to it, so the timeline ends on one
+   straight line: buttons on the left, scroll bar on the right, both below
+   the separator. */
+#fg-hscroll{flex:0 0 auto;height:40px;overflow-x:auto;overflow-y:hidden;
+  border-top:1px solid rgba(255,255,255,.06);display:flex;align-items:center;}
+#fg-hscroll-inner{height:1px;flex:0 0 auto;}
+#fg-hscroll::-webkit-scrollbar{height:11px;}
+#fg-hscroll::-webkit-scrollbar-track{background:rgba(0,0,0,.28);border-radius:6px;margin:0 6px;}
+#fg-hscroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.24);border-radius:6px;border:2px solid transparent;background-clip:content-box;}
+#fg-hscroll::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.4);background-clip:content-box;}
 /* Design audit 2026-07, round 2 (feedback: "le work area ressemble trop à
    un calque" — the boxed/bordered/purple v1 read as another layer bar, not
    a lightweight timeline indicator; "le ruler au dessus" — the numbered
@@ -1004,7 +1018,7 @@ body.mode-motion .lrow.act{box-shadow:inset 3px 0 0 #4E6FF2,inset 0 0 0 1px rgba
    work-area bars — confirmed live: elementFromPoint() over #bars-row hit
    a .layer-inout-bar instead. z-index:1 (below frame-hdr/bars-row's 2) so
    this box itself never outranks them either. */
-#frame-grid{display:flex;flex-direction:column;position:relative;z-index:1;padding-bottom:10px;}
+#frame-grid{display:flex;flex-direction:column;position:relative;z-index:1;}
 /* Must stay in lockstep with .lrow's height (28px, v3 redesign) — the layer
    name column (#layer-panel) and the frame grid (#fg-wrap) are separate
    flex columns rendered independently, so any mismatch between .lrow's and
