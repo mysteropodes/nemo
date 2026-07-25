@@ -1468,3 +1468,19 @@ body.mode-motion .lrow.act{box-shadow:inset 3px 0 0 #4E6FF2,inset 0 0 0 1px rgba
 .sb-ruler{position:absolute;height:14px;background:repeating-linear-gradient(90deg,var(--border2) 0 1px,transparent 1px 8px),var(--panel2);border:1px solid var(--border);border-radius:4px 4px 0 0;cursor:ew-resize;overflow:visible;}
 .sb-ruler .sb-ph{top:0;bottom:-4px;}
 .sb-ruler-lbl{position:absolute;right:4px;top:0;font-size:8px;color:var(--text-dim);pointer-events:none;line-height:14px;}
+
+/* ---- Motion graph editor (motion-graph.js) ----
+   Absolutely positioned INSIDE #fg-wrap (the scroller) so it inherits
+   horizontal scroll and the live FC frame width without participating in the
+   panel/grid row-alignment invariant motion.js depends on. */
+#motion-graph{position:absolute;left:0;top:42px;z-index:3;display:none;
+  background:var(--panel);border-top:1px solid var(--border);}
+#motion-graph svg{display:block;}
+#motion-graph .mg-key{cursor:ns-resize;}
+#motion-graph .mg-ease{cursor:move;}
+/* Pinned to the visible scroll window (left is updated on scroll) rather than
+   to the graph's own origin, so the legend stays readable at any scroll x. */
+#motion-graph .mg-legend{position:absolute;top:4px;font-size:9px;
+  background:color-mix(in srgb,var(--panel) 88%,transparent);
+  padding:2px 6px;border-radius:3px;pointer-events:none;white-space:nowrap;}
+#btn-mgraph.on{color:var(--accent);}
