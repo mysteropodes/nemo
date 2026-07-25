@@ -5,7 +5,7 @@
   "build": {
     "frontendDist": "../src",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "python3 ../scripts/assert-no-private-labs.py"
+    "beforeBuildCommand": "python3 scripts/assert-no-private-labs.py"
   },
   "app": {
     "withGlobalTauri": true,
