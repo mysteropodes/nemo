@@ -1640,3 +1640,26 @@ body.mode-motion .lrow.act{box-shadow:inset 3px 0 0 #4E6FF2,inset 0 0 0 1px rgba
 .motion-expr-glob{margin-left:auto;font-size:9.5px;padding:2px 7px;border-radius:4px;
   border:1px solid var(--border);background:var(--panel2);color:var(--text-dim);cursor:pointer;}
 .motion-expr-glob:hover{color:var(--text);border-color:var(--border2);}
+
+/* ---- EXPRESSION EDITOR (Van Dijk 7.5) + PICKWHIP (7.3) --------------- */
+.motion-expr-pane{position:relative;display:flex;width:100%;margin-top:4px;
+  border:1px solid var(--border);border-radius:5px;background:#131217;overflow:hidden;}
+.motion-expr-gutter{flex:0 0 auto;width:26px;padding:5px 0;overflow:hidden;
+  text-align:right;user-select:none;background:rgba(255,255,255,.03);
+  border-right:1px solid var(--border);}
+.motion-expr-gutter span{display:block;font:10px/1.45 var(--font-mono,monospace);
+  color:rgba(236,234,231,.28);padding-right:5px;}
+.motion-expr-gutter span.err{color:#ff6b6b;font-weight:700;}
+.motion-expr-pane .motion-expr-code{flex:1;min-width:0;height:58px;resize:none;border:0;
+  background:transparent;color:var(--text);padding:5px 7px;outline:none;
+  font:10px/1.45 var(--font-mono,monospace);white-space:pre;overflow:auto;}
+/* Bottom-right grip. Deliberately not `resize:vertical` on the textarea:
+   a native resize gives no event, and the frame grid has to re-render on
+   every height change to keep its rows aligned (CLAUDE.md §11). */
+.motion-expr-grip{position:absolute;right:0;bottom:0;width:14px;height:14px;
+  cursor:ns-resize;background:linear-gradient(135deg,transparent 45%,var(--border2) 45%,var(--border2) 55%,transparent 55%);}
+.motion-expr-whip{display:inline-block;width:9px;height:9px;margin-left:8px;
+  vertical-align:-1px;border-radius:50%;border:1.5px solid var(--text-dim);cursor:alias;}
+.motion-expr-whip:hover{border-color:var(--accent,#5b6cff);box-shadow:0 0 0 2px rgba(91,108,255,.25);}
+.motion-prop-row.pick-target,.motion-track-row.pick-target{
+  outline:1px solid var(--accent,#5b6cff);outline-offset:-1px;background:rgba(91,108,255,.12);}

@@ -5198,6 +5198,11 @@ function onKeyDown(event){
   // ('u' is otherwise bound to the Line tool, TOOL_SHORTCUTS) — only inside
   // Motion mode, the Line tool shortcut is untouched everywhere else.
   if((k==='u'||k==='U')&&state.appMode==='motion'&&window.SMMotion&&SMMotion.revealAnimated()){event.preventDefault();return;}
+  // E / M — Van Dijk 5.1's siblings of U. Guarded on Motion mode like U, and
+  // checked AFTER the tool shortcuts they'd otherwise shadow: `e` is only a
+  // reveal here, never in Animation 2D where it may be a tool letter.
+  if((k==='e'||k==='E')&&!event.metaKey&&!event.ctrlKey&&!event.altKey&&state.appMode==='motion'&&window.SMMotion&&SMMotion.revealEffects()){event.preventDefault();return;}
+  if((k==='m'||k==='M')&&!event.metaKey&&!event.ctrlKey&&!event.altKey&&state.appMode==='motion'&&window.SMMotion&&SMMotion.revealMattes()){event.preventDefault();return;}
   // Shift+F3 — AE's own Graph Editor toggle. Motion-only, like every other
   // binding in this block.
   if(k==='F3'&&event.shiftKey&&state.appMode==='motion'&&window.SMMotionGraph){event.preventDefault();SMMotionGraph.toggle();return;}
