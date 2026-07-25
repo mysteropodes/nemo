@@ -54,6 +54,7 @@
     if (!target) {
       onCb.checked = false; onCb.disabled = true;
       kindRow.style.display = stopsList.style.display = addRow.style.display = hintRow.style.display = 'none';
+      if (window.syncFillGradientButton) syncFillGradientButton();
       return;
     }
     onCb.disabled = false;
@@ -63,6 +64,10 @@
     kindRow.style.display = show; addRow.style.display = show; hintRow.style.display = grad ? 'block' : 'none';
     stopsList.style.display = grad ? 'block' : 'none';
     stopsList.innerHTML = '';
+    // Le bouton dégradé de la ligne Fill (timeline.js) reflète cet état —
+    // resynchronisé ici parce que c'est le seul endroit qui sait ce que porte
+    // réellement la sélection courante.
+    if (window.syncFillGradientButton) syncFillGradientButton();
     if (!grad) return;
     document.getElementById('p-grad-kind').value = grad.kind;
     var stops = sortedStops(grad);
