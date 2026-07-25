@@ -1494,3 +1494,10 @@ body.mode-motion .lrow.act{box-shadow:inset 3px 0 0 #4E6FF2,inset 0 0 0 1px rgba
 .lparent:hover{color:var(--text);border-color:var(--border2);}
 .lparent.none{opacity:.55;}
 .lrow.act .lparent{border-color:var(--border2);}
+
+/* Effects count on the collapsed section header (effects-panel.js) — the
+   header is all that's on screen while the section is collapsed, so it has to
+   carry the "this layer has effects" signal by itself. */
+.phdr .fx-count{margin-left:auto;background:var(--accent);color:#fff;border-radius:8px;
+  min-width:15px;height:15px;line-height:15px;text-align:center;font-size:9px;
+  font-weight:700;padding:0 4px;}
