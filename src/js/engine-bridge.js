@@ -475,7 +475,11 @@
           // is applied (see palette-panel.js's gradient editor) — NOT yet
           // re-projected through elMat/motionMat/parentChain, a known v1
           // limitation (documented on ItemIn.fill_gradient in engine.rs too).
-          if (c.data && c.data.fillGradient) {
+          // gradientGeomOk: a from/to-less gradient would send `undefined`
+          // endpoints into the Rust side. Skipping it here leaves the flat
+          // fillColor in place — the shape still draws, just without the
+          // ramp, instead of rendering as garbage.
+          if (c.data && c.data.fillGradient && (!window.gradientGeomOk || window.gradientGeomOk(c.data.fillGradient))) {
             var fg = c.data.fillGradient;
             item.fillGradient = {
               kind: fg.kind, from: fg.from, to: fg.to,
