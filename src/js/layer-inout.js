@@ -453,6 +453,34 @@
     endMarquee();
     if (!_drag) return;
     var d = _drag; _drag = null;
+    // A time-linked layer (Parent in Time) resolves its in/out from its
+    // SOURCE, so the ld.inPoint/outPoint this drag just wrote would be
+    // ignored — the bar would snap back and the drag would read as broken.
+    // Convert the movement into a change of OFFSET instead: the layer keeps
+    // following its source, now at the distance you just dragged it to.
+    // Same principle as spatial parenting, where moving a child changes the
+    // child's own transform rather than detaching it.
+    (function reconcileTimeLinks() {
+      var members = d.group ? d.members : [{ li: d.li, origIn: d.origIn, origOut: d.origOut }];
+      members.forEach(function (m) {
+        var ld = state.layers[m.li];
+        if (!ld || !ld.timeLink) return;
+        var mode = ld.timeLink.mode || 'both';
+        // What the user dragged the edge TO, before resolution takes over.
+        var wantIn = ld.inPoint != null ? ld.inPoint : m.origIn;
+        var wantOut = ld.outPoint != null ? ld.outPoint : m.origOut;
+        var srcIn = null, srcOut = null;
+        state.layers.forEach(function (o) {
+          if (o !== ld && o.layerUid === ld.timeLink.uid) { srcIn = inPointOf(o); srcOut = outPointOf(o); }
+        });
+        if (srcIn == null) return; // source gone — leave the hard values alone
+        if (mode !== 'out') ld.timeLink.inOffset = wantIn - srcIn;
+        if (mode !== 'in') ld.timeLink.outOffset = wantOut - srcOut;
+        // The hard values are dead weight on a linked layer; dropping them
+        // keeps a later unlink from resurrecting a stale range.
+        delete ld.inPoint; delete ld.outPoint;
+      });
+    })();
     // Feedback: "il faudrait pouvoir select des in et/out point de calque
     // avec keyframe pour les déplacer ensemble" — a whole-bar BODY move
     // (type:'both') retimes the layer's actual keyframe content along with
