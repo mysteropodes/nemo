@@ -380,6 +380,31 @@
   // The value of `prop` on layer `ld` at `frame` — exact key, interpolated,
   // clamped outside the keyed range, the static override, or the neutral
   // default. Always returns an array (length 1 or 2, per PROP_DIM).
+  // Generic single-number track evaluator (2026-07-25, keyable effect
+  // parameters). Same key shape as a layer property track — {keys:[{frame, v,
+  // curvePoints, hold}]} — evaluated with the SAME curve code and the SAME
+  // hold semantics, so an effect's blur radius eases exactly like a Position
+  // key and a hold behaves identically. Deliberately shared rather than
+  // reimplemented next to the effects panel: a second copy of this maths would
+  // drift the first time either side gained a curve type (CLAUDE.md §3's
+  // duplicated-pair hazard, applied before it exists).
+  function evalTrack(track, frame, fallback) {
+    if (!track || !track.keys || !track.keys.length) return fallback;
+    var ks = track.keys;
+    if (frame <= ks[0].frame) return ks[0].v[0];
+    var last = ks[ks.length - 1];
+    if (frame >= last.frame) return last.v[0];
+    for (var i = 0; i < ks.length - 1; i++) {
+      var a = ks[i], b = ks[i + 1];
+      if (frame >= a.frame && frame < b.frame) {
+        if (a.hold) return a.v[0];
+        var t = (frame - a.frame) / (b.frame - a.frame);
+        var y = evalCurvePoints(a.curvePoints || DEFAULT_CURVE, t);
+        return a.v[0] + (b.v[0] - a.v[0]) * y;
+      }
+    }
+    return last.v[0];
+  }
   function rawValueAtFrame(ld, prop, frame) {
     var track = ld.motion && ld.motion[prop];
     if (!track || !track.keys.length) return staticValue(ld, prop);
@@ -2963,6 +2988,10 @@
 
   window.SMMotion = {
     valueAtFrame: valueAtFrame,
+    // Generic track evaluator — effects-panel.js keys its parameters with it
+    // so an effect eases exactly like a layer property (see evalTrack).
+    evalTrack: evalTrack,
+    DEFAULT_CURVE: function () { return JSON.parse(JSON.stringify(DEFAULT_CURVE)); },
     isAnimated: isAnimated,
     // Layer-level get/set for external gesture writers (select-bridge's
     // native-video footage drag) — same semantics as the Transform panel

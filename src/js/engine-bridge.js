@@ -202,9 +202,26 @@
   // #[serde(rename_all = "camelCase")]). Shared by both the ordinary-layer
   // and effect/adjustment-layer push sites below — same stack, same wire
   // shape, only the SOURCE texture composite_scene runs it on differs.
-  function sceneEffectsOf(ld) {
+  // frameIdx (2026-07-25): effect parameters can be keyframed, so the value
+  // sent to the renderer is the one AT THIS FRAME, not the effect's static
+  // field. effectParamValueAt (effects-panel.js) returns the static value
+  // untouched when a parameter isn't keyed, so an unanimated effect is
+  // bit-identical to before. Defaults to the current frame, which is what the
+  // live view wants; export passes the frame it is writing.
+  // Export renders frame by frame through renderFrameToPixelsPNG, which calls
+  // loadFrame(f) — and loadFrame does NOT move state.currentFrame. Reading the
+  // current frame here would therefore have given EVERY exported image the
+  // effect value of whatever frame the editor happened to be sitting on, i.e.
+  // a frozen effect in the file and a moving one on screen. This override is
+  // set around the export's own buildSceneJson call.
+  var _fxFrameOverride = null;
+  function sceneEffectsOf(ld, frameIdx) {
+    var f = (frameIdx != null) ? frameIdx
+          : (_fxFrameOverride != null ? _fxFrameOverride : state.currentFrame);
+    var at = window.effectParamValueAt || function (e, k) { return e[k]; };
     return (ld.effects || []).map(function (e) {
-      return { effectType: e.type, enabled: !!e.enabled, p1: e.p1, p2: e.p2, p3: e.p3, p4: e.p4 };
+      return { effectType: e.type, enabled: !!e.enabled,
+               p1: at(e, 'p1', f), p2: at(e, 'p2', f), p3: at(e, 'p3', f), p4: at(e, 'p4', f) };
     });
   }
 
@@ -1587,7 +1604,9 @@
     engine.resize(cw, ch);
     engine.set_viewport(0, 0, 1, 0, cw / 2, ch / 2);
     loadFrame(frameIdx);
-    var json = buildSceneJson(true, true);
+    _fxFrameOverride = frameIdx;
+    var json;
+    try { json = buildSceneJson(true, true); } finally { _fxFrameOverride = null; }
     var bytes = await engine.render_to_pixels(json);
     var imgData = new ImageData(new Uint8ClampedArray(bytes.buffer, bytes.byteOffset, bytes.byteLength), cw, ch);
     var off = document.createElement('canvas'); off.width = cw; off.height = ch;
