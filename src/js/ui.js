@@ -913,7 +913,16 @@
   // it anywhere else and it stays floating where you left it; its header
   // remains draggable to move it again. Docked order persists per label.
   var secDrag={el:null,startX:0,startY:0,started:false,offX:0,offY:0,wasFloating:false};
-  function secKey(sec){var h=sec.querySelector('.phdr');return h?h.textContent.replace(/[^A-Za-z]/g,'').slice(0,20):'';}
+  // Keyed on the section's ID, not its header text (2026-07-26): two
+  // sections legitimately share the header "Effects" (#effects-stack-sec,
+  // the per-layer effect stack, and #effects-sec, the tool-options one), so
+  // a text key couldn't tell them apart — a save/restore cycle could swap
+  // their positions. Text keys are also language-dependent (data-i18n), so
+  // switching languages used to orphan the whole saved order. The legacy
+  // text key stays as a read-time fallback so pre-existing saved orders
+  // still restore once, after which the next drag re-saves as IDs.
+  function secLegacyKey(sec){var h=sec.querySelector('.phdr');return h?h.textContent.replace(/[^A-Za-z]/g,'').slice(0,20):'';}
+  function secKey(sec){return sec.id||secLegacyKey(sec);}
   function saveSecOrder(){
     var pp=document.getElementById('props-panel');
     try{localStorage.setItem('nemo-panel-order',JSON.stringify(Array.prototype.slice.call(pp.querySelectorAll('.psec:not(.floating)')).map(secKey)));}catch(e){}
@@ -924,7 +933,7 @@
     var pp0=document.getElementById('props-panel');
     savedOrder.forEach(function(k){
       var secs=Array.prototype.slice.call(pp0.querySelectorAll('.psec'));
-      var m=secs.filter(function(s){return secKey(s)===k;})[0];
+      var m=secs.filter(function(s){return secKey(s)===k||secLegacyKey(s)===k;})[0];
       if(m)pp0.appendChild(m);
     });
   }
