@@ -697,7 +697,7 @@ body:not(.mode-motion) #motion-props-sec{display:none;}
    room to spare) so an unselected/non-current key stays readable sitting
    on top of the accent-tinted connection bar (trackRowHtml, motion.js)
    instead of partly blending into it. */
-.motion-key{width:9px;height:9px;border-radius:2px;background:#e6e6e6;border:1px solid rgba(0,0,0,.5);box-shadow:0 0 0 1.5px rgba(0,0,0,.35);transform:rotate(45deg);}
+.motion-key{position:relative;width:9px;height:9px;border-radius:2px;background:#e6e6e6;border:1px solid rgba(0,0,0,.5);box-shadow:0 0 0 1.5px rgba(0,0,0,.35);transform:rotate(45deg);}
 .motion-key.cur{background:#ffaa28;width:11px;height:11px;}
 .motion-key.sel{background:var(--accent);border-color:#fff;box-shadow:0 0 0 1.5px var(--accent);}
 .motion-key.hold{border-radius:1px;transform:rotate(0deg);}
@@ -732,6 +732,23 @@ body:not(.mode-motion) #motion-props-sec{display:none;}
 .motion-keysel-edge-bottom{bottom:-9px;}
 .motion-keysel-edge::after{content:'';position:absolute;left:0;right:0;top:50%;height:3px;transform:translateY(-50%);background:var(--accent);border-radius:2px;opacity:.85;}
 .motion-keysel-edge:hover::after{opacity:1;height:4px;}
+/* Side edges = SPACE (spread/compress the selection along time, the opposite
+   edge staying anchored). Vertical strips, so they reset the top/bottom
+   geometry the shared .motion-keysel-edge rule sets for the skew edges. */
+/* z-index 2 + the top/bottom edges inset below: on a selection spanning ONE
+   track row the box is ~11px tall, so the 14px-tall skew edges covered the
+   whole thing and swallowed every click meant for the side edges (they are
+   later siblings, so they won the hit test). The corners now belong to the
+   side edges, the usual resize-handle convention — and skew on a single row
+   is a no-op anyway (its handler refuses under 2 rows). */
+.motion-keysel-edge-left,.motion-keysel-edge-right{left:auto;right:auto;top:-4px;bottom:-4px;
+  height:auto;width:14px;z-index:2;}
+.motion-keysel-edge-top,.motion-keysel-edge-bottom{left:10px;right:10px;}
+.motion-keysel-edge-left{left:-9px;}
+.motion-keysel-edge-right{right:-9px;}
+.motion-keysel-edge-left::after,.motion-keysel-edge-right::after{left:50%;right:auto;top:0;bottom:0;
+  height:auto;width:3px;transform:translateX(-50%);}
+.motion-keysel-edge-left:hover::after,.motion-keysel-edge-right:hover::after{height:auto;width:4px;}
 .lrow.motion-disabled{cursor:not-allowed;opacity:.45;}
 .lrow.motion-disabled:hover{background:transparent;}
 body.mode-motion #layer-panel{width:260px;}
@@ -788,7 +805,18 @@ body.mode-motion .lrow.act{box-shadow:inset 3px 0 0 #4E6FF2,inset 0 0 0 1px rgba
 #layer-ctrls button:hover{background:#2c2a31;color:var(--text);}
 #layer-ctrls .material-symbols-rounded{font-size:13px;}
 #layer-ctrls svg{width:13px;height:13px;display:block;}
-#fg-wrap{flex:1;overflow:auto;position:relative;}
+/* The grid's viewport runs 40px LOWER than #layer-list's, because the panel
+   gives that bottom strip to its +/camera/trash buttons while the grid has
+   no equivalent chrome — so the last rows were drawn with no name beside
+   them, and the timeline's zoom scrollbar sat on top of the last row
+   (2026-07-25: "les boutons d'ajout à gauche sont plus haut que la scroll
+   bar" then "tu aurais pu mettre la scroll bar sous le trait orange").
+   #fg-col holds the grid above that band; #fg-wrap ends where #layer-list
+   ends so the two panels always show exactly the same rows, and
+   #tlzoom-scrollbar (timeline-zoom.js) is drawn in the band itself, level
+   with the buttons. */
+#fg-col{flex:1;display:flex;flex-direction:column;min-width:0;padding-bottom:40px;box-sizing:border-box;}
+#fg-wrap{flex:1;overflow:auto;position:relative;min-height:0;}
 /* Design audit 2026-07, round 2 (feedback: "le work area ressemble trop à
    un calque" — the boxed/bordered/purple v1 read as another layer bar, not
    a lightweight timeline indicator; "le ruler au dessus" — the numbered
@@ -1494,6 +1522,16 @@ body.mode-motion .lrow.act{box-shadow:inset 3px 0 0 #4E6FF2,inset 0 0 0 1px rgba
 .lparent:hover{color:var(--text);border-color:var(--border2);}
 .lparent.none{opacity:.55;}
 .lrow.act .lparent{border-color:var(--border2);}
+/* Pickwhip (AE's parent spiral): drag from this dot onto another layer row.
+   Sits INSIDE .lparent so the cell keeps one footprint in the row — the
+   click-to-open-menu path stays on the label text, the drag path on the dot,
+   so neither gesture can swallow the other. */
+.lpick{display:inline-block;width:9px;height:9px;margin-right:4px;vertical-align:-1px;
+  border-radius:50%;border:1.5px solid var(--text-dim);cursor:alias;flex:0 0 auto;}
+.lpick:hover{border-color:var(--accent,#5b6cff);box-shadow:0 0 0 2px rgba(91,108,255,.25);}
+.lrow.pick-target{outline:1px solid var(--accent,#5b6cff);outline-offset:-1px;background:rgba(91,108,255,.12);}
+.lpick-line{position:fixed;z-index:9999;pointer-events:none;height:0;border-top:1.5px dashed var(--accent,#5b6cff);
+  transform-origin:0 0;}
 
 /* Effects count on the collapsed section header (effects-panel.js) — the
    header is all that's on screen while the section is collapsed, so it has to
@@ -1557,3 +1595,48 @@ body.mode-motion .lrow.act{box-shadow:inset 3px 0 0 #4E6FF2,inset 0 0 0 1px rgba
 .fx-keynav-btn.off{opacity:.25;cursor:default;}
 .fx-keynav-btn.off:hover{color:var(--text-dim);background:none;}
 .fx-keynav-count{font-size:8px;color:var(--text-dark);margin-left:2px;min-width:8px;text-align:center;}
+
+/* ---- TIMELINE MARKERS (2026-07-25) ----------------------------------- */
+/* Comp markers ride #bars-row (the strip under the ruler), layer markers
+   ride their own .frow — both anchored at frame*FC, so they scroll with the
+   grid and stay on their frame at any zoom. */
+.tl-marker{position:absolute;top:2px;width:0;height:0;z-index:6;cursor:ew-resize;
+  border-left:5px solid transparent;border-right:5px solid transparent;
+  border-top:9px solid var(--marker-color,#e8b64c);pointer-events:auto;}
+.tl-marker:hover{filter:brightness(1.35);}
+.tl-marker-layer{top:3px;border-top-width:8px;}
+.tl-marker-label{position:absolute;left:7px;top:-9px;font-size:9px;line-height:1;
+  color:var(--text);background:rgba(0,0,0,.55);padding:1px 4px;border-radius:3px;
+  white-space:nowrap;pointer-events:none;}
+
+/* ---- BPM GUIDES (2026-07-25) ----------------------------------------- */
+/* Full-height hairlines inside #frame-grid, behind every row's content
+   (z-index 0 against .frow's own stacking) so they read as a grid you align
+   TO rather than another layer of chrome on top. */
+.bpm-line{position:absolute;top:0;bottom:0;width:1px;background:rgba(255,255,255,.07);
+  pointer-events:none;z-index:0;}
+.bpm-line.bpm-bar{background:rgba(120,180,255,.22);width:1px;}
+
+/* Work-area duration read-out — centred, non-interactive so the bar keeps
+   its whole surface draggable. */
+.wa-dur{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  font-size:9px;line-height:1;color:rgba(255,255,255,.72);white-space:nowrap;
+  pointer-events:none;text-shadow:0 1px 2px rgba(0,0,0,.6);}
+
+/* Per-keyframe colour (Van Dijk 3.4) — the tint replaces the neutral fill
+   but keeps the selected/current states winning above it, so colouring a key
+   never costs you the feedback about what is selected. */
+.motion-key.tinted{background:var(--key-color,#e6e6e6);}
+.motion-key.cur,.motion-key.sel{background:#ffaa28;}
+.motion-key.sel{background:var(--accent);}
+/* Velocity read-out on the selected key (3.5). Counter-rotated: the diamond
+   itself is rotate(45deg), so the label would otherwise sit on the diagonal. */
+.motion-key-vel{position:absolute;left:14px;top:-2px;transform:rotate(-45deg);
+  font-size:8.5px;line-height:1;color:var(--text-dim);background:rgba(0,0,0,.6);
+  padding:1px 3px;border-radius:3px;white-space:nowrap;pointer-events:none;}
+
+/* Expression row extras (Van Dijk 7.2 / 7.4) */
+.motion-expr-raw{margin-left:10px;font-size:9.5px;color:var(--text-dim);}
+.motion-expr-glob{margin-left:auto;font-size:9.5px;padding:2px 7px;border-radius:4px;
+  border:1px solid var(--border);background:var(--panel2);color:var(--text-dim);cursor:pointer;}
+.motion-expr-glob:hover{color:var(--text);border-color:var(--border2);}

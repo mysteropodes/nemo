@@ -215,14 +215,34 @@
   // a frozen effect in the file and a moving one on screen. This override is
   // set around the export's own buildSceneJson call.
   var _fxFrameOverride = null;
-  function sceneEffectsOf(ld, frameIdx) {
+  function sceneEffectsOf(ld, frameIdx, _guard) {
     var f = (frameIdx != null) ? frameIdx
           : (_fxFrameOverride != null ? _fxFrameOverride : state.currentFrame);
     var at = window.effectParamValueAt || function (e, k) { return e[k]; };
-    return (ld.effects || []).map(function (e) {
+    // "Instance Effect" (Van Dijk 5.2): a layer can borrow another layer's
+    // whole effects stack live, instead of copy-pasting it and then having
+    // two copies to keep in sync. Resolved HERE rather than by duplicating
+    // the data, so the source's own keyframed parameters drive the borrower
+    // at the same frame — that is the entire point over a copy.
+    //
+    // The borrowed stack comes FIRST: its own effects then stack on top,
+    // which matches how you'd read it in the panel (inherited base, local
+    // additions). _guard stops a cycle (A borrows B, B borrows A) at one
+    // hop instead of blowing the stack.
+    var inherited = [];
+    if (ld.effectsFrom && !_guard && window.SMMotion && SMMotion.ensureLayerUid) {
+      for (var li = 0; li < state.layers.length; li++) {
+        var src = state.layers[li];
+        if (src !== ld && src.layerUid === ld.effectsFrom) {
+          inherited = sceneEffectsOf(src, frameIdx, true);
+          break;
+        }
+      }
+    }
+    return inherited.concat((ld.effects || []).map(function (e) {
       return { effectType: e.type, enabled: !!e.enabled,
                p1: at(e, 'p1', f), p2: at(e, 'p2', f), p3: at(e, 'p3', f), p4: at(e, 'p4', f) };
-    });
+    }));
   }
 
   // excludeGhosts (2026-07 audit): the live editing view legitimately wants
@@ -496,6 +516,55 @@
       // Effects stack (2026-07 rewrite — was separate blurRadius/gshadow_*
       // fields) — runs on THIS layer's own isolated alpha (see
       // geometry-wasm/src/engine.rs's LayerIn::effects doc comment).
+      // ---- MOTION BLUR (2026-07-25) ----------------------------------
+      // AE's per-layer switch, gated by a comp-wide one, sampled the way
+      // every renderer without a real velocity buffer does it: N copies of
+      // the layer along the shutter interval, each at 1/N opacity, drawn
+      // UNDER the sharp current frame.
+      //
+      // The samples are built from the items ALREADY produced above rather
+      // than by re-running that whole loop N times — the loop interleaves
+      // item building with the transform pass, and duplicating it would be
+      // the "two readers that must stay identical" trap CLAUDE.md §3 is
+      // about. Instead each sample applies the DELTA between the matrix at
+      // the current frame and the matrix at the sample time, around the same
+      // pivot: exact for this transform model (scale, then rotate, then
+      // translate about a fixed pivot), and layerMotionAt already accepts a
+      // fractional frame (rawValueAtFrame interpolates on a float t).
+      //
+      // Samples the layer's OWN motion only, not its parent chain — a
+      // parented layer blurs on its own movement, not the rig's. Noted
+      // rather than silently approximated.
+      var mbOn = state.motionBlurOn && state.layers[i].motionBlur && motionMat && items.length;
+      if (mbOn) {
+        var mbSamples = Math.max(2, Math.min(16, state.motionBlurSamples || 6));
+        var mbShutter = Math.max(0.05, Math.min(2, state.motionBlurShutter || 0.5)); // in frames
+        for (var s = 1; s <= mbSamples; s++) {
+          var t = (s / mbSamples) * mbShutter;
+          var ms = SMMotion.layerMotionAt(i, state.currentFrame - t);
+          if (!ms) continue;
+          var delta = {
+            dx: ms.dx - motionMat.dx, dy: ms.dy - motionMat.dy,
+            rot: ms.rot - motionMat.rot,
+            sx: motionMat.sx ? ms.sx / motionMat.sx : 1,
+            sy: motionMat.sy ? ms.sy / motionMat.sy : 1,
+            op: 1, ax: 0, ay: 0,
+          };
+          // Nothing moved between these two instants — every remaining
+          // sample would be an exact copy of the sharp layer, so stop
+          // rather than pay for identical draws.
+          if (!delta.dx && !delta.dy && !delta.rot && delta.sx === 1 && delta.sy === 1) continue;
+          var fade = (1 - s / (mbSamples + 1)) / mbSamples * 2; // trail off toward the tail
+          var sampleItems = items.map(function (it) {
+            var c = {};
+            for (var k in it) if (Object.prototype.hasOwnProperty.call(it, k)) c[k] = it[k];
+            if (c.segments) c.segments = roundSegs(SMMotion.transformSegments(c.segments, motionPivot, delta));
+            c.opacity = (c.opacity != null ? c.opacity : 1) * fade;
+            return c;
+          });
+          layers.push({ items: sampleItems });
+        }
+      }
       layers.push({ items: items, blendMode: (bm && bm !== 'normal') ? bm : undefined, matteMode: (mm && mm !== 'none') ? mm : undefined,
         effects: sceneEffectsOf(state.layers[i]) });
     }

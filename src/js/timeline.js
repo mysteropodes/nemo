@@ -610,6 +610,118 @@ window.SM={
     if(state.activeLayerIdx>=state.layers.length)state.activeLayerIdx=state.layers.length-1;
     activateUL(state.activeLayerIdx);loadFrame(state.currentFrame);updateUI();showToast('Calque(s) supprimé(s) — ⌘Z pour annuler');
   },
+  // Standing "keyframes follow this edge" lock (Van Dijk 2.2). Stored per
+  // layer so it survives the session and needs no modifier at drag time.
+  // "Trim Comp to Work Area" (Van Dijk 1.3). Drops everything outside the
+  // work area and re-bases frame 0 on its start — layers, keyframes, markers
+  // and the camera all shift together, or the trim would silently desync the
+  // very things that were timed against it.
+  trimToWorkArea:function(){
+    var inF=state.waIn||0,outF=(state.waOut!=null?state.waOut:state.totalFrames-1);
+    if(outF<=inF){showToast('Zone de travail trop courte');return;}
+    if(inF===0&&outF===state.totalFrames-1){showToast('La zone de travail couvre déjà tout');return;}
+    saveAllLayerFrames();pushUndoLayers();
+    var n=outF-inF+1;
+    state.layers.forEach(function(ld,li){
+      ld.frames=ld.frames.slice(inF,outF+1);
+      while(ld.frames.length<n)ld.frames.push({strokes:[],isKeyframe:false,isInterpolated:false});
+      if(ld.inPoint!=null)ld.inPoint=Math.max(0,ld.inPoint-inF);
+      if(ld.outPoint!=null)ld.outPoint=Math.max(0,Math.min(n-1,ld.outPoint-inF));
+      if(ld.markers)ld.markers=ld.markers.map(function(m){return{frame:m.frame-inF,name:m.name,color:m.color};}).filter(function(m){return m.frame>=0&&m.frame<n;});
+      if(window.SMMotion&&SMMotion.shiftLayerMotionKeys)SMMotion.shiftLayerMotionKeys(li,-inF);
+    });
+    if(state.markers)state.markers=state.markers.map(function(m){return{frame:m.frame-inF,name:m.name,color:m.color};}).filter(function(m){return m.frame>=0&&m.frame<n;});
+    if(state.cameraKeys)state.cameraKeys=state.cameraKeys.map(function(k){var c2=JSON.parse(JSON.stringify(k));c2.frame=k.frame-inF;return c2;}).filter(function(k){return k.frame>=0&&k.frame<n;});
+    state.totalFrames=n;window._totalF=n;
+    state.waIn=0;state.waOut=n-1;window._waIn=0;window._waOut=n-1;
+    state.currentFrame=Math.max(0,Math.min(n-1,state.currentFrame-inF));
+    loadFrame(state.currentFrame);renderLayerList();renderTimeline();updateUI();
+    if(window.updateWaBar)updateWaBar();
+    showToast('Composition réduite à la zone de travail ('+n+' frames)');
+  },
+  setLayerKeyLock:function(li,mode){
+    var ld=state.layers[li==null?state.activeLayerIdx:li];if(!ld)return;
+    pushUndo();
+    if(mode)ld.keyLock=mode;else delete ld.keyLock;
+    showToast(mode?('Keyframes verrouillées sur '+(mode==='in'?'le point d\u2019entrée':mode==='out'?'le point de sortie':'le calque')):'Verrou de keyframes retiré');
+    renderLayerList();renderTimeline();
+  },
+  toggleLayerMotionBlur:function(li){
+    var ld=state.layers[li==null?state.activeLayerIdx:li];if(!ld)return;
+    pushUndo();ld.motionBlur=!ld.motionBlur;
+    if(ld.motionBlur&&!state.motionBlurOn)showToast('Flou de mouvement activé sur le calque — active aussi l\u2019interrupteur de la comp');
+    else showToast(ld.motionBlur?'Flou de mouvement activé':'Flou de mouvement désactivé');
+    renderLayerList();renderTimeline();
+    if(window.SMEngineBridge)SMEngineBridge.renderNow();
+  },
+  toggleMotionBlurComp:function(){
+    state.motionBlurOn=!state.motionBlurOn;
+    var n=state.layers.filter(function(l){return l.motionBlur;}).length;
+    showToast(state.motionBlurOn?('Flou de mouvement activé sur la comp ('+n+' calque(s))'):'Flou de mouvement désactivé sur la comp');
+    var b=document.getElementById('btn-mblur');if(b)b.classList.toggle('active',!!state.motionBlurOn);
+    renderLayerList();renderTimeline();
+    if(window.SMEngineBridge)SMEngineBridge.renderNow();
+  },
+  setMotionBlurSettings:function(samples,shutter){
+    if(samples!=null)state.motionBlurSamples=Math.max(2,Math.min(16,parseInt(samples,10)||6));
+    if(shutter!=null)state.motionBlurShutter=Math.max(0.05,Math.min(2,parseFloat(shutter)||0.5));
+    if(window.SMEngineBridge)SMEngineBridge.renderNow();
+  },
+  toggleLayerShy:function(li){
+    var ld=state.layers[li==null?state.activeLayerIdx:li];if(!ld)return;
+    pushUndo();ld.shy=!ld.shy;
+    if(ld.shy&&!state.shyEnabled)showToast('Calque marqué « shy » — active l\u2019interrupteur pour le masquer');
+    renderLayerList();renderTimeline();
+  },
+  toggleShyMode:function(){
+    state.shyEnabled=!state.shyEnabled;
+    var n=state.layers.filter(function(l){return l.shy;}).length;
+    showToast(state.shyEnabled?('Calques shy masqués ('+n+')'):'Tous les calques affichés');
+    renderLayerList();renderTimeline();
+  },
+  // AE's Cmd+Shift+D: cut the layer in TWO at the playhead. Both halves keep
+  // the whole content and all their keyframes — it is the in/out window that
+  // splits, which is exactly how AE does it (and why the two halves can be
+  // retimed independently afterwards without anything being lost).
+  splitLayerAtPlayhead:function(li){
+    li=(li==null?state.activeLayerIdx:li);
+    var ld=state.layers[li];if(!ld){showToast('Aucun calque');return;}
+    var f=state.currentFrame;
+    var inF=window.layerInPoint?layerInPoint(ld):(ld.inPoint!=null?ld.inPoint:0);
+    var outF=window.layerOutPoint?layerOutPoint(ld):(ld.outPoint!=null?ld.outPoint:state.totalFrames-1);
+    if(f<=inF||f>outF){showToast('Place la tête de lecture à l\u2019intérieur du calque pour le couper');return;}
+    saveAllLayerFrames();pushUndoLayers();
+    var ni=createUserLayer(ld.name+' (2)');
+    var dst=state.layers[ni];
+    dst.frames=JSON.parse(JSON.stringify(ld.frames));
+    dst.color=ld.color;
+    if(ld.blendMode)dst.blendMode=ld.blendMode;
+    if(ld.motion)dst.motion=JSON.parse(JSON.stringify(ld.motion));
+    if(ld.motionStatic)dst.motionStatic=JSON.parse(JSON.stringify(ld.motionStatic));
+    if(ld.elementMotion)dst.elementMotion=JSON.parse(JSON.stringify(ld.elementMotion));
+    if(ld.effects)dst.effects=JSON.parse(JSON.stringify(ld.effects));
+    if(ld.markers)dst.markers=JSON.parse(JSON.stringify(ld.markers));
+    if(ld.symbolId){dst.symbolId=ld.symbolId;dst.symPlayMode=ld.symPlayMode;dst.symSpeed=ld.symSpeed;dst.symPlacedAt=ld.symPlacedAt;dst.symSingleFrame=ld.symSingleFrame;dst.symMatrix=ld.symMatrix;dst.locked=ld.locked;}
+    dst.inPoint=f;dst.outPoint=outF;
+    ld.outPoint=f-1;
+    // createUserLayer appends to the TOP of the stack, which would drop the
+    // second half far from the one it was cut out of. AE leaves the two
+    // halves adjacent, and so does this: move it to sit directly above its
+    // source. Both arrays are spliced together — userLayers and state.layers
+    // are index-parallel everywhere in this file.
+    if(ni!==li+1){
+      var movedL=state.layers.splice(ni,1)[0];
+      var movedU=userLayers.splice(ni,1)[0];
+      var at=Math.min(li+1,state.layers.length);
+      state.layers.splice(at,0,movedL);
+      userLayers.splice(at,0,movedU);
+      userLayers.forEach(function(l){l.insertBelow(arcLayer);});
+      ni=at;
+    }
+    activateUL(ni);loadFrame(state.currentFrame);renderLayerList();renderTimeline();updateUI();
+    if(window.SMEngineBridge)SMEngineBridge.renderNow();
+    showToast('Calque coupé à la frame '+(f+1));
+  },
   duplicateLayer:function(){saveAllLayerFrames();pushUndoLayers();var src=state.layers[state.activeLayerIdx];var ni=createUserLayer(src.name+' copy');state.layers[ni].frames=JSON.parse(JSON.stringify(src.frames));if(src.blendMode)state.layers[ni].blendMode=src.blendMode;state.layers[ni].color=src.color;if(src.motion)state.layers[ni].motion=JSON.parse(JSON.stringify(src.motion));if(src.motionStatic)state.layers[ni].motionStatic=JSON.parse(JSON.stringify(src.motionStatic));
     // elementMotion is keyed by strokeId, and duplicateLayer's frames clone
     // above (JSON.stringify) preserves each stroke's strokeId unchanged —
@@ -681,6 +793,8 @@ window.SM={
   propagateLFSFill:function(which){propagateLFSFill(state.activeLayerIdx,which);},
   enterSymbol:function(symId){enterSymbol(symId);},
   splitLayerIntoElementsCore:function(li,opts){return splitLayerIntoElementsCore(li,opts);},
+  splitLayerIntoElements:function(li){return splitLayerIntoElements(li);},
+  mergeLayersIntoOne:function(indices,opts){return mergeLayersIntoOne(indices,opts);},
   exitToScene:function(){exitToScene();},
   closeSymbolTab:function(symId){closeSymbolTab(symId);},
   enterMontageView:function(montageId){enterMontageView(montageId);},
@@ -1006,7 +1120,7 @@ window.SM={
         // be just as useless. Note isNullLayer above was already persisted,
         // and its own tooltip calls a null layer a "pivot/parent pour d'autres
         // calques" — the pivot came back, everything hung off it did not.
-        layerUid:l.layerUid,parentLayerUid:l.parentLayerUid};}),
+        layerUid:l.layerUid,parentLayerUid:l.parentLayerUid,markers:l.markers,shy:l.shy,keyLock:l.keyLock,timeRemap:l.timeRemap,motionBlur:l.motionBlur,effectsFrom:l.effectsFrom};}),
       layerFolders:state.layerFolders,layerLinkGroups:state.layerLinkGroups,
       // StoryBoard node space (2026-07) — plain data by construction (no
       // runtime-only fields live in state.storyboard, see storyboard.js's
@@ -1028,7 +1142,13 @@ window.SM={
       symmetryEnabled:state.symmetryEnabled,symmetryMode:state.symmetryMode,symmetryAxis:state.symmetryAxis,symmetryRadialCenter:state.symmetryRadialCenter,symmetryRadialSectors:state.symmetryRadialSectors,symmetryExtend:state.symmetryExtend,
       motionArcs:state.motionArcs,easingCurve:state.easingCurve,resamplePts:state.resamplePts,tweenStep:state.tweenStep,
       tweenOverrides:state.tweenOverrides,tweenEasing:state.tweenEasing||{},comments:state.comments||[],
-      cameraKeys:state.cameraKeys||[],cameraLayerOn:!!state.cameraLayerOn});
+      cameraKeys:state.cameraKeys||[],cameraLayerOn:!!state.cameraLayerOn,
+      // Comp markers (markers.js) — pure annotation, but losing them on save
+      // would make the feature pointless.
+      markers:state.markers||[],shyEnabled:!!state.shyEnabled,
+      bpm:state.bpm,bpmOffset:state.bpmOffset,bpmShow:!!state.bpmShow,
+      motionBlurOn:!!state.motionBlurOn,motionBlurSamples:state.motionBlurSamples,motionBlurShutter:state.motionBlurShutter,
+      exprGlobals:state.exprGlobals||''});
   },
   mergeRemoteSnapshot:function(remoteData,remoteProfile){return mergeRemoteSnapshot(remoteData,remoteProfile);},
   // Cycles (v19) : repete N fois la plage de frames selectionnee (walk
@@ -1178,6 +1298,11 @@ window.SM={
       state.easingCurve=_ec;if(window._curveEditor)window._curveEditor.setState(_ec);
     }
     state.comments=d.comments||[];
+    state.markers=d.markers||[];
+    state.shyEnabled=!!d.shyEnabled;
+    state.bpm=d.bpm!=null?d.bpm:120;state.bpmOffset=d.bpmOffset||0;state.bpmShow=!!d.bpmShow;
+    state.exprGlobals=d.exprGlobals||'';
+    state.motionBlurOn=!!d.motionBlurOn;state.motionBlurSamples=d.motionBlurSamples||6;state.motionBlurShutter=d.motionBlurShutter!=null?d.motionBlurShutter:0.5;
     if(typeof refreshFbAvatars==='function')refreshFbAvatars(); // avatar stack mirrors state.comments — resync on project import
     state.cameraKeys=d.cameraKeys||[];state.cameraLayerOn=!!d.cameraLayerOn;state.cameraView=false;
     // Explicit fallback to the app default, not just "leave whatever was
@@ -1868,7 +1993,57 @@ function camGridRowOffset(){
   return r?r.getBoundingClientRect().height:0;
 }
 
+// Every render below empties #frame-grid / #layer-list with innerHTML='',
+// which drops both containers' scroll position to 0 — and since a render
+// fires after almost every edit (a bar drag, a keyframe move, a property
+// change), the timeline kept snapping back to the top mid-gesture.
+// Reported 2026-07-25 with before/after screenshots: "je déplace les out
+// point de calque et là tout descend d'un coup, il faut laisser en place".
+// Horizontal scroll had the same problem, just less visible because the
+// jump only shows once you've scrolled along the timeline.
+//
+// Captured before the wipe, restored after the content is back — the
+// restore has to run while the new rows already give the container its
+// full scrollHeight, or the assignment is clamped to a stale (smaller)
+// maximum and quietly lands short.
+// #playhead is position:absolute inside #fg-wrap, so it scrolls WITH the
+// content: as soon as you scrolled down, its top edge — and with it the
+// numbered flag that is the whole grab affordance — slid up out of the
+// viewport, and the line looked cut short (2026-07-25: "le timecursor
+// disparaît quand on scroll", with a before/after screenshot).
+// Pinning it to the viewport instead: top follows scrollTop, height is the
+// visible height, so the flag always sits at the ruler and the line always
+// spans exactly what you can see. Only the VERTICAL axis — `left` stays
+// content-relative (currentFrame*FC), which is what makes it scroll
+// correctly sideways with the frames it points at.
+function syncPlayheadToViewport(){
+  var wrap=document.getElementById('fg-wrap'),ph=document.getElementById('playhead');
+  if(!wrap||!ph)return;
+  ph.style.top=wrap.scrollTop+'px';
+  ph.style.height=Math.max(0,wrap.clientHeight)+'px';
+}
+(function bindPlayheadScrollSync(){
+  function bind(){
+    var wrap=document.getElementById('fg-wrap');
+    if(!wrap)return;
+    wrap.addEventListener('scroll',syncPlayheadToViewport);
+    syncPlayheadToViewport();
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind);else bind();
+})();
+function _tlScrollSnapshot(){
+  var wrap=document.getElementById('fg-wrap'),panel=document.getElementById('layer-list');
+  return {wrap:wrap,panel:panel,
+    top:wrap?wrap.scrollTop:0,left:wrap?wrap.scrollLeft:0,
+    panelTop:panel?panel.scrollTop:0};
+}
+function _tlScrollRestore(s){
+  if(!s)return;
+  if(s.wrap){s.wrap.scrollTop=s.top;s.wrap.scrollLeft=s.left;}
+  if(s.panel)s.panel.scrollTop=s.panelTop;
+}
 function renderTimeline(){
+  var _scroll=_tlScrollSnapshot();
   var hdr=document.getElementById('frame-hdr'),grid=document.getElementById('frame-grid');hdr.innerHTML='';grid.innerHTML='';
   var fps=Math.max(1,state.fps);
   for(var i=0;i<state.totalFrames;i++){
@@ -1907,6 +2082,17 @@ function renderTimeline(){
   // across. Sizing it explicitly to match fixes the seam.
   var barsRow=document.getElementById('bars-row');
   if(barsRow)barsRow.style.width=(state.totalFrames*FC)+'px';
+  // #frame-hdr needs the SAME explicit width, for the same reason — the
+  // comment above claimed flexbox sized it from its .fhc children, but it
+  // is a flex-direction:column CHILD of #fg-wrap, so its width is its CROSS
+  // axis and follows the container, not the content. Measured: 779px box
+  // around 844px of cells. The ruler's own background therefore stopped
+  // partway across, and whatever sits behind it showed through at ruler
+  // height once scrolled — reported 2026-07-25 as "des layers qui
+  // apparaissent au niveau des rulers de timing en haut à droite". Exactly
+  // the #bars-row and #frame-grid bug, in the one place it was assumed not
+  // to apply.
+  hdr.style.width=(state.totalFrames*FC)+'px';
   // Bug found 2026-07 ("le highlight d'un layer selectionné ne va pas
   // jusqu'au bout de la timeline") — same root cause family as #bars-row
   // above, one level down: #frame-grid is `flex-direction:column`, so
@@ -2005,6 +2191,11 @@ function renderTimeline(){
     if(entry.hidden)return;
     rowCount++;
     var li=entry.idx;var row=document.createElement('div');row.className='frow'+(li===state.activeLayerIdx?' act':'');
+    // data-layer was Motion-only, so anything addressing "the grid row for
+    // layer N" silently found nothing in Animation 2D (2026-07-25: layer
+    // markers rendered in Motion and vanished here). Same attribute, same
+    // meaning, both modes — the row already knows its index.
+    row.dataset.layer=li;
     // Collapsed Stroke/Fill/Shadow head row: its OWN strokes are what the
     // 'fl'/'hl' (full/hollow) keyframe dot would normally reflect, but the
     // head is whichever member happens to render topmost (often Shadow,
@@ -2039,7 +2230,12 @@ function renderTimeline(){
   // scrollbar. Math.max keeps the line covering a tall/scrolled layer
   // list too (that case was already correct).
   var awrap=document.getElementById('fg-wrap');
-  document.getElementById('playhead').style.left=(state.currentFrame*FC)+'px';document.getElementById('playhead').style.height=Math.max(30+rowCount*ROW_H+camGridRowOffset(),awrap?awrap.clientHeight:0)+'px';document.getElementById('playhead-flag').textContent=state.currentFrame+1;
+  document.getElementById('playhead').style.left=(state.currentFrame*FC)+'px';
+  syncPlayheadToViewport();
+  document.getElementById('playhead-flag').textContent=state.currentFrame+1;
+  // Markers are overlays on rows this function just rebuilt — re-attach.
+  if(window.SMMarkers)SMMarkers.render();
+  if(window.SMBpm)SMBpm.render();
   if(window.SMAudio)SMAudio.renderStrip();
   renderTweenCurveStrips();
   // renderTimeline() wipes #frame-grid, so the graph editor — which hides that
@@ -2049,6 +2245,7 @@ function renderTimeline(){
     document.getElementById('frame-grid').style.visibility='hidden';
     SMMotionGraph.render();
   }
+  _tlScrollRestore(_scroll);
 }
 // ---- TWEEN EASING CURVE STRIPS (toggle: btn-tween-curves) ----
 // Purely additive display, complements the global/per-pair easing system —
@@ -2939,6 +3136,14 @@ function computeLayerRenderOrder(){
       order.push({type:'layer',idx:i,hidden:false});
     }
   }
+  // Shy (AE's own switch, 2026-07-25): a per-layer flag plus one global
+  // toggle. Marked hidden here rather than filtered out, so it rides the
+  // SAME mechanism folders and link-groups already use — every consumer
+  // that already honours `hidden` gets shy for free, and nothing downstream
+  // has to learn a second way for a row to be absent.
+  if(state.shyEnabled)order.forEach(function(e){
+    if(e.type==='layer'&&state.layers[e.idx]&&state.layers[e.idx].shy)e.hidden=true;
+  });
   return order;
 }
 // Groups the current multi-selection (_layerSel) into a new folder — only
@@ -3065,12 +3270,74 @@ function _layerIndexByUid(uid){
   for(var i=0;i<state.layers.length;i++)if(state.layers[i].layerUid===uid)return i;
   return -1;
 }
+// AE's parent pickwhip, shared by BOTH timelines (2026-07-25). Drag the dot
+// onto any layer row to parent to it; drop outside / on itself / on a
+// descendant cancels. Deliberately the same code as the dropdown path below
+// — both call SMMotion.setLayerParent, which owns the cycle refusal, so
+// there is still exactly ONE writer of ld.parentLayerUid.
+function startParentPickwhip(li,fromEl,ev){
+  ev.stopPropagation(); ev.preventDefault();
+  var M=window.SMMotion; if(!M||!M.setLayerParent){showToast('Parentage indisponible');return;}
+  var bad=parentDescendants(li);
+  var r0=fromEl.getBoundingClientRect();
+  var ox=r0.left+r0.width/2, oy=r0.top+r0.height/2;
+  var line=document.createElement('div'); line.className='lpick-line'; document.body.appendChild(line);
+  var hover=null;
+  function paint(x,y){
+    var dx=x-ox, dy=y-oy;
+    line.style.left=ox+'px'; line.style.top=oy+'px';
+    line.style.width=Math.sqrt(dx*dx+dy*dy)+'px';
+    line.style.transform='rotate('+Math.atan2(dy,dx)+'rad)';
+  }
+  function rowUnder(x,y){
+    var el=document.elementFromPoint(x,y); if(!el)return null;
+    var row=el.closest?el.closest('.lrow[data-layer]'):null; if(!row)return null;
+    var idx=parseInt(row.dataset.layer,10);
+    if(isNaN(idx)||idx===li||bad[idx])return null;
+    return {row:row,idx:idx};
+  }
+  function onMove(e){
+    paint(e.clientX,e.clientY);
+    var t=rowUnder(e.clientX,e.clientY);
+    if(hover&&(!t||t.row!==hover.row))hover.row.classList.remove('pick-target');
+    if(t&&(!hover||t.row!==hover.row))t.row.classList.add('pick-target');
+    hover=t;
+  }
+  function cleanup(){
+    document.removeEventListener('mousemove',onMove,true);
+    document.removeEventListener('mouseup',onUp,true);
+    document.removeEventListener('keydown',onKey,true);
+    if(hover)hover.row.classList.remove('pick-target');
+    line.remove();
+  }
+  function onUp(e){
+    var t=rowUnder(e.clientX,e.clientY);
+    cleanup();
+    if(!t)return; // dropped on nothing / itself / a descendant — no-op, no undo entry
+    pushUndo();
+    M.setLayerParent(li,M.ensureLayerUid(state.layers[t.idx]));
+    renderLayerList(); renderTimeline();
+    if(window.SMEngineBridge)SMEngineBridge.renderNow();
+  }
+  function onKey(e){ if(e.key==='Escape'){cleanup();} }
+  document.addEventListener('mousemove',onMove,true);
+  document.addEventListener('mouseup',onUp,true);
+  document.addEventListener('keydown',onKey,true);
+  paint(ev.clientX,ev.clientY);
+}
 function buildParentCell(row,ld,li){
   var cell=document.createElement('div');
   cell.className='lparent';
   var pIdx=_layerIndexByUid(ld.parentLayerUid);
   var pName=(pIdx>=0&&state.layers[pIdx])?(state.layers[pIdx].name||('Layer '+(pIdx+1))):null;
-  cell.textContent=pName||'—';
+  var pick=document.createElement('span');
+  pick.className='lpick';
+  pick.title='Glisser sur un calque pour le définir comme parent';
+  pick.addEventListener('mousedown',function(e){startParentPickwhip(li,pick,e);});
+  cell.appendChild(pick);
+  var lbl=document.createElement('span');
+  lbl.textContent=pName||'—';
+  cell.appendChild(lbl);
   cell.classList.toggle('none',!pName);
   cell.title=pName?('Parent : '+pName+' — cliquer pour changer'):'Aucun parent — cliquer pour en choisir un';
   function open(e){
@@ -3143,13 +3410,14 @@ function paintFillSwatches(v){
   var fhex=document.getElementById('p-fill-hex');if(fhex&&document.activeElement!==fhex)fhex.value=hexDisplayValue(v);
 }
 function renderLayerList(){
+  var _scroll=_tlScrollSnapshot(); // see _tlScrollSnapshot — same wipe, same jump
   var list=document.getElementById('layer-list');list.innerHTML='';
   // Motion mode: expandable Transform property rows instead of the plain
   // per-layer row list — see motion.js's own header comment for why this
   // is a full early return rather than a branch woven through the rest of
   // this function (folders/link-groups/components have no meaning yet in
   // Motion mode's v1 scope).
-  if(state.appMode==='motion'){if(window.SMMotion)SMMotion.renderLayerListMotion(list);return;}
+  if(state.appMode==='motion'){if(window.SMMotion)SMMotion.renderLayerListMotion(list);_tlScrollRestore(_scroll);return;}
   if(window.SMCamera)SMCamera.renderPanelRow(list);
   var order=computeLayerRenderOrder();
   order.forEach(function(entry){
@@ -3332,6 +3600,14 @@ function renderLayerList(){
         {label:'Renommer',action:function(){startLayerRename(idx4);}},
         {label:l4.isTextLayer?'Retirer le marquage « calque de texte »':'Marquer comme calque de texte',action:function(){l4.isTextLayer=!l4.isTextLayer;renderLayerList();}},
         {label:'Grouper en dossier',disabled:_layerSel.length<2,action:function(){groupSelectionIntoFolder();}},
+        // Split / merge as a reversible PAIR (2026-07-25). "Éclater" existed
+        // only as a Motion double-click with no visible entry point and no
+        // inverse; both directions now sit next to each other, in both
+        // timelines, so the round-trip is discoverable from either end.
+        {label:'Éclater en calques (une forme par calque)',disabled:!!l4.symbolId||!!l4.lfsGroup,action:function(){window.SM.splitLayerIntoElements(idx4);}},
+        {label:'Couper au niveau de la tête de lecture  (⌘⇧D)',action:function(){window.SM.splitLayerAtPlayhead(idx4);}},
+        {label:l4.shy?'Retirer le marquage « shy »':'Marquer comme « shy »',action:function(){window.SM.toggleLayerShy(idx4);}},
+        {label:'Fusionner les calques sélectionnés',disabled:_layerSel.length<2,action:function(){window.SM.mergeLayersIntoOne(_layerSel.slice());}},
         {label:'Retirer du dossier',disabled:!l4.folderId,action:function(){delete l4.folderId;renderLayerList();renderTimeline();}},
         {label:'Convertir en composant',disabled:!!l4.symbolId||!!l4.lfsGroup,action:function(){window.SM.convertActiveLayerToComponent();}},
         {label:'Décomposer le composant',disabled:!l4.symbolId,action:function(){window.SM.convertComponentToLayer();}},
@@ -3373,6 +3649,7 @@ function renderLayerList(){
   // and interactively a layer row: name + mute + volume live here now
   // instead of overlapping the waveform strip in the frame grid.
   if(window.SMAudio)window.SMAudio.renderStrip();
+  _tlScrollRestore(_scroll);
 }
 // Manual mouse-based drag-to-reorder (kept consistent with the frame grid's
 // custom drag rather than HTML5 draggable, which behaves inconsistently
@@ -4257,6 +4534,28 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 // programmatically so their own listeners run unchanged), and the
 // settings modal (general pane, or jump straight to its shortcuts tab).
 function initAppMenu(){
+  (function bindMotionBlur(){
+    var b=document.getElementById('btn-mblur');
+    if(!b)return;
+    b.addEventListener('click',function(){window.SM.toggleMotionBlurComp();});
+    b.addEventListener('contextmenu',function(e){
+      e.preventDefault();
+      var s=prompt('Échantillons de flou (2-16)',String(state.motionBlurSamples||6));
+      if(s===null)return;
+      var sh=prompt('Ouverture d\u2019obturateur, en frames (0.05-2)',String(state.motionBlurShutter!=null?state.motionBlurShutter:0.5));
+      if(sh===null)return;
+      window.SM.setMotionBlurSettings(s,sh);
+      showToast('Flou : '+state.motionBlurSamples+' échantillons · obturateur '+state.motionBlurShutter+' f');
+    });
+  })();
+  (function bindShy(){
+    var b=document.getElementById('btn-shy');
+    if(!b)return;
+    b.addEventListener('click',function(){
+      window.SM.toggleShyMode();
+      b.classList.toggle('active',!!state.shyEnabled);
+    });
+  })();
   var btn=document.getElementById('app-menu-btn');if(!btn||!window.showContextMenu)return;
   function clickEl(id){var el=document.getElementById(id);if(el)el.click();}
   btn.addEventListener('click',function(e){
@@ -4810,6 +5109,14 @@ function onKeyDown(event){
   // was ever wired to it. Plain 'd' (no modifier, handled further down)
   // stays bound to duplicateKeyframe — a real, distinct, still-useful
   // action (clones the whole current frame) — untouched.
+  // Cmd/Ctrl+Shift+D — AE's "split layer at the playhead". Checked BEFORE
+  // the plain Cmd+D below, which would otherwise swallow it whenever canvas
+  // objects happen to be selected.
+  if((event.metaKey||event.ctrlKey)&&event.shiftKey&&(event.key==='d'||event.key==='D')){
+    event.preventDefault();
+    window.SM.splitLayerAtPlayhead();
+    return;
+  }
   if((event.metaKey||event.ctrlKey)&&(event.key==='d'||event.key==='D')&&selectedPaths.length){
     event.preventDefault();
     duplicateSelection();

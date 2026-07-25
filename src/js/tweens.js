@@ -4268,6 +4268,15 @@ function restoreLayersSnapshot(s){
   if(state.waOut>=s.totalFrames)state.waOut=s.totalFrames-1;window._waOut=state.waOut;
   if(state.currentFrame>=s.totalFrames)state.currentFrame=s.totalFrames-1;
   state.activeLayerIdx=Math.max(0,Math.min(s.active,state.layers.length-1));
+  // The `state.layers=[]` above replaces the array, which breaks the alias
+  // enterSymbol set up (state.layers === state.symbols[id].layers). Re-point
+  // it immediately so anything reading the SYMBOL rather than `state` mid-
+  // session — a second instance of the same component rendered in the outer
+  // scene, StoryBoard's live thumbnails, an export kicked off while inside —
+  // sees the undone state instead of the pre-undo one. exitToScene writes
+  // the same value back as the authoritative chokepoint; this keeps the two
+  // views in agreement in between.
+  if(state.activeSymbolId&&state.symbols[state.activeSymbolId])state.symbols[state.activeSymbolId].layers=state.layers;
   // Caméra (v19) : les clés caméra font partie du snapshot complet — un
   // undo après un drag de cadrage restaure le cadrage d'avant, pas
   // seulement les traits. Les snapshots antérieurs à v19 n'ont pas le

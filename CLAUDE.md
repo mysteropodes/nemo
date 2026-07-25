@@ -358,3 +358,54 @@ du color-picker, l'opacité par swatch du color-manager, le stop de dégradé, `
 (ou rien) sans le token `scrub`, donc silencieusement non-scrubbables malgré un `data-step` par
 ailleurs correct. Un `type="range"` natif (slider) n'a pas besoin de cette classe — c'est un
 mécanisme d'interaction différent, déjà équivalent en pratique (glisser le curseur).
+
+## 11. Motion — état après la session du 2026-07-25 (AE-lite)
+
+Motion a reçu une grosse passe de features After Effects. À lire avant d'y
+retoucher, surtout pour les invariants qui ne se voient pas dans le code.
+
+**L'invariant d'alignement panneau/grille est la contrainte n°1.** `#layer-list`
+(gauche) et `#frame-grid` (droite) rendent DEUX listes de lignes qui doivent
+rester ligne-à-ligne identiques. Toute propriété ajoutée doit passer par
+`propsFor(holder)` (motion.js) — le seul endroit qui décide de la liste — sinon
+les deux côtés divergent silencieusement. Même règle pour toute ligne
+supplémentaire (éditeur d'expression, etc.) : si un côté l'insère, l'autre doit
+réserver la même hauteur.
+
+**Scroll.** `renderTimeline`/`renderLayerList` vident leur conteneur, ce qui
+remet le scroll à 0 — ils prennent donc un snapshot avant et le restaurent
+après (`_tlScrollSnapshot`/`_tlScrollRestore`). La synchro verticale des deux
+panneaux est un miroir **1:1** (layer-scroll-sync.js) : ne jamais y remettre
+un décalage « pour compenser le header », c'était le bug. Les plages de scroll
+sont égalisées par une cale en fin de contenu. Le `#playhead` est épinglé au
+viewport (`syncPlayheadToViewport`) parce qu'il est `position:absolute` dans le
+conteneur scrollable.
+
+**Bas de timeline.** `#fg-col` garde libre la bande de 40 px du bas :
+`#layer-ctrls` à gauche, `#tlzoom-scrollbar` (timeline-zoom.js) à droite. Ne pas
+réintroduire de barre de scroll native sur `#fg-wrap` — timeline-zoom la masque
+volontairement, il n'y en a qu'une.
+
+**Un seul geste, un seul rectangle.** Le lasso de motion.js est en phase de
+CAPTURE sur `#fg-wrap` : il fait suivre à `SMLayerInOut.marqueeSelect` (barres
+in/out) et layer-inout fait suivre à `SMMotion.marqueeSelect` (clés). Les deux
+sens sont nécessaires — sans ça, un des deux types de sélection meurt.
+
+**Boîte de sélection de clés** : n'apparaît qu'à partir de 2 pistes de
+propriété (demande explicite). Bords haut/bas = skew, bords gauche/droite =
+space, remplissage = déplacement, Cmd+glisser = liquify. Un seul moteur
+(`startSkewDrag`/`onDragMove`), un facteur par clé selon le mode.
+
+**Déplacement des clés avec les in/out** — ordre de priorité, à ne pas
+inverser : sélection explicite > verrou permanent `ld.keyLock` > défaut par
+poignée. Alt a UN sens à la fois selon qu'il y a une sélection ou non.
+
+**Ajouts persistés** (à répercuter dans `exportJSON` ET l'import) : `markers`
+(comp + calque), `shy`, `keyLock`, `timeRemap`, `motionBlur`, `bpm*`,
+`shyEnabled`, `motionBlur*`.
+
+**Time Remap** passe par `resolveSymbolFrameIdx` (app.js), point de passage
+unique de tous les lecteurs d'un composant. **Motion blur** est un
+post-traitement dans `buildSceneJson` : il réutilise les items déjà construits
+et leur applique la matrice DELTA — ne jamais dupliquer la boucle de
+construction (CLAUDE.md §3).
