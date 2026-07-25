@@ -379,29 +379,13 @@ window.SM={
       });
       saveActiveLayerFrame();updateUI();
     }},
-  setStrokeColor:function(v){state.strokeColor=v;document.getElementById('stroke-well').style.background=v;document.getElementById('pm-stroke').style.background=v;
-    ['color-stroke','pm-stroke-c'].forEach(function(id){var el=document.getElementById(id);el.value=v;el.dataset.hex8=v;});
-    // Figma-style inline hex/alpha fields (2026-07) — see setFillColor's
-    // own comment; alphaPctFromHex reads the hex8 alpha byte (defaults to
-    // 100 when absent/opaque, same "#rrggbb == fully opaque" convention
-    // color-picker.js's hexToAlpha already uses).
-    var shex=document.getElementById('p-stroke-hex');if(shex&&document.activeElement!==shex)shex.value=hexDisplayValue(v);
-    var salpha=document.getElementById('p-stroke-alpha');if(salpha&&document.activeElement!==salpha)salpha.value=alphaPctFromHex(v);
+  setStrokeColor:function(v){state.strokeColor=v;paintStrokeSwatches(v);
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(p.data&&p.data.isVectorBrush)p.fillColor=v;else if(p.strokeColor)p.strokeColor=v;});saveActiveLayerFrame();updateUI();}
     // Fill/Stroke Select tool: recolor ONLY the clicked aspect — a 'stroke'
     // selection here means strokeColor, never touches fillColor even on a
     // combined shape (that's the whole point of this tool vs plain Select).
     else if(state.tool==='fsselect'&&_fsSel.some(function(s){return s.kind==='stroke';})){pushUndo();_fsSel=_fsSel.map(function(sel){if(sel.kind!=='stroke')return sel;var arc=fsRealizeStrokeSegment(sel,userLayers[state.activeLayerIdx]);arc.strokeColor=v;return{path:arc,kind:'stroke',segStart:0,segEnd:arc.length,closed:arc.closed};});saveActiveLayerFrame();updateUI();}},
-  setFillColor:function(v){state.fillColor=v;
-    // Background is written unconditionally (even while fill is disabled) so
-    // the swatch shows the last-picked color as soon as fill is re-enabled —
-    // the .none overlay (red diagonal) is what actually communicates "off".
-    document.getElementById('fill-well').style.background=v;document.getElementById('pm-fill').style.background=v;
-    ['color-fill','pm-fill-c'].forEach(function(id){var el=document.getElementById(id);el.value=v;el.dataset.hex8=v;});
-    // Figma-style inline hex field (2026-07) — kept in sync with every
-    // other write path to this color (popover, eyedropper, project load),
-    // not just this function's own callers.
-    var fhex=document.getElementById('p-fill-hex');if(fhex&&document.activeElement!==fhex)fhex.value=hexDisplayValue(v);
+  setFillColor:function(v){state.fillColor=v;paintFillSwatches(v);
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(p.fillColor)p.fillColor=v;});saveActiveLayerFrame();updateUI();}
     else if(state.tool==='fsselect'&&_fsSel.some(function(s){return s.kind==='fill'||s.kind==='fillregion';})){pushUndo();_fsSel=_fsSel.map(function(sel){if(sel.kind!=='fill'&&sel.kind!=='fillregion')return sel;if(sel.kind==='fillregion')sel=fsRealizeFillRegion(sel,userLayers[state.activeLayerIdx]);sel.path.fillColor=v;return sel;});saveActiveLayerFrame();updateUI();}},
   setFillEnabled:function(v){state.fillEnabled=v;var fw=document.getElementById('fill-well'),pf=document.getElementById('pm-fill');fw.classList.toggle('none',!v);pf.classList.toggle('none',!v);document.getElementById('p-fill-on').checked=v;
@@ -1677,13 +1661,19 @@ function updateSelPropsPanel(){
         // reason as every other color-input writer in this codebase.
         var css=hasFill?colorHex8(ref.fillColor):state.fillColor;
         state.fillColor=css;state.fillEnabled=hasFill;
-        document.getElementById('pm-fill').style.background=css;
+        // Through the shared writer, not a hand-picked subset of the DOM —
+        // this used to paint pm-fill and pm-fill-c only, leaving p-fill-hex
+        // and the whole LEFT panel showing the previous colour. See
+        // paintFillSwatches for the measurement.
+        paintFillSwatches(css);
         document.getElementById('pm-fill').classList.toggle('none',!hasFill);
-        document.getElementById('pm-fill-c').value=css;
-        document.getElementById('pm-fill-c').dataset.hex8=css;
         document.getElementById('p-fill-on').checked=hasFill;
         var ftog=document.getElementById('fill-enable-toggle');if(ftog)ftog.classList.toggle('off',!hasFill);
         var hasStroke=!!ref.strokeColor;state.strokeEnabled=hasStroke;
+        // The stroke side adopted NOTHING before: selecting a #e91e63 stroke
+        // left every stroke surface on the previous colour, so the panels
+        // described a shape that wasn't selected.
+        if(hasStroke){var scss=colorHex8(ref.strokeColor);state.strokeColor=scss;paintStrokeSwatches(scss);}
         var stog=document.getElementById('stroke-enable-toggle');if(stog)stog.classList.toggle('off',!hasStroke);
       }
       // Same staleness fix for Cap/Join/Paint Order/Miter Limit/Dash Offset —
@@ -3085,6 +3075,46 @@ function buildParentCell(row,ld,li){
   cell.addEventListener('click',open);
   cell.addEventListener('mousedown',function(e){e.stopPropagation();});
   row.appendChild(cell);
+}
+// THE single writer for every surface that DISPLAYS the current stroke/fill
+// colour (2026-07-25, "les couleurs j'ai l'impression que c'est pas synchro
+// entre panneau gauche et droit").
+//
+// There were two writers for the same value and they disagreed. setStrokeColor
+// /setFillColor painted all seven surfaces; the selection handler in updateUI
+// hand-wrote only four of them. Selecting a shape therefore left the app
+// showing two different colours at once — measured on a #8bc34a fill:
+//
+//   pm-fill (right swatch)   #8bc34a   <- adopted the selection
+//   pm-fill-c (right input)  #8bc34a   <- adopted
+//   p-fill-hex (right hex)   0066FF    <- still the previous global colour
+//   color-fill / fill-well   #0066ff   <- still the previous, LEFT panel
+//
+// Two widgets in the same panel contradicting each other. Split out here so
+// both callers paint the same set: setStrokeColor/setFillColor also APPLY the
+// colour to the selection, which is why the selection handler can't simply
+// call them (it would rewrite the object it just read, and push undo doing it).
+//
+// Keeps the existing 8-digit-hex convention untouched: `.value` is assigned
+// the full string and the native input truncates it to 6 digits by design,
+// with `.dataset.hex8` carrying the alpha alongside (CLAUDE.md §2).
+function paintStrokeSwatches(v){
+  var sw=document.getElementById('stroke-well'); if(sw)sw.style.background=v;
+  var pm=document.getElementById('pm-stroke');   if(pm)pm.style.background=v;
+  ['color-stroke','pm-stroke-c'].forEach(function(id){var el=document.getElementById(id);if(el){el.value=v;el.dataset.hex8=v;}});
+  var shex=document.getElementById('p-stroke-hex');if(shex&&document.activeElement!==shex)shex.value=hexDisplayValue(v);
+  var salpha=document.getElementById('p-stroke-alpha');if(salpha&&document.activeElement!==salpha)salpha.value=alphaPctFromHex(v);
+}
+function paintFillSwatches(v){
+  // Background written unconditionally (even while fill is disabled) so the
+  // swatch shows the last-picked colour the moment fill is re-enabled — the
+  // .none overlay is what communicates "off".
+  var fw=document.getElementById('fill-well'); if(fw)fw.style.background=v;
+  var pf=document.getElementById('pm-fill');   if(pf)pf.style.background=v;
+  ['color-fill','pm-fill-c'].forEach(function(id){var el=document.getElementById(id);if(el){el.value=v;el.dataset.hex8=v;}});
+  // No fill-side alpha field exists (only the stroke has one) — the fill's
+  // alpha rides in dataset.hex8 above.
+  var fhex=document.getElementById('p-fill-hex');if(fhex&&document.activeElement!==fhex)fhex.value=hexDisplayValue(v);
 }
 function renderLayerList(){
   var list=document.getElementById('layer-list');list.innerHTML='';
