@@ -732,6 +732,23 @@ body:not(.mode-motion) #motion-props-sec{display:none;}
 .motion-keysel-edge-bottom{bottom:-9px;}
 .motion-keysel-edge::after{content:'';position:absolute;left:0;right:0;top:50%;height:3px;transform:translateY(-50%);background:var(--accent);border-radius:2px;opacity:.85;}
 .motion-keysel-edge:hover::after{opacity:1;height:4px;}
+/* Side edges = SPACE (spread/compress the selection along time, the opposite
+   edge staying anchored). Vertical strips, so they reset the top/bottom
+   geometry the shared .motion-keysel-edge rule sets for the skew edges. */
+/* z-index 2 + the top/bottom edges inset below: on a selection spanning ONE
+   track row the box is ~11px tall, so the 14px-tall skew edges covered the
+   whole thing and swallowed every click meant for the side edges (they are
+   later siblings, so they won the hit test). The corners now belong to the
+   side edges, the usual resize-handle convention — and skew on a single row
+   is a no-op anyway (its handler refuses under 2 rows). */
+.motion-keysel-edge-left,.motion-keysel-edge-right{left:auto;right:auto;top:-4px;bottom:-4px;
+  height:auto;width:14px;z-index:2;}
+.motion-keysel-edge-top,.motion-keysel-edge-bottom{left:10px;right:10px;}
+.motion-keysel-edge-left{left:-9px;}
+.motion-keysel-edge-right{right:-9px;}
+.motion-keysel-edge-left::after,.motion-keysel-edge-right::after{left:50%;right:auto;top:0;bottom:0;
+  height:auto;width:3px;transform:translateX(-50%);}
+.motion-keysel-edge-left:hover::after,.motion-keysel-edge-right:hover::after{height:auto;width:4px;}
 .lrow.motion-disabled{cursor:not-allowed;opacity:.45;}
 .lrow.motion-disabled:hover{background:transparent;}
 body.mode-motion #layer-panel{width:260px;}

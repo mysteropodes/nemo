@@ -2416,7 +2416,16 @@
             menu.push({ sep: true });
             menu.push({ label: 'Distribuer uniformément', action: distributeKeys });
             menu.push({ label: 'Inverser l’ordre (flip)', action: flipKeys });
+            menu.push({ label: 'Subdiviser (clé à mi-chemin)', action: subdivideKeys });
             menu.push({ label: 'Sélectionner 1 sur 2', action: function () { selectEveryNthKey(2); } });
+            menu.push({ label: 'Sélectionner 1 sur N…', action: function () {
+              var v = prompt('Garder une clé sur combien ?', '3');
+              if (v !== null) selectEveryNthKey(v);
+            } });
+            menu.push({ label: 'Garder au hasard…', action: function () {
+              var v = prompt('Garder quel pourcentage de la sélection ?', '50');
+              if (v !== null) grabRandomKeys(v);
+            } });
           }
           if (_motionKeySel.length >= 1) menu.push({ label: 'Inverser la sélection', action: invertKeySelection });
           window.showContextMenu(e.clientX, e.clientY, menu);
@@ -2585,6 +2594,58 @@
     renderTimeline();
     if (window.showToast) showToast(_motionKeySel.length + ' clé(s) sélectionnée(s)');
   }
+  // Subdivide: insert a key HALFWAY between each consecutive pair of
+  // selected keys on the same track (2026-07-25, Skew Pro's "Subdivide").
+  // The inserted key takes the value the curve already produces at that
+  // frame, so the animation is bit-for-bit unchanged the moment it lands —
+  // it exists to give you a handle to grab, which is the whole point. The
+  // new keys are added to the selection so a subdivide → drag → subdivide
+  // loop works without re-selecting, and a pair only one frame apart is
+  // skipped (no room for a key between them) rather than silently
+  // overwriting one of its own endpoints.
+  function subdivideKeys() {
+    if (_motionKeySel.length < 2) { if (window.showToast) showToast('Sélectionne au moins 2 clés'); return; }
+    pushUndo();
+    var added = 0, skipped = 0, fresh = [];
+    _groupKeySelByTrack().forEach(function (g) {
+      if (g.items.length < 2) return;
+      var track = g.holder.motion && g.holder.motion[g.prop];
+      if (!track) return;
+      var sorted = g.items.slice().sort(function (a, b) { return a.frame - b.frame; });
+      for (var i = 0; i < sorted.length - 1; i++) {
+        var a = sorted[i], b = sorted[i + 1];
+        var mid = Math.round((a.frame + b.frame) / 2);
+        if (mid <= a.frame || mid >= b.frame) { skipped++; continue; }
+        if (keyAt(track, mid)) { skipped++; continue; }
+        // Read the value BEFORE inserting — rawValueAtFrame walks this same
+        // track, so inserting first would make the new key sample itself.
+        var v = rawValueAtFrame(g.holder, g.prop, mid);
+        var nk = { frame: mid, v: v.slice(), curvePoints: cloneCurvePts(a.curvePoints || DEFAULT_CURVE), hOut: [0, 0], hIn: [0, 0] };
+        track.keys.push(nk); added++;
+        fresh.push({ holder: g.holder, prop: g.prop, key: nk });
+      }
+      sortKeys(track);
+    });
+    setKeySel(_motionKeySel.concat(fresh));
+    renderLayerList(); renderTimeline();
+    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+    if (window.showToast) showToast(added + ' clé(s) insérée(s)' + (skipped ? ' — ' + skipped + ' intervalle(s) trop court(s)' : ''));
+  }
+  // Keep a random subset of the current selection (Skew Pro's "Grab
+  // Randomly"): the fast way to make a uniform batch of layers/keys feel
+  // hand-made. Guarantees at least one key survives, so it can't silently
+  // empty the selection on a small one.
+  function grabRandomKeys(percent) {
+    var p = Math.max(1, Math.min(100, parseInt(percent, 10) || 50)) / 100;
+    if (!_motionKeySel.length) { if (window.showToast) showToast('Aucune clé sélectionnée'); return; }
+    var pool = _motionKeySel.slice();
+    var want = Math.max(1, Math.round(pool.length * p));
+    var out = [];
+    while (out.length < want && pool.length) out.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+    setKeySel(out);
+    renderTimeline();
+    if (window.showToast) showToast(out.length + ' clé(s) gardée(s) au hasard');
+  }
   // Inverts within whatever tracks are CURRENTLY RENDERED (the same
   // universe the marquee itself draws over).
   function invertKeySelection() {
@@ -2648,6 +2709,20 @@
       boxEl.appendChild(edge);
     });
   }
+  // Side edges = "Space": drag one to spread the selection out along the
+  // timeline (or squeeze it in), the opposite edge staying put. Distinct
+  // from the top/bottom skew edges, which slide whole ROWS; this one
+  // rescales the selection's own timing. Needs 2+ distinct frames to mean
+  // anything, hence the guard in the caller.
+  function addSpaceEdges(boxEl, onStart) {
+    ['left', 'right'].forEach(function (pos) {
+      var edge = document.createElement('div');
+      edge.className = 'motion-keysel-edge motion-keysel-edge-' + pos;
+      edge.title = 'Glisser pour espacer / resserrer les clés dans le temps (le bord opposé reste ancré)';
+      edge.addEventListener('mousedown', function (e) { e.stopPropagation(); e.preventDefault(); onStart(e, pos); });
+      boxEl.appendChild(edge);
+    });
+  }
   function addMoveFill(boxEl, onStart) {
     var fill = document.createElement('div');
     fill.className = 'motion-keysel-fill';
@@ -2661,7 +2736,13 @@
     rows = rows.filter(function (r) { return r.length || true; });
     if (!rows.length) return;
     pushUndo();
-    window._motionSkewDrag = { startX: e.clientX, mode: mode, rows: rows };
+    // Selection extent along TIME, captured once at mousedown — the Space
+    // gestures (left/right edges) need it to place each key between the
+    // anchored edge and the dragged one, and recomputing it mid-drag would
+    // move the anchor under the cursor as the keys spread.
+    var fMin = Infinity, fMax = -Infinity;
+    rows.forEach(function (row) { row.forEach(function (en) { fMin = Math.min(fMin, en.orig); fMax = Math.max(fMax, en.orig); }); });
+    window._motionSkewDrag = { startX: e.clientX, mode: mode, rows: rows, fMin: fMin, fMax: fMax };
   }
   // Key box rows = one row per PROPERTY TRACK holding selected keys, in
   // rendered (document) order — matches the reference where each visible
@@ -2699,7 +2780,34 @@
     if (!_keySelBoxEl) {
       _keySelBoxEl = document.createElement('div'); _keySelBoxEl.className = 'motion-keysel-box';
       document.body.appendChild(_keySelBoxEl);
+      // The box's own surfaces (fill + edges) are pointer-events:auto so
+      // they can be dragged — which also means they swallow right-clicks on
+      // the keys UNDERNEATH, and every batch op (Distribuer, Flip,
+      // Subdiviser, Easy Ease…) lives in that cell context menu. Found
+      // 2026-07-25: as soon as the box appeared, the menu became
+      // unreachable for exactly the selection it was meant to act on.
+      // Forward instead of duplicating the menu: blank out the box for one
+      // hit-test and re-dispatch to whatever is really under the cursor.
+      _keySelBoxEl.addEventListener('contextmenu', function (e) {
+        var prev = _keySelBoxEl.style.pointerEvents;
+        _keySelBoxEl.style.pointerEvents = 'none';
+        var kids = Array.prototype.slice.call(_keySelBoxEl.children);
+        var prevKids = kids.map(function (c) { var p = c.style.pointerEvents; c.style.pointerEvents = 'none'; return p; });
+        var under = document.elementFromPoint(e.clientX, e.clientY);
+        _keySelBoxEl.style.pointerEvents = prev;
+        kids.forEach(function (c, i) { c.style.pointerEvents = prevKids[i]; });
+        if (!under) return;
+        e.preventDefault(); e.stopPropagation();
+        under.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: e.clientX, clientY: e.clientY }));
+      });
       addMoveFill(_keySelBoxEl, function (e, mode) { startSkewDrag(buildKeyRows(), mode, e); });
+      addSpaceEdges(_keySelBoxEl, function (e, mode) {
+        var rows = buildKeyRows();
+        var f0 = Infinity, f1 = -Infinity;
+        rows.forEach(function (r) { r.forEach(function (en) { f0 = Math.min(f0, en.orig); f1 = Math.max(f1, en.orig); }); });
+        if (!(f1 > f0)) { if (window.showToast) showToast('Sélectionne des clés sur 2 frames différentes pour les espacer'); return; }
+        startSkewDrag(rows, mode, e);
+      });
       addStaggerEdges(_keySelBoxEl, function (e, mode) {
         var rows = buildKeyRows();
         if (rows.length < 2) { if (window.showToast) showToast('Sélectionne des clés sur 2 pistes ou plus pour skewer'); return; }
@@ -2835,10 +2943,27 @@
       sk.rows.forEach(function (row) { row.forEach(function (en) { dragged.push(en.key); }); });
       var plan = [];
       var ok3 = sk.rows.every(function (row, r) {
-        var f = sk.mode === 'move' || n < 2 ? 1 : (sk.mode === 'top' ? (n - 1 - r) / (n - 1) : r / (n - 1));
-        var d2 = Math.round(total * f);
+        // Row-based factor for the SKEW gestures (top/bottom edges): the
+        // dragged edge's row moves the full distance, the opposite row
+        // stays anchored, rows in between interpolate — the diagonal.
+        var rowF = sk.mode === 'move' || n < 2 ? 1
+          : (sk.mode === 'top' ? (n - 1 - r) / (n - 1) : r / (n - 1));
         return row.every(function (en) {
-          var nf = en.orig + d2;
+          // ...and a TIME-based factor for the SPACE gestures (left/right
+          // edges, 2026-07-25, Skew Pro's "Space" lesson): spread or
+          // compress the selection along the timeline with the opposite
+          // edge anchored. The factor has to be per-KEY here, not per-row —
+          // it depends on where the key sits between the selection's first
+          // and last frame, not on which track it lives in. Same absolute-
+          // from-original arithmetic as the skew, so it inherits the
+          // no-drift and drag-back-to-restore properties unchanged.
+          var f = rowF;
+          if (sk.mode === 'left' || sk.mode === 'right') {
+            var span = sk.fMax - sk.fMin;
+            f = span <= 0 ? 0 // every key on one frame — nothing to spread
+              : (sk.mode === 'right' ? (en.orig - sk.fMin) / span : (sk.fMax - en.orig) / span);
+          }
+          var nf = en.orig + Math.round(total * f);
           if (nf < 0 || nf >= state.totalFrames) return false;
           var existing = keyAt(en.track, nf);
           // Only an UNdragged key blocks — another dragged key sitting at
