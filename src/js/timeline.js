@@ -704,6 +704,11 @@ window.SM={
     if(ld.symbolId){dst.symbolId=ld.symbolId;dst.symPlayMode=ld.symPlayMode;dst.symSpeed=ld.symSpeed;dst.symPlacedAt=ld.symPlacedAt;dst.symSingleFrame=ld.symSingleFrame;dst.symMatrix=ld.symMatrix;dst.locked=ld.locked;}
     dst.inPoint=f;dst.outPoint=outF;
     ld.outPoint=f-1;
+    // Splitting materialises hard in/out values on both halves, which a
+    // time link would then override — so the link is dropped rather than
+    // left to silently win over the cut the user just made.
+    if(ld.timeLink){delete ld.timeLink;delete dst.timeLink;showToast('Lien temporel retiré : la coupe fixe les points d\u2019entrée/sortie');}
+    else delete dst.timeLink;
     // createUserLayer appends to the TOP of the stack, which would drop the
     // second half far from the one it was cut out of. AE leaves the two
     // halves adjacent, and so does this: move it to sit directly above its
@@ -1120,7 +1125,7 @@ window.SM={
         // be just as useless. Note isNullLayer above was already persisted,
         // and its own tooltip calls a null layer a "pivot/parent pour d'autres
         // calques" — the pivot came back, everything hung off it did not.
-        layerUid:l.layerUid,parentLayerUid:l.parentLayerUid,markers:l.markers,shy:l.shy,keyLock:l.keyLock,timeRemap:l.timeRemap,motionBlur:l.motionBlur,effectsFrom:l.effectsFrom};}),
+        layerUid:l.layerUid,parentLayerUid:l.parentLayerUid,markers:l.markers,shy:l.shy,keyLock:l.keyLock,timeRemap:l.timeRemap,motionBlur:l.motionBlur,effectsFrom:l.effectsFrom,timeLink:l.timeLink};}),
       layerFolders:state.layerFolders,layerLinkGroups:state.layerLinkGroups,
       // StoryBoard node space (2026-07) — plain data by construction (no
       // runtime-only fields live in state.storyboard, see storyboard.js's
@@ -1272,13 +1277,31 @@ window.SM={
       if(ld.motion)state.layers[idx].motion=ld.motion;
       if(ld.elementMotion)state.layers[idx].elementMotion=ld.elementMotion;
       if(ld.motionStatic)state.layers[idx].motionStatic=ld.motionStatic;
-      if(ld.inPoint)state.layers[idx].inPoint=ld.inPoint;
+      // `!=null`, not truthy: a project saved with an explicit inPoint of 0
+      // silently lost that override on reload, because 0 is falsy. Its
+      // sibling one line down already used !=null. Pre-existing, found
+      // 2026-07-26 while auditing this whitelist.
+      if(ld.inPoint!=null)state.layers[idx].inPoint=ld.inPoint;
       if(ld.outPoint!=null)state.layers[idx].outPoint=ld.outPoint;
       // EXPERIMENTAL (native-video-decode): decoder session is runtime-only
       // (_nvSessionId) — native-video-bridge reopens it lazily from
       // nativeVideo.path on the first frame sync after this load.
       if(ld.nativeVideo)state.layers[idx].nativeVideo=ld.nativeVideo;
       if(ld.montageId)state.layers[idx].montageId=ld.montageId;
+      // Per-layer fields added 2026-07-25/26. This restore list is a
+      // WHITELIST — a field written by exportJSON but absent here is
+      // silently dropped on load, which is the same "writer updated, reader
+      // forgotten" shape as CLAUDE.md §1's warning about
+      // saveAllLayerFrames. Every one of these was in the file and gone
+      // after a round-trip until this block existed; caught by testing the
+      // round-trip rather than the save.
+      if(ld.markers)state.layers[idx].markers=ld.markers;                 // repères de calque
+      if(ld.shy)state.layers[idx].shy=true;                               // interrupteur shy
+      if(ld.keyLock)state.layers[idx].keyLock=ld.keyLock;                 // verrou clés -> in/out
+      if(ld.timeRemap)state.layers[idx].timeRemap=ld.timeRemap;           // remappage temporel
+      if(ld.motionBlur)state.layers[idx].motionBlur=true;                 // flou de mouvement
+      if(ld.effectsFrom)state.layers[idx].effectsFrom=ld.effectsFrom;     // Instance Effect
+      if(ld.timeLink)state.layers[idx].timeLink=ld.timeLink;              // Parent in Time
       state.layers[idx].color=ld.color||nextLayerColor();
       ld.frames.forEach(function(f){if(!f.isInterpolated)f.isInterpolated=false;});while(state.layers[idx].frames.length<state.totalFrames)state.layers[idx].frames.push({strokes:[],isKeyframe:false,isInterpolated:false});});
     state.layerFolders=d.layerFolders||{};state.layerLinkGroups=d.layerLinkGroups||{};

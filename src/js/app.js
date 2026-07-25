@@ -1018,7 +1018,57 @@ function autoInPointFromBlankKeyframe(ld){
 // apart from "explicitly dragged to exactly frame 0", so an explicit
 // user override back to 0 would otherwise be silently reclaimed by the
 // auto-detect below on the very next render.
-function layerInPoint(ld){
+// ---- PARENT IN TIME (Sander van Dijk 2.1, 2026-07-26) ----------------
+// "The Time Properties of a layer remain static. We manually drag, move and
+// trim the static blocks called Layers." His idea: In/Out become VALUES that
+// can be driven from elsewhere. Here that is a link to another layer plus an
+// offset — the 80% case of his sketch, without putting arbitrary code on a
+// path that runs per layer per frame.
+//
+//   ld.timeLink = { uid, inOffset, outOffset, mode: 'both' | 'in' | 'out' }
+//
+// Resolution lives in layerInPoint/layerOutPoint because they are the single
+// chokepoint every consumer already goes through (13 call sites across
+// app.js, engine-bridge.js, layer-inout.js, motion.js, timeline.js).
+// Unlinked layers pay nothing: the very first check is `!ld.timeLink`.
+function timeLinkSourceOf(ld){
+  if(!ld||!ld.timeLink||!ld.timeLink.uid)return null;
+  for(var i=0;i<state.layers.length;i++){
+    var s=state.layers[i];
+    if(s!==ld&&s.layerUid===ld.timeLink.uid)return s;
+  }
+  return null; // source deleted — fall through to the layer's own values
+}
+// A link chain must terminate. Same shape as the spatial parenting guard
+// (SMMotion.setLayerParent / parentDescendants): a visited set plus a hard
+// depth cap, so a cycle degrades to "use my own value" instead of recursing
+// until the stack dies.
+function resolveLinkedTime(ld,which,seen,depth){
+  var link=ld.timeLink;
+  if(!link)return null;
+  var mode=link.mode||'both';
+  if(which==='in'&&mode==='out')return null;
+  if(which==='out'&&mode==='in')return null;
+  var src=timeLinkSourceOf(ld);
+  if(!src)return null;
+  seen=seen||[];
+  if(seen.indexOf(ld)>=0||depth>16)return null;
+  seen.push(ld);
+  var base=which==='in'?layerInPoint(src,seen,depth+1):layerOutPoint(src,seen,depth+1);
+  var off=which==='in'?(link.inOffset||0):(link.outOffset||0);
+  return Math.max(0,Math.min(state.totalFrames-1,base+off));
+}
+// True when the layer's visible range comes from anywhere other than the
+// full timeline — used by getEffectiveStrokes, whose own guard used to test
+// ld.inPoint/ld.outPoint directly and would therefore skip the range check
+// entirely for a layer whose range comes from a LINK (CLAUDE.md §1: a new
+// field that one reader doesn't know about).
+function layerHasTimeRange(ld){
+  return !!(ld&&(ld.inPoint!=null||ld.outPoint!=null||ld.timeLink));
+}
+function layerInPoint(ld,_seen,_depth){
+  var linked=resolveLinkedTime(ld,'in',_seen,_depth||0);
+  if(linked!=null)return linked;
   if(ld.inPoint!=null)return ld.inPoint;
   var auto=autoInPointFromBlankKeyframe(ld);
   return auto!=null?auto:0;
@@ -1043,7 +1093,9 @@ function autoOutPointFromBlankKeyframe(ld){
   }
   return(lastNonBlank>=0&&lastNonBlank<frames.length-1)?lastNonBlank:null;
 }
-function layerOutPoint(ld){
+function layerOutPoint(ld,_seen,_depth){
+  var linked=resolveLinkedTime(ld,'out',_seen,_depth||0);
+  if(linked!=null)return linked;
   if(ld.outPoint!=null)return ld.outPoint;
   var auto=autoOutPointFromBlankKeyframe(ld);
   return auto!=null?auto:state.totalFrames-1;
@@ -1062,7 +1114,7 @@ function layerOutPoint(ld){
 // two of these flags on the same layer.
 function getEffectiveStrokes(layerIdx,frameIdx){
   var ld=state.layers[layerIdx];if(!ld)return[];
-  if((ld.inPoint||ld.outPoint!=null)&&(frameIdx<layerInPoint(ld)||frameIdx>layerOutPoint(ld)))return[];
+  if(layerHasTimeRange(ld)&&(frameIdx<layerInPoint(ld)||frameIdx>layerOutPoint(ld)))return[];
   // EXPERIMENTAL (native-video-decode): a natively-decoded video layer has
   // no vector strokes at all — its picture is an engine-side image item
   // (buildSceneJson, engine-bridge.js), not frame data.
@@ -1443,7 +1495,7 @@ function mergeLayersIntoOne(indices,opts){
   var merged={
     name:name,visible:true,locked:false,frames:frames,
     color:srcs[0].color||nextLayerColor(),
-    layerUid:srcs[0].layerUid,parentLayerUid:srcs[0].parentLayerUid,
+    layerUid:srcs[0].layerUid,parentLayerUid:srcs[0].parentLayerUid,timeLink:srcs[0].timeLink,
   };
   if(Object.keys(elMotion).length)merged.elementMotion=elMotion;
   // Any OTHER layer parented to one of the layers about to disappear must
@@ -1456,6 +1508,12 @@ function mergeLayersIntoOne(indices,opts){
   state.layers.forEach(function(other,oi){
     if(idx.indexOf(oi)>=0)return;
     if(other.parentLayerUid&&goneUids[other.parentLayerUid])other.parentLayerUid=merged.layerUid||null;
+    // Same re-point for the TIME link (Parent in Time, 2026-07-26): a layer
+    // whose time source disappears into the merge must follow the survivor,
+    // or its link goes dead exactly like the spatial one would.
+    if(other.timeLink&&other.timeLink.uid&&goneUids[other.timeLink.uid]){
+      if(merged.layerUid)other.timeLink.uid=merged.layerUid;else delete other.timeLink;
+    }
   });
   // Paper layers: one fresh Layer replaces the N being removed, inserted
   // where the topmost source sat (same splice-from-the-end discipline the

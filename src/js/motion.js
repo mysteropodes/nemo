@@ -1945,6 +1945,7 @@
     nameRow.textContent = (ld.name || ('Layer ' + (state.activeLayerIdx + 1))) + (ld.symbolId ? ' (composant)' : '');
     body.appendChild(nameRow);
     renderParentRow(body, ld, state.activeLayerIdx);
+    renderTimeLinkRow(body, ld, state.activeLayerIdx);
     renderTransformGroup(body, ld, 'Transform');
   }
   // Layer parenting (2026-07, "gestion de parentage de calque dans motion
@@ -1982,6 +1983,160 @@
     });
     row.appendChild(sel);
     body.appendChild(row);
+  }
+  // ---- PARENT IN TIME (Van Dijk 2.1) ---------------------------------
+  // The spatial Parent row's counterpart: instead of "whose transform do I
+  // follow", "whose TIME do I follow". Same pickwhip idiom as parenting and
+  // as the expression whip, dropped on another layer's row; the offsets are
+  // plain frame fields (scrub-enabled per CLAUDE.md §10).
+  function renderTimeLinkRow(body, ld, li) {
+    var row = document.createElement('div'); row.className = 'lrow motion-prop-row';
+    var label = document.createElement('span'); label.textContent = 'Temps'; label.style.minWidth = '70px';
+    row.appendChild(label);
+
+    var whip = document.createElement('span');
+    whip.className = 'lpick';
+    whip.title = 'Glisser sur un calque : ses points d\u2019entrée/sortie pilotent ceux-ci';
+    whip.addEventListener('mousedown', function (e) { startTimeLinkPickwhip(li, whip, e); });
+    row.appendChild(whip);
+
+    var srcIdx = -1;
+    if (ld.timeLink && ld.timeLink.uid) {
+      state.layers.forEach(function (o, oi) { if (o !== ld && o.layerUid === ld.timeLink.uid) srcIdx = oi; });
+    }
+    var name = document.createElement('span');
+    name.className = 'lparent' + (srcIdx < 0 ? ' none' : '');
+    name.style.marginLeft = '4px';
+    name.textContent = srcIdx >= 0 ? (state.layers[srcIdx].name || ('Layer ' + (srcIdx + 1)))
+      : (ld.timeLink ? 'source introuvable' : '—');
+    name.title = srcIdx >= 0 ? 'Cliquer pour délier' : 'Aucun lien temporel';
+    name.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (!ld.timeLink) return;
+      pushUndo(); delete ld.timeLink;
+      renderLayerList(); renderTimeline();
+      if (window.loadFrame) loadFrame(state.currentFrame);
+      if (window.SMEngineBridge) SMEngineBridge.renderNow();
+      if (window.showToast) showToast('Lien temporel retiré');
+    });
+    row.appendChild(name);
+
+    if (ld.timeLink) {
+      // Which edges follow, and by how much.
+      var sel = document.createElement('select'); sel.className = 'motion-parent-select'; sel.style.marginLeft = '6px';
+      [['both', 'entrée + sortie'], ['in', 'entrée seule'], ['out', 'sortie seule']].forEach(function (o) {
+        var op = document.createElement('option'); op.value = o[0]; op.textContent = o[1];
+        if ((ld.timeLink.mode || 'both') === o[0]) op.selected = true;
+        sel.appendChild(op);
+      });
+      sel.addEventListener('mousedown', function (e) { e.stopPropagation(); });
+      sel.addEventListener('change', function () {
+        pushUndo(); ld.timeLink.mode = sel.value;
+        renderLayerList(); renderTimeline();
+        if (window.loadFrame) loadFrame(state.currentFrame);
+        if (window.SMEngineBridge) SMEngineBridge.renderNow();
+      });
+      row.appendChild(sel);
+      [['inOffset', 'décalage entrée'], ['outOffset', 'décalage sortie']].forEach(function (o) {
+        var f = document.createElement('input');
+        f.type = 'number'; f.className = 'pi scrub'; f.dataset.step = '1';
+        f.style.width = '46px'; f.style.marginLeft = '4px';
+        f.title = o[1] + ' (frames)';
+        f.value = ld.timeLink[o[0]] || 0;
+        function commitOff() {
+          var v = parseInt(f.value, 10) || 0;
+          if (v === (ld.timeLink[o[0]] || 0)) return;
+          pushUndo(); ld.timeLink[o[0]] = v;
+          renderLayerList(); renderTimeline();
+          if (window.loadFrame) loadFrame(state.currentFrame);
+          if (window.SMEngineBridge) SMEngineBridge.renderNow();
+        }
+        f.addEventListener('change', commitOff);
+        f.addEventListener('blur', commitOff);
+        f.addEventListener('mousedown', function (e) { e.stopPropagation(); });
+        row.appendChild(f);
+      });
+    }
+    body.appendChild(row);
+  }
+  // Cycle refusal lives HERE (the only place a link is created), mirroring
+  // setLayerParent's own contract for spatial parenting: resolveLinkedTime
+  // additionally degrades safely if a cycle ever appears through some other
+  // route, but a cycle should never be creatable in the first place.
+  function timeLinkWouldCycle(li, targetIdx) {
+    var seen = {}, cur = targetIdx, guard = 0;
+    while (cur >= 0 && guard++ < 64) {
+      if (cur === li) return true;
+      if (seen[cur]) return false;
+      seen[cur] = 1;
+      var l = state.layers[cur];
+      if (!l || !l.timeLink || !l.timeLink.uid) return false;
+      var next = -1;
+      state.layers.forEach(function (o, oi) { if (o.layerUid === l.timeLink.uid) next = oi; });
+      cur = next;
+    }
+    return false;
+  }
+  function startTimeLinkPickwhip(li, fromEl, ev) {
+    ev.stopPropagation(); ev.preventDefault();
+    var r0 = fromEl.getBoundingClientRect();
+    var ox = r0.left + r0.width / 2, oy = r0.top + r0.height / 2;
+    var line = document.createElement('div'); line.className = 'lpick-line';
+    document.body.appendChild(line);
+    var hover = null;
+    function paint(x, y) {
+      var dx = x - ox, dy = y - oy;
+      line.style.left = ox + 'px'; line.style.top = oy + 'px';
+      line.style.width = Math.sqrt(dx * dx + dy * dy) + 'px';
+      line.style.transform = 'rotate(' + Math.atan2(dy, dx) + 'rad)';
+    }
+    function rowUnder(x, y) {
+      var el = document.elementFromPoint(x, y); if (!el || !el.closest) return null;
+      var row = el.closest('.lrow[data-layer], .frow[data-layer]');
+      if (!row) return null;
+      var idx = parseInt(row.dataset.layer, 10);
+      if (isNaN(idx) || idx === li || timeLinkWouldCycle(li, idx)) return null;
+      return { row: row, idx: idx };
+    }
+    function onMove(e) {
+      paint(e.clientX, e.clientY);
+      var t = rowUnder(e.clientX, e.clientY);
+      if (hover && (!t || t.row !== hover.row)) hover.row.classList.remove('pick-target');
+      if (t && (!hover || t.row !== hover.row)) t.row.classList.add('pick-target');
+      hover = t;
+    }
+    function cleanup() {
+      document.removeEventListener('mousemove', onMove, true);
+      document.removeEventListener('mouseup', onUp, true);
+      document.removeEventListener('keydown', onKey, true);
+      if (hover) hover.row.classList.remove('pick-target');
+      line.remove();
+    }
+    function onUp(e) {
+      var t = rowUnder(e.clientX, e.clientY);
+      cleanup();
+      if (t == null) return;
+      var ld = state.layers[li], src = state.layers[t.idx];
+      pushUndo();
+      // Seed the offsets from the CURRENT gap, so linking never makes the
+      // layer jump: it stays exactly where it is and only starts following.
+      var myIn = layerInPoint(ld), myOut = layerOutPoint(ld);
+      ld.timeLink = {
+        uid: ensureLayerUid(src),
+        inOffset: myIn - layerInPoint(src),
+        outOffset: myOut - layerOutPoint(src),
+        mode: 'both',
+      };
+      renderLayerList(); renderTimeline();
+      if (window.loadFrame) loadFrame(state.currentFrame);
+      if (window.SMEngineBridge) SMEngineBridge.renderNow();
+      if (window.showToast) showToast('Temps lié à « ' + (src.name || ('Layer ' + (t.idx + 1))) + ' »');
+    }
+    function onKey(e) { if (e.key === 'Escape') cleanup(); }
+    document.addEventListener('mousemove', onMove, true);
+    document.addEventListener('mouseup', onUp, true);
+    document.addEventListener('keydown', onKey, true);
+    paint(ev.clientX, ev.clientY);
   }
   // Shared by all three stopwatch icons (Transform group properties, fill
   // color row, vertex row) — same three-state title logic, only the "off"
