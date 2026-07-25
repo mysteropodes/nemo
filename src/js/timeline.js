@@ -3040,17 +3040,30 @@ function parentDescendants(li){
   });
   return out;
 }
+// Resolved locally rather than through SMMotion.findLayerIndexByUid, because
+// this runs at RENDER time and renderLayerList fires during boot BEFORE
+// motion.js has defined SMMotion. An early return on a missing SMMotion made
+// the whole column vanish on first paint and never come back until something
+// else happened to re-render the list — silently, which is how it survived
+// testing (every test called renderLayerList itself, long after load). The
+// lookup is two lines; the dependency was not worth it.
+function _layerIndexByUid(uid){
+  if(!uid)return -1;
+  for(var i=0;i<state.layers.length;i++)if(state.layers[i].layerUid===uid)return i;
+  return -1;
+}
 function buildParentCell(row,ld,li){
-  var M=window.SMMotion; if(!M||!M.setLayerParent)return;
   var cell=document.createElement('div');
   cell.className='lparent';
-  var pIdx=ld.parentLayerUid&&M.findLayerIndexByUid?M.findLayerIndexByUid(ld.parentLayerUid):-1;
+  var pIdx=_layerIndexByUid(ld.parentLayerUid);
   var pName=(pIdx>=0&&state.layers[pIdx])?(state.layers[pIdx].name||('Layer '+(pIdx+1))):null;
   cell.textContent=pName||'—';
   cell.classList.toggle('none',!pName);
   cell.title=pName?('Parent : '+pName+' — cliquer pour changer'):'Aucun parent — cliquer pour en choisir un';
   function open(e){
     e.stopPropagation(); e.preventDefault();
+    var M=window.SMMotion;
+    if(!M||!M.setLayerParent){showToast('Parentage indisponible');return;}
     var bad=parentDescendants(li);
     var items=[{label:'Aucun (parentage libre)',disabled:!ld.parentLayerUid,action:function(){
       pushUndo(); M.setLayerParent(li,null); renderLayerList(); renderTimeline();
