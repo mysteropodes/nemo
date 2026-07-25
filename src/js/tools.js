@@ -4214,13 +4214,56 @@ function _eraseDegenerateSelfLoops(path){
   // entirely. 1.5px is well under anything a real drawn detail would ever
   // need two distinct anchors that close together for.
   var REVISIT_TOL=1.5;
-  var changed=true,guard=0;
+  // AREA GUARD (2026-07-25). The splice below rests on the assumption stated
+  // in the header comment — "by construction that sub-loop's own closed shape
+  // is degenerate/near-zero-area clipper noise, never real geometry". That
+  // holds for unite()'s re-processed touch points, but NOT for the one
+  // deliberate revisit _mergeHoleIntoExterior creates: a hole merged into its
+  // exterior through a zero-width slit revisits the slit anchor on purpose,
+  // and the sub-loop bracketed by that revisit IS the hole.
+  //
+  // Without this guard the two passes fought each other, and the hole always
+  // lost. Measured on a 200x200 square minus a 50px circle, straight through
+  // insertBooleanResult:
+  //
+  //                        segments   area    bounds
+  //   after hole merge        10      35000   100,100 200x200   (correct)
+  //   after this function      3      61980    56, 56 279x279   (destroyed)
+  //
+  // The hole was spliced out entirely, and simplify() below then refit curves
+  // through the three survivors, ballooning the outline past the original
+  // shape. Every path that reaches insertBooleanResult with a hole was
+  // affected: the boolean subtract/exclude tool, fill merge, and the eraser
+  // piercing the middle of a filled shape.
+  //
+  // Scale-invariant threshold rather than an absolute one, so it behaves the
+  // same on a thumbnail and a full-canvas shape. The two populations are ~3
+  // orders of magnitude apart — the real hole above is 12.5% of its bounding
+  // box, while the clipper slivers this function was written for measured
+  // ~0.3% of shape area TOTAL across ~40 loops — so 0.2% sits far from either
+  // edge rather than between them.
+  var MIN_LOOP_FRAC=0.002;
+  function _subLoopArea(segs,from,to){
+    // Shoelace over the anchor ring segs[from..to]; handles ignored on
+    // purpose, since this only has to separate "essentially nothing" from
+    // "a real enclosed region".
+    var a=0;
+    for(var k=from;k<=to;k++){
+      var p=segs[k].point,q=segs[k===to?from:k+1].point;
+      a+=p.x*q.y-q.x*p.y;
+    }
+    return Math.abs(a)/2;
+  }
+  var bb=path.bounds, bbArea=Math.max(1,bb.width*bb.height);
+  var minLoopArea=Math.max(1,bbArea*MIN_LOOP_FRAC);
+  var changed=true,guard=0,keptRevisit=false;
   while(changed&&guard<5000){
     changed=false;guard++;
     var segs=path.segments,n=segs.length;
     for(var i=0;i<n;i++){
       for(var j=0;j<i;j++){
         if(segs[i].point.getDistance(segs[j].point)<=REVISIT_TOL){
+          if(_subLoopArea(segs,j,i)>minLoopArea){keptRevisit=true;continue;} // real geometry (a hole), not clipper noise
           path.removeSegments(j+1,i+1);
           changed=true;
           break;
@@ -4244,7 +4287,17 @@ function _eraseDegenerateSelfLoops(path){
   // unconditionally (safe/idempotent on an already-clean shape too, not
   // gated on whether a revisit was actually spliced like the old
   // smooth()-only pass was).
-  path.simplify(2.5);
+  // ...but NOT on a path that legitimately returns along its own slit
+  // (2026-07-25). Douglas-Peucker + a least-squares bezier refit both assume a
+  // simple, non-self-touching curve. Fed a hole merged through a zero-width
+  // seam, the refit pulls the two coincident anchors apart into a bulge:
+  // measured on a square-minus-circle donut, area 32972 (ideal 32146) and
+  // bounds 100,100 200x200 going in, area 54286 and bounds 68,65 267x265
+  // coming out. The area guard above having preserved a revisit is exactly the
+  // signal that this path is one of those, so the refit is skipped for it —
+  // and only for it, leaving the ordinary unite()-output case this pass was
+  // written for untouched.
+  if(!keptRevisit)path.simplify(2.5);
 }
 // strokeInfo (optional, 2026-07 — "l'eraser supprime le stroke entier"):
 // every branch below used to hardcode strokeColor=null on its island(s),
@@ -4300,18 +4353,25 @@ function insertBooleanResult(layer,insertAt,result,fillColor,opacity,strokeInfo)
     return flat;
   }
   var islands=exteriors.map(function(ext){
-    var extSegs=ext.segments.map(function(s){return{point:[s.point.x,s.point.y],handleIn:[0,0],handleOut:[0,0]};});
+    // Handles carried through, not zeroed (2026-07-25). This merge was written
+    // for insertBooleanResult's straight WASM polygons, where every handle is
+    // [0,0] anyway — but Paper's own subtract()/exclude() feed the SAME
+    // function, and their output is curved. Zeroing turned a circular hole cut
+    // by the boolean tool into a 4-corner diamond, and any curved exterior
+    // into a polygon. Measured on a 50px-radius circular hole: area 5000
+    // (diamond) instead of 7854 (circle).
+    var extSegs=ext.segments.map(function(s){return{point:[s.point.x,s.point.y],handleIn:[s.handleIn.x,s.handleIn.y],handleOut:[s.handleOut.x,s.handleOut.y]};});
     // Bounds-containment pairs each hole with the exterior it sits inside
     // — good enough since a hole can only ever nest inside the ONE
     // exterior it was cut from (_polygonsToPaperItem builds one hole list
     // per source polygon, never shared across exteriors).
     var myHoles=holes.filter(function(h){return ext.bounds.contains(h.bounds);});
     myHoles.forEach(function(h){
-      var holeSegs=h.segments.map(function(s){return{point:[s.point.x,s.point.y],handleIn:[0,0],handleOut:[0,0]};});
+      var holeSegs=h.segments.map(function(s){return{point:[s.point.x,s.point.y],handleIn:[s.handleIn.x,s.handleIn.y],handleOut:[s.handleOut.x,s.handleOut.y]};});
       extSegs=_mergeHoleIntoExterior(extSegs,holeSegs);
     });
     var merged=new Path({insert:false});
-    extSegs.forEach(function(s){merged.add(new Segment(new Point(s.point[0],s.point[1])));});
+    extSegs.forEach(function(s){merged.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));});
     merged.closed=true;
     // Multiple holes merged into the same exterior can each independently
     // pick the SAME closest exterior point (_polyClosestPair) as their own
