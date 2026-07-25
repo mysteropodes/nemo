@@ -351,6 +351,53 @@
     saveActiveLayerFrame(); renderEffectsList();
     if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
   }
+  // ---- keyframe navigator ----
+  // Keying a parameter without a way to reach or remove its keys is only half
+  // a feature: a key could be created at the playhead and then never moved or
+  // deleted. The natural home would be a track in the Motion timeline, but
+  // that side rests on a panel/grid row-count invariant this file has no
+  // business touching (see motion.js's ROW_H header), so the navigator lives
+  // on the parameter row itself — the same prev/toggle/next triple AE puts
+  // beside an animated property, and enough to reach every key.
+  function paramKeysOf(eff, key) {
+    return (eff.keys && eff.keys[key] && eff.keys[key].keys) ? eff.keys[key].keys : [];
+  }
+  function keyAtFrame(eff, key, frame) {
+    return paramKeysOf(eff, key).filter(function (k) { return k.frame === frame; })[0] || null;
+  }
+  function gotoAdjacentKey(eff, key, dir) {
+    var ks = paramKeysOf(eff, key), f = state.currentFrame, best = null;
+    ks.forEach(function (k) {
+      if (dir < 0 ? k.frame < f : k.frame > f) {
+        if (best === null || (dir < 0 ? k.frame > best : k.frame < best)) best = k.frame;
+      }
+    });
+    if (best !== null) goToFrame(best);
+    return best !== null;
+  }
+  function toggleKeyHere(idx, key) {
+    var t = effectsTarget(); if (!t || !t.obj.effects || !t.obj.effects[idx]) return;
+    var eff = t.obj.effects[idx];
+    if (!paramKeyed(eff, key)) return;
+    var ks = paramKeysOf(eff, key);
+    var here = keyAtFrame(eff, key, state.currentFrame);
+    pushUndo();
+    if (here) {
+      // Removing the LAST key would leave an empty track that still reads as
+      // "animated" — collapse back to a static value instead, freezing what
+      // the animation showed. Same choice the stopwatch makes when turned off.
+      if (ks.length === 1) {
+        eff[key] = here.v[0];
+        delete eff.keys[key];
+      } else {
+        ks.splice(ks.indexOf(here), 1);
+      }
+    } else {
+      setParamKey(idx, key, state.currentFrame, paramValueAt(eff, key, state.currentFrame));
+    }
+    saveActiveLayerFrame(); renderEffectsList();
+    if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+  }
   function setParam(idx, key, raw) {
     var t = effectsTarget(); if (!t || !t.obj.effects || !t.obj.effects[idx]) return;
     var eff = t.obj.effects[idx];
@@ -399,6 +446,33 @@
       input.addEventListener('input', function () { setParam(idx, p.key, (parseFloat(this.value) || 0) / (p.scale || 1)); });
       input.addEventListener('click', function (e) { e.stopPropagation(); });
       line.appendChild(sw); line.appendChild(label); line.appendChild(input); line.appendChild(unit);
+      // Navigator, only once the parameter is actually animated — an unkeyed
+      // parameter has nothing to navigate, and three inert arrows would read
+      // as broken controls.
+      if (keyed) {
+        var ks = paramKeysOf(eff, p.key);
+        var nav = document.createElement('div'); nav.className = 'fx-keynav';
+        var hasPrev = ks.some(function (k) { return k.frame < state.currentFrame; });
+        var hasNext = ks.some(function (k) { return k.frame > state.currentFrame; });
+        var onKey = !!keyAtFrame(eff, p.key, state.currentFrame);
+        function navBtn(txt, on, title, fn) {
+          var b = document.createElement('span');
+          b.className = 'fx-keynav-btn' + (on ? '' : ' off');
+          b.textContent = txt; b.title = title;
+          if (on) b.addEventListener('click', function (e) { e.stopPropagation(); fn(); });
+          nav.appendChild(b);
+        }
+        navBtn('◀', hasPrev, 'Clé précédente', function () { gotoAdjacentKey(eff, p.key, -1); renderEffectsList(); });
+        navBtn(onKey ? '◆' : '◇', true,
+               onKey ? 'Supprimer la clé à cette frame' : 'Poser une clé à cette frame',
+               function () { toggleKeyHere(idx, p.key); });
+        navBtn('▶', hasNext, 'Clé suivante', function () { gotoAdjacentKey(eff, p.key, 1); renderEffectsList(); });
+        var count = document.createElement('span');
+        count.className = 'fx-keynav-count'; count.textContent = ks.length;
+        count.title = ks.length + ' clé(s)';
+        nav.appendChild(count);
+        line.appendChild(nav);
+      }
       wrap.appendChild(line);
     });
     row.parentNode.insertBefore(wrap, row.nextSibling);

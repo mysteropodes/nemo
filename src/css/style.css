@@ -1546,3 +1546,14 @@ body.mode-motion .lrow.act{box-shadow:inset 3px 0 0 #4E6FF2,inset 0 0 0 1px rgba
   display:flex;align-items:center;justify-content:center;}
 .fx-stopwatch:hover{color:var(--text);}
 .fx-stopwatch.on{color:var(--accent);}
+
+/* Navigateur de clés d'un paramètre d'effet (effects-panel.js) — le triple
+   précédent / poser-supprimer / suivant qu'AE place à côté d'une propriété
+   animée, plus le nombre de clés. */
+.fx-keynav{display:flex;align-items:center;gap:2px;margin-left:auto;flex:0 0 auto;}
+.fx-keynav-btn{cursor:pointer;color:var(--text-dim);font-size:9px;line-height:1;
+  padding:2px 3px;border-radius:3px;user-select:none;}
+.fx-keynav-btn:hover{color:var(--text);background:rgba(255,255,255,.06);}
+.fx-keynav-btn.off{opacity:.25;cursor:default;}
+.fx-keynav-btn.off:hover{color:var(--text-dim);background:none;}
+.fx-keynav-count{font-size:8px;color:var(--text-dark);margin-left:2px;min-width:8px;text-align:center;}
