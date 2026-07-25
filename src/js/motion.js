@@ -2366,6 +2366,24 @@
         // convention — the shape itself communicates "no interpolation
         // out of this key" without needing to open the curve editor).
         dia.className = 'motion-key' + (fi === state.currentFrame ? ' cur' : '') + (isKeySelected(ld, prop, k) ? ' sel' : '') + (k.hold ? ' hold' : '');
+        // Per-key colour (Van Dijk 3.4: "sometimes you have so many
+        // keyframes it becomes difficult to know what does what — like
+        // layers, we could color keyframes to highlight a group"). Only a
+        // paint job: nothing reads k.color at evaluation time.
+        if (k.color) { dia.classList.add('tinted'); dia.style.setProperty('--key-color', k.color); }
+        // Velocity read-out (3.5): the ease actually applied out of this key,
+        // as a percentage, shown on the SELECTED key instead of living in a
+        // dialog. Derived from the same curvePoints the interpolator uses,
+        // so it can never disagree with what the animation does.
+        if (isKeySelected(ld, prop, k)) {
+          var vel = easeOutPercent(k);
+          if (vel != null) {
+            var vl = document.createElement('span');
+            vl.className = 'motion-key-vel';
+            vl.textContent = vel + '%';
+            dia.appendChild(vl);
+          }
+        }
         c.appendChild(dia);
       }
       (function (frameIdx, key) {
@@ -2440,6 +2458,13 @@
             menu.push({ label: 'Distribuer uniformément', action: distributeKeys });
             menu.push({ label: 'Inverser l’ordre (flip)', action: flipKeys });
             menu.push({ label: 'Subdiviser (clé à mi-chemin)', action: subdivideKeys });
+            menu.push({ label: 'Colorer les clés…', action: function () {
+              var palette = ['#e8b64c', '#4ea9ff', '#59d38a', '#ff6b8b', '#b98cff', '#ffffff'];
+              var names = ['Ambre', 'Bleu', 'Vert', 'Rose', 'Violet', 'Blanc'];
+              window.showContextMenu(e.clientX + 8, e.clientY + 8,
+                names.map(function (n, i) { return { label: n, action: function () { colorSelectedKeys(palette[i]); } }; })
+                  .concat([{ sep: true }, { label: 'Retirer la couleur', action: function () { colorSelectedKeys(null); } }]));
+            } });
             menu.push({ label: 'Sélectionner 1 sur 2', action: function () { selectEveryNthKey(2); } });
             menu.push({ label: 'Sélectionner 1 sur N…', action: function () {
               var v = prompt('Garder une clé sur combien ?', '3');
@@ -2626,6 +2651,26 @@
   // loop works without re-selecting, and a pair only one frame apart is
   // skipped (no room for a key between them) rather than silently
   // overwriting one of its own endpoints.
+  // How much ease leaves this key, as a percentage. 0% = linear out, 100% =
+  // fully eased out. Read off the curve's FIRST span: with the on-curve
+  // waypoint model used everywhere here (see DEFAULT_CURVE), a key that
+  // leaves linearly has its first waypoint on the diagonal, and the further
+  // that point sits below the diagonal the slower the start.
+  function easeOutPercent(k) {
+    var pts = k && k.curvePoints;
+    if (!pts || pts.length < 2) return null;
+    var p = pts[1];
+    if (!p || !p.x) return 0;
+    var lag = Math.max(0, Math.min(1, 1 - (p.y / p.x)));
+    return Math.round(lag * 100);
+  }
+  function colorSelectedKeys(color) {
+    if (!_motionKeySel.length) { if (window.showToast) showToast('Aucune clé sélectionnée'); return; }
+    pushUndo();
+    _motionKeySel.forEach(function (s) { if (color) s.key.color = color; else delete s.key.color; });
+    renderTimeline();
+    if (window.showToast) showToast(color ? (_motionKeySel.length + ' clé(s) colorée(s)') : 'Couleur retirée');
+  }
   function subdivideKeys() {
     if (_motionKeySel.length < 2) { if (window.showToast) showToast('Sélectionne au moins 2 clés'); return; }
     pushUndo();

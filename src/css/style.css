@@ -697,7 +697,7 @@ body:not(.mode-motion) #motion-props-sec{display:none;}
    room to spare) so an unselected/non-current key stays readable sitting
    on top of the accent-tinted connection bar (trackRowHtml, motion.js)
    instead of partly blending into it. */
-.motion-key{width:9px;height:9px;border-radius:2px;background:#e6e6e6;border:1px solid rgba(0,0,0,.5);box-shadow:0 0 0 1.5px rgba(0,0,0,.35);transform:rotate(45deg);}
+.motion-key{position:relative;width:9px;height:9px;border-radius:2px;background:#e6e6e6;border:1px solid rgba(0,0,0,.5);box-shadow:0 0 0 1.5px rgba(0,0,0,.35);transform:rotate(45deg);}
 .motion-key.cur{background:#ffaa28;width:11px;height:11px;}
 .motion-key.sel{background:var(--accent);border-color:#fff;box-shadow:0 0 0 1.5px var(--accent);}
 .motion-key.hold{border-radius:1px;transform:rotate(0deg);}
@@ -1622,3 +1622,15 @@ body.mode-motion .lrow.act{box-shadow:inset 3px 0 0 #4E6FF2,inset 0 0 0 1px rgba
 .wa-dur{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
   font-size:9px;line-height:1;color:rgba(255,255,255,.72);white-space:nowrap;
   pointer-events:none;text-shadow:0 1px 2px rgba(0,0,0,.6);}
+
+/* Per-keyframe colour (Van Dijk 3.4) — the tint replaces the neutral fill
+   but keeps the selected/current states winning above it, so colouring a key
+   never costs you the feedback about what is selected. */
+.motion-key.tinted{background:var(--key-color,#e6e6e6);}
+.motion-key.cur,.motion-key.sel{background:#ffaa28;}
+.motion-key.sel{background:var(--accent);}
+/* Velocity read-out on the selected key (3.5). Counter-rotated: the diamond
+   itself is rotate(45deg), so the label would otherwise sit on the diagonal. */
+.motion-key-vel{position:absolute;left:14px;top:-2px;transform:rotate(-45deg);
+  font-size:8.5px;line-height:1;color:var(--text-dim);background:rgba(0,0,0,.6);
+  padding:1px 3px;border-radius:3px;white-space:nowrap;pointer-events:none;}
