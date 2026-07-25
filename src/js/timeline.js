@@ -610,6 +610,61 @@ window.SM={
     if(state.activeLayerIdx>=state.layers.length)state.activeLayerIdx=state.layers.length-1;
     activateUL(state.activeLayerIdx);loadFrame(state.currentFrame);updateUI();showToast('Calque(s) supprimé(s) — ⌘Z pour annuler');
   },
+  toggleLayerShy:function(li){
+    var ld=state.layers[li==null?state.activeLayerIdx:li];if(!ld)return;
+    pushUndo();ld.shy=!ld.shy;
+    if(ld.shy&&!state.shyEnabled)showToast('Calque marqué « shy » — active l\u2019interrupteur pour le masquer');
+    renderLayerList();renderTimeline();
+  },
+  toggleShyMode:function(){
+    state.shyEnabled=!state.shyEnabled;
+    var n=state.layers.filter(function(l){return l.shy;}).length;
+    showToast(state.shyEnabled?('Calques shy masqués ('+n+')'):'Tous les calques affichés');
+    renderLayerList();renderTimeline();
+  },
+  // AE's Cmd+Shift+D: cut the layer in TWO at the playhead. Both halves keep
+  // the whole content and all their keyframes — it is the in/out window that
+  // splits, which is exactly how AE does it (and why the two halves can be
+  // retimed independently afterwards without anything being lost).
+  splitLayerAtPlayhead:function(li){
+    li=(li==null?state.activeLayerIdx:li);
+    var ld=state.layers[li];if(!ld){showToast('Aucun calque');return;}
+    var f=state.currentFrame;
+    var inF=window.layerInPoint?layerInPoint(ld):(ld.inPoint!=null?ld.inPoint:0);
+    var outF=window.layerOutPoint?layerOutPoint(ld):(ld.outPoint!=null?ld.outPoint:state.totalFrames-1);
+    if(f<=inF||f>outF){showToast('Place la tête de lecture à l\u2019intérieur du calque pour le couper');return;}
+    saveAllLayerFrames();pushUndoLayers();
+    var ni=createUserLayer(ld.name+' (2)');
+    var dst=state.layers[ni];
+    dst.frames=JSON.parse(JSON.stringify(ld.frames));
+    dst.color=ld.color;
+    if(ld.blendMode)dst.blendMode=ld.blendMode;
+    if(ld.motion)dst.motion=JSON.parse(JSON.stringify(ld.motion));
+    if(ld.motionStatic)dst.motionStatic=JSON.parse(JSON.stringify(ld.motionStatic));
+    if(ld.elementMotion)dst.elementMotion=JSON.parse(JSON.stringify(ld.elementMotion));
+    if(ld.effects)dst.effects=JSON.parse(JSON.stringify(ld.effects));
+    if(ld.markers)dst.markers=JSON.parse(JSON.stringify(ld.markers));
+    if(ld.symbolId){dst.symbolId=ld.symbolId;dst.symPlayMode=ld.symPlayMode;dst.symSpeed=ld.symSpeed;dst.symPlacedAt=ld.symPlacedAt;dst.symSingleFrame=ld.symSingleFrame;dst.symMatrix=ld.symMatrix;dst.locked=ld.locked;}
+    dst.inPoint=f;dst.outPoint=outF;
+    ld.outPoint=f-1;
+    // createUserLayer appends to the TOP of the stack, which would drop the
+    // second half far from the one it was cut out of. AE leaves the two
+    // halves adjacent, and so does this: move it to sit directly above its
+    // source. Both arrays are spliced together — userLayers and state.layers
+    // are index-parallel everywhere in this file.
+    if(ni!==li+1){
+      var movedL=state.layers.splice(ni,1)[0];
+      var movedU=userLayers.splice(ni,1)[0];
+      var at=Math.min(li+1,state.layers.length);
+      state.layers.splice(at,0,movedL);
+      userLayers.splice(at,0,movedU);
+      userLayers.forEach(function(l){l.insertBelow(arcLayer);});
+      ni=at;
+    }
+    activateUL(ni);loadFrame(state.currentFrame);renderLayerList();renderTimeline();updateUI();
+    if(window.SMEngineBridge)SMEngineBridge.renderNow();
+    showToast('Calque coupé à la frame '+(f+1));
+  },
   duplicateLayer:function(){saveAllLayerFrames();pushUndoLayers();var src=state.layers[state.activeLayerIdx];var ni=createUserLayer(src.name+' copy');state.layers[ni].frames=JSON.parse(JSON.stringify(src.frames));if(src.blendMode)state.layers[ni].blendMode=src.blendMode;state.layers[ni].color=src.color;if(src.motion)state.layers[ni].motion=JSON.parse(JSON.stringify(src.motion));if(src.motionStatic)state.layers[ni].motionStatic=JSON.parse(JSON.stringify(src.motionStatic));
     // elementMotion is keyed by strokeId, and duplicateLayer's frames clone
     // above (JSON.stringify) preserves each stroke's strokeId unchanged —
@@ -1008,7 +1063,7 @@ window.SM={
         // be just as useless. Note isNullLayer above was already persisted,
         // and its own tooltip calls a null layer a "pivot/parent pour d'autres
         // calques" — the pivot came back, everything hung off it did not.
-        layerUid:l.layerUid,parentLayerUid:l.parentLayerUid,markers:l.markers};}),
+        layerUid:l.layerUid,parentLayerUid:l.parentLayerUid,markers:l.markers,shy:l.shy};}),
       layerFolders:state.layerFolders,layerLinkGroups:state.layerLinkGroups,
       // StoryBoard node space (2026-07) — plain data by construction (no
       // runtime-only fields live in state.storyboard, see storyboard.js's
@@ -1033,7 +1088,7 @@ window.SM={
       cameraKeys:state.cameraKeys||[],cameraLayerOn:!!state.cameraLayerOn,
       // Comp markers (markers.js) — pure annotation, but losing them on save
       // would make the feature pointless.
-      markers:state.markers||[]});
+      markers:state.markers||[],shyEnabled:!!state.shyEnabled});
   },
   mergeRemoteSnapshot:function(remoteData,remoteProfile){return mergeRemoteSnapshot(remoteData,remoteProfile);},
   // Cycles (v19) : repete N fois la plage de frames selectionnee (walk
@@ -1184,6 +1239,7 @@ window.SM={
     }
     state.comments=d.comments||[];
     state.markers=d.markers||[];
+    state.shyEnabled=!!d.shyEnabled;
     if(typeof refreshFbAvatars==='function')refreshFbAvatars(); // avatar stack mirrors state.comments — resync on project import
     state.cameraKeys=d.cameraKeys||[];state.cameraLayerOn=!!d.cameraLayerOn;state.cameraView=false;
     // Explicit fallback to the app default, not just "leave whatever was
@@ -3016,6 +3072,14 @@ function computeLayerRenderOrder(){
       order.push({type:'layer',idx:i,hidden:false});
     }
   }
+  // Shy (AE's own switch, 2026-07-25): a per-layer flag plus one global
+  // toggle. Marked hidden here rather than filtered out, so it rides the
+  // SAME mechanism folders and link-groups already use — every consumer
+  // that already honours `hidden` gets shy for free, and nothing downstream
+  // has to learn a second way for a row to be absent.
+  if(state.shyEnabled)order.forEach(function(e){
+    if(e.type==='layer'&&state.layers[e.idx]&&state.layers[e.idx].shy)e.hidden=true;
+  });
   return order;
 }
 // Groups the current multi-selection (_layerSel) into a new folder — only
@@ -3477,6 +3541,8 @@ function renderLayerList(){
         // inverse; both directions now sit next to each other, in both
         // timelines, so the round-trip is discoverable from either end.
         {label:'Éclater en calques (une forme par calque)',disabled:!!l4.symbolId||!!l4.lfsGroup,action:function(){window.SM.splitLayerIntoElements(idx4);}},
+        {label:'Couper au niveau de la tête de lecture  (⌘⇧D)',action:function(){window.SM.splitLayerAtPlayhead(idx4);}},
+        {label:l4.shy?'Retirer le marquage « shy »':'Marquer comme « shy »',action:function(){window.SM.toggleLayerShy(idx4);}},
         {label:'Fusionner les calques sélectionnés',disabled:_layerSel.length<2,action:function(){window.SM.mergeLayersIntoOne(_layerSel.slice());}},
         {label:'Retirer du dossier',disabled:!l4.folderId,action:function(){delete l4.folderId;renderLayerList();renderTimeline();}},
         {label:'Convertir en composant',disabled:!!l4.symbolId||!!l4.lfsGroup,action:function(){window.SM.convertActiveLayerToComponent();}},
@@ -4404,6 +4470,14 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 // programmatically so their own listeners run unchanged), and the
 // settings modal (general pane, or jump straight to its shortcuts tab).
 function initAppMenu(){
+  (function bindShy(){
+    var b=document.getElementById('btn-shy');
+    if(!b)return;
+    b.addEventListener('click',function(){
+      window.SM.toggleShyMode();
+      b.classList.toggle('active',!!state.shyEnabled);
+    });
+  })();
   var btn=document.getElementById('app-menu-btn');if(!btn||!window.showContextMenu)return;
   function clickEl(id){var el=document.getElementById(id);if(el)el.click();}
   btn.addEventListener('click',function(e){
@@ -4957,6 +5031,14 @@ function onKeyDown(event){
   // was ever wired to it. Plain 'd' (no modifier, handled further down)
   // stays bound to duplicateKeyframe — a real, distinct, still-useful
   // action (clones the whole current frame) — untouched.
+  // Cmd/Ctrl+Shift+D — AE's "split layer at the playhead". Checked BEFORE
+  // the plain Cmd+D below, which would otherwise swallow it whenever canvas
+  // objects happen to be selected.
+  if((event.metaKey||event.ctrlKey)&&event.shiftKey&&(event.key==='d'||event.key==='D')){
+    event.preventDefault();
+    window.SM.splitLayerAtPlayhead();
+    return;
+  }
   if((event.metaKey||event.ctrlKey)&&(event.key==='d'||event.key==='D')&&selectedPaths.length){
     event.preventDefault();
     duplicateSelection();

@@ -1811,6 +1811,9 @@
         var multi = _layerSel.length >= 2 && _layerSel.indexOf(li) >= 0;
         window.showContextMenu(e.clientX, e.clientY, [
           { label: 'Éclater en calques (une forme par calque)', disabled: !!ld.symbolId || !!ld.lfsGroup, action: function () { window.SM.splitLayerIntoElements(li); } },
+          { label: 'Couper au niveau de la tête de lecture  (⌘⇧D)', action: function () { window.SM.splitLayerAtPlayhead(li); } },
+          { label: ld.shy ? 'Retirer le marquage « shy »' : 'Marquer comme « shy »', action: function () { window.SM.toggleLayerShy(li); } },
+          { label: 'Ajouter un repère sur ce calque', action: function () { if (window.SMMarkers) SMMarkers.addLayerMarker(li, state.currentFrame, ''); } },
           { label: 'Fusionner les calques sélectionnés', disabled: !multi, action: function () { window.SM.mergeLayersIntoOne(_layerSel.slice()); } },
           { sep: true },
           { label: 'Échelonner les calques sélectionnés…', disabled: !multi, action: function () {
@@ -3176,6 +3179,8 @@
     document.body.classList.toggle('mode-storyboard', mode === 'storyboard');
     var mgBtn = document.getElementById('btn-mgraph');
     if (mgBtn) mgBtn.style.display = (mode === 'motion') ? '' : 'none';
+    var shyBtn = document.getElementById('btn-shy');
+    if (shyBtn) shyBtn.style.display = (mode === 'motion') ? '' : 'none';
     // StoryBoard swaps the whole timeline area for the node space —
     // renderLayerList/renderTimeline still run (their targets are hidden,
     // harmless) so switching BACK lands on an up-to-date grid.
