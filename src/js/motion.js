@@ -2850,11 +2850,16 @@
       window._motionRevealedLayers = null;
       removeKeySelectionBox();
       removeLayerStaggerBox();
+      // The graph editor hides #frame-grid while it's open — leaving Motion
+      // with it still on would strand the 2D timeline invisible.
+      if (window.SMMotionGraph && SMMotionGraph.isOn()) SMMotionGraph.toggle(false);
     }
     state.appMode = mode;
     document.querySelectorAll('.app-mode-btn').forEach(function (b) { b.classList.toggle('active', b.dataset.mode === mode); });
     document.body.classList.toggle('mode-motion', mode === 'motion');
     document.body.classList.toggle('mode-storyboard', mode === 'storyboard');
+    var mgBtn = document.getElementById('btn-mgraph');
+    if (mgBtn) mgBtn.style.display = (mode === 'motion') ? '' : 'none';
     // StoryBoard swaps the whole timeline area for the node space —
     // renderLayerList/renderTimeline still run (their targets are hidden,
     // harmless) so switching BACK lands on an up-to-date grid.
@@ -3030,6 +3035,11 @@
     elementLabel: elementLabel,
     distributeKeys: distributeKeys, flipKeys: flipKeys, selectEveryNthKey: selectEveryNthKey, invertKeySelection: invertKeySelection,
     getKeySelection: function () { return _motionKeySel.slice(); },
+    // Lets the graph editor drive the SAME selection the track view uses, so
+    // clicking a point on a curve lights up its diamond and makes F9 / Delete
+    // / copy behave identically from either view. Without this the two views
+    // would each hold their own idea of what is selected.
+    selectKeys: function (sel) { setKeySel(sel || []); },
     // ui.js's shared curve widget calls this after a motion segment's
     // curvePoints change (drag/preset/add/delete point) — the canvas needs
     // a repaint since the eased value at the current frame may have
