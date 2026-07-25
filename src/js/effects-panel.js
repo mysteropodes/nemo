@@ -413,6 +413,20 @@
     if (hint) hint.style.display = ld.isEffectLayer ? '' : 'none';
     var targetHint = document.getElementById('effects-target-hint');
     if (targetHint) targetHint.style.display = singleSelectedElement() ? '' : 'none';
+    // Count badge on the collapsed header (2026-07-25). This section is a
+    // normal collapsible panel and ships collapsed, so a layer carrying three
+    // effects looked exactly like a layer carrying none — the whole stack is
+    // invisible until you happen to click the header. The header is the only
+    // thing on screen when collapsed, so that is where the count belongs.
+    var t = effectsTarget();
+    var n = (t && t.obj && t.obj.effects) ? t.obj.effects.length : 0;
+    var hdr = sec.querySelector('.phdr');
+    if (hdr) {
+      var badge = hdr.querySelector('.fx-count');
+      if (!badge) { badge = document.createElement('span'); badge.className = 'fx-count'; hdr.appendChild(badge); }
+      badge.textContent = n ? String(n) : '';
+      badge.style.display = n ? '' : 'none';
+    }
     renderEffectsList();
   }
   window.updateEffectsPanel = renderEffectsSection;
