@@ -1835,6 +1835,22 @@
           { label: 'Couper au niveau de la tête de lecture  (⌘⇧D)', action: function () { window.SM.splitLayerAtPlayhead(li); } },
           { label: ld.shy ? 'Retirer le marquage « shy »' : 'Marquer comme « shy »', action: function () { window.SM.toggleLayerShy(li); } },
           { label: ld.motionBlur ? 'Désactiver le flou de mouvement' : 'Activer le flou de mouvement', action: function () { window.SM.toggleLayerMotionBlur(li); } },
+          { label: ld.effectsFrom ? 'Ne plus hériter des effets' : 'Hériter des effets d\u2019un calque…', action: function () {
+            if (ld.effectsFrom) { pushUndo(); delete ld.effectsFrom; renderLayerList(); renderTimeline(); if (window.SMEngineBridge) SMEngineBridge.renderNow(); return; }
+            var items = [];
+            state.layers.forEach(function (other, oi) {
+              if (oi === li || !other.effects || !other.effects.length) return;
+              items.push({ label: (other.name || ('Layer ' + (oi + 1))) + '  (' + other.effects.length + ')', action: function () {
+                pushUndo();
+                ld.effectsFrom = ensureLayerUid(other);
+                renderLayerList(); renderTimeline();
+                if (window.SMEngineBridge) SMEngineBridge.renderNow();
+                if (window.showToast) showToast('Effets hérités de « ' + (other.name || ('Layer ' + (oi + 1))) + ' » — ils suivent leurs propres keyframes');
+              } });
+            });
+            if (!items.length) { if (window.showToast) showToast('Aucun autre calque ne porte d\u2019effets'); return; }
+            window.showContextMenu(e.clientX + 8, e.clientY + 8, items);
+          } },
           { sep: true },
           // showContextMenu has no submenus — a disabled row is the honest
           // way to title a group rather than a button that does nothing.
@@ -2388,6 +2404,21 @@
         rect.setAttribute('width', (b.frame - a.frame) * FC); rect.setAttribute('height', barH);
         rect.setAttribute('fill', 'var(--accent)'); rect.setAttribute('opacity', '0.35');
         svg.appendChild(rect);
+      }
+      // Frame-duration block behind each key (Van Dijk 3.3): the diamond is
+      // centred on the frame's START, which at high zoom makes it hard to
+      // see how much time one frame actually occupies — and whether a key
+      // lines up with a layer's out point. Drawn only when a frame is wide
+      // enough for the block to mean anything (his "closest three zoom
+      // levels"), otherwise it degrades into a smear.
+      if (FC >= 18) {
+        track.keys.forEach(function (k) {
+          var d = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+          d.setAttribute('x', k.frame * FC); d.setAttribute('y', 0);
+          d.setAttribute('width', FC); d.setAttribute('height', ROW_H);
+          d.setAttribute('fill', k.color || 'var(--accent)'); d.setAttribute('opacity', '0.13');
+          svg.appendChild(d);
+        });
       }
     }
     for (var fi = 0; fi < state.totalFrames; fi++) {

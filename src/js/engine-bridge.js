@@ -215,14 +215,34 @@
   // a frozen effect in the file and a moving one on screen. This override is
   // set around the export's own buildSceneJson call.
   var _fxFrameOverride = null;
-  function sceneEffectsOf(ld, frameIdx) {
+  function sceneEffectsOf(ld, frameIdx, _guard) {
     var f = (frameIdx != null) ? frameIdx
           : (_fxFrameOverride != null ? _fxFrameOverride : state.currentFrame);
     var at = window.effectParamValueAt || function (e, k) { return e[k]; };
-    return (ld.effects || []).map(function (e) {
+    // "Instance Effect" (Van Dijk 5.2): a layer can borrow another layer's
+    // whole effects stack live, instead of copy-pasting it and then having
+    // two copies to keep in sync. Resolved HERE rather than by duplicating
+    // the data, so the source's own keyframed parameters drive the borrower
+    // at the same frame — that is the entire point over a copy.
+    //
+    // The borrowed stack comes FIRST: its own effects then stack on top,
+    // which matches how you'd read it in the panel (inherited base, local
+    // additions). _guard stops a cycle (A borrows B, B borrows A) at one
+    // hop instead of blowing the stack.
+    var inherited = [];
+    if (ld.effectsFrom && !_guard && window.SMMotion && SMMotion.ensureLayerUid) {
+      for (var li = 0; li < state.layers.length; li++) {
+        var src = state.layers[li];
+        if (src !== ld && src.layerUid === ld.effectsFrom) {
+          inherited = sceneEffectsOf(src, frameIdx, true);
+          break;
+        }
+      }
+    }
+    return inherited.concat((ld.effects || []).map(function (e) {
       return { effectType: e.type, enabled: !!e.enabled,
                p1: at(e, 'p1', f), p2: at(e, 'p2', f), p3: at(e, 'p3', f), p4: at(e, 'p4', f) };
-    });
+    }));
   }
 
   // excludeGhosts (2026-07 audit): the live editing view legitimately wants

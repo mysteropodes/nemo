@@ -1120,7 +1120,7 @@ window.SM={
         // be just as useless. Note isNullLayer above was already persisted,
         // and its own tooltip calls a null layer a "pivot/parent pour d'autres
         // calques" — the pivot came back, everything hung off it did not.
-        layerUid:l.layerUid,parentLayerUid:l.parentLayerUid,markers:l.markers,shy:l.shy,keyLock:l.keyLock,timeRemap:l.timeRemap,motionBlur:l.motionBlur};}),
+        layerUid:l.layerUid,parentLayerUid:l.parentLayerUid,markers:l.markers,shy:l.shy,keyLock:l.keyLock,timeRemap:l.timeRemap,motionBlur:l.motionBlur,effectsFrom:l.effectsFrom};}),
       layerFolders:state.layerFolders,layerLinkGroups:state.layerLinkGroups,
       // StoryBoard node space (2026-07) — plain data by construction (no
       // runtime-only fields live in state.storyboard, see storyboard.js's
