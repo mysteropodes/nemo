@@ -939,6 +939,16 @@ function applyMatrixToStrokeData(sd,m){
 function resolveSymbolFrameIdx(sym,layer,mainFrameIdx){
   var elapsed=Math.max(0,(mainFrameIdx-(layer.symPlacedAt||0)))*(layer.symSpeed||1);
   var total=Math.max(1,sym.totalFrames);
+  // Time Remap (motion.js) overrides play mode / speed / placement entirely
+  // — that is the point of it: a keyframed curve names the internal frame
+  // directly, so freeze, hold, reverse and ramp all come from the curve
+  // instead of from a fixed mode. Single chokepoint on purpose: every
+  // consumer of a component's content (canvas, export, StoryBoard
+  // thumbnails) already resolves its frame through here.
+  if(layer.timeRemap&&window.SMMotion&&SMMotion.timeRemapValue){
+    var rv=SMMotion.timeRemapValue(layer,mainFrameIdx);
+    if(rv!=null)return Math.max(0,Math.min(total-1,Math.round(rv)));
+  }
   if(layer.symPlayMode==='single')return Math.min(total-1,Math.max(0,Math.floor(layer.symSingleFrame||0)));
   if(layer.symPlayMode==='once'){
     // symTrimIn/symTrimOut are optional (default: play the WHOLE symbol

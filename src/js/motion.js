@@ -43,9 +43,19 @@
   // alignement des keyframes aux properties").
   var ROW_H = 22;
   var PROPS = ['position', 'anchor', 'rotation', 'scale', 'opacity'];
-  var PROP_LABEL = { position: 'Position', anchor: 'Anchor Point', rotation: 'Rotation', scale: 'Scale', opacity: 'Opacity' };
-  var PROP_DIM = { position: 2, anchor: 2, rotation: 1, scale: 2, opacity: 1 };
-  var PROP_UNIT = { position: 'px', anchor: 'px', rotation: '°', scale: '%', opacity: '%' };
+  // Time Remap (AE, 2026-07-25) is an EXTRA row, not a 6th transform: it
+  // never feeds computeMotionMat — it drives which internal frame a
+  // component instance shows (resolveSymbolFrameIdx, app.js). Both the
+  // panel and the grid must iterate the same list or their rows desync,
+  // which is the alignment invariant ROW_H's header comment is about — so
+  // there is exactly ONE function that decides, and both sides call it.
+  function propsFor(holder) {
+    if (holder && holder.timeRemap) return PROPS.concat(['timeRemap']);
+    return PROPS;
+  }
+  var PROP_LABEL = { position: 'Position', anchor: 'Anchor Point', rotation: 'Rotation', scale: 'Scale', opacity: 'Opacity', timeRemap: 'Time Remap' };
+  var PROP_DIM = { position: 2, anchor: 2, rotation: 1, scale: 2, opacity: 1, timeRemap: 1 };
+  var PROP_UNIT = { position: 'px', anchor: 'px', rotation: '°', scale: '%', opacity: '%', timeRemap: 'f' };
   var PROP_DEFAULT = { position: [0, 0], anchor: [0, 0], rotation: [0], scale: [100, 100], opacity: [100] };
   // AE's own shortcuts: P/A/R/S/T reveal just that property's row. Kept as
   // a lookup table (not hardcoded in the keydown handler) so the property
@@ -1821,6 +1831,8 @@
           { label: '   • le point de sortie' + (ld.keyLock === 'out' ? '  ✓' : ''), action: function () { window.SM.setLayerKeyLock(li, ld.keyLock === 'out' ? null : 'out'); } },
           { label: '   • le calque entier' + (ld.keyLock === 'layer' ? '  ✓' : ''), action: function () { window.SM.setLayerKeyLock(li, ld.keyLock === 'layer' ? null : 'layer'); } },
           { label: 'Ajouter un repère sur ce calque', action: function () { if (window.SMMarkers) SMMarkers.addLayerMarker(li, state.currentFrame, ''); } },
+          { label: ld.timeRemap ? 'Désactiver le remappage temporel' : 'Activer le remappage temporel', disabled: !ld.symbolId,
+            action: function () { ld.timeRemap ? disableTimeRemap(li) : enableTimeRemap(li); } },
           { label: 'Fusionner les calques sélectionnés', disabled: !multi, action: function () { window.SM.mergeLayersIntoOne(_layerSel.slice()); } },
           { sep: true },
           { label: 'Échelonner les calques sélectionnés…', disabled: !multi, action: function () {
@@ -1943,7 +1955,7 @@
     });
     grp.appendChild(filterBtn);
     list.appendChild(grp);
-    PROPS.forEach(function (prop) {
+    propsFor(holder).forEach(function (prop) {
       if (isPropFiltered(prop) || (_hideUnanimated && !propHasContent(holder, prop))) return;
       var pr = document.createElement('div'); pr.className = 'lrow motion-prop-row';
       var sw = document.createElement('div');
@@ -2485,7 +2497,7 @@
       if (!expanded) return;
       var grpSpacer = document.createElement('div'); grpSpacer.className = 'frow';
       grid.appendChild(grpSpacer);
-      PROPS.forEach(function (prop) { renderTracksFor(grid, ld, prop); });
+      propsFor(ld).forEach(function (prop) { renderTracksFor(grid, ld, prop); });
       // Mirrors renderElementsList's panel structure: one spacer per
       // element, its own track rows only when that ONE element is expanded
       // (only one element expands at a time, same single-expand contract
@@ -2952,6 +2964,58 @@
       }
     }
   }
+  // ---- TIME REMAP (2026-07-25) ----------------------------------------
+  // AE's Time Remapping, for component-instance layers: instead of the
+  // instance playing at a fixed speed/loop mode, a keyframed curve says
+  // WHICH internal frame to show at each main-timeline frame. Freeze, hold,
+  // reverse, ramp and ping-pong all fall out of the same curve, with the
+  // existing easing/graph editor working on it unchanged because it is a
+  // normal motion track (same shape as position/scale/...).
+  //
+  // Enabling seeds two keys — internal frame 0 at the layer's in point,
+  // last internal frame at its out point — which is exactly AE's behaviour
+  // and, crucially, means turning it on changes nothing on screen: the
+  // linear ramp between those two keys reproduces the default playback.
+  function enableTimeRemap(li) {
+    var ld = state.layers[li];
+    if (!ld) return false;
+    if (!ld.symbolId) { if (window.showToast) showToast('Le remappage temporel s\u2019applique aux calques composants'); return false; }
+    var sym = state.symbols[ld.symbolId];
+    if (!sym) return false;
+    if (ld.timeRemap) { if (window.showToast) showToast('Remappage temporel déjà actif'); return false; }
+    pushUndo();
+    var inF = window.layerInPoint ? layerInPoint(ld) : (ld.inPoint != null ? ld.inPoint : 0);
+    var outF = window.layerOutPoint ? layerOutPoint(ld) : (ld.outPoint != null ? ld.outPoint : state.totalFrames - 1);
+    var last = Math.max(0, (sym.totalFrames || 1) - 1);
+    ld.timeRemap = { keys: [
+      { frame: inF, v: [0], curvePoints: cloneCurvePts(CURVE_LINEAR), hOut: [0, 0], hIn: [0, 0] },
+      { frame: Math.max(inF + 1, outF), v: [last], curvePoints: cloneCurvePts(CURVE_LINEAR), hOut: [0, 0], hIn: [0, 0] },
+    ] };
+    renderLayerList(); renderTimeline();
+    if (window.loadFrame) loadFrame(state.currentFrame);
+    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+    if (window.showToast) showToast('Remappage temporel activé — 0 → ' + last);
+    return true;
+  }
+  function disableTimeRemap(li) {
+    var ld = state.layers[li];
+    if (!ld || !ld.timeRemap) return false;
+    pushUndo();
+    delete ld.timeRemap;
+    renderLayerList(); renderTimeline();
+    if (window.loadFrame) loadFrame(state.currentFrame);
+    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+    if (window.showToast) showToast('Remappage temporel désactivé');
+    return true;
+  }
+  // The internal frame this instance should show at `frame`, or null when
+  // the layer isn't remapped. app.js's resolveSymbolFrameIdx is the single
+  // consumer — one chokepoint, so nothing else can disagree about it.
+  function timeRemapValue(ld, frame) {
+    var t = ld && ld.timeRemap;
+    if (!t || !t.keys || !t.keys.length) return null;
+    return evalTrack(t, frame, 0);
+  }
   // Retime every keyframe a layer owns by dx frames. The counterpart to
   // SM.shiftLayerFrames (timeline.js), which moves only ld.frames — the
   // DRAWN content. Found 2026-07-25 while testing the in/out handles: a bar
@@ -3345,6 +3409,9 @@
     findLayerIndexByUid: findLayerIndexByUid,
     setLayerParent: setLayerParent,
     shiftLayerMotionKeys: shiftLayerMotionKeys,
+    enableTimeRemap: enableTimeRemap,
+    disableTimeRemap: disableTimeRemap,
+    timeRemapValue: timeRemapValue,
     parentChainMats: parentChainMats,
     applyParentChainToSegments: applyParentChainToSegments,
     applyParentChainToImageRect: applyParentChainToImageRect,
