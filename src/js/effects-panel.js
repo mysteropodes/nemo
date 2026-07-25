@@ -317,6 +317,42 @@
     return window.SMMotion ? SMMotion.evalTrack(eff.keys[key], frame, stat) : stat;
   }
   window.effectParamValueAt = paramValueAt;
+  // Single writer for an effect parameter key, shared with the scripting API
+  // (nemo-script.js). A script building the key object itself would be a
+  // second definition of the shape, and the two would drift the first time it
+  // gains a field — the same reason evalTrack was factored out of motion.js
+  // rather than copied.
+  window.SMEffectKeys = {
+    valueAt: paramValueAt,
+    isKeyed: paramKeyed,
+    setKey: function (eff, key, frame, value, curvePoints) {
+      if (!eff.keys) eff.keys = {};
+      if (!eff.keys[key]) eff.keys[key] = { keys: [] };
+      var trk = eff.keys[key];
+      var curve = curvePoints || (window.SMMotion ? SMMotion.DEFAULT_CURVE() : [{ x: 0, y: 0 }, { x: 1, y: 1 }]);
+      var ex = trk.keys.filter(function (k) { return k.frame === frame; })[0];
+      if (ex) { ex.v = [value]; ex.curvePoints = curve; }
+      else {
+        trk.keys.push({ frame: frame | 0, v: [value], curvePoints: curve, hOut: [0, 0], hIn: [0, 0] });
+        trk.keys.sort(function (a, b) { return a.frame - b.frame; });
+      }
+      return trk;
+    },
+    // The valid type list, so a caller can refuse an unknown one BEFORE
+    // creating it. addEffect happily accepts any string and the renderer then
+    // receives an effect it cannot draw — silent nonsense rather than an
+    // error, which is exactly what this file's own rule forbids.
+    types: function () {
+      var t = Object.keys(EFFECT_PARAM_CONFIG);
+      (state.customEffects || []).forEach(function (c) { t.push('custom:' + c.id); });
+      return t;
+    },
+    paramNames: function (type) { return paramConfigFor(type).map(function (p) { return p.key; }); },
+    labelOf: function (type, key) {
+      var c = paramConfigFor(type).filter(function (p) { return p.key === key; })[0];
+      return c ? window.SM.t(c.label) : key;
+    }
+  };
   function ensureParamTrack(eff, key) {
     if (!eff.keys) eff.keys = {};
     if (!eff.keys[key]) eff.keys[key] = { keys: [] };
