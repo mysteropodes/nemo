@@ -1484,3 +1484,13 @@ body.mode-motion .lrow.act{box-shadow:inset 3px 0 0 #4E6FF2,inset 0 0 0 1px rgba
   background:color-mix(in srgb,var(--panel) 88%,transparent);
   padding:2px 6px;border-radius:3px;pointer-events:none;white-space:nowrap;}
 #btn-mgraph.on{color:var(--accent);}
+
+/* AE-style "Parent & Link" cell on each layer row (timeline.js buildParentCell).
+   Fixed max width with ellipsis so a long parent name can never push the row
+   wider than the user-resizable layer panel. */
+.lparent{margin-left:auto;flex:0 0 auto;max-width:84px;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;font-size:9.5px;color:var(--text-dim);padding:2px 6px;border-radius:4px;
+  border:1px solid var(--border);background:var(--panel2);cursor:pointer;line-height:1.4;}
+.lparent:hover{color:var(--text);border-color:var(--border2);}
+.lparent.none{opacity:.55;}
+.lrow.act .lparent{border-color:var(--border2);}

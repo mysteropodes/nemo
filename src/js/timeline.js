@@ -1014,7 +1014,15 @@ window.SM={
     var sceneWaIn=srcSnap?srcSnap.waIn:state.waIn;
     var sceneWaOut=srcSnap?srcSnap.waOut:state.waOut;
     return JSON.stringify({version:13,totalFrames:sceneTotal,fps:sceneFps,canvasW:state.canvasW,canvasH:state.canvasH,canvasBg:state.canvasBg,waIn:sceneWaIn,waOut:sceneWaOut,
-      layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color,motion:l.motion,motionStatic:l.motionStatic,elementMotion:l.elementMotion,inPoint:l.inPoint,outPoint:l.outPoint,nativeVideo:l.nativeVideo,matteMode:l.matteMode,montageId:l.montageId,expressions:l.expressions,isTextLayer:l.isTextLayer,isNullLayer:l.isNullLayer,isEffectLayer:l.isEffectLayer,effects:l.effects};}),
+      layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color,motion:l.motion,motionStatic:l.motionStatic,elementMotion:l.elementMotion,inPoint:l.inPoint,outPoint:l.outPoint,nativeVideo:l.nativeVideo,matteMode:l.matteMode,montageId:l.montageId,expressions:l.expressions,isTextLayer:l.isTextLayer,isNullLayer:l.isNullLayer,isEffectLayer:l.isEffectLayer,effects:l.effects,
+        // Layer parenting (2026-07-25). BOTH of these were missing from this
+        // list, so every parent link was silently dropped on save — a rig
+        // survived the session and nothing more. `uid` is the stable identity
+        // parentLayerUid points at, so persisting one without the other would
+        // be just as useless. Note isNullLayer above was already persisted,
+        // and its own tooltip calls a null layer a "pivot/parent pour d'autres
+        // calques" — the pivot came back, everything hung off it did not.
+        layerUid:l.layerUid,parentLayerUid:l.parentLayerUid};}),
       layerFolders:state.layerFolders,layerLinkGroups:state.layerLinkGroups,
       // StoryBoard node space (2026-07) — plain data by construction (no
       // runtime-only fields live in state.storyboard, see storyboard.js's
@@ -1152,6 +1160,11 @@ window.SM={
       if(ld.folderId)state.layers[idx].folderId=ld.folderId;
       if(ld.channel)state.layers[idx].channel=ld.channel;
       if(ld.linkGroupId)state.layers[idx].linkGroupId=ld.linkGroupId;
+      // Restore the layer's own identity BEFORE anything resolves a parent
+      // against it — parentLayerUid is matched by uid, so a layer whose uid
+      // was regenerated on load would orphan every child pointing at it.
+      if(ld.layerUid)state.layers[idx].layerUid=ld.layerUid;
+      if(ld.parentLayerUid)state.layers[idx].parentLayerUid=ld.parentLayerUid;
       if(ld.motion)state.layers[idx].motion=ld.motion;
       if(ld.elementMotion)state.layers[idx].elementMotion=ld.elementMotion;
       if(ld.motionStatic)state.layers[idx].motionStatic=ld.motionStatic;
@@ -3004,6 +3017,75 @@ function openLayerColorSwatches(anchorEl,currentHex,onPick){
     });
   },0);
 }
+// AE's "Parent & Link" column, on the layer rows themselves (2026-07-25,
+// "il manque le système de parentage directement sur les calques comme dans
+// after"). The data model (ld.parentLayerUid), the cycle refusal
+// (SMMotion.setLayerParent) and the chain composition (parentChainMats, wired
+// into engine-bridge/export/native-video) all already existed — but the only
+// way to REACH them was a dropdown inside Motion mode's property panel, on one
+// layer at a time, and only while that layer was expanded. motion.js's own
+// comment calls that row "AE's Parent & Link column reimagined", which is
+// exactly the thing this restores: in AE the column is always on screen for
+// every layer at once, which is what makes a rig readable at a glance.
+//
+// A menu rather than a <select>: the layer panel is narrow and user-resizable,
+// so a native select would either clip its own label or force the column wider
+// than the panel. showContextMenu already gives dimmed disabled entries,
+// outside-click dismissal and Escape for free.
+function parentDescendants(li){
+  // Every layer that has `li` somewhere up its own parent chain — these can't
+  // become its parent without forming a cycle. setLayerParent refuses those
+  // anyway; listing them as disabled explains WHY before the click instead of
+  // after it.
+  var M=window.SMMotion; if(!M||!M.findLayerIndexByUid)return {};
+  var out={};
+  state.layers.forEach(function(other,oi){
+    var cur=other.parentLayerUid,guard=0,seen={};
+    while(cur&&!seen[cur]&&guard++<256){
+      seen[cur]=true;
+      var pi=M.findLayerIndexByUid(cur);
+      if(pi===li){out[oi]=true;break;}
+      cur=pi>=0?state.layers[pi].parentLayerUid:null;
+    }
+  });
+  return out;
+}
+function buildParentCell(row,ld,li){
+  var M=window.SMMotion; if(!M||!M.setLayerParent)return;
+  var cell=document.createElement('div');
+  cell.className='lparent';
+  var pIdx=ld.parentLayerUid&&M.findLayerIndexByUid?M.findLayerIndexByUid(ld.parentLayerUid):-1;
+  var pName=(pIdx>=0&&state.layers[pIdx])?(state.layers[pIdx].name||('Layer '+(pIdx+1))):null;
+  cell.textContent=pName||'—';
+  cell.classList.toggle('none',!pName);
+  cell.title=pName?('Parent : '+pName+' — cliquer pour changer'):'Aucun parent — cliquer pour en choisir un';
+  function open(e){
+    e.stopPropagation(); e.preventDefault();
+    var bad=parentDescendants(li);
+    var items=[{label:'Aucun (parentage libre)',disabled:!ld.parentLayerUid,action:function(){
+      pushUndo(); M.setLayerParent(li,null); renderLayerList(); renderTimeline();
+      if(window.SMEngineBridge)SMEngineBridge.renderNow();
+    }}];
+    items.push({sep:true});
+    state.layers.forEach(function(other,oi){
+      if(oi===li)return; // a layer can't parent itself
+      var uid=M.ensureLayerUid(other);
+      items.push({
+        label:(other.name||('Layer '+(oi+1)))+(bad[oi]?'  (descendant)':''),
+        disabled:!!bad[oi]||ld.parentLayerUid===uid,
+        action:function(){
+          pushUndo(); M.setLayerParent(li,uid); renderLayerList(); renderTimeline();
+          if(window.SMEngineBridge)SMEngineBridge.renderNow();
+        }
+      });
+    });
+    var r=cell.getBoundingClientRect();
+    showContextMenu(r.left,r.bottom+2,items);
+  }
+  cell.addEventListener('click',open);
+  cell.addEventListener('mousedown',function(e){e.stopPropagation();});
+  row.appendChild(cell);
+}
 function renderLayerList(){
   var list=document.getElementById('layer-list');list.innerHTML='';
   // Motion mode: expandable Transform property rows instead of the plain
@@ -3150,6 +3232,7 @@ function renderLayerList(){
       row.appendChild(mb);
     }
     row.appendChild(nm);
+    buildParentCell(row,ld,i);
     row.addEventListener('click',function(e){
       // A completed drag-drop still fires a trailing native 'click' on
       // mouseup (browsers do this whenever mousedown/mouseup land on
