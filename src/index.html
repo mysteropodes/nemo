@@ -587,6 +587,14 @@
           <input type="text" class="pi color-hex-input" id="p-fill-hex" value="FF0000" maxlength="9" spellcheck="false" data-i18n-title="hexInputTitle" title="Code hex — tape pour changer">
           <input type="number" class="pi scrub color-opacity-input" id="p-opacity" value="100" min="5" max="100" data-step="1">
           <span class="color-pct">%</span>
+          <!-- Gradient toggle, ON THE FILL ROW (2026-07-25). The control it
+               drives (#p-grad-on) already existed but lived inside the section
+               headed "Effects" — a mislabelled neighbour of the real effects
+               stack (see #effects-stack-sec's own ID-collision note) — so a
+               gradient fill was unfindable unless you already knew. Every
+               comparable app puts the fill TYPE next to the fill swatch, which
+               is what this is. Wired in timeline.js's initFillGradientButton. -->
+          <button class="pbtn fill-grad-btn" id="p-fill-grad-btn" title="Dégradé de fill — sélectionne une seule forme avec l'outil Sélection"><span class="fill-grad-ramp"></span></button>
           <div class="lico color-eye-toggle" id="fill-enable-toggle" data-i18n-title="fillEnableTitle" title="Enable/disable fill"></div>
         </div>
         <!-- "Propager la couleur…" button removed (feedback 2026-07: "pas

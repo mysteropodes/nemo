@@ -1526,3 +1526,15 @@ body.mode-motion .lrow.act{box-shadow:inset 3px 0 0 #4E6FF2,inset 0 0 0 1px rgba
 .npanel-check{display:flex;align-items:center;gap:5px;cursor:pointer;}
 .npanel-slider{flex:1;}
 .nplugin-frame{display:block;width:100%;border:none;background:var(--panel);border-radius:0 0 8px 8px;}
+
+/* Bouton dégradé sur la ligne Fill (timeline.js initFillGradientButton).
+   Une rampe miniature plutôt qu'une icône abstraite : le contrôle montre ce
+   qu'il fait, ce qui est tout l'objet de l'avoir déplacé ici. */
+.fill-grad-btn{padding:0;width:22px;height:20px;flex:0 0 auto;display:flex;
+  align-items:center;justify-content:center;}
+.fill-grad-ramp{display:block;width:14px;height:12px;border-radius:2px;
+  border:1px solid var(--border2);
+  background:linear-gradient(90deg,var(--text) 0%,transparent 100%);}
+.fill-grad-btn.on{border-color:var(--accent);}
+.fill-grad-btn.on .fill-grad-ramp{border-color:var(--accent);}
+.fill-grad-btn.off{opacity:.4;}

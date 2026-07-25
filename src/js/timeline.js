@@ -4083,6 +4083,49 @@ function updateTextActionsPanel(){
 // separate #effect-layer-sec-specific rendering that used to live here
 // has been replaced by that file's unified updateEffectsPanel(), shared
 // with ordinary layers.
+// Gradient toggle on the fill row (2026-07-25, "les gradient et blur ont été
+// travaillé mais non implémenté dans l'ui"). The feature was fully working —
+// verified applying, editing and surviving save/load — but its only entry
+// point was a checkbox inside a section headed "Effects", which is a
+// mislabelled neighbour of the real effects stack. Unfindable unless you
+// already knew where to look.
+//
+// This drives that SAME checkbox rather than duplicating its logic: dispatching
+// a real 'change' means gradient-bridge.js's own handler does all the work, so
+// there is one implementation and no second path to keep in sync.
+function initFillGradientButton(){
+  var btn=document.getElementById('p-fill-grad-btn');
+  var cb=document.getElementById('p-grad-on');
+  if(!btn||!cb)return;
+  btn.addEventListener('click',function(e){
+    e.preventDefault();e.stopPropagation();
+    if(cb.disabled){
+      // The checkbox disables itself when there is no single shape selected —
+      // say why instead of looking broken (same rule as the rest of this file).
+      showToast('Sélectionne une seule forme avec l\'outil Sélection pour lui appliquer un dégradé');
+      return;
+    }
+    cb.checked=!cb.checked;
+    cb.dispatchEvent(new Event('change',{bubbles:true}));
+    syncFillGradientButton();
+  });
+  syncFillGradientButton();
+}
+// Reflects the selection's real state, so the button reads as ON when the
+// selected shape actually carries a gradient.
+function syncFillGradientButton(){
+  var btn=document.getElementById('p-fill-grad-btn');
+  var cb=document.getElementById('p-grad-on');
+  if(!btn||!cb)return;
+  btn.classList.toggle('on',!!cb.checked);
+  btn.classList.toggle('off',!!cb.disabled);
+  btn.title=cb.disabled
+    ? 'Dégradé de fill — sélectionne une seule forme avec l\'outil Sélection'
+    : (cb.checked?'Dégradé de fill actif — cliquer pour revenir en aplat'
+                 :'Appliquer un dégradé au fill de la forme sélectionnée');
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initFillGradientButton);
+else initFillGradientButton();
 function initCycleAndPropagate(){
   var cyc=document.getElementById('btn-cycle');
   if(cyc)cyc.addEventListener('click',function(){
