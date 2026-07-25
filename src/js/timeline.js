@@ -3067,12 +3067,74 @@ function _layerIndexByUid(uid){
   for(var i=0;i<state.layers.length;i++)if(state.layers[i].layerUid===uid)return i;
   return -1;
 }
+// AE's parent pickwhip, shared by BOTH timelines (2026-07-25). Drag the dot
+// onto any layer row to parent to it; drop outside / on itself / on a
+// descendant cancels. Deliberately the same code as the dropdown path below
+// — both call SMMotion.setLayerParent, which owns the cycle refusal, so
+// there is still exactly ONE writer of ld.parentLayerUid.
+function startParentPickwhip(li,fromEl,ev){
+  ev.stopPropagation(); ev.preventDefault();
+  var M=window.SMMotion; if(!M||!M.setLayerParent){showToast('Parentage indisponible');return;}
+  var bad=parentDescendants(li);
+  var r0=fromEl.getBoundingClientRect();
+  var ox=r0.left+r0.width/2, oy=r0.top+r0.height/2;
+  var line=document.createElement('div'); line.className='lpick-line'; document.body.appendChild(line);
+  var hover=null;
+  function paint(x,y){
+    var dx=x-ox, dy=y-oy;
+    line.style.left=ox+'px'; line.style.top=oy+'px';
+    line.style.width=Math.sqrt(dx*dx+dy*dy)+'px';
+    line.style.transform='rotate('+Math.atan2(dy,dx)+'rad)';
+  }
+  function rowUnder(x,y){
+    var el=document.elementFromPoint(x,y); if(!el)return null;
+    var row=el.closest?el.closest('.lrow[data-layer]'):null; if(!row)return null;
+    var idx=parseInt(row.dataset.layer,10);
+    if(isNaN(idx)||idx===li||bad[idx])return null;
+    return {row:row,idx:idx};
+  }
+  function onMove(e){
+    paint(e.clientX,e.clientY);
+    var t=rowUnder(e.clientX,e.clientY);
+    if(hover&&(!t||t.row!==hover.row))hover.row.classList.remove('pick-target');
+    if(t&&(!hover||t.row!==hover.row))t.row.classList.add('pick-target');
+    hover=t;
+  }
+  function cleanup(){
+    document.removeEventListener('mousemove',onMove,true);
+    document.removeEventListener('mouseup',onUp,true);
+    document.removeEventListener('keydown',onKey,true);
+    if(hover)hover.row.classList.remove('pick-target');
+    line.remove();
+  }
+  function onUp(e){
+    var t=rowUnder(e.clientX,e.clientY);
+    cleanup();
+    if(!t)return; // dropped on nothing / itself / a descendant — no-op, no undo entry
+    pushUndo();
+    M.setLayerParent(li,M.ensureLayerUid(state.layers[t.idx]));
+    renderLayerList(); renderTimeline();
+    if(window.SMEngineBridge)SMEngineBridge.renderNow();
+  }
+  function onKey(e){ if(e.key==='Escape'){cleanup();} }
+  document.addEventListener('mousemove',onMove,true);
+  document.addEventListener('mouseup',onUp,true);
+  document.addEventListener('keydown',onKey,true);
+  paint(ev.clientX,ev.clientY);
+}
 function buildParentCell(row,ld,li){
   var cell=document.createElement('div');
   cell.className='lparent';
   var pIdx=_layerIndexByUid(ld.parentLayerUid);
   var pName=(pIdx>=0&&state.layers[pIdx])?(state.layers[pIdx].name||('Layer '+(pIdx+1))):null;
-  cell.textContent=pName||'—';
+  var pick=document.createElement('span');
+  pick.className='lpick';
+  pick.title='Glisser sur un calque pour le définir comme parent';
+  pick.addEventListener('mousedown',function(e){startParentPickwhip(li,pick,e);});
+  cell.appendChild(pick);
+  var lbl=document.createElement('span');
+  lbl.textContent=pName||'—';
+  cell.appendChild(lbl);
   cell.classList.toggle('none',!pName);
   cell.title=pName?('Parent : '+pName+' — cliquer pour changer'):'Aucun parent — cliquer pour en choisir un';
   function open(e){

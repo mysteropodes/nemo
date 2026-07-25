@@ -1695,6 +1695,16 @@
       row.appendChild(solo);
       var nm = document.createElement('div'); nm.className = 'lnm'; nm.textContent = ld.name || ('Layer ' + (li + 1));
       row.appendChild(nm);
+      // Parent column — the SAME buildParentCell Animation 2D's rows use
+      // (2026-07-25, "tu n'as pas porté le parentage là-bas"). Motion had
+      // parenting only as a dropdown buried in the right-hand properties
+      // panel, which shows the ACTIVE layer alone: you could not see which
+      // layers were parented, compare two of them, or re-parent without
+      // first selecting. AE puts it in the timeline for exactly that reason,
+      // and Animation 2D already had it here. Same function, so the cycle
+      // refusal, the descendant greying and the new pickwhip come along for
+      // free rather than being reimplemented (and drifting) per timeline.
+      if (typeof buildParentCell === 'function') buildParentCell(row, ld, li);
       row.addEventListener('click', function (e) {
         // A completed drag-drop still fires a trailing native 'click' on
         // mouseup — same guard timeline.js's own layer rows use (see its

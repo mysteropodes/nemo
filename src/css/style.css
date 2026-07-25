@@ -1494,6 +1494,16 @@ body.mode-motion .lrow.act{box-shadow:inset 3px 0 0 #4E6FF2,inset 0 0 0 1px rgba
 .lparent:hover{color:var(--text);border-color:var(--border2);}
 .lparent.none{opacity:.55;}
 .lrow.act .lparent{border-color:var(--border2);}
+/* Pickwhip (AE's parent spiral): drag from this dot onto another layer row.
+   Sits INSIDE .lparent so the cell keeps one footprint in the row — the
+   click-to-open-menu path stays on the label text, the drag path on the dot,
+   so neither gesture can swallow the other. */
+.lpick{display:inline-block;width:9px;height:9px;margin-right:4px;vertical-align:-1px;
+  border-radius:50%;border:1.5px solid var(--text-dim);cursor:alias;flex:0 0 auto;}
+.lpick:hover{border-color:var(--accent,#5b6cff);box-shadow:0 0 0 2px rgba(91,108,255,.25);}
+.lrow.pick-target{outline:1px solid var(--accent,#5b6cff);outline-offset:-1px;background:rgba(91,108,255,.12);}
+.lpick-line{position:fixed;z-index:9999;pointer-events:none;height:0;border-top:1.5px dashed var(--accent,#5b6cff);
+  transform-origin:0 0;}
 
 /* Effects count on the collapsed section header (effects-panel.js) — the
    header is all that's on screen while the section is collapsed, so it has to
