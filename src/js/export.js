@@ -80,7 +80,10 @@ function exportBuildFrame(frameIdx,alpha){
       // gradient for free, unlike the Rust/vello live-canvas path which
       // needed its own ItemIn.fillGradient + peniko::Gradient plumbing
       // (engine-bridge.js/geometry-wasm). Overrides desP's flat fillColor.
-      if(!sd.isRaster&&sd.fillGradient){
+      // Same from/to guard as buildSceneJson's own branch — an export must
+      // not throw on data the on-screen render already tolerates (CLAUDE.md
+      // §3: the two paths have to agree, including about what they refuse).
+      if(!sd.isRaster&&sd.fillGradient&&(!window.gradientGeomOk||window.gradientGeomOk(sd.fillGradient))){
         var fg=sd.fillGradient;
         var stops=fg.stops.map(function(s){return [s.color,s.offset];});
         var grad=new Gradient(stops,fg.kind==='radial');

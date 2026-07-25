@@ -167,10 +167,21 @@
     var fx = grad.from[0], fy = grad.from[1], tx = grad.to[0], ty = grad.to[1];
     return { x: fx + (tx - fx) * t, y: fy + (ty - fy) * t };
   }
+  // A gradient with no from/to (older project data, an import, a script
+  // that built the object by hand) used to make this THROW — and this runs
+  // inside buildSceneJson, so the exception took the whole renderNow() down
+  // with it: a completely blank canvas, from an overlay. An overlay must
+  // never be able to do that. Drawing nothing is the correct degradation;
+  // buildSceneJson/export.js fall back to the flat fillColor for the shape
+  // itself (see their own guards).
+  function gradGeomOk(grad) {
+    return !!(grad && grad.from && grad.to && grad.from.length >= 2 && grad.to.length >= 2 && grad.stops && grad.stops.length);
+  }
   function buildGradientGizmoItems() {
     var target = singleTarget();
     if (!target || !target.data.fillGradient) return [];
     var grad = target.data.fillGradient;
+    if (!gradGeomOk(grad)) return [];
     var items = [];
     var col = [90, 180, 255, 255];
     items.push({
@@ -203,6 +214,10 @@
     return items;
   }
   window.buildGradientGizmoItems = buildGradientGizmoItems;
+  // Shared with buildSceneJson (engine-bridge.js) and export.js so all three
+  // agree on what counts as a drawable gradient — CLAUDE.md §1: one tag,
+  // three readers, they must not disagree about it.
+  window.gradientGeomOk = gradGeomOk;
 
   // ---- drag interaction ----
   var dragging = null; // 'from' | 'to' | {stopIndex} | null
