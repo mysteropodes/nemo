@@ -2794,8 +2794,17 @@
   function addMoveFill(boxEl, onStart) {
     var fill = document.createElement('div');
     fill.className = 'motion-keysel-fill';
-    fill.title = 'Glisser pour déplacer toutes les clés sélectionnées ensemble';
-    fill.addEventListener('mousedown', function (e) { e.stopPropagation(); e.preventDefault(); onStart(e, 'move'); });
+    fill.title = 'Glisser pour déplacer toutes les clés sélectionnées ensemble'
+      + '\n⌘/Ctrl + glisser : liquify — les clés proches du curseur suivent plus que les lointaines';
+    fill.addEventListener('mousedown', function (e) {
+      e.stopPropagation(); e.preventDefault();
+      // Skew Pro's "Liquify": same drag, but the influence falls off with
+      // distance from where you grabbed, so a block of keys deforms instead
+      // of sliding rigidly. Cmd/Ctrl picks it because the plain drag (move)
+      // and both edge drags (skew, space) already own the unmodified
+      // gestures.
+      onStart(e, (e.metaKey || e.ctrlKey) ? 'liquify' : 'move');
+    });
     boxEl.appendChild(fill);
   }
   // rows: array (ordered top→bottom visually) of arrays of {track, key,
@@ -2810,7 +2819,11 @@
     // move the anchor under the cursor as the keys spread.
     var fMin = Infinity, fMax = -Infinity;
     rows.forEach(function (row) { row.forEach(function (en) { fMin = Math.min(fMin, en.orig); fMax = Math.max(fMax, en.orig); }); });
-    window._motionSkewDrag = { startX: e.clientX, mode: mode, rows: rows, fMin: fMin, fMax: fMax };
+    // Liquify needs to know WHERE along the timeline you grabbed — the
+    // falloff is centred there, not on the selection's middle.
+    var grid = document.getElementById('frame-grid');
+    var grabFrame = grid ? ((e.clientX - grid.getBoundingClientRect().left) / FC) : (fMin + fMax) / 2;
+    window._motionSkewDrag = { startX: e.clientX, mode: mode, rows: rows, fMin: fMin, fMax: fMax, grabFrame: grabFrame };
   }
   // Key box rows = one row per PROPERTY TRACK holding selected keys, in
   // rendered (document) order — matches the reference where each visible
@@ -3196,7 +3209,16 @@
           // from-original arithmetic as the skew, so it inherits the
           // no-drift and drag-back-to-restore properties unchanged.
           var f = rowF;
-          if (sk.mode === 'left' || sk.mode === 'right') {
+          if (sk.mode === 'liquify') {
+            // Gaussian falloff around the grab point. Radius scales with the
+            // selection's own span so the same gesture feels the same on a
+            // 10-frame and a 200-frame selection; a single-frame selection
+            // falls back to a fixed radius rather than dividing by zero.
+            var span2 = Math.max(1, sk.fMax - sk.fMin);
+            var radius = Math.max(2, span2 * 0.35);
+            var dist = (en.orig - sk.grabFrame) / radius;
+            f = Math.exp(-dist * dist);
+          } else if (sk.mode === 'left' || sk.mode === 'right') {
             var span = sk.fMax - sk.fMin;
             f = span <= 0 ? 0 // every key on one frame — nothing to spread
               : (sk.mode === 'right' ? (en.orig - sk.fMin) / span : (sk.fMax - en.orig) / span);
