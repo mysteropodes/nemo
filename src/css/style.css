@@ -1502,3 +1502,27 @@ body.mode-motion .lrow.act{box-shadow:inset 3px 0 0 #4E6FF2,inset 0 0 0 1px rgba
   min-width:15px;height:15px;line-height:15px;text-align:center;font-size:9px;
   font-weight:700;padding:0 4px;}
 
+
+/* ---- Nemo script panels & HTML plugins (nemo-panel.js / nemo-plugin.js) ---- */
+.npanel{position:fixed;z-index:400;background:var(--panel2);border:1px solid var(--border2);
+  border-radius:8px;box-shadow:0 12px 40px rgba(0,0,0,.55);min-width:190px;font-size:11px;color:var(--text);}
+.npanel-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 8px;
+  border-bottom:1px solid var(--border);cursor:move;font-weight:600;user-select:none;}
+.npanel-close{background:none;border:none;color:var(--text-dim);font-size:15px;line-height:1;cursor:pointer;padding:0 2px;}
+.npanel-close:hover{color:var(--text);}
+.npanel-body{display:flex;flex-direction:column;gap:6px;padding:8px;}
+.npanel-row{display:flex;align-items:center;gap:6px;}
+.npanel-label{color:var(--text-dim);min-width:64px;}
+.npanel-text{color:var(--text-dim);}
+.npanel-group{display:flex;flex-direction:column;gap:6px;padding:8px;border:1px solid var(--border);border-radius:6px;}
+.npanel-group-title{font-size:9px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.4px;}
+.npanel-btn{background:var(--panel);border:1px solid var(--border2);color:var(--text);
+  border-radius:5px;padding:5px 10px;cursor:pointer;font-size:11px;}
+.npanel-btn:hover{border-color:var(--accent);color:#fff;}
+.npanel-input{background:var(--panel);border:1px solid var(--border);color:var(--text);
+  border-radius:4px;padding:4px 6px;font-size:11px;flex:1;min-width:50px;}
+.npanel-select{background:var(--panel);border:1px solid var(--border);color:var(--text);
+  border-radius:4px;padding:4px 6px;font-size:11px;flex:1;}
+.npanel-check{display:flex;align-items:center;gap:5px;cursor:pointer;}
+.npanel-slider{flex:1;}
+.nplugin-frame{display:block;width:100%;border:none;background:var(--panel);border-radius:0 0 8px 8px;}
