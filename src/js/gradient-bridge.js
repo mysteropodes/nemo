@@ -25,6 +25,22 @@
   function sortedStops(grad) {
     return grad.stops.slice().sort(function (a, b) { return a.offset - b.offset; });
   }
+  // Keeps grad.stops itself in ascending offset order (2026-07-25).
+  //
+  // sortedStops above returns a sorted COPY and was only ever used to draw the
+  // panel, so the stored array stayed in insertion order — "+ Stop" appended a
+  // 0.5 stop AFTER the 1.0 one. The two renderers (engine-bridge's
+  // buildSceneJson and export.js) both map fg.stops RAW, and a gradient with
+  // out-of-order offsets does not draw that stop at all: reported as "si on
+  // rajoute un point d'une autre couleur elle n'apparaît pas".
+  //
+  // Fixed at the source rather than in the consumers. Sorting in one renderer
+  // and forgetting the other is exactly the bug family CLAUDE.md §1 is about,
+  // and there are three of them counting the panel.
+  function normalizeStops(grad) {
+    if (grad && grad.stops) grad.stops.sort(function (a, b) { return a.offset - b.offset; });
+    return grad;
+  }
   function defaultGradientFor(p) {
     var b = p.bounds;
     var cx = b.center.x, cy = b.center.y;
@@ -87,6 +103,7 @@
       offInp.value = Math.round(stop.offset * 100);
       offInp.addEventListener('change', function () {
         pushUndo(); stop.offset = Math.max(0, Math.min(100, parseFloat(this.value) || 0)) / 100;
+        normalizeStops(grad);
         saveActiveLayerFrame(); renderGradientPanel(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
       });
       var pct = document.createElement('span'); pct.style.cssText = 'font-size:9px;color:var(--text-dim)'; pct.textContent = '%';
@@ -135,6 +152,7 @@
     var a = stops[bestGapIdx], b = stops[bestGapIdx + 1] || stops[bestGapIdx];
     var mid = (a.offset + b.offset) / 2;
     grad.stops.push({ offset: mid, color: a.color });
+    normalizeStops(grad);
     saveActiveLayerFrame(); renderGradientPanel();
     if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
   }
@@ -204,7 +222,10 @@
     else {
       for (var i = 0; i < grad.stops.length; i++) {
         var sp = stopWorldPos(grad, grad.stops[i].offset);
-        if (hitPoint(wp, sp.x, sp.y, 9)) { dragging = { stopIndex: i }; break; }
+        // The stop OBJECT, not its index: normalizeStops reorders the array
+        // mid-drag as soon as the stop crosses a neighbour, and an index would
+        // then point at the wrong stop — the dragged one would jump.
+        if (hitPoint(wp, sp.x, sp.y, 9)) { dragging = { stop: grad.stops[i] }; break; }
       }
     }
     if (!dragging) return;
@@ -227,7 +248,8 @@
       var fx = grad.from[0], fy = grad.from[1], tx = grad.to[0], ty = grad.to[1];
       var dx = tx - fx, dy = ty - fy, len2 = dx * dx + dy * dy || 1;
       var t = ((w[0] - fx) * dx + (w[1] - fy) * dy) / len2;
-      grad.stops[dragging.stopIndex].offset = Math.max(0, Math.min(1, t));
+      dragging.stop.offset = Math.max(0, Math.min(1, t));
+      normalizeStops(grad);
     }
     window.SMEngineBridge.renderNow();
   }
