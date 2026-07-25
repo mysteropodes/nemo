@@ -112,7 +112,200 @@
   // widget/model the Tween feature already has, just scoped per motion
   // segment instead of one curve applying everywhere. See CLAUDE.md §3 on
   // why this stays a small separate copy rather than a shared import. ----
-  var DEFAULT_CURVE = [{ x: 0, y: 0 }, { x: 0.42, y: 0 }, { x: 0.58, y: 1 }, { x: 1, y: 1 }];
+  // Every motion keyframe's default ease. These are ON-CURVE WAYPOINTS (the
+  // model this file and ui.js share — see MOTION_DEFAULT_CURVE's comment
+  // there), NOT bezier control handles.
+  //
+  // That distinction was the bug (2026-07-25). The old value was
+  // [{0,0},{.42,0},{.58,1},{1,1}] — the four numbers of CSS
+  // `cubic-bezier(.42,0,.58,1)`, i.e. `ease-in-out`, where .42/.58 are
+  // CONTROL HANDLES the curve merely leans toward. Fed to evalCurvePoints as
+  // waypoints, they became points the curve is forced THROUGH: pinned to 0
+  // until 42% of the segment and to 1 from 58% on. Measured on two position
+  // keys 12 frames apart, x going 40 -> 120:
+  //
+  //   legacy       40 40 40 40 40 40 80 120 120 120 120 120 120
+  //   linear       40 47 53 60 67 73 80  87  93 100 107 113 120
+  //   this curve   40 43 47 52 61 70 80  90  99 108 113 117 120
+  //
+  // Every default keyframe pair in Motion held still, snapped across in two
+  // frames, and held still again — a step, not an ease.
+  //
+  // Same intent as before (a gentle ease-in-out), expressed correctly for
+  // this model: these are the samples of smoothstep 3t^2-2t^3 at quarter
+  // points, so the waypoint interpretation reproduces the curve that was
+  // meant all along. Legacy keys carrying the exact old array are rewritten
+  // by migrateLegacyCurves below.
+  var DEFAULT_CURVE = [{ x: 0, y: 0 }, { x: 0.25, y: 0.156 }, { x: 0.5, y: 0.5 }, { x: 0.75, y: 0.844 }, { x: 1, y: 1 }];
+  var LEGACY_STEP_CURVE = [{ x: 0, y: 0 }, { x: 0.42, y: 0 }, { x: 0.58, y: 1 }, { x: 1, y: 1 }];
+  // A key still carrying the broken default bit-for-bit was never touched by
+  // hand, so replacing it restores the intended motion without overwriting
+  // any real edit. Anything dragged even slightly fails the equality test and
+  // is left exactly as the user tuned it.
+  function isLegacyStepCurve(pts) {
+    if (!pts || pts.length !== LEGACY_STEP_CURVE.length) return false;
+    for (var i = 0; i < pts.length; i++) {
+      if (typeof pts[i].tx === 'number') return false; // hand-dragged tangent
+      if (Math.abs(pts[i].x - LEGACY_STEP_CURVE[i].x) > 1e-9) return false;
+      if (Math.abs(pts[i].y - LEGACY_STEP_CURVE[i].y) > 1e-9) return false;
+    }
+    return true;
+  }
+  // ---- keyframe interpolation presets (After Effects parity) ----
+  // All three are expressed in the same on-curve-waypoint model as
+  // DEFAULT_CURVE, so they round-trip through the existing ease editor and
+  // through save/load with no new field. LINEAR is two waypoints (constant
+  // velocity); EASE_BOTH is the smoothstep default; the one-sided pair eases
+  // only the end it names and stays straight at the other, which is what AE's
+  // Easy Ease In / Easy Ease Out do.
+  var CURVE_LINEAR = [{ x: 0, y: 0 }, { x: 1, y: 1 }];
+  // F9's ease is deliberately STRONGER than DEFAULT_CURVE. AE can make Easy
+  // Ease identical to "the ease" because its own default is linear, so F9
+  // always changes something. This app's default is already a gentle
+  // ease-in-out (the original intent, kept), so an F9 that applied the same
+  // shape would be a silent no-op on every fresh keyframe — which is exactly
+  // how it first tested. A more pronounced curve keeps F9 meaningful and
+  // still reads as "ease this", matching AE's own fairly strong 33% influence.
+  var CURVE_EASE = [{ x: 0, y: 0 }, { x: 0.25, y: 0.09 }, { x: 0.5, y: 0.5 }, { x: 0.75, y: 0.91 }, { x: 1, y: 1 }];
+  // One-sided: straight through the half it does not name, eased at the half
+  // it does. easeIn decelerates ARRIVING at the key, easeOut accelerates
+  // leaving it — AE's Easy Ease In / Easy Ease Out.
+  var CURVE_EASE_IN = [{ x: 0, y: 0 }, { x: 0.25, y: 0.25 }, { x: 0.5, y: 0.5 }, { x: 0.75, y: 0.91 }, { x: 1, y: 1 }];
+  var CURVE_EASE_OUT = [{ x: 0, y: 0 }, { x: 0.25, y: 0.09 }, { x: 0.5, y: 0.5 }, { x: 0.75, y: 0.75 }, { x: 1, y: 1 }];
+  // A key's curvePoints govern the segment LEAVING it (valueAtFrame reads the
+  // left key's curve), so "ease at this key" means: ease the outgoing segment,
+  // and ease the incoming one by touching the previous key's curve. Applying
+  // to both is what makes F9 on a middle key feel symmetric, exactly as in AE.
+  function prevKeyOf(track, key) {
+    var i = track.keys.indexOf(key);
+    return i > 0 ? track.keys[i - 1] : null;
+  }
+  function applyCurveToSelection(kind) {
+    var sel = _motionKeySel;
+    if (!sel || !sel.length) return 0;
+    pushUndo();
+    var n = 0;
+    sel.forEach(function (s) {
+      var track = s.holder && s.holder.motion && s.holder.motion[s.prop];
+      if (!track) return;
+      if (kind === 'hold') { s.key.hold = !s.key.hold; n++; return; }
+      var outPts = kind === 'linear' ? CURVE_LINEAR : (kind === 'easeIn' ? CURVE_EASE_IN : (kind === 'easeOut' ? CURVE_EASE_OUT : CURVE_EASE));
+      // easeIn shapes the segment ARRIVING at this key, so it belongs on the
+      // previous key; the others shape the outgoing segment.
+      if (kind === 'easeIn') {
+        var pk = prevKeyOf(track, s.key);
+        if (pk) { pk.curvePoints = cloneCurvePts(CURVE_EASE_IN); n++; }
+      } else if (kind === 'easeOut') {
+        s.key.curvePoints = cloneCurvePts(CURVE_EASE_OUT); n++;
+      } else {
+        s.key.curvePoints = cloneCurvePts(outPts);
+        var pk2 = prevKeyOf(track, s.key);
+        if (pk2) pk2.curvePoints = cloneCurvePts(outPts);
+        n++;
+      }
+    });
+    if (n) { renderLayerList(); renderTimeline(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); }
+    return n;
+  }
+  function setKeyInterp(kind) { return applyCurveToSelection(kind); }
+  function applyEasyEase(which) { return applyCurveToSelection(which || 'ease'); }
+  // Shift every selected keyframe in time. Guards the whole move against
+  // collisions and against running off frame 0 BEFORE applying any of it, so a
+  // nudge either happens for the whole selection or not at all — a partial
+  // shift would silently change the spacing the user was preserving.
+  function nudgeSelectedKeys(delta) {
+    var sel = _motionKeySel;
+    if (!sel || !sel.length || !delta) return 0;
+    var groups = {};
+    sel.forEach(function (s) {
+      var track = s.holder && s.holder.motion && s.holder.motion[s.prop];
+      if (!track) return;
+      var id = (s.holder.uid || state.layers.indexOf(s.holder)) + '|' + s.prop;
+      (groups[id] || (groups[id] = { track: track, keys: [] })).keys.push(s.key);
+    });
+    var ok = true;
+    Object.keys(groups).forEach(function (id) {
+      var g = groups[id];
+      g.keys.forEach(function (k) {
+        var nf = k.frame + delta;
+        if (nf < 0 || nf > state.totalFrames - 1) ok = false;
+        var occupant = g.track.keys.find(function (o) { return o.frame === nf; });
+        if (occupant && g.keys.indexOf(occupant) < 0) ok = false;
+      });
+    });
+    if (!ok) return 0;
+    pushUndo();
+    var n = 0;
+    Object.keys(groups).forEach(function (id) {
+      var g = groups[id];
+      g.keys.forEach(function (k) { k.frame += delta; n++; });
+      sortKeys(g.track);
+    });
+    renderLayerList(); renderTimeline();
+    if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+    return n;
+  }
+  function deleteSelectedKeys() {
+    var sel = _motionKeySel;
+    if (!sel || !sel.length) return 0;
+    pushUndo();
+    var n = 0;
+    sel.forEach(function (s) {
+      var track = s.holder && s.holder.motion && s.holder.motion[s.prop];
+      if (!track) return;
+      var i = track.keys.indexOf(s.key);
+      if (i >= 0) { track.keys.splice(i, 1); n++; }
+    });
+    if (n) { setKeySel([]); renderLayerList(); renderTimeline(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); }
+    return n;
+  }
+  // Copy/paste keeps frames RELATIVE to the earliest key copied, so pasting at
+  // the playhead reproduces the selection's own rhythm wherever it lands —
+  // AE's behaviour, and the reason this stores offsets rather than frames.
+  var _keyClip = null;
+  function copySelectedKeys() {
+    var sel = _motionKeySel;
+    if (!sel || !sel.length) return 0;
+    var base = Math.min.apply(null, sel.map(function (s) { return s.key.frame; }));
+    _keyClip = sel.map(function (s) {
+      return { prop: s.prop, dt: s.key.frame - base, v: s.key.v.slice(), hold: !!s.key.hold, curvePoints: cloneCurvePts(s.key.curvePoints || DEFAULT_CURVE) };
+    });
+    return _keyClip.length;
+  }
+  function pasteKeys() {
+    if (!_keyClip || !_keyClip.length) return 0;
+    var ld = state.layers[state.activeLayerIdx];
+    if (!ld) return 0;
+    pushUndo();
+    var n = 0;
+    _keyClip.forEach(function (c) {
+      var f = state.currentFrame + c.dt;
+      if (f < 0 || f > state.totalFrames - 1) return;
+      var track = ensureTrack(ld, c.prop);
+      var ex = track.keys.find(function (k) { return k.frame === f; });
+      if (ex) { ex.v = c.v.slice(); ex.hold = c.hold; ex.curvePoints = cloneCurvePts(c.curvePoints); }
+      else track.keys.push({ frame: f, v: c.v.slice(), hold: c.hold, curvePoints: cloneCurvePts(c.curvePoints), hOut: [0, 0], hIn: [0, 0] });
+      sortKeys(track); n++;
+    });
+    if (n) { renderLayerList(); renderTimeline(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); }
+    return n;
+  }
+  function hasKeySelection() { return !!(_motionKeySel && _motionKeySel.length); }
+  function hasKeyClipboard() { return !!(_keyClip && _keyClip.length); }
+  function migrateLegacyCurves() {
+    var n = 0;
+    (state.layers || []).forEach(function (ld) {
+      if (!ld || !ld.motion) return;
+      Object.keys(ld.motion).forEach(function (prop) {
+        var trk = ld.motion[prop];
+        if (!trk || !trk.keys) return;
+        trk.keys.forEach(function (k) {
+          if (isLegacyStepCurve(k.curvePoints)) { k.curvePoints = cloneCurvePts(DEFAULT_CURVE); n++; }
+        });
+      });
+    });
+    return n;
+  }
   // tx/ty preserved: a point's manual tangent override (draggable Alt-
   // handles in the shared curve editor, ui.js) — stripping them here
   // reset hand-tuned tangents on every key clone.
@@ -2129,6 +2322,19 @@
             // reached. Renders as a square (see the .hold class above).
             menu.push({ label: key.hold ? 'Retirer le maintien (hold)' : 'Maintenir (hold)', action: function () { pushUndo(); key.hold = !key.hold; renderLayerList(); renderTimeline(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); } });
           }
+          // Interpolation presets, mirroring the keyboard layer added
+          // alongside them (timeline.js onKeyDown) so neither is the only way
+          // in — the keyboard is faster once known, the menu is how it gets
+          // known. They act on the whole selection, so right-clicking a key
+          // that isn't selected yet selects it first (the mousedown handler
+          // above already did that by the time this fires).
+          if (_motionKeySel.length) {
+            menu.push({ sep: true });
+            menu.push({ label: 'Easy Ease  (F9)', action: function () { applyEasyEase('ease'); } });
+            menu.push({ label: 'Easy Ease In  (Maj+F9)', action: function () { applyEasyEase('easeIn'); } });
+            menu.push({ label: 'Easy Ease Out  (Cmd+Maj+F9)', action: function () { applyEasyEase('easeOut'); } });
+            menu.push({ label: 'Linéaire  (Cmd+Alt+K)', action: function () { setKeyInterp('linear'); } });
+          }
           // Batch ops act on the WHOLE current multi-selection, offered
           // regardless of which key/cell was right-clicked. No Align here
           // (unlike layer bars) — a keyframe has no duration, "align"
@@ -2830,5 +3036,14 @@
     // changed; the panel's scrub field too, if the playhead sits inside
     // the segment being reshaped.
     onEaseSegChanged: function () { renderLayerList(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); },
+    migrateLegacyCurves: migrateLegacyCurves,
+    setKeyInterp: setKeyInterp,
+    applyEasyEase: applyEasyEase,
+    nudgeSelectedKeys: nudgeSelectedKeys,
+    deleteSelectedKeys: deleteSelectedKeys,
+    copySelectedKeys: copySelectedKeys,
+    pasteKeys: pasteKeys,
+    hasKeySelection: hasKeySelection,
+    hasKeyClipboard: hasKeyClipboard,
   };
 })();
