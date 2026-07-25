@@ -3010,7 +3010,19 @@
     var w = Math.abs(dx), h = Math.abs(dy);
     var r = _motionMarquee.rectEl;
     r.style.left = x0 + 'px'; r.style.top = y0 + 'px'; r.style.width = w + 'px'; r.style.height = h + 'px';
-    if (_motionMarquee.moved) applyMarqueeSelection(x0, y0, x0 + w, y0 + h);
+    if (_motionMarquee.moved) {
+      applyMarqueeSelection(x0, y0, x0 + w, y0 + h);
+      // ...and the layer BARS in the same sweep. This marquee is registered
+      // on #fg-wrap in the CAPTURE phase and stops propagation, so it fires
+      // before layer-inout.js's own row/wrap listeners can start their bar
+      // marquee — which meant in/out point selection was simply dead in
+      // Motion, the only mode where the bars exist at all (verified live
+      // 2026-07-25: a drag across three bars' left halves left
+      // getBarSelection() empty). layer-inout.js already forwards to
+      // SMMotion.marqueeSelect in the other direction; this is the missing
+      // half, so one rectangle now picks up keys AND in/out points together.
+      if (window.SMLayerInOut && SMLayerInOut.marqueeSelect) SMLayerInOut.marqueeSelect(x0, y0, x0 + w, y0 + h);
+    }
   }
   function endMarquee() {
     if (!_motionMarquee) return;
@@ -3020,7 +3032,14 @@
     // A plain click on empty grid space (no drag) clears the selection,
     // same "click empty = deselect" convention as the canvas's own
     // marquee/selection tools elsewhere in this app.
-    if (!moved) { setKeySel([]); renderTimeline(); }
+    // A plain click on empty grid space clears the BAR selection too, not
+    // just the key one — they are now made by the same gesture, so leaving
+    // one of them behind would be the same desync in reverse.
+    if (!moved) {
+      setKeySel([]);
+      if (window.SMLayerInOut && SMLayerInOut.clearSelection) SMLayerInOut.clearSelection();
+      renderTimeline();
+    }
   }
 
   // Drag-to-retime a keyframe (mousemove/up delegated from ui.js's global

@@ -698,6 +698,13 @@
   window.SMLayerInOut = {
     inPointOf: inPointOf, outPointOf: outPointOf, hasCustomRange: hasCustomRange, buildBar: buildBar, updateBar: updateBar,
     alignBars: alignBars, distributeBars: distributeBars, flipBars: flipBars, staggerBars: staggerBars, selectEveryNth: selectEveryNth, invertBarSelection: invertBarSelection,
+    // Exposed so Motion's own grid marquee can drive bar selection too —
+    // it intercepts the mousedown in capture phase before this module's
+    // listeners ever see it (2026-07-25), so the two marquees have to share
+    // one gesture rather than race for it. Mirror of the SMMotion.marqueeSelect
+    // call this module already makes in the other direction.
+    marqueeSelect: applyMarqueeSelection,
+    clearSelection: clearBarSel,
     getBarSelection: function () { return _barSel.slice(); },
     setBarSelection: function (sel) { _barSel = sel; refreshBarSelClasses(); },
   };
