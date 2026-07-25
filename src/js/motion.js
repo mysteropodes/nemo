@@ -1617,7 +1617,26 @@
     // index first so each splice (replacing 1 layer with N) never shifts
     // an index this loop hasn't visited yet.
     if (window.SM && window.SM.splitLayerIntoElementsCore) {
+      // Record ONE undo entry covering the whole auto-split before touching
+      // anything (2026-07-25, "impossible de revenir qu'à un seul calque
+      // après"): each core call runs silent, and `silent` also skips
+      // pushUndo — so entering a component to LOOK at it used to rewrite
+      // its layer structure permanently, with no undo step to walk back
+      // and no merge command to do it by hand. Pre-counted rather than
+      // pushed unconditionally so browsing an already-split component (the
+      // idempotent re-entry case) doesn't spam the undo stack with no-ops.
+      var willSplit = 0;
+      for (var q = 0; q < state.layers.length; q++) {
+        var qd = state.layers[q];
+        if (!qd || qd.symbolId) continue;
+        var qe = layerElements(q, qd);
+        if (qe && qe.length >= 2) willSplit++;
+      }
+      if (willSplit) pushUndo();
       for (var i = state.layers.length - 1; i >= 0; i--) window.SM.splitLayerIntoElementsCore(i, { silent: true });
+      // The way back is not obvious from the result (N rows where there was
+      // one) — say it once, with the exact gesture.
+      if (willSplit) showToast('Éclaté en calques — clic droit › « Fusionner les calques sélectionnés » pour revenir en arrière');
     }
   }
   function renderLayerListMotion(list) {
@@ -1696,14 +1715,23 @@
           renderLayerList(); renderTimeline();
           return;
         }
-        if (e.shiftKey && _layerSel.length) {
-          var anchor = _layerSel[0]; _layerSel = [];
+        // Shift-click used to require a PRE-EXISTING selection (`&&
+        // _layerSel.length`), and Motion's plain click a few lines down
+        // cleared it to [] — so the reflex gesture (click a row, shift-click
+        // another) selected nothing at all here, and the only way to reach
+        // any multi-layer command was to know about Cmd-click. Animation 2D
+        // never had the problem because ITS plain click sets [idx]; Motion
+        // now does the same, and the anchor falls back to the active layer
+        // so the very first Shift-click works from a cold start.
+        if (e.shiftKey) {
+          var anchor = _layerSel.length ? _layerSel[0] : state.activeLayerIdx;
+          _layerSel = [];
           for (var l = Math.min(anchor, li); l <= Math.max(anchor, li); l++) _layerSel.push(l);
           window.SM.setActiveLayer(li);
           renderLayerList(); renderTimeline();
           return;
         }
-        _layerSel = [];
+        _layerSel = [li];
         // A row can be open via the single-accordion state OR via U's
         // reveal set (or both) — always drop it from the reveal set on
         // click, but only touch the single-accordion value if THIS row is
@@ -1762,10 +1790,20 @@
       // typed number, same UX convention layer-inout.js's own staggerBars
       // context-menu entry already uses for layer in/out bars.
       row.addEventListener('contextmenu', function (e) {
-        if (_layerSel.length < 2 || _layerSel.indexOf(li) < 0 || !window.showContextMenu) return;
+        if (!window.showContextMenu) return;
         e.preventDefault(); e.stopPropagation();
+        // Used to open ONLY for a 2+ layer selection (it held a single
+        // stagger entry) — so right-clicking one layer in Motion did
+        // nothing at all. Now always opens: the split/merge pair below is
+        // the documented way back from Motion's own double-click-to-split
+        // (2026-07-25), and it has to be reachable from the row you just
+        // split, which is by definition where you look for it.
+        var multi = _layerSel.length >= 2 && _layerSel.indexOf(li) >= 0;
         window.showContextMenu(e.clientX, e.clientY, [
-          { label: 'Échelonner les calques sélectionnés…', action: function () {
+          { label: 'Éclater en calques (une forme par calque)', disabled: !!ld.symbolId || !!ld.lfsGroup, action: function () { window.SM.splitLayerIntoElements(li); } },
+          { label: 'Fusionner les calques sélectionnés', disabled: !multi, action: function () { window.SM.mergeLayersIntoOne(_layerSel.slice()); } },
+          { sep: true },
+          { label: 'Échelonner les calques sélectionnés…', disabled: !multi, action: function () {
             var v = prompt('Décalage entre calques (frames)', '2');
             var step = parseInt(v, 10);
             if (!isNaN(step) && step !== 0) staggerSelectedLayers(step);

@@ -681,6 +681,8 @@ window.SM={
   propagateLFSFill:function(which){propagateLFSFill(state.activeLayerIdx,which);},
   enterSymbol:function(symId){enterSymbol(symId);},
   splitLayerIntoElementsCore:function(li,opts){return splitLayerIntoElementsCore(li,opts);},
+  splitLayerIntoElements:function(li){return splitLayerIntoElements(li);},
+  mergeLayersIntoOne:function(indices,opts){return mergeLayersIntoOne(indices,opts);},
   exitToScene:function(){exitToScene();},
   closeSymbolTab:function(symId){closeSymbolTab(symId);},
   enterMontageView:function(montageId){enterMontageView(montageId);},
@@ -3332,6 +3334,12 @@ function renderLayerList(){
         {label:'Renommer',action:function(){startLayerRename(idx4);}},
         {label:l4.isTextLayer?'Retirer le marquage « calque de texte »':'Marquer comme calque de texte',action:function(){l4.isTextLayer=!l4.isTextLayer;renderLayerList();}},
         {label:'Grouper en dossier',disabled:_layerSel.length<2,action:function(){groupSelectionIntoFolder();}},
+        // Split / merge as a reversible PAIR (2026-07-25). "Éclater" existed
+        // only as a Motion double-click with no visible entry point and no
+        // inverse; both directions now sit next to each other, in both
+        // timelines, so the round-trip is discoverable from either end.
+        {label:'Éclater en calques (une forme par calque)',disabled:!!l4.symbolId||!!l4.lfsGroup,action:function(){window.SM.splitLayerIntoElements(idx4);}},
+        {label:'Fusionner les calques sélectionnés',disabled:_layerSel.length<2,action:function(){window.SM.mergeLayersIntoOne(_layerSel.slice());}},
         {label:'Retirer du dossier',disabled:!l4.folderId,action:function(){delete l4.folderId;renderLayerList();renderTimeline();}},
         {label:'Convertir en composant',disabled:!!l4.symbolId||!!l4.lfsGroup,action:function(){window.SM.convertActiveLayerToComponent();}},
         {label:'Décomposer le composant',disabled:!l4.symbolId,action:function(){window.SM.convertComponentToLayer();}},

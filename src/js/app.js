@@ -1324,6 +1324,153 @@ function splitLayerIntoElementsCore(li,opts){
   if(!silent)showToast('Calque éclaté en '+n+' calques');
   return true;
 }
+// True inverse of splitLayerIntoElementsCore — merges N layers back into a
+// single one. Added 2026-07-25 after "quand on double clic sur un calque
+// avec plusieurs vecto/forme à l'intérieur impossible de revenir qu'à un
+// seul calque après": the split had no inverse ANYWHERE in the app, and
+// entering a Component auto-splits SILENTLY (enterComponentLayer, silent:true
+// skips pushUndo), so merely LOOKING inside a component permanently
+// rewrote its layer structure with no undo entry to walk back. The split
+// side of that is fixed at its call site (it records undo now); this is the
+// explicit way back, reachable from both timelines' layer context menu.
+//
+// Frame model: mirrors the split. A merged frame is a keyframe if ANY
+// source has one there; its strokes are every source's strokes AT that
+// frame, held-frame semantics included (a source that has no keyframe at fi
+// still contributes what it VISIBLY shows there, inherited from its last
+// keyframe — otherwise merging layers whose keyframes don't line up would
+// silently drop content, which is exactly the "handled in one reader but
+// not the others" family CLAUDE.md §1 warns about). Deliberately reads the
+// RAW stored strokes rather than getEffectiveStrokes: the latter bakes
+// layer/element motion into geometry, which would freeze the animation into
+// the drawing instead of preserving it as editable keys.
+//
+// Layer-level Motion is DEMOTED to per-element motion (the exact mirror of
+// the split's element→layer promotion) rather than dropped. For the
+// round-trip case (each source holds exactly 1 shape, which is what a split
+// produces) this is lossless: element motion pivots on the stroke's own
+// bounds+anchor and the layer's bounds ARE that stroke's bounds. A source
+// bundling several shapes gets the same transform copied onto each of them,
+// which differs from a true group pivot — flagged in the toast rather than
+// silently approximated.
+function mergeLayersIntoOne(indices,opts){
+  var silent=!!(opts&&opts.silent);
+  var idx=(indices||[]).slice().sort(function(a,b){return a-b;});
+  // de-dup — a caller can easily pass the active layer twice (selection + active)
+  idx=idx.filter(function(v,i){return i===0||v!==idx[i-1];});
+  if(idx.length<2){if(!silent)showToast('Sélectionnez au moins 2 calques à fusionner');return false;}
+  var srcs=[],bad=null;
+  for(var a=0;a<idx.length;a++){
+    var l=state.layers[idx[a]];
+    if(!l){if(!silent)showToast('Calque introuvable');return false;}
+    // Non-stroke-holders have no `frames` content to concatenate — merging
+    // one would quietly delete whatever it stands for (a component's whole
+    // symbol, a montage, a decoded video). Refuse with a reason instead.
+    if(l.symbolId)bad=bad||'un composant';
+    else if(l.lfsGroup)bad=bad||'un groupe Ligne/Plein/Ombre';
+    else if(l.montageId)bad=bad||'un calque de montage StoryBoard';
+    else if(l.nativeVideo)bad=bad||'un calque vidéo';
+    else if(l.isNullLayer)bad=bad||'un calque Null';
+    else if(l.isEffectLayer)bad=bad||'un calque d\'effet';
+    srcs.push(l);
+  }
+  if(bad){if(!silent)showToast('Impossible de fusionner : la sélection contient '+bad);return false;}
+  saveAllLayerFrames();if(!silent)pushUndo();
+  var target=idx[0];
+  // Held-frame resolution WITHOUT motion baking — the plain-layer tail of
+  // getEffectiveStrokes, kept separate on purpose (see header comment).
+  function rawAt(ld,fi){
+    var f=ld.frames[fi];if(!f)return null;
+    if(f.isKeyframe||f.isInterpolated)return f.strokes||[];
+    for(var i=fi-1;i>=0;i--){var pf=ld.frames[i];if(pf&&pf.isKeyframe)return pf.strokes||[];}
+    return null;
+  }
+  var nf=0;srcs.forEach(function(l){nf=Math.max(nf,(l.frames||[]).length);});
+  if(!nf)nf=state.totalFrames;
+  var elMotion=JSON.parse(JSON.stringify(state.layers[target].elementMotion||{}));
+  var approximated=0;
+  var frames=[];
+  for(var fi=0;fi<nf;fi++){
+    var anyKey=false,anyInterp=false,strokes=[];
+    for(var s=0;s<srcs.length;s++){
+      var f=srcs[s].frames[fi];
+      if(f&&f.isKeyframe)anyKey=true;
+      if(f&&f.isInterpolated)anyInterp=true;
+    }
+    if(anyKey||anyInterp){
+      for(var s2=0;s2<srcs.length;s2++){
+        var part=rawAt(srcs[s2],fi);
+        if(part&&part.length)strokes=strokes.concat(JSON.parse(JSON.stringify(part)));
+      }
+    }
+    frames.push({strokes:strokes,isKeyframe:anyKey,isInterpolated:!anyKey&&anyInterp});
+  }
+  // Demote each source's layer-level Motion onto its own strokes.
+  srcs.forEach(function(l){
+    var hasMotion=(l.motion&&Object.keys(l.motion).length)||(l.motionStatic&&Object.keys(l.motionStatic).length);
+    if(!hasMotion)return;
+    var seen={},ids=[];
+    (l.frames||[]).forEach(function(f){
+      if(!f||!f.isKeyframe&&!f.isInterpolated)return;
+      (f.strokes||[]).forEach(function(sd,i){
+        if(sd.isBrushTextureCopy)return;
+        if(!sd.strokeId)sd.strokeId='s'+Date.now().toString(36)+'_'+i+'_'+Math.floor(Math.random()*1e6);
+        if(!seen[sd.strokeId]){seen[sd.strokeId]=1;ids.push(sd.strokeId);}
+      });
+    });
+    if(ids.length>1)approximated++;
+    ids.forEach(function(sid){
+      var h=elMotion[sid]||(elMotion[sid]={});
+      if(l.motion)h.motion=JSON.parse(JSON.stringify(l.motion));
+      if(l.motionStatic)h.motionStatic=JSON.parse(JSON.stringify(l.motionStatic));
+    });
+  });
+  // "Layer 1 — Forme 3" + "Layer 1 — Forme 4" → "Layer 1": recover the name
+  // the split derived these from, so a split/merge round-trip is invisible.
+  var name=srcs[0].name||'Layer 1';
+  var m=/^(.*?)\s+—\s+(Forme|Image|Texte)\s+\d+$/.exec(name);
+  if(m&&srcs.every(function(l){return (l.name||'').indexOf(m[1]+' — ')===0;}))name=m[1];
+  var merged={
+    name:name,visible:true,locked:false,frames:frames,
+    color:srcs[0].color||nextLayerColor(),
+    layerUid:srcs[0].layerUid,parentLayerUid:srcs[0].parentLayerUid,
+  };
+  if(Object.keys(elMotion).length)merged.elementMotion=elMotion;
+  // Any OTHER layer parented to one of the layers about to disappear must
+  // be re-pointed at the survivor, or its parenting silently goes dead
+  // (parentChainMats resolves by uid and just finds nothing) — the exact
+  // shape of bug CLAUDE.md §1 is about, one consumer updated and the rest
+  // left dangling.
+  var goneUids={};
+  for(var g=1;g<idx.length;g++){var gu=state.layers[idx[g]].layerUid;if(gu)goneUids[gu]=1;}
+  state.layers.forEach(function(other,oi){
+    if(idx.indexOf(oi)>=0)return;
+    if(other.parentLayerUid&&goneUids[other.parentLayerUid])other.parentLayerUid=merged.layerUid||null;
+  });
+  // Paper layers: one fresh Layer replaces the N being removed, inserted
+  // where the topmost source sat (same splice-from-the-end discipline the
+  // split uses so no index shifts under an iteration still in progress).
+  arcLayer.activate();
+  var newUL=new Layer({name:'user-merge-'+Date.now()});
+  for(var r=idx.length-1;r>=0;r--){
+    userLayers[idx[r]].remove();
+    userLayers.splice(idx[r],1);
+    state.layers.splice(idx[r],1);
+  }
+  userLayers.splice(target,0,newUL);
+  state.layers.splice(target,0,merged);
+  userLayers.forEach(function(l){l.insertBelow(arcLayer);});
+  state.activeLayerIdx=target;
+  _layerSel=[target];
+  activateUL(state.activeLayerIdx);
+  loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
+  if(!silent){
+    showToast(approximated
+      ? idx.length+' calques fusionnés — animation reportée par forme (pivot approché sur '+approximated+' calque(s) multi-formes)'
+      : idx.length+' calques fusionnés en « '+name+' »');
+  }
+  return true;
+}
 // Inverse of convertLayerToComponent: bakes what the component instance
 // actually displays on each main-timeline frame (play mode, speed and
 // single-frame settings included) back into plain layer keyframes, then
@@ -1522,7 +1669,22 @@ function exitToScene(){
   // totalFrames/fps are primitives copied into state at enterSymbol() time,
   // not a live binding back to state.symbols[symId] — write them back now
   // so frame-count/fps edits made while inside the symbol aren't lost.
-  var sym=state.symbols[symId];if(sym){sym.totalFrames=state.totalFrames;sym.fps=state.fps;}
+  var sym=state.symbols[symId];if(sym){
+    sym.totalFrames=state.totalFrames;sym.fps=state.fps;
+    // ...and `layers` for the same reason, discovered 2026-07-25. enterSymbol
+    // aliases state.layers TO sym.layers, so in-place edits (splice, push,
+    // per-layer mutation) write straight through and this looked unnecessary
+    // — but any code path that REPLACES the array instead of mutating it
+    // silently severs that alias, and the leading example is
+    // restoreLayersSnapshot (tweens.js), which does `state.layers=[]` then
+    // rebuilds. Net effect before this line: EVERY layer-level undo made
+    // inside a component (split, merge, add/delete/reorder/rename a layer)
+    // was silently thrown away the moment you went back to the scene — the
+    // screen showed the undone state right up until you left. Writing the
+    // current array back here makes the alias an optimization rather than a
+    // correctness requirement.
+    sym.layers=state.layers;
+  }
   var symLayers=_symbolPaperLayers[symId];if(symLayers)symLayers.forEach(function(l){l.visible=false;});
   state.layers=_sceneSnapshot.layers;state.totalFrames=_sceneSnapshot.totalFrames;state.waIn=_sceneSnapshot.waIn;state.waOut=_sceneSnapshot.waOut;
   window._waIn=state.waIn;window._waOut=state.waOut;window._totalF=state.totalFrames;
