@@ -804,6 +804,14 @@
     });
   }
   document.getElementById('frame-hdr').addEventListener('mousedown',function(e){
+    // LEFT button only. Without this, a right-click on the ruler scrubbed the
+    // playhead — and worse, the e.preventDefault() below on a button-2
+    // mousedown SUPPRESSES the contextmenu event that would follow, so the
+    // ruler's own right-click menu (markers, BPM grid, trim to work area)
+    // could never open at all. Found 2026-07-26 by right-clicking the ruler
+    // as a user: the menu I had added was unreachable from the one place it
+    // belongs, while the playhead jumped instead.
+    if(e.button!==0)return;
     var wrap=document.getElementById('fg-wrap');var rect=wrap.getBoundingClientRect();
     var x=e.clientX-rect.left+wrap.scrollLeft;var frame=Math.floor(x/FC);
     if(frame>=0&&frame<(window._totalF||24)){scrubbing=true;if(window.SM){window.SM.stopPlay();window.SM.goToFrame(frame);}}
@@ -815,6 +823,7 @@
   // "click somewhere in this thin strip of frame cells".
   var playheadFlag=document.getElementById('playhead-flag');
   if(playheadFlag)playheadFlag.addEventListener('mousedown',function(e){
+    if(e.button!==0)return; // same reason as the ruler above
     scrubbing=true;if(window.SM)window.SM.stopPlay();
     e.preventDefault();e.stopPropagation();
   });

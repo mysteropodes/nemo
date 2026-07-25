@@ -348,7 +348,7 @@ function fsRealizeFillRegion(sel,layer){
     // everywhere else a boolean op's result needs inserting) already knows
     // how to explode that into independent flat Paths rather than this
     // branch needing its own second copy of that logic.
-    insertBooleanResult(layer,idx,rest,fillPath.fillColor,fillPath.opacity);
+    insertBooleanResult(layer,idx,rest,fillPath.fillColor,fillPath.opacity,null,fillPath.data);
     fillPath.remove();
     return{path:lobe,kind:'fill'};
   }
@@ -2032,7 +2032,7 @@ function fillMergeSameColor(layer,newFill,allowFillShapeAbsorb){
   var topIdx=Math.max.apply(null,idxs);
   var removedBelow=idxs.filter(function(i){return i<topIdx;}).length;
   newFill.remove();absorbed.forEach(function(c){c.remove();});
-  var parts=insertBooleanResult(layer,Math.min(topIdx-removedBelow,layer.children.length),acc,newFill.fillColor,op);
+  var parts=insertBooleanResult(layer,Math.min(topIdx-removedBelow,layer.children.length),acc,newFill.fillColor,op,null,newFill.data);
   if(mergedSeeds.length){
     parts.forEach(function(part){
       part.data.fillSeeds=mergedSeeds;
@@ -3560,7 +3560,7 @@ function applyFillBrushPlacement(path,layer){
       // into flat Paths at insertion, same as eraseAtPoint/booleanOp, so it
       // isn't silently dropped by saveActiveLayerFrame's `instanceof Path`
       // filter the moment the frame next saves.
-      var islands=insertBooleanResult(layer,Math.min(idx,layer.children.length),united,path.fillColor,path.opacity);
+      var islands=insertBooleanResult(layer,Math.min(idx,layer.children.length),united,path.fillColor,path.opacity,null,target.data);
       return islands[0];
     }
     return path;
@@ -4005,7 +4005,10 @@ function booleanOp(op){
   // or a hole) — split into flat Paths at insertion, same as eraseAtPoint,
   // so it isn't silently dropped by saveActiveLayerFrame's `instanceof
   // Path` filter (or selection/click-to-pick) the moment the frame saves.
-  var islands=insertBooleanResult(boolLayer,boolLayer.children.length,result,style.fillColor,style.opacity);
+  // Same source as the style (the last-selected path — the one whose look the
+  // union takes on), so the merged shape keeps ONE coherent identity rather
+  // than an arbitrary mix of the operands'.
+  var islands=insertBooleanResult(boolLayer,boolLayer.children.length,result,style.fillColor,style.opacity,null,style.data);
   paths.forEach(function(p){p.remove();});
   selectedPaths=islands;state.selectedStrokeIndices=[];
   fillRegenerateLinked(boolLayer,islands[0]);
@@ -4093,6 +4096,11 @@ function eraseAtPoint(path,worldPt,radius,fromPt){
   // fillColor already IS the visible ink, strokeColor is never the real
   // border there).
   var origStrokeInfo=(!isVB&&path.strokeColor)?{color:path.strokeColor,width:path.strokeWidth,cap:path.strokeCap,join:path.strokeJoin}:null;
+  // Captured here for the same reason as origStrokeInfo: the ribbon-expansion
+  // branch below can replace `path` with a `combined` clone that carries no
+  // .data at all. See insertBooleanResult's BOOL_KEEP_DATA_* comment for what
+  // survives an erase and what deliberately doesn't.
+  var origData=path.data;
   // eraseExpandStrokeToFill/buildVariableWidthPath builds a ribbon by
   // flattening the path into a plain point SEQUENCE and sweeping a width
   // along it — built for an OPEN stroke's centerline, with no concept of
@@ -4204,7 +4212,7 @@ function eraseAtPoint(path,worldPt,radius,fromPt){
     // silhouette is left (origStrokeInfo, captured above before any
     // ribbon-expansion), rather than silently losing its border on the
     // first touch ("l'eraser supprime le stroke entier", 2026-07).
-    insertBooleanResult(layer,Math.min(tIdx,layer.children.length),result,col,op,origStrokeInfo);
+    insertBooleanResult(layer,Math.min(tIdx,layer.children.length),result,col,op,origStrokeInfo,origData);
   }else if(result)result.remove();
 }
 // Inserts the result of a Paper.js/WASM boolean op (subtract/unite/
@@ -4391,7 +4399,38 @@ function _eraseDegenerateSelfLoops(path){
 // (can't preserve a tapered centerline through an arbitrary bite, but a
 // plain outline at the same width/color is the closest visual match) —
 // every other caller omits it and keeps the old strokeColor=null default.
-function insertBooleanResult(layer,insertAt,result,fillColor,opacity,strokeInfo){
+// Identity/ownership metadata a boolean op must NOT silently drop (2026-07-26,
+// found by erasing a corner off a grouped square: the bitten square came back
+// with data === {} and had quietly left its own group). A boolean op replaces
+// the source Path object entirely, and nothing here used to carry ANY of its
+// .data across — so one eraser touch reset the shape's identity:
+//   strokeId    → per-element Motion animation keyed to it is orphaned
+//   groupId     → the shape drops out of its group, half the group left behind
+//   owner*      → collaboration attribution stripped
+//   linkedFillId→ the companion fill keeps pointing at an id no path carries
+//   effects     → per-stroke effects list lost
+// GEOMETRY tags are deliberately NOT in this list — isVectorBrush /
+// centerSegments / widthProfile / strokeProfile / fillSeed* / brushTexture*
+// all describe how to REBUILD the outline, and a notched outline no longer
+// has a valid centerline to rebuild from (see eraseAtPoint's own comment on
+// origStrokeInfo — that tradeoff is intentional and predates this).
+var BOOL_KEEP_DATA_ALL=['groupId','ownerId','ownerName','ownerColor','channelTag','shadowSwatchId','tweenOn','boxAngle','xformAnchorKey','xformAnchorCustom','effects'];
+// Keys that must stay UNIQUE across the layer: both are lookup map keys
+// (motion.js:1413 scans for the first data.strokeId match, app.js:740 builds
+// byId[linkedFillId]), so copying them onto every island of a split would
+// make all but one unreachable. The first island inherits the identity; the
+// extra islands are genuinely new shapes and get their OWN fresh id, so they
+// stay individually addressable by per-element Motion instead of persisting
+// with strokeId:null (nothing else mints one on save — app.js:1479 only does
+// so inside mergeLayersIntoOne).
+var BOOL_KEEP_DATA_FIRST=['strokeId','linkedFillId','isLinkedFillCompanion'];
+function carryBooleanData(isl,srcData,isFirst){
+  if(!srcData)return;
+  BOOL_KEEP_DATA_ALL.forEach(function(k){if(srcData[k]!==undefined)isl.data[k]=srcData[k];});
+  if(isFirst)BOOL_KEEP_DATA_FIRST.forEach(function(k){if(srcData[k]!==undefined)isl.data[k]=srcData[k];});
+  else if(srcData.strokeId)ensureStrokeId(isl);
+}
+function insertBooleanResult(layer,insertAt,result,fillColor,opacity,strokeInfo,srcData){
   function applyStroke(isl){
     if(strokeInfo&&strokeInfo.color){isl.strokeColor=strokeInfo.color;isl.strokeWidth=strokeInfo.width;isl.strokeCap=strokeInfo.cap;isl.strokeJoin=strokeInfo.join;}
     else isl.strokeColor=null;
@@ -4408,6 +4447,7 @@ function insertBooleanResult(layer,insertAt,result,fillColor,opacity,strokeInfo)
     if(fillColor!==undefined)result.fillColor=fillColor;
     applyStroke(result);
     if(opacity!==undefined)result.opacity=opacity;
+    carryBooleanData(result,srcData,true);
     layer.insertChild(insertAt,result);
     return[result];
   }
@@ -4427,6 +4467,7 @@ function insertBooleanResult(layer,insertAt,result,fillColor,opacity,strokeInfo)
       if(fillColor!==undefined)isl.fillColor=fillColor;
       applyStroke(isl);
       if(opacity!==undefined)isl.opacity=opacity;
+      carryBooleanData(isl,srcData,k===0);
       layer.insertChild(insertAt+k,isl);
     });
     result.remove();
@@ -4465,6 +4506,7 @@ function insertBooleanResult(layer,insertAt,result,fillColor,opacity,strokeInfo)
     if(fillColor!==undefined)isl.fillColor=fillColor;
     applyStroke(isl);
     if(opacity!==undefined)isl.opacity=opacity;
+    carryBooleanData(isl,srcData,k===0);
     layer.insertChild(insertAt+k,isl);
   });
   result.remove();
