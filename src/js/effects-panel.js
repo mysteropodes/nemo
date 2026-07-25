@@ -298,10 +298,67 @@
     if (expandedIdx === idx) expandedIdx = -1; else if (expandedIdx > idx) expandedIdx--;
     saveActiveLayerFrame(); renderEffectsSection(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
   }
+  // ---- keyable effect parameters (2026-07-25) ----
+  // An effect was a fixed number: a blur could be strong or weak but never
+  // came INTO focus. Each parameter can now carry its own key track, stored on
+  // the effect itself as `keys.p1 = {keys:[…]}` — the same shape a layer
+  // property uses, evaluated by the same SMMotion.evalTrack, so an eased blur
+  // and an eased Position behave identically and a hold means the same thing
+  // in both. It also rides along in save/load for free: the effects array is
+  // already serialised wholesale on both layers and shapes.
+  function paramKeyed(eff, key) {
+    return !!(eff.keys && eff.keys[key] && eff.keys[key].keys && eff.keys[key].keys.length);
+  }
+  // THE value getter — everything that needs a parameter goes through this, so
+  // keyed and static parameters are indistinguishable to callers.
+  function paramValueAt(eff, key, frame) {
+    var stat = eff[key];
+    if (!paramKeyed(eff, key)) return stat;
+    return window.SMMotion ? SMMotion.evalTrack(eff.keys[key], frame, stat) : stat;
+  }
+  window.effectParamValueAt = paramValueAt;
+  function ensureParamTrack(eff, key) {
+    if (!eff.keys) eff.keys = {};
+    if (!eff.keys[key]) eff.keys[key] = { keys: [] };
+    return eff.keys[key];
+  }
+  function setParamKey(idx, key, frame, value) {
+    var t = effectsTarget(); if (!t || !t.obj.effects || !t.obj.effects[idx]) return;
+    var eff = t.obj.effects[idx];
+    var trk = ensureParamTrack(eff, key);
+    var curve = window.SMMotion ? SMMotion.DEFAULT_CURVE() : [{ x: 0, y: 0 }, { x: 1, y: 1 }];
+    var ex = trk.keys.filter(function (k) { return k.frame === frame; })[0];
+    if (ex) ex.v = [value];
+    else {
+      trk.keys.push({ frame: frame, v: [value], curvePoints: curve, hOut: [0, 0], hIn: [0, 0] });
+      trk.keys.sort(function (a, b) { return a.frame - b.frame; });
+    }
+  }
+  // Stopwatch, matching the Motion panel's own convention: turning it ON keys
+  // the CURRENT value at the current frame so nothing jumps, turning it OFF
+  // freezes the value the animation had reached rather than snapping back to
+  // whatever the static field last held.
+  function toggleParamKeying(idx, key) {
+    var t = effectsTarget(); if (!t || !t.obj.effects || !t.obj.effects[idx]) return;
+    var eff = t.obj.effects[idx];
+    pushUndo();
+    if (paramKeyed(eff, key)) {
+      eff[key] = paramValueAt(eff, key, state.currentFrame);
+      delete eff.keys[key];
+    } else {
+      setParamKey(idx, key, state.currentFrame, eff[key]);
+    }
+    saveActiveLayerFrame(); renderEffectsList();
+    if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+  }
   function setParam(idx, key, raw) {
     var t = effectsTarget(); if (!t || !t.obj.effects || !t.obj.effects[idx]) return;
+    var eff = t.obj.effects[idx];
     pushUndo();
-    t.obj.effects[idx][key] = raw;
+    // While keying, editing the field writes a key at the current frame rather
+    // than the static value — same as dragging a keyed property in Motion.
+    if (paramKeyed(eff, key)) setParamKey(idx, key, state.currentFrame, raw);
+    else eff[key] = raw;
     saveActiveLayerFrame(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
   }
 
@@ -317,18 +374,31 @@
     }
     cfg.forEach(function (p) {
       var line = document.createElement('div'); line.className = 'fx-row-param';
+      // Stopwatch first, like the Motion panel puts it — same position, same
+      // glyph, so it reads as the same gesture in both places.
+      var keyed = paramKeyed(eff, p.key);
+      var sw = document.createElement('div');
+      sw.className = 'lico fx-stopwatch' + (keyed ? ' on' : '');
+      sw.innerHTML = '<span style="font-size:11px;line-height:1">' + (keyed ? '◈' : '◇') + '</span>';
+      sw.title = keyed ? 'Animé — cliquer pour figer la valeur actuelle'
+                       : 'Animer ce paramètre (pose une clé à la frame courante)';
+      sw.addEventListener('click', function (e) { e.stopPropagation(); toggleParamKeying(idx, p.key); });
       var label = document.createElement('span'); label.className = 'pl'; label.textContent = window.SM.t(p.label);
       var input = document.createElement('input');
       input.type = 'number'; input.className = 'pi scrub';
       input.min = p.min; input.max = p.max; input.dataset.step = p.step;
-      var stored = eff[p.key];
       var def = defaultsArrFor(eff.type)[{ p1: 0, p2: 1, p3: 2, p4: 3 }[p.key]];
-      input.value = Math.round(((stored !== undefined ? stored : def) * (p.scale || 1)) * 100) / 100;
+      var stored = eff[p.key] !== undefined ? eff[p.key] : def;
+      // Shows the value AT THE CURRENT FRAME once keyed, so scrubbing the
+      // timeline moves the field — the field is a readout of the animation,
+      // not a separate setting sitting beside it.
+      var shown = keyed ? paramValueAt(eff, p.key, state.currentFrame) : stored;
+      input.value = Math.round((shown * (p.scale || 1)) * 100) / 100;
       var unit = document.createElement('span');
       unit.style.cssText = 'font-size:9px;color:var(--text-dim)'; unit.textContent = p.unit || '';
       input.addEventListener('input', function () { setParam(idx, p.key, (parseFloat(this.value) || 0) / (p.scale || 1)); });
       input.addEventListener('click', function (e) { e.stopPropagation(); });
-      line.appendChild(label); line.appendChild(input); line.appendChild(unit);
+      line.appendChild(sw); line.appendChild(label); line.appendChild(input); line.appendChild(unit);
       wrap.appendChild(line);
     });
     row.parentNode.insertBefore(wrap, row.nextSibling);

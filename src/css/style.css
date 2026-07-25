@@ -1538,3 +1538,11 @@ body.mode-motion .lrow.act{box-shadow:inset 3px 0 0 #4E6FF2,inset 0 0 0 1px rgba
 .fill-grad-btn.on{border-color:var(--accent);}
 .fill-grad-btn.on .fill-grad-ramp{border-color:var(--accent);}
 .fill-grad-btn.off{opacity:.4;}
+
+/* Stopwatch de paramètre d'effet (effects-panel.js) — même glyphe et même
+   position que celui du panneau Motion, pour que ce soit lu comme le même
+   geste des deux côtés. */
+.fx-stopwatch{cursor:pointer;color:var(--text-dark);flex:0 0 auto;width:16px;
+  display:flex;align-items:center;justify-content:center;}
+.fx-stopwatch:hover{color:var(--text);}
+.fx-stopwatch.on{color:var(--accent);}
