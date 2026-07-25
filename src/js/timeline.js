@@ -601,7 +601,12 @@ window.SM={
       showToast('Calque caméra supprimé');
       return;
     }
-    if(state.layers.length<=1)return;saveAllLayerFrames();
+    // Refusing to delete the last layer is right — a document with no layer
+    // has nowhere to draw — but it was silent, so the trash button just
+    // appeared broken (2026-07-25 UX audit). Every other refusal in this file
+    // says why; this one now does too.
+    if(state.layers.length<=1){showToast('Impossible de supprimer le dernier calque');return;}
+    saveAllLayerFrames();
     pushUndoLayers();
     var sel=(_layerSel.length?_layerSel.slice():[state.activeLayerIdx]).sort(function(a,b){return b-a;});
     sel.forEach(function(idx){
@@ -3968,6 +3973,17 @@ function updateTextActionsPanel(){
 function initCycleAndPropagate(){
   var cyc=document.getElementById('btn-cycle');
   if(cyc)cyc.addEventListener('click',function(){
+    // Check the precondition BEFORE asking the question (2026-07-25 UX audit).
+    // repeatSelection already refuses with a clear message when no frame range
+    // is selected — but the prompt ran first, so the user typed a count, hit
+    // OK, and only then learned they needed a selection. Worse, cancelling the
+    // prompt returned before repeatSelection ever ran, so clicking this button
+    // with nothing selected was completely silent. Same message, raised to the
+    // point where it's actually useful.
+    if(typeof selBounds==='function'&&!selBounds()){
+      showToast('Sélectionne d\'abord une plage de frames dans la timeline');
+      return;
+    }
     var n=prompt('Repeter la plage selectionnee combien de fois ?','2');
     if(n===null)return;
     window.SM.repeatSelection(n);

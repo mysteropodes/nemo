@@ -37,9 +37,18 @@
     if (window.showToast) showToast('Groupe créé (' + selectedPaths.length + ' éléments)');
   }
   function ungroupSelection() {
-    if (!window.selectedPaths || !selectedPaths.length) return;
+    // Both refusals were silent while groupSelection's own ("Sélectionnez au
+    // moins 2 calques") is not — so Cmd+Shift+G read as a broken shortcut
+    // rather than an inapplicable one (2026-07-25 UX audit).
+    if (!window.selectedPaths || !selectedPaths.length) {
+      if (window.showToast) showToast('Sélectionnez d\'abord un groupe à dissocier');
+      return;
+    }
     var hasGroup = selectedPaths.some(function (p) { return p.data && p.data.groupId; });
-    if (!hasGroup) return;
+    if (!hasGroup) {
+      if (window.showToast) showToast('La sélection ne contient aucun groupe');
+      return;
+    }
     pushUndo();
     selectedPaths.forEach(function (p) { if (p.data) delete p.data.groupId; });
     saveActiveLayerFrame(); updateUI();
