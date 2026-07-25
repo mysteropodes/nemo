@@ -4212,6 +4212,10 @@ function initAppMenu(){
       // the user's side: opening a script file.
       {label:'Ouvrir un script After Effects (.jsx)…',id:'ctx-ae-script',
         action:function(){if(window.SMAEScript)SMAEScript.openFile();}},
+      // CEP extension (.zxp) — a panel rather than a script, so it gets its
+      // own entry (aeext-host.js).
+      {label:'Ouvrir une extension After Effects (.zxp)…',id:'ctx-ae-ext',
+        action:function(){if(window.SMAEExt)SMAEExt.openFile();}},
       {label:tt('menuVersionHistory'),id:'ctx-history',action:function(){clickEl('btn-history');}},
       {sep:true},
       {label:tt('menuImportImg'),action:function(){clickEl('btn-import-img');}},

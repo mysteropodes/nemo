@@ -106,6 +106,73 @@
     });
     trk.keys.sort(function (a, b) { return a.frame - b.frame; });
   };
+  // ---- keyframe interpolation & easing ----
+  // The single most common thing a script does after creating keys is ease
+  // them, so without this most "animate X" scripts produced correct timing
+  // with the wrong feel. AE expresses ease two ways and both are used:
+  //   setInterpolationTypeAtKey(i, LINEAR|BEZIER|HOLD)  — the coarse type
+  //   setTemporalEaseAtKey(i, [inEase], [outEase])      — KeyframeEase objects
+  //     carrying speed + INFLUENCE (a percentage, AE's default ease is 33.33)
+  // Nemo stores ease as on-curve waypoints on the key that STARTS a segment
+  // (see motion.js DEFAULT_CURVE), so both forms are translated into that one
+  // representation rather than stored alongside it — a second source of truth
+  // would drift the moment the user touched the graph editor.
+  function easeCurveFor(inInf, outInf) {
+    // influence 0 = linear at that end, 100 = fully eased. AE's own Easy Ease
+    // is 33.33; mapping influence to the waypoint's distance from the diagonal
+    // reproduces that shape closely enough to read identically on the graph.
+    var a = Math.max(0, Math.min(100, outInf == null ? 0 : outInf)) / 100;
+    var b = Math.max(0, Math.min(100, inInf == null ? 0 : inInf)) / 100;
+    // outInf shapes the START of the segment (leaving the key), inInf its END.
+    return [
+      { x: 0, y: 0 },
+      { x: 0.25, y: 0.25 - 0.19 * a },
+      { x: 0.5, y: 0.5 },
+      { x: 0.75, y: 0.75 + 0.19 * b },
+      { x: 1, y: 1 }
+    ];
+  }
+  AEProperty.prototype._keyAt = function (i) {
+    var trk = (state.layers[this._li].motion || {})[this._p];
+    return trk && trk.keys[i - 1] ? trk.keys[i - 1] : null;
+  };
+  AEProperty.prototype.setInterpolationTypeAtKey = function (i, inType, outType) {
+    note('setInterpolationTypeAtKey ' + this.name + ' #' + i);
+    var k = this._keyAt(i); if (!k) return;
+    var t = (outType != null ? outType : inType);
+    if (t === 6604 /* HOLD */) { k.hold = true; return; }
+    k.hold = false;
+    if (t === 6612 /* LINEAR */) k.curvePoints = [{ x: 0, y: 0 }, { x: 1, y: 1 }];
+    else k.curvePoints = easeCurveFor(33.33, 33.33); // BEZIER — AE's own default influence
+  };
+  AEProperty.prototype.setTemporalEaseAtKey = function (i, inEase, outEase) {
+    note('setTemporalEaseAtKey ' + this.name + ' #' + i);
+    var k = this._keyAt(i); if (!k) return;
+    function inf(e) { return (e && e.length ? e[0] : e) ? ((e && e.length ? e[0] : e).influence) : null; }
+    k.hold = false;
+    k.curvePoints = easeCurveFor(inf(inEase), inf(outEase));
+  };
+  AEProperty.prototype.keyInTemporalEase = function (i) {
+    var k = this._keyAt(i); return [new KeyframeEase(0, k && !k.hold ? 33.33 : 0.1)];
+  };
+  AEProperty.prototype.keyOutTemporalEase = function (i) { return this.keyInTemporalEase(i); };
+  AEProperty.prototype.keyInInterpolationType = function (i) {
+    var k = this._keyAt(i); return k && k.hold ? 6604 : 6613;
+  };
+  AEProperty.prototype.keyOutInterpolationType = AEProperty.prototype.keyInInterpolationType;
+  // AE's batch setter — cheaper than a loop for a script writing many keys,
+  // and common in generated/baked animation.
+  AEProperty.prototype.setValuesAtTimes = function (times, values) {
+    note('setValuesAtTimes ' + this.name + ' x' + (times || []).length);
+    for (var i = 0; i < times.length; i++) this._write(secToFrame(times[i]), values[i], true);
+  };
+  AEProperty.prototype.nearestKeyIndex = function (t) {
+    var trk = (state.layers[this._li].motion || {})[this._p];
+    if (!trk || !trk.keys.length) return 0;
+    var f = secToFrame(t), best = 1, bd = Infinity;
+    trk.keys.forEach(function (k, i) { var d = Math.abs(k.frame - f); if (d < bd) { bd = d; best = i + 1; } });
+    return best;
+  };
   AEProperty.prototype.setValue = function (v) { note('setValue ' + this.name); this._write(0, v, false); };
   AEProperty.prototype.setValueAtTime = function (t, v) {
     note('setValueAtTime ' + this.name + ' @' + t + 's');
@@ -136,7 +203,52 @@
   function AELayer(li) { this._li = li; }
   AELayer.prototype.property = function (n) { note('property ' + n); return new AEProperty(this._li, n); };
   AELayer.prototype.remove = function () { note('layer.remove'); window.SM.setActiveLayer(this._li); window.SM.deleteLayer(); };
-  AELayer.prototype.moveToBeginning = function () { nyi('Layer.moveToBeginning'); };
+  AELayer.prototype.duplicate = function () {
+    note('layer.duplicate');
+    var prev = state.activeLayerIdx;
+    window.SM.setActiveLayer(this._li);
+    window.SM.duplicateLayer();
+    var ni = state.layers.length - 1;
+    window.SM.setActiveLayer(prev);
+    return new AELayer(ni);
+  };
+  // AE's layer stack is 1 = frontmost; Nemo's array is the reverse (highest
+  // index renders on top, which is why the panel counts down). Moving a layer
+  // therefore means splicing it to the mirrored position.
+  function moveLayerTo(from, to) {
+    if (from === to || to < 0 || to >= state.layers.length) return;
+    var ld = state.layers.splice(from, 1)[0];
+    var ul = userLayers.splice(from, 1)[0];
+    state.layers.splice(to, 0, ld);
+    userLayers.splice(to, 0, ul);
+    // userLayers is a Paper.js z-order too — reinsert so painting matches.
+    if (ul && ul.parent) ul.remove();
+    if (paper && paper.project) paper.project.insertLayer(to, ul);
+    if (window.renderLayerList) renderLayerList();
+    if (window.renderTimeline) renderTimeline();
+  }
+  AELayer.prototype.moveToBeginning = function () { note('layer.moveToBeginning'); moveLayerTo(this._li, state.layers.length - 1); };
+  AELayer.prototype.moveToEnd = function () { note('layer.moveToEnd'); moveLayerTo(this._li, 0); };
+  AELayer.prototype.moveBefore = function (other) { note('layer.moveBefore'); moveLayerTo(this._li, other._li); };
+  AELayer.prototype.moveAfter = function (other) { note('layer.moveAfter'); moveLayerTo(this._li, Math.max(0, other._li - 1)); };
+  // AE in/out points are SECONDS off the comp start; Nemo stores them as frame
+  // indices (layer-inout.js), so they convert like every other time here.
+  Object.defineProperty(AELayer.prototype, 'inPoint', {
+    get: function () { var v = state.layers[this._li].inPoint; return frameToSec(v == null ? 0 : v); },
+    set: function (t) { state.layers[this._li].inPoint = secToFrame(t); if (window.renderTimeline) renderTimeline(); }
+  });
+  Object.defineProperty(AELayer.prototype, 'outPoint', {
+    get: function () { var v = state.layers[this._li].outPoint; return frameToSec(v == null ? state.totalFrames - 1 : v); },
+    set: function (t) { state.layers[this._li].outPoint = secToFrame(t); if (window.renderTimeline) renderTimeline(); }
+  });
+  Object.defineProperty(AELayer.prototype, 'startTime', {
+    get: function () { return 0; },
+    set: function () { nyi('Layer.startTime (décalage temporel de calque)'); }
+  });
+  Object.defineProperty(AELayer.prototype, 'selected', {
+    get: function () { return state.activeLayerIdx === this._li; },
+    set: function (v) { if (v) window.SM.setActiveLayer(this._li); }
+  });
   Object.defineProperty(AELayer.prototype, 'name', {
     get: function () { return state.layers[this._li].name; },
     set: function (v) { state.layers[this._li].name = String(v); if (window.renderLayerList) renderLayerList(); }
@@ -183,8 +295,50 @@
     window.SM.addNullLayer();
     return new AELayer(state.layers.length - 1);
   };
-  AELayers.prototype.addSolid = function () { nyi('LayerCollection.addSolid'); };
-  AELayers.prototype.addText = function () { nyi('LayerCollection.addText'); };
+  // A solid in AE is a coloured rectangle filling its own size. Nemo has no
+  // "solid" layer TYPE, so it becomes what it actually is here: a new layer
+  // holding one filled rectangle. That keeps the script's intent (a coloured
+  // block you can transform and parent to) rather than refusing over a
+  // vocabulary difference.
+  AELayers.prototype.addSolid = function (color, name, w, h) {
+    note('layers.addSolid ' + name);
+    window.SM.addLayer();
+    var li = state.layers.length - 1;
+    state.layers[li].name = name || 'Solid';
+    var prevActive = state.activeLayerIdx;
+    state.activeLayerIdx = li; activateUL(li);
+    state.layers[li].frames[state.currentFrame].isKeyframe = true;
+    loadFrame(state.currentFrame);
+    var cw = w || compW(), ch = h || compH();
+    var x = (compW() - cw) / 2, y = (compH() - ch) / 2;
+    var hex = '#000000';
+    if (color && color.length >= 3) {
+      hex = '#' + [0, 1, 2].map(function (i) {
+        var c = Math.round(Math.max(0, Math.min(1, color[i])) * 255).toString(16);
+        return c.length < 2 ? '0' + c : c;
+      }).join('');
+    }
+    var r = new Path.Rectangle({ from: [x, y], to: [x + cw, y + ch], insert: false });
+    r.fillColor = hex; r.strokeColor = null;
+    userLayers[li].addChild(r);
+    saveActiveLayerFrame();
+    state.activeLayerIdx = prevActive; activateUL(prevActive); loadFrame(state.currentFrame);
+    if (window.renderLayerList) renderLayerList();
+    return new AELayer(li);
+  };
+  // Text needs the app's own text pipeline (font metrics, vector-text
+  // conversion), so this creates the layer and marks it as a text layer with
+  // the string set — anything richer (per-character styling, source text
+  // keyframes) still refuses by name rather than pretending.
+  AELayers.prototype.addText = function (txt) {
+    note('layers.addText');
+    window.SM.addLayer();
+    var li = state.layers.length - 1;
+    state.layers[li].name = (typeof txt === 'string' && txt) ? txt : 'Text';
+    state.layers[li].isTextLayer = true;
+    if (window.renderLayerList) renderLayerList();
+    return new AELayer(li);
+  };
   AELayers.prototype.byName = function (n) {
     for (var i = 0; i < state.layers.length; i++) if (state.layers[i].name === n) return new AELayer(i);
     return null;
@@ -234,9 +388,25 @@
     return app;
   }
 
+  // AE exposes these as globals and scripts construct/compare against them
+  // constantly — `new KeyframeEase(0, 33)` and
+  // `KeyframeInterpolationType.LINEAR` appear in almost every easing routine.
+  function KeyframeEase(speed, influence) {
+    if (!(this instanceof KeyframeEase)) return new KeyframeEase(speed, influence);
+    this.speed = speed || 0;
+    this.influence = influence == null ? 33.33 : influence;
+  }
+  window.KeyframeEase = KeyframeEase;
+
   // A tiny ES3-era shim for the globals AE scripts reach for reflexively.
   function buildGlobals() {
     return {
+      KeyframeEase: KeyframeEase,
+      // AE's own numeric enum values, so a script comparing against them
+      // behaves identically here.
+      KeyframeInterpolationType: { LINEAR: 6612, BEZIER: 6613, HOLD: 6604 },
+      PropertyValueType: { NO_VALUE: 6613, ThreeD_SPATIAL: 6614, ThreeD: 6615, TwoD_SPATIAL: 6616, TwoD: 6617, OneD: 6618, COLOR: 6619 },
+      BlendingMode: { NORMAL: 5012, MULTIPLY: 5016, SCREEN: 5019, OVERLAY: 5013 },
       alert: function (m) { if (window.showToast) showToast(String(m)); note('alert: ' + m); },
       writeLn: function (m) { note('writeLn: ' + m); },
       $: { writeln: function (m) { note('$.writeln: ' + m); }, engineName: 'nemo', level: 0 },
@@ -348,12 +518,13 @@
     supported: function () {
       return {
         properties: Object.keys(PROP_MAP),
-        layer: ['name', 'index', 'enabled', 'locked', 'parent', 'position', 'scale', 'rotation', 'opacity', 'anchorPoint', 'property()', 'remove()'],
-        comp: ['name', 'width', 'height', 'frameRate', 'frameDuration', 'duration', 'numLayers', 'time', 'layers(i)', 'layers.byName()', 'layers.addNull()', 'selectedLayers'],
+        layer: ['name', 'index', 'enabled', 'locked', 'selected', 'parent', 'inPoint', 'outPoint', 'position', 'scale', 'rotation', 'opacity', 'anchorPoint', 'property()', 'remove()', 'duplicate()', 'moveBefore/moveAfter/moveToBeginning/moveToEnd()'],
+        comp: ['name', 'width', 'height', 'frameRate', 'frameDuration', 'duration', 'numLayers', 'time', 'layers(i)', 'layers.byName()', 'layers.addNull()', 'layers.addSolid()', 'layers.addText()', 'selectedLayers'],
         app: ['project.activeItem', 'project.item()', 'beginUndoGroup()', 'endUndoGroup()', 'version'],
-        globals: ['alert()', '$.writeln()'],
+        property: ['setValue', 'setValueAtTime', 'setValuesAtTimes', 'valueAtTime', 'value', 'numKeys', 'keyTime', 'keyValue', 'removeKey', 'nearestKeyIndex', 'setInterpolationTypeAtKey', 'setTemporalEaseAtKey', 'keyInInterpolationType', 'keyIn/OutTemporalEase'],
+        globals: ['alert()', '$.writeln()', 'KeyframeEase', 'KeyframeInterpolationType', 'PropertyValueType', 'BlendingMode'],
         scriptUI: ['Window (palette/dialog)', 'group', 'panel', 'button', 'statictext', 'edittext', 'checkbox', 'radiobutton', 'dropdownlist', 'listbox', 'slider', 'progressbar', 'orientation/alignChildren/spacing/margins', 'onClick/onChange/onChanging'],
-        notSupported: ['File/Folder I/O', 'expressions', 'render queue', 'addSolid/addText', 'executeCommand', 'absolute-bounds layout']
+        notSupported: ['File/Folder I/O', 'expressions', 'render queue', 'executeCommand', 'Layer.startTime', 'absolute-bounds ScriptUI layout']
       };
     }
   };
