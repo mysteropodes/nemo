@@ -2021,6 +2021,13 @@ function renderTimeline(){
   document.getElementById('playhead').style.left=(state.currentFrame*FC)+'px';document.getElementById('playhead').style.height=Math.max(30+rowCount*ROW_H+camGridRowOffset(),awrap?awrap.clientHeight:0)+'px';document.getElementById('playhead-flag').textContent=state.currentFrame+1;
   if(window.SMAudio)SMAudio.renderStrip();
   renderTweenCurveStrips();
+  // renderTimeline() wipes #frame-grid, so the graph editor — which hides that
+  // grid and draws over the same box — has to be re-applied after every
+  // rebuild, or toggling zoom/frames silently drops it.
+  if(window.SMMotionGraph&&SMMotionGraph.isOn()){
+    document.getElementById('frame-grid').style.visibility='hidden';
+    SMMotionGraph.render();
+  }
 }
 // ---- TWEEN EASING CURVE STRIPS (toggle: btn-tween-curves) ----
 // Purely additive display, complements the global/per-pair easing system —
@@ -4655,6 +4662,9 @@ function onKeyDown(event){
   // ('u' is otherwise bound to the Line tool, TOOL_SHORTCUTS) — only inside
   // Motion mode, the Line tool shortcut is untouched everywhere else.
   if((k==='u'||k==='U')&&state.appMode==='motion'&&window.SMMotion&&SMMotion.revealAnimated()){event.preventDefault();return;}
+  // Shift+F3 — AE's own Graph Editor toggle. Motion-only, like every other
+  // binding in this block.
+  if(k==='F3'&&event.shiftKey&&state.appMode==='motion'&&window.SMMotionGraph){event.preventDefault();SMMotionGraph.toggle();return;}
   // ---- Motion keyframe keyboard layer (2026-07-25) ----
   // The Motion timeline already had drag-retime, marquee multi-select, hold,
   // distribute/flip/select-every-2nd and a per-segment ease editor — but every
