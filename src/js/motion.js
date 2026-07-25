@@ -1823,6 +1823,7 @@
           { label: 'Éclater en calques (une forme par calque)', disabled: !!ld.symbolId || !!ld.lfsGroup, action: function () { window.SM.splitLayerIntoElements(li); } },
           { label: 'Couper au niveau de la tête de lecture  (⌘⇧D)', action: function () { window.SM.splitLayerAtPlayhead(li); } },
           { label: ld.shy ? 'Retirer le marquage « shy »' : 'Marquer comme « shy »', action: function () { window.SM.toggleLayerShy(li); } },
+          { label: ld.motionBlur ? 'Désactiver le flou de mouvement' : 'Activer le flou de mouvement', action: function () { window.SM.toggleLayerMotionBlur(li); } },
           { sep: true },
           // showContextMenu has no submenus — a disabled row is the honest
           // way to title a group rather than a button that does nothing.
@@ -3252,6 +3253,8 @@
     if (mgBtn) mgBtn.style.display = (mode === 'motion') ? '' : 'none';
     var shyBtn = document.getElementById('btn-shy');
     if (shyBtn) shyBtn.style.display = (mode === 'motion') ? '' : 'none';
+    var mbBtn = document.getElementById('btn-mblur');
+    if (mbBtn) mbBtn.style.display = (mode === 'motion') ? '' : 'none';
     // StoryBoard swaps the whole timeline area for the node space —
     // renderLayerList/renderTimeline still run (their targets are hidden,
     // harmless) so switching BACK lands on an up-to-date grid.

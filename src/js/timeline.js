@@ -646,6 +646,27 @@ window.SM={
     showToast(mode?('Keyframes verrouillées sur '+(mode==='in'?'le point d\u2019entrée':mode==='out'?'le point de sortie':'le calque')):'Verrou de keyframes retiré');
     renderLayerList();renderTimeline();
   },
+  toggleLayerMotionBlur:function(li){
+    var ld=state.layers[li==null?state.activeLayerIdx:li];if(!ld)return;
+    pushUndo();ld.motionBlur=!ld.motionBlur;
+    if(ld.motionBlur&&!state.motionBlurOn)showToast('Flou de mouvement activé sur le calque — active aussi l\u2019interrupteur de la comp');
+    else showToast(ld.motionBlur?'Flou de mouvement activé':'Flou de mouvement désactivé');
+    renderLayerList();renderTimeline();
+    if(window.SMEngineBridge)SMEngineBridge.renderNow();
+  },
+  toggleMotionBlurComp:function(){
+    state.motionBlurOn=!state.motionBlurOn;
+    var n=state.layers.filter(function(l){return l.motionBlur;}).length;
+    showToast(state.motionBlurOn?('Flou de mouvement activé sur la comp ('+n+' calque(s))'):'Flou de mouvement désactivé sur la comp');
+    var b=document.getElementById('btn-mblur');if(b)b.classList.toggle('active',!!state.motionBlurOn);
+    renderLayerList();renderTimeline();
+    if(window.SMEngineBridge)SMEngineBridge.renderNow();
+  },
+  setMotionBlurSettings:function(samples,shutter){
+    if(samples!=null)state.motionBlurSamples=Math.max(2,Math.min(16,parseInt(samples,10)||6));
+    if(shutter!=null)state.motionBlurShutter=Math.max(0.05,Math.min(2,parseFloat(shutter)||0.5));
+    if(window.SMEngineBridge)SMEngineBridge.renderNow();
+  },
   toggleLayerShy:function(li){
     var ld=state.layers[li==null?state.activeLayerIdx:li];if(!ld)return;
     pushUndo();ld.shy=!ld.shy;
@@ -1099,7 +1120,7 @@ window.SM={
         // be just as useless. Note isNullLayer above was already persisted,
         // and its own tooltip calls a null layer a "pivot/parent pour d'autres
         // calques" — the pivot came back, everything hung off it did not.
-        layerUid:l.layerUid,parentLayerUid:l.parentLayerUid,markers:l.markers,shy:l.shy,keyLock:l.keyLock,timeRemap:l.timeRemap};}),
+        layerUid:l.layerUid,parentLayerUid:l.parentLayerUid,markers:l.markers,shy:l.shy,keyLock:l.keyLock,timeRemap:l.timeRemap,motionBlur:l.motionBlur};}),
       layerFolders:state.layerFolders,layerLinkGroups:state.layerLinkGroups,
       // StoryBoard node space (2026-07) — plain data by construction (no
       // runtime-only fields live in state.storyboard, see storyboard.js's
@@ -1125,7 +1146,8 @@ window.SM={
       // Comp markers (markers.js) — pure annotation, but losing them on save
       // would make the feature pointless.
       markers:state.markers||[],shyEnabled:!!state.shyEnabled,
-      bpm:state.bpm,bpmOffset:state.bpmOffset,bpmShow:!!state.bpmShow});
+      bpm:state.bpm,bpmOffset:state.bpmOffset,bpmShow:!!state.bpmShow,
+      motionBlurOn:!!state.motionBlurOn,motionBlurSamples:state.motionBlurSamples,motionBlurShutter:state.motionBlurShutter});
   },
   mergeRemoteSnapshot:function(remoteData,remoteProfile){return mergeRemoteSnapshot(remoteData,remoteProfile);},
   // Cycles (v19) : repete N fois la plage de frames selectionnee (walk
@@ -1278,6 +1300,7 @@ window.SM={
     state.markers=d.markers||[];
     state.shyEnabled=!!d.shyEnabled;
     state.bpm=d.bpm!=null?d.bpm:120;state.bpmOffset=d.bpmOffset||0;state.bpmShow=!!d.bpmShow;
+    state.motionBlurOn=!!d.motionBlurOn;state.motionBlurSamples=d.motionBlurSamples||6;state.motionBlurShutter=d.motionBlurShutter!=null?d.motionBlurShutter:0.5;
     if(typeof refreshFbAvatars==='function')refreshFbAvatars(); // avatar stack mirrors state.comments — resync on project import
     state.cameraKeys=d.cameraKeys||[];state.cameraLayerOn=!!d.cameraLayerOn;state.cameraView=false;
     // Explicit fallback to the app default, not just "leave whatever was
@@ -4509,6 +4532,20 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 // programmatically so their own listeners run unchanged), and the
 // settings modal (general pane, or jump straight to its shortcuts tab).
 function initAppMenu(){
+  (function bindMotionBlur(){
+    var b=document.getElementById('btn-mblur');
+    if(!b)return;
+    b.addEventListener('click',function(){window.SM.toggleMotionBlurComp();});
+    b.addEventListener('contextmenu',function(e){
+      e.preventDefault();
+      var s=prompt('Échantillons de flou (2-16)',String(state.motionBlurSamples||6));
+      if(s===null)return;
+      var sh=prompt('Ouverture d\u2019obturateur, en frames (0.05-2)',String(state.motionBlurShutter!=null?state.motionBlurShutter:0.5));
+      if(sh===null)return;
+      window.SM.setMotionBlurSettings(s,sh);
+      showToast('Flou : '+state.motionBlurSamples+' échantillons · obturateur '+state.motionBlurShutter+' f');
+    });
+  })();
   (function bindShy(){
     var b=document.getElementById('btn-shy');
     if(!b)return;

@@ -496,6 +496,55 @@
       // Effects stack (2026-07 rewrite — was separate blurRadius/gshadow_*
       // fields) — runs on THIS layer's own isolated alpha (see
       // geometry-wasm/src/engine.rs's LayerIn::effects doc comment).
+      // ---- MOTION BLUR (2026-07-25) ----------------------------------
+      // AE's per-layer switch, gated by a comp-wide one, sampled the way
+      // every renderer without a real velocity buffer does it: N copies of
+      // the layer along the shutter interval, each at 1/N opacity, drawn
+      // UNDER the sharp current frame.
+      //
+      // The samples are built from the items ALREADY produced above rather
+      // than by re-running that whole loop N times — the loop interleaves
+      // item building with the transform pass, and duplicating it would be
+      // the "two readers that must stay identical" trap CLAUDE.md §3 is
+      // about. Instead each sample applies the DELTA between the matrix at
+      // the current frame and the matrix at the sample time, around the same
+      // pivot: exact for this transform model (scale, then rotate, then
+      // translate about a fixed pivot), and layerMotionAt already accepts a
+      // fractional frame (rawValueAtFrame interpolates on a float t).
+      //
+      // Samples the layer's OWN motion only, not its parent chain — a
+      // parented layer blurs on its own movement, not the rig's. Noted
+      // rather than silently approximated.
+      var mbOn = state.motionBlurOn && state.layers[i].motionBlur && motionMat && items.length;
+      if (mbOn) {
+        var mbSamples = Math.max(2, Math.min(16, state.motionBlurSamples || 6));
+        var mbShutter = Math.max(0.05, Math.min(2, state.motionBlurShutter || 0.5)); // in frames
+        for (var s = 1; s <= mbSamples; s++) {
+          var t = (s / mbSamples) * mbShutter;
+          var ms = SMMotion.layerMotionAt(i, state.currentFrame - t);
+          if (!ms) continue;
+          var delta = {
+            dx: ms.dx - motionMat.dx, dy: ms.dy - motionMat.dy,
+            rot: ms.rot - motionMat.rot,
+            sx: motionMat.sx ? ms.sx / motionMat.sx : 1,
+            sy: motionMat.sy ? ms.sy / motionMat.sy : 1,
+            op: 1, ax: 0, ay: 0,
+          };
+          // Nothing moved between these two instants — every remaining
+          // sample would be an exact copy of the sharp layer, so stop
+          // rather than pay for identical draws.
+          if (!delta.dx && !delta.dy && !delta.rot && delta.sx === 1 && delta.sy === 1) continue;
+          var fade = (1 - s / (mbSamples + 1)) / mbSamples * 2; // trail off toward the tail
+          var sampleItems = items.map(function (it) {
+            var c = {};
+            for (var k in it) if (Object.prototype.hasOwnProperty.call(it, k)) c[k] = it[k];
+            if (c.segments) c.segments = roundSegs(SMMotion.transformSegments(c.segments, motionPivot, delta));
+            c.opacity = (c.opacity != null ? c.opacity : 1) * fade;
+            return c;
+          });
+          layers.push({ items: sampleItems });
+        }
+      }
       layers.push({ items: items, blendMode: (bm && bm !== 'normal') ? bm : undefined, matteMode: (mm && mm !== 'none') ? mm : undefined,
         effects: sceneEffectsOf(state.layers[i]) });
     }
