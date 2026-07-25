@@ -610,6 +610,15 @@ window.SM={
     if(state.activeLayerIdx>=state.layers.length)state.activeLayerIdx=state.layers.length-1;
     activateUL(state.activeLayerIdx);loadFrame(state.currentFrame);updateUI();showToast('Calque(s) supprimé(s) — ⌘Z pour annuler');
   },
+  // Standing "keyframes follow this edge" lock (Van Dijk 2.2). Stored per
+  // layer so it survives the session and needs no modifier at drag time.
+  setLayerKeyLock:function(li,mode){
+    var ld=state.layers[li==null?state.activeLayerIdx:li];if(!ld)return;
+    pushUndo();
+    if(mode)ld.keyLock=mode;else delete ld.keyLock;
+    showToast(mode?('Keyframes verrouillées sur '+(mode==='in'?'le point d\u2019entrée':mode==='out'?'le point de sortie':'le calque')):'Verrou de keyframes retiré');
+    renderLayerList();renderTimeline();
+  },
   toggleLayerShy:function(li){
     var ld=state.layers[li==null?state.activeLayerIdx:li];if(!ld)return;
     pushUndo();ld.shy=!ld.shy;
@@ -1063,7 +1072,7 @@ window.SM={
         // be just as useless. Note isNullLayer above was already persisted,
         // and its own tooltip calls a null layer a "pivot/parent pour d'autres
         // calques" — the pivot came back, everything hung off it did not.
-        layerUid:l.layerUid,parentLayerUid:l.parentLayerUid,markers:l.markers,shy:l.shy};}),
+        layerUid:l.layerUid,parentLayerUid:l.parentLayerUid,markers:l.markers,shy:l.shy,keyLock:l.keyLock};}),
       layerFolders:state.layerFolders,layerLinkGroups:state.layerLinkGroups,
       // StoryBoard node space (2026-07) — plain data by construction (no
       // runtime-only fields live in state.storyboard, see storyboard.js's

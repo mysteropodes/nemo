@@ -512,6 +512,27 @@
     // instruction, and it would be silently ignored otherwise (measured:
     // the in point moved 29 -> 40 while the selected key stayed at 22).
     // Alt still means "leave the keyframes where they are", so it opts out.
+    //
+    // A layer can also carry a STANDING lock (ld.keyLock === 'in' | 'out' |
+    // 'layer'), Sander van Dijk's "Lock Keyframes to In and Out Points":
+    // with it set, the layer's keys follow that edge every time, with no
+    // selection needed and no modifier to remember. The selection path below
+    // still wins when there IS one — an explicit pick beats a standing rule.
+    var lockDx = 0;
+    if (!hasKeySel && !altHeld && window.SMMotion && SMMotion.shiftLayerMotionKeys) {
+      var lockOne = function (li2, origIn, origOut) {
+        var l2 = state.layers[li2]; if (!l2 || !l2.keyLock) return;
+        var moved = l2.keyLock === 'out' ? outPointOf(l2) - origOut : inPointOf(l2) - origIn;
+        // 'layer' locks to the whole block, so only a body move counts;
+        // 'in'/'out' follow their own edge whichever handle was dragged.
+        if (l2.keyLock === 'layer' && d.type !== 'both') return;
+        if (!moved) return;
+        SMMotion.shiftLayerMotionKeys(li2, moved);
+        lockDx = moved;
+      };
+      if (d.group) d.members.forEach(function (m) { lockOne(m.li, m.origIn, m.origOut); });
+      else lockOne(d.li, d.origIn, d.origOut);
+    }
     var selDx = 0;
     if (hasKeySel && !altHeld) {
       if (d.group) {
@@ -558,6 +579,8 @@
         // the picked keys are the ones that move (or, under Alt, the ones that
         // deliberately don't) — sweeping the rest along would contradict both.
         if (hasKeySel) return;
+        var lk = state.layers[li] && state.layers[li].keyLock;
+        if (lk && lockDx) return; // the standing lock above already moved this layer's keys
         if (window.SMMotion && SMMotion.shiftLayerMotionKeys) SMMotion.shiftLayerMotionKeys(li, dx);
       };
       if (d.group) {
