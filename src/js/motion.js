@@ -43,9 +43,19 @@
   // alignement des keyframes aux properties").
   var ROW_H = 22;
   var PROPS = ['position', 'anchor', 'rotation', 'scale', 'opacity'];
-  var PROP_LABEL = { position: 'Position', anchor: 'Anchor Point', rotation: 'Rotation', scale: 'Scale', opacity: 'Opacity' };
-  var PROP_DIM = { position: 2, anchor: 2, rotation: 1, scale: 2, opacity: 1 };
-  var PROP_UNIT = { position: 'px', anchor: 'px', rotation: '°', scale: '%', opacity: '%' };
+  // Time Remap (AE, 2026-07-25) is an EXTRA row, not a 6th transform: it
+  // never feeds computeMotionMat — it drives which internal frame a
+  // component instance shows (resolveSymbolFrameIdx, app.js). Both the
+  // panel and the grid must iterate the same list or their rows desync,
+  // which is the alignment invariant ROW_H's header comment is about — so
+  // there is exactly ONE function that decides, and both sides call it.
+  function propsFor(holder) {
+    if (holder && holder.timeRemap) return PROPS.concat(['timeRemap']);
+    return PROPS;
+  }
+  var PROP_LABEL = { position: 'Position', anchor: 'Anchor Point', rotation: 'Rotation', scale: 'Scale', opacity: 'Opacity', timeRemap: 'Time Remap' };
+  var PROP_DIM = { position: 2, anchor: 2, rotation: 1, scale: 2, opacity: 1, timeRemap: 1 };
+  var PROP_UNIT = { position: 'px', anchor: 'px', rotation: '°', scale: '%', opacity: '%', timeRemap: 'f' };
   var PROP_DEFAULT = { position: [0, 0], anchor: [0, 0], rotation: [0], scale: [100, 100], opacity: [100] };
   // AE's own shortcuts: P/A/R/S/T reveal just that property's row. Kept as
   // a lookup table (not hardcoded in the keydown handler) so the property
@@ -538,22 +548,33 @@
       opacity: valueAtFrame(ld2, 'opacity', frame)[0],
     };
   }
+  // Project-wide expression preamble (Van Dijk 7.2, "set global variables":
+  // define something once and use it from every expression instead of
+  // retyping it). Plain statements — `var k = 12;` — evaluated in the same
+  // scope as the expression body, so anything it declares is in scope.
+  // Cached against BOTH the expression's code and the preamble, so editing
+  // the preamble recompiles every expression rather than silently leaving
+  // stale ones behind.
+  function exprGlobals() { return state.exprGlobals || ''; }
   function compiledFnFor(holder, prop) {
     var ex = holder.expressions[prop];
-    if (holder._exprCompiled && holder._exprCompiled[prop] && holder._exprCompiled[prop].code === ex.code) {
+    var pre = exprGlobals();
+    if (holder._exprCompiled && holder._exprCompiled[prop] && holder._exprCompiled[prop].code === ex.code
+        && holder._exprCompiled[prop].pre === pre) {
       return holder._exprCompiled[prop].fn;
     }
     var fn;
     try {
       // eslint-disable-next-line no-new-func
-      fn = new Function('time', 'frame', 'value', 'layer', 'wiggle', 'loopOut', '"use strict";\nreturn (\n' + ex.code + '\n);');
+      fn = new Function('time', 'frame', 'value', 'layer', 'wiggle', 'loopOut',
+        '"use strict";\n' + (pre ? pre + '\n' : '') + 'return (\n' + ex.code + '\n);');
       ex.lastError = null;
     } catch (e) {
       fn = null;
-      ex.lastError = 'Erreur de syntaxe : ' + e.message;
+      ex.lastError = 'Erreur de syntaxe : ' + e.message + (pre ? ' (variables globales incluses)' : '');
     }
     if (!holder._exprCompiled) holder._exprCompiled = {};
-    holder._exprCompiled[prop] = { code: ex.code, fn: fn };
+    holder._exprCompiled[prop] = { code: ex.code, pre: pre, fn: fn };
     return fn;
   }
   // Normalizes an expression's return value to the array shape PROP_DIM
@@ -1617,7 +1638,26 @@
     // index first so each splice (replacing 1 layer with N) never shifts
     // an index this loop hasn't visited yet.
     if (window.SM && window.SM.splitLayerIntoElementsCore) {
+      // Record ONE undo entry covering the whole auto-split before touching
+      // anything (2026-07-25, "impossible de revenir qu'à un seul calque
+      // après"): each core call runs silent, and `silent` also skips
+      // pushUndo — so entering a component to LOOK at it used to rewrite
+      // its layer structure permanently, with no undo step to walk back
+      // and no merge command to do it by hand. Pre-counted rather than
+      // pushed unconditionally so browsing an already-split component (the
+      // idempotent re-entry case) doesn't spam the undo stack with no-ops.
+      var willSplit = 0;
+      for (var q = 0; q < state.layers.length; q++) {
+        var qd = state.layers[q];
+        if (!qd || qd.symbolId) continue;
+        var qe = layerElements(q, qd);
+        if (qe && qe.length >= 2) willSplit++;
+      }
+      if (willSplit) pushUndo();
       for (var i = state.layers.length - 1; i >= 0; i--) window.SM.splitLayerIntoElementsCore(i, { silent: true });
+      // The way back is not obvious from the result (N rows where there was
+      // one) — say it once, with the exact gesture.
+      if (willSplit) showToast('Éclaté en calques — clic droit › « Fusionner les calques sélectionnés » pour revenir en arrière');
     }
   }
   function renderLayerListMotion(list) {
@@ -1676,6 +1716,16 @@
       row.appendChild(solo);
       var nm = document.createElement('div'); nm.className = 'lnm'; nm.textContent = ld.name || ('Layer ' + (li + 1));
       row.appendChild(nm);
+      // Parent column — the SAME buildParentCell Animation 2D's rows use
+      // (2026-07-25, "tu n'as pas porté le parentage là-bas"). Motion had
+      // parenting only as a dropdown buried in the right-hand properties
+      // panel, which shows the ACTIVE layer alone: you could not see which
+      // layers were parented, compare two of them, or re-parent without
+      // first selecting. AE puts it in the timeline for exactly that reason,
+      // and Animation 2D already had it here. Same function, so the cycle
+      // refusal, the descendant greying and the new pickwhip come along for
+      // free rather than being reimplemented (and drifting) per timeline.
+      if (typeof buildParentCell === 'function') buildParentCell(row, ld, li);
       row.addEventListener('click', function (e) {
         // A completed drag-drop still fires a trailing native 'click' on
         // mouseup — same guard timeline.js's own layer rows use (see its
@@ -1696,14 +1746,23 @@
           renderLayerList(); renderTimeline();
           return;
         }
-        if (e.shiftKey && _layerSel.length) {
-          var anchor = _layerSel[0]; _layerSel = [];
+        // Shift-click used to require a PRE-EXISTING selection (`&&
+        // _layerSel.length`), and Motion's plain click a few lines down
+        // cleared it to [] — so the reflex gesture (click a row, shift-click
+        // another) selected nothing at all here, and the only way to reach
+        // any multi-layer command was to know about Cmd-click. Animation 2D
+        // never had the problem because ITS plain click sets [idx]; Motion
+        // now does the same, and the anchor falls back to the active layer
+        // so the very first Shift-click works from a cold start.
+        if (e.shiftKey) {
+          var anchor = _layerSel.length ? _layerSel[0] : state.activeLayerIdx;
+          _layerSel = [];
           for (var l = Math.min(anchor, li); l <= Math.max(anchor, li); l++) _layerSel.push(l);
           window.SM.setActiveLayer(li);
           renderLayerList(); renderTimeline();
           return;
         }
-        _layerSel = [];
+        _layerSel = [li];
         // A row can be open via the single-accordion state OR via U's
         // reveal set (or both) — always drop it from the reveal set on
         // click, but only touch the single-accordion value if THIS row is
@@ -1762,10 +1821,49 @@
       // typed number, same UX convention layer-inout.js's own staggerBars
       // context-menu entry already uses for layer in/out bars.
       row.addEventListener('contextmenu', function (e) {
-        if (_layerSel.length < 2 || _layerSel.indexOf(li) < 0 || !window.showContextMenu) return;
+        if (!window.showContextMenu) return;
         e.preventDefault(); e.stopPropagation();
+        // Used to open ONLY for a 2+ layer selection (it held a single
+        // stagger entry) — so right-clicking one layer in Motion did
+        // nothing at all. Now always opens: the split/merge pair below is
+        // the documented way back from Motion's own double-click-to-split
+        // (2026-07-25), and it has to be reachable from the row you just
+        // split, which is by definition where you look for it.
+        var multi = _layerSel.length >= 2 && _layerSel.indexOf(li) >= 0;
         window.showContextMenu(e.clientX, e.clientY, [
-          { label: 'Échelonner les calques sélectionnés…', action: function () {
+          { label: 'Éclater en calques (une forme par calque)', disabled: !!ld.symbolId || !!ld.lfsGroup, action: function () { window.SM.splitLayerIntoElements(li); } },
+          { label: 'Couper au niveau de la tête de lecture  (⌘⇧D)', action: function () { window.SM.splitLayerAtPlayhead(li); } },
+          { label: ld.shy ? 'Retirer le marquage « shy »' : 'Marquer comme « shy »', action: function () { window.SM.toggleLayerShy(li); } },
+          { label: ld.motionBlur ? 'Désactiver le flou de mouvement' : 'Activer le flou de mouvement', action: function () { window.SM.toggleLayerMotionBlur(li); } },
+          { label: ld.effectsFrom ? 'Ne plus hériter des effets' : 'Hériter des effets d\u2019un calque…', action: function () {
+            if (ld.effectsFrom) { pushUndo(); delete ld.effectsFrom; renderLayerList(); renderTimeline(); if (window.SMEngineBridge) SMEngineBridge.renderNow(); return; }
+            var items = [];
+            state.layers.forEach(function (other, oi) {
+              if (oi === li || !other.effects || !other.effects.length) return;
+              items.push({ label: (other.name || ('Layer ' + (oi + 1))) + '  (' + other.effects.length + ')', action: function () {
+                pushUndo();
+                ld.effectsFrom = ensureLayerUid(other);
+                renderLayerList(); renderTimeline();
+                if (window.SMEngineBridge) SMEngineBridge.renderNow();
+                if (window.showToast) showToast('Effets hérités de « ' + (other.name || ('Layer ' + (oi + 1))) + ' » — ils suivent leurs propres keyframes');
+              } });
+            });
+            if (!items.length) { if (window.showToast) showToast('Aucun autre calque ne porte d\u2019effets'); return; }
+            window.showContextMenu(e.clientX + 8, e.clientY + 8, items);
+          } },
+          { sep: true },
+          // showContextMenu has no submenus — a disabled row is the honest
+          // way to title a group rather than a button that does nothing.
+          { label: 'Verrouiller les keyframes sur :', disabled: true, action: function () {} },
+          { label: '   • le point d\u2019entrée' + (ld.keyLock === 'in' ? '  ✓' : ''), action: function () { window.SM.setLayerKeyLock(li, ld.keyLock === 'in' ? null : 'in'); } },
+          { label: '   • le point de sortie' + (ld.keyLock === 'out' ? '  ✓' : ''), action: function () { window.SM.setLayerKeyLock(li, ld.keyLock === 'out' ? null : 'out'); } },
+          { label: '   • le calque entier' + (ld.keyLock === 'layer' ? '  ✓' : ''), action: function () { window.SM.setLayerKeyLock(li, ld.keyLock === 'layer' ? null : 'layer'); } },
+          { label: 'Ajouter un repère sur ce calque', action: function () { if (window.SMMarkers) SMMarkers.addLayerMarker(li, state.currentFrame, ''); } },
+          { label: ld.timeRemap ? 'Désactiver le remappage temporel' : 'Activer le remappage temporel', disabled: !ld.symbolId,
+            action: function () { ld.timeRemap ? disableTimeRemap(li) : enableTimeRemap(li); } },
+          { label: 'Fusionner les calques sélectionnés', disabled: !multi, action: function () { window.SM.mergeLayersIntoOne(_layerSel.slice()); } },
+          { sep: true },
+          { label: 'Échelonner les calques sélectionnés…', disabled: !multi, action: function () {
             var v = prompt('Décalage entre calques (frames)', '2');
             var step = parseInt(v, 10);
             if (!isNaN(step) && step !== 0) staggerSelectedLayers(step);
@@ -1885,7 +1983,7 @@
     });
     grp.appendChild(filterBtn);
     list.appendChild(grp);
-    PROPS.forEach(function (prop) {
+    propsFor(holder).forEach(function (prop) {
       if (isPropFiltered(prop) || (_hideUnanimated && !propHasContent(holder, prop))) return;
       var pr = document.createElement('div'); pr.className = 'lrow motion-prop-row';
       var sw = document.createElement('div');
@@ -2010,6 +2108,30 @@
     head.appendChild(cb);
     head.appendChild(document.createTextNode(' Activer l’expression'));
     row.appendChild(head);
+    // The value the property WOULD have without the expression (Van Dijk
+    // 7.4). With an expression on, the field above shows the RESULT, and
+    // the underlying keyframed value becomes invisible — you end up
+    // disabling the expression just to see what you are driving.
+    var rawWrap = document.createElement('span');
+    rawWrap.className = 'motion-expr-raw';
+    var raw = rawValueAtFrame(holder, prop, state.currentFrame);
+    rawWrap.textContent = 'sans expression : ' + raw.map(function (n) { return Math.round(n * 100) / 100; }).join(', ') + ' ' + (PROP_UNIT[prop] || '');
+    rawWrap.title = 'Valeur de la propriété avant application de l’expression, à la frame courante';
+    row.appendChild(rawWrap);
+    // Project-wide preamble (7.2) — reachable from the same place you write
+    // the expression that uses it, rather than a settings panel away.
+    var glob = document.createElement('button');
+    glob.className = 'motion-expr-glob';
+    glob.textContent = exprGlobals() ? 'Variables globales ✓' : 'Variables globales…';
+    glob.title = 'Code exécuté avant CHAQUE expression du projet — déclare ici ce que tu réutilises partout';
+    glob.addEventListener('click', function (e) {
+      e.preventDefault(); e.stopPropagation();
+      var v = prompt('Variables globales — exécutées avant chaque expression\nex : var beat = 60 / 120 * ' + (state.fps || 24) + ';', exprGlobals());
+      if (v === null) return;
+      pushUndo();
+      window.SMMotion.setExprGlobals(v);
+    });
+    row.appendChild(glob);
     var ta = document.createElement('textarea'); ta.className = 'motion-expr-code';
     ta.value = expr.code; ta.spellcheck = false; ta.rows = 3;
     ta.placeholder = 'value + wiggle(2, 10)';
@@ -2283,6 +2405,21 @@
         rect.setAttribute('fill', 'var(--accent)'); rect.setAttribute('opacity', '0.35');
         svg.appendChild(rect);
       }
+      // Frame-duration block behind each key (Van Dijk 3.3): the diamond is
+      // centred on the frame's START, which at high zoom makes it hard to
+      // see how much time one frame actually occupies — and whether a key
+      // lines up with a layer's out point. Drawn only when a frame is wide
+      // enough for the block to mean anything (his "closest three zoom
+      // levels"), otherwise it degrades into a smear.
+      if (FC >= 18) {
+        track.keys.forEach(function (k) {
+          var d = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+          d.setAttribute('x', k.frame * FC); d.setAttribute('y', 0);
+          d.setAttribute('width', FC); d.setAttribute('height', ROW_H);
+          d.setAttribute('fill', k.color || 'var(--accent)'); d.setAttribute('opacity', '0.13');
+          svg.appendChild(d);
+        });
+      }
     }
     for (var fi = 0; fi < state.totalFrames; fi++) {
       var c = document.createElement('div');
@@ -2295,6 +2432,24 @@
         // convention — the shape itself communicates "no interpolation
         // out of this key" without needing to open the curve editor).
         dia.className = 'motion-key' + (fi === state.currentFrame ? ' cur' : '') + (isKeySelected(ld, prop, k) ? ' sel' : '') + (k.hold ? ' hold' : '');
+        // Per-key colour (Van Dijk 3.4: "sometimes you have so many
+        // keyframes it becomes difficult to know what does what — like
+        // layers, we could color keyframes to highlight a group"). Only a
+        // paint job: nothing reads k.color at evaluation time.
+        if (k.color) { dia.classList.add('tinted'); dia.style.setProperty('--key-color', k.color); }
+        // Velocity read-out (3.5): the ease actually applied out of this key,
+        // as a percentage, shown on the SELECTED key instead of living in a
+        // dialog. Derived from the same curvePoints the interpolator uses,
+        // so it can never disagree with what the animation does.
+        if (isKeySelected(ld, prop, k)) {
+          var vel = easeOutPercent(k);
+          if (vel != null) {
+            var vl = document.createElement('span');
+            vl.className = 'motion-key-vel';
+            vl.textContent = vel + '%';
+            dia.appendChild(vl);
+          }
+        }
         c.appendChild(dia);
       }
       (function (frameIdx, key) {
@@ -2368,7 +2523,23 @@
             menu.push({ sep: true });
             menu.push({ label: 'Distribuer uniformément', action: distributeKeys });
             menu.push({ label: 'Inverser l’ordre (flip)', action: flipKeys });
+            menu.push({ label: 'Subdiviser (clé à mi-chemin)', action: subdivideKeys });
+            menu.push({ label: 'Colorer les clés…', action: function () {
+              var palette = ['#e8b64c', '#4ea9ff', '#59d38a', '#ff6b8b', '#b98cff', '#ffffff'];
+              var names = ['Ambre', 'Bleu', 'Vert', 'Rose', 'Violet', 'Blanc'];
+              window.showContextMenu(e.clientX + 8, e.clientY + 8,
+                names.map(function (n, i) { return { label: n, action: function () { colorSelectedKeys(palette[i]); } }; })
+                  .concat([{ sep: true }, { label: 'Retirer la couleur', action: function () { colorSelectedKeys(null); } }]));
+            } });
             menu.push({ label: 'Sélectionner 1 sur 2', action: function () { selectEveryNthKey(2); } });
+            menu.push({ label: 'Sélectionner 1 sur N…', action: function () {
+              var v = prompt('Garder une clé sur combien ?', '3');
+              if (v !== null) selectEveryNthKey(v);
+            } });
+            menu.push({ label: 'Garder au hasard…', action: function () {
+              var v = prompt('Garder quel pourcentage de la sélection ?', '50');
+              if (v !== null) grabRandomKeys(v);
+            } });
           }
           if (_motionKeySel.length >= 1) menu.push({ label: 'Inverser la sélection', action: invertKeySelection });
           window.showContextMenu(e.clientX, e.clientY, menu);
@@ -2418,7 +2589,7 @@
       if (!expanded) return;
       var grpSpacer = document.createElement('div'); grpSpacer.className = 'frow';
       grid.appendChild(grpSpacer);
-      PROPS.forEach(function (prop) { renderTracksFor(grid, ld, prop); });
+      propsFor(ld).forEach(function (prop) { renderTracksFor(grid, ld, prop); });
       // Mirrors renderElementsList's panel structure: one spacer per
       // element, its own track rows only when that ONE element is expanded
       // (only one element expands at a time, same single-expand contract
@@ -2537,6 +2708,78 @@
     renderTimeline();
     if (window.showToast) showToast(_motionKeySel.length + ' clé(s) sélectionnée(s)');
   }
+  // Subdivide: insert a key HALFWAY between each consecutive pair of
+  // selected keys on the same track (2026-07-25, Skew Pro's "Subdivide").
+  // The inserted key takes the value the curve already produces at that
+  // frame, so the animation is bit-for-bit unchanged the moment it lands —
+  // it exists to give you a handle to grab, which is the whole point. The
+  // new keys are added to the selection so a subdivide → drag → subdivide
+  // loop works without re-selecting, and a pair only one frame apart is
+  // skipped (no room for a key between them) rather than silently
+  // overwriting one of its own endpoints.
+  // How much ease leaves this key, as a percentage. 0% = linear out, 100% =
+  // fully eased out. Read off the curve's FIRST span: with the on-curve
+  // waypoint model used everywhere here (see DEFAULT_CURVE), a key that
+  // leaves linearly has its first waypoint on the diagonal, and the further
+  // that point sits below the diagonal the slower the start.
+  function easeOutPercent(k) {
+    var pts = k && k.curvePoints;
+    if (!pts || pts.length < 2) return null;
+    var p = pts[1];
+    if (!p || !p.x) return 0;
+    var lag = Math.max(0, Math.min(1, 1 - (p.y / p.x)));
+    return Math.round(lag * 100);
+  }
+  function colorSelectedKeys(color) {
+    if (!_motionKeySel.length) { if (window.showToast) showToast('Aucune clé sélectionnée'); return; }
+    pushUndo();
+    _motionKeySel.forEach(function (s) { if (color) s.key.color = color; else delete s.key.color; });
+    renderTimeline();
+    if (window.showToast) showToast(color ? (_motionKeySel.length + ' clé(s) colorée(s)') : 'Couleur retirée');
+  }
+  function subdivideKeys() {
+    if (_motionKeySel.length < 2) { if (window.showToast) showToast('Sélectionne au moins 2 clés'); return; }
+    pushUndo();
+    var added = 0, skipped = 0, fresh = [];
+    _groupKeySelByTrack().forEach(function (g) {
+      if (g.items.length < 2) return;
+      var track = g.holder.motion && g.holder.motion[g.prop];
+      if (!track) return;
+      var sorted = g.items.slice().sort(function (a, b) { return a.frame - b.frame; });
+      for (var i = 0; i < sorted.length - 1; i++) {
+        var a = sorted[i], b = sorted[i + 1];
+        var mid = Math.round((a.frame + b.frame) / 2);
+        if (mid <= a.frame || mid >= b.frame) { skipped++; continue; }
+        if (keyAt(track, mid)) { skipped++; continue; }
+        // Read the value BEFORE inserting — rawValueAtFrame walks this same
+        // track, so inserting first would make the new key sample itself.
+        var v = rawValueAtFrame(g.holder, g.prop, mid);
+        var nk = { frame: mid, v: v.slice(), curvePoints: cloneCurvePts(a.curvePoints || DEFAULT_CURVE), hOut: [0, 0], hIn: [0, 0] };
+        track.keys.push(nk); added++;
+        fresh.push({ holder: g.holder, prop: g.prop, key: nk });
+      }
+      sortKeys(track);
+    });
+    setKeySel(_motionKeySel.concat(fresh));
+    renderLayerList(); renderTimeline();
+    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+    if (window.showToast) showToast(added + ' clé(s) insérée(s)' + (skipped ? ' — ' + skipped + ' intervalle(s) trop court(s)' : ''));
+  }
+  // Keep a random subset of the current selection (Skew Pro's "Grab
+  // Randomly"): the fast way to make a uniform batch of layers/keys feel
+  // hand-made. Guarantees at least one key survives, so it can't silently
+  // empty the selection on a small one.
+  function grabRandomKeys(percent) {
+    var p = Math.max(1, Math.min(100, parseInt(percent, 10) || 50)) / 100;
+    if (!_motionKeySel.length) { if (window.showToast) showToast('Aucune clé sélectionnée'); return; }
+    var pool = _motionKeySel.slice();
+    var want = Math.max(1, Math.round(pool.length * p));
+    var out = [];
+    while (out.length < want && pool.length) out.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+    setKeySel(out);
+    renderTimeline();
+    if (window.showToast) showToast(out.length + ' clé(s) gardée(s) au hasard');
+  }
   // Inverts within whatever tracks are CURRENTLY RENDERED (the same
   // universe the marquee itself draws over).
   function invertKeySelection() {
@@ -2600,11 +2843,34 @@
       boxEl.appendChild(edge);
     });
   }
+  // Side edges = "Space": drag one to spread the selection out along the
+  // timeline (or squeeze it in), the opposite edge staying put. Distinct
+  // from the top/bottom skew edges, which slide whole ROWS; this one
+  // rescales the selection's own timing. Needs 2+ distinct frames to mean
+  // anything, hence the guard in the caller.
+  function addSpaceEdges(boxEl, onStart) {
+    ['left', 'right'].forEach(function (pos) {
+      var edge = document.createElement('div');
+      edge.className = 'motion-keysel-edge motion-keysel-edge-' + pos;
+      edge.title = 'Glisser pour espacer / resserrer les clés dans le temps (le bord opposé reste ancré)';
+      edge.addEventListener('mousedown', function (e) { e.stopPropagation(); e.preventDefault(); onStart(e, pos); });
+      boxEl.appendChild(edge);
+    });
+  }
   function addMoveFill(boxEl, onStart) {
     var fill = document.createElement('div');
     fill.className = 'motion-keysel-fill';
-    fill.title = 'Glisser pour déplacer toutes les clés sélectionnées ensemble';
-    fill.addEventListener('mousedown', function (e) { e.stopPropagation(); e.preventDefault(); onStart(e, 'move'); });
+    fill.title = 'Glisser pour déplacer toutes les clés sélectionnées ensemble'
+      + '\n⌘/Ctrl + glisser : liquify — les clés proches du curseur suivent plus que les lointaines';
+    fill.addEventListener('mousedown', function (e) {
+      e.stopPropagation(); e.preventDefault();
+      // Skew Pro's "Liquify": same drag, but the influence falls off with
+      // distance from where you grabbed, so a block of keys deforms instead
+      // of sliding rigidly. Cmd/Ctrl picks it because the plain drag (move)
+      // and both edge drags (skew, space) already own the unmodified
+      // gestures.
+      onStart(e, (e.metaKey || e.ctrlKey) ? 'liquify' : 'move');
+    });
     boxEl.appendChild(fill);
   }
   // rows: array (ordered top→bottom visually) of arrays of {track, key,
@@ -2613,7 +2879,17 @@
     rows = rows.filter(function (r) { return r.length || true; });
     if (!rows.length) return;
     pushUndo();
-    window._motionSkewDrag = { startX: e.clientX, mode: mode, rows: rows };
+    // Selection extent along TIME, captured once at mousedown — the Space
+    // gestures (left/right edges) need it to place each key between the
+    // anchored edge and the dragged one, and recomputing it mid-drag would
+    // move the anchor under the cursor as the keys spread.
+    var fMin = Infinity, fMax = -Infinity;
+    rows.forEach(function (row) { row.forEach(function (en) { fMin = Math.min(fMin, en.orig); fMax = Math.max(fMax, en.orig); }); });
+    // Liquify needs to know WHERE along the timeline you grabbed — the
+    // falloff is centred there, not on the selection's middle.
+    var grid = document.getElementById('frame-grid');
+    var grabFrame = grid ? ((e.clientX - grid.getBoundingClientRect().left) / FC) : (fMin + fMax) / 2;
+    window._motionSkewDrag = { startX: e.clientX, mode: mode, rows: rows, fMin: fMin, fMax: fMax, grabFrame: grabFrame };
   }
   // Key box rows = one row per PROPERTY TRACK holding selected keys, in
   // rendered (document) order — matches the reference where each visible
@@ -2642,6 +2918,21 @@
     if (_layerSel.length >= 2) { removeKeySelectionBox(); return; }
     var dias = Array.from(document.querySelectorAll('#frame-grid .motion-key.sel'));
     if (dias.length < 2) { removeKeySelectionBox(); return; }
+    // The box only earns its place on keys stacked across SEVERAL property
+    // tracks (2026-07-25: "quand on select sur une seule propriété des
+    // keyframes pas besoin de la box c'est pour plusieurs keyframes les
+    // unes en dessous des autres"). Its whole point is the cross-row
+    // gestures — skew is literally undefined on one row (its own handler
+    // refuses under 2 rows), so on a single property the box was pure
+    // overlay: it covered the keys, hid the diamonds it was drawn around,
+    // and intercepted clicks meant for them. Keys on one track are already
+    // draggable as a group by grabbing any one of them.
+    var rowsHit = [];
+    dias.forEach(function (d) {
+      var row = d.closest('.motion-track-row');
+      if (row && rowsHit.indexOf(row) < 0) rowsHit.push(row);
+    });
+    if (rowsHit.length < 2) { removeKeySelectionBox(); return; }
     var x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
     dias.forEach(function (d) {
       var b = d.getBoundingClientRect();
@@ -2651,7 +2942,34 @@
     if (!_keySelBoxEl) {
       _keySelBoxEl = document.createElement('div'); _keySelBoxEl.className = 'motion-keysel-box';
       document.body.appendChild(_keySelBoxEl);
+      // The box's own surfaces (fill + edges) are pointer-events:auto so
+      // they can be dragged — which also means they swallow right-clicks on
+      // the keys UNDERNEATH, and every batch op (Distribuer, Flip,
+      // Subdiviser, Easy Ease…) lives in that cell context menu. Found
+      // 2026-07-25: as soon as the box appeared, the menu became
+      // unreachable for exactly the selection it was meant to act on.
+      // Forward instead of duplicating the menu: blank out the box for one
+      // hit-test and re-dispatch to whatever is really under the cursor.
+      _keySelBoxEl.addEventListener('contextmenu', function (e) {
+        var prev = _keySelBoxEl.style.pointerEvents;
+        _keySelBoxEl.style.pointerEvents = 'none';
+        var kids = Array.prototype.slice.call(_keySelBoxEl.children);
+        var prevKids = kids.map(function (c) { var p = c.style.pointerEvents; c.style.pointerEvents = 'none'; return p; });
+        var under = document.elementFromPoint(e.clientX, e.clientY);
+        _keySelBoxEl.style.pointerEvents = prev;
+        kids.forEach(function (c, i) { c.style.pointerEvents = prevKids[i]; });
+        if (!under) return;
+        e.preventDefault(); e.stopPropagation();
+        under.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: e.clientX, clientY: e.clientY }));
+      });
       addMoveFill(_keySelBoxEl, function (e, mode) { startSkewDrag(buildKeyRows(), mode, e); });
+      addSpaceEdges(_keySelBoxEl, function (e, mode) {
+        var rows = buildKeyRows();
+        var f0 = Infinity, f1 = -Infinity;
+        rows.forEach(function (r) { r.forEach(function (en) { f0 = Math.min(f0, en.orig); f1 = Math.max(f1, en.orig); }); });
+        if (!(f1 > f0)) { if (window.showToast) showToast('Sélectionne des clés sur 2 frames différentes pour les espacer'); return; }
+        startSkewDrag(rows, mode, e);
+      });
       addStaggerEdges(_keySelBoxEl, function (e, mode) {
         var rows = buildKeyRows();
         if (rows.length < 2) { if (window.showToast) showToast('Sélectionne des clés sur 2 pistes ou plus pour skewer'); return; }
@@ -2718,6 +3036,20 @@
       _layerStaggerBoxEl = document.createElement('div'); _layerStaggerBoxEl.className = 'motion-keysel-box';
       document.body.appendChild(_layerStaggerBoxEl);
       addMoveFill(_layerStaggerBoxEl, function (e, mode) { startSkewDrag(buildLayerRows(), mode, e); });
+      // Space on the LAYER box, which is where the reference actually
+      // demonstrates it ("select layers across multiple rows, drag from the
+      // right edge to space them out"): spreads the selected layers' keys
+      // apart in time with the opposite edge anchored. Same per-key factor
+      // as the key box — a layer's keys sit at their own frames, so a layer
+      // early in the span moves little and a late one moves a lot, which is
+      // exactly the spread.
+      addSpaceEdges(_layerStaggerBoxEl, function (e, mode) {
+        var rows = buildLayerRows();
+        var f0 = Infinity, f1 = -Infinity;
+        rows.forEach(function (r) { r.forEach(function (en) { f0 = Math.min(f0, en.orig); f1 = Math.max(f1, en.orig); }); });
+        if (!(f1 > f0)) { if (window.showToast) showToast('Il faut des clés sur au moins 2 frames différentes pour les espacer'); return; }
+        startSkewDrag(rows, mode, e);
+      });
       addStaggerEdges(_layerStaggerBoxEl, function (e, mode) {
         var rows = buildLayerRows();
         if (rows.length < 2) return;
@@ -2726,6 +3058,128 @@
     }
     _layerStaggerBoxEl.style.left = gb.left + 'px'; _layerStaggerBoxEl.style.top = y0 + 'px';
     _layerStaggerBoxEl.style.width = gb.width + 'px'; _layerStaggerBoxEl.style.height = (y1 - y0) + 'px';
+    // The box deliberately spans the FULL grid width so the skew edges can
+    // be grabbed anywhere along the row ("j'ai juste à glisser la box…
+    // peu importe où je suis"). That puts its own left/right extremities
+    // thousands of pixels off-screen, which would make the Space handles
+    // unreachable in practice (measured: right edge at x≈2926 on an 800px
+    // view). So pin them to the selection's KEY SPAN instead of the box's
+    // geometry — which is also where they belong conceptually: the handles
+    // sit exactly where the content starts and ends, like the key box's do.
+    var el = _layerStaggerBoxEl.querySelector('.motion-keysel-edge-left');
+    var er = _layerStaggerBoxEl.querySelector('.motion-keysel-edge-right');
+    if (el && er) {
+      var sf0 = Infinity, sf1 = -Infinity;
+      _layerSel.forEach(function (li) {
+        var h = state.layers[li];
+        if (!h || !h.motion) return;
+        PROPS.forEach(function (prop) {
+          var t = h.motion[prop]; if (!t) return;
+          t.keys.forEach(function (k) { sf0 = Math.min(sf0, k.frame); sf1 = Math.max(sf1, k.frame); });
+        });
+      });
+      if (sf1 > sf0) {
+        el.style.display = ''; er.style.display = '';
+        el.style.left = (sf0 * FC - 7) + 'px'; el.style.right = 'auto';
+        er.style.left = (sf1 * FC + FC - 7) + 'px'; er.style.right = 'auto';
+      } else {
+        // One frame (or no keys at all) — nothing to spread, and a handle
+        // that silently does nothing is worse than no handle.
+        el.style.display = 'none'; er.style.display = 'none';
+      }
+    }
+  }
+  // ---- TIME REMAP (2026-07-25) ----------------------------------------
+  // AE's Time Remapping, for component-instance layers: instead of the
+  // instance playing at a fixed speed/loop mode, a keyframed curve says
+  // WHICH internal frame to show at each main-timeline frame. Freeze, hold,
+  // reverse, ramp and ping-pong all fall out of the same curve, with the
+  // existing easing/graph editor working on it unchanged because it is a
+  // normal motion track (same shape as position/scale/...).
+  //
+  // Enabling seeds two keys — internal frame 0 at the layer's in point,
+  // last internal frame at its out point — which is exactly AE's behaviour
+  // and, crucially, means turning it on changes nothing on screen: the
+  // linear ramp between those two keys reproduces the default playback.
+  function enableTimeRemap(li) {
+    var ld = state.layers[li];
+    if (!ld) return false;
+    if (!ld.symbolId) { if (window.showToast) showToast('Le remappage temporel s\u2019applique aux calques composants'); return false; }
+    var sym = state.symbols[ld.symbolId];
+    if (!sym) return false;
+    if (ld.timeRemap) { if (window.showToast) showToast('Remappage temporel déjà actif'); return false; }
+    pushUndo();
+    var inF = window.layerInPoint ? layerInPoint(ld) : (ld.inPoint != null ? ld.inPoint : 0);
+    var outF = window.layerOutPoint ? layerOutPoint(ld) : (ld.outPoint != null ? ld.outPoint : state.totalFrames - 1);
+    var last = Math.max(0, (sym.totalFrames || 1) - 1);
+    ld.timeRemap = { keys: [
+      { frame: inF, v: [0], curvePoints: cloneCurvePts(CURVE_LINEAR), hOut: [0, 0], hIn: [0, 0] },
+      { frame: Math.max(inF + 1, outF), v: [last], curvePoints: cloneCurvePts(CURVE_LINEAR), hOut: [0, 0], hIn: [0, 0] },
+    ] };
+    renderLayerList(); renderTimeline();
+    if (window.loadFrame) loadFrame(state.currentFrame);
+    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+    if (window.showToast) showToast('Remappage temporel activé — 0 → ' + last);
+    return true;
+  }
+  function disableTimeRemap(li) {
+    var ld = state.layers[li];
+    if (!ld || !ld.timeRemap) return false;
+    pushUndo();
+    delete ld.timeRemap;
+    renderLayerList(); renderTimeline();
+    if (window.loadFrame) loadFrame(state.currentFrame);
+    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+    if (window.showToast) showToast('Remappage temporel désactivé');
+    return true;
+  }
+  // The internal frame this instance should show at `frame`, or null when
+  // the layer isn't remapped. app.js's resolveSymbolFrameIdx is the single
+  // consumer — one chokepoint, so nothing else can disagree about it.
+  function timeRemapValue(ld, frame) {
+    var t = ld && ld.timeRemap;
+    if (!t || !t.keys || !t.keys.length) return null;
+    return evalTrack(t, frame, 0);
+  }
+  // Retime every keyframe a layer owns by dx frames. The counterpart to
+  // SM.shiftLayerFrames (timeline.js), which moves only ld.frames — the
+  // DRAWN content. Found 2026-07-25 while testing the in/out handles: a bar
+  // drag in Motion moved the artwork and the visibility window but left the
+  // Position/Rotation/Scale/Opacity keys exactly where they were, so the
+  // layer arrived somewhere new still animating on the old schedule. In
+  // Motion "the keyframes" means these, so "déplacer le calque avec ses
+  // keyframes" was only ever half true.
+  //
+  // Covers all three holders a layer can carry keys in — its own motion,
+  // each per-element holder, and each effect's parameter tracks (the
+  // effects panel keeps them in eff.keys[param].keys, see
+  // effects-panel.js's ensureParamTrack). Missing any one of them is the
+  // CLAUDE.md §1 shape of bug: retimed in one reader, stale in the others.
+  function shiftLayerMotionKeys(li, dx) {
+    var ld = state.layers[li];
+    if (!ld || !dx) return false;
+    var total = state.totalFrames, touched = false;
+    // A key pushed past either end is CLAMPED, not dropped (dropping would
+    // silently destroy animation the user can't see going). Clamping can
+    // land two keys on the same frame, so collapse exact duplicates
+    // afterwards, keeping the earliest-listed one.
+    function shiftTrack(t) {
+      if (!t || !t.keys || !t.keys.length) return;
+      t.keys.forEach(function (k) { k.frame = Math.max(0, Math.min(total - 1, k.frame + dx)); });
+      t.keys.sort(function (a, b) { return a.frame - b.frame; });
+      for (var i = t.keys.length - 1; i > 0; i--) if (t.keys[i].frame === t.keys[i - 1].frame) t.keys.splice(i, 1);
+      touched = true;
+    }
+    function shiftHolder(h) {
+      if (!h || !h.motion) return;
+      PROPS.forEach(function (prop) { shiftTrack(h.motion[prop]); });
+    }
+    shiftHolder(ld);
+    if (ld.elementMotion) Object.keys(ld.elementMotion).forEach(function (id) { shiftHolder(ld.elementMotion[id]); });
+    if (ld.effects) ld.effects.forEach(function (eff) {
+      if (eff && eff.keys) Object.keys(eff.keys).forEach(function (p) { shiftTrack(eff.keys[p]); });
+    });
+    return touched;
   }
   // Right-click alternative to dragging the handle — same rank-0-anchor,
   // every-property-together semantics, applied instantly for a typed step
@@ -2755,7 +3209,19 @@
     var w = Math.abs(dx), h = Math.abs(dy);
     var r = _motionMarquee.rectEl;
     r.style.left = x0 + 'px'; r.style.top = y0 + 'px'; r.style.width = w + 'px'; r.style.height = h + 'px';
-    if (_motionMarquee.moved) applyMarqueeSelection(x0, y0, x0 + w, y0 + h);
+    if (_motionMarquee.moved) {
+      applyMarqueeSelection(x0, y0, x0 + w, y0 + h);
+      // ...and the layer BARS in the same sweep. This marquee is registered
+      // on #fg-wrap in the CAPTURE phase and stops propagation, so it fires
+      // before layer-inout.js's own row/wrap listeners can start their bar
+      // marquee — which meant in/out point selection was simply dead in
+      // Motion, the only mode where the bars exist at all (verified live
+      // 2026-07-25: a drag across three bars' left halves left
+      // getBarSelection() empty). layer-inout.js already forwards to
+      // SMMotion.marqueeSelect in the other direction; this is the missing
+      // half, so one rectangle now picks up keys AND in/out points together.
+      if (window.SMLayerInOut && SMLayerInOut.marqueeSelect) SMLayerInOut.marqueeSelect(x0, y0, x0 + w, y0 + h);
+    }
   }
   function endMarquee() {
     if (!_motionMarquee) return;
@@ -2765,7 +3231,14 @@
     // A plain click on empty grid space (no drag) clears the selection,
     // same "click empty = deselect" convention as the canvas's own
     // marquee/selection tools elsewhere in this app.
-    if (!moved) { setKeySel([]); renderTimeline(); }
+    // A plain click on empty grid space clears the BAR selection too, not
+    // just the key one — they are now made by the same gesture, so leaving
+    // one of them behind would be the same desync in reverse.
+    if (!moved) {
+      setKeySel([]);
+      if (window.SMLayerInOut && SMLayerInOut.clearSelection) SMLayerInOut.clearSelection();
+      renderTimeline();
+    }
   }
 
   // Drag-to-retime a keyframe (mousemove/up delegated from ui.js's global
@@ -2787,10 +3260,36 @@
       sk.rows.forEach(function (row) { row.forEach(function (en) { dragged.push(en.key); }); });
       var plan = [];
       var ok3 = sk.rows.every(function (row, r) {
-        var f = sk.mode === 'move' || n < 2 ? 1 : (sk.mode === 'top' ? (n - 1 - r) / (n - 1) : r / (n - 1));
-        var d2 = Math.round(total * f);
+        // Row-based factor for the SKEW gestures (top/bottom edges): the
+        // dragged edge's row moves the full distance, the opposite row
+        // stays anchored, rows in between interpolate — the diagonal.
+        var rowF = sk.mode === 'move' || n < 2 ? 1
+          : (sk.mode === 'top' ? (n - 1 - r) / (n - 1) : r / (n - 1));
         return row.every(function (en) {
-          var nf = en.orig + d2;
+          // ...and a TIME-based factor for the SPACE gestures (left/right
+          // edges, 2026-07-25, Skew Pro's "Space" lesson): spread or
+          // compress the selection along the timeline with the opposite
+          // edge anchored. The factor has to be per-KEY here, not per-row —
+          // it depends on where the key sits between the selection's first
+          // and last frame, not on which track it lives in. Same absolute-
+          // from-original arithmetic as the skew, so it inherits the
+          // no-drift and drag-back-to-restore properties unchanged.
+          var f = rowF;
+          if (sk.mode === 'liquify') {
+            // Gaussian falloff around the grab point. Radius scales with the
+            // selection's own span so the same gesture feels the same on a
+            // 10-frame and a 200-frame selection; a single-frame selection
+            // falls back to a fixed radius rather than dividing by zero.
+            var span2 = Math.max(1, sk.fMax - sk.fMin);
+            var radius = Math.max(2, span2 * 0.35);
+            var dist = (en.orig - sk.grabFrame) / radius;
+            f = Math.exp(-dist * dist);
+          } else if (sk.mode === 'left' || sk.mode === 'right') {
+            var span = sk.fMax - sk.fMin;
+            f = span <= 0 ? 0 // every key on one frame — nothing to spread
+              : (sk.mode === 'right' ? (en.orig - sk.fMin) / span : (sk.fMax - en.orig) / span);
+          }
+          var nf = en.orig + Math.round(total * f);
           if (nf < 0 || nf >= state.totalFrames) return false;
           var existing = keyAt(en.track, nf);
           // Only an UNdragged key blocks — another dragged key sitting at
@@ -2885,6 +3384,10 @@
     document.body.classList.toggle('mode-storyboard', mode === 'storyboard');
     var mgBtn = document.getElementById('btn-mgraph');
     if (mgBtn) mgBtn.style.display = (mode === 'motion') ? '' : 'none';
+    var shyBtn = document.getElementById('btn-shy');
+    if (shyBtn) shyBtn.style.display = (mode === 'motion') ? '' : 'none';
+    var mbBtn = document.getElementById('btn-mblur');
+    if (mbBtn) mbBtn.style.display = (mode === 'motion') ? '' : 'none';
     // StoryBoard swaps the whole timeline area for the node space —
     // renderLayerList/renderTimeline still run (their targets are hidden,
     // harmless) so switching BACK lands on an up-to-date grid.
@@ -3041,6 +3544,26 @@
     ensureLayerUid: ensureLayerUid,
     findLayerIndexByUid: findLayerIndexByUid,
     setLayerParent: setLayerParent,
+    shiftLayerMotionKeys: shiftLayerMotionKeys,
+    exprGlobals: exprGlobals,
+    setExprGlobals: function (code) {
+      state.exprGlobals = code || '';
+      // Drop every cached compile: they were built with the OLD preamble.
+      state.layers.forEach(function (l) {
+        delete l._exprCompiled;
+        if (l.elementMotion) Object.keys(l.elementMotion).forEach(function (k) { delete l.elementMotion[k]._exprCompiled; });
+      });
+      renderLayerList(); renderTimeline();
+      if (window.SMEngineBridge) SMEngineBridge.renderNow();
+    },
+    // The value a property WOULD have without its expression (Van Dijk 7.4,
+    // "show the unaffected value of the property"). rawValueAtFrame is the
+    // pre-expression path by construction — valueAtFrame is the one that
+    // layers the expression on top — so this cannot drift from it.
+    rawValueAtFrame: function (holder, prop, frame) { return rawValueAtFrame(holder, prop, frame); },
+    enableTimeRemap: enableTimeRemap,
+    disableTimeRemap: disableTimeRemap,
+    timeRemapValue: timeRemapValue,
     parentChainMats: parentChainMats,
     applyParentChainToSegments: applyParentChainToSegments,
     applyParentChainToImageRect: applyParentChainToImageRect,
@@ -3064,6 +3587,29 @@
     elementLabel: elementLabel,
     distributeKeys: distributeKeys, flipKeys: flipKeys, selectEveryNthKey: selectEveryNthKey, invertKeySelection: invertKeySelection,
     getKeySelection: function () { return _motionKeySel.slice(); },
+    // Move an explicit set of keys by dx frames — used by layer-inout.js so
+    // that dragging a layer's in/out point carries the SELECTED keyframes
+    // with it (2026-07-25: "il faut pouvoir bouger les in/out point de
+    // calque avec les keyframes selectionnées aussi"). Takes the selection
+    // captured at drag START, not the live one: the drag itself re-renders
+    // the grid, and a re-render rebuilds the diamonds.
+    shiftKeySelection: function (sel, dx) {
+      if (!sel || !sel.length || !dx) return false;
+      var total = state.totalFrames, tracks = [];
+      sel.forEach(function (s) {
+        if (!s || !s.key) return;
+        s.key.frame = Math.max(0, Math.min(total - 1, s.key.frame + dx));
+        var t = s.holder && s.holder.motion && s.holder.motion[s.prop];
+        if (t && tracks.indexOf(t) < 0) tracks.push(t);
+      });
+      // Clamping at the edges can stack two keys on one frame — same
+      // collapse rule as shiftLayerMotionKeys, keeping the earliest.
+      tracks.forEach(function (t) {
+        sortKeys(t);
+        for (var i = t.keys.length - 1; i > 0; i--) if (t.keys[i].frame === t.keys[i - 1].frame) t.keys.splice(i, 1);
+      });
+      return true;
+    },
     // Lets the graph editor drive the SAME selection the track view uses, so
     // clicking a point on a curve lights up its diamond and makes F9 / Delete
     // / copy behave identically from either view. Without this the two views

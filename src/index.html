@@ -1293,6 +1293,15 @@
     <button class="tb" id="btn-tween-curves" data-i18n-title="btnTweenCurvesTitle" title="Afficher/masquer les courbes d'easing sous les calques avec tween — clic sur un segment pour l'éditer individuellement" style="margin-left:4px"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17c3 0 3-10 6-10s3 10 6 10 3-8 6-8"/></svg></button>
     <!-- Graph editor (Motion mode only — shown/hidden by setAppMode). Clic
          droit bascule valeur/vitesse, Alt+clic fige l'échelle verticale. -->
+    <!-- Shy switch (AE): hides every layer flagged shy from BOTH panels at
+         once. Motion-only, like the graph editor next to it — the flag is
+         about taming a long property list, which is a Motion problem. -->
+    <!-- BPM guides (Van Dijk 1.2): clic = afficher/masquer, clic droit =
+         régler tempo et décalage. -->
+    <button class="tb" id="btn-bpm" title="Grille BPM — clic : afficher/masquer · clic droit : régler le tempo" style="margin-left:4px"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 18V5l10-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="16" cy="16" r="3"/></svg></button>
+    <!-- Motion blur (comp switch). Clic droit : échantillons + obturateur. -->
+    <button class="tb" id="btn-mblur" title="Flou de mouvement de la composition — clic droit : échantillons et obturateur" style="margin-left:4px;display:none"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="8" cy="12" r="4"/><path d="M14 9h6M14 12h5M14 15h3"/></svg></button>
+    <button class="tb" id="btn-shy" title="Masquer les calques « shy » (clic droit sur un calque pour le marquer)" style="margin-left:4px;display:none"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></svg></button>
     <button class="tb" id="btn-mgraph" title="Éditeur de courbes (Maj+F3) — clic droit : valeur/vitesse · Alt+clic : figer l'échelle" style="margin-left:4px;display:none"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20V4"/><path d="M3 20h18"/><path d="M6 16c4 0 3-9 7-9 3 0 3 5 6 5"/><circle cx="6" cy="16" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/></svg></button>
   </div>
   <div id="tl-content">
@@ -1322,6 +1331,10 @@
       </div>
     </div>
     <div id="layer-panel-resize" data-i18n-title="layerPanelResizeTitle" title="Drag to resize the layers panel"></div>
+    <!-- Column wrapper so #fg-wrap can end at the separator line while the
+         timeline's own zoom scrollbar (#tlzoom-scrollbar, timeline-zoom.js)
+         is drawn in the band below it. -->
+    <div id="fg-col">
     <div id="fg-wrap">
       <!-- Design audit 2026-07 (feedback: "le ruler au dessus"): #frame-hdr
            (the numbered ruler) now comes FIRST in both DOM and stacking —
@@ -1362,6 +1375,8 @@
            already uses. -->
       <div id="playhead"><div id="playhead-flag" data-i18n-title="playheadFlagTitle" title="Glisse pour te déplacer dans le temps"></div></div>
     </div>
+
+  </div>
   </div>
 </div>
 
@@ -1433,6 +1448,8 @@
 <script src="js/nemo-plugin.js"></script>
 <script src="js/layer-inout.js"></script>
 <script src="js/layer-scroll-sync.js"></script>
+<script src="js/markers.js"></script>
+<script src="js/bpm-grid.js"></script>
 <script src="js/timeline-zoom.js"></script>
 <script src="js/p2p-contacts.js"></script>
 <script src="js/audio-bridge.js"></script>

@@ -698,6 +698,18 @@
     var inF=(window.state&&state.waIn!=null)?state.waIn:(window._waIn||0);
     var outF=(window.state&&state.waOut!=null)?state.waOut:(window._waOut||23);
     bar.style.left=(inF*FC)+'px';bar.style.width=((outF-inF+1)*FC)+'px';
+    // Duration read-out in the middle of the bar (Van Dijk 1.3, "show the
+    // length of the work area bar in the center"): the number you actually
+    // want while setting a loop range, and it was nowhere on screen.
+    // Frames AND seconds, because a work area is usually set against music
+    // or a reference video, both of which are timed in seconds.
+    var lab=bar.querySelector('.wa-dur');
+    if(!lab){lab=document.createElement('span');lab.className='wa-dur';bar.appendChild(lab);}
+    var n=outF-inF+1, secs=n/Math.max(1,state.fps);
+    lab.textContent=n+' f · '+(secs<10?secs.toFixed(2):secs.toFixed(1))+' s';
+    // Hide it when the bar is too narrow to hold the text rather than let it
+    // spill over the handles.
+    lab.style.display=((outF-inF+1)*FC<64)?'none':'';
     // Design audit 2026-07, round 2 (feedback: "un highlight dans la zone
     // de previz"): #wa-tint mirrors this same left/width down through the
     // actual scrub/preview area (#frame-grid), a second time — updateWaBar
