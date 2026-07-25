@@ -1595,3 +1595,16 @@ body.mode-motion .lrow.act{box-shadow:inset 3px 0 0 #4E6FF2,inset 0 0 0 1px rgba
 .fx-keynav-btn.off{opacity:.25;cursor:default;}
 .fx-keynav-btn.off:hover{color:var(--text-dim);background:none;}
 .fx-keynav-count{font-size:8px;color:var(--text-dark);margin-left:2px;min-width:8px;text-align:center;}
+
+/* ---- TIMELINE MARKERS (2026-07-25) ----------------------------------- */
+/* Comp markers ride #bars-row (the strip under the ruler), layer markers
+   ride their own .frow — both anchored at frame*FC, so they scroll with the
+   grid and stay on their frame at any zoom. */
+.tl-marker{position:absolute;top:2px;width:0;height:0;z-index:6;cursor:ew-resize;
+  border-left:5px solid transparent;border-right:5px solid transparent;
+  border-top:9px solid var(--marker-color,#e8b64c);pointer-events:auto;}
+.tl-marker:hover{filter:brightness(1.35);}
+.tl-marker-layer{top:3px;border-top-width:8px;}
+.tl-marker-label{position:absolute;left:7px;top:-9px;font-size:9px;line-height:1;
+  color:var(--text);background:rgba(0,0,0,.55);padding:1px 4px;border-radius:3px;
+  white-space:nowrap;pointer-events:none;}

@@ -1008,7 +1008,7 @@ window.SM={
         // be just as useless. Note isNullLayer above was already persisted,
         // and its own tooltip calls a null layer a "pivot/parent pour d'autres
         // calques" — the pivot came back, everything hung off it did not.
-        layerUid:l.layerUid,parentLayerUid:l.parentLayerUid};}),
+        layerUid:l.layerUid,parentLayerUid:l.parentLayerUid,markers:l.markers};}),
       layerFolders:state.layerFolders,layerLinkGroups:state.layerLinkGroups,
       // StoryBoard node space (2026-07) — plain data by construction (no
       // runtime-only fields live in state.storyboard, see storyboard.js's
@@ -1030,7 +1030,10 @@ window.SM={
       symmetryEnabled:state.symmetryEnabled,symmetryMode:state.symmetryMode,symmetryAxis:state.symmetryAxis,symmetryRadialCenter:state.symmetryRadialCenter,symmetryRadialSectors:state.symmetryRadialSectors,symmetryExtend:state.symmetryExtend,
       motionArcs:state.motionArcs,easingCurve:state.easingCurve,resamplePts:state.resamplePts,tweenStep:state.tweenStep,
       tweenOverrides:state.tweenOverrides,tweenEasing:state.tweenEasing||{},comments:state.comments||[],
-      cameraKeys:state.cameraKeys||[],cameraLayerOn:!!state.cameraLayerOn});
+      cameraKeys:state.cameraKeys||[],cameraLayerOn:!!state.cameraLayerOn,
+      // Comp markers (markers.js) — pure annotation, but losing them on save
+      // would make the feature pointless.
+      markers:state.markers||[]});
   },
   mergeRemoteSnapshot:function(remoteData,remoteProfile){return mergeRemoteSnapshot(remoteData,remoteProfile);},
   // Cycles (v19) : repete N fois la plage de frames selectionnee (walk
@@ -1180,6 +1183,7 @@ window.SM={
       state.easingCurve=_ec;if(window._curveEditor)window._curveEditor.setState(_ec);
     }
     state.comments=d.comments||[];
+    state.markers=d.markers||[];
     if(typeof refreshFbAvatars==='function')refreshFbAvatars(); // avatar stack mirrors state.comments — resync on project import
     state.cameraKeys=d.cameraKeys||[];state.cameraLayerOn=!!d.cameraLayerOn;state.cameraView=false;
     // Explicit fallback to the app default, not just "leave whatever was
@@ -2068,6 +2072,11 @@ function renderTimeline(){
     if(entry.hidden)return;
     rowCount++;
     var li=entry.idx;var row=document.createElement('div');row.className='frow'+(li===state.activeLayerIdx?' act':'');
+    // data-layer was Motion-only, so anything addressing "the grid row for
+    // layer N" silently found nothing in Animation 2D (2026-07-25: layer
+    // markers rendered in Motion and vanished here). Same attribute, same
+    // meaning, both modes — the row already knows its index.
+    row.dataset.layer=li;
     // Collapsed Stroke/Fill/Shadow head row: its OWN strokes are what the
     // 'fl'/'hl' (full/hollow) keyframe dot would normally reflect, but the
     // head is whichever member happens to render topmost (often Shadow,
@@ -2105,6 +2114,8 @@ function renderTimeline(){
   document.getElementById('playhead').style.left=(state.currentFrame*FC)+'px';
   syncPlayheadToViewport();
   document.getElementById('playhead-flag').textContent=state.currentFrame+1;
+  // Markers are overlays on rows this function just rebuilt — re-attach.
+  if(window.SMMarkers)SMMarkers.render();
   if(window.SMAudio)SMAudio.renderStrip();
   renderTweenCurveStrips();
   // renderTimeline() wipes #frame-grid, so the graph editor — which hides that
