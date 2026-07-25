@@ -4207,15 +4207,6 @@ function initAppMenu(){
       {label:tt('menuSave'),shortcut:'⌘S',action:function(){if(window.SMProject)window.SMProject.save();}},
       {label:tt('menuSaveAs'),shortcut:'⇧⌘S',action:function(){if(window.SMProject)window.SMProject.saveAs();}},
       {label:tt('menuFromKitsu'),id:'ctx-kitsu-open',action:function(){clickEl('btn-kitsu-open');}},
-      // Run an After Effects .jsx against this document (aescript-host.js).
-      // Under Open rather than in a tools menu because that is what it is from
-      // the user's side: opening a script file.
-      {label:'Ouvrir un script After Effects (.jsx)…',id:'ctx-ae-script',
-        action:function(){if(window.SMAEScript)SMAEScript.openFile();}},
-      // CEP extension (.zxp) — a panel rather than a script, so it gets its
-      // own entry (aeext-host.js).
-      {label:'Ouvrir une extension After Effects (.zxp)…',id:'ctx-ae-ext',
-        action:function(){if(window.SMAEExt)SMAEExt.openFile();}},
       {label:tt('menuVersionHistory'),id:'ctx-history',action:function(){clickEl('btn-history');}},
       {sep:true},
       {label:tt('menuImportImg'),action:function(){clickEl('btn-import-img');}},
