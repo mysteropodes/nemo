@@ -132,7 +132,14 @@
     var replaceBtn = document.getElementById('btn-palette-replace');
     if (replaceBtn) {
       replaceBtn.classList.toggle('active', replaceArmed);
-      replaceBtn.textContent = replaceArmed ? (replaceSource ? '🔁 Clique la cible…' : '🔁 Clique la source…') : '🔁 Remplacer dans le calque';
+      // Title only — writing textContent here used to DESTROY the button's
+      // SVG icon on the very first render (it's an .icon-only-btn, the icon
+      // is its whole face), leaving a hardcoded-French emoji label instead.
+      // The armed-state prompts already reach the user via showToast.
+      if (!replaceBtn.dataset.baseTitle) replaceBtn.dataset.baseTitle = replaceBtn.title;
+      replaceBtn.title = replaceArmed
+        ? (replaceSource ? 'Remplacer : clique la couleur CIBLE' : 'Remplacer : clique la couleur SOURCE')
+        : replaceBtn.dataset.baseTitle;
     }
   }
 
