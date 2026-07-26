@@ -36,6 +36,21 @@
   window.SMLabs.register('view-filter', {
     flag: 'nemo-labs-viewfilter',
     describe: 'Contrôle des valeurs : SMLabs.setViewFilter(\'values\'|\'contrast\'|\'dim\'|\'none\'|cssFilter) — affichage seulement, le dessin reste intact',
+    // Turning the prototype on used to set the flag and NOTHING else: the
+    // filter only ever applied via the console API, so the floating panel's
+    // "Contrôle des valeurs" button was a dead button for anyone who hadn't
+    // read this file (measured: flag 1, computed filter still 'none').
+    // Enabling now applies the preset the button's own label promises —
+    // grayscale value check — and setViewFilter stays the way to pick any
+    // other preset. Same "a button that silently does nothing is worse than
+    // no button" fix selectGhostAll already got (timeline.js:1930).
+    onEnable: function () {
+      var t = area(); if (!t) return;
+      if (!t.style.filter) {
+        t.style.filter = PRESETS.values;
+        if (typeof showToast === 'function') showToast('Contrôle des valeurs — niveaux de gris (SMLabs.setViewFilter pour les autres)');
+      }
+    },
     onDisable: function () { var t = area(); if (t) t.style.filter = ''; },
   });
 })();
