@@ -260,7 +260,21 @@ async function exportRunFfmpeg(args,onProgress){
 // layer in the overwhelming common case (no effects used) short-circuits
 // on the very first layer.
 function exportHasActiveEffects(){
-  return state.layers.some(function(ld){return ld.effects&&ld.effects.some(function(e){return e.enabled;});});
+  if(state.layers.some(function(ld){return ld.effects&&ld.effects.some(function(e){return e.enabled;});}))return true;
+  // PER-STROKE effects too (sd.effects — engine-bridge.js:508 reads
+  // c.data.effects and runs it through the same sceneEffectsOf). This
+  // predicate only ever scanned LAYER effects, so a project whose effects
+  // all live on individual strokes stayed on the Paper path and lost every
+  // one of them in the export, silently — the same screen/export split
+  // blend and matte had (2026-07-26). Short-circuits on the first hit, and
+  // runs once per export, not per frame.
+  return state.layers.some(function(ld){
+    return (ld.frames||[]).some(function(f){
+      return f&&(f.strokes||[]).some(function(sd){
+        return sd&&sd.effects&&sd.effects.length&&sd.effects.some(function(e){return e.enabled;});
+      });
+    });
+  });
 }
 // Layer BLEND MODE and TRACK MATTE are per-layer compositing, and
 // exportBuildFrame below merges every layer into ONE flat throwaway Paper
