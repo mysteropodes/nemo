@@ -394,17 +394,25 @@
     try{markSaved(window.SM.exportJSON());}catch(e){}
     if(tauriOk()&&window.__TAURI__.window&&window.__TAURI__.window.getCurrentWindow){
       try{
-        window.__TAURI__.window.getCurrentWindow().onCloseRequested(async function(event){
-          if(!isDirty())return; // clean → close proceeds normally
+        var appWindow=window.__TAURI__.window.getCurrentWindow();
+        var allowConfirmedClose=false;
+        appWindow.onCloseRequested(async function(event){
+          if(allowConfirmedClose||!isDirty())return; // clean/confirmed → close proceeds normally
+          // Tauri cannot keep the original native close request pending
+          // across an awaited dialog. Cancel it synchronously, then issue a
+          // fresh close request after positive confirmation.
+          event.preventDefault();
           try{
             var leave=await window.__TAURI__.dialog.ask(
               'Des modifications non sauvegardées seront perdues. Quitter quand même ?',
               {title:'Modifications non sauvegardées',kind:'warning',okLabel:'Quitter sans sauvegarder',cancelLabel:'Annuler'});
-            if(!leave)event.preventDefault();
+            if(leave){
+              allowConfirmedClose=true;
+              await appWindow.close();
+            }
           }catch(e){
             // dialog unavailable (permission/API) — err on the side of NOT
             // losing work: block this close so the user can save manually.
-            event.preventDefault();
             showToast('Modifications non sauvegardées — sauvegarde avant de quitter');
           }
         });
