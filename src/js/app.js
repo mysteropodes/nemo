@@ -2011,8 +2011,39 @@ function _writeBackGhostProxies(layerIdx){
 // screen. One collector, called from both, so a future consumer-list change
 // (a new data.* tag to skip) can't be applied to one path and forgotten in
 // the other.
+// LAST-DITCH defence for CLAUDE.md §1's CompoundPath hazard (2026-07-26).
+// The collect loop below only serializes `instanceof Path` and Raster, so a
+// CompoundPath left in a layer is dropped ENTIRELY and SILENTLY here: measured
+// on a rectangle-with-a-hole, 1 child of area 168575 -> 0 strokes saved -> 0
+// children after the next loadFrame. The artwork is simply gone, no error, no
+// warning, and it renders fine right up until the save.
+//
+// insertBooleanResult is the documented way to add a boolean result to a
+// layer and every current call site uses it — but that is a convention every
+// future author has to remember, and §1 exists precisely because this keeps
+// recurring. Flattening here instead means it cannot cost artwork again no
+// matter which path produced the CompoundPath (a new feature, an import, a
+// script). Same island-splitting + keyhole-merge every other consumer already
+// expects, so nothing downstream learns anything new.
+function _flattenCompoundChildren(li){
+  var layer=userLayers[li];
+  if(typeof CompoundPath==='undefined'||typeof insertBooleanResult!=='function')return;
+  var kids=layer.children.slice();
+  for(var i=0;i<kids.length;i++){
+    var c=kids[i];
+    if(!(c instanceof CompoundPath))continue;
+    var at=layer.children.indexOf(c);
+    if(at<0)continue;
+    var strokeInfo=c.strokeColor?{color:c.strokeColor,width:c.strokeWidth,cap:c.strokeCap,join:c.strokeJoin}:null;
+    try{
+      insertBooleanResult(layer,at,c,c.fillColor,c.opacity,strokeInfo,c.data);
+      console.warn('[save] CompoundPath aplati avant sauvegarde (il aurait été perdu) — voir CLAUDE.md §1');
+    }catch(e){console.warn('[save] aplatissement du CompoundPath impossible',e);}
+  }
+}
 function _collectLayerStrokes(li,ld){
   var strokes=[];
+  _flattenCompoundChildren(li);
   userLayers[li].children.forEach(function(c){if(c.data&&c.data.ghostFrame!==undefined)return;if(c instanceof Path&&c.segments.length>0){enforceChannelStrip(ld,c);strokes.push(serP(c));}else if(c instanceof Raster)strokes.push(serR(c));});
   return strokes;
 }
