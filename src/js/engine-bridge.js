@@ -649,7 +649,9 @@
     if (symmetryItems.length) layers.push({ items: symmetryItems });
     var gradientGizmoItems = window.buildGradientGizmoItems ? window.buildGradientGizmoItems() : [];
     if (gradientGizmoItems.length) layers.push({ items: gradientGizmoItems });
-    return JSON.stringify({ layers: layers });
+    var frameForFx = (_fxFrameOverride != null ? _fxFrameOverride : state.currentFrame) || 0;
+    var fpsForFx = Math.max(1, state.fps || 24);
+    return JSON.stringify({ time: frameForFx / fpsForFx, layers: layers });
   }
 
   // Onion skin ghosts (tweens.js's renderOS() keeps onionPrevLayer/

@@ -184,6 +184,15 @@
       },
     },
     { name: 'xsheet', label: 'Feuille d\'exposition flottante' },
+    {
+      name: 'reference-3d', label: 'Référence 3D — personnage & mains',
+      hintExtra: 'Mannequins 3D rotatifs pour le dessin : glisser pour tourner, molette pour zoomer. Ils restent une référence écran et ne sont jamais exportés.',
+      extra: function (c) {
+        var row = subRow();
+        [['Avatar CC0', function () { window.SMLabs.openCC0AvatarReference(); }], ['Mains CC0', function () { window.SMLabs.openCC0HandReference(); }], ['Mannequin', function () { window.SMLabs.openCharacterReference('neutral'); }], ['Action', function () { window.SMLabs.openCharacterReference('action'); }], ['Main simple', function () { window.SMLabs.openHandReference('open'); }], ['Poing', function () { window.SMLabs.openHandReference('fist'); }], ['Index', function () { window.SMLabs.openHandReference('point'); }]].forEach(function (d) { var b = mkBtn(d[0]); b.addEventListener('click', d[1]); row.appendChild(b); });
+        c.appendChild(row);
+      },
+    },
     { name: 'multiframe-draw', label: 'Dessin multi-frames', hintExtra: 'Sélectionne plusieurs frames dans la timeline avant de dessiner — le trait est tamponné sur chacune.' },
   ];
 

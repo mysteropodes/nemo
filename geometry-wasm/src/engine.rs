@@ -284,6 +284,8 @@ fn mix_mode_index(name: Option<&str>) -> u32 {
 #[derive(Deserialize, Serialize)]
 pub(crate) struct SceneIn {
     pub(crate) layers: Vec<LayerIn>,
+    #[serde(default)]
+    pub(crate) time: f32,
 }
 
 // Builds the filled ribbon outline for a pressure-brush stroke from its
@@ -645,6 +647,8 @@ pub struct VelloEngine {
     // scratch before the screen-blend composite — unrelated to this one).
     blur_scratch_tex: wgpu::Texture,
     blur_scratch_view: wgpu::TextureView,
+    bloom_extract_tex: wgpu::Texture,
+    bloom_extract_view: wgpu::TextureView,
     // ---- Effect (adjustment) layers (2026-07) — color_adjust.wgsl. No
     // result_tex/view of its own: unlike blur_result above (used for a
     // per-layer blur that still needs to flow into the ordinary composite/
@@ -715,6 +719,9 @@ pub struct VelloEngine {
     // other shader bug in this file; it can't corrupt or crash the wasm
     // instance).
     custom_effect_pipelines: std::collections::HashMap<String, wgpu::RenderPipeline>,
+    // Current scene time in seconds, copied from SceneIn before each render.
+    // Custom/simple WGSL effects receive it as params.time.
+    fx_time: f32,
 }
 
 // ---- Blend compositor plumbing (see blend.wgsl's doc comment) ----
@@ -1613,6 +1620,7 @@ fn simple_fx_pass(
     p2: f32,
     p3: f32,
     p4: f32,
+    time: f32,
     tex_w: f32,
     tex_h: f32,
     target_view: &wgpu::TextureView,
@@ -1624,6 +1632,7 @@ fn simple_fx_pass(
     payload[12..16].copy_from_slice(&p3.to_le_bytes());
     payload[16..20].copy_from_slice(&tex_w.to_le_bytes());
     payload[20..24].copy_from_slice(&tex_h.to_le_bytes());
+    payload[24..28].copy_from_slice(&time.to_le_bytes());
     payload[28..32].copy_from_slice(&p4.to_le_bytes());
     queue.write_buffer(uniform_buf, 0, &payload);
     let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -1979,6 +1988,7 @@ pub async fn create_engine(
     let (blur_pipeline, blur_bind_group_layout, blur_sampler, blur_uniform_buf) = create_blur_pipeline(&device);
     let (blur_result_tex, blur_result_view) = create_matte_result_texture(&device, width, height);
     let (blur_scratch_tex, blur_scratch_view) = create_matte_result_texture(&device, width, height);
+    let (bloom_extract_tex, bloom_extract_view) = create_matte_result_texture(&device, width, height);
     let (color_pipeline, color_bind_group_layout, color_sampler, color_uniform_buf) = create_color_adjust_pipeline(&device);
     let (vignette_pipeline, vignette_bind_group_layout, vignette_sampler, vignette_uniform_buf) = create_vignette_pipeline(&device);
     let (simple_fx_pipeline, simple_fx_bind_group_layout, simple_fx_sampler, simple_fx_uniform_buf) = create_simple_fx_pipeline(&device);
@@ -2035,6 +2045,8 @@ pub async fn create_engine(
         blur_result_view,
         blur_scratch_tex,
         blur_scratch_view,
+        bloom_extract_tex,
+        bloom_extract_view,
         color_pipeline,
         color_bind_group_layout,
         color_sampler,
@@ -2056,6 +2068,7 @@ pub async fn create_engine(
         element_build_b_tex,
         element_build_b_view,
         custom_effect_pipelines: std::collections::HashMap::new(),
+        fx_time: 0.0,
     })
 }
 
@@ -2149,6 +2162,22 @@ impl VelloEngine {
                     source, &self.blur_result_view, 2, target,
                 );
             }
+            "hqBloom" => {
+                simple_fx_pass(
+                    &self.device, &self.queue, &self.simple_fx_pipeline, &self.simple_fx_bind_group_layout, &self.simple_fx_sampler, &self.simple_fx_uniform_buf,
+                    source, 14.0,
+                    eff.p1.unwrap_or(0.55), 0.0, eff.p3.unwrap_or(1.4), eff.p4.unwrap_or(0.25),
+                    self.fx_time, self.width as f32, self.height as f32, &self.bloom_extract_view,
+                );
+                blur_pass(
+                    &self.device, &self.queue, &self.blur_pipeline, &self.blur_bind_group_layout, &self.blur_sampler, &self.blur_uniform_buf,
+                    &self.bloom_extract_view, eff.p2.unwrap_or(28.0) * z, self.width, self.height, &self.blur_scratch_view, &self.blur_result_view,
+                );
+                composite_pass(
+                    &self.device, &self.queue, &self.blend_pipeline, &self.blend_bind_group_layout, &self.blend_sampler, &self.blend_uniform_buf,
+                    source, &self.blur_result_view, 2, target,
+                );
+            }
             "sepia" | "invert" | "grayscale" | "posterize" | "pixelate" | "chromaticAberration" | "scanlines" | "grain" | "sharpen" | "edgeDetect" | "groundShadow" | "contourBrut" | "threshold" | "halftone" => {
                 let effect_id = match eff.effect_type.as_str() {
                     "sepia" => 0.0,
@@ -2210,7 +2239,7 @@ impl VelloEngine {
                         &self.device, &self.queue, &self.simple_fx_pipeline, &self.simple_fx_bind_group_layout, &self.simple_fx_sampler, &self.simple_fx_uniform_buf,
                         source, effect_id,
                         p1, eff.p2.unwrap_or(default_p2), eff.p3.unwrap_or(default_p3), eff.p4.unwrap_or(default_p4),
-                        self.width as f32, self.height as f32, target,
+                        self.fx_time, self.width as f32, self.height as f32, target,
                     );
                 }
             }
@@ -2231,7 +2260,7 @@ impl VelloEngine {
                         &self.device, &self.queue, pipeline, &self.simple_fx_bind_group_layout, &self.simple_fx_sampler, &self.simple_fx_uniform_buf,
                         source, 0.0,
                         eff.p1.unwrap_or(0.0), eff.p2.unwrap_or(0.0), eff.p3.unwrap_or(0.0), eff.p4.unwrap_or(0.0),
-                        self.width as f32, self.height as f32, target,
+                        self.fx_time, self.width as f32, self.height as f32, target,
                     );
                 }
             }
@@ -2771,6 +2800,9 @@ impl VelloEngine {
         let (blur_scratch_tex, blur_scratch_view) = create_matte_result_texture(&self.device, width, height);
         self.blur_scratch_tex = blur_scratch_tex;
         self.blur_scratch_view = blur_scratch_view;
+        let (bloom_extract_tex, bloom_extract_view) = create_matte_result_texture(&self.device, width, height);
+        self.bloom_extract_tex = bloom_extract_tex;
+        self.bloom_extract_view = bloom_extract_view;
         let (effect_stack_a_tex, effect_stack_a_view) = create_blend_accum_texture(&self.device, width, height, "effect-stack-a");
         self.effect_stack_a_tex = effect_stack_a_tex;
         self.effect_stack_a_view = effect_stack_a_view;
@@ -2856,6 +2888,7 @@ impl VelloEngine {
     pub fn render(&mut self, scene_json: &str) -> Result<(), JsValue> {
         let scene_in: SceneIn = serde_json::from_str(scene_json)
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        self.fx_time = scene_in.time;
         let view_tf = self.viewport.transform();
         // Confirmed in-browser (see removed [wasm-debug] probe) that this
         // canvas's WebGPU surface only advertises CompositeAlphaMode::
@@ -2894,6 +2927,7 @@ impl VelloEngine {
     pub async fn render_to_pixels(&mut self, scene_json: &str) -> Result<Vec<u8>, JsValue> {
         let scene_in: SceneIn = serde_json::from_str(scene_json)
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        self.fx_time = scene_in.time;
         let view_tf = self.viewport.transform();
         self.composite_scene(&scene_in, view_tf, Color::TRANSPARENT)?;
 

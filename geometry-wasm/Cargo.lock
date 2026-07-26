@@ -330,6 +330,7 @@ dependencies = [
  "geo-booleanop",
  "geo-types",
  "log",
+ "naga",
  "serde",
  "serde_json",
  "vello",
