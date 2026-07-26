@@ -138,7 +138,7 @@ export class VelloEngine {
      * the artboard center (e.g. canvasW/2, canvasH/2) to match Animate's
      * Rotate Stage tool; pass (0,0) for a plain top-left-anchored zoom/pan.
      */
-    set_viewport(pan_x: number, pan_y: number, zoom: number, rotation: number, pivot_x: number, pivot_y: number): void;
+    set_viewport(pan_x: number, pan_y: number, zoom: number, rotation: number, pivot_x: number, pivot_y: number, effect_zoom: number): void;
 }
 
 export function align_pair(a_json: string, b_json: string): string;
@@ -250,7 +250,7 @@ export interface InitOutput {
     readonly velloengine_screen_to_world: (a: number, b: number, c: number) => [number, number];
     readonly velloengine_select_at: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number, number, number];
     readonly velloengine_selection_bounds: (a: number, b: number, c: number) => [number, number, number, number];
-    readonly velloengine_set_viewport: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
+    readonly velloengine_set_viewport: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => void;
     readonly align_pair: (a: number, b: number, c: number, d: number) => [number, number, number, number];
     readonly auto_match: (a: number, b: number, c: number, d: number) => [number, number, number, number];
     readonly resample_stroke: (a: number, b: number, c: number) => [number, number, number, number];

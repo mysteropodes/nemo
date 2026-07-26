@@ -509,13 +509,17 @@ struct Viewport {
     pan_x: f64,
     pan_y: f64,
     zoom: f64,
+    // Logical editor zoom, excluding the device-pixel ratio baked into
+    // `zoom` for geometry rasterization. Pixel-space effects use this so
+    // Retina displays do not accidentally double their radius/block size.
+    effect_zoom: f64,
     rotation: f64,
     pivot_x: f64,
     pivot_y: f64,
 }
 impl Default for Viewport {
     fn default() -> Self {
-        Viewport { pan_x: 0.0, pan_y: 0.0, zoom: 1.0, rotation: 0.0, pivot_x: 0.0, pivot_y: 0.0 }
+        Viewport { pan_x: 0.0, pan_y: 0.0, zoom: 1.0, effect_zoom: 1.0, rotation: 0.0, pivot_x: 0.0, pivot_y: 0.0 }
     }
 }
 impl Viewport {
@@ -2136,7 +2140,7 @@ impl VelloEngine {
         // that must NOT grow with zoom). Not applied to custom: WGSL
         // effects below — p1..p4 there have no fixed meaning this
         // function could assume is a pixel size.
-        let z = self.viewport.zoom.max(0.0001) as f32;
+        let z = self.viewport.effect_zoom.max(0.0001) as f32;
         match eff.effect_type.as_str() {
             "colorAdjust" => color_adjust_pass(
                 &self.device, &self.queue, &self.color_pipeline, &self.color_bind_group_layout, &self.color_sampler, &self.color_uniform_buf,
@@ -2541,14 +2545,19 @@ impl VelloEngine {
     /// `rotation` in radians, pivoting around `(pivot_x, pivot_y)` — pass
     /// the artboard center (e.g. canvasW/2, canvasH/2) to match Animate's
     /// Rotate Stage tool; pass (0,0) for a plain top-left-anchored zoom/pan.
-    pub fn set_viewport(&mut self, pan_x: f64, pan_y: f64, zoom: f64, rotation: f64, pivot_x: f64, pivot_y: f64) {
+    pub fn set_viewport(&mut self, pan_x: f64, pan_y: f64, zoom: f64, rotation: f64, pivot_x: f64, pivot_y: f64, effect_zoom: f64) {
         // A zero/negative zoom (a stray or buggy JS-side value — this is
         // caller-controlled, not otherwise validated) makes Affine::scale
         // singular; screen_to_world's inverse() then yields inf/NaN that
         // silently poisons all hit-testing/coordinate math afterward
         // instead of failing loudly. Same floor already used by
         // gizmo_handles for the same reason (see its own zoom.max call).
-        self.viewport = Viewport { pan_x, pan_y, zoom: zoom.max(0.0001), rotation, pivot_x, pivot_y };
+        self.viewport = Viewport {
+            pan_x, pan_y,
+            zoom: zoom.max(0.0001),
+            effect_zoom: effect_zoom.max(0.0001),
+            rotation, pivot_x, pivot_y,
+        };
     }
 
     /// Screen (canvas pixel) coordinates -> world coordinates, accounting

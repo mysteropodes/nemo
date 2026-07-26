@@ -254,7 +254,11 @@
   // same invariant export.js's own exportBuildFrame already enforces for
   // the plain (non-effects) export path — this closes the same gap for the
   // WGPU-effects one, which reuses this function instead of exportBuildFrame.
-  function buildSceneJson(skipVolatile, excludeGhosts) {
+  function buildSceneJson(skipVolatile, excludeGhosts, renderContext) {
+    renderContext = renderContext || {};
+    var renderFrame = renderContext.frame != null ? renderContext.frame
+      : (_fxFrameOverride != null ? _fxFrameOverride : state.currentFrame);
+    var includeEditorOverlays = renderContext.includeEditorOverlays !== false;
     var layers = [];
     // StoryBoard montage preview (storyboard.js, 2026-07): when the node
     // space has an active montage, the canvas shows THAT montage's frame
@@ -296,7 +300,7 @@
       // baked into the next saveActiveLayerFrame() permanently). Null (the
       // overwhelmingly common case — no motion on this layer) skips the
       // per-item transform pass entirely below.
-      var motionMat = (window.SMMotion && children.length) ? SMMotion.layerMotionAt(i, state.currentFrame) : null;
+      var motionMat = (window.SMMotion && children.length) ? SMMotion.layerMotionAt(i, renderFrame) : null;
       // Pivot = auto bounds center + the layer's Anchor Point offset
       // (motionMat.ax/ay) — see motion.js's layerMotionAt header comment.
       var motionPivot = motionMat ? { x: userLayers[i].bounds.center.x + motionMat.ax, y: userLayers[i].bounds.center.y + motionMat.ay } : null;
@@ -306,7 +310,7 @@
       // nesting order as elMat-then-motionMat above one level further out.
       // Empty array (the common case, no parent) makes the per-item loop
       // below a no-op cost.
-      var parentChain = window.SMMotion ? SMMotion.parentChainMats(i, state.currentFrame) : [];
+      var parentChain = window.SMMotion ? SMMotion.parentChainMats(i, renderFrame) : [];
       // Brush-texture companions (isBrushTextureCopy — bitmap raster or
       // vector dab group) don't get their own Elements row in Motion
       // (motion.js's layerElements folds them into their anchor's, "merge
@@ -337,18 +341,18 @@
         var nv = state.layers[i].nativeVideo;
         var inF = window.layerInPoint ? layerInPoint(state.layers[i]) : 0;
         var outF = window.layerOutPoint ? layerOutPoint(state.layers[i]) : state.totalFrames - 1;
-        if (state.currentFrame >= inF && state.currentFrame <= outF) {
+        if (renderFrame >= inF && renderFrame <= outF) {
           var nvS = Math.min(state.canvasW / nv.width, state.canvasH / nv.height);
           var nvW = nv.width * nvS, nvH = nv.height * nvS;
           var nvRect = { x: (state.canvasW - nvW) / 2, y: (state.canvasH - nvH) / 2, width: nvW, height: nvH };
           var nvOp = 1;
-          var nvMat = window.SMMotion ? SMMotion.layerMotionAt(i, state.currentFrame) : null;
+          var nvMat = window.SMMotion ? SMMotion.layerMotionAt(i, renderFrame) : null;
           if (nvMat) {
             var nvPivot = { x: nvRect.x + nvRect.width / 2 + nvMat.ax, y: nvRect.y + nvRect.height / 2 + nvMat.ay };
             nvRect = SMMotion.transformImageRect(nvRect, nvPivot, nvMat);
             nvOp *= nvMat.op;
           }
-          var nvChain = SMMotion.parentChainMats(i, state.currentFrame);
+          var nvChain = SMMotion.parentChainMats(i, renderFrame);
           for (var nvpc = 0; nvpc < nvChain.length; nvpc++) { nvRect = SMMotion.transformImageRect(nvRect, nvChain[nvpc].pivot, nvChain[nvpc].mat); nvOp *= nvChain[nvpc].mat.op; }
           items.push({ image: { imageId: 'nv:' + i, x: nvRect.x, y: nvRect.y, width: nvRect.width, height: nvRect.height, opacity: nvOp, rotation: nvRect.rotation || 0 } });
         }
@@ -382,7 +386,7 @@
         // AE's shape-group-inside-a-layer composition. null in the common
         // case (this item has no per-element motion of its own).
         var cStrokeId = c.data && ((c.data.isBrushTextureCopy && brushAnchorStrokeId && brushAnchorStrokeId[c.data.brushGroupId]) || c.data.strokeId);
-        var elMat = (window.SMMotion && cStrokeId) ? SMMotion.elementMotionAt(i, cStrokeId, state.currentFrame) : null;
+        var elMat = (window.SMMotion && cStrokeId) ? SMMotion.elementMotionAt(i, cStrokeId, renderFrame) : null;
         var elPivot = elMat ? { x: c.bounds.center.x + elMat.ax, y: c.bounds.center.y + elMat.ay } : null;
         if (c instanceof Raster) {
           var imageId = registerRasterIfNeeded(c);
@@ -426,7 +430,7 @@
           // shape's OWN local space, same as elMat's own pivot is computed
           // from `c.bounds` (the pre-offset bounds), matching AE's model
           // where a path's own points are edited before any transform.
-          if (window.SMMotion && cStrokeId) sd.segments = SMMotion.applyPathVertexOffsetsFor(i, cStrokeId, sd.segments, state.currentFrame);
+          if (window.SMMotion && cStrokeId) sd.segments = SMMotion.applyPathVertexOffsetsFor(i, cStrokeId, sd.segments, renderFrame);
           if (elMat) sd.segments = SMMotion.transformSegments(sd.segments, elPivot, elMat);
           if (motionMat) sd.segments = SMMotion.transformSegments(sd.segments, motionPivot, motionMat);
           for (var pc2 = 0; pc2 < parentChain.length; pc2++) sd.segments = SMMotion.transformSegments(sd.segments, parentChain[pc2].pivot, parentChain[pc2].mat);
@@ -465,24 +469,29 @@
           // the user actually keyed/set it (elementFillColorAt returns
           // null otherwise, see its own comment in motion.js).
           if (window.SMMotion && cStrokeId) {
-            var fcOverride = SMMotion.elementFillColorAt(i, cStrokeId, state.currentFrame);
+            var fcOverride = SMMotion.elementFillColorAt(i, cStrokeId, renderFrame);
             if (fcOverride) item.fillColor = fcOverride;
           }
           // Gradient fill (2026-07) — takes priority over the flat fillColor
           // above on the Rust side (geometry-wasm's paint_fill), same
           // "richer field wins" precedent as centerline/image. Anchor points
-          // are absolute world coordinates authored once when the gradient
-          // is applied (see palette-panel.js's gradient editor) — NOT yet
-          // re-projected through elMat/motionMat/parentChain, a known v1
-          // limitation (documented on ItemIn.fill_gradient in engine.rs too).
+          // are document coordinates and follow the exact same element,
+          // layer and parent transform chain as the path geometry.
           // gradientGeomOk: a from/to-less gradient would send `undefined`
           // endpoints into the Rust side. Skipping it here leaves the flat
           // fillColor in place — the shape still draws, just without the
           // ramp, instead of rendering as garbage.
           if (c.data && c.data.fillGradient && (!window.gradientGeomOk || window.gradientGeomOk(c.data.fillGradient))) {
             var fg = c.data.fillGradient;
+            function transformedGradientPoint(pt) {
+              var one = [{ point: [pt[0], pt[1]], handleIn: [0, 0], handleOut: [0, 0] }];
+              if (elMat) one = SMMotion.transformSegments(one, elPivot, elMat);
+              if (motionMat) one = SMMotion.transformSegments(one, motionPivot, motionMat);
+              for (var gpc = 0; gpc < parentChain.length; gpc++) one = SMMotion.transformSegments(one, parentChain[gpc].pivot, parentChain[gpc].mat);
+              return one[0].point;
+            }
             item.fillGradient = {
-              kind: fg.kind, from: fg.from, to: fg.to,
+              kind: fg.kind, from: transformedGradientPoint(fg.from), to: transformedGradientPoint(fg.to),
               stops: fg.stops.map(function (s) { return { offset: s.offset, color: cssColorToRgba(s.color, op) || [0, 0, 0, 0] }; }),
             };
           }
@@ -496,6 +505,14 @@
             if (c.dashArray && c.dashArray.length) {
               item.dashPattern = c.dashArray;
               item.dashOffset = c.dashOffset;
+            }
+          }
+          if (includeEditorOverlays && state.currentFrameOutline) {
+            delete item.fillGradient;
+            item.fillColor = null;
+            if (!item.strokeColor) {
+              item.strokeColor = [235, 235, 240, Math.round(255 * op)];
+              item.strokeWidth = Math.max(1 / view.zoom, 0.75);
             }
           }
           if (c.data && c.data.paintOrder) item.paintOrder = c.data.paintOrder;
@@ -545,7 +562,7 @@
         var mbShutter = Math.max(0.05, Math.min(2, state.motionBlurShutter || 0.5)); // in frames
         for (var s = 1; s <= mbSamples; s++) {
           var t = (s / mbSamples) * mbShutter;
-          var ms = SMMotion.layerMotionAt(i, state.currentFrame - t);
+          var ms = SMMotion.layerMotionAt(i, renderFrame - t);
           if (!ms) continue;
           var delta = {
             dx: ms.dx - motionMat.dx, dy: ms.dy - motionMat.dy,
@@ -603,53 +620,55 @@
     // Onion ghosts sit right above the background but BELOW the current
     // frame's real artwork (layers[1..]) — a faint reference, never
     // obscuring what's actually being drawn on top of it.
-    var onionItems = buildOnionSkinItems();
-    if (onionItems.length) layers.splice(1, 0, { items: onionItems });
-    var ghostAllItems = buildGhostAllItems();
-    if (ghostAllItems.length) layers.splice(1, 0, { items: ghostAllItems });
-    var nodeItems = buildNodeHandleItems();
-    if (nodeItems.length) layers.push({ items: nodeItems });
-    var xformItems = buildTransformBoxItems();
-    if (xformItems.length) layers.push({ items: xformItems });
-    var marqueeItems = buildMarqueeItems();
-    if (marqueeItems.length) layers.push({ items: marqueeItems });
-    var fsSelItems = buildFSSelectionItems();
-    if (fsSelItems.length) layers.push({ items: fsSelItems });
-    var revisionItems = buildRevisionOutlineItems();
-    if (revisionItems.length) layers.push({ items: revisionItems });
-    var commentItems = buildCommentPinItems();
-    if (commentItems.length) layers.push({ items: commentItems });
-    if (window.SMCamera) {
-      var cameraItems = SMCamera.buildOverlayItems();
-      if (cameraItems.length) layers.push({ items: cameraItems.map(function (it) { it.segments = roundSegs(it.segments); return it; }) });
+    if (includeEditorOverlays) {
+      var onionItems = buildOnionSkinItems();
+      if (onionItems.length) layers.splice(1, 0, { items: onionItems });
+      var ghostAllItems = buildGhostAllItems();
+      if (ghostAllItems.length) layers.splice(1, 0, { items: ghostAllItems });
+      var nodeItems = buildNodeHandleItems();
+      if (nodeItems.length) layers.push({ items: nodeItems });
+      var xformItems = buildTransformBoxItems();
+      if (xformItems.length) layers.push({ items: xformItems });
+      var marqueeItems = buildMarqueeItems();
+      if (marqueeItems.length) layers.push({ items: marqueeItems });
+      var fsSelItems = buildFSSelectionItems();
+      if (fsSelItems.length) layers.push({ items: fsSelItems });
+      var revisionItems = buildRevisionOutlineItems();
+      if (revisionItems.length) layers.push({ items: revisionItems });
+      var commentItems = buildCommentPinItems();
+      if (commentItems.length) layers.push({ items: commentItems });
+      if (window.SMCamera) {
+        var cameraItems = SMCamera.buildOverlayItems();
+        if (cameraItems.length) layers.push({ items: cameraItems.map(function (it) { it.segments = roundSegs(it.segments); return it; }) });
+      }
+      if (window.SMMotion) {
+        var motionItems = SMMotion.buildOverlayItems();
+        if (motionItems.length) layers.push({ items: motionItems.map(function (it) { it.segments = roundSegs(it.segments); return it; }) });
+      }
+      if (typeof fillCloseStrokesOverlayItems === 'function') {
+        var fillCloseItems = fillCloseStrokesOverlayItems();
+        if (fillCloseItems.length) layers.push({ items: fillCloseItems.map(function (it) { it.segments = roundSegs(it.segments); return it; }) });
+      }
+      if (!skipVolatile) {
+        var eraserItems = buildEraserCursorItems();
+        if (eraserItems.length) layers.push({ items: eraserItems });
+        var pressureItems = buildPressureCursorItems();
+        if (pressureItems.length) layers.push({ items: pressureItems });
+        var penItems = buildPenPreviewItems();
+        if (penItems.length) layers.push({ items: penItems });
+      }
+      var arcItems = buildArcHandleItems();
+      if (arcItems.length) layers.push({ items: arcItems });
+      var safetyItems = buildSafetyZoneItems();
+      if (safetyItems.length) layers.push({ items: safetyItems });
+      var perspectiveItems = window.buildPerspectiveGuideItems ? window.buildPerspectiveGuideItems() : [];
+      if (perspectiveItems.length) layers.push({ items: perspectiveItems });
+      var symmetryItems = window.buildSymmetryGuideItems ? window.buildSymmetryGuideItems() : [];
+      if (symmetryItems.length) layers.push({ items: symmetryItems });
+      var gradientGizmoItems = window.buildGradientGizmoItems ? window.buildGradientGizmoItems() : [];
+      if (gradientGizmoItems.length) layers.push({ items: gradientGizmoItems });
     }
-    if (window.SMMotion) {
-      var motionItems = SMMotion.buildOverlayItems();
-      if (motionItems.length) layers.push({ items: motionItems.map(function (it) { it.segments = roundSegs(it.segments); return it; }) });
-    }
-    if (typeof fillCloseStrokesOverlayItems === 'function') {
-      var fillCloseItems = fillCloseStrokesOverlayItems();
-      if (fillCloseItems.length) layers.push({ items: fillCloseItems.map(function (it) { it.segments = roundSegs(it.segments); return it; }) });
-    }
-    if (!skipVolatile) {
-      var eraserItems = buildEraserCursorItems();
-      if (eraserItems.length) layers.push({ items: eraserItems });
-      var pressureItems = buildPressureCursorItems();
-      if (pressureItems.length) layers.push({ items: pressureItems });
-      var penItems = buildPenPreviewItems();
-      if (penItems.length) layers.push({ items: penItems });
-    }
-    var arcItems = buildArcHandleItems();
-    if (arcItems.length) layers.push({ items: arcItems });
-    var safetyItems = buildSafetyZoneItems();
-    if (safetyItems.length) layers.push({ items: safetyItems });
-    var perspectiveItems = window.buildPerspectiveGuideItems ? window.buildPerspectiveGuideItems() : [];
-    if (perspectiveItems.length) layers.push({ items: perspectiveItems });
-    var symmetryItems = window.buildSymmetryGuideItems ? window.buildSymmetryGuideItems() : [];
-    if (symmetryItems.length) layers.push({ items: symmetryItems });
-    var gradientGizmoItems = window.buildGradientGizmoItems ? window.buildGradientGizmoItems() : [];
-    if (gradientGizmoItems.length) layers.push({ items: gradientGizmoItems });
-    var frameForFx = (_fxFrameOverride != null ? _fxFrameOverride : state.currentFrame) || 0;
+    var frameForFx = renderFrame || 0;
     var fpsForFx = Math.max(1, state.fps || 24);
     return JSON.stringify({ time: frameForFx / fpsForFx, layers: layers });
   }
@@ -1306,7 +1325,7 @@
     var pivotWX = state.canvasW / 2, pivotWY = state.canvasH / 2;
     var panAdjX = panX + pivotWX * (z - 1);
     var panAdjY = panY + pivotWY * (z - 1);
-    engine.set_viewport(panAdjX, panAdjY, z, state.canvasRotation || 0, pivotWX, pivotWY);
+    engine.set_viewport(panAdjX, panAdjY, z, state.canvasRotation || 0, pivotWX, pivotWY, view.zoom);
   }
 
   // Shared with renderWithOverlayItem/renderNow so all three call sites stay
@@ -1677,11 +1696,17 @@
   async function renderFrameToPixelsPNG(frameIdx) {
     var cw = state.canvasW, ch = state.canvasH;
     engine.resize(cw, ch);
-    engine.set_viewport(0, 0, 1, 0, cw / 2, ch / 2);
+    engine.set_viewport(0, 0, 1, 0, cw / 2, ch / 2, 1);
     loadFrame(frameIdx);
     _fxFrameOverride = frameIdx;
     var json;
-    try { json = buildSceneJson(true, true); } finally { _fxFrameOverride = null; }
+    try {
+      json = buildSceneJson(true, true, {
+        frame: frameIdx,
+        forExport: true,
+        includeEditorOverlays: false,
+      });
+    } finally { _fxFrameOverride = null; }
     var bytes = await engine.render_to_pixels(json);
     var imgData = new ImageData(new Uint8ClampedArray(bytes.buffer, bytes.byteOffset, bytes.byteLength), cw, ch);
     var off = document.createElement('canvas'); off.width = cw; off.height = ch;

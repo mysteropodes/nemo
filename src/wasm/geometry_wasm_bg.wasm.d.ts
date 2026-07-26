@@ -17,7 +17,7 @@ export const velloengine_scale_selection: (a: number, b: number, c: number, d: n
 export const velloengine_screen_to_world: (a: number, b: number, c: number) => [number, number];
 export const velloengine_select_at: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number, number, number];
 export const velloengine_selection_bounds: (a: number, b: number, c: number) => [number, number, number, number];
-export const velloengine_set_viewport: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
+export const velloengine_set_viewport: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => void;
 export const align_pair: (a: number, b: number, c: number, d: number) => [number, number, number, number];
 export const auto_match: (a: number, b: number, c: number, d: number) => [number, number, number, number];
 export const resample_stroke: (a: number, b: number, c: number) => [number, number, number, number];
