@@ -103,6 +103,7 @@
     if (bestNh) {
       pushUndo();
       _nodeDrag.active = true; _nodeDrag.path = selectedPaths[0]; _nodeDrag.segIndex = bestNh.segIndex;
+      _nodeDrag.dragStartPointer = pt.clone(); _nodeDrag.appliedDelta = new Point(0, 0);
       // grabbing one of several marquee-selected anchors drags them all
       if (bestNh.type === 'point' && _nodeSel.indexOf(bestNh.segIndex) >= 0 && _nodeSel.length > 1) {
         _nodeDrag.type = 'group';
@@ -168,6 +169,19 @@
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
     var pt = new Point(w[0], w[1]);
     var delta = pt.subtract(lastPt);
+    if (_nodeDrag.active && (_nodeDrag.type === 'point' || _nodeDrag.type === 'group')) {
+      var desired = pt.subtract(_nodeDrag.dragStartPointer || lastPt);
+      if (e.shiftKey) {
+        var snapped = constrainAngle45(_nodeDrag.dragStartPointer || lastPt, pt);
+        desired = snapped.subtract(_nodeDrag.dragStartPointer || lastPt);
+      }
+      var already = _nodeDrag.appliedDelta || new Point(0, 0);
+      delta = desired.subtract(already);
+      _nodeDrag.appliedDelta = desired;
+    } else if (_nodeDrag.active && e.shiftKey && (_nodeDrag.type === 'handleIn' || _nodeDrag.type === 'handleOut')) {
+      var hs = nodeEditSegmentsData(_nodeDrag.path)[_nodeDrag.segIndex];
+      if (hs) pt = constrainAngle45(new Point(hs.point[0], hs.point[1]), pt);
+    }
 
     if (_nmq.active) {
       var nx1 = Math.min(_nmq.start.x, pt.x), ny1 = Math.min(_nmq.start.y, pt.y);

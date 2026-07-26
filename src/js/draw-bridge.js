@@ -320,7 +320,7 @@
       // reported bug for stylus users). With Fill on, also paint the region
       // enclosed by the centerline underneath the ribbon, same live-fill
       // behavior the plain-stroke mode already has.
-      if (state.fillEnabled) {
+      if (state.fillEnabled && !state.shadowMode) {
         return [regionPreview, ribbon];
       }
       return ribbon;
@@ -614,9 +614,6 @@
       // points directly — not what a filled shape's nodes should behave
       // like). isFillShape stays (still needed by pen-bridge.js's own
       // close-path/endpoint-snap exclusion guard).
-      delete path.data.isVectorBrush;
-      delete path.data.centerSegments;
-      delete path.data.widthProfile;
       if (state.shadowMode) {
         // A shadow guide stroke must never auto-merge/unite with whatever
         // real artwork happens to sit underneath it — both
@@ -627,6 +624,9 @@
         // Fill Brush commit path).
         applyShadowBrushTag(path);
       } else {
+        delete path.data.isVectorBrush;
+        delete path.data.centerSegments;
+        delete path.data.widthProfile;
         // Placement (Above/Below/Merge) — see applyFillBrushPlacement's own
         // comment; replaces the old unconditional "always at the back". The
         // return value MUST be captured: 'merge' mode, when it finds an
@@ -690,7 +690,7 @@
       // rebuildVectorBrushOutline; pure drag-to-move is handled at its own
       // two call sites) keeps re-syncing it — fixing the reported "fill
       // pas attaché au stroke" desync on top of the initial mismatch.
-      if (state.fillEnabled) {
+      if (state.fillEnabled && !state.shadowMode) {
         var fillPath = new Path();
         fillPath.fillColor = state.fillColor;
         fillPath.strokeColor = null;
@@ -737,7 +737,7 @@
       // baseWidth for a shape whose width varies along its length) — now
       // that it accepts a widthProfile, wire it up here too so a preset
       // actually applies to pressure strokes at draw time.
-      if (state.brushPreset && state.brushPreset !== 'none') applyBrushTexture(path, state.brushPreset);
+      if (!state.shadowMode && state.brushPreset && state.brushPreset !== 'none') applyBrushTexture(path, state.brushPreset);
     } else {
       path = new Path();
       // Left-panel stroke eye honored here too (it always was for the
@@ -766,8 +766,8 @@
       // same anchor+companion architecture as applyBrushTexture, just one
       // Raster companion instead of many vector dabs; the path committed
       // above (fill included) stays as the real, subselect-editable anchor.
-      if (state.strokeEnabled && state.bitmapBrushOn && window.SMBitmapBrush) window.SMBitmapBrush.applyToPath(path, null, samples);
-      else if (state.strokeEnabled && state.brushPreset && state.brushPreset !== 'none') applyBrushTexture(path, state.brushPreset);
+      if (!state.shadowMode && state.strokeEnabled && state.bitmapBrushOn && window.SMBitmapBrush) window.SMBitmapBrush.applyToPath(path, null, samples);
+      else if (!state.shadowMode && state.strokeEnabled && state.brushPreset && state.brushPreset !== 'none') applyBrushTexture(path, state.brushPreset);
       if (state.drawMode === 'behind') {
         userLayers[state.activeLayerIdx].insertChild(0, path);
         // Same re-anchor need as the linkedFill case a few lines up in the
