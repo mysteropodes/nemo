@@ -1216,7 +1216,42 @@ if(window.__TAURI__&&window.__TAURI__.event&&window.__TAURI__.event.listen){
 // promoted it to isKeyframe:true, strokes:[] — the stroke wasn't moved,
 // it was deleted. Must compute the effective content FIRST, while the
 // frame still reads as "not yet a keyframe".
-function ensureKeyframe(){var ldk=state.layers[state.activeLayerIdx];if(ldk.nativeVideo){showToast('Calque vidéo — dessine sur un calque normal au-dessus');return;}if(ldk.montageId){showToast('Calque montage — son contenu s\u2019édite dans le StoryBoard');return;}var curF=ldk.frames[state.currentFrame];if(!curF.isKeyframe&&!curF.isInterpolated){var effStrokes=JSON.parse(JSON.stringify(getEffectiveStrokes(state.activeLayerIdx,state.currentFrame)));curF.isKeyframe=true;curF.strokes=effStrokes;loadFrame(state.currentFrame);syncLinkedKeyframeFolder(state.activeLayerIdx,state.currentFrame);}}
+// Why the active layer can't take a drawing edit right now, or null if it
+// can. ensureKeyframe already refused nativeVideo/montageId WITH a message;
+// `locked` and `symbolId` were refused SILENTLY (found 2026-07-26 by a
+// tool x condition sweep: all five drawing tools on a locked layer, and all
+// five on a component layer, produced zero children, zero saved strokes and
+// zero toasts — you draw and nothing whatsoever happens or explains why).
+// The component case is the nastier of the two: nothing on the canvas says
+// the layer is an instance, so it just reads as the app being broken.
+var _editRefusalAt=0;
+function editRefusalReason(){
+  var ld=state.layers[state.activeLayerIdx];
+  if(!ld)return null;
+  // symbolId BEFORE locked, deliberately: convertActiveLayerToComponent sets
+  // locked=true on the instance, so a component layer is ALWAYS both — and
+  // "unlock it with the padlock" is the useless half of the truth. Following
+  // that advice unlocks the layer and you still can't draw, you just finally
+  // get told why. The component nature is the actual reason.
+  if(ld.symbolId)return 'Calque composant — double-clique dessus pour entrer dedans et dessiner';
+  if(ld.locked)return 'Calque verrouillé — déverrouille-le (cadenas) pour dessiner dessus';
+  if(ld.nativeVideo)return 'Calque vidéo — dessine sur un calque normal au-dessus';
+  if(ld.montageId)return 'Calque montage — son contenu s\u2019édite dans le StoryBoard';
+  return null;
+}
+// True when the edit may proceed; otherwise explains ONCE and returns false.
+// Throttled: a locked-layer drag re-enters the mousemove guards many times
+// per gesture, and one toast per frame would be its own bug.
+function canEditActiveLayer(){
+  var why=editRefusalReason();
+  if(!why)return true;
+  var now=Date.now();
+  if(now-_editRefusalAt>1500){_editRefusalAt=now;if(window.showToast)showToast(why);}
+  return false;
+}
+window.canEditActiveLayer=canEditActiveLayer;
+window.editRefusalReason=editRefusalReason;
+function ensureKeyframe(){var ldk=state.layers[state.activeLayerIdx];if(!canEditActiveLayer())return;var curF=ldk.frames[state.currentFrame];if(!curF.isKeyframe&&!curF.isInterpolated){var effStrokes=JSON.parse(JSON.stringify(getEffectiveStrokes(state.activeLayerIdx,state.currentFrame)));curF.isKeyframe=true;curF.strokes=effStrokes;loadFrame(state.currentFrame);syncLinkedKeyframeFolder(state.activeLayerIdx,state.currentFrame);}}
 
 // ---- VECTOR FILL ENGINE ----
 // The fill of an area IS just the closed loop formed by the strokes around
@@ -4670,7 +4705,7 @@ function onMouseDown(event){
   if(state.appMode==='motion'&&window.SMMotion&&SMMotion.onDown(event))return;
   var layer=userLayers[state.activeLayerIdx];
   if(state.tool==='draw'){
-    if(state.layers[state.activeLayerIdx].locked)return;
+    if(!canEditActiveLayer())return;
     // Same both-eyes-off guard as draw-bridge.js's commitStroke — never
     // commit fully invisible ink.
     if(!state.strokeEnabled&&!state.fillEnabled){showToast('Stroke et Fill désactivés — rien à dessiner');return;}
@@ -4689,7 +4724,7 @@ function onMouseDown(event){
     }
     currentPath.add(event.point);stabQueue=[event.point.clone()];
   }else if(state.tool==='pen'){
-    if(state.layers[state.activeLayerIdx].locked)return;
+    if(!canEditActiveLayer())return;
     var now=Date.now();
     var isDoubleClick=_pen.path&&(now-_pen.lastClickTime<350)&&_pen.lastClickPt&&event.point.getDistance(_pen.lastClickPt)<10/view.zoom;
     _pen.lastClickTime=now;_pen.lastClickPt=event.point.clone();
@@ -4726,7 +4761,7 @@ function onMouseDown(event){
     }
     _pen.draggingHandle=true;
   }else if(state.tool==='line'||state.tool==='rect'||state.tool==='ellipse'){
-    if(state.layers[state.activeLayerIdx].locked)return;pushUndo();ensureKeyframe();layer.activate();shapeStart=event.point.clone();
+    if(!canEditActiveLayer())return;pushUndo();ensureKeyframe();layer.activate();shapeStart=event.point.clone();
     if(state.tool==='line')currentPath=new Path.Line({from:event.point,to:event.point,strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,strokeCap:state.strokeCap,fillColor:null,opacity:state.opacity/100});
     else if(state.tool==='rect')currentPath=new Path.Rectangle({from:event.point,to:event.point.add(new Point(1,1)),strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,fillColor:state.fillEnabled?state.fillColor:null,opacity:state.opacity/100});
     else currentPath=new Path.Ellipse({rectangle:new Rectangle(event.point,new Size(1,1)),strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,fillColor:state.fillEnabled?state.fillColor:null,opacity:state.opacity/100});
@@ -4931,7 +4966,7 @@ function onMouseDown(event){
     }
     renderArcs();updateUI();
   }else if(state.tool==='eraser'){
-    if(state.layers[state.activeLayerIdx].locked)return;
+    if(!canEditActiveLayer())return;
     // pushUndo() BEFORE ensureKeyframe(), and unconditionally — see
     // draw-bridge.js's commitStroke comment: one undo must revert both the
     // frame's auto-promotion to keyframe and whatever this gesture erases.
@@ -4961,7 +4996,7 @@ function onMouseDown(event){
       fillRegenerateLinked(layer,erasedItem2);saveActiveLayerFrame();updateUI();
     }
   }else if(state.tool==='fill'){
-    if(state.layers[state.activeLayerIdx].locked)return;
+    if(!canEditActiveLayer())return;
     if(event.event.altKey){
       // Alt+drag: draw a TEMPORARY closing stroke to help the fill engine
       // bridge a region its own crossing/gap detection can't close on its
@@ -5028,7 +5063,7 @@ function onMouseDown(event){
     fillMergeSameColor(layer,res.path);
     saveActiveLayerFrame();updateUI();showToast('Fill appliqué');
   }else if(state.tool==='fillbrush'){
-    if(state.layers[state.activeLayerIdx].locked)return;pushUndo();ensureKeyframe();layer.activate();
+    if(!canEditActiveLayer())return;pushUndo();ensureKeyframe();layer.activate();
     _vbLastPenPressure=null;_vb.pts=[event.point.clone()];_vb.widths=[vbPressureOf(event)];_vb.lastT=Date.now();_vb.lastPt=event.point.clone();
     currentPath=new Path();currentPath.fillColor=state.fillColor;currentPath.strokeColor=null;currentPath.opacity=state.opacity/100;
     currentPath.data.isVectorBrush=true;currentPath.data.isFillShape=true;
@@ -5212,7 +5247,7 @@ function onMouseDrag(event){
     symGestureAccumulate(new Matrix().translate(event.delta));}
   }else if(state.tool==='eraser'){
     eraseUpdateCursor(event);
-    if(state.layers[state.activeLayerIdx].locked)return;
+    if(!canEditActiveLayer())return;
     var layer2e=userLayers[state.activeLayerIdx];
     // A fast mouse/tablet sweep can jump the cursor several eraser-widths
     // between two consecutive drag events — hit-testing only the NEW point
