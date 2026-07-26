@@ -31,6 +31,15 @@ function exportBuildFrame(frameIdx,alpha){
   }
   for(var li=0;li<state.layers.length;li++){
     var ld=state.layers[li];if(!ld.visible)continue;
+    // Track matte SOURCE layer: engine.rs's composite_scene consumes the
+    // layer directly above a matted one and never paints it as its own
+    // visible content. This path had no idea, so the export GAINED an
+    // opaque layer the screen never shows (2026-07-26). Skipping it here
+    // is only half the story — the matted layer itself still isn't masked
+    // on this path, which is why exportNeedsEngine() routes any project
+    // using a matte through the engine instead. This keeps the plain-Paper
+    // fallback (SVG, scale>1) from being actively WRONG in the meantime.
+    if(li>0&&state.layers[li-1]&&state.layers[li-1].matteMode&&state.layers[li-1].matteMode!=='none')continue;
     var strokes=getEffectiveStrokes(li,frameIdx);
     // Team review ghosts (revision-bridge.js): a frozen "before" copy a
     // reviewer's correction leaves behind, meant to stay visible ON-CANVAS
@@ -64,6 +73,7 @@ function exportBuildFrame(frameIdx,alpha){
     // applied outermost, same composition order as buildSceneJson
     // (engine-bridge.js) — see motion.js's parentChainMats header comment.
     var parentChain=window.SMMotion?SMMotion.parentChainMats(li,frameIdx):[];
+    var built=[]; // this layer's own items, so a blend mode can wrap them below
     strokes.forEach(function(sd){
       // Raster strokes (isRaster: imported images, SVG-sequence frames,
       // and Bitmap Brush's texture companions, bitmap-brush.js) went
@@ -129,7 +139,21 @@ function exportBuildFrame(frameIdx,alpha){
         p.opacity=p.opacity*pc.mat.op;
         if(p.strokeWidth)p.strokeWidth*=(Math.abs(pc.mat.sx)+Math.abs(pc.mat.sy))/2;
       }
+      built.push(p);
     });
+    // Layer BLEND MODE — buildSceneJson passes ld.blendMode straight to the
+    // renderer, so it is visible on screen; nothing here read it, so every
+    // raster/SVG export silently came out in Normal. Everything above merges
+    // into the ONE flat `L`, leaving no per-layer object to carry it, so give
+    // this layer's items their own Group and hang the blend mode on that —
+    // Paper.js composites a Group's blendMode natively, so rasterize() and
+    // exportSVG() both get it for free. Only when it is actually non-normal:
+    // the flat structure stays exactly as it was for every ordinary layer.
+    if(built.length&&ld.blendMode&&ld.blendMode!=='normal'){
+      var grp=new Group({children:built,insert:false});
+      grp.blendMode=ld.blendMode;
+      L.addChild(grp);
+    }
   }
   // Caméra (v18) : bake le zoom/pan de la frame dans le rendu exporté —
   // le rect caméra interpolé remplit exactement le canvas de sortie.
@@ -238,6 +262,27 @@ async function exportRunFfmpeg(args,onProgress){
 function exportHasActiveEffects(){
   return state.layers.some(function(ld){return ld.effects&&ld.effects.some(function(e){return e.enabled;});});
 }
+// Layer BLEND MODE and TRACK MATTE are per-layer compositing, and
+// exportBuildFrame below merges every layer into ONE flat throwaway Paper
+// layer — there is no per-layer object left for either to live on. Found
+// 2026-07-26 by diffing screen against export feature by feature: both are
+// read by buildSceneJson (engine-bridge.js:512/572) so they render on
+// screen, and export.js read NEITHER, so both silently vanished from every
+// raster export. Matte was the worse half: engine.rs's composite_scene also
+// SKIPS painting the matte source layer as its own content, so the export
+// additionally GAINED an opaque layer the screen never shows.
+//
+// Routed through the engine, exactly like effects already are, rather than
+// reimplementing compositing in Paper: same proven path, and screen/export
+// agree by construction instead of by two implementations staying in sync
+// (CLAUDE.md §3's whole point). Blend ALSO gets a native Paper fallback in
+// exportBuildFrame for the paths this routing can't cover (SVG, scale>1).
+function exportHasLayerCompositing(){
+  return state.layers.some(function(ld){
+    return (ld.blendMode&&ld.blendMode!=='normal')||(ld.matteMode&&ld.matteMode!=='none');
+  });
+}
+function exportNeedsEngine(){return exportHasActiveEffects()||exportHasLayerCompositing();}
 // ---- PNG sequence rendering to a working directory (shared by raster exports) ----
 async function exportRenderPNGsToDir(dir,start,end,scale,onProgress,alpha){
   // Effects (blur/vignette/glow/ground shadow/...) only ever rendered in
@@ -251,7 +296,7 @@ async function exportRenderPNGsToDir(dir,start,end,scale,onProgress,alpha){
   // Scale>1 (supersampled export) isn't supported on this path yet, so it
   // only kicks in at the default scale — see renderFrameToPixelsPNG's own
   // comment for why.
-  var useFx=(scale===1||!scale)&&exportHasActiveEffects()&&window.SMEngineBridge&&window.SMEngineBridge.beginEffectsExport();
+  var useFx=(scale===1||!scale)&&exportNeedsEngine()&&window.SMEngineBridge&&window.SMEngineBridge.beginEffectsExport();
   try{
     for(var f=start,i=1;f<=end;f++,i++){
       var url=useFx?await SMEngineBridge.renderFrameToPixelsPNG(f):exportFrameDataURL(f,scale,alpha);
