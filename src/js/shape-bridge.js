@@ -17,7 +17,9 @@
     return (
       window.SMEngineBridge && window.SMEngineBridge.isEnabled() &&
       (state.tool === 'line' || state.tool === 'rect' || state.tool === 'ellipse') &&
-      !state.playing && !state.layers[state.activeLayerIdx].locked
+      // Same deferral as draw-bridge's own shouldIntercept — the Paper path
+      // is where the refusal gets explained (canEditActiveLayer, tools.js).
+      !state.playing && !(window.editRefusalReason && window.editRefusalReason())
     );
   }
 

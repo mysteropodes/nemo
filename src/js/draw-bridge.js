@@ -136,7 +136,13 @@
     return (
       window.SMEngineBridge && window.SMEngineBridge.isEnabled() &&
       (state.tool === 'draw' || state.tool === 'fillbrush') && !state.playing &&
-      !state.layers[state.activeLayerIdx].locked
+      // Defer to the Paper path whenever the layer can't take an edit at all
+      // (locked, component, video, montage). That path refuses AUDIBLY via
+      // canEditActiveLayer (tools.js); intercepting here would swallow the
+      // gesture silently instead — which is exactly what a component layer
+      // used to do: you draw on an instance and nothing happens, with no
+      // hint that the layer is an instance at all.
+      !(window.editRefusalReason && window.editRefusalReason())
     );
   }
   function isFillBrush() { return state.tool === 'fillbrush'; }
