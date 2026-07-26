@@ -597,6 +597,17 @@
           <button class="pbtn fill-grad-btn" id="p-fill-grad-btn" title="Dégradé de fill — sélectionne une seule forme avec l'outil Sélection"><span class="fill-grad-ramp"></span></button>
           <div class="lico color-eye-toggle" id="fill-enable-toggle" data-i18n-title="fillEnableTitle" title="Enable/disable fill"></div>
         </div>
+        <!-- Gradient editor belongs to Fill, not to a second section named
+             Effects. It stays collapsed until the fill-gradient button is
+             used, while retaining the existing control IDs so the canvas
+             gizmo and persistence code continue to share one implementation. -->
+        <div id="p-fill-gradient-editor" class="fill-gradient-editor" style="display:none">
+          <div class="pr"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer" data-i18n-title="gradFillTitle" title="Applique un dégradé au fill de la sélection actuelle (une seule forme à la fois, outil Sélection)"><input type="checkbox" id="p-grad-on" style="accent-color:var(--accent)"> <span data-i18n="gradFillLabel">Dégradé de fill</span></label></div>
+          <div class="pr" id="p-grad-kind-row" style="display:none"><span class="pl" data-i18n="fieldType">Type</span><select class="psel" id="p-grad-kind"><option value="linear" selected data-i18n="gradLinear">Linéaire</option><option value="radial" data-i18n="gradRadial">Radial</option></select></div>
+          <div id="p-grad-stops-list" style="display:none"></div>
+          <div class="pr" id="p-grad-addstop-row" style="display:none;gap:4px"><button class="pbtn" id="btn-grad-add-stop" style="flex:1" data-i18n="btnAddStop">+ Stop</button></div>
+          <div class="pr" id="p-grad-hint-row" style="display:none;font-size:9px;color:var(--text-dim)" data-i18n="gradHint">Glissez le carré/rond sur le canevas pour repositionner le dégradé, glissez un losange pour déplacer un stop.</div>
+        </div>
         <!-- "Propager la couleur…" button removed (feedback 2026-07: "pas
              besoin du bouton propagate color, on verra ça d'un moteur
              séparé") — a dedicated cross-frame color-propagation engine is
@@ -748,25 +759,6 @@
         <div class="pr" id="p-taper-row"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="p-taper" style="accent-color:var(--accent)"> <span data-i18n="taperEndsLabel">Taper ends (Draw/Pen)</span></label></div>
         <div class="pr" id="p-shadowmode-row" data-i18n-title="shadowModeTitle" title="Tags what you draw as Shadow — draw fills first, then rough shadow-boundary lines over them like a Japanese anime layout; separating Stroke/Fill/Shadow later routes anything drawn with this on into its own Shadow layer instead of Stroke/Fill"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="p-shadowmode" style="accent-color:var(--accent)"> <span data-i18n="shadowModeLabel">Shadow (Draw/Pen/Shape)</span></label></div>
         <div class="pr" data-i18n-title="eraserSizeTitle" title="Eraser cuts the path precisely at this width instead of deleting the whole stroke"><span class="pl" data-i18n="fieldEraser">Eraser</span><input type="number" class="pi scrub" id="p-erasersize" value="14" min="4" max="120" data-step="1"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
-      </div>
-    </div>
-    <div class="psec" id="effects-sec">
-      <div class="phdr" id="phdr-effects"><span class="ar">☰</span> <span data-i18n="hdrEffects">Effects</span></div>
-      <div class="pbdy">
-        <!-- Gradient fill (2026-07, Illustrator/Rive-style) — applies to
-             the SINGLE currently selected shape's fill (Select tool). The
-             from/to endpoints AND each stop's position along the line are
-             edited by dragging the on-canvas gizmo directly (gradient-
-             bridge.js's own pointerdown/move/up, same pattern as
-             perspective-bridge.js/symmetry-bridge.js's guide dragging) —
-             this panel only edits STOP COLORS/count and Linear vs Radial,
-             deliberately no angle/position number fields now that dragging
-             covers that directly. -->
-        <div class="pr"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer" data-i18n-title="gradFillTitle" title="Applique un dégradé au fill de la sélection actuelle (une seule forme à la fois, outil Sélection)"><input type="checkbox" id="p-grad-on" style="accent-color:var(--accent)"> <span data-i18n="gradFillLabel">Dégradé de fill</span></label></div>
-        <div class="pr" id="p-grad-kind-row" style="display:none"><span class="pl" data-i18n="fieldType">Type</span><select class="psel" id="p-grad-kind"><option value="linear" selected data-i18n="gradLinear">Linéaire</option><option value="radial" data-i18n="gradRadial">Radial</option></select></div>
-        <div id="p-grad-stops-list" style="display:none"></div>
-        <div class="pr" id="p-grad-addstop-row" style="display:none;gap:4px"><button class="pbtn" id="btn-grad-add-stop" style="flex:1" data-i18n="btnAddStop">+ Stop</button></div>
-        <div class="pr" id="p-grad-hint-row" style="display:none;font-size:9px;color:var(--text-dim)" data-i18n="gradHint">Glissez le carré/rond sur le canevas pour repositionner le dégradé, glissez un losange pour déplacer un stop.</div>
       </div>
     </div>
     <div class="psec" id="swatches-sec"><!-- id required: panel-order persistence keys on it (ui.js secKey) -->
@@ -1182,6 +1174,7 @@
   <div style="display:flex;align-items:center;margin-bottom:8px;font-size:10px;font-weight:600;letter-spacing:.03em;color:var(--text-dim);text-transform:uppercase"><span data-i18n="onionSkinLabel">Onion Skin</span> <span id="os-st" style="margin-left:auto;font-size:9px;color:var(--green)">ON</span></div>
   <div class="pr" style="font-size:9px;color:var(--text-dim);margin-bottom:6px" data-i18n="onionDragHint">Glisser les marqueurs rouge/bleu sur la timeline</div>
   <div class="pr" style="margin-bottom:6px"><span class="pl" data-i18n="fieldMode">Mode</span><select class="psel" id="p-omode"><option value="tinted" data-i18n="omodeTinted">Tinted</option><option value="original" data-i18n="omodeOriginal">Original</option><option value="outline" data-i18n="omodeOutline">Outline</option></select></div>
+  <div class="pr" style="margin-bottom:6px"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="p-current-outline"> Frame courante en contour</label></div>
   <div class="pr" style="margin-bottom:6px"><span class="pl" data-i18n="fieldPrevOp">Prev Op</span><input type="number" class="pi scrub" id="p-opop" value="30" min="5" max="80" data-step="1"></div>
   <div class="pr" style="margin-bottom:6px"><span class="pl" data-i18n="fieldNextOp">Next Op</span><input type="number" class="pi scrub" id="p-onop" value="30" min="5" max="80" data-step="1"></div>
   <!-- Marker-range presets, folded in from the now-removed separate
@@ -1303,6 +1296,7 @@
     <button class="tb" id="btn-mblur" title="Flou de mouvement de la composition — clic droit : échantillons et obturateur" style="margin-left:4px;display:none"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="8" cy="12" r="4"/><path d="M14 9h6M14 12h5M14 15h3"/></svg></button>
     <button class="tb" id="btn-shy" title="Masquer les calques « shy » (clic droit sur un calque pour le marquer)" style="margin-left:4px;display:none"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></svg></button>
     <button class="tb" id="btn-mgraph" title="Éditeur de courbes (Maj+F3) — clic droit : valeur/vitesse · Alt+clic : figer l'échelle" style="margin-left:4px;display:none"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20V4"/><path d="M3 20h18"/><path d="M6 16c4 0 3-9 7-9 3 0 3 5 6 5"/><circle cx="6" cy="16" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/></svg></button>
+    <button class="tb" id="btn-toolbar-customize" title="Personnaliser les boutons visibles de la barre" aria-label="Personnaliser la barre d’outils"><span class="material-symbols-rounded" style="font-size:16px">&#xe5d3;</span></button>
   </div>
   <div id="tl-content">
     <div id="layer-panel">
