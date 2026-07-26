@@ -205,6 +205,60 @@
     });
     return overlayItemFor(mirrored);
   }
+  // A mirrored/rotated copy is a SEPARATE stroke, but path.clone() copies
+  // .data wholesale — so every copy used to ship out carrying the source's
+  // own identity. Three concrete failures, all found live (2026-07-26):
+  //
+  //  1. duplicate strokeId — motion.js:1413 resolves an element by scanning
+  //     for the FIRST data.strokeId match, so per-element animation aimed
+  //     at the mirror silently drove the original instead.
+  //  2. duplicate linkedFillId with no companion of its own — app.js:740
+  //     builds byId[linkedFillId], so both strokes claimed the SAME fill
+  //     backdrop and the mirror had none.
+  //  3. stale centerSegments — only .segments got reflected, the vector-
+  //     brush CENTERLINE kept the source's coordinates. Any rebuild
+  //     (applying a stroke profile, a width edit, rebuildVectorBrushOutline)
+  //     therefore teleported the mirror straight on top of the original —
+  //     measured: centre x 1489 snapped back to 431, i.e. the mirror
+  //     visually disappeared.
+  //
+  // mapPoint/mapVector are the SAME transform the copy's own segments went
+  // through, passed in by each branch so the reflect and rotate cases share
+  // this one function (they were already two copies of the clone logic).
+  function adoptFreshIdentity(copy, mapPoint, mapVector) {
+    var d = copy.data || (copy.data = {});
+    var hadLinkedFill = !!(d.isVectorBrush && d.linkedFill && !d.linkedFill.removed);
+    var fillStyle = hadLinkedFill ? { fillColor: d.linkedFill.fillColor, opacity: d.linkedFill.opacity } : null;
+    delete d.strokeId; delete d.linkedFill; delete d.linkedFillId;
+    // groupId/brushGroupId are membership tags: a copy that inherits them
+    // joins a group it was never added to (same class of bug as the ids).
+    delete d.groupId; delete d.brushGroupId;
+    if (typeof ensureStrokeId === 'function') ensureStrokeId(copy);
+    if (d.centerSegments) {
+      d.centerSegments = d.centerSegments.map(function (s) {
+        var p = mapPoint(s.point[0], s.point[1]);
+        var hi = s.handleIn ? mapVector(s.handleIn[0], s.handleIn[1]) : null;
+        var ho = s.handleOut ? mapVector(s.handleOut[0], s.handleOut[1]) : null;
+        var out = { point: [p.x, p.y], width: s.width };
+        if (hi) out.handleIn = [hi.x, hi.y];
+        if (ho) out.handleOut = [ho.x, ho.y];
+        return out;
+      });
+    }
+    // Its own fill backdrop, at the copy's position — same fresh-id-pair
+    // shape _materializeClones (tools.js) already uses for duplicates.
+    if (fillStyle && typeof ensureStrokeId === 'function') {
+      var fillClone = new Path();
+      fillClone.fillColor = fillStyle.fillColor; fillClone.strokeColor = null;
+      if (fillStyle.opacity !== undefined) fillClone.opacity = fillStyle.opacity;
+      fillClone.insertBelow(copy);
+      d.linkedFill = fillClone;
+      d.linkedFillId = ensureStrokeId({ data: {} });
+      fillClone.data.isLinkedFillCompanion = true;
+      fillClone.data.linkedFillId = d.linkedFillId;
+      if (typeof rebuildVectorBrushOutline === 'function') rebuildVectorBrushOutline(copy);
+    }
+  }
   function onStrokeCommitted(path, layer) {
     if (!state.symmetryEnabled || !path.segments || !path.segments.length) return;
     if (state.symmetryMode === 'radial') {
@@ -213,8 +267,15 @@
       var center = new Point(c.x, c.y);
       for (var k = 1; k < n; k++) {
         var copy = path.clone({ insert: false });
-        copy.rotate(k * 360 / n, center);
+        var ang = k * 360 / n;
+        copy.rotate(ang, center);
         copy.insertAbove(path);
+        (function (a) {
+          var rad = a * Math.PI / 180, cs = Math.cos(rad), sn = Math.sin(rad);
+          adoptFreshIdentity(copy,
+            function (x, y) { var dx = x - center.x, dy = y - center.y; return { x: center.x + dx * cs - dy * sn, y: center.y + dx * sn + dy * cs }; },
+            function (vx, vy) { return { x: vx * cs - vy * sn, y: vx * sn + vy * cs }; });
+        })(ang);
         if (typeof tagOwner === 'function') tagOwner(copy);
       }
       return;
@@ -236,6 +297,9 @@
     // for the vertical-only case; still correct for an arbitrary angle.
     if (mirrored.closed) mirrored.reverse();
     mirrored.insertAbove(path);
+    adoptFreshIdentity(mirrored,
+      function (x, y) { return reflectPoint(x, y, axis); },
+      function (vx, vy) { return reflectVector(vx, vy, axis); });
     if (typeof tagOwner === 'function') tagOwner(mirrored);
   }
   // Same mirror/rotate math as onPreview/onStrokeCommitted above, but for a
