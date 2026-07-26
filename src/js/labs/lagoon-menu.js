@@ -62,8 +62,19 @@
     // Never steal Q while typing in a field.
     var tag = (e.target && e.target.tagName) || '';
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (e.target && e.target.isContentEditable)) return;
-    if (e.key === 'Escape' && el) { close(); return; }
+    if (e.key === 'Escape' && el) { e.stopPropagation(); e.preventDefault(); close(); return; }
     if (e.key !== 'q' && e.key !== 'Q') return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return; // don't eat browser/app shortcuts
+    // Q is ALSO a core tool shortcut (timeline.js runToolShortcut → the
+    // Perspective tool). Without this, pressing Q opened the radial menu
+    // AND silently switched the active tool underneath it — dismissing with
+    // Escape then left you in a tool you never picked (measured live: tool
+    // went 'draw' → 'perspective' on the same keypress that opened the
+    // menu). flip-roll.js and mirror-check.js already guard their own R/M
+    // against exactly this; this one didn't.
+    e.stopPropagation();
+    e.preventDefault();
+    if (e.repeat) return; // key-repeat spam while held would toggle open/closed
     if (el) { close(); return; }
     open(lastMouse.x, lastMouse.y);
   }, true);
