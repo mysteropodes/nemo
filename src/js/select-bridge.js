@@ -370,6 +370,16 @@
       }
     }
     if (!shouldIntercept()) return;
+    // Every gesture starts from a clean slate (2026-07-26). onDown has a
+    // dozen branches and several of them `return` without ever assigning
+    // `mode`, so the PREVIOUS gesture's mode could survive into the new one
+    // and onMove would act on it. Defensive, not a reported bug: the only
+    // reproduction found was through synthetic pointer+mouse events firing
+    // the same gesture into two handlers at once, which real input never
+    // does — re-checked against real drags and it does NOT occur. Kept
+    // anyway because a branch should have to opt IN to a mode rather than
+    // every branch having to remember to opt out of the last one.
+    mode = null;
     e.stopImmediatePropagation();
     e.preventDefault();
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
@@ -809,7 +819,13 @@
     } else if (mode === 'marquee') {
       var prevA = project.activeLayer;
       marqueeLayer.activate();
-      if (_marquee.lasso) {
+      // Null-guarded like the rectangle branch just below already is —
+      // that branch's own guard shows a null rect here was already
+      // considered reachable; the lasso branch simply never got the same
+      // treatment. Degrade to doing nothing, never throw mid-drag.
+      if (!_marquee.rect) {
+        // nothing to extend — the gesture was never properly started
+      } else if (_marquee.lasso) {
         _marquee.rect.add(pt);
       } else {
         var mx1 = Math.min(marqueeStart.x, pt.x), my1 = Math.min(marqueeStart.y, pt.y);
