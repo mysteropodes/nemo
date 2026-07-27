@@ -485,24 +485,40 @@
              s'affiche plus que dans le contexte du panneau Layer,
              c'est-à-dire quand un calque est sélectionné, via la même
              condition que Blend/Matte/Flou ci-dessus. -->
-        <div class="pr" style="gap:4px;margin-top:6px">
-          <button class="pbtn" id="btn-ref-import" data-i18n-title="refImportTitle" title="Importer une vidéo, une séquence d'images (sélection multiple) ou une image seule comme référence de rotoscopie" data-i18n="refImportBtn">Référence…</button>
-          <button class="pbtn" id="btn-ref-remove" disabled data-i18n="btnRemove">Retirer</button>
-          <input type="file" id="ref-file-input" accept="video/*,image/*" multiple style="display:none">
-        </div>
-        <div class="pr" style="font-size:9px;color:var(--text-dim)" id="p-ref-name" data-i18n="refNoneLabel">Aucune référence</div>
-        <div class="pr"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="p-ref-on"> <span data-i18n="fieldVisible">Visible</span></label></div>
-        <!-- Scrub field, not a native range slider (feedback 2026-07: "tout
-             ce qui est slider doit être changer en valeur à slider comme
-             les autres propriétés du genre") — matches every other opacity/
-             numeric field in this panel (.pi.scrub, drag-to-change or
-             click-to-type, wired generically in ui.js — no per-field JS
-             needed, reference-bridge.js's existing 'input' listener on
-             #p-ref-opacity already reads .value the same way either type
-             produces it). -->
-        <div class="pr dims-row">
-          <span class="pl" data-i18n="fieldOpacity">Opacity</span><input type="number" class="pi scrub" id="p-ref-opacity" min="5" max="100" value="50" data-step="1">
-          <span class="pl" data-i18n="fieldOffset">Offset</span><input type="number" class="pi scrub" id="p-ref-offset" value="0" data-step="1" data-i18n-title="refOffsetTitle" title="Frame de la timeline où la référence démarre">
+        <!-- Un SEUL contrôle visible (feedback 2026-07-27 : "j'aimerais que
+             ça soit seulement un bouton qui apparait et qui ouvre le menu
+             d'option pour celui ci") — cinq contrôles permanents pour une
+             fonction utilisée ponctuellement mangeaient autant de hauteur de
+             panneau que Blend + Matte réunis. La ligne adopte la forme
+             label + .psel des voisines (Blend/Matte) et affiche l'état
+             courant, pour qu'on sache s'il y a une référence chargée SANS
+             ouvrir le menu.
+             Les contrôles ne sont pas reconstruits dans le popover : ce sont
+             les MÊMES noeuds, simplement déplacés dans #ref-pop, donc toute
+             la logique de reference-bridge.js (getElementById + listeners
+             posés une fois à l'init, syncUI qui repeint même popover fermé)
+             continue de marcher sans duplication. -->
+        <div class="pr"><span class="pl" data-i18n="fieldReference">Référence</span><div class="psel" id="p-ref-menu" role="button" tabindex="0" style="cursor:pointer;user-select:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" data-i18n-title="refMenuTitle" title="Vidéo, séquence d'images ou image fixe affichée sous le dessin pour la rotoscopie" data-i18n="refNoneShort">Aucune</div></div>
+        <input type="file" id="ref-file-input" accept="video/*,image/*" multiple style="display:none">
+        <div id="ref-pop" style="display:none">
+          <div class="pr" style="gap:4px">
+            <button class="pbtn" id="btn-ref-import" style="flex:1" data-i18n-title="refImportTitle" title="Importer une vidéo, une séquence d'images (sélection multiple) ou une image seule comme référence de rotoscopie" data-i18n="refImportBtn">Référence…</button>
+            <button class="pbtn" id="btn-ref-remove" disabled data-i18n="btnRemove">Retirer</button>
+          </div>
+          <div class="pr" style="font-size:9px;color:var(--text-dim)" id="p-ref-name" data-i18n="refNoneLabel">Aucune référence</div>
+          <div class="pr"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="p-ref-on"> <span data-i18n="fieldVisible">Visible</span></label></div>
+          <!-- Scrub field, not a native range slider (feedback 2026-07: "tout
+               ce qui est slider doit être changer en valeur à slider comme
+               les autres propriétés du genre") — matches every other opacity/
+               numeric field in this panel (.pi.scrub, drag-to-change or
+               click-to-type, wired generically in ui.js — no per-field JS
+               needed, reference-bridge.js's existing 'input' listener on
+               #p-ref-opacity already reads .value the same way either type
+               produces it). -->
+          <div class="pr dims-row">
+            <span class="pl" data-i18n="fieldOpacity">Opacity</span><input type="number" class="pi scrub" id="p-ref-opacity" min="5" max="100" value="50" data-step="1">
+            <span class="pl" data-i18n="fieldOffset">Offset</span><input type="number" class="pi scrub" id="p-ref-offset" value="0" data-step="1" data-i18n-title="refOffsetTitle" title="Frame de la timeline où la référence démarre">
+          </div>
         </div>
       </div>
     </div>

@@ -349,6 +349,68 @@
     var op = document.getElementById('p-ref-opacity'); if (op && r) op.value = Math.round((r.opacity !== undefined ? r.opacity : 0.5) * 100);
     var off = document.getElementById('p-ref-offset'); if (off && r) off.value = r.offsetFrames || 0;
     var rm = document.getElementById('btn-ref-remove'); if (rm) rm.disabled = !r;
+    // The collapsed trigger has to carry the state the popover now hides:
+    // whether a reference is loaded, and whether it's actually showing.
+    var trig = document.getElementById('p-ref-menu');
+    if (trig) {
+      var tr = (window.SM && window.SM.t) ? window.SM.t : function (k) { return k; };
+      trig.textContent = r ? (r.name + (r.visible ? '' : ' — ' + tr('refHiddenSuffix'))) : tr('refNoneShort');
+      trig.style.color = r ? '' : 'rgba(236,234,231,.45)';
+      trig.title = r ? (r.name + ' — ' + tr('refMenuTitle')) : tr('refMenuTitle');
+    }
+  }
+
+  // ---- options popover ----
+  // Same anchored-popover shell as the brush/tip pickers (ctx-menu class,
+  // outside-mousedown + Escape to close). It MOVES #ref-pop into <body>
+  // rather than cloning it, so there is exactly one set of #p-ref-* nodes in
+  // the document at any time — cloning would give the listeners bound at
+  // init() a stale target and quietly stop half the controls from working.
+  var popOpen = false, popHome = null, popCloseHandlers = null;
+
+  function closePop() {
+    if (!popOpen) return;
+    var pop = document.getElementById('ref-pop');
+    if (pop) {
+      pop.style.cssText = 'display:none';
+      pop.className = '';
+      // Put it back where it came from, so a later open() re-anchors from a
+      // known place and the panel markup stays self-describing.
+      if (popHome && popHome.parentNode) popHome.parentNode.insertBefore(pop, popHome);
+    }
+    popOpen = false;
+    if (popCloseHandlers) { popCloseHandlers(); popCloseHandlers = null; }
+  }
+
+  function openPop(anchorEl) {
+    var pop = document.getElementById('ref-pop');
+    if (!pop) return;
+    if (popOpen) { closePop(); return; }
+    if (!popHome) { popHome = document.createComment('ref-pop'); pop.parentNode.insertBefore(popHome, pop); }
+    document.body.appendChild(pop);
+    pop.className = 'ctx-menu';
+    pop.style.cssText = 'display:flex;flex-direction:column;gap:6px;padding:8px;width:230px;visibility:hidden';
+    popOpen = true;
+    syncUI();
+
+    var ar = anchorEl.getBoundingClientRect();
+    var ew = pop.offsetWidth, eh = pop.offsetHeight;
+    pop.style.left = Math.max(4, Math.min(ar.left, window.innerWidth - ew - 8)) + 'px';
+    pop.style.top = Math.max(4, Math.min(ar.bottom + 6, window.innerHeight - eh - 8)) + 'px';
+    pop.style.visibility = '';
+
+    // The file dialog steals focus and (under Tauri) can fire a stray
+    // mousedown on the way back — closing on it would tear the popover down
+    // right as the import lands, so only clicks that land outside BOTH the
+    // popover and its trigger count.
+    function onOutside(e) { if (!pop.contains(e.target) && e.target !== anchorEl) closePop(); }
+    function onKey(e) { if (e.key === 'Escape') closePop(); }
+    document.addEventListener('mousedown', onOutside, true);
+    document.addEventListener('keydown', onKey);
+    popCloseHandlers = function () {
+      document.removeEventListener('mousedown', onOutside, true);
+      document.removeEventListener('keydown', onKey);
+    };
   }
 
   window.SMReference = {
@@ -357,9 +419,20 @@
     importFiles: importFiles,
     // after importJSON/newProject swapped state.refMedia wholesale
     reload: function () { syncUI(); var r = ref(); if (r) syncToFrame(state.currentFrame, true); bumpScene(); },
+    openOptions: function () { var t = document.getElementById('p-ref-menu'); if (t) openPop(t); },
+    closeOptions: closePop,
   };
 
   function init() {
+    var trig = document.getElementById('p-ref-menu');
+    if (trig) {
+      // The trigger's text IS the current value, so applyI18n's data-i18n
+      // sweep would stamp the "None" placeholder over a loaded reference's
+      // name on every language switch — repaint right after it instead.
+      window.SM = window.SM || {}; (window.SM.afterI18n = window.SM.afterI18n || []).push(syncUI);
+      trig.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); openPop(trig); });
+      trig.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openPop(trig); } });
+    }
     var btn = document.getElementById('btn-ref-import');
     var input = document.getElementById('ref-file-input');
     if (btn && input) {
@@ -367,7 +440,10 @@
       input.addEventListener('change', function (e) { importFiles(e.target.files); e.target.value = ''; });
     }
     var on = document.getElementById('p-ref-on');
-    if (on) on.addEventListener('change', function () { var r = ref(); if (r) { r.visible = on.checked; if (r.visible) syncToFrame(state.currentFrame, true); bumpScene(); } });
+    // syncUI() on toggle: the collapsed trigger reports visibility now, and
+    // this handler is the only place it can change without going through
+    // setRef() (which repaints on its own).
+    if (on) on.addEventListener('change', function () { var r = ref(); if (r) { r.visible = on.checked; if (r.visible) syncToFrame(state.currentFrame, true); bumpScene(); syncUI(); } });
     var op = document.getElementById('p-ref-opacity');
     if (op) op.addEventListener('input', function () { var r = ref(); if (r) { r.opacity = op.value / 100; bumpScene(); } });
     var off = document.getElementById('p-ref-offset');

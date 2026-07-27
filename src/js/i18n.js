@@ -332,6 +332,10 @@
       rangeAll:'Whole timeline',
       rangeWorkArea:'Work area',
       recentProjects:'Recent Projects',
+      fieldReference:'Reference',
+      refMenuTitle:'Video, image sequence or still shown under the artwork for rotoscoping',
+      refHiddenSuffix:'hidden',
+      refNoneShort:'None',
       refImportBtn:'Reference…',
       refImportTitle:'Import a video, an image sequence (multi-select) or a single image as a rotoscoping reference',
       refNoneLabel:'No reference',
@@ -932,6 +936,10 @@
       rangeAll:'Toute la timeline',
       rangeWorkArea:'Zone de travail',
       recentProjects:'Recent Projects',
+      fieldReference:'Référence',
+      refMenuTitle:'Vidéo, séquence d\'images ou image fixe affichée sous le dessin pour la rotoscopie',
+      refHiddenSuffix:'masquée',
+      refNoneShort:'Aucune',
       refImportBtn:'Référence…',
       refImportTitle:'Importer une vidéo, une séquence d\'images (sélection multiple) ou une image seule comme référence de rotoscopie',
       refNoneLabel:'Aucune référence',
@@ -1532,6 +1540,10 @@
       rangeAll:'タイムライン全体',
       rangeWorkArea:'作業エリア',
       recentProjects:'最近のプロジェクト',
+      fieldReference:'リファレンス',
+      refMenuTitle:'ロトスコープ用に作画の下に表示する動画・画像シーケンス・静止画',
+      refHiddenSuffix:'非表示',
+      refNoneShort:'なし',
       refImportBtn:'リファレンス…',
       refImportTitle:'動画、画像シーケンス（複数選択）、または単一の画像をロトスコープのリファレンスとしてインポート',
       refNoneLabel:'リファレンスなし',
@@ -2132,6 +2144,10 @@
       rangeAll:'Toda la línea de tiempo',
       rangeWorkArea:'Área de trabajo',
       recentProjects:'Proyectos recientes',
+      fieldReference:'Referencia',
+      refMenuTitle:'Video, secuencia de imágenes o imagen fija mostrada bajo el dibujo para rotoscopia',
+      refHiddenSuffix:'oculta',
+      refNoneShort:'Ninguna',
       refImportBtn:'Referencia…',
       refImportTitle:'Importa un video, una secuencia de imágenes (selección múltiple) o una sola imagen como referencia de rotoscopia',
       refNoneLabel:'Sin referencia',
@@ -2434,6 +2450,12 @@
     document.querySelectorAll('[data-i18n-html]').forEach(function(el){el.innerHTML=t(el.getAttribute('data-i18n-html'));});
     var langSel=document.getElementById('settings-language');
     if(langSel&&langSel.value!==currentLang())langSel.value=currentLang();
+    // Labels whose text is DYNAMIC (a control that shows the current value,
+    // not a fixed string) can't live on data-i18n alone: the sweep above
+    // would overwrite the live value with the placeholder every time the
+    // language changes. Such modules register a repaint here instead.
+    var after=(window.SM&&window.SM.afterI18n)||[];
+    for(var i=0;i<after.length;i++){try{after[i]();}catch(e){}}
   }
   function setLanguage(lang){
     if(LANGS.indexOf(lang)<0)return;
@@ -2455,6 +2477,7 @@
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initLanguage);else initLanguage();
   window.SM=window.SM||{};
+  window.SM.afterI18n=window.SM.afterI18n||[];
   window.SM.setLanguage=setLanguage;
   window.SM.t=t;
   window.SM.applyI18n=applyI18n;
