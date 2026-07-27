@@ -27,16 +27,50 @@
     // Match vector-preset previews: a neutral white sample on the menu's
     // dark background, independent of the artwork's current stroke colour.
     var color = '#ffffff';
-    // Tint pass — identical convention to bitmap-brush.js's own
-    // beginLivePreview tinting: fill with color, clip to the mask's alpha.
-    var scale = Math.min(w, h) * 0.85 / mask.width;
-    var dw = mask.width * scale, dh = mask.height * scale;
-    var dx = (w - dw) / 2, dy = (h - dh) / 2;
+    // STAMPED ALONG A STROKE, not a single centred dab (2026-07-27: "les
+    // brush bitmap n'apparaissent pas comme les brush vector en forme de
+    // trait"). A lone dab shows the tip's silhouette but says nothing about
+    // what the brush actually draws — spacing, edge build-up, how it reads
+    // as a line — which is the whole point of comparing entries side by
+    // side. Same wave as brush-preset-picker.js's getDemoPath so vector and
+    // bitmap rows are visually comparable.
+    var pad = 6;
+    var amp = h * 0.22, steps = 48;
+    // Dab diameter sized to the strip, then spaced at a fraction of it —
+    // tight enough to read as a continuous stroke rather than a dotted line.
+    var dia = Math.max(4, h * 0.62);
+    var spacing = Math.max(1, dia * 0.16);
+    // Build the tinted dab ONCE and blit it repeatedly: tinting per stamp
+    // would be ~50 full-canvas composites per preview, times every row.
+    var dab = document.createElement('canvas');
+    dab.width = dab.height = Math.ceil(dia);
+    var dctx = dab.getContext('2d');
+    dctx.fillStyle = color;
+    dctx.fillRect(0, 0, dab.width, dab.height);
+    dctx.globalCompositeOperation = 'destination-in';
+    dctx.drawImage(mask, 0, 0, dab.width, dab.height);
+    // Walk the wave at even-ish arc length so spacing stays regular through
+    // the curve's steep parts instead of bunching at the ends.
+    var pts = [];
+    for (var i = 0; i <= steps; i++) {
+      var t = i / steps;
+      pts.push({ x: pad + t * (w - pad * 2), y: h / 2 + Math.sin(t * Math.PI * 2.2) * amp });
+    }
     ctx.save();
-    ctx.fillStyle = color;
-    ctx.fillRect(0, 0, w, h);
-    ctx.globalCompositeOperation = 'destination-in';
-    ctx.drawImage(mask, dx, dy, dw, dh);
+    ctx.globalAlpha = 0.9;
+    var carry = 0;
+    for (var k = 1; k < pts.length; k++) {
+      var a = pts[k - 1], b = pts[k];
+      var segLen = Math.hypot(b.x - a.x, b.y - a.y);
+      var d = carry;
+      while (d <= segLen) {
+        var f = segLen ? d / segLen : 0;
+        var cx = a.x + (b.x - a.x) * f, cy = a.y + (b.y - a.y) * f;
+        ctx.drawImage(dab, cx - dia / 2, cy - dia / 2, dia, dia);
+        d += spacing;
+      }
+      carry = d - segLen;
+    }
     ctx.restore();
   }
 
