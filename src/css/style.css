@@ -874,8 +874,17 @@ body.mode-motion .larrow{font-size:10px;}
 /* Feedback: "la selection d'un calque peut mettre un liserais blanc autour
    aussi" — a thin white outline in ADDITION to the existing left accent
    bar, so the selected layer/element/property row reads clearly against
-   the now-colored in/out bars (layer-inout.js) sharing the same row. */
-body.mode-motion .lrow.act{box-shadow:inset 3px 0 0 #4E6FF2,inset 0 0 0 1px rgba(255,255,255,.35);}
+   the now-colored in/out bars (layer-inout.js) sharing the same row.
+   2026-07-27: the outline now belongs to .motion-selected, not .act. Motion
+   tags a SELECTED row `act motion-selected` and a merely-active one `act`,
+   but .motion-selected had no rule anywhere — so the two states were
+   pixel-identical and deselecting changed nothing on screen. Clicking empty
+   space really did drop the selection; it just never looked like it
+   ("ça doit deselect aussi les calques"). Active keeps the left accent bar
+   alone (it's a position, not a selection); selected adds the outline and a
+   stronger tint. */
+body.mode-motion .lrow.act{box-shadow:inset 3px 0 0 #4E6FF2;}
+body.mode-motion .lrow.act.motion-selected{background:rgba(63,107,245,.16);box-shadow:inset 3px 0 0 #4E6FF2,inset 0 0 0 1px rgba(255,255,255,.35);}
 .lrow:hover{background:rgba(255,255,255,.03);}
 /* v4: matches the mockup's "Layer 1 Stroke" selected-row treatment — the
    tint and left accent bar span the FULL row (name column + frame-grid

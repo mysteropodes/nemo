@@ -3667,7 +3667,17 @@
     if (!moved) {
       setKeySel([]);
       if (window.SMLayerInOut && SMLayerInOut.clearSelection) SMLayerInOut.clearSelection();
+      // ...and the LAYER selection — the third thing this gesture owns, and
+      // the one it was leaving behind (2026-07-27: "dans la timeline si on
+      // clic à côté ou y a pas de calque il faut aussi pouvoir deselect").
+      // #layer-list's empty area already dropped it, so the same click
+      // deselected or not depending on which half of the timeline it landed
+      // in. renderLayerList is the left-hand half; renderTimeline below only
+      // repaints the grid.
+      var droppedLayers = _layerSel.length > 0;
+      if (droppedLayers) _layerSel = [];
       renderTimeline();
+      if (droppedLayers) renderLayerList();
     }
   }
 
