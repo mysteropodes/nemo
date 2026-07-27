@@ -388,18 +388,42 @@ window.SM={
   setFillColor:function(v){state.fillColor=v;paintFillSwatches(v);
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(p.fillColor)p.fillColor=v;});saveActiveLayerFrame();updateUI();}
     else if(state.tool==='fsselect'&&_fsSel.some(function(s){return s.kind==='fill'||s.kind==='fillregion';})){pushUndo();_fsSel=_fsSel.map(function(sel){if(sel.kind!=='fill'&&sel.kind!=='fillregion')return sel;if(sel.kind==='fillregion')sel=fsRealizeFillRegion(sel,userLayers[state.activeLayerIdx]);sel.path.fillColor=v;return sel;});saveActiveLayerFrame();updateUI();}},
-  setFillEnabled:function(v){state.fillEnabled=v;var fw=document.getElementById('fill-well'),pf=document.getElementById('pm-fill');fw.classList.toggle('none',!v);pf.classList.toggle('none',!v);document.getElementById('p-fill-on').checked=v;
-    var ft=document.getElementById('fill-enable-toggle');if(ft){ft.classList.toggle('off',!v);ft.innerHTML=v?ICO_EYE:ICO_EYE_CLOSED;}
-    var ftlp=document.getElementById('fill-enable-toggle-lp');if(ftlp){ftlp.classList.toggle('off',!v);ftlp.innerHTML=v?ICO_EYE:ICO_EYE_CLOSED;}
+  // Fill/Stroke on-off is mirrored by TWO eye icons — the right-panel one
+  // (#fill-enable-toggle / #stroke-enable-toggle) and the left tool-panel one
+  // (…-lp). Every place that changes the state must refresh BOTH, plus the
+  // open/closed glyph, or the two disagree.
+  //
+  // Found 2026-07-27: selecting a shape with no stroke ADOPTS its state
+  // (state.strokeEnabled=false, see the adopt-from-selection block further
+  // down) and only ever greyed the right-panel icon, so the left one kept
+  // showing an OPEN eye while the stroke was genuinely off — you then draw a
+  // black stroke, nothing appears, and the only visible switch says it is
+  // enabled. Same shape as CLAUDE.md §1: one piece of state, several readers,
+  // only one updated.
+  _syncFillEnabledUI:function(v){
+    var fw=document.getElementById('fill-well'),pf=document.getElementById('pm-fill');
+    if(fw)fw.classList.toggle('none',!v);
+    if(pf)pf.classList.toggle('none',!v);
+    var cb=document.getElementById('p-fill-on');if(cb)cb.checked=v;
+    ['fill-enable-toggle','fill-enable-toggle-lp'].forEach(function(id){
+      var el=document.getElementById(id);
+      if(el){el.classList.toggle('off',!v);el.innerHTML=v?ICO_EYE:ICO_EYE_CLOSED;}
+    });
+  },
+  _syncStrokeEnabledUI:function(v){
+    ['stroke-enable-toggle','stroke-enable-toggle-lp'].forEach(function(id){
+      var el=document.getElementById(id);
+      if(el){el.classList.toggle('off',!v);el.innerHTML=v?ICO_EYE:ICO_EYE_CLOSED;}
+    });
+  },
+  setFillEnabled:function(v){state.fillEnabled=v;window.SM._syncFillEnabledUI(v);
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(p.data&&p.data.isVectorBrush)return;p.fillColor=v?state.fillColor:null;});saveActiveLayerFrame();updateUI();}
     else if(state.tool==='fsselect'&&_fsSel.some(function(s){return s.kind==='fill'||s.kind==='fillregion';})){pushUndo();_fsSel=_fsSel.map(function(sel){if(sel.kind!=='fill'&&sel.kind!=='fillregion')return sel;if(sel.kind==='fillregion')sel=fsRealizeFillRegion(sel,userLayers[state.activeLayerIdx]);sel.path.fillColor=v?state.fillColor:null;if(!v){fsUnlinkFillRegen(sel.path);if(!sel.path.strokeColor){sel.path.remove();return null;}}return sel;}).filter(Boolean);saveActiveLayerFrame();updateUI();}},
   // Mirrors setFillEnabled exactly, for the Stroke side — didn't exist
   // before (Stroke had no on/off concept, only a color), added alongside
   // the quick phdr toggle button since disabling stroke without it required
   // opening the color popover and hunting for "None".
-  setStrokeEnabled:function(v){state.strokeEnabled=v;
-    var st=document.getElementById('stroke-enable-toggle');if(st){st.classList.toggle('off',!v);st.innerHTML=v?ICO_EYE:ICO_EYE_CLOSED;}
-    var stlp=document.getElementById('stroke-enable-toggle-lp');if(stlp){stlp.classList.toggle('off',!v);stlp.innerHTML=v?ICO_EYE:ICO_EYE_CLOSED;}
+  setStrokeEnabled:function(v){state.strokeEnabled=v;window.SM._syncStrokeEnabledUI(v);
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(p.data&&p.data.isVectorBrush)return;p.strokeColor=v?state.strokeColor:null;});saveActiveLayerFrame();updateUI();}
     // fsselect's 'stroke' selection can be just a bounded segment (between
     // two crossings), which has no standalone color to null — disabling it
@@ -1837,15 +1861,13 @@ function updateSelPropsPanel(){
         // and the whole LEFT panel showing the previous colour. See
         // paintFillSwatches for the measurement.
         paintFillSwatches(css);
-        document.getElementById('pm-fill').classList.toggle('none',!hasFill);
-        document.getElementById('p-fill-on').checked=hasFill;
-        var ftog=document.getElementById('fill-enable-toggle');if(ftog)ftog.classList.toggle('off',!hasFill);
+        window.SM._syncFillEnabledUI(hasFill);
         var hasStroke=!!ref.strokeColor;state.strokeEnabled=hasStroke;
         // The stroke side adopted NOTHING before: selecting a #e91e63 stroke
         // left every stroke surface on the previous colour, so the panels
         // described a shape that wasn't selected.
         if(hasStroke){var scss=colorHex8(ref.strokeColor);state.strokeColor=scss;paintStrokeSwatches(scss);}
-        var stog=document.getElementById('stroke-enable-toggle');if(stog)stog.classList.toggle('off',!hasStroke);
+        window.SM._syncStrokeEnabledUI(hasStroke);
       }
       // Same staleness fix for Cap/Join/Paint Order/Miter Limit/Dash Offset —
       // reflect the selected path's actual values instead of leaving
@@ -1930,7 +1952,7 @@ function updateFsSelPanel(){
     document.getElementById('stroke-well').style.background=sc;document.getElementById('pm-stroke').style.background=sc;
     ['color-stroke','pm-stroke-c'].forEach(function(id){var el=document.getElementById(id);if(el){el.value=sc;el.dataset.hex8=sc;}});
     state.strokeEnabled=true;
-    if(stog)stog.classList.remove('off');
+    window.SM._syncStrokeEnabledUI(true);
   }
 }
 // ---- GHOST ALL: turn the visual-only ghosts into real, editable, jointly-
