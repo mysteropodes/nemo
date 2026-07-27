@@ -429,6 +429,9 @@
     ["Les deux pastilles de couleur choisissent les teintes du dégradé, l'angle règle sa direction (mode linéaire). \"Appliquer à la sélection\" reprend l'effet si tu changes de sélection.", "The two color swatches choose the gradient's hues, the angle sets its direction (linear mode). \"Apply to selection\" reapplies the effect if you change the selection.", "Las dos pastillas de color eligen los tonos del degradado, el ángulo ajusta su dirección (modo lineal). \"Aplicar a la selección\" reaplica el efecto si cambias de selección.", "2つのカラースウォッチでグラデーションの色を選び、角度で方向を調整します（線形モード時）。「Appliquer à la sélection」は、選択範囲を変えたときに効果を再適用します。"],
     ["Référence (roto)", "Reference (roto)", "Referencia (roto)", "リファレンス（ロト）"],
     ["Vidéo ou image comme calque de référence", "A video or image as a reference layer", "Vídeo o imagen como capa de referencia", "動画や画像をリファレンスレイヤーとして使う"],
+    ["Ouvre les options de Référence", "Open the Reference options", "Abre las opciones de Referencia", "リファレンスのオプションを開く"],
+    ["La ligne \"Référence\" affiche l'état courant ; clique-la pour ouvrir ses réglages (import, visibilité, opacité, décalage).", "The \"Reference\" row shows the current state; click it to open its settings (import, visibility, opacity, offset).", "La fila \"Referencia\" muestra el estado actual; haz clic para abrir sus ajustes (importar, visibilidad, opacidad, desplazamiento).", "「リファレンス」の行は現在の状態を表示します。クリックすると設定（読み込み・表示・不透明度・オフセット）が開きます。"],
+    ["Clique \"Référence…\" pour voir le sélecteur de fichier s'ouvrir (vidéo, séquence d'images, ou image seule).", "Click \"Reference…\" to see the file picker open (video, image sequence, or a single image).", "Haz clic en \"Referencia…\" para ver cómo se abre el selector de archivos (video, secuencia de imágenes o una sola imagen).", "「リファレンス…」をクリックするとファイル選択が開きます（動画・画像シーケンス・単一画像）。"],
     ["Dessiner par-dessus une référence", "Drawing over a reference", "Dibujar sobre una referencia", "リファレンスの上に描く"],
     ["La Référence affiche une vidéo, une séquence d'images ou une image fixe SOUS ton dessin, pour la rotoscopie — elle suit la frame courante et n'est jamais exportée.", "Reference shows a video, an image sequence, or a still image UNDER your drawing, for rotoscoping — it follows the current frame and is never exported.", "La Referencia muestra un vídeo, una secuencia de imágenes o una imagen fija DEBAJO de tu dibujo, para rotoscopia — sigue el fotograma actual y nunca se exporta.", "リファレンスは、動画・画像シーケンス・静止画をロトスコープ用に描画の下に表示します — 現在のフレームに追従し、書き出しには含まれません。"],
     ["Ouvre la section \"Référence (roto)\"", "Open the \"Reference (roto)\" section", "Abre la sección \"Referencia (roto)\"", "「Référence (roto)」セクションを開く"],
@@ -1328,9 +1331,14 @@
         {
           type: 'state', target: '#layer-sec .phdr', title: 'Ouvre la section "Layer"', body: 'Clique l\'en-tête "Layer" dans le panneau de droite pour la déplier, si besoin.',
           hint: 'En attente…',
-          check: function (win) { var el = win.document.getElementById('btn-ref-import'); return !!(el && el.getBoundingClientRect().height > 0); }
+          // Cible le déclencheur replié, pas #btn-ref-import : depuis
+          // 2026-07-27 les contrôles vivent dans un popover et n'ont plus de
+          // hauteur tant qu'il n'est pas ouvert — l'ancien check restait
+          // faux même une fois la section correctement dépliée.
+          check: function (win) { var el = win.document.getElementById('p-ref-menu'); return !!(el && el.getBoundingClientRect().height > 0); }
         },
-        { type: 'click', target: '#btn-ref-import', title: 'Regarde le bouton "Importer…"', body: 'Clique "Importer…" pour voir le sélecteur de fichier s\'ouvrir (vidéo, séquence d\'images, ou image seule).' },
+        { type: 'click', target: '#p-ref-menu', title: 'Ouvre les options de Référence', body: 'La ligne "Référence" affiche l\'état courant ; clique-la pour ouvrir ses réglages (import, visibilité, opacité, décalage).' },
+        { type: 'click', target: '#btn-ref-import', title: 'Regarde le bouton "Importer…"', body: 'Clique "Référence…" pour voir le sélecteur de fichier s\'ouvrir (vidéo, séquence d\'images, ou image seule).' },
         { type: 'click', target: '#p-ref-opacity', title: 'Repère le réglage Opacity', body: 'Ce champ (glisse pour changer, ou clique pour taper une valeur) règle la transparence de la référence une fois importée, pour qu\'elle ne gêne pas ton dessin par-dessus.' },
         { type: 'info', title: 'Bien joué !', body: '"Offset" décale la frame de départ de la référence par rapport à la timeline — utile si ta vidéo ne commence pas au même instant que ton animation.' }
       ]
