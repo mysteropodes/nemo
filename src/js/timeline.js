@@ -6047,14 +6047,43 @@ document.getElementById('btn-ghost-all').addEventListener('click',function(){win
     candidates().forEach(function(b){
       var row=document.createElement('label');row.className='toolbar-custom-row';
       var cb=document.createElement('input');cb.type='checkbox';cb.checked=hidden.indexOf(b.id)<0;
-      var label=document.createElement('span');label.textContent=b.title||b.getAttribute('aria-label')||b.id;
+      // The row shows the button's OWN icon plus a SHORT name. Using the raw
+      // title made every row a full tooltip sentence (up to 90 chars, e.g.
+      // "Loop playback (work area) — right-click for ping-pong"), ellipsised
+      // to nothing useful in a 250px popover — reported 2026-07-27 ("icon
+      // texte moins long mieux mis en page"). A tooltip explains what a
+      // control DOES; this list only has to say WHICH control it is, and the
+      // icon carries most of that.
+      var ico=document.createElement('span');ico.className='toolbar-custom-ico';
+      // Clone the button's WHOLE icon content, not just an <svg>: this
+      // toolbar mixes inline SVG, material-symbols spans and bare text
+      // glyphs (↻ ▭ ☷ ✥) and one text label ("All"). Matching only svg left
+      // 11 of 18 rows with an empty icon slot.
+      ico.innerHTML=b.innerHTML;
+      // Cut at the first tooltip separator: everything before the em dash,
+      // middle dot or shortcut parenthesis is the control's name, the rest is
+      // explanation. Falls back to the whole title when there is no separator.
+      var full=b.title||b.getAttribute('aria-label')||b.id;
+      var short=full.split(/\s+[—·]\s+|\s*\(|\s*,\s*/)[0].trim()||full;
+      // A few titles are one long clause with no separator at all
+      // ("Show/hide Shadow Brush guide lines across all layers and
+      // components"). Clip those at a word boundary rather than letting CSS
+      // ellipsis eat an arbitrary character — the full text stays on hover.
+      if(short.length>30){
+        var cut=short.slice(0,30);
+        var sp=cut.lastIndexOf(' ');
+        short=(sp>12?cut.slice(0,sp):cut).replace(/[\s'’,:;-]+$/,'')+'…';
+      }
+      var label=document.createElement('span');label.className='toolbar-custom-name';
+      label.textContent=short;
+      row.title=full; // the long explanation stays reachable on hover
       cb.addEventListener('change',function(){
         var h=readHidden(),at=h.indexOf(b.id);
         if(cb.checked&&at>=0)h.splice(at,1);
         if(!cb.checked&&at<0)h.push(b.id);
         localStorage.setItem(KEY,JSON.stringify(h));apply();
       });
-      row.appendChild(cb);row.appendChild(label);pop.appendChild(row);
+      row.appendChild(cb);row.appendChild(ico);row.appendChild(label);pop.appendChild(row);
     });
     document.body.appendChild(pop);
     var r=trigger.getBoundingClientRect();
