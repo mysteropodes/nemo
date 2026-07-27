@@ -4041,6 +4041,7 @@ function rebuildVectorBrushOutline(path){
 // as plain [x,y] arrays, while normal Path.segments use real Paper Points —
 // these accessors paper over that so the conversion logic itself doesn't care.
 function _ptGet(isVB,seg){return isVB?new Point(seg.point[0],seg.point[1]):seg.point;}
+function _ptSet(isVB,seg,pt){if(isVB)seg.point=[pt.x,pt.y];else seg.point=pt;}
 function _ptHandleIn(isVB,seg){return isVB?new Point(seg.handleIn?seg.handleIn[0]:0,seg.handleIn?seg.handleIn[1]:0):seg.handleIn;}
 function _ptHandleOut(isVB,seg){return isVB?new Point(seg.handleOut?seg.handleOut[0]:0,seg.handleOut?seg.handleOut[1]:0):seg.handleOut;}
 function _ptSetHandleIn(isVB,seg,pt){if(isVB)seg.handleIn=[pt.x,pt.y];else seg.handleIn=pt;}
