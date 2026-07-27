@@ -4907,6 +4907,22 @@ function onMouseDown(event){
       return;
     }
     var subHit=layer.hitTest(event.point,{stroke:true,fill:true,pixel:true,tolerance:8/view.zoom});
+    // Isolation entered by a Select double-click: only the isolated shape
+    // (or its group) is reachable, and clicking anywhere else leaves rather
+    // than selecting something new — same contract fsselect had, kept so
+    // the gesture behaves identically now that it enters subselect instead.
+    if(_fsIsolation&&subHit){
+      var subAllowed=_fsIsolation.groupId
+        ? !!(subHit.item.data&&subHit.item.data.groupId===_fsIsolation.groupId)
+        : subHit.item===_fsIsolation.path;
+      if(!subAllowed)subHit=null;
+    }
+    if(!subHit&&_fsIsolation){
+      _fsIsolation=null;clearSel();window.SM.setTool('select');
+      renderArcs();updateUI();
+      if(window.SMEngineBridge)SMEngineBridge.renderNow();
+      return;
+    }
     // Raster companions resolve to their anchor too (Bitmap Brush v2) —
     // see the same fix's full comment in subselect-bridge.js.
     if(subHit&&(subHit.item instanceof Path||(subHit.item instanceof Raster&&subHit.item.data&&subHit.item.data.isBrushTextureCopy))){
@@ -5737,26 +5753,27 @@ function onViewDoubleClick(event){
   var fillPath=hit.item;
   clearSel();
   fsClearSel();
-  if(fillPath.fillColor)_fsSel.push({path:fillPath,kind:'fill'});
-  if(fillPath.strokeColor)_fsSel.push({path:fillPath,kind:'stroke',segStart:0,segEnd:fillPath.length,closed:fillPath.closed});
   _fsIsolation={groupId:fillPath.data&&fillPath.data.groupId,path:fillPath};
   // strokeBounds (not plain bounds) includes stroke-width padding — a
   // perfectly axis-aligned line has zero-height/width *geometric* bounds,
   // so a straight stroke lying exactly on the fill's edge would otherwise
   // count as merely touching (not intersecting) and get missed. Padding by
   // a couple of pixels on top of that covers any remaining tolerance gap.
-  var fb=(fillPath.strokeBounds||fillPath.bounds).expand(4/view.zoom);
-  layer.children.forEach(function(c){
-    if(c instanceof Path&&c!==fillPath&&c.strokeColor){
-      var cb=(c.strokeBounds||c.bounds);
-      if(cb.intersects(fb)){
-        if(_fsIsolation.groupId&&c.data&&c.data.groupId===_fsIsolation.groupId){
-          _fsSel.push({path:c,kind:'stroke',segStart:0,segEnd:c.length,closed:c.closed});
-        }
-      }
-    }
-  });
-  window.SM.setTool('fsselect');
+  // Double-click enters SUBSELECT on the clicked shape (2026-07-27: "au
+  // double clic avec select j'aimerais plutôt l'outil subselect avec même
+  // fonctionnement mais capable de modifier les points de vecteurs"). It
+  // used to enter fsselect, which isolates the same way but can only pick
+  // whole fill/stroke fragments — never the anchors. Isolation semantics are
+  // unchanged (_fsIsolation still scopes what is reachable, and clicking
+  // outside it drops back to Select); only the tool differs, so the shape's
+  // vertices and tangents are editable straight away.
+  selectedPaths=[fillPath];
+  state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;});
+  window.SM.setTool('subselect');
+  // nodeHandles is the array the NEXT click hit-tests against, and only this
+  // call populates it — without it the first click on an anchor silently
+  // misses (same staleness trap subselect-bridge.js documents at length).
+  renderNodeHandles();
   renderArcs();updateUI();
   if(window.SMEngineBridge)SMEngineBridge.renderNow();
 }
