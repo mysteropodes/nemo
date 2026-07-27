@@ -65,12 +65,75 @@
     return radiusScreen();
   };
 
+  // A pressure-brush stroke is an OUTLINE generated from a centerline; the
+  // centerline (data.centerSegments) is the editable thing, and
+  // rebuildVectorBrushOutline regenerates the ribbon — and re-syncs its
+  // linked fill backdrop — from it. Same isVB/centerSegments split
+  // setPointType and every node-drag already use (tools.js).
+  function isRibbon(c) {
+    return !!(c.data && c.data.isVectorBrush && c.data.centerSegments && c.data.centerSegments.length >= 2);
+  }
+
   function sculptables(layer) {
     return layer.children.filter(function (c) {
-      if (!(c instanceof Path) || !c.segments || c.segments.length < 2) return false;
-      if (c.data && (c.data.isVectorBrush || c.data.isFillShape || c.data.isBrushTextureCopy || c.data.ghostFrame !== undefined)) return false;
-      return true;
+      if (!(c instanceof Path)) return false;
+      if (c.data && (c.data.isBrushTextureCopy || c.data.ghostFrame !== undefined)) return false;
+      // A linked fill backdrop is REBUILT from its ribbon's centerline, so
+      // sculpting it as an independent path is precisely what pushed the
+      // fill while the stroke stayed put (2026-07-27: "le sculpt vecto ne
+      // prend pas le trait en même temps que le fill surtout quand ils sont
+      // attaché l'un à l'autre"). It was the ONE companion tag this filter
+      // never listed — CLAUDE.md §1.
+      if (c.data && c.data.isLinkedFillCompanion) return false;
+      if (isRibbon(c)) return true;
+      // Bucket fills are re-traced from their walls at gesture end instead.
+      if (c.data && c.data.isFillShape) return false;
+      return !!(c.segments && c.segments.length >= 2);
     });
+  }
+
+  // Nodes to displace: the centerline for a ribbon, the path's own segments
+  // otherwise. Handles are stored relative to their point in both models, so
+  // moving a point carries its handles and the curve character survives.
+  function nodesOf(p) { return isRibbon(p) ? p.data.centerSegments : p.segments; }
+
+  function centerPathOf(p) {
+    var c = new Path({ insert: false });
+    p.data.centerSegments.forEach(function (s) {
+      var seg = new Segment(new Point(s.point[0], s.point[1]),
+        new Point(s.handleIn ? s.handleIn[0] : 0, s.handleIn ? s.handleIn[1] : 0),
+        new Point(s.handleOut ? s.handleOut[0] : 0, s.handleOut ? s.handleOut[1] : 0));
+      c.add(seg);
+      // Ride the width along on the Segment object itself rather than a
+      // parallel array — divideAt() splices a new segment in and would shift
+      // every index after it.
+      c.segments[c.segments.length - 1]._w = s.width;
+    });
+    return c;
+  }
+
+  function writeCenterPath(p, c) {
+    p.data.centerSegments = c.segments.map(function (s) {
+      return {
+        point: [s.point.x, s.point.y],
+        handleIn: [s.handleIn.x, s.handleIn.y],
+        handleOut: [s.handleOut.x, s.handleOut.y],
+        width: s._w,
+      };
+    });
+  }
+
+  // An anchor inserted by divideAt has no width of its own — interpolate it
+  // from the nearest neighbours that do, or rebuildVectorBrushOutline reads
+  // undefined and the ribbon collapses to NaN width at that point.
+  function fillMissingWidths(segs) {
+    for (var i = 0; i < segs.length; i++) {
+      if (segs[i]._w != null) continue;
+      var a = i - 1; while (a >= 0 && segs[a]._w == null) a--;
+      var b = i + 1; while (b < segs.length && segs[b]._w == null) b++;
+      var wa = a >= 0 ? segs[a]._w : null, wb = b < segs.length ? segs[b]._w : null;
+      segs[i]._w = wa == null ? (wb == null ? 1 : wb) : (wb == null ? wa : (wa + wb) / 2);
+    }
   }
 
   // A long simplified stroke can pass straight through the brush with
@@ -79,30 +142,46 @@
   // subdivides under the brush: if the CURVE runs within the radius but
   // no anchor is inside, insert anchors at the nearest spot (and once
   // more each side for a bendable span) before displacing.
-  function densifyUnderBrush(p, center, R) {
+  function divideUnderBrush(c, center, R) {
+    var added = false;
     for (var guard = 0; guard < 6; guard++) {
-      var anyInside = p.segments.some(function (seg) { return seg.point.getDistance(center) < R * 0.8; });
-      if (anyInside) return;
-      var near = p.getNearestLocation(center);
-      if (!near || near.point.getDistance(center) >= R) return;
-      p.divideAt(near);
+      var anyInside = c.segments.some(function (seg) { return seg.point.getDistance(center) < R * 0.8; });
+      if (anyInside) break;
+      var near = c.getNearestLocation(center);
+      if (!near || near.point.getDistance(center) >= R) break;
+      if (!c.divideAt(near)) break;
+      added = true;
     }
+    return added;
   }
+
+  function densifyUnderBrush(p, center, R) {
+    if (!isRibbon(p)) { divideUnderBrush(p, center, R); return; }
+    var c = centerPathOf(p);
+    if (divideUnderBrush(c, center, R)) { fillMissingWidths(c.segments); writeCenterPath(p, c); }
+    c.remove();
+  }
+
   function applyPush(layer, center, delta, R) {
     var moved = false;
     sculptables(layer).forEach(function (p) {
       // Cheap reject: brush circle vs stroke bbox.
       if (!p.bounds.expand(2 * R).contains(center)) return;
       densifyUnderBrush(p, center, R);
-      var hit = false;
-      p.segments.forEach(function (seg) {
-        var d = seg.point.getDistance(center);
+      var vb = isRibbon(p), hit = false;
+      nodesOf(p).forEach(function (seg) {
+        var pt = _ptGet(vb, seg);
+        var d = pt.getDistance(center);
         if (d >= R) return;
         var w = 1 - d / R; w = w * w; // quadratic falloff
-        seg.point = seg.point.add(delta.multiply(w));
+        _ptSet(vb, seg, pt.add(delta.multiply(w)));
         hit = true;
       });
-      if (hit) { moved = true; if (touched.indexOf(p) < 0) touched.push(p); }
+      if (hit) {
+        if (vb) rebuildVectorBrushOutline(p); // regenerates the ribbon AND its linked fill
+        moved = true;
+        if (touched.indexOf(p) < 0) touched.push(p);
+      }
     });
     return moved;
   }
@@ -111,19 +190,23 @@
     var moved = false;
     sculptables(layer).forEach(function (p) {
       if (!p.bounds.expand(2 * R).contains(center)) return;
-      var segs = p.segments;
-      var hit = false;
+      var vb = isRibbon(p), segs = nodesOf(p), hit = false;
       // Relax interior points toward their neighbors' midpoint; endpoints
       // stay pinned so the stroke never shrinks off its anchors.
       for (var i = 1; i < segs.length - 1; i++) {
-        var d = segs[i].point.getDistance(center);
+        var pt = _ptGet(vb, segs[i]);
+        var d = pt.getDistance(center);
         if (d >= R) continue;
         var w = (1 - d / R); w = w * w * 0.35; // gentler than push
-        var mid = segs[i - 1].point.add(segs[i + 1].point).divide(2);
-        segs[i].point = segs[i].point.add(mid.subtract(segs[i].point).multiply(w));
+        var mid = _ptGet(vb, segs[i - 1]).add(_ptGet(vb, segs[i + 1])).divide(2);
+        _ptSet(vb, segs[i], pt.add(mid.subtract(pt).multiply(w)));
         hit = true;
       }
-      if (hit) { moved = true; if (touched.indexOf(p) < 0) touched.push(p); }
+      if (hit) {
+        if (vb) rebuildVectorBrushOutline(p);
+        moved = true;
+        if (touched.indexOf(p) < 0) touched.push(p);
+      }
     });
     return moved;
   }
