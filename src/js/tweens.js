@@ -4283,7 +4283,14 @@ function restoreLayersSnapshot(s){
   // champ : on laisse alors les clés actuelles intactes (undefined check).
   if(s.cameraKeys!==undefined)state.cameraKeys=JSON.parse(JSON.stringify(s.cameraKeys));
   activateUL(state.activeLayerIdx);
-  loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
+  loadFrame(state.currentFrame);
+  // Paper objects are recreated by loadFrame(). Rebind the ordinary
+  // selection by its persisted child indexes and clear selection modes
+  // whose entries contain direct references to the removed objects.
+  if(window.SMSelectBridge&&SMSelectBridge.refreshAfterDocumentRestore)SMSelectBridge.refreshAfterDocumentRestore();
+  if(typeof fsClearSel==='function')fsClearSel();
+  if(typeof _nodeSel!=='undefined')_nodeSel=[];
+  renderOS();renderArcs();updateUI();
   if(window.SMCamera&&window.updateCameraPanel){updateCameraPanel();}
 }
 function undo(){if(!state.undoStack.length){showToast('Rien à annuler');return;}var s=state.undoStack.pop();var sl=state.undoLabels.pop()||_actionLabelNow();
@@ -4500,4 +4507,3 @@ function updateReassignBadge(){
     showToast('Sélectionnez l\'élément correspondant, puis cliquez le bouton jaune');
   };
 }
-

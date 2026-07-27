@@ -56,11 +56,90 @@ function hitTestComponentLayers(point){
 // shape fsHitTest always returned; single-select is just the length-1 case.
 var _fsSel=[];
 function fsClearSel(){_fsSel=[];}
+var _fsIsolation=null; // {groupId,path}; entered by Select double-click
 // Last-touched entry — every place that used to read _fsSel.kind/.path
 // directly for a SINGLE-value display (panel color swatch, header text)
 // keeps doing that against this one, while actions (recolor/delete/opacity)
 // loop over the whole _fsSel array.
 function fsPrimarySel(){return _fsSel.length?_fsSel[_fsSel.length-1]:null;}
+function fsSelectionAtPoint(pt){
+  for(var i=_fsSel.length-1;i>=0;i--){
+    var hi=fsHighlightPath(_fsSel[i]);
+    if(!hi)continue;
+    var hit=false;
+    try{
+      hit=(_fsSel[i].kind==='stroke')
+        ? !!hi.hitTest(pt,{stroke:true,tolerance:8/view.zoom})
+        : (hi.contains(pt)||!!hi.hitTest(pt,{fill:true,tolerance:2/view.zoom}));
+    }catch(e){hit=false;}
+    hi.remove();
+    if(hit)return _fsSel[i];
+  }
+  return null;
+}
+// Promote the selected fill/stroke fragments to ordinary standalone paths.
+// Once promoted, the regular Select tool supplies the complete move/scale/
+// rotate UI instead of maintaining a second, subtly different transform
+// implementation for aspect selections.
+function fsPromoteSelectionForTransform(layer){
+  if(!_fsSel.length)return[];
+  var promoted=[];
+  // Fill cuts change the source geometry, so realize them first.
+  _fsSel.filter(function(s){return s.kind==='fillregion';}).forEach(function(s){
+    var r=fsRealizeFillRegion(s,layer);
+    if(r&&r.path&&promoted.indexOf(r.path)<0)promoted.push(r.path);
+  });
+  _fsSel.filter(function(s){return s.kind==='fill';}).forEach(function(s){
+    if(!s.path||s.path.removed)return;
+    // Selecting only the fill of a combined fill+stroke shape must not drag
+    // its outline along. Split the visual aspects into two real paths.
+    if(s.path.strokeColor){
+      var fillOnly=s.path.clone({insert:false,deep:true});
+      fillOnly.strokeColor=null;
+      s.path.fillColor=null;
+      if(s.path.data)delete s.path.data.fillGradient;
+      fsUnlinkFillRegen(fillOnly);fsUnlinkFillRegen(s.path);
+      layer.insertChild(layer.children.indexOf(s.path),fillOnly);
+      promoted.push(fillOnly);
+    }else if(promoted.indexOf(s.path)<0)promoted.push(s.path);
+  });
+  // Descending offsets keep earlier offsets valid while an open path is
+  // split repeatedly into selected arcs.
+  _fsSel.filter(function(s){return s.kind==='stroke'&&s.path&&!s.path.removed;})
+    .sort(function(a,b){return b.segStart-a.segStart;})
+    .forEach(function(s){
+      var p=s.path;
+      var whole=s.segStart===0&&Math.abs(s.segEnd-p.length)<0.001;
+      if(whole&&p.fillColor){
+        var strokeOnly=p.clone({insert:false,deep:true});
+        strokeOnly.fillColor=null;
+        if(strokeOnly.data)delete strokeOnly.data.fillGradient;
+        p.strokeColor=null;
+        layer.insertChild(layer.children.indexOf(p)+1,strokeOnly);
+        if(promoted.indexOf(strokeOnly)<0)promoted.push(strokeOnly);
+      }else{
+        var arc=fsRealizeStrokeSegment(s,layer);
+        if(arc&&promoted.indexOf(arc)<0)promoted.push(arc);
+      }
+    });
+  return promoted.filter(function(p){return p&&!p.removed;});
+}
+var _fsPromoteDrag=null;
+document.addEventListener('pointerdown',function(e){
+  var onStage=e.target===canvasEl||(e.target&&e.target.id==='rust-canvas');
+  if(e.button!==0||state.tool!=='fsselect'||!window.SMEngineBridge||!SMEngineBridge.isEnabled()||!onStage)return;
+  var w=SMEngineBridge.screenToWorld(e.clientX,e.clientY),pt=new Point(w[0],w[1]);
+  var selectedAtPointer=fsSelectionAtPoint(pt);
+  if(!selectedAtPointer||e.shiftKey)return;
+  pushUndo();
+  selectedPaths=fsPromoteSelectionForTransform(userLayers[state.activeLayerIdx]);
+  fsClearSel();_fsIsolation=null;
+  state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i){return i>=0;});
+  window.SM.setTool('select');
+  _fsPromoteDrag={last:pt};
+  renderTransformHandles();renderNodeHandles();updateUI();
+  e.preventDefault();e.stopImmediatePropagation();
+},{capture:true});
 // Raw pointermove/pointerup listeners for the fsselect marquee/lasso
 // (2026-07) — NOT Paper.js Tool's own onMouseDrag/onMouseUp (the branches
 // below still handle those, for when the Rust engine is off and Paper's
@@ -77,6 +156,16 @@ function fsPrimarySel(){return _fsSel.length?_fsSel[_fsSel.length-1]:null;}
 // IS off: whichever resolves first clears _marquee.active, making the
 // other a no-op.
 document.addEventListener('pointermove',function(e){
+  if(_fsPromoteDrag){
+    var wm=SMEngineBridge.screenToWorld(e.clientX,e.clientY),pm=new Point(wm[0],wm[1]);
+    var delta=pm.subtract(_fsPromoteDrag.last);_fsPromoteDrag.last=pm;
+    selectedPaths.forEach(function(p){
+      p.position=p.position.add(delta);
+      if(p.data&&p.data.isVectorBrush&&p.data.centerSegments)p.data.centerSegments.forEach(function(s){s.point=[s.point[0]+delta.x,s.point[1]+delta.y];});
+    });
+    renderTransformHandles();renderNodeHandles();SMEngineBridge.renderNow();
+    e.preventDefault();e.stopImmediatePropagation();return;
+  }
   if(!(_marquee.active&&_marquee.mode==='fsselect')||!window.SMEngineBridge)return;
   var w=window.SMEngineBridge.screenToWorld(e.clientX,e.clientY);
   var pt=new Point(w[0],w[1]);
@@ -93,37 +182,57 @@ document.addEventListener('pointermove',function(e){
   prevA.activate();
   if(window.SMEngineBridge.renderNow)window.SMEngineBridge.renderNow();
 },{capture:true});
+function fsStrokeRangesInRegion(path,region){
+  var out=[],len=path.length||0;if(len<0.001)return out;
+  var steps=Math.max(24,Math.min(600,Math.ceil(len/(3/view.zoom))));
+  var runStart=null;
+  for(var i=0;i<=steps;i++){
+    var off=len*i/steps,pt=path.getPointAt(Math.min(len,off));
+    var inside=!!(pt&&region.contains(pt));
+    if(inside&&runStart===null)runStart=off;
+    if((!inside||i===steps)&&runStart!==null){
+      var end=inside?off:Math.max(runStart,len*(i-1)/steps);
+      if(end-runStart>0.5/view.zoom)out.push({path:path,kind:'stroke',segStart:runStart,segEnd:end,closed:path.closed});
+      runStart=null;
+    }
+  }
+  return out;
+}
+function fsResolveRegionSelection(region,layer){
+  var rb=region.bounds;
+  layer.children.forEach(function(c){
+    if(!(c instanceof Path)||c.segments.length===0||!(c.strokeColor||c.fillColor))return;
+    if(!rb.intersects(c.bounds))return;
+    var intersects=false;
+    try{intersects=region.intersects(c);}catch(e){}
+    var fullyInside=region.contains(c.bounds.topLeft)&&region.contains(c.bounds.topRight)&&
+      region.contains(c.bounds.bottomLeft)&&region.contains(c.bounds.bottomRight);
+    if(!fullyInside&&!intersects&&!region.contains(c.position))return;
+    if(c.fillColor){
+      var fillKind=fullyInside?{path:c,kind:'fill'}:{path:c,kind:'fillregion',boolCut:true,cutter:region.clone({insert:false}),inside:true};
+      if(!_fsSel.some(function(s){return s.path===c&&s.kind===fillKind.kind;}))_fsSel.push(fillKind);
+    }
+    if(c.strokeColor){
+      var ranges=fullyInside?[{path:c,kind:'stroke',segStart:0,segEnd:c.length,closed:c.closed}]:fsStrokeRangesInRegion(c,region);
+      ranges.forEach(function(r){
+        if(!_fsSel.some(function(s){return s.path===c&&s.kind==='stroke'&&Math.abs(s.segStart-r.segStart)<0.01&&Math.abs(s.segEnd-r.segEnd)<0.01;}))_fsSel.push(r);
+      });
+    }
+  });
+}
 document.addEventListener('pointerup',function(e){
+  if(_fsPromoteDrag){
+    _fsPromoteDrag=null;saveActiveLayerFrame();renderArcs();updateUI();
+    if(window.SMEngineBridge)SMEngineBridge.renderNow();
+    e.preventDefault();e.stopImmediatePropagation();return;
+  }
   if(!(_marquee.active&&_marquee.mode==='fsselect'))return;
   if(_marquee.rect){
     var mbf=_marquee.rect.bounds;
     var lassoF=null;
     if(_marquee.lasso&&_marquee.rect.segments.length>2){_marquee.rect.closePath();lassoF=_marquee.rect;}
     var layerF=userLayers[state.activeLayerIdx];
-    layerF.children.forEach(function(c){
-      if(!(c instanceof Path)||c.segments.length===0||!(c.strokeColor||c.fillColor))return;
-      if(!mbf.intersects(c.bounds))return;
-      if(_fsSel.some(function(s){return s.path===c;}))return; // already selected — Shift+lasso over the same shape twice shouldn't duplicate it
-      if(lassoF&&!lassoF.contains(c.position)){
-        if(!lassoF.intersects(c))return;
-        // 2026-07 feedback ("le lasso... selectionne toute la forme au lieu
-        // de la partie delimitee, comme dans Photoshop/Animate") — the
-        // lasso's outline crosses this fill WITHOUT enclosing its center:
-        // carve just the overlapping sub-region (reusing the exact same
-        // boolCut fillregion machinery fsFindFillRegion/fsRealizeFillRegion/
-        // fsHighlightPath already use for a manual cutter path) instead of
-        // selecting the whole shape. A stroke-only shape has no fill
-        // polygon to intersect against — keep the prior whole-stroke
-        // fallback for that case (segment-based lasso cutting isn't built).
-        if(c.fillColor){
-          _fsSel.push({path:c,kind:'fillregion',boolCut:true,cutter:lassoF.clone({insert:false}),inside:true});
-        }else{
-          _fsSel.push({path:c,kind:'stroke',segStart:0,segEnd:c.length,closed:c.closed});
-        }
-        return;
-      }
-      _fsSel.push(c.fillColor?{path:c,kind:'fill'}:{path:c,kind:'stroke',segStart:0,segEnd:c.length,closed:c.closed});
-    });
+    fsResolveRegionSelection(lassoF||_marquee.rect,layerF);
     _marquee.rect.remove();_marquee.rect=null;_marquee.mode=null;
   }
   _marquee.active=false;renderArcs();updateUI();
@@ -847,6 +956,16 @@ function selBoxPt(x,y,box){
   var dx=x-box.pivot.x,dy=y-box.pivot.y;
   return new Point(box.pivot.x+dx*c-dy*s,box.pivot.y+dx*s+dy*c);
 }
+// Gradient anchors are document geometry just like path vertices. Keep them
+// in the same transform stream so a gradient never appears pinned to the
+// canvas while its owning shape moves, scales or rotates.
+function transformFillGradient(path, pointTransform){
+  var g=path&&path.data&&path.data.fillGradient;
+  if(!g||!g.from||!g.to)return;
+  var a=pointTransform(new Point(g.from[0],g.from[1]));
+  var b=pointTransform(new Point(g.to[0],g.to[1]));
+  g.from=[a.x,a.y];g.to=[b.x,b.y];
+}
 // Align toolbar (redesign 2026-07-09) — each selected path moves by its OWN
 // delta against the combined selection bounds (not a uniform group shift
 // like selPropsApplyMove), so this can't reuse that function; the per-path
@@ -871,6 +990,7 @@ function alignSelection(mode){
     moved=true;
     var d=new Point(dx,dy);
     p.translate(d);
+    transformFillGradient(p,function(pt){return pt.add(d);});
     if(p.data&&p.data.isVectorBrush&&p.data.centerSegments)p.data.centerSegments.forEach(function(s){s.point=[s.point[0]+dx,s.point[1]+dy];});
     if(p.data&&p.data.linkedFill&&!p.data.linkedFill.removed)p.data.linkedFill.translate(d);
     if(p.data&&p.data.brushCompanions)p.data.brushCompanions.forEach(function(c){if(!c.removed)c.translate(d);});
@@ -1313,21 +1433,27 @@ function applyShadowBrushTag(p,preferFill){
   p.data.channelTag='shadow';
   if(window.SMShadowBrush){
     var sw=window.SMShadowBrush.activeSwatch();
-    // A vector-brush/tapered-outline path OR a committed Fill Brush shape
-    // (isFillShape — isVectorBrush is deliberately deleted from these right
-    // after commit, see the Fill Brush commit comment just above this
-    // file's fillWallPath-gap fix, but isFillShape stays) represents its
-    // ink via fillColor (strokeColor null); a plain Pen/Draw/Shape path
-    // represents it via strokeColor instead. draw-bridge.js's "fill seul"
-    // ribbon-enclosed branch (Stroke off + Fill on) is a THIRD case — a
-    // plain closed fill path with neither flag set — so callers that know
-    // their path is fill-ink-only despite lacking either flag pass
-    // preferFill explicitly rather than being silently misdetected as a
-    // stroke-ink path. Whichever is the actual ink channel gets the swatch
-    // color; the OTHER is explicitly cleared so nothing stray (e.g. a
-    // leftover state.fillColor) shows through.
-    if(preferFill||p.data.isVectorBrush||p.data.isFillShape){p.fillColor=sw.color;p.strokeColor=null;}
-    else{p.strokeColor=sw.color;p.fillColor=null;}
+    // Shadow Brush is construction ink for the fill solver, never a painted
+    // ribbon. Convert pressure/Fill-Brush outlines back to their centreline
+    // while that centreline still exists, then enforce a visible stroke and
+    // no fill for every producer (Draw, Fill Brush, Pen and Shape).
+    if(p.data.isVectorBrush&&p.data.centerSegments&&p.data.centerSegments.length){
+      var shadowCenter=p.data.centerSegments.map(function(s){return{
+        point:[s.point[0],s.point[1]],
+        handleIn:s.handleIn?[s.handleIn[0],s.handleIn[1]]:[0,0],
+        handleOut:s.handleOut?[s.handleOut[0],s.handleOut[1]]:[0,0],
+      };});
+      p.removeSegments();
+      shadowCenter.forEach(function(s){
+        p.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));
+      });
+      p.closed=false;
+      delete p.data.isVectorBrush;delete p.data.centerSegments;delete p.data.widthProfile;
+    }
+    p.fillColor=null;
+    p.strokeColor=sw.color;
+    p.strokeWidth=Math.max(1,p.strokeWidth||state.brushSize||3);
+    p.strokeCap='round';p.strokeJoin='round';
     p.data.shadowSwatchId=sw.id;
   }
 }
@@ -4449,7 +4575,7 @@ function _eraseDegenerateSelfLoops(path){
 // all describe how to REBUILD the outline, and a notched outline no longer
 // has a valid centerline to rebuild from (see eraseAtPoint's own comment on
 // origStrokeInfo — that tradeoff is intentional and predates this).
-var BOOL_KEEP_DATA_ALL=['groupId','ownerId','ownerName','ownerColor','channelTag','shadowSwatchId','tweenOn','boxAngle','xformAnchorKey','xformAnchorCustom','effects'];
+var BOOL_KEEP_DATA_ALL=['groupId','ownerId','ownerName','ownerColor','channelTag','shadowSwatchId','tweenOn','boxAngle','xformAnchorKey','xformAnchorCustom','effects','fillGradient'];
 // Keys that must stay UNIQUE across the layer: both are lookup map keys
 // (motion.js:1413 scans for the first data.strokeId match, app.js:740 builds
 // byId[linkedFillId]), so copying them onto every island of a split would
@@ -4771,6 +4897,7 @@ function onMouseDown(event){
     if(bestNh){
       pushUndo();
       _nodeDrag.active=true;_nodeDrag.path=selectedPaths[0];_nodeDrag.segIndex=bestNh.segIndex;
+      _nodeDrag.dragStartPointer=event.point.clone();_nodeDrag.appliedDelta=new Point(0,0);
       // grabbing one of several marquee-selected anchors drags them all
       if(bestNh.type==='point'&&_nodeSel.indexOf(bestNh.segIndex)>=0&&_nodeSel.length>1){_nodeDrag.type='group';}
       else{
@@ -4815,7 +4942,25 @@ function onMouseDown(event){
     // finalized in onMouseUp once the drag distance is known.
     _textDragStart=event.point.clone();
   }else if(state.tool==='fsselect'){
+    var selectedFragment=fsSelectionAtPoint(event.point);
+    if(selectedFragment&&!event.event.shiftKey){
+      pushUndo();
+      var promoted=fsPromoteSelectionForTransform(layer);
+      fsClearSel();_fsIsolation=null;
+      selectedPaths=promoted;
+      state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;});
+      window.SM.setTool('select');
+      _moveDragStarted=true;
+      renderTransformHandles();renderNodeHandles();updateUI();
+      return;
+    }
     var fsHit=fsHitTest(event.point,layer);
+    if(_fsIsolation&&fsHit){
+      var allowed=_fsIsolation.groupId
+        ? !!(fsHit.path.data&&fsHit.path.data.groupId===_fsIsolation.groupId)
+        : fsHit.path===_fsIsolation.path;
+      if(!allowed)fsHit=null;
+    }
     // event.event.shiftKey/altKey (native event), not event.modifiers.shift/alt
     // (Paper.js's own tracking) -- same proven-reliable pattern the Pen tool
     // and Zoom tool already use in this exact file: this app's own global
@@ -4833,6 +4978,11 @@ function onMouseDown(event){
         _fsSel=[fsHit];
       }
     }else{
+      if(_fsIsolation){
+        _fsIsolation=null;fsClearSel();window.SM.setTool('select');updateUI();
+        if(window.SMEngineBridge)SMEngineBridge.renderNow();
+        return;
+      }
       if(!event.event.shiftKey)fsClearSel();
       // Clicked empty canvas: start a rubber-band marquee (Alt held =
       // temporarily flips to/from lasso) — same feedback, "il faudrait les
@@ -5147,6 +5297,19 @@ function onMouseDrag(event){
       prevTxt.activate();
     }
   }else if(state.tool==='subselect'){
+    var nodeEventPoint=event.point,nodeEventDelta=event.delta;
+    if(_nodeDrag.active&&(_nodeDrag.type==='point'||_nodeDrag.type==='group')){
+      var nodeDesired=nodeEventPoint.subtract(_nodeDrag.dragStartPointer||nodeEventPoint.subtract(event.delta));
+      if(event.event.shiftKey){
+        var nodeSnap=constrainAngle45(_nodeDrag.dragStartPointer,nodeEventPoint);
+        nodeDesired=nodeSnap.subtract(_nodeDrag.dragStartPointer);
+      }
+      nodeEventDelta=nodeDesired.subtract(_nodeDrag.appliedDelta||new Point(0,0));
+      _nodeDrag.appliedDelta=nodeDesired;
+    }else if(_nodeDrag.active&&event.event.shiftKey&&(_nodeDrag.type==='handleIn'||_nodeDrag.type==='handleOut')){
+      var nodeHs=nodeEditSegmentsData(_nodeDrag.path)[_nodeDrag.segIndex];
+      if(nodeHs)nodeEventPoint=constrainAngle45(new Point(nodeHs.point[0],nodeHs.point[1]),nodeEventPoint);
+    }
     if(_nmq.active){
       var nx1=Math.min(_nmq.start.x,event.point.x),ny1=Math.min(_nmq.start.y,event.point.y);
       var nx2=Math.max(_nmq.start.x,event.point.x),ny2=Math.max(_nmq.start.y,event.point.y);
@@ -5157,10 +5320,10 @@ function onMouseDrag(event){
     }else if(_nodeDrag.active&&_nodeDrag.type==='group'){
       var gp=_nodeDrag.path;
       if(gp.data&&gp.data.isVectorBrush&&gp.data.centerSegments){
-        _nodeSel.forEach(function(si){var cs3=gp.data.centerSegments[si];if(cs3)cs3.point=[cs3.point[0]+event.delta.x,cs3.point[1]+event.delta.y];});
+        _nodeSel.forEach(function(si){var cs3=gp.data.centerSegments[si];if(cs3)cs3.point=[cs3.point[0]+nodeEventDelta.x,cs3.point[1]+nodeEventDelta.y];});
         rebuildVectorBrushOutline(gp);
       }else{
-        _nodeSel.forEach(function(si){var sg=gp.segments[si];if(sg)sg.point=sg.point.add(event.delta);});
+        _nodeSel.forEach(function(si){var sg=gp.segments[si];if(sg)sg.point=sg.point.add(nodeEventDelta);});
       }
       renderNodeHandles();
       // Live fill follow: without this, a fill linked to this stroke only
@@ -5171,15 +5334,15 @@ function onMouseDrag(event){
       var sdp=_nodeDrag.path;
       if(sdp.data&&sdp.data.isVectorBrush&&sdp.data.centerSegments){
         var scs=sdp.data.centerSegments[_nodeDrag.segIndex];
-        if(_nodeDrag.type==='point'){scs.point=[scs.point[0]+event.delta.x,scs.point[1]+event.delta.y];}
-        else if(_nodeDrag.type==='handleOut'){var sno=[event.point.x-scs.point[0],event.point.y-scs.point[1]];scs.handleOut=sno;if(!event.modifiers.alt)scs.handleIn=[-sno[0],-sno[1]];}
-        else if(_nodeDrag.type==='handleIn'){var sni=[event.point.x-scs.point[0],event.point.y-scs.point[1]];scs.handleIn=sni;if(!event.modifiers.alt)scs.handleOut=[-sni[0],-sni[1]];}
+        if(_nodeDrag.type==='point'){scs.point=[scs.point[0]+nodeEventDelta.x,scs.point[1]+nodeEventDelta.y];}
+        else if(_nodeDrag.type==='handleOut'){var sno=[nodeEventPoint.x-scs.point[0],nodeEventPoint.y-scs.point[1]];scs.handleOut=sno;if(!event.modifiers.alt)scs.handleIn=[-sno[0],-sno[1]];}
+        else if(_nodeDrag.type==='handleIn'){var sni=[nodeEventPoint.x-scs.point[0],nodeEventPoint.y-scs.point[1]];scs.handleIn=sni;if(!event.modifiers.alt)scs.handleOut=[-sni[0],-sni[1]];}
         rebuildVectorBrushOutline(sdp);
       }else{
         var sseg=sdp.segments[_nodeDrag.segIndex];
-        if(_nodeDrag.type==='point')sseg.point=sseg.point.add(event.delta);
-        else if(_nodeDrag.type==='handleOut'){sseg.handleOut=event.point.subtract(sseg.point);if(!event.modifiers.alt)sseg.handleIn=sseg.handleOut.multiply(-1);}
-        else if(_nodeDrag.type==='handleIn'){sseg.handleIn=event.point.subtract(sseg.point);if(!event.modifiers.alt)sseg.handleOut=sseg.handleIn.multiply(-1);}
+        if(_nodeDrag.type==='point')sseg.point=sseg.point.add(nodeEventDelta);
+        else if(_nodeDrag.type==='handleOut'){sseg.handleOut=nodeEventPoint.subtract(sseg.point);if(!event.modifiers.alt)sseg.handleIn=sseg.handleOut.multiply(-1);}
+        else if(_nodeDrag.type==='handleIn'){sseg.handleIn=nodeEventPoint.subtract(sseg.point);if(!event.modifiers.alt)sseg.handleOut=sseg.handleIn.multiply(-1);}
       }
       renderNodeHandles();
       fillRegenerateLinked(userLayers[state.activeLayerIdx],sdp);
@@ -5315,7 +5478,10 @@ function onMouseUp(event){
         csF.forEach(function(s){currentPath.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));});
         currentPath.closed=true;
         currentPath.fillColor=state.fillColor;currentPath.strokeColor=null;
-        delete currentPath.data.isVectorBrush;
+        if(state.shadowMode){
+          currentPath.data.isVectorBrush=true;
+          currentPath.data.centerSegments=csF;
+        }else delete currentPath.data.isVectorBrush;
       }
       else{
         var rawWidths=_vb.pts.map(function(p,i){return vbWidthFor(_vb.widths[i]);});
@@ -5328,7 +5494,7 @@ function onMouseUp(event){
       _vb.pts=[];_vb.widths=[];
     }else if(currentPath.segments.length<2){
       currentPath.remove();if(state.undoStack.length)state.undoStack.pop();
-    }else if(state.bitmapBrushOn&&state.strokeEnabled&&window.SMBitmapBrush){
+    }else if(!state.shadowMode&&state.bitmapBrushOn&&state.strokeEnabled&&window.SMBitmapBrush){
       // Bitmap Brush's tools.js mirror (v2, 2026-07) — same anchor+
       // companion call as draw-bridge.js's commitStroke: the plain path
       // Paper built during the drag stays as the real, subselect-editable
@@ -5384,9 +5550,6 @@ function onMouseUp(event){
       // for fillMergeSameColor to fuse them into one shape. isFillShape
       // stays (still needed by pen-bridge.js's close-path/endpoint-snap
       // exclusion guard).
-      delete currentPath.data.isVectorBrush;
-      delete currentPath.data.centerSegments;
-      delete currentPath.data.widthProfile;
       if(state.shadowMode){
         // A shadow guide stroke must never auto-merge/unite with whatever
         // real artwork happens to sit underneath it — both
@@ -5397,6 +5560,9 @@ function onMouseUp(event){
         // and both are skipped entirely for this stroke.
         applyShadowBrushTag(currentPath);
       }else{
+        delete currentPath.data.isVectorBrush;
+        delete currentPath.data.centerSegments;
+        delete currentPath.data.widthProfile;
         // Placement (Above/Below/Merge) — see applyFillBrushPlacement's own
         // comment; replaces the old unconditional "always at the back".
         currentPath=applyFillBrushPlacement(currentPath,userLayers[state.activeLayerIdx]);
@@ -5452,23 +5618,7 @@ function onMouseUp(event){
         var lassoF=null;
         if(_marquee.lasso&&_marquee.rect.segments.length>2){_marquee.rect.closePath();lassoF=_marquee.rect;}
         var layerF=userLayers[state.activeLayerIdx];
-        layerF.children.forEach(function(c){
-          if(!(c instanceof Path)||c.segments.length===0||!(c.strokeColor||c.fillColor))return;
-          if(!mbf.intersects(c.bounds))return;
-          if(_fsSel.some(function(s){return s.path===c;}))return; // already selected — Shift+lasso over the same shape twice shouldn't duplicate it
-          if(lassoF&&!lassoF.contains(c.position)){
-            if(!lassoF.intersects(c))return;
-            // Same sub-region carving as the raw pointerup listener above
-            // (engine-on path) — see its comment for the full rationale.
-            if(c.fillColor){
-              _fsSel.push({path:c,kind:'fillregion',boolCut:true,cutter:lassoF.clone({insert:false}),inside:true});
-            }else{
-              _fsSel.push({path:c,kind:'stroke',segStart:0,segEnd:c.length,closed:c.closed});
-            }
-            return;
-          }
-          _fsSel.push(c.fillColor?{path:c,kind:'fill'}:{path:c,kind:'stroke',segStart:0,segEnd:c.length,closed:c.closed});
-        });
+        fsResolveRegionSelection(lassoF||_marquee.rect,layerF);
         _marquee.rect.remove();_marquee.rect=null;_marquee.mode=null;
       }
       _marquee.active=false;renderArcs();updateUI();
@@ -5585,7 +5735,11 @@ function onViewDoubleClick(event){
   var hit=layer.hitTest(event.point,{fill:true,tolerance:4/view.zoom});
   if(!hit||!(hit.item instanceof Path)||!hit.item.fillColor)return;
   var fillPath=hit.item;
-  if(selectedPaths.indexOf(fillPath)<0)selectedPaths.push(fillPath);
+  clearSel();
+  fsClearSel();
+  if(fillPath.fillColor)_fsSel.push({path:fillPath,kind:'fill'});
+  if(fillPath.strokeColor)_fsSel.push({path:fillPath,kind:'stroke',segStart:0,segEnd:fillPath.length,closed:fillPath.closed});
+  _fsIsolation={groupId:fillPath.data&&fillPath.data.groupId,path:fillPath};
   // strokeBounds (not plain bounds) includes stroke-width padding — a
   // perfectly axis-aligned line has zero-height/width *geometric* bounds,
   // so a straight stroke lying exactly on the fill's edge would otherwise
@@ -5595,13 +5749,24 @@ function onViewDoubleClick(event){
   layer.children.forEach(function(c){
     if(c instanceof Path&&c!==fillPath&&c.strokeColor){
       var cb=(c.strokeBounds||c.bounds);
-      if(cb.intersects(fb)&&selectedPaths.indexOf(c)<0)selectedPaths.push(c);
+      if(cb.intersects(fb)){
+        if(_fsIsolation.groupId&&c.data&&c.data.groupId===_fsIsolation.groupId){
+          _fsSel.push({path:c,kind:'stroke',segStart:0,segEnd:c.length,closed:c.closed});
+        }
+      }
     }
   });
-  state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;});
+  window.SM.setTool('fsselect');
   renderArcs();updateUI();
+  if(window.SMEngineBridge)SMEngineBridge.renderNow();
 }
 view.onMouseDown=onMouseDown;view.onMouseDrag=onMouseDrag;view.onMouseUp=onMouseUp;view.onMouseMove=onMouseMoveTool;view.onDoubleClick=onViewDoubleClick;
+canvasEl.addEventListener('dblclick',function(e){
+  if(!(window.SMEngineBridge&&SMEngineBridge.isEnabled())||state.tool!=='select')return;
+  var w=SMEngineBridge.screenToWorld(e.clientX,e.clientY);
+  onViewDoubleClick({point:new Point(w[0],w[1])});
+  e.preventDefault();e.stopImmediatePropagation();
+},{capture:true});
 // Zoom-to-pointer: the fixed ±8%-per-event step (old code) felt identical
 // for a single notchy mouse-wheel click and a fast trackpad fling — every
 // event was the same size regardless of how hard/fast the gesture was.

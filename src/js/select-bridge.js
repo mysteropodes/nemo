@@ -36,6 +36,13 @@
   function nvClearSelection() {
     if (window._nvSelectedLayer != null) { window._nvSelectedLayer = null; }
   }
+  function syncMotionLayerSelection(li, additive) {
+    if (state.appMode !== 'motion' || typeof _layerSel === 'undefined') return;
+    if (li == null) { if (!additive) _layerSel = []; return; }
+    if (additive) {
+      if (_layerSel.indexOf(li) < 0) _layerSel.push(li);
+    } else _layerSel = [li];
+  }
   var xformDir = null, xformAnchor = null, xformOrigHandlePos = null, xformLastSx = 1, xformLastSy = 1;
   var xformMap = null; // geometry<->rendered-world mapper when the active layer has a Motion transform
   // Ctrl+drag corner = free-transform DISTORT pins (2026-07, "avec l'outil
@@ -499,6 +506,26 @@
       return;
     }
 
+    // The transform box itself is a draggable surface, including its empty
+    // center. This matters especially for Ghost All where the distribution
+    // box can span large gaps with no actual path under the pointer.
+    if (selectedPaths.length) {
+      var bodyHandle = computeHandles();
+      if (bodyHandle) {
+        var bodyPt = pt;
+        if (bodyHandle.map) {
+          var bodyGeom = bodyHandle.map.inv(bodyPt.x, bodyPt.y);
+          bodyPt = new Point(bodyGeom[0], bodyGeom[1]);
+        }
+        if (bodyHandle.box && bodyHandle.box.angle) bodyPt = bodyPt.rotate(-bodyHandle.box.angle, bodyHandle.box.pivot);
+        if (bodyHandle.bounds.contains(bodyPt)) {
+          mode = 'move';
+          moveStarted = false;
+          return;
+        }
+      }
+    }
+
     var layer = userLayers[state.activeLayerIdx];
     var activeLdForLock = state.layers[state.activeLayerIdx];
     // A locked ACTIVE layer's own content must be as untouchable as a locked
@@ -622,6 +649,7 @@
         if (!e.shiftKey) clearSel();
         state.activeLayerIdx = nvHit;
         activateUL(nvHit);
+        syncMotionLayerSelection(nvHit, e.shiftKey);
         window._nvSelectedLayer = nvHit; // gizmo drawn by buildTransformBoxItems' nv branch
         mode = 'nv-drag';
         nvIdx = nvHit;
@@ -643,6 +671,7 @@
         if (!e.shiftKey) clearSel();
         state.activeLayerIdx = compHit.layerIdx;
         activateUL(compHit.layerIdx);
+        syncMotionLayerSelection(compHit.layerIdx, e.shiftKey);
         selectedPaths = userLayers[compHit.layerIdx].children.filter(function (c) { return (c instanceof Path || c instanceof Raster) && isSelectablePathChild(c); });
         state.selectedStrokeIndices = [];
         renderArcs(); updateUI();
@@ -660,6 +689,7 @@
         state.activeLayerIdx = hitOtherLayerIdx;
         activateUL(hitOtherLayerIdx);
       }
+      syncMotionLayerSelection(state.activeLayerIdx, e.shiftKey);
       // A component layer must act as one rigid transform group even when
       // it's the ACTIVE layer — the hitTestComponentLayers fallback below
       // only fires when the active layer's OWN hitTest misses, so clicking
@@ -713,6 +743,7 @@
       moveStarted = false;
     } else {
       if (!e.shiftKey) clearSel();
+      syncMotionLayerSelection(null, e.shiftKey);
       mode = 'marquee';
       marqueeStart = pt.clone();
       var prevA = project.activeLayer;
@@ -914,6 +945,7 @@
       // translate(delta*N) — zero accumulated drift by construction.
       selectedPaths.forEach(function (p) {
         p.translate(delta);
+        transformFillGradient(p, function (gp) { return gp.add(delta); });
         if (p.data && p.data.isVectorBrush && p.data.centerSegments) {
           p.data.centerSegments.forEach(function (s) { s.point = [s.point[0] + delta.x, s.point[1] + delta.y]; });
         }
@@ -997,6 +1029,9 @@
       }
       selectedPaths.forEach(function (p) {
         p.scale(stepSx, stepSy, anchor);
+        transformFillGradient(p, function (gp) {
+          return new Point(anchor.x + (gp.x - anchor.x) * stepSx, anchor.y + (gp.y - anchor.y) * stepSy);
+        });
         if (p.data && p.data.isVectorBrush && p.data.centerSegments) {
           scaleCenterSegments(p.data.centerSegments, stepSx, stepSy, anchor.x, anchor.y);
           rebuildVectorBrushOutline(p);
@@ -1071,6 +1106,7 @@
       }
       selectedPaths.forEach(function (p) {
         p.rotate(stepAngle, rotCenter);
+        transformFillGradient(p, function (gp) { return gp.rotate(stepAngle, rotCenter); });
         if (p.data && p.data.isVectorBrush && p.data.centerSegments) {
           rotateCenterSegments(p.data.centerSegments, stepAngle, rotCenter.x, rotCenter.y);
           rebuildVectorBrushOutline(p);
@@ -1526,6 +1562,19 @@
   // the gizmo draw the ACTUAL live-distorted quad instead of the static
   // pre-distort rectangle while a corner-pin drag is in progress.
   window.SMSelectBridge = {
+    refreshAfterDocumentRestore: function () {
+      // Undo/redo rebuilds every Paper item. Any gesture-local object
+      // reference therefore points at removed geometry after the restore.
+      mode = null;
+      draggingArc = null;
+      arcDragCache = null;
+      moveStarted = false;
+      distortDir = null; distortSrcQuad = null; distortSegs = null; distortDstQuad = null;
+      selectedPaths = (state.selectedStrokeIndices || []).map(function (i) {
+        return userLayers[state.activeLayerIdx] && userLayers[state.activeLayerIdx].children[i];
+      }).filter(function (p) { return p && !p.removed; });
+      state.selectedStrokeIndices = selectedPaths.map(getSI).filter(function (i) { return i >= 0; });
+    },
     getDistortState: function () {
       return mode === 'xform-distort' ? { dir: distortDir, quad: distortDstQuad } : null;
     },
