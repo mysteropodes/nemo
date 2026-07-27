@@ -456,7 +456,37 @@
         paramsWrap.appendChild(pill);
       });
     });
-    paramsWrap.style.display = anyParams ? 'flex' : 'none';
+    hasParams = anyParams;
+    applyParamsVisibility();
+  }
+
+  // -- option rows appear on hover, collapse on leave --------------------
+  // 2026-07-27: "tous les menu sont bien comme ça mais doivent s'affiché
+  // quand on hover la barre flottante et se refermer en hover off". The
+  // strip sits ON the drawing area, so with three or four tools armed the
+  // permanently-expanded option rows covered a good slice of the canvas
+  // while you were drawing — the exact thing this panel was kept small to
+  // avoid. The icon row (which says WHAT is on) always stays.
+  var hasParams = false, hovering = false, dragging = false;
+  function applyParamsVisibility() {
+    var paramsWrap = document.getElementById('labs-float-params');
+    if (!paramsWrap) return;
+    // Two ways to be "still using it" with the pointer outside: mid-drag of
+    // the whole panel (collapsing would resize it under the cursor), and
+    // typing/scrubbing in a stepper field, which keeps focus but frees the
+    // mouse to wander off.
+    var busy = dragging || (document.activeElement && paramsWrap.contains(document.activeElement));
+    paramsWrap.style.display = (hasParams && (hovering || busy)) ? 'flex' : 'none';
+  }
+
+  function setupHover() {
+    var panel = document.getElementById('labs-float-panel');
+    if (!panel) return;
+    panel.addEventListener('mouseenter', function () { hovering = true; applyParamsVisibility(); });
+    panel.addEventListener('mouseleave', function () { hovering = false; applyParamsVisibility(); });
+    // A field can lose focus while the pointer is already elsewhere — that's
+    // the moment the "busy" reprieve above expires.
+    panel.addEventListener('focusout', function () { setTimeout(applyParamsVisibility, 0); });
   }
 
   // -- drag anywhere within #canvas-area, position persisted -------------
@@ -493,7 +523,7 @@
     relPos = loadPos();
     applyFixedPos();
     window.addEventListener('resize', applyFixedPos);
-    var dragging = false, startX = 0, startY = 0, startLeft = 0, startTop = 0;
+    var startX = 0, startY = 0, startLeft = 0, startTop = 0;
     handle.addEventListener('pointerdown', function (e) {
       dragging = true;
       startX = e.clientX; startY = e.clientY;
@@ -519,11 +549,13 @@
       dragging = false;
       try { handle.releasePointerCapture(e.pointerId); } catch (er) {}
       savePos(relPos);
+      applyParamsVisibility();
     });
   }
 
   function init() {
     setupDrag();
+    setupHover();
     renderLabsFloatPanel();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
