@@ -332,6 +332,11 @@ body.tools-docked-away #tools-panel-resize{display:none;}
    value/plus in one flat strip). */
 #labs-float-params{display:flex;flex-direction:column;align-items:stretch;gap:4px;padding:5px 3px 2px 3px;margin-top:2px;border-top:1px solid rgba(255,255,255,.08);max-height:220px;overflow-y:auto;}
 .labs-float-stepper{display:flex;align-items:center;background:var(--panel3);border-radius:7px;overflow:hidden;min-height:24px;}
+/* Vertical rule inside a .pr row — separates two groups of controls that
+   share one line (BG swatch vs the view/overlay toggles in the Document
+   section). Sized off the row's own content height rather than a fixed px
+   so it stays visually centred if the row's controls change height. */
+.pr .pr-vsep{width:1px;align-self:stretch;margin:2px 4px;background:rgba(236,234,231,.14);flex:none;}
 .labs-float-stepper .lfs-tool-icon{width:22px;display:flex;align-items:center;justify-content:center;color:rgba(236,234,231,.32);flex:none;}
 .labs-float-stepper .lfs-tool-icon svg{width:13px;height:13px;}
 .labs-float-stepper .lfs-label{font-size:9px;color:var(--text-dim);padding:0 6px 0 8px;white-space:nowrap;}
