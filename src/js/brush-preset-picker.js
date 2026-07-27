@@ -94,7 +94,10 @@
     var ctx = canvas.getContext('2d');
     var w = canvas.width, h = canvas.height;
     ctx.clearRect(0, 0, w, h);
-    var textColor = getComputedStyle(document.documentElement).getPropertyValue('--text').trim() || '#eee';
+    // Preset thumbnails are neutral samples, not a preview of the current
+    // paint colour: consistent white ink on the picker's dark surface makes
+    // density/edge quality comparable across every vector and bitmap entry.
+    var textColor = '#ffffff';
     var preset = window.resolveBrushPreset ? window.resolveBrushPreset(presetKey) : null;
     if (!preset) {
       ctx.globalAlpha = 1; ctx.strokeStyle = textColor; ctx.lineWidth = 2; ctx.setLineDash([]);

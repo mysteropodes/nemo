@@ -24,7 +24,9 @@
     ctx.clearRect(0, 0, w, h);
     if (!window.SMBitmapBrush) return;
     var mask = window.SMBitmapBrush.buildTipCanvas(tipKey, 1); // fixed seed — the picker shows the TIP shape, not a particular stroke's jitter
-    var color = (window.state && state.strokeColor) || '#000000';
+    // Match vector-preset previews: a neutral white sample on the menu's
+    // dark background, independent of the artwork's current stroke colour.
+    var color = '#ffffff';
     // Tint pass — identical convention to bitmap-brush.js's own
     // beginLivePreview tinting: fill with color, clip to the mask's alpha.
     var scale = Math.min(w, h) * 0.85 / mask.width;

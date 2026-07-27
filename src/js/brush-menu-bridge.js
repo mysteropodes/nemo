@@ -206,12 +206,10 @@
     checkRow(params, 'Taper ends', !!state.taperEnds, function (v) { driveOriginal('p-taper', v, true, 'change'); });
   }
   function buildBitmapParams(params) {
-    // The Stroke panel's #p-bitmapbrush-on checkbox is gone (2026-07
-    // harmonization — this floating panel is the sole owner of
-    // state.bitmapBrushOn now), so this calls window.SM.setBitmapBrushOn
-    // directly instead of driving a hidden original element that no longer
-    // exists.
-    checkRow(params, 'Bitmap Brush actif', !!state.bitmapBrushOn, function (v) { if (window.SM && window.SM.setBitmapBrushOn) window.SM.setBitmapBrushOn(v); });
+    // No manual Bitmap on/off switch here: choosing a bitmap tip activates
+    // bitmap drawing, choosing a vector preset deactivates it. The preset is
+    // the mode, so the UI cannot end up showing one family while drawing
+    // with the other.
     numRow(params, 'Taille', state.brushSize || 3, 1, 300, 1, function (v) { driveOriginal('p-sw', v, false, 'change'); });
     // Spacing/Scatter/Opacity/Pressure no longer have a Stroke-panel element
     // to drive at all (removed, 2026-07 harmonization) — call
@@ -256,6 +254,8 @@
       var grid = document.createElement('div'); grid.className = 'bp-grid';
       g.keys.forEach(function (k) { grid.appendChild(makeBrushItem(k, k === current, function (key) {
         commitBrushPreview();
+        state.bitmapBrushOn = false;
+        driveOriginal('p-vecbrush', true, true, 'change');
         // NOT window.SM.applyVectorBrushToSelection(key) too — selectPreset
         // (brush-preset-picker.js) already retroactively re-textures the
         // current selection itself (its own pushUndo included); calling
@@ -274,6 +274,8 @@
       var cgrid = document.createElement('div'); cgrid.className = 'bp-grid';
       custom.forEach(function (k) { cgrid.appendChild(makeBrushItem(k, k === current, function (key) {
         commitBrushPreview();
+        state.bitmapBrushOn = false;
+        driveOriginal('p-vecbrush', true, true, 'change');
         // NOT window.SM.applyVectorBrushToSelection(key) too — selectPreset
         // (brush-preset-picker.js) already retroactively re-textures the
         // current selection itself (its own pushUndo included); calling
@@ -323,7 +325,7 @@
         // next, not just retexture whatever's currently selected.
         if (window.SM) {
           if (window.SM.setBitmapBrushOn) window.SM.setBitmapBrushOn(true);
-          if (window.SM.setVectorBrush) window.SM.setVectorBrush(false);
+          driveOriginal('p-vecbrush', false, true, 'change');
         }
         if (window.SM && window.SM.applyBitmapBrushToSelection) window.SM.applyBitmapBrushToSelection();
         buildBitmapGrid(container);
@@ -348,7 +350,7 @@
         // next, not just retexture whatever's currently selected.
         if (window.SM) {
           if (window.SM.setBitmapBrushOn) window.SM.setBitmapBrushOn(true);
-          if (window.SM.setVectorBrush) window.SM.setVectorBrush(false);
+          driveOriginal('p-vecbrush', false, true, 'change');
         }
         if (window.SM && window.SM.applyBitmapBrushToSelection) window.SM.applyBitmapBrushToSelection();
         buildBitmapGrid(container);
@@ -395,7 +397,7 @@
     buildContent(el);
 
     var ar = anchorEl.getBoundingClientRect();
-    el.style.visibility = 'hidden'; el.style.display = 'block';
+    el.style.visibility = 'hidden'; el.style.display = 'flex';
     var ew = el.offsetWidth, eh = el.offsetHeight;
     var left = Math.min(ar.left, window.innerWidth - ew - 8);
     var top = Math.min(ar.bottom + 6, window.innerHeight - eh - 8);
