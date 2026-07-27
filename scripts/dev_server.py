@@ -15,11 +15,20 @@
 # into the shipped app by accident.
 import http.server
 import json
+import os
 import re
 import sys
 from pathlib import Path
 
-FEEDBACK_ROOT = Path(__file__).resolve().parent.parent / ".feedback"
+# Tests may point the browser-preview bridge at the same app-data feedback
+# folder used by Tauri. The default remains the repo-local, unbundled
+# `.feedback` directory so ordinary development never touches app data.
+FEEDBACK_ROOT = Path(
+    os.environ.get(
+        "STROKEMOTION_FEEDBACK_ROOT",
+        str(Path(__file__).resolve().parent.parent / ".feedback"),
+    )
+).expanduser()
 
 
 def safe_segment(s):
@@ -41,6 +50,16 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
         self.send_header("Cache-Control", "no-store, no-cache, must-revalidate")
         http.server.SimpleHTTPRequestHandler.end_headers(self)
+
+    def send_head(self):
+        # SimpleHTTPRequestHandler still answers 304 to an old
+        # If-Modified-Since request even when the response says no-store.
+        # During rapid shader/UI iterations the filesystem timestamp can
+        # share the same one-second value, making WebKit reuse stale bytes.
+        # A dev server should always return the source currently on disk.
+        if "If-Modified-Since" in self.headers:
+            del self.headers["If-Modified-Since"]
+        return super().send_head()
 
     def _json(self, status, payload):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
