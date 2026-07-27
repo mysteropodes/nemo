@@ -912,7 +912,10 @@
   // the right panel to re-dock it (at the position under the cursor), drop
   // it anywhere else and it stays floating where you left it; its header
   // remains draggable to move it again. Docked order persists per label.
-  var secDrag={el:null,startX:0,startY:0,started:false,offX:0,offY:0,wasFloating:false};
+  var secDrag={el:null,startX:0,startY:0,started:false,offX:0,offY:0,wasFloating:false,before:true};
+  var secDropIndicator=document.createElement('div');
+  secDropIndicator.id='panel-drop-indicator';
+  document.body.appendChild(secDropIndicator);
   // Keyed on the section's ID, not its header text (2026-07-26): two
   // sections legitimately share the header "Effects" (#effects-stack-sec,
   // the per-layer effect stack, and #effects-sec, the tool-options one), so
@@ -962,13 +965,22 @@
     secDrag.el.style.left=Math.max(0,Math.min(window.innerWidth-fw,e.clientX-secDrag.offX))+'px';
     secDrag.el.style.top=Math.max(0,Math.min(window.innerHeight-fh,e.clientY-secDrag.offY))+'px';
     document.querySelectorAll('.psec.drag-over-sec').forEach(function(s){s.classList.remove('drag-over-sec');});
+    secDropIndicator.style.display='none';
     var ppr=document.getElementById('props-panel').getBoundingClientRect();
     if(e.clientX>=ppr.left&&e.clientX<=ppr.right&&e.clientY>=ppr.top&&e.clientY<=ppr.bottom){
       secDrag.el.style.pointerEvents='none';
       var under=document.elementFromPoint(e.clientX,e.clientY);
       secDrag.el.style.pointerEvents='';
       var over=under&&under.closest?under.closest('.psec'):null;
-      if(over&&over!==secDrag.el)over.classList.add('drag-over-sec');
+      if(over&&over!==secDrag.el){
+        over.classList.add('drag-over-sec');
+        var or=over.getBoundingClientRect();
+        secDrag.before=e.clientY<or.top+or.height/2;
+        secDropIndicator.style.display='block';
+        secDropIndicator.style.left=or.left+'px';
+        secDropIndicator.style.width=or.width+'px';
+        secDropIndicator.style.top=(secDrag.before?or.top:or.bottom)+'px';
+      }
     }
   });
   window.addEventListener('mouseup',function(e){
@@ -981,12 +993,16 @@
         var over2=document.querySelector('.psec.drag-over-sec');
         secDrag.el.classList.remove('floating');
         secDrag.el.style.left='';secDrag.el.style.top='';
-        if(over2)pp3.insertBefore(secDrag.el,over2);
+        if(over2){
+          if(secDrag.before)pp3.insertBefore(secDrag.el,over2);
+          else pp3.insertBefore(secDrag.el,over2.nextSibling);
+        }
         else pp3.appendChild(secDrag.el);
         saveSecOrder();
       }
       window._secDragJustEnded=true;
       document.querySelectorAll('.psec').forEach(function(s){s.classList.remove('drag-sec','drag-over-sec');});
+      secDropIndicator.style.display='none';
     }
     secDrag.el=null;secDrag.started=false;
   });
