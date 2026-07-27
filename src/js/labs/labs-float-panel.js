@@ -294,11 +294,27 @@
     // which don't fit PARAMS' "one localStorage-backed number" shape since
     // mode is a string cycle and both fields live on `state`, not
     // localStorage.
+    // Every option row carries its owning tool's icon at the far left, greyed
+    // (feedback 2026-07-26: "Un icon tout à gauche de la ligne de l'outil
+    // grisé doit apparaître"). The PARAMS-driven rows further down already
+    // built one; the hand-written Symmetry/Perspective pills never did, so
+    // with several tools active at once those rows were the only ones giving
+    // no clue which tool they belonged to — precisely the case the feedback
+    // is about. One helper so a future hand-built pill can't forget again.
+    function stepperPill(toolKey) {
+      var pill = document.createElement('div');
+      pill.className = 'labs-float-stepper';
+      var ico = document.createElement('span');
+      ico.className = 'lfs-tool-icon';
+      ico.innerHTML = ICONS[toolKey] || '';
+      pill.appendChild(ico);
+      return pill;
+    }
     paramsWrap.innerHTML = '';
     var anyParams = false;
     if (registered.symmetry) {
       anyParams = true;
-      var modePill = document.createElement('div'); modePill.className = 'labs-float-stepper';
+      var modePill = stepperPill('symmetry');
       var modeLbl = document.createElement('span'); modeLbl.className = 'lfs-label'; modeLbl.textContent = 'Mode';
       var modePrev = document.createElement('button'); modePrev.className = 'lfs-btn'; modePrev.textContent = '−';
       var modeVal = document.createElement('span'); modeVal.className = 'lfs-val';
@@ -318,7 +334,7 @@
       modePill.appendChild(modeLbl); modePill.appendChild(modePrev); modePill.appendChild(modeVal); modePill.appendChild(modeNext);
       paramsWrap.appendChild(modePill);
       if (state.symmetryMode === 'radial') {
-        var secPill = document.createElement('div'); secPill.className = 'labs-float-stepper';
+        var secPill = stepperPill('symmetry');
         var secLbl = document.createElement('span'); secLbl.className = 'lfs-label'; secLbl.textContent = 'Secteurs';
         var secMinus = document.createElement('button'); secMinus.className = 'lfs-btn'; secMinus.textContent = '−';
         var secVal = document.createElement('span'); secVal.className = 'lfs-val'; secVal.textContent = state.symmetryRadialSectors;
@@ -339,7 +355,7 @@
       // perspective n'ont plus lieu d'être, les options doivent être gérées
       // au niveau du panneau flottant") — same wide-toggle-pill/action-pill
       // shape as Perspective's own Lock/Reset just below.
-      var extPill = document.createElement('div'); extPill.className = 'labs-float-stepper';
+      var extPill = stepperPill('symmetry');
       var extBtn = document.createElement('button'); extBtn.className = 'lfs-btn wide' + (state.symmetryExtend ? ' on' : '');
       extBtn.textContent = 'Extend'; extBtn.title = "Off: a stroke crossing the axis is cut right at it, so it and its mirror never overlap at the fold";
       extBtn.addEventListener('click', function () {
@@ -348,7 +364,7 @@
       });
       extPill.appendChild(extBtn);
       paramsWrap.appendChild(extPill);
-      var symResetPill = document.createElement('div'); symResetPill.className = 'labs-float-stepper';
+      var symResetPill = stepperPill('symmetry');
       var symResetBtn = document.createElement('button'); symResetBtn.className = 'lfs-btn wide';
       symResetBtn.textContent = 'Reset'; symResetBtn.title = 'Reset position';
       symResetBtn.addEventListener('click', function () { if (window.resetSymmetryGuide) window.resetSymmetryGuide(); });
@@ -361,7 +377,7 @@
       // Symmetry's Extend/Reset above) — only on/off was mirrored here
       // before, so this panel had no Mode control at all yet either.
       anyParams = true;
-      var pModePill = document.createElement('div'); pModePill.className = 'labs-float-stepper';
+      var pModePill = stepperPill('perspective');
       var pModeLbl = document.createElement('span'); pModeLbl.className = 'lfs-label'; pModeLbl.textContent = 'Mode';
       var pModePrev = document.createElement('button'); pModePrev.className = 'lfs-btn'; pModePrev.textContent = '−';
       var pModeVal = document.createElement('span'); pModeVal.className = 'lfs-val';
@@ -377,7 +393,7 @@
       pModeNext.addEventListener('click', function () { cyclePerspMode(1); });
       pModePill.appendChild(pModeLbl); pModePill.appendChild(pModePrev); pModePill.appendChild(pModeVal); pModePill.appendChild(pModeNext);
       paramsWrap.appendChild(pModePill);
-      var densPill = document.createElement('div'); densPill.className = 'labs-float-stepper';
+      var densPill = stepperPill('perspective');
       var densLbl = document.createElement('span'); densLbl.className = 'lfs-label'; densLbl.textContent = 'Densité';
       var densMinus = document.createElement('button'); densMinus.className = 'lfs-btn'; densMinus.textContent = '−';
       var densVal = document.createElement('span'); densVal.className = 'lfs-val'; densVal.textContent = state.perspectiveDensity;
@@ -391,7 +407,7 @@
       densPlus.addEventListener('click', function () { setDensity(state.perspectiveDensity + 2); });
       densPill.appendChild(densLbl); densPill.appendChild(densMinus); densPill.appendChild(densVal); densPill.appendChild(densPlus);
       paramsWrap.appendChild(densPill);
-      var lockPill = document.createElement('div'); lockPill.className = 'labs-float-stepper';
+      var lockPill = stepperPill('perspective');
       var lockBtn = document.createElement('button'); lockBtn.className = 'lfs-btn wide';
       lockBtn.textContent = 'Lock'; lockBtn.title = 'Prevents dragging any vanishing point with the Perspective tool';
       var vpsNow = window.ensurePerspectiveVPs ? window.ensurePerspectiveVPs() : [];
@@ -404,7 +420,7 @@
       });
       lockPill.appendChild(lockBtn);
       paramsWrap.appendChild(lockPill);
-      var perspResetPill = document.createElement('div'); perspResetPill.className = 'labs-float-stepper';
+      var perspResetPill = stepperPill('perspective');
       var perspResetBtn = document.createElement('button'); perspResetBtn.className = 'lfs-btn wide';
       perspResetBtn.textContent = 'Reset'; perspResetBtn.title = 'Reset positions';
       perspResetBtn.addEventListener('click', function () { if (window.resetPerspectiveVPs) window.resetPerspectiveVPs(); });
