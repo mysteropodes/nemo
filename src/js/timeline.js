@@ -6031,10 +6031,27 @@ document.getElementById('btn-ghost-all').addEventListener('click',function(){win
   if(!toolbar||!trigger)return;
   var KEY='nemo-timeline-toolbar-hidden';
   var pop=null;
+  // Transport is never hideable — same rule as the overflow trigger itself.
+  // Go to first / Previous / Play-Stop / Next / Go to last / Loop are how you
+  // move through time at all; a timeline without them is not a timeline, and
+  // hiding one would be an easy irreversible-looking mistake to make from a
+  // checkbox list (2026-07-27: "tout ça ne doit pas y apparaître, il reste
+  // quoi qu'il arrive"). They are excluded from the list rather than shown
+  // disabled — an entry you can never act on is just noise.
+  var ALWAYS_VISIBLE=['btn-ff','btn-pf','btn-play','btn-nf','btn-lf','btn-loop'];
   function readHidden(){try{return JSON.parse(localStorage.getItem(KEY)||'[]');}catch(e){return[];}}
-  function candidates(){return Array.prototype.slice.call(toolbar.querySelectorAll(':scope > button.tb[id]')).filter(function(b){return b!==trigger;});}
+  function candidates(){return Array.prototype.slice.call(toolbar.querySelectorAll(':scope > button.tb[id]')).filter(function(b){return b!==trigger&&ALWAYS_VISIBLE.indexOf(b.id)<0;});}
   function apply(){
     var hidden=readHidden();
+    // Drop any stored id that is now protected, so a transport button hidden
+    // by an earlier build (or by hand in localStorage) comes back instead of
+    // staying invisible with no entry left to re-enable it.
+    var cleaned=hidden.filter(function(id){return ALWAYS_VISIBLE.indexOf(id)<0;});
+    if(cleaned.length!==hidden.length){hidden=cleaned;localStorage.setItem(KEY,JSON.stringify(hidden));}
+    ALWAYS_VISIBLE.forEach(function(id){
+      var b=document.getElementById(id);
+      if(b)b.classList.remove('toolbar-user-hidden');
+    });
     candidates().forEach(function(b){b.classList.toggle('toolbar-user-hidden',hidden.indexOf(b.id)>=0);});
   }
   function close(){if(pop){pop.remove();pop=null;}document.removeEventListener('pointerdown',outside,true);}
