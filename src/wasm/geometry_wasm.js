@@ -425,9 +425,10 @@ export class VelloEngine {
      * @param {number} rotation
      * @param {number} pivot_x
      * @param {number} pivot_y
+     * @param {number} effect_zoom
      */
-    set_viewport(pan_x, pan_y, zoom, rotation, pivot_x, pivot_y) {
-        wasm.velloengine_set_viewport(this.__wbg_ptr, pan_x, pan_y, zoom, rotation, pivot_x, pivot_y);
+    set_viewport(pan_x, pan_y, zoom, rotation, pivot_x, pivot_y, effect_zoom) {
+        wasm.velloengine_set_viewport(this.__wbg_ptr, pan_x, pan_y, zoom, rotation, pivot_x, pivot_y, effect_zoom);
     }
 }
 if (Symbol.dispose) VelloEngine.prototype[Symbol.dispose] = VelloEngine.prototype.free;

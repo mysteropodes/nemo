@@ -63,6 +63,7 @@ const EFFECT_GROUND_SHADOW: f32 = 10.0;
 const EFFECT_CONTOUR_BRUT: f32 = 11.0;
 const EFFECT_THRESHOLD: f32 = 12.0;
 const EFFECT_HALFTONE: f32 = 13.0;
+const EFFECT_BLOOM_EXTRACT: f32 = 14.0;
 
 // Standard Rec.601 luminance weights — appears identically across every
 // grayscale/luminance tutorial, public-domain-level constant.
@@ -102,6 +103,19 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         let b = textureSample(src_tex, tex_sampler, in.uv - dir * amt * 2.0).b;
         let a = textureSample(src_tex, tex_sampler, in.uv).a;
         return vec4<f32>(r, g, b, a);
+    }
+
+    if (id == EFFECT_BLOOM_EXTRACT) {
+        // Bright-pass for native HQ Bloom. p1=threshold, p3=intensity,
+        // p4=warmth (-1 cool .. +1 warm). p2 is reserved for blur radius
+        // on the Rust side, so it is intentionally ignored here.
+        let src = textureSample(src_tex, tex_sampler, in.uv);
+        let l = luma(src.rgb);
+        let mask = smoothstep(params.p1, min(params.p1 + 0.35, 1.0), l);
+        let warmth = clamp(params.p4 * 0.5 + 0.5, 0.0, 1.0);
+        let tint = mix(vec3<f32>(0.65, 0.78, 1.0), vec3<f32>(1.0, 0.78, 0.45), warmth);
+        let rgb = src.rgb * src.a * mask * max(params.p3, 0.0) * tint;
+        return vec4<f32>(rgb, src.a * mask);
     }
 
     if (id == EFFECT_SHARPEN) {
@@ -175,20 +189,32 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         let sx = in.uv.x * params.tex_w - h * params.p1;
         let in_bounds = sy >= 0.0 && sy < params.tex_h && sx >= 0.0 && sx < params.tex_w;
         let src_uv = vec2<f32>(sx / params.tex_w, sy / params.tex_h);
-        // Conic blur approximation (reference's "Conic Blur": softness
-        // grows with object-to-ground distance) — average a handful of
-        // taps spread proportionally to h instead of exposing a 5th
-        // dedicated blur param (already at the 4-slot limit here).
-        let blur_texels = clamp(h * 0.06, 0.0, 10.0);
+        // Distance-aware conic blur: the reference effect deliberately
+        // softens the cast shadow as it gets farther from the object.  The
+        // previous implementation only sampled five horizontal neighbours,
+        // which produced a banded/striped shadow on diagonal silhouettes.
+        // A compact weighted 3x3 kernel keeps this single-pass effect fast
+        // while giving the penumbra a genuinely two-dimensional shape.
+        let blur_texels = clamp(h * 0.085 + 0.75, 0.75, 14.0);
         var a_sum = 0.0;
-        let taps = 5;
-        for (var i = 0; i < taps; i = i + 1) {
-            let jitter = (f32(i) / f32(taps - 1) - 0.5) * 2.0 * blur_texels;
-            let tap_uv = src_uv + vec2<f32>(jitter * texel.x, 0.0);
-            a_sum = a_sum + textureSample(src_tex, tex_sampler, tap_uv).a;
+        var w_sum = 0.0;
+        for (var i = 0; i < 9; i = i + 1) {
+            let ix = i % 3;
+            let iy = i / 3;
+            let ox = f32(ix) - 1.0;
+            let oy = f32(iy) - 1.0;
+            let radius = length(vec2<f32>(ox, oy));
+            let weight = select(2.0, 1.0, radius > 0.9);
+            let tap_uv = src_uv + vec2<f32>(ox * texel.x, oy * texel.y) * blur_texels;
+            a_sum = a_sum + textureSample(src_tex, tex_sampler, tap_uv).a * weight;
+            w_sum = w_sum + weight;
         }
         let valid_shadow_area = y > ground_y && params.p3 > 0.0001 && in_bounds;
-        let shadow_a = select(0.0, (a_sum / f32(taps)) * clamp(params.p4, 0.0, 1.0), valid_shadow_area);
+        // Slightly fade the far end so long projections do not terminate as
+        // a hard rectangular cut.  This is the soft contact-to-penumbra
+        // transition that makes the shadow read as attached to the object.
+        let distance_fade = 1.0 - smoothstep(0.72, 1.0, h / max(ground_y, 1.0));
+        let shadow_a = select(0.0, (a_sum / max(w_sum, 0.001)) * clamp(params.p4, 0.0, 1.0) * distance_fade, valid_shadow_area);
         // Foreground always wins over its own shadow. IMPORTANT: this only
         // produces a correct silhouette-shaped shadow when `src` is this
         // ONE layer's own ISOLATED render (real alpha: transparent where
@@ -205,7 +231,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         // development: sampled alpha was ~1.0 everywhere, not just over
         // the shape).
         let is_fg = src.a > 0.01;
-        let out_rgb = select(vec3<f32>(0.0), src.rgb, is_fg);
+        let out_rgb = select(vec3<f32>(0.008, 0.01, 0.016), src.rgb, is_fg);
         let out_a = select(shadow_a, src.a, is_fg);
         return vec4<f32>(out_rgb, out_a);
     }

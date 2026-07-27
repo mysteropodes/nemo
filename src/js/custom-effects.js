@@ -23,8 +23,17 @@
   // load, "Resume Last Session") since register_custom_effect's compiled
   // pipeline lives only in that instance's memory, not in project data.
   function registerAllCustomEffects() {
+    (window.SMSHADER_EFFECTS || []).forEach(function (c) {
+      if (window.SMEngineBridge) {
+        try { window.SMEngineBridge.registerCustomEffect('custom:' + c.id, c.source); }
+        catch (e) { console.warn('[shader-effects-library] failed to register ' + c.id, e); }
+      }
+    });
     ensureList().forEach(function (c) {
-      if (window.SMEngineBridge) window.SMEngineBridge.registerCustomEffect('custom:' + c.id, c.source);
+      if (window.SMEngineBridge) {
+        try { window.SMEngineBridge.registerCustomEffect('custom:' + c.id, c.source); }
+        catch (e) { console.warn('[custom-effects] failed to register ' + c.id, e); }
+      }
     });
   }
   window.registerAllCustomEffects = registerAllCustomEffects;

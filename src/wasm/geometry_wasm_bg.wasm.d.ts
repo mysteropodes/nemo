@@ -17,12 +17,11 @@ export const velloengine_scale_selection: (a: number, b: number, c: number, d: n
 export const velloengine_screen_to_world: (a: number, b: number, c: number) => [number, number];
 export const velloengine_select_at: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number, number, number];
 export const velloengine_selection_bounds: (a: number, b: number, c: number) => [number, number, number, number];
-export const velloengine_set_viewport: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
+export const velloengine_set_viewport: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => void;
 export const align_pair: (a: number, b: number, c: number, d: number) => [number, number, number, number];
 export const auto_match: (a: number, b: number, c: number, d: number) => [number, number, number, number];
 export const resample_stroke: (a: number, b: number, c: number) => [number, number, number, number];
 export const fill_find: (a: number, b: number) => [number, number, number, number];
-export const interp_stroke: (a: number, b: number) => [number, number, number, number];
 export const __wbg_strokemodeler_free: (a: number, b: number) => void;
 export const effective_frame_index: (a: number, b: number, c: number) => [number, number, number];
 export const ellipse_segments: (a: number, b: number, c: number, d: number) => [number, number];
@@ -36,6 +35,7 @@ export const strokemodeler_up: (a: number, b: number, c: number, d: number, e: n
 export const boolean_op: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
 export const erase_at_point: (a: number, b: number) => [number, number, number, number];
 export const hit_test: (a: number, b: number, c: number, d: number, e: number) => [number, number, number, number];
+export const interp_stroke: (a: number, b: number) => [number, number, number, number];
 export const wasm_bindgen__convert__closures_____invoke__h4177160f1dac6248: (a: number, b: number, c: any) => [number, number];
 export const wasm_bindgen__convert__closures_____invoke__h49909fab4bc066b4: (a: number, b: number, c: any, d: any) => void;
 export const wasm_bindgen__convert__closures_____invoke__h29bfc5eda1199406: (a: number, b: number, c: any) => void;
