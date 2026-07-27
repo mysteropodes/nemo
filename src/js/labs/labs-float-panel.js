@@ -159,7 +159,7 @@
     'canvas-grid': 'Grille',
     'view-filter': 'Contrôle des valeurs',
     'french-curve': 'Gabarit courbe (maintenir F)',
-    'vector-sculpt': 'Sculpt vectoriel (maintenir W)',
+    'vector-sculpt': 'Sculpt vectoriel — glisser, Shift pour lisser, Alt+glisser pour le rayon',
     'out-of-pegs': 'Décalage des fantômes onion',
     'flip-roll': "Rouleau d'animateur (maintenir R)",
     'mirror-check': 'Miroir de contrôle (maintenir M)',
@@ -419,13 +419,24 @@
         pill.className = 'labs-float-stepper';
         var lbl = document.createElement('span'); lbl.className = 'lfs-label'; lbl.textContent = p.label;
         var minus = document.createElement('button'); minus.className = 'lfs-btn'; minus.textContent = '−';
-        var val = document.createElement('span'); val.className = 'lfs-val';
+        var val = document.createElement('input');
+        val.type = 'number';
+        val.className = 'lfs-val scrub';
+        val.min = p.min; val.max = p.max; val.step = p.step;
         var plus = document.createElement('button'); plus.className = 'lfs-btn'; plus.textContent = '+';
-        function refresh() { val.textContent = paramValue(p); }
+        function refresh() { val.value = paramValue(p); }
         refresh();
         minus.addEventListener('click', function () { p.set(Math.max(p.min, paramValue(p) - p.step)); refresh(); });
         plus.addEventListener('click', function () { p.set(Math.min(p.max, paramValue(p) + p.step)); refresh(); });
-        pill.appendChild(lbl); pill.appendChild(minus); pill.appendChild(val); pill.appendChild(plus);
+        val.addEventListener('change', function () {
+          var next = Math.max(p.min, Math.min(p.max, parseFloat(val.value)));
+          if (isNaN(next)) next = p.def;
+          p.set(next); refresh();
+        });
+        var toolIcon = document.createElement('span');
+        toolIcon.className = 'lfs-tool-icon';
+        toolIcon.innerHTML = ICONS[n] || '';
+        pill.appendChild(toolIcon); pill.appendChild(lbl); pill.appendChild(minus); pill.appendChild(val); pill.appendChild(plus);
         paramsWrap.appendChild(pill);
       });
     });
