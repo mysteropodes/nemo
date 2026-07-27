@@ -24,9 +24,16 @@
       var ld = state.layers[li];
       if (!ld || ld.symbolId) return; // component layers store no strokes of their own
       var sd = serP(path);
+      // Timeline frame selection describes columns as well as rows. After
+      // creating/switching to a new layer the selection may still carry the
+      // previous layer index; use its selected frame numbers on the current
+      // drawing layer instead of silently producing zero targets.
+      var seen = {};
       var targets = _sel.frames.filter(function (s) {
-        return s.layer === li && s.frame !== state.currentFrame && ld.frames[s.frame];
-      });
+        if (s.frame === state.currentFrame || !ld.frames[s.frame] || seen[s.frame]) return false;
+        seen[s.frame] = true;
+        return true;
+      }).map(function (s) { return { layer: li, frame: s.frame }; });
       // TWO passes, resolve-then-mutate: promoting a non-keyframe target
       // freezes its inherited hold content via getEffectiveStrokes — but
       // that inheritance scans back to the previous KEYFRAME, so promoting
