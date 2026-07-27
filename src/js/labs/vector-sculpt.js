@@ -41,10 +41,20 @@
     document.body.appendChild(cursor);
     return cursor;
   }
+  // These are DOCUMENT-level capture handlers that swallow the event
+  // (stopImmediatePropagation + preventDefault) — so they must refuse
+  // anything outside the drawing area, or turning the prototype on kills
+  // every click in the app: timeline rows, panel fields, toolbar buttons
+  // (found 2026-07-27 while testing the timeline — a pointerdown on
+  // #layer-list never reached a single other listener). onMove/onUp only
+  // act once a drag started here, so gating the entry point covers all three.
+  function inCanvas(e) {
+    var area = document.getElementById('canvas-area');
+    return !!(area && e.target && area.contains(e.target));
+  }
   function updateCursor(e) {
     var c = ensureCursor();
-    var area = document.getElementById('canvas-area');
-    var visible = isActive() && area && area.contains(e.target);
+    var visible = isActive() && inCanvas(e);
     c.style.display = visible ? 'block' : 'none';
     if (!visible) return;
     var r = radiusScreen();
@@ -212,7 +222,7 @@
   }
 
   function onDown(e) {
-    if (!isActive()) return;
+    if (!isActive() || !inCanvas(e)) return;
     e.stopImmediatePropagation(); e.preventDefault();
     if (e.altKey) {
       resizing = true;

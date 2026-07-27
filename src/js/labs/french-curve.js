@@ -70,8 +70,16 @@
     pts = []; lastScreen = null;
   }
 
+  // Same trap as vector-sculpt.js: this is a DOCUMENT-level capture handler
+  // that swallows the event, so without a canvas-area check, arming the
+  // guide killed every click in the rest of the app (timeline rows, panel
+  // fields, toolbar). onMove/onUp only act once `dragging` was set here.
+  function inCanvas(e) {
+    var area = document.getElementById('canvas-area');
+    return !!(area && e.target && area.contains(e.target));
+  }
   function onDown(e) {
-    if (!armed || !window.SMEngineBridge) return;
+    if (!armed || !window.SMEngineBridge || !inCanvas(e)) return;
     var ld = state.layers[state.activeLayerIdx];
     if (!ld || ld.locked) return;
     e.stopImmediatePropagation(); e.preventDefault();
