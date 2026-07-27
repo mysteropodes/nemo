@@ -93,11 +93,14 @@ function exportBuildFrame(frameIdx,alpha){
       // Same from/to guard as buildSceneJson's own branch — an export must
       // not throw on data the on-screen render already tolerates (CLAUDE.md
       // §3: the two paths have to agree, including about what they refuse).
-      if(!sd.isRaster&&sd.fillGradient&&(!window.gradientGeomOk||window.gradientGeomOk(sd.fillGradient))){
-        var fg=sd.fillGradient;
-        var stops=fg.stops.map(function(s){return [s.color,s.offset];});
-        var grad=new Gradient(stops,fg.kind==='radial');
-        p.fillColor=new Color(grad,new Point(fg.from[0],fg.from[1]),new Point(fg.to[0],fg.to[1]));
+      var pendingGradient=(!sd.isRaster&&sd.fillGradient&&(!window.gradientGeomOk||window.gradientGeomOk(sd.fillGradient)))?sd.fillGradient:null;
+      var pendingGradientFrom=pendingGradient?new Point(pendingGradient.from[0],pendingGradient.from[1]):null;
+      var pendingGradientTo=pendingGradient?new Point(pendingGradient.to[0],pendingGradient.to[1]):null;
+      function transformGradientByMat(pt,pivot,mat){
+        if(!pt||!mat)return pt;
+        var q=new Point(pivot.x+(pt.x-pivot.x)*mat.sx,pivot.y+(pt.y-pivot.y)*mat.sy);
+        q=q.rotate(mat.rot,pivot);
+        return q.add(new Point(mat.dx,mat.dy));
       }
       // Path property, per-vertex (motion.js's applyPathVertexOffsetsFor,
       // 2026-07): innermost transform — applied directly to `p`'s own
@@ -118,6 +121,8 @@ function exportBuildFrame(frameIdx,alpha){
       if(elMat){
         var epc=p.bounds.center;
         var elPivot=new Point(epc.x+elMat.ax,epc.y+elMat.ay);
+        pendingGradientFrom=transformGradientByMat(pendingGradientFrom,elPivot,elMat);
+        pendingGradientTo=transformGradientByMat(pendingGradientTo,elPivot,elMat);
         p.scale(elMat.sx,elMat.sy,elPivot);
         p.rotate(elMat.rot,elPivot);
         p.translate(elMat.dx,elMat.dy);
@@ -125,6 +130,8 @@ function exportBuildFrame(frameIdx,alpha){
         if(p.strokeWidth)p.strokeWidth*=(Math.abs(elMat.sx)+Math.abs(elMat.sy))/2;
       }
       if(motionMat){
+        pendingGradientFrom=transformGradientByMat(pendingGradientFrom,motionPivot,motionMat);
+        pendingGradientTo=transformGradientByMat(pendingGradientTo,motionPivot,motionMat);
         p.scale(motionMat.sx,motionMat.sy,motionPivot);
         p.rotate(motionMat.rot,motionPivot);
         p.translate(motionMat.dx,motionMat.dy);
@@ -133,11 +140,18 @@ function exportBuildFrame(frameIdx,alpha){
       }
       for(var pci=0;pci<parentChain.length;pci++){
         var pc=parentChain[pci];
+        pendingGradientFrom=transformGradientByMat(pendingGradientFrom,pc.pivot,pc.mat);
+        pendingGradientTo=transformGradientByMat(pendingGradientTo,pc.pivot,pc.mat);
         p.scale(pc.mat.sx,pc.mat.sy,pc.pivot);
         p.rotate(pc.mat.rot,pc.pivot);
         p.translate(pc.mat.dx,pc.mat.dy);
         p.opacity=p.opacity*pc.mat.op;
         if(p.strokeWidth)p.strokeWidth*=(Math.abs(pc.mat.sx)+Math.abs(pc.mat.sy))/2;
+      }
+      if(pendingGradient){
+        var stops=pendingGradient.stops.map(function(s){return [s.color,s.offset];});
+        var grad=new Gradient(stops,pendingGradient.kind==='radial');
+        p.fillColor=new Color(grad,pendingGradientFrom,pendingGradientTo);
       }
       built.push(p);
     });
