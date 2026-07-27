@@ -1092,6 +1092,36 @@
       { point: [cx, cy + r], handleIn: [-k, 0], handleOut: [k, 0] },
     ];
   }
+  function applyMotionPoint(p, pivot, m) {
+    var x=pivot.x+(p.x-pivot.x)*m.sx,y=pivot.y+(p.y-pivot.y)*m.sy;
+    var q=rotPt(x,y,pivot.x,pivot.y,m.rot);
+    return{x:q[0]+m.dx,y:q[1]+m.dy};
+  }
+  function invertMotionPoint(p,pivot,m){
+    var q=rotPt(p.x-m.dx,p.y-m.dy,pivot.x,pivot.y,-m.rot);
+    return{x:pivot.x+(q[0]-pivot.x)/(m.sx||1),y:pivot.y+(q[1]-pivot.y)/(m.sy||1)};
+  }
+  // Element overlays start in the element's own world geometry, then must
+  // pass through the containing layer and every parent exactly like the
+  // rendered path. Keeping the inverse alongside it makes canvas dragging
+  // write the element-local key value even when a parent is rotated/scaled.
+  function outerMotionMaps(t){
+    if(!t||!t.strokeId)return[];
+    var out=[],lm=layerMotionAt(t.li,state.currentFrame);
+    if(lm&&userLayers[t.li]){
+      out.push({mat:lm,pivot:{x:userLayers[t.li].bounds.center.x+lm.ax,y:userLayers[t.li].bounds.center.y+lm.ay}});
+    }
+    return out.concat(parentChainMats(t.li,state.currentFrame));
+  }
+  function outerWorldPoint(t,p){
+    outerMotionMaps(t).forEach(function(x){p=applyMotionPoint(p,x.pivot,x.mat);});
+    return p;
+  }
+  function outerLocalPoint(t,p){
+    var maps=outerMotionMaps(t);
+    for(var i=maps.length-1;i>=0;i--)p=invertMotionPoint(p,maps[i].pivot,maps[i].mat);
+    return p;
+  }
   // ---- Unified motion path for a multi-element canvas selection
   // (2026-07-16, "si on sélectionne plusieurs éléments qui ont
   // actuellement un motion path individuel alors ils auront un motion
@@ -1171,10 +1201,11 @@
     // reference, not itself animated relative to the moving artwork).
     var anc = valueAtFrame(holder, 'anchor', state.currentFrame);
     var ax = bc.x + anc[0], ay = bc.y + anc[1];
+    var aw=outerWorldPoint(t,{x:ax,y:ay});
     var ancCol = [80, 220, 140, 255];
-    items.push({ segments: [{ point: [ax - 9 * zs, ay] }, { point: [ax + 9 * zs, ay] }], closed: false, fillColor: null, strokeColor: ancCol, strokeWidth: 1.5 * zs });
-    items.push({ segments: [{ point: [ax, ay - 9 * zs] }, { point: [ax, ay + 9 * zs] }], closed: false, fillColor: null, strokeColor: ancCol, strokeWidth: 1.5 * zs });
-    items.push({ segments: circleSegs(ax, ay, 6 * zs), closed: true, fillColor: null, strokeColor: ancCol, strokeWidth: 1.5 * zs });
+    items.push({ segments: [{ point: [aw.x - 9 * zs, aw.y] }, { point: [aw.x + 9 * zs, aw.y] }], closed: false, fillColor: null, strokeColor: ancCol, strokeWidth: 1.5 * zs });
+    items.push({ segments: [{ point: [aw.x, aw.y - 9 * zs] }, { point: [aw.x, aw.y + 9 * zs] }], closed: false, fillColor: null, strokeColor: ancCol, strokeWidth: 1.5 * zs });
+    items.push({ segments: circleSegs(aw.x, aw.y, 6 * zs), closed: true, fillColor: null, strokeColor: ancCol, strokeWidth: 1.5 * zs });
     // Scale/rotate transform box (2026-07) — Motion mode previously had NO
     // on-canvas affordance for Scale/Rotation at all, only this anchor
     // crosshair and the position motion-path dots below: scaling/rotating a
@@ -1254,18 +1285,20 @@
       var steps = 24;
       for (var s = 0; s <= steps; s++) {
         var t = s / steps, v = 1 - t;
-        pts.push({
-          point: [
+        var rawPathPoint={
+          x:
             pvx + v * v * v * a.v[0] + 3 * v * v * t * (a.v[0] + ho[0]) + 3 * v * t * t * (b.v[0] + hi[0]) + t * t * t * b.v[0],
-            pvy + v * v * v * a.v[1] + 3 * v * v * t * (a.v[1] + ho[1]) + 3 * v * t * t * (b.v[1] + hi[1]) + t * t * t * b.v[1],
-          ],
-        });
+          y:pvy + v * v * v * a.v[1] + 3 * v * v * t * (a.v[1] + ho[1]) + 3 * v * t * t * (b.v[1] + hi[1]) + t * t * t * b.v[1]
+        };
+        var worldPathPoint=outerWorldPoint(t,rawPathPoint);
+        pts.push({point:[worldPathPoint.x,worldPathPoint.y]});
       }
       items.push({ segments: pts, closed: false, fillColor: null, strokeColor: pathCol, strokeWidth: 1.5 * zs, dashPattern: [5 * zs, 4 * zs] });
     }
     ks.forEach(function (k, ki) {
       var isCur = k.frame === state.currentFrame;
-      var kx = pvx + k.v[0], ky = pvy + k.v[1];
+      var rawKey={x:pvx+k.v[0],y:pvy+k.v[1]},worldKey=outerWorldPoint(t,rawKey);
+      var kx=worldKey.x,ky=worldKey.y;
       items.push({ segments: circleSegs(kx, ky, (isCur ? 6 : 4.5) * zs), closed: true, fillColor: isCur ? [255, 170, 40, 255] : [230, 230, 230, 255], strokeColor: [30, 30, 30, 255], strokeWidth: 1.2 * zs });
       // Spatial handles, same discoverable small-dot pattern as camera.js
       var hs = [];
@@ -1273,7 +1306,8 @@
       if (ki > 0) hs.push(k.hIn || [0, 0]);
       hs.forEach(function (h) {
         if (!h[0] && !h[1]) return;
-        var hx = kx + h[0], hy = ky + h[1];
+        var worldHandle=outerWorldPoint(t,{x:rawKey.x+h[0],y:rawKey.y+h[1]});
+        var hx=worldHandle.x,hy=worldHandle.y;
         items.push({ segments: [{ point: [kx, ky] }, { point: [hx, hy] }], closed: false, fillColor: null, strokeColor: handleCol, strokeWidth: 1 * zs });
         items.push({ segments: circleSegs(hx, hy, 4 * zs), closed: true, fillColor: handleCol, strokeColor: [30, 30, 30, 255], strokeWidth: 1 * zs });
       });
@@ -1284,7 +1318,7 @@
   // exact world point a position delta of [0,0] should render/hit-test at.
   function motionPivotOf(t) {
     var anc = valueAtFrame(t.holder, 'anchor', state.currentFrame);
-    return { x: t.boundsCenter.x + anc[0], y: t.boundsCenter.y + anc[1] };
+    return outerWorldPoint(t,{ x: t.boundsCenter.x + anc[0], y: t.boundsCenter.y + anc[1] });
   }
   // Geometry-space bounds + the target's own current position/anchor/
   // rotation/scale, folded into a single fwd(x,y) mapper — same formula as
@@ -1411,22 +1445,23 @@
   // actually lands on a handle/dot, so an unrelated click falls through
   // unchanged into Select/Draw/etc. below it).
   var _motionDrag = null; // {mode:'point'|'handle', key, which}
-  function hitPositionHandle(pt, ks, pv) {
+  function hitPositionHandle(pt, ks, pv, target) {
     var tol = 10 / view.zoom;
     for (var i = 0; i < ks.length; i++) {
       var k = ks[i], hs = [];
       if (i < ks.length - 1) hs.push(['hOut', k.hOut || [0, 0]]);
       if (i > 0) hs.push(['hIn', k.hIn || [0, 0]]);
       for (var j = 0; j < hs.length; j++) {
-        var hx = pv.x + k.v[0] + hs[j][1][0], hy = pv.y + k.v[1] + hs[j][1][1];
+        var wh=outerWorldPoint(target,{x:pv.x+k.v[0]+hs[j][1][0],y:pv.y+k.v[1]+hs[j][1][1]});
+        var hx=wh.x,hy=wh.y;
         if (Math.hypot(pt.x - hx, pt.y - hy) < tol) return { key: k, which: hs[j][0] };
       }
     }
     return null;
   }
-  function hitPositionDot(pt, ks, pv) {
+  function hitPositionDot(pt, ks, pv, target) {
     var tol = 8 / view.zoom;
-    for (var i = 0; i < ks.length; i++) if (Math.hypot(pt.x - (pv.x + ks[i].v[0]), pt.y - (pv.y + ks[i].v[1])) < tol) return ks[i];
+    for (var i = 0; i < ks.length; i++){var wp=outerWorldPoint(target,{x:pv.x+ks[i].v[0],y:pv.y+ks[i].v[1]});if(Math.hypot(pt.x-wp.x,pt.y-wp.y)<tol)return ks[i];}
     return null;
   }
   // Finds the LIVE Paper item for a strokeId within a layer (including
@@ -1491,8 +1526,9 @@
   function hitAnchorPoint(pt, t) {
     var tol = 9 / view.zoom;
     var anc = valueAtFrame(t.holder, 'anchor', state.currentFrame);
-    var ax = t.boundsCenter.x + anc[0], ay = t.boundsCenter.y + anc[1];
-    return Math.hypot(pt.x - ax, pt.y - ay) < tol ? { holder: t.holder, bc: t.boundsCenter } : null;
+    var aw=outerWorldPoint(t,{x:t.boundsCenter.x+anc[0],y:t.boundsCenter.y+anc[1]});
+    var ax=aw.x,ay=aw.y;
+    return Math.hypot(pt.x - ax, pt.y - ay) < tol ? { holder: t.holder, bc: t.boundsCenter, target:t } : null;
   }
   function onDown(event) {
     // Unified multi-selection path first — while it's active the overlay
@@ -1561,14 +1597,15 @@
       }
       var ks = activePositionKeys();
       if (ks) {
-        var pv = motionPivotOf(t);
-        var hp = hitPositionHandle(event.point, ks, pv);
-        if (hp) { pushUndo(); _motionDrag = { mode: 'handle', key: hp.key, which: hp.which, pv: pv }; return true; }
-        var pk = hitPositionDot(event.point, ks, pv);
-        if (pk) { pushUndo(); _motionDrag = { mode: 'point', key: pk, pv: pv }; return true; }
+        var anc2=valueAtFrame(t.holder,'anchor',state.currentFrame);
+        var pv={x:t.boundsCenter.x+anc2[0],y:t.boundsCenter.y+anc2[1]};
+        var hp = hitPositionHandle(event.point, ks, pv,t);
+        if (hp) { pushUndo(); _motionDrag = { mode: 'handle', key: hp.key, which: hp.which, pv: pv,t:t }; return true; }
+        var pk = hitPositionDot(event.point, ks, pv,t);
+        if (pk) { pushUndo(); _motionDrag = { mode: 'point', key: pk, pv: pv,t:t }; return true; }
       }
       var ap = hitAnchorPoint(event.point, t);
-      if (ap) { pushUndo(); _motionDrag = { mode: 'anchor', holder: ap.holder, bc: ap.bc }; return true; }
+      if (ap) { pushUndo(); _motionDrag = { mode: 'anchor', holder: ap.holder, bc: ap.bc, t:ap.target }; return true; }
     }
     return false;
   }
@@ -1606,7 +1643,8 @@
         k.v[0] += dx; k.v[1] += dy;
       });
     } else if (_motionDrag.mode === 'anchor') {
-      setValue(_motionDrag.holder, 'anchor', [event.point.x - _motionDrag.bc.x, event.point.y - _motionDrag.bc.y]);
+      var localAnchor=outerLocalPoint(_motionDrag.t,{x:event.point.x,y:event.point.y});
+      setValue(_motionDrag.holder, 'anchor', [localAnchor.x - _motionDrag.bc.x, localAnchor.y - _motionDrag.bc.y]);
     } else if (_motionDrag.mode === 'motionRotate') {
       // Recomputed from the FIXED drag-start baseline every tick (not
       // incrementally accumulated) — setValue always writes an absolute
@@ -1623,12 +1661,13 @@
       setValue(_motionDrag.t.holder, 'scale', [_motionDrag.origScale[0] * ratio, _motionDrag.origScale[1] * ratio]);
     } else {
       var k = _motionDrag.key, pv = _motionDrag.pv;
+      var localPointer=outerLocalPoint(_motionDrag.t,{x:event.point.x,y:event.point.y});
       // Both branches now resolve against the SAME pivot buildOverlayItems
       // draws from (motionPivotOf — bounds center + anchor offset), so a
       // key.v of [0,0] drags from exactly where its dot is drawn, matching
       // computeMotionMat's delta semantics instead of raw world coords.
-      if (_motionDrag.mode === 'handle') k[_motionDrag.which] = [event.point.x - (pv.x + k.v[0]), event.point.y - (pv.y + k.v[1])];
-      else { k.v[0] = event.point.x - pv.x; k.v[1] = event.point.y - pv.y; }
+      if (_motionDrag.mode === 'handle') k[_motionDrag.which] = [localPointer.x - (pv.x + k.v[0]), localPointer.y - (pv.y + k.v[1])];
+      else { k.v[0] = localPointer.x - pv.x; k.v[1] = localPointer.y - pv.y; }
     }
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
     return true;
@@ -1717,6 +1756,15 @@
     }
   }
   function renderLayerListMotion(list) {
+    if (!list._motionEmptySelectBound) {
+      list._motionEmptySelectBound = true;
+      list.addEventListener('pointerdown', function (e) {
+        if (e.target !== list || state.appMode !== 'motion') return;
+        _layerSel = [];
+        setKeySel([]);
+        renderLayerList(); renderTimeline();
+      });
+    }
     // Inside a Component (state.activeSymbolId, entered via
     // enterComponentLayer's dblclick below OR Animation2D's own
     // dblclick-to-enter-symbol): state.layers IS the symbol's own layers
@@ -1741,7 +1789,7 @@
       var isComponent = !!ld.symbolId;
       var expanded = isLayerExpanded(li);
       var row = document.createElement('div');
-      row.className = 'lrow' + (li === state.activeLayerIdx ? ' act' : '');
+      row.className = 'lrow' + (_layerSel.indexOf(li) >= 0 ? ' act motion-selected' : (li === state.activeLayerIdx ? ' act' : ''));
       row.dataset.layer = li;
       if (isComponent) row.title = 'Composant — Position/Anchor/Rotation/Scale/Opacity animent l\'instance entière (le contenu interne s\'édite via "Éditer le composant…")';
       var arrow = document.createElement('div'); arrow.className = 'lico larrow'; arrow.textContent = expanded ? '▾' : '▸';
