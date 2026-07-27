@@ -111,7 +111,7 @@ var state={
   // Eraser field in Tool Options exactly as before.
   eraserSize:14,selRotAccum:0,tweenSkipManual:true,
   resamplePts:50,tweenStep:1,
-  canvasW:1920,canvasH:1080,canvasBg:'#ffffff',canvasClip:false,safetyZones:false,ghostAllFrames:false,
+  canvasW:1920,canvasH:1080,canvasBg:'#ffffff',canvasClip:false,safetyZones:false,ghostAllFrames:false,currentFrameOutline:false,
   // Multi-palette swatch library (Shade-for-AE-style, palette-panel.js) —
   // an array (not a map) so tab order IS display order, no separate sort
   // field needed. colorPalette (flat array) is kept as a legacy field ONLY
@@ -937,6 +937,20 @@ function applyMatrixToStrokeData(sd,m){
   return sd;
 }
 function resolveSymbolFrameIdx(sym,layer,mainFrameIdx){
+  // A key on the parent Animation 2D timeline may explicitly pick the
+  // component frame displayed for the whole held span. This is deliberately
+  // stored on the OUTER frame entry: symbol-internal drawing keys remain in
+  // the component editor and never leak into the parent timeline.
+  if(layer.frames){
+    for(var keyFi=Math.min(mainFrameIdx,layer.frames.length-1);keyFi>=0;keyFi--){
+      var timingKey=layer.frames[keyFi];
+      if(!timingKey||!timingKey.isKeyframe)continue;
+      if(timingKey.componentFrame!=null){
+        return Math.min(Math.max(1,sym.totalFrames)-1,Math.max(0,Math.floor(timingKey.componentFrame)));
+      }
+      break;
+    }
+  }
   var elapsed=Math.max(0,(mainFrameIdx-(layer.symPlacedAt||0)))*(layer.symSpeed||1);
   var total=Math.max(1,sym.totalFrames);
   // Time Remap (motion.js) overrides play mode / speed / placement entirely
@@ -1150,8 +1164,16 @@ function getEffectiveStrokes(layerIdx,frameIdx){
     // layer — see insertBlankKeyframe's blankOverride flag. Every component
     // layer's frames[] is otherwise pure timing decoration, never read for
     // content, so this is the one deliberate exception.
-    var ownF=ld.frames[frameIdx];
-    if(ownF&&ownF.isKeyframe&&ownF.blankOverride)return[];
+    // Blank/component-frame choices are held until the next outer key,
+    // exactly like ordinary Animation 2D keyframes. The former exact-frame
+    // check made an F7 component disappear for one frame and immediately
+    // reappear throughout what the timeline displayed as a blank span.
+    for(var ownFi=Math.min(frameIdx,ld.frames.length-1);ownFi>=0;ownFi--){
+      var ownF=ld.frames[ownFi];
+      if(!ownF||!ownF.isKeyframe)continue;
+      if(ownF.blankOverride)return[];
+      break;
+    }
     var ii=resolveSymbolFrameIdx(sym,ld,frameIdx);
     // Composite EVERY visible sub-layer of the component, not just the
     // first — a multi-layer component (convertLayersToComponent) used to
@@ -1261,7 +1283,7 @@ function convertLayerToComponent(layerIdx){
   // 'loop' default made a component's parent-timeline keyframe misleadingly
   // look "empty/short" when the component itself kept cycling underneath).
   ld.symbolId=symId;ld.locked=true;ld.symPlayMode='once';ld.symSpeed=1;ld.symPlacedAt=0;ld.symSingleFrame=0;
-  ld.frames=[];for(var i=0;i<state.totalFrames;i++)ld.frames.push({strokes:[],isKeyframe:i===0,isInterpolated:false});
+  ld.frames=[];for(var i=0;i<state.totalFrames;i++)ld.frames.push({strokes:[],isKeyframe:i===0,isInterpolated:false,componentFrame:i===0?0:undefined});
   loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderSymbolTabs)renderSymbolTabs();
   showToast('Composant créé: '+state.symbols[symId].name);
 }
@@ -1292,7 +1314,7 @@ function convertLayersToComponent(indices){
   for(var k=indices.length-1;k>=0;k--){state.layers.splice(indices[k],1);userLayers.splice(indices[k],1);}
   var newLd={name:'Composant',symbolId:symId,locked:true,visible:true,symPlayMode:'once',symSpeed:1,symPlacedAt:0,symSingleFrame:0,
     frames:[]};
-  for(var i=0;i<state.totalFrames;i++)newLd.frames.push({strokes:[],isKeyframe:i===0,isInterpolated:false});
+  for(var i=0;i<state.totalFrames;i++)newLd.frames.push({strokes:[],isKeyframe:i===0,isInterpolated:false,componentFrame:i===0?0:undefined});
   var newUl=new Layer({name:'layer-'+state.layers.length});
   state.layers.splice(insertAt,0,newLd);
   userLayers.splice(insertAt,0,newUl);
@@ -2316,6 +2338,15 @@ function insertFrame(){
 // No undo/render side effects of its own — callers own that.
 function _insertKeyframeCore(layerIdx,frameIdx){
   var ld=state.layers[layerIdx];var f=ld.frames[frameIdx];
+  if(ld.symbolId){
+    var sym=state.symbols[ld.symbolId];
+    f.strokes=[];
+    f.componentFrame=sym?resolveSymbolFrameIdx(sym,ld,frameIdx):0;
+    delete f.blankOverride;
+    f.isKeyframe=true;f.isInterpolated=false;
+    syncLinkedKeyframeFolder(layerIdx,frameIdx);
+    return;
+  }
   f.strokes=JSON.parse(JSON.stringify(getEffectiveStrokes(layerIdx,frameIdx)));
   f.isKeyframe=true;f.isInterpolated=false;
   syncLinkedKeyframeFolder(layerIdx,frameIdx);
@@ -2336,7 +2367,9 @@ function insertKeyframe(){
   var eligible=targets.filter(function(li){
     var ld=state.layers[li];
     if(!ld)return false;
-    if(ld.locked){lockedHit=true;return false;}
+    // Component instances are locked against editing their internal drawing
+    // on the parent canvas, but their OUTER timing row must remain editable.
+    if(ld.locked&&!ld.symbolId){lockedHit=true;return false;}
     return !ld.frames[cf].isKeyframe;
   });
   if(!eligible.length){showToast(lockedHit?'Calque verrouillé':'Déjà une keyframe');return;}
@@ -2370,7 +2403,7 @@ function nextKeyframeFrame(layerIdx,fromFrame){
 function insertKeyframeAt(layerIdx,frameIdx){
   saveAllLayerFrames();
   var ld=state.layers[layerIdx];var f=ld.frames[frameIdx];
-  if(ld.locked){showToast('Calque verrouillé');return false;}
+  if(ld.locked&&!ld.symbolId){showToast('Calque verrouillé');return false;}
   if(f.isKeyframe){showToast('Déjà une keyframe');return false;}
   pushUndoLayers();
   _insertKeyframeCore(layerIdx,frameIdx);
@@ -2380,7 +2413,7 @@ function insertKeyframeAt(layerIdx,frameIdx){
 }
 function insertBlankKeyframe(){
   var ld=state.layers[state.activeLayerIdx];
-  if(ld.locked){showToast('Calque verrouillé');return;}
+  if(ld.locked&&!ld.symbolId){showToast('Calque verrouillé');return;}
   saveAllLayerFrames();pushUndoLayers();
   var f={strokes:[],isKeyframe:true,isInterpolated:false};
   // On a component layer this main-timeline row is otherwise dead timing
@@ -2447,4 +2480,3 @@ function duplicateSelectedFrames(){
   state.currentFrame=b.minF+span;window._curFrame=state.currentFrame;
   window.SM.pasteFrames();
 }
-
