@@ -118,6 +118,23 @@
       return;
     }
     var subHit = layer.hitTest(pt, { stroke: true, fill: true, pixel: true, tolerance: 8 / view.zoom });
+    // Isolation entered by a Select double-click (tools.js's
+    // onViewDoubleClick sets _fsIsolation): only that shape/group is
+    // reachable, and a click outside it leaves back to Select. This file is
+    // the ENGINE-ON port of the same branch and the engine is on by default,
+    // so the guard has to exist in both or the gesture behaves differently
+    // depending on the renderer — CLAUDE.md §3's duplicated-pair rule.
+    if (window._fsIsolation && subHit) {
+      var subAllowed = window._fsIsolation.groupId
+        ? !!(subHit.item.data && subHit.item.data.groupId === window._fsIsolation.groupId)
+        : subHit.item === window._fsIsolation.path;
+      if (!subAllowed) subHit = null;
+    }
+    if (!subHit && window._fsIsolation) {
+      window._fsIsolation = null; clearSel(); window.SM.setTool('select');
+      renderArcs(); updateUI(); window.SMEngineBridge.renderNow();
+      return;
+    }
     // Raster companions count too (Bitmap Brush v2, bitmap-brush.js): the
     // visible texture over a bitmap-brush stroke is ONE Raster tagged
     // isBrushTextureCopy — its anchor path has strokeColor camouflaged to
