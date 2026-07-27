@@ -542,7 +542,6 @@
              label to its natural width; the icon row gets an identical
              (hidden) "BG" label as a spacer so its buttons start at the
              EXACT same x as the swatch above, not a guessed margin. -->
-        <div class="pr dims-row"><span class="pl">BG</span><input type="color" id="p-cbg" value="#ffffff" style="width:28px;height:22px;border:none;cursor:pointer;padding:0;"></div>
         <!-- Icon buttons instead of text (feedback 2026-07: "les boutons
              avec un texte est-ce qu'ils peuvent avoir un bouton icon
              plutôt que texte") — tooltip (title) carries the label, same
@@ -556,8 +555,18 @@
              icon-only + tooltip-carries-the-label convention as Fit/Reset
              View just above, .active toggled on click like every other
              toggle button in this app (btn-ghost-all, btn-loop, etc.). -->
+        <!-- BG swatch and the view/overlay buttons share ONE row (feedback
+             2026-07-26: "les boutons tout en bas doivent être aligné à BG en
+             horizontal avec un séparateur entre bg et icons"). An earlier
+             round had only aligned their LEFT EDGES by giving the icon row a
+             hidden "BG" label as a spacer — the two were still stacked on
+             separate lines, which is what the feedback is actually about.
+             The hidden-label spacer is gone: the real label now sits on the
+             same row, and .pr-vsep marks where the colour control ends and
+             the view/overlay toggles begin. -->
         <div class="pr dims-row" style="gap:4px">
-          <span class="pl" style="visibility:hidden" aria-hidden="true">BG</span>
+          <span class="pl">BG</span><input type="color" id="p-cbg" value="#ffffff" style="width:28px;height:22px;border:none;cursor:pointer;padding:0;">
+          <span class="pr-vsep" aria-hidden="true"></span>
           <button class="pbtn icon-only-btn" id="btn-fit" data-i18n-title="btnFitTitle" title="Fit — fit the canvas to the viewport"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M3 16v3a2 2 0 0 0 2 2h3"/></svg></button>
           <button class="pbtn icon-only-btn" id="btn-resetv" data-i18n-title="btnResetViewTitle" title="Reset View — restore zoom/pan/rotation to default"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 1 3 6.7"/><path d="M3 21v-5h5"/></svg></button>
           <button class="pbtn icon-only-btn" id="btn-clip" data-i18n-title="clipCanvasTitle" title="Clip to canvas — hide artwork outside the canvas bounds (off by default, so you can see and work with content that spills over the edge)"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/></svg></button>
