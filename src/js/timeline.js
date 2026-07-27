@@ -819,7 +819,17 @@ window.SM={
   exitMontageView:function(){exitMontageView();},
   setSymbolPlayMode:function(v){var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.symbolId)return;ld.symPlayMode=v;loadFrame(state.currentFrame);renderOS();updateUI();},
   setSymbolSpeed:function(v){var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.symbolId)return;ld.symSpeed=Math.max(0.1,parseFloat(v)||1);loadFrame(state.currentFrame);renderOS();updateUI();},
-  setSymbolSingleFrame:function(v){var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.symbolId)return;ld.symSingleFrame=Math.max(0,parseInt(v)||0);loadFrame(state.currentFrame);renderOS();updateUI();},
+  setSymbolSingleFrame:function(v){
+    var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.symbolId)return;
+    var picked=Math.max(0,parseInt(v)||0);
+    ld.symSingleFrame=picked;
+    // When the playhead is on an outer component key, the choice belongs to
+    // that key (and is held until the next one). Older projects and frames
+    // without an explicit key keep the legacy global single-frame fallback.
+    var f=ld.frames&&ld.frames[state.currentFrame];
+    if(f&&f.isKeyframe){f.componentFrame=picked;delete f.blankOverride;}
+    loadFrame(state.currentFrame);renderOS();updateUI();
+  },
   setSymbolPlacedAt:function(v){var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.symbolId)return;ld.symPlacedAt=parseInt(v)||0;loadFrame(state.currentFrame);renderOS();updateUI();},
   moveFrames:function(sel,dLayer,dFrame){
     if(!sel.length)return;
@@ -1586,7 +1596,7 @@ function updateStatusBarHelp(){
 function updatePropsContext(){
   var hasSel=(state.tool==='select'||state.tool==='subselect')&&selectedPaths.length>0;
   var ctx,hdrText;
-  var show={'sel-props-sec':false,'fill-sec':false,'stroke-sec':false,'tool-opts-sec':false,'effects-sec':false,'canvas-sec':false,'layer-sec':false};
+  var show={'sel-props-sec':false,'fill-sec':false,'stroke-sec':false,'tool-opts-sec':false,'canvas-sec':false,'layer-sec':false};
   if(state.tool==='fsselect'&&_fsSel.length){
     // Multi-select (2026-07): show BOTH sections if the selection mixes
     // fill and stroke picks — no Position/Size (this tool doesn't offer
@@ -1602,7 +1612,7 @@ function updatePropsContext(){
     hdrText=(fsPrimPC.kind==='stroke'?'Stroke'+fsSegLabel:'Fill'+fsFillLabel)+fsCountPC+' sélectionné(e)';
   }else if(hasSel){
     ctx='selection';
-    show['sel-props-sec']=show['fill-sec']=show['stroke-sec']=show['effects-sec']=true;
+    show['sel-props-sec']=show['fill-sec']=show['stroke-sec']=true;
     // Mockup 2026-07-17 (réordonnancement du panel) : Layer (Blend) et
     // Document restent visibles pendant une sélection, juste sous le bloc
     // transform — avant, sélectionner un trait les faisait disparaître.
@@ -1683,7 +1693,7 @@ function updatePropsContext(){
   // layer-sec (Blend/Matte/Flou) is spared: those are genuine per-layer
   // properties still meaningful while animating, not a drawing-tool panel.
   if(state.appMode==='motion'){
-    show['sel-props-sec']=show['fill-sec']=show['stroke-sec']=show['tool-opts-sec']=show['effects-sec']=show['canvas-sec']=false;
+    show['sel-props-sec']=show['fill-sec']=show['stroke-sec']=show['tool-opts-sec']=show['canvas-sec']=false;
   }
   Object.keys(show).forEach(function(id){var sec=document.getElementById(id);if(sec)sec.style.display=show[id]?'block':'none';});
   // state.drawMode (Front/Behind) has no effect on Fill Brush — it's always
@@ -1987,7 +1997,9 @@ function selPropsApplyMove(dx,dy,skipUndo){
   // more on every tick — this field now fires on every 'input' tick of a
   // scrub-drag (many times per gesture), same accumulation risk.
   selectedPaths.forEach(function(p){
-    p.translate(new Point(dx,dy));
+    var d=new Point(dx,dy);
+    p.translate(d);
+    transformFillGradient(p,function(pt){return pt.add(d);});
     if(p.data&&p.data.isVectorBrush&&p.data.centerSegments)p.data.centerSegments.forEach(function(s){s.point=[s.point[0]+dx,s.point[1]+dy];});
     if(p.data&&p.data.linkedFill&&!p.data.linkedFill.removed)p.data.linkedFill.translate(new Point(dx,dy));
     if(p.data&&p.data.brushCompanions)p.data.brushCompanions.forEach(function(c){if(!c.removed)c.translate(new Point(dx,dy));});
@@ -2000,6 +2012,7 @@ function selPropsApplyScale(sx,sy,anchor,skipUndo){
   if(!skipUndo)pushUndo();
   selectedPaths.forEach(function(p){
     p.scale(sx,sy,anchor);
+    transformFillGradient(p,function(pt){return new Point(anchor.x+(pt.x-anchor.x)*sx,anchor.y+(pt.y-anchor.y)*sy);});
     if(p.data&&p.data.isVectorBrush&&p.data.centerSegments){scaleCenterSegments(p.data.centerSegments,sx,sy,anchor.x,anchor.y);rebuildVectorBrushOutline(p);}
   });
   fillRegenerateLinked(userLayers[state.activeLayerIdx],null);
@@ -2010,6 +2023,7 @@ function selPropsApplyRotate(deltaDeg,center,skipUndo){
   if(!skipUndo)pushUndo();
   selectedPaths.forEach(function(p){
     p.rotate(deltaDeg,center);
+    transformFillGradient(p,function(pt){return pt.rotate(deltaDeg,center);});
     if(p.data&&p.data.isVectorBrush&&p.data.centerSegments){rotateCenterSegments(p.data.centerSegments,deltaDeg,center.x,center.y);rebuildVectorBrushOutline(p);}
   });
   fillRegenerateLinked(userLayers[state.activeLayerIdx],null);
@@ -2526,34 +2540,22 @@ function hexToRgbTriplet(hex){
 }
 function renderKeyframeCellsInto(rowEl,li,contentLayerIdxs){
   var ld=state.layers[li];
-  // Component layers (2026-07 fix, "je perd l'affichage des keyframes"):
-  // convertLayerToComponent (app.js) collapses the outer ld.frames to a
-  // single placement stub (CLAUDE.md family-of-bug #1 — the real drawing
-  // data moved into state.symbols[symId].layers[...].frames), so reading
-  // ld.frames here silently showed the markers as gone. Fix: read the
-  // INNER symbol frame this instance resolves to at each outer frame via
-  // resolveSymbolFrameIdx (app.js) — the exact same mapping
-  // getEffectiveStrokes uses at render time — so markers always agree
-  // with what's actually on screen instead of drifting from a second,
-  // reimplemented resolution.
+  // A component instance is one object on the parent Animation 2D timeline.
+  // Its row therefore shows the OUTER placement/blank keys in ld.frames,
+  // never the symbol's internal drawing keys. Internal keys belong to the
+  // component editor; mirroring them here made one instance look like a
+  // collection of unrelated parent keys and made selecting/moving the
+  // instance timing ambiguous.
   var sym=ld.symbolId?state.symbols[ld.symbolId]:null;
-  function symFrameAt(fi){
-    var ii=resolveSymbolFrameIdx(sym,ld,fi);
-    var kf=false,interp=false,manual=false,hasContent=false;
-    sym.layers.forEach(function(symLayer){
-      var f=symLayer&&symLayer.frames[ii];if(!f)return;
-      if(f.isKeyframe){kf=true;if(f.strokes.length)hasContent=true;}
-      else if(f.isInterpolated){interp=true;if(f.isManualEdit)manual=true;if(f.strokes.length)hasContent=true;}
-      else if(f.strokes&&f.strokes.length)hasContent=true;
-    });
-    return{isKeyframe:kf,isInterpolated:interp,isManualEdit:manual,hasContent:hasContent};
-  }
-  function frOf(fi){return sym?symFrameAt(fi):ld.frames[fi];}
+  function frOf(fi){return ld.frames[fi];}
   // Normally just this layer's own strokes; when contentLayerIdxs is given
   // (collapsed Stroke/Fill/Shadow head row — see renderTimeline's call
   // site), "full" means ANY sibling channel has content at that frame.
   function hasContentAt(fi){
-    if(sym)return symFrameAt(fi).hasContent;
+    if(sym){
+      var own=ld.frames[fi];
+      return !!(own&&own.isKeyframe&&!own.blankOverride);
+    }
     if(!contentLayerIdxs)return ld.frames[fi].strokes.length>0;
     return contentLayerIdxs.some(function(idx){var f=state.layers[idx]&&state.layers[idx].frames[fi];return f&&f.strokes.length>0;});
   }
@@ -3766,7 +3768,9 @@ function updateCompInstancePanel(){
   sec.style.display='block';
   document.getElementById('comp-playmode').value=ld.symPlayMode||'loop';
   document.getElementById('comp-singleframe-row').style.display=(ld.symPlayMode==='single')?'flex':'none';
-  document.getElementById('comp-singleframe').value=ld.symSingleFrame||0;
+  var sym=state.symbols[ld.symbolId];
+  var resolved=sym?resolveSymbolFrameIdx(sym,ld,state.currentFrame):(ld.symSingleFrame||0);
+  document.getElementById('comp-singleframe').value=resolved;
   document.getElementById('comp-speed').value=ld.symSpeed||1;
   document.getElementById('comp-offset').value=ld.symPlacedAt||0;
   renderCompFrameStrip(ld);
@@ -3786,7 +3790,9 @@ function renderCompFrameStrip(ld){
     var cell=document.createElement('div');
     cell.style.cssText='width:14px;height:14px;flex:0 0 auto;border-radius:2px;cursor:pointer;font-size:8px;display:flex;align-items:center;justify-content:center;';
     var isCur=i===current;
-    var isSingleSel=ld.symPlayMode==='single'&&i===(ld.symSingleFrame||0);
+    var own=ld.frames&&ld.frames[state.currentFrame];
+    var isExplicit=!!(own&&own.isKeyframe&&own.componentFrame!=null);
+    var isSingleSel=(isExplicit||ld.symPlayMode==='single')&&i===current;
     cell.style.background=isSingleSel?'var(--accent)':(isCur?'rgba(255,255,255,.25)':'var(--bg)');
     cell.style.border='1px solid '+(isCur?'var(--accent)':'rgba(255,255,255,.15)');
     cell.title='Frame '+i;
@@ -4435,6 +4441,7 @@ function updateTextActionsPanel(){
 function initFillGradientButton(){
   var btn=document.getElementById('p-fill-grad-btn');
   var cb=document.getElementById('p-grad-on');
+  var editor=document.getElementById('p-fill-gradient-editor');
   if(!btn||!cb)return;
   btn.addEventListener('click',function(e){
     e.preventDefault();e.stopPropagation();
@@ -4444,6 +4451,7 @@ function initFillGradientButton(){
       showToast('Sélectionne une seule forme avec l\'outil Sélection pour lui appliquer un dégradé');
       return;
     }
+    if(editor)editor.style.display='block';
     cb.checked=!cb.checked;
     cb.dispatchEvent(new Event('change',{bubbles:true}));
     syncFillGradientButton();
@@ -4455,9 +4463,11 @@ function initFillGradientButton(){
 function syncFillGradientButton(){
   var btn=document.getElementById('p-fill-grad-btn');
   var cb=document.getElementById('p-grad-on');
+  var editor=document.getElementById('p-fill-gradient-editor');
   if(!btn||!cb)return;
   btn.classList.toggle('on',!!cb.checked);
   btn.classList.toggle('off',!!cb.disabled);
+  if(editor)editor.style.display=(!cb.disabled&&cb.checked)?'block':'none';
   btn.title=cb.disabled
     ? 'Dégradé de fill — sélectionne une seule forme avec l\'outil Sélection'
     : (cb.checked?'Dégradé de fill actif — cliquer pour revenir en aplat'
@@ -5991,6 +6001,47 @@ document.getElementById('p-skipmanual').addEventListener('change',function(){sta
 document.getElementById('btn-tw').addEventListener('click',function(){window.SM.generateTweens();});
 document.getElementById('btn-os').addEventListener('click',function(){window.SM.toggleOnion();});
 document.getElementById('btn-ghost-all').addEventListener('click',function(){window.SM.toggleGhostAll();});
+// Persistent toolbar customization. The overflow button is intentionally
+// never hideable, so hidden controls always remain recoverable.
+(function initToolbarCustomization(){
+  var toolbar=document.getElementById('tl-toolbar');
+  var trigger=document.getElementById('btn-toolbar-customize');
+  if(!toolbar||!trigger)return;
+  var KEY='nemo-timeline-toolbar-hidden';
+  var pop=null;
+  function readHidden(){try{return JSON.parse(localStorage.getItem(KEY)||'[]');}catch(e){return[];}}
+  function candidates(){return Array.prototype.slice.call(toolbar.querySelectorAll(':scope > button.tb[id]')).filter(function(b){return b!==trigger;});}
+  function apply(){
+    var hidden=readHidden();
+    candidates().forEach(function(b){b.classList.toggle('toolbar-user-hidden',hidden.indexOf(b.id)>=0);});
+  }
+  function close(){if(pop){pop.remove();pop=null;}document.removeEventListener('pointerdown',outside,true);}
+  function outside(e){if(pop&&!pop.contains(e.target)&&e.target!==trigger)close();}
+  trigger.addEventListener('click',function(e){
+    e.stopPropagation();
+    if(pop){close();return;}
+    pop=document.createElement('div');pop.className='ctx-menu toolbar-custom-pop';
+    var hidden=readHidden();
+    candidates().forEach(function(b){
+      var row=document.createElement('label');row.className='toolbar-custom-row';
+      var cb=document.createElement('input');cb.type='checkbox';cb.checked=hidden.indexOf(b.id)<0;
+      var label=document.createElement('span');label.textContent=b.title||b.getAttribute('aria-label')||b.id;
+      cb.addEventListener('change',function(){
+        var h=readHidden(),at=h.indexOf(b.id);
+        if(cb.checked&&at>=0)h.splice(at,1);
+        if(!cb.checked&&at<0)h.push(b.id);
+        localStorage.setItem(KEY,JSON.stringify(h));apply();
+      });
+      row.appendChild(cb);row.appendChild(label);pop.appendChild(row);
+    });
+    document.body.appendChild(pop);
+    var r=trigger.getBoundingClientRect();
+    pop.style.left=Math.max(6,Math.min(window.innerWidth-pop.offsetWidth-6,r.right-pop.offsetWidth))+'px';
+    pop.style.top=Math.min(window.innerHeight-pop.offsetHeight-6,r.bottom+5)+'px';
+    setTimeout(function(){document.addEventListener('pointerdown',outside,true);},0);
+  });
+  apply();
+})();
 document.getElementById('btn-tween-curves').addEventListener('click',function(){window.SM.toggleTweenCurves();});
 document.getElementById('btn-ghost-select').addEventListener('click',function(){selectGhostAll();});
 document.getElementById('btn-shadow-guides').addEventListener('click',function(){window.SM.toggleShadowGuides();});
@@ -6010,6 +6061,14 @@ document.getElementById('btn-os-outline').addEventListener('click',function(){
   var v=state.onionMode==='outline'?'tinted':'outline';window.SM.setOnionMode(v);
   this.classList.toggle('active',v==='outline');document.getElementById('p-omode').value=v;
 });
+var currentOutlineChk=document.getElementById('p-current-outline');
+if(currentOutlineChk){
+  currentOutlineChk.checked=!!state.currentFrameOutline;
+  currentOutlineChk.addEventListener('change',function(){
+    state.currentFrameOutline=this.checked;
+    if(window.SMEngineBridge)SMEngineBridge.renderNow();
+  });
+}
 // Animate's "Modify Onion Markers" menu — presets for the marker span
 // around the playhead, plus the anchor/follow toggle (markers travel with
 // the playhead by default, exactly like Animate; anchoring pins them).
