@@ -39,6 +39,9 @@ wasm-bindgen-futures = "0.4"
 futures-channel = "0.3"
 web-sys = { version = "0.3", features = ["HtmlCanvasElement", "console"] }
 
+[dev-dependencies]
+naga = { version = "29.0.4", features = ["wgsl-in"] }
+
 [profile.release]
 opt-level = "s"
 lto = true
