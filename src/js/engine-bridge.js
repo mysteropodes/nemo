@@ -381,13 +381,14 @@
     // `loaded` flag before the engine can draw it.
     var id = engineIdFor(raster);
     if (!id) return null;
-    if (registeredImageIds[id]) return id;
+    if (registeredImageIds[id]) { _touchImage(id); return id; }
     if (!raster.loaded || !raster.canvas) return null; // not decoded yet — try again next tick
     var cv = raster.canvas;
     var ctx = cv.getContext('2d');
     var pixels = ctx.getImageData(0, 0, cv.width, cv.height).data;
     engine.register_image(id, pixels, cv.width, cv.height);
     registeredImageIds[id] = true;
+    _noteImageRegistered(id, cv.width, cv.height);
     return id;
   }
 
@@ -477,17 +478,86 @@
     }
     return { pixels: cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data, w: cv.width, h: cv.height };
   }
+  // ---- BOUNDED IMAGE STORE (2026-07-28) --------------------------------
+  // The engine's image map was unbounded by design — its own comment said
+  // "cached for the engine's whole lifetime". That is fine for a drawing
+  // document with a handful of imported rasters, and untenable for the
+  // footage side of the app: a 1000-frame 1920x1080 sequence is 8.3GB of
+  // decoded RGBA8, and nothing ever dropped a byte of it.
+  //
+  // Eviction is driven from JS, not the engine, for the same reason the
+  // retained path store is: this side knows what the scene being rendered
+  // actually references, and it can always re-upload (the pixels come back
+  // from the Paper Raster's canvas, or from the video/reference bridge's own
+  // per-frame push). An engine-side LRU would have to guess, and a wrong
+  // guess makes an image silently vanish from the picture.
+  //
+  // Policy: least-recently-USED (as in, last emitted into a scene), never
+  // touching anything the CURRENT build references, down to a byte budget.
+  var _imgBytes = new Map();       // id -> decoded bytes held by the engine
+  var _imgLastUsed = new Map();    // id -> build tick when last emitted
+  var _imgUsedThisBuild = null;    // Set, non-null only during a scene build
+  var _imgTick = 0;
+  var _imgBudgetBytes = 384 * 1024 * 1024;
+  var _imgEvictions = 0;
+
+  function _noteImageRegistered(id, w, h) {
+    _imgBytes.set(id, w * h * 4);
+    // Counts as a USE, not merely a registration: an image is uploaded
+    // because the frame being built needs it, so it must join
+    // _imgUsedThisBuild or it becomes an eviction candidate the instant it
+    // arrives — measured, it evicted everything including what was on screen.
+    _touchImage(id);
+  }
+  // Called wherever an image id is emitted into the scene being built.
+  function _touchImage(id) {
+    _imgLastUsed.set(id, ++_imgTick);
+    if (_imgUsedThisBuild) _imgUsedThisBuild.add(id);
+  }
+  function _imgTotalBytes() {
+    var t = 0;
+    _imgBytes.forEach(function (b) { t += b; });
+    return t;
+  }
+  // Run at the END of a scene build, when `_imgUsedThisBuild` is exactly the
+  // set of ids this frame draws. Anything else is a candidate, oldest first.
+  function enforceImageBudget() {
+    var total = _imgTotalBytes();
+    if (total <= _imgBudgetBytes || !engine || !engine.retire_images) return;
+    var cands = [];
+    _imgBytes.forEach(function (bytes, id) {
+      if (_imgUsedThisBuild && _imgUsedThisBuild.has(id)) return;   // on screen now
+      cands.push({ id: id, t: _imgLastUsed.get(id) || 0, b: bytes });
+    });
+    cands.sort(function (a, b) { return a.t - b.t; });
+    var drop = [];
+    for (var i = 0; i < cands.length && total > _imgBudgetBytes; i++) {
+      drop.push(cands[i].id); total -= cands[i].b;
+    }
+    if (!drop.length) return;
+    try { engine.retire_images(JSON.stringify(drop)); } catch (e) { return; }
+    for (var k = 0; k < drop.length; k++) {
+      // Dropping the JS-side gate is what makes the next use re-upload —
+      // registerRasterIfNeeded/registerCachedImage both early-out on it.
+      delete registeredImageIds[drop[k]];
+      _imgBytes.delete(drop[k]); _imgLastUsed.delete(drop[k]);
+    }
+    _imgEvictions += drop.length;
+  }
+
   function registerCachedImage(id, source) {
     if (!engine || registeredImageIds[id]) return;
     var p = drawableToPixels(source);
     engine.register_image(id, p.pixels, p.w, p.h);
     registeredImageIds[id] = true;
+    _noteImageRegistered(id, p.w, p.h);
   }
   function registerImagePixels(id, source) {
     if (!engine) return;
     var p = drawableToPixels(source);
     engine.register_image(id, p.pixels, p.w, p.h);
     registeredImageIds[id] = true;
+    _noteImageRegistered(id, p.w, p.h);
   }
   // Raw-bytes variant (EXPERIMENTAL, native-video-decode branch): the
   // native decoder already produces tightly-packed RGBA8 — going through
@@ -500,6 +570,7 @@
     if (!engine) return false;
     engine.register_image(id, pixels, w, h);
     registeredImageIds[id] = true;
+    _noteImageRegistered(id, w, h);
     return true;
   }
 
@@ -563,6 +634,10 @@
   // WGPU-effects one, which reuses this function instead of exportBuildFrame.
   function buildSceneJson(skipVolatile, excludeGhosts, renderContext) {
     renderContext = renderContext || {};
+    // Opened here and closed at the return below: while a build is in flight
+    // this collects every image id the frame actually draws, which is what
+    // makes eviction safe (nothing on screen is ever a candidate).
+    _imgUsedThisBuild = new Set();
     var renderFrame = renderContext.frame != null ? renderContext.frame
       : (_fxFrameOverride != null ? _fxFrameOverride : state.currentFrame);
     var includeEditorOverlays = renderContext.includeEditorOverlays !== false;
@@ -664,6 +739,7 @@
           }
           var nvChain = SMMotion.parentChainMats(i, renderFrame);
           for (var nvpc = 0; nvpc < nvChain.length; nvpc++) { nvRect = SMMotion.transformImageRect(nvRect, nvChain[nvpc].pivot, nvChain[nvpc].mat); nvOp *= nvChain[nvpc].mat.op; }
+          _touchImage('nv:' + i);
           items.push({ image: { imageId: 'nv:' + i, x: nvRect.x, y: nvRect.y, width: nvRect.width, height: nvRect.height, opacity: nvOp, rotation: nvRect.rotation || 0 } });
         }
       }
@@ -1035,7 +1111,12 @@
     }
     var frameForFx = renderFrame || 0;
     var fpsForFx = Math.max(1, state.fps || 24);
-    return JSON.stringify({ time: frameForFx / fpsForFx, layers: layers });
+    var _sceneOut = JSON.stringify({ time: frameForFx / fpsForFx, layers: layers });
+    // Closes the build: `_imgUsedThisBuild` is now exactly what this frame
+    // draws, which is the only moment eviction can be decided safely.
+    enforceImageBudget();
+    _imgUsedThisBuild = null;
+    return _sceneOut;
   }
 
   // Onion skin ghosts (tweens.js's renderOS() keeps onionPrevLayer/
@@ -2144,6 +2225,22 @@
       }
       return _pathRefsEnabled;
     },
+    // Footage memory: the store is bounded now (see enforceImageBudget).
+    // Exposed so a project can be sized against a machine, and so the
+    // eviction policy can be observed rather than assumed.
+    imageStoreStats: function () {
+      return {
+        jsBytes: _imgTotalBytes(),
+        engineBytes: (engine && engine.image_store_bytes) ? engine.image_store_bytes() : -1,
+        engineCount: (engine && engine.image_store_size) ? engine.image_store_size() : -1,
+        budgetBytes: _imgBudgetBytes,
+        evictions: _imgEvictions,
+      };
+    },
+    // Math.floor, NOT `| 0`: bitwise coercion wraps at 2^31, so any budget
+    // above ~2.1GB silently became a tiny number (a 4GB budget landed on 1
+    // byte and evicted the whole store on the first frame).
+    setImageBudgetBytes: function (n) { _imgBudgetBytes = Math.max(1, Math.floor(n)); return _imgBudgetBytes; },
     // Diagnostics: times the scene serialization in isolation. fps probes
     // aggregate loadFrame + Paper rebuild + engine render + browser paint,
     // which swamped the signal this change actually moves.

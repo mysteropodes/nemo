@@ -2954,10 +2954,35 @@ impl VelloEngine {
     }
 
     /// Lets JS skip a redundant `register_image` upload for an image it's
-    /// already registered this session (images are cached for the engine's
-    /// whole lifetime, not per-scene, so this is a simple presence check).
+    /// already registered (presence check — the store is now bounded and JS
+    /// may have retired this id, so a `false` here means "upload again").
     pub fn has_image(&self, id: &str) -> bool {
         self.images.contains_key(id)
+    }
+
+    /// Total decoded bytes held by the image store. This used to be unbounded
+    /// by design ("cached for the engine's whole lifetime"), which is fine for
+    /// a handful of imported rasters and untenable for footage: a 1000-frame
+    /// 1920x1080 sequence is 8.3GB of RGBA8. JS drives eviction (it is the
+    /// side that knows what the CURRENT scene references and can re-upload
+    /// from the Paper Raster / video bridge on demand) — this just reports.
+    pub fn image_store_bytes(&self) -> f64 {
+        self.images.values().map(|d| (d.width as f64) * (d.height as f64) * 4.0).sum()
+    }
+    pub fn image_store_size(&self) -> u32 {
+        self.images.len() as u32
+    }
+
+    /// Drops images by id. Mirrors retire_paths. Never called for an id the
+    /// scene being rendered still references — the caller checks that, because
+    /// dropping a live id would make the picture lose an image with no signal
+    /// beyond a warning in paint_layer_items.
+    pub fn retire_images(&mut self, ids_json: &str) -> Result<(), JsValue> {
+        let ids: Vec<String> = serde_json::from_str(ids_json).map_err(|e| JsValue::from_str(&e.to_string()))?;
+        for id in ids {
+            self.images.remove(&id);
+        }
+        Ok(())
     }
 
     /// Retained path store (see the `paths` field's doc comment). `coords` is

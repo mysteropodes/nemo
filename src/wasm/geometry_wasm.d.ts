@@ -33,10 +33,20 @@ export class VelloEngine {
     gizmo_handles(scene_json: string): string;
     /**
      * Lets JS skip a redundant `register_image` upload for an image it's
-     * already registered this session (images are cached for the engine's
-     * whole lifetime, not per-scene, so this is a simple presence check).
+     * already registered (presence check — the store is now bounded and JS
+     * may have retired this id, so a `false` here means "upload again").
      */
     has_image(id: string): boolean;
+    /**
+     * Total decoded bytes held by the image store. This used to be unbounded
+     * by design ("cached for the engine's whole lifetime"), which is fine for
+     * a handful of imported rasters and untenable for footage: a 1000-frame
+     * 1920x1080 sequence is 8.3GB of RGBA8. JS drives eviction (it is the
+     * side that knows what the CURRENT scene references and can re-upload
+     * from the Paper Raster / video bridge on demand) — this just reports.
+     */
+    image_store_bytes(): number;
+    image_store_size(): number;
     path_store_size(): number;
     /**
      * Registers (or re-registers, if `key` already exists — e.g. the
@@ -111,6 +121,13 @@ export class VelloEngine {
      * this on every resize-observer tick regardless.
      */
     resize(width: number, height: number): void;
+    /**
+     * Drops images by id. Mirrors retire_paths. Never called for an id the
+     * scene being rendered still references — the caller checks that, because
+     * dropping a live id would make the picture lose an image with no signal
+     * beyond a warning in paint_layer_items.
+     */
+    retire_images(ids_json: string): void;
     /**
      * Retirement is JS-driven (FinalizationRegistry on the stroke dicts) —
      * this side never guesses at lifetimes. `ids_json`: JSON array of keys.
@@ -261,6 +278,8 @@ export interface InitOutput {
     readonly velloengine_get_selection: (a: number) => [number, number, number, number];
     readonly velloengine_gizmo_handles: (a: number, b: number, c: number) => [number, number, number, number];
     readonly velloengine_has_image: (a: number, b: number, c: number) => number;
+    readonly velloengine_image_store_bytes: (a: number) => number;
+    readonly velloengine_image_store_size: (a: number) => number;
     readonly velloengine_path_store_size: (a: number) => number;
     readonly velloengine_register_custom_effect: (a: number, b: number, c: number, d: number, e: number) => [number, number];
     readonly velloengine_register_image: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number];
@@ -268,6 +287,7 @@ export interface InitOutput {
     readonly velloengine_render: (a: number, b: number, c: number) => [number, number];
     readonly velloengine_render_to_pixels: (a: number, b: number, c: number) => any;
     readonly velloengine_resize: (a: number, b: number, c: number) => void;
+    readonly velloengine_retire_images: (a: number, b: number, c: number) => [number, number];
     readonly velloengine_retire_paths: (a: number, b: number, c: number) => [number, number];
     readonly velloengine_rotate_selection: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
     readonly velloengine_scale_selection: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number, number, number];
@@ -289,10 +309,10 @@ export interface InitOutput {
     readonly strokemodeler_move: (a: number, b: number, c: number, d: number, e: number) => [number, number];
     readonly strokemodeler_new: (a: number, b: number) => number;
     readonly strokemodeler_up: (a: number, b: number, c: number, d: number, e: number) => [number, number];
+    readonly interp_stroke: (a: number, b: number) => [number, number, number, number];
     readonly boolean_op: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
     readonly erase_at_point: (a: number, b: number) => [number, number, number, number];
     readonly hit_test: (a: number, b: number, c: number, d: number, e: number) => [number, number, number, number];
-    readonly interp_stroke: (a: number, b: number) => [number, number, number, number];
     readonly wasm_bindgen__convert__closures_____invoke__h4177160f1dac6248: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen__convert__closures_____invoke__h49909fab4bc066b4: (a: number, b: number, c: any, d: any) => void;
     readonly wasm_bindgen__convert__closures_____invoke__h29bfc5eda1199406: (a: number, b: number, c: any) => void;

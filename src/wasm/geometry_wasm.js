@@ -162,8 +162,8 @@ export class VelloEngine {
     }
     /**
      * Lets JS skip a redundant `register_image` upload for an image it's
-     * already registered this session (images are cached for the engine's
-     * whole lifetime, not per-scene, so this is a simple presence check).
+     * already registered (presence check — the store is now bounded and JS
+     * may have retired this id, so a `false` here means "upload again").
      * @param {string} id
      * @returns {boolean}
      */
@@ -172,6 +172,26 @@ export class VelloEngine {
         const len0 = WASM_VECTOR_LEN;
         const ret = wasm.velloengine_has_image(this.__wbg_ptr, ptr0, len0);
         return ret !== 0;
+    }
+    /**
+     * Total decoded bytes held by the image store. This used to be unbounded
+     * by design ("cached for the engine's whole lifetime"), which is fine for
+     * a handful of imported rasters and untenable for footage: a 1000-frame
+     * 1920x1080 sequence is 8.3GB of RGBA8. JS drives eviction (it is the
+     * side that knows what the CURRENT scene references and can re-upload
+     * from the Paper Raster / video bridge on demand) — this just reports.
+     * @returns {number}
+     */
+    image_store_bytes() {
+        const ret = wasm.velloengine_image_store_bytes(this.__wbg_ptr);
+        return ret;
+    }
+    /**
+     * @returns {number}
+     */
+    image_store_size() {
+        const ret = wasm.velloengine_image_store_size(this.__wbg_ptr);
+        return ret >>> 0;
     }
     /**
      * @returns {number}
@@ -306,6 +326,21 @@ export class VelloEngine {
      */
     resize(width, height) {
         wasm.velloengine_resize(this.__wbg_ptr, width, height);
+    }
+    /**
+     * Drops images by id. Mirrors retire_paths. Never called for an id the
+     * scene being rendered still references — the caller checks that, because
+     * dropping a live id would make the picture lose an image with no signal
+     * beyond a warning in paint_layer_items.
+     * @param {string} ids_json
+     */
+    retire_images(ids_json) {
+        const ptr0 = passStringToWasm0(ids_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.velloengine_retire_images(this.__wbg_ptr, ptr0, len0);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
     }
     /**
      * Retirement is JS-driven (FinalizationRegistry on the stroke dicts) —
