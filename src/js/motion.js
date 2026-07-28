@@ -3561,22 +3561,33 @@
     // "j'ai juste à glisser la box... peu importe où je suis" — the whole
     // top/bottom edge (addStaggerEdges) needs a genuinely wide box to grab
     // along, not a narrow strip that's itself hard to land on.
-    var gb = gridEl.getBoundingClientRect();
+    // Clamped to what is actually ON SCREEN. The box used to span the grid's
+    // whole CONTENT (measured: 3600px against a 979px viewport), so most of
+    // it — and most of its skew edges — sat thousands of pixels past the
+    // right edge where no pointer can reach, and the two Space edges had to
+    // be re-pinned by hand further down to compensate. The visible rect is
+    // the only part a gesture can ever start in.
+    var gbFull = gridEl.getBoundingClientRect();
+    var wrapEl2 = document.getElementById('fg-wrap');
+    var wr2 = wrapEl2 ? wrapEl2.getBoundingClientRect() : gbFull;
+    var gbLeft = Math.max(gbFull.left, wr2.left);
+    var gbRight = Math.min(gbFull.right, wr2.right);
+    var gb = { left: gbLeft, width: Math.max(0, gbRight - gbLeft) };
     if (!_layerStaggerBoxEl) {
       _layerStaggerBoxEl = document.createElement('div'); _layerStaggerBoxEl.className = 'motion-keysel-box';
       document.body.appendChild(_layerStaggerBoxEl);
-      addMoveFill(_layerStaggerBoxEl, function (e, mode) {
-        var rows = buildLayerRows();
-        // No key anywhere in the selection — the box's key engine has
-        // nothing to move, so the drag did literally nothing, silently
-        // (2026-07-27: "le glisser horizontalement ne marche pas sur les
-        // calques"; the layers in that report were freshly created, so no
-        // property had a key yet). What there IS to move horizontally then
-        // is the layers' own presence in time, which is exactly what the
-        // in/out bars filling these rows show.
-        if (!rows.some(function (r) { return r.length; })) { dragLayerBars(e); return; }
-        startSkewDrag(rows, mode, e);
-      });
+      // The fill covers LAYER rows, so dragging it moves the LAYERS in time —
+      // bars and their keys together, which is what AE does when you drag
+      // selected layers in its timeline (2026-07-27: "la box d'alignement…
+      // ne permet pas encore de bien déplacé les calques dans le temps").
+      // It used to move keys ALONE whenever the selection had any, which is
+      // a different operation living in a different place: dragging keys.
+      // Nothing is lost — the key box (two or more property tracks selected)
+      // still owns move/skew/space/liquify on keys, and the edges of THIS box
+      // still skew and space them. Routing through layer-inout.js's group bar
+      // drag also means clamping, keyframe carry-along and undo behave
+      // exactly as they do when you drag one of those bars by hand.
+      addMoveFill(_layerStaggerBoxEl, function (e) { dragLayerBars(e); });
       // Space on the LAYER box, which is where the reference actually
       // demonstrates it ("select layers across multiple rows, drag from the
       // right edge to space them out"): spreads the selected layers' keys
