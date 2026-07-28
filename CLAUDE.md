@@ -322,6 +322,49 @@ pleine de maintiens (« on twos »/« on threes »), c'est là que ça paie.
 geste puis aller-retour de frame (stocké et enfants cohérents, visible à l'écran) ; undo/redo ;
 masquage/réaffichage de calque ; gomme.
 
+### 5quinquies. Le store d'images du moteur est borné (2026-07-28)
+
+Le premier mur du côté FOOTAGE de l'app (vidéo/images/séquences), et ce n'est pas une
+lenteur : c'est une limite dure. `register_image` insérait sans jamais rien retirer — son
+propre commentaire l'assumait, « cached for the engine's whole lifetime ». Correct pour un
+document de dessin avec quelques rasters importés, intenable pour du métrage.
+
+**Mesuré** : 120 frames distinctes en 640×360 = **105,5 Mo** décodés, soit 5 secondes à
+24 fps. À 1920×1080 c'est ~950 Mo pour les mêmes 5 s, ~11 Go la minute. Rien n'en libérait
+un octet.
+
+**L'éviction est pilotée par JS, pas par le moteur** — même raison que pour les paths
+retenus (§5ter) : ce côté-ci sait ce que la scène en cours de construction référence
+réellement, et il peut toujours re-téléverser (les pixels reviennent du canvas du Raster
+Paper, ou du push par frame des ponts vidéo/référence). Une LRU côté moteur devrait deviner,
+et une mauvaise devinette fait disparaître une image de l'image sans autre signal qu'un
+warning.
+
+Politique : LRU par dernière UTILISATION (dernière émission dans une scène), jusqu'à un
+budget d'octets (**384 Mo par défaut**, `setImageBudgetBytes`). `_imgUsedThisBuild` est
+ouvert au début de `buildSceneJson` et fermé au retour : **rien de ce que la frame courante
+dessine n'est jamais candidat**. Côté Rust : `retire_images`, `image_store_bytes`,
+`image_store_size`.
+
+⚠️ Deux bugs à moi, tous deux trouvés par la mesure et pas par la relecture :
+- `Math.max(1, n | 0)` — **la coercition bitwise déborde à 2³¹**, donc un budget de 4 Go
+  atterrissait sur 1 octet et vidait tout le store dès la première frame. `Math.floor`.
+- Une image fraîchement téléversée doit compter comme **utilisée**, pas seulement comme
+  enregistrée : sans l'ajouter à `_imgUsedThisBuild`, elle devenait candidate à l'éviction
+  à l'instant même où elle arrivait (le store finissait à 0 en dessinant quand même, via
+  re-upload permanent).
+
+**Vérification** : sous un budget de 8 Mo forçant une éviction continue (223 évictions), les
+frames rendues sont **identiques au pixel près** à la référence en budget large, sur 6 frames.
+Budget 32 Mo : 36 images retenues, 31,6 Mo, sous budget, ça dessine. Aucune régression côté
+dessin — 2000 rasters partageant une source ne tiennent qu'UNE entrée (3,1 ms/frame, zéro
+éviction), et le projet réel de l'utilisateur n'évince rien.
+
+**Le budget n'est pas un réglage « perf » mais un réglage MACHINE** — c'est l'équivalent du
+cache RAM d'After Effects. Il devra être exposé dans les Réglages quand le côté footage
+sortira, avec une valeur par défaut dérivée de la VRAM disponible plutôt que la constante
+actuelle.
+
 **`renderNow(true)` (viewportOnly) est un contrat d'appelant** : seul le viewport a changé
 depuis le dernier rendu. Vrai pour pan/rotate (aucun item de scène ne dépend de center ou de
 la rotation ; les poignées en `1/view.zoom` dépendent du ZOOM seul). JAMAIS l'inférer
