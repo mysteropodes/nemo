@@ -910,22 +910,28 @@ body.mode-motion .lrow.act.motion-selected{background:rgba(63,107,245,.16);box-s
 .solo-btn.on{color:#000;background:#ffcc00;}
 .solo-btn.on:hover{background:#ffd633;}
 .lnm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 4px;}
-#layer-ctrls{display:flex;align-items:center;gap:6px;padding:0 14px;height:40px;border-top:1px solid rgba(255,255,255,.06);}
+/* Header row of the layers column — 42px, matching #frame-hdr (20) +
+   #bars-row (22) on the grid side. That equality is what keeps every .lrow
+   aligned with its .frow, so it must not drift. */
+#layer-hdr{height:42px;flex-shrink:0;border-bottom:1px solid var(--border);background:var(--panel2);display:flex;align-items:center;padding:0 6px;}
+#layer-ctrls{display:flex;align-items:center;gap:6px;}
 #layer-ctrls button{width:24px;height:24px;background:var(--panel3);border:none;color:rgba(236,234,231,.55);cursor:pointer;padding:2px;border-radius:7px;display:flex;align-items:center;justify-content:center;}
 #layer-ctrls button:hover{background:#2c2a31;color:var(--text);}
 #layer-ctrls .material-symbols-rounded{font-size:13px;}
 #layer-ctrls svg{width:13px;height:13px;display:block;}
-/* The grid's viewport runs 40px LOWER than #layer-list's, because the panel
-   gives that bottom strip to its +/camera/trash buttons while the grid has
-   no equivalent chrome — so the last rows were drawn with no name beside
-   them, and the timeline's zoom scrollbar sat on top of the last row
-   (2026-07-25: "les boutons d'ajout à gauche sont plus haut que la scroll
-   bar" then "tu aurais pu mettre la scroll bar sous le trait orange").
-   #fg-col holds the grid above that band; #fg-wrap ends where #layer-list
-   ends so the two panels always show exactly the same rows, and
-   #tlzoom-scrollbar (timeline-zoom.js) is drawn in the band itself, level
-   with the buttons. */
-#fg-col{flex:1;display:flex;flex-direction:column;min-width:0;padding-bottom:40px;box-sizing:border-box;}
+/* Both columns reserve the SAME bottom band, so #fg-wrap and #layer-list
+   always end at the same y and therefore always show exactly the same rows —
+   otherwise the last rows get drawn with no name beside them, and the zoom
+   scrollbar sits on top of a row (2026-07-25: "les boutons d'ajout à gauche
+   sont plus haut que la scroll bar" then "tu aurais pu mettre la scroll bar
+   sous le trait orange"). The band used to be 40px because the layer
+   buttons lived down there; they moved into #layer-hdr (2026-07-27), so it
+   now only has to clear #tlzoom-scrollbar's 12px — 24px of timeline height
+   handed back to the rows.
+   THREE places must agree on this number: both paddings below and
+   BOTTOM_BAND_PX in timeline-zoom.js, which centres the 12px bar in it. */
+#layer-panel{padding-bottom:16px;box-sizing:border-box;}
+#fg-col{flex:1;display:flex;flex-direction:column;min-width:0;padding-bottom:16px;box-sizing:border-box;}
 #fg-wrap{flex:1;overflow:auto;position:relative;min-height:0;}
 /* Design audit 2026-07, round 2 (feedback: "le work area ressemble trop à
    un calque" — the boxed/bordered/purple v1 read as another layer bar, not

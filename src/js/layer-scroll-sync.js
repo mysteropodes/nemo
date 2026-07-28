@@ -21,13 +21,13 @@
 // register; a plain 1:1 gives exactly 0.
 //
 // What the offset was really chasing is the OTHER mismatch, at the bottom
-// edge: the panel's viewport is ~82px shorter (both that title bar above and
-// #layer-ctrls — the +/delete/duplicate buttons — below sit outside
-// #layer-list and eat its clientHeight, while the grid has no equivalent
-// chrome), so panelMax (452) > gridMax (412). Under a 1:1 mirror, scrolling
-// the GRID to its own max leaves the panel 40px short, hiding its last rows
-// under #layer-ctrls. A per-row offset cannot fix that — it just trades a
-// bottom-edge bug for a permanent misalignment at every other position.
+// edge: the panel's viewport is shorter than the grid's (#layer-hdr sits
+// outside #layer-list and eats its clientHeight, while the grid's own header
+// scrolls INSIDE #fg-wrap), so panelMax > gridMax. Under a 1:1 mirror,
+// scrolling the GRID to its own max leaves the panel short, hiding its last
+// rows. A per-row offset cannot fix that — it just trades a bottom-edge bug
+// for a permanent misalignment at every other position. The numbers move
+// with the layout, which is why equalize() measures instead of hardcoding.
 //
 // So: equalize the two scroll RANGES with a spacer at the end of the grid's
 // content, then mirror 1:1. Both ends line up, and every row in between

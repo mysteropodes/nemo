@@ -48,10 +48,13 @@
   var KEY_VER = 'nemo-timeline-fc-ver';
   var CUR_VER = '2'; // bump whenever DEFAULT_FC changes and existing persisted values should be migrated once
   var DEFAULT_FC = 30;
-  // Height of the timeline's bottom chrome band — #layer-ctrls on the panel
-  // side, this scrollbar on the grid side. Keep in sync with #layer-ctrls'
-  // height in style.css.
-  var BOTTOM_BAND_PX = 40;
+  // Height of the timeline's bottom chrome band, which this scrollbar is
+  // centred in. Was 40px when the layer buttons lived down there too; they
+  // moved into #layer-hdr (2026-07-27) so the band only has to clear the
+  // 12px bar. MUST equal #layer-panel's and #fg-col's padding-bottom in
+  // style.css — those two keep the panel and the grid ending at the same y,
+  // and this centres the bar in whatever they leave free.
+  var BOTTOM_BAND_PX = 16;
 
   // Bug found 2026-07 ("impossible de l'amener jusqu'au bout"): with the
   // old 64px ceiling, closing the scrollbar-handle gap all the way down
@@ -107,13 +110,14 @@
     // of being a static CSS left:0/bottom:0.
     var wrapRect = wrap.getBoundingClientRect();
     bar.style.left = wrapRect.left + 'px';
-    // BELOW the grid, centred in the 40px band that #layer-ctrls occupies on
-    // the panel side — not `wrapRect.bottom - 12`, which laid it over the
+    // BELOW the grid, centred in the reserved bottom band (BOTTOM_BAND_PX,
+    // matched by #layer-panel's and #fg-col's padding-bottom) — not
+    // `wrapRect.bottom - 12`, which laid it over the
     // last row (2026-07-25: "double barre de scroll, une en haut avec les
     // poignées bleues alors qu'elle devrait aller à la place de celle en bas
-    // en grise"). #fg-wrap now stops at the separator line and #fg-col
-    // leaves that band free, so the bar reads as the timeline's bottom
-    // chrome, level with the panel's buttons, instead of covering content.
+    // en grise"). #fg-wrap stops at the separator line and both columns
+    // leave that band free, so the bar reads as the timeline's bottom
+    // chrome instead of covering content.
     bar.style.top = (wrapRect.bottom + Math.round((BOTTOM_BAND_PX - 12) / 2)) + 'px';
     bar.style.width = trackW + 'px';
     thumb.style.width = thumbW + 'px';
