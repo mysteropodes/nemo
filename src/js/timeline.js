@@ -860,6 +860,49 @@ window.SM={
     var b=selBounds();if(!b)return;
     var offsetL=dLayer-b.minL,offsetF=dFrame-b.minF;
     if(offsetL===0&&offsetF===0)return;
+    // RIPPLE (2026-07-28 feedback: "bougé l'outpoint d'une clé dans
+    // Animation 2D ne pousse pas toutes les clé qui sont après seulement la
+    // clé suivante"). Grabbing a single keyframe's own dot in the frame-grid
+    // (the mousedown handler above, `grabbedDot` branch) sets `sel` to
+    // exactly ONE {layer,frame} entry and lands here — every LATER keyframe
+    // on that same layer used to sit at its own original frame number,
+    // since rekeyTweenPairData/retimeTweenSpans below only ever rekey the
+    // tween PAIR touching a frame that's actually in `sel`. Mirrors
+    // moveKeyframe's own ripple fix (timeline.js, Motion's equivalent
+    // gesture via layer-inout.js) — SAME proof for why only the upper bound
+    // needs guarding: every rippled frame is > the dragged one, so adding
+    // the identical offsetF to both can never reorder or collide them,
+    // regardless of offsetF's sign.
+    //
+    // Scoped tightly to this one gesture (single cell, no layer change): a
+    // genuine multi-cell rectangle selection, or a cross-layer drag, is a
+    // different action the user already explicitly scoped by selecting —
+    // rippling THOSE too would silently move frames nobody selected.
+    //
+    // Added to `sel` itself (not handled separately) so the rest of this
+    // function's existing generic capture/blank/write/rekey pipeline
+    // carries the rippled frames along for free — they are ordinary
+    // keyframes on the same layer, indistinguishable from one the user
+    // selected by hand.
+    if(sel.length===1&&offsetL===0){
+      var li0=sel[0].layer,ld0=state.layers[li0];
+      var srcFrame0=ld0&&ld0.frames[sel[0].frame];
+      if(ld0&&!ld0.locked&&srcFrame0&&srcFrame0.isKeyframe){
+        var allKfs0=ld0.frames.map(function(f,fi){return f.isKeyframe?fi:null;}).filter(function(x){return x!==null;});
+        var laterKfs0=allKfs0.filter(function(f){return f>sel[0].frame;});
+        if(offsetF>0&&laterKfs0.length){
+          // Must clamp here, not rely on the generic out-of-range SKIP a few
+          // lines down (`if(tl<0||...||tf>=state.totalFrames)return;`) —
+          // that skip silently DROPS the frame (already blanked from its
+          // source by then), which for a frame the user never explicitly
+          // selected would be data loss introduced by this very fix.
+          var lastKf0=laterKfs0[laterKfs0.length-1];
+          var maxDelta0=(state.totalFrames-1)-lastKf0;
+          if(offsetF>maxDelta0)offsetF=Math.max(0,maxDelta0);
+        }
+        laterKfs0.forEach(function(f){sel.push({layer:li0,frame:f});});
+      }
+    }
     // Locked layers are untouchable on BOTH ends of a move: a locked source
     // must not be blanked out, and a locked target must not be overwritten
     // (feedback #18 — dragging keyframes in the grid bypassed the lock that
