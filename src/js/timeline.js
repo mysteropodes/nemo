@@ -307,7 +307,15 @@ window.SM={
   toggleTweenCurves:function(){
     state.showTweenCurves=!state.showTweenCurves;
     var b=document.getElementById('btn-tween-curves');if(b)b.classList.toggle('active',state.showTweenCurves);
-    renderTweenCurveStrips();
+    // A row's HEIGHT (not just the strip drawn inside it) now depends on
+    // this flag — that decision is made in renderTimeline()'s own row-
+    // building loop (which calls renderTweenCurveStrips() itself at the
+    // end), so a bare renderTweenCurveStrips() here left every row at its
+    // stale height on toggle (confirmed empirically: strip drew at the new
+    // 92px height but the .frow itself stayed 34px, clipping it). Mirror
+    // the same height on the layer panel's .lrow (CLAUDE.md §11).
+    renderTimeline();
+    renderLayerList();
   },
   toggleGhostAll:function(){
     state.ghostAllFrames=!state.ghostAllFrames;
@@ -2389,6 +2397,14 @@ function renderTimeline(){
     // markers rendered in Motion and vanished here). Same attribute, same
     // meaning, both modes — the row already knows its index.
     row.dataset.layer=li;
+    // Tween curve strips (below) need this row taller than the default
+    // ROW_H when it has a tween span to show — plain document flow handles
+    // the actual reflow of rows below it for free, no cumulative-height
+    // bookkeeping needed HERE. frameGridRowHeight/layerCurveRowExtraHeight
+    // are the single source of truth other pixel-math consumers (the
+    // cross-layer keyframe-drag target detection below) must also read from.
+    var extraH=layerCurveRowExtraHeight(li);
+    if(extraH>0)row.style.height=(ROW_H+extraH)+'px';
     // Collapsed Stroke/Fill/Shadow head row: its OWN strokes are what the
     // 'fl'/'hl' (full/hollow) keyframe dot would normally reflect, but the
     // head is whichever member happens to render topmost (often Shadow,
@@ -2442,19 +2458,85 @@ function renderTimeline(){
 }
 // ---- TWEEN EASING CURVE STRIPS (toggle: btn-tween-curves) ----
 // Purely additive display, complements the global/per-pair easing system —
-// never touched by generateTweens(). A thin sparkline of the EFFECTIVE
-// curve (per-pair override if one exists, else the global fallback — same
-// getEasingForPair tweens.js itself uses) along the bottom of every layer
-// row, for each tween span (a keyframe pair with at least one generated
-// isInterpolated frame between them). Clicking a segment's own strip opens
-// a floating draggable-point editor right there (openTweenCurveInset,
-// below) — a real distinct editing surface under the layer, not the tiny
-// fixed right-panel widget, per explicit request.
+// never touched by generateTweens(). Was originally a thin 8px sparkline
+// per tween span; per explicit request ("j'aimerais que ça soit
+// visuellement dans le genre ça ouvre le panneau avec les courbes mais pour
+// toutes les clés de la timeline") it's now the SAME rich draggable-point
+// editor as the floating popup (openTweenCurveInset, below), but persistent
+// and inline — every tween span on a qualifying layer's row, all at once,
+// no click needed to open anything. Only layers that actually have a tween
+// span grow taller to fit it (TWEEN_ROW_EXTRA_H); a layer with no tween
+// (e.g. no keyframes generated between its keys) stays at the normal
+// ROW_H, non-overlapping, per the reference screenshot.
 function layerKeyframeList(li){
   var ld=state.layers[li];if(!ld)return[];
   var keys=[];
   for(var i=0;i<state.totalFrames;i++)if(ld.frames[i]&&ld.frames[i].isKeyframe)keys.push(i);
   return keys;
+}
+// [fA,fB] pairs of consecutive keyframes on layer li with at least one
+// generated isInterpolated frame between them — the single definition of
+// "this layer has a tween to show", shared by the row-height decision below
+// and the strip renderer, so the two can never drift out of phase.
+function layerTweenSpans(li){
+  var ld=state.layers[li];if(!ld)return[];
+  var keys=layerKeyframeList(li);
+  var spans=[];
+  for(var k=0;k<keys.length-1;k++){
+    var fA=keys[k],fB=keys[k+1];
+    var hasTween=false;
+    for(var fi=fA+1;fi<fB;fi++){if(ld.frames[fi]&&ld.frames[fi].isInterpolated){hasTween=true;break;}}
+    if(hasTween)spans.push([fA,fB]);
+  }
+  return spans;
+}
+function layerHasTweenSpans(li){return layerTweenSpans(li).length>0;}
+var TWEEN_ROW_EXTRA_H=92;
+// Extra pixel height a layer's .frow/.lrow reserves for its curve strip —
+// 0 unless the toggle is on AND this layer actually has a tween to show.
+function layerCurveRowExtraHeight(li){
+  if(!state.showTweenCurves)return 0;
+  return layerHasTweenSpans(li)?TWEEN_ROW_EXTRA_H:0;
+}
+// A layer's CURRENT total row height in #frame-grid — the single source of
+// truth every pixel-math consumer below (and renderTimeline's own row
+// height, and renderLayerList's mirrored .lrow) must read from. Reduces to
+// the plain ROW_H constant whenever no row is taller, so anything built on
+// top of it is byte-for-byte identical to before this feature existed in
+// that (default) case.
+function frameGridRowHeight(li){return ROW_H+layerCurveRowExtraHeight(li);}
+// Cumulative pixel offset from the grid's top to the TOP of layer li's own
+// row. Rows render top-to-bottom from the HIGHEST layer index (see
+// computeLayerRenderOrder/renderTimeline's own comment), and a row can now
+// be taller than ROW_H, so this can no longer be a flat li*ROW_H
+// multiplication — this + layerIndexAtGridY below replace that formula
+// everywhere a pixel position needs to know which/where a layer's row is,
+// WITHOUT touching the rows' own rendering (that's plain document flow,
+// the browser reflows it for free when a .frow's height changes).
+function visualTopOfLayer(li){
+  var n=state.layers.length,acc=0;
+  for(var li2=n-1;li2>li;li2--)acc+=frameGridRowHeight(li2);
+  return acc;
+}
+function frameGridTotalRowsHeight(){
+  var n=state.layers.length,total=0;
+  for(var i=0;i<n;i++)total+=frameGridRowHeight(i);
+  return total;
+}
+// Reverse of visualTopOfLayer: which layer's row a given yRel (pixels from
+// the grid top, past the camera row) falls in. Replaces
+// `state.layers.length-1-Math.floor(yRel/ROW_H)` — identical result when
+// every row is still ROW_H tall.
+function layerIndexAtGridY(yRel){
+  var n=state.layers.length;
+  if(n===0)return 0;
+  var y=Math.max(0,yRel),acc=0;
+  for(var p=0;p<n;p++){
+    var li=n-1-p,h=frameGridRowHeight(li);
+    if(y<acc+h)return li;
+    acc+=h;
+  }
+  return 0;
 }
 function renderTweenCurveStrips(){
   var grid=document.getElementById('frame-grid');
@@ -2468,127 +2550,53 @@ function renderTweenCurveStrips(){
     if(!firstCell||firstCell.dataset.layer===undefined)return;
     var li=parseInt(firstCell.dataset.layer);
     if(isNaN(li)||!state.layers[li])return;
-    var ld=state.layers[li];
-    var keys=layerKeyframeList(li);
-    if(keys.length<2)return;
-    var STRIP_H=8;
-    var svg=null;
-    for(var k=0;k<keys.length-1;k++){
-      var fA=keys[k],fB=keys[k+1];
-      var hasTween=false;
-      for(var fi=fA+1;fi<fB;fi++){if(ld.frames[fi]&&ld.frames[fi].isInterpolated){hasTween=true;break;}}
-      if(!hasTween)continue;
-      if(!svg){
-        svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
-        svg.setAttribute('class','tw-curve-strip');
-        svg.style.cssText='position:absolute;left:0;bottom:0;width:'+(state.totalFrames*FC)+'px;height:'+STRIP_H+'px;pointer-events:none;';
-        row.style.position='relative';
-        row.appendChild(svg);
-      }
-      var evalFn=getEasingForPair(li,fA,fB);
+    var spans=layerTweenSpans(li);
+    if(!spans.length)return;
+    var wrap=document.createElement('div');
+    wrap.className='tw-curve-strip';
+    wrap.style.cssText='position:absolute;left:0;bottom:0;width:'+(state.totalFrames*FC)+'px;height:'+TWEEN_ROW_EXTRA_H+'px;background:rgba(0,0,0,.18);border-top:1px solid rgba(255,255,255,.08);';
+    row.style.position='relative';
+    row.appendChild(wrap);
+    spans.forEach(function(span){
+      var fA=span[0],fB=span[1];
       var x0=fA*FC,w=(fB-fA)*FC;
-      var N=Math.max(4,Math.min(24,fB-fA));
-      var pts=[];
-      for(var s=0;s<=N;s++){
-        var t=s/N;
-        var y=Math.max(0,Math.min(1,evalFn(t)));
-        pts.push((x0+t*w).toFixed(1)+','+(STRIP_H-1-y*(STRIP_H-2)).toFixed(1));
-      }
-      var custom=!!(state.tweenEasing&&state.tweenEasing[li+':'+fA+'-'+fB]&&state.tweenEasing[li+':'+fA+'-'+fB].points);
-      var poly=document.createElementNS('http://www.w3.org/2000/svg','polyline');
-      poly.setAttribute('points',pts.join(' '));
-      poly.setAttribute('fill','none');
-      poly.setAttribute('stroke',custom?'#4a9eff':'rgba(255,255,255,.35)');
-      poly.setAttribute('stroke-width',custom?'2':'1.2');
-      poly.style.cursor='pointer';
-      poly.style.pointerEvents='stroke';
-      // The thin strip is just an indicator — clicking it opens a proper
-      // draggable-point editor right there, floating over the timeline
-      // (not the small fixed panel far away on the right), per explicit
-      // request: "une partie distincte qui s'ouvre dessous... par un
-      // encart qui apparaît", with points easy to grab and drag directly.
-      poly.addEventListener('click',(function(l,a,b,r){return function(e){
-        e.stopPropagation();
-        openTweenCurveInset(l,a,b);
-      };})(li,fA,fB));
-      svg.appendChild(poly);
-    }
+      var box=document.createElement('div');
+      box.className='tw-curve-strip-box';
+      box.style.cssText='position:absolute;left:'+x0+'px;top:0;width:'+w+'px;height:100%;box-sizing:border-box;border-right:1px solid rgba(255,255,255,.06);';
+      var pad=6;
+      // Same builder as the floating popup (openTweenCurveInset) — one
+      // implementation of the drag/redraw/regen logic, see its own header
+      // comment.
+      var built=buildTweenCurveSVG(li,fA,fB,Math.max(20,w-2*pad),TWEEN_ROW_EXTRA_H-2*pad);
+      built.svg.style.position='absolute';built.svg.style.left=pad+'px';built.svg.style.top=pad+'px';
+      box.appendChild(built.svg);
+      wrap.appendChild(box);
+    });
   });
 }
 window.renderTweenCurveStrips=renderTweenCurveStrips;
-// ---- FLOATING INLINE CURVE EDITOR ("encart") for one tween span ----
-// A self-contained draggable-point curve editor (independent of the
-// shared #curve-canvas singleton in ui.js, which can only show ONE curve
-// at a time and lives in a fixed right-panel spot) — appended to
-// document.body so it truly floats ON TOP of the timeline regardless of
-// #frame-grid's own scroll/overflow clipping, anchored right where the
-// clicked tween segment is. Same underlying data (state.tweenEasing) and
-// evaluator (evalPointsCurve) as the main widget, so both stay in sync;
-// this is just a second, quicker editing surface for in-place tweaks.
-var _tweenCurveInset=null;
-function closeTweenCurveInset(){
-  if(!_tweenCurveInset)return;
-  document.removeEventListener('pointerdown',_tweenCurveInset.outsideHandler,true);
-  _tweenCurveInset.el.remove();
-  _tweenCurveInset=null;
-}
-// Finds the DOM row for layer `li` in the frame-grid — used to align the
-// inset to the tween span's actual on-screen position (not a fixed popup
-// size dropped near a click point, per explicit follow-up: "il faut
-// vraiment que ça soit une partie distincte qui s'ouvre dessous... par un
-// encart", with the reference screenshot showing the curve box spanning
-// EXACTLY the keyframe-to-keyframe width, right under that layer's row).
-function findLayerRow(li){
-  var rows=document.querySelectorAll('#frame-grid .frow');
-  for(var i=0;i<rows.length;i++){
-    var fc=rows[i].querySelector('.fc');
-    if(fc&&parseInt(fc.dataset.layer,10)===li)return rows[i];
-  }
-  return null;
-}
-function openTweenCurveInset(li,fA,fB){
-  closeTweenCurveInset();
-  var row=findLayerRow(li);
-  if(!row)return;
+// ---- SHARED CURVE-EDITOR SVG (draggable control points) ----
+// Builds the actual draggable-point curve editor surface — used by BOTH the
+// persistent inline strips above and the floating popup below, so there is
+// exactly one implementation of the drag/redraw/regen logic (CLAUDE.md §3:
+// duplicated logic drifts out of phase). Reads/writes the same
+// state.tweenEasing[li+':'+fA+'-'+fB] entry either way, so editing a span
+// inline and via the popup (right-click a cell → "Éditer la courbe de ce
+// tween…", still available when the toggle is off) always agree.
+function buildTweenCurveSVG(li,fA,fB,svgW,svgH){
   var key=li+':'+fA+'-'+fB;
   if(!state.tweenEasing)state.tweenEasing={};
   var seg=state.tweenEasing[key]=state.tweenEasing[key]||{};
   if(!seg.points||!seg.points.length){
     // Starts from whatever curve is CURRENTLY effective for this pair
-    // (global fallback), not a hardcoded default — same convention as
-    // ui.js's tweenSegCurve() used before this rewrite.
+    // (global fallback), not a hardcoded default.
     var base=(window._curveEditor&&window._curveEditor.getState().points)||[{x:0,y:0},{x:.42,y:0},{x:.58,y:1},{x:1,y:1}];
     seg.points=base.map(function(p){return{x:p.x,y:p.y};});
   }
-  var rowRect=row.getBoundingClientRect();
-  var HDR=20,pad=10;
-  var W=Math.max(140,(fB-fA)*FC);
-  var H=110;
-  var left=Math.max(4,Math.min(window.innerWidth-W-4,rowRect.left+fA*FC));
-  var top=rowRect.bottom+2;
-  var svgW=W-2*pad,svgH=H-HDR-pad;
-  var box=document.createElement('div');
-  box.className='tw-curve-inset';
-  box.style.cssText='position:fixed;left:'+Math.round(left)+'px;top:'+Math.round(top)+'px;width:'+W+'px;height:'+H+'px;background:rgba(13,17,23,.85);border:2px solid #4a9eff;border-radius:3px;box-shadow:0 6px 24px rgba(0,0,0,.55);z-index:5000;padding:'+pad+'px;box-sizing:border-box;font-family:inherit;';
-  box.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;height:'+HDR+'px">'
-    +'<span style="font-size:10px;color:#9ca3af">Tween '+(fA+1)+' → '+(fB+1)+'</span>'
-    +'<div style="display:flex;gap:8px;align-items:center">'
-    +'<button class="tw-ci-reset" style="background:none;border:none;color:#9ca3af;cursor:pointer;font-size:9px;text-decoration:underline;padding:0" title="Revenir à la courbe globale pour cette paire">réinitialiser</button>'
-    +'<button class="tw-ci-close" style="background:none;border:none;color:#9ca3af;cursor:pointer;font-size:14px;line-height:1;padding:0" title="Fermer">✕</button>'
-    +'</div></div>';
-  box.querySelector('.tw-ci-close').addEventListener('click',function(e){e.stopPropagation();closeTweenCurveInset();});
-  box.querySelector('.tw-ci-reset').addEventListener('click',function(e){
-    e.stopPropagation();
-    delete state.tweenEasing[key];
-    closeTweenCurveInset();
-    onTweenPairCurveChanged(li,fA);
-  });
   var svgNS='http://www.w3.org/2000/svg';
   var svg=document.createElementNS(svgNS,'svg');
   svg.setAttribute('width',svgW);svg.setAttribute('height',svgH);
   svg.style.cssText='display:block;cursor:crosshair;touch-action:none;';
-  box.appendChild(svg);
-  document.body.appendChild(box);
 
   var ipad=6;
   function toSX(px){return ipad+px*(svgW-2*ipad);}
@@ -2657,6 +2665,71 @@ function openTweenCurveInset(li,fA,fB){
     redraw();regenNow();
   });
   redraw();
+  return {svg:svg,redraw:redraw,seg:seg};
+}
+// ---- FLOATING INLINE CURVE EDITOR ("encart") for one tween span ----
+// A self-contained draggable-point curve editor (independent of the
+// shared #curve-canvas singleton in ui.js, which can only show ONE curve
+// at a time and lives in a fixed right-panel spot) — appended to
+// document.body so it truly floats ON TOP of the timeline regardless of
+// #frame-grid's own scroll/overflow clipping, anchored right where the
+// clicked tween segment is. Same underlying data (state.tweenEasing) and
+// evaluator (evalPointsCurve) as the main widget, so both stay in sync;
+// this is just a second, quicker editing surface for in-place tweaks.
+var _tweenCurveInset=null;
+function closeTweenCurveInset(){
+  if(!_tweenCurveInset)return;
+  document.removeEventListener('pointerdown',_tweenCurveInset.outsideHandler,true);
+  _tweenCurveInset.el.remove();
+  _tweenCurveInset=null;
+}
+// Finds the DOM row for layer `li` in the frame-grid — used to align the
+// inset to the tween span's actual on-screen position (not a fixed popup
+// size dropped near a click point, per explicit follow-up: "il faut
+// vraiment que ça soit une partie distincte qui s'ouvre dessous... par un
+// encart", with the reference screenshot showing the curve box spanning
+// EXACTLY the keyframe-to-keyframe width, right under that layer's row).
+function findLayerRow(li){
+  var rows=document.querySelectorAll('#frame-grid .frow');
+  for(var i=0;i<rows.length;i++){
+    var fc=rows[i].querySelector('.fc');
+    if(fc&&parseInt(fc.dataset.layer,10)===li)return rows[i];
+  }
+  return null;
+}
+function openTweenCurveInset(li,fA,fB){
+  closeTweenCurveInset();
+  var row=findLayerRow(li);
+  if(!row)return;
+  var key=li+':'+fA+'-'+fB;
+  var rowRect=row.getBoundingClientRect();
+  var HDR=20,pad=10;
+  var W=Math.max(140,(fB-fA)*FC);
+  var H=110;
+  var left=Math.max(4,Math.min(window.innerWidth-W-4,rowRect.left+fA*FC));
+  var top=rowRect.bottom+2;
+  var svgW=W-2*pad,svgH=H-HDR-pad;
+  var box=document.createElement('div');
+  box.className='tw-curve-inset';
+  box.style.cssText='position:fixed;left:'+Math.round(left)+'px;top:'+Math.round(top)+'px;width:'+W+'px;height:'+H+'px;background:rgba(13,17,23,.85);border:2px solid #4a9eff;border-radius:3px;box-shadow:0 6px 24px rgba(0,0,0,.55);z-index:5000;padding:'+pad+'px;box-sizing:border-box;font-family:inherit;';
+  box.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;height:'+HDR+'px">'
+    +'<span style="font-size:10px;color:#9ca3af">Tween '+(fA+1)+' → '+(fB+1)+'</span>'
+    +'<div style="display:flex;gap:8px;align-items:center">'
+    +'<button class="tw-ci-reset" style="background:none;border:none;color:#9ca3af;cursor:pointer;font-size:9px;text-decoration:underline;padding:0" title="Revenir à la courbe globale pour cette paire">réinitialiser</button>'
+    +'<button class="tw-ci-close" style="background:none;border:none;color:#9ca3af;cursor:pointer;font-size:14px;line-height:1;padding:0" title="Fermer">✕</button>'
+    +'</div></div>';
+  box.querySelector('.tw-ci-close').addEventListener('click',function(e){e.stopPropagation();closeTweenCurveInset();});
+  box.querySelector('.tw-ci-reset').addEventListener('click',function(e){
+    e.stopPropagation();
+    delete state.tweenEasing[key];
+    closeTweenCurveInset();
+    onTweenPairCurveChanged(li,fA);
+  });
+  // Same builder as the persistent inline strips (renderTweenCurveStrips) —
+  // see its header comment for why this is shared rather than duplicated.
+  var built=buildTweenCurveSVG(li,fA,fB,svgW,svgH);
+  box.appendChild(built.svg);
+  document.body.appendChild(box);
   var outsideHandler=function(e){if(!box.contains(e.target))closeTweenCurveInset();};
   setTimeout(function(){document.addEventListener('pointerdown',outsideHandler,true);},0);
   _tweenCurveInset={el:box,outsideHandler:outsideHandler};
@@ -3211,7 +3284,7 @@ document.getElementById('frame-grid').addEventListener('mousemove',function(e){
   // renderTimeline), so the row under the cursor maps to a flipped index.
   // yRel is measured past the camera row (camOff), which is always
   // prepended before any real layer row and isn't part of state.layers.
-  var toL=Math.max(0,Math.min(state.layers.length-1,state.layers.length-1-Math.floor(yRel/ROW_H)));
+  var toL=layerIndexAtGridY(yRel);
 
   if(!_tlDrag.moved){
     var dist=Math.abs(toF-_tlDrag.startF)+Math.abs(toL-_tlDrag.startL);
@@ -3270,7 +3343,7 @@ document.getElementById('frame-grid').addEventListener('mousemove',function(e){
   // keyframe point is following the cursor across the timeline, while the
   // ghost cell below still shows the precise snapped drop target.
   var clampedX=Math.max(0,Math.min(state.totalFrames*FC,xRel));
-  var clampedY=Math.max(12,Math.min(state.layers.length*ROW_H-12,yRel));
+  var clampedY=Math.max(12,Math.min(frameGridTotalRowsHeight()-12,yRel));
   _tlDrag.cursorDot.style.left=(clampedX+gridOffLeft)+'px';
   _tlDrag.cursorDot.style.top=(clampedY+camOff+gridOffTop)+'px';
 
@@ -3279,8 +3352,8 @@ document.getElementById('frame-grid').addEventListener('mousemove',function(e){
     var gl=s.layer+offL,gf=s.frame+offF;
     if(gl<0||gl>=state.layers.length||gf<0||gf>=state.totalFrames)return;
     var d=document.createElement('div');
-    d.style.cssText='position:absolute;width:'+FC+'px;height:'+ROW_H+'px;background:rgba(74,158,255,.35);border:1px solid rgba(74,158,255,.7);border-radius:2px;box-sizing:border-box;';
-    d.style.left=(gf*FC+gridOffLeft)+'px';d.style.top=((state.layers.length-1-gl)*ROW_H+camOff+gridOffTop)+'px';
+    d.style.cssText='position:absolute;width:'+FC+'px;height:'+frameGridRowHeight(gl)+'px;background:rgba(74,158,255,.35);border:1px solid rgba(74,158,255,.7);border-radius:2px;box-sizing:border-box;';
+    d.style.left=(gf*FC+gridOffLeft)+'px';d.style.top=(visualTopOfLayer(gl)+camOff+gridOffTop)+'px';
     var fr=state.layers[s.layer].frames[s.frame];
     if(fr&&fr.isKeyframe){
       var dot=document.createElement('div');
@@ -3729,6 +3802,15 @@ function renderLayerList(frameOnly){
     var i=entry.idx;
     var ld=state.layers[i];var row=document.createElement('div');row.className='lrow'+(ld.symbolId?' is-comp':'')+(ld.folderId?' in-folder':'')+(ld.linkGroupId?' in-linkgroup':'');row.dataset.layer=i;if(i===state.activeLayerIdx)row.classList.add('act');
     if(_layerSel.indexOf(i)>=0)row.classList.add('sel');
+    // Mirror renderTimeline's per-row tween-curve extra height exactly (same
+    // layerCurveRowExtraHeight source) — the #layer-list/#frame-grid
+    // alignment invariant (CLAUDE.md §11) requires both sides reserve the
+    // same height for any row. align-items:center (the row's own CSS)
+    // would otherwise vertically center the icons in the middle of the
+    // taller box; pin them to the top instead so they still line up with
+    // the frame-grid's own (unchanged, still ROW_H-tall) keyframe cells.
+    var lrowExtraH=layerCurveRowExtraHeight(i);
+    if(lrowExtraH>0){row.style.height=(ROW_H+lrowExtraH)+'px';row.style.alignItems='flex-start';row.style.paddingTop='8px';}
     // Every row reserves the SAME arrow slot a folder header uses, even
     // when it does nothing here — otherwise every other icon shifts left
     // by one slot's width depending on whether the row above happens to be
