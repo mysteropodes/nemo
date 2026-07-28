@@ -1480,7 +1480,7 @@ function updateUI(frameOnly){
   window._totalF=state.totalFrames;window._waIn=state.waIn;window._waOut=state.waOut;window._curFrame=state.currentFrame;
   window.updateWaBar();window.updateOmMarkers(state.currentFrame,state.totalFrames);
   if(frameOnly)updatePlayhead();else renderTimeline();
-  renderLayerList();updateCompInstancePanel();updateFootagePanel();updateSelPropsPanel();updateFsSelPanel();updateRevisionPanel();updateTextActionsPanel();if(window.updateEffectsPanel)window.updateEffectsPanel();updatePropsContext();
+  renderLayerList(frameOnly);updateCompInstancePanel();updateFootagePanel();updateSelPropsPanel();updateFsSelPanel();updateRevisionPanel();updateTextActionsPanel();if(window.updateEffectsPanel)window.updateEffectsPanel();updatePropsContext();
 }
 // Team review Accept/Reject panel — shown when exactly one selected item is
 // either an active (non-ghost) revision (data.revisionParentId) or a
@@ -3505,7 +3505,16 @@ function paintFillSwatches(v){
   // alpha rides in dataset.hex8 above.
   var fhex=document.getElementById('p-fill-hex');if(fhex&&document.activeElement!==fhex)fhex.value=hexDisplayValue(v);
 }
-function renderLayerList(){
+// `frameOnly` — same contract as updateUI's: nothing but state.currentFrame
+// changed. Animation 2D's rows are frame-INDEPENDENT (name, colour dot,
+// visibility, lock, solo — not one state.currentFrame reference in this
+// function's own 240 lines), so a scrub was rebuilding every row for
+// nothing: 4.2ms per tick at 40 layers. Motion's rows are NOT — each
+// property track prints its VALUE at the playhead — so the decision lives
+// here, next to the mode branch that already exists, rather than in the
+// caller.
+function renderLayerList(frameOnly){
+  if(frameOnly&&state.appMode!=='motion')return;
   var _scroll=_tlScrollSnapshot(); // see _tlScrollSnapshot — same wipe, same jump
   var list=document.getElementById('layer-list');list.innerHTML='';
   // Motion mode: expandable Transform property rows instead of the plain
