@@ -3472,6 +3472,31 @@
     });
     return rows;
   }
+  // Hands the gesture to layer-inout.js's existing group-bar drag instead of
+  // teaching the skew engine a second entry type: re-dispatching the press on
+  // the first selected layer's own bar means this is literally the same code
+  // path as marquee-selecting those bars and dragging one, so clamping,
+  // keyframe carry-along, time-link reconciliation and undo all behave
+  // identically rather than being reimplemented here and drifting.
+  // Skew and Space genuinely need keys — there is no bar equivalent of
+  // "spread these apart in time by their own frames". They used to return
+  // silently, which reads exactly like the tool being broken; say why.
+  function noKeysGuard(rows) {
+    if (rows.some(function (r) { return r.length; })) return true;
+    if (window.showToast) showToast('Aucune clé sur ces calques — pose des clés, ou glisse le centre de la boîte pour décaler les calques dans le temps');
+    return false;
+  }
+
+  function dragLayerBars(e) {
+    if (!window.SMLayerInOut || !SMLayerInOut.setBarSelection || !_layerSel.length) return;
+    SMLayerInOut.setBarSelection(_layerSel.map(function (li) { return { li: li, part: 'both' }; }));
+    var bar = document.querySelector('#frame-grid .frow[data-layer="' + _layerSel[0] + '"] .layer-inout-bar');
+    if (!bar) return;
+    bar.dispatchEvent(new MouseEvent('mousedown', {
+      bubbles: true, cancelable: true, button: 0, clientX: e.clientX, clientY: e.clientY,
+    }));
+  }
+
   function updateLayerStaggerBox() {
     if (state.appMode !== 'motion' || _layerSel.length < 2) { removeLayerStaggerBox(); return; }
     var spacers = _layerSel.map(function (li) { return document.querySelector('#frame-grid .frow[data-layer="' + li + '"]'); }).filter(Boolean);
@@ -3487,7 +3512,18 @@
     if (!_layerStaggerBoxEl) {
       _layerStaggerBoxEl = document.createElement('div'); _layerStaggerBoxEl.className = 'motion-keysel-box';
       document.body.appendChild(_layerStaggerBoxEl);
-      addMoveFill(_layerStaggerBoxEl, function (e, mode) { startSkewDrag(buildLayerRows(), mode, e); });
+      addMoveFill(_layerStaggerBoxEl, function (e, mode) {
+        var rows = buildLayerRows();
+        // No key anywhere in the selection — the box's key engine has
+        // nothing to move, so the drag did literally nothing, silently
+        // (2026-07-27: "le glisser horizontalement ne marche pas sur les
+        // calques"; the layers in that report were freshly created, so no
+        // property had a key yet). What there IS to move horizontally then
+        // is the layers' own presence in time, which is exactly what the
+        // in/out bars filling these rows show.
+        if (!rows.some(function (r) { return r.length; })) { dragLayerBars(e); return; }
+        startSkewDrag(rows, mode, e);
+      });
       // Space on the LAYER box, which is where the reference actually
       // demonstrates it ("select layers across multiple rows, drag from the
       // right edge to space them out"): spreads the selected layers' keys
@@ -3497,6 +3533,7 @@
       // exactly the spread.
       addSpaceEdges(_layerStaggerBoxEl, function (e, mode) {
         var rows = buildLayerRows();
+        if (!noKeysGuard(rows)) return;
         var f0 = Infinity, f1 = -Infinity;
         rows.forEach(function (r) { r.forEach(function (en) { f0 = Math.min(f0, en.orig); f1 = Math.max(f1, en.orig); }); });
         if (!(f1 > f0)) { if (window.showToast) showToast('Il faut des clés sur au moins 2 frames différentes pour les espacer'); return; }
@@ -3504,7 +3541,7 @@
       });
       addStaggerEdges(_layerStaggerBoxEl, function (e, mode) {
         var rows = buildLayerRows();
-        if (rows.length < 2) return;
+        if (rows.length < 2 || !noKeysGuard(rows)) return;
         startSkewDrag(rows, mode, e);
       });
     }
