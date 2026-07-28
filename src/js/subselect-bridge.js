@@ -102,6 +102,33 @@
     }
     if (bestNh) {
       pushUndo();
+      // Promote a HELD frame to a real keyframe before touching geometry.
+      // Without this, editing vertices on a frame that merely inherits an
+      // earlier keyframe was silently DISCARDED: saveActiveLayerFrame (app.js)
+      // returns early when the frame is neither a keyframe nor interpolated,
+      // so the edit lived only in the live Paper items until the next
+      // loadFrame threw it away. Reported 2026-07-28 ("quand je modifie les
+      // vecteurs d'une clé prolongée [...] ça ne modifie pas la clé").
+      //
+      // This also makes subselect answer the same way the Draw tool already
+      // did — drawing on a held frame has always created a keyframe. Same
+      // gesture class, same answer, nothing lost either way.
+      var _wasKey = (function () {
+        var f = state.layers[state.activeLayerIdx].frames[state.currentFrame];
+        return !!(f && (f.isKeyframe || f.isInterpolated));
+      })();
+      ensureKeyframe();
+      if (!_wasKey) {
+        // ensureKeyframe -> loadFrame rebuilds the layer's children, so every
+        // Paper reference captured above is now stale. Re-resolve by INDEX
+        // (bestNh.segIndex stays valid — same geometry, new objects), exactly
+        // as select-bridge's beginDistort does after its own ensureKeyframe.
+        selectedPaths = state.selectedStrokeIndices
+          .map(function (i) { return userLayers[state.activeLayerIdx].children[i]; })
+          .filter(Boolean);
+        if (!selectedPaths.length) return;
+        renderNodeHandles();
+      }
       _nodeDrag.active = true; _nodeDrag.path = selectedPaths[0]; _nodeDrag.segIndex = bestNh.segIndex;
       _nodeDrag.dragStartPointer = pt.clone(); _nodeDrag.appliedDelta = new Point(0, 0);
       // grabbing one of several marquee-selected anchors drags them all
