@@ -116,7 +116,7 @@
     // are used today (imported once via images.js, not interactively
     // resized), revisit if that changes.
     if (!raster.loaded || !raster.canvas) return null; // not decoded yet — try again next tick
-    var id = raster.data && raster.data.src;
+    var id = engineIdFor(raster);
     if (!id) return null;
     if (registeredImageIds[id]) return id;
     var cv = raster.canvas;
@@ -124,6 +124,49 @@
     var pixels = ctx.getImageData(0, 0, cv.width, cv.height).data;
     engine.register_image(id, pixels, cv.width, cv.height);
     registeredImageIds[id] = true;
+    return id;
+  }
+
+  // ---- ENGINE IMAGE ID (2026-07-28) ----
+  // The id handed to the engine used to BE the raster's data URL. The engine
+  // only ever uses it as a HashMap key — it never reads it — but every scene
+  // item carried the whole base64 string, so buildSceneJson emitted it once
+  // per visible raster on EVERY render. Measured on a real project: 24
+  // rasters produced a 4.6MB scene JSON and a 9.3ms full render, which is
+  // what made a Motion drag (one full render per pointermove) unusable while
+  // the same drag in Animation 2D stayed smooth on its cached base prefix.
+  //
+  // A short content-derived id keeps every property that mattered: identical
+  // pixels still collapse to one key, so the GPU texture cache and
+  // registeredImageIds keep deduplicating exactly as before. Namespaced
+  // 'i1:' because the engine's id space is FLAT and already holds
+  // 'nv:<layer>' and the reference-bridge's 'ref:*' — a bare hash could
+  // collide with one of those and swap a video frame for artwork.
+  //
+  // Memoised per distinct source string, not per raster: loadFrame rebuilds
+  // every Raster object each tick, so recomputing would hash megabytes of
+  // base64 per frame — exactly the cost being removed. Collisions are
+  // eliminated rather than made unlikely: on a hash hit the stored source is
+  // compared and a suffix added if it differs, so two images can never
+  // silently become one.
+  var _engineIdBySrc = new Map(), _engineIdSrc = new Map();
+  function _hashSrc(str) {
+    var h1 = 0x811c9dc5, h2 = 0x01000193;
+    for (var i = 0; i < str.length; i++) {
+      var c = str.charCodeAt(i);
+      h1 ^= c; h1 = (h1 * 0x01000193) >>> 0;
+      h2 = (h2 ^ c) >>> 0; h2 = (h2 * 0x85ebca6b) >>> 0;
+    }
+    return str.length.toString(36) + '-' + h1.toString(36) + '-' + h2.toString(36);
+  }
+  function engineIdFor(raster) {
+    var src = raster && raster.data && raster.data.src;
+    if (!src) return null;
+    var known = _engineIdBySrc.get(src);
+    if (known) return known;
+    var base = 'i1:' + _hashSrc(src), id = base, n = 1;
+    while (_engineIdSrc.has(id) && _engineIdSrc.get(id) !== src) { n++; id = base + '#' + n; }
+    _engineIdBySrc.set(src, id); _engineIdSrc.set(id, src);
     return id;
   }
 
@@ -1736,6 +1779,11 @@
     setPressureCursor: setPressureCursor,
     setPenPreview: setPenPreview,
     registerImagePixels: registerImagePixels,
+    // ONE definition of raster->engine image identity. bitmap-brush.js
+    // re-uploads pixels under this id during erase and live restamp; if it
+    // derived its own, the scene would ask for a key nobody wrote to and
+    // the texture would silently stop updating (CLAUDE.md §1).
+    engineIdFor: engineIdFor,
     registerImageRaw: registerImageRaw,
     // Custom WGSL effects (2026-07) — see custom-effects.js's own
     // registerAllCustomEffects for why every definition gets re-sent here
