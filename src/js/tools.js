@@ -1371,7 +1371,25 @@ function canEditActiveLayer(){
 }
 window.canEditActiveLayer=canEditActiveLayer;
 window.editRefusalReason=editRefusalReason;
-function ensureKeyframe(){var ldk=state.layers[state.activeLayerIdx];if(!canEditActiveLayer())return;var curF=ldk.frames[state.currentFrame];if(!curF.isKeyframe&&!curF.isInterpolated){var effStrokes=JSON.parse(JSON.stringify(getEffectiveStrokes(state.activeLayerIdx,state.currentFrame)));curF.isKeyframe=true;curF.strokes=effStrokes;loadFrame(state.currentFrame);syncLinkedKeyframeFolder(state.activeLayerIdx,state.currentFrame);}}
+// Promotes a HELD frame (one that merely inherits an earlier keyframe) into a
+// real keyframe, so the edit about to happen can be persisted at all —
+// saveActiveLayerFrame ignores frames that are neither keyframe nor
+// interpolated.
+//
+// `blank` decides what the new keyframe STARTS from, and the two answers are
+// not interchangeable (2026-07-28 feedback, screenshots): drawing a small
+// circle on a held frame used to inherit the big circle from frame 1 too, so
+// the "new drawing" carried the old one along. Traditional 2D animation says
+// a new frame is a NEW DRAWING — if you want both shapes together you go edit
+// the keyframe itself. So content-CREATING tools (draw, pen, line/rect/
+// ellipse) pass blank=true.
+//
+// Everything else must NOT: the eraser needs the strokes it is about to cut,
+// the paint bucket needs the walls it fills between, select/subselect need the
+// very items being transformed. Handing those an empty frame would delete the
+// subject of the edit. That asymmetry is the whole point of the flag — do not
+// "simplify" it into one behaviour.
+function ensureKeyframe(blank){var ldk=state.layers[state.activeLayerIdx];if(!canEditActiveLayer())return;var curF=ldk.frames[state.currentFrame];if(!curF.isKeyframe&&!curF.isInterpolated){var effStrokes=blank?[]:JSON.parse(JSON.stringify(getEffectiveStrokes(state.activeLayerIdx,state.currentFrame)));curF.isKeyframe=true;curF.strokes=effStrokes;loadFrame(state.currentFrame);syncLinkedKeyframeFolder(state.activeLayerIdx,state.currentFrame);}}
 
 // ---- VECTOR FILL ENGINE ----
 // The fill of an area IS just the closed loop formed by the strokes around
@@ -4836,7 +4854,7 @@ function onMouseDown(event){
     // Same both-eyes-off guard as draw-bridge.js's commitStroke — never
     // commit fully invisible ink.
     if(!state.strokeEnabled&&!state.fillEnabled){showToast('Stroke et Fill désactivés — rien à dessiner');return;}
-    pushUndo();ensureKeyframe();layer.activate();
+    pushUndo();ensureKeyframe(true);layer.activate();
     if(state.vectorBrush){
       _vbLastPenPressure=null;_vbResetPressureFilter();stabQueue=[event.point.clone()];_vb.pts=[event.point.clone()];_vb.widths=[vbPressureOf(event)];_vb.lastT=Date.now();_vb.lastPt=event.point.clone();
       currentPath=new Path();currentPath.fillColor=state.strokeEnabled?state.strokeColor:state.fillColor;currentPath.strokeColor=null;currentPath.opacity=state.opacity/100;
@@ -4857,7 +4875,7 @@ function onMouseDown(event){
     _pen.lastClickTime=now;_pen.lastClickPt=event.point.clone();
     if(isDoubleClick){finalizePen();return;}
     if(!_pen.path){
-      pushUndo();ensureKeyframe();layer.activate();
+      pushUndo();ensureKeyframe(true);layer.activate();
       _pen.path=new Path();_pen.path.strokeColor=state.strokeColor;_pen.path.strokeWidth=state.brushSize;
       _pen.path.strokeCap=state.strokeCap;_pen.path.strokeJoin=state.strokeJoin;_pen.path.fillColor=null;_pen.path.opacity=state.opacity/100;
       applyStrokeStyle(_pen.path);
@@ -4888,7 +4906,7 @@ function onMouseDown(event){
     }
     _pen.draggingHandle=true;
   }else if(state.tool==='line'||state.tool==='rect'||state.tool==='ellipse'){
-    if(!canEditActiveLayer())return;pushUndo();ensureKeyframe();layer.activate();shapeStart=event.point.clone();
+    if(!canEditActiveLayer())return;pushUndo();ensureKeyframe(true);layer.activate();shapeStart=event.point.clone();
     if(state.tool==='line')currentPath=new Path.Line({from:event.point,to:event.point,strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,strokeCap:state.strokeCap,fillColor:null,opacity:state.opacity/100});
     else if(state.tool==='rect')currentPath=new Path.Rectangle({from:event.point,to:event.point.add(new Point(1,1)),strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,fillColor:state.fillEnabled?state.fillColor:null,opacity:state.opacity/100});
     else currentPath=new Path.Ellipse({rectangle:new Rectangle(event.point,new Size(1,1)),strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,fillColor:state.fillEnabled?state.fillColor:null,opacity:state.opacity/100});
