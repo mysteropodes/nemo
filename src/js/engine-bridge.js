@@ -2143,10 +2143,25 @@
     _fxExportSavedEngineW = engineW; _fxExportSavedEngineH = engineH;
     return true;
   }
-  async function renderFrameToPixelsPNG(frameIdx) {
-    var cw = state.canvasW, ch = state.canvasH;
-    engine.resize(cw, ch);
-    engine.set_viewport(0, 0, 1, 0, cw / 2, ch / 2, 1);
+  // Resizes the engine's render target for an offscreen (render_to_pixels)
+  // pass — decoupled from #rust-canvas's own on-screen width/height (that's
+  // the whole point of render_to_pixels never touching the visible surface,
+  // see engine.rs's own doc comment). Shared by renderFrameToPixelsPNG
+  // (always native size) and the playback bake cache (playback-cache.js,
+  // resized once to a REDUCED size for the whole bake pass) — one place
+  // that pairs resize()+set_viewport() instead of two copies drifting out
+  // of phase (CLAUDE.md §3).
+  function resizeEngineOffscreen(w, h) {
+    engine.resize(w, h);
+    engine.set_viewport(0, 0, 1, 0, w / 2, h / 2, 1);
+  }
+  // Renders one frame and returns the raw RGBA8 pixels — the actual
+  // GPU-readback call site, factored out so both the PNG-encoding export
+  // path below and the playback bake cache call the exact same
+  // loadFrame/buildSceneJson/render_to_pixels sequence instead of
+  // duplicating it (CLAUDE.md §3). Caller must already have the engine at
+  // the size it wants (resizeEngineOffscreen) before calling this.
+  async function renderFrameRawPixels(frameIdx) {
     loadFrame(frameIdx);
     _fxFrameOverride = frameIdx;
     var json;
@@ -2158,7 +2173,13 @@
       });
     } finally { _fxFrameOverride = null; }
     var bytes = await engine.render_to_pixels(json);
-    var imgData = new ImageData(new Uint8ClampedArray(bytes.buffer, bytes.byteOffset, bytes.byteLength), cw, ch);
+    return new Uint8ClampedArray(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  }
+  async function renderFrameToPixelsPNG(frameIdx) {
+    var cw = state.canvasW, ch = state.canvasH;
+    resizeEngineOffscreen(cw, ch);
+    var pixels = await renderFrameRawPixels(frameIdx);
+    var imgData = new ImageData(pixels, cw, ch);
     var off = document.createElement('canvas'); off.width = cw; off.height = ch;
     off.getContext('2d').putImageData(imgData, 0, 0);
     return off.toDataURL('image/png');
@@ -2279,6 +2300,13 @@
     beginEffectsExport: beginEffectsExport,
     renderFrameToPixelsPNG: renderFrameToPixelsPNG,
     endEffectsExport: endEffectsExport,
+    // Playback bake cache (playback-cache.js) — same offscreen
+    // resize/readback pair the effects-export path above uses, exposed
+    // separately so the bake pass can pick its OWN (reduced) resolution
+    // instead of always native, without duplicating the resize+viewport or
+    // render_to_pixels call sites.
+    resizeEngineOffscreen: function (w, h) { if (!engine) return false; resizeEngineOffscreen(w, h); return true; },
+    renderFrameRawPixels: function (frameIdx) { if (!engine) return Promise.resolve(null); return renderFrameRawPixels(frameIdx); },
   };
 
   // Rust/vello is now the default renderer (no more opt-in checkbox) — per
