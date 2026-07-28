@@ -43,6 +43,16 @@
   // alignement des keyframes aux properties").
   var ROW_H = 22;
   var PROPS = ['position', 'anchor', 'rotation', 'scale', 'opacity'];
+  // 3D layer (2026-07-28, After-Effects-style "3D layer" toggle,
+  // ld.threeD) — three EXTRA scalar properties, revealed only when the
+  // layer/holder has 3D on: positionZ (depth), rotationX/rotationY (the
+  // existing 'rotation' stays exactly as-is, now read as Z-rotation).
+  // Deliberately NOT a 3rd dimension bolted onto 'position' itself (which
+  // would ripple through every PROP_DIM-keyed call site in this file) —
+  // three independent dim-1 properties reuse the exact same generic
+  // track/keyframe/interpolation machinery 'rotation'/'opacity' already
+  // do, zero changes needed to that machinery.
+  var PROPS_WITH_3D = ['position', 'positionZ', 'anchor', 'rotation', 'rotationX', 'rotationY', 'scale', 'opacity'];
   // Time Remap (AE, 2026-07-25) is an EXTRA row, not a 6th transform: it
   // never feeds computeMotionMat — it drives which internal frame a
   // component instance shows (resolveSymbolFrameIdx, app.js). Both the
@@ -50,8 +60,9 @@
   // which is the alignment invariant ROW_H's header comment is about — so
   // there is exactly ONE function that decides, and both sides call it.
   function propsFor(holder) {
-    if (holder && holder.timeRemap) return PROPS.concat(['timeRemap']);
-    return PROPS;
+    var list = (holder && holder.threeD) ? PROPS_WITH_3D : PROPS;
+    if (holder && holder.timeRemap) return list.concat(['timeRemap']);
+    return list;
   }
   // THE track resolver (2026-07-26). Every transform property's track lives
   // in holder.motion[prop] — except timeRemap, which predates its own row
@@ -68,10 +79,10 @@
     if (prop === 'timeRemap') return holder.timeRemap || null;
     return (holder.motion && holder.motion[prop]) || null;
   }
-  var PROP_LABEL = { position: 'Position', anchor: 'Anchor Point', rotation: 'Rotation', scale: 'Scale', opacity: 'Opacity', timeRemap: 'Time Remap' };
-  var PROP_DIM = { position: 2, anchor: 2, rotation: 1, scale: 2, opacity: 1, timeRemap: 1 };
-  var PROP_UNIT = { position: 'px', anchor: 'px', rotation: '°', scale: '%', opacity: '%', timeRemap: 'f' };
-  var PROP_DEFAULT = { position: [0, 0], anchor: [0, 0], rotation: [0], scale: [100, 100], opacity: [100], timeRemap: [0] };
+  var PROP_LABEL = { position: 'Position', anchor: 'Anchor Point', rotation: 'Rotation', scale: 'Scale', opacity: 'Opacity', timeRemap: 'Time Remap', positionZ: 'Position Z', rotationX: 'Rotation X', rotationY: 'Rotation Y' };
+  var PROP_DIM = { position: 2, anchor: 2, rotation: 1, scale: 2, opacity: 1, timeRemap: 1, positionZ: 1, rotationX: 1, rotationY: 1 };
+  var PROP_UNIT = { position: 'px', anchor: 'px', rotation: '°', scale: '%', opacity: '%', timeRemap: 'f', positionZ: 'px', rotationX: '°', rotationY: '°' };
+  var PROP_DEFAULT = { position: [0, 0], anchor: [0, 0], rotation: [0], scale: [100, 100], opacity: [100], timeRemap: [0], positionZ: [0], rotationX: [0], rotationY: [0] };
   // AE's own shortcuts: P/A/R/S/T reveal just that property's row. Kept as
   // a lookup table (not hardcoded in the keydown handler) so the property
   // list and its shortcuts can't silently drift apart.
@@ -898,6 +909,241 @@
     // from).
     return { dx: pos[0], dy: pos[1], rot: rot, sx: scl[0] / 100, sy: scl[1] / 100, op: Math.max(0, op / 100), ax: anc[0], ay: anc[1] };
   }
+  // ---- 3D LAYERS (2026-07-28, After-Effects-style, "chantier sécurisé")
+  // ----
+  // A 3D-enabled layer's own content renders through the EXACT SAME 2D
+  // pipeline every layer already uses (see engine-bridge.js's quad3d
+  // branch) — the isolation strategy is to render it normally into its own
+  // texture, then composite that texture as a perspective-correct quad.
+  // The ONLY new math is here: where do this layer's 4 canvas-sized
+  // corners land after a real 3D transform + camera projection. See
+  // engine.rs's Quad3DIn doc comment for the clip-space-w trick that makes
+  // the GPU do the actual foreshortening from this data — nothing 3D-aware
+  // happens on the Rust side, only here.
+  //
+  // Fixed pinhole camera looking straight down +Z at the canvas center —
+  // no explicit 3D Camera layer type yet (this is exactly AE's own
+  // behavior when a comp has no Camera layer: a default camera is
+  // synthesized). CAMERA_DISTANCE is chosen so z=0 needs ZERO change from
+  // today's picture (screen = world exactly at z=0, the critical
+  // correctness invariant: toggling threeD on with every 3D value still at
+  // its default must reproduce the SAME pixels as before the toggle).
+  var CAMERA_DISTANCE = 2000; // world units — same pixel space as canvasW/H
+  function degToRad(d) { return d * Math.PI / 180; }
+  // Rotates a point around the ORIGIN, X axis then Y then Z (Z = the same
+  // rotation the existing 2D 'rotation' property already applies) — callers
+  // translate to/from the pivot themselves, same pivot-then-rotate-then-
+  // translate shape transformSegments already uses for the 2D-only case.
+  function rotate3D(x, y, z, rx, ry, rz) {
+    var a, c, s, nx, ny, nz;
+    if (rx) { a = degToRad(rx); c = Math.cos(a); s = Math.sin(a); ny = y * c - z * s; nz = y * s + z * c; y = ny; z = nz; }
+    if (ry) { a = degToRad(ry); c = Math.cos(a); s = Math.sin(a); nx = x * c + z * s; nz = -x * s + z * c; x = nx; z = nz; }
+    if (rz) { a = degToRad(rz); c = Math.cos(a); s = Math.sin(a); nx = x * c - y * s; ny = x * s + y * c; x = nx; y = ny; }
+    return [x, y, z];
+  }
+  // ---- Grease-Pencil-style vertex projection (2026-07-28, revised) ----
+  // First cut of this feature rendered a 3D layer's content to an isolated
+  // texture and warped the WHOLE TEXTURE as a perspective quad (a new Rust
+  // pipeline, since reverted) — technically correct perspective, but it
+  // meant stroke WIDTH got warped right along with everything else (thinner
+  // on the foreshortened side). Explicit user correction: "comme pour
+  // grease pencil, l'épaisseur du trait n'est jamais aplatie, c'est
+  // seulement les vecteurs qui sont mis en 3D" — only the PATH GEOMETRY
+  // (vertex positions) should follow the 3D transform; stroke thickness
+  // stays constant in screen space, exactly like Blender's Grease Pencil
+  // (or TVPaint's 3D layer stacking) treats a 2D stroke positioned in 3D
+  // space. This is also simpler and needs ZERO Rust changes: a projected
+  // vertex is just an ordinary 2D point, so the existing per-item pipeline
+  // (gradients, per-element effects, dash patterns, retained paths for
+  // non-3D layers, etc.) needs nothing new — only ONE more segment
+  // transform step, slotted in exactly where the (now-suppressed)
+  // motionMat's own transformSegments call already lived, engine-bridge.js.
+  function project3DToScreenPoint(px, py, pz, canvasW, canvasH) {
+    var p = project3DToScreen(px, py, pz, canvasW, canvasH);
+    return p;
+  }
+  // One projector function per layer per frame — captures the layer's
+  // current position/anchor/rotation(XYZ)/scale ONCE (matching
+  // computeMotionMat's own read-once-per-frame contract) and returns a
+  // plain (px,py) -> {x,y} closure, reused across every vertex of every
+  // item in the layer so they all move together as one rigid (but
+  // perspective-projected) plane.
+  function make3DProjector(ld, bounds, frameIdx, canvasW, canvasH) {
+    var pos = valueAtFrame(ld, 'position', frameIdx);
+    var anc = valueAtFrame(ld, 'anchor', frameIdx);
+    var rot = valueAtFrame(ld, 'rotation', frameIdx)[0];
+    var scl = valueAtFrame(ld, 'scale', frameIdx);
+    var posZ = valueAtFrame(ld, 'positionZ', frameIdx)[0];
+    var rotX = valueAtFrame(ld, 'rotationX', frameIdx)[0];
+    var rotY = valueAtFrame(ld, 'rotationY', frameIdx)[0];
+    var sx = scl[0] / 100, sy = scl[1] / 100;
+    var pivotX = bounds.x + bounds.width / 2 + anc[0];
+    var pivotY = bounds.y + bounds.height / 2 + anc[1];
+    return function (px, py) {
+      var lx = (px - pivotX) * sx, ly = (py - pivotY) * sy;
+      var r = rotate3D(lx, ly, 0, rotX, rotY, rot);
+      var wx = pivotX + r[0] + pos[0] - canvasW / 2;
+      var wy = pivotY + r[1] + pos[1] - canvasH / 2;
+      var wz = r[2] + posZ;
+      return project3DToScreenPoint(wx, wy, wz, canvasW, canvasH);
+    };
+  }
+  // Projects every vertex of a stroke's segments through `projector` —
+  // handles (bezier control tangents) are RELATIVE vectors, and a true
+  // perspective-correct transform of a cubic curve isn't itself a cubic (a
+  // known limitation of perspective-warping bezier curves in general) — a
+  // nearby-sample-then-subtract approximation is standard practice here
+  // (handles are typically much smaller than the shape itself, so the
+  // local-linearization error stays visually negligible even under strong
+  // rotation — the SAME reasoning applies to any nonlinear path warp, not
+  // specific to this feature).
+  function project3DSegments(segments, projector) {
+    return segments.map(function (s) {
+      var p = projector(s.point[0], s.point[1]);
+      var out = { point: [p.x, p.y] };
+      if (s.handleIn) {
+        var hip = projector(s.point[0] + s.handleIn[0], s.point[1] + s.handleIn[1]);
+        out.handleIn = [hip.x - p.x, hip.y - p.y];
+      }
+      if (s.handleOut) {
+        var hop = projector(s.point[0] + s.handleOut[0], s.point[1] + s.handleOut[1]);
+        out.handleOut = [hop.x - p.x, hop.y - p.y];
+      }
+      return out;
+    });
+  }
+  function toggleLayer3D(li) {
+    var ld = state.layers[li];
+    if (!ld) return;
+    ld.threeD = !ld.threeD;
+    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+    if (window.renderLayerList) renderLayerList();
+  }
+  // ---- 3D GIZMO ("un beau gizmo", 2026-07-28) ----
+  // AE's own convention: 3 colored axis arrows (X red/Y green/Z blue) for
+  // Position, 3 colored rings for Rotation. Both are projected through the
+  // EXACT SAME camera model compute3DCorners uses, then emitted as
+  // ordinary 2D path/line overlay primitives via buildOverlayItems below —
+  // exactly how the existing anchor-crosshair/scale-rotate-box overlay
+  // already works (plain {segments,...} objects fed into the SAME
+  // Rust/vello scene-JSON pipeline as real artwork). No Rust changes
+  // needed for the gizmo itself — only the LAYER's own content goes
+  // through the quad3d path; the gizmo is drawn like any other 2D overlay.
+  var GIZMO_AXIS_LEN = 180; // world units — a fixed size, independent of the layer's own bounds (AE's gizmo is a fixed screen size too)
+  var GIZMO_RING_RADIUS = 130;
+  var GIZMO_COLORS = { x: [235, 70, 70, 255], y: [90, 200, 100, 255], z: [70, 130, 235, 255] };
+  function project3DToScreen(wx, wy, wz, canvasW, canvasH) {
+    var depthW = (CAMERA_DISTANCE + wz) / CAMERA_DISTANCE;
+    if (depthW < 0.05) depthW = 0.05;
+    return { x: canvasW / 2 + wx / depthW, y: canvasH / 2 + wy / depthW };
+  }
+  // One layer's current 3D pose — resolved ONCE per draw/hit-test call so
+  // the gizmo's drawn position and its own hit-test always agree exactly
+  // (both read the SAME valueAtFrame calls, never two separate paths that
+  // could drift, CLAUDE.md §3).
+  function gizmo3DPose(t) {
+    var holder = t.holder;
+    var pos = valueAtFrame(holder, 'position', state.currentFrame);
+    var anc = valueAtFrame(holder, 'anchor', state.currentFrame);
+    var rot = valueAtFrame(holder, 'rotation', state.currentFrame)[0];
+    var posZ = valueAtFrame(holder, 'positionZ', state.currentFrame)[0];
+    var rotX = valueAtFrame(holder, 'rotationX', state.currentFrame)[0];
+    var rotY = valueAtFrame(holder, 'rotationY', state.currentFrame)[0];
+    var pivotX = t.boundsCenter.x + anc[0], pivotY = t.boundsCenter.y + anc[1];
+    return {
+      pos: pos, rot: rot, posZ: posZ, rotX: rotX, rotY: rotY,
+      // Anchor's WORLD 3D position, canvas-center-relative — same
+      // convention compute3DCorners' own pivot handling uses.
+      originWX: pivotX + pos[0] - state.canvasW / 2,
+      originWY: pivotY + pos[1] - state.canvasH / 2,
+      originWZ: posZ,
+    };
+  }
+  function gizmo3DOriginScreen(pose) { return project3DToScreen(pose.originWX, pose.originWY, pose.originWZ, state.canvasW, state.canvasH); }
+  // Local axes (tilt WITH the layer's current rotation — AE's "Local Axis
+  // Mode", more informative than fixed world-aligned arrows once a layer
+  // is already rotated).
+  function gizmo3DAxisScreenPoints(pose) {
+    var dirs = { x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] };
+    var origin = gizmo3DOriginScreen(pose);
+    var out = {};
+    ['x', 'y', 'z'].forEach(function (axis) {
+      var d = dirs[axis];
+      var r = rotate3D(d[0] * GIZMO_AXIS_LEN, d[1] * GIZMO_AXIS_LEN, d[2] * GIZMO_AXIS_LEN, pose.rotX, pose.rotY, pose.rot);
+      out[axis] = { origin: origin, tip: project3DToScreen(pose.originWX + r[0], pose.originWY + r[1], pose.originWZ + r[2], state.canvasW, state.canvasH) };
+    });
+    return out;
+  }
+  // Each ring lies in the plane PERPENDICULAR to its own rotation axis
+  // (e.g. the X ring, which rotates around X, is drawn in the local Y-Z
+  // plane) — sampled as N screen points and connected; a circle in 3D
+  // projects to an ellipse-ish 2D shape naturally, no separate math needed.
+  function gizmo3DRingScreenPoints(pose) {
+    var N = 32;
+    var planes = {
+      x: function (a) { return [0, Math.cos(a) * GIZMO_RING_RADIUS, Math.sin(a) * GIZMO_RING_RADIUS]; },
+      y: function (a) { return [Math.sin(a) * GIZMO_RING_RADIUS, 0, Math.cos(a) * GIZMO_RING_RADIUS]; },
+      z: function (a) { return [Math.cos(a) * GIZMO_RING_RADIUS, Math.sin(a) * GIZMO_RING_RADIUS, 0]; },
+    };
+    var out = {};
+    ['x', 'y', 'z'].forEach(function (axis) {
+      var pts = [];
+      for (var i = 0; i <= N; i++) {
+        var a = (i / N) * Math.PI * 2;
+        var p = planes[axis](a);
+        var r = rotate3D(p[0], p[1], p[2], pose.rotX, pose.rotY, pose.rot);
+        pts.push(project3DToScreen(pose.originWX + r[0], pose.originWY + r[1], pose.originWZ + r[2], state.canvasW, state.canvasH));
+      }
+      out[axis] = pts;
+    });
+    return out;
+  }
+  function distToSegment(pt, a, b) {
+    var dx = b.x - a.x, dy = b.y - a.y, len2 = dx * dx + dy * dy;
+    var tt = len2 ? Math.max(0, Math.min(1, ((pt.x - a.x) * dx + (pt.y - a.y) * dy) / len2)) : 0;
+    return Math.hypot(pt.x - (a.x + tt * dx), pt.y - (a.y + tt * dy));
+  }
+  // Gizmo hit-tests are LAYER-target only (t.strokeId unset) — 3D is a
+  // layer-level-only feature in this pass (ld.threeD), matching
+  // make3DProjector's own scope. Both return the actual hit DISTANCE
+  // (not just axis/pose) — with 6 controls (3 arrows + 3 rings) sharing
+  // one small screen region, "arrows always win" turned out wrong in
+  // testing (a ring sample point that happens to fall near an arrow's own
+  // line stole the grab even when the ring was the closer, more obviously-
+  // intended target) — onDown below picks whichever of the two hits is
+  // NUMERICALLY CLOSER instead of a fixed type priority.
+  function hit3DGizmoAxis(pt, t) {
+    if (!t || t.strokeId || !state.layers[t.li] || !state.layers[t.li].threeD) return null;
+    var pose = gizmo3DPose(t);
+    var axisPts = gizmo3DAxisScreenPoints(pose);
+    var tol = 8 / view.zoom;
+    var axes = ['x', 'y', 'z'];
+    var best = null;
+    for (var i = 0; i < axes.length; i++) {
+      var seg = axisPts[axes[i]];
+      var o = outerWorldPoint(t, seg.origin), tp = outerWorldPoint(t, seg.tip);
+      var d = distToSegment(pt, o, tp);
+      if (d < tol && (!best || d < best.dist)) best = { axis: axes[i], pose: pose, dist: d };
+    }
+    return best;
+  }
+  function hit3DGizmoRing(pt, t) {
+    if (!t || t.strokeId || !state.layers[t.li] || !state.layers[t.li].threeD) return null;
+    var pose = gizmo3DPose(t);
+    var ringPts = gizmo3DRingScreenPoints(pose);
+    var tol = 7 / view.zoom;
+    var axes = ['x', 'y', 'z'];
+    var best = null;
+    for (var ai = 0; ai < axes.length; ai++) {
+      var pts = ringPts[axes[ai]];
+      for (var i = 0; i < pts.length - 1; i++) {
+        var a = outerWorldPoint(t, pts[i]), b = outerWorldPoint(t, pts[i + 1]);
+        var d = distToSegment(pt, a, b);
+        if (d < tol && (!best || d < best.dist)) best = { axis: axes[ai], pose: pose, dist: d };
+      }
+    }
+    return best;
+  }
   function layerMotionAt(li, frameIdx) {
     var ld = state.layers[li];
     if (!ld) return null;
@@ -1241,6 +1487,36 @@
     items.push({ segments: [{ point: [aw.x - 9 * zs, aw.y] }, { point: [aw.x + 9 * zs, aw.y] }], closed: false, fillColor: null, strokeColor: ancCol, strokeWidth: 1.5 * zs });
     items.push({ segments: [{ point: [aw.x, aw.y - 9 * zs] }, { point: [aw.x, aw.y + 9 * zs] }], closed: false, fillColor: null, strokeColor: ancCol, strokeWidth: 1.5 * zs });
     items.push({ segments: circleSegs(aw.x, aw.y, 6 * zs), closed: true, fillColor: null, strokeColor: ancCol, strokeWidth: 1.5 * zs });
+    // 3D gizmo (2026-07-28) — layer-target only (not per-element), only
+    // when this layer has 3D on. Position arrows first, then rotation
+    // rings on top (rings are the more precise/deliberate grab, matching
+    // the box-handles-before-position-dots priority already established
+    // in onDown below).
+    if (t.li != null && state.layers[t.li] && state.layers[t.li].threeD && !t.strokeId) {
+      var pose3D = gizmo3DPose(t);
+      var axisPts3D = gizmo3DAxisScreenPoints(pose3D);
+      ['x', 'y', 'z'].forEach(function (axis) {
+        var seg = axisPts3D[axis];
+        var o = outerWorldPoint(t, seg.origin), tp = outerWorldPoint(t, seg.tip);
+        var col = GIZMO_COLORS[axis];
+        items.push({ segments: [{ point: [o.x, o.y] }, { point: [tp.x, tp.y] }], closed: false, fillColor: null, strokeColor: col, strokeWidth: 2.2 * zs });
+        var dx = tp.x - o.x, dy = tp.y - o.y, len = Math.hypot(dx, dy) || 1;
+        var ux = dx / len, uy = dy / len, px = -uy, py = ux, ah = 9 * zs, aw2 = 4 * zs;
+        items.push({
+          segments: [
+            { point: [tp.x, tp.y] },
+            { point: [tp.x - ux * ah + px * aw2, tp.y - uy * ah + py * aw2] },
+            { point: [tp.x - ux * ah - px * aw2, tp.y - uy * ah - py * aw2] },
+          ], closed: true, fillColor: col, strokeColor: null,
+        });
+      });
+      var ringPts3D = gizmo3DRingScreenPoints(pose3D);
+      ['x', 'y', 'z'].forEach(function (axis) {
+        var col = GIZMO_COLORS[axis];
+        var segs = ringPts3D[axis].map(function (p) { var w = outerWorldPoint(t, p); return { point: [w.x, w.y] }; });
+        items.push({ segments: segs, closed: true, fillColor: null, strokeColor: [col[0], col[1], col[2], 150], strokeWidth: 1.4 * zs });
+      });
+    }
     // Scale/rotate transform box (2026-07) — Motion mode previously had NO
     // on-canvas affordance for Scale/Rotation at all, only this anchor
     // crosshair and the position motion-path dots below: scaling/rotating a
@@ -1252,7 +1528,12 @@
     // coherence — same box, drawn via motionHandlePositions()/motionBoxGeom()
     // (which fold in the layer's OWN current position/anchor/rotation/scale,
     // so the box always sits exactly where the object renders THIS frame).
-    var mh = motionHandlePositions(t);
+    // 3D gizmo REPLACES this box entirely for a 3D layer (explicit user
+    // request) — showing both at once would be two overlapping, partially-
+    // redundant control systems (the box's own rotate ring is 2D-only Z
+    // rotation, which the 3D gizmo's blue ring already covers).
+    var is3DTargetForBox = t.li != null && state.layers[t.li] && state.layers[t.li].threeD && !t.strokeId;
+    var mh = is3DTargetForBox ? null : motionHandlePositions(t);
     if (mh) {
       var boxCol = [74, 158, 255, 204];
       var lb = mh.g.bounds;
@@ -1640,11 +1921,48 @@
     // once a key has been moved away from it (the ordinary case) or by
     // starting the drag from a few px off-center.
     if (t) {
+      // 3D gizmo (2026-07-28) checked BEFORE the 2D scale/rotate box below —
+      // when a layer has 3D on, its own axis arrows/rotation rings are the
+      // deliberate, precise controls for it, same "precise grab wins"
+      // priority the box-handles-before-position-dots ordering already
+      // established for the 2D case. Between the two 3D control types
+      // (arrows vs rings), whichever is NUMERICALLY CLOSER to the click
+      // wins — found by testing that a fixed "arrows always win" priority
+      // let an arrow's line steal a click clearly aimed at a nearby ring
+      // sample point.
+      var axisHit3D = hit3DGizmoAxis(event.point, t);
+      var ringHit3D = hit3DGizmoRing(event.point, t);
+      if (axisHit3D && (!ringHit3D || axisHit3D.dist <= ringHit3D.dist)) {
+        pushUndo();
+        var axisPts3D_ = gizmo3DAxisScreenPoints(axisHit3D.pose);
+        var o3d = outerWorldPoint(t, axisPts3D_[axisHit3D.axis].origin), tp3d = outerWorldPoint(t, axisPts3D_[axisHit3D.axis].tip);
+        var dx3d = tp3d.x - o3d.x, dy3d = tp3d.y - o3d.y, dl3d = Math.hypot(dx3d, dy3d) || 1;
+        _motionDrag = {
+          mode: 'axis3d', t: t, axis: axisHit3D.axis,
+          dirX: dx3d / dl3d, dirY: dy3d / dl3d,
+          startPt: { x: event.point.x, y: event.point.y },
+          baseline: axisHit3D.axis === 'z' ? axisHit3D.pose.posZ : axisHit3D.pose.pos[axisHit3D.axis === 'x' ? 0 : 1],
+        };
+        return true;
+      }
+      if (ringHit3D) {
+        pushUndo();
+        var center3d = outerWorldPoint(t, gizmo3DOriginScreen(ringHit3D.pose));
+        var startAngle3D = Math.atan2(event.point.y - center3d.y, event.point.x - center3d.x) * 180 / Math.PI;
+        _motionDrag = {
+          mode: 'ring3d', t: t, axis: ringHit3D.axis, center: center3d, startAngle: startAngle3D,
+          baseline: ringHit3D.axis === 'x' ? ringHit3D.pose.rotX : (ringHit3D.axis === 'y' ? ringHit3D.pose.rotY : ringHit3D.pose.rot),
+        };
+        return true;
+      }
       // Scale/rotate box handles checked FIRST — same priority order as
       // Animation 2D's own hitTestHandles (select-bridge.js): a corner/
       // rotate grab is a deliberate, precise action, so it should win any
       // rare overlap with a position dot/anchor rather than the reverse.
-      var boxHit = hitMotionBoxHandle(event.point, t);
+      // Skipped entirely for a 3D layer — the box isn't drawn there (see
+      // buildOverlayItems' is3DTargetForBox), so it must not still be a
+      // live (invisible) hit-target either.
+      var boxHit = (t.li != null && state.layers[t.li] && state.layers[t.li].threeD && !t.strokeId) ? null : hitMotionBoxHandle(event.point, t);
       if (boxHit) {
         pushUndo();
         var g = motionBoxGeom(t);
@@ -1715,6 +2033,26 @@
       // geometry mutation would need to guard against.
       var ang = Math.atan2(event.point.y - _motionDrag.pivot.y, event.point.x - _motionDrag.pivot.x) * 180 / Math.PI;
       setValue(_motionDrag.t.holder, 'rotation', [_motionDrag.origRot + (ang - _motionDrag.startAngle)]);
+    } else if (_motionDrag.mode === 'axis3d') {
+      // Drag projected onto the arrow's OWN screen-space direction (a
+      // standard simplification for lightweight 3D gizmos — full ray/plane
+      // unprojection isn't needed to get a natural-feeling drag along one
+      // axis) — recomputed from the FIXED drag-start baseline every tick,
+      // same "absolute, not accumulated" convention as motionRotate above.
+      var ddx = event.point.x - _motionDrag.startPt.x, ddy = event.point.y - _motionDrag.startPt.y;
+      var along = ddx * _motionDrag.dirX + ddy * _motionDrag.dirY;
+      var newVal3D = _motionDrag.baseline + along;
+      if (_motionDrag.axis === 'z') setValue(_motionDrag.t.holder, 'positionZ', [newVal3D]);
+      else {
+        var curPos3D = valueAtFrame(_motionDrag.t.holder, 'position', state.currentFrame);
+        setValue(_motionDrag.t.holder, 'position', [_motionDrag.axis === 'x' ? newVal3D : curPos3D[0], _motionDrag.axis === 'y' ? newVal3D : curPos3D[1]]);
+      }
+    } else if (_motionDrag.mode === 'ring3d') {
+      var ang3D = Math.atan2(event.point.y - _motionDrag.center.y, event.point.x - _motionDrag.center.x) * 180 / Math.PI;
+      var newRot3D = _motionDrag.baseline + (ang3D - _motionDrag.startAngle);
+      if (_motionDrag.axis === 'x') setValue(_motionDrag.t.holder, 'rotationX', [newRot3D]);
+      else if (_motionDrag.axis === 'y') setValue(_motionDrag.t.holder, 'rotationY', [newRot3D]);
+      else setValue(_motionDrag.t.holder, 'rotation', [newRot3D]);
     } else if (_motionDrag.mode === 'motionScale') {
       // v1 scope: uniform scale only (both axes move by the same ratio) —
       // no per-edge single-axis handles yet, matching this increment's
@@ -1905,6 +2243,13 @@
       var solo = document.createElement('div'); solo.className = 'lico solo-btn' + (ld.solo ? ' on' : ' off'); solo.title = SM.t('layerSoloTitle'); solo.textContent = 'S';
       solo.addEventListener('click', function (e) { e.stopPropagation(); window.SM.toggleLayerSolo(li); });
       row.appendChild(solo);
+      // 3D layer toggle (2026-07-28) — same icon/button as Animation 2D's
+      // own layer list (timeline.js renderLayerList), shown here too since
+      // this is precisely where the Position Z/Rotation X/Y properties it
+      // reveals actually live and get keyframed.
+      var d3 = document.createElement('div'); d3.className = 'lico' + (ld.threeD ? '' : ' off'); d3.title = '3D Layer'; d3.innerHTML = ICO_3D;
+      d3.addEventListener('click', function (e) { e.stopPropagation(); toggleLayer3D(li); renderLayerList(); });
+      row.appendChild(d3);
       // Same badge as Animation 2D's rows, from the same decider — Motion is
       // a different VIEW of these layers, not a different set, so it must not
       // describe them differently.
@@ -4184,6 +4529,22 @@
 
   window.SMMotion = {
     valueAtFrame: valueAtFrame,
+    // 3D layers (2026-07-28) — see make3DProjector/project3DSegments' own
+    // doc comment (Grease-Pencil-style: vertices move in 3D, stroke width
+    // never scales).
+    make3DProjector: make3DProjector,
+    project3DSegments: project3DSegments,
+    toggleLayer3D: toggleLayer3D,
+    // 3D gizmo diagnostics — exposed so its projection/hit-test math can be
+    // verified directly (screenshots/pixel-probing alone can't confirm
+    // WHICH handle a screen point resolves to).
+    activeMotionTarget: activeMotionTarget,
+    gizmo3DPose: gizmo3DPose,
+    gizmo3DAxisScreenPoints: gizmo3DAxisScreenPoints,
+    gizmo3DRingScreenPoints: gizmo3DRingScreenPoints,
+    hit3DGizmoAxis: hit3DGizmoAxis,
+    hit3DGizmoRing: hit3DGizmoRing,
+    debugMotionDrag: function () { return _motionDrag; },
     // Generic track evaluator — effects-panel.js keys its parameters with it
     // so an effect eases exactly like a layer property (see evalTrack).
     evalTrack: evalTrack,
