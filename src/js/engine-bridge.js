@@ -231,11 +231,25 @@
     var liveOrigs = protos.map(function (pr) { return pr._changed; });
     protos.forEach(function (pr, i) {
       pr._changed = function (flags) {
-        if ((flags & _geomFlagMask) && this._data && this._data.__engineSrcDict) this._data.__engineSrcDict = null;
+        if (flags & _geomFlagMask) {
+          if (this._data && this._data.__engineSrcDict) this._data.__engineSrcDict = null;
+          // Second consumer of the same signal: loadFrame skips rebuilding a
+          // layer whose stored strokes are unchanged, and must NOT do that if
+          // the live items were edited without being saved back (a sculpt on
+          // a non-keyframe, say). Marking the owning Paper layer here is what
+          // makes that skip safe. `_parent` direct, not `.parent` — same
+          // lazy-getter caution as `_data` above.
+          var par = this._parent;
+          if (par) par._smGeomDirty = true;
+        }
         return liveOrigs[i].apply(this, arguments);
       };
     });
     _pathRefsEnabled = true;
+    // Tells loadFrame (app.js) that the dirty signal it relies on is live.
+    // Without the hook installed there is no way to know a layer was
+    // edited, so loadFrame must keep rebuilding unconditionally.
+    window.__smGeomDirtyHookInstalled = true;
   }
 
   // Returns an engine key for this item's geometry, or null to fall back to

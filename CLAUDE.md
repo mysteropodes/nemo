@@ -277,6 +277,51 @@ contradictoires d'un run à l'autre (37→36 fps puis 28→39 fps). Utiliser
 `goToFrame + timeSceneBuild(1)` pour le coût par tick. Le reste du coût est `loadFrame`/`desP`
 qui reconstruit les objets Paper — non touché par ce chantier, c'est le mur suivant.
 
+### 5quater. `loadFrame` ne reconstruit plus ce qui n'a pas changé (2026-07-28)
+
+Après la géométrie retenue, le mur suivant était `loadFrame` lui-même : **32,6 ms sur 37,0 ms
+par frame (88 %) étaient `desP`**, à reconstruire 4000 objets Paper. Les alternatives de
+construction plafonnent à 1,4× (mesuré : `add()` par segment 7,33 µs/path, constructeur avec
+tableau de Segments 6,33, tableaux bruts 5,33) — pas de quoi changer de catégorie.
+
+Le vrai levier : `getEffectiveStrokes` renvoie **le tableau STOCKÉ** (`f.strokes`, ou celui de
+la keyframe héritée). Donc toute frame qui MAINTIENT sur une keyframe rend le **même objet
+tableau** — et `loadFrame` reconstruisait des calques dont le contenu était identique.
+Mesuré : 83 % des couples calque-frame sur un projet en maintien de 6.
+
+`_canReuseMaterialized(lyr, strokes)` (app.js) saute `removeChildren` + reconstruction quand
+**les trois** conditions tiennent :
+1. `lyr._matStrokes === strokes` — test d'IDENTITÉ, et c'est le point : tout écrivain
+   REMPLACE le tableau (`f.strokes = strokes`), il ne le mute pas en place, donc une frame
+   modifiée présente toujours un objet différent. Les branches composant/montage/lfs
+   synthétisent un tableau neuf à chaque appel : elles ne matchent jamais et continuent de
+   reconstruire, inchangées.
+2. `!lyr._smGeomDirty` — drapeau posé par le MÊME hook `_changed` que la géométrie retenue
+   (§5ter), sur `this._parent`. Sans lui, un sculpt non sauvegardé sur une frame non-keyframe
+   survivrait au rechargement, alors que `loadFrame` doit l'annuler. Vérifié en pilotant :
+   mutation → drapeau à true → `loadFrame` reconstruit → mutation annulée.
+3. `lyr.children.length === strokes.length` — paranoïa. `desP`/`desR` émettent exactement un
+   item par stroke ; toute divergence force une reconstruction plutôt que de faire confiance
+   à la seule identité (c'est ce qui rattrape un trait fraîchement dessiné, ajouté au calque
+   sans que `_matStrokes` bouge).
+
+Le garde global `window.__smGeomDirtyHookInstalled` : si le hook n'est pas posé (moteur
+désactivé, auto-test échoué), **aucune réutilisation** — sans signal de saleté il n'y a aucun
+moyen de savoir si les items live ont été édités.
+
+Mesuré : `loadFrame` 35,1 → **3,35 ms** à 4000 traits (10,5×) ; 8,3 → **0,64 ms** à 2000
+(12,8×). Coût par tick de scrub bout-en-bout : 42,4 → **13,7 ms** à 4000 (3,1×), 13,8 →
+**5,8 ms** à 2000, 16,2 → **6,4 ms** à 2000+Motion.
+
+⚠️ **Pire cas honnête : une keyframe sur CHAQUE frame de chaque calque ne gagne rien**
+(8,1 → 8,06 ms, mesuré) — mais ne régresse pas non plus. L'animation traditionnelle est
+pleine de maintiens (« on twos »/« on threes »), c'est là que ça paie.
+
+**Vérification** : rendu identique (PNG) entre réutilisation et reconstruction forcée sur
+8 frames en Animation 2D, 6 en Motion, 5 sur le projet réel ; trait réellement dessiné au
+geste puis aller-retour de frame (stocké et enfants cohérents, visible à l'écran) ; undo/redo ;
+masquage/réaffichage de calque ; gomme.
+
 **`renderNow(true)` (viewportOnly) est un contrat d'appelant** : seul le viewport a changé
 depuis le dernier rendu. Vrai pour pan/rotate (aucun item de scène ne dépend de center ou de
 la rotation ; les poignées en `1/view.zoom` dépendent du ZOOM seul). JAMAIS l'inférer
