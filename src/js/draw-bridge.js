@@ -611,7 +611,9 @@
     // undo was needed to remove that, and it consumed the undo slot that
     // belonged to whatever was drawn before it. One undo must revert both.
     pushUndo();
-    ensureKeyframe();
+    // blank: a new drawing on a held frame is a NEW drawing, not the previous
+    // one carried forward — see ensureKeyframe's own comment (tools.js).
+    ensureKeyframe(true);
     var layer = userLayers[state.activeLayerIdx];
     layer.activate();
     var path;
