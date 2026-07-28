@@ -91,9 +91,35 @@
   var _hideUnanimated = false;
   function propHasContent(holder, prop) { return isAnimated(holder, prop) || !!(holder.motionStatic && holder.motionStatic[prop]); }
   function isPropFiltered(prop) { return !!_propFilter && _propFilter.indexOf(prop) < 0; }
+  // Which layers a property shortcut acts on: the selection, or EVERY layer
+  // when nothing is selected (2026-07-27: "si je fais 'p' alors ça affiche
+  // seulement toutes les prop position de tous les calques ou ceux de la
+  // sélection") — AE's own rule.
+  function shortcutTargets() {
+    if (_layerSel.length) return _layerSel.slice();
+    return state.layers.map(function (_l, i) { return i; });
+  }
   function handlePropShortcut(key, shiftKey) {
     var prop = PROP_SHORTCUT[(key || '').toLowerCase()];
     if (!prop) return false;
+    // Filtering to a property is only half of AE's gesture — the layers have
+    // to be OPEN for that row to exist at all. Since selecting no longer
+    // expands anything, P on a fresh timeline used to filter a set of rows
+    // that were all still folded away, i.e. show nothing. Reveal the targets
+    // here, and let a second press of the same key fold them back, so the
+    // shortcut is a toggle rather than a one-way trip.
+    var targets = shortcutTargets();
+    var alreadyShowing = !shiftKey && _propFilter && _propFilter.length === 1 && _propFilter[0] === prop &&
+      window._motionRevealedLayers && targets.every(function (li) { return window._motionRevealedLayers.indexOf(li) >= 0; });
+    if (alreadyShowing) {
+      _propFilter = null;
+      window._motionRevealedLayers = [];
+      window._motionExpandedLayer = null;
+      renderLayerList(); renderTimeline();
+      return true;
+    }
+    window._motionRevealedLayers = targets;
+    window._motionExpandedLayer = null; // the reveal set replaces the single-row accordion
     if (shiftKey) {
       if (!_propFilter) _propFilter = PROPS.slice(); // shift on a fresh/all-shown state starts from "all", then removes
       var i = _propFilter.indexOf(prop);
@@ -1789,10 +1815,34 @@
       var isComponent = !!ld.symbolId;
       var expanded = isLayerExpanded(li);
       var row = document.createElement('div');
-      row.className = 'lrow' + (_layerSel.indexOf(li) >= 0 ? ' act motion-selected' : (li === state.activeLayerIdx ? ' act' : ''));
+      // Motion paints the SELECTION and nothing else — no fallback
+      // highlight on the merely-active layer (2026-07-27: "ce n'est pas
+      // possible de deselect tout les calque, y en a toujours 1 de
+      // select"). activeLayerIdx is always a valid index by design (the
+      // drawing tools need a target), so lighting it up made an empty
+      // selection indistinguishable from a one-layer selection and put a
+      // floor of one under every deselect. AE shows nothing selected when
+      // nothing is; Animation 2D keeps its own .act cue, where it means
+      // "this is where the brush draws" and is genuinely useful.
+      row.className = 'lrow' + (_layerSel.indexOf(li) >= 0 ? ' act motion-selected' : '');
       row.dataset.layer = li;
       if (isComponent) row.title = 'Composant — Position/Anchor/Rotation/Scale/Opacity animent l\'instance entière (le contenu interne s\'édite via "Éditer le composant…")';
       var arrow = document.createElement('div'); arrow.className = 'lico larrow'; arrow.textContent = expanded ? '▾' : '▸';
+      // The twirl-down is now the ONLY way to open a layer's properties, so
+      // it needs its own handler — it used to be decoration on a row whose
+      // click did the expanding. stopPropagation keeps opening a layer from
+      // also changing what's selected, the way AE's twirl behaves.
+      arrow.addEventListener('click', function (e) {
+        e.stopPropagation();
+        if (window._motionRevealedLayers) {
+          var ri2 = window._motionRevealedLayers.indexOf(li);
+          if (ri2 >= 0) window._motionRevealedLayers.splice(ri2, 1);
+        }
+        window._motionExpandedLayer = isLayerExpanded(li) ? null : li;
+        window._motionExpandedElement = null;
+        _propFilter = null; // a hand-opened layer shows all its properties
+        renderLayerList(); renderTimeline();
+      });
       row.appendChild(arrow);
       // Same color dot / eye / lock / solo controls as Animation 2D's own
       // layer row (timeline.js's renderLayerList) — Motion mode is a
@@ -1876,9 +1926,12 @@
           var ri = window._motionRevealedLayers.indexOf(li);
           if (ri >= 0) window._motionRevealedLayers.splice(ri, 1);
         }
-        window._motionExpandedLayer = expanded ? (window._motionExpandedLayer === li ? null : window._motionExpandedLayer) : li;
-        _propFilter = null; // fresh "show all" every time the expanded layer changes
-        window._motionExpandedElement = null;
+        // Selecting no longer EXPANDS (2026-07-27: "quand on select un calque
+        // cela ne doit pas ouvrir son dropdown de property, on doit le faire
+        // manuellement"). AE separates the two: click the name to select,
+        // click the twirl-down to open. The arrow below owns expansion now,
+        // so selecting several layers no longer unfolds a wall of property
+        // rows you then have to close one by one.
         setKeySel([]);
         // window.SM.setActiveLayer(li), not a raw state.activeLayerIdx=li —
         // found live (2026-07-17, "on ne voit pas la box de transformation
@@ -3030,7 +3083,7 @@
       // and stayed dark on the right ("cette partie n'est pas hightlight
       // quand select") even though it is one row across both panels.
       var spacer = document.createElement('div');
-      spacer.className = 'frow' + (_layerSel.indexOf(li) >= 0 ? ' act motion-selected' : (li === state.activeLayerIdx ? ' act' : ''));
+      spacer.className = 'frow' + (_layerSel.indexOf(li) >= 0 ? ' act motion-selected' : '');
       spacer.dataset.layer = li;
       if (window.SMLayerInOut) SMLayerInOut.buildBar(spacer, li);
       grid.appendChild(spacer);
