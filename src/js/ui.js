@@ -1026,10 +1026,13 @@
 
   // Rive-style scrubbable numeric fields, replacing every slider in the
   // right panel: drag left/right on the field to change its value (hold
-  // Shift for fine 0.1-step adjustments, Alt for x10 coarse steps — same
-  // modifier convention Rive/AE use), or just click to place a caret and
-  // type a value directly. A plain click (no drag) never fires a change,
-  // so tabbing/typing behaves exactly like a normal number input.
+  // Cmd/Ctrl for fine 0.1-step adjustments — more precise, Shift for x10
+  // coarse steps — reaches further per pixel dragged; 2026-07-28, explicit
+  // request to match this exact pairing "comme dans toutes les app du
+  // genre" — replaces an earlier Shift=fine/Alt=coarse mapping), or just
+  // click to place a caret and type a value directly. A plain click (no
+  // drag) never fires a change, so tabbing/typing behaves exactly like a
+  // normal number input.
   // Pointer Events + explicit setPointerCapture, not raw mousedown/mousemove/
   // mouseup on window: the previous version tracked drag state in a plain
   // closure variable cleared on a *global* window 'mouseup' listener — if
@@ -1109,7 +1112,10 @@
       window._scrubLiveActive=true;
     }
     var step=parseFloat(scrubState.el.dataset.step)||1;
-    if(e.shiftKey)step*=0.1;else if(e.altKey)step*=10;
+    // Cmd (Mac) / Ctrl (Windows/Linux) = precise (fine, ×0.1) ; Shift =
+    // reaches further per pixel (coarse, ×10) — see this block's own
+    // header comment for why this exact pairing.
+    if(e.metaKey||e.ctrlKey)step*=0.1;else if(e.shiftKey)step*=10;
     var raw=scrubState.startVal+Math.round(dx/4)*step;
     var min=scrubState.el.min!==''?parseFloat(scrubState.el.min):null;
     var max=scrubState.el.max!==''?parseFloat(scrubState.el.max):null;
