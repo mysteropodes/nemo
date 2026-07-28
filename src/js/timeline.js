@@ -176,12 +176,25 @@ function stopPlay(){if(!state.playing)return;state.playing=false;
 }
 function togglePlay(){if(state.playing)stopPlay();else startPlay();}
 
+// Keyframe diamonds (.motion-key/.km) land at frame*FC+FC/2 in Motion —
+// CSS flex justify-content:center inside `.fc`, no explicit JS positioning
+// — while the playhead line used frame*FC everywhere (left-edge convention,
+// via border-left on a width:var(--fc) box). Invisible in Animation 2D
+// (there the playhead's left edge IS the correct mark — no per-frame
+// diamond to line up with), but in Motion the line visibly missed every
+// diamond's center by half a cell ("le curseur devrait arriver aligné à la
+// keyframe", 2026-07-28) — made obvious there specifically because Motion
+// also paints a frame-duration background block (motion.js) spanning that
+// same box, contrasting against the centered diamond. One shared helper so
+// the three call sites (this function, and renderTimeline()'s Motion/
+// Animation-2D branches) can't drift apart again (CLAUDE.md §3).
+function playheadLeftPx(frame){return frame*FC+(state.appMode==='motion'?FC/2:0);}
 function updatePlayhead(){
   if(window.SMCamera){SMCamera.applyCameraView();if(window.updateCameraPanel)updateCameraPanel();}
   var tlCfEl0=document.getElementById('tl-cf');
   if(document.activeElement!==tlCfEl0)tlCfEl0.value=state.currentFrame+1;
   document.getElementById('info-frame').textContent=state.currentFrame+1;
-  document.getElementById('playhead').style.left=(state.currentFrame*FC)+'px';
+  document.getElementById('playhead').style.left=playheadLeftPx(state.currentFrame)+'px';
   document.getElementById('playhead-flag').textContent=state.currentFrame+1;
   document.querySelectorAll('.fc.cur').forEach(function(el){el.classList.remove('cur');});
   document.querySelectorAll('.fhc.cur').forEach(function(el){el.classList.remove('cur');});
@@ -2421,7 +2434,7 @@ function renderTimeline(){
   if(state.appMode==='motion'){
     if(window.SMMotion)SMMotion.renderTimelineMotion(grid);
     var mph=document.getElementById('playhead');
-    mph.style.left=(state.currentFrame*FC)+'px';
+    mph.style.left=playheadLeftPx(state.currentFrame)+'px';
     // Bug found 2026-07 ("la valeur de frame ne change pas dans motion"):
     // this branch positioned the playhead LINE but never touched
     // #playhead-flag's own text — only the Animation 2D branch further
@@ -2522,7 +2535,7 @@ function renderTimeline(){
   // scrollbar. Math.max keeps the line covering a tall/scrolled layer
   // list too (that case was already correct).
   var awrap=document.getElementById('fg-wrap');
-  document.getElementById('playhead').style.left=(state.currentFrame*FC)+'px';
+  document.getElementById('playhead').style.left=playheadLeftPx(state.currentFrame)+'px';
   syncPlayheadToViewport();
   document.getElementById('playhead-flag').textContent=state.currentFrame+1;
   // Markers are overlays on rows this function just rebuilt — re-attach.
