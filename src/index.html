@@ -925,7 +925,7 @@
   <div class="modal-box">
     <div class="modal-hdr"><span data-i18n="exportTitle">Export</span> <button id="export-close" class="modal-x">&times;</button></div>
     <div class="modal-bdy">
-      <div class="pr"><span class="pl" style="width:90px" data-i18n="fieldFormat">Format</span>
+      <div class="pr"><span class="pl" data-i18n="fieldFormat">Format</span>
         <select class="psel" id="exp-format" style="flex:1">
           <option value="svg" data-i18n="expSeqSvg">Séquence SVG</option>
           <option value="png" data-i18n="expSeqPng">Séquence PNG</option>
@@ -940,13 +940,13 @@
       </div>
       <div class="pr" id="exp-rive-hint" style="display:none;font-size:9px;color:var(--text-dim)" data-i18n="expRiveHint">Nécessite Rive Editor ouvert en local avec le serveur MCP actif (port 9791).</div>
       <div class="pr" id="exp-ae-camera-hint" style="display:none;font-size:9px;color:var(--text-dim)" data-i18n="expAeCameraHint">Génère un script .jsx à lancer dans After Effects (File &gt; Scripts &gt; Run Script File…) — nécessite un calque caméra actif.</div>
-      <div class="pr"><span class="pl" style="width:90px" data-i18n="fieldRange">Plage</span>
+      <div class="pr"><span class="pl" data-i18n="fieldRange">Plage</span>
         <select class="psel" id="exp-range" style="flex:1">
           <option value="wa" data-i18n="rangeWorkArea">Zone de travail</option>
           <option value="all" data-i18n="rangeAll">Toute la timeline</option>
         </select>
       </div>
-      <div class="pr" id="exp-scale-row"><span class="pl" style="width:90px" data-i18n="fieldScale">Échelle</span>
+      <div class="pr" id="exp-scale-row"><span class="pl" data-i18n="fieldScale">Échelle</span>
         <select class="psel" id="exp-scale" style="flex:1" data-i18n-title="expScaleTitle" title="Contenu vectoriel — l'agrandissement reste net à n'importe quelle échelle">
           <option value="0.5">0.5x</option>
           <option value="1" selected>1x</option>
@@ -957,7 +957,7 @@
           <option value="custom" data-i18n="expScaleCustom">Personnalisé…</option>
         </select>
       </div>
-      <div class="pr" id="exp-size-row" style="display:none"><span class="pl" style="width:90px" data-i18n="fieldSize2">Taille</span>
+      <div class="pr" id="exp-size-row" style="display:none"><span class="pl" data-i18n="fieldSize2">Taille</span>
         <input type="number" class="pi scrub" id="exp-w" min="1" max="16384" style="width:70px" data-step="1">
         <span style="font-size:9px;color:var(--text-dim)">×</span>
         <input type="number" class="pi scrub" id="exp-h" min="1" max="16384" style="width:70px" data-step="1">
@@ -1146,9 +1146,9 @@
     <div class="modal-bdy">
       <div id="kitsu-step-login">
         <div style="font-size:10px;color:var(--text-dim);margin-bottom:10px" data-i18n="kitsuLoginDesc">Connexion à ton studio Kitsu (CGWire) — asynchrone, aucune synchronisation en temps réel avec les autres postes.</div>
-        <div class="pr" style="gap:8px"><span class="pl" style="flex:none;width:70px" data-i18n="kitsuServerUrl">URL serveur</span><input type="text" id="kitsu-url" class="pi" style="flex:1" placeholder="https://kitsu.monstudio.com"></div>
-        <div class="pr" style="gap:8px;margin-top:6px"><span class="pl" style="flex:none;width:70px" data-i18n="kitsuEmail">Email</span><input type="email" id="kitsu-email" class="pi" style="flex:1"></div>
-        <div class="pr" style="gap:8px;margin-top:6px"><span class="pl" style="flex:none;width:70px" data-i18n="kitsuPassword">Mot de passe</span><input type="password" id="kitsu-password" class="pi" style="flex:1"></div>
+        <div class="pr" style="gap:8px"><span class="pl" data-i18n="kitsuServerUrl">URL serveur</span><input type="text" id="kitsu-url" class="pi" style="flex:1" placeholder="https://kitsu.monstudio.com"></div>
+        <div class="pr" style="gap:8px;margin-top:6px"><span class="pl" data-i18n="kitsuEmail">Email</span><input type="email" id="kitsu-email" class="pi" style="flex:1"></div>
+        <div class="pr" style="gap:8px;margin-top:6px"><span class="pl" data-i18n="kitsuPassword">Mot de passe</span><input type="password" id="kitsu-password" class="pi" style="flex:1"></div>
         <div id="kitsu-login-error" style="font-size:10px;color:#ff6b6b;margin-top:6px;display:none"></div>
         <div class="pr" style="margin-top:10px"><button class="pbtn ac" id="kitsu-login-btn" style="flex:1" data-i18n="btnLogin">Se connecter</button></div>
       </div>

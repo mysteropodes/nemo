@@ -1541,6 +1541,15 @@ body.mode-motion .lrow.act.motion-selected{background:rgba(63,107,245,.16);box-s
 .modal-x{background:none;border:none;color:var(--text-dim);font-size:16px;cursor:pointer;line-height:1;}
 .modal-x:hover{color:var(--text);}
 .modal-bdy{padding:12px 14px;display:flex;flex-direction:column;gap:8px;}
+/* ONE label column for every dialog. Each one was internally consistent but
+   they disagreed with each other — 90px in Export, 70px in Kitsu, 68px
+   (the panel default) in Settings — set by per-row inline widths, so opening
+   two dialogs in a row shifted the field column under you for no reason a
+   reader could see. 90px because that is what the widest label actually
+   needs (Export's "Format" row measures 90 in all four languages, Kitsu's
+   Spanish "URL del servidor" 85); dialogs have the width to spare, unlike
+   the 220px side panel where 68px was the right trade. */
+.modal-bdy .pl{width:90px;flex:none;}
 .modal-box.wide{width:700px;max-width:92vw;}
 /* Réglages accumulates a LOT of sections (langue, sync, feedback local,
    feedback GitHub, raccourcis…) — without this the whole page scrolled
