@@ -115,10 +115,26 @@
     // resolution it had when first registered — acceptable for how rasters
     // are used today (imported once via images.js, not interactively
     // resized), revisit if that changes.
-    if (!raster.loaded || !raster.canvas) return null; // not decoded yet — try again next tick
+    // ORDER MATTERS. `raster.canvas` is not an accessor, it is a BUILDER:
+    // Paper allocates a canvas and drawImages the source into it on first
+    // access, per Raster OBJECT — and loadFrame rebuilds every Raster on
+    // every frame. Touching it before the already-registered check meant a
+    // scene of N rasters paid N canvas allocations + N drawImage calls per
+    // frame to re-derive pixels the GPU had held since the first frame.
+    // Measured (2026-07-28, 2000 bitmap items): 24fps target delivered at
+    // 4.4fps, with 16 main-thread long tasks of 150-370ms across 3s — none
+    // of it attributable to any function in the play loop, because the cost
+    // was inside this one property read.
+    //
+    // The id comes from raster.data.src alone (engineIdFor, memoised per
+    // source string), so it costs nothing and needs no decoded canvas.
+    // Checking it first also removes a one-frame flash: a rebuilt Raster
+    // whose image is already on the GPU no longer has to wait for its own
+    // `loaded` flag before the engine can draw it.
     var id = engineIdFor(raster);
     if (!id) return null;
     if (registeredImageIds[id]) return id;
+    if (!raster.loaded || !raster.canvas) return null; // not decoded yet — try again next tick
     var cv = raster.canvas;
     var ctx = cv.getContext('2d');
     var pixels = ctx.getImageData(0, 0, cv.width, cv.height).data;
