@@ -91,6 +91,15 @@
   var _hideUnanimated = false;
   function propHasContent(holder, prop) { return isAnimated(holder, prop) || !!(holder.motionStatic && holder.motionStatic[prop]); }
   function isPropFiltered(prop) { return !!_propFilter && _propFilter.indexOf(prop) < 0; }
+  // The "TRANSFORM" header earns its row when it groups a list you're
+  // scanning. Once a shortcut has narrowed the view to one property it groups
+  // nothing — you asked for Position, so show Position (2026-07-27: "quand on
+  // utilise les raccourcis pour afficher les propriétés pas la peine
+  // d'afficher le transform"). AE does the same: P gives you the one line.
+  // ONE predicate for both renderers — the panel builds this header and the
+  // grid builds a blank spacer to match it, and a row that exists on one side
+  // only is the alignment bug CLAUDE.md §11 opens with.
+  function showsGroupHeader() { return !_propFilter; }
   // Which layers a property shortcut acts on: the selection, or EVERY layer
   // when nothing is selected (2026-07-27: "si je fais 'p' alors ça affiche
   // seulement toutes les prop position de tous les calques ou ceux de la
@@ -2278,6 +2287,10 @@
   // (stopwatch toggle) since that can affect which rows/tracks exist;
   // scrubbing a value only needs the timeline (track content) + canvas.
   function renderTransformGroup(list, holder, groupLabel) {
+    if (showsGroupHeader()) renderTransformHeader(list, groupLabel);
+    renderTransformProps(list, holder);
+  }
+  function renderTransformHeader(list, groupLabel) {
     var grp = document.createElement('div'); grp.className = 'lrow motion-group-row';
     var grpLabel = document.createElement('span'); grpLabel.textContent = groupLabel;
     grp.appendChild(grpLabel);
@@ -2295,6 +2308,8 @@
     });
     grp.appendChild(filterBtn);
     list.appendChild(grp);
+  }
+  function renderTransformProps(list, holder) {
     propsFor(holder).forEach(function (prop) {
       if (isPropFiltered(prop) || (_hideUnanimated && !propHasContent(holder, prop))) return;
       var pr = document.createElement('div'); pr.className = 'lrow motion-prop-row';
@@ -3088,8 +3103,10 @@
       if (window.SMLayerInOut) SMLayerInOut.buildBar(spacer, li);
       grid.appendChild(spacer);
       if (!expanded) return;
-      var grpSpacer = document.createElement('div'); grpSpacer.className = 'frow';
-      grid.appendChild(grpSpacer);
+      if (showsGroupHeader()) {
+        var grpSpacer = document.createElement('div'); grpSpacer.className = 'frow';
+        grid.appendChild(grpSpacer);
+      }
       propsFor(ld).forEach(function (prop) { renderTracksFor(grid, ld, prop); });
       // Mirrors renderElementsList's panel structure: one spacer per
       // element, its own track rows only when that ONE element is expanded
@@ -3117,8 +3134,10 @@
           // track) while list's had 'motion-group-row' (a header) — same
           // "extra row on one side only" bug class as the Fill-row fix
           // above, just at the element level instead of the shape level.
-          var elGrpSpacer = document.createElement('div'); elGrpSpacer.className = 'frow';
-          grid.appendChild(elGrpSpacer);
+          if (showsGroupHeader()) {
+            var elGrpSpacer = document.createElement('div'); elGrpSpacer.className = 'frow';
+            grid.appendChild(elGrpSpacer);
+          }
           PROPS.forEach(function (prop) { renderTracksFor(grid, elHolder, prop); });
           // Path group (mirrors renderElementsList's renderPathVertexGroup
           // exactly — same expand condition, same vertex count, same
