@@ -901,6 +901,12 @@ function symGestureAccumulate(opMatrix){
   var m=symMatrixOf(ld);
   opMatrix.append(m);
   symMatrixSet(ld,opMatrix);
+  // NOTE: no _sceneVersion bump here. symMatrix is materialised by
+  // getEffectiveStrokes at loadFrame time; engine-bridge.js never reads it
+  // (grep: zero references), so bumping the version only forces a rebuild
+  // that produces the same bytes. What makes a component drag visible live
+  // is the geometry translate in select-bridge.js's move branch — see the
+  // selectedPaths re-sync there.
 }
 // Applies an affine matrix to one raw stroke-data dict's geometry in place
 // — point gets the full affine, handleIn/handleOut are deltas so only the
