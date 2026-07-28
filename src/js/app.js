@@ -2194,6 +2194,10 @@ function _maybePromoteInterpolated(f,strokes){
 // layer — leave it alone.
 function saveActiveLayerFrame(){
   window._sceneVersion++;
+  // Motion caches a component's whole-duration union bounds (the gizmo's
+  // fixed reference box); frame content is what it is derived from, so it
+  // must not outlive a write. Cheap: this is a gesture-end path.
+  if (window.SMMotion && SMMotion.invalidateSymbolUnionBounds) SMMotion.invalidateSymbolUnionBounds();
   var ld=state.layers[state.activeLayerIdx];if(ld.symbolId||ld.nativeVideo||ld.montageId||ld.isNullLayer||ld.isEffectLayer)return;
   if(!layerIsEffectivelyVisible(state.activeLayerIdx))return;
   _writeBackGhostProxies(state.activeLayerIdx);
@@ -2204,6 +2208,7 @@ function saveActiveLayerFrame(){
   f.strokes=strokes;
 }
 function saveAllLayerFrames(){
+  if (window.SMMotion && SMMotion.invalidateSymbolUnionBounds) SMMotion.invalidateSymbolUnionBounds();
   _writeBackGhostProxies(state.activeLayerIdx);
   for(var i=0;i<state.layers.length;i++){if(state.layers[i].symbolId||state.layers[i].nativeVideo||state.layers[i].montageId||state.layers[i].isNullLayer||state.layers[i].isEffectLayer)continue;
   if(!layerIsEffectivelyVisible(i))continue;

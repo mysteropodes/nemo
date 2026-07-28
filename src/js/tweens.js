@@ -4293,10 +4293,16 @@ function restoreLayersSnapshot(s){
   renderOS();renderArcs();updateUI();
   if(window.SMCamera&&window.updateCameraPanel){updateCameraPanel();}
 }
-function undo(){if(!state.undoStack.length){showToast('Rien à annuler');return;}var s=state.undoStack.pop();var sl=state.undoLabels.pop()||_actionLabelNow();
+// Both branches below rewrite frame strokes; Motion's component union-bounds
+// cache is derived from those, so drop it here rather than in each branch.
+function undo(){if(window.SMMotion&&SMMotion.invalidateSymbolUnionBounds)SMMotion.invalidateSymbolUnionBounds();
+if(!state.undoStack.length){showToast('Rien à annuler');return;}var s=state.undoStack.pop();var sl=state.undoLabels.pop()||_actionLabelNow();
 if(s.type==='layers'){state.redoStack.push(layersSnapshotNow());state.redoLabels.push(sl);restoreLayersSnapshot(s);if(window.renderHistoryPanelIfOpen)renderHistoryPanelIfOpen();return;}
 var cur={frame:state.currentFrame,layers:[]};for(var i=0;i<state.layers.length;i++){var f=state.layers[i].frames[state.currentFrame];cur.layers.push({strokes:JSON.parse(JSON.stringify(f.strokes)),isKeyframe:f.isKeyframe,isInterpolated:f.isInterpolated});}state.redoStack.push(cur);state.redoLabels.push(sl);for(var i2=0;i2<s.layers.length&&i2<state.layers.length;i2++){var tf=state.layers[i2].frames[s.frame];tf.strokes=s.layers[i2].strokes;tf.isKeyframe=s.layers[i2].isKeyframe;tf.isInterpolated=s.layers[i2].isInterpolated;}if(s.frame!==state.currentFrame)state.currentFrame=s.frame;loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderHistoryPanelIfOpen)renderHistoryPanelIfOpen();}
-function redo(){if(!state.redoStack.length){showToast('Rien à refaire');return;}var s=state.redoStack.pop();var sl=state.redoLabels.pop()||_actionLabelNow();
+// Both branches below rewrite frame strokes; Motion's component union-bounds
+// cache is derived from those, so drop it here rather than in each branch.
+function redo(){if(window.SMMotion&&SMMotion.invalidateSymbolUnionBounds)SMMotion.invalidateSymbolUnionBounds();
+if(!state.redoStack.length){showToast('Rien à refaire');return;}var s=state.redoStack.pop();var sl=state.redoLabels.pop()||_actionLabelNow();
 if(s.type==='layers'){state.undoStack.push(layersSnapshotNow());state.undoLabels.push(sl);restoreLayersSnapshot(s);if(window.renderHistoryPanelIfOpen)renderHistoryPanelIfOpen();return;}
 var cur={frame:state.currentFrame,layers:[]};for(var i=0;i<state.layers.length;i++){var f=state.layers[i].frames[state.currentFrame];cur.layers.push({strokes:JSON.parse(JSON.stringify(f.strokes)),isKeyframe:f.isKeyframe,isInterpolated:f.isInterpolated});}state.undoStack.push(cur);state.undoLabels.push(sl);for(var i2=0;i2<s.layers.length&&i2<state.layers.length;i2++){var tf=state.layers[i2].frames[s.frame];tf.strokes=s.layers[i2].strokes;tf.isKeyframe=s.layers[i2].isKeyframe;tf.isInterpolated=s.layers[i2].isInterpolated;}if(s.frame!==state.currentFrame)state.currentFrame=s.frame;loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderHistoryPanelIfOpen)renderHistoryPanelIfOpen();}
 
