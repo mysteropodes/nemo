@@ -345,14 +345,14 @@
                reaches them — without it the rounded input backgrounds stack
                edge-to-edge and visually fuse. -->
           <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px">
-            <div class="pr"><span class="pl" data-i18n="fieldPosition">Position</span><input type="number" class="pi scrub" id="sp-x" value="0" data-step="1" data-i18n-title="titleDragX" title="X — drag to scrub, click to type"><input type="number" class="pi scrub" id="sp-y" value="0" data-step="1" data-i18n-title="titleDragY" title="Y — drag to scrub, click to type"></div>
+            <div class="pr sp-xform-row"><span class="pl" data-i18n="fieldPosition">Position</span><input type="number" class="pi scrub" id="sp-x" value="0" data-step="1" data-i18n-title="titleDragX" title="X — drag to scrub, click to type"><input type="number" class="pi scrub" id="sp-y" value="0" data-step="1" data-i18n-title="titleDragY" title="Y — drag to scrub, click to type"></div>
             <!-- Proportion lock (2026-07 feedback: "il manque le cadenas sur
                  le size pour lier les 2") — same dims-lock-btn as the
                  Document panel's own W/H lock (index.html above), reused
                  as-is since it's already generic (see btn-sp-size-lock's
                  wiring in timeline.js). -->
-            <div class="pr dims-row"><span class="pl" data-i18n="fieldSize">Size</span><input type="number" class="pi scrub" id="sp-w" value="0" min="1" data-step="1" data-i18n-title="fieldWidth" title="Width"><input type="number" class="pi scrub" id="sp-h" value="0" min="1" data-step="1" data-i18n-title="fieldHeight" title="Height"><button class="dims-lock-btn" id="btn-sp-size-lock" type="button" data-i18n-title="dimsLockTitle" title="Lier largeur/hauteur (garder les proportions)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></button></div>
-            <div class="pr"><span class="pl" data-i18n="fieldRotate">Rotate</span><input type="number" class="pi scrub" id="sp-rot" value="0" data-step="1" data-i18n-title="titleRotateSel" title="Rotation relative to selection state (degrees)"><span style="font-size:9px;color:var(--text-dim)">°</span></div>
+            <div class="pr sp-xform-row"><span class="pl" data-i18n="fieldSize">Size</span><input type="number" class="pi scrub" id="sp-w" value="0" min="1" data-step="1" data-i18n-title="fieldWidth" title="Width"><input type="number" class="pi scrub" id="sp-h" value="0" min="1" data-step="1" data-i18n-title="fieldHeight" title="Height"><button class="dims-lock-btn" id="btn-sp-size-lock" type="button" data-i18n-title="dimsLockTitle" title="Lier largeur/hauteur (garder les proportions)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></button></div>
+            <div class="pr sp-xform-row"><span class="pl" data-i18n="fieldRotate">Rotate</span><input type="number" class="pi scrub" id="sp-rot" value="0" data-step="1" data-i18n-title="titleRotateSel" title="Rotation relative to selection state (degrees)"><span style="font-size:9px;color:var(--text-dim)">°</span></div>
           </div>
           <!-- Anchor point (pivot) picker — redesign 2026-07-09, AE-style
                9-dot widget. Sets state.xformAnchorKey (tools.js), read by
@@ -515,7 +515,7 @@
                needed, reference-bridge.js's existing 'input' listener on
                #p-ref-opacity already reads .value the same way either type
                produces it). -->
-          <div class="pr dims-row">
+          <div class="pr dims-row pair-grid">
             <span class="pl" data-i18n="fieldOpacity">Opacity</span><input type="number" class="pi scrub" id="p-ref-opacity" min="5" max="100" value="50" data-step="1">
             <span class="pl" data-i18n="fieldOffset">Offset</span><input type="number" class="pi scrub" id="p-ref-offset" value="0" data-step="1" data-i18n-title="refOffsetTitle" title="Frame de la timeline où la référence démarre">
           </div>
@@ -535,9 +535,9 @@
              glyph (was two abstract interlocking arcs, reported as "pas
              très clair") — the same link/unlink icon shape used
              everywhere for this exact concept. -->
-        <div class="pr dims-row">
-          <span class="pl" style="min-width:14px" data-i18n="fieldW">W</span><input type="number" class="pi scrub" id="p-cw" value="1920" min="1" max="7680" data-step="1">
-          <span class="pl" style="min-width:14px" data-i18n="fieldH">H</span><input type="number" class="pi scrub" id="p-ch" value="1080" min="1" max="4320" data-step="1">
+        <div class="pr dims-row pair-grid">
+          <span class="pl" data-i18n="fieldW">W</span><input type="number" class="pi scrub" id="p-cw" value="1920" min="1" max="7680" data-step="1">
+          <span class="pl" data-i18n="fieldH">H</span><input type="number" class="pi scrub" id="p-ch" value="1080" min="1" max="4320" data-step="1">
           <button class="dims-lock-btn" id="btn-dims-lock" type="button" data-i18n-title="dimsLockTitle" title="Lier largeur/hauteur (garder les proportions)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></button>
         </div>
         <!-- FPS + Frames paired on one row (2026-07, "dans les différents
@@ -545,7 +545,7 @@
              sur la même ligne") — same dims-row treatment as W/H just
              above (gap + non-growing labels), reused as-is since its CSS
              is generic, not actually dimensions-specific. -->
-        <div class="pr dims-row">
+        <div class="pr dims-row pair-grid">
           <span class="pl">FPS</span><input type="number" class="pi scrub" id="proj-fps" value="12" min="1" max="60" data-step="1">
           <span class="pl">Frames</span><input type="number" class="pi scrub" id="proj-frames" value="24" min="1" max="999" data-step="1">
         </div>

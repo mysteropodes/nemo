@@ -660,6 +660,48 @@ input[type="checkbox"]:disabled{opacity:.4;cursor:not-allowed;}
    line, so their labels are deliberately hug-width — they opt out of the
    single-column grid above rather than fighting it. */
 .dims-row .pl{min-width:0!important;width:auto!important;flex:none;overflow:visible;}
+
+/* ...but hug-width labels mean each pair starts wherever its own text ends,
+   so W/H and FPS/Frames — stacked in the same section — put their fields on
+   four different x at four different widths (2026-07-27: "dans rive les
+   value sont quand même bien aligné, nous c'est un peu le basard"). This
+   replaces the flex flow with a real four-column grid: two FIXED label
+   columns and two equal value columns, so every paired row in the panel
+   shares the same grid lines whatever its labels say. A fifth `auto` track
+   takes an optional trailing control (the W/H proportion lock); rows without
+   one leave it empty and it collapses to nothing.
+   Only the canonical label|field|label|field rows carry this class — the BG
+   icon strip and the P.min/P.max row (which interleaves unit suffixes
+   between the fields) are genuinely different shapes and stay on flex. */
+.pair-grid{display:grid!important;grid-template-columns:44px minmax(0,1fr) 44px minmax(0,1fr) 22px;gap:5px;align-items:center;}
+.pair-grid .pl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+/* The trailing 22px track is FIXED, not auto: a row without a lock button
+   would otherwise size that track to 0 and shift its own columns 3 and 4
+   left of the row above's (measured: 11px out). Reserved on every row, it
+   reads as a consistent right gutter — same as the Rive reference, whose
+   stopwatch column is present on every line whether or not it is lit.
+   The fields must FILL their track too, or they sit 50px wide at the track's
+   left edge and the columns only look aligned when the tracks happen to be
+   equal. */
+.pair-grid .pi{width:100%;min-width:0;}
+
+/* Position / Size / Rotate in the selection panel, one grid for the three.
+   Size was a .dims-row (hug label, so its lock button fits) while Position
+   and Rotate were ordinary rows with the 68px label column — so Size's two
+   fields sat ~35px left of Position's, which is the ragged block in the
+   reported screenshot. Rotate's single field spans both value columns so its
+   box ends on the same right edge as the pairs above, and the degree symbol
+   shares the trailing column with Size's lock. */
+/* Narrower label column and tighter gaps than the panel default here: this
+   block shares its row with the 9-dot anchor picker, so the whole grid has
+   ~172px to spend. At the default 68px label + 6px gaps the value boxes
+   came out 32px and clipped their own numbers ("586" -> "58(") — alignment
+   is not worth buying with legibility. 54px still fits "Position", the
+   longest label of the three. */
+.sp-xform-row{display:grid;grid-template-columns:54px minmax(0,1fr) minmax(0,1fr) 22px;gap:4px;align-items:center;}
+.sp-xform-row .pl{width:auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.sp-xform-row .pi{width:100%;min-width:0;}
+#sp-rot{grid-column:2 / span 2;}
 .dims-lock-btn{flex:none;width:22px;height:22px;border:none;background:transparent;color:rgba(236,234,231,.4);cursor:pointer;border-radius:5px;display:flex;align-items:center;justify-content:center;}
 .dims-lock-btn:hover{background:rgba(255,255,255,.08);color:var(--text);}
 .dims-lock-btn.on{color:var(--accent-hover);background:var(--accent-dim);}
