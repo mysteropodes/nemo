@@ -1289,7 +1289,17 @@ function convertLayerToComponent(layerIdx){
   // 'loop' default made a component's parent-timeline keyframe misleadingly
   // look "empty/short" when the component itself kept cycling underneath).
   ld.symbolId=symId;ld.locked=true;ld.symPlayMode='once';ld.symSpeed=1;ld.symPlacedAt=0;ld.symSingleFrame=0;
-  ld.frames=[];for(var i=0;i<state.totalFrames;i++)ld.frames.push({strokes:[],isKeyframe:i===0,isInterpolated:false,componentFrame:i===0?0:undefined});
+  // NO componentFrame stamp here. resolveSymbolFrameIdx treats that field as
+  // an explicit "hold this internal frame from here on" — the same thing the
+  // frame strip writes when you deliberately pick a frame — and it is checked
+  // BEFORE play mode. Stamping 0 on frame 0 therefore pinned every freshly
+  // converted component to its own first frame for the whole timeline, and
+  // the symPlayMode:'once' set two lines above never ran (2026-07-28: "il ne
+  // lit pas toutes les frames du composant dans animation 2D"). Worse, when
+  // the source layers' drawing starts LATER than frame 0 the pinned frame is
+  // blank, so the component looked like it had vanished entirely — the same
+  // report from the day before, same single cause.
+  ld.frames=[];for(var i=0;i<state.totalFrames;i++)ld.frames.push({strokes:[],isKeyframe:i===0,isInterpolated:false});
   loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderSymbolTabs)renderSymbolTabs();
   showToast('Composant créé: '+state.symbols[symId].name);
 }
@@ -1320,7 +1330,7 @@ function convertLayersToComponent(indices){
   for(var k=indices.length-1;k>=0;k--){state.layers.splice(indices[k],1);userLayers.splice(indices[k],1);}
   var newLd={name:'Composant',symbolId:symId,locked:true,visible:true,symPlayMode:'once',symSpeed:1,symPlacedAt:0,symSingleFrame:0,
     frames:[]};
-  for(var i=0;i<state.totalFrames;i++)newLd.frames.push({strokes:[],isKeyframe:i===0,isInterpolated:false,componentFrame:i===0?0:undefined});
+  for(var i=0;i<state.totalFrames;i++)newLd.frames.push({strokes:[],isKeyframe:i===0,isInterpolated:false}); // no componentFrame — see convertLayerToComponent
   var newUl=new Layer({name:'layer-'+state.layers.length});
   state.layers.splice(insertAt,0,newLd);
   userLayers.splice(insertAt,0,newUl);
