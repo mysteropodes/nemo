@@ -995,7 +995,15 @@ function symGestureAccumulate(opMatrix){
 // `src` is immutable by contract — desR reads it, nothing rewrites it in
 // place — so the clone shares the same string reference. Any future field
 // that is both large and immutable belongs in HEAVY too.
-var _HEAVY_STROKE_FIELDS = ['src'];
+// `src` is a base64 data URL (~190KB per raster); bitmapPressureProfile is
+// the per-dab pressure sampling a bitmap-brush stroke carries (62KB across
+// the reference project, second only to src). Both are written once at
+// creation and only ever read afterwards, so a clone can share them.
+var _HEAVY_STROKE_FIELDS = ['src', 'bitmapPressureProfile'];
+// Exported so the undo snapshot (_cloneLayersForUndo, tweens.js) shares the
+// same list — two copies of it would drift the moment a third heavy field
+// appears (CLAUDE.md §3).
+window._HEAVY_STROKE_FIELDS = _HEAVY_STROKE_FIELDS;
 function cloneStrokeForTransform(sd) {
   var heavy = null, k, i;
   for (i = 0; i < _HEAVY_STROKE_FIELDS.length; i++) {

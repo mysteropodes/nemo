@@ -4065,7 +4065,11 @@ function computeArcMatchState(){
   return {fA:fA,fB:fB,sA:sA,sB:sB,matches:matches,fm:fm};
 }
 function renderArcs(cached){
-  updateReassignBadge();
+  // Computed BEFORE updateReassignBadge and handed to it — see its own
+  // comment. Both need the identical state; running the matcher twice per
+  // scrub tick was the single largest cost on the scrub path.
+  var st=cached||computeArcMatchState();
+  updateReassignBadge(st);
   arcLayer.removeChildren();arcHandles=[];
   renderNodeHandles();
   renderTransformHandles();
@@ -4074,7 +4078,6 @@ function renderArcs(cached){
   // was ALSO an O(n³) Hungarian on hundreds of entries per click. m.a
   // indexes the filtered list; selectedStrokeIndices index the raw frame
   // array — map back through .orig for the selection check.
-  var st=cached||computeArcMatchState();
   if(!st)return;
   var fA=st.fA,fB=st.fB,sA=st.sA,sB=st.sB,matches=st.matches,fm=st.fm;
   arcLayer.activate();var cols=['#ff6b6b','#4ecdc4','#ffe66d','#a29bfe','#fd79a8','#00cec9'];var easFn=getEasingForPair(state.activeLayerIdx,fA,fB);
@@ -4228,10 +4231,60 @@ function renderOS(){
 // frames, all layers, frame count). The old per-current-frame snapshot
 // couldn't restore anything that touched other frames or the arrays'
 // shape — moving/pasting frames, tweens, layer ops — which made ⌘Z feel
-// like it only worked for strokes. A full snapshot is ~a few hundred KB
-// per entry (JSON) which at maxUndo=60 stays well within budget.
+// like it only worked for strokes.
+//
+// "~a few hundred KB per entry, well within budget at maxUndo=60" — that
+// estimate predates rasters and the bitmap brush. On the reference project a
+// stringify of state.layers is ~15MB, essentially all of it base64 `src`
+// (15.3MB against 66KB for the next-largest field), so 60 entries retained
+// up to ~900MB and every gesture that pushes undo paid a multi-MB JSON round
+// trip. Nothing in a snapshot is ever mutated in place — restoreLayersSnapshot
+// installs the objects and later replaces whole arrays (`f.strokes=...`) —
+// and JS strings are immutable, so sharing the heavy fields by reference is
+// unconditionally safe. Same split the render path already uses
+// (cloneStrokeForTransform, app.js). 2026-07-28.
 function pushUndo(){pushUndoLayers();}
-function layersSnapshotNow(){return{type:'layers',layers:JSON.parse(JSON.stringify(state.layers)),active:state.activeLayerIdx,totalFrames:state.totalFrames,cameraKeys:JSON.parse(JSON.stringify(state.cameraKeys||[]))};}
+// Walks every stroke of a layers tree in a deterministic order. Both the
+// live tree and its clone have identical shape, so two walks stay in lockstep
+// and a flat array indexed by visit order is enough to pair them up.
+function _walkStrokes(layers,fn){
+  for(var li=0;li<layers.length;li++){
+    var fr=(layers[li]&&layers[li].frames)||[];
+    for(var fi=0;fi<fr.length;fi++){
+      var st=(fr[fi]&&fr[fi].strokes)||[];
+      for(var si=0;si<st.length;si++)fn(st[si]);
+    }
+  }
+}
+// Clone for undo WITHOUT duplicating the heavy immutable payloads.
+//
+// Measured three ways before settling on this one — a per-object JS cloner
+// and a JSON replacer/reviver pair were both SLOWER than the plain full
+// round trip they were meant to beat (14.1ms and 26.5ms against 16.1ms on a
+// 10-layer/8000-raster scene), because one native JSON.stringify of the
+// whole tree beats thousands of small JS-side copies even when it moves far
+// more bytes. Detaching the heavy strings first and letting the native path
+// do the rest wins on both counts: 4.1ms, and the clone ends up holding the
+// SAME string objects as the live tree instead of fresh copies.
+//
+// The live tree is briefly mutated (heavy fields nulled) — synchronous, with
+// no call-out in between, and restored in a `finally` so a throw inside
+// JSON.stringify cannot leave it stripped.
+function _cloneLayersForUndo(layers){
+  var HEAVY=(window._HEAVY_STROKE_FIELDS)||['src','bitmapPressureProfile'];
+  var saved=[],c;
+  _walkStrokes(layers,function(s){
+    var e=null;
+    for(var i=0;i<HEAVY.length;i++){var k=HEAVY[i];
+      if(typeof s[k]==='string'){(e||(e={}))[k]=s[k];s[k]=null;}}
+    saved.push(e);
+  });
+  try{ c=JSON.parse(JSON.stringify(layers)); }
+  finally{ var j=0;_walkStrokes(layers,function(s){var e=saved[j++];if(e)for(var k in e)s[k]=e[k];}); }
+  var j2=0;_walkStrokes(c,function(s){var e=saved[j2++];if(e)for(var k in e)s[k]=e[k];});
+  return c;
+}
+function layersSnapshotNow(){return{type:'layers',layers:_cloneLayersForUndo(state.layers),active:state.activeLayerIdx,totalFrames:state.totalFrames,cameraKeys:JSON.parse(JSON.stringify(state.cameraKeys||[]))};}
 // Human-readable description of "what's about to happen", captured at the
 // SAME moment as the snapshot (pushUndoLayers runs before the mutation it
 // guards, so this reflects the active tool/frame/layer context of the
@@ -4464,7 +4517,7 @@ function positionReassignBadge(worldBounds,label,color){
   el.style.left=(rect.left+tr.x+8)+'px';
   el.style.top=(rect.top+tr.y-10)+'px';
 }
-function updateReassignBadge(){
+function updateReassignBadge(cached){
   var el=reassignBadgeEl();if(!el)return;
   if(_reassign.active&&_reassign.step===2){
     // Guards against a STALE selectedPaths[0] left over from before the
@@ -4499,8 +4552,20 @@ function updateReassignBadge(){
     return;
   }
   if(_reassign.active){hideReassignBadge();return;} // mid legacy step-1 multi-click flow -- avoid a stale green badge underneath
-  var st=computeArcMatchState();
-  if(!st||st.fm.length!==1||selectedPaths.length!==1||!(selectedPaths[0]instanceof Path)||userLayers[state.activeLayerIdx].children.indexOf(selectedPaths[0])<0){hideReassignBadge();return;}
+  // The three SELECTION guards below used to sit AFTER computeArcMatchState(),
+  // so the badge paid a full O(n^3) Hungarian match just to discover the
+  // selection wasn't a single path. They depend on nothing the matcher
+  // produces — hoisted (2026-07-28).
+  if(selectedPaths.length!==1||!(selectedPaths[0]instanceof Path)||userLayers[state.activeLayerIdx].children.indexOf(selectedPaths[0])<0){hideReassignBadge();return;}
+  // `cached` — renderArcs computes this same state for its own arcs, and used
+  // to call us BEFORE doing so, running the matcher twice per scrub tick.
+  // Measured live at 60 strokes/keyframe: 13.1ms per tick (WASM) / 23.6ms
+  // (JS fallback), exactly half of it duplicate. tweens.js's own comment at
+  // computeArcMatchState documents the O(n^3) and split it out for arc-handle
+  // drags; the scrub path (goToFrame -> renderArcs) never got the same
+  // treatment.
+  var st=cached||computeArcMatchState();
+  if(!st||st.fm.length!==1){hideReassignBadge();return;}
   var m=st.fm[0],sd=st.sA[m.a],p2=selectedPaths[0];
   var aStrokeId=sd.strokeId||ensureStrokeId(p2);
   var fA=st.fA,fB=st.fB;
