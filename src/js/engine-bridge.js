@@ -104,6 +104,190 @@
     }
     return segs;
   }
+  // ---- RETAINED PATH STORE (2026-07-28) -------------------------------
+  // The `register_image`/imageId pattern, extended to vector geometry.
+  //
+  // Why: an item's segments were re-serialized into the scene JSON, re-parsed
+  // by serde and rebuilt into a BezPath on EVERY render even when the
+  // geometry had not changed since the previous frame. Measured: 2000 vector
+  // strokes scrubbed at 31fps where 2000 rasters — six numbers and an id per
+  // item — reached 61fps. 4000 strokes x 24 segments is ~1.15M coordinates
+  // pushed across the JS/WASM boundary per frame.
+  //
+  // The identity trick is the same one that makes images work. For images it
+  // is the `src` string; here it is the STORED STROKE DICT's object identity.
+  // getEffectiveStrokes hands back the very same dict objects for a frame
+  // until an edit replaces the whole array (f.strokes = ..., see
+  // saveActiveLayerFrame) — so a dict that is `===` to the one we registered
+  // from is a promise that the geometry is unchanged. desP stamps the dict it
+  // built from onto `path.data.__engineSrcDict` (app.js).
+  //
+  // That covers reload-from-storage, but NOT live mutation: sculpt/erase/
+  // drag mutate the Paper item in place without touching the stored dict.
+  // Hence the _changed hook below, which nulls the stamp on any GEOMETRY
+  // change so a mutated item falls back to inline serialization until the
+  // next desP rebuild re-stamps it.
+  //
+  // Scope of v1, deliberately narrow: a pathRef is emitted only for items
+  // whose geometry reaches the renderer untransformed (no per-vertex offset,
+  // no element/layer/parent Motion matrix). Those transforms rewrite every
+  // coordinate, so the stored path would be the wrong shape. That is exactly
+  // the measured case (Animation 2D scrub / drawing-heavy documents). The
+  // natural follow-up is an `Affine` alongside the ref for elMat/motionMat/
+  // parentChain — they ARE affine around a pivot — leaving only per-vertex
+  // offsets on the inline path. Not built here: one correctness surface at a
+  // time.
+  var _pathKeyByDict = new WeakMap();
+  // THE assumption this whole mechanism rests on: a stored stroke dict's
+  // object identity IS its geometry identity. That holds only for layer kinds
+  // whose getEffectiveStrokes branch returns the STORED array. Three branches
+  // synthesize instead — `symbolId` (a component instance with a camera or
+  // symMatrix runs every stroke through cloneStrokeForTransform, minting
+  // fresh dicts on EVERY call), `montageId` (StoryBoard-resolved strokes) and
+  // `lfsGroup` (concatenated sub-layer channels). Registering from those grew
+  // the store without bound: measured on the reference project, 0 -> 25 -> 50
+  // -> 75 entries across identical scrub passes over the same frames.
+  //
+  // A "only register a dict seen twice" heuristic was tried first and is NOT
+  // enough: seen-twice means "the scene was built twice while this dict was
+  // alive", which a second render between two loadFrames satisfies trivially.
+  // The gate below is explicit instead — and because CLAUDE.md §1 is exactly
+  // about a new branch being missed by one reader, `_registerCap` is a hard
+  // backstop so any future synthesizing branch degrades into "no speedup"
+  // rather than "unbounded memory".
+  var _registerCap = 250000;
+  var _registerCount = 0;
+  var _capWarned = false;
+  var _pathRefSeq = 0;
+  var _pathRefsEnabled = false;   // flipped on only by a PASSING self-test
+  var _geomFlagMask = 0;
+  var _retireQueue = [];
+  var _pathRegistry = (typeof FinalizationRegistry === 'function')
+    ? new FinalizationRegistry(function (key) { _retireQueue.push(key); })
+    : null;
+
+  // Paper's ChangeFlag bit values are version-specific and not part of its
+  // public API, so they are DISCOVERED rather than hardcoded: mutate a
+  // throwaway path's geometry and record the flags, then change only its
+  // style and subtract those. If anything about that probe looks wrong the
+  // whole feature stays off and the renderer keeps its existing behaviour —
+  // a wrong mask would either null every stamp (slow but correct) or, far
+  // worse, MISS a real geometry edit and paint stale geometry.
+  function installGeometryHook() {
+    if (_pathRefsEnabled || !window.paper || !paper.Path || !paper.Item) return;
+    // TWO prototypes, established by probing rather than assumed: `Path` has
+    // its OWN _changed, and Paper's class system captures `base` as a direct
+    // function reference at definition time — so patching Item.prototype
+    // alone never intercepts a Path's changes (measured: zero callbacks).
+    // CompoundPath and Raster have no own _changed and inherit Item's, so
+    // both prototypes must be wrapped to cover every item type a layer holds.
+    var protos = [];
+    if (Object.prototype.hasOwnProperty.call(paper.Path.prototype, '_changed')) protos.push(paper.Path.prototype);
+    if (Object.prototype.hasOwnProperty.call(paper.Item.prototype, '_changed')) protos.push(paper.Item.prototype);
+    if (!protos.length) return;
+    // The probe MUST run on an INSERTED item: an `insert:false` path fires no
+    // _changed at all (measured), which is exactly how the first version of
+    // this probe silently produced a zero mask.
+    var scratch = new paper.Layer();
+    var probe = new paper.Path({ insert: true });
+    var probeFlags = 0;
+    var origs = protos.map(function (pr) { return pr._changed; });
+    protos.forEach(function (pr, i) {
+      pr._changed = function (flags) { if (this === probe) probeFlags |= flags; return origs[i].apply(this, arguments); };
+    });
+    var geomBits = 0, styleBits = 0;
+    try {
+      probeFlags = 0;
+      probe.add(new paper.Point(0, 0));
+      probe.add(new paper.Point(10, 10));
+      probe.firstSegment.point.x = 5;
+      geomBits = probeFlags;
+      probeFlags = 0;
+      probe.fillColor = '#ff0000';
+      probe.opacity = 0.5;
+      probe.strokeWidth = 3;     // carries its own STROKE bit on top of STYLE
+      styleBits = probeFlags;
+    } catch (e) {
+      protos.forEach(function (pr, i) { pr._changed = origs[i]; });
+      probe.remove(); scratch.remove();
+      console.warn('[engine-bridge] retained-path probe threw, feature disabled', e);
+      return;
+    }
+    protos.forEach(function (pr, i) { pr._changed = origs[i]; });
+    probe.remove(); scratch.remove();
+    // Style changes carry a shared "needs redraw" bit that geometry changes
+    // carry too; subtracting the style set leaves only the geometry-only bits
+    // (measured on this build: geometry 41, style 449 -> mask 40).
+    _geomFlagMask = geomBits & ~styleBits;
+    if (!_geomFlagMask) {
+      console.warn('[engine-bridge] retained paths off: no geometry-only change flag found');
+      return;
+    }
+    // Real hook. Hot path — runs on every mutation of every item — so the
+    // cheap bitmask test comes first, and `_data` is read directly rather
+    // than through Paper's `data` getter, which LAZILY CREATES an object on
+    // every access (the same builder-not-accessor trap as raster.canvas,
+    // CLAUDE.md §5bis).
+    var liveOrigs = protos.map(function (pr) { return pr._changed; });
+    protos.forEach(function (pr, i) {
+      pr._changed = function (flags) {
+        if ((flags & _geomFlagMask) && this._data && this._data.__engineSrcDict) this._data.__engineSrcDict = null;
+        return liveOrigs[i].apply(this, arguments);
+      };
+    });
+    _pathRefsEnabled = true;
+  }
+
+  // Returns an engine key for this item's geometry, or null to fall back to
+  // inline segments. `segs` must already be the rounded array that WOULD have
+  // been sent, so a registered path and an inline one are byte-identical
+  // geometry (CLAUDE.md §3: the two paths must not drift).
+  // Lookup only — must stay free of any serialization, because the whole
+  // point is to answer "already registered?" BEFORE paying for serP().
+  // A first attempt kept serP+roundSegs unconditional and only skipped the
+  // JSON bytes: measured 36fps -> 33fps, i.e. slightly WORSE, because serP
+  // walking the Paper path is the dominant cost and the WeakMap lookup was
+  // pure addition. The saving only exists if the serialization is skipped.
+  function existingPathRef(item) {
+    if (!_pathRefsEnabled || !engine) return null;
+    var d = item._data && item._data.__engineSrcDict;
+    return d ? (_pathKeyByDict.get(d) || null) : null;
+  }
+  function pathRefFor(item, segs, closed) {
+    if (!_pathRefsEnabled || !engine || !engine.register_path) return null;
+    var dict = item._data && item._data.__engineSrcDict;
+    if (!dict) return null;
+    var key = _pathKeyByDict.get(dict);
+    if (key) return key;
+    if (!segs.length) return null;
+    if (_registerCount >= _registerCap) {
+      if (!_capWarned) { _capWarned = true; console.warn('[engine-bridge] retained-path cap reached; new geometry stays inline'); }
+      return null;
+    }
+    key = 'p' + (++_pathRefSeq);
+    var flat = new Float64Array(segs.length * 6);
+    for (var i = 0; i < segs.length; i++) {
+      var s = segs[i], o = i * 6;
+      flat[o] = s.point[0]; flat[o + 1] = s.point[1];
+      if (s.handleIn) { flat[o + 2] = s.handleIn[0]; flat[o + 3] = s.handleIn[1]; }
+      if (s.handleOut) { flat[o + 4] = s.handleOut[0]; flat[o + 5] = s.handleOut[1]; }
+    }
+    engine.register_path(key, flat, !!closed);
+    _registerCount++;
+    _pathKeyByDict.set(dict, key);
+    if (_pathRegistry) _pathRegistry.register(dict, key);
+    return key;
+  }
+
+  // Flushed once per render rather than per collection callback — retiring is
+  // pure bookkeeping and a batched JSON array is one boundary crossing.
+  function flushRetiredPaths() {
+    if (!_retireQueue.length || !engine || !engine.retire_paths) return;
+    var batch = _retireQueue;
+    _retireQueue = [];
+    try { engine.retire_paths(JSON.stringify(batch)); } catch (e) { /* non-fatal */ }
+  }
+
   function registerRasterIfNeeded(raster) {
     // Paper.js's Raster keeps its OWN internal <canvas> representation
     // (`.canvas`, already decoded/ready once `.loaded` is true) rather than
@@ -379,6 +563,15 @@
       // may not even have, having never been individually keyed). One
       // pass over children building brushGroupId -> anchor strokeId,
       // reused below instead of a lookup per companion.
+      // Cheap upfront gate for the retained-path fast path below: per-vertex
+      // path offsets and per-element matrices both live in ld.elementMotion,
+      // so a layer without it can have neither — and that is the common case.
+      // Checked at LAYER level so the per-item fast path costs one boolean
+      // instead of a function call into motion.js.
+      var layerHasElemMotion = !!(state.layers[i].elementMotion && Object.keys(state.layers[i].elementMotion).length);
+      // Only layer kinds whose getEffectiveStrokes branch returns the STORED
+      // stroke array can back a retained path — see the store's comment.
+      var layerRetainable = !state.layers[i].symbolId && !state.layers[i].montageId && !state.layers[i].lfsGroup;
       var brushAnchorStrokeId = null;
       for (var bi = 0; bi < children.length; bi++) {
         var bc = children[bi];
@@ -482,17 +675,26 @@
         else if (c instanceof Path && c.segments.length >= 2) subPaths = [c];
         else continue;
         subPaths.forEach(function (sub) {
-          var sd = serP(sub);
+          // FAST PATH: geometry provably untransformed AND already registered
+          // -> emit the ref without touching serP/roundSegs at all. This is
+          // the entire point of the retained store; everything below is the
+          // cold path that pays serialization once per new geometry.
+          var fastRef = (layerRetainable && !layerHasElemMotion && !motionMat && !parentChain.length) ? existingPathRef(sub) : null;
+          var sd = fastRef ? null : serP(sub);
+          // Identity, not deep-compare: applyPathVertexOffsetsFor returns the
+          // SAME array when the shape has no per-vertex keys, so `!==` is an
+          // exact "were the coordinates rewritten?" test.
+          var segsBefore = sd ? sd.segments : null;
           // Path property, per-vertex (motion.js's applyPathVertexOffsetsFor,
           // 2026-07): innermost layer of the transform stack, applied to the
           // raw geometry BEFORE elMat — a vertex offset is authored in the
           // shape's OWN local space, same as elMat's own pivot is computed
           // from `c.bounds` (the pre-offset bounds), matching AE's model
           // where a path's own points are edited before any transform.
-          if (window.SMMotion && cStrokeId) sd.segments = SMMotion.applyPathVertexOffsetsFor(i, cStrokeId, sd.segments, renderFrame);
-          if (elMat) sd.segments = SMMotion.transformSegments(sd.segments, elPivot, elMat);
-          if (motionMat) sd.segments = SMMotion.transformSegments(sd.segments, motionPivot, motionMat);
-          for (var pc2 = 0; pc2 < parentChain.length; pc2++) sd.segments = SMMotion.transformSegments(sd.segments, parentChain[pc2].pivot, parentChain[pc2].mat);
+          if (sd && window.SMMotion && cStrokeId) sd.segments = SMMotion.applyPathVertexOffsetsFor(i, cStrokeId, sd.segments, renderFrame);
+          if (sd && elMat) sd.segments = SMMotion.transformSegments(sd.segments, elPivot, elMat);
+          if (sd && motionMat) sd.segments = SMMotion.transformSegments(sd.segments, motionPivot, motionMat);
+          if (sd) for (var pc2 = 0; pc2 < parentChain.length; pc2++) sd.segments = SMMotion.transformSegments(sd.segments, parentChain[pc2].pivot, parentChain[pc2].mat);
           var op = c.opacity !== undefined ? c.opacity : 1;
           if (elMat) op *= elMat.op;
           if (motionMat) op *= motionMat.op;
@@ -516,11 +718,20 @@
           // `"dashPattern":[],"dashOffset":0,"miterLimit":10,...` on every
           // one of a dab-heavy document's thousands of fill-only items was
           // ~200 bytes/item of dead weight re-parsed by serde every render.
-          var item = {
-            segments: roundSegs(sd.segments),
-            closed: !!sd.closed,
-            fillColor: cssColorToRgba(c.fillColor ? c.fillColor.toCSS(true) : null, op),
-          };
+          // Retained path (see the store's own comment above): only when the
+          // geometry reaches here untouched by the per-vertex / element /
+          // layer / parent transform chain — any of those rewrite every
+          // coordinate, so the stored path would be the wrong shape.
+          var rounded = sd ? roundSegs(sd.segments) : null;
+          var geomUntouched = sd && layerRetainable && (sd.segments === segsBefore) && !elMat && !motionMat && !parentChain.length;
+          var pathRef = fastRef || (geomUntouched ? pathRefFor(sub, rounded, sd.closed) : null);
+          var item = pathRef
+            ? { pathRef: pathRef, fillColor: cssColorToRgba(c.fillColor ? c.fillColor.toCSS(true) : null, op) }
+            : {
+              segments: rounded,
+              closed: !!sd.closed,
+              fillColor: cssColorToRgba(c.fillColor ? c.fillColor.toCSS(true) : null, op),
+            };
           // Extended per-shape property: Fill color (2026-07) — overrides
           // the item's own painted color with its element holder's
           // 'fillColor' track, [r,g,b,a] 0-255, the exact shape
@@ -1424,6 +1635,7 @@
           if (viewportChanged) { syncViewport(); lastViewportKey = viewportKey; }
           lastSceneJson = json;
           window.__lastSceneJson = json;
+          flushRetiredPaths();
           engine.render(json);
         }
         lastSceneVersion = window._sceneVersion;
@@ -1520,6 +1732,9 @@
       // runs) need to be re-registered now, or their pipelines simply
       // won't exist yet and run_one_effect's "custom:" branch would no-op.
       if (window.registerAllCustomEffects) window.registerAllCustomEffects();
+      // Retained path store: probe Paper's change flags and, only if the
+      // probe passes, start emitting pathRefs (see installGeometryHook).
+      installGeometryHook();
       if (window.ResizeObserver) {
         resizeObserver = new ResizeObserver(handleResize);
         resizeObserver.observe(paperCanvas);
@@ -1800,6 +2015,55 @@
     // derived its own, the scene would ask for a key nobody wrote to and
     // the texture would silently stop updating (CLAUDE.md §1).
     engineIdFor: engineIdFor,
+    // Project load replaces every stored stroke dict at once, so every
+    // retained path is garbage immediately — dropping them eagerly beats
+    // waiting for the GC to walk thousands of dead WeakMap entries.
+    clearRetainedPaths: function () {
+      _pathKeyByDict = new WeakMap(); _retireQueue = []; _registerCount = 0;
+      if (engine && engine.clear_paths) { try { engine.clear_paths(); } catch (e) { /* non-fatal */ } }
+    },
+    // Kill switch. Retained paths are a deep change to what the renderer is
+    // handed, so there is a way to turn them off at runtime without a
+    // rebuild — both to A/B the output (the whole feature is only worth
+    // shipping if the picture is byte-identical) and as a field escape hatch
+    // if some item type ever turns out to mutate geometry without tripping
+    // the change hook. Turning it OFF also drops every stamp, so the very
+    // next scene build falls back to inline segments immediately rather than
+    // waiting for a desP rebuild.
+    setRetainedPathsEnabled: function (on) {
+      _pathRefsEnabled = !!on && !!_geomFlagMask;
+      if (!on) {
+        for (var i = 0; i < userLayers.length; i++) {
+          var ch = userLayers[i].children;
+          for (var k = 0; k < ch.length; k++) if (ch[k]._data) ch[k]._data.__engineSrcDict = null;
+        }
+        // Dropping the WeakMap alone would ORPHAN every engine-side entry:
+        // retirement fires when the stored DICT is collected, and the dicts
+        // are still very much alive (they are the document). Without this the
+        // engine store grew on every off/on cycle with nothing able to free
+        // it. Disabling means forget everything, both sides.
+        _pathKeyByDict = new WeakMap();
+        _retireQueue = [];
+        _registerCount = 0;
+        if (engine && engine.clear_paths) { try { engine.clear_paths(); } catch (e) { /* non-fatal */ } }
+      }
+      return _pathRefsEnabled;
+    },
+    // Diagnostics: times the scene serialization in isolation. fps probes
+    // aggregate loadFrame + Paper rebuild + engine render + browser paint,
+    // which swamped the signal this change actually moves.
+    timeSceneBuild: function (n) {
+      n = n || 20;
+      var t = performance.now(), bytes = 0;
+      for (var i = 0; i < n; i++) bytes = buildSceneJson().length;
+      return { msPerBuild: +((performance.now() - t) / n).toFixed(2), bytes: bytes };
+    },
+    // Diagnostics only (perf probes / tests) — not used by app code.
+    retainedPathStats: function () {
+      return { enabled: _pathRefsEnabled, geomFlagMask: _geomFlagMask,
+        registered: (engine && engine.path_store_size) ? engine.path_store_size() : -1,
+        pendingRetire: _retireQueue.length };
+    },
     registerImageRaw: registerImageRaw,
     // Custom WGSL effects (2026-07) — see custom-effects.js's own
     // registerAllCustomEffects for why every definition gets re-sent here
