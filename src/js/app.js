@@ -2295,6 +2295,24 @@ function saveAllLayerFrames(){
   _maybePromoteInterpolated(f,strokes);
   f.strokes=strokes;}
 }
+// Guards for loadFrame's rebuild skip — deliberately conservative: every one
+// of these returning false costs a rebuild (slow), while a wrong `true` would
+// paint stale content (silent). In doubt, rebuild.
+function _canReuseMaterialized(lyr,strokes){
+  // No dirty signal available (engine off, or the _changed probe failed) means
+  // no way to know whether the live items were edited — never reuse.
+  if(!window.__smGeomDirtyHookInstalled)return false;
+  if(lyr._smGeomDirty)return false;
+  if(!lyr._matStrokes||lyr._matStrokes!==strokes)return false;
+  // An empty result is a FRESH array on every call (`return []`), so it could
+  // never match anyway; excluded explicitly so the intent is readable.
+  if(!strokes.length)return false;
+  // Paranoia: desP/desR emit exactly one item per stroke. Any divergence
+  // (a consumer that inserted or removed something) forces a rebuild rather
+  // than trusting the identity test alone.
+  if(lyr.children.length!==strokes.length)return false;
+  return true;
+}
 function loadFrame(idx){
   window._sceneVersion++;
   // See _maybePromoteInterpolated's own comment — loadFrame is the one
@@ -2311,7 +2329,24 @@ function loadFrame(idx){
   // EXPERIMENTAL (native-video-decode branch): natively-decoded video
   // LAYERS follow the playhead through the same choke point.
   if(window.SMNativeVideo)SMNativeVideo.onFrameChanged(idx);
-  for(var i=0;i<state.layers.length;i++){userLayers[i].removeChildren();if(!layerIsEffectivelyVisible(i))continue;
+  for(var i=0;i<state.layers.length;i++){
+  if(!layerIsEffectivelyVisible(i)){userLayers[i].removeChildren();userLayers[i]._matStrokes=null;continue;}
+  // Skip the rebuild when this layer's effective content is literally the
+  // SAME array it was last built from. getEffectiveStrokes returns the stored
+  // `f.strokes` (or an inherited keyframe's), so every frame that HOLDS on a
+  // keyframe hands back an identical array object — measured 83% of
+  // layer-frames on a 6-frame-hold project. Rebuilding them was 88% of
+  // loadFrame's cost (32.6ms of 37.0ms per frame at 4000 strokes), and it
+  // produced Paper items identical to the ones already sitting there.
+  //
+  // This is an identity test, not a deep compare, and that is the point:
+  // every writer REPLACES the array (f.strokes = strokes, saveActiveLayerFrame)
+  // rather than mutating it in place, so a changed frame always presents a
+  // different object. Component/montage/lfs layers synthesize a fresh array
+  // per call and therefore never match — they keep rebuilding, unchanged.
+  var strokes=getEffectiveStrokes(i,idx);
+  if(_canReuseMaterialized(userLayers[i],strokes))continue;
+  userLayers[i].removeChildren();
   // No explicit `op` override here (unlike renderOS()'s onion-skin ghosts,
   // which intentionally force a computed fade-opacity regardless of the
   // object's own value) — omitting it lets desR/desP fall through to the
@@ -2321,7 +2356,8 @@ function loadFrame(idx){
   // against the correctly-stored interpolated value permanently flagged
   // untouched inbetweens as "manually edited" the moment you navigated
   // through them.
-  var strokes=getEffectiveStrokes(i,idx);strokes.forEach(function(sd){if(sd.isRaster)desR(sd,userLayers[i]);else desP(sd,userLayers[i]);});relinkBrushCompanions(userLayers[i]);relinkLinkedFills(userLayers[i]);}
+  strokes.forEach(function(sd){if(sd.isRaster)desR(sd,userLayers[i]);else desP(sd,userLayers[i]);});relinkBrushCompanions(userLayers[i]);relinkLinkedFills(userLayers[i]);
+  userLayers[i]._matStrokes=strokes;userLayers[i]._smGeomDirty=false;}
   userLayers[state.activeLayerIdx].activate();
   // Vue caméra (v18) : loadFrame est LE point de passage de tout changement
   // de frame (scrub, lecture, goToFrame) — même raison que le hook
