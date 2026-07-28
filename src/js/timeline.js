@@ -5259,7 +5259,15 @@ function onKeyDown(event){
   // is reassigned while a layer is expanded here, same as AE's own P/A/R/S/T
   // only means "reveal this property" when a layer is selected in its
   // Timeline panel.
-  if(state.appMode==='motion'&&window._motionExpandedLayer!=null&&window.SMMotion&&SMMotion.handlePropShortcut(k,event.shiftKey)){event.preventDefault();return;}
+  // The "a layer's Transform group actually expanded" half of that scoping is
+  // gone (2026-07-27: "si je fais 'p' alors ça affiche seulement toute les
+  // prop position de tous les calques ou ceux de la sélection"): in AE you
+  // press P to OPEN Position, you don't open a layer first and then filter
+  // it. handlePropShortcut reveals its own targets now, so requiring one to
+  // be open beforehand meant the key did nothing from a clean timeline —
+  // which is exactly when you reach for it. Motion mode alone is scope
+  // enough; the toolbar buttons for Pen/Rect/Subselect are untouched.
+  if(state.appMode==='motion'&&window.SMMotion&&SMMotion.handlePropShortcut(k,event.shiftKey)){event.preventDefault();return;}
   // AE's "U" — reveal animated properties on the selected layer(s) (or
   // every layer if none selected), explicit request. Takes priority over
   // the normal tool shortcuts below for the same reason P/A/R/S/T does
