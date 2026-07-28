@@ -4159,20 +4159,64 @@ function booleanOpWasm(op,paths){
   }
   return _polygonsToPaperItem(finalPolys);
 }
+// A vector-brush ribbon drawn with Fill enabled is really TWO Paper.js
+// items — the pressure ribbon itself (selectable, data.linkedFillId) and
+// its filled backdrop (data.isLinkedFillCompanion, excluded from selection
+// everywhere by isSelectablePathChild, app.js:423). Mirrors
+// relinkLinkedFills' own lookup-by-id (app.js:752) rather than trusting
+// the live data.linkedFill reference alone — cheap, and correct even if a
+// relink somehow hasn't run yet this session.
+function findLinkedFillCompanion(layer,ribbon){
+  var lid=ribbon.data&&ribbon.data.linkedFillId;
+  if(!lid)return null;
+  var live=ribbon.data.linkedFill;
+  if(live&&!live.removed&&live.data&&live.data.linkedFillId===lid)return live;
+  var found=null;
+  layer.children.forEach(function(c){
+    if(found||c===ribbon)return;
+    if(c.data&&c.data.isLinkedFillCompanion&&c.data.linkedFillId===lid)found=c;
+  });
+  return found;
+}
 function booleanOp(op){
   if(selectedPaths.length<2){showToast('Sélectionnez au moins 2 formes');return;}
   pushUndo();
   var paths=selectedPaths.slice();
+  var boolLayer=userLayers[state.activeLayerIdx];
+  // A vector-brush ribbon drawn with Fill enabled is really TWO Paper.js
+  // items covering DIFFERENT parts of what the user sees as one shape —
+  // the ribbon is the tapered outline RING alone (fillColor = ink), the
+  // companion is the enclosed INTERIOR alone (fillColor = fill, its
+  // geometry pinned to the ribbon's own centerline by
+  // rebuildVectorBrushOutline). Booleans used to run on the ribbon only,
+  // so a subtract of two filled blobs correctly notched the thin border
+  // ring but left BOTH interior fills completely untouched underneath —
+  // which reads exactly like "n'a plus l'air de marcher sur des formes
+  // select" (2026-07-28): the part of the shape the user actually looks at
+  // never changes. The real per-shape operand is ring ∪ interior — union
+  // them first so `op` sees the WHOLE visible shape. (For an OPEN stroke
+  // the companion is a degenerate zero-area centerline loop — see
+  // draw-bridge.js's commitStroke — so the union is just the ribbon again,
+  // same as before.) Track every companion unioned in so BOTH halves of
+  // each pair get removed below, alongside the ribbons.
+  var extraRemovals=[];
+  var operands=paths.map(function(p){
+    var companion=findLinkedFillCompanion(boolLayer,p);
+    if(!companion)return p;
+    extraRemovals.push(companion);
+    try{return p.unite(companion,{insert:false})||p;}
+    catch(e){return p;}
+  });
   var result=null;
   if(window.GeometryWasm&&window.GeometryWasm.ready){
-    try{result=booleanOpWasm(op,paths);}
+    try{result=booleanOpWasm(op,operands);}
     catch(e){console.warn('[geometry-wasm] boolean op failed, falling back to Paper.js',e);result=null;}
   }
   if(!result){
-    result=paths[0];
-    for(var i=1;i<paths.length;i++){
-      var r=result[op](paths[i],{insert:false});
-      if(result!==paths[0])result.remove();
+    result=operands[0];
+    for(var i=1;i<operands.length;i++){
+      var r=result[op](operands[i],{insert:false});
+      if(result!==operands[0])result.remove();
       result=r;
     }
   }
@@ -4180,17 +4224,24 @@ function booleanOp(op){
   result.strokeColor=style.strokeColor;result.strokeWidth=style.strokeWidth;
   result.strokeCap=style.strokeCap;result.strokeJoin=style.strokeJoin;
   result.fillColor=style.fillColor;result.opacity=style.opacity;
-  var boolLayer=userLayers[state.activeLayerIdx];
   // subtract/exclude routinely produce a CompoundPath (disjoint remainders,
   // or a hole) — split into flat Paths at insertion, same as eraseAtPoint,
   // so it isn't silently dropped by saveActiveLayerFrame's `instanceof
   // Path` filter (or selection/click-to-pick) the moment the frame saves.
   // Same source as the style (the last-selected path — the one whose look the
   // union takes on), so the merged shape keeps ONE coherent identity rather
-  // than an arbitrary mix of the operands'.
+  // than an arbitrary mix of the operands'. carryBooleanData (below) never
+  // copies linkedFillId/isLinkedFillCompanion/linkedFill — see
+  // BOOL_KEEP_DATA_FIRST's own comment for why carrying those forward onto
+  // a merged, no-longer-a-ribbon result was the actual bug.
   var islands=insertBooleanResult(boolLayer,boolLayer.children.length,result,style.fillColor,style.opacity,null,style.data);
   paths.forEach(function(p){p.remove();});
+  extraRemovals.forEach(function(c){if(!c.removed)c.remove();});
   selectedPaths=islands;state.selectedStrokeIndices=[];
+  // Unrelated paint-bucket fills (data.fillSeed/fillSeeds — a totally
+  // different "linked" system, see fillRegenerateLinked's own header
+  // comment) may have used one of the booleaned shapes as a wall; keep
+  // re-tracing those, same as before this fix.
   fillRegenerateLinked(boolLayer,islands[0]);
   saveActiveLayerFrame();updateUI();showToast('Opération booléenne appliquée');
 }
@@ -4595,15 +4646,31 @@ function _eraseDegenerateSelfLoops(path){
 // has a valid centerline to rebuild from (see eraseAtPoint's own comment on
 // origStrokeInfo — that tradeoff is intentional and predates this).
 var BOOL_KEEP_DATA_ALL=['groupId','ownerId','ownerName','ownerColor','channelTag','shadowSwatchId','tweenOn','boxAngle','xformAnchorKey','xformAnchorCustom','effects','fillGradient'];
-// Keys that must stay UNIQUE across the layer: both are lookup map keys
-// (motion.js:1413 scans for the first data.strokeId match, app.js:740 builds
-// byId[linkedFillId]), so copying them onto every island of a split would
-// make all but one unreachable. The first island inherits the identity; the
-// extra islands are genuinely new shapes and get their OWN fresh id, so they
-// stay individually addressable by per-element Motion instead of persisting
-// with strokeId:null (nothing else mints one on save — app.js:1479 only does
-// so inside mergeLayersIntoOne).
-var BOOL_KEEP_DATA_FIRST=['strokeId','linkedFillId','isLinkedFillCompanion'];
+// Keys that must stay UNIQUE across the layer: strokeId is a lookup map key
+// (motion.js:1413 scans for the first data.strokeId match), so copying it
+// onto every island of a split would make all but one unreachable. The
+// first island inherits the identity; the extra islands are genuinely new
+// shapes and get their OWN fresh id, so they stay individually addressable
+// by per-element Motion instead of persisting with strokeId:null (nothing
+// else mints one on save — app.js:1479 only does so inside
+// mergeLayersIntoOne).
+//
+// linkedFillId/isLinkedFillCompanion deliberately NOT here (2026-07-28,
+// "boolean ops don't work on selected shapes anymore" — found live: a
+// vector-brush ribbon's fill backdrop is a SEPARATE, non-selectable Paper
+// item (isSelectablePathChild, app.js:423), so a boolean op's own operands
+// were always the ribbon's thin outline RING alone — the op notched the
+// ring correctly but the companion's INTERIOR fill (what the user actually
+// looks at) sat completely untouched underneath, unremoved. Carrying
+// linkedFillId/isLinkedFillCompanion forward here then re-declared "I still
+// have a companion" on the merged result, pointing at that now-orphaned,
+// geometrically stale interior. booleanOp() below unions each ribbon with
+// its companion BEFORE running the op (so the op sees the whole visible
+// shape) and removes both halves of every such pair afterward, so the
+// boolean result is a plain new shape — not a stroke/fill pair anymore (a
+// union/subtract of two differently-colored ribbons isn't itself a
+// coherent pressure stroke to preserve the link for).
+var BOOL_KEEP_DATA_FIRST=['strokeId'];
 function carryBooleanData(isl,srcData,isFirst){
   if(!srcData)return;
   BOOL_KEEP_DATA_ALL.forEach(function(k){if(srcData[k]!==undefined)isl.data[k]=srcData[k];});
