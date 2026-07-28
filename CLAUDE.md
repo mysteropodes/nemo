@@ -125,6 +125,70 @@ dessin au stylet 240Hz : 19fps → 60fps ; pan : 5fps → 60fps. **Ne pas les d�
    persistance via serP garde la précision pleine), champs de style par défaut omis (tous les
    champs `ItemIn` sont `#[serde(default)]` côté Rust, vérifié). 1215→901 Ko à 2600 items.
 
+### 5bis. Deuxième passe perf (2026-07-28) — lecture / scrub / drag
+
+Point de départ : « la lecture dans motion de cet élément est saccadée » sur un projet
+réel. Mesuré : 24 fps visés rendus à 20 fps, avec un intervalle rAF de **47,7 ms** (l'écran
+repeignait à 21 Hz). Après correction : rAF 16,1 ms, scrub 60 fps. **Deux familles de bug**,
+à reconnaître avant d'en réintroduire une :
+
+**(a) Un accès « gratuit » qui ne l'est pas, placé AVANT le garde bon marché.**
+`raster.canvas` (Paper.js) n'est pas un accesseur mais un **constructeur** : il alloue un
+canvas et y fait un `drawImage` au premier accès, **par objet Raster** — et `loadFrame`
+reconstruit tous les Raster à chaque frame. `registerRasterIfNeeded` le lisait avant
+`registeredImageIds[id]`, donc N rasters = N allocations de canvas par frame pour des pixels
+déjà sur le GPU (2000 items : 24 fps rendus à 4,4 fps). Même forme dans select-bridge
+(`computeHandles()` avant le garde `e.altKey`). **Toujours tester le cache/garde le moins
+cher en premier**, et se méfier de `.canvas`, `.bounds`, `.rasterize()`, `.getImageData()`.
+
+**(b) Reconstruire tout un DOM/arbre parce que la frame a bougé.**
+`renderTimeline()` refait 4800 nœuds (27,7 ms à 40 calques) ; sa seule sortie dépendante de
+la frame est la classe `.cur` + la position du playhead, ce que `updatePlayhead()` produit
+en 0,1 ms. D'où le **contrat `frameOnly`** : `goToFrame` le passe à `updateUI`, qui appelle
+`updatePlayhead()` au lieu de `renderTimeline()`, et le transmet à `renderLayerList` (qui
+l'honore en Animation 2D seulement — en Motion les lignes affichent la VALEUR à la tête de
+lecture). C'est le découpage que la lecture utilisait déjà (`startPlay` → `updatePlayhead`
+seul, `stopPlay` → `updateUI` complet). **Un appelant qui a changé le CONTENU ne doit jamais
+passer `frameOnly`.** Vérifié par diff DOM normalisé (ordre des classes trié) : identique à
+un rebuild complet sur 28/28 cas.
+
+**Invalider un cache, c'est aussi choisir QUAND.** Le cache de `symbolUnionBounds` a d'abord
+été purgé depuis `saveAllLayerFrames` — or `goToFrame` l'appelle à **chaque avance de
+frame**, donc la lecture recalculait l'union de 120 frames par tick (75 % du temps mur).
+Gardé par `state.activeSymbolId` : le contenu d'un symbole ne change que quand on est
+DEDANS. `_sceneVersion` est un mauvais critère ici — select-bridge l'incrémente à chaque
+move de drag.
+
+**Ne pas dupliquer le matcher.** `renderArcs` appelait `updateReassignBadge` qui recalculait
+`computeArcMatchState()` (hongrois en O(n³)) de son côté : deux fois par tick de scrub
+(13,1 ms à 60 traits, moitié pure duplication). L'état se calcule une fois et se passe.
+
+**Les drags bruts doivent avoir un garde ou un verrou rAF** : barre in/out (garde de delta,
+100 mousemoves → 6 rebuilds), poignée de zoom timeline (verrou rAF, 40 → 1 + flush au
+relâchement).
+
+**Clonage : partager les charges lourdes, mais mesurer.** `src` (base64) et
+`bitmapPressureProfile` sont écrits une fois puis seulement lus — `_HEAVY_STROKE_FIELDS`
+(app.js, exporté) les liste, `cloneStrokeForTransform` les partage par référence. Contre-
+intuitif et vérifié : pour l'undo, un cloneur JS par objet et un couple replacer/reviver
+sont **plus lents** qu'un `JSON.parse(JSON.stringify())` complet (14,1 et 26,5 ms contre
+16,1) — un seul stringify natif de tout l'arbre bat des milliers de petites copies JS même
+en déplaçant plus d'octets. Ce qui gagne : **détacher** les chaînes lourdes, cloner en
+natif, rattacher (10,7 ms), avec restauration en `finally`.
+
+**Mesurer : le rAF est gelé quand l'onglet est caché.** Tout chiffre basé sur
+`requestAnimationFrame` n'est valable que si `document.visibilityState === 'visible'` —
+sinon la sonde ne récolte aucun échantillon et un calcul naïf sort un NaN d'apparence
+plausible. Et le scrub mesuré en boucle serrée sous-estime le coût réel : le rendu moteur
+est coalescé en rAF (§5.2), donc **c'est l'intervalle rAF en lecture qui est le chiffre
+honnête**, pas la durée synchrone de `goToFrame`.
+
+Repères après cette passe (scène synthétique, régime établi, Animation 2D) :
+vecteurs 500/frame scrub 60 fps · vecteurs 2000/frame 31 fps · images 1000/frame 60 fps ·
+séquence 200/frame 60 fps · bitmap 2000/frame 61 fps ; lecture 23,2-23,4 fps sur 24 partout.
+Les vecteurs restent ~2× plus chers que les rasters par item (chaque segment est
+re-sérialisé dans le JSON de scène, un raster c'est six nombres et un id).
+
 **`renderNow(true)` (viewportOnly) est un contrat d'appelant** : seul le viewport a changé
 depuis le dernier rendu. Vrai pour pan/rotate (aucun item de scène ne dépend de center ou de
 la rotation ; les poignées en `1/view.zoom` dépendent du ZOOM seul). JAMAIS l'inférer
