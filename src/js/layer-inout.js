@@ -829,6 +829,18 @@
     // call this module already makes in the other direction.
     marqueeSelect: applyMarqueeSelection,
     clearSelection: clearBarSel,
+    // Retime layers by a per-layer frame delta, content and property keys
+    // included — the same two calls a bar drag makes at drop, exposed so
+    // motion.js's box edges can stagger a whole selection without
+    // reimplementing (and drifting from) that pair. Callers own the in/out
+    // values themselves; this moves what LIVES at those frames.
+    retimeLayers: function (plan) {
+      (plan || []).forEach(function (p) {
+        if (!p || !p.dx) return;
+        if (window.SM && window.SM.shiftLayerFrames) window.SM.shiftLayerFrames(p.li, p.dx);
+        if (window.SMMotion && SMMotion.shiftLayerMotionKeys) SMMotion.shiftLayerMotionKeys(p.li, p.dx);
+      });
+    },
     getBarSelection: function () { return _barSel.slice(); },
     setBarSelection: function (sel) { _barSel = sel; refreshBarSelClasses(); },
   };

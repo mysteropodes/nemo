@@ -3550,6 +3550,63 @@
     }));
   }
 
+  // ---- layer skew (box top/bottom edge) ----
+  // Absolute from a start-of-gesture snapshot, never incremental: a drag
+  // ticks dozens of times and rounding each tick's own delta to whole frames
+  // would accumulate, while re-deriving every position from the snapshot
+  // cannot drift — the same reason startSkewDrag works this way for keys.
+  var _layerSkew = null;
+  function startLayerSkewDrag(mode, e) {
+    // Visual top-to-bottom order, not state.layers order: the list renders
+    // newest-first, so index order is upside down and 'top'/'bottom' would
+    // anchor the wrong end (buildLayerRows sorts the same way, for the same
+    // reason).
+    var order = _layerSel.slice().sort(function (a, b) {
+      var ra = document.querySelector('#frame-grid .frow[data-layer="' + a + '"]');
+      var rb = document.querySelector('#frame-grid .frow[data-layer="' + b + '"]');
+      if (!ra || !rb) return a - b;
+      return ra.getBoundingClientRect().top - rb.getBoundingClientRect().top;
+    });
+    if (window.pushUndo) pushUndo();
+    _layerSkew = {
+      mode: mode, startX: e.clientX, applied: {},
+      rows: order.map(function (li) {
+        var ld = state.layers[li];
+        return { li: li, origIn: SMLayerInOut.inPointOf(ld), origOut: SMLayerInOut.outPointOf(ld) };
+      }),
+    };
+  }
+  function onLayerSkewMove(e) {
+    if (!_layerSkew) return false;
+    var total = (e.clientX - _layerSkew.startX) / FC;
+    var n = _layerSkew.rows.length;
+    _layerSkew.rows.forEach(function (r, i) {
+      var f = n < 2 ? 1 : (_layerSkew.mode === 'top' ? (n - 1 - i) / (n - 1) : i / (n - 1));
+      var dx = Math.round(total * f);
+      var w = r.origOut - r.origIn;
+      var ni = Math.max(0, r.origIn + dx);
+      var ld = state.layers[r.li];
+      ld.inPoint = ni; ld.outPoint = ni + w;
+      _layerSkew.applied[r.li] = ni - r.origIn;
+    });
+    renderTimeline();
+    return true;
+  }
+  function onLayerSkewUp() {
+    if (!_layerSkew) return false;
+    // Content and property keys follow ONCE, at drop — same as a bar drag,
+    // which deliberately doesn't re-shift ld.frames on every mousemove.
+    var plan = Object.keys(_layerSkew.applied).map(function (li) {
+      return { li: +li, dx: _layerSkew.applied[li] };
+    });
+    _layerSkew = null;
+    if (window.SMLayerInOut && SMLayerInOut.retimeLayers) SMLayerInOut.retimeLayers(plan);
+    renderTimeline(); renderLayerList();
+    if (window.loadFrame) loadFrame(state.currentFrame);
+    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+    return true;
+  }
+
   function updateLayerStaggerBox() {
     if (state.appMode !== 'motion' || _layerSel.length < 2) { removeLayerStaggerBox(); return; }
     var spacers = _layerSel.map(function (li) { return document.querySelector('#frame-grid .frow[data-layer="' + li + '"]'); }).filter(Boolean);
@@ -3603,10 +3660,16 @@
         if (!(f1 > f0)) { if (window.showToast) showToast('Il faut des clés sur au moins 2 frames différentes pour les espacer'); return; }
         startSkewDrag(rows, mode, e);
       });
+      // Top/bottom edge on a LAYER selection staggers the LAYERS in time —
+      // the counterpart of what the same edge does to keys, and what the box
+      // sitting over layer rows implies (2026-07-27: "le haut et le bas de la
+      // box sur une selection de calque ne les déplace actuellement pas comme
+      // ça peut déplacé des clé en skew"). Same diagonal as the key skew: the
+      // dragged edge's row travels the full distance, the opposite row stays
+      // anchored, the rows between interpolate.
       addStaggerEdges(_layerStaggerBoxEl, function (e, mode) {
-        var rows = buildLayerRows();
-        if (rows.length < 2 || !noKeysGuard(rows)) return;
-        startSkewDrag(rows, mode, e);
+        if (_layerSel.length < 2) return;
+        startLayerSkewDrag(mode, e);
       });
     }
     _layerStaggerBoxEl.style.left = gb.left + 'px'; _layerStaggerBoxEl.style.top = y0 + 'px';
@@ -3817,6 +3880,7 @@
   // pointer handlers via SMMotion.onDragMove/onDragUp, same pattern as the
   // span-end/keyframe drag handlers already in timeline.js).
   function onDragMove(e) {
+    if (onLayerSkewMove(e)) return;
     updateMarquee(e);
     var sk = window._motionSkewDrag;
     if (sk) {
@@ -3920,6 +3984,7 @@
     if (window.SMEngineBridge) SMEngineBridge.renderNow(); // live stage feedback — see skew-drag branch's own comment above
   }
   function onDragUp() {
+    if (onLayerSkewUp()) return;
     endMarquee();
     if (window._motionSkewDrag) { window._motionSkewDrag = null; if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); return; }
     if (!window._motionKeyDrag) return;
