@@ -1004,6 +1004,17 @@ window.SM={
   // the live document first (saveAllLayerFrames) and rekeys motion-arc
   // tween data across the move (rekeyTweenPairData), which the original
   // version of this function skipped.
+  // RIPPLE (2026-07-28 feedback, with screenshot of the ruler's key
+  // diamonds): dragging one keyframe used to leave every LATER keyframe
+  // sitting at its own original frame number — only the tween pair
+  // immediately touching the dragged key got re-keyed (rekeyTweenPairData
+  // matched on `fA===fromFrame` alone), so the gap the drag opened or
+  // closed never propagated past the very next key. "quand je bouge
+  // l'outpoint d'une clé ça bouge la clé suivante mais pas toutes les
+  // clé qui suivent" — every timeline tool with this gesture (AE,
+  // Premiere, Harmony's ripple) carries the rest of the sequence along so
+  // relative spacing is preserved; this now does that as the default,
+  // not an opt-in.
   moveKeyframe:function(layerIdx,fromFrame,toFrame){
     if(fromFrame===toFrame)return false;
     var ld=state.layers[layerIdx];if(!ld||ld.locked)return false;
@@ -1011,14 +1022,42 @@ window.SM={
     var src=ld.frames[fromFrame];if(!src||!src.isKeyframe)return false;
     pushUndo();saveAllLayerFrames();
     var beforeKfs=ld.frames.map(function(f,fi){return f.isKeyframe?fi:null;}).filter(function(x){return x!==null;});
+    // beforeKfs is walked in ascending frame order (map over the frames
+    // array), so this filter is already sorted — no separate sort needed.
+    var laterKfs=beforeKfs.filter(function(f){return f>fromFrame;});
+    var delta=toFrame-fromFrame;
+    // Only the UPPER bound needs guarding. laterKfs[i] > fromFrame for
+    // every entry, so laterKfs[i]+delta > fromFrame+delta = toFrame always
+    // — the dragged key can never end up sitting past (or on) a rippled
+    // one, regardless of delta's sign, so relative order/spacing among the
+    // moved set survives untouched. Lower bound (>=0) follows from the
+    // same inequality once toFrame itself is known >=0 (guarded above).
+    if(delta>0&&laterKfs.length){
+      var lastKf=laterKfs[laterKfs.length-1];
+      var maxDelta=(state.totalFrames-1)-lastKf;
+      if(delta>maxDelta){delta=Math.max(0,maxDelta);toFrame=fromFrame+delta;}
+    }
     var capturedIb=captureTweenInbetweens(layerIdx,beforeKfs);
-    ld.frames[toFrame]={strokes:src.strokes,isKeyframe:true,isInterpolated:false};
-    ld.frames[fromFrame]={strokes:[],isKeyframe:false,isInterpolated:false};
+    // Every frame actually changing slot, dragged key included. Read ALL
+    // source content before writing anything — moves.length writes can't
+    // step on each other's reads this way, so write order doesn't matter
+    // (unlike the single-key version this replaces, which never had this
+    // hazard because it only ever touched two slots).
+    var moves=[{from:fromFrame,to:toFrame}];
+    laterKfs.forEach(function(f){moves.push({from:f,to:f+delta});});
+    var srcData={};moves.forEach(function(m){srcData[m.from]=ld.frames[m.from].strokes;});
+    var destSet={};moves.forEach(function(m){destSet[m.to]=true;});
+    moves.forEach(function(m){ld.frames[m.to]={strokes:srcData[m.from],isKeyframe:true,isInterpolated:false};});
+    // Clear a vacated slot only if nothing else just moved INTO it —
+    // otherwise a same-frame no-op segment (from===to, possible once delta
+    // is clamped to 0 above) would erase the very content it just wrote.
+    moves.forEach(function(m){if(!destSet[m.from])ld.frames[m.from]={strokes:[],isKeyframe:false,isInterpolated:false};});
+    var moveMap={};moves.forEach(function(m){moveMap[m.from]=m.to;});
     var mkPairs=[];
     for(var i=0;i<beforeKfs.length-1;i++){
       var fA=beforeKfs[i],fB=beforeKfs[i+1];
-      var newFA=fA===fromFrame?toFrame:fA;
-      var newFB=fB===fromFrame?toFrame:fB;
+      var newFA=moveMap[fA]!==undefined?moveMap[fA]:fA;
+      var newFB=moveMap[fB]!==undefined?moveMap[fB]:fB;
       rekeyTweenPairData(fA,fB,newFA,newFB);
       mkPairs.push({fA:fA,fB:fB,newFA:newFA,newFB:newFB});
     }
