@@ -1334,9 +1334,18 @@
            #layer-list the same way frame-hdr+bars-row sit above
            #frame-grid on the timeline side, and it's that match that keeps
            every .lrow lined up with its .frow across the panel split. -->
-      <div style="height:42px;border-bottom:1px solid var(--border);background:var(--panel2);display:flex;align-items:center;padding:0 6px;font-size:9px;color:var(--text-dim)" data-i18n="layersHdr">Layers</div>
-      <div id="layer-list"></div>
-      <div id="layer-ctrls">
+      <!-- The layer buttons live in THIS header row, not in a band under the
+           list (2026-07-27: "revoir l'interface en bas au niveau timeline…
+           ça gagne en espace et clarté"). They used to sit in a 40px strip
+           at the bottom, which the grid side had to mirror with 40px of dead
+           padding purely to keep the two row lists aligned — 40px of
+           timeline height spent on nothing. Up here they reuse the header
+           that already existed, and the reserved bottom band shrinks to the
+           zoom scrollbar alone. The "Layers" caption is gone with it: six
+           labelled icon buttons say what the column is more directly than
+           the word did. -->
+      <div id="layer-hdr">
+        <div id="layer-ctrls">
         <button id="btn-al" data-i18n-title="btnNewLayerTitle" title="New layer"><span class="material-symbols-rounded">&#xe145;</span></button>
         <!-- Camera & audio moved here from the timeline toolbar (feedback
              #16): they both ADD a special layer/track, so they live next to
@@ -1351,7 +1360,9 @@
         <button id="btn-dl" data-i18n-title="btnDeleteLayerTitle" title="Delete active layer"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 3h6l1 2h4v2H4V5h4z"/><path d="M6 9h12l-1 12H7z"/></svg></button>
         <button id="btn-dupl" data-i18n-title="btnDuplLayerTitle" title="Duplicate active layer"><span class="material-symbols-rounded">&#xe14d;</span></button>
         <button id="btn-comp" data-i18n-title="btnCompLayerTitle" title="Convert layer to component"><span style="font-size:13px;line-height:1">&#x25c8;</span></button>
+        </div>
       </div>
+      <div id="layer-list"></div>
     </div>
     <div id="layer-panel-resize" data-i18n-title="layerPanelResizeTitle" title="Drag to resize the layers panel"></div>
     <!-- Column wrapper so #fg-wrap can end at the separator line while the
