@@ -4278,6 +4278,14 @@
     // timeline, not only from inside a property track's own cells.
     marqueeSelect: applyMarqueeSelection,
     clearKeySelection: function () { setKeySel([]); },
+    // Cheap predicate for engine-bridge's retained-path fast path: per-vertex
+    // offsets are the ONE part of the element-Motion stack that is not an
+    // affine, so a shape carrying them can never ride a stored path.
+    hasPathVertexMotionFor: function (li, strokeId) {
+      var ld = state.layers[li];
+      if (!ld || !ld.elementMotion || !strokeId) return false;
+      return hasPathVertexMotion(ld.elementMotion[strokeId]);
+    },
     // Called by the two frame-content writers in app.js — the union is
     // derived from that content, so it must not outlive an edit.
     invalidateSymbolUnionBounds: invalidateSymbolUnionBounds,

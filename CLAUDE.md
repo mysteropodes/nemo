@@ -236,10 +236,46 @@ prod). Rendu prouvé **identique octet pour octet** (PNG via `render_to_pixels`)
 testant : `renderFrameToPixelsPNG` appelle `loadFrame`, qui reconstruit les items et les
 RE-TAMPONNE — un A/B naïf compare donc refs contre refs et passe toujours.
 
-**Portée v1** : `pathRef` seulement quand la géométrie arrive non transformée (pas d'offset
-par vertex, pas de matrice élément/calque/parent). La suite naturelle est d'envoyer un
-`Affine` à côté du ref pour elMat/motionMat/parentChain — ce sont des affines autour d'un
-pivot — ce qui couvrirait Motion. Non fait ici : une surface de correction à la fois.
+**v2 — Motion inclus (`pathTransform`).** Toute la chaîne élément → calque → parents est une
+composition d'affines autour d'un pivot : elle est repliée en UNE matrice 2×3 envoyée à côté
+du ref (`affineFromMotion`/`affineMul`, engine-bridge), que le moteur compose avec sa
+view transform. Une forme ANIMÉE réutilise donc son path enregistré au lieu de re-sérialiser
+chaque coordonnée. Mesuré : 2000 vect + Motion 7,33 ms/1751 Ko → **1,82 ms/573 Ko** (4,0×) ;
+4000 vect + Motion 26,68 ms/6349 Ko → **3,71 ms/1149 Ko** (7,2×). Coût réel par tick de scrub
+(boucle déterministe, cf. ci-dessous) : 2000 sans Motion 22,8 → 17,1 ms ; 4000 avec Motion
+83,2 → 59,0 ms.
+
+⚠️ **`affineFromMotion` DOIT rester le miroir exact de `transformSegments` (motion.js)** —
+mise à l'échelle dans le repère local du pivot, rotation autour du pivot, translation en
+dernier. Si les deux divergent, l'image ne change que pour les formes animées, donc
+silencieusement : c'est un pixel-A/B qui l'attrape, pas une relecture (§3).
+
+**Quatre exclusions, chacune parce qu'elle changerait l'image** : offsets par vertex (seule
+pièce non affine), **échelle non uniforme** n'importe où dans la chaîne (le chemin inline
+multiplie la largeur de trait par `(|sx|+|sy|)/2` alors que le moteur trace À TRAVERS
+l'affine — ça ne coïncide que si `sx == sy`, sinon c'est une plume elliptique), fill en
+dégradé (ses ancres sont pré-transformées inline), et l'overlay `currentFrameOutline` (sa
+largeur de trait est une constante écran qui ne doit pas suivre l'affine). Avec
+`pathTransform`, JS envoie donc la largeur de trait **non multipliée**.
+
+⚠️ **L'enregistrement lit `segsBefore`, la géométrie AVANT transformation** — un path stocké
+doit vivre dans l'espace propre de la forme, jamais posé. Le premier jet de la v2
+enregistrait la géométrie posée : un calque en permanence animé ne présentant jamais de frame
+non transformée, il ne pouvait jamais amorcer son entrée de store.
+
+**Identité de rendu, chiffrée** : v1 (non transformé) reste **identique au bit près**. v2
+avec `pathTransform` diffère au pire de **63 px sur 2 073 600 (0,003 %), écart de canal max
+1/255** — artefact d'ORDRE D'ARRONDI (inline arrondit après transformation, le retenu arrondit
+avant puis applique une affine exacte), pas une erreur de maths : le transport de points est
+exact à 1e-15, vérifié point à point contre `transformSegments`. Une forme mal placée
+donnerait des milliers de pixels à 255.
+
+**Mesurer la perf ici : les sondes fps basées sur rAF ne sont PAS fiables** — la boucle de
+sonde et le tick rAF du moteur s'aliasent, et le même réglage a donné des résultats
+contradictoires d'un run à l'autre (37→36 fps puis 28→39 fps). Utiliser
+`SMEngineBridge.timeSceneBuild(n)` pour la sérialisation isolée, et une boucle synchrone
+`goToFrame + timeSceneBuild(1)` pour le coût par tick. Le reste du coût est `loadFrame`/`desP`
+qui reconstruit les objets Paper — non touché par ce chantier, c'est le mur suivant.
 
 **`renderNow(true)` (viewportOnly) est un contrat d'appelant** : seul le viewport a changé
 depuis le dernier rendu. Vrai pour pan/rotate (aucun item de scène ne dépend de center ou de

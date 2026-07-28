@@ -30,6 +30,18 @@ pub(crate) struct ItemIn {
     // empty geometry there (bug family §1).
     #[serde(default)]
     pub(crate) path_ref: Option<String>,
+    // Affine [a,b,c,d,e,f] (SVG/kurbo convention) composed with the view
+    // transform for THIS item only — lets an animated shape reuse its
+    // registered path instead of falling back to re-serializing every
+    // coordinate. Element/layer/parent Motion matrices are all affine around
+    // a pivot, so the whole chain collapses into one of these.
+    //
+    // The stroke rides the same transform, so JS must send the UNSCALED
+    // strokeWidth when this is present (it pre-multiplies by strokeScale on
+    // the inline path). Only emitted for uniformly-scaled chains, where
+    // vello's stroking and JS's (|sx|+|sy|)/2 agree exactly.
+    #[serde(default)]
+    pub(crate) path_transform: Option<[f64; 6]>,
     #[serde(default)]
     pub(crate) segments: Vec<SegIn>,
     #[serde(default)]
@@ -1887,16 +1899,22 @@ fn paint_layer_items(
                 None => continue,
             }
         };
+        // A retained path is stored in its own untransformed space; its
+        // per-item Motion chain arrives as one affine folded in here.
+        let item_tf = match &item.path_transform {
+            Some(m) => view_tf * Affine::new(*m),
+            None => view_tf,
+        };
         let paint_fill = |scene: &mut Scene| {
             if let Some(grad) = item.fill_gradient.as_ref().and_then(gradient_brush) {
-                scene.fill(vello::peniko::Fill::NonZero, view_tf, &grad, None, bez);
+                scene.fill(vello::peniko::Fill::NonZero, item_tf, &grad, None, bez);
             } else if let Some(fc) = item.fill_color {
-                scene.fill(vello::peniko::Fill::NonZero, view_tf, color_from(fc), None, bez);
+                scene.fill(vello::peniko::Fill::NonZero, item_tf, color_from(fc), None, bez);
             }
         };
         let paint_stroke = |scene: &mut Scene| {
             if let Some(sc) = item.stroke_color {
-                scene.stroke(&stroke_from(item), view_tf, color_from(sc), None, bez);
+                scene.stroke(&stroke_from(item), item_tf, color_from(sc), None, bez);
             }
         };
         if item.paint_order.as_deref() == Some("strokeFirst") {

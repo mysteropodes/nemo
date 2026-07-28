@@ -36,10 +36,10 @@ export const strokemodeler_down: (a: number, b: number, c: number, d: number, e:
 export const strokemodeler_move: (a: number, b: number, c: number, d: number, e: number) => [number, number];
 export const strokemodeler_new: (a: number, b: number) => number;
 export const strokemodeler_up: (a: number, b: number, c: number, d: number, e: number) => [number, number];
-export const interp_stroke: (a: number, b: number) => [number, number, number, number];
 export const boolean_op: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
 export const erase_at_point: (a: number, b: number) => [number, number, number, number];
 export const hit_test: (a: number, b: number, c: number, d: number, e: number) => [number, number, number, number];
+export const interp_stroke: (a: number, b: number) => [number, number, number, number];
 export const wasm_bindgen__convert__closures_____invoke__h4177160f1dac6248: (a: number, b: number, c: any) => [number, number];
 export const wasm_bindgen__convert__closures_____invoke__h49909fab4bc066b4: (a: number, b: number, c: any, d: any) => void;
 export const wasm_bindgen__convert__closures_____invoke__h29bfc5eda1199406: (a: number, b: number, c: any) => void;

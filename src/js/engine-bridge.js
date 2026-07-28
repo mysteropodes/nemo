@@ -242,6 +242,56 @@
   // inline segments. `segs` must already be the rounded array that WOULD have
   // been sent, so a registered path and an inline one are byte-identical
   // geometry (CLAUDE.md §3: the two paths must not drift).
+  // ---- MOTION CHAIN AS ONE AFFINE (2026-07-28, retained-path v2) --------
+  // Every Motion matrix in the item -> element -> layer -> parent chain is an
+  // affine around a pivot, so the whole chain collapses into a single 2x3 the
+  // engine can compose with its view transform. That lets an ANIMATED shape
+  // keep using its registered path instead of falling back to re-serializing
+  // every coordinate, which was v1's biggest gap (Motion was entirely
+  // excluded). Per-vertex path offsets are the one non-affine piece and are
+  // screened out by the caller.
+  //
+  // Convention: [a,b,c,d,e,f] as SVG/kurbo, x' = a*x + c*y + e, y' = b*x + d*y + f.
+  // Mirrors transformSegments (motion.js) EXACTLY — scale in the pivot's local
+  // frame, rotate around the pivot, translate last:
+  //   A = T(dx,dy) . T(P) . R(rot) . S(sx,sy) . T(-P)
+  // If those two ever drift the picture silently changes only for animated
+  // shapes, so they are verified against each other by a pixel A/B, not by
+  // reading (CLAUDE.md §3).
+  function affineFromMotion(m, pivot) {
+    var rad = (m.rot || 0) * Math.PI / 180, cs = Math.cos(rad), sn = Math.sin(rad);
+    var a = cs * m.sx, b = sn * m.sx, c = -sn * m.sy, d = cs * m.sy;
+    return [a, b, c, d,
+      pivot.x + (m.dx || 0) - a * pivot.x - c * pivot.y,
+      pivot.y + (m.dy || 0) - b * pivot.x - d * pivot.y];
+  }
+  // m2 applied AFTER m1.
+  function affineMul(m2, m1) {
+    return [
+      m2[0] * m1[0] + m2[2] * m1[1],
+      m2[1] * m1[0] + m2[3] * m1[1],
+      m2[0] * m1[2] + m2[2] * m1[3],
+      m2[1] * m1[2] + m2[3] * m1[3],
+      m2[0] * m1[4] + m2[2] * m1[5] + m2[4],
+      m2[1] * m1[4] + m2[3] * m1[5] + m2[5],
+    ];
+  }
+  // Uniform scale only. The inline path scales stroke width by
+  // (|sx|+|sy|)/2 while the engine strokes THROUGH the affine, and those two
+  // agree exactly only when sx == sy — a non-uniform chain would draw a
+  // subtly different (elliptical-pen) stroke, so it falls back to inline
+  // rather than quietly changing the picture.
+  function motionChainUniform(elMat, motionMat, parentChain) {
+    var EPS = 1e-9;
+    if (elMat && Math.abs(elMat.sx - elMat.sy) > EPS) return false;
+    if (motionMat && Math.abs(motionMat.sx - motionMat.sy) > EPS) return false;
+    for (var i = 0; i < parentChain.length; i++) {
+      var pm = parentChain[i].mat;
+      if (Math.abs(pm.sx - pm.sy) > EPS) return false;
+    }
+    return true;
+  }
+
   // Lookup only — must stay free of any serialization, because the whole
   // point is to answer "already registered?" BEFORE paying for serP().
   // A first attempt kept serP+roundSegs unconditional and only skipped the
@@ -563,12 +613,6 @@
       // may not even have, having never been individually keyed). One
       // pass over children building brushGroupId -> anchor strokeId,
       // reused below instead of a lookup per companion.
-      // Cheap upfront gate for the retained-path fast path below: per-vertex
-      // path offsets and per-element matrices both live in ld.elementMotion,
-      // so a layer without it can have neither — and that is the common case.
-      // Checked at LAYER level so the per-item fast path costs one boolean
-      // instead of a function call into motion.js.
-      var layerHasElemMotion = !!(state.layers[i].elementMotion && Object.keys(state.layers[i].elementMotion).length);
       // Only layer kinds whose getEffectiveStrokes branch returns the STORED
       // stroke array can back a retained path — see the store's comment.
       var layerRetainable = !state.layers[i].symbolId && !state.layers[i].montageId && !state.layers[i].lfsGroup;
@@ -679,7 +723,21 @@
           // -> emit the ref without touching serP/roundSegs at all. This is
           // the entire point of the retained store; everything below is the
           // cold path that pays serialization once per new geometry.
-          var fastRef = (layerRetainable && !layerHasElemMotion && !motionMat && !parentChain.length) ? existingPathRef(sub) : null;
+          // v2: the Motion chain no longer disqualifies a retained path — it
+          // is folded into ONE affine sent alongside the ref. Four things
+          // still do, each because it would change the picture:
+          //   - per-vertex path offsets (the only non-affine piece)
+          //   - a non-uniform scale anywhere in the chain (stroke-width
+          //     semantics differ, see motionChainUniform)
+          //   - a gradient fill (its anchors are pre-transformed inline)
+          //   - the current-frame outline overlay (its stroke width is a
+          //     screen-space constant that must NOT ride the affine)
+          var xformable = layerRetainable
+            && !(window.SMMotion && cStrokeId && SMMotion.hasPathVertexMotionFor(i, cStrokeId))
+            && !(c.data && c.data.fillGradient)
+            && !(includeEditorOverlays && state.currentFrameOutline)
+            && motionChainUniform(elMat, motionMat, parentChain);
+          var fastRef = xformable ? existingPathRef(sub) : null;
           var sd = fastRef ? null : serP(sub);
           // Identity, not deep-compare: applyPathVertexOffsetsFor returns the
           // SAME array when the shape has no per-vertex keys, so `!==` is an
@@ -723,15 +781,35 @@
           // layer / parent transform chain — any of those rewrite every
           // coordinate, so the stored path would be the wrong shape.
           var rounded = sd ? roundSegs(sd.segments) : null;
-          var geomUntouched = sd && layerRetainable && (sd.segments === segsBefore) && !elMat && !motionMat && !parentChain.length;
-          var pathRef = fastRef || (geomUntouched ? pathRefFor(sub, rounded, sd.closed) : null);
-          var item = pathRef
-            ? { pathRef: pathRef, fillColor: cssColorToRgba(c.fillColor ? c.fillColor.toCSS(true) : null, op) }
-            : {
+          // A stored path must live in the shape's OWN space, never a posed
+          // one — so registration reads `segsBefore`, the pre-transform array
+          // (transformSegments returns a new array, it does not mutate). That
+          // is what lets a permanently-animated layer register at all: v2's
+          // first draft registered from the POSED geometry and so a Motion
+          // layer, which never presents an untransformed frame, could never
+          // seed its own store entry.
+          var pathRef = fastRef;
+          if (!pathRef && sd && xformable) pathRef = pathRefFor(sub, roundSegs(segsBefore), sd.closed);
+          var pathTf = null;
+          if (pathRef && (elMat || motionMat || parentChain.length)) {
+            if (elMat) pathTf = affineFromMotion(elMat, elPivot);
+            if (motionMat) { var mm = affineFromMotion(motionMat, motionPivot); pathTf = pathTf ? affineMul(mm, pathTf) : mm; }
+            for (var pcf = 0; pcf < parentChain.length; pcf++) {
+              var pmf = affineFromMotion(parentChain[pcf].mat, parentChain[pcf].pivot);
+              pathTf = pathTf ? affineMul(pmf, pathTf) : pmf;
+            }
+          }
+          var item;
+          if (pathRef) {
+            item = { pathRef: pathRef, fillColor: cssColorToRgba(c.fillColor ? c.fillColor.toCSS(true) : null, op) };
+            if (pathTf) item.pathTransform = pathTf;
+          } else {
+            item = {
               segments: rounded,
               closed: !!sd.closed,
               fillColor: cssColorToRgba(c.fillColor ? c.fillColor.toCSS(true) : null, op),
             };
+          }
           // Extended per-shape property: Fill color (2026-07) — overrides
           // the item's own painted color with its element holder's
           // 'fillColor' track, [r,g,b,a] 0-255, the exact shape
@@ -768,7 +846,10 @@
           var sc = cssColorToRgba(c.strokeColor ? c.strokeColor.toCSS(true) : null, op);
           if (sc) {
             item.strokeColor = sc;
-            item.strokeWidth = (c.strokeWidth || 1) * strokeScale;
+            // With pathTransform the engine strokes THROUGH the affine, which
+            // already scales the pen — pre-multiplying here too would square
+            // the scale.
+            item.strokeWidth = (c.strokeWidth || 1) * (item.pathTransform ? 1 : strokeScale);
             item.strokeCap = c.strokeCap;
             item.strokeJoin = c.strokeJoin;
             item.miterLimit = c.miterLimit;
