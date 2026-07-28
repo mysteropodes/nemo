@@ -1303,6 +1303,15 @@
     <button class="tb" id="btn-nf" data-i18n-title="btnNextFrameTitle" title="Next frame"><span class="material-symbols-rounded">&#xe5cc;</span></button>
     <button class="tb" id="btn-lf" data-i18n-title="btnLastFrameTitle" title="Go to last frame"><span class="material-symbols-rounded">&#xe044;</span></button>
     <button class="tb active" id="btn-loop" data-i18n-title="btnLoopTitle" title="Loop playback (work area) — right-click for ping-pong"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></button>
+    <!-- Manual fallback for the playback bake cache (playback-cache.js) —
+         SVG (not a Material Symbols codepoint) on purpose: this project's
+         embedded font is a subset containing only ALREADY-referenced
+         codepoints, so any new one renders silently blank (see this
+         project's own CLAUDE.md). The cache normally kicks in
+         automatically only when real-time playback can't keep up
+         (timeline.js's rAF-interval monitor) — this button forces the
+         same bake pass on demand, e.g. right before a review/demo. -->
+    <button class="tb" id="btn-bake-cache" title="Forcer le cache de lecture (normalement automatique si la lecture décroche)"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/><path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/></svg></button>
     <span style="width:1px;height:20px;background:var(--border2);flex:none"></span>
     <div class="ti">
       <span data-i18n="fieldFPS">FPS</span><input type="number" class="scrub" id="tl-fps" value="12" min="1" max="60" data-step="1">
@@ -1531,6 +1540,7 @@
 <script src="js/media-library.js"></script>
 <script type="module" src="js/geometry-wasm-loader.js"></script>
 <script src="js/engine-bridge.js"></script>
+<script src="js/playback-cache.js"></script>
 <script src="js/perspective-bridge.js"></script>
 <script src="js/symmetry-bridge.js"></script>
 <script src="js/gradient-bridge.js"></script>

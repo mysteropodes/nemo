@@ -4303,6 +4303,14 @@ function _actionLabelNow(){
 // UN snapshot pré-geste au premier mouvement puis lève ce flag ; ici on
 // no-op tant qu'il est levé (y compris le 'change' final du release).
 function pushUndoLayers(){if(window._scrubLiveActive)return;saveAllLayerFrames();state.undoStack.push(layersSnapshotNow());state.undoLabels.push(_actionLabelNow());if(state.undoStack.length>state.maxUndo){state.undoStack.shift();state.undoLabels.shift();}state.redoStack=[];state.redoLabels=[];if(window.SMFeedback)SMFeedback.logAction();if(window.renderHistoryPanelIfOpen)renderHistoryPanelIfOpen();
+  // Playback bake cache (playback-cache.js): this is the SAME chokepoint
+  // SMFeedback.logAction() right above already trusts as "a real content-
+  // mutating action happened" — any baked bitmap for the frame(s) this
+  // action touched is now stale. Whole-cache invalidation, not per-frame
+  // tracking (simpler and correct; structural changes like entering a
+  // symbol or resizing the canvas are caught separately by the cache's own
+  // identity stamp, see playback-cache.js's _stampMatches).
+  if(window.SMPlaybackCache)SMPlaybackCache.invalidateAll();
   // See _maybePromoteInterpolated's own comment (app.js) — this is the
   // SAME choke point SMFeedback.logAction() right above already trusts as
   // "a real content-mutating action happened" (its own doc comment: "only

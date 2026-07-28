@@ -61,6 +61,44 @@ function startPlay(){if(state.playing)return;
   // PACE stays true to state.fps even when individual frames are heavy.
   var frameMs=1000/state.fps;
   var playClock=performance.now();
+  // Advance the live document + screen to `next` — checks the playback bake
+  // cache (playback-cache.js) first: a cached frame just blits a bitmap
+  // (cheap 2D drawImage), skipping loadFrame/buildSceneJson/engine.render()
+  // entirely for that tick. Falls through to the untouched original path
+  // (loadFrame + rust-canvas) on a cache miss, or when the cache module
+  // isn't loaded at all — a strict no-op for anyone who never triggers a
+  // bake.
+  function _advanceToFrame(next){
+    saveAllLayerFrames();state.currentFrame=next;window._curFrame=next;
+    if(window.SMPlaybackCache&&SMPlaybackCache.blitFrame(next)){
+      // cache hit — document intentionally NOT reloaded (see performance
+      // monitor below: only a LIVE render should feed the "is real-time
+      // failing" signal, and this tick clearly isn't one)
+    }else{
+      if(window.SMPlaybackCache)SMPlaybackCache.hideBakePreview();
+      loadFrame(next);
+    }
+    updatePlayhead();
+  }
+  // Real-time-playback monitor (2026-07 — "le preview cache arrivera que si
+  // l'app n'arrive pas à lire en temps réel", explicit user direction): the
+  // bake cache is a FALLBACK for genuine underperformance, not a step every
+  // project pays automatically. Same "rAF interval is the honest number"
+  // methodology as CLAUDE.md §5bis — a rolling median over many ticks, not
+  // a single sample, so one GC pause or a window-refocus blip can't trigger
+  // a bake; only a SUSTAINED shortfall does. Only fed by ticks that did a
+  // LIVE (uncached) render — a cache hit is fast by construction and would
+  // otherwise constantly reset the signal to "fine" right as playback
+  // enters the very range that still needs baking.
+  var _perfSamples=[],_perfWindow=30,_lastTickAt=performance.now();
+  function _livePerfSample(now){
+    var dt=now-_lastTickAt;_lastTickAt=now;
+    _perfSamples.push(dt);
+    if(_perfSamples.length>_perfWindow)_perfSamples.shift();
+    if(_perfSamples.length<_perfWindow)return false;
+    var sorted=_perfSamples.slice().sort(function(a,b){return a-b;});
+    return sorted[Math.floor(sorted.length/2)]>frameMs*1.5;
+  }
   function playStep(now){
     if(!state.playing)return;
     var steps=Math.floor((now-playClock)/frameMs);
@@ -75,16 +113,58 @@ function startPlay(){if(state.playing)return;
         var n2=advancePlayFrame(next);
         if(n2===null){
           // land exactly on the edge frame before stopping, like before
-          if(next!==state.currentFrame){saveAllLayerFrames();state.currentFrame=next;window._curFrame=next;loadFrame(next);updatePlayhead();}
+          if(next!==state.currentFrame)_advanceToFrame(next);
           stopPlay();return;
         }
         next=n2;
       }
-      if(next!==state.currentFrame){saveAllLayerFrames();state.currentFrame=next;window._curFrame=next;loadFrame(next);updatePlayhead();}
+      var wasCached=window.SMPlaybackCache&&SMPlaybackCache.hasFrame(next);
+      if(next!==state.currentFrame)_advanceToFrame(next);
+      if(!wasCached&&window.SMPlaybackCache&&!SMPlaybackCache.isBaking()&&_livePerfSample(now)){
+        autoBakeThenResume();
+        return;
+      }
     }
     playRaf=requestAnimationFrame(playStep);
   }
   playRaf=requestAnimationFrame(playStep);
+}
+// Auto-triggered by playStep's performance monitor when live playback can't
+// keep up with state.fps — stops playback, bakes the current work-area
+// range (playback-cache.js), then resumes. Also callable directly from the
+// manual "cache de lecture" fallback button (#btn-bake-cache).
+function autoBakeThenResume(){
+  if(!window.SMPlaybackCache||SMPlaybackCache.isBaking())return;
+  var savedDir=state.playDir;
+  var from=state.waIn,to=state.waOut;
+  if(state.playing)stopPlay();
+  if(window.showToast)showToast('Optimisation de la lecture…','info');
+  SMPlaybackCache.bakeRange(from,to).then(function(res){
+    if(res&&res.started&&window.showToast){
+      if(res.budgetHit)showToast('Cache de lecture : '+res.cached+'/'+res.total+' images (limite mémoire atteinte)','warn');
+      else if(res.cancelled)showToast('Cache de lecture annulé ('+res.cached+' images)','warn');
+      else showToast('Cache de lecture prêt ('+res.cached+' images)','success');
+    }
+    state.playDir=savedDir;
+    startPlay();
+  });
+}
+// Manual fallback (#btn-bake-cache, user-approved safety valve alongside
+// the automatic trigger above) — bakes on demand (e.g. before a demo) but
+// does NOT auto-start playback afterward, unlike autoBakeThenResume: the
+// user asked for the cache to be ready, not for playback to begin.
+function manualBakeCache(){
+  if(!window.SMPlaybackCache){return;}
+  if(SMPlaybackCache.isBaking()){showToast('Cache de lecture déjà en cours…','info');return;}
+  if(state.playing)stopPlay();
+  showToast('Mise en cache de la lecture…','info');
+  SMPlaybackCache.bakeRange(state.waIn,state.waOut).then(function(res){
+    if(!res)return;
+    if(!res.started){showToast('Cache de lecture indisponible','warn');return;}
+    if(res.budgetHit)showToast('Cache de lecture : '+res.cached+'/'+res.total+' images (limite mémoire atteinte)','warn');
+    else if(res.cancelled)showToast('Cache de lecture annulé ('+res.cached+' images)','warn');
+    else showToast('Cache de lecture prêt ('+res.cached+' images)','success');
+  });
 }
 function stopPlay(){if(!state.playing)return;state.playing=false;
   if(playRaf){cancelAnimationFrame(playRaf);playRaf=null;}
@@ -6408,6 +6488,7 @@ document.getElementById('p-skipmanual').addEventListener('change',function(){sta
 document.getElementById('btn-tw').addEventListener('click',function(){window.SM.generateTweens();});
 document.getElementById('btn-os').addEventListener('click',function(){window.SM.toggleOnion();});
 document.getElementById('btn-ghost-all').addEventListener('click',function(){window.SM.toggleGhostAll();});
+document.getElementById('btn-bake-cache').addEventListener('click',function(){manualBakeCache();});
 // Persistent toolbar customization. The overflow button is intentionally
 // never hideable, so hidden controls always remain recoverable.
 (function initToolbarCustomization(){
