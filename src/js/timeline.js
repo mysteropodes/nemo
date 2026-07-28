@@ -1449,7 +1449,7 @@ function updateUI(){
   document.getElementById('info-sel').textContent=state.tool==='select'&&selectedPaths.length>0?selectedPaths.length+' '+SM.t('selCountSuffix'):'';
   window._totalF=state.totalFrames;window._waIn=state.waIn;window._waOut=state.waOut;window._curFrame=state.currentFrame;
   window.updateWaBar();window.updateOmMarkers(state.currentFrame,state.totalFrames);
-  renderTimeline();renderLayerList();updateCompInstancePanel();updateSelPropsPanel();updateFsSelPanel();updateRevisionPanel();updateTextActionsPanel();if(window.updateEffectsPanel)window.updateEffectsPanel();updatePropsContext();
+  renderTimeline();renderLayerList();updateCompInstancePanel();updateFootagePanel();updateSelPropsPanel();updateFsSelPanel();updateRevisionPanel();updateTextActionsPanel();if(window.updateEffectsPanel)window.updateEffectsPanel();updatePropsContext();
 }
 // Team review Accept/Reject panel — shown when exactly one selected item is
 // either an active (non-ghost) revision (data.revisionParentId) or a
@@ -3796,6 +3796,44 @@ function renderSymbolTabs(){
     x.addEventListener('click',function(e){e.stopPropagation();window.SM.closeSymbolTab(symId);});
     bar.appendChild(tab);
   });
+}
+// Footage panel — mirrors updateCompInstancePanel's shape (show/hide from the
+// active layer, populate, no state of its own). Reads the layer's kind from
+// layer-kind.js rather than re-testing flags, so it can never disagree with
+// the badge on the row.
+function updateFootagePanel(){
+  var sec=document.getElementById('footage-sec');
+  if(!sec)return;
+  var ld=state.layers[state.activeLayerIdx];
+  var kind=(ld&&window.SMLayerKind)?SMLayerKind.of(ld):null;
+  var isFootage=kind&&(kind.key==='image'||kind.key==='sequence'||kind.key==='video');
+  if(!isFootage||!window._layerActiveExplicit){sec.style.display='none';return;}
+  sec.style.display='block';
+  document.getElementById('footage-kind').textContent=kind.label;
+  var meta=ld.footage||{};
+  // The name is whatever we were told at import; fall back to the layer's
+  // own name rather than showing an empty row for pre-tag projects.
+  document.getElementById('footage-name').textContent=meta.name||ld.name||'—';
+  document.getElementById('footage-name').title=meta.name||ld.name||'';
+  // Dimensions come from the raster actually on the frame, not from the
+  // import-time metadata: a scaled footage layer should report what it IS
+  // now, and pre-tag projects have no metadata at all.
+  var st=(ld.frames&&ld.frames[state.currentFrame]&&ld.frames[state.currentFrame].strokes)||[];
+  var ras=null;
+  for(var i=0;i<st.length;i++){if(st[i]&&st[i].isRaster){ras=st[i];break;}}
+  document.getElementById('footage-w').value=ras?Math.round(ras.width):0;
+  document.getElementById('footage-h').value=ras?Math.round(ras.height):0;
+  var countRow=document.getElementById('footage-count-row');
+  var isSeq=kind.key==='sequence';
+  countRow.style.display=isSeq?'flex':'none';
+  if(isSeq){
+    var n=meta.count;
+    if(n==null){n=0;(ld.frames||[]).forEach(function(f){if(f&&f.strokes&&f.strokes.some(function(x){return x&&x.isRaster;}))n++;});}
+    document.getElementById('footage-count').textContent=n;
+  }
+  // A video's source lives in ld.nativeVideo and is swapped by its own
+  // importer, so only the raster kinds get the in-place replace.
+  document.getElementById('btn-footage-replace').style.display=(kind.key==='video')?'none':'';
 }
 function updateCompInstancePanel(){
   var sec=document.getElementById('comp-instance-sec');
