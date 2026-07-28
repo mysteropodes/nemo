@@ -837,7 +837,78 @@ function serR(r){
 // kept Paper's default natural-pixel dimensions instead of the intended
 // world-space w/h whenever onLoad never fired. Checking `.loaded` first
 // covers both cases.
-function desR(d,layer,op){var prev=project.activeLayer;layer.activate();var r=new Raster(d.src);r.data.src=d.src;if(d.isBitmapBrush)r.data.isBitmapBrush=true;if(d.brushGroupId)r.data.brushGroupId=d.brushGroupId;if(d.isBrushTextureCopy)r.data.isBrushTextureCopy=true;if(d.groupId)r.data.groupId=d.groupId;
+// ---- DECODED-IMAGE CACHE (2026-07-28) ----
+// loadFrame() rebuilds every item through desR on EVERY scrub tick, and desR
+// used to hand Paper a data: URL — one fresh PNG decode per raster per frame,
+// forever. Measured on a real 15.9MB project: 57 raster reads across the
+// component's keyframes for only 24 distinct images, 4.7MB of base64 decoded
+// just to visit frame 0. That is the "il redessine à chaque fois" cost.
+//
+// Keyed on the data URL itself, which is already this codebase's image
+// identity (engine-bridge.js's registerRasterIfNeeded keys the GPU texture
+// the same way), so nothing new has to stay in sync. Every path that CHANGES
+// a raster's pixels — eraseBite, flushEraseDirty, liveRestamp, regenerate —
+// writes a fresh toDataURL string, i.e. a new key: a mutated image can never
+// read a stale entry, and no explicit invalidation is needed.
+//
+// Sharing one decoded <img> across many Rasters is safe: Paper's _setImage
+// copies the element into the Raster's OWN canvas (setSize does
+// getCanvas + drawImage(previousElement)), so a later r.size/rotate on one
+// Raster cannot disturb another. It also makes the Raster synchronously
+// `loaded`, which is what removes the async gap the onLoad hook below exists
+// to paper over.
+//
+// Bounded: an imported video mints ~one distinct frame per video frame
+// (images.js), so an unbounded map would grow to the whole decoded movie.
+// LRU by insertion order, capped on BOTH count and approximate bytes.
+var _imgCacheMax=120, _imgCacheMaxBytes=192*1024*1024;
+var _imgCache=new Map(), _imgCacheBytes=0;
+function _imgCacheGet(src){
+  var e=_imgCache.get(src);
+  if(!e)return null;
+  // Re-insert to mark most-recently-used (Map preserves insertion order).
+  _imgCache.delete(src);_imgCache.set(src,e);
+  // Only a fully decoded element is usable synchronously; a pending one is
+  // reported as a miss so the caller takes the normal async path.
+  return (e.img&&e.img.complete&&e.img.naturalWidth)?e.img:null;
+}
+// Decode ONE image we own, in the background. Deliberately not Paper's own
+// r.image: after decode Paper swaps its internal element for a canvas
+// (_setImage -> setSize -> getCanvas + drawImage), so the element reachable
+// from a loaded Raster has no .complete/.naturalWidth and is useless as a
+// cache entry — verified live (loaded:true, complete:false, naturalWidth:null).
+// Owning the element also means Paper can never mutate it under us.
+function _imgCacheWarm(src){
+  if(!src||src.indexOf('data:')!==0||_imgCache.has(src)||_imgCacheWarming[src])return;
+  _imgCacheWarming[src]=1;
+  var im=new Image();
+  im.onload=function(){delete _imgCacheWarming[src];_imgCachePut(src,im);};
+  im.onerror=function(){delete _imgCacheWarming[src];};
+  im.src=src;
+}
+var _imgCacheWarming={};
+function _imgCachePut(src,img){
+  if(!src||!img||_imgCache.has(src))return;
+  var bytes=src.length;
+  _imgCache.set(src,{img:img,bytes:bytes});_imgCacheBytes+=bytes;
+  while(_imgCache.size>_imgCacheMax||_imgCacheBytes>_imgCacheMaxBytes){
+    var oldest=_imgCache.keys().next();
+    if(oldest.done)break;
+    var ev=_imgCache.get(oldest.value);
+    _imgCache.delete(oldest.value);_imgCacheBytes-=(ev&&ev.bytes)||0;
+  }
+}
+// Exposed for measurement and for the tests that prove the hit rate.
+window.__imgCacheStats=function(){return{entries:_imgCache.size,mo:+( _imgCacheBytes/1e6).toFixed(2),hits:_imgCacheHits,misses:_imgCacheMisses};};
+window.__imgCacheReset=function(){_imgCache.clear();_imgCacheBytes=0;_imgCacheHits=0;_imgCacheMisses=0;};
+var _imgCacheHits=0,_imgCacheMisses=0;
+function desR(d,layer,op){var prev=project.activeLayer;layer.activate();
+  // Cache hit: hand Paper the ALREADY-DECODED element, which makes the
+  // Raster synchronously `loaded` — place() runs inline below and the
+  // async onLoad path (and its self-healing renderNow) is never needed.
+  var _cached=_imgCacheGet(d.src);
+  if(_cached)_imgCacheHits++;else{_imgCacheMisses++;_imgCacheWarm(d.src);}
+  var r=new Raster(_cached||d.src);r.data.src=d.src;if(d.isBitmapBrush)r.data.isBitmapBrush=true;if(d.brushGroupId)r.data.brushGroupId=d.brushGroupId;if(d.isBrushTextureCopy)r.data.isBrushTextureCopy=true;if(d.groupId)r.data.groupId=d.groupId;
   if(d.isText){r.data.isText=true;r.data.text=d.text||'';r.data.font=d.font||'sans-serif';r.data.size=d.size||48;r.data.color=d.color||'#000000';r.data.align=d.align||'left';if(d.fixedWidth)r.data.fixedWidth=d.fixedWidth;if(d.isTextChar)r.data.isTextChar=true;if(d.textGroupId)r.data.textGroupId=d.textGroupId;}
   r.position=new Point(d.x,d.y);r.opacity=op!==undefined?op:(d.opacity!==undefined?d.opacity:1);var w=d.width,h=d.height;
   // serR()'s mid-decode fallback reads this — see its own comment. Cleared
@@ -852,6 +923,7 @@ function desR(d,layer,op){var prev=project.activeLayer;layer.activate();var r=ne
   if(r.loaded)place();
   else r.onLoad=function(){
     place();
+
     // Found live (2026-07-17, "un scrub dans la timeline fait disparaitre
     // la texture"): loadFrame() rebuilds EVERY item fresh via desR/desP on
     // every scrub tick, so a bitmap-brush texture's Raster is a BRAND NEW
