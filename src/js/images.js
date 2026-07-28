@@ -103,6 +103,11 @@
     var idx=createUserLayer(prefix);
     while(frames.length<state.totalFrames)frames.push({strokes:[],isKeyframe:false,isInterpolated:false});
     state.layers[idx].frames=frames;
+    // Say what this layer IS, rather than leaving every reader to infer it
+    // from its contents (see layer-kind.js). Purely descriptive — it
+    // changes no stroke and no renderer reads it — but it is what lets
+    // the timeline label a sequence as a sequence instead of guessing.
+    state.layers[idx].footage={kind:'sequence',count:frames.length};
     activateUL(idx);loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
     if(window.SMMediaLibrary)SMMediaLibrary.addEntry(state.layers[idx].name,'image',frames[0].strokes[0].src,state.layers[idx].name);
     showToast('Séquence importée: '+items.length+' images sur le calque "'+prefix+'"');
@@ -173,6 +178,7 @@
       var idx=createUserLayer(seq.prefix);
       while(frames.length<state.totalFrames)frames.push({strokes:[],isKeyframe:false,isInterpolated:false});
       state.layers[idx].frames=frames;
+      state.layers[idx].footage={kind:'sequence',count:frames.length};
       activateUL(idx);loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
       if(window.SMMediaLibrary)SMMediaLibrary.addEntry(state.layers[idx].name,'image',frames[0].strokes[0].src,state.layers[idx].name);
       showToast('Séquence importée: '+seq.items.length+' images');
@@ -254,6 +260,7 @@
     var idx=createUserLayer(prefix);
     while(frames.length<state.totalFrames)frames.push({strokes:[],isKeyframe:false,isInterpolated:false});
     state.layers[idx].frames=frames;
+    state.layers[idx].footage={kind:'sequence',from:'video',count:frames.length};
     activateUL(idx);
     // convertLayerToComponent() below calls saveAllLayerFrames(), which
     // re-serializes the CURRENT frame from the live Paper.js document for
