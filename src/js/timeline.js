@@ -1340,6 +1340,21 @@ window.SM={
       // restore it or a reopened project silently falls back to the
       // heuristic and can re-label a sequence as a still.
       if(ld.footage)state.layers[idx].footage=ld.footage;
+      // Migration: every component created before 2026-07-28 carries a
+      // componentFrame:0 stamp on its frame 0, written by the conversion
+      // itself. resolveSymbolFrameIdx reads that as a deliberate "hold
+      // internal frame 0", so those components never play — and show nothing
+      // at all when their content starts after frame 0. A DELIBERATE pick is
+      // distinguishable: the frame strip sets play mode to 'single' at the
+      // same time (setSymbolSingleFrame + setSymbolPlayMode, timeline.js), so
+      // only clear the stamp when the layer is in a PLAYING mode, where an
+      // explicit hold on frame 0 is exactly the bug and never a choice.
+      var _mig=state.layers[idx];
+      if(_mig.symbolId&&_mig.symPlayMode!=='single'&&_mig.frames&&_mig.frames[0]&&_mig.frames[0].componentFrame===0){
+        var _other=false;
+        for(var _fi=1;_fi<_mig.frames.length;_fi++){if(_mig.frames[_fi]&&_mig.frames[_fi].componentFrame!=null){_other=true;break;}}
+        if(!_other)delete _mig.frames[0].componentFrame;
+      }
       // Per-layer fields added 2026-07-25/26. This restore list is a
       // WHITELIST — a field written by exportJSON but absent here is
       // silently dropped on load, which is the same "writer updated, reader
