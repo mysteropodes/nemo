@@ -2446,6 +2446,16 @@
     document.querySelectorAll('[data-i18n-html]').forEach(function(el){el.innerHTML=t(el.getAttribute('data-i18n-html'));});
     var langSel=document.getElementById('settings-language');
     if(langSel&&langSel.value!==currentLang())langSel.value=currentLang();
+    // Property labels sit in a fixed-width column (style.css .pl) so every
+    // value field lines up, which means a long translation ellipsizes. Carry
+    // the full text in the tooltip so nothing becomes unreadable — done here
+    // because that's where the text is last written, and re-run per language
+    // since the same label can fit in one and not another.
+    document.querySelectorAll('.pl').forEach(function(el){
+      if(el.getAttribute('data-i18n-title'))return; // already has a real explanatory tooltip
+      var txt=(el.textContent||'').trim();
+      if(txt)el.title=txt;
+    });
     // Labels whose text is DYNAMIC (a control that shows the current value,
     // not a fixed string) can't live on data-i18n alone: the sweep above
     // would overwrite the live value with the placeholder every time the

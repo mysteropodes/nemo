@@ -389,7 +389,20 @@ body.tools-docked-away #tools-panel-resize{display:none;}
 .pbdy{padding:2px 14px 12px;display:flex;flex-direction:column;gap:8px;}
 .pbdy.hid{display:none;}
 .pr{display:flex;align-items:center;gap:6px;}
-.pl{font-size:11.5px;color:rgba(236,234,231,.45);min-width:50px;}
+/* FIXED label column, not a minimum (2026-07-27: "dans rive sur la capture
+   les value sont quand même bien aligné, nous c'est un peu le bazard… ça ne
+   respecte pas bien les règles de mise en page"). min-width:50px meant every
+   label longer than 50px pushed its OWN value field right and no further, so
+   the value column started at a different x on almost every row — measured
+   five distinct positions in one panel (1030/1051/1052/1060/1061/1064).
+   One width for all of them puts every field on the same grid line, which is
+   what the Rive reference does.
+   Labels that outrun the column ellipsize rather than shove the field: at
+   68px, English and French all fit (longest: "Dash Offset", 63px), Spanish
+   and Japanese don't (104px and 103px for that same row), and widening the
+   column to fit them would cost a third of a 220px panel on every row. The
+   full text stays reachable — i18n.js titles each label after its sweep. */
+.pl{font-size:11.5px;color:rgba(236,234,231,.45);width:68px;flex:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 /* Panel fields (.pi/.psel/.pbtn) were sized for a ~13px value inside a
    ~31px-tall box — reduced from 8px/10px vertical/horizontal padding to
    5px/8px so the whole right panel column of sections takes noticeably
@@ -638,7 +651,10 @@ input[type="checkbox"]:disabled{opacity:.4;cursor:not-allowed;}
    between the two fields toggles proportion-lock (tools-panel-dock.js
    sibling pattern: JS toggles .on, CSS just reflects it). */
 .dims-row{gap:5px;}
-.dims-row .pl{min-width:0!important;flex:none;}
+/* Paired rows (W/H, X/Y, Opacity/Offset) fit TWO label+field pairs on one
+   line, so their labels are deliberately hug-width — they opt out of the
+   single-column grid above rather than fighting it. */
+.dims-row .pl{min-width:0!important;width:auto!important;flex:none;overflow:visible;}
 .dims-lock-btn{flex:none;width:22px;height:22px;border:none;background:transparent;color:rgba(236,234,231,.4);cursor:pointer;border-radius:5px;display:flex;align-items:center;justify-content:center;}
 .dims-lock-btn:hover{background:rgba(255,255,255,.08);color:var(--text);}
 .dims-lock-btn.on{color:var(--accent-hover);background:var(--accent-dim);}
