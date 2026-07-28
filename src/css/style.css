@@ -382,7 +382,12 @@ body.tools-docked-away #tools-panel-resize{display:none;}
 #panel-drop-indicator{position:fixed;display:none;height:3px;background:var(--accent);border-radius:2px;z-index:320;pointer-events:none;transform:translateY(-1px);box-shadow:0 0 0 1px rgba(74,158,255,.28),0 0 8px rgba(74,158,255,.8);}
 .psec.floating{position:fixed;width:280px;z-index:150;margin:0;box-shadow:0 14px 44px rgba(0,0,0,.6);background:var(--panel);border-radius:8px;border-bottom:none;}
 .psec.floating .phdr{cursor:grab;background:var(--panel3);}
-.phdr{display:flex;align-items:center;padding:10px 14px;background:transparent;cursor:pointer;font-size:12.5px;font-weight:600;color:rgba(236,234,231,.85);gap:6px;user-select:none;}
+/* 5px, was 10px (2026-07-27: "la hauteur des onglets peut aussi être
+   réduite") — 40px per header down to 30px, and with eleven of them stacked
+   in the panel that is ~110px of scrolling saved before any content shows.
+   Not halved outright: the row is still the section's click target, and 30px
+   is the floor where it stays comfortable to hit. */
+.phdr{display:flex;align-items:center;padding:5px 14px;background:transparent;cursor:pointer;font-size:12.5px;font-weight:600;color:rgba(236,234,231,.85);gap:6px;user-select:none;}
 .phdr:active{cursor:grabbing;}
 .phdr .ar{font-size:14px;color:rgba(236,234,231,.3);transition:none;order:2;margin-left:auto;}
 .phdr.closed .ar{transform:none;}
@@ -942,12 +947,13 @@ body.mode-motion .lrow.act.motion-selected{background:rgba(63,107,245,.16);box-s
    sont plus haut que la scroll bar" then "tu aurais pu mettre la scroll bar
    sous le trait orange"). The band used to be 40px because the layer
    buttons lived down there; they moved into #layer-hdr (2026-07-27), so it
-   now only has to clear #tlzoom-scrollbar's 12px — 24px of timeline height
-   handed back to the rows.
+   only has to clear the zoom scrollbar, and both were then halved on top of
+   that (2026-07-27: "toute cette zone là tu peux réduire le heigth de 50%")
+   — 32px of timeline height handed back to the rows in total.
    THREE places must agree on this number: both paddings below and
-   BOTTOM_BAND_PX in timeline-zoom.js, which centres the 12px bar in it. */
-#layer-panel{padding-bottom:16px;box-sizing:border-box;}
-#fg-col{flex:1;display:flex;flex-direction:column;min-width:0;padding-bottom:16px;box-sizing:border-box;}
+   BOTTOM_BAND_PX in timeline-zoom.js, which centres the bar in it. */
+#layer-panel{padding-bottom:8px;box-sizing:border-box;}
+#fg-col{flex:1;display:flex;flex-direction:column;min-width:0;padding-bottom:8px;box-sizing:border-box;}
 #fg-wrap{flex:1;overflow:auto;position:relative;min-height:0;}
 /* Design audit 2026-07, round 2 (feedback: "le work area ressemble trop à
    un calque" — the boxed/bordered/purple v1 read as another layer bar, not
