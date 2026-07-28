@@ -1449,7 +1449,8 @@ function syncDocFields(){
 }
 function updateUI(){
   syncDocFields();
-  var strokes=getEffectiveStrokes(state.activeLayerIdx,state.currentFrame);
+  // countOnly: this is only ever read for .length just below.
+  var strokes=getEffectiveStrokes(state.activeLayerIdx,state.currentFrame,true);
   document.getElementById('info-frame').textContent=state.currentFrame+1;
   document.getElementById('info-strokes').textContent=(window.SM&&SM.t?SM.t(strokes.length===1?'strokeCountOne':'strokeCountOther'):(strokes.length+' trait'+(strokes.length!==1?'s':''))).replace('{n}',strokes.length);
   var tlCfEl=document.getElementById('tl-cf');

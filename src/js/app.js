@@ -983,6 +983,32 @@ function symGestureAccumulate(opMatrix){
 // Applies an affine matrix to one raw stroke-data dict's geometry in place
 // — point gets the full affine, handleIn/handleOut are deltas so only the
 // linear (non-translating) part applies to them.
+// Deep-clone a stroke dict for transforming, WITHOUT copying its image
+// payload. A raster stroke's `src` is a base64 data URL — on a real project
+// that is ~190KB per raster and 15.3MB across a component (the next-largest
+// field, `segments`, totals 66KB: src is 99.5% of the bytes). Every
+// transform site here only ever rewrites geometry, so round-tripping that
+// string through JSON was pure waste: measured 1.9ms per call for one
+// component's 20 strokes, paid twice per frame on every scrub/playback tick
+// (2026-07-28, "la lecture dans motion de cet élément est saccadée").
+//
+// `src` is immutable by contract — desR reads it, nothing rewrites it in
+// place — so the clone shares the same string reference. Any future field
+// that is both large and immutable belongs in HEAVY too.
+var _HEAVY_STROKE_FIELDS = ['src'];
+function cloneStrokeForTransform(sd) {
+  var heavy = null, k, i;
+  for (i = 0; i < _HEAVY_STROKE_FIELDS.length; i++) {
+    k = _HEAVY_STROKE_FIELDS[i];
+    if (sd[k] !== undefined) { (heavy || (heavy = {}))[k] = sd[k]; }
+  }
+  if (!heavy) return JSON.parse(JSON.stringify(sd));
+  var light = {};
+  for (k in sd) { if (heavy[k] === undefined) light[k] = sd[k]; }
+  var out = JSON.parse(JSON.stringify(light));
+  for (k in heavy) out[k] = heavy[k];
+  return out;
+}
 function applyMatrixToStrokeData(sd,m){
   if(sd.isRaster){
     // A raster stroke has no `segments` (see serR/desR — just a center x/y
@@ -1204,7 +1230,15 @@ function layerOutPoint(ld,_seen,_depth){
 // project with slightly stray state to crash, for a purely hypothetical
 // benefit. Revisit if a future feature ever legitimately needs to combine
 // two of these flags on the same layer.
-function getEffectiveStrokes(layerIdx,frameIdx){
+// `countOnly` skips the transform stage (element motion, component camera,
+// instance matrix). Every one of those is a 1:1 map — they rewrite geometry,
+// never add or drop a stroke — so the COUNT is identical either way, and a
+// caller that only needs the count should not pay for the clones. updateUI
+// (timeline.js) was calling the full path once per frame purely to print the
+// status-bar stroke count, doubling the per-frame transform cost of every
+// scrub and playback tick (2026-07-28). Do NOT use countOnly to get strokes
+// you intend to draw: the returned dicts are untransformed.
+function getEffectiveStrokes(layerIdx,frameIdx,countOnly){
   var ld=state.layers[layerIdx];if(!ld)return[];
   if(layerHasTimeRange(ld)&&(frameIdx<layerInPoint(ld)||frameIdx>layerOutPoint(ld)))return[];
   // EXPERIMENTAL (native-video-decode): a natively-decoded video layer has
@@ -1265,6 +1299,7 @@ function getEffectiveStrokes(layerIdx,frameIdx){
       if(sf.isKeyframe||sf.isInterpolated){out=out.concat(sf.strokes);return;}
       for(var k=ii-1;k>=0;k--){if(symLayer.frames[k].isKeyframe){out=out.concat(symLayer.frames[k].strokes);break;}}
     });
+    if(countOnly)return out;
     // Element-level Motion (2026-07, "precomp par calque"): a per-shape
     // animated Position/Anchor/Rotation/Scale/Opacity INSIDE this component
     // instance — same descriptor and nesting order exportBuildFrame
@@ -1307,11 +1342,11 @@ function getEffectiveStrokes(layerIdx,frameIdx){
     // instance is placed, same as its own layers/keyframes/tweens do.
     if(sym.cameraKeys&&sym.cameraKeys.length&&window.SMCamera){
       var camM=SMCamera.cameraMatrixAtFrame(sym.cameraKeys,ii,state.canvasW,state.canvasH);
-      if(camM)out=out.map(function(sd){return applyMatrixToStrokeData(JSON.parse(JSON.stringify(sd)),camM);});
+      if(camM)out=out.map(function(sd){return applyMatrixToStrokeData(cloneStrokeForTransform(sd),camM);});
     }
     if(ld.symMatrix){
       var m=symMatrixOf(ld);
-      out=out.map(function(sd){return applyMatrixToStrokeData(JSON.parse(JSON.stringify(sd)),m);});
+      out=out.map(function(sd){return applyMatrixToStrokeData(cloneStrokeForTransform(sd),m);});
     }
     return out;
   }
@@ -2192,12 +2227,31 @@ function _maybePromoteInterpolated(f,strokes){
 // generateTweens) silently wiped the hidden layer's current-frame content.
 // The stored frame data is the source of truth for an unpopulated live
 // layer — leave it alone.
+// Motion caches a component's whole-duration union bounds (the gizmo's fixed
+// reference box, symbolUnionBounds in motion.js); frame content is what it is
+// derived from, so a write to that content must drop it.
+//
+// The gate matters as much as the call. These two writers are NOT a
+// gesture-end path — goToFrame calls saveAllLayerFrames on EVERY frame
+// advance, so invalidating unconditionally meant playback recomputed the
+// 120-frame union on every tick: measured 7505 getEffectiveStrokes calls for
+// 63 played frames (119 per frame = the union's whole loop), 75% of wall
+// clock, 24fps target delivered at 20fps with a 47.7ms repaint interval.
+//
+// A write can only change a SYMBOL's content while you are inside that
+// symbol — enterSymbol swaps state.layers/userLayers to sym.layers, so
+// outside one these writers touch ordinary scene layers, which no
+// symbolUnionBounds result is derived from. exitToScene is covered because it
+// calls saveAllLayerFrames while activeSymbolId is still set. undo/redo are
+// hooked separately (tweens.js) since they restore content without passing
+// through either writer.
+function _invalidateSymbolUnionIfEditingSymbol(){
+  if(!state.activeSymbolId)return;
+  if(window.SMMotion&&SMMotion.invalidateSymbolUnionBounds)SMMotion.invalidateSymbolUnionBounds();
+}
 function saveActiveLayerFrame(){
   window._sceneVersion++;
-  // Motion caches a component's whole-duration union bounds (the gizmo's
-  // fixed reference box); frame content is what it is derived from, so it
-  // must not outlive a write. Cheap: this is a gesture-end path.
-  if (window.SMMotion && SMMotion.invalidateSymbolUnionBounds) SMMotion.invalidateSymbolUnionBounds();
+  _invalidateSymbolUnionIfEditingSymbol();
   var ld=state.layers[state.activeLayerIdx];if(ld.symbolId||ld.nativeVideo||ld.montageId||ld.isNullLayer||ld.isEffectLayer)return;
   if(!layerIsEffectivelyVisible(state.activeLayerIdx))return;
   _writeBackGhostProxies(state.activeLayerIdx);
@@ -2208,7 +2262,7 @@ function saveActiveLayerFrame(){
   f.strokes=strokes;
 }
 function saveAllLayerFrames(){
-  if (window.SMMotion && SMMotion.invalidateSymbolUnionBounds) SMMotion.invalidateSymbolUnionBounds();
+  _invalidateSymbolUnionIfEditingSymbol();
   _writeBackGhostProxies(state.activeLayerIdx);
   for(var i=0;i<state.layers.length;i++){if(state.layers[i].symbolId||state.layers[i].nativeVideo||state.layers[i].montageId||state.layers[i].isNullLayer||state.layers[i].isEffectLayer)continue;
   if(!layerIsEffectivelyVisible(i))continue;
