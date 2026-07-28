@@ -142,8 +142,17 @@
       '#fg-wrap{scrollbar-width:none;-ms-overflow-style:none;}' +
       '#fg-wrap::-webkit-scrollbar{display:none;}' +
       '#tlzoom-scrollbar .tlzoom-sb-full{opacity:.5;}' +
-      '#tlzoom-scrollbar .tlzoom-sb-handle{background:rgba(74,158,255,.65);transition:background .1s,transform .1s;}' +
-      '#tlzoom-scrollbar .tlzoom-sb-handle:hover{background:#4ea9ff;transform:scaleX(1.15);}';
+      // The blue cap is drawn by ::after at HALF the element's width
+      // (2026-07-27: "les poignée bleu… peuvent être réduite de 50% en
+      // width — je parle bien visuellement des poignée bleu"). The
+      // element itself keeps its full EDGE_PX so the grab zone is
+      // unchanged; shrinking the element instead would have made a
+      // already-6px-tall control genuinely hard to hit.
+      '#tlzoom-scrollbar .tlzoom-sb-handle{background:none;}' +
+      '#tlzoom-scrollbar .tlzoom-sb-handle::after{content:"";position:absolute;top:0;bottom:0;width:50%;background:rgba(74,158,255,.65);border-radius:inherit;transition:background .1s,transform .1s;}' +
+      '#tlzoom-scrollbar .tlzoom-sb-handle.tlzoom-sb-left::after{left:0;}' +
+      '#tlzoom-scrollbar .tlzoom-sb-handle.tlzoom-sb-right::after{right:0;}' +
+      '#tlzoom-scrollbar .tlzoom-sb-handle:hover::after{background:#4ea9ff;transform:scaleX(1.15);}';
     document.head.appendChild(style);
 
     bar = document.createElement('div');
@@ -160,7 +169,7 @@
     thumb.style.cssText = 'position:absolute;top:0;height:' + BAR_H + 'px;background:rgba(255,255,255,.14);border-radius:' + (BAR_H / 2) + 'px;cursor:grab;';
     var leftHandle = document.createElement('div'), rightHandle = document.createElement('div');
     [leftHandle, rightHandle].forEach(function (h, i) {
-      h.className = 'tlzoom-sb-handle';
+      h.className = 'tlzoom-sb-handle ' + (i === 0 ? 'tlzoom-sb-left' : 'tlzoom-sb-right');
       h.title = 'Glisser pour zoomer / dézoomer la timeline';
       h.style.cssText = 'position:absolute;top:0;width:' + EDGE_PX + 'px;height:' + BAR_H + 'px;cursor:ew-resize;border-radius:' + (i === 0 ? (BAR_H / 2) + 'px 2px 2px ' + (BAR_H / 2) + 'px' : '2px ' + (BAR_H / 2) + 'px ' + (BAR_H / 2) + 'px 2px') + ';' + (i === 0 ? 'left:0;' : 'right:0;');
       thumb.appendChild(h);
