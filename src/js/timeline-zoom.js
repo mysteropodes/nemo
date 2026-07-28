@@ -51,10 +51,15 @@
   // Height of the timeline's bottom chrome band, which this scrollbar is
   // centred in. Was 40px when the layer buttons lived down there too; they
   // moved into #layer-hdr (2026-07-27) so the band only has to clear the
-  // 12px bar. MUST equal #layer-panel's and #fg-col's padding-bottom in
+  // bar, then both were halved on top of that ("le glisser pour zoomer la
+  // timeline toute cette zone là tu peux réduire le heigth de 50%").
+  // BOTTOM_BAND_PX MUST equal #layer-panel's and #fg-col's padding-bottom in
   // style.css — those two keep the panel and the grid ending at the same y,
-  // and this centres the bar in whatever they leave free.
-  var BOTTOM_BAND_PX = 16;
+  // and this centres the bar in whatever they leave free. BAR_H is the bar's
+  // own height, used for both the CSS and that centring, so the two can't
+  // drift the way a hardcoded 12 in the formula did.
+  var BOTTOM_BAND_PX = 8;
+  var BAR_H = 6;
 
   // Bug found 2026-07 ("impossible de l'amener jusqu'au bout"): with the
   // old 64px ceiling, closing the scrollbar-handle gap all the way down
@@ -118,7 +123,7 @@
     // en grise"). #fg-wrap stops at the separator line and both columns
     // leave that band free, so the bar reads as the timeline's bottom
     // chrome instead of covering content.
-    bar.style.top = (wrapRect.bottom + Math.round((BOTTOM_BAND_PX - 12) / 2)) + 'px';
+    bar.style.top = (wrapRect.bottom + Math.round((BOTTOM_BAND_PX - BAR_H) / 2)) + 'px';
     bar.style.width = trackW + 'px';
     thumb.style.width = thumbW + 'px';
     thumb.style.left = thumbLeft + 'px';
@@ -147,17 +152,17 @@
     // redrawScrollbar()'s comment: a plain absolutely-positioned child of
     // #fg-wrap scrolls away with the content it's meant to control.
     // left/top are resynced to #fg-wrap's live rect on every redraw.
-    bar.style.cssText = 'position:fixed;left:0;top:0;height:12px;z-index:60;background:rgba(255,255,255,.04);border-radius:6px;overflow:visible;';
+    bar.style.cssText = 'position:fixed;left:0;top:0;height:' + BAR_H + 'px;z-index:60;background:rgba(255,255,255,.04);border-radius:' + (BAR_H / 2) + 'px;overflow:visible;';
     thumb = document.createElement('div');
     // Body = pan handle, neutral gray always (no color change on hover —
     // color means "this is a zoom knob", the body deliberately never uses
     // it, hover just gives the familiar grab->grabbing cursor).
-    thumb.style.cssText = 'position:absolute;top:0;height:12px;background:rgba(255,255,255,.14);border-radius:6px;cursor:grab;';
+    thumb.style.cssText = 'position:absolute;top:0;height:' + BAR_H + 'px;background:rgba(255,255,255,.14);border-radius:' + (BAR_H / 2) + 'px;cursor:grab;';
     var leftHandle = document.createElement('div'), rightHandle = document.createElement('div');
     [leftHandle, rightHandle].forEach(function (h, i) {
       h.className = 'tlzoom-sb-handle';
       h.title = 'Glisser pour zoomer / dézoomer la timeline';
-      h.style.cssText = 'position:absolute;top:0;width:' + EDGE_PX + 'px;height:12px;cursor:ew-resize;border-radius:' + (i === 0 ? '6px 2px 2px 6px' : '2px 6px 6px 2px') + ';' + (i === 0 ? 'left:0;' : 'right:0;');
+      h.style.cssText = 'position:absolute;top:0;width:' + EDGE_PX + 'px;height:' + BAR_H + 'px;cursor:ew-resize;border-radius:' + (i === 0 ? (BAR_H / 2) + 'px 2px 2px ' + (BAR_H / 2) + 'px' : '2px ' + (BAR_H / 2) + 'px ' + (BAR_H / 2) + 'px 2px') + ';' + (i === 0 ? 'left:0;' : 'right:0;');
       thumb.appendChild(h);
     });
     bar.appendChild(thumb);
