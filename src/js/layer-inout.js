@@ -446,8 +446,19 @@
     // live (dragging the out point below the playhead should hide the
     // layer immediately) — loadFrame() re-derives userLayers[i] from
     // getEffectiveStrokes(), which is the actual gate.
-    if (window.loadFrame) loadFrame(state.currentFrame);
-    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+    //
+    // But only when the range ACTUALLY moved. This is a raw mousemove
+    // handler with no rAF latch, and in/out points are quantised to whole
+    // frames (dx is Math.round'ed above), so a pointer sliding across one
+    // frame's width fired a full Paper scene rebuild + engine render on
+    // every event — dozens of identical rebuilds per frame of travel. The
+    // bar itself still follows the pointer (updateBar, above) because it is
+    // cheap; only the scene rebuild is gated. 2026-07-28.
+    if (ld.inPoint !== _drag.lastIn || ld.outPoint !== _drag.lastOut) {
+      _drag.lastIn = ld.inPoint; _drag.lastOut = ld.outPoint;
+      if (window.loadFrame) loadFrame(state.currentFrame);
+      if (window.SMEngineBridge) SMEngineBridge.renderNow();
+    }
   });
   document.addEventListener('mouseup', function (upEv) {
     endMarquee();

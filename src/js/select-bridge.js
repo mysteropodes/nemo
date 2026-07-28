@@ -786,10 +786,18 @@
       if (shouldIntercept() && selectedPaths.length) {
         var wh = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
         var hpt = new Point(wh[0], wh[1]);
-        var hh2 = computeHandles();
         // Alt-gated, matching hitTestHandles' own new requirement — showing
         // the "grabbable" grow effect without Alt held would visually
         // promise a drag that onDown won't actually honor.
+        //
+        // computeHandles() used to run BEFORE that gate even though e.altKey
+        // is its only consumer here (hh2 is read on the next line and
+        // nowhere else). It goes through orientedSelBox(), which deep-clones
+        // every selected path when the selection box is rotated — paid on
+        // every pointermove of a plain hover, with no Alt held and nothing
+        // being dragged. Same shape as registerRasterIfNeeded's canvas read:
+        // expensive work in front of the cheap check that discards it.
+        var hh2 = e.altKey ? computeHandles() : null;
         var isHover = !!(e.altKey && hh2 && hh2.anchorPos && hpt.getDistance(hh2.anchorPos) < 9 / view.zoom);
         if (isHover !== state.xformAnchorHovered) {
           state.xformAnchorHovered = isHover;

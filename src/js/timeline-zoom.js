@@ -250,10 +250,22 @@
       var newThumbLeft = dragMode === 'zoom-right' ? anchorTrackX : (anchorTrackX - g.thumbW);
       var scrollRatioNew = Math.max(0, Math.min(1, newThumbLeft / Math.max(1, trackW - g.thumbW)));
       wrap2.scrollLeft = scrollRatioNew * g.maxScroll;
-      refresh();
+      // refresh() -> renderTimeline(), which empties and recreates every
+      // ruler cell and grid row (measured 27.7ms at 40 layers). onMove is
+      // bound to raw window pointermove with no throttle, so a zoom-handle
+      // drag queued one full rebuild per event — several per displayed
+      // frame, all but the last one thrown away. Latched to one per
+      // animation frame; onUp does a final unlatched refresh so the last
+      // pointer position always lands. 2026-07-28.
+      if (!refreshRaf) refreshRaf = requestAnimationFrame(function () { refreshRaf = 0; refresh(); });
     }
+    var refreshRaf = 0;
     function onUp() {
       if (!dragMode) return;
+      // Flush the latched rebuild — the drag's final position must not be
+      // left sitting in a cancelled animation frame.
+      if (refreshRaf) { cancelAnimationFrame(refreshRaf); refreshRaf = 0; }
+      if (dragMode !== 'pan') refresh();
       dragMode = null;
       thumb.style.cursor = 'grab';
       localStorage.setItem(KEY, String(window.FC));
