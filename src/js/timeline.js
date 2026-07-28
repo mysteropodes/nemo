@@ -1447,7 +1447,21 @@ function syncDocFields(){
   var clipBtn=document.getElementById('btn-clip');if(clipBtn)clipBtn.classList.toggle('active',!!state.canvasClip);
   var safetyBtn=document.getElementById('btn-safety');if(safetyBtn)safetyBtn.classList.toggle('active',!!state.safetyZones);
 }
-function updateUI(){
+// `frameOnly` — the caller guarantees that NOTHING but state.currentFrame
+// changed. renderTimeline() rebuilds every ruler cell and every grid row from
+// scratch (measured 9.9ms at 10 layers, 27.7ms at 40 — 4800 DOM nodes), and a
+// scrub calls this once per displayed frame, so at 40 layers a drag was
+// capped at 14fps. Its ONLY frame-dependent output is the '.cur' class on the
+// header cell plus the playhead's position and flag text — verified by
+// reading every state.currentFrame reference inside it — and updatePlayhead()
+// already produces exactly those three, in 0.1ms.
+//
+// This is the same split playback has always used (startPlay's loop calls
+// updatePlayhead alone and stopPlay then does a full updateUI), so it is not
+// a new invariant, just the scrub path adopting the proven one. Any caller
+// that CHANGED CONTENT must not pass frameOnly — the panel refreshes below
+// still run either way, only the wholesale timeline rebuild is skipped.
+function updateUI(frameOnly){
   syncDocFields();
   // countOnly: this is only ever read for .length just below.
   var strokes=getEffectiveStrokes(state.activeLayerIdx,state.currentFrame,true);
@@ -1465,7 +1479,8 @@ function updateUI(){
   document.getElementById('info-sel').textContent=state.tool==='select'&&selectedPaths.length>0?selectedPaths.length+' '+SM.t('selCountSuffix'):'';
   window._totalF=state.totalFrames;window._waIn=state.waIn;window._waOut=state.waOut;window._curFrame=state.currentFrame;
   window.updateWaBar();window.updateOmMarkers(state.currentFrame,state.totalFrames);
-  renderTimeline();renderLayerList();updateCompInstancePanel();updateFootagePanel();updateSelPropsPanel();updateFsSelPanel();updateRevisionPanel();updateTextActionsPanel();if(window.updateEffectsPanel)window.updateEffectsPanel();updatePropsContext();
+  if(frameOnly)updatePlayhead();else renderTimeline();
+  renderLayerList();updateCompInstancePanel();updateFootagePanel();updateSelPropsPanel();updateFsSelPanel();updateRevisionPanel();updateTextActionsPanel();if(window.updateEffectsPanel)window.updateEffectsPanel();updatePropsContext();
 }
 // Team review Accept/Reject panel — shown when exactly one selected item is
 // either an active (non-ghost) revision (data.revisionParentId) or a

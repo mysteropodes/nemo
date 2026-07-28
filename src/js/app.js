@@ -2436,7 +2436,8 @@ function goToFrame(idx){
   if(idx===state.currentFrame)return;
   saveAllLayerFrames();state.currentFrame=idx;window._curFrame=idx;
   if(window.SMAudio&&!state.playing)SMAudio.scrubAt(idx); // scrub audio au deplacement du playhead (v19)
-  loadFrame(idx);if(!state.playing){renderOS();renderArcs();updateUI();}else{updatePlayhead();}
+  // frameOnly: goToFrame changes the frame and nothing else — see updateUI.
+  loadFrame(idx);if(!state.playing){renderOS();renderArcs();updateUI(true);}else{updatePlayhead();}
 }
 
 // F5/insertFrame — Animate's actual convention (corrected: an earlier pass
