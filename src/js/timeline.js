@@ -2792,10 +2792,41 @@ document.getElementById('frame-grid').addEventListener('mousedown',function(e){
   // keyframe comes after nextKeyFi — can't trim past the FOLLOWING span's
   // own boundary — or the last frame of the timeline if there's no such
   // keyframe (nothing else to collide with).
+  // RIPPLE (2026-07-28 feedback, confirmed as a third occurrence of the
+  // same bug already fixed for Motion's layer-bar drag and Animation 2D's
+  // keyframe-dot drag): committing this trim used to relocate ONLY
+  // nextKeyFi, leaving every keyframe after it sitting at its own original
+  // frame number — the WHOLE tail should shift by the same amount the
+  // handle moved, exactly like dragging a clip edge in a video editor
+  // ripples everything downstream of the cut. See the mouseup handler
+  // below for the actual move; the bound here just needs to stop being
+  // MORE conservative than that new behavior requires — the old cap
+  // (stop before the next-next keyframe) existed only because that
+  // keyframe used to stay put and could be collided with. Now it moves
+  // too, so the true limit is whichever keyframe ends up LAST in the
+  // chain, capped by the timeline itself — same proof as moveFrames' own
+  // ripple: every rippled frame's ORIGINAL position is > nextKeyFi-1, so
+  // adding the identical delta to all of them can never reorder or
+  // collide them with each other.
   var dragMax=state.totalFrames-1;
-  if(nextKeyFi>=0){for(var ni=nextKeyFi+1;ni<state.layers[li].frames.length;ni++){if(ld.frames[ni].isKeyframe){dragMax=ni-1;break;}}}
+  if(nextKeyFi>=0){
+    var lastKeyInChain=nextKeyFi;
+    for(var ni=nextKeyFi+1;ni<ld.frames.length;ni++){if(ld.frames[ni].isKeyframe)lastKeyInChain=ni;}
+    // Bound is relative to nextKeyFi (what actually moves), NOT the
+    // span-end cell's own `fi` (always nextKeyFi-1, the last frame of the
+    // CURRENT span) — got this backwards on the first pass, caught before
+    // driving it: verified below against a concrete totalFrames example.
+    dragMax=nextKeyFi+((state.totalFrames-1)-lastKeyInChain);
+  }
   else dragMax=fi; // no bordering keyframe — old shrink-only behavior, capped at the current end
-  _spanShrink={active:true,li:li,srcFi:srcFi,maxFi:fi,nextKeyFi:nextKeyFi,dragMax:dragMax};
+  // Snapshot every keyframe AFTER nextKeyFi ONCE here — not on every
+  // mousemove tick — so the live preview (below) can show them riding
+  // along with the same delta, matching the ripple this handler's mouseup
+  // now actually commits (2026-07-28, "on peut les voir bougé pendant le
+  // drag").
+  var laterKeys=[];
+  if(nextKeyFi>=0)for(var lki=nextKeyFi+1;lki<ld.frames.length;lki++){if(ld.frames[lki].isKeyframe)laterKeys.push(lki);}
+  _spanShrink={active:true,li:li,srcFi:srcFi,maxFi:fi,nextKeyFi:nextKeyFi,dragMax:dragMax,laterKeys:laterKeys};
   // Dimmed (not hidden — feedback: "laisser la barre bleue d'outpoint et la
   // clé d'après visuellement pendant le drag") so the original position
   // stays visible as a reference next to the live span-drag-preview.
@@ -2851,21 +2882,47 @@ window.addEventListener('mousemove',function(e){
   // A previous version appended this dot into the SAME cell as the bar
   // (prevCell) — visually overlapping instead of adjacent.
   if(_spanShrink.nextKeyFi>=0){
-    var dotCell=document.querySelector('.fc[data-layer="'+_spanShrink.li+'"][data-frame="'+(fi+1)+'"]');
+    // FIX (2026-07-28, found while adding the ripple preview below): this
+    // used to show the dot at `fi+1`, one frame LATER than where mouseup
+    // actually writes it (`ld.frames[fi]=moved` — confirmed empirically,
+    // not just by reading: dragging to a cell dead-center on frame 20
+    // showed the preview dot at 20 but committed to 19). The preview must
+    // show the SAME frame the drop will actually use, or the ripple
+    // preview added below would inherit the identical one-frame lie.
+    var ld=state.layers[_spanShrink.li];
+    var dotCell=document.querySelector('.fc[data-layer="'+_spanShrink.li+'"][data-frame="'+fi+'"]');
     if(dotCell){
       dotCell.classList.add('span-drag-dot-cell');
-      // Still sitting at the keyframe's ORIGINAL spot (fi+1===nextKeyFi) —
+      // Still sitting at the keyframe's ORIGINAL spot (fi===nextKeyFi) —
       // its real .km dot is already there (dimmed via tl-outdrag-source-key
       // on mousedown); the opacity override in style.css brings it back to
       // full instead of stacking a redundant second dot on top of it.
-      if(fi+1!==_spanShrink.nextKeyFi){
-        var ld=state.layers[_spanShrink.li];
+      if(fi!==_spanShrink.nextKeyFi){
         var movedFr=ld.frames[_spanShrink.nextKeyFi];
         var full=movedFr&&movedFr.strokes.length>0;
         var dot=document.createElement('div');
         dot.className='km drag-key-preview '+(full?'fl':'hl');
         dotCell.appendChild(dot);
       }
+    }
+    // Ripple preview: every keyframe AFTER nextKeyFi rides along with the
+    // SAME delta (fi-nextKeyFi) this drag would actually apply — without
+    // this, only the bordering keyframe appeared to move while the rest of
+    // the tail silently teleported the instant the mouse released.
+    var delta=fi-_spanShrink.nextKeyFi;
+    if(delta!==0){
+      _spanShrink.laterKeys.forEach(function(origFi){
+        var newFi=origFi+delta;
+        if(newFi<0||newFi>=state.totalFrames)return; // would overflow — dragMax already prevents this in practice, defensive only
+        var lCell=document.querySelector('.fc[data-layer="'+_spanShrink.li+'"][data-frame="'+newFi+'"]');
+        if(!lCell)return;
+        lCell.classList.add('span-drag-dot-cell');
+        var lFr=ld.frames[origFi];
+        var lFull=lFr&&lFr.strokes.length>0;
+        var lDot=document.createElement('div');
+        lDot.className='km drag-key-preview '+(lFull?'fl':'hl');
+        lCell.appendChild(lDot);
+      });
     }
   }
 });
@@ -2889,9 +2946,32 @@ window.addEventListener('mouseup',function(e){
     if(fi===nextKeyFi)return; // dropped right back where it already was
     pushUndo();saveAllLayerFrames();
     var ld=state.layers[li];
-    var moved=ld.frames[nextKeyFi];
-    ld.frames[nextKeyFi]={strokes:[],isKeyframe:false,isInterpolated:false};
-    ld.frames[fi]=moved;
+    var delta=fi-nextKeyFi;
+    // RIPPLE (2026-07-28 feedback — third occurrence of the bug already
+    // fixed for Motion's layer-bar drag and Animation 2D's keyframe-dot
+    // drag): every keyframe AFTER nextKeyFi moves by the SAME delta, not
+    // just nextKeyFi itself — otherwise the tail stays put while the span
+    // in front of it changes length, which is what read as "only the next
+    // key moves, not the ones after it". Every rippled frame's ORIGINAL
+    // position is > nextKeyFi (checked at mousedown, before this delta was
+    // known), so adding the identical delta to all of them can't reorder
+    // or collide them with each other — same proof as moveFrames' ripple.
+    // Capture-blank-write in three separate passes (not one combined loop)
+    // for the same reason moveFrames does it that way: with delta>0 a
+    // naive in-order write could stomp a not-yet-read LATER frame whose
+    // target position coincides with an EARLIER frame's source position.
+    var toMove=[nextKeyFi];
+    for(var ri=nextKeyFi+1;ri<ld.frames.length;ri++){if(ld.frames[ri].isKeyframe)toMove.push(ri);}
+    var captured=toMove.map(function(f){return {from:f,to:f+delta,content:ld.frames[f]};});
+    captured.forEach(function(c){ld.frames[c.from]={strokes:[],isKeyframe:false,isInterpolated:false};});
+    captured.forEach(function(c){if(c.to>=0&&c.to<ld.frames.length)ld.frames[c.to]=c.content;});
+    // Tween/arc rekeying is NOT attempted here — the ORIGINAL (pre-fix)
+    // handler never called captureTweenInbetweens/rekeyTweenPairData for
+    // this specific gesture either (unlike moveFrames, which already did),
+    // so any interpolated spans crossing a rippled keyframe were already
+    // silently orphaned before this change. Out of scope for "fix the
+    // ripple" — flagged here rather than silently left unfixed AND
+    // undocumented.
     loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
   }else{
     if(fi>=_spanShrink.maxFi)return; // dropped on the existing (open-ended) end — no-op
