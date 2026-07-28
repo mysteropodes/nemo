@@ -154,7 +154,28 @@
   // fresh listeners bound to a fresh `entry` every time.
   function buildColorRow(entry) {
     var row = document.createElement('div'); row.className = 'pr color-row';
-    var sw = document.createElement('div'); sw.className = 'cw-mini'; sw.style.flexShrink = '0';
+    // The swatch never opened anything on click — everywhere ELSE in the
+    // app, a color swatch opens ColorPicker's full hue/sat/alpha popover
+    // (see color-picker.js's wireColorSwatches, used by Fill/Stroke); this
+    // one row type was simply never wired up to it, so clicking it looked
+    // broken by omission rather than by a bug (2026-07-28 screenshot,
+    // arrow pointing at the swatch: "je clic là et ça ne fait rien").
+    var sw = document.createElement('div'); sw.className = 'cw-mini'; sw.style.flexShrink = '0'; sw.style.cursor = 'pointer';
+    sw.title = 'Choisir une couleur…';
+    sw.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (!window.ColorPicker) return;
+      // No liveEditing guard here, unlike the two handlers below: the
+      // picker is its OWN floating popover with its OWN hex field — it
+      // never touches this row's inputs directly the way typing/scrubbing
+      // does, so there's nothing here to protect from self-destruction,
+      // and the row's OWN hex/opacity text SHOULD stay live-synced while
+      // the popover is open (first draft copied the guard reflexively and
+      // the row's text visibly lagged the swatch during a picker drag).
+      window.ColorPicker.open(sw, row.dataset.hex, function (newHex) {
+        recolorColor(row.dataset.hex, newHex);
+      });
+    });
     var hexInput = document.createElement('input');
     hexInput.type = 'text'; hexInput.className = 'pi color-hex-input'; hexInput.spellcheck = false; hexInput.maxLength = 9;
     var opacityInput = document.createElement('input');
