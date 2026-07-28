@@ -868,6 +868,24 @@
          right-click popover on the timeline's own onion button (#btn-os) —
          see #onion-pop below and initOnionPopover() in timeline.js
          (feedback #23). Same control ids, same wiring. -->
+    <!-- Footage (image / séquence / vidéo) — 2026-07-27. A video had a layer
+         type and a gizmo; a still or a sequence had neither, so there was
+         nowhere to see WHAT a footage layer points at, let alone swap it.
+         Read-only facts plus the one action that was missing (replace the
+         source in place, keeping the layer, its transform and its keys). -->
+    <div class="psec" id="footage-sec" style="display:none">
+      <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrFootage">Footage</span></div>
+      <div class="pbdy">
+        <div class="pr"><span class="pl" data-i18n="fieldKind">Type</span><div class="psel" id="footage-kind" style="pointer-events:none;background-image:none">—</div></div>
+        <div class="pr"><span class="pl" data-i18n="fieldSource">Source</span><div class="psel" id="footage-name" style="pointer-events:none;background-image:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">—</div></div>
+        <div class="pr dims-row pair-grid">
+          <span class="pl" data-i18n="fieldW">W</span><input type="number" class="pi" id="footage-w" value="0" disabled>
+          <span class="pl" data-i18n="fieldH">H</span><input type="number" class="pi" id="footage-h" value="0" disabled>
+        </div>
+        <div class="pr" id="footage-count-row"><span class="pl" data-i18n="fieldFrames">Frames</span><div class="psel" id="footage-count" style="pointer-events:none;background-image:none">0</div></div>
+        <div class="pr"><button class="pbtn" id="btn-footage-replace" style="flex:1" data-i18n="footageReplace">Remplacer la source…</button></div>
+      </div>
+    </div>
     <div class="psec" id="comp-instance-sec" style="display:none">
       <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrComponentInstance">Component Instance</span></div>
       <div class="pbdy">

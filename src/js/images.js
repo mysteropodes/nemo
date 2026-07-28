@@ -113,23 +113,35 @@
     showToast('Séquence importée: '+items.length+' images sur le calque "'+prefix+'"');
   }
 
+  // A still used to be pushed onto whatever layer happened to be active,
+  // which made it the only importer that did NOT produce a layer — a video
+  // and a sequence both create one, so an image was the odd case with no
+  // type, no source to inspect and nothing to replace (2026-07-27 audit).
+  // One layer per image now, tagged as footage, same as its siblings; the
+  // layer is the thing you then move, key and swap.
   async function importStandalone(paths){
     saveAllLayerFrames();pushUndoLayers();
-    var ld=state.layers[state.activeLayerIdx];
-    if(!ld.frames[state.currentFrame].isKeyframe&&!ld.frames[state.currentFrame].isInterpolated){
-      ld.frames[state.currentFrame].strokes=JSON.parse(JSON.stringify(getEffectiveStrokes(state.activeLayerIdx,state.currentFrame)));
-      ld.frames[state.currentFrame].isKeyframe=true;
-    }
     for(var i=0;i<paths.length;i++){
       var dataUrl=await readAsDataUrl(paths[i]);
       var nat=await naturalSize(dataUrl);
       var fit=fitSize(nat.w,nat.h);
-      var offset=i*24;
-      ld.frames[state.currentFrame].strokes.push({isRaster:true,src:dataUrl,x:state.canvasW/2+offset,y:state.canvasH/2+offset,width:fit.w,height:fit.h,opacity:1});
-      if(window.SMMediaLibrary)SMMediaLibrary.addEntry(baseName(paths[i]),'image',dataUrl,ld.name);
+      var nm=baseName(paths[i]);
+      var idx=createUserLayer(nm);
+      var ldN=state.layers[idx];
+      // Present on EVERY frame, not just the current one: a still is a
+      // still for the layer's whole length, and a one-frame raster would
+      // vanish the moment the playhead moved.
+      for(var f=0;f<ldN.frames.length;f++){
+        ldN.frames[f].strokes=[{isRaster:true,src:dataUrl,x:state.canvasW/2,y:state.canvasH/2,width:fit.w,height:fit.h,opacity:1}];
+        ldN.frames[f].isKeyframe=(f===0);
+        ldN.frames[f].isInterpolated=(f!==0);
+      }
+      ldN.footage={kind:'image',name:nm,w:nat.w,h:nat.h};
+      activateUL(idx);
+      if(window.SMMediaLibrary)SMMediaLibrary.addEntry(nm,'image',dataUrl,ldN.name);
     }
-    loadFrame(state.currentFrame);updateUI();
-    showToast(paths.length>1?paths.length+' images importées':'Image importée');
+    loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
+    showToast(paths.length>1?paths.length+' images importées sur leurs calques':'Image importée sur son calque');
   }
 
   async function importImages(){
@@ -391,6 +403,55 @@
   });
   document.getElementById('btn-import-video')&&document.getElementById('btn-import-video').addEventListener('click',importVideo);
 
+  // Swap a footage layer's image without touching the layer: its transform,
+  // its Motion keys, its in/out range and its place in the stack all stay,
+  // only the pixels change. Rewrites every raster on the layer, so a still
+  // (same image on all frames) and a sequence-turned-still both land right.
+  async function replaceFootageSource(){
+    var li=state.activeLayerIdx, ld=state.layers[li];
+    if(!ld)return;
+    var dataUrl=null,nm=null;
+    if(tauriOk()){
+      var path=await window.__TAURI__.dialog.open({title:'Remplacer la source',multiple:false,
+        filters:[{name:'Images',extensions:['png','jpg','jpeg','webp','gif','tif','tiff','exr','psd','dpx','bmp']}]});
+      if(!path)return;
+      dataUrl=await readAsDataUrl(path);nm=baseName(path);
+    }else{
+      dataUrl=await new Promise(function(res){
+        var inp=document.createElement('input');inp.type='file';inp.accept='image/*';inp.style.display='none';
+        document.body.appendChild(inp);
+        inp.addEventListener('change',function(e){
+          var f=e.target.files&&e.target.files[0];inp.remove();
+          if(!f){res(null);return;}
+          nm=f.name;var r=new FileReader();r.onload=function(){res(r.result);};r.readAsDataURL(f);
+        });
+        inp.click();
+      });
+      if(!dataUrl)return;
+    }
+    var nat=await naturalSize(dataUrl);
+    saveAllLayerFrames();pushUndoLayers();
+    var n=0;
+    (ld.frames||[]).forEach(function(f){
+      (f&&f.strokes||[]).forEach(function(st){
+        if(!st||!st.isRaster)return;
+        // Keep the placement the user gave it — only the pixels and the
+        // aspect change, so a footage layer already positioned in a shot
+        // does not jump when its source is swapped.
+        var ratio=nat.h?nat.w/nat.h:1;
+        st.src=dataUrl;
+        st.height=st.width/ratio;
+        n++;
+      });
+    });
+    if(ld.footage){ld.footage.name=nm||ld.footage.name;ld.footage.w=nat.w;ld.footage.h=nat.h;}
+    loadFrame(state.currentFrame);updateUI();
+    if(window.SMEngineBridge)SMEngineBridge.renderNow();
+    showToast(n?'Source remplacée ('+n+' image(s))':'Aucune image à remplacer sur ce calque');
+  }
+  document.getElementById('btn-footage-replace')&&document.getElementById('btn-footage-replace').addEventListener('click',replaceFootageSource);
+
   window.SM=window.SM||{};window.SM.importImages=importImages;window.SM.importVideo=importVideo;
+  window.SM.replaceFootageSource=replaceFootageSource;
   window.SM.importImageFiles=importImageFiles;window.SM.importVideoFile=importVideoFile;
 })();
