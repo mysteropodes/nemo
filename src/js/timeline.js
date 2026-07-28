@@ -1164,7 +1164,7 @@ window.SM={
     var sceneWaIn=srcSnap?srcSnap.waIn:state.waIn;
     var sceneWaOut=srcSnap?srcSnap.waOut:state.waOut;
     return JSON.stringify({version:13,totalFrames:sceneTotal,fps:sceneFps,canvasW:state.canvasW,canvasH:state.canvasH,canvasBg:state.canvasBg,waIn:sceneWaIn,waOut:sceneWaOut,
-      layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color,motion:l.motion,motionStatic:l.motionStatic,elementMotion:l.elementMotion,inPoint:l.inPoint,outPoint:l.outPoint,nativeVideo:l.nativeVideo,matteMode:l.matteMode,montageId:l.montageId,expressions:l.expressions,isTextLayer:l.isTextLayer,isNullLayer:l.isNullLayer,isEffectLayer:l.isEffectLayer,effects:l.effects,
+      layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color,motion:l.motion,motionStatic:l.motionStatic,elementMotion:l.elementMotion,inPoint:l.inPoint,outPoint:l.outPoint,nativeVideo:l.nativeVideo,matteMode:l.matteMode,montageId:l.montageId,expressions:l.expressions,isTextLayer:l.isTextLayer,isNullLayer:l.isNullLayer,isEffectLayer:l.isEffectLayer,effects:l.effects,footage:l.footage,
         // Layer parenting (2026-07-25). BOTH of these were missing from this
         // list, so every parent link was silently dropped on save — a rig
         // survived the session and nothing more. `uid` is the stable identity
@@ -1335,6 +1335,11 @@ window.SM={
       // nativeVideo.path on the first frame sync after this load.
       if(ld.nativeVideo)state.layers[idx].nativeVideo=ld.nativeVideo;
       if(ld.montageId)state.layers[idx].montageId=ld.montageId;
+      // Footage tag (2026-07-27) — descriptive only (it changes no
+      // stroke), but exportJSON persists it, so the import side has to
+      // restore it or a reopened project silently falls back to the
+      // heuristic and can re-label a sequence as a still.
+      if(ld.footage)state.layers[idx].footage=ld.footage;
       // Per-layer fields added 2026-07-25/26. This restore list is a
       // WHITELIST — a field written by exportJSON but absent here is
       // silently dropped on load, which is the same "writer updated, reader
@@ -3559,6 +3564,16 @@ function renderLayerList(){
     // silently blank. 'S' matches the existing text-badge convention (LFS,
     // the ◈ component badge) already used for icons outside that font.
     var solo=document.createElement('div');solo.className='lico solo-btn'+(ld.solo?' on':' off');solo.title='Solo layer (hide all others)';solo.textContent='S';solo.dataset.layer=i;solo.addEventListener('click',function(e){e.stopPropagation();window.SM.toggleLayerSolo(parseInt(this.dataset.layer));});
+    // Type badge — a video, an imported sequence and a hand-drawn layer were
+    // three identical rows before this (layer-kind.js decides which). Sits
+    // just before the name so the eye reads "what" then "which", and carries
+    // the kind as a class so CSS can tint it per type.
+    var kind=window.SMLayerKind?SMLayerKind.of(ld):null;
+    if(kind&&kind.key!=='draw'){
+      var kb=document.createElement('div');kb.className='lkind lkind-'+kind.key;
+      kb.title=kind.label;kb.innerHTML=kind.icon;
+      row.appendChild(kb);
+    }
     var nm=document.createElement('div');nm.className='lnm';nm.textContent=ld.name;
     row.appendChild(eye);row.appendChild(lock);row.appendChild(solo);
     if(ld.symbolId){var cb=document.createElement('div');cb.className='lico comp-badge';cb.title='Component — double-click to edit';cb.innerHTML='<span style="font-size:11px;line-height:1">\u25c8</span>';row.appendChild(cb);}

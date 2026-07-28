@@ -1877,6 +1877,15 @@
       var solo = document.createElement('div'); solo.className = 'lico solo-btn' + (ld.solo ? ' on' : ' off'); solo.title = SM.t('layerSoloTitle'); solo.textContent = 'S';
       solo.addEventListener('click', function (e) { e.stopPropagation(); window.SM.toggleLayerSolo(li); });
       row.appendChild(solo);
+      // Same badge as Animation 2D's rows, from the same decider — Motion is
+      // a different VIEW of these layers, not a different set, so it must not
+      // describe them differently.
+      var kind = window.SMLayerKind ? SMLayerKind.of(ld) : null;
+      if (kind && kind.key !== 'draw') {
+        var kb = document.createElement('div'); kb.className = 'lkind lkind-' + kind.key;
+        kb.title = kind.label; kb.innerHTML = kind.icon;
+        row.appendChild(kb);
+      }
       var nm = document.createElement('div'); nm.className = 'lnm'; nm.textContent = ld.name || ('Layer ' + (li + 1));
       row.appendChild(nm);
       // Parent column — the SAME buildParentCell Animation 2D's rows use

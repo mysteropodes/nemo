@@ -1364,6 +1364,20 @@ body.mode-motion .lrow.act.motion-selected{background:rgba(63,107,245,.16);box-s
 .sym-tab .sym-tab-x:hover{color:var(--text);}
 .lico.comp-badge{color:var(--accent);}
 .lrow.is-comp .lnm{font-style:italic;}
+/* Layer type badge (layer-kind.js). Drawing layers get none — they are the
+   default, and a badge on every row would be noise rather than information;
+   the badge's job is to make the exceptions stand out. Tinted per kind so
+   the type reads before the icon is even resolved: footage warm, generated
+   content cool, structural neutral. */
+.lkind{width:16px;flex:none;display:flex;align-items:center;justify-content:center;opacity:.85;}
+.lkind svg{display:block;}
+.lkind-image,.lkind-sequence,.lkind-video{color:#e0a45e;}
+.lkind-camera{color:#ffaa28;}
+.lkind-effect{color:#7fd1c8;}
+.lkind-text{color:#c9a0ff;}
+.lkind-component{color:#8fa6ff;}
+.lkind-montage{color:#8fa6ff;}
+.lkind-null{color:rgba(236,234,231,.4);}
 .lrow.lfolder{background:var(--panel2);cursor:default;}
 .lrow.lfolder:hover{background:var(--panel2);}
 .lrow.in-folder{padding-left:16px;}
