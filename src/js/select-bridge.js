@@ -896,7 +896,27 @@
       if (!moveStarted) {
         pushUndo();
         if (state.appMode !== 'motion') ensureKeyframe();
-        selectedPaths = state.selectedStrokeIndices.map(function (i) { return userLayers[state.activeLayerIdx].children[i]; }).filter(Boolean);
+        // Re-grab by index because ensureKeyframe() just above can rebuild
+        // this layer's children, orphaning the Paper objects picked at
+        // pointerdown. A COMPONENT selection has no indices though — its
+        // branch in onDown selects the whole layer and leaves
+        // selectedStrokeIndices empty on purpose — so the map produced an
+        // EMPTY array and every remaining tick translated nothing. symMatrix
+        // kept accumulating (it doesn't read selectedPaths), so the data
+        // moved while the picture didn't, and the component jumped to its
+        // new spot only on release (2026-07-27: "des component que l'on
+        // bouge et qui ne bouge pas reel time avec le drag"; measured:
+        // symMatrix.tx 755→831→907→982→1058→1133 across the ticks with
+        // userLayers[0].bounds.x pinned at 963.8, then 1341.5 at pointerup).
+        // Falling back to the same whole-layer grab that branch made keeps
+        // the orphan fix for ordinary selections and restores the live
+        // preview for components. Translating their geometry is purely
+        // visual: saveActiveLayerFrame returns early on ld.symbolId, and
+        // loadFrame re-derives the layer from the symbol + symMatrix, so it
+        // can never be baked or double-applied.
+        selectedPaths = state.selectedStrokeIndices.length
+          ? state.selectedStrokeIndices.map(function (i) { return userLayers[state.activeLayerIdx].children[i]; }).filter(Boolean)
+          : userLayers[state.activeLayerIdx].children.filter(function (c) { return (c instanceof Path || c instanceof Raster) && isSelectablePathChild(c); });
         moveStarted = true;
       }
       var delta = pt.subtract(lastPt);
