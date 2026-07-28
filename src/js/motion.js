@@ -1378,14 +1378,40 @@
   // branch already does (a throwaway Path so curved segments' real extent
   // counts, not just anchor points), reduced with unionBounds (tweens.js,
   // a plain generic min/max reducer already used for per-frame feature
-  // bounds — reused here across frames instead). No cache: this is
-  // Motion-overlay code for whichever ONE layer is currently selected/
-  // expanded, not the hot per-frame render pipeline (CLAUDE.md §5), and a
-  // component's own duration is typically a small slice of the timeline.
+  // bounds — reused here across frames instead).
+  //
+  // This originally shipped with no cache, on the reasoning that it was
+  // "Motion-overlay code for whichever ONE layer is currently selected, not
+  // the hot per-frame render pipeline". That reasoning was wrong: the Motion
+  // overlay IS rebuilt by every render, and a drag renders once per
+  // pointermove — so "one selected layer" turned out to mean "every frame of
+  // the drag you are trying to do". Hence the cache below.
+  //
+  // The union is a FIXED geometric reference: it deliberately does not depend
+  // on the current frame (that is the whole point — the gizmo's pivot must
+  // not jump as the scrub crosses keyframes). Computing it walks every frame
+  // of the instance and rebuilds a temporary Paper Path per stroke just to
+  // read its bounds — on a real 120-frame component that is ~1.8M Segment/
+  // Point allocations. buildOverlayItems calls it TWICE per render (once via
+  // activeMotionTarget, once via motionBoxGeom), and a Motion drag renders
+  // once per pointermove: measured 326ms + 316ms of a 642ms overlay build,
+  // i.e. the entire reason dragging a component in Motion was unusable while
+  // the same drag in Animation 2D — where a plain layer uses Paper's own
+  // cached bounds — stayed fluid (2026-07-28).
+  //
+  // Cached per (symbol, in, out). Invalidated only when frame content is
+  // written (saveActiveLayerFrame / saveAllLayerFrames), which happens at
+  // gesture ends, never per pointermove — so a drag holds the cache for its
+  // whole duration, which is exactly the case being fixed.
+  var _symUnionCache = new Map();
+  function invalidateSymbolUnionBounds() { _symUnionCache.clear(); }
   function symbolUnionBounds(li) {
     var ld = state.layers[li];
     if (!ld || !ld.symbolId) return null;
     var inF = layerInPoint(ld), outF = layerOutPoint(ld);
+    var ck = ld.symbolId + '|' + inF + '|' + outF;
+    var hit = _symUnionCache.get(ck);
+    if (hit !== undefined) return hit;
     var feats = [];
     for (var f = inF; f <= outF; f++) {
       getEffectiveStrokes(li, f).forEach(function (sd) {
@@ -1398,9 +1424,11 @@
         feats.push({ bounds: { x: b.x, y: b.y, w: b.width, h: b.height } });
       });
     }
-    if (!feats.length) return null;
+    if (!feats.length) { _symUnionCache.set(ck, null); return null; }
     var u = unionBounds(feats);
-    return new Rectangle(u.x, u.y, u.w, u.h);
+    var rect = new Rectangle(u.x, u.y, u.w, u.h);
+    _symUnionCache.set(ck, rect);
+    return rect;
   }
   function motionBoxGeom(t) {
     var ld = state.layers[t.li];
@@ -4250,6 +4278,9 @@
     // timeline, not only from inside a property track's own cells.
     marqueeSelect: applyMarqueeSelection,
     clearKeySelection: function () { setKeySel([]); },
+    // Called by the two frame-content writers in app.js — the union is
+    // derived from that content, so it must not outlive an edit.
+    invalidateSymbolUnionBounds: invalidateSymbolUnionBounds,
     // layer-inout.js calls this when a bar press turned out to be a plain
     // click rather than a retime drag — the bar covers most of the grid half
     // of a layer's row, so without it that whole strip stayed unclickable.
