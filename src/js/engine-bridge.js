@@ -693,6 +693,32 @@
       // Empty array (the common case, no parent) makes the per-item loop
       // below a no-op cost.
       var parentChain = window.SMMotion ? SMMotion.parentChainMats(i, renderFrame) : [];
+      // 3D layer (2026-07-28, Grease-Pencil-style — see motion.js's
+      // make3DProjector/project3DSegments doc comment) — the layer-level
+      // motionMat/parentChain above get REPLACED by a per-VERTEX 3D
+      // projector (applied inside the per-item loop below, right where
+      // motionMat's own transformSegments call already lived) rather than
+      // a single affine matrix, so suppress them here to their neutral/
+      // no-op state: every downstream per-item consumer already treats
+      // null/[] as "no transform", so this is the one place that needs
+      // changing rather than every scattered call site. Per-ELEMENT motion
+      // (elMat) is untouched — a shape animating inside a 3D layer still
+      // works, composed before the layer's own 3D projection. Parenting
+      // INTO or OUT OF a 3D layer is explicitly out of scope for this pass
+      // (composing a 2D affine parent transform with this layer's own
+      // nonlinear 3D projection is exactly the "nested 3D" complexity the
+      // plan flagged) — a parented 3D layer simply ignores its parent's
+      // transform for now, not silently wrong in a way that's hard to
+      // notice. Images (Raster items) are also out of scope this pass —
+      // the projector below only ever applies to items with `.segments`
+      // (vector paths); an image inside a 3D layer renders unprojected.
+      var is3D = !!state.layers[i].threeD;
+      var project3D = null;
+      if (is3D) {
+        motionMat = null; motionPivot = null; parentChain = [];
+        var q3dBounds = userLayers[i].bounds;
+        if (window.SMMotion && q3dBounds) project3D = SMMotion.make3DProjector(state.layers[i], q3dBounds, renderFrame, state.canvasW, state.canvasH);
+      }
       // Brush-texture companions (isBrushTextureCopy — bitmap raster or
       // vector dab group) don't get their own Elements row in Motion
       // (motion.js's layerElements folds them into their anchor's, "merge
@@ -822,7 +848,19 @@
           //   - a gradient fill (its anchors are pre-transformed inline)
           //   - the current-frame outline overlay (its stroke width is a
           //     screen-space constant that must NOT ride the affine)
+          // 3D layer (2026-07-28): a 5th exclusion, same reasoning as the
+          // other four — retained-path registration stores `segsBefore`
+          // (the PRE-transform geometry) and relies on `pathTf` (a single
+          // AFFINE matrix) to reproduce the posed result on the Rust side.
+          // The 3D projector below is NONLINEAR (a real perspective
+          // projection, not scale+rotate+translate) — pathTf can't
+          // represent it, so a retained path would render flat/unprojected
+          // whenever this fast path fired. Always take the cold (serP)
+          // path for a 3D layer instead, exactly like symbolId/montageId/
+          // lfsGroup already do for their own "synthesizes new geometry
+          // every call" reasons (layerRetainable, above).
           var xformable = layerRetainable
+            && !project3D
             && !(window.SMMotion && cStrokeId && SMMotion.hasPathVertexMotionFor(i, cStrokeId))
             && !(c.data && c.data.fillGradient)
             && !(includeEditorOverlays && state.currentFrameOutline)
@@ -842,6 +880,13 @@
           if (sd && window.SMMotion && cStrokeId) sd.segments = SMMotion.applyPathVertexOffsetsFor(i, cStrokeId, sd.segments, renderFrame);
           if (sd && elMat) sd.segments = SMMotion.transformSegments(sd.segments, elPivot, elMat);
           if (sd && motionMat) sd.segments = SMMotion.transformSegments(sd.segments, motionPivot, motionMat);
+          // 3D layer (2026-07-28) — replaces motionMat's role for a 3D-
+          // enabled layer (motionMat is forced null above): projects every
+          // VERTEX through the layer's 3D transform + camera, leaving
+          // strokeWidth/strokeScale (below) completely untouched — the
+          // Grease-Pencil-style contract this feature was explicitly
+          // corrected to (motion.js's make3DProjector doc comment).
+          if (sd && project3D) sd.segments = SMMotion.project3DSegments(sd.segments, project3D);
           if (sd) for (var pc2 = 0; pc2 < parentChain.length; pc2++) sd.segments = SMMotion.transformSegments(sd.segments, parentChain[pc2].pivot, parentChain[pc2].mat);
           var op = c.opacity !== undefined ? c.opacity : 1;
           if (elMat) op *= elMat.op;
@@ -1027,6 +1072,10 @@
           layers.push({ items: sampleItems });
         }
       }
+      // 3D layer (2026-07-28) — no special envelope needed: each item's
+      // segments were already projected in place (project3D, above), so
+      // this layer's `items` push through the EXACT SAME path as any
+      // ordinary layer. blendMode/matteMode/effects still apply normally.
       layers.push({ items: items, blendMode: (bm && bm !== 'normal') ? bm : undefined, matteMode: (mm && mm !== 'none') ? mm : undefined,
         effects: sceneEffectsOf(state.layers[i]) });
     }

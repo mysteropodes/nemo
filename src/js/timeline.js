@@ -1342,7 +1342,9 @@ window.SM={
         // be just as useless. Note isNullLayer above was already persisted,
         // and its own tooltip calls a null layer a "pivot/parent pour d'autres
         // calques" — the pivot came back, everything hung off it did not.
-        layerUid:l.layerUid,parentLayerUid:l.parentLayerUid,markers:l.markers,shy:l.shy,keyLock:l.keyLock,timeRemap:l.timeRemap,motionBlur:l.motionBlur,effectsFrom:l.effectsFrom,timeLink:l.timeLink};}),
+        layerUid:l.layerUid,parentLayerUid:l.parentLayerUid,markers:l.markers,shy:l.shy,keyLock:l.keyLock,timeRemap:l.timeRemap,motionBlur:l.motionBlur,effectsFrom:l.effectsFrom,timeLink:l.timeLink,
+        // 3D layer toggle (2026-07-28) — see motion.js's compute3DCorners.
+        threeD:l.threeD};}),
       layerFolders:state.layerFolders,layerLinkGroups:state.layerLinkGroups,
       // StoryBoard node space (2026-07) — plain data by construction (no
       // runtime-only fields live in state.storyboard, see storyboard.js's
@@ -1542,6 +1544,7 @@ window.SM={
       if(ld.motionBlur)state.layers[idx].motionBlur=true;                 // flou de mouvement
       if(ld.effectsFrom)state.layers[idx].effectsFrom=ld.effectsFrom;     // Instance Effect
       if(ld.timeLink)state.layers[idx].timeLink=ld.timeLink;              // Parent in Time
+      if(ld.threeD)state.layers[idx].threeD=true;                         // calque 3D
       state.layers[idx].color=ld.color||nextLayerColor();
       ld.frames.forEach(function(f){if(!f.isInterpolated)f.isInterpolated=false;});while(state.layers[idx].frames.length<state.totalFrames)state.layers[idx].frames.push({strokes:[],isKeyframe:false,isInterpolated:false});});
     state.layerFolders=d.layerFolders||{};state.layerLinkGroups=d.layerLinkGroups||{};
@@ -3612,6 +3615,11 @@ var ICO_EYE='<svg viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7
 var ICO_EYE_CLOSED='<svg viewBox="0 0 24 24"><path fill="currentColor" d="m9.342 18.781-1.931-.518.787-2.939a10.99 10.99 0 0 1-3.237-1.872l-2.153 2.154-1.415-1.415 2.154-2.153a10.957 10.957 0 0 1-2.371-5.07l1.968-.359C3.903 10.811 7.579 14 12 14c4.42 0 8.097-3.188 8.856-7.39l1.968.358a10.958 10.958 0 0 1-2.37 5.071l2.153 2.153-1.415 1.415-2.153-2.154a10.99 10.99 0 0 1-3.237 1.872l.787 2.94-1.931.517-.788-2.94a11.07 11.07 0 0 1-3.74 0l-.788 2.94Z"/></svg>';
 var ICO_LOCK='<svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="1.8" fill="currentColor"/><path d="M8 11V8a4 4 0 018 0v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
 var ICO_UNLOCK='<svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="1.8" fill="currentColor"/><path d="M8 11V8a4 4 0 017.6-1.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+// 3D layer toggle (2026-07-28, After-Effects-style) — isometric cube
+// wireframe, plain inline SVG like every other layer-row icon (not an
+// icon-font glyph — this project's embedded font is a subset containing
+// only already-referenced codepoints, see this project's own CLAUDE.md).
+var ICO_3D='<svg viewBox="0 0 24 24"><path d="M12 3 L20 7.5 L20 16.5 L12 21 L4 16.5 L4 7.5 Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 3 L12 12 M20 7.5 L12 12 M4 7.5 L12 12 M12 12 L12 21" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>';
 // Layer color label picker (v5) — a small predefined-swatch "nuancier"
 // instead of jumping straight to the full SV/hue/hex ColorPicker. Reuses
 // LAYER_COLOR_PALETTE (app.js) so the choices match the auto-assigned
@@ -3931,6 +3939,11 @@ function renderLayerList(frameOnly){
     // silently blank. 'S' matches the existing text-badge convention (LFS,
     // the ◈ component badge) already used for icons outside that font.
     var solo=document.createElement('div');solo.className='lico solo-btn'+(ld.solo?' on':' off');solo.title='Solo layer (hide all others)';solo.textContent='S';solo.dataset.layer=i;solo.addEventListener('click',function(e){e.stopPropagation();window.SM.toggleLayerSolo(parseInt(this.dataset.layer));});
+    // 3D layer toggle (2026-07-28, After-Effects-style) — same .lico
+    // convention as eye/lock above, delegating to motion.js's
+    // toggleLayer3D (the state mutation + re-render live there, not
+    // inline here, matching every other icon button's own convention).
+    var d3=document.createElement('div');d3.className='lico'+(ld.threeD?'':' off');d3.title='3D Layer';d3.innerHTML=ICO_3D;d3.dataset.layer=i;d3.addEventListener('click',function(e){e.stopPropagation();if(window.SMMotion)SMMotion.toggleLayer3D(parseInt(this.dataset.layer));});
     // Type badge — a video, an imported sequence and a hand-drawn layer were
     // three identical rows before this (layer-kind.js decides which). Sits
     // just before the name so the eye reads "what" then "which", and carries
@@ -3942,7 +3955,7 @@ function renderLayerList(frameOnly){
       row.appendChild(kb);
     }
     var nm=document.createElement('div');nm.className='lnm';nm.textContent=ld.name;
-    row.appendChild(eye);row.appendChild(lock);row.appendChild(solo);
+    row.appendChild(eye);row.appendChild(lock);row.appendChild(solo);row.appendChild(d3);
     if(ld.symbolId){var cb=document.createElement('div');cb.className='lico comp-badge';cb.title='Component — double-click to edit';cb.innerHTML='<span style="font-size:11px;line-height:1">\u25c8</span>';row.appendChild(cb);}
     if(ld.lfsGroup){var lb=document.createElement('div');lb.className='lico comp-badge';lb.title='Ligne/Plein/Ombre layer';lb.innerHTML='<span style="font-size:11px;line-height:1">LFS</span>';row.appendChild(lb);}
     // Stroke/Fill/Shadow channel badge — a fully normal layer row (own
