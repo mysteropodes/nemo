@@ -453,6 +453,17 @@
     endMarquee();
     if (!_drag) return;
     var d = _drag; _drag = null;
+    // A press on a bar that never turned into a retime drag is a plain CLICK,
+    // and the bar covers most of the grid half of a layer's row — so without
+    // this that whole strip was unselectable (2026-07-27: "impossible de
+    // select un layer en clicquand de ce côté de la timeline"). Group drags
+    // have no single `li` and already carry their own bar selection, so they
+    // are left alone.
+    if (!d.group && d.li != null && Math.abs(upEv.clientX - d.startX) < 3 &&
+        state.appMode === 'motion' && window.SMMotion && SMMotion.selectLayerFromGrid) {
+      SMMotion.selectLayerFromGrid(d.li);
+      return;
+    }
     // A time-linked layer (Parent in Time) resolves its in/out from its
     // SOURCE, so the ld.inPoint/outPoint this drag just wrote would be
     // ignored — the bar would snap back and the drag would read as broken.

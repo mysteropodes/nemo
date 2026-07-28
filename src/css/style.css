@@ -866,6 +866,14 @@ body.mode-motion .lrow{height:22px;font-size:10.5px;}
    Effects opens a real writable box, not a hairline). */
 body.mode-motion .lrow.motion-expr-editor{height:auto;}
 body.mode-motion .frow{height:22px;}
+/* Grid half of a selected layer's row — same active/selected split as
+   .lrow just below, so one row reads the same across both panels
+   (2026-07-27: "cette partie n'est pas hightlight quand select"). The
+   selected tint has to sit ABOVE the in/out bar that fills this row, hence
+   the ::after overlay rather than a background the bar would cover. */
+body.mode-motion .frow.act{box-shadow:inset 3px 0 0 #4E6FF2;background:none;}
+body.mode-motion .frow.act.motion-selected{position:relative;box-shadow:inset 3px 0 0 #4E6FF2,inset 0 0 0 1px rgba(255,255,255,.35);}
+body.mode-motion .frow.act.motion-selected::after{content:'';position:absolute;inset:0;background:rgba(63,107,245,.16);pointer-events:none;}
 body.mode-motion .fc{height:22px;}
 body.mode-motion .lico{width:16px;height:16px;}
 body.mode-motion .motion-key{width:7px;height:7px;}

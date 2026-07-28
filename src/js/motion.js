@@ -3003,13 +3003,35 @@
       grid.appendChild(spacer);
     }
   }
+  // Selecting a layer from the GRID half of the timeline (2026-07-27:
+  // "impossible de select un layer en clicquand de ce côté de la timeline").
+  // Same selection the layer-list row click makes, MINUS the accordion
+  // toggle: on the left the row IS the name, so expanding it on click is the
+  // obvious reading; on the right the row is the layer's in/out bar, whose
+  // own gesture is dragging timing — collapsing or expanding the whole
+  // timeline under a click that was aimed at the bar is not what you meant.
+  function selectLayerFromGrid(li) {
+    if (state.appMode !== 'motion' || !state.layers[li]) return;
+    _layerSel = [li];
+    setKeySel([]);
+    window.SM.setActiveLayer(li);
+    renderLayerList(); renderTimeline();
+    if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+  }
+
   function renderTimelineMotion(grid) {
     var order = (typeof computeLayerRenderOrder === 'function') ? computeLayerRenderOrder() : state.layers.map(function (_l, i) { return { type: 'layer', idx: i }; });
     order.forEach(function (entry) {
       if (entry.type !== 'layer' || entry.hidden) return;
       var li = entry.idx, ld = state.layers[li];
       var expanded = isLayerExpanded(li);
-      var spacer = document.createElement('div'); spacer.className = 'frow'; spacer.dataset.layer = li;
+      // SAME class string renderLayerListMotion puts on this layer's row —
+      // the grid half was left plain, so a selected layer lit up on the left
+      // and stayed dark on the right ("cette partie n'est pas hightlight
+      // quand select") even though it is one row across both panels.
+      var spacer = document.createElement('div');
+      spacer.className = 'frow' + (_layerSel.indexOf(li) >= 0 ? ' act motion-selected' : (li === state.activeLayerIdx ? ' act' : ''));
+      spacer.dataset.layer = li;
       if (window.SMLayerInOut) SMLayerInOut.buildBar(spacer, li);
       grid.appendChild(spacer);
       if (!expanded) return;
@@ -3221,11 +3243,16 @@
     });
     renderTimeline();
   }
-  var _motionMarquee = null; // {startX, startY, rectEl, moved}
+  var _motionMarquee = null; // {startX, startY, rectEl, moved, layer}
   function startMarquee(e) {
     var rect = document.createElement('div'); rect.className = 'motion-marquee-rect';
     document.body.appendChild(rect);
-    _motionMarquee = { startX: e.clientX, startY: e.clientY, rectEl: rect, moved: false };
+    // Which layer's row the press landed on, if any — read HERE because by
+    // mouseup the pointer has usually left it. null means empty grid space,
+    // which is what endMarquee treats as "deselect".
+    var rowEl = e.target && e.target.closest && e.target.closest('.frow[data-layer]');
+    var li = rowEl ? parseInt(rowEl.dataset.layer, 10) : NaN;
+    _motionMarquee = { startX: e.clientX, startY: e.clientY, rectEl: rect, moved: false, layer: isNaN(li) ? null : li };
   }
   function applyMarqueeSelection(x0, y0, x1, y1) {
     var sel = [];
@@ -3656,8 +3683,12 @@
   function endMarquee() {
     if (!_motionMarquee) return;
     var moved = _motionMarquee.moved;
+    var downLayer = _motionMarquee.layer;
     _motionMarquee.rectEl.remove();
     _motionMarquee = null;
+    // A plain click that landed ON a layer's own grid row SELECTS that layer
+    // rather than clearing — the grid half of a row is still that row.
+    if (!moved && downLayer != null) { selectLayerFromGrid(downLayer); return; }
     // A plain click on empty grid space (no drag) clears the selection,
     // same "click empty = deselect" convention as the canvas's own
     // marquee/selection tools elsewhere in this app.
@@ -4025,6 +4056,10 @@
     // timeline, not only from inside a property track's own cells.
     marqueeSelect: applyMarqueeSelection,
     clearKeySelection: function () { setKeySel([]); },
+    // layer-inout.js calls this when a bar press turned out to be a plain
+    // click rather than a retime drag — the bar covers most of the grid half
+    // of a layer's row, so without it that whole strip stayed unclickable.
+    selectLayerFromGrid: selectLayerFromGrid,
     layerElements: layerElements,
     elementLabel: elementLabel,
     distributeKeys: distributeKeys, flipKeys: flipKeys, selectEveryNthKey: selectEveryNthKey, invertKeySelection: invertKeySelection,
