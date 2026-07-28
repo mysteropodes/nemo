@@ -614,9 +614,20 @@
   // All right-panel sections start collapsed (Selection/Component Instance
   // are already display:none by default via their own conditional-show
   // logic — collapsing their body too is harmless, they just won't have
-  // been expanded when they eventually become visible on selection).
-  document.querySelectorAll('.psec .pbdy').forEach(function(b){b.classList.add('hid');});
-  document.querySelectorAll('.psec .phdr').forEach(function(h){h.classList.add('closed');});
+  // been expanded when they eventually become visible on selection), EXCEPT
+  // Selected Colors: its own header comment (index.html) documents it as
+  // "toujours visible" (fill/stroke colors of the selection, or the active
+  // layer+canvas's colors when nothing is selected) — every other panel's
+  // collapsed-by-default state gets fixed by SOME later trigger
+  // (updatePropsContext for tool panels, autoExpandOnSelection here for the
+  // has-a-selection case), but the no-selection case had no such trigger,
+  // so on a fresh launch (nothing ever selected yet) this panel silently
+  // stayed collapsed and empty forever — "ça ne fonctionne pas quand rien
+  // n'est sélectionné alors qu'il faudrait" (2026-07-28). Starting it
+  // expanded like any other always-on panel sidesteps needing a second
+  // auto-open trigger for the opposite edge.
+  document.querySelectorAll('.psec .pbdy').forEach(function(b){if(b.id!=='selected-colors-body')b.classList.add('hid');});
+  document.querySelectorAll('.psec .phdr').forEach(function(h){if(h.id!=='selected-colors-hdr'&&!h.contains(document.getElementById('selected-colors-hdr')))h.classList.add('closed');});
 
   // Panel-visibility-by-context is now owned by updatePropsContext() in
   // timeline.js (the unified Properties panel: Transform/Fill/Stroke/Tool
