@@ -189,6 +189,58 @@ séquence 200/frame 60 fps · bitmap 2000/frame 61 fps ; lecture 23,2-23,4 fps s
 Les vecteurs restent ~2× plus chers que les rasters par item (chaque segment est
 re-sérialisé dans le JSON de scène, un raster c'est six nombres et un id).
 
+### 5ter. Géométrie retenue côté moteur (2026-07-28)
+
+Le pattern `register_image`/`imageId` étendu aux paths. Avant : les segments d'un item
+étaient re-sérialisés dans le JSON de scène, re-parsés par serde et reconstruits en
+`BezPath` à **chaque rendu**, même géométrie inchangée. Après : JS enregistre le path une
+fois (`register_path`) et n'envoie plus qu'un `pathRef`.
+
+Mesuré (sérialisation de scène isolée, `SMEngineBridge.timeSceneBuild`) :
+2000 vecteurs 5,2 ms/1652 Ko → **1,5 ms/300 Ko** ; 4000 vecteurs 15,0 ms/6156 Ko →
+**2,8 ms/606 Ko**. Scrub bout-en-bout (médiane d'intervalle rAF) : 36,2 → 27,7 ms à 2000,
+96,3 → 57,7 ms à 4000.
+
+**L'invariant unique dont tout dépend : l'identité d'objet d'un dict de stroke stocké EST
+son identité de géométrie.** `desP` tamponne le dict source sur `path.data.__engineSrcDict`
+(app.js) ; engine-bridge mappe dict → clé moteur. Trois conséquences à ne jamais oublier :
+
+1. **Seuls les calques dont `getEffectiveStrokes` renvoie le tableau STOCKÉ sont éligibles.**
+   `symbolId` (un composant avec caméra/symMatrix passe par `cloneStrokeForTransform`, qui
+   fabrique des dicts NEUFS à chaque appel), `montageId` et `lfsGroup` synthétisent — pour
+   eux l'identité ne veut rien dire. Mesuré avant le garde : le store grimpait 0 → 25 → 50
+   → 75 sur des passes de scrub identiques. Le garde est explicite (`layerRetainable`) et
+   `_registerCap` (250k) est un filet dur pour qu'une future branche synthétisante dégrade
+   en « pas de gain » plutôt qu'en fuite mémoire.
+   ⚠️ Une heuristique « n'enregistrer qu'un dict vu deux fois » a été essayée et NE SUFFIT
+   PAS : « vu deux fois » signifie « la scène a été construite deux fois pendant que ce dict
+   vivait », ce qu'un second rendu entre deux `loadFrame` satisfait trivialement.
+
+2. **La mutation live doit invalider le stamp.** Hook sur `_changed`, avec le masque de bits
+   **découvert par auto-test** et non codé en dur — et deux pièges vérifiés empiriquement :
+   `Path` a son PROPRE `_changed` (le système de classes de Paper capture `base` par
+   référence directe, donc patcher `Item.prototype` seul n'intercepte rien : zéro callback
+   mesuré), et un item **non inséré** ne déclenche aucun `_changed` du tout — c'est ce qui
+   avait produit un masque nul silencieux au premier essai. `CompoundPath`/`Raster` n'ont
+   pas de `_changed` propre et héritent d'`Item` : les DEUX prototypes doivent être hookés.
+   Si l'auto-test échoue, la fonctionnalité reste OFF (le rendu garde son comportement).
+
+3. **Le gain n'existe que si `serP()` est sauté.** Première version : garder serP+roundSegs
+   inconditionnels et n'économiser que les octets JSON → **36 → 33 fps, soit pire**, le
+   lookup n'étant que du coût ajouté. C'est le parcours du path Paper qui domine, pas la
+   taille du JSON.
+
+**Vérification** : `setRetainedPathsEnabled(false)` est un vrai interrupteur (aussi filet en
+prod). Rendu prouvé **identique octet pour octet** (PNG via `render_to_pixels`) ON vs OFF sur
+7 frames, après gomme, après undo/redo, et avec un CompoundPath en donut réel. Attention en
+testant : `renderFrameToPixelsPNG` appelle `loadFrame`, qui reconstruit les items et les
+RE-TAMPONNE — un A/B naïf compare donc refs contre refs et passe toujours.
+
+**Portée v1** : `pathRef` seulement quand la géométrie arrive non transformée (pas d'offset
+par vertex, pas de matrice élément/calque/parent). La suite naturelle est d'envoyer un
+`Affine` à côté du ref pour elMat/motionMat/parentChain — ce sont des affines autour d'un
+pivot — ce qui couvrirait Motion. Non fait ici : une surface de correction à la fois.
+
 **`renderNow(true)` (viewportOnly) est un contrat d'appelant** : seul le viewport a changé
 depuis le dernier rendu. Vrai pour pan/rotate (aucun item de scène ne dépend de center ou de
 la rotation ; les poignées en `1/view.zoom` dépendent du ZOOM seul). JAMAIS l'inférer

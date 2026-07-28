@@ -14,6 +14,11 @@ export class VelloEngine {
     private constructor();
     free(): void;
     [Symbol.dispose](): void;
+    /**
+     * Project-load hygiene (importJSON): every stroke dict is new, so every
+     * stored path is garbage at once — cheaper than waiting for the GC.
+     */
+    clear_paths(): void;
     clear_selection(): void;
     get_selection(): string;
     /**
@@ -32,6 +37,7 @@ export class VelloEngine {
      * whole lifetime, not per-scene, so this is a simple presence check).
      */
     has_image(id: string): boolean;
+    path_store_size(): number;
     /**
      * Registers (or re-registers, if `key` already exists — e.g. the
      * author just edited the source) a user-authored custom WGSL effect
@@ -71,6 +77,15 @@ export class VelloEngine {
      * matters for vello's internal upload caching).
      */
     register_image(id: string, rgba: Uint8Array, width: number, height: number): void;
+    /**
+     * Retained path store (see the `paths` field's doc comment). `coords` is
+     * a flat [px,py, hInX,hInY, hOutX,hOutY] × n array — the same
+     * RELATIVE-handle convention as SegIn/serP, 6 slots per segment with
+     * explicit zeros where the JSON form omits a zero handle. Built through
+     * build_bezpath_from_segments so a registered path and an inline one
+     * produce byte-identical curves (single source of truth, §3).
+     */
+    register_path(id: string, coords: Float64Array, closed: boolean): void;
     render(scene_json: string): void;
     /**
      * Phase C6 (export pipeline): renders the scene offscreen and reads the
@@ -96,6 +111,11 @@ export class VelloEngine {
      * this on every resize-observer tick regardless.
      */
     resize(width: number, height: number): void;
+    /**
+     * Retirement is JS-driven (FinalizationRegistry on the stroke dicts) —
+     * this side never guesses at lifetimes. `ids_json`: JSON array of keys.
+     */
+    retire_paths(ids_json: string): void;
     /**
      * Rotates every selected item in-place around `(pivot_x, pivot_y)` by
      * `angle` radians — mirrors selPropsApplyRotate in tools.js.
@@ -236,15 +256,19 @@ export interface InitOutput {
     readonly memory: WebAssembly.Memory;
     readonly __wbg_velloengine_free: (a: number, b: number) => void;
     readonly create_engine: (a: any, b: number, c: number) => any;
+    readonly velloengine_clear_paths: (a: number) => void;
     readonly velloengine_clear_selection: (a: number) => void;
     readonly velloengine_get_selection: (a: number) => [number, number, number, number];
     readonly velloengine_gizmo_handles: (a: number, b: number, c: number) => [number, number, number, number];
     readonly velloengine_has_image: (a: number, b: number, c: number) => number;
+    readonly velloengine_path_store_size: (a: number) => number;
     readonly velloengine_register_custom_effect: (a: number, b: number, c: number, d: number, e: number) => [number, number];
     readonly velloengine_register_image: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number];
+    readonly velloengine_register_path: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
     readonly velloengine_render: (a: number, b: number, c: number) => [number, number];
     readonly velloengine_render_to_pixels: (a: number, b: number, c: number) => any;
     readonly velloengine_resize: (a: number, b: number, c: number) => void;
+    readonly velloengine_retire_paths: (a: number, b: number, c: number) => [number, number];
     readonly velloengine_rotate_selection: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
     readonly velloengine_scale_selection: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number, number, number];
     readonly velloengine_screen_to_world: (a: number, b: number, c: number) => [number, number];
@@ -265,10 +289,10 @@ export interface InitOutput {
     readonly strokemodeler_move: (a: number, b: number, c: number, d: number, e: number) => [number, number];
     readonly strokemodeler_new: (a: number, b: number) => number;
     readonly strokemodeler_up: (a: number, b: number, c: number, d: number, e: number) => [number, number];
+    readonly interp_stroke: (a: number, b: number) => [number, number, number, number];
     readonly boolean_op: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
     readonly erase_at_point: (a: number, b: number) => [number, number, number, number];
     readonly hit_test: (a: number, b: number, c: number, d: number, e: number) => [number, number, number, number];
-    readonly interp_stroke: (a: number, b: number) => [number, number, number, number];
     readonly wasm_bindgen__convert__closures_____invoke__h4177160f1dac6248: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen__convert__closures_____invoke__h49909fab4bc066b4: (a: number, b: number, c: any, d: any) => void;
     readonly wasm_bindgen__convert__closures_____invoke__h29bfc5eda1199406: (a: number, b: number, c: any) => void;

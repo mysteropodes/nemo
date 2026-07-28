@@ -98,6 +98,13 @@ export class VelloEngine {
         const ptr = this.__destroy_into_raw();
         wasm.__wbg_velloengine_free(ptr, 0);
     }
+    /**
+     * Project-load hygiene (importJSON): every stroke dict is new, so every
+     * stored path is garbage at once — cheaper than waiting for the GC.
+     */
+    clear_paths() {
+        wasm.velloengine_clear_paths(this.__wbg_ptr);
+    }
     clear_selection() {
         wasm.velloengine_clear_selection(this.__wbg_ptr);
     }
@@ -167,6 +174,13 @@ export class VelloEngine {
         return ret !== 0;
     }
     /**
+     * @returns {number}
+     */
+    path_store_size() {
+        const ret = wasm.velloengine_path_store_size(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
      * Registers (or re-registers, if `key` already exists — e.g. the
      * author just edited the source) a user-authored custom WGSL effect
      * (2026-07, feedback: "la possibilité d'ajouter ses propres effets
@@ -230,6 +244,24 @@ export class VelloEngine {
         }
     }
     /**
+     * Retained path store (see the `paths` field's doc comment). `coords` is
+     * a flat [px,py, hInX,hInY, hOutX,hOutY] × n array — the same
+     * RELATIVE-handle convention as SegIn/serP, 6 slots per segment with
+     * explicit zeros where the JSON form omits a zero handle. Built through
+     * build_bezpath_from_segments so a registered path and an inline one
+     * produce byte-identical curves (single source of truth, §3).
+     * @param {string} id
+     * @param {Float64Array} coords
+     * @param {boolean} closed
+     */
+    register_path(id, coords, closed) {
+        const ptr0 = passStringToWasm0(id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passArrayF64ToWasm0(coords, wasm.__wbindgen_malloc);
+        const len1 = WASM_VECTOR_LEN;
+        wasm.velloengine_register_path(this.__wbg_ptr, ptr0, len0, ptr1, len1, closed);
+    }
+    /**
      * @param {string} scene_json
      */
     render(scene_json) {
@@ -274,6 +306,19 @@ export class VelloEngine {
      */
     resize(width, height) {
         wasm.velloengine_resize(this.__wbg_ptr, width, height);
+    }
+    /**
+     * Retirement is JS-driven (FinalizationRegistry on the stroke dicts) —
+     * this side never guesses at lifetimes. `ids_json`: JSON array of keys.
+     * @param {string} ids_json
+     */
+    retire_paths(ids_json) {
+        const ptr0 = passStringToWasm0(ids_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.velloengine_retire_paths(this.__wbg_ptr, ptr0, len0);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
     }
     /**
      * Rotates every selected item in-place around `(pivot_x, pivot_y)` by
@@ -1854,17 +1899,17 @@ function __wbg_get_imports() {
             arg0.writeTexture(arg1, getArrayU8FromWasm0(arg2, arg3), arg4, arg5);
         }, arguments); },
         __wbindgen_cast_0000000000000001: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 60, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 61, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen__convert__closures_____invoke__h29bfc5eda1199406);
             return ret;
         },
         __wbindgen_cast_0000000000000002: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 85, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 86, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen__convert__closures_____invoke__h4177160f1dac6248);
             return ret;
         },
         __wbindgen_cast_0000000000000003: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("GPUUncapturedErrorEvent")], shim_idx: 60, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("GPUUncapturedErrorEvent")], shim_idx: 61, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen__convert__closures_____invoke__h29bfc5eda1199406_2);
             return ret;
         },
@@ -2160,6 +2205,13 @@ function makeMutClosure(arg0, arg1, f) {
 function passArray8ToWasm0(arg, malloc) {
     const ptr = malloc(arg.length * 1, 1) >>> 0;
     getUint8ArrayMemory0().set(arg, ptr / 1);
+    WASM_VECTOR_LEN = arg.length;
+    return ptr;
+}
+
+function passArrayF64ToWasm0(arg, malloc) {
+    const ptr = malloc(arg.length * 8, 8) >>> 0;
+    getFloat64ArrayMemory0().set(arg, ptr / 8);
     WASM_VECTOR_LEN = arg.length;
     return ptr;
 }

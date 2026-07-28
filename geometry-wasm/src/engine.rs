@@ -19,6 +19,17 @@ use web_sys::HtmlCanvasElement;
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ItemIn {
+    // Reference into the engine's retained path store (register_path) — when
+    // present, `segments`/`closed` are ABSENT by contract and the stored
+    // BezPath is used instead. Precedence: `image` > `pathRef` > `centerline`
+    // > `segments` (mirrors the existing "richer field wins" convention).
+    // NOTE: the legacy Phase-C1 selection APIs (select_at, selection_bounds,
+    // apply_transform — zero JS callers today, selection lives in Paper.js)
+    // do NOT resolve pathRef; if they are ever revived they must go through
+    // the same store lookup paint_layer_items uses, or refs will read as
+    // empty geometry there (bug family §1).
+    #[serde(default)]
+    pub(crate) path_ref: Option<String>,
     #[serde(default)]
     pub(crate) segments: Vec<SegIn>,
     #[serde(default)]
@@ -570,6 +581,21 @@ pub struct VelloEngine {
     // lets vello's own internal resource cache recognize "this is the same
     // image as last frame" and skip re-uploading pixels to the GPU.
     images: std::collections::HashMap<String, vello::peniko::ImageData>,
+    // Retained path store (2026-07-28) — the `images` pattern above, applied
+    // to vector geometry. A stroke's segments used to be re-serialized into
+    // the scene JSON, re-parsed by serde, and rebuilt into a BezPath on EVERY
+    // render even though the geometry hadn't changed since the last frame —
+    // measured as the reason 2000 vector strokes scrubbed at 31fps while
+    // 2000 rasters (six numbers + an id per item) reached 61fps. JS registers
+    // a path once via register_path() and then sends only `pathRef` in the
+    // scene item; the JS side owns invalidation (a Paper `_changed` hook
+    // clears the item→dict stamp on any geometry mutation) and retirement
+    // (FinalizationRegistry on the stroke dicts → retire_paths()). This side
+    // is a dumb map on purpose: no LRU, no eviction heuristics — a silent
+    // engine-side eviction would make a referenced path vanish from the
+    // picture with no JS-visible signal (same reasoning as registeredImageIds
+    // never guessing at lifetimes). A pathRef miss paints nothing and warns.
+    paths: std::collections::HashMap<String, BezPath>,
     // 1×1 transparent "atlas keepalive" drawn far off-canvas into EVERY
     // scene (see composite_scene) — works around a vello 0.9 atlas bug
     // found live (2026-07-17, "trait bitmap brush disparaît après dessin
@@ -1814,6 +1840,7 @@ fn paint_layer_items(
     items: &[ItemIn],
     view_tf: Affine,
     images: &std::collections::HashMap<String, vello::peniko::ImageData>,
+    paths: &std::collections::HashMap<String, BezPath>,
 ) {
     for item in items {
         if let Some(img_ref) = &item.image {
@@ -1836,20 +1863,40 @@ fn paint_layer_items(
             }
             continue;
         }
-        let bez = match build_bezpath(item) {
-            Some(b) => b,
-            None => continue,
+        // Retained-ref first: a pathRef item carries no segments at all, so
+        // falling through to build_bezpath would silently skip it. A missing
+        // store entry paints nothing but WARNS (console via console_log) —
+        // it means the JS registration/retirement contract was broken, and a
+        // silent skip here is exactly how "the shape vanished" class bugs
+        // stay invisible (see the CompoundPath story in engine-bridge.js).
+        let built: BezPath;
+        let bez: &BezPath = if let Some(r) = &item.path_ref {
+            match paths.get(r) {
+                Some(p) => p,
+                None => {
+                    log::warn!("pathRef '{}' not in retained store — item skipped", r);
+                    continue;
+                }
+            }
+        } else {
+            match build_bezpath(item) {
+                Some(b) => {
+                    built = b;
+                    &built
+                }
+                None => continue,
+            }
         };
         let paint_fill = |scene: &mut Scene| {
             if let Some(grad) = item.fill_gradient.as_ref().and_then(gradient_brush) {
-                scene.fill(vello::peniko::Fill::NonZero, view_tf, &grad, None, &bez);
+                scene.fill(vello::peniko::Fill::NonZero, view_tf, &grad, None, bez);
             } else if let Some(fc) = item.fill_color {
-                scene.fill(vello::peniko::Fill::NonZero, view_tf, color_from(fc), None, &bez);
+                scene.fill(vello::peniko::Fill::NonZero, view_tf, color_from(fc), None, bez);
             }
         };
         let paint_stroke = |scene: &mut Scene| {
             if let Some(sc) = item.stroke_color {
-                scene.stroke(&stroke_from(item), view_tf, color_from(sc), None, &bez);
+                scene.stroke(&stroke_from(item), view_tf, color_from(sc), None, bez);
             }
         };
         if item.paint_order.as_deref() == Some("strokeFirst") {
@@ -2016,6 +2063,7 @@ pub async fn create_engine(
         surface_format: format,
         surface_alpha_mode: alpha_mode,
         images: std::collections::HashMap::new(),
+        paths: std::collections::HashMap::new(),
         atlas_keepalive: vello::peniko::ImageData {
             data: vec![0u8, 0, 0, 0].into(),
             format: vello::peniko::ImageFormat::Rgba8,
@@ -2343,7 +2391,7 @@ impl VelloEngine {
             };
             let mut scene = Scene::new();
             self.push_atlas_keepalive(&mut scene);
-            paint_layer_items(&mut scene, &layer.items[i..end], view_tf, &self.images);
+            paint_layer_items(&mut scene, &layer.items[i..end], view_tf, &self.images, &self.paths);
             self.renderer
                 .render_to_texture(&self.device, &self.queue, &scene, &self.blend_layer_view, &layer_params)
                 .map_err(|e| JsValue::from_str(&format!("render_to_texture failed: {e:?}")))?;
@@ -2406,7 +2454,7 @@ impl VelloEngine {
             let mut scene = Scene::new();
             self.push_atlas_keepalive(&mut scene);
             for layer in &scene_in.layers {
-                paint_layer_items(&mut scene, &layer.items, view_tf, &self.images);
+                paint_layer_items(&mut scene, &layer.items, view_tf, &self.images, &self.paths);
             }
             let params = RenderParams { base_color, width: self.width, height: self.height, antialiasing_method: AaConfig::Area };
             self.renderer
@@ -2467,7 +2515,7 @@ impl VelloEngine {
             } else {
                 let mut scene = Scene::new();
                 self.push_atlas_keepalive(&mut scene);
-                paint_layer_items(&mut scene, &layer.items, view_tf, &self.images);
+                paint_layer_items(&mut scene, &layer.items, view_tf, &self.images, &self.paths);
                 self.renderer
                     .render_to_texture(&self.device, &self.queue, &scene, &self.blend_layer_view, &layer_params)
                     .map_err(|e| JsValue::from_str(&format!("render_to_texture failed: {e:?}")))?;
@@ -2478,7 +2526,7 @@ impl VelloEngine {
                 // is_matte_source precompute above, same condition).
                 let mut matte_scene = Scene::new();
                 self.push_atlas_keepalive(&mut matte_scene);
-                paint_layer_items(&mut matte_scene, &scene_in.layers[i + 1].items, view_tf, &self.images);
+                paint_layer_items(&mut matte_scene, &scene_in.layers[i + 1].items, view_tf, &self.images, &self.paths);
                 self.renderer
                     .render_to_texture(&self.device, &self.queue, &matte_scene, &self.matte_source_view, &layer_params)
                     .map_err(|e| JsValue::from_str(&format!("render_to_texture failed: {e:?}")))?;
@@ -2892,6 +2940,46 @@ impl VelloEngine {
     /// whole lifetime, not per-scene, so this is a simple presence check).
     pub fn has_image(&self, id: &str) -> bool {
         self.images.contains_key(id)
+    }
+
+    /// Retained path store (see the `paths` field's doc comment). `coords` is
+    /// a flat [px,py, hInX,hInY, hOutX,hOutY] × n array — the same
+    /// RELATIVE-handle convention as SegIn/serP, 6 slots per segment with
+    /// explicit zeros where the JSON form omits a zero handle. Built through
+    /// build_bezpath_from_segments so a registered path and an inline one
+    /// produce byte-identical curves (single source of truth, §3).
+    pub fn register_path(&mut self, id: String, coords: &[f64], closed: bool) {
+        let n = coords.len() / 6;
+        let mut segs = Vec::with_capacity(n);
+        for i in 0..n {
+            let o = i * 6;
+            segs.push(SegIn {
+                point: [coords[o], coords[o + 1]],
+                handle_in: [coords[o + 2], coords[o + 3]],
+                handle_out: [coords[o + 4], coords[o + 5]],
+            });
+        }
+        self.paths.insert(id, build_bezpath_from_segments(&segs, closed));
+    }
+
+    /// Retirement is JS-driven (FinalizationRegistry on the stroke dicts) —
+    /// this side never guesses at lifetimes. `ids_json`: JSON array of keys.
+    pub fn retire_paths(&mut self, ids_json: &str) -> Result<(), JsValue> {
+        let ids: Vec<String> = serde_json::from_str(ids_json).map_err(|e| JsValue::from_str(&e.to_string()))?;
+        for id in ids {
+            self.paths.remove(&id);
+        }
+        Ok(())
+    }
+
+    /// Project-load hygiene (importJSON): every stroke dict is new, so every
+    /// stored path is garbage at once — cheaper than waiting for the GC.
+    pub fn clear_paths(&mut self) {
+        self.paths.clear();
+    }
+
+    pub fn path_store_size(&self) -> u32 {
+        self.paths.len() as u32
     }
 
     pub fn render(&mut self, scene_json: &str) -> Result<(), JsValue> {
