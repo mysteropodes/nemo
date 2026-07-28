@@ -1,4 +1,9 @@
-// ---- LABS PROTOTYPE — SVG import as real editable vectors ----
+// ---- SVG import as real editable vectors ----
+// Promoted out of Labs 2026-07-27: this is the only importer in Nemo that
+// produces EDITABLE geometry rather than a flat Raster, which makes it the
+// obvious front door for a logo, an icon or a character turnaround — and it
+// was behind a prototype flag plus a floating button in the corner. The
+// parsing work below is unchanged; only the way in is.
 // Every other asset importer in Nemo (images.js) drops a flat Raster onto
 // the layer — fine for a photo reference, dead weight for a logo/icon/
 // character turnaround that was ALREADY vector data before it got dragged
@@ -110,7 +115,7 @@
     return inserted;
   }
 
-  window.SMLabs.importSVGString = function (svgText) {
+  function importSVGString(svgText) {
     var root;
     try { root = project.importSVG(svgText, { insert: false, expandShapes: true }); }
     catch (e) { if (typeof showToast === 'function') showToast('SVG invalide : ' + e.message); return 0; }
@@ -190,46 +195,32 @@
       e.target.value = '';
       if (!file) return;
       var r = new FileReader();
-      r.onload = function () { window.SMLabs.importSVGString(r.result); };
+      r.onload = function () { importSVGString(r.result); };
       r.readAsText(file);
     });
     return fileInput;
   }
 
-  window.SMLabs.importSVGFile = async function () {
+  async function importSVGFile() {
     if (tauriOk()) {
       var path = await window.__TAURI__.dialog.open({ title: 'Importer un SVG', multiple: false, filters: [{ name: 'SVG', extensions: ['svg'] }] });
       if (!path) return;
       var text = await window.__TAURI__.fs.readTextFile(path);
-      window.SMLabs.importSVGString(text);
+      importSVGString(text);
       return;
     }
     ensureFileInput().click();
   };
 
-  // Floating button, mounted/unmounted with the prototype's own on/off
-  // state (labs-core.js's onEnable/onDisable) — no index.html touch.
-  var btn = null;
-  function mount() {
-    if (btn) return;
-    btn = document.createElement('button');
-    btn.id = 'labs-svg-import-btn';
-    btn.textContent = 'Importer SVG (Labs)…';
-    btn.title = 'SVG → vecteurs éditables (prototype Labs)';
-    btn.style.cssText =
-      'position:fixed;left:16px;bottom:16px;z-index:9999;padding:8px 14px;border-radius:8px;' +
-      'background:#2a2933;color:#eceae7;border:1px solid rgba(255,255,255,.15);cursor:pointer;' +
-      'font:12px system-ui,sans-serif;box-shadow:0 4px 16px rgba(0,0,0,.4);';
-    btn.addEventListener('click', function () { window.SMLabs.importSVGFile(); });
-    document.body.appendChild(btn);
-  }
-  function unmount() { if (btn) { btn.remove(); btn = null; } }
 
-  window.SMLabs.register('svg-import', {
-    flag: 'nemo-labs-svgimport',
-    describe: 'Import SVG → vecteurs éditables réels (pas un raster) : SMLabs.importSVGFile() ou bouton flottant, groupes/transforms aplatis, trous fusionnés façon insertBooleanResult',
-    onEnable: mount,
-    onDisable: unmount,
-  });
-  if (window.SMLabs.isOn('svg-import')) mount();
+  // Public entry point. The SMLabs.* names above are kept as aliases so any
+  // script or plugin written against the prototype keeps working.
+  window.SMSvgImport = { openFile: importSVGFile, importString: importSVGString };
+  // Aliases for anything written against the prototype (a user script, a
+  // plugin) — set only if Labs is present, so this module no longer depends
+  // on it to load.
+  if (window.SMLabs) {
+    window.SMLabs.importSVGFile = importSVGFile;
+    window.SMLabs.importSVGString = importSVGString;
+  }
 })();

@@ -4640,7 +4640,32 @@ function initAppMenu(){
     });
   })();
   var btn=document.getElementById('app-menu-btn');if(!btn||!window.showContextMenu)return;
-  function clickEl(id){var el=document.getElementById(id);if(el)el.click();}
+  // Reads an .obj and hands it to the 3D reference viewer (labs/reference-3d.js).
+// Tauri gets a native dialog, the browser preview a hidden input — same split
+// every other importer here uses.
+function openObjReference(){
+  function feed(text){
+    if(!window.SMLabs||!SMLabs.open3DReference){showToast('Visionneuse 3D indisponible');return;}
+    SMLabs.open3DReference(text);
+  }
+  if(typeof window.__TAURI__!=='undefined'){
+    window.__TAURI__.dialog.open({title:'Importer une référence 3D (.obj)',multiple:false,
+      filters:[{name:'OBJ',extensions:['obj']}]}).then(function(path){
+      if(!path)return;
+      return window.__TAURI__.fs.readTextFile(path).then(feed);
+    }).catch(function(e){showToast('Import OBJ échoué : '+e.message);});
+    return;
+  }
+  var inp=document.createElement('input');inp.type='file';inp.accept='.obj';inp.style.display='none';
+  document.body.appendChild(inp);
+  inp.addEventListener('change',function(e){
+    var f=e.target.files&&e.target.files[0];inp.remove();
+    if(!f)return;
+    var r=new FileReader();r.onload=function(){feed(r.result);};r.readAsText(f);
+  });
+  inp.click();
+}
+function clickEl(id){var el=document.getElementById(id);if(el)el.click();}
   btn.addEventListener('click',function(e){
     e.stopPropagation();
     var tt=(window.SM&&SM.t)?SM.t:function(k){return k;};
@@ -4669,6 +4694,18 @@ function initAppMenu(){
       {label:tt('menuImportImg'),action:function(){clickEl('btn-import-img');}},
       {label:tt('menuImportVideo'),action:function(){clickEl('btn-import-video');}},
       {label:tt('menuImportPsd'),id:'ctx-import-psd',action:function(){clickEl('btn-import-psd');}},
+      // SVG sits with the other importers now, not behind a Labs flag and a
+      // floating button (2026-07-27): it is the only import path that yields
+      // EDITABLE geometry instead of a flat Raster, so it is the natural
+      // front door for a logo or a turnaround.
+      {label:tt('menuImportSvg'),id:'ctx-import-svg',
+        action:function(){if(window.SMSvgImport)SMSvgImport.openFile();}},
+      // The OBJ reference viewer's loader existed and worked, with nothing
+      // anywhere calling it — SMLabs.open3DReference had zero call sites, so
+      // only the two bundled CC0 models were ever reachable. This is that
+      // missing entry point. It stays a REFERENCE (an overlay you draw from,
+      // never exported, never baked), which is what the viewer is today.
+      {label:tt('menuImport3D'),id:'ctx-import-3d',action:openObjReference},
       {label:tt('menuExport'),id:'ctx-export',action:function(){clickEl('btn-export');}},
       {sep:true},
       {label:tt('menuSettings'),action:function(){clickEl('btn-settings');}},
