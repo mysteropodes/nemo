@@ -54,8 +54,14 @@
   // space path.segments/nodeEditSegmentsData already use — no other line
   // needs to change.
   function toLocalPoint(pt, layerIdx) {
-    if (!window.SMMotion || !SMMotion.layerMotionPointMap) return pt;
-    var map = SMMotion.layerMotionPointMap(layerIdx);
+    if (!window.SMMotion) return pt;
+    var map = SMMotion.layerMotionPointMap ? SMMotion.layerMotionPointMap(layerIdx) : null;
+    // 3D layers (2026-07-29 fix) — layerMotionPointMap returns null for a
+    // 3D-toggled layer even with real rotationX/rotationY set (it only
+    // recognizes the base 2D properties); layerMotion3DPointMap is the
+    // dedicated perspective-correct counterpart — see its own header
+    // comment in motion.js for the ray-plane-intersection math.
+    if (!map && SMMotion.layerMotion3DPointMap) map = SMMotion.layerMotion3DPointMap(layerIdx);
     if (!map) return pt;
     var lp = map.inv(pt.x, pt.y);
     return new Point(lp[0], lp[1]);

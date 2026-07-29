@@ -60,8 +60,14 @@ var _rigDraw = { path: null, boneId: null, ld: null, draggingHandle: false, last
   // correctly-hit raw point on a 2x-scaled layer collapsed the shape's
   // bounds from 40x160 to ~141x131 instead of following the drag 1:1).
   function toLocalPoint(pt, layerIdx) {
-    if (!window.SMMotion || !SMMotion.layerMotionPointMap) return pt;
-    var map = SMMotion.layerMotionPointMap(layerIdx);
+    if (!window.SMMotion) return pt;
+    var map = SMMotion.layerMotionPointMap ? SMMotion.layerMotionPointMap(layerIdx) : null;
+    // 3D layers (2026-07-29 fix) — layerMotionPointMap only recognizes the
+    // base 2D properties and returns null for a 3D-toggled layer even with
+    // real rotationX/rotationY set; layerMotion3DPointMap is the dedicated
+    // (perspective-correct, not affine) counterpart for that case — see its
+    // own header comment in motion.js for the ray-plane-intersection math.
+    if (!map && SMMotion.layerMotion3DPointMap) map = SMMotion.layerMotion3DPointMap(layerIdx);
     if (!map) return pt;
     var lp = map.inv(pt.x, pt.y);
     return new Point(lp[0], lp[1]);
