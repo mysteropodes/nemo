@@ -41,6 +41,32 @@ var _rigDraw = { path: null, boneId: null, ld: null, draggingHandle: false, last
     );
   }
 
+  // A layer's Motion Position/Rotation/Scale is, by design, applied ONLY at
+  // render time (engine-bridge.js's buildSceneJson composes it into a
+  // pathTransform matrix — see motion.js's computeMotionMat/layerMotionAt
+  // header comment) and is NEVER baked into the Paper.js document's own
+  // segments — same contract subselect-bridge.js's own toLocalPoint (2026-07-
+  // 29 fix) and select-bridge.js's hitPt already honor. This file never did:
+  // every bone anchor/segment/influence-circle-center lives in bone.segments'
+  // RAW coordinates (ensureLayerRig, applyRigDeform), but onDown/onMove fed
+  // them the pointer's RENDERED/world position unmapped. Invisible at
+  // scale=1 (identity map, which is why every earlier live test in this
+  // session passed), but on any Component instance with an active Motion
+  // Scale/Rotation/Position — "un calque qui change avec le zoom" — a click
+  // exactly on a visually-scaled anchor missed it, and posing snapped the
+  // bone to whatever raw coordinate happened to be under the RENDERED
+  // cursor position instead of the equivalent local one, visibly corrupting
+  // the shape (confirmed live, QA-confirmed 2026-07-29: dragging at a
+  // correctly-hit raw point on a 2x-scaled layer collapsed the shape's
+  // bounds from 40x160 to ~141x131 instead of following the drag 1:1).
+  function toLocalPoint(pt, layerIdx) {
+    if (!window.SMMotion || !SMMotion.layerMotionPointMap) return pt;
+    var map = SMMotion.layerMotionPointMap(layerIdx);
+    if (!map) return pt;
+    var lp = map.inv(pt.x, pt.y);
+    return new Point(lp[0], lp[1]);
+  }
+
   // Hit-tests every anchor of every bone on the active layer's rig. Returns
   // {boneId, vi} on a hit, tolerance in the same "N/view.zoom" screen-pixel
   // convention as every other handle hit-test in this codebase (motion.js's
@@ -96,7 +122,7 @@ var _rigDraw = { path: null, boneId: null, ld: null, draggingHandle: false, last
     e.stopImmediatePropagation();
     e.preventDefault();
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
-    var pt = new Point(w[0], w[1]);
+    var pt = toLocalPoint(new Point(w[0], w[1]), state.activeLayerIdx);
     var ld = state.layers[state.activeLayerIdx];
     var mode = state.rigSubMode || 'draw';
 
@@ -218,25 +244,30 @@ var _rigDraw = { path: null, boneId: null, ld: null, draggingHandle: false, last
     e.stopImmediatePropagation();
     e.preventDefault();
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
+    // Local (raw document-space) point for anything that reads/writes
+    // bone.segments or a raw-space center — see toLocalPoint's own comment.
+    var localPt = toLocalPoint(new Point(w[0], w[1]), state.activeLayerIdx);
     if (_radiusDrag) {
       var bone = _radiusDrag.ld.rig.bones[_radiusDrag.boneId];
-      bone.radius = Math.max(1, new Point(w[0], w[1]).getDistance(_radiusDrag.center));
+      bone.radius = Math.max(1, localPt.getDistance(_radiusDrag.center));
       window.SMEngineBridge.renderNow();
       return;
     }
     if (_posing) {
       var poseBone = _posing.ld.rig.bones[_posing.boneId];
-      poseBone.segments[_posing.vi].point = [w[0], w[1]];
+      poseBone.segments[_posing.vi].point = [localPt.x, localPt.y];
       applyRigDeform(_posing.ld);
       window.SMEngineBridge.renderNow();
       return;
     }
-    // Only Tracer has an in-progress bone to rubber-band toward.
+    // Only Tracer has an in-progress bone to rubber-band toward. Kept in
+    // RENDERED/world space (w, not localPt) to match buildRigPreviewItems'
+    // own forward-mapped bone segments (engine-bridge.js, 2026-07-29 fix) —
+    // the rubber-band line's two endpoints must live in the SAME space.
     if ((state.rigSubMode || 'draw') === 'draw' && window.SMEngineBridge.setRigPreview) window.SMEngineBridge.setRigPreview(w);
     if (_rigDraw.draggingHandle && _rigDraw.path) {
       var seg = _rigDraw.path.lastSegment;
-      var pt = new Point(w[0], w[1]);
-      var delta = pt.subtract(seg.point);
+      var delta = localPt.subtract(seg.point);
       seg.handleOut = delta;
       if (!e.altKey) seg.handleIn = delta.multiply(-1);
     }

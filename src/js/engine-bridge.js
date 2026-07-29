@@ -1822,6 +1822,23 @@
     var zs = 1 / view.zoom;
     var items = [];
     var boneCol = [255, 200, 60, 235], handleCol = [255, 200, 60, 178];
+    // 2026-07-29 fix — same story as buildNodeHandleItems' own toRendered a
+    // bit below in this file (see its comment, and rig-bridge.js's
+    // toLocalPoint): bone.segments/_rigDraw.path live in raw document space,
+    // but the shape they deform renders through the active layer's own
+    // Motion transform. This overlay used to draw the bone/handles/influence
+    // circle straight from raw coordinates, so on any layer with an active
+    // Motion Scale/Rotation/Position the rig guide visibly sat in the wrong
+    // place relative to the shape it's actually editing. transformSegments
+    // (motion.js) is the SAME point+handle-vector transform buildSceneJson's
+    // own pathTransform composes elsewhere — reused here instead of hand-
+    // rolling the math a second time. Radius uses the average of sx/sy: an
+    // exact ellipse would need a different render primitive than a circle,
+    // and Motion "zoom" is overwhelmingly a uniform scale in practice.
+    var motionMap = (window.SMMotion && SMMotion.layerMotionPointMap) ? SMMotion.layerMotionPointMap(state.activeLayerIdx) : null;
+    function toRenderedSegs(segs) { return motionMap ? SMMotion.transformSegments(segs, motionMap.pivot, motionMap.mat) : segs; }
+    function toRendered(x, y) { return motionMap ? motionMap.fwd(x, y) : [x, y]; }
+    function toRenderedRadius(r) { return motionMap ? r * (motionMap.mat.sx + motionMap.mat.sy) / 2 : r; }
     function pushHandles(pt, hi, ho) {
       if (Math.hypot(hi[0], hi[1]) > 0.5) {
         var hiPt = [pt[0] + hi[0], pt[1] + hi[1]];
@@ -1853,27 +1870,31 @@
       // JSON copy doesn't have yet) — skip its stored copy here to avoid
       // drawing it twice.
       if (typeof _rigDraw !== 'undefined' && _rigDraw.path && _rigDraw.boneId === bid) return;
-      items.push({ segments: roundSegs(bone.segments), closed: !!bone.closed, fillColor: null, strokeColor: boneCol, strokeWidth: 2 * zs });
-      bone.segments.forEach(function (s) {
+      var renderedSegs = toRenderedSegs(bone.segments);
+      items.push({ segments: roundSegs(renderedSegs), closed: !!bone.closed, fillColor: null, strokeColor: boneCol, strokeWidth: 2 * zs });
+      renderedSegs.forEach(function (s) {
         pushHandles(s.point, s.handleIn || [0, 0], s.handleOut || [0, 0]);
         items.push(circleItem(s.point[0], s.point[1], 3.5 * zs, [255, 255, 255, 255], boneCol, 1.2 * zs));
       });
       if (showInfluence && window.SMRig) {
-        var c = SMRig.boneCircleCenter(bone);
-        var r = SMRig.boneRadiusOf(bone, panelDefault);
-        items.push({ segments: [{ point: [c.x - 4 * zs, c.y] }, { point: [c.x + 4 * zs, c.y] }], closed: false, fillColor: null, strokeColor: influenceCol, strokeWidth: 1.4 * zs });
-        items.push({ segments: [{ point: [c.x, c.y - 4 * zs] }, { point: [c.x, c.y + 4 * zs] }], closed: false, fillColor: null, strokeColor: influenceCol, strokeWidth: 1.4 * zs });
-        items.push(circleItem(c.x, c.y, r, null, influenceCol, 1.6 * zs));
+        var c0 = SMRig.boneCircleCenter(bone);
+        var r0 = SMRig.boneRadiusOf(bone, panelDefault);
+        var c = toRendered(c0.x, c0.y);
+        var r = toRenderedRadius(r0);
+        items.push({ segments: [{ point: [c[0] - 4 * zs, c[1]] }, { point: [c[0] + 4 * zs, c[1]] }], closed: false, fillColor: null, strokeColor: influenceCol, strokeWidth: 1.4 * zs });
+        items.push({ segments: [{ point: [c[0], c[1] - 4 * zs] }, { point: [c[0], c[1] + 4 * zs] }], closed: false, fillColor: null, strokeColor: influenceCol, strokeWidth: 1.4 * zs });
+        items.push(circleItem(c[0], c[1], r, null, influenceCol, 1.6 * zs));
       }
     });
     if (typeof _rigDraw !== 'undefined' && _rigDraw.path) {
       if (rigPreviewWorld) {
-        var last = _rigDraw.path.lastSegment.point;
-        items.push(lineItem([last.x, last.y], rigPreviewWorld, [255, 220, 130, 153], 1 * zs));
+        var lastRaw = _rigDraw.path.lastSegment.point;
+        var lastRendered = toRendered(lastRaw.x, lastRaw.y);
+        items.push(lineItem(lastRendered, rigPreviewWorld, [255, 220, 130, 153], 1 * zs));
       }
-      _rigDraw.path.segments.forEach(function (s) {
-        pushHandles([s.point.x, s.point.y], [s.handleIn.x, s.handleIn.y], [s.handleOut.x, s.handleOut.y]);
-        items.push(circleItem(s.point.x, s.point.y, 3.5 * zs, [255, 255, 255, 255], boneCol, 1.2 * zs));
+      toRenderedSegs(_rigDraw.path.segments.map(function (s) { return { point: [s.point.x, s.point.y], handleIn: [s.handleIn.x, s.handleIn.y], handleOut: [s.handleOut.x, s.handleOut.y] }; })).forEach(function (s) {
+        pushHandles(s.point, s.handleIn, s.handleOut);
+        items.push(circleItem(s.point[0], s.point[1], 3.5 * zs, [255, 255, 255, 255], boneCol, 1.2 * zs));
       });
     }
     return items;
