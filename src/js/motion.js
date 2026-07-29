@@ -4492,6 +4492,33 @@
     if (ld.effects) ld.effects.forEach(function (eff) {
       if (eff && eff.keys) Object.keys(eff.keys).forEach(function (p) { shiftTrack(eff.keys[p]); });
     });
+    // Per-ELEMENT effects (effects-panel.js's effectsTarget, single-shape-
+    // selected case) live on the stroke's own dict (sd.effects), not in any
+    // per-layer aggregate the way ld.elementMotion is — confirmed live this
+    // gap existed: dragging a layer's in/out bar retimed ld.effects and
+    // ld.elementMotion but left a keyed per-element effect's keys at their
+    // original frames, exactly the "retimed in one reader, stale in the
+    // others" shape this function's own header comment warns about, just
+    // missing this one target. desP assigns p.data.effects=d.effects BY
+    // REFERENCE (app.js), so the live selected element's view updates for
+    // free once its underlying stored dict is shifted here — no separate
+    // live-object pass needed. Dedupe by array identity: a held span's
+    // frames all reference the SAME stored dict object (CLAUDE.md §5quater),
+    // so shifting per-frame without this would shift that one shared array
+    // once per held frame that references it, not once.
+    if (ld.frames) {
+      var seenEffArrays = new WeakSet();
+      ld.frames.forEach(function (f) {
+        if (!f || !f.strokes) return;
+        f.strokes.forEach(function (sd) {
+          if (!sd || !sd.effects || seenEffArrays.has(sd.effects)) return;
+          seenEffArrays.add(sd.effects);
+          sd.effects.forEach(function (eff) {
+            if (eff && eff.keys) Object.keys(eff.keys).forEach(function (p) { shiftTrack(eff.keys[p]); });
+          });
+        });
+      });
+    }
     return touched;
   }
   // Right-click alternative to dragging the handle — same rank-0-anchor,
