@@ -30,7 +30,15 @@ function exportBuildFrame(frameIdx,alpha){
     new Path.Rectangle({point:[0,0],size:[state.canvasW,state.canvasH],fillColor:new Color(0,0,0,0),insert:true});
   }
   for(var li=0;li<state.layers.length;li++){
-    var ld=state.layers[li];if(!ld.visible)continue;
+    var ld=state.layers[li];
+    // layerIsEffectivelyVisible (app.js), not a bare .visible check
+    // (2026-07 fix): the live canvas and the primary Rust-engine export
+    // both already resolve solo through that helper — this plain-Paper.js
+    // fallback (used whenever Tauri/the engine isn't available, or at
+    // scale>1) checked only .visible, so soloing a layer restricted what
+    // you SAW but silently let every other merely-visible layer leak into
+    // this export path anyway. Confirmed live.
+    if(!layerIsEffectivelyVisible(li))continue;
     // Track matte SOURCE layer: engine.rs's composite_scene consumes the
     // layer directly above a matted one and never paints it as its own
     // visible content. This path had no idea, so the export GAINED an
@@ -465,7 +473,10 @@ function lottieBuild(start,end){
   }
 
   for(var li=state.layers.length-1;li>=0;li--){
-    var ld=state.layers[li];if(!ld.visible)continue;
+    var ld=state.layers[li];
+    // Same solo-aware fix as exportBuildFrame above — this Lottie exporter
+    // had the identical bare .visible check, same leak.
+    if(!layerIsEffectivelyVisible(li))continue;
     var bm=lottieBmCode(ld.blendMode);
     // per-frame strokes array for this layer across the export range —
     // drops fully-invisible brush-texture anchors (opacity:0 by convention,
