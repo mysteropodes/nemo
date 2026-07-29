@@ -774,7 +774,22 @@ window.SM={
   toggleLayerMotionBlur:function(li){
     var ld=state.layers[li==null?state.activeLayerIdx:li];if(!ld)return;
     pushUndo();ld.motionBlur=!ld.motionBlur;
-    if(ld.motionBlur&&!state.motionBlurOn)showToast('Flou de mouvement activé sur le calque — active aussi l\u2019interrupteur de la comp');
+    // buildSceneJson's mbOn gate (engine-bridge.js) is
+    // state.motionBlurOn && ld.motionBlur — the toast below has always
+    // claimed enabling a layer's own flag turns the comp switch on too,
+    // but nothing ever actually flipped state.motionBlurOn: the layer
+    // flag flipped, the toast said the comp switch was on too, and
+    // #btn-mblur stayed visually off — motion blur silently never
+    // rendered until the user found and clicked that separate button.
+    // Confirmed live (2026-07). Made the toast true instead of walking it
+    // back, matching REAL_FEATURES.symmetry/perspective's own "flip the
+    // companion switch + resync its button" precedent (labs-float-panel.js).
+    var needsCompOn=ld.motionBlur&&!state.motionBlurOn;
+    if(needsCompOn){
+      state.motionBlurOn=true;
+      var mbBtn=document.getElementById('btn-mblur');if(mbBtn)mbBtn.classList.add('active');
+    }
+    if(needsCompOn)showToast('Flou de mouvement activé sur le calque — active aussi l\u2019interrupteur de la comp');
     else showToast(ld.motionBlur?'Flou de mouvement activé':'Flou de mouvement désactivé');
     renderLayerList();renderTimeline();
     if(window.SMEngineBridge)SMEngineBridge.renderNow();
@@ -795,7 +810,17 @@ window.SM={
   toggleLayerShy:function(li){
     var ld=state.layers[li==null?state.activeLayerIdx:li];if(!ld)return;
     pushUndo();ld.shy=!ld.shy;
-    if(ld.shy&&!state.shyEnabled)showToast('Calque marqué « shy » — active l\u2019interrupteur pour le masquer');
+    // Same over-promising-toast bug as toggleLayerMotionBlur just above
+    // (2026-07 fix, same session): claimed marking a layer shy "active
+    // l'interrupteur pour le masquer" but never actually flipped
+    // state.shyEnabled — #btn-shy stayed off and shy layers stayed
+    // visible until the user separately found and clicked that button.
+    var needsShyOn=ld.shy&&!state.shyEnabled;
+    if(needsShyOn){
+      state.shyEnabled=true;
+      var shyBtn=document.getElementById('btn-shy');if(shyBtn)shyBtn.classList.add('active');
+    }
+    if(needsShyOn)showToast('Calque marqué « shy » — active l\u2019interrupteur pour le masquer');
     renderLayerList();renderTimeline();
   },
   toggleShyMode:function(){
