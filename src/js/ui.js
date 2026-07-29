@@ -49,6 +49,19 @@
   // step instead of an ease once read as on-curve waypoints.
   var MOTION_DEFAULT_CURVE=[{x:0,y:0},{x:.25,y:.156},{x:.5,y:.5},{x:.75,y:.844},{x:1,y:1}];
   function motionCurve(){return motionEaseSeg.curvePoints||(motionEaseSeg.curvePoints=clonePts(MOTION_DEFAULT_CURVE));}
+  // Tween-pair points-based ease mode (2026-07 fix — "le easing s'applique à
+  // tous les tween du calque au lieu de juste celui entre les 2 clés"). Root
+  // cause: clicking a tween cell opened this widget in its DEFAULT mode
+  // (editing cs.points, the GLOBAL fallback every pair without its own
+  // state.tweenEasing entry shares), so a drag here visibly reshaped every
+  // OTHER tween that had never been given its own override — indistinguishable
+  // from "one shared curve" since almost no pair gets an explicit override
+  // otherwise. `seg` is the SAME state.tweenEasing[li+':'+fA+'-'+fB] object
+  // timeline.js's buildTweenCurveSVG (inline strips + floating inset) already
+  // reads/writes, so all three editing surfaces stay in agreement.
+  var tweenEaseSeg=null,tweenEaseLabel='',tweenEaseOnChange=null;
+  function isTweenMode(){return !!tweenEaseSeg;}
+  function tweenCurve(){return(tweenEaseSeg.points&&tweenEaseSeg.points.length)?tweenEaseSeg.points:(tweenEaseSeg.points=clonePts(cs.points));}
   // Brush pressure-response curve (2026-07 — audit gap "aucun éditeur de
   // courbe de pression dédié"): same on-curve-waypoint model as the other
   // two modes, but global (one curve, not per-segment/per-key) and stored
@@ -75,8 +88,8 @@
   // independently of whatever this singleton widget happens to be
   // showing, which this widget's one-curve-at-a-time model can't do. Only
   // evalPointsCurve below is shared between the two.)
-  function activePoints(){return isMotionMode()?motionCurve():(isPressureMode()?pressureCurve():cs.points);}
-  function setActivePoints(pts){if(isMotionMode())motionEaseSeg.curvePoints=pts;else if(isPressureMode())state.pressureCurvePoints=pts;else cs.points=pts;}
+  function activePoints(){return isMotionMode()?motionCurve():(isTweenMode()?tweenCurve():(isPressureMode()?pressureCurve():cs.points));}
+  function setActivePoints(pts){if(isMotionMode())motionEaseSeg.curvePoints=pts;else if(isTweenMode())tweenEaseSeg.points=pts;else if(isPressureMode())state.pressureCurvePoints=pts;else cs.points=pts;}
   // A small easing gallery (After Effects/GreenSock-style grid of named
   // curve families, each in/out/inout where that makes sense) — through-
   // point approximations of their usual off-curve-handle shapes, since the
@@ -257,7 +270,7 @@
     // global evalCurve/cs.points), everything else about the rendering is
     // shared with the tween's own curve view.
     ctx.strokeStyle='#4a9eff';ctx.lineWidth=2.5;ctx.beginPath();
-    var evalFn=(isMotionMode()||isPressureMode())?function(x){return evalPointsCurve(pts,x);}:evalCurve;
+    var evalFn=(isMotionMode()||isTweenMode()||isPressureMode())?function(x){return evalPointsCurve(pts,x);}:evalCurve;
     ctx.moveTo(tX(0),tY(evalFn(0),yr));
     var N=100;for(var s=1;s<=N;s++){var xx=s/N;ctx.lineTo(tX(xx),tY(evalFn(xx),yr));}
     ctx.stroke();
@@ -294,7 +307,7 @@
       });
     }
     var coordsEl=document.getElementById('curve-coords');
-    if(coordsEl)coordsEl.textContent=isMotionMode()?motionEaseLabel:(pts.length+' '+SM.t('curvePointsSuffix'));
+    if(coordsEl)coordsEl.textContent=isMotionMode()?motionEaseLabel:(isTweenMode()?tweenEaseLabel:(pts.length+' '+SM.t('curvePointsSuffix')));
   }
   function drawH(nx,ny,c,yr,r){ctx.beginPath();ctx.arc(tX(nx),tY(ny,yr),r,0,Math.PI*2);ctx.fillStyle=c;ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.stroke();}
   function hitT(mx,my){
@@ -311,6 +324,12 @@
   // onEaseSegChanged hook (if present) picks up the repaint instead.
   function pushCurve(){
     if(isMotionMode()){if(window.SMMotion&&window.SMMotion.onEaseSegChanged)window.SMMotion.onEaseSegChanged();return;}
+    // Tween-pair mode: state.tweenEasing[key] is already mutated in place
+    // (setActivePoints/dragging write straight into tweenEaseSeg.points) —
+    // but unlike Motion (evaluated live every frame) a tween's frames are
+    // BAKED, so the caller's onChange callback (set by editTweenPair, see
+    // timeline.js's call site) must re-run generateTweens for this pair.
+    if(isTweenMode()){if(tweenEaseOnChange)tweenEaseOnChange();return;}
     // Pressure mode: state.pressureCurvePoints is already mutated in place
     // (setActivePoints/dragging write straight into it) — nothing else to
     // persist, applyPressureCurve (tools.js) reads it live on every stroke
@@ -545,7 +564,7 @@
     // Clears motion mode too — only one "currently edited segment" at a
     // time on this one shared canvas.
     editCameraSeg:function(seg,label){
-      motionEaseSeg=null;pressureEaseActive=false;
+      motionEaseSeg=null;tweenEaseSeg=null;pressureEaseActive=false;
       camEaseSeg=seg;camEaseLabel=label||'';
       if(window.openPropsSection)window.openPropsSection('easing-sec');
       draw();
@@ -559,7 +578,7 @@
     // lazily created/mutated in place, same live-reference contract
     // editCameraSeg already has for `.ease`).
     editMotionSeg:function(seg,label){
-      camEaseSeg=null;pressureEaseActive=false;
+      camEaseSeg=null;tweenEaseSeg=null;pressureEaseActive=false;
       motionEaseSeg=seg;motionEaseLabel=label||'';
       selected=null;
       if(window.openPropsSection)window.openPropsSection('easing-sec');
@@ -569,11 +588,27 @@
       if(!motionEaseSeg)return;
       motionEaseSeg=null;draw();
     },
+    // Tween-pair points-based ease editing (2026-07 fix) — see tweenEaseSeg
+    // above. `seg` is state.tweenEasing[li+':'+fA+'-'+fB] itself; `onChange`
+    // is called after every commit (drag-end, add/delete point, preset
+    // click — anything that already calls pushCurve()) so the caller can
+    // re-bake this pair's frames (timeline.js's onTweenPairCurveChanged).
+    editTweenPair:function(seg,label,onChange){
+      camEaseSeg=null;motionEaseSeg=null;pressureEaseActive=false;
+      tweenEaseSeg=seg;tweenEaseLabel=label||'';tweenEaseOnChange=onChange||null;
+      selected=null;
+      if(window.openPropsSection)window.openPropsSection('easing-sec');
+      draw();
+    },
+    exitTweenPair:function(){
+      if(!tweenEaseSeg)return;
+      tweenEaseSeg=null;tweenEaseOnChange=null;draw();
+    },
     // Pressure-curve editing (2026-07, audit gap "aucun éditeur de courbe
     // de pression dédié") — see pressureEaseActive/pressureCurve above.
     // Global, no `seg`/label param needed (there's only ever one).
     editPressureCurve:function(){
-      camEaseSeg=null;motionEaseSeg=null;
+      camEaseSeg=null;motionEaseSeg=null;tweenEaseSeg=null;
       pressureEaseActive=true;selected=null;
       if(window.openPropsSection)window.openPropsSection('easing-sec');
       draw();
@@ -584,6 +619,7 @@
     },
     isCameraMode:isCamMode,
     isMotionMode:isMotionMode,
+    isTweenMode:isTweenMode,
     isPressureMode:isPressureMode
   };
   // Pure function of an explicit points array (no closure state touched) —

@@ -2907,9 +2907,9 @@ function openTweenCurveInset(li,fA,fB){
   setTimeout(function(){document.addEventListener('pointerdown',outsideHandler,true);},0);
   _tweenCurveInset={el:box,outsideHandler:outsideHandler};
 }
-// Shared by the inset above and (indirectly, same data) the main widget's
-// tween-seg mode — regenerate just this span and refresh every display
-// that could be showing it (strips, onion, arcs).
+// Shared by the inset above and the main widget's tween-pair mode (see
+// editTweenSegForCell) — regenerate just this span and refresh every
+// display that could be showing it (strips, onion, arcs).
 function onTweenPairCurveChanged(li,fA){
   selClear();selAdd(li,fA);
   generateTweens();
@@ -2917,6 +2917,30 @@ function onTweenPairCurveChanged(li,fA){
   if(state.activeLayerIdx===li)renderOS();
   updateUI();
   renderTweenCurveStrips();
+}
+// Which keyframe pair (of layer li's own keyframe list) frame `fi` falls
+// inside — same lookup used by both the frame-grid click handler and its
+// context menu, kept as one function so they can't disagree about which
+// span a given cell belongs to.
+function tweenPairForCell(li,fi){
+  var keys=layerKeyframeList(li);
+  for(var i=0;i<keys.length-1;i++){if(fi>=keys[i]&&fi<=keys[i+1])return{a:keys[i],b:keys[i+1]};}
+  return null;
+}
+// Puts the shared Easing Curve widget (ui.js's #curve-canvas) into
+// tween-pair mode scoped to whichever span this cell belongs to, instead
+// of leaving it on the global default curve every span without its own
+// override shares (the actual bug this whole helper exists to close — see
+// this function's call site). No-op (falls back to exitTweenPair via the
+// caller) when the cell isn't inside a tween span.
+function editTweenSegForCell(li,fi,fr0){
+  openPropsSection('tween-sec');openPropsSection('easing-sec');
+  var pair=tweenPairForCell(li,fi);
+  if(!pair||!window._curveEditor||!window._curveEditor.editTweenPair)return;
+  var key=li+':'+pair.a+'-'+pair.b;
+  if(!state.tweenEasing)state.tweenEasing={};
+  var seg=state.tweenEasing[key]=state.tweenEasing[key]||{};
+  window._curveEditor.editTweenPair(seg,'Tween '+(pair.a+1)+' → '+(pair.b+1),function(){onTweenPairCurveChanged(li,pair.a);});
 }
 // Builds one row's worth of frame cells for layer `li` into `rowEl` — shared
 // by the normal per-layer row and a collapsed folder's representative row
@@ -3359,7 +3383,13 @@ document.getElementById('frame-grid').addEventListener('mousedown',function(e){
     // Easing Curve sections on the right — those are exactly the two panels
     // relevant to an inbetween frame, and they previously stayed collapsed
     // (or whatever section the user last had open) until manually expanded.
-    if(fr0&&fr0.isInterpolated){openPropsSection('tween-sec');openPropsSection('easing-sec');}
+    // 2026-07 fix ("le easing s'applique à tous les tween du calque"): also
+    // put the Easing Curve widget into tween-pair mode (editTweenSegForCell)
+    // scoped to THIS span, instead of leaving it on its default global
+    // curve — which every OTHER span without its own override shares, so
+    // editing it here used to visibly reshape every tween on the project.
+    if(fr0&&fr0.isInterpolated)editTweenSegForCell(li,fi,fr0);
+    else if(window._curveEditor)window._curveEditor.exitTweenPair();
   }
 
   // Relocating a SINGLE keyframe that has its own outpoint (a bordering
@@ -3416,8 +3446,7 @@ document.getElementById('frame-grid').addEventListener('contextmenu',function(e)
   // that pair's easing curve (openTweenCurveInset) — same idea as the
   // tween-curve-strip's own click-to-edit, reachable even with
   // state.showTweenCurves off.
-  var twKeys=layerKeyframeList(li),twPair=null;
-  for(var tki=0;tki<twKeys.length-1;tki++){if(fi>=twKeys[tki]&&fi<=twKeys[tki+1]){twPair={a:twKeys[tki],b:twKeys[tki+1]};break;}}
+  var twPair=tweenPairForCell(li,fi);
   var twMenuItems=twPair?[{label:'Éditer la courbe de ce tween…',action:function(){openTweenCurveInset(li,twPair.a,twPair.b);}},{sep:true}]:[];
   window.showContextMenu(e.clientX,e.clientY,twMenuItems.concat([
     {label:'Copier',shortcut:'⌘C',action:function(){window.SM.copyFrames();}},
