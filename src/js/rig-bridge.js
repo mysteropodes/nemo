@@ -120,6 +120,20 @@ var _rigDraw = { path: null, boneId: null, ld: null, draggingHandle: false, last
     if (mode === 'move') {
       var anchorHit = hitBoneAnchor(pt);
       if (anchorHit) {
+        // Undo checkpoint (2026-07-29 fix, QA-confirmed: undo after a pose-
+        // drag + Commit left the bone's OWN segments still posed while the
+        // shape reverted to unposed — a visible mismatch between the rig
+        // overlay and the actual geometry). This mode was the only one of
+        // the three missing a pushUndo before its own mutation (Assigner's
+        // radius-drag already has one a few lines up; Tracer's new-bone-
+        // start already has one below). Placed here, at drag START, not in
+        // rigCommitFrame (app.js) — by the time Commit runs, bone.segments
+        // has ALREADY been live-mutated by this drag, so a checkpoint taken
+        // there captures that already-posed rig paired with the frame's
+        // still-unbaked (pre-Commit) strokes: an internally inconsistent
+        // snapshot. _rigPoseUndoPushed (below) tells rigCommitFrame this
+        // checkpoint already exists so it doesn't ALSO push its own bad one.
+        pushUndo();
         _posing = { ld: ld, boneId: anchorHit.boneId, vi: anchorHit.vi };
         // Marks the pose as live-but-uncommitted for saveActiveLayerFrame/
         // saveAllLayerFrames (app.js) — cleared only by rigCommitFrame/
@@ -127,6 +141,7 @@ var _rigDraw = { path: null, boneId: null, ld: null, draggingHandle: false, last
         // sit live far longer than one drag gesture (see those functions'
         // own comment for why this matters: the periodic autosave timer).
         ld._rigPoseLive = true;
+        ld._rigPoseUndoPushed = true;
         window.SMEngineBridge.suspend();
       }
       return;

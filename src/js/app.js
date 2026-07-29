@@ -1476,7 +1476,15 @@ function rigResetPose(ld){
 function rigCommitFrame(ld){
   if(!ld.rig||!ld.rig.binds.length){showToast('Aucun trait riggé');return false;}
   if(!canEditActiveLayer())return false;
-  pushUndo();
+  // Skip when a pose-drag already pushed its own checkpoint (rig-bridge.js,
+  // 2026-07-29 fix) — by NOW, bone.segments has already been live-mutated
+  // by that drag, so a checkpoint taken here would pair that already-posed
+  // rig with the frame's still-unbaked (pre-Commit) strokes: an internally
+  // inconsistent snapshot that made undo revert the shape but leave the
+  // bone visually still posed. Still pushed here for the rarer case of
+  // Commit being clicked with no preceding drag this session.
+  if(!ld._rigPoseUndoPushed)pushUndo();
+  ld._rigPoseUndoPushed=false;
   ensureKeyframe();
   relinkRigBinds(ld,userLayers[state.activeLayerIdx]);
   applyRigDeform(ld);
