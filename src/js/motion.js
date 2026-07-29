@@ -4810,6 +4810,10 @@
       var r = mm.rot * Math.PI / 180, c = Math.cos(r), s = Math.sin(r);
       return {
         mat: mm,
+        // Exposed (2026-07-29) so a caller can feed transformSegments
+        // directly (pivot + mat) instead of re-deriving px/py itself —
+        // engine-bridge.js's buildRigPreviewItems is the first consumer.
+        pivot: new Point(px, py),
         fwd: function (x, y) {
           var lx = (x - px) * mm.sx, ly = (y - py) * mm.sy;
           return [px + lx * c - ly * s + mm.dx, py + lx * s + ly * c + mm.dy];
