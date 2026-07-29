@@ -190,6 +190,19 @@ export function auto_match(strokes_a_json: string, strokes_b_json: string): stri
 export function boolean_op(op: string, a_json: string, b_json: string): string;
 
 /**
+ * Same operations as `boolean_op`, but `a_json` is a JSON array of polygons
+ * (a MultiPolygon) instead of a single one. Needed to fold a 3rd+ operand
+ * into an already-disjoint multi-piece accumulator: `boolean_op` can only
+ * take a single polygon per side, so a naive JS-side fold that collapses
+ * the accumulator to "the single largest piece" between folds silently
+ * drops every other disjoint piece already accumulated (e.g. uniting 3
+ * mutually non-overlapping shapes loses the middle one). geo_booleanop's
+ * BooleanOp trait already implements MultiPolygon-vs-Polygon natively
+ * (boolean/mod.rs) — this just exposes that instead of reinventing it.
+ */
+export function boolean_op_multi(op: string, a_json: string, b_json: string): string;
+
+/**
  * Async because WebGPU adapter/device negotiation is inherently async —
  * JS must `await` this once, then reuse the returned handle every frame.
  * Sets up wgpu manually (rather than via vello::util::RenderContext) so we
@@ -299,20 +312,21 @@ export interface InitOutput {
     readonly auto_match: (a: number, b: number, c: number, d: number) => [number, number, number, number];
     readonly resample_stroke: (a: number, b: number, c: number) => [number, number, number, number];
     readonly fill_find: (a: number, b: number) => [number, number, number, number];
-    readonly __wbg_strokemodeler_free: (a: number, b: number) => void;
+    readonly interp_stroke: (a: number, b: number) => [number, number, number, number];
+    readonly boolean_op: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
+    readonly boolean_op_multi: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
     readonly effective_frame_index: (a: number, b: number, c: number) => [number, number, number];
+    readonly hit_test: (a: number, b: number, c: number, d: number, e: number) => [number, number, number, number];
+    readonly resolve_symbol_frame: (a: number, b: number, c: number) => [number, number, number];
+    readonly __wbg_strokemodeler_free: (a: number, b: number) => void;
     readonly ellipse_segments: (a: number, b: number, c: number, d: number) => [number, number];
+    readonly erase_at_point: (a: number, b: number) => [number, number, number, number];
     readonly line_segments: (a: number, b: number, c: number, d: number) => [number, number];
     readonly rect_segments: (a: number, b: number, c: number, d: number) => [number, number];
-    readonly resolve_symbol_frame: (a: number, b: number, c: number) => [number, number, number];
     readonly strokemodeler_down: (a: number, b: number, c: number, d: number, e: number) => [number, number];
     readonly strokemodeler_move: (a: number, b: number, c: number, d: number, e: number) => [number, number];
     readonly strokemodeler_new: (a: number, b: number) => number;
     readonly strokemodeler_up: (a: number, b: number, c: number, d: number, e: number) => [number, number];
-    readonly interp_stroke: (a: number, b: number) => [number, number, number, number];
-    readonly boolean_op: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
-    readonly erase_at_point: (a: number, b: number) => [number, number, number, number];
-    readonly hit_test: (a: number, b: number, c: number, d: number, e: number) => [number, number, number, number];
     readonly wasm_bindgen__convert__closures_____invoke__h4177160f1dac6248: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen__convert__closures_____invoke__h49909fab4bc066b4: (a: number, b: number, c: any, d: any) => void;
     readonly wasm_bindgen__convert__closures_____invoke__h29bfc5eda1199406: (a: number, b: number, c: any) => void;

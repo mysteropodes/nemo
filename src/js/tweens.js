@@ -4131,8 +4131,23 @@ function renderGhostAll(){
     var fr=ld.frames[fi];if(!fr.isKeyframe||!fr.strokes.length)continue;
     var dist=Math.abs(fi-cf);
     var op=Math.max(.12,.4-dist*.03);
-    fr.strokes.forEach(function(sd){
+    // Combine-groups (2026-07-29 fix, QA-confirmed): unlike buildSceneJson's
+    // live render (renderCombinesFromChildren), this reads the frame's raw
+    // stored dicts directly — a subtract/intersect/exclude group ghosted
+    // undivided showed every raw member instead of the merged result the
+    // live frame actually displays. Dict-based twin of that same adapter;
+    // pass-through (same array reference) when this layer has no groups.
+    var ghostStrokes=fr.strokes;
+    if(window.SMGroup&&ld.groups)ghostStrokes=SMGroup.applyCombinesToStrokes(ghostStrokes,ld);
+    ghostStrokes.forEach(function(sd){
       if(sd.isRaster)return;
+      // A combine-group member suppressed by applyCombinesToStrokes just
+      // above (null fill AND stroke, hasRealStroke:false) draws nothing in
+      // the real frame — Ghost All forces a uniform purple outline onto
+      // EVERY dict below regardless of paint, so without this it drew a
+      // stray outline for a shape that's actually invisible (the merged
+      // combine result already contributes its own, correct outline).
+      if(!sd.fillColor&&!sd.strokeColor)return;
       var p=desP(sd,ghostAllLayer,op);
       p.strokeColor=new Color(.68,.6,1,op*1.6);
       p.fillColor=null;
@@ -4161,6 +4176,7 @@ function renderOS(){
   renderGhostAll();
   onionPrevLayer.removeChildren();onionNextLayer.removeChildren();
   if(!state.onionSkin)return;var li=state.activeLayerIdx;var cf=state.currentFrame;
+  var osLd=state.layers[li];
   // isRaster entries (imported image/video frames) go through desR, not
   // desP — a Raster has no fillColor/strokeColor, so tinted/outline modes
   // (which recolor the stroke) fall back to a plain opacity fade for it,
@@ -4221,8 +4237,8 @@ function renderOS(){
   // isBrushTextureCopy/brushTexturePreset return above, so anything
   // reaching this line with a fillColor and no real stroke is a genuine
   // plain fill shape, not a texture-camouflaged one.
-  for(var fi=cf-1;fi>=state.onionIn&&fi>=0;fi--){var strokes=getEffectiveStrokes(li,fi);if(!strokes.length)continue;var dist=cf-fi;var op=(state.onionPrevOpacity/100)*Math.max(.15,1-(dist/prevRangeSpan)*.85);strokes.forEach(function(sd){if(sd.isBrushTextureCopy||sd.brushTexturePreset)return;if(sd.isRaster){var pr=desR(sd,onionPrevLayer);pr.opacity=op;return;}var p=desP(sd,onionPrevLayer,op);var canTint=sd.hasRealStroke||sd.fillColor;if(state.onionMode==='tinted'&&canTint)p.strokeColor=new Color(1,.3,.3,op);else if(state.onionMode==='outline'&&canTint){p.fillColor=null;p.strokeColor=new Color(1,.3,.3,op*.8);p.strokeWidth=1;}else p.opacity=op;});}
-  for(var fi2=cf+1;fi2<=state.onionOut&&fi2<state.totalFrames;fi2++){var strokes2=getEffectiveStrokes(li,fi2);if(!strokes2.length)continue;var dist2=fi2-cf;var op2=(state.onionNextOpacity/100)*Math.max(.15,1-(dist2/nextRangeSpan)*.85);strokes2.forEach(function(sd){if(sd.isBrushTextureCopy||sd.brushTexturePreset)return;if(sd.isRaster){var nr=desR(sd,onionNextLayer);nr.opacity=op2;return;}var p=desP(sd,onionNextLayer,op2);var canTint2=sd.hasRealStroke||sd.fillColor;if(state.onionMode==='tinted'&&canTint2)p.strokeColor=new Color(.3,.55,1,op2);else if(state.onionMode==='outline'&&canTint2){p.fillColor=null;p.strokeColor=new Color(.3,.55,1,op2*.8);p.strokeWidth=1;}else p.opacity=op2;});}
+  for(var fi=cf-1;fi>=state.onionIn&&fi>=0;fi--){var strokes=getEffectiveStrokes(li,fi);if(!strokes.length)continue;if(window.SMGroup&&osLd&&osLd.groups)strokes=SMGroup.applyCombinesToStrokes(strokes,osLd);var dist=cf-fi;var op=(state.onionPrevOpacity/100)*Math.max(.15,1-(dist/prevRangeSpan)*.85);strokes.forEach(function(sd){if(sd.isBrushTextureCopy||sd.brushTexturePreset)return;if(sd.isRaster){var pr=desR(sd,onionPrevLayer);pr.opacity=op;return;}var p=desP(sd,onionPrevLayer,op);var canTint=sd.hasRealStroke||sd.fillColor;if(state.onionMode==='tinted'&&canTint)p.strokeColor=new Color(1,.3,.3,op);else if(state.onionMode==='outline'&&canTint){p.fillColor=null;p.strokeColor=new Color(1,.3,.3,op*.8);p.strokeWidth=1;}else p.opacity=op;});}
+  for(var fi2=cf+1;fi2<=state.onionOut&&fi2<state.totalFrames;fi2++){var strokes2=getEffectiveStrokes(li,fi2);if(!strokes2.length)continue;if(window.SMGroup&&osLd&&osLd.groups)strokes2=SMGroup.applyCombinesToStrokes(strokes2,osLd);var dist2=fi2-cf;var op2=(state.onionNextOpacity/100)*Math.max(.15,1-(dist2/nextRangeSpan)*.85);strokes2.forEach(function(sd){if(sd.isBrushTextureCopy||sd.brushTexturePreset)return;if(sd.isRaster){var nr=desR(sd,onionNextLayer);nr.opacity=op2;return;}var p=desP(sd,onionNextLayer,op2);var canTint2=sd.hasRealStroke||sd.fillColor;if(state.onionMode==='tinted'&&canTint2)p.strokeColor=new Color(.3,.55,1,op2);else if(state.onionMode==='outline'&&canTint2){p.fillColor=null;p.strokeColor=new Color(.3,.55,1,op2*.8);p.strokeWidth=1;}else p.opacity=op2;});}
   userLayers[state.activeLayerIdx].activate();
 }
 

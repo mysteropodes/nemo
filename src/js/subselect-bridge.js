@@ -35,6 +35,31 @@
   function shouldIntercept() {
     return window.SMEngineBridge && window.SMEngineBridge.isEnabled() && state.tool === 'subselect' && !state.playing;
   }
+  // 2026-07-29 fix ("les poignées se dessinent hors de la forme sur un
+  // Component déplacé/tourné en Motion"): a layer's Motion Position/
+  // Rotation/Scale is, by design, applied ONLY at render time (engine-
+  // bridge.js's buildSceneJson composes it into a pathTransform matrix —
+  // see motion.js's computeMotionMat/layerMotionAt header comment) and is
+  // NEVER baked into the Paper.js document's own segments. select-bridge.js
+  // already accounts for this on every hit-test (SMMotion.layerMotionPointMap,
+  // .inv to map a click's rendered/world point back into the raw geometry
+  // space `layer.hitTest`/path.segments actually live in) — this file never
+  // did, so every hit-test/drag here silently operated in the WRONG space
+  // the instant the active layer had a non-identity Motion transform (in
+  // practice: any Component instance moved/rotated/scaled via Motion,
+  // per CLAUDE.md §8's auto-conversion rule). Mapping the pointer into
+  // local/document space ONCE, right here, keeps every downstream line in
+  // this file (hit-testing nodeHandles[].pos, layer.hitTest, the node
+  // marquee's containment test, drag delta math) consistently in the SAME
+  // space path.segments/nodeEditSegmentsData already use — no other line
+  // needs to change.
+  function toLocalPoint(pt, layerIdx) {
+    if (!window.SMMotion || !SMMotion.layerMotionPointMap) return pt;
+    var map = SMMotion.layerMotionPointMap(layerIdx);
+    if (!map) return pt;
+    var lp = map.inv(pt.x, pt.y);
+    return new Point(lp[0], lp[1]);
+  }
 
   // Illustrator/Figma "Convert Anchor Point" convention, ported to a plain
   // Alt+click (no drag) instead of a dedicated tool: a point WITH tangent
@@ -87,7 +112,7 @@
     e.stopImmediatePropagation();
     e.preventDefault();
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
-    var pt = new Point(w[0], w[1]);
+    var pt = toLocalPoint(new Point(w[0], w[1]), state.activeLayerIdx);
     lastPt = pt;
     _downClientX = e.clientX; _downClientY = e.clientY; _downAlt = e.altKey;
     window.SMEngineBridge.suspend();
@@ -211,7 +236,7 @@
     e.stopImmediatePropagation();
     e.preventDefault();
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
-    var pt = new Point(w[0], w[1]);
+    var pt = toLocalPoint(new Point(w[0], w[1]), state.activeLayerIdx);
     var delta = pt.subtract(lastPt);
     if (_nodeDrag.active && (_nodeDrag.type === 'point' || _nodeDrag.type === 'group')) {
       var desired = pt.subtract(_nodeDrag.dragStartPointer || lastPt);

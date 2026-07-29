@@ -95,3 +95,34 @@ pub fn boolean_op(op: &str, a_json: &str, b_json: &str) -> Result<String, JsValu
     let out = from_multipolygon(&result);
     serde_json::to_string(&out).map_err(|e| JsValue::from_str(&e.to_string()))
 }
+
+/// Same operations as `boolean_op`, but `a_json` is a JSON array of polygons
+/// (a MultiPolygon) instead of a single one. Needed to fold a 3rd+ operand
+/// into an already-disjoint multi-piece accumulator: `boolean_op` can only
+/// take a single polygon per side, so a naive JS-side fold that collapses
+/// the accumulator to "the single largest piece" between folds silently
+/// drops every other disjoint piece already accumulated (e.g. uniting 3
+/// mutually non-overlapping shapes loses the middle one). geo_booleanop's
+/// BooleanOp trait already implements MultiPolygon-vs-Polygon natively
+/// (boolean/mod.rs) — this just exposes that instead of reinventing it.
+#[wasm_bindgen]
+pub fn boolean_op_multi(op: &str, a_json: &str, b_json: &str) -> Result<String, JsValue> {
+    let a: Vec<PolygonIn> =
+        serde_json::from_str(a_json).map_err(|e| JsValue::from_str(&e.to_string()))?;
+    let b: PolygonIn =
+        serde_json::from_str(b_json).map_err(|e| JsValue::from_str(&e.to_string()))?;
+    let multi_a = MultiPolygon(a.iter().map(to_polygon).collect());
+    let poly_b = to_polygon(&b);
+
+    let operation = match op {
+        "unite" => Operation::Union,
+        "subtract" => Operation::Difference,
+        "intersect" => Operation::Intersection,
+        "exclude" => Operation::Xor,
+        other => return Err(JsValue::from_str(&format!("unknown boolean op: {}", other))),
+    };
+
+    let result = multi_a.boolean(&poly_b, operation);
+    let out = from_multipolygon(&result);
+    serde_json::to_string(&out).map_err(|e| JsValue::from_str(&e.to_string()))
+}

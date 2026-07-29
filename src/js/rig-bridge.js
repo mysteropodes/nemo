@@ -1,34 +1,38 @@
-// ---- Rig tool (2026-07-29) — bone-path drawing + pose dragging ----
-// Same capture-phase-interception architecture as pen-bridge.js, which this
-// file mirrors closely for the DRAWING half (click=corner anchor,
-// click-drag=smooth anchor with symmetric tangent handles, double-click or
-// click-near-first-anchor finishes the bone). Two departures from pen-bridge:
+// ---- Rig tool (2026-07-29) — 3-step: Tracer / Assigner / Déplacer ----
+// Redesigned per Cyril's own spec after the first (2-mode) attempt was still
+// unclear: "il faut faire plus simple: un bouton icon pour dessiner les
+// bones, un bouton d'assignation qui assigne automatiquement les éléments du
+// layer sélectionné aux bones comme dans Shapper par rapport à la proximité,
+// et après un autre bouton pour déplacer les bones. 3 étapes distinctes. Et
+// dans l'assignement automatique tu as les box d'influences comme dans
+// Shapper sur les vecteurs que tu peux modifier si l'assignement automatique
+// ne fonctionne pas." state.rigSubMode is 'draw' | 'assign' | 'move' — a
+// click NEVER means two different things depending on hidden state; which of
+// the three it means is a single explicit panel button (timeline.js), not a
+// side-effect of what's under the cursor.
 //
-// 1. Unified interaction — a single onDown hit-tests every EXISTING bone
-//    anchor across the active layer's rig FIRST; a hit starts a POSE drag
-//    (moves that anchor, live-deforms every bound shape via
-//    app.js's applyRigDeform) instead of drawing. Only a miss falls through
-//    to the Pen-style draw-a-new-bone logic below. This is what lets the
-//    same tool serve both "build the skeleton" and "puppet it" without a
-//    separate mode switch.
-// 2. A finished bone is NEVER inserted into the real Paper layer — it would
-//    otherwise become ordinary artwork geometry (visible, exported, hit-
-//    tested by every other tool, saved by saveActiveLayerFrame — exactly
-//    CLAUDE.md §1's family of bug). `_rigDraw.path` is a live Paper Path
-//    used only for its own segment/handle math while being drawn (built
-//    with {insert:false}, matching every other "insert:false by
-//    convention" builder in this codebase); at finalize time its segments
-//    are copied into ld.rig.bones[id] (plain JSON) and the Paper object is
-//    discarded.
+// Same capture-phase-interception architecture as pen-bridge.js for the
+// DRAWING mode (click=corner anchor, click-drag=smooth anchor with symmetric
+// tangent handles, double-click/Enter/click-near-first-anchor finishes the
+// bone). A finished bone is NEVER inserted into the real Paper layer — it
+// would otherwise become ordinary artwork geometry (visible, exported, hit-
+// tested by every other tool, saved by saveActiveLayerFrame — exactly
+// CLAUDE.md §1's family of bug). `_rigDraw.path` is a live Paper Path used
+// only for its own segment/handle math while being drawn (built with
+// {insert:false}, matching every other "insert:false by convention" builder
+// in this codebase); at finalize time its segments are copied into
+// ld.rig.bones[id] (plain JSON) and the Paper object is discarded.
+//
 // Bare global (not inside the IIFE below), exactly mirroring tools.js's own
 // `_pen` — engine-bridge.js's buildRigPreviewItems reads `_rigDraw.path`
 // directly (via `typeof _rigDraw !== 'undefined'`) to render the in-progress
 // bone WHILE it's being drawn, before finalizeRigBone() copies it into
 // ld.rig.bones (plain JSON) and discards this live Paper Path.
-var _rigDraw = { path: null, boneId: null, draggingHandle: false, lastClickTime: 0, lastClickPt: null };
+var _rigDraw = { path: null, boneId: null, ld: null, draggingHandle: false, lastClickTime: 0, lastClickPt: null };
 
 (function () {
-  var _posing = null; // {ld, boneId, vi} while dragging an existing bone anchor
+  var _posing = null; // {ld, boneId, vi} while dragging an existing bone anchor (Déplacer mode)
+  var _radiusDrag = null; // {ld, boneId} while dragging an influence circle's edge (Assigner mode)
 
   function shouldIntercept() {
     return (
@@ -56,6 +60,37 @@ var _rigDraw = { path: null, boneId: null, draggingHandle: false, lastClickTime:
     return best;
   }
 
+  // A bone's influence-circle CENTER (Assigner mode) — the geometric center
+  // of its own bounding box, a stable, easy-to-reason-about point that
+  // doesn't depend on which end of the bone was drawn first.
+  function boneCircleCenter(bone) {
+    var bp = _boneSegsToPath(bone.segments, bone.closed);
+    var c = bp.bounds.center;
+    bp.remove();
+    return new Point(c.x, c.y);
+  }
+  function boneRadiusOf(bone, defaultRadius) { return bone.radius || defaultRadius; }
+  function panelDefaultRadius() { return parseFloat((document.getElementById('rig-weight-radius') || {}).value) || 200; }
+  function panelRotate() { return !!(document.getElementById('rig-rotate-mode') || {}).checked; }
+
+  // Influence-circle EDGE hit-test (Shapper-style, Assigner mode) — the
+  // handle you grab to resize a bone's own falloff radius. Tolerance is
+  // generous (10/zoom) since it's a thin ring, not a filled target.
+  function hitRadiusHandle(pt) {
+    var ld = state.layers[state.activeLayerIdx];
+    if (!ld || !ld.rig) return null;
+    var def = panelDefaultRadius();
+    var tol = 10 / view.zoom, best = null, bestD = tol;
+    Object.keys(ld.rig.bones).forEach(function (bid) {
+      var bone = ld.rig.bones[bid];
+      var c = boneCircleCenter(bone);
+      var r = boneRadiusOf(bone, def);
+      var d = Math.abs(pt.getDistance(c) - r);
+      if (d < bestD) { bestD = d; best = { boneId: bid, center: c }; }
+    });
+    return best;
+  }
+
   function onDown(e) {
     if (!shouldIntercept()) return;
     e.stopImmediatePropagation();
@@ -63,20 +98,44 @@ var _rigDraw = { path: null, boneId: null, draggingHandle: false, lastClickTime:
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
     var pt = new Point(w[0], w[1]);
     var ld = state.layers[state.activeLayerIdx];
+    var mode = state.rigSubMode || 'draw';
 
-    var anchorHit = hitBoneAnchor(pt);
-    if (anchorHit) {
-      _posing = { ld: ld, boneId: anchorHit.boneId, vi: anchorHit.vi };
-      // Marks the pose as live-but-uncommitted for saveActiveLayerFrame/
-      // saveAllLayerFrames (app.js) — cleared only by rigCommitFrame/
-      // rigResetPose, deliberately NOT on pointerup here, since a pose can
-      // sit live far longer than one drag gesture (see those functions'
-      // own comment for why this matters: the periodic autosave timer).
-      ld._rigPoseLive = true;
-      window.SMEngineBridge.suspend();
+    // ---- Assigner: drag an influence circle's edge to resize it. Nothing
+    // else is interactive here — assignment itself runs from the panel's
+    // "Assigner automatiquement" button, not from a canvas click, so a miss
+    // is a silent no-op rather than accidentally starting a new bone.
+    if (mode === 'assign') {
+      var rh = hitRadiusHandle(pt);
+      if (rh && ld && ld.rig) {
+        pushUndo();
+        _radiusDrag = { ld: ld, boneId: rh.boneId, center: rh.center };
+        window.SMEngineBridge.suspend();
+      }
       return;
     }
 
+    // ---- Déplacer: pose-drag an EXISTING bone anchor only. No drawing, no
+    // binding — a click that misses every anchor here does nothing, on
+    // purpose (mirrors Assigner's own "one gesture, one meaning" rule).
+    if (mode === 'move') {
+      var anchorHit = hitBoneAnchor(pt);
+      if (anchorHit) {
+        _posing = { ld: ld, boneId: anchorHit.boneId, vi: anchorHit.vi };
+        // Marks the pose as live-but-uncommitted for saveActiveLayerFrame/
+        // saveAllLayerFrames (app.js) — cleared only by rigCommitFrame/
+        // rigResetPose, deliberately NOT on pointerup here, since a pose can
+        // sit live far longer than one drag gesture (see those functions'
+        // own comment for why this matters: the periodic autosave timer).
+        ld._rigPoseLive = true;
+        window.SMEngineBridge.suspend();
+      }
+      return;
+    }
+
+    // ---- Tracer: pure Pen-style bone drawing, no posing (Déplacer owns
+    // that now) — a click on an existing anchor here just starts a new bone
+    // from that point instead (still useful: branching a skeleton), never
+    // grabs/moves it.
     var now = Date.now();
     var isDoubleClick = _rigDraw.path && (now - _rigDraw.lastClickTime < 350) && _rigDraw.lastClickPt && pt.getDistance(_rigDraw.lastClickPt) < 10 / view.zoom;
     _rigDraw.lastClickTime = now;
@@ -85,7 +144,19 @@ var _rigDraw = { path: null, boneId: null, draggingHandle: false, lastClickTime:
     if (isDoubleClick) { finalizeRigBone(); window.SMEngineBridge.renderNow(); return; }
 
     if (!_rigDraw.path) {
+      // Undo checkpoint (2026-07-29 fix, QA-confirmed: no pushUndo existed
+      // ANYWHERE in this file — a finished bone could never be undone at
+      // all). Placed here, once per NEW bone, mirroring exactly where
+      // pen-bridge.js's sibling tools.js onMouseDown pushes for a fresh Pen
+      // path (`if(!_pen.path){pushUndo();...}`) — one undo removes the
+      // whole bone, not one per anchor click.
+      pushUndo();
       ensureLayerRig(ld);
+      // Remembered so finalizeRigBone() targets the layer the bone was
+      // actually STARTED on, not whichever layer happens to be active when
+      // the bone is finished — see that function's own comment for the bug
+      // this fixes (crash when the active layer changes mid-draw).
+      _rigDraw.ld = ld;
       // Auto-continuation from an existing OPEN bone's endpoint (same trick
       // pen-bridge.js uses for ordinary paths) — lets a skeleton branch by
       // starting the next bone right at a previous one's tip.
@@ -132,14 +203,21 @@ var _rigDraw = { path: null, boneId: null, draggingHandle: false, lastClickTime:
     e.stopImmediatePropagation();
     e.preventDefault();
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
+    if (_radiusDrag) {
+      var bone = _radiusDrag.ld.rig.bones[_radiusDrag.boneId];
+      bone.radius = Math.max(1, new Point(w[0], w[1]).getDistance(_radiusDrag.center));
+      window.SMEngineBridge.renderNow();
+      return;
+    }
     if (_posing) {
-      var bone = _posing.ld.rig.bones[_posing.boneId];
-      bone.segments[_posing.vi].point = [w[0], w[1]];
+      var poseBone = _posing.ld.rig.bones[_posing.boneId];
+      poseBone.segments[_posing.vi].point = [w[0], w[1]];
       applyRigDeform(_posing.ld);
       window.SMEngineBridge.renderNow();
       return;
     }
-    if (window.SMEngineBridge.setRigPreview) window.SMEngineBridge.setRigPreview(w);
+    // Only Tracer has an in-progress bone to rubber-band toward.
+    if ((state.rigSubMode || 'draw') === 'draw' && window.SMEngineBridge.setRigPreview) window.SMEngineBridge.setRigPreview(w);
     if (_rigDraw.draggingHandle && _rigDraw.path) {
       var seg = _rigDraw.path.lastSegment;
       var pt = new Point(w[0], w[1]);
@@ -151,6 +229,22 @@ var _rigDraw = { path: null, boneId: null, draggingHandle: false, lastClickTime:
   }
 
   function onUp(e) {
+    if (_radiusDrag) {
+      e.stopImmediatePropagation(); e.preventDefault();
+      // Re-assign on release (2026-07-29) — the whole point of a Shapper-
+      // style influence circle is seeing the deformation follow the radius
+      // you just set, not needing a second trip to the "Assigner
+      // automatiquement" button to find out if it helped.
+      if (window.rigAutoAssignLayer) {
+        var li = state.layers.indexOf(_radiusDrag.ld);
+        if (li >= 0) rigAutoAssignLayer(_radiusDrag.ld, userLayers[li], panelDefaultRadius(), panelRotate());
+      }
+      applyRigDeform(_radiusDrag.ld);
+      _radiusDrag = null;
+      window.SMEngineBridge.resume();
+      window.SMEngineBridge.renderNow();
+      return;
+    }
     if (_posing) {
       e.stopImmediatePropagation(); e.preventDefault();
       _posing = null;
@@ -173,16 +267,32 @@ var _rigDraw = { path: null, boneId: null, draggingHandle: false, lastClickTime:
   function finalizeRigBone() {
     if (window.SMEngineBridge && window.SMEngineBridge.setRigPreview) window.SMEngineBridge.setRigPreview(null);
     if (!_rigDraw.path) return;
-    var ld = state.layers[state.activeLayerIdx];
-    if (_rigDraw.path.segments.length < 2) { _rigDraw.path.remove(); _rigDraw.path = null; _rigDraw.boneId = null; return; }
+    // Bug found live (2026-07-29 QA sweep): using state.activeLayerIdx here
+    // crashed (`Cannot read properties of undefined (reading 'bones')`)
+    // whenever the active layer changed (or a new project loaded) while a
+    // bone was still mid-draw — this used to grab whatever layer/project is
+    // CURRENT at finalize time, not the one the bone actually belongs to.
+    // _rigDraw.ld (set in onDown) is the layer the bone was started on; if
+    // that layer no longer exists (e.g. a brand-new project), fall back to
+    // the current active layer rather than crash.
+    var ld = _rigDraw.ld || state.layers[state.activeLayerIdx];
+    if (_rigDraw.path.segments.length < 2) { _rigDraw.path.remove(); _rigDraw.path = null; _rigDraw.boneId = null; _rigDraw.ld = null; return; }
+    if (!ld) { _rigDraw.path.remove(); _rigDraw.path = null; _rigDraw.boneId = null; _rigDraw.ld = null; return; }
+    ensureLayerRig(ld);
     var segsOut = _rigDraw.path.segments.map(function (s) {
       return { point: [s.point.x, s.point.y], handleIn: [s.handleIn.x, s.handleIn.y], handleOut: [s.handleOut.x, s.handleOut.y] };
     });
     var closed = _rigDraw.path.closed;
-    ld.rig.bones[_rigDraw.boneId] = { segments: segsOut, restSegments: JSON.parse(JSON.stringify(segsOut)), closed: closed };
+    // Preserve a radius already set on this bone (branching/re-drawing an
+    // existing open bone reuses its id, see the auto-continuation block
+    // above) — only a genuinely NEW bone starts without one (falls back to
+    // the panel default, boneRadiusOf/rigBindStroke).
+    var prevRadius = ld.rig.bones[_rigDraw.boneId] && ld.rig.bones[_rigDraw.boneId].radius;
+    ld.rig.bones[_rigDraw.boneId] = { segments: segsOut, restSegments: JSON.parse(JSON.stringify(segsOut)), closed: closed, radius: prevRadius };
     _rigDraw.path.remove();
-    _rigDraw.path = null; _rigDraw.boneId = null; _rigDraw.draggingHandle = false;
+    _rigDraw.path = null; _rigDraw.boneId = null; _rigDraw.ld = null; _rigDraw.draggingHandle = false;
     if (window.renderLayerList) renderLayerList();
+    if (window.renderRigModeUI) renderRigModeUI();
   }
 
   function init() {
@@ -198,5 +308,7 @@ var _rigDraw = { path: null, boneId: null, draggingHandle: false, lastClickTime:
   window.SMRig = {
     finalizeRigBone: finalizeRigBone,
     hitBoneAnchor: hitBoneAnchor,
+    boneCircleCenter: boneCircleCenter,
+    boneRadiusOf: boneRadiusOf,
   };
 })();

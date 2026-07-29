@@ -740,11 +740,31 @@ var _nmq={active:false,start:null,rect:null};
 // silently editing a disposable dab that gets regenerated on the next
 // stroke edit anyway.
 function resolveBrushAnchor(item,layer){
-  if(!item||!item.data||!item.data.isBrushTextureCopy||!item.data.brushGroupId)return item;
-  var gid=item.data.brushGroupId;
-  for(var i=0;i<layer.children.length;i++){
-    var c=layer.children[i];
-    if(c.data&&c.data.brushGroupId===gid&&!c.data.isBrushTextureCopy)return c;
+  if(!item||!item.data)return item;
+  if(item.data.isBrushTextureCopy&&item.data.brushGroupId){
+    var gid=item.data.brushGroupId;
+    for(var i=0;i<layer.children.length;i++){
+      var c=layer.children[i];
+      if(c.data&&c.data.brushGroupId===gid&&!c.data.isBrushTextureCopy)return c;
+    }
+    return item;
+  }
+  // linkedFill backdrop (2026-07-29 fix, QA-confirmed live: "des fois ça
+  // sélectionne le tout des fois juste le fill") — this function already
+  // redirected a dab-stamp hit back to its real anchor, but never covered
+  // its sibling companion tag: a click landing where only the linkedFill
+  // backdrop is hittable (a gap between dab stamps, or wherever the
+  // textured ribbon's own drawn geometry doesn't reach but the simpler
+  // backdrop fill does — see applyBrushTexture, this file) used to select
+  // the backdrop directly instead of the real vector-brush stroke, exactly
+  // the "sometimes the whole thing, sometimes just the fill" inconsistency
+  // — same class of bug as the dab case above, same fix shape.
+  if(item.data.isLinkedFillCompanion&&item.data.linkedFillId){
+    var lid=item.data.linkedFillId;
+    for(var j=0;j<layer.children.length;j++){
+      var c2=layer.children[j];
+      if(c2.data&&c2.data.linkedFillId===lid&&!c2.data.isLinkedFillCompanion)return c2;
+    }
   }
   return item;
 }
@@ -1098,7 +1118,7 @@ function rotateCenterSegments(segs,angleDeg,cx,cy){
 // selection it was built from, so it's cleared here too — nodeLayer
 // (the Paper-fallback's actual visual dots) already gets wiped by the
 // next real renderNodeHandles() call, no need to touch it here.
-function clearSel(){selectedPaths=[];state.selectedStrokeIndices=[];_nodeSel=[];state.xformAnchorCustom=null;state.xformAnchorHovered=false;state.xformRingHovered=false;if(typeof nodeHandles!=='undefined')nodeHandles=[];
+function clearSel(keepLayerExplicit){selectedPaths=[];state.selectedStrokeIndices=[];_nodeSel=[];state.xformAnchorCustom=null;state.xformAnchorHovered=false;state.xformRingHovered=false;if(typeof nodeHandles!=='undefined')nodeHandles=[];
   // 2026-07 ("si on clic dans le canvas sans rien sélectionner il ne faut
   // pas afficher les options de calque, ce n'est que si on sélectionne des
   // calques dans la timeline"): drop the "an explicit timeline layer click
@@ -1108,7 +1128,7 @@ function clearSel(){selectedPaths=[];state.selectedStrokeIndices=[];_nodeSel=[];
   // should then hide layer-sec instead of defaulting to the last-active
   // layer. setActiveLayer (timeline.js) sets the flag back to true right
   // after ITS OWN clearSel() call, so clicking a layer row still works.
-  if(typeof window!=='undefined')window._layerActiveExplicit=false;
+  if(typeof window!=='undefined'&&!keepLayerExplicit)window._layerActiveExplicit=false;
 }
 function getSI(path){var ch=userLayers[state.activeLayerIdx].children;for(var i=0;i<ch.length;i++){if(ch[i]===path)return i;}return -1;}
 // UI/UX audit (2026-07): the statusbar footer has claimed "⌘/Ctrl+D
@@ -4119,7 +4139,18 @@ function _pathToPolygonInput(path){
 }
 function _polygonsToPaperItem(polys){
   if(!polys.length)return null;
-  function buildLoop(pts){var p=new Path();pts.forEach(function(pt,i){var pp=new Point(pt[0],pt[1]);if(i===0)p.moveTo(pp);else p.lineTo(pp);});p.closed=true;return p;}
+  // {insert:false} (2026-07-29 fix): every OTHER caller in this file builds
+  // scratch geometry this way by convention (CLAUDE.md's own "insert:false
+  // by convention" note) — this one didn't, so a single-polygon result (no
+  // CompoundPath wrapper, the plain "two shapes merge into one seamless
+  // outline" case) silently landed in whatever layer happened to be Paper's
+  // globally active one at call time. Destructive callers (booleanOp/
+  // eraseAtPoint, via insertBooleanResult's layer.insertChild) never
+  // noticed — insertChild reparents unconditionally regardless of where an
+  // item started. The NEW non-destructive combine-group path
+  // (computeGroupCombine) never reparents by design, so this was leaking a
+  // real, permanent stray Path into the document on every single render.
+  function buildLoop(pts){var p=new Path({insert:false});pts.forEach(function(pt,i){var pp=new Point(pt[0],pt[1]);if(i===0)p.moveTo(pp);else p.lineTo(pp);});p.closed=true;return p;}
   if(polys.length===1&&!polys[0].holes.length)return buildLoop(polys[0].exterior);
   var cp=new CompoundPath({insert:false});
   polys.forEach(function(poly){
@@ -4139,28 +4170,23 @@ function _polygonsToPaperItem(polys){
   });
   return cp;
 }
-function _polyArea(poly){
-  var pts=poly.exterior,a=0,n=pts.length;
-  for(var i=0;i<n;i++){var j=(i+1)%n;a+=pts[i][0]*pts[j][1]-pts[j][0]*pts[i][1];}
-  return Math.abs(a)/2;
-}
 function booleanOpWasm(op,paths){
-  var accumulator=_pathToPolygonInput(paths[0]);
-  var finalPolys=[accumulator];
+  // The accumulator is the FULL set of polygons produced so far (a
+  // MultiPolygon), not just one piece — folding in a 3rd+ operand used to
+  // collapse the accumulator to its single largest-by-area polygon between
+  // folds, which silently dropped every other already-accumulated disjoint
+  // piece (uniting 3 mutually non-overlapping shapes lost the middle one).
+  // boolean_op_multi (Rust) accepts a MultiPolygon on the 'a' side so every
+  // prior piece stays in play for each subsequent fold.
+  var accumulator=[_pathToPolygonInput(paths[0])];
+  var finalPolys=accumulator;
   for(var i=1;i<paths.length;i++){
     var b=_pathToPolygonInput(paths[i]);
-    var json=window.GeometryWasm.boolean_op(op,JSON.stringify(accumulator),JSON.stringify(b));
+    var json=window.GeometryWasm.boolean_op_multi(op,JSON.stringify(accumulator),JSON.stringify(b));
     var polys=JSON.parse(json);
     if(!polys.length)return null;
-    // Exclude/subtract can legitimately produce several disjoint polygons
-    // (e.g. two crescents from an XOR) — every one of them belongs in the
-    // final result. Only the accumulator carried into the NEXT fold (for a
-    // 3rd+ operand) collapses to the single largest-by-area polygon, since
-    // that's a reasonable simplification and matches how the plain-2-shape
-    // case (the common one) behaves either way.
     finalPolys=polys;
-    polys=polys.slice().sort(function(x,y){return _polyArea(y)-_polyArea(x);});
-    accumulator=polys[0];
+    accumulator=polys;
   }
   return _polygonsToPaperItem(finalPolys);
 }
@@ -4183,11 +4209,14 @@ function findLinkedFillCompanion(layer,ribbon){
   });
   return found;
 }
-function booleanOp(op){
-  if(selectedPaths.length<2){showToast('Sélectionnez au moins 2 formes');return;}
-  pushUndo();
-  var paths=selectedPaths.slice();
-  var boolLayer=userLayers[state.activeLayerIdx];
+// Non-destructive combine groups (2026-07-29) reuse this exact fold — see
+// computeGroupCombine below — so the companion-union pre-step and the WASM/
+// Paper.js fold itself are hoisted out, unchanged, rather than duplicated.
+// Returns the raw fold result (may be a CompoundPath) plus every real linked-
+// fill companion that was unioned in transiently — the CALLER decides whether
+// to remove those (destructive booleanOp does; the non-destructive combine
+// path never does, since nothing is being destroyed there).
+function foldBooleanOp(op,paths,layer){
   // A vector-brush ribbon drawn with Fill enabled is really TWO Paper.js
   // items covering DIFFERENT parts of what the user sees as one shape —
   // the ribbon is the tapered outline RING alone (fillColor = ink), the
@@ -4202,11 +4231,28 @@ function booleanOp(op){
   // them first so `op` sees the WHOLE visible shape. (For an OPEN stroke
   // the companion is a degenerate zero-area centerline loop — see
   // draw-bridge.js's commitStroke — so the union is just the ribbon again,
-  // same as before.) Track every companion unioned in so BOTH halves of
-  // each pair get removed below, alongside the ribbons.
+  // same as before.)
   var extraRemovals=[];
   var operands=paths.map(function(p){
-    var companion=findLinkedFillCompanion(boolLayer,p);
+    // Stroke-only operand (2026-07-29 fix, QA-confirmed live: combining two
+    // brush strokes drawn with Fill OFF produced invisible slivers at wrong
+    // positions) — Paper.js's own .unite()/.subtract()/etc. work on FILL
+    // geometry only; a path with no fillColor has none, so the boolean ran
+    // on the bare (often OPEN, auto-closed-by-a-straight-line-for-the-
+    // computation) centerline instead of the actual rendered stroke ribbon,
+    // producing geometry with no visible relationship to what's on screen
+    // (confirmed: bounds landed outside the strokes' own area, and the
+    // result inherited fillColor:null/strokeColor:null — fully invisible).
+    // Same fix already used by the vector eraser for the identical problem
+    // (eraseExpandStrokeToFill, this file) — expand the stroke into its own
+    // real filled ribbon shape first, so the boolean sees what you actually
+    // drew. A vector-brush ribbon or anything with a fill already skips this
+    // (fillColor set) and is untouched.
+    if(!p.fillColor&&p.strokeColor){
+      var expanded=eraseExpandStrokeToFill(p);
+      if(expanded)p=expanded;
+    }
+    var companion=findLinkedFillCompanion(layer,p);
     if(!companion)return p;
     extraRemovals.push(companion);
     try{return p.unite(companion,{insert:false})||p;}
@@ -4225,10 +4271,32 @@ function booleanOp(op){
       result=r;
     }
   }
+  return{result:result,companions:extraRemovals};
+}
+function booleanOp(op){
+  if(selectedPaths.length<2){showToast('Sélectionnez au moins 2 formes');return;}
+  pushUndo();
+  var paths=selectedPaths.slice();
+  var boolLayer=userLayers[state.activeLayerIdx];
+  var folded=foldBooleanOp(op,paths,boolLayer);
+  var result=folded.result;
   var style=paths[paths.length-1];
   result.strokeColor=style.strokeColor;result.strokeWidth=style.strokeWidth;
   result.strokeCap=style.strokeCap;result.strokeJoin=style.strokeJoin;
-  result.fillColor=style.fillColor;result.opacity=style.opacity;
+  // Stroke-only style source (2026-07-29 fix, same one as foldBooleanOp's
+  // own eraseExpandStrokeToFill call above) — insertBooleanResult below
+  // ALWAYS drops the stroke on its islands (its own strokeInfo arg is
+  // hardcoded null a few lines down, an existing, unrelated boolean-tool
+  // behavior: every result is fill-only regardless of source) and only ever
+  // applies the fillColor it's given. A stroke-only source's fillColor is
+  // null, so the visible result used to be fillColor:null AND
+  // strokeColor:null — completely invisible. The geometry is now the
+  // EXPANDED FILLED RIBBON (foldBooleanOp), so falling back to the source's
+  // own strokeColor here paints that ribbon the same ink color the original
+  // strokes had — the closest this tool's fill-only result model can get to
+  // "what a merged stroke looks like".
+  var resultFill=style.fillColor||style.strokeColor;
+  result.fillColor=resultFill;result.opacity=style.opacity;
   // subtract/exclude routinely produce a CompoundPath (disjoint remainders,
   // or a hole) — split into flat Paths at insertion, same as eraseAtPoint,
   // so it isn't silently dropped by saveActiveLayerFrame's `instanceof
@@ -4239,9 +4307,14 @@ function booleanOp(op){
   // copies linkedFillId/isLinkedFillCompanion/linkedFill — see
   // BOOL_KEEP_DATA_FIRST's own comment for why carrying those forward onto
   // a merged, no-longer-a-ribbon result was the actual bug.
-  var islands=insertBooleanResult(boolLayer,boolLayer.children.length,result,style.fillColor,style.opacity,null,style.data);
+  // A destructive merge also ends any non-destructive combine-group
+  // membership the SOURCE shapes had (2026-07-29): they're about to be
+  // .remove()'d, so leave no dangling ld.groups[gid].order reference to a
+  // strokeId that no longer exists on any live path.
+  if(window.SMGroup&&SMGroup.removeMemberFromGroup)paths.forEach(function(p){if(p.data&&p.data.groupId)SMGroup.removeMemberFromGroup(p,state.layers[state.activeLayerIdx],boolLayer,{skipUndo:true,silent:true});});
+  var islands=insertBooleanResult(boolLayer,boolLayer.children.length,result,resultFill,style.opacity,null,style.data);
   paths.forEach(function(p){p.remove();});
-  extraRemovals.forEach(function(c){if(!c.removed)c.remove();});
+  folded.companions.forEach(function(c){if(!c.removed)c.remove();});
   selectedPaths=islands;state.selectedStrokeIndices=[];
   // Unrelated paint-bucket fills (data.fillSeed/fillSeeds — a totally
   // different "linked" system, see fillRegenerateLinked's own header
@@ -4682,25 +4755,19 @@ function carryBooleanData(isl,srcData,isFirst){
   if(isFirst)BOOL_KEEP_DATA_FIRST.forEach(function(k){if(srcData[k]!==undefined)isl.data[k]=srcData[k];});
   else if(srcData.strokeId)ensureStrokeId(isl);
 }
-function insertBooleanResult(layer,insertAt,result,fillColor,opacity,strokeInfo,srcData){
-  function applyStroke(isl){
-    if(strokeInfo&&strokeInfo.color){isl.strokeColor=strokeInfo.color;isl.strokeWidth=strokeInfo.width;isl.strokeCap=strokeInfo.cap;isl.strokeJoin=strokeInfo.join;}
-    else isl.strokeColor=null;
-  }
+// Splits a raw boolean-fold result (possibly a CompoundPath with disjoint
+// islands and/or holes) into detached, UNSTYLED flat Paths — never inserted
+// into any layer. Non-destructive combine-groups (computeGroupCombine below)
+// use this directly on a transient fold they never insert anywhere;
+// insertBooleanResult (destructive booleanOp/flattenGroup) wraps it with
+// styling + real layer insertion. Hoisted out unchanged from what used to be
+// inline in insertBooleanResult — see that function's own history for why
+// hole-merging/degenerate-loop cleanup work the way they do.
+function flattenBooleanResult(result){
   if(!(result instanceof CompoundPath)){
-    // Every OTHER branch below applies fillColor/opacity/strokeColor=null
-    // to its island(s) — this simplest one (the op produced one seamless
-    // Path, no holes or islands at all, e.g. two same-color fills merging
-    // into a single continuous outline) forgot to, silently inserting
-    // `result` with whatever style it happened to inherit from Paper's own
-    // unite()/etc (typically nothing — confirmed live: fillColor came back
-    // null even though a color was explicitly passed in).
+    // The op produced one seamless Path, no holes or islands at all (e.g.
+    // two same-color fills merging into a single continuous outline).
     _eraseDegenerateSelfLoops(result);
-    if(fillColor!==undefined)result.fillColor=fillColor;
-    applyStroke(result);
-    if(opacity!==undefined)result.opacity=opacity;
-    carryBooleanData(result,srcData,true);
-    layer.insertChild(insertAt,result);
     return[result];
   }
   var children=result.children.slice();
@@ -4710,18 +4777,10 @@ function insertBooleanResult(layer,insertAt,result,fillColor,opacity,strokeInfo,
   var exteriors=children.filter(function(c){return c.clockwise;});
   var holes=children.filter(function(c){return !c.clockwise;});
   // No holes at all (plain multi-island result, e.g. an eraser stroke that
-  // split a shape in two) — unchanged prior behavior, one flat Path per
-  // island, nothing to merge.
+  // split a shape in two) — one flat Path per island, nothing to merge.
   if(!holes.length){
     var flat=exteriors.length?exteriors:children;
     flat.forEach(function(isl){isl.remove();});
-    flat.forEach(function(isl,k){
-      if(fillColor!==undefined)isl.fillColor=fillColor;
-      applyStroke(isl);
-      if(opacity!==undefined)isl.opacity=opacity;
-      carryBooleanData(isl,srcData,k===0);
-      layer.insertChild(insertAt+k,isl);
-    });
     result.remove();
     return flat;
   }
@@ -4754,15 +4813,35 @@ function insertBooleanResult(layer,insertAt,result,fillColor,opacity,strokeInfo,
     _eraseDegenerateSelfLoops(merged);
     return merged;
   });
-  islands.forEach(function(isl,k){
+  result.remove();
+  return islands;
+}
+// Non-destructive combine-group core (2026-07-29): given N live/transient
+// Paths and a mode, returns the combined result as detached flat Paths —
+// NEVER removes or mutates the sources, and never inserts anything into a
+// layer. Reuses foldBooleanOp/flattenBooleanResult verbatim — the same
+// hard-won correctness work (vector-brush companion pre-union, hole-merging,
+// degenerate-loop cleanup) the destructive tool already has, with zero
+// duplicated boolean-op logic (CLAUDE.md §3: don't duplicate a matcher/loop).
+function computeGroupCombine(paths,mode,layer){
+  if(paths.length<2)return paths.slice();
+  var folded=foldBooleanOp(mode,paths,layer);
+  return flattenBooleanResult(folded.result);
+}
+function insertBooleanResult(layer,insertAt,result,fillColor,opacity,strokeInfo,srcData){
+  function applyStroke(isl){
+    if(strokeInfo&&strokeInfo.color){isl.strokeColor=strokeInfo.color;isl.strokeWidth=strokeInfo.width;isl.strokeCap=strokeInfo.cap;isl.strokeJoin=strokeInfo.join;}
+    else isl.strokeColor=null;
+  }
+  var flat=flattenBooleanResult(result);
+  flat.forEach(function(isl,k){
     if(fillColor!==undefined)isl.fillColor=fillColor;
     applyStroke(isl);
     if(opacity!==undefined)isl.opacity=opacity;
     carryBooleanData(isl,srcData,k===0);
     layer.insertChild(insertAt+k,isl);
   });
-  result.remove();
-  return islands;
+  return flat;
 }
 
 // ---- PRESSURE-SIMULATED VECTOR BRUSH ----
@@ -5850,6 +5929,30 @@ function onViewDoubleClick(event){
   var hit=layer.hitTest(event.point,{fill:true,tolerance:4/view.zoom});
   if(!hit||!(hit.item instanceof Path)||!hit.item.fillColor)return;
   var fillPath=hit.item;
+  // Group double-click (2026-07-29 fix, Cyril: "si c'est un group et que l'on
+  // double clic on doit entrer dans le group avec l'outil select pas
+  // subselect, l'outil subselect n'apparait qu'après si on double clic sur
+  // un des éléments du group"): a grouped shape's FIRST double-click now just
+  // selects the whole group and stays on Select — same result a plain single
+  // click's own membersOf() expansion already gives, double-click is only a
+  // more discoverable way to reach it. Subselect (below, unchanged) only
+  // kicks in on a SECOND double-click on one specific member, once that
+  // group is ALREADY the current selection — "entering" it, in effect.
+  // Ungrouped shapes are untouched: straight to Subselect on the first
+  // double-click, exactly the 2026-07-27 behavior this only refines.
+  var dblGid=fillPath.data&&fillPath.data.groupId;
+  if(dblGid){
+    var dblMembers=window.SMGroup?SMGroup.membersOf(fillPath,layer):[fillPath];
+    var dblWholeGroupSelected=selectedPaths.length===dblMembers.length&&dblMembers.every(function(m){return selectedPaths.indexOf(m)>=0;});
+    if(!dblWholeGroupSelected){
+      clearSel();fsClearSel();_fsIsolation=null;
+      selectedPaths=dblMembers.slice();
+      state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;});
+      renderArcs();updateUI();
+      if(window.SMEngineBridge)SMEngineBridge.renderNow();
+      return;
+    }
+  }
   clearSel();
   fsClearSel();
   _fsIsolation={groupId:fillPath.data&&fillPath.data.groupId,path:fillPath};

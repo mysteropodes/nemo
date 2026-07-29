@@ -304,11 +304,23 @@
     sym.layers.forEach(function (sl) {
       var idx = Math.min(fi, sl.frames.length - 1);
       var fr = sl.frames[idx];
-      if (fr && (fr.isKeyframe || fr.isInterpolated)) { out = out.concat(fr.strokes || []); return; }
-      for (var k = idx - 1; k >= 0; k--) {
-        var f2 = sl.frames[k];
-        if (f2 && f2.isKeyframe) { out = out.concat(f2.strokes || []); return; }
+      var slStrokes = null;
+      if (fr && (fr.isKeyframe || fr.isInterpolated)) { slStrokes = fr.strokes || []; }
+      else {
+        for (var k = idx - 1; k >= 0; k--) {
+          var f2 = sl.frames[k];
+          if (f2 && f2.isKeyframe) { slStrokes = f2.strokes || []; break; }
+        }
       }
+      if (!slStrokes) return;
+      // Combine-groups (2026-07-29 fix, QA-confirmed): ld.groups is copied
+      // onto the symbol's own inner layer (convertLayerToComponent/
+      // convertLayersToComponent) but this reader — used by StoryBoard's
+      // montage strip + card thumbnails — read fr.strokes raw, same gap
+      // renderOS/renderGhostAll had (dict-based twin of buildSceneJson's
+      // live renderCombinesFromChildren).
+      if (window.SMGroup && sl.groups) slStrokes = SMGroup.applyCombinesToStrokes(slStrokes, sl);
+      out = out.concat(slStrokes);
     });
     return out;
   }

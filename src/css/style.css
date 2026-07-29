@@ -782,7 +782,8 @@ input[type="checkbox"]:disabled{opacity:.4;cursor:not-allowed;}
    layer panel + matching keyframe-track rows in the grid — see motion.js.
    Reuses .lrow/.frow's 34px rhythm; group/property rows below an expanded
    layer are visually indented and slightly recessed. */
-.motion-group-row{padding-left:24px;padding-right:8px;color:var(--text-dim);font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;cursor:default;background:rgba(255,255,255,.015);display:flex;align-items:center;justify-content:space-between;}
+.motion-group-row{padding-left:24px;padding-right:8px;color:var(--text-dim);font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;cursor:default;background:rgba(255,255,255,.015);display:flex;align-items:center;justify-content:space-between;margin-top:6px;}
+.motion-group-row:first-child{margin-top:0;}
 .motion-filter-btn{display:flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:3px;cursor:pointer;color:var(--text-dark);flex-shrink:0;}
 .motion-filter-btn:hover{background:var(--panel3);color:var(--text);}
 .motion-filter-btn.on{color:var(--accent);}
@@ -817,6 +818,19 @@ input[type="checkbox"]:disabled{opacity:.4;cursor:not-allowed;}
 .motion-expr-code{width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;padding:6px;resize:vertical;}
 .motion-expr-code:focus{outline:none;border-color:var(--accent);}
 .motion-expr-error{font-size:10px;color:var(--red);white-space:pre-wrap;}
+/* Anchor Point 3x3 grid selector (2026-07-29, LottieFiles-inspired) — icon
+   toggle on the anchor row + its inline popover row, same open/close
+   convention as the ƒx expression editor just above. */
+.motion-anchor-grid-btn{color:var(--text-dark);cursor:pointer;}
+.motion-anchor-grid-btn:hover{background:var(--panel3);color:var(--text);}
+.motion-anchor-grid-btn.on{color:var(--accent);}
+.motion-anchor-grid-row{height:auto;justify-content:center;padding:6px 8px;cursor:default;background:rgba(255,255,255,.02);}
+.motion-anchor-grid{display:grid;grid-template-columns:repeat(3,18px);grid-template-rows:repeat(3,18px);gap:3px;}
+.motion-anchor-cell{width:18px;height:18px;padding:0;border:1px solid var(--border2);border-radius:3px;background:var(--panel2);cursor:pointer;position:relative;}
+.motion-anchor-cell:hover{border-color:var(--accent);background:var(--panel3);}
+.motion-anchor-cell::after{content:'';position:absolute;top:50%;left:50%;width:4px;height:4px;transform:translate(-50%,-50%);border-radius:50%;background:var(--text-dim);}
+.motion-anchor-cell:hover::after{background:var(--accent);}
+.motion-anchor-cell.center::after{background:var(--accent);width:5px;height:5px;}
 /* Right-panel "Propriétés du calque" section (motion.js
    renderMotionPropsPanel) — Motion mode only; the rows inside reuse the
    global .lrow/.motion-prop-row styles, which aren't scoped to
@@ -845,6 +859,14 @@ body:not(.mode-motion) #motion-props-sec{display:none;}
    file order, confirmed live (computed width stayed 50px).*/
 .pi.motion-val{width:34px;padding:2px 3px;font-size:10.5px;border-radius:4px;}
 .motion-unit{color:var(--text-dark);font-size:10px;width:14px;flex-shrink:0;}
+/* Compact per-dimension label ("X"/"Y") before each field of a multi-dim
+   property (2026-07-29, LottieFiles-inspired) — purely visual, no click
+   handler needed (the field itself is the interactive part). */
+.motion-dim-label{color:var(--text-dark);font-size:9px;flex-shrink:0;width:7px;text-align:center;}
+/* Stopwatch moved to the row's right edge (2026-07-29, "keyframe button à
+   droite... plus rapide à aller chercher") — margin only, so the icon's own
+   fixed width/height (.lico) stays untouched and centered. */
+.motion-prop-row .motion-stopwatch{margin-left:4px;}
 .motion-track-row{position:relative;}
 /* Per-property tracks (Position/Rotation/.../each element's own) are mostly
    empty space between the sparse diamonds that actually matter — the plain
@@ -1084,6 +1106,17 @@ body.mode-motion .lrow.act.motion-selected{background:rgba(63,107,245,.16);box-s
 .layer-inout-bar.full-range .layer-inout-handle{--io-handle-color:rgba(255,255,255,.4);}
 .layer-inout-bar .layer-inout-handle.left{left:-1px;}
 .layer-inout-bar .layer-inout-handle.right{right:0;}
+/* More discoverable trim handles, Motion mode ONLY (2026-07-29,
+   LottieFiles-inspired: "l'affichage du calque avec ses poignées out/in
+   Point" — a plain 7px sliver read as part of the bar's own border, not as
+   a grabbable control). Animation 2D's frame-grid bars are untouched —
+   this never widens the actual click target (still the full row height,
+   same element), just adds a tab-shaped outer corner + a grip ornament so
+   the handle reads as "drag me" at a glance. */
+body.mode-motion .layer-inout-bar .layer-inout-handle{width:9px;opacity:1;}
+body.mode-motion .layer-inout-bar .layer-inout-handle.left{border-radius:4px 0 0 4px;}
+body.mode-motion .layer-inout-bar .layer-inout-handle.right{border-radius:0 4px 4px 0;}
+body.mode-motion .layer-inout-bar .layer-inout-handle::after{content:'';position:absolute;top:50%;left:50%;width:3px;height:8px;transform:translate(-50%,-50%);background:rgba(0,0,0,.3);border-radius:1px;pointer-events:none;}
 /* Bug found 2026-07 ("si hover ou select avec rectangle le in ou outpoint
    celui ci doit se bleuté") — hover tints a handle blue, overriding
    whatever color (layer tint or neutral full-range) it'd otherwise show.

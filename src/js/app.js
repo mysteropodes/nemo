@@ -1129,7 +1129,7 @@ function _resolveDuplicatorPath(dup,frameIdx){
   if(!p.length){p.remove();return null;}
   return{path:p,length:p.length,closed:!!sd.closed,start:p.getPointAt(0)};
 }
-function applyLayerDuplicator(ld,base,frameIdx){
+function applyLayerDuplicator(ld,base,frameIdx,layerIdx){
   var dup=ld.duplicator,mode=dup.mode||'grid';
   // Hard cap mirrors _registerCap's "never unbounded" philosophy
   // (engine-bridge.js) — a typo'd count degrades to "big", never "hangs".
@@ -1139,6 +1139,21 @@ function applyLayerDuplicator(ld,base,frameIdx){
   if(count<=1)return base;
   var pivot=_boundsCenterOfStrokes(base);
   var M=window.SMMotion;
+  // Temporal stagger (2026-07-29, LottieFiles Duplicator "Animation" tab
+  // equivalent — the user explicitly asked for this after seeing it there):
+  // each copy re-samples the SEED LAYER'S OWN content (getEffectiveStrokes,
+  // NOT the placement/index stagger below — that stays a separate axis,
+  // same as LottieFiles' own Pattern/Animation tab split) at a per-copy
+  // TIME-SHIFTED frame instead of reusing `base` for every copy. This is
+  // the natural fit for Nemo's frame-based drawn content (a hand-drawn walk
+  // cycle, a tweened sequence, or a Component's own internal timeline —
+  // getEffectiveStrokes' symbolId branch already resolves that) rather than
+  // LottieFiles' purely-numeric position/rotation loop. Wraps within the
+  // seed layer's own effective span (layerInPoint..layerOutPoint) so the
+  // "wave" effect actually loops instead of freezing at a hard edge.
+  var tOff=dup.timeOffset,tOffOn=tOff&&tOff.enabled&&layerIdx!=null&&(tOff.offsetFrames|0)!==0;
+  var tInF,tSpan;
+  if(tOffOn){tInF=layerInPoint(ld);tSpan=Math.max(1,layerOutPoint(ld)-tInF+1);}
   var dPos=M?M.valueAtFrame(ld,'dupOffsetPos',frameIdx):[0,0];
   var dRot=M?M.valueAtFrame(ld,'dupOffsetRot',frameIdx)[0]:0;
   var dScale=M?M.valueAtFrame(ld,'dupOffsetScale',frameIdx):[0,0];
@@ -1149,6 +1164,26 @@ function applyLayerDuplicator(ld,base,frameIdx){
   if(mode==='path'&&!pathInfo)return base; // unconfigured/broken path ref: show the seed, not nothing
   var out=[];
   for(var k=0;k<count;k++){
+    var baseK=base,pivotK=pivot;
+    if(tOffOn){
+      var shiftFrames;
+      if(tOff.direction==='backward')shiftFrames=(count-1-k)*tOff.offsetFrames;
+      else if(tOff.direction==='centerOut')shiftFrames=Math.round(Math.abs(k-(count-1)/2)*tOff.offsetFrames);
+      else if(tOff.direction==='random'){
+        // Same seeded-per-index precedent as the position/rotation/scale/
+        // opacity stagger above (a different prime multiplier so it draws
+        // an independent sequence, not the same jitter values reused) —
+        // never Math.random() at render time, or the wave reshuffles on
+        // every scrub tick instead of holding a stable pattern.
+        var rngT=seededRng(((dup.seed||0)+k*104729)>>>0);
+        shiftFrames=Math.floor(rngT()*count)*tOff.offsetFrames;
+      } else shiftFrames=k*tOff.offsetFrames; // 'forward' (default): copy 0 = current frame, each next copy lags further behind
+      var shiftedIdx=tInF+(((frameIdx-tInF-shiftFrames)%tSpan)+tSpan)%tSpan;
+      var shifted=getEffectiveStrokes(layerIdx,shiftedIdx);
+      if(shifted.length){baseK=shifted;pivotK=_boundsCenterOfStrokes(baseK);}
+      // Nothing drawn at the shifted frame (a hold-blank span) — fall back
+      // to the current frame's own content rather than vanishing that copy.
+    }
     var baseDx=0,baseDy=0,baseRot=0;
     if(mode==='grid'){
       baseDx=(k%cols)*(dup.spacingX||0);
@@ -1196,7 +1231,7 @@ function applyLayerDuplicator(ld,base,frameIdx){
     // with no extra transform. Multiple effectors simply SUM their
     // contributions on top of the existing index-based stagger — additive,
     // like AE/C4D's own default effector combination.
-    var instX=pivot.x+baseDx,instY=pivot.y+baseDy;
+    var instX=pivotK.x+baseDx,instY=pivotK.y+baseDy;
     (dup.effectors||[]).forEach(function(eff){
       var ddx=instX-(eff.pos?eff.pos.x:0),ddy=instY-(eff.pos?eff.pos.y:0);
       var w;
@@ -1220,9 +1255,9 @@ function applyLayerDuplicator(ld,base,frameIdx){
     // rotate/scale in place around the seed's own bounds-center first, the
     // placement translate last — same inner-transform-then-outer-placement
     // order as a Component's own camera followed by symMatrix.
-    var mat=dupMatrixFromDescriptor({dx:baseDx+posK[0],dy:baseDy+posK[1],rot:baseRot+rotK,sx:1+scaleK[0]/100,sy:1+scaleK[1]/100},pivot);
+    var mat=dupMatrixFromDescriptor({dx:baseDx+posK[0],dy:baseDy+posK[1],rot:baseRot+rotK,sx:1+scaleK[0]/100,sy:1+scaleK[1]/100},pivotK);
     var opFactor=Math.max(0,Math.min(1,1+opK/100));
-    base.forEach(function(sd){
+    baseK.forEach(function(sd){
       var sd2=applyMatrixToStrokeData(cloneStrokeForTransform(sd),mat);
       sd2.opacity=(sd2.opacity!==undefined?sd2.opacity:1)*opFactor;
       sd2.isDuplicatorCopy=true;sd2.dupIndex=k;
@@ -1241,7 +1276,7 @@ function getEffectiveStrokesRendered(layerIdx,frameIdx){
   var base=getEffectiveStrokes(layerIdx,frameIdx);
   var ld=state.layers[layerIdx];
   if(!ld||!ld.duplicator||ld._dupEditSource||!base.length)return base;
-  return applyLayerDuplicator(ld,base,frameIdx);
+  return applyLayerDuplicator(ld,base,frameIdx,layerIdx);
 }
 // ---- RIG (2026-07-29) — "un système de rig à la Shapper", promoted from
 // the dormant src/js/labs/rig-deform.js prototype. Shapper (the studio's
@@ -1321,6 +1356,13 @@ function rigBindStroke(ld,path,boneIds,radius,rotate){
   if(!path.segments||!path.segments.length){console.warn('[rig] cible invalide ou vide');return false;}
   if(path.data&&(path.data.isVectorBrush||path.data.isLinkedFillCompanion)){console.warn('[rig] les traits pinceau vectoriel (ruban + fill lié) ne sont pas encore supportés par le rig');return false;}
   ensureStrokeId(path);
+  // Re-binding the SAME shape (canvas click-to-bind makes this the common
+  // case, not a rare mistake — clicking a shape again to change which bone
+  // it follows, or to widen the radius, must replace, not stack) used to
+  // just push a second entry: applyRigDeform iterates ld.rig.binds and SUMS
+  // every entry touching a given strokeId, so a duplicate silently doubled
+  // that shape's deformation instead of cleanly superseding it.
+  rig.binds=rig.binds.filter(function(b){return b.strokeId!==path.data.strokeId;});
   radius=radius||200;
   var rest=path.segments.map(function(s){return[s.point.x,s.point.y];});
   var weights=rest.map(function(pt){
@@ -1332,13 +1374,40 @@ function rigBindStroke(ld,path,boneIds,radius,rotate){
       bp.remove();
       if(!loc)return;
       var dist=loc.point.getDistance(p);
-      var infl=Math.max(0,1-dist/radius);
+      // Per-bone radius override (2026-07-29, Shapper-style influence
+      // circles, rig-bridge.js Assign mode) — bone.radius is set by dragging
+      // that bone's own on-canvas circle; falls back to the passed-in
+      // default (the panel's Rayon de poids field) for a bone that's never
+      // been adjusted, so existing single-radius projects are unaffected.
+      var boneRadius=bone.radius||radius;
+      var infl=Math.max(0,1-dist/boneRadius);
       if(infl>0)w.push({boneId:bid,offset:loc.offset,w:infl});
     });
     return w;
   });
   rig.binds.push({strokeId:path.data.strokeId,rest:rest,weights:weights,rotate:!!rotate,_live:path});
   return true;
+}
+// Auto-assign (2026-07-29, Cyril's own spec — "un bouton d'assignation qui
+// assigne automatiquement les éléments du layer sélectionné aux bones comme
+// dans Shapper par rapport à la proximité") — step 2 of the Rig tool's 3-step
+// flow. Binds EVERY selectable shape on the layer against EVERY bone in one
+// pass (rigBindStroke's own per-bone-radius weighting already produces a
+// sensible "nearest bone wins, blended near a boundary" result without
+// needing per-shape bone selection) — replaces whatever binds already
+// existed (rigBindStroke's own re-bind-replaces-not-stacks fix above), so
+// running this again after adjusting an influence circle is the expected
+// "try again" gesture, not something that piles up stale binds.
+function rigAutoAssignLayer(ld,layer,defaultRadius,rotate){
+  var rig=ensureLayerRig(ld);
+  var boneIds=Object.keys(rig.bones);
+  if(!boneIds.length)return 0;
+  var n=0;
+  layer.children.forEach(function(c){
+    if(!(c instanceof Path)||!isSelectablePathChild(c))return;
+    if(rigBindStroke(ld,c,boneIds,defaultRadius,rotate))n++;
+  });
+  return n;
 }
 // Live per-vertex deform — called on every pose drag tick AND once more
 // right before a commit, so the committed keyframe always matches exactly
@@ -1849,7 +1918,13 @@ function convertLayerToComponent(layerIdx){
   var ld=state.layers[layerIdx];if(!ld||ld.symbolId){showToast('Déjà un composant ou calque invalide');return;}
   saveAllLayerFrames();pushUndo();
   var symId=genSymbolId();
-  var symLayer={name:'Layer 1',visible:true,locked:false,frames:JSON.parse(JSON.stringify(ld.frames))};
+  // groups (2026-07-29 fix, QA-confirmed combine-groups regression): the
+  // OUTER instance (`ld` itself, reused below) keeps its .groups by
+  // accident since it's the same object — but state.layers/userLayers swap
+  // to the SYMBOL's own layers while editing INSIDE the component
+  // (enterSymbol), and symLayer had no .groups at all, so a combine-group
+  // rendered raw/uncombined the moment you entered to edit it.
+  var symLayer={name:'Layer 1',visible:true,locked:false,frames:JSON.parse(JSON.stringify(ld.frames)),groups:ld.groups?JSON.parse(JSON.stringify(ld.groups)):undefined};
   state.symbols[symId]={name:ld.name+' (Comp)',totalFrames:state.totalFrames,fps:state.fps,layers:[symLayer]};
   if(window.SMStoryboard)SMStoryboard.addInstanceAuto(symId);
   // 'once' = play through the component's own full defined duration exactly
@@ -1886,19 +1961,45 @@ function convertLayersToComponent(indices){
   if(indices.length<2){convertLayerToComponent(indices[0]!==undefined?indices[0]:state.activeLayerIdx);return;}
   saveAllLayerFrames();pushUndo();
   var symId=genSymbolId();
+  // Combine-group remap + merge (2026-07-29 fix, QA-confirmed): each source
+  // layer's own ld.groups may share id strings with another source's (same
+  // reasoning as mergeLayersIntoOne's own remap below), AND — separately —
+  // getEffectiveStrokes's symbolId branch flattens EVERY sub-layer's strokes
+  // into the outer instance's own single userLayers[li].children, so the
+  // OUTER instance needs the UNION of every source's registry to combine
+  // any of them, not just whichever happened to survive. Confirmed bug: the
+  // outer `newLd` below had no .groups property at all, so every
+  // combine-group in a merged component rendered raw/uncombined.
+  var mergedGroups={};
   var symLayers=indices.map(function(i){
     var src=state.layers[i];
-    return{name:src.name,visible:src.visible,locked:false,frames:JSON.parse(JSON.stringify(src.frames)),
+    var framesClone=JSON.parse(JSON.stringify(src.frames));
+    var groupsClone;
+    if(src.groups){
+      var remap={};
+      Object.keys(src.groups).forEach(function(oldGid){remap[oldGid]='grp_'+Date.now().toString(36)+'_'+Math.floor(Math.random()*1e6);});
+      framesClone.forEach(function(f){(f.strokes||[]).forEach(function(sd){if(sd.groupId&&remap[sd.groupId])sd.groupId=remap[sd.groupId];});});
+      groupsClone={};
+      Object.keys(src.groups).forEach(function(oldGid){
+        var grp=src.groups[oldGid];
+        var newOrder=(grp.order||[]).map(function(e){return remap[e]||e;});
+        var newGid=remap[oldGid];
+        groupsClone[newGid]={combineMode:grp.combineMode,order:newOrder};
+        mergedGroups[newGid]=groupsClone[newGid];
+      });
+    }
+    return{name:src.name,visible:src.visible,locked:false,frames:framesClone,
       motion:src.motion?JSON.parse(JSON.stringify(src.motion)):undefined,
       motionStatic:src.motionStatic?JSON.parse(JSON.stringify(src.motionStatic)):undefined,
-      elementMotion:src.elementMotion?JSON.parse(JSON.stringify(src.elementMotion)):undefined};
+      elementMotion:src.elementMotion?JSON.parse(JSON.stringify(src.elementMotion)):undefined,
+      groups:groupsClone};
   });
   state.symbols[symId]={name:'Composant',totalFrames:state.totalFrames,fps:state.fps,layers:symLayers};
   if(window.SMStoryboard)SMStoryboard.addInstanceAuto(symId);
   var insertAt=indices[0];
   for(var k=indices.length-1;k>=0;k--){state.layers.splice(indices[k],1);userLayers.splice(indices[k],1);}
   var newLd={name:'Composant',symbolId:symId,locked:true,visible:true,symPlayMode:'once',symSpeed:1,symPlacedAt:0,symSingleFrame:0,
-    frames:[]};
+    frames:[],groups:Object.keys(mergedGroups).length?mergedGroups:undefined};
   for(var i=0;i<state.totalFrames;i++)newLd.frames.push({strokes:[],isKeyframe:i===0,isInterpolated:false}); // no componentFrame — see convertLayerToComponent
   var newUl=new Layer({name:'layer-'+state.layers.length});
   state.layers.splice(insertAt,0,newLd);
@@ -2045,6 +2146,28 @@ function mergeLayersIntoOne(indices,opts){
   }
   if(bad){if(!silent)showToast('Impossible de fusionner : la sélection contient '+bad);return false;}
   saveAllLayerFrames();if(!silent)pushUndo();
+  // Combine-group remap (2026-07-29): each source layer's OWN ld.groups may
+  // share id strings with ANOTHER source's — e.g. merging a layer with its
+  // own duplicateLayer() clone, which deliberately keeps the same groupId
+  // strings (see that function's own comment). Mint a fresh gid per group
+  // per source BEFORE concatenating strokes below, mirroring the strokeId
+  // collision-avoidance a few lines down for the exact same reason: reusing
+  // an id string across two originally-separate things silently fuses them
+  // into one wrongly-combined group.
+  var mergedGroups={};
+  srcs.forEach(function(l){
+    if(!l.groups)return;
+    var remap={};
+    Object.keys(l.groups).forEach(function(oldGid){remap[oldGid]='grp_'+Date.now().toString(36)+'_'+Math.floor(Math.random()*1e6);});
+    (l.frames||[]).forEach(function(f){
+      (f.strokes||[]).forEach(function(sd){if(sd.groupId&&remap[sd.groupId])sd.groupId=remap[sd.groupId];});
+    });
+    Object.keys(l.groups).forEach(function(oldGid){
+      var grp=l.groups[oldGid];
+      var newOrder=(grp.order||[]).map(function(e){return remap[e]||e;});
+      mergedGroups[remap[oldGid]]={combineMode:grp.combineMode,order:newOrder};
+    });
+  });
   var target=idx[0];
   // Held-frame resolution WITHOUT motion baking — the plain-layer tail of
   // getEffectiveStrokes, kept separate on purpose (see header comment).
@@ -2105,6 +2228,7 @@ function mergeLayersIntoOne(indices,opts){
     layerUid:srcs[0].layerUid,parentLayerUid:srcs[0].parentLayerUid,timeLink:srcs[0].timeLink,
   };
   if(Object.keys(elMotion).length)merged.elementMotion=elMotion;
+  if(Object.keys(mergedGroups).length)merged.groups=mergedGroups;
   // Any OTHER layer parented to one of the layers about to disappear must
   // be re-pointed at the survivor, or its parenting silently goes dead
   // (parentChainMats resolves by uid and just finds nothing) — the exact
@@ -2729,7 +2853,7 @@ function saveActiveLayerFrame(){
   // Rig tool is the one interaction in this app where "live but
   // uncommitted" is meant to survive far longer than a single gesture
   // (Commit/Reset are deliberate separate actions, not implied by mouseup).
-  var ld=state.layers[state.activeLayerIdx];if(ld.symbolId||ld.nativeVideo||ld.montageId||ld.isNullLayer||ld.isEffectLayer||(ld.duplicator&&!ld._dupEditSource)||ld._rigPoseLive)return;
+  var ld=state.layers[state.activeLayerIdx];if(ld.symbolId||ld.nativeVideo||ld.montageId||ld.isNullLayer||ld.isEffectLayer||ld.lfsGroup||(ld.duplicator&&!ld._dupEditSource)||ld._rigPoseLive)return;
   if(!layerIsEffectivelyVisible(state.activeLayerIdx))return;
   _writeBackGhostProxies(state.activeLayerIdx);
   var f=ld.frames[state.currentFrame];
@@ -2742,7 +2866,7 @@ function saveAllLayerFrames(){
   _invalidateSymbolUnionIfEditingSymbol();
   _writeBackGhostProxies(state.activeLayerIdx);
   // duplicator skip: same reason as saveActiveLayerFrame's guard above.
-  for(var i=0;i<state.layers.length;i++){if(state.layers[i].symbolId||state.layers[i].nativeVideo||state.layers[i].montageId||state.layers[i].isNullLayer||state.layers[i].isEffectLayer||(state.layers[i].duplicator&&!state.layers[i]._dupEditSource)||state.layers[i]._rigPoseLive)continue;
+  for(var i=0;i<state.layers.length;i++){if(state.layers[i].symbolId||state.layers[i].nativeVideo||state.layers[i].montageId||state.layers[i].isNullLayer||state.layers[i].isEffectLayer||state.layers[i].lfsGroup||(state.layers[i].duplicator&&!state.layers[i]._dupEditSource)||state.layers[i]._rigPoseLive)continue;
   if(!layerIsEffectivelyVisible(i))continue;
   var f=state.layers[i].frames[state.currentFrame];if(!f||(!f.isKeyframe&&!f.isInterpolated))continue;
   var strokes=_collectLayerStrokes(i,state.layers[i]);
@@ -2971,6 +3095,24 @@ function goToFrame(idx){
   // Already on this frame (e.g. a live-scrub tick that re-dispatched 'change'
   // without the value actually moving) — avoid a redundant save+reload pass.
   if(idx===state.currentFrame)return;
+  // Bug found live (2026-07-29 QA sweep): an INTERRUPTED Subselect node-drag
+  // (pointerdown+move, never released) left window._nodeDrag.active pointing
+  // at a Path that loadFrame() is about to rebuild with a brand-new identity.
+  // Any later stray pointermove/up kept applying the drag delta by segIndex
+  // alone to whatever object now occupies that slot — silently corrupting the
+  // new frame's stored geometry. Scrubbing frames must sever any in-progress
+  // node edit the same way releasing the mouse would, before the rebuild.
+  if(typeof _nodeDrag!=='undefined'){_nodeDrag.active=false;_nodeDrag.path=null;}
+  if(typeof _nmq!=='undefined'){if(_nmq.rect){_nmq.rect.remove();_nmq.rect=null;}_nmq.active=false;}
+  // Bug found live (2026-07-29 QA sweep): loadFrame() below rebuilds every
+  // layer's live Paper.js children with brand-new object identities, but a
+  // pre-existing shape selection (selectedPaths) kept pointing at the OLD,
+  // now-detached objects (.parent===null) — the Transform/Fill/Stroke panel
+  // kept showing and silently "editing" that ghost with zero effect on the
+  // real, on-screen frame. clearSel(true) drops the shape selection (not the
+  // layer selection — the `true` preserves _layerActiveExplicit, unlike a
+  // canvas deselect, so layer-sec doesn't flicker shut on every scrub).
+  if(selectedPaths.length||_nodeSel.length)clearSel(true);
   saveAllLayerFrames();state.currentFrame=idx;window._curFrame=idx;
   if(window.SMAudio&&!state.playing)SMAudio.scrubAt(idx); // scrub audio au deplacement du playhead (v19)
   // frameOnly: goToFrame changes the frame and nothing else — see updateUI.

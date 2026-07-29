@@ -22,6 +22,35 @@
 // all ported too.
 (function () {
   var mode = null; // 'xform-scale' | 'xform-rotate' | 'marquee' | 'move' | 'arc' | 'nv-drag' | 'nv-scale' | 'nv-rotate' | null
+  // Non-destructive combine groups (2026-07-29) — hit-test confirmatory
+  // guard. UNION never has a problem here: the combined visible region is
+  // exactly the union of members' own real geometry, so "hit a real
+  // member" and "hit something visible" always agree. subtract/intersect/
+  // exclude don't: a click can land inside a member's UNMODIFIED geometry
+  // that the combine visually cut away — a false-positive "select the
+  // group" on what looks like empty canvas. Only runs (computeGroupCombine
+  // is not cheap) when the raw hit actually resolved to a non-union
+  // combine-group member — never per-frame, only per hit-test.
+  function combineVisibleAt(item, pt, layerIdx) {
+    var gid = item.data && item.data.groupId;
+    if (!gid) return true;
+    var ld = state.layers[layerIdx];
+    if (!ld || !ld.groups || !ld.groups[gid]) return true;
+    var grp = ld.groups[gid];
+    if (!grp.combineMode || grp.combineMode === 'none' || grp.combineMode === 'unite') return true;
+    if (!window.SMGroup) return true;
+    var layer = userLayers[layerIdx];
+    var members = SMGroup.resolveGroupMembers(gid, ld, layer);
+    if (members.length < 2) return true;
+    try {
+      var islands = computeGroupCombine(members, grp.combineMode, layer);
+      return islands.some(function (isl) { return isl.contains(pt); });
+    } catch (e) { return true; }
+  }
+  function combineHitConfirm(hit, hitPt, layerIdx) {
+    if (!hit || !hit.item) return true;
+    return combineVisibleAt(hit.item, hitPt, layerIdx);
+  }
   // Native-video footage gestures (2026-07, "une vidéo est un objet comme
   // les autres"): clicking a video layer SELECTS it (window._nvSelectedLayer,
   // read by engine-bridge's buildTransformBoxItems to draw the same
@@ -519,6 +548,28 @@
         }
         if (bodyHandle.box && bodyHandle.box.angle) bodyPt = bodyPt.rotate(-bodyHandle.box.angle, bodyHandle.box.pivot);
         if (bodyHandle.bounds.contains(bodyPt)) {
+          // Widen to the clicked item's full group/combine-group BEFORE
+          // starting the move (2026-07-29, QA-confirmed): this shortcut
+          // fires and returns on ANY click inside the current selection's
+          // own box — which a lone group member's body-click always is,
+          // since its own box IS that member's bounds. Without this, the
+          // idx2 group-widening logic a bit further below (for the case
+          // where `hit` misses this early shortcut) never even gets a
+          // chance to run: a Subselect edit leaving just one member
+          // selected meant clicking that member again to grab "the whole
+          // group" only ever dragged the one member.
+          if (window.SMGroup) {
+            var bodyLd = state.layers[state.activeLayerIdx];
+            if (!(bodyLd && bodyLd.locked && !bodyLd.symbolId)) {
+              var bodyLayer = userLayers[state.activeLayerIdx];
+              var bodyHit = bodyLayer.hitTest(pt, { stroke: true, fill: true, tolerance: 8 / view.zoom });
+              if (bodyHit && (bodyHit.item instanceof Path || bodyHit.item instanceof Raster) && combineHitConfirm(bodyHit, pt, state.activeLayerIdx)) {
+                var bodyP = resolveBrushAnchor(bodyHit.item, bodyLayer);
+                SMGroup.membersOf(bodyP, bodyLayer).forEach(function (m) { if (selectedPaths.indexOf(m) < 0) selectedPaths.push(m); });
+                state.selectedStrokeIndices = selectedPaths.map(getSI).filter(function (i2) { return i2 >= 0; });
+              }
+            }
+          }
           mode = 'move';
           moveStarted = false;
           return;
@@ -565,6 +616,7 @@
       if (hitMap) { var hg = hitMap.inv(pt.x, pt.y); hitPt = new Point(hg[0], hg[1]); }
     }
     var hit = (activeLdForLock.locked && !activeLdForLock.symbolId) ? null : layer.hitTest(hitPt, { stroke: true, fill: true, tolerance: 8 / view.zoom });
+    if (hit && !combineHitConfirm(hit, hitPt, state.activeLayerIdx)) hit = null;
     var hitOtherLayerIdx = -1;
     // If nothing on the active layer, check every OTHER normal (non-
     // component) layer too — clicking a stroke that lives on layer 1 while
@@ -737,6 +789,18 @@
         // doesn't".
         clearSel();
         clickedSet.forEach(function (m) { selectedPaths.push(m); });
+      } else {
+        // p is ALREADY selected (idx2>=0) — but its own group siblings might
+        // not be (2026-07-29 fix, QA-confirmed): right after a Subselect
+        // vertex-edit leaves just ONE member selected, clicking that same
+        // member again (to grab "the whole group") left selectedPaths at
+        // just the one path, since neither branch above ever ran. ADD any
+        // missing sibling rather than replacing the selection outright — an
+        // existing broader multi-selection (e.g. from a marquee spanning
+        // several unrelated shapes, one of which happens to be `p`) must
+        // still survive a click-to-drag on one of its members, same
+        // reasoning the idx2>=0 short-circuit existed for in the first place.
+        clickedSet.forEach(function (m) { if (selectedPaths.indexOf(m) < 0) selectedPaths.push(m); });
       }
       state.selectedStrokeIndices = selectedPaths.map(getSI).filter(function (i2) { return i2 >= 0; });
       mode = selectedPaths.length ? 'move' : null;
@@ -1296,6 +1360,16 @@
             // Lasso : le test bounds ne suffit pas (le lasso peut serpenter) —
             // l'item doit avoir son centre DANS le trace, ou le croiser.
             if (lassoPath && !(lassoPath.contains(c.position) || (c instanceof Path && lassoPath.intersects(c)))) return;
+            // Non-destructive combine groups (2026-07-29): a bounds-only
+            // intersection is correct/expected for a REAL marquee drag (a
+            // rectangle surrounding a donut's own bounding box legitimately
+            // selects it, hole included — standard marquee semantics in
+            // every design tool) but wrongly over-selects when onDown's own
+            // precise hitTest already missed and this degenerated into a
+            // near-zero-size rect — i.e. what was actually just a CLICK on
+            // a visually cut-away region. Only that degenerate case gets
+            // the extra precision check; a genuine drag is untouched.
+            if (!lassoPath && mb.width < 3 / view.zoom && mb.height < 3 / view.zoom && !combineVisibleAt(c, mb.center, state.activeLayerIdx)) return;
             if (selectedPaths.indexOf(c) < 0) selectedPaths.push(c);
           }
         });
@@ -1388,6 +1462,7 @@
       if (hitMap) { var hg = hitMap.inv(pt.x, pt.y); hitPt = new Point(hg[0], hg[1]); }
     }
     var hit = (activeLdForLock.locked && !activeLdForLock.symbolId) ? null : layer.hitTest(hitPt, { stroke: true, fill: true, tolerance: 8 / view.zoom });
+    if (hit && !combineHitConfirm(hit, hitPt, state.activeLayerIdx)) hit = null;
     var clickedPath = null;
     if (hit && (hit.item instanceof Path || hit.item instanceof Raster)) {
       clickedPath = resolveBrushAnchor(hit.item, layer);
@@ -1440,6 +1515,41 @@
     ];
     if (multi || isGrouped) {
       items.push({ label: isGrouped ? 'Dissocier' : 'Grouper', shortcut: isGrouped ? '⇧⌘G' : '⌘G', action: function () { if (window.SMGroup) { if (isGrouped) SMGroup.ungroupSelection(); else SMGroup.groupSelection(); } } });
+      items.push({ sep: true });
+    }
+    // Non-destructive combine groups (2026-07-29) — "Combiner (Union)" is
+    // the ONE flat entry offered here (discoverability over a 4-way
+    // submenu — this app's context menu is flat-list only, and Union is by
+    // far the common case; the other 3 modes stay reachable via Alt+click
+    // on their own toolbar icon). If the current selection already IS one
+    // active combine-group's full membership, offer changing its mode/
+    // removing a member/flattening instead of creating a new one.
+    var _cbLayer = userLayers[state.activeLayerIdx], _cbLd = state.layers[state.activeLayerIdx];
+    var _cbGid = null;
+    if (window.SMGroup && _cbLd && _cbLd.groups) {
+      if (!multi && p0.data && p0.data.groupId && _cbLd.groups[p0.data.groupId]) _cbGid = p0.data.groupId;
+      else if (multi) {
+        var _cbFirst = selectedPaths[0].data && selectedPaths[0].data.groupId;
+        if (_cbFirst && _cbLd.groups[_cbFirst]) {
+          var _cbMembers = SMGroup.resolveGroupMembers(_cbFirst, _cbLd, _cbLayer);
+          if (_cbMembers.length === selectedPaths.length && _cbMembers.every(function (m) { return selectedPaths.indexOf(m) >= 0; })) _cbGid = _cbFirst;
+        }
+      }
+    }
+    var _cbActive = (_cbGid && _cbLd.groups[_cbGid].combineMode !== 'none') ? _cbGid : null;
+    if (window.SMGroup && multi && !_cbActive) {
+      items.push({ label: 'Combiner (Union) — non destructif', action: function () { SMGroup.combineSelection('unite'); } });
+      items.push({ sep: true });
+    }
+    if (_cbActive) {
+      var _cbCurMode = _cbLd.groups[_cbActive].combineMode;
+      var _cbLabels = { unite: 'Union', subtract: 'Soustraction', intersect: 'Intersection', exclude: 'Exclusion' };
+      ['unite', 'subtract', 'intersect', 'exclude'].forEach(function (m) {
+        items.push({ label: (m === _cbCurMode ? '✓ ' : '') + _cbLabels[m], action: function () { SMGroup.setGroupCombineMode(_cbActive, _cbLd, m); } });
+      });
+      items.push({ sep: true });
+      if (!multi) items.push({ label: 'Sortir du groupe', action: function () { SMGroup.removeMemberFromGroup(p0, _cbLd, _cbLayer); } });
+      items.push({ label: 'Aplatir', action: function () { SMGroup.flattenGroup(_cbActive, _cbLd, _cbLayer); } });
       items.push({ sep: true });
     }
     items = items.concat([
@@ -1605,6 +1715,26 @@
     },
     getDistortState: function () {
       return mode === 'xform-distort' ? { dir: distortDir, quad: distortDstQuad } : null;
+    },
+    // Switching tools mid-marquee-drag (2026-07-29, QA-confirmed) used to
+    // leave a stuck ghost selection rectangle: onUp's own finalization
+    // (removing the rect, folding it into selectedPaths) only ever runs on
+    // THIS tool's own pointerup, which never comes once another tool is
+    // picked mid-drag — and onMove doesn't gate on state.tool==='select' at
+    // all once `mode` is already set (only the hover-only, no-mode branch
+    // checks shouldIntercept()), so the rect kept following the pointer and
+    // even kept queuing itself into the next pointerup's marquee-select
+    // logic under whatever tool got picked next. Scoped to marquee only —
+    // it's pure UI/selection state with no live document geometry to leave
+    // half-mutated, unlike move/scale/rotate/distort (their own onUp
+    // already handles committing what THEY changed; this isn't a general
+    // abandon-any-gesture hook).
+    cancelMarquee: function () {
+      if (mode !== 'marquee') return;
+      if (_marquee.rect) { _marquee.rect.remove(); _marquee.rect = null; }
+      _marquee.active = false;
+      mode = null;
+      if (window.SMEngineBridge) window.SMEngineBridge.resume();
     },
     toggleTweenOnForSelection: toggleTweenOnForSelection,
   };

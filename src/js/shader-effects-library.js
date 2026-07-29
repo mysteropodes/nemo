@@ -2,9 +2,25 @@
 // Shipped as built-in custom shaders. Each source is a fragment BODY only:
 // no top-level WGSL declarations, because engine.rs wraps it inside fs_main.
 (function () {
-  function param(key, label, min, max, step, unit, defaultValue) {
+  // `spatial` (2026-07-29 fix, "un effet twirl qui bouge en fonction du
+  // zoom du canvas"): engine.rs's run_one_effect deliberately does NOT
+  // zoom-compensate any "custom:" effect's p1..p4 (its own comment: "p1..p4
+  // there have no fixed meaning this function could assume is a pixel
+  // size") — correct for a truly arbitrary user-authored shader, but this
+  // SHIPPED library already knows exactly what each parameter means (e.g.
+  // Twirl's Radius below is a distance from center, normalized 0-1 against
+  // the FIXED-size render target/uv space — the exact same "effects change
+  // size in the wrong direction as zoom changes" bug already fixed for the
+  // built-in effects, just via a normalized UV radius here instead of a raw
+  // pixel count). Flag any param here whose value is a spatial size/radius/
+  // offset (angles, colors, ratios, counts, opacities are NOT spatial) —
+  // sceneEffectsOf (engine-bridge.js) reads this flag and multiplies the
+  // value by view.zoom before it ever reaches the engine, mirroring
+  // run_one_effect's own `* z` compensation for the built-in effects.
+  function param(key, label, min, max, step, unit, defaultValue, spatial) {
     var out = { key: key, label: label, min: min, max: max, step: step, scale: 1, unit: unit || '' };
     if (defaultValue !== undefined) out.defaultValue = defaultValue;
+    if (spatial) out.spatial = true;
     return out;
   }
   function fx(id, name, category, params, lines) {
@@ -106,7 +122,7 @@
       'return vec4<f32>(src.rgb * select(0.0, a / max(src.a, 0.001), src.a > 0.001), a);',
     ]),
     fx('shader_minimax', 'Minimax', 'Stylize', [
-      param('p1', 'Radius', 1, 12, 1, 'px', 2),
+      param('p1', 'Radius', 1, 12, 1, 'px', 2, true),
       param('p2', 'Mode', 0, 1, 1, '', 1),
     ], [
       'let r = max(1.0, params.p1); var mn = src.rgb; var mx = src.rgb;',
@@ -114,8 +130,8 @@
       'return vec4<f32>(select(mn, mx, params.p2 > 0.5), src.a);',
     ]),
     fx('shader_grid', 'Grid', 'Generate', [
-      param('p1', 'Size', 4, 160, 1, 'px', 40),
-      param('p2', 'Width', 0.5, 12, 0.5, 'px', 1),
+      param('p1', 'Size', 4, 160, 1, 'px', 40, true),
+      param('p2', 'Width', 0.5, 12, 0.5, 'px', 1, true),
       param('p3', 'Opacity', 0, 1, 0.01, '', 0.7),
     ], [
       'let cell = max(params.p1, 1.0); let pos = uv * vec2<f32>(params.tex_w, params.tex_h); let g = min(fract(pos.x / cell), fract(pos.y / cell));',
@@ -123,7 +139,7 @@
       'return vec4<f32>(mix(src.rgb, vec3<f32>(1.0), line * clamp(params.p3, 0.0, 1.0)), src.a);',
     ]),
     fx('shader_checkerboard', 'Checkerboard', 'Generate', [
-      param('p1', 'Size', 4, 160, 1, 'px', 32),
+      param('p1', 'Size', 4, 160, 1, 'px', 32, true),
       param('p2', 'Opacity', 0, 1, 0.01, '', 0.8),
     ], [
       'let pos = floor(uv * vec2<f32>(params.tex_w, params.tex_h) / max(params.p1, 1.0)); let chk = fract((pos.x + pos.y) * 0.5) * 2.0;',
@@ -168,7 +184,7 @@
     ]),
     fx('shader_twirl', 'Twirl', 'Distort', [
       param('p1', 'Angle', -720, 720, 1, 'deg', 180),
-      param('p2', 'Radius', 0, 1.5, 0.01, '', 0.5),
+      param('p2', 'Radius', 0, 1.5, 0.01, '', 0.5, true),
     ], [
       'let c = vec2<f32>(0.5); let v = uv - c; let r = length(v); let radius = max(params.p2, 0.001);',
       'let amt = (1.0 - smoothstep(0.0, radius, r)) * params.p1 * 0.01745329252; let s = sin(amt); let co = cos(amt);',
@@ -178,15 +194,15 @@
     ]),
     fx('shader_bulge', 'Bulge', 'Distort', [
       param('p1', 'Amount', -1, 1, 0.01, '', 0.4),
-      param('p2', 'Radius', 0, 1.5, 0.01, '', 0.65),
+      param('p2', 'Radius', 0, 1.5, 0.01, '', 0.65, true),
     ], [
       'let c = vec2<f32>(0.5); let v = uv - c; let r = length(v); let fall = 1.0 - smoothstep(0.0, max(params.p2, 0.001), r);',
       'let outc = textureSample(src_tex, tex_sampler, clamp(c + v * (1.0 - params.p1 * fall * 0.5), vec2<f32>(0.0), vec2<f32>(1.0)));',
       'return vec4<f32>(outc.rgb, outc.a);',
     ]),
     fx('shader_wave_warp', 'Wave Warp', 'Distort', [
-      param('p1', 'Height', -80, 80, 1, 'px', 16),
-      param('p2', 'Width', 4, 300, 1, 'px', 80),
+      param('p1', 'Height', -80, 80, 1, 'px', 16, true),
+      param('p2', 'Width', 4, 300, 1, 'px', 80, true),
       param('p3', 'Direction', 0, 360, 1, 'deg', 0),
       param('p4', 'Evolution', -3600, 3600, 1, 'deg', 0),
     ], [
@@ -196,7 +212,7 @@
       'return vec4<f32>(outc.rgb, outc.a);',
     ]),
     fx('shader_turbulent_displace', 'Turbulent Displace', 'Distort', [
-      param('p1', 'Amount', 0, 120, 1, 'px', 20),
+      param('p1', 'Amount', 0, 120, 1, 'px', 20, true),
       param('p2', 'Size', 1, 80, 1, '', 12),
       param('p3', 'Complexity', 1, 4, 1, '', 2),
       param('p4', 'Evolution', -3600, 3600, 1, 'deg', 0),
@@ -280,7 +296,7 @@
       'return vec4<f32>(mix(src.rgb, mapped, clamp(params.p2, 0.0, 1.0)), src.a);',
     ]),
     fx('shader_directional_blur', 'Directional Blur', 'Blur', [
-      param('p1', 'Length', 0, 160, 1, 'px', 24),
+      param('p1', 'Length', 0, 160, 1, 'px', 24, true),
       param('p2', 'Direction', 0, 360, 1, 'deg', 0),
     ], [
       'let a = params.p2 * 0.01745329252; let d = vec2<f32>(cos(a), sin(a)) * texel * params.p1;',
@@ -313,7 +329,7 @@
       'return vec4<f32>(outc.rgb / max(outc.a, 0.001), outc.a);',
     ]),
     fx('shader_soft_directional_blur', 'Soft Directional Blur', 'Blur', [
-      param('p1', 'Length', 0, 240, 1, 'px', 48),
+      param('p1', 'Length', 0, 240, 1, 'px', 48, true),
       param('p2', 'Direction', 0, 360, 1, 'deg', 0),
       param('p3', 'Softness', 0.2, 3, 0.05, '', 1.4),
     ], [
@@ -344,7 +360,7 @@
     fx('shader_lightning', 'Lightning', 'Generate', [
       param('p1', 'Intensity', 0, 4, 0.05, '', 1.5),
       param('p2', 'Jaggedness', 0, 1, 0.01, '', 0.45),
-      param('p3', 'Width', 0.001, 0.08, 0.001, '', 0.015),
+      param('p3', 'Width', 0.001, 0.08, 0.001, '', 0.015, true),
       param('p4', 'Evolution', -3600, 3600, 1, 'deg', 0),
     ], [
       'let y = uv.y; let evo = params.p4 * 0.01745329252;',
@@ -372,7 +388,7 @@
     ]),
     fx('shader_particle_field', 'Particle Field', 'Particles', [
       param('p1', 'Count', 4, 80, 1, '', 32),
-      param('p2', 'Size', 0.001, 0.05, 0.001, '', 0.012),
+      param('p2', 'Size', 0.001, 0.05, 0.001, '', 0.012, true),
       param('p3', 'Brightness', 0, 4, 0.05, '', 1.5),
       param('p4', 'Evolution', -3600, 3600, 1, 'deg', 0),
     ], [
@@ -402,7 +418,7 @@
     ]),
     fx('shader_particle_vortex', 'Particle Vortex', 'Particles', [
       param('p1', 'Count', 8, 120, 1, '', 48),
-      param('p2', 'Radius', 0.05, 0.8, 0.01, '', 0.45),
+      param('p2', 'Radius', 0.05, 0.8, 0.01, '', 0.45, true),
       param('p3', 'Brightness', 0, 4, 0.05, '', 1.4),
       param('p4', 'Evolution', -3600, 3600, 1, 'deg', 0),
     ], [
@@ -414,7 +430,7 @@
     ]),
     fx('shader_particle_burst', 'Particle Burst', 'Particles', [
       param('p1', 'Count', 8, 120, 1, '', 56),
-      param('p2', 'Spread', 0.05, 1, 0.01, '', 0.55),
+      param('p2', 'Spread', 0.05, 1, 0.01, '', 0.55, true),
       param('p3', 'Brightness', 0, 4, 0.05, '', 1.6),
       param('p4', 'Evolution', -3600, 3600, 1, 'deg', 0),
     ], [
@@ -427,7 +443,7 @@
     ]),
     fx('shader_cinematic_glow', 'Cinematic Glow', 'Stylize', [
       param('p1', 'Threshold', 0, 1, 0.01, '', 0.55),
-      param('p2', 'Radius', 1, 80, 1, 'px', 28),
+      param('p2', 'Radius', 1, 80, 1, 'px', 28, true),
       param('p3', 'Intensity', 0, 4, 0.05, '', 1.4),
       param('p4', 'Warmth', -1, 1, 0.01, '', 0.25),
     ], [
@@ -445,7 +461,7 @@
       'return vec4<f32>(src.rgb + bloom, src.a);',
     ]),
     fx('shader_heat_haze', 'Heat Haze', 'Distort', [
-      param('p1', 'Amount', 0, 80, 1, 'px', 18),
+      param('p1', 'Amount', 0, 80, 1, 'px', 18, true),
       param('p2', 'Scale', 1, 80, 1, '', 22),
       param('p3', 'Vertical Bias', -1, 1, 0.01, '', 0.35),
       param('p4', 'Evolution', -3600, 3600, 1, 'deg', 0),
@@ -471,7 +487,7 @@
     ]),
     fx('shader_plexus_field', 'Plexus Field', 'Particles', [
       param('p1', 'Density', 4, 48, 1, '', 18),
-      param('p2', 'Point Size', 0.001, 0.06, 0.001, '', 0.012),
+      param('p2', 'Point Size', 0.001, 0.06, 0.001, '', 0.012, true),
       param('p3', 'Lines', 0, 1, 0.01, '', 0.65),
       param('p4', 'Evolution', -3600, 3600, 1, 'deg', 0),
     ], [
@@ -504,7 +520,7 @@
       'return vec4<f32>(src.rgb + col * params.p3, src.a);',
     ]),
     fx('shader_chroma_smear', 'Chroma Smear', 'Stylize', [
-      param('p1', 'Amount', 0, 80, 1, 'px', 20),
+      param('p1', 'Amount', 0, 80, 1, 'px', 20, true),
       param('p2', 'Direction', 0, 360, 1, 'deg', 0),
       param('p3', 'Color Split', 0, 2, 0.01, '', 0.8),
     ], [
@@ -533,7 +549,7 @@
       'let outc = textureSample(src_tex, tex_sampler, cell); return vec4<f32>(outc.rgb, outc.a);',
     ]),
     fx('shader_ripple', 'Ripple', 'Distort', [
-      param('p1', 'Amplitude', 0, 80, 1, 'px', 12),
+      param('p1', 'Amplitude', 0, 80, 1, 'px', 12, true),
       param('p2', 'Frequency', 1, 80, 1, '', 24),
       param('p3', 'Phase', -3600, 3600, 1, 'deg', 0),
       param('p4', 'Direction', 0, 360, 1, 'deg', 90),
@@ -545,7 +561,7 @@
     ]),
     fx('shader_spherize', 'Spherize', 'Distort', [
       param('p1', 'Amount', -1, 1, 0.01, '', 0.65),
-      param('p2', 'Radius', 0.05, 1, 0.01, '', 0.5),
+      param('p2', 'Radius', 0.05, 1, 0.01, '', 0.5, true),
     ], [
       'let c = vec2<f32>(0.5); let v = uv - c; let r = length(v); let radius = max(params.p2, 0.01);',
       'let inside = smoothstep(radius, radius - 0.01, r); let nr = r * (1.0 - params.p1 * (1.0 - smoothstep(0.0, radius, r)) * 0.42);',
@@ -553,7 +569,7 @@
       'return vec4<f32>(outc.rgb, outc.a);',
     ]),
     fx('shader_displacement', 'Displacement', 'Distort', [
-      param('p1', 'Amount', 0, 120, 1, 'px', 18),
+      param('p1', 'Amount', 0, 120, 1, 'px', 18, true),
       param('p2', 'Scale', 2, 80, 1, '', 18),
       param('p3', 'Evolution', -3600, 3600, 1, 'deg', 0),
     ], [
@@ -589,15 +605,15 @@
     fx('shader_gradient_wipe', 'Gradient Wipe', 'Keying', [
       param('p1', 'Completion', 0, 1, 0.01, '', 0.5),
       param('p2', 'Angle', 0, 360, 1, 'deg', 0),
-      param('p3', 'Softness', 0, 1, 0.01, '', 0.12),
+      param('p3', 'Softness', 0, 1, 0.01, '', 0.12, true),
     ], [
       'let a = params.p2 * 0.01745329252; let d = vec2<f32>(cos(a), sin(a)); let g = dot(uv - vec2<f32>(0.5), d) + 0.5;',
       'let mask = smoothstep(params.p1, params.p1 - max(params.p3, 0.001), g); return vec4<f32>(src.rgb, src.a * (1.0 - mask));',
     ]),
     fx('shader_drop_shadow', 'Drop Shadow', 'Stylize', [
-      param('p1', 'Distance', 0, 160, 1, 'px', 18),
+      param('p1', 'Distance', 0, 160, 1, 'px', 18, true),
       param('p2', 'Direction', 0, 360, 1, 'deg', 135),
-      param('p3', 'Softness', 0, 80, 1, 'px', 16),
+      param('p3', 'Softness', 0, 80, 1, 'px', 16, true),
       param('p4', 'Opacity', 0, 100, 1, '%', 55),
     ], [
       'let a = params.p2 * 0.01745329252; let dir = vec2<f32>(cos(a), sin(a)); let off = dir * params.p1 * texel;',
@@ -607,9 +623,9 @@
       'return vec4<f32>(rgb, oa);',
     ]),
     fx('shader_inner_shadow', 'Inner Shadow', 'Stylize', [
-      param('p1', 'Distance', 0, 100, 1, 'px', 12),
+      param('p1', 'Distance', 0, 100, 1, 'px', 12, true),
       param('p2', 'Direction', 0, 360, 1, 'deg', 135),
-      param('p3', 'Softness', 0, 60, 1, 'px', 12),
+      param('p3', 'Softness', 0, 60, 1, 'px', 12, true),
       param('p4', 'Opacity', 0, 100, 1, '%', 60),
     ], [
       'let a = params.p2 * 0.01745329252; let dir = vec2<f32>(cos(a), sin(a)); let off = dir * params.p1 * texel; let edge = textureSample(src_tex, tex_sampler, clamp(uv + off, vec2<f32>(0.0), vec2<f32>(1.0))).a;',
@@ -618,7 +634,7 @@
       'let shadow = clamp(src.a - outside / 5.0, 0.0, 1.0) * clamp(params.p4 * 0.01, 0.0, 1.0); return vec4<f32>(src.rgb * (1.0 - shadow * 0.82), src.a);',
     ]),
     fx('shader_bevel', 'Bevel & Relief', 'Stylize', [
-      param('p1', 'Size', 1, 40, 1, 'px', 8),
+      param('p1', 'Size', 1, 40, 1, 'px', 8, true),
       param('p2', 'Angle', 0, 360, 1, 'deg', 135),
       param('p3', 'Strength', 0, 200, 1, '%', 85),
       param('p4', 'Softness', 0, 1, 0.01, '', 0.35),
@@ -628,7 +644,7 @@
       'return vec4<f32>(clamp(rgb, vec3<f32>(0.0), vec3<f32>(1.0)), src.a);',
     ]),
     fx('shader_soft_outline', 'Soft Outline', 'Stylize', [
-      param('p1', 'Thickness', 1, 40, 1, 'px', 8),
+      param('p1', 'Thickness', 1, 40, 1, 'px', 8, true),
       param('p2', 'Brightness', 0, 200, 1, '%', 100),
       param('p3', 'Opacity', 0, 100, 1, '%', 75),
     ], [
@@ -672,7 +688,7 @@
     ]),
     fx('shader_light_sweep', 'Light Sweep', 'Stylize', [
       param('p1', 'Position', -1, 2, 0.01, '', 0.5),
-      param('p2', 'Width', 0.01, 1, 0.01, '', 0.18),
+      param('p2', 'Width', 0.01, 1, 0.01, '', 0.18, true),
       param('p3', 'Angle', -180, 180, 1, 'deg', 25),
       param('p4', 'Intensity', 0, 3, 0.05, '', 1.2),
     ], [
