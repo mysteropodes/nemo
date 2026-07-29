@@ -61,6 +61,15 @@
   // (grid/radial/path mode, counts, seed) is deliberately NOT here — it's
   // static per-layer state edited in its own panel (#duplicator-sec), like
   // a Component instance's own placement fields.
+  // Extra Motion properties for a duplicator-enabled layer (per-copy stagger
+  // deltas). Unlike every other Motion property (applied purely inside
+  // buildSceneJson's own per-item matrix, computeMotionMat), these are read
+  // by applyLayerDuplicator (app.js) only when getEffectiveStrokesRendered
+  // runs — a plain renderNow() alone would re-serialize stale materialized
+  // copies. Fixed centrally in SMEngineBridge.renderNow() (engine-bridge.js:
+  // a loadFrame precedes buildSceneJson whenever any layer has a duplicator)
+  // rather than patching every commit path here — see that fix's own
+  // comment for why (CLAUDE.md §1's whack-a-mole trap).
   var PROPS_DUP_EXTRA = ['dupOffsetPos', 'dupOffsetRot', 'dupOffsetScale', 'dupOffsetOpacity'];
   // Time Remap (AE, 2026-07-25) is an EXTRA row, not a 6th transform: it
   // never feeds computeMotionMat — it drives which internal frame a

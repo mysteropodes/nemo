@@ -2131,6 +2131,22 @@
     syncViewport();
     lastViewportKey = viewportKeyNow();
     invalidateOverlayBase(); // scene may have mutated without a version bump (eraser/select drags) — never let a stale drag-cache survive this
+    // Mograph duplicator (2026-07-29): unlike every other Motion property,
+    // which applies purely inside buildSceneJson's own per-item matrix
+    // (computeMotionMat) and so is always fresh here, the duplicator's
+    // dupOffset* properties are read by applyLayerDuplicator (app.js) ONLY
+    // when getEffectiveStrokesRendered runs — which only happens inside
+    // loadFrame. Any renderNow() call that isn't preceded by a loadFrame
+    // (drag/type a Dup. field, drag a keyframe's value, paste a keyframe,
+    // box-skew multiple keys…) would otherwise re-serialize the SAME stale
+    // materialized copies — found live, "la duplication n'est pas en temps
+    // réel quand on modifie les value". Patching every individual commit
+    // path is exactly the whack-a-mole CLAUDE.md §1 warns about; a duplicator
+    // layer's own loadFrame is already a no-reuse full rebuild by design
+    // (§6's retained-path exclusion), so re-running it here is a correctness
+    // fix, not a new cost, and every non-duplicator layer's existing
+    // hold-frame reuse (_canReuseMaterialized) keeps this near-free.
+    if (state.layers.some(function (l) { return l.duplicator && !l._dupEditSource; })) loadFrame(state.currentFrame);
     var json = buildSceneJson();
     lastSceneJson = json;
     window.__lastSceneJson = json;
