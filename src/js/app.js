@@ -1243,6 +1243,221 @@ function getEffectiveStrokesRendered(layerIdx,frameIdx){
   if(!ld||!ld.duplicator||ld._dupEditSource||!base.length)return base;
   return applyLayerDuplicator(ld,base,frameIdx);
 }
+// ---- RIG (2026-07-29) — "un système de rig à la Shapper", promoted from
+// the dormant src/js/labs/rig-deform.js prototype. Shapper (the studio's
+// own AE mask-influence extension) has no bone HIERARCHY at all: a handful
+// of movable control points/paths, each shape vertex carries a 0..1
+// influence weight per control, and posing offsets every vertex it
+// influences by weight × the control's own delta from rest. Two
+// deliberate departures from both Shapper and the labs prototype, per
+// explicit request: bones are drawn as real VECTOR PATHS via a Pen-tool
+// interaction (rig-bridge.js), not abstract point placement; and a bone's
+// LOCAL TANGENT (sampled continuously along its curve, not one chord angle
+// for the whole bone) drives rotation-aware skinning when a bind has
+// rotate mode on — Shapper itself only ever used the straight chord
+// between two mask points.
+//
+// Persisted shape, plain JSON throughout (CLAUDE.md §1: a live Paper
+// reference never survives save/reload — the labs prototype's
+// `binds[i].path` was exactly this anti-pattern, fixed here from the
+// start): ld.rig = {bones:{id:{segments,restSegments,closed}},
+// ikChains:{endId:{...}}, binds:[{strokeId,rest,weights,rotate}], nextId}.
+// `binds[i]._live` (underscore, runtime-only) is the resolved live Paper
+// item, rebuilt by relinkRigBinds after every loadFrame — never persisted.
+function ensureLayerRig(ld){
+  if(!ld.rig)ld.rig={bones:{},ikChains:{},binds:[],nextId:1};
+  return ld.rig;
+}
+function rigFreshId(rig,prefix){return prefix+(rig.nextId++);}
+// A bone's segments (or restSegments) as a throwaway Paper Path, purely for
+// getNearestLocation/getLocationAt/tangent sampling — never inserted into
+// any layer.
+function _boneSegsToPath(segs,closed){
+  var p=new Path({insert:false});
+  segs.forEach(function(s){p.add(new Segment(new Point(s.point[0],s.point[1]),new Point((s.handleIn||[0,0])[0],(s.handleIn||[0,0])[1]),new Point((s.handleOut||[0,0])[0],(s.handleOut||[0,0])[1])));});
+  if(closed)p.closed=true;
+  return p;
+}
+// Rebuilds each bind's LIVE Paper reference after loadFrame replaced
+// userLayers[i].children (the old references are orphaned the moment a
+// layer rebuilds) — same strokeId-lookup pattern as
+// relinkBrushCompanions/relinkLinkedFills, called right alongside them. A
+// bind whose target vanished, or whose vertex COUNT no longer matches its
+// stored `rest` (the underlying stroke was sculpted/erased/boolean'd since
+// bind time), is DROPPED rather than risk deforming the wrong vertices —
+// "in doubt, drop," the same posture §5quater's `_canReuseMaterialized`
+// takes for "in doubt, rebuild."
+function relinkRigBinds(ld,layer){
+  if(!ld.rig||!ld.rig.binds||!ld.rig.binds.length)return;
+  var byId={};
+  layer.children.forEach(function(c){if(c.data&&c.data.strokeId)byId[c.data.strokeId]=c;});
+  ld.rig.binds=ld.rig.binds.filter(function(b){
+    var item=byId[b.strokeId];
+    if(!item||!item.segments||item.segments.length!==b.rest.length)return false;
+    b._live=item;
+    return true;
+  });
+}
+// Binds `path`'s own vertices to one or more bones, weighted by distance
+// to the NEAREST POINT ANYWHERE ALONG each bone's path (getNearestLocation
+// — already precedented elsewhere in this codebase, e.g. tools.js's
+// t-junction snapping, tweens.js's tween feature matching), not just to a
+// bone's own control points — a straight/curved bone influences vertices
+// along its whole length, not only at its ends. `offset` (the bone's own
+// path-length offset of the nearest point) is captured once here and
+// re-sampled at pose time via getLocationAt — same offset, current bone
+// geometry — so both position AND local tangent stay correctly anchored
+// to the SAME point on the bone as it's posed.
+function rigBindStroke(ld,path,boneIds,radius,rotate){
+  var rig=ensureLayerRig(ld);
+  // CompoundPath BEFORE the segments/length guard, deliberately: a
+  // CompoundPath has no `.segments` of its own (its geometry lives in
+  // `.children`, each a Path) — checking segments first would catch every
+  // CompoundPath as "invalid or empty target" and this dedicated,
+  // more-useful message would never fire (verified live: it didn't, until
+  // this reorder).
+  if(!path){console.warn('[rig] cible invalide');return false;}
+  if(path.className==='CompoundPath'){console.warn('[rig] les CompoundPath (résultats booléens à trous/îles) ne sont pas encore supportés par le rig');return false;}
+  if(!path.segments||!path.segments.length){console.warn('[rig] cible invalide ou vide');return false;}
+  if(path.data&&(path.data.isVectorBrush||path.data.isLinkedFillCompanion)){console.warn('[rig] les traits pinceau vectoriel (ruban + fill lié) ne sont pas encore supportés par le rig');return false;}
+  ensureStrokeId(path);
+  radius=radius||200;
+  var rest=path.segments.map(function(s){return[s.point.x,s.point.y];});
+  var weights=rest.map(function(pt){
+    var w=[],p=new Point(pt[0],pt[1]);
+    boneIds.forEach(function(bid){
+      var bone=rig.bones[bid];if(!bone)return;
+      var bp=_boneSegsToPath(bone.restSegments,bone.closed);
+      var loc=bp.getNearestLocation(p);
+      bp.remove();
+      if(!loc)return;
+      var dist=loc.point.getDistance(p);
+      var infl=Math.max(0,1-dist/radius);
+      if(infl>0)w.push({boneId:bid,offset:loc.offset,w:infl});
+    });
+    return w;
+  });
+  rig.binds.push({strokeId:path.data.strokeId,rest:rest,weights:weights,rotate:!!rotate,_live:path});
+  return true;
+}
+// Live per-vertex deform — called on every pose drag tick AND once more
+// right before a commit, so the committed keyframe always matches exactly
+// what was last seen live (no drift between preview and bake).
+function applyRigDeform(ld){
+  var rig=ld.rig;if(!rig||!rig.binds.length)return;
+  var boneCache={};
+  function bonePaths(bid){
+    if(boneCache[bid])return boneCache[bid];
+    var bone=rig.bones[bid];
+    var entry={rest:_boneSegsToPath(bone.restSegments,bone.closed),cur:_boneSegsToPath(bone.segments,bone.closed)};
+    boneCache[bid]=entry;
+    return entry;
+  }
+  rig.binds.forEach(function(b){
+    if(!b._live||!b._live.segments)return;
+    var segs=b._live.segments;
+    for(var i=0;i<segs.length&&i<b.rest.length;i++){
+      var restPt=b.rest[i],dx=0,dy=0;
+      (b.weights[i]||[]).forEach(function(wentry){
+        var bp=bonePaths(wentry.boneId);
+        var curLoc=bp.cur.getLocationAt(wentry.offset),restLoc=bp.rest.getLocationAt(wentry.offset);
+        if(!curLoc||!restLoc)return;
+        if(b.rotate){
+          // Rotate the vertex's own rest-offset FROM the bone by the bone's
+          // LOCAL tangent delta at this exact point (sampled continuously
+          // along the curve, not one angle for the whole bone — the
+          // capability Shapper's own chord-angle model doesn't have), then
+          // translate by how far that point itself moved. This is
+          // rotation-aware LBS, generalized from "one bone-angle" to "a
+          // tangent field along the curve."
+          var restAng=Math.atan2(restLoc.tangent.y,restLoc.tangent.x);
+          var curAng=Math.atan2(curLoc.tangent.y,curLoc.tangent.x);
+          var da=curAng-restAng,cosA=Math.cos(da),sinA=Math.sin(da);
+          var offX=restPt[0]-restLoc.point.x,offY=restPt[1]-restLoc.point.y;
+          var rOffX=offX*cosA-offY*sinA,rOffY=offX*sinA+offY*cosA;
+          dx+=wentry.w*((curLoc.point.x+rOffX)-restPt[0]);
+          dy+=wentry.w*((curLoc.point.y+rOffY)-restPt[1]);
+        }else{
+          dx+=wentry.w*(curLoc.point.x-restLoc.point.x);
+          dy+=wentry.w*(curLoc.point.y-restLoc.point.y);
+        }
+      });
+      segs[i].point=new Point(restPt[0]+dx,restPt[1]+dy);
+    }
+  });
+  Object.keys(boneCache).forEach(function(bid){boneCache[bid].rest.remove();boneCache[bid].cur.remove();});
+}
+function rigResetPose(ld){
+  var rig=ld.rig;if(!rig)return;
+  Object.keys(rig.bones).forEach(function(bid){
+    var bone=rig.bones[bid];
+    bone.segments=JSON.parse(JSON.stringify(bone.restSegments));
+  });
+  applyRigDeform(ld);
+}
+// Bakes the current LIVE pose into a real keyframe. Order matters — the
+// labs prototype had this backwards (ensureKeyframe AFTER the pose was
+// already live), so _smGeomDirty forced loadFrame to rebuild from the OLD
+// stored data before saveActiveLayerFrame ran, silently discarding the
+// pose. ensureKeyframe MUST run first (mirrors rigMagnetBrush's own,
+// already-correct ordering in the same labs file), THEN re-apply the
+// deform (ensureKeyframe's own loadFrame just rebuilt fresh, undeformed
+// Paper items from the newly-promoted keyframe's stored data), THEN save.
+function rigCommitFrame(ld){
+  if(!ld.rig||!ld.rig.binds.length){showToast('Aucun trait riggé');return false;}
+  if(!canEditActiveLayer())return false;
+  pushUndo();
+  ensureKeyframe();
+  relinkRigBinds(ld,userLayers[state.activeLayerIdx]);
+  applyRigDeform(ld);
+  saveActiveLayerFrame();updateUI();
+  if(window.SMEngineBridge)SMEngineBridge.renderNow();
+  showToast('Pose du rig figée sur cette frame');
+  return true;
+}
+// ---- IK (3-point chain, 2-bone law-of-cosines) — ported verbatim from
+// the labs prototype's own rigSetIK/rigDragIKEnd; operates on bone-anchor
+// POSITIONS only, indifferent to whether they're freeform dots (as in the
+// prototype) or a bone path's own segment points (here).
+function rigSetIK(ld,rootRef,jointRef,endRef,flip){
+  var rig=ensureLayerRig(ld);
+  var r=rigAnchorPoint(rig,rootRef),j=rigAnchorPoint(rig,jointRef),e=rigAnchorPoint(rig,endRef);
+  if(!r||!j||!e)return false;
+  var l1=Math.hypot(j.x-r.x,j.y-r.y),l2=Math.hypot(e.x-j.x,e.y-j.y);
+  rig.ikChains[endRef.boneId+':'+endRef.vi]={root:rootRef,joint:jointRef,end:endRef,l1:l1,l2:l2,flip:!!flip};
+  return true;
+}
+function rigAnchorPoint(rig,ref){
+  var bone=rig.bones[ref.boneId];if(!bone||!bone.restSegments[ref.vi])return null;
+  var s=bone.segments[ref.vi]||bone.restSegments[ref.vi];
+  return{x:s.point[0],y:s.point[1]};
+}
+function rigDragIKEnd(ld,endKey,x,y){
+  var rig=ld.rig;var chain=rig&&rig.ikChains[endKey];if(!chain)return false;
+  var rootS=rig.bones[chain.root.boneId].segments[chain.root.vi];
+  var dx=x-rootS.point[0],dy=y-rootS.point[1],dist=Math.hypot(dx,dy);
+  var l1=chain.l1,l2=chain.l2,maxD=l1+l2,minD=Math.abs(l1-l2);
+  var clamped=Math.max(minD+1e-6,Math.min(maxD-1e-6,dist));
+  var baseAngle=Math.atan2(dy,dx);
+  var cosA=Math.max(-1,Math.min(1,(l1*l1+clamped*clamped-l2*l2)/(2*l1*clamped)));
+  var a=Math.acos(cosA);
+  var jointAngle=baseAngle+(chain.flip?-a:a);
+  var jointX=rootS.point[0]+l1*Math.cos(jointAngle),jointY=rootS.point[1]+l1*Math.sin(jointAngle);
+  rig.bones[chain.joint.boneId].segments[chain.joint.vi].point=[jointX,jointY];
+  // End effector goes to (rootS + clamped distance along baseAngle), NOT the
+  // raw (x,y) target — verified live: using the raw target here silently
+  // stretched the joint-end segment past l2 whenever the drag went further
+  // than the chain's reach (l1+l2), breaking the whole point of a rigid
+  // 2-bone IK solve. This reconstructs the exact raw (x,y) when the target
+  // was already reachable (clamped===dist, so this equals rootS+(dx,dy)),
+  // and the closest reachable point on the baseAngle ray otherwise — always
+  // exactly l2 from the joint by the same law-of-cosines construction used
+  // for jointAngle above.
+  var endX=rootS.point[0]+clamped*Math.cos(baseAngle),endY=rootS.point[1]+clamped*Math.sin(baseAngle);
+  rig.bones[chain.end.boneId].segments[chain.end.vi].point=[endX,endY];
+  applyRigDeform(ld);
+  return true;
+}
 function resolveSymbolFrameIdx(sym,layer,mainFrameIdx){
   // A key on the parent Animation 2D timeline may explicitly pick the
   // component frame displayed for the whole held span. This is deliberately
@@ -2546,7 +2761,7 @@ function loadFrame(idx){
   // against the correctly-stored interpolated value permanently flagged
   // untouched inbetweens as "manually edited" the moment you navigated
   // through them.
-  strokes.forEach(function(sd){if(sd.isRaster)desR(sd,userLayers[i]);else desP(sd,userLayers[i]);});relinkBrushCompanions(userLayers[i]);relinkLinkedFills(userLayers[i]);
+  strokes.forEach(function(sd){if(sd.isRaster)desR(sd,userLayers[i]);else desP(sd,userLayers[i]);});relinkBrushCompanions(userLayers[i]);relinkLinkedFills(userLayers[i]);if(state.layers[i].rig)relinkRigBinds(state.layers[i],userLayers[i]);
   userLayers[i]._matStrokes=strokes;userLayers[i]._smGeomDirty=false;}
   userLayers[state.activeLayerIdx].activate();
   // Vue caméra (v18) : loadFrame est LE point de passage de tout changement

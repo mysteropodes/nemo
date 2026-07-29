@@ -357,7 +357,7 @@ window.SM={
       showToast('Profil "Producteur" : lecture seule + commentaires');
       return;
     }
-    if(t!=='select'&&t!=='subselect')clearSel();if(t!=='fsselect')fsClearSel();if(t!=='pen'&&_pen.path)finalizePen();if(t!=='eraser'&&typeof _eraserCursor!=='undefined'&&_eraserCursor){_eraserCursor.remove();_eraserCursor=null;}
+    if(t!=='select'&&t!=='subselect'&&t!=='rig')clearSel();if(t!=='fsselect')fsClearSel();if(t!=='pen'&&_pen.path)finalizePen();if(t!=='rig'&&typeof _rigDraw!=='undefined'&&_rigDraw.path&&window.SMRig)window.SMRig.finalizeRigBone();if(t!=='eraser'&&typeof _eraserCursor!=='undefined'&&_eraserCursor){_eraserCursor.remove();_eraserCursor=null;}
     // Picking a tool always means "I'm done with the timeline frame
     // selection" — leaving it selected made the status bar keep showing
     // keyframe shortcuts instead of the newly-picked tool's help.
@@ -385,7 +385,7 @@ window.SM={
     state.tool=t;renderArcs();
     if(_camToolChanged)renderTimeline();
     document.querySelectorAll('.tool-btn').forEach(function(b){b.classList.toggle('active',b.dataset.tool===t);});
-    var cc={draw:'crosshair',pen:'crosshair',line:'crosshair',rect:'crosshair',ellipse:'crosshair',select:'default',subselect:'default',fsselect:'default',comment:'crosshair',camera:'move',text:'text',eraser:'pointer',fill:'crosshair',fillbrush:'crosshair',eyedropper:'crosshair',hand:'grab',zoom:'zoom-in',rotate:'grab',perspective:'crosshair',symmetry:'crosshair'};
+    var cc={draw:'crosshair',pen:'crosshair',line:'crosshair',rect:'crosshair',ellipse:'crosshair',select:'default',subselect:'default',fsselect:'default',comment:'crosshair',camera:'move',text:'text',eraser:'pointer',fill:'crosshair',fillbrush:'crosshair',eyedropper:'crosshair',hand:'grab',zoom:'zoom-in',rotate:'grab',perspective:'crosshair',symmetry:'crosshair',rig:'crosshair'};
     canvasEl.style.cursor=cc[t]||'default';
     updatePropsContext();
     if(window.renderLabsFloatPanel)renderLabsFloatPanel();},
@@ -859,6 +859,11 @@ window.SM={
     // motion data is keyed by, a plain deep-copy stays correctly matched.
     if(src.elementMotion)state.layers[ni].elementMotion=JSON.parse(JSON.stringify(src.elementMotion));
     if(src.duplicator){state.layers[ni].duplicator=JSON.parse(JSON.stringify(src.duplicator));state.layers[ni].locked=true;}
+    // ld.rig doesn't force-lock its layer (unlike duplicator) — binds
+    // reference strokeId, unchanged by the frame clone above (same comment
+    // as elementMotion just above), so relinkRigBinds matches correctly
+    // on the duplicate without any extra remapping.
+    if(src.rig)state.layers[ni].rig=JSON.parse(JSON.stringify(src.rig));
     if(src.inPoint!=null)state.layers[ni].inPoint=src.inPoint;if(src.outPoint!=null)state.layers[ni].outPoint=src.outPoint;activateUL(ni);loadFrame(state.currentFrame);updateUI();},
   setActiveLayer:function(idx){if(idx<0||idx>=state.layers.length)return;saveAllLayerFrames();activateUL(idx);clearSel();
     window._layerActiveExplicit=true; // see clearSel()'s own comment — an explicit timeline row click, not a canvas deselect
@@ -1367,7 +1372,13 @@ window.SM={
         // Mograph duplicator (2026-07-29) — copied wholesale like
         // symMatrix/lfsSettings, no per-field whitelist for its innards.
         // (_dupEditSource is transient and deliberately NOT persisted.)
-        duplicator:l.duplicator||undefined};}),
+        duplicator:l.duplicator||undefined,
+        // Rig tool (2026-07-29) — bones/binds/ikChains, plain JSON by
+        // construction (see app.js's ensureLayerRig), copied wholesale like
+        // duplicator above. Binds reference strokeId, relinked on load by
+        // relinkRigBinds (app.js, called from loadFrame) — never a live
+        // Path reference, so a straight JSON round-trip is safe.
+        rig:l.rig||undefined};}),
       layerFolders:state.layerFolders,layerLinkGroups:state.layerLinkGroups,
       // StoryBoard node space (2026-07) — plain data by construction (no
       // runtime-only fields live in state.storyboard, see storyboard.js's
@@ -1569,6 +1580,7 @@ window.SM={
       if(ld.timeLink)state.layers[idx].timeLink=ld.timeLink;              // Parent in Time
       if(ld.threeD)state.layers[idx].threeD=true;                         // calque 3D
       if(ld.duplicator){state.layers[idx].duplicator=ld.duplicator;state.layers[idx].locked=true;} // duplicateur mograph (relock: _dupEditSource n'est jamais persisté)
+      if(ld.rig)state.layers[idx].rig=ld.rig;                             // rig (os/binds/IK) — relinkRigBinds fait le reste au premier loadFrame
       state.layers[idx].color=ld.color||nextLayerColor();
       ld.frames.forEach(function(f){if(!f.isInterpolated)f.isInterpolated=false;});while(state.layers[idx].frames.length<state.totalFrames)state.layers[idx].frames.push({strokes:[],isKeyframe:false,isInterpolated:false});});
     state.layerFolders=d.layerFolders||{};state.layerLinkGroups=d.layerLinkGroups||{};
@@ -1774,6 +1786,7 @@ function getToolHelp(tool){
     comment:{desc:tt('thCommentDesc'),sc:[]},
     text:{desc:tt('thTextDesc'),sc:[]},
     perspective:{desc:tt('thPerspectiveDesc'),sc:[]},
+    rig:{desc:tt('thRigDesc'),sc:[['S',tt('thTool')],['Clic',tt('thAnchor')],['Glisser une ancre existante',tt('thRigPose')],['Double-clic',tt('thFinish')]]},
   };
   return TOOL_HELP[tool];
 }
@@ -1856,8 +1869,13 @@ function updateStatusBarHelp(){
 function updatePropsContext(){
   var hasSel=(state.tool==='select'||state.tool==='subselect')&&selectedPaths.length>0;
   var ctx,hdrText;
-  var show={'sel-props-sec':false,'fill-sec':false,'stroke-sec':false,'tool-opts-sec':false,'canvas-sec':false,'layer-sec':false};
-  if(state.tool==='fsselect'&&_fsSel.length){
+  var show={'sel-props-sec':false,'fill-sec':false,'stroke-sec':false,'tool-opts-sec':false,'canvas-sec':false,'layer-sec':false,'rig-opts-sec':false};
+  if(state.tool==='rig'){
+    ctx='rig';
+    show['rig-opts-sec']=true;
+    show['layer-sec']=!!(state.layers[state.activeLayerIdx]);
+    hdrText=(window.SM&&SM.t?SM.t('toolRig'):'Rig')+' — Options';
+  }else if(state.tool==='fsselect'&&_fsSel.length){
     // Multi-select (2026-07): show BOTH sections if the selection mixes
     // fill and stroke picks — no Position/Size (this tool doesn't offer
     // transform, Select already owns that) and no Effects (blend mode
@@ -1953,7 +1971,7 @@ function updatePropsContext(){
   // layer-sec (Blend/Matte/Flou) is spared: those are genuine per-layer
   // properties still meaningful while animating, not a drawing-tool panel.
   if(state.appMode==='motion'){
-    show['sel-props-sec']=show['fill-sec']=show['stroke-sec']=show['tool-opts-sec']=show['canvas-sec']=false;
+    show['sel-props-sec']=show['fill-sec']=show['stroke-sec']=show['tool-opts-sec']=show['canvas-sec']=show['rig-opts-sec']=false;
   }
   Object.keys(show).forEach(function(id){var sec=document.getElementById(id);if(sec)sec.style.display=show[id]?'block':'none';});
   // state.drawMode (Front/Behind) has no effect on Fill Brush — it's always
@@ -4426,6 +4444,7 @@ var TOOL_SHORTCUTS=[
   {action:'text',key:'y',label:'Texte'},
   {action:'rotate',key:'w',label:'Rotation du canevas'},
   {action:'perspective',key:'q',label:'Perspective'},
+  {action:'rig',key:'s',label:'Rig (Skeleton)'},
 ];
 var _shortcutOverrides=null;
 function shortcutOverrides(){
@@ -6879,6 +6898,41 @@ document.getElementById('comp-offset').addEventListener('change',function(){wind
     var ld=state.layers[state.activeLayerIdx];
     if(!ld||!ld.duplicator||!window.SMMotion)return;
     SMMotion.setDuplicatorEditSource(state.activeLayerIdx,!ld._dupEditSource);
+  });
+})();
+// ---- Rig tool panel (2026-07-29) ----
+// Weight radius / rotate mode are read directly off the panel at BIND time
+// (rigBindStroke's own radius/rotate params) rather than mirrored into a
+// state field — they're bind-time parameters, not a persisted per-layer
+// setting, so there's nothing to keep in sync when the panel isn't visible.
+(function(){
+  document.getElementById('btn-rig-bind').addEventListener('click',function(){
+    var ld=state.layers[state.activeLayerIdx];
+    if(!ld)return;
+    if(!canEditActiveLayer())return;
+    var rig=ld.rig;
+    if(!rig||!Object.keys(rig.bones).length){showToast('Dessine au moins un os avant de lier');return;}
+    if(typeof selectedPaths==='undefined'||!selectedPaths.length){showToast('Sélectionne d’abord une forme (outil Sélection) avant de la lier au rig');return;}
+    var radius=parseFloat(document.getElementById('rig-weight-radius').value)||200;
+    var rotate=document.getElementById('rig-rotate-mode').checked;
+    var boneIds=Object.keys(rig.bones);
+    pushUndo();
+    var n=0;
+    selectedPaths.forEach(function(p){if(rigBindStroke(ld,p,boneIds,radius,rotate))n++;});
+    if(n)showToast(n+' forme(s) liée(s) au rig');
+  });
+  document.getElementById('btn-rig-commit').addEventListener('click',function(){
+    var ld=state.layers[state.activeLayerIdx];
+    if(ld)rigCommitFrame(ld);
+  });
+  document.getElementById('btn-rig-reset').addEventListener('click',function(){
+    var ld=state.layers[state.activeLayerIdx];
+    if(!ld||!ld.rig)return;
+    if(!canEditActiveLayer())return;
+    pushUndo();
+    rigResetPose(ld);
+    if(window.SMEngineBridge)SMEngineBridge.renderNow();
+    showToast('Pose du rig réinitialisée');
   });
 })();
 // Save/Save As/Open/New buttons and the legacy download/upload fallback
