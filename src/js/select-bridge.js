@@ -613,6 +613,12 @@
     var hitPt = pt;
     if (state.appMode === 'motion' && window.SMMotion) {
       var hitMap = SMMotion.layerMotionPointMap(state.activeLayerIdx);
+      // 3D layers (2026-07-29 fix) — layerMotionPointMap returns null for a
+      // 3D-toggled layer even with real rotationX/rotationY set (it only
+      // recognizes the base 2D properties); layerMotion3DPointMap is the
+      // dedicated perspective-correct counterpart — see its own header
+      // comment in motion.js for the ray-plane-intersection math.
+      if (!hitMap && SMMotion.layerMotion3DPointMap) hitMap = SMMotion.layerMotion3DPointMap(state.activeLayerIdx);
       if (hitMap) { var hg = hitMap.inv(pt.x, pt.y); hitPt = new Point(hg[0], hg[1]); }
     }
     var hit = (activeLdForLock.locked && !activeLdForLock.symbolId) ? null : layer.hitTest(hitPt, { stroke: true, fill: true, tolerance: 8 / view.zoom });
@@ -1459,6 +1465,12 @@
     var hitPt = pt;
     if (state.appMode === 'motion' && window.SMMotion) {
       var hitMap = SMMotion.layerMotionPointMap(state.activeLayerIdx);
+      // 3D layers (2026-07-29 fix) — layerMotionPointMap returns null for a
+      // 3D-toggled layer even with real rotationX/rotationY set (it only
+      // recognizes the base 2D properties); layerMotion3DPointMap is the
+      // dedicated perspective-correct counterpart — see its own header
+      // comment in motion.js for the ray-plane-intersection math.
+      if (!hitMap && SMMotion.layerMotion3DPointMap) hitMap = SMMotion.layerMotion3DPointMap(state.activeLayerIdx);
       if (hitMap) { var hg = hitMap.inv(pt.x, pt.y); hitPt = new Point(hg[0], hg[1]); }
     }
     var hit = (activeLdForLock.locked && !activeLdForLock.symbolId) ? null : layer.hitTest(hitPt, { stroke: true, fill: true, tolerance: 8 / view.zoom });

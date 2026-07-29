@@ -1835,10 +1835,32 @@
     // rolling the math a second time. Radius uses the average of sx/sy: an
     // exact ellipse would need a different render primitive than a circle,
     // and Motion "zoom" is overwhelmingly a uniform scale in practice.
-    var motionMap = (window.SMMotion && SMMotion.layerMotionPointMap) ? SMMotion.layerMotionPointMap(state.activeLayerIdx) : null;
-    function toRenderedSegs(segs) { return motionMap ? SMMotion.transformSegments(segs, motionMap.pivot, motionMap.mat) : segs; }
-    function toRendered(x, y) { return motionMap ? motionMap.fwd(x, y) : [x, y]; }
-    function toRenderedRadius(r) { return motionMap ? r * (motionMap.mat.sx + motionMap.mat.sy) / 2 : r; }
+    // 3D layers (2026-07-29 fix) — the 2D affine map/transformSegments pair
+    // above don't apply here at all (make3DProjector's forward map is a
+    // true perspective projection); project3DSegments (motion.js, already
+    // used by buildSceneJson's own 3D branch) is the correct per-vertex
+    // equivalent of transformSegments for this case.
+    var activeLd = state.layers[state.activeLayerIdx];
+    var is3DActive = !!(activeLd && activeLd.threeD);
+    var bounds3D = (is3DActive && userLayers[state.activeLayerIdx]) ? userLayers[state.activeLayerIdx].bounds : null;
+    var projector3D = (is3DActive && window.SMMotion && SMMotion.make3DProjector && bounds3D) ? SMMotion.make3DProjector(activeLd, bounds3D, state.currentFrame, state.canvasW, state.canvasH) : null;
+    var motionMap = (!projector3D && window.SMMotion && SMMotion.layerMotionPointMap) ? SMMotion.layerMotionPointMap(state.activeLayerIdx) : null;
+    function toRenderedSegs(segs) {
+      if (projector3D) return SMMotion.project3DSegments(segs, projector3D);
+      return motionMap ? SMMotion.transformSegments(segs, motionMap.pivot, motionMap.mat) : segs;
+    }
+    function toRendered(x, y) {
+      if (projector3D) { var p = projector3D(x, y); return [p.x, p.y]; }
+      return motionMap ? motionMap.fwd(x, y) : [x, y];
+    }
+    // No single scale factor exists under perspective — approximated by
+    // probing the actual projected distance from the circle's own (already-
+    // rendered) center to one point on its rim. Fine for a rough visual
+    // guide (never hit-tested against, never exported).
+    function toRenderedRadius(r, cx, cy, renderedC) {
+      if (projector3D) { var rim = projector3D(cx + r, cy); return Math.hypot(rim.x - renderedC[0], rim.y - renderedC[1]); }
+      return motionMap ? r * (motionMap.mat.sx + motionMap.mat.sy) / 2 : r;
+    }
     function pushHandles(pt, hi, ho) {
       if (Math.hypot(hi[0], hi[1]) > 0.5) {
         var hiPt = [pt[0] + hi[0], pt[1] + hi[1]];
@@ -1880,7 +1902,7 @@
         var c0 = SMRig.boneCircleCenter(bone);
         var r0 = SMRig.boneRadiusOf(bone, panelDefault);
         var c = toRendered(c0.x, c0.y);
-        var r = toRenderedRadius(r0);
+        var r = toRenderedRadius(r0, c0.x, c0.y, c);
         items.push({ segments: [{ point: [c[0] - 4 * zs, c[1]] }, { point: [c[0] + 4 * zs, c[1]] }], closed: false, fillColor: null, strokeColor: influenceCol, strokeWidth: 1.4 * zs });
         items.push({ segments: [{ point: [c[0], c[1] - 4 * zs] }, { point: [c[0], c[1] + 4 * zs] }], closed: false, fillColor: null, strokeColor: influenceCol, strokeWidth: 1.4 * zs });
         items.push(circleItem(c[0], c[1], r, null, influenceCol, 1.6 * zs));
@@ -1964,6 +1986,10 @@
     // the overlay actually sits on the shape it's editing instead of at its
     // pre-transform position.
     var motionMap = (window.SMMotion && SMMotion.layerMotionPointMap) ? SMMotion.layerMotionPointMap(state.activeLayerIdx) : null;
+    // 3D layers (2026-07-29 fix) — layerMotionPointMap returns null for a
+    // 3D-toggled layer even with real rotationX/rotationY set; layerMotion3DPointMap
+    // is the dedicated perspective-correct counterpart (motion.js).
+    if (!motionMap && window.SMMotion && SMMotion.layerMotion3DPointMap) motionMap = SMMotion.layerMotion3DPointMap(state.activeLayerIdx);
     function toRendered(x, y) { return motionMap ? motionMap.fwd(x, y) : [x, y]; }
     segs.forEach(function (s, i) {
       var pt = toRendered(s.point[0], s.point[1]);

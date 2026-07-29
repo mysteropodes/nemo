@@ -1011,6 +1011,72 @@
       return project3DToScreenPoint(wx, wy, wz, canvasW, canvasH);
     };
   }
+  // 3D layers (2026-07-29, Cyril: "attaque le chantier" of Select/Subselect/
+  // Rig having zero awareness of ld.threeD) — layerMotionPointMap (below)
+  // only recognizes the base 2D properties, so it returned null for a
+  // 3D-toggled layer (rotationX/rotationY/positionZ never registered as
+  // "this layer has a transform"), and every canvas tool built on it
+  // (select-bridge.js, subselect-bridge.js, rig-bridge.js) silently fell
+  // back to "no mapping", operating at the click's RAW screen position —
+  // confirmed live: dragging a rig bone anchor on a 3D-rotated layer
+  // snapped it to a wildly wrong position, nowhere near the cursor.
+  //
+  // Unlike the 2D case, make3DProjector's forward map is a true PERSPECTIVE
+  // projection (project3DToScreen: screen = center + world/depthW, depthW
+  // depending on each point's own post-rotation Z) — not affine, so
+  // inverting it isn't a 2x2 matrix invert. This solves the actual
+  // ray-plane intersection instead: the layer's local XY plane, after its
+  // 3D rotation, is a plane in 3D — point O (the pivot's world position)
+  // spanned by basis vectors e1/e2 (the rotated, scaled local X/Y unit
+  // vectors, from the SAME rotate3D the forward projector itself uses, just
+  // probed with unit vectors instead of an actual point). The screen point
+  // defines a camera ray (the exact inverse of project3DToScreen's own
+  // depthW formula: a point at ray-parameter t has wz = CAMERA_DISTANCE*
+  // (t-1), which reproduces depthW=t and wx/depthW=ux at every t — i.e.
+  // every point on this ray really does project to the same screen point,
+  // by construction). Solving where the ray crosses the plane (3 linear
+  // equations, 3 unknowns t/lx/ly — Cramer's rule) gives back the exact
+  // local (lx,ly) that projected there: the mathematically correct
+  // inverse, not a local/linearized approximation.
+  function layerMotion3DPointMap(li) {
+    var ld = state.layers[li];
+    if (!ld || !ld.threeD) return null;
+    var lb = userLayers[li] && userLayers[li].bounds;
+    if (!lb) return null;
+    var frameIdx = state.currentFrame;
+    var pos = valueAtFrame(ld, 'position', frameIdx);
+    var anc = valueAtFrame(ld, 'anchor', frameIdx);
+    var rot = valueAtFrame(ld, 'rotation', frameIdx)[0];
+    var scl = valueAtFrame(ld, 'scale', frameIdx);
+    var posZ = valueAtFrame(ld, 'positionZ', frameIdx)[0];
+    var rotX = valueAtFrame(ld, 'rotationX', frameIdx)[0];
+    var rotY = valueAtFrame(ld, 'rotationY', frameIdx)[0];
+    var sx = scl[0] / 100 || 1e-6, sy = scl[1] / 100 || 1e-6;
+    var pivotX = lb.x + lb.width / 2 + anc[0], pivotY = lb.y + lb.height / 2 + anc[1];
+    var projector = make3DProjector(ld, lb, frameIdx, state.canvasW, state.canvasH);
+    var Ox = pivotX + pos[0] - state.canvasW / 2, Oy = pivotY + pos[1] - state.canvasH / 2, Oz = posZ;
+    var e1 = rotate3D(sx, 0, 0, rotX, rotY, rot);
+    var e2 = rotate3D(0, sy, 0, rotX, rotY, rot);
+    return {
+      fwd: function (x, y) { var p = projector(x, y); return [p.x, p.y]; },
+      inv: function (sx2, sy2) {
+        var ux = sx2 - state.canvasW / 2, uy = sy2 - state.canvasH / 2;
+        // [ux,-e1x,-e2x; uy,-e1y,-e2y; CAMERA_DISTANCE,-e1z,-e2z] * [t,lx,ly]^T = [Ox,Oy,Oz+CAMERA_DISTANCE]^T
+        var a11 = ux, a12 = -e1[0], a13 = -e2[0], b1 = Ox;
+        var a21 = uy, a22 = -e1[1], a23 = -e2[1], b2 = Oy;
+        var a31 = CAMERA_DISTANCE, a32 = -e1[2], a33 = -e2[2], b3 = Oz + CAMERA_DISTANCE;
+        var det = a11 * (a22 * a33 - a23 * a32) - a12 * (a21 * a33 - a23 * a31) + a13 * (a21 * a32 - a22 * a31);
+        // Degenerate: the view ray is exactly parallel to the rotated plane
+        // (a true edge-on 90° view) — falls back to the pivot rather than
+        // dividing by ~0; a real user gesture never sustains exactly 90°.
+        if (Math.abs(det) < 1e-9) return [pivotX, pivotY];
+        var detLx = a11 * (b2 * a33 - a23 * b3) - b1 * (a21 * a33 - a23 * a31) + a13 * (a21 * b3 - b2 * a31);
+        var detLy = a11 * (a22 * b3 - b2 * a32) - a12 * (a21 * b3 - b2 * a31) + b1 * (a21 * a32 - a22 * a31);
+        var lx = detLx / det, ly = detLy / det;
+        return [pivotX + lx / sx, pivotY + ly / sy];
+      },
+    };
+  }
   // Projects every vertex of a stroke's segments through `projector` —
   // handles (bezier control tangents) are RELATIVE vectors, and a true
   // perspective-correct transform of a cubic curve isn't itself a cubic (a
@@ -4829,6 +4895,13 @@
         },
       };
     },
+    // 3D counterpart of layerMotionPointMap just above — null unless
+    // ld.threeD, since a 3D layer's forward map is a true perspective
+    // projection, not the 2D case's affine one (see layerMotion3DPointMap's
+    // own header comment). Callers check the 2D map first (the overwhelmingly
+    // common case) and fall back to this one only when it's null AND the
+    // active layer is 3D.
+    layerMotion3DPointMap: layerMotion3DPointMap,
     setLayerValue: function (li, prop, vals) { var ld = state.layers[li]; if (ld) setValue(ld, prop, vals); },
     layerMotionAt: layerMotionAt,
     // Exposed for getEffectiveStrokes' symbolId branch (app.js, 2026-07-29
