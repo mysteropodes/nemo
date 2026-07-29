@@ -1559,6 +1559,25 @@
     items.push({ segments: [{ point: [aw.x - 9 * zs, aw.y] }, { point: [aw.x + 9 * zs, aw.y] }], closed: false, fillColor: null, strokeColor: ancCol, strokeWidth: 1.5 * zs });
     items.push({ segments: [{ point: [aw.x, aw.y - 9 * zs] }, { point: [aw.x, aw.y + 9 * zs] }], closed: false, fillColor: null, strokeColor: ancCol, strokeWidth: 1.5 * zs });
     items.push({ segments: circleSegs(aw.x, aw.y, 6 * zs), closed: true, fillColor: null, strokeColor: ancCol, strokeWidth: 1.5 * zs });
+    // Mograph effectors (2026-07-29) — layer-target only, only when this
+    // layer has a duplicator with 1+ effectors. Each is a crosshair-in-
+    // circle (same shape as the anchor point above, own color so the two
+    // are never confused) plus a translucent, non-interactive falloff-
+    // radius ring — same circleSegs primitive already used for the 3D
+    // gizmo's own rotation rings just below.
+    if (t.li != null && state.layers[t.li] && state.layers[t.li].duplicator && state.layers[t.li].duplicator.effectors && !t.strokeId) {
+      var effCol = [255, 120, 220, 255];
+      state.layers[t.li].duplicator.effectors.forEach(function (eff) {
+        if (!eff.pos) return;
+        var ew = outerWorldPoint(t, { x: eff.pos.x, y: eff.pos.y });
+        items.push({ segments: [{ point: [ew.x - 8 * zs, ew.y] }, { point: [ew.x + 8 * zs, ew.y] }], closed: false, fillColor: null, strokeColor: effCol, strokeWidth: 1.5 * zs });
+        items.push({ segments: [{ point: [ew.x, ew.y - 8 * zs] }, { point: [ew.x, ew.y + 8 * zs] }], closed: false, fillColor: null, strokeColor: effCol, strokeWidth: 1.5 * zs });
+        items.push({ segments: circleSegs(ew.x, ew.y, 5 * zs), closed: true, fillColor: null, strokeColor: effCol, strokeWidth: 1.5 * zs });
+        // Falloff ring — world-space radius (not zoom-scaled: it represents
+        // a real document-space distance, unlike the handle glyphs above).
+        items.push({ segments: circleSegs(ew.x, ew.y, eff.radius || 0), closed: true, fillColor: null, strokeColor: [255, 120, 220, 90], strokeWidth: 1 * zs });
+      });
+    }
     // 3D gizmo (2026-07-28) — layer-target only (not per-element), only
     // when this layer has 3D on. Position arrows first, then rotation
     // rings on top (rings are the more precise/deliberate grab, matching
@@ -1946,6 +1965,22 @@
     var ax=aw.x,ay=aw.y;
     return Math.hypot(pt.x - ax, pt.y - ay) < tol ? { holder: t.holder, bc: t.boundsCenter, target:t } : null;
   }
+  // Mograph effector handles (2026-07-29) — layer-target only (not
+  // per-element), only when this layer has a duplicator with 1+ effectors.
+  // Iterated back-to-front so the LAST-added (topmost-drawn) effector wins
+  // an overlapping click, matching normal z-order picking conventions.
+  function hitEffectorHandle(pt, t) {
+    var dup = t.li != null && state.layers[t.li] && state.layers[t.li].duplicator;
+    var effs = dup && dup.effectors;
+    if (!effs || !effs.length) return null;
+    var tol = 8 / view.zoom;
+    for (var i = effs.length - 1; i >= 0; i--) {
+      var eff = effs[i]; if (!eff.pos) continue;
+      var wp = outerWorldPoint(t, { x: eff.pos.x, y: eff.pos.y });
+      if (Math.hypot(pt.x - wp.x, pt.y - wp.y) < tol) return eff;
+    }
+    return null;
+  }
   function onDown(event) {
     // Unified multi-selection path first — while it's active the overlay
     // shows ONLY the unified dots (see buildOverlayItems), so the single-
@@ -2059,6 +2094,12 @@
       }
       var ap = hitAnchorPoint(event.point, t);
       if (ap) { pushUndo(); _motionDrag = { mode: 'anchor', holder: ap.holder, bc: ap.bc, t:ap.target }; return true; }
+      // Effector handles (2026-07-29) — checked last, lowest priority: they
+      // only exist on duplicator layers and the user places them wherever
+      // they like, so overlap with the box/position/anchor controls above
+      // is rare, but those established grabs should still win if it happens.
+      var effHit = hitEffectorHandle(event.point, t);
+      if (effHit) { pushUndo(); _motionDrag = { mode: 'effector', t: t, eff: effHit }; return true; }
     }
     return false;
   }
@@ -2098,6 +2139,16 @@
     } else if (_motionDrag.mode === 'anchor') {
       var localAnchor=outerLocalPoint(_motionDrag.t,{x:event.point.x,y:event.point.y});
       setValue(_motionDrag.holder, 'anchor', [localAnchor.x - _motionDrag.bc.x, localAnchor.y - _motionDrag.bc.y]);
+    } else if (_motionDrag.mode === 'effector') {
+      // Plain mutation, not setValue/keyframe — effectors are static
+      // per-duplicator config (like its mode/rows/radius/etc.), not a
+      // Motion-keyframable property (see the effectors plan's own note on
+      // why: a variable-length array doesn't fit propsFor's fixed list).
+      // The already-shipped renderNow() duplicator guard (engine-bridge.js)
+      // re-materializes on the very next render, so this needs no explicit
+      // loadFrame call here.
+      var localEff=outerLocalPoint(_motionDrag.t,{x:event.point.x,y:event.point.y});
+      _motionDrag.eff.pos={x:localEff.x,y:localEff.y};
     } else if (_motionDrag.mode === 'motionRotate') {
       // Recomputed from the FIXED drag-start baseline every tick (not
       // incrementally accumulated) — setValue always writes an absolute

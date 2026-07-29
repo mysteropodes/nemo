@@ -4338,7 +4338,55 @@ function updateDuplicatorPanel(){
   var editBtn=document.getElementById('btn-dup-edit-source');
   editBtn.textContent=ld._dupEditSource?(window.SM&&SM.t?SM.t('dupEditSourceDone'):'Terminé — réactiver la duplication'):(window.SM&&SM.t?SM.t('dupEditSource'):'Modifier la forme source…');
   editBtn.classList.toggle('ac',!ld._dupEditSource);
+  renderDuplicatorEffectors(dup);
 }
+// Effector rows (2026-07-29) — rebuilt from scratch every call, same
+// "variable-length list, no static markup" pattern as renderCompFrameStrip
+// above. Each field writes straight into ld.duplicator.effectors[i].* then
+// reloads the frame — the shipped renderNow() duplicator guard already
+// covers real-time correctness for any mutation path, this one included.
+function renderDuplicatorEffectors(dup){
+  var list=document.getElementById('dup-effectors-list');
+  if(!list)return;
+  list.innerHTML='';
+  (dup.effectors||[]).forEach(function(eff,i){
+    var row=document.createElement('div');
+    row.style.cssText='display:flex;flex-direction:column;gap:4px;padding:6px 8px;margin:2px 0;border-radius:6px;background:rgba(255,255,255,.03)';
+    function line(){var l=document.createElement('div');l.className='pr';row.appendChild(l);return l;}
+    function num(l,id,val,step){var s=document.createElement('span');s.className='pl';s.textContent=l;var inp=document.createElement('input');inp.type='number';inp.className='pi scrub';inp.value=val;inp.dataset.step=step||1;inp.addEventListener('change',function(){id(parseFloat(inp.value)||0);dupRefreshFromPanel();});return[s,inp];}
+    // Header: falloff mode, radius, strength, delete.
+    var hdr=line();
+    var modeSel=document.createElement('select');modeSel.className='psel';
+    ['radial','linear'].forEach(function(v){var o=document.createElement('option');o.value=v;o.textContent=v==='radial'?'Radial':'Linear';if(eff.falloff===v||(!eff.falloff&&v==='radial'))o.selected=true;modeSel.appendChild(o);});
+    modeSel.addEventListener('change',function(){eff.falloff=modeSel.value;renderDuplicatorEffectors(dup);dupRefreshFromPanel();});
+    hdr.appendChild(modeSel);
+    var rad=num('R',function(v){eff.radius=v;},eff.radius||200,1);hdr.appendChild(rad[0]);hdr.appendChild(rad[1]);
+    var str=num('%',function(v){eff.strength=v;},eff.strength!=null?eff.strength:100,1);hdr.appendChild(str[0]);hdr.appendChild(str[1]);
+    var delBtn=document.createElement('button');delBtn.className='pbtn';delBtn.textContent='✕';delBtn.style.marginLeft='auto';
+    delBtn.addEventListener('click',function(){dup.effectors.splice(i,1);renderDuplicatorEffectors(dup);dupRefreshFromPanel();});
+    hdr.appendChild(delBtn);
+    if((eff.falloff||'radial')==='linear'){
+      var angRow=line();
+      var ang=num('°',function(v){eff.angle=v;},eff.angle||0,1);angRow.appendChild(ang[0]);angRow.appendChild(ang[1]);
+    }
+    // Offsets: same 4 deltas as the index-based stagger, just spatially weighted.
+    var posRow=line();
+    var px=num('Pos X',function(v){(eff.offsetPos||(eff.offsetPos=[0,0]))[0]=v;},(eff.offsetPos||[0,0])[0],1);posRow.appendChild(px[0]);posRow.appendChild(px[1]);
+    var py=num('Y',function(v){(eff.offsetPos||(eff.offsetPos=[0,0]))[1]=v;},(eff.offsetPos||[0,0])[1],1);posRow.appendChild(py[0]);posRow.appendChild(py[1]);
+    var rotScaleRow=line();
+    var rot=num('Rot',function(v){eff.offsetRot=v;},eff.offsetRot||0,1);rotScaleRow.appendChild(rot[0]);rotScaleRow.appendChild(rot[1]);
+    var sx=num('Sc X',function(v){(eff.offsetScale||(eff.offsetScale=[0,0]))[0]=v;},(eff.offsetScale||[0,0])[0],1);rotScaleRow.appendChild(sx[0]);rotScaleRow.appendChild(sx[1]);
+    var sy=num('Y',function(v){(eff.offsetScale||(eff.offsetScale=[0,0]))[1]=v;},(eff.offsetScale||[0,0])[1],1);rotScaleRow.appendChild(sy[0]);rotScaleRow.appendChild(sy[1]);
+    var opRow=line();
+    var op=num('Op',function(v){eff.offsetOpacity=v;},eff.offsetOpacity||0,1);opRow.appendChild(op[0]);opRow.appendChild(op[1]);
+    list.appendChild(row);
+  });
+}
+// Shared refresh for every dynamically-built effector field above — same
+// reload+render sequence the static duplicator fields already use
+// (dupRefresh, in the wiring IIFE further down), factored out here since
+// this function lives above that closure.
+function dupRefreshFromPanel(){loadFrame(state.currentFrame);if(window.SMEngineBridge)SMEngineBridge.renderNow();}
 window.updateDuplicatorPanel=updateDuplicatorPanel;
 function showToast(m){var el=document.getElementById('toast');el.textContent=m;el.classList.add('show');clearTimeout(window._toastT);window._toastT=setTimeout(function(){el.classList.remove('show');},2500);}
 
@@ -6813,6 +6861,18 @@ document.getElementById('comp-offset').addEventListener('change',function(){wind
   document.getElementById('dup-path-align').addEventListener('change',function(){var d=dupOf();if(!d)return;d.pathAlignTangent=this.checked;dupRefresh();});
   document.getElementById('dup-path-layer').addEventListener('change',function(){var d=dupOf();if(!d)return;d.pathLayerUid=this.value||null;dupRefresh();});
   document.getElementById('btn-dup-reseed').addEventListener('click',function(){var d=dupOf();if(!d)return;d.seed=Math.floor(Math.random()*1e6);dupRefresh();});
+  // Effectors (2026-07-29) — new one starts centered on the layer's own
+  // seed content so it's immediately visible/draggable rather than sitting
+  // off-canvas at the space origin.
+  document.getElementById('btn-dup-add-effector').addEventListener('click',function(){
+    var d=dupOf();if(!d)return;
+    var ld=state.layers[state.activeLayerIdx];
+    var strokes=getEffectiveStrokes(state.activeLayerIdx,state.currentFrame);
+    var pivot=_boundsCenterOfStrokes(strokes);
+    if(!d.effectors)d.effectors=[];
+    d.effectors.push({pos:{x:pivot.x,y:pivot.y},radius:200,falloff:'radial',angle:0,strength:100,offsetPos:[0,0],offsetRot:0,offsetScale:[0,0],offsetOpacity:0});
+    renderDuplicatorEffectors(d);dupRefresh();
+  });
   function wireRand(id,key){document.getElementById(id).addEventListener('change',function(){var d=dupOf();if(!d)return;(d.staggerRandom||(d.staggerRandom={}))[key]=this.checked;dupRefresh();});}
   wireRand('dup-rand-pos','position');wireRand('dup-rand-rot','rotation');wireRand('dup-rand-scale','scale');wireRand('dup-rand-op','opacity');
   document.getElementById('btn-dup-edit-source').addEventListener('click',function(){
