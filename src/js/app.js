@@ -1402,10 +1402,43 @@ function rigAutoAssignLayer(ld,layer,defaultRadius,rotate){
   var rig=ensureLayerRig(ld);
   var boneIds=Object.keys(rig.bones);
   if(!boneIds.length)return 0;
+  // Auto-size the fallback radius (2026-07-29 fix, "l'autoassign marche pas
+  // alors que j'ai mis les bones sur la shape") — rigBindStroke's per-vertex
+  // weight is a LINEAR falloff clamped to 0 past the radius (its own
+  // `Math.max(0,1-dist/boneRadius)`), and the fixed 200px default is
+  // narrower than half the width of any shape over ~400px — the common
+  // case for a torso/limb on the default 1920x1080 canvas. Auto-assign
+  // still created a bind (the toast said "N shape(s) assigned"), but with
+  // every outer vertex at 0 weight it visibly did nothing when posed —
+  // indistinguishable from "doesn't work" to the artist. Scan every
+  // selectable shape's vertices once and grow the radius to the farthest
+  // one actually needs, so every vertex gets at least SOME pull from its
+  // nearest non-overridden bone; a bone the artist already resized via its
+  // own influence circle (Assigner mode) keeps that manual radius, exactly
+  // as before.
+  var neededRadius=defaultRadius||200;
+  layer.children.forEach(function(c){
+    if(!(c instanceof Path)||!isSelectablePathChild(c))return;
+    c.segments.forEach(function(s){
+      boneIds.forEach(function(bid){
+        var bone=rig.bones[bid];
+        if(!bone||bone.radius)return;
+        var bp=_boneSegsToPath(bone.restSegments,bone.closed);
+        var loc=bp.getNearestLocation(s.point);
+        bp.remove();
+        if(!loc)return;
+        var dist=loc.point.getDistance(s.point);
+        if(dist>neededRadius)neededRadius=dist;
+      });
+    });
+  });
+  // Small margin so the single farthest vertex gets a sliver of pull
+  // instead of landing exactly on the falloff's zero boundary.
+  neededRadius=Math.ceil(neededRadius*1.05);
   var n=0;
   layer.children.forEach(function(c){
     if(!(c instanceof Path)||!isSelectablePathChild(c))return;
-    if(rigBindStroke(ld,c,boneIds,defaultRadius,rotate))n++;
+    if(rigBindStroke(ld,c,boneIds,neededRadius,rotate))n++;
   });
   return n;
 }
