@@ -1362,13 +1362,7 @@ function rigBindStroke(ld,path,boneIds,radius,rotate){
   // desP (app.js) reconstructs a vector-brush stroke straight from its
   // stored `.segments` (the ribbon's actual outline), not from
   // centerSegments/widthProfile, so a rig-posed deformation persists through
-  // save/reload exactly like any other shape's. Each Path (ribbon and
-  // companion) is bound and weighted independently from its OWN vertices —
-  // same as binding any two nearby shapes to one skeleton — so they track
-  // the pose closely but not with byte-identical interpolation; a LATER
-  // brush-width edit re-derives the ribbon from centerSegments/widthProfile
-  // and would discard the posed deformation, a real but separate limitation
-  // (not attempted here).
+  // save/reload exactly like any other shape's.
   ensureStrokeId(path);
   // Re-binding the SAME shape (canvas click-to-bind makes this the common
   // case, not a rare mistake — clicking a shape again to change which bone
@@ -1378,28 +1372,58 @@ function rigBindStroke(ld,path,boneIds,radius,rotate){
   // that shape's deformation instead of cleanly superseding it.
   rig.binds=rig.binds.filter(function(b){return b.strokeId!==path.data.strokeId;});
   radius=radius||200;
-  var rest=path.segments.map(function(s){return[s.point.x,s.point.y];});
-  var weights=rest.map(function(pt){
-    var w=[],p=new Point(pt[0],pt[1]);
-    boneIds.forEach(function(bid){
-      var bone=rig.bones[bid];if(!bone)return;
-      var bp=_boneSegsToPath(bone.restSegments,bone.closed);
-      var loc=bp.getNearestLocation(p);
-      bp.remove();
-      if(!loc)return;
-      var dist=loc.point.getDistance(p);
-      // Per-bone radius override (2026-07-29, Shapper-style influence
-      // circles, rig-bridge.js Assign mode) — bone.radius is set by dragging
-      // that bone's own on-canvas circle; falls back to the passed-in
-      // default (the panel's Rayon de poids field) for a bone that's never
-      // been adjusted, so existing single-radius projects are unaffected.
-      var boneRadius=bone.radius||radius;
-      var infl=Math.max(0,1-dist/boneRadius);
-      if(infl>0)w.push({boneId:bid,offset:loc.offset,w:infl});
+  // Shared by the ribbon's own boundary AND (below) its centerSegments —
+  // same per-point "nearest offset on each bone's rest curve, falloff by
+  // distance" weighting, just fed a different point list.
+  function weighForPoints(pts){
+    return pts.map(function(pt){
+      var w=[],p=new Point(pt[0],pt[1]);
+      boneIds.forEach(function(bid){
+        var bone=rig.bones[bid];if(!bone)return;
+        var bp=_boneSegsToPath(bone.restSegments,bone.closed);
+        var loc=bp.getNearestLocation(p);
+        bp.remove();
+        if(!loc)return;
+        var dist=loc.point.getDistance(p);
+        // Per-bone radius override (2026-07-29, Shapper-style influence
+        // circles, rig-bridge.js Assign mode) — bone.radius is set by dragging
+        // that bone's own on-canvas circle; falls back to the passed-in
+        // default (the panel's Rayon de poids field) for a bone that's never
+        // been adjusted, so existing single-radius projects are unaffected.
+        var boneRadius=bone.radius||radius;
+        var infl=Math.max(0,1-dist/boneRadius);
+        if(infl>0)w.push({boneId:bid,offset:loc.offset,w:infl});
+      });
+      return w;
     });
-    return w;
-  });
-  rig.binds.push({strokeId:path.data.strokeId,rest:rest,weights:weights,rotate:!!rotate,_live:path});
+  }
+  var rest=path.segments.map(function(s){return[s.point.x,s.point.y];});
+  var weights=weighForPoints(rest);
+  var bind={strokeId:path.data.strokeId,rest:rest,weights:weights,rotate:!!rotate,_live:path};
+  // Keep centerSegments (the source data any future brush-width edit
+  // regenerates the boundary FROM, via rebuildVectorBrushOutline) in sync
+  // too — 2026-07-29 fix, Cyril: attaque le chantier of a later width edit
+  // silently discarding a rig pose. Deformed independently from its OWN few
+  // points (see applyRigDeform's own comment for why a straight per-vertex
+  // copy from the boundary isn't used: buildVariableWidthPath's smoothing +
+  // round-cap arcs make the boundary's point correspondence to the
+  // centerline non-trivial to invert) — same known limitation the ribbon's
+  // full many-point boundary doesn't have: a 2-point bezier centerline
+  // can't exactly represent an arbitrary multi-joint bend, only approximate
+  // its overall displacement. Good enough for what this is actually FOR
+  // (a plausible starting point for the NEXT regeneration, not the on-
+  // screen render — that stays the boundary's own precise per-vertex deform).
+  if(path.data.isVectorBrush&&path.data.centerSegments&&path.data.centerSegments.length){
+    // Original (pre-pose) point AND handles — handle rotation in
+    // applyRigDeform must always rotate FROM these fixed rest vectors, never
+    // from the current live ones, or repeated calls (every drag tick) would
+    // compound rotation on top of already-rotated handles instead of
+    // recomputing the full rest-to-current rotation each time.
+    var centerRest=path.data.centerSegments.map(function(s){return{point:[s.point[0],s.point[1]],handleIn:s.handleIn?[s.handleIn[0],s.handleIn[1]]:null,handleOut:s.handleOut?[s.handleOut[0],s.handleOut[1]]:null};});
+    bind.centerRest=centerRest;
+    bind.centerWeights=weighForPoints(centerRest.map(function(r){return r.point;}));
+  }
+  rig.binds.push(bind);
   return true;
 }
 // Auto-assign (2026-07-29, Cyril's own spec — "un bouton d'assignation qui
@@ -1534,6 +1558,53 @@ function applyRigDeform(ld){
     if(bLive.data&&bLive.data.isVectorBrush&&bLive.data.linkedFill&&!bLive.data.linkedFill.removed){
       bLive.data.linkedFill.segments=segs.map(function(s){return new Segment(s.point,s.handleIn,s.handleOut);});
       bLive.data.linkedFill.closed=true;
+    }
+    // centerSegments sync (2026-07-29, "attaque le chantier" of a later
+    // brush-width edit discarding a rig pose — see rigBindStroke's own
+    // comment for why this is bound/deformed separately from the boundary
+    // above rather than derived from it). Unlike the boundary's per-vertex
+    // loop (left untouched — already verified correct, no reason to risk
+    // it), this ALSO rotates handleIn/handleOut by each point's own
+    // weighted-average local rotation: centerSegments has only 2-4 points
+    // with large handles forming real bezier curves, so leaving handles
+    // unrotated (fine for the boundary's hundreds of near-straight,
+    // already-smoothed segments) would visibly warp the curve the moment a
+    // future width edit rebuilds the ribbon from it.
+    if(bLive.data&&bLive.data.isVectorBrush&&bLive.data.centerSegments&&b.centerRest&&b.centerWeights){
+      var centerSegs=bLive.data.centerSegments;
+      for(var ci=0;ci<centerSegs.length&&ci<b.centerRest.length;ci++){
+        var cRest=b.centerRest[ci],cRestP=cRest.point,cdx=0,cdy=0,cSumW=0,cSumDaW=0;
+        (b.centerWeights[ci]||[]).forEach(function(wentry){
+          var bp=bonePaths(wentry.boneId);
+          var curLoc=bp.cur.getLocationAt(wentry.offset),restLoc=bp.rest.getLocationAt(wentry.offset);
+          if(!curLoc||!restLoc)return;
+          if(b.rotate){
+            var restAng=Math.atan2(restLoc.tangent.y,restLoc.tangent.x);
+            var curAng=Math.atan2(curLoc.tangent.y,curLoc.tangent.x);
+            var da=curAng-restAng,cosA=Math.cos(da),sinA=Math.sin(da);
+            var offX=cRestP[0]-restLoc.point.x,offY=cRestP[1]-restLoc.point.y;
+            var rOffX=offX*cosA-offY*sinA,rOffY=offX*sinA+offY*cosA;
+            cdx+=wentry.w*((curLoc.point.x+rOffX)-cRestP[0]);
+            cdy+=wentry.w*((curLoc.point.y+rOffY)-cRestP[1]);
+            cSumDaW+=da*wentry.w;cSumW+=wentry.w;
+          }else{
+            cdx+=wentry.w*(curLoc.point.x-restLoc.point.x);
+            cdy+=wentry.w*(curLoc.point.y-restLoc.point.y);
+          }
+        });
+        centerSegs[ci].point=[cRestP[0]+cdx,cRestP[1]+cdy];
+        // Always rotated FROM the immutable rest handles (cRest.handleIn/
+        // Out), never from the current live ones — see rigBindStroke's own
+        // comment on why (idempotent across repeated calls, no compounding).
+        if(cSumW>0){
+          var avgDa=cSumDaW/cSumW,c2=Math.cos(avgDa),s2=Math.sin(avgDa);
+          if(cRest.handleIn)centerSegs[ci].handleIn=[cRest.handleIn[0]*c2-cRest.handleIn[1]*s2,cRest.handleIn[0]*s2+cRest.handleIn[1]*c2];
+          if(cRest.handleOut)centerSegs[ci].handleOut=[cRest.handleOut[0]*c2-cRest.handleOut[1]*s2,cRest.handleOut[0]*s2+cRest.handleOut[1]*c2];
+        }else{
+          if(cRest.handleIn)centerSegs[ci].handleIn=cRest.handleIn.slice();
+          if(cRest.handleOut)centerSegs[ci].handleOut=cRest.handleOut.slice();
+        }
+      }
     }
   });
   Object.keys(boneCache).forEach(function(bid){boneCache[bid].rest.remove();boneCache[bid].cur.remove();});
