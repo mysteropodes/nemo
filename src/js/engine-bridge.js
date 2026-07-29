@@ -1149,6 +1149,8 @@
         if (pressureItems.length) layers.push({ items: pressureItems });
         var penItems = buildPenPreviewItems();
         if (penItems.length) layers.push({ items: penItems });
+        var rigItems = buildRigPreviewItems();
+        if (rigItems.length) layers.push({ items: rigItems });
       }
       var arcItems = buildArcHandleItems();
       if (arcItems.length) layers.push({ items: arcItems });
@@ -1713,6 +1715,66 @@
     return items;
   }
 
+  // Rig tool (rig-bridge.js) — bones live as plain JSON on ld.rig.bones,
+  // never inserted into the real Paper layer (that would make them ordinary
+  // artwork geometry — see rig-bridge.js's own header comment), so unlike
+  // everything else rendered here they can't be read off layer.children.
+  // A bone's stored segment shape ({point,handleIn,handleOut}) already
+  // matches an overlay item's own `segments` field one-for-one, so a
+  // finished bone drops straight into an item literal with zero conversion;
+  // only the anchor/tangent-handle markers need building, mirroring
+  // buildPenPreviewItems' own loop above. `_rigDraw` (rig-bridge.js) is a
+  // bare global exactly like tools.js's `_pen` — same reason: this function
+  // needs to read the in-progress WIP path while it's still being drawn,
+  // before it's copied into ld.rig.bones at finalize time.
+  var rigPreviewWorld = null;
+  function setRigPreview(worldPt) { rigPreviewWorld = worldPt; }
+  function buildRigPreviewItems() {
+    if (state.tool !== 'rig') return [];
+    var ld = state.layers[state.activeLayerIdx];
+    if (!ld || !ld.rig) return [];
+    var zs = 1 / view.zoom;
+    var items = [];
+    var boneCol = [255, 200, 60, 235], handleCol = [255, 200, 60, 178];
+    function pushHandles(pt, hi, ho) {
+      if (Math.hypot(hi[0], hi[1]) > 0.5) {
+        var hiPt = [pt[0] + hi[0], pt[1] + hi[1]];
+        items.push(lineItem(pt, hiPt, handleCol, 1 * zs));
+        items.push(rectItem(hiPt[0], hiPt[1], 3 * zs, [255, 255, 255, 255], boneCol, 1 * zs));
+      }
+      if (Math.hypot(ho[0], ho[1]) > 0.5) {
+        var hoPt = [pt[0] + ho[0], pt[1] + ho[1]];
+        items.push(lineItem(pt, hoPt, handleCol, 1 * zs));
+        items.push(rectItem(hoPt[0], hoPt[1], 3 * zs, [255, 255, 255, 255], boneCol, 1 * zs));
+      }
+    }
+    Object.keys(ld.rig.bones).forEach(function (bid) {
+      var bone = ld.rig.bones[bid];
+      if (!bone.segments || bone.segments.length < 2) return;
+      // The bone currently being (re-)drawn renders from the live Paper
+      // Path below instead (it has a rubber-band cursor line the stored
+      // JSON copy doesn't have yet) — skip its stored copy here to avoid
+      // drawing it twice.
+      if (typeof _rigDraw !== 'undefined' && _rigDraw.path && _rigDraw.boneId === bid) return;
+      items.push({ segments: roundSegs(bone.segments), closed: !!bone.closed, fillColor: null, strokeColor: boneCol, strokeWidth: 2 * zs });
+      bone.segments.forEach(function (s) {
+        pushHandles(s.point, s.handleIn || [0, 0], s.handleOut || [0, 0]);
+        items.push(circleItem(s.point[0], s.point[1], 3.5 * zs, [255, 255, 255, 255], boneCol, 1.2 * zs));
+      });
+    });
+    if (typeof _rigDraw !== 'undefined' && _rigDraw.path) {
+      if (rigPreviewWorld) {
+        var last = _rigDraw.path.lastSegment.point;
+        items.push(lineItem([last.x, last.y], rigPreviewWorld, [255, 220, 130, 153], 1 * zs));
+      }
+      _rigDraw.path.segments.forEach(function (s) {
+        pushHandles([s.point.x, s.point.y], [s.handleIn.x, s.handleIn.y], [s.handleOut.x, s.handleOut.y]);
+        items.push(circleItem(s.point.x, s.point.y, 3.5 * zs, [255, 255, 255, 255], boneCol, 1.2 * zs));
+      });
+    }
+    return items;
+  }
+
   // Tween motion-arc handles: renderArcs() in tweens.js draws these into a
   // real Paper `arcLayer` (dashed CUBIC-bezier curve between two matched
   // strokes' centroids + two independent OUT/IN draggable handles, upgraded
@@ -2274,6 +2336,7 @@
     setEraserCursor: setEraserCursor,
     setPressureCursor: setPressureCursor,
     setPenPreview: setPenPreview,
+    setRigPreview: setRigPreview,
     registerImagePixels: registerImagePixels,
     // ONE definition of raster->engine image identity. bitmap-brush.js
     // re-uploads pixels under this id during erase and live restamp; if it
