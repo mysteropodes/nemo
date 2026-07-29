@@ -903,6 +903,48 @@
         <div class="pr"><button class="pbtn" id="btn-comp-detach" style="flex:1" data-i18n-title="compDetachTitle" title="Bake the component's animation back into a normal layer" data-i18n="compDetachBtn">Décomposer en calque</button></div>
       </div>
     </div>
+    <!-- Mograph duplicator (2026-07-29) — static/structural config for
+         ld.duplicator (mode, counts, seed). The ANIMATABLE per-copy deltas
+         (dupOffsetPos/Rot/Scale/Opacity) live as Motion properties, not
+         here. Same .psec shape as #comp-instance-sec above; shown/hidden by
+         updateDuplicatorPanel() (timeline.js). -->
+    <div class="psec" id="duplicator-sec" style="display:none">
+      <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrDuplicator">Duplicator</span></div>
+      <div class="pbdy">
+        <div class="pr"><span class="pl" data-i18n="fieldDupMode">Mode</span>
+          <select class="psel" id="dup-mode">
+            <option value="grid" data-i18n="dupModeGrid">Grille</option>
+            <option value="radial" data-i18n="dupModeRadial">Radial</option>
+            <option value="path" data-i18n="dupModePath">Chemin</option>
+          </select>
+        </div>
+        <div class="pr dims-row" id="dup-grid-row">
+          <span class="pl" data-i18n="fieldDupRows">Lignes</span><input type="number" class="pi scrub" id="dup-rows" value="2" min="1" max="30" data-step="1">
+          <span class="pl" data-i18n="fieldDupCols">Col.</span><input type="number" class="pi scrub" id="dup-cols" value="3" min="1" max="30" data-step="1">
+        </div>
+        <div class="pr dims-row" id="dup-grid-spacing-row">
+          <span class="pl">X</span><input type="number" class="pi scrub" id="dup-spacingx" value="150" data-step="1" data-i18n-title="dupSpacingTitle" title="Espacement entre copies (px)">
+          <span class="pl">Y</span><input type="number" class="pi scrub" id="dup-spacingy" value="150" data-step="1">
+        </div>
+        <div class="pr" id="dup-count-row"><span class="pl" data-i18n="fieldDupCount">Copies</span><input type="number" class="pi scrub" id="dup-count" value="8" min="1" max="500" data-step="1"></div>
+        <div class="pr dims-row" id="dup-radial-row">
+          <span class="pl" data-i18n="fieldDupRadius">Rayon</span><input type="number" class="pi scrub" id="dup-radius" value="200" data-step="1">
+          <span class="pl">°</span><input type="number" class="pi scrub" id="dup-startangle" value="0" data-step="1" data-i18n-title="dupStartAngleTitle" title="Angle de départ (degrés)">
+        </div>
+        <div class="pr" id="dup-radial-orient-row"><label style="display:flex;gap:5px;align-items:center;font-size:10px;cursor:pointer"><input type="checkbox" id="dup-radial-orient"> <span data-i18n="dupOrientRadial">Orienter selon l'angle</span></label></div>
+        <div class="pr" id="dup-path-row"><span class="pl" data-i18n="fieldDupPathLayer">Calque chemin</span><select class="psel" id="dup-path-layer"></select></div>
+        <div class="pr" id="dup-path-align-row"><label style="display:flex;gap:5px;align-items:center;font-size:10px;cursor:pointer"><input type="checkbox" id="dup-path-align" checked> <span data-i18n="dupAlignTangent">Aligner à la tangente</span></label></div>
+        <div class="pr dims-row"><span class="pl" data-i18n="fieldDupSeed">Seed</span><input type="number" class="pi scrub" id="dup-seed" value="0" data-step="1"><button class="pbtn" id="btn-dup-reseed" data-i18n-title="dupReseedTitle" title="Nouveau seed aléatoire">⟳</button></div>
+        <div class="pr" style="flex-wrap:wrap;gap:6px;font-size:10px">
+          <span class="pl" style="flex-basis:100%" data-i18n="dupRandomHdr">Aléatoire (sinon séquentiel)</span>
+          <label style="display:flex;gap:4px;align-items:center;cursor:pointer"><input type="checkbox" id="dup-rand-pos"> <span data-i18n="dupRandPos">Pos</span></label>
+          <label style="display:flex;gap:4px;align-items:center;cursor:pointer"><input type="checkbox" id="dup-rand-rot"> <span data-i18n="dupRandRot">Rot</span></label>
+          <label style="display:flex;gap:4px;align-items:center;cursor:pointer"><input type="checkbox" id="dup-rand-scale"> <span data-i18n="dupRandScale">Échelle</span></label>
+          <label style="display:flex;gap:4px;align-items:center;cursor:pointer"><input type="checkbox" id="dup-rand-op"> <span data-i18n="dupRandOp">Opacité</span></label>
+        </div>
+        <div class="pr"><button class="pbtn ac" id="btn-dup-edit-source" style="flex:1" data-i18n="dupEditSource">Modifier la forme source…</button></div>
+      </div>
+    </div>
     <!-- Onion Skin right-panel section removed (feedback 2026-07: "plus
          besoin de l'onglet onion skin dans le panneau droit tout se fait
          sur le bouton de la timeline") — it was purely a redundant toggle

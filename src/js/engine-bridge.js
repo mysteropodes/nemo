@@ -730,7 +730,10 @@
       // reused below instead of a lookup per companion.
       // Only layer kinds whose getEffectiveStrokes branch returns the STORED
       // stroke array can back a retained path — see the store's comment.
-      var layerRetainable = !state.layers[i].symbolId && !state.layers[i].montageId && !state.layers[i].lfsGroup;
+      // duplicator: 4th synthesizing case — getEffectiveStrokesRendered
+      // (app.js) allocates fresh clone dicts per call, so dict identity
+      // (the store's one invariant) is meaningless for these too.
+      var layerRetainable = !state.layers[i].symbolId && !state.layers[i].montageId && !state.layers[i].lfsGroup && !state.layers[i].duplicator;
       var brushAnchorStrokeId = null;
       for (var bi = 0; bi < children.length; bi++) {
         var bc = children[bi];

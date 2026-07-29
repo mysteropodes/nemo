@@ -53,6 +53,15 @@
   // track/keyframe/interpolation machinery 'rotation'/'opacity' already
   // do, zero changes needed to that machinery.
   var PROPS_WITH_3D = ['position', 'positionZ', 'anchor', 'rotation', 'rotationX', 'rotationY', 'scale', 'opacity'];
+  // Mograph duplicator (2026-07-29, ld.duplicator) — four EXTRA keyframable
+  // per-copy DELTAS (each copy k gets k× the delta, or a seeded random in
+  // ±delta — see applyLayerDuplicator, app.js), revealed only when the
+  // layer has a duplicator. Same "extra ordinary properties, zero new
+  // machinery" approach as PROPS_WITH_3D above. The structural config
+  // (grid/radial/path mode, counts, seed) is deliberately NOT here — it's
+  // static per-layer state edited in its own panel (#duplicator-sec), like
+  // a Component instance's own placement fields.
+  var PROPS_DUP_EXTRA = ['dupOffsetPos', 'dupOffsetRot', 'dupOffsetScale', 'dupOffsetOpacity'];
   // Time Remap (AE, 2026-07-25) is an EXTRA row, not a 6th transform: it
   // never feeds computeMotionMat — it drives which internal frame a
   // component instance shows (resolveSymbolFrameIdx, app.js). Both the
@@ -61,6 +70,7 @@
   // there is exactly ONE function that decides, and both sides call it.
   function propsFor(holder) {
     var list = (holder && holder.threeD) ? PROPS_WITH_3D : PROPS;
+    if (holder && holder.duplicator) list = list.concat(PROPS_DUP_EXTRA);
     if (holder && holder.timeRemap) return list.concat(['timeRemap']);
     return list;
   }
@@ -79,10 +89,10 @@
     if (prop === 'timeRemap') return holder.timeRemap || null;
     return (holder.motion && holder.motion[prop]) || null;
   }
-  var PROP_LABEL = { position: 'Position', anchor: 'Anchor Point', rotation: 'Rotation', scale: 'Scale', opacity: 'Opacity', timeRemap: 'Time Remap', positionZ: 'Position Z', rotationX: 'Rotation X', rotationY: 'Rotation Y' };
-  var PROP_DIM = { position: 2, anchor: 2, rotation: 1, scale: 2, opacity: 1, timeRemap: 1, positionZ: 1, rotationX: 1, rotationY: 1 };
-  var PROP_UNIT = { position: 'px', anchor: 'px', rotation: '°', scale: '%', opacity: '%', timeRemap: 'f', positionZ: 'px', rotationX: '°', rotationY: '°' };
-  var PROP_DEFAULT = { position: [0, 0], anchor: [0, 0], rotation: [0], scale: [100, 100], opacity: [100], timeRemap: [0], positionZ: [0], rotationX: [0], rotationY: [0] };
+  var PROP_LABEL = { position: 'Position', anchor: 'Anchor Point', rotation: 'Rotation', scale: 'Scale', opacity: 'Opacity', timeRemap: 'Time Remap', positionZ: 'Position Z', rotationX: 'Rotation X', rotationY: 'Rotation Y', dupOffsetPos: 'Dup. Offset', dupOffsetRot: 'Dup. Rotation', dupOffsetScale: 'Dup. Scale', dupOffsetOpacity: 'Dup. Opacity' };
+  var PROP_DIM = { position: 2, anchor: 2, rotation: 1, scale: 2, opacity: 1, timeRemap: 1, positionZ: 1, rotationX: 1, rotationY: 1, dupOffsetPos: 2, dupOffsetRot: 1, dupOffsetScale: 2, dupOffsetOpacity: 1 };
+  var PROP_UNIT = { position: 'px', anchor: 'px', rotation: '°', scale: '%', opacity: '%', timeRemap: 'f', positionZ: 'px', rotationX: '°', rotationY: '°', dupOffsetPos: 'px', dupOffsetRot: '°', dupOffsetScale: '%', dupOffsetOpacity: '%' };
+  var PROP_DEFAULT = { position: [0, 0], anchor: [0, 0], rotation: [0], scale: [100, 100], opacity: [100], timeRemap: [0], positionZ: [0], rotationX: [0], rotationY: [0], dupOffsetPos: [0, 0], dupOffsetRot: [0], dupOffsetScale: [0, 0], dupOffsetOpacity: [0] };
   // AE's own shortcuts: P/A/R/S/T reveal just that property's row. Kept as
   // a lookup table (not hardcoded in the keydown handler) so the property
   // list and its shortcuts can't silently drift apart.
@@ -1018,6 +1028,59 @@
     ld.threeD = !ld.threeD;
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
     if (window.renderLayerList) renderLayerList();
+  }
+  // ---- MOGRAPH DUPLICATOR (2026-07-29) ----
+  // Per-layer opt-in grid/radial/path array duplication (AE shape Repeater
+  // family). The multiplication itself happens in applyLayerDuplicator /
+  // getEffectiveStrokesRendered (app.js) at loadFrame time — NEVER by
+  // mutating the stored frames. The layer is force-LOCKED while the
+  // duplicator is active: what loadFrame materializes is exactly what
+  // saveActiveLayerFrame reads back into ld.frames on the next frame
+  // navigation, so an editable multiplied layer would permanently bake N
+  // copies into the drawing on the first scrub (CLAUDE.md family-of-bug
+  // n°1, destructive variant). Editing the seed shape goes through the
+  // panel's dedicated "edit source" toggle (ld._dupEditSource, transient,
+  // never persisted), which suspends the multiplication so normal editing
+  // and saving apply to the single real shape again.
+  function toggleLayerDuplicator(li) {
+    var ld = state.layers[li];
+    if (!ld) return;
+    if (ld.duplicator) {
+      ld.duplicator = null;
+      ld._dupEditSource = false;
+      ld.locked = false;
+    } else {
+      ld.duplicator = {
+        mode: 'grid',
+        rows: 2, cols: 3,
+        spacingX: 150, spacingY: 150,
+        count: 8,
+        radius: 200, startAngle: 0, endAngle: null, radialOrient: false,
+        pathLayerUid: null, pathAlignTangent: true,
+        seed: Math.floor(Math.random() * 1e6),
+        staggerRandom: { position: false, rotation: false, scale: false, opacity: false },
+      };
+      ld.locked = true;
+    }
+    loadFrame(state.currentFrame);
+    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+    if (window.renderLayerList) renderLayerList();
+    if (window.updateDuplicatorPanel) updateDuplicatorPanel();
+  }
+  function setDuplicatorEditSource(li, on) {
+    var ld = state.layers[li];
+    if (!ld || !ld.duplicator) return;
+    // Leaving edit mode: commit the live (single-seed) layer into stored
+    // frame data BEFORE flipping the flag — saveActiveLayerFrame's
+    // duplicator guard only lets the save through while _dupEditSource is
+    // still true, and the loadFrame below rebuilds from stored data.
+    if (!on && ld._dupEditSource && li === state.activeLayerIdx) saveActiveLayerFrame();
+    ld._dupEditSource = !!on;
+    ld.locked = !on;
+    loadFrame(state.currentFrame);
+    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+    if (window.renderLayerList) renderLayerList();
+    if (window.updateDuplicatorPanel) updateDuplicatorPanel();
   }
   // ---- 3D GIZMO ("un beau gizmo", 2026-07-28) ----
   // AE's own convention: 3 colored axis arrows (X red/Y green/Z blue) for
@@ -2250,6 +2313,12 @@
       var d3 = document.createElement('div'); d3.className = 'lico' + (ld.threeD ? '' : ' off'); d3.title = '3D Layer'; d3.innerHTML = ICO_3D;
       d3.addEventListener('click', function (e) { e.stopPropagation(); toggleLayer3D(li); renderLayerList(); });
       row.appendChild(d3);
+      // Mograph duplicator toggle — shown here too since the dupOffset*
+      // properties it reveals live/get keyframed in this list (same
+      // reasoning as the 3D toggle above).
+      var ddup = document.createElement('div'); ddup.className = 'lico' + (ld.duplicator ? '' : ' off'); ddup.title = 'Duplicator (grille / radial / chemin)'; ddup.innerHTML = ICO_DUP;
+      ddup.addEventListener('click', function (e) { e.stopPropagation(); toggleLayerDuplicator(li); });
+      row.appendChild(ddup);
       // Same badge as Animation 2D's rows, from the same decider — Motion is
       // a different VIEW of these layers, not a different set, so it must not
       // describe them differently.
@@ -4535,6 +4604,8 @@
     make3DProjector: make3DProjector,
     project3DSegments: project3DSegments,
     toggleLayer3D: toggleLayer3D,
+    toggleLayerDuplicator: toggleLayerDuplicator,
+    setDuplicatorEditSource: setDuplicatorEditSource,
     // 3D gizmo diagnostics — exposed so its projection/hit-test math can be
     // verified directly (screenshots/pixel-probing alone can't confirm
     // WHICH handle a screen point resolves to).

@@ -632,6 +632,10 @@ function desP(d,layer,op){var prev=project.activeLayer;layer.activate();var p=ne
   // fallback chain untouched.
   p.strokeColor=d.hasRealStroke===false?null:(d.strokeColor||((d.isVectorBrush||d.brushTexturePreset||d.bitmapBrushSpec||d.isBrushTextureCopy||dNoStrokeChannel||dIsShadowChannel)?null:'#fff'));p.strokeWidth=d.strokeWidth||3;p.strokeCap=d.strokeCap||'round';p.strokeJoin=d.strokeJoin||'round';if(d.miterLimit!==undefined)p.miterLimit=d.miterLimit;if(d.fillColor)p.fillColor=d.fillColor;else p.fillColor=null;p.opacity=op!==undefined?op:(d.opacity!==undefined?d.opacity:1);if(d.dashArray&&d.dashArray.length)p.dashArray=d.dashArray;if(d.dashOffset!==undefined)p.dashOffset=d.dashOffset;if(d.paintOrder){p.data.paintOrder=d.paintOrder;}if(d.isVectorBrush){p.data.isVectorBrush=true;if(d.centerSegments)p.data.centerSegments=d.centerSegments;if(d.widthProfile)p.data.widthProfile=d.widthProfile;if(d.strokeProfile)p.data.strokeProfile=d.strokeProfile;if(d.profileBase)p.data.profileBase=d.profileBase;if(d.isFillShape)p.data.isFillShape=true;applyBrushKeyline(p);}if(d.fillSeed)p.data.fillSeed=d.fillSeed;if(d.fillSeeds&&d.fillSeeds.length)p.data.fillSeeds=d.fillSeeds;if((d.fillSeed||(d.fillSeeds&&d.fillSeeds.length))&&d.fillGapPx!==undefined)p.data.fillGapPx=d.fillGapPx;if(d.fillWalls)p.data.fillWalls=d.fillWalls;if(d.strokeId)p.data.strokeId=d.strokeId;if(d.brushGroupId)p.data.brushGroupId=d.brushGroupId;if(d.isLinkedFillCompanion)p.data.isLinkedFillCompanion=true;if(d.linkedFillId)p.data.linkedFillId=d.linkedFillId;if(d.tweenOn)p.data.tweenOn=true;if(d.boxAngle)p.data.boxAngle=d.boxAngle;if(d.xformAnchorKey)p.data.xformAnchorKey=d.xformAnchorKey;if(d.xformAnchorCustom)p.data.xformAnchorCustom=d.xformAnchorCustom;if(d.isBrushTextureCopy)p.data.isBrushTextureCopy=true;if(d.brushTexturePreset)p.data.brushTexturePreset=d.brushTexturePreset;if(d.bitmapBrushSpec)p.data.bitmapBrushSpec=d.bitmapBrushSpec;if(d.bitmapPressureProfile)p.data.bitmapPressureProfile=d.bitmapPressureProfile;if(d.preTextureOpacity!==undefined)p.data.preTextureOpacity=d.preTextureOpacity;if(d.preTextureStroke!==undefined)p.data.preTextureStroke=d.preTextureStroke;if(d.channelTag)p.data.channelTag=d.channelTag;if(d.shadowSwatchId)p.data.shadowSwatchId=d.shadowSwatchId;if(d.ownerId)p.data.ownerId=d.ownerId;if(d.ownerName)p.data.ownerName=d.ownerName;if(d.ownerColor)p.data.ownerColor=d.ownerColor;if(d.revisionParentId)p.data.revisionParentId=d.revisionParentId;if(d.isRevisionGhost)p.data.isRevisionGhost=true;if(d.revisionAction)p.data.revisionAction=d.revisionAction;if(d.preRevisionOpacity!==undefined)p.data.preRevisionOpacity=d.preRevisionOpacity;if(d.fillGradient)p.data.fillGradient=d.fillGradient;if(d.groupId)p.data.groupId=d.groupId;if(d.effects&&d.effects.length)p.data.effects=d.effects;
   if(d.isVectorText)p.data.isVectorText=true;if(d.vectorChar)p.data.vectorChar=d.vectorChar;if(d.isText)p.data.isText=true;
+  // Mograph duplicator copy tags (applyLayerDuplicator) — belt-and-suspenders
+  // for future layer.children consumers; the layer is force-locked so no
+  // interactive path reads these today.
+  if(d.isDuplicatorCopy)p.data.isDuplicatorCopy=true;if(d.dupIndex!=null)p.data.dupIndex=d.dupIndex;
   if(d.isTextRoot){p.data.isTextRoot=true;p.data.text=d.text||'';p.data.vectorFont=d.vectorFont||'Roboto-Regular';p.data.size=d.textSize||48;p.data.color=d.textColor||'#000000';p.data.align=d.textAlign||'left';if(d.textFixedWidth)p.data.fixedWidth=d.textFixedWidth;}
   // Retained-path stamp (engine-bridge.js, 2026-07-28): the stored stroke
   // dict this Paper item was built FROM. Dict object identity is the
@@ -1063,6 +1067,149 @@ function applyMatrixToStrokeData(sd,m){
     return{point:[p.x,p.y],handleIn:[hiT.x,hiT.y],handleOut:[hoT.x,hoT.y]};
   });
   return sd;
+}
+// ---- MOGRAPH DUPLICATOR (2026-07-29) ----
+// Grid/radial/path array duplication of a layer's content (AE shape
+// Repeater family), applied at loadFrame time via
+// getEffectiveStrokesRendered below — the stored frames NEVER contain the
+// copies. See toggleLayerDuplicator (motion.js) for the lock/edit-source
+// safety model, and saveActiveLayerFrame's guard for why it matters.
+//
+// Fourth mirror of the same closed-form affine as affineFromMotion
+// (engine-bridge.js), transformSegments (motion.js) and camera.js's own
+// matrix build: scale in the pivot's local frame, rotate around the pivot,
+// translate last. Built as ONE expression, never chained
+// Matrix.translate/rotate/scale calls — a bare Matrix's own methods APPEND
+// while Item methods PREPEND, a real shipped-bug class documented in
+// CLAUDE.md §8 point 2.
+function dupMatrixFromDescriptor(m,pivot){
+  var rad=(m.rot||0)*Math.PI/180,cs=Math.cos(rad),sn=Math.sin(rad);
+  var a=cs*m.sx,b=sn*m.sx,c=-sn*m.sy,d=cs*m.sy;
+  var tx=pivot.x+(m.dx||0)-a*pivot.x-c*pivot.y;
+  var ty=pivot.y+(m.dy||0)-b*pivot.x-d*pivot.y;
+  return new Matrix(a,b,c,d,tx,ty);
+}
+// Anchor-point bounds of the seed strokes — a pivot, not a render bound,
+// so segment anchor points are precise enough (no bezier-extrema math, no
+// throwaway Paper Path).
+function _boundsCenterOfStrokes(strokes){
+  var minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  strokes.forEach(function(sd){
+    if(sd.isRaster){
+      minX=Math.min(minX,sd.x-sd.width/2);maxX=Math.max(maxX,sd.x+sd.width/2);
+      minY=Math.min(minY,sd.y-sd.height/2);maxY=Math.max(maxY,sd.y+sd.height/2);
+      return;
+    }
+    if(!sd.segments)return;
+    sd.segments.forEach(function(s){
+      minX=Math.min(minX,s.point[0]);maxX=Math.max(maxX,s.point[0]);
+      minY=Math.min(minY,s.point[1]);maxY=Math.max(maxY,s.point[1]);
+    });
+  });
+  if(minX===Infinity)return{x:state.canvasW/2,y:state.canvasH/2};
+  return{x:(minX+maxX)/2,y:(minY+maxY)/2};
+}
+// Path-mode distribution source: another layer referenced by stable
+// layerUid (same mechanism as AE-style parenting, parentLayerUid /
+// SMMotion.findLayerIndexByUid) — its BASE content deliberately (a
+// duplicator can't reference another duplicator; the panel's <select>
+// also excludes them, this is the runtime backstop).
+function _resolveDuplicatorPath(dup,frameIdx){
+  var idx=window.SMMotion?SMMotion.findLayerIndexByUid(dup.pathLayerUid):-1;
+  if(idx<0)return null;
+  var srcLd=state.layers[idx];
+  if(!srcLd||srcLd.duplicator)return null;
+  var strokes=getEffectiveStrokes(idx,frameIdx);
+  var sd=null;
+  for(var i=0;i<strokes.length;i++){if(!strokes[i].isRaster&&strokes[i].segments&&strokes[i].segments.length>=2){sd=strokes[i];break;}}
+  if(!sd)return null;
+  var p=new Path({insert:false});
+  sd.segments.forEach(function(s){p.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));});
+  if(sd.closed)p.closed=true;
+  if(!p.length){p.remove();return null;}
+  return{path:p,length:p.length,closed:!!sd.closed,start:p.getPointAt(0)};
+}
+function applyLayerDuplicator(ld,base,frameIdx){
+  var dup=ld.duplicator,mode=dup.mode||'grid';
+  // Hard cap mirrors _registerCap's "never unbounded" philosophy
+  // (engine-bridge.js) — a typo'd count degrades to "big", never "hangs".
+  var count=mode==='grid'
+    ?Math.min(900,Math.max(1,dup.rows||1)*Math.max(1,dup.cols||1))
+    :Math.min(500,Math.max(1,dup.count||1));
+  if(count<=1)return base;
+  var pivot=_boundsCenterOfStrokes(base);
+  var M=window.SMMotion;
+  var dPos=M?M.valueAtFrame(ld,'dupOffsetPos',frameIdx):[0,0];
+  var dRot=M?M.valueAtFrame(ld,'dupOffsetRot',frameIdx)[0]:0;
+  var dScale=M?M.valueAtFrame(ld,'dupOffsetScale',frameIdx):[0,0];
+  var dOpacity=M?M.valueAtFrame(ld,'dupOffsetOpacity',frameIdx)[0]:0;
+  var randMode=dup.staggerRandom||{};
+  var cols=Math.max(1,dup.cols||1);
+  var pathInfo=mode==='path'?_resolveDuplicatorPath(dup,frameIdx):null;
+  if(mode==='path'&&!pathInfo)return base; // unconfigured/broken path ref: show the seed, not nothing
+  var out=[];
+  for(var k=0;k<count;k++){
+    var baseDx=0,baseDy=0,baseRot=0;
+    if(mode==='grid'){
+      baseDx=(k%cols)*(dup.spacingX||0);
+      baseDy=Math.floor(k/cols)*(dup.spacingY||0);
+    }else if(mode==='radial'){
+      var span=dup.endAngle!=null?(dup.endAngle-dup.startAngle):360;
+      var ang=(dup.startAngle||0)+k*(span/count);
+      var rr=ang*Math.PI/180;
+      baseDx=(dup.radius||0)*Math.cos(rr);
+      baseDy=(dup.radius||0)*Math.sin(rr);
+      if(dup.radialOrient)baseRot=ang;
+    }else{ // path
+      var t=pathInfo.closed?k/count:(count>1?k/(count-1):0);
+      var off=Math.min(pathInfo.length,t*pathInfo.length);
+      var pt=pathInfo.path.getPointAt(off)||pathInfo.start;
+      baseDx=pt.x-pathInfo.start.x;
+      baseDy=pt.y-pathInfo.start.y;
+      if(dup.pathAlignTangent){var tan=pathInfo.path.getTangentAt(off);if(tan)baseRot=tan.angle;}
+    }
+    // One RNG per index, drawing a FIXED number of values in a FIXED order
+    // regardless of which properties are actually random — flipping one
+    // property's mode later must not reshuffle another's pattern. 7919
+    // (prime) decorrelates consecutive k. seededRng (mulberry32, tools.js)
+    // — never Math.random() at render time, or the stagger reshuffles on
+    // every scrub tick (same rule as dabRecordsForTween's seeded stamping).
+    var rngK=seededRng(((dup.seed||0)+k*7919)>>>0);
+    var rx=rngK(),ry=rngK(),rrr=rngK(),rsx=rngK(),rsy=rngK(),rop=rngK();
+    // Random mode: each copy draws uniformly in ±delta (the keyframed
+    // value is the jitter AMPLITUDE); sequential mode: copy k gets k×delta
+    // (the value is the per-copy INCREMENT). Simple, predictable, and each
+    // mode's knob means one thing.
+    var posK=randMode.position?[(2*rx-1)*dPos[0],(2*ry-1)*dPos[1]]:[k*dPos[0],k*dPos[1]];
+    var rotK=randMode.rotation?(2*rrr-1)*dRot:k*dRot;
+    var scaleK=randMode.scale?[(2*rsx-1)*dScale[0],(2*rsy-1)*dScale[1]]:[k*dScale[0],k*dScale[1]];
+    var opK=randMode.opacity?(2*rop-1)*dOpacity:k*dOpacity;
+    // Stagger folded into ONE matrix with the mode's own placement:
+    // rotate/scale in place around the seed's own bounds-center first, the
+    // placement translate last — same inner-transform-then-outer-placement
+    // order as a Component's own camera followed by symMatrix.
+    var mat=dupMatrixFromDescriptor({dx:baseDx+posK[0],dy:baseDy+posK[1],rot:baseRot+rotK,sx:1+scaleK[0]/100,sy:1+scaleK[1]/100},pivot);
+    var opFactor=Math.max(0,Math.min(1,1+opK/100));
+    base.forEach(function(sd){
+      var sd2=applyMatrixToStrokeData(cloneStrokeForTransform(sd),mat);
+      sd2.opacity=(sd2.opacity!==undefined?sd2.opacity:1)*opFactor;
+      sd2.isDuplicatorCopy=true;sd2.dupIndex=k;
+      out.push(sd2);
+    });
+  }
+  if(pathInfo)pathInfo.path.remove();
+  return out;
+}
+// The ONLY sanctioned way to get a layer's content WITH the duplicator
+// applied. getEffectiveStrokes itself stays untouched — its ~16 other call
+// sites (tween baking, ensureKeyframe, onion ghosts, status-bar count…)
+// must keep seeing the single real seed shape. Only loadFrame and
+// export.js's two frame builders substitute this in.
+function getEffectiveStrokesRendered(layerIdx,frameIdx){
+  var base=getEffectiveStrokes(layerIdx,frameIdx);
+  var ld=state.layers[layerIdx];
+  if(!ld||!ld.duplicator||ld._dupEditSource||!base.length)return base;
+  return applyLayerDuplicator(ld,base,frameIdx);
 }
 function resolveSymbolFrameIdx(sym,layer,mainFrameIdx){
   // A key on the parent Animation 2D timeline may explicitly pick the
@@ -2276,7 +2423,12 @@ function _invalidateSymbolUnionIfEditingSymbol(){
 function saveActiveLayerFrame(){
   window._sceneVersion++;
   _invalidateSymbolUnionIfEditingSymbol();
-  var ld=state.layers[state.activeLayerIdx];if(ld.symbolId||ld.nativeVideo||ld.montageId||ld.isNullLayer||ld.isEffectLayer)return;
+  // duplicator (unless in edit-source mode): the live Paper layer holds the
+  // N-way EXPANSION (getEffectiveStrokesRendered, loadFrame) — reading it
+  // back here would permanently bake N copies into the stored drawing on
+  // the very first scrub. Same class of skip as symbolId (synthetic live
+  // content, real data lives elsewhere).
+  var ld=state.layers[state.activeLayerIdx];if(ld.symbolId||ld.nativeVideo||ld.montageId||ld.isNullLayer||ld.isEffectLayer||(ld.duplicator&&!ld._dupEditSource))return;
   if(!layerIsEffectivelyVisible(state.activeLayerIdx))return;
   _writeBackGhostProxies(state.activeLayerIdx);
   var f=ld.frames[state.currentFrame];
@@ -2288,7 +2440,8 @@ function saveActiveLayerFrame(){
 function saveAllLayerFrames(){
   _invalidateSymbolUnionIfEditingSymbol();
   _writeBackGhostProxies(state.activeLayerIdx);
-  for(var i=0;i<state.layers.length;i++){if(state.layers[i].symbolId||state.layers[i].nativeVideo||state.layers[i].montageId||state.layers[i].isNullLayer||state.layers[i].isEffectLayer)continue;
+  // duplicator skip: same reason as saveActiveLayerFrame's guard above.
+  for(var i=0;i<state.layers.length;i++){if(state.layers[i].symbolId||state.layers[i].nativeVideo||state.layers[i].montageId||state.layers[i].isNullLayer||state.layers[i].isEffectLayer||(state.layers[i].duplicator&&!state.layers[i]._dupEditSource))continue;
   if(!layerIsEffectivelyVisible(i))continue;
   var f=state.layers[i].frames[state.currentFrame];if(!f||(!f.isKeyframe&&!f.isInterpolated))continue;
   var strokes=_collectLayerStrokes(i,state.layers[i]);
@@ -2344,7 +2497,12 @@ function loadFrame(idx){
   // rather than mutating it in place, so a changed frame always presents a
   // different object. Component/montage/lfs layers synthesize a fresh array
   // per call and therefore never match — they keep rebuilding, unchanged.
-  var strokes=getEffectiveStrokes(i,idx);
+  // getEffectiveStrokesRendered = getEffectiveStrokes + the mograph
+  // duplicator's N-way expansion (no-op for every non-duplicator layer —
+  // identical array, so the identity-reuse test below is untouched). A
+  // duplicator layer returns a fresh array per call and therefore always
+  // rebuilds, same accepted cost as component/montage/lfs layers.
+  var strokes=getEffectiveStrokesRendered(i,idx);
   if(_canReuseMaterialized(userLayers[i],strokes))continue;
   userLayers[i].removeChildren();
   // No explicit `op` override here (unlike renderOS()'s onion-skin ghosts,
