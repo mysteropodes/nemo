@@ -1394,6 +1394,7 @@ function rigResetPose(ld){
     bone.segments=JSON.parse(JSON.stringify(bone.restSegments));
   });
   applyRigDeform(ld);
+  ld._rigPoseLive=false;
 }
 // Bakes the current LIVE pose into a real keyframe. Order matters — the
 // labs prototype had this backwards (ensureKeyframe AFTER the pose was
@@ -1410,6 +1411,7 @@ function rigCommitFrame(ld){
   ensureKeyframe();
   relinkRigBinds(ld,userLayers[state.activeLayerIdx]);
   applyRigDeform(ld);
+  ld._rigPoseLive=false;
   saveActiveLayerFrame();updateUI();
   if(window.SMEngineBridge)SMEngineBridge.renderNow();
   showToast('Pose du rig figée sur cette frame');
@@ -2675,7 +2677,17 @@ function saveActiveLayerFrame(){
   // back here would permanently bake N copies into the stored drawing on
   // the very first scrub. Same class of skip as symbolId (synthetic live
   // content, real data lives elsewhere).
-  var ld=state.layers[state.activeLayerIdx];if(ld.symbolId||ld.nativeVideo||ld.montageId||ld.isNullLayer||ld.isEffectLayer||(ld.duplicator&&!ld._dupEditSource))return;
+  // ld._rigPoseLive (2026-07-29): a posed-but-not-yet-committed Rig drag —
+  // see the identical guard in saveAllLayerFrames below for why this can't
+  // just rely on "the user will click Commit quickly": found live, the
+  // periodic 30s autosave (setInterval below, timeline.js) calls
+  // saveAllLayerFrames unconditionally and would otherwise bake an
+  // uncommitted pose into frame data on its own schedule, silently
+  // defeating Reset Pose's whole "discard the live drag" contract — the
+  // Rig tool is the one interaction in this app where "live but
+  // uncommitted" is meant to survive far longer than a single gesture
+  // (Commit/Reset are deliberate separate actions, not implied by mouseup).
+  var ld=state.layers[state.activeLayerIdx];if(ld.symbolId||ld.nativeVideo||ld.montageId||ld.isNullLayer||ld.isEffectLayer||(ld.duplicator&&!ld._dupEditSource)||ld._rigPoseLive)return;
   if(!layerIsEffectivelyVisible(state.activeLayerIdx))return;
   _writeBackGhostProxies(state.activeLayerIdx);
   var f=ld.frames[state.currentFrame];
@@ -2688,7 +2700,7 @@ function saveAllLayerFrames(){
   _invalidateSymbolUnionIfEditingSymbol();
   _writeBackGhostProxies(state.activeLayerIdx);
   // duplicator skip: same reason as saveActiveLayerFrame's guard above.
-  for(var i=0;i<state.layers.length;i++){if(state.layers[i].symbolId||state.layers[i].nativeVideo||state.layers[i].montageId||state.layers[i].isNullLayer||state.layers[i].isEffectLayer||(state.layers[i].duplicator&&!state.layers[i]._dupEditSource))continue;
+  for(var i=0;i<state.layers.length;i++){if(state.layers[i].symbolId||state.layers[i].nativeVideo||state.layers[i].montageId||state.layers[i].isNullLayer||state.layers[i].isEffectLayer||(state.layers[i].duplicator&&!state.layers[i]._dupEditSource)||state.layers[i]._rigPoseLive)continue;
   if(!layerIsEffectivelyVisible(i))continue;
   var f=state.layers[i].frames[state.currentFrame];if(!f||(!f.isKeyframe&&!f.isInterpolated))continue;
   var strokes=_collectLayerStrokes(i,state.layers[i]);
@@ -2713,7 +2725,24 @@ function _canReuseMaterialized(lyr,strokes){
   if(lyr.children.length!==strokes.length)return false;
   return true;
 }
-function loadFrame(idx){
+// `dupOnly` (2026-07-29): renderNow()'s duplicator-refresh guard (engine-
+// bridge.js) used to call loadFrame(idx) UNSCOPED — rebuilding EVERY layer,
+// not just duplicator ones. loadFrame is also the chokepoint that makes a
+// DIRTY layer (_smGeomDirty, e.g. a live Subselect/Eraser/Rig drag not yet
+// saved) discard its uncommitted edit and rebuild from stored data — by
+// design for actual frame navigation (scrub/playback/goToFrame), where
+// abandoning an unsaved edit on the frame you're leaving is correct. But
+// renderNow()'s guard calls loadFrame on the SAME frame purely to force the
+// duplicator's fresh N-way expansion (dupOffset* is only read here) — not a
+// navigation at all. Found live: with ANY duplicator-enabled layer anywhere
+// in the document, every OTHER layer's live drag (Subselect node-drag, Rig
+// pose-drag — anything calling the plain renderNow() per move tick) got
+// silently reverted to its stored (rest) geometry on literally every
+// pointermove, because this same forced rebuild ran across the whole
+// document each time. `dupOnly=true` skips every non-duplicator layer
+// entirely (no removeChildren, no rebuild, no dirty-flag reset) so the
+// duplicator refresh no longer has this collateral blast radius.
+function loadFrame(idx,dupOnly){
   window._sceneVersion++;
   // See _maybePromoteInterpolated's own comment — loadFrame is the one
   // choke point every frame navigation (scrub, playback, goToFrame) goes
@@ -2730,6 +2759,7 @@ function loadFrame(idx){
   // LAYERS follow the playhead through the same choke point.
   if(window.SMNativeVideo)SMNativeVideo.onFrameChanged(idx);
   for(var i=0;i<state.layers.length;i++){
+  if(dupOnly&&!state.layers[i].duplicator)continue;
   if(!layerIsEffectivelyVisible(i)){userLayers[i].removeChildren();userLayers[i]._matStrokes=null;continue;}
   // Skip the rebuild when this layer's effective content is literally the
   // SAME array it was last built from. getEffectiveStrokes returns the stored

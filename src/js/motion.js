@@ -4544,6 +4544,15 @@
       // The graph editor hides #frame-grid while it's open — leaving Motion
       // with it still on would strand the 2D timeline invisible.
       if (window.SMMotionGraph && SMMotionGraph.isOn()) SMMotionGraph.toggle(false);
+      // _layerSel (Motion's own multi-layer selection) has no equivalent UI
+      // in Animation 2D, so nothing visually hints it's still set — found
+      // live: leaving Motion with a layer selected there left insertFrame()/
+      // removeFrame() (app.js) silently targeting THAT stale selection
+      // instead of the active layer, and refusing outright with no visible
+      // cause whenever the stale selection happened to be a locked layer
+      // (e.g. a Component instance). Same "start fresh" precedent as the
+      // other Motion-only transient state cleared just above.
+      _layerSel = [];
     }
     state.appMode = mode;
     document.querySelectorAll('.app-mode-btn').forEach(function (b) { b.classList.toggle('active', b.dataset.mode === mode); });

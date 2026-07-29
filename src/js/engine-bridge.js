@@ -2208,7 +2208,11 @@
     // (§6's retained-path exclusion), so re-running it here is a correctness
     // fix, not a new cost, and every non-duplicator layer's existing
     // hold-frame reuse (_canReuseMaterialized) keeps this near-free.
-    if (state.layers.some(function (l) { return l.duplicator && !l._dupEditSource; })) loadFrame(state.currentFrame);
+    // dupOnly=true (2026-07-29): scopes the rebuild to duplicator layers
+    // only — see loadFrame's own header comment for the live bug this fixes
+    // (an unscoped call here silently reverted any OTHER layer's in-progress
+    // live drag — Subselect, Eraser, Rig pose — on every render tick).
+    if (state.layers.some(function (l) { return l.duplicator && !l._dupEditSource; })) loadFrame(state.currentFrame, true);
     var json = buildSceneJson();
     lastSceneJson = json;
     window.__lastSceneJson = json;
