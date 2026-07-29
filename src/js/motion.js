@@ -4869,29 +4869,69 @@
     // overwhelmingly common case — callers skip all mapping then).
     layerMotionPointMap: function (li) {
       var mm = layerMotionAt(li, state.currentFrame);
-      if (!mm) return null;
+      // Parent chain (2026-07-29 fix, Cyril: "fait ce qu'il faut") — this
+      // used to only look at the layer's OWN transform, so a layer with NO
+      // motion of its own but parented to one that DOES (e.g. "Parent" has
+      // a Position offset, "Child" is parentLayerUid'd to it and holds the
+      // actual shape) returned null — select-bridge.js/subselect-bridge.js/
+      // rig-bridge.js then skipped mapping entirely, hit-testing/dragging at
+      // the click's RAW position while the content actually rendered
+      // wherever the ancestor's transform put it. Confirmed live: a shape's
+      // raw point at (280,380) rendered at (400,320) once its parent had a
+      // +120,-60 Position key, with layerMotionPointMap still returning
+      // null for the child. fwd applies the layer's own transform first,
+      // then each ancestor in order (immediate parent first) — the SAME
+      // composition order buildSceneJson's own per-item loop already uses
+      // (own motionMat via transformSegments, then parentChain in a loop);
+      // inv undoes them in the exact reverse order.
+      var chain = parentChainMats(li, state.currentFrame);
+      if (!mm && !chain.length) return null;
       var lb = userLayers[li] && userLayers[li].bounds;
       if (!lb) return null;
-      var px = lb.center.x + mm.ax, py = lb.center.y + mm.ay;
-      var r = mm.rot * Math.PI / 180, c = Math.cos(r), s = Math.sin(r);
+      var ownMat = mm || { dx: 0, dy: 0, rot: 0, sx: 1, sy: 1, op: 1, ax: 0, ay: 0 };
+      var px = lb.center.x + ownMat.ax, py = lb.center.y + ownMat.ay;
+      var r = ownMat.rot * Math.PI / 180, c = Math.cos(r), s = Math.sin(r);
+      function fwdOne(x, y, pivotX, pivotY, mat, cc, ss) {
+        var lx = (x - pivotX) * mat.sx, ly = (y - pivotY) * mat.sy;
+        return [pivotX + lx * cc - ly * ss + mat.dx, pivotY + lx * ss + ly * cc + mat.dy];
+      }
+      function invOne(x, y, pivotX, pivotY, mat, cc, ss) {
+        var wx = x - mat.dx - pivotX, wy = y - mat.dy - pivotY;
+        var lx = wx * cc + wy * ss, ly = -wx * ss + wy * cc;
+        return [pivotX + lx / (mat.sx || 1e-6), pivotY + ly / (mat.sy || 1e-6)];
+      }
       return {
-        mat: mm,
-        // Exposed (2026-07-29) so a caller can feed transformSegments
-        // directly (pivot + mat) instead of re-deriving px/py itself —
-        // engine-bridge.js's buildRigPreviewItems is the first consumer.
+        // OWN-level transform only (unchanged meaning, pre-2026-07-29) —
+        // kept for callers that feed this straight into transformSegments
+        // for handle-vector rotation (engine-bridge.js's buildRigPreviewItems).
+        // A ROTATING ancestor's own contribution to handle-vector rotation
+        // isn't composed here — a residual, narrower gap than the point-
+        // mapping fix below (parented layer + Rig + a rotating ancestor
+        // would still render slightly-off curve handles on the overlay;
+        // point hit-testing/dragging, the part that matters for actually
+        // grabbing the right thing, is fully correct).
+        mat: ownMat,
         pivot: new Point(px, py),
         fwd: function (x, y) {
-          var lx = (x - px) * mm.sx, ly = (y - py) * mm.sy;
-          return [px + lx * c - ly * s + mm.dx, py + lx * s + ly * c + mm.dy];
+          var p = fwdOne(x, y, px, py, ownMat, c, s);
+          for (var i = 0; i < chain.length; i++) {
+            var ch = chain[i], cr = ch.mat.rot * Math.PI / 180;
+            p = fwdOne(p[0], p[1], ch.pivot.x, ch.pivot.y, ch.mat, Math.cos(cr), Math.sin(cr));
+          }
+          return p;
         },
         inv: function (x, y) {
-          var wx = x - mm.dx - px, wy = y - mm.dy - py;
-          var lx = wx * c + wy * s, ly = -wx * s + wy * c;
-          return [px + lx / (mm.sx || 1e-6), py + ly / (mm.sy || 1e-6)];
+          var cx = x, cy = y;
+          for (var i = chain.length - 1; i >= 0; i--) {
+            var ch = chain[i], cr = ch.mat.rot * Math.PI / 180;
+            var rr = invOne(cx, cy, ch.pivot.x, ch.pivot.y, ch.mat, Math.cos(cr), Math.sin(cr));
+            cx = rr[0]; cy = rr[1];
+          }
+          return invOne(cx, cy, px, py, ownMat, c, s);
         },
         invVec: function (x, y) {
           var lx = x * c + y * s, ly = -x * s + y * c;
-          return [lx / (mm.sx || 1e-6), ly / (mm.sy || 1e-6)];
+          return [lx / (ownMat.sx || 1e-6), ly / (ownMat.sy || 1e-6)];
         },
       };
     },
