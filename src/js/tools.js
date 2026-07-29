@@ -1354,6 +1354,11 @@ function editRefusalReason(){
   // that advice unlocks the layer and you still can't draw, you just finally
   // get told why. The component nature is the actual reason.
   if(ld.symbolId)return 'Calque composant — double-clique dessus pour entrer dedans et dessiner';
+  // duplicator BEFORE locked, same reasoning as symbolId above: the toggle
+  // force-locks the layer, so "unlock it" would be the useless half of the
+  // truth — the duplicator is the actual reason, and the panel's edit-source
+  // button is the actual fix.
+  if(ld.duplicator&&!ld._dupEditSource)return 'Calque duplicateur — « Modifier la forme source » (panneau Duplicator) pour éditer';
   if(ld.locked)return 'Calque verrouillé — déverrouille-le (cadenas) pour dessiner dessus';
   if(ld.nativeVideo)return 'Calque vidéo — dessine sur un calque normal au-dessus';
   if(ld.montageId)return 'Calque montage — son contenu s\u2019édite dans le StoryBoard';

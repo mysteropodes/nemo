@@ -858,6 +858,7 @@ window.SM={
     // so the duplicate's strokes carry the SAME ids the original's element
     // motion data is keyed by, a plain deep-copy stays correctly matched.
     if(src.elementMotion)state.layers[ni].elementMotion=JSON.parse(JSON.stringify(src.elementMotion));
+    if(src.duplicator){state.layers[ni].duplicator=JSON.parse(JSON.stringify(src.duplicator));state.layers[ni].locked=true;}
     if(src.inPoint!=null)state.layers[ni].inPoint=src.inPoint;if(src.outPoint!=null)state.layers[ni].outPoint=src.outPoint;activateUL(ni);loadFrame(state.currentFrame);updateUI();},
   setActiveLayer:function(idx){if(idx<0||idx>=state.layers.length)return;saveAllLayerFrames();activateUL(idx);clearSel();
     window._layerActiveExplicit=true; // see clearSel()'s own comment — an explicit timeline row click, not a canvas deselect
@@ -895,6 +896,11 @@ window.SM={
     renderArcs();updateUI();},
   toggleLayerVis:function(idx){state.layers[idx].visible=!state.layers[idx].visible;loadFrame(state.currentFrame);updateUI();},
   toggleLayerLock:function(idx){
+    // A duplicator layer's lock is managed by the duplicator itself
+    // (toggleLayerDuplicator/setDuplicatorEditSource, motion.js) — a direct
+    // padlock unlock would let edits hit the N-way-expanded live layer and
+    // desync locked/_dupEditSource. Route through the panel's own button.
+    if(state.layers[idx].duplicator&&!state.layers[idx]._dupEditSource&&state.layers[idx].locked){showToast('Calque duplicateur — « Modifier la forme source » (panneau Duplicator) pour éditer');return;}
     state.layers[idx].locked=!state.layers[idx].locked;
     // Locking a layer that already has content selected (selected before the
     // lock, or the lock toggled while it's the active layer) must drop that
@@ -1357,7 +1363,11 @@ window.SM={
         // calques" — the pivot came back, everything hung off it did not.
         layerUid:l.layerUid,parentLayerUid:l.parentLayerUid,markers:l.markers,shy:l.shy,keyLock:l.keyLock,timeRemap:l.timeRemap,motionBlur:l.motionBlur,effectsFrom:l.effectsFrom,timeLink:l.timeLink,
         // 3D layer toggle (2026-07-28) — see motion.js's compute3DCorners.
-        threeD:l.threeD};}),
+        threeD:l.threeD,
+        // Mograph duplicator (2026-07-29) — copied wholesale like
+        // symMatrix/lfsSettings, no per-field whitelist for its innards.
+        // (_dupEditSource is transient and deliberately NOT persisted.)
+        duplicator:l.duplicator||undefined};}),
       layerFolders:state.layerFolders,layerLinkGroups:state.layerLinkGroups,
       // StoryBoard node space (2026-07) — plain data by construction (no
       // runtime-only fields live in state.storyboard, see storyboard.js's
@@ -1558,6 +1568,7 @@ window.SM={
       if(ld.effectsFrom)state.layers[idx].effectsFrom=ld.effectsFrom;     // Instance Effect
       if(ld.timeLink)state.layers[idx].timeLink=ld.timeLink;              // Parent in Time
       if(ld.threeD)state.layers[idx].threeD=true;                         // calque 3D
+      if(ld.duplicator){state.layers[idx].duplicator=ld.duplicator;state.layers[idx].locked=true;} // duplicateur mograph (relock: _dupEditSource n'est jamais persisté)
       state.layers[idx].color=ld.color||nextLayerColor();
       ld.frames.forEach(function(f){if(!f.isInterpolated)f.isInterpolated=false;});while(state.layers[idx].frames.length<state.totalFrames)state.layers[idx].frames.push({strokes:[],isKeyframe:false,isInterpolated:false});});
     state.layerFolders=d.layerFolders||{};state.layerLinkGroups=d.layerLinkGroups||{};
@@ -1669,7 +1680,7 @@ function updateUI(frameOnly){
   window._totalF=state.totalFrames;window._waIn=state.waIn;window._waOut=state.waOut;window._curFrame=state.currentFrame;
   window.updateWaBar();window.updateOmMarkers(state.currentFrame,state.totalFrames);
   if(frameOnly)updatePlayhead();else renderTimeline();
-  renderLayerList(frameOnly);updateCompInstancePanel();updateFootagePanel();updateSelPropsPanel();updateFsSelPanel();updateRevisionPanel();updateTextActionsPanel();if(window.updateEffectsPanel)window.updateEffectsPanel();updatePropsContext();
+  renderLayerList(frameOnly);updateCompInstancePanel();updateDuplicatorPanel();updateFootagePanel();updateSelPropsPanel();updateFsSelPanel();updateRevisionPanel();updateTextActionsPanel();if(window.updateEffectsPanel)window.updateEffectsPanel();updatePropsContext();
 }
 // Team review Accept/Reject panel — shown when exactly one selected item is
 // either an active (non-ghost) revision (data.revisionParentId) or a
@@ -3633,6 +3644,10 @@ var ICO_UNLOCK='<svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9
 // icon-font glyph — this project's embedded font is a subset containing
 // only already-referenced codepoints, see this project's own CLAUDE.md).
 var ICO_3D='<svg viewBox="0 0 24 24"><path d="M12 3 L20 7.5 L20 16.5 L12 21 L4 16.5 L4 7.5 Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 3 L12 12 M20 7.5 L12 12 M4 7.5 L12 12 M12 12 L12 21" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>';
+// Mograph duplicator toggle (2026-07-29) — 2x2 grid of squares, one filled
+// (the seed) and three outlined (the copies). Same inline-SVG convention as
+// ICO_3D above.
+var ICO_DUP='<svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.2" fill="currentColor"/><rect x="13.5" y="4" width="7" height="7" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="4" y="13.5" width="7" height="7" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>';
 // Layer color label picker (v5) — a small predefined-swatch "nuancier"
 // instead of jumping straight to the full SV/hue/hex ColorPicker. Reuses
 // LAYER_COLOR_PALETTE (app.js) so the choices match the auto-assigned
@@ -3957,6 +3972,9 @@ function renderLayerList(frameOnly){
     // toggleLayer3D (the state mutation + re-render live there, not
     // inline here, matching every other icon button's own convention).
     var d3=document.createElement('div');d3.className='lico'+(ld.threeD?'':' off');d3.title='3D Layer';d3.innerHTML=ICO_3D;d3.dataset.layer=i;d3.addEventListener('click',function(e){e.stopPropagation();if(window.SMMotion)SMMotion.toggleLayer3D(parseInt(this.dataset.layer));});
+    // Mograph duplicator toggle — same .lico convention, delegates to
+    // motion.js's toggleLayerDuplicator (lock + config init live there).
+    var ddup=document.createElement('div');ddup.className='lico'+(ld.duplicator?'':' off');ddup.title='Duplicator (grille / radial / chemin)';ddup.innerHTML=ICO_DUP;ddup.dataset.layer=i;ddup.addEventListener('click',function(e){e.stopPropagation();if(window.SMMotion)SMMotion.toggleLayerDuplicator(parseInt(this.dataset.layer));});
     // Type badge — a video, an imported sequence and a hand-drawn layer were
     // three identical rows before this (layer-kind.js decides which). Sits
     // just before the name so the eye reads "what" then "which", and carries
@@ -3968,7 +3986,7 @@ function renderLayerList(frameOnly){
       row.appendChild(kb);
     }
     var nm=document.createElement('div');nm.className='lnm';nm.textContent=ld.name;
-    row.appendChild(eye);row.appendChild(lock);row.appendChild(solo);row.appendChild(d3);
+    row.appendChild(eye);row.appendChild(lock);row.appendChild(solo);row.appendChild(d3);row.appendChild(ddup);
     if(ld.symbolId){var cb=document.createElement('div');cb.className='lico comp-badge';cb.title='Component — double-click to edit';cb.innerHTML='<span style="font-size:11px;line-height:1">\u25c8</span>';row.appendChild(cb);}
     if(ld.lfsGroup){var lb=document.createElement('div');lb.className='lico comp-badge';lb.title='Ligne/Plein/Ombre layer';lb.innerHTML='<span style="font-size:11px;line-height:1">LFS</span>';row.appendChild(lb);}
     // Stroke/Fill/Shadow channel badge — a fully normal layer row (own
@@ -4268,6 +4286,60 @@ function renderCompFrameStrip(ld){
     strip.appendChild(cell);
   }
 }
+// Mograph duplicator config panel (2026-07-29) — same show/hide-from-the-
+// active-layer shape as updateCompInstancePanel above. Only the STATIC
+// config lives here (mode/counts/seed/random toggles); the animatable
+// per-copy deltas are ordinary Motion properties (PROPS_DUP_EXTRA,
+// motion.js). Field listeners are wired once at startup (bottom of this
+// file, next to #comp-playmode's own) and write into ld.duplicator.* then
+// reload the frame.
+function updateDuplicatorPanel(){
+  var sec=document.getElementById('duplicator-sec');
+  if(!sec)return;
+  var ld=state.layers[state.activeLayerIdx];
+  if(!ld||!ld.duplicator){sec.style.display='none';return;}
+  sec.style.display='block';
+  var dup=ld.duplicator;
+  var mode=dup.mode||'grid';
+  document.getElementById('dup-mode').value=mode;
+  document.getElementById('dup-grid-row').style.display=mode==='grid'?'flex':'none';
+  document.getElementById('dup-grid-spacing-row').style.display=mode==='grid'?'flex':'none';
+  document.getElementById('dup-count-row').style.display=mode!=='grid'?'flex':'none';
+  document.getElementById('dup-radial-row').style.display=mode==='radial'?'flex':'none';
+  document.getElementById('dup-radial-orient-row').style.display=mode==='radial'?'flex':'none';
+  document.getElementById('dup-path-row').style.display=mode==='path'?'flex':'none';
+  document.getElementById('dup-path-align-row').style.display=mode==='path'?'flex':'none';
+  document.getElementById('dup-rows').value=dup.rows||1;
+  document.getElementById('dup-cols').value=dup.cols||1;
+  document.getElementById('dup-spacingx').value=dup.spacingX||0;
+  document.getElementById('dup-spacingy').value=dup.spacingY||0;
+  document.getElementById('dup-count').value=dup.count||1;
+  document.getElementById('dup-radius').value=dup.radius||0;
+  document.getElementById('dup-startangle').value=dup.startAngle||0;
+  document.getElementById('dup-radial-orient').checked=!!dup.radialOrient;
+  document.getElementById('dup-path-align').checked=!!dup.pathAlignTangent;
+  document.getElementById('dup-seed').value=dup.seed||0;
+  var sr=dup.staggerRandom||{};
+  document.getElementById('dup-rand-pos').checked=!!sr.position;
+  document.getElementById('dup-rand-rot').checked=!!sr.rotation;
+  document.getElementById('dup-rand-scale').checked=!!sr.scale;
+  document.getElementById('dup-rand-op').checked=!!sr.opacity;
+  // Path-layer picker: every OTHER layer that isn't itself a duplicator
+  // (no chained duplicators in v1 — same refusal as _resolveDuplicatorPath's
+  // own runtime guard, this is just the UI half).
+  var sel=document.getElementById('dup-path-layer');
+  sel.innerHTML='';
+  var none=document.createElement('option');none.value='';none.textContent='—';sel.appendChild(none);
+  state.layers.forEach(function(l,i){
+    if(i===state.activeLayerIdx||l.duplicator)return;
+    var o=document.createElement('option');o.value=l.layerUid||'';o.textContent=l.name||('Layer '+(i+1));sel.appendChild(o);
+  });
+  sel.value=dup.pathLayerUid||'';
+  var editBtn=document.getElementById('btn-dup-edit-source');
+  editBtn.textContent=ld._dupEditSource?(window.SM&&SM.t?SM.t('dupEditSourceDone'):'Terminé — réactiver la duplication'):(window.SM&&SM.t?SM.t('dupEditSource'):'Modifier la forme source…');
+  editBtn.classList.toggle('ac',!ld._dupEditSource);
+}
+window.updateDuplicatorPanel=updateDuplicatorPanel;
 function showToast(m){var el=document.getElementById('toast');el.textContent=m;el.classList.add('show');clearTimeout(window._toastT);window._toastT=setTimeout(function(){el.classList.remove('show');},2500);}
 
 // ---- KEYBOARD ----
@@ -6722,6 +6794,33 @@ document.getElementById('comp-playmode').addEventListener('change',function(){wi
 document.getElementById('comp-singleframe').addEventListener('change',function(){window.SM.setSymbolSingleFrame(this.value);});
 document.getElementById('comp-speed').addEventListener('change',function(){window.SM.setSymbolSpeed(this.value);});
 document.getElementById('comp-offset').addEventListener('change',function(){window.SM.setSymbolPlacedAt(this.value);});
+// ---- Mograph duplicator panel (2026-07-29) ----
+// Every field writes into ld.duplicator.* then reloads the frame — the
+// multiplication itself lives in applyLayerDuplicator (app.js). `change`
+// (not `input`) so a scrub gesture commits once per settle, same as the
+// component-instance fields above.
+(function(){
+  function dupOf(){var ld=state.layers[state.activeLayerIdx];return(ld&&ld.duplicator)?ld.duplicator:null;}
+  function dupRefresh(){loadFrame(state.currentFrame);if(window.SMEngineBridge)SMEngineBridge.renderNow();updateDuplicatorPanel();}
+  function wireNum(id,key,min,max){document.getElementById(id).addEventListener('change',function(){var d=dupOf();if(!d)return;var v=parseFloat(this.value);if(!isFinite(v))return;if(min!==undefined)v=Math.max(min,v);if(max!==undefined)v=Math.min(max,v);d[key]=v;dupRefresh();});}
+  document.getElementById('dup-mode').addEventListener('change',function(){var d=dupOf();if(!d)return;d.mode=this.value;dupRefresh();});
+  wireNum('dup-rows','rows',1,30);wireNum('dup-cols','cols',1,30);
+  wireNum('dup-spacingx','spacingX');wireNum('dup-spacingy','spacingY');
+  wireNum('dup-count','count',1,500);
+  wireNum('dup-radius','radius');wireNum('dup-startangle','startAngle');
+  wireNum('dup-seed','seed');
+  document.getElementById('dup-radial-orient').addEventListener('change',function(){var d=dupOf();if(!d)return;d.radialOrient=this.checked;dupRefresh();});
+  document.getElementById('dup-path-align').addEventListener('change',function(){var d=dupOf();if(!d)return;d.pathAlignTangent=this.checked;dupRefresh();});
+  document.getElementById('dup-path-layer').addEventListener('change',function(){var d=dupOf();if(!d)return;d.pathLayerUid=this.value||null;dupRefresh();});
+  document.getElementById('btn-dup-reseed').addEventListener('click',function(){var d=dupOf();if(!d)return;d.seed=Math.floor(Math.random()*1e6);dupRefresh();});
+  function wireRand(id,key){document.getElementById(id).addEventListener('change',function(){var d=dupOf();if(!d)return;(d.staggerRandom||(d.staggerRandom={}))[key]=this.checked;dupRefresh();});}
+  wireRand('dup-rand-pos','position');wireRand('dup-rand-rot','rotation');wireRand('dup-rand-scale','scale');wireRand('dup-rand-op','opacity');
+  document.getElementById('btn-dup-edit-source').addEventListener('click',function(){
+    var ld=state.layers[state.activeLayerIdx];
+    if(!ld||!ld.duplicator||!window.SMMotion)return;
+    SMMotion.setDuplicatorEditSource(state.activeLayerIdx,!ld._dupEditSource);
+  });
+})();
 // Save/Save As/Open/New buttons and the legacy download/upload fallback
 // are wired in project.js, which also owns the start screen and the
 // recent-projects list.

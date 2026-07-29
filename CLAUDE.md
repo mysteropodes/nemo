@@ -13,8 +13,11 @@ Chaque calque Paper.js (`userLayers[i].children`) est lu par PLUSIEURS boucles i
 historiquement toutes écrites avec l'hypothèse "chaque enfant est un `Path` simple". Dès qu'un
 nouveau type d'item (`CompoundPath`) ou un nouveau tag `data.*` (`isVectorBrush`,
 `isLinkedFillCompanion`, `isBrushTextureCopy`, `brushGroupId`, `fillSeed`/`fillWalls`,
-`strokeId`, `preTextureOpacity`/`preTextureStroke`…) apparaît, **il faut vérifier qu'il est
-géré ou exclu partout**, pas juste là où on vient de l'introduire.
+`strokeId`, `preTextureOpacity`/`preTextureStroke`, `isDuplicatorCopy`/`dupIndex`…) apparaît,
+**il faut vérifier qu'il est géré ou exclu partout**, pas juste là où on vient de l'introduire.
+(`isDuplicatorCopy`/`dupIndex` : copies synthétiques du duplicateur mograph — le calque est
+verrouillé de force et exclu de saveActiveLayerFrame/saveAllLayerFrames, voir
+`applyLayerDuplicator`/`getEffectiveStrokesRendered` dans app.js.)
 
 **Ancres de brush-texture, deux modes de camouflage** (applyBrushTexture, tools.js) : une ancre
 SANS fill est cachée par `opacity=0` (+ `preTextureOpacity` pour restaurer) ; une ancre AVEC

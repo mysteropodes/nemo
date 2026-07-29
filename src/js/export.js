@@ -40,7 +40,9 @@ function exportBuildFrame(frameIdx,alpha){
     // using a matte through the engine instead. This keeps the plain-Paper
     // fallback (SVG, scale>1) from being actively WRONG in the meantime.
     if(li>0&&state.layers[li-1]&&state.layers[li-1].matteMode&&state.layers[li-1].matteMode!=='none')continue;
-    var strokes=getEffectiveStrokes(li,frameIdx);
+    // Rendered variant: includes the mograph duplicator's N-way expansion
+    // (app.js) — identical to getEffectiveStrokes for every other layer.
+    var strokes=getEffectiveStrokesRendered(li,frameIdx);
     // Team review ghosts (revision-bridge.js): a frozen "before" copy a
     // reviewer's correction leaves behind, meant to stay visible ON-CANVAS
     // (so Accept/Reject has something to act on) but never in a rendered
@@ -478,7 +480,7 @@ function lottieBuild(start,end){
     // dab companions are UNAFFECTED — they're real Paths with segments,
     // same as before.
     var framesStrokes=[];
-    for(var f=start;f<=end;f++)framesStrokes[f]=getEffectiveStrokes(li,f).filter(function(sd){return sd.opacity!==0&&!sd.isRaster&&!sd.isRevisionGhost&&(state.exportIncludeShadowGuides||sd.channelTag!=='shadow');});
+    for(var f=start;f<=end;f++)framesStrokes[f]=getEffectiveStrokesRendered(li,f).filter(function(sd){return sd.opacity!==0&&!sd.isRaster&&!sd.isRevisionGhost&&(state.exportIncludeShadowGuides||sd.channelTag!=='shadow');});
 
     // figure out the max stroke-slot count and, for each slot, the
     // contiguous frame runs where that slot exists (count stable)
