@@ -911,7 +911,23 @@ window.SM={
     // model applies to an LFS group's 3 channel symbols.
     if(src.symbolId)state.layers[ni].symbolId=src.symbolId;
     if(src.lfsGroup){state.layers[ni].lfsGroup=true;state.layers[ni].lfsIds=JSON.parse(JSON.stringify(src.lfsIds));state.layers[ni].lfsSettings=JSON.parse(JSON.stringify(src.lfsSettings));state.layers[ni].locked=true;}
-    if(src.inPoint!=null)state.layers[ni].inPoint=src.inPoint;if(src.outPoint!=null)state.layers[ni].outPoint=src.outPoint;activateUL(ni);loadFrame(state.currentFrame);updateUI();},
+    if(src.inPoint!=null)state.layers[ni].inPoint=src.inPoint;if(src.outPoint!=null)state.layers[ni].outPoint=src.outPoint;
+    // 2026-07 fix: markers/shy/keyLock/timeRemap/motionBlur/effects/
+    // effectsFrom/isEffectLayer were all missing from this list — every one
+    // of them is a real, persisted per-layer field (see exportJSON's own
+    // layer serialization a few hundred lines up) that this function simply
+    // never copied, so a duplicate silently lost each one even though the
+    // source layer visibly had it. motionBlurSamples/motionBlurShutter are
+    // NOT here on purpose — those are comp-wide (state.*), not per-layer.
+    if(src.markers)state.layers[ni].markers=JSON.parse(JSON.stringify(src.markers));
+    if(src.shy)state.layers[ni].shy=true;
+    if(src.keyLock)state.layers[ni].keyLock=src.keyLock;
+    if(src.timeRemap)state.layers[ni].timeRemap=JSON.parse(JSON.stringify(src.timeRemap));
+    if(src.motionBlur)state.layers[ni].motionBlur=true;
+    if(src.effects&&src.effects.length)state.layers[ni].effects=JSON.parse(JSON.stringify(src.effects));
+    if(src.effectsFrom)state.layers[ni].effectsFrom=src.effectsFrom;
+    if(src.isEffectLayer)state.layers[ni].isEffectLayer=true;
+    activateUL(ni);loadFrame(state.currentFrame);updateUI();},
   setActiveLayer:function(idx){if(idx<0||idx>=state.layers.length)return;saveAllLayerFrames();activateUL(idx);clearSel();
     window._layerActiveExplicit=true; // see clearSel()'s own comment — an explicit timeline row click, not a canvas deselect
     // The camera row is a synthetic pseudo-layer (not a real state.layers
