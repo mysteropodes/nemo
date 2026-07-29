@@ -8,7 +8,7 @@
 // Phase C1 engine-skeleton entry point — not wired into the live app yet,
 // only used by its own isolated test harness until later migration phases.
 window.GeometryWasm = {
-  ready: false, boolean_op: null, fill_find: null, create_engine: null, hit_test: null,
+  ready: false, boolean_op: null, boolean_op_multi: null, fill_find: null, create_engine: null, hit_test: null,
   interp_stroke: null, auto_match: null, resample_stroke: null, align_pair: null, erase_at_point: null,
   line_segments: null, rect_segments: null, ellipse_segments: null,
   resolve_symbol_frame: null, effective_frame_index: null,
@@ -23,6 +23,7 @@ var wasmBust = Date.now();
 import('../wasm/geometry_wasm.js?v=' + wasmBust).then(function (mod) {
   return mod.default({ module_or_path: new URL('../wasm/geometry_wasm_bg.wasm?v=' + wasmBust, import.meta.url) }).then(function () {
     window.GeometryWasm.boolean_op = mod.boolean_op;
+    window.GeometryWasm.boolean_op_multi = mod.boolean_op_multi;
     window.GeometryWasm.fill_find = mod.fill_find;
     window.GeometryWasm.create_engine = mod.create_engine;
     window.GeometryWasm.hit_test = mod.hit_test;

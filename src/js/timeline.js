@@ -357,7 +357,7 @@ window.SM={
       showToast('Profil "Producteur" : lecture seule + commentaires');
       return;
     }
-    if(t!=='select'&&t!=='subselect'&&t!=='rig')clearSel();if(t!=='fsselect')fsClearSel();if(t!=='pen'&&_pen.path)finalizePen();if(t!=='rig'&&typeof _rigDraw!=='undefined'&&_rigDraw.path&&window.SMRig)window.SMRig.finalizeRigBone();if(t!=='eraser'&&typeof _eraserCursor!=='undefined'&&_eraserCursor){_eraserCursor.remove();_eraserCursor=null;}
+    if(t!=='select'&&t!=='subselect'&&t!=='rig')clearSel();if(t!=='fsselect')fsClearSel();if(t!=='pen'&&_pen.path)finalizePen();if(t!=='rig'&&typeof _rigDraw!=='undefined'&&_rigDraw.path&&window.SMRig)window.SMRig.finalizeRigBone();if(t!=='eraser'&&typeof _eraserCursor!=='undefined'&&_eraserCursor){_eraserCursor.remove();_eraserCursor=null;}if(t!=='select'&&window.SMSelectBridge)window.SMSelectBridge.cancelMarquee();
     // Picking a tool always means "I'm done with the timeline frame
     // selection" — leaving it selected made the status bar keep showing
     // keyframe shortcuts instead of the newly-picked tool's help.
@@ -864,6 +864,28 @@ window.SM={
     // as elementMotion just above), so relinkRigBinds matches correctly
     // on the duplicate without any extra remapping.
     if(src.rig)state.layers[ni].rig=JSON.parse(JSON.stringify(src.rig));
+    // Combine groups (2026-07-29): the frame clone above already preserves
+    // each stroke's data.groupId unchanged, so the duplicate's strokes carry
+    // the SAME groupId strings as the original — harmless for duplicateLayer
+    // ALONE (resolveGroupMembers/membersOf are always scoped to one explicit
+    // layer argument, never cross-layer) but see mergeLayersIntoOne's own
+    // groupId remap for why merging this duplicate back with its original
+    // needs a fresh id per group.
+    if(src.groups)state.layers[ni].groups=JSON.parse(JSON.stringify(src.groups));
+    // Bugs found live (2026-07-29 QA sweep): symbolId/lfsGroup were missing
+    // here entirely — since both redirect real content to state.symbols
+    // (getEffectiveStrokes never reads ld.frames for them, and the save
+    // guards above correctly never write resolved content back into them),
+    // a duplicate with neither flag ended up with genuinely-empty frames —
+    // a blank, invisible layer (Component case), or silently demoted to a
+    // plain layer that happened to show whatever had already leaked into
+    // ld.frames (LFS case, see the leak fix in saveActiveLayerFrame). A
+    // Component instance sharing its source symbolId is the existing,
+    // correct model for multiple instances of one symbol (each instance
+    // already carries its own placement/motion/camera) — same sharing
+    // model applies to an LFS group's 3 channel symbols.
+    if(src.symbolId)state.layers[ni].symbolId=src.symbolId;
+    if(src.lfsGroup){state.layers[ni].lfsGroup=true;state.layers[ni].lfsIds=JSON.parse(JSON.stringify(src.lfsIds));state.layers[ni].lfsSettings=JSON.parse(JSON.stringify(src.lfsSettings));state.layers[ni].locked=true;}
     if(src.inPoint!=null)state.layers[ni].inPoint=src.inPoint;if(src.outPoint!=null)state.layers[ni].outPoint=src.outPoint;activateUL(ni);loadFrame(state.currentFrame);updateUI();},
   setActiveLayer:function(idx){if(idx<0||idx>=state.layers.length)return;saveAllLayerFrames();activateUL(idx);clearSel();
     window._layerActiveExplicit=true; // see clearSel()'s own comment — an explicit timeline row click, not a canvas deselect
@@ -1378,7 +1400,13 @@ window.SM={
         // duplicator above. Binds reference strokeId, relinked on load by
         // relinkRigBinds (app.js, called from loadFrame) — never a live
         // Path reference, so a straight JSON round-trip is safe.
-        rig:l.rig||undefined};}),
+        rig:l.rig||undefined,
+        // Non-destructive combine groups (2026-07-29) — copied wholesale
+        // like duplicator/rig above. Membership itself is the plain
+        // data.groupId tag on each stroke (already round-trips via serP/
+        // desP unmodified); ld.groups is just the group-level combineMode/
+        // order metadata group-bridge.js has nowhere else to hang.
+        groups:l.groups||undefined};}),
       layerFolders:state.layerFolders,layerLinkGroups:state.layerLinkGroups,
       // StoryBoard node space (2026-07) — plain data by construction (no
       // runtime-only fields live in state.storyboard, see storyboard.js's
@@ -1581,6 +1609,7 @@ window.SM={
       if(ld.threeD)state.layers[idx].threeD=true;                         // calque 3D
       if(ld.duplicator){state.layers[idx].duplicator=ld.duplicator;state.layers[idx].locked=true;} // duplicateur mograph (relock: _dupEditSource n'est jamais persisté)
       if(ld.rig)state.layers[idx].rig=ld.rig;                             // rig (os/binds/IK) — relinkRigBinds fait le reste au premier loadFrame
+      if(ld.groups)state.layers[idx].groups=ld.groups;                    // groupes de combinaison non-destructifs — data.groupId sur chaque stroke fait déjà le tour via serP/desP
       state.layers[idx].color=ld.color||nextLayerColor();
       ld.frames.forEach(function(f){if(!f.isInterpolated)f.isInterpolated=false;});while(state.layers[idx].frames.length<state.totalFrames)state.layers[idx].frames.push({strokes:[],isKeyframe:false,isInterpolated:false});});
     state.layerFolders=d.layerFolders||{};state.layerLinkGroups=d.layerLinkGroups||{};
@@ -1869,11 +1898,12 @@ function updateStatusBarHelp(){
 function updatePropsContext(){
   var hasSel=(state.tool==='select'||state.tool==='subselect')&&selectedPaths.length>0;
   var ctx,hdrText;
-  var show={'sel-props-sec':false,'fill-sec':false,'stroke-sec':false,'tool-opts-sec':false,'canvas-sec':false,'layer-sec':false,'rig-opts-sec':false};
+  var show={'sel-props-sec':false,'fill-sec':false,'stroke-sec':false,'tool-opts-sec':false,'canvas-sec':false,'layer-sec':false,'rig-opts-sec':false,'combine-opts-sec':false};
   if(state.tool==='rig'){
     ctx='rig';
     show['rig-opts-sec']=true;
     show['layer-sec']=!!(state.layers[state.activeLayerIdx]);
+    if(window.renderRigModeUI)renderRigModeUI();
     hdrText=(window.SM&&SM.t?SM.t('toolRig'):'Rig')+' — Options';
   }else if(state.tool==='fsselect'&&_fsSel.length){
     // Multi-select (2026-07): show BOTH sections if the selection mixes
@@ -1901,6 +1931,24 @@ function updatePropsContext(){
     // fields (updateSelPropsPanel) that section sits right above.
     show['canvas-sec']=state.tool!=='subselect';
     show['layer-sec']=!!(state.layers[state.activeLayerIdx]);
+    // Rig bind (2026-07-29 fix, "on ne sait pas comment select l'élément qui
+    // doit y être associé"): #rig-opts-sec (with the "Lier la sélection"
+    // button) used to be shown ONLY while state.tool==='rig' — but binding a
+    // shape needs a REAL canvas selection, which only the Select/Subselect
+    // tools can make (the Rig tool's own onDown intercepts every click for
+    // bone-drawing/posing instead). So switching to Select to actually pick
+    // something hid the one button that finishes the job — there was no
+    // sequence of clicks that showed both a selection AND the Bind button at
+    // once. Surfacing it here too (only when there's something to bind TO —
+    // the active layer already has 1+ bones) closes that gap without
+    // touching the Rig-tool-active branch above.
+    var rigLd=state.layers[state.activeLayerIdx];
+    if(rigLd&&rigLd.rig&&rigLd.rig.bones&&Object.keys(rigLd.rig.bones).length){show['rig-opts-sec']=true;if(window.renderRigModeUI)renderRigModeUI();}
+    // Combine-group panel (2026-07-29 UX fix) — visible for ANY selection so
+    // "Combiner" is discoverable the moment 2+ shapes are selected, not only
+    // after already knowing the Alt+click/context-menu shortcuts exist.
+    show['combine-opts-sec']=true;
+    if(window.updateCombinePanel)updateCombinePanel();
     hdrText=selectedPaths.length+(selectedPaths.length>1?' éléments sélectionnés':' élément sélectionné');
   }else if(FILL_STROKE_TOOLS.indexOf(state.tool)>=0){
     ctx='tool:'+state.tool;
@@ -1971,7 +2019,7 @@ function updatePropsContext(){
   // layer-sec (Blend/Matte/Flou) is spared: those are genuine per-layer
   // properties still meaningful while animating, not a drawing-tool panel.
   if(state.appMode==='motion'){
-    show['sel-props-sec']=show['fill-sec']=show['stroke-sec']=show['tool-opts-sec']=show['canvas-sec']=show['rig-opts-sec']=false;
+    show['sel-props-sec']=show['fill-sec']=show['stroke-sec']=show['tool-opts-sec']=show['canvas-sec']=show['rig-opts-sec']=show['combine-opts-sec']=false;
   }
   Object.keys(show).forEach(function(id){var sec=document.getElementById(id);if(sec)sec.style.display=show[id]?'block':'none';});
   // state.drawMode (Front/Behind) has no effect on Fill Brush — it's always
@@ -4005,7 +4053,14 @@ function renderLayerList(frameOnly){
     }
     var nm=document.createElement('div');nm.className='lnm';nm.textContent=ld.name;
     row.appendChild(eye);row.appendChild(lock);row.appendChild(solo);row.appendChild(d3);row.appendChild(ddup);
-    if(ld.symbolId){var cb=document.createElement('div');cb.className='lico comp-badge';cb.title='Component — double-click to edit';cb.innerHTML='<span style="font-size:11px;line-height:1">\u25c8</span>';row.appendChild(cb);}
+    // Text badge, not the ◈ glyph it used to be (2026-07-29 fix, "l'icon
+    // component du calque est le meme que celui pour le 3D layer") -- the
+    // diamond-shaped glyph read as visually identical to ICO_3D's hexagon
+    // wireframe at 14px next to each other in the row. 'C' matches this same
+    // file's own text-badge convention already used for every OTHER layer
+    // kind below (T/MT/FX/LFS/Tr/Pl/Om) instead of being the one symbolic
+    // outlier among them.
+    if(ld.symbolId){var cb=document.createElement('div');cb.className='lico comp-badge';cb.title='Component — double-click to edit';cb.innerHTML='<span style="font-size:11px;line-height:1;font-weight:700">C</span>';row.appendChild(cb);}
     if(ld.lfsGroup){var lb=document.createElement('div');lb.className='lico comp-badge';lb.title='Ligne/Plein/Ombre layer';lb.innerHTML='<span style="font-size:11px;line-height:1">LFS</span>';row.appendChild(lb);}
     // Stroke/Fill/Shadow channel badge — a fully normal layer row (own
     // working eye/lock/solo above, no folder wrapper), just visually
@@ -4345,6 +4400,11 @@ function updateDuplicatorPanel(){
   // Path-layer picker: every OTHER layer that isn't itself a duplicator
   // (no chained duplicators in v1 — same refusal as _resolveDuplicatorPath's
   // own runtime guard, this is just the UI half).
+  var tOff=dup.timeOffset||{};
+  document.getElementById('dup-anim-enabled').checked=!!tOff.enabled;
+  document.getElementById('dup-anim-row').style.display=tOff.enabled?'flex':'none';
+  document.getElementById('dup-anim-offset').value=tOff.offsetFrames!=null?tOff.offsetFrames:1;
+  document.getElementById('dup-anim-direction').value=tOff.direction||'forward';
   var sel=document.getElementById('dup-path-layer');
   sel.innerHTML='';
   var none=document.createElement('option');none.value='';none.textContent='—';sel.appendChild(none);
@@ -5997,8 +6057,23 @@ function onKeyDown(event){
     }
   }
   else if(k==='Alt'){state.altDown=true;}
+  // Rig: Enter-to-finish / Escape-to-cancel an in-progress bone (2026-07-29
+  // fix, QA-confirmed "on ne sait pas comment finir les traits de bones") —
+  // rig-bridge.js's bone drawing otherwise ONLY finished via double-click or
+  // clicking back near the first anchor (Pen-tool convention), but Pen ITSELF
+  // already has this exact Enter/Escape pair a few lines below — Rig
+  // silently never got the same pair when it was built, even though it
+  // mirrors Pen's drawing interaction everywhere else.
+  else if(k==='Enter'&&state.tool==='rig'&&typeof _rigDraw!=='undefined'&&_rigDraw.path){event.preventDefault();if(window.SMRig)SMRig.finalizeRigBone();updateUI();}
   else if(k==='Enter'){event.preventDefault();if(state.tool==='pen'&&_pen.path)finalizePen();else togglePlay();}
   else if(k==='Escape'){
+    if(state.tool==='rig'&&typeof _rigDraw!=='undefined'&&_rigDraw.path){
+      if(window.SMEngineBridge&&window.SMEngineBridge.setRigPreview)window.SMEngineBridge.setRigPreview(null);
+      _rigDraw.path.remove();
+      if(state.undoStack.length)state.undoStack.pop();
+      _rigDraw.path=null;_rigDraw.boneId=null;_rigDraw.ld=null;_rigDraw.draggingHandle=false;
+      updateUI();
+    }
     if(state.tool==='pen'&&_pen.path){if(_pen.previewLine){_pen.previewLine.remove();_pen.previewLine=null;}_pen.path.remove();if(state.undoStack.length)state.undoStack.pop();_pen.path=null;_pen.draggingHandle=false;saveActiveLayerFrame();updateUI();}
     // UI/UX audit (2026-07): the footer hint has claimed "Échap
     // Désélectionner" for an object selection, but this handler only ever
@@ -6420,10 +6495,19 @@ document.querySelectorAll('#align-toolbar .align-btn').forEach(function(btn){
 document.getElementById('btn-pt-corner').addEventListener('click',function(){window.SM.setPointType('corner');});
 document.getElementById('btn-pt-smooth').addEventListener('click',function(){window.SM.setPointType('smooth');});
 document.getElementById('btn-pt-symmetric').addEventListener('click',function(){window.SM.setPointType('symmetric');});
-document.getElementById('btn-bool-unite').addEventListener('click',function(){window.SM.booleanOp('unite');});
-document.getElementById('btn-bool-subtract').addEventListener('click',function(){window.SM.booleanOp('subtract');});
-document.getElementById('btn-bool-intersect').addEventListener('click',function(){window.SM.booleanOp('intersect');});
-document.getElementById('btn-bool-exclude').addEventListener('click',function(){window.SM.booleanOp('exclude');});
+// Alt/Option+click = non-destructive combine-group (2026-07-29, mirrors
+// Illustrator's own Alt+Pathfinder "Compound Shape" convention) — plain
+// click keeps the existing destructive booleanOp byte-for-byte unchanged.
+function wireBoolBtn(id,mode){
+  document.getElementById(id).addEventListener('click',function(e){
+    if(e.altKey&&window.SMGroup)SMGroup.combineSelection(mode);
+    else window.SM.booleanOp(mode);
+  });
+}
+wireBoolBtn('btn-bool-unite','unite');
+wireBoolBtn('btn-bool-subtract','subtract');
+wireBoolBtn('btn-bool-intersect','intersect');
+wireBoolBtn('btn-bool-exclude','exclude');
 document.getElementById('p-erasersize').addEventListener('input',function(){window.SM.setEraserSize(this.value);});
 document.getElementById('p-fillbrushsize').addEventListener('input',function(){window.SM.setFillBrushSize(this.value);});
 document.getElementById('p-brushpreset').addEventListener('change',function(){window.SM.setBrushPreset(this.value);if(window.BrushPresetPicker)window.BrushPresetPicker.paintButton(this.value);});
@@ -6868,18 +6952,40 @@ document.getElementById('comp-offset').addEventListener('change',function(){wind
 // component-instance fields above.
 (function(){
   function dupOf(){var ld=state.layers[state.activeLayerIdx];return(ld&&ld.duplicator)?ld.duplicator:null;}
-  function dupRefresh(){loadFrame(state.currentFrame);if(window.SMEngineBridge)SMEngineBridge.renderNow();updateDuplicatorPanel();}
-  function wireNum(id,key,min,max){document.getElementById(id).addEventListener('change',function(){var d=dupOf();if(!d)return;var v=parseFloat(this.value);if(!isFinite(v))return;if(min!==undefined)v=Math.max(min,v);if(max!==undefined)v=Math.min(max,v);d[key]=v;dupRefresh();});}
-  document.getElementById('dup-mode').addEventListener('change',function(){var d=dupOf();if(!d)return;d.mode=this.value;dupRefresh();});
+  // Union-bounds cache invalidation (2026-07-29, same fix as
+  // symbolUnionBounds's getEffectiveStrokesRendered switch, motion.js): a
+  // duplicator field changes what a COMPONENT instance's union bounds should
+  // be, but that cache's key is only symbolId|inPoint|outPoint — it has no
+  // way to know the duplicator config itself just changed, so it would keep
+  // serving the pre-edit bounds (gizmo drifts again after the very next
+  // rows/cols/spacing tweak) without this.
+  function dupRefresh(){loadFrame(state.currentFrame);if(window.SMMotion&&SMMotion.invalidateSymbolUnionBounds)SMMotion.invalidateSymbolUnionBounds();if(window.SMEngineBridge)SMEngineBridge.renderNow();updateDuplicatorPanel();}
+  // pushUndo() BEFORE the mutation in every listener below (2026-07-29 fix,
+  // QA-confirmed: "aucun champ du panneau Duplicator ne pousse d'undo — un
+  // Cmd+Z après avoir juste coché/tapé un réglage saute silencieusement à
+  // l'action réelle précédente (ex. un dessin), perdant les deux à la fois").
+  // Only the scrub-drag path on these same <input class="scrub"> fields ever
+  // got a checkpoint for free, via ui.js's generic drag handler — a plain
+  // click/type/select change on any of them (checkbox, <select>, or a typed
+  // number + Tab, no drag) bypassed pushUndo entirely. Matches every other
+  // panel's own convention (group-bridge.js etc.: pushUndo() first, mutate
+  // second).
+  function wireNum(id,key,min,max){document.getElementById(id).addEventListener('change',function(){var d=dupOf();if(!d)return;var v=parseFloat(this.value);if(!isFinite(v))return;if(min!==undefined)v=Math.max(min,v);if(max!==undefined)v=Math.min(max,v);pushUndo();d[key]=v;dupRefresh();});}
+  document.getElementById('dup-mode').addEventListener('change',function(){var d=dupOf();if(!d)return;pushUndo();d.mode=this.value;dupRefresh();});
   wireNum('dup-rows','rows',1,30);wireNum('dup-cols','cols',1,30);
   wireNum('dup-spacingx','spacingX');wireNum('dup-spacingy','spacingY');
   wireNum('dup-count','count',1,500);
   wireNum('dup-radius','radius');wireNum('dup-startangle','startAngle');
   wireNum('dup-seed','seed');
-  document.getElementById('dup-radial-orient').addEventListener('change',function(){var d=dupOf();if(!d)return;d.radialOrient=this.checked;dupRefresh();});
-  document.getElementById('dup-path-align').addEventListener('change',function(){var d=dupOf();if(!d)return;d.pathAlignTangent=this.checked;dupRefresh();});
-  document.getElementById('dup-path-layer').addEventListener('change',function(){var d=dupOf();if(!d)return;d.pathLayerUid=this.value||null;dupRefresh();});
-  document.getElementById('btn-dup-reseed').addEventListener('click',function(){var d=dupOf();if(!d)return;d.seed=Math.floor(Math.random()*1e6);dupRefresh();});
+  document.getElementById('dup-radial-orient').addEventListener('change',function(){var d=dupOf();if(!d)return;pushUndo();d.radialOrient=this.checked;dupRefresh();});
+  document.getElementById('dup-path-align').addEventListener('change',function(){var d=dupOf();if(!d)return;pushUndo();d.pathAlignTangent=this.checked;dupRefresh();});
+  document.getElementById('dup-path-layer').addEventListener('change',function(){var d=dupOf();if(!d)return;pushUndo();d.pathLayerUid=this.value||null;dupRefresh();});
+  document.getElementById('btn-dup-reseed').addEventListener('click',function(){var d=dupOf();if(!d)return;pushUndo();d.seed=Math.floor(Math.random()*1e6);dupRefresh();});
+  // Temporal stagger (2026-07-29) — same pattern as the fields above.
+  function tOffOf(){var d=dupOf();if(!d)return null;return d.timeOffset||(d.timeOffset={enabled:false,offsetFrames:1,direction:'forward'});}
+  document.getElementById('dup-anim-enabled').addEventListener('change',function(){var t=tOffOf();if(!t)return;pushUndo();t.enabled=this.checked;dupRefresh();});
+  document.getElementById('dup-anim-offset').addEventListener('change',function(){var t=tOffOf();if(!t)return;var v=parseFloat(this.value);if(!isFinite(v))return;pushUndo();t.offsetFrames=v;dupRefresh();});
+  document.getElementById('dup-anim-direction').addEventListener('change',function(){var t=tOffOf();if(!t)return;pushUndo();t.direction=this.value;dupRefresh();});
   // Effectors (2026-07-29) — new one starts centered on the layer's own
   // seed content so it's immediately visible/draggable rather than sitting
   // off-canvas at the space origin.
@@ -6888,11 +6994,12 @@ document.getElementById('comp-offset').addEventListener('change',function(){wind
     var ld=state.layers[state.activeLayerIdx];
     var strokes=getEffectiveStrokes(state.activeLayerIdx,state.currentFrame);
     var pivot=_boundsCenterOfStrokes(strokes);
+    pushUndo();
     if(!d.effectors)d.effectors=[];
     d.effectors.push({pos:{x:pivot.x,y:pivot.y},radius:200,falloff:'radial',angle:0,strength:100,offsetPos:[0,0],offsetRot:0,offsetScale:[0,0],offsetOpacity:0});
     renderDuplicatorEffectors(d);dupRefresh();
   });
-  function wireRand(id,key){document.getElementById(id).addEventListener('change',function(){var d=dupOf();if(!d)return;(d.staggerRandom||(d.staggerRandom={}))[key]=this.checked;dupRefresh();});}
+  function wireRand(id,key){document.getElementById(id).addEventListener('change',function(){var d=dupOf();if(!d)return;pushUndo();(d.staggerRandom||(d.staggerRandom={}))[key]=this.checked;dupRefresh();});}
   wireRand('dup-rand-pos','position');wireRand('dup-rand-rot','rotation');wireRand('dup-rand-scale','scale');wireRand('dup-rand-op','opacity');
   document.getElementById('btn-dup-edit-source').addEventListener('click',function(){
     var ld=state.layers[state.activeLayerIdx];
@@ -6900,26 +7007,51 @@ document.getElementById('comp-offset').addEventListener('change',function(){wind
     SMMotion.setDuplicatorEditSource(state.activeLayerIdx,!ld._dupEditSource);
   });
 })();
-// ---- Rig tool panel (2026-07-29) ----
+// ---- Rig tool panel (2026-07-29) — 3-step: Tracer / Assigner / Déplacer ----
 // Weight radius / rotate mode are read directly off the panel at BIND time
 // (rigBindStroke's own radius/rotate params) rather than mirrored into a
 // state field — they're bind-time parameters, not a persisted per-layer
 // setting, so there's nothing to keep in sync when the panel isn't visible.
+// state.rigSubMode is transient (not persisted, resets to 'draw' on reload),
+// read directly by rig-bridge.js's onDown to decide what a click means.
+state.rigSubMode=state.rigSubMode||'draw';
+var RIG_MODE_BTN_IDS={draw:'btn-rig-mode-draw',assign:'btn-rig-mode-assign',move:'btn-rig-mode-move'};
+var RIG_HINTS={
+  draw:'rigHint',
+  assign:'rigHintAssign',
+  move:'rigHintMove',
+};
+function renderRigModeUI(){
+  var btns=Object.keys(RIG_MODE_BTN_IDS).map(function(m){return document.getElementById(RIG_MODE_BTN_IDS[m]);});
+  var assignRow=document.getElementById('rig-assign-row');
+  var hintEl=document.getElementById('rig-hint');
+  if(btns.some(function(b){return !b;})||!assignRow||!hintEl)return;
+  var mode=state.rigSubMode||'draw';
+  Object.keys(RIG_MODE_BTN_IDS).forEach(function(m){document.getElementById(RIG_MODE_BTN_IDS[m]).classList.toggle('ac',m===mode);});
+  assignRow.style.display=mode==='assign'?'flex':'none';
+  hintEl.textContent=window.SM&&SM.t?SM.t(RIG_HINTS[mode]):hintEl.textContent;
+}
+window.renderRigModeUI=renderRigModeUI;
 (function(){
-  document.getElementById('btn-rig-bind').addEventListener('click',function(){
+  Object.keys(RIG_MODE_BTN_IDS).forEach(function(mode){
+    document.getElementById(RIG_MODE_BTN_IDS[mode]).addEventListener('click',function(){
+      state.rigSubMode=mode;
+      renderRigModeUI();
+      if(window.SMEngineBridge)SMEngineBridge.renderNow(); // influence circles only draw in Assigner — must repaint on mode switch
+    });
+  });
+  document.getElementById('btn-rig-auto-assign').addEventListener('click',function(){
     var ld=state.layers[state.activeLayerIdx];
     if(!ld)return;
     if(!canEditActiveLayer())return;
     var rig=ld.rig;
-    if(!rig||!Object.keys(rig.bones).length){showToast('Dessine au moins un os avant de lier');return;}
-    if(typeof selectedPaths==='undefined'||!selectedPaths.length){showToast('Sélectionne d’abord une forme (outil Sélection) avant de la lier au rig');return;}
+    if(!rig||!Object.keys(rig.bones).length){showToast(window.SM&&SM.t?SM.t('rigNeedBoneToast'):'Dessine au moins un os avant d\'assigner');return;}
     var radius=parseFloat(document.getElementById('rig-weight-radius').value)||200;
     var rotate=document.getElementById('rig-rotate-mode').checked;
-    var boneIds=Object.keys(rig.bones);
     pushUndo();
-    var n=0;
-    selectedPaths.forEach(function(p){if(rigBindStroke(ld,p,boneIds,radius,rotate))n++;});
-    if(n)showToast(n+' forme(s) liée(s) au rig');
+    var n=rigAutoAssignLayer(ld,userLayers[state.activeLayerIdx],radius,rotate);
+    if(window.SMEngineBridge)SMEngineBridge.renderNow();
+    showToast(n+(window.SM&&SM.t?SM.t('rigAutoAssignedToast'):' forme(s) assignée(s) automatiquement'));
   });
   document.getElementById('btn-rig-commit').addEventListener('click',function(){
     var ld=state.layers[state.activeLayerIdx];
@@ -6933,6 +7065,77 @@ document.getElementById('comp-offset').addEventListener('change',function(){wind
     rigResetPose(ld);
     if(window.SMEngineBridge)SMEngineBridge.renderNow();
     showToast('Pose du rig réinitialisée');
+  });
+})();
+// ---- Combine-group panel (2026-07-29 UX fix) ----
+// Resolves whether the CURRENT canvas selection already IS one existing
+// combine-group (single member selected, or the full matching set selected)
+// — mirrors group-bridge.js's own combineSelection "existingGid" check so
+// this panel and Alt+click never disagree about what counts as "already
+// grouped". Exposed on window so updatePropsContext (above) can call it
+// every time the selection changes.
+var COMBINE_MODE_BTN_IDS={unite:'btn-combine-unite',subtract:'btn-combine-subtract',intersect:'btn-combine-intersect',exclude:'btn-combine-exclude'};
+function updateCombinePanel(){
+  var sel=window.selectedPaths;
+  var existingRow=document.getElementById('combine-existing-row');
+  var btns=Object.keys(COMBINE_MODE_BTN_IDS).map(function(m){return document.getElementById(COMBINE_MODE_BTN_IDS[m]);});
+  if(!existingRow||btns.some(function(b){return !b;}))return;
+  var li=state.activeLayerIdx,ld=state.layers[li],layer=userLayers[li];
+  var gid=null;
+  if(ld&&ld.groups&&sel&&sel.length){
+    var firstGid=sel[0].data&&sel[0].data.groupId;
+    if(firstGid&&ld.groups[firstGid]&&ld.groups[firstGid].combineMode!=='none'){
+      if(sel.length===1)gid=firstGid;
+      else if(window.SMGroup){
+        var members=SMGroup.resolveGroupMembers(firstGid,ld,layer);
+        if(members.length===sel.length&&members.every(function(m){return sel.indexOf(m)!==-1;}))gid=firstGid;
+      }
+    }
+  }
+  var activeMode=gid?ld.groups[gid].combineMode:'unite';
+  Object.keys(COMBINE_MODE_BTN_IDS).forEach(function(m){document.getElementById(COMBINE_MODE_BTN_IDS[m]).classList.toggle('ac',m===activeMode);});
+  existingRow.style.display=gid?'flex':'none';
+  // Disabled (not hidden) when there's nothing to combine yet — 2+ shapes
+  // needed to CREATE a group, but changing an EXISTING group's mode only
+  // needs that group to be the current selection (gid set), even at 1 member.
+  var canAct=gid||(sel&&sel.length>=2);
+  btns.forEach(function(b){b.disabled=!canAct;});
+}
+window.updateCombinePanel=updateCombinePanel;
+(function(){
+  function activeCombineGid(){
+    var sel=window.selectedPaths;
+    if(!sel||!sel.length)return null;
+    var firstGid=sel[0].data&&sel[0].data.groupId;
+    var ld=state.layers[state.activeLayerIdx];
+    if(!firstGid||!ld||!ld.groups||!ld.groups[firstGid]||ld.groups[firstGid].combineMode==='none')return null;
+    return firstGid;
+  }
+  // One click = combine (first time) or change mode (already a group) —
+  // collapses the old select+separate-button two-step into the actual
+  // one decision the user is making (2026-07-29 UX fix).
+  Object.keys(COMBINE_MODE_BTN_IDS).forEach(function(mode){
+    document.getElementById(COMBINE_MODE_BTN_IDS[mode]).addEventListener('click',function(){
+      if(!window.SMGroup)return;
+      var gid=activeCombineGid();
+      if(gid)SMGroup.setGroupCombineMode(gid,state.layers[state.activeLayerIdx],mode);
+      else SMGroup.combineSelection(mode);
+      updateCombinePanel();
+    });
+  });
+  document.getElementById('btn-combine-remove').addEventListener('click',function(){
+    var sel=window.selectedPaths;
+    if(!sel||sel.length!==1||!window.SMGroup)return;
+    var li=state.activeLayerIdx;
+    SMGroup.removeMemberFromGroup(sel[0],state.layers[li],userLayers[li]);
+    updateCombinePanel();
+  });
+  document.getElementById('btn-combine-flatten').addEventListener('click',function(){
+    var gid=activeCombineGid();
+    if(!gid||!window.SMGroup)return;
+    var li=state.activeLayerIdx;
+    SMGroup.flattenGroup(gid,state.layers[li],userLayers[li]);
+    updateCombinePanel();
   });
 })();
 // Save/Save As/Open/New buttons and the legacy download/upload fallback

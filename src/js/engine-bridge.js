@@ -618,8 +618,25 @@
       }
     }
     return inherited.concat((ld.effects || []).map(function (e) {
-      return { effectType: e.type, enabled: !!e.enabled,
+      var out = { effectType: e.type, enabled: !!e.enabled,
                p1: at(e, 'p1', f), p2: at(e, 'p2', f), p3: at(e, 'p3', f), p4: at(e, 'p4', f) };
+      // Zoom-compensate any "spatial" param of a shipped shader-library
+      // effect (2026-07-29 fix, "un effet twirl qui bouge en fonction du
+      // zoom du canvas") — engine.rs's run_one_effect explicitly skips this
+      // for every "custom:" effect (it can't know a generic p1..p4's
+      // meaning), but this library's own param() definitions DO know, via
+      // the `spatial` flag (shader-effects-library.js) — same reasoning/
+      // direction as run_one_effect's own `* z` for the built-in effects.
+      if (typeof e.type === 'string' && e.type.indexOf('custom:') === 0 && window.SMSHADER_EFFECTS) {
+        var libId = e.type.slice('custom:'.length);
+        var def = SMSHADER_EFFECTS.filter(function (d) { return d.id === libId; })[0];
+        if (def) {
+          def.params.forEach(function (p) {
+            if (p.spatial && out[p.key] != null) out[p.key] = out[p.key] * view.zoom;
+          });
+        }
+      }
+      return out;
     }));
   }
 
@@ -1012,8 +1029,62 @@
           // engine.rs's paint_layer_items for how an item carrying this is
           // isolated and effect-processed on its own within the layer.
           if (c.data && c.data.effects && c.data.effects.length) item.effects = sceneEffectsOf(c.data);
+          // Non-destructive combine groups (2026-07-29) need to find, after
+          // this loop, which JSON item(s) came from which live source item —
+          // stripped again right after use, never sent to the renderer.
+          item.__srcC = sub;
           items.push(item);
         });
+      }
+      // Non-destructive combine groups (2026-07-29) — post-process on the
+      // JSON items just built, never on the live document (see the "why not
+      // touch the live document" rationale, group-bridge.js): suppress the
+      // paint of any item whose source is a combine-group member (in the
+      // JSON item only — the live Path keeps its real fill/stroke, still
+      // fully hit-testable/editable), then append the combined outline
+      // (styled from the topmost member). Scoped strictly to this layer's
+      // own ld.groups, cheap no-op for the overwhelmingly common case of no
+      // combine-groups at all.
+      if (window.SMGroup && state.layers[i].groups && Object.keys(state.layers[i].groups).length) {
+        var combineRes = SMGroup.renderCombinesFromChildren(userLayers[i], state.layers[i]);
+        var suppressArr = combineRes.suppress;
+        items.forEach(function (it) {
+          if (suppressArr.length && it.__srcC && suppressArr.indexOf(it.__srcC) !== -1) {
+            it.fillColor = null; it.strokeColor = null; delete it.strokeWidth; delete it.dashPattern; delete it.dashOffset; delete it.fillGradient;
+          }
+          delete it.__srcC;
+        });
+        combineRes.extra.forEach(function (ex) {
+          var op2 = ex.path.opacity !== undefined ? ex.path.opacity : 1;
+          var exSegs = ex.path.segments.map(function (s) { return { point: [s.point.x, s.point.y], handleIn: [s.handleIn.x, s.handleIn.y], handleOut: [s.handleOut.x, s.handleOut.y] }; });
+          // Layer Motion transform (2026-07-29 fix, QA-confirmed "le gizmo/
+          // combine se décale par rapport au calque") — computeGroupCombine
+          // runs on the members' raw LIVE Paper geometry (un-posed, same
+          // §5ter "stored path lives in the shape's own space" contract
+          // every other item in this loop already follows), but unlike
+          // those, this merged item was built straight from that geometry
+          // with no pathTransform/pathRef of its own — every other item
+          // gets motionMat+parentChain applied via pathTransform, so this
+          // one must too, or it stays frozen at the pre-Motion position
+          // while the rest of the layer (and its own now-suppressed
+          // members) moves. No elMat here on purpose: the merge can draw
+          // from several members that could each carry a DIFFERENT
+          // per-element Motion, so there is no single element transform
+          // that's correct for the combined shape — only the layer-level
+          // chain, which is uniform across every item in this layer.
+          if (motionMat) exSegs = SMMotion.transformSegments(exSegs, motionPivot, motionMat);
+          for (var pcx = 0; pcx < parentChain.length; pcx++) exSegs = SMMotion.transformSegments(exSegs, parentChain[pcx].pivot, parentChain[pcx].mat);
+          var extraItem = {
+            segments: roundSegs(exSegs),
+            closed: !!ex.path.closed,
+            fillColor: cssColorToRgba(ex.path.fillColor ? ex.path.fillColor.toCSS(true) : null, op2),
+          };
+          var exSc = cssColorToRgba(ex.path.strokeColor ? ex.path.strokeColor.toCSS(true) : null, op2);
+          if (exSc) { extraItem.strokeColor = exSc; extraItem.strokeWidth = ex.path.strokeWidth || 1; }
+          items.push(extraItem);
+        });
+      } else {
+        items.forEach(function (it) { delete it.__srcC; });
       }
       var bm = state.layers[i].blendMode;
       // Track matte (2026-07, scouted from Caddis's Layer.matteMode):
@@ -1509,6 +1580,21 @@
     // stay visually distinct.
     if (_nmq.active && _nmq.rect) {
       var nb = _nmq.rect.bounds;
+      // 2026-07-29 fix: _nmq's own corners now live in raw document space
+      // (subselect-bridge.js's toLocalPoint — same reasoning as
+      // buildNodeHandleItems above), same as everything else this box is
+      // compared against (_nodeSel's containment test). Map the 4 corners
+      // through the active layer's Motion transform so the drawn box
+      // matches where the drag visually happened. Only an axis-aligned
+      // approximation (bounding box of the 4 mapped corners) when the
+      // layer is also rotated — boundsRectItem has no rotated-quad form —
+      // acceptable since the actual selection logic is exact regardless.
+      var motionMap2 = (window.SMMotion && SMMotion.layerMotionPointMap) ? SMMotion.layerMotionPointMap(state.activeLayerIdx) : null;
+      if (motionMap2) {
+        var nCorners = [[nb.left, nb.top], [nb.right, nb.top], [nb.right, nb.bottom], [nb.left, nb.bottom]].map(function (c) { return motionMap2.fwd(c[0], c[1]); });
+        var nxs = nCorners.map(function (c) { return c[0]; }), nys = nCorners.map(function (c) { return c[1]; });
+        return [boundsRectItem(Math.min.apply(null, nxs), Math.min.apply(null, nys), Math.max.apply(null, nxs), Math.max.apply(null, nys), [255, 184, 108, 20], [255, 184, 108, 230], 1 / view.zoom)];
+      }
       return [boundsRectItem(nb.left, nb.top, nb.right, nb.bottom, [255, 184, 108, 20], [255, 184, 108, 230], 1 / view.zoom)];
     }
     return [];
@@ -1748,6 +1834,17 @@
         items.push(rectItem(hoPt[0], hoPt[1], 3 * zs, [255, 255, 255, 255], boneCol, 1 * zs));
       }
     }
+    // Influence circles (2026-07-29, Assigner mode — "les box d'influences
+    // comme dans Shapper sur les vecteurs que tu peux modifier si
+    // l'assignement automatique ne fonctionne pas") — one dashed ring per
+    // bone, centered on its own bounding-box center (rig-bridge.js's
+    // boneCircleCenter), radius = bone.radius||panel default. Drag the ring
+    // ITSELF (rig-bridge.js's hitRadiusHandle) to resize; release re-runs
+    // auto-assign so the deformation reflects the new radius immediately.
+    var showInfluence = state.rigSubMode === 'assign';
+    var influenceCol = [255, 120, 220, 200];
+    var panelRadiusEl = document.getElementById('rig-weight-radius');
+    var panelDefault = (panelRadiusEl && parseFloat(panelRadiusEl.value)) || 200;
     Object.keys(ld.rig.bones).forEach(function (bid) {
       var bone = ld.rig.bones[bid];
       if (!bone.segments || bone.segments.length < 2) return;
@@ -1761,6 +1858,13 @@
         pushHandles(s.point, s.handleIn || [0, 0], s.handleOut || [0, 0]);
         items.push(circleItem(s.point[0], s.point[1], 3.5 * zs, [255, 255, 255, 255], boneCol, 1.2 * zs));
       });
+      if (showInfluence && window.SMRig) {
+        var c = SMRig.boneCircleCenter(bone);
+        var r = SMRig.boneRadiusOf(bone, panelDefault);
+        items.push({ segments: [{ point: [c.x - 4 * zs, c.y] }, { point: [c.x + 4 * zs, c.y] }], closed: false, fillColor: null, strokeColor: influenceCol, strokeWidth: 1.4 * zs });
+        items.push({ segments: [{ point: [c.x, c.y - 4 * zs] }, { point: [c.x, c.y + 4 * zs] }], closed: false, fillColor: null, strokeColor: influenceCol, strokeWidth: 1.4 * zs });
+        items.push(circleItem(c.x, c.y, r, null, influenceCol, 1.6 * zs));
+      }
     });
     if (typeof _rigDraw !== 'undefined' && _rigDraw.path) {
       if (rigPreviewWorld) {
@@ -1830,16 +1934,27 @@
     var segs = nodeEditSegmentsData(path);
     var zs = 1 / view.zoom;
     var items = [];
+    // 2026-07-29 fix — see subselect-bridge.js's toLocalPoint comment for
+    // the full story: path.segments/nodeEditSegmentsData live in raw
+    // document space, but the shape itself renders through the active
+    // layer's own Motion transform (buildSceneJson's pathTransform, applied
+    // to THIS layer's items a few hundred lines above in this same
+    // function). Map every handle point through the SAME transform here so
+    // the overlay actually sits on the shape it's editing instead of at its
+    // pre-transform position.
+    var motionMap = (window.SMMotion && SMMotion.layerMotionPointMap) ? SMMotion.layerMotionPointMap(state.activeLayerIdx) : null;
+    function toRendered(x, y) { return motionMap ? motionMap.fwd(x, y) : [x, y]; }
     segs.forEach(function (s, i) {
-      var pt = s.point, hi = s.handleIn, ho = s.handleOut;
+      var pt = toRendered(s.point[0], s.point[1]);
+      var hi = s.handleIn, ho = s.handleOut;
       var hiLen = Math.hypot(hi[0], hi[1]), hoLen = Math.hypot(ho[0], ho[1]);
       if (hiLen > 0.5) {
-        var hiPt = [pt[0] + hi[0], pt[1] + hi[1]];
+        var hiPt = toRendered(s.point[0] + hi[0], s.point[1] + hi[1]);
         items.push(lineItem(pt, hiPt, [120, 170, 255, 178], 1 * zs));
         items.push(rectItem(hiPt[0], hiPt[1], 3 * zs, [255, 255, 255, 255], [74, 158, 255, 255], 1 * zs));
       }
       if (hoLen > 0.5) {
-        var hoPt = [pt[0] + ho[0], pt[1] + ho[1]];
+        var hoPt = toRendered(s.point[0] + ho[0], s.point[1] + ho[1]);
         items.push(lineItem(pt, hoPt, [120, 170, 255, 178], 1 * zs));
         items.push(rectItem(hoPt[0], hoPt[1], 3 * zs, [255, 255, 255, 255], [74, 158, 255, 255], 1 * zs));
       }

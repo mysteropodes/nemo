@@ -60,6 +60,12 @@ function exportBuildFrame(frameIdx,alpha){
     // bridge.js's header comment); default OFF so a fresh export doesn't
     // need this unchecked every time just to get a clean render.
     if(!state.exportIncludeShadowGuides)strokes=strokes.filter(function(sd){return sd.channelTag!=='shadow';});
+    // Non-destructive combine groups (2026-07-29) — same post-process
+    // buildSceneJson applies (engine-bridge.js), on the dict side: suppress
+    // each combine-group member's own fill/stroke in this EXPORT-ONLY copy
+    // (the real stored strokes are untouched) and append the combined
+    // outline(s).
+    if(window.SMGroup&&ld.groups)strokes=SMGroup.applyCombinesToStrokes(strokes,ld);
     // Motion mode (motion.js): unlike buildSceneJson (engine-bridge.js),
     // exportBuildFrame merges every original layer's strokes straight into
     // the ONE shared throwaway `L`, so there's no per-layer Paper object left
@@ -480,7 +486,13 @@ function lottieBuild(start,end){
     // dab companions are UNAFFECTED — they're real Paths with segments,
     // same as before.
     var framesStrokes=[];
-    for(var f=start;f<=end;f++)framesStrokes[f]=getEffectiveStrokesRendered(li,f).filter(function(sd){return sd.opacity!==0&&!sd.isRaster&&!sd.isRevisionGhost&&(state.exportIncludeShadowGuides||sd.channelTag!=='shadow');});
+    for(var f=start;f<=end;f++){
+      var fStrokes=getEffectiveStrokesRendered(li,f).filter(function(sd){return sd.opacity!==0&&!sd.isRaster&&!sd.isRevisionGhost&&(state.exportIncludeShadowGuides||sd.channelTag!=='shadow');});
+      // Non-destructive combine groups (2026-07-29) — same post-process as
+      // exportBuildFrame/buildSceneJson.
+      if(window.SMGroup&&ld.groups)fStrokes=SMGroup.applyCombinesToStrokes(fStrokes,ld);
+      framesStrokes[f]=fStrokes;
+    }
 
     // figure out the max stroke-slot count and, for each slot, the
     // contiguous frame runs where that slot exists (count stable)

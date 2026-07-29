@@ -36,7 +36,14 @@
     effect: SVG('<path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/><circle cx="12" cy="12" r="3"/>'),
     text: SVG('<path d="M5 6h14M12 6v13M9 19h6"/>'),
     'null': SVG('<path d="M12 4v16M4 12h16"/><circle cx="12" cy="12" r="8" stroke-dasharray="3 3"/>'),
-    component: SVG('<path d="M12 3 21 8v8l-9 5-9-5V8Z"/><path d="m12 12 9-4M12 12v9M12 12 3 8"/>'),
+    // Two overlapping squares ("an instance stamped from a shared
+    // definition"), not the isometric-cube glyph this used to be
+    // (2026-07-29 fix, "l'icon component du calque est le même que celui
+    // pour le 3D layer") — that cube path was visually the same hexagon-
+    // wireframe silhouette as ICO_3D (timeline.js) at this same 12px render
+    // size, so a Component layer and a 3D-toggled layer were indistinguishable
+    // at a glance in the row.
+    component: SVG('<rect x="4" y="8" width="11" height="11" rx="2"/><rect x="9" y="3" width="11" height="11" rx="2"/>'),
     montage: SVG('<rect x="3" y="5" width="7" height="14" rx="1.5"/><rect x="14" y="5" width="7" height="14" rx="1.5"/>'),
   };
   // Fallback labels, used when i18n hasn't loaded (or has no entry). The real

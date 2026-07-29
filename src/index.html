@@ -595,6 +595,43 @@
         </div>
       </div>
     </div>
+    <!-- Combine-group panel (2026-07-29 UX fix, "l'interface sur les shape
+         group c'est encore obscur à voir comment l'utiliser") — the ONLY
+         entry points before this were an Alt+click convention on the 4
+         boolean toolbar buttons and a context-menu item, both easy to never
+         discover on your own. Mirrors the Rig/Duplicator panel's own
+         convention (a dedicated, self-explanatory psec instead of a hidden
+         modifier-click) — shown for ANY 1+ selection (updatePropsContext,
+         timeline.js) so "Combiner" is visible the moment you select 2+
+         shapes, and "Sortir du groupe"/"Aplatir" appear once that selection
+         already IS a combine-group (updateCombinePanel, timeline.js). -->
+    <div class="psec" id="combine-opts-sec" style="display:none">
+      <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrCombine">Forme combinée</span></div>
+      <div class="pbdy">
+        <!-- Icons, not a dropdown+separate button (2026-07-29 UX fix, Cyril:
+             "ça pourrait être des boutons et c'est quand même confusant avec
+             les anciens boutons plus haut, faudrait clarifier mieux tout
+             ça") — reuses the EXACT same 4 SVGs as the toolbar's own
+             #btn-bool-* buttons above (union/subtract/intersect/exclude) so
+             the two surfaces read as "the same 4 operations, two doors" at a
+             glance instead of two visually unrelated UIs for the same
+             concept. One click = combine (if not yet) or change mode (if
+             already) — collapses the old two-step (pick mode in a select,
+             THEN press a separate Combiner button) into the one action that
+             actually matters.-->
+        <div class="pr" style="gap:4px">
+          <button class="pbtn combine-mode-btn ac" id="btn-combine-unite" data-mode="unite" data-i18n-title="boolUnion" title="Union — merge shapes into one"><svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M3,12 A6,6 0 1,0 15,12 A6,6 0 1,0 3,12 Z M9,12 A6,6 0 1,0 21,12 A6,6 0 1,0 9,12 Z"/></svg></button>
+          <button class="pbtn combine-mode-btn" id="btn-combine-subtract" data-mode="subtract" data-i18n-title="boolSubtract" title="Subtract — cut later shapes out of the first"><svg viewBox="0 0 24 24" width="15" height="15"><defs><mask id="ic-combine-sub-mask"><circle cx="9" cy="12" r="6" fill="#fff"/><circle cx="15" cy="12" r="6" fill="#000"/></mask></defs><circle cx="9" cy="12" r="6" fill="currentColor" mask="url(#ic-combine-sub-mask)"/><circle cx="15" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="1.3" opacity="0.45"/></svg></button>
+          <button class="pbtn combine-mode-btn" id="btn-combine-intersect" data-mode="intersect" data-i18n-title="boolIntersect" title="Intersect — keep only the overlapping area"><svg viewBox="0 0 24 24" width="15" height="15"><defs><clipPath id="ic-combine-int-clip"><circle cx="15" cy="12" r="6"/></clipPath></defs><circle cx="9" cy="12" r="6" fill="currentColor" clip-path="url(#ic-combine-int-clip)"/><circle cx="9" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.4"/><circle cx="15" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.4"/></svg></button>
+          <button class="pbtn combine-mode-btn" id="btn-combine-exclude" data-mode="exclude" data-i18n-title="boolExclude" title="Exclude — keep everything except the overlap"><svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path fill-rule="evenodd" d="M3,12 A6,6 0 1,0 15,12 A6,6 0 1,0 3,12 Z M9,12 A6,6 0 1,0 21,12 A6,6 0 1,0 9,12 Z"/></svg></button>
+        </div>
+        <div class="pr" id="combine-existing-row" style="gap:6px;display:none">
+          <button class="pbtn" id="btn-combine-remove" style="flex:1" data-i18n-title="combineRemoveTitle" title="Sort la forme sélectionnée du groupe combiné, sans y toucher" data-i18n="combineRemoveBtn">Sortir du groupe</button>
+          <button class="pbtn" id="btn-combine-flatten" style="flex:1" data-i18n-title="combineFlattenTitle" title="Fusionne définitivement en une seule forme — DESTRUCTIF, contrairement à Combiner" data-i18n="combineFlattenBtn">Aplatir</button>
+        </div>
+        <div class="pr" style="font-size:9px;color:var(--text-dim)" data-i18n="combineHint">Astuce : Alt+clic sur un des 4 boutons booléens de la barre d'outils combine aussi, directement.</div>
+      </div>
+    </div>
     <div class="psec" id="fill-sec">
       <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrFill">Fill</span></div>
       <div class="pbdy">
@@ -947,6 +984,26 @@
           <label style="display:flex;gap:4px;align-items:center;cursor:pointer"><input type="checkbox" id="dup-rand-scale"> <span data-i18n="dupRandScale">Échelle</span></label>
           <label style="display:flex;gap:4px;align-items:center;cursor:pointer"><input type="checkbox" id="dup-rand-op"> <span data-i18n="dupRandOp">Opacité</span></label>
         </div>
+        <!-- Temporal stagger (2026-07-29, LottieFiles Duplicator "Animation"
+             tab equivalent) — independent of the static Pattern stagger
+             above: each copy re-samples the SEED LAYER'S OWN frame content
+             (its drawn animation / tweens / Component timeline) at a
+             per-copy time offset instead of the current frame, wrapping
+             within the layer's own effective span. Math lives in
+             applyLayerDuplicator (app.js). -->
+        <div class="pr" style="border-top:1px solid var(--border);padding-top:8px;margin-top:2px">
+          <span class="pl" data-i18n="dupAnimHdr">Animation (décalage temporel)</span>
+          <label style="display:flex;gap:5px;align-items:center;font-size:10px;cursor:pointer;margin-left:auto"><input type="checkbox" id="dup-anim-enabled"> <span data-i18n="dupAnimEnabled">Actif</span></label>
+        </div>
+        <div class="pr dims-row" id="dup-anim-row">
+          <span class="pl" data-i18n="fieldDupAnimOffset">Décalage</span><input type="number" class="pi scrub" id="dup-anim-offset" value="1" data-step="1" data-i18n-title="dupAnimOffsetTitle" title="Frames de décalage entre chaque copie">
+          <select class="psel" id="dup-anim-direction">
+            <option value="forward" data-i18n="dupAnimForward">Forward</option>
+            <option value="backward" data-i18n="dupAnimBackward">Backward</option>
+            <option value="centerOut" data-i18n="dupAnimCenterOut">Center Out</option>
+            <option value="random" data-i18n="dupAnimRandom">Random</option>
+          </select>
+        </div>
         <!-- Effectors (2026-07-29) — spatial falloff, stacked: independent
              of copy index, an effector's influence depends on each copy's
              DISTANCE from a draggable point (see the on-canvas handle,
@@ -972,16 +1029,40 @@
     <div class="psec" id="rig-opts-sec" style="display:none">
       <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrRig">Rig</span></div>
       <div class="pbdy">
-        <div class="pr"><span class="pl" data-i18n="fieldRigWeightRadius">Rayon de poids</span><input type="number" class="pi scrub" id="rig-weight-radius" value="200" min="1" max="4000" data-step="1" data-i18n-title="rigWeightRadiusTitle" title="Distance au-delà de laquelle un os n'influence plus un vertex lié"></div>
-        <div class="pr"><label style="display:flex;gap:5px;align-items:center;font-size:10px;cursor:pointer" data-i18n-title="rigRotateModeTitle" title="Fait tourner localement chaque vertex selon la tangente de l'os (au-delà de Shapper) — désactive si une forme se déchire sur une courbure"><input type="checkbox" id="rig-rotate-mode" checked> <span data-i18n="rigRotateModeLabel">Rotation selon tangente</span></label></div>
-        <div class="pr" style="gap:6px">
-          <button class="pbtn" id="btn-rig-bind" style="flex:1" data-i18n-title="rigBindTitle" title="Lie la sélection canvas courante aux os déjà dessinés" data-i18n="rigBindBtn">Lier la sélection</button>
+        <!-- 3-step redesign (2026-07-29, Cyril's own spec — "il faut faire
+             plus simple: un bouton icon pour dessiner les bones, un bouton
+             d'assignation qui assigne automatiquement les éléments du layer
+             sélectionné aux bones comme dans Shapper par rapport à la
+             proximité, et après un autre bouton pour déplacer les bones. 3
+             étapes distinctes.") — replaces the earlier "Tracer/Sélection"
+             2-mode + manual bone-checklist attempt entirely: THREE separate,
+             single-purpose tools instead of one overloaded canvas gesture.
+             state.rigSubMode is 'draw'|'assign'|'move', read by
+             rig-bridge.js's onDown to pick which of the three a click means
+             — a click NEVER does two different things depending on hidden
+             state anymore. -->
+        <div class="pr" style="gap:4px">
+          <button class="pbtn combine-mode-btn ac" id="btn-rig-mode-draw" style="flex:1" data-i18n-title="rigModeDrawTitle" title="1. Dessiner de nouveaux os"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg></button>
+          <button class="pbtn combine-mode-btn" id="btn-rig-mode-assign" style="flex:1" data-i18n-title="rigModeAssignTitle" title="2. Assigner automatiquement les formes aux os (par proximité, façon Shapper)"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="17" r="3"/><circle cx="17" cy="7" r="3"/><path d="M9.5 14.5l5-5"/></svg></button>
+          <button class="pbtn combine-mode-btn" id="btn-rig-mode-move" style="flex:1" data-i18n-title="rigModeMoveTitle" title="3. Déplacer / poser les os déjà dessinés"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20"/></svg></button>
         </div>
+        <div class="pr" id="rig-active-bone-row" style="display:none;font-size:9px;color:var(--text-dim)"></div>
+        <!-- Step 2 only: shown while Assigner is active. Weight radius is the
+             DEFAULT influence for a bone that hasn't had its own on-canvas
+             circle dragged yet (bone.radius, app.js rigBindStroke) — dragging
+             a bone's circle in Assign mode overrides it per-bone, same
+             "global default + per-item override" convention as everywhere
+             else in this app. -->
+        <div class="pr" id="rig-assign-row" style="display:none;gap:6px">
+          <button class="pbtn ac" id="btn-rig-auto-assign" style="flex:1" data-i18n-title="rigAutoAssignTitle" title="Lie chaque forme sélectionnable du calque à l'os le plus proche (par distance) — écrase les liaisons existantes" data-i18n="rigAutoAssignBtn">Assigner automatiquement</button>
+        </div>
+        <div class="pr"><span class="pl" data-i18n="fieldRigWeightRadius">Rayon de poids</span><input type="number" class="pi scrub" id="rig-weight-radius" value="200" min="1" max="4000" data-step="1" data-i18n-title="rigWeightRadiusTitle" title="Distance au-delà de laquelle un os n'influence plus un vertex lié — glisser le bord du cercle d'un os (mode Assigner) règle le SIEN spécifiquement"></div>
+        <div class="pr"><label style="display:flex;gap:5px;align-items:center;font-size:10px;cursor:pointer" data-i18n-title="rigRotateModeTitle" title="Fait tourner localement chaque vertex selon la tangente de l'os (au-delà de Shapper) — désactive si une forme se déchire sur une courbure"><input type="checkbox" id="rig-rotate-mode" checked> <span data-i18n="rigRotateModeLabel">Rotation selon tangente</span></label></div>
         <div class="pr" style="gap:6px">
           <button class="pbtn ac" id="btn-rig-commit" style="flex:1" data-i18n="rigCommitBtn">Figer la pose</button>
           <button class="pbtn" id="btn-rig-reset" style="flex:1" data-i18n="rigResetBtn">Réinitialiser</button>
         </div>
-        <div class="pr" style="font-size:9px;color:var(--text-dim)" data-i18n="rigHint">Clic: nouvel os · Glisser une ancre: dessiner une courbe · Glisser une ancre EXISTANTE: poser · Double-clic: terminer l'os</div>
+        <div class="pr" style="font-size:9px;color:var(--text-dim)" id="rig-hint" data-i18n="rigHint">Clic: nouvel os · Glisser une ancre: dessiner une courbe · Double-clic ou Entrée: terminer l'os · Échap: annuler</div>
       </div>
     </div>
     <!-- Onion Skin right-panel section removed (feedback 2026-07: "plus

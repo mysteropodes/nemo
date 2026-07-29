@@ -102,6 +102,10 @@
   var PROP_DIM = { position: 2, anchor: 2, rotation: 1, scale: 2, opacity: 1, timeRemap: 1, positionZ: 1, rotationX: 1, rotationY: 1, dupOffsetPos: 2, dupOffsetRot: 1, dupOffsetScale: 2, dupOffsetOpacity: 1 };
   var PROP_UNIT = { position: 'px', anchor: 'px', rotation: '°', scale: '%', opacity: '%', timeRemap: 'f', positionZ: 'px', rotationX: '°', rotationY: '°', dupOffsetPos: 'px', dupOffsetRot: '°', dupOffsetScale: '%', dupOffsetOpacity: '%' };
   var PROP_DEFAULT = { position: [0, 0], anchor: [0, 0], rotation: [0], scale: [100, 100], opacity: [100], timeRemap: [0], positionZ: [0], rotationX: [0], rotationY: [0], dupOffsetPos: [0, 0], dupOffsetRot: [0], dupOffsetScale: [0, 0], dupOffsetOpacity: [0] };
+  // Small per-dimension labels ("X"/"Y") shown before each multi-dimension
+  // property's field, LottieFiles-inspired (2026-07-29) — every 2-dim prop
+  // here is an X/Y pair, so one shared default covers them all.
+  var PROP_DIM_LABELS = { position: ['X', 'Y'], anchor: ['X', 'Y'], scale: ['X', 'Y'], dupOffsetPos: ['X', 'Y'], dupOffsetScale: ['X', 'Y'] };
   // AE's own shortcuts: P/A/R/S/T reveal just that property's row. Kept as
   // a lookup table (not hardcoded in the keydown handler) so the property
   // list and its shortcuts can't silently drift apart.
@@ -1054,6 +1058,10 @@
   function toggleLayerDuplicator(li) {
     var ld = state.layers[li];
     if (!ld) return;
+    // 2026-07-29 fix (QA-confirmed missing checkpoint, same family as the
+    // duplicator panel's own fields below) — this also flips ld.locked,
+    // an easy-to-regret side effect that must be undoable on its own.
+    pushUndo();
     if (ld.duplicator) {
       ld.duplicator = null;
       ld._dupEditSource = false;
@@ -1068,10 +1076,14 @@
         pathLayerUid: null, pathAlignTangent: true,
         seed: Math.floor(Math.random() * 1e6),
         staggerRandom: { position: false, rotation: false, scale: false, opacity: false },
+        // Temporal stagger (2026-07-29, LottieFiles "Animation" tab
+        // equivalent) — off by default, see applyLayerDuplicator (app.js).
+        timeOffset: { enabled: false, offsetFrames: 1, direction: 'forward' },
       };
       ld.locked = true;
     }
     loadFrame(state.currentFrame);
+    invalidateSymbolUnionBounds(); // same cache-staleness fix as dupRefresh (timeline.js)
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
     if (window.renderLayerList) renderLayerList();
     if (window.updateDuplicatorPanel) updateDuplicatorPanel();
@@ -1706,7 +1718,21 @@
       var isCur = k.frame === state.currentFrame;
       var rawKey={x:pvx+k.v[0],y:pvy+k.v[1]},worldKey=outerWorldPoint(t,rawKey);
       var kx=worldKey.x,ky=worldKey.y;
-      items.push({ segments: circleSegs(kx, ky, (isCur ? 6 : 4.5) * zs), closed: true, fillColor: isCur ? [255, 170, 40, 255] : [230, 230, 230, 255], strokeColor: [30, 30, 30, 255], strokeWidth: 1.2 * zs });
+      // Diamond, not a circle (2026-07-29 fix, "plusieurs points s'affiche
+      // sur un seul élément on ne sait pas trop quoi prendre") — a key at
+      // its default [0,0] delta draws exactly on the anchor crosshair
+      // (comment above, motionPivotOf) and the anchor itself is ALSO a
+      // circle, so the two used to be indistinguishable blobs stacked on
+      // top of each other with only a subtle color/fill difference to go
+      // on. A diamond is the near-universal keyframe glyph (AE, Premiere,
+      // every NLE's graph editor) and reads as a distinct object sitting
+      // on/inside the anchor's circle instead of a second, confusing
+      // circle — same diamond shape this file already uses for per-vertex
+      // handles a few dozen lines below, just a different color/size.
+      // Hit-testing (hitPositionDot) is untouched — it's a pure distance
+      // check, never depended on the drawn shape.
+      var kr = (isCur ? 6 : 4.5) * zs;
+      items.push({ segments: [{ point: [kx - kr, ky] }, { point: [kx, ky - kr] }, { point: [kx + kr, ky] }, { point: [kx, ky + kr] }], closed: true, fillColor: isCur ? [255, 170, 40, 255] : [230, 230, 230, 255], strokeColor: [30, 30, 30, 255], strokeWidth: 1.2 * zs });
       // Spatial handles, same discoverable small-dot pattern as camera.js
       var hs = [];
       if (ki < ks.length - 1) hs.push(k.hOut || [0, 0]);
@@ -1786,7 +1812,18 @@
     if (hit !== undefined) return hit;
     var feats = [];
     for (var f = inF; f <= outF; f++) {
-      getEffectiveStrokes(li, f).forEach(function (sd) {
+      // getEffectiveStrokesRendered, not getEffectiveStrokes (2026-07-29 fix,
+      // QA-confirmed "le gizmo se décale par rapport au calque" on a
+      // Component layer that also has a mograph duplicator): the plain
+      // getEffectiveStrokes only returns the SEED content — duplicator
+      // expansion happens in getEffectiveStrokesRendered
+      // (applyLayerDuplicator, app.js) — so this union used to span just the
+      // one un-duplicated shape while the render path (engine-bridge.js
+      // reads userLayers[i].bounds directly) already showed every copy,
+      // pulling the gizmo/transform-box pivot away from the actual content
+      // centroid the instant a Motion key auto-converted the layer to a
+      // Component (CLAUDE.md §8).
+      getEffectiveStrokesRendered(li, f).forEach(function (sd) {
         if (sd.isRaster) { feats.push({ bounds: { x: sd.x - sd.width / 2, y: sd.y - sd.height / 2, w: sd.width, h: sd.height } }); return; }
         if (!sd.segments || !sd.segments.length) return;
         var tmp = new Path({ insert: false });
@@ -1942,7 +1979,7 @@
     // like THIS frame, same as any element's box always has.
     if (window._motionExpandedLayer != null && window._motionExpandedElement != null) {
       var item = findElementItem(li, window._motionExpandedElement);
-      if (item) return { li: li, strokeId: window._motionExpandedElement, holder: ensureElementHolder(ld, window._motionExpandedElement), boundsCenter: item.bounds.center };
+      if (item) return { li: li, strokeId: window._motionExpandedElement, holder: ensureElementHolder(ld, window._motionExpandedElement), boundsCenter: item.bounds.center, bounds: item.bounds };
       // Element no longer present at this frame (drawing changed) — fall
       // back to the layer rather than silently drawing nothing.
     }
@@ -1951,7 +1988,8 @@
     // its box (motionBoxGeom, above) as the scrub crosses different
     // keyframes.
     var ub = ld.symbolId ? symbolUnionBounds(li) : null;
-    return { li: li, strokeId: null, holder: ld, boundsCenter: (ub || userLayers[li].bounds).center };
+    var lb = ub || userLayers[li].bounds;
+    return { li: li, strokeId: null, holder: ld, boundsCenter: lb.center, bounds: lb };
   }
   function activePositionKeys() {
     var t = activeMotionTarget();
@@ -2908,11 +2946,32 @@
           if (editorRow) editorRow.scrollIntoView({ block: 'nearest' });
         }
       });
-      pr.appendChild(sw); pr.appendChild(exprBtn); pr.appendChild(pnm);
+      pr.appendChild(exprBtn); pr.appendChild(pnm);
+      // Anchor Point 3x3 grid selector (2026-07-29, LottieFiles-inspired) —
+      // one click snaps the anchor to a corner/edge/center of the holder's
+      // OWN current bounds, instead of hand-computing ax/ay offsets. Only
+      // meaningful for 'anchor' (the other properties have no such notion).
+      if (prop === 'anchor') {
+        var gridBtn = document.createElement('div');
+        gridBtn.className = 'lico motion-anchor-grid-btn' + (window._anchorGridOpenFor === holder ? ' on' : '');
+        gridBtn.title = 'Point d\'ancrage — grille rapide';
+        gridBtn.innerHTML = '<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3.5" y="3.5" width="17" height="17" rx="1.5"/><path d="M3.5 9.5h17M3.5 14.5h17M9.5 3.5v17M14.5 3.5v17"/></svg>';
+        gridBtn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          window._anchorGridOpenFor = (window._anchorGridOpenFor === holder) ? null : holder;
+          renderLayerList(); renderTimeline();
+        });
+        pr.appendChild(gridBtn);
+      }
       var vals = isAnimated(holder, prop) ? valueAtFrame(holder, prop, state.currentFrame) : staticValue(holder, prop);
       var fieldWrap = document.createElement('div'); fieldWrap.className = 'motion-fields';
+      var DIM_LABEL = PROP_DIM[prop] > 1 ? (PROP_DIM_LABELS[prop] || ['X', 'Y', 'Z']) : null;
       for (var d = 0; d < PROP_DIM[prop]; d++) {
         (function (dim) {
+          if (DIM_LABEL) {
+            var dl = document.createElement('span'); dl.className = 'motion-dim-label'; dl.textContent = DIM_LABEL[dim];
+            fieldWrap.appendChild(dl);
+          }
           var f = scrubField(vals[dim], function (nv) {
             pushUndo();
             var nvals = isAnimated(holder, prop) ? valueAtFrame(holder, prop, state.currentFrame) : staticValue(holder, prop);
@@ -2933,11 +2992,48 @@
       var unit = document.createElement('span'); unit.className = 'motion-unit'; unit.textContent = PROP_UNIT[prop];
       fieldWrap.appendChild(unit);
       pr.appendChild(fieldWrap);
+      pr.appendChild(sw);
       list.appendChild(pr);
       if (window._exprEditorOpen && window._exprEditorOpen.holder === holder && window._exprEditorOpen.prop === prop) {
         list.appendChild(buildExprEditorRow(holder, prop));
       }
+      if (prop === 'anchor' && window._anchorGridOpenFor === holder) {
+        list.appendChild(buildAnchorGridRow(holder));
+      }
     });
+  }
+  // Inline 3x3 anchor picker, opened via the anchor row's grid icon (same
+  // single-accordion convention as the expression editor below) — each cell
+  // snaps ax/ay to a corner/edge/center of the holder's CURRENT bounds
+  // (activeMotionTarget's bounds, the same source the canvas gizmo/pivot
+  // already use — see motionPivotOf). Guarded on t.holder===holder so a
+  // stale click (holder no longer the active/expanded target) is a no-op
+  // rather than silently writing into the wrong shape's anchor.
+  function buildAnchorGridRow(holder) {
+    var row = document.createElement('div'); row.className = 'lrow motion-anchor-grid-row';
+    var grid = document.createElement('div'); grid.className = 'motion-anchor-grid';
+    for (var r = 0; r < 3; r++) {
+      for (var c = 0; c < 3; c++) {
+        (function (row9, col9) {
+          var cell = document.createElement('button'); cell.type = 'button';
+          cell.className = 'motion-anchor-cell' + (row9 === 1 && col9 === 1 ? ' center' : '');
+          cell.addEventListener('click', function (e) {
+            e.stopPropagation();
+            var t = activeMotionTarget();
+            if (!t || t.holder !== holder || !t.bounds) return;
+            pushUndo();
+            var ax = (col9 - 1) * t.bounds.width / 2;
+            var ay = (row9 - 1) * t.bounds.height / 2;
+            setValue(holder, 'anchor', [ax, ay]);
+            renderLayerList(); renderTimeline();
+            if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+          });
+          grid.appendChild(cell);
+        })(r, c);
+      }
+    }
+    row.appendChild(grid);
+    return row;
   }
   // Inline expression editor — appended right after its property's row when
   // toggled open via the ƒx button, same single-accordion convention as
