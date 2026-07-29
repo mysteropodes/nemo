@@ -92,9 +92,19 @@
       row.className = 'pr'; row.style.gap = '4px';
       var colorInp = document.createElement('input');
       colorInp.type = 'color'; colorInp.value = stop.color.slice(0, 7);
+      colorInp.dataset.hex8 = stop.color;
       colorInp.style.cssText = 'width:24px;height:22px;border:none;cursor:pointer;padding:0;';
       colorInp.addEventListener('change', function () {
-        pushUndo(); stop.color = this.value;
+        pushUndo();
+        // A native <input type=color> can only ever produce a 6-hex value
+        // (CLAUDE.md §2) — this.value alone would silently drop the stop's
+        // alpha to fully opaque on every edit, even a same-hue repick.
+        // There's no separate alpha control for a gradient stop, so the fix
+        // is simply to preserve whatever alpha byte the stop already had
+        // instead of dropping it.
+        var prevA = (stop.color && stop.color.length === 9) ? stop.color.slice(7, 9) : 'ff';
+        stop.color = this.value + prevA;
+        this.dataset.hex8 = stop.color;
         saveActiveLayerFrame(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
       });
       var offInp = document.createElement('input');
