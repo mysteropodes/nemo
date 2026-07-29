@@ -522,8 +522,17 @@ function serP(p){var isVB=!!(p.data&&p.data.isVectorBrush);var center=isVB&&p.da
   // channelTag below), so it must keep whatever the user actually drew.
   // isShadowNoStroke still exempts a genuinely strokeless shadow FILL from
   // the '#ffffff' fallback a few lines down, same reasoning as isTexAnchor.
+  // Also true for a Shadow Brush "fill only" guide (preferFill, tools.js's
+  // applyShadowBrushTag) drawn in an ORDINARY not-yet-channel-split layer —
+  // channelTag on the STROKE itself, not just pChLayer.channel, since that
+  // split may never have happened yet. Missing this half produced a phantom
+  // white outline around the very first save of such a guide (confirmed
+  // live): the on-canvas Path correctly had strokeColor=null, but serP's
+  // fallback saw a falsy strokeColor with no exemption and wrote '#ffffff'
+  // into the stored dict immediately, before any desP round-trip could
+  // self-heal it via hasRealStroke.
   var isNoStrokeChannel=!!(pChLayer&&pChLayer.channel==='fill');
-  var isShadowNoStroke=!!(pChLayer&&pChLayer.channel==='shadow'&&!p.strokeColor);
+  var isShadowNoStroke=!!(((pChLayer&&pChLayer.channel==='shadow')||(p.data&&p.data.channelTag==='shadow'))&&!p.strokeColor);
   var channelTag=(p.data&&p.data.channelTag)?p.data.channelTag:undefined;
   // Which shadow swatch produced this stroke (tools.js's Shadow Brush commit
   // site) — without it, swatch attribution silently dies at the first

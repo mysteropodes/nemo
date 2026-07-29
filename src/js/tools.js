@@ -1493,10 +1493,26 @@ function applyShadowBrushTag(p,preferFill){
       p.closed=false;
       delete p.data.isVectorBrush;delete p.data.centerSegments;delete p.data.widthProfile;
     }
-    p.fillColor=null;
-    p.strokeColor=sw.color;
-    p.strokeWidth=Math.max(1,p.strokeWidth||state.brushSize||3);
-    p.strokeCap='round';p.strokeJoin='round';
+    // preferFill (2026-07 fix): the "Stroke off / Fill on" vector-brush
+    // commit (draw-bridge.js's shadowPreferFill) never had a stroke to
+    // begin with — its ink lives entirely in fillColor. Forcing the
+    // default stroke-only treatment on it silently overrode the user's
+    // explicit Stroke-eye-OFF choice, turning an intended filled patch
+    // into a near-invisible 1px hairline (strokeWidth falling back to
+    // Paper's own Path default since this branch never sets one).
+    // Confirmed live: drawing with vectorBrush+!strokeEnabled+fillEnabled
+    // and Shadow armed produced fillColor:null, strokeColor:<swatch> —
+    // exactly the parameter this function was documented (but never wired)
+    // to prevent.
+    if(preferFill){
+      p.strokeColor=null;
+      p.fillColor=sw.color;
+    }else{
+      p.fillColor=null;
+      p.strokeColor=sw.color;
+      p.strokeWidth=Math.max(1,p.strokeWidth||state.brushSize||3);
+      p.strokeCap='round';p.strokeJoin='round';
+    }
     p.data.shadowSwatchId=sw.id;
   }
 }
