@@ -1435,12 +1435,23 @@ function rigAutoAssignLayer(ld,layer,defaultRadius,rotate){
   // Small margin so the single farthest vertex gets a sliver of pull
   // instead of landing exactly on the falloff's zero boundary.
   neededRadius=Math.ceil(neededRadius*1.05);
-  var n=0;
+  var n=0,skippedUnsupported=0;
   layer.children.forEach(function(c){
+    if(c instanceof CompoundPath){skippedUnsupported++;return;}
     if(!(c instanceof Path)||!isSelectablePathChild(c))return;
+    // Brush strokes (ribbon + its linked-fill backdrop, both real Path
+    // children of the layer) aren't supported by rigBindStroke yet (own
+    // guard, below) — it already warned to the console, but a console.warn
+    // is invisible to a normal user. Counted here so the caller can surface
+    // an honest toast instead of a silent "0 forme(s) assignée(s)" that
+    // looked exactly like a bug (reported live, 2026-07-29: "l'autoassign
+    // marche pas" on a shape drawn with the default Brush tool — the most
+    // common way to start drawing, so this silent gap was reachable
+    // immediately, not an edge case).
+    if(c.data&&(c.data.isVectorBrush||c.data.isLinkedFillCompanion)){skippedUnsupported++;return;}
     if(rigBindStroke(ld,c,boneIds,neededRadius,rotate))n++;
   });
-  return n;
+  return {n:n,skippedUnsupported:skippedUnsupported};
 }
 // Live per-vertex deform — called on every pose drag tick AND once more
 // right before a commit, so the committed keyframe always matches exactly
