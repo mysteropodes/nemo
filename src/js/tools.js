@@ -5896,6 +5896,20 @@ function onMouseMoveTool(event){
   _pen.previewLine.dashArray=[4/view.zoom,3/view.zoom];
   _pen.previewLine.guide=true;
 }
+// Which group's double-click most recently widened the selection to the
+// whole group (tools.js's own onViewDoubleClick, below) — persistent state,
+// not a click-timing window: a real double-click is itself two clicks, and
+// select-bridge.js's own single-click group-widening (Bug 1 fix, 2026-07-29)
+// already runs on the FIRST of those two clicks — by the time this native
+// dblclick event fires a moment later, the group is ALREADY the full
+// selection, so "is the whole group currently selected" can never
+// distinguish a genuine first double-click from a second one (found live,
+// QA-confirmed: double-clicking a fresh group jumped straight to Subselect
+// instead of staying on Select). This flag is the missing signal: only a
+// double-click on a group that was ALSO the last one explicitly entered
+// this way counts as "the second one" — naturally invalidated the moment
+// the user selects anything else (dblWholeGroupSelected below goes false).
+var _groupEnteredGid=null;
 // Double-click a filled shape to also select the stroke(s) that bound it —
 // matches Animate's "double-click a fill selects its surrounding stroke"
 // convention. There's no stored link between a fill (built by the Fill
@@ -5944,10 +5958,17 @@ function onViewDoubleClick(event){
   if(dblGid){
     var dblMembers=window.SMGroup?SMGroup.membersOf(fillPath,layer):[fillPath];
     var dblWholeGroupSelected=selectedPaths.length===dblMembers.length&&dblMembers.every(function(m){return selectedPaths.indexOf(m)>=0;});
-    if(!dblWholeGroupSelected){
+    // See _groupEnteredGid's own comment above: "the whole group happens to
+    // be selected right now" is NOT enough on its own — it's true after
+    // EVERY click on a member (select-bridge.js's single-click widening),
+    // not just a genuine repeat double-click. Only treat this as "the
+    // second one" when it's also the SAME group this same mechanism most
+    // recently entered.
+    if(!(dblWholeGroupSelected&&_groupEnteredGid===dblGid)){
       clearSel();fsClearSel();_fsIsolation=null;
       selectedPaths=dblMembers.slice();
       state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;});
+      _groupEnteredGid=dblGid;
       renderArcs();updateUI();
       if(window.SMEngineBridge)SMEngineBridge.renderNow();
       return;
