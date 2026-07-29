@@ -942,6 +942,18 @@
           <label style="display:flex;gap:4px;align-items:center;cursor:pointer"><input type="checkbox" id="dup-rand-scale"> <span data-i18n="dupRandScale">Échelle</span></label>
           <label style="display:flex;gap:4px;align-items:center;cursor:pointer"><input type="checkbox" id="dup-rand-op"> <span data-i18n="dupRandOp">Opacité</span></label>
         </div>
+        <!-- Effectors (2026-07-29) — spatial falloff, stacked: independent
+             of copy index, an effector's influence depends on each copy's
+             DISTANCE from a draggable point (see the on-canvas handle,
+             motion.js buildOverlayItems). #dup-effectors-list is rebuilt
+             from ld.duplicator.effectors on every updateDuplicatorPanel
+             call (variable-length array, can't be static markup like the
+             fields above). -->
+        <div class="pr" style="border-top:1px solid var(--border);padding-top:8px;margin-top:2px">
+          <span class="pl" data-i18n="dupEffectorsHdr">Effectors</span>
+          <button class="pbtn" id="btn-dup-add-effector" style="margin-left:auto" data-i18n="dupAddEffector">+ Effector</button>
+        </div>
+        <div id="dup-effectors-list"></div>
         <div class="pr"><button class="pbtn ac" id="btn-dup-edit-source" style="flex:1" data-i18n="dupEditSource">Modifier la forme source…</button></div>
       </div>
     </div>

@@ -1184,6 +1184,38 @@ function applyLayerDuplicator(ld,base,frameIdx){
     var rotK=randMode.rotation?(2*rrr-1)*dRot:k*dRot;
     var scaleK=randMode.scale?[(2*rsx-1)*dScale[0],(2*rsy-1)*dScale[1]]:[k*dScale[0],k*dScale[1]];
     var opK=randMode.opacity?(2*rop-1)*dOpacity:k*dOpacity;
+    // Effectors (2026-07-29, mograph "n'oublie pas la création des
+    // effectors"): a SPATIAL contribution, independent of copy index —
+    // each effector weights its own delta by this instance's DISTANCE from
+    // the effector's position (radial: Euclidean distance from a point;
+    // linear: signed projection onto a direction, i.e. a directional band),
+    // ramped linearly from 1 at the effector to 0 at its radius. instX/instY
+    // is this instance's own placed position (pivot+base offset) BEFORE the
+    // index-stagger posK is added — the same local/content space `pivot`
+    // already lives in, so it lines up with an effector's stored position
+    // with no extra transform. Multiple effectors simply SUM their
+    // contributions on top of the existing index-based stagger — additive,
+    // like AE/C4D's own default effector combination.
+    var instX=pivot.x+baseDx,instY=pivot.y+baseDy;
+    (dup.effectors||[]).forEach(function(eff){
+      var ddx=instX-(eff.pos?eff.pos.x:0),ddy=instY-(eff.pos?eff.pos.y:0);
+      var w;
+      if(eff.falloff==='linear'){
+        var rad=(eff.angle||0)*Math.PI/180;
+        var proj=ddx*Math.cos(rad)+ddy*Math.sin(rad); // signed distance along the effector's direction
+        w=Math.max(0,Math.min(1,1-proj/(eff.radius||1)));
+      }else{ // radial
+        var dist=Math.hypot(ddx,ddy);
+        w=Math.max(0,Math.min(1,1-dist/(eff.radius||1)));
+      }
+      w*=(eff.strength!=null?eff.strength:100)/100;
+      if(!w)return;
+      var eop=eff.offsetPos||[0,0],esc=eff.offsetScale||[0,0];
+      posK[0]+=w*eop[0];posK[1]+=w*eop[1];
+      rotK+=w*(eff.offsetRot||0);
+      scaleK[0]+=w*esc[0];scaleK[1]+=w*esc[1];
+      opK+=w*(eff.offsetOpacity||0);
+    });
     // Stagger folded into ONE matrix with the mode's own placement:
     // rotate/scale in place around the seed's own bounds-center first, the
     // placement translate last — same inner-transform-then-outer-placement
