@@ -1354,7 +1354,21 @@ function rigBindStroke(ld,path,boneIds,radius,rotate){
   if(!path){console.warn('[rig] cible invalide');return false;}
   if(path.className==='CompoundPath'){console.warn('[rig] les CompoundPath (résultats booléens à trous/îles) ne sont pas encore supportés par le rig');return false;}
   if(!path.segments||!path.segments.length){console.warn('[rig] cible invalide ou vide');return false;}
-  if(path.data&&(path.data.isVectorBrush||path.data.isLinkedFillCompanion)){console.warn('[rig] les traits pinceau vectoriel (ruban + fill lié) ne sont pas encore supportés par le rig');return false;}
+  // Vector-brush ribbons (isVectorBrush) and their linked-fill companion
+  // (isLinkedFillCompanion) are supported like any other Path (2026-07-29,
+  // Cyril: "l'idée c'est la même que pour Shapper... les points de vecteurs
+  // suivent les bones") — applyRigDeform below is fully generic, moving
+  // whatever Path is bound vertex-by-vertex with no type-specific logic, and
+  // desP (app.js) reconstructs a vector-brush stroke straight from its
+  // stored `.segments` (the ribbon's actual outline), not from
+  // centerSegments/widthProfile, so a rig-posed deformation persists through
+  // save/reload exactly like any other shape's. Each Path (ribbon and
+  // companion) is bound and weighted independently from its OWN vertices —
+  // same as binding any two nearby shapes to one skeleton — so they track
+  // the pose closely but not with byte-identical interpolation; a LATER
+  // brush-width edit re-derives the ribbon from centerSegments/widthProfile
+  // and would discard the posed deformation, a real but separate limitation
+  // (not attempted here).
   ensureStrokeId(path);
   // Re-binding the SAME shape (canvas click-to-bind makes this the common
   // case, not a rare mistake — clicking a shape again to change which bone
@@ -1435,21 +1449,29 @@ function rigAutoAssignLayer(ld,layer,defaultRadius,rotate){
   // Small margin so the single farthest vertex gets a sliver of pull
   // instead of landing exactly on the falloff's zero boundary.
   neededRadius=Math.ceil(neededRadius*1.05);
+  // CompoundPaths (boolean results with holes/islands) are the one
+  // remaining unsupported case — rigBindStroke's own guard rejects them
+  // (no single `.segments` to bind), counted here so the caller can surface
+  // an honest toast instead of a silent "0 forme(s) assignée(s)" (2026-07-29:
+  // vector-brush strokes used to hit this same silent gap too — now bound
+  // like any other Path, see rigBindStroke's own comment).
   var n=0,skippedUnsupported=0;
   layer.children.forEach(function(c){
     if(c instanceof CompoundPath){skippedUnsupported++;return;}
     if(!(c instanceof Path)||!isSelectablePathChild(c))return;
-    // Brush strokes (ribbon + its linked-fill backdrop, both real Path
-    // children of the layer) aren't supported by rigBindStroke yet (own
-    // guard, below) — it already warned to the console, but a console.warn
-    // is invisible to a normal user. Counted here so the caller can surface
-    // an honest toast instead of a silent "0 forme(s) assignée(s)" that
-    // looked exactly like a bug (reported live, 2026-07-29: "l'autoassign
-    // marche pas" on a shape drawn with the default Brush tool — the most
-    // common way to start drawing, so this silent gap was reachable
-    // immediately, not an edge case).
-    if(c.data&&(c.data.isVectorBrush||c.data.isLinkedFillCompanion)){skippedUnsupported++;return;}
     if(rigBindStroke(ld,c,boneIds,neededRadius,rotate))n++;
+    // A vector-brush ribbon's linked-fill companion is NOT independently
+    // bound (2026-07-29, superseded attempt below this comment used to try
+    // it) — QA-confirmed live on a multi-joint pose: the companion's own
+    // sparse 2-point geometry (just its centerline endpoints) can't
+    // represent an arbitrarily bent multi-joint curve the same way the
+    // ribbon's many finely-sampled points can, so its own weighted
+    // deformation traced a near-straight line cutting across the bend
+    // instead of following it — a visible mismatched red sliver in the
+    // gap. applyRigDeform (below) instead copies the ribbon's OWN already-
+    // correctly-deformed boundary onto the companion after every deform,
+    // guaranteeing an exact match by construction instead of a second,
+    // independently-approximated deformation that can diverge.
   });
   return {n:n,skippedUnsupported:skippedUnsupported};
 }
@@ -1496,6 +1518,22 @@ function applyRigDeform(ld){
         }
       });
       segs[i].point=new Point(restPt[0]+dx,restPt[1]+dy);
+    }
+    // Vector-brush companion sync (2026-07-29, "les points de vecteurs
+    // suivent les bones comme dans Shapper") — copy the ribbon's OWN just-
+    // deformed boundary onto its linked-fill companion instead of deforming
+    // the companion independently off its own sparse 2-point geometry
+    // (QA-confirmed live: that diverged into a visible straight sliver
+    // across a multi-joint bend the many-point ribbon correctly followed).
+    // Guarantees an exact match by construction, matching this SAME
+    // "companion mirrors the ribbon" convention move/scale/rotate already
+    // use elsewhere in the app (select-bridge.js/tools.js) — just done here
+    // with a full segment copy instead of one shared rigid transform, since
+    // a per-vertex LBS deform has no single transform to mirror.
+    var bLive=b._live;
+    if(bLive.data&&bLive.data.isVectorBrush&&bLive.data.linkedFill&&!bLive.data.linkedFill.removed){
+      bLive.data.linkedFill.segments=segs.map(function(s){return new Segment(s.point,s.handleIn,s.handleOut);});
+      bLive.data.linkedFill.closed=true;
     }
   });
   Object.keys(boneCache).forEach(function(bid){boneCache[bid].rest.remove();boneCache[bid].cur.remove();});
