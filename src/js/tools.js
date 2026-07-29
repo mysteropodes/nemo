@@ -5042,6 +5042,14 @@ function onMouseDown(event){
   }else if(state.tool==='camera'){
     if(window.SMCamera)SMCamera.onDown(event);
   }else if(state.tool==='text'){
+    // Same edit-refusal gate as draw/pen above — found live: without this,
+    // placing text on a locked/component/duplicator layer let the popover
+    // open and accept typing (looked like it worked), but the layer never
+    // actually gets the item (saveActiveLayerFrame's own guard correctly
+    // refuses it later) — text silently vanishes with no toast telling the
+    // user why, instead of being refused audibly up front like every other
+    // drawing tool.
+    if(!canEditActiveLayer())return;
     // A plain click still opens the point-text popover immediately (see
     // onMouseUp's companion branch — a click-with-no-drag never enters the
     // preview-rectangle path below, matching pre-2026-07 behavior exactly).
@@ -5819,7 +5827,7 @@ function onViewDoubleClick(event){
   // Re-edit a placed text block in place (2026-07 rework) — checked before
   // the select-only guard below since double-clicking with the Text tool
   // itself active must also work, not just Select.
-  if(state.tool==='select'||state.tool==='text'){
+  if((state.tool==='select'||state.tool==='text')&&canEditActiveLayer()){
     var textLayer=userLayers[state.activeLayerIdx];
     var textHit=textLayer.hitTest(event.point,{fill:true,stroke:true,tolerance:4/view.zoom});
     if(textHit&&textHit.item instanceof Raster&&textHit.item.data&&textHit.item.data.isText&&!textHit.item.data.isTextChar){

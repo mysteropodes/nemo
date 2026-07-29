@@ -67,6 +67,12 @@ var _rigDraw = { path: null, boneId: null, draggingHandle: false, lastClickTime:
     var anchorHit = hitBoneAnchor(pt);
     if (anchorHit) {
       _posing = { ld: ld, boneId: anchorHit.boneId, vi: anchorHit.vi };
+      // Marks the pose as live-but-uncommitted for saveActiveLayerFrame/
+      // saveAllLayerFrames (app.js) — cleared only by rigCommitFrame/
+      // rigResetPose, deliberately NOT on pointerup here, since a pose can
+      // sit live far longer than one drag gesture (see those functions'
+      // own comment for why this matters: the periodic autosave timer).
+      ld._rigPoseLive = true;
       window.SMEngineBridge.suspend();
       return;
     }
