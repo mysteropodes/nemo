@@ -1713,42 +1713,84 @@ function getEffectiveStrokes(layerIdx,frameIdx,countOnly){
     // dropping the rest even though they're all visible and fully editable
     // inside the component itself.
     var out=[];
+    if(countOnly){
+      sym.layers.forEach(function(symLayer){
+        if(!symLayer||symLayer.visible===false)return;
+        var sf=symLayer.frames[ii];if(!sf)return;
+        if(sf.isKeyframe||sf.isInterpolated){out=out.concat(sf.strokes);return;}
+        for(var k=ii-1;k>=0;k--){if(symLayer.frames[k].isKeyframe){out=out.concat(symLayer.frames[k].strokes);break;}}
+      });
+      return out;
+    }
     sym.layers.forEach(function(symLayer){
       if(!symLayer||symLayer.visible===false)return;
       var sf=symLayer.frames[ii];if(!sf)return;
-      if(sf.isKeyframe||sf.isInterpolated){out=out.concat(sf.strokes);return;}
-      for(var k=ii-1;k>=0;k--){if(symLayer.frames[k].isKeyframe){out=out.concat(symLayer.frames[k].strokes);break;}}
+      var layerStrokes=null;
+      if(sf.isKeyframe||sf.isInterpolated){layerStrokes=sf.strokes;}
+      else{for(var k=ii-1;k>=0;k--){if(symLayer.frames[k].isKeyframe){layerStrokes=symLayer.frames[k].strokes;break;}}}
+      if(!layerStrokes)return;
+      // Element-level Motion (2026-07, "precomp par calque"): a per-shape
+      // animated Position/Anchor/Rotation/Scale/Opacity INSIDE this component
+      // instance — same descriptor and nesting order exportBuildFrame
+      // (export.js) already uses for plain layers (elMat applied first,
+      // pivoted around the STROKE's own bounds+anchor, before any outer/
+      // instance-level transform). Reused here via a throwaway Path since
+      // these are still raw stroke-data dicts (loadFrame builds the real
+      // Paper items from this function's return value, not before it).
+      // elementMotionAt used to always return null for a ld.symbolId layer —
+      // lifted in motion.js alongside this change. Applied PER SUB-LAYER
+      // (not on the flattened `out`, see the layer-level step right below)
+      // so the layer's own pivot, computed next, reflects each element's
+      // CURRENT (already element-transformed) position — same "shape
+      // group's transform nested inside its parent layer" order AE uses.
+      if(window.SMMotion){
+        layerStrokes=layerStrokes.map(function(sd){
+          if(sd.isRaster||!sd.strokeId)return sd;
+          var elMat=SMMotion.elementMotionAt(layerIdx,sd.strokeId,frameIdx);
+          if(!elMat)return sd;
+          var sd2=JSON.parse(JSON.stringify(sd));
+          var tmp=new Path({insert:false});
+          for(var si=0;si<sd2.segments.length;si++){var s=sd2.segments[si];tmp.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));}
+          if(sd2.closed)tmp.closed=true;
+          var epc=tmp.bounds.center;
+          var elPivot=new Point(epc.x+elMat.ax,epc.y+elMat.ay);
+          tmp.scale(elMat.sx,elMat.sy,elPivot);
+          tmp.rotate(elMat.rot,elPivot);
+          tmp.translate(elMat.dx,elMat.dy);
+          sd2.segments=tmp.segments.map(function(s){return{point:[s.point.x,s.point.y],handleIn:[s.handleIn.x,s.handleIn.y],handleOut:[s.handleOut.x,s.handleOut.y]};});
+          sd2.opacity=(sd2.opacity!==undefined?sd2.opacity:1)*elMat.op;
+          return sd2;
+        });
+      }
+      // Layer-level Motion (2026-07-29 fix — found live while beta-testing:
+      // a multi-layer component's sub-layer can carry a layer-level Motion
+      // track exactly like any ordinary layer, set while editing INSIDE via
+      // enterSymbol — this was never composed here at all, so the sub-
+      // layer's own Position/Rotation/Scale/Opacity keyframes silently did
+      // nothing the moment you exited back to the placed instance, even
+      // though they still animated correctly while editing inside. One
+      // nesting level further out than element motion above — mirrors
+      // parentChainMats' own pivot convention (a layer's bounds-center, not
+      // an individual stroke's).
+      var layerMat=window.SMMotion?SMMotion.computeMotionMatFor(symLayer,ii):null;
+      if(layerMat){
+        var pivot=_boundsCenterOfStrokes(layerStrokes);
+        pivot={x:pivot.x+layerMat.ax,y:pivot.y+layerMat.ay};
+        layerStrokes=layerStrokes.map(function(sd){
+          var sd2=JSON.parse(JSON.stringify(sd));
+          if(sd2.isRaster){
+            var rb=SMMotion.transformImageRect({x:sd2.x-sd2.width/2,y:sd2.y-sd2.height/2,width:sd2.width,height:sd2.height,rotation:sd2.rotation||0},pivot,layerMat);
+            sd2.x=rb.x+rb.width/2;sd2.y=rb.y+rb.height/2;sd2.width=rb.width;sd2.height=rb.height;
+            if(rb.rotation)sd2.rotation=rb.rotation;else delete sd2.rotation;
+          }else if(sd2.segments){
+            sd2.segments=SMMotion.transformSegments(sd2.segments,pivot,layerMat);
+          }
+          sd2.opacity=(sd2.opacity!==undefined?sd2.opacity:1)*layerMat.op;
+          return sd2;
+        });
+      }
+      out=out.concat(layerStrokes);
     });
-    if(countOnly)return out;
-    // Element-level Motion (2026-07, "precomp par calque"): a per-shape
-    // animated Position/Anchor/Rotation/Scale/Opacity INSIDE this component
-    // instance — same descriptor and nesting order exportBuildFrame
-    // (export.js) already uses for plain layers (elMat applied first,
-    // pivoted around the STROKE's own bounds+anchor, before any outer/
-    // instance-level transform). Reused here via a throwaway Path since
-    // these are still raw stroke-data dicts (loadFrame builds the real
-    // Paper items from this function's return value, not before it).
-    // elementMotionAt used to always return null for a ld.symbolId layer —
-    // lifted in motion.js alongside this change.
-    if(window.SMMotion){
-      out=out.map(function(sd){
-        if(sd.isRaster||!sd.strokeId)return sd;
-        var elMat=SMMotion.elementMotionAt(layerIdx,sd.strokeId,frameIdx);
-        if(!elMat)return sd;
-        var sd2=JSON.parse(JSON.stringify(sd));
-        var tmp=new Path({insert:false});
-        for(var si=0;si<sd2.segments.length;si++){var s=sd2.segments[si];tmp.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));}
-        if(sd2.closed)tmp.closed=true;
-        var epc=tmp.bounds.center;
-        var elPivot=new Point(epc.x+elMat.ax,epc.y+elMat.ay);
-        tmp.scale(elMat.sx,elMat.sy,elPivot);
-        tmp.rotate(elMat.rot,elPivot);
-        tmp.translate(elMat.dx,elMat.dy);
-        sd2.segments=tmp.segments.map(function(s){return{point:[s.point.x,s.point.y],handleIn:[s.handleIn.x,s.handleIn.y],handleOut:[s.handleOut.x,s.handleOut.y]};});
-        sd2.opacity=(sd2.opacity!==undefined?sd2.opacity:1)*elMat.op;
-        return sd2;
-      });
-    }
     // The instance transform (symMatrixOf) — skip entirely (and the clone
     // it requires) when it's identity, the common case. Strokes returned
     // here are live references into the SYMBOL'S OWN stored frame data, so
