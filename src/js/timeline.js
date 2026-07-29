@@ -7049,9 +7049,16 @@ window.renderRigModeUI=renderRigModeUI;
     var radius=parseFloat(document.getElementById('rig-weight-radius').value)||200;
     var rotate=document.getElementById('rig-rotate-mode').checked;
     pushUndo();
-    var n=rigAutoAssignLayer(ld,userLayers[state.activeLayerIdx],radius,rotate);
+    var res=rigAutoAssignLayer(ld,userLayers[state.activeLayerIdx],radius,rotate);
     if(window.SMEngineBridge)SMEngineBridge.renderNow();
-    showToast(n+(window.SM&&SM.t?SM.t('rigAutoAssignedToast'):' forme(s) assignée(s) automatiquement'));
+    // 0 assigned but candidates existed (2026-07-29 fix, QA-confirmed live:
+    // "l'autoassign marche pas" on a shape drawn with the default Brush
+    // tool) — rigBindStroke silently rejects vector-brush strokes and
+    // CompoundPaths with only a console.warn, so a plain "0 forme(s)
+    // assignée(s)" toast read exactly like a bug instead of an honest
+    // "not supported yet" — surfaced explicitly instead of guessing.
+    if(res.n===0&&res.skippedUnsupported>0)showToast(window.SM&&SM.t?SM.t('rigAutoAssignBrushUnsupportedToast'):'Les traits pinceau ne sont pas encore supportés par le Rig — dessine avec Rectangle/Ellipse/Plume à la place');
+    else showToast(res.n+(window.SM&&SM.t?SM.t('rigAutoAssignedToast'):' forme(s) assignée(s) automatiquement'));
   });
   document.getElementById('btn-rig-commit').addEventListener('click',function(){
     var ld=state.layers[state.activeLayerIdx];
