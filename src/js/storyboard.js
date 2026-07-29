@@ -777,6 +777,7 @@
         var oe = world.querySelector('[data-sb-id="' + o.id + '"]');
         if (oe) neighbors.push({ x: o.x, y: o.y, w: oe.offsetWidth, h: oe.offsetHeight });
       });
+      var downX = e.clientX, downY = e.clientY;
       var moved = false, lastX = e.clientX, lastY = e.clientY, raf = 0, left = false;
       // Dragging a montage BLOCK moves the WHOLE assembly ("quand on drag
       // un montage alors ça doit bouger tout l'ensemble") — snapshot every
@@ -841,6 +842,14 @@
       }
       function mv(ev) {
         lastX = ev.clientX; lastY = ev.clientY;
+        // 4px threshold before this counts as a real drag (2026-07 fix,
+        // matches the click-vs-drag idiom used elsewhere in this app, e.g.
+        // layer-row reordering) — without it, ANY pointermove at all, even
+        // the sub-pixel jitter real mouse/trackpad hardware produces on
+        // what the user experiences as a plain click, immediately desnapped
+        // an already-chained module via apply()'s own "first movement"
+        // branch below, before the user ever intended to drag it.
+        if (!moved && Math.hypot(lastX - downX, lastY - downY) < 4) return;
         moved = true;
         if (!raf) raf = requestAnimationFrame(apply);
       }
