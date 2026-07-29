@@ -1117,6 +1117,16 @@
       // parented layer blurs on its own movement, not the rig's. Noted
       // rather than silently approximated.
       var mbOn = state.motionBlurOn && state.layers[i].motionBlur && motionMat && items.length;
+      // Computed once and shared with the ghosts below (2026-07 fix) — was
+      // previously only ever called for the real layer's own push, so a
+      // ghost sample always composited plain-Normal/un-effected regardless
+      // of this layer's actual blendMode/effects stack. Re-evaluating per
+      // ghost at its OWN sample time would be more "correct" for a keyed
+      // effect param, but the geometry delta above already only APPROXIMATES
+      // each sample (reusing the sharp frame's built items, not a full
+      // re-render) — reusing the sharp frame's effects here matches that
+      // same established approximation, not a new one.
+      var mbEffects = sceneEffectsOf(state.layers[i]);
       if (mbOn) {
         var mbSamples = Math.max(2, Math.min(16, state.motionBlurSamples || 6));
         var mbShutter = Math.max(0.05, Math.min(2, state.motionBlurShutter || 0.5)); // in frames
@@ -1140,10 +1150,30 @@
             var c = {};
             for (var k in it) if (Object.prototype.hasOwnProperty.call(it, k)) c[k] = it[k];
             if (c.segments) c.segments = roundSegs(SMMotion.transformSegments(c.segments, motionPivot, delta));
+            // Retained-path items (pathRef+pathTransform, no segments —
+            // CLAUDE.md §5ter) fell through untouched here: c.pathTransform
+            // got shallow-copied as-is, so every ghost sat at the EXACT
+            // same position as the sharp frame, just faded — stacked
+            // duplicates instead of a smear, for what's now the common case
+            // (any ordinary animated shape layer once geometry retention is
+            // on). Same fix as segments, composed as the OUTERMOST affine —
+            // mirrors how motionMat's own affine gets folded into pathTf
+            // above (affineMul(newer, older)).
+            else if (c.pathTransform) c.pathTransform = affineMul(affineFromMotion(delta, motionPivot), c.pathTransform);
             c.opacity = (c.opacity != null ? c.opacity : 1) * fade;
             return c;
           });
-          layers.push({ items: sampleItems });
+          // blendMode/effects (2026-07 fix): a ghost previously always
+          // composited plain Normal with no effects stack, regardless of
+          // this layer's own settings — a Screen-blend or Glow-effect layer
+          // showed a correctly blended/effected sharp frame trailed by
+          // ghosts that ignored both. matteMode deliberately NOT carried:
+          // engine.rs resolves a matte source by array adjacency (the layer
+          // directly above), and duplicating matteMode across N ghost
+          // entries would change which entries sit adjacent to what without
+          // a way to verify the Rust-side consequence from here — left as a
+          // separate, not-yet-addressed gap rather than guessed at.
+          layers.push({ items: sampleItems, blendMode: (bm && bm !== 'normal') ? bm : undefined, effects: mbEffects });
         }
       }
       // 3D layer (2026-07-28) — no special envelope needed: each item's
@@ -1151,7 +1181,7 @@
       // this layer's `items` push through the EXACT SAME path as any
       // ordinary layer. blendMode/matteMode/effects still apply normally.
       layers.push({ items: items, blendMode: (bm && bm !== 'normal') ? bm : undefined, matteMode: (mm && mm !== 'none') ? mm : undefined,
-        effects: sceneEffectsOf(state.layers[i]) });
+        effects: mbEffects });
     }
     // artboard background as the bottom item of a synthetic bottom layer,
     // mirroring drawStage()'s background rect
