@@ -4731,6 +4731,16 @@
     },
     setLayerValue: function (li, prop, vals) { var ld = state.layers[li]; if (ld) setValue(ld, prop, vals); },
     layerMotionAt: layerMotionAt,
+    // Exposed for getEffectiveStrokes' symbolId branch (app.js, 2026-07-29
+    // fix: "un calque interne d'un component multi-calques n'anime jamais
+    // depuis l'extérieur") — composing a sym.layers[] entry's OWN layer-
+    // level Motion when rendering the placed instance from outside. Not the
+    // same as layerMotionAt just above: that one assumes a state.layers
+    // index (the instance itself); a sub-layer inside state.symbols[id]
+    // isn't indexed there at all. Same computeMotionMat every layer-level
+    // Motion consumer already shares (layerMotionAt/parentChainMats), just
+    // reachable from outside this closure with an arbitrary holder object.
+    computeMotionMatFor: computeMotionMat,
     elementMotionAt: elementMotionAt,
     elementFillColorAt: elementFillColorAt,
     transformSegments: transformSegments,
