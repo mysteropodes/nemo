@@ -890,20 +890,37 @@
     if (window.loadFrame) loadFrame(state.currentFrame);
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
   }
+  // Shared write path for every batch op below (2026-07-30 fix — found
+  // still outstanding by the broad QA audit, deliberately deferred twice
+  // earlier this session). Every one of these ops used to write straight
+  // to ld.inPoint/outPoint, same bug trySetLinkedEdge's own header comment
+  // already fixed once for the single-bar drag handlers: a linked child's
+  // in/out is completely inert (layerInPoint/layerOutPoint check
+  // resolveLinkedTime FIRST and never read ld.inPoint/outPoint once an edge
+  // is linked), so Align/Distribute/Flip/Stagger silently did nothing to any
+  // Parent-in-Time child caught in the selection — no error, the bar just
+  // never moved. Redirects through the same helper the manual drag path
+  // uses; `w` (each bar's own duration) is always computed from the CURRENT
+  // effective in/out before either write, so the two edges never see a
+  // half-updated width mid-iteration.
+  function setBarEdges(ld, newIn, newOut) {
+    if (!trySetLinkedEdge(ld, 'in', newIn)) ld.inPoint = newIn;
+    if (!trySetLinkedEdge(ld, 'out', newOut)) ld.outPoint = newOut;
+  }
   function alignBars(mode) {
     applyBatch(function (items) {
       if (mode === 'left') {
         var minIn = Math.min.apply(null, items.map(function (x) { return inPointOf(x.ld); }));
-        items.forEach(function (x) { var w = outPointOf(x.ld) - inPointOf(x.ld); x.ld.inPoint = minIn; x.ld.outPoint = minIn + w; });
+        items.forEach(function (x) { var w = outPointOf(x.ld) - inPointOf(x.ld); setBarEdges(x.ld, minIn, minIn + w); });
       } else if (mode === 'right') {
         var maxOut = Math.max.apply(null, items.map(function (x) { return outPointOf(x.ld); }));
-        items.forEach(function (x) { var w = outPointOf(x.ld) - inPointOf(x.ld); x.ld.outPoint = maxOut; x.ld.inPoint = maxOut - w; });
+        items.forEach(function (x) { var w = outPointOf(x.ld) - inPointOf(x.ld); setBarEdges(x.ld, maxOut - w, maxOut); });
       } else {
         var avgCenter = items.reduce(function (s, x) { return s + (inPointOf(x.ld) + outPointOf(x.ld)) / 2; }, 0) / items.length;
         items.forEach(function (x) {
           var w = outPointOf(x.ld) - inPointOf(x.ld);
           var ni = Math.max(0, Math.round(avgCenter - w / 2));
-          x.ld.inPoint = ni; x.ld.outPoint = ni + w;
+          setBarEdges(x.ld, ni, ni + w);
         });
       }
     });
@@ -918,7 +935,7 @@
       sorted.forEach(function (x, i) {
         var w = outPointOf(x.ld) - inPointOf(x.ld);
         var ni = Math.round(first + step * i);
-        x.ld.inPoint = ni; x.ld.outPoint = ni + w;
+        setBarEdges(x.ld, ni, ni + w);
       });
     });
   }
@@ -931,7 +948,7 @@
       var reversed = slots.slice().reverse();
       sorted.forEach(function (x, i) {
         var w = outPointOf(x.ld) - inPointOf(x.ld);
-        x.ld.inPoint = reversed[i]; x.ld.outPoint = reversed[i] + w;
+        setBarEdges(x.ld, reversed[i], reversed[i] + w);
       });
     });
   }
@@ -951,7 +968,7 @@
       sorted.forEach(function (x, i) {
         var w = outPointOf(x.ld) - inPointOf(x.ld);
         var ni = Math.max(0, base + step * i);
-        x.ld.inPoint = ni; x.ld.outPoint = ni + w;
+        setBarEdges(x.ld, ni, ni + w);
       });
     });
   }
