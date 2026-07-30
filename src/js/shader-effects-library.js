@@ -112,7 +112,15 @@
     ]),
     fx('shader_roughen_alpha', 'Roughen Alpha', 'Stylize', [
       param('p1', 'Amount', 0, 1, 0.01, '', 0.5),
-      param('p2', 'Scale', 1, 80, 1, 'px', 18),
+      // Missing the `spatial` flag every other 'px'-unit param in this file
+      // carries (found 2026-07-30 auditing every effect against the Twirl
+      // fix's own precedent, Cyril: "les effets Wgsl qui ne sont pas stable
+      // appliqué à un objet calques quand on zoom") — without it, the noise
+      // cell size stays a fixed SCREEN-pixel count instead of scaling with
+      // view.zoom like shader_grid's near-identical 'Size' param does, so
+      // the roughened edge's grain visibly changes density every time you
+      // zoom instead of staying constant relative to the artwork.
+      param('p2', 'Scale', 1, 80, 1, 'px', 18, true),
       param('p3', 'Softness', 0, 1, 0.01, '', 0.15),
     ], [
       'let cell = floor(uv * max(params.p2, 1.0) * 80.0);',
