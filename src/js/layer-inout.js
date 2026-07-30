@@ -496,8 +496,13 @@
           if (o !== ld && o.layerUid === ld.timeLink.uid) { srcIn = inPointOf(o); srcOut = outPointOf(o); }
         });
         if (srcIn == null) return; // source gone — leave the hard values alone
-        if (mode !== 'out') ld.timeLink.inOffset = wantIn - srcIn;
-        if (mode !== 'in') ld.timeLink.outOffset = wantOut - srcOut;
+        // Offsets are Motion properties now (timeLinkInOffset/Out,
+        // 2026-07-30) — write through the same public setter the side-panel
+        // field and the pickwhip use, not the raw legacy field.
+        if (window.SMMotion) {
+          if (mode !== 'out') SMMotion.setLayerValue(m.li, 'timeLinkInOffset', [wantIn - srcIn]);
+          if (mode !== 'in') SMMotion.setLayerValue(m.li, 'timeLinkOutOffset', [wantOut - srcOut]);
+        }
         // The hard values are dead weight on a linked layer; dropping them
         // keeps a later unlink from resurrecting a stale range.
         delete ld.inPoint; delete ld.outPoint;

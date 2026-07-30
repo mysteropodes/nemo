@@ -92,10 +92,13 @@
         // contract as dragging a linked bar in the timeline.
         var src = null;
         state.layers.forEach(function (o) { if (o !== ld && o.layerUid === ld.timeLink.uid) src = o; });
-        if (src) {
+        if (src && window.SMMotion) {
           var mode = ld.timeLink.mode || 'both';
-          if (which === 'in' && mode !== 'out') ld.timeLink.inOffset = f - layerInPoint(src);
-          if (which === 'out' && mode !== 'in') ld.timeLink.outOffset = f - layerOutPoint(src);
+          // Offsets are Motion properties (timeLinkInOffset/Out) — write
+          // through the same public setter any other property uses.
+          if (which === 'in' && mode !== 'out') SMMotion.setLayerValue(this.index, 'timeLinkInOffset', [f - layerInPoint(src)]);
+          if (which === 'out' && mode !== 'in') SMMotion.setLayerValue(this.index, 'timeLinkOutOffset', [f - layerOutPoint(src)]);
+          if (window.loadFrame) loadFrame(state.currentFrame);
           if (window.renderTimeline) renderTimeline();
           return;
         }
@@ -310,7 +313,13 @@
       if (!tl) return null;
       var si = -1;
       state.layers.forEach(function (o, oi) { if (o.layerUid === tl.uid) si = oi; });
-      return { layer: si >= 0 ? new Layer(si) : null, inOffset: tl.inOffset | 0, outOffset: tl.outOffset | 0, mode: tl.mode || 'both' };
+      // Offsets are Motion properties now (timeLinkInOffset/Out,
+      // 2026-07-30) — read through the same public getter as any other
+      // property, resolved (expression included) at the current frame,
+      // not the raw legacy field.
+      var inOff = window.SMMotion ? (SMMotion.getLayerValue(this.index, 'timeLinkInOffset') || [0])[0] : (tl.inOffset | 0);
+      var outOff = window.SMMotion ? (SMMotion.getLayerValue(this.index, 'timeLinkOutOffset') || [0])[0] : (tl.outOffset | 0);
+      return { layer: si >= 0 ? new Layer(si) : null, inOffset: inOff | 0, outOffset: outOff | 0, mode: tl.mode || 'both' };
     }
   });
   Layer.prototype.linkTime = function (other, opts) {
@@ -321,12 +330,10 @@
     // Seeded from the CURRENT gap by default, so linking never makes the
     // layer jump — same contract as the pickwhip.
     var myIn = window.layerInPoint ? layerInPoint(ld) : 0, myOut = window.layerOutPoint ? layerOutPoint(ld) : state.totalFrames - 1;
-    ld.timeLink = {
-      uid: SMMotion.ensureLayerUid(src),
-      inOffset: opts.inOffset != null ? opts.inOffset | 0 : myIn - layerInPoint(src),
-      outOffset: opts.outOffset != null ? opts.outOffset | 0 : myOut - layerOutPoint(src),
-      mode: opts.mode || 'both',
-    };
+    ld.timeLink = { uid: SMMotion.ensureLayerUid(src), mode: opts.mode || 'both' };
+    SMMotion.setLayerValue(this.index, 'timeLinkInOffset', [opts.inOffset != null ? opts.inOffset | 0 : myIn - layerInPoint(src)]);
+    SMMotion.setLayerValue(this.index, 'timeLinkOutOffset', [opts.outOffset != null ? opts.outOffset | 0 : myOut - layerOutPoint(src)]);
+    if (window.loadFrame) loadFrame(state.currentFrame);
     note('linkTime');
     return this;
   };
