@@ -5463,6 +5463,23 @@
   //                          follow-up feedback wants moving a layer's
   //                          whole timing back — same "keeps its own
   //                          gesture" treatment as its own handles now.
+  //   #motion-graph-resize   — the Motion Graph Editor's own height-resize
+  //                          handle (motion-graph.js, 2026-07-30). Same
+  //                          capture-order bug as every entry above: its
+  //                          own mousedown listener lives in the bubble
+  //                          phase, so it was silently swallowed here
+  //                          before ever firing (confirmed live —
+  //                          elementFromPoint correctly found the handle,
+  //                          but dispatchEvent returned false with zero
+  //                          trace of the handle's own listener ever
+  //                          running). Motion-graph.js's OWN document-level
+  //                          capture listener (onDown, for .mg-key/.mg-ease)
+  //                          runs BEFORE this one and could stop it the
+  //                          same way it already does for those two
+  //                          classes, but this handle isn't a key or an
+  //                          ease waypoint — excluding it here, alongside
+  //                          every other "has its own gesture" element,
+  //                          is the consistent fix.
   // (historical) Deliberate trade-off: dragging a bar's BODY no longer
   // moved the layer range while in Motion — same priority call as the
   // canvas, where drag-anywhere marquee wins over object-move unless you
@@ -5472,7 +5489,7 @@
     if (!wrap) return;
     wrap.addEventListener('mousedown', function (e) {
       if (state.appMode !== 'motion' || e.button !== 0) return;
-      if (e.target.closest('.fc.motion-fc, .layer-inout-handle, .layer-inout-key, .layer-inout-bar, #frame-hdr, #playhead-flag, #bars-row')) return;
+      if (e.target.closest('.fc.motion-fc, .layer-inout-handle, .layer-inout-key, .layer-inout-bar, #frame-hdr, #playhead-flag, #bars-row, #motion-graph-resize')) return;
       // Scrollbar clicks land on the wrap itself but outside its client
       // area — intercepting them would break scrollbar dragging.
       var r = wrap.getBoundingClientRect();
