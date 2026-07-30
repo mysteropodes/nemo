@@ -795,6 +795,23 @@
         // doesn't".
         clearSel();
         clickedSet.forEach(function (m) { selectedPaths.push(m); });
+        // _groupEnteredGid (tools.js, group double-click) tracks "did the
+        // LAST thing that happened enter this exact group via double-click,
+        // with nothing unrelated since" — but nothing ever reset it back to
+        // null, so it stayed set to whatever group was last double-clicked
+        // for the rest of the SESSION. A plain single click here landing on
+        // a DIFFERENT (or ungrouped) target means that continuity is over —
+        // without this, double-clicking a group you'd entered earlier (even
+        // much earlier, after touching plenty of unrelated shapes since)
+        // skipped straight to Subselect on what the user experiences as a
+        // fresh first double-click (2026-07-30 fix, Cyril: "un bug pourtant
+        // relevé très souvent — si je double clic [sur un groupe déjà
+        // touché] ça switch sur subselect alors que ça devrait rester
+        // select"). Clicking back onto the SAME still-entered group is a
+        // no-op here (condition short-circuits), so the genuine "double-
+        // click, then immediately double-click again" fast path into
+        // Subselect is untouched — see tools.js's onViewDoubleClick.
+        if (window._groupEnteredGid && (!p.data || p.data.groupId !== window._groupEnteredGid)) window._groupEnteredGid = null;
       } else {
         // p is ALREADY selected (idx2>=0) — but its own group siblings might
         // not be (2026-07-29 fix, QA-confirmed): right after a Subselect
