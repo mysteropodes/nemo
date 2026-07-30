@@ -2702,12 +2702,34 @@
       if (willSplit) showToast('Éclaté en calques — clic droit › « Fusionner les calques sélectionnés » pour revenir en arrière');
     }
   }
+  // Bar highlighting (layer-inout.js's own _barSel, used for group bar-drags
+  // and rendered as the white outline on a timeline bar) and this module's
+  // _layerSel (Cmd/Shift multi-select, the stagger/skew box) are two
+  // independently-tracked selections that both render as the SAME visual
+  // state on a layer's bar — every plain-click path that changes _layerSel
+  // used to leave the other exactly where it was. Found live: Shift-click 2
+  // bars to multi-select them, then plain-click a layer's NAME in the list
+  // — the name's row highlighted correctly and the panel followed, but both
+  // bars stayed lit with their OLD selection outline, and a following plain
+  // click back on one of those still-lit bars read as a (zero-distance,
+  // no-op) GROUP drag instead of updating the selection at all, because
+  // layer-inout.js's own onDown branches on ITS OWN bar selection still
+  // finding 2+ members (Cyril: "la selection des calques... pas hyper
+  // bonne"). Call this after every _layerSel assignment so the two can
+  // never drift apart — mirrors the fix already applied to the "click
+  // empty grid space" case a few hundred lines down (endMarquee).
+  function syncBarSelToLayerSel() {
+    if (window.SMLayerInOut && SMLayerInOut.setBarSelection) {
+      SMLayerInOut.setBarSelection(_layerSel.map(function (li) { return { li: li, part: 'both' }; }));
+    }
+  }
   function renderLayerListMotion(list) {
     if (!list._motionEmptySelectBound) {
       list._motionEmptySelectBound = true;
       list.addEventListener('pointerdown', function (e) {
         if (e.target !== list || state.appMode !== 'motion') return;
         _layerSel = [];
+        syncBarSelToLayerSel();
         setKeySel([]);
         renderLayerList(); renderTimeline();
       });
@@ -2866,6 +2888,7 @@
         if (e.metaKey || e.ctrlKey) {
           if (_layerSel.indexOf(state.activeLayerIdx) < 0) _layerSel.push(state.activeLayerIdx);
           var p = _layerSel.indexOf(li); if (p >= 0) _layerSel.splice(p, 1); else _layerSel.push(li);
+          syncBarSelToLayerSel();
           window.SM.setActiveLayer(li);
           renderLayerList(); renderTimeline();
           return;
@@ -2882,11 +2905,13 @@
           var anchor = _layerSel.length ? _layerSel[0] : state.activeLayerIdx;
           _layerSel = [];
           for (var l = Math.min(anchor, li); l <= Math.max(anchor, li); l++) _layerSel.push(l);
+          syncBarSelToLayerSel();
           window.SM.setActiveLayer(li);
           renderLayerList(); renderTimeline();
           return;
         }
         _layerSel = [li];
+        syncBarSelToLayerSel();
         // A row can be open via the single-accordion state OR via U's
         // reveal set (or both) — always drop it from the reveal set on
         // click, but only touch the single-accordion value if THIS row is
@@ -4249,6 +4274,7 @@
   function selectLayerFromGrid(li) {
     if (state.appMode !== 'motion' || !state.layers[li]) return;
     _layerSel = [li];
+    syncBarSelToLayerSel();
     setKeySel([]);
     window.SM.setActiveLayer(li);
     renderLayerList(); renderTimeline();

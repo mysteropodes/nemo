@@ -415,7 +415,10 @@
         if (!mld || !mrow) return null;
         return { li: s.li, row: mrow, origIn: inPointOf(mld), origOut: outPointOf(mld) };
       }).filter(Boolean);
-      _drag = { group: true, type: type, startX: e.clientX, members: members, alt: !!e.altKey, keySel: keySelNow() };
+      // pressLi: which bar was actually clicked, kept alongside the group so
+      // a plain (no-modifier, no-move) click can narrow the selection down
+      // to just this one layer at mouseup — see that check's own comment.
+      _drag = { group: true, type: type, startX: e.clientX, members: members, alt: !!e.altKey, keySel: keySelNow(), pressLi: li };
       return;
     }
     _drag = { li: li, row: row, type: type, startX: e.clientX, origIn: inPointOf(ld), origOut: outPointOf(ld), alt: !!e.altKey, keySel: keySelNow() };
@@ -546,12 +549,27 @@
     // A press on a bar that never turned into a retime drag is a plain CLICK,
     // and the bar covers most of the grid half of a layer's row — so without
     // this that whole strip was unselectable (2026-07-27: "impossible de
-    // select un layer en clicquand de ce côté de la timeline"). Group drags
-    // have no single `li` and already carry their own bar selection, so they
-    // are left alone.
+    // select un layer en clicquand de ce côté de la timeline").
     if (!d.group && d.li != null && Math.abs(upEv.clientX - d.startX) < 3 &&
         state.appMode === 'motion' && window.SMMotion && SMMotion.selectLayerFromGrid) {
       SMMotion.selectLayerFromGrid(d.li);
+      return;
+    }
+    // A group drag that never actually moved is ALSO a plain click — onDown
+    // only takes this branch because the pressed bar happened to already be
+    // part of a 2+ selection, but the user's gesture is indistinguishable
+    // from any other plain click. Previously this fell straight through to
+    // reconcileTimeLinks/shiftLayerFrames below and did nothing visible, so
+    // a plain click on an already-multi-selected bar silently stopped
+    // selecting anything at all — found live (Cyril: "la selection des
+    // calques... pas hyper bonne"): Shift-click 2 bars, then plain-click one
+    // of them again, expecting it to narrow to just that layer like every
+    // other selection tool in this app. Same convention as a fresh
+    // (non-group) click a few lines up — narrow to the one bar actually
+    // pressed, which also resyncs _barSel via selectLayerFromGrid.
+    if (d.group && d.pressLi != null && Math.abs(upEv.clientX - d.startX) < 3 &&
+        state.appMode === 'motion' && window.SMMotion && SMMotion.selectLayerFromGrid) {
+      SMMotion.selectLayerFromGrid(d.pressLi);
       return;
     }
     // A time-linked layer (Parent in Time) resolves its in/out from its
