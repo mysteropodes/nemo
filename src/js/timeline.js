@@ -1881,7 +1881,7 @@ function getToolHelp(tool){
     // Rig's Tracer step is Pen-style bone drawing (rig-bridge.js) — same
     // Shift/Alt semantics as Pen, undocumented here (only Pen's own row
     // had them, a different tool).
-    rig:{desc:tt('thRigDesc'),sc:[['S',tt('thTool')],['Clic',tt('thAnchor')],['Shift',tt('thAngle45')],['Clic près d’une pointe',tt('thRigBranch')],['Alt+clic près d’une pointe',tt('thRigExtend')],['Alt+glisser une poignée',tt('thBreakTangent')],['Glisser une ancre ou une poignée existante',tt('thRigPose')],['Double-clic',tt('thFinish')]]},
+    rig:{desc:tt('thRigDesc'),sc:[['S',tt('thTool')],['Clic',tt('thAnchor')],['Shift',tt('thAngle45')],['Clic près d’une pointe',tt('thRigBranch')],['Alt+clic près d’une pointe',tt('thRigExtend')],['Alt+glisser une poignée',tt('thBreakTangent')],['Glisser une ancre ou une poignée existante',tt('thRigPose')],['Alt+glisser le bout d’une chaîne de 2 os',tt('thRigIK')],['Double-clic',tt('thFinish')]]},
   };
   return TOOL_HELP[tool];
 }
