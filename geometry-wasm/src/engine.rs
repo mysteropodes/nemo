@@ -10,7 +10,7 @@
 // inherently async) and keeps the returned handle to call `.render(json)`
 // on every frame.
 use serde::{Deserialize, Serialize};
-use vello::kurbo::{Affine, BezPath, Shape, Stroke};
+use vello::kurbo::{Affine, BezPath, Rect, Shape, Stroke};
 use vello::peniko::Color;
 use vello::{wgpu, AaConfig, AaSupport, RenderParams, Renderer, RendererOptions, Scene};
 use wasm_bindgen::prelude::*;
@@ -1589,11 +1589,13 @@ fn create_simple_fx_pipeline(device: &wgpu::Device) -> (wgpu::RenderPipeline, wg
         min_filter: wgpu::FilterMode::Linear,
         ..Default::default()
     });
-    // 32 bytes: effect_id, p1, p2, p3, tex_w, tex_h, time, pad — see
-    // simple_fx.wgsl's Params.
+    // 48 bytes: effect_id, p1, p2, p3, tex_w, tex_h, time, p4, bbox_x,
+    // bbox_y, bbox_w, bbox_h — see simple_fx.wgsl's Params. (2026-07-30:
+    // grew from 32 bytes to add the bbox_* fields — see run_one_effect's
+    // own doc comment for why.)
     let uniform_buf = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("simple-fx-params"),
-        size: 32,
+        size: 48,
         usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         mapped_at_creation: false,
     });
@@ -1665,9 +1667,13 @@ fn simple_fx_pass(
     time: f32,
     tex_w: f32,
     tex_h: f32,
+    bbox_x: f32,
+    bbox_y: f32,
+    bbox_w: f32,
+    bbox_h: f32,
     target_view: &wgpu::TextureView,
 ) {
-    let mut payload = [0u8; 32];
+    let mut payload = [0u8; 48];
     payload[0..4].copy_from_slice(&effect_id.to_le_bytes());
     payload[4..8].copy_from_slice(&p1.to_le_bytes());
     payload[8..12].copy_from_slice(&p2.to_le_bytes());
@@ -1676,6 +1682,10 @@ fn simple_fx_pass(
     payload[20..24].copy_from_slice(&tex_h.to_le_bytes());
     payload[24..28].copy_from_slice(&time.to_le_bytes());
     payload[28..32].copy_from_slice(&p4.to_le_bytes());
+    payload[32..36].copy_from_slice(&bbox_x.to_le_bytes());
+    payload[36..40].copy_from_slice(&bbox_y.to_le_bytes());
+    payload[40..44].copy_from_slice(&bbox_w.to_le_bytes());
+    payload[44..48].copy_from_slice(&bbox_h.to_le_bytes());
     queue.write_buffer(uniform_buf, 0, &payload);
     let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("simple-fx-bind-group"),
@@ -2187,7 +2197,21 @@ impl VelloEngine {
     /// never needs `&mut self`, which is what lets apply_effect_stack below
     /// hold multiple `&self.effect_stack_*_view` borrows across a loop
     /// without fighting the borrow checker.
-    fn run_one_effect(&self, eff: &EffectIn, source: &wgpu::TextureView, target: &wgpu::TextureView) {
+    // `bbox` = (x, y, w, h) in DEVICE PIXELS — the on-screen bounding box of
+    // whatever this effect is actually attached to (one item for a per-
+    // element effect, the whole layer's items for a per-layer effect, or
+    // the full canvas for an adjustment/effect layer, which has no shape of
+    // its own — see items_bbox_px and this fn's three call sites). Forwarded
+    // into simple_fx_pass's Params uniform so shader bodies that need a
+    // "center of MY content" concept (Twirl/Bulge/Spherize/etc., see
+    // shader-effects-library.js's local_uv convention) don't have to assume
+    // that's the center of the canvas — see local_uv's own doc comment
+    // (register_custom_effect) for why that assumption was wrong: Cyril,
+    // 2026-07-30, "un effet Wgsl... quand on zoom dans le canvas... même en
+    // bougeant le canvas avec la main" — reproduced live, a Twirl effect's
+    // pattern changed under PURE PANNING (no zoom at all), which only makes
+    // sense if the effect's reference frame was the viewport, not the shape.
+    fn run_one_effect(&self, eff: &EffectIn, source: &wgpu::TextureView, target: &wgpu::TextureView, bbox: (f32, f32, f32, f32)) {
         // Every PIXEL-space effect parameter below (blur/glow radius,
         // pixelate block size, chromatic-aberration offset, contour
         // thickness, halftone cell size) is applied to the raster AFTER
@@ -2233,11 +2257,13 @@ impl VelloEngine {
                 );
             }
             "hqBloom" => {
+                // Threshold/brightness pass, no "center of my shape" concept
+                // — full-canvas bbox (a no-op for this effect either way).
                 simple_fx_pass(
                     &self.device, &self.queue, &self.simple_fx_pipeline, &self.simple_fx_bind_group_layout, &self.simple_fx_sampler, &self.simple_fx_uniform_buf,
                     source, 14.0,
                     eff.p1.unwrap_or(0.55), 0.0, eff.p3.unwrap_or(1.4), eff.p4.unwrap_or(0.25),
-                    self.fx_time, self.width as f32, self.height as f32, &self.bloom_extract_view,
+                    self.fx_time, self.width as f32, self.height as f32, 0.0, 0.0, self.width as f32, self.height as f32, &self.bloom_extract_view,
                 );
                 blur_pass(
                     &self.device, &self.queue, &self.blur_pipeline, &self.blur_bind_group_layout, &self.blur_sampler, &self.blur_uniform_buf,
@@ -2309,7 +2335,7 @@ impl VelloEngine {
                         &self.device, &self.queue, &self.simple_fx_pipeline, &self.simple_fx_bind_group_layout, &self.simple_fx_sampler, &self.simple_fx_uniform_buf,
                         source, effect_id,
                         p1, eff.p2.unwrap_or(default_p2), eff.p3.unwrap_or(default_p3), eff.p4.unwrap_or(default_p4),
-                        self.fx_time, self.width as f32, self.height as f32, target,
+                        self.fx_time, self.width as f32, self.height as f32, bbox.0, bbox.1, bbox.2, bbox.3, target,
                     );
                 }
             }
@@ -2330,7 +2356,7 @@ impl VelloEngine {
                         &self.device, &self.queue, pipeline, &self.simple_fx_bind_group_layout, &self.simple_fx_sampler, &self.simple_fx_uniform_buf,
                         source, 0.0,
                         eff.p1.unwrap_or(0.0), eff.p2.unwrap_or(0.0), eff.p3.unwrap_or(0.0), eff.p4.unwrap_or(0.0),
-                        self.fx_time, self.width as f32, self.height as f32, target,
+                        self.fx_time, self.width as f32, self.height as f32, bbox.0, bbox.1, bbox.2, bbox.3, target,
                     );
                 }
             }
@@ -2355,17 +2381,72 @@ impl VelloEngine {
     /// "0 = disabled, no GPU cost" convention the old single-field version
     /// had via 0-valued radius/opacity) — this function assumes at least
     /// one enabled entry exists.
-    fn apply_effect_stack(&self, initial_source: &wgpu::TextureView, effects: &[EffectIn]) -> bool {
+    fn apply_effect_stack(&self, initial_source: &wgpu::TextureView, effects: &[EffectIn], bbox: (f32, f32, f32, f32)) -> bool {
         let enabled: Vec<&EffectIn> = effects.iter().filter(|e| e.enabled).collect();
         let mut current: &wgpu::TextureView = initial_source;
         let mut use_a = true;
         for eff in &enabled {
             let target: &wgpu::TextureView = if use_a { &self.effect_stack_a_view } else { &self.effect_stack_b_view };
-            self.run_one_effect(eff, current, target);
+            self.run_one_effect(eff, current, target, bbox);
             current = target;
             use_a = !use_a;
         }
         !use_a
+    }
+
+    /// Union on-screen (device-pixel) bounding box of `items` after
+    /// `view_tf` — mirrors paint_layer_items' own per-item geometry
+    /// resolution (path_ref lookup / build_bezpath, item_tf construction,
+    /// placed image rect) so the box matches exactly what actually got
+    /// painted. Falls back to the full canvas when no item resolves to real
+    /// geometry (matches every effect's pre-existing canvas-wide behavior
+    /// for that edge case — an empty/unresolvable set of items is not
+    /// something a distortion effect can meaningfully center on anyway).
+    fn items_bbox_px(&self, items: &[ItemIn], view_tf: Affine) -> (f32, f32, f32, f32) {
+        let mut acc: Option<Rect> = None;
+        for item in items {
+            let item_rect = if let Some(img_ref) = &item.image {
+                let rect = Rect::new(img_ref.x, img_ref.y, img_ref.x + img_ref.width, img_ref.y + img_ref.height);
+                let place = if img_ref.rotation != 0.0 {
+                    let (cx, cy) = (img_ref.x + img_ref.width / 2.0, img_ref.y + img_ref.height / 2.0);
+                    Affine::translate((cx, cy)) * Affine::rotate(img_ref.rotation.to_radians()) * Affine::translate((-cx, -cy))
+                } else {
+                    Affine::IDENTITY
+                };
+                Some((view_tf * place).transform_rect_bbox(rect))
+            } else {
+                let built: BezPath;
+                let bez: &BezPath = if let Some(r) = &item.path_ref {
+                    match self.paths.get(r) {
+                        Some(p) => p,
+                        None => continue,
+                    }
+                } else {
+                    match build_bezpath(item) {
+                        Some(b) => {
+                            built = b;
+                            &built
+                        }
+                        None => continue,
+                    }
+                };
+                let item_tf = match &item.path_transform {
+                    Some(m) => view_tf * Affine::new(*m),
+                    None => view_tf,
+                };
+                Some(item_tf.transform_rect_bbox(bez.bounding_box()))
+            };
+            if let Some(r) = item_rect {
+                acc = Some(match acc {
+                    Some(a) => a.union(r),
+                    None => r,
+                });
+            }
+        }
+        match acc {
+            Some(r) if r.width() > 0.5 && r.height() > 0.5 => (r.x0 as f32, r.y0 as f32, r.width() as f32, r.height() as f32),
+            _ => (0.0, 0.0, self.width as f32, self.height as f32),
+        }
     }
 
     /// Paints one layer whose items include at least one with its OWN
@@ -2414,7 +2495,8 @@ impl VelloEngine {
                 .render_to_texture(&self.device, &self.queue, &scene, &self.blend_layer_view, &layer_params)
                 .map_err(|e| JsValue::from_str(&format!("render_to_texture failed: {e:?}")))?;
             let (run_source, run_source_tex): (&wgpu::TextureView, &wgpu::Texture) = if has_fx {
-                let in_a = self.apply_effect_stack(&self.blend_layer_view, &layer.items[i].effects);
+                let bbox = self.items_bbox_px(&layer.items[i..i + 1], view_tf);
+                let in_a = self.apply_effect_stack(&self.blend_layer_view, &layer.items[i].effects, bbox);
                 if in_a { (&self.effect_stack_a_view, &self.effect_stack_a_tex) } else { (&self.effect_stack_b_view, &self.effect_stack_b_tex) }
             } else {
                 (&self.blend_layer_view, &self.blend_layer_tex)
@@ -2501,7 +2583,13 @@ impl VelloEngine {
             if layer.is_effect_layer.unwrap_or(false) {
                 let backdrop_view = if accum_is_a { &self.blend_accum_a_view } else { &self.blend_accum_b_view };
                 if layer.effects.iter().any(|e| e.enabled) {
-                    let in_a = self.apply_effect_stack(backdrop_view, &layer.effects);
+                    // Full-canvas bbox, deliberately NOT items_bbox_px: an
+                    // adjustment/effect layer has no shape of its own (its
+                    // own `items` are ignored entirely, is_effect_layer's
+                    // whole point) — it grades/distorts everything already
+                    // composited below it, so "my own content" IS the whole
+                    // frame, same as a real AE adjustment layer.
+                    let in_a = self.apply_effect_stack(backdrop_view, &layer.effects, (0.0, 0.0, self.width as f32, self.height as f32));
                     let result_tex = if in_a { &self.effect_stack_a_tex } else { &self.effect_stack_b_tex };
                     let target_tex = if accum_is_a { &self.blend_accum_b } else { &self.blend_accum_a };
                     let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("effect-stack-to-accum-copy") });
@@ -2573,7 +2661,8 @@ impl VelloEngine {
             // See LayerIn::effects' doc comment for why this differs from
             // the accumulator an effect/adjustment layer's stack runs on.
             if layer.effects.iter().any(|e| e.enabled) {
-                let in_a = self.apply_effect_stack(source_view, &layer.effects);
+                let bbox = self.items_bbox_px(&layer.items, view_tf);
+                let in_a = self.apply_effect_stack(source_view, &layer.effects, bbox);
                 source_view = if in_a { &self.effect_stack_a_view } else { &self.effect_stack_b_view };
             }
 
@@ -2901,14 +2990,29 @@ impl VelloEngine {
     /// WGSL statements ending in `return vec4<f32>(...)`), wrapped here
     /// into a full document that already declares the standard fullscreen-
     /// triangle vertex shader, the texture/sampler/Params bindings, and
-    /// three convenience locals every author can use without re-deriving
-    /// them: `uv` (0..1), `src` (the pixel already sampled at `uv`), and
-    /// `texel` (1 texel in UV units, for neighbor-sampling effects). Same
-    /// `Params{effect_id,p1,p2,p3,tex_w,tex_h,time,p4}` layout as
-    /// simple_fx.wgsl, so an author's `params.p1`..`params.p4` map 1:1 onto
-    /// the SAME p1..p4 fields the stack UI's generic param editor already
-    /// writes for every other effect type — no separate wiring needed on
-    /// the JS side for a custom effect's parameters.
+    /// six convenience locals every author can use without re-deriving
+    /// them: `uv` (0..1 across the FULL CANVAS), `src` (the pixel already
+    /// sampled at `uv`), `texel` (1 texel in UV units, for neighbor-
+    /// sampling effects), and — 2026-07-30, see run_one_effect's own doc
+    /// comment for the bug this fixes — `bbox_o`/`bbox_s` (the on-screen
+    /// device-pixel origin/size of whatever this effect is actually
+    /// attached to) and `local_uv` (0..1 across just THAT bbox instead of
+    /// the whole canvas, can go outside 0..1 near/past its edges same as
+    /// `uv` already can). Any effect with a "center of my own shape"
+    /// concept (a twirl/bulge pivot, a wave's phase, a particle grid)
+    /// should distort in `local_uv` space and map back to real texture
+    /// coordinates via `bbox_o + result * bbox_s` (in device px) before
+    /// dividing by `vec2(tex_w, tex_h)` for the final textureSample — NOT
+    /// `uv`/`vec2(0.5)` directly, which is the canvas center, not the
+    /// shape's — confirmed live: a shipped Twirl effect's pattern visibly
+    /// changed under pure panning (zero zoom change) before this existed,
+    /// which only makes sense if its reference frame was the viewport.
+    /// Same `Params{effect_id,p1,p2,p3,tex_w,tex_h,time,p4,bbox_x,bbox_y,
+    /// bbox_w,bbox_h}` layout as simple_fx.wgsl, so an author's
+    /// `params.p1`..`params.p4` map 1:1 onto the SAME p1..p4 fields the
+    /// stack UI's generic param editor already writes for every other
+    /// effect type — no separate wiring needed on the JS side for a custom
+    /// effect's parameters.
     ///
     /// Compiling arbitrary author-supplied WGSL at runtime is safe here:
     /// this crate only ever targets the web/WebGPU wgpu backend (built via
@@ -2920,7 +3024,7 @@ impl VelloEngine {
     /// never a Rust panic or a corrupted wasm instance.
     pub fn register_custom_effect(&mut self, key: String, fs_body: String) -> Result<(), JsValue> {
         let source = format!(
-            "struct VsOut {{\n    @builtin(position) pos: vec4<f32>,\n    @location(0) uv: vec2<f32>,\n}};\n\n@vertex\nfn vs_main(@builtin(vertex_index) vid: u32) -> VsOut {{\n    var positions = array<vec2<f32>, 3>(\n        vec2<f32>(-1.0, -1.0),\n        vec2<f32>(3.0, -1.0),\n        vec2<f32>(-1.0, 3.0),\n    );\n    let p = positions[vid];\n    var out: VsOut;\n    out.pos = vec4<f32>(p, 0.0, 1.0);\n    out.uv = vec2<f32>(p.x * 0.5 + 0.5, 1.0 - (p.y * 0.5 + 0.5));\n    return out;\n}}\n\n@group(0) @binding(0) var src_tex: texture_2d<f32>;\n@group(0) @binding(1) var tex_sampler: sampler;\n\nstruct Params {{\n    effect_id: f32,\n    p1: f32,\n    p2: f32,\n    p3: f32,\n    tex_w: f32,\n    tex_h: f32,\n    time: f32,\n    p4: f32,\n}};\n@group(0) @binding(2) var<uniform> params: Params;\n\n@fragment\nfn fs_main(in: VsOut) -> @location(0) vec4<f32> {{\n    let uv = in.uv;\n    let texel = vec2<f32>(1.0 / max(params.tex_w, 1.0), 1.0 / max(params.tex_h, 1.0));\n    let src = textureSample(src_tex, tex_sampler, uv);\n{fs_body}\n}}\n"
+            "struct VsOut {{\n    @builtin(position) pos: vec4<f32>,\n    @location(0) uv: vec2<f32>,\n}};\n\n@vertex\nfn vs_main(@builtin(vertex_index) vid: u32) -> VsOut {{\n    var positions = array<vec2<f32>, 3>(\n        vec2<f32>(-1.0, -1.0),\n        vec2<f32>(3.0, -1.0),\n        vec2<f32>(-1.0, 3.0),\n    );\n    let p = positions[vid];\n    var out: VsOut;\n    out.pos = vec4<f32>(p, 0.0, 1.0);\n    out.uv = vec2<f32>(p.x * 0.5 + 0.5, 1.0 - (p.y * 0.5 + 0.5));\n    return out;\n}}\n\n@group(0) @binding(0) var src_tex: texture_2d<f32>;\n@group(0) @binding(1) var tex_sampler: sampler;\n\nstruct Params {{\n    effect_id: f32,\n    p1: f32,\n    p2: f32,\n    p3: f32,\n    tex_w: f32,\n    tex_h: f32,\n    time: f32,\n    p4: f32,\n    bbox_x: f32,\n    bbox_y: f32,\n    bbox_w: f32,\n    bbox_h: f32,\n}};\n@group(0) @binding(2) var<uniform> params: Params;\n\n@fragment\nfn fs_main(in: VsOut) -> @location(0) vec4<f32> {{\n    let uv = in.uv;\n    let texel = vec2<f32>(1.0 / max(params.tex_w, 1.0), 1.0 / max(params.tex_h, 1.0));\n    let src = textureSample(src_tex, tex_sampler, uv);\n    let bbox_o = vec2<f32>(params.bbox_x, params.bbox_y);\n    let bbox_s = vec2<f32>(max(params.bbox_w, 1.0), max(params.bbox_h, 1.0));\n    let local_uv = (uv * vec2<f32>(params.tex_w, params.tex_h) - bbox_o) / bbox_s;\n{fs_body}\n}}\n"
         );
         let pipeline = create_custom_effect_pipeline(&self.device, &self.simple_fx_bind_group_layout, &source);
         self.custom_effect_pipelines.insert(key, pipeline);

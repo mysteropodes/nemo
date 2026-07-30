@@ -123,7 +123,7 @@
       param('p2', 'Scale', 1, 80, 1, 'px', 18, true),
       param('p3', 'Softness', 0, 1, 0.01, '', 0.15),
     ], [
-      'let cell = floor(uv * max(params.p2, 1.0) * 80.0);',
+      'let cell = floor(local_uv * max(params.p2, 1.0) * 80.0);',
       'let n = fract(sin(dot(cell, vec2<f32>(127.1, 311.7))) * 43758.5453);',
       'let edge = smoothstep(n - params.p3, n + params.p3 + 0.001, src.a);',
       'let a = mix(src.a, edge * src.a, clamp(params.p1, 0.0, 1.0));',
@@ -190,22 +190,38 @@
       'let ray = pow(abs(sin((uv.x - c.x) * 80.0) * sin((uv.y - c.y) * 80.0)), 18.0);',
       'return vec4<f32>(src.rgb + vec3<f32>(1.0, 0.78, 0.42) * (core + ray * 0.25) * params.p1, src.a);',
     ]),
+    // 2026-07-30: 'Distort' effects below were rewritten to operate in
+    // local_uv (0..1 across THIS shape's own on-screen bbox, see
+    // engine.rs's register_custom_effect doc comment) instead of raw uv
+    // (0..1 across the whole canvas) — Cyril reproduced live that a
+    // shipped Twirl's pattern visibly changed under PURE PANNING (zero
+    // zoom change), which only makes sense if its "center" (vec2(0.5)) was
+    // actually the canvas center, not the shape's. Any Radius/Center-style
+    // param that's already a UV-fraction (not a 'px' value) had its
+    // `spatial` flag REMOVED here too: local_uv already normalizes to the
+    // shape's current on-screen size (zoom AND any Motion/3D/Duplicator
+    // scale baked in via the item's own transform), so the old
+    // view.zoom-only multiplication is now redundant and would
+    // double-compensate.
     fx('shader_twirl', 'Twirl', 'Distort', [
       param('p1', 'Angle', -720, 720, 1, 'deg', 180),
-      param('p2', 'Radius', 0, 1.5, 0.01, '', 0.5, true),
+      param('p2', 'Radius', 0, 1.5, 0.01, '', 0.5),
     ], [
-      'let c = vec2<f32>(0.5); let v = uv - c; let r = length(v); let radius = max(params.p2, 0.001);',
+      'let c = vec2<f32>(0.5); let v = local_uv - c; let r = length(v); let radius = max(params.p2, 0.001);',
       'let amt = (1.0 - smoothstep(0.0, radius, r)) * params.p1 * 0.01745329252; let s = sin(amt); let co = cos(amt);',
-      'let suv = c + vec2<f32>(v.x * co - v.y * s, v.x * s + v.y * co);',
+      'let lsuv = c + vec2<f32>(v.x * co - v.y * s, v.x * s + v.y * co);',
+      'let suv = (bbox_o + lsuv * bbox_s) / vec2<f32>(params.tex_w, params.tex_h);',
       'let outc = textureSample(src_tex, tex_sampler, clamp(suv, vec2<f32>(0.0), vec2<f32>(1.0)));',
       'return vec4<f32>(outc.rgb, outc.a);',
     ]),
     fx('shader_bulge', 'Bulge', 'Distort', [
       param('p1', 'Amount', -1, 1, 0.01, '', 0.4),
-      param('p2', 'Radius', 0, 1.5, 0.01, '', 0.65, true),
+      param('p2', 'Radius', 0, 1.5, 0.01, '', 0.65),
     ], [
-      'let c = vec2<f32>(0.5); let v = uv - c; let r = length(v); let fall = 1.0 - smoothstep(0.0, max(params.p2, 0.001), r);',
-      'let outc = textureSample(src_tex, tex_sampler, clamp(c + v * (1.0 - params.p1 * fall * 0.5), vec2<f32>(0.0), vec2<f32>(1.0)));',
+      'let c = vec2<f32>(0.5); let v = local_uv - c; let r = length(v); let fall = 1.0 - smoothstep(0.0, max(params.p2, 0.001), r);',
+      'let lsuv = c + v * (1.0 - params.p1 * fall * 0.5);',
+      'let suv = (bbox_o + lsuv * bbox_s) / vec2<f32>(params.tex_w, params.tex_h);',
+      'let outc = textureSample(src_tex, tex_sampler, clamp(suv, vec2<f32>(0.0), vec2<f32>(1.0)));',
       'return vec4<f32>(outc.rgb, outc.a);',
     ]),
     fx('shader_wave_warp', 'Wave Warp', 'Distort', [
@@ -215,7 +231,7 @@
       param('p4', 'Evolution', -3600, 3600, 1, 'deg', 0),
     ], [
       'let a = params.p3 * 0.01745329252; let dir = vec2<f32>(cos(a), sin(a)); let nrm = vec2<f32>(-dir.y, dir.x);',
-      'let phase = dot(uv * vec2<f32>(params.tex_w, params.tex_h), dir) / max(params.p2, 1.0) * 6.2831853 + params.p4 * 0.01745329252;',
+      'let phase = dot(local_uv * bbox_s, dir) / max(params.p2, 1.0) * 6.2831853 + params.p4 * 0.01745329252;',
       'let outc = textureSample(src_tex, tex_sampler, clamp(uv + nrm * sin(phase) * params.p1 * texel, vec2<f32>(0.0), vec2<f32>(1.0)));',
       'return vec4<f32>(outc.rgb, outc.a);',
     ]),
@@ -227,11 +243,11 @@
     ], [
       'let evo = vec2<f32>(cos(params.p4 * 0.01745329252), sin(params.p4 * 0.01745329252)) * 13.0;',
       'let scale = max(params.p2, 1.0) * 10.0;',
-      'let p = (uv + evo * 0.002) * scale; let ip = floor(p); let fp = fract(p); let u = fp * fp * (vec2<f32>(3.0) - 2.0 * fp);',
+      'let p = (local_uv + evo * 0.002) * scale; let ip = floor(p); let fp = fract(p); let u = fp * fp * (vec2<f32>(3.0) - 2.0 * fp);',
       'let a = fract(sin(dot(ip, vec2<f32>(127.1, 311.7))) * 43758.5453); let b = fract(sin(dot(ip + vec2<f32>(1.0, 0.0), vec2<f32>(127.1, 311.7))) * 43758.5453);',
       'let c = fract(sin(dot(ip + vec2<f32>(0.0, 1.0), vec2<f32>(127.1, 311.7))) * 43758.5453); let d = fract(sin(dot(ip + vec2<f32>(1.0, 1.0), vec2<f32>(127.1, 311.7))) * 43758.5453);',
       'var n1 = mix(mix(a, b, u.x), mix(c, d, u.x), u.y);',
-      'let q = (uv + vec2<f32>(9.2, 4.7) - evo * 0.0015) * scale; let iq = floor(q); let fq = fract(q); let uq = fq * fq * (vec2<f32>(3.0) - 2.0 * fq);',
+      'let q = (local_uv + vec2<f32>(9.2, 4.7) - evo * 0.0015) * scale; let iq = floor(q); let fq = fract(q); let uq = fq * fq * (vec2<f32>(3.0) - 2.0 * fq);',
       'let e = fract(sin(dot(iq, vec2<f32>(269.5, 183.3))) * 43758.5453); let f = fract(sin(dot(iq + vec2<f32>(1.0, 0.0), vec2<f32>(269.5, 183.3))) * 43758.5453);',
       'let g = fract(sin(dot(iq + vec2<f32>(0.0, 1.0), vec2<f32>(269.5, 183.3))) * 43758.5453); let h = fract(sin(dot(iq + vec2<f32>(1.0, 1.0), vec2<f32>(269.5, 183.3))) * 43758.5453);',
       'var n2 = mix(mix(e, f, uq.x), mix(g, h, uq.x), uq.y);',
@@ -242,7 +258,8 @@
     fx('shader_optics_compensation', 'Optics Compensation', 'Distort', [
       param('p1', 'FOV', -1, 1, 0.01, '', 0.25),
     ], [
-      'let c = vec2<f32>(0.5); let v = uv - c; let suv = c + v * (1.0 + params.p1 * dot(v, v) * 1.8);',
+      'let c = vec2<f32>(0.5); let v = local_uv - c; let lsuv = c + v * (1.0 + params.p1 * dot(v, v) * 1.8);',
+      'let suv = (bbox_o + lsuv * bbox_s) / vec2<f32>(params.tex_w, params.tex_h);',
       'let outc = textureSample(src_tex, tex_sampler, clamp(suv, vec2<f32>(0.0), vec2<f32>(1.0)));',
       'return vec4<f32>(outc.rgb, outc.a);',
     ]),
@@ -324,7 +341,10 @@
       param('p2', 'Center X', 0, 1, 0.01, '', 0.5),
       param('p3', 'Center Y', 0, 1, 0.01, '', 0.5),
     ], [
-      'let c = vec2<f32>(params.p2, params.p3); let v = uv - c;',
+      // Center X/Y are shape-local (0..1 across this item's own bbox, see
+      // local_uv's doc comment) — converted to real uv ONCE, then the tap
+      // loop below stays in ordinary uv space like every other blur here.
+      'let c = (bbox_o + vec2<f32>(params.p2, params.p3) * bbox_s) / vec2<f32>(params.tex_w, params.tex_h); let v = uv - c;',
       'var acc = vec4<f32>(0.0); var wsum = 0.0;',
       'for (var i = 0; i < 17; i = i + 1) {',
       '  let t = f32(i) / 16.0;',
@@ -475,8 +495,8 @@
       param('p4', 'Evolution', -3600, 3600, 1, 'deg', 0),
     ], [
       'let evo = params.p4 * 0.01745329252;',
-      'let n = sin(uv.y * params.p2 * 9.0 + evo) * 0.55 + sin((uv.y + uv.x * 0.3) * params.p2 * 17.0 - evo * 1.37) * 0.28 + sin(uv.x * params.p2 * 5.0 + evo * 0.7) * 0.17;',
-      'let lift = smoothstep(1.0, 0.0, uv.y) * (0.6 + params.p3 * 0.4);',
+      'let n = sin(local_uv.y * params.p2 * 9.0 + evo) * 0.55 + sin((local_uv.y + local_uv.x * 0.3) * params.p2 * 17.0 - evo * 1.37) * 0.28 + sin(local_uv.x * params.p2 * 5.0 + evo * 0.7) * 0.17;',
+      'let lift = smoothstep(1.0, 0.0, local_uv.y) * (0.6 + params.p3 * 0.4);',
       'let outc = textureSample(src_tex, tex_sampler, clamp(uv + vec2<f32>(n, n * 0.22) * params.p1 * texel * lift, vec2<f32>(0.0), vec2<f32>(1.0)));',
       'return vec4<f32>(outc.rgb, outc.a);',
     ]),
@@ -543,8 +563,9 @@
       param('p1', 'Axis', 0, 360, 1, 'deg', 0),
       param('p2', 'Position', 0, 1, 0.01, '', 0.5),
     ], [
-      'let a = params.p1 * 0.01745329252; let d = vec2<f32>(cos(a), sin(a)); let q = uv - vec2<f32>(0.5);',
-      'let side = dot(q, d); let muv = uv - d * side * 2.0 * select(0.0, 1.0, side > params.p2 - 0.5);',
+      'let a = params.p1 * 0.01745329252; let d = vec2<f32>(cos(a), sin(a)); let q = local_uv - vec2<f32>(0.5);',
+      'let side = dot(q, d); let lmuv = local_uv - d * side * 2.0 * select(0.0, 1.0, side > params.p2 - 0.5);',
+      'let muv = (bbox_o + lmuv * bbox_s) / vec2<f32>(params.tex_w, params.tex_h);',
       'let outc = textureSample(src_tex, tex_sampler, clamp(muv, vec2<f32>(0.0), vec2<f32>(1.0)));',
       'return vec4<f32>(outc.rgb, outc.a);',
     ]),
@@ -563,17 +584,19 @@
       param('p4', 'Direction', 0, 360, 1, 'deg', 90),
     ], [
       'let a = params.p4 * 0.01745329252; let d = vec2<f32>(cos(a), sin(a)); let phase = params.p3 * 0.01745329252;',
-      'let wave = sin(dot(uv - vec2<f32>(0.5), d) * params.p2 * 6.28318 + phase) * params.p1 * texel;',
+      'let wave = sin(dot(local_uv - vec2<f32>(0.5), d) * params.p2 * 6.28318 + phase) * params.p1 * texel;',
       'let outc = textureSample(src_tex, tex_sampler, clamp(uv + vec2<f32>(-d.y, d.x) * wave, vec2<f32>(0.0), vec2<f32>(1.0)));',
       'return vec4<f32>(outc.rgb, outc.a);',
     ]),
     fx('shader_spherize', 'Spherize', 'Distort', [
       param('p1', 'Amount', -1, 1, 0.01, '', 0.65),
-      param('p2', 'Radius', 0.05, 1, 0.01, '', 0.5, true),
+      param('p2', 'Radius', 0.05, 1, 0.01, '', 0.5),
     ], [
-      'let c = vec2<f32>(0.5); let v = uv - c; let r = length(v); let radius = max(params.p2, 0.01);',
+      'let c = vec2<f32>(0.5); let v = local_uv - c; let r = length(v); let radius = max(params.p2, 0.01);',
       'let inside = smoothstep(radius, radius - 0.01, r); let nr = r * (1.0 - params.p1 * (1.0 - smoothstep(0.0, radius, r)) * 0.42);',
-      'let suv = c + normalize(v + vec2<f32>(0.00001)) * nr * inside + v * (1.0 - inside); let outc = textureSample(src_tex, tex_sampler, clamp(suv, vec2<f32>(0.0), vec2<f32>(1.0)));',
+      'let lsuv = c + normalize(v + vec2<f32>(0.00001)) * nr * inside + v * (1.0 - inside);',
+      'let suv = (bbox_o + lsuv * bbox_s) / vec2<f32>(params.tex_w, params.tex_h);',
+      'let outc = textureSample(src_tex, tex_sampler, clamp(suv, vec2<f32>(0.0), vec2<f32>(1.0)));',
       'return vec4<f32>(outc.rgb, outc.a);',
     ]),
     fx('shader_displacement', 'Displacement', 'Distort', [
@@ -581,8 +604,8 @@
       param('p2', 'Scale', 2, 80, 1, '', 18),
       param('p3', 'Evolution', -3600, 3600, 1, 'deg', 0),
     ], [
-      'let t = params.p3 * 0.01745329252; let n1 = sin(uv.y * params.p2 + t) * 0.6 + sin(uv.y * params.p2 * 2.7 - t * 1.4) * 0.3;',
-      'let n2 = sin(uv.x * params.p2 * 1.3 - t * 0.8) * 0.6 + sin(uv.x * params.p2 * 3.1 + t) * 0.3;',
+      'let t = params.p3 * 0.01745329252; let n1 = sin(local_uv.y * params.p2 + t) * 0.6 + sin(local_uv.y * params.p2 * 2.7 - t * 1.4) * 0.3;',
+      'let n2 = sin(local_uv.x * params.p2 * 1.3 - t * 0.8) * 0.6 + sin(local_uv.x * params.p2 * 3.1 + t) * 0.3;',
       'let outc = textureSample(src_tex, tex_sampler, clamp(uv + vec2<f32>(n1, n2) * params.p1 * texel, vec2<f32>(0.0), vec2<f32>(1.0))); return vec4<f32>(outc.rgb, outc.a);',
     ]),
     fx('shader_fill', 'Fill Color', 'Color', [
@@ -674,16 +697,19 @@
       param('p3', 'Center X', 0, 1, 0.01, '', 0.5),
       param('p4', 'Center Y', 0, 1, 0.01, '', 0.5),
     ], [
-      'let c = vec2<f32>(params.p3, params.p4); let v = uv - c; let r = length(v); let ang = atan2(v.y, v.x) + params.p2 * 0.01745329252; let seg = 6.2831853 / max(params.p1, 2.0); let folded = abs(fract(ang / seg + 0.5) - 0.5) * seg;',
-      'let suv = c + vec2<f32>(cos(folded), sin(folded)) * r; let outc = textureSample(src_tex, tex_sampler, clamp(suv, vec2<f32>(0.0), vec2<f32>(1.0))); return vec4<f32>(outc.rgb, outc.a);',
+      'let c = vec2<f32>(params.p3, params.p4); let v = local_uv - c; let r = length(v); let ang = atan2(v.y, v.x) + params.p2 * 0.01745329252; let seg = 6.2831853 / max(params.p1, 2.0); let folded = abs(fract(ang / seg + 0.5) - 0.5) * seg;',
+      'let lsuv = c + vec2<f32>(cos(folded), sin(folded)) * r;',
+      'let suv = (bbox_o + lsuv * bbox_s) / vec2<f32>(params.tex_w, params.tex_h);',
+      'let outc = textureSample(src_tex, tex_sampler, clamp(suv, vec2<f32>(0.0), vec2<f32>(1.0))); return vec4<f32>(outc.rgb, outc.a);',
     ]),
     fx('shader_polar_coordinates', 'Polar Coordinates', 'Distort', [
       param('p1', 'Mix', 0, 1, 0.01, '', 1),
       param('p2', 'Rotation', -360, 360, 1, 'deg', 0),
       param('p3', 'Radius', 0.1, 2, 0.01, '', 1),
     ], [
-      'let q = uv - vec2<f32>(0.5); let r = length(q) * params.p3; let a = atan2(q.y, q.x) / 6.2831853 + 0.5 + params.p2 * 0.0027777778; let polar = vec2<f32>(fract(a), clamp(r, 0.0, 1.0));',
-      'let outc = textureSample(src_tex, tex_sampler, polar); let rgb = mix(src.rgb, outc.rgb, clamp(params.p1, 0.0, 1.0)); return vec4<f32>(rgb, mix(src.a, outc.a, clamp(params.p1, 0.0, 1.0)));',
+      'let q = local_uv - vec2<f32>(0.5); let r = length(q) * params.p3; let a = atan2(q.y, q.x) / 6.2831853 + 0.5 + params.p2 * 0.0027777778; let lpolar = vec2<f32>(fract(a), clamp(r, 0.0, 1.0));',
+      'let polar = (bbox_o + lpolar * bbox_s) / vec2<f32>(params.tex_w, params.tex_h);',
+      'let outc = textureSample(src_tex, tex_sampler, clamp(polar, vec2<f32>(0.0), vec2<f32>(1.0))); let rgb = mix(src.rgb, outc.rgb, clamp(params.p1, 0.0, 1.0)); return vec4<f32>(rgb, mix(src.a, outc.a, clamp(params.p1, 0.0, 1.0)));',
     ]),
     fx('shader_motion_tile', 'Motion Tile', 'Distort', [
       param('p1', 'Offset X', -2, 2, 0.01, '', 0),
@@ -691,7 +717,8 @@
       param('p3', 'Scale', 0.25, 4, 0.01, '', 1),
       param('p4', 'Mirror', 0, 1, 1, '', 1),
     ], [
-      'let q = (uv - vec2<f32>(0.5)) * params.p3 + vec2<f32>(0.5 + params.p1, 0.5 + params.p2); let cell = floor(q); let f = fract(q); let parity = fract((cell.x + cell.y) * 0.5) * 2.0; let mirrored = select(f, 1.0 - f, parity > 0.5 && params.p4 > 0.5);',
+      'let q = (local_uv - vec2<f32>(0.5)) * params.p3 + vec2<f32>(0.5 + params.p1, 0.5 + params.p2); let cell = floor(q); let f = fract(q); let parity = fract((cell.x + cell.y) * 0.5) * 2.0; let lmirrored = select(f, 1.0 - f, parity > 0.5 && params.p4 > 0.5);',
+      'let mirrored = (bbox_o + lmirrored * bbox_s) / vec2<f32>(params.tex_w, params.tex_h);',
       'let outc = textureSample(src_tex, tex_sampler, clamp(mirrored, vec2<f32>(0.0), vec2<f32>(1.0))); return vec4<f32>(outc.rgb, outc.a);',
     ]),
     fx('shader_light_sweep', 'Light Sweep', 'Stylize', [
