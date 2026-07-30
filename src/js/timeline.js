@@ -927,6 +927,16 @@ window.SM={
     if(src.effects&&src.effects.length)state.layers[ni].effects=JSON.parse(JSON.stringify(src.effects));
     if(src.effectsFrom)state.layers[ni].effectsFrom=src.effectsFrom;
     if(src.isEffectLayer)state.layers[ni].isEffectLayer=true;
+    // Same gap, noticed while adding multi-parent (2026-07-30): a parented
+    // layer's duplicate silently came out unparented — parentLayerUid
+    // (and now parentLayerUidB) were never copied either, despite being
+    // real per-layer fields with no comment explaining an intentional
+    // omission. Referencing the SAME uid the source points at, not a
+    // freshly-generated one — a duplicate following its source's parent
+    // is the expected "keep every relationship" behavior every other
+    // field on this list already follows.
+    if(src.parentLayerUid)state.layers[ni].parentLayerUid=src.parentLayerUid;
+    if(src.parentLayerUidB)state.layers[ni].parentLayerUidB=src.parentLayerUidB;
     activateUL(ni);loadFrame(state.currentFrame);updateUI();},
   setActiveLayer:function(idx){if(idx<0||idx>=state.layers.length)return;saveAllLayerFrames();activateUL(idx);clearSel();
     window._layerActiveExplicit=true; // see clearSel()'s own comment — an explicit timeline row click, not a canvas deselect
@@ -1429,7 +1439,7 @@ window.SM={
         // be just as useless. Note isNullLayer above was already persisted,
         // and its own tooltip calls a null layer a "pivot/parent pour d'autres
         // calques" — the pivot came back, everything hung off it did not.
-        layerUid:l.layerUid,parentLayerUid:l.parentLayerUid,markers:l.markers,shy:l.shy,keyLock:l.keyLock,timeRemap:l.timeRemap,motionBlur:l.motionBlur,effectsFrom:l.effectsFrom,timeLink:l.timeLink,
+        layerUid:l.layerUid,parentLayerUid:l.parentLayerUid,parentLayerUidB:l.parentLayerUidB,markers:l.markers,shy:l.shy,keyLock:l.keyLock,timeRemap:l.timeRemap,motionBlur:l.motionBlur,effectsFrom:l.effectsFrom,timeLink:l.timeLink,
         // 3D layer toggle (2026-07-28) — see motion.js's compute3DCorners.
         threeD:l.threeD,
         // Mograph duplicator (2026-07-29) — copied wholesale like
@@ -1599,6 +1609,7 @@ window.SM={
       // was regenerated on load would orphan every child pointing at it.
       if(ld.layerUid)state.layers[idx].layerUid=ld.layerUid;
       if(ld.parentLayerUid)state.layers[idx].parentLayerUid=ld.parentLayerUid;
+      if(ld.parentLayerUidB)state.layers[idx].parentLayerUidB=ld.parentLayerUidB;
       if(ld.motion)state.layers[idx].motion=ld.motion;
       if(ld.elementMotion)state.layers[idx].elementMotion=ld.elementMotion;
       if(ld.motionStatic)state.layers[idx].motionStatic=ld.motionStatic;
@@ -3833,13 +3844,25 @@ function parentDescendants(li){
   // after it.
   var M=window.SMMotion; if(!M||!M.findLayerIndexByUid)return {};
   var out={};
+  // Walks BOTH parent slots (2026-07-30, multi-parent) — a layer reachable
+  // only through someone's Parent B is just as much a descendant as one
+  // reachable through Parent A; missing this half wouldn't let an actual
+  // cycle through, since setLayerParent/setLayerParentB's own
+  // wouldCreateParentCycle guard is the real backstop, but it WOULD leave
+  // that option un-greyed-out here, looking valid until the click refused
+  // it.
   state.layers.forEach(function(other,oi){
-    var cur=other.parentLayerUid,guard=0,seen={};
-    while(cur&&!seen[cur]&&guard++<256){
+    var queue=[other.parentLayerUid,other.parentLayerUidB].filter(Boolean),guard=0,seen={};
+    while(queue.length&&guard++<256){
+      var cur=queue.shift();
+      if(seen[cur])continue;
       seen[cur]=true;
       var pi=M.findLayerIndexByUid(cur);
       if(pi===li){out[oi]=true;break;}
-      cur=pi>=0?state.layers[pi].parentLayerUid:null;
+      if(pi>=0){
+        if(state.layers[pi].parentLayerUid)queue.push(state.layers[pi].parentLayerUid);
+        if(state.layers[pi].parentLayerUidB)queue.push(state.layers[pi].parentLayerUidB);
+      }
     }
   });
   return out;
@@ -3916,38 +3939,71 @@ function buildParentCell(row,ld,li){
   cell.className='lparent';
   var pIdx=_layerIndexByUid(ld.parentLayerUid);
   var pName=(pIdx>=0&&state.layers[pIdx])?(state.layers[pIdx].name||('Layer '+(pIdx+1))):null;
+  // Multi-parent crossfade (2026-07-30, "plusieurs parent... jouer comme
+  // une opacité les parents entre eux") — Parent B is picked from the SAME
+  // cell's context menu (below) rather than a second pick-whip/column: the
+  // layer-list row is already tight, and a second parent is a rare/
+  // advanced case, not something every row needs a permanent affordance
+  // for. The label grows to show both once B is set, so it's discoverable
+  // rather than hidden.
+  var pbIdx=_layerIndexByUid(ld.parentLayerUidB);
+  var pbName=(pbIdx>=0&&state.layers[pbIdx])?(state.layers[pbIdx].name||('Layer '+(pbIdx+1))):null;
   var pick=document.createElement('span');
   pick.className='lpick';
-  pick.title='Glisser sur un calque pour le définir comme parent';
+  pick.title='Glisser sur un calque pour le définir comme parent (A)';
   pick.addEventListener('mousedown',function(e){startParentPickwhip(li,pick,e);});
   cell.appendChild(pick);
   var lbl=document.createElement('span');
-  lbl.textContent=pName||'—';
+  lbl.textContent=pbName?(pName||'—')+' + '+pbName:(pName||'—');
   cell.appendChild(lbl);
   cell.classList.toggle('none',!pName);
-  cell.title=pName?('Parent : '+pName+' — cliquer pour changer'):'Aucun parent — cliquer pour en choisir un';
+  cell.title=pbName?('Parent A : '+pName+' + Parent B : '+pbName+' (blend animable) — cliquer pour changer')
+    :(pName?('Parent : '+pName+' — cliquer pour changer'):'Aucun parent — cliquer pour en choisir un');
   function open(e){
     e.stopPropagation(); e.preventDefault();
     var M=window.SMMotion;
     if(!M||!M.setLayerParent){showToast('Parentage indisponible');return;}
     var bad=parentDescendants(li);
-    var items=[{label:'Aucun (parentage libre)',disabled:!ld.parentLayerUid,action:function(){
+    var items=[{label:'Parent A : Aucun (parentage libre)',disabled:!ld.parentLayerUid,action:function(){
       pushUndo(); M.setLayerParent(li,null); renderLayerList(); renderTimeline();
       if(window.SMEngineBridge)SMEngineBridge.renderNow();
     }}];
-    items.push({sep:true});
     state.layers.forEach(function(other,oi){
       if(oi===li)return; // a layer can't parent itself
       var uid=M.ensureLayerUid(other);
       items.push({
-        label:(other.name||('Layer '+(oi+1)))+(bad[oi]?'  (descendant)':''),
-        disabled:!!bad[oi]||ld.parentLayerUid===uid,
+        label:'Parent A : '+(other.name||('Layer '+(oi+1)))+(bad[oi]?'  (descendant)':'')+(ld.parentLayerUidB===uid?'  (déjà Parent B)':''),
+        disabled:!!bad[oi]||ld.parentLayerUid===uid||ld.parentLayerUidB===uid,
         action:function(){
           pushUndo(); M.setLayerParent(li,uid); renderLayerList(); renderTimeline();
           if(window.SMEngineBridge)SMEngineBridge.renderNow();
         }
       });
     });
+    // Parent B section — only reachable once Parent A exists (crossfading
+    // needs two endpoints; a lone Parent B with no A would just silently
+    // do nothing, per blendedAncestorMat's own guard, motion.js).
+    items.push({sep:true});
+    if(!ld.parentLayerUid){
+      items.push({label:'Parent B (choisir d’abord un Parent A)',disabled:true});
+    }else{
+      items.push({label:'Parent B : Aucun',disabled:!ld.parentLayerUidB,action:function(){
+        pushUndo(); M.setLayerParentB(li,null); renderLayerList(); renderTimeline();
+        if(window.SMEngineBridge)SMEngineBridge.renderNow();
+      }});
+      state.layers.forEach(function(other,oi){
+        if(oi===li)return;
+        var uid=M.ensureLayerUid(other);
+        items.push({
+          label:'Parent B : '+(other.name||('Layer '+(oi+1)))+(bad[oi]?'  (descendant)':'')+(ld.parentLayerUid===uid?'  (déjà Parent A)':''),
+          disabled:!!bad[oi]||ld.parentLayerUid===uid||ld.parentLayerUidB===uid,
+          action:function(){
+            pushUndo(); M.setLayerParentB(li,uid); renderLayerList(); renderTimeline();
+            if(window.SMEngineBridge)SMEngineBridge.renderNow();
+          }
+        });
+      });
+    }
     var r=cell.getBoundingClientRect();
     showContextMenu(r.left,r.bottom+2,items);
   }
