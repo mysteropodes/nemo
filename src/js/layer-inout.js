@@ -420,7 +420,15 @@
   function onDown(li, row, type, e) {
     e.stopPropagation(); e.preventDefault();
     var ld = state.layers[li]; if (!ld) return;
-    if (e.metaKey || e.ctrlKey) { toggleBarSel(li); _barAnchorLi = li; return; } // toggle one, no drag
+    if (e.metaKey || e.ctrlKey) { // toggle one, no drag
+      toggleBarSel(li); _barAnchorLi = li;
+      // Mirror into _layerSel — without this the bar-built selection never
+      // reached the layer list's highlight or its _layerSel-gated menu items
+      // (2026-07-31 fix; the reverse direction, syncBarSelToLayerSel, was
+      // wired one commit before these modifier branches existed).
+      if (window.SMMotion && SMMotion.syncLayerSelFromBarSel) SMMotion.syncLayerSelFromBarSel(_barSel, li);
+      return;
+    }
     if (e.shiftKey) { // contiguous range from the anchor to this bar, no drag
       var anchorLi = (_barAnchorLi != null && state.layers[_barAnchorLi]) ? _barAnchorLi : li;
       var lo = Math.min(anchorLi, li), hi = Math.max(anchorLi, li);
@@ -428,6 +436,7 @@
       for (var rk = lo; rk <= hi; rk++) rangeSel.push({ li: rk, part: 'both' });
       _barSel = rangeSel;
       refreshBarSelClasses();
+      if (window.SMMotion && SMMotion.syncLayerSelFromBarSel) SMMotion.syncLayerSelFromBarSel(_barSel, anchorLi);
       return;
     }
     if (window.SMMotion && SMMotion.clearKeyframeShiftPreview) SMMotion.clearKeyframeShiftPreview(); // never inherit a prior drag's leftover offset
@@ -1126,6 +1135,9 @@
       });
     },
     getBarSelection: function () { return _barSel.slice(); },
-    setBarSelection: function (sel) { _barSel = sel; refreshBarSelClasses(); },
+    // Optional anchorLi keeps _barAnchorLi in step with the layer-list's own
+    // frozen anchor (motion.js syncBarSelToLayerSel passes it) so Shift-
+    // ranges continue from the user's last click whichever side it was on.
+    setBarSelection: function (sel, anchorLi) { _barSel = sel; if (anchorLi != null && state.layers[anchorLi]) _barAnchorLi = anchorLi; refreshBarSelClasses(); },
   };
 })();

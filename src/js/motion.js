@@ -2823,8 +2823,25 @@
   // empty grid space" case a few hundred lines down (endMarquee).
   function syncBarSelToLayerSel() {
     if (window.SMLayerInOut && SMLayerInOut.setBarSelection) {
-      SMLayerInOut.setBarSelection(_layerSel.map(function (li) { return { li: li, part: 'both' }; }));
+      // Second arg carries the layer-list's frozen anchor into the bar side
+      // (_barAnchorLi) so a bar-side Shift-click right after a row-side
+      // Shift/Ctrl-click ranges from the SAME anchor the user's last click
+      // established, not an unrelated stale one (2026-07-31 unification).
+      SMLayerInOut.setBarSelection(_layerSel.map(function (li) { return { li: li, part: 'both' }; }), _layerSelAnchor >= 0 ? _layerSelAnchor : null);
     }
+  }
+  // Reverse direction of syncBarSelToLayerSel — closes the desync the bar
+  // side's own Shift/Ctrl clicks introduced (2026-07-31, scoping: a bar-built
+  // multi-selection never reached _layerSel, so the row highlight and every
+  // _layerSel-gated menu item — 'Fusionner les calques sélectionnés',
+  // 'Grouper en dossier' — ignored it; only a PLAIN bar click resynced, via
+  // selectLayerFromGrid). Called from layer-inout.js's onDown modifier
+  // branches with the bar selection it just built and the anchor it used.
+  function syncLayerSelFromBarSel(barSel, anchorLi) {
+    _layerSel = [];
+    (barSel || []).forEach(function (s) { if (_layerSel.indexOf(s.li) < 0) _layerSel.push(s.li); });
+    if (anchorLi != null && state.layers[anchorLi]) _layerSelAnchor = anchorLi;
+    renderLayerList(); renderTimeline();
   }
   function renderLayerListMotion(list) {
     if (!list._motionEmptySelectBound) {
@@ -2991,6 +3008,7 @@
         if (e.metaKey || e.ctrlKey) {
           if (_layerSel.indexOf(state.activeLayerIdx) < 0) _layerSel.push(state.activeLayerIdx);
           var p = _layerSel.indexOf(li); if (p >= 0) _layerSel.splice(p, 1); else _layerSel.push(li);
+          _layerSelAnchor = li;
           syncBarSelToLayerSel();
           window.SM.setActiveLayer(li);
           renderLayerList(); renderTimeline();
@@ -3005,7 +3023,10 @@
         // now does the same, and the anchor falls back to the active layer
         // so the very first Shift-click works from a cold start.
         if (e.shiftKey) {
-          var anchor = _layerSel.length ? _layerSel[0] : state.activeLayerIdx;
+          // Frozen anchor (2026-07-31 — see _layerSelAnchor's declaration in
+          // timeline.js): _layerSel[0] drifted after any Shift-click toward a
+          // lower index; the dedicated anchor never moves under Shift.
+          var anchor = (_layerSelAnchor >= 0 && _layerSelAnchor < state.layers.length) ? _layerSelAnchor : (_layerSel.length ? _layerSel[0] : state.activeLayerIdx);
           _layerSel = [];
           for (var l = Math.min(anchor, li); l <= Math.max(anchor, li); l++) _layerSel.push(l);
           syncBarSelToLayerSel();
@@ -3014,6 +3035,7 @@
           return;
         }
         _layerSel = [li];
+        _layerSelAnchor = li;
         syncBarSelToLayerSel();
         // A row can be open via the single-accordion state OR via U's
         // reveal set (or both) — always drop it from the reveal set on
@@ -4248,6 +4270,54 @@
       (function (frameIdx, key) {
         c.addEventListener('mousedown', function (e) {
           e.stopPropagation();
+          // Ctrl/Cmd = toggle one key, Shift = rectangular range from the
+          // frozen anchor (2026-07-31 unification — keyframe diamonds had
+          // ZERO modifier handling; the only multi-select was the marquee).
+          // Selection-only: no drag started, no playhead move, no undo push
+          // (matches the layer-list and bar handlers' own modifier clicks).
+          if (key && (e.metaKey || e.ctrlKey)) {
+            if (isKeySelected(ld, prop, key)) {
+              setKeySel(_motionKeySel.filter(function (s) { return !(s.holder === ld && s.prop === prop && s.key === key); }));
+            } else {
+              var next = _motionKeySel.slice();
+              next.push({ holder: ld, prop: prop, key: key });
+              setKeySel(next);
+            }
+            _keyAnchor = { holder: ld, prop: prop, frame: key.frame };
+            // Full re-render, not a class toggle: a selected diamond renders
+            // extra CONTENT (the ease% velocity badge), not just a class.
+            renderTimeline();
+            return;
+          }
+          if (key && e.shiftKey) {
+            // Reuse the marquee's own rectangle-selection logic between the
+            // anchor cell and the clicked cell — byte-for-byte the same
+            // selection a literal marquee drag between them would produce,
+            // over whatever rows are currently rendered.
+            var anchorCell = null;
+            if (_keyAnchor) {
+              var rowsA = document.querySelectorAll('#frame-grid .motion-track-row');
+              for (var ri = 0; ri < rowsA.length; ri++) {
+                if (rowsA[ri]._smHolder === _keyAnchor.holder && rowsA[ri]._smProp === _keyAnchor.prop) {
+                  anchorCell = rowsA[ri].querySelector('.fc[data-frame="' + _keyAnchor.frame + '"]');
+                  break;
+                }
+              }
+            }
+            if (anchorCell) {
+              var ar = anchorCell.getBoundingClientRect(), cr2 = c.getBoundingClientRect();
+              var ax = ar.left + ar.width / 2, ay = ar.top + ar.height / 2;
+              var bx = cr2.left + cr2.width / 2, by = cr2.top + cr2.height / 2;
+              applyMarqueeSelection(Math.min(ax, bx), Math.min(ay, by), Math.max(ax, bx), Math.max(ay, by));
+            } else {
+              // No usable anchor (cold start / its row collapsed): plain
+              // select this key and make it the anchor for the next Shift.
+              setKeySel([{ holder: ld, prop: prop, key: key }]);
+              _keyAnchor = { holder: ld, prop: prop, frame: key.frame };
+            }
+            renderTimeline();
+            return;
+          }
           if (key) {
             // Dragging a key that's already part of a multi-selection moves
             // the WHOLE group together, one frame-delta shared by all of
@@ -4267,6 +4337,7 @@
               }
             } else {
               setKeySel([{ holder: ld, prop: prop, key: key }]);
+              _keyAnchor = { holder: ld, prop: prop, frame: key.frame };
               window._motionKeyDrag = { ld: ld, prop: prop, key: key, startX: e.clientX, startFrame: key.frame };
             }
           } else {
@@ -4518,6 +4589,12 @@
   // matter which), then drag any ONE of the selected diamonds to retime
   // the whole group together by the same frame delta.
   var _motionKeySel = []; // [{holder, prop, key}]
+  // Frozen Shift-range anchor for keyframe clicks (2026-07-31 unification —
+  // same contract as layer-inout.js's _barAnchorLi and timeline.js's
+  // _layerSelAnchor): set on every plain click and Ctrl-toggle on a key,
+  // never moved by a Shift-click itself. Stored as plain data ({holder,
+  // prop, frame}), never a DOM node — rows are rebuilt on every render.
+  var _keyAnchor = null;
   function isKeySelected(holder, prop, key) {
     return _motionKeySel.some(function (s) { return s.holder === holder && s.prop === prop && s.key === key; });
   }
@@ -5659,6 +5736,9 @@
     // AE's Numpad-Enter "open selected precomp" (timeline.js onKeyDown) —
     // was previously reachable only by double-clicking the Motion row.
     enterComponentLayer: enterComponentLayer,
+    // Bar-side Shift/Ctrl selection → layer-list mirror (layer-inout.js
+    // onDown calls this; see the function's own comment).
+    syncLayerSelFromBarSel: syncLayerSelFromBarSel,
     // 3D layers (2026-07-28) — see make3DProjector/project3DSegments' own
     // doc comment (Grease-Pencil-style: vertices move in 3D, stroke width
     // never scales).
