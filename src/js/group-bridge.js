@@ -227,8 +227,15 @@
     // result fully invisible; fall back to its strokeColor, the closest
     // match to "what the merged stroke looked like" this fill-only result
     // model can give).
-    var flattenFill = style.fillColor || style.strokeColor;
-    var islands = insertBooleanResult(layer, insertAt, folded.result, flattenFill, style.opacity, null, style.data);
+    // Visual-fill style source (2026-07-30 fix, same as booleanOp's own in
+    // tools.js — see its comment there): a vector-brush ribbon's OWN
+    // fillColor is its ink color, not the fill the user actually sees —
+    // that lives on its separate linked-fill companion. Prefer it (and
+    // its .data, for fillGradient via BOOL_KEEP_DATA_ALL) when present.
+    var styleCompanion = findLinkedFillCompanion(layer, style);
+    var fillSource = styleCompanion || style;
+    var flattenFill = fillSource.fillColor || style.strokeColor;
+    var islands = insertBooleanResult(layer, insertAt, folded.result, flattenFill, style.opacity, null, fillSource.data);
     members.forEach(function (m) { m.remove(); });
     folded.companions.forEach(function (c) { if (!c.removed) c.remove(); });
     delete ld.groups[gid];
