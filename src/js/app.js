@@ -1441,7 +1441,7 @@ function relinkRigBinds(ld,layer){
 // re-sampled at pose time via getLocationAt — same offset, current bone
 // geometry — so both position AND local tangent stay correctly anchored
 // to the SAME point on the bone as it's posed.
-function rigBindStroke(ld,path,boneIds,radius,rotate){
+function rigBindStroke(ld,path,boneIds,radius,rotate,softness){
   var rig=ensureLayerRig(ld);
   // CompoundPath BEFORE the segments/length guard, deliberately: a
   // CompoundPath has no `.segments` of its own (its geometry lives in
@@ -1470,6 +1470,22 @@ function rigBindStroke(ld,path,boneIds,radius,rotate){
   // that shape's deformation instead of cleanly superseding it.
   rig.binds=rig.binds.filter(function(b){return b.strokeId!==path.data.strokeId;});
   radius=radius||200;
+  // Falloff softness (2026-07-30, "il n'y a qu'un rayon dur... aucune
+  // courbe d'adoucissement" — a hard linear taper was the only option,
+  // unlike the Duplicator's own Effector, which already has a proper
+  // falloff convention elsewhere in this app). 0 = the original plain
+  // linear taper, BYTE-IDENTICAL to every project bound before this
+  // existed; 1 = full smoothstep (3t²-2t³, zero derivative at both the
+  // bone itself and the radius edge — the standard "soft" falloff used
+  // by every painted-weight rig tool, Blender included). Linearly
+  // blended between the two rather than a free exponent: two clearly-
+  // named ends (hard vs soft) are easier to reason about while dragging
+  // a single slider than an unbounded gamma value would be. One value
+  // for the whole layer's bind pass, not per-bone — the per-bone knob
+  // that actually varies limb-to-limb is the RADIUS (bone.radius), which
+  // already exists; needing a DIFFERENT falloff shape per bone is a much
+  // rarer ask than needing a different reach.
+  softness=Math.max(0,Math.min(1,softness||0));
   // Shared by the ribbon's own boundary AND (below) its centerSegments —
   // same per-point "nearest offset on each bone's rest curve, falloff by
   // distance" weighting, just fed a different point list.
@@ -1489,7 +1505,8 @@ function rigBindStroke(ld,path,boneIds,radius,rotate){
         // default (the panel's Rayon de poids field) for a bone that's never
         // been adjusted, so existing single-radius projects are unaffected.
         var boneRadius=bone.radius||radius;
-        var infl=Math.max(0,1-dist/boneRadius);
+        var t=Math.max(0,1-dist/boneRadius);
+        var infl=softness?t+(t*t*(3-2*t)-t)*softness:t;
         if(infl>0)w.push({boneId:bid,offset:loc.offset,w:infl});
       });
       return w;
@@ -1534,7 +1551,7 @@ function rigBindStroke(ld,path,boneIds,radius,rotate){
 // existed (rigBindStroke's own re-bind-replaces-not-stacks fix above), so
 // running this again after adjusting an influence circle is the expected
 // "try again" gesture, not something that piles up stale binds.
-function rigAutoAssignLayer(ld,layer,defaultRadius,rotate){
+function rigAutoAssignLayer(ld,layer,defaultRadius,rotate,softness){
   var rig=ensureLayerRig(ld);
   var boneIds=Object.keys(rig.bones);
   if(!boneIds.length)return 0;
@@ -1581,7 +1598,7 @@ function rigAutoAssignLayer(ld,layer,defaultRadius,rotate){
   layer.children.forEach(function(c){
     if(c instanceof CompoundPath){skippedUnsupported++;return;}
     if(!(c instanceof Path)||!isSelectablePathChild(c))return;
-    if(rigBindStroke(ld,c,boneIds,neededRadius,rotate))n++;
+    if(rigBindStroke(ld,c,boneIds,neededRadius,rotate,softness))n++;
     // A vector-brush ribbon's linked-fill companion is NOT independently
     // bound (2026-07-29, superseded attempt below this comment used to try
     // it) — QA-confirmed live on a multi-joint pose: the companion's own
