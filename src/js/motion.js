@@ -2679,7 +2679,27 @@
     // Auto-split every entered layer that still bundles 2+ shapes — highest
     // index first so each splice (replacing 1 layer with N) never shifts
     // an index this loop hasn't visited yet.
-    if (window.SM && window.SM.splitLayerIntoElementsCore) {
+    //
+    // Only when the component holds exactly ONE layer (2026-07-30 fix,
+    // Cyril: "si je met 2 calques avec un matte... que je met dans
+    // componant... en ouvrant le componant les 2 calques sont séparé en 4
+    // formes... je devrais me retrouver avec la même chose que les calques
+    // select que j'ai mis dans le componant"). The motivating case for
+    // auto-split (CLAUDE.md §8) was always a SINGLE hand-drawn layer with
+    // several shapes bundled together — entering is the only way to get
+    // real per-shape structure out of that, since there's nothing else to
+    // preserve. A component built from convertLayersToComponent (2+
+    // pre-existing, deliberately separate layers) already has the
+    // structure the user chose; silently re-exploding EACH of those
+    // layers by its own shape count on every entry second-guesses a
+    // decision already made outside the component (and, concretely,
+    // scrambles any matte/blendMode adjacency between them — matte's
+    // source is "the layer directly above", which a silent re-split can
+    // reorder). Manual "Release to Layers" from the layer context menu
+    // (splitLayerIntoElements, not -Core) still reaches any one bundled
+    // layer explicitly, with its own undo step — this only removes the
+    // SILENT, automatic, on-every-entry version for the multi-layer case.
+    if (window.SM && window.SM.splitLayerIntoElementsCore && state.layers.length === 1) {
       // Record ONE undo entry covering the whole auto-split before touching
       // anything (2026-07-25, "impossible de revenir qu'à un seul calque
       // après"): each core call runs silent, and `silent` also skips
