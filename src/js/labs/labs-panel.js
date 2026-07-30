@@ -44,13 +44,14 @@
   function mkNum(value, min, max, step, width) {
     var inp = document.createElement('input');
     inp.type = 'number'; inp.value = value; inp.min = min; inp.max = max; inp.step = step || 1;
-    inp.className = 'pi';
+    inp.className = 'pi scrub';
+    inp.dataset.step = step || 1;
     inp.style.cssText = 'flex:none;width:' + (width || 52) + 'px;padding:3px 5px;font-size:11px;';
     return inp;
   }
   function mkSelect(options, value) {
     var sel = document.createElement('select');
-    sel.className = 'pi';
+    sel.className = 'psel';
     sel.style.cssText = 'flex:none;width:auto;padding:3px 5px;font-size:11px;';
     options.forEach(function (o) {
       var opt = document.createElement('option');

@@ -95,9 +95,9 @@
       row.style.cssText = 'display:flex;gap:4px;align-items:center;margin-bottom:4px';
       row.innerHTML =
         '<input type="text" class="pi" data-f="label" style="width:90px" placeholder="Label">' +
-        '<input type="number" class="pi" data-f="min" style="width:56px" placeholder="min">' +
-        '<input type="number" class="pi" data-f="max" style="width:56px" placeholder="max">' +
-        '<input type="number" class="pi" data-f="step" style="width:56px" placeholder="step" step="any">' +
+        '<input type="number" class="pi scrub" data-f="min" data-step="1" style="width:56px" placeholder="min">' +
+        '<input type="number" class="pi scrub" data-f="max" data-step="1" style="width:56px" placeholder="max">' +
+        '<input type="number" class="pi scrub" data-f="step" data-step="1" style="width:56px" placeholder="step" step="any">' +
         '<input type="text" class="pi" data-f="unit" style="width:40px" placeholder="unit">' +
         '<div class="lico" data-rm style="cursor:pointer;width:18px;text-align:center">×</div>';
       row.querySelector('[data-f="label"]').value = p.label;
