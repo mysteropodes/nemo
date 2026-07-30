@@ -46,6 +46,16 @@ struct Params {
     tex_h: f32,
     time: f32,
     p4: f32, // was _pad0 — first effect to need a 4th slot is EFFECT_GROUND_SHADOW
+    // 2026-07-30: on-screen bbox (device px) of whatever this effect is
+    // attached to — see engine.rs's run_one_effect doc comment. Unused by
+    // every EFFECT_* below (none has a "center of my content" concept —
+    // this file's Params struct just has to stay byte-identical to the
+    // register_custom_effect-generated one, since both bind the SAME
+    // uniform buffer/bind-group-layout, simple_fx_bind_group_layout).
+    bbox_x: f32,
+    bbox_y: f32,
+    bbox_w: f32,
+    bbox_h: f32,
 };
 @group(0) @binding(2) var<uniform> params: Params;
 

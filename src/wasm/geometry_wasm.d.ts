@@ -58,14 +58,29 @@ export class VelloEngine {
      * WGSL statements ending in `return vec4<f32>(...)`), wrapped here
      * into a full document that already declares the standard fullscreen-
      * triangle vertex shader, the texture/sampler/Params bindings, and
-     * three convenience locals every author can use without re-deriving
-     * them: `uv` (0..1), `src` (the pixel already sampled at `uv`), and
-     * `texel` (1 texel in UV units, for neighbor-sampling effects). Same
-     * `Params{effect_id,p1,p2,p3,tex_w,tex_h,time,p4}` layout as
-     * simple_fx.wgsl, so an author's `params.p1`..`params.p4` map 1:1 onto
-     * the SAME p1..p4 fields the stack UI's generic param editor already
-     * writes for every other effect type — no separate wiring needed on
-     * the JS side for a custom effect's parameters.
+     * six convenience locals every author can use without re-deriving
+     * them: `uv` (0..1 across the FULL CANVAS), `src` (the pixel already
+     * sampled at `uv`), `texel` (1 texel in UV units, for neighbor-
+     * sampling effects), and — 2026-07-30, see run_one_effect's own doc
+     * comment for the bug this fixes — `bbox_o`/`bbox_s` (the on-screen
+     * device-pixel origin/size of whatever this effect is actually
+     * attached to) and `local_uv` (0..1 across just THAT bbox instead of
+     * the whole canvas, can go outside 0..1 near/past its edges same as
+     * `uv` already can). Any effect with a "center of my own shape"
+     * concept (a twirl/bulge pivot, a wave's phase, a particle grid)
+     * should distort in `local_uv` space and map back to real texture
+     * coordinates via `bbox_o + result * bbox_s` (in device px) before
+     * dividing by `vec2(tex_w, tex_h)` for the final textureSample — NOT
+     * `uv`/`vec2(0.5)` directly, which is the canvas center, not the
+     * shape's — confirmed live: a shipped Twirl effect's pattern visibly
+     * changed under pure panning (zero zoom change) before this existed,
+     * which only makes sense if its reference frame was the viewport.
+     * Same `Params{effect_id,p1,p2,p3,tex_w,tex_h,time,p4,bbox_x,bbox_y,
+     * bbox_w,bbox_h}` layout as simple_fx.wgsl, so an author's
+     * `params.p1`..`params.p4` map 1:1 onto the SAME p1..p4 fields the
+     * stack UI's generic param editor already writes for every other
+     * effect type — no separate wiring needed on the JS side for a custom
+     * effect's parameters.
      *
      * Compiling arbitrary author-supplied WGSL at runtime is safe here:
      * this crate only ever targets the web/WebGPU wgpu backend (built via
