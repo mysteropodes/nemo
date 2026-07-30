@@ -4180,6 +4180,12 @@
         rect.setAttribute('x', a.frame * FC + FC / 2); rect.setAttribute('y', barY);
         rect.setAttribute('width', (b.frame - a.frame) * FC); rect.setAttribute('height', barH);
         rect.setAttribute('fill', 'var(--accent)'); rect.setAttribute('opacity', '0.35');
+        // class + key index so previewKeyframeShift can translate these live
+        // during a bar/in-out drag alongside the diamonds — without the tag
+        // they stayed frozen at their pre-drag position until drop ("la
+        // barre bleue entre les keyframes ne bouge pas en temps réel").
+        rect.setAttribute('class', 'motion-key-connect');
+        rect.setAttribute('data-i', i);
         svg.appendChild(rect);
       }
       // Frame-duration block behind each key (Van Dijk 3.3): the diamond is
@@ -4189,11 +4195,14 @@
       // enough for the block to mean anything (his "closest three zoom
       // levels"), otherwise it degrades into a smear.
       if (FC >= 18) {
-        track.keys.forEach(function (k) {
+        track.keys.forEach(function (k, ki) {
           var d = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
           d.setAttribute('x', k.frame * FC); d.setAttribute('y', 0);
           d.setAttribute('width', FC); d.setAttribute('height', ROW_H);
           d.setAttribute('fill', k.color || 'var(--accent)'); d.setAttribute('opacity', '0.13');
+          // Same live-preview tagging as the connector bars above.
+          d.setAttribute('class', 'motion-key-durblock');
+          d.setAttribute('data-ki', ki);
           svg.appendChild(d);
         });
       }
@@ -5157,6 +5166,35 @@
         dias = rowEl.querySelectorAll('.motion-key');
       }
       dias.forEach(function (d) { d.style.transform = 'translateX(' + px + 'px)'; });
+      // SVG connector bars + duration blocks (trackRowHtml) must track the
+      // diamonds live too — they were the one element family this preview
+      // skipped, so they visibly froze mid-drag while everything else moved
+      // ("la barre bleue entre les keyframes ne bouge pas en temps réel").
+      // 'layer' mode: every key in the row shifts by the same dx, so every
+      // connector/block shifts identically — no per-rect check needed.
+      // 'selected' mode: a connector only moves rigidly when BOTH its
+      // endpoint keys are selected (a mixed pair would need a stretch, not
+      // a translate — left as-is, same as before, strictly no worse); a
+      // duration block moves when its own key is selected.
+      var rects = rowEl.querySelectorAll('.motion-key-connect, .motion-key-durblock');
+      if (!rects.length) return;
+      if (mode === 'selected') {
+        var track = trackFor(rowEl._smHolder, rowEl._smProp);
+        if (!track || !track.keys.length) return;
+        rects.forEach(function (r) {
+          var sel;
+          if (r.getAttribute('class') === 'motion-key-connect') {
+            var i = +r.getAttribute('data-i');
+            sel = track.keys[i] && track.keys[i + 1] && isKeySelected(rowEl._smHolder, rowEl._smProp, track.keys[i]) && isKeySelected(rowEl._smHolder, rowEl._smProp, track.keys[i + 1]);
+          } else {
+            var ki = +r.getAttribute('data-ki');
+            sel = track.keys[ki] && isKeySelected(rowEl._smHolder, rowEl._smProp, track.keys[ki]);
+          }
+          if (sel) r.style.transform = 'translateX(' + px + 'px)';
+        });
+      } else {
+        rects.forEach(function (r) { r.style.transform = 'translateX(' + px + 'px)'; });
+      }
     });
   }
   // Called once at drag START (before the first preview) and at drop —
@@ -5166,7 +5204,7 @@
   // rebuilds via renderTimeline() but only on the branches that actually
   // reach it (defensive here rather than trusting every return path does).
   function clearKeyframeShiftPreview() {
-    document.querySelectorAll('#frame-grid .motion-key').forEach(function (d) { if (d.style.transform) d.style.transform = ''; });
+    document.querySelectorAll('#frame-grid .motion-key, #frame-grid .motion-key-connect, #frame-grid .motion-key-durblock').forEach(function (d) { if (d.style.transform) d.style.transform = ''; });
   }
   function shiftLayerMotionKeys(li, dx) {
     var ld = state.layers[li];
