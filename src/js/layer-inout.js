@@ -1070,6 +1070,15 @@
       var menu = [
         { label: 'Réinitialiser (pleine durée)', action: function () { if (window.pushUndo) pushUndo(); delete state.layers[li].inPoint; delete state.layers[li].outPoint; if (window.renderTimeline) renderTimeline(); if (window.loadFrame) loadFrame(state.currentFrame); if (window.SMEngineBridge) SMEngineBridge.renderNow(); } },
       ];
+      // Menu-based Parent-in-Time (2026-07-31, Cyril: "clic droit pour
+      // parent in time sur ... keyframe + in/out point") — target layer is
+      // this bar's own; reachable whatever else is selected. Same shared
+      // builder as the Motion layer-row menu (timeline.js).
+      if (window.buildTimeLinkMenuItems) {
+        menu.push({ label: 'Parent in Time — lier le temps à…', action: function () {
+          window.showContextMenu(e.clientX + 8, e.clientY + 8, window.buildTimeLinkMenuItems(li, state.layers[li], function () { if (window.renderLayerList) renderLayerList(); if (window.renderTimeline) renderTimeline(); }));
+        } });
+      }
       // Batch ops act on the WHOLE current selection, not just the bar
       // that was right-clicked — offered once >=2 bars are selected,
       // regardless of which one you right-click.
