@@ -1261,7 +1261,21 @@ function _duplicatorModeOffset(dup,mode,k,count,cols,pathInfo){
   }
   return{baseDx:baseDx,baseDy:baseDy,baseRot:baseRot};
 }
-function applyLayerDuplicator(ld,base,frameIdx,layerIdx){
+// opts (2026-07-30 fix, found live: a Duplicator set on a Component's OWN
+// inner sub-layer rendered correctly only while editing INSIDE the symbol
+// — state.layers is aliased to sym.layers there, so loadFrame's normal
+// getEffectiveStrokesRendered call reaches it. Composited from OUTSIDE
+// (placed instance, StoryBoard montage), getEffectiveStrokes's ld.symbolId
+// branch below reads every symLayer directly and never applied its
+// duplicator at all — same "consumer A handles it, consumer B doesn't"
+// shape as CLAUDE.md §1). That branch has no `layerIdx` into state.layers
+// for a symLayer (it isn't one), so the temporal-offset sub-feature's
+// getEffectiveStrokes(layerIdx,shiftedIdx) re-sample can't work unmodified
+// — opts.resample/opts.spanStart/opts.spanLen let a caller substitute its
+// own frame lookup and span bounds instead. Omitted (as getEffectiveStrokes
+// Rendered's call below still does), this behaves exactly as before.
+function applyLayerDuplicator(ld,base,frameIdx,layerIdx,opts){
+  opts=opts||{};
   var dup=ld.duplicator,mode=dup.mode||'grid';
   var count=_duplicatorCount(dup);
   if(count<=1)return base;
@@ -1279,9 +1293,12 @@ function applyLayerDuplicator(ld,base,frameIdx,layerIdx){
   // LottieFiles' purely-numeric position/rotation loop. Wraps within the
   // seed layer's own effective span (layerInPoint..layerOutPoint) so the
   // "wave" effect actually loops instead of freezing at a hard edge.
-  var tOff=dup.timeOffset,tOffOn=tOff&&tOff.enabled&&layerIdx!=null&&(tOff.offsetFrames|0)!==0;
+  var tOff=dup.timeOffset,tOffOn=tOff&&tOff.enabled&&(opts.resample||layerIdx!=null)&&(tOff.offsetFrames|0)!==0;
   var tInF,tSpan;
-  if(tOffOn){tInF=layerInPoint(ld);tSpan=Math.max(1,layerOutPoint(ld)-tInF+1);}
+  if(tOffOn){
+    tInF=opts.spanStart!=null?opts.spanStart:layerInPoint(ld);
+    tSpan=Math.max(1,opts.spanLen!=null?opts.spanLen:(layerOutPoint(ld)-tInF+1));
+  }
   var dPos=M?M.valueAtFrame(ld,'dupOffsetPos',frameIdx):[0,0];
   var dRot=M?M.valueAtFrame(ld,'dupOffsetRot',frameIdx)[0]:0;
   var dScale=M?M.valueAtFrame(ld,'dupOffsetScale',frameIdx):[0,0];
@@ -1320,7 +1337,7 @@ function applyLayerDuplicator(ld,base,frameIdx,layerIdx){
         shiftFrames=Math.floor(rngT()*count)*tOff.offsetFrames;
       } else shiftFrames=k*tOff.offsetFrames; // 'forward' (default): copy 0 = current frame, each next copy lags further behind
       var shiftedIdx=tInF+(((frameIdx-tInF-shiftFrames)%tSpan)+tSpan)%tSpan;
-      var shifted=getEffectiveStrokes(layerIdx,shiftedIdx);
+      var shifted=opts.resample?opts.resample(shiftedIdx):getEffectiveStrokes(layerIdx,shiftedIdx);
       if(shifted.length){baseK=shifted;pivotK=_boundsCenterOfStrokes(baseK);}
       // Nothing drawn at the shifted frame (a hold-blank span) — fall back
       // to the current frame's own content rather than vanishing that copy.
@@ -2217,6 +2234,24 @@ function getEffectiveStrokes(layerIdx,frameIdx,countOnly){
           return sd2;
         });
       }
+      // Duplicator (2026-07-30 fix, see applyLayerDuplicator's own header
+      // comment) — applied AFTER element/layer motion above, same order a
+      // top-level layer's duplicator sees relative to ITS OWN transform:
+      // the seed is animated first, then multiplied. _dupEditSource mirrors
+      // getEffectiveStrokesRendered's own guard (app.js) — a symLayer
+      // mid-"edit the duplicator's source shape directly" session shows its
+      // single seed, not N stale copies.
+      if(symLayer.duplicator&&!symLayer._dupEditSource&&layerStrokes.length){
+        layerStrokes=applyLayerDuplicator(symLayer,layerStrokes,ii,null,{
+          spanStart:0,spanLen:symLayer.frames.length,
+          resample:function(shiftedIdx){
+            var rf=symLayer.frames[shiftedIdx];if(!rf)return[];
+            if(rf.isKeyframe||rf.isInterpolated)return rf.strokes||[];
+            for(var kk=shiftedIdx-1;kk>=0;kk--){if(symLayer.frames[kk].isKeyframe)return symLayer.frames[kk].strokes||[];}
+            return[];
+          }
+        });
+      }
       out=out.concat(layerStrokes);
     });
     // The instance transform (symMatrixOf) — skip entirely (and the clone
@@ -3065,6 +3100,19 @@ function enterMontageView(montageId){
   state.motionArcs=m.motionArcs||(m.motionArcs={});
   state.tweenOverrides=m.tweenOverrides||(m.tweenOverrides={});
   state.tweenEasing=m.tweenEasing||(m.tweenEasing={});
+  // cameraKeys (2026-07-30 fix, found live by a background exploration
+  // agent — bug missed by the markers/motionArcs/tweenOverrides/tweenEasing
+  // fix right above): unlike those four, cameraKeys was never actually
+  // reassigned here — only CAPTURED by reference into the snapshot above,
+  // exactly like the other four used to be before that fix. state.cameraKeys
+  // stayed the SAME array the whole time inside the montage view, so a
+  // camera key created "inside" wrote straight into the real outer scene's
+  // camera track, and exitMontageView's restore below was a no-op (handing
+  // the reference back to itself, already mutated). enterSymbol/exitToScene
+  // already isolate camera per-symbol (sym.cameraKeys) — this gives montage
+  // view the identical treatment, on the montage module `m` itself (same
+  // storyboard.js persistence story as markers et al. above).
+  state.cameraKeys=m.cameraKeys||(m.cameraKeys=[]);
   userLayers.forEach(function(l){l.opacity=0.25;});
   var total=SMStoryboard.montageTotal(m);
   var newLayers=[],newUls=[],acc=0;
@@ -3108,7 +3156,7 @@ function exitMontageView(){
   // montage module itself — same pairing as enterMontageView's swap, same
   // reasoning as exitToScene's sym.* write-back.
   var mWB=window.SMStoryboard?SMStoryboard.montageById(state.activeMontageViewId):null;
-  if(mWB){mWB.markers=state.markers;mWB.motionArcs=state.motionArcs;mWB.tweenOverrides=state.tweenOverrides;mWB.tweenEasing=state.tweenEasing;}
+  if(mWB){mWB.markers=state.markers;mWB.motionArcs=state.motionArcs;mWB.tweenOverrides=state.tweenOverrides;mWB.tweenEasing=state.tweenEasing;mWB.cameraKeys=state.cameraKeys;}
   userLayers.forEach(function(l){l.remove();});
   state.layers=_montageViewSnapshot.layers;state.totalFrames=_montageViewSnapshot.totalFrames;state.waIn=_montageViewSnapshot.waIn;state.waOut=_montageViewSnapshot.waOut;
   window._waIn=state.waIn;window._waOut=state.waOut;window._totalF=state.totalFrames;
