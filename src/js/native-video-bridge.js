@@ -797,6 +797,31 @@
   // never touches one; the web backend's own decode already round-trips
   // through a canvas internally, see _videoFrameToRgba).
   async function importAsLayer(source) {
+    // Guard (2026-07-30 fix, found live: importing footage while editing
+    // inside a Component creates the nativeVideo layer in sym.layers — the
+    // ONLY place video rendering ever looks for it is buildSceneJson's
+    // direct state.layers[i].nativeVideo check (engine-bridge.js), a
+    // top-level-index lookup with no path into a symbol's own sub-layers.
+    // getEffectiveStrokes's symbolId branch (app.js) only ever flattens
+    // STROKE data when compositing an instance from outside — a nativeVideo
+    // sub-layer has none to contribute (same top-level early-return as its
+    // outer counterpart) and nothing recreates it as a video item either.
+    // Net effect: the video plays fine while still inside, then silently
+    // and PERMANENTLY vanishes — no error — the moment you exit, in a
+    // placed instance or a StoryBoard montage alike. Unlike the Duplicator
+    // gap fixed earlier this session, there's no missing-field copy to add:
+    // video rendering isn't stroke-shaped data at all, so there's nothing
+    // for the compositing path to carry through. Refusing here, matching
+    // every sibling structural guard elsewhere in this app (convertLayer
+    // ToComponent's own type list, mergeLayersIntoOne, StoryBoard's canvas
+    // lockout), is far safer than a silent, unrecoverable content loss.
+    if (state.activeSymbolId) { if (window.showToast) showToast('Impossible d’importer une vidéo à l’intérieur d’un composant — fermez-le d’abord'); return -1; }
+    // Montage view (enterMontageView, app.js) swaps state.layers to a
+    // throwaway SYNTHETIC per-segment array with no write-back on exit at
+    // all (unlike a symbol's) — a video "imported" there is discarded the
+    // instant you leave, even before the cross-context rendering gap above
+    // would apply.
+    if (state.activeMontageViewId) { if (window.showToast) showToast('Impossible d’importer une vidéo à l’intérieur d’un montage — fermez-le d’abord'); return -1; }
     var info = await open(source);
     if (window.saveAllLayerFrames) saveAllLayerFrames();
     if (window.pushUndoLayers) pushUndoLayers();
