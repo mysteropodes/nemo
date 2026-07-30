@@ -1222,6 +1222,68 @@
       return out;
     });
   }
+  // Image/video 3D projection (2026-07-30, Cyril: "la 3D sur les footage
+  // pareil je crois que ça marche pas" — confirmed: engine-bridge.js's own
+  // comment on the per-item loop states outright "an image inside a 3D
+  // layer renders unprojected", a DELIBERATE scope boundary from when 3D
+  // layers first shipped, not a regression).
+  //
+  // project3DSegments above projects every VERTEX independently because a
+  // vector path's STROKE WIDTH must never warp with perspective — Cyril's
+  // own explicit correction when this feature was first built ("comme pour
+  // grease pencil, l'épaisseur du trait n'est jamais aplatie"), which is
+  // why the original whole-texture perspective-quad-warp Rust pipeline was
+  // reverted in favor of this per-vertex approach. A raster image/video has
+  // no stroke-width concept to protect, so warping the WHOLE picture as a
+  // true perspective trapezoid would actually be the semantically correct
+  // behavior for it — but engine.rs's ImageRef (the wire shape a rendered
+  // image item takes) is a plain axis-aligned rect + single rotation, with
+  // no support for 4 independently-positioned corners; making it one would
+  // mean a new Rust-side rendering primitive (a texture-mapped quad, real
+  // WGPU/vello shader work) — out of scope for a JS-only pass and a
+  // meaningfully bigger, separate undertaking.
+  //
+  // This is the middle ground: probes the projector along the rect's own
+  // (possibly already-rotated, e.g. by elMat) local axes instead of a
+  // single center point, then rebuilds an axis-aligned-but-rotated rect
+  // from the resulting screen-space half-width/half-height vectors — same
+  // "probe an offset point, use the delta" technique project3DSegments
+  // itself already uses for bezier handles just above. Gives correct
+  // position, correct rotationZ-equivalent screen rotation, and a
+  // reasonable foreshortening-driven scale approximation for moderate
+  // rotationX/rotationY — NOT true perspective (the projected shape is
+  // always forced back into a rectangle, never an actual trapezoid), so a
+  // steeply-tilted image won't show the trapezoidal keystoning a real 3D
+  // plane would. Degrades gracefully (no crash, just a less accurate rect)
+  // rather than blowing up as rotation approaches the 90°-edge-on case.
+  function project3DImageRect(rect, projector) {
+    var cx = rect.x + rect.width / 2, cy = rect.y + rect.height / 2;
+    var hw = rect.width / 2, hh = rect.height / 2;
+    var rot = (rect.rotation || 0) * Math.PI / 180, cos = Math.cos(rot), sin = Math.sin(rot);
+    // Local +X/+Y axis directions in world space, accounting for the rect's
+    // OWN existing rotation (e.g. already applied by elMat before this
+    // runs) — probing along world-axis-aligned offsets instead would be
+    // wrong the moment the input rect isn't already unrotated.
+    var axX = cos, axY = sin, ayX = -sin, ayY = cos;
+    // Full edge-to-edge probes (both +hw/-hw, both +hh/-hh), not a single
+    // center-to-edge probe: under rotationX/rotationY one edge of the plane
+    // moves CLOSER to the camera and the other FARTHER, so a one-sided
+    // probe reads only that edge's own (magnified or minified) foreshortening
+    // instead of a representative average — confirmed live, an EARLIER
+    // version of this function probed center-to-edge only and a 45°
+    // rotationY produced a rect 70% WIDER than the source, not narrower as
+    // real foreshortening should. Averaging both edges' spans cancels that
+    // one-sided bias out; the center still comes from the rect's own
+    // center point directly (unaffected by this asymmetry either way).
+    var pC = projector(cx, cy);
+    var pXPos = projector(cx + hw * axX, cy + hw * axY), pXNeg = projector(cx - hw * axX, cy - hw * axY);
+    var pYPos = projector(cx + hh * ayX, cy + hh * ayY), pYNeg = projector(cx - hh * ayX, cy - hh * ayY);
+    var xVec = { x: (pXPos.x - pXNeg.x) / 2, y: (pXPos.y - pXNeg.y) / 2 };
+    var yVec = { x: (pYPos.x - pYNeg.x) / 2, y: (pYPos.y - pYNeg.y) / 2 };
+    var newHalfW = Math.hypot(xVec.x, xVec.y), newHalfH = Math.hypot(yVec.x, yVec.y);
+    var rotDeg = Math.atan2(xVec.y, xVec.x) * 180 / Math.PI;
+    return { x: pC.x - newHalfW, y: pC.y - newHalfH, width: newHalfW * 2, height: newHalfH * 2, rotation: rotDeg };
+  }
   function toggleLayer3D(li) {
     var ld = state.layers[li];
     if (!ld) return;
@@ -5690,6 +5752,7 @@
     transformSegments: transformSegments,
     transformImageRect: transformImageRect,
     transformImageRectByMatrix: transformImageRectByMatrix,
+    project3DImageRect: project3DImageRect,
     ensureLayerUid: ensureLayerUid,
     findLayerIndexByUid: findLayerIndexByUid,
     setLayerParent: setLayerParent,
