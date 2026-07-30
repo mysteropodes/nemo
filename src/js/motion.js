@@ -3086,6 +3086,13 @@
         // split, which is by definition where you look for it.
         var multi = _layerSel.length >= 2 && _layerSel.indexOf(li) >= 0;
         window.showContextMenu(e.clientX, e.clientY, [
+          // Renommer (2026-07-31, shortcut-parity sweep): Motion mode had NO
+          // rename path at all — Animation 2D's dblclick is claimed here by
+          // enterComponentLayer/splitLayerIntoElements, and this menu never
+          // had the entry Animation 2D's row menu has. startLayerRename
+          // (timeline.js) works unmodified against Motion rows (same
+          // .lrow[data-layer]/.lnm DOM shape). F2 is the keyboard path.
+          { label: 'Renommer  (F2)', action: function () { startLayerRename(li); } },
           { label: 'Éclater en calques (une forme par calque)', disabled: !!ld.symbolId || !!ld.lfsGroup, action: function () { window.SM.splitLayerIntoElements(li); } },
           { label: 'Couper au niveau de la tête de lecture  (⌘⇧D)', action: function () { window.SM.splitLayerAtPlayhead(li); } },
           { label: ld.shy ? 'Retirer le marquage « shy »' : 'Marquer comme « shy »', action: function () { window.SM.toggleLayerShy(li); } },
@@ -5649,6 +5656,9 @@
     // (in/out/whole layer) share the exact same drag/cycle-check/link-
     // creation logic as the original side-panel "Temps" pickwhip.
     startTimeLinkPickwhip: startTimeLinkPickwhip,
+    // AE's Numpad-Enter "open selected precomp" (timeline.js onKeyDown) —
+    // was previously reachable only by double-clicking the Motion row.
+    enterComponentLayer: enterComponentLayer,
     // 3D layers (2026-07-28) — see make3DProjector/project3DSegments' own
     // doc comment (Grease-Pencil-style: vertices move in 3D, stroke width
     // never scales).
