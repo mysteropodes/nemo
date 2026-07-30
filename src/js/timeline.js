@@ -4531,21 +4531,33 @@ function renderDuplicatorEffectors(dup){
     var targetProps=(M2&&M2.DUP_TARGET_PROPS)||['position','rotation','scale','opacity'];
     var channels=effectorChannels(eff);
     channels.forEach(function(ch,ci){
-      var chRow=line();
       var dim=M2?M2.propDim(ch.prop):(ch.value?ch.value.length:1);
       var dimLabels=(M2&&M2.propDimLabels(ch.prop))||null;
       var propLabel=M2?M2.propLabel(ch.prop):ch.prop;
-      var lbl=document.createElement('span');lbl.className='pl';lbl.style.minWidth='72px';lbl.textContent=propLabel;chRow.appendChild(lbl);
+      // Two lines per channel, not one (2026-07-30 fix — "alignement comme
+      // les autres et value box trop petite"): a single line with the
+      // property name PLUS 2 value fields meant 3 separate .pl labels
+      // (each a fixed 68px per style.css) fighting the row's own .pi
+      // flex:1 inputs for space, so a 2D property's boxes ended up tiny.
+      // Name+delete get their OWN line; the value(s) go on a SEPARATE
+      // `dims-row`-classed line — the exact class the Rows/Cols and X/Y
+      // spacing fields above already use (style.css: `.dims-row .pl`
+      // shrinks to its label's own content width instead of the fixed
+      // 68px), so X/Y get to split the full row width like every other
+      // multi-value field in this same panel, not a bespoke narrower one.
+      var nameRow=line();
+      var nameLbl=document.createElement('span');nameLbl.textContent=propLabel;nameRow.appendChild(nameLbl);
+      var rmCh=document.createElement('button');rmCh.className='pbtn';rmCh.textContent='✕';rmCh.style.marginLeft='auto';
+      rmCh.addEventListener('click',function(){channels.splice(ci,1);renderDuplicatorEffectors(dup);dupRefreshFromPanel();});
+      nameRow.appendChild(rmCh);
+      var valRow=line();valRow.classList.add('dims-row');
       if(!ch.value)ch.value=[];
       for(var vd=0;vd<dim;vd++){
         (function(vd){
           var f=num(dimLabels?dimLabels[vd]:(dim>1?String(vd+1):''),function(v){ch.value[vd]=v;},ch.value[vd]||0,1);
-          chRow.appendChild(f[0]);chRow.appendChild(f[1]);
+          valRow.appendChild(f[0]);valRow.appendChild(f[1]);
         })(vd);
       }
-      var rmCh=document.createElement('button');rmCh.className='pbtn';rmCh.textContent='✕';rmCh.style.marginLeft='auto';
-      rmCh.addEventListener('click',function(){channels.splice(ci,1);renderDuplicatorEffectors(dup);dupRefreshFromPanel();});
-      chRow.appendChild(rmCh);
     });
     var addRow=line();
     var addSel=document.createElement('select');addSel.className='psel';
