@@ -254,6 +254,29 @@
     var lpr = document.getElementById('layer-panel-resize');
     var fg = document.getElementById('fg-wrap');
     [lp, lpr, fg].forEach(function (el) { if (el) el.style.display = on ? 'none' : ''; });
+    // Canvas lockout (2026-07-30 fix — found live: "StoryBoard ne manipule
+    // QUE des Components" per CLAUDE.md §8, but nothing ever enforced it.
+    // Every drawing/edit tool bridge (draw-bridge, shape-bridge, rig-bridge,
+    // pen-bridge, eraser-bridge, fill-bridge, gradient-bridge, select-bridge,
+    // subselect-bridge, symmetry-bridge, perspective-bridge — 12+ files)
+    // attaches its OWN pointerdown listener straight to #canvas-area /
+    // #drawing-canvas, each gated only on `state.tool===<itself>` — none of
+    // them ever checked appMode, so switching to StoryBoard with a drawing
+    // tool still selected left the canvas fully live: dragging Rectangle
+    // silently inserted a new shape into the flat layer underneath, no
+    // warning, no guard. Rather than repeat the same appMode check in every
+    // one of those files (this function is the ONE place setAppMode already
+    // routes every StoryBoard enter/exit through, motion.js:5409), disabling
+    // pointer-events here starves all of them at once — none of their
+    // listeners are even attached to #canvas-area/#drawing-canvas directly
+    // (not document/window), so a non-interactive ancestor is enough to stop
+    // every one of them from ever firing. Same 0.25 dim convention
+    // enterSymbol/enterMontageView already use for "this content exists but
+    // isn't the active context right now" (app.js) — silently freezing the
+    // canvas with no visual change would read as the app hanging, not as
+    // "StoryBoard doesn't touch this."
+    var canvasArea = document.getElementById('canvas-area');
+    if (canvasArea) { canvasArea.style.pointerEvents = on ? 'none' : ''; canvasArea.style.opacity = on ? '0.25' : ''; }
     if (on) { applyView(); render(); }
   }
 
