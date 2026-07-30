@@ -742,6 +742,22 @@ window.SM={
   // and the camera all shift together, or the trim would silently desync the
   // very things that were timed against it.
   trimToWorkArea:function(){
+    // 2026-07-30 fix: the only structural layer op with no activeSymbolId/
+    // activeMontageViewId guard (~10 siblings in app.js all refuse with this
+    // same toast — convertLayerToComponent, mergeLayersIntoOne, splitLayer-
+    // IntoElements, etc.). Shrinking totalFrames here writes straight
+    // through to state.layers/state.markers/state.cameraKeys, which correctly
+    // alias the entered symbol's own data while inside one (see enterSymbol) —
+    // but sym.totalFrames is SHARED by every other instance/placement of
+    // that same symbol elsewhere in the project (other layers, other
+    // StoryBoard montages), so trimming it from inside one editing session
+    // silently reshapes all of them with no warning. Inside a montage view
+    // it's actively pointless instead: state.layers there is a throwaway
+    // synthetic per-segment array with no write-back on exit (unlike a
+    // symbol's), so the toast would claim success and every bit of it
+    // reverts the moment you leave.
+    if(state.activeSymbolId){showToast('Fermez d\'abord le composant en cours d\'édition');return;}
+    if(state.activeMontageViewId){showToast('Fermez d\'abord le montage en cours d\'édition');return;}
     var inF=state.waIn||0,outF=(state.waOut!=null?state.waOut:state.totalFrames-1);
     if(outF<=inF){showToast('Zone de travail trop courte');return;}
     if(inF===0&&outF===state.totalFrames-1){showToast('La zone de travail couvre déjà tout');return;}
@@ -909,7 +925,14 @@ window.SM={
     // correct model for multiple instances of one symbol (each instance
     // already carries its own placement/motion/camera) — same sharing
     // model applies to an LFS group's 3 channel symbols.
-    if(src.symbolId)state.layers[ni].symbolId=src.symbolId;
+    // symPlayMode/symSpeed/symPlacedAt/symSingleFrame/symMatrix (2026-07-30
+    // fix): splitLayerAtPlayhead a few lines up already copies this exact
+    // set alongside symbolId — duplicateLayer only ever copied the bare
+    // symbolId, so duplicating any Component instance that had been resized/
+    // retimed/held-on-a-frame silently reset the copy to defaults (play
+    // once, speed 1, no matrix) instead of matching what was visibly on
+    // screen. locked was already force-set a few lines below (parity kept).
+    if(src.symbolId){state.layers[ni].symbolId=src.symbolId;state.layers[ni].symPlayMode=src.symPlayMode;state.layers[ni].symSpeed=src.symSpeed;state.layers[ni].symPlacedAt=src.symPlacedAt;state.layers[ni].symSingleFrame=src.symSingleFrame;if(src.symMatrix)state.layers[ni].symMatrix=JSON.parse(JSON.stringify(src.symMatrix));state.layers[ni].locked=src.locked;}
     if(src.lfsGroup){state.layers[ni].lfsGroup=true;state.layers[ni].lfsIds=JSON.parse(JSON.stringify(src.lfsIds));state.layers[ni].lfsSettings=JSON.parse(JSON.stringify(src.lfsSettings));state.layers[ni].locked=true;}
     if(src.inPoint!=null)state.layers[ni].inPoint=src.inPoint;if(src.outPoint!=null)state.layers[ni].outPoint=src.outPoint;
     // 2026-07 fix: markers/shy/keyLock/timeRemap/motionBlur/effects/
@@ -1430,6 +1453,16 @@ window.SM={
     var sceneFps=srcSnap?srcSnap.fps:state.fps;
     var sceneWaIn=srcSnap?srcSnap.waIn:state.waIn;
     var sceneWaOut=srcSnap?srcSnap.waOut:state.waOut;
+    // cameraKeys (2026-07-30 fix): enterSymbol/enterMontageView (app.js)
+    // swap live state.cameraKeys to the entered context's OWN camera track
+    // (§8 CLAUDE.md) exactly like they swap state.layers — but unlike
+    // layers/totalFrames/fps/waIn/waOut just above, this export kept reading
+    // the live state.cameraKeys straight through, so autosave firing while
+    // inside a component or montage view silently overwrote the real outer
+    // scene's camera animation with whatever the entered context's camera
+    // happened to be (both snapshot objects already carry the outer value —
+    // see _sceneSnapshot/_montageViewSnapshot's own cameraKeys field).
+    var sceneCameraKeys=srcSnap?srcSnap.cameraKeys:state.cameraKeys;
     return JSON.stringify({version:13,totalFrames:sceneTotal,fps:sceneFps,canvasW:state.canvasW,canvasH:state.canvasH,canvasBg:state.canvasBg,waIn:sceneWaIn,waOut:sceneWaOut,
       layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color,motion:l.motion,motionStatic:l.motionStatic,elementMotion:l.elementMotion,inPoint:l.inPoint,outPoint:l.outPoint,nativeVideo:l.nativeVideo,matteMode:l.matteMode,montageId:l.montageId,expressions:l.expressions,isTextLayer:l.isTextLayer,isNullLayer:l.isNullLayer,isEffectLayer:l.isEffectLayer,effects:l.effects,footage:l.footage,
         // Layer parenting (2026-07-25). BOTH of these were missing from this
@@ -1446,12 +1479,23 @@ window.SM={
         // symMatrix/lfsSettings, no per-field whitelist for its innards.
         // (_dupEditSource is transient and deliberately NOT persisted.)
         duplicator:l.duplicator||undefined,
-        // Rig tool (2026-07-29) — bones/binds/ikChains, plain JSON by
-        // construction (see app.js's ensureLayerRig), copied wholesale like
-        // duplicator above. Binds reference strokeId, relinked on load by
-        // relinkRigBinds (app.js, called from loadFrame) — never a live
-        // Path reference, so a straight JSON round-trip is safe.
-        rig:l.rig||undefined,
+        // Rig tool (2026-07-29) — bones/ikChains are plain JSON by
+        // construction (see rig-bridge.js's bone creation / app.js's
+        // ikChains writes: segments/restSegments/closed/radius and
+        // root/joint/end/l1/l2/flip, all numbers and plain point arrays).
+        // binds are NOT quite as innocent, though — each one carries a
+        // `_live` field (app.js's rigBindStroke: `_live:path`), the actual
+        // live Paper.js Path relinkRigBinds resolves on every loadFrame.
+        // That field WAS being copied wholesale here (2026-07-30 fix,
+        // correcting this same comment's own prior claim) straight into
+        // JSON.stringify — Paper items hold circular internal references
+        // (segments back to their path, path back to its layer/project),
+        // so exporting any rigged layer risked throwing mid-save rather
+        // than silently bloating the file. Only strokeId/rest/weights/
+        // rotate are ever meant to persist; _live is rebuilt fresh from
+        // strokeId by relinkRigBinds on the next loadFrame regardless.
+        rig:l.rig?{bones:l.rig.bones,ikChains:l.rig.ikChains,nextId:l.rig.nextId,
+          binds:(l.rig.binds||[]).map(function(b){return{strokeId:b.strokeId,rest:b.rest,weights:b.weights,rotate:b.rotate};})}:undefined,
         // Non-destructive combine groups (2026-07-29) — copied wholesale
         // like duplicator/rig above. Membership itself is the plain
         // data.groupId tag on each stroke (already round-trips via serP/
@@ -1479,7 +1523,7 @@ window.SM={
       symmetryEnabled:state.symmetryEnabled,symmetryMode:state.symmetryMode,symmetryAxis:state.symmetryAxis,symmetryRadialCenter:state.symmetryRadialCenter,symmetryRadialSectors:state.symmetryRadialSectors,symmetryExtend:state.symmetryExtend,
       motionArcs:state.motionArcs,easingCurve:state.easingCurve,resamplePts:state.resamplePts,tweenStep:state.tweenStep,
       tweenOverrides:state.tweenOverrides,tweenEasing:state.tweenEasing||{},comments:state.comments||[],
-      cameraKeys:state.cameraKeys||[],cameraLayerOn:!!state.cameraLayerOn,
+      cameraKeys:sceneCameraKeys||[],cameraLayerOn:!!state.cameraLayerOn,
       // Comp markers (markers.js) — pure annotation, but losing them on save
       // would make the feature pointless.
       markers:state.markers||[],shyEnabled:!!state.shyEnabled,
@@ -4660,7 +4704,13 @@ function renderDuplicatorEffectors(dup){
     function num(l,id,val,step,title){
       var s=document.createElement('span');s.className='pl';s.textContent=l;if(title)s.title=title;
       var inp=document.createElement('input');inp.type='number';inp.className='pi scrub';inp.value=val;inp.dataset.step=step||1;if(title)inp.title=title;
-      inp.addEventListener('change',function(){id(parseFloat(inp.value)||0);dupRefreshFromPanel();});
+      // pushUndo (2026-07-30 fix): every static duplicator field (wireNum,
+      // a few hundred lines down) calls pushUndo() before mutating — this
+      // dynamically-rebuilt effector panel never got the same treatment,
+      // so radius/strength/angle/per-channel values were all silently
+      // un-undoable (confirmed: the whole effectors UI shares this one
+      // helper, so one fix here covers every numeric field it renders).
+      inp.addEventListener('change',function(){pushUndo();id(parseFloat(inp.value)||0);dupRefreshFromPanel();});
       return[s,inp];
     }
     // Header: falloff mode, radius, strength, delete.
@@ -4668,12 +4718,12 @@ function renderDuplicatorEffectors(dup){
     var modeSel=document.createElement('select');modeSel.className='psel';
     modeSel.title='Radial : influence en cercle autour du point de l’effector, dégradée jusqu’au rayon R. Linear : influence en bande le long d’une direction (angle °), dégradée jusqu’à la distance R.';
     ['radial','linear'].forEach(function(v){var o=document.createElement('option');o.value=v;o.textContent=v==='radial'?'Radial':'Linear';if(eff.falloff===v||(!eff.falloff&&v==='radial'))o.selected=true;modeSel.appendChild(o);});
-    modeSel.addEventListener('change',function(){eff.falloff=modeSel.value;renderDuplicatorEffectors(dup);dupRefreshFromPanel();});
+    modeSel.addEventListener('change',function(){pushUndo();eff.falloff=modeSel.value;renderDuplicatorEffectors(dup);dupRefreshFromPanel();});
     hdr.appendChild(modeSel);
     var rad=num('R',function(v){eff.radius=v;},eff.radius||200,1,'Rayon d’action (px) — distance à laquelle l’influence de cet effector retombe à zéro. Le point d’origine se règle en glissant le repère de l’effector sur le canvas, en mode Motion.');hdr.appendChild(rad[0]);hdr.appendChild(rad[1]);
     var str=num('%',function(v){eff.strength=v;},eff.strength!=null?eff.strength:100,1,'Force globale de cet effector (%) — multiplie toutes ses propriétés ci-dessous. 0% = aucun effet, 100% = plein effet au centre.');hdr.appendChild(str[0]);hdr.appendChild(str[1]);
     var delBtn=document.createElement('button');delBtn.className='pbtn';delBtn.textContent='✕';delBtn.style.marginLeft='auto';delBtn.title='Supprimer cet effector';
-    delBtn.addEventListener('click',function(){dup.effectors.splice(i,1);renderDuplicatorEffectors(dup);dupRefreshFromPanel();});
+    delBtn.addEventListener('click',function(){pushUndo();dup.effectors.splice(i,1);renderDuplicatorEffectors(dup);dupRefreshFromPanel();});
     hdr.appendChild(delBtn);
     if((eff.falloff||'radial')==='linear'){
       var angRow=line();
@@ -4718,7 +4768,7 @@ function renderDuplicatorEffectors(dup){
       nameLbl.title='Valeur appliquée aux copies les plus proches de cet effector (plein effet au centre, s’estompe jusqu’au rayon R) — pas la position de l’effector lui-même.';
       nameRow.appendChild(nameLbl);
       var rmCh=document.createElement('button');rmCh.className='pbtn';rmCh.textContent='✕';rmCh.style.marginLeft='auto';rmCh.title='Retirer cette propriété de l’effector';
-      rmCh.addEventListener('click',function(){channels.splice(ci,1);renderDuplicatorEffectors(dup);dupRefreshFromPanel();});
+      rmCh.addEventListener('click',function(){pushUndo();channels.splice(ci,1);renderDuplicatorEffectors(dup);dupRefreshFromPanel();});
       nameRow.appendChild(rmCh);
       var valRow=line();valRow.classList.add('dims-row');
       if(!ch.value)ch.value=[];
@@ -4740,6 +4790,7 @@ function renderDuplicatorEffectors(dup){
     });
     addSel.addEventListener('change',function(){
       if(!addSel.value)return;
+      pushUndo();
       var dim=M2?M2.propDim(addSel.value):1;
       channels.push({prop:addSel.value,value:new Array(dim).fill(0)});
       renderDuplicatorEffectors(dup);dupRefreshFromPanel();

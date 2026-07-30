@@ -2272,9 +2272,29 @@ function ensureSymbolPaperLayers(symId){
   return arr;
 }
 function genSymbolId(){return 'sym_'+Date.now()+'_'+Math.floor(Math.random()*10000);}
+// Refuses source types whose "content" isn't the plain `.frames` array a
+// component's symLayer clones below — mirrors mergeLayersIntoOne's own
+// refusal list (app.js, same reasoning: converting one of these would
+// either silently drop what it actually stands for, since a raw
+// JSON.parse(JSON.stringify(ld.frames)) clone doesn't capture a montage's
+// StoryBoard graph or a native video's decode source, or double-wrap
+// something already symbol-shaped). Missing here entirely before this fix
+// (2026-07-30) — convertLayerToComponent/convertLayersToComponent had no
+// type guard at all, unlike every sibling structural op.
+function badComponentSourceReason(l){
+  if(l.symbolId)return'un composant';
+  if(l.lfsGroup)return'un groupe Ligne/Plein/Ombre';
+  if(l.montageId)return'un calque de montage StoryBoard';
+  if(l.nativeVideo)return'un calque vidéo';
+  if(l.isNullLayer)return'un calque Null';
+  if(l.isEffectLayer)return'un calque d\'effet';
+  return null;
+}
 function convertLayerToComponent(layerIdx){
   if(state.activeSymbolId){showToast('Fermez d\'abord le composant en cours d\'édition');return;}
-  var ld=state.layers[layerIdx];if(!ld||ld.symbolId){showToast('Déjà un composant ou calque invalide');return;}
+  var ld=state.layers[layerIdx];if(!ld){showToast('Calque invalide');return;}
+  var bad=badComponentSourceReason(ld);
+  if(bad){showToast('Impossible de convertir : '+bad);return;}
   saveAllLayerFrames();pushUndo();
   var symId=genSymbolId();
   // groups (2026-07-29 fix, QA-confirmed combine-groups regression): the
@@ -2317,6 +2337,15 @@ function convertLayerToComponent(layerIdx){
 function convertLayersToComponent(indices){
   if(state.activeSymbolId){showToast('Fermez d\'abord le composant en cours d\'édition');return;}
   indices=indices.slice().sort(function(a,b){return a-b;}).filter(function(i){return state.layers[i]&&!state.layers[i].symbolId;});
+  // Type guard (2026-07-30 fix): the filter above only ever dropped
+  // already-symbolId layers silently — a montage/video/Null/effect layer
+  // sailed straight into symLayers below with its `.frames` blindly cloned,
+  // which for these types isn't the real content at all. Refuse with the
+  // SAME reasons convertLayerToComponent/mergeLayersIntoOne already use.
+  for(var bi=0;bi<indices.length;bi++){
+    var badReason=badComponentSourceReason(state.layers[indices[bi]]);
+    if(badReason){showToast('Impossible de convertir : la sélection contient '+badReason);return;}
+  }
   if(indices.length<2){convertLayerToComponent(indices[0]!==undefined?indices[0]:state.activeLayerIdx);return;}
   saveAllLayerFrames();pushUndo();
   var symId=genSymbolId();
@@ -2443,12 +2472,60 @@ function splitLayerIntoElementsCore(li,opts){
     }
     var entry=els[e];
     var emh=ld.elementMotion&&ld.elementMotion[entry.strokeId];
-    newLayers.push({
+    var nl={
       name:(ld.name||'Layer')+' — '+SMMotion.elementLabel(entry,e),
       visible:true,locked:false,frames:frames,color:nextLayerColor(),
       motion:(emh&&emh.motion)?JSON.parse(JSON.stringify(emh.motion)):undefined,
       motionStatic:(emh&&emh.motionStatic)?JSON.parse(JSON.stringify(emh.motionStatic)):undefined,
-    });
+      // blendMode/parentLayerUid(+B)/timeLink (2026-07-30 fix, same
+      // CLAUDE.md §1 shape already fixed once in convertLayersToComponent/
+      // mergeLayersIntoOne): ld's own OUTWARD references describe the whole
+      // original layer's spatial/time parenting, unrelated to which of the
+      // N pieces a given stroke landed in — every split-off layer keeps
+      // moving/timing with the same external parent ld had, or the group
+      // visibly drifts apart the moment any of them gets keyed. blendMode
+      // similarly composites per-layer against the accumulated frame below;
+      // applying it to every split-off layer reproduces the original
+      // single-pass blend exactly for non-overlapping shapes (the common
+      // case here) and is a reasonable approximation otherwise — same
+      // "flag rather than silently drop" tradeoff mergeLayersIntoOne makes.
+      blendMode:ld.blendMode,
+      parentLayerUid:ld.parentLayerUid,parentLayerUidB:ld.parentLayerUidB,
+      timeLink:ld.timeLink?JSON.parse(JSON.stringify(ld.timeLink)):undefined,
+    };
+    if(e===n-1){
+      // matteMode/layerUid: UNLIKE the fields above, these are positional —
+      // matteMode reads alpha from array adjacency (i+1, engine-bridge.js),
+      // so it only means something on whichever split-off layer ends up at
+      // ld's OLD highest index once spliced back in, i.e. the last one
+      // pushed here (newLayers[n-1] lands at li+n-1, still directly below
+      // whatever used to sit above ld). Setting it on every layer would
+      // instead matte each piece against its own SIBLING, not the intended
+      // external source. Keeping ld's layerUid string alive on this same
+      // layer (instead of leaving it undefined on all N, as before) means
+      // any OTHER layer's parentLayerUid/parentLayerUidB/timeLink.uid that
+      // pointed at ld keeps resolving with zero extra re-point pass needed
+      // — the uid itself never changes, only which layer object answers to it.
+      nl.matteMode=ld.matteMode;
+      if(ld.layerUid)nl.layerUid=ld.layerUid;
+    }
+    newLayers.push(nl);
+  }
+  // groups (combine-group definitions): only the LAST new layer can hold
+  // 2+ strokes (the "overflow" slice, strokes.slice(n-1)) — every other one
+  // holds exactly 1 stroke by construction and can't combine with anything.
+  // Even for that layer, only keep entries whose gid still appears on one
+  // of ITS OWN strokes, dropping any whose combine partner landed on a
+  // different single-stroke layer instead — a combine can't span layers,
+  // same unrepresentable-once-split limit matteMode has, just data-driven
+  // here since there's no single adjacency slot to assign it to.
+  if(ld.groups&&newLayers.length){
+    var lastLayer=newLayers[newLayers.length-1];
+    var keepGids={};
+    lastLayer.frames.forEach(function(f){(f.strokes||[]).forEach(function(sd){if(sd.groupId)keepGids[sd.groupId]=1;});});
+    var keptGroups={};
+    Object.keys(ld.groups).forEach(function(gid){if(keepGids[gid])keptGroups[gid]=ld.groups[gid];});
+    if(Object.keys(keptGroups).length)lastLayer.groups=JSON.parse(JSON.stringify(keptGroups));
   }
   var newUls=[];
   arcLayer.activate();
@@ -2596,6 +2673,12 @@ function mergeLayersIntoOne(indices,opts){
     name:name,visible:true,locked:false,frames:frames,
     color:srcs[0].color||nextLayerColor(),
     layerUid:srcs[0].layerUid,parentLayerUid:srcs[0].parentLayerUid,timeLink:srcs[0].timeLink,
+    // matteMode/blendMode: same field-drop bug already fixed once in
+    // convertLayersToComponent (§1) — recurred here in the sibling merge
+    // path. Inherited from the topmost (first) source, matching how
+    // everything else about the merged layer (color, layerUid, timeLink)
+    // is taken from srcs[0].
+    matteMode:srcs[0].matteMode,blendMode:srcs[0].blendMode,
   };
   if(Object.keys(elMotion).length)merged.elementMotion=elMotion;
   if(Object.keys(mergedGroups).length)merged.groups=mergedGroups;
@@ -2609,6 +2692,11 @@ function mergeLayersIntoOne(indices,opts){
   state.layers.forEach(function(other,oi){
     if(idx.indexOf(oi)>=0)return;
     if(other.parentLayerUid&&goneUids[other.parentLayerUid])other.parentLayerUid=merged.layerUid||null;
+    // parentLayerUidB (multi-parent blend, 2026-07-30): the spatial parent
+    // re-point above only ever touched parentLayerUid — parentLayerUidB is
+    // the exact same kind of uid reference and needs the same treatment or
+    // a blend's B side silently goes dead when its source gets merged away.
+    if(other.parentLayerUidB&&goneUids[other.parentLayerUidB])other.parentLayerUidB=merged.layerUid||null;
     // Same re-point for the TIME link (Parent in Time, 2026-07-26): a layer
     // whose time source disappears into the merge must follow the survivor,
     // or its link goes dead exactly like the spatial one would.
@@ -2816,13 +2904,30 @@ function enterSymbol(symId){
   // (exitToScene) and for StoryBoard's own document swap (enterMontageView/
   // exitMontageView).
   if(typeof clearSel==='function')clearSel();
-  _sceneSnapshot={layers:state.layers,totalFrames:state.totalFrames,waIn:state.waIn,waOut:state.waOut,activeLayerIdx:state.activeLayerIdx,fps:state.fps,currentFrame:state.currentFrame,userLayers:userLayers,cameraKeys:state.cameraKeys};
+  // markers/motionArcs/tweenOverrides/tweenEasing (2026-07-30 fix, same
+  // shape as cameraKeys just below): a symbol can hold plain vector layers
+  // with real per-shape tween overrides and its own comp markers, exactly
+  // like the outer scene — without swapping these too, they stayed the
+  // OUTER scene's live values the whole time a symbol was open, so editing
+  // easing/markers while inside silently wrote into the outer document's
+  // data at whatever frame indices happened to line up, instead of the
+  // symbol's own. See exitToScene for the write-back half of this pair —
+  // required here because timeline.js/markers.js reassign these wholesale
+  // in several places (trimToWorkArea, import, "clear all markers"), which
+  // severs a plain object/array alias the same way undo's restoreLayersSnapshot
+  // does for state.layers (see exitToScene's own sym.layers comment).
+  _sceneSnapshot={layers:state.layers,totalFrames:state.totalFrames,waIn:state.waIn,waOut:state.waOut,activeLayerIdx:state.activeLayerIdx,fps:state.fps,currentFrame:state.currentFrame,userLayers:userLayers,cameraKeys:state.cameraKeys,
+    markers:state.markers,motionArcs:state.motionArcs,tweenOverrides:state.tweenOverrides,tweenEasing:state.tweenEasing};
   userLayers.forEach(function(l){l.opacity=0.25;});
   var sym=state.symbols[symId];
   var symPaperLayers=ensureSymbolPaperLayers(symId);
   symPaperLayers.forEach(function(l){l.visible=true;l.opacity=1;});
   state.layers=sym.layers;state.totalFrames=sym.totalFrames;state.waIn=0;state.waOut=sym.totalFrames-1;
   state.cameraKeys=sym.cameraKeys||(sym.cameraKeys=[]);
+  state.markers=sym.markers||(sym.markers=[]);
+  state.motionArcs=sym.motionArcs||(sym.motionArcs={});
+  state.tweenOverrides=sym.tweenOverrides||(sym.tweenOverrides={});
+  state.tweenEasing=sym.tweenEasing||(sym.tweenEasing={});
   window._waIn=0;window._waOut=state.waOut;window._totalF=state.totalFrames;
   state.activeLayerIdx=0;state.currentFrame=0;state.fps=sym.fps||state.fps;
   userLayers=symPaperLayers;
@@ -2853,6 +2958,12 @@ function exitToScene(){
     // current array back here makes the alias an optimization rather than a
     // correctness requirement.
     sym.layers=state.layers;
+    // markers/motionArcs/tweenOverrides/tweenEasing write-back — same
+    // reasoning as sym.layers just above (see enterSymbol's comment for the
+    // full explanation): several call sites reassign these wholesale rather
+    // than mutating in place, which would otherwise silently strand any
+    // edit made inside the symbol the instant one of those call sites ran.
+    sym.markers=state.markers;sym.motionArcs=state.motionArcs;sym.tweenOverrides=state.tweenOverrides;sym.tweenEasing=state.tweenEasing;
   }
   var symLayers=_symbolPaperLayers[symId];if(symLayers)symLayers.forEach(function(l){l.visible=false;});
   state.layers=_sceneSnapshot.layers;state.totalFrames=_sceneSnapshot.totalFrames;state.waIn=_sceneSnapshot.waIn;state.waOut=_sceneSnapshot.waOut;
@@ -2860,6 +2971,7 @@ function exitToScene(){
   state.activeLayerIdx=_sceneSnapshot.activeLayerIdx;state.currentFrame=_sceneSnapshot.currentFrame;state.fps=_sceneSnapshot.fps;
   userLayers=_sceneSnapshot.userLayers;
   state.cameraKeys=_sceneSnapshot.cameraKeys;
+  state.markers=_sceneSnapshot.markers;state.motionArcs=_sceneSnapshot.motionArcs;state.tweenOverrides=_sceneSnapshot.tweenOverrides;state.tweenEasing=_sceneSnapshot.tweenEasing;
   userLayers.forEach(function(l){l.opacity=1;});
   state.activeSymbolId=null;_sceneSnapshot=null;
   activateUL(state.activeLayerIdx);drawStage();loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderSymbolTabs)renderSymbolTabs();
@@ -2902,7 +3014,20 @@ function enterMontageView(montageId){
   if(!mods.length){showToast('Montage vide — accrochez des instances contre son bloc d\'abord');return;}
   saveAllLayerFrames();
   if(typeof clearSel==='function')clearSel(); // see enterSymbol's own comment — same document-swap stale-selection risk
-  _montageViewSnapshot={layers:state.layers,totalFrames:state.totalFrames,waIn:state.waIn,waOut:state.waOut,activeLayerIdx:state.activeLayerIdx,fps:state.fps,currentFrame:state.currentFrame,userLayers:userLayers,cameraKeys:state.cameraKeys};
+  // markers/motionArcs/tweenOverrides/tweenEasing (2026-07-30 fix) — same
+  // swap+write-back pair as enterSymbol/exitToScene, kept on the montage
+  // module `m` itself (part of state.storyboard, already copied wholesale
+  // by exportJSON, so no new export plumbing needed). Montage-view segments
+  // are locked symbolId placements so genuine per-shape tweening rarely
+  // applies here, but markers plainly can, and leaving any of the four live
+  // against the outer scene's values for the swap's duration risked the
+  // exact same silent cross-context write enterSymbol's own comment covers.
+  _montageViewSnapshot={layers:state.layers,totalFrames:state.totalFrames,waIn:state.waIn,waOut:state.waOut,activeLayerIdx:state.activeLayerIdx,fps:state.fps,currentFrame:state.currentFrame,userLayers:userLayers,cameraKeys:state.cameraKeys,
+    markers:state.markers,motionArcs:state.motionArcs,tweenOverrides:state.tweenOverrides,tweenEasing:state.tweenEasing};
+  state.markers=m.markers||(m.markers=[]);
+  state.motionArcs=m.motionArcs||(m.motionArcs={});
+  state.tweenOverrides=m.tweenOverrides||(m.tweenOverrides={});
+  state.tweenEasing=m.tweenEasing||(m.tweenEasing={});
   userLayers.forEach(function(l){l.opacity=0.25;});
   var total=SMStoryboard.montageTotal(m);
   var newLayers=[],newUls=[],acc=0;
@@ -2942,12 +3067,18 @@ function exitMontageView(){
   if(state.activeSymbolId){showToast('Fermez d\'abord le composant en cours d\'édition');return;}
   saveAllLayerFrames();
   if(typeof clearSel==='function')clearSel(); // see enterSymbol's own comment
+  // Write back markers/motionArcs/tweenOverrides/tweenEasing onto the
+  // montage module itself — same pairing as enterMontageView's swap, same
+  // reasoning as exitToScene's sym.* write-back.
+  var mWB=window.SMStoryboard?SMStoryboard.montageById(state.activeMontageViewId):null;
+  if(mWB){mWB.markers=state.markers;mWB.motionArcs=state.motionArcs;mWB.tweenOverrides=state.tweenOverrides;mWB.tweenEasing=state.tweenEasing;}
   userLayers.forEach(function(l){l.remove();});
   state.layers=_montageViewSnapshot.layers;state.totalFrames=_montageViewSnapshot.totalFrames;state.waIn=_montageViewSnapshot.waIn;state.waOut=_montageViewSnapshot.waOut;
   window._waIn=state.waIn;window._waOut=state.waOut;window._totalF=state.totalFrames;
   state.activeLayerIdx=_montageViewSnapshot.activeLayerIdx;state.currentFrame=_montageViewSnapshot.currentFrame;state.fps=_montageViewSnapshot.fps;
   userLayers=_montageViewSnapshot.userLayers;
   state.cameraKeys=_montageViewSnapshot.cameraKeys;
+  state.markers=_montageViewSnapshot.markers;state.motionArcs=_montageViewSnapshot.motionArcs;state.tweenOverrides=_montageViewSnapshot.tweenOverrides;state.tweenEasing=_montageViewSnapshot.tweenEasing;
   userLayers.forEach(function(l){l.opacity=1;});
   state.activeMontageViewId=null;_montageViewSnapshot=null;
   activateUL(state.activeLayerIdx);drawStage();loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderSymbolTabs)renderSymbolTabs();
