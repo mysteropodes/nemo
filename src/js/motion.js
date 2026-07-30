@@ -3089,20 +3089,35 @@
     name.textContent = srcIdx >= 0 ? (state.layers[srcIdx].name || ('Layer ' + (srcIdx + 1)))
       : (ld.timeLink ? 'source introuvable' : '—');
     name.title = srcIdx >= 0 ? 'Cliquer pour délier' : 'Aucun lien temporel';
+    // UI/UX audit (2026-07-30): used to delete the link on a bare click,
+    // no confirmation — a real trap right next to the Parent row's pill
+    // one line up, which opens a menu on click instead of acting
+    // instantly. Now opens a one-item menu too, same idiom.
     name.addEventListener('click', function (e) {
       e.stopPropagation();
       if (!ld.timeLink) return;
-      pushUndo(); delete ld.timeLink;
-      renderLayerList(); renderTimeline();
-      if (window.loadFrame) loadFrame(state.currentFrame);
-      if (window.SMEngineBridge) SMEngineBridge.renderNow();
-      if (window.showToast) showToast('Lien temporel retiré');
+      if (!window.showContextMenu) return;
+      var r = name.getBoundingClientRect();
+      window.showContextMenu(r.left, r.bottom + 2, [
+        { label: 'Délier le temps', action: function () {
+          pushUndo(); delete ld.timeLink;
+          renderLayerList(); renderTimeline();
+          if (window.loadFrame) loadFrame(state.currentFrame);
+          if (window.SMEngineBridge) SMEngineBridge.renderNow();
+          if (window.showToast) showToast('Lien temporel retiré');
+        } },
+      ]);
     });
     row.appendChild(name);
 
     if (ld.timeLink) {
       // Which edges follow, and by how much.
-      var sel = document.createElement('select'); sel.className = 'motion-parent-select'; sel.style.marginLeft = '6px';
+      // UI/UX audit (2026-07-30): was a bare native <select> — the exact
+      // same bug class as the Parent row's own pill, fixed earlier this
+      // session (renderParentRow), reappearing one row below it. .psel is
+      // the app-wide styled-dropdown class (style.css), used everywhere
+      // else selects appear.
+      var sel = document.createElement('select'); sel.className = 'psel'; sel.style.marginLeft = '6px';
       [['both', 'entrée + sortie'], ['in', 'entrée seule'], ['out', 'sortie seule']].forEach(function (o) {
         var op = document.createElement('option'); op.value = o[0]; op.textContent = o[1];
         if ((ld.timeLink.mode || 'both') === o[0]) op.selected = true;
@@ -4059,6 +4074,19 @@
       var spacer = document.createElement('div'); spacer.className = 'frow motion-track-spacer';
       spacer.style.height = (refRow ? refRow.getBoundingClientRect().height : 90) + 'px';
       grid.appendChild(spacer);
+    }
+    // UI/UX report (2026-07-30, "encore pas mal de décalage d'ui dans la
+    // timeline motion"): buildAnchorGridRow (the 3x3 anchor-point picker,
+    // opened from the Anchor Point row's grid icon) is the SAME class of
+    // extra variable-height row as the expression editor just above — but
+    // had no matching spacer here at all, unlike the editor which was
+    // already fixed. Every row below an open anchor grid was silently
+    // shifted, same failure mode, just a second still-open instance of it.
+    if (prop === 'anchor' && window._anchorGridOpenFor === holder) {
+      var agRefRow = document.querySelector('#layer-list .motion-anchor-grid-row');
+      var agSpacer = document.createElement('div'); agSpacer.className = 'frow motion-track-spacer';
+      agSpacer.style.height = (agRefRow ? agRefRow.getBoundingClientRect().height : 60) + 'px';
+      grid.appendChild(agSpacer);
     }
   }
   // Selecting a layer from the GRID half of the timeline (2026-07-27:
