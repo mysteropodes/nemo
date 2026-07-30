@@ -151,9 +151,17 @@
 
   var SHORT_NAME = {
     'brush-menu': 'Brosses (vecteur/bitmap)',
-    'shadow-brush': 'Shadow Brush (lignes de délimitation, calque Shadow)',
-    'symmetry': 'Guide de symétrie / mandala',
-    'perspective': 'Guide de perspective',
+    // UI/UX audit (2026-07-30): the only real explanation of this tool
+    // lived in English on a checkbox buried in Export options, nowhere
+    // near this icon — the actual discovery point for a first-time user.
+    'shadow-brush': 'Shadow Brush — dessine des lignes de délimitation dans une couleur dédiée, pour séparer trait/fond/ombre sans que ce soit du dessin final',
+    // UI/UX audit (2026-07-30): both of these restated their own name —
+    // the ONLY tooltip either tool has anywhere (their sole discovery
+    // point is this Labs icon), so a first-time user had no way to learn
+    // what enabling them actually does before poking around. No After
+    // Effects equivalent for either, unlike most of this panel's tools.
+    'symmetry': 'Guide de symétrie — dessine en miroir de part et d’autre d’un axe déplaçable',
+    'perspective': 'Guide de perspective — trace des rayons convergents vers un ou plusieurs points de fuite déplaçables',
     'predictive-stroke': 'Trait prédictif',
     'multiframe-draw': 'Dessin multi-frames',
     'canvas-grid': 'Grille',

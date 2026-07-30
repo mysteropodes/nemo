@@ -1230,6 +1230,12 @@
         timeOffset: { enabled: false, offsetFrames: 1, direction: 'forward' },
       };
       ld.locked = true;
+      // UI/UX audit (2026-07-30): enabling this dumps ~15 fields into the
+      // panel at once (Mode, grille, radial, chemin, seed, 4 toggles
+      // random, décalage temporel, Effectors...) with zero feedback that
+      // anything happened — Time Remap's own enable already toasts a
+      // one-line summary (enableTimeRemap below); this had nothing.
+      if (window.showToast) showToast('Duplicator activé — grille 2×3 par défaut, réglable dans le panel');
     }
     loadFrame(state.currentFrame);
     invalidateSymbolUnionBounds(); // same cache-staleness fix as dupRefresh (timeline.js)
@@ -2897,7 +2903,15 @@
           { label: '   • le point de sortie' + (ld.keyLock === 'out' ? '  ✓' : ''), action: function () { window.SM.setLayerKeyLock(li, ld.keyLock === 'out' ? null : 'out'); } },
           { label: '   • le calque entier' + (ld.keyLock === 'layer' ? '  ✓' : ''), action: function () { window.SM.setLayerKeyLock(li, ld.keyLock === 'layer' ? null : 'layer'); } },
           { label: 'Ajouter un repère sur ce calque', action: function () { if (window.SMMarkers) SMMarkers.addLayerMarker(li, state.currentFrame, ''); } },
-          { label: ld.timeRemap ? 'Désactiver le remappage temporel' : 'Activer le remappage temporel', disabled: !ld.symbolId,
+          // UI/UX audit (2026-07-30): used to grey this out via `disabled`
+          // when the layer isn't a Component — showContextMenu has no
+          // hover-title mechanism for disabled rows, so that state
+          // explained nothing. enableTimeRemap already has the exact
+          // guard toast needed ('Le remappage temporel s'applique aux
+          // calques composants') — leaving the row always clickable lets
+          // that existing message do the explaining instead of a silent
+          // grey row.
+          { label: ld.timeRemap ? 'Désactiver le remappage temporel' : 'Activer le remappage temporel',
             action: function () { ld.timeRemap ? disableTimeRemap(li) : enableTimeRemap(li); } },
           { label: 'Fusionner les calques sélectionnés', disabled: !multi, action: function () { window.SM.mergeLayersIntoOne(_layerSel.slice()); } },
           { sep: true },
@@ -3071,6 +3085,7 @@
   function renderTimeLinkRow(body, ld, li) {
     var row = document.createElement('div'); row.className = 'lrow motion-prop-row';
     var label = document.createElement('span'); label.textContent = 'Temps'; label.style.minWidth = '70px';
+    label.title = 'Lie le temps de ce calque à celui d’un autre — quand le calque source avance, recule ou est décalé dans la timeline, celui-ci suit. Utile pour garder plusieurs calques synchronisés sans les animer un par un.';
     row.appendChild(label);
 
     var whip = document.createElement('span');
