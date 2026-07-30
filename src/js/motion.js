@@ -3158,7 +3158,14 @@
     }
     return false;
   }
-  function startTimeLinkPickwhip(li, fromEl, ev) {
+  // mode ('both'|'in'|'out') — which edge(s) the resulting link drives.
+  // Defaults to 'both' for the original single side-panel pickwhip; the
+  // on-timeline-bar connection points (layer-inout.js, Van Dijk 2.1's 3
+  // anchor points — In Point/Out Point/whole Layer) pass 'in'/'out'
+  // explicitly. Exported via SMMotion so layer-inout.js (outside this
+  // file's IIFE) can call the SAME drag-line/cycle-check/link-creation
+  // logic instead of a second implementation (CLAUDE.md §3).
+  function startTimeLinkPickwhip(li, fromEl, ev, mode) {
     ev.stopPropagation(); ev.preventDefault();
     var r0 = fromEl.getBoundingClientRect();
     var ox = r0.left + r0.width / 2, oy = r0.top + r0.height / 2;
@@ -3203,7 +3210,7 @@
       // layer jump: it stays exactly where it is and only starts following.
       var myIn = layerInPoint(ld), myOut = layerOutPoint(ld);
       var seedInOff = myIn - layerInPoint(src), seedOutOff = myOut - layerOutPoint(src);
-      ld.timeLink = { uid: ensureLayerUid(src), mode: 'both' };
+      ld.timeLink = { uid: ensureLayerUid(src), mode: mode || 'both' };
       // Offsets are Motion properties now (timeLinkInOffset/Out) — write
       // through setValue like any other, not a raw field on the link.
       setValue(ld, 'timeLinkInOffset', [seedInOff]);
@@ -3211,7 +3218,8 @@
       renderLayerList(); renderTimeline();
       if (window.loadFrame) loadFrame(state.currentFrame);
       if (window.SMEngineBridge) SMEngineBridge.renderNow();
-      if (window.showToast) showToast('Temps lié à « ' + (src.name || ('Layer ' + (t.idx + 1))) + ' »');
+      var modeLabel = mode === 'in' ? ' (entrée)' : mode === 'out' ? ' (sortie)' : '';
+      if (window.showToast) showToast('Temps lié à « ' + (src.name || ('Layer ' + (t.idx + 1))) + ' »' + modeLabel);
     }
     function onKey(e) { if (e.key === 'Escape') cleanup(); }
     document.addEventListener('mousemove', onMove, true);
@@ -5201,6 +5209,11 @@
 
   window.SMMotion = {
     valueAtFrame: valueAtFrame,
+    // Parent in Time on-timeline connector (2026-07-30, Van Dijk 2.1) —
+    // layer-inout.js calls this directly so the 3 on-bar anchor points
+    // (in/out/whole layer) share the exact same drag/cycle-check/link-
+    // creation logic as the original side-panel "Temps" pickwhip.
+    startTimeLinkPickwhip: startTimeLinkPickwhip,
     // 3D layers (2026-07-28) — see make3DProjector/project3DSegments' own
     // doc comment (Grease-Pencil-style: vertices move in 3D, stroke width
     // never scales).

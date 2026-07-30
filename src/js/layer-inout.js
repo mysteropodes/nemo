@@ -46,6 +46,7 @@
     bar.style.width = Math.max(FC, (outF - inF + 1) * FC) + 'px';
     var custom = hasCustomRange(ld);
     bar.classList.toggle('full-range', !custom);
+    bar.classList.toggle('has-timelink', !!ld.timeLink);
     // Layer-color tint ALWAYS applied now (2026-07-17, explicit request:
     // "il faut que ça couleur soit déjà appliqué quoi qu'il arrive" — a
     // layer previously only showed its own color once trimmed, reading as
@@ -780,6 +781,25 @@
     hright.title = 'Point de sortie — glisser pour rogner (les keyframes ne bougent pas : rogner la fin ne déplace rien).';
     bar.title = 'Glisser le corps : déplace le calque ET ses keyframes. Alt+glisser : déplacer la fenêtre de visibilité seule, keyframes en place.';
     bar.appendChild(hleft); bar.appendChild(hright);
+    // Parent in Time — 3 on-timeline connection points (2026-07-30, Van
+    // Dijk 2.1). Glisser directement depuis la barre plutôt que par le
+    // panel latéral "Temps" — même lien (ld.timeLink), juste l'endroit du
+    // geste qui change. Un seul lien par geste (confirmé avec Cyril, pas
+    // de multi-calques en un coup) ; réutilise startTimeLinkPickwhip
+    // (motion.js, exposé via SMMotion) pour le drag/le anti-cycle/la
+    // création du lien, pas une seconde implémentation.
+    ['in', 'whole', 'out'].forEach(function (mode) {
+      var a = document.createElement('div');
+      a.className = 'timelink-anchor ' + mode;
+      a.title = mode === 'in' ? 'Glisser vers un autre calque : lie le point d’entrée de ce calque à son temps'
+        : mode === 'out' ? 'Glisser vers un autre calque : lie le point de sortie de ce calque à son temps'
+        : 'Glisser vers un autre calque : lie tout le calque (entrée + sortie) à son temps';
+      a.addEventListener('mousedown', function (e) {
+        if (!window.SMMotion || !window.SMMotion.startTimeLinkPickwhip) return;
+        window.SMMotion.startTimeLinkPickwhip(li, a, e, mode === 'whole' ? 'both' : mode);
+      });
+      bar.appendChild(a);
+    });
     row.appendChild(bar);
     updateBar(row, li);
     _rowLayerIdx.set(row, li);
