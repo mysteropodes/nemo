@@ -1525,6 +1525,21 @@
   // reading these two dedicated onion layers instead.
   function onionLayerItems(layer) {
     var items = [];
+    // 3D layers (2026-07-30 fix, QA sweep) — onionPrevLayer/onionNextLayer/
+    // ghostAllLayer are always a ghosted copy of the CURRENTLY ACTIVE layer
+    // specifically (renderOS/renderGhostAll, tweens.js, both key off
+    // state.activeLayerIdx), so unlike buildSceneJson's own per-item 3D
+    // branch (which has to handle every layer), this only ever needs ONE
+    // projector for the whole call. Without it, a 3D layer's onion-skin/
+    // Ghost-All ghosts rendered flat/unprojected while the real current-
+    // frame content next to them rendered correctly projected — visibly
+    // misaligned. Exact same pattern as buildRigPreviewItems' own 3D branch
+    // a few hundred lines down in this file (same "active layer only"
+    // scope), reused rather than re-derived.
+    var activeLd = state.layers[state.activeLayerIdx];
+    var is3DActive = !!(activeLd && activeLd.threeD);
+    var bounds3D = (is3DActive && userLayers[state.activeLayerIdx]) ? userLayers[state.activeLayerIdx].bounds : null;
+    var onionProjector3D = (is3DActive && window.SMMotion && SMMotion.make3DProjector && bounds3D) ? SMMotion.make3DProjector(activeLd, bounds3D, state.currentFrame, state.canvasW, state.canvasH) : null;
     layer.children.forEach(function (c) {
       // Same Shadow Brush guide-line filter as buildSceneJson() above — an
       // onion-skin/Ghost-All ghost of a shadow-tagged guide line shouldn't
@@ -1538,6 +1553,7 @@
         var imageId = registerRasterIfNeeded(c);
         if (imageId) {
           var rb = rasterImageRect(c); // same rotation-aware rect as buildSceneJson's own Raster branch
+          if (onionProjector3D) rb = SMMotion.project3DImageRect(rb, onionProjector3D);
           items.push({ image: { imageId: imageId, x: rb.x, y: rb.y, width: rb.width, height: rb.height, opacity: c.opacity !== undefined ? c.opacity : 1, rotation: rb.rotation || 0 } });
         }
         return;
@@ -1552,6 +1568,7 @@
       else return;
       subPaths.forEach(function (sub) {
         var sd = serP(sub);
+        if (onionProjector3D) sd.segments = SMMotion.project3DSegments(sd.segments, onionProjector3D);
         var op = c.opacity !== undefined ? c.opacity : 1;
         items.push({
           segments: roundSegs(sd.segments),
