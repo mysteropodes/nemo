@@ -358,6 +358,7 @@
       var c1=[tX(e2[0]),tY(e2[1],yr)],c2=[tX(e2[2]),tY(e2[3],yr)];
       var d1=Math.hypot(mx-c1[0],my-c1[1]),d2=Math.hypot(mx-c2[0],my-c2[1]);
       if(window.pushUndo)window.pushUndo(); // camera ease is part of the framing — Cmd+Z restores it too
+      window._scrubLiveActive=true; // see mouseup below + dragTangent's own comment — no pushCurve on this path today, kept consistent so a future one can't reopen the flood
       camDragWhich=d1<=d2?0:1;
       return;
     }
@@ -372,6 +373,14 @@
         for(var hi2=0;hi2<hs.length;hi2++){
           if(Math.hypot(mx-tX(hs[hi2].x),my-tY(hs[hi2].y,yrT))<10){
             if(window.pushUndo)window.pushUndo(); // one undo per tangent gesture — same convention as the camera handles above
+            // 2026-07-30 fix: this pushUndo() was the only real snapshot —
+            // nothing raised _scrubLiveActive afterward, so every mousemove
+            // tick's pushCurve()→...→generateTweens()→pushUndoLayers() (tween
+            // mode) pushed its OWN full undo entry, unthrottled, for the
+            // whole drag. A single tangent drag with the multi-select easing
+            // apply (pushCurve fans out to every selected tween pair) could
+            // evict the entire 60-entry undo cap in well under a second.
+            window._scrubLiveActive=true;
             dragTangent={idx:selected,dir:hs[hi2].dir};
             return;
           }
@@ -379,6 +388,14 @@
       }
     }
     var hit=hitT(mx,my);
+    // 2026-07-30 fix: unlike the camera-handle and tangent-handle drags just
+    // above (both already call pushUndo once per gesture), plain point-drag
+    // had NEITHER a pre-gesture snapshot NOR the _scrubLiveActive guard —
+    // every mousemove tick's pushCurve()→pushUndoLayers() (tween mode) was a
+    // full, unguarded undo entry, so Ctrl+Z after a drag only undid its last
+    // tick instead of the whole gesture, and the flood could evict the
+    // 60-entry undo cap on its own.
+    if(hit>=0){if(window.pushUndo)window.pushUndo();window._scrubLiveActive=true;}
     dragging=hit>=0?hit:null;
     if(hit>=0){selected=hit;showTangents=e.altKey;}
     else showTangents=false; // plain click off any point clears the sticky reveal
@@ -436,7 +453,17 @@
     p.y=Math.max(-1,Math.min(2,ny));
     draw();pushCurve();
   });
-  window.addEventListener('mouseup',function(){dragging=null;camDragWhich=null;dragTangent=null;});
+  window.addEventListener('mouseup',function(){
+    // No extra commit needed here (verified live, 2026-07-30 — an earlier
+    // version of this fix added one and it double-pushed): mousemove above
+    // already calls pushCurve() on EVERY tick, including the last one right
+    // before mouseup, so the final point position and its generateTweens
+    // re-bake are already applied by the time this fires. All this needs to
+    // do is close out the gesture — clearing _scrubLiveActive is what lets
+    // the NEXT unrelated pushUndoLayers() call through again.
+    dragging=null;camDragWhich=null;dragTangent=null;
+    window._scrubLiveActive=false;
+  });
   cvs.addEventListener('dblclick',function(e){
     if(isCamMode())return; // camera mode has exactly 2 fixed control points, nothing to add
     rect=cvs.getBoundingClientRect();

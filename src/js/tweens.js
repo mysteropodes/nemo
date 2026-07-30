@@ -4300,7 +4300,28 @@ function _cloneLayersForUndo(layers){
   var j2=0;_walkStrokes(c,function(s){var e=saved[j2++];if(e)for(var k in e)s[k]=e[k];});
   return c;
 }
-function layersSnapshotNow(){return{type:'layers',layers:_cloneLayersForUndo(state.layers),active:state.activeLayerIdx,totalFrames:state.totalFrames,cameraKeys:JSON.parse(JSON.stringify(state.cameraKeys||[]))};}
+// symbolId/montageViewId (2026-07-30 fix): a snapshot's `layers` is whatever
+// state.layers currently ALIASES — the outer scene, or (enterSymbol/
+// enterMontageView) a symbol's or montage-view's own private array. Undo/
+// redo used to restore blind: pop a snapshot, overwrite state.layers,
+// done — with zero record of which document it came from. Push a snapshot
+// while inside a symbol, exit to the outer scene (exitToScene's own
+// sym.layers write-back keeps the symbol's copy correct), then hit Ctrl+Z:
+// restoreLayersSnapshot would silently install the SYMBOL's old layers into
+// the OUTER scene's state.layers, with activeSymbolId reading null the
+// whole time — no toast, no visual hint beyond content that's suddenly
+// wrong. Tagging here is what undo()/redo() below check before restoring.
+function layersSnapshotNow(){return{type:'layers',layers:_cloneLayersForUndo(state.layers),active:state.activeLayerIdx,totalFrames:state.totalFrames,cameraKeys:JSON.parse(JSON.stringify(state.cameraKeys||[])),
+  symbolId:state.activeSymbolId||null,montageViewId:state.activeMontageViewId||null};}
+// Human-readable "where this undo entry belongs", for the cross-context
+// guard in undo()/redo() below. Falls back to '?' for a symbol/montage
+// deleted since the snapshot was taken — still names the RIGHT KIND of
+// context even if the specific one is gone.
+function _undoContextLabel(symbolId,montageViewId){
+  if(symbolId){var sym=state.symbols&&state.symbols[symbolId];return'le composant « '+(sym?sym.name:'?')+' »';}
+  if(montageViewId){var m=window.SMStoryboard&&SMStoryboard.montageById(montageViewId);return'le montage « '+((m&&m.name)?m.name:'?')+' »';}
+  return'la Scène principale';
+}
 // Human-readable description of "what's about to happen", captured at the
 // SAME moment as the snapshot (pushUndoLayers runs before the mutation it
 // guards, so this reflects the active tool/frame/layer context of the
@@ -4373,13 +4394,30 @@ function restoreLayersSnapshot(s){
 // Both branches below rewrite frame strokes; Motion's component union-bounds
 // cache is derived from those, so drop it here rather than in each branch.
 function undo(){if(window.SMMotion&&SMMotion.invalidateSymbolUnionBounds)SMMotion.invalidateSymbolUnionBounds();
-if(!state.undoStack.length){showToast('Rien à annuler');return;}var s=state.undoStack.pop();var sl=state.undoLabels.pop()||_actionLabelNow();
+if(!state.undoStack.length){showToast('Rien à annuler');return;}
+// Cross-context guard (2026-07-30 fix) — PEEK before popping: a mismatched
+// entry stays on the stack untouched so the user can navigate to the right
+// symbol/montage/scene and undo it from there, instead of it being silently
+// consumed (or worse, silently misapplied) from here.
+var top=state.undoStack[state.undoStack.length-1];
+if(top.type==='layers'&&((top.symbolId||null)!==(state.activeSymbolId||null)||(top.montageViewId||null)!==(state.activeMontageViewId||null))){
+  showToast('Dernière action faite dans '+_undoContextLabel(top.symbolId,top.montageViewId)+' — retournez-y pour l’annuler');
+  return;
+}
+var s=state.undoStack.pop();var sl=state.undoLabels.pop()||_actionLabelNow();
 if(s.type==='layers'){state.redoStack.push(layersSnapshotNow());state.redoLabels.push(sl);restoreLayersSnapshot(s);if(window.renderHistoryPanelIfOpen)renderHistoryPanelIfOpen();return;}
 var cur={frame:state.currentFrame,layers:[]};for(var i=0;i<state.layers.length;i++){var f=state.layers[i].frames[state.currentFrame];cur.layers.push({strokes:JSON.parse(JSON.stringify(f.strokes)),isKeyframe:f.isKeyframe,isInterpolated:f.isInterpolated});}state.redoStack.push(cur);state.redoLabels.push(sl);for(var i2=0;i2<s.layers.length&&i2<state.layers.length;i2++){var tf=state.layers[i2].frames[s.frame];tf.strokes=s.layers[i2].strokes;tf.isKeyframe=s.layers[i2].isKeyframe;tf.isInterpolated=s.layers[i2].isInterpolated;}if(s.frame!==state.currentFrame)state.currentFrame=s.frame;loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderHistoryPanelIfOpen)renderHistoryPanelIfOpen();}
 // Both branches below rewrite frame strokes; Motion's component union-bounds
 // cache is derived from those, so drop it here rather than in each branch.
 function redo(){if(window.SMMotion&&SMMotion.invalidateSymbolUnionBounds)SMMotion.invalidateSymbolUnionBounds();
-if(!state.redoStack.length){showToast('Rien à refaire');return;}var s=state.redoStack.pop();var sl=state.redoLabels.pop()||_actionLabelNow();
+if(!state.redoStack.length){showToast('Rien à refaire');return;}
+// Same cross-context guard as undo() above, mirrored for the redo stack.
+var top=state.redoStack[state.redoStack.length-1];
+if(top.type==='layers'&&((top.symbolId||null)!==(state.activeSymbolId||null)||(top.montageViewId||null)!==(state.activeMontageViewId||null))){
+  showToast('Dernière action faite dans '+_undoContextLabel(top.symbolId,top.montageViewId)+' — retournez-y pour la refaire');
+  return;
+}
+var s=state.redoStack.pop();var sl=state.redoLabels.pop()||_actionLabelNow();
 if(s.type==='layers'){state.undoStack.push(layersSnapshotNow());state.undoLabels.push(sl);restoreLayersSnapshot(s);if(window.renderHistoryPanelIfOpen)renderHistoryPanelIfOpen();return;}
 var cur={frame:state.currentFrame,layers:[]};for(var i=0;i<state.layers.length;i++){var f=state.layers[i].frames[state.currentFrame];cur.layers.push({strokes:JSON.parse(JSON.stringify(f.strokes)),isKeyframe:f.isKeyframe,isInterpolated:f.isInterpolated});}state.undoStack.push(cur);state.undoLabels.push(sl);for(var i2=0;i2<s.layers.length&&i2<state.layers.length;i2++){var tf=state.layers[i2].frames[s.frame];tf.strokes=s.layers[i2].strokes;tf.isKeyframe=s.layers[i2].isKeyframe;tf.isInterpolated=s.layers[i2].isInterpolated;}if(s.frame!==state.currentFrame)state.currentFrame=s.frame;loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderHistoryPanelIfOpen)renderHistoryPanelIfOpen();}
 
