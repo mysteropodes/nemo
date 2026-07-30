@@ -5014,6 +5014,57 @@
   // effects panel keeps them in eff.keys[param].keys, see
   // effects-panel.js's ensureParamTrack). Missing any one of them is the
   // CLAUDE.md §1 shape of bug: retimed in one reader, stale in the others.
+  // Cheap LIVE visual preview during a layer-bar/in-out drag (layer-inout.js
+  // calls this from its mousemove, once per event) — 2026-07-30, Cyril:
+  // "les clé ne bouge pas en temp réel avec calque ou in/outpoint". The
+  // actual data commit (shiftLayerMotionKeys/shiftKeySelection below) still
+  // only runs ONCE, at drop — same "cheap live visual, expensive commit at
+  // drop" split as updateBar's own bar-position preview, not a live
+  // shiftLayerMotionKeys call on every mousemove (which touches ld.motion,
+  // ld.elementMotion, ld.effects and per-element effects across the whole
+  // layer — see that function's own header comment on how much it walks —
+  // and would reintroduce exactly the per-mousemove-rebuild cost CLAUDE.md
+  // §5bis already paid down once for this same timeline).
+  //
+  // 'layer' mode only moves diamonds in tracks belonging to `li` (its own
+  // holder plus each per-element holder) that are CURRENTLY RENDERED —
+  // collapsed/hidden rows have no diamonds on screen to preview, and the
+  // drop-time commit (which touches every track regardless of visibility)
+  // is unaffected by that scoping. 'selected' mode ignores `li` and moves
+  // whatever's already tagged .sel, mirroring shiftKeySelection's own
+  // target. Purely a transform on existing DOM nodes — the next real
+  // renderTimeline() (drop, or anything else that rebuilds the grid) throws
+  // these nodes away, so nothing needs undoing on the data side.
+  function previewKeyframeShift(li, dxFrames, mode) {
+    if (!dxFrames) return;
+    var px = Math.round(dxFrames * FC);
+    var holders = null;
+    if (mode !== 'selected') {
+      var ld = state.layers[li];
+      if (!ld) return;
+      holders = [ld];
+      if (ld.elementMotion) Object.keys(ld.elementMotion).forEach(function (k) { holders.push(ld.elementMotion[k]); });
+    }
+    document.querySelectorAll('#frame-grid .motion-track-row').forEach(function (rowEl) {
+      var dias;
+      if (mode === 'selected') {
+        dias = rowEl.querySelectorAll('.motion-key.sel');
+      } else {
+        if (holders.indexOf(rowEl._smHolder) < 0) return;
+        dias = rowEl.querySelectorAll('.motion-key');
+      }
+      dias.forEach(function (d) { d.style.transform = 'translateX(' + px + 'px)'; });
+    });
+  }
+  // Called once at drag START (before the first preview) and at drop —
+  // stray transforms must never survive past either boundary: a fresh drag
+  // that never qualifies for a preview (e.g. an out-drag, never retimes)
+  // must not inherit a PRIOR drag's leftover offset, and a drop always
+  // rebuilds via renderTimeline() but only on the branches that actually
+  // reach it (defensive here rather than trusting every return path does).
+  function clearKeyframeShiftPreview() {
+    document.querySelectorAll('#frame-grid .motion-key').forEach(function (d) { if (d.style.transform) d.style.transform = ''; });
+  }
   function shiftLayerMotionKeys(li, dx) {
     var ld = state.layers[li];
     if (!ld || !dx) return false;
@@ -5565,6 +5616,8 @@
     setLayerParentB: setLayerParentB,
     blendedParentContributionFor3D: blendedParentContributionFor3D,
     shiftLayerMotionKeys: shiftLayerMotionKeys,
+    previewKeyframeShift: previewKeyframeShift,
+    clearKeyframeShiftPreview: clearKeyframeShiftPreview,
     exprGlobals: exprGlobals,
     setExprGlobals: function (code) {
       state.exprGlobals = code || '';
