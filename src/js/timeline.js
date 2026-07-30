@@ -3824,6 +3824,15 @@ window.addEventListener('mouseup',function(){
 // Multi-selection of layer rows (Cmd/Ctrl+click toggles, Shift+click
 // ranges); operations like Delete apply to the whole set.
 var _layerSel=[];
+// Frozen Shift-range anchor for the layer selection (2026-07-31 unification
+// pass). Both row handlers (Animation 2D below, Motion's renderLayerListMotion)
+// previously derived the anchor from _layerSel[0] — the CURRENT first element
+// of the live array — which silently relocates after any Shift-click toward a
+// LOWER index (the rebuilt range's [0] is min(anchor,idx), not the original
+// anchor). layer-inout.js's _barAnchorLi already avoids this exact drift with
+// a dedicated variable Shift never touches; this is the same contract for the
+// layer list: set on every plain click and Ctrl-toggle, read-only for Shift.
+var _layerSelAnchor=-1;
 // Inline rename — window.prompt() is silently ignored by Tauri's WKWebView,
 // so the row's label swaps to a real text input instead.
 function startLayerRename(idx){
@@ -4476,10 +4485,16 @@ function renderLayerList(frameOnly){
       if(e.metaKey||e.ctrlKey){
         if(_layerSel.indexOf(state.activeLayerIdx)<0)_layerSel.push(state.activeLayerIdx);
         var p=_layerSel.indexOf(idx);if(p>=0)_layerSel.splice(p,1);else _layerSel.push(idx);
-      }else if(e.shiftKey&&_layerSel.length){
-        var anchor=_layerSel[0];_layerSel=[];
+        _layerSelAnchor=idx;
+      }else if(e.shiftKey){
+        // Frozen anchor (see _layerSelAnchor's declaration comment) with the
+        // same cold-start fallback Motion's handler already had — the old
+        // `&&_layerSel.length` guard made the very first Shift-click here a
+        // plain select instead of a range from the active layer.
+        var anchor=(_layerSelAnchor>=0&&_layerSelAnchor<state.layers.length)?_layerSelAnchor:(_layerSel.length?_layerSel[0]:state.activeLayerIdx);
+        _layerSel=[];
         for(var l=Math.min(anchor,idx);l<=Math.max(anchor,idx);l++)_layerSel.push(l);
-      }else _layerSel=[idx];
+      }else{_layerSel=[idx];_layerSelAnchor=idx;}
       window.SM.setActiveLayer(idx);
     });
     row.addEventListener('dblclick',function(){var idx3=parseInt(this.dataset.layer);var l2=state.layers[idx3];if(l2.symbolId){window.SM.enterSymbol(l2.symbolId);return;}if(l2.lfsGroup){window.SM.enterSymbol(l2.lfsIds.full);return;}startLayerRename(idx3);});
