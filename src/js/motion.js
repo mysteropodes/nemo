@@ -2872,7 +2872,7 @@
         tlb2.addEventListener('click', function (e) { e.stopPropagation(); });
         tlb2.addEventListener('contextmenu', function (e) {
           e.preventDefault(); e.stopPropagation();
-          pushUndo(); delete ld.timeLink;
+          pushUndo(); unlinkTimeLinkPreserveRange(ld);
           renderLayerList(); renderTimeline();
           if (window.loadFrame) loadFrame(state.currentFrame);
           if (window.SMEngineBridge) SMEngineBridge.renderNow();
@@ -3253,7 +3253,7 @@
     // menu was an easy miss; right-click is the fast, hard-to-fumble path
     // he asked for, kept alongside the menu rather than replacing it).
     function unlinkTime() {
-      pushUndo(); delete ld.timeLink;
+      pushUndo(); unlinkTimeLinkPreserveRange(ld);
       renderLayerList(); renderTimeline();
       if (window.loadFrame) loadFrame(state.currentFrame);
       if (window.SMEngineBridge) SMEngineBridge.renderNow();

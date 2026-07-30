@@ -2049,6 +2049,23 @@ function layerOutPoint(ld,_seen,_depth){
   var auto=autoOutPointFromBlankKeyframe(ld);
   return auto!=null?auto:state.totalFrames-1;
 }
+// Right-click unlink (2026-07-30, on-timeline anchors/badges/Temps row) must
+// leave the layer exactly where it LOOKED while linked — a bare `delete
+// ld.timeLink` makes layerInPoint/layerOutPoint above fall through to
+// ld.inPoint/outPoint, which are UNSET on a linked layer (trySetLinkedEdge/
+// reconcileTimeLinks, layer-inout.js, never write them while a link covers
+// that edge) — so deleting the link alone silently reset the layer to full
+// range. Found live: Cyril, "le calque se reset alors qu'il doit rester
+// comme il était en étant parent, juste le parent in time désactivé."
+// Capture the CURRENT resolved values before deleting the link and bake
+// them as the new hard ld.inPoint/outPoint — every unlink call site should
+// go through this instead of deleting the link directly.
+function unlinkTimeLinkPreserveRange(ld){
+  if(!ld||!ld.timeLink)return;
+  var effIn=layerInPoint(ld),effOut=layerOutPoint(ld);
+  delete ld.timeLink;
+  ld.inPoint=effIn;ld.outPoint=effOut;
+}
 // Each branch below does an unconditional early `return`, so if a layer
 // ever ended up with more than one of nativeVideo/montageId/lfsGroup/
 // symbolId set (shouldn't happen — each is assigned by its own distinct,
