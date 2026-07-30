@@ -249,11 +249,23 @@ var _rigDraw = { path: null, boneId: null, ld: null, draggingHandle: false, last
       // the bone is finished — see that function's own comment for the bug
       // this fixes (crash when the active layer changes mid-draw).
       _rigDraw.ld = ld;
-      // Auto-continuation from an existing OPEN bone's endpoint (same trick
-      // pen-bridge.js uses for ordinary paths) — lets a skeleton branch by
-      // starting the next bone right at a previous one's tip.
+      // Proximity to an existing OPEN bone's endpoint (same trick
+      // pen-bridge.js uses for ordinary paths) — two DIFFERENT things
+      // depending on Alt, both starting at that exact tip:
+      //  - plain click (2026-07-30 fix, "il manque pas mal de chose"): a
+      //    genuine BRANCH — a brand-new bone, its own id, coincidentally
+      //    starting at the same point. This is what a skeleton actually
+      //    needs (spine->arm->forearm is a tree, not one ever-longer path)
+      //    and what rigDragIKEnd's chain-of-two-bones math (app.js) is
+      //    built to walk — it needs two SEPARATE bones sharing a joint,
+      //    not one 3-point bone, to have a joint to bend at all.
+      //  - Alt+click: the OLD default — reopen and EXTEND the same bone
+      //    (same id), for the rarer case of continuing a curve you
+      //    finished a segment early on. The comment here used to claim
+      //    "branch" while the code actually always did this — now true
+      //    either way, spelled out instead of contradicting the code.
       var tolExt = 10 / view.zoom;
-      var bestD = tolExt, bestBoneId = null, bestEnd = null;
+      var bestD = tolExt, bestBoneId = null, bestEnd = null, bestPt = null;
       Object.keys(ld.rig.bones).forEach(function (bid) {
         var bone = ld.rig.bones[bid];
         if (bone.closed) return;
@@ -261,17 +273,22 @@ var _rigDraw = { path: null, boneId: null, ld: null, draggingHandle: false, last
         var first = new Point(segs[0].point[0], segs[0].point[1]);
         var last = new Point(segs[segs.length - 1].point[0], segs[segs.length - 1].point[1]);
         var df = pt.getDistance(first), dl = pt.getDistance(last);
-        if (df < bestD) { bestD = df; bestBoneId = bid; bestEnd = 'first'; }
-        if (dl < bestD) { bestD = dl; bestBoneId = bid; bestEnd = 'last'; }
+        if (df < bestD) { bestD = df; bestBoneId = bid; bestEnd = 'first'; bestPt = first; }
+        if (dl < bestD) { bestD = dl; bestBoneId = bid; bestEnd = 'last'; bestPt = last; }
       });
-      if (bestBoneId) {
+      if (bestBoneId && e.altKey) {
         _rigDraw.boneId = bestBoneId;
         _rigDraw.path = _boneSegsToPath(ld.rig.bones[bestBoneId].segments, false);
         if (bestEnd === 'first') _rigDraw.path.reverse();
       } else {
         _rigDraw.boneId = rigFreshId(ld.rig, 'bone');
         _rigDraw.path = new Path({ insert: false });
-        _rigDraw.path.add(pt);
+        // Snap exactly onto the existing bone's tip when branching, not the
+        // raw (slightly-off) click point — a branch that's 1-2px shy of a
+        // true coincidence would silently fail the tip-proximity chain
+        // detection a future IK/parent-chain feature walks by exact-enough
+        // distance, not by an explicit link.
+        _rigDraw.path.add(bestBoneId ? bestPt : pt);
       }
     } else {
       var first2 = _rigDraw.path.firstSegment.point;
