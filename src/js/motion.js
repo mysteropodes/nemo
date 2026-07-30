@@ -5345,6 +5345,27 @@
   // ---- mode switching ----
   function setAppMode(mode) {
     if (state.appMode === mode) return;
+    // Every other risky action while inside a Component (convertLayerToComponent,
+    // mergeLayersIntoOne, splitLayerIntoElements, enterSymbol itself, etc. — app.js
+    // lines 2276/2318/2410/2651/2674/2699/2741/2806/2896/2942) refuses with this
+    // same toast rather than proceeding — the Anim2D/Motion/StoryBoard toggle had
+    // no such guard, the only one of the ~10 call sites missing it (2026-07-30
+    // fix, found via workflow investigation of Cyril's report: "j'ai un montage
+    // dans motion, je dessine dans anim2D et reviens dans motion et là si je
+    // scrub mes clé disparaissent"). Without it, double-clicking a Component to
+    // enter it (the documented "precomp" gesture, CLAUDE.md §8) and then reaching
+    // for the top toggle instead of the "Scene" tab silently left the user
+    // editing the SYMBOL's own isolated state.layers/userLayers while every
+    // panel/button relabelled itself as if they were back in the outer scene —
+    // confirmed live: activeSymbolId stayed non-null after clicking Motion
+    // directly, drawing there landed in the symbol's own frames untouched, and
+    // exiting via "Scene" afterward left the outer scene's OTHER layer with
+    // genuinely corrupted stroke data (27 strokes materializing on a frame that
+    // held 2) — real, permanent data loss/corruption, not just a stale render.
+    // "Scene" (exitToScene) remains the one way out of a symbol everywhere else
+    // in the app; this makes the mode toggle consistent with that instead of a
+    // silent trap.
+    if (state.activeSymbolId) { if (window.showToast) showToast('Fermez d\'abord le composant en cours d\'édition'); return; }
     // Leaving Motion mode: the shared ease-curve widget (see
     // openMotionEaseEditor) may still be pointed at a motion key whose row
     // is about to disappear — fall back to the plain tween-curve view, same
