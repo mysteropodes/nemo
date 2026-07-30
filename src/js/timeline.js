@@ -3006,7 +3006,34 @@ function editTweenSegForCell(li,fi,fr0){
   var key=li+':'+pair.a+'-'+pair.b;
   if(!state.tweenEasing)state.tweenEasing={};
   var seg=state.tweenEasing[key]=state.tweenEasing[key]||{};
-  window._curveEditor.editTweenPair(seg,'Tween '+(pair.a+1)+' → '+(pair.b+1),function(){onTweenPairCurveChanged(li,pair.a);});
+  // Captured BEFORE onTweenPairCurveChanged's own selClear/selAdd dance
+  // (below) clobbers _sel.frames — 2026-07-30, Cyril: "ça devrait être
+  // automatique sur les keyframes select ou les tween". Whatever the user
+  // had selected when they opened this editor is what the curve change
+  // should also apply to, once it actually changes.
+  var selSnapshot=_sel.frames.slice();
+  window._curveEditor.editTweenPair(seg,'Tween '+(pair.a+1)+' → '+(pair.b+1),function(){applyTweenCurveToSelection(li,pair,seg,selSnapshot);});
+}
+// Applies `seg`'s already-mutated-in-place curve (drag/preset click, same
+// commit point every tween-pair curve edit goes through) to every OTHER
+// tween pair implied by `selSnapshot` — each selected keyframe maps to
+// the pair it starts (tweenPairForCell), deduplicated so several selected
+// frames landing in the same span only regenerate it once. Falls back to
+// the single-pair path unchanged when nothing else is selected.
+function applyTweenCurveToSelection(li,pair,seg,selSnapshot){
+  var seen={};seen[li+':'+pair.a+'-'+pair.b]=true;
+  var touched=[{li:li,fA:pair.a}];
+  (selSnapshot||[]).forEach(function(s){
+    var p2=tweenPairForCell(s.layer,s.frame);
+    if(!p2)return;
+    var k2=s.layer+':'+p2.a+'-'+p2.b;
+    if(seen[k2])return;
+    seen[k2]=true;
+    if(!state.tweenEasing)state.tweenEasing={};
+    state.tweenEasing[k2]={points:(seg.points||[]).map(function(p){var o={x:p.x,y:p.y};if(typeof p.tx==='number'){o.tx=p.tx;o.ty=p.ty||0;}return o;})};
+    touched.push({li:s.layer,fA:p2.a});
+  });
+  touched.forEach(function(t){onTweenPairCurveChanged(t.li,t.fA);});
 }
 // Builds one row's worth of frame cells for layer `li` into `rowEl` — shared
 // by the normal per-layer row and a collapsed folder's representative row
