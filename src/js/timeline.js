@@ -7317,8 +7317,9 @@ window.renderRigModeUI=renderRigModeUI;
     if(!rig||!Object.keys(rig.bones).length){showToast(window.SM&&SM.t?SM.t('rigNeedBoneToast'):'Dessine au moins un os avant d\'assigner');return;}
     var radius=parseFloat(document.getElementById('rig-weight-radius').value)||200;
     var rotate=document.getElementById('rig-rotate-mode').checked;
+    var softness=(parseFloat(document.getElementById('rig-falloff-softness').value)||0)/100;
     pushUndo();
-    var res=rigAutoAssignLayer(ld,userLayers[state.activeLayerIdx],radius,rotate);
+    var res=rigAutoAssignLayer(ld,userLayers[state.activeLayerIdx],radius,rotate,softness);
     if(window.SMEngineBridge)SMEngineBridge.renderNow();
     // 0 assigned but candidates existed (2026-07-29 fix, QA-confirmed live:
     // "l'autoassign marche pas" on a shape drawn with the default Brush

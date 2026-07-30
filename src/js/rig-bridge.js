@@ -191,6 +191,7 @@ var _rigDraw = { path: null, boneId: null, ld: null, draggingHandle: false, last
   function boneRadiusOf(bone, defaultRadius) { return bone.radius || defaultRadius; }
   function panelDefaultRadius() { return parseFloat((document.getElementById('rig-weight-radius') || {}).value) || 200; }
   function panelRotate() { return !!(document.getElementById('rig-rotate-mode') || {}).checked; }
+  function panelSoftness() { return (parseFloat((document.getElementById('rig-falloff-softness') || {}).value) || 0) / 100; }
 
   // Influence-circle EDGE hit-test (Shapper-style, Assigner mode) — the
   // handle you grab to resize a bone's own falloff radius. Tolerance is
@@ -442,7 +443,7 @@ var _rigDraw = { path: null, boneId: null, ld: null, draggingHandle: false, last
       // automatiquement" button to find out if it helped.
       if (window.rigAutoAssignLayer) {
         var li = state.layers.indexOf(_radiusDrag.ld);
-        if (li >= 0) rigAutoAssignLayer(_radiusDrag.ld, userLayers[li], panelDefaultRadius(), panelRotate());
+        if (li >= 0) rigAutoAssignLayer(_radiusDrag.ld, userLayers[li], panelDefaultRadius(), panelRotate(), panelSoftness());
       }
       applyRigDeform(_radiusDrag.ld);
       _radiusDrag = null;
