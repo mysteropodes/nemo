@@ -16,6 +16,39 @@
   // keeping ONE definition avoids the two drifting apart.
   function inPointOf(ld) { return window.layerInPoint ? layerInPoint(ld) : (ld.inPoint != null ? ld.inPoint : 0); }
   function outPointOf(ld) { return window.layerOutPoint ? layerOutPoint(ld) : (ld.outPoint != null ? ld.outPoint : state.totalFrames - 1); }
+  // Parent-in-Time makes ld.inPoint/outPoint completely inert on a linked
+  // edge — layerInPoint/layerOutPoint (app.js) check resolveLinkedTime
+  // FIRST and return its result unconditionally when the edge is linked,
+  // never even reading ld.inPoint/outPoint. Every drag handler below used
+  // to write straight to those fields regardless, so dragging a linked
+  // child's bar visibly did nothing (found live, Cyril: "les enfants du
+  // parent in time... on ne peut pas les drag"). This redirects the SAME
+  // drag math to timeLinkInOffset/timeLinkOutOffset instead — the ACTUAL
+  // value resolveLinkedTime reads — so the bar genuinely follows the
+  // cursor. `effectiveValue` is what the caller wants this edge to END UP
+  // AT (identical to what it would have assigned to ld.inPoint/outPoint);
+  // this converts that into the offset from the link source's CURRENT
+  // in/out that produces the same effective result. Only the edge(s) the
+  // link's own mode actually covers are redirected — mirrors
+  // resolveLinkedTime's own per-edge mode check exactly, so (e.g.) an
+  // 'in'-only link still lets the OUT handle drag normally. Returns true
+  // when it handled the write (caller skips its own ld.inPoint/outPoint
+  // assignment for that edge); false means the edge isn't linked and the
+  // caller's normal write should proceed unchanged.
+  function trySetLinkedEdge(ld, which, effectiveValue) {
+    if (!ld.timeLink) return false;
+    var mode = ld.timeLink.mode || 'both';
+    if (which === 'in' && mode === 'out') return false;
+    if (which === 'out' && mode === 'in') return false;
+    var src = window.timeLinkSourceOf ? timeLinkSourceOf(ld) : null;
+    if (!src) return false;
+    if (!window.SMMotion || !window.SMMotion.setLayerValue) return false;
+    var base = which === 'in' ? inPointOf(src) : outPointOf(src);
+    var prop = which === 'in' ? 'timeLinkInOffset' : 'timeLinkOutOffset';
+    var li = state.layers.indexOf(ld);
+    SMMotion.setLayerValue(li, prop, [effectiveValue - base]);
+    return true;
+  }
   // A manually-dragged range OR an auto-detected blank-keyframe trim both
   // count as "not full range" for styling — a naturally-shortened bar
   // (layer stops drawing partway through) should read as visually distinct
@@ -436,14 +469,16 @@
       if (_drag.type === 'in') {
         _drag.members.forEach(function (m) {
           var mld = state.layers[m.li]; if (!mld) return;
-          mld.inPoint = Math.max(0, Math.min(m.origIn + dx, m.origOut - 1));
+          var mNewIn = Math.max(0, Math.min(m.origIn + dx, m.origOut - 1));
+          if (!trySetLinkedEdge(mld, 'in', mNewIn)) mld.inPoint = mNewIn;
           updateBar(m.row, m.li);
           updateLinkedChildrenBars(m.li);
         });
       } else if (_drag.type === 'out') {
         _drag.members.forEach(function (m) {
           var mld = state.layers[m.li]; if (!mld) return;
-          mld.outPoint = Math.min(total - 1, Math.max(m.origOut + dx, m.origIn + 1));
+          var mNewOut = Math.min(total - 1, Math.max(m.origOut + dx, m.origIn + 1));
+          if (!trySetLinkedEdge(mld, 'out', mNewOut)) mld.outPoint = mNewOut;
           updateBar(m.row, m.li);
           updateLinkedChildrenBars(m.li);
         });
@@ -455,7 +490,10 @@
         if (!ok) return;
         _drag.members.forEach(function (m) {
           var mld = state.layers[m.li]; if (!mld) return;
-          mld.inPoint = m.origIn + dx; mld.outPoint = m.origOut + dx;
+          var mInHandled = trySetLinkedEdge(mld, 'in', m.origIn + dx);
+          var mOutHandled = trySetLinkedEdge(mld, 'out', m.origOut + dx);
+          if (!mInHandled) mld.inPoint = m.origIn + dx;
+          if (!mOutHandled) mld.outPoint = m.origOut + dx;
           updateBar(m.row, m.li);
           updateLinkedChildrenBars(m.li);
         });
@@ -466,13 +504,20 @@
     }
     var ld = state.layers[_drag.li]; if (!ld) { _drag = null; return; }
     var dx = Math.round((e.clientX - _drag.startX) / FC);
-    if (_drag.type === 'in') ld.inPoint = Math.max(0, Math.min(_drag.origIn + dx, _drag.origOut - 1));
-    else if (_drag.type === 'out') ld.outPoint = Math.min(total - 1, Math.max(_drag.origOut + dx, _drag.origIn + 1));
-    else {
+    if (_drag.type === 'in') {
+      var newIn = Math.max(0, Math.min(_drag.origIn + dx, _drag.origOut - 1));
+      if (!trySetLinkedEdge(ld, 'in', newIn)) ld.inPoint = newIn;
+    } else if (_drag.type === 'out') {
+      var newOut = Math.min(total - 1, Math.max(_drag.origOut + dx, _drag.origIn + 1));
+      if (!trySetLinkedEdge(ld, 'out', newOut)) ld.outPoint = newOut;
+    } else {
       var w = _drag.origOut - _drag.origIn;
       var ni = Math.max(0, _drag.origIn + dx);
       if (ni + w >= total) ni = total - 1 - w;
-      ld.inPoint = ni; ld.outPoint = ni + w;
+      var inHandled = trySetLinkedEdge(ld, 'in', ni);
+      var outHandled = trySetLinkedEdge(ld, 'out', ni + w);
+      if (!inHandled) ld.inPoint = ni;
+      if (!outHandled) ld.outPoint = ni + w;
     }
     updateBar(_drag.row, _drag.li);
     updateLinkedChildrenBars(_drag.li);
@@ -522,9 +567,21 @@
         var ld = state.layers[m.li];
         if (!ld || !ld.timeLink) return;
         var mode = ld.timeLink.mode || 'both';
-        // What the user dragged the edge TO, before resolution takes over.
-        var wantIn = ld.inPoint != null ? ld.inPoint : m.origIn;
-        var wantOut = ld.outPoint != null ? ld.outPoint : m.origOut;
+        // What the user dragged the edge TO. trySetLinkedEdge (mousemove,
+        // above) already writes the offset LIVE for any edge this link
+        // covers and never touches ld.inPoint/outPoint while doing so — so
+        // when they're still null here, the drag's real result is the
+        // CURRENT resolved position, not m.origIn (the pre-drag value).
+        // Falling back to origIn silently overwrote every live-linked drag
+        // back to a zero offset on mouseup (bug found live: onDown fires,
+        // setLayerValue fires mid-drag with the right numbers, then this
+        // function stomped them back to the start). ld.inPoint/outPoint are
+        // only ever non-null here for a pre-existing hard value that
+        // predates this link (or an edge the mode doesn't cover, handled by
+        // the mode guards below) — that legacy value is still the right
+        // thing to migrate into an offset once.
+        var wantIn = ld.inPoint != null ? ld.inPoint : inPointOf(ld);
+        var wantOut = ld.outPoint != null ? ld.outPoint : outPointOf(ld);
         var srcIn = null, srcOut = null;
         state.layers.forEach(function (o) {
           if (o !== ld && o.layerUid === ld.timeLink.uid) { srcIn = inPointOf(o); srcOut = outPointOf(o); }
@@ -538,8 +595,11 @@
           if (mode !== 'in') SMMotion.setLayerValue(m.li, 'timeLinkOutOffset', [wantOut - srcOut]);
         }
         // The hard values are dead weight on a linked layer; dropping them
-        // keeps a later unlink from resurrecting a stale range.
-        delete ld.inPoint; delete ld.outPoint;
+        // keeps a later unlink from resurrecting a stale range. Only for
+        // edges the link actually covers — a partial-mode link's other edge
+        // is a real trim value, just written fresh by this same drag.
+        if (mode !== 'out') delete ld.inPoint;
+        if (mode !== 'in') delete ld.outPoint;
       });
     })();
     // Feedback: "il faudrait pouvoir select des in et/out point de calque
@@ -824,12 +884,31 @@
     ['in', 'whole', 'out'].forEach(function (mode) {
       var a = document.createElement('div');
       a.className = 'timelink-anchor ' + mode;
-      a.title = mode === 'in' ? 'Glisser vers un autre calque : lie le point d’entrée de ce calque à son temps'
+      a.title = (mode === 'in' ? 'Glisser vers un autre calque : lie le point d’entrée de ce calque à son temps'
         : mode === 'out' ? 'Glisser vers un autre calque : lie le point de sortie de ce calque à son temps'
-        : 'Glisser vers un autre calque : lie tout le calque (entrée + sortie) à son temps';
+        : 'Glisser vers un autre calque : lie tout le calque (entrée + sortie) à son temps') + ' — clic droit pour délier';
       a.addEventListener('mousedown', function (e) {
         if (!window.SMMotion || !window.SMMotion.startTimeLinkPickwhip) return;
         window.SMMotion.startTimeLinkPickwhip(li, a, e, mode === 'whole' ? 'both' : mode);
+      });
+      // Right-click = instant unlink (2026-07-30, Cyril: "il était
+      // impossible de désactiver le parent in time... ça peut être un
+      // raccourci ou clic droit sur les boutons de parent") — stops
+      // propagation so it doesn't ALSO trigger the bar's own contextmenu
+      // (reset in/out points) a few lines below. A no-op when this layer
+      // isn't linked, so right-clicking a plain anchor before any drag
+      // stays inert rather than erroring.
+      a.addEventListener('contextmenu', function (e) {
+        e.preventDefault(); e.stopPropagation();
+        var ld2 = state.layers[li];
+        if (!ld2 || !ld2.timeLink) return;
+        if (window.pushUndo) pushUndo();
+        delete ld2.timeLink;
+        if (window.renderLayerList) renderLayerList();
+        if (window.renderTimeline) renderTimeline();
+        if (window.loadFrame) loadFrame(state.currentFrame);
+        if (window.SMEngineBridge) SMEngineBridge.renderNow();
+        if (window.showToast) showToast('Lien temporel retiré');
       });
       bar.appendChild(a);
     });
