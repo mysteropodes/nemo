@@ -96,6 +96,22 @@
     // shows nothing extra here, same "hidden until its prerequisite is
     // set" precedent Time Remap already establishes for symbolId.
     if (holder && holder.parentLayerUidB) list = list.concat(['parentBlend']);
+    // Parent in Time (Van Dijk 2.1, "Time... In/Out Points become values...
+    // linked together with Expressions") — offset rows only appear for
+    // whichever edge(s) the current link mode actually drives (mirrors
+    // resolveLinkedTime's own which==='out'&&mode==='in' style guard,
+    // app.js) so there's never a dead control for an edge that isn't
+    // linked. NO stopwatch on these rows (see the exception in
+    // renderTransformProps) — layerInPoint/layerOutPoint are read at 13
+    // call sites with no frame parameter (confirmed by grep before
+    // building this), so true per-frame keyframing has no coherent
+    // meaning here without a much bigger rewrite. Expression-only,
+    // evaluated live off state.currentFrame — confirmed scope with Cyril.
+    if (holder && holder.timeLink) {
+      var tlMode = holder.timeLink.mode || 'both';
+      if (tlMode !== 'out') list = list.concat(['timeLinkInOffset']);
+      if (tlMode !== 'in') list = list.concat(['timeLinkOutOffset']);
+    }
     if (holder && holder.timeRemap) return list.concat(['timeRemap']);
     return list;
   }
@@ -114,15 +130,34 @@
     if (prop === 'timeRemap') return holder.timeRemap || null;
     return (holder.motion && holder.motion[prop]) || null;
   }
-  var PROP_LABEL = { position: 'Position', anchor: 'Anchor Point', rotation: 'Rotation', scale: 'Scale', opacity: 'Opacity', timeRemap: 'Time Remap', positionZ: 'Position Z', rotationX: 'Rotation X', rotationY: 'Rotation Y', dupOffsetPos: 'Dup. Offset', dupOffsetRot: 'Dup. Rotation', dupOffsetScale: 'Dup. Scale', dupOffsetOpacity: 'Dup. Opacity', dupOffsetPosZ: 'Dup. Offset Z', dupOffsetRotX: 'Dup. Rotation X', dupOffsetRotY: 'Dup. Rotation Y', parentBlend: 'Parent Blend' };
-  var PROP_DIM = { position: 2, anchor: 2, rotation: 1, scale: 2, opacity: 1, timeRemap: 1, positionZ: 1, rotationX: 1, rotationY: 1, dupOffsetPos: 2, dupOffsetRot: 1, dupOffsetScale: 2, dupOffsetOpacity: 1, dupOffsetPosZ: 1, dupOffsetRotX: 1, dupOffsetRotY: 1, parentBlend: 1 };
-  var PROP_UNIT = { position: 'px', anchor: 'px', rotation: '°', scale: '%', opacity: '%', timeRemap: 'f', positionZ: 'px', rotationX: '°', rotationY: '°', dupOffsetPos: 'px', dupOffsetRot: '°', dupOffsetScale: '%', dupOffsetOpacity: '%', dupOffsetPosZ: 'px', dupOffsetRotX: '°', dupOffsetRotY: '°', parentBlend: '%' };
+  var PROP_LABEL = { position: 'Position', anchor: 'Anchor Point', rotation: 'Rotation', scale: 'Scale', opacity: 'Opacity', timeRemap: 'Time Remap', positionZ: 'Position Z', rotationX: 'Rotation X', rotationY: 'Rotation Y', dupOffsetPos: 'Dup. Offset', dupOffsetRot: 'Dup. Rotation', dupOffsetScale: 'Dup. Scale', dupOffsetOpacity: 'Dup. Opacity', dupOffsetPosZ: 'Dup. Offset Z', dupOffsetRotX: 'Dup. Rotation X', dupOffsetRotY: 'Dup. Rotation Y', parentBlend: 'Parent Blend', timeLinkInOffset: 'Décalage entrée', timeLinkOutOffset: 'Décalage sortie' };
+  var PROP_DIM = { position: 2, anchor: 2, rotation: 1, scale: 2, opacity: 1, timeRemap: 1, positionZ: 1, rotationX: 1, rotationY: 1, dupOffsetPos: 2, dupOffsetRot: 1, dupOffsetScale: 2, dupOffsetOpacity: 1, dupOffsetPosZ: 1, dupOffsetRotX: 1, dupOffsetRotY: 1, parentBlend: 1, timeLinkInOffset: 1, timeLinkOutOffset: 1 };
+  var PROP_UNIT = { position: 'px', anchor: 'px', rotation: '°', scale: '%', opacity: '%', timeRemap: 'f', positionZ: 'px', rotationX: '°', rotationY: '°', dupOffsetPos: 'px', dupOffsetRot: '°', dupOffsetScale: '%', dupOffsetOpacity: '%', dupOffsetPosZ: 'px', dupOffsetRotX: '°', dupOffsetRotY: '°', parentBlend: '%', timeLinkInOffset: 'f', timeLinkOutOffset: 'f' };
   // parentBlend defaults to 0 — "0%" reads as "fully Parent A" (the
   // pre-existing single parent), matching the invariant that assigning a
   // second parent must never itself move anything until the user actually
   // animates the blend (same "adding a feature is a visual no-op until
   // deliberately used" precedent enableTimeRemap's own seeded keys follow).
-  var PROP_DEFAULT = { position: [0, 0], anchor: [0, 0], rotation: [0], scale: [100, 100], opacity: [100], timeRemap: [0], positionZ: [0], rotationX: [0], rotationY: [0], dupOffsetPos: [0, 0], dupOffsetRot: [0], dupOffsetScale: [0, 0], dupOffsetOpacity: [0], dupOffsetPosZ: [0], dupOffsetRotX: [0], dupOffsetRotY: [0], parentBlend: [0] };
+  var PROP_DEFAULT = { position: [0, 0], anchor: [0, 0], rotation: [0], scale: [100, 100], opacity: [100], timeRemap: [0], positionZ: [0], rotationX: [0], rotationY: [0], dupOffsetPos: [0, 0], dupOffsetRot: [0], dupOffsetScale: [0, 0], dupOffsetOpacity: [0], dupOffsetPosZ: [0], dupOffsetRotX: [0], dupOffsetRotY: [0], parentBlend: [0], timeLinkInOffset: [0], timeLinkOutOffset: [0] };
+  // Rows with no stopwatch — layerInPoint/layerOutPoint (app.js) are read at
+  // 13 call sites with no frame parameter, so a real keyframe track on these
+  // would silently only ever reflect state.currentFrame at read time (export
+  // included) rather than the frame actually being resolved. Static value +
+  // expression only (still fully wired: hasExpr/evalExpressionFor don't care
+  // whether a track exists) — confirmed scope with Cyril rather than either
+  // hiding this limitation or threading frame through all 13 sites.
+  var PROP_NO_STOPWATCH = { timeLinkInOffset: 1, timeLinkOutOffset: 1 };
+  // timeLinkInOffset/timeLinkOutOffset feed layerHasTimeRange/
+  // getEffectiveStrokes' visible-range check (app.js) — unlike every other
+  // Motion property, committing one of these can change WHICH content is
+  // materialized for this layer, not just its transform, so it needs the
+  // extra loadFrame() reconstruction that renderNow() alone doesn't do.
+  // Narrow, explicit exception — called from every commit path that can
+  // change these two props (plain value, expression toggle, expression
+  // code), not a general property hook.
+  function reloadIfTimeLinkOffset(prop) {
+    if ((prop === 'timeLinkInOffset' || prop === 'timeLinkOutOffset') && window.loadFrame) loadFrame(state.currentFrame);
+  }
   // Small per-dimension labels ("X"/"Y") shown before each multi-dimension
   // property's field, LottieFiles-inspired (2026-07-29) — every 2-dim prop
   // here is an X/Y pair, so one shared default covers them all.
@@ -3081,25 +3116,12 @@
         if (window.SMEngineBridge) SMEngineBridge.renderNow();
       });
       row.appendChild(sel);
-      [['inOffset', 'décalage entrée'], ['outOffset', 'décalage sortie']].forEach(function (o) {
-        var f = document.createElement('input');
-        f.type = 'number'; f.className = 'pi scrub'; f.dataset.step = '1';
-        f.style.width = '46px'; f.style.marginLeft = '4px';
-        f.title = o[1] + ' (frames)';
-        f.value = ld.timeLink[o[0]] || 0;
-        function commitOff() {
-          var v = parseInt(f.value, 10) || 0;
-          if (v === (ld.timeLink[o[0]] || 0)) return;
-          pushUndo(); ld.timeLink[o[0]] = v;
-          renderLayerList(); renderTimeline();
-          if (window.loadFrame) loadFrame(state.currentFrame);
-          if (window.SMEngineBridge) SMEngineBridge.renderNow();
-        }
-        f.addEventListener('change', commitOff);
-        f.addEventListener('blur', commitOff);
-        f.addEventListener('mousedown', function (e) { e.stopPropagation(); });
-        row.appendChild(f);
-      });
+      // The offsets themselves (timeLinkInOffset/timeLinkOutOffset) render
+      // as their own generic property rows right after this one — propsFor
+      // includes them whenever ld.timeLink is set (motion.js) — so they get
+      // the expression (ƒx) button for free instead of a bespoke field
+      // here. migrateTimeLinkOffsets (app.js) carries old projects'
+      // ld.timeLink.inOffset/outOffset plain numbers over on first read.
     }
     body.appendChild(row);
   }
@@ -3165,12 +3187,12 @@
       // Seed the offsets from the CURRENT gap, so linking never makes the
       // layer jump: it stays exactly where it is and only starts following.
       var myIn = layerInPoint(ld), myOut = layerOutPoint(ld);
-      ld.timeLink = {
-        uid: ensureLayerUid(src),
-        inOffset: myIn - layerInPoint(src),
-        outOffset: myOut - layerOutPoint(src),
-        mode: 'both',
-      };
+      var seedInOff = myIn - layerInPoint(src), seedOutOff = myOut - layerOutPoint(src);
+      ld.timeLink = { uid: ensureLayerUid(src), mode: 'both' };
+      // Offsets are Motion properties now (timeLinkInOffset/Out) — write
+      // through setValue like any other, not a raw field on the link.
+      setValue(ld, 'timeLinkInOffset', [seedInOff]);
+      setValue(ld, 'timeLinkOutOffset', [seedOutOff]);
       renderLayerList(); renderTimeline();
       if (window.loadFrame) loadFrame(state.currentFrame);
       if (window.SMEngineBridge) SMEngineBridge.renderNow();
@@ -3342,6 +3364,7 @@
             // refresh the other's copy of the field, or they visibly
             // disagree until the next unrelated refresh.
             renderLayerList(); renderTimeline();
+            reloadIfTimeLinkOffset(prop);
             if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
           });
           fieldWrap.appendChild(f);
@@ -3350,7 +3373,7 @@
       var unit = document.createElement('span'); unit.className = 'motion-unit'; unit.textContent = PROP_UNIT[prop];
       fieldWrap.appendChild(unit);
       pr.appendChild(fieldWrap);
-      pr.appendChild(sw);
+      if (!PROP_NO_STOPWATCH[prop]) pr.appendChild(sw);
       list.appendChild(pr);
       if (window._exprEditorOpen && window._exprEditorOpen.holder === holder && window._exprEditorOpen.prop === prop) {
         list.appendChild(buildExprEditorRow(holder, prop));
@@ -3408,6 +3431,7 @@
       expr.enabled = cb.checked;
       if (typeof saveActiveLayerFrame === 'function') saveActiveLayerFrame();
       renderLayerList(); renderTimeline();
+      reloadIfTimeLinkOffset(prop);
       if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
     });
     head.appendChild(cb);
@@ -3476,6 +3500,7 @@
       expr.lastError = null;
       if (holder._exprCompiled) delete holder._exprCompiled[prop];
       if (typeof saveActiveLayerFrame === 'function') saveActiveLayerFrame();
+      reloadIfTimeLinkOffset(prop);
       if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
     }
     ta.addEventListener('blur', commit);

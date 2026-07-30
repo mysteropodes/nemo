@@ -1876,14 +1876,24 @@ function autoInPointFromBlankKeyframe(ld){
 // apart from "explicitly dragged to exactly frame 0", so an explicit
 // user override back to 0 would otherwise be silently reclaimed by the
 // auto-detect below on the very next render.
-// ---- PARENT IN TIME (Sander van Dijk 2.1, 2026-07-26) ----------------
+// ---- PARENT IN TIME (Sander van Dijk 2.1, 2026-07-26 + 2026-07-30) ----
 // "The Time Properties of a layer remain static. We manually drag, move and
 // trim the static blocks called Layers." His idea: In/Out become VALUES that
-// can be driven from elsewhere. Here that is a link to another layer plus an
-// offset — the 80% case of his sketch, without putting arbitrary code on a
-// path that runs per layer per frame.
+// can be driven from elsewhere — a link to another layer plus an offset.
 //
-//   ld.timeLink = { uid, inOffset, outOffset, mode: 'both' | 'in' | 'out' }
+//   ld.timeLink = { uid, mode: 'both' | 'in' | 'out' }
+//   ld.motion.timeLinkInOffset / ld.motionStatic.timeLinkInOffset  (+Out)
+//
+// The offset itself (2026-07-30) is a real Motion property — expression-
+// linkable through the same hasExpr/evalExpressionFor every other property
+// uses (motion.js), delivering Van Dijk's "linked together with
+// Expressions" without a bespoke second expression system. Deliberately
+// NOT true per-frame keyframing (motion.js's PROP_NO_STOPWATCH hides the
+// stopwatch on these two rows): see resolveLinkedTime below and
+// migrateTimeLinkOffsets for why, and [[project-nemo-parent-in-time-expr]]
+// for the full scoping conversation with Cyril. inOffset/outOffset used to
+// live as plain numbers directly on ld.timeLink — migrateTimeLinkOffsets
+// carries old projects over once, non-destructively.
 //
 // Resolution lives in layerInPoint/layerOutPoint because they are the single
 // chokepoint every consumer already goes through (13 call sites across
@@ -1896,6 +1906,27 @@ function timeLinkSourceOf(ld){
     if(s!==ld&&s.layerUid===ld.timeLink.uid)return s;
   }
   return null; // source deleted — fall through to the layer's own values
+}
+// One-time, idempotent — pre-2026-07-30 links stored a plain number at
+// ld.timeLink.inOffset/outOffset. Now that those offsets are real Motion
+// properties (timeLinkInOffset/timeLinkOutOffset, motion.js — Van Dijk 2.1,
+// "linked together with Expressions"), resolveLinkedTime reads them through
+// valueAtFrame like any other property. Without this migration an old
+// project's offsets would silently reset to 0 the first time it's opened
+// after this change (CLAUDE.md §1: a field moving location breaks every
+// reader that doesn't know about the new one). Legacy fields are left in
+// place, unread from now on, not deleted — non-destructive, same as
+// effectorChannels' own migration (motion.js).
+function migrateTimeLinkOffsets(ld){
+  if(!ld||!ld.timeLink)return;
+  if(ld.timeLink.inOffset&&!(ld.motion&&ld.motion.timeLinkInOffset)&&!(ld.motionStatic&&ld.motionStatic.timeLinkInOffset)){
+    ld.motionStatic=ld.motionStatic||{};
+    ld.motionStatic.timeLinkInOffset=[ld.timeLink.inOffset];
+  }
+  if(ld.timeLink.outOffset&&!(ld.motion&&ld.motion.timeLinkOutOffset)&&!(ld.motionStatic&&ld.motionStatic.timeLinkOutOffset)){
+    ld.motionStatic=ld.motionStatic||{};
+    ld.motionStatic.timeLinkOutOffset=[ld.timeLink.outOffset];
+  }
 }
 // A link chain must terminate. Same shape as the spatial parenting guard
 // (SMMotion.setLayerParent / parentDescendants): a visited set plus a hard
@@ -1913,7 +1944,18 @@ function resolveLinkedTime(ld,which,seen,depth){
   if(seen.indexOf(ld)>=0||depth>16)return null;
   seen.push(ld);
   var base=which==='in'?layerInPoint(src,seen,depth+1):layerOutPoint(src,seen,depth+1);
-  var off=which==='in'?(link.inOffset||0):(link.outOffset||0);
+  // Expression-only, evaluated off state.currentFrame (confirmed scope with
+  // Cyril): layerInPoint/layerOutPoint carry no frame parameter at any of
+  // their 13 call sites, so this is "the offset as of right now", not a
+  // value that sweeps per exported frame. An export pass that never moves
+  // state.currentFrame resolves every frame with the SAME offset — accepted
+  // limitation of the small-scope option, not a bug.
+  migrateTimeLinkOffsets(ld);
+  var offProp=which==='in'?'timeLinkInOffset':'timeLinkOutOffset';
+  // valueAtFrame is motion.js-internal (that file's whole body is one IIFE,
+  // unlike this one) — only reachable through the SMMotion export, not bare.
+  var offVals=window.SMMotion?SMMotion.valueAtFrame(ld,offProp,state.currentFrame):null;
+  var off=(offVals&&offVals[0])||0;
   return Math.max(0,Math.min(state.totalFrames-1,base+off));
 }
 // True when the layer's visible range comes from anywhere other than the
