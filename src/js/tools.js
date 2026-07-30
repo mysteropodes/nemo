@@ -4154,6 +4154,20 @@ function _pathToPolygonInput(path){
   return{exterior:exterior,holes:[]};
 }
 function _polygonsToPaperItem(polys){
+  // Degenerate-polygon guard (2026-07-30 fix, QA sweep: erasing through a
+  // unite()'d shape in a way that splits it into islands could leave a
+  // fully-inserted, data-tagged 0-segment/0-area Path in the live layer —
+  // indistinguishable from a real stroke by its data.* tags alone). A
+  // polygon with fewer than 3 points can't have any area at all; the WASM
+  // boolean-clipper occasionally emits one of these as a spurious extra
+  // "island" alongside the real result. buildLoop() below has no guard for
+  // an empty point array (its moveTo/lineTo forEach just does nothing on
+  // zero points, silently producing a closed-but-empty Path), and every
+  // downstream caller (flattenBooleanResult's no-holes branch, in
+  // particular) returns whatever it's given with no further filter — so
+  // this is the one chokepoint that guards booleanOp AND eraseAtPoint's
+  // WASM path at once (both call this function).
+  polys=polys.filter(function(p){return p.exterior&&p.exterior.length>=3;});
   if(!polys.length)return null;
   // {insert:false} (2026-07-29 fix): every OTHER caller in this file builds
   // scratch geometry this way by convention (CLAUDE.md's own "insert:false
