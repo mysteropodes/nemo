@@ -4311,16 +4311,31 @@ function booleanOp(op){
   // own strokeColor here paints that ribbon the same ink color the original
   // strokes had — the closest this tool's fill-only result model can get to
   // "what a merged stroke looks like".
-  var resultFill=style.fillColor||style.strokeColor;
+  // Visual-fill style source (2026-07-30 fix, Cyril: "combined shape avec
+  // des shape de brush avec stroke et fill") — a vector-brush ribbon drawn
+  // with Fill enabled has its OWN fillColor set to the ink/Stroke color
+  // (see foldBooleanOp's header comment above); the color/gradient the
+  // user actually SEES as the shape's fill lives on its separate
+  // linked-fill companion (findLinkedFillCompanion) — never independently
+  // selectable, so it never lands in `style` on its own. Reading
+  // style.fillColor alone silently replaced a filled brush shape's
+  // visible fill with its thin ink outline's color instead. Same "whole
+  // visible shape, not just the ribbon" reasoning foldBooleanOp already
+  // applies to the GEOMETRY a few lines up — apply it to the STYLE too.
+  var styleCompanion=findLinkedFillCompanion(boolLayer,style);
+  var fillSource=styleCompanion||style;
+  var resultFill=fillSource.fillColor||style.strokeColor;
   result.fillColor=resultFill;result.opacity=style.opacity;
   // subtract/exclude routinely produce a CompoundPath (disjoint remainders,
   // or a hole) — split into flat Paths at insertion, same as eraseAtPoint,
   // so it isn't silently dropped by saveActiveLayerFrame's `instanceof
   // Path` filter (or selection/click-to-pick) the moment the frame saves.
-  // Same source as the style (the last-selected path — the one whose look the
-  // union takes on), so the merged shape keeps ONE coherent identity rather
-  // than an arbitrary mix of the operands'. carryBooleanData (below) never
-  // copies linkedFillId/isLinkedFillCompanion/linkedFill — see
+  // Same fillSource as resultFill above (the companion when the
+  // last-selected path has one, otherwise the path itself) — so the
+  // merged shape keeps ONE coherent identity, including its fillGradient
+  // (BOOL_KEEP_DATA_ALL) if the companion carried one, rather than an
+  // arbitrary mix of the operands'. carryBooleanData (below) never copies
+  // linkedFillId/isLinkedFillCompanion/linkedFill itself — see
   // BOOL_KEEP_DATA_FIRST's own comment for why carrying those forward onto
   // a merged, no-longer-a-ribbon result was the actual bug.
   // A destructive merge also ends any non-destructive combine-group
@@ -4328,7 +4343,7 @@ function booleanOp(op){
   // .remove()'d, so leave no dangling ld.groups[gid].order reference to a
   // strokeId that no longer exists on any live path.
   if(window.SMGroup&&SMGroup.removeMemberFromGroup)paths.forEach(function(p){if(p.data&&p.data.groupId)SMGroup.removeMemberFromGroup(p,state.layers[state.activeLayerIdx],boolLayer,{skipUndo:true,silent:true});});
-  var islands=insertBooleanResult(boolLayer,boolLayer.children.length,result,resultFill,style.opacity,null,style.data);
+  var islands=insertBooleanResult(boolLayer,boolLayer.children.length,result,resultFill,style.opacity,null,fillSource.data);
   paths.forEach(function(p){p.remove();});
   folded.companions.forEach(function(c){if(!c.removed)c.remove();});
   selectedPaths=islands;state.selectedStrokeIndices=[];
