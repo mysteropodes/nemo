@@ -1576,18 +1576,56 @@ window.SM={
       state.totalFrames=needed;window._totalF=needed;
       if(state.waOut<needed-1){state.waOut=needed-1;window._waOut=state.waOut;}
     }
+    // Component layers (state.layers[l].symbolId) store no frames of their
+    // own to repeat (their content/timing comes from the symbol's own
+    // Frame/Speed/Offset model) — correctly skipped below. Found live
+    // (2026-07-30 QA sweep): with every selected layer a Component (which
+    // happens automatically the instant a layer gets its first Motion
+    // layer-level keyframe — see maybeAutoConvertToComponent, motion.js),
+    // EVERY layer got skipped and nothing happened at all, yet the toast
+    // still unconditionally claimed success. Track whether anything was
+    // actually cycled so the toast can tell the truth.
+    var anyLayerCycled=false;
     for(var l=b.minL;l<=b.maxL;l++){
       if(!state.layers[l]||state.layers[l].symbolId)continue;
+      anyLayerCycled=true;
+      var ld=state.layers[l];
       for(var r=1;r<=times;r++){
         for(var f=b.minF;f<=b.maxF;f++){
-          var src=state.layers[l].frames[f];
+          var src=ld.frames[f];
           var dst=b.maxF+ (r-1)*span + (f-b.minF) + 1;
-          state.layers[l].frames[dst]={strokes:JSON.parse(JSON.stringify(src.strokes||[])),isKeyframe:!!src.isKeyframe,isInterpolated:!!src.isInterpolated};
+          ld.frames[dst]={strokes:JSON.parse(JSON.stringify(src.strokes||[])),isKeyframe:!!src.isKeyframe,isInterpolated:!!src.isInterpolated};
         }
+      }
+      // Motion layer-level keyframe tracks (2026-07-30 fix) — the loop
+      // above only ever touched ld.frames (Animation 2D's drawn content);
+      // a Motion position/rotation/scale/opacity track set up as a walk
+      // cycle just held flat at its last keyframe's value for the whole
+      // cycled span instead of repeating, defeating the toolbar tooltip's
+      // own advertised purpose ("répète la plage sélectionnée N fois —
+      // cycles de marche"). Same dst=f+r*span mapping as the strokes loop
+      // above (dst=maxF+(r-1)*span+(f-minF)+1 simplifies to f+r*span for
+      // f in [minF,maxF]) — reuses ld.motion's own keyframe shape verbatim,
+      // no new fields, so the existing tween/easing UI reads the repeated
+      // keys exactly like any hand-placed one.
+      if(ld.motion){
+        Object.keys(ld.motion).forEach(function(prop){
+          var track=ld.motion[prop];if(!track||!track.keys||!track.keys.length)return;
+          var toAdd=[];
+          track.keys.forEach(function(k){
+            if(k.frame<b.minF||k.frame>b.maxF)return;
+            for(var r=1;r<=times;r++){
+              var clone=JSON.parse(JSON.stringify(k));
+              clone.frame=k.frame+r*span;
+              toAdd.push(clone);
+            }
+          });
+          if(toAdd.length){track.keys=track.keys.concat(toAdd);track.keys.sort(function(a,b){return a.frame-b.frame;});}
+        });
       }
     }
     loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
-    showToast('Cycle : plage repetee '+times+' fois');
+    showToast(anyLayerCycled?('Cycle : plage repetee '+times+' fois'):'Cycle : aucun calque à répéter (calques Component ignorés)');
   },
   // Propagation de couleur (v19) : applique la couleur du fill/trait
   // selectionne a TOUTES les occurrences du meme strokeId sur toutes les
