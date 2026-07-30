@@ -1829,6 +1829,27 @@
     var w = rb.width * m.sx, h = rb.height * m.sy;
     return { x: ncx - w / 2, y: ncy - h / 2, width: w, height: h, rotation: (rb.rotation || 0) + (m.rot || 0) };
   }
+  // Same job as transformImageRect just above, but for a raw Paper.js
+  // Matrix (camera/symMatrix's own shape — see app.js's symMatrixOf/
+  // SMCamera.cameraMatrixAtFrame) instead of the decomposed {sx,sy,rot,dx,
+  // dy} one every OTHER Motion transform here produces. Written for the
+  // nested-video-in-Component fix (2026-07-30): a Component's own camera
+  // and instance placement bake straight into stroke segments via
+  // applyMatrixToStrokeData (app.js) for vector/raster content, but an
+  // image RECT (nativeVideo's item shape) has no `.segments` for that
+  // function's Matrix.transform(Point) calls to walk — this decomposes the
+  // matrix's linear part into scale+rotation once instead (sqrt of each
+  // column's squared length for scale, atan2 of the first column for
+  // rotation — accurate for any similarity transform: translate+scale+
+  // rotate, no skew, which is everything camera/symMatrix ever compose).
+  function transformImageRectByMatrix(rb, m) {
+    var cx = rb.x + rb.width / 2, cy = rb.y + rb.height / 2;
+    var c = m.transform(new Point(cx, cy));
+    var scaleX = Math.sqrt(m.a * m.a + m.b * m.b), scaleY = Math.sqrt(m.c * m.c + m.d * m.d);
+    var rotDeg = Math.atan2(m.b, m.a) * 180 / Math.PI;
+    var w = rb.width * scaleX, h = rb.height * scaleY;
+    return { x: c.x - w / 2, y: c.y - h / 2, width: w, height: h, rotation: (rb.rotation || 0) + rotDeg };
+  }
 
   // ---- canvas overlay: the position motion path for the layer(s)
   // currently expanded in the Motion panel — same dashed-bezier + handle
@@ -5668,6 +5689,7 @@
     elementFillColorAt: elementFillColorAt,
     transformSegments: transformSegments,
     transformImageRect: transformImageRect,
+    transformImageRectByMatrix: transformImageRectByMatrix,
     ensureLayerUid: ensureLayerUid,
     findLayerIndexByUid: findLayerIndexByUid,
     setLayerParent: setLayerParent,

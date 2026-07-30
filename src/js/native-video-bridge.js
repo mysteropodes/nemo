@@ -474,11 +474,53 @@
     // layer in a browser (loaded project) just fails its lazy re-open with
     // a console error, same as any other unreachable source.
     for (var i = 0; i < state.layers.length; i++) {
-      if (state.layers[i].nativeVideo) _layerFrameSync(i, frame);
+      if (state.layers[i].nativeVideo) _layerFrameSync(i, state.layers[i], frame);
+    }
+    _syncSymbolVideos(frame);
+  }
+  // Nested video (2026-07-30 fix — Cyril: "attaque le chantier pour les
+  // vidéo dans des component"): the loop above only ever walks TOP-LEVEL
+  // state.layers, by index — while editing INSIDE a Component, state.layers
+  // IS sym.layers (enterSymbol's alias), so a nativeVideo sub-layer gets
+  // found and synced there for free under key `i`. Viewed from OUTSIDE
+  // (placed instance, StoryBoard montage), that sub-layer never appears in
+  // state.layers at all — this is the second half of that same gap,
+  // walking every symbolId instance currently in the composited scene and
+  // syncing whatever nativeVideo sub-layers ITS symbol owns, to whichever
+  // INTERNAL frame resolveSymbolFrameIdx says this instance should be
+  // showing right now (same resolution getEffectiveStrokes' symbolId
+  // branch, app.js, already uses for its own `ii`). Key is
+  // 'nvsym:<symbolId>:<subLayerIndex>' — stable across renders regardless
+  // of which outer layer/context is looking at it, deliberately DIFFERENT
+  // from the plain 'nv:<i>' key the same session gets registered under
+  // while editing inside (both point at the same live decode session on
+  // `sl` itself via sl._nvSessionId, which lives on the layer object and
+  // travels with it either way — only the registered IMAGE id and this
+  // file's own JS-side sync-state cache differ, so switching between
+  // inside/outside pays one extra re-upload the first time each is hit,
+  // not a correctness issue).
+  // Single level only: a Component instance nested INSIDE another
+  // Component's own sym.layers is not walked recursively here.
+  function _syncSymbolVideos(outerFrame) {
+    for (var j = 0; j < state.layers.length; j++) {
+      var ld = state.layers[j];
+      if (!ld || !ld.symbolId || ld.visible === false) continue;
+      if (window.layerHasTimeRange && layerHasTimeRange(ld)) {
+        var inF = window.layerInPoint ? layerInPoint(ld) : 0;
+        var outF = window.layerOutPoint ? layerOutPoint(ld) : state.totalFrames - 1;
+        if (outerFrame < inF || outerFrame > outF) continue;
+      }
+      var sym = state.symbols[ld.symbolId];
+      if (!sym) continue;
+      var ii = window.resolveSymbolFrameIdx ? resolveSymbolFrameIdx(sym, ld, outerFrame) : 0;
+      for (var k = 0; k < sym.layers.length; k++) {
+        var sl = sym.layers[k];
+        if (sl && sl.nativeVideo && sl.visible !== false) _layerFrameSync('nvsym:' + ld.symbolId + ':' + k, sl, ii);
+      }
     }
   }
-  function _syncState(li) {
-    return _layerSync[li] || (_layerSync[li] = { busy: false, pending: null, lastShown: -1, jsCache: new Map(), jsBytes: 0, prefetchQueue: [], prefetching: false });
+  function _syncState(key) {
+    return _layerSync[key] || (_layerSync[key] = { busy: false, pending: null, lastShown: -1, jsCache: new Map(), jsBytes: 0, prefetchQueue: [], prefetching: false });
   }
   function _jsCachePut(st, frame, px) {
     if (st.jsCache.has(frame)) { st.jsBytes -= st.jsCache.get(frame).length; st.jsCache.delete(frame); }
@@ -519,8 +561,7 @@
   // engine-bridge.js's nvMat handling), so reusing stale JSON there would
   // freeze the video at its LAST rendered position/scale while only its
   // pixels kept updating. Falls back to a full renderNow() for those.
-  function _canFastRender(li) {
-    var ld = state.layers[li];
+  function _canFastRender(ld) {
     return !(ld && ld.motion && Object.keys(ld.motion).length);
   }
   // Pull frames around `center` into the JS window, nearest-first, both
@@ -529,9 +570,21 @@
   // originals backward pulls would pay a keyframe walk each, so forward
   // only). Single in-flight chain per layer; a new center simply replaces
   // the queue (latest wins, same principle as everywhere else here).
-  function _prefetch(li, center) {
-    var st = _syncState(li);
-    var ld = state.layers[li];
+  //
+  // key/ld (2026-07-30, nested-video-in-Component fix): every function in
+  // this cluster used to take a bare top-level `li` and re-fetch
+  // state.layers[li] itself — meaningless for a nativeVideo layer living
+  // inside a symbol's OWN sym.layers, which isn't in state.layers at all
+  // once you're not actively editing inside it. `key` is either the plain
+  // numeric top-level index (unchanged behavior) or a stable string
+  // 'nvsym:<symbolId>:<subLayerIndex>' (see _syncSymbolVideos above); `ld`
+  // is the layer object itself, passed by the caller instead of looked up,
+  // since sl._nvSessionId lives ON the object and travels with it either
+  // way. Re-deriving `ld` after an await (below) reads straight off the
+  // SAME object reference rather than re-indexing — correct for both cases
+  // as long as the caller didn't literally delete/replace that object.
+  function _prefetch(key, ld, center) {
+    var st = _syncState(key);
     if (!ld || !ld.nativeVideo || !ld._nvSessionId) return;
     var nv = ld.nativeVideo;
     var bidir = !!nv.optimizedPath || _isAllIntra(nv.codec);
@@ -543,7 +596,7 @@
       try {
         while (st.prefetchQueue.length) {
           var f = st.prefetchQueue.shift();
-          var sess = state.layers[li] && state.layers[li]._nvSessionId;
+          var sess = ld._nvSessionId;
           if (!sess) break;
           var px = await frameBytes(sess, f);
           _jsCachePut(st, f, px);
@@ -552,11 +605,10 @@
       st.prefetching = false;
     })();
   }
-  function _layerFrameSync(li, frame) {
-    var ld = state.layers[li];
+  function _layerFrameSync(key, ld, frame) {
     if (!ld || !ld.nativeVideo) return;
     var nv = ld.nativeVideo;
-    var st = _syncState(li);
+    var st = _syncState(key);
     if (ld._nvSessionId && nv.frameCount) {
       var target = _targetFor(nv, frame);
       if (target === st.lastShown) return; // frame unchanged — loadFrame ran for an unrelated reason
@@ -564,7 +616,7 @@
       // upload inside this very loadFrame turn, no decode wait. Must call
       // renderImageOnly() explicitly (NOT rely on tick()'s own dirty-check
       // loop): the scene JSON's image item only carries the id string
-      // 'nv:<li>', never the frame's actual bytes, so it's byte-identical
+      // 'nv:<key>', never the frame's actual bytes, so it's byte-identical
       // before and after this update — tick()'s string-diff would see
       // "no change" and skip rendering entirely, leaving the new frame's
       // pixels sitting unrendered in the engine's image cache (found live
@@ -572,25 +624,24 @@
       var cached = _jsCacheGet(st, target);
       if (cached) {
         var tR = performance.now();
-        if (window.SMEngineBridge) SMEngineBridge.registerImageRaw('nv:' + li, cached, nv.width, nv.height);
+        if (window.SMEngineBridge) SMEngineBridge.registerImageRaw(_imageIdFor(key), cached, nv.width, nv.height);
         st.lastShown = target;
         if (window.SMEngineBridge && SMEngineBridge.isEnabled()) {
-          if (_canFastRender(li)) SMEngineBridge.renderImageOnly(); else SMEngineBridge.renderNow();
+          if (_canFastRender(ld)) SMEngineBridge.renderImageOnly(); else SMEngineBridge.renderNow();
         }
         _stats.serves++; _stats.jsHits++;
         _pushStat(_stats.renderMs, performance.now() - tR);
-        _prefetch(li, target);
+        _prefetch(key, ld, target);
         return;
       }
     }
-    _layerFrameSyncAsync(li, frame);
+    _layerFrameSyncAsync(key, ld, frame);
   }
-  async function _layerFrameSyncAsync(li, frame) {
-    var st = _syncState(li);
+  async function _layerFrameSyncAsync(key, ld, frame) {
+    var st = _syncState(key);
     if (st.busy) { st.pending = frame; return; }
     st.busy = true;
     try {
-      var ld = state.layers[li];
       if (!ld || !ld.nativeVideo) return;
       var nv = ld.nativeVideo;
       // Lazy (re)open from the persisted path — first frame after an
@@ -626,7 +677,14 @@
         if (!info) {
           info = await open(nv.path);
           nv.codec = info.codec || nv.codec || '';
-          _optimizeLayerMedia(li); // no-op if already all-intra or in flight
+          // Background re-optimize (no-op if already all-intra or in
+          // flight) is keyed by a top-level index re-lookup — skipped for
+          // a nested symLayer (string key), which has none. Nested video
+          // simply stays on the slower non-optimized decode path; a real
+          // fix would need _optimizeLayerMedia keyed the same way as
+          // everything else here, deferred as a known scope boundary
+          // rather than blocking correctness on it.
+          if (typeof key === 'number') _optimizeLayerMedia(key);
         }
         ld._nvSessionId = info.session_id; // runtime-only (not in exportJSON's layer whitelist)
         nv.frameCount = Number(info.frame_count);
@@ -639,22 +697,27 @@
       _pushStat(_stats.ipcMs, performance.now() - tI);
       _jsCachePut(st, target, px);
       var tR = performance.now();
-      if (window.SMEngineBridge) SMEngineBridge.registerImageRaw('nv:' + li, px, nv.width, nv.height);
+      if (window.SMEngineBridge) SMEngineBridge.registerImageRaw(_imageIdFor(key), px, nv.width, nv.height);
       st.lastShown = target;
       window._sceneVersion++;
       if (window.SMEngineBridge && SMEngineBridge.isEnabled()) {
-        if (_canFastRender(li)) SMEngineBridge.renderImageOnly(); else SMEngineBridge.renderNow();
+        if (_canFastRender(ld)) SMEngineBridge.renderImageOnly(); else SMEngineBridge.renderNow();
       }
       _stats.serves++;
       _pushStat(_stats.renderMs, performance.now() - tR);
-      _prefetch(li, target);
+      _prefetch(key, ld, target);
     } catch (e) {
-      console.error('[native-video] layer ' + li + ' sync failed:', e);
+      console.error('[native-video] layer ' + key + ' sync failed:', e);
     } finally {
       st.busy = false;
-      if (st.pending != null) { var p = st.pending; st.pending = null; _layerFrameSync(li, p); }
+      if (st.pending != null) { var p = st.pending; st.pending = null; _layerFrameSync(key, ld, p); }
     }
   }
+  // 'nv:<i>' for a top-level layer (unchanged wire id engine-bridge.js's
+  // buildSceneJson already expects), 'nvsym:<key>' for a nested symLayer —
+  // key here is ALREADY the full 'nvsym:<symbolId>:<subLayerIndex>' string
+  // _syncSymbolVideos built, so this just picks the right prefix by type.
+  function _imageIdFor(key) { return typeof key === 'number' ? ('nv:' + key) : key; }
 
   // ---- optimized media (the DaVinci Resolve pattern) ----
   // Long-GOP sources (H.264/HEVC/VP9…) make every seek cost a keyframe
@@ -797,30 +860,22 @@
   // never touches one; the web backend's own decode already round-trips
   // through a canvas internally, see _videoFrameToRgba).
   async function importAsLayer(source) {
-    // Guard (2026-07-30 fix, found live: importing footage while editing
-    // inside a Component creates the nativeVideo layer in sym.layers — the
-    // ONLY place video rendering ever looks for it is buildSceneJson's
-    // direct state.layers[i].nativeVideo check (engine-bridge.js), a
-    // top-level-index lookup with no path into a symbol's own sub-layers.
-    // getEffectiveStrokes's symbolId branch (app.js) only ever flattens
-    // STROKE data when compositing an instance from outside — a nativeVideo
-    // sub-layer has none to contribute (same top-level early-return as its
-    // outer counterpart) and nothing recreates it as a video item either.
-    // Net effect: the video plays fine while still inside, then silently
-    // and PERMANENTLY vanishes — no error — the moment you exit, in a
-    // placed instance or a StoryBoard montage alike. Unlike the Duplicator
-    // gap fixed earlier this session, there's no missing-field copy to add:
-    // video rendering isn't stroke-shaped data at all, so there's nothing
-    // for the compositing path to carry through. Refusing here, matching
-    // every sibling structural guard elsewhere in this app (convertLayer
-    // ToComponent's own type list, mergeLayersIntoOne, StoryBoard's canvas
-    // lockout), is far safer than a silent, unrecoverable content loss.
-    if (state.activeSymbolId) { if (window.showToast) showToast('Impossible d’importer une vidéo à l’intérieur d’un composant — fermez-le d’abord'); return -1; }
-    // Montage view (enterMontageView, app.js) swaps state.layers to a
-    // throwaway SYNTHETIC per-segment array with no write-back on exit at
-    // all (unlike a symbol's) — a video "imported" there is discarded the
-    // instant you leave, even before the cross-context rendering gap above
-    // would apply.
+    // Component guard REMOVED (2026-07-30): importing footage while editing
+    // inside a Component used to create a nativeVideo layer that played
+    // fine while still inside, then silently and permanently vanished the
+    // moment you exited — buildSceneJson's video rendering only ever looked
+    // at top-level state.layers[i].nativeVideo, with no path into a
+    // symbol's own sym.layers. Now genuinely supported end-to-end: see
+    // engine-bridge.js's buildSceneJson (the nested-video render block,
+    // keyed 'nvsym:<symbolId>:<subLayerIndex>') and this file's own
+    // _syncSymbolVideos (the matching sync driver, called alongside the
+    // top-level loop from the same onFrameChanged choke point).
+    //
+    // Montage view keeps its own guard, unrelated to the fix above:
+    // enterMontageView (app.js) swaps state.layers to a throwaway
+    // SYNTHETIC per-segment array with no write-back on exit at all
+    // (unlike a symbol's) — a video "imported" there is discarded the
+    // instant you leave regardless of whether rendering could reach it.
     if (state.activeMontageViewId) { if (window.showToast) showToast('Impossible d’importer une vidéo à l’intérieur d’un montage — fermez-le d’abord'); return -1; }
     var info = await open(source);
     if (window.saveAllLayerFrames) saveAllLayerFrames();
