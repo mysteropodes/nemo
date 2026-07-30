@@ -2334,7 +2334,18 @@ function convertLayersToComponent(indices){
       motion:src.motion?JSON.parse(JSON.stringify(src.motion)):undefined,
       motionStatic:src.motionStatic?JSON.parse(JSON.stringify(src.motionStatic)):undefined,
       elementMotion:src.elementMotion?JSON.parse(JSON.stringify(src.elementMotion)):undefined,
-      groups:groupsClone};
+      groups:groupsClone,
+      // matteMode/blendMode dropped entirely here (2026-07-30 fix, Cyril:
+      // "je met 2 calques avec un matte sur l'un que je met dans componant,
+      // je perd le matte") — same CLAUDE.md §1 shape as the Motion-loss bug
+      // this function's own header comment already fixed once: a per-layer
+      // field that only ever got threaded through the ORIGINAL state.layers
+      // object, silently absent from the symLayer clone. matteMode's
+      // adjacency convention (source = the layer directly above, engine-
+      // bridge.js) is preserved for free since `indices` stays sorted and
+      // symLayers keeps that same relative order, so this is purely a
+      // missing-field copy, not a re-derivation.
+      matteMode:src.matteMode,blendMode:src.blendMode};
   });
   state.symbols[symId]={name:'Composant',totalFrames:state.totalFrames,fps:state.fps,layers:symLayers};
   if(window.SMStoryboard)SMStoryboard.addInstanceAuto(symId);
