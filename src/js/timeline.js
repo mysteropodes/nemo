@@ -1848,7 +1848,7 @@ function openPropsSection(id){
 function getToolHelp(tool){
   var tt=(window.SM&&SM.t)?SM.t:function(k){return k;};
   var TOOL_HELP={
-    select:{desc:tt('thSelectDesc'),sc:[['V',tt('thTool')],['Shift+clic',tt('thAdd')],['Alt+glisser',tt('thMoveAnchor')],['Suppr',tt('thErase')]]},
+    select:{desc:tt('thSelectDesc'),sc:[['V',tt('thTool')],['Shift+clic',tt('thAdd')],['Alt+glisser',tt('thMoveAnchor')],['Suppr',tt('thErase')],['Shift+X',tt('thFlipH')],['Shift+Alt+X',tt('thFlipV')]]},
     subselect:{desc:tt('thSubselectDesc'),sc:[['A',tt('thTool')],['Alt+clic',tt('thBreakTangent')]]},
     fsselect:{desc:tt('thFsselectDesc'),sc:[['Shift+clic',tt('thAdd')]]},
     draw:{desc:tt('thDrawDesc'),sc:[['B',tt('thTool')],['Alt+glisser',tt('thSize')],['[ ]',tt('thSizePlusMinus')]]},
@@ -4676,7 +4676,7 @@ var TOOL_SHORTCUTS=[
   {action:'hand',key:'h',label:'Hand (pan)'},
   {action:'zoom',key:'z',label:'Zoom'},
   {action:'toggleOnion',key:'o',label:'Toggle Onion Skin'},
-  // UI/UX audit (2026-07): these 3 tools had NO letter shortcut at all —
+  // UI/UX audit (2026-07): these tools had NO letter shortcut at all —
   // every other tool button does, so their absence read as an
   // inconsistency rather than a deliberate omission. The alphabet is
   // nearly exhausted by the bindings above (only q/s/w/y were free); no
@@ -4686,8 +4686,17 @@ var TOOL_SHORTCUTS=[
   // (shortcutOverrides/localStorage) like any other entry here.
   {action:'text',key:'y',label:'Texte'},
   {action:'rotate',key:'w',label:'Rotation du canevas'},
-  {action:'perspective',key:'q',label:'Perspective'},
   {action:'rig',key:'s',label:'Rig (Skeleton)'},
+  // Deliberately NOT bound to 'q' (or anything): the Perspective rail
+  // button was removed on purpose (see the comment above the button
+  // markup in index.html) — perspective is reachable ONLY via the Labs
+  // floating panel now. A live 'q' binding with no matching rail button
+  // used to switch state.tool to 'perspective' silently: every .tool-btn
+  // lost its .active class (none has data-tool="perspective" to match),
+  // so the whole rail went dark with zero explanation while the cursor
+  // quietly became a crosshair — found by the same audit, fixed by
+  // deleting the binding rather than re-adding a button the UI review
+  // that removed it explicitly didn't want back.
 ];
 var _shortcutOverrides=null;
 function shortcutOverrides(){
@@ -4704,7 +4713,29 @@ function setShortcutKey(action,key){
   var ov=shortcutOverrides();
   if(key)ov[action]=key.toLowerCase();else delete ov[action];
   try{localStorage.setItem('nemo-shortcuts',JSON.stringify(ov));}catch(e){}
+  syncToolButtonShortcutBadge(action);
 }
+// UI/UX audit (2026-07): rebinding a shortcut in Réglages > Raccourcis
+// updated shortcutKeyFor()/localStorage correctly, but the left rail's own
+// <span class="sk"> letter badge is static markup — nothing ever told it a
+// rebind happened, so the toolbar kept showing the OLD default letter
+// forever after a rebind (and even on a fresh load with a pre-existing
+// override already in localStorage). Only touches the badge text, never
+// the prose title= attribute — those aren't all "(X)"-suffixed the same
+// way (e.g. Hand's is "(H or Space)"), so rewriting them generically here
+// would be more likely to mangle one than to fix it.
+function syncToolButtonShortcutBadge(action){
+  var btn=document.querySelector('.tool-btn[data-tool="'+action+'"]');
+  if(!btn)return;
+  var sk=btn.querySelector('.sk');
+  if(!sk)return;
+  var key=shortcutKeyFor(action);
+  sk.textContent=key?key.toUpperCase():'';
+}
+function syncAllToolButtonShortcutBadges(){
+  TOOL_SHORTCUTS.forEach(function(s){syncToolButtonShortcutBadge(s.action);});
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',syncAllToolButtonShortcutBadges);else syncAllToolButtonShortcutBadges();
 function runToolShortcut(k){
   var lk=(k||'').toLowerCase();
   for(var i=0;i<TOOL_SHORTCUTS.length;i++){
@@ -6116,8 +6147,11 @@ function onKeyDown(event){
   // Motion mode's P/A/R/S/T property-reveal shortcuts (After Effects
   // convention, explicitly requested) DELIBERATELY take priority over the
   // normal tool shortcuts below — p/r/a are otherwise bound to Pen/
-  // Rectangle/Subselect (TOOL_SHORTCUTS above) and t is hardcoded to
-  // generateTweens a few lines down. Scoped tightly (Motion mode active AND
+  // Rectangle/Subselect and s to Rig (TOOL_SHORTCUTS above; found missing
+  // from this comment by a UI/UX audit — the collision itself was already
+  // correct in code, only the explanation was incomplete) — and t is
+  // hardcoded to generateTweens a few lines down. Scoped tightly (Motion
+  // mode active AND
   // a layer's Transform group actually expanded) so this contextual
   // override never fires outside Motion mode — the toolbar buttons for
   // those tools still work unaffected everywhere, only the KEYBOARD letter
@@ -6204,7 +6238,17 @@ function onKeyDown(event){
   else if(k==='k'||k==='K'){if(state.playing)stopPlay();goToFrame(nextKeyframeFrame(state.activeLayerIdx,state.currentFrame));}
   else if(k===','){if(state.playing)stopPlay();goToFrame(state.currentFrame-1);}
   else if(k==='.'||k===';'){if(state.playing)stopPlay();goToFrame(state.currentFrame+1);}
-  else if(k==='x'||k==='X')window.SM.swapStrokeFill();
+  // UI/UX audit (2026-07-30): X was bound twice in this same chain — once
+  // here (fires first, always wins) and once further down to flipHorizontal/
+  // flipVertical (shiftKey-gated), making the second binding permanently
+  // unreachable dead code even though both functions are fully implemented
+  // and useful. Merged into one branch: X alone keeps its existing meaning
+  // (swap stroke/fill), Shift+X/Shift+Alt+X reach the flip functions that
+  // were otherwise unreachable from any key, menu, or button.
+  else if(k==='x'||k==='X'){
+    if(event.shiftKey){if(event.altKey)window.SM.flipVertical();else window.SM.flipHorizontal();}
+    else window.SM.swapStrokeFill();
+  }
   else if(k==='t'||k==='T')window.SM.generateTweens();
   // [ ] brush/eraser size — Photoshop/Procreate/Clip Studio convention,
   // absent here entirely before this (grepped: no bracket-key handler
@@ -6386,7 +6430,6 @@ function onKeyDown(event){
   else if(k==='F7'){event.preventDefault();insertBlankKeyframe();}
   else if(k==='d'||k==='D'){window.SM.duplicateKeyframe();}
   else if(k==='f'||k==='F'){if(!event.shiftKey)window.SM.flipPreview();}
-  else if(k==='x'||k==='X'){if(event.shiftKey)window.SM.flipVertical();else window.SM.flipHorizontal();}
   else if(k==='+'||k==='='){window.SM.extendExposure(1);}
 }
 // Longest hold still read as a tap. Generous enough to survive a slow
