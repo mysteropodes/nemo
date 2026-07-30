@@ -731,10 +731,22 @@
       // (vector paths); an image inside a 3D layer renders unprojected.
       var is3D = !!state.layers[i].threeD;
       var project3D = null;
+      // Per-clone 3D projector cache (2026-07-30, "en 3D aussi avec ID de
+      // chaque cloner") — a duplicator+3D layer's clones can each carry
+      // their own extra positionZ/rotationX/rotationY delta on
+      // data.dup3D (applyLayerDuplicator, app.js). Building a fresh
+      // make3DProjector per VERTEX would be wasteful; this caches one per
+      // unique dupIndex instead, reused by every stroke belonging to that
+      // same clone (built lazily below, in the per-item loop, the first
+      // time each dupIndex is actually seen). Stays null/unused for every
+      // ordinary 3D layer (no duplicator) or 2D duplicator (no threeD) —
+      // zero extra cost for the overwhelmingly common cases.
+      var dup3DProjectorCache = null;
       if (is3D) {
         motionMat = null; motionPivot = null; parentChain = [];
         var q3dBounds = userLayers[i].bounds;
         if (window.SMMotion && q3dBounds) project3D = SMMotion.make3DProjector(state.layers[i], q3dBounds, renderFrame, state.canvasW, state.canvasH);
+        if (state.layers[i].duplicator) dup3DProjectorCache = {};
       }
       // Brush-texture companions (isBrushTextureCopy — bitmap raster or
       // vector dab group) don't get their own Elements row in Motion
@@ -906,7 +918,21 @@
           // strokeWidth/strokeScale (below) completely untouched — the
           // Grease-Pencil-style contract this feature was explicitly
           // corrected to (motion.js's make3DProjector doc comment).
-          if (sd && project3D) sd.segments = SMMotion.project3DSegments(sd.segments, project3D);
+          if (sd && project3D) {
+            // Per-clone 3D override (2026-07-30) — a duplicator copy
+            // carrying its own positionZ/rotationX/rotationY delta
+            // (data.dup3D, app.js's applyLayerDuplicator) gets its OWN
+            // projector instead of the layer-wide `project3D` every other
+            // item here shares, cached per dupIndex so every stroke
+            // belonging to the same clone reuses one build.
+            var itemProjector = project3D;
+            if (c.data && c.data.dup3D && dup3DProjectorCache) {
+              var dk3 = c.data.dupIndex;
+              if (!dup3DProjectorCache[dk3]) dup3DProjectorCache[dk3] = SMMotion.make3DProjector(state.layers[i], q3dBounds, renderFrame, state.canvasW, state.canvasH, c.data.dup3D);
+              itemProjector = dup3DProjectorCache[dk3];
+            }
+            sd.segments = SMMotion.project3DSegments(sd.segments, itemProjector);
+          }
           if (sd) for (var pc2 = 0; pc2 < parentChain.length; pc2++) sd.segments = SMMotion.transformSegments(sd.segments, parentChain[pc2].pivot, parentChain[pc2].mat);
           var op = c.opacity !== undefined ? c.opacity : 1;
           if (elMat) op *= elMat.op;

@@ -70,7 +70,17 @@
   // a loadFrame precedes buildSceneJson whenever any layer has a duplicator)
   // rather than patching every commit path here — see that fix's own
   // comment for why (CLAUDE.md §1's whack-a-mole trap).
-  var PROPS_DUP_EXTRA = ['dupOffsetPos', 'dupOffsetRot', 'dupOffsetScale', 'dupOffsetOpacity'];
+  // dupOffsetPosZ/RotX/RotY (2026-07-30, "en 3D aussi avec ID de chaque
+  // cloner") — same per-copy k×delta/±delta stagger as the original 4, just
+  // three more channels so a duplicator's copies can spread/rotate through
+  // real depth instead of just the XY plane. Only visibly does anything
+  // once the layer ALSO has threeD on (buildSceneJson reads them off each
+  // clone's own data.dup3D to build a per-clone 3D projector instead of the
+  // single shared layer-wide one — see engine-bridge.js) — shown
+  // unconditionally here anyway, same "extra property exists, does nothing
+  // until its prerequisite is met" precedent Time Remap already sets for
+  // a non-Component layer.
+  var PROPS_DUP_EXTRA = ['dupOffsetPos', 'dupOffsetRot', 'dupOffsetScale', 'dupOffsetOpacity', 'dupOffsetPosZ', 'dupOffsetRotX', 'dupOffsetRotY'];
   // Time Remap (AE, 2026-07-25) is an EXTRA row, not a 6th transform: it
   // never feeds computeMotionMat — it drives which internal frame a
   // component instance shows (resolveSymbolFrameIdx, app.js). Both the
@@ -98,14 +108,24 @@
     if (prop === 'timeRemap') return holder.timeRemap || null;
     return (holder.motion && holder.motion[prop]) || null;
   }
-  var PROP_LABEL = { position: 'Position', anchor: 'Anchor Point', rotation: 'Rotation', scale: 'Scale', opacity: 'Opacity', timeRemap: 'Time Remap', positionZ: 'Position Z', rotationX: 'Rotation X', rotationY: 'Rotation Y', dupOffsetPos: 'Dup. Offset', dupOffsetRot: 'Dup. Rotation', dupOffsetScale: 'Dup. Scale', dupOffsetOpacity: 'Dup. Opacity' };
-  var PROP_DIM = { position: 2, anchor: 2, rotation: 1, scale: 2, opacity: 1, timeRemap: 1, positionZ: 1, rotationX: 1, rotationY: 1, dupOffsetPos: 2, dupOffsetRot: 1, dupOffsetScale: 2, dupOffsetOpacity: 1 };
-  var PROP_UNIT = { position: 'px', anchor: 'px', rotation: '°', scale: '%', opacity: '%', timeRemap: 'f', positionZ: 'px', rotationX: '°', rotationY: '°', dupOffsetPos: 'px', dupOffsetRot: '°', dupOffsetScale: '%', dupOffsetOpacity: '%' };
-  var PROP_DEFAULT = { position: [0, 0], anchor: [0, 0], rotation: [0], scale: [100, 100], opacity: [100], timeRemap: [0], positionZ: [0], rotationX: [0], rotationY: [0], dupOffsetPos: [0, 0], dupOffsetRot: [0], dupOffsetScale: [0, 0], dupOffsetOpacity: [0] };
+  var PROP_LABEL = { position: 'Position', anchor: 'Anchor Point', rotation: 'Rotation', scale: 'Scale', opacity: 'Opacity', timeRemap: 'Time Remap', positionZ: 'Position Z', rotationX: 'Rotation X', rotationY: 'Rotation Y', dupOffsetPos: 'Dup. Offset', dupOffsetRot: 'Dup. Rotation', dupOffsetScale: 'Dup. Scale', dupOffsetOpacity: 'Dup. Opacity', dupOffsetPosZ: 'Dup. Offset Z', dupOffsetRotX: 'Dup. Rotation X', dupOffsetRotY: 'Dup. Rotation Y' };
+  var PROP_DIM = { position: 2, anchor: 2, rotation: 1, scale: 2, opacity: 1, timeRemap: 1, positionZ: 1, rotationX: 1, rotationY: 1, dupOffsetPos: 2, dupOffsetRot: 1, dupOffsetScale: 2, dupOffsetOpacity: 1, dupOffsetPosZ: 1, dupOffsetRotX: 1, dupOffsetRotY: 1 };
+  var PROP_UNIT = { position: 'px', anchor: 'px', rotation: '°', scale: '%', opacity: '%', timeRemap: 'f', positionZ: 'px', rotationX: '°', rotationY: '°', dupOffsetPos: 'px', dupOffsetRot: '°', dupOffsetScale: '%', dupOffsetOpacity: '%', dupOffsetPosZ: 'px', dupOffsetRotX: '°', dupOffsetRotY: '°' };
+  var PROP_DEFAULT = { position: [0, 0], anchor: [0, 0], rotation: [0], scale: [100, 100], opacity: [100], timeRemap: [0], positionZ: [0], rotationX: [0], rotationY: [0], dupOffsetPos: [0, 0], dupOffsetRot: [0], dupOffsetScale: [0, 0], dupOffsetOpacity: [0], dupOffsetPosZ: [0], dupOffsetRotX: [0], dupOffsetRotY: [0] };
   // Small per-dimension labels ("X"/"Y") shown before each multi-dimension
   // property's field, LottieFiles-inspired (2026-07-29) — every 2-dim prop
   // here is an X/Y pair, so one shared default covers them all.
   var PROP_DIM_LABELS = { position: ['X', 'Y'], anchor: ['X', 'Y'], scale: ['X', 'Y'], dupOffsetPos: ['X', 'Y'], dupOffsetScale: ['X', 'Y'] };
+  // Which properties a duplicator's per-copy stagger AND an Effector
+  // (app.js's applyLayerDuplicator) can drive — the "n'importe quel
+  // property" generalization (2026-07-30) is bounded to this curated set
+  // (every ordinary transform channel except anchor/timeRemap, which don't
+  // make sense per-clone) rather than truly arbitrary properties (fill
+  // color etc. aren't PROP_DIM-registered as keyframable at all yet).
+  // Exported so app.js's applyLayerDuplicator/Effector UI don't hardcode a
+  // second copy of this list (CLAUDE.md §3's duplicated-pair trap).
+  var DUP_TARGET_PROPS = ['position', 'positionZ', 'rotation', 'rotationX', 'rotationY', 'scale', 'opacity'];
+  var DUP_OFFSET_PROP = { position: 'dupOffsetPos', positionZ: 'dupOffsetPosZ', rotation: 'dupOffsetRot', rotationX: 'dupOffsetRotX', rotationY: 'dupOffsetRotY', scale: 'dupOffsetScale', opacity: 'dupOffsetOpacity' };
   // AE's own shortcuts: P/A/R/S/T reveal just that property's row. Kept as
   // a lookup table (not hardcoded in the keydown handler) so the property
   // list and its shortcuts can't silently drift apart.
@@ -991,14 +1011,26 @@
   // plain (px,py) -> {x,y} closure, reused across every vertex of every
   // item in the layer so they all move together as one rigid (but
   // perspective-projected) plane.
-  function make3DProjector(ld, bounds, frameIdx, canvasW, canvasH) {
+  // extraDelta (2026-07-30, "en 3D aussi avec ID de chaque cloner") — an
+  // optional {dz,drx,dry} added on top of the layer's own posZ/rotX/rotY,
+  // ADDITIVE exactly like a duplicator clone's 2D dx/dy/rot/sx/sy is on
+  // top of nothing (fresh placement, not a delta on an existing transform)
+  // — here it's a delta on the layer's shared base 3D pose, because unlike
+  // 2D placement (which the duplicator generates from scratch per clone)
+  // the layer's OWN 3D orientation must still apply uniformly underneath.
+  // Omitted (every other call site) behaves identically to before this
+  // param existed. Lets buildSceneJson (engine-bridge.js) build one extra
+  // projector per unique per-clone delta instead of the single shared
+  // layer-wide one, for a duplicator+3D layer whose clones carry their own
+  // positionZ/rotationX/rotationY offset (data.dup3D, app.js).
+  function make3DProjector(ld, bounds, frameIdx, canvasW, canvasH, extraDelta) {
     var pos = valueAtFrame(ld, 'position', frameIdx);
     var anc = valueAtFrame(ld, 'anchor', frameIdx);
     var rot = valueAtFrame(ld, 'rotation', frameIdx)[0];
     var scl = valueAtFrame(ld, 'scale', frameIdx);
-    var posZ = valueAtFrame(ld, 'positionZ', frameIdx)[0];
-    var rotX = valueAtFrame(ld, 'rotationX', frameIdx)[0];
-    var rotY = valueAtFrame(ld, 'rotationY', frameIdx)[0];
+    var posZ = valueAtFrame(ld, 'positionZ', frameIdx)[0] + (extraDelta ? (extraDelta.dz || 0) : 0);
+    var rotX = valueAtFrame(ld, 'rotationX', frameIdx)[0] + (extraDelta ? (extraDelta.drx || 0) : 0);
+    var rotY = valueAtFrame(ld, 'rotationY', frameIdx)[0] + (extraDelta ? (extraDelta.dry || 0) : 0);
     var sx = scl[0] / 100, sy = scl[1] / 100;
     var pivotX = bounds.x + bounds.width / 2 + anc[0];
     var pivotY = bounds.y + bounds.height / 2 + anc[1];
@@ -4861,6 +4893,17 @@
     // never scales).
     make3DProjector: make3DProjector,
     project3DSegments: project3DSegments,
+    // Duplicator/Effector "any property" generalization (2026-07-30) — the
+    // single source of truth for which properties a duplicator's stagger
+    // and its Effectors can target, and their PROP_DIM/PROP_LABEL/PROP_UNIT
+    // shape, so app.js (the math) and timeline.js (the UI) both read the
+    // SAME list instead of each hardcoding their own copy.
+    DUP_TARGET_PROPS: DUP_TARGET_PROPS,
+    DUP_OFFSET_PROP: DUP_OFFSET_PROP,
+    propDim: function (prop) { return PROP_DIM[prop] || 1; },
+    propLabel: function (prop) { return PROP_LABEL[prop] || prop; },
+    propUnit: function (prop) { return PROP_UNIT[prop] || ''; },
+    propDimLabels: function (prop) { return PROP_DIM_LABELS[prop] || null; },
     toggleLayer3D: toggleLayer3D,
     toggleLayerDuplicator: toggleLayerDuplicator,
     setDuplicatorEditSource: setDuplicatorEditSource,
