@@ -1165,13 +1165,105 @@ function _resolveDuplicatorPath(dup,frameIdx){
   if(!p.length){p.remove();return null;}
   return{path:p,length:p.length,closed:!!sd.closed,start:p.getPointAt(0)};
 }
-function applyLayerDuplicator(ld,base,frameIdx,layerIdx){
-  var dup=ld.duplicator,mode=dup.mode||'grid';
-  // Hard cap mirrors _registerCap's "never unbounded" philosophy
-  // (engine-bridge.js) — a typo'd count degrades to "big", never "hangs".
-  var count=mode==='grid'
+// Shared by applyLayerDuplicator (below, the strokes/rasters path) AND
+// engine-bridge.js's nativeVideo render branch (2026-07-30 — a native video
+// layer's picture is ONE image item pushed directly, entirely bypassing
+// getEffectiveStrokesRendered, so the Duplicator previously had zero effect
+// on a video layer: enabling it changed nothing on screen). This is ONE
+// clone's placement (position/rotation/scale/opacity delta + this clone's
+// own effector contributions), given its index `k` and the pivot ITS
+// content is centered on — `pivotK` is a parameter rather than always
+// `pivot` because the stroke path's temporal stagger (tOffOn below)
+// re-samples the seed layer's own content at a per-copy shifted frame, so
+// different copies can be centered on different bounds. nativeVideo has
+// exactly one decoded image per frame tick (no per-clone re-sampling is
+// possible), so its caller always passes the same pivot for every k —
+// temporal stagger is a no-op for video, same reason it can't animate.
+// MUST stay the only place this math lives — mirrors CLAUDE.md §3's rule
+// for render()/render_to_pixels(): if this ever forks into two copies, the
+// RNG draw order (7919-decorrelated per index, exactly 9 draws every time
+// regardless of which properties are actually random) and the effector
+// summation must be changed in both, or the two paths silently diverge.
+function _duplicatorClonePlacement(dup,k,pivotK,baseDx,baseDy,baseRot,dPos,dRot,dScale,dOpacity,dPosZ,dRotX,dRotY,randMode,is3DLayer){
+  var rngK=seededRng(((dup.seed||0)+k*7919)>>>0);
+  var rx=rngK(),ry=rngK(),rrr=rngK(),rsx=rngK(),rsy=rngK(),rop=rngK();
+  var posK=randMode.position?[(2*rx-1)*dPos[0],(2*ry-1)*dPos[1]]:[k*dPos[0],k*dPos[1]];
+  var rotK=randMode.rotation?(2*rrr-1)*dRot:k*dRot;
+  var scaleK=randMode.scale?[(2*rsx-1)*dScale[0],(2*rsy-1)*dScale[1]]:[k*dScale[0],k*dScale[1]];
+  var opK=randMode.opacity?(2*rop-1)*dOpacity:k*dOpacity;
+  var rz=rngK(),rrx=rngK(),rry=rngK();
+  var dzK=randMode.position?(2*rz-1)*dPosZ:k*dPosZ;
+  var drxK=randMode.rotation?(2*rrx-1)*dRotX:k*dRotX;
+  var dryK=randMode.rotation?(2*rry-1)*dRotY:k*dRotY;
+  var instX=pivotK.x+baseDx,instY=pivotK.y+baseDy;
+  (dup.effectors||[]).forEach(function(eff){
+    var ddx=instX-(eff.pos?eff.pos.x:0),ddy=instY-(eff.pos?eff.pos.y:0);
+    var w;
+    if(eff.falloff==='linear'){
+      var rad=(eff.angle||0)*Math.PI/180;
+      var proj=ddx*Math.cos(rad)+ddy*Math.sin(rad);
+      w=Math.max(0,Math.min(1,1-proj/(eff.radius||1)));
+    }else{
+      var dist=Math.hypot(ddx,ddy);
+      w=Math.max(0,Math.min(1,1-dist/(eff.radius||1)));
+    }
+    w*=(eff.strength!=null?eff.strength:100)/100;
+    if(!w)return;
+    effectorChannels(eff).forEach(function(ch){
+      var v=ch.value||[];
+      switch(ch.prop){
+        case 'position':posK[0]+=w*(v[0]||0);posK[1]+=w*(v[1]||0);break;
+        case 'positionZ':dzK+=w*(v[0]||0);break;
+        case 'rotation':rotK+=w*(v[0]||0);break;
+        case 'rotationX':drxK+=w*(v[0]||0);break;
+        case 'rotationY':dryK+=w*(v[0]||0);break;
+        case 'scale':scaleK[0]+=w*(v[0]||0);scaleK[1]+=w*(v[1]||0);break;
+        case 'opacity':opK+=w*(v[0]||0);break;
+      }
+    });
+  });
+  var opFactor=Math.max(0,Math.min(1,1+opK/100));
+  var dup3D=(is3DLayer&&(dzK||drxK||dryK))?{dz:dzK,drx:drxK,dry:dryK}:null;
+  return{dx:baseDx+posK[0],dy:baseDy+posK[1],rot:baseRot+rotK,sx:1+scaleK[0]/100,sy:1+scaleK[1]/100,opacityFactor:opFactor,dup3D:dup3D};
+}
+// Hard cap mirrors _registerCap's "never unbounded" philosophy
+// (engine-bridge.js) — a typo'd count degrades to "big", never "hangs".
+// Shared so the nativeVideo render path can't drift to a different ceiling.
+function _duplicatorCount(dup){
+  var mode=dup.mode||'grid';
+  return mode==='grid'
     ?Math.min(900,Math.max(1,dup.rows||1)*Math.max(1,dup.cols||1))
     :Math.min(500,Math.max(1,dup.count||1));
+}
+// The mode-specific (grid/radial/path) base offset for clone `k`, BEFORE
+// any RNG stagger or effector contribution — shared with the nativeVideo
+// render path for the same reason as _duplicatorClonePlacement above.
+// `pathInfo` is _resolveDuplicatorPath's result (null unless mode==='path').
+function _duplicatorModeOffset(dup,mode,k,count,cols,pathInfo){
+  var baseDx=0,baseDy=0,baseRot=0;
+  if(mode==='grid'){
+    baseDx=(k%cols)*(dup.spacingX||0);
+    baseDy=Math.floor(k/cols)*(dup.spacingY||0);
+  }else if(mode==='radial'){
+    var span=dup.endAngle!=null?(dup.endAngle-dup.startAngle):360;
+    var ang=(dup.startAngle||0)+k*(span/count);
+    var rr=ang*Math.PI/180;
+    baseDx=(dup.radius||0)*Math.cos(rr);
+    baseDy=(dup.radius||0)*Math.sin(rr);
+    if(dup.radialOrient)baseRot=ang;
+  }else{ // path
+    var t=pathInfo.closed?k/count:(count>1?k/(count-1):0);
+    var off=Math.min(pathInfo.length,t*pathInfo.length);
+    var pt=pathInfo.path.getPointAt(off)||pathInfo.start;
+    baseDx=pt.x-pathInfo.start.x;
+    baseDy=pt.y-pathInfo.start.y;
+    if(dup.pathAlignTangent){var tan=pathInfo.path.getTangentAt(off);if(tan)baseRot=tan.angle;}
+  }
+  return{baseDx:baseDx,baseDy:baseDy,baseRot:baseRot};
+}
+function applyLayerDuplicator(ld,base,frameIdx,layerIdx){
+  var dup=ld.duplicator,mode=dup.mode||'grid';
+  var count=_duplicatorCount(dup);
   if(count<=1)return base;
   var pivot=_boundsCenterOfStrokes(base);
   var M=window.SMMotion;
@@ -1233,110 +1325,26 @@ function applyLayerDuplicator(ld,base,frameIdx,layerIdx){
       // Nothing drawn at the shifted frame (a hold-blank span) — fall back
       // to the current frame's own content rather than vanishing that copy.
     }
-    var baseDx=0,baseDy=0,baseRot=0;
-    if(mode==='grid'){
-      baseDx=(k%cols)*(dup.spacingX||0);
-      baseDy=Math.floor(k/cols)*(dup.spacingY||0);
-    }else if(mode==='radial'){
-      var span=dup.endAngle!=null?(dup.endAngle-dup.startAngle):360;
-      var ang=(dup.startAngle||0)+k*(span/count);
-      var rr=ang*Math.PI/180;
-      baseDx=(dup.radius||0)*Math.cos(rr);
-      baseDy=(dup.radius||0)*Math.sin(rr);
-      if(dup.radialOrient)baseRot=ang;
-    }else{ // path
-      var t=pathInfo.closed?k/count:(count>1?k/(count-1):0);
-      var off=Math.min(pathInfo.length,t*pathInfo.length);
-      var pt=pathInfo.path.getPointAt(off)||pathInfo.start;
-      baseDx=pt.x-pathInfo.start.x;
-      baseDy=pt.y-pathInfo.start.y;
-      if(dup.pathAlignTangent){var tan=pathInfo.path.getTangentAt(off);if(tan)baseRot=tan.angle;}
-    }
-    // One RNG per index, drawing a FIXED number of values in a FIXED order
-    // regardless of which properties are actually random — flipping one
-    // property's mode later must not reshuffle another's pattern. 7919
-    // (prime) decorrelates consecutive k. seededRng (mulberry32, tools.js)
-    // — never Math.random() at render time, or the stagger reshuffles on
-    // every scrub tick (same rule as dabRecordsForTween's seeded stamping).
-    var rngK=seededRng(((dup.seed||0)+k*7919)>>>0);
-    var rx=rngK(),ry=rngK(),rrr=rngK(),rsx=rngK(),rsy=rngK(),rop=rngK();
-    // Random mode: each copy draws uniformly in ±delta (the keyframed
-    // value is the jitter AMPLITUDE); sequential mode: copy k gets k×delta
-    // (the value is the per-copy INCREMENT). Simple, predictable, and each
-    // mode's knob means one thing.
-    var posK=randMode.position?[(2*rx-1)*dPos[0],(2*ry-1)*dPos[1]]:[k*dPos[0],k*dPos[1]];
-    var rotK=randMode.rotation?(2*rrr-1)*dRot:k*dRot;
-    var scaleK=randMode.scale?[(2*rsx-1)*dScale[0],(2*rsy-1)*dScale[1]]:[k*dScale[0],k*dScale[1]];
-    var opK=randMode.opacity?(2*rop-1)*dOpacity:k*dOpacity;
-    // 3 more draws, appended AFTER the original 6 (see dPosZ's own comment
-    // above for why order/count here matters) — positionZ shares
-    // Position's random/sequential checkbox, rotationX/Y share Rotation's,
-    // rather than tripling the panel's checkbox count for axes that are
-    // conceptually "more of the same property."
-    var rz=rngK(),rrx=rngK(),rry=rngK();
-    var dzK=randMode.position?(2*rz-1)*dPosZ:k*dPosZ;
-    var drxK=randMode.rotation?(2*rrx-1)*dRotX:k*dRotX;
-    var dryK=randMode.rotation?(2*rry-1)*dRotY:k*dRotY;
-    // Effectors (2026-07-29, mograph "n'oublie pas la création des
-    // effectors"): a SPATIAL contribution, independent of copy index —
-    // each effector weights its own delta by this instance's DISTANCE from
-    // the effector's position (radial: Euclidean distance from a point;
-    // linear: signed projection onto a direction, i.e. a directional band),
-    // ramped linearly from 1 at the effector to 0 at its radius. instX/instY
-    // is this instance's own placed position (pivot+base offset) BEFORE the
-    // index-stagger posK is added — the same local/content space `pivot`
-    // already lives in, so it lines up with an effector's stored position
-    // with no extra transform. Multiple effectors simply SUM their
-    // contributions on top of the existing index-based stagger — additive,
-    // like AE/C4D's own default effector combination.
-    var instX=pivotK.x+baseDx,instY=pivotK.y+baseDy;
-    (dup.effectors||[]).forEach(function(eff){
-      var ddx=instX-(eff.pos?eff.pos.x:0),ddy=instY-(eff.pos?eff.pos.y:0);
-      var w;
-      if(eff.falloff==='linear'){
-        var rad=(eff.angle||0)*Math.PI/180;
-        var proj=ddx*Math.cos(rad)+ddy*Math.sin(rad); // signed distance along the effector's direction
-        w=Math.max(0,Math.min(1,1-proj/(eff.radius||1)));
-      }else{ // radial
-        var dist=Math.hypot(ddx,ddy);
-        w=Math.max(0,Math.min(1,1-dist/(eff.radius||1)));
-      }
-      w*=(eff.strength!=null?eff.strength:100)/100;
-      if(!w)return;
-      // "N'importe quel property" (2026-07-30): an effector's contribution
-      // is now an arbitrary {prop,value} channel list (effectorChannels
-      // migrates a legacy 4-fixed-field effector into this shape once, in
-      // place — see its own comment above) instead of 4 hardcoded fields,
-      // routed here to whichever of THIS clone's accumulators that
-      // property feeds — positionZ/rotationX/rotationY join the original
-      // position/rotation/scale/opacity as valid targets, the actual "3D
-      // aussi" half of this generalization.
-      effectorChannels(eff).forEach(function(ch){
-        var v=ch.value||[];
-        switch(ch.prop){
-          case 'position':posK[0]+=w*(v[0]||0);posK[1]+=w*(v[1]||0);break;
-          case 'positionZ':dzK+=w*(v[0]||0);break;
-          case 'rotation':rotK+=w*(v[0]||0);break;
-          case 'rotationX':drxK+=w*(v[0]||0);break;
-          case 'rotationY':dryK+=w*(v[0]||0);break;
-          case 'scale':scaleK[0]+=w*(v[0]||0);scaleK[1]+=w*(v[1]||0);break;
-          case 'opacity':opK+=w*(v[0]||0);break;
-        }
-      });
-    });
+    var modeOff=_duplicatorModeOffset(dup,mode,k,count,cols,pathInfo);
+    var baseDx=modeOff.baseDx,baseDy=modeOff.baseDy,baseRot=modeOff.baseRot;
+    // Per-clone RNG draws, effector summation and the resulting placement
+    // descriptor all live in _duplicatorClonePlacement (shared with the
+    // nativeVideo render path, engine-bridge.js) — see its own comment for
+    // why pivotK is passed in rather than always using `pivot`.
+    var place=_duplicatorClonePlacement(dup,k,pivotK,baseDx,baseDy,baseRot,dPos,dRot,dScale,dOpacity,dPosZ,dRotX,dRotY,randMode,is3DLayer);
     // Stagger folded into ONE matrix with the mode's own placement:
     // rotate/scale in place around the seed's own bounds-center first, the
     // placement translate last — same inner-transform-then-outer-placement
     // order as a Component's own camera followed by symMatrix.
-    var mat=dupMatrixFromDescriptor({dx:baseDx+posK[0],dy:baseDy+posK[1],rot:baseRot+rotK,sx:1+scaleK[0]/100,sy:1+scaleK[1]/100},pivotK);
-    var opFactor=Math.max(0,Math.min(1,1+opK/100));
+    var mat=dupMatrixFromDescriptor(place,pivotK);
+    var opFactor=place.opacityFactor;
     // Per-clone 3D delta (2026-07-30) — only attached when it can actually
     // do anything (layer is 3D-enabled AND at least one axis actually
     // moved), so an ordinary 2D duplicator's clones carry no extra field.
     // buildSceneJson (engine-bridge.js) reads data.dup3D to build a
     // per-dupIndex 3D projector instead of sharing the single layer-wide
     // one every other item on a 3D layer uses.
-    var dup3D=(is3DLayer&&(dzK||drxK||dryK))?{dz:dzK,drx:drxK,dry:dryK}:null;
+    var dup3D=place.dup3D;
     baseK.forEach(function(sd){
       var sd2=applyMatrixToStrokeData(cloneStrokeForTransform(sd),mat);
       sd2.opacity=(sd2.opacity!==undefined?sd2.opacity:1)*opFactor;

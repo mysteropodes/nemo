@@ -4581,21 +4581,32 @@ function renderDuplicatorEffectors(dup){
     var row=document.createElement('div');
     row.style.cssText='display:flex;flex-direction:column;gap:4px;padding:6px 8px;margin:2px 0;border-radius:6px;background:rgba(255,255,255,.03)';
     function line(){var l=document.createElement('div');l.className='pr';row.appendChild(l);return l;}
-    function num(l,id,val,step){var s=document.createElement('span');s.className='pl';s.textContent=l;var inp=document.createElement('input');inp.type='number';inp.className='pi scrub';inp.value=val;inp.dataset.step=step||1;inp.addEventListener('change',function(){id(parseFloat(inp.value)||0);dupRefreshFromPanel();});return[s,inp];}
+    // 2026-07-30 (UX audit, "l'Effector... pas très compréhensible
+    // d'utilisation"): single-letter labels (R, %) had no title at all —
+    // the ONLY way to learn what they meant was trial and error. `title`
+    // now goes on both the label span AND the input (whichever the user
+    // actually hovers), same pattern as every other tooltip in this panel.
+    function num(l,id,val,step,title){
+      var s=document.createElement('span');s.className='pl';s.textContent=l;if(title)s.title=title;
+      var inp=document.createElement('input');inp.type='number';inp.className='pi scrub';inp.value=val;inp.dataset.step=step||1;if(title)inp.title=title;
+      inp.addEventListener('change',function(){id(parseFloat(inp.value)||0);dupRefreshFromPanel();});
+      return[s,inp];
+    }
     // Header: falloff mode, radius, strength, delete.
     var hdr=line();
     var modeSel=document.createElement('select');modeSel.className='psel';
+    modeSel.title='Radial : influence en cercle autour du point de l’effector, dégradée jusqu’au rayon R. Linear : influence en bande le long d’une direction (angle °), dégradée jusqu’à la distance R.';
     ['radial','linear'].forEach(function(v){var o=document.createElement('option');o.value=v;o.textContent=v==='radial'?'Radial':'Linear';if(eff.falloff===v||(!eff.falloff&&v==='radial'))o.selected=true;modeSel.appendChild(o);});
     modeSel.addEventListener('change',function(){eff.falloff=modeSel.value;renderDuplicatorEffectors(dup);dupRefreshFromPanel();});
     hdr.appendChild(modeSel);
-    var rad=num('R',function(v){eff.radius=v;},eff.radius||200,1);hdr.appendChild(rad[0]);hdr.appendChild(rad[1]);
-    var str=num('%',function(v){eff.strength=v;},eff.strength!=null?eff.strength:100,1);hdr.appendChild(str[0]);hdr.appendChild(str[1]);
-    var delBtn=document.createElement('button');delBtn.className='pbtn';delBtn.textContent='✕';delBtn.style.marginLeft='auto';
+    var rad=num('R',function(v){eff.radius=v;},eff.radius||200,1,'Rayon d’action (px) — distance à laquelle l’influence de cet effector retombe à zéro. Le point d’origine se règle en glissant le repère de l’effector sur le canvas, en mode Motion.');hdr.appendChild(rad[0]);hdr.appendChild(rad[1]);
+    var str=num('%',function(v){eff.strength=v;},eff.strength!=null?eff.strength:100,1,'Force globale de cet effector (%) — multiplie toutes ses propriétés ci-dessous. 0% = aucun effet, 100% = plein effet au centre.');hdr.appendChild(str[0]);hdr.appendChild(str[1]);
+    var delBtn=document.createElement('button');delBtn.className='pbtn';delBtn.textContent='✕';delBtn.style.marginLeft='auto';delBtn.title='Supprimer cet effector';
     delBtn.addEventListener('click',function(){dup.effectors.splice(i,1);renderDuplicatorEffectors(dup);dupRefreshFromPanel();});
     hdr.appendChild(delBtn);
     if((eff.falloff||'radial')==='linear'){
       var angRow=line();
-      var ang=num('°',function(v){eff.angle=v;},eff.angle||0,1);angRow.appendChild(ang[0]);angRow.appendChild(ang[1]);
+      var ang=num('°',function(v){eff.angle=v;},eff.angle||0,1,'Direction de la bande d’influence (degrés) — 0° = vers la droite, 90° = vers le bas.');angRow.appendChild(ang[0]);angRow.appendChild(ang[1]);
     }
     // Offsets: "n'importe quel property" (2026-07-30) — was 4 hardcoded
     // Pos/Rot/Scale/Opacity rows; now an arbitrary per-effector channel
@@ -4626,8 +4637,16 @@ function renderDuplicatorEffectors(dup){
       // 68px), so X/Y get to split the full row width like every other
       // multi-value field in this same panel, not a bespoke narrower one.
       var nameRow=line();
-      var nameLbl=document.createElement('span');nameLbl.textContent=propLabel;nameRow.appendChild(nameLbl);
-      var rmCh=document.createElement('button');rmCh.className='pbtn';rmCh.textContent='✕';rmCh.style.marginLeft='auto';
+      var nameLbl=document.createElement('span');nameLbl.textContent=propLabel;
+      // 2026-07-30 (UX audit): the number(s) below are easy to mistake for
+      // "the effector's own position" — they're actually the DELTA applied
+      // to a clone that sits exactly AT the effector's center (full 100%
+      // strength); clones further out get a fraction of it, down to 0 at
+      // the radius. Spelled out on hover since the row's own name (just
+      // "Position", "Scale"...) can't say all that.
+      nameLbl.title='Valeur appliquée aux copies les plus proches de cet effector (plein effet au centre, s’estompe jusqu’au rayon R) — pas la position de l’effector lui-même.';
+      nameRow.appendChild(nameLbl);
+      var rmCh=document.createElement('button');rmCh.className='pbtn';rmCh.textContent='✕';rmCh.style.marginLeft='auto';rmCh.title='Retirer cette propriété de l’effector';
       rmCh.addEventListener('click',function(){channels.splice(ci,1);renderDuplicatorEffectors(dup);dupRefreshFromPanel();});
       nameRow.appendChild(rmCh);
       var valRow=line();valRow.classList.add('dims-row');
@@ -4641,6 +4660,7 @@ function renderDuplicatorEffectors(dup){
     });
     var addRow=line();
     var addSel=document.createElement('select');addSel.className='psel';
+    addSel.title='Ajoute une propriété que cet effector va faire varier sur les copies proches (Position, Rotation, Échelle, Opacité…).';
     var placeholder=document.createElement('option');placeholder.textContent='+ Propriété…';placeholder.value='';addSel.appendChild(placeholder);
     var already={};channels.forEach(function(ch){already[ch.prop]=true;});
     targetProps.forEach(function(p){

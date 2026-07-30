@@ -795,18 +795,58 @@
         if (renderFrame >= inF && renderFrame <= outF) {
           var nvS = Math.min(state.canvasW / nv.width, state.canvasH / nv.height);
           var nvW = nv.width * nvS, nvH = nv.height * nvS;
-          var nvRect = { x: (state.canvasW - nvW) / 2, y: (state.canvasH - nvH) / 2, width: nvW, height: nvH };
-          var nvOp = 1;
-          var nvMat = window.SMMotion ? SMMotion.layerMotionAt(i, renderFrame) : null;
-          if (nvMat) {
-            var nvPivot = { x: nvRect.x + nvRect.width / 2 + nvMat.ax, y: nvRect.y + nvRect.height / 2 + nvMat.ay };
-            nvRect = SMMotion.transformImageRect(nvRect, nvPivot, nvMat);
-            nvOp *= nvMat.op;
+          var nvRectBase = { x: (state.canvasW - nvW) / 2, y: (state.canvasH - nvH) / 2, width: nvW, height: nvH };
+          // Duplicator (2026-07-30): a native video layer has no strokes array
+          // (getEffectiveStrokes short-circuits to [] for nativeVideo, app.js),
+          // so it never reached applyLayerDuplicator/getEffectiveStrokesRendered
+          // — enabling the Duplicator on a video layer used to do nothing at
+          // all. Duplicated HERE, in the video's own local/content space
+          // (nvRectBase, pivot = its own center), exactly mirroring the stroke
+          // path's order: seed content gets duplicated first, THEN the
+          // layer's own Motion transform + parent chain apply uniformly to
+          // every resulting rect below — never the other way around, or a
+          // rotated/scaled layer would duplicate along the wrong axes.
+          // _duplicatorCount/_duplicatorModeOffset/_duplicatorClonePlacement
+          // (app.js) are the SAME functions applyLayerDuplicator itself calls
+          // — never re-derive this math here.
+          var nvDup = state.layers[i].duplicator;
+          var nvCount = nvDup ? _duplicatorCount(nvDup) : 1;
+          var nvRects;
+          if (nvDup && nvCount > 1) {
+            var nvMode = nvDup.mode || 'grid';
+            var nvCols = Math.max(1, nvDup.cols || 1);
+            var nvPathInfo = nvMode === 'path' ? _resolveDuplicatorPath(nvDup, renderFrame) : null;
+            if (nvMode === 'path' && !nvPathInfo) {
+              nvRects = [{ rect: nvRectBase, opacityFactor: 1 }]; // unconfigured path ref: show the seed, not nothing
+            } else {
+              var nvPivot = { x: nvRectBase.x + nvRectBase.width / 2, y: nvRectBase.y + nvRectBase.height / 2 };
+              // No per-clone content resampling exists for video (exactly one
+              // decoded frame backs 'nv:'+i) — temporal stagger is a no-op
+              // here, unlike the stroke path's tOffOn branch.
+              nvRects = [];
+              for (var nvk = 0; nvk < nvCount; nvk++) {
+                var nvOff = _duplicatorModeOffset(nvDup, nvMode, nvk, nvCount, nvCols, nvPathInfo);
+                var nvPlace = _duplicatorClonePlacement(nvDup, nvk, nvPivot, nvOff.baseDx, nvOff.baseDy, nvOff.baseRot, [0, 0], 0, [0, 0], 0, 0, 0, 0, nvDup.staggerRandom || {}, false);
+                nvRects.push({ rect: SMMotion.transformImageRect(nvRectBase, nvPivot, nvPlace), opacityFactor: nvPlace.opacityFactor });
+              }
+              if (nvPathInfo) nvPathInfo.path.remove();
+            }
+          } else {
+            nvRects = [{ rect: nvRectBase, opacityFactor: 1 }];
           }
+          var nvMat = window.SMMotion ? SMMotion.layerMotionAt(i, renderFrame) : null;
           var nvChain = SMMotion.parentChainMats(i, renderFrame);
-          for (var nvpc = 0; nvpc < nvChain.length; nvpc++) { nvRect = SMMotion.transformImageRect(nvRect, nvChain[nvpc].pivot, nvChain[nvpc].mat); nvOp *= nvChain[nvpc].mat.op; }
-          _touchImage('nv:' + i);
-          items.push({ image: { imageId: 'nv:' + i, x: nvRect.x, y: nvRect.y, width: nvRect.width, height: nvRect.height, opacity: nvOp, rotation: nvRect.rotation || 0 } });
+          _touchImage('nv:' + i); // one shared texture for every clone — touch once, not per clone
+          for (var nvri = 0; nvri < nvRects.length; nvri++) {
+            var nvRect = nvRects[nvri].rect, nvOp = nvRects[nvri].opacityFactor;
+            if (nvMat) {
+              var nvItemPivot = { x: nvRect.x + nvRect.width / 2 + nvMat.ax, y: nvRect.y + nvRect.height / 2 + nvMat.ay };
+              nvRect = SMMotion.transformImageRect(nvRect, nvItemPivot, nvMat);
+              nvOp *= nvMat.op;
+            }
+            for (var nvpc = 0; nvpc < nvChain.length; nvpc++) { nvRect = SMMotion.transformImageRect(nvRect, nvChain[nvpc].pivot, nvChain[nvpc].mat); nvOp *= nvChain[nvpc].mat.op; }
+            items.push({ image: { imageId: 'nv:' + i, x: nvRect.x, y: nvRect.y, width: nvRect.width, height: nvRect.height, opacity: nvOp, rotation: nvRect.rotation || 0 } });
+          }
         }
       }
       for (var s = 0; s < children.length; s++) {
