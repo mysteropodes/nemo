@@ -3036,6 +3036,21 @@ function exitToScene(){
     // than mutating in place, which would otherwise silently strand any
     // edit made inside the symbol the instant one of those call sites ran.
     sym.markers=state.markers;sym.motionArcs=state.motionArcs;sym.tweenOverrides=state.tweenOverrides;sym.tweenEasing=state.tweenEasing;
+    // cameraKeys write-back (2026-07-30 fix) — enterSymbol aliases
+    // state.cameraKeys TO sym.cameraKeys (line ~2998, same pattern as
+    // sym.layers above), so in-place edits (SMCamera.setKey/removeKey,
+    // which push/splice) already write through without this. But camera.js's
+    // "Supprimer le calque caméra" action does `state.cameraKeys=[]` — a
+    // wholesale REPLACE, not a mutation — which silently severs the alias
+    // exactly like restoreLayersSnapshot's own `state.layers=[]` did for
+    // sym.layers before that write-back existed. Without this, deleting the
+    // camera layer while inside a Component looked like it worked (the UI's
+    // own state.cameraKeys really is empty) but sym.cameraKeys still held
+    // every original key, and reappeared in full the next time the
+    // Component was entered. exitMontageView's own identical write-back
+    // (a few hundred lines down) already had this; only this sibling
+    // function was missing it.
+    sym.cameraKeys=state.cameraKeys;
   }
   var symLayers=_symbolPaperLayers[symId];if(symLayers)symLayers.forEach(function(l){l.visible=false;});
   state.layers=_sceneSnapshot.layers;state.totalFrames=_sceneSnapshot.totalFrames;state.waIn=_sceneSnapshot.waIn;state.waOut=_sceneSnapshot.waOut;
