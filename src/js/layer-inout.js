@@ -978,7 +978,7 @@
         var ld2 = state.layers[li];
         if (!ld2 || !ld2.timeLink) return;
         if (window.pushUndo) pushUndo();
-        delete ld2.timeLink;
+        if (window.unlinkTimeLinkPreserveRange) unlinkTimeLinkPreserveRange(ld2); else delete ld2.timeLink;
         if (window.renderLayerList) renderLayerList();
         if (window.renderTimeline) renderTimeline();
         if (window.loadFrame) loadFrame(state.currentFrame);

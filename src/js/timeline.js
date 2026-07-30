@@ -4300,7 +4300,7 @@ function renderLayerList(frameOnly){
       tlb.addEventListener('click',function(e){e.stopPropagation();});
       tlb.addEventListener('contextmenu',function(e){
         e.preventDefault();e.stopPropagation();
-        pushUndo();delete ld.timeLink;
+        pushUndo();unlinkTimeLinkPreserveRange(ld);
         renderLayerList();renderTimeline();
         if(window.loadFrame)loadFrame(state.currentFrame);
         if(window.SMEngineBridge)SMEngineBridge.renderNow();
