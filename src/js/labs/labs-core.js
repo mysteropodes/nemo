@@ -19,13 +19,13 @@
     var p = protos[name];
     return !!p && localStorage.getItem(p.flag) === '1';
   }
-  function setOn(name, on) {
+  function setOn(name, on, silent) {
     var p = protos[name];
     if (!p) { console.warn('[labs] unknown prototype:', name, '— SMLabs.list()'); return false; }
     localStorage.setItem(p.flag, on ? '1' : '0');
     if (on && p.onEnable) p.onEnable();
     if (!on && p.onDisable) p.onDisable();
-    if (typeof showToast === 'function') showToast('Labs — ' + name + ' : ' + (on ? 'activé' : 'désactivé'));
+    if (!silent && typeof showToast === 'function') showToast('Labs — ' + name + ' : ' + (on ? 'activé' : 'désactivé'));
     return on;
   }
 
@@ -41,6 +41,21 @@
     return Object.keys(protos).map(function (n) {
       return { name: n, on: isOn(n), what: protos[n].describe || '' };
     });
+  };
+  // Flags are plain origin-scoped localStorage, with no project identity
+  // attached at all (2026-07-30 fix, QA sweep: "un Labs enabled dans un
+  // projet carrie silencieusement dans tous les projets suivants, avec pour
+  // seul indicateur un toast one-shot au moment du dessin"). Making this
+  // properly per-project (stored inside the project JSON) would put
+  // prototype-testing scaffolding into real project files — exactly what
+  // "no Réglages UI on purpose... not shipped features" already rejects.
+  // Simpler and true to that intent: OFF is the only state a project can
+  // ever load into. Called from project.js's newProject() and timeline.js's
+  // SM.importJSON() (non-silent — an explicit Open Project, not the silent
+  // nemo-auto boot-time resume of the SAME session, which should still let
+  // an in-progress Labs test survive a plain page refresh).
+  L.resetAll = function () {
+    Object.keys(protos).forEach(function (n) { if (isOn(n)) setOn(n, false, true); });
   };
 
   // Fan-out for draw-bridge.js's commit hook. Order = registration order
