@@ -406,10 +406,30 @@
   function keySelNow() {
     return (window.SMMotion && SMMotion.getKeySelection) ? SMMotion.getKeySelection() : [];
   }
+  // Shift-range vs Ctrl/Cmd-toggle (2026-07-30 fix, Cyril: "avec shift on
+  // doit pouvoir select plusieurs calques, in out point, et avec ctrl aussi
+  // pour sauter des calque") — previously shiftKey/metaKey/ctrlKey all did
+  // the exact same thing (toggleBarSel, a plain membership flip), so Shift
+  // could only ever build up a selection one bar at a time same as Ctrl,
+  // never grab a contiguous run in one click like the layer-list's own
+  // Shift-click (motion.js row handler) already does. _barAnchorLi tracks
+  // the last EXPLICITLY bar-clicked layer — set on every plain click/toggle,
+  // left untouched by a Shift-click itself so a run of Shift-clicks grows
+  // or shrinks the range from the SAME fixed end rather than drifting.
+  var _barAnchorLi = null;
   function onDown(li, row, type, e) {
     e.stopPropagation(); e.preventDefault();
     var ld = state.layers[li]; if (!ld) return;
-    if (e.shiftKey || e.metaKey || e.ctrlKey) { toggleBarSel(li); return; } // select-only, no drag
+    if (e.metaKey || e.ctrlKey) { toggleBarSel(li); _barAnchorLi = li; return; } // toggle one, no drag
+    if (e.shiftKey) { // contiguous range from the anchor to this bar, no drag
+      var anchorLi = (_barAnchorLi != null && state.layers[_barAnchorLi]) ? _barAnchorLi : li;
+      var lo = Math.min(anchorLi, li), hi = Math.max(anchorLi, li);
+      var rangeSel = [];
+      for (var rk = lo; rk <= hi; rk++) rangeSel.push({ li: rk, part: 'both' });
+      _barSel = rangeSel;
+      refreshBarSelClasses();
+      return;
+    }
     if (window.SMMotion && SMMotion.clearKeyframeShiftPreview) SMMotion.clearKeyframeShiftPreview(); // never inherit a prior drag's leftover offset
     if (window.pushUndo) pushUndo(); // one undo step for the whole drag, not one per mousemove
     // Flush any live canvas content into ld.frames BEFORE this drag starts
@@ -434,7 +454,15 @@
       var members = _barSel.map(function (s) {
         var mld = state.layers[s.li], mrow = _liToRow[s.li];
         if (!mld || !mrow) return null;
-        return { li: s.li, row: mrow, origIn: inPointOf(mld), origOut: outPointOf(mld) };
+        // part travels with each member (2026-07-30 fix, Cyril: "pas
+        // possible de faire bouger un in point d'un calque avec un
+        // outpoint d'un autre... quand ils sont tous les 2 select") — a
+        // marquee can tag different bars with different parts ('in' on
+        // one, 'out' on another, 'both' on a third); the drag below now
+        // moves each member according to ITS OWN part instead of forcing
+        // every member to follow whichever single handle was physically
+        // grabbed to start the gesture.
+        return { li: s.li, row: mrow, origIn: inPointOf(mld), origOut: outPointOf(mld), part: s.part || 'both' };
       }).filter(Boolean);
       // pressLi: which bar was actually clicked, kept alongside the group so
       // a plain (no-modifier, no-move) click can narrow the selection down
@@ -485,34 +513,45 @@
       // or OUT handle — so a group in-point trim silently shifted the
       // whole range (out point included) instead of trimming just that
       // edge. Each handle type now only touches the field it owns, exactly
-      // like the single-bar (non-group) branch below — 'in'/'out' clamp
-      // per-member independently (trimming can't break another member),
-      // 'both' keeps the original whole-range shift with its group-wide
-      // bounds check (shifting must stay valid for every member at once,
-      // since duration is preserved).
-      if (_drag.type === 'in') {
-        _drag.members.forEach(function (m) {
-          var mld = state.layers[m.li]; if (!mld) return;
-          var mNewIn = Math.max(0, Math.min(m.origIn + dx, m.origOut - 1));
-          if (!trySetLinkedEdge(mld, 'in', mNewIn)) mld.inPoint = mNewIn;
-          updateBar(m.row, m.li);
-          updateLinkedChildrenBars(m.li);
-        });
-      } else if (_drag.type === 'out') {
-        _drag.members.forEach(function (m) {
-          var mld = state.layers[m.li]; if (!mld) return;
-          var mNewOut = Math.min(total - 1, Math.max(m.origOut + dx, m.origIn + 1));
-          if (!trySetLinkedEdge(mld, 'out', mNewOut)) mld.outPoint = mNewOut;
-          updateBar(m.row, m.li);
-          updateLinkedChildrenBars(m.li);
-        });
-      } else {
-        var ok = _drag.members.every(function (m) {
+      // like the single-bar (non-group) branch below.
+      //
+      // 2026-07-30 fix (Cyril: "pas possible de faire bouger un in point
+      // d'un calque avec un outpoint d'un autre et inversement quand ils
+      // sont tous les 2 select") — the type of the ONE handle physically
+      // grabbed to start the drag used to apply to EVERY member uniformly,
+      // so a marquee that tagged layer A's IN and layer B's OUT separately
+      // still moved both the same way once dragged together. Partition by
+      // each member's OWN part instead (copied onto m.part in onDown,
+      // straight from _barSel's marquee-assigned in/out/both tag): 'in'/
+      // 'out' members clamp independently per-member (trimming one can't
+      // break another), 'both' members keep the original group-wide bounds
+      // check so a rigid whole-bar group still stays aligned or doesn't
+      // move at all, never partially clamping some members but not others.
+      var inMembers = [], outMembers = [], bothMembersM = [];
+      _drag.members.forEach(function (m) {
+        var p = m.part || 'both';
+        if (p === 'in') inMembers.push(m); else if (p === 'out') outMembers.push(m); else bothMembersM.push(m);
+      });
+      inMembers.forEach(function (m) {
+        var mld = state.layers[m.li]; if (!mld) return;
+        var mNewIn = Math.max(0, Math.min(m.origIn + dx, m.origOut - 1));
+        if (!trySetLinkedEdge(mld, 'in', mNewIn)) mld.inPoint = mNewIn;
+        updateBar(m.row, m.li);
+        updateLinkedChildrenBars(m.li);
+      });
+      outMembers.forEach(function (m) {
+        var mld = state.layers[m.li]; if (!mld) return;
+        var mNewOut = Math.min(total - 1, Math.max(m.origOut + dx, m.origIn + 1));
+        if (!trySetLinkedEdge(mld, 'out', mNewOut)) mld.outPoint = mNewOut;
+        updateBar(m.row, m.li);
+        updateLinkedChildrenBars(m.li);
+      });
+      if (bothMembersM.length) {
+        var ok = bothMembersM.every(function (m) {
           var ni = m.origIn + dx, no = m.origOut + dx;
           return ni >= 0 && no <= total - 1;
         });
-        if (!ok) return;
-        _drag.members.forEach(function (m) {
+        if (ok) bothMembersM.forEach(function (m) {
           var mld = state.layers[m.li]; if (!mld) return;
           var mInHandled = trySetLinkedEdge(mld, 'in', m.origIn + dx);
           var mOutHandled = trySetLinkedEdge(mld, 'out', m.origOut + dx);
@@ -539,7 +578,10 @@
       } else {
         _drag.members.forEach(function (m) {
           var mld = state.layers[m.li]; if (!mld) return;
-          livePreviewLayerKeys(m.li, _drag.type, mld, m.origIn, e.altKey);
+          // m.part, not _drag.type — this now matches the per-member edge
+          // this specific bar actually moved a few lines up, instead of
+          // whichever handle was grabbed to start the whole gesture.
+          livePreviewLayerKeys(m.li, m.part || 'both', mld, m.origIn, e.altKey);
         });
       }
       if (window.loadFrame) loadFrame(state.currentFrame);
@@ -609,6 +651,7 @@
     // select un layer en clicquand de ce côté de la timeline").
     if (!d.group && d.li != null && Math.abs(upEv.clientX - d.startX) < 3 &&
         state.appMode === 'motion' && window.SMMotion && SMMotion.selectLayerFromGrid) {
+      _barAnchorLi = d.li;
       SMMotion.selectLayerFromGrid(d.li);
       return;
     }
@@ -626,6 +669,7 @@
     // pressed, which also resyncs _barSel via selectLayerFromGrid.
     if (d.group && d.pressLi != null && Math.abs(upEv.clientX - d.startX) < 3 &&
         state.appMode === 'motion' && window.SMMotion && SMMotion.selectLayerFromGrid) {
+      _barAnchorLi = d.pressLi;
       SMMotion.selectLayerFromGrid(d.pressLi);
       return;
     }
