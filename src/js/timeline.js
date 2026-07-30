@@ -4517,16 +4517,51 @@ function renderDuplicatorEffectors(dup){
       var angRow=line();
       var ang=num('°',function(v){eff.angle=v;},eff.angle||0,1);angRow.appendChild(ang[0]);angRow.appendChild(ang[1]);
     }
-    // Offsets: same 4 deltas as the index-based stagger, just spatially weighted.
-    var posRow=line();
-    var px=num('Pos X',function(v){(eff.offsetPos||(eff.offsetPos=[0,0]))[0]=v;},(eff.offsetPos||[0,0])[0],1);posRow.appendChild(px[0]);posRow.appendChild(px[1]);
-    var py=num('Y',function(v){(eff.offsetPos||(eff.offsetPos=[0,0]))[1]=v;},(eff.offsetPos||[0,0])[1],1);posRow.appendChild(py[0]);posRow.appendChild(py[1]);
-    var rotScaleRow=line();
-    var rot=num('Rot',function(v){eff.offsetRot=v;},eff.offsetRot||0,1);rotScaleRow.appendChild(rot[0]);rotScaleRow.appendChild(rot[1]);
-    var sx=num('Sc X',function(v){(eff.offsetScale||(eff.offsetScale=[0,0]))[0]=v;},(eff.offsetScale||[0,0])[0],1);rotScaleRow.appendChild(sx[0]);rotScaleRow.appendChild(sx[1]);
-    var sy=num('Y',function(v){(eff.offsetScale||(eff.offsetScale=[0,0]))[1]=v;},(eff.offsetScale||[0,0])[1],1);rotScaleRow.appendChild(sy[0]);rotScaleRow.appendChild(sy[1]);
-    var opRow=line();
-    var op=num('Op',function(v){eff.offsetOpacity=v;},eff.offsetOpacity||0,1);opRow.appendChild(op[0]);opRow.appendChild(op[1]);
+    // Offsets: "n'importe quel property" (2026-07-30) — was 4 hardcoded
+    // Pos/Rot/Scale/Opacity rows; now an arbitrary per-effector channel
+    // list (eff.channels, app.js's effectorChannels — migrates a
+    // pre-2026-07-30 effector's legacy 4 fields into this same shape once,
+    // in place, the first time the duplicator math or this panel touches
+    // it), any of SMMotion.DUP_TARGET_PROPS (adds positionZ/rotationX/
+    // rotationY alongside the original 4 — the "3D aussi" half). One
+    // shared row-builder handles both the 2-value (X/Y-style) and
+    // 1-value properties via SMMotion.propDim/propDimLabels, so a future
+    // addition to DUP_TARGET_PROPS needs no new UI code here.
+    var M2=window.SMMotion;
+    var targetProps=(M2&&M2.DUP_TARGET_PROPS)||['position','rotation','scale','opacity'];
+    var channels=effectorChannels(eff);
+    channels.forEach(function(ch,ci){
+      var chRow=line();
+      var dim=M2?M2.propDim(ch.prop):(ch.value?ch.value.length:1);
+      var dimLabels=(M2&&M2.propDimLabels(ch.prop))||null;
+      var propLabel=M2?M2.propLabel(ch.prop):ch.prop;
+      var lbl=document.createElement('span');lbl.className='pl';lbl.style.minWidth='72px';lbl.textContent=propLabel;chRow.appendChild(lbl);
+      if(!ch.value)ch.value=[];
+      for(var vd=0;vd<dim;vd++){
+        (function(vd){
+          var f=num(dimLabels?dimLabels[vd]:(dim>1?String(vd+1):''),function(v){ch.value[vd]=v;},ch.value[vd]||0,1);
+          chRow.appendChild(f[0]);chRow.appendChild(f[1]);
+        })(vd);
+      }
+      var rmCh=document.createElement('button');rmCh.className='pbtn';rmCh.textContent='✕';rmCh.style.marginLeft='auto';
+      rmCh.addEventListener('click',function(){channels.splice(ci,1);renderDuplicatorEffectors(dup);dupRefreshFromPanel();});
+      chRow.appendChild(rmCh);
+    });
+    var addRow=line();
+    var addSel=document.createElement('select');addSel.className='psel';
+    var placeholder=document.createElement('option');placeholder.textContent='+ Propriété…';placeholder.value='';addSel.appendChild(placeholder);
+    var already={};channels.forEach(function(ch){already[ch.prop]=true;});
+    targetProps.forEach(function(p){
+      if(already[p])return; // one entry per property — edit the existing row instead of stacking duplicates
+      var o=document.createElement('option');o.value=p;o.textContent=M2?M2.propLabel(p):p;addSel.appendChild(o);
+    });
+    addSel.addEventListener('change',function(){
+      if(!addSel.value)return;
+      var dim=M2?M2.propDim(addSel.value):1;
+      channels.push({prop:addSel.value,value:new Array(dim).fill(0)});
+      renderDuplicatorEffectors(dup);dupRefreshFromPanel();
+    });
+    addRow.appendChild(addSel);
     list.appendChild(row);
   });
 }
@@ -7066,7 +7101,16 @@ document.getElementById('comp-offset').addEventListener('change',function(){wind
     var pivot=_boundsCenterOfStrokes(strokes);
     pushUndo();
     if(!d.effectors)d.effectors=[];
-    d.effectors.push({pos:{x:pivot.x,y:pivot.y},radius:200,falloff:'radial',angle:0,strength:100,offsetPos:[0,0],offsetRot:0,offsetScale:[0,0],offsetOpacity:0});
+    // channels (2026-07-30, "n'importe quel property"): a fresh effector
+    // starts pre-seeded with a Position channel (the single most common
+    // starting point, matching this button's old always-4-fields default)
+    // rather than empty — the user adds more via the row's own "+
+    // Propriété…" picker (renderDuplicatorEffectors). No legacy
+    // offsetPos/offsetRot/offsetScale/offsetOpacity fields on a NEW
+    // effector — those only exist for effectors created before this
+    // change, migrated into this same channels shape on first read
+    // (effectorChannels, app.js).
+    d.effectors.push({pos:{x:pivot.x,y:pivot.y},radius:200,falloff:'radial',angle:0,strength:100,channels:[{prop:'position',value:[0,0]}]});
     renderDuplicatorEffectors(d);dupRefresh();
   });
   function wireRand(id,key){document.getElementById(id).addEventListener('change',function(){var d=dupOf();if(!d)return;pushUndo();(d.staggerRandom||(d.staggerRandom={}))[key]=this.checked;dupRefresh();});}

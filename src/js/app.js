@@ -645,6 +645,13 @@ function desP(d,layer,op){var prev=project.activeLayer;layer.activate();var p=ne
   // for future layer.children consumers; the layer is force-locked so no
   // interactive path reads these today.
   if(d.isDuplicatorCopy)p.data.isDuplicatorCopy=true;if(d.dupIndex!=null)p.data.dupIndex=d.dupIndex;
+  // dupCloneId ("ID de chaque cloner") and dup3D (per-clone 3D delta) —
+  // same "carried for future/other consumers, force-locked so nothing
+  // interactive reads these today" reasoning as isDuplicatorCopy/dupIndex
+  // just above. buildSceneJson (engine-bridge.js) DOES read dup3D off the
+  // live object here for its per-clone 3D projector cache — the one real,
+  // current consumer.
+  if(d.dupCloneId)p.data.dupCloneId=d.dupCloneId;if(d.dup3D)p.data.dup3D=d.dup3D;
   if(d.isTextRoot){p.data.isTextRoot=true;p.data.text=d.text||'';p.data.vectorFont=d.vectorFont||'Roboto-Regular';p.data.size=d.textSize||48;p.data.color=d.textColor||'#000000';p.data.align=d.textAlign||'left';if(d.textFixedWidth)p.data.fixedWidth=d.textFixedWidth;}
   // Retained-path stamp (engine-bridge.js, 2026-07-28): the stored stroke
   // dict this Paper item was built FROM. Dict object identity is the
@@ -1091,6 +1098,26 @@ function applyMatrixToStrokeData(sd,m){
 // Matrix.translate/rotate/scale calls — a bare Matrix's own methods APPEND
 // while Item methods PREPEND, a real shipped-bug class documented in
 // CLAUDE.md §8 point 2.
+// "N'importe quel property" (2026-07-30) — an Effector's contribution used
+// to be 4 hardcoded fields (offsetPos/offsetRot/offsetScale/offsetOpacity);
+// now it's an arbitrary list of {prop,value} channels, any of
+// SMMotion.DUP_TARGET_PROPS. An effector created before this change has no
+// `channels` array yet — migrate it ONCE, in place (eff IS the live
+// dup.effectors[i] object, so this sticks and gets saved forward on the
+// next project save), by folding whichever legacy fields are non-zero into
+// the equivalent channel entries. Idempotent: eff.channels is truthy after
+// the first call (even an empty array for an all-zero legacy effector), so
+// every later call just returns it.
+function effectorChannels(eff){
+  if(eff.channels)return eff.channels;
+  var ch=[];
+  if(eff.offsetPos&&(eff.offsetPos[0]||eff.offsetPos[1]))ch.push({prop:'position',value:[eff.offsetPos[0]||0,eff.offsetPos[1]||0]});
+  if(eff.offsetRot)ch.push({prop:'rotation',value:[eff.offsetRot]});
+  if(eff.offsetScale&&(eff.offsetScale[0]||eff.offsetScale[1]))ch.push({prop:'scale',value:[eff.offsetScale[0]||0,eff.offsetScale[1]||0]});
+  if(eff.offsetOpacity)ch.push({prop:'opacity',value:[eff.offsetOpacity]});
+  eff.channels=ch;
+  return ch;
+}
 function dupMatrixFromDescriptor(m,pivot){
   var rad=(m.rot||0)*Math.PI/180,cs=Math.cos(rad),sn=Math.sin(rad);
   var a=cs*m.sx,b=sn*m.sx,c=-sn*m.sy,d=cs*m.sy;
@@ -1167,6 +1194,19 @@ function applyLayerDuplicator(ld,base,frameIdx,layerIdx){
   var dRot=M?M.valueAtFrame(ld,'dupOffsetRot',frameIdx)[0]:0;
   var dScale=M?M.valueAtFrame(ld,'dupOffsetScale',frameIdx):[0,0];
   var dOpacity=M?M.valueAtFrame(ld,'dupOffsetOpacity',frameIdx)[0]:0;
+  // positionZ/rotationX/rotationY (2026-07-30, "en 3D aussi avec ID de
+  // chaque cloner") — same k×delta/±delta stagger as the original 4,
+  // ADDED alongside them rather than folded into one generic per-property
+  // loop: a generic loop would change how many values seededRng draws
+  // before reaching scale/opacity's own draws below, silently reshuffling
+  // every EXISTING project's random-mode scale/opacity pattern the moment
+  // this shipped (seededRng's stream position is call-count-order
+  // sensitive) — appending new draws AFTER the original 6 keeps every
+  // pre-existing duplicator byte-identical.
+  var dPosZ=M?M.valueAtFrame(ld,'dupOffsetPosZ',frameIdx)[0]:0;
+  var dRotX=M?M.valueAtFrame(ld,'dupOffsetRotX',frameIdx)[0]:0;
+  var dRotY=M?M.valueAtFrame(ld,'dupOffsetRotY',frameIdx)[0]:0;
+  var is3DLayer=!!ld.threeD;
   var randMode=dup.staggerRandom||{};
   var cols=Math.max(1,dup.cols||1);
   var pathInfo=mode==='path'?_resolveDuplicatorPath(dup,frameIdx):null;
@@ -1228,6 +1268,15 @@ function applyLayerDuplicator(ld,base,frameIdx,layerIdx){
     var rotK=randMode.rotation?(2*rrr-1)*dRot:k*dRot;
     var scaleK=randMode.scale?[(2*rsx-1)*dScale[0],(2*rsy-1)*dScale[1]]:[k*dScale[0],k*dScale[1]];
     var opK=randMode.opacity?(2*rop-1)*dOpacity:k*dOpacity;
+    // 3 more draws, appended AFTER the original 6 (see dPosZ's own comment
+    // above for why order/count here matters) — positionZ shares
+    // Position's random/sequential checkbox, rotationX/Y share Rotation's,
+    // rather than tripling the panel's checkbox count for axes that are
+    // conceptually "more of the same property."
+    var rz=rngK(),rrx=rngK(),rry=rngK();
+    var dzK=randMode.position?(2*rz-1)*dPosZ:k*dPosZ;
+    var drxK=randMode.rotation?(2*rrx-1)*dRotX:k*dRotX;
+    var dryK=randMode.rotation?(2*rry-1)*dRotY:k*dRotY;
     // Effectors (2026-07-29, mograph "n'oublie pas la création des
     // effectors"): a SPATIAL contribution, independent of copy index —
     // each effector weights its own delta by this instance's DISTANCE from
@@ -1254,11 +1303,26 @@ function applyLayerDuplicator(ld,base,frameIdx,layerIdx){
       }
       w*=(eff.strength!=null?eff.strength:100)/100;
       if(!w)return;
-      var eop=eff.offsetPos||[0,0],esc=eff.offsetScale||[0,0];
-      posK[0]+=w*eop[0];posK[1]+=w*eop[1];
-      rotK+=w*(eff.offsetRot||0);
-      scaleK[0]+=w*esc[0];scaleK[1]+=w*esc[1];
-      opK+=w*(eff.offsetOpacity||0);
+      // "N'importe quel property" (2026-07-30): an effector's contribution
+      // is now an arbitrary {prop,value} channel list (effectorChannels
+      // migrates a legacy 4-fixed-field effector into this shape once, in
+      // place — see its own comment above) instead of 4 hardcoded fields,
+      // routed here to whichever of THIS clone's accumulators that
+      // property feeds — positionZ/rotationX/rotationY join the original
+      // position/rotation/scale/opacity as valid targets, the actual "3D
+      // aussi" half of this generalization.
+      effectorChannels(eff).forEach(function(ch){
+        var v=ch.value||[];
+        switch(ch.prop){
+          case 'position':posK[0]+=w*(v[0]||0);posK[1]+=w*(v[1]||0);break;
+          case 'positionZ':dzK+=w*(v[0]||0);break;
+          case 'rotation':rotK+=w*(v[0]||0);break;
+          case 'rotationX':drxK+=w*(v[0]||0);break;
+          case 'rotationY':dryK+=w*(v[0]||0);break;
+          case 'scale':scaleK[0]+=w*(v[0]||0);scaleK[1]+=w*(v[1]||0);break;
+          case 'opacity':opK+=w*(v[0]||0);break;
+        }
+      });
     });
     // Stagger folded into ONE matrix with the mode's own placement:
     // rotate/scale in place around the seed's own bounds-center first, the
@@ -1266,10 +1330,27 @@ function applyLayerDuplicator(ld,base,frameIdx,layerIdx){
     // order as a Component's own camera followed by symMatrix.
     var mat=dupMatrixFromDescriptor({dx:baseDx+posK[0],dy:baseDy+posK[1],rot:baseRot+rotK,sx:1+scaleK[0]/100,sy:1+scaleK[1]/100},pivotK);
     var opFactor=Math.max(0,Math.min(1,1+opK/100));
+    // Per-clone 3D delta (2026-07-30) — only attached when it can actually
+    // do anything (layer is 3D-enabled AND at least one axis actually
+    // moved), so an ordinary 2D duplicator's clones carry no extra field.
+    // buildSceneJson (engine-bridge.js) reads data.dup3D to build a
+    // per-dupIndex 3D projector instead of sharing the single layer-wide
+    // one every other item on a 3D layer uses.
+    var dup3D=(is3DLayer&&(dzK||drxK||dryK))?{dz:dzK,drx:drxK,dry:dryK}:null;
     baseK.forEach(function(sd){
       var sd2=applyMatrixToStrokeData(cloneStrokeForTransform(sd),mat);
       sd2.opacity=(sd2.opacity!==undefined?sd2.opacity:1)*opFactor;
       sd2.isDuplicatorCopy=true;sd2.dupIndex=k;
+      // Stable per-clone identity ("ID de chaque cloner") — deterministic
+      // from the duplicator's own seed + this copy's index, so it's
+      // reproducible across re-materializations (every render rebuilds
+      // this array from scratch) without a persisted counter. Distinct
+      // from strokeId, which every clone inherits VERBATIM from the seed
+      // shape (cloneStrokeForTransform, deliberate — see group-bridge.js's
+      // own composite-key comment): dupCloneId is what actually tells
+      // copies of the SAME seed shape apart.
+      sd2.dupCloneId='dup'+(dup.seed||0)+'_'+k;
+      if(dup3D)sd2.dup3D=dup3D;
       out.push(sd2);
     });
   }
