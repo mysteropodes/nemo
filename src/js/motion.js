@@ -2811,6 +2811,33 @@
         kb.title = kind.label; kb.innerHTML = kind.icon;
         row.appendChild(kb);
       }
+      // Parent-in-Time badge (2026-07-30, "on ne sait pas si c'est parent ou
+      // pas") — Motion is exactly where a time-linked layer's OWN row lives,
+      // yet unlike the spatial Parent pill right below (which always shows,
+      // empty or not), a timeLink had no indicator anywhere outside the
+      // panel's own expanded Temps row — collapse that and the link became
+      // invisible right where it matters most. Right-click unlinks directly,
+      // same fast path as the Parent pill and renderTimeLinkRow's own name
+      // pill (both a few hundred lines down) — Cyril: "ça peut être un
+      // raccourci ou clic droit sur les boutons de parent".
+      if (ld.timeLink) {
+        var tlIdx2 = -1;
+        state.layers.forEach(function (o, oi) { if (o !== ld && o.layerUid === ld.timeLink.uid) tlIdx2 = oi; });
+        var tlName2 = tlIdx2 >= 0 ? (state.layers[tlIdx2].name || ('Layer ' + (tlIdx2 + 1))) : 'source introuvable';
+        var tlb2 = document.createElement('div'); tlb2.className = 'lico comp-badge';
+        tlb2.title = 'Temps lié à « ' + tlName2 + ' » — clic droit pour délier';
+        tlb2.innerHTML = '<span style="font-size:9px;line-height:1;font-weight:700">Tp</span>';
+        tlb2.addEventListener('click', function (e) { e.stopPropagation(); });
+        tlb2.addEventListener('contextmenu', function (e) {
+          e.preventDefault(); e.stopPropagation();
+          pushUndo(); delete ld.timeLink;
+          renderLayerList(); renderTimeline();
+          if (window.loadFrame) loadFrame(state.currentFrame);
+          if (window.SMEngineBridge) SMEngineBridge.renderNow();
+          if (window.showToast) showToast('Lien temporel retiré');
+        });
+        row.appendChild(tlb2);
+      }
       var nm = document.createElement('div'); nm.className = 'lnm'; nm.textContent = ld.name || ('Layer ' + (li + 1));
       row.appendChild(nm);
       // Parent column — the SAME buildParentCell Animation 2D's rows use
@@ -3129,6 +3156,20 @@
       var r = pill.getBoundingClientRect();
       window.showContextMenu(r.left, r.bottom + 2, items);
     });
+    // Right-click = instant full un-parent (2026-07-30, Cyril: "ça peut
+    // être un raccourci ou clic droit sur les boutons de parent") — same
+    // fast path as the layer-list's own pill (buildParentCell, timeline.js),
+    // which this row is otherwise a styled duplicate of.
+    pill.addEventListener('contextmenu', function (e) {
+      e.stopPropagation(); e.preventDefault();
+      if (!pName && !pbName) return;
+      pushUndo();
+      setLayerParent(li, null);
+      if (window.setLayerParentB) setLayerParentB(li, null);
+      renderLayerList(); renderTimeline();
+      if (window.SMEngineBridge) SMEngineBridge.renderNow();
+      if (window.showToast) showToast('Parent retiré');
+    });
 
     row.appendChild(pill);
     body.appendChild(row);
@@ -3159,7 +3200,25 @@
     name.style.marginLeft = '4px';
     name.textContent = srcIdx >= 0 ? (state.layers[srcIdx].name || ('Layer ' + (srcIdx + 1)))
       : (ld.timeLink ? 'source introuvable' : '—');
-    name.title = srcIdx >= 0 ? 'Cliquer pour délier' : 'Aucun lien temporel';
+    name.title = srcIdx >= 0 ? 'Cliquer pour délier (menu), ou clic droit pour délier directement' : 'Aucun lien temporel';
+    // Shared by both unlink gestures below — direct right-click AND the
+    // click-then-menu path, so the two can never drift (2026-07-30, Cyril:
+    // "il était impossible de désactiver le parent in time" — turned out
+    // the click-then-menu path DID work, but the tiny name pill + 1-item
+    // menu was an easy miss; right-click is the fast, hard-to-fumble path
+    // he asked for, kept alongside the menu rather than replacing it).
+    function unlinkTime() {
+      pushUndo(); delete ld.timeLink;
+      renderLayerList(); renderTimeline();
+      if (window.loadFrame) loadFrame(state.currentFrame);
+      if (window.SMEngineBridge) SMEngineBridge.renderNow();
+      if (window.showToast) showToast('Lien temporel retiré');
+    }
+    name.addEventListener('contextmenu', function (e) {
+      e.stopPropagation(); e.preventDefault();
+      if (!ld.timeLink) return;
+      unlinkTime();
+    });
     // UI/UX audit (2026-07-30): used to delete the link on a bare click,
     // no confirmation — a real trap right next to the Parent row's pill
     // one line up, which opens a menu on click instead of acting
@@ -3170,13 +3229,7 @@
       if (!window.showContextMenu) return;
       var r = name.getBoundingClientRect();
       window.showContextMenu(r.left, r.bottom + 2, [
-        { label: 'Délier le temps', action: function () {
-          pushUndo(); delete ld.timeLink;
-          renderLayerList(); renderTimeline();
-          if (window.loadFrame) loadFrame(state.currentFrame);
-          if (window.SMEngineBridge) SMEngineBridge.renderNow();
-          if (window.showToast) showToast('Lien temporel retiré');
-        } },
+        { label: 'Délier le temps', action: unlinkTime },
       ]);
     });
     row.appendChild(name);

@@ -4033,6 +4033,22 @@ function buildParentCell(row,ld,li){
   }
   cell.addEventListener('click',open);
   cell.addEventListener('mousedown',function(e){e.stopPropagation();});
+  // Right-click = instant full un-parent, both A and B (2026-07-30, Cyril:
+  // "ça peut être un raccourci ou clic droit sur les boutons de parent") —
+  // the menu's own "Parent A : Aucun"/"Parent B : Aucun" entries still work
+  // for clearing just one, but a full unlink used to need the menu twice
+  // (once per slot) with no faster path at all.
+  cell.addEventListener('contextmenu',function(e){
+    e.preventDefault();e.stopPropagation();
+    if(!pName&&!pbName)return; // nothing to clear
+    var M=window.SMMotion;if(!M||!M.setLayerParent)return;
+    pushUndo();
+    M.setLayerParent(li,null);
+    if(M.setLayerParentB)M.setLayerParentB(li,null);
+    renderLayerList();renderTimeline();
+    if(window.SMEngineBridge)SMEngineBridge.renderNow();
+    if(window.showToast)showToast('Parent retiré');
+  });
   row.appendChild(cell);
 }
 // THE single writer for every surface that DISPLAYS the current stroke/fill
@@ -4263,6 +4279,34 @@ function renderLayerList(frameOnly){
       mb.innerHTML='<span style="font-size:9px;line-height:1;font-weight:700">'+(ld.matteMode?'M':'M▲')+'</span>';
       if(ld.matteMode){mb.style.cursor='pointer';mb.addEventListener('click',function(e){e.stopPropagation();state.activeLayerIdx=i;activateUL(i);updatePropsContext();openMatteDropdownAt(mb);});}
       row.appendChild(mb);
+    }
+    // Parent-in-Time badge (2026-07-30, "on ne sait pas si c'est parent ou
+    // pas") — unlike the spatial Parent, which always shows a pill (empty
+    // or not) via buildParentCell just below, a time-linked layer had NO
+    // indicator anywhere outside the Motion panel's own expanded Temps row
+    // — collapse that row (the default state) and the link became
+    // completely invisible in the layer list. Same conditional-badge
+    // convention as text/null/effect/matte above (only takes a slot when
+    // actually active, since "not linked" is the common case). Right-click
+    // unlinks directly — Cyril: "ça peut être un raccourci ou clic droit
+    // sur les boutons de parent" — no menu detour needed, matching how a
+    // right-click is already a deliberate, rarely-accidental gesture.
+    if(ld.timeLink){
+      var tlIdx=_layerIndexByUid(ld.timeLink.uid);
+      var tlName=(tlIdx>=0&&state.layers[tlIdx])?(state.layers[tlIdx].name||('Layer '+(tlIdx+1))):'source introuvable';
+      var tlb=document.createElement('div');tlb.className='lico comp-badge';
+      tlb.title='Temps lié à « '+tlName+' » — clic droit pour délier';
+      tlb.innerHTML='<span style="font-size:9px;line-height:1;font-weight:700">Tp</span>';
+      tlb.addEventListener('click',function(e){e.stopPropagation();});
+      tlb.addEventListener('contextmenu',function(e){
+        e.preventDefault();e.stopPropagation();
+        pushUndo();delete ld.timeLink;
+        renderLayerList();renderTimeline();
+        if(window.loadFrame)loadFrame(state.currentFrame);
+        if(window.SMEngineBridge)SMEngineBridge.renderNow();
+        if(window.showToast)showToast('Lien temporel retiré');
+      });
+      row.appendChild(tlb);
     }
     row.appendChild(nm);
     buildParentCell(row,ld,i);
