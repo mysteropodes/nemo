@@ -1463,6 +1463,31 @@ window.SM={
     // happened to be (both snapshot objects already carry the outer value —
     // see _sceneSnapshot/_montageViewSnapshot's own cameraKeys field).
     var sceneCameraKeys=srcSnap?srcSnap.cameraKeys:state.cameraKeys;
+    // symbols rig._live (2026-07-30 fix, found live by a background
+    // exploration agent): the outer `layers` map just below already
+    // whitelists rig.binds to strip _live (the live Paper.js Path
+    // relinkRigBinds rebuilds every loadFrame — see its own comment there)
+    // — but state.symbols got copied wholesale a few lines down, with no
+    // equivalent whitelist for a Component's OWN inner layers. Once a rigged
+    // Component had been entered even once this session (which populates
+    // _live via relinkRigBinds), exiting left it attached, and export baked
+    // a full duplicate copy of the live Path's geometry into the file via
+    // Paper's own toJSON serializer — same cloneRigForSymbol (app.js) used
+    // when a rig first moves into a symLayer at Component-conversion time.
+    var sceneSymbols=state.symbols;
+    if(window.cloneRigForSymbol){
+      var symbolsNeedingClean=Object.keys(state.symbols).filter(function(sid){return state.symbols[sid].layers.some(function(sl){return sl.rig;});});
+      if(symbolsNeedingClean.length){
+        sceneSymbols={};
+        Object.keys(state.symbols).forEach(function(sid){
+          var sym=state.symbols[sid];
+          if(symbolsNeedingClean.indexOf(sid)<0){sceneSymbols[sid]=sym;return;}
+          sceneSymbols[sid]=Object.assign({},sym,{layers:sym.layers.map(function(sl){
+            return sl.rig?Object.assign({},sl,{rig:cloneRigForSymbol(sl.rig)}):sl;
+          })});
+        });
+      }
+    }
     return JSON.stringify({version:13,totalFrames:sceneTotal,fps:sceneFps,canvasW:state.canvasW,canvasH:state.canvasH,canvasBg:state.canvasBg,waIn:sceneWaIn,waOut:sceneWaOut,
       layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color,motion:l.motion,motionStatic:l.motionStatic,elementMotion:l.elementMotion,inPoint:l.inPoint,outPoint:l.outPoint,nativeVideo:l.nativeVideo,matteMode:l.matteMode,montageId:l.montageId,expressions:l.expressions,isTextLayer:l.isTextLayer,isNullLayer:l.isNullLayer,isEffectLayer:l.isEffectLayer,effects:l.effects,footage:l.footage,
         // Layer parenting (2026-07-25). BOTH of these were missing from this
@@ -1507,7 +1532,7 @@ window.SM={
       // runtime-only fields live in state.storyboard, see storyboard.js's
       // own data-model comment), so a wholesale copy is safe.
       storyboard:state.storyboard||null,
-      symbols:state.symbols,palettes:state.palettes,activePaletteIdx:state.activePaletteIdx,customBrushPresets:state.customBrushPresets,
+      symbols:sceneSymbols,palettes:state.palettes,activePaletteIdx:state.activePaletteIdx,customBrushPresets:state.customBrushPresets,
       shadowPalette:state.shadowPalette,shadowActiveId:state.shadowActiveId,
       // Custom WGSL effects (2026-07, feedback: "la possibilité d'ajouter
       // ses propres effets wgsl") — project-wide like symbols/palettes
@@ -1636,8 +1661,15 @@ window.SM={
     state.customEffects=d.customEffects||[];
     if(window.registerAllCustomEffects)window.registerAllCustomEffects();
     d.layers.forEach(function(ld){var idx=createUserLayer(ld.name);state.layers[idx].visible=ld.visible!==false;state.layers[idx].locked=ld.locked||false;state.layers[idx].frames=ld.frames;
-      if(ld.blendMode)state.layers[idx].blendMode=ld.blendMode;
-      if(ld.matteMode)state.layers[idx].matteMode=ld.matteMode;
+      // typeof-guarded: a corrupted/older project file (or the stale
+      // localStorage 'nemo-auto' autosave restored silently at boot, right
+      // below) can carry a non-string value here — passed through
+      // untyped, it reaches engine-bridge's buildSceneJson and crashes
+      // engine.rs's serde deserialization (Option<String>), which
+      // permanently disables the whole Rust renderer for the session
+      // (see engine-bridge.js's tick() catch).
+      if(typeof ld.blendMode==='string')state.layers[idx].blendMode=ld.blendMode;
+      if(typeof ld.matteMode==='string')state.layers[idx].matteMode=ld.matteMode;
       if(ld.expressions)state.layers[idx].expressions=ld.expressions;
       if(ld.isTextLayer)state.layers[idx].isTextLayer=true;
       if(ld.isNullLayer)state.layers[idx].isNullLayer=true;
