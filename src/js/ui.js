@@ -323,7 +323,12 @@
   // module doesn't know about Motion mode's rows) — motion.js's own
   // onEaseSegChanged hook (if present) picks up the repaint instead.
   function pushCurve(){
-    if(isMotionMode()){if(window.SMMotion&&window.SMMotion.onEaseSegChanged)window.SMMotion.onEaseSegChanged();return;}
+    // Pass the segment itself (2026-07-30, Cyril: "on devrait pouvoir
+    // appliquer les tween directement depuis le panneau easing... ça
+    // devrait être automatique sur les keyframes select") — motion.js's
+    // handler needs to know WHICH key just changed to copy its curvePoints
+    // onto every OTHER selected key too.
+    if(isMotionMode()){if(window.SMMotion&&window.SMMotion.onEaseSegChanged)window.SMMotion.onEaseSegChanged(motionEaseSeg);return;}
     // Tween-pair mode: state.tweenEasing[key] is already mutated in place
     // (setActivePoints/dragging write straight into tweenEaseSeg.points) —
     // but unlike Motion (evaluated live every frame) a tween's frames are

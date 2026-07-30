@@ -5730,7 +5730,35 @@
     // a repaint since the eased value at the current frame may have
     // changed; the panel's scrub field too, if the playhead sits inside
     // the segment being reshaped.
-    onEaseSegChanged: function () { renderLayerList(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); },
+    //
+    // Also propagates to every OTHER selected keyframe (2026-07-30, Cyril:
+    // "on devrait pouvoir appliquer les tween directement depuis le
+    // panneau easing dés que l'on change la curve manuellement ou via les
+    // preset... automatique sur les keyframes select") — the editor is
+    // opened on exactly ONE key (segmentLeftKey, openMotionEaseEditor);
+    // with 2+ keys selected when you reshape it, copy the same curve onto
+    // the others too instead of only ever touching the one the editor
+    // happens to be pointed at. Cross-property/cross-layer selections are
+    // allowed on purpose — curvePoints is a normalized [0,1]x[0,1] shape,
+    // meaningless-but-harmless on a key where it never gets evaluated (the
+    // last key of a track has no "next" key to ease into), and applying
+    // one curve across a mixed multi-property pick is exactly the "select
+    // several keys, dial in one ease, done" workflow this was asked for.
+    // Cloned per key (never shared by reference) so a later edit to ONE of
+    // them doesn't silently reshape the rest all over again.
+    onEaseSegChanged: function (seg) {
+      if (seg && seg.curvePoints && _motionKeySel.length > 1) {
+        _motionKeySel.forEach(function (s) {
+          if (!s.key || s.key === seg) return;
+          s.key.curvePoints = seg.curvePoints.map(function (p) {
+            var o = { x: p.x, y: p.y };
+            if (typeof p.tx === 'number') { o.tx = p.tx; o.ty = p.ty || 0; }
+            return o;
+          });
+        });
+      }
+      renderLayerList(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+    },
     migrateLegacyCurves: migrateLegacyCurves,
     setKeyInterp: setKeyInterp,
     applyEasyEase: applyEasyEase,
