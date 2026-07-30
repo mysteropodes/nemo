@@ -3135,6 +3135,12 @@
             if (!items.length) { if (window.showToast) showToast('Aucun autre calque ne porte d\u2019effets'); return; }
             window.showContextMenu(e.clientX + 8, e.clientY + 8, items);
           } },
+          // Menu-based Parent-in-Time (2026-07-31) \u2014 creation used to be
+          // pickwhip-drag ONLY; reachable now from any right-click on the
+          // row regardless of what else (keyframes, bars) is selected.
+          { label: 'Parent in Time \u2014 lier le temps \u00e0\u2026', action: function () {
+            window.showContextMenu(e.clientX + 8, e.clientY + 8, window.buildTimeLinkMenuItems(li, ld, function () { renderLayerList(); renderTimeline(); }));
+          } },
           { sep: true },
           // showContextMenu has no submenus — a disabled row is the honest
           // way to title a group rather than a button that does nothing.
@@ -3439,6 +3445,33 @@
     }
     return false;
   }
+  // The ONE place a time link is actually written (2026-07-31 extraction —
+  // this used to live inline in startTimeLinkPickwhip's onUp; the new
+  // menu-based creation path, timeline.js's buildTimeLinkMenuItems, calls
+  // this same function instead of duplicating the seed/cycle logic — the
+  // exact setLayerParent/buildParentMenuItems split spatial parenting
+  // already uses). mode: 'both'|'in'|'out'. Returns true on success.
+  function setLayerTimeLink(li, targetIdx, mode) {
+    var ld = state.layers[li], src = state.layers[targetIdx];
+    if (!ld || !src || targetIdx === li) return false;
+    if (timeLinkWouldCycle(li, targetIdx)) { if (window.showToast) showToast('Lien impossible : créerait un cycle'); return false; }
+    pushUndo();
+    // Seed the offsets from the CURRENT gap, so linking never makes the
+    // layer jump: it stays exactly where it is and only starts following.
+    var myIn = layerInPoint(ld), myOut = layerOutPoint(ld);
+    var seedInOff = myIn - layerInPoint(src), seedOutOff = myOut - layerOutPoint(src);
+    ld.timeLink = { uid: ensureLayerUid(src), mode: mode || 'both' };
+    // Offsets are Motion properties now (timeLinkInOffset/Out) — write
+    // through setValue like any other, not a raw field on the link.
+    setValue(ld, 'timeLinkInOffset', [seedInOff]);
+    setValue(ld, 'timeLinkOutOffset', [seedOutOff]);
+    renderLayerList(); renderTimeline();
+    if (window.loadFrame) loadFrame(state.currentFrame);
+    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+    var modeLabel = mode === 'in' ? ' (entrée)' : mode === 'out' ? ' (sortie)' : '';
+    if (window.showToast) showToast('Temps lié à « ' + (src.name || ('Layer ' + (targetIdx + 1))) + ' »' + modeLabel);
+    return true;
+  }
   // mode ('both'|'in'|'out') — which edge(s) the resulting link drives.
   // Defaults to 'both' for the original single side-panel pickwhip; the
   // on-timeline-bar connection points (layer-inout.js, Van Dijk 2.1's 3
@@ -3485,22 +3518,7 @@
       var t = rowUnder(e.clientX, e.clientY);
       cleanup();
       if (t == null) return;
-      var ld = state.layers[li], src = state.layers[t.idx];
-      pushUndo();
-      // Seed the offsets from the CURRENT gap, so linking never makes the
-      // layer jump: it stays exactly where it is and only starts following.
-      var myIn = layerInPoint(ld), myOut = layerOutPoint(ld);
-      var seedInOff = myIn - layerInPoint(src), seedOutOff = myOut - layerOutPoint(src);
-      ld.timeLink = { uid: ensureLayerUid(src), mode: mode || 'both' };
-      // Offsets are Motion properties now (timeLinkInOffset/Out) — write
-      // through setValue like any other, not a raw field on the link.
-      setValue(ld, 'timeLinkInOffset', [seedInOff]);
-      setValue(ld, 'timeLinkOutOffset', [seedOutOff]);
-      renderLayerList(); renderTimeline();
-      if (window.loadFrame) loadFrame(state.currentFrame);
-      if (window.SMEngineBridge) SMEngineBridge.renderNow();
-      var modeLabel = mode === 'in' ? ' (entrée)' : mode === 'out' ? ' (sortie)' : '';
-      if (window.showToast) showToast('Temps lié à « ' + (src.name || ('Layer ' + (t.idx + 1))) + ' »' + modeLabel);
+      setLayerTimeLink(li, t.idx, mode);
     }
     function onKey(e) { if (e.key === 'Escape') cleanup(); }
     document.addEventListener('mousemove', onMove, true);
@@ -4406,6 +4424,19 @@
             } });
           }
           if (_motionKeySel.length >= 1) menu.push({ label: 'Inverser la sélection', action: invertKeySelection });
+          // Menu-based Parent-in-Time (2026-07-31) — third surface after the
+          // Motion layer-row and in/out-bar menus, for full symmetry: a
+          // right-click on a keyframe cell can link ITS layer's time without
+          // hunting for the row. Target = the active layer (keyframe rows
+          // always belong to the currently-expanded active layer's tracks);
+          // the keyframe selection itself is incidental context (confirmed
+          // with Cyril), the offsets seed from the current gap as always.
+          if (window.buildTimeLinkMenuItems && state.layers[state.activeLayerIdx]) {
+            menu.push({ sep: true });
+            menu.push({ label: 'Parent in Time — lier le temps à…', action: function () {
+              window.showContextMenu(e.clientX + 8, e.clientY + 8, window.buildTimeLinkMenuItems(state.activeLayerIdx, state.layers[state.activeLayerIdx], function () { renderLayerList(); renderTimeline(); }));
+            } });
+          }
           window.showContextMenu(e.clientX, e.clientY, menu);
         });
       })(fi, k);
@@ -5739,6 +5770,10 @@
     // Bar-side Shift/Ctrl selection → layer-list mirror (layer-inout.js
     // onDown calls this; see the function's own comment).
     syncLayerSelFromBarSel: syncLayerSelFromBarSel,
+    // Menu-based Parent-in-Time creation (timeline.js buildTimeLinkMenuItems
+    // — same core-setter split as setLayerParent/buildParentMenuItems).
+    setLayerTimeLink: setLayerTimeLink,
+    timeLinkWouldCycle: timeLinkWouldCycle,
     // 3D layers (2026-07-28) — see make3DProjector/project3DSegments' own
     // doc comment (Grease-Pencil-style: vertices move in 3D, stroke width
     // never scales).

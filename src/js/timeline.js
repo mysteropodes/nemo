@@ -4157,6 +4157,34 @@ function buildParentMenuItems(li,ld,onChanged){
   return items;
 }
 window.buildParentMenuItems=buildParentMenuItems;
+// Parent-in-Time picker — the menu-based sibling of the pickwhip drag
+// (2026-07-31, Cyril: "gestion du clic droit pour parent in time sur select
+// keyframe + layer, keyframe + in/out point"). Same shape as
+// buildParentMenuItems above; the actual link write goes through the ONE
+// shared setter (SMMotion.setLayerTimeLink, extracted from the pickwhip's
+// onUp) so the two creation paths can never drift. Mode is fixed to 'both'
+// here — 'in'/'out'-only refinement stays on the existing Temps-row select
+// and the on-bar anchor dots.
+function buildTimeLinkMenuItems(li,ld,onChanged){
+  var M=window.SMMotion;
+  if(!M||!M.setLayerTimeLink)return [{label:'Parent in Time indisponible',disabled:true}];
+  var items=[{label:'Temps : Aucun (délier, position conservée)',disabled:!ld.timeLink,action:function(){
+    pushUndo();unlinkTimeLinkPreserveRange(ld);onChanged();
+    if(window.SMEngineBridge)SMEngineBridge.renderNow();
+  }}];
+  state.layers.forEach(function(other,oi){
+    if(oi===li)return; // a layer can't follow its own time
+    var isCur=!!(ld.timeLink&&ld.timeLink.uid&&other.layerUid===ld.timeLink.uid);
+    var cyc=M.timeLinkWouldCycle?M.timeLinkWouldCycle(li,oi):false;
+    items.push({
+      label:'Lier le temps à : '+(other.name||('Layer '+(oi+1)))+(isCur?'  ✓':'')+(cyc?'  (cycle)':''),
+      disabled:isCur||cyc,
+      action:function(){M.setLayerTimeLink(li,oi,'both');onChanged();}
+    });
+  });
+  return items;
+}
+window.buildTimeLinkMenuItems=buildTimeLinkMenuItems;
 function buildParentCell(row,ld,li){
   var cell=document.createElement('div');
   cell.className='lparent';
