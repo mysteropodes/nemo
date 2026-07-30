@@ -365,6 +365,23 @@
       }
       out = out.concat(slStrokes);
     });
+    // Component's own camera (2026-07-30 fix) — same gap the two comments
+    // above already describe for this reader, confirmed by code reading:
+    // getEffectiveStrokes's ld.symbolId branch (app.js) bakes sym.cameraKeys
+    // into the instance's content at its own single chokepoint, but this
+    // reader — the ONE other place a symbol's resolved strokes are built,
+    // used by StoryBoard thumbnails AND montageStrokesAt (which in turn
+    // feeds a ld.montageId layer's real getEffectiveStrokes output, i.e.
+    // actual export, not just editor preview) — never did. A Component
+    // animated with an internal camera pan/zoom while edited directly would
+    // silently lose that camera move the moment it's viewed through a
+    // StoryBoard montage. window.applyMatrixToStrokeData/cloneStrokeForTransform
+    // are app.js globals (this file loads after it), same access pattern
+    // already used for window.applyLayerDuplicator right above.
+    if (sym.cameraKeys && sym.cameraKeys.length && window.SMCamera && window.applyMatrixToStrokeData) {
+      var camM = SMCamera.cameraMatrixAtFrame(sym.cameraKeys, fi, state.canvasW, state.canvasH);
+      if (camM) out = out.map(function (sd) { return applyMatrixToStrokeData(cloneStrokeForTransform(sd), camM); });
+    }
     return out;
   }
 
