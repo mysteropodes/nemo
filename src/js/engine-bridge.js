@@ -849,6 +849,104 @@
           }
         }
       }
+      // Nested video (2026-07-30, "attaque le chantier pour les vidéo dans
+      // des component"): a nativeVideo layer living inside a Component's
+      // OWN sym.layers is invisible to the block above (keyed purely off
+      // this top-level `i`) — native-video-bridge.js's _syncSymbolVideos
+      // (called from the same onFrameChanged choke point as the top-level
+      // sync) is what actually uploads its pixels, under image id
+      // 'nvsym:<symbolId>:<subLayerIndex>'; this is the render-side match
+      // for that upload. Mirrors the block above almost exactly, with one
+      // extra stage: the symbol's OWN internal composition (its layer-level
+      // Motion on the video sub-layer, its OWN camera, and the instance's
+      // symMatrix placement) applies FIRST, in symbol-space — exactly the
+      // same order getEffectiveStrokes' symbolId branch (app.js) already
+      // bakes into stroke content — THEN this outer layer's own Motion/
+      // parent chain applies on top, identical to the plain block above.
+      if (state.layers[i].symbolId && window.SMEngineBridge && window.SMMotion) {
+        var nvsymLd = state.layers[i];
+        var nvsymSym = state.symbols[nvsymLd.symbolId];
+        if (nvsymSym) {
+          var nvsymIi = window.resolveSymbolFrameIdx ? resolveSymbolFrameIdx(nvsymSym, nvsymLd, renderFrame) : 0;
+          for (var nvsymK = 0; nvsymK < nvsymSym.layers.length; nvsymK++) {
+            var sl = nvsymSym.layers[nvsymK];
+            if (!sl || !sl.nativeVideo || sl.visible === false) continue;
+            var nvsymImageId = 'nvsym:' + nvsymLd.symbolId + ':' + nvsymK;
+            if (!registeredImageIds[nvsymImageId]) continue;
+            var nvsymNv = sl.nativeVideo;
+            var nvsymInF = window.layerInPoint ? layerInPoint(sl) : 0;
+            var nvsymOutF = window.layerOutPoint ? layerOutPoint(sl) : (nvsymSym.totalFrames - 1);
+            if (nvsymIi < nvsymInF || nvsymIi > nvsymOutF) continue;
+            var nvsymS = Math.min(state.canvasW / nvsymNv.width, state.canvasH / nvsymNv.height);
+            var nvsymW = nvsymNv.width * nvsymS, nvsymH = nvsymNv.height * nvsymS;
+            var nvsymRectBase = { x: (state.canvasW - nvsymW) / 2, y: (state.canvasH - nvsymH) / 2, width: nvsymW, height: nvsymH };
+            // Duplicator on the video sub-layer itself — same seed-then-
+            // placement order as the top-level block, in the video's own
+            // local/content space, before any of the symbol/instance/outer
+            // transform stages below.
+            var nvsymDup = sl.duplicator;
+            var nvsymCount = nvsymDup ? _duplicatorCount(nvsymDup) : 1;
+            var nvsymRects;
+            if (nvsymDup && nvsymCount > 1) {
+              var nvsymMode = nvsymDup.mode || 'grid';
+              var nvsymCols = Math.max(1, nvsymDup.cols || 1);
+              var nvsymPathInfo = nvsymMode === 'path' ? _resolveDuplicatorPath(nvsymDup, nvsymIi) : null;
+              if (nvsymMode === 'path' && !nvsymPathInfo) {
+                nvsymRects = [{ rect: nvsymRectBase, opacityFactor: 1 }];
+              } else {
+                var nvsymPivot = { x: nvsymRectBase.x + nvsymRectBase.width / 2, y: nvsymRectBase.y + nvsymRectBase.height / 2 };
+                nvsymRects = [];
+                for (var nvsymK2 = 0; nvsymK2 < nvsymCount; nvsymK2++) {
+                  var nvsymOff = _duplicatorModeOffset(nvsymDup, nvsymMode, nvsymK2, nvsymCount, nvsymCols, nvsymPathInfo);
+                  var nvsymPlace = _duplicatorClonePlacement(nvsymDup, nvsymK2, nvsymPivot, nvsymOff.baseDx, nvsymOff.baseDy, nvsymOff.baseRot, [0, 0], 0, [0, 0], 0, 0, 0, 0, nvsymDup.staggerRandom || {}, false);
+                  nvsymRects.push({ rect: SMMotion.transformImageRect(nvsymRectBase, nvsymPivot, nvsymPlace), opacityFactor: nvsymPlace.opacityFactor });
+                }
+                if (nvsymPathInfo) nvsymPathInfo.path.remove();
+              }
+            } else {
+              nvsymRects = [{ rect: nvsymRectBase, opacityFactor: 1 }];
+            }
+            // Symbol-internal stage: the video sub-layer's OWN Motion
+            // (computeMotionMatFor takes the layer OBJECT — sl has no
+            // top-level state.layers index for layerMotionAt to use), then
+            // the symbol's OWN camera, then the instance's symMatrix
+            // placement — same three steps and order getEffectiveStrokes'
+            // symbolId branch already applies to stroke content.
+            var nvsymLayerMat = SMMotion.computeMotionMatFor(sl, nvsymIi);
+            var nvsymOp2 = 1;
+            for (var nvsymRi = 0; nvsymRi < nvsymRects.length; nvsymRi++) {
+              var nvsymRect = nvsymRects[nvsymRi].rect, nvsymOp = nvsymRects[nvsymRi].opacityFactor;
+              if (nvsymLayerMat) {
+                var nvsymLayerPivot = { x: nvsymRect.x + nvsymRect.width / 2 + nvsymLayerMat.ax, y: nvsymRect.y + nvsymRect.height / 2 + nvsymLayerMat.ay };
+                nvsymRect = SMMotion.transformImageRect(nvsymRect, nvsymLayerPivot, nvsymLayerMat);
+                nvsymOp *= nvsymLayerMat.op;
+              }
+              if (nvsymSym.cameraKeys && nvsymSym.cameraKeys.length && window.SMCamera) {
+                var nvsymCamM = SMCamera.cameraMatrixAtFrame(nvsymSym.cameraKeys, nvsymIi, state.canvasW, state.canvasH);
+                if (nvsymCamM) nvsymRect = SMMotion.transformImageRectByMatrix(nvsymRect, nvsymCamM);
+              }
+              if (nvsymLd.symMatrix && window.symMatrixOf) {
+                nvsymRect = SMMotion.transformImageRectByMatrix(nvsymRect, symMatrixOf(nvsymLd));
+              }
+              // Outer stage: the instance layer's OWN Motion + parent
+              // chain — identical treatment to the plain top-level video
+              // block above, and to how a symbolId layer's own baked
+              // strokes get this same pair applied by the per-item loop
+              // further down.
+              var nvsymOuterMat = SMMotion.layerMotionAt(i, renderFrame);
+              if (nvsymOuterMat) {
+                var nvsymOuterPivot = { x: nvsymRect.x + nvsymRect.width / 2 + nvsymOuterMat.ax, y: nvsymRect.y + nvsymRect.height / 2 + nvsymOuterMat.ay };
+                nvsymRect = SMMotion.transformImageRect(nvsymRect, nvsymOuterPivot, nvsymOuterMat);
+                nvsymOp *= nvsymOuterMat.op;
+              }
+              var nvsymChain = SMMotion.parentChainMats(i, renderFrame);
+              for (var nvsymPc = 0; nvsymPc < nvsymChain.length; nvsymPc++) { nvsymRect = SMMotion.transformImageRect(nvsymRect, nvsymChain[nvsymPc].pivot, nvsymChain[nvsymPc].mat); nvsymOp *= nvsymChain[nvsymPc].mat.op; }
+              items.push({ image: { imageId: nvsymImageId, x: nvsymRect.x, y: nvsymRect.y, width: nvsymRect.width, height: nvsymRect.height, opacity: nvsymOp, rotation: nvsymRect.rotation || 0 } });
+            }
+            _touchImage(nvsymImageId);
+          }
+        }
+      }
       for (var s = 0; s < children.length; s++) {
         var c = children[s];
         // Team review view filter — 'mine' hides everyone else's content
