@@ -129,6 +129,56 @@ var _rigDraw = { path: null, boneId: null, ld: null, draggingHandle: false, last
     return best;
   }
 
+  // IK chain auto-detection (2026-07-30, wiring rigSetIK/rigDragIKEnd,
+  // app.js — a complete, correct 2-bone law-of-cosines solver that existed
+  // with zero callers anywhere reachable from the UI: "il manque pas mal
+  // de chose" included half the rig engine simply never being invoked).
+  // No parentBoneId or explicit chain-authoring UI exists in this data
+  // model — two bones read as a chain purely by ONE bone's near end
+  // exactly coinciding with another bone's own endpoint, the topology a
+  // plain branch-click (onDown's Tracer auto-continuation, above) already
+  // produces for free when drawing a 2-segment limb tip-to-tip. Given the
+  // bone+vi of the anchor about to be dragged, returns the chain if (and
+  // only if) that anchor is one bone's own FAR end (index 0 or the last
+  // index — the "wrist") and its NEAR end coincides with some OTHER bone's
+  // endpoint (the "elbow"); that other bone's own opposite end is the
+  // "shoulder", a fixed pivot the drag rotates everything around.
+  function otherEnd(bone, idx) { return idx === 0 ? bone.segments.length - 1 : 0; }
+  function findIKChain(ld, boneId, vi) {
+    var rig = ld.rig;
+    var endBone = rig.bones[boneId];
+    if (!endBone || endBone.closed || endBone.segments.length < 2) return null;
+    var lastIdx = endBone.segments.length - 1;
+    if (vi !== 0 && vi !== lastIdx) return null; // an interior vertex has no "other end" to be a chain at all
+    var nearIdx = otherEnd(endBone, vi);
+    var nearPt = new Point(endBone.segments[nearIdx].point[0], endBone.segments[nearIdx].point[1]);
+    var tol = 2; // exact-enough bone-drawing coincidence, not a screen hit-test radius
+    var rootBoneId = null, rootJointIdx = null;
+    Object.keys(rig.bones).forEach(function (bid) {
+      if (bid === boneId || rootBoneId) return;
+      var b = rig.bones[bid];
+      if (b.closed || b.segments.length < 2) return;
+      var bLast = b.segments.length - 1;
+      [0, bLast].forEach(function (i) {
+        if (rootBoneId) return;
+        var p = new Point(b.segments[i].point[0], b.segments[i].point[1]);
+        if (p.getDistance(nearPt) < tol) { rootBoneId = bid; rootJointIdx = i; }
+      });
+    });
+    if (!rootBoneId) return null;
+    return {
+      root: { boneId: rootBoneId, vi: otherEnd(rig.bones[rootBoneId], rootJointIdx) },
+      joint: { boneId: rootBoneId, vi: rootJointIdx },
+      // Mirrored joint point on the END bone's own near end — rigDragIKEnd
+      // (app.js) only ever writes chain.joint (the ROOT bone's side); this
+      // codebase has no parent-child bone link to keep the two coincident
+      // points together automatically, so onMove below copies the solved
+      // joint position over to this one after every solve, by hand.
+      endNear: { boneId: boneId, vi: nearIdx },
+      end: { boneId: boneId, vi: vi },
+    };
+  }
+
   // A bone's influence-circle CENTER (Assigner mode) — the geometric center
   // of its own bounding box, a stable, easy-to-reason-about point that
   // doesn't depend on which end of the bone was drawn first.
@@ -211,7 +261,18 @@ var _rigDraw = { path: null, boneId: null, ld: null, draggingHandle: false, last
         // snapshot. _rigPoseUndoPushed (below) tells rigCommitFrame this
         // checkpoint already exists so it doesn't ALSO push its own bad one.
         pushUndo();
-        _posing = { ld: ld, boneId: anchorHit.boneId, vi: anchorHit.vi, kind: anchorHit.kind };
+        // Alt+drag an ANCHOR (not a handle — that's already Alt's OTHER
+        // meaning here, breaking a tangent) that's the far tip of a
+        // 2-bone chain solves IK instead of a plain FK point-move: pulling
+        // a "hand" bends the "elbow" automatically. A first-pass gesture
+        // choice (Cyril hasn't specified how he wants IK invoked) — plain
+        // drag keeps ordinary FK on every anchor exactly as before, so
+        // this is purely additive.
+        var ikChain = (anchorHit.kind === 'anchor' && e.altKey) ? findIKChain(ld, anchorHit.boneId, anchorHit.vi) : null;
+        if (ikChain) {
+          rigSetIK(ld, ikChain.root, ikChain.joint, ikChain.end, false);
+        }
+        _posing = { ld: ld, boneId: anchorHit.boneId, vi: anchorHit.vi, kind: anchorHit.kind, ik: ikChain };
         // Marks the pose as live-but-uncommitted for saveActiveLayerFrame/
         // saveAllLayerFrames (app.js) — cleared only by rigCommitFrame/
         // rigResetPose, deliberately NOT on pointerup here, since a pose can
@@ -322,6 +383,21 @@ var _rigDraw = { path: null, boneId: null, ld: null, draggingHandle: false, last
       return;
     }
     if (_posing) {
+      if (_posing.ik) {
+        var chain = _posing.ik;
+        var endKey = chain.end.boneId + ':' + chain.end.vi;
+        rigDragIKEnd(_posing.ld, endKey, localPt.x, localPt.y);
+        // rigDragIKEnd only writes chain.joint (the ROOT bone's own end) —
+        // copy that solved position onto the END bone's coincident near
+        // end too (see findIKChain's own comment: no parent-child link
+        // exists to do this automatically), or the two bones visibly pull
+        // apart at the "elbow" the moment the chain bends.
+        var jointS = _posing.ld.rig.bones[chain.joint.boneId].segments[chain.joint.vi];
+        _posing.ld.rig.bones[chain.endNear.boneId].segments[chain.endNear.vi].point = jointS.point.slice();
+        applyRigDeform(_posing.ld);
+        window.SMEngineBridge.renderNow();
+        return;
+      }
       var poseBone = _posing.ld.rig.bones[_posing.boneId];
       var poseSeg = poseBone.segments[_posing.vi];
       if (_posing.kind === 'handleIn' || _posing.kind === 'handleOut') {
