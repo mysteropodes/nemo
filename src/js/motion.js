@@ -115,6 +115,44 @@
     if (holder && holder.timeRemap) return list.concat(['timeRemap']);
     return list;
   }
+  // ---- Collapsible "Duplicator" sub-group (2026-07-30, "créer des sous
+  // menu à transform pour des properties comme duplicator afin que ça soit
+  // mieux rangés") ----
+  // THE visible row sequence of a holder's Transform group. The panel
+  // (renderTransformProps) AND the grid (renderTimelineMotion — the layer
+  // loop and the element loop both) iterate THIS list, never propsFor
+  // directly, so the sub-group's header row and its collapsed/expanded
+  // state can never desync the two sides (ROW_H's alignment invariant).
+  // propsFor itself stays the data-level truth untouched: every non-render
+  // consumer (key collection for stagger/skew/selection-box bounds) keeps
+  // seeing dup props regardless of collapse — collapsing is purely visual.
+  // The shared filter (property-letter filter + hide-unanimated) lives HERE
+  // for the same reason; renderTracksFor re-checks it internally, which is
+  // a harmless no-op since it's the identical condition.
+  // Entries: {row:'prop', prop} — one ordinary property row;
+  //          {row:'dupHeader'} — the Duplicator sub-header (panel: a
+  //          chevron header row, grid: one blank spacer .frow).
+  // Dup rows are re-grouped AFTER parentBlend/timeLink/timeRemap even
+  // though propsFor lists them before — a collapsible unit reads best last,
+  // and both sides get the same order from here so alignment holds.
+  function transformRowPlan(holder) {
+    var rows = [], dupProps = [];
+    propsFor(holder).forEach(function (prop) {
+      if (isPropFiltered(prop) || (_hideUnanimated && !propHasContent(holder, prop))) return;
+      if (PROPS_DUP_EXTRA.indexOf(prop) >= 0) { dupProps.push(prop); return; }
+      rows.push({ row: 'prop', prop: prop });
+    });
+    if (dupProps.length) {
+      rows.push({ row: 'dupHeader' });
+      if (isDupGroupExpanded(holder)) dupProps.forEach(function (p) { rows.push({ row: 'prop', prop: p }); });
+    }
+    return rows;
+  }
+  // Same single-accordion idiom as _motionExpandedPathHolder one level
+  // down — object identity against the live holder dict, which is stable
+  // across renders (state.layers entries are mutated in place, never
+  // recreated, same assumption the Path group already relies on).
+  function isDupGroupExpanded(holder) { return window._motionExpandedDupHolder === holder; }
   // THE track resolver (2026-07-26). Every transform property's track lives
   // in holder.motion[prop] — except timeRemap, which predates its own row
   // here and lives at ld.timeRemap (enableTimeRemap; consumed by app.js's
@@ -1189,7 +1227,15 @@
     if (!ld) return;
     ld.threeD = !ld.threeD;
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
+    // renderTimeline too, not just renderLayerList (2026-07-30 fix — Cyril:
+    // "encore des problème de calage d'ui... là où j'ai active la
+    // duplication"): threeD changes propsFor(ld)'s row count (PROPS_WITH_3D
+    // adds 3 rows) exactly like the Duplicator toggle below — the LEFT panel
+    // re-rendered with the new count, but #frame-grid kept its stale one
+    // until some unrelated later action happened to call renderTimeline(),
+    // desyncing every layer row below this one in the meantime.
     if (window.renderLayerList) renderLayerList();
+    if (window.renderTimeline) renderTimeline();
   }
   // ---- MOGRAPH DUPLICATOR (2026-07-29) ----
   // Per-layer opt-in grid/radial/path array duplication (AE shape Repeater
@@ -1240,7 +1286,17 @@
     loadFrame(state.currentFrame);
     invalidateSymbolUnionBounds(); // same cache-staleness fix as dupRefresh (timeline.js)
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
+    // renderTimeline too (2026-07-30 fix — Cyril: "encore des problème de
+    // calage d'ui... là où j'ai active la duplication"): enabling/disabling
+    // ld.duplicator changes propsFor(ld)'s row count by 7 (PROPS_DUP_EXTRA)
+    // — #layer-list re-rendered with the new count right below, but
+    // #frame-grid silently kept its PREVIOUS row count until some unrelated
+    // later action happened to call renderTimeline(), so every layer row
+    // below this one visibly drifted from its own keyframe track in the
+    // meantime. Same alignment-invariant class ROW_H's header comment warns
+    // about — this was simply a call site that never got the memo.
     if (window.renderLayerList) renderLayerList();
+    if (window.renderTimeline) renderTimeline();
     if (window.updateDuplicatorPanel) updateDuplicatorPanel();
   }
   function setDuplicatorEditSource(li, on) {
@@ -3276,9 +3332,27 @@
     grp.appendChild(filterBtn);
     list.appendChild(grp);
   }
+  // Panel half of transformRowPlan's dupHeader entry — same chevron idiom
+  // as renderPathVertexGroup one level down. The grid half is one blank
+  // .frow spacer (renderTimelineMotion), same header↔spacer pairing as
+  // every other group header in this file.
+  function renderDupGroupHeader(list, holder) {
+    var grp = document.createElement('div'); grp.className = 'lrow motion-group-row';
+    var arrow = document.createElement('span'); arrow.className = 'lico larrow'; arrow.textContent = isDupGroupExpanded(holder) ? '▾' : '▸';
+    var label = document.createElement('span'); label.textContent = 'Duplicator';
+    grp.title = 'Décalages par copie du Duplicator (position, rotation, échelle, opacité…) — cliquer pour replier/déplier';
+    grp.appendChild(arrow); grp.appendChild(label);
+    grp.addEventListener('click', function (e) {
+      e.stopPropagation();
+      window._motionExpandedDupHolder = isDupGroupExpanded(holder) ? null : holder;
+      renderLayerList(); renderTimeline();
+    });
+    list.appendChild(grp);
+  }
   function renderTransformProps(list, holder) {
-    propsFor(holder).forEach(function (prop) {
-      if (isPropFiltered(prop) || (_hideUnanimated && !propHasContent(holder, prop))) return;
+    transformRowPlan(holder).forEach(function (entry) {
+      if (entry.row === 'dupHeader') { renderDupGroupHeader(list, holder); return; }
+      var prop = entry.prop;
       var pr = document.createElement('div'); pr.className = 'lrow motion-prop-row';
       // Same identity tags the grid's track rows carry (renderTracksFor) —
       // without them the expression pickwhip could only be dropped on the
@@ -4145,17 +4219,32 @@
       grid.appendChild(spacer);
       if (!expanded) return;
       if (showsGroupHeader()) {
-        var grpSpacer = document.createElement('div'); grpSpacer.className = 'frow';
+        // 'motion-group-row' too, not just 'frow' (2026-07-30 fix, Cyril:
+        // "encore des problème de calage d'ui"): .motion-group-row carries
+        // margin-top:6px (style.css) that ONLY existed on the panel side's
+        // real header row — this plain spacer never picked it up, so every
+        // row from here down silently sat 6px lower on the LEFT than its own
+        // keyframe track on the RIGHT. Reusing the exact same class (instead
+        // of hand-copying the margin value) guarantees the two can never
+        // drift apart again if that CSS rule ever changes.
+        var grpSpacer = document.createElement('div'); grpSpacer.className = 'frow motion-group-row';
         grid.appendChild(grpSpacer);
       }
-      propsFor(ld).forEach(function (prop) { renderTracksFor(grid, ld, prop); });
+      // transformRowPlan, not propsFor directly — the Duplicator sub-group
+      // (collapsed by default) must render as ONE blank spacer here, mirroring
+      // the panel's single chevron header row, not one spacer per hidden dup
+      // property (see transformRowPlan's own comment, motion.js).
+      transformRowPlan(ld).forEach(function (entry) {
+        if (entry.row === 'dupHeader') { var dupSpacer = document.createElement('div'); dupSpacer.className = 'frow motion-group-row'; grid.appendChild(dupSpacer); return; }
+        renderTracksFor(grid, ld, entry.prop);
+      });
       // Mirrors renderElementsList's panel structure: one spacer per
       // element, its own track rows only when that ONE element is expanded
       // (only one element expands at a time, same single-expand contract
       // as layers).
       var els = layerElements(li, ld);
       if (els.length) {
-        var elHdrSpacer = document.createElement('div'); elHdrSpacer.className = 'frow';
+        var elHdrSpacer = document.createElement('div'); elHdrSpacer.className = 'frow motion-group-row';
         grid.appendChild(elHdrSpacer);
         els.forEach(function (entry) {
           var elExpanded = window._motionExpandedElement === entry.strokeId;
@@ -4176,15 +4265,30 @@
           // "extra row on one side only" bug class as the Fill-row fix
           // above, just at the element level instead of the shape level.
           if (showsGroupHeader()) {
-            var elGrpSpacer = document.createElement('div'); elGrpSpacer.className = 'frow';
+            var elGrpSpacer = document.createElement('div'); elGrpSpacer.className = 'frow motion-group-row';
             grid.appendChild(elGrpSpacer);
           }
-          PROPS.forEach(function (prop) { renderTracksFor(grid, elHolder, prop); });
+          // transformRowPlan(elHolder), not the bare PROPS (2026-07-30 fix,
+          // found while auditing the Duplicator alignment bug): this
+          // hardcoded the base 5 properties instead of going through the
+          // single row-list source of truth like the panel side
+          // (renderTransformGroup -> renderTransformProps -> transformRowPlan)
+          // already does. Dormant today — ensureElementHolder never stamps
+          // .duplicator/.threeD/etc. on an element holder yet — but it's
+          // exactly the shape of bug this whole pass is fixing, one level
+          // down, and CLAUDE.md §1 is explicit that a dormant divergence
+          // like this is still a bug: the moment a per-element duplicator/3D
+          // capability ships, this line would silently disagree with the
+          // panel instead of just working.
+          transformRowPlan(elHolder).forEach(function (entry) {
+            if (entry.row === 'dupHeader') { var elDupSpacer = document.createElement('div'); elDupSpacer.className = 'frow motion-group-row'; grid.appendChild(elDupSpacer); return; }
+            renderTracksFor(grid, elHolder, entry.prop);
+          });
           // Path group (mirrors renderElementsList's renderPathVertexGroup
           // exactly — same expand condition, same vertex count, same
           // spacer-then-rows shape as the Transform group just above).
           if (!entry.sd.isRaster && entry.sd.segments && entry.sd.segments.length) {
-            var pathHdrSpacer = document.createElement('div'); pathHdrSpacer.className = 'frow';
+            var pathHdrSpacer = document.createElement('div'); pathHdrSpacer.className = 'frow motion-group-row';
             grid.appendChild(pathHdrSpacer);
             if (isPathGroupExpanded(elHolder)) {
               for (var vi = 0; vi < entry.sd.segments.length; vi++) renderTracksFor(grid, elHolder, 'vtx' + vi);
@@ -4848,7 +4952,14 @@
     }
     function shiftHolder(h) {
       if (!h || !h.motion) return;
-      PROPS.forEach(function (prop) { shiftTrack(h.motion[prop]); });
+      // propsFor(h), not the base PROPS (2026-07-30 fix, found while auditing
+      // the Duplicator alignment bug — same "PROPS instead of propsFor"
+      // omission, just in retiming instead of rendering): a 3D/duplicator/
+      // multi-parent-blend/timeLink holder has keyframe tracks beyond the
+      // base 5, and PROPS alone silently left them at their pre-drag frames
+      // — exactly the "retimed in one reader, stale in the others" bug this
+      // function's own header comment warns about.
+      propsFor(h).forEach(function (prop) { shiftTrack(h.motion[prop]); });
     }
     shiftHolder(ld);
     // timeRemap lives OUTSIDE ld.motion (see trackFor) — without this, a
