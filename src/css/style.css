@@ -1137,6 +1137,23 @@ body.mode-motion .layer-inout-bar .layer-inout-handle::after{content:'';position
    the bar's own .sel outline so a single-edge selection still reads as
    clearly "selected", not just "hovered". */
 .layer-inout-handle.sel{opacity:1;background:var(--accent-hover);box-shadow:0 0 0 1.5px #fff;}
+/* Parent in Time — on-timeline connection points (2026-07-30, Van Dijk
+   2.1: Shift+[ / Shift+] / Shift+\ "create connection point on In Point /
+   Out Point / the Layer"). Sit ABOVE the bar's own top edge (negative
+   top), never overlapping .layer-inout-handle's full-height resize hit
+   zone at the left/right edges — same "two gestures, two elements" split
+   CLAUDE.md already uses for .lpick vs .lparent. Subtle by default
+   (discoverable without being loud), same opacity step-up on hover as
+   .layer-inout-handle itself. */
+.layer-inout-bar .timelink-anchor{position:absolute;top:-5px;width:8px;height:8px;margin-left:-4px;
+  border-radius:50%;border:1.5px solid var(--text-dim);background:var(--panel2);cursor:alias;
+  opacity:.55;z-index:5;}
+.layer-inout-bar .timelink-anchor:hover{opacity:1;border-color:var(--accent,#5b6cff);box-shadow:0 0 0 2px rgba(91,108,255,.25);}
+.layer-inout-bar .timelink-anchor.in{left:0;}
+.layer-inout-bar .timelink-anchor.out{left:100%;}
+.layer-inout-bar .timelink-anchor.whole{left:50%;}
+.layer-inout-bar.has-timelink{border-bottom:2px solid var(--accent,#5b6cff);}
+
 /* Multi-select (marquee rect -> group-drag several layers' bars together,
    layer-inout.js) */
 .layer-inout-bar.sel{box-shadow:0 0 0 1.5px #fff;}
