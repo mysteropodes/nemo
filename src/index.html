@@ -896,7 +896,7 @@
     <div class="psec" id="easing-sec">
       <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrEasingCurve">Easing Curve</span></div>
       <div class="pbdy" style="align-items:center">
-        <div id="curve-canvas-wrap" data-i18n-title="curveCanvasTitle" title="Clic+glisser un point pour le déplacer. Double-clic sur une zone vide pour ajouter un point. Suppr/Retour arrière (survol du curseur) pour retirer le point sélectionné (les 2 extrémités ne peuvent pas être retirées).">
+        <div id="curve-canvas-wrap" data-i18n-title="curveCanvasTitle" title="Clic+glisser un point pour le déplacer. Alt+clic sur un point pour afficher/masquer ses tangentes. Double-clic sur une zone vide pour ajouter un point. Suppr/Retour arrière (survol du curseur) pour retirer le point sélectionné (les 2 extrémités ne peuvent pas être retirées).">
           <canvas id="curve-canvas" width="400" height="400"></canvas>
           <div id="curve-resize-handle" data-i18n-title="dragToResize" title="Glisser pour redimensionner"></div>
         </div>
@@ -1497,7 +1497,7 @@
     <button class="tb active" id="btn-shadow-guides" data-i18n-title="btnShadowGuidesTitle" title="Afficher/masquer les lignes de guide Shadow sur tous les calques et composants" ><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M20.25 19.5h-9.44l7.724-7.715L21 9.31a1.49 1.49 0 0 0 0-2.119l-4.19-4.19a1.51 1.51 0 0 0-2.12 0L3.44 14.25A1.492 1.492 0 0 0 3 15.31v4.19A1.5 1.5 0 0 0 4.5 21h15.75a.75.75 0 1 0 0-1.5ZM4.5 15.31l9-9 4.19 4.19-9 9H4.5v-4.19Z"/></svg></button>
     <button class="tb" id="btn-revision-view" data-i18n-title="btnRevisionViewTitle" title="Vue de révision — cycle Tout / Mes traits / Corrections" style="width:auto;padding:0 8px;font-size:10px" data-i18n="revisionViewAll">Tout</button>
     <button class="tb" id="btn-cycle" data-i18n-title="btnCycleTitle" title="Cycle — repete N fois la plage de frames selectionnee (walk cycles)" ><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></button>
-    <button class="tb" id="btn-tween-curves" data-i18n-title="btnTweenCurvesTitle" title="Afficher/masquer les courbes d'easing sous les calques avec tween — clic sur un segment pour l'éditer individuellement" ><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17c3 0 3-10 6-10s3 10 6 10 3-8 6-8"/></svg></button>
+    <button class="tb" id="btn-tween-curves" data-i18n-title="btnTweenCurvesTitle" title="Afficher/masquer les courbes d'easing sous les calques avec tween — clic sur un segment pour l'éditer individuellement. Dans l'éditeur : clic sur une zone vide pour ajouter un point, double-clic sur un point pour le retirer" ><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17c3 0 3-10 6-10s3 10 6 10 3-8 6-8"/></svg></button>
     <!-- Graph editor (Motion mode only — shown/hidden by setAppMode). Clic
          droit bascule valeur/vitesse, Alt+clic fige l'échelle verticale. -->
     <!-- Shy switch (AE): hides every layer flagged shy from BOTH panels at

@@ -1848,17 +1848,28 @@ function openPropsSection(id){
 function getToolHelp(tool){
   var tt=(window.SM&&SM.t)?SM.t:function(k){return k;};
   var TOOL_HELP={
-    select:{desc:tt('thSelectDesc'),sc:[['V',tt('thTool')],['Shift+clic',tt('thAdd')],['Alt+glisser',tt('thMoveAnchor')],['Suppr',tt('thErase')],['Shift+X',tt('thFlipH')],['Shift+Alt+X',tt('thFlipV')]]},
+    // UI/UX audit (2026-07-30): Ctrl+glisser un coin (distort) had NO
+    // affordance anywhere — not here, not on the handle itself before
+    // Ctrl was already held. Alt+glisser also had two DIFFERENT meanings
+    // depending on where the drag starts (pivot vs empty canvas) collapsed
+    // into one label that only documented the first — split into two rows.
+    select:{desc:tt('thSelectDesc'),sc:[['V',tt('thTool')],['Shift+clic',tt('thAdd')],['Alt+glisser (pivot)',tt('thMoveAnchor')],['Alt+glisser (zone vide)',tt('thLassoEmpty')],['Ctrl+glisser un coin',tt('thDistort')],['Suppr',tt('thErase')],['Shift+X',tt('thFlipH')],['Shift+Alt+X',tt('thFlipV')]]},
     subselect:{desc:tt('thSubselectDesc'),sc:[['A',tt('thTool')],['Alt+clic',tt('thBreakTangent')]]},
     fsselect:{desc:tt('thFsselectDesc'),sc:[['Shift+clic',tt('thAdd')]]},
     draw:{desc:tt('thDrawDesc'),sc:[['B',tt('thTool')],['Alt+glisser',tt('thSize')],['[ ]',tt('thSizePlusMinus')]]},
-    pen:{desc:tt('thPenDesc'),sc:[['P',tt('thTool')],['Clic',tt('thAnchor')],['Échap',tt('thFinish')]]},
+    // Shift (angle 45°) and Alt (break the handle being dragged into a
+    // corner) were undocumented for Pen — the ONLY place a user would
+    // learn them was Subselect's own Alt+clic row above, a different tool.
+    pen:{desc:tt('thPenDesc'),sc:[['P',tt('thTool')],['Clic',tt('thAnchor')],['Shift',tt('thAngle45')],['Alt+glisser une poignée',tt('thBreakTangent')],['Échap',tt('thFinish')]]},
     line:{desc:tt('thLineDesc'),sc:[['Shift',tt('thAngle45')]]},
     rect:{desc:tt('thRectDesc'),sc:[['Shift',tt('thSquare')]]},
     ellipse:{desc:tt('thEllipseDesc'),sc:[['Shift',tt('thCircle')]]},
     fill:{desc:tt('thFillDesc'),sc:[['Alt+glisser',tt('thClosingStroke')],['Shift+clic',tt('thRemoveFill')],['Échap',tt('thCancelStroke')]]},
     fillbrush:{desc:tt('thFillbrushDesc'),sc:[]},
-    eraser:{desc:tt('thEraserDesc'),sc:[['E',tt('thTool')],['[ ]',tt('thSizePlusMinus')]]},
+    // Alt+glisser live-resizes the brush here exactly like it does on Draw
+    // (above) — was undocumented on this sibling tool specifically, even
+    // though the gesture and the code path are the same.
+    eraser:{desc:tt('thEraserDesc'),sc:[['E',tt('thTool')],['Alt+glisser',tt('thSize')],['[ ]',tt('thSizePlusMinus')]]},
     eyedropper:{desc:tt('thEyedropperDesc'),sc:[['I',tt('thTool')]]},
     hand:{desc:tt('thHandDesc'),sc:[['Espace',tt('thHoldTemp')],['Espace',tt('thTapPlay')]]},
     zoom:{desc:tt('thZoomDesc'),sc:[['Z',tt('thTool')]]},
@@ -1867,7 +1878,10 @@ function getToolHelp(tool){
     comment:{desc:tt('thCommentDesc'),sc:[]},
     text:{desc:tt('thTextDesc'),sc:[]},
     perspective:{desc:tt('thPerspectiveDesc'),sc:[]},
-    rig:{desc:tt('thRigDesc'),sc:[['S',tt('thTool')],['Clic',tt('thAnchor')],['Glisser une ancre existante',tt('thRigPose')],['Double-clic',tt('thFinish')]]},
+    // Rig's Tracer step is Pen-style bone drawing (rig-bridge.js) — same
+    // Shift/Alt semantics as Pen, undocumented here (only Pen's own row
+    // had them, a different tool).
+    rig:{desc:tt('thRigDesc'),sc:[['S',tt('thTool')],['Clic',tt('thAnchor')],['Shift',tt('thAngle45')],['Alt+glisser une poignée',tt('thBreakTangent')],['Glisser une ancre existante',tt('thRigPose')],['Double-clic',tt('thFinish')]]},
   };
   return TOOL_HELP[tool];
 }
