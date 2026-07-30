@@ -4190,7 +4190,7 @@ function renderLayerList(frameOnly){
     var d3=document.createElement('div');d3.className='lico'+(ld.threeD?'':' off');d3.title='3D Layer';d3.innerHTML=ICO_3D;d3.dataset.layer=i;d3.addEventListener('click',function(e){e.stopPropagation();if(window.SMMotion)SMMotion.toggleLayer3D(parseInt(this.dataset.layer));});
     // Mograph duplicator toggle — same .lico convention, delegates to
     // motion.js's toggleLayerDuplicator (lock + config init live there).
-    var ddup=document.createElement('div');ddup.className='lico'+(ld.duplicator?'':' off');ddup.title='Duplicator (grille / radial / chemin)';ddup.innerHTML=ICO_DUP;ddup.dataset.layer=i;ddup.addEventListener('click',function(e){e.stopPropagation();if(window.SMMotion)SMMotion.toggleLayerDuplicator(parseInt(this.dataset.layer));});
+    var ddup=document.createElement('div');ddup.className='lico'+(ld.duplicator?'':' off');ddup.title='Duplicator — répète cette forme en grille, en cercle (radial) ou le long d’un chemin, avec un décalage animable entre copies (comme le Cloner de Cinema 4D / MoGraph)';ddup.innerHTML=ICO_DUP;ddup.dataset.layer=i;ddup.addEventListener('click',function(e){e.stopPropagation();if(window.SMMotion)SMMotion.toggleLayerDuplicator(parseInt(this.dataset.layer));});
     // Type badge — a video, an imported sequence and a hand-drawn layer were
     // three identical rows before this (layer-kind.js decides which). Sits
     // just before the name so the eye reads "what" then "which", and carries
