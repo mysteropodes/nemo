@@ -438,7 +438,7 @@
         var val = document.createElement('input');
         val.type = 'number';
         val.className = 'lfs-val scrub';
-        val.min = p.min; val.max = p.max; val.step = p.step;
+        val.min = p.min; val.max = p.max; val.step = p.step; val.dataset.step = p.step;
         var plus = document.createElement('button'); plus.className = 'lfs-btn'; plus.textContent = '+';
         function refresh() { val.value = paramValue(p); }
         refresh();
