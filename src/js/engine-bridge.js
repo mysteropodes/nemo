@@ -745,7 +745,15 @@
       if (is3D) {
         motionMat = null; motionPivot = null; parentChain = [];
         var q3dBounds = userLayers[i].bounds;
-        if (window.SMMotion && q3dBounds) project3D = SMMotion.make3DProjector(state.layers[i], q3dBounds, renderFrame, state.canvasW, state.canvasH);
+        // Multi-parent crossfade (2026-07-30) — a 3D layer ignores
+        // parentChain entirely (just above), so this is the ONLY path a 3D
+        // layer's 2 parents (if it has both) ever reach it through:
+        // blendedParentContributionFor3D returns null for every OTHER
+        // case (no parents, exactly one parent — same "3D layers don't
+        // parent" boundary as before this feature), so this is a no-op
+        // for the overwhelmingly common case.
+        var parent3D = (window.SMMotion && SMMotion.blendedParentContributionFor3D) ? SMMotion.blendedParentContributionFor3D(i, renderFrame) : null;
+        if (window.SMMotion && q3dBounds) project3D = SMMotion.make3DProjector(state.layers[i], q3dBounds, renderFrame, state.canvasW, state.canvasH, parent3D);
         if (state.layers[i].duplicator) dup3DProjectorCache = {};
       }
       // Brush-texture companions (isBrushTextureCopy — bitmap raster or
@@ -928,7 +936,25 @@
             var itemProjector = project3D;
             if (c.data && c.data.dup3D && dup3DProjectorCache) {
               var dk3 = c.data.dupIndex;
-              if (!dup3DProjectorCache[dk3]) dup3DProjectorCache[dk3] = SMMotion.make3DProjector(state.layers[i], q3dBounds, renderFrame, state.canvasW, state.canvasH, c.data.dup3D);
+              if (!dup3DProjectorCache[dk3]) {
+                // Merge with the layer-wide parent3D contribution (if any)
+                // — without this, a layer that's BOTH a duplicator AND
+                // multi-parented would apply the parent blend to its
+                // shared `project3D` but silently drop it from every
+                // per-clone override, since dup3D only ever carries the
+                // clone's OWN delta.
+                var cloneDelta = c.data.dup3D;
+                if (parent3D) {
+                  cloneDelta = {
+                    dx: (parent3D.dx || 0), dy: (parent3D.dy || 0), drot: (parent3D.drot || 0),
+                    dsxPct: (parent3D.dsxPct || 0), dsyPct: (parent3D.dsyPct || 0),
+                    dz: (cloneDelta.dz || 0) + (parent3D.dz || 0),
+                    drx: (cloneDelta.drx || 0) + (parent3D.drx || 0),
+                    dry: (cloneDelta.dry || 0) + (parent3D.dry || 0),
+                  };
+                }
+                dup3DProjectorCache[dk3] = SMMotion.make3DProjector(state.layers[i], q3dBounds, renderFrame, state.canvasW, state.canvasH, cloneDelta);
+              }
               itemProjector = dup3DProjectorCache[dk3];
             }
             sd.segments = SMMotion.project3DSegments(sd.segments, itemProjector);

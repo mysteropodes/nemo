@@ -90,6 +90,12 @@
   function propsFor(holder) {
     var list = (holder && holder.threeD) ? PROPS_WITH_3D : PROPS;
     if (holder && holder.duplicator) list = list.concat(PROPS_DUP_EXTRA);
+    // Multi-parent crossfade (2026-07-30, "jouer comme une opacité les
+    // parents entre eux") — parentBlend only means anything once a SECOND
+    // parent exists (parentLayerUidB); an ordinary single-parent layer
+    // shows nothing extra here, same "hidden until its prerequisite is
+    // set" precedent Time Remap already establishes for symbolId.
+    if (holder && holder.parentLayerUidB) list = list.concat(['parentBlend']);
     if (holder && holder.timeRemap) return list.concat(['timeRemap']);
     return list;
   }
@@ -108,10 +114,15 @@
     if (prop === 'timeRemap') return holder.timeRemap || null;
     return (holder.motion && holder.motion[prop]) || null;
   }
-  var PROP_LABEL = { position: 'Position', anchor: 'Anchor Point', rotation: 'Rotation', scale: 'Scale', opacity: 'Opacity', timeRemap: 'Time Remap', positionZ: 'Position Z', rotationX: 'Rotation X', rotationY: 'Rotation Y', dupOffsetPos: 'Dup. Offset', dupOffsetRot: 'Dup. Rotation', dupOffsetScale: 'Dup. Scale', dupOffsetOpacity: 'Dup. Opacity', dupOffsetPosZ: 'Dup. Offset Z', dupOffsetRotX: 'Dup. Rotation X', dupOffsetRotY: 'Dup. Rotation Y' };
-  var PROP_DIM = { position: 2, anchor: 2, rotation: 1, scale: 2, opacity: 1, timeRemap: 1, positionZ: 1, rotationX: 1, rotationY: 1, dupOffsetPos: 2, dupOffsetRot: 1, dupOffsetScale: 2, dupOffsetOpacity: 1, dupOffsetPosZ: 1, dupOffsetRotX: 1, dupOffsetRotY: 1 };
-  var PROP_UNIT = { position: 'px', anchor: 'px', rotation: '°', scale: '%', opacity: '%', timeRemap: 'f', positionZ: 'px', rotationX: '°', rotationY: '°', dupOffsetPos: 'px', dupOffsetRot: '°', dupOffsetScale: '%', dupOffsetOpacity: '%', dupOffsetPosZ: 'px', dupOffsetRotX: '°', dupOffsetRotY: '°' };
-  var PROP_DEFAULT = { position: [0, 0], anchor: [0, 0], rotation: [0], scale: [100, 100], opacity: [100], timeRemap: [0], positionZ: [0], rotationX: [0], rotationY: [0], dupOffsetPos: [0, 0], dupOffsetRot: [0], dupOffsetScale: [0, 0], dupOffsetOpacity: [0], dupOffsetPosZ: [0], dupOffsetRotX: [0], dupOffsetRotY: [0] };
+  var PROP_LABEL = { position: 'Position', anchor: 'Anchor Point', rotation: 'Rotation', scale: 'Scale', opacity: 'Opacity', timeRemap: 'Time Remap', positionZ: 'Position Z', rotationX: 'Rotation X', rotationY: 'Rotation Y', dupOffsetPos: 'Dup. Offset', dupOffsetRot: 'Dup. Rotation', dupOffsetScale: 'Dup. Scale', dupOffsetOpacity: 'Dup. Opacity', dupOffsetPosZ: 'Dup. Offset Z', dupOffsetRotX: 'Dup. Rotation X', dupOffsetRotY: 'Dup. Rotation Y', parentBlend: 'Parent Blend' };
+  var PROP_DIM = { position: 2, anchor: 2, rotation: 1, scale: 2, opacity: 1, timeRemap: 1, positionZ: 1, rotationX: 1, rotationY: 1, dupOffsetPos: 2, dupOffsetRot: 1, dupOffsetScale: 2, dupOffsetOpacity: 1, dupOffsetPosZ: 1, dupOffsetRotX: 1, dupOffsetRotY: 1, parentBlend: 1 };
+  var PROP_UNIT = { position: 'px', anchor: 'px', rotation: '°', scale: '%', opacity: '%', timeRemap: 'f', positionZ: 'px', rotationX: '°', rotationY: '°', dupOffsetPos: 'px', dupOffsetRot: '°', dupOffsetScale: '%', dupOffsetOpacity: '%', dupOffsetPosZ: 'px', dupOffsetRotX: '°', dupOffsetRotY: '°', parentBlend: '%' };
+  // parentBlend defaults to 0 — "0%" reads as "fully Parent A" (the
+  // pre-existing single parent), matching the invariant that assigning a
+  // second parent must never itself move anything until the user actually
+  // animates the blend (same "adding a feature is a visual no-op until
+  // deliberately used" precedent enableTimeRemap's own seeded keys follow).
+  var PROP_DEFAULT = { position: [0, 0], anchor: [0, 0], rotation: [0], scale: [100, 100], opacity: [100], timeRemap: [0], positionZ: [0], rotationX: [0], rotationY: [0], dupOffsetPos: [0, 0], dupOffsetRot: [0], dupOffsetScale: [0, 0], dupOffsetOpacity: [0], dupOffsetPosZ: [0], dupOffsetRotX: [0], dupOffsetRotY: [0], parentBlend: [0] };
   // Small per-dimension labels ("X"/"Y") shown before each multi-dimension
   // property's field, LottieFiles-inspired (2026-07-29) — every 2-dim prop
   // here is an X/Y pair, so one shared default covers them all.
@@ -1011,23 +1022,28 @@
   // plain (px,py) -> {x,y} closure, reused across every vertex of every
   // item in the layer so they all move together as one rigid (but
   // perspective-projected) plane.
-  // extraDelta (2026-07-30, "en 3D aussi avec ID de chaque cloner") — an
-  // optional {dz,drx,dry} added on top of the layer's own posZ/rotX/rotY,
-  // ADDITIVE exactly like a duplicator clone's 2D dx/dy/rot/sx/sy is on
-  // top of nothing (fresh placement, not a delta on an existing transform)
-  // — here it's a delta on the layer's shared base 3D pose, because unlike
-  // 2D placement (which the duplicator generates from scratch per clone)
-  // the layer's OWN 3D orientation must still apply uniformly underneath.
-  // Omitted (every other call site) behaves identically to before this
-  // param existed. Lets buildSceneJson (engine-bridge.js) build one extra
-  // projector per unique per-clone delta instead of the single shared
-  // layer-wide one, for a duplicator+3D layer whose clones carry their own
-  // positionZ/rotationX/rotationY offset (data.dup3D, app.js).
+  // extraDelta — an optional additive contribution on top of the layer's
+  // own base pose, omitted (every call site before 2026-07-30) behaving
+  // identically to before this param existed. Two independent producers:
+  // (1) a duplicator clone's own positionZ/rotationX/rotationY offset
+  // (data.dup3D, app.js — {dz,drx,dry} only, "en 3D aussi avec ID de
+  // chaque cloner"), and (2) a layer's blended multi-parent contribution
+  // ({dx,dy,drot,dsxPct,dsyPct,dz,drx,dry} — parentChainMats' 2D part
+  // PLUS blendedParent3D's 3D part combined, "jouer comme une opacité les
+  // parents entre eux" — a 3D layer ignores parentChain entirely
+  // (engine-bridge.js), so this is the ONLY way a 3D child ever sees ANY
+  // parent contribution, 2D or 3D). Every field defaults to 0/no-op when
+  // absent, so either producer can supply just the fields it has.
   function make3DProjector(ld, bounds, frameIdx, canvasW, canvasH, extraDelta) {
     var pos = valueAtFrame(ld, 'position', frameIdx);
     var anc = valueAtFrame(ld, 'anchor', frameIdx);
     var rot = valueAtFrame(ld, 'rotation', frameIdx)[0];
     var scl = valueAtFrame(ld, 'scale', frameIdx);
+    if (extraDelta) {
+      pos = [pos[0] + (extraDelta.dx || 0), pos[1] + (extraDelta.dy || 0)];
+      rot += extraDelta.drot || 0;
+      scl = [scl[0] + (extraDelta.dsxPct || 0), scl[1] + (extraDelta.dsyPct || 0)];
+    }
     var posZ = valueAtFrame(ld, 'positionZ', frameIdx)[0] + (extraDelta ? (extraDelta.dz || 0) : 0);
     var rotX = valueAtFrame(ld, 'rotationX', frameIdx)[0] + (extraDelta ? (extraDelta.drx || 0) : 0);
     var rotY = valueAtFrame(ld, 'rotationY', frameIdx)[0] + (extraDelta ? (extraDelta.dry || 0) : 0);
@@ -1361,26 +1377,180 @@
     for (var i = 0; i < state.layers.length; i++) if (state.layers[i].layerUid === uid) return i;
     return -1;
   }
+  // Refuse to create a cycle (A parents B parents A) — BFS the CANDIDATE
+  // parent's own ancestry through BOTH parent slots (a node can have up to
+  // 2 outgoing edges now, parentLayerUid AND parentLayerUidB, so this is a
+  // small DAG walk, not a single linear chain); if `targetUid` appears
+  // anywhere in it, the assignment would loop. Shared by setLayerParent
+  // and setLayerParentB so both slots get the exact same guard.
+  function wouldCreateParentCycle(targetUid, candidateParentUid) {
+    if (!candidateParentUid) return false;
+    var queue = [candidateParentUid], visited = {}, guard = 0;
+    while (queue.length && guard++ < 256) {
+      var cur = queue.shift();
+      if (cur === targetUid) return true;
+      if (visited[cur]) continue;
+      visited[cur] = true;
+      var idx = findLayerIndexByUid(cur);
+      if (idx < 0) continue;
+      if (state.layers[idx].parentLayerUid) queue.push(state.layers[idx].parentLayerUid);
+      if (state.layers[idx].parentLayerUidB) queue.push(state.layers[idx].parentLayerUidB);
+    }
+    return false;
+  }
   function setLayerParent(li, parentUid) {
     var ld = state.layers[li];
     if (!ld) return;
-    if (parentUid) {
-      // Refuse to create a cycle (A parents B parents A) — walk the
-      // CANDIDATE parent's own chain; if `li` (by uid) appears in it,
-      // this assignment would loop. Same visited-set guard as
-      // parentChainMats below, applied up front instead of just capping
-      // depth at read time, so the UI never silently accepts a cycle.
-      var uid = ensureLayerUid(ld);
-      var cur = parentUid, visited = {}, guard = 0;
-      while (cur && !visited[cur] && guard++ < 256) {
-        if (cur === uid) { if (window.showToast) showToast('Parentage refusé : créerait une boucle'); return; }
-        visited[cur] = true;
-        var idx = findLayerIndexByUid(cur);
-        cur = idx >= 0 ? state.layers[idx].parentLayerUid : null;
-      }
+    if (parentUid && wouldCreateParentCycle(ensureLayerUid(ld), parentUid)) {
+      if (window.showToast) showToast('Parentage refusé : créerait une boucle');
+      return;
     }
     ld.parentLayerUid = parentUid || null;
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
+  }
+  // Second parent slot (2026-07-30, "plusieurs parent... jouer comme une
+  // opacité les parents entre eux") — see parentChainMats' own header
+  // comment for the full crossfade design. Setting it to the SAME uid as
+  // parentLayerUid is refused (not a cycle, just meaningless — blending a
+  // layer with itself), everything else mirrors setLayerParent exactly.
+  function setLayerParentB(li, parentUid) {
+    var ld = state.layers[li];
+    if (!ld) return;
+    if (parentUid && parentUid === ld.parentLayerUid) {
+      if (window.showToast) showToast('Parent B doit être différent du Parent A');
+      return;
+    }
+    if (parentUid && wouldCreateParentCycle(ensureLayerUid(ld), parentUid)) {
+      if (window.showToast) showToast('Parentage refusé : créerait une boucle');
+      return;
+    }
+    ld.parentLayerUidB = parentUid || null;
+    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+  }
+  // ---- Multi-parent crossfade (2026-07-30, "plusieurs parent... jouer
+  // comme une opacité les parents entre eux") ----
+  // Confirmed with Cyril: exactly 2 parents, a single 0-100 blend (Motion-
+  // keyable like opacity) crossfading between "fully follows Parent A" and
+  // "fully follows Parent B" — not an N-way weighted average. A layer with
+  // no parentLayerUidB behaves EXACTLY as before (parentChainMats' dispatch
+  // below routes it straight to the untouched legacy path) — this is
+  // purely additive, zero risk to the single-parent case every existing
+  // parented layer already uses.
+  //
+  // Shortest-path angle lerp — naive (a + (b-a)*t) breaks at the
+  // wraparound (350°->10° must cross through 0°, not swing the long way
+  // through 180°). Same reasoning AE/Blender rotation blending uses.
+  function lerpAngleDeg(a, b, t) { var d = ((b - a + 180) % 360 + 360) % 360 - 180; return a + d * t; }
+  // Reduces an ENTIRE ancestor chain (starting at startUid, walking
+  // parentLayerUid only — a chain ancestor's OWN second parent is not
+  // recursively blended here, out of scope for this pass, same
+  // "explicitly scoped rather than silently wrong" precedent 3D-layers-
+  // ignore-parents already sets elsewhere) to ONE equivalent
+  // {dx,dy,rot,sx,sy} descriptor, by tracking 3 reference points (origin,
+  // +unitX, +unitY) through the chain via transformSegments — reuses the
+  // exact same affine math every ordinary parented layer already renders
+  // through instead of a second hand-rolled matrix-composition
+  // implementation (CLAUDE.md §3's duplicated-pair trap). Exact whenever
+  // the composed chain has no shear (the overwhelmingly common case — one
+  // or two ancestors with ordinary rotation+uniform-or-near-uniform
+  // scale); a deeply nested chain mixing non-uniform scale with rotation
+  // at multiple levels can in principle introduce shear this
+  // shear-free-by-construction descriptor can't represent exactly — an
+  // accepted, documented approximation in that narrow case, not a silent
+  // one.
+  function composeChainTransform(startUid, frameIdx) {
+    var startIdx = findLayerIndexByUid(startUid);
+    if (startIdx < 0) return null;
+    var segs = [
+      { point: [0, 0], handleIn: [0, 0], handleOut: [0, 0] },
+      { point: [1, 0], handleIn: [0, 0], handleOut: [0, 0] },
+      { point: [0, 1], handleIn: [0, 0], handleOut: [0, 0] },
+    ];
+    var visited = {}, curIdx = startIdx, guard = 0, any = false;
+    while (curIdx >= 0 && !visited[curIdx] && guard++ < 64) {
+      visited[curIdx] = true;
+      var aLd = state.layers[curIdx];
+      var m = computeMotionMat(aLd, frameIdx);
+      if (m && userLayers[curIdx] && userLayers[curIdx].bounds) {
+        var pivot = { x: userLayers[curIdx].bounds.center.x + m.ax, y: userLayers[curIdx].bounds.center.y + m.ay };
+        segs = transformSegments(segs, pivot, m);
+        any = true;
+      }
+      var nextUid = aLd.parentLayerUid;
+      curIdx = nextUid ? findLayerIndexByUid(nextUid) : -1;
+    }
+    if (!any) return null;
+    var o = segs[0].point, ux = segs[1].point, uy = segs[2].point;
+    var vx = [ux[0] - o[0], ux[1] - o[1]], vy = [uy[0] - o[0], uy[1] - o[1]];
+    return { dx: o[0], dy: o[1], rot: Math.atan2(vx[1], vx[0]) * 180 / Math.PI, sx: Math.hypot(vx[0], vx[1]), sy: Math.hypot(vy[0], vy[1]) };
+  }
+  // The blended 2D contribution for a layer with BOTH parents set — a
+  // drop-in {mat,pivot} (pivot fixed at the origin: composeChainTransform's
+  // dx/dy already IS the absolute resulting position, not a pivot-relative
+  // one, so no separate pivot offset is needed) that every existing
+  // parentChain consumer already knows how to apply, via parentChainMats'
+  // own dispatch below.
+  function blendedAncestorMat(li, frameIdx) {
+    var ld = state.layers[li];
+    if (!ld || !ld.parentLayerUidB || !ld.parentLayerUid) return null;
+    var t = (valueAtFrame(ld, 'parentBlend', frameIdx)[0] || 0) / 100;
+    var A = composeChainTransform(ld.parentLayerUid, frameIdx);
+    var B = composeChainTransform(ld.parentLayerUidB, frameIdx);
+    if (!A && !B) return null;
+    A = A || { dx: 0, dy: 0, rot: 0, sx: 1, sy: 1 };
+    B = B || { dx: 0, dy: 0, rot: 0, sx: 1, sy: 1 };
+    return {
+      dx: A.dx + (B.dx - A.dx) * t, dy: A.dy + (B.dy - A.dy) * t,
+      rot: lerpAngleDeg(A.rot, B.rot, t),
+      sx: A.sx + (B.sx - A.sx) * t, sy: A.sy + (B.sy - A.sy) * t,
+      op: 1, ax: 0, ay: 0,
+    };
+  }
+  // The blended 3D contribution (Cyril: "il faut que ça marche aussi avec
+  // des calques 3D") — deliberately SINGLE-LEVEL: each parent contributes
+  // its OWN positionZ/rotationX/rotationY (only if that parent itself has
+  // threeD on) without recursively composing that parent's own ancestor's
+  // 3D pose — full multi-level 3D chain composition is a much larger
+  // undertaking (real 3D matrix composition, not 2D affines) than this
+  // pass's scope. Consumed only by a 3D CHILD (engine-bridge.js's is3D
+  // branch, via make3DProjector's widened extraDelta) — a 2D child never
+  // reads this, its parents' 3D pose (if any) simply doesn't apply to it,
+  // matching the existing "3D layers project independently" boundary.
+  function blendedParent3D(li, frameIdx) {
+    var ld = state.layers[li];
+    if (!ld || !ld.parentLayerUidB || !ld.parentLayerUid) return null;
+    var t = (valueAtFrame(ld, 'parentBlend', frameIdx)[0] || 0) / 100;
+    var aIdx = findLayerIndexByUid(ld.parentLayerUid), bIdx = findLayerIndexByUid(ld.parentLayerUidB);
+    var aLd = aIdx >= 0 ? state.layers[aIdx] : null, bLd = bIdx >= 0 ? state.layers[bIdx] : null;
+    var aZ = (aLd && aLd.threeD) ? valueAtFrame(aLd, 'positionZ', frameIdx)[0] : 0;
+    var bZ = (bLd && bLd.threeD) ? valueAtFrame(bLd, 'positionZ', frameIdx)[0] : 0;
+    var aRX = (aLd && aLd.threeD) ? valueAtFrame(aLd, 'rotationX', frameIdx)[0] : 0;
+    var bRX = (bLd && bLd.threeD) ? valueAtFrame(bLd, 'rotationX', frameIdx)[0] : 0;
+    var aRY = (aLd && aLd.threeD) ? valueAtFrame(aLd, 'rotationY', frameIdx)[0] : 0;
+    var bRY = (bLd && bLd.threeD) ? valueAtFrame(bLd, 'rotationY', frameIdx)[0] : 0;
+    if (!aZ && !bZ && !aRX && !bRX && !aRY && !bRY) return null;
+    return { dz: aZ + (bZ - aZ) * t, drx: lerpAngleDeg(aRX, bRX, t), dry: lerpAngleDeg(aRY, bRY, t) };
+  }
+  // The ONLY entry point a 3D layer needs for multi-parent support — a 3D
+  // child ignores parentChain entirely (engine-bridge.js forces it to []
+  // for any threeD layer), so blendedAncestorMat's 2D result never reaches
+  // it through the normal path. Combines that 2D part with
+  // blendedParent3D's 3D part into ONE make3DProjector-shaped extraDelta,
+  // so a 3D layer with 2 parents gets both halves of the crossfade in a
+  // single call. Returns null (a plain 3D layer, no parents, or only one
+  // parent — the ordinary already-correct "3D layers don't parent" case)
+  // exactly when make3DProjector should be called with no extraDelta at
+  // all, i.e. today's unchanged behavior.
+  function blendedParentContributionFor3D(li, frameIdx) {
+    var ld = state.layers[li];
+    if (!ld || !ld.parentLayerUidB || !ld.parentLayerUid) return null;
+    var m2d = blendedAncestorMat(li, frameIdx);
+    var m3d = blendedParent3D(li, frameIdx);
+    if (!m2d && !m3d) return null;
+    var out = {};
+    if (m2d) { out.dx = m2d.dx; out.dy = m2d.dy; out.drot = m2d.rot; out.dsxPct = (m2d.sx - 1) * 100; out.dsyPct = (m2d.sy - 1) * 100; }
+    if (m3d) { out.dz = m3d.dz; out.drx = m3d.drx; out.dry = m3d.dry; }
+    return out;
   }
   // Every ANCESTOR's own layer-level Motion transform, immediate parent
   // first — engine-bridge.js/export.js apply the layer's OWN motionMat,
@@ -1393,7 +1563,18 @@
   // project file edited by hand, or a parent later deleted and its uid
   // reused by coincidence — extremely unlikely but a hard guard costs
   // nothing here).
+  // Dispatches to the blended (2-parent) path when parentLayerUidB is set;
+  // every existing single-parent layer takes the untouched legacy path
+  // below, unchanged in every way (2026-07-30).
   function parentChainMats(li, frameIdx) {
+    var ld = state.layers[li];
+    if (ld && ld.parentLayerUidB) {
+      var bm = blendedAncestorMat(li, frameIdx);
+      return bm ? [{ mat: bm, pivot: { x: 0, y: 0 } }] : [];
+    }
+    return legacyParentChainMats(li, frameIdx);
+  }
+  function legacyParentChainMats(li, frameIdx) {
     var mats = [];
     var ld = state.layers[li];
     if (!ld) return mats;
@@ -5031,6 +5212,8 @@
     ensureLayerUid: ensureLayerUid,
     findLayerIndexByUid: findLayerIndexByUid,
     setLayerParent: setLayerParent,
+    setLayerParentB: setLayerParentB,
+    blendedParentContributionFor3D: blendedParentContributionFor3D,
     shiftLayerMotionKeys: shiftLayerMotionKeys,
     exprGlobals: exprGlobals,
     setExprGlobals: function (code) {
