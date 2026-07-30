@@ -39,6 +39,7 @@
 
   // ---- New / Open / Save (native fs, real files on disk) ----
   function newProject(cfg){
+    if(window.SMLabs&&window.SMLabs.resetAll)window.SMLabs.resetAll(); // see labs-core.js's own comment — a Labs prototype must never silently carry into a new project
     if(state.activeSymbolId)exitToScene();
     while(userLayers.length>0)userLayers.pop().remove();state.layers=[];
     Object.keys(_symbolPaperLayers).forEach(function(k){_symbolPaperLayers[k].forEach(function(l){l.remove();});});_symbolPaperLayers={};

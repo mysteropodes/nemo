@@ -1662,6 +1662,13 @@ window.SM={
     showToast('Couleur propagee sur '+count+' frame(s)');
   },
   importJSON:function(json,silent){
+    // See labs-core.js's own comment on resetAll — a Labs prototype flag
+    // must never silently carry into a different project. `silent` here
+    // doesn't distinguish "boot-time nemo-auto resume" from "explicit Open
+    // Project" (both pass true, per the version-check comment a few lines
+    // down), so this runs unconditionally: any load is a fresh start for
+    // these dev-only prototype toggles.
+    if(window.SMLabs&&window.SMLabs.resetAll)window.SMLabs.resetAll();
     // Every stored stroke dict is about to be replaced, so the engine's
     // retained path store (keyed on dict identity) is entirely stale.
     if(window.SMEngineBridge&&SMEngineBridge.clearRetainedPaths)SMEngineBridge.clearRetainedPaths();
