@@ -343,6 +343,26 @@
       // renderOS/renderGhostAll had (dict-based twin of buildSceneJson's
       // live renderCombinesFromChildren).
       if (window.SMGroup && sl.groups) slStrokes = SMGroup.applyCombinesToStrokes(slStrokes, sl);
+      // Duplicator (2026-07-30 fix) — same gap the combine-groups comment
+      // right above already describes for this reader, confirmed live for
+      // a Duplicator specifically: a montage card thumbnail/strip showed
+      // only the seed shape for a component whose inner layer has a
+      // Duplicator, while editing the same component directly showed every
+      // copy. window.applyLayerDuplicator is app.js's own global (this file
+      // loads after it) — same resample/spanStart/spanLen opts
+      // getEffectiveStrokes's symbolId branch (app.js) now passes for the
+      // identical reason: no state.layers index exists for `sl` here.
+      if (sl.duplicator && !sl._dupEditSource && slStrokes.length && window.applyLayerDuplicator) {
+        slStrokes = window.applyLayerDuplicator(sl, slStrokes, idx, null, {
+          spanStart: 0, spanLen: sl.frames.length,
+          resample: function (shiftedIdx) {
+            var rf = sl.frames[shiftedIdx]; if (!rf) return [];
+            if (rf.isKeyframe || rf.isInterpolated) return rf.strokes || [];
+            for (var kk = shiftedIdx - 1; kk >= 0; kk--) { if (sl.frames[kk].isKeyframe) return sl.frames[kk].strokes || []; }
+            return [];
+          }
+        });
+      }
       out = out.concat(slStrokes);
     });
     return out;
