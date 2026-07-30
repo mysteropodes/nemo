@@ -1614,11 +1614,12 @@ function applyRigDeform(ld){
     if(!b._live||!b._live.segments)return;
     var segs=b._live.segments;
     for(var i=0;i<segs.length&&i<b.rest.length;i++){
-      var restPt=b.rest[i],dx=0,dy=0;
+      var restPt=b.rest[i],dx=0,dy=0,sumW=0;
       (b.weights[i]||[]).forEach(function(wentry){
         var bp=bonePaths(wentry.boneId);
         var curLoc=bp.cur.getLocationAt(wentry.offset),restLoc=bp.rest.getLocationAt(wentry.offset);
         if(!curLoc||!restLoc)return;
+        sumW+=wentry.w;
         if(b.rotate){
           // Rotate the vertex's own rest-offset FROM the bone by the bone's
           // LOCAL tangent delta at this exact point (sampled continuously
@@ -1639,7 +1640,22 @@ function applyRigDeform(ld){
           dy+=wentry.w*(curLoc.point.y-restLoc.point.y);
         }
       });
-      segs[i].point=new Point(restPt[0]+dx,restPt[1]+dy);
+      // Normalize by total weight — but ONLY when it exceeds 1 (2026-07-30
+      // fix, "il manque pas mal de chose les tangents", root cause: at a
+      // joint where two bones both reach full influence — dist≈0 for each,
+      // so infl≈1 for each — sumW≈2 and this vertex used to get displaced
+      // ~2x, the ballooning/tearing right at elbows/knees, exactly the
+      // failure the "désactive si une forme se déchire sur une courbure"
+      // tooltip was quietly asking the user to work around instead of
+      // fixing. Clamping the divisor to max(1,sumW) instead of ALWAYS
+      // dividing by sumW is deliberate: a single bone's own linear falloff
+      // (infl=1-dist/radius, weighForPoints) already tapers smoothly to 0
+      // at its radius edge — dividing by a sub-1 sumW there would undo that
+      // taper and turn it into a hard cutoff. Only genuine over-saturation
+      // (sumW>1, multiple bones both pulling at meaningful strength) gets
+      // scaled back down.
+      var norm=sumW>1?sumW:1;
+      segs[i].point=new Point(restPt[0]+dx/norm,restPt[1]+dy/norm);
     }
     // Vector-brush companion sync (2026-07-29, "les points de vecteurs
     // suivent les bones comme dans Shapper") — copy the ribbon's OWN just-
@@ -1671,11 +1687,12 @@ function applyRigDeform(ld){
     if(bLive.data&&bLive.data.isVectorBrush&&bLive.data.centerSegments&&b.centerRest&&b.centerWeights){
       var centerSegs=bLive.data.centerSegments;
       for(var ci=0;ci<centerSegs.length&&ci<b.centerRest.length;ci++){
-        var cRest=b.centerRest[ci],cRestP=cRest.point,cdx=0,cdy=0,cSumW=0,cSumDaW=0;
+        var cRest=b.centerRest[ci],cRestP=cRest.point,cdx=0,cdy=0,cSumW=0,cSumDaW=0,cTotalW=0;
         (b.centerWeights[ci]||[]).forEach(function(wentry){
           var bp=bonePaths(wentry.boneId);
           var curLoc=bp.cur.getLocationAt(wentry.offset),restLoc=bp.rest.getLocationAt(wentry.offset);
           if(!curLoc||!restLoc)return;
+          cTotalW+=wentry.w;
           if(b.rotate){
             var restAng=Math.atan2(restLoc.tangent.y,restLoc.tangent.x);
             var curAng=Math.atan2(curLoc.tangent.y,curLoc.tangent.x);
@@ -1690,7 +1707,14 @@ function applyRigDeform(ld){
             cdy+=wentry.w*(curLoc.point.y-restLoc.point.y);
           }
         });
-        centerSegs[ci].point=[cRestP[0]+cdx,cRestP[1]+cdy];
+        // Same over-saturation clamp as the boundary loop above (2026-07-30
+        // fix) — cTotalW is a SEPARATE accumulator from cSumW on purpose:
+        // cSumW only accumulates in rotate mode (it also drives the handle-
+        // rotation average just below) and would wrongly stay 0 in non-
+        // rotate mode, which is fine for ITS OWN purpose but wrong as a
+        // position-normalization divisor.
+        var cNorm=cTotalW>1?cTotalW:1;
+        centerSegs[ci].point=[cRestP[0]+cdx/cNorm,cRestP[1]+cdy/cNorm];
         // Always rotated FROM the immutable rest handles (cRest.handleIn/
         // Out), never from the current live ones — see rigBindStroke's own
         // comment on why (idempotent across repeated calls, no compounding).
