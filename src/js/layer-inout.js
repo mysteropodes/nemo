@@ -387,6 +387,35 @@
     }
     _drag = { li: li, row: row, type: type, startX: e.clientX, origIn: inPointOf(ld), origOut: outPointOf(ld), alt: !!e.altKey, keySel: keySelNow() };
   }
+  // Parent in Time (2026-07-30 on-timeline connector) — a dragged bar's OWN
+  // position is kept live via updateBar (cheap, see its neighboring comment
+  // below), but a layer TIME-LINKED to whatever's being dragged resolves
+  // its in/out FROM the dragged layer's CURRENT position (resolveLinkedTime,
+  // app.js) — without an equally live update here, its bar visibly froze
+  // until the drag ended and the one full renderTimeline() below finally
+  // ran. Found live: "l'autre calque ne bouge pas en temps réel pendant le
+  // drag du parent." Walks transitively (a chain of links), not just direct
+  // children, same small guard bound resolveLinkedTime itself uses for
+  // cycle-safety — still just a handful of cheap updateBar calls, not a
+  // full rebuild.
+  function updateLinkedChildrenBars(sourceLi) {
+    var srcLd = state.layers[sourceLi];
+    var srcUid = (srcLd && window.SMMotion && window.SMMotion.ensureLayerUid) ? SMMotion.ensureLayerUid(srcLd) : null;
+    if (!srcUid) return;
+    state.layers.forEach(function (l2, li2) {
+      if (!l2.timeLink || !l2.timeLink.uid) return;
+      var cur = l2, guard = 0, found = false;
+      while (cur && cur.timeLink && cur.timeLink.uid && guard++ < 16) {
+        if (cur.timeLink.uid === srcUid) { found = true; break; }
+        var next = null;
+        state.layers.forEach(function (o) { if (o.layerUid === cur.timeLink.uid) next = o; });
+        cur = next;
+      }
+      if (!found) return;
+      var row = _liToRow[li2];
+      if (row) updateBar(row, li2);
+    });
+  }
   document.addEventListener('mousemove', function (e) {
     updateMarquee(e);
     if (!_drag) return;
@@ -409,12 +438,14 @@
           var mld = state.layers[m.li]; if (!mld) return;
           mld.inPoint = Math.max(0, Math.min(m.origIn + dx, m.origOut - 1));
           updateBar(m.row, m.li);
+          updateLinkedChildrenBars(m.li);
         });
       } else if (_drag.type === 'out') {
         _drag.members.forEach(function (m) {
           var mld = state.layers[m.li]; if (!mld) return;
           mld.outPoint = Math.min(total - 1, Math.max(m.origOut + dx, m.origIn + 1));
           updateBar(m.row, m.li);
+          updateLinkedChildrenBars(m.li);
         });
       } else {
         var ok = _drag.members.every(function (m) {
@@ -426,6 +457,7 @@
           var mld = state.layers[m.li]; if (!mld) return;
           mld.inPoint = m.origIn + dx; mld.outPoint = m.origOut + dx;
           updateBar(m.row, m.li);
+          updateLinkedChildrenBars(m.li);
         });
       }
       if (window.loadFrame) loadFrame(state.currentFrame);
@@ -443,6 +475,7 @@
       ld.inPoint = ni; ld.outPoint = ni + w;
     }
     updateBar(_drag.row, _drag.li);
+    updateLinkedChildrenBars(_drag.li);
     // Content visibility for the CURRENT frame must reflect the new range
     // live (dragging the out point below the playhead should hide the
     // layer immediately) — loadFrame() re-derives userLayers[i] from
