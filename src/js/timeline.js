@@ -6269,6 +6269,11 @@ function onKeyDown(event){
   // wins over shapes and frame cells — same "more specific selection wins"
   // rule the shape-vs-frame split below already follows. Gated on there BEING
   // a keyframe selection, so ⌘C is unchanged everywhere else.
+  // Cmd/Ctrl+Shift+C — AE's "Precompose" (→ convert to Component). Checked
+  // BEFORE the plain Cmd+C below, which never excluded shiftKey and would
+  // otherwise silently swallow this combo as a copy (2026-07-31 AE/Animate
+  // shortcut-parity sweep).
+  if((event.metaKey||event.ctrlKey)&&event.shiftKey&&(event.key==='c'||event.key==='C')){if(inField)return;event.preventDefault();window.SM.convertActiveLayerToComponent();return;}
   if((event.metaKey||event.ctrlKey)&&event.key==='c'){if(inField)return;event.preventDefault();
     if(state.appMode==='motion'&&window.SMMotion&&SMMotion.hasKeySelection&&SMMotion.hasKeySelection()){SMMotion.copySelectedKeys();return;}
     if(selectedPaths.length)copySelection();else window.SM.copyFrames();return;}
@@ -6314,9 +6319,19 @@ function onKeyDown(event){
     window.SM.splitLayerAtPlayhead();
     return;
   }
-  if((event.metaKey||event.ctrlKey)&&(event.key==='d'||event.key==='D')&&selectedPaths.length){
+  // Cmd/Ctrl+D — "duplicate", following the same "most specific selection
+  // wins" priority the Delete chain below uses: canvas shapes > selected
+  // frame cells > the active layer (AE/Animate's own Cmd+D meaning).
+  // Previously this only fired with a canvas selection; without one it fell
+  // through to the unrelated bare-'d' duplicateKeyframe branch by accident
+  // (no modifier check there), so duplicateLayer/duplicateSelectedFrames
+  // were keyboard-unreachable (2026-07-31 parity sweep, confirmed w/ Cyril).
+  if((event.metaKey||event.ctrlKey)&&(event.key==='d'||event.key==='D')){
+    if(inField)return;
     event.preventDefault();
-    duplicateSelection();
+    if(selectedPaths.length)duplicateSelection();
+    else if(_sel.frames.length)window.SM.duplicateSelectedFrames();
+    else window.SM.duplicateLayer();
     return;
   }
   // Ctrl/Cmd+G "group selected CANVAS objects" (2026-07, feedback: "mettre
@@ -6351,6 +6366,15 @@ function onKeyDown(event){
   if((event.metaKey||event.ctrlKey)&&(event.key==='g'||event.key==='G')&&!event.shiftKey){
     event.preventDefault();
     groupSelectionIntoFolder();
+    return;
+  }
+  // Cmd/Ctrl+L — AE's "lock selected layers". Applies to the layer-panel
+  // multi-selection when there is one, else the active layer — same
+  // multi-target pattern deleteLayer already uses (2026-07-31 parity sweep).
+  if((event.metaKey||event.ctrlKey)&&(event.key==='l'||event.key==='L')){
+    if(inField)return;
+    event.preventDefault();
+    (_layerSel.length?_layerSel.slice():[state.activeLayerIdx]).forEach(function(idx){window.SM.toggleLayerLock(idx);});
     return;
   }
   // Ctrl/Cmd+Alt +/-/0 canvas zoom — mouse wheel already zoomed the canvas
@@ -6525,6 +6549,11 @@ function onKeyDown(event){
   // silently never got the same pair when it was built, even though it
   // mirrors Pen's drawing interaction everywhere else.
   else if(k==='Enter'&&state.tool==='rig'&&typeof _rigDraw!=='undefined'&&_rigDraw.path){event.preventDefault();if(window.SMRig)SMRig.finalizeRigBone();updateUI();}
+  // Numpad-Enter — AE's own "open selected precomp" key, which AE keeps
+  // DISTINCT from regular Return (event.code tells them apart, event.key is
+  // 'Enter' for both). Regular Enter keeps its play/pen/rig meanings below
+  // untouched. Motion mode + Component layer only (2026-07-31 parity sweep).
+  else if(k==='Enter'&&event.code==='NumpadEnter'&&state.appMode==='motion'&&state.layers[state.activeLayerIdx]&&state.layers[state.activeLayerIdx].symbolId&&window.SMMotion&&SMMotion.enterComponentLayer){event.preventDefault();SMMotion.enterComponentLayer(state.activeLayerIdx);}
   else if(k==='Enter'){event.preventDefault();if(state.tool==='pen'&&_pen.path)finalizePen();else togglePlay();}
   else if(k==='Escape'){
     if(state.tool==='rig'&&typeof _rigDraw!=='undefined'&&_rigDraw.path){
@@ -6659,8 +6688,23 @@ function onKeyDown(event){
     else if(event.shiftKey)removeFrame();
   }
   else if(k==='F5'){event.preventDefault();insertFrame();}
+  // Shift+F6 — Animate's "Clear Keyframe". Must be checked BEFORE plain F6:
+  // that branch never excluded shiftKey, so Shift+F6 accidentally INSERTED
+  // a keyframe instead (2026-07-31 parity sweep). clearKeyframe (app.js)
+  // was previously reachable only via the frame-cell right-click menu.
+  else if(k==='F6'&&event.shiftKey){event.preventDefault();clearKeyframe();}
   else if(k==='F6'){event.preventDefault();insertKeyframe();}
   else if(k==='F7'){event.preventDefault();insertBlankKeyframe();}
+  // F2 — rename the active layer (Windows/Finder convention; AE's own
+  // binding is plain Return, firmly claimed by Play/pen/rig above by
+  // deliberate design). Also the ONLY rename path in Motion mode, whose
+  // row dblclick is claimed by enterComponentLayer (2026-07-31 sweep).
+  else if(k==='F2'){event.preventDefault();if(state.layers[state.activeLayerIdx])startLayerRename(state.activeLayerIdx);}
+  // '/' — AE's "100% zoom / actual size" → resetView (zoom=1 + recenter).
+  // Deliberately NOT shift-gated: on AZERTY, typing '/' requires Shift, so
+  // a Shift+/ distinction (AE's fit-to-window) is unreachable for French
+  // layouts — fit already has Ctrl+Alt+0.
+  else if(k==='/'){event.preventDefault();window.SM.resetView();}
   else if(k==='d'||k==='D'){window.SM.duplicateKeyframe();}
   else if(k==='f'||k==='F'){if(!event.shiftKey)window.SM.flipPreview();}
   else if(k==='+'||k==='='){window.SM.extendExposure(1);}
