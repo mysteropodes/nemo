@@ -706,7 +706,18 @@
   // (scrubbable number fields show their own value directly — no separate label span to sync anymore)
   var rh=document.getElementById('tl-resize'),ta=document.getElementById('timeline-area'),rsy,rsh;
   rh.addEventListener('mousedown',function(e){rsy=e.clientY;rsh=ta.offsetHeight;window._tlResize=true;e.preventDefault();});
-  window.addEventListener('mousemove',function(e){if(!window._tlResize)return;ta.style.height=Math.max(80,Math.min(500,rsh+(rsy-e.clientY)))+'px';});
+  window.addEventListener('mousemove',function(e){
+    if(!window._tlResize)return;
+    // Cap was a flat 500px regardless of window size — feedback: "monter
+    // la timeline presque en haut". #top-area (canvas+panels row) has
+    // flex:1/min-height:0, so it shrinks freely; the only real ceiling is
+    // the window itself. Reserve 150px above the timeline (34px
+    // #app-topbar + a usable sliver of canvas/tools, not the full 500)
+    // so dragging all the way up still leaves the mode-switch/topbar
+    // reachable instead of the timeline eating the whole window.
+    var maxH=Math.max(500,window.innerHeight-150);
+    ta.style.height=Math.max(80,Math.min(maxH,rsh+(rsy-e.clientY)))+'px';
+  });
   window.addEventListener('mouseup',function(){window._tlResize=false;});
 
   // Layers panel horizontal resize — same drag-a-thin-bar pattern as the
