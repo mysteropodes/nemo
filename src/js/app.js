@@ -3441,6 +3441,19 @@ function saveActiveLayerFrame(){
   // (Commit/Reset are deliberate separate actions, not implied by mouseup).
   var ld=state.layers[state.activeLayerIdx];if(ld.symbolId||ld.nativeVideo||ld.montageId||ld.isNullLayer||ld.isEffectLayer||ld.lfsGroup||(ld.duplicator&&!ld._dupEditSource)||ld._rigPoseLive)return;
   if(!layerIsEffectivelyVisible(state.activeLayerIdx))return;
+  // Same class of bug as the eye/solo guard right above, found live
+  // 2026-07-30 (Cyril: "avec plein d'aller retour, scrub, trim de layer
+  // entre motion et animation 2D on perd des data de keyframes"):
+  // getEffectiveStrokes returns [] for a frame outside layerInPoint/
+  // layerOutPoint (a trimmed layer), so loadFrame leaves THIS layer's live
+  // Paper layer empty whenever the playhead sits on one of its own hidden
+  // frames — even though ld.frames[frame].strokes still holds real drawn
+  // content. Without this gate, saving here (goToFrame's unconditional
+  // pre-navigation save, or the 30s autosave interval, timeline.js) reads
+  // that empty live layer and permanently overwrites the stored keyframe
+  // with []. Reproduced: draw at frames 0/5/10, trim outPoint below 10,
+  // navigate away — frame 10's 2 strokes silently became 0.
+  if(layerHasTimeRange(ld)&&(state.currentFrame<layerInPoint(ld)||state.currentFrame>layerOutPoint(ld)))return;
   _writeBackGhostProxies(state.activeLayerIdx);
   var f=ld.frames[state.currentFrame];
   if(!f.isKeyframe&&!f.isInterpolated)return;
@@ -3454,6 +3467,11 @@ function saveAllLayerFrames(){
   // duplicator skip: same reason as saveActiveLayerFrame's guard above.
   for(var i=0;i<state.layers.length;i++){if(state.layers[i].symbolId||state.layers[i].nativeVideo||state.layers[i].montageId||state.layers[i].isNullLayer||state.layers[i].isEffectLayer||state.layers[i].lfsGroup||(state.layers[i].duplicator&&!state.layers[i]._dupEditSource)||state.layers[i]._rigPoseLive)continue;
   if(!layerIsEffectivelyVisible(i))continue;
+  // Trim-range guard — see saveActiveLayerFrame's identical check for the
+  // full explanation. Per-layer here (unlike the single active layer
+  // above) since every OTHER layer can each have its own independent
+  // in/out range while sharing the same global state.currentFrame.
+  if(layerHasTimeRange(state.layers[i])&&(state.currentFrame<layerInPoint(state.layers[i])||state.currentFrame>layerOutPoint(state.layers[i])))continue;
   var f=state.layers[i].frames[state.currentFrame];if(!f||(!f.isKeyframe&&!f.isInterpolated))continue;
   var strokes=_collectLayerStrokes(i,state.layers[i]);
   _maybePromoteInterpolated(f,strokes);
