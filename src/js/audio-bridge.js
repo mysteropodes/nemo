@@ -251,8 +251,28 @@
   }
 
   // ---- playback ----
+  // Component/montage guard (2026-07-30 fix — found live: entering a
+  // Component swaps state.fps to the symbol's own fps and resets
+  // state.currentFrame to 0 (app.js's enterSymbol), same for
+  // enterMontageView's synthetic scene, but state.audioTracks is a single
+  // document-wide array with no per-context swap of its own (by design —
+  // audio genuinely is comp-wide, not per-symbol). tSec below computes
+  // straight off state.fps/state.currentFrame, so playing/scrubbing while
+  // inside silently scheduled against the WRONG timeline: confirmed live,
+  // playback from inside a Component with fps 24→12 rescheduled to a
+  // completely unrelated delay/offset, and scrubAt's own tSec went
+  // negative for every frame inside a component placed later than frame 0,
+  // making its own no-op guard below swallow every scrub with zero
+  // feedback. There's no well-defined "equivalent outer-scene time" while
+  // isolated inside editing a symbol's own internal animation in the first
+  // place (the same symbol can be placed at multiple different points/
+  // speeds elsewhere) — suspending entirely here, rather than computing a
+  // guess, is the same "guard over silent wrong behavior" posture already
+  // used throughout this app's other symbol/montage-context bugs this
+  // session.
+  function _audioContextSuspended() { return !!(state.activeSymbolId || state.activeMontageViewId); }
   function startTrack(track, fromFrame) {
-    if (track.muted || !track._buffer) return;
+    if (track.muted || !track._buffer || _audioContextSuspended()) return;
     var c = ensureCtx();
     if (!c) return;
     var src = c.createBufferSource();
@@ -300,6 +320,7 @@
   // pas des dizaines de sources superposees.
   var _lastScrubT = 0;
   function scrubAt(frame) {
+    if (_audioContextSuspended()) return; // see startTrack's doc comment above
     var now = performance.now();
     if (now - _lastScrubT < 40) return;
     _lastScrubT = now;
