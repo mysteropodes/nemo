@@ -834,8 +834,24 @@
           } else {
             nvRects = [{ rect: nvRectBase, opacityFactor: 1 }];
           }
-          var nvMat = window.SMMotion ? SMMotion.layerMotionAt(i, renderFrame) : null;
-          var nvChain = SMMotion.parentChainMats(i, renderFrame);
+          // 3D layer (2026-07-30, Cyril: "la 3D sur les footage... marche
+          // pas" — confirmed and fixed, see motion.js's project3DImageRect
+          // doc comment). NOT reusing the shared layer-wide `project3D`
+          // here (unlike the raster branch above, which does) — that one's
+          // pivot comes from userLayers[i].bounds, the layer's real Paper
+          // CHILDREN bounds, which for a nativeVideo layer are ALWAYS
+          // degenerate: a native video has no backing Paper item at all
+          // (getEffectiveStrokes short-circuits to [] for it, app.js), so
+          // the shared projector's pivot silently collapses to the anchor
+          // point alone instead of the video's own visual center — found
+          // live: a pure rotationY produced a WIDER, oddly cropped rect
+          // instead of a foreshortened one. Built fresh here with the
+          // video's own rect as its bounds instead, same "own visual
+          // center is the default pivot" contract every other Motion
+          // transform in this app already follows.
+          var nvMat = (!is3D && window.SMMotion) ? SMMotion.layerMotionAt(i, renderFrame) : null;
+          var nvChain = is3D ? [] : SMMotion.parentChainMats(i, renderFrame);
+          var nvProject3D = (is3D && window.SMMotion) ? SMMotion.make3DProjector(state.layers[i], nvRectBase, renderFrame, state.canvasW, state.canvasH, parent3D) : null;
           _touchImage('nv:' + i); // one shared texture for every clone — touch once, not per clone
           for (var nvri = 0; nvri < nvRects.length; nvri++) {
             var nvRect = nvRects[nvri].rect, nvOp = nvRects[nvri].opacityFactor;
@@ -845,6 +861,7 @@
               nvOp *= nvMat.op;
             }
             for (var nvpc = 0; nvpc < nvChain.length; nvpc++) { nvRect = SMMotion.transformImageRect(nvRect, nvChain[nvpc].pivot, nvChain[nvpc].mat); nvOp *= nvChain[nvpc].mat.op; }
+            if (nvProject3D) nvRect = SMMotion.project3DImageRect(nvRect, nvProject3D);
             items.push({ image: { imageId: 'nv:' + i, x: nvRect.x, y: nvRect.y, width: nvRect.width, height: nvRect.height, opacity: nvOp, rotation: nvRect.rotation || 0 } });
           }
         }
@@ -986,6 +1003,39 @@
           if (elMat) { rb = SMMotion.transformImageRect(rb, elPivot, elMat); imgOp *= elMat.op; }
           if (motionMat) { rb = SMMotion.transformImageRect(rb, motionPivot, motionMat); imgOp *= motionMat.op; }
           for (var pc = 0; pc < parentChain.length; pc++) { rb = SMMotion.transformImageRect(rb, parentChain[pc].pivot, parentChain[pc].mat); imgOp *= parentChain[pc].mat.op; }
+          // 3D layer (2026-07-30, Cyril: "la 3D sur les footage... marche
+          // pas" — confirmed, see motion.js's project3DImageRect doc
+          // comment for the full reasoning/approximation tradeoff).
+          // motionMat/parentChain are already forced null/[] above when
+          // is3D (elMat is untouched, same as the vector path below), so
+          // this REPLACES what their contribution would have been rather
+          // than stacking on top of it. Per-clone override mirrors the
+          // vector path's own dup3D handling a few hundred lines down
+          // (same cache, same merge-with-parent3D logic) — a duplicated
+          // raster (imported image used as a Duplicator seed) gets its
+          // own clone's positionZ/rotationX/rotationY delta instead of
+          // sharing the layer-wide projector.
+          if (project3D) {
+            var rbProjector = project3D;
+            if (c.data && c.data.dup3D && dup3DProjectorCache) {
+              var rbDk3 = c.data.dupIndex;
+              if (!dup3DProjectorCache[rbDk3]) {
+                var rbCloneDelta = c.data.dup3D;
+                if (parent3D) {
+                  rbCloneDelta = {
+                    dx: (parent3D.dx || 0), dy: (parent3D.dy || 0), drot: (parent3D.drot || 0),
+                    dsxPct: (parent3D.dsxPct || 0), dsyPct: (parent3D.dsyPct || 0),
+                    dz: (rbCloneDelta.dz || 0) + (parent3D.dz || 0),
+                    drx: (rbCloneDelta.drx || 0) + (parent3D.drx || 0),
+                    dry: (rbCloneDelta.dry || 0) + (parent3D.dry || 0),
+                  };
+                }
+                dup3DProjectorCache[rbDk3] = SMMotion.make3DProjector(state.layers[i], q3dBounds, renderFrame, state.canvasW, state.canvasH, rbCloneDelta);
+              }
+              rbProjector = dup3DProjectorCache[rbDk3];
+            }
+            rb = SMMotion.project3DImageRect(rb, rbProjector);
+          }
           items.push({
             image: { imageId: imageId, x: rb.x, y: rb.y, width: rb.width, height: rb.height, opacity: imgOp, rotation: rb.rotation || 0 },
           });
