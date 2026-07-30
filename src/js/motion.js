@@ -1401,6 +1401,15 @@
   function setLayerParent(li, parentUid) {
     var ld = state.layers[li];
     if (!ld) return;
+    // Mirrors setLayerParentB's own guard below — the context menu already
+    // disables "Parent A : X (déjà Parent B)", but the pickwhip drag (still
+    // Parent-A-only) calls straight through to this function and bypassed
+    // it, reachable live: drag the pickwhip onto the existing Parent B and
+    // land on a meaningless "blend a layer with itself" state.
+    if (parentUid && parentUid === ld.parentLayerUidB) {
+      if (window.showToast) showToast('Parent A doit être différent du Parent B');
+      return;
+    }
     if (parentUid && wouldCreateParentCycle(ensureLayerUid(ld), parentUid)) {
       if (window.showToast) showToast('Parentage refusé : créerait une boucle');
       return;
@@ -2927,26 +2936,96 @@
     var row = document.createElement('div'); row.className = 'lrow motion-prop-row';
     var label = document.createElement('span'); label.textContent = 'Parent'; label.style.minWidth = '70px';
     row.appendChild(label);
-    var sel = document.createElement('select'); sel.className = 'motion-parent-select'; sel.style.flex = '1';
-    var noneOpt = document.createElement('option'); noneOpt.value = ''; noneOpt.textContent = 'Aucun (parentage libre)';
-    sel.appendChild(noneOpt);
-    state.layers.forEach(function (other, oi) {
-      if (oi === li) return; // can't parent a layer to itself
-      var opt = document.createElement('option');
-      opt.value = ensureLayerUid(other);
-      opt.textContent = other.name || ('Layer ' + (oi + 1));
-      if (ld.parentLayerUid && ld.parentLayerUid === opt.value) opt.selected = true;
-      sel.appendChild(opt);
+
+    // Same pill as the layer-list cell ("même ui que dans le calque",
+    // buildParentCell/timeline.js) — shares its .lparent look and the exact
+    // same context menu (buildParentMenuItems, timeline.js) so Parent A/B
+    // can't drift between the two surfaces. Unconstrained width here (no
+    // .lparent max-width): this row isn't as cramped as the layer list.
+    var pIdx = _layerIndexByUid(ld.parentLayerUid);
+    var pName = (pIdx >= 0 && state.layers[pIdx]) ? (state.layers[pIdx].name || ('Layer ' + (pIdx + 1))) : null;
+    var pbIdx = _layerIndexByUid(ld.parentLayerUidB);
+    var pbName = (pbIdx >= 0 && state.layers[pbIdx]) ? (state.layers[pbIdx].name || ('Layer ' + (pbIdx + 1))) : null;
+
+    var pill = document.createElement('div');
+    pill.className = 'lparent motion-parent-pill' + (pName ? '' : ' none') + (pbName ? ' blendable' : '');
+    pill.title = pbName ? ('Parent A : ' + pName + '  +  Parent B : ' + pbName + '  —  glisser pour fondre, cliquer pour changer')
+      : (pName ? ('Parent : ' + pName + ' — cliquer pour changer') : 'Aucun parent — cliquer pour en choisir un');
+
+    // "Une barre bleu dedans pour fade le parent" — only meaningful once a
+    // second parent exists (blendedAncestorMat itself no-ops without one).
+    // Reads/writes the SAME parentBlend value as the generic keyframable
+    // row further down this panel (propsFor includes it once parentLayerUidB
+    // is set) — this bar is a fast spatial way to scrub the CURRENT frame's
+    // value, not a replacement for keyframing it on the track.
+    var fill = null;
+    if (pbName) { fill = document.createElement('span'); fill.className = 'mp-fill'; pill.appendChild(fill); }
+
+    var pick = document.createElement('span');
+    pick.className = 'lpick';
+    pick.title = 'Glisser sur un calque pour le définir comme parent (A)';
+    pick.addEventListener('mousedown', function (e) { startParentPickwhip(li, pick, e); });
+    pill.appendChild(pick);
+
+    var lbl = document.createElement('span'); lbl.className = 'mp-label';
+    lbl.textContent = pbName ? (pName || '—') + ' + ' + pbName : (pName || '—');
+    pill.appendChild(lbl);
+
+    function currentBlend() {
+      var v = valueAtFrame(ld, 'parentBlend', state.currentFrame);
+      return (v && typeof v[0] === 'number') ? v[0] : 0;
+    }
+    if (fill) fill.style.width = Math.max(0, Math.min(100, currentBlend())) + '%';
+
+    // Click vs. drag disambiguated by movement threshold — same idiom as
+    // .scrub numeric fields (ui.js): a plain click still opens the parent
+    // menu below; only real horizontal movement writes to parentBlend.
+    // Render is rAF-coalesced (§5's own rationale — a stylet fires far
+    // faster than 60Hz, only the last position per frame matters).
+    var moved = false, startX = 0, startVal = 0, pid = null, liveRaf = 0;
+    function scheduleLiveRender() {
+      if (liveRaf) return;
+      liveRaf = requestAnimationFrame(function () { liveRaf = 0; if (window.SMEngineBridge) SMEngineBridge.renderNow(); });
+    }
+    pill.addEventListener('pointerdown', function (e) {
+      if (!pbName) return; // nothing to blend without a second parent
+      if (e.target.closest && e.target.closest('.lpick')) return; // pickwhip owns this gesture
+      moved = false; startX = e.clientX; startVal = currentBlend(); pid = e.pointerId;
+      pill.setPointerCapture(pid);
+      e.preventDefault();
     });
-    if (!ld.parentLayerUid) noneOpt.selected = true;
-    sel.addEventListener('mousedown', function (e) { e.stopPropagation(); });
-    sel.addEventListener('click', function (e) { e.stopPropagation(); });
-    sel.addEventListener('change', function (e) {
-      e.stopPropagation(); pushUndo();
-      setLayerParent(li, sel.value || null);
-      renderLayerList(); renderTimeline();
+    pill.addEventListener('pointermove', function (e) {
+      if (pid === null || e.pointerId !== pid) return;
+      var dx = e.clientX - startX;
+      if (!moved) {
+        if (Math.abs(dx) < 3) return;
+        moved = true; pushUndo(); window._scrubLiveActive = true;
+      }
+      var rect = pill.getBoundingClientRect();
+      var raw = Math.max(0, Math.min(100, startVal + (dx / Math.max(1, rect.width)) * 100));
+      fill.style.width = raw + '%';
+      setValue(ld, 'parentBlend', [raw]);
+      scheduleLiveRender();
     });
-    row.appendChild(sel);
+    function endDrag(e) {
+      if (pid === null || (e && e.pointerId !== undefined && e.pointerId !== pid)) return;
+      pid = null;
+      if (moved) { window._scrubLiveActive = false; renderLayerList(); renderTimeline(); }
+    }
+    pill.addEventListener('pointerup', endDrag);
+    pill.addEventListener('pointercancel', endDrag);
+
+    pill.addEventListener('mousedown', function (e) { e.stopPropagation(); });
+    pill.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (moved) { moved = false; return; } // a drag just ended here — don't also open the menu
+      if (!window.showContextMenu || !window.buildParentMenuItems) return;
+      var items = window.buildParentMenuItems(li, ld, function () { renderLayerList(); renderTimeline(); });
+      var r = pill.getBoundingClientRect();
+      window.showContextMenu(r.left, r.bottom + 2, items);
+    });
+
+    row.appendChild(pill);
     body.appendChild(row);
   }
   // ---- PARENT IN TIME (Van Dijk 2.1) ---------------------------------

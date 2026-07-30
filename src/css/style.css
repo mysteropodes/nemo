@@ -1775,6 +1775,21 @@ body.mode-motion .layer-inout-bar .layer-inout-handle::after{content:'';position
 .lpick-line{position:fixed;z-index:9999;pointer-events:none;height:0;border-top:1.5px dashed var(--accent,#5b6cff);
   transform-origin:0 0;}
 
+/* Motion panel's own Parent row (motion.js renderParentRow) — starts from
+   the exact same .lparent pill as the layer-list cell ("même ui que dans
+   le calque") but unconstrained in width, since the Motion panel row has
+   room the layer list doesn't. Once Parent B is set the pill doubles as
+   the crossfade fader ("une barre bleu dedans pour fade le parent"): .mp-fill
+   is an inner width=blend% bar, click-vs-drag disambiguated by movement
+   threshold exactly like the .scrub numeric fields (ui.js) — a plain click
+   still opens the same parent menu as the layer-list cell. */
+.motion-parent-pill{flex:1;max-width:none;position:relative;overflow:hidden;}
+.motion-parent-pill.blendable{cursor:ew-resize;}
+.motion-parent-pill .mp-fill{position:absolute;left:0;top:0;bottom:0;width:0;
+  background:linear-gradient(90deg,rgba(63,107,245,.5),rgba(63,107,245,.3));
+  border-right:1.5px solid var(--accent);pointer-events:none;}
+.motion-parent-pill .mp-label{position:relative;z-index:1;}
+
 /* Effects count on the collapsed section header (effects-panel.js) — the
    header is all that's on screen while the section is collapsed, so it has to
    carry the "this layer has effects" signal by itself. */

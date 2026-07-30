@@ -3934,6 +3934,58 @@ function startParentPickwhip(li,fromEl,ev){
   document.addEventListener('keydown',onKey,true);
   paint(ev.clientX,ev.clientY);
 }
+// Shared by buildParentCell (layer-list row) AND motion.js's renderParentRow
+// (Layer Properties panel) — ONE implementation of "what does the Parent A /
+// Parent B picker menu contain," so the two surfaces can never drift apart
+// (CLAUDE.md §3). `onChanged()` fires after every write, before the caller's
+// own re-render — each surface refreshes only what it actually shows.
+function buildParentMenuItems(li,ld,onChanged){
+  var M=window.SMMotion;
+  if(!M||!M.setLayerParent)return [{label:'Parentage indisponible',disabled:true}];
+  var bad=parentDescendants(li);
+  var items=[{label:'Parent A : Aucun (parentage libre)',disabled:!ld.parentLayerUid,action:function(){
+    pushUndo(); M.setLayerParent(li,null); onChanged();
+    if(window.SMEngineBridge)SMEngineBridge.renderNow();
+  }}];
+  state.layers.forEach(function(other,oi){
+    if(oi===li)return; // a layer can't parent itself
+    var uid=M.ensureLayerUid(other);
+    items.push({
+      label:'Parent A : '+(other.name||('Layer '+(oi+1)))+(bad[oi]?'  (descendant)':'')+(ld.parentLayerUidB===uid?'  (déjà Parent B)':''),
+      disabled:!!bad[oi]||ld.parentLayerUid===uid||ld.parentLayerUidB===uid,
+      action:function(){
+        pushUndo(); M.setLayerParent(li,uid); onChanged();
+        if(window.SMEngineBridge)SMEngineBridge.renderNow();
+      }
+    });
+  });
+  // Parent B section — only reachable once Parent A exists (crossfading
+  // needs two endpoints; a lone Parent B with no A would just silently
+  // do nothing, per blendedAncestorMat's own guard, motion.js).
+  items.push({sep:true});
+  if(!ld.parentLayerUid){
+    items.push({label:'Parent B (choisir d’abord un Parent A)',disabled:true});
+  }else{
+    items.push({label:'Parent B : Aucun',disabled:!ld.parentLayerUidB,action:function(){
+      pushUndo(); M.setLayerParentB(li,null); onChanged();
+      if(window.SMEngineBridge)SMEngineBridge.renderNow();
+    }});
+    state.layers.forEach(function(other,oi){
+      if(oi===li)return;
+      var uid=M.ensureLayerUid(other);
+      items.push({
+        label:'Parent B : '+(other.name||('Layer '+(oi+1)))+(bad[oi]?'  (descendant)':'')+(ld.parentLayerUid===uid?'  (déjà Parent A)':''),
+        disabled:!!bad[oi]||ld.parentLayerUid===uid||ld.parentLayerUidB===uid,
+        action:function(){
+          pushUndo(); M.setLayerParentB(li,uid); onChanged();
+          if(window.SMEngineBridge)SMEngineBridge.renderNow();
+        }
+      });
+    });
+  }
+  return items;
+}
+window.buildParentMenuItems=buildParentMenuItems;
 function buildParentCell(row,ld,li){
   var cell=document.createElement('div');
   cell.className='lparent';
@@ -3961,49 +4013,7 @@ function buildParentCell(row,ld,li){
     :(pName?('Parent : '+pName+' — cliquer pour changer'):'Aucun parent — cliquer pour en choisir un');
   function open(e){
     e.stopPropagation(); e.preventDefault();
-    var M=window.SMMotion;
-    if(!M||!M.setLayerParent){showToast('Parentage indisponible');return;}
-    var bad=parentDescendants(li);
-    var items=[{label:'Parent A : Aucun (parentage libre)',disabled:!ld.parentLayerUid,action:function(){
-      pushUndo(); M.setLayerParent(li,null); renderLayerList(); renderTimeline();
-      if(window.SMEngineBridge)SMEngineBridge.renderNow();
-    }}];
-    state.layers.forEach(function(other,oi){
-      if(oi===li)return; // a layer can't parent itself
-      var uid=M.ensureLayerUid(other);
-      items.push({
-        label:'Parent A : '+(other.name||('Layer '+(oi+1)))+(bad[oi]?'  (descendant)':'')+(ld.parentLayerUidB===uid?'  (déjà Parent B)':''),
-        disabled:!!bad[oi]||ld.parentLayerUid===uid||ld.parentLayerUidB===uid,
-        action:function(){
-          pushUndo(); M.setLayerParent(li,uid); renderLayerList(); renderTimeline();
-          if(window.SMEngineBridge)SMEngineBridge.renderNow();
-        }
-      });
-    });
-    // Parent B section — only reachable once Parent A exists (crossfading
-    // needs two endpoints; a lone Parent B with no A would just silently
-    // do nothing, per blendedAncestorMat's own guard, motion.js).
-    items.push({sep:true});
-    if(!ld.parentLayerUid){
-      items.push({label:'Parent B (choisir d’abord un Parent A)',disabled:true});
-    }else{
-      items.push({label:'Parent B : Aucun',disabled:!ld.parentLayerUidB,action:function(){
-        pushUndo(); M.setLayerParentB(li,null); renderLayerList(); renderTimeline();
-        if(window.SMEngineBridge)SMEngineBridge.renderNow();
-      }});
-      state.layers.forEach(function(other,oi){
-        if(oi===li)return;
-        var uid=M.ensureLayerUid(other);
-        items.push({
-          label:'Parent B : '+(other.name||('Layer '+(oi+1)))+(bad[oi]?'  (descendant)':'')+(ld.parentLayerUid===uid?'  (déjà Parent A)':''),
-          disabled:!!bad[oi]||ld.parentLayerUid===uid||ld.parentLayerUidB===uid,
-          action:function(){
-            pushUndo(); M.setLayerParentB(li,uid); renderLayerList(); renderTimeline();
-            if(window.SMEngineBridge)SMEngineBridge.renderNow();
-          }
-        });
-      });
-    }
+    var items=buildParentMenuItems(li,ld,function(){renderLayerList();renderTimeline();});
     var r=cell.getBoundingClientRect();
     showContextMenu(r.left,r.bottom+2,items);
   }
