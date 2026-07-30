@@ -49,6 +49,26 @@
     SMMotion.setLayerValue(li, prop, [effectiveValue - base]);
     return true;
   }
+  // Live keyframe-diamond preview during a drag (2026-07-30, Cyril: "les clé
+  // ne bouge pas en temp réel avec calque ou in/outpoint") — mirrors (a
+  // deliberately simplified, "good enough for a preview" copy of) the
+  // retime decision the mouseup handler makes for real a few hundred lines
+  // down, but only calls into motion.js's transform-only preview, never the
+  // actual data commit. `type==='out'` never retimes the layer-wide default
+  // (mirrors mouseup's own toast: "Rogner la fin ne déplace jamais les
+  // keyframes"), so Alt on an out-drag must NOT invert it — same guard
+  // shape as mouseup's `d.type !== 'out'` inside the ternary condition.
+  function livePreviewLayerKeys(li, type, ld, origIn, altKey) {
+    if (!window.SMMotion || !SMMotion.previewKeyframeShift) return;
+    var defaultRetimes = type !== 'out' && (type === 'both' || !!state.activeSymbolId);
+    var retimes = (altKey && type !== 'out') ? !defaultRetimes : defaultRetimes;
+    if (!retimes) return;
+    SMMotion.previewKeyframeShift(li, inPointOf(ld) - origIn, 'layer');
+  }
+  function livePreviewSelectedKeys(dxFrames) {
+    if (!window.SMMotion || !SMMotion.previewKeyframeShift) return;
+    SMMotion.previewKeyframeShift(null, dxFrames, 'selected');
+  }
   // A manually-dragged range OR an auto-detected blank-keyframe trim both
   // count as "not full range" for styling — a naturally-shortened bar
   // (layer stops drawing partway through) should read as visually distinct
@@ -390,6 +410,7 @@
     e.stopPropagation(); e.preventDefault();
     var ld = state.layers[li]; if (!ld) return;
     if (e.shiftKey || e.metaKey || e.ctrlKey) { toggleBarSel(li); return; } // select-only, no drag
+    if (window.SMMotion && SMMotion.clearKeyframeShiftPreview) SMMotion.clearKeyframeShiftPreview(); // never inherit a prior drag's leftover offset
     if (window.pushUndo) pushUndo(); // one undo step for the whole drag, not one per mousemove
     // Flush any live canvas content into ld.frames BEFORE this drag starts
     // touching ld.inPoint/outPoint — mousemove below updates those live,
@@ -501,6 +522,26 @@
           updateLinkedChildrenBars(m.li);
         });
       }
+      // Live keyframe preview — one shared selDx read off the first member
+      // that actually moved (matches mouseup's own reconciliation a few
+      // hundred lines down: a group drag shares ONE keySel, not one per
+      // member), otherwise each member previews its own layer-wide shift.
+      if (_drag.keySel && _drag.keySel.length) {
+        if (!e.altKey) {
+          var selDxLive = 0;
+          _drag.members.some(function (m) {
+            var mld = state.layers[m.li]; if (!mld) return false;
+            selDxLive = (_drag.type === 'out' ? outPointOf(mld) - m.origOut : inPointOf(mld) - m.origIn);
+            return !!selDxLive;
+          });
+          livePreviewSelectedKeys(selDxLive);
+        }
+      } else {
+        _drag.members.forEach(function (m) {
+          var mld = state.layers[m.li]; if (!mld) return;
+          livePreviewLayerKeys(m.li, _drag.type, mld, m.origIn, e.altKey);
+        });
+      }
       if (window.loadFrame) loadFrame(state.currentFrame);
       if (window.SMEngineBridge) SMEngineBridge.renderNow();
       return;
@@ -524,6 +565,14 @@
     }
     updateBar(_drag.row, _drag.li);
     updateLinkedChildrenBars(_drag.li);
+    if (_drag.keySel && _drag.keySel.length) {
+      if (!e.altKey) {
+        var selDxLive2 = _drag.type === 'out' ? (outPointOf(ld) - _drag.origOut) : (inPointOf(ld) - _drag.origIn);
+        livePreviewSelectedKeys(selDxLive2);
+      }
+    } else {
+      livePreviewLayerKeys(_drag.li, _drag.type, ld, _drag.origIn, e.altKey);
+    }
     // Content visibility for the CURRENT frame must reflect the new range
     // live (dragging the out point below the playhead should hide the
     // layer immediately) — loadFrame() re-derives userLayers[i] from
@@ -546,6 +595,14 @@
     endMarquee();
     if (!_drag) return;
     var d = _drag; _drag = null;
+    // The live preview is a transform on whatever was rendered at drag
+    // start — every branch below either commits data + calls
+    // renderLayerList/renderTimeline (which rebuilds these nodes from
+    // scratch, transform and all) or does nothing further; clearing here
+    // unconditionally means a branch that DOESN'T re-render (e.g. the
+    // click-to-select return just below) can never leave a stale offset
+    // behind either.
+    if (window.SMMotion && SMMotion.clearKeyframeShiftPreview) SMMotion.clearKeyframeShiftPreview();
     // A press on a bar that never turned into a retime drag is a plain CLICK,
     // and the bar covers most of the grid half of a layer's row — so without
     // this that whole strip was unselectable (2026-07-27: "impossible de
