@@ -493,9 +493,17 @@
       // Stopwatch first, like the Motion panel puts it — same position, same
       // glyph, so it reads as the same gesture in both places.
       var keyed = paramKeyed(eff, p.key);
+      // UI/UX audit (2026-07-30): was a Unicode ◈/◇ glyph with only 2
+      // states (keyed or not) — every other stopwatch in the app (motion.js
+      // renderTransformProps) is this same SVG diamond with 3 states:
+      // hollow+dim (not animated), hollow+accent outline (animated, no key
+      // exactly at this frame), solid+accent (animated, key right here).
+      // keyAtFrame already existed for the keyframe navigator below —
+      // reused rather than re-deriving hasKeyHere a second way.
+      var hasKeyHere = keyed && !!keyAtFrame(eff, p.key, state.currentFrame);
       var sw = document.createElement('div');
       sw.className = 'lico fx-stopwatch' + (keyed ? ' on' : '');
-      sw.innerHTML = '<span style="font-size:11px;line-height:1">' + (keyed ? '◈' : '◇') + '</span>';
+      sw.innerHTML = '<svg viewBox="0 0 24 24" width="12" height="12"><path d="M12 3l9 9-9 9-9-9z" fill="' + (hasKeyHere ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2"/></svg>';
       sw.title = keyed ? 'Animé — cliquer pour figer la valeur actuelle'
                        : 'Animer ce paramètre (pose une clé à la frame courante)';
       sw.addEventListener('click', function (e) { e.stopPropagation(); toggleParamKeying(idx, p.key); });
