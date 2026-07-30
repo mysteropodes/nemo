@@ -91,6 +91,43 @@ var _rigDraw = { path: null, boneId: null, ld: null, draggingHandle: false, last
     });
     return best;
   }
+  // Anchor OR tangent-handle hit-test for Déplacer mode (2026-07-30 fix,
+  // "il manque pas mal de chose les tangents"): the handles ARE drawn for
+  // every finished bone (engine-bridge.js's pushHandles, unconditional, one
+  // small square per non-zero handleIn/handleOut) but hitBoneAnchor above
+  // never tested them and onMove only ever wrote .point — a real, visible
+  // false affordance: squares that look grabbable and aren't. Returns the
+  // single CLOSEST target across anchors and handles of every bone (not
+  // "anchor always wins ties") so a tight curve's handle, when it sits
+  // closer to the cursor than the anchor itself, is the one that grabs.
+  // `kind` is 'anchor'|'handleIn'|'handleOut' — onDown/onMove below use it
+  // to know which field of segments[vi] to write.
+  function hitBoneAnchorOrHandle(pt) {
+    var ld = state.layers[state.activeLayerIdx];
+    if (!ld || !ld.rig) return null;
+    var tol = 9 / view.zoom;
+    var bones = ld.rig.bones, bestD = tol, best = null;
+    Object.keys(bones).forEach(function (bid) {
+      var segs = bones[bid].segments;
+      for (var i = 0; i < segs.length; i++) {
+        var s = segs[i];
+        var d = pt.getDistance(new Point(s.point[0], s.point[1]));
+        if (d < bestD) { bestD = d; best = { boneId: bid, vi: i, kind: 'anchor' }; }
+        ['handleIn', 'handleOut'].forEach(function (which) {
+          var h = s[which];
+          // A near-zero handle (straight segment, the common case for a
+          // fresh bone) has no meaningful on-screen target — skip it rather
+          // than let it silently steal anchor-hit priority right at the
+          // anchor's own position.
+          if (!h || (Math.abs(h[0]) < 0.5 && Math.abs(h[1]) < 0.5)) return;
+          var hp = new Point(s.point[0] + h[0], s.point[1] + h[1]);
+          var dh = pt.getDistance(hp);
+          if (dh < bestD) { bestD = dh; best = { boneId: bid, vi: i, kind: which }; }
+        });
+      }
+    });
+    return best;
+  }
 
   // A bone's influence-circle CENTER (Assigner mode) — the geometric center
   // of its own bounding box, a stable, easy-to-reason-about point that
@@ -146,11 +183,19 @@ var _rigDraw = { path: null, boneId: null, ld: null, draggingHandle: false, last
       return;
     }
 
-    // ---- Déplacer: pose-drag an EXISTING bone anchor only. No drawing, no
-    // binding — a click that misses every anchor here does nothing, on
-    // purpose (mirrors Assigner's own "one gesture, one meaning" rule).
+    // ---- Déplacer: pose-drag an EXISTING bone anchor OR tangent handle. No
+    // drawing, no binding — a click that misses every target here does
+    // nothing, on purpose (mirrors Assigner's own "one gesture, one
+    // meaning" rule). Handle dragging (2026-07-30) reuses this exact same
+    // pose machinery (_posing, applyRigDeform on every move) rather than a
+    // separate mode: a handle edit IS a pose, in the same sense an anchor
+    // move is — applyRigDeform already drives rotation-aware skinning off
+    // the LIVE tangent vs the REST tangent (getLocationAt on bp.cur vs
+    // bp.rest), and a bone's tangent at any point depends on its handles
+    // just as much as its anchor positions, so reshaping a curve responds
+    // through the identical mechanism with zero new code in applyRigDeform.
     if (mode === 'move') {
-      var anchorHit = hitBoneAnchor(pt);
+      var anchorHit = hitBoneAnchorOrHandle(pt);
       if (anchorHit) {
         // Undo checkpoint (2026-07-29 fix, QA-confirmed: undo after a pose-
         // drag + Commit left the bone's OWN segments still posed while the
@@ -166,7 +211,7 @@ var _rigDraw = { path: null, boneId: null, ld: null, draggingHandle: false, last
         // snapshot. _rigPoseUndoPushed (below) tells rigCommitFrame this
         // checkpoint already exists so it doesn't ALSO push its own bad one.
         pushUndo();
-        _posing = { ld: ld, boneId: anchorHit.boneId, vi: anchorHit.vi };
+        _posing = { ld: ld, boneId: anchorHit.boneId, vi: anchorHit.vi, kind: anchorHit.kind };
         // Marks the pose as live-but-uncommitted for saveActiveLayerFrame/
         // saveAllLayerFrames (app.js) — cleared only by rigCommitFrame/
         // rigResetPose, deliberately NOT on pointerup here, since a pose can
@@ -261,7 +306,22 @@ var _rigDraw = { path: null, boneId: null, ld: null, draggingHandle: false, last
     }
     if (_posing) {
       var poseBone = _posing.ld.rig.bones[_posing.boneId];
-      poseBone.segments[_posing.vi].point = [localPt.x, localPt.y];
+      var poseSeg = poseBone.segments[_posing.vi];
+      if (_posing.kind === 'handleIn' || _posing.kind === 'handleOut') {
+        // Handles are stored as vectors RELATIVE to the anchor (see
+        // pushHandles, engine-bridge.js), not absolute points.
+        var hVec = localPt.subtract(new Point(poseSeg.point[0], poseSeg.point[1]));
+        poseSeg[_posing.kind] = [hVec.x, hVec.y];
+        // Symmetric tangent by default (same Alt-to-break convention as
+        // Tracer's own handle-drag a few lines up, and as Pen's — already
+        // documented in the Rig status-bar help before this fix existed to
+        // make it true): dragging one handle mirrors the OTHER to keep the
+        // curve smooth through this anchor, unless Alt asks for a corner.
+        var other = _posing.kind === 'handleOut' ? 'handleIn' : 'handleOut';
+        if (!e.altKey) poseSeg[other] = [-hVec.x, -hVec.y];
+      } else {
+        poseSeg.point = [localPt.x, localPt.y];
+      }
       applyRigDeform(_posing.ld);
       window.SMEngineBridge.renderNow();
       return;
@@ -360,6 +420,7 @@ var _rigDraw = { path: null, boneId: null, ld: null, draggingHandle: false, last
   window.SMRig = {
     finalizeRigBone: finalizeRigBone,
     hitBoneAnchor: hitBoneAnchor,
+    hitBoneAnchorOrHandle: hitBoneAnchorOrHandle,
     boneCircleCenter: boneCircleCenter,
     boneRadiusOf: boneRadiusOf,
   };
