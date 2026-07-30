@@ -24,6 +24,19 @@
       var ld = state.layers[li];
       if (!ld || ld.symbolId) return; // component layers store no strokes of their own
       var sd = serP(path);
+      // A vector-brush stroke drawn with Fill enabled is really TWO Paper.js
+      // Paths — this ribbon (the tapered ink outline) plus a separate
+      // linked-fill companion holding the actual visible fill (isVectorBrush/
+      // linkedFill, see draw-bridge.js's commitStroke) — path.data.linkedFill
+      // is a live reference to it. onStroke only ever received `path` (the
+      // ribbon), so the stamped copies on every other selected frame carried
+      // the outline but silently lost the enclosed fill entirely (found by
+      // QA sweep 2026-07-30). serP it alongside the ribbon so a stamped
+      // frame gets the same ribbon+companion pair a real hand-drawn stroke
+      // would — both share sd.linkedFillId, exactly what relinkLinkedFills
+      // (app.js, called from loadFrame) needs to re-pair them after the
+      // next reconstruction.
+      var sdFill = path.data.linkedFill ? serP(path.data.linkedFill) : null;
       // Timeline frame selection describes columns as well as rows. After
       // creating/switching to a new layer the selection may still carry the
       // previous layer index; use its selected frame numbers on the current
@@ -55,6 +68,7 @@
           if (typeof syncLinkedKeyframeFolder === 'function') syncLinkedKeyframeFolder(li, s.frame);
         }
         f.strokes.push(JSON.parse(JSON.stringify(sd)));
+        if (sdFill) f.strokes.push(JSON.parse(JSON.stringify(sdFill)));
         stamped++;
       });
       if (stamped && typeof showToast === 'function') showToast('Labs — trait ajouté sur ' + stamped + ' autre(s) frame(s)');
