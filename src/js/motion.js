@@ -4205,9 +4205,18 @@
           { label: 'Supprimer', action: function () {
             var item = liveItemByStrokeId(li, entry.strokeId);
             if (!item) return;
-            pushUndo(); item.remove();
+            pushUndo();
+            // Stale-selection guard (2026-07-31, found live via screenshot):
+            // if this shape was the current canvas selection, removing it
+            // without clearing selectedPaths left a detached (.parent===
+            // null) reference behind — same "reconstruction leaves a ghost
+            // selection" bug shape goToFrame's own clearSel fix (2026-07-29
+            // QA sweep) already exists for elsewhere in this codebase.
+            if (window.selectedPaths && selectedPaths.indexOf(item) >= 0 && window.clearSel) clearSel(true);
+            item.remove();
             if (window._motionExpandedElement === entry.strokeId) window._motionExpandedElement = null;
             saveActiveLayerFrame(); renderLayerList(); renderTimeline();
+            if (window.renderArcs) renderArcs();
             if (window.SMEngineBridge) SMEngineBridge.renderNow();
           } },
         ]);

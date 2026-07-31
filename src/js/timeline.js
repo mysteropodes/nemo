@@ -2818,6 +2818,20 @@ function renderTimeline(){
     // bar's on-screen presence here is gone.
     renderKeyframeCellsInto(row,li,contentIdxs);
     grid.appendChild(row);
+    // Mirrors renderLayerList's renderShapeTreeRowsInto exactly — one blank
+    // spacer per tree entry, same row count, no content (frame data is
+    // per-LAYER; a shape/group row has none of its own to show here). Same
+    // "call the same enumerator on both sides" contract as Motion's own
+    // renderElementsList/renderTimelineMotion pair.
+    if(window._layerShapesExpanded&&window._layerShapesExpanded[li]&&window.SMMotion&&SMMotion.buildShapeTree){
+      var ld2=state.layers[li];
+      var shTree=SMMotion.buildShapeTree(li,ld2);
+      if(shTree.length){
+        var shHdrSpacer=document.createElement('div');shHdrSpacer.className='frow motion-group-row';
+        grid.appendChild(shHdrSpacer);rowCount++;
+        shTree.forEach(function(){var shSpacer=document.createElement('div');shSpacer.className='frow';grid.appendChild(shSpacer);rowCount++;});
+      }
+    }
   });
   // rowCount only counts state.layers rows — the camera row (prepended
   // above, not part of state.layers) never added its own height here, so
@@ -3878,6 +3892,87 @@ function startLayerRename(idx){
   input.addEventListener('mousedown',function(e){e.stopPropagation();});
   input.addEventListener('dblclick',function(e){e.stopPropagation();});
 }
+// Group/shape tree rows for Animation 2D (2026-07-31) — the disclosure
+// arrow wired above toggles window._layerShapesExpanded[li]; when open,
+// this appends one row per SMMotion.buildShapeTree(li, ld) entry (group
+// headers + ungrouped shapes) into #layer-list. renderTimeline's own
+// layer loop calls buildShapeTree the SAME way to emit matching blank
+// spacers — same "two independent readers of one enumerator" contract
+// Motion's own renderElementsList/renderTimelineMotion pair already
+// established (motion.js), not a shared pre-counted array. Unlike
+// Motion's element list, a row here never expands further (Animation 2D
+// has no per-shape Motion track to reveal), so the row count is fixed —
+// simpler to keep in lockstep than Motion's variable-expand case.
+function renderShapeTreeRowsInto(list,li,ld){
+  if(!window.SMMotion||!SMMotion.buildShapeTree)return;
+  var tree=SMMotion.buildShapeTree(li,ld);
+  if(!tree.length)return;
+  var hdr=document.createElement('div');hdr.className='lrow motion-group-row';hdr.textContent='Formes';
+  list.appendChild(hdr);
+  var shapeIdx=0;
+  tree.forEach(function(node){
+    if(node.type==='group'){
+      var grow=document.createElement('div');grow.className='lrow motion-elem-row motion-elem-group';
+      var gswatch=document.createElement('div');gswatch.className='motion-elem-swatch';gswatch.textContent='▤';gswatch.style.background='transparent';
+      var gnm=document.createElement('div');gnm.className='lnm';gnm.textContent=node.name;
+      grow.appendChild(gswatch);grow.appendChild(gnm);
+      var memberIds=SMMotion.layerElements(li,ld).filter(function(e){return e.sd.groupId===node.gid;}).map(function(e){return e.strokeId;});
+      function commitGroupRename(v){pushUndo();if(window.SMGroup&&SMGroup.renameGroup)SMGroup.renameGroup(node.gid,ld,v,memberIds);saveActiveLayerFrame();renderLayerList();renderTimeline();}
+      grow.addEventListener('click',function(){SMMotion.selectShapesByStrokeIds(li,memberIds);});
+      grow.addEventListener('dblclick',function(e){e.stopPropagation();SMMotion.startShapeTreeRename(grow,node.name,commitGroupRename);});
+      grow.addEventListener('contextmenu',function(e){
+        e.preventDefault();e.stopPropagation();
+        if(!window.showContextMenu)return;
+        window.showContextMenu(e.clientX,e.clientY,[
+          {label:'Renommer',action:function(){SMMotion.startShapeTreeRename(grow,node.name,commitGroupRename);}},
+          {label:'Sélectionner les membres',action:function(){SMMotion.selectShapesByStrokeIds(li,memberIds);}},
+          {label:'Dissocier le groupe',action:function(){
+            pushUndo();
+            memberIds.forEach(function(sid){var it=SMMotion.liveItemByStrokeId(li,sid);if(it&&it.data)delete it.data.groupId;});
+            if(ld.groups)delete ld.groups[node.gid];
+            saveActiveLayerFrame();renderLayerList();renderTimeline();
+            if(window.SMEngineBridge)SMEngineBridge.renderNow();
+          }},
+        ]);
+      });
+      list.appendChild(grow);
+      return;
+    }
+    var idx=shapeIdx++;
+    var srow=document.createElement('div');srow.className='lrow motion-elem-row';
+    var sswatch=document.createElement('div');sswatch.className='motion-elem-swatch';sswatch.style.background=node.sd.fillColor||node.sd.strokeColor||'transparent';
+    var snm=document.createElement('div');snm.className='lnm';snm.textContent=SMMotion.elementLabel(node,idx,ld);
+    srow.appendChild(sswatch);srow.appendChild(snm);
+    srow.addEventListener('click',function(){SMMotion.selectShapesByStrokeIds(li,[node.strokeId]);});
+    srow.addEventListener('dblclick',function(e){
+      e.stopPropagation();
+      SMMotion.startShapeTreeRename(srow,SMMotion.elementLabel(node,idx,ld),function(v){
+        pushUndo();if(!ld.shapeNames)ld.shapeNames={};ld.shapeNames[node.strokeId]=v;saveActiveLayerFrame();renderLayerList();renderTimeline();
+      });
+    });
+    srow.addEventListener('contextmenu',function(e){
+      e.preventDefault();e.stopPropagation();
+      if(!window.showContextMenu)return;
+      window.showContextMenu(e.clientX,e.clientY,[
+        {label:'Renommer',action:function(){SMMotion.startShapeTreeRename(srow,SMMotion.elementLabel(node,idx,ld),function(v){pushUndo();if(!ld.shapeNames)ld.shapeNames={};ld.shapeNames[node.strokeId]=v;saveActiveLayerFrame();renderLayerList();renderTimeline();});}},
+        {label:'Sélectionner',action:function(){SMMotion.selectShapesByStrokeIds(li,[node.strokeId]);}},
+        {label:'Supprimer',action:function(){
+          var item=SMMotion.liveItemByStrokeId(li,node.strokeId);
+          if(!item)return;
+          pushUndo();
+          // Stale-selection guard (2026-07-31, found live via screenshot):
+          // deleting the current canvas selection without clearing
+          // selectedPaths left a detached (.parent===null) reference behind.
+          if(window.selectedPaths&&selectedPaths.indexOf(item)>=0)clearSel(true);
+          item.remove();
+          saveActiveLayerFrame();renderLayerList();renderTimeline();renderArcs();
+          if(window.SMEngineBridge)SMEngineBridge.renderNow();
+        }},
+      ]);
+    });
+    list.appendChild(srow);
+  });
+}
 // Shared by renderLayerList() and renderTimeline() so the layer list and
 // the frame grid always agree on which rows are visible — a folder header
 // entry appears once, right before the first of its (consecutive) member
@@ -4582,6 +4677,27 @@ function renderLayerList(frameOnly){
       });
       row.appendChild(tlb);
     }
+    // Group/shape tree disclosure (2026-07-31, Animation 2D half of the
+    // panel Cyril asked for — Motion's own version, commit 1a8c99a,
+    // already ships this; this is the same idea with no per-shape
+    // expand-to-Transform sub-state, since Animation 2D doesn't key
+    // individual shapes). Only shown when the layer actually has
+    // selectable content to browse — an empty layer or a symbol/lfs/
+    // montage layer (whose real content lives elsewhere entirely) has
+    // nothing for buildShapeTree to enumerate anyway.
+    if(!ld.symbolId&&!ld.lfsGroup&&!ld.montageId){
+      var shArrow=document.createElement('div');shArrow.className='lico larrow';shArrow.style.cursor='pointer';
+      var shExpanded=!!(window._layerShapesExpanded&&window._layerShapesExpanded[i]);
+      shArrow.textContent=shExpanded?'▾':'▸';
+      shArrow.title=shExpanded?'Masquer les formes/groupes':'Afficher les formes/groupes de ce calque';
+      shArrow.addEventListener('click',function(e){
+        e.stopPropagation();
+        if(!window._layerShapesExpanded)window._layerShapesExpanded={};
+        window._layerShapesExpanded[i]=!window._layerShapesExpanded[i];
+        renderLayerList();renderTimeline();
+      });
+      row.appendChild(shArrow);
+    }
     row.appendChild(nm);
     buildParentCell(row,ld,i);
     row.addEventListener('click',function(e){
@@ -4681,6 +4797,7 @@ function renderLayerList(frameOnly){
       ]);
     });
     list.appendChild(row);
+    if(window._layerShapesExpanded&&window._layerShapesExpanded[i])renderShapeTreeRowsInto(list,i,ld);
   });
   // v14: audio tracks get their own rows appended after the real layers —
   // synthetic (not part of state.layers, so none of the layer.children
