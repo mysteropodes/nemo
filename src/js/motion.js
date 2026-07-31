@@ -4010,34 +4010,207 @@
       // keyframe (not a clone), so this mutation persists on next save,
       // same lazy-assign contract ensureStrokeId already has for live Paper
       // items (tools.js).
-      if (!sd.strokeId) sd.strokeId = 's' + Date.now().toString(36) + '_' + i + '_' + Math.floor(Math.random() * 1e6);
+      var isNewStamp = !sd.strokeId;
+      if (isNewStamp) sd.strokeId = 's' + Date.now().toString(36) + '_' + i + '_' + Math.floor(Math.random() * 1e6);
+      // Mirror the fresh stamp onto the LIVE Paper item too (2026-07-31,
+      // group/shape tree panel's click-to-select) — found live: the dict
+      // and the live canvas item are two SEPARATE representations that only
+      // sync via desP (dict->live, on the NEXT loadFrame) or serP (live-
+      // >dict, on save). Stamping only the dict left every freshly-drawn
+      // shape's live item with data.strokeId===null until some unrelated
+      // later reload happened to reconstruct it from the now-stamped dict —
+      // liveItemByStrokeId's lookup silently failed in the meantime. `i`
+      // lines up positionally with userLayers[li].children BEFORE the
+      // isBrushTextureCopy filter above (both walk the same stored array in
+      // the same order for an ordinary layer — CLAUDE.md §5quater's own
+      // children.length===strokes.length identity contract).
+      if (isNewStamp) {
+        var liveLayer = window.userLayers && userLayers[li];
+        var liveItem = liveLayer && liveLayer.children[i];
+        if (liveItem && liveItem.data && !liveItem.data.strokeId) liveItem.data.strokeId = sd.strokeId;
+      }
       out.push({ strokeId: sd.strokeId, sd: sd });
     });
     return out;
   }
-  function elementLabel(entry, idx) {
+  function elementLabel(entry, idx, ld) {
     var sd = entry.sd;
+    // Custom name (2026-07-31, group/shape tree panel) — ld.shapeNames is
+    // keyed by strokeId, same identity ensureStrokeId already gives every
+    // shape; falls back to the existing auto-generated text when unset.
+    if (ld && ld.shapeNames && ld.shapeNames[entry.strokeId]) return ld.shapeNames[entry.strokeId];
     if (sd.isRaster) return 'Image ' + (idx + 1);
     return (sd.fillColor ? 'Forme' : 'Trait') + ' ' + (idx + 1);
   }
+  // Group/shape tree (2026-07-31, Cyril: "vrai panel de gestion de group et
+  // shape layer") — flat, z-ordered wrapper around layerElements() that
+  // nests shapes sharing a Cmd+G data.groupId (group-bridge.js) under a
+  // named {type:'group'} header, emitted once at the group's FIRST
+  // occurrence in z-order. Mode-agnostic (dict-based, same as
+  // layerElements) — the same function backs both Motion's renderElementsList
+  // AND Animation 2D's forthcoming layer-row shape list, so the two can
+  // never diverge in which shapes/groups exist or in what order.
+  function buildShapeTree(li, ld) {
+    var flat = layerElements(li, ld);
+    var out = [], emittedGroups = {};
+    flat.forEach(function (entry) {
+      var gid = entry.sd.groupId;
+      if (gid) {
+        if (!emittedGroups[gid]) {
+          emittedGroups[gid] = true;
+          var meta = ld.groups && ld.groups[gid];
+          out.push({ type: 'group', gid: gid, name: (meta && meta.name) || 'Groupe' });
+        }
+      } else {
+        out.push({ type: 'shape', strokeId: entry.strokeId, sd: entry.sd });
+      }
+    });
+    return out;
+  }
+  // Resolves a strokeId back to its LIVE Paper item on layer `li` — the
+  // panel operates on dicts (getEffectiveStrokes), but click-to-select and
+  // delete both need the real canvas object. null for a strokeId that
+  // doesn't currently resolve (e.g. mid-frame-transition edge case).
+  function liveItemByStrokeId(li, strokeId) {
+    var layer = window.userLayers && userLayers[li]; if (!layer) return null;
+    for (var i = 0; i < layer.children.length; i++) {
+      var d = layer.children[i].data;
+      if (d && d.strokeId === strokeId) return layer.children[i];
+    }
+    // Positional fallback (2026-07-31): a strokeId stamped onto the stored
+    // dict BEFORE this dual-stamp fix existed (an older session/save) never
+    // reached the live item — layerElements's own iteration order matches
+    // userLayers[li].children's for an ordinary layer, so resolve by the
+    // dict's position among non-brush-texture-companion strokes and, if
+    // found, stamp the live item so future lookups hit the fast path above.
+    var ld = state.layers[li];
+    var strokes = ld ? (getEffectiveStrokes(li, state.currentFrame) || []) : [];
+    var pos = -1;
+    for (var si = 0, seen = 0; si < strokes.length; si++) {
+      if (strokes[si].isBrushTextureCopy) continue;
+      if (strokes[si].strokeId === strokeId) { pos = seen; break; }
+      seen++;
+    }
+    if (pos >= 0 && layer.children[pos]) {
+      var item = layer.children[pos];
+      if (item.data && !item.data.strokeId) item.data.strokeId = strokeId;
+      return item;
+    }
+    return null;
+  }
+  // Click-to-select (2026-07-31 — the previous Éléments list only ever
+  // toggled the row's OWN expand state, never touched selectedPaths at
+  // all: "manage without going through canvas-only interaction" needs the
+  // row to actually select). strokeIds is an array so a group header can
+  // select every member at once.
+  function selectShapesByStrokeIds(li, strokeIds) {
+    var items = strokeIds.map(function (sid) { return liveItemByStrokeId(li, sid); }).filter(Boolean);
+    if (!items.length) return;
+    window.SM.setActiveLayer(li);
+    selectedPaths = items;
+    if (window.state) state.selectedStrokeIndices = items.map(function (it) { return typeof getSI === 'function' ? getSI(it) : -1; }).filter(function (i2) { return i2 >= 0; });
+    if (window.renderArcs) renderArcs();
+    if (window.updateUI) updateUI();
+    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+  }
+  // Inline rename for a shape or a group header — same input-swap idiom as
+  // timeline.js's startLayerRename, targeting this row's own .lnm instead.
+  function startShapeTreeRename(rowEl, currentName, commit) {
+    var nm = rowEl.querySelector('.lnm'); if (!nm) return;
+    var input = document.createElement('input'); input.type = 'text'; input.value = currentName;
+    input.style.cssText = 'width:100%;background:var(--bg);border:1px solid var(--accent);color:var(--text);font-size:11px;border-radius:4px;padding:1px 4px;outline:none;';
+    nm.innerHTML = ''; nm.appendChild(input); input.focus(); input.select();
+    var done = false;
+    function finish() { if (done) return; done = true; var v = input.value.trim(); if (v) commit(v); else { renderLayerList(); renderTimeline(); } }
+    input.addEventListener('keydown', function (e) { e.stopPropagation(); if (e.key === 'Enter') finish(); else if (e.key === 'Escape') { done = true; renderLayerList(); renderTimeline(); } });
+    input.addEventListener('blur', finish);
+    input.addEventListener('mousedown', function (e) { e.stopPropagation(); });
+    input.addEventListener('dblclick', function (e) { e.stopPropagation(); });
+  }
   function renderElementsList(list, li, ld) {
-    var els = layerElements(li, ld);
-    if (!els.length) return;
+    var tree = buildShapeTree(li, ld);
+    if (!tree.length) return;
     var hdr = document.createElement('div'); hdr.className = 'lrow motion-group-row'; hdr.textContent = 'Éléments';
     list.appendChild(hdr);
-    els.forEach(function (entry, idx) {
+    var shapeIdx = 0;
+    tree.forEach(function (node) {
+      if (node.type === 'group') {
+        var grow = document.createElement('div'); grow.className = 'lrow motion-elem-row motion-elem-group';
+        var gswatch = document.createElement('div'); gswatch.className = 'motion-elem-swatch'; gswatch.textContent = '▤'; gswatch.style.background = 'transparent';
+        var gnm = document.createElement('div'); gnm.className = 'lnm'; gnm.textContent = node.name;
+        grow.appendChild(gswatch); grow.appendChild(gnm);
+        // Recompute this group's own member strokeIds from the flat list
+        // (layerElements), not the already-collapsed tree — click-select
+        // and rename both need the full membership, not just "a group
+        // exists here".
+        var memberIds = layerElements(li, ld).filter(function (e) { return e.sd.groupId === node.gid; }).map(function (e) { return e.strokeId; });
+        function commitGroupRename(v) {
+          pushUndo();
+          // SMGroup.renameGroup (group-bridge.js) — creates ld.groups[gid]
+          // on demand if this is a plain (non-combine) group's FIRST rename,
+          // same shared setter groupSelection itself now seeds at creation.
+          if (window.SMGroup && SMGroup.renameGroup) SMGroup.renameGroup(node.gid, ld, v, memberIds);
+          saveActiveLayerFrame(); renderLayerList(); renderTimeline();
+        }
+        grow.addEventListener('click', function () { selectShapesByStrokeIds(li, memberIds); });
+        grow.addEventListener('dblclick', function (e) { e.stopPropagation(); startShapeTreeRename(grow, node.name, commitGroupRename); });
+        grow.addEventListener('contextmenu', function (e) {
+          e.preventDefault(); e.stopPropagation();
+          if (!window.showContextMenu) return;
+          window.showContextMenu(e.clientX, e.clientY, [
+            { label: 'Renommer', action: function () { startShapeTreeRename(grow, node.name, commitGroupRename); } },
+            { label: 'Sélectionner les membres', action: function () { selectShapesByStrokeIds(li, memberIds); } },
+            { label: 'Dissocier le groupe', action: function () {
+              pushUndo();
+              memberIds.forEach(function (sid) { var it = liveItemByStrokeId(li, sid); if (it && it.data) delete it.data.groupId; });
+              if (ld.groups) delete ld.groups[node.gid];
+              saveActiveLayerFrame(); renderLayerList(); renderTimeline();
+              if (window.SMEngineBridge) SMEngineBridge.renderNow();
+            } },
+          ]);
+        });
+        list.appendChild(grow);
+        return;
+      }
+      var entry = { strokeId: node.strokeId, sd: node.sd };
+      var idx = shapeIdx++;
       var expanded = window._motionExpandedElement === entry.strokeId;
       var row = document.createElement('div'); row.className = 'lrow motion-elem-row';
       var swatch = document.createElement('div'); swatch.className = 'motion-elem-swatch';
       swatch.style.background = entry.sd.fillColor || entry.sd.strokeColor || 'transparent';
       if (elementHasMotion(ld, entry.strokeId)) swatch.classList.add('has-motion');
       var arrow = document.createElement('div'); arrow.className = 'lico larrow'; arrow.textContent = expanded ? '▾' : '▸';
-      var nm = document.createElement('div'); nm.className = 'lnm'; nm.textContent = elementLabel(entry, idx);
+      var nm = document.createElement('div'); nm.className = 'lnm'; nm.textContent = elementLabel(entry, idx, ld);
       row.appendChild(arrow); row.appendChild(swatch); row.appendChild(nm);
       row.addEventListener('click', function () {
+        selectShapesByStrokeIds(li, [entry.strokeId]);
         window._motionExpandedElement = expanded ? null : entry.strokeId;
         renderLayerList(); renderTimeline();
-        if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+      });
+      row.addEventListener('dblclick', function (e) {
+        e.stopPropagation();
+        startShapeTreeRename(row, elementLabel(entry, idx, ld), function (v) {
+          pushUndo();
+          if (!ld.shapeNames) ld.shapeNames = {};
+          ld.shapeNames[entry.strokeId] = v;
+          saveActiveLayerFrame(); renderLayerList(); renderTimeline();
+        });
+      });
+      row.addEventListener('contextmenu', function (e) {
+        e.preventDefault(); e.stopPropagation();
+        if (!window.showContextMenu) return;
+        window.showContextMenu(e.clientX, e.clientY, [
+          { label: 'Renommer', action: function () { startShapeTreeRename(row, elementLabel(entry, idx, ld), function (v) { pushUndo(); if (!ld.shapeNames) ld.shapeNames = {}; ld.shapeNames[entry.strokeId] = v; saveActiveLayerFrame(); renderLayerList(); renderTimeline(); }); } },
+          { label: 'Sélectionner', action: function () { selectShapesByStrokeIds(li, [entry.strokeId]); } },
+          { label: 'Supprimer', action: function () {
+            var item = liveItemByStrokeId(li, entry.strokeId);
+            if (!item) return;
+            pushUndo(); item.remove();
+            if (window._motionExpandedElement === entry.strokeId) window._motionExpandedElement = null;
+            saveActiveLayerFrame(); renderLayerList(); renderTimeline();
+            if (window.SMEngineBridge) SMEngineBridge.renderNow();
+          } },
+        ]);
       });
       list.appendChild(row);
       if (!expanded) return;
@@ -4538,16 +4711,19 @@
         if (entry.row === 'dupHeader') { var dupSpacer = document.createElement('div'); dupSpacer.className = 'frow motion-group-row'; grid.appendChild(dupSpacer); return; }
         renderTracksFor(grid, ld, entry.prop);
       });
-      // Mirrors renderElementsList's panel structure: one spacer per
-      // element, its own track rows only when that ONE element is expanded
-      // (only one element expands at a time, same single-expand contract
-      // as layers).
-      var els = layerElements(li, ld);
+      // Mirrors renderElementsList's panel structure: one spacer per tree
+      // node (shape OR group header — 2026-07-31, group/shape tree panel),
+      // its own track rows only when that ONE shape entry is expanded (only
+      // one element expands at a time, same single-expand contract as
+      // layers; a group-header node's `.strokeId` is undefined so it can
+      // never match _motionExpandedElement and never expands here — group
+      // rows have no per-group Transform in this pass).
+      var els = buildShapeTree(li, ld);
       if (els.length) {
         var elHdrSpacer = document.createElement('div'); elHdrSpacer.className = 'frow motion-group-row';
         grid.appendChild(elHdrSpacer);
         els.forEach(function (entry) {
-          var elExpanded = window._motionExpandedElement === entry.strokeId;
+          var elExpanded = entry.type === 'shape' && window._motionExpandedElement === entry.strokeId;
           var elSpacer = document.createElement('div'); elSpacer.className = 'frow';
           grid.appendChild(elSpacer);
           if (!elExpanded) return;
@@ -5774,6 +5950,15 @@
     // — same core-setter split as setLayerParent/buildParentMenuItems).
     setLayerTimeLink: setLayerTimeLink,
     timeLinkWouldCycle: timeLinkWouldCycle,
+    // Group/shape tree (2026-07-31) — mode-agnostic, reused by Animation
+    // 2D's own layer-row shape list (timeline.js) so both modes' trees can
+    // never diverge in content or z-order.
+    buildShapeTree: buildShapeTree,
+    layerElements: layerElements,
+    elementLabel: elementLabel,
+    liveItemByStrokeId: liveItemByStrokeId,
+    selectShapesByStrokeIds: selectShapesByStrokeIds,
+    startShapeTreeRename: startShapeTreeRename,
     // 3D layers (2026-07-28) — see make3DProjector/project3DSegments' own
     // doc comment (Grease-Pencil-style: vertices move in 3D, stroke width
     // never scales).
