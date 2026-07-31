@@ -2545,7 +2545,10 @@ function splitLayerIntoElementsCore(li,opts){
     var entry=els[e];
     var emh=ld.elementMotion&&ld.elementMotion[entry.strokeId];
     var nl={
-      name:(ld.name||'Layer')+' — '+SMMotion.elementLabel(entry,e),
+      // ld passed through (2026-07-31, group/shape tree panel) — a shape
+      // custom-renamed via the tree panel keeps that name as the split-off
+      // layer's own name instead of always falling back to "Forme N".
+      name:(ld.name||'Layer')+' — '+SMMotion.elementLabel(entry,e,ld),
       visible:true,locked:false,frames:frames,color:nextLayerColor(),
       motion:(emh&&emh.motion)?JSON.parse(JSON.stringify(emh.motion)):undefined,
       motionStatic:(emh&&emh.motionStatic)?JSON.parse(JSON.stringify(emh.motionStatic)):undefined,

@@ -1533,7 +1533,7 @@ window.SM={
         // data.groupId tag on each stroke (already round-trips via serP/
         // desP unmodified); ld.groups is just the group-level combineMode/
         // order metadata group-bridge.js has nowhere else to hang.
-        groups:l.groups||undefined};}),
+        groups:l.groups||undefined,shapeNames:l.shapeNames||undefined};}),
       layerFolders:state.layerFolders,layerLinkGroups:state.layerLinkGroups,
       // StoryBoard node space (2026-07) — plain data by construction (no
       // runtime-only fields live in state.storyboard, see storyboard.js's
@@ -1795,6 +1795,7 @@ window.SM={
       if(ld.duplicator){state.layers[idx].duplicator=ld.duplicator;state.layers[idx].locked=true;} // duplicateur mograph (relock: _dupEditSource n'est jamais persisté)
       if(ld.rig)state.layers[idx].rig=ld.rig;                             // rig (os/binds/IK) — relinkRigBinds fait le reste au premier loadFrame
       if(ld.groups)state.layers[idx].groups=ld.groups;                    // groupes de combinaison non-destructifs — data.groupId sur chaque stroke fait déjà le tour via serP/desP
+      if(ld.shapeNames)state.layers[idx].shapeNames=ld.shapeNames;        // noms personnalisés de formes (2026-07-31, panel groupes/formes) — keyés par strokeId, même identité stable que serP/desP
       state.layers[idx].color=ld.color||nextLayerColor();
       ld.frames.forEach(function(f){if(!f.isInterpolated)f.isInterpolated=false;});while(state.layers[idx].frames.length<state.totalFrames)state.layers[idx].frames.push({strokes:[],isKeyframe:false,isInterpolated:false});});
     // Migration matte→uid (2026-07-31): a project saved before mattes were

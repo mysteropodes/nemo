@@ -31,7 +31,18 @@
     }
     pushUndo();
     var gid = 'grp_' + Date.now().toString(36) + '_' + Math.floor(Math.random() * 1e6);
-    selectedPaths.forEach(function (p) { if (!p.data) p.data = {}; p.data.groupId = gid; });
+    var li = state.activeLayerIdx, ld = state.layers[li];
+    selectedPaths.forEach(function (p) { if (!p.data) p.data = {}; p.data.groupId = gid; ensureStrokeId(p); });
+    // Named from the moment it's created (2026-07-31, group/shape tree
+    // panel — Cyril: "vrai panel de gestion de group") — a plain Cmd+G
+    // group used to have NO ld.groups entry at all, only the members'
+    // data.groupId tag; a combine-group (below) had metadata but no name.
+    // Unified here so both kinds of group show up named in the tree panel
+    // from day one, not just after an explicit rename.
+    if (ld) {
+      ensureLayerGroups(ld);
+      ld.groups[gid] = { name: 'Groupe', combineMode: 'none', order: selectedPaths.map(function (p) { return p.data.strokeId; }) };
+    }
     saveActiveLayerFrame(); updateUI();
     if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
     if (window.showToast) showToast('Groupe créé (' + selectedPaths.length + ' éléments)');
@@ -177,6 +188,19 @@
     ld.groups[gid].combineMode = mode;
     saveActiveLayerFrame(); updateUI();
     if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+  }
+  // Named groups (2026-07-31, group/shape tree panel) — a plain Cmd+G group
+  // (groupSelection above) only ever stamped data.groupId with no metadata
+  // object at all; a combine-group had one but no `name` field. Called by
+  // motion.js's tree-panel rename UI whenever a group without a ld.groups
+  // entry yet gets renamed for the first time — creates one on demand
+  // (combineMode:'none', matching a plain group's actual behavior) rather
+  // than requiring every group to go through combineSelection first.
+  function renameGroup(gid, ld, name, memberStrokeIds) {
+    if (!ld || !gid) return;
+    ensureLayerGroups(ld);
+    if (!ld.groups[gid]) ld.groups[gid] = { combineMode: 'none', order: (memberStrokeIds || []).slice() };
+    ld.groups[gid].name = name;
   }
   // "Sortir du groupe" — removes ONE shape from its combine-group, leaving
   // the rest intact. Distinct from ungroupSelection (whole-group dissolve)
@@ -427,7 +451,7 @@
     groupSelection: groupSelection, ungroupSelection: ungroupSelection, membersOf: membersOf,
     ensureLayerGroups: ensureLayerGroups, resolveGroupMembers: resolveGroupMembers,
     combineSelection: combineSelection, setGroupCombineMode: setGroupCombineMode,
-    removeMemberFromGroup: removeMemberFromGroup, flattenGroup: flattenGroup,
+    removeMemberFromGroup: removeMemberFromGroup, flattenGroup: flattenGroup, renameGroup: renameGroup,
     renderCombinesFromChildren: renderCombinesFromChildren, applyCombinesToStrokes: applyCombinesToStrokes,
   };
 })();
