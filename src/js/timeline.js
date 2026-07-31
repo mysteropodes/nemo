@@ -894,6 +894,13 @@ window.SM={
     showToast('Calque coupé à la frame '+(f+1));
   },
   duplicateLayer:function(){saveAllLayerFrames();pushUndoLayers();var src=state.layers[state.activeLayerIdx];var ni=createUserLayer(src.name+' copy');state.layers[ni].frames=JSON.parse(JSON.stringify(src.frames));if(src.blendMode)state.layers[ni].blendMode=src.blendMode;state.layers[ni].color=src.color;if(src.motion)state.layers[ni].motion=JSON.parse(JSON.stringify(src.motion));if(src.motionStatic)state.layers[ni].motionStatic=JSON.parse(JSON.stringify(src.motionStatic));
+    // matteMode was dropped here entirely (pre-existing, found by the
+    // 2026-07-31 uid-matte scoping) — a duplicated matted layer silently
+    // lost its matte. The uid travels with it (the duplicate masks against
+    // the SAME source layer as the original — sources can matte several
+    // consumers at once by design).
+    if(src.matteMode)state.layers[ni].matteMode=src.matteMode;
+    if(src.matteSourceLayerUid)state.layers[ni].matteSourceLayerUid=src.matteSourceLayerUid;
     // elementMotion is keyed by strokeId, and duplicateLayer's frames clone
     // above (JSON.stringify) preserves each stroke's strokeId unchanged —
     // so the duplicate's strokes carry the SAME ids the original's element
@@ -1489,7 +1496,7 @@ window.SM={
       }
     }
     return JSON.stringify({version:13,totalFrames:sceneTotal,fps:sceneFps,canvasW:state.canvasW,canvasH:state.canvasH,canvasBg:state.canvasBg,waIn:sceneWaIn,waOut:sceneWaOut,
-      layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color,motion:l.motion,motionStatic:l.motionStatic,elementMotion:l.elementMotion,inPoint:l.inPoint,outPoint:l.outPoint,nativeVideo:l.nativeVideo,matteMode:l.matteMode,montageId:l.montageId,expressions:l.expressions,isTextLayer:l.isTextLayer,isNullLayer:l.isNullLayer,isEffectLayer:l.isEffectLayer,effects:l.effects,footage:l.footage,
+      layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color,motion:l.motion,motionStatic:l.motionStatic,elementMotion:l.elementMotion,inPoint:l.inPoint,outPoint:l.outPoint,nativeVideo:l.nativeVideo,matteMode:l.matteMode,matteSourceLayerUid:l.matteSourceLayerUid,montageId:l.montageId,expressions:l.expressions,isTextLayer:l.isTextLayer,isNullLayer:l.isNullLayer,isEffectLayer:l.isEffectLayer,effects:l.effects,footage:l.footage,
         // Layer parenting (2026-07-25). BOTH of these were missing from this
         // list, so every parent link was silently dropped on save — a rig
         // survived the session and nothing more. `uid` is the stable identity
@@ -1715,6 +1722,7 @@ window.SM={
       // (see engine-bridge.js's tick() catch).
       if(typeof ld.blendMode==='string')state.layers[idx].blendMode=ld.blendMode;
       if(typeof ld.matteMode==='string')state.layers[idx].matteMode=ld.matteMode;
+      if(typeof ld.matteSourceLayerUid==='string')state.layers[idx].matteSourceLayerUid=ld.matteSourceLayerUid;
       if(ld.expressions)state.layers[idx].expressions=ld.expressions;
       if(ld.isTextLayer)state.layers[idx].isTextLayer=true;
       if(ld.isNullLayer)state.layers[idx].isNullLayer=true;
@@ -1785,6 +1793,23 @@ window.SM={
       if(ld.groups)state.layers[idx].groups=ld.groups;                    // groupes de combinaison non-destructifs — data.groupId sur chaque stroke fait déjà le tour via serP/desP
       state.layers[idx].color=ld.color||nextLayerColor();
       ld.frames.forEach(function(f){if(!f.isInterpolated)f.isInterpolated=false;});while(state.layers[idx].frames.length<state.totalFrames)state.layers[idx].frames.push({strokes:[],isKeyframe:false,isInterpolated:false});});
+    // Migration matte→uid (2026-07-31): a project saved before mattes were
+    // uid-referenced carries matteMode without matteSourceLayerUid — its
+    // source was implicitly "the layer directly above (i+1)". Freeze that
+    // relationship ONCE into a uid here (every layer + its layerUid already
+    // exist, the forEach above just finished), so the matte survives any
+    // later reorder/split/merge exactly like parentLayerUid does. No i+1
+    // layer -> left unset, the matte stays a safe no-op (same graceful
+    // degradation as a dangling parent uid). Covers both a real Open and
+    // the boot-time 'nemo-auto' autosave restore — both funnel through here.
+    for(var _mmi=0;_mmi<state.layers.length;_mmi++){
+      var _mml=state.layers[_mmi];
+      if(_mml.matteMode&&_mml.matteMode!=='none'&&!_mml.matteSourceLayerUid&&_mmi+1<state.layers.length){
+        var _mms=state.layers[_mmi+1];
+        if(!_mms.layerUid)_mms.layerUid='ly_'+Date.now().toString(36)+'_'+Math.floor(Math.random()*1e6);
+        _mml.matteSourceLayerUid=_mms.layerUid;
+      }
+    }
     state.layerFolders=d.layerFolders||{};state.layerLinkGroups=d.layerLinkGroups||{};
     state.motionArcs=d.motionArcs||{};state.tweenOverrides=d.tweenOverrides||{};state.tweenEasing=d.tweenEasing||{};
     // Migration (2026-07): the old shipped DEFAULT easing points
@@ -4185,6 +4210,62 @@ function buildTimeLinkMenuItems(li,ld,onChanged){
   return items;
 }
 window.buildTimeLinkMenuItems=buildTimeLinkMenuItems;
+// Which layer indices are currently consumed as a matte SOURCE (2026-07-31,
+// uid-based mattes) — THE shared answer for every JS-side reader (the layer-
+// row badge in renderLayerList, export.js's skip-consumed-source check), so
+// they can't drift from each other or from engine.rs's resolve_matte_source:
+// same rule — explicit matteSourceLayerUid wins, missing uid falls back to
+// the legacy implicit i+1 adjacency, dangling/self references resolve to
+// nothing (matte is a no-op, source paints normally).
+function matteSourceIndicesInUse(){
+  var used={};
+  for(var i=0;i<state.layers.length;i++){
+    var ld=state.layers[i];
+    if(!ld.matteMode||ld.matteMode==='none')continue;
+    var si=-1;
+    if(ld.matteSourceLayerUid){
+      for(var j=0;j<state.layers.length;j++){
+        if(j!==i&&state.layers[j].layerUid===ld.matteSourceLayerUid){si=j;break;}
+      }
+    }else if(i+1<state.layers.length)si=i+1;
+    if(si>=0)used[si]=1;
+  }
+  return used;
+}
+window.matteSourceIndicesInUse=matteSourceIndicesInUse;
+// Matte-source picker (2026-07-31, Cyril: "Gestion des matte de layer pas au
+// même index comme pour parentage") — same shared-menu shape as
+// buildParentMenuItems/buildTimeLinkMenuItems above. Any other layer can be
+// the source (above OR below — that's the point of decoupling from
+// adjacency), and one source can matte several consumers at once (both
+// confirmed with Cyril). Picking a source with no mode set defaults the
+// mode to 'alpha' so the pick has a visible effect immediately.
+function buildMatteMenuItems(li,ld,onChanged){
+  var items=[{label:'Matte : Aucune (retirer)',disabled:!ld.matteMode,action:function(){
+    pushUndo();
+    delete ld.matteMode;delete ld.matteSourceLayerUid;
+    onChanged();
+    if(window.SMEngineBridge)SMEngineBridge.renderNow();
+  }}];
+  state.layers.forEach(function(other,oi){
+    if(oi===li)return; // a layer can't matte itself
+    var uid=(window.SMMotion&&SMMotion.ensureLayerUid)?SMMotion.ensureLayerUid(other):(other.layerUid||(other.layerUid='ly_'+Date.now().toString(36)+'_'+Math.floor(Math.random()*1e6)));
+    var isCur=ld.matteSourceLayerUid===uid;
+    items.push({
+      label:'Source : '+(other.name||('Layer '+(oi+1)))+(isCur?'  ✓':''),
+      disabled:isCur,
+      action:function(){
+        pushUndo();
+        ld.matteSourceLayerUid=uid;
+        if(!ld.matteMode||ld.matteMode==='none')ld.matteMode='alpha';
+        onChanged();
+        if(window.SMEngineBridge)SMEngineBridge.renderNow();
+      }
+    });
+  });
+  return items;
+}
+window.buildMatteMenuItems=buildMatteMenuItems;
 function buildParentCell(row,ld,li){
   var cell=document.createElement('div');
   cell.className='lparent';
@@ -4296,6 +4377,11 @@ function renderLayerList(frameOnly){
   if(state.appMode==='motion'){if(window.SMMotion)SMMotion.renderLayerListMotion(list);_tlScrollRestore(_scroll);return;}
   if(window.SMCamera)SMCamera.renderPanelRow(list);
   var order=computeLayerRenderOrder();
+  // Which layer indices are consumed as a matte SOURCE — computed once per
+  // render (uid-resolved with legacy i+1 fallback), consumed by the per-row
+  // matte badge below. Same helper export.js uses to skip painting a
+  // consumed source, so the two readers can't drift.
+  var _matteSrcMap=matteSourceIndicesInUse();
   order.forEach(function(entry){
     if(entry.type==='folder'){
       var fid=entry.id,fmeta=state.layerFolders[fid];if(!fmeta)return;
@@ -4451,16 +4537,14 @@ function renderLayerList(frameOnly){
     // directly above a masked one — its IMPLICIT source, AE convention —
     // shows a dimmed 'M▲' so its role is visible too, even though nothing
     // is actually SET on that layer's own data.
-    // A layer i is a matte SOURCE when the layer BELOW it (i-1) has its
-    // matteMode set — matteMode on layer X means "X's alpha comes from
-    // X+1", so X+1 is the source. Row i is that source when i-1's mode is
-    // set, not i+1's (caught by the badge simply never appearing on the
-    // source layer in a quick browser check — the array direction was
-    // backwards on the first pass).
-    var isMatteSource=(i-1>=0)&&state.layers[i-1]&&state.layers[i-1].matteMode;
+    // A layer is a matte SOURCE when ANY layer's resolved source is this
+    // index (uid-based since 2026-07-31, legacy i+1 fallback for
+    // pre-migration data) — see matteSourceIndicesInUse, computed once
+    // before this loop.
+    var isMatteSource=!!_matteSrcMap[i];
     if(ld.matteMode||isMatteSource){
       var mb=document.createElement('div');mb.className='lico comp-badge'+(isMatteSource&&!ld.matteMode?' off':'');
-      mb.title=ld.matteMode?('Matte: '+(typeof MATTE_MODE_LABELS!=='undefined'?MATTE_MODE_LABELS[ld.matteMode]:ld.matteMode)+' — clic pour changer'):'Source de matte pour le calque du dessous';
+      mb.title=ld.matteMode?('Matte: '+(typeof MATTE_MODE_LABELS!=='undefined'?MATTE_MODE_LABELS[ld.matteMode]:ld.matteMode)+' — clic pour changer'):'Source de matte pour un autre calque';
       mb.innerHTML='<span style="font-size:9px;line-height:1;font-weight:700">'+(ld.matteMode?'M':'M▲')+'</span>';
       if(ld.matteMode){mb.style.cursor='pointer';mb.addEventListener('click',function(e){e.stopPropagation();state.activeLayerIdx=i;activateUL(i);updatePropsContext();openMatteDropdownAt(mb);});}
       row.appendChild(mb);
@@ -4571,7 +4655,13 @@ function renderLayerList(frameOnly){
         // (which only shows once one exists) or the right-panel dropdown
         // (buried in a fallback context — see updatePropsContext). Needs a
         // layer above to draw the mask FROM, AE convention.
-        {label:idx4>=state.layers.length-1?'Matte (aucun calque au-dessus)':(l4.matteMode?'Changer la matte…':'Appliquer une matte…'),disabled:idx4>=state.layers.length-1,action:function(){
+        // uid-based mattes (2026-07-31): the source no longer needs to be
+        // the layer directly above — any other layer works, so the only
+        // impossible case is "no other layer exists at all".
+        {label:'Source de la matte…',disabled:state.layers.length<2,action:function(){
+          window.showContextMenu(e.clientX+8,e.clientY+8,buildMatteMenuItems(idx4,l4,function(){renderLayerList();renderTimeline();}));
+        }},
+        {label:state.layers.length<2?'Matte (aucun autre calque)':(l4.matteMode?'Changer la matte…':'Appliquer une matte…'),disabled:state.layers.length<2,action:function(){
           window.SM.setActiveLayer(idx4);updatePropsContext();
           // The right-panel dropdown only exists in the Document-fallback
           // context (see updatePropsContext) — if a draw tool is active it
@@ -7210,12 +7300,15 @@ var MATTE_MODE_LABELS={none:'Aucun',alpha:'Alpha',alphaInverted:'Alpha (inversé
   function open(anchorEl){
     var anchor=anchorEl||dd;
     var ld=currentLd();if(!ld)return;
-    // A matte needs a layer ABOVE this one to draw from (AE convention —
-    // the source is implicit, never picked). Nothing to offer on the
-    // topmost layer; refusing to open beats a picker that visibly does
-    // nothing once a mode is chosen.
-    if(state.activeLayerIdx>=state.layers.length-1){
-      if(window.showToast)showToast('Aucun calque au-dessus pour servir de matte');
+    // uid-based mattes (2026-07-31): the source no longer has to be the
+    // layer directly above — any other layer can serve (picked via
+    // 'Source de la matte…' in the row's context menu / buildMatteMenuItems).
+    // The only impossible case left is a single-layer document. If no
+    // source is set yet, the legacy adjacent layer (if any) is frozen into
+    // matteSourceLayerUid at commit below, so the default matches the old
+    // behavior but survives reordering.
+    if(state.layers.length<2){
+      if(window.showToast)showToast('Aucun autre calque pour servir de matte');
       return;
     }
     origMode=ld.matteMode||'none';
@@ -7230,6 +7323,17 @@ var MATTE_MODE_LABELS={none:'Aucun',alpha:'Alpha',alphaInverted:'Alpha (inversé
         var ld2=currentLd();if(ld2)ld2.matteMode=origMode==='none'?undefined:origMode;
         pushUndo();
         applyPreview(v);
+        // Freeze the source identity at commit (2026-07-31): a mode set
+        // with no explicit source yet gets the legacy adjacent layer's uid
+        // stamped, so the relationship survives reordering from day one —
+        // same freeze the importJSON migration applies to old projects.
+        var ld3=currentLd();
+        if(ld3&&v!=='none'&&!ld3.matteSourceLayerUid&&state.activeLayerIdx+1<state.layers.length){
+          var src3=state.layers[state.activeLayerIdx+1];
+          if(!src3.layerUid)src3.layerUid='ly_'+Date.now().toString(36)+'_'+Math.floor(Math.random()*1e6);
+          ld3.matteSourceLayerUid=src3.layerUid;
+        }
+        if(ld3&&v==='none')delete ld3.matteSourceLayerUid;
         setLabel(v);
         origMode=null;
         close(false);
