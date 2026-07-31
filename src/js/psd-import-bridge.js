@@ -60,6 +60,10 @@
         saveActiveLayerFrame();
         updateUI();
         if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+        // Media library registration (2026-07-31) — PSD imports were a
+        // real import surface entirely invisible to the catalog until now,
+        // same shape as images.js's own addEntry calls.
+        if (window.SMMediaLibrary) SMMediaLibrary.addEntry(state.layers[idx].name, 'image', url, state.layers[idx].name, { layerUid: state.layers[idx].layerUid });
       };
       prevActive.activate();
       imported++;

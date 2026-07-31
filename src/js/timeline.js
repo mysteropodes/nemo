@@ -1548,9 +1548,13 @@ window.SM={
       customEffects:state.customEffects,
       // audio: only the persistable fields — _buffer/_peaksCanvas/_srcNode
       // are live runtime objects that must never hit JSON
-      audioTracks:(state.audioTracks||[]).map(function(t){return{name:t.name,dataB64:t.dataB64,offsetFrames:t.offsetFrames||0,volume:t.volume!==undefined?t.volume:1,muted:!!t.muted};}),
+      audioTracks:(state.audioTracks||[]).map(function(t){return{name:t.name,dataB64:t.dataB64,offsetFrames:t.offsetFrames||0,volume:t.volume!==undefined?t.volume:1,muted:!!t.muted,audioId:t.audioId};}),
       refMedia:state.refMedia?{type:state.refMedia.type,name:state.refMedia.name,src:state.refMedia.src,frames:state.refMedia.frames,opacity:state.refMedia.opacity,visible:state.refMedia.visible,offsetFrames:state.refMedia.offsetFrames||0}:null,
-      mediaLibrary:(state.mediaLibrary||[]).map(function(m){return{id:m.id,name:m.name,kind:m.kind,thumb:m.thumb,layerName:m.layerName};}),
+      // layerUid/linked/path/audioId/sizeBytes (2026-07-31): added for the
+      // real asset-panel pass — a field written here but missing from the
+      // import restore below is the exact "writer updated, reader forgotten"
+      // shape CLAUDE.md §1 warns about; kept in sync with the import side.
+      mediaLibrary:(state.mediaLibrary||[]).map(function(m){return{id:m.id,name:m.name,kind:m.kind,thumb:m.thumb,layerName:m.layerName,layerUid:m.layerUid,linked:m.linked,path:m.path,audioId:m.audioId,sizeBytes:m.sizeBytes,importedAt:m.importedAt};}),
       perspectiveEnabled:state.perspectiveEnabled,perspectiveMode:state.perspectiveMode,perspectiveDensity:state.perspectiveDensity,perspectiveVPs:state.perspectiveVPs,
       symmetryEnabled:state.symmetryEnabled,symmetryMode:state.symmetryMode,symmetryAxis:state.symmetryAxis,symmetryRadialCenter:state.symmetryRadialCenter,symmetryRadialSectors:state.symmetryRadialSectors,symmetryExtend:state.symmetryExtend,
       motionArcs:state.motionArcs,easingCurve:state.easingCurve,resamplePts:state.resamplePts,tweenStep:state.tweenStep,
@@ -4790,9 +4794,19 @@ function updateFootagePanel(){
     if(n==null){n=0;(ld.frames||[]).forEach(function(f){if(f&&f.strokes&&f.strokes.some(function(x){return x&&x.isRaster;}))n++;});}
     document.getElementById('footage-count').textContent=n;
   }
-  // A video's source lives in ld.nativeVideo and is swapped by its own
-  // importer, so only the raster kinds get the in-place replace.
-  document.getElementById('btn-footage-replace').style.display=(kind.key==='video')?'none':'';
+  // A video's source lives in ld.nativeVideo, not a per-frame raster src,
+  // so it needs its own relink flow (native-video-bridge.js's
+  // replaceNativeVideoSource) instead of images.js's replaceFootageSource
+  // — previously hidden outright here with no relink path at all for the
+  // default/preferred video-import route (2026-07-31 fix, real asset-panel
+  // pass). The click handler (images.js) dispatches on this data attribute.
+  var repBtn=document.getElementById('btn-footage-replace');
+  repBtn.style.display='';
+  repBtn.dataset.kind=kind.key;
+  repBtn.textContent=(kind.key==='video')?'Relier / remplacer le fichier…':'Remplacer la source…';
+  // A web-imported (non-Tauri) video session has no real path to relink —
+  // same limitation replaceNativeVideoSource itself guards on with a toast.
+  repBtn.disabled=(kind.key==='video'&&ld.nativeVideo&&ld.nativeVideo.isWeb);
 }
 function updateCompInstancePanel(){
   var sec=document.getElementById('comp-instance-sec');

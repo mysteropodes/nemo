@@ -914,7 +914,12 @@
       tc.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(px), info.width, info.height), 0, 0);
       var sc = document.createElement('canvas'); sc.width = tw; sc.height = th;
       sc.getContext('2d').drawImage(tc, 0, 0, tw, th);
-      if (window.SMMediaLibrary) SMMediaLibrary.addEntry(name, 'video', sc.toDataURL('image/jpeg', 0.7), ld.name);
+      // linked, not embedded (2026-07-31): a nativeVideo layer only persists
+      // ld.nativeVideo.path — no bytes live in the project file, so the
+      // panel needs to represent "this can go offline if the file moves"
+      // rather than a byte count. isWeb sessions have no real filesystem
+      // path to relink to, so they're marked embedded-ish (no relink offer).
+      if (window.SMMediaLibrary) SMMediaLibrary.addEntry(name, 'video', sc.toDataURL('image/jpeg', 0.7), ld.name, { layerUid: ld.layerUid, linked: !isWeb, path: isWeb ? null : source });
     } catch (e) { /* thumbnail is cosmetic — import already succeeded */ }
     if (window.activateUL) activateUL(idx);
     if (window.loadFrame) loadFrame(state.currentFrame);
@@ -953,8 +958,51 @@
     }
   }
 
+  // Relink a nativeVideo layer to a different file (2026-07-31, Cyril:
+  // "vrai panel de gestion de fichier importé" — a moved/deleted video had
+  // NO recovery path at all: images.js's replaceFootageSource exists for
+  // the embedded raster kinds but is explicitly hidden for kind==='video'
+  // in the layer-row's footage panel, since a nativeVideo layer has no
+  // per-frame raster src to swap — the source is the DECODE SESSION
+  // itself). Same dialog shape as replaceFootageSource, but the actual
+  // swap follows _optimizeLayerMedia's own session-replace steps: open the
+  // new path, point the layer at the fresh session, drop the old one, and
+  // clear the per-layer sync cache (stale bytes from the OLD decode).
+  async function replaceNativeVideoSource(li) {
+    var ld = state.layers[li];
+    if (!ld || !ld.nativeVideo) { if (window.showToast) showToast('Pas un calque vidéo native'); return; }
+    if (ld.nativeVideo.isWeb) { if (window.showToast) showToast('Relink indisponible pour une vidéo importée sans Tauri — réimporte-la'); return; }
+    if (!tauriOk()) { if (window.showToast) showToast('Relink nécessite l’app Tauri'); return; }
+    var path = await window.__TAURI__.dialog.open({ title: 'Relier / remplacer le fichier vidéo', multiple: false,
+      filters: [{ name: 'Vidéos', extensions: ['mp4', 'mov', 'mkv', 'webm', 'avi'] }] });
+    if (!path) return;
+    var info;
+    try { info = await open(path); }
+    catch (e) { if (window.showToast) showToast('Ouverture impossible : ' + (e && e.message || e), 'warn'); return; }
+    if (window.pushUndo) pushUndo();
+    var oldSession = ld._nvSessionId;
+    var nv = ld.nativeVideo;
+    nv.path = path; nv.isWeb = false; nv.fps = info.fps; nv.frameCount = Number(info.frame_count);
+    nv.width = info.width; nv.height = info.height; nv.codec = info.codec || '';
+    nv.optimizedPath = null; // re-optimize against the new source, the old target no longer matches
+    ld._nvSessionId = info.session_id;
+    var st = _syncState(li);
+    st.jsCache.clear(); st.jsBytes = 0; st.prefetchQueue = []; st.lastShown = -1;
+    if (oldSession) close(oldSession).catch(function () {});
+    if (Number(info.frame_count) > state.totalFrames && window.SM && SM.setTotalFrames) SM.setTotalFrames(Number(info.frame_count));
+    _optimizeLayerMedia(li);
+    // Keep the catalog entry pointed at the same layer/uid but reflect the
+    // new source — refresh path/thumb rather than spawning a second entry.
+    var entry = (state.mediaLibrary || []).find(function (m) { return m.layerUid && m.layerUid === ld.layerUid; });
+    if (entry) { entry.path = path; entry.name = path.split('/').pop().replace(/\.[^.]+$/, ''); if (window.SMMediaLibrary) SMMediaLibrary.reload(); }
+    if (window.loadFrame) loadFrame(state.currentFrame);
+    if (window.updateUI) updateUI();
+    if (window.showToast) showToast('Vidéo reliée : ' + path.split('/').pop());
+  }
+
   window.SMNativeVideo = {
     open: open,
+    replaceNativeVideoSource: replaceNativeVideoSource,
     frameBytes: frameBytes,
     registerFrame: registerFrame,
     close: close,

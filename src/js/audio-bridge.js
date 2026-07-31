@@ -299,7 +299,11 @@
 
   // ---- import ----
   function addTrackFromDataURL(name, dataURL) {
-    var track = { name: name, dataB64: dataURL, offsetFrames: 0, volume: 1, muted: false };
+    // audioId (2026-07-31, media-library registration): audio tracks had no
+    // stable identity at all — an array index isn't one (reorder/delete
+    // shifts it) — minted here so the catalog entry can find its way back
+    // to the right track for deletion without guessing by name.
+    var track = { name: name, dataB64: dataURL, offsetFrames: 0, volume: 1, muted: false, audioId: 'au' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7) };
     tracks().push(track);
     logAudio('import');
     if (dataURL.length > 8 * 1024 * 1024) {
@@ -307,6 +311,24 @@
     }
     decodeTrack(track);
     renderStrip();
+    // Real asset-panel pass (2026-07-31, Cyril) — audio was a fully working,
+    // separate feature (this whole file) but entirely invisible to the
+    // Médias catalog. No thumb (media-library.js renders a note-icon tile
+    // for kind==='audio'), no owning layer — audioId is what the panel's
+    // "Supprimer la piste" menu entry reuses to find this exact track.
+    if (window.SMMediaLibrary) SMMediaLibrary.addEntry(name, 'audio', null, null, { audioId: track.audioId });
+  }
+  // Removes a track by its stable audioId (2026-07-31) — reuses the exact
+  // stop+splice this file already does elsewhere for track deletion,
+  // rather than the media panel duplicating that logic.
+  function removeTrackByAudioId(audioId) {
+    var list = tracks();
+    var i = list.findIndex(function (t) { return t.audioId === audioId; });
+    if (i < 0) return false;
+    stopTrack(list[i]);
+    list.splice(i, 1);
+    renderStrip();
+    return true;
   }
   function importFile(file) {
     var r = new FileReader();
@@ -346,6 +368,7 @@
     renderStrip: renderStrip,
     importFile: importFile,
     addTrackFromDataURL: addTrackFromDataURL,
+    removeTrackByAudioId: removeTrackByAudioId,
     // after importJSON/newProject replaced state.audioTracks wholesale:
     // decode whatever the new list holds and redraw the strip
     reload: function () {

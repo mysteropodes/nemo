@@ -1665,7 +1665,16 @@ body.mode-motion .layer-inout-bar .layer-inout-handle::after{content:'';position
 /* Rebuilt 2026-07 as a row-based list (project-list-table reference:
    thumbnail+name, a colored type pill, an owner-like avatar+name) instead
    of the original thumbnail grid — see media-library.js render(). */
-.media-grid{display:flex;flex-direction:column;gap:4px;padding:0 8px 8px;}
+/* Compact/expand toggle (2026-07-31) — bounded default height + scroll,
+   same .expanded-class-flip idiom as .fx-row-chevron/.fx-row.expanded
+   above, NOT the continuous #tl-resize drag-handle (a different gesture). */
+.media-grid{display:flex;flex-direction:column;gap:4px;padding:0 8px 8px;max-height:184px;overflow-y:auto;transition:max-height .15s ease;}
+.media-grid.expanded{max-height:520px;}
+.media-panel-hdr{display:flex;align-items:center;gap:6px;}
+.media-expand-toggle{flex:none;width:16px;height:16px;display:flex;align-items:center;justify-content:center;color:rgba(236,234,231,.4);cursor:pointer;transition:transform .12s ease;}
+.media-expand-toggle:hover{color:var(--text);}
+.media-expand-toggle svg{display:block;}
+.media-expand-toggle.expanded{transform:rotate(180deg);}
 .media-row{position:relative;display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:6px;background:var(--panel3);cursor:pointer;}
 .media-row:hover{box-shadow:0 0 0 1px var(--accent);}
 .media-row-thumb{position:relative;width:30px;height:30px;flex:none;border-radius:4px;overflow:hidden;background:var(--panel2);}
@@ -1677,6 +1686,13 @@ body.mode-motion .layer-inout-bar .layer-inout-handle::after{content:'';position
 .media-row-badge{font-size:8px;line-height:1.6;padding:0 6px;border-radius:8px;font-weight:600;letter-spacing:.02em;}
 .media-row-badge.kind-image{background:rgba(180,155,230,.18);color:#c9b6f2;}
 .media-row-badge.kind-video{background:rgba(74,158,255,.18);color:#7ea0fa;}
+.media-row-badge.kind-audio{background:rgba(120,200,150,.18);color:#8fd6a8;}
+/* Embedded/linked distinction (2026-07-31) — a nativeVideo asset only
+   persists a filesystem path; this badge is what "can go offline" looks
+   like before the user ever hits a broken relink. */
+.media-row-badge.kind-linked{background:rgba(230,170,80,.18);color:#e8b869;}
+.media-row-size{font-size:8px;color:var(--text-dim);opacity:.75;}
+.media-row-thumb-icon{display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--text-dim);}
 .media-row-owner{display:flex;align-items:center;gap:4px;font-size:8.5px;color:var(--text-dim);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .media-row-owner-dot{width:6px;height:6px;border-radius:50%;flex:none;}
 .media-row-owner.orphan{color:var(--red);font-style:italic;}
