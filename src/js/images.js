@@ -109,7 +109,7 @@
     // the timeline label a sequence as a sequence instead of guessing.
     state.layers[idx].footage={kind:'sequence',count:frames.length};
     activateUL(idx);loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
-    if(window.SMMediaLibrary)SMMediaLibrary.addEntry(state.layers[idx].name,'image',frames[0].strokes[0].src,state.layers[idx].name);
+    if(window.SMMediaLibrary)SMMediaLibrary.addEntry(state.layers[idx].name,'image',frames[0].strokes[0].src,state.layers[idx].name,{layerUid:state.layers[idx].layerUid});
     showToast('Séquence importée: '+items.length+' images sur le calque "'+prefix+'"');
   }
 
@@ -138,7 +138,7 @@
       }
       ldN.footage={kind:'image',name:nm,w:nat.w,h:nat.h};
       activateUL(idx);
-      if(window.SMMediaLibrary)SMMediaLibrary.addEntry(nm,'image',dataUrl,ldN.name);
+      if(window.SMMediaLibrary)SMMediaLibrary.addEntry(nm,'image',dataUrl,ldN.name,{layerUid:ldN.layerUid});
     }
     loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
     showToast(paths.length>1?paths.length+' images importées sur leurs calques':'Image importée sur son calque');
@@ -192,7 +192,7 @@
       state.layers[idx].frames=frames;
       state.layers[idx].footage={kind:'sequence',count:frames.length};
       activateUL(idx);loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
-      if(window.SMMediaLibrary)SMMediaLibrary.addEntry(state.layers[idx].name,'image',frames[0].strokes[0].src,state.layers[idx].name);
+      if(window.SMMediaLibrary)SMMediaLibrary.addEntry(state.layers[idx].name,'image',frames[0].strokes[0].src,state.layers[idx].name,{layerUid:state.layers[idx].layerUid});
       showToast('Séquence importée: '+seq.items.length+' images');
     }else{
       saveAllLayerFrames();pushUndoLayers();
@@ -206,7 +206,7 @@
         var n=await naturalSize(du);var ft=fitSize(n.w,n.h);
         var off=j*24;
         ld.frames[state.currentFrame].strokes.push({isRaster:true,src:du,x:state.canvasW/2+off,y:state.canvasH/2+off,width:ft.w,height:ft.h,opacity:1});
-        if(window.SMMediaLibrary)SMMediaLibrary.addEntry(files[j].name,'image',du,ld.name);
+        if(window.SMMediaLibrary)SMMediaLibrary.addEntry(files[j].name,'image',du,ld.name,{layerUid:ld.layerUid});
       }
       loadFrame(state.currentFrame);updateUI();
       showToast(files.length>1?files.length+' images importées':'Image importée');
@@ -314,7 +314,7 @@
     var firstFrameThumb=(frames.filter(function(f){return f.strokes.length;})[0]||{}).strokes;
     firstFrameThumb=firstFrameThumb&&firstFrameThumb[0]&&firstFrameThumb[0].src;
     convertLayerToComponent(idx);
-    if(window.SMMediaLibrary&&firstFrameThumb)SMMediaLibrary.addEntry(state.layers[idx].name,'video',firstFrameThumb,state.layers[idx].name);
+    if(window.SMMediaLibrary&&firstFrameThumb)SMMediaLibrary.addEntry(state.layers[idx].name,'video',firstFrameThumb,state.layers[idx].name,{layerUid:state.layers[idx].layerUid});
     showToast('Vidéo importée : '+frames.filter(function(f){return f.strokes.length;}).length+' images sur le calque "'+prefix+'"');
   }
   async function importVideoFile(file){
@@ -449,7 +449,15 @@
     if(window.SMEngineBridge)SMEngineBridge.renderNow();
     showToast(n?'Source remplacée ('+n+' image(s))':'Aucune image à remplacer sur ce calque');
   }
-  document.getElementById('btn-footage-replace')&&document.getElementById('btn-footage-replace').addEventListener('click',replaceFootageSource);
+  // A video layer's source is a decode session (ld.nativeVideo), not a
+  // per-frame raster src — dispatched to native-video-bridge.js's own
+  // relink flow instead of this file's replaceFootageSource, which only
+  // knows how to swap raster bytes (2026-07-31, updateFootagePanel sets
+  // data-kind on this same button each time the panel refreshes).
+  document.getElementById('btn-footage-replace')&&document.getElementById('btn-footage-replace').addEventListener('click',function(){
+    if(this.dataset.kind==='video'){if(window.SMNativeVideo)SMNativeVideo.replaceNativeVideoSource(state.activeLayerIdx);return;}
+    replaceFootageSource();
+  });
 
   window.SM=window.SM||{};window.SM.importImages=importImages;window.SM.importVideo=importVideo;
   window.SM.replaceFootageSource=replaceFootageSource;
