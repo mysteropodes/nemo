@@ -187,14 +187,21 @@ pub(crate) struct LayerIn {
     #[serde(default)]
     pub(crate) blend_mode: Option<String>,
     // Track matte (2026-07, scouted from Caddis's Layer.matteMode): this
-    // layer's alpha comes from the layer immediately ABOVE it in the
-    // stack (AE convention — "matteLayerId" is implicit, always the next
-    // layer up, never named explicitly) instead of its own painted pixels'
-    // alpha. "alpha"/"alphaInverted"/"luma"/"lumaInverted"; None/"none" is
-    // the default (no matte). The matte SOURCE layer itself is consumed —
-    // composite_scene skips painting it as its own visible layer.
+    // layer's alpha comes from a SOURCE layer's painted pixels instead of
+    // its own. "alpha"/"alphaInverted"/"luma"/"lumaInverted"; None/"none"
+    // is the default (no matte). The matte SOURCE layer itself is consumed
+    // — composite_scene skips painting it as its own visible layer.
     #[serde(default)]
     pub(crate) matte_mode: Option<String>,
+    // Which layer is the matte source (2026-07-31, uid-based mattes):
+    // resolved entirely JS-side from ld.matteSourceLayerUid (engine-bridge's
+    // buildSceneJson final pass) — the engine stays stateless and purely
+    // positional, it just no longer ASSUMES adjacency. None = the legacy
+    // implicit "layer directly above (i+1)" AE convention (scene JSON from
+    // older saves whose uid didn't resolve, or pre-migration projects) —
+    // see resolve_matte_source, the single reader of both conventions.
+    #[serde(default)]
+    pub(crate) matte_source_index: Option<usize>,
     // Adjustment/effect layer (2026-07, Motion) — an AE-style layer with no
     // painted content of its own whose EFFECTS STACK (below) applies to
     // EVERYTHING BELOW it in the layer stack instead of just itself.
@@ -1096,6 +1103,35 @@ fn matte_mode_of(s: Option<&str>) -> Option<(u32, bool)> {
         Some("luma") => Some((1, false)),
         Some("lumaInverted") => Some((1, true)),
         _ => None,
+    }
+}
+
+/// The ONE place "which layer is layer `i`'s matte source" is answered
+/// (2026-07-31, uid-based mattes) — used by BOTH composite_scene sites (the
+/// is_matte_source precompute AND the paint-time lookup), which previously
+/// each hardcoded `i + 1` independently: exactly the duplicated-readers
+/// drift trap this repo's CLAUDE.md §3 documents for render/render_to_pixels.
+/// Explicit matte_source_index wins (JS-resolved from matteSourceLayerUid,
+/// may point anywhere in the stack, above or below); None falls back to the
+/// legacy implicit "directly above (i+1)" convention so old scene JSON keeps
+/// rendering unchanged. Out-of-range or self-referencing indices return None
+/// — the matte degrades to a no-op for the frame instead of panicking or
+/// silently masking against the wrong layer.
+fn resolve_matte_source(layers: &[LayerIn], i: usize) -> Option<usize> {
+    if matte_mode_of(layers[i].matte_mode.as_deref()).is_none() {
+        return None;
+    }
+    let n = layers.len();
+    match layers[i].matte_source_index {
+        Some(s) if s < n && s != i => Some(s),
+        Some(_) => None,
+        None => {
+            if i + 1 < n {
+                Some(i + 1)
+            } else {
+                None
+            }
+        }
     }
 }
 
@@ -2539,9 +2575,12 @@ impl VelloEngine {
     fn composite_scene(&mut self, scene_in: &SceneIn, view_tf: Affine, base_color: Color) -> Result<(), JsValue> {
         let n = scene_in.layers.len();
         let mut is_matte_source = vec![false; n];
-        for (i, l) in scene_in.layers.iter().enumerate() {
-            if matte_mode_of(l.matte_mode.as_deref()).is_some() && i + 1 < n {
-                is_matte_source[i + 1] = true;
+        for i in 0..n {
+            // resolve_matte_source is the single source of truth for which
+            // layer gets consumed — uid-resolved index or legacy i+1, same
+            // answer the paint-time lookup below will compute.
+            if let Some(s) = resolve_matte_source(&scene_in.layers, i) {
+                is_matte_source[s] = true;
             }
         }
         let has_matte = is_matte_source.iter().any(|&b| b);
@@ -2627,12 +2666,15 @@ impl VelloEngine {
                     .map_err(|e| JsValue::from_str(&format!("render_to_texture failed: {e:?}")))?;
             }
 
-            let mut source_view: &wgpu::TextureView = if let Some((mode, invert)) = matte_mode_of(layer.matte_mode.as_deref()) {
-                // i+1 exists whenever matte_mode_of returned Some (see the
-                // is_matte_source precompute above, same condition).
+            // Both halves resolved through the SAME helper as the precompute
+            // — a matte whose source doesn't resolve (dangling uid, index
+            // out of range) degrades to "no matte" instead of masking
+            // against the wrong layer.
+            let matte_src = resolve_matte_source(&scene_in.layers, i);
+            let mut source_view: &wgpu::TextureView = if let (Some((mode, invert)), Some(ms)) = (matte_mode_of(layer.matte_mode.as_deref()), matte_src) {
                 let mut matte_scene = Scene::new();
                 self.push_atlas_keepalive(&mut matte_scene);
-                paint_layer_items(&mut matte_scene, &scene_in.layers[i + 1].items, view_tf, &self.images, &self.paths);
+                paint_layer_items(&mut matte_scene, &scene_in.layers[ms].items, view_tf, &self.images, &self.paths);
                 self.renderer
                     .render_to_texture(&self.device, &self.queue, &matte_scene, &self.matte_source_view, &layer_params)
                     .map_err(|e| JsValue::from_str(&format!("render_to_texture failed: {e:?}")))?;

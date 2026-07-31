@@ -29,6 +29,7 @@ function exportBuildFrame(frameIdx,alpha){
     // nothing but keeps the layer's bounds pinned to the canvas rect.
     new Path.Rectangle({point:[0,0],size:[state.canvasW,state.canvasH],fillColor:new Color(0,0,0,0),insert:true});
   }
+  var _matteSrcMap=window.matteSourceIndicesInUse?matteSourceIndicesInUse():{};
   for(var li=0;li<state.layers.length;li++){
     var ld=state.layers[li];
     // layerIsEffectivelyVisible (app.js), not a bare .visible check
@@ -39,15 +40,19 @@ function exportBuildFrame(frameIdx,alpha){
     // you SAW but silently let every other merely-visible layer leak into
     // this export path anyway. Confirmed live.
     if(!layerIsEffectivelyVisible(li))continue;
-    // Track matte SOURCE layer: engine.rs's composite_scene consumes the
-    // layer directly above a matted one and never paints it as its own
-    // visible content. This path had no idea, so the export GAINED an
-    // opaque layer the screen never shows (2026-07-26). Skipping it here
-    // is only half the story — the matted layer itself still isn't masked
-    // on this path, which is why exportNeedsEngine() routes any project
-    // using a matte through the engine instead. This keeps the plain-Paper
-    // fallback (SVG, scale>1) from being actively WRONG in the meantime.
-    if(li>0&&state.layers[li-1]&&state.layers[li-1].matteMode&&state.layers[li-1].matteMode!=='none')continue;
+    // Track matte SOURCE layer: engine.rs's composite_scene consumes a
+    // matte's source layer and never paints it as its own visible content.
+    // This path had no idea, so the export GAINED an opaque layer the
+    // screen never shows (2026-07-26). Skipping it here is only half the
+    // story — the matted layer itself still isn't masked on this path,
+    // which is why exportNeedsEngine() routes any project using a matte
+    // through the engine instead. This keeps the plain-Paper fallback
+    // (SVG, scale>1) from being actively WRONG in the meantime.
+    // uid-based since 2026-07-31: resolved through the SAME shared helper
+    // the layer-row badge uses (matteSourceIndicesInUse, timeline.js) —
+    // previously an independent li-1 re-implementation of the adjacency
+    // rule, the exact two-readers-drift trap CLAUDE.md §3 documents.
+    if(_matteSrcMap[li])continue;
     // Rendered variant: includes the mograph duplicator's N-way expansion
     // (app.js) — identical to getEffectiveStrokes for every other layer.
     var strokes=getEffectiveStrokesRendered(li,frameIdx);

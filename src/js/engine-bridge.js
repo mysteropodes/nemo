@@ -667,11 +667,20 @@
     // item builder every other stroke-data consumer uses (CLAUDE.md §1:
     // no new parallel serialization path).
     var sbPreview = (state.appMode === 'storyboard' && window.SMStoryboard) ? SMStoryboard.getPreviewLayer() : null;
+    // Track matte by uid (2026-07-31): userLayerEntries[i] = the ONE wire
+    // entry that IS state.layers[i]'s own main slot (never a motion-blur
+    // ghost sample). Recorded at all four push sites of the loop below so
+    // the final pass before JSON.stringify can resolve each layer's
+    // matteSourceLayerUid to a concrete wire-array index via OBJECT
+    // IDENTITY (layers.indexOf) — immune to the bg unshift, onion/ghost
+    // splices, and any future overlay insertions, unlike any index math
+    // done mid-loop.
+    var userLayerEntries = [];
     if (sbPreview) {
       layers.push({ items: onionLayerItems(sbPreview) });
     } else
     for (var i = 0; i < state.layers.length; i++) {
-      if (!layerIsEffectivelyVisible(i) || !userLayers[i]) { layers.push({ items: [] }); continue; }
+      if (!layerIsEffectivelyVisible(i) || !userLayers[i]) { layers.push(userLayerEntries[i] = { items: [] }); continue; }
       // Null layer (2026-07, Motion) — pure organizational/pivot layer,
       // never painted (AE's "Null Object"), same "no content, no paint"
       // shape as an invisible layer above, but still emitted as its OWN
@@ -679,7 +688,7 @@
       // other layers can still parent to it via SMMotion's existing
       // parentLayerUid/parentChainMats mechanism, which only needs the
       // layer to exist at some index, not to draw anything).
-      if (state.layers[i].isNullLayer) { layers.push({ items: [] }); continue; }
+      if (state.layers[i].isNullLayer) { layers.push(userLayerEntries[i] = { items: [] }); continue; }
       // Effect (adjustment) layer (2026-07, Motion; effects stack rewrite
       // 2026-07) — never paints its own content either (ld.frames/strokes
       // are ignored on purpose, matching AE's "Adjustment Layer" toggle),
@@ -687,7 +696,7 @@
       // composite_scene applies each enabled entry to everything already
       // composited below it — see that function's is_effect_layer branch.
       if (state.layers[i].isEffectLayer) {
-        layers.push({ items: [], isEffectLayer: true, effects: sceneEffectsOf(state.layers[i]) });
+        layers.push(userLayerEntries[i] = { items: [], isEffectLayer: true, effects: sceneEffectsOf(state.layers[i]) });
         continue;
       }
       var children = userLayers[i].children;
@@ -1420,7 +1429,7 @@
       // segments were already projected in place (project3D, above), so
       // this layer's `items` push through the EXACT SAME path as any
       // ordinary layer. blendMode/matteMode/effects still apply normally.
-      layers.push({ items: items, blendMode: (bm && bm !== 'normal') ? bm : undefined, matteMode: (mm && mm !== 'none') ? mm : undefined,
+      layers.push(userLayerEntries[i] = { items: items, blendMode: (bm && bm !== 'normal') ? bm : undefined, matteMode: (mm && mm !== 'none') ? mm : undefined,
         effects: mbEffects });
     }
     // artboard background as the bottom item of a synthetic bottom layer,
@@ -1503,6 +1512,25 @@
       if (symmetryItems.length) layers.push({ items: symmetryItems });
       var gradientGizmoItems = window.buildGradientGizmoItems ? window.buildGradientGizmoItems() : [];
       if (gradientGizmoItems.length) layers.push({ items: gradientGizmoItems });
+    }
+    // Track matte source resolution (uid-based, 2026-07-31) — runs LAST,
+    // after every unshift/splice above, so layers.indexOf gives the final
+    // wire position of the source's main entry. A missing/dangling/self-
+    // referencing uid leaves matteSourceIndex unset — engine.rs's
+    // resolve_matte_source then applies the legacy implicit-i+1 fallback,
+    // keeping pre-migration scenes rendering exactly as before.
+    for (var mi = 0; mi < state.layers.length; mi++) {
+      var mEntry = userLayerEntries[mi];
+      if (!mEntry || !mEntry.matteMode) continue;
+      var mUid = state.layers[mi].matteSourceLayerUid;
+      if (!mUid) continue;
+      var mSrcIdx = -1;
+      for (var mj = 0; mj < state.layers.length; mj++) {
+        if (mj !== mi && state.layers[mj].layerUid === mUid) { mSrcIdx = mj; break; }
+      }
+      if (mSrcIdx < 0 || !userLayerEntries[mSrcIdx]) continue;
+      var mFinal = layers.indexOf(userLayerEntries[mSrcIdx]);
+      if (mFinal >= 0) mEntry.matteSourceIndex = mFinal;
     }
     var frameForFx = renderFrame || 0;
     var fpsForFx = Math.max(1, state.fps || 24);

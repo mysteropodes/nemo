@@ -2565,20 +2565,27 @@ function splitLayerIntoElementsCore(li,opts){
       parentLayerUid:ld.parentLayerUid,parentLayerUidB:ld.parentLayerUidB,
       timeLink:ld.timeLink?JSON.parse(JSON.stringify(ld.timeLink)):undefined,
     };
+    // matteMode: with a frozen matteSourceLayerUid (2026-07-31, uid-based
+    // mattes) the source no longer depends on array adjacency, so EVERY
+    // split-off piece can keep the matte and still mask against the same
+    // external source — this removes the old documented positional
+    // limitation ("only means something on whichever split-off layer ends
+    // up at ld's OLD highest index"). A legacy ld with matteMode but no
+    // uid keeps the old last-piece-only behavior (adjacency is all it has).
+    if(ld.matteSourceLayerUid){
+      nl.matteMode=ld.matteMode;
+      nl.matteSourceLayerUid=ld.matteSourceLayerUid;
+    }
     if(e===n-1){
-      // matteMode/layerUid: UNLIKE the fields above, these are positional —
-      // matteMode reads alpha from array adjacency (i+1, engine-bridge.js),
-      // so it only means something on whichever split-off layer ends up at
-      // ld's OLD highest index once spliced back in, i.e. the last one
-      // pushed here (newLayers[n-1] lands at li+n-1, still directly below
-      // whatever used to sit above ld). Setting it on every layer would
-      // instead matte each piece against its own SIBLING, not the intended
-      // external source. Keeping ld's layerUid string alive on this same
+      // Legacy positional matte (no uid) — see the block above; adjacency
+      // only survives on the last piece (newLayers[n-1] lands at li+n-1,
+      // still directly below whatever used to sit above ld).
+      // Keeping ld's layerUid string alive on this same
       // layer (instead of leaving it undefined on all N, as before) means
       // any OTHER layer's parentLayerUid/parentLayerUidB/timeLink.uid that
       // pointed at ld keeps resolving with zero extra re-point pass needed
       // — the uid itself never changes, only which layer object answers to it.
-      nl.matteMode=ld.matteMode;
+      if(!ld.matteSourceLayerUid)nl.matteMode=ld.matteMode;
       if(ld.layerUid)nl.layerUid=ld.layerUid;
     }
     newLayers.push(nl);
@@ -2751,6 +2758,10 @@ function mergeLayersIntoOne(indices,opts){
     // everything else about the merged layer (color, layerUid, timeLink)
     // is taken from srcs[0].
     matteMode:srcs[0].matteMode,blendMode:srcs[0].blendMode,
+    // Travels with matteMode (2026-07-31, uid-based mattes) — dropping the
+    // uid alone would silently downgrade the merged layer back to the
+    // legacy adjacency behavior.
+    matteSourceLayerUid:srcs[0].matteSourceLayerUid,
   };
   if(Object.keys(elMotion).length)merged.elementMotion=elMotion;
   if(Object.keys(mergedGroups).length)merged.groups=mergedGroups;
@@ -2774,6 +2785,12 @@ function mergeLayersIntoOne(indices,opts){
     // or its link goes dead exactly like the spatial one would.
     if(other.timeLink&&other.timeLink.uid&&goneUids[other.timeLink.uid]){
       if(merged.layerUid)other.timeLink.uid=merged.layerUid;else delete other.timeLink;
+    }
+    // Same re-point for the matte source (2026-07-31, uid-based mattes): a
+    // matte whose source layer disappears into the merge follows the
+    // survivor, same family as the three uid references above.
+    if(other.matteSourceLayerUid&&goneUids[other.matteSourceLayerUid]){
+      if(merged.layerUid)other.matteSourceLayerUid=merged.layerUid;else delete other.matteSourceLayerUid;
     }
   });
   // Paper layers: one fresh Layer replaces the N being removed, inserted
