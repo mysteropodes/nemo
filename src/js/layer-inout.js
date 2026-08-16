@@ -1018,6 +1018,36 @@
   // wires its drag handlers. Idempotent-safe to call once per row per
   // render pass (renderTimeline/renderTimelineMotion rebuild rows from
   // scratch every time, same as every other overlay in this codebase).
+  // Parent-in-Time anchor role helpers (2026-08-16 restyle,
+  // nemo-timeline-inout-spec.html). Nemo's ld.timeLink={uid,mode} links the
+  // WHOLE layer to one source by uid, with mode picking which of the
+  // CHILD's own edges are driven — the source is always resolved via the
+  // SAME edge type (trySetLinkedEdge above), so unlike the spec's own
+  // {c:{r,a},p:{r,a}} shape, neither side stores a separate anchor role.
+  // The anchor a link visually belongs to is therefore DERIVED, not
+  // stored: it's whichever on-bar anchor the pickwhip gesture that created
+  // it was dragged FROM — mode:'in' -> the in anchor, 'out' -> the out
+  // anchor, 'both' -> the whole-layer anchor, exactly mirroring
+  // startTimeLinkPickwhip's own mode mapping a few lines below.
+  function timeLinkChildAnchor(ld) {
+    if (!ld || !ld.timeLink) return null;
+    var mode = ld.timeLink.mode || 'both';
+    return mode === 'in' ? 'in' : mode === 'out' ? 'out' : 'whole';
+  }
+  // A layer is a PARENT on anchor `anchorType` when some OTHER layer's link
+  // targets it AND that other layer's own derived child anchor is the SAME
+  // type — symmetric with timeLinkChildAnchor since today's model only ever
+  // resolves same-type-to-same-type (in follows in, out follows out; cross-
+  // type "in follows out" is a separate, larger data-model change, not yet
+  // built).
+  function isTimeLinkParentAnchor(li, anchorType) {
+    var ld = state.layers[li];
+    var uid = ld && ((window.SMMotion && SMMotion.ensureLayerUid) ? SMMotion.ensureLayerUid(ld) : ld.layerUid);
+    if (!uid) return false;
+    return state.layers.some(function (other) {
+      return other !== ld && other.timeLink && other.timeLink.uid === uid && timeLinkChildAnchor(other) === anchorType;
+    });
+  }
   function buildBar(row, li) {
     row.style.position = 'relative';
     var bar = document.createElement('div'); bar.className = 'layer-inout-bar' + (selPartOf(li) === 'both' ? ' sel' : '');
@@ -1037,9 +1067,17 @@
     // de multi-calques en un coup) ; réutilise startTimeLinkPickwhip
     // (motion.js, exposé via SMMotion) pour le drag/le anti-cycle/la
     // création du lien, pas une seconde implémentation.
+    var childAnchor = timeLinkChildAnchor(state.layers[li]);
     ['in', 'whole', 'out'].forEach(function (mode) {
       var a = document.createElement('div');
       a.className = 'timelink-anchor ' + mode;
+      // Engaged-anchor coloring (2026-08-16) — "Lecture du lien: rond
+      // foncé = enfant, rond clair = parent... ces deux-là sont TOUJOURS
+      // visibles, Alt ne révèle que les points encore libres" (CSS below
+      // gates the free/default state's visibility on an Alt-held class;
+      // .is-child/.is-parent opt back out of that gate unconditionally).
+      if (childAnchor === mode) a.classList.add('is-child');
+      if (isTimeLinkParentAnchor(li, mode)) a.classList.add('is-parent');
       a.title = (mode === 'in' ? 'Glisser vers un autre calque : lie le point d’entrée de ce calque à son temps'
         : mode === 'out' ? 'Glisser vers un autre calque : lie le point de sortie de ce calque à son temps'
         : 'Glisser vers un autre calque : lie tout le calque (entrée + sortie) à son temps') + ' — clic droit pour délier';
@@ -1111,6 +1149,24 @@
     // e.target===row means the click missed the bar entirely.
     row.addEventListener('mousedown', function (e) { if (e.target === row) startMarquee(e); });
   }
+
+  // Alt-reveal for free (unlinked) timelink-anchor dots (2026-08-16, spec:
+  // "maintiens Alt pour révéler les points libres") — a class on #frame-grid
+  // itself (not on each row, which renderTimeline wipes and rebuilds
+  // constantly) so it survives across re-renders with zero re-registration.
+  // Deliberately its OWN independent Alt-tracking rather than reading
+  // state.altDown (set by timeline.js's onKeyDown/onKeyUp for the UNRELATED
+  // Alt+drag "move visibility window only" gesture on the handles) — reusing
+  // that flag would mean this dot-reveal and that other gesture's meaning
+  // are coupled for no reason, and drift the moment either one's own
+  // key-handling logic changes.
+  function setTimeLinkAltReveal(v) {
+    var grid = document.getElementById('frame-grid');
+    if (grid) grid.classList.toggle('timelink-alt', v);
+  }
+  document.addEventListener('keydown', function (e) { if (e.key === 'Alt') setTimeLinkAltReveal(true); });
+  document.addEventListener('keyup', function (e) { if (e.key === 'Alt') setTimeLinkAltReveal(false); });
+  window.addEventListener('blur', function () { setTimeLinkAltReveal(false); });
 
   // Feedback: "on doit pouvoir drag + rect en dessous les calques même là
   // où y en pas dans la timeline". The per-row listener above only ever
