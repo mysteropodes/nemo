@@ -283,8 +283,18 @@
     bar.classList.toggle('sel', part === 'both');
     var hleft = bar.querySelector('.layer-inout-handle.left');
     var hright = bar.querySelector('.layer-inout-handle.right');
-    if (hleft) hleft.classList.toggle('sel', part === 'in');
-    if (hright) hright.classList.toggle('sel', part === 'out');
+    // 2026-08-16 fix (Cyril, live: "les in out/point des layers... disparaissent
+    // si je les select avec le rec box, il faudrait que celui ci s'assombrisse")
+    // — a whole-bar marquee pick (part==='both') used to leave BOTH handles in
+    // their default light/white pill colour while the bar itself grew a white
+    // .sel box-shadow ring right up against them — a light pill sitting flush
+    // against a white ring reads as gone, not merely unselected. Darkening
+    // both handles whenever the WHOLE bar is selected (in addition to the
+    // existing single-edge darkening) keeps them visible against that ring,
+    // and is the more honest signal anyway: a whole-bar selection DOES cover
+    // both edges.
+    if (hleft) hleft.classList.toggle('sel', part === 'in' || part === 'both');
+    if (hright) hright.classList.toggle('sel', part === 'out' || part === 'both');
   }
   var _marquee = null; // {startX, startY, rectEl, moved}
   function startMarquee(e) {

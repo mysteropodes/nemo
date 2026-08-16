@@ -16,6 +16,21 @@
   --red:#ff5555;--green:#5FA875;--orange:#F0A585;--purple:#B49BE6;
   --tool-size:36px;--fc:30px;
 }
+/* In-place canvas text editing (2026-08-16, Cyril: "LE TEXT DEVRAIT
+   POUVOIR S'EDITER DIRECTEMENT sur le canvas... comme tout les logiciel
+   d'édition de text type ai ou figma") — a named face distinct from the
+   plain 'Roboto' keyword already used as a generic fallback in the app's
+   own UI font stack a few lines down, so the two never collide. Same
+   bundled TTFs vector-text-bridge.js already fetches for real glyph
+   outlines (fonts/Roboto-Regular.ttf, fonts/Roboto-Bold.ttf) — loading
+   them here too lets the #tp-inplace-editor overlay (timeline.js) render
+   in the SAME face while the user is typing, so the illusion holds:
+   what's on screen during editing looks like the vector glyphs it's about
+   to become, not a generic system font standing in for them. */
+@font-face{font-family:'Nemo Vector Text';font-weight:400;src:url('fonts/Roboto-Regular.ttf') format('truetype');}
+@font-face{font-family:'Nemo Vector Text';font-weight:700;src:url('fonts/Roboto-Bold.ttf') format('truetype');}
+#tp-inplace-editor{position:fixed;z-index:210;background:transparent;border:none;outline:none;resize:none;
+  overflow:hidden;padding:0;margin:0;font-family:'Nemo Vector Text',sans-serif;white-space:pre;}
 html,body{width:100%;height:100%;overflow:hidden;background:var(--gutter);color:var(--text);
   font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
   /* -webkit-user-select alongside the unprefixed property (2026-07,
