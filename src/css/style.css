@@ -1102,10 +1102,23 @@ body.mode-motion .lrow.act.motion-selected{background:rgba(63,107,245,.16);box-s
    Handles are a solid bracket, always visible (not hover-only). */
 .layer-inout-bar{position:absolute;left:0;top:2px;bottom:2px;background:rgba(63,107,245,.32);border:1px solid rgba(63,107,245,.85);border-radius:3px;cursor:grab;z-index:2;box-sizing:border-box;}
 .layer-inout-bar.full-range{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.28);}
-.layer-inout-bar .layer-inout-handle{position:absolute;top:-1px;bottom:-1px;width:7px;background:var(--io-handle-color,var(--accent));cursor:ew-resize;border-radius:2px;opacity:.85;}
-.layer-inout-bar.full-range .layer-inout-handle{--io-handle-color:rgba(255,255,255,.4);}
-.layer-inout-bar .layer-inout-handle.left{left:-1px;}
-.layer-inout-bar .layer-inout-handle.right{right:0;}
+/* 2026-08-16 restyle (nemo-timeline-inout-spec.html, Cyril): a permanent
+   white pill INSET inside the bar, not an edge-flush full-height sliver
+   colored by the layer's own tint — the bar already carries that color, the
+   handle's whole job now is to read as a neutral, always-legible grab
+   affordance on top of it, regardless of which layer/color it belongs to.
+   --pill/--pill-hot/--pill-dark are this rule family's own tokens (not
+   reused elsewhere) so the 3-state ramp (idle/hover-drag/selected) stays
+   self-contained and easy to re-tune without hunting other consumers of
+   --accent-hover. */
+.layer-inout-bar .layer-inout-handle{position:absolute;top:3px;bottom:3px;width:7px;background:var(--pill,#C9D6D2);cursor:ew-resize;border-radius:3px;opacity:1;}
+.layer-inout-bar .layer-inout-handle.left{left:3px;}
+.layer-inout-bar .layer-inout-handle.right{right:3px;}
+/* Widened invisible hit zone (spec: "±5px en X et ±6px en Y, sinon elle est
+   inattrapable") — a 7px-wide pill is otherwise a genuinely hard target,
+   especially at low timeline zoom. Purely a bigger click area: the visible
+   pill's own size/position is unchanged. */
+.layer-inout-bar .layer-inout-handle::before{content:'';position:absolute;left:-5px;right:-5px;top:-6px;bottom:-6px;}
 /* More discoverable trim handles, Motion mode ONLY (2026-07-29,
    LottieFiles-inspired: "l'affichage du calque avec ses poignées out/in
    Point" — a plain 7px sliver read as part of the bar's own border, not as
@@ -1117,26 +1130,21 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:9px;opacity:1;}
 body.mode-motion .layer-inout-bar .layer-inout-handle.left{border-radius:4px 0 0 4px;}
 body.mode-motion .layer-inout-bar .layer-inout-handle.right{border-radius:0 4px 4px 0;}
 body.mode-motion .layer-inout-bar .layer-inout-handle::after{content:'';position:absolute;top:50%;left:50%;width:3px;height:8px;transform:translate(-50%,-50%);background:rgba(0,0,0,.3);border-radius:1px;pointer-events:none;}
-/* Bug found 2026-07 ("si hover ou select avec rectangle le in ou outpoint
-   celui ci doit se bleuté") — hover tints a handle blue, overriding
-   whatever color (layer tint or neutral full-range) it'd otherwise show.
-   layer-inout.js sets the layer's own color via --io-handle-color instead
-   of an inline background, so this can actually win via normal cascade.
-   Follow-up ("le bleu est pas assez clair et tu synchronise le bleuté in
-   et outpoint alors qu'il faut desynchro"): switched to --accent-hover
-   (the app's existing lighter blue, already used for hover states
-   elsewhere) instead of the darker --accent; and scoped to the handle
-   ITSELF (:hover on .layer-inout-handle), not the whole bar — hovering
-   the bar body used to light up BOTH the in and out handle together,
-   when only whichever one the cursor is actually over should react. */
-.layer-inout-handle:hover{opacity:1;background:var(--accent-hover);}
-/* Feedback: "si on drag sur une partie du calque alors ça select le in ou
-   out point seulement" — a marquee that only overlaps one edge of a bar
-   selects (persistently, not just on hover) ONLY that handle instead of
-   the whole bar — same lighter blue as hover, plus a white ring matching
-   the bar's own .sel outline so a single-edge selection still reads as
-   clearly "selected", not just "hovered". */
-.layer-inout-handle.sel{opacity:1;background:var(--accent-hover);box-shadow:0 0 0 1.5px #fff;}
+/* États (spec): repos -> pill désaturée · survol -> blanc pur + halo,
+   ew-resize · drag -> conserve l'état survol tant que le bouton est
+   enfoncé, même hors zone (.hot is toggled by onDown/mouseup in
+   layer-inout.js — it already drove the state machine, this is the first
+   CSS that actually paints it; before this the handle visually reverted to
+   idle mid-drag the instant the cursor left its bounds). */
+.layer-inout-handle:hover,.layer-inout-handle.hot{background:var(--pill-hot,#fff);box-shadow:0 0 0 3px rgba(255,255,255,.18);}
+/* sélectionné -> la poignée s'assombrit, AUCUN contour ajouté (2026-08-16:
+   removes the old white box-shadow ring around the handle — "l'ancien
+   rectangle de sélection... est du bruit visuel", the one thing the spec
+   explicitly asks to delete. Darkening the fill is now the ONLY selected
+   signal, same "fill = the marker" principle applied to the keyframe
+   diamonds a few rules below.) */
+.layer-inout-handle.sel,.layer-inout-handle.sel.hot{background:var(--pill-dark,#5C6D69);box-shadow:none;}
+.layer-inout-handle.sel:hover{background:#7C8D89;box-shadow:none;}
 /* Parent in Time — on-timeline connection points (2026-07-30, Van Dijk
    2.1: Shift+[ / Shift+] / Shift+\ "create connection point on In Point /
    Out Point / the Layer"). Sit ABOVE the bar's own top edge (negative

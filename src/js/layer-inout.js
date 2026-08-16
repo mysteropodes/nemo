@@ -111,16 +111,12 @@
     // it's trimmed" signal survives alongside the always-on color.
     bar.style.background = hexToRgba(ld.color, custom ? 0.55 : 0.22);
     bar.style.borderColor = hexToRgba(ld.color, custom ? 0.95 : 0.5);
-    // Bug found 2026-07 ("si hover ou select avec rectangle le in ou
-    // outpoint celui ci doit se bleuté"): this used to set the handle's
-    // background as an INLINE style, which always wins over any CSS rule
-    // regardless of selector specificity — .layer-inout-handle:hover and
-    // .layer-inout-bar.sel .layer-inout-handle (style.css) existed but
-    // could never actually show through on a trimmed (custom-color) bar.
-    // Routing the layer color through a custom property instead lets
-    // normal CSS cascade rules for hover/selected states win as expected.
-    if (custom) bar.style.setProperty('--io-handle-color', hexToRgba(ld.color, 1));
-    else bar.style.removeProperty('--io-handle-color');
+    // Handle is a uniform white pill now regardless of layer color
+    // (2026-08-16 restyle, nemo-timeline-inout-spec.html) — the bar itself
+    // still carries the per-layer tint above; the handle's per-layer
+    // --io-handle-color override (previously needed to win the CSS cascade
+    // over :hover/.sel on a trimmed bar) is retired along with it, since the
+    // handle no longer varies by layer color at all.
     // Animation 2D's per-frame .fc cells (Motion mode's collapsed spacer row
     // has none — nothing to dim there, the bar alone is enough context).
     var cells = row.querySelectorAll('.fc');
@@ -452,6 +448,16 @@
     // since made unreliable (bug found live: content was vanishing
     // entirely instead of moving — see shiftLayerFrames' own comment).
     if (window.saveAllLayerFrames) saveAllLayerFrames();
+    // Drag state (2026-08-16, nemo-timeline-inout-spec.html): "conserve
+    // l'état survol tant que le bouton est enfoncé, même hors zone" — the
+    // handle actually grabbed (e.target for a handle mousedown, since the
+    // listener is bound directly to hleft/hright) gets a .hot class the
+    // :hover CSS rule also matches, so it stays lit even once the cursor
+    // drags past its small hitbox. Cleared at mouseup below. null for a
+    // bar-BODY drag (type==='both' from the bar itself, not a handle) —
+    // nothing to highlight there.
+    var handleEl = (type === 'in' || type === 'out') ? e.target : null;
+    if (handleEl) handleEl.classList.add('hot');
     // Grabbing ANY part of an already-selected bar (body OR an edge handle)
     // moves/trims the whole group together — feedback: "je ne peux pas
     // select les inpoint ou outpoint avec le rect de select + drag" (an
@@ -476,10 +482,10 @@
       // pressLi: which bar was actually clicked, kept alongside the group so
       // a plain (no-modifier, no-move) click can narrow the selection down
       // to just this one layer at mouseup — see that check's own comment.
-      _drag = { group: true, type: type, startX: e.clientX, members: members, alt: !!e.altKey, keySel: keySelNow(), pressLi: li };
+      _drag = { group: true, type: type, startX: e.clientX, members: members, alt: !!e.altKey, keySel: keySelNow(), pressLi: li, hotEl: handleEl };
       return;
     }
-    _drag = { li: li, row: row, type: type, startX: e.clientX, origIn: inPointOf(ld), origOut: outPointOf(ld), alt: !!e.altKey, keySel: keySelNow() };
+    _drag = { li: li, row: row, type: type, startX: e.clientX, origIn: inPointOf(ld), origOut: outPointOf(ld), alt: !!e.altKey, keySel: keySelNow(), hotEl: handleEl };
   }
   // Parent in Time (2026-07-30 on-timeline connector) — a dragged bar's OWN
   // position is kept live via updateBar (cheap, see its neighboring comment
@@ -646,6 +652,11 @@
     endMarquee();
     if (!_drag) return;
     var d = _drag; _drag = null;
+    // Unconditional, before any branch below (including the early-return
+    // "plain click" ones a few lines down, which don't otherwise touch this
+    // element) — a stale .hot surviving past mouseup would leave the handle
+    // looking permanently "grabbed".
+    if (d.hotEl) d.hotEl.classList.remove('hot');
     // The live preview is a transform on whatever was rendered at drag
     // start — every branch below either commits data + calls
     // renderLayerList/renderTimeline (which rebuilds these nodes from
