@@ -964,8 +964,19 @@ body:not(.mode-motion) #motion-props-sec{display:none;}
 .motion-keysel-edge{position:absolute;left:-4px;right:-4px;height:14px;pointer-events:auto;cursor:ew-resize;z-index:1;}
 .motion-keysel-edge-top{top:-9px;}
 .motion-keysel-edge-bottom{bottom:-9px;}
-.motion-keysel-edge::after{content:'';position:absolute;left:0;right:0;top:50%;height:3px;transform:translateY(-50%);background:var(--accent);border-radius:2px;opacity:.85;}
-.motion-keysel-edge:hover::after{opacity:1;height:4px;}
+/* 2026-08-16 (Cyril: "la ligne de rectangle soit uniforme juste quand on
+   hover et grab grossis un peu") — this bar used to sit at opacity:.85
+   ALWAYS, on top of the plain 1.5px box border, so the box read as
+   uneven: a crisp thin line on the sides, a bright thick one top/bottom,
+   regardless of whether anyone was even near it. Now transparent at rest
+   (the box's own border alone is the uniform outline), lights up to the
+   SAME accent only on hover (matching the box's border colour, not a
+   brighter one — "uniforme"), and grows a touch further only while
+   actually gripped (.grabbing, toggled by the skew-drag start/end in
+   motion.js) rather than on hover alone. */
+.motion-keysel-edge::after{content:'';position:absolute;left:0;right:0;top:50%;height:3px;transform:translateY(-50%);background:var(--accent);border-radius:2px;opacity:0;transition:opacity .1s linear,height .1s linear;}
+.motion-keysel-edge:hover::after{opacity:.85;}
+.motion-keysel-edge.grabbing::after{opacity:1;height:5px;}
 /* Side edges = SPACE (spread/compress the selection along time, the opposite
    edge staying anchored). Vertical strips, so they reset the top/bottom
    geometry the shared .motion-keysel-edge rule sets for the skew edges. */
@@ -982,7 +993,8 @@ body:not(.mode-motion) #motion-props-sec{display:none;}
 .motion-keysel-edge-right{right:-9px;}
 .motion-keysel-edge-left::after,.motion-keysel-edge-right::after{left:50%;right:auto;top:0;bottom:0;
   height:auto;width:3px;transform:translateX(-50%);}
-.motion-keysel-edge-left:hover::after,.motion-keysel-edge-right:hover::after{height:auto;width:4px;}
+.motion-keysel-edge-left:hover::after,.motion-keysel-edge-right:hover::after{opacity:.85;}
+.motion-keysel-edge-left.grabbing::after,.motion-keysel-edge-right.grabbing::after{opacity:1;width:5px;}
 .lrow.motion-disabled{cursor:not-allowed;opacity:.45;}
 .lrow.motion-disabled:hover{background:transparent;}
 body.mode-motion #layer-panel{width:260px;}
