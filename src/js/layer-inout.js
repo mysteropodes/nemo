@@ -64,11 +64,31 @@
   // keyframes"), so Alt on an out-drag must NOT invert it — same guard
   // shape as mouseup's `d.type !== 'out'` inside the ternary condition.
   function livePreviewLayerKeys(li, type, ld, origIn, altKey) {
-    if (!window.SMMotion || !SMMotion.previewKeyframeShift) return;
     var defaultRetimes = type !== 'out' && (type === 'both' || !!state.activeSymbolId);
     var retimes = (altKey && type !== 'out') ? !defaultRetimes : defaultRetimes;
     if (!retimes) return;
-    SMMotion.previewKeyframeShift(li, inPointOf(ld) - origIn, 'layer');
+    var dxFrames = inPointOf(ld) - origIn;
+    if (window.SMMotion && SMMotion.previewKeyframeShift) SMMotion.previewKeyframeShift(li, dxFrames, 'layer');
+    previewInOutTicks(li, dxFrames);
+  }
+  // Sibling to previewKeyframeShift's `.motion-key` diamond preview above,
+  // but for the DRAWING-keyframe tick marks (renderKeyTicks) inside this
+  // layer's own in/out bar (2026-08-16, Cyril: "les keyframes ne suivent pas
+  // en temps réel le drag du calque"). Those ticks are positioned relative to
+  // the bar's OWN left edge (`(frameIdx - inF) * FC`) — during a body drag
+  // updateBar keeps rewriting both the bar's left (inF*FC) and every tick's
+  // left off the SAME live-shifting inF, so the two offsets cancel out and
+  // the tick's on-screen position stays glued to its original absolute frame
+  // the whole time (ld.frames itself isn't actually shifted until drop —
+  // "cheap live visual, expensive commit at drop", same split as the
+  // diamonds). A translateX nudge here is the same cheap trick, scoped to
+  // this one layer's bar(s) since a group drag calls this per member.
+  function previewInOutTicks(li, dxFrames) {
+    if (!dxFrames) return;
+    var px = Math.round(dxFrames * FC);
+    document.querySelectorAll('#frame-grid .frow[data-layer="' + li + '"] .layer-inout-key').forEach(function (tick) {
+      tick.style.transform = 'translateX(' + px + 'px)';
+    });
   }
   function livePreviewSelectedKeys(dxFrames) {
     if (!window.SMMotion || !SMMotion.previewKeyframeShift) return;
