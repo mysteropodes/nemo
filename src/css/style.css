@@ -1147,19 +1147,49 @@ body.mode-motion .layer-inout-bar .layer-inout-handle::after{content:'';position
 .layer-inout-handle.sel:hover{background:#7C8D89;box-shadow:none;}
 /* Parent in Time — on-timeline connection points (2026-07-30, Van Dijk
    2.1: Shift+[ / Shift+] / Shift+\ "create connection point on In Point /
-   Out Point / the Layer"). Sit ABOVE the bar's own top edge (negative
-   top), never overlapping .layer-inout-handle's full-height resize hit
-   zone at the left/right edges — same "two gestures, two elements" split
-   CLAUDE.md already uses for .lpick vs .lparent. Subtle by default
-   (discoverable without being loud), same opacity step-up on hover as
-   .layer-inout-handle itself. */
-.layer-inout-bar .timelink-anchor{position:absolute;top:-5px;width:8px;height:8px;margin-left:-4px;
+   Out Point / the Layer"). Restyled 2026-08-16 (nemo-timeline-inout-
+   spec.html): moved from sitting ABOVE the bar's top edge to CENTERED on
+   the bar's own vertical middle, diameter matched to the handle's own
+   width so the two read as one calibrated module instead of two unrelated
+   ones fighting for the same corner ("deux modules graphiques différents
+   pour des objets voisins" — the spec's own complaint about the old
+   top-edge placement). Horizontally still half-in/half-out of the bar edge
+   via left:0/50%/100% + a negative margin equal to half its own new
+   diameter (in/out) — unchanged mechanism, just re-tuned to the new size.
+   9px matches body.mode-motion's own handle width a few rules up — these
+   anchors only ever render in Motion mode (the only place buildBar's
+   on-bar Parent-in-Time UI is used), so there's no base/Motion split to
+   keep in sync here the way the handle itself needs one. */
+.layer-inout-bar .timelink-anchor{position:absolute;top:50%;width:9px;height:9px;margin-top:-4.5px;margin-left:-4.5px;
   border-radius:50%;border:1.5px solid var(--text-dim);background:var(--panel2);cursor:alias;
-  opacity:.55;z-index:5;}
-.layer-inout-bar .timelink-anchor:hover{opacity:1;border-color:var(--accent,#5b6cff);box-shadow:0 0 0 2px rgba(91,108,255,.25);}
+  opacity:0;pointer-events:none;z-index:5;transition:opacity .12s linear,background .12s linear,border-color .12s linear;}
+/* Widened hitbox (spec: "±4 px") — a 9px dot is a small target even before
+   accounting for it being half-hidden by design. */
+.layer-inout-bar .timelink-anchor::before{content:'';position:absolute;inset:-4px;}
+/* Visibility (spec: "un point engagé dans un lien est affiché en
+   permanence ; Alt maintenu... ne révèle que les points encore libres") —
+   base state above is fully hidden/inert; #frame-grid.timelink-alt (Alt
+   held, see setTimeLinkAltReveal in layer-inout.js) reveals EVERY anchor
+   including free ones, while .is-child/.is-parent opt back into visibility
+   unconditionally regardless of Alt, since an already-engaged point's role
+   should never depend on a held key to be legible. */
+#frame-grid.timelink-alt .layer-inout-bar .timelink-anchor,
+.layer-inout-bar .timelink-anchor.is-child,
+.layer-inout-bar .timelink-anchor.is-parent{opacity:1;pointer-events:auto;}
+.layer-inout-bar .timelink-anchor:hover{border-color:var(--accent,#5b6cff);box-shadow:0 0 0 2px rgba(91,108,255,.25);}
 .layer-inout-bar .timelink-anchor.in{left:0;}
 .layer-inout-bar .timelink-anchor.out{left:100%;}
 .layer-inout-bar .timelink-anchor.whole{left:50%;}
+/* État des ronds (spec): "le rôle se lit à la couleur — enfant -> rond
+   plein foncé, parent -> rond plein clair. Un point à la fois enfant et
+   parent : fond foncé, contour clair." No connection line between points
+   at all — color alone carries the relationship, matching the spec's own
+   explicit "pas de trait" rule (this codebase's separate .has-timelink
+   whole-bar bottom-border hint, just below, stays as a coarser "this layer
+   participates somehow" signal — the dots now carry the precise role). */
+.layer-inout-bar .timelink-anchor.is-child{background:#04382E;border-color:#04382E;}
+.layer-inout-bar .timelink-anchor.is-parent{background:#fff;border-color:#fff;}
+.layer-inout-bar .timelink-anchor.is-child.is-parent{background:#04382E;border-color:#fff;}
 .layer-inout-bar.has-timelink{border-bottom:2px solid var(--accent,#5b6cff);}
 
 /* Multi-select (marquee rect -> group-drag several layers' bars together,
