@@ -43,7 +43,12 @@
     var src = window.timeLinkSourceOf ? timeLinkSourceOf(ld) : null;
     if (!src) return false;
     if (!window.SMMotion || !window.SMMotion.setLayerValue) return false;
-    var base = which === 'in' ? inPointOf(src) : outPointOf(src);
+    // Cross-type source (2026-08-16) — same srcAnchor fallback as
+    // resolveLinkedTime (app.js) and setLayerTimeLink (motion.js); absent
+    // for every pre-existing/same-type link, so this changes nothing for
+    // those.
+    var srcWhich = (ld.timeLink.srcAnchor === 'in' || ld.timeLink.srcAnchor === 'out') ? ld.timeLink.srcAnchor : which;
+    var base = srcWhich === 'in' ? inPointOf(src) : outPointOf(src);
     var prop = which === 'in' ? 'timeLinkInOffset' : 'timeLinkOutOffset';
     var li = state.layers.indexOf(ld);
     SMMotion.setLayerValue(li, prop, [effectiveValue - base]);
@@ -726,12 +731,22 @@
           if (o !== ld && o.layerUid === ld.timeLink.uid) { srcIn = inPointOf(o); srcOut = outPointOf(o); }
         });
         if (srcIn == null) return; // source gone — leave the hard values alone
+        // Cross-type source (2026-08-16): srcAnchor overrides which of the
+        // SOURCE's edges an 'in'/'out'-mode link reads from — same fallback
+        // as resolveLinkedTime (app.js), setLayerTimeLink (motion.js) and
+        // trySetLinkedEdge (mousemove, above). Absent for every pre-existing
+        // / same-type link, so this changes nothing for those. 'both' mode
+        // never sets srcAnchor (no meaning for "my whole range follows your
+        // single point"), so it always reads the same-type srcIn/srcOut.
+        var srcWhich = (ld.timeLink.srcAnchor === 'in' || ld.timeLink.srcAnchor === 'out') ? ld.timeLink.srcAnchor : null;
+        var srcForIn = srcWhich ? (srcWhich === 'in' ? srcIn : srcOut) : srcIn;
+        var srcForOut = srcWhich ? (srcWhich === 'in' ? srcIn : srcOut) : srcOut;
         // Offsets are Motion properties now (timeLinkInOffset/Out,
         // 2026-07-30) — write through the same public setter the side-panel
         // field and the pickwhip use, not the raw legacy field.
         if (window.SMMotion) {
-          if (mode !== 'out') SMMotion.setLayerValue(m.li, 'timeLinkInOffset', [wantIn - srcIn]);
-          if (mode !== 'in') SMMotion.setLayerValue(m.li, 'timeLinkOutOffset', [wantOut - srcOut]);
+          if (mode !== 'out') SMMotion.setLayerValue(m.li, 'timeLinkInOffset', [wantIn - srcForIn]);
+          if (mode !== 'in') SMMotion.setLayerValue(m.li, 'timeLinkOutOffset', [wantOut - srcForOut]);
         }
         // The hard values are dead weight on a linked layer; dropping them
         // keeps a later unlink from resurrecting a stale range. Only for
