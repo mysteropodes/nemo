@@ -2040,12 +2040,24 @@ function resolveLinkedTime(ld,which,seen,depth){
 function layerHasTimeRange(ld){
   return !!(ld&&(ld.inPoint!=null||ld.outPoint!=null||ld.timeLink));
 }
+// Both resolvers clamp their result into the CURRENT timeline (2026-08-16).
+// Shrinking the project length (SM.setTotalFrames, timeline.js) deliberately
+// leaves per-layer data alone — the frames array itself is never truncated
+// either, so pulling 120 frames down to 30 and back up restores everything.
+// But a stored ld.outPoint of 100 then still RESOLVED to 100 on a 30-frame
+// timeline, and layer-inout.js sizes the bar straight off this value: the
+// green bar ran ~780px past the end of the ruler and inflated the grid's own
+// scroll width with it. Clamping here (the one chokepoint every reader goes
+// through — the bar, saveActiveLayerFrame's range guard, getEffectiveStrokes)
+// hides the overflow everywhere at once while keeping ld.inPoint/outPoint
+// untouched, so the layer's real range comes back if the timeline grows again.
+function _clampToTimeline(f){var last=state.totalFrames-1;return f<0?0:(f>last?last:f);}
 function layerInPoint(ld,_seen,_depth){
   var linked=resolveLinkedTime(ld,'in',_seen,_depth||0);
-  if(linked!=null)return linked;
-  if(ld.inPoint!=null)return ld.inPoint;
+  if(linked!=null)return _clampToTimeline(linked);
+  if(ld.inPoint!=null)return _clampToTimeline(ld.inPoint);
   var auto=autoInPointFromBlankKeyframe(ld);
-  return auto!=null?auto:0;
+  return auto!=null?_clampToTimeline(auto):0;
 }
 // When the user hasn't manually dragged an out point, default to where the
 // layer's own drawing actually stops (its last blank keyframe — F7,
@@ -2069,10 +2081,10 @@ function autoOutPointFromBlankKeyframe(ld){
 }
 function layerOutPoint(ld,_seen,_depth){
   var linked=resolveLinkedTime(ld,'out',_seen,_depth||0);
-  if(linked!=null)return linked;
-  if(ld.outPoint!=null)return ld.outPoint;
+  if(linked!=null)return _clampToTimeline(linked);
+  if(ld.outPoint!=null)return _clampToTimeline(ld.outPoint);
   var auto=autoOutPointFromBlankKeyframe(ld);
-  return auto!=null?auto:state.totalFrames-1;
+  return auto!=null?_clampToTimeline(auto):state.totalFrames-1;
 }
 // Right-click unlink (2026-07-30, on-timeline anchors/badges/Temps row) must
 // leave the layer exactly where it LOOKED while linked — a bare `delete

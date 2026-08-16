@@ -674,7 +674,18 @@ window.SM={
   setOnionPrevOp:function(v){state.onionPrevOpacity=v;renderOS();},setOnionNextOp:function(v){state.onionNextOpacity=v;renderOS();},
   setOnionMode:function(v){state.onionMode=v;renderOS();},
   setWorkArea:function(inF,outF){state.waIn=inF;state.waOut=outF;},
-  setTotalFrames:function(v){v=Math.max(1,Math.min(999,v));saveAllLayerFrames();for(var i=0;i<state.layers.length;i++){while(state.layers[i].frames.length<v)state.layers[i].frames.push({strokes:[],isKeyframe:false,isInterpolated:false});}state.totalFrames=v;window._totalF=v;if(state.waOut>=v)state.waOut=v-1;window._waOut=state.waOut;if(state.currentFrame>=v)goToFrame(v-1);updateUI();},
+  setTotalFrames:function(v){v=Math.max(1,Math.min(999,v));saveAllLayerFrames();for(var i=0;i<state.layers.length;i++){while(state.layers[i].frames.length<v)state.layers[i].frames.push({strokes:[],isKeyframe:false,isInterpolated:false});}state.totalFrames=v;window._totalF=v;if(state.waOut>=v)state.waOut=v-1;
+    // waIn had no clamp beside waOut's (2026-08-16): shrinking the timeline
+    // below a moved work-area start left waIn > waOut — not merely out of
+    // range but INVERTED, which draws #wa-bar as a strip starting past the
+    // end of the ruler (reproduced: 120->30 frames with waIn 50 put the whole
+    // work area at 550-880px on a 330px timeline). Clamped after waOut so the
+    // pair can never cross. Per-layer in/out and markers are deliberately NOT
+    // touched here — those are hidden by their own readers instead, so the
+    // user's ranges survive a shrink-and-grow round trip the way the frames
+    // array already does (see layerInPoint/layerOutPoint, app.js).
+    if(state.waIn>=state.waOut)state.waIn=Math.max(0,state.waOut-1);
+    window._waIn=state.waIn;window._waOut=state.waOut;if(state.currentFrame>=v)goToFrame(v-1);updateUI();},
   addLayer:function(){saveAllLayerFrames();pushUndoLayers();var idx=createUserLayer(nextLayerName());activateUL(idx);loadFrame(state.currentFrame);updateUI();},
   // Null layer (2026-07, Motion) — AE's "Null Object": exists purely as a
   // parenting/pivot target for other layers (SMMotion's existing
