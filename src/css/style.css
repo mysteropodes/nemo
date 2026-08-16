@@ -881,11 +881,25 @@ body:not(.mode-motion) #motion-props-sec{display:none;}
    room to spare) so an unselected/non-current key stays readable sitting
    on top of the accent-tinted connection bar (trackRowHtml, motion.js)
    instead of partly blending into it. */
-.motion-key{position:relative;width:9px;height:9px;border-radius:2px;background:#e6e6e6;border:1px solid rgba(0,0,0,.5);box-shadow:0 0 0 1.5px rgba(0,0,0,.35);transform:rotate(45deg);}
-.motion-key.cur{background:#ffaa28;width:11px;height:11px;}
-.motion-key.sel{background:var(--accent);border-color:#fff;box-shadow:0 0 0 1.5px var(--accent);}
+/* 2026-08-16 restyle (nemo-timeline-inout-spec.html): "un seul dessin quel
+   que soit le voisinage — losange en contour, sans remplissage... le
+   remplissage devient EXCLUSIVEMENT le marqueur de sélection". Base is now
+   an outline-only diamond (transparent center — the connector bar behind
+   it shows through by design, same "ring sitting on the bar" read the
+   spec's own mockup uses) instead of a permanently solid-filled one; .sel
+   is the only state that fills it. Kept the dark halo box-shadow for
+   legibility against the accent-tinted connector either way — unrelated
+   axis, still needed on a thin-bordered shape sitting on varied
+   backgrounds. */
+.motion-key{position:relative;width:9px;height:9px;border-radius:2px;background:transparent;border:1.5px solid #cfcfcf;box-shadow:0 0 0 1.5px rgba(0,0,0,.35);transform:rotate(45deg);}
+.motion-key.cur{background:#ffaa28;border-color:#ffaa28;width:11px;height:11px;}
+/* Selected -> darkens the connector's own selected treatment lighter, same
+   "fill is the ONLY added signal, no extra ring" principle just applied to
+   the in/out handle a batch earlier — no separate box-shadow ring here
+   either now, the fill alone reads as selected. */
+.motion-key.sel{background:var(--accent);border-color:var(--accent);}
 .motion-key.hold{border-radius:1px;transform:rotate(0deg);}
-.motion-key.sel.cur{background:#ffaa28;box-shadow:0 0 0 1.5px var(--accent);}
+.motion-key.sel.cur{background:#ffaa28;border-color:#ffaa28;}
 /* Marquee rectangle (motion.js, screen-fixed since it spans multiple .frow
    rows, unlike per-row overlays elsewhere in this file). */
 .motion-marquee-rect{position:fixed;border:1px solid var(--accent);background:rgba(63,107,245,.15);pointer-events:none;z-index:50;}
