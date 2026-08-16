@@ -5551,6 +5551,98 @@ function openTextPopoverForEdit(raster){
   var ta=document.getElementById('text-input');ta.focus();ta.select();
 }
 function closeTextPopover(){var pop=document.getElementById('text-popover');if(pop)pop.style.display='none';_textPendingPt=null;_textPendingBox=null;_textEditingRaster=null;}
+// In-place canvas text editing (2026-08-16, Cyril: "LE TEXT DEVRAIT
+// POUVOIR S'EDITER DIRECTEMENT sur le canvas... comme tout les logiciel
+// d'édition de text type ai ou figma") — double-clicking a VECTOR text
+// block now edits it right where it sits instead of opening the side
+// popover: the live glyph Paths hide, a transparent <textarea> appears at
+// their exact screen position/size/style (font, weight, italic slant via
+// CSS font-style, decoration, letter-spacing, alignment — everything the
+// Typography panel itself exposes), and committing (blur or Cmd/Ctrl+
+// Enter) rebuilds the glyphs through the SAME buildVectorTextGroup path
+// the panel's own edits already use. Escape cancels and restores the
+// original glyphs untouched — nothing is rebuilt, so a cancelled edit
+// costs nothing.
+//
+// Deliberately vector-only, same reasoning as the Typography panel's own
+// scoping (see updateTextPropsPanel's comment): raster text (the Canvas2D
+// bake) has no live glyph outlines to hide/restore this way, and its
+// double-click popover already exists unchanged. Font: a real @font-face
+// (style.css, 'Nemo Vector Text') loads the SAME bundled Roboto TTFs
+// vector-text-bridge.js parses for glyph outlines, so the overlay LOOKS
+// like the vector result it's about to become, not a generic stand-in.
+var _inplaceTa=null,_inplaceRoot=null,_inplaceHidden=null;
+function openInPlaceTextEditor(root){
+  if(!root||!root.data||!window.SMVectorText)return;
+  if(_inplaceTa)closeInPlaceTextEditor(true); // a stray prior editor (shouldn't happen, but never stack two)
+  var d=root.data;
+  var members=window.SMVectorText.vectorTextGroupMembers(root);
+  if(!members.length)return;
+  var bounds=members.reduce(function(b,p){return b?b.unite(p.bounds):p.bounds.clone();},null);
+  members.forEach(function(p){p.visible=false;});
+  _inplaceHidden=members;_inplaceRoot=root;
+  var ta=document.createElement('textarea');
+  ta.id='tp-inplace-editor';
+  ta.value=d.text||'';
+  ta.spellcheck=false;
+  document.body.appendChild(ta);
+  _inplaceTa=ta;
+  function reposition(){
+    var topLeftView=view.projectToView(bounds.topLeft);
+    var canvasEl=document.getElementById('drawing-canvas');
+    var cr=canvasEl.getBoundingClientRect();
+    var fontPx=(d.size||48)*view.zoom;
+    ta.style.left=(cr.left+topLeftView.x)+'px';
+    ta.style.top=(cr.top+topLeftView.y)+'px';
+    ta.style.fontSize=fontPx+'px';
+    ta.style.color=d.color||'#000000';
+    ta.style.fontWeight=d.bold?'700':'400';
+    ta.style.fontStyle=d.italic?'italic':'normal';
+    ta.style.textDecoration=[d.underline?'underline':'',d.strike?'line-through':''].filter(Boolean).join(' ')||'none';
+    ta.style.letterSpacing=((d.letterSpacing||0)*view.zoom)+'px';
+    ta.style.lineHeight=String(d.lineHeightMult||1.25);
+    ta.style.textAlign=d.align||'left';
+    if(d.fixedWidth){ta.style.whiteSpace='pre-wrap';ta.style.width=(d.fixedWidth*view.zoom)+'px';}
+    else{ta.style.whiteSpace='pre';ta.style.width=Math.max(20,ta.scrollWidth)+'px';}
+    ta.style.height=ta.scrollHeight+'px';
+  }
+  reposition();
+  ta.addEventListener('input',reposition);
+  ta.addEventListener('keydown',function(e){
+    e.stopPropagation();
+    if(e.key==='Escape'){e.preventDefault();closeInPlaceTextEditor(true);}
+    else if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)){e.preventDefault();closeInPlaceTextEditor(false);}
+  });
+  ta.addEventListener('blur',function(){closeInPlaceTextEditor(false);});
+  ta.focus();ta.select();
+}
+function closeInPlaceTextEditor(cancel){
+  var ta=_inplaceTa,root=_inplaceRoot,hidden=_inplaceHidden;
+  if(!ta)return;
+  _inplaceTa=null;_inplaceRoot=null;_inplaceHidden=null;
+  var newText=ta.value;
+  ta.remove();
+  var restore=function(){if(hidden)hidden.forEach(function(p){if(p&&!p.removed)p.visible=true;});};
+  if(cancel||!root||!root.data||!newText.trim()||newText===root.data.text){restore();if(window.SMEngineBridge)SMEngineBridge.renderNow();return;}
+  var d=root.data;
+  var opts={bold:d.bold,italic:d.italic,underline:d.underline,strike:d.strike,letterSpacing:d.letterSpacing,wordSpacing:d.wordSpacing,lineHeightMult:d.lineHeightMult,textCase:d.textCase};
+  var layer=root.parent;
+  if(!layer){restore();return;} // layer vanished mid-edit (deleted, mode switch) — bail rather than build into nothing
+  var groupBounds=window.SMVectorText.vectorTextGroupMembers(root).reduce(function(b,p){return b?b.unite(p.bounds):p.bounds.clone();},null);
+  var topLeft=groupBounds.topLeft.clone();
+  pushUndo();
+  window.SMVectorText.vectorTextGroupMembers(root).forEach(function(p){p.remove();});
+  window.SMVectorText.buildVectorTextGroup(newText,d.vectorFont,d.size,d.color,d.align,d.fixedWidth,topLeft,layer,opts).then(function(res){
+    if(res.paths.length)selectedPaths=res.paths.slice();
+    saveActiveLayerFrame();updateUI();
+    if(window.SMEngineBridge)SMEngineBridge.renderNow();
+  }).catch(function(e){
+    console.warn('[in-place text] rebuild failed',e);
+    showToast('Édition du texte : échec de la reconstruction');
+    restore();
+  });
+}
+window.openInPlaceTextEditor=openInPlaceTextEditor;
 // Shared layout pass (2026-07) — used by BOTH commitText's flattened bake
 // AND splitTextIntoCharacters' per-character split, so a split always
 // matches the flattened text pixel-for-pixel (same wrap decisions, same

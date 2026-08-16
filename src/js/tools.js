@@ -5979,7 +5979,11 @@ function onViewDoubleClick(event){
     if(textHit&&textHit.item instanceof Path&&textHit.item.data&&textHit.item.data.isVectorText){
       var vtGid=textHit.item.data.groupId;
       var vtRoot=textLayer.children.filter(function(c){return c.data&&c.data.groupId===vtGid&&c.data.isTextRoot;})[0];
-      if(vtRoot&&window.openTextPopoverForEdit)openTextPopoverForEdit(vtRoot);
+      // In-place canvas editing (2026-08-16) — double-clicking vector text
+      // now edits it right on the canvas (Illustrator/Figma convention)
+      // instead of opening the side popover; see openInPlaceTextEditor's
+      // own header comment (timeline.js) for why this is vector-only.
+      if(vtRoot&&window.openInPlaceTextEditor)openInPlaceTextEditor(vtRoot);
       return;
     }
   }
