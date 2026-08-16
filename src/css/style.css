@@ -1287,7 +1287,16 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
 /* Per-keyframe tick marks inside the in/out bar (layer-inout.js
    renderKeyTicks) — one per Animation 2D "full" keyframe, draggable to
    retime that keyframe without leaving Motion mode. */
-.layer-inout-bar .layer-inout-key{position:absolute;top:0;bottom:0;width:3px;margin-left:-1.5px;background:#fff;opacity:.85;cursor:ew-resize;z-index:3;border-radius:1px;}
+/* z-index:6, above #playhead's 5 (2026-08-16, Cyril: "si je met une
+   keyframe l'indicateur de frame disparait") — F6/insertKeyframe always
+   inserts AT state.currentFrame, so a freshly-placed keyframe's tick and
+   the playhead sit at the EXACT same x the instant it's created. #playhead
+   has a solid 2px accent-blue border-left at z-index:5, previously higher
+   than this tick's z-index:3 — it fully painted over the tick, so the very
+   moment you placed a keyframe, its marker looked like it had vanished
+   (it hadn't; it just moved). Confirmed live: moving the playhead one
+   frame away instantly revealed the tick was there all along. */
+.layer-inout-bar .layer-inout-key{position:absolute;top:0;bottom:0;width:3px;margin-left:-1.5px;background:#fff;opacity:.85;cursor:ew-resize;z-index:6;border-radius:1px;}
 .layer-inout-bar .layer-inout-key:hover{opacity:1;background:var(--accent);width:4px;margin-left:-2px;}
 /* Blank-keyframe gaps inside the bar (layer-inout.js renderContentGaps,
    2026-07) — dims a genuinely empty stretch instead of letting it read as

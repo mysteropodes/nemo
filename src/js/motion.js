@@ -5093,7 +5093,17 @@
       var edge = document.createElement('div');
       edge.className = 'motion-keysel-edge motion-keysel-edge-' + pos;
       edge.title = 'Glisser horizontalement pour skewer les clés (ce bord bouge, l\'autre reste ancré)';
-      edge.addEventListener('mousedown', function (e) { e.stopPropagation(); e.preventDefault(); onStart(e, pos); });
+      edge.addEventListener('mousedown', function (e) {
+        e.stopPropagation(); e.preventDefault();
+        // .grabbing thickens the edge bar a touch further than plain hover
+        // (2026-08-16, Cyril: "quand on hover et grab grossis un peu") —
+        // self-contained rather than threaded through startSkewDrag/onDragUp,
+        // same add-on-mousedown/remove-on-mouseup convention ui.js already
+        // uses for its own resize handles (lpr/tpr/ppr .active).
+        edge.classList.add('grabbing');
+        document.addEventListener('mouseup', function () { edge.classList.remove('grabbing'); }, { once: true });
+        onStart(e, pos);
+      });
       boxEl.appendChild(edge);
     });
   }
@@ -5107,7 +5117,12 @@
       var edge = document.createElement('div');
       edge.className = 'motion-keysel-edge motion-keysel-edge-' + pos;
       edge.title = 'Glisser pour espacer / resserrer les clés dans le temps (le bord opposé reste ancré)';
-      edge.addEventListener('mousedown', function (e) { e.stopPropagation(); e.preventDefault(); onStart(e, pos); });
+      edge.addEventListener('mousedown', function (e) {
+        e.stopPropagation(); e.preventDefault();
+        edge.classList.add('grabbing');
+        document.addEventListener('mouseup', function () { edge.classList.remove('grabbing'); }, { once: true });
+        onStart(e, pos);
+      });
       boxEl.appendChild(edge);
     });
   }
