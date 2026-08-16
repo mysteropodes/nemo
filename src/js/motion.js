@@ -3451,16 +3451,33 @@
   // this same function instead of duplicating the seed/cycle logic — the
   // exact setLayerParent/buildParentMenuItems split spatial parenting
   // already uses). mode: 'both'|'in'|'out'. Returns true on success.
-  function setLayerTimeLink(li, targetIdx, mode) {
+  // srcAnchor (2026-08-16, spec: "un in-point peut suivre un out-point...
+  // enchaîner l'apparition d'un calque sur la disparition du précédent") —
+  // which of the SOURCE's own edges to read from, when it differs from the
+  // child's own edge type. Only meaningful for a single driven edge (mode
+  // 'in'/'out'); 'both' always reads same-type on both sides — "my whole
+  // range follows your single point" has no clean meaning, so a whole-
+  // layer link stays same-type-only by design. Falls back to the child's
+  // own mode (today's exact behavior) when unset/'whole'/invalid, so every
+  // EXISTING call site (the side-panel Temps row, the menu-based creation
+  // from buildTimeLinkMenuItems, a pickwhip drop that didn't land on a
+  // specific target anchor) is 100% unaffected.
+  function setLayerTimeLink(li, targetIdx, mode, srcAnchor) {
     var ld = state.layers[li], src = state.layers[targetIdx];
     if (!ld || !src || targetIdx === li) return false;
     if (timeLinkWouldCycle(li, targetIdx)) { if (window.showToast) showToast('Lien impossible : créerait un cycle'); return false; }
     pushUndo();
+    mode = mode || 'both';
+    var xType = (mode !== 'both' && (srcAnchor === 'in' || srcAnchor === 'out')) ? srcAnchor : mode;
     // Seed the offsets from the CURRENT gap, so linking never makes the
     // layer jump: it stays exactly where it is and only starts following.
     var myIn = layerInPoint(ld), myOut = layerOutPoint(ld);
-    var seedInOff = myIn - layerInPoint(src), seedOutOff = myOut - layerOutPoint(src);
-    ld.timeLink = { uid: ensureLayerUid(src), mode: mode || 'both' };
+    var srcInVal = layerInPoint(src), srcOutVal = layerOutPoint(src);
+    var xVal = xType === 'out' ? srcOutVal : srcInVal;
+    var seedInOff = myIn - (mode === 'in' ? xVal : srcInVal);
+    var seedOutOff = myOut - (mode === 'out' ? xVal : srcOutVal);
+    ld.timeLink = { uid: ensureLayerUid(src), mode: mode };
+    if (mode !== 'both' && xType !== mode) ld.timeLink.srcAnchor = xType;
     // Offsets are Motion properties now (timeLinkInOffset/Out) — write
     // through setValue like any other, not a raw field on the link.
     setValue(ld, 'timeLinkInOffset', [seedInOff]);
@@ -3468,8 +3485,12 @@
     renderLayerList(); renderTimeline();
     if (window.loadFrame) loadFrame(state.currentFrame);
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
-    var modeLabel = mode === 'in' ? ' (entrée)' : mode === 'out' ? ' (sortie)' : '';
-    if (window.showToast) showToast('Temps lié à « ' + (src.name || ('Layer ' + (targetIdx + 1))) + ' »' + modeLabel);
+    var srcName = src.name || ('Layer ' + (targetIdx + 1));
+    var msg;
+    if (mode === 'both') msg = 'Temps lié à « ' + srcName + ' »';
+    else if (xType !== mode) msg = (mode === 'in' ? 'Point d’entrée' : 'Point de sortie') + ' lié à ' + (xType === 'out' ? 'la sortie' : 'l’entrée') + ' de « ' + srcName + ' »';
+    else msg = 'Temps lié à « ' + srcName + ' »' + (mode === 'in' ? ' (entrée)' : ' (sortie)');
+    if (window.showToast) showToast(msg);
     return true;
   }
   // mode ('both'|'in'|'out') — which edge(s) the resulting link drives.
@@ -3498,7 +3519,17 @@
       if (!row) return null;
       var idx = parseInt(row.dataset.layer, 10);
       if (isNaN(idx) || idx === li || timeLinkWouldCycle(li, idx)) return null;
-      return { row: row, idx: idx };
+      // Cross-type source detection (2026-08-16) — if the drop point landed
+      // on one of the TARGET's own on-bar anchor dots specifically (not
+      // just its bar/row generally), that anchor's type ('in'/'out') feeds
+      // setLayerTimeLink's srcAnchor; landing on 'whole' or anywhere else
+      // on the row leaves it unset, same-type default (today's behavior).
+      var anchorEl = el.closest('.timelink-anchor');
+      var srcAnchor = null;
+      if (anchorEl && (anchorEl.classList.contains('in') || anchorEl.classList.contains('out'))) {
+        srcAnchor = anchorEl.classList.contains('in') ? 'in' : 'out';
+      }
+      return { row: row, idx: idx, srcAnchor: srcAnchor };
     }
     function onMove(e) {
       paint(e.clientX, e.clientY);
@@ -3518,7 +3549,7 @@
       var t = rowUnder(e.clientX, e.clientY);
       cleanup();
       if (t == null) return;
-      setLayerTimeLink(li, t.idx, mode);
+      setLayerTimeLink(li, t.idx, mode, t.srcAnchor);
     }
     function onKey(e) { if (e.key === 'Escape') cleanup(); }
     document.addEventListener('mousemove', onMove, true);

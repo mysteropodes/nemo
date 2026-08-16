@@ -2009,7 +2009,15 @@ function resolveLinkedTime(ld,which,seen,depth){
   seen=seen||[];
   if(seen.indexOf(ld)>=0||depth>16)return null;
   seen.push(ld);
-  var base=which==='in'?layerInPoint(src,seen,depth+1):layerOutPoint(src,seen,depth+1);
+  // Cross-type source (2026-08-16, spec: "un in-point peut suivre un
+  // out-point") — link.srcAnchor overrides which of the SOURCE's edges to
+  // read from, when it differs from `which` (the CHILD's own edge). Absent
+  // for every link created before this existed (and for any 'both'-mode
+  // link, which never sets it — see setLayerTimeLink's own comment for why
+  // "both" stays same-type-only), so this is a pure fallback: old projects
+  // and same-type links resolve EXACTLY as before.
+  var srcWhich=(link.srcAnchor==='in'||link.srcAnchor==='out')?link.srcAnchor:which;
+  var base=srcWhich==='in'?layerInPoint(src,seen,depth+1):layerOutPoint(src,seen,depth+1);
   // Expression-only, evaluated off state.currentFrame (confirmed scope with
   // Cyril): layerInPoint/layerOutPoint carry no frame parameter at any of
   // their 13 call sites, so this is "the offset as of right now", not a
