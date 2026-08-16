@@ -1924,7 +1924,7 @@ function updateUI(frameOnly){
   window._totalF=state.totalFrames;window._waIn=state.waIn;window._waOut=state.waOut;window._curFrame=state.currentFrame;
   window.updateWaBar();window.updateOmMarkers(state.currentFrame,state.totalFrames);
   if(frameOnly)updatePlayhead();else renderTimeline();
-  renderLayerList(frameOnly);updateCompInstancePanel();updateDuplicatorPanel();updateFootagePanel();updateSelPropsPanel();updateFsSelPanel();updateRevisionPanel();updateTextActionsPanel();if(window.updateEffectsPanel)window.updateEffectsPanel();updatePropsContext();
+  renderLayerList(frameOnly);updateCompInstancePanel();updateDuplicatorPanel();updateFootagePanel();updateSelPropsPanel();updateFsSelPanel();updateRevisionPanel();updateTextActionsPanel();updateTextPropsPanel();if(window.updateEffectsPanel)window.updateEffectsPanel();updatePropsContext();
 }
 // Team review Accept/Reject panel — shown when exactly one selected item is
 // either an active (non-ghost) revision (data.revisionParentId) or a
@@ -5803,6 +5803,146 @@ function updateTextActionsPanel(){
     document.getElementById('btn-text-split-chars').onclick=function(){splitTextIntoCharacters(p);};
   }
 }
+// Typography panel (2026-08-16, "le panneau droite pour le texte") — live,
+// persistent alternative to the popover for VECTOR text roots ONLY. Raster
+// text (the Canvas2D bake) is deliberately excluded: it has no real per-
+// character glyph outlines to shear/decorate, and letter/word spacing has
+// no equivalent in the Canvas2D fillText() API this codebase's raster path
+// uses — offering these controls on a raster block would either no-op
+// silently or need a second, divergent implementation. Raster text keeps
+// using its existing double-click popover (openTextPopoverForEdit),
+// unchanged by this feature.
+function textPropsRoot(){
+  if(state.tool!=='select'||!selectedPaths.length)return null;
+  var first=selectedPaths[0];
+  if(!first||!first.data||!first.data.isVectorText||!first.data.groupId||!window.SMVectorText)return null;
+  // A plain click on vector text selects EVERY glyph Path sharing its
+  // groupId (same click-select behaviour as any other combine-group) — not
+  // just the single root Path isTextRoot lives on. Resolve to that root,
+  // but only when the CURRENT selection is exactly this whole group (mirrors
+  // updateCombinePanel's own "selection === group members" check) — a
+  // partial pick (Shift-click removed one glyph, or a marquee that only
+  // grazed some of them) has no single coherent set of typography values
+  // to show or edit.
+  var members=window.SMVectorText.vectorTextGroupMembers(first);
+  var root=members.filter(function(p){return p.data&&p.data.isTextRoot;})[0];
+  if(!root||selectedPaths.length!==members.length)return null;
+  var allMatch=selectedPaths.every(function(p){return p.data&&p.data.groupId===first.data.groupId;});
+  return allMatch?root:null;
+}
+function updateTextPropsPanel(){
+  var sec=document.getElementById('text-props-sec');
+  if(!sec)return;
+  var root=textPropsRoot();
+  sec.style.display=root?'':'none';
+  if(!root)return;
+  var d=root.data;
+  // Skip re-populating whatever field currently has focus — a re-render
+  // triggered by this SAME edit's own rebuild (updateUI, called from
+  // applyTextPropsEdit's .then) must not yank the cursor out from under a
+  // still-focused field or overwrite a value mid-drag (same guard pattern
+  // as every other live-bound numeric field in this file).
+  var content=document.getElementById('tp-content');
+  if(document.activeElement!==content)content.value=d.text||'';
+  var sizeEl=document.getElementById('tp-size');
+  if(document.activeElement!==sizeEl)sizeEl.value=d.size||48;
+  var colorEl=document.getElementById('tp-color');
+  if(document.activeElement!==colorEl)colorEl.value=d.color||'#000000';
+  document.querySelectorAll('.tp-align-btn').forEach(function(b){b.classList.toggle('ac',b.dataset.val===(d.align||'left'));});
+  document.querySelectorAll('.tp-style-btn').forEach(function(b){b.classList.toggle('ac',!!d[b.dataset.flag]);});
+  document.querySelectorAll('.tp-case-btn').forEach(function(b){b.classList.toggle('ac',b.dataset.val===(d.textCase||'none'));});
+  var lsEl=document.getElementById('tp-letter-spacing');
+  if(document.activeElement!==lsEl)lsEl.value=d.letterSpacing||0;
+  var lhEl=document.getElementById('tp-line-height');
+  if(document.activeElement!==lhEl)lhEl.value=d.lineHeightMult||1.25;
+  var wsEl=document.getElementById('tp-word-spacing');
+  if(document.activeElement!==wsEl)wsEl.value=d.wordSpacing||0;
+  var isFixed=!!d.fixedWidth;
+  document.querySelectorAll('.tp-width-btn').forEach(function(b){b.classList.toggle('ac',(b.dataset.val==='fixed')===isFixed);});
+  var fwEl=document.getElementById('tp-fixed-width');
+  fwEl.style.display=isFixed?'':'none';
+  if(document.activeElement!==fwEl)fwEl.value=d.fixedWidth||300;
+}
+// Commits every field on the panel by rebuilding the vector glyph group —
+// the SAME remove-then-rebuild the popover's re-edit path already does
+// (commitVectorText, above), just triggered from a persistent panel instead
+// of a one-shot Apply button. One pushUndo per call: every caller binds
+// this to 'change'/'click'/'blur', never 'input', specifically so a scrub-
+// drag or a run of keystrokes commits ONCE when the gesture ends rather
+// than flooding the undo stack per intermediate value (the exact bug
+// already found and fixed once this session for the easing-curve drag).
+function applyTextPropsEdit(){
+  var root=textPropsRoot();
+  if(!root||!window.SMVectorText)return;
+  var d=root.data;
+  var text=document.getElementById('tp-content').value;
+  if(!text.trim())return; // never rebuild into an empty block — same guard commitText uses
+  var size=parseInt(document.getElementById('tp-size').value,10)||d.size||48;
+  var color=document.getElementById('tp-color').value||d.color;
+  var alignBtn=document.querySelector('.tp-align-btn.ac');
+  var align=alignBtn?alignBtn.dataset.val:(d.align||'left');
+  var opts={
+    bold:document.querySelector('.tp-style-btn[data-flag="bold"]').classList.contains('ac'),
+    italic:document.querySelector('.tp-style-btn[data-flag="italic"]').classList.contains('ac'),
+    underline:document.querySelector('.tp-style-btn[data-flag="underline"]').classList.contains('ac'),
+    strike:document.querySelector('.tp-style-btn[data-flag="strike"]').classList.contains('ac'),
+    letterSpacing:parseFloat(document.getElementById('tp-letter-spacing').value)||0,
+    lineHeightMult:parseFloat(document.getElementById('tp-line-height').value)||1.25,
+    wordSpacing:parseFloat(document.getElementById('tp-word-spacing').value)||0,
+    textCase:(document.querySelector('.tp-case-btn.ac')||{}).dataset?document.querySelector('.tp-case-btn.ac').dataset.val:'none',
+  };
+  var widthBtn=document.querySelector('.tp-width-btn.ac');
+  var fixedWidthWorld=(widthBtn&&widthBtn.dataset.val==='fixed')?(parseFloat(document.getElementById('tp-fixed-width').value)||300):null;
+  var layer=root.parent;
+  var groupBounds=window.SMVectorText.vectorTextGroupMembers(root).reduce(function(b,p){return b?b.unite(p.bounds):p.bounds.clone();},null);
+  var topLeft=groupBounds.topLeft.clone();
+  pushUndo();
+  window.SMVectorText.vectorTextGroupMembers(root).forEach(function(p){p.remove();});
+  window.SMVectorText.buildVectorTextGroup(text,d.vectorFont,size,color,align,fixedWidthWorld,topLeft,layer,opts).then(function(res){
+    // Re-point the selection at every glyph of the freshly-built group, not
+    // just its root — the old paths were just removed above, and
+    // textPropsRoot() requires the CURRENT selection to be exactly the
+    // whole group (same contract a real click-select produces). Selecting
+    // only the root here would make the panel vanish the instant this
+    // same edit's own updateUI() call re-renders below.
+    if(res.paths.length)selectedPaths=res.paths.slice();
+    saveActiveLayerFrame();updateUI();
+    if(window.SMEngineBridge)window.SMEngineBridge.renderNow();
+  }).catch(function(e){
+    console.warn('[text-props] rebuild failed',e);
+    showToast('Édition du texte : échec de la reconstruction');
+  });
+}
+(function(){
+  var contentEl=document.getElementById('tp-content');
+  if(!contentEl)return; // this file is also loaded in contexts without the full panel markup
+  contentEl.addEventListener('blur',applyTextPropsEdit);
+  ['tp-size','tp-color','tp-letter-spacing','tp-line-height','tp-word-spacing','tp-fixed-width'].forEach(function(id){
+    document.getElementById(id).addEventListener('change',applyTextPropsEdit);
+  });
+  document.querySelectorAll('.tp-align-btn').forEach(function(b){
+    b.addEventListener('click',function(){
+      document.querySelectorAll('.tp-align-btn').forEach(function(o){o.classList.toggle('ac',o===b);});
+      applyTextPropsEdit();
+    });
+  });
+  document.querySelectorAll('.tp-style-btn').forEach(function(b){
+    b.addEventListener('click',function(){b.classList.toggle('ac');applyTextPropsEdit();});
+  });
+  document.querySelectorAll('.tp-case-btn').forEach(function(b){
+    b.addEventListener('click',function(){
+      document.querySelectorAll('.tp-case-btn').forEach(function(o){o.classList.toggle('ac',o===b);});
+      applyTextPropsEdit();
+    });
+  });
+  document.querySelectorAll('.tp-width-btn').forEach(function(b){
+    b.addEventListener('click',function(){
+      document.querySelectorAll('.tp-width-btn').forEach(function(o){o.classList.toggle('ac',o===b);});
+      document.getElementById('tp-fixed-width').style.display=(b.dataset.val==='fixed')?'':'none';
+      applyTextPropsEdit();
+    });
+  });
+})();
 // Effects stack panel (2026-07 rewrite) — see effects-panel.js; the
 // separate #effect-layer-sec-specific rendering that used to live here
 // has been replaced by that file's unified updateEffectsPanel(), shared

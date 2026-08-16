@@ -410,6 +410,64 @@
         <div class="pr"><button class="pbtn ac" id="btn-text-split-chars" style="flex:1" data-i18n="textSplitBtn">Découper par caractère</button></div>
       </div>
     </div>
+    <!-- Typography panel (2026-08-16) — live re-editable properties for a
+         selected VECTOR text root (raster text keeps the popover-only flow;
+         see updateTextPropsPanel's own comment, timeline.js, for why). Every
+         field commits through the SAME rebuild path buildVectorTextGroup
+         already used for the popover's re-edit (removes the old glyph
+         group, rebuilds fresh) — this panel is a second, persistent DOOR
+         onto that one mechanism, not a parallel one. -->
+    <div class="psec" id="text-props-sec" style="display:none">
+      <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrTypography">Typographie</span></div>
+      <div class="pbdy">
+        <div class="pr"><textarea id="tp-content" rows="2" style="width:100%;resize:vertical;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:12px;padding:5px;box-sizing:border-box" data-i18n-title="tpContentTitle" title="Contenu du texte"></textarea></div>
+        <div class="pr" style="gap:6px">
+          <select id="tp-font" class="psel" style="flex:1" data-i18n-title="tpFontTitle" title="Police">
+            <option value="Roboto">Roboto</option>
+          </select>
+          <input type="number" id="tp-size" value="48" min="4" max="800" style="width:56px" class="pi scrub" data-step="1" data-i18n-title="textSizeTitle" title="Taille (px)">
+          <input type="color" id="tp-color" value="#000000" style="width:26px;height:24px;padding:0;border:1px solid var(--border);border-radius:5px;background:none" data-i18n-title="colorTitle" title="Couleur">
+        </div>
+        <div class="pr" style="gap:4px" data-i18n-title="alignTitle" title="Alignement">
+          <button class="pbtn tp-align-btn" data-val="left" style="flex:1" data-i18n="alignLeftOpt">Gauche</button>
+          <button class="pbtn tp-align-btn" data-val="center" style="flex:1" data-i18n="alignCenterOpt">Centre</button>
+          <button class="pbtn tp-align-btn" data-val="right" style="flex:1" data-i18n="alignRightOpt">Droite</button>
+        </div>
+        <div class="pr" style="gap:4px" data-i18n-title="tpStyleTitle" title="Style (chaque bouton se togglee indépendamment)">
+          <button class="pbtn tp-style-btn" data-flag="bold" style="flex:1;font-weight:700">B</button>
+          <button class="pbtn tp-style-btn" data-flag="italic" style="flex:1;font-style:italic">I</button>
+          <button class="pbtn tp-style-btn" data-flag="underline" style="flex:1;text-decoration:underline">U</button>
+          <button class="pbtn tp-style-btn" data-flag="strike" style="flex:1;text-decoration:line-through">S</button>
+        </div>
+        <div class="pr" style="gap:4px" data-i18n-title="tpCaseTitle" title="Casse du texte">
+          <button class="pbtn tp-case-btn" data-val="none" style="flex:1" data-i18n="tpCaseNone">Aa</button>
+          <button class="pbtn tp-case-btn" data-val="upper" style="flex:1" data-i18n="tpCaseUpper">AA</button>
+          <button class="pbtn tp-case-btn" data-val="lower" style="flex:1" data-i18n="tpCaseLower">aa</button>
+          <button class="pbtn tp-case-btn" data-val="capitalize" style="flex:1" data-i18n="tpCaseCap">Ab</button>
+        </div>
+        <div class="pr" style="gap:10px">
+          <label style="flex:1;display:flex;flex-direction:column;gap:2px">
+            <span style="font-size:10px;color:var(--text-dim)" data-i18n="tpLetterSpacing">Espacement lettres</span>
+            <input type="number" id="tp-letter-spacing" value="0" step="0.5" style="width:100%" class="pi scrub" data-step="0.5">
+          </label>
+          <label style="flex:1;display:flex;flex-direction:column;gap:2px">
+            <span style="font-size:10px;color:var(--text-dim)" data-i18n="tpLineHeight">Hauteur de ligne</span>
+            <input type="number" id="tp-line-height" value="1.25" step="0.05" min="0.5" max="4" style="width:100%" class="pi scrub" data-step="0.05">
+          </label>
+        </div>
+        <div class="pr">
+          <label style="flex:1;display:flex;flex-direction:column;gap:2px">
+            <span style="font-size:10px;color:var(--text-dim)" data-i18n="tpWordSpacing">Espacement mots</span>
+            <input type="number" id="tp-word-spacing" value="0" step="0.5" style="width:100%" class="pi scrub" data-step="0.5">
+          </label>
+        </div>
+        <div class="pr" style="gap:4px">
+          <button class="pbtn tp-width-btn ac" data-val="auto" style="flex:1" data-i18n="tpWidthAuto">Largeur auto</button>
+          <button class="pbtn tp-width-btn" data-val="fixed" style="flex:1" data-i18n="tpWidthFixed">Largeur fixe</button>
+          <input type="number" id="tp-fixed-width" value="300" min="10" style="width:64px;display:none" class="pi scrub" data-step="1">
+        </div>
+      </div>
+    </div>
     <!-- Effects stack (2026-07 rewrite, feedback: "organisé les effets dans
          des menu" + "voir les effet appliqué au calque... et voir les
          paramètre de ces effets") — ONE shared "Effects" list for BOTH

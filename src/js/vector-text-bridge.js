@@ -134,8 +134,12 @@ function buildGlyphPaths(otPath, color) {
 // Same greedy word-wrap contract as timeline.js's computeTextLayout (raster
 // path) — kept intentionally parallel so switching a text block between
 // raster and vector modes wraps identically, not a second slightly-
-// different implementation of the same behavior.
-function wrapVectorLines(font, text, size, fixedWidthWorld) {
+// different implementation of the same behavior. advanceWidth is a callback
+// (ch-run -> px) rather than a plain font.getAdvanceWidth call so the
+// typography panel's letter/word spacing (2026-08-16) is honoured during
+// wrapping too — a line that "fits" under Roboto's own default spacing but
+// not under a wider tracking value must wrap at a different point.
+function wrapVectorLines(text, fixedWidthWorld, advanceWidth) {
   var lines = text.split('\n');
   if (!fixedWidthWorld) return lines;
   var wrapped = [];
@@ -144,29 +148,74 @@ function wrapVectorLines(font, text, size, fixedWidthWorld) {
     var words = l.split(' '); var cur = '';
     words.forEach(function (w) {
       var test = cur ? cur + ' ' + w : w;
-      if (cur && font.getAdvanceWidth(test, size) > fixedWidthWorld) { wrapped.push(cur); cur = w; }
+      if (cur && advanceWidth(test) > fixedWidthWorld) { wrapped.push(cur); cur = w; }
       else cur = test;
     });
     wrapped.push(cur);
   });
   return wrapped;
 }
+function applyTextCase(text, textCase) {
+  if (textCase === 'upper') return text.toUpperCase();
+  if (textCase === 'lower') return text.toLowerCase();
+  if (textCase === 'capitalize') return text.replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+  return text;
+}
 // Builds a placed vector-text block as flat Path items sharing a groupId
 // (same "stable id groups members, not a new item type" pattern as Cmd+G
 // groups) into `layer`, top-left anchored at `topLeftWorld`. Returns
 // {paths, groupId, width, height} — paths[0] carries the FULL metadata
 // (isTextRoot) needed to find/re-edit/re-wrap this block later.
-function buildVectorTextGroup(text, fontKey, size, color, align, fixedWidthWorld, topLeftWorld, layer) {
-  return loadVectorFont(fontKey).then(function (font) {
-    var lineHeight = size * 1.25; // matches the raster bake's own line-height convention
-    var wrapped = wrapVectorLines(font, text, size, fixedWidthWorld);
+//
+// opts (2026-08-16, typography panel — nemo-timeline-inout-spec sibling
+// feature, "le panneau droite pour le texte"): bold/italic/underline/
+// strike/letterSpacing/wordSpacing/lineHeightMult/textCase, all optional
+// and defaulting to today's exact prior behaviour (Roboto Regular, no
+// decoration, 0 extra tracking, 1.25x line height, case untouched) — a
+// pre-existing text block re-rendered through this function without opts
+// looks byte-identical to before this feature existed.
+function buildVectorTextGroup(text, fontKey, size, color, align, fixedWidthWorld, topLeftWorld, layer, opts) {
+  opts = opts || {};
+  // Bold is a REAL second weight (bundled Roboto-Bold.ttf), not a synthetic
+  // fatten — swapping the loaded font file, same as the Font dropdown's own
+  // 'vector:Roboto-Bold' entry, so B toggled from the panel and picking
+  // "Roboto Bold" from Font both converge on the identical file.
+  var baseFamily = fontKey.replace(/-(Bold|Regular)$/, '');
+  var resolvedFontKey = opts.bold ? baseFamily + '-Bold' : baseFamily + '-Regular';
+  if (!VECTOR_FONTS[resolvedFontKey]) resolvedFontKey = fontKey; // unknown family — don't 404 on a guessed name
+  return loadVectorFont(resolvedFontKey).then(function (font) {
+    var lineHeightMult = opts.lineHeightMult || 1.25;
+    var lineHeight = size * lineHeightMult;
+    var letterSpacing = opts.letterSpacing || 0;
+    var wordSpacing = opts.wordSpacing || 0;
+    var displayText = applyTextCase(text, opts.textCase);
+    // Faux italic (2026-08-16): no italic weight is bundled, so this shears
+    // each glyph's OWN outline about its baseline — the standard "oblique"
+    // fallback every text engine without a real italic font uses. Angle
+    // matches common UI conventions (Roboto Italic sits ~-12°); done via a
+    // Paper.js Matrix on each finished Path rather than pre-warping the
+    // opentype segments, so the shear composes correctly regardless of
+    // where the glyph sits on the line.
+    var italicSkew = opts.italic ? Math.tan(12 * Math.PI / 180) : 0;
+    function advance(ch, ord) {
+      var glyph = font.charToGlyph(ch);
+      var w = glyph.advanceWidth * (size / font.unitsPerEm);
+      if (ord < 0 || ch !== ' ') w += letterSpacing; else w += letterSpacing + wordSpacing;
+      return w;
+    }
+    function runWidth(str) {
+      var w = 0;
+      str.split('').forEach(function (ch, i) { w += advance(ch, i); });
+      return Math.max(0, w - letterSpacing); // no trailing tracking after the last glyph
+    }
+    var wrapped = wrapVectorLines(displayText, fixedWidthWorld, runWidth);
     var maxW = 0;
-    wrapped.forEach(function (l) { maxW = Math.max(maxW, font.getAdvanceWidth(l, size)); });
+    wrapped.forEach(function (l) { maxW = Math.max(maxW, runWidth(l)); });
     var groupId = 'vtxt' + Date.now().toString(36) + '_' + Math.floor(Math.random() * 1e6);
     var allPaths = [];
     var prevActive = project.activeLayer; layer.activate();
     wrapped.forEach(function (line, li) {
-      var lineWidth = font.getAdvanceWidth(line, size);
+      var lineWidth = runWidth(line);
       var startX = topLeftWorld.x;
       if (align === 'center') startX = topLeftWorld.x + (maxW - lineWidth) / 2;
       else if (align === 'right') startX = topLeftWorld.x + (maxW - lineWidth);
@@ -174,23 +223,42 @@ function buildVectorTextGroup(text, fontKey, size, color, align, fixedWidthWorld
       // Ascent ≈ size, matching the raster bake's textBaseline='top' anchor
       // closely enough for the two modes to feel consistent when switching.
       var baselineY = topLeftWorld.y + li * lineHeight + size * 0.8;
-      line.split('').forEach(function (ch) {
+      // Underline/strikethrough (2026-08-16): one thin filled Path per line,
+      // spanning the line's own advance width — not the block's maxW, so a
+      // centered/right-aligned short line doesn't drag a decoration under
+      // neighbouring whitespace. Skipped for a blank line (nothing to
+      // decorate). Thickness/offset are size-relative, matching common
+      // type conventions (~5% of size, underline sits just below the
+      // baseline, strike sits at x-height-ish mid-line).
+      if ((opts.underline || opts.strike) && line.trim() !== '') {
+        var deco = new Path.Rectangle(new Point(startX, 0), new Size(lineWidth, Math.max(1, size * 0.06)));
+        deco.fillColor = color; deco.strokeColor = null;
+        if (opts.underline) { var u = deco.clone(); u.position.y = baselineY + size * 0.08; u.data.isVectorText = true; u.data.groupId = groupId; allPaths.push(u); }
+        if (opts.strike) { var s = deco.clone(); s.position.y = baselineY - size * 0.28; s.data.isVectorText = true; s.data.groupId = groupId; allPaths.push(s); }
+        deco.remove(); // the template itself is never part of the group, only its clones
+      }
+      line.split('').forEach(function (ch, ci) {
         var glyph = font.charToGlyph(ch);
         if (ch.trim() !== '') {
           var otPath = glyph.getPath(cursorX, baselineY, size);
           var built = buildGlyphPaths(otPath, color);
+          if (italicSkew) built.forEach(function (p) { p.transform(new Matrix(1, 0, -italicSkew, 1, italicSkew * baselineY, 0)); });
           built.forEach(function (p) { p.data.isVectorText = true; p.data.groupId = groupId; p.data.vectorChar = ch; });
           allPaths = allPaths.concat(built);
         }
-        cursorX += glyph.advanceWidth * (size / font.unitsPerEm);
+        cursorX += advance(ch, ci);
       });
     });
     prevActive.activate();
     if (allPaths.length) {
       var root = allPaths[0];
       root.data.isText = true; root.data.isTextRoot = true;
-      root.data.text = text; root.data.vectorFont = fontKey; root.data.size = size;
+      root.data.text = text; root.data.vectorFont = resolvedFontKey; root.data.size = size;
       root.data.color = color; root.data.align = align; root.data.fixedWidth = fixedWidthWorld || null;
+      root.data.bold = !!opts.bold; root.data.italic = !!opts.italic;
+      root.data.underline = !!opts.underline; root.data.strike = !!opts.strike;
+      root.data.letterSpacing = letterSpacing; root.data.wordSpacing = wordSpacing;
+      root.data.lineHeightMult = lineHeightMult; root.data.textCase = opts.textCase || 'none';
     }
     allPaths.forEach(function (p) { if (window.tagOwner) tagOwner(p); });
     return { paths: allPaths, groupId: groupId, width: maxW, height: wrapped.length * lineHeight };
