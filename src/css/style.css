@@ -891,7 +891,17 @@ body:not(.mode-motion) #motion-props-sec{display:none;}
    legibility against the accent-tinted connector either way — unrelated
    axis, still needed on a thin-bordered shape sitting on varied
    backgrounds. */
-.motion-key{position:relative;width:9px;height:9px;border-radius:2px;background:transparent;border:1.5px solid #cfcfcf;box-shadow:0 0 0 1.5px rgba(0,0,0,.35);transform:rotate(45deg);}
+/* z-index:2 (2026-08-16, mirrors the spec's own .kf-conn{z-index:1} vs
+   .kf{z-index:3}) — a connector's rect spans EXACTLY diamond-center to
+   diamond-center (so it lines up visually with both endpoints), which
+   means at every interior key its edge pixel geometrically sits on top of
+   that key's own diamond. Without an explicit z-index here to win that
+   tie, elementFromPoint (real mouse hit-testing, unlike a synthetic
+   dispatchEvent aimed straight at a target) could resolve a click on a
+   diamond to the neighbouring connector instead — found live right after
+   fixing the connector's own click-through bug (see trackRowHtml's
+   rowEl.appendChild(svg) comment, motion.js). */
+.motion-key{position:relative;z-index:2;width:9px;height:9px;border-radius:2px;background:transparent;border:1.5px solid #cfcfcf;box-shadow:0 0 0 1.5px rgba(0,0,0,.35);transform:rotate(45deg);}
 .motion-key.cur{background:#ffaa28;border-color:#ffaa28;width:11px;height:11px;}
 /* Selected -> darkens the connector's own selected treatment lighter, same
    "fill is the ONLY added signal, no extra ring" principle just applied to

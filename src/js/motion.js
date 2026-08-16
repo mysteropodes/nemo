@@ -4700,6 +4700,23 @@
       })(fi, k);
       rowEl.appendChild(c);
     }
+    // Re-parent the overlay svg to the END of the row now that the .fc grid
+    // exists (2026-08-16, Cyril: "il est impossible de select le trait
+    // entre 2 keyframes") — appendChild on a node already in the tree MOVES
+    // it, no duplicate. Both the svg (position:absolute) and each .fc cell
+    // (position:relative) are "positioned, z-index:auto" boxes, which paint
+    // in DOM order — appended first at the top of this function, the svg
+    // was BEHIND every .fc cell for hit-testing, even though it stayed
+    // visually correct (the cells' own background is transparent where
+    // nothing else draws). A synthetic dispatchEvent() called directly on
+    // the <rect> during testing skips hit-testing entirely and "worked"
+    // regardless — a real click, resolved via elementFromPoint, always hit
+    // the covering .fc cell first and never reached the connector. Moving
+    // the svg last makes it paint on top; its own pointer-events:none still
+    // lets every empty region (and the .fc cells' own clicks/diamonds)
+    // pass straight through — only the connector rect's explicit
+    // pointer-events:auto actually intercepts anything.
+    rowEl.appendChild(svg);
   }
   function renderTracksFor(grid, holder, prop) {
     // Must mirror renderTransformGroup's own skip condition exactly (same
