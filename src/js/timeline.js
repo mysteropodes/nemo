@@ -7022,6 +7022,24 @@ function onKeyDown(event){
   // handler uses (ld.inPoint clamped below outPoint, and vice versa) so
   // this can never invert the range. Plain [ ] stay bound to brush/eraser
   // size (established earlier this session) — Alt is free and unclaimed.
+  //
+  // 2026-08-16 fix (Cyril, live: "si j'avance le curseur de temps sur une
+  // autre keyframe et que je dessine cela ramène l'outpoint à la frame sur
+  // laquelle j'ai dessiné il ne faudrait pas") — root cause traced to a
+  // shortcut COLLISION, not a drawing bug: Draw/Fill-brush/Pen/Fill all
+  // bind Alt+drag to their OWN gesture (brush resize, closing-stroke,
+  // tangent-break — see the toolShortcuts table above, thSize/
+  // thClosingStroke/thBreakTangent), so a user resizing their brush via
+  // Alt+drag mid-stroke, then reaching for the ALSO-bound `]` brush-size
+  // key while Alt is still physically held, fired this AE shortcut instead
+  // — silently trimming the layer's out point to wherever the playhead
+  // happened to be. Excluded here for exactly the tools that claim Alt for
+  // something of their own; Select/Subselect (where this shortcut actually
+  // makes sense) are unaffected.
+  else if(event.altKey&&(k==='['||k===']')&&['draw','fillbrush','pen','fill'].indexOf(state.tool)>=0){
+    // fall through to nothing — let the tool's own Alt+drag/brush-size
+    // handling (already bound elsewhere) be the only thing `]`/`[` do here.
+  }
   else if(event.altKey&&k==='['){
     var ldIn=state.layers[state.activeLayerIdx];
     if(ldIn&&!ldIn.symbolId){
