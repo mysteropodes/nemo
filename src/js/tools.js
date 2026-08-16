@@ -1414,7 +1414,23 @@ window.editRefusalReason=editRefusalReason;
 // very items being transformed. Handing those an empty frame would delete the
 // subject of the edit. That asymmetry is the whole point of the flag — do not
 // "simplify" it into one behaviour.
-function ensureKeyframe(blank){var ldk=state.layers[state.activeLayerIdx];if(!canEditActiveLayer())return;var curF=ldk.frames[state.currentFrame];if(!curF.isKeyframe&&!curF.isInterpolated){var effStrokes=blank?[]:JSON.parse(JSON.stringify(getEffectiveStrokes(state.activeLayerIdx,state.currentFrame)));curF.isKeyframe=true;curF.strokes=effStrokes;loadFrame(state.currentFrame);syncLinkedKeyframeFolder(state.activeLayerIdx,state.currentFrame);}}
+// `_justEnsuredKeyframeAt` (2026-08-16, Cyril: "si j'avance le curseur de
+// temps sur une autre keyframe et que je dessine cela ramène l'outpoint à la
+// frame sur laquelle j'ai dessiner"): promoting a held frame past the
+// layer's trim range starts it BLANK (see the big comment above on `blank`)
+// — for one moment `curF.strokes` really is `[]`. saveActiveLayerFrame's own
+// trim-range guard (app.js) was silently refusing to persist the draw that
+// follows on a frame outside ld.inPoint/outPoint, so the stroke rendered live
+// but never actually saved — reloading/scrubbing away and back showed the
+// frame blank again, and if the layer's out point was auto-derived (no
+// explicit ld.outPoint), that permanently-blank keyframe became the new
+// "last non-blank frame", visibly snapping the out point back to right where
+// the user had just drawn. Stamping the frame index here lets the very next
+// saveActiveLayerFrame() bypass that guard for THIS one frame only — the
+// guard's real job is stopping a stale/empty live layer from clobbering good
+// stored data during navigation/autosave, not blocking an edit on the frame
+// the user is standing on right now.
+function ensureKeyframe(blank){var ldk=state.layers[state.activeLayerIdx];if(!canEditActiveLayer())return;var curF=ldk.frames[state.currentFrame];if(!curF.isKeyframe&&!curF.isInterpolated){var effStrokes=blank?[]:JSON.parse(JSON.stringify(getEffectiveStrokes(state.activeLayerIdx,state.currentFrame)));curF.isKeyframe=true;curF.strokes=effStrokes;ldk._justEnsuredKeyframeAt=state.currentFrame;loadFrame(state.currentFrame);syncLinkedKeyframeFolder(state.activeLayerIdx,state.currentFrame);}}
 
 // ---- VECTOR FILL ENGINE ----
 // The fill of an area IS just the closed loop formed by the strokes around

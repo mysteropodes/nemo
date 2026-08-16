@@ -3496,7 +3496,15 @@ function saveActiveLayerFrame(){
   // that empty live layer and permanently overwrites the stored keyframe
   // with []. Reproduced: draw at frames 0/5/10, trim outPoint below 10,
   // navigate away — frame 10's 2 strokes silently became 0.
-  if(layerHasTimeRange(ld)&&(state.currentFrame<layerInPoint(ld)||state.currentFrame>layerOutPoint(ld)))return;
+  // `_justEnsuredKeyframeAt` (2026-08-16, see ensureKeyframe's own comment,
+  // tools.js): the ONE call right after a content-creating tool just
+  // promoted this exact frame is never a stale navigation/autosave read —
+  // it's the save that persists the edit the user just made. Consuming the
+  // flag here (whether or not it actually matched) keeps it from lingering
+  // into some later, unrelated saveActiveLayerFrame() call.
+  var freshlyEnsured=ld._justEnsuredKeyframeAt===state.currentFrame;
+  delete ld._justEnsuredKeyframeAt;
+  if(!freshlyEnsured&&layerHasTimeRange(ld)&&(state.currentFrame<layerInPoint(ld)||state.currentFrame>layerOutPoint(ld)))return;
   _writeBackGhostProxies(state.activeLayerIdx);
   var f=ld.frames[state.currentFrame];
   if(!f.isKeyframe&&!f.isInterpolated)return;
