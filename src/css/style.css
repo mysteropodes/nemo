@@ -897,18 +897,35 @@ body:not(.mode-motion) #motion-props-sec{display:none;}
    "fill is the ONLY added signal, no extra ring" principle just applied to
    the in/out handle a batch earlier — no separate box-shadow ring here
    either now, the fill alone reads as selected. */
-.motion-key.sel{background:var(--accent);border-color:var(--accent);}
+.motion-key.sel{background:#F2FBF8;border-color:#F2FBF8;}
 .motion-key.hold{border-radius:1px;transform:rotate(0deg);}
 .motion-key.sel.cur{background:#ffaa28;border-color:#ffaa28;}
 /* Connector rect (task #101, nemo-timeline-inout-spec.html: "le trait est
-   une cible, pas une décoration") — a hover brightens toward the fully-lit
-   .sel look so the draggable target reads as interactive before it's even
-   clicked; .sel itself mirrors the diamonds' fill-only convention. Presentation
-   attributes on the <rect> (fill/opacity, set once in trackRowHtml) act as
-   the lowest-priority default here, so these plain class rules already win
-   the cascade with no !important needed. */
-.motion-key-connect:hover{opacity:.55;}
-.motion-key-connect.sel{opacity:.8;}
+   une cible, pas une décoration"). Colours are the spec's .kf-conn ramp
+   verbatim — a solid deep teal at rest, brightening on hover, fully lit
+   when selected:
+       .kf-conn{background:#2E6B60}  :hover{#3E8C7E}  .sel{#6FD9C4}
+   2026-08-16 fix (Cyril: "tu as pas fait les ligne de connexion comme dans
+   la doc"): the first pass drew these as var(--accent) BLUE at opacity .35,
+   which is neither the spec's colour nor solid — the line read as a faint
+   wash instead of the deliberate teal cord the doc shows running between
+   two diamonds. Painting them here rather than via presentation attributes
+   on the <rect> is what makes the :hover state reachable at all (a
+   presentation attribute can't have states), and `fill` beats a
+   presentation attribute in the cascade regardless. */
+.motion-key-connect{fill:#2E6B60;pointer-events:auto;cursor:ew-resize;transition:fill .1s linear;}
+.motion-key-connect:hover{fill:#3E8C7E;}
+.motion-key-connect.sel{fill:#6FD9C4;}
+/* Alt = retime (first key planted, second one slides). Driven by the SAME
+   #frame-grid.timelink-alt class layer-inout.js already toggles for the
+   Parent-in-Time dot reveal, mirroring the spec's own .kstage.alt container
+   switch — the doc flags this shared-modifier overlap in its "Non résolu"
+   section and concludes the two contexts don't collide (link dots live on
+   LAYER bars, retiming on PROPERTY tracks), so one reveal class serving
+   both is the consistent reading. Container-driven, not a per-element
+   mousemove handler: the cursor has to change the instant Alt goes down,
+   without waiting for the pointer to move a pixel. */
+#frame-grid.timelink-alt .motion-key-connect{cursor:e-resize;}
 /* Marquee rectangle (motion.js, screen-fixed since it spans multiple .frow
    rows, unlike per-row overlays elsewhere in this file). */
 .motion-marquee-rect{position:fixed;border:1px solid var(--accent);background:rgba(63,107,245,.15);pointer-events:none;z-index:50;}
@@ -2004,7 +2021,15 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
    never costs you the feedback about what is selected. */
 .motion-key.tinted{background:var(--key-color,#e6e6e6);}
 .motion-key.cur,.motion-key.sel{background:#ffaa28;}
-.motion-key.sel{background:var(--accent);}
+/* Same #F2FBF8 as the base .motion-key.sel rule ~1100 lines up, NOT a
+   second opinion about the colour — this override exists purely to outrank
+   .tinted above, which would otherwise keep a colour-tagged key looking
+   unselected. 2026-08-16: both had to move off var(--accent) together;
+   editing only the base rule would have changed nothing on screen, since
+   this one wins the cascade (same trap as the Motion-mode in/out handle
+   override, hit twice already — a restyle that looks right in the base
+   rule can be silently clobbered by a later one). */
+.motion-key.sel{background:#F2FBF8;border-color:#F2FBF8;}
 /* Velocity read-out on the selected key (3.5). Counter-rotated: the diamond
    itself is rotate(45deg), so the label would otherwise sit on the diagonal. */
 .motion-key-vel{position:absolute;left:14px;top:-2px;transform:rotate(-45deg);

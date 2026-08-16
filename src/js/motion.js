@@ -4427,11 +4427,45 @@
     svg.style.cssText = 'position:absolute;left:0;top:0;pointer-events:none;';
     rowEl.appendChild(svg);
     if (track && track.keys.length) {
+      // Frame-duration block behind each key (Van Dijk 3.3): the diamond is
+      // centred on the frame's START, which at high zoom makes it hard to
+      // see how much time one frame actually occupies — and whether a key
+      // lines up with a layer's out point. Drawn only when a frame is wide
+      // enough for the block to mean anything (his "closest three zoom
+      // levels"), otherwise it degrades into a smear.
+      //
+      // Drawn BEFORE the connectors (2026-08-16): SVG paints in document
+      // order, and the spec stacks these explicitly — .kf-frame z-index:0,
+      // .kf-conn z-index:1, .kf z-index:3. The previous order had the
+      // duration block painting OVER the connector line it's supposed to sit
+      // behind, muddying the line's colour at high zoom.
+      if (FC >= 18) {
+        track.keys.forEach(function (k, ki) {
+          var d = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+          d.setAttribute('x', k.frame * FC); d.setAttribute('y', 0);
+          d.setAttribute('width', FC); d.setAttribute('height', ROW_H);
+          d.setAttribute('fill', k.color || 'var(--accent)'); d.setAttribute('opacity', '0.13');
+          // Same live-preview tagging as the connector bars below.
+          d.setAttribute('class', 'motion-key-durblock');
+          d.setAttribute('data-ki', ki);
+          svg.appendChild(d);
+        });
+      }
       // Connection bar between consecutive keys whose value actually
       // changes — AE-wishlist idea (sandervandijk.tv "Connection"/"Keyframe
       // Duration"): makes it obvious at a glance WHERE movement happens
       // instead of a row of identical-looking diamonds with no context.
-      var barH = Math.max(3, Math.round(ROW_H * 0.27)), barY = Math.round((ROW_H - barH) / 2);
+      //
+      // Geometry from the spec's own .kf-conn rule (2026-08-16): height 5,
+      // border-radius 2, vertically centred. Both flat pixel values, NOT
+      // ratios of the row height — the spec's diamonds are 7px and Nemo's
+      // Motion diamonds are 7px too (body.mode-motion .motion-key), so the
+      // line has to keep the same absolute proportion against them, not
+      // rescale with a row that happens to be half the mockup's height.
+      // Colour/hover/selected all live in CSS (.motion-key-connect) rather
+      // than presentation attributes here — the spec defines three states
+      // and a CSS class ramp is the only way :hover can reach them.
+      var barH = 5, barY = Math.round((ROW_H - barH) / 2);
       for (var i = 0; i < track.keys.length - 1; i++) {
         var a = track.keys[i], b = track.keys[i + 1];
         var changed = a.v.some(function (v, d) { return v !== b.v[d]; });
@@ -4439,7 +4473,7 @@
         var rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
         rect.setAttribute('x', a.frame * FC + FC / 2); rect.setAttribute('y', barY);
         rect.setAttribute('width', (b.frame - a.frame) * FC); rect.setAttribute('height', barH);
-        rect.setAttribute('fill', 'var(--accent)'); rect.setAttribute('opacity', '0.35');
+        rect.setAttribute('rx', 2);
         // class + key index so previewKeyframeShift can translate these live
         // during a bar/in-out drag alongside the diamonds — without the tag
         // they stayed frozen at their pre-drag position until drop ("la
@@ -4455,13 +4489,10 @@
         // drag moves the whole segment by one shared delta (duration
         // constant); Alt+drag retimes — the first key stays planted, only
         // the second moves, stretching/compressing the movement in place.
-        // pointer-events:auto here punches a hole through the parent svg's
+        // pointer-events:auto (CSS) punches a hole through the parent svg's
         // pointer-events:none (set once at the top of trackRowHtml) — every
         // OTHER child (durblocks, the invisible hit area) stays pass-
         // through, only the connector itself is a real target.
-        rect.style.pointerEvents = 'auto';
-        rect.style.cursor = 'ew-resize';
-        rect.addEventListener('mousemove', function (e) { rect.style.cursor = e.altKey ? 'e-resize' : 'ew-resize'; });
         (function (keyA, keyB) {
           rect.addEventListener('mousedown', function (e) {
             e.stopPropagation();
@@ -4479,24 +4510,6 @@
           });
         })(a, b);
         svg.appendChild(rect);
-      }
-      // Frame-duration block behind each key (Van Dijk 3.3): the diamond is
-      // centred on the frame's START, which at high zoom makes it hard to
-      // see how much time one frame actually occupies — and whether a key
-      // lines up with a layer's out point. Drawn only when a frame is wide
-      // enough for the block to mean anything (his "closest three zoom
-      // levels"), otherwise it degrades into a smear.
-      if (FC >= 18) {
-        track.keys.forEach(function (k, ki) {
-          var d = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-          d.setAttribute('x', k.frame * FC); d.setAttribute('y', 0);
-          d.setAttribute('width', FC); d.setAttribute('height', ROW_H);
-          d.setAttribute('fill', k.color || 'var(--accent)'); d.setAttribute('opacity', '0.13');
-          // Same live-preview tagging as the connector bars above.
-          d.setAttribute('class', 'motion-key-durblock');
-          d.setAttribute('data-ki', ki);
-          svg.appendChild(d);
-        });
       }
     }
     for (var fi = 0; fi < state.totalFrames; fi++) {
