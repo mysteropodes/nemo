@@ -597,16 +597,33 @@
         updateLinkedChildrenBars(m.li);
       });
       if (bothMembersM.length) {
-        var ok = bothMembersM.every(function (m) {
-          var ni = m.origIn + dx, no = m.origOut + dx;
-          return ni >= 0 && no <= total - 1;
+        // CLAMP the group's shift to what every member can absorb, rather
+        // than refusing the whole gesture the moment ONE member would fall
+        // off an edge (2026-08-16 fix). The old all-or-nothing `ok` check
+        // meant a single boundary-touching member silently froze the entire
+        // group with zero feedback — and since an untrimmed layer spans the
+        // WHOLE timeline by definition (inPointOf 0, outPointOf total-1),
+        // selecting several layers where any one of them was still at its
+        // default range made group-dragging a dead gesture in BOTH
+        // directions. Clamping keeps the group rigid (relative offsets
+        // preserved — members must not desync) while letting it slide as
+        // far as the tightest member allows, which is also what the
+        // single-bar body drag a hundred lines below has always done
+        // (`if (ni + w >= total) ni = total - 1 - w`). A member already
+        // spanning the full timeline still pins dx to 0 — that one is
+        // arithmetic, not a policy choice.
+        var dxLo = -Infinity, dxHi = Infinity;
+        bothMembersM.forEach(function (m) {
+          dxLo = Math.max(dxLo, -m.origIn);
+          dxHi = Math.min(dxHi, total - 1 - m.origOut);
         });
-        if (ok) bothMembersM.forEach(function (m) {
+        var gdx = Math.max(dxLo, Math.min(dx, dxHi));
+        if (dxLo <= dxHi) bothMembersM.forEach(function (m) {
           var mld = state.layers[m.li]; if (!mld) return;
-          var mInHandled = trySetLinkedEdge(mld, 'in', m.origIn + dx);
-          var mOutHandled = trySetLinkedEdge(mld, 'out', m.origOut + dx);
-          if (!mInHandled) mld.inPoint = m.origIn + dx;
-          if (!mOutHandled) mld.outPoint = m.origOut + dx;
+          var mInHandled = trySetLinkedEdge(mld, 'in', m.origIn + gdx);
+          var mOutHandled = trySetLinkedEdge(mld, 'out', m.origOut + gdx);
+          if (!mInHandled) mld.inPoint = m.origIn + gdx;
+          if (!mOutHandled) mld.outPoint = m.origOut + gdx;
           updateBar(m.row, m.li);
           updateLinkedChildrenBars(m.li);
         });
