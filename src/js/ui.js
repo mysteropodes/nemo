@@ -987,6 +987,15 @@
     var el=e.target.closest?e.target.closest('[title],[data-tip]'):null;
     if(!el){tip.classList.remove('show');return;}
     if(el.hasAttribute('title')){el.dataset.tip=el.getAttribute('title');el.removeAttribute('title');}
+    // Inside the timeline the hint goes to the status bar instead (2026-08-16,
+    // Cyril: "enlève les tooltip sur la timeline, affiche plutôt les tip dans
+    // la barre noir du bas à gauche"). timeline.js mirrors the same `title`
+    // text into #statusbar-help for this region, so without this the two fired
+    // together and the floating box ALSO covered the very bars/keys/handles
+    // being hovered — the one place in the app where a tooltip lands directly
+    // on top of the thing you are aiming at. The title->data-tip swap above
+    // still runs first so that mirror keeps finding the text under either name.
+    if(el.closest('#tl-content')){tip.classList.remove('show');return;}
     var t=el.dataset.tip;if(!t){tip.classList.remove('show');return;}
     tip.textContent=t;tip.classList.add('show');
     var r=el.getBoundingClientRect();

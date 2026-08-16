@@ -2105,7 +2105,12 @@ function updateStatusBarHelp(){
     hoverEl=null;
     updateStatusBarHelp();
   }
-  ['props-panel','tl-toolbar','layer-panel','layer-ctrls'].forEach(function(id){
+  // 'tl-content' (2026-08-16) covers the whole timeline — layer panel AND
+  // frame grid, so every bar, handle, keyframe tick, diamond and connector
+  // reports here. It is also the region where ui.js deliberately suppresses
+  // its floating tooltip (see that listener's own comment), making the status
+  // bar the ONLY place a timeline hint appears rather than a duplicate of it.
+  ['props-panel','tl-toolbar','tl-content','layer-ctrls'].forEach(function(id){
     var root=document.getElementById(id);
     if(!root)return;
     root.addEventListener('mouseover',showTitle);
