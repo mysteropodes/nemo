@@ -96,7 +96,17 @@
     if (!barsRow) return;
     Array.prototype.slice.call(document.querySelectorAll('.tl-marker')).forEach(function (el) { el.remove(); });
 
-    compMarkers().forEach(function (m) { barsRow.appendChild(buildEl(m, compMarkers(), null)); });
+    // Markers sitting past the end of the CURRENT timeline are skipped rather
+    // than clamped (2026-08-16): shrinking the project length leaves marker
+    // data alone on purpose — same contract as the frames array, which is
+    // never truncated either — but a marker at frame 90 on a 30-frame timeline
+    // was still being placed at 90*FC, drawing three ruler-widths past the
+    // end. Clamping the DATA instead would pile every out-of-range marker onto
+    // the last frame and silently merge them; skipping the OVERLAY keeps each
+    // marker exactly where the user put it, ready to reappear if the timeline
+    // grows back.
+    function inRange(m) { return m.frame >= 0 && m.frame < state.totalFrames; }
+    compMarkers().filter(inRange).forEach(function (m) { barsRow.appendChild(buildEl(m, compMarkers(), null)); });
 
     // Layer markers ride their own row in the grid, so they scroll with it
     // and land exactly on the layer they annotate.
@@ -105,7 +115,7 @@
       var row = document.querySelector('#frame-grid .frow[data-layer="' + li + '"]');
       if (!row) return;
       if (getComputedStyle(row).position === 'static') row.style.position = 'relative';
-      ld.markers.forEach(function (m) { row.appendChild(buildEl(m, ld.markers, li)); });
+      ld.markers.filter(inRange).forEach(function (m) { row.appendChild(buildEl(m, ld.markers, li)); });
     });
   }
 
