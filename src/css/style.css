@@ -1114,7 +1114,11 @@ body.mode-motion .lrow.act.motion-selected{background:rgba(63,107,245,.16);box-s
    a custom range) so a layer's actual duration always reads instantly,
    every row an obviously-colored block regardless of whether it's trimmed.
    Handles are a solid bracket, always visible (not hover-only). */
-.layer-inout-bar{position:absolute;left:0;top:2px;bottom:2px;background:rgba(63,107,245,.32);border:1px solid rgba(63,107,245,.85);border-radius:3px;cursor:grab;z-index:2;box-sizing:border-box;}
+/* border-radius bumped 3px->6px (2026-08-16, spec's own reference bar is
+   8px on a 30px-tall bar — proportionally closer to this than the old
+   fairly-square 3px was) so the bar itself reads as a rounded capsule the
+   inset white pill sits inside, matching the spec's visual reference. */
+.layer-inout-bar{position:absolute;left:0;top:2px;bottom:2px;background:rgba(63,107,245,.32);border:1px solid rgba(63,107,245,.85);border-radius:6px;cursor:grab;z-index:2;box-sizing:border-box;}
 .layer-inout-bar.full-range{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.28);}
 /* 2026-08-16 restyle (nemo-timeline-inout-spec.html, Cyril): a permanent
    white pill INSET inside the bar, not an edge-flush full-height sliver
@@ -1138,12 +1142,19 @@ body.mode-motion .lrow.act.motion-selected{background:rgba(63,107,245,.16);box-s
    Point" — a plain 7px sliver read as part of the bar's own border, not as
    a grabbable control). Animation 2D's frame-grid bars are untouched —
    this never widens the actual click target (still the full row height,
-   same element), just adds a tab-shaped outer corner + a grip ornament so
-   the handle reads as "drag me" at a glance. */
-body.mode-motion .layer-inout-bar .layer-inout-handle{width:9px;opacity:1;}
-body.mode-motion .layer-inout-bar .layer-inout-handle.left{border-radius:4px 0 0 4px;}
-body.mode-motion .layer-inout-bar .layer-inout-handle.right{border-radius:0 4px 4px 0;}
-body.mode-motion .layer-inout-bar .layer-inout-handle::after{content:'';position:absolute;top:50%;left:50%;width:3px;height:8px;transform:translate(-50%,-50%);background:rgba(0,0,0,.3);border-radius:1px;pointer-events:none;}
+   same element), just a touch wider than the base pill so it reads clearly
+   at Motion's shorter 18px bar height.
+   2026-08-16 fix (Cyril, live screenshot: "attention visuellement à quoi
+   doivent ressembler les poignée in out, regarde bien la documentation") —
+   this override still shipped the PRE-restyle tab shape (rounded only on
+   the outer corner) plus a dark grip-glyph ::after bar, from before the
+   spec's plain symmetric pill existed. Motion mode is the ONLY place these
+   handles actually render (Parent-in-Time anchors are Motion-only too), so
+   the batch-A restyle's new pill never actually reached the screen — this
+   override was clobbering it back to the old look every time. Now a fully
+   symmetric, undecorated pill, matching the base rule's own shape at a
+   slightly wider size. */
+body.mode-motion .layer-inout-bar .layer-inout-handle{width:9px;border-radius:4px;opacity:1;}
 /* États (spec): repos -> pill désaturée · survol -> blanc pur + halo,
    ew-resize · drag -> conserve l'état survol tant que le bouton est
    enfoncé, même hors zone (.hot is toggled by onDown/mouseup in
