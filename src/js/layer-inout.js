@@ -678,6 +678,17 @@
         state.appMode === 'motion' && window.SMMotion && SMMotion.selectLayerFromGrid) {
       _barAnchorLi = d.li;
       SMMotion.selectLayerFromGrid(d.li);
+      // selectLayerFromGrid always syncs _barSel with part:'both' (whole-bar
+      // ring) since it has no notion of which handle was actually pressed —
+      // right for a body click, wrong for a plain click ON a handle, which
+      // should darken THAT handle instead (spec: "sélectionné -> la poignée
+      // s'assombrit" — found live, Cyril: "quand on select ça ne devient pas
+      // foncé"). Override to the handle-specific selection afterward rather
+      // than duplicate selectLayerFromGrid's layer-activation side effects.
+      if (d.type === 'in' || d.type === 'out') {
+        _barSel = [{ li: d.li, part: d.type }];
+        refreshBarSelClasses();
+      }
       return;
     }
     // A group drag that never actually moved is ALSO a plain click — onDown

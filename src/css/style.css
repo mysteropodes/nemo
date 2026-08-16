@@ -900,6 +900,15 @@ body:not(.mode-motion) #motion-props-sec{display:none;}
 .motion-key.sel{background:var(--accent);border-color:var(--accent);}
 .motion-key.hold{border-radius:1px;transform:rotate(0deg);}
 .motion-key.sel.cur{background:#ffaa28;border-color:#ffaa28;}
+/* Connector rect (task #101, nemo-timeline-inout-spec.html: "le trait est
+   une cible, pas une décoration") — a hover brightens toward the fully-lit
+   .sel look so the draggable target reads as interactive before it's even
+   clicked; .sel itself mirrors the diamonds' fill-only convention. Presentation
+   attributes on the <rect> (fill/opacity, set once in trackRowHtml) act as
+   the lowest-priority default here, so these plain class rules already win
+   the cascade with no !important needed. */
+.motion-key-connect:hover{opacity:.55;}
+.motion-key-connect.sel{opacity:.8;}
 /* Marquee rectangle (motion.js, screen-fixed since it spans multiple .frow
    rows, unlike per-row overlays elsewhere in this file). */
 .motion-marquee-rect{position:fixed;border:1px solid var(--accent);background:rgba(63,107,245,.15);pointer-events:none;z-index:50;}
@@ -1151,10 +1160,18 @@ body.mode-motion .lrow.act.motion-selected{background:rgba(63,107,245,.16);box-s
    spec's plain symmetric pill existed. Motion mode is the ONLY place these
    handles actually render (Parent-in-Time anchors are Motion-only too), so
    the batch-A restyle's new pill never actually reached the screen — this
-   override was clobbering it back to the old look every time. Now a fully
-   symmetric, undecorated pill, matching the base rule's own shape at a
-   slightly wider size. */
-body.mode-motion .layer-inout-bar .layer-inout-handle{width:9px;border-radius:4px;opacity:1;}
+   override was clobbering it back to the old look every time.
+   2026-08-16 second fix (Cyril, live: "c'est un rond pas une barre... le
+   rond de parentage est collé à la barre de poignée") — the first fix above
+   widened this to 9px without touching height, which on Motion's 18px bar
+   (ROW_H 22, handle inset top/bottom:3 -> 12px tall) reads as a near-square
+   BLOB, not the doc's elongated pill (.handle{width:5px;height:18px} on its
+   own 30px bar — a ~0.28 width/height ratio). Matching that ratio here
+   (12px tall -> ~3-4px wide) both restores the pill silhouette AND stops it
+   visually merging with the timelink-anchor dot sitting at the bar's very
+   edge (that dot's position never moved; only the handle had grown wide
+   enough to reach under it). */
+body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2px;opacity:1;}
 /* États (spec): repos -> pill désaturée · survol -> blanc pur + halo,
    ew-resize · drag -> conserve l'état survol tant que le bouton est
    enfoncé, même hors zone (.hot is toggled by onDown/mouseup in
@@ -1181,11 +1198,17 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:9px;border-radius:4p
    top-edge placement). Horizontally still half-in/half-out of the bar edge
    via left:0/50%/100% + a negative margin equal to half its own new
    diameter (in/out) — unchanged mechanism, just re-tuned to the new size.
-   9px matches body.mode-motion's own handle width a few rules up — these
-   anchors only ever render in Motion mode (the only place buildBar's
-   on-bar Parent-in-Time UI is used), so there's no base/Motion split to
-   keep in sync here the way the handle itself needs one. */
-.layer-inout-bar .timelink-anchor{position:absolute;top:50%;width:9px;height:9px;margin-top:-4.5px;margin-left:-4.5px;
+   2026-08-16 second fix: was 9px to match body.mode-motion's handle width
+   at the time — that handle has since shrunk to 4px (see its own comment,
+   "c'est un rond pas une barre"), leaving this dot oversized enough to
+   physically overlap the handle instead of sitting flush beside it
+   ("le rond de parentage est collé à la barre de poignée"). 6px keeps the
+   doc's own ~1.4x dot/handle diameter ratio (.link-dot 7px on a .handle
+   5px) instead of literally matching the handle's width. These anchors
+   only ever render in Motion mode (the only place buildBar's on-bar
+   Parent-in-Time UI is used), so there's no base/Motion split to keep in
+   sync here the way the handle itself needs one. */
+.layer-inout-bar .timelink-anchor{position:absolute;top:50%;width:6px;height:6px;margin-top:-3px;margin-left:-3px;
   border-radius:50%;border:1.5px solid var(--text-dim);background:var(--panel2);cursor:alias;
   opacity:0;pointer-events:none;z-index:5;transition:opacity .12s linear,background .12s linear,border-color .12s linear;}
 /* Widened hitbox (spec: "±4 px") — a 9px dot is a small target even before
