@@ -4444,8 +4444,40 @@
         // during a bar/in-out drag alongside the diamonds — without the tag
         // they stayed frozen at their pre-drag position until drop ("la
         // barre bleue entre les keyframes ne bouge pas en temps réel").
-        rect.setAttribute('class', 'motion-key-connect');
+        // .sel mirrors the diamonds' own convention: on when BOTH endpoint
+        // keys are selected, which is exactly the state a connector click
+        // (below) produces — never toggled independently of them.
+        rect.setAttribute('class', 'motion-key-connect' + (isKeySelected(ld, prop, a) && isKeySelected(ld, prop, b) ? ' sel' : ''));
         rect.setAttribute('data-i', i);
+        // The connector is a draggable TARGET, not decoration
+        // (nemo-timeline-inout-spec.html, 2026-08-16): "le trait est une
+        // cible, pas une décoration". Click selects both endpoint keys;
+        // drag moves the whole segment by one shared delta (duration
+        // constant); Alt+drag retimes — the first key stays planted, only
+        // the second moves, stretching/compressing the movement in place.
+        // pointer-events:auto here punches a hole through the parent svg's
+        // pointer-events:none (set once at the top of trackRowHtml) — every
+        // OTHER child (durblocks, the invisible hit area) stays pass-
+        // through, only the connector itself is a real target.
+        rect.style.pointerEvents = 'auto';
+        rect.style.cursor = 'ew-resize';
+        rect.addEventListener('mousemove', function (e) { rect.style.cursor = e.altKey ? 'e-resize' : 'ew-resize'; });
+        (function (keyA, keyB) {
+          rect.addEventListener('mousedown', function (e) {
+            e.stopPropagation();
+            pushUndo();
+            setKeySel([{ holder: ld, prop: prop, key: keyA }, { holder: ld, prop: prop, key: keyB }]);
+            _keyAnchor = { holder: ld, prop: prop, frame: keyA.frame };
+            window._motionConnectDrag = {
+              ld: ld, prop: prop, a: keyA, b: keyB,
+              startX: e.clientX, startAFrame: keyA.frame, startBFrame: keyB.frame,
+              retime: e.altKey,
+            };
+            document.body.style.cursor = e.altKey ? 'e-resize' : 'ew-resize';
+            goToFrame(keyA.frame);
+            renderTimeline();
+          });
+        })(a, b);
         svg.appendChild(rect);
       }
       // Frame-duration block behind each key (Van Dijk 3.3): the diamond is
@@ -5681,6 +5713,48 @@
   // span-end/keyframe drag handlers already in timeline.js).
   function onDragMove(e) {
     if (onLayerSkewMove(e)) return;
+    var cd = window._motionConnectDrag;
+    if (cd) {
+      // Collective clamp, same rule for both gestures (spec: "une clé ne
+      // franchit jamais une voisine restée fixe") — the neighbor OUTSIDE
+      // the pair (the key before A, the key after B) never moves, so
+      // whichever endpoint is actually dragging this frame is bounded by
+      // it. Re-read the track fresh every move rather than snapshotting
+      // prev/next at mousedown: sortKeys() below can shuffle indices if a
+      // drag ever lands exactly on a neighbor's frame (blocked below, but
+      // cheap enough to just always re-derive).
+      var track = trackFor(cd.ld, cd.prop);
+      var ia = track.keys.indexOf(cd.a), ib = track.keys.indexOf(cd.b);
+      var prevKey = ia > 0 ? track.keys[ia - 1] : null;
+      var nextKey = ib >= 0 && ib < track.keys.length - 1 ? track.keys[ib + 1] : null;
+      var deltaFrames = Math.round((e.clientX - cd.startX) / FC);
+      if (cd.retime) {
+        // First key stays planted; only the second moves — stretches or
+        // compresses the segment in place. Bounded by A itself (can never
+        // reach or cross it) and by the next fixed key beyond B, if any.
+        var lo = cd.startAFrame + 1;
+        var hi = Math.min(state.totalFrames - 1, nextKey ? nextKey.frame - 1 : state.totalFrames - 1);
+        var nb = Math.max(lo, Math.min(hi, cd.startBFrame + deltaFrames));
+        if (nb === cd.b.frame) return;
+        cd.b.frame = nb; sortKeys(track);
+      } else {
+        // Both endpoints move together by the SAME delta (duration
+        // constant) — clamp is the intersection of what each endpoint can
+        // individually tolerate against ITS OWN outside neighbor.
+        var loD = prevKey ? (prevKey.frame + 1 - cd.startAFrame) : -cd.startAFrame;
+        var hiD = Math.min(
+          state.totalFrames - 1 - cd.startBFrame,
+          nextKey ? (nextKey.frame - 1 - cd.startBFrame) : Infinity
+        );
+        var d = Math.max(loD, Math.min(hiD, deltaFrames));
+        if (!d) return;
+        cd.a.frame = cd.startAFrame + d; cd.b.frame = cd.startBFrame + d;
+        sortKeys(track);
+      }
+      renderTimeline();
+      if (window.SMEngineBridge) SMEngineBridge.renderNow();
+      return;
+    }
     updateMarquee(e);
     var sk = window._motionSkewDrag;
     if (sk) {
@@ -5787,6 +5861,7 @@
     if (onLayerSkewUp()) return;
     endMarquee();
     if (window._motionSkewDrag) { window._motionSkewDrag = null; if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); return; }
+    if (window._motionConnectDrag) { window._motionConnectDrag = null; document.body.style.cursor = ''; if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); return; }
     if (!window._motionKeyDrag) return;
     window._motionKeyDrag = null;
     if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
@@ -5962,7 +6037,16 @@
     if (!wrap) return;
     wrap.addEventListener('mousedown', function (e) {
       if (state.appMode !== 'motion' || e.button !== 0) return;
-      if (e.target.closest('.fc.motion-fc, .layer-inout-handle, .layer-inout-key, .layer-inout-bar, #frame-hdr, #playhead-flag, #bars-row, #motion-graph-resize')) return;
+      // .motion-key-connect (task #101): the SVG connector rect lives in its
+      // own overlay <svg>, not inside a .fc.motion-fc cell like the diamonds
+      // it sits between — without its own exemption here, this capture-phase
+      // marquee-starter swallowed every mousedown on it before the rect's
+      // own listener (trackRowHtml) ever saw the event, silently turning a
+      // connector click/drag into a marquee-select instead. Found via a live
+      // dispatchEvent trace: stopPropagation/preventDefault both firing from
+      // THIS function on every attempt, zero trace of the rect's own
+      // listener ever running.
+      if (e.target.closest('.fc.motion-fc, .layer-inout-handle, .layer-inout-key, .layer-inout-bar, .motion-key-connect, #frame-hdr, #playhead-flag, #bars-row, #motion-graph-resize')) return;
       // Scrollbar clicks land on the wrap itself but outside its client
       // area — intercepting them would break scrollbar dragging.
       var r = wrap.getBoundingClientRect();
