@@ -2477,6 +2477,20 @@ function updateSelPropsPanel(){
         // described a shape that wasn't selected.
         if(hasStroke){var scss=colorHex8(ref.strokeColor);state.strokeColor=scss;paintStrokeSwatches(scss);}
         window.SM._syncStrokeEnabledUI(hasStroke);
+        // Stroke gradient along path (2026-08) — reflect the (first)
+        // selected path's actual state, same staleness fix as the stroke
+        // color swatch right above.
+        var sgCk=document.getElementById('p-strokegrad-along');
+        if(sgCk){
+          var sg=ref.data&&ref.data.strokeGradientAlongPath;
+          sgCk.checked=!!sg;
+          if(sg){
+            document.getElementById('p-strokegrad-from-c').value=sg.from||'#ff0000';
+            document.getElementById('p-strokegrad-from').style.background=sg.from||'#ff0000';
+            document.getElementById('p-strokegrad-to-c').value=sg.to||'#0000ff';
+            document.getElementById('p-strokegrad-to').style.background=sg.to||'#0000ff';
+          }
+        }
       }
       // Same staleness fix for Cap/Join/Paint Order/Miter Limit/Dash Offset —
       // reflect the selected path's actual values instead of leaving
@@ -7402,6 +7416,46 @@ document.getElementById('fill-enable-toggle-lp').addEventListener('click',functi
 document.getElementById('stroke-enable-toggle-lp').addEventListener('click',function(){window.SM.setStrokeEnabled(!state.strokeEnabled);});
 document.getElementById('color-stroke').addEventListener('input',function(){window.SM.setStrokeColor(this.dataset.hex8||this.value);if(!state.strokeEnabled)window.SM.setStrokeEnabled(true);});
 document.getElementById('pm-stroke-c').addEventListener('input',function(){var v=this.dataset.hex8||this.value;window.SM.setStrokeColor(v);document.getElementById('color-stroke').value=v;document.getElementById('color-stroke').dataset.hex8=v;if(!state.strokeEnabled)window.SM.setStrokeEnabled(true);});
+// Stroke gradient along path (2026-08) — applies to the current canvas
+// selection only (unlike most Fill/Stroke fields, which also edit the
+// tool's own default when nothing is selected) — this is a per-shape
+// property with no meaningful "future stroke" default the way a flat
+// color has.
+function applyStrokeGradAlongToSelection(mutate){
+  if(!selectedPaths.length)return;
+  pushUndo();
+  selectedPaths.forEach(function(p){mutate(p);});
+  saveActiveLayerFrame();updateUI();
+  if(window.SMEngineBridge)SMEngineBridge.renderNow();
+}
+document.getElementById('p-strokegrad-along').addEventListener('change',function(){
+  var on=this.checked;
+  applyStrokeGradAlongToSelection(function(p){
+    if(on){
+      var fromC=document.getElementById('p-strokegrad-from-c').value;
+      var toC=document.getElementById('p-strokegrad-to-c').value;
+      p.data.strokeGradientAlongPath={from:fromC,to:toC};
+    }else{
+      delete p.data.strokeGradientAlongPath;
+    }
+  });
+});
+document.getElementById('p-strokegrad-from-c').addEventListener('input',function(){
+  var v=this.value;
+  document.getElementById('p-strokegrad-from').style.background=v;
+  applyStrokeGradAlongToSelection(function(p){
+    if(!p.data.strokeGradientAlongPath)return;
+    p.data.strokeGradientAlongPath.from=v;
+  });
+});
+document.getElementById('p-strokegrad-to-c').addEventListener('input',function(){
+  var v=this.value;
+  document.getElementById('p-strokegrad-to').style.background=v;
+  applyStrokeGradAlongToSelection(function(p){
+    if(!p.data.strokeGradientAlongPath)return;
+    p.data.strokeGradientAlongPath.to=v;
+  });
+});
 // Figma-style color row (2026-07, "les couleurs ça peut être un système
 // comme [Figma]") — inline eye toggles + editable hex/alpha text fields
 // right in the Fill/Stroke rows, alongside the existing swatch popover.

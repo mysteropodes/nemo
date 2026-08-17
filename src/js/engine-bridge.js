@@ -1112,6 +1112,7 @@
             && !(window.SMMotion && cStrokeId && SMMotion.hasPathVertexMotionFor(i, cStrokeId))
             && !(window.SMMotion && cStrokeId && SMMotion.hasTrimMotionFor(i, cStrokeId))
             && !(c.data && c.data.fillGradient)
+            && !(c.data && c.data.strokeGradientAlongPath)
             && !(includeEditorOverlays && state.currentFrameOutline)
             && motionChainUniform(elMat, motionMat, parentChain);
           var fastRef = xformable ? existingPathRef(sub) : null;
@@ -1302,6 +1303,60 @@
           // engine.rs's paint_layer_items for how an item carrying this is
           // isolated and effect-processed on its own within the layer.
           if (c.data && c.data.effects && c.data.effects.length) item.effects = sceneEffectsOf(c.data);
+          // Stroke gradient along path (2026-08, "gradient qui tire du
+          // début à la fin du trait" — distinct from fillGradient above,
+          // which is a spatial 2-point ramp unrelated to the path's own
+          // shape). No new WGSL/Rust needed: this engine draws ONE flat
+          // color per stroked item, so a gradient becomes many small
+          // straight sub-segments, each solid-colored at its own arc-length
+          // position — the same "split into pieces along the path" idea
+          // buildBitmapBrush's dab-stamping already uses for a different
+          // purpose. v1: exactly 2 stops (from/to), piece count adaptive to
+          // length (denser trait = more pieces, capped both ends so a tiny
+          // trait or a huge one both stay cheap).
+          if (item.segments && item.strokeColor && c.data && c.data.strokeGradientAlongPath && window.SMMotion) {
+            var sg = c.data.strokeGradientAlongPath;
+            var fromRgba = cssColorToRgba(sg.from, op), toRgba = cssColorToRgba(sg.to, op);
+            if (fromRgba && toRgba) {
+              var poly = SMMotion.flattenSegmentsToPolyline(item.segments, item.closed, 20);
+              var cumL = [0];
+              for (var pli = 1; pli < poly.length; pli++) {
+                var pdx = poly[pli][0] - poly[pli - 1][0], pdy = poly[pli][1] - poly[pli - 1][1];
+                cumL.push(cumL[pli - 1] + Math.sqrt(pdx * pdx + pdy * pdy));
+              }
+              var totalL = cumL[cumL.length - 1];
+              if (totalL > 0) {
+                var pieceCount = Math.max(6, Math.min(48, Math.round(totalL / 40)));
+                var pieceLen = totalL / pieceCount;
+                function pointAtLenGrad(len) {
+                  for (var qi = 1; qi < cumL.length; qi++) {
+                    if (cumL[qi] >= len) {
+                      var qSegLen = cumL[qi] - cumL[qi - 1];
+                      var qt = qSegLen > 0 ? (len - cumL[qi - 1]) / qSegLen : 0;
+                      return [poly[qi - 1][0] + (poly[qi][0] - poly[qi - 1][0]) * qt, poly[qi - 1][1] + (poly[qi][1] - poly[qi - 1][1]) * qt];
+                    }
+                  }
+                  return poly[poly.length - 1];
+                }
+                for (var pieceI = 0; pieceI < pieceCount; pieceI++) {
+                  var pA = pointAtLenGrad(pieceI * pieceLen), pB = pointAtLenGrad((pieceI + 1) * pieceLen);
+                  var tMid = (pieceI + 0.5) / pieceCount;
+                  var pieceColor = [
+                    Math.round(fromRgba[0] + (toRgba[0] - fromRgba[0]) * tMid),
+                    Math.round(fromRgba[1] + (toRgba[1] - fromRgba[1]) * tMid),
+                    Math.round(fromRgba[2] + (toRgba[2] - fromRgba[2]) * tMid),
+                    Math.round(fromRgba[3] + (toRgba[3] - fromRgba[3]) * tMid),
+                  ];
+                  items.push({
+                    segments: [{ point: pA, handleIn: [0, 0], handleOut: [0, 0] }, { point: pB, handleIn: [0, 0], handleOut: [0, 0] }],
+                    closed: false, fillColor: null, strokeColor: pieceColor,
+                    strokeWidth: item.strokeWidth, strokeCap: item.strokeCap, strokeJoin: item.strokeJoin,
+                  });
+                }
+                return; // pieces pushed directly — skip the single combined item below
+              }
+            }
+          }
           // Non-destructive combine groups (2026-07-29) need to find, after
           // this loop, which JSON item(s) came from which live source item —
           // stripped again right after use, never sent to the renderer.
