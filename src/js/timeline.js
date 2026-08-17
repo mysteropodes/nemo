@@ -6420,6 +6420,10 @@ function clickEl(id){var el=document.getElementById(id);if(el)el.click();}
         action:function(){if(window.SMScript)SMScript.openFile();}},
       {label:'Ouvrir un plugin Nemo (.zip)…',id:'ctx-nemo-plugin',
         action:function(){if(window.SMPlugin)SMPlugin.openFile();}},
+      // Duplicate canvas viewer (2026-08, AE feature audit 8.4 "New
+      // Viewer") — a second panel on the same comp, independently panned/
+      // zoomed and optionally locked to a frame.
+      {label:'Nouvelle vue',action:function(){if(window.SMSecondViewer)SMSecondViewer.open();}},
       {label:tt('menuVersionHistory'),id:'ctx-history',action:function(){clickEl('btn-history');}},
       {sep:true},
       {label:tt('menuImportImg'),action:function(){clickEl('btn-import-img');}},
