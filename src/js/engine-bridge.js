@@ -2971,7 +2971,18 @@
     _fxExportSavedFrame = null;
   }
 
+  // Duplicate canvas viewer (2026-08, AE feature audit 8.4, "New Viewer" —
+  // a second window/panel on the SAME comp, often locked to a different
+  // frame than the main view). Deliberately narrow: just a frame-scoped
+  // buildSceneJson call, not the whole raw function — second-viewer.js
+  // owns its OWN VelloEngine instance/canvas/viewport entirely, this is
+  // the one seam it needs into engine-bridge's closure. skipVolatile=true
+  // (no drag-cursor previews — a second static viewer has no tool of its
+  // own drawing into it) and includeEditorOverlays=false (no selection
+  // handles/marquee/etc. — those belong to the tool driving the MAIN
+  // canvas, not a read-only reference view).
   window.SMEngineBridge = {
+    buildSceneJsonForFrame: function (frame) { return buildSceneJson(true, false, { frame: frame, includeEditorOverlays: false }); },
     setEnabled: setEnabled,
     isEnabled: function () { return enabled; },
     screenToWorld: screenToWorld,
