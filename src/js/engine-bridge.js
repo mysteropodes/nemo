@@ -689,6 +689,13 @@
       // parentLayerUid/parentChainMats mechanism, which only needs the
       // layer to exist at some index, not to draw anything).
       if (state.layers[i].isNullLayer) { layers.push(userLayerEntries[i] = { items: [] }); continue; }
+      // Guide layer (2026-08, AE feature audit 8.6) — a real layer object
+      // (rotatable/parentable/keyable, unlike a classic ruler-drag guide),
+      // same "no content, no paint" shape as Null right above. The actual
+      // guide LINE is drawn separately, as an editor-only overlay
+      // (buildGuideLayerItems, below) — never part of the real/exported
+      // scene, same convention as safety zones/perspective guides.
+      if (state.layers[i].isGuideLayer) { layers.push(userLayerEntries[i] = { items: [] }); continue; }
       // Effect (adjustment) layer (2026-07, Motion; effects stack rewrite
       // 2026-07) — never paints its own content either (ld.frames/strokes
       // are ignored on purpose, matching AE's "Adjustment Layer" toggle),
@@ -1614,6 +1621,8 @@
       if (arcItems.length) layers.push({ items: arcItems });
       var safetyItems = buildSafetyZoneItems();
       if (safetyItems.length) layers.push({ items: safetyItems });
+      var guideItems = buildGuideLayerItems();
+      if (guideItems.length) layers.push({ items: guideItems });
       var perspectiveItems = window.buildPerspectiveGuideItems ? window.buildPerspectiveGuideItems() : [];
       if (perspectiveItems.length) layers.push({ items: perspectiveItems });
       var symmetryItems = window.buildSymmetryGuideItems ? window.buildSymmetryGuideItems() : [];
@@ -1803,6 +1812,51 @@
     ];
   }
 
+  // ---- Guide layers (2026-08, AE feature audit 8.6 — "guides as a real
+  // layer object": rotatable, parentable, colored, unlike a classic
+  // ruler-drag guide) ----
+  // A guide layer has no content of its own (see the isGuideLayer skip in
+  // the main per-layer loop) — its line is entirely derived from the SAME
+  // Transform properties every other layer already has: ld.guidePos (a
+  // WORLD anchor point, defaults to canvas center) is the base the layer's
+  // own Position track offsets, and Rotation sets the line's angle
+  // (0°/horizontal by default, +90° if guideOrientation is 'vertical') —
+  // zero new keyframe machinery, reuses layerMotionAt/parentChainMats
+  // exactly like an ordinary layer's own transform chain, so parenting a
+  // guide to an animated layer (or keying the guide itself) just works.
+  // Drawn as a single line spanning well past the canvas (SPAN, same
+  // "comfortably past any realistic content" convention as
+  // CLIP_MASK_SPAN) — never part of the real/exported scene.
+  function buildGuideLayerItems() {
+    if (!window.SMMotion) return [];
+    var items = [], SPAN = 100000, frame = state.currentFrame;
+    for (var i = 0; i < state.layers.length; i++) {
+      var gld = state.layers[i];
+      if (!gld.isGuideLayer || gld.visible === false) continue;
+      var basePos = gld.guidePos || [state.canvasW / 2, state.canvasH / 2];
+      // layerMotionAt just reads the layer's OWN motion/motionStatic dict
+      // (computeMotionMat) — no bounds/pivot needed to call it, that's only
+      // required by callers that go on to transform CONTENT around a
+      // pivot (ordinary layers). A guide has none, so its own dx/dy/rot
+      // apply directly as a flat offset/rotation on the anchor point.
+      var ownMat = SMMotion.layerMotionAt(i, frame);
+      var angleRad = ((gld.guideOrientation === 'vertical' ? 90 : 0) + (ownMat ? ownMat.rot : 0)) * Math.PI / 180;
+      var pt = [{ point: [basePos[0] + (ownMat ? ownMat.dx : 0), basePos[1] + (ownMat ? ownMat.dy : 0)], handleIn: [0, 0], handleOut: [0, 0] }];
+      var parentChain = SMMotion.parentChainMats(i, frame);
+      for (var pc = 0; pc < parentChain.length; pc++) {
+        pt = SMMotion.transformSegments(pt, parentChain[pc].pivot, parentChain[pc].mat);
+        angleRad += (parentChain[pc].mat.rot || 0) * Math.PI / 180;
+      }
+      var cx = pt[0].point[0], cy = pt[0].point[1];
+      var ex = Math.cos(angleRad) * SPAN, ey = Math.sin(angleRad) * SPAN;
+      var col = cssColorToRgba(gld.color || '#00baff', 1) || [0, 186, 255, 255];
+      items.push({
+        segments: [{ point: [cx - ex, cy - ey], handleIn: [0, 0], handleOut: [0, 0] }, { point: [cx + ex, cy + ey], handleIn: [0, 0], handleOut: [0, 0] }],
+        closed: false, fillColor: null, strokeColor: col, strokeWidth: Math.max(1, 1 / view.zoom),
+      });
+    }
+    return items;
+  }
   // ---- Safety zones (Document panel toggle) ----
   // Standard broadcast/film safe-area convention: action-safe = inset 5% of
   // each dimension (90% of canvas visible), title-safe = inset 10% (80%

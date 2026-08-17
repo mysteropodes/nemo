@@ -709,6 +709,15 @@ window.SM={
   // has an immediately visible (if subtle) effect rather than looking
   // like a no-op.
   addEffectLayer:function(){saveAllLayerFrames();pushUndoLayers();var idx=createUserLayer(nextLayerName().replace(/^Layer/,'Effet'));state.layers[idx].isEffectLayer=true;state.layers[idx].effects=[];activateUL(idx);loadFrame(state.currentFrame);updateUI();},
+  // Guide layer (2026-08, AE feature audit 8.6) — a real layer object
+  // (rotatable/parentable/keyable Transform, colored) instead of a classic
+  // ruler-drag guide: no content of its own (same "no real content" guard
+  // list as Null/Effect above), the line itself is engine-bridge.js's
+  // buildGuideLayerItems, an editor-only overlay derived from the layer's
+  // OWN Position/Rotation Transform (guidePos is the anchor Position
+  // offsets from; Rotation sets the angle) — zero new keyframe machinery.
+  // Defaults to horizontal through canvas center.
+  addGuideLayer:function(){saveAllLayerFrames();pushUndoLayers();var idx=createUserLayer(nextLayerName().replace(/^Layer/,'Guide'));state.layers[idx].isGuideLayer=true;state.layers[idx].guidePos=[state.canvasW/2,state.canvasH/2];state.layers[idx].guideOrientation='horizontal';state.layers[idx].color='#00baff';activateUL(idx);loadFrame(state.currentFrame);updateUI();},
   deleteLayer:function(){
     // The camera row isn't in state.layers (synthetic pseudo-layer, see
     // camera.js) — the generic layer-panel trash button silently did
@@ -1539,7 +1548,7 @@ window.SM={
       }
     }
     return JSON.stringify({version:13,totalFrames:sceneTotal,fps:sceneFps,canvasW:state.canvasW,canvasH:state.canvasH,canvasBg:state.canvasBg,waIn:sceneWaIn,waOut:sceneWaOut,
-      layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color,motion:l.motion,motionStatic:l.motionStatic,elementMotion:l.elementMotion,inPoint:l.inPoint,outPoint:l.outPoint,nativeVideo:l.nativeVideo,matteMode:l.matteMode,matteSourceLayerUid:l.matteSourceLayerUid,montageId:l.montageId,expressions:l.expressions,isTextLayer:l.isTextLayer,isNullLayer:l.isNullLayer,isEffectLayer:l.isEffectLayer,effects:l.effects,footage:l.footage,
+      layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color,motion:l.motion,motionStatic:l.motionStatic,elementMotion:l.elementMotion,inPoint:l.inPoint,outPoint:l.outPoint,nativeVideo:l.nativeVideo,matteMode:l.matteMode,matteSourceLayerUid:l.matteSourceLayerUid,montageId:l.montageId,expressions:l.expressions,isTextLayer:l.isTextLayer,isNullLayer:l.isNullLayer,isEffectLayer:l.isEffectLayer,isGuideLayer:l.isGuideLayer,guidePos:l.guidePos,guideOrientation:l.guideOrientation,effects:l.effects,footage:l.footage,
         // Layer parenting (2026-07-25). BOTH of these were missing from this
         // list, so every parent link was silently dropped on save — a rig
         // survived the session and nothing more. `uid` is the stable identity
@@ -1774,6 +1783,7 @@ window.SM={
       if(ld.isTextLayer)state.layers[idx].isTextLayer=true;
       if(ld.isNullLayer)state.layers[idx].isNullLayer=true;
       if(ld.isEffectLayer){state.layers[idx].isEffectLayer=true;}
+      if(ld.isGuideLayer){state.layers[idx].isGuideLayer=true;state.layers[idx].guidePos=(ld.guidePos||[state.canvasW/2,state.canvasH/2]).slice();state.layers[idx].guideOrientation=ld.guideOrientation||'horizontal';}
       state.layers[idx].effects=ld.effects||[];
       if(ld.symbolId){state.layers[idx].symbolId=ld.symbolId;state.layers[idx].symPlayMode=ld.symPlayMode||'loop';state.layers[idx].symSpeed=ld.symSpeed||1;state.layers[idx].symPlacedAt=ld.symPlacedAt||0;state.layers[idx].symSingleFrame=ld.symSingleFrame||0;if(ld.symMatrix)state.layers[idx].symMatrix=ld.symMatrix;}
       if(ld.lfsGroup){state.layers[idx].lfsGroup=true;state.layers[idx].lfsIds=ld.lfsIds;state.layers[idx].lfsSettings=ld.lfsSettings;}
@@ -4723,6 +4733,7 @@ function renderLayerList(frameOnly){
     // icon font is subsetted and silently renders blank for un-included
     // codepoints, see the lock-icon fix comment further up this function).
     if(ld.isNullLayer){var nlb=document.createElement('div');nlb.className='lico comp-badge';nlb.title='Calque Null — jamais rendu, sert de pivot/parent pour d’autres calques';nlb.innerHTML='<span style="font-size:11px;line-height:1;font-weight:700">⊘</span>';row.appendChild(nlb);}
+    if(ld.isGuideLayer){var glb=document.createElement('div');glb.className='lico comp-badge';glb.title='Calque Guide — ligne repère visible en édition seulement, jamais exportée. Position/Rotation pilotent la ligne, comme n’importe quel calque';glb.style.color=ld.color||'#00baff';glb.innerHTML='<span style="font-size:11px;line-height:1;font-weight:700">┆</span>';row.appendChild(glb);}
     if(ld.isEffectLayer){
       var fxLabels=window.EFFECT_LABELS||{};
       var enabledFx=(ld.effects||[]).filter(function(e){return e.enabled;});
@@ -4847,6 +4858,7 @@ function renderLayerList(frameOnly){
         {label:'Insérer un calque',action:function(){window.SM.addLayer();}},
         {label:'Insérer un calque Null',action:function(){window.SM.addNullLayer();}},
         {label:'Insérer un calque d’effet',action:function(){window.SM.addEffectLayer();}},
+        {label:'Insérer un calque Guide',action:function(){window.SM.addGuideLayer();}},
         {label:'Dupliquer le calque',action:function(){window.SM.duplicateLayer();}},
         {label:'Supprimer le calque',action:function(){window.SM.deleteLayer();}},
         {sep:true},
@@ -8165,6 +8177,7 @@ document.getElementById('btn-al').addEventListener('click',function(e){
     {label:'Calque',action:function(){window.SM.addLayer();}},
     {label:'Calque Null',action:function(){window.SM.addNullLayer();}},
     {label:'Calque d’effet',action:function(){window.SM.addEffectLayer();}},
+    {label:'Calque Guide',action:function(){window.SM.addGuideLayer();}},
   ]);
 });
 document.getElementById('btn-dl').addEventListener('click',function(){window.SM.deleteLayer();});
