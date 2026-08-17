@@ -2587,6 +2587,12 @@ function splitLayerIntoElementsCore(li,opts){
       blendMode:ld.blendMode,
       parentLayerUid:ld.parentLayerUid,parentLayerUidB:ld.parentLayerUidB,
       timeLink:ld.timeLink?JSON.parse(JSON.stringify(ld.timeLink)):undefined,
+      // Same gap as the fields above (2026-08-16 QA sweep): ld's in/out
+      // point describes the whole original layer's visibility WINDOW, not
+      // which piece a stroke landed in — every split-off layer needs the
+      // same window or N-1 of them un-trim back to the full timeline the
+      // instant the split runs.
+      inPoint:ld.inPoint,outPoint:ld.outPoint,
     };
     // matteMode: with a frozen matteSourceLayerUid (2026-07-31, uid-based
     // mattes) the source no longer depends on array adjacency, so EVERY
