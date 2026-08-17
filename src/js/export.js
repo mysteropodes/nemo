@@ -720,8 +720,74 @@ function lottieShapeValue(sd,camMatrix){
     c:!!sd.closed
   };
 }
-function lottiePathLayer(name,runStrokes,runStart,runEnd,fps,camByFrame,bm){
+// Stroke gradient along path (2026-08, AE feature audit 6.3/9.2) — Lottie
+// has no native "gradient follows the stroke's own length" concept either
+// (its 'gs' gradient-stroke shape is spatial, same 2-point limitation AE
+// itself has) — same reasoning as engine-bridge.js's live-render approach:
+// split into many small solid-colored straight sub-segments, one Lottie
+// shape GROUP per piece, all packed into the layer's `shapes` array
+// together (Lottie composites sibling groups within one shape layer
+// naturally, no separate Lottie layer needed per piece).
+//
+// STATIC approximation, posed at the run's first frame only — unlike the
+// path animation ('sh' keyframes) elsewhere in this exporter, a per-piece
+// split can't easily follow a frame-by-frame ANIMATED path (piece count/
+// positions would need re-deriving every frame, and Lottie has no keyframed
+// "N groups" concept). Stated v1 limitation: a gradient-along-path stroke
+// that ALSO moves/reshapes during this run exports frozen at its start
+// pose — correct for the overwhelmingly common case (a static or lightly
+// keyed decorative stroke), same tradeoff class as Trim Paths' own
+// polyline-not-exact-bezier approximation.
+function lottieGradientAlongPathShapes(first){
+  if(!window.SMMotion)return null;
+  var sg=first.strokeGradientAlongPath;
+  var fromRgba=lottieHexToRGBA(sg.from,1),toRgba=lottieHexToRGBA(sg.to,1);
+  var poly=SMMotion.flattenSegmentsToPolyline(first.segments,first.closed,20);
+  var cumL=[0];
+  for(var i=1;i<poly.length;i++){var dx=poly[i][0]-poly[i-1][0],dy=poly[i][1]-poly[i-1][1];cumL.push(cumL[i-1]+Math.sqrt(dx*dx+dy*dy));}
+  var totalL=cumL[cumL.length-1];
+  if(totalL<=0)return null;
+  var pieceCount=Math.max(6,Math.min(48,Math.round(totalL/40)));
+  var pieceLen=totalL/pieceCount;
+  function pointAtLen(len){
+    for(var qi=1;qi<cumL.length;qi++){
+      if(cumL[qi]>=len){var segLen=cumL[qi]-cumL[qi-1];var t=segLen>0?(len-cumL[qi-1])/segLen:0;return[poly[qi-1][0]+(poly[qi][0]-poly[qi-1][0])*t,poly[qi-1][1]+(poly[qi][1]-poly[qi-1][1])*t];}
+    }
+    return poly[poly.length-1];
+  }
+  var op=first.opacity!==undefined?first.opacity:1;
+  var groups=[];
+  for(var pi=0;pi<pieceCount;pi++){
+    var pA=pointAtLen(pi*pieceLen),pB=pointAtLen((pi+1)*pieceLen);
+    var tMid=(pi+0.5)/pieceCount;
+    var col=[
+      (fromRgba[0]+(toRgba[0]-fromRgba[0])*tMid),
+      (fromRgba[1]+(toRgba[1]-fromRgba[1])*tMid),
+      (fromRgba[2]+(toRgba[2]-fromRgba[2])*tMid),
+      1
+    ];
+    groups.push({ty:'gr',it:[
+      {ty:'sh',ks:{a:0,k:{i:[[0,0],[0,0]],o:[[0,0],[0,0]],v:[pA,pB],c:false}}},
+      {ty:'st',c:{a:0,k:col},o:{a:0,k:op*100},w:{a:0,k:first.strokeWidth||2},lc:first.strokeCap==='round'?2:(first.strokeCap==='square'?3:1),lj:2},
+      {ty:'tr',p:{a:0,k:[0,0]},a:{a:0,k:[0,0]},s:{a:0,k:[100,100]},r:{a:0,k:0},o:{a:0,k:100}},
+    ]});
+  }
+  return groups;
+}
+function lottiePathLayer(name,runStrokes,runStart,runEnd,fps,camByFrame,bm,li){
   var first=runStrokes[runStart];
+  if(first.strokeGradientAlongPath&&first.hasRealStroke&&first.segments&&first.segments.length){
+    var gradShapes=lottieGradientAlongPathShapes(first);
+    if(gradShapes){
+      return{
+        ddd:0,ty:4,nm:name,sr:1,
+        ks:{o:{a:0,k:100},r:{a:0,k:0},p:{a:0,k:[0,0,0]},a:{a:0,k:[0,0,0]},s:{a:0,k:[100,100,100]}},
+        ao:0,
+        shapes:gradShapes,
+        ip:runStart,op:runEnd+1,st:0,bm:bm||0
+      };
+    }
+  }
   // sd.strokeColor defaults to '#ffffff' as a legacy fallback even when the
   // path never had a real stroke (serP, app.js) — CLAUDE.md's documented
   // hasRealStroke field exists precisely so consumers can tell the two
@@ -742,6 +808,23 @@ function lottiePathLayer(name,runStrokes,runStart,runEnd,fps,camByFrame,bm){
   }
   if(first.fillColor){
     shapeItems.push({ty:'fl',c:{a:0,k:lottieHexToRGBA(first.fillColor,1)},o:{a:0,k:(first.opacity!==undefined?first.opacity:1)*100}});
+  }
+  // Trim Paths (2026-08, AE feature audit 9.2) — Lottie has a NATIVE shape
+  // modifier for this ('tm', Bodymovin/lottie-web's own Trim Paths), a
+  // near 1:1 mapping to Nemo's own trimStart/trimEnd/trimOffset: s/e are
+  // the SAME 0-100 percent space, o is in DEGREES (AE's own Trim Paths
+  // Offset property is natively degrees, not percent — Nemo's own o is
+  // percent for UI-simplicity reasons, see motion.js's PROP_DEFAULT
+  // comment, so *3.6 converts one to the other here at the export
+  // boundary only). Keyframed per-frame exactly like the path ('sh')
+  // shape above, since trim is itself an animatable per-element property.
+  if(window.SMMotion&&li!=null&&first.strokeId&&SMMotion.hasTrimMotionFor(li,first.strokeId)){
+    var tmS=[],tmE=[],tmO=[];
+    for(var tf=runStart;tf<=runEnd;tf++){
+      var win=SMMotion.trimWindowAt(li,first.strokeId,tf)||{start:0,end:100,offset:0};
+      tmS.push({t:tf,s:[win.start]});tmE.push({t:tf,s:[win.end]});tmO.push({t:tf,s:[win.offset*3.6]});
+    }
+    shapeItems.push({ty:'tm',s:{a:1,k:tmS},e:{a:1,k:tmE},o:{a:1,k:tmO},m:1});
   }
   shapeItems.push({ty:'tr',p:{a:0,k:[0,0]},a:{a:0,k:[0,0]},s:{a:0,k:[100,100]},r:{a:0,k:0},o:{a:0,k:100}});
   return{
@@ -800,7 +883,19 @@ function lottieBuild(start,end){
     // same as before.
     var framesStrokes=[];
     for(var f=start;f<=end;f++){
-      var fStrokes=getEffectiveStrokesRendered(li,f).filter(function(sd){return sd.opacity!==0&&!sd.isRaster&&!sd.isRevisionGhost&&(state.exportIncludeShadowGuides||sd.channelTag!=='shadow');});
+      // isMask (2026-08, AE feature audit 9.2 "voir si nos nouvelles
+      // features peuvent être compatible" Lottie): excluded from the
+      // exported shapes, not just left in as a normal visible shape. This
+      // exporter turns every STROKE into its own Lottie shape LAYER (no
+      // per-Nemo-layer grouping), so there's no single Lottie layer a mask
+      // could attach masksProperties to — real Lottie masking needs that
+      // restructure, not done here. Excluding is still strictly better
+      // than the prior behavior: without this, a mask exported as an
+      // ordinary opaque shape in its EDIT-time color (masks are white-
+      // filled only inside the live engine's own render, never in the
+      // persisted stroke data) — a wrong, visible extra shape, worse than
+      // an honestly-missing clip.
+      var fStrokes=getEffectiveStrokesRendered(li,f).filter(function(sd){return sd.opacity!==0&&!sd.isRaster&&!sd.isRevisionGhost&&!sd.isMask&&(state.exportIncludeShadowGuides||sd.channelTag!=='shadow');});
       // Non-destructive combine groups (2026-07-29) — same post-process as
       // exportBuildFrame/buildSceneJson.
       if(window.SMGroup&&ld.groups)fStrokes=SMGroup.applyCombinesToStrokes(fStrokes,ld);
@@ -821,7 +916,7 @@ function lottieBuild(start,end){
           var runEnd=f-1;
           var runStrokes={};
           for(var rf=runStart;rf<=runEnd;rf++)runStrokes[rf]=framesStrokes[rf][slot];
-          var layer=lottiePathLayer(ld.name+' / shape'+slot,runStrokes,runStart,runEnd,fps,camByFrame,bm);
+          var layer=lottiePathLayer(ld.name+' / shape'+slot,runStrokes,runStart,runEnd,fps,camByFrame,bm,li);
           layer.ind=ind++;
           layers.push(layer);
           runStart=null;

@@ -89,14 +89,40 @@
     return{isSeq:false};
   }
 
-  async function importSequence(items,prefix){
+  // Prompt Frame Rate (2026-08, AE feature audit 8.3, "prevent mismatch
+  // with project settings") — asks what rate the SEQUENCE was captured at
+  // before importing it, defaulting to the project's own fps (so hitting
+  // Enter with no change reproduces the old silent 1-image-per-project-
+  // frame behavior exactly). A native prompt() — same pattern bpm-grid.js
+  // already uses for a single numeric value, not worth a bespoke modal for
+  // one field. Returns a positive number, or null if cancelled/invalid
+  // (caller treats null as "same as project fps", i.e. a no-op).
+  function promptSequenceFps(){
+    var v=window.prompt('Fréquence de la séquence (images par seconde) ? Laisser tel quel = '+state.fps+' fps (fréquence du projet).',String(state.fps));
+    if(v===null)return null;
+    var n=parseFloat(v);
+    return(n>0&&isFinite(n))?n:null;
+  }
+  // Repeats each sequence entry to approximate the requested playback
+  // speed relative to the project's own fps — e.g. a 12fps sequence in a
+  // 24fps project shows each source image for 2 project frames. Simple
+  // nearest-integer repeat rather than true resampling (no dropped-frame
+  // case for seqFps > project fps beyond rounding to 1) — matches AE's own
+  // "prevent mismatch" framing (get the DURATION right) without building a
+  // full retiming engine for what's fundamentally an import-time nicety.
+  function seqRepeatCount(seqFps){
+    if(!seqFps||seqFps===state.fps)return 1;
+    return Math.max(1,Math.round(state.fps/seqFps));
+  }
+  async function importSequence(items,prefix,seqFps){
     showToast('Import de la séquence…');
+    var rep=seqRepeatCount(seqFps);
     var frames=[];
     for(var i=0;i<items.length;i++){
       var dataUrl=await readAsDataUrl(items[i].path);
       var nat=await naturalSize(dataUrl);
       var fit=fitSize(nat.w,nat.h);
-      frames.push({strokes:[{isRaster:true,src:dataUrl,x:state.canvasW/2,y:state.canvasH/2,width:fit.w,height:fit.h,opacity:1}],isKeyframe:true,isInterpolated:false});
+      for(var r=0;r<rep;r++)frames.push({strokes:[{isRaster:true,src:dataUrl,x:state.canvasW/2,y:state.canvasH/2,width:fit.w,height:fit.h,opacity:1}],isKeyframe:r===0,isInterpolated:r!==0});
     }
     saveAllLayerFrames();pushUndoLayers();
     if(frames.length>state.totalFrames)window.SM.setTotalFrames(frames.length);
@@ -154,7 +180,7 @@
     if(!paths)return;
     paths=Array.isArray(paths)?paths:[paths];
     var seq=paths.length>=2?detectSequence(paths):{isSeq:false};
-    if(seq.isSeq)await importSequence(seq.items.map(function(it){return{path:it.path};}),seq.prefix);
+    if(seq.isSeq)await importSequence(seq.items.map(function(it){return{path:it.path};}),seq.prefix,promptSequenceFps());
     else await importStandalone(paths);
   }
 
@@ -177,13 +203,14 @@
     var names=files.map(function(f){return f.name;});
     var seq=files.length>=2?detectSequence(names):{isSeq:false};
     if(seq.isSeq){
+      var seqFps=promptSequenceFps(),rep=seqRepeatCount(seqFps);
       showToast('Import de la séquence…');
       var frames=[];
       for(var i=0;i<seq.items.length;i++){
         var file=files[names.indexOf(seq.items[i].path)];
         var dataUrl=await fileToDataUrl(file);
         var nat=await naturalSize(dataUrl);var fit=fitSize(nat.w,nat.h);
-        frames.push({strokes:[{isRaster:true,src:dataUrl,x:state.canvasW/2,y:state.canvasH/2,width:fit.w,height:fit.h,opacity:1}],isKeyframe:true,isInterpolated:false});
+        for(var r=0;r<rep;r++)frames.push({strokes:[{isRaster:true,src:dataUrl,x:state.canvasW/2,y:state.canvasH/2,width:fit.w,height:fit.h,opacity:1}],isKeyframe:r===0,isInterpolated:r!==0});
       }
       saveAllLayerFrames();pushUndoLayers();
       if(frames.length>state.totalFrames)window.SM.setTotalFrames(frames.length);
