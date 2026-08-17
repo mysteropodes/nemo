@@ -449,8 +449,17 @@ Checklist avant `npm run build` :
    confirme `--enable-gpl --enable-libx264 --enable-libx265`). Le piper en sous-processus est
    de la "simple agrégation" (le pattern standard de tout logiciel de montage commercial qui
    embarque ffmpeg), nettement plus sain juridiquement que le linkage direct qu'on avait avant
-   — mais ça ne fait pas disparaître la dépendance GPL en soi. Avant toute vente, il faudra
-   toujours une build ffmpeg custom LGPL-only décode-seul si on veut être totalement propre.
+   — mais ça ne fait pas disparaître la dépendance GPL en soi, ni la question SÉPARÉE des
+   brevets logiciels H.264/H.265 (libx264/libx265) qui touche même une build 100% conforme GPL.
+   **Ce n'est plus seulement "avant toute vente" — passage open source (2026-08-17, audit
+   complet dans [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)) : rendu bloquant avant toute
+   publication publique du repo tel quel.** Correctif recommandé : build ffmpeg custom
+   `--disable-gpl` sans libx264/libx265 (garder libvpx/libaom-libsvtav1/libopus =
+   royalty-free), ce qui fait converger le MP4 desktop et le WebM navigateur (`export.js`,
+   `exportVideoBrowser`/`exportGifBrowser`, 2026-08-17) sur la même famille de codec — le
+   chemin navigateur, lui, n'embarque AUCUN codec (MediaRecorder délègue au navigateur de
+   l'utilisateur, licence déjà payée par l'éditeur du navigateur) et n'a donc aucun problème
+   équivalent.
 4. Si c'est un vrai changement fonctionnel (pas juste un patch de bug) : lancer
    `./scripts/publish-update.sh "notes"` après la build pour que les installs existantes le
    voient — voir §6 pour le détail des tokens nécessaires.
