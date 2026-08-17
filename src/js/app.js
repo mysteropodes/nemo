@@ -2786,6 +2786,14 @@ function mergeLayersIntoOne(indices,opts){
     // legacy adjacency behavior.
     matteSourceLayerUid:srcs[0].matteSourceLayerUid,
   };
+  // Same field-drop bug again (2026-08-16 QA sweep): a trimmed source's
+  // in/out point wasn't in this list at all, so merging a layer manually
+  // rogné à [5,50] silently un-trimmed it back to the full timeline —
+  // content past the old out point that used to be hidden was suddenly
+  // visible. Inherited from srcs[0], same "topmost source wins" convention
+  // as color/matteMode/timeLink right above.
+  if(srcs[0].inPoint!=null)merged.inPoint=srcs[0].inPoint;
+  if(srcs[0].outPoint!=null)merged.outPoint=srcs[0].outPoint;
   if(Object.keys(elMotion).length)merged.elementMotion=elMotion;
   if(Object.keys(mergedGroups).length)merged.groups=mergedGroups;
   // Any OTHER layer parented to one of the layers about to disappear must
