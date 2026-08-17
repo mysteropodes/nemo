@@ -193,6 +193,58 @@
     ws.decoder.configure({ codec: ws.codec, codedWidth: ws.width, codedHeight: ws.height, description: ws.description });
   }
 
+  // Annex-B → AVCC repack (2026-08-17, found live: re-importing a video
+  // this app's OWN browser export produced — MediaRecorder's H.264 output
+  // — timed out with zero decoded frames despite a config VideoDecoder
+  // itself reported as fully supported). Root cause, confirmed by
+  // inspecting raw sample bytes: the avcC box (and so `avc1.xx` codec
+  // string/config) declares AVCC framing — each NAL unit prefixed by its
+  // own 4-byte big-endian LENGTH — but Chrome's MediaRecorder actually
+  // writes samples in Annex-B framing (each NAL prefixed by a 00 00 01 or
+  // 00 00 00 01 START CODE instead). WebCodecs takes the container's word
+  // for it: configured for AVCC, it silently can't find NAL boundaries in
+  // Annex-B data and just never emits output — no error, no exception,
+  // exactly the "muet" symptom this bridge's own timeout guard exists
+  // for. This isn't only a self-referential concern (re-importing this
+  // app's own export) — any MediaRecorder-sourced MP4 a user might import
+  // (a screen recording, a webcam capture tool built on the same API) can
+  // carry the identical mismatch. Detects Annex-B by its start-code
+  // signature and repacks to AVCC in place; a properly-authored file
+  // (camera, NLE export) already IS AVCC and this is a no-op single-pass
+  // scan per sample, negligible next to the decode itself.
+  function _isAnnexB(data) {
+    if (data.length < 4) return false;
+    if (data[0] === 0 && data[1] === 0 && data[2] === 1) return true;
+    if (data[0] === 0 && data[1] === 0 && data[2] === 0 && data[3] === 1) return true;
+    return false;
+  }
+  function _annexBToAvcc(data) {
+    // Find every start code, split into NAL units (each running to the
+    // next start code or EOF), re-emit as [u32 length][NAL bytes].
+    var starts = [];
+    for (var i = 0; i < data.length - 2; i++) {
+      if (data[i] === 0 && data[i + 1] === 0 && data[i + 2] === 1) {
+        starts.push({ pos: i, len: (i > 0 && data[i - 1] === 0) ? 4 : 3 });
+      }
+    }
+    if (!starts.length) return data; // shouldn't happen (caller already checked _isAnnexB), fail safe
+    var nals = [];
+    for (var j = 0; j < starts.length; j++) {
+      var nalStart = starts[j].pos + starts[j].len;
+      var nalEnd = (j + 1 < starts.length) ? starts[j + 1].pos - (starts[j + 1].len === 4 ? 1 : 0) : data.length;
+      if (nalEnd > nalStart) nals.push(data.subarray(nalStart, nalEnd));
+    }
+    var total = 0; nals.forEach(function (n) { total += 4 + n.length; });
+    var out = new Uint8Array(total);
+    var off = 0;
+    nals.forEach(function (n) {
+      out[off] = (n.length >>> 24) & 0xff; out[off + 1] = (n.length >>> 16) & 0xff;
+      out[off + 2] = (n.length >>> 8) & 0xff; out[off + 3] = n.length & 0xff;
+      out.set(n, off + 4);
+      off += 4 + n.length;
+    });
+    return out;
+  }
   async function _decodeWebFrame(ws, frameIndex) {
     if (frameIndex < 0 || frameIndex >= ws.samples.length) throw new Error('frame index hors limites');
     var startIdx = frameIndex;
@@ -212,7 +264,11 @@
     var need = frameIndex - startIdx + 1;
     for (var i = startIdx; i <= frameIndex; i++) {
       var s = ws.samples[i];
-      ws.decoder.decode(new EncodedVideoChunk({ type: s.is_sync ? 'key' : 'delta', timestamp: s.cts, duration: s.duration, data: s.data }));
+      // Checked once per sample (cheap relative to the decode itself) —
+      // see _isAnnexB/_annexBToAvcc's own comment for why this is needed
+      // at all despite the container's avcC box already declaring AVCC.
+      var sampleData = _isAnnexB(s.data) ? _annexBToAvcc(s.data) : s.data;
+      ws.decoder.decode(new EncodedVideoChunk({ type: s.is_sync ? 'key' : 'delta', timestamp: s.cts, duration: s.duration, data: sampleData }));
     }
     // Deliberately NOT decoder.flush() — flush() drains AND resets the
     // decode context in at least Chrome's implementation, so the VERY
