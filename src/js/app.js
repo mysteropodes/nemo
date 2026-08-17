@@ -605,6 +605,14 @@ function serP(p){var isVB=!!(p.data&&p.data.isVectorBrush);var center=isVB&&p.da
   // re-editing or persisting the block's original string/font/layout).
   isVectorText:(p.data&&p.data.isVectorText)?true:undefined,
   vectorChar:(p.data&&p.data.vectorChar)?p.data.vectorChar:undefined,
+  // Text Animator (2026-08-17) grouping — which letter/word/line this glyph
+  // (or, on a raster split Raster, this character) belongs to, stamped at
+  // build time (vector-text-bridge.js/timeline.js's splitTextIntoCharacters)
+  // so text-animator.js can group getEffectiveStrokes' stroke dicts by unit
+  // without re-deriving word/line boundaries from strings at animate time.
+  charIndex:(p.data&&p.data.charIndex!=null)?p.data.charIndex:undefined,
+  wordIndex:(p.data&&p.data.wordIndex!=null)?p.data.wordIndex:undefined,
+  lineIndex:(p.data&&p.data.lineIndex!=null)?p.data.lineIndex:undefined,
   isText:(p.data&&p.data.isText)?true:undefined,
   isTextRoot:(p.data&&p.data.isTextRoot)?true:undefined,
   text:(p.data&&p.data.isTextRoot)?p.data.text:undefined,
@@ -641,6 +649,7 @@ function desP(d,layer,op){var prev=project.activeLayer;layer.activate();var p=ne
   // fallback chain untouched.
   p.strokeColor=d.hasRealStroke===false?null:(d.strokeColor||((d.isVectorBrush||d.brushTexturePreset||d.bitmapBrushSpec||d.isBrushTextureCopy||dNoStrokeChannel||dIsShadowChannel)?null:'#fff'));p.strokeWidth=d.strokeWidth||3;p.strokeCap=typeof d.strokeCap==='string'?d.strokeCap:'round';p.strokeJoin=typeof d.strokeJoin==='string'?d.strokeJoin:'round';if(d.miterLimit!==undefined)p.miterLimit=d.miterLimit;if(d.fillColor)p.fillColor=d.fillColor;else p.fillColor=null;p.opacity=op!==undefined?op:(d.opacity!==undefined?d.opacity:1);if(d.dashArray&&d.dashArray.length)p.dashArray=d.dashArray;if(d.dashOffset!==undefined)p.dashOffset=d.dashOffset;if(d.paintOrder){p.data.paintOrder=d.paintOrder;}if(d.isVectorBrush){p.data.isVectorBrush=true;if(d.centerSegments)p.data.centerSegments=d.centerSegments;if(d.widthProfile)p.data.widthProfile=d.widthProfile;if(d.strokeProfile)p.data.strokeProfile=d.strokeProfile;if(d.profileBase)p.data.profileBase=d.profileBase;if(d.isFillShape)p.data.isFillShape=true;applyBrushKeyline(p);}if(d.fillSeed)p.data.fillSeed=d.fillSeed;if(d.fillSeeds&&d.fillSeeds.length)p.data.fillSeeds=d.fillSeeds;if((d.fillSeed||(d.fillSeeds&&d.fillSeeds.length))&&d.fillGapPx!==undefined)p.data.fillGapPx=d.fillGapPx;if(d.fillWalls)p.data.fillWalls=d.fillWalls;if(d.strokeId)p.data.strokeId=d.strokeId;if(d.brushGroupId)p.data.brushGroupId=d.brushGroupId;if(d.isLinkedFillCompanion)p.data.isLinkedFillCompanion=true;if(d.linkedFillId)p.data.linkedFillId=d.linkedFillId;if(d.tweenOn)p.data.tweenOn=true;if(d.boxAngle)p.data.boxAngle=d.boxAngle;if(d.xformAnchorKey)p.data.xformAnchorKey=d.xformAnchorKey;if(d.xformAnchorCustom)p.data.xformAnchorCustom=d.xformAnchorCustom;if(d.isBrushTextureCopy)p.data.isBrushTextureCopy=true;if(d.brushTexturePreset)p.data.brushTexturePreset=d.brushTexturePreset;if(d.bitmapBrushSpec)p.data.bitmapBrushSpec=d.bitmapBrushSpec;if(d.bitmapPressureProfile)p.data.bitmapPressureProfile=d.bitmapPressureProfile;if(d.preTextureOpacity!==undefined)p.data.preTextureOpacity=d.preTextureOpacity;if(d.preTextureStroke!==undefined)p.data.preTextureStroke=d.preTextureStroke;if(d.channelTag)p.data.channelTag=d.channelTag;if(d.shadowSwatchId)p.data.shadowSwatchId=d.shadowSwatchId;if(d.ownerId)p.data.ownerId=d.ownerId;if(d.ownerName)p.data.ownerName=d.ownerName;if(d.ownerColor)p.data.ownerColor=d.ownerColor;if(d.revisionParentId)p.data.revisionParentId=d.revisionParentId;if(d.isRevisionGhost)p.data.isRevisionGhost=true;if(d.revisionAction)p.data.revisionAction=d.revisionAction;if(d.preRevisionOpacity!==undefined)p.data.preRevisionOpacity=d.preRevisionOpacity;if(d.fillGradient)p.data.fillGradient=d.fillGradient;if(d.groupId)p.data.groupId=d.groupId;if(d.effects&&d.effects.length)p.data.effects=d.effects;
   if(d.isVectorText)p.data.isVectorText=true;if(d.vectorChar)p.data.vectorChar=d.vectorChar;if(d.isText)p.data.isText=true;
+  if(d.charIndex!=null)p.data.charIndex=d.charIndex;if(d.wordIndex!=null)p.data.wordIndex=d.wordIndex;if(d.lineIndex!=null)p.data.lineIndex=d.lineIndex;
   // Mograph duplicator copy tags (applyLayerDuplicator) — belt-and-suspenders
   // for future layer.children consumers; the layer is force-locked so no
   // interactive path reads these today.
@@ -862,6 +871,11 @@ function serR(r){
     // but would break any future "recombine"/select-siblings tooling).
     if(r.data.isTextChar)d.isTextChar=true;
     if(r.data.textGroupId)d.textGroupId=r.data.textGroupId;
+    // Text Animator grouping (2026-08-17) — see serP's own charIndex comment,
+    // same contract for a raster-split character.
+    if(r.data.charIndex!=null)d.charIndex=r.data.charIndex;
+    if(r.data.wordIndex!=null)d.wordIndex=r.data.wordIndex;
+    if(r.data.lineIndex!=null)d.lineIndex=r.data.lineIndex;
   }
   return d;}
 // r.onLoad attached AFTER `new Raster(d.src)` can miss an ALREADY-loaded
@@ -945,7 +959,7 @@ function desR(d,layer,op){var prev=project.activeLayer;layer.activate();
   var _cached=_imgCacheGet(d.src);
   if(_cached)_imgCacheHits++;else{_imgCacheMisses++;_imgCacheWarm(d.src);}
   var r=new Raster(_cached||d.src);r.data.src=d.src;if(d.isBitmapBrush)r.data.isBitmapBrush=true;if(d.brushGroupId)r.data.brushGroupId=d.brushGroupId;if(d.isBrushTextureCopy)r.data.isBrushTextureCopy=true;if(d.groupId)r.data.groupId=d.groupId;
-  if(d.isText){r.data.isText=true;r.data.text=d.text||'';r.data.font=d.font||'sans-serif';r.data.size=d.size||48;r.data.color=d.color||'#000000';r.data.align=d.align||'left';if(d.fixedWidth)r.data.fixedWidth=d.fixedWidth;if(d.isTextChar)r.data.isTextChar=true;if(d.textGroupId)r.data.textGroupId=d.textGroupId;}
+  if(d.isText){r.data.isText=true;r.data.text=d.text||'';r.data.font=d.font||'sans-serif';r.data.size=d.size||48;r.data.color=d.color||'#000000';r.data.align=d.align||'left';if(d.fixedWidth)r.data.fixedWidth=d.fixedWidth;if(d.isTextChar)r.data.isTextChar=true;if(d.textGroupId)r.data.textGroupId=d.textGroupId;if(d.charIndex!=null)r.data.charIndex=d.charIndex;if(d.wordIndex!=null)r.data.wordIndex=d.wordIndex;if(d.lineIndex!=null)r.data.lineIndex=d.lineIndex;}
   r.position=new Point(d.x,d.y);r.opacity=op!==undefined?op:(d.opacity!==undefined?d.opacity:1);var w=d.width,h=d.height;
   // serR()'s mid-decode fallback reads this — see its own comment. Cleared
   // once place() actually applies the real geometry so serR immediately

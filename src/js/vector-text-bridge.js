@@ -214,6 +214,11 @@ function buildVectorTextGroup(text, fontKey, size, color, align, fixedWidthWorld
     var groupId = 'vtxt' + Date.now().toString(36) + '_' + Math.floor(Math.random() * 1e6);
     var allPaths = [];
     var prevActive = project.activeLayer; layer.activate();
+    // Text Animator (2026-08-17) grouping — a running word index across the
+    // WHOLE block (not reset per line), so "mot 5" means the same thing
+    // whether the block wraps onto one line or five: each non-space run of
+    // characters increments it once, on its FIRST character.
+    var wordCursor = 0, charCursor = 0;
     wrapped.forEach(function (line, li) {
       var lineWidth = runWidth(line);
       var startX = topLeftWorld.x;
@@ -237,15 +242,19 @@ function buildVectorTextGroup(text, fontKey, size, color, align, fixedWidthWorld
         if (opts.strike) { var s = deco.clone(); s.position.y = baselineY - size * 0.28; s.data.isVectorText = true; s.data.groupId = groupId; allPaths.push(s); }
         deco.remove(); // the template itself is never part of the group, only its clones
       }
+      var atWordStart = true;
       line.split('').forEach(function (ch, ci) {
         var glyph = font.charToGlyph(ch);
         if (ch.trim() !== '') {
+          if (atWordStart) { wordCursor++; atWordStart = false; }
           var otPath = glyph.getPath(cursorX, baselineY, size);
           var built = buildGlyphPaths(otPath, color);
           if (italicSkew) built.forEach(function (p) { p.transform(new Matrix(1, 0, -italicSkew, 1, italicSkew * baselineY, 0)); });
-          built.forEach(function (p) { p.data.isVectorText = true; p.data.groupId = groupId; p.data.vectorChar = ch; });
+          built.forEach(function (p) { p.data.isVectorText = true; p.data.groupId = groupId; p.data.vectorChar = ch;
+            p.data.charIndex = charCursor; p.data.wordIndex = wordCursor; p.data.lineIndex = li; });
           allPaths = allPaths.concat(built);
-        }
+          charCursor++;
+        } else { atWordStart = true; }
         cursorX += advance(ch, ci);
       });
     });
