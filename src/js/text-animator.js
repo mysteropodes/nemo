@@ -128,13 +128,35 @@
       });
     });
   }
+  // Deterministic seeded RNG (mulberry32) — same reasoning this codebase's
+  // own seededRng (tools.js, brush-texture dabs) already documents: a
+  // fresh Math.random() per apply() would reshuffle the stagger order on
+  // every live-preview tweak (unrelated slider moves would visibly
+  // scramble WHICH letter goes first), and would render differently in
+  // export than in preview. Seeded by groupId (stable per text block) so
+  // "Randomiser" gives a consistent, reproducible shuffle instead.
+  function seededRng(seed){
+    var h=0; for(var i=0;i<seed.length;i++)h=(h*31+seed.charCodeAt(i))|0;
+    return function(){ h|=0; h=(h+0x6D2B79F5)|0; var t=Math.imul(h^h>>>15,1|h); t=(t+Math.imul(t^t>>>7,61|t))^t; return ((t^t>>>14)>>>0)/4294967296; };
+  }
+  // Fisher-Yates shuffle of [0..n-1] — used to randomize WHICH stagger
+  // slot each unit lands in (not raw per-unit jitter): every unit still
+  // gets a distinct slot 0..n-1 * staggerFrames, so slots can never
+  // collide or go negative, just arrive in a scrambled order — the same
+  // guarantee Figma Motion's own "Randomize order" toggle gives.
+  function shuffledOrder(n, seed){
+    var arr=[]; for(var i=0;i<n;i++)arr.push(i);
+    var rng=seededRng(seed);
+    for(var j=arr.length-1;j>0;j--){ var k=Math.floor(rng()*(j+1)); var tmp=arr[j]; arr[j]=arr[k]; arr[k]=tmp; }
+    return arr;
+  }
   // Writes the staggered keys for every unit of `groupId` on layer `li`.
   // opts: {mode, preset, startFrame, unitFrames, staggerFrames, easing,
-  // skipUndo, skipClear}. One undo step for the whole INTERACTION, not
-  // one per call — the panel below calls this live on every control
-  // tweak with skipUndo=true (a single pushUndo happened once at open,
-  // see openPanel), so "Annuler" always reverts the whole session in one
-  // step regardless of how many times the sliders moved.
+  // randomize, skipUndo, skipClear}. One undo step for the whole
+  // INTERACTION, not one per call — the panel below calls this live on
+  // every control tweak with skipUndo=true (a single pushUndo happened
+  // once at open, see openPanel), so "Annuler" always reverts the whole
+  // session in one step regardless of how many times the sliders moved.
   function apply(li, groupId, opts){
     var ld=state.layers[li]; if(!ld)return 0;
     var preset=PRESETS[opts.preset]; if(!preset)return 0;
@@ -151,8 +173,14 @@
     // An exit staggers LAST unit first (AE/Figma convention: a sentence
     // dissolves from the end backwards, mirroring how it typed itself in)
     // — same unit list, just walked in reverse for stagger-offset purposes
-    // only; the unit's own strokeIds are untouched.
-    var order=preset.exit?units.map(function(_,i){return units.length-1-i;}):units.map(function(_,i){return i;});
+    // only; the unit's own strokeIds are untouched. Randomize replaces
+    // that base order with a seeded shuffle instead (mutually exclusive
+    // with the reversed-exit order — a randomized exit is still "all
+    // units, scrambled slots", the reverse convention only matters for
+    // the non-randomized default).
+    var order=opts.randomize
+      ? shuffledOrder(units.length, groupId+'|'+mode)
+      : (preset.exit?units.map(function(_,i){return units.length-1-i;}):units.map(function(_,i){return i;}));
     units.forEach(function(u,i){
       var f0=Math.round(start+order[i]*staggerFrames);
       var f1=f0+unitFrames;
@@ -185,6 +213,13 @@
   // session regardless of how many tweaks happened; Terminé just closes,
   // leaving the already-live result in place — no separate "commit" step.
   var _panel=null, _panelUndoTaken=false;
+  // Remembers the panel's own last-used values across opens (2026-08-17)
+  // — same in-memory-only scope as _propFilter/_hideUnanimated in
+  // motion.js (module state, not persisted to the project or disk): the
+  // point is "reopening the panel a moment later doesn't reset to
+  // defaults", not surviving a reload. localStorage would be the wrong
+  // tool here anyway — these are per-EDIT preferences, not app settings.
+  var _lastSettings={mode:'char',preset:'fadeIn',easing:'default',unitFrames:12,staggerFrames:3,randomize:false};
   function closePanel(){ if(_panel){_panel.remove();_panel=null;} _panelUndoTaken=false; }
   function openPanel(li, groupId){
     closePanel();
@@ -213,6 +248,7 @@
       o.textContent=v==='char'?'Lettres':v==='word'?'Mots':'Lignes';
       unitSel.appendChild(o);
     });
+    unitSel.value=_lastSettings.mode;
     var rUnit=row('Unité'); rUnit.appendChild(unitSel); p.appendChild(rUnit);
 
     var presetSel=document.createElement('select');
@@ -223,6 +259,7 @@
       var o=document.createElement('option'); o.value=k; o.textContent=PRESET_LABELS[k]||k;
       (PRESETS[k].exit?grpOut:grpIn).appendChild(o);
     });
+    presetSel.value=_lastSettings.preset;
     var rPreset=row('Style'); rPreset.appendChild(presetSel); p.appendChild(rPreset);
 
     var easeSel=document.createElement('select');
@@ -230,6 +267,7 @@
       var o=document.createElement('option'); o.value=k; o.textContent=EASING_LABELS[k];
       easeSel.appendChild(o);
     });
+    easeSel.value=_lastSettings.easing;
     var rEase=row('Accélération'); rEase.appendChild(easeSel); p.appendChild(rEase);
 
     function numInput(val,step){
@@ -241,11 +279,14 @@
     var startInp=numInput(state.currentFrame,1);
     var rStart=row('Frame de départ'); rStart.appendChild(startInp); p.appendChild(rStart);
 
-    var durInp=numInput(12,1);
+    var durInp=numInput(_lastSettings.unitFrames,1);
     var rDur=row('Durée / unité (frames)'); rDur.appendChild(durInp); p.appendChild(rDur);
 
-    var stagInp=numInput(3,1);
+    var stagInp=numInput(_lastSettings.staggerFrames,1);
     var rStag=row('Décalage entre unités (frames)'); rStag.appendChild(stagInp); p.appendChild(rStag);
+
+    var randChk=document.createElement('input'); randChk.type='checkbox'; randChk.checked=_lastSettings.randomize;
+    var rRand=row('Ordre aléatoire'); rRand.appendChild(randChk); p.appendChild(rRand);
 
     // Scrub slider — previews the animation's own span (start → last
     // unit's end) without touching the app's main timeline/playhead UI,
@@ -271,14 +312,19 @@
         startFrame:parseInt(startInp.value,10)||0,
         unitFrames:parseInt(durInp.value,10)||12,
         staggerFrames:parseInt(stagInp.value,10)||0,
+        randomize:randChk.checked,
       };
     }
     // Live preview: re-applies with skipUndo (the one pushUndo already
     // happened at open) — clearGroup inside apply() wipes the previous
     // pass first, so tweaking a slider back and forth never accumulates
-    // orphan keyframes.
+    // orphan keyframes. Also remembers every value for the NEXT time the
+    // panel opens (startFrame excluded — that one should track the
+    // playhead, not stick to wherever the last edit happened).
     function preview(){
       var opts=currentOpts();
+      _lastSettings.mode=opts.mode; _lastSettings.preset=opts.preset; _lastSettings.easing=opts.easing;
+      _lastSettings.unitFrames=opts.unitFrames; _lastSettings.staggerFrames=opts.staggerFrames; _lastSettings.randomize=opts.randomize;
       lastUnitCount=apply(li,groupId,Object.assign({skipUndo:true},opts));
       var span=opts.startFrame+Math.max(0,lastUnitCount-1)*opts.staggerFrames+opts.unitFrames;
       scrubInp.min=Math.max(0,opts.startFrame-2);
@@ -294,7 +340,7 @@
       if(window.SMEngineBridge)SMEngineBridge.renderNow();
       scrubFrameLabel.textContent='frame '+f;
     }
-    [unitSel,presetSel,easeSel].forEach(function(el){el.addEventListener('change',preview);});
+    [unitSel,presetSel,easeSel,randChk].forEach(function(el){el.addEventListener('change',preview);});
     [startInp,durInp,stagInp].forEach(function(el){el.addEventListener('input',preview);el.addEventListener('change',preview);});
     scrubInp.addEventListener('input',scrubToValue);
 
