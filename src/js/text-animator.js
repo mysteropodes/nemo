@@ -164,9 +164,12 @@
     var rUnit=row('Unité'); rUnit.appendChild(unitSel); p.appendChild(rUnit);
 
     var presetSel=document.createElement('select');
+    var grpIn=document.createElement('optgroup'); grpIn.label='Apparition';
+    var grpOut=document.createElement('optgroup'); grpOut.label='Disparition';
+    presetSel.appendChild(grpIn); presetSel.appendChild(grpOut);
     Object.keys(PRESETS).forEach(function(k){
       var o=document.createElement('option'); o.value=k; o.textContent=PRESET_LABELS[k]||k;
-      presetSel.appendChild(o);
+      (PRESETS[k].exit?grpOut:grpIn).appendChild(o);
     });
     var rPreset=row('Style'); rPreset.appendChild(presetSel); p.appendChild(rPreset);
 
