@@ -978,6 +978,14 @@ window.SM={
     // field on this list already follows.
     if(src.parentLayerUid)state.layers[ni].parentLayerUid=src.parentLayerUid;
     if(src.parentLayerUidB)state.layers[ni].parentLayerUidB=src.parentLayerUidB;
+    // Same gap as parentLayerUid just above (2026-08-16 QA sweep): Parent-
+    // in-Time's own link descriptor was never copied, so a duplicated linked
+    // layer silently came out unlinked even though timeLinkInOffset/
+    // timeLinkOutOffset (Motion properties, inside src.motion, already
+    // copied above) rode along fine — the duplicate had the OFFSET but
+    // nothing left to resolve it against. References the SAME source uid,
+    // same "keep every relationship" convention as parentLayerUid.
+    if(src.timeLink)state.layers[ni].timeLink=JSON.parse(JSON.stringify(src.timeLink));
     activateUL(ni);loadFrame(state.currentFrame);updateUI();},
   setActiveLayer:function(idx){if(idx<0||idx>=state.layers.length)return;saveAllLayerFrames();activateUL(idx);clearSel();
     window._layerActiveExplicit=true; // see clearSel()'s own comment — an explicit timeline row click, not a canvas deselect
