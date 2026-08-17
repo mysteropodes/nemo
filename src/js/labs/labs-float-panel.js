@@ -151,15 +151,23 @@
 
   var SHORT_NAME = {
     'brush-menu': 'Brosses (vecteur/bitmap)',
-    'shadow-brush': 'Shadow Brush (lignes de délimitation, calque Shadow)',
-    'symmetry': 'Guide de symétrie / mandala',
-    'perspective': 'Guide de perspective',
+    // UI/UX audit (2026-07-30): the only real explanation of this tool
+    // lived in English on a checkbox buried in Export options, nowhere
+    // near this icon — the actual discovery point for a first-time user.
+    'shadow-brush': 'Shadow Brush — dessine des lignes de délimitation dans une couleur dédiée, pour séparer trait/fond/ombre sans que ce soit du dessin final',
+    // UI/UX audit (2026-07-30): both of these restated their own name —
+    // the ONLY tooltip either tool has anywhere (their sole discovery
+    // point is this Labs icon), so a first-time user had no way to learn
+    // what enabling them actually does before poking around. No After
+    // Effects equivalent for either, unlike most of this panel's tools.
+    'symmetry': 'Guide de symétrie — dessine en miroir de part et d’autre d’un axe déplaçable',
+    'perspective': 'Guide de perspective — trace des rayons convergents vers un ou plusieurs points de fuite déplaçables',
     'predictive-stroke': 'Trait prédictif',
     'multiframe-draw': 'Dessin multi-frames',
     'canvas-grid': 'Grille',
     'view-filter': 'Contrôle des valeurs',
     'french-curve': 'Gabarit courbe (maintenir F)',
-    'vector-sculpt': 'Sculpt vectoriel (maintenir W)',
+    'vector-sculpt': 'Sculpt vectoriel — glisser, Shift pour lisser, Alt+glisser pour le rayon',
     'out-of-pegs': 'Décalage des fantômes onion',
     'flip-roll': "Rouleau d'animateur (maintenir R)",
     'mirror-check': 'Miroir de contrôle (maintenir M)',
@@ -294,11 +302,27 @@
     // which don't fit PARAMS' "one localStorage-backed number" shape since
     // mode is a string cycle and both fields live on `state`, not
     // localStorage.
+    // Every option row carries its owning tool's icon at the far left, greyed
+    // (feedback 2026-07-26: "Un icon tout à gauche de la ligne de l'outil
+    // grisé doit apparaître"). The PARAMS-driven rows further down already
+    // built one; the hand-written Symmetry/Perspective pills never did, so
+    // with several tools active at once those rows were the only ones giving
+    // no clue which tool they belonged to — precisely the case the feedback
+    // is about. One helper so a future hand-built pill can't forget again.
+    function stepperPill(toolKey) {
+      var pill = document.createElement('div');
+      pill.className = 'labs-float-stepper';
+      var ico = document.createElement('span');
+      ico.className = 'lfs-tool-icon';
+      ico.innerHTML = ICONS[toolKey] || '';
+      pill.appendChild(ico);
+      return pill;
+    }
     paramsWrap.innerHTML = '';
     var anyParams = false;
     if (registered.symmetry) {
       anyParams = true;
-      var modePill = document.createElement('div'); modePill.className = 'labs-float-stepper';
+      var modePill = stepperPill('symmetry');
       var modeLbl = document.createElement('span'); modeLbl.className = 'lfs-label'; modeLbl.textContent = 'Mode';
       var modePrev = document.createElement('button'); modePrev.className = 'lfs-btn'; modePrev.textContent = '−';
       var modeVal = document.createElement('span'); modeVal.className = 'lfs-val';
@@ -318,7 +342,7 @@
       modePill.appendChild(modeLbl); modePill.appendChild(modePrev); modePill.appendChild(modeVal); modePill.appendChild(modeNext);
       paramsWrap.appendChild(modePill);
       if (state.symmetryMode === 'radial') {
-        var secPill = document.createElement('div'); secPill.className = 'labs-float-stepper';
+        var secPill = stepperPill('symmetry');
         var secLbl = document.createElement('span'); secLbl.className = 'lfs-label'; secLbl.textContent = 'Secteurs';
         var secMinus = document.createElement('button'); secMinus.className = 'lfs-btn'; secMinus.textContent = '−';
         var secVal = document.createElement('span'); secVal.className = 'lfs-val'; secVal.textContent = state.symmetryRadialSectors;
@@ -339,7 +363,7 @@
       // perspective n'ont plus lieu d'être, les options doivent être gérées
       // au niveau du panneau flottant") — same wide-toggle-pill/action-pill
       // shape as Perspective's own Lock/Reset just below.
-      var extPill = document.createElement('div'); extPill.className = 'labs-float-stepper';
+      var extPill = stepperPill('symmetry');
       var extBtn = document.createElement('button'); extBtn.className = 'lfs-btn wide' + (state.symmetryExtend ? ' on' : '');
       extBtn.textContent = 'Extend'; extBtn.title = "Off: a stroke crossing the axis is cut right at it, so it and its mirror never overlap at the fold";
       extBtn.addEventListener('click', function () {
@@ -348,7 +372,7 @@
       });
       extPill.appendChild(extBtn);
       paramsWrap.appendChild(extPill);
-      var symResetPill = document.createElement('div'); symResetPill.className = 'labs-float-stepper';
+      var symResetPill = stepperPill('symmetry');
       var symResetBtn = document.createElement('button'); symResetBtn.className = 'lfs-btn wide';
       symResetBtn.textContent = 'Reset'; symResetBtn.title = 'Reset position';
       symResetBtn.addEventListener('click', function () { if (window.resetSymmetryGuide) window.resetSymmetryGuide(); });
@@ -361,7 +385,7 @@
       // Symmetry's Extend/Reset above) — only on/off was mirrored here
       // before, so this panel had no Mode control at all yet either.
       anyParams = true;
-      var pModePill = document.createElement('div'); pModePill.className = 'labs-float-stepper';
+      var pModePill = stepperPill('perspective');
       var pModeLbl = document.createElement('span'); pModeLbl.className = 'lfs-label'; pModeLbl.textContent = 'Mode';
       var pModePrev = document.createElement('button'); pModePrev.className = 'lfs-btn'; pModePrev.textContent = '−';
       var pModeVal = document.createElement('span'); pModeVal.className = 'lfs-val';
@@ -377,7 +401,7 @@
       pModeNext.addEventListener('click', function () { cyclePerspMode(1); });
       pModePill.appendChild(pModeLbl); pModePill.appendChild(pModePrev); pModePill.appendChild(pModeVal); pModePill.appendChild(pModeNext);
       paramsWrap.appendChild(pModePill);
-      var densPill = document.createElement('div'); densPill.className = 'labs-float-stepper';
+      var densPill = stepperPill('perspective');
       var densLbl = document.createElement('span'); densLbl.className = 'lfs-label'; densLbl.textContent = 'Densité';
       var densMinus = document.createElement('button'); densMinus.className = 'lfs-btn'; densMinus.textContent = '−';
       var densVal = document.createElement('span'); densVal.className = 'lfs-val'; densVal.textContent = state.perspectiveDensity;
@@ -391,7 +415,7 @@
       densPlus.addEventListener('click', function () { setDensity(state.perspectiveDensity + 2); });
       densPill.appendChild(densLbl); densPill.appendChild(densMinus); densPill.appendChild(densVal); densPill.appendChild(densPlus);
       paramsWrap.appendChild(densPill);
-      var lockPill = document.createElement('div'); lockPill.className = 'labs-float-stepper';
+      var lockPill = stepperPill('perspective');
       var lockBtn = document.createElement('button'); lockBtn.className = 'lfs-btn wide';
       lockBtn.textContent = 'Lock'; lockBtn.title = 'Prevents dragging any vanishing point with the Perspective tool';
       var vpsNow = window.ensurePerspectiveVPs ? window.ensurePerspectiveVPs() : [];
@@ -404,7 +428,7 @@
       });
       lockPill.appendChild(lockBtn);
       paramsWrap.appendChild(lockPill);
-      var perspResetPill = document.createElement('div'); perspResetPill.className = 'labs-float-stepper';
+      var perspResetPill = stepperPill('perspective');
       var perspResetBtn = document.createElement('button'); perspResetBtn.className = 'lfs-btn wide';
       perspResetBtn.textContent = 'Reset'; perspResetBtn.title = 'Reset positions';
       perspResetBtn.addEventListener('click', function () { if (window.resetPerspectiveVPs) window.resetPerspectiveVPs(); });
@@ -419,17 +443,58 @@
         pill.className = 'labs-float-stepper';
         var lbl = document.createElement('span'); lbl.className = 'lfs-label'; lbl.textContent = p.label;
         var minus = document.createElement('button'); minus.className = 'lfs-btn'; minus.textContent = '−';
-        var val = document.createElement('span'); val.className = 'lfs-val';
+        var val = document.createElement('input');
+        val.type = 'number';
+        val.className = 'lfs-val scrub';
+        val.min = p.min; val.max = p.max; val.step = p.step; val.dataset.step = p.step;
         var plus = document.createElement('button'); plus.className = 'lfs-btn'; plus.textContent = '+';
-        function refresh() { val.textContent = paramValue(p); }
+        function refresh() { val.value = paramValue(p); }
         refresh();
         minus.addEventListener('click', function () { p.set(Math.max(p.min, paramValue(p) - p.step)); refresh(); });
         plus.addEventListener('click', function () { p.set(Math.min(p.max, paramValue(p) + p.step)); refresh(); });
-        pill.appendChild(lbl); pill.appendChild(minus); pill.appendChild(val); pill.appendChild(plus);
+        val.addEventListener('change', function () {
+          var next = Math.max(p.min, Math.min(p.max, parseFloat(val.value)));
+          if (isNaN(next)) next = p.def;
+          p.set(next); refresh();
+        });
+        var toolIcon = document.createElement('span');
+        toolIcon.className = 'lfs-tool-icon';
+        toolIcon.innerHTML = ICONS[n] || '';
+        pill.appendChild(toolIcon); pill.appendChild(lbl); pill.appendChild(minus); pill.appendChild(val); pill.appendChild(plus);
         paramsWrap.appendChild(pill);
       });
     });
-    paramsWrap.style.display = anyParams ? 'flex' : 'none';
+    hasParams = anyParams;
+    applyParamsVisibility();
+  }
+
+  // -- option rows appear on hover, collapse on leave --------------------
+  // 2026-07-27: "tous les menu sont bien comme ça mais doivent s'affiché
+  // quand on hover la barre flottante et se refermer en hover off". The
+  // strip sits ON the drawing area, so with three or four tools armed the
+  // permanently-expanded option rows covered a good slice of the canvas
+  // while you were drawing — the exact thing this panel was kept small to
+  // avoid. The icon row (which says WHAT is on) always stays.
+  var hasParams = false, hovering = false, dragging = false;
+  function applyParamsVisibility() {
+    var paramsWrap = document.getElementById('labs-float-params');
+    if (!paramsWrap) return;
+    // Two ways to be "still using it" with the pointer outside: mid-drag of
+    // the whole panel (collapsing would resize it under the cursor), and
+    // typing/scrubbing in a stepper field, which keeps focus but frees the
+    // mouse to wander off.
+    var busy = dragging || (document.activeElement && paramsWrap.contains(document.activeElement));
+    paramsWrap.style.display = (hasParams && (hovering || busy)) ? 'flex' : 'none';
+  }
+
+  function setupHover() {
+    var panel = document.getElementById('labs-float-panel');
+    if (!panel) return;
+    panel.addEventListener('mouseenter', function () { hovering = true; applyParamsVisibility(); });
+    panel.addEventListener('mouseleave', function () { hovering = false; applyParamsVisibility(); });
+    // A field can lose focus while the pointer is already elsewhere — that's
+    // the moment the "busy" reprieve above expires.
+    panel.addEventListener('focusout', function () { setTimeout(applyParamsVisibility, 0); });
   }
 
   // -- drag anywhere within #canvas-area, position persisted -------------
@@ -466,7 +531,7 @@
     relPos = loadPos();
     applyFixedPos();
     window.addEventListener('resize', applyFixedPos);
-    var dragging = false, startX = 0, startY = 0, startLeft = 0, startTop = 0;
+    var startX = 0, startY = 0, startLeft = 0, startTop = 0;
     handle.addEventListener('pointerdown', function (e) {
       dragging = true;
       startX = e.clientX; startY = e.clientY;
@@ -492,11 +557,13 @@
       dragging = false;
       try { handle.releasePointerCapture(e.pointerId); } catch (er) {}
       savePos(relPos);
+      applyParamsVisibility();
     });
   }
 
   function init() {
     setupDrag();
+    setupHover();
     renderLabsFloatPanel();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

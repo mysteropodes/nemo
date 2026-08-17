@@ -472,7 +472,9 @@
       var bake = bakeToCanvas(basePath, basePath.data.bitmapBrushSpec, raster.canvas);
       raster.position = new Point(bake.minX + bake.w / 2, bake.minY + bake.h / 2);
       raster.size = new Size(bake.w, bake.h);
-      if (window.SMEngineBridge && raster.data.src) SMEngineBridge.registerImagePixels(raster.data.src, bake.canvas);
+      // Same id the scene asks for — see SMEngineBridge.engineIdFor.
+      var _eid = window.SMEngineBridge && SMEngineBridge.engineIdFor && SMEngineBridge.engineIdFor(raster);
+      if (_eid) SMEngineBridge.registerImagePixels(_eid, bake.canvas);
       if (window.SMEngineBridge) SMEngineBridge.renderNow();
     });
   }
@@ -513,7 +515,8 @@
     ctx.fill();
     ctx.restore();
     raster.data._bmbEraseDirty = true;
-    if (window.SMEngineBridge && raster.data.src) SMEngineBridge.registerImagePixels(raster.data.src, cv);
+    var _eid2 = window.SMEngineBridge && SMEngineBridge.engineIdFor && SMEngineBridge.engineIdFor(raster);
+    if (_eid2) SMEngineBridge.registerImagePixels(_eid2, cv);
   }
   function flushEraseDirty(layer) {
     if (!layer) return;

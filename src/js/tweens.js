@@ -4065,7 +4065,11 @@ function computeArcMatchState(){
   return {fA:fA,fB:fB,sA:sA,sB:sB,matches:matches,fm:fm};
 }
 function renderArcs(cached){
-  updateReassignBadge();
+  // Computed BEFORE updateReassignBadge and handed to it — see its own
+  // comment. Both need the identical state; running the matcher twice per
+  // scrub tick was the single largest cost on the scrub path.
+  var st=cached||computeArcMatchState();
+  updateReassignBadge(st);
   arcLayer.removeChildren();arcHandles=[];
   renderNodeHandles();
   renderTransformHandles();
@@ -4074,7 +4078,6 @@ function renderArcs(cached){
   // was ALSO an O(n³) Hungarian on hundreds of entries per click. m.a
   // indexes the filtered list; selectedStrokeIndices index the raw frame
   // array — map back through .orig for the selection check.
-  var st=cached||computeArcMatchState();
   if(!st)return;
   var fA=st.fA,fB=st.fB,sA=st.sA,sB=st.sB,matches=st.matches,fm=st.fm;
   arcLayer.activate();var cols=['#ff6b6b','#4ecdc4','#ffe66d','#a29bfe','#fd79a8','#00cec9'];var easFn=getEasingForPair(state.activeLayerIdx,fA,fB);
@@ -4128,8 +4131,23 @@ function renderGhostAll(){
     var fr=ld.frames[fi];if(!fr.isKeyframe||!fr.strokes.length)continue;
     var dist=Math.abs(fi-cf);
     var op=Math.max(.12,.4-dist*.03);
-    fr.strokes.forEach(function(sd){
+    // Combine-groups (2026-07-29 fix, QA-confirmed): unlike buildSceneJson's
+    // live render (renderCombinesFromChildren), this reads the frame's raw
+    // stored dicts directly — a subtract/intersect/exclude group ghosted
+    // undivided showed every raw member instead of the merged result the
+    // live frame actually displays. Dict-based twin of that same adapter;
+    // pass-through (same array reference) when this layer has no groups.
+    var ghostStrokes=fr.strokes;
+    if(window.SMGroup&&ld.groups)ghostStrokes=SMGroup.applyCombinesToStrokes(ghostStrokes,ld);
+    ghostStrokes.forEach(function(sd){
       if(sd.isRaster)return;
+      // A combine-group member suppressed by applyCombinesToStrokes just
+      // above (null fill AND stroke, hasRealStroke:false) draws nothing in
+      // the real frame — Ghost All forces a uniform purple outline onto
+      // EVERY dict below regardless of paint, so without this it drew a
+      // stray outline for a shape that's actually invisible (the merged
+      // combine result already contributes its own, correct outline).
+      if(!sd.fillColor&&!sd.strokeColor)return;
       var p=desP(sd,ghostAllLayer,op);
       p.strokeColor=new Color(.68,.6,1,op*1.6);
       p.fillColor=null;
@@ -4158,6 +4176,7 @@ function renderOS(){
   renderGhostAll();
   onionPrevLayer.removeChildren();onionNextLayer.removeChildren();
   if(!state.onionSkin)return;var li=state.activeLayerIdx;var cf=state.currentFrame;
+  var osLd=state.layers[li];
   // isRaster entries (imported image/video frames) go through desR, not
   // desP — a Raster has no fillColor/strokeColor, so tinted/outline modes
   // (which recolor the stroke) fall back to a plain opacity fade for it,
@@ -4218,8 +4237,8 @@ function renderOS(){
   // isBrushTextureCopy/brushTexturePreset return above, so anything
   // reaching this line with a fillColor and no real stroke is a genuine
   // plain fill shape, not a texture-camouflaged one.
-  for(var fi=cf-1;fi>=state.onionIn&&fi>=0;fi--){var strokes=getEffectiveStrokes(li,fi);if(!strokes.length)continue;var dist=cf-fi;var op=(state.onionPrevOpacity/100)*Math.max(.15,1-(dist/prevRangeSpan)*.85);strokes.forEach(function(sd){if(sd.isBrushTextureCopy||sd.brushTexturePreset)return;if(sd.isRaster){var pr=desR(sd,onionPrevLayer);pr.opacity=op;return;}var p=desP(sd,onionPrevLayer,op);var canTint=sd.hasRealStroke||sd.fillColor;if(state.onionMode==='tinted'&&canTint)p.strokeColor=new Color(1,.3,.3,op);else if(state.onionMode==='outline'&&canTint){p.fillColor=null;p.strokeColor=new Color(1,.3,.3,op*.8);p.strokeWidth=1;}else p.opacity=op;});}
-  for(var fi2=cf+1;fi2<=state.onionOut&&fi2<state.totalFrames;fi2++){var strokes2=getEffectiveStrokes(li,fi2);if(!strokes2.length)continue;var dist2=fi2-cf;var op2=(state.onionNextOpacity/100)*Math.max(.15,1-(dist2/nextRangeSpan)*.85);strokes2.forEach(function(sd){if(sd.isBrushTextureCopy||sd.brushTexturePreset)return;if(sd.isRaster){var nr=desR(sd,onionNextLayer);nr.opacity=op2;return;}var p=desP(sd,onionNextLayer,op2);var canTint2=sd.hasRealStroke||sd.fillColor;if(state.onionMode==='tinted'&&canTint2)p.strokeColor=new Color(.3,.55,1,op2);else if(state.onionMode==='outline'&&canTint2){p.fillColor=null;p.strokeColor=new Color(.3,.55,1,op2*.8);p.strokeWidth=1;}else p.opacity=op2;});}
+  for(var fi=cf-1;fi>=state.onionIn&&fi>=0;fi--){var strokes=getEffectiveStrokes(li,fi);if(!strokes.length)continue;if(window.SMGroup&&osLd&&osLd.groups)strokes=SMGroup.applyCombinesToStrokes(strokes,osLd);var dist=cf-fi;var op=(state.onionPrevOpacity/100)*Math.max(.15,1-(dist/prevRangeSpan)*.85);strokes.forEach(function(sd){if(sd.isBrushTextureCopy||sd.brushTexturePreset)return;if(sd.isRaster){var pr=desR(sd,onionPrevLayer);pr.opacity=op;return;}var p=desP(sd,onionPrevLayer,op);var canTint=sd.hasRealStroke||sd.fillColor;if(state.onionMode==='tinted'&&canTint)p.strokeColor=new Color(1,.3,.3,op);else if(state.onionMode==='outline'&&canTint){p.fillColor=null;p.strokeColor=new Color(1,.3,.3,op*.8);p.strokeWidth=1;}else p.opacity=op;});}
+  for(var fi2=cf+1;fi2<=state.onionOut&&fi2<state.totalFrames;fi2++){var strokes2=getEffectiveStrokes(li,fi2);if(!strokes2.length)continue;if(window.SMGroup&&osLd&&osLd.groups)strokes2=SMGroup.applyCombinesToStrokes(strokes2,osLd);var dist2=fi2-cf;var op2=(state.onionNextOpacity/100)*Math.max(.15,1-(dist2/nextRangeSpan)*.85);strokes2.forEach(function(sd){if(sd.isBrushTextureCopy||sd.brushTexturePreset)return;if(sd.isRaster){var nr=desR(sd,onionNextLayer);nr.opacity=op2;return;}var p=desP(sd,onionNextLayer,op2);var canTint2=sd.hasRealStroke||sd.fillColor;if(state.onionMode==='tinted'&&canTint2)p.strokeColor=new Color(.3,.55,1,op2);else if(state.onionMode==='outline'&&canTint2){p.fillColor=null;p.strokeColor=new Color(.3,.55,1,op2*.8);p.strokeWidth=1;}else p.opacity=op2;});}
   userLayers[state.activeLayerIdx].activate();
 }
 
@@ -4228,10 +4247,81 @@ function renderOS(){
 // frames, all layers, frame count). The old per-current-frame snapshot
 // couldn't restore anything that touched other frames or the arrays'
 // shape — moving/pasting frames, tweens, layer ops — which made ⌘Z feel
-// like it only worked for strokes. A full snapshot is ~a few hundred KB
-// per entry (JSON) which at maxUndo=60 stays well within budget.
+// like it only worked for strokes.
+//
+// "~a few hundred KB per entry, well within budget at maxUndo=60" — that
+// estimate predates rasters and the bitmap brush. On the reference project a
+// stringify of state.layers is ~15MB, essentially all of it base64 `src`
+// (15.3MB against 66KB for the next-largest field), so 60 entries retained
+// up to ~900MB and every gesture that pushes undo paid a multi-MB JSON round
+// trip. Nothing in a snapshot is ever mutated in place — restoreLayersSnapshot
+// installs the objects and later replaces whole arrays (`f.strokes=...`) —
+// and JS strings are immutable, so sharing the heavy fields by reference is
+// unconditionally safe. Same split the render path already uses
+// (cloneStrokeForTransform, app.js). 2026-07-28.
 function pushUndo(){pushUndoLayers();}
-function layersSnapshotNow(){return{type:'layers',layers:JSON.parse(JSON.stringify(state.layers)),active:state.activeLayerIdx,totalFrames:state.totalFrames,cameraKeys:JSON.parse(JSON.stringify(state.cameraKeys||[]))};}
+// Walks every stroke of a layers tree in a deterministic order. Both the
+// live tree and its clone have identical shape, so two walks stay in lockstep
+// and a flat array indexed by visit order is enough to pair them up.
+function _walkStrokes(layers,fn){
+  for(var li=0;li<layers.length;li++){
+    var fr=(layers[li]&&layers[li].frames)||[];
+    for(var fi=0;fi<fr.length;fi++){
+      var st=(fr[fi]&&fr[fi].strokes)||[];
+      for(var si=0;si<st.length;si++)fn(st[si]);
+    }
+  }
+}
+// Clone for undo WITHOUT duplicating the heavy immutable payloads.
+//
+// Measured three ways before settling on this one — a per-object JS cloner
+// and a JSON replacer/reviver pair were both SLOWER than the plain full
+// round trip they were meant to beat (14.1ms and 26.5ms against 16.1ms on a
+// 10-layer/8000-raster scene), because one native JSON.stringify of the
+// whole tree beats thousands of small JS-side copies even when it moves far
+// more bytes. Detaching the heavy strings first and letting the native path
+// do the rest wins on both counts: 4.1ms, and the clone ends up holding the
+// SAME string objects as the live tree instead of fresh copies.
+//
+// The live tree is briefly mutated (heavy fields nulled) — synchronous, with
+// no call-out in between, and restored in a `finally` so a throw inside
+// JSON.stringify cannot leave it stripped.
+function _cloneLayersForUndo(layers){
+  var HEAVY=(window._HEAVY_STROKE_FIELDS)||['src','bitmapPressureProfile'];
+  var saved=[],c;
+  _walkStrokes(layers,function(s){
+    var e=null;
+    for(var i=0;i<HEAVY.length;i++){var k=HEAVY[i];
+      if(typeof s[k]==='string'){(e||(e={}))[k]=s[k];s[k]=null;}}
+    saved.push(e);
+  });
+  try{ c=JSON.parse(JSON.stringify(layers)); }
+  finally{ var j=0;_walkStrokes(layers,function(s){var e=saved[j++];if(e)for(var k in e)s[k]=e[k];}); }
+  var j2=0;_walkStrokes(c,function(s){var e=saved[j2++];if(e)for(var k in e)s[k]=e[k];});
+  return c;
+}
+// symbolId/montageViewId (2026-07-30 fix): a snapshot's `layers` is whatever
+// state.layers currently ALIASES — the outer scene, or (enterSymbol/
+// enterMontageView) a symbol's or montage-view's own private array. Undo/
+// redo used to restore blind: pop a snapshot, overwrite state.layers,
+// done — with zero record of which document it came from. Push a snapshot
+// while inside a symbol, exit to the outer scene (exitToScene's own
+// sym.layers write-back keeps the symbol's copy correct), then hit Ctrl+Z:
+// restoreLayersSnapshot would silently install the SYMBOL's old layers into
+// the OUTER scene's state.layers, with activeSymbolId reading null the
+// whole time — no toast, no visual hint beyond content that's suddenly
+// wrong. Tagging here is what undo()/redo() below check before restoring.
+function layersSnapshotNow(){return{type:'layers',layers:_cloneLayersForUndo(state.layers),active:state.activeLayerIdx,totalFrames:state.totalFrames,cameraKeys:JSON.parse(JSON.stringify(state.cameraKeys||[])),
+  symbolId:state.activeSymbolId||null,montageViewId:state.activeMontageViewId||null};}
+// Human-readable "where this undo entry belongs", for the cross-context
+// guard in undo()/redo() below. Falls back to '?' for a symbol/montage
+// deleted since the snapshot was taken — still names the RIGHT KIND of
+// context even if the specific one is gone.
+function _undoContextLabel(symbolId,montageViewId){
+  if(symbolId){var sym=state.symbols&&state.symbols[symbolId];return'le composant « '+(sym?sym.name:'?')+' »';}
+  if(montageViewId){var m=window.SMStoryboard&&SMStoryboard.montageById(montageViewId);return'le montage « '+((m&&m.name)?m.name:'?')+' »';}
+  return'la Scène principale';
+}
 // Human-readable description of "what's about to happen", captured at the
 // SAME moment as the snapshot (pushUndoLayers runs before the mutation it
 // guards, so this reflects the active tool/frame/layer context of the
@@ -4250,6 +4340,14 @@ function _actionLabelNow(){
 // UN snapshot pré-geste au premier mouvement puis lève ce flag ; ici on
 // no-op tant qu'il est levé (y compris le 'change' final du release).
 function pushUndoLayers(){if(window._scrubLiveActive)return;saveAllLayerFrames();state.undoStack.push(layersSnapshotNow());state.undoLabels.push(_actionLabelNow());if(state.undoStack.length>state.maxUndo){state.undoStack.shift();state.undoLabels.shift();}state.redoStack=[];state.redoLabels=[];if(window.SMFeedback)SMFeedback.logAction();if(window.renderHistoryPanelIfOpen)renderHistoryPanelIfOpen();
+  // Playback bake cache (playback-cache.js): this is the SAME chokepoint
+  // SMFeedback.logAction() right above already trusts as "a real content-
+  // mutating action happened" — any baked bitmap for the frame(s) this
+  // action touched is now stale. Whole-cache invalidation, not per-frame
+  // tracking (simpler and correct; structural changes like entering a
+  // symbol or resizing the canvas are caught separately by the cache's own
+  // identity stamp, see playback-cache.js's _stampMatches).
+  if(window.SMPlaybackCache)SMPlaybackCache.invalidateAll();
   // See _maybePromoteInterpolated's own comment (app.js) — this is the
   // SAME choke point SMFeedback.logAction() right above already trusts as
   // "a real content-mutating action happened" (its own doc comment: "only
@@ -4283,13 +4381,43 @@ function restoreLayersSnapshot(s){
   // champ : on laisse alors les clés actuelles intactes (undefined check).
   if(s.cameraKeys!==undefined)state.cameraKeys=JSON.parse(JSON.stringify(s.cameraKeys));
   activateUL(state.activeLayerIdx);
-  loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
+  loadFrame(state.currentFrame);
+  // Paper objects are recreated by loadFrame(). Rebind the ordinary
+  // selection by its persisted child indexes and clear selection modes
+  // whose entries contain direct references to the removed objects.
+  if(window.SMSelectBridge&&SMSelectBridge.refreshAfterDocumentRestore)SMSelectBridge.refreshAfterDocumentRestore();
+  if(typeof fsClearSel==='function')fsClearSel();
+  if(typeof _nodeSel!=='undefined')_nodeSel=[];
+  renderOS();renderArcs();updateUI();
   if(window.SMCamera&&window.updateCameraPanel){updateCameraPanel();}
 }
-function undo(){if(!state.undoStack.length){showToast('Rien à annuler');return;}var s=state.undoStack.pop();var sl=state.undoLabels.pop()||_actionLabelNow();
+// Both branches below rewrite frame strokes; Motion's component union-bounds
+// cache is derived from those, so drop it here rather than in each branch.
+function undo(){if(window.SMMotion&&SMMotion.invalidateSymbolUnionBounds)SMMotion.invalidateSymbolUnionBounds();
+if(!state.undoStack.length){showToast('Rien à annuler');return;}
+// Cross-context guard (2026-07-30 fix) — PEEK before popping: a mismatched
+// entry stays on the stack untouched so the user can navigate to the right
+// symbol/montage/scene and undo it from there, instead of it being silently
+// consumed (or worse, silently misapplied) from here.
+var top=state.undoStack[state.undoStack.length-1];
+if(top.type==='layers'&&((top.symbolId||null)!==(state.activeSymbolId||null)||(top.montageViewId||null)!==(state.activeMontageViewId||null))){
+  showToast('Dernière action faite dans '+_undoContextLabel(top.symbolId,top.montageViewId)+' — retournez-y pour l’annuler');
+  return;
+}
+var s=state.undoStack.pop();var sl=state.undoLabels.pop()||_actionLabelNow();
 if(s.type==='layers'){state.redoStack.push(layersSnapshotNow());state.redoLabels.push(sl);restoreLayersSnapshot(s);if(window.renderHistoryPanelIfOpen)renderHistoryPanelIfOpen();return;}
 var cur={frame:state.currentFrame,layers:[]};for(var i=0;i<state.layers.length;i++){var f=state.layers[i].frames[state.currentFrame];cur.layers.push({strokes:JSON.parse(JSON.stringify(f.strokes)),isKeyframe:f.isKeyframe,isInterpolated:f.isInterpolated});}state.redoStack.push(cur);state.redoLabels.push(sl);for(var i2=0;i2<s.layers.length&&i2<state.layers.length;i2++){var tf=state.layers[i2].frames[s.frame];tf.strokes=s.layers[i2].strokes;tf.isKeyframe=s.layers[i2].isKeyframe;tf.isInterpolated=s.layers[i2].isInterpolated;}if(s.frame!==state.currentFrame)state.currentFrame=s.frame;loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderHistoryPanelIfOpen)renderHistoryPanelIfOpen();}
-function redo(){if(!state.redoStack.length){showToast('Rien à refaire');return;}var s=state.redoStack.pop();var sl=state.redoLabels.pop()||_actionLabelNow();
+// Both branches below rewrite frame strokes; Motion's component union-bounds
+// cache is derived from those, so drop it here rather than in each branch.
+function redo(){if(window.SMMotion&&SMMotion.invalidateSymbolUnionBounds)SMMotion.invalidateSymbolUnionBounds();
+if(!state.redoStack.length){showToast('Rien à refaire');return;}
+// Same cross-context guard as undo() above, mirrored for the redo stack.
+var top=state.redoStack[state.redoStack.length-1];
+if(top.type==='layers'&&((top.symbolId||null)!==(state.activeSymbolId||null)||(top.montageViewId||null)!==(state.activeMontageViewId||null))){
+  showToast('Dernière action faite dans '+_undoContextLabel(top.symbolId,top.montageViewId)+' — retournez-y pour la refaire');
+  return;
+}
+var s=state.redoStack.pop();var sl=state.redoLabels.pop()||_actionLabelNow();
 if(s.type==='layers'){state.undoStack.push(layersSnapshotNow());state.undoLabels.push(sl);restoreLayersSnapshot(s);if(window.renderHistoryPanelIfOpen)renderHistoryPanelIfOpen();return;}
 var cur={frame:state.currentFrame,layers:[]};for(var i=0;i<state.layers.length;i++){var f=state.layers[i].frames[state.currentFrame];cur.layers.push({strokes:JSON.parse(JSON.stringify(f.strokes)),isKeyframe:f.isKeyframe,isInterpolated:f.isInterpolated});}state.undoStack.push(cur);state.undoLabels.push(sl);for(var i2=0;i2<s.layers.length&&i2<state.layers.length;i2++){var tf=state.layers[i2].frames[s.frame];tf.strokes=s.layers[i2].strokes;tf.isKeyframe=s.layers[i2].isKeyframe;tf.isInterpolated=s.layers[i2].isInterpolated;}if(s.frame!==state.currentFrame)state.currentFrame=s.frame;loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderHistoryPanelIfOpen)renderHistoryPanelIfOpen();}
 
@@ -4451,7 +4579,7 @@ function positionReassignBadge(worldBounds,label,color){
   el.style.left=(rect.left+tr.x+8)+'px';
   el.style.top=(rect.top+tr.y-10)+'px';
 }
-function updateReassignBadge(){
+function updateReassignBadge(cached){
   var el=reassignBadgeEl();if(!el)return;
   if(_reassign.active&&_reassign.step===2){
     // Guards against a STALE selectedPaths[0] left over from before the
@@ -4486,8 +4614,20 @@ function updateReassignBadge(){
     return;
   }
   if(_reassign.active){hideReassignBadge();return;} // mid legacy step-1 multi-click flow -- avoid a stale green badge underneath
-  var st=computeArcMatchState();
-  if(!st||st.fm.length!==1||selectedPaths.length!==1||!(selectedPaths[0]instanceof Path)||userLayers[state.activeLayerIdx].children.indexOf(selectedPaths[0])<0){hideReassignBadge();return;}
+  // The three SELECTION guards below used to sit AFTER computeArcMatchState(),
+  // so the badge paid a full O(n^3) Hungarian match just to discover the
+  // selection wasn't a single path. They depend on nothing the matcher
+  // produces — hoisted (2026-07-28).
+  if(selectedPaths.length!==1||!(selectedPaths[0]instanceof Path)||userLayers[state.activeLayerIdx].children.indexOf(selectedPaths[0])<0){hideReassignBadge();return;}
+  // `cached` — renderArcs computes this same state for its own arcs, and used
+  // to call us BEFORE doing so, running the matcher twice per scrub tick.
+  // Measured live at 60 strokes/keyframe: 13.1ms per tick (WASM) / 23.6ms
+  // (JS fallback), exactly half of it duplicate. tweens.js's own comment at
+  // computeArcMatchState documents the O(n^3) and split it out for arc-handle
+  // drags; the scrub path (goToFrame -> renderArcs) never got the same
+  // treatment.
+  var st=cached||computeArcMatchState();
+  if(!st||st.fm.length!==1){hideReassignBadge();return;}
   var m=st.fm[0],sd=st.sA[m.a],p2=selectedPaths[0];
   var aStrokeId=sd.strokeId||ensureStrokeId(p2);
   var fA=st.fA,fB=st.fB;
@@ -4500,4 +4640,3 @@ function updateReassignBadge(){
     showToast('Sélectionnez l\'élément correspondant, puis cliquez le bouton jaune');
   };
 }
-

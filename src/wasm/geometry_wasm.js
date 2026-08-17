@@ -98,6 +98,13 @@ export class VelloEngine {
         const ptr = this.__destroy_into_raw();
         wasm.__wbg_velloengine_free(ptr, 0);
     }
+    /**
+     * Project-load hygiene (importJSON): every stroke dict is new, so every
+     * stored path is garbage at once — cheaper than waiting for the GC.
+     */
+    clear_paths() {
+        wasm.velloengine_clear_paths(this.__wbg_ptr);
+    }
     clear_selection() {
         wasm.velloengine_clear_selection(this.__wbg_ptr);
     }
@@ -155,8 +162,8 @@ export class VelloEngine {
     }
     /**
      * Lets JS skip a redundant `register_image` upload for an image it's
-     * already registered this session (images are cached for the engine's
-     * whole lifetime, not per-scene, so this is a simple presence check).
+     * already registered (presence check — the store is now bounded and JS
+     * may have retired this id, so a `false` here means "upload again").
      * @param {string} id
      * @returns {boolean}
      */
@@ -165,6 +172,33 @@ export class VelloEngine {
         const len0 = WASM_VECTOR_LEN;
         const ret = wasm.velloengine_has_image(this.__wbg_ptr, ptr0, len0);
         return ret !== 0;
+    }
+    /**
+     * Total decoded bytes held by the image store. This used to be unbounded
+     * by design ("cached for the engine's whole lifetime"), which is fine for
+     * a handful of imported rasters and untenable for footage: a 1000-frame
+     * 1920x1080 sequence is 8.3GB of RGBA8. JS drives eviction (it is the
+     * side that knows what the CURRENT scene references and can re-upload
+     * from the Paper Raster / video bridge on demand) — this just reports.
+     * @returns {number}
+     */
+    image_store_bytes() {
+        const ret = wasm.velloengine_image_store_bytes(this.__wbg_ptr);
+        return ret;
+    }
+    /**
+     * @returns {number}
+     */
+    image_store_size() {
+        const ret = wasm.velloengine_image_store_size(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * @returns {number}
+     */
+    path_store_size() {
+        const ret = wasm.velloengine_path_store_size(this.__wbg_ptr);
+        return ret >>> 0;
     }
     /**
      * Registers (or re-registers, if `key` already exists — e.g. the
@@ -176,14 +210,29 @@ export class VelloEngine {
      * WGSL statements ending in `return vec4<f32>(...)`), wrapped here
      * into a full document that already declares the standard fullscreen-
      * triangle vertex shader, the texture/sampler/Params bindings, and
-     * three convenience locals every author can use without re-deriving
-     * them: `uv` (0..1), `src` (the pixel already sampled at `uv`), and
-     * `texel` (1 texel in UV units, for neighbor-sampling effects). Same
-     * `Params{effect_id,p1,p2,p3,tex_w,tex_h,time,p4}` layout as
-     * simple_fx.wgsl, so an author's `params.p1`..`params.p4` map 1:1 onto
-     * the SAME p1..p4 fields the stack UI's generic param editor already
-     * writes for every other effect type — no separate wiring needed on
-     * the JS side for a custom effect's parameters.
+     * six convenience locals every author can use without re-deriving
+     * them: `uv` (0..1 across the FULL CANVAS), `src` (the pixel already
+     * sampled at `uv`), `texel` (1 texel in UV units, for neighbor-
+     * sampling effects), and — 2026-07-30, see run_one_effect's own doc
+     * comment for the bug this fixes — `bbox_o`/`bbox_s` (the on-screen
+     * device-pixel origin/size of whatever this effect is actually
+     * attached to) and `local_uv` (0..1 across just THAT bbox instead of
+     * the whole canvas, can go outside 0..1 near/past its edges same as
+     * `uv` already can). Any effect with a "center of my own shape"
+     * concept (a twirl/bulge pivot, a wave's phase, a particle grid)
+     * should distort in `local_uv` space and map back to real texture
+     * coordinates via `bbox_o + result * bbox_s` (in device px) before
+     * dividing by `vec2(tex_w, tex_h)` for the final textureSample — NOT
+     * `uv`/`vec2(0.5)` directly, which is the canvas center, not the
+     * shape's — confirmed live: a shipped Twirl effect's pattern visibly
+     * changed under pure panning (zero zoom change) before this existed,
+     * which only makes sense if its reference frame was the viewport.
+     * Same `Params{effect_id,p1,p2,p3,tex_w,tex_h,time,p4,bbox_x,bbox_y,
+     * bbox_w,bbox_h}` layout as simple_fx.wgsl, so an author's
+     * `params.p1`..`params.p4` map 1:1 onto the SAME p1..p4 fields the
+     * stack UI's generic param editor already writes for every other
+     * effect type — no separate wiring needed on the JS side for a custom
+     * effect's parameters.
      *
      * Compiling arbitrary author-supplied WGSL at runtime is safe here:
      * this crate only ever targets the web/WebGPU wgpu backend (built via
@@ -230,6 +279,24 @@ export class VelloEngine {
         }
     }
     /**
+     * Retained path store (see the `paths` field's doc comment). `coords` is
+     * a flat [px,py, hInX,hInY, hOutX,hOutY] × n array — the same
+     * RELATIVE-handle convention as SegIn/serP, 6 slots per segment with
+     * explicit zeros where the JSON form omits a zero handle. Built through
+     * build_bezpath_from_segments so a registered path and an inline one
+     * produce byte-identical curves (single source of truth, §3).
+     * @param {string} id
+     * @param {Float64Array} coords
+     * @param {boolean} closed
+     */
+    register_path(id, coords, closed) {
+        const ptr0 = passStringToWasm0(id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passArrayF64ToWasm0(coords, wasm.__wbindgen_malloc);
+        const len1 = WASM_VECTOR_LEN;
+        wasm.velloengine_register_path(this.__wbg_ptr, ptr0, len0, ptr1, len1, closed);
+    }
+    /**
      * @param {string} scene_json
      */
     render(scene_json) {
@@ -274,6 +341,34 @@ export class VelloEngine {
      */
     resize(width, height) {
         wasm.velloengine_resize(this.__wbg_ptr, width, height);
+    }
+    /**
+     * Drops images by id. Mirrors retire_paths. Never called for an id the
+     * scene being rendered still references — the caller checks that, because
+     * dropping a live id would make the picture lose an image with no signal
+     * beyond a warning in paint_layer_items.
+     * @param {string} ids_json
+     */
+    retire_images(ids_json) {
+        const ptr0 = passStringToWasm0(ids_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.velloengine_retire_images(this.__wbg_ptr, ptr0, len0);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * Retirement is JS-driven (FinalizationRegistry on the stroke dicts) —
+     * this side never guesses at lifetimes. `ids_json`: JSON array of keys.
+     * @param {string} ids_json
+     */
+    retire_paths(ids_json) {
+        const ptr0 = passStringToWasm0(ids_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.velloengine_retire_paths(this.__wbg_ptr, ptr0, len0);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
     }
     /**
      * Rotates every selected item in-place around `(pivot_x, pivot_y)` by
@@ -425,9 +520,10 @@ export class VelloEngine {
      * @param {number} rotation
      * @param {number} pivot_x
      * @param {number} pivot_y
+     * @param {number} effect_zoom
      */
-    set_viewport(pan_x, pan_y, zoom, rotation, pivot_x, pivot_y) {
-        wasm.velloengine_set_viewport(this.__wbg_ptr, pan_x, pan_y, zoom, rotation, pivot_x, pivot_y);
+    set_viewport(pan_x, pan_y, zoom, rotation, pivot_x, pivot_y, effect_zoom) {
+        wasm.velloengine_set_viewport(this.__wbg_ptr, pan_x, pan_y, zoom, rotation, pivot_x, pivot_y, effect_zoom);
     }
 }
 if (Symbol.dispose) VelloEngine.prototype[Symbol.dispose] = VelloEngine.prototype.free;
@@ -508,6 +604,46 @@ export function boolean_op(op, a_json, b_json) {
         const ptr2 = passStringToWasm0(b_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         const len2 = WASM_VECTOR_LEN;
         const ret = wasm.boolean_op(ptr0, len0, ptr1, len1, ptr2, len2);
+        var ptr4 = ret[0];
+        var len4 = ret[1];
+        if (ret[3]) {
+            ptr4 = 0; len4 = 0;
+            throw takeFromExternrefTable0(ret[2]);
+        }
+        deferred5_0 = ptr4;
+        deferred5_1 = len4;
+        return getStringFromWasm0(ptr4, len4);
+    } finally {
+        wasm.__wbindgen_free(deferred5_0, deferred5_1, 1);
+    }
+}
+
+/**
+ * Same operations as `boolean_op`, but `a_json` is a JSON array of polygons
+ * (a MultiPolygon) instead of a single one. Needed to fold a 3rd+ operand
+ * into an already-disjoint multi-piece accumulator: `boolean_op` can only
+ * take a single polygon per side, so a naive JS-side fold that collapses
+ * the accumulator to "the single largest piece" between folds silently
+ * drops every other disjoint piece already accumulated (e.g. uniting 3
+ * mutually non-overlapping shapes loses the middle one). geo_booleanop's
+ * BooleanOp trait already implements MultiPolygon-vs-Polygon natively
+ * (boolean/mod.rs) — this just exposes that instead of reinventing it.
+ * @param {string} op
+ * @param {string} a_json
+ * @param {string} b_json
+ * @returns {string}
+ */
+export function boolean_op_multi(op, a_json, b_json) {
+    let deferred5_0;
+    let deferred5_1;
+    try {
+        const ptr0 = passStringToWasm0(op, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passStringToWasm0(a_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len1 = WASM_VECTOR_LEN;
+        const ptr2 = passStringToWasm0(b_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len2 = WASM_VECTOR_LEN;
+        const ret = wasm.boolean_op_multi(ptr0, len0, ptr1, len1, ptr2, len2);
         var ptr4 = ret[0];
         var len4 = ret[1];
         if (ret[3]) {
@@ -914,10 +1050,6 @@ function __wbg_get_imports() {
         __wbg_dispatchWorkgroups_0cf298d736b85a78: function(arg0, arg1, arg2, arg3) {
             arg0.dispatchWorkgroups(arg1 >>> 0, arg2 >>> 0, arg3 >>> 0);
         },
-        __wbg_document_179650d6cb13c263: function(arg0) {
-            const ret = arg0.document;
-            return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
-        },
         __wbg_draw_ad0811de56a2d768: function(arg0, arg1, arg2, arg3, arg4) {
             arg0.draw(arg1 >>> 0, arg2 >>> 0, arg3 >>> 0, arg4 >>> 0);
         },
@@ -946,10 +1078,6 @@ function __wbg_get_imports() {
             const ret = arg0.getContext(getStringFromWasm0(arg1, arg2));
             return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
         }, arguments); },
-        __wbg_getContext_fd298c901058eb31: function() { return handleError(function (arg0, arg1, arg2) {
-            const ret = arg0.getContext(getStringFromWasm0(arg1, arg2));
-            return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
-        }, arguments); },
         __wbg_getCurrentTexture_51975ae7185fd15f: function() { return handleError(function (arg0) {
             const ret = arg0.getCurrentTexture();
             return ret;
@@ -961,10 +1089,6 @@ function __wbg_get_imports() {
         __wbg_getPreferredCanvasFormat_1b8495aeb1d11ab1: function(arg0) {
             const ret = arg0.getPreferredCanvasFormat();
             return (__wbindgen_enum_GpuTextureFormat.indexOf(ret) + 1 || 96) - 1;
-        },
-        __wbg_get_b2053e9bfdf3ca8e: function(arg0, arg1) {
-            const ret = arg0[arg1 >>> 0];
-            return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
         },
         __wbg_gpu_a7c12045c25d009a: function(arg0) {
             const ret = arg0.gpu;
@@ -1007,16 +1131,6 @@ function __wbg_get_imports() {
             let result;
             try {
                 result = arg0 instanceof GPUValidationError;
-            } catch (_) {
-                result = false;
-            }
-            const ret = result;
-            return ret;
-        },
-        __wbg_instanceof_Window_05ba1ee4f6781663: function(arg0) {
-            let result;
-            try {
-                result = arg0 instanceof Window;
             } catch (_) {
                 result = false;
             }
@@ -1221,10 +1335,6 @@ function __wbg_get_imports() {
             const ret = arg0.push(arg1);
             return ret;
         },
-        __wbg_querySelectorAll_7e98cbe256deaadd: function() { return handleError(function (arg0, arg1, arg2) {
-            const ret = arg0.querySelectorAll(getStringFromWasm0(arg1, arg2));
-            return ret;
-        }, arguments); },
         __wbg_queueMicrotask_0ab5b2d2393e99b9: function(arg0) {
             const ret = arg0.queueMicrotask;
             return ret;
@@ -1853,17 +1963,17 @@ function __wbg_get_imports() {
             arg0.writeTexture(arg1, getArrayU8FromWasm0(arg2, arg3), arg4, arg5);
         }, arguments); },
         __wbindgen_cast_0000000000000001: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 60, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 59, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen__convert__closures_____invoke__h29bfc5eda1199406);
             return ret;
         },
         __wbindgen_cast_0000000000000002: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 85, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 87, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen__convert__closures_____invoke__h4177160f1dac6248);
             return ret;
         },
         __wbindgen_cast_0000000000000003: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("GPUUncapturedErrorEvent")], shim_idx: 60, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("GPUUncapturedErrorEvent")], shim_idx: 59, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen__convert__closures_____invoke__h29bfc5eda1199406_2);
             return ret;
         },
@@ -2159,6 +2269,13 @@ function makeMutClosure(arg0, arg1, f) {
 function passArray8ToWasm0(arg, malloc) {
     const ptr = malloc(arg.length * 1, 1) >>> 0;
     getUint8ArrayMemory0().set(arg, ptr / 1);
+    WASM_VECTOR_LEN = arg.length;
+    return ptr;
+}
+
+function passArrayF64ToWasm0(arg, malloc) {
+    const ptr = malloc(arg.length * 8, 8) >>> 0;
+    getFloat64ArrayMemory0().set(arg, ptr / 8);
     WASM_VECTOR_LEN = arg.length;
     return ptr;
 }

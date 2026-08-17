@@ -136,7 +136,13 @@
     return (
       window.SMEngineBridge && window.SMEngineBridge.isEnabled() &&
       (state.tool === 'draw' || state.tool === 'fillbrush') && !state.playing &&
-      !state.layers[state.activeLayerIdx].locked
+      // Defer to the Paper path whenever the layer can't take an edit at all
+      // (locked, component, video, montage). That path refuses AUDIBLY via
+      // canEditActiveLayer (tools.js); intercepting here would swallow the
+      // gesture silently instead — which is exactly what a component layer
+      // used to do: you draw on an instance and nothing happens, with no
+      // hint that the layer is an instance at all.
+      !(window.editRefusalReason && window.editRefusalReason())
     );
   }
   function isFillBrush() { return state.tool === 'fillbrush'; }
@@ -293,6 +299,31 @@
     return [r, g, b, Math.round(255 * op)];
   }
 
+  // The Bitmap Brush paints its live preview on its own screen-space canvas
+  // (bitmap-brush.js). One predicate for all three sites that care — the two
+  // that START/feed that preview and overlayItem() below, which has to stop
+  // drawing the vector stroke while it runs — so they can never disagree
+  // about whether the bitmap path is active.
+  function bitmapLive() {
+    return !!(state.bitmapBrushOn && state.strokeEnabled && !state.vectorBrush && !isFillBrush() && window.SMBitmapBrush);
+  }
+
+  // Dab-size multiplier for the Bitmap Brush live preview. It MUST be the
+  // same quantity applyBitmapBrushTexture stores in bitmapPressureProfile
+  // and bakeToCanvas then multiplies each dab by: width / nominal size,
+  // clamped. The preview was passing the RAW pressure instead — a different
+  // number entirely (measured on one stroke: 0.70 raw vs 1.205 stored), so
+  // every previewed dab came out ~40% too small and the stroke visibly
+  // thickened on release (2026-07-27: "le trait bitmap pendant le dessin
+  // n'est pas le même quand on finis"). It also ignored the Pressure toggle,
+  // which the bake gates on via spec.pressure — with it off the preview kept
+  // varying dab size while the final result did not.
+  function bitmapPressureMul(pressure) {
+    if (!state.bitmapPressure) return 1;
+    var ref = state.brushSize || 1;
+    return Math.max(0.2, Math.min(2.5, widthFor(pressure) / ref));
+  }
+
   function overlayItem() {
     if (isFillBrush()) {
       return { centerline: samples, fillColor: hexToRgba(state.fillColor, state.opacity) };
@@ -314,7 +345,7 @@
       // reported bug for stylus users). With Fill on, also paint the region
       // enclosed by the centerline underneath the ribbon, same live-fill
       // behavior the plain-stroke mode already has.
-      if (state.fillEnabled) {
+      if (state.fillEnabled && !state.shadowMode) {
         return [regionPreview, ribbon];
       }
       return ribbon;
@@ -347,10 +378,21 @@
       if (Math.hypot(s[0] - last[0], s[1] - last[1]) >= minGap) decimated.push(s);
     }
     if (decimated.length < 2 && samples.length > 1) decimated.push(samples[samples.length - 1]);
+    // Bitmap Brush: the dabs on bitmap-brush.js's own canvas ARE the stroke
+    // preview, so drawing this vector line too showed a thin hard-edged
+    // path running under (and ahead of) them for the whole gesture, then
+    // vanishing on release — reported 2026-07-27 ("quand je dessinne avec
+    // une brush bitmap, je vois le trait vector en dessous"). Nulling the
+    // stroke channel and keeping the fill mirrors exactly what commitStroke
+    // produces: the anchor path survives with its fill, and only its
+    // strokeColor is nulled once the dabs replace the line (see CLAUDE.md
+    // §1 on the two texture-anchor camouflage modes).
+    var bmLive = bitmapLive();
+    if (bmLive && !state.fillEnabled) return [];
     var item = {
       segments: decimated.map(function (s) { return { point: [s[0], s[1]], handleIn: [0, 0], handleOut: [0, 0] }; }),
       closed: false,
-      strokeColor: state.strokeEnabled ? hexToRgba(state.strokeColor, state.opacity) : null,
+      strokeColor: (state.strokeEnabled && !bmLive) ? hexToRgba(state.strokeColor, state.opacity) : null,
       strokeWidth: state.brushSize,
       strokeCap: state.strokeCap,
       strokeJoin: state.strokeJoin,
@@ -428,9 +470,9 @@
     // independent of the Rust engine's overlay-item JSON path (see that
     // file's header for why). Only for the same plain constant-width case
     // commitStroke's own bitmap-brush branch handles.
-    if (state.bitmapBrushOn && state.strokeEnabled && !state.vectorBrush && !isFillBrush() && window.SMBitmapBrush) {
+    if (bitmapLive()) {
       window.SMBitmapBrush.beginLivePreview();
-      window.SMBitmapBrush.livePreviewMove(e.clientX, e.clientY, pressure);
+      window.SMBitmapBrush.livePreviewMove(e.clientX, e.clientY, bitmapPressureMul(pressure));
     }
   }
   function onMove(e) {
@@ -469,8 +511,8 @@
       samples.push([w[0], w[1], widthFor(pressure)]);
       if (state.vectorBrush) window.SMEngineBridge.setPressureCursor(w, widthFor(pressure) / 2);
     }
-    if (state.bitmapBrushOn && state.strokeEnabled && !state.vectorBrush && !isFillBrush() && window.SMBitmapBrush) {
-      window.SMBitmapBrush.livePreviewMove(e.clientX, e.clientY, pressure);
+    if (bitmapLive()) {
+      window.SMBitmapBrush.livePreviewMove(e.clientX, e.clientY, bitmapPressureMul(pressure));
     }
     var previewItems = [].concat(overlayItem());
     // Same guarded, no-op-when-absent pattern as the commitStroke hook
@@ -569,7 +611,9 @@
     // undo was needed to remove that, and it consumed the undo slot that
     // belonged to whatever was drawn before it. One undo must revert both.
     pushUndo();
-    ensureKeyframe();
+    // blank: a new drawing on a held frame is a NEW drawing, not the previous
+    // one carried forward — see ensureKeyframe's own comment (tools.js).
+    ensureKeyframe(true);
     var layer = userLayers[state.activeLayerIdx];
     layer.activate();
     var path;
@@ -608,9 +652,6 @@
       // points directly — not what a filled shape's nodes should behave
       // like). isFillShape stays (still needed by pen-bridge.js's own
       // close-path/endpoint-snap exclusion guard).
-      delete path.data.isVectorBrush;
-      delete path.data.centerSegments;
-      delete path.data.widthProfile;
       if (state.shadowMode) {
         // A shadow guide stroke must never auto-merge/unite with whatever
         // real artwork happens to sit underneath it — both
@@ -621,6 +662,9 @@
         // Fill Brush commit path).
         applyShadowBrushTag(path);
       } else {
+        delete path.data.isVectorBrush;
+        delete path.data.centerSegments;
+        delete path.data.widthProfile;
         // Placement (Above/Below/Merge) — see applyFillBrushPlacement's own
         // comment; replaces the old unconditional "always at the back". The
         // return value MUST be captured: 'merge' mode, when it finds an
@@ -684,7 +728,7 @@
       // rebuildVectorBrushOutline; pure drag-to-move is handled at its own
       // two call sites) keeps re-syncing it — fixing the reported "fill
       // pas attaché au stroke" desync on top of the initial mismatch.
-      if (state.fillEnabled) {
+      if (state.fillEnabled && !state.shadowMode) {
         var fillPath = new Path();
         fillPath.fillColor = state.fillColor;
         fillPath.strokeColor = null;
@@ -731,7 +775,7 @@
       // baseWidth for a shape whose width varies along its length) — now
       // that it accepts a widthProfile, wire it up here too so a preset
       // actually applies to pressure strokes at draw time.
-      if (state.brushPreset && state.brushPreset !== 'none') applyBrushTexture(path, state.brushPreset);
+      if (!state.shadowMode && state.brushPreset && state.brushPreset !== 'none') applyBrushTexture(path, state.brushPreset);
     } else {
       path = new Path();
       // Left-panel stroke eye honored here too (it always was for the
@@ -760,8 +804,8 @@
       // same anchor+companion architecture as applyBrushTexture, just one
       // Raster companion instead of many vector dabs; the path committed
       // above (fill included) stays as the real, subselect-editable anchor.
-      if (state.strokeEnabled && state.bitmapBrushOn && window.SMBitmapBrush) window.SMBitmapBrush.applyToPath(path, null, samples);
-      else if (state.strokeEnabled && state.brushPreset && state.brushPreset !== 'none') applyBrushTexture(path, state.brushPreset);
+      if (!state.shadowMode && state.strokeEnabled && state.bitmapBrushOn && window.SMBitmapBrush) window.SMBitmapBrush.applyToPath(path, null, samples);
+      else if (!state.shadowMode && state.strokeEnabled && state.brushPreset && state.brushPreset !== 'none') applyBrushTexture(path, state.brushPreset);
       if (state.drawMode === 'behind') {
         userLayers[state.activeLayerIdx].insertChild(0, path);
         // Same re-anchor need as the linkedFill case a few lines up in the

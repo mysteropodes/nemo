@@ -16,18 +16,59 @@
 (function () {
   function uid() { return 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 
-  function addEntry(name, kind, thumb, layerName) {
+  // Rough byte estimate for a base64 dataURL, used for the panel's size
+  // column — no need to be exact (this is a browse aid, not a disk audit).
+  function dataUrlBytes(du) {
+    if (!du || du.indexOf(',') < 0) return 0;
+    var b64 = du.slice(du.indexOf(',') + 1);
+    return Math.round(b64.length * 0.75);
+  }
+
+  // opts (2026-07-31, real asset-panel pass — Cyril: "vrai panel de gestion
+  // de fichier importé"): { layerUid, linked, path } —
+  // - layerUid: stable identity (app.js's createUserLayer stamp), resolved
+  //   FIRST everywhere below; layerName stays only as a fallback for entries
+  //   saved before this pass and for kinds (audio) with no owning layer.
+  // - linked/path: nativeVideo entries only persist a filesystem path (no
+  //   embedded bytes) and can go offline if the file moves — surfaced as a
+  //   badge instead of a size, and is what gates the relink action.
+  function addEntry(name, kind, thumb, layerName, opts) {
     if (!state.mediaLibrary) state.mediaLibrary = [];
-    state.mediaLibrary.push({ id: uid(), name: name, kind: kind, thumb: thumb, layerName: layerName || null, importedAt: Date.now() });
+    opts = opts || {};
+    state.mediaLibrary.push({
+      id: uid(), name: name, kind: kind, thumb: thumb, layerName: layerName || null,
+      layerUid: opts.layerUid || null, linked: !!opts.linked, path: opts.path || null,
+      // audioId: audio tracks have no owning layer at all (state.audioTracks
+      // is a separate array) — this is their own identity, used only by the
+      // 'Supprimer la piste' menu action below to find the right track.
+      audioId: opts.audioId || null,
+      sizeBytes: opts.linked ? null : dataUrlBytes(thumb),
+      importedAt: Date.now(),
+    });
     render();
   }
 
+  // uid-first resolve (2026-07-31) with a name fallback for pre-migration
+  // entries — a rename no longer orphans the catalog link once the entry
+  // carries a layerUid.
+  function resolveSrcLayer(m) {
+    if (m.layerUid) {
+      var byUid = state.layers.find(function (l) { return l.layerUid === m.layerUid; });
+      if (byUid) return byUid;
+    }
+    if (m.layerName) return state.layers.find(function (l) { return l.name === m.layerName; }) || null;
+    return null;
+  }
+
   function jumpToLayer(m) {
-    if (!m.layerName) return;
-    var idx = state.layers.findIndex(function (l) { return l.name === m.layerName; });
-    if (idx < 0) { if (window.showToast) showToast('Calque source introuvable (supprimé ou renommé)'); return; }
+    // Audio has no owning layer at all — a click is simply inert, not an
+    // error (distinct from the "was a layer, now gone" orphan case below).
+    if (!m.layerName && !m.layerUid) return;
+    var ld = resolveSrcLayer(m);
+    if (!ld) { if (window.showToast) showToast('Calque source introuvable (supprimé ou renommé)'); return; }
+    var idx = state.layers.indexOf(ld);
     if (window.SM) SM.setActiveLayer(idx);
-    if (window.showToast) showToast('Calque « ' + m.layerName + ' » sélectionné');
+    if (window.showToast) showToast('Calque « ' + ld.name + ' » sélectionné');
   }
 
   function removeEntry(id) {
@@ -74,6 +115,12 @@
     var d = new Date(ts);
     return d.getDate() + '/' + (d.getMonth() + 1) + '/' + String(d.getFullYear()).slice(2);
   }
+  function formatBytes(n) {
+    if (!n) return '';
+    if (n < 1024) return n + ' o';
+    if (n < 1024 * 1024) return Math.round(n / 1024) + ' Ko';
+    return (n / (1024 * 1024)).toFixed(1) + ' Mo';
+  }
   // Rebuilt 2026-07 as a ROW-based list ("l'organisation file des footage
   // importé dans ce genre là" — a project-list-table reference screenshot:
   // name+thumbnail, a colored status/type pill, an owner-like avatar+name)
@@ -84,15 +131,21 @@
   // layer's own color as a stand-in for the reference's owner avatar, since
   // there's no per-user concept here — the layer IS the "owner" of an
   // imported asset), and import date.
+  var KIND_LABEL = { video: 'Vidéo', image: 'Image', audio: 'Audio' };
   function render() {
     var grid = document.getElementById('media-grid'); if (!grid) return;
     grid.innerHTML = '';
+    var orphanCount = 0;
     (state.mediaLibrary || []).forEach(function (m) {
       var row = document.createElement('div'); row.className = 'media-row'; row.title = m.name;
       var thumb = document.createElement('div'); thumb.className = 'media-row-thumb';
-      var img = document.createElement('img'); img.src = m.thumb; img.draggable = m.kind === 'image';
-      thumb.appendChild(img);
-      if (m.kind === 'video') { var pb = document.createElement('div'); pb.className = 'media-row-playicon'; pb.textContent = '▶'; thumb.appendChild(pb); }
+      if (m.kind === 'audio') {
+        thumb.classList.add('media-row-thumb-icon'); thumb.textContent = '♪';
+      } else {
+        var img = document.createElement('img'); img.src = m.thumb; img.draggable = m.kind === 'image';
+        thumb.appendChild(img);
+        if (m.kind === 'video') { var pb = document.createElement('div'); pb.className = 'media-row-playicon'; pb.textContent = '▶'; thumb.appendChild(pb); }
+      }
       row.appendChild(thumb);
 
       var main = document.createElement('div'); main.className = 'media-row-main';
@@ -100,18 +153,29 @@
       main.appendChild(nameEl);
 
       var meta = document.createElement('div'); meta.className = 'media-row-meta';
-      var kindBadge = document.createElement('span'); kindBadge.className = 'media-row-badge ' + (m.kind === 'video' ? 'kind-video' : 'kind-image'); kindBadge.textContent = m.kind === 'video' ? 'Vidéo' : 'Image';
+      var kindBadge = document.createElement('span'); kindBadge.className = 'media-row-badge kind-' + m.kind; kindBadge.textContent = KIND_LABEL[m.kind] || m.kind;
       meta.appendChild(kindBadge);
+      // Embedded (a size in the project file) vs linked (nativeVideo — only
+      // a filesystem path persists) — a real asset panel needs this
+      // distinction since it determines what "broken" even means (2026-07-31).
+      if (m.linked) {
+        var linkBadge = document.createElement('span'); linkBadge.className = 'media-row-badge kind-linked'; linkBadge.textContent = 'Fichier lié'; linkBadge.title = m.path || '';
+        meta.appendChild(linkBadge);
+      } else if (m.sizeBytes) {
+        var sizeEl = document.createElement('span'); sizeEl.className = 'media-row-size'; sizeEl.textContent = formatBytes(m.sizeBytes);
+        meta.appendChild(sizeEl);
+      }
 
       // "Owner" column equivalent: the source layer, colored dot + name —
       // or a muted "Orphelin" pill if that layer no longer exists (deleted/
       // renamed since import; jumpToLayer already toasted this on click,
       // this makes it visible without having to click first).
-      var srcLayer = m.layerName ? state.layers.find(function (l) { return l.name === m.layerName; }) : null;
-      if (m.layerName) {
+      var srcLayer = resolveSrcLayer(m);
+      if (m.layerName || m.layerUid) {
+        if (!srcLayer) orphanCount++;
         var owner = document.createElement('span'); owner.className = 'media-row-owner' + (srcLayer ? '' : ' orphan');
         if (srcLayer) { var dot = document.createElement('span'); dot.className = 'media-row-owner-dot'; dot.style.background = srcLayer.color || 'var(--text-dim)'; owner.appendChild(dot); }
-        var ownerLbl = document.createElement('span'); ownerLbl.textContent = srcLayer ? m.layerName : 'Orphelin';
+        var ownerLbl = document.createElement('span'); ownerLbl.textContent = srcLayer ? srcLayer.name : 'Orphelin';
         owner.appendChild(ownerLbl);
         meta.appendChild(owner);
       }
@@ -126,9 +190,30 @@
         e.preventDefault(); e.stopPropagation();
         if (!window.showContextMenu) return;
         var items = [];
-        if (m.layerName) items.push({ label: 'Sélectionner le calque', action: function () { jumpToLayer(m); } });
+        if (srcLayer) items.push({ label: 'Sélectionner le calque', action: function () { jumpToLayer(m); } });
         if (m.kind === 'image') items.push({ label: 'Insérer une copie sur le calque actif', action: function () { insertImageOnCanvas(m); } });
-        items.push({ label: 'Retirer de la bibliothèque', action: function () { removeEntry(m.id); } });
+        // Relink (2026-07-31): only nativeVideo entries can go offline (a
+        // moved/deleted file — the embedded kinds never can, their bytes
+        // live IN the project). replaceNativeVideoSource is native-video-
+        // bridge.js's own relink flow, same dialog/session-swap shape as
+        // images.js's replaceFootageSource for the embedded raster kinds.
+        if (m.linked && srcLayer && window.SMNativeVideo && window.SMNativeVideo.replaceNativeVideoSource) {
+          items.push({ label: 'Relier / remplacer le fichier…', action: function () {
+            var li = state.layers.indexOf(srcLayer);
+            window.SMNativeVideo.replaceNativeVideoSource(li);
+          } });
+        }
+        // Audio has real controls (mute/volume/offset-drag) on its own
+        // timeline row already (audio-bridge.js) — deliberately NOT
+        // duplicated here (same divergence risk CLAUDE.md flags for propsFor/
+        // panel-grid). Only delete, reusing that file's own stop+splice.
+        if (m.kind === 'audio' && m.audioId) {
+          items.push({ label: 'Supprimer la piste', action: function () {
+            if (window.SMAudio && SMAudio.removeTrackByAudioId(m.audioId)) removeEntry(m.id);
+          } });
+        } else {
+          items.push({ label: 'Retirer de la bibliothèque', action: function () { removeEntry(m.id); } });
+        }
         window.showContextMenu(e.clientX, e.clientY, items);
       });
       if (m.kind === 'image') {
@@ -139,6 +224,27 @@
       }
       grid.appendChild(row);
     });
+    // Bulk cleanup (2026-07-31) — catalog-only (never touches the
+    // underlying layer, which has its own trash button already): shows/
+    // hides based on whether there's anything TO clean, and labels the
+    // count so it isn't a mystery button.
+    var cleanupBtn = document.getElementById('btn-media-cleanup');
+    if (cleanupBtn) {
+      cleanupBtn.style.display = orphanCount ? '' : 'none';
+      cleanupBtn.textContent = 'Nettoyer (' + orphanCount + ')';
+    }
+  }
+  // Catalog-only cleanup: removes entries whose source layer no longer
+  // resolves (deleted, or renamed on a pre-migration entry with no uid).
+  // Never deletes the layer itself — that stays the layer panel's job.
+  function cleanupOrphans() {
+    var before = (state.mediaLibrary || []).length;
+    state.mediaLibrary = (state.mediaLibrary || []).filter(function (m) {
+      return !(m.layerName || m.layerUid) || resolveSrcLayer(m);
+    });
+    var removed = before - state.mediaLibrary.length;
+    render();
+    if (window.showToast) showToast(removed + ' entrée(s) orpheline(s) retirée(s) du catalogue');
   }
 
   // OS drag-and-drop onto the panel's own drop zone (#media-drop) — separate
@@ -184,12 +290,29 @@
     });
   }
 
+  // Compact/expand toggle (2026-07-31, Cyril: "un petit bouton qui ouvrira
+  // un plus grand en hauteur") — #media-grid defaults to a bounded, scrolling
+  // height (css); the chevron just flips a class, same idiom as effects-
+  // panel.js's per-row .fx-row-chevron/.expanded rotate-on-toggle, not the
+  // continuous #tl-resize drag-handle (that's a different interaction).
+  function initExpandToggle() {
+    var btn = document.getElementById('media-expand-toggle');
+    var grid = document.getElementById('media-grid');
+    if (!btn || !grid) return;
+    btn.addEventListener('click', function () {
+      grid.classList.toggle('expanded');
+      btn.classList.toggle('expanded', grid.classList.contains('expanded'));
+    });
+  }
+
   function init() {
     render();
     initDropZone();
     initCanvasDropTarget();
+    initExpandToggle();
     var bImg = document.getElementById('btn-media-import-img'); if (bImg) bImg.addEventListener('click', function () { if (window.SM) SM.importImages(); });
     var bVid = document.getElementById('btn-media-import-video'); if (bVid) bVid.addEventListener('click', function () { if (window.SM) SM.importVideo(); });
+    var bClean = document.getElementById('btn-media-cleanup'); if (bClean) bClean.addEventListener('click', cleanupOrphans);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 

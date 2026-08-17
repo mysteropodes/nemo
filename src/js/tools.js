@@ -56,11 +56,90 @@ function hitTestComponentLayers(point){
 // shape fsHitTest always returned; single-select is just the length-1 case.
 var _fsSel=[];
 function fsClearSel(){_fsSel=[];}
+var _fsIsolation=null; // {groupId,path}; entered by Select double-click
 // Last-touched entry — every place that used to read _fsSel.kind/.path
 // directly for a SINGLE-value display (panel color swatch, header text)
 // keeps doing that against this one, while actions (recolor/delete/opacity)
 // loop over the whole _fsSel array.
 function fsPrimarySel(){return _fsSel.length?_fsSel[_fsSel.length-1]:null;}
+function fsSelectionAtPoint(pt){
+  for(var i=_fsSel.length-1;i>=0;i--){
+    var hi=fsHighlightPath(_fsSel[i]);
+    if(!hi)continue;
+    var hit=false;
+    try{
+      hit=(_fsSel[i].kind==='stroke')
+        ? !!hi.hitTest(pt,{stroke:true,tolerance:8/view.zoom})
+        : (hi.contains(pt)||!!hi.hitTest(pt,{fill:true,tolerance:2/view.zoom}));
+    }catch(e){hit=false;}
+    hi.remove();
+    if(hit)return _fsSel[i];
+  }
+  return null;
+}
+// Promote the selected fill/stroke fragments to ordinary standalone paths.
+// Once promoted, the regular Select tool supplies the complete move/scale/
+// rotate UI instead of maintaining a second, subtly different transform
+// implementation for aspect selections.
+function fsPromoteSelectionForTransform(layer){
+  if(!_fsSel.length)return[];
+  var promoted=[];
+  // Fill cuts change the source geometry, so realize them first.
+  _fsSel.filter(function(s){return s.kind==='fillregion';}).forEach(function(s){
+    var r=fsRealizeFillRegion(s,layer);
+    if(r&&r.path&&promoted.indexOf(r.path)<0)promoted.push(r.path);
+  });
+  _fsSel.filter(function(s){return s.kind==='fill';}).forEach(function(s){
+    if(!s.path||s.path.removed)return;
+    // Selecting only the fill of a combined fill+stroke shape must not drag
+    // its outline along. Split the visual aspects into two real paths.
+    if(s.path.strokeColor){
+      var fillOnly=s.path.clone({insert:false,deep:true});
+      fillOnly.strokeColor=null;
+      s.path.fillColor=null;
+      if(s.path.data)delete s.path.data.fillGradient;
+      fsUnlinkFillRegen(fillOnly);fsUnlinkFillRegen(s.path);
+      layer.insertChild(layer.children.indexOf(s.path),fillOnly);
+      promoted.push(fillOnly);
+    }else if(promoted.indexOf(s.path)<0)promoted.push(s.path);
+  });
+  // Descending offsets keep earlier offsets valid while an open path is
+  // split repeatedly into selected arcs.
+  _fsSel.filter(function(s){return s.kind==='stroke'&&s.path&&!s.path.removed;})
+    .sort(function(a,b){return b.segStart-a.segStart;})
+    .forEach(function(s){
+      var p=s.path;
+      var whole=s.segStart===0&&Math.abs(s.segEnd-p.length)<0.001;
+      if(whole&&p.fillColor){
+        var strokeOnly=p.clone({insert:false,deep:true});
+        strokeOnly.fillColor=null;
+        if(strokeOnly.data)delete strokeOnly.data.fillGradient;
+        p.strokeColor=null;
+        layer.insertChild(layer.children.indexOf(p)+1,strokeOnly);
+        if(promoted.indexOf(strokeOnly)<0)promoted.push(strokeOnly);
+      }else{
+        var arc=fsRealizeStrokeSegment(s,layer);
+        if(arc&&promoted.indexOf(arc)<0)promoted.push(arc);
+      }
+    });
+  return promoted.filter(function(p){return p&&!p.removed;});
+}
+var _fsPromoteDrag=null;
+document.addEventListener('pointerdown',function(e){
+  var onStage=e.target===canvasEl||(e.target&&e.target.id==='rust-canvas');
+  if(e.button!==0||state.tool!=='fsselect'||!window.SMEngineBridge||!SMEngineBridge.isEnabled()||!onStage)return;
+  var w=SMEngineBridge.screenToWorld(e.clientX,e.clientY),pt=new Point(w[0],w[1]);
+  var selectedAtPointer=fsSelectionAtPoint(pt);
+  if(!selectedAtPointer||e.shiftKey)return;
+  pushUndo();
+  selectedPaths=fsPromoteSelectionForTransform(userLayers[state.activeLayerIdx]);
+  fsClearSel();_fsIsolation=null;
+  state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i){return i>=0;});
+  window.SM.setTool('select');
+  _fsPromoteDrag={last:pt};
+  renderTransformHandles();renderNodeHandles();updateUI();
+  e.preventDefault();e.stopImmediatePropagation();
+},{capture:true});
 // Raw pointermove/pointerup listeners for the fsselect marquee/lasso
 // (2026-07) — NOT Paper.js Tool's own onMouseDrag/onMouseUp (the branches
 // below still handle those, for when the Rust engine is off and Paper's
@@ -77,6 +156,16 @@ function fsPrimarySel(){return _fsSel.length?_fsSel[_fsSel.length-1]:null;}
 // IS off: whichever resolves first clears _marquee.active, making the
 // other a no-op.
 document.addEventListener('pointermove',function(e){
+  if(_fsPromoteDrag){
+    var wm=SMEngineBridge.screenToWorld(e.clientX,e.clientY),pm=new Point(wm[0],wm[1]);
+    var delta=pm.subtract(_fsPromoteDrag.last);_fsPromoteDrag.last=pm;
+    selectedPaths.forEach(function(p){
+      p.position=p.position.add(delta);
+      if(p.data&&p.data.isVectorBrush&&p.data.centerSegments)p.data.centerSegments.forEach(function(s){s.point=[s.point[0]+delta.x,s.point[1]+delta.y];});
+    });
+    renderTransformHandles();renderNodeHandles();SMEngineBridge.renderNow();
+    e.preventDefault();e.stopImmediatePropagation();return;
+  }
   if(!(_marquee.active&&_marquee.mode==='fsselect')||!window.SMEngineBridge)return;
   var w=window.SMEngineBridge.screenToWorld(e.clientX,e.clientY);
   var pt=new Point(w[0],w[1]);
@@ -93,37 +182,57 @@ document.addEventListener('pointermove',function(e){
   prevA.activate();
   if(window.SMEngineBridge.renderNow)window.SMEngineBridge.renderNow();
 },{capture:true});
+function fsStrokeRangesInRegion(path,region){
+  var out=[],len=path.length||0;if(len<0.001)return out;
+  var steps=Math.max(24,Math.min(600,Math.ceil(len/(3/view.zoom))));
+  var runStart=null;
+  for(var i=0;i<=steps;i++){
+    var off=len*i/steps,pt=path.getPointAt(Math.min(len,off));
+    var inside=!!(pt&&region.contains(pt));
+    if(inside&&runStart===null)runStart=off;
+    if((!inside||i===steps)&&runStart!==null){
+      var end=inside?off:Math.max(runStart,len*(i-1)/steps);
+      if(end-runStart>0.5/view.zoom)out.push({path:path,kind:'stroke',segStart:runStart,segEnd:end,closed:path.closed});
+      runStart=null;
+    }
+  }
+  return out;
+}
+function fsResolveRegionSelection(region,layer){
+  var rb=region.bounds;
+  layer.children.forEach(function(c){
+    if(!(c instanceof Path)||c.segments.length===0||!(c.strokeColor||c.fillColor))return;
+    if(!rb.intersects(c.bounds))return;
+    var intersects=false;
+    try{intersects=region.intersects(c);}catch(e){}
+    var fullyInside=region.contains(c.bounds.topLeft)&&region.contains(c.bounds.topRight)&&
+      region.contains(c.bounds.bottomLeft)&&region.contains(c.bounds.bottomRight);
+    if(!fullyInside&&!intersects&&!region.contains(c.position))return;
+    if(c.fillColor){
+      var fillKind=fullyInside?{path:c,kind:'fill'}:{path:c,kind:'fillregion',boolCut:true,cutter:region.clone({insert:false}),inside:true};
+      if(!_fsSel.some(function(s){return s.path===c&&s.kind===fillKind.kind;}))_fsSel.push(fillKind);
+    }
+    if(c.strokeColor){
+      var ranges=fullyInside?[{path:c,kind:'stroke',segStart:0,segEnd:c.length,closed:c.closed}]:fsStrokeRangesInRegion(c,region);
+      ranges.forEach(function(r){
+        if(!_fsSel.some(function(s){return s.path===c&&s.kind==='stroke'&&Math.abs(s.segStart-r.segStart)<0.01&&Math.abs(s.segEnd-r.segEnd)<0.01;}))_fsSel.push(r);
+      });
+    }
+  });
+}
 document.addEventListener('pointerup',function(e){
+  if(_fsPromoteDrag){
+    _fsPromoteDrag=null;saveActiveLayerFrame();renderArcs();updateUI();
+    if(window.SMEngineBridge)SMEngineBridge.renderNow();
+    e.preventDefault();e.stopImmediatePropagation();return;
+  }
   if(!(_marquee.active&&_marquee.mode==='fsselect'))return;
   if(_marquee.rect){
     var mbf=_marquee.rect.bounds;
     var lassoF=null;
     if(_marquee.lasso&&_marquee.rect.segments.length>2){_marquee.rect.closePath();lassoF=_marquee.rect;}
     var layerF=userLayers[state.activeLayerIdx];
-    layerF.children.forEach(function(c){
-      if(!(c instanceof Path)||c.segments.length===0||!(c.strokeColor||c.fillColor))return;
-      if(!mbf.intersects(c.bounds))return;
-      if(_fsSel.some(function(s){return s.path===c;}))return; // already selected — Shift+lasso over the same shape twice shouldn't duplicate it
-      if(lassoF&&!lassoF.contains(c.position)){
-        if(!lassoF.intersects(c))return;
-        // 2026-07 feedback ("le lasso... selectionne toute la forme au lieu
-        // de la partie delimitee, comme dans Photoshop/Animate") — the
-        // lasso's outline crosses this fill WITHOUT enclosing its center:
-        // carve just the overlapping sub-region (reusing the exact same
-        // boolCut fillregion machinery fsFindFillRegion/fsRealizeFillRegion/
-        // fsHighlightPath already use for a manual cutter path) instead of
-        // selecting the whole shape. A stroke-only shape has no fill
-        // polygon to intersect against — keep the prior whole-stroke
-        // fallback for that case (segment-based lasso cutting isn't built).
-        if(c.fillColor){
-          _fsSel.push({path:c,kind:'fillregion',boolCut:true,cutter:lassoF.clone({insert:false}),inside:true});
-        }else{
-          _fsSel.push({path:c,kind:'stroke',segStart:0,segEnd:c.length,closed:c.closed});
-        }
-        return;
-      }
-      _fsSel.push(c.fillColor?{path:c,kind:'fill'}:{path:c,kind:'stroke',segStart:0,segEnd:c.length,closed:c.closed});
-    });
+    fsResolveRegionSelection(lassoF||_marquee.rect,layerF);
     _marquee.rect.remove();_marquee.rect=null;_marquee.mode=null;
   }
   _marquee.active=false;renderArcs();updateUI();
@@ -348,7 +457,7 @@ function fsRealizeFillRegion(sel,layer){
     // everywhere else a boolean op's result needs inserting) already knows
     // how to explode that into independent flat Paths rather than this
     // branch needing its own second copy of that logic.
-    insertBooleanResult(layer,idx,rest,fillPath.fillColor,fillPath.opacity);
+    insertBooleanResult(layer,idx,rest,fillPath.fillColor,fillPath.opacity,null,fillPath.data);
     fillPath.remove();
     return{path:lobe,kind:'fill'};
   }
@@ -631,11 +740,31 @@ var _nmq={active:false,start:null,rect:null};
 // silently editing a disposable dab that gets regenerated on the next
 // stroke edit anyway.
 function resolveBrushAnchor(item,layer){
-  if(!item||!item.data||!item.data.isBrushTextureCopy||!item.data.brushGroupId)return item;
-  var gid=item.data.brushGroupId;
-  for(var i=0;i<layer.children.length;i++){
-    var c=layer.children[i];
-    if(c.data&&c.data.brushGroupId===gid&&!c.data.isBrushTextureCopy)return c;
+  if(!item||!item.data)return item;
+  if(item.data.isBrushTextureCopy&&item.data.brushGroupId){
+    var gid=item.data.brushGroupId;
+    for(var i=0;i<layer.children.length;i++){
+      var c=layer.children[i];
+      if(c.data&&c.data.brushGroupId===gid&&!c.data.isBrushTextureCopy)return c;
+    }
+    return item;
+  }
+  // linkedFill backdrop (2026-07-29 fix, QA-confirmed live: "des fois ça
+  // sélectionne le tout des fois juste le fill") — this function already
+  // redirected a dab-stamp hit back to its real anchor, but never covered
+  // its sibling companion tag: a click landing where only the linkedFill
+  // backdrop is hittable (a gap between dab stamps, or wherever the
+  // textured ribbon's own drawn geometry doesn't reach but the simpler
+  // backdrop fill does — see applyBrushTexture, this file) used to select
+  // the backdrop directly instead of the real vector-brush stroke, exactly
+  // the "sometimes the whole thing, sometimes just the fill" inconsistency
+  // — same class of bug as the dab case above, same fix shape.
+  if(item.data.isLinkedFillCompanion&&item.data.linkedFillId){
+    var lid=item.data.linkedFillId;
+    for(var j=0;j<layer.children.length;j++){
+      var c2=layer.children[j];
+      if(c2.data&&c2.data.linkedFillId===lid&&!c2.data.isLinkedFillCompanion)return c2;
+    }
   }
   return item;
 }
@@ -847,6 +976,16 @@ function selBoxPt(x,y,box){
   var dx=x-box.pivot.x,dy=y-box.pivot.y;
   return new Point(box.pivot.x+dx*c-dy*s,box.pivot.y+dx*s+dy*c);
 }
+// Gradient anchors are document geometry just like path vertices. Keep them
+// in the same transform stream so a gradient never appears pinned to the
+// canvas while its owning shape moves, scales or rotates.
+function transformFillGradient(path, pointTransform){
+  var g=path&&path.data&&path.data.fillGradient;
+  if(!g||!g.from||!g.to)return;
+  var a=pointTransform(new Point(g.from[0],g.from[1]));
+  var b=pointTransform(new Point(g.to[0],g.to[1]));
+  g.from=[a.x,a.y];g.to=[b.x,b.y];
+}
 // Align toolbar (redesign 2026-07-09) — each selected path moves by its OWN
 // delta against the combined selection bounds (not a uniform group shift
 // like selPropsApplyMove), so this can't reuse that function; the per-path
@@ -871,6 +1010,7 @@ function alignSelection(mode){
     moved=true;
     var d=new Point(dx,dy);
     p.translate(d);
+    transformFillGradient(p,function(pt){return pt.add(d);});
     if(p.data&&p.data.isVectorBrush&&p.data.centerSegments)p.data.centerSegments.forEach(function(s){s.point=[s.point[0]+dx,s.point[1]+dy];});
     if(p.data&&p.data.linkedFill&&!p.data.linkedFill.removed)p.data.linkedFill.translate(d);
     if(p.data&&p.data.brushCompanions)p.data.brushCompanions.forEach(function(c){if(!c.removed)c.translate(d);});
@@ -978,7 +1118,7 @@ function rotateCenterSegments(segs,angleDeg,cx,cy){
 // selection it was built from, so it's cleared here too — nodeLayer
 // (the Paper-fallback's actual visual dots) already gets wiped by the
 // next real renderNodeHandles() call, no need to touch it here.
-function clearSel(){selectedPaths=[];state.selectedStrokeIndices=[];_nodeSel=[];state.xformAnchorCustom=null;state.xformAnchorHovered=false;state.xformRingHovered=false;if(typeof nodeHandles!=='undefined')nodeHandles=[];
+function clearSel(keepLayerExplicit){selectedPaths=[];state.selectedStrokeIndices=[];_nodeSel=[];state.xformAnchorCustom=null;state.xformAnchorHovered=false;state.xformRingHovered=false;if(typeof nodeHandles!=='undefined')nodeHandles=[];
   // 2026-07 ("si on clic dans le canvas sans rien sélectionner il ne faut
   // pas afficher les options de calque, ce n'est que si on sélectionne des
   // calques dans la timeline"): drop the "an explicit timeline layer click
@@ -988,7 +1128,7 @@ function clearSel(){selectedPaths=[];state.selectedStrokeIndices=[];_nodeSel=[];
   // should then hide layer-sec instead of defaulting to the last-active
   // layer. setActiveLayer (timeline.js) sets the flag back to true right
   // after ITS OWN clearSel() call, so clicking a layer row still works.
-  if(typeof window!=='undefined')window._layerActiveExplicit=false;
+  if(typeof window!=='undefined'&&!keepLayerExplicit)window._layerActiveExplicit=false;
 }
 function getSI(path){var ch=userLayers[state.activeLayerIdx].children;for(var i=0;i<ch.length;i++){if(ch[i]===path)return i;}return -1;}
 // UI/UX audit (2026-07): the statusbar footer has claimed "⌘/Ctrl+D
@@ -1216,7 +1356,81 @@ if(window.__TAURI__&&window.__TAURI__.event&&window.__TAURI__.event.listen){
 // promoted it to isKeyframe:true, strokes:[] — the stroke wasn't moved,
 // it was deleted. Must compute the effective content FIRST, while the
 // frame still reads as "not yet a keyframe".
-function ensureKeyframe(){var ldk=state.layers[state.activeLayerIdx];if(ldk.nativeVideo){showToast('Calque vidéo — dessine sur un calque normal au-dessus');return;}if(ldk.montageId){showToast('Calque montage — son contenu s\u2019édite dans le StoryBoard');return;}var curF=ldk.frames[state.currentFrame];if(!curF.isKeyframe&&!curF.isInterpolated){var effStrokes=JSON.parse(JSON.stringify(getEffectiveStrokes(state.activeLayerIdx,state.currentFrame)));curF.isKeyframe=true;curF.strokes=effStrokes;loadFrame(state.currentFrame);syncLinkedKeyframeFolder(state.activeLayerIdx,state.currentFrame);}}
+// Why the active layer can't take a drawing edit right now, or null if it
+// can. ensureKeyframe already refused nativeVideo/montageId WITH a message;
+// `locked` and `symbolId` were refused SILENTLY (found 2026-07-26 by a
+// tool x condition sweep: all five drawing tools on a locked layer, and all
+// five on a component layer, produced zero children, zero saved strokes and
+// zero toasts — you draw and nothing whatsoever happens or explains why).
+// The component case is the nastier of the two: nothing on the canvas says
+// the layer is an instance, so it just reads as the app being broken.
+var _editRefusalAt=0;
+function editRefusalReason(){
+  var ld=state.layers[state.activeLayerIdx];
+  if(!ld)return null;
+  // symbolId BEFORE locked, deliberately: convertActiveLayerToComponent sets
+  // locked=true on the instance, so a component layer is ALWAYS both — and
+  // "unlock it with the padlock" is the useless half of the truth. Following
+  // that advice unlocks the layer and you still can't draw, you just finally
+  // get told why. The component nature is the actual reason.
+  if(ld.symbolId)return 'Calque composant — double-clique dessus pour entrer dedans et dessiner';
+  // duplicator BEFORE locked, same reasoning as symbolId above: the toggle
+  // force-locks the layer, so "unlock it" would be the useless half of the
+  // truth — the duplicator is the actual reason, and the panel's edit-source
+  // button is the actual fix.
+  if(ld.duplicator&&!ld._dupEditSource)return 'Calque duplicateur — « Modifier la forme source » (panneau Duplicator) pour éditer';
+  if(ld.locked)return 'Calque verrouillé — déverrouille-le (cadenas) pour dessiner dessus';
+  if(ld.nativeVideo)return 'Calque vidéo — dessine sur un calque normal au-dessus';
+  if(ld.montageId)return 'Calque montage — son contenu s\u2019édite dans le StoryBoard';
+  return null;
+}
+// True when the edit may proceed; otherwise explains ONCE and returns false.
+// Throttled: a locked-layer drag re-enters the mousemove guards many times
+// per gesture, and one toast per frame would be its own bug.
+function canEditActiveLayer(){
+  var why=editRefusalReason();
+  if(!why)return true;
+  var now=Date.now();
+  if(now-_editRefusalAt>1500){_editRefusalAt=now;if(window.showToast)showToast(why);}
+  return false;
+}
+window.canEditActiveLayer=canEditActiveLayer;
+window.editRefusalReason=editRefusalReason;
+// Promotes a HELD frame (one that merely inherits an earlier keyframe) into a
+// real keyframe, so the edit about to happen can be persisted at all —
+// saveActiveLayerFrame ignores frames that are neither keyframe nor
+// interpolated.
+//
+// `blank` decides what the new keyframe STARTS from, and the two answers are
+// not interchangeable (2026-07-28 feedback, screenshots): drawing a small
+// circle on a held frame used to inherit the big circle from frame 1 too, so
+// the "new drawing" carried the old one along. Traditional 2D animation says
+// a new frame is a NEW DRAWING — if you want both shapes together you go edit
+// the keyframe itself. So content-CREATING tools (draw, pen, line/rect/
+// ellipse) pass blank=true.
+//
+// Everything else must NOT: the eraser needs the strokes it is about to cut,
+// the paint bucket needs the walls it fills between, select/subselect need the
+// very items being transformed. Handing those an empty frame would delete the
+// subject of the edit. That asymmetry is the whole point of the flag — do not
+// "simplify" it into one behaviour.
+// `_justEnsuredKeyframeAt` (2026-08-16, Cyril: "si j'avance le curseur de
+// temps sur une autre keyframe et que je dessine cela ramène l'outpoint à la
+// frame sur laquelle j'ai dessiner"): promoting a held frame past the
+// layer's trim range starts it BLANK (see the big comment above on `blank`)
+// — for one moment `curF.strokes` really is `[]`. saveActiveLayerFrame's own
+// trim-range guard (app.js) was silently refusing to persist the draw that
+// follows on a frame outside ld.inPoint/outPoint, so the stroke rendered live
+// but never actually saved — reloading/scrubbing away and back showed the
+// frame blank again, and if the layer's out point was auto-derived (no
+// explicit ld.outPoint), that permanently-blank keyframe became the new
+// "last non-blank frame", visibly snapping the out point back to right where
+// the user had just drawn. Stamping the frame index here lets the very next
+// saveActiveLayerFrame() bypass that guard for THIS one frame only — the
+// guard's real job is stopping a stale/empty live layer from clobbering good
+// stored data during navigation/autosave, not blocking an edit on the frame
+// the user is standing on right now.
+function ensureKeyframe(blank){var ldk=state.layers[state.activeLayerIdx];if(!canEditActiveLayer())return;var curF=ldk.frames[state.currentFrame];if(!curF.isKeyframe&&!curF.isInterpolated){var effStrokes=blank?[]:JSON.parse(JSON.stringify(getEffectiveStrokes(state.activeLayerIdx,state.currentFrame)));curF.isKeyframe=true;curF.strokes=effStrokes;ldk._justEnsuredKeyframeAt=state.currentFrame;loadFrame(state.currentFrame);syncLinkedKeyframeFolder(state.activeLayerIdx,state.currentFrame);}}
 
 // ---- VECTOR FILL ENGINE ----
 // The fill of an area IS just the closed loop formed by the strokes around
@@ -1278,26 +1492,62 @@ function applyShadowBrushTag(p,preferFill){
   p.data.channelTag='shadow';
   if(window.SMShadowBrush){
     var sw=window.SMShadowBrush.activeSwatch();
-    // A vector-brush/tapered-outline path OR a committed Fill Brush shape
-    // (isFillShape — isVectorBrush is deliberately deleted from these right
-    // after commit, see the Fill Brush commit comment just above this
-    // file's fillWallPath-gap fix, but isFillShape stays) represents its
-    // ink via fillColor (strokeColor null); a plain Pen/Draw/Shape path
-    // represents it via strokeColor instead. draw-bridge.js's "fill seul"
-    // ribbon-enclosed branch (Stroke off + Fill on) is a THIRD case — a
-    // plain closed fill path with neither flag set — so callers that know
-    // their path is fill-ink-only despite lacking either flag pass
-    // preferFill explicitly rather than being silently misdetected as a
-    // stroke-ink path. Whichever is the actual ink channel gets the swatch
-    // color; the OTHER is explicitly cleared so nothing stray (e.g. a
-    // leftover state.fillColor) shows through.
-    if(preferFill||p.data.isVectorBrush||p.data.isFillShape){p.fillColor=sw.color;p.strokeColor=null;}
-    else{p.strokeColor=sw.color;p.fillColor=null;}
+    // Shadow Brush is construction ink for the fill solver, never a painted
+    // ribbon. Convert pressure/Fill-Brush outlines back to their centreline
+    // while that centreline still exists, then enforce a visible stroke and
+    // no fill for every producer (Draw, Fill Brush, Pen and Shape).
+    if(p.data.isVectorBrush&&p.data.centerSegments&&p.data.centerSegments.length){
+      var shadowCenter=p.data.centerSegments.map(function(s){return{
+        point:[s.point[0],s.point[1]],
+        handleIn:s.handleIn?[s.handleIn[0],s.handleIn[1]]:[0,0],
+        handleOut:s.handleOut?[s.handleOut[0],s.handleOut[1]]:[0,0],
+      };});
+      p.removeSegments();
+      shadowCenter.forEach(function(s){
+        p.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));
+      });
+      p.closed=false;
+      delete p.data.isVectorBrush;delete p.data.centerSegments;delete p.data.widthProfile;
+    }
+    // preferFill (2026-07 fix): the "Stroke off / Fill on" vector-brush
+    // commit (draw-bridge.js's shadowPreferFill) never had a stroke to
+    // begin with — its ink lives entirely in fillColor. Forcing the
+    // default stroke-only treatment on it silently overrode the user's
+    // explicit Stroke-eye-OFF choice, turning an intended filled patch
+    // into a near-invisible 1px hairline (strokeWidth falling back to
+    // Paper's own Path default since this branch never sets one).
+    // Confirmed live: drawing with vectorBrush+!strokeEnabled+fillEnabled
+    // and Shadow armed produced fillColor:null, strokeColor:<swatch> —
+    // exactly the parameter this function was documented (but never wired)
+    // to prevent.
+    if(preferFill){
+      p.strokeColor=null;
+      p.fillColor=sw.color;
+    }else{
+      p.fillColor=null;
+      p.strokeColor=sw.color;
+      p.strokeWidth=Math.max(1,p.strokeWidth||state.brushSize||3);
+      p.strokeCap='round';p.strokeJoin='round';
+    }
     p.data.shadowSwatchId=sw.id;
   }
 }
 function tagOwner(p){
-  if(!p||!p.data||!state.userProfile)return;
+  if(!p||!p.data)return;
+  // Mask mode (2026-08, AE-style "Mask" — see the mask-feature audit):
+  // every draw-tool commit site (Draw/Pen/Fill Brush/Line/Rect/Ellipse)
+  // already calls tagOwner() right after finalizing the new shape, so
+  // hooking the mask tag in here reaches all of them without touching
+  // each site individually — same reasoning as an AE user drawing a mask
+  // with the Pen/Rect/Ellipse tool while a layer (not a new shape layer)
+  // is the active target. maskModeType picks Add/Subtract/Intersect for
+  // shapes drawn WHILE the toggle is on; changing it later per-shape is
+  // done from the mask's own property row (Properties panel), not here.
+  if(state.maskMode){
+    p.data.isMask=true;
+    p.data.maskMode=state.maskModeType||'add';
+  }
+  if(!state.userProfile)return;
   p.data.ownerId=state.userProfile.id;
   p.data.ownerName=state.userProfile.name;
   // Captured at authorship time, not resolved later — this machine may
@@ -2032,7 +2282,7 @@ function fillMergeSameColor(layer,newFill,allowFillShapeAbsorb){
   var topIdx=Math.max.apply(null,idxs);
   var removedBelow=idxs.filter(function(i){return i<topIdx;}).length;
   newFill.remove();absorbed.forEach(function(c){c.remove();});
-  var parts=insertBooleanResult(layer,Math.min(topIdx-removedBelow,layer.children.length),acc,newFill.fillColor,op);
+  var parts=insertBooleanResult(layer,Math.min(topIdx-removedBelow,layer.children.length),acc,newFill.fillColor,op,null,newFill.data);
   if(mergedSeeds.length){
     parts.forEach(function(part){
       part.data.fillSeeds=mergedSeeds;
@@ -3560,7 +3810,7 @@ function applyFillBrushPlacement(path,layer){
       // into flat Paths at insertion, same as eraseAtPoint/booleanOp, so it
       // isn't silently dropped by saveActiveLayerFrame's `instanceof Path`
       // filter the moment the frame next saves.
-      var islands=insertBooleanResult(layer,Math.min(idx,layer.children.length),united,path.fillColor,path.opacity);
+      var islands=insertBooleanResult(layer,Math.min(idx,layer.children.length),united,path.fillColor,path.opacity,null,target.data);
       return islands[0];
     }
     return path;
@@ -3719,6 +3969,86 @@ function applyTaperToCenterSegments(segs,taperFrac){
 // Rebuilds the visible filled outline of a centerline-driven path from its
 // current data.centerSegments + per-anchor widths. Call after any edit to
 // the centerline (node drag) or after generating an interpolated frame.
+// ---- STROKE PROFILES (Sander van Dijk 6.2 "Taper Shape Layer Strokes",
+// 6.3 "Stroke Gradients", 2026-07-26) ----------------------------------
+// AE can only stroke a path at ONE width, so he asks for tapering and for
+// gradients that run ALONG a stroke rather than across it. Nemo already has
+// both capabilities — they are what the pressure brush is made of: a
+// centreline (data.centerSegments, each anchor carrying its own width) that
+// rebuildVectorBrushOutline turns into a FILLED ribbon. What was missing is
+// a way to put an existing path into that machinery after the fact.
+//
+// So 6.2 is a conversion, and 6.3 comes free with it: once the stroke is a
+// filled outline, the gradient system that already paints fills paints it
+// along the ribbon, with no renderer change at all.
+function strokeProfileWidthFn(kind, base) {
+  var floor = taperFloorWidth();
+  var span = Math.max(0, base - floor);
+  switch (kind) {
+    // Ramp lengths differ on purpose: a single-ended taper reads better
+    // over a longer run, a double-ended one has to leave a body in between.
+    case 'taper-in':   return function (t) { return floor + span * Math.min(1, t / 0.35); };
+    case 'taper-out':  return function (t) { return floor + span * Math.min(1, (1 - t) / 0.35); };
+    case 'taper-both': return function (t) { return taperWidthAtFrac(t, base, 0.18); };
+    case 'bulge':      return function (t) { return floor + span * Math.sin(Math.PI * Math.min(1, Math.max(0, t))); };
+    case 'even':       return function () { return base; };
+    default:           return function () { return base; };
+  }
+}
+// Applies a width profile to ONE path, in place. In place matters: the path
+// keeps its identity, so strokeId (tween matching), groupId, channelTag,
+// ownerId, its z-order and every other data.* tag survive untouched — the
+// exact "new item type handled in one reader but not the others" risk
+// CLAUDE.md §1 warns about, avoided by never creating a new item.
+function applyStrokeProfileToPath(path, kind, baseOverride) {
+  if (!path || !(path instanceof Path)) return false; // CompoundPath: no single centreline
+  if (!path.segments || path.segments.length < 2) return false;
+  var already = !!(path.data && path.data.isVectorBrush && path.data.centerSegments && path.data.centerSegments.length > 1);
+  var base = baseOverride || (already ? (path.data.profileBase || state.brushSize) : (path.strokeWidth || state.brushSize));
+  var fn = strokeProfileWidthFn(kind, base);
+  // The profile has to go into the DENSE widthProfile, not only into the
+  // per-anchor widths. rebuildVectorBrushOutline interpolates linearly
+  // BETWEEN anchors, so on a 2-anchor path (a straight line drawn with the
+  // Line tool — the most obvious thing to taper) a taper-both would set both
+  // ends to the floor width and the interpolation would make the whole
+  // stroke a hairline: the taper is not just invisible, it eats the stroke.
+  // Measured before this fix: widths [0.6, 0.6] for a base of 3, and `bulge`
+  // came out identical to `taper-both`.
+  function denseProfile(f) {
+    var out = [], N = 64;
+    for (var i = 0; i <= N; i++) { var t = i / N; out.push({ t: t, width: f(t) }); }
+    return out;
+  }
+  if (already) {
+    // Re-profile the EXISTING centreline. Re-deriving it from path.segments
+    // would be wrong: those are the outline by now, not the centreline.
+    var cs = path.data.centerSegments;
+    var lens = [0];
+    for (var i = 1; i < cs.length; i++) lens.push(lens[i - 1] + new Point(cs[i].point).getDistance(new Point(cs[i - 1].point)));
+    var total = lens[lens.length - 1] || 1;
+    cs.forEach(function (sg, i2) { sg.width = fn(lens[i2] / total); });
+    path.data.widthProfile = denseProfile(fn);
+  } else {
+    var ink = path.strokeColor || path.fillColor;
+    if (!ink) return false; // nothing to paint the ribbon with
+    // buildCenterSegmentsFromPath always writes a numeric .width — several
+    // readers (scaleCenterSegments, setBrushSize, resample) index .width
+    // with no default and would produce NaN geometry without it.
+    path.data.centerSegments = buildCenterSegmentsFromPath(path, fn);
+    path.data.widthProfile = denseProfile(fn);
+    path.data.isVectorBrush = true;
+    // The ribbon is FILLED. serP forces strokeColor to null for any
+    // isVectorBrush item and desP nulls the fill when it is falsy, so an
+    // ink left in strokeColor would come back invisible after one
+    // save/reload — the failure is delayed, which is what makes it nasty.
+    path.fillColor = ink;
+    path.strokeColor = null;
+  }
+  path.data.profileBase = base;
+  path.data.strokeProfile = kind;
+  rebuildVectorBrushOutline(path); // synchronous: nothing else ever calls it
+  return true;
+}
 function rebuildVectorBrushOutline(path){
   var cs=path.data&&path.data.centerSegments;
   if(!cs||cs.length<2)return;
@@ -3800,6 +4130,7 @@ function rebuildVectorBrushOutline(path){
 // as plain [x,y] arrays, while normal Path.segments use real Paper Points —
 // these accessors paper over that so the conversion logic itself doesn't care.
 function _ptGet(isVB,seg){return isVB?new Point(seg.point[0],seg.point[1]):seg.point;}
+function _ptSet(isVB,seg,pt){if(isVB)seg.point=[pt.x,pt.y];else seg.point=pt;}
 function _ptHandleIn(isVB,seg){return isVB?new Point(seg.handleIn?seg.handleIn[0]:0,seg.handleIn?seg.handleIn[1]:0):seg.handleIn;}
 function _ptHandleOut(isVB,seg){return isVB?new Point(seg.handleOut?seg.handleOut[0]:0,seg.handleOut?seg.handleOut[1]:0):seg.handleOut;}
 function _ptSetHandleIn(isVB,seg,pt){if(isVB)seg.handleIn=[pt.x,pt.y];else seg.handleIn=pt;}
@@ -3853,8 +4184,33 @@ function _pathToPolygonInput(path){
   return{exterior:exterior,holes:[]};
 }
 function _polygonsToPaperItem(polys){
+  // Degenerate-polygon guard (2026-07-30 fix, QA sweep: erasing through a
+  // unite()'d shape in a way that splits it into islands could leave a
+  // fully-inserted, data-tagged 0-segment/0-area Path in the live layer —
+  // indistinguishable from a real stroke by its data.* tags alone). A
+  // polygon with fewer than 3 points can't have any area at all; the WASM
+  // boolean-clipper occasionally emits one of these as a spurious extra
+  // "island" alongside the real result. buildLoop() below has no guard for
+  // an empty point array (its moveTo/lineTo forEach just does nothing on
+  // zero points, silently producing a closed-but-empty Path), and every
+  // downstream caller (flattenBooleanResult's no-holes branch, in
+  // particular) returns whatever it's given with no further filter — so
+  // this is the one chokepoint that guards booleanOp AND eraseAtPoint's
+  // WASM path at once (both call this function).
+  polys=polys.filter(function(p){return p.exterior&&p.exterior.length>=3;});
   if(!polys.length)return null;
-  function buildLoop(pts){var p=new Path();pts.forEach(function(pt,i){var pp=new Point(pt[0],pt[1]);if(i===0)p.moveTo(pp);else p.lineTo(pp);});p.closed=true;return p;}
+  // {insert:false} (2026-07-29 fix): every OTHER caller in this file builds
+  // scratch geometry this way by convention (CLAUDE.md's own "insert:false
+  // by convention" note) — this one didn't, so a single-polygon result (no
+  // CompoundPath wrapper, the plain "two shapes merge into one seamless
+  // outline" case) silently landed in whatever layer happened to be Paper's
+  // globally active one at call time. Destructive callers (booleanOp/
+  // eraseAtPoint, via insertBooleanResult's layer.insertChild) never
+  // noticed — insertChild reparents unconditionally regardless of where an
+  // item started. The NEW non-destructive combine-group path
+  // (computeGroupCombine) never reparents by design, so this was leaking a
+  // real, permanent stray Path into the document on every single render.
+  function buildLoop(pts){var p=new Path({insert:false});pts.forEach(function(pt,i){var pp=new Point(pt[0],pt[1]);if(i===0)p.moveTo(pp);else p.lineTo(pp);});p.closed=true;return p;}
   if(polys.length===1&&!polys[0].holes.length)return buildLoop(polys[0].exterior);
   var cp=new CompoundPath({insert:false});
   polys.forEach(function(poly){
@@ -3874,60 +4230,171 @@ function _polygonsToPaperItem(polys){
   });
   return cp;
 }
-function _polyArea(poly){
-  var pts=poly.exterior,a=0,n=pts.length;
-  for(var i=0;i<n;i++){var j=(i+1)%n;a+=pts[i][0]*pts[j][1]-pts[j][0]*pts[i][1];}
-  return Math.abs(a)/2;
-}
 function booleanOpWasm(op,paths){
-  var accumulator=_pathToPolygonInput(paths[0]);
-  var finalPolys=[accumulator];
+  // The accumulator is the FULL set of polygons produced so far (a
+  // MultiPolygon), not just one piece — folding in a 3rd+ operand used to
+  // collapse the accumulator to its single largest-by-area polygon between
+  // folds, which silently dropped every other already-accumulated disjoint
+  // piece (uniting 3 mutually non-overlapping shapes lost the middle one).
+  // boolean_op_multi (Rust) accepts a MultiPolygon on the 'a' side so every
+  // prior piece stays in play for each subsequent fold.
+  var accumulator=[_pathToPolygonInput(paths[0])];
+  var finalPolys=accumulator;
   for(var i=1;i<paths.length;i++){
     var b=_pathToPolygonInput(paths[i]);
-    var json=window.GeometryWasm.boolean_op(op,JSON.stringify(accumulator),JSON.stringify(b));
+    var json=window.GeometryWasm.boolean_op_multi(op,JSON.stringify(accumulator),JSON.stringify(b));
     var polys=JSON.parse(json);
     if(!polys.length)return null;
-    // Exclude/subtract can legitimately produce several disjoint polygons
-    // (e.g. two crescents from an XOR) — every one of them belongs in the
-    // final result. Only the accumulator carried into the NEXT fold (for a
-    // 3rd+ operand) collapses to the single largest-by-area polygon, since
-    // that's a reasonable simplification and matches how the plain-2-shape
-    // case (the common one) behaves either way.
     finalPolys=polys;
-    polys=polys.slice().sort(function(x,y){return _polyArea(y)-_polyArea(x);});
-    accumulator=polys[0];
+    accumulator=polys;
   }
   return _polygonsToPaperItem(finalPolys);
+}
+// A vector-brush ribbon drawn with Fill enabled is really TWO Paper.js
+// items — the pressure ribbon itself (selectable, data.linkedFillId) and
+// its filled backdrop (data.isLinkedFillCompanion, excluded from selection
+// everywhere by isSelectablePathChild, app.js:423). Mirrors
+// relinkLinkedFills' own lookup-by-id (app.js:752) rather than trusting
+// the live data.linkedFill reference alone — cheap, and correct even if a
+// relink somehow hasn't run yet this session.
+function findLinkedFillCompanion(layer,ribbon){
+  var lid=ribbon.data&&ribbon.data.linkedFillId;
+  if(!lid)return null;
+  var live=ribbon.data.linkedFill;
+  if(live&&!live.removed&&live.data&&live.data.linkedFillId===lid)return live;
+  var found=null;
+  layer.children.forEach(function(c){
+    if(found||c===ribbon)return;
+    if(c.data&&c.data.isLinkedFillCompanion&&c.data.linkedFillId===lid)found=c;
+  });
+  return found;
+}
+// Non-destructive combine groups (2026-07-29) reuse this exact fold — see
+// computeGroupCombine below — so the companion-union pre-step and the WASM/
+// Paper.js fold itself are hoisted out, unchanged, rather than duplicated.
+// Returns the raw fold result (may be a CompoundPath) plus every real linked-
+// fill companion that was unioned in transiently — the CALLER decides whether
+// to remove those (destructive booleanOp does; the non-destructive combine
+// path never does, since nothing is being destroyed there).
+function foldBooleanOp(op,paths,layer){
+  // A vector-brush ribbon drawn with Fill enabled is really TWO Paper.js
+  // items covering DIFFERENT parts of what the user sees as one shape —
+  // the ribbon is the tapered outline RING alone (fillColor = ink), the
+  // companion is the enclosed INTERIOR alone (fillColor = fill, its
+  // geometry pinned to the ribbon's own centerline by
+  // rebuildVectorBrushOutline). Booleans used to run on the ribbon only,
+  // so a subtract of two filled blobs correctly notched the thin border
+  // ring but left BOTH interior fills completely untouched underneath —
+  // which reads exactly like "n'a plus l'air de marcher sur des formes
+  // select" (2026-07-28): the part of the shape the user actually looks at
+  // never changes. The real per-shape operand is ring ∪ interior — union
+  // them first so `op` sees the WHOLE visible shape. (For an OPEN stroke
+  // the companion is a degenerate zero-area centerline loop — see
+  // draw-bridge.js's commitStroke — so the union is just the ribbon again,
+  // same as before.)
+  var extraRemovals=[];
+  var operands=paths.map(function(p){
+    // Stroke-only operand (2026-07-29 fix, QA-confirmed live: combining two
+    // brush strokes drawn with Fill OFF produced invisible slivers at wrong
+    // positions) — Paper.js's own .unite()/.subtract()/etc. work on FILL
+    // geometry only; a path with no fillColor has none, so the boolean ran
+    // on the bare (often OPEN, auto-closed-by-a-straight-line-for-the-
+    // computation) centerline instead of the actual rendered stroke ribbon,
+    // producing geometry with no visible relationship to what's on screen
+    // (confirmed: bounds landed outside the strokes' own area, and the
+    // result inherited fillColor:null/strokeColor:null — fully invisible).
+    // Same fix already used by the vector eraser for the identical problem
+    // (eraseExpandStrokeToFill, this file) — expand the stroke into its own
+    // real filled ribbon shape first, so the boolean sees what you actually
+    // drew. A vector-brush ribbon or anything with a fill already skips this
+    // (fillColor set) and is untouched.
+    if(!p.fillColor&&p.strokeColor){
+      var expanded=eraseExpandStrokeToFill(p);
+      if(expanded)p=expanded;
+    }
+    var companion=findLinkedFillCompanion(layer,p);
+    if(!companion)return p;
+    extraRemovals.push(companion);
+    try{return p.unite(companion,{insert:false})||p;}
+    catch(e){return p;}
+  });
+  var result=null;
+  if(window.GeometryWasm&&window.GeometryWasm.ready){
+    try{result=booleanOpWasm(op,operands);}
+    catch(e){console.warn('[geometry-wasm] boolean op failed, falling back to Paper.js',e);result=null;}
+  }
+  if(!result){
+    result=operands[0];
+    for(var i=1;i<operands.length;i++){
+      var r=result[op](operands[i],{insert:false});
+      if(result!==operands[0])result.remove();
+      result=r;
+    }
+  }
+  return{result:result,companions:extraRemovals};
 }
 function booleanOp(op){
   if(selectedPaths.length<2){showToast('Sélectionnez au moins 2 formes');return;}
   pushUndo();
   var paths=selectedPaths.slice();
-  var result=null;
-  if(window.GeometryWasm&&window.GeometryWasm.ready){
-    try{result=booleanOpWasm(op,paths);}
-    catch(e){console.warn('[geometry-wasm] boolean op failed, falling back to Paper.js',e);result=null;}
-  }
-  if(!result){
-    result=paths[0];
-    for(var i=1;i<paths.length;i++){
-      var r=result[op](paths[i],{insert:false});
-      if(result!==paths[0])result.remove();
-      result=r;
-    }
-  }
+  var boolLayer=userLayers[state.activeLayerIdx];
+  var folded=foldBooleanOp(op,paths,boolLayer);
+  var result=folded.result;
   var style=paths[paths.length-1];
   result.strokeColor=style.strokeColor;result.strokeWidth=style.strokeWidth;
   result.strokeCap=style.strokeCap;result.strokeJoin=style.strokeJoin;
-  result.fillColor=style.fillColor;result.opacity=style.opacity;
-  var boolLayer=userLayers[state.activeLayerIdx];
+  // Stroke-only style source (2026-07-29 fix, same one as foldBooleanOp's
+  // own eraseExpandStrokeToFill call above) — insertBooleanResult below
+  // ALWAYS drops the stroke on its islands (its own strokeInfo arg is
+  // hardcoded null a few lines down, an existing, unrelated boolean-tool
+  // behavior: every result is fill-only regardless of source) and only ever
+  // applies the fillColor it's given. A stroke-only source's fillColor is
+  // null, so the visible result used to be fillColor:null AND
+  // strokeColor:null — completely invisible. The geometry is now the
+  // EXPANDED FILLED RIBBON (foldBooleanOp), so falling back to the source's
+  // own strokeColor here paints that ribbon the same ink color the original
+  // strokes had — the closest this tool's fill-only result model can get to
+  // "what a merged stroke looks like".
+  // Visual-fill style source (2026-07-30 fix, Cyril: "combined shape avec
+  // des shape de brush avec stroke et fill") — a vector-brush ribbon drawn
+  // with Fill enabled has its OWN fillColor set to the ink/Stroke color
+  // (see foldBooleanOp's header comment above); the color/gradient the
+  // user actually SEES as the shape's fill lives on its separate
+  // linked-fill companion (findLinkedFillCompanion) — never independently
+  // selectable, so it never lands in `style` on its own. Reading
+  // style.fillColor alone silently replaced a filled brush shape's
+  // visible fill with its thin ink outline's color instead. Same "whole
+  // visible shape, not just the ribbon" reasoning foldBooleanOp already
+  // applies to the GEOMETRY a few lines up — apply it to the STYLE too.
+  var styleCompanion=findLinkedFillCompanion(boolLayer,style);
+  var fillSource=styleCompanion||style;
+  var resultFill=fillSource.fillColor||style.strokeColor;
+  result.fillColor=resultFill;result.opacity=style.opacity;
   // subtract/exclude routinely produce a CompoundPath (disjoint remainders,
   // or a hole) — split into flat Paths at insertion, same as eraseAtPoint,
   // so it isn't silently dropped by saveActiveLayerFrame's `instanceof
   // Path` filter (or selection/click-to-pick) the moment the frame saves.
-  var islands=insertBooleanResult(boolLayer,boolLayer.children.length,result,style.fillColor,style.opacity);
+  // Same fillSource as resultFill above (the companion when the
+  // last-selected path has one, otherwise the path itself) — so the
+  // merged shape keeps ONE coherent identity, including its fillGradient
+  // (BOOL_KEEP_DATA_ALL) if the companion carried one, rather than an
+  // arbitrary mix of the operands'. carryBooleanData (below) never copies
+  // linkedFillId/isLinkedFillCompanion/linkedFill itself — see
+  // BOOL_KEEP_DATA_FIRST's own comment for why carrying those forward onto
+  // a merged, no-longer-a-ribbon result was the actual bug.
+  // A destructive merge also ends any non-destructive combine-group
+  // membership the SOURCE shapes had (2026-07-29): they're about to be
+  // .remove()'d, so leave no dangling ld.groups[gid].order reference to a
+  // strokeId that no longer exists on any live path.
+  if(window.SMGroup&&SMGroup.removeMemberFromGroup)paths.forEach(function(p){if(p.data&&p.data.groupId)SMGroup.removeMemberFromGroup(p,state.layers[state.activeLayerIdx],boolLayer,{skipUndo:true,silent:true});});
+  var islands=insertBooleanResult(boolLayer,boolLayer.children.length,result,resultFill,style.opacity,null,fillSource.data);
   paths.forEach(function(p){p.remove();});
+  folded.companions.forEach(function(c){if(!c.removed)c.remove();});
   selectedPaths=islands;state.selectedStrokeIndices=[];
+  // Unrelated paint-bucket fills (data.fillSeed/fillSeeds — a totally
+  // different "linked" system, see fillRegenerateLinked's own header
+  // comment) may have used one of the booleaned shapes as a wall; keep
+  // re-tracing those, same as before this fix.
   fillRegenerateLinked(boolLayer,islands[0]);
   saveActiveLayerFrame();updateUI();showToast('Opération booléenne appliquée');
 }
@@ -4013,6 +4480,11 @@ function eraseAtPoint(path,worldPt,radius,fromPt){
   // fillColor already IS the visible ink, strokeColor is never the real
   // border there).
   var origStrokeInfo=(!isVB&&path.strokeColor)?{color:path.strokeColor,width:path.strokeWidth,cap:path.strokeCap,join:path.strokeJoin}:null;
+  // Captured here for the same reason as origStrokeInfo: the ribbon-expansion
+  // branch below can replace `path` with a `combined` clone that carries no
+  // .data at all. See insertBooleanResult's BOOL_KEEP_DATA_* comment for what
+  // survives an erase and what deliberately doesn't.
+  var origData=path.data;
   // eraseExpandStrokeToFill/buildVariableWidthPath builds a ribbon by
   // flattening the path into a plain point SEQUENCE and sweeping a width
   // along it — built for an OPEN stroke's centerline, with no concept of
@@ -4124,7 +4596,7 @@ function eraseAtPoint(path,worldPt,radius,fromPt){
     // silhouette is left (origStrokeInfo, captured above before any
     // ribbon-expansion), rather than silently losing its border on the
     // first touch ("l'eraser supprime le stroke entier", 2026-07).
-    insertBooleanResult(layer,Math.min(tIdx,layer.children.length),result,col,op,origStrokeInfo);
+    insertBooleanResult(layer,Math.min(tIdx,layer.children.length),result,col,op,origStrokeInfo,origData);
   }else if(result)result.remove();
 }
 // Inserts the result of a Paper.js/WASM boolean op (subtract/unite/
@@ -4311,24 +4783,66 @@ function _eraseDegenerateSelfLoops(path){
 // (can't preserve a tapered centerline through an arbitrary bite, but a
 // plain outline at the same width/color is the closest visual match) —
 // every other caller omits it and keeps the old strokeColor=null default.
-function insertBooleanResult(layer,insertAt,result,fillColor,opacity,strokeInfo){
-  function applyStroke(isl){
-    if(strokeInfo&&strokeInfo.color){isl.strokeColor=strokeInfo.color;isl.strokeWidth=strokeInfo.width;isl.strokeCap=strokeInfo.cap;isl.strokeJoin=strokeInfo.join;}
-    else isl.strokeColor=null;
-  }
+// Identity/ownership metadata a boolean op must NOT silently drop (2026-07-26,
+// found by erasing a corner off a grouped square: the bitten square came back
+// with data === {} and had quietly left its own group). A boolean op replaces
+// the source Path object entirely, and nothing here used to carry ANY of its
+// .data across — so one eraser touch reset the shape's identity:
+//   strokeId    → per-element Motion animation keyed to it is orphaned
+//   groupId     → the shape drops out of its group, half the group left behind
+//   owner*      → collaboration attribution stripped
+//   linkedFillId→ the companion fill keeps pointing at an id no path carries
+//   effects     → per-stroke effects list lost
+// GEOMETRY tags are deliberately NOT in this list — isVectorBrush /
+// centerSegments / widthProfile / strokeProfile / fillSeed* / brushTexture*
+// all describe how to REBUILD the outline, and a notched outline no longer
+// has a valid centerline to rebuild from (see eraseAtPoint's own comment on
+// origStrokeInfo — that tradeoff is intentional and predates this).
+var BOOL_KEEP_DATA_ALL=['groupId','ownerId','ownerName','ownerColor','channelTag','shadowSwatchId','tweenOn','boxAngle','xformAnchorKey','xformAnchorCustom','effects','fillGradient'];
+// Keys that must stay UNIQUE across the layer: strokeId is a lookup map key
+// (motion.js:1413 scans for the first data.strokeId match), so copying it
+// onto every island of a split would make all but one unreachable. The
+// first island inherits the identity; the extra islands are genuinely new
+// shapes and get their OWN fresh id, so they stay individually addressable
+// by per-element Motion instead of persisting with strokeId:null (nothing
+// else mints one on save — app.js:1479 only does so inside
+// mergeLayersIntoOne).
+//
+// linkedFillId/isLinkedFillCompanion deliberately NOT here (2026-07-28,
+// "boolean ops don't work on selected shapes anymore" — found live: a
+// vector-brush ribbon's fill backdrop is a SEPARATE, non-selectable Paper
+// item (isSelectablePathChild, app.js:423), so a boolean op's own operands
+// were always the ribbon's thin outline RING alone — the op notched the
+// ring correctly but the companion's INTERIOR fill (what the user actually
+// looks at) sat completely untouched underneath, unremoved. Carrying
+// linkedFillId/isLinkedFillCompanion forward here then re-declared "I still
+// have a companion" on the merged result, pointing at that now-orphaned,
+// geometrically stale interior. booleanOp() below unions each ribbon with
+// its companion BEFORE running the op (so the op sees the whole visible
+// shape) and removes both halves of every such pair afterward, so the
+// boolean result is a plain new shape — not a stroke/fill pair anymore (a
+// union/subtract of two differently-colored ribbons isn't itself a
+// coherent pressure stroke to preserve the link for).
+var BOOL_KEEP_DATA_FIRST=['strokeId'];
+function carryBooleanData(isl,srcData,isFirst){
+  if(!srcData)return;
+  BOOL_KEEP_DATA_ALL.forEach(function(k){if(srcData[k]!==undefined)isl.data[k]=srcData[k];});
+  if(isFirst)BOOL_KEEP_DATA_FIRST.forEach(function(k){if(srcData[k]!==undefined)isl.data[k]=srcData[k];});
+  else if(srcData.strokeId)ensureStrokeId(isl);
+}
+// Splits a raw boolean-fold result (possibly a CompoundPath with disjoint
+// islands and/or holes) into detached, UNSTYLED flat Paths — never inserted
+// into any layer. Non-destructive combine-groups (computeGroupCombine below)
+// use this directly on a transient fold they never insert anywhere;
+// insertBooleanResult (destructive booleanOp/flattenGroup) wraps it with
+// styling + real layer insertion. Hoisted out unchanged from what used to be
+// inline in insertBooleanResult — see that function's own history for why
+// hole-merging/degenerate-loop cleanup work the way they do.
+function flattenBooleanResult(result){
   if(!(result instanceof CompoundPath)){
-    // Every OTHER branch below applies fillColor/opacity/strokeColor=null
-    // to its island(s) — this simplest one (the op produced one seamless
-    // Path, no holes or islands at all, e.g. two same-color fills merging
-    // into a single continuous outline) forgot to, silently inserting
-    // `result` with whatever style it happened to inherit from Paper's own
-    // unite()/etc (typically nothing — confirmed live: fillColor came back
-    // null even though a color was explicitly passed in).
+    // The op produced one seamless Path, no holes or islands at all (e.g.
+    // two same-color fills merging into a single continuous outline).
     _eraseDegenerateSelfLoops(result);
-    if(fillColor!==undefined)result.fillColor=fillColor;
-    applyStroke(result);
-    if(opacity!==undefined)result.opacity=opacity;
-    layer.insertChild(insertAt,result);
     return[result];
   }
   var children=result.children.slice();
@@ -4338,17 +4852,10 @@ function insertBooleanResult(layer,insertAt,result,fillColor,opacity,strokeInfo)
   var exteriors=children.filter(function(c){return c.clockwise;});
   var holes=children.filter(function(c){return !c.clockwise;});
   // No holes at all (plain multi-island result, e.g. an eraser stroke that
-  // split a shape in two) — unchanged prior behavior, one flat Path per
-  // island, nothing to merge.
+  // split a shape in two) — one flat Path per island, nothing to merge.
   if(!holes.length){
     var flat=exteriors.length?exteriors:children;
     flat.forEach(function(isl){isl.remove();});
-    flat.forEach(function(isl,k){
-      if(fillColor!==undefined)isl.fillColor=fillColor;
-      applyStroke(isl);
-      if(opacity!==undefined)isl.opacity=opacity;
-      layer.insertChild(insertAt+k,isl);
-    });
     result.remove();
     return flat;
   }
@@ -4381,14 +4888,35 @@ function insertBooleanResult(layer,insertAt,result,fillColor,opacity,strokeInfo)
     _eraseDegenerateSelfLoops(merged);
     return merged;
   });
-  islands.forEach(function(isl,k){
+  result.remove();
+  return islands;
+}
+// Non-destructive combine-group core (2026-07-29): given N live/transient
+// Paths and a mode, returns the combined result as detached flat Paths —
+// NEVER removes or mutates the sources, and never inserts anything into a
+// layer. Reuses foldBooleanOp/flattenBooleanResult verbatim — the same
+// hard-won correctness work (vector-brush companion pre-union, hole-merging,
+// degenerate-loop cleanup) the destructive tool already has, with zero
+// duplicated boolean-op logic (CLAUDE.md §3: don't duplicate a matcher/loop).
+function computeGroupCombine(paths,mode,layer){
+  if(paths.length<2)return paths.slice();
+  var folded=foldBooleanOp(mode,paths,layer);
+  return flattenBooleanResult(folded.result);
+}
+function insertBooleanResult(layer,insertAt,result,fillColor,opacity,strokeInfo,srcData){
+  function applyStroke(isl){
+    if(strokeInfo&&strokeInfo.color){isl.strokeColor=strokeInfo.color;isl.strokeWidth=strokeInfo.width;isl.strokeCap=strokeInfo.cap;isl.strokeJoin=strokeInfo.join;}
+    else isl.strokeColor=null;
+  }
+  var flat=flattenBooleanResult(result);
+  flat.forEach(function(isl,k){
     if(fillColor!==undefined)isl.fillColor=fillColor;
     applyStroke(isl);
     if(opacity!==undefined)isl.opacity=opacity;
+    carryBooleanData(isl,srcData,k===0);
     layer.insertChild(insertAt+k,isl);
   });
-  result.remove();
-  return islands;
+  return flat;
 }
 
 // ---- PRESSURE-SIMULATED VECTOR BRUSH ----
@@ -4548,11 +5076,11 @@ function onMouseDown(event){
   if(state.appMode==='motion'&&window.SMMotion&&SMMotion.onDown(event))return;
   var layer=userLayers[state.activeLayerIdx];
   if(state.tool==='draw'){
-    if(state.layers[state.activeLayerIdx].locked)return;
+    if(!canEditActiveLayer())return;
     // Same both-eyes-off guard as draw-bridge.js's commitStroke — never
     // commit fully invisible ink.
     if(!state.strokeEnabled&&!state.fillEnabled){showToast('Stroke et Fill désactivés — rien à dessiner');return;}
-    pushUndo();ensureKeyframe();layer.activate();
+    pushUndo();ensureKeyframe(true);layer.activate();
     if(state.vectorBrush){
       _vbLastPenPressure=null;_vbResetPressureFilter();stabQueue=[event.point.clone()];_vb.pts=[event.point.clone()];_vb.widths=[vbPressureOf(event)];_vb.lastT=Date.now();_vb.lastPt=event.point.clone();
       currentPath=new Path();currentPath.fillColor=state.strokeEnabled?state.strokeColor:state.fillColor;currentPath.strokeColor=null;currentPath.opacity=state.opacity/100;
@@ -4567,13 +5095,13 @@ function onMouseDown(event){
     }
     currentPath.add(event.point);stabQueue=[event.point.clone()];
   }else if(state.tool==='pen'){
-    if(state.layers[state.activeLayerIdx].locked)return;
+    if(!canEditActiveLayer())return;
     var now=Date.now();
     var isDoubleClick=_pen.path&&(now-_pen.lastClickTime<350)&&_pen.lastClickPt&&event.point.getDistance(_pen.lastClickPt)<10/view.zoom;
     _pen.lastClickTime=now;_pen.lastClickPt=event.point.clone();
     if(isDoubleClick){finalizePen();return;}
     if(!_pen.path){
-      pushUndo();ensureKeyframe();layer.activate();
+      pushUndo();ensureKeyframe(true);layer.activate();
       _pen.path=new Path();_pen.path.strokeColor=state.strokeColor;_pen.path.strokeWidth=state.brushSize;
       _pen.path.strokeCap=state.strokeCap;_pen.path.strokeJoin=state.strokeJoin;_pen.path.fillColor=null;_pen.path.opacity=state.opacity/100;
       applyStrokeStyle(_pen.path);
@@ -4604,7 +5132,7 @@ function onMouseDown(event){
     }
     _pen.draggingHandle=true;
   }else if(state.tool==='line'||state.tool==='rect'||state.tool==='ellipse'){
-    if(state.layers[state.activeLayerIdx].locked)return;pushUndo();ensureKeyframe();layer.activate();shapeStart=event.point.clone();
+    if(!canEditActiveLayer())return;pushUndo();ensureKeyframe(true);layer.activate();shapeStart=event.point.clone();
     if(state.tool==='line')currentPath=new Path.Line({from:event.point,to:event.point,strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,strokeCap:state.strokeCap,fillColor:null,opacity:state.opacity/100});
     else if(state.tool==='rect')currentPath=new Path.Rectangle({from:event.point,to:event.point.add(new Point(1,1)),strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,fillColor:state.fillEnabled?state.fillColor:null,opacity:state.opacity/100});
     else currentPath=new Path.Ellipse({rectangle:new Rectangle(event.point,new Size(1,1)),strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,fillColor:state.fillEnabled?state.fillColor:null,opacity:state.opacity/100});
@@ -4614,6 +5142,7 @@ function onMouseDown(event){
     if(bestNh){
       pushUndo();
       _nodeDrag.active=true;_nodeDrag.path=selectedPaths[0];_nodeDrag.segIndex=bestNh.segIndex;
+      _nodeDrag.dragStartPointer=event.point.clone();_nodeDrag.appliedDelta=new Point(0,0);
       // grabbing one of several marquee-selected anchors drags them all
       if(bestNh.type==='point'&&_nodeSel.indexOf(bestNh.segIndex)>=0&&_nodeSel.length>1){_nodeDrag.type='group';}
       else{
@@ -4623,6 +5152,22 @@ function onMouseDown(event){
       return;
     }
     var subHit=layer.hitTest(event.point,{stroke:true,fill:true,pixel:true,tolerance:8/view.zoom});
+    // Isolation entered by a Select double-click: only the isolated shape
+    // (or its group) is reachable, and clicking anywhere else leaves rather
+    // than selecting something new — same contract fsselect had, kept so
+    // the gesture behaves identically now that it enters subselect instead.
+    if(_fsIsolation&&subHit){
+      var subAllowed=_fsIsolation.groupId
+        ? !!(subHit.item.data&&subHit.item.data.groupId===_fsIsolation.groupId)
+        : subHit.item===_fsIsolation.path;
+      if(!subAllowed)subHit=null;
+    }
+    if(!subHit&&_fsIsolation){
+      _fsIsolation=null;clearSel();window.SM.setTool('select');
+      renderArcs();updateUI();
+      if(window.SMEngineBridge)SMEngineBridge.renderNow();
+      return;
+    }
     // Raster companions resolve to their anchor too (Bitmap Brush v2) —
     // see the same fix's full comment in subselect-bridge.js.
     if(subHit&&(subHit.item instanceof Path||(subHit.item instanceof Raster&&subHit.item.data&&subHit.item.data.isBrushTextureCopy))){
@@ -4651,6 +5196,14 @@ function onMouseDown(event){
   }else if(state.tool==='camera'){
     if(window.SMCamera)SMCamera.onDown(event);
   }else if(state.tool==='text'){
+    // Same edit-refusal gate as draw/pen above — found live: without this,
+    // placing text on a locked/component/duplicator layer let the popover
+    // open and accept typing (looked like it worked), but the layer never
+    // actually gets the item (saveActiveLayerFrame's own guard correctly
+    // refuses it later) — text silently vanishes with no toast telling the
+    // user why, instead of being refused audibly up front like every other
+    // drawing tool.
+    if(!canEditActiveLayer())return;
     // A plain click still opens the point-text popover immediately (see
     // onMouseUp's companion branch — a click-with-no-drag never enters the
     // preview-rectangle path below, matching pre-2026-07 behavior exactly).
@@ -4658,7 +5211,25 @@ function onMouseDown(event){
     // finalized in onMouseUp once the drag distance is known.
     _textDragStart=event.point.clone();
   }else if(state.tool==='fsselect'){
+    var selectedFragment=fsSelectionAtPoint(event.point);
+    if(selectedFragment&&!event.event.shiftKey){
+      pushUndo();
+      var promoted=fsPromoteSelectionForTransform(layer);
+      fsClearSel();_fsIsolation=null;
+      selectedPaths=promoted;
+      state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;});
+      window.SM.setTool('select');
+      _moveDragStarted=true;
+      renderTransformHandles();renderNodeHandles();updateUI();
+      return;
+    }
     var fsHit=fsHitTest(event.point,layer);
+    if(_fsIsolation&&fsHit){
+      var allowed=_fsIsolation.groupId
+        ? !!(fsHit.path.data&&fsHit.path.data.groupId===_fsIsolation.groupId)
+        : fsHit.path===_fsIsolation.path;
+      if(!allowed)fsHit=null;
+    }
     // event.event.shiftKey/altKey (native event), not event.modifiers.shift/alt
     // (Paper.js's own tracking) -- same proven-reliable pattern the Pen tool
     // and Zoom tool already use in this exact file: this app's own global
@@ -4676,6 +5247,11 @@ function onMouseDown(event){
         _fsSel=[fsHit];
       }
     }else{
+      if(_fsIsolation){
+        _fsIsolation=null;fsClearSel();window.SM.setTool('select');updateUI();
+        if(window.SMEngineBridge)SMEngineBridge.renderNow();
+        return;
+      }
       if(!event.event.shiftKey)fsClearSel();
       // Clicked empty canvas: start a rubber-band marquee (Alt held =
       // temporarily flips to/from lasso) — same feedback, "il faudrait les
@@ -4809,7 +5385,7 @@ function onMouseDown(event){
     }
     renderArcs();updateUI();
   }else if(state.tool==='eraser'){
-    if(state.layers[state.activeLayerIdx].locked)return;
+    if(!canEditActiveLayer())return;
     // pushUndo() BEFORE ensureKeyframe(), and unconditionally — see
     // draw-bridge.js's commitStroke comment: one undo must revert both the
     // frame's auto-promotion to keyframe and whatever this gesture erases.
@@ -4839,7 +5415,7 @@ function onMouseDown(event){
       fillRegenerateLinked(layer,erasedItem2);saveActiveLayerFrame();updateUI();
     }
   }else if(state.tool==='fill'){
-    if(state.layers[state.activeLayerIdx].locked)return;
+    if(!canEditActiveLayer())return;
     if(event.event.altKey){
       // Alt+drag: draw a TEMPORARY closing stroke to help the fill engine
       // bridge a region its own crossing/gap detection can't close on its
@@ -4906,7 +5482,7 @@ function onMouseDown(event){
     fillMergeSameColor(layer,res.path);
     saveActiveLayerFrame();updateUI();showToast('Fill appliqué');
   }else if(state.tool==='fillbrush'){
-    if(state.layers[state.activeLayerIdx].locked)return;pushUndo();ensureKeyframe();layer.activate();
+    if(!canEditActiveLayer())return;pushUndo();ensureKeyframe();layer.activate();
     _vbLastPenPressure=null;_vb.pts=[event.point.clone()];_vb.widths=[vbPressureOf(event)];_vb.lastT=Date.now();_vb.lastPt=event.point.clone();
     currentPath=new Path();currentPath.fillColor=state.fillColor;currentPath.strokeColor=null;currentPath.opacity=state.opacity/100;
     currentPath.data.isVectorBrush=true;currentPath.data.isFillShape=true;
@@ -4990,6 +5566,19 @@ function onMouseDrag(event){
       prevTxt.activate();
     }
   }else if(state.tool==='subselect'){
+    var nodeEventPoint=event.point,nodeEventDelta=event.delta;
+    if(_nodeDrag.active&&(_nodeDrag.type==='point'||_nodeDrag.type==='group')){
+      var nodeDesired=nodeEventPoint.subtract(_nodeDrag.dragStartPointer||nodeEventPoint.subtract(event.delta));
+      if(event.event.shiftKey){
+        var nodeSnap=constrainAngle45(_nodeDrag.dragStartPointer,nodeEventPoint);
+        nodeDesired=nodeSnap.subtract(_nodeDrag.dragStartPointer);
+      }
+      nodeEventDelta=nodeDesired.subtract(_nodeDrag.appliedDelta||new Point(0,0));
+      _nodeDrag.appliedDelta=nodeDesired;
+    }else if(_nodeDrag.active&&event.event.shiftKey&&(_nodeDrag.type==='handleIn'||_nodeDrag.type==='handleOut')){
+      var nodeHs=nodeEditSegmentsData(_nodeDrag.path)[_nodeDrag.segIndex];
+      if(nodeHs)nodeEventPoint=constrainAngle45(new Point(nodeHs.point[0],nodeHs.point[1]),nodeEventPoint);
+    }
     if(_nmq.active){
       var nx1=Math.min(_nmq.start.x,event.point.x),ny1=Math.min(_nmq.start.y,event.point.y);
       var nx2=Math.max(_nmq.start.x,event.point.x),ny2=Math.max(_nmq.start.y,event.point.y);
@@ -5000,10 +5589,10 @@ function onMouseDrag(event){
     }else if(_nodeDrag.active&&_nodeDrag.type==='group'){
       var gp=_nodeDrag.path;
       if(gp.data&&gp.data.isVectorBrush&&gp.data.centerSegments){
-        _nodeSel.forEach(function(si){var cs3=gp.data.centerSegments[si];if(cs3)cs3.point=[cs3.point[0]+event.delta.x,cs3.point[1]+event.delta.y];});
+        _nodeSel.forEach(function(si){var cs3=gp.data.centerSegments[si];if(cs3)cs3.point=[cs3.point[0]+nodeEventDelta.x,cs3.point[1]+nodeEventDelta.y];});
         rebuildVectorBrushOutline(gp);
       }else{
-        _nodeSel.forEach(function(si){var sg=gp.segments[si];if(sg)sg.point=sg.point.add(event.delta);});
+        _nodeSel.forEach(function(si){var sg=gp.segments[si];if(sg)sg.point=sg.point.add(nodeEventDelta);});
       }
       renderNodeHandles();
       // Live fill follow: without this, a fill linked to this stroke only
@@ -5014,15 +5603,15 @@ function onMouseDrag(event){
       var sdp=_nodeDrag.path;
       if(sdp.data&&sdp.data.isVectorBrush&&sdp.data.centerSegments){
         var scs=sdp.data.centerSegments[_nodeDrag.segIndex];
-        if(_nodeDrag.type==='point'){scs.point=[scs.point[0]+event.delta.x,scs.point[1]+event.delta.y];}
-        else if(_nodeDrag.type==='handleOut'){var sno=[event.point.x-scs.point[0],event.point.y-scs.point[1]];scs.handleOut=sno;if(!event.modifiers.alt)scs.handleIn=[-sno[0],-sno[1]];}
-        else if(_nodeDrag.type==='handleIn'){var sni=[event.point.x-scs.point[0],event.point.y-scs.point[1]];scs.handleIn=sni;if(!event.modifiers.alt)scs.handleOut=[-sni[0],-sni[1]];}
+        if(_nodeDrag.type==='point'){scs.point=[scs.point[0]+nodeEventDelta.x,scs.point[1]+nodeEventDelta.y];}
+        else if(_nodeDrag.type==='handleOut'){var sno=[nodeEventPoint.x-scs.point[0],nodeEventPoint.y-scs.point[1]];scs.handleOut=sno;if(!event.modifiers.alt)scs.handleIn=[-sno[0],-sno[1]];}
+        else if(_nodeDrag.type==='handleIn'){var sni=[nodeEventPoint.x-scs.point[0],nodeEventPoint.y-scs.point[1]];scs.handleIn=sni;if(!event.modifiers.alt)scs.handleOut=[-sni[0],-sni[1]];}
         rebuildVectorBrushOutline(sdp);
       }else{
         var sseg=sdp.segments[_nodeDrag.segIndex];
-        if(_nodeDrag.type==='point')sseg.point=sseg.point.add(event.delta);
-        else if(_nodeDrag.type==='handleOut'){sseg.handleOut=event.point.subtract(sseg.point);if(!event.modifiers.alt)sseg.handleIn=sseg.handleOut.multiply(-1);}
-        else if(_nodeDrag.type==='handleIn'){sseg.handleIn=event.point.subtract(sseg.point);if(!event.modifiers.alt)sseg.handleOut=sseg.handleIn.multiply(-1);}
+        if(_nodeDrag.type==='point')sseg.point=sseg.point.add(nodeEventDelta);
+        else if(_nodeDrag.type==='handleOut'){sseg.handleOut=nodeEventPoint.subtract(sseg.point);if(!event.modifiers.alt)sseg.handleIn=sseg.handleOut.multiply(-1);}
+        else if(_nodeDrag.type==='handleIn'){sseg.handleIn=nodeEventPoint.subtract(sseg.point);if(!event.modifiers.alt)sseg.handleOut=sseg.handleIn.multiply(-1);}
       }
       renderNodeHandles();
       fillRegenerateLinked(userLayers[state.activeLayerIdx],sdp);
@@ -5090,7 +5679,7 @@ function onMouseDrag(event){
     symGestureAccumulate(new Matrix().translate(event.delta));}
   }else if(state.tool==='eraser'){
     eraseUpdateCursor(event);
-    if(state.layers[state.activeLayerIdx].locked)return;
+    if(!canEditActiveLayer())return;
     var layer2e=userLayers[state.activeLayerIdx];
     // A fast mouse/tablet sweep can jump the cursor several eraser-widths
     // between two consecutive drag events — hit-testing only the NEW point
@@ -5158,7 +5747,10 @@ function onMouseUp(event){
         csF.forEach(function(s){currentPath.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));});
         currentPath.closed=true;
         currentPath.fillColor=state.fillColor;currentPath.strokeColor=null;
-        delete currentPath.data.isVectorBrush;
+        if(state.shadowMode){
+          currentPath.data.isVectorBrush=true;
+          currentPath.data.centerSegments=csF;
+        }else delete currentPath.data.isVectorBrush;
       }
       else{
         var rawWidths=_vb.pts.map(function(p,i){return vbWidthFor(_vb.widths[i]);});
@@ -5171,7 +5763,7 @@ function onMouseUp(event){
       _vb.pts=[];_vb.widths=[];
     }else if(currentPath.segments.length<2){
       currentPath.remove();if(state.undoStack.length)state.undoStack.pop();
-    }else if(state.bitmapBrushOn&&state.strokeEnabled&&window.SMBitmapBrush){
+    }else if(!state.shadowMode&&state.bitmapBrushOn&&state.strokeEnabled&&window.SMBitmapBrush){
       // Bitmap Brush's tools.js mirror (v2, 2026-07) — same anchor+
       // companion call as draw-bridge.js's commitStroke: the plain path
       // Paper built during the drag stays as the real, subselect-editable
@@ -5227,9 +5819,6 @@ function onMouseUp(event){
       // for fillMergeSameColor to fuse them into one shape. isFillShape
       // stays (still needed by pen-bridge.js's close-path/endpoint-snap
       // exclusion guard).
-      delete currentPath.data.isVectorBrush;
-      delete currentPath.data.centerSegments;
-      delete currentPath.data.widthProfile;
       if(state.shadowMode){
         // A shadow guide stroke must never auto-merge/unite with whatever
         // real artwork happens to sit underneath it — both
@@ -5240,6 +5829,9 @@ function onMouseUp(event){
         // and both are skipped entirely for this stroke.
         applyShadowBrushTag(currentPath);
       }else{
+        delete currentPath.data.isVectorBrush;
+        delete currentPath.data.centerSegments;
+        delete currentPath.data.widthProfile;
         // Placement (Above/Below/Merge) — see applyFillBrushPlacement's own
         // comment; replaces the old unconditional "always at the back".
         currentPath=applyFillBrushPlacement(currentPath,userLayers[state.activeLayerIdx]);
@@ -5263,7 +5855,10 @@ function onMouseUp(event){
     var textDragWidth=Math.abs(event.point.x-_textDragStart.x);
     if(textDragWidth>20/view.zoom){
       var textTopLeft=new Point(Math.min(_textDragStart.x,event.point.x),Math.min(_textDragStart.y,event.point.y));
-      if(window.openTextPopoverForBox)openTextPopoverForBox(textTopLeft,textDragWidth);
+      // Drag-a-box now types straight on the canvas (AE/Figma-style area
+      // text), no popup — see startInPlaceTextCreation (timeline.js).
+      // Point-click text placement keeps the popover for now.
+      if(window.startInPlaceTextCreation)startInPlaceTextCreation(textTopLeft,textDragWidth);
     }else if(window.openTextPopover)openTextPopover(_textDragStart);
     _textDragStart=null;
   }else if((state.tool==='line'||state.tool==='rect'||state.tool==='ellipse')&&currentPath){
@@ -5295,23 +5890,7 @@ function onMouseUp(event){
         var lassoF=null;
         if(_marquee.lasso&&_marquee.rect.segments.length>2){_marquee.rect.closePath();lassoF=_marquee.rect;}
         var layerF=userLayers[state.activeLayerIdx];
-        layerF.children.forEach(function(c){
-          if(!(c instanceof Path)||c.segments.length===0||!(c.strokeColor||c.fillColor))return;
-          if(!mbf.intersects(c.bounds))return;
-          if(_fsSel.some(function(s){return s.path===c;}))return; // already selected — Shift+lasso over the same shape twice shouldn't duplicate it
-          if(lassoF&&!lassoF.contains(c.position)){
-            if(!lassoF.intersects(c))return;
-            // Same sub-region carving as the raw pointerup listener above
-            // (engine-on path) — see its comment for the full rationale.
-            if(c.fillColor){
-              _fsSel.push({path:c,kind:'fillregion',boolCut:true,cutter:lassoF.clone({insert:false}),inside:true});
-            }else{
-              _fsSel.push({path:c,kind:'stroke',segStart:0,segEnd:c.length,closed:c.closed});
-            }
-            return;
-          }
-          _fsSel.push(c.fillColor?{path:c,kind:'fill'}:{path:c,kind:'stroke',segStart:0,segEnd:c.length,closed:c.closed});
-        });
+        fsResolveRegionSelection(lassoF||_marquee.rect,layerF);
         _marquee.rect.remove();_marquee.rect=null;_marquee.mode=null;
       }
       _marquee.active=false;renderArcs();updateUI();
@@ -5395,6 +5974,20 @@ function onMouseMoveTool(event){
   _pen.previewLine.dashArray=[4/view.zoom,3/view.zoom];
   _pen.previewLine.guide=true;
 }
+// Which group's double-click most recently widened the selection to the
+// whole group (tools.js's own onViewDoubleClick, below) — persistent state,
+// not a click-timing window: a real double-click is itself two clicks, and
+// select-bridge.js's own single-click group-widening (Bug 1 fix, 2026-07-29)
+// already runs on the FIRST of those two clicks — by the time this native
+// dblclick event fires a moment later, the group is ALREADY the full
+// selection, so "is the whole group currently selected" can never
+// distinguish a genuine first double-click from a second one (found live,
+// QA-confirmed: double-clicking a fresh group jumped straight to Subselect
+// instead of staying on Select). This flag is the missing signal: only a
+// double-click on a group that was ALSO the last one explicitly entered
+// this way counts as "the second one" — naturally invalidated the moment
+// the user selects anything else (dblWholeGroupSelected below goes false).
+var _groupEnteredGid=null;
 // Double-click a filled shape to also select the stroke(s) that bound it —
 // matches Animate's "double-click a fill selects its surrounding stroke"
 // convention. There's no stored link between a fill (built by the Fill
@@ -5405,7 +5998,7 @@ function onViewDoubleClick(event){
   // Re-edit a placed text block in place (2026-07 rework) — checked before
   // the select-only guard below since double-clicking with the Text tool
   // itself active must also work, not just Select.
-  if(state.tool==='select'||state.tool==='text'){
+  if((state.tool==='select'||state.tool==='text')&&canEditActiveLayer()){
     var textLayer=userLayers[state.activeLayerIdx];
     var textHit=textLayer.hitTest(event.point,{fill:true,stroke:true,tolerance:4/view.zoom});
     if(textHit&&textHit.item instanceof Raster&&textHit.item.data&&textHit.item.data.isText&&!textHit.item.data.isTextChar){
@@ -5419,7 +6012,11 @@ function onViewDoubleClick(event){
     if(textHit&&textHit.item instanceof Path&&textHit.item.data&&textHit.item.data.isVectorText){
       var vtGid=textHit.item.data.groupId;
       var vtRoot=textLayer.children.filter(function(c){return c.data&&c.data.groupId===vtGid&&c.data.isTextRoot;})[0];
-      if(vtRoot&&window.openTextPopoverForEdit)openTextPopoverForEdit(vtRoot);
+      // In-place canvas editing (2026-08-16) — double-clicking vector text
+      // now edits it right on the canvas (Illustrator/Figma convention)
+      // instead of opening the side popover; see openInPlaceTextEditor's
+      // own header comment (timeline.js) for why this is vector-only.
+      if(vtRoot&&window.openInPlaceTextEditor)openInPlaceTextEditor(vtRoot);
       return;
     }
   }
@@ -5428,23 +6025,70 @@ function onViewDoubleClick(event){
   var hit=layer.hitTest(event.point,{fill:true,tolerance:4/view.zoom});
   if(!hit||!(hit.item instanceof Path)||!hit.item.fillColor)return;
   var fillPath=hit.item;
-  if(selectedPaths.indexOf(fillPath)<0)selectedPaths.push(fillPath);
+  // Group double-click (2026-07-29 fix, Cyril: "si c'est un group et que l'on
+  // double clic on doit entrer dans le group avec l'outil select pas
+  // subselect, l'outil subselect n'apparait qu'après si on double clic sur
+  // un des éléments du group"): a grouped shape's FIRST double-click now just
+  // selects the whole group and stays on Select — same result a plain single
+  // click's own membersOf() expansion already gives, double-click is only a
+  // more discoverable way to reach it. Subselect (below, unchanged) only
+  // kicks in on a SECOND double-click on one specific member, once that
+  // group is ALREADY the current selection — "entering" it, in effect.
+  // Ungrouped shapes are untouched: straight to Subselect on the first
+  // double-click, exactly the 2026-07-27 behavior this only refines.
+  var dblGid=fillPath.data&&fillPath.data.groupId;
+  if(dblGid){
+    var dblMembers=window.SMGroup?SMGroup.membersOf(fillPath,layer):[fillPath];
+    var dblWholeGroupSelected=selectedPaths.length===dblMembers.length&&dblMembers.every(function(m){return selectedPaths.indexOf(m)>=0;});
+    // See _groupEnteredGid's own comment above: "the whole group happens to
+    // be selected right now" is NOT enough on its own — it's true after
+    // EVERY click on a member (select-bridge.js's single-click widening),
+    // not just a genuine repeat double-click. Only treat this as "the
+    // second one" when it's also the SAME group this same mechanism most
+    // recently entered.
+    if(!(dblWholeGroupSelected&&_groupEnteredGid===dblGid)){
+      clearSel();fsClearSel();_fsIsolation=null;
+      selectedPaths=dblMembers.slice();
+      state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;});
+      _groupEnteredGid=dblGid;
+      renderArcs();updateUI();
+      if(window.SMEngineBridge)SMEngineBridge.renderNow();
+      return;
+    }
+  }
+  clearSel();
+  fsClearSel();
+  _fsIsolation={groupId:fillPath.data&&fillPath.data.groupId,path:fillPath};
   // strokeBounds (not plain bounds) includes stroke-width padding — a
   // perfectly axis-aligned line has zero-height/width *geometric* bounds,
   // so a straight stroke lying exactly on the fill's edge would otherwise
   // count as merely touching (not intersecting) and get missed. Padding by
   // a couple of pixels on top of that covers any remaining tolerance gap.
-  var fb=(fillPath.strokeBounds||fillPath.bounds).expand(4/view.zoom);
-  layer.children.forEach(function(c){
-    if(c instanceof Path&&c!==fillPath&&c.strokeColor){
-      var cb=(c.strokeBounds||c.bounds);
-      if(cb.intersects(fb)&&selectedPaths.indexOf(c)<0)selectedPaths.push(c);
-    }
-  });
+  // Double-click enters SUBSELECT on the clicked shape (2026-07-27: "au
+  // double clic avec select j'aimerais plutôt l'outil subselect avec même
+  // fonctionnement mais capable de modifier les points de vecteurs"). It
+  // used to enter fsselect, which isolates the same way but can only pick
+  // whole fill/stroke fragments — never the anchors. Isolation semantics are
+  // unchanged (_fsIsolation still scopes what is reachable, and clicking
+  // outside it drops back to Select); only the tool differs, so the shape's
+  // vertices and tangents are editable straight away.
+  selectedPaths=[fillPath];
   state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;});
+  window.SM.setTool('subselect');
+  // nodeHandles is the array the NEXT click hit-tests against, and only this
+  // call populates it — without it the first click on an anchor silently
+  // misses (same staleness trap subselect-bridge.js documents at length).
+  renderNodeHandles();
   renderArcs();updateUI();
+  if(window.SMEngineBridge)SMEngineBridge.renderNow();
 }
 view.onMouseDown=onMouseDown;view.onMouseDrag=onMouseDrag;view.onMouseUp=onMouseUp;view.onMouseMove=onMouseMoveTool;view.onDoubleClick=onViewDoubleClick;
+canvasEl.addEventListener('dblclick',function(e){
+  if(!(window.SMEngineBridge&&SMEngineBridge.isEnabled())||state.tool!=='select')return;
+  var w=SMEngineBridge.screenToWorld(e.clientX,e.clientY);
+  onViewDoubleClick({point:new Point(w[0],w[1])});
+  e.preventDefault();e.stopImmediatePropagation();
+},{capture:true});
 // Zoom-to-pointer: the fixed ±8%-per-event step (old code) felt identical
 // for a single notchy mouse-wheel click and a fast trackpad fling — every
 // event was the same size regardless of how hard/fast the gesture was.

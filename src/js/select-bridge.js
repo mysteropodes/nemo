@@ -22,6 +22,35 @@
 // all ported too.
 (function () {
   var mode = null; // 'xform-scale' | 'xform-rotate' | 'marquee' | 'move' | 'arc' | 'nv-drag' | 'nv-scale' | 'nv-rotate' | null
+  // Non-destructive combine groups (2026-07-29) — hit-test confirmatory
+  // guard. UNION never has a problem here: the combined visible region is
+  // exactly the union of members' own real geometry, so "hit a real
+  // member" and "hit something visible" always agree. subtract/intersect/
+  // exclude don't: a click can land inside a member's UNMODIFIED geometry
+  // that the combine visually cut away — a false-positive "select the
+  // group" on what looks like empty canvas. Only runs (computeGroupCombine
+  // is not cheap) when the raw hit actually resolved to a non-union
+  // combine-group member — never per-frame, only per hit-test.
+  function combineVisibleAt(item, pt, layerIdx) {
+    var gid = item.data && item.data.groupId;
+    if (!gid) return true;
+    var ld = state.layers[layerIdx];
+    if (!ld || !ld.groups || !ld.groups[gid]) return true;
+    var grp = ld.groups[gid];
+    if (!grp.combineMode || grp.combineMode === 'none' || grp.combineMode === 'unite') return true;
+    if (!window.SMGroup) return true;
+    var layer = userLayers[layerIdx];
+    var members = SMGroup.resolveGroupMembers(gid, ld, layer);
+    if (members.length < 2) return true;
+    try {
+      var islands = computeGroupCombine(members, grp.combineMode, layer);
+      return islands.some(function (isl) { return isl.contains(pt); });
+    } catch (e) { return true; }
+  }
+  function combineHitConfirm(hit, hitPt, layerIdx) {
+    if (!hit || !hit.item) return true;
+    return combineVisibleAt(hit.item, hitPt, layerIdx);
+  }
   // Native-video footage gestures (2026-07, "une vidéo est un objet comme
   // les autres"): clicking a video layer SELECTS it (window._nvSelectedLayer,
   // read by engine-bridge's buildTransformBoxItems to draw the same
@@ -35,6 +64,13 @@
   var nvPivot = null, nvOrigDist = 1, nvStartAngle = 0, nvOrigRot = 0;
   function nvClearSelection() {
     if (window._nvSelectedLayer != null) { window._nvSelectedLayer = null; }
+  }
+  function syncMotionLayerSelection(li, additive) {
+    if (state.appMode !== 'motion' || typeof _layerSel === 'undefined') return;
+    if (li == null) { if (!additive) _layerSel = []; return; }
+    if (additive) {
+      if (_layerSel.indexOf(li) < 0) _layerSel.push(li);
+    } else _layerSel = [li];
   }
   var xformDir = null, xformAnchor = null, xformOrigHandlePos = null, xformLastSx = 1, xformLastSy = 1;
   var xformMap = null; // geometry<->rendered-world mapper when the active layer has a Motion transform
@@ -370,6 +406,16 @@
       }
     }
     if (!shouldIntercept()) return;
+    // Every gesture starts from a clean slate (2026-07-26). onDown has a
+    // dozen branches and several of them `return` without ever assigning
+    // `mode`, so the PREVIOUS gesture's mode could survive into the new one
+    // and onMove would act on it. Defensive, not a reported bug: the only
+    // reproduction found was through synthetic pointer+mouse events firing
+    // the same gesture into two handlers at once, which real input never
+    // does — re-checked against real drags and it does NOT occur. Kept
+    // anyway because a branch should have to opt IN to a mode rather than
+    // every branch having to remember to opt out of the last one.
+    mode = null;
     e.stopImmediatePropagation();
     e.preventDefault();
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
@@ -489,6 +535,48 @@
       return;
     }
 
+    // The transform box itself is a draggable surface, including its empty
+    // center. This matters especially for Ghost All where the distribution
+    // box can span large gaps with no actual path under the pointer.
+    if (selectedPaths.length) {
+      var bodyHandle = computeHandles();
+      if (bodyHandle) {
+        var bodyPt = pt;
+        if (bodyHandle.map) {
+          var bodyGeom = bodyHandle.map.inv(bodyPt.x, bodyPt.y);
+          bodyPt = new Point(bodyGeom[0], bodyGeom[1]);
+        }
+        if (bodyHandle.box && bodyHandle.box.angle) bodyPt = bodyPt.rotate(-bodyHandle.box.angle, bodyHandle.box.pivot);
+        if (bodyHandle.bounds.contains(bodyPt)) {
+          // Widen to the clicked item's full group/combine-group BEFORE
+          // starting the move (2026-07-29, QA-confirmed): this shortcut
+          // fires and returns on ANY click inside the current selection's
+          // own box — which a lone group member's body-click always is,
+          // since its own box IS that member's bounds. Without this, the
+          // idx2 group-widening logic a bit further below (for the case
+          // where `hit` misses this early shortcut) never even gets a
+          // chance to run: a Subselect edit leaving just one member
+          // selected meant clicking that member again to grab "the whole
+          // group" only ever dragged the one member.
+          if (window.SMGroup) {
+            var bodyLd = state.layers[state.activeLayerIdx];
+            if (!(bodyLd && bodyLd.locked && !bodyLd.symbolId)) {
+              var bodyLayer = userLayers[state.activeLayerIdx];
+              var bodyHit = bodyLayer.hitTest(pt, { stroke: true, fill: true, tolerance: 8 / view.zoom });
+              if (bodyHit && (bodyHit.item instanceof Path || bodyHit.item instanceof Raster) && combineHitConfirm(bodyHit, pt, state.activeLayerIdx)) {
+                var bodyP = resolveBrushAnchor(bodyHit.item, bodyLayer);
+                SMGroup.membersOf(bodyP, bodyLayer).forEach(function (m) { if (selectedPaths.indexOf(m) < 0) selectedPaths.push(m); });
+                state.selectedStrokeIndices = selectedPaths.map(getSI).filter(function (i2) { return i2 >= 0; });
+              }
+            }
+          }
+          mode = 'move';
+          moveStarted = false;
+          return;
+        }
+      }
+    }
+
     var layer = userLayers[state.activeLayerIdx];
     var activeLdForLock = state.layers[state.activeLayerIdx];
     // A locked ACTIVE layer's own content must be as untouchable as a locked
@@ -525,9 +613,16 @@
     var hitPt = pt;
     if (state.appMode === 'motion' && window.SMMotion) {
       var hitMap = SMMotion.layerMotionPointMap(state.activeLayerIdx);
+      // 3D layers (2026-07-29 fix) — layerMotionPointMap returns null for a
+      // 3D-toggled layer even with real rotationX/rotationY set (it only
+      // recognizes the base 2D properties); layerMotion3DPointMap is the
+      // dedicated perspective-correct counterpart — see its own header
+      // comment in motion.js for the ray-plane-intersection math.
+      if (!hitMap && SMMotion.layerMotion3DPointMap) hitMap = SMMotion.layerMotion3DPointMap(state.activeLayerIdx);
       if (hitMap) { var hg = hitMap.inv(pt.x, pt.y); hitPt = new Point(hg[0], hg[1]); }
     }
     var hit = (activeLdForLock.locked && !activeLdForLock.symbolId) ? null : layer.hitTest(hitPt, { stroke: true, fill: true, tolerance: 8 / view.zoom });
+    if (hit && !combineHitConfirm(hit, hitPt, state.activeLayerIdx)) hit = null;
     var hitOtherLayerIdx = -1;
     // If nothing on the active layer, check every OTHER normal (non-
     // component) layer too — clicking a stroke that lives on layer 1 while
@@ -612,6 +707,7 @@
         if (!e.shiftKey) clearSel();
         state.activeLayerIdx = nvHit;
         activateUL(nvHit);
+        syncMotionLayerSelection(nvHit, e.shiftKey);
         window._nvSelectedLayer = nvHit; // gizmo drawn by buildTransformBoxItems' nv branch
         mode = 'nv-drag';
         nvIdx = nvHit;
@@ -633,6 +729,7 @@
         if (!e.shiftKey) clearSel();
         state.activeLayerIdx = compHit.layerIdx;
         activateUL(compHit.layerIdx);
+        syncMotionLayerSelection(compHit.layerIdx, e.shiftKey);
         selectedPaths = userLayers[compHit.layerIdx].children.filter(function (c) { return (c instanceof Path || c instanceof Raster) && isSelectablePathChild(c); });
         state.selectedStrokeIndices = [];
         renderArcs(); updateUI();
@@ -650,6 +747,7 @@
         state.activeLayerIdx = hitOtherLayerIdx;
         activateUL(hitOtherLayerIdx);
       }
+      syncMotionLayerSelection(state.activeLayerIdx, e.shiftKey);
       // A component layer must act as one rigid transform group even when
       // it's the ACTIVE layer — the hitTestComponentLayers fallback below
       // only fires when the active layer's OWN hitTest misses, so clicking
@@ -697,12 +795,42 @@
         // doesn't".
         clearSel();
         clickedSet.forEach(function (m) { selectedPaths.push(m); });
+        // _groupEnteredGid (tools.js, group double-click) tracks "did the
+        // LAST thing that happened enter this exact group via double-click,
+        // with nothing unrelated since" — but nothing ever reset it back to
+        // null, so it stayed set to whatever group was last double-clicked
+        // for the rest of the SESSION. A plain single click here landing on
+        // a DIFFERENT (or ungrouped) target means that continuity is over —
+        // without this, double-clicking a group you'd entered earlier (even
+        // much earlier, after touching plenty of unrelated shapes since)
+        // skipped straight to Subselect on what the user experiences as a
+        // fresh first double-click (2026-07-30 fix, Cyril: "un bug pourtant
+        // relevé très souvent — si je double clic [sur un groupe déjà
+        // touché] ça switch sur subselect alors que ça devrait rester
+        // select"). Clicking back onto the SAME still-entered group is a
+        // no-op here (condition short-circuits), so the genuine "double-
+        // click, then immediately double-click again" fast path into
+        // Subselect is untouched — see tools.js's onViewDoubleClick.
+        if (window._groupEnteredGid && (!p.data || p.data.groupId !== window._groupEnteredGid)) window._groupEnteredGid = null;
+      } else {
+        // p is ALREADY selected (idx2>=0) — but its own group siblings might
+        // not be (2026-07-29 fix, QA-confirmed): right after a Subselect
+        // vertex-edit leaves just ONE member selected, clicking that same
+        // member again (to grab "the whole group") left selectedPaths at
+        // just the one path, since neither branch above ever ran. ADD any
+        // missing sibling rather than replacing the selection outright — an
+        // existing broader multi-selection (e.g. from a marquee spanning
+        // several unrelated shapes, one of which happens to be `p`) must
+        // still survive a click-to-drag on one of its members, same
+        // reasoning the idx2>=0 short-circuit existed for in the first place.
+        clickedSet.forEach(function (m) { if (selectedPaths.indexOf(m) < 0) selectedPaths.push(m); });
       }
       state.selectedStrokeIndices = selectedPaths.map(getSI).filter(function (i2) { return i2 >= 0; });
       mode = selectedPaths.length ? 'move' : null;
       moveStarted = false;
     } else {
       if (!e.shiftKey) clearSel();
+      syncMotionLayerSelection(null, e.shiftKey);
       mode = 'marquee';
       marqueeStart = pt.clone();
       var prevA = project.activeLayer;
@@ -745,10 +873,18 @@
       if (shouldIntercept() && selectedPaths.length) {
         var wh = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
         var hpt = new Point(wh[0], wh[1]);
-        var hh2 = computeHandles();
         // Alt-gated, matching hitTestHandles' own new requirement — showing
         // the "grabbable" grow effect without Alt held would visually
         // promise a drag that onDown won't actually honor.
+        //
+        // computeHandles() used to run BEFORE that gate even though e.altKey
+        // is its only consumer here (hh2 is read on the next line and
+        // nowhere else). It goes through orientedSelBox(), which deep-clones
+        // every selected path when the selection box is rotated — paid on
+        // every pointermove of a plain hover, with no Alt held and nothing
+        // being dragged. Same shape as registerRasterIfNeeded's canvas read:
+        // expensive work in front of the cheap check that discards it.
+        var hh2 = e.altKey ? computeHandles() : null;
         var isHover = !!(e.altKey && hh2 && hh2.anchorPos && hpt.getDistance(hh2.anchorPos) < 9 / view.zoom);
         if (isHover !== state.xformAnchorHovered) {
           state.xformAnchorHovered = isHover;
@@ -809,7 +945,13 @@
     } else if (mode === 'marquee') {
       var prevA = project.activeLayer;
       marqueeLayer.activate();
-      if (_marquee.lasso) {
+      // Null-guarded like the rectangle branch just below already is —
+      // that branch's own guard shows a null rect here was already
+      // considered reachable; the lasso branch simply never got the same
+      // treatment. Degrade to doing nothing, never throw mid-drag.
+      if (!_marquee.rect) {
+        // nothing to extend — the gesture was never properly started
+      } else if (_marquee.lasso) {
         _marquee.rect.add(pt);
       } else {
         var mx1 = Math.min(marqueeStart.x, pt.x), my1 = Math.min(marqueeStart.y, pt.y);
@@ -849,7 +991,27 @@
       if (!moveStarted) {
         pushUndo();
         if (state.appMode !== 'motion') ensureKeyframe();
-        selectedPaths = state.selectedStrokeIndices.map(function (i) { return userLayers[state.activeLayerIdx].children[i]; }).filter(Boolean);
+        // Re-grab by index because ensureKeyframe() just above can rebuild
+        // this layer's children, orphaning the Paper objects picked at
+        // pointerdown. A COMPONENT selection has no indices though — its
+        // branch in onDown selects the whole layer and leaves
+        // selectedStrokeIndices empty on purpose — so the map produced an
+        // EMPTY array and every remaining tick translated nothing. symMatrix
+        // kept accumulating (it doesn't read selectedPaths), so the data
+        // moved while the picture didn't, and the component jumped to its
+        // new spot only on release (2026-07-27: "des component que l'on
+        // bouge et qui ne bouge pas reel time avec le drag"; measured:
+        // symMatrix.tx 755→831→907→982→1058→1133 across the ticks with
+        // userLayers[0].bounds.x pinned at 963.8, then 1341.5 at pointerup).
+        // Falling back to the same whole-layer grab that branch made keeps
+        // the orphan fix for ordinary selections and restores the live
+        // preview for components. Translating their geometry is purely
+        // visual: saveActiveLayerFrame returns early on ld.symbolId, and
+        // loadFrame re-derives the layer from the symbol + symMatrix, so it
+        // can never be baked or double-applied.
+        selectedPaths = state.selectedStrokeIndices.length
+          ? state.selectedStrokeIndices.map(function (i) { return userLayers[state.activeLayerIdx].children[i]; }).filter(Boolean)
+          : userLayers[state.activeLayerIdx].children.filter(function (c) { return (c instanceof Path || c instanceof Raster) && isSelectablePathChild(c); });
         moveStarted = true;
       }
       var delta = pt.subtract(lastPt);
@@ -898,6 +1060,7 @@
       // translate(delta*N) — zero accumulated drift by construction.
       selectedPaths.forEach(function (p) {
         p.translate(delta);
+        transformFillGradient(p, function (gp) { return gp.add(delta); });
         if (p.data && p.data.isVectorBrush && p.data.centerSegments) {
           p.data.centerSegments.forEach(function (s) { s.point = [s.point[0] + delta.x, s.point[1] + delta.y]; });
         }
@@ -981,6 +1144,9 @@
       }
       selectedPaths.forEach(function (p) {
         p.scale(stepSx, stepSy, anchor);
+        transformFillGradient(p, function (gp) {
+          return new Point(anchor.x + (gp.x - anchor.x) * stepSx, anchor.y + (gp.y - anchor.y) * stepSy);
+        });
         if (p.data && p.data.isVectorBrush && p.data.centerSegments) {
           scaleCenterSegments(p.data.centerSegments, stepSx, stepSy, anchor.x, anchor.y);
           rebuildVectorBrushOutline(p);
@@ -1055,6 +1221,7 @@
       }
       selectedPaths.forEach(function (p) {
         p.rotate(stepAngle, rotCenter);
+        transformFillGradient(p, function (gp) { return gp.rotate(stepAngle, rotCenter); });
         if (p.data && p.data.isVectorBrush && p.data.centerSegments) {
           rotateCenterSegments(p.data.centerSegments, stepAngle, rotCenter.x, rotCenter.y);
           rebuildVectorBrushOutline(p);
@@ -1216,6 +1383,16 @@
             // Lasso : le test bounds ne suffit pas (le lasso peut serpenter) —
             // l'item doit avoir son centre DANS le trace, ou le croiser.
             if (lassoPath && !(lassoPath.contains(c.position) || (c instanceof Path && lassoPath.intersects(c)))) return;
+            // Non-destructive combine groups (2026-07-29): a bounds-only
+            // intersection is correct/expected for a REAL marquee drag (a
+            // rectangle surrounding a donut's own bounding box legitimately
+            // selects it, hole included — standard marquee semantics in
+            // every design tool) but wrongly over-selects when onDown's own
+            // precise hitTest already missed and this degenerated into a
+            // near-zero-size rect — i.e. what was actually just a CLICK on
+            // a visually cut-away region. Only that degenerate case gets
+            // the extra precision check; a genuine drag is untouched.
+            if (!lassoPath && mb.width < 3 / view.zoom && mb.height < 3 / view.zoom && !combineVisibleAt(c, mb.center, state.activeLayerIdx)) return;
             if (selectedPaths.indexOf(c) < 0) selectedPaths.push(c);
           }
         });
@@ -1305,9 +1482,16 @@
     var hitPt = pt;
     if (state.appMode === 'motion' && window.SMMotion) {
       var hitMap = SMMotion.layerMotionPointMap(state.activeLayerIdx);
+      // 3D layers (2026-07-29 fix) — layerMotionPointMap returns null for a
+      // 3D-toggled layer even with real rotationX/rotationY set (it only
+      // recognizes the base 2D properties); layerMotion3DPointMap is the
+      // dedicated perspective-correct counterpart — see its own header
+      // comment in motion.js for the ray-plane-intersection math.
+      if (!hitMap && SMMotion.layerMotion3DPointMap) hitMap = SMMotion.layerMotion3DPointMap(state.activeLayerIdx);
       if (hitMap) { var hg = hitMap.inv(pt.x, pt.y); hitPt = new Point(hg[0], hg[1]); }
     }
     var hit = (activeLdForLock.locked && !activeLdForLock.symbolId) ? null : layer.hitTest(hitPt, { stroke: true, fill: true, tolerance: 8 / view.zoom });
+    if (hit && !combineHitConfirm(hit, hitPt, state.activeLayerIdx)) hit = null;
     var clickedPath = null;
     if (hit && (hit.item instanceof Path || hit.item instanceof Raster)) {
       clickedPath = resolveBrushAnchor(hit.item, layer);
@@ -1360,6 +1544,41 @@
     ];
     if (multi || isGrouped) {
       items.push({ label: isGrouped ? 'Dissocier' : 'Grouper', shortcut: isGrouped ? '⇧⌘G' : '⌘G', action: function () { if (window.SMGroup) { if (isGrouped) SMGroup.ungroupSelection(); else SMGroup.groupSelection(); } } });
+      items.push({ sep: true });
+    }
+    // Non-destructive combine groups (2026-07-29) — "Combiner (Union)" is
+    // the ONE flat entry offered here (discoverability over a 4-way
+    // submenu — this app's context menu is flat-list only, and Union is by
+    // far the common case; the other 3 modes stay reachable via Alt+click
+    // on their own toolbar icon). If the current selection already IS one
+    // active combine-group's full membership, offer changing its mode/
+    // removing a member/flattening instead of creating a new one.
+    var _cbLayer = userLayers[state.activeLayerIdx], _cbLd = state.layers[state.activeLayerIdx];
+    var _cbGid = null;
+    if (window.SMGroup && _cbLd && _cbLd.groups) {
+      if (!multi && p0.data && p0.data.groupId && _cbLd.groups[p0.data.groupId]) _cbGid = p0.data.groupId;
+      else if (multi) {
+        var _cbFirst = selectedPaths[0].data && selectedPaths[0].data.groupId;
+        if (_cbFirst && _cbLd.groups[_cbFirst]) {
+          var _cbMembers = SMGroup.resolveGroupMembers(_cbFirst, _cbLd, _cbLayer);
+          if (_cbMembers.length === selectedPaths.length && _cbMembers.every(function (m) { return selectedPaths.indexOf(m) >= 0; })) _cbGid = _cbFirst;
+        }
+      }
+    }
+    var _cbActive = (_cbGid && _cbLd.groups[_cbGid].combineMode !== 'none') ? _cbGid : null;
+    if (window.SMGroup && multi && !_cbActive) {
+      items.push({ label: 'Combiner (Union) — non destructif', action: function () { SMGroup.combineSelection('unite'); } });
+      items.push({ sep: true });
+    }
+    if (_cbActive) {
+      var _cbCurMode = _cbLd.groups[_cbActive].combineMode;
+      var _cbLabels = { unite: 'Union', subtract: 'Soustraction', intersect: 'Intersection', exclude: 'Exclusion' };
+      ['unite', 'subtract', 'intersect', 'exclude'].forEach(function (m) {
+        items.push({ label: (m === _cbCurMode ? '✓ ' : '') + _cbLabels[m], action: function () { SMGroup.setGroupCombineMode(_cbActive, _cbLd, m); } });
+      });
+      items.push({ sep: true });
+      if (!multi) items.push({ label: 'Sortir du groupe', action: function () { SMGroup.removeMemberFromGroup(p0, _cbLd, _cbLayer); } });
+      items.push({ label: 'Aplatir', action: function () { SMGroup.flattenGroup(_cbActive, _cbLd, _cbLayer); } });
       items.push({ sep: true });
     }
     items = items.concat([
@@ -1433,6 +1652,37 @@
         }
       });
     }
+    // Stroke profiles (Sander van Dijk 6.2). Offered on any selection that
+    // holds at least one open path: a profile turns a flat stroke into a
+    // variable-width filled ribbon, which is also what makes a gradient run
+    // ALONG the stroke rather than across it (his 6.3, free once the stroke
+    // is a fill).
+    var profilable = (window.selectedPaths || []).some(function (p) { return p && p.segments && p.segments.length >= 2; });
+    if (profilable) {
+      items.push({ sep: true });
+      items.push({ label: 'Profil de contour :', disabled: true, action: function () {} });
+      [['taper-both', '   • effilé aux deux bouts'],
+       ['taper-in', '   • effilé au début'],
+       ['taper-out', '   • effilé à la fin'],
+       ['bulge', '   • renflé au centre'],
+       ['even', '   • épaisseur constante (ruban)']].forEach(function (o) {
+        items.push({ label: o[1], action: function () { window.SM.applyStrokeProfile(o[0]); } });
+      });
+    }
+    // Text Animator (2026-08-17, text-animator.js) — right-click access
+    // straight on the canvas, same shortcut every other single-item
+    // action here already gets, instead of only being reachable through
+    // the right-panel text section. Same eligibility check as that panel
+    // (groupIdForItem): a vector-text glyph, or an already-split raster
+    // character — a whole not-yet-split raster block still has nothing
+    // to group into units.
+    if (selectedPaths.length === 1 && window.SMTextAnimator) {
+      var animGid = window.SMTextAnimator.groupIdForItem(p0);
+      if (animGid) {
+        items.push({ sep: true });
+        items.push({ label: 'Animer le texte…', action: function () { window.SMTextAnimator.openPanel(state.activeLayerIdx, animGid); } });
+      }
+    }
     window.showContextMenu(e.clientX, e.clientY, items);
   }
 
@@ -1493,8 +1743,41 @@
   // the gizmo draw the ACTUAL live-distorted quad instead of the static
   // pre-distort rectangle while a corner-pin drag is in progress.
   window.SMSelectBridge = {
+    refreshAfterDocumentRestore: function () {
+      // Undo/redo rebuilds every Paper item. Any gesture-local object
+      // reference therefore points at removed geometry after the restore.
+      mode = null;
+      draggingArc = null;
+      arcDragCache = null;
+      moveStarted = false;
+      distortDir = null; distortSrcQuad = null; distortSegs = null; distortDstQuad = null;
+      selectedPaths = (state.selectedStrokeIndices || []).map(function (i) {
+        return userLayers[state.activeLayerIdx] && userLayers[state.activeLayerIdx].children[i];
+      }).filter(function (p) { return p && !p.removed; });
+      state.selectedStrokeIndices = selectedPaths.map(getSI).filter(function (i) { return i >= 0; });
+    },
     getDistortState: function () {
       return mode === 'xform-distort' ? { dir: distortDir, quad: distortDstQuad } : null;
+    },
+    // Switching tools mid-marquee-drag (2026-07-29, QA-confirmed) used to
+    // leave a stuck ghost selection rectangle: onUp's own finalization
+    // (removing the rect, folding it into selectedPaths) only ever runs on
+    // THIS tool's own pointerup, which never comes once another tool is
+    // picked mid-drag — and onMove doesn't gate on state.tool==='select' at
+    // all once `mode` is already set (only the hover-only, no-mode branch
+    // checks shouldIntercept()), so the rect kept following the pointer and
+    // even kept queuing itself into the next pointerup's marquee-select
+    // logic under whatever tool got picked next. Scoped to marquee only —
+    // it's pure UI/selection state with no live document geometry to leave
+    // half-mutated, unlike move/scale/rotate/distort (their own onUp
+    // already handles committing what THEY changed; this isn't a general
+    // abandon-any-gesture hook).
+    cancelMarquee: function () {
+      if (mode !== 'marquee') return;
+      if (_marquee.rect) { _marquee.rect.remove(); _marquee.rect = null; }
+      _marquee.active = false;
+      mode = null;
+      if (window.SMEngineBridge) window.SMEngineBridge.resume();
     },
     toggleTweenOnForSelection: toggleTweenOnForSelection,
   };

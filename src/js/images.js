@@ -89,42 +89,85 @@
     return{isSeq:false};
   }
 
-  async function importSequence(items,prefix){
+  // Prompt Frame Rate (2026-08, AE feature audit 8.3, "prevent mismatch
+  // with project settings") — asks what rate the SEQUENCE was captured at
+  // before importing it, defaulting to the project's own fps (so hitting
+  // Enter with no change reproduces the old silent 1-image-per-project-
+  // frame behavior exactly). A native prompt() — same pattern bpm-grid.js
+  // already uses for a single numeric value, not worth a bespoke modal for
+  // one field. Returns a positive number, or null if cancelled/invalid
+  // (caller treats null as "same as project fps", i.e. a no-op).
+  function promptSequenceFps(){
+    var v=window.prompt('Fréquence de la séquence (images par seconde) ? Laisser tel quel = '+state.fps+' fps (fréquence du projet).',String(state.fps));
+    if(v===null)return null;
+    var n=parseFloat(v);
+    return(n>0&&isFinite(n))?n:null;
+  }
+  // Repeats each sequence entry to approximate the requested playback
+  // speed relative to the project's own fps — e.g. a 12fps sequence in a
+  // 24fps project shows each source image for 2 project frames. Simple
+  // nearest-integer repeat rather than true resampling (no dropped-frame
+  // case for seqFps > project fps beyond rounding to 1) — matches AE's own
+  // "prevent mismatch" framing (get the DURATION right) without building a
+  // full retiming engine for what's fundamentally an import-time nicety.
+  function seqRepeatCount(seqFps){
+    if(!seqFps||seqFps===state.fps)return 1;
+    return Math.max(1,Math.round(state.fps/seqFps));
+  }
+  async function importSequence(items,prefix,seqFps){
     showToast('Import de la séquence…');
+    var rep=seqRepeatCount(seqFps);
     var frames=[];
     for(var i=0;i<items.length;i++){
       var dataUrl=await readAsDataUrl(items[i].path);
       var nat=await naturalSize(dataUrl);
       var fit=fitSize(nat.w,nat.h);
-      frames.push({strokes:[{isRaster:true,src:dataUrl,x:state.canvasW/2,y:state.canvasH/2,width:fit.w,height:fit.h,opacity:1}],isKeyframe:true,isInterpolated:false});
+      for(var r=0;r<rep;r++)frames.push({strokes:[{isRaster:true,src:dataUrl,x:state.canvasW/2,y:state.canvasH/2,width:fit.w,height:fit.h,opacity:1}],isKeyframe:r===0,isInterpolated:r!==0});
     }
     saveAllLayerFrames();pushUndoLayers();
     if(frames.length>state.totalFrames)window.SM.setTotalFrames(frames.length);
     var idx=createUserLayer(prefix);
     while(frames.length<state.totalFrames)frames.push({strokes:[],isKeyframe:false,isInterpolated:false});
     state.layers[idx].frames=frames;
+    // Say what this layer IS, rather than leaving every reader to infer it
+    // from its contents (see layer-kind.js). Purely descriptive — it
+    // changes no stroke and no renderer reads it — but it is what lets
+    // the timeline label a sequence as a sequence instead of guessing.
+    state.layers[idx].footage={kind:'sequence',count:frames.length};
     activateUL(idx);loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
-    if(window.SMMediaLibrary)SMMediaLibrary.addEntry(state.layers[idx].name,'image',frames[0].strokes[0].src,state.layers[idx].name);
+    if(window.SMMediaLibrary)SMMediaLibrary.addEntry(state.layers[idx].name,'image',frames[0].strokes[0].src,state.layers[idx].name,{layerUid:state.layers[idx].layerUid});
     showToast('Séquence importée: '+items.length+' images sur le calque "'+prefix+'"');
   }
 
+  // A still used to be pushed onto whatever layer happened to be active,
+  // which made it the only importer that did NOT produce a layer — a video
+  // and a sequence both create one, so an image was the odd case with no
+  // type, no source to inspect and nothing to replace (2026-07-27 audit).
+  // One layer per image now, tagged as footage, same as its siblings; the
+  // layer is the thing you then move, key and swap.
   async function importStandalone(paths){
     saveAllLayerFrames();pushUndoLayers();
-    var ld=state.layers[state.activeLayerIdx];
-    if(!ld.frames[state.currentFrame].isKeyframe&&!ld.frames[state.currentFrame].isInterpolated){
-      ld.frames[state.currentFrame].strokes=JSON.parse(JSON.stringify(getEffectiveStrokes(state.activeLayerIdx,state.currentFrame)));
-      ld.frames[state.currentFrame].isKeyframe=true;
-    }
     for(var i=0;i<paths.length;i++){
       var dataUrl=await readAsDataUrl(paths[i]);
       var nat=await naturalSize(dataUrl);
       var fit=fitSize(nat.w,nat.h);
-      var offset=i*24;
-      ld.frames[state.currentFrame].strokes.push({isRaster:true,src:dataUrl,x:state.canvasW/2+offset,y:state.canvasH/2+offset,width:fit.w,height:fit.h,opacity:1});
-      if(window.SMMediaLibrary)SMMediaLibrary.addEntry(baseName(paths[i]),'image',dataUrl,ld.name);
+      var nm=baseName(paths[i]);
+      var idx=createUserLayer(nm);
+      var ldN=state.layers[idx];
+      // Present on EVERY frame, not just the current one: a still is a
+      // still for the layer's whole length, and a one-frame raster would
+      // vanish the moment the playhead moved.
+      for(var f=0;f<ldN.frames.length;f++){
+        ldN.frames[f].strokes=[{isRaster:true,src:dataUrl,x:state.canvasW/2,y:state.canvasH/2,width:fit.w,height:fit.h,opacity:1}];
+        ldN.frames[f].isKeyframe=(f===0);
+        ldN.frames[f].isInterpolated=(f!==0);
+      }
+      ldN.footage={kind:'image',name:nm,w:nat.w,h:nat.h};
+      activateUL(idx);
+      if(window.SMMediaLibrary)SMMediaLibrary.addEntry(nm,'image',dataUrl,ldN.name,{layerUid:ldN.layerUid});
     }
-    loadFrame(state.currentFrame);updateUI();
-    showToast(paths.length>1?paths.length+' images importées':'Image importée');
+    loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
+    showToast(paths.length>1?paths.length+' images importées sur leurs calques':'Image importée sur son calque');
   }
 
   async function importImages(){
@@ -137,7 +180,7 @@
     if(!paths)return;
     paths=Array.isArray(paths)?paths:[paths];
     var seq=paths.length>=2?detectSequence(paths):{isSeq:false};
-    if(seq.isSeq)await importSequence(seq.items.map(function(it){return{path:it.path};}),seq.prefix);
+    if(seq.isSeq)await importSequence(seq.items.map(function(it){return{path:it.path};}),seq.prefix,promptSequenceFps());
     else await importStandalone(paths);
   }
 
@@ -160,21 +203,23 @@
     var names=files.map(function(f){return f.name;});
     var seq=files.length>=2?detectSequence(names):{isSeq:false};
     if(seq.isSeq){
+      var seqFps=promptSequenceFps(),rep=seqRepeatCount(seqFps);
       showToast('Import de la séquence…');
       var frames=[];
       for(var i=0;i<seq.items.length;i++){
         var file=files[names.indexOf(seq.items[i].path)];
         var dataUrl=await fileToDataUrl(file);
         var nat=await naturalSize(dataUrl);var fit=fitSize(nat.w,nat.h);
-        frames.push({strokes:[{isRaster:true,src:dataUrl,x:state.canvasW/2,y:state.canvasH/2,width:fit.w,height:fit.h,opacity:1}],isKeyframe:true,isInterpolated:false});
+        for(var r=0;r<rep;r++)frames.push({strokes:[{isRaster:true,src:dataUrl,x:state.canvasW/2,y:state.canvasH/2,width:fit.w,height:fit.h,opacity:1}],isKeyframe:r===0,isInterpolated:r!==0});
       }
       saveAllLayerFrames();pushUndoLayers();
       if(frames.length>state.totalFrames)window.SM.setTotalFrames(frames.length);
       var idx=createUserLayer(seq.prefix);
       while(frames.length<state.totalFrames)frames.push({strokes:[],isKeyframe:false,isInterpolated:false});
       state.layers[idx].frames=frames;
+      state.layers[idx].footage={kind:'sequence',count:frames.length};
       activateUL(idx);loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
-      if(window.SMMediaLibrary)SMMediaLibrary.addEntry(state.layers[idx].name,'image',frames[0].strokes[0].src,state.layers[idx].name);
+      if(window.SMMediaLibrary)SMMediaLibrary.addEntry(state.layers[idx].name,'image',frames[0].strokes[0].src,state.layers[idx].name,{layerUid:state.layers[idx].layerUid});
       showToast('Séquence importée: '+seq.items.length+' images');
     }else{
       saveAllLayerFrames();pushUndoLayers();
@@ -188,7 +233,7 @@
         var n=await naturalSize(du);var ft=fitSize(n.w,n.h);
         var off=j*24;
         ld.frames[state.currentFrame].strokes.push({isRaster:true,src:du,x:state.canvasW/2+off,y:state.canvasH/2+off,width:ft.w,height:ft.h,opacity:1});
-        if(window.SMMediaLibrary)SMMediaLibrary.addEntry(files[j].name,'image',du,ld.name);
+        if(window.SMMediaLibrary)SMMediaLibrary.addEntry(files[j].name,'image',du,ld.name,{layerUid:ld.layerUid});
       }
       loadFrame(state.currentFrame);updateUI();
       showToast(files.length>1?files.length+' images importées':'Image importée');
@@ -254,6 +299,7 @@
     var idx=createUserLayer(prefix);
     while(frames.length<state.totalFrames)frames.push({strokes:[],isKeyframe:false,isInterpolated:false});
     state.layers[idx].frames=frames;
+    state.layers[idx].footage={kind:'sequence',from:'video',count:frames.length};
     activateUL(idx);
     // convertLayerToComponent() below calls saveAllLayerFrames(), which
     // re-serializes the CURRENT frame from the live Paper.js document for
@@ -295,7 +341,7 @@
     var firstFrameThumb=(frames.filter(function(f){return f.strokes.length;})[0]||{}).strokes;
     firstFrameThumb=firstFrameThumb&&firstFrameThumb[0]&&firstFrameThumb[0].src;
     convertLayerToComponent(idx);
-    if(window.SMMediaLibrary&&firstFrameThumb)SMMediaLibrary.addEntry(state.layers[idx].name,'video',firstFrameThumb,state.layers[idx].name);
+    if(window.SMMediaLibrary&&firstFrameThumb)SMMediaLibrary.addEntry(state.layers[idx].name,'video',firstFrameThumb,state.layers[idx].name,{layerUid:state.layers[idx].layerUid});
     showToast('Vidéo importée : '+frames.filter(function(f){return f.strokes.length;}).length+' images sur le calque "'+prefix+'"');
   }
   async function importVideoFile(file){
@@ -384,6 +430,63 @@
   });
   document.getElementById('btn-import-video')&&document.getElementById('btn-import-video').addEventListener('click',importVideo);
 
+  // Swap a footage layer's image without touching the layer: its transform,
+  // its Motion keys, its in/out range and its place in the stack all stay,
+  // only the pixels change. Rewrites every raster on the layer, so a still
+  // (same image on all frames) and a sequence-turned-still both land right.
+  async function replaceFootageSource(){
+    var li=state.activeLayerIdx, ld=state.layers[li];
+    if(!ld)return;
+    var dataUrl=null,nm=null;
+    if(tauriOk()){
+      var path=await window.__TAURI__.dialog.open({title:'Remplacer la source',multiple:false,
+        filters:[{name:'Images',extensions:['png','jpg','jpeg','webp','gif','tif','tiff','exr','psd','dpx','bmp']}]});
+      if(!path)return;
+      dataUrl=await readAsDataUrl(path);nm=baseName(path);
+    }else{
+      dataUrl=await new Promise(function(res){
+        var inp=document.createElement('input');inp.type='file';inp.accept='image/*';inp.style.display='none';
+        document.body.appendChild(inp);
+        inp.addEventListener('change',function(e){
+          var f=e.target.files&&e.target.files[0];inp.remove();
+          if(!f){res(null);return;}
+          nm=f.name;var r=new FileReader();r.onload=function(){res(r.result);};r.readAsDataURL(f);
+        });
+        inp.click();
+      });
+      if(!dataUrl)return;
+    }
+    var nat=await naturalSize(dataUrl);
+    saveAllLayerFrames();pushUndoLayers();
+    var n=0;
+    (ld.frames||[]).forEach(function(f){
+      (f&&f.strokes||[]).forEach(function(st){
+        if(!st||!st.isRaster)return;
+        // Keep the placement the user gave it — only the pixels and the
+        // aspect change, so a footage layer already positioned in a shot
+        // does not jump when its source is swapped.
+        var ratio=nat.h?nat.w/nat.h:1;
+        st.src=dataUrl;
+        st.height=st.width/ratio;
+        n++;
+      });
+    });
+    if(ld.footage){ld.footage.name=nm||ld.footage.name;ld.footage.w=nat.w;ld.footage.h=nat.h;}
+    loadFrame(state.currentFrame);updateUI();
+    if(window.SMEngineBridge)SMEngineBridge.renderNow();
+    showToast(n?'Source remplacée ('+n+' image(s))':'Aucune image à remplacer sur ce calque');
+  }
+  // A video layer's source is a decode session (ld.nativeVideo), not a
+  // per-frame raster src — dispatched to native-video-bridge.js's own
+  // relink flow instead of this file's replaceFootageSource, which only
+  // knows how to swap raster bytes (2026-07-31, updateFootagePanel sets
+  // data-kind on this same button each time the panel refreshes).
+  document.getElementById('btn-footage-replace')&&document.getElementById('btn-footage-replace').addEventListener('click',function(){
+    if(this.dataset.kind==='video'){if(window.SMNativeVideo)SMNativeVideo.replaceNativeVideoSource(state.activeLayerIdx);return;}
+    replaceFootageSource();
+  });
+
   window.SM=window.SM||{};window.SM.importImages=importImages;window.SM.importVideo=importVideo;
+  window.SM.replaceFootageSource=replaceFootageSource;
   window.SM.importImageFiles=importImageFiles;window.SM.importVideoFile=importVideoFile;
 })();

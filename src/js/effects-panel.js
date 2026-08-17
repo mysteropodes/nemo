@@ -42,6 +42,12 @@
       { key: 'p2', label: 'fxParamSpread', min: 0, max: 95, step: 1, scale: 100, unit: '%' },
     ],
     glow: [{ key: 'p1', label: 'fxParamRadius', min: 0, max: 200, step: 1, scale: 1, unit: 'px' }],
+    hqBloom: [
+      { key: 'p1', label: 'Threshold', min: 0, max: 100, step: 1, scale: 100, unit: '%' },
+      { key: 'p2', label: 'fxParamRadius', min: 0, max: 200, step: 1, scale: 1, unit: 'px' },
+      { key: 'p3', label: 'fxParamIntensity', min: 0, max: 400, step: 1, scale: 100, unit: '%' },
+      { key: 'p4', label: 'Warmth', min: -100, max: 100, step: 1, scale: 100, unit: '' },
+    ],
     sepia: [], invert: [], grayscale: [],
     posterize: [{ key: 'p1', label: 'fxParamLevels', min: 2, max: 32, step: 1, scale: 1, unit: '' }],
     pixelate: [{ key: 'p1', label: 'fxParamBlockSize', min: 2, max: 64, step: 1, scale: 1, unit: 'px' }],
@@ -86,6 +92,7 @@
   };
   var EFFECT_DEFAULTS = {
     blur: [8, 0, 0, 0], colorAdjust: [0, 0, 0, 0], vignette: [0.5, 0.4, 0, 0], glow: [16, 0, 0, 0],
+    hqBloom: [0.55, 28, 1.4, 0.25],
     sepia: [0, 0, 0, 0], invert: [0, 0, 0, 0], grayscale: [0, 0, 0, 0], posterize: [6, 0, 0, 0],
     pixelate: [16, 0, 0, 0], chromaticAberration: [4, 0, 0, 0], scanlines: [240, 0.5, 0, 0],
     grain: [0.08, 0, 0, 0], sharpen: [0.5, 0, 0, 0], edgeDetect: [4, 0, 0, 0],
@@ -108,6 +115,7 @@
   // snapshot frozen at whatever language was active when this script parsed.
   var EFFECT_LABEL_KEYS = {
     blur: 'fxTypeBlur', colorAdjust: 'fxTypeColorAdjust', vignette: 'fxTypeVignette', glow: 'fxTypeGlow',
+    hqBloom: 'HQ Bloom',
     sepia: 'fxTypeSepia', invert: 'fxTypeInvert', grayscale: 'fxTypeGrayscale', posterize: 'fxTypePosterize',
     pixelate: 'fxTypePixelate', chromaticAberration: 'fxTypeChromaticAberration', scanlines: 'fxTypeScanlines',
     grain: 'fxTypeGrain', sharpen: 'fxTypeSharpen', edgeDetect: 'fxTypeEdgeDetect', groundShadow: 'fxTypeGroundShadow',
@@ -120,7 +128,7 @@
     },
   });
   window.EFFECT_LABELS = EFFECT_LABELS;
-  // Grouped like After Effects' own Effects menu (Blur & Sharpen, Color
+  // Grouped like a familiar motion/compositing Effects menu (Blur & Sharpen, Color
   // Correction, Stylize, Distort, Generate) — rendered as a categorized
   // flyout with a preview swatch per effect (buildAddEffectMenu below).
   // `layerOnly` categories (Ombres, Contours) are omitted from the menu
@@ -131,7 +139,7 @@
   var EFFECT_CATEGORIES = [
     { label: 'fxCatBlurSharpen', types: ['blur', 'sharpen'] },
     { label: 'fxCatColor', types: ['colorAdjust', 'grayscale', 'sepia', 'posterize', 'invert', 'threshold'] },
-    { label: 'fxCatStylize', types: ['vignette', 'glow', 'edgeDetect', 'grain', 'scanlines', 'halftone'] },
+    { label: 'fxCatStylize', types: ['vignette', 'glow', 'hqBloom', 'edgeDetect', 'grain', 'scanlines', 'halftone'] },
     { label: 'fxCatDistort', types: ['pixelate', 'chromaticAberration'] },
     { label: 'fxCatContours', types: ['contourBrut'], layerOnly: true },
     { label: 'fxCatShadows', types: ['groundShadow'], layerOnly: true },
@@ -176,7 +184,11 @@
   // rest of this file (param rows, row labels, defaults on add) treats a
   // custom effect exactly like a built-in one without a parallel code path.
   function isCustomEffect(type) { return typeof type === 'string' && type.indexOf('custom:') === 0; }
-  function customDefFor(type) { return isCustomEffect(type) && window.customEffectDef ? window.customEffectDef(type.slice(7)) : null; }
+  function customDefFor(type) {
+    if (!isCustomEffect(type)) return null;
+    var id = type.slice(7);
+    return (window.SMShaderEffectDef && window.SMShaderEffectDef(id)) || (window.customEffectDef && window.customEffectDef(id)) || null;
+  }
   function labelFor(type) {
     var cd = customDefFor(type);
     return cd ? cd.name : (EFFECT_LABELS[type] || type);
@@ -187,7 +199,7 @@
   }
   function defaultsArrFor(type) {
     var cd = customDefFor(type);
-    if (cd) return cd.params.map(function (p) { return p.min; }).concat([0, 0, 0, 0]).slice(0, 4);
+    if (cd) return cd.params.map(function (p) { return p.defaultValue !== undefined ? p.defaultValue : p.min; }).concat([0, 0, 0, 0]).slice(0, 4);
     return EFFECT_DEFAULTS[type] || [0, 0, 0, 0];
   }
 
@@ -248,6 +260,26 @@
       row.addEventListener('click', function (e) { e.stopPropagation(); open(); });
       menu.appendChild(row);
     });
+    if (window.SMSHADER_EFFECT_CATEGORIES && window.SMSHADER_EFFECTS) {
+      window.SMSHADER_EFFECT_CATEGORIES.forEach(function (catName) {
+        var defs = window.SMSHADER_EFFECTS.filter(function (fx) { return fx.category === catName; });
+        if (!defs.length) return;
+        var row = document.createElement('div');
+        row.className = 'fx-addmenu-cat';
+        row.innerHTML = '<span>Shaders · ' + catName + '</span><span class="fx-addmenu-arrow">›</span>';
+        var open = function () {
+          openSubmenu(row, defs.map(function (def) {
+            // Use the stable shader id as the preview class.  Leaving this
+            // null makes the tile fall back to the empty `{ }` placeholder,
+            // which made every shipped shader look as if it had no preview.
+            return { label: def.name, preview: def.id, action: function () { addEffect('custom:' + def.id); } };
+          }));
+        };
+        row.addEventListener('mouseenter', open);
+        row.addEventListener('click', function (e) { e.stopPropagation(); open(); });
+        menu.appendChild(row);
+      });
+    }
     // Custom shaders (2026-07) — user-authored effects saved in
     // state.customEffects, plus a fixed entry to open the authoring modal.
     var customRow = document.createElement('div');
@@ -255,7 +287,7 @@
     customRow.innerHTML = '<span>' + window.SM.t('fxCatCustom') + '</span><span class="fx-addmenu-arrow">›</span>';
     var openCustom = function () {
       var items = (state.customEffects || []).map(function (c) {
-        return { label: c.name, preview: null, action: function () { addEffect('custom:' + c.id); } };
+        return { label: c.name, preview: c.id, action: function () { addEffect('custom:' + c.id); } };
       });
       items.push({ label: '+ New custom shader…', preview: null, action: function () { if (window.openCustomEffectEditor) window.openCustomEffectEditor(null); } });
       openSubmenu(customRow, items);
@@ -344,6 +376,7 @@
     // error, which is exactly what this file's own rule forbids.
     types: function () {
       var t = Object.keys(EFFECT_PARAM_CONFIG);
+      (window.SMSHADER_EFFECTS || []).forEach(function (c) { t.push('custom:' + c.id); });
       (state.customEffects || []).forEach(function (c) { t.push('custom:' + c.id); });
       return t;
     },
@@ -460,9 +493,17 @@
       // Stopwatch first, like the Motion panel puts it — same position, same
       // glyph, so it reads as the same gesture in both places.
       var keyed = paramKeyed(eff, p.key);
+      // UI/UX audit (2026-07-30): was a Unicode ◈/◇ glyph with only 2
+      // states (keyed or not) — every other stopwatch in the app (motion.js
+      // renderTransformProps) is this same SVG diamond with 3 states:
+      // hollow+dim (not animated), hollow+accent outline (animated, no key
+      // exactly at this frame), solid+accent (animated, key right here).
+      // keyAtFrame already existed for the keyframe navigator below —
+      // reused rather than re-deriving hasKeyHere a second way.
+      var hasKeyHere = keyed && !!keyAtFrame(eff, p.key, state.currentFrame);
       var sw = document.createElement('div');
       sw.className = 'lico fx-stopwatch' + (keyed ? ' on' : '');
-      sw.innerHTML = '<span style="font-size:11px;line-height:1">' + (keyed ? '◈' : '◇') + '</span>';
+      sw.innerHTML = '<svg viewBox="0 0 24 24" width="12" height="12"><path d="M12 3l9 9-9 9-9-9z" fill="' + (hasKeyHere ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2"/></svg>';
       sw.title = keyed ? 'Animé — cliquer pour figer la valeur actuelle'
                        : 'Animer ce paramètre (pose une clé à la frame courante)';
       sw.addEventListener('click', function (e) { e.stopPropagation(); toggleParamKeying(idx, p.key); });

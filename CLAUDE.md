@@ -13,8 +13,11 @@ Chaque calque Paper.js (`userLayers[i].children`) est lu par PLUSIEURS boucles i
 historiquement toutes écrites avec l'hypothèse "chaque enfant est un `Path` simple". Dès qu'un
 nouveau type d'item (`CompoundPath`) ou un nouveau tag `data.*` (`isVectorBrush`,
 `isLinkedFillCompanion`, `isBrushTextureCopy`, `brushGroupId`, `fillSeed`/`fillWalls`,
-`strokeId`, `preTextureOpacity`/`preTextureStroke`…) apparaît, **il faut vérifier qu'il est
-géré ou exclu partout**, pas juste là où on vient de l'introduire.
+`strokeId`, `preTextureOpacity`/`preTextureStroke`, `isDuplicatorCopy`/`dupIndex`…) apparaît,
+**il faut vérifier qu'il est géré ou exclu partout**, pas juste là où on vient de l'introduire.
+(`isDuplicatorCopy`/`dupIndex` : copies synthétiques du duplicateur mograph — le calque est
+verrouillé de force et exclu de saveActiveLayerFrame/saveAllLayerFrames, voir
+`applyLayerDuplicator`/`getEffectiveStrokesRendered` dans app.js.)
 
 **Ancres de brush-texture, deux modes de camouflage** (applyBrushTexture, tools.js) : une ancre
 SANS fill est cachée par `opacity=0` (+ `preTextureOpacity` pour restaurer) ; une ancre AVEC
@@ -125,6 +128,246 @@ dessin au stylet 240Hz : 19fps → 60fps ; pan : 5fps → 60fps. **Ne pas les d�
    persistance via serP garde la précision pleine), champs de style par défaut omis (tous les
    champs `ItemIn` sont `#[serde(default)]` côté Rust, vérifié). 1215→901 Ko à 2600 items.
 
+### 5bis. Deuxième passe perf (2026-07-28) — lecture / scrub / drag
+
+Point de départ : « la lecture dans motion de cet élément est saccadée » sur un projet
+réel. Mesuré : 24 fps visés rendus à 20 fps, avec un intervalle rAF de **47,7 ms** (l'écran
+repeignait à 21 Hz). Après correction : rAF 16,1 ms, scrub 60 fps. **Deux familles de bug**,
+à reconnaître avant d'en réintroduire une :
+
+**(a) Un accès « gratuit » qui ne l'est pas, placé AVANT le garde bon marché.**
+`raster.canvas` (Paper.js) n'est pas un accesseur mais un **constructeur** : il alloue un
+canvas et y fait un `drawImage` au premier accès, **par objet Raster** — et `loadFrame`
+reconstruit tous les Raster à chaque frame. `registerRasterIfNeeded` le lisait avant
+`registeredImageIds[id]`, donc N rasters = N allocations de canvas par frame pour des pixels
+déjà sur le GPU (2000 items : 24 fps rendus à 4,4 fps). Même forme dans select-bridge
+(`computeHandles()` avant le garde `e.altKey`). **Toujours tester le cache/garde le moins
+cher en premier**, et se méfier de `.canvas`, `.bounds`, `.rasterize()`, `.getImageData()`.
+
+**(b) Reconstruire tout un DOM/arbre parce que la frame a bougé.**
+`renderTimeline()` refait 4800 nœuds (27,7 ms à 40 calques) ; sa seule sortie dépendante de
+la frame est la classe `.cur` + la position du playhead, ce que `updatePlayhead()` produit
+en 0,1 ms. D'où le **contrat `frameOnly`** : `goToFrame` le passe à `updateUI`, qui appelle
+`updatePlayhead()` au lieu de `renderTimeline()`, et le transmet à `renderLayerList` (qui
+l'honore en Animation 2D seulement — en Motion les lignes affichent la VALEUR à la tête de
+lecture). C'est le découpage que la lecture utilisait déjà (`startPlay` → `updatePlayhead`
+seul, `stopPlay` → `updateUI` complet). **Un appelant qui a changé le CONTENU ne doit jamais
+passer `frameOnly`.** Vérifié par diff DOM normalisé (ordre des classes trié) : identique à
+un rebuild complet sur 28/28 cas.
+
+**Invalider un cache, c'est aussi choisir QUAND.** Le cache de `symbolUnionBounds` a d'abord
+été purgé depuis `saveAllLayerFrames` — or `goToFrame` l'appelle à **chaque avance de
+frame**, donc la lecture recalculait l'union de 120 frames par tick (75 % du temps mur).
+Gardé par `state.activeSymbolId` : le contenu d'un symbole ne change que quand on est
+DEDANS. `_sceneVersion` est un mauvais critère ici — select-bridge l'incrémente à chaque
+move de drag.
+
+**Ne pas dupliquer le matcher.** `renderArcs` appelait `updateReassignBadge` qui recalculait
+`computeArcMatchState()` (hongrois en O(n³)) de son côté : deux fois par tick de scrub
+(13,1 ms à 60 traits, moitié pure duplication). L'état se calcule une fois et se passe.
+
+**Les drags bruts doivent avoir un garde ou un verrou rAF** : barre in/out (garde de delta,
+100 mousemoves → 6 rebuilds), poignée de zoom timeline (verrou rAF, 40 → 1 + flush au
+relâchement).
+
+**Clonage : partager les charges lourdes, mais mesurer.** `src` (base64) et
+`bitmapPressureProfile` sont écrits une fois puis seulement lus — `_HEAVY_STROKE_FIELDS`
+(app.js, exporté) les liste, `cloneStrokeForTransform` les partage par référence. Contre-
+intuitif et vérifié : pour l'undo, un cloneur JS par objet et un couple replacer/reviver
+sont **plus lents** qu'un `JSON.parse(JSON.stringify())` complet (14,1 et 26,5 ms contre
+16,1) — un seul stringify natif de tout l'arbre bat des milliers de petites copies JS même
+en déplaçant plus d'octets. Ce qui gagne : **détacher** les chaînes lourdes, cloner en
+natif, rattacher (10,7 ms), avec restauration en `finally`.
+
+**Mesurer : le rAF est gelé quand l'onglet est caché.** Tout chiffre basé sur
+`requestAnimationFrame` n'est valable que si `document.visibilityState === 'visible'` —
+sinon la sonde ne récolte aucun échantillon et un calcul naïf sort un NaN d'apparence
+plausible. Et le scrub mesuré en boucle serrée sous-estime le coût réel : le rendu moteur
+est coalescé en rAF (§5.2), donc **c'est l'intervalle rAF en lecture qui est le chiffre
+honnête**, pas la durée synchrone de `goToFrame`.
+
+Repères après cette passe (scène synthétique, régime établi, Animation 2D) :
+vecteurs 500/frame scrub 60 fps · vecteurs 2000/frame 31 fps · images 1000/frame 60 fps ·
+séquence 200/frame 60 fps · bitmap 2000/frame 61 fps ; lecture 23,2-23,4 fps sur 24 partout.
+Les vecteurs restent ~2× plus chers que les rasters par item (chaque segment est
+re-sérialisé dans le JSON de scène, un raster c'est six nombres et un id).
+
+### 5ter. Géométrie retenue côté moteur (2026-07-28)
+
+Le pattern `register_image`/`imageId` étendu aux paths. Avant : les segments d'un item
+étaient re-sérialisés dans le JSON de scène, re-parsés par serde et reconstruits en
+`BezPath` à **chaque rendu**, même géométrie inchangée. Après : JS enregistre le path une
+fois (`register_path`) et n'envoie plus qu'un `pathRef`.
+
+Mesuré (sérialisation de scène isolée, `SMEngineBridge.timeSceneBuild`) :
+2000 vecteurs 5,2 ms/1652 Ko → **1,5 ms/300 Ko** ; 4000 vecteurs 15,0 ms/6156 Ko →
+**2,8 ms/606 Ko**. Scrub bout-en-bout (médiane d'intervalle rAF) : 36,2 → 27,7 ms à 2000,
+96,3 → 57,7 ms à 4000.
+
+**L'invariant unique dont tout dépend : l'identité d'objet d'un dict de stroke stocké EST
+son identité de géométrie.** `desP` tamponne le dict source sur `path.data.__engineSrcDict`
+(app.js) ; engine-bridge mappe dict → clé moteur. Trois conséquences à ne jamais oublier :
+
+1. **Seuls les calques dont `getEffectiveStrokes` renvoie le tableau STOCKÉ sont éligibles.**
+   `symbolId` (un composant avec caméra/symMatrix passe par `cloneStrokeForTransform`, qui
+   fabrique des dicts NEUFS à chaque appel), `montageId` et `lfsGroup` synthétisent — pour
+   eux l'identité ne veut rien dire. Mesuré avant le garde : le store grimpait 0 → 25 → 50
+   → 75 sur des passes de scrub identiques. Le garde est explicite (`layerRetainable`) et
+   `_registerCap` (250k) est un filet dur pour qu'une future branche synthétisante dégrade
+   en « pas de gain » plutôt qu'en fuite mémoire.
+   ⚠️ Une heuristique « n'enregistrer qu'un dict vu deux fois » a été essayée et NE SUFFIT
+   PAS : « vu deux fois » signifie « la scène a été construite deux fois pendant que ce dict
+   vivait », ce qu'un second rendu entre deux `loadFrame` satisfait trivialement.
+
+2. **La mutation live doit invalider le stamp.** Hook sur `_changed`, avec le masque de bits
+   **découvert par auto-test** et non codé en dur — et deux pièges vérifiés empiriquement :
+   `Path` a son PROPRE `_changed` (le système de classes de Paper capture `base` par
+   référence directe, donc patcher `Item.prototype` seul n'intercepte rien : zéro callback
+   mesuré), et un item **non inséré** ne déclenche aucun `_changed` du tout — c'est ce qui
+   avait produit un masque nul silencieux au premier essai. `CompoundPath`/`Raster` n'ont
+   pas de `_changed` propre et héritent d'`Item` : les DEUX prototypes doivent être hookés.
+   Si l'auto-test échoue, la fonctionnalité reste OFF (le rendu garde son comportement).
+
+3. **Le gain n'existe que si `serP()` est sauté.** Première version : garder serP+roundSegs
+   inconditionnels et n'économiser que les octets JSON → **36 → 33 fps, soit pire**, le
+   lookup n'étant que du coût ajouté. C'est le parcours du path Paper qui domine, pas la
+   taille du JSON.
+
+**Vérification** : `setRetainedPathsEnabled(false)` est un vrai interrupteur (aussi filet en
+prod). Rendu prouvé **identique octet pour octet** (PNG via `render_to_pixels`) ON vs OFF sur
+7 frames, après gomme, après undo/redo, et avec un CompoundPath en donut réel. Attention en
+testant : `renderFrameToPixelsPNG` appelle `loadFrame`, qui reconstruit les items et les
+RE-TAMPONNE — un A/B naïf compare donc refs contre refs et passe toujours.
+
+**v2 — Motion inclus (`pathTransform`).** Toute la chaîne élément → calque → parents est une
+composition d'affines autour d'un pivot : elle est repliée en UNE matrice 2×3 envoyée à côté
+du ref (`affineFromMotion`/`affineMul`, engine-bridge), que le moteur compose avec sa
+view transform. Une forme ANIMÉE réutilise donc son path enregistré au lieu de re-sérialiser
+chaque coordonnée. Mesuré : 2000 vect + Motion 7,33 ms/1751 Ko → **1,82 ms/573 Ko** (4,0×) ;
+4000 vect + Motion 26,68 ms/6349 Ko → **3,71 ms/1149 Ko** (7,2×). Coût réel par tick de scrub
+(boucle déterministe, cf. ci-dessous) : 2000 sans Motion 22,8 → 17,1 ms ; 4000 avec Motion
+83,2 → 59,0 ms.
+
+⚠️ **`affineFromMotion` DOIT rester le miroir exact de `transformSegments` (motion.js)** —
+mise à l'échelle dans le repère local du pivot, rotation autour du pivot, translation en
+dernier. Si les deux divergent, l'image ne change que pour les formes animées, donc
+silencieusement : c'est un pixel-A/B qui l'attrape, pas une relecture (§3).
+
+**Quatre exclusions, chacune parce qu'elle changerait l'image** : offsets par vertex (seule
+pièce non affine), **échelle non uniforme** n'importe où dans la chaîne (le chemin inline
+multiplie la largeur de trait par `(|sx|+|sy|)/2` alors que le moteur trace À TRAVERS
+l'affine — ça ne coïncide que si `sx == sy`, sinon c'est une plume elliptique), fill en
+dégradé (ses ancres sont pré-transformées inline), et l'overlay `currentFrameOutline` (sa
+largeur de trait est une constante écran qui ne doit pas suivre l'affine). Avec
+`pathTransform`, JS envoie donc la largeur de trait **non multipliée**.
+
+⚠️ **L'enregistrement lit `segsBefore`, la géométrie AVANT transformation** — un path stocké
+doit vivre dans l'espace propre de la forme, jamais posé. Le premier jet de la v2
+enregistrait la géométrie posée : un calque en permanence animé ne présentant jamais de frame
+non transformée, il ne pouvait jamais amorcer son entrée de store.
+
+**Identité de rendu, chiffrée** : v1 (non transformé) reste **identique au bit près**. v2
+avec `pathTransform` diffère au pire de **63 px sur 2 073 600 (0,003 %), écart de canal max
+1/255** — artefact d'ORDRE D'ARRONDI (inline arrondit après transformation, le retenu arrondit
+avant puis applique une affine exacte), pas une erreur de maths : le transport de points est
+exact à 1e-15, vérifié point à point contre `transformSegments`. Une forme mal placée
+donnerait des milliers de pixels à 255.
+
+**Mesurer la perf ici : les sondes fps basées sur rAF ne sont PAS fiables** — la boucle de
+sonde et le tick rAF du moteur s'aliasent, et le même réglage a donné des résultats
+contradictoires d'un run à l'autre (37→36 fps puis 28→39 fps). Utiliser
+`SMEngineBridge.timeSceneBuild(n)` pour la sérialisation isolée, et une boucle synchrone
+`goToFrame + timeSceneBuild(1)` pour le coût par tick. Le reste du coût est `loadFrame`/`desP`
+qui reconstruit les objets Paper — non touché par ce chantier, c'est le mur suivant.
+
+### 5quater. `loadFrame` ne reconstruit plus ce qui n'a pas changé (2026-07-28)
+
+Après la géométrie retenue, le mur suivant était `loadFrame` lui-même : **32,6 ms sur 37,0 ms
+par frame (88 %) étaient `desP`**, à reconstruire 4000 objets Paper. Les alternatives de
+construction plafonnent à 1,4× (mesuré : `add()` par segment 7,33 µs/path, constructeur avec
+tableau de Segments 6,33, tableaux bruts 5,33) — pas de quoi changer de catégorie.
+
+Le vrai levier : `getEffectiveStrokes` renvoie **le tableau STOCKÉ** (`f.strokes`, ou celui de
+la keyframe héritée). Donc toute frame qui MAINTIENT sur une keyframe rend le **même objet
+tableau** — et `loadFrame` reconstruisait des calques dont le contenu était identique.
+Mesuré : 83 % des couples calque-frame sur un projet en maintien de 6.
+
+`_canReuseMaterialized(lyr, strokes)` (app.js) saute `removeChildren` + reconstruction quand
+**les trois** conditions tiennent :
+1. `lyr._matStrokes === strokes` — test d'IDENTITÉ, et c'est le point : tout écrivain
+   REMPLACE le tableau (`f.strokes = strokes`), il ne le mute pas en place, donc une frame
+   modifiée présente toujours un objet différent. Les branches composant/montage/lfs
+   synthétisent un tableau neuf à chaque appel : elles ne matchent jamais et continuent de
+   reconstruire, inchangées.
+2. `!lyr._smGeomDirty` — drapeau posé par le MÊME hook `_changed` que la géométrie retenue
+   (§5ter), sur `this._parent`. Sans lui, un sculpt non sauvegardé sur une frame non-keyframe
+   survivrait au rechargement, alors que `loadFrame` doit l'annuler. Vérifié en pilotant :
+   mutation → drapeau à true → `loadFrame` reconstruit → mutation annulée.
+3. `lyr.children.length === strokes.length` — paranoïa. `desP`/`desR` émettent exactement un
+   item par stroke ; toute divergence force une reconstruction plutôt que de faire confiance
+   à la seule identité (c'est ce qui rattrape un trait fraîchement dessiné, ajouté au calque
+   sans que `_matStrokes` bouge).
+
+Le garde global `window.__smGeomDirtyHookInstalled` : si le hook n'est pas posé (moteur
+désactivé, auto-test échoué), **aucune réutilisation** — sans signal de saleté il n'y a aucun
+moyen de savoir si les items live ont été édités.
+
+Mesuré : `loadFrame` 35,1 → **3,35 ms** à 4000 traits (10,5×) ; 8,3 → **0,64 ms** à 2000
+(12,8×). Coût par tick de scrub bout-en-bout : 42,4 → **13,7 ms** à 4000 (3,1×), 13,8 →
+**5,8 ms** à 2000, 16,2 → **6,4 ms** à 2000+Motion.
+
+⚠️ **Pire cas honnête : une keyframe sur CHAQUE frame de chaque calque ne gagne rien**
+(8,1 → 8,06 ms, mesuré) — mais ne régresse pas non plus. L'animation traditionnelle est
+pleine de maintiens (« on twos »/« on threes »), c'est là que ça paie.
+
+**Vérification** : rendu identique (PNG) entre réutilisation et reconstruction forcée sur
+8 frames en Animation 2D, 6 en Motion, 5 sur le projet réel ; trait réellement dessiné au
+geste puis aller-retour de frame (stocké et enfants cohérents, visible à l'écran) ; undo/redo ;
+masquage/réaffichage de calque ; gomme.
+
+### 5quinquies. Le store d'images du moteur est borné (2026-07-28)
+
+Le premier mur du côté FOOTAGE de l'app (vidéo/images/séquences), et ce n'est pas une
+lenteur : c'est une limite dure. `register_image` insérait sans jamais rien retirer — son
+propre commentaire l'assumait, « cached for the engine's whole lifetime ». Correct pour un
+document de dessin avec quelques rasters importés, intenable pour du métrage.
+
+**Mesuré** : 120 frames distinctes en 640×360 = **105,5 Mo** décodés, soit 5 secondes à
+24 fps. À 1920×1080 c'est ~950 Mo pour les mêmes 5 s, ~11 Go la minute. Rien n'en libérait
+un octet.
+
+**L'éviction est pilotée par JS, pas par le moteur** — même raison que pour les paths
+retenus (§5ter) : ce côté-ci sait ce que la scène en cours de construction référence
+réellement, et il peut toujours re-téléverser (les pixels reviennent du canvas du Raster
+Paper, ou du push par frame des ponts vidéo/référence). Une LRU côté moteur devrait deviner,
+et une mauvaise devinette fait disparaître une image de l'image sans autre signal qu'un
+warning.
+
+Politique : LRU par dernière UTILISATION (dernière émission dans une scène), jusqu'à un
+budget d'octets (**384 Mo par défaut**, `setImageBudgetBytes`). `_imgUsedThisBuild` est
+ouvert au début de `buildSceneJson` et fermé au retour : **rien de ce que la frame courante
+dessine n'est jamais candidat**. Côté Rust : `retire_images`, `image_store_bytes`,
+`image_store_size`.
+
+⚠️ Deux bugs à moi, tous deux trouvés par la mesure et pas par la relecture :
+- `Math.max(1, n | 0)` — **la coercition bitwise déborde à 2³¹**, donc un budget de 4 Go
+  atterrissait sur 1 octet et vidait tout le store dès la première frame. `Math.floor`.
+- Une image fraîchement téléversée doit compter comme **utilisée**, pas seulement comme
+  enregistrée : sans l'ajouter à `_imgUsedThisBuild`, elle devenait candidate à l'éviction
+  à l'instant même où elle arrivait (le store finissait à 0 en dessinant quand même, via
+  re-upload permanent).
+
+**Vérification** : sous un budget de 8 Mo forçant une éviction continue (223 évictions), les
+frames rendues sont **identiques au pixel près** à la référence en budget large, sur 6 frames.
+Budget 32 Mo : 36 images retenues, 31,6 Mo, sous budget, ça dessine. Aucune régression côté
+dessin — 2000 rasters partageant une source ne tiennent qu'UNE entrée (3,1 ms/frame, zéro
+éviction), et le projet réel de l'utilisateur n'évince rien.
+
+**Le budget n'est pas un réglage « perf » mais un réglage MACHINE** — c'est l'équivalent du
+cache RAM d'After Effects. Il devra être exposé dans les Réglages quand le côté footage
+sortira, avec une valeur par défaut dérivée de la VRAM disponible plutôt que la constante
+actuelle.
+
 **`renderNow(true)` (viewportOnly) est un contrat d'appelant** : seul le viewport a changé
 depuis le dernier rendu. Vrai pour pan/rotate (aucun item de scène ne dépend de center ou de
 la rotation ; les poignées en `1/view.zoom` dépendent du ZOOM seul). JAMAIS l'inférer
@@ -206,8 +449,17 @@ Checklist avant `npm run build` :
    confirme `--enable-gpl --enable-libx264 --enable-libx265`). Le piper en sous-processus est
    de la "simple agrégation" (le pattern standard de tout logiciel de montage commercial qui
    embarque ffmpeg), nettement plus sain juridiquement que le linkage direct qu'on avait avant
-   — mais ça ne fait pas disparaître la dépendance GPL en soi. Avant toute vente, il faudra
-   toujours une build ffmpeg custom LGPL-only décode-seul si on veut être totalement propre.
+   — mais ça ne fait pas disparaître la dépendance GPL en soi, ni la question SÉPARÉE des
+   brevets logiciels H.264/H.265 (libx264/libx265) qui touche même une build 100% conforme GPL.
+   **Ce n'est plus seulement "avant toute vente" — passage open source (2026-08-17, audit
+   complet dans [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)) : rendu bloquant avant toute
+   publication publique du repo tel quel.** Correctif recommandé : build ffmpeg custom
+   `--disable-gpl` sans libx264/libx265 (garder libvpx/libaom-libsvtav1/libopus =
+   royalty-free), ce qui fait converger le MP4 desktop et le WebM navigateur (`export.js`,
+   `exportVideoBrowser`/`exportGifBrowser`, 2026-08-17) sur la même famille de codec — le
+   chemin navigateur, lui, n'embarque AUCUN codec (MediaRecorder délègue au navigateur de
+   l'utilisateur, licence déjà payée par l'éditeur du navigateur) et n'a donc aucun problème
+   équivalent.
 4. Si c'est un vrai changement fonctionnel (pas juste un patch de bug) : lancer
    `./scripts/publish-update.sh "notes"` après la build pour que les installs existantes le
    voient — voir §6 pour le détail des tokens nécessaires.

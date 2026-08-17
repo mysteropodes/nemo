@@ -48,10 +48,18 @@
   var KEY_VER = 'nemo-timeline-fc-ver';
   var CUR_VER = '2'; // bump whenever DEFAULT_FC changes and existing persisted values should be migrated once
   var DEFAULT_FC = 30;
-  // Height of the timeline's bottom chrome band — #layer-ctrls on the panel
-  // side, this scrollbar on the grid side. Keep in sync with #layer-ctrls'
-  // height in style.css.
-  var BOTTOM_BAND_PX = 40;
+  // Height of the timeline's bottom chrome band, which this scrollbar is
+  // centred in. Was 40px when the layer buttons lived down there too; they
+  // moved into #layer-hdr (2026-07-27) so the band only has to clear the
+  // bar, then both were halved on top of that ("le glisser pour zoomer la
+  // timeline toute cette zone là tu peux réduire le heigth de 50%").
+  // BOTTOM_BAND_PX MUST equal #layer-panel's and #fg-col's padding-bottom in
+  // style.css — those two keep the panel and the grid ending at the same y,
+  // and this centres the bar in whatever they leave free. BAR_H is the bar's
+  // own height, used for both the CSS and that centring, so the two can't
+  // drift the way a hardcoded 12 in the formula did.
+  var BOTTOM_BAND_PX = 8;
+  var BAR_H = 6;
 
   // Bug found 2026-07 ("impossible de l'amener jusqu'au bout"): with the
   // old 64px ceiling, closing the scrollbar-handle gap all the way down
@@ -107,14 +115,15 @@
     // of being a static CSS left:0/bottom:0.
     var wrapRect = wrap.getBoundingClientRect();
     bar.style.left = wrapRect.left + 'px';
-    // BELOW the grid, centred in the 40px band that #layer-ctrls occupies on
-    // the panel side — not `wrapRect.bottom - 12`, which laid it over the
+    // BELOW the grid, centred in the reserved bottom band (BOTTOM_BAND_PX,
+    // matched by #layer-panel's and #fg-col's padding-bottom) — not
+    // `wrapRect.bottom - 12`, which laid it over the
     // last row (2026-07-25: "double barre de scroll, une en haut avec les
     // poignées bleues alors qu'elle devrait aller à la place de celle en bas
-    // en grise"). #fg-wrap now stops at the separator line and #fg-col
-    // leaves that band free, so the bar reads as the timeline's bottom
-    // chrome, level with the panel's buttons, instead of covering content.
-    bar.style.top = (wrapRect.bottom + Math.round((BOTTOM_BAND_PX - 12) / 2)) + 'px';
+    // en grise"). #fg-wrap stops at the separator line and both columns
+    // leave that band free, so the bar reads as the timeline's bottom
+    // chrome instead of covering content.
+    bar.style.top = (wrapRect.bottom + Math.round((BOTTOM_BAND_PX - BAR_H) / 2)) + 'px';
     bar.style.width = trackW + 'px';
     thumb.style.width = thumbW + 'px';
     thumb.style.left = thumbLeft + 'px';
@@ -133,8 +142,17 @@
       '#fg-wrap{scrollbar-width:none;-ms-overflow-style:none;}' +
       '#fg-wrap::-webkit-scrollbar{display:none;}' +
       '#tlzoom-scrollbar .tlzoom-sb-full{opacity:.5;}' +
-      '#tlzoom-scrollbar .tlzoom-sb-handle{background:rgba(74,158,255,.65);transition:background .1s,transform .1s;}' +
-      '#tlzoom-scrollbar .tlzoom-sb-handle:hover{background:#4ea9ff;transform:scaleX(1.15);}';
+      // The blue cap is drawn by ::after at HALF the element's width
+      // (2026-07-27: "les poignée bleu… peuvent être réduite de 50% en
+      // width — je parle bien visuellement des poignée bleu"). The
+      // element itself keeps its full EDGE_PX so the grab zone is
+      // unchanged; shrinking the element instead would have made a
+      // already-6px-tall control genuinely hard to hit.
+      '#tlzoom-scrollbar .tlzoom-sb-handle{background:none;}' +
+      '#tlzoom-scrollbar .tlzoom-sb-handle::after{content:"";position:absolute;top:0;bottom:0;width:50%;background:rgba(74,158,255,.65);border-radius:inherit;transition:background .1s,transform .1s;}' +
+      '#tlzoom-scrollbar .tlzoom-sb-handle.tlzoom-sb-left::after{left:0;}' +
+      '#tlzoom-scrollbar .tlzoom-sb-handle.tlzoom-sb-right::after{right:0;}' +
+      '#tlzoom-scrollbar .tlzoom-sb-handle:hover::after{background:#4ea9ff;transform:scaleX(1.15);}';
     document.head.appendChild(style);
 
     bar = document.createElement('div');
@@ -143,17 +161,17 @@
     // redrawScrollbar()'s comment: a plain absolutely-positioned child of
     // #fg-wrap scrolls away with the content it's meant to control.
     // left/top are resynced to #fg-wrap's live rect on every redraw.
-    bar.style.cssText = 'position:fixed;left:0;top:0;height:12px;z-index:60;background:rgba(255,255,255,.04);border-radius:6px;overflow:visible;';
+    bar.style.cssText = 'position:fixed;left:0;top:0;height:' + BAR_H + 'px;z-index:60;background:rgba(255,255,255,.04);border-radius:' + (BAR_H / 2) + 'px;overflow:visible;';
     thumb = document.createElement('div');
     // Body = pan handle, neutral gray always (no color change on hover —
     // color means "this is a zoom knob", the body deliberately never uses
     // it, hover just gives the familiar grab->grabbing cursor).
-    thumb.style.cssText = 'position:absolute;top:0;height:12px;background:rgba(255,255,255,.14);border-radius:6px;cursor:grab;';
+    thumb.style.cssText = 'position:absolute;top:0;height:' + BAR_H + 'px;background:rgba(255,255,255,.14);border-radius:' + (BAR_H / 2) + 'px;cursor:grab;';
     var leftHandle = document.createElement('div'), rightHandle = document.createElement('div');
     [leftHandle, rightHandle].forEach(function (h, i) {
-      h.className = 'tlzoom-sb-handle';
+      h.className = 'tlzoom-sb-handle ' + (i === 0 ? 'tlzoom-sb-left' : 'tlzoom-sb-right');
       h.title = 'Glisser pour zoomer / dézoomer la timeline';
-      h.style.cssText = 'position:absolute;top:0;width:' + EDGE_PX + 'px;height:12px;cursor:ew-resize;border-radius:' + (i === 0 ? '6px 2px 2px 6px' : '2px 6px 6px 2px') + ';' + (i === 0 ? 'left:0;' : 'right:0;');
+      h.style.cssText = 'position:absolute;top:0;width:' + EDGE_PX + 'px;height:' + BAR_H + 'px;cursor:ew-resize;border-radius:' + (i === 0 ? (BAR_H / 2) + 'px 2px 2px ' + (BAR_H / 2) + 'px' : '2px ' + (BAR_H / 2) + 'px ' + (BAR_H / 2) + 'px 2px') + ';' + (i === 0 ? 'left:0;' : 'right:0;');
       thumb.appendChild(h);
     });
     bar.appendChild(thumb);
@@ -232,10 +250,22 @@
       var newThumbLeft = dragMode === 'zoom-right' ? anchorTrackX : (anchorTrackX - g.thumbW);
       var scrollRatioNew = Math.max(0, Math.min(1, newThumbLeft / Math.max(1, trackW - g.thumbW)));
       wrap2.scrollLeft = scrollRatioNew * g.maxScroll;
-      refresh();
+      // refresh() -> renderTimeline(), which empties and recreates every
+      // ruler cell and grid row (measured 27.7ms at 40 layers). onMove is
+      // bound to raw window pointermove with no throttle, so a zoom-handle
+      // drag queued one full rebuild per event — several per displayed
+      // frame, all but the last one thrown away. Latched to one per
+      // animation frame; onUp does a final unlatched refresh so the last
+      // pointer position always lands. 2026-07-28.
+      if (!refreshRaf) refreshRaf = requestAnimationFrame(function () { refreshRaf = 0; refresh(); });
     }
+    var refreshRaf = 0;
     function onUp() {
       if (!dragMode) return;
+      // Flush the latched rebuild — the drag's final position must not be
+      // left sitting in a cancelled animation frame.
+      if (refreshRaf) { cancelAnimationFrame(refreshRaf); refreshRaf = 0; }
+      if (dragMode !== 'pan') refresh();
       dragMode = null;
       thumb.style.cursor = 'grab';
       localStorage.setItem(KEY, String(window.FC));

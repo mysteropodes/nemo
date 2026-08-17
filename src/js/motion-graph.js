@@ -20,14 +20,27 @@
 
   var HDR_OFFSET = 42;      // #frame-hdr (20) + #bars-row (22), same constant index.html documents
   var PAD_T = 26, PAD_B = 22;
-  var MIN_H = 180;
+  var MIN_H = 180, MAX_H = 900;
   var HANDLE_R = 4;
+  var RH_INSET = 10; // resize handle sits this many px inside the graph's own bottom edge — see render()'s comment
 
   var _on = false;
   var _mode = 'value';      // 'value' | 'speed'
   var _fit = null;          // {min,max} locked range, or null to auto-fit
+  // User-set height override, or null to auto-fill #fg-wrap like before
+  // this existed (2026-07-30, Cyril: "avoir la possibilité d'agrandir en
+  // hauteur les graph de tween car si point trop haut impossible de
+  // select") — auto-fit already rescales the Y range to whatever's
+  // plotted, but a FROZEN range (freezeRange, Alt+click) followed by a
+  // drag that pushes a value beyond it draws that point's handle outside
+  // [0,H] — off the SVG entirely, with nothing to scroll to reach it. A
+  // taller graph is the direct fix: more vertical pixels per unit of
+  // value, so the same range needs less panel height to stay clickable.
+  // Not persisted (matches _fit's own runtime-only lifetime) — a per-
+  // session UI preference, not document content.
+  var _heightOverride = null;
   var _drag = null;
-  var _el = null, _svg = null;
+  var _el = null, _svg = null, _rh = null, _rhDrag = null;
 
   // One colour per property/dimension. Position and Scale are 2D, so their two
   // dimensions must stay distinguishable from each other AND from the other
@@ -113,23 +126,71 @@
     _el.id = 'motion-graph';
     _el.addEventListener('contextmenu', function (e) { e.preventDefault(); e.stopPropagation(); });
     w.appendChild(_el);
+    ensureResizeHandle(w);
     return _el;
   }
 
+  // Bottom-edge drag handle, same thin-strip idiom as ui.js's own
+  // #curve-resize-handle for the Easing Curve widget — a sibling of _el
+  // (not a child) because render() replaces _el's entire innerHTML on
+  // every frame/drag update, which would silently detach a child handle
+  // the next time a key gets dragged.
+  function ensureResizeHandle(w) {
+    if (_rh && _rh.parentNode) return _rh;
+    _rh = document.createElement('div');
+    _rh.id = 'motion-graph-resize';
+    _rh.title = 'Glisser pour agrandir/réduire le graph en hauteur';
+    // z-index high enough to win over #tlzoom-scrollbar (timeline-zoom.js,
+    // z-index:auto, CLAUDE.md §11's "40px bottom band") — when the graph
+    // fills #fg-wrap's full height (no override yet), this handle's default
+    // bottom-flush position sits exactly on that scrollbar's own row and
+    // was losing hit-testing to it (confirmed live: elementFromPoint at the
+    // handle's own rect returned the scrollbar, not this element).
+    _rh.style.cssText = 'position:absolute;left:0;height:7px;cursor:ns-resize;z-index:50;display:none;';
+    w.appendChild(_rh);
+    var rsy, rsh;
+    _rh.addEventListener('mousedown', function (e) {
+      rsy = e.clientY; rsh = height(); _rhDrag = true;
+      e.preventDefault(); e.stopPropagation();
+    });
+    window.addEventListener('mousemove', function (e) {
+      if (!_rhDrag) return;
+      _heightOverride = Math.max(MIN_H, Math.min(MAX_H, rsh + (e.clientY - rsy)));
+      render();
+    });
+    window.addEventListener('mouseup', function () { _rhDrag = false; });
+    return _rh;
+  }
+
   function height() {
+    if (_heightOverride) return Math.max(MIN_H, Math.min(MAX_H, _heightOverride));
     var w = host();
     var h = w ? w.clientHeight - HDR_OFFSET : 0;
     return Math.max(MIN_H, h);
   }
 
   function render() {
-    if (!_on) { if (_el) _el.style.display = 'none'; return; }
+    if (!_on) { if (_el) _el.style.display = 'none'; if (_rh) _rh.style.display = 'none'; return; }
     var el = ensureEl(); if (!el) return;
     el.style.display = 'block';
     var W = state.totalFrames * fc(), H = height();
     el.style.top = HDR_OFFSET + 'px';
     el.style.width = W + 'px';
     el.style.height = H + 'px';
+    if (_rh) {
+      _rh.style.display = 'block';
+      // Inset a few px INTO the graph's own bottom edge rather than sitting
+      // flush with it — flush put this handle on the exact same row as
+      // #tlzoom-scrollbar's own always-present band just below #fg-wrap,
+      // and raising z-index alone didn't win that fight (confirmed live:
+      // elementFromPoint at the handle's own rect still returned the
+      // scrollbar — the two aren't in the same stacking context, so a
+      // local z-index bump here doesn't cross it). Overlapping the graph's
+      // last few content pixels instead of the boundary line sidesteps the
+      // conflict entirely rather than trying to out-rank it.
+      _rh.style.top = (HDR_OFFSET + H - RH_INSET) + 'px';
+      _rh.style.width = W + 'px';
+    }
 
     var all = tracks().map(function (t) { t.pts = sampleCurve(t); return t; });
     var rg = rangeOf(all);

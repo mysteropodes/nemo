@@ -35,6 +35,37 @@
   function shouldIntercept() {
     return window.SMEngineBridge && window.SMEngineBridge.isEnabled() && state.tool === 'subselect' && !state.playing;
   }
+  // 2026-07-29 fix ("les poignées se dessinent hors de la forme sur un
+  // Component déplacé/tourné en Motion"): a layer's Motion Position/
+  // Rotation/Scale is, by design, applied ONLY at render time (engine-
+  // bridge.js's buildSceneJson composes it into a pathTransform matrix —
+  // see motion.js's computeMotionMat/layerMotionAt header comment) and is
+  // NEVER baked into the Paper.js document's own segments. select-bridge.js
+  // already accounts for this on every hit-test (SMMotion.layerMotionPointMap,
+  // .inv to map a click's rendered/world point back into the raw geometry
+  // space `layer.hitTest`/path.segments actually live in) — this file never
+  // did, so every hit-test/drag here silently operated in the WRONG space
+  // the instant the active layer had a non-identity Motion transform (in
+  // practice: any Component instance moved/rotated/scaled via Motion,
+  // per CLAUDE.md §8's auto-conversion rule). Mapping the pointer into
+  // local/document space ONCE, right here, keeps every downstream line in
+  // this file (hit-testing nodeHandles[].pos, layer.hitTest, the node
+  // marquee's containment test, drag delta math) consistently in the SAME
+  // space path.segments/nodeEditSegmentsData already use — no other line
+  // needs to change.
+  function toLocalPoint(pt, layerIdx) {
+    if (!window.SMMotion) return pt;
+    var map = SMMotion.layerMotionPointMap ? SMMotion.layerMotionPointMap(layerIdx) : null;
+    // 3D layers (2026-07-29 fix) — layerMotionPointMap returns null for a
+    // 3D-toggled layer even with real rotationX/rotationY set (it only
+    // recognizes the base 2D properties); layerMotion3DPointMap is the
+    // dedicated perspective-correct counterpart — see its own header
+    // comment in motion.js for the ray-plane-intersection math.
+    if (!map && SMMotion.layerMotion3DPointMap) map = SMMotion.layerMotion3DPointMap(layerIdx);
+    if (!map) return pt;
+    var lp = map.inv(pt.x, pt.y);
+    return new Point(lp[0], lp[1]);
+  }
 
   // Illustrator/Figma "Convert Anchor Point" convention, ported to a plain
   // Alt+click (no drag) instead of a dedicated tool: a point WITH tangent
@@ -87,7 +118,7 @@
     e.stopImmediatePropagation();
     e.preventDefault();
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
-    var pt = new Point(w[0], w[1]);
+    var pt = toLocalPoint(new Point(w[0], w[1]), state.activeLayerIdx);
     lastPt = pt;
     _downClientX = e.clientX; _downClientY = e.clientY; _downAlt = e.altKey;
     window.SMEngineBridge.suspend();
@@ -102,7 +133,35 @@
     }
     if (bestNh) {
       pushUndo();
+      // Promote a HELD frame to a real keyframe before touching geometry.
+      // Without this, editing vertices on a frame that merely inherits an
+      // earlier keyframe was silently DISCARDED: saveActiveLayerFrame (app.js)
+      // returns early when the frame is neither a keyframe nor interpolated,
+      // so the edit lived only in the live Paper items until the next
+      // loadFrame threw it away. Reported 2026-07-28 ("quand je modifie les
+      // vecteurs d'une clé prolongée [...] ça ne modifie pas la clé").
+      //
+      // This also makes subselect answer the same way the Draw tool already
+      // did — drawing on a held frame has always created a keyframe. Same
+      // gesture class, same answer, nothing lost either way.
+      var _wasKey = (function () {
+        var f = state.layers[state.activeLayerIdx].frames[state.currentFrame];
+        return !!(f && (f.isKeyframe || f.isInterpolated));
+      })();
+      ensureKeyframe();
+      if (!_wasKey) {
+        // ensureKeyframe -> loadFrame rebuilds the layer's children, so every
+        // Paper reference captured above is now stale. Re-resolve by INDEX
+        // (bestNh.segIndex stays valid — same geometry, new objects), exactly
+        // as select-bridge's beginDistort does after its own ensureKeyframe.
+        selectedPaths = state.selectedStrokeIndices
+          .map(function (i) { return userLayers[state.activeLayerIdx].children[i]; })
+          .filter(Boolean);
+        if (!selectedPaths.length) return;
+        renderNodeHandles();
+      }
       _nodeDrag.active = true; _nodeDrag.path = selectedPaths[0]; _nodeDrag.segIndex = bestNh.segIndex;
+      _nodeDrag.dragStartPointer = pt.clone(); _nodeDrag.appliedDelta = new Point(0, 0);
       // grabbing one of several marquee-selected anchors drags them all
       if (bestNh.type === 'point' && _nodeSel.indexOf(bestNh.segIndex) >= 0 && _nodeSel.length > 1) {
         _nodeDrag.type = 'group';
@@ -117,6 +176,23 @@
       return;
     }
     var subHit = layer.hitTest(pt, { stroke: true, fill: true, pixel: true, tolerance: 8 / view.zoom });
+    // Isolation entered by a Select double-click (tools.js's
+    // onViewDoubleClick sets _fsIsolation): only that shape/group is
+    // reachable, and a click outside it leaves back to Select. This file is
+    // the ENGINE-ON port of the same branch and the engine is on by default,
+    // so the guard has to exist in both or the gesture behaves differently
+    // depending on the renderer — CLAUDE.md §3's duplicated-pair rule.
+    if (window._fsIsolation && subHit) {
+      var subAllowed = window._fsIsolation.groupId
+        ? !!(subHit.item.data && subHit.item.data.groupId === window._fsIsolation.groupId)
+        : subHit.item === window._fsIsolation.path;
+      if (!subAllowed) subHit = null;
+    }
+    if (!subHit && window._fsIsolation) {
+      window._fsIsolation = null; clearSel(); window.SM.setTool('select');
+      renderArcs(); updateUI(); window.SMEngineBridge.renderNow();
+      return;
+    }
     // Raster companions count too (Bitmap Brush v2, bitmap-brush.js): the
     // visible texture over a bitmap-brush stroke is ONE Raster tagged
     // isBrushTextureCopy — its anchor path has strokeColor camouflaged to
@@ -166,8 +242,21 @@
     e.stopImmediatePropagation();
     e.preventDefault();
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
-    var pt = new Point(w[0], w[1]);
+    var pt = toLocalPoint(new Point(w[0], w[1]), state.activeLayerIdx);
     var delta = pt.subtract(lastPt);
+    if (_nodeDrag.active && (_nodeDrag.type === 'point' || _nodeDrag.type === 'group')) {
+      var desired = pt.subtract(_nodeDrag.dragStartPointer || lastPt);
+      if (e.shiftKey) {
+        var snapped = constrainAngle45(_nodeDrag.dragStartPointer || lastPt, pt);
+        desired = snapped.subtract(_nodeDrag.dragStartPointer || lastPt);
+      }
+      var already = _nodeDrag.appliedDelta || new Point(0, 0);
+      delta = desired.subtract(already);
+      _nodeDrag.appliedDelta = desired;
+    } else if (_nodeDrag.active && e.shiftKey && (_nodeDrag.type === 'handleIn' || _nodeDrag.type === 'handleOut')) {
+      var hs = nodeEditSegmentsData(_nodeDrag.path)[_nodeDrag.segIndex];
+      if (hs) pt = constrainAngle45(new Point(hs.point[0], hs.point[1]), pt);
+    }
 
     if (_nmq.active) {
       var nx1 = Math.min(_nmq.start.x, pt.x), ny1 = Math.min(_nmq.start.y, pt.y);

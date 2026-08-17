@@ -254,6 +254,29 @@
     var lpr = document.getElementById('layer-panel-resize');
     var fg = document.getElementById('fg-wrap');
     [lp, lpr, fg].forEach(function (el) { if (el) el.style.display = on ? 'none' : ''; });
+    // Canvas lockout (2026-07-30 fix — found live: "StoryBoard ne manipule
+    // QUE des Components" per CLAUDE.md §8, but nothing ever enforced it.
+    // Every drawing/edit tool bridge (draw-bridge, shape-bridge, rig-bridge,
+    // pen-bridge, eraser-bridge, fill-bridge, gradient-bridge, select-bridge,
+    // subselect-bridge, symmetry-bridge, perspective-bridge — 12+ files)
+    // attaches its OWN pointerdown listener straight to #canvas-area /
+    // #drawing-canvas, each gated only on `state.tool===<itself>` — none of
+    // them ever checked appMode, so switching to StoryBoard with a drawing
+    // tool still selected left the canvas fully live: dragging Rectangle
+    // silently inserted a new shape into the flat layer underneath, no
+    // warning, no guard. Rather than repeat the same appMode check in every
+    // one of those files (this function is the ONE place setAppMode already
+    // routes every StoryBoard enter/exit through, motion.js:5409), disabling
+    // pointer-events here starves all of them at once — none of their
+    // listeners are even attached to #canvas-area/#drawing-canvas directly
+    // (not document/window), so a non-interactive ancestor is enough to stop
+    // every one of them from ever firing. Same 0.25 dim convention
+    // enterSymbol/enterMontageView already use for "this content exists but
+    // isn't the active context right now" (app.js) — silently freezing the
+    // canvas with no visual change would read as the app hanging, not as
+    // "StoryBoard doesn't touch this."
+    var canvasArea = document.getElementById('canvas-area');
+    if (canvasArea) { canvasArea.style.pointerEvents = on ? 'none' : ''; canvasArea.style.opacity = on ? '0.25' : ''; }
     if (on) { applyView(); render(); }
   }
 
@@ -304,12 +327,61 @@
     sym.layers.forEach(function (sl) {
       var idx = Math.min(fi, sl.frames.length - 1);
       var fr = sl.frames[idx];
-      if (fr && (fr.isKeyframe || fr.isInterpolated)) { out = out.concat(fr.strokes || []); return; }
-      for (var k = idx - 1; k >= 0; k--) {
-        var f2 = sl.frames[k];
-        if (f2 && f2.isKeyframe) { out = out.concat(f2.strokes || []); return; }
+      var slStrokes = null;
+      if (fr && (fr.isKeyframe || fr.isInterpolated)) { slStrokes = fr.strokes || []; }
+      else {
+        for (var k = idx - 1; k >= 0; k--) {
+          var f2 = sl.frames[k];
+          if (f2 && f2.isKeyframe) { slStrokes = f2.strokes || []; break; }
+        }
       }
+      if (!slStrokes) return;
+      // Combine-groups (2026-07-29 fix, QA-confirmed): ld.groups is copied
+      // onto the symbol's own inner layer (convertLayerToComponent/
+      // convertLayersToComponent) but this reader — used by StoryBoard's
+      // montage strip + card thumbnails — read fr.strokes raw, same gap
+      // renderOS/renderGhostAll had (dict-based twin of buildSceneJson's
+      // live renderCombinesFromChildren).
+      if (window.SMGroup && sl.groups) slStrokes = SMGroup.applyCombinesToStrokes(slStrokes, sl);
+      // Duplicator (2026-07-30 fix) — same gap the combine-groups comment
+      // right above already describes for this reader, confirmed live for
+      // a Duplicator specifically: a montage card thumbnail/strip showed
+      // only the seed shape for a component whose inner layer has a
+      // Duplicator, while editing the same component directly showed every
+      // copy. window.applyLayerDuplicator is app.js's own global (this file
+      // loads after it) — same resample/spanStart/spanLen opts
+      // getEffectiveStrokes's symbolId branch (app.js) now passes for the
+      // identical reason: no state.layers index exists for `sl` here.
+      if (sl.duplicator && !sl._dupEditSource && slStrokes.length && window.applyLayerDuplicator) {
+        slStrokes = window.applyLayerDuplicator(sl, slStrokes, idx, null, {
+          spanStart: 0, spanLen: sl.frames.length,
+          resample: function (shiftedIdx) {
+            var rf = sl.frames[shiftedIdx]; if (!rf) return [];
+            if (rf.isKeyframe || rf.isInterpolated) return rf.strokes || [];
+            for (var kk = shiftedIdx - 1; kk >= 0; kk--) { if (sl.frames[kk].isKeyframe) return sl.frames[kk].strokes || []; }
+            return [];
+          }
+        });
+      }
+      out = out.concat(slStrokes);
     });
+    // Component's own camera (2026-07-30 fix) — same gap the two comments
+    // above already describe for this reader, confirmed by code reading:
+    // getEffectiveStrokes's ld.symbolId branch (app.js) bakes sym.cameraKeys
+    // into the instance's content at its own single chokepoint, but this
+    // reader — the ONE other place a symbol's resolved strokes are built,
+    // used by StoryBoard thumbnails AND montageStrokesAt (which in turn
+    // feeds a ld.montageId layer's real getEffectiveStrokes output, i.e.
+    // actual export, not just editor preview) — never did. A Component
+    // animated with an internal camera pan/zoom while edited directly would
+    // silently lose that camera move the moment it's viewed through a
+    // StoryBoard montage. window.applyMatrixToStrokeData/cloneStrokeForTransform
+    // are app.js globals (this file loads after it), same access pattern
+    // already used for window.applyLayerDuplicator right above.
+    if (sym.cameraKeys && sym.cameraKeys.length && window.SMCamera && window.applyMatrixToStrokeData) {
+      var camM = SMCamera.cameraMatrixAtFrame(sym.cameraKeys, fi, state.canvasW, state.canvasH);
+      if (camM) out = out.map(function (sd) { return applyMatrixToStrokeData(cloneStrokeForTransform(sd), camM); });
+    }
     return out;
   }
 
@@ -765,6 +837,7 @@
         var oe = world.querySelector('[data-sb-id="' + o.id + '"]');
         if (oe) neighbors.push({ x: o.x, y: o.y, w: oe.offsetWidth, h: oe.offsetHeight });
       });
+      var downX = e.clientX, downY = e.clientY;
       var moved = false, lastX = e.clientX, lastY = e.clientY, raf = 0, left = false;
       // Dragging a montage BLOCK moves the WHOLE assembly ("quand on drag
       // un montage alors ça doit bouger tout l'ensemble") — snapshot every
@@ -829,6 +902,14 @@
       }
       function mv(ev) {
         lastX = ev.clientX; lastY = ev.clientY;
+        // 4px threshold before this counts as a real drag (2026-07 fix,
+        // matches the click-vs-drag idiom used elsewhere in this app, e.g.
+        // layer-row reordering) — without it, ANY pointermove at all, even
+        // the sub-pixel jitter real mouse/trackpad hardware produces on
+        // what the user experiences as a plain click, immediately desnapped
+        // an already-chained module via apply()'s own "first movement"
+        // branch below, before the user ever intended to drag it.
+        if (!moved && Math.hypot(lastX - downX, lastY - downY) < 4) return;
         moved = true;
         if (!raf) raf = requestAnimationFrame(apply);
       }

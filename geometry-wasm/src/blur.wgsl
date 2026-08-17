@@ -65,7 +65,7 @@ struct Params {
 };
 @group(0) @binding(2) var<uniform> params: Params;
 
-const KERNEL_HALF: i32 = 16; // 33 taps, 1-texel spacing along `dir`
+const KERNEL_HALF: i32 = 24; // 49 taps; spacing adapts for very large radii
 
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
@@ -73,7 +73,12 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let dir = vec2<f32>(params.dir_x, params.dir_y);
     // sigma ≈ radius/3 (practical Gaussian cutoff), floored so radius=0
     // degenerates to an all-weight-on-center passthrough instead of a 0/0.
-    let sigma = max(params.radius_px / 3.0, 0.0001);
+    // Keep dense sampling for small blurs, but cover the complete requested
+    // radius for large blurs instead of clipping the Gaussian at ±16 px.
+    // Linear filtering between these taps preserves a smooth result without
+    // the wide-radius banding of the old fixed-spacing kernel.
+    let sample_step = max(params.radius_px / 24.0, 1.0);
+    let sigma = max(params.radius_px / 3.0 / sample_step, 0.0001);
     let two_sigma2 = 2.0 * sigma * sigma;
     var color_sum = vec3<f32>(0.0);
     var alpha_sum = 0.0;
@@ -81,7 +86,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     for (var i = -KERNEL_HALF; i <= KERNEL_HALF; i = i + 1) {
         let offset_texels = f32(i);
         let w = exp(-(offset_texels * offset_texels) / two_sigma2);
-        let offset = dir * offset_texels * texel;
+        let offset = dir * offset_texels * sample_step * texel;
         let s = textureSample(src_tex, tex_sampler, in.uv + offset);
         color_sum = color_sum + s.rgb * s.a * w;
         alpha_sum = alpha_sum + s.a * w;

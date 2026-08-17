@@ -49,6 +49,19 @@
   // step instead of an ease once read as on-curve waypoints.
   var MOTION_DEFAULT_CURVE=[{x:0,y:0},{x:.25,y:.156},{x:.5,y:.5},{x:.75,y:.844},{x:1,y:1}];
   function motionCurve(){return motionEaseSeg.curvePoints||(motionEaseSeg.curvePoints=clonePts(MOTION_DEFAULT_CURVE));}
+  // Tween-pair points-based ease mode (2026-07 fix — "le easing s'applique à
+  // tous les tween du calque au lieu de juste celui entre les 2 clés"). Root
+  // cause: clicking a tween cell opened this widget in its DEFAULT mode
+  // (editing cs.points, the GLOBAL fallback every pair without its own
+  // state.tweenEasing entry shares), so a drag here visibly reshaped every
+  // OTHER tween that had never been given its own override — indistinguishable
+  // from "one shared curve" since almost no pair gets an explicit override
+  // otherwise. `seg` is the SAME state.tweenEasing[li+':'+fA+'-'+fB] object
+  // timeline.js's buildTweenCurveSVG (inline strips + floating inset) already
+  // reads/writes, so all three editing surfaces stay in agreement.
+  var tweenEaseSeg=null,tweenEaseLabel='',tweenEaseOnChange=null;
+  function isTweenMode(){return !!tweenEaseSeg;}
+  function tweenCurve(){return(tweenEaseSeg.points&&tweenEaseSeg.points.length)?tweenEaseSeg.points:(tweenEaseSeg.points=clonePts(cs.points));}
   // Brush pressure-response curve (2026-07 — audit gap "aucun éditeur de
   // courbe de pression dédié"): same on-curve-waypoint model as the other
   // two modes, but global (one curve, not per-segment/per-key) and stored
@@ -75,8 +88,8 @@
   // independently of whatever this singleton widget happens to be
   // showing, which this widget's one-curve-at-a-time model can't do. Only
   // evalPointsCurve below is shared between the two.)
-  function activePoints(){return isMotionMode()?motionCurve():(isPressureMode()?pressureCurve():cs.points);}
-  function setActivePoints(pts){if(isMotionMode())motionEaseSeg.curvePoints=pts;else if(isPressureMode())state.pressureCurvePoints=pts;else cs.points=pts;}
+  function activePoints(){return isMotionMode()?motionCurve():(isTweenMode()?tweenCurve():(isPressureMode()?pressureCurve():cs.points));}
+  function setActivePoints(pts){if(isMotionMode())motionEaseSeg.curvePoints=pts;else if(isTweenMode())tweenEaseSeg.points=pts;else if(isPressureMode())state.pressureCurvePoints=pts;else cs.points=pts;}
   // A small easing gallery (After Effects/GreenSock-style grid of named
   // curve families, each in/out/inout where that makes sense) — through-
   // point approximations of their usual off-curve-handle shapes, since the
@@ -257,7 +270,7 @@
     // global evalCurve/cs.points), everything else about the rendering is
     // shared with the tween's own curve view.
     ctx.strokeStyle='#4a9eff';ctx.lineWidth=2.5;ctx.beginPath();
-    var evalFn=(isMotionMode()||isPressureMode())?function(x){return evalPointsCurve(pts,x);}:evalCurve;
+    var evalFn=(isMotionMode()||isTweenMode()||isPressureMode())?function(x){return evalPointsCurve(pts,x);}:evalCurve;
     ctx.moveTo(tX(0),tY(evalFn(0),yr));
     var N=100;for(var s=1;s<=N;s++){var xx=s/N;ctx.lineTo(tX(xx),tY(evalFn(xx),yr));}
     ctx.stroke();
@@ -294,7 +307,7 @@
       });
     }
     var coordsEl=document.getElementById('curve-coords');
-    if(coordsEl)coordsEl.textContent=isMotionMode()?motionEaseLabel:(pts.length+' '+SM.t('curvePointsSuffix'));
+    if(coordsEl)coordsEl.textContent=isMotionMode()?motionEaseLabel:(isTweenMode()?tweenEaseLabel:(pts.length+' '+SM.t('curvePointsSuffix')));
   }
   function drawH(nx,ny,c,yr,r){ctx.beginPath();ctx.arc(tX(nx),tY(ny,yr),r,0,Math.PI*2);ctx.fillStyle=c;ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.stroke();}
   function hitT(mx,my){
@@ -310,7 +323,18 @@
   // module doesn't know about Motion mode's rows) — motion.js's own
   // onEaseSegChanged hook (if present) picks up the repaint instead.
   function pushCurve(){
-    if(isMotionMode()){if(window.SMMotion&&window.SMMotion.onEaseSegChanged)window.SMMotion.onEaseSegChanged();return;}
+    // Pass the segment itself (2026-07-30, Cyril: "on devrait pouvoir
+    // appliquer les tween directement depuis le panneau easing... ça
+    // devrait être automatique sur les keyframes select") — motion.js's
+    // handler needs to know WHICH key just changed to copy its curvePoints
+    // onto every OTHER selected key too.
+    if(isMotionMode()){if(window.SMMotion&&window.SMMotion.onEaseSegChanged)window.SMMotion.onEaseSegChanged(motionEaseSeg);return;}
+    // Tween-pair mode: state.tweenEasing[key] is already mutated in place
+    // (setActivePoints/dragging write straight into tweenEaseSeg.points) —
+    // but unlike Motion (evaluated live every frame) a tween's frames are
+    // BAKED, so the caller's onChange callback (set by editTweenPair, see
+    // timeline.js's call site) must re-run generateTweens for this pair.
+    if(isTweenMode()){if(tweenEaseOnChange)tweenEaseOnChange();return;}
     // Pressure mode: state.pressureCurvePoints is already mutated in place
     // (setActivePoints/dragging write straight into it) — nothing else to
     // persist, applyPressureCurve (tools.js) reads it live on every stroke
@@ -334,6 +358,7 @@
       var c1=[tX(e2[0]),tY(e2[1],yr)],c2=[tX(e2[2]),tY(e2[3],yr)];
       var d1=Math.hypot(mx-c1[0],my-c1[1]),d2=Math.hypot(mx-c2[0],my-c2[1]);
       if(window.pushUndo)window.pushUndo(); // camera ease is part of the framing — Cmd+Z restores it too
+      window._scrubLiveActive=true; // see mouseup below + dragTangent's own comment — no pushCurve on this path today, kept consistent so a future one can't reopen the flood
       camDragWhich=d1<=d2?0:1;
       return;
     }
@@ -348,6 +373,14 @@
         for(var hi2=0;hi2<hs.length;hi2++){
           if(Math.hypot(mx-tX(hs[hi2].x),my-tY(hs[hi2].y,yrT))<10){
             if(window.pushUndo)window.pushUndo(); // one undo per tangent gesture — same convention as the camera handles above
+            // 2026-07-30 fix: this pushUndo() was the only real snapshot —
+            // nothing raised _scrubLiveActive afterward, so every mousemove
+            // tick's pushCurve()→...→generateTweens()→pushUndoLayers() (tween
+            // mode) pushed its OWN full undo entry, unthrottled, for the
+            // whole drag. A single tangent drag with the multi-select easing
+            // apply (pushCurve fans out to every selected tween pair) could
+            // evict the entire 60-entry undo cap in well under a second.
+            window._scrubLiveActive=true;
             dragTangent={idx:selected,dir:hs[hi2].dir};
             return;
           }
@@ -355,6 +388,14 @@
       }
     }
     var hit=hitT(mx,my);
+    // 2026-07-30 fix: unlike the camera-handle and tangent-handle drags just
+    // above (both already call pushUndo once per gesture), plain point-drag
+    // had NEITHER a pre-gesture snapshot NOR the _scrubLiveActive guard —
+    // every mousemove tick's pushCurve()→pushUndoLayers() (tween mode) was a
+    // full, unguarded undo entry, so Ctrl+Z after a drag only undid its last
+    // tick instead of the whole gesture, and the flood could evict the
+    // 60-entry undo cap on its own.
+    if(hit>=0){if(window.pushUndo)window.pushUndo();window._scrubLiveActive=true;}
     dragging=hit>=0?hit:null;
     if(hit>=0){selected=hit;showTangents=e.altKey;}
     else showTangents=false; // plain click off any point clears the sticky reveal
@@ -412,7 +453,17 @@
     p.y=Math.max(-1,Math.min(2,ny));
     draw();pushCurve();
   });
-  window.addEventListener('mouseup',function(){dragging=null;camDragWhich=null;dragTangent=null;});
+  window.addEventListener('mouseup',function(){
+    // No extra commit needed here (verified live, 2026-07-30 — an earlier
+    // version of this fix added one and it double-pushed): mousemove above
+    // already calls pushCurve() on EVERY tick, including the last one right
+    // before mouseup, so the final point position and its generateTweens
+    // re-bake are already applied by the time this fires. All this needs to
+    // do is close out the gesture — clearing _scrubLiveActive is what lets
+    // the NEXT unrelated pushUndoLayers() call through again.
+    dragging=null;camDragWhich=null;dragTangent=null;
+    window._scrubLiveActive=false;
+  });
   cvs.addEventListener('dblclick',function(e){
     if(isCamMode())return; // camera mode has exactly 2 fixed control points, nothing to add
     rect=cvs.getBoundingClientRect();
@@ -545,7 +596,7 @@
     // Clears motion mode too — only one "currently edited segment" at a
     // time on this one shared canvas.
     editCameraSeg:function(seg,label){
-      motionEaseSeg=null;pressureEaseActive=false;
+      motionEaseSeg=null;tweenEaseSeg=null;pressureEaseActive=false;
       camEaseSeg=seg;camEaseLabel=label||'';
       if(window.openPropsSection)window.openPropsSection('easing-sec');
       draw();
@@ -559,7 +610,7 @@
     // lazily created/mutated in place, same live-reference contract
     // editCameraSeg already has for `.ease`).
     editMotionSeg:function(seg,label){
-      camEaseSeg=null;pressureEaseActive=false;
+      camEaseSeg=null;tweenEaseSeg=null;pressureEaseActive=false;
       motionEaseSeg=seg;motionEaseLabel=label||'';
       selected=null;
       if(window.openPropsSection)window.openPropsSection('easing-sec');
@@ -569,11 +620,27 @@
       if(!motionEaseSeg)return;
       motionEaseSeg=null;draw();
     },
+    // Tween-pair points-based ease editing (2026-07 fix) — see tweenEaseSeg
+    // above. `seg` is state.tweenEasing[li+':'+fA+'-'+fB] itself; `onChange`
+    // is called after every commit (drag-end, add/delete point, preset
+    // click — anything that already calls pushCurve()) so the caller can
+    // re-bake this pair's frames (timeline.js's onTweenPairCurveChanged).
+    editTweenPair:function(seg,label,onChange){
+      camEaseSeg=null;motionEaseSeg=null;pressureEaseActive=false;
+      tweenEaseSeg=seg;tweenEaseLabel=label||'';tweenEaseOnChange=onChange||null;
+      selected=null;
+      if(window.openPropsSection)window.openPropsSection('easing-sec');
+      draw();
+    },
+    exitTweenPair:function(){
+      if(!tweenEaseSeg)return;
+      tweenEaseSeg=null;tweenEaseOnChange=null;draw();
+    },
     // Pressure-curve editing (2026-07, audit gap "aucun éditeur de courbe
     // de pression dédié") — see pressureEaseActive/pressureCurve above.
     // Global, no `seg`/label param needed (there's only ever one).
     editPressureCurve:function(){
-      camEaseSeg=null;motionEaseSeg=null;
+      camEaseSeg=null;motionEaseSeg=null;tweenEaseSeg=null;
       pressureEaseActive=true;selected=null;
       if(window.openPropsSection)window.openPropsSection('easing-sec');
       draw();
@@ -584,6 +651,7 @@
     },
     isCameraMode:isCamMode,
     isMotionMode:isMotionMode,
+    isTweenMode:isTweenMode,
     isPressureMode:isPressureMode
   };
   // Pure function of an explicit points array (no closure state touched) —
@@ -614,9 +682,20 @@
   // All right-panel sections start collapsed (Selection/Component Instance
   // are already display:none by default via their own conditional-show
   // logic — collapsing their body too is harmless, they just won't have
-  // been expanded when they eventually become visible on selection).
-  document.querySelectorAll('.psec .pbdy').forEach(function(b){b.classList.add('hid');});
-  document.querySelectorAll('.psec .phdr').forEach(function(h){h.classList.add('closed');});
+  // been expanded when they eventually become visible on selection), EXCEPT
+  // Selected Colors: its own header comment (index.html) documents it as
+  // "toujours visible" (fill/stroke colors of the selection, or the active
+  // layer+canvas's colors when nothing is selected) — every other panel's
+  // collapsed-by-default state gets fixed by SOME later trigger
+  // (updatePropsContext for tool panels, autoExpandOnSelection here for the
+  // has-a-selection case), but the no-selection case had no such trigger,
+  // so on a fresh launch (nothing ever selected yet) this panel silently
+  // stayed collapsed and empty forever — "ça ne fonctionne pas quand rien
+  // n'est sélectionné alors qu'il faudrait" (2026-07-28). Starting it
+  // expanded like any other always-on panel sidesteps needing a second
+  // auto-open trigger for the opposite edge.
+  document.querySelectorAll('.psec .pbdy').forEach(function(b){if(b.id!=='selected-colors-body')b.classList.add('hid');});
+  document.querySelectorAll('.psec .phdr').forEach(function(h){if(h.id!=='selected-colors-hdr'&&!h.contains(document.getElementById('selected-colors-hdr')))h.classList.add('closed');});
 
   // Panel-visibility-by-context is now owned by updatePropsContext() in
   // timeline.js (the unified Properties panel: Transform/Fill/Stroke/Tool
@@ -627,7 +706,18 @@
   // (scrubbable number fields show their own value directly — no separate label span to sync anymore)
   var rh=document.getElementById('tl-resize'),ta=document.getElementById('timeline-area'),rsy,rsh;
   rh.addEventListener('mousedown',function(e){rsy=e.clientY;rsh=ta.offsetHeight;window._tlResize=true;e.preventDefault();});
-  window.addEventListener('mousemove',function(e){if(!window._tlResize)return;ta.style.height=Math.max(80,Math.min(500,rsh+(rsy-e.clientY)))+'px';});
+  window.addEventListener('mousemove',function(e){
+    if(!window._tlResize)return;
+    // Cap was a flat 500px regardless of window size — feedback: "monter
+    // la timeline presque en haut". #top-area (canvas+panels row) has
+    // flex:1/min-height:0, so it shrinks freely; the only real ceiling is
+    // the window itself. Reserve 150px above the timeline (34px
+    // #app-topbar + a usable sliver of canvas/tools, not the full 500)
+    // so dragging all the way up still leaves the mode-switch/topbar
+    // reachable instead of the timeline eating the whole window.
+    var maxH=Math.max(500,window.innerHeight-150);
+    ta.style.height=Math.max(80,Math.min(maxH,rsh+(rsy-e.clientY)))+'px';
+  });
   window.addEventListener('mouseup',function(){window._tlResize=false;});
 
   // Layers panel horizontal resize — same drag-a-thin-bar pattern as the
@@ -804,6 +894,14 @@
     });
   }
   document.getElementById('frame-hdr').addEventListener('mousedown',function(e){
+    // LEFT button only. Without this, a right-click on the ruler scrubbed the
+    // playhead — and worse, the e.preventDefault() below on a button-2
+    // mousedown SUPPRESSES the contextmenu event that would follow, so the
+    // ruler's own right-click menu (markers, BPM grid, trim to work area)
+    // could never open at all. Found 2026-07-26 by right-clicking the ruler
+    // as a user: the menu I had added was unreachable from the one place it
+    // belongs, while the playhead jumped instead.
+    if(e.button!==0)return;
     var wrap=document.getElementById('fg-wrap');var rect=wrap.getBoundingClientRect();
     var x=e.clientX-rect.left+wrap.scrollLeft;var frame=Math.floor(x/FC);
     if(frame>=0&&frame<(window._totalF||24)){scrubbing=true;if(window.SM){window.SM.stopPlay();window.SM.goToFrame(frame);}}
@@ -815,6 +913,7 @@
   // "click somewhere in this thin strip of frame cells".
   var playheadFlag=document.getElementById('playhead-flag');
   if(playheadFlag)playheadFlag.addEventListener('mousedown',function(e){
+    if(e.button!==0)return; // same reason as the ruler above
     scrubbing=true;if(window.SM)window.SM.stopPlay();
     e.preventDefault();e.stopPropagation();
   });
@@ -888,6 +987,15 @@
     var el=e.target.closest?e.target.closest('[title],[data-tip]'):null;
     if(!el){tip.classList.remove('show');return;}
     if(el.hasAttribute('title')){el.dataset.tip=el.getAttribute('title');el.removeAttribute('title');}
+    // Inside the timeline the hint goes to the status bar instead (2026-08-16,
+    // Cyril: "enlève les tooltip sur la timeline, affiche plutôt les tip dans
+    // la barre noir du bas à gauche"). timeline.js mirrors the same `title`
+    // text into #statusbar-help for this region, so without this the two fired
+    // together and the floating box ALSO covered the very bars/keys/handles
+    // being hovered — the one place in the app where a tooltip lands directly
+    // on top of the thing you are aiming at. The title->data-tip swap above
+    // still runs first so that mirror keeps finding the text under either name.
+    if(el.closest('#tl-content')){tip.classList.remove('show');return;}
     var t=el.dataset.tip;if(!t){tip.classList.remove('show');return;}
     tip.textContent=t;tip.classList.add('show');
     var r=el.getBoundingClientRect();
@@ -903,8 +1011,20 @@
   // the right panel to re-dock it (at the position under the cursor), drop
   // it anywhere else and it stays floating where you left it; its header
   // remains draggable to move it again. Docked order persists per label.
-  var secDrag={el:null,startX:0,startY:0,started:false,offX:0,offY:0,wasFloating:false};
-  function secKey(sec){var h=sec.querySelector('.phdr');return h?h.textContent.replace(/[^A-Za-z]/g,'').slice(0,20):'';}
+  var secDrag={el:null,startX:0,startY:0,started:false,offX:0,offY:0,wasFloating:false,before:true};
+  var secDropIndicator=document.createElement('div');
+  secDropIndicator.id='panel-drop-indicator';
+  document.body.appendChild(secDropIndicator);
+  // Keyed on the section's ID, not its header text (2026-07-26): two
+  // sections legitimately share the header "Effects" (#effects-stack-sec,
+  // the per-layer effect stack, and #effects-sec, the tool-options one), so
+  // a text key couldn't tell them apart — a save/restore cycle could swap
+  // their positions. Text keys are also language-dependent (data-i18n), so
+  // switching languages used to orphan the whole saved order. The legacy
+  // text key stays as a read-time fallback so pre-existing saved orders
+  // still restore once, after which the next drag re-saves as IDs.
+  function secLegacyKey(sec){var h=sec.querySelector('.phdr');return h?h.textContent.replace(/[^A-Za-z]/g,'').slice(0,20):'';}
+  function secKey(sec){return sec.id||secLegacyKey(sec);}
   function saveSecOrder(){
     var pp=document.getElementById('props-panel');
     try{localStorage.setItem('nemo-panel-order',JSON.stringify(Array.prototype.slice.call(pp.querySelectorAll('.psec:not(.floating)')).map(secKey)));}catch(e){}
@@ -915,7 +1035,7 @@
     var pp0=document.getElementById('props-panel');
     savedOrder.forEach(function(k){
       var secs=Array.prototype.slice.call(pp0.querySelectorAll('.psec'));
-      var m=secs.filter(function(s){return secKey(s)===k;})[0];
+      var m=secs.filter(function(s){return secKey(s)===k||secLegacyKey(s)===k;})[0];
       if(m)pp0.appendChild(m);
     });
   }
@@ -944,13 +1064,22 @@
     secDrag.el.style.left=Math.max(0,Math.min(window.innerWidth-fw,e.clientX-secDrag.offX))+'px';
     secDrag.el.style.top=Math.max(0,Math.min(window.innerHeight-fh,e.clientY-secDrag.offY))+'px';
     document.querySelectorAll('.psec.drag-over-sec').forEach(function(s){s.classList.remove('drag-over-sec');});
+    secDropIndicator.style.display='none';
     var ppr=document.getElementById('props-panel').getBoundingClientRect();
     if(e.clientX>=ppr.left&&e.clientX<=ppr.right&&e.clientY>=ppr.top&&e.clientY<=ppr.bottom){
       secDrag.el.style.pointerEvents='none';
       var under=document.elementFromPoint(e.clientX,e.clientY);
       secDrag.el.style.pointerEvents='';
       var over=under&&under.closest?under.closest('.psec'):null;
-      if(over&&over!==secDrag.el)over.classList.add('drag-over-sec');
+      if(over&&over!==secDrag.el){
+        over.classList.add('drag-over-sec');
+        var or=over.getBoundingClientRect();
+        secDrag.before=e.clientY<or.top+or.height/2;
+        secDropIndicator.style.display='block';
+        secDropIndicator.style.left=or.left+'px';
+        secDropIndicator.style.width=or.width+'px';
+        secDropIndicator.style.top=(secDrag.before?or.top:or.bottom)+'px';
+      }
     }
   });
   window.addEventListener('mouseup',function(e){
@@ -963,12 +1092,16 @@
         var over2=document.querySelector('.psec.drag-over-sec');
         secDrag.el.classList.remove('floating');
         secDrag.el.style.left='';secDrag.el.style.top='';
-        if(over2)pp3.insertBefore(secDrag.el,over2);
+        if(over2){
+          if(secDrag.before)pp3.insertBefore(secDrag.el,over2);
+          else pp3.insertBefore(secDrag.el,over2.nextSibling);
+        }
         else pp3.appendChild(secDrag.el);
         saveSecOrder();
       }
       window._secDragJustEnded=true;
       document.querySelectorAll('.psec').forEach(function(s){s.classList.remove('drag-sec','drag-over-sec');});
+      secDropIndicator.style.display='none';
     }
     secDrag.el=null;secDrag.started=false;
   });
@@ -981,10 +1114,13 @@
 
   // Rive-style scrubbable numeric fields, replacing every slider in the
   // right panel: drag left/right on the field to change its value (hold
-  // Shift for fine 0.1-step adjustments, Alt for x10 coarse steps — same
-  // modifier convention Rive/AE use), or just click to place a caret and
-  // type a value directly. A plain click (no drag) never fires a change,
-  // so tabbing/typing behaves exactly like a normal number input.
+  // Cmd/Ctrl for fine 0.1-step adjustments — more precise, Shift for x10
+  // coarse steps — reaches further per pixel dragged; 2026-07-28, explicit
+  // request to match this exact pairing "comme dans toutes les app du
+  // genre" — replaces an earlier Shift=fine/Alt=coarse mapping), or just
+  // click to place a caret and type a value directly. A plain click (no
+  // drag) never fires a change, so tabbing/typing behaves exactly like a
+  // normal number input.
   // Pointer Events + explicit setPointerCapture, not raw mousedown/mousemove/
   // mouseup on window: the previous version tracked drag state in a plain
   // closure variable cleared on a *global* window 'mouseup' listener — if
@@ -1064,7 +1200,10 @@
       window._scrubLiveActive=true;
     }
     var step=parseFloat(scrubState.el.dataset.step)||1;
-    if(e.shiftKey)step*=0.1;else if(e.altKey)step*=10;
+    // Cmd (Mac) / Ctrl (Windows/Linux) = precise (fine, ×0.1) ; Shift =
+    // reaches further per pixel (coarse, ×10) — see this block's own
+    // header comment for why this exact pairing.
+    if(e.metaKey||e.ctrlKey)step*=0.1;else if(e.shiftKey)step*=10;
     var raw=scrubState.startVal+Math.round(dx/4)*step;
     var min=scrubState.el.min!==''?parseFloat(scrubState.el.min):null;
     var max=scrubState.el.max!==''?parseFloat(scrubState.el.max):null;

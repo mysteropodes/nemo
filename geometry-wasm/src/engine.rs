@@ -10,15 +10,45 @@
 // inherently async) and keeps the returned handle to call `.render(json)`
 // on every frame.
 use serde::{Deserialize, Serialize};
-use vello::kurbo::{Affine, BezPath, Shape, Stroke};
+use vello::kurbo::{Affine, BezPath, Rect, Shape, Stroke};
 use vello::peniko::Color;
 use vello::{wgpu, AaConfig, AaSupport, RenderParams, Renderer, RendererOptions, Scene};
 use wasm_bindgen::prelude::*;
 use web_sys::HtmlCanvasElement;
 
-#[derive(Deserialize, Serialize)]
+// Clone (2026-08, masks): composite_scene's Add-mask union step needs a
+// contiguous `&[ItemIn]` of just the Add-mode masks pulled out of
+// LayerIn::masks (a Vec<MaskIn>, not a Vec<ItemIn>) — cloning that handful
+// of mask items into a fresh Vec is the simplest way to get one without
+// changing paint_layer_items' slice-based signature (used elsewhere,
+// CLAUDE.md §3 territory). Cheap: masks are a handful of items, cloned
+// once per frame, nowhere near the hot path.
+#[derive(Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ItemIn {
+    // Reference into the engine's retained path store (register_path) — when
+    // present, `segments`/`closed` are ABSENT by contract and the stored
+    // BezPath is used instead. Precedence: `image` > `pathRef` > `centerline`
+    // > `segments` (mirrors the existing "richer field wins" convention).
+    // NOTE: the legacy Phase-C1 selection APIs (select_at, selection_bounds,
+    // apply_transform — zero JS callers today, selection lives in Paper.js)
+    // do NOT resolve pathRef; if they are ever revived they must go through
+    // the same store lookup paint_layer_items uses, or refs will read as
+    // empty geometry there (bug family §1).
+    #[serde(default)]
+    pub(crate) path_ref: Option<String>,
+    // Affine [a,b,c,d,e,f] (SVG/kurbo convention) composed with the view
+    // transform for THIS item only — lets an animated shape reuse its
+    // registered path instead of falling back to re-serializing every
+    // coordinate. Element/layer/parent Motion matrices are all affine around
+    // a pivot, so the whole chain collapses into one of these.
+    //
+    // The stroke rides the same transform, so JS must send the UNSCALED
+    // strokeWidth when this is present (it pre-multiplies by strokeScale on
+    // the inline path). Only emitted for uniformly-scaled chains, where
+    // vello's stroking and JS's (|sx|+|sy|)/2 agree exactly.
+    #[serde(default)]
+    pub(crate) path_transform: Option<[f64; 6]>,
     #[serde(default)]
     pub(crate) segments: Vec<SegIn>,
     #[serde(default)]
@@ -88,7 +118,7 @@ pub(crate) struct ItemIn {
     #[serde(default)]
     pub(crate) effects: Vec<EffectIn>,
 }
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ImageRef {
     pub(crate) image_id: String,
@@ -164,14 +194,21 @@ pub(crate) struct LayerIn {
     #[serde(default)]
     pub(crate) blend_mode: Option<String>,
     // Track matte (2026-07, scouted from Caddis's Layer.matteMode): this
-    // layer's alpha comes from the layer immediately ABOVE it in the
-    // stack (AE convention — "matteLayerId" is implicit, always the next
-    // layer up, never named explicitly) instead of its own painted pixels'
-    // alpha. "alpha"/"alphaInverted"/"luma"/"lumaInverted"; None/"none" is
-    // the default (no matte). The matte SOURCE layer itself is consumed —
-    // composite_scene skips painting it as its own visible layer.
+    // layer's alpha comes from a SOURCE layer's painted pixels instead of
+    // its own. "alpha"/"alphaInverted"/"luma"/"lumaInverted"; None/"none"
+    // is the default (no matte). The matte SOURCE layer itself is consumed
+    // — composite_scene skips painting it as its own visible layer.
     #[serde(default)]
     pub(crate) matte_mode: Option<String>,
+    // Which layer is the matte source (2026-07-31, uid-based mattes):
+    // resolved entirely JS-side from ld.matteSourceLayerUid (engine-bridge's
+    // buildSceneJson final pass) — the engine stays stateless and purely
+    // positional, it just no longer ASSUMES adjacency. None = the legacy
+    // implicit "layer directly above (i+1)" AE convention (scene JSON from
+    // older saves whose uid didn't resolve, or pre-migration projects) —
+    // see resolve_matte_source, the single reader of both conventions.
+    #[serde(default)]
+    pub(crate) matte_source_index: Option<usize>,
     // Adjustment/effect layer (2026-07, Motion) — an AE-style layer with no
     // painted content of its own whose EFFECTS STACK (below) applies to
     // EVERYTHING BELOW it in the layer stack instead of just itself.
@@ -210,6 +247,41 @@ pub(crate) struct LayerIn {
     // (per-layer only).
     #[serde(default)]
     pub(crate) effects: Vec<EffectIn>,
+    // Vector masks (2026-08, AE-style "Mask", per-layer geometry that clips
+    // this layer's own content — distinct from matte_mode/matte_source_index
+    // above, which clips against ANOTHER layer). JS (engine-bridge.js)
+    // pre-builds each mask's `item` as solid opaque white fill/no stroke —
+    // only its GEOMETRY matters here, never its real on-canvas paint, so
+    // paint_layer_items can render it completely unmodified (see
+    // composite_scene's mask-combine algorithm for why this needs no new
+    // WGSL: Add is a plain union (all Add items painted in one Scene —
+    // overlapping opaque white stays opaque white), Subtract/Intersect
+    // reuse matte_pass's own alpha-multiply math one mask at a time).
+    #[serde(default)]
+    pub(crate) masks: Vec<MaskIn>,
+    // ONE shared feather (world px, pre-scaled by JS same as any other
+    // radius-shaped effect param) applied to the FINAL combined silhouette,
+    // not per-mask — a deliberate v1 simplification (see the mask-feature
+    // audit): AE feathers each mask individually before combining, but the
+    // overwhelmingly common case is one mask per masked layer, where the
+    // two are indistinguishable, and a single shared value avoids a whole
+    // extra per-mask blur+combine interleaving for a rarely-exercised case.
+    #[serde(default)]
+    pub(crate) mask_feather: f64,
+}
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct MaskIn {
+    pub(crate) item: ItemIn,
+    // "add" (union, default) | "subtract" | "intersect" — same vocabulary
+    // as AE's own mask mode dropdown (minus Lighten/Darken/Difference,
+    // dropped for v1: rare in practice and each needs its own compose
+    // formula beyond matte_pass's reusable alpha-multiply).
+    #[serde(default = "default_mask_mode")]
+    pub(crate) mode: String,
+}
+fn default_mask_mode() -> String {
+    "add".to_string()
 }
 
 #[derive(Deserialize, Serialize, Clone)]
@@ -284,6 +356,8 @@ fn mix_mode_index(name: Option<&str>) -> u32 {
 #[derive(Deserialize, Serialize)]
 pub(crate) struct SceneIn {
     pub(crate) layers: Vec<LayerIn>,
+    #[serde(default)]
+    pub(crate) time: f32,
 }
 
 // Builds the filled ribbon outline for a pressure-brush stroke from its
@@ -507,13 +581,17 @@ struct Viewport {
     pan_x: f64,
     pan_y: f64,
     zoom: f64,
+    // Logical editor zoom, excluding the device-pixel ratio baked into
+    // `zoom` for geometry rasterization. Pixel-space effects use this so
+    // Retina displays do not accidentally double their radius/block size.
+    effect_zoom: f64,
     rotation: f64,
     pivot_x: f64,
     pivot_y: f64,
 }
 impl Default for Viewport {
     fn default() -> Self {
-        Viewport { pan_x: 0.0, pan_y: 0.0, zoom: 1.0, rotation: 0.0, pivot_x: 0.0, pivot_y: 0.0 }
+        Viewport { pan_x: 0.0, pan_y: 0.0, zoom: 1.0, effect_zoom: 1.0, rotation: 0.0, pivot_x: 0.0, pivot_y: 0.0 }
     }
 }
 impl Viewport {
@@ -564,6 +642,21 @@ pub struct VelloEngine {
     // lets vello's own internal resource cache recognize "this is the same
     // image as last frame" and skip re-uploading pixels to the GPU.
     images: std::collections::HashMap<String, vello::peniko::ImageData>,
+    // Retained path store (2026-07-28) — the `images` pattern above, applied
+    // to vector geometry. A stroke's segments used to be re-serialized into
+    // the scene JSON, re-parsed by serde, and rebuilt into a BezPath on EVERY
+    // render even though the geometry hadn't changed since the last frame —
+    // measured as the reason 2000 vector strokes scrubbed at 31fps while
+    // 2000 rasters (six numbers + an id per item) reached 61fps. JS registers
+    // a path once via register_path() and then sends only `pathRef` in the
+    // scene item; the JS side owns invalidation (a Paper `_changed` hook
+    // clears the item→dict stamp on any geometry mutation) and retirement
+    // (FinalizationRegistry on the stroke dicts → retire_paths()). This side
+    // is a dumb map on purpose: no LRU, no eviction heuristics — a silent
+    // engine-side eviction would make a referenced path vanish from the
+    // picture with no JS-visible signal (same reasoning as registeredImageIds
+    // never guessing at lifetimes). A pathRef miss paints nothing and warns.
+    paths: std::collections::HashMap<String, BezPath>,
     // 1×1 transparent "atlas keepalive" drawn far off-canvas into EVERY
     // scene (see composite_scene) — works around a vello 0.9 atlas bug
     // found live (2026-07-17, "trait bitmap brush disparaît après dessin
@@ -626,6 +719,26 @@ pub struct VelloEngine {
     matte_source_view: wgpu::TextureView,
     matte_result_tex: wgpu::Texture,
     matte_result_view: wgpu::TextureView,
+    // ---- Vector masks (2026-08, AE-style "Mask" — see composite_scene's
+    // mask handling) — NOT a new pipeline: masks reuse matte_pipeline
+    // itself (the "multiply alpha" math a Subtract/Intersect combine needs
+    // IS matte_pass's own alpha-matte formula) and blur_pass for feather.
+    // Only new textures are needed: mask_scratch (vello writes a single
+    // mask's own white-filled geometry here, or the union of every
+    // Add-mode mask in one render — STORAGE_BINDING, same shape as
+    // matte_source), and an accum ping-pong pair + one result texture
+    // (RENDER_ATTACHMENT, our own matte_pass writes these, same shape as
+    // matte_result) for chaining Subtract/Intersect masks one at a time
+    // and then applying the finished silhouette to the layer's own
+    // content. See composite_scene's doc comment on the combine algorithm.
+    mask_scratch_tex: wgpu::Texture,
+    mask_scratch_view: wgpu::TextureView,
+    mask_accum_a_tex: wgpu::Texture,
+    mask_accum_a_view: wgpu::TextureView,
+    mask_accum_b_tex: wgpu::Texture,
+    mask_accum_b_view: wgpu::TextureView,
+    mask_applied_tex: wgpu::Texture,
+    mask_applied_view: wgpu::TextureView,
     // ---- Feather/blur compositor (blur.wgsl, see composite_scene's blur
     // handling and blur.wgsl's own doc comment) ----
     // blur_result reuses matte_result's exact texture shape (RENDER_ATTACHMENT
@@ -645,6 +758,8 @@ pub struct VelloEngine {
     // scratch before the screen-blend composite — unrelated to this one).
     blur_scratch_tex: wgpu::Texture,
     blur_scratch_view: wgpu::TextureView,
+    bloom_extract_tex: wgpu::Texture,
+    bloom_extract_view: wgpu::TextureView,
     // ---- Effect (adjustment) layers (2026-07) — color_adjust.wgsl. No
     // result_tex/view of its own: unlike blur_result above (used for a
     // per-layer blur that still needs to flow into the ordinary composite/
@@ -715,6 +830,9 @@ pub struct VelloEngine {
     // other shader bug in this file; it can't corrupt or crash the wasm
     // instance).
     custom_effect_pipelines: std::collections::HashMap<String, wgpu::RenderPipeline>,
+    // Current scene time in seconds, copied from SceneIn before each render.
+    // Custom/simple WGSL effects receive it as params.time.
+    fx_time: f32,
 }
 
 // ---- Blend compositor plumbing (see blend.wgsl's doc comment) ----
@@ -880,7 +998,15 @@ fn create_matte_result_texture(device: &wgpu::Device, width: u32, height: u32) -
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,
         format: BLEND_SCRATCH_FORMAT,
-        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+        // COPY_DST (2026-08, masks): the Add-mask union step needs to copy
+        // mask_scratch's vello output (STORAGE_BINDING) into mask_accum_a
+        // (built via this function) so the Subtract/Intersect loop always
+        // reads/writes RENDER_ATTACHMENT-shaped textures — every OTHER
+        // texture built here (matte_result/blur_result/blur_scratch/
+        // bloom_extract) is only ever a render-pass TARGET, never a plain
+        // copy destination, so this flag was never needed before; adding
+        // it is a pure no-op for them.
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
         view_formats: &[],
     });
     let view = tex.create_view(&wgpu::TextureViewDescriptor::default());
@@ -1047,6 +1173,35 @@ fn matte_mode_of(s: Option<&str>) -> Option<(u32, bool)> {
         Some("luma") => Some((1, false)),
         Some("lumaInverted") => Some((1, true)),
         _ => None,
+    }
+}
+
+/// The ONE place "which layer is layer `i`'s matte source" is answered
+/// (2026-07-31, uid-based mattes) — used by BOTH composite_scene sites (the
+/// is_matte_source precompute AND the paint-time lookup), which previously
+/// each hardcoded `i + 1` independently: exactly the duplicated-readers
+/// drift trap this repo's CLAUDE.md §3 documents for render/render_to_pixels.
+/// Explicit matte_source_index wins (JS-resolved from matteSourceLayerUid,
+/// may point anywhere in the stack, above or below); None falls back to the
+/// legacy implicit "directly above (i+1)" convention so old scene JSON keeps
+/// rendering unchanged. Out-of-range or self-referencing indices return None
+/// — the matte degrades to a no-op for the frame instead of panicking or
+/// silently masking against the wrong layer.
+fn resolve_matte_source(layers: &[LayerIn], i: usize) -> Option<usize> {
+    if matte_mode_of(layers[i].matte_mode.as_deref()).is_none() {
+        return None;
+    }
+    let n = layers.len();
+    match layers[i].matte_source_index {
+        Some(s) if s < n && s != i => Some(s),
+        Some(_) => None,
+        None => {
+            if i + 1 < n {
+                Some(i + 1)
+            } else {
+                None
+            }
+        }
     }
 }
 
@@ -1540,11 +1695,13 @@ fn create_simple_fx_pipeline(device: &wgpu::Device) -> (wgpu::RenderPipeline, wg
         min_filter: wgpu::FilterMode::Linear,
         ..Default::default()
     });
-    // 32 bytes: effect_id, p1, p2, p3, tex_w, tex_h, time, pad — see
-    // simple_fx.wgsl's Params.
+    // 48 bytes: effect_id, p1, p2, p3, tex_w, tex_h, time, p4, bbox_x,
+    // bbox_y, bbox_w, bbox_h — see simple_fx.wgsl's Params. (2026-07-30:
+    // grew from 32 bytes to add the bbox_* fields — see run_one_effect's
+    // own doc comment for why.)
     let uniform_buf = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("simple-fx-params"),
-        size: 32,
+        size: 48,
         usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         mapped_at_creation: false,
     });
@@ -1613,18 +1770,28 @@ fn simple_fx_pass(
     p2: f32,
     p3: f32,
     p4: f32,
+    time: f32,
     tex_w: f32,
     tex_h: f32,
+    bbox_x: f32,
+    bbox_y: f32,
+    bbox_w: f32,
+    bbox_h: f32,
     target_view: &wgpu::TextureView,
 ) {
-    let mut payload = [0u8; 32];
+    let mut payload = [0u8; 48];
     payload[0..4].copy_from_slice(&effect_id.to_le_bytes());
     payload[4..8].copy_from_slice(&p1.to_le_bytes());
     payload[8..12].copy_from_slice(&p2.to_le_bytes());
     payload[12..16].copy_from_slice(&p3.to_le_bytes());
     payload[16..20].copy_from_slice(&tex_w.to_le_bytes());
     payload[20..24].copy_from_slice(&tex_h.to_le_bytes());
+    payload[24..28].copy_from_slice(&time.to_le_bytes());
     payload[28..32].copy_from_slice(&p4.to_le_bytes());
+    payload[32..36].copy_from_slice(&bbox_x.to_le_bytes());
+    payload[36..40].copy_from_slice(&bbox_y.to_le_bytes());
+    payload[40..44].copy_from_slice(&bbox_w.to_le_bytes());
+    payload[44..48].copy_from_slice(&bbox_h.to_le_bytes());
     queue.write_buffer(uniform_buf, 0, &payload);
     let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("simple-fx-bind-group"),
@@ -1801,6 +1968,7 @@ fn paint_layer_items(
     items: &[ItemIn],
     view_tf: Affine,
     images: &std::collections::HashMap<String, vello::peniko::ImageData>,
+    paths: &std::collections::HashMap<String, BezPath>,
 ) {
     for item in items {
         if let Some(img_ref) = &item.image {
@@ -1823,20 +1991,46 @@ fn paint_layer_items(
             }
             continue;
         }
-        let bez = match build_bezpath(item) {
-            Some(b) => b,
-            None => continue,
+        // Retained-ref first: a pathRef item carries no segments at all, so
+        // falling through to build_bezpath would silently skip it. A missing
+        // store entry paints nothing but WARNS (console via console_log) —
+        // it means the JS registration/retirement contract was broken, and a
+        // silent skip here is exactly how "the shape vanished" class bugs
+        // stay invisible (see the CompoundPath story in engine-bridge.js).
+        let built: BezPath;
+        let bez: &BezPath = if let Some(r) = &item.path_ref {
+            match paths.get(r) {
+                Some(p) => p,
+                None => {
+                    log::warn!("pathRef '{}' not in retained store — item skipped", r);
+                    continue;
+                }
+            }
+        } else {
+            match build_bezpath(item) {
+                Some(b) => {
+                    built = b;
+                    &built
+                }
+                None => continue,
+            }
+        };
+        // A retained path is stored in its own untransformed space; its
+        // per-item Motion chain arrives as one affine folded in here.
+        let item_tf = match &item.path_transform {
+            Some(m) => view_tf * Affine::new(*m),
+            None => view_tf,
         };
         let paint_fill = |scene: &mut Scene| {
             if let Some(grad) = item.fill_gradient.as_ref().and_then(gradient_brush) {
-                scene.fill(vello::peniko::Fill::NonZero, view_tf, &grad, None, &bez);
+                scene.fill(vello::peniko::Fill::NonZero, item_tf, &grad, None, bez);
             } else if let Some(fc) = item.fill_color {
-                scene.fill(vello::peniko::Fill::NonZero, view_tf, color_from(fc), None, &bez);
+                scene.fill(vello::peniko::Fill::NonZero, item_tf, color_from(fc), None, bez);
             }
         };
         let paint_stroke = |scene: &mut Scene| {
             if let Some(sc) = item.stroke_color {
-                scene.stroke(&stroke_from(item), view_tf, color_from(sc), None, &bez);
+                scene.stroke(&stroke_from(item), item_tf, color_from(sc), None, bez);
             }
         };
         if item.paint_order.as_deref() == Some("strokeFirst") {
@@ -1976,9 +2170,14 @@ pub async fn create_engine(
     let (matte_pipeline, matte_bind_group_layout, matte_sampler, matte_uniform_buf) = create_matte_pipeline(&device);
     let (matte_source_tex, matte_source_view) = create_blend_layer_texture(&device, width, height);
     let (matte_result_tex, matte_result_view) = create_matte_result_texture(&device, width, height);
+    let (mask_scratch_tex, mask_scratch_view) = create_blend_layer_texture(&device, width, height);
+    let (mask_accum_a_tex, mask_accum_a_view) = create_matte_result_texture(&device, width, height);
+    let (mask_accum_b_tex, mask_accum_b_view) = create_matte_result_texture(&device, width, height);
+    let (mask_applied_tex, mask_applied_view) = create_matte_result_texture(&device, width, height);
     let (blur_pipeline, blur_bind_group_layout, blur_sampler, blur_uniform_buf) = create_blur_pipeline(&device);
     let (blur_result_tex, blur_result_view) = create_matte_result_texture(&device, width, height);
     let (blur_scratch_tex, blur_scratch_view) = create_matte_result_texture(&device, width, height);
+    let (bloom_extract_tex, bloom_extract_view) = create_matte_result_texture(&device, width, height);
     let (color_pipeline, color_bind_group_layout, color_sampler, color_uniform_buf) = create_color_adjust_pipeline(&device);
     let (vignette_pipeline, vignette_bind_group_layout, vignette_sampler, vignette_uniform_buf) = create_vignette_pipeline(&device);
     let (simple_fx_pipeline, simple_fx_bind_group_layout, simple_fx_sampler, simple_fx_uniform_buf) = create_simple_fx_pipeline(&device);
@@ -2002,6 +2201,7 @@ pub async fn create_engine(
         surface_format: format,
         surface_alpha_mode: alpha_mode,
         images: std::collections::HashMap::new(),
+        paths: std::collections::HashMap::new(),
         atlas_keepalive: vello::peniko::ImageData {
             data: vec![0u8, 0, 0, 0].into(),
             format: vello::peniko::ImageFormat::Rgba8,
@@ -2027,6 +2227,14 @@ pub async fn create_engine(
         matte_source_view,
         matte_result_tex,
         matte_result_view,
+        mask_scratch_tex,
+        mask_scratch_view,
+        mask_accum_a_tex,
+        mask_accum_a_view,
+        mask_accum_b_tex,
+        mask_accum_b_view,
+        mask_applied_tex,
+        mask_applied_view,
         blur_pipeline,
         blur_bind_group_layout,
         blur_sampler,
@@ -2035,6 +2243,8 @@ pub async fn create_engine(
         blur_result_view,
         blur_scratch_tex,
         blur_scratch_view,
+        bloom_extract_tex,
+        bloom_extract_view,
         color_pipeline,
         color_bind_group_layout,
         color_sampler,
@@ -2056,6 +2266,7 @@ pub async fn create_engine(
         element_build_b_tex,
         element_build_b_view,
         custom_effect_pipelines: std::collections::HashMap::new(),
+        fx_time: 0.0,
     })
 }
 
@@ -2104,7 +2315,21 @@ impl VelloEngine {
     /// never needs `&mut self`, which is what lets apply_effect_stack below
     /// hold multiple `&self.effect_stack_*_view` borrows across a loop
     /// without fighting the borrow checker.
-    fn run_one_effect(&self, eff: &EffectIn, source: &wgpu::TextureView, target: &wgpu::TextureView) {
+    // `bbox` = (x, y, w, h) in DEVICE PIXELS — the on-screen bounding box of
+    // whatever this effect is actually attached to (one item for a per-
+    // element effect, the whole layer's items for a per-layer effect, or
+    // the full canvas for an adjustment/effect layer, which has no shape of
+    // its own — see items_bbox_px and this fn's three call sites). Forwarded
+    // into simple_fx_pass's Params uniform so shader bodies that need a
+    // "center of MY content" concept (Twirl/Bulge/Spherize/etc., see
+    // shader-effects-library.js's local_uv convention) don't have to assume
+    // that's the center of the canvas — see local_uv's own doc comment
+    // (register_custom_effect) for why that assumption was wrong: Cyril,
+    // 2026-07-30, "un effet Wgsl... quand on zoom dans le canvas... même en
+    // bougeant le canvas avec la main" — reproduced live, a Twirl effect's
+    // pattern changed under PURE PANNING (no zoom at all), which only makes
+    // sense if the effect's reference frame was the viewport, not the shape.
+    fn run_one_effect(&self, eff: &EffectIn, source: &wgpu::TextureView, target: &wgpu::TextureView, bbox: (f32, f32, f32, f32)) {
         // Every PIXEL-space effect parameter below (blur/glow radius,
         // pixelate block size, chromatic-aberration offset, contour
         // thickness, halftone cell size) is applied to the raster AFTER
@@ -2123,7 +2348,7 @@ impl VelloEngine {
         // that must NOT grow with zoom). Not applied to custom: WGSL
         // effects below — p1..p4 there have no fixed meaning this
         // function could assume is a pixel size.
-        let z = self.viewport.zoom.max(0.0001) as f32;
+        let z = self.viewport.effect_zoom.max(0.0001) as f32;
         match eff.effect_type.as_str() {
             "colorAdjust" => color_adjust_pass(
                 &self.device, &self.queue, &self.color_pipeline, &self.color_bind_group_layout, &self.color_sampler, &self.color_uniform_buf,
@@ -2143,6 +2368,24 @@ impl VelloEngine {
                 blur_pass(
                     &self.device, &self.queue, &self.blur_pipeline, &self.blur_bind_group_layout, &self.blur_sampler, &self.blur_uniform_buf,
                     source, eff.p1.unwrap_or(16.0) * z, self.width, self.height, &self.blur_scratch_view, &self.blur_result_view,
+                );
+                composite_pass(
+                    &self.device, &self.queue, &self.blend_pipeline, &self.blend_bind_group_layout, &self.blend_sampler, &self.blend_uniform_buf,
+                    source, &self.blur_result_view, 2, target,
+                );
+            }
+            "hqBloom" => {
+                // Threshold/brightness pass, no "center of my shape" concept
+                // — full-canvas bbox (a no-op for this effect either way).
+                simple_fx_pass(
+                    &self.device, &self.queue, &self.simple_fx_pipeline, &self.simple_fx_bind_group_layout, &self.simple_fx_sampler, &self.simple_fx_uniform_buf,
+                    source, 14.0,
+                    eff.p1.unwrap_or(0.55), 0.0, eff.p3.unwrap_or(1.4), eff.p4.unwrap_or(0.25),
+                    self.fx_time, self.width as f32, self.height as f32, 0.0, 0.0, self.width as f32, self.height as f32, &self.bloom_extract_view,
+                );
+                blur_pass(
+                    &self.device, &self.queue, &self.blur_pipeline, &self.blur_bind_group_layout, &self.blur_sampler, &self.blur_uniform_buf,
+                    &self.bloom_extract_view, eff.p2.unwrap_or(28.0) * z, self.width, self.height, &self.blur_scratch_view, &self.blur_result_view,
                 );
                 composite_pass(
                     &self.device, &self.queue, &self.blend_pipeline, &self.blend_bind_group_layout, &self.blend_sampler, &self.blend_uniform_buf,
@@ -2210,7 +2453,7 @@ impl VelloEngine {
                         &self.device, &self.queue, &self.simple_fx_pipeline, &self.simple_fx_bind_group_layout, &self.simple_fx_sampler, &self.simple_fx_uniform_buf,
                         source, effect_id,
                         p1, eff.p2.unwrap_or(default_p2), eff.p3.unwrap_or(default_p3), eff.p4.unwrap_or(default_p4),
-                        self.width as f32, self.height as f32, target,
+                        self.fx_time, self.width as f32, self.height as f32, bbox.0, bbox.1, bbox.2, bbox.3, target,
                     );
                 }
             }
@@ -2231,7 +2474,7 @@ impl VelloEngine {
                         &self.device, &self.queue, pipeline, &self.simple_fx_bind_group_layout, &self.simple_fx_sampler, &self.simple_fx_uniform_buf,
                         source, 0.0,
                         eff.p1.unwrap_or(0.0), eff.p2.unwrap_or(0.0), eff.p3.unwrap_or(0.0), eff.p4.unwrap_or(0.0),
-                        self.width as f32, self.height as f32, target,
+                        self.fx_time, self.width as f32, self.height as f32, bbox.0, bbox.1, bbox.2, bbox.3, target,
                     );
                 }
             }
@@ -2256,17 +2499,72 @@ impl VelloEngine {
     /// "0 = disabled, no GPU cost" convention the old single-field version
     /// had via 0-valued radius/opacity) — this function assumes at least
     /// one enabled entry exists.
-    fn apply_effect_stack(&self, initial_source: &wgpu::TextureView, effects: &[EffectIn]) -> bool {
+    fn apply_effect_stack(&self, initial_source: &wgpu::TextureView, effects: &[EffectIn], bbox: (f32, f32, f32, f32)) -> bool {
         let enabled: Vec<&EffectIn> = effects.iter().filter(|e| e.enabled).collect();
         let mut current: &wgpu::TextureView = initial_source;
         let mut use_a = true;
         for eff in &enabled {
             let target: &wgpu::TextureView = if use_a { &self.effect_stack_a_view } else { &self.effect_stack_b_view };
-            self.run_one_effect(eff, current, target);
+            self.run_one_effect(eff, current, target, bbox);
             current = target;
             use_a = !use_a;
         }
         !use_a
+    }
+
+    /// Union on-screen (device-pixel) bounding box of `items` after
+    /// `view_tf` — mirrors paint_layer_items' own per-item geometry
+    /// resolution (path_ref lookup / build_bezpath, item_tf construction,
+    /// placed image rect) so the box matches exactly what actually got
+    /// painted. Falls back to the full canvas when no item resolves to real
+    /// geometry (matches every effect's pre-existing canvas-wide behavior
+    /// for that edge case — an empty/unresolvable set of items is not
+    /// something a distortion effect can meaningfully center on anyway).
+    fn items_bbox_px(&self, items: &[ItemIn], view_tf: Affine) -> (f32, f32, f32, f32) {
+        let mut acc: Option<Rect> = None;
+        for item in items {
+            let item_rect = if let Some(img_ref) = &item.image {
+                let rect = Rect::new(img_ref.x, img_ref.y, img_ref.x + img_ref.width, img_ref.y + img_ref.height);
+                let place = if img_ref.rotation != 0.0 {
+                    let (cx, cy) = (img_ref.x + img_ref.width / 2.0, img_ref.y + img_ref.height / 2.0);
+                    Affine::translate((cx, cy)) * Affine::rotate(img_ref.rotation.to_radians()) * Affine::translate((-cx, -cy))
+                } else {
+                    Affine::IDENTITY
+                };
+                Some((view_tf * place).transform_rect_bbox(rect))
+            } else {
+                let built: BezPath;
+                let bez: &BezPath = if let Some(r) = &item.path_ref {
+                    match self.paths.get(r) {
+                        Some(p) => p,
+                        None => continue,
+                    }
+                } else {
+                    match build_bezpath(item) {
+                        Some(b) => {
+                            built = b;
+                            &built
+                        }
+                        None => continue,
+                    }
+                };
+                let item_tf = match &item.path_transform {
+                    Some(m) => view_tf * Affine::new(*m),
+                    None => view_tf,
+                };
+                Some(item_tf.transform_rect_bbox(bez.bounding_box()))
+            };
+            if let Some(r) = item_rect {
+                acc = Some(match acc {
+                    Some(a) => a.union(r),
+                    None => r,
+                });
+            }
+        }
+        match acc {
+            Some(r) if r.width() > 0.5 && r.height() > 0.5 => (r.x0 as f32, r.y0 as f32, r.width() as f32, r.height() as f32),
+            _ => (0.0, 0.0, self.width as f32, self.height as f32),
+        }
     }
 
     /// Paints one layer whose items include at least one with its OWN
@@ -2310,12 +2608,13 @@ impl VelloEngine {
             };
             let mut scene = Scene::new();
             self.push_atlas_keepalive(&mut scene);
-            paint_layer_items(&mut scene, &layer.items[i..end], view_tf, &self.images);
+            paint_layer_items(&mut scene, &layer.items[i..end], view_tf, &self.images, &self.paths);
             self.renderer
                 .render_to_texture(&self.device, &self.queue, &scene, &self.blend_layer_view, &layer_params)
                 .map_err(|e| JsValue::from_str(&format!("render_to_texture failed: {e:?}")))?;
             let (run_source, run_source_tex): (&wgpu::TextureView, &wgpu::Texture) = if has_fx {
-                let in_a = self.apply_effect_stack(&self.blend_layer_view, &layer.items[i].effects);
+                let bbox = self.items_bbox_px(&layer.items[i..i + 1], view_tf);
+                let in_a = self.apply_effect_stack(&self.blend_layer_view, &layer.items[i].effects, bbox);
                 if in_a { (&self.effect_stack_a_view, &self.effect_stack_a_tex) } else { (&self.effect_stack_b_view, &self.effect_stack_b_tex) }
             } else {
                 (&self.blend_layer_view, &self.blend_layer_tex)
@@ -2358,9 +2657,12 @@ impl VelloEngine {
     fn composite_scene(&mut self, scene_in: &SceneIn, view_tf: Affine, base_color: Color) -> Result<(), JsValue> {
         let n = scene_in.layers.len();
         let mut is_matte_source = vec![false; n];
-        for (i, l) in scene_in.layers.iter().enumerate() {
-            if matte_mode_of(l.matte_mode.as_deref()).is_some() && i + 1 < n {
-                is_matte_source[i + 1] = true;
+        for i in 0..n {
+            // resolve_matte_source is the single source of truth for which
+            // layer gets consumed — uid-resolved index or legacy i+1, same
+            // answer the paint-time lookup below will compute.
+            if let Some(s) = resolve_matte_source(&scene_in.layers, i) {
+                is_matte_source[s] = true;
             }
         }
         let has_matte = is_matte_source.iter().any(|&b| b);
@@ -2369,11 +2671,12 @@ impl VelloEngine {
             l.effects.iter().any(|e| e.enabled) || l.items.iter().any(|it| it.effects.iter().any(|e| e.enabled))
         });
         let has_effect = scene_in.layers.iter().any(|l| l.is_effect_layer.unwrap_or(false));
-        if !has_blend && !has_matte && !has_effects_stack && !has_effect {
+        let has_mask = scene_in.layers.iter().any(|l| !l.masks.is_empty());
+        if !has_blend && !has_matte && !has_effects_stack && !has_effect && !has_mask {
             let mut scene = Scene::new();
             self.push_atlas_keepalive(&mut scene);
             for layer in &scene_in.layers {
-                paint_layer_items(&mut scene, &layer.items, view_tf, &self.images);
+                paint_layer_items(&mut scene, &layer.items, view_tf, &self.images, &self.paths);
             }
             let params = RenderParams { base_color, width: self.width, height: self.height, antialiasing_method: AaConfig::Area };
             self.renderer
@@ -2402,7 +2705,13 @@ impl VelloEngine {
             if layer.is_effect_layer.unwrap_or(false) {
                 let backdrop_view = if accum_is_a { &self.blend_accum_a_view } else { &self.blend_accum_b_view };
                 if layer.effects.iter().any(|e| e.enabled) {
-                    let in_a = self.apply_effect_stack(backdrop_view, &layer.effects);
+                    // Full-canvas bbox, deliberately NOT items_bbox_px: an
+                    // adjustment/effect layer has no shape of its own (its
+                    // own `items` are ignored entirely, is_effect_layer's
+                    // whole point) — it grades/distorts everything already
+                    // composited below it, so "my own content" IS the whole
+                    // frame, same as a real AE adjustment layer.
+                    let in_a = self.apply_effect_stack(backdrop_view, &layer.effects, (0.0, 0.0, self.width as f32, self.height as f32));
                     let result_tex = if in_a { &self.effect_stack_a_tex } else { &self.effect_stack_b_tex };
                     let target_tex = if accum_is_a { &self.blend_accum_b } else { &self.blend_accum_a };
                     let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("effect-stack-to-accum-copy") });
@@ -2434,18 +2743,141 @@ impl VelloEngine {
             } else {
                 let mut scene = Scene::new();
                 self.push_atlas_keepalive(&mut scene);
-                paint_layer_items(&mut scene, &layer.items, view_tf, &self.images);
+                paint_layer_items(&mut scene, &layer.items, view_tf, &self.images, &self.paths);
                 self.renderer
                     .render_to_texture(&self.device, &self.queue, &scene, &self.blend_layer_view, &layer_params)
                     .map_err(|e| JsValue::from_str(&format!("render_to_texture failed: {e:?}")))?;
             }
 
-            let mut source_view: &wgpu::TextureView = if let Some((mode, invert)) = matte_mode_of(layer.matte_mode.as_deref()) {
-                // i+1 exists whenever matte_mode_of returned Some (see the
-                // is_matte_source precompute above, same condition).
+            // Vector masks (2026-08) — combine this layer's own masks (if
+            // any) into one silhouette and multiply it into the layer's
+            // own just-rendered content, BEFORE matte (order doesn't
+            // matter between the two — both are plain alpha multiplies,
+            // see matte_pass — but masks need to run first regardless
+            // since the matte block below reads `masked_view` as ITS
+            // input instead of the layer's raw paint). See LayerIn::masks'
+            // doc comment for the combine algorithm and the v1
+            // shared-feather simplification.
+            let masked_view: &wgpu::TextureView = if !layer.masks.is_empty() {
+                let add_items: Vec<ItemIn> =
+                    layer.masks.iter().filter(|m| m.mode != "subtract" && m.mode != "intersect").map(|m| m.item.clone()).collect();
+                if add_items.is_empty() {
+                    // No Add-mode mask at all (only Subtract/Intersect) —
+                    // start from "everything visible" so a lone Intersect
+                    // shows just that shape and a lone Subtract punches a
+                    // hole in a fully-visible layer, both more intuitive
+                    // than AE's literal top-to-bottom accumulation (see the
+                    // mask-feature audit's deliberate-deviation note).
+                    clear_texture(&self.device, &self.queue, &self.mask_accum_a_view, wgpu::Color::WHITE);
+                } else {
+                    // Union: every Add mask painted white into ONE Scene —
+                    // ordinary src-over of opaque-white-on-opaque-white
+                    // stays opaque white, so overlapping Add shapes union
+                    // for free with zero extra compose passes.
+                    let mut mscene = Scene::new();
+                    self.push_atlas_keepalive(&mut mscene);
+                    paint_layer_items(&mut mscene, &add_items, view_tf, &self.images, &self.paths);
+                    self.renderer
+                        .render_to_texture(&self.device, &self.queue, &mscene, &self.mask_scratch_view, &layer_params)
+                        .map_err(|e| JsValue::from_str(&format!("render_to_texture failed: {e:?}")))?;
+                    // mask_scratch is STORAGE_BINDING (vello writes it);
+                    // mask_accum_a is RENDER_ATTACHMENT (matte_pass writes
+                    // it) — a plain texture copy bridges the two so the
+                    // Subtract/Intersect loop below always reads/writes the
+                    // same RENDER_ATTACHMENT-shaped pair, matching the
+                    // established blend_accum_a/b idiom.
+                    let mut encoder =
+                        self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("mask-add-to-accum-copy") });
+                    encoder.copy_texture_to_texture(
+                        self.mask_scratch_tex.as_image_copy(),
+                        self.mask_accum_a_tex.as_image_copy(),
+                        wgpu::Extent3d { width: self.width, height: self.height, depth_or_array_layers: 1 },
+                    );
+                    self.queue.submit(Some(encoder.finish()));
+                }
+                let mut accum_is_a = true;
+                for m in layer.masks.iter().filter(|m| m.mode == "subtract" || m.mode == "intersect") {
+                    let mut sscene = Scene::new();
+                    self.push_atlas_keepalive(&mut sscene);
+                    paint_layer_items(&mut sscene, std::slice::from_ref(&m.item), view_tf, &self.images, &self.paths);
+                    self.renderer
+                        .render_to_texture(&self.device, &self.queue, &sscene, &self.mask_scratch_view, &layer_params)
+                        .map_err(|e| JsValue::from_str(&format!("render_to_texture failed: {e:?}")))?;
+                    let (cur_view, next_view) =
+                        if accum_is_a { (&self.mask_accum_a_view, &self.mask_accum_b_view) } else { (&self.mask_accum_b_view, &self.mask_accum_a_view) };
+                    // Subtract = matte_pass with invert=true (alpha *=
+                    // 1-this); Intersect = invert=false (alpha *= this) —
+                    // matte_pass's own alpha-matte formula IS the combine
+                    // math a mask compose needs, no new WGSL required.
+                    matte_pass(
+                        &self.device,
+                        &self.queue,
+                        &self.matte_pipeline,
+                        &self.matte_bind_group_layout,
+                        &self.matte_sampler,
+                        &self.matte_uniform_buf,
+                        cur_view,
+                        &self.mask_scratch_view,
+                        0,
+                        m.mode == "subtract",
+                        next_view,
+                    );
+                    accum_is_a = !accum_is_a;
+                }
+                let combined_view: &wgpu::TextureView = if accum_is_a { &self.mask_accum_a_view } else { &self.mask_accum_b_view };
+                // Feather (2026-08, AE parity — the actual ask this
+                // shipped for): softens the FINAL combined silhouette's
+                // edge via the exact same separable Gaussian blur_pass
+                // already used for the Effects panel's own Blur — a true
+                // edge-normal alpha falloff on the mask itself, not a
+                // whole-layer image blur (which would soften the masked
+                // CONTENT instead of just the clip boundary).
+                let feather = layer.mask_feather as f32;
+                let silhouette_view: &wgpu::TextureView = if feather > 0.01 {
+                    blur_pass(
+                        &self.device,
+                        &self.queue,
+                        &self.blur_pipeline,
+                        &self.blur_bind_group_layout,
+                        &self.blur_sampler,
+                        &self.blur_uniform_buf,
+                        combined_view,
+                        feather,
+                        self.width,
+                        self.height,
+                        &self.blur_scratch_view,
+                        &self.blur_result_view,
+                    );
+                    &self.blur_result_view
+                } else {
+                    combined_view
+                };
+                matte_pass(
+                    &self.device,
+                    &self.queue,
+                    &self.matte_pipeline,
+                    &self.matte_bind_group_layout,
+                    &self.matte_sampler,
+                    &self.matte_uniform_buf,
+                    &self.blend_layer_view,
+                    silhouette_view,
+                    0,
+                    false,
+                    &self.mask_applied_view,
+                );
+                &self.mask_applied_view
+            } else {
+                &self.blend_layer_view
+            };
+            // Both halves resolved through the SAME helper as the precompute
+            // — a matte whose source doesn't resolve (dangling uid, index
+            // out of range) degrades to "no matte" instead of masking
+            // against the wrong layer.
+            let matte_src = resolve_matte_source(&scene_in.layers, i);
+            let mut source_view: &wgpu::TextureView = if let (Some((mode, invert)), Some(ms)) = (matte_mode_of(layer.matte_mode.as_deref()), matte_src) {
                 let mut matte_scene = Scene::new();
                 self.push_atlas_keepalive(&mut matte_scene);
-                paint_layer_items(&mut matte_scene, &scene_in.layers[i + 1].items, view_tf, &self.images);
+                paint_layer_items(&mut matte_scene, &scene_in.layers[ms].items, view_tf, &self.images, &self.paths);
                 self.renderer
                     .render_to_texture(&self.device, &self.queue, &matte_scene, &self.matte_source_view, &layer_params)
                     .map_err(|e| JsValue::from_str(&format!("render_to_texture failed: {e:?}")))?;
@@ -2456,7 +2888,7 @@ impl VelloEngine {
                     &self.matte_bind_group_layout,
                     &self.matte_sampler,
                     &self.matte_uniform_buf,
-                    &self.blend_layer_view,
+                    masked_view,
                     &self.matte_source_view,
                     mode,
                     invert,
@@ -2464,7 +2896,7 @@ impl VelloEngine {
                 );
                 &self.matte_result_view
             } else {
-                &self.blend_layer_view
+                masked_view
             };
             // Effects stack (2026-07 rewrite) — runs on THIS layer's own
             // isolated alpha (real transparency), AFTER matte (so a matted
@@ -2474,7 +2906,8 @@ impl VelloEngine {
             // See LayerIn::effects' doc comment for why this differs from
             // the accumulator an effect/adjustment layer's stack runs on.
             if layer.effects.iter().any(|e| e.enabled) {
-                let in_a = self.apply_effect_stack(source_view, &layer.effects);
+                let bbox = self.items_bbox_px(&layer.items, view_tf);
+                let in_a = self.apply_effect_stack(source_view, &layer.effects, bbox);
                 source_view = if in_a { &self.effect_stack_a_view } else { &self.effect_stack_b_view };
             }
 
@@ -2512,14 +2945,19 @@ impl VelloEngine {
     /// `rotation` in radians, pivoting around `(pivot_x, pivot_y)` — pass
     /// the artboard center (e.g. canvasW/2, canvasH/2) to match Animate's
     /// Rotate Stage tool; pass (0,0) for a plain top-left-anchored zoom/pan.
-    pub fn set_viewport(&mut self, pan_x: f64, pan_y: f64, zoom: f64, rotation: f64, pivot_x: f64, pivot_y: f64) {
+    pub fn set_viewport(&mut self, pan_x: f64, pan_y: f64, zoom: f64, rotation: f64, pivot_x: f64, pivot_y: f64, effect_zoom: f64) {
         // A zero/negative zoom (a stray or buggy JS-side value — this is
         // caller-controlled, not otherwise validated) makes Affine::scale
         // singular; screen_to_world's inverse() then yields inf/NaN that
         // silently poisons all hit-testing/coordinate math afterward
         // instead of failing loudly. Same floor already used by
         // gizmo_handles for the same reason (see its own zoom.max call).
-        self.viewport = Viewport { pan_x, pan_y, zoom: zoom.max(0.0001), rotation, pivot_x, pivot_y };
+        self.viewport = Viewport {
+            pan_x, pan_y,
+            zoom: zoom.max(0.0001),
+            effect_zoom: effect_zoom.max(0.0001),
+            rotation, pivot_x, pivot_y,
+        };
     }
 
     /// Screen (canvas pixel) coordinates -> world coordinates, accounting
@@ -2765,12 +3203,27 @@ impl VelloEngine {
         let (matte_result_tex, matte_result_view) = create_matte_result_texture(&self.device, width, height);
         self.matte_result_tex = matte_result_tex;
         self.matte_result_view = matte_result_view;
+        let (mask_scratch_tex, mask_scratch_view) = create_blend_layer_texture(&self.device, width, height);
+        self.mask_scratch_tex = mask_scratch_tex;
+        self.mask_scratch_view = mask_scratch_view;
+        let (mask_accum_a_tex, mask_accum_a_view) = create_matte_result_texture(&self.device, width, height);
+        self.mask_accum_a_tex = mask_accum_a_tex;
+        self.mask_accum_a_view = mask_accum_a_view;
+        let (mask_accum_b_tex, mask_accum_b_view) = create_matte_result_texture(&self.device, width, height);
+        self.mask_accum_b_tex = mask_accum_b_tex;
+        self.mask_accum_b_view = mask_accum_b_view;
+        let (mask_applied_tex, mask_applied_view) = create_matte_result_texture(&self.device, width, height);
+        self.mask_applied_tex = mask_applied_tex;
+        self.mask_applied_view = mask_applied_view;
         let (blur_result_tex, blur_result_view) = create_matte_result_texture(&self.device, width, height);
         self.blur_result_tex = blur_result_tex;
         self.blur_result_view = blur_result_view;
         let (blur_scratch_tex, blur_scratch_view) = create_matte_result_texture(&self.device, width, height);
         self.blur_scratch_tex = blur_scratch_tex;
         self.blur_scratch_view = blur_scratch_view;
+        let (bloom_extract_tex, bloom_extract_view) = create_matte_result_texture(&self.device, width, height);
+        self.bloom_extract_tex = bloom_extract_tex;
+        self.bloom_extract_view = bloom_extract_view;
         let (effect_stack_a_tex, effect_stack_a_view) = create_blend_accum_texture(&self.device, width, height, "effect-stack-a");
         self.effect_stack_a_tex = effect_stack_a_tex;
         self.effect_stack_a_view = effect_stack_a_view;
@@ -2794,14 +3247,29 @@ impl VelloEngine {
     /// WGSL statements ending in `return vec4<f32>(...)`), wrapped here
     /// into a full document that already declares the standard fullscreen-
     /// triangle vertex shader, the texture/sampler/Params bindings, and
-    /// three convenience locals every author can use without re-deriving
-    /// them: `uv` (0..1), `src` (the pixel already sampled at `uv`), and
-    /// `texel` (1 texel in UV units, for neighbor-sampling effects). Same
-    /// `Params{effect_id,p1,p2,p3,tex_w,tex_h,time,p4}` layout as
-    /// simple_fx.wgsl, so an author's `params.p1`..`params.p4` map 1:1 onto
-    /// the SAME p1..p4 fields the stack UI's generic param editor already
-    /// writes for every other effect type — no separate wiring needed on
-    /// the JS side for a custom effect's parameters.
+    /// six convenience locals every author can use without re-deriving
+    /// them: `uv` (0..1 across the FULL CANVAS), `src` (the pixel already
+    /// sampled at `uv`), `texel` (1 texel in UV units, for neighbor-
+    /// sampling effects), and — 2026-07-30, see run_one_effect's own doc
+    /// comment for the bug this fixes — `bbox_o`/`bbox_s` (the on-screen
+    /// device-pixel origin/size of whatever this effect is actually
+    /// attached to) and `local_uv` (0..1 across just THAT bbox instead of
+    /// the whole canvas, can go outside 0..1 near/past its edges same as
+    /// `uv` already can). Any effect with a "center of my own shape"
+    /// concept (a twirl/bulge pivot, a wave's phase, a particle grid)
+    /// should distort in `local_uv` space and map back to real texture
+    /// coordinates via `bbox_o + result * bbox_s` (in device px) before
+    /// dividing by `vec2(tex_w, tex_h)` for the final textureSample — NOT
+    /// `uv`/`vec2(0.5)` directly, which is the canvas center, not the
+    /// shape's — confirmed live: a shipped Twirl effect's pattern visibly
+    /// changed under pure panning (zero zoom change) before this existed,
+    /// which only makes sense if its reference frame was the viewport.
+    /// Same `Params{effect_id,p1,p2,p3,tex_w,tex_h,time,p4,bbox_x,bbox_y,
+    /// bbox_w,bbox_h}` layout as simple_fx.wgsl, so an author's
+    /// `params.p1`..`params.p4` map 1:1 onto the SAME p1..p4 fields the
+    /// stack UI's generic param editor already writes for every other
+    /// effect type — no separate wiring needed on the JS side for a custom
+    /// effect's parameters.
     ///
     /// Compiling arbitrary author-supplied WGSL at runtime is safe here:
     /// this crate only ever targets the web/WebGPU wgpu backend (built via
@@ -2813,7 +3281,7 @@ impl VelloEngine {
     /// never a Rust panic or a corrupted wasm instance.
     pub fn register_custom_effect(&mut self, key: String, fs_body: String) -> Result<(), JsValue> {
         let source = format!(
-            "struct VsOut {{\n    @builtin(position) pos: vec4<f32>,\n    @location(0) uv: vec2<f32>,\n}};\n\n@vertex\nfn vs_main(@builtin(vertex_index) vid: u32) -> VsOut {{\n    var positions = array<vec2<f32>, 3>(\n        vec2<f32>(-1.0, -1.0),\n        vec2<f32>(3.0, -1.0),\n        vec2<f32>(-1.0, 3.0),\n    );\n    let p = positions[vid];\n    var out: VsOut;\n    out.pos = vec4<f32>(p, 0.0, 1.0);\n    out.uv = vec2<f32>(p.x * 0.5 + 0.5, 1.0 - (p.y * 0.5 + 0.5));\n    return out;\n}}\n\n@group(0) @binding(0) var src_tex: texture_2d<f32>;\n@group(0) @binding(1) var tex_sampler: sampler;\n\nstruct Params {{\n    effect_id: f32,\n    p1: f32,\n    p2: f32,\n    p3: f32,\n    tex_w: f32,\n    tex_h: f32,\n    time: f32,\n    p4: f32,\n}};\n@group(0) @binding(2) var<uniform> params: Params;\n\n@fragment\nfn fs_main(in: VsOut) -> @location(0) vec4<f32> {{\n    let uv = in.uv;\n    let texel = vec2<f32>(1.0 / max(params.tex_w, 1.0), 1.0 / max(params.tex_h, 1.0));\n    let src = textureSample(src_tex, tex_sampler, uv);\n{fs_body}\n}}\n"
+            "struct VsOut {{\n    @builtin(position) pos: vec4<f32>,\n    @location(0) uv: vec2<f32>,\n}};\n\n@vertex\nfn vs_main(@builtin(vertex_index) vid: u32) -> VsOut {{\n    var positions = array<vec2<f32>, 3>(\n        vec2<f32>(-1.0, -1.0),\n        vec2<f32>(3.0, -1.0),\n        vec2<f32>(-1.0, 3.0),\n    );\n    let p = positions[vid];\n    var out: VsOut;\n    out.pos = vec4<f32>(p, 0.0, 1.0);\n    out.uv = vec2<f32>(p.x * 0.5 + 0.5, 1.0 - (p.y * 0.5 + 0.5));\n    return out;\n}}\n\n@group(0) @binding(0) var src_tex: texture_2d<f32>;\n@group(0) @binding(1) var tex_sampler: sampler;\n\nstruct Params {{\n    effect_id: f32,\n    p1: f32,\n    p2: f32,\n    p3: f32,\n    tex_w: f32,\n    tex_h: f32,\n    time: f32,\n    p4: f32,\n    bbox_x: f32,\n    bbox_y: f32,\n    bbox_w: f32,\n    bbox_h: f32,\n}};\n@group(0) @binding(2) var<uniform> params: Params;\n\n@fragment\nfn fs_main(in: VsOut) -> @location(0) vec4<f32> {{\n    let uv = in.uv;\n    let texel = vec2<f32>(1.0 / max(params.tex_w, 1.0), 1.0 / max(params.tex_h, 1.0));\n    let src = textureSample(src_tex, tex_sampler, uv);\n    let bbox_o = vec2<f32>(params.bbox_x, params.bbox_y);\n    let bbox_s = vec2<f32>(max(params.bbox_w, 1.0), max(params.bbox_h, 1.0));\n    let local_uv = (uv * vec2<f32>(params.tex_w, params.tex_h) - bbox_o) / bbox_s;\n{fs_body}\n}}\n"
         );
         let pipeline = create_custom_effect_pipeline(&self.device, &self.simple_fx_bind_group_layout, &source);
         self.custom_effect_pipelines.insert(key, pipeline);
@@ -2847,15 +3315,81 @@ impl VelloEngine {
     }
 
     /// Lets JS skip a redundant `register_image` upload for an image it's
-    /// already registered this session (images are cached for the engine's
-    /// whole lifetime, not per-scene, so this is a simple presence check).
+    /// already registered (presence check — the store is now bounded and JS
+    /// may have retired this id, so a `false` here means "upload again").
     pub fn has_image(&self, id: &str) -> bool {
         self.images.contains_key(id)
+    }
+
+    /// Total decoded bytes held by the image store. This used to be unbounded
+    /// by design ("cached for the engine's whole lifetime"), which is fine for
+    /// a handful of imported rasters and untenable for footage: a 1000-frame
+    /// 1920x1080 sequence is 8.3GB of RGBA8. JS drives eviction (it is the
+    /// side that knows what the CURRENT scene references and can re-upload
+    /// from the Paper Raster / video bridge on demand) — this just reports.
+    pub fn image_store_bytes(&self) -> f64 {
+        self.images.values().map(|d| (d.width as f64) * (d.height as f64) * 4.0).sum()
+    }
+    pub fn image_store_size(&self) -> u32 {
+        self.images.len() as u32
+    }
+
+    /// Drops images by id. Mirrors retire_paths. Never called for an id the
+    /// scene being rendered still references — the caller checks that, because
+    /// dropping a live id would make the picture lose an image with no signal
+    /// beyond a warning in paint_layer_items.
+    pub fn retire_images(&mut self, ids_json: &str) -> Result<(), JsValue> {
+        let ids: Vec<String> = serde_json::from_str(ids_json).map_err(|e| JsValue::from_str(&e.to_string()))?;
+        for id in ids {
+            self.images.remove(&id);
+        }
+        Ok(())
+    }
+
+    /// Retained path store (see the `paths` field's doc comment). `coords` is
+    /// a flat [px,py, hInX,hInY, hOutX,hOutY] × n array — the same
+    /// RELATIVE-handle convention as SegIn/serP, 6 slots per segment with
+    /// explicit zeros where the JSON form omits a zero handle. Built through
+    /// build_bezpath_from_segments so a registered path and an inline one
+    /// produce byte-identical curves (single source of truth, §3).
+    pub fn register_path(&mut self, id: String, coords: &[f64], closed: bool) {
+        let n = coords.len() / 6;
+        let mut segs = Vec::with_capacity(n);
+        for i in 0..n {
+            let o = i * 6;
+            segs.push(SegIn {
+                point: [coords[o], coords[o + 1]],
+                handle_in: [coords[o + 2], coords[o + 3]],
+                handle_out: [coords[o + 4], coords[o + 5]],
+            });
+        }
+        self.paths.insert(id, build_bezpath_from_segments(&segs, closed));
+    }
+
+    /// Retirement is JS-driven (FinalizationRegistry on the stroke dicts) —
+    /// this side never guesses at lifetimes. `ids_json`: JSON array of keys.
+    pub fn retire_paths(&mut self, ids_json: &str) -> Result<(), JsValue> {
+        let ids: Vec<String> = serde_json::from_str(ids_json).map_err(|e| JsValue::from_str(&e.to_string()))?;
+        for id in ids {
+            self.paths.remove(&id);
+        }
+        Ok(())
+    }
+
+    /// Project-load hygiene (importJSON): every stroke dict is new, so every
+    /// stored path is garbage at once — cheaper than waiting for the GC.
+    pub fn clear_paths(&mut self) {
+        self.paths.clear();
+    }
+
+    pub fn path_store_size(&self) -> u32 {
+        self.paths.len() as u32
     }
 
     pub fn render(&mut self, scene_json: &str) -> Result<(), JsValue> {
         let scene_in: SceneIn = serde_json::from_str(scene_json)
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        self.fx_time = scene_in.time;
         let view_tf = self.viewport.transform();
         // Confirmed in-browser (see removed [wasm-debug] probe) that this
         // canvas's WebGPU surface only advertises CompositeAlphaMode::
@@ -2894,6 +3428,7 @@ impl VelloEngine {
     pub async fn render_to_pixels(&mut self, scene_json: &str) -> Result<Vec<u8>, JsValue> {
         let scene_in: SceneIn = serde_json::from_str(scene_json)
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        self.fx_time = scene_in.time;
         let view_tf = self.viewport.transform();
         self.composite_scene(&scene_in, view_tf, Color::TRANSPARENT)?;
 

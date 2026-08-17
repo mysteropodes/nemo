@@ -111,7 +111,7 @@ var state={
   // Eraser field in Tool Options exactly as before.
   eraserSize:14,selRotAccum:0,tweenSkipManual:true,
   resamplePts:50,tweenStep:1,
-  canvasW:1920,canvasH:1080,canvasBg:'#ffffff',canvasClip:false,safetyZones:false,ghostAllFrames:false,
+  canvasW:1920,canvasH:1080,canvasBg:'#ffffff',canvasClip:false,safetyZones:false,ghostAllFrames:false,currentFrameOutline:false,
   // Multi-palette swatch library (Shade-for-AE-style, palette-panel.js) —
   // an array (not a map) so tab order IS display order, no separate sort
   // field needed. colorPalette (flat array) is kept as a legacy field ONLY
@@ -522,8 +522,17 @@ function serP(p){var isVB=!!(p.data&&p.data.isVectorBrush);var center=isVB&&p.da
   // channelTag below), so it must keep whatever the user actually drew.
   // isShadowNoStroke still exempts a genuinely strokeless shadow FILL from
   // the '#ffffff' fallback a few lines down, same reasoning as isTexAnchor.
+  // Also true for a Shadow Brush "fill only" guide (preferFill, tools.js's
+  // applyShadowBrushTag) drawn in an ORDINARY not-yet-channel-split layer —
+  // channelTag on the STROKE itself, not just pChLayer.channel, since that
+  // split may never have happened yet. Missing this half produced a phantom
+  // white outline around the very first save of such a guide (confirmed
+  // live): the on-canvas Path correctly had strokeColor=null, but serP's
+  // fallback saw a falsy strokeColor with no exemption and wrote '#ffffff'
+  // into the stored dict immediately, before any desP round-trip could
+  // self-heal it via hasRealStroke.
   var isNoStrokeChannel=!!(pChLayer&&pChLayer.channel==='fill');
-  var isShadowNoStroke=!!(pChLayer&&pChLayer.channel==='shadow'&&!p.strokeColor);
+  var isShadowNoStroke=!!(((pChLayer&&pChLayer.channel==='shadow')||(p.data&&p.data.channelTag==='shadow'))&&!p.strokeColor);
   var channelTag=(p.data&&p.data.channelTag)?p.data.channelTag:undefined;
   // Which shadow swatch produced this stroke (tools.js's Shadow Brush commit
   // site) — without it, swatch attribution silently dies at the first
@@ -564,7 +573,7 @@ function serP(p){var isVB=!!(p.data&&p.data.isVectorBrush);var center=isVB&&p.da
   // in tweens.js) keep treating these strokes as fill-only, exactly as before
   // this cosmetic hairline existed.
   var hasRealStroke=isVB?false:!!p.strokeColor;
-  return{segments:p.segments.map(function(s){return{point:[s.point.x,s.point.y],handleIn:[s.handleIn.x,s.handleIn.y],handleOut:[s.handleOut.x,s.handleOut.y]};}),closed:!!p.closed,strokeColor:(isVB||isNoStrokeChannel||isShadowNoStroke||isTexAnchor&&!p.strokeColor)?null:(p.strokeColor?colorHex8(p.strokeColor):'#ffffff'),hasRealStroke:hasRealStroke,strokeWidth:p.strokeWidth,strokeCap:p.strokeCap||'round',strokeJoin:p.strokeJoin||'round',miterLimit:p.miterLimit,fillColor:p.fillColor?colorHex8(p.fillColor):null,opacity:p.opacity!==undefined?p.opacity:1,dashArray:(p.dashArray&&p.dashArray.length)?p.dashArray.slice():undefined,dashOffset:p.dashOffset,paintOrder:(p.data&&p.data.paintOrder)?p.data.paintOrder:undefined,isVectorBrush:isVB||undefined,isFillShape:(p.data&&p.data.isFillShape)?true:undefined,centerSegments:center,widthProfile:widthProfile,fillSeed:fillSeed,fillSeeds:fillSeeds,fillGapPx:fillGapPx,fillWalls:fillWalls,strokeId:strokeId,brushGroupId:brushGroupId,isLinkedFillCompanion:isLinkedFillCompanion,linkedFillId:linkedFillId,tweenOn:(p.data&&p.data.tweenOn)?true:undefined,boxAngle:(p.data&&p.data.boxAngle)?p.data.boxAngle:undefined,
+  return{segments:p.segments.map(function(s){return{point:[s.point.x,s.point.y],handleIn:[s.handleIn.x,s.handleIn.y],handleOut:[s.handleOut.x,s.handleOut.y]};}),closed:!!p.closed,strokeColor:(isVB||isNoStrokeChannel||isShadowNoStroke||isTexAnchor&&!p.strokeColor)?null:(p.strokeColor?colorHex8(p.strokeColor):'#ffffff'),hasRealStroke:hasRealStroke,strokeWidth:p.strokeWidth,strokeCap:p.strokeCap||'round',strokeJoin:p.strokeJoin||'round',miterLimit:p.miterLimit,fillColor:p.fillColor?colorHex8(p.fillColor):null,opacity:p.opacity!==undefined?p.opacity:1,dashArray:(p.dashArray&&p.dashArray.length)?p.dashArray.slice():undefined,dashOffset:p.dashOffset,paintOrder:(p.data&&p.data.paintOrder)?p.data.paintOrder:undefined,isVectorBrush:isVB||undefined,isFillShape:(p.data&&p.data.isFillShape)?true:undefined,centerSegments:center,widthProfile:widthProfile,strokeProfile:(p.data&&p.data.strokeProfile)||undefined,profileBase:(p.data&&p.data.profileBase)||undefined,fillSeed:fillSeed,fillSeeds:fillSeeds,fillGapPx:fillGapPx,fillWalls:fillWalls,strokeId:strokeId,brushGroupId:brushGroupId,isLinkedFillCompanion:isLinkedFillCompanion,linkedFillId:linkedFillId,tweenOn:(p.data&&p.data.tweenOn)?true:undefined,boxAngle:(p.data&&p.data.boxAngle)?p.data.boxAngle:undefined,
   // Rotate/scale anchor choice (2026-07, "la position du point d'ancrage
   // n'est pas mise en mémoire si je désélectionne et resélectionne
   // l'élément") — same persistence pattern as boxAngle right above: was
@@ -596,6 +605,14 @@ function serP(p){var isVB=!!(p.data&&p.data.isVectorBrush);var center=isVB&&p.da
   // re-editing or persisting the block's original string/font/layout).
   isVectorText:(p.data&&p.data.isVectorText)?true:undefined,
   vectorChar:(p.data&&p.data.vectorChar)?p.data.vectorChar:undefined,
+  // Text Animator (2026-08-17) grouping — which letter/word/line this glyph
+  // (or, on a raster split Raster, this character) belongs to, stamped at
+  // build time (vector-text-bridge.js/timeline.js's splitTextIntoCharacters)
+  // so text-animator.js can group getEffectiveStrokes' stroke dicts by unit
+  // without re-deriving word/line boundaries from strings at animate time.
+  charIndex:(p.data&&p.data.charIndex!=null)?p.data.charIndex:undefined,
+  wordIndex:(p.data&&p.data.wordIndex!=null)?p.data.wordIndex:undefined,
+  lineIndex:(p.data&&p.data.lineIndex!=null)?p.data.lineIndex:undefined,
   isText:(p.data&&p.data.isText)?true:undefined,
   isTextRoot:(p.data&&p.data.isTextRoot)?true:undefined,
   text:(p.data&&p.data.isTextRoot)?p.data.text:undefined,
@@ -603,7 +620,20 @@ function serP(p){var isVB=!!(p.data&&p.data.isVectorBrush);var center=isVB&&p.da
   textSize:(p.data&&p.data.isTextRoot)?p.data.size:undefined,
   textColor:(p.data&&p.data.isTextRoot)?p.data.color:undefined,
   textAlign:(p.data&&p.data.isTextRoot)?p.data.align:undefined,
-  textFixedWidth:(p.data&&p.data.isTextRoot&&p.data.fixedWidth)?p.data.fixedWidth:undefined};}
+  textFixedWidth:(p.data&&p.data.isTextRoot&&p.data.fixedWidth)?p.data.fixedWidth:undefined,
+  // Vector mask (2026-08, AE-style "Mask") — see engine-bridge.js's
+  // buildSceneJson mask-extraction comment for how these three drive the
+  // engine's clip. §1 consumer check: buildSceneJson reads them (done),
+  // saveActiveLayerFrame/selectedPaths/tween-matching treat a mask as an
+  // ordinary Path (no exclusion needed — it's meant to select/tween/undo
+  // exactly like any other shape, only RENDERING treats it specially).
+  isMask:(p.data&&p.data.isMask)?true:undefined,
+  maskMode:(p.data&&p.data.maskMode)?p.data.maskMode:undefined,
+  maskFeather:(p.data&&p.data.maskFeather)?p.data.maskFeather:undefined,
+  // Stroke gradient along path (2026-08, "gradient qui tire du début à la
+  // fin du trait") — {from,to} hex strings, distinct from fillGradient
+  // (spatial 2-point ramp) above.
+  strokeGradientAlongPath:(p.data&&p.data.strokeGradientAlongPath)?p.data.strokeGradientAlongPath:undefined};}
 // `closed` was missing from this round-trip entirely — every path rebuilt
 // via desP() (onion-skin ghosts, tween/inbetween generation, undo/redo
 // snapshots, project load: everything that goes through serP/desP) silently
@@ -630,9 +660,39 @@ function desP(d,layer,op){var prev=project.activeLayer;layer.activate();var p=ne
   // outline it never had ("un trait blanc apparaît autour du fill après
   // ctrl+Z"). Legacy data predating the field (undefined) keeps the old
   // fallback chain untouched.
-  p.strokeColor=d.hasRealStroke===false?null:(d.strokeColor||((d.isVectorBrush||d.brushTexturePreset||d.bitmapBrushSpec||d.isBrushTextureCopy||dNoStrokeChannel||dIsShadowChannel)?null:'#fff'));p.strokeWidth=d.strokeWidth||3;p.strokeCap=d.strokeCap||'round';p.strokeJoin=d.strokeJoin||'round';if(d.miterLimit!==undefined)p.miterLimit=d.miterLimit;if(d.fillColor)p.fillColor=d.fillColor;else p.fillColor=null;p.opacity=op!==undefined?op:(d.opacity!==undefined?d.opacity:1);if(d.dashArray&&d.dashArray.length)p.dashArray=d.dashArray;if(d.dashOffset!==undefined)p.dashOffset=d.dashOffset;if(d.paintOrder){p.data.paintOrder=d.paintOrder;}if(d.isVectorBrush){p.data.isVectorBrush=true;if(d.centerSegments)p.data.centerSegments=d.centerSegments;if(d.widthProfile)p.data.widthProfile=d.widthProfile;if(d.isFillShape)p.data.isFillShape=true;applyBrushKeyline(p);}if(d.fillSeed)p.data.fillSeed=d.fillSeed;if(d.fillSeeds&&d.fillSeeds.length)p.data.fillSeeds=d.fillSeeds;if((d.fillSeed||(d.fillSeeds&&d.fillSeeds.length))&&d.fillGapPx!==undefined)p.data.fillGapPx=d.fillGapPx;if(d.fillWalls)p.data.fillWalls=d.fillWalls;if(d.strokeId)p.data.strokeId=d.strokeId;if(d.brushGroupId)p.data.brushGroupId=d.brushGroupId;if(d.isLinkedFillCompanion)p.data.isLinkedFillCompanion=true;if(d.linkedFillId)p.data.linkedFillId=d.linkedFillId;if(d.tweenOn)p.data.tweenOn=true;if(d.boxAngle)p.data.boxAngle=d.boxAngle;if(d.xformAnchorKey)p.data.xformAnchorKey=d.xformAnchorKey;if(d.xformAnchorCustom)p.data.xformAnchorCustom=d.xformAnchorCustom;if(d.isBrushTextureCopy)p.data.isBrushTextureCopy=true;if(d.brushTexturePreset)p.data.brushTexturePreset=d.brushTexturePreset;if(d.bitmapBrushSpec)p.data.bitmapBrushSpec=d.bitmapBrushSpec;if(d.bitmapPressureProfile)p.data.bitmapPressureProfile=d.bitmapPressureProfile;if(d.preTextureOpacity!==undefined)p.data.preTextureOpacity=d.preTextureOpacity;if(d.preTextureStroke!==undefined)p.data.preTextureStroke=d.preTextureStroke;if(d.channelTag)p.data.channelTag=d.channelTag;if(d.shadowSwatchId)p.data.shadowSwatchId=d.shadowSwatchId;if(d.ownerId)p.data.ownerId=d.ownerId;if(d.ownerName)p.data.ownerName=d.ownerName;if(d.ownerColor)p.data.ownerColor=d.ownerColor;if(d.revisionParentId)p.data.revisionParentId=d.revisionParentId;if(d.isRevisionGhost)p.data.isRevisionGhost=true;if(d.revisionAction)p.data.revisionAction=d.revisionAction;if(d.preRevisionOpacity!==undefined)p.data.preRevisionOpacity=d.preRevisionOpacity;if(d.fillGradient)p.data.fillGradient=d.fillGradient;if(d.groupId)p.data.groupId=d.groupId;if(d.effects&&d.effects.length)p.data.effects=d.effects;
+  p.strokeColor=d.hasRealStroke===false?null:(d.strokeColor||((d.isVectorBrush||d.brushTexturePreset||d.bitmapBrushSpec||d.isBrushTextureCopy||dNoStrokeChannel||dIsShadowChannel)?null:'#fff'));p.strokeWidth=d.strokeWidth||3;p.strokeCap=typeof d.strokeCap==='string'?d.strokeCap:'round';p.strokeJoin=typeof d.strokeJoin==='string'?d.strokeJoin:'round';if(d.miterLimit!==undefined)p.miterLimit=d.miterLimit;if(d.fillColor)p.fillColor=d.fillColor;else p.fillColor=null;p.opacity=op!==undefined?op:(d.opacity!==undefined?d.opacity:1);if(d.dashArray&&d.dashArray.length)p.dashArray=d.dashArray;if(d.dashOffset!==undefined)p.dashOffset=d.dashOffset;if(d.paintOrder){p.data.paintOrder=d.paintOrder;}if(d.isVectorBrush){p.data.isVectorBrush=true;if(d.centerSegments)p.data.centerSegments=d.centerSegments;if(d.widthProfile)p.data.widthProfile=d.widthProfile;if(d.strokeProfile)p.data.strokeProfile=d.strokeProfile;if(d.profileBase)p.data.profileBase=d.profileBase;if(d.isFillShape)p.data.isFillShape=true;applyBrushKeyline(p);}if(d.fillSeed)p.data.fillSeed=d.fillSeed;if(d.fillSeeds&&d.fillSeeds.length)p.data.fillSeeds=d.fillSeeds;if((d.fillSeed||(d.fillSeeds&&d.fillSeeds.length))&&d.fillGapPx!==undefined)p.data.fillGapPx=d.fillGapPx;if(d.fillWalls)p.data.fillWalls=d.fillWalls;if(d.strokeId)p.data.strokeId=d.strokeId;if(d.brushGroupId)p.data.brushGroupId=d.brushGroupId;if(d.isLinkedFillCompanion)p.data.isLinkedFillCompanion=true;if(d.linkedFillId)p.data.linkedFillId=d.linkedFillId;if(d.tweenOn)p.data.tweenOn=true;if(d.boxAngle)p.data.boxAngle=d.boxAngle;if(d.xformAnchorKey)p.data.xformAnchorKey=d.xformAnchorKey;if(d.xformAnchorCustom)p.data.xformAnchorCustom=d.xformAnchorCustom;if(d.isBrushTextureCopy)p.data.isBrushTextureCopy=true;if(d.brushTexturePreset)p.data.brushTexturePreset=d.brushTexturePreset;if(d.bitmapBrushSpec)p.data.bitmapBrushSpec=d.bitmapBrushSpec;if(d.bitmapPressureProfile)p.data.bitmapPressureProfile=d.bitmapPressureProfile;if(d.preTextureOpacity!==undefined)p.data.preTextureOpacity=d.preTextureOpacity;if(d.preTextureStroke!==undefined)p.data.preTextureStroke=d.preTextureStroke;if(d.channelTag)p.data.channelTag=d.channelTag;if(d.shadowSwatchId)p.data.shadowSwatchId=d.shadowSwatchId;if(d.ownerId)p.data.ownerId=d.ownerId;if(d.ownerName)p.data.ownerName=d.ownerName;if(d.ownerColor)p.data.ownerColor=d.ownerColor;if(d.revisionParentId)p.data.revisionParentId=d.revisionParentId;if(d.isRevisionGhost)p.data.isRevisionGhost=true;if(d.revisionAction)p.data.revisionAction=d.revisionAction;if(d.preRevisionOpacity!==undefined)p.data.preRevisionOpacity=d.preRevisionOpacity;if(d.fillGradient)p.data.fillGradient=d.fillGradient;if(d.groupId)p.data.groupId=d.groupId;if(d.effects&&d.effects.length)p.data.effects=d.effects;
   if(d.isVectorText)p.data.isVectorText=true;if(d.vectorChar)p.data.vectorChar=d.vectorChar;if(d.isText)p.data.isText=true;
+  if(d.charIndex!=null)p.data.charIndex=d.charIndex;if(d.wordIndex!=null)p.data.wordIndex=d.wordIndex;if(d.lineIndex!=null)p.data.lineIndex=d.lineIndex;
+  // Mograph duplicator copy tags (applyLayerDuplicator) — belt-and-suspenders
+  // for future layer.children consumers; the layer is force-locked so no
+  // interactive path reads these today.
+  if(d.isDuplicatorCopy)p.data.isDuplicatorCopy=true;if(d.dupIndex!=null)p.data.dupIndex=d.dupIndex;
+  // dupCloneId ("ID de chaque cloner") and dup3D (per-clone 3D delta) —
+  // same "carried for future/other consumers, force-locked so nothing
+  // interactive reads these today" reasoning as isDuplicatorCopy/dupIndex
+  // just above. buildSceneJson (engine-bridge.js) DOES read dup3D off the
+  // live object here for its per-clone 3D projector cache — the one real,
+  // current consumer.
+  if(d.dupCloneId)p.data.dupCloneId=d.dupCloneId;if(d.dup3D)p.data.dup3D=d.dup3D;
   if(d.isTextRoot){p.data.isTextRoot=true;p.data.text=d.text||'';p.data.vectorFont=d.vectorFont||'Roboto-Regular';p.data.size=d.textSize||48;p.data.color=d.textColor||'#000000';p.data.align=d.textAlign||'left';if(d.textFixedWidth)p.data.fixedWidth=d.textFixedWidth;}
+  if(d.isMask){p.data.isMask=true;p.data.maskMode=d.maskMode||'add';if(d.maskFeather)p.data.maskFeather=d.maskFeather;}
+  if(d.strokeGradientAlongPath)p.data.strokeGradientAlongPath=d.strokeGradientAlongPath;
+  // Retained-path stamp (engine-bridge.js, 2026-07-28): the stored stroke
+  // dict this Paper item was built FROM. Dict object identity is the
+  // geometry identity — getEffectiveStrokes returns the SAME stored dict
+  // objects for a frame until an edit replaces the whole strokes array
+  // (f.strokes=..., saveActiveLayerFrame), the same insight that made `src`
+  // string identity work for images. engine-bridge maps dict→engine path
+  // key and emits a pathRef instead of re-serializing segments every frame.
+  // Live-mutation safety: a Paper Item.prototype._changed hook (installed +
+  // self-tested in engine-bridge) NULLS this stamp on any geometry change,
+  // so a sculpted/dragged item falls back to inline serialization until the
+  // next desP rebuild re-stamps it. Set LAST — construction above fires
+  // _changed per added segment, which would clear an earlier stamp.
+  // §1 consumers checked: serP reads named fields only (no wholesale data
+  // copy — no cycle into saves), onionLayerItems/tween matching/select
+  // bridges ignore unknown data.* fields.
+  p.data.__engineSrcDict=d;
   prev.activate();return p;}
 // Phase 2 (async multi-user sync): merges a remote collaborator's exported
 // project JSON into the CURRENT live document at the data level (state.layers
@@ -826,6 +886,11 @@ function serR(r){
     // but would break any future "recombine"/select-siblings tooling).
     if(r.data.isTextChar)d.isTextChar=true;
     if(r.data.textGroupId)d.textGroupId=r.data.textGroupId;
+    // Text Animator grouping (2026-08-17) — see serP's own charIndex comment,
+    // same contract for a raster-split character.
+    if(r.data.charIndex!=null)d.charIndex=r.data.charIndex;
+    if(r.data.wordIndex!=null)d.wordIndex=r.data.wordIndex;
+    if(r.data.lineIndex!=null)d.lineIndex=r.data.lineIndex;
   }
   return d;}
 // r.onLoad attached AFTER `new Raster(d.src)` can miss an ALREADY-loaded
@@ -837,8 +902,79 @@ function serR(r){
 // kept Paper's default natural-pixel dimensions instead of the intended
 // world-space w/h whenever onLoad never fired. Checking `.loaded` first
 // covers both cases.
-function desR(d,layer,op){var prev=project.activeLayer;layer.activate();var r=new Raster(d.src);r.data.src=d.src;if(d.isBitmapBrush)r.data.isBitmapBrush=true;if(d.brushGroupId)r.data.brushGroupId=d.brushGroupId;if(d.isBrushTextureCopy)r.data.isBrushTextureCopy=true;if(d.groupId)r.data.groupId=d.groupId;
-  if(d.isText){r.data.isText=true;r.data.text=d.text||'';r.data.font=d.font||'sans-serif';r.data.size=d.size||48;r.data.color=d.color||'#000000';r.data.align=d.align||'left';if(d.fixedWidth)r.data.fixedWidth=d.fixedWidth;if(d.isTextChar)r.data.isTextChar=true;if(d.textGroupId)r.data.textGroupId=d.textGroupId;}
+// ---- DECODED-IMAGE CACHE (2026-07-28) ----
+// loadFrame() rebuilds every item through desR on EVERY scrub tick, and desR
+// used to hand Paper a data: URL — one fresh PNG decode per raster per frame,
+// forever. Measured on a real 15.9MB project: 57 raster reads across the
+// component's keyframes for only 24 distinct images, 4.7MB of base64 decoded
+// just to visit frame 0. That is the "il redessine à chaque fois" cost.
+//
+// Keyed on the data URL itself, which is already this codebase's image
+// identity (engine-bridge.js's registerRasterIfNeeded keys the GPU texture
+// the same way), so nothing new has to stay in sync. Every path that CHANGES
+// a raster's pixels — eraseBite, flushEraseDirty, liveRestamp, regenerate —
+// writes a fresh toDataURL string, i.e. a new key: a mutated image can never
+// read a stale entry, and no explicit invalidation is needed.
+//
+// Sharing one decoded <img> across many Rasters is safe: Paper's _setImage
+// copies the element into the Raster's OWN canvas (setSize does
+// getCanvas + drawImage(previousElement)), so a later r.size/rotate on one
+// Raster cannot disturb another. It also makes the Raster synchronously
+// `loaded`, which is what removes the async gap the onLoad hook below exists
+// to paper over.
+//
+// Bounded: an imported video mints ~one distinct frame per video frame
+// (images.js), so an unbounded map would grow to the whole decoded movie.
+// LRU by insertion order, capped on BOTH count and approximate bytes.
+var _imgCacheMax=120, _imgCacheMaxBytes=192*1024*1024;
+var _imgCache=new Map(), _imgCacheBytes=0;
+function _imgCacheGet(src){
+  var e=_imgCache.get(src);
+  if(!e)return null;
+  // Re-insert to mark most-recently-used (Map preserves insertion order).
+  _imgCache.delete(src);_imgCache.set(src,e);
+  // Only a fully decoded element is usable synchronously; a pending one is
+  // reported as a miss so the caller takes the normal async path.
+  return (e.img&&e.img.complete&&e.img.naturalWidth)?e.img:null;
+}
+// Decode ONE image we own, in the background. Deliberately not Paper's own
+// r.image: after decode Paper swaps its internal element for a canvas
+// (_setImage -> setSize -> getCanvas + drawImage), so the element reachable
+// from a loaded Raster has no .complete/.naturalWidth and is useless as a
+// cache entry — verified live (loaded:true, complete:false, naturalWidth:null).
+// Owning the element also means Paper can never mutate it under us.
+function _imgCacheWarm(src){
+  if(!src||src.indexOf('data:')!==0||_imgCache.has(src)||_imgCacheWarming[src])return;
+  _imgCacheWarming[src]=1;
+  var im=new Image();
+  im.onload=function(){delete _imgCacheWarming[src];_imgCachePut(src,im);};
+  im.onerror=function(){delete _imgCacheWarming[src];};
+  im.src=src;
+}
+var _imgCacheWarming={};
+function _imgCachePut(src,img){
+  if(!src||!img||_imgCache.has(src))return;
+  var bytes=src.length;
+  _imgCache.set(src,{img:img,bytes:bytes});_imgCacheBytes+=bytes;
+  while(_imgCache.size>_imgCacheMax||_imgCacheBytes>_imgCacheMaxBytes){
+    var oldest=_imgCache.keys().next();
+    if(oldest.done)break;
+    var ev=_imgCache.get(oldest.value);
+    _imgCache.delete(oldest.value);_imgCacheBytes-=(ev&&ev.bytes)||0;
+  }
+}
+// Exposed for measurement and for the tests that prove the hit rate.
+window.__imgCacheStats=function(){return{entries:_imgCache.size,mo:+( _imgCacheBytes/1e6).toFixed(2),hits:_imgCacheHits,misses:_imgCacheMisses};};
+window.__imgCacheReset=function(){_imgCache.clear();_imgCacheBytes=0;_imgCacheHits=0;_imgCacheMisses=0;};
+var _imgCacheHits=0,_imgCacheMisses=0;
+function desR(d,layer,op){var prev=project.activeLayer;layer.activate();
+  // Cache hit: hand Paper the ALREADY-DECODED element, which makes the
+  // Raster synchronously `loaded` — place() runs inline below and the
+  // async onLoad path (and its self-healing renderNow) is never needed.
+  var _cached=_imgCacheGet(d.src);
+  if(_cached)_imgCacheHits++;else{_imgCacheMisses++;_imgCacheWarm(d.src);}
+  var r=new Raster(_cached||d.src);r.data.src=d.src;if(d.isBitmapBrush)r.data.isBitmapBrush=true;if(d.brushGroupId)r.data.brushGroupId=d.brushGroupId;if(d.isBrushTextureCopy)r.data.isBrushTextureCopy=true;if(d.groupId)r.data.groupId=d.groupId;
+  if(d.isText){r.data.isText=true;r.data.text=d.text||'';r.data.font=d.font||'sans-serif';r.data.size=d.size||48;r.data.color=d.color||'#000000';r.data.align=d.align||'left';if(d.fixedWidth)r.data.fixedWidth=d.fixedWidth;if(d.isTextChar)r.data.isTextChar=true;if(d.textGroupId)r.data.textGroupId=d.textGroupId;if(d.charIndex!=null)r.data.charIndex=d.charIndex;if(d.wordIndex!=null)r.data.wordIndex=d.wordIndex;if(d.lineIndex!=null)r.data.lineIndex=d.lineIndex;}
   r.position=new Point(d.x,d.y);r.opacity=op!==undefined?op:(d.opacity!==undefined?d.opacity:1);var w=d.width,h=d.height;
   // serR()'s mid-decode fallback reads this — see its own comment. Cleared
   // once place() actually applies the real geometry so serR immediately
@@ -852,6 +988,7 @@ function desR(d,layer,op){var prev=project.activeLayer;layer.activate();var r=ne
   if(r.loaded)place();
   else r.onLoad=function(){
     place();
+
     // Found live (2026-07-17, "un scrub dans la timeline fait disparaitre
     // la texture"): loadFrame() rebuilds EVERY item fresh via desR/desP on
     // every scrub tick, so a bitmap-brush texture's Raster is a BRAND NEW
@@ -901,10 +1038,50 @@ function symGestureAccumulate(opMatrix){
   var m=symMatrixOf(ld);
   opMatrix.append(m);
   symMatrixSet(ld,opMatrix);
+  // NOTE: no _sceneVersion bump here. symMatrix is materialised by
+  // getEffectiveStrokes at loadFrame time; engine-bridge.js never reads it
+  // (grep: zero references), so bumping the version only forces a rebuild
+  // that produces the same bytes. What makes a component drag visible live
+  // is the geometry translate in select-bridge.js's move branch — see the
+  // selectedPaths re-sync there.
 }
 // Applies an affine matrix to one raw stroke-data dict's geometry in place
 // — point gets the full affine, handleIn/handleOut are deltas so only the
 // linear (non-translating) part applies to them.
+// Deep-clone a stroke dict for transforming, WITHOUT copying its image
+// payload. A raster stroke's `src` is a base64 data URL — on a real project
+// that is ~190KB per raster and 15.3MB across a component (the next-largest
+// field, `segments`, totals 66KB: src is 99.5% of the bytes). Every
+// transform site here only ever rewrites geometry, so round-tripping that
+// string through JSON was pure waste: measured 1.9ms per call for one
+// component's 20 strokes, paid twice per frame on every scrub/playback tick
+// (2026-07-28, "la lecture dans motion de cet élément est saccadée").
+//
+// `src` is immutable by contract — desR reads it, nothing rewrites it in
+// place — so the clone shares the same string reference. Any future field
+// that is both large and immutable belongs in HEAVY too.
+// `src` is a base64 data URL (~190KB per raster); bitmapPressureProfile is
+// the per-dab pressure sampling a bitmap-brush stroke carries (62KB across
+// the reference project, second only to src). Both are written once at
+// creation and only ever read afterwards, so a clone can share them.
+var _HEAVY_STROKE_FIELDS = ['src', 'bitmapPressureProfile'];
+// Exported so the undo snapshot (_cloneLayersForUndo, tweens.js) shares the
+// same list — two copies of it would drift the moment a third heavy field
+// appears (CLAUDE.md §3).
+window._HEAVY_STROKE_FIELDS = _HEAVY_STROKE_FIELDS;
+function cloneStrokeForTransform(sd) {
+  var heavy = null, k, i;
+  for (i = 0; i < _HEAVY_STROKE_FIELDS.length; i++) {
+    k = _HEAVY_STROKE_FIELDS[i];
+    if (sd[k] !== undefined) { (heavy || (heavy = {}))[k] = sd[k]; }
+  }
+  if (!heavy) return JSON.parse(JSON.stringify(sd));
+  var light = {};
+  for (k in sd) { if (heavy[k] === undefined) light[k] = sd[k]; }
+  var out = JSON.parse(JSON.stringify(light));
+  for (k in heavy) out[k] = heavy[k];
+  return out;
+}
 function applyMatrixToStrokeData(sd,m){
   if(sd.isRaster){
     // A raster stroke has no `segments` (see serR/desR — just a center x/y
@@ -936,7 +1113,783 @@ function applyMatrixToStrokeData(sd,m){
   });
   return sd;
 }
+// ---- MOGRAPH DUPLICATOR (2026-07-29) ----
+// Grid/radial/path array duplication of a layer's content (AE shape
+// Repeater family), applied at loadFrame time via
+// getEffectiveStrokesRendered below — the stored frames NEVER contain the
+// copies. See toggleLayerDuplicator (motion.js) for the lock/edit-source
+// safety model, and saveActiveLayerFrame's guard for why it matters.
+//
+// Fourth mirror of the same closed-form affine as affineFromMotion
+// (engine-bridge.js), transformSegments (motion.js) and camera.js's own
+// matrix build: scale in the pivot's local frame, rotate around the pivot,
+// translate last. Built as ONE expression, never chained
+// Matrix.translate/rotate/scale calls — a bare Matrix's own methods APPEND
+// while Item methods PREPEND, a real shipped-bug class documented in
+// CLAUDE.md §8 point 2.
+// "N'importe quel property" (2026-07-30) — an Effector's contribution used
+// to be 4 hardcoded fields (offsetPos/offsetRot/offsetScale/offsetOpacity);
+// now it's an arbitrary list of {prop,value} channels, any of
+// SMMotion.DUP_TARGET_PROPS. An effector created before this change has no
+// `channels` array yet — migrate it ONCE, in place (eff IS the live
+// dup.effectors[i] object, so this sticks and gets saved forward on the
+// next project save), by folding whichever legacy fields are non-zero into
+// the equivalent channel entries. Idempotent: eff.channels is truthy after
+// the first call (even an empty array for an all-zero legacy effector), so
+// every later call just returns it.
+function effectorChannels(eff){
+  if(eff.channels)return eff.channels;
+  var ch=[];
+  if(eff.offsetPos&&(eff.offsetPos[0]||eff.offsetPos[1]))ch.push({prop:'position',value:[eff.offsetPos[0]||0,eff.offsetPos[1]||0]});
+  if(eff.offsetRot)ch.push({prop:'rotation',value:[eff.offsetRot]});
+  if(eff.offsetScale&&(eff.offsetScale[0]||eff.offsetScale[1]))ch.push({prop:'scale',value:[eff.offsetScale[0]||0,eff.offsetScale[1]||0]});
+  if(eff.offsetOpacity)ch.push({prop:'opacity',value:[eff.offsetOpacity]});
+  eff.channels=ch;
+  return ch;
+}
+function dupMatrixFromDescriptor(m,pivot){
+  var rad=(m.rot||0)*Math.PI/180,cs=Math.cos(rad),sn=Math.sin(rad);
+  var a=cs*m.sx,b=sn*m.sx,c=-sn*m.sy,d=cs*m.sy;
+  var tx=pivot.x+(m.dx||0)-a*pivot.x-c*pivot.y;
+  var ty=pivot.y+(m.dy||0)-b*pivot.x-d*pivot.y;
+  return new Matrix(a,b,c,d,tx,ty);
+}
+// Anchor-point bounds of the seed strokes — a pivot, not a render bound,
+// so segment anchor points are precise enough (no bezier-extrema math, no
+// throwaway Paper Path).
+function _boundsCenterOfStrokes(strokes){
+  var minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  strokes.forEach(function(sd){
+    if(sd.isRaster){
+      minX=Math.min(minX,sd.x-sd.width/2);maxX=Math.max(maxX,sd.x+sd.width/2);
+      minY=Math.min(minY,sd.y-sd.height/2);maxY=Math.max(maxY,sd.y+sd.height/2);
+      return;
+    }
+    if(!sd.segments)return;
+    sd.segments.forEach(function(s){
+      minX=Math.min(minX,s.point[0]);maxX=Math.max(maxX,s.point[0]);
+      minY=Math.min(minY,s.point[1]);maxY=Math.max(maxY,s.point[1]);
+    });
+  });
+  if(minX===Infinity)return{x:state.canvasW/2,y:state.canvasH/2};
+  return{x:(minX+maxX)/2,y:(minY+maxY)/2};
+}
+// Path-mode distribution source: another layer referenced by stable
+// layerUid (same mechanism as AE-style parenting, parentLayerUid /
+// SMMotion.findLayerIndexByUid) — its BASE content deliberately (a
+// duplicator can't reference another duplicator; the panel's <select>
+// also excludes them, this is the runtime backstop).
+function _resolveDuplicatorPath(dup,frameIdx){
+  var idx=window.SMMotion?SMMotion.findLayerIndexByUid(dup.pathLayerUid):-1;
+  if(idx<0)return null;
+  var srcLd=state.layers[idx];
+  if(!srcLd||srcLd.duplicator)return null;
+  var strokes=getEffectiveStrokes(idx,frameIdx);
+  var sd=null;
+  for(var i=0;i<strokes.length;i++){if(!strokes[i].isRaster&&strokes[i].segments&&strokes[i].segments.length>=2){sd=strokes[i];break;}}
+  if(!sd)return null;
+  var p=new Path({insert:false});
+  sd.segments.forEach(function(s){p.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));});
+  if(sd.closed)p.closed=true;
+  if(!p.length){p.remove();return null;}
+  return{path:p,length:p.length,closed:!!sd.closed,start:p.getPointAt(0)};
+}
+// Shared by applyLayerDuplicator (below, the strokes/rasters path) AND
+// engine-bridge.js's nativeVideo render branch (2026-07-30 — a native video
+// layer's picture is ONE image item pushed directly, entirely bypassing
+// getEffectiveStrokesRendered, so the Duplicator previously had zero effect
+// on a video layer: enabling it changed nothing on screen). This is ONE
+// clone's placement (position/rotation/scale/opacity delta + this clone's
+// own effector contributions), given its index `k` and the pivot ITS
+// content is centered on — `pivotK` is a parameter rather than always
+// `pivot` because the stroke path's temporal stagger (tOffOn below)
+// re-samples the seed layer's own content at a per-copy shifted frame, so
+// different copies can be centered on different bounds. nativeVideo has
+// exactly one decoded image per frame tick (no per-clone re-sampling is
+// possible), so its caller always passes the same pivot for every k —
+// temporal stagger is a no-op for video, same reason it can't animate.
+// MUST stay the only place this math lives — mirrors CLAUDE.md §3's rule
+// for render()/render_to_pixels(): if this ever forks into two copies, the
+// RNG draw order (7919-decorrelated per index, exactly 9 draws every time
+// regardless of which properties are actually random) and the effector
+// summation must be changed in both, or the two paths silently diverge.
+function _duplicatorClonePlacement(dup,k,pivotK,baseDx,baseDy,baseRot,dPos,dRot,dScale,dOpacity,dPosZ,dRotX,dRotY,randMode,is3DLayer){
+  var rngK=seededRng(((dup.seed||0)+k*7919)>>>0);
+  var rx=rngK(),ry=rngK(),rrr=rngK(),rsx=rngK(),rsy=rngK(),rop=rngK();
+  var posK=randMode.position?[(2*rx-1)*dPos[0],(2*ry-1)*dPos[1]]:[k*dPos[0],k*dPos[1]];
+  var rotK=randMode.rotation?(2*rrr-1)*dRot:k*dRot;
+  var scaleK=randMode.scale?[(2*rsx-1)*dScale[0],(2*rsy-1)*dScale[1]]:[k*dScale[0],k*dScale[1]];
+  var opK=randMode.opacity?(2*rop-1)*dOpacity:k*dOpacity;
+  var rz=rngK(),rrx=rngK(),rry=rngK();
+  var dzK=randMode.position?(2*rz-1)*dPosZ:k*dPosZ;
+  var drxK=randMode.rotation?(2*rrx-1)*dRotX:k*dRotX;
+  var dryK=randMode.rotation?(2*rry-1)*dRotY:k*dRotY;
+  var instX=pivotK.x+baseDx,instY=pivotK.y+baseDy;
+  (dup.effectors||[]).forEach(function(eff){
+    var ddx=instX-(eff.pos?eff.pos.x:0),ddy=instY-(eff.pos?eff.pos.y:0);
+    var w;
+    if(eff.falloff==='linear'){
+      var rad=(eff.angle||0)*Math.PI/180;
+      var proj=ddx*Math.cos(rad)+ddy*Math.sin(rad);
+      w=Math.max(0,Math.min(1,1-proj/(eff.radius||1)));
+    }else{
+      var dist=Math.hypot(ddx,ddy);
+      w=Math.max(0,Math.min(1,1-dist/(eff.radius||1)));
+    }
+    w*=(eff.strength!=null?eff.strength:100)/100;
+    if(!w)return;
+    effectorChannels(eff).forEach(function(ch){
+      var v=ch.value||[];
+      switch(ch.prop){
+        case 'position':posK[0]+=w*(v[0]||0);posK[1]+=w*(v[1]||0);break;
+        case 'positionZ':dzK+=w*(v[0]||0);break;
+        case 'rotation':rotK+=w*(v[0]||0);break;
+        case 'rotationX':drxK+=w*(v[0]||0);break;
+        case 'rotationY':dryK+=w*(v[0]||0);break;
+        case 'scale':scaleK[0]+=w*(v[0]||0);scaleK[1]+=w*(v[1]||0);break;
+        case 'opacity':opK+=w*(v[0]||0);break;
+      }
+    });
+  });
+  var opFactor=Math.max(0,Math.min(1,1+opK/100));
+  var dup3D=(is3DLayer&&(dzK||drxK||dryK))?{dz:dzK,drx:drxK,dry:dryK}:null;
+  return{dx:baseDx+posK[0],dy:baseDy+posK[1],rot:baseRot+rotK,sx:1+scaleK[0]/100,sy:1+scaleK[1]/100,opacityFactor:opFactor,dup3D:dup3D};
+}
+// Hard cap mirrors _registerCap's "never unbounded" philosophy
+// (engine-bridge.js) — a typo'd count degrades to "big", never "hangs".
+// Shared so the nativeVideo render path can't drift to a different ceiling.
+function _duplicatorCount(dup){
+  var mode=dup.mode||'grid';
+  return mode==='grid'
+    ?Math.min(900,Math.max(1,dup.rows||1)*Math.max(1,dup.cols||1))
+    :Math.min(500,Math.max(1,dup.count||1));
+}
+// The mode-specific (grid/radial/path) base offset for clone `k`, BEFORE
+// any RNG stagger or effector contribution — shared with the nativeVideo
+// render path for the same reason as _duplicatorClonePlacement above.
+// `pathInfo` is _resolveDuplicatorPath's result (null unless mode==='path').
+function _duplicatorModeOffset(dup,mode,k,count,cols,pathInfo){
+  var baseDx=0,baseDy=0,baseRot=0;
+  if(mode==='grid'){
+    baseDx=(k%cols)*(dup.spacingX||0);
+    baseDy=Math.floor(k/cols)*(dup.spacingY||0);
+  }else if(mode==='radial'){
+    var span=dup.endAngle!=null?(dup.endAngle-dup.startAngle):360;
+    var ang=(dup.startAngle||0)+k*(span/count);
+    var rr=ang*Math.PI/180;
+    baseDx=(dup.radius||0)*Math.cos(rr);
+    baseDy=(dup.radius||0)*Math.sin(rr);
+    if(dup.radialOrient)baseRot=ang;
+  }else{ // path
+    var t=pathInfo.closed?k/count:(count>1?k/(count-1):0);
+    var off=Math.min(pathInfo.length,t*pathInfo.length);
+    var pt=pathInfo.path.getPointAt(off)||pathInfo.start;
+    baseDx=pt.x-pathInfo.start.x;
+    baseDy=pt.y-pathInfo.start.y;
+    if(dup.pathAlignTangent){var tan=pathInfo.path.getTangentAt(off);if(tan)baseRot=tan.angle;}
+  }
+  return{baseDx:baseDx,baseDy:baseDy,baseRot:baseRot};
+}
+// opts (2026-07-30 fix, found live: a Duplicator set on a Component's OWN
+// inner sub-layer rendered correctly only while editing INSIDE the symbol
+// — state.layers is aliased to sym.layers there, so loadFrame's normal
+// getEffectiveStrokesRendered call reaches it. Composited from OUTSIDE
+// (placed instance, StoryBoard montage), getEffectiveStrokes's ld.symbolId
+// branch below reads every symLayer directly and never applied its
+// duplicator at all — same "consumer A handles it, consumer B doesn't"
+// shape as CLAUDE.md §1). That branch has no `layerIdx` into state.layers
+// for a symLayer (it isn't one), so the temporal-offset sub-feature's
+// getEffectiveStrokes(layerIdx,shiftedIdx) re-sample can't work unmodified
+// — opts.resample/opts.spanStart/opts.spanLen let a caller substitute its
+// own frame lookup and span bounds instead. Omitted (as getEffectiveStrokes
+// Rendered's call below still does), this behaves exactly as before.
+function applyLayerDuplicator(ld,base,frameIdx,layerIdx,opts){
+  opts=opts||{};
+  var dup=ld.duplicator,mode=dup.mode||'grid';
+  var count=_duplicatorCount(dup);
+  if(count<=1)return base;
+  var pivot=_boundsCenterOfStrokes(base);
+  var M=window.SMMotion;
+  // Temporal stagger (2026-07-29, LottieFiles Duplicator "Animation" tab
+  // equivalent — the user explicitly asked for this after seeing it there):
+  // each copy re-samples the SEED LAYER'S OWN content (getEffectiveStrokes,
+  // NOT the placement/index stagger below — that stays a separate axis,
+  // same as LottieFiles' own Pattern/Animation tab split) at a per-copy
+  // TIME-SHIFTED frame instead of reusing `base` for every copy. This is
+  // the natural fit for Nemo's frame-based drawn content (a hand-drawn walk
+  // cycle, a tweened sequence, or a Component's own internal timeline —
+  // getEffectiveStrokes' symbolId branch already resolves that) rather than
+  // LottieFiles' purely-numeric position/rotation loop. Wraps within the
+  // seed layer's own effective span (layerInPoint..layerOutPoint) so the
+  // "wave" effect actually loops instead of freezing at a hard edge.
+  var tOff=dup.timeOffset,tOffOn=tOff&&tOff.enabled&&(opts.resample||layerIdx!=null)&&(tOff.offsetFrames|0)!==0;
+  var tInF,tSpan;
+  if(tOffOn){
+    tInF=opts.spanStart!=null?opts.spanStart:layerInPoint(ld);
+    tSpan=Math.max(1,opts.spanLen!=null?opts.spanLen:(layerOutPoint(ld)-tInF+1));
+  }
+  var dPos=M?M.valueAtFrame(ld,'dupOffsetPos',frameIdx):[0,0];
+  var dRot=M?M.valueAtFrame(ld,'dupOffsetRot',frameIdx)[0]:0;
+  var dScale=M?M.valueAtFrame(ld,'dupOffsetScale',frameIdx):[0,0];
+  var dOpacity=M?M.valueAtFrame(ld,'dupOffsetOpacity',frameIdx)[0]:0;
+  // positionZ/rotationX/rotationY (2026-07-30, "en 3D aussi avec ID de
+  // chaque cloner") — same k×delta/±delta stagger as the original 4,
+  // ADDED alongside them rather than folded into one generic per-property
+  // loop: a generic loop would change how many values seededRng draws
+  // before reaching scale/opacity's own draws below, silently reshuffling
+  // every EXISTING project's random-mode scale/opacity pattern the moment
+  // this shipped (seededRng's stream position is call-count-order
+  // sensitive) — appending new draws AFTER the original 6 keeps every
+  // pre-existing duplicator byte-identical.
+  var dPosZ=M?M.valueAtFrame(ld,'dupOffsetPosZ',frameIdx)[0]:0;
+  var dRotX=M?M.valueAtFrame(ld,'dupOffsetRotX',frameIdx)[0]:0;
+  var dRotY=M?M.valueAtFrame(ld,'dupOffsetRotY',frameIdx)[0]:0;
+  var is3DLayer=!!ld.threeD;
+  var randMode=dup.staggerRandom||{};
+  var cols=Math.max(1,dup.cols||1);
+  var pathInfo=mode==='path'?_resolveDuplicatorPath(dup,frameIdx):null;
+  if(mode==='path'&&!pathInfo)return base; // unconfigured/broken path ref: show the seed, not nothing
+  var out=[];
+  for(var k=0;k<count;k++){
+    var baseK=base,pivotK=pivot;
+    if(tOffOn){
+      var shiftFrames;
+      if(tOff.direction==='backward')shiftFrames=(count-1-k)*tOff.offsetFrames;
+      else if(tOff.direction==='centerOut')shiftFrames=Math.round(Math.abs(k-(count-1)/2)*tOff.offsetFrames);
+      else if(tOff.direction==='random'){
+        // Same seeded-per-index precedent as the position/rotation/scale/
+        // opacity stagger above (a different prime multiplier so it draws
+        // an independent sequence, not the same jitter values reused) —
+        // never Math.random() at render time, or the wave reshuffles on
+        // every scrub tick instead of holding a stable pattern.
+        var rngT=seededRng(((dup.seed||0)+k*104729)>>>0);
+        shiftFrames=Math.floor(rngT()*count)*tOff.offsetFrames;
+      } else shiftFrames=k*tOff.offsetFrames; // 'forward' (default): copy 0 = current frame, each next copy lags further behind
+      var shiftedIdx=tInF+(((frameIdx-tInF-shiftFrames)%tSpan)+tSpan)%tSpan;
+      var shifted=opts.resample?opts.resample(shiftedIdx):getEffectiveStrokes(layerIdx,shiftedIdx);
+      if(shifted.length){baseK=shifted;pivotK=_boundsCenterOfStrokes(baseK);}
+      // Nothing drawn at the shifted frame (a hold-blank span) — fall back
+      // to the current frame's own content rather than vanishing that copy.
+    }
+    var modeOff=_duplicatorModeOffset(dup,mode,k,count,cols,pathInfo);
+    var baseDx=modeOff.baseDx,baseDy=modeOff.baseDy,baseRot=modeOff.baseRot;
+    // Per-clone RNG draws, effector summation and the resulting placement
+    // descriptor all live in _duplicatorClonePlacement (shared with the
+    // nativeVideo render path, engine-bridge.js) — see its own comment for
+    // why pivotK is passed in rather than always using `pivot`.
+    var place=_duplicatorClonePlacement(dup,k,pivotK,baseDx,baseDy,baseRot,dPos,dRot,dScale,dOpacity,dPosZ,dRotX,dRotY,randMode,is3DLayer);
+    // Stagger folded into ONE matrix with the mode's own placement:
+    // rotate/scale in place around the seed's own bounds-center first, the
+    // placement translate last — same inner-transform-then-outer-placement
+    // order as a Component's own camera followed by symMatrix.
+    var mat=dupMatrixFromDescriptor(place,pivotK);
+    var opFactor=place.opacityFactor;
+    // Per-clone 3D delta (2026-07-30) — only attached when it can actually
+    // do anything (layer is 3D-enabled AND at least one axis actually
+    // moved), so an ordinary 2D duplicator's clones carry no extra field.
+    // buildSceneJson (engine-bridge.js) reads data.dup3D to build a
+    // per-dupIndex 3D projector instead of sharing the single layer-wide
+    // one every other item on a 3D layer uses.
+    var dup3D=place.dup3D;
+    baseK.forEach(function(sd){
+      var sd2=applyMatrixToStrokeData(cloneStrokeForTransform(sd),mat);
+      sd2.opacity=(sd2.opacity!==undefined?sd2.opacity:1)*opFactor;
+      sd2.isDuplicatorCopy=true;sd2.dupIndex=k;
+      // Stable per-clone identity ("ID de chaque cloner") — deterministic
+      // from the duplicator's own seed + this copy's index, so it's
+      // reproducible across re-materializations (every render rebuilds
+      // this array from scratch) without a persisted counter. Distinct
+      // from strokeId, which every clone inherits VERBATIM from the seed
+      // shape (cloneStrokeForTransform, deliberate — see group-bridge.js's
+      // own composite-key comment): dupCloneId is what actually tells
+      // copies of the SAME seed shape apart.
+      sd2.dupCloneId='dup'+(dup.seed||0)+'_'+k;
+      if(dup3D)sd2.dup3D=dup3D;
+      out.push(sd2);
+    });
+  }
+  if(pathInfo)pathInfo.path.remove();
+  return out;
+}
+// The ONLY sanctioned way to get a layer's content WITH the duplicator
+// applied. getEffectiveStrokes itself stays untouched — its ~16 other call
+// sites (tween baking, ensureKeyframe, onion ghosts, status-bar count…)
+// must keep seeing the single real seed shape. Only loadFrame and
+// export.js's two frame builders substitute this in.
+function getEffectiveStrokesRendered(layerIdx,frameIdx){
+  var base=getEffectiveStrokes(layerIdx,frameIdx);
+  var ld=state.layers[layerIdx];
+  if(!ld||!ld.duplicator||ld._dupEditSource||!base.length)return base;
+  return applyLayerDuplicator(ld,base,frameIdx,layerIdx);
+}
+// ---- RIG (2026-07-29) — "un système de rig à la Shapper", promoted from
+// the dormant src/js/labs/rig-deform.js prototype. Shapper (the studio's
+// own AE mask-influence extension) has no bone HIERARCHY at all: a handful
+// of movable control points/paths, each shape vertex carries a 0..1
+// influence weight per control, and posing offsets every vertex it
+// influences by weight × the control's own delta from rest. Two
+// deliberate departures from both Shapper and the labs prototype, per
+// explicit request: bones are drawn as real VECTOR PATHS via a Pen-tool
+// interaction (rig-bridge.js), not abstract point placement; and a bone's
+// LOCAL TANGENT (sampled continuously along its curve, not one chord angle
+// for the whole bone) drives rotation-aware skinning when a bind has
+// rotate mode on — Shapper itself only ever used the straight chord
+// between two mask points.
+//
+// Persisted shape, plain JSON throughout (CLAUDE.md §1: a live Paper
+// reference never survives save/reload — the labs prototype's
+// `binds[i].path` was exactly this anti-pattern, fixed here from the
+// start): ld.rig = {bones:{id:{segments,restSegments,closed}},
+// ikChains:{endId:{...}}, binds:[{strokeId,rest,weights,rotate}], nextId}.
+// `binds[i]._live` (underscore, runtime-only) is the resolved live Paper
+// item, rebuilt by relinkRigBinds after every loadFrame — never persisted.
+function ensureLayerRig(ld){
+  if(!ld.rig)ld.rig={bones:{},ikChains:{},binds:[],nextId:1};
+  return ld.rig;
+}
+function rigFreshId(rig,prefix){return prefix+(rig.nextId++);}
+// A bone's segments (or restSegments) as a throwaway Paper Path, purely for
+// getNearestLocation/getLocationAt/tangent sampling — never inserted into
+// any layer.
+function _boneSegsToPath(segs,closed){
+  var p=new Path({insert:false});
+  segs.forEach(function(s){p.add(new Segment(new Point(s.point[0],s.point[1]),new Point((s.handleIn||[0,0])[0],(s.handleIn||[0,0])[1]),new Point((s.handleOut||[0,0])[0],(s.handleOut||[0,0])[1])));});
+  if(closed)p.closed=true;
+  return p;
+}
+// Rebuilds each bind's LIVE Paper reference after loadFrame replaced
+// userLayers[i].children (the old references are orphaned the moment a
+// layer rebuilds) — same strokeId-lookup pattern as
+// relinkBrushCompanions/relinkLinkedFills, called right alongside them. A
+// bind whose target vanished, or whose vertex COUNT no longer matches its
+// stored `rest` (the underlying stroke was sculpted/erased/boolean'd since
+// bind time), is DROPPED rather than risk deforming the wrong vertices —
+// "in doubt, drop," the same posture §5quater's `_canReuseMaterialized`
+// takes for "in doubt, rebuild."
+function relinkRigBinds(ld,layer){
+  if(!ld.rig||!ld.rig.binds||!ld.rig.binds.length)return;
+  var byId={};
+  layer.children.forEach(function(c){if(c.data&&c.data.strokeId)byId[c.data.strokeId]=c;});
+  ld.rig.binds=ld.rig.binds.filter(function(b){
+    var item=byId[b.strokeId];
+    if(!item||!item.segments||item.segments.length!==b.rest.length)return false;
+    b._live=item;
+    return true;
+  });
+}
+// Binds `path`'s own vertices to one or more bones, weighted by distance
+// to the NEAREST POINT ANYWHERE ALONG each bone's path (getNearestLocation
+// — already precedented elsewhere in this codebase, e.g. tools.js's
+// t-junction snapping, tweens.js's tween feature matching), not just to a
+// bone's own control points — a straight/curved bone influences vertices
+// along its whole length, not only at its ends. `offset` (the bone's own
+// path-length offset of the nearest point) is captured once here and
+// re-sampled at pose time via getLocationAt — same offset, current bone
+// geometry — so both position AND local tangent stay correctly anchored
+// to the SAME point on the bone as it's posed.
+function rigBindStroke(ld,path,boneIds,radius,rotate,softness){
+  var rig=ensureLayerRig(ld);
+  // CompoundPath BEFORE the segments/length guard, deliberately: a
+  // CompoundPath has no `.segments` of its own (its geometry lives in
+  // `.children`, each a Path) — checking segments first would catch every
+  // CompoundPath as "invalid or empty target" and this dedicated,
+  // more-useful message would never fire (verified live: it didn't, until
+  // this reorder).
+  if(!path){console.warn('[rig] cible invalide');return false;}
+  if(path.className==='CompoundPath'){console.warn('[rig] les CompoundPath (résultats booléens à trous/îles) ne sont pas encore supportés par le rig');return false;}
+  if(!path.segments||!path.segments.length){console.warn('[rig] cible invalide ou vide');return false;}
+  // Vector-brush ribbons (isVectorBrush) and their linked-fill companion
+  // (isLinkedFillCompanion) are supported like any other Path (2026-07-29,
+  // Cyril: "l'idée c'est la même que pour Shapper... les points de vecteurs
+  // suivent les bones") — applyRigDeform below is fully generic, moving
+  // whatever Path is bound vertex-by-vertex with no type-specific logic, and
+  // desP (app.js) reconstructs a vector-brush stroke straight from its
+  // stored `.segments` (the ribbon's actual outline), not from
+  // centerSegments/widthProfile, so a rig-posed deformation persists through
+  // save/reload exactly like any other shape's.
+  ensureStrokeId(path);
+  // Re-binding the SAME shape (canvas click-to-bind makes this the common
+  // case, not a rare mistake — clicking a shape again to change which bone
+  // it follows, or to widen the radius, must replace, not stack) used to
+  // just push a second entry: applyRigDeform iterates ld.rig.binds and SUMS
+  // every entry touching a given strokeId, so a duplicate silently doubled
+  // that shape's deformation instead of cleanly superseding it.
+  rig.binds=rig.binds.filter(function(b){return b.strokeId!==path.data.strokeId;});
+  radius=radius||200;
+  // Falloff softness (2026-07-30, "il n'y a qu'un rayon dur... aucune
+  // courbe d'adoucissement" — a hard linear taper was the only option,
+  // unlike the Duplicator's own Effector, which already has a proper
+  // falloff convention elsewhere in this app). 0 = the original plain
+  // linear taper, BYTE-IDENTICAL to every project bound before this
+  // existed; 1 = full smoothstep (3t²-2t³, zero derivative at both the
+  // bone itself and the radius edge — the standard "soft" falloff used
+  // by every painted-weight rig tool, Blender included). Linearly
+  // blended between the two rather than a free exponent: two clearly-
+  // named ends (hard vs soft) are easier to reason about while dragging
+  // a single slider than an unbounded gamma value would be. One value
+  // for the whole layer's bind pass, not per-bone — the per-bone knob
+  // that actually varies limb-to-limb is the RADIUS (bone.radius), which
+  // already exists; needing a DIFFERENT falloff shape per bone is a much
+  // rarer ask than needing a different reach.
+  softness=Math.max(0,Math.min(1,softness||0));
+  // Shared by the ribbon's own boundary AND (below) its centerSegments —
+  // same per-point "nearest offset on each bone's rest curve, falloff by
+  // distance" weighting, just fed a different point list.
+  function weighForPoints(pts){
+    return pts.map(function(pt){
+      var w=[],p=new Point(pt[0],pt[1]);
+      boneIds.forEach(function(bid){
+        var bone=rig.bones[bid];if(!bone)return;
+        var bp=_boneSegsToPath(bone.restSegments,bone.closed);
+        var loc=bp.getNearestLocation(p);
+        bp.remove();
+        if(!loc)return;
+        var dist=loc.point.getDistance(p);
+        // Per-bone radius override (2026-07-29, Shapper-style influence
+        // circles, rig-bridge.js Assign mode) — bone.radius is set by dragging
+        // that bone's own on-canvas circle; falls back to the passed-in
+        // default (the panel's Rayon de poids field) for a bone that's never
+        // been adjusted, so existing single-radius projects are unaffected.
+        var boneRadius=bone.radius||radius;
+        var t=Math.max(0,1-dist/boneRadius);
+        var infl=softness?t+(t*t*(3-2*t)-t)*softness:t;
+        if(infl>0)w.push({boneId:bid,offset:loc.offset,w:infl});
+      });
+      return w;
+    });
+  }
+  var rest=path.segments.map(function(s){return[s.point.x,s.point.y];});
+  var weights=weighForPoints(rest);
+  var bind={strokeId:path.data.strokeId,rest:rest,weights:weights,rotate:!!rotate,_live:path};
+  // Keep centerSegments (the source data any future brush-width edit
+  // regenerates the boundary FROM, via rebuildVectorBrushOutline) in sync
+  // too — 2026-07-29 fix, Cyril: attaque le chantier of a later width edit
+  // silently discarding a rig pose. Deformed independently from its OWN few
+  // points (see applyRigDeform's own comment for why a straight per-vertex
+  // copy from the boundary isn't used: buildVariableWidthPath's smoothing +
+  // round-cap arcs make the boundary's point correspondence to the
+  // centerline non-trivial to invert) — same known limitation the ribbon's
+  // full many-point boundary doesn't have: a 2-point bezier centerline
+  // can't exactly represent an arbitrary multi-joint bend, only approximate
+  // its overall displacement. Good enough for what this is actually FOR
+  // (a plausible starting point for the NEXT regeneration, not the on-
+  // screen render — that stays the boundary's own precise per-vertex deform).
+  if(path.data.isVectorBrush&&path.data.centerSegments&&path.data.centerSegments.length){
+    // Original (pre-pose) point AND handles — handle rotation in
+    // applyRigDeform must always rotate FROM these fixed rest vectors, never
+    // from the current live ones, or repeated calls (every drag tick) would
+    // compound rotation on top of already-rotated handles instead of
+    // recomputing the full rest-to-current rotation each time.
+    var centerRest=path.data.centerSegments.map(function(s){return{point:[s.point[0],s.point[1]],handleIn:s.handleIn?[s.handleIn[0],s.handleIn[1]]:null,handleOut:s.handleOut?[s.handleOut[0],s.handleOut[1]]:null};});
+    bind.centerRest=centerRest;
+    bind.centerWeights=weighForPoints(centerRest.map(function(r){return r.point;}));
+  }
+  rig.binds.push(bind);
+  return true;
+}
+// Auto-assign (2026-07-29, Cyril's own spec — "un bouton d'assignation qui
+// assigne automatiquement les éléments du layer sélectionné aux bones comme
+// dans Shapper par rapport à la proximité") — step 2 of the Rig tool's 3-step
+// flow. Binds EVERY selectable shape on the layer against EVERY bone in one
+// pass (rigBindStroke's own per-bone-radius weighting already produces a
+// sensible "nearest bone wins, blended near a boundary" result without
+// needing per-shape bone selection) — replaces whatever binds already
+// existed (rigBindStroke's own re-bind-replaces-not-stacks fix above), so
+// running this again after adjusting an influence circle is the expected
+// "try again" gesture, not something that piles up stale binds.
+function rigAutoAssignLayer(ld,layer,defaultRadius,rotate,softness){
+  var rig=ensureLayerRig(ld);
+  var boneIds=Object.keys(rig.bones);
+  if(!boneIds.length)return 0;
+  // Auto-size the fallback radius (2026-07-29 fix, "l'autoassign marche pas
+  // alors que j'ai mis les bones sur la shape") — rigBindStroke's per-vertex
+  // weight is a LINEAR falloff clamped to 0 past the radius (its own
+  // `Math.max(0,1-dist/boneRadius)`), and the fixed 200px default is
+  // narrower than half the width of any shape over ~400px — the common
+  // case for a torso/limb on the default 1920x1080 canvas. Auto-assign
+  // still created a bind (the toast said "N shape(s) assigned"), but with
+  // every outer vertex at 0 weight it visibly did nothing when posed —
+  // indistinguishable from "doesn't work" to the artist. Scan every
+  // selectable shape's vertices once and grow the radius to the farthest
+  // one actually needs, so every vertex gets at least SOME pull from its
+  // nearest non-overridden bone; a bone the artist already resized via its
+  // own influence circle (Assigner mode) keeps that manual radius, exactly
+  // as before.
+  var neededRadius=defaultRadius||200;
+  layer.children.forEach(function(c){
+    if(!(c instanceof Path)||!isSelectablePathChild(c))return;
+    c.segments.forEach(function(s){
+      boneIds.forEach(function(bid){
+        var bone=rig.bones[bid];
+        if(!bone||bone.radius)return;
+        var bp=_boneSegsToPath(bone.restSegments,bone.closed);
+        var loc=bp.getNearestLocation(s.point);
+        bp.remove();
+        if(!loc)return;
+        var dist=loc.point.getDistance(s.point);
+        if(dist>neededRadius)neededRadius=dist;
+      });
+    });
+  });
+  // Small margin so the single farthest vertex gets a sliver of pull
+  // instead of landing exactly on the falloff's zero boundary.
+  neededRadius=Math.ceil(neededRadius*1.05);
+  // CompoundPaths (boolean results with holes/islands) are the one
+  // remaining unsupported case — rigBindStroke's own guard rejects them
+  // (no single `.segments` to bind), counted here so the caller can surface
+  // an honest toast instead of a silent "0 forme(s) assignée(s)" (2026-07-29:
+  // vector-brush strokes used to hit this same silent gap too — now bound
+  // like any other Path, see rigBindStroke's own comment).
+  var n=0,skippedUnsupported=0;
+  layer.children.forEach(function(c){
+    if(c instanceof CompoundPath){skippedUnsupported++;return;}
+    if(!(c instanceof Path)||!isSelectablePathChild(c))return;
+    if(rigBindStroke(ld,c,boneIds,neededRadius,rotate,softness))n++;
+    // A vector-brush ribbon's linked-fill companion is NOT independently
+    // bound (2026-07-29, superseded attempt below this comment used to try
+    // it) — QA-confirmed live on a multi-joint pose: the companion's own
+    // sparse 2-point geometry (just its centerline endpoints) can't
+    // represent an arbitrarily bent multi-joint curve the same way the
+    // ribbon's many finely-sampled points can, so its own weighted
+    // deformation traced a near-straight line cutting across the bend
+    // instead of following it — a visible mismatched red sliver in the
+    // gap. applyRigDeform (below) instead copies the ribbon's OWN already-
+    // correctly-deformed boundary onto the companion after every deform,
+    // guaranteeing an exact match by construction instead of a second,
+    // independently-approximated deformation that can diverge.
+  });
+  return {n:n,skippedUnsupported:skippedUnsupported};
+}
+// Live per-vertex deform — called on every pose drag tick AND once more
+// right before a commit, so the committed keyframe always matches exactly
+// what was last seen live (no drift between preview and bake).
+function applyRigDeform(ld){
+  var rig=ld.rig;if(!rig||!rig.binds.length)return;
+  var boneCache={};
+  function bonePaths(bid){
+    if(boneCache[bid])return boneCache[bid];
+    var bone=rig.bones[bid];
+    var entry={rest:_boneSegsToPath(bone.restSegments,bone.closed),cur:_boneSegsToPath(bone.segments,bone.closed)};
+    boneCache[bid]=entry;
+    return entry;
+  }
+  rig.binds.forEach(function(b){
+    if(!b._live||!b._live.segments)return;
+    var segs=b._live.segments;
+    for(var i=0;i<segs.length&&i<b.rest.length;i++){
+      var restPt=b.rest[i],dx=0,dy=0,sumW=0;
+      (b.weights[i]||[]).forEach(function(wentry){
+        var bp=bonePaths(wentry.boneId);
+        var curLoc=bp.cur.getLocationAt(wentry.offset),restLoc=bp.rest.getLocationAt(wentry.offset);
+        if(!curLoc||!restLoc)return;
+        sumW+=wentry.w;
+        if(b.rotate){
+          // Rotate the vertex's own rest-offset FROM the bone by the bone's
+          // LOCAL tangent delta at this exact point (sampled continuously
+          // along the curve, not one angle for the whole bone — the
+          // capability Shapper's own chord-angle model doesn't have), then
+          // translate by how far that point itself moved. This is
+          // rotation-aware LBS, generalized from "one bone-angle" to "a
+          // tangent field along the curve."
+          var restAng=Math.atan2(restLoc.tangent.y,restLoc.tangent.x);
+          var curAng=Math.atan2(curLoc.tangent.y,curLoc.tangent.x);
+          var da=curAng-restAng,cosA=Math.cos(da),sinA=Math.sin(da);
+          var offX=restPt[0]-restLoc.point.x,offY=restPt[1]-restLoc.point.y;
+          var rOffX=offX*cosA-offY*sinA,rOffY=offX*sinA+offY*cosA;
+          dx+=wentry.w*((curLoc.point.x+rOffX)-restPt[0]);
+          dy+=wentry.w*((curLoc.point.y+rOffY)-restPt[1]);
+        }else{
+          dx+=wentry.w*(curLoc.point.x-restLoc.point.x);
+          dy+=wentry.w*(curLoc.point.y-restLoc.point.y);
+        }
+      });
+      // Normalize by total weight — but ONLY when it exceeds 1 (2026-07-30
+      // fix, "il manque pas mal de chose les tangents", root cause: at a
+      // joint where two bones both reach full influence — dist≈0 for each,
+      // so infl≈1 for each — sumW≈2 and this vertex used to get displaced
+      // ~2x, the ballooning/tearing right at elbows/knees, exactly the
+      // failure the "désactive si une forme se déchire sur une courbure"
+      // tooltip was quietly asking the user to work around instead of
+      // fixing. Clamping the divisor to max(1,sumW) instead of ALWAYS
+      // dividing by sumW is deliberate: a single bone's own linear falloff
+      // (infl=1-dist/radius, weighForPoints) already tapers smoothly to 0
+      // at its radius edge — dividing by a sub-1 sumW there would undo that
+      // taper and turn it into a hard cutoff. Only genuine over-saturation
+      // (sumW>1, multiple bones both pulling at meaningful strength) gets
+      // scaled back down.
+      var norm=sumW>1?sumW:1;
+      segs[i].point=new Point(restPt[0]+dx/norm,restPt[1]+dy/norm);
+    }
+    // Vector-brush companion sync (2026-07-29, "les points de vecteurs
+    // suivent les bones comme dans Shapper") — copy the ribbon's OWN just-
+    // deformed boundary onto its linked-fill companion instead of deforming
+    // the companion independently off its own sparse 2-point geometry
+    // (QA-confirmed live: that diverged into a visible straight sliver
+    // across a multi-joint bend the many-point ribbon correctly followed).
+    // Guarantees an exact match by construction, matching this SAME
+    // "companion mirrors the ribbon" convention move/scale/rotate already
+    // use elsewhere in the app (select-bridge.js/tools.js) — just done here
+    // with a full segment copy instead of one shared rigid transform, since
+    // a per-vertex LBS deform has no single transform to mirror.
+    var bLive=b._live;
+    if(bLive.data&&bLive.data.isVectorBrush&&bLive.data.linkedFill&&!bLive.data.linkedFill.removed){
+      bLive.data.linkedFill.segments=segs.map(function(s){return new Segment(s.point,s.handleIn,s.handleOut);});
+      bLive.data.linkedFill.closed=true;
+    }
+    // centerSegments sync (2026-07-29, "attaque le chantier" of a later
+    // brush-width edit discarding a rig pose — see rigBindStroke's own
+    // comment for why this is bound/deformed separately from the boundary
+    // above rather than derived from it). Unlike the boundary's per-vertex
+    // loop (left untouched — already verified correct, no reason to risk
+    // it), this ALSO rotates handleIn/handleOut by each point's own
+    // weighted-average local rotation: centerSegments has only 2-4 points
+    // with large handles forming real bezier curves, so leaving handles
+    // unrotated (fine for the boundary's hundreds of near-straight,
+    // already-smoothed segments) would visibly warp the curve the moment a
+    // future width edit rebuilds the ribbon from it.
+    if(bLive.data&&bLive.data.isVectorBrush&&bLive.data.centerSegments&&b.centerRest&&b.centerWeights){
+      var centerSegs=bLive.data.centerSegments;
+      for(var ci=0;ci<centerSegs.length&&ci<b.centerRest.length;ci++){
+        var cRest=b.centerRest[ci],cRestP=cRest.point,cdx=0,cdy=0,cSumW=0,cSumDaW=0,cTotalW=0;
+        (b.centerWeights[ci]||[]).forEach(function(wentry){
+          var bp=bonePaths(wentry.boneId);
+          var curLoc=bp.cur.getLocationAt(wentry.offset),restLoc=bp.rest.getLocationAt(wentry.offset);
+          if(!curLoc||!restLoc)return;
+          cTotalW+=wentry.w;
+          if(b.rotate){
+            var restAng=Math.atan2(restLoc.tangent.y,restLoc.tangent.x);
+            var curAng=Math.atan2(curLoc.tangent.y,curLoc.tangent.x);
+            var da=curAng-restAng,cosA=Math.cos(da),sinA=Math.sin(da);
+            var offX=cRestP[0]-restLoc.point.x,offY=cRestP[1]-restLoc.point.y;
+            var rOffX=offX*cosA-offY*sinA,rOffY=offX*sinA+offY*cosA;
+            cdx+=wentry.w*((curLoc.point.x+rOffX)-cRestP[0]);
+            cdy+=wentry.w*((curLoc.point.y+rOffY)-cRestP[1]);
+            cSumDaW+=da*wentry.w;cSumW+=wentry.w;
+          }else{
+            cdx+=wentry.w*(curLoc.point.x-restLoc.point.x);
+            cdy+=wentry.w*(curLoc.point.y-restLoc.point.y);
+          }
+        });
+        // Same over-saturation clamp as the boundary loop above (2026-07-30
+        // fix) — cTotalW is a SEPARATE accumulator from cSumW on purpose:
+        // cSumW only accumulates in rotate mode (it also drives the handle-
+        // rotation average just below) and would wrongly stay 0 in non-
+        // rotate mode, which is fine for ITS OWN purpose but wrong as a
+        // position-normalization divisor.
+        var cNorm=cTotalW>1?cTotalW:1;
+        centerSegs[ci].point=[cRestP[0]+cdx/cNorm,cRestP[1]+cdy/cNorm];
+        // Always rotated FROM the immutable rest handles (cRest.handleIn/
+        // Out), never from the current live ones — see rigBindStroke's own
+        // comment on why (idempotent across repeated calls, no compounding).
+        if(cSumW>0){
+          var avgDa=cSumDaW/cSumW,c2=Math.cos(avgDa),s2=Math.sin(avgDa);
+          if(cRest.handleIn)centerSegs[ci].handleIn=[cRest.handleIn[0]*c2-cRest.handleIn[1]*s2,cRest.handleIn[0]*s2+cRest.handleIn[1]*c2];
+          if(cRest.handleOut)centerSegs[ci].handleOut=[cRest.handleOut[0]*c2-cRest.handleOut[1]*s2,cRest.handleOut[0]*s2+cRest.handleOut[1]*c2];
+        }else{
+          if(cRest.handleIn)centerSegs[ci].handleIn=cRest.handleIn.slice();
+          if(cRest.handleOut)centerSegs[ci].handleOut=cRest.handleOut.slice();
+        }
+      }
+    }
+  });
+  Object.keys(boneCache).forEach(function(bid){boneCache[bid].rest.remove();boneCache[bid].cur.remove();});
+}
+function rigResetPose(ld){
+  var rig=ld.rig;if(!rig)return;
+  Object.keys(rig.bones).forEach(function(bid){
+    var bone=rig.bones[bid];
+    bone.segments=JSON.parse(JSON.stringify(bone.restSegments));
+  });
+  applyRigDeform(ld);
+  ld._rigPoseLive=false;
+}
+// Bakes the current LIVE pose into a real keyframe. Order matters — the
+// labs prototype had this backwards (ensureKeyframe AFTER the pose was
+// already live), so _smGeomDirty forced loadFrame to rebuild from the OLD
+// stored data before saveActiveLayerFrame ran, silently discarding the
+// pose. ensureKeyframe MUST run first (mirrors rigMagnetBrush's own,
+// already-correct ordering in the same labs file), THEN re-apply the
+// deform (ensureKeyframe's own loadFrame just rebuilt fresh, undeformed
+// Paper items from the newly-promoted keyframe's stored data), THEN save.
+function rigCommitFrame(ld){
+  if(!ld.rig||!ld.rig.binds.length){showToast('Aucun trait riggé');return false;}
+  if(!canEditActiveLayer())return false;
+  // Skip when a pose-drag already pushed its own checkpoint (rig-bridge.js,
+  // 2026-07-29 fix) — by NOW, bone.segments has already been live-mutated
+  // by that drag, so a checkpoint taken here would pair that already-posed
+  // rig with the frame's still-unbaked (pre-Commit) strokes: an internally
+  // inconsistent snapshot that made undo revert the shape but leave the
+  // bone visually still posed. Still pushed here for the rarer case of
+  // Commit being clicked with no preceding drag this session.
+  if(!ld._rigPoseUndoPushed)pushUndo();
+  ld._rigPoseUndoPushed=false;
+  ensureKeyframe();
+  relinkRigBinds(ld,userLayers[state.activeLayerIdx]);
+  applyRigDeform(ld);
+  ld._rigPoseLive=false;
+  saveActiveLayerFrame();updateUI();
+  if(window.SMEngineBridge)SMEngineBridge.renderNow();
+  showToast('Pose du rig figée sur cette frame');
+  return true;
+}
+// ---- IK (3-point chain, 2-bone law-of-cosines) — ported verbatim from
+// the labs prototype's own rigSetIK/rigDragIKEnd; operates on bone-anchor
+// POSITIONS only, indifferent to whether they're freeform dots (as in the
+// prototype) or a bone path's own segment points (here).
+function rigSetIK(ld,rootRef,jointRef,endRef,flip){
+  var rig=ensureLayerRig(ld);
+  var r=rigAnchorPoint(rig,rootRef),j=rigAnchorPoint(rig,jointRef),e=rigAnchorPoint(rig,endRef);
+  if(!r||!j||!e)return false;
+  var l1=Math.hypot(j.x-r.x,j.y-r.y),l2=Math.hypot(e.x-j.x,e.y-j.y);
+  rig.ikChains[endRef.boneId+':'+endRef.vi]={root:rootRef,joint:jointRef,end:endRef,l1:l1,l2:l2,flip:!!flip};
+  return true;
+}
+function rigAnchorPoint(rig,ref){
+  var bone=rig.bones[ref.boneId];if(!bone||!bone.restSegments[ref.vi])return null;
+  var s=bone.segments[ref.vi]||bone.restSegments[ref.vi];
+  return{x:s.point[0],y:s.point[1]};
+}
+function rigDragIKEnd(ld,endKey,x,y){
+  var rig=ld.rig;var chain=rig&&rig.ikChains[endKey];if(!chain)return false;
+  var rootS=rig.bones[chain.root.boneId].segments[chain.root.vi];
+  var dx=x-rootS.point[0],dy=y-rootS.point[1],dist=Math.hypot(dx,dy);
+  var l1=chain.l1,l2=chain.l2,maxD=l1+l2,minD=Math.abs(l1-l2);
+  var clamped=Math.max(minD+1e-6,Math.min(maxD-1e-6,dist));
+  var baseAngle=Math.atan2(dy,dx);
+  var cosA=Math.max(-1,Math.min(1,(l1*l1+clamped*clamped-l2*l2)/(2*l1*clamped)));
+  var a=Math.acos(cosA);
+  var jointAngle=baseAngle+(chain.flip?-a:a);
+  var jointX=rootS.point[0]+l1*Math.cos(jointAngle),jointY=rootS.point[1]+l1*Math.sin(jointAngle);
+  rig.bones[chain.joint.boneId].segments[chain.joint.vi].point=[jointX,jointY];
+  // End effector goes to (rootS + clamped distance along baseAngle), NOT the
+  // raw (x,y) target — verified live: using the raw target here silently
+  // stretched the joint-end segment past l2 whenever the drag went further
+  // than the chain's reach (l1+l2), breaking the whole point of a rigid
+  // 2-bone IK solve. This reconstructs the exact raw (x,y) when the target
+  // was already reachable (clamped===dist, so this equals rootS+(dx,dy)),
+  // and the closest reachable point on the baseAngle ray otherwise — always
+  // exactly l2 from the joint by the same law-of-cosines construction used
+  // for jointAngle above.
+  var endX=rootS.point[0]+clamped*Math.cos(baseAngle),endY=rootS.point[1]+clamped*Math.sin(baseAngle);
+  rig.bones[chain.end.boneId].segments[chain.end.vi].point=[endX,endY];
+  applyRigDeform(ld);
+  return true;
+}
 function resolveSymbolFrameIdx(sym,layer,mainFrameIdx){
+  // A key on the parent Animation 2D timeline may explicitly pick the
+  // component frame displayed for the whole held span. This is deliberately
+  // stored on the OUTER frame entry: symbol-internal drawing keys remain in
+  // the component editor and never leak into the parent timeline.
+  if(layer.frames){
+    for(var keyFi=Math.min(mainFrameIdx,layer.frames.length-1);keyFi>=0;keyFi--){
+      var timingKey=layer.frames[keyFi];
+      if(!timingKey||!timingKey.isKeyframe)continue;
+      if(timingKey.componentFrame!=null){
+        return Math.min(Math.max(1,sym.totalFrames)-1,Math.max(0,Math.floor(timingKey.componentFrame)));
+      }
+      break;
+    }
+  }
   var elapsed=Math.max(0,(mainFrameIdx-(layer.symPlacedAt||0)))*(layer.symSpeed||1);
   var total=Math.max(1,sym.totalFrames);
   // Time Remap (motion.js) overrides play mode / speed / placement entirely
@@ -1018,10 +1971,122 @@ function autoInPointFromBlankKeyframe(ld){
 // apart from "explicitly dragged to exactly frame 0", so an explicit
 // user override back to 0 would otherwise be silently reclaimed by the
 // auto-detect below on the very next render.
-function layerInPoint(ld){
-  if(ld.inPoint!=null)return ld.inPoint;
+// ---- PARENT IN TIME (Sander van Dijk 2.1, 2026-07-26 + 2026-07-30) ----
+// "The Time Properties of a layer remain static. We manually drag, move and
+// trim the static blocks called Layers." His idea: In/Out become VALUES that
+// can be driven from elsewhere — a link to another layer plus an offset.
+//
+//   ld.timeLink = { uid, mode: 'both' | 'in' | 'out' }
+//   ld.motion.timeLinkInOffset / ld.motionStatic.timeLinkInOffset  (+Out)
+//
+// The offset itself (2026-07-30) is a real Motion property — expression-
+// linkable through the same hasExpr/evalExpressionFor every other property
+// uses (motion.js), delivering Van Dijk's "linked together with
+// Expressions" without a bespoke second expression system. Deliberately
+// NOT true per-frame keyframing (motion.js's PROP_NO_STOPWATCH hides the
+// stopwatch on these two rows): see resolveLinkedTime below and
+// migrateTimeLinkOffsets for why, and [[project-nemo-parent-in-time-expr]]
+// for the full scoping conversation with Cyril. inOffset/outOffset used to
+// live as plain numbers directly on ld.timeLink — migrateTimeLinkOffsets
+// carries old projects over once, non-destructively.
+//
+// Resolution lives in layerInPoint/layerOutPoint because they are the single
+// chokepoint every consumer already goes through (13 call sites across
+// app.js, engine-bridge.js, layer-inout.js, motion.js, timeline.js).
+// Unlinked layers pay nothing: the very first check is `!ld.timeLink`.
+function timeLinkSourceOf(ld){
+  if(!ld||!ld.timeLink||!ld.timeLink.uid)return null;
+  for(var i=0;i<state.layers.length;i++){
+    var s=state.layers[i];
+    if(s!==ld&&s.layerUid===ld.timeLink.uid)return s;
+  }
+  return null; // source deleted — fall through to the layer's own values
+}
+// One-time, idempotent — pre-2026-07-30 links stored a plain number at
+// ld.timeLink.inOffset/outOffset. Now that those offsets are real Motion
+// properties (timeLinkInOffset/timeLinkOutOffset, motion.js — Van Dijk 2.1,
+// "linked together with Expressions"), resolveLinkedTime reads them through
+// valueAtFrame like any other property. Without this migration an old
+// project's offsets would silently reset to 0 the first time it's opened
+// after this change (CLAUDE.md §1: a field moving location breaks every
+// reader that doesn't know about the new one). Legacy fields are left in
+// place, unread from now on, not deleted — non-destructive, same as
+// effectorChannels' own migration (motion.js).
+function migrateTimeLinkOffsets(ld){
+  if(!ld||!ld.timeLink)return;
+  if(ld.timeLink.inOffset&&!(ld.motion&&ld.motion.timeLinkInOffset)&&!(ld.motionStatic&&ld.motionStatic.timeLinkInOffset)){
+    ld.motionStatic=ld.motionStatic||{};
+    ld.motionStatic.timeLinkInOffset=[ld.timeLink.inOffset];
+  }
+  if(ld.timeLink.outOffset&&!(ld.motion&&ld.motion.timeLinkOutOffset)&&!(ld.motionStatic&&ld.motionStatic.timeLinkOutOffset)){
+    ld.motionStatic=ld.motionStatic||{};
+    ld.motionStatic.timeLinkOutOffset=[ld.timeLink.outOffset];
+  }
+}
+// A link chain must terminate. Same shape as the spatial parenting guard
+// (SMMotion.setLayerParent / parentDescendants): a visited set plus a hard
+// depth cap, so a cycle degrades to "use my own value" instead of recursing
+// until the stack dies.
+function resolveLinkedTime(ld,which,seen,depth){
+  var link=ld.timeLink;
+  if(!link)return null;
+  var mode=link.mode||'both';
+  if(which==='in'&&mode==='out')return null;
+  if(which==='out'&&mode==='in')return null;
+  var src=timeLinkSourceOf(ld);
+  if(!src)return null;
+  seen=seen||[];
+  if(seen.indexOf(ld)>=0||depth>16)return null;
+  seen.push(ld);
+  // Cross-type source (2026-08-16, spec: "un in-point peut suivre un
+  // out-point") — link.srcAnchor overrides which of the SOURCE's edges to
+  // read from, when it differs from `which` (the CHILD's own edge). Absent
+  // for every link created before this existed (and for any 'both'-mode
+  // link, which never sets it — see setLayerTimeLink's own comment for why
+  // "both" stays same-type-only), so this is a pure fallback: old projects
+  // and same-type links resolve EXACTLY as before.
+  var srcWhich=(link.srcAnchor==='in'||link.srcAnchor==='out')?link.srcAnchor:which;
+  var base=srcWhich==='in'?layerInPoint(src,seen,depth+1):layerOutPoint(src,seen,depth+1);
+  // Expression-only, evaluated off state.currentFrame (confirmed scope with
+  // Cyril): layerInPoint/layerOutPoint carry no frame parameter at any of
+  // their 13 call sites, so this is "the offset as of right now", not a
+  // value that sweeps per exported frame. An export pass that never moves
+  // state.currentFrame resolves every frame with the SAME offset — accepted
+  // limitation of the small-scope option, not a bug.
+  migrateTimeLinkOffsets(ld);
+  var offProp=which==='in'?'timeLinkInOffset':'timeLinkOutOffset';
+  // valueAtFrame is motion.js-internal (that file's whole body is one IIFE,
+  // unlike this one) — only reachable through the SMMotion export, not bare.
+  var offVals=window.SMMotion?SMMotion.valueAtFrame(ld,offProp,state.currentFrame):null;
+  var off=(offVals&&offVals[0])||0;
+  return Math.max(0,Math.min(state.totalFrames-1,base+off));
+}
+// True when the layer's visible range comes from anywhere other than the
+// full timeline — used by getEffectiveStrokes, whose own guard used to test
+// ld.inPoint/ld.outPoint directly and would therefore skip the range check
+// entirely for a layer whose range comes from a LINK (CLAUDE.md §1: a new
+// field that one reader doesn't know about).
+function layerHasTimeRange(ld){
+  return !!(ld&&(ld.inPoint!=null||ld.outPoint!=null||ld.timeLink));
+}
+// Both resolvers clamp their result into the CURRENT timeline (2026-08-16).
+// Shrinking the project length (SM.setTotalFrames, timeline.js) deliberately
+// leaves per-layer data alone — the frames array itself is never truncated
+// either, so pulling 120 frames down to 30 and back up restores everything.
+// But a stored ld.outPoint of 100 then still RESOLVED to 100 on a 30-frame
+// timeline, and layer-inout.js sizes the bar straight off this value: the
+// green bar ran ~780px past the end of the ruler and inflated the grid's own
+// scroll width with it. Clamping here (the one chokepoint every reader goes
+// through — the bar, saveActiveLayerFrame's range guard, getEffectiveStrokes)
+// hides the overflow everywhere at once while keeping ld.inPoint/outPoint
+// untouched, so the layer's real range comes back if the timeline grows again.
+function _clampToTimeline(f){var last=state.totalFrames-1;return f<0?0:(f>last?last:f);}
+function layerInPoint(ld,_seen,_depth){
+  var linked=resolveLinkedTime(ld,'in',_seen,_depth||0);
+  if(linked!=null)return _clampToTimeline(linked);
+  if(ld.inPoint!=null)return _clampToTimeline(ld.inPoint);
   var auto=autoInPointFromBlankKeyframe(ld);
-  return auto!=null?auto:0;
+  return auto!=null?_clampToTimeline(auto):0;
 }
 // When the user hasn't manually dragged an out point, default to where the
 // layer's own drawing actually stops (its last blank keyframe — F7,
@@ -1043,10 +2108,29 @@ function autoOutPointFromBlankKeyframe(ld){
   }
   return(lastNonBlank>=0&&lastNonBlank<frames.length-1)?lastNonBlank:null;
 }
-function layerOutPoint(ld){
-  if(ld.outPoint!=null)return ld.outPoint;
+function layerOutPoint(ld,_seen,_depth){
+  var linked=resolveLinkedTime(ld,'out',_seen,_depth||0);
+  if(linked!=null)return _clampToTimeline(linked);
+  if(ld.outPoint!=null)return _clampToTimeline(ld.outPoint);
   var auto=autoOutPointFromBlankKeyframe(ld);
-  return auto!=null?auto:state.totalFrames-1;
+  return auto!=null?_clampToTimeline(auto):state.totalFrames-1;
+}
+// Right-click unlink (2026-07-30, on-timeline anchors/badges/Temps row) must
+// leave the layer exactly where it LOOKED while linked — a bare `delete
+// ld.timeLink` makes layerInPoint/layerOutPoint above fall through to
+// ld.inPoint/outPoint, which are UNSET on a linked layer (trySetLinkedEdge/
+// reconcileTimeLinks, layer-inout.js, never write them while a link covers
+// that edge) — so deleting the link alone silently reset the layer to full
+// range. Found live: Cyril, "le calque se reset alors qu'il doit rester
+// comme il était en étant parent, juste le parent in time désactivé."
+// Capture the CURRENT resolved values before deleting the link and bake
+// them as the new hard ld.inPoint/outPoint — every unlink call site should
+// go through this instead of deleting the link directly.
+function unlinkTimeLinkPreserveRange(ld){
+  if(!ld||!ld.timeLink)return;
+  var effIn=layerInPoint(ld),effOut=layerOutPoint(ld);
+  delete ld.timeLink;
+  ld.inPoint=effIn;ld.outPoint=effOut;
 }
 // Each branch below does an unconditional early `return`, so if a layer
 // ever ended up with more than one of nativeVideo/montageId/lfsGroup/
@@ -1060,9 +2144,17 @@ function layerOutPoint(ld){
 // project with slightly stray state to crash, for a purely hypothetical
 // benefit. Revisit if a future feature ever legitimately needs to combine
 // two of these flags on the same layer.
-function getEffectiveStrokes(layerIdx,frameIdx){
+// `countOnly` skips the transform stage (element motion, component camera,
+// instance matrix). Every one of those is a 1:1 map — they rewrite geometry,
+// never add or drop a stroke — so the COUNT is identical either way, and a
+// caller that only needs the count should not pay for the clones. updateUI
+// (timeline.js) was calling the full path once per frame purely to print the
+// status-bar stroke count, doubling the per-frame transform cost of every
+// scrub and playback tick (2026-07-28). Do NOT use countOnly to get strokes
+// you intend to draw: the returned dicts are untransformed.
+function getEffectiveStrokes(layerIdx,frameIdx,countOnly){
   var ld=state.layers[layerIdx];if(!ld)return[];
-  if((ld.inPoint||ld.outPoint!=null)&&(frameIdx<layerInPoint(ld)||frameIdx>layerOutPoint(ld)))return[];
+  if(layerHasTimeRange(ld)&&(frameIdx<layerInPoint(ld)||frameIdx>layerOutPoint(ld)))return[];
   // EXPERIMENTAL (native-video-decode): a natively-decoded video layer has
   // no vector strokes at all — its picture is an engine-side image item
   // (buildSceneJson, engine-bridge.js), not frame data.
@@ -1070,7 +2162,7 @@ function getEffectiveStrokes(layerIdx,frameIdx){
   // Null/Effect layer (2026-07, Motion) — never have real content by
   // design (see SM.addNullLayer/addEffectLayer's own comments); same
   // "no strokes to speak of" early-return as nativeVideo above.
-  if(ld.isNullLayer||ld.isEffectLayer)return[];
+  if(ld.isNullLayer||ld.isEffectLayer||ld.isGuideLayer)return[];
   // StoryBoard montage layer (storyboard.js, 2026-07): the layer's content
   // at frame f IS the montage's resolved frame (looping) — the montage
   // stays the single source of truth, edits in the node space show up
@@ -1098,8 +2190,16 @@ function getEffectiveStrokes(layerIdx,frameIdx){
     // layer — see insertBlankKeyframe's blankOverride flag. Every component
     // layer's frames[] is otherwise pure timing decoration, never read for
     // content, so this is the one deliberate exception.
-    var ownF=ld.frames[frameIdx];
-    if(ownF&&ownF.isKeyframe&&ownF.blankOverride)return[];
+    // Blank/component-frame choices are held until the next outer key,
+    // exactly like ordinary Animation 2D keyframes. The former exact-frame
+    // check made an F7 component disappear for one frame and immediately
+    // reappear throughout what the timeline displayed as a blank span.
+    for(var ownFi=Math.min(frameIdx,ld.frames.length-1);ownFi>=0;ownFi--){
+      var ownF=ld.frames[ownFi];
+      if(!ownF||!ownF.isKeyframe)continue;
+      if(ownF.blankOverride)return[];
+      break;
+    }
     var ii=resolveSymbolFrameIdx(sym,ld,frameIdx);
     // Composite EVERY visible sub-layer of the component, not just the
     // first — a multi-layer component (convertLayersToComponent) used to
@@ -1107,41 +2207,102 @@ function getEffectiveStrokes(layerIdx,frameIdx){
     // dropping the rest even though they're all visible and fully editable
     // inside the component itself.
     var out=[];
+    if(countOnly){
+      sym.layers.forEach(function(symLayer){
+        if(!symLayer||symLayer.visible===false)return;
+        var sf=symLayer.frames[ii];if(!sf)return;
+        if(sf.isKeyframe||sf.isInterpolated){out=out.concat(sf.strokes);return;}
+        for(var k=ii-1;k>=0;k--){if(symLayer.frames[k].isKeyframe){out=out.concat(symLayer.frames[k].strokes);break;}}
+      });
+      return out;
+    }
     sym.layers.forEach(function(symLayer){
       if(!symLayer||symLayer.visible===false)return;
       var sf=symLayer.frames[ii];if(!sf)return;
-      if(sf.isKeyframe||sf.isInterpolated){out=out.concat(sf.strokes);return;}
-      for(var k=ii-1;k>=0;k--){if(symLayer.frames[k].isKeyframe){out=out.concat(symLayer.frames[k].strokes);break;}}
+      var layerStrokes=null;
+      if(sf.isKeyframe||sf.isInterpolated){layerStrokes=sf.strokes;}
+      else{for(var k=ii-1;k>=0;k--){if(symLayer.frames[k].isKeyframe){layerStrokes=symLayer.frames[k].strokes;break;}}}
+      if(!layerStrokes)return;
+      // Element-level Motion (2026-07, "precomp par calque"): a per-shape
+      // animated Position/Anchor/Rotation/Scale/Opacity INSIDE this component
+      // instance — same descriptor and nesting order exportBuildFrame
+      // (export.js) already uses for plain layers (elMat applied first,
+      // pivoted around the STROKE's own bounds+anchor, before any outer/
+      // instance-level transform). Reused here via a throwaway Path since
+      // these are still raw stroke-data dicts (loadFrame builds the real
+      // Paper items from this function's return value, not before it).
+      // elementMotionAt used to always return null for a ld.symbolId layer —
+      // lifted in motion.js alongside this change. Applied PER SUB-LAYER
+      // (not on the flattened `out`, see the layer-level step right below)
+      // so the layer's own pivot, computed next, reflects each element's
+      // CURRENT (already element-transformed) position — same "shape
+      // group's transform nested inside its parent layer" order AE uses.
+      if(window.SMMotion){
+        layerStrokes=layerStrokes.map(function(sd){
+          if(sd.isRaster||!sd.strokeId)return sd;
+          var elMat=SMMotion.elementMotionAt(layerIdx,sd.strokeId,frameIdx);
+          if(!elMat)return sd;
+          var sd2=JSON.parse(JSON.stringify(sd));
+          var tmp=new Path({insert:false});
+          for(var si=0;si<sd2.segments.length;si++){var s=sd2.segments[si];tmp.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));}
+          if(sd2.closed)tmp.closed=true;
+          var epc=tmp.bounds.center;
+          var elPivot=new Point(epc.x+elMat.ax,epc.y+elMat.ay);
+          tmp.scale(elMat.sx,elMat.sy,elPivot);
+          tmp.rotate(elMat.rot,elPivot);
+          tmp.translate(elMat.dx,elMat.dy);
+          sd2.segments=tmp.segments.map(function(s){return{point:[s.point.x,s.point.y],handleIn:[s.handleIn.x,s.handleIn.y],handleOut:[s.handleOut.x,s.handleOut.y]};});
+          sd2.opacity=(sd2.opacity!==undefined?sd2.opacity:1)*elMat.op;
+          return sd2;
+        });
+      }
+      // Layer-level Motion (2026-07-29 fix — found live while beta-testing:
+      // a multi-layer component's sub-layer can carry a layer-level Motion
+      // track exactly like any ordinary layer, set while editing INSIDE via
+      // enterSymbol — this was never composed here at all, so the sub-
+      // layer's own Position/Rotation/Scale/Opacity keyframes silently did
+      // nothing the moment you exited back to the placed instance, even
+      // though they still animated correctly while editing inside. One
+      // nesting level further out than element motion above — mirrors
+      // parentChainMats' own pivot convention (a layer's bounds-center, not
+      // an individual stroke's).
+      var layerMat=window.SMMotion?SMMotion.computeMotionMatFor(symLayer,ii):null;
+      if(layerMat){
+        var pivot=_boundsCenterOfStrokes(layerStrokes);
+        pivot={x:pivot.x+layerMat.ax,y:pivot.y+layerMat.ay};
+        layerStrokes=layerStrokes.map(function(sd){
+          var sd2=JSON.parse(JSON.stringify(sd));
+          if(sd2.isRaster){
+            var rb=SMMotion.transformImageRect({x:sd2.x-sd2.width/2,y:sd2.y-sd2.height/2,width:sd2.width,height:sd2.height,rotation:sd2.rotation||0},pivot,layerMat);
+            sd2.x=rb.x+rb.width/2;sd2.y=rb.y+rb.height/2;sd2.width=rb.width;sd2.height=rb.height;
+            if(rb.rotation)sd2.rotation=rb.rotation;else delete sd2.rotation;
+          }else if(sd2.segments){
+            sd2.segments=SMMotion.transformSegments(sd2.segments,pivot,layerMat);
+          }
+          sd2.opacity=(sd2.opacity!==undefined?sd2.opacity:1)*layerMat.op;
+          return sd2;
+        });
+      }
+      // Duplicator (2026-07-30 fix, see applyLayerDuplicator's own header
+      // comment) — applied AFTER element/layer motion above, same order a
+      // top-level layer's duplicator sees relative to ITS OWN transform:
+      // the seed is animated first, then multiplied. _dupEditSource mirrors
+      // getEffectiveStrokesRendered's own guard (app.js) — a symLayer
+      // mid-"edit the duplicator's source shape directly" session shows its
+      // single seed, not N stale copies.
+      if(symLayer.duplicator&&!symLayer._dupEditSource&&layerStrokes.length){
+        layerStrokes=applyLayerDuplicator(symLayer,layerStrokes,ii,null,{
+          spanStart:0,spanLen:symLayer.frames.length,
+          resample:function(shiftedIdx){
+            var rf=symLayer.frames[shiftedIdx];if(!rf)return[];
+            if(rf.isKeyframe||rf.isInterpolated)return rf.strokes||[];
+            for(var kk=shiftedIdx-1;kk>=0;kk--){if(symLayer.frames[kk].isKeyframe)return symLayer.frames[kk].strokes||[];}
+            return[];
+          }
+        });
+      }
+      out=out.concat(layerStrokes);
     });
-    // Element-level Motion (2026-07, "precomp par calque"): a per-shape
-    // animated Position/Anchor/Rotation/Scale/Opacity INSIDE this component
-    // instance — same descriptor and nesting order exportBuildFrame
-    // (export.js) already uses for plain layers (elMat applied first,
-    // pivoted around the STROKE's own bounds+anchor, before any outer/
-    // instance-level transform). Reused here via a throwaway Path since
-    // these are still raw stroke-data dicts (loadFrame builds the real
-    // Paper items from this function's return value, not before it).
-    // elementMotionAt used to always return null for a ld.symbolId layer —
-    // lifted in motion.js alongside this change.
-    if(window.SMMotion){
-      out=out.map(function(sd){
-        if(sd.isRaster||!sd.strokeId)return sd;
-        var elMat=SMMotion.elementMotionAt(layerIdx,sd.strokeId,frameIdx);
-        if(!elMat)return sd;
-        var sd2=JSON.parse(JSON.stringify(sd));
-        var tmp=new Path({insert:false});
-        for(var si=0;si<sd2.segments.length;si++){var s=sd2.segments[si];tmp.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));}
-        if(sd2.closed)tmp.closed=true;
-        var epc=tmp.bounds.center;
-        var elPivot=new Point(epc.x+elMat.ax,epc.y+elMat.ay);
-        tmp.scale(elMat.sx,elMat.sy,elPivot);
-        tmp.rotate(elMat.rot,elPivot);
-        tmp.translate(elMat.dx,elMat.dy);
-        sd2.segments=tmp.segments.map(function(s){return{point:[s.point.x,s.point.y],handleIn:[s.handleIn.x,s.handleIn.y],handleOut:[s.handleOut.x,s.handleOut.y]};});
-        sd2.opacity=(sd2.opacity!==undefined?sd2.opacity:1)*elMat.op;
-        return sd2;
-      });
-    }
     // The instance transform (symMatrixOf) — skip entirely (and the clone
     // it requires) when it's identity, the common case. Strokes returned
     // here are live references into the SYMBOL'S OWN stored frame data, so
@@ -1155,11 +2316,11 @@ function getEffectiveStrokes(layerIdx,frameIdx){
     // instance is placed, same as its own layers/keyframes/tweens do.
     if(sym.cameraKeys&&sym.cameraKeys.length&&window.SMCamera){
       var camM=SMCamera.cameraMatrixAtFrame(sym.cameraKeys,ii,state.canvasW,state.canvasH);
-      if(camM)out=out.map(function(sd){return applyMatrixToStrokeData(JSON.parse(JSON.stringify(sd)),camM);});
+      if(camM)out=out.map(function(sd){return applyMatrixToStrokeData(cloneStrokeForTransform(sd),camM);});
     }
     if(ld.symMatrix){
       var m=symMatrixOf(ld);
-      out=out.map(function(sd){return applyMatrixToStrokeData(JSON.parse(JSON.stringify(sd)),m);});
+      out=out.map(function(sd){return applyMatrixToStrokeData(cloneStrokeForTransform(sd),m);});
     }
     return out;
   }
@@ -1195,12 +2356,66 @@ function ensureSymbolPaperLayers(symId){
   return arr;
 }
 function genSymbolId(){return 'sym_'+Date.now()+'_'+Math.floor(Math.random()*10000);}
+// Refuses source types whose "content" isn't the plain `.frames` array a
+// component's symLayer clones below — mirrors mergeLayersIntoOne's own
+// refusal list (app.js, same reasoning: converting one of these would
+// either silently drop what it actually stands for, since a raw
+// JSON.parse(JSON.stringify(ld.frames)) clone doesn't capture a montage's
+// StoryBoard graph or a native video's decode source, or double-wrap
+// something already symbol-shaped). Missing here entirely before this fix
+// (2026-07-30) — convertLayerToComponent/convertLayersToComponent had no
+// type guard at all, unlike every sibling structural op.
+function badComponentSourceReason(l){
+  if(l.symbolId)return'un composant';
+  if(l.lfsGroup)return'un groupe Ligne/Plein/Ombre';
+  if(l.montageId)return'un calque de montage StoryBoard';
+  if(l.nativeVideo)return'un calque vidéo';
+  if(l.isNullLayer)return'un calque Null';
+  if(l.isEffectLayer)return'un calque d\'effet';
+  if(l.isGuideLayer)return'un calque Guide';
+  return null;
+}
+// Whitelist-clones a rig for a symLayer, dropping binds[i]._live (the live
+// Paper.js Path reference relinkRigBinds rebuilds after every loadFrame —
+// see exportJSON's own identical clone, timeline.js) — same shape as the
+// matteMode/blendMode/motion fields these two convert-to-Component
+// functions already carry over, found missing entirely by live testing
+// (2026-07-30): rigging a shape then triggering the Motion auto-conversion
+// to Component (maybeAutoConvertToComponent) silently dropped every bone/
+// bind/IK chain — the symbol's own inner layer came out with rig:undefined,
+// while the outer instance kept its now-orphaned rig data on a locked,
+// content-wiped layer. Binds reference strokeId, unaffected by the frames
+// clone happening alongside this at each call site (same reasoning as
+// duplicateLayer's own rig comment, timeline.js).
+function cloneRigForSymbol(rig){
+  if(!rig)return undefined;
+  return{bones:rig.bones,ikChains:rig.ikChains,nextId:rig.nextId,
+    binds:(rig.binds||[]).map(function(b){return{strokeId:b.strokeId,rest:b.rest,weights:b.weights,rotate:b.rotate};})};
+}
 function convertLayerToComponent(layerIdx){
   if(state.activeSymbolId){showToast('Fermez d\'abord le composant en cours d\'édition');return;}
-  var ld=state.layers[layerIdx];if(!ld||ld.symbolId){showToast('Déjà un composant ou calque invalide');return;}
+  var ld=state.layers[layerIdx];if(!ld){showToast('Calque invalide');return;}
+  var bad=badComponentSourceReason(ld);
+  if(bad){showToast('Impossible de convertir : '+bad);return;}
   saveAllLayerFrames();pushUndo();
   var symId=genSymbolId();
-  var symLayer={name:'Layer 1',visible:true,locked:false,frames:JSON.parse(JSON.stringify(ld.frames))};
+  // groups (2026-07-29 fix, QA-confirmed combine-groups regression): the
+  // OUTER instance (`ld` itself, reused below) keeps its .groups by
+  // accident since it's the same object — but state.layers/userLayers swap
+  // to the SYMBOL's own layers while editing INSIDE the component
+  // (enterSymbol), and symLayer had no .groups at all, so a combine-group
+  // rendered raw/uncombined the moment you entered to edit it.
+  var symLayer={name:'Layer 1',visible:true,locked:false,frames:JSON.parse(JSON.stringify(ld.frames)),groups:ld.groups?JSON.parse(JSON.stringify(ld.groups)):undefined,
+    rig:cloneRigForSymbol(ld.rig)};
+  // The rig binds specific strokes within ld's OWN content — once ld
+  // becomes a symbolId-holding instance its frames are wiped (below), so a
+  // rig left on `ld` itself would reference strokes that no longer exist
+  // anywhere. Delete rather than leave it as dead data (unlike ld.motion,
+  // deliberately KEPT here — see this function's own convertLayerToComponent
+  // vs convertLayersToComponent distinction, CLAUDE.md §8: single-layer
+  // conversion's ld stays the instance and its motion IS the instance's own
+  // transform, but a rig has no equivalent "instance-level" meaning).
+  delete ld.rig;
   state.symbols[symId]={name:ld.name+' (Comp)',totalFrames:state.totalFrames,fps:state.fps,layers:[symLayer]};
   if(window.SMStoryboard)SMStoryboard.addInstanceAuto(symId);
   // 'once' = play through the component's own full defined duration exactly
@@ -1209,6 +2424,16 @@ function convertLayerToComponent(layerIdx){
   // 'loop' default made a component's parent-timeline keyframe misleadingly
   // look "empty/short" when the component itself kept cycling underneath).
   ld.symbolId=symId;ld.locked=true;ld.symPlayMode='once';ld.symSpeed=1;ld.symPlacedAt=0;ld.symSingleFrame=0;
+  // NO componentFrame stamp here. resolveSymbolFrameIdx treats that field as
+  // an explicit "hold this internal frame from here on" — the same thing the
+  // frame strip writes when you deliberately pick a frame — and it is checked
+  // BEFORE play mode. Stamping 0 on frame 0 therefore pinned every freshly
+  // converted component to its own first frame for the whole timeline, and
+  // the symPlayMode:'once' set two lines above never ran (2026-07-28: "il ne
+  // lit pas toutes les frames du composant dans animation 2D"). Worse, when
+  // the source layers' drawing starts LATER than frame 0 the pinned frame is
+  // blank, so the component looked like it had vanished entirely — the same
+  // report from the day before, same single cause.
   ld.frames=[];for(var i=0;i<state.totalFrames;i++)ld.frames.push({strokes:[],isKeyframe:i===0,isInterpolated:false});
   loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderSymbolTabs)renderSymbolTabs();
   showToast('Composant créé: '+state.symbols[symId].name);
@@ -1224,23 +2449,101 @@ function convertLayerToComponent(layerIdx){
 function convertLayersToComponent(indices){
   if(state.activeSymbolId){showToast('Fermez d\'abord le composant en cours d\'édition');return;}
   indices=indices.slice().sort(function(a,b){return a-b;}).filter(function(i){return state.layers[i]&&!state.layers[i].symbolId;});
+  // Type guard (2026-07-30 fix): the filter above only ever dropped
+  // already-symbolId layers silently — a montage/video/Null/effect layer
+  // sailed straight into symLayers below with its `.frames` blindly cloned,
+  // which for these types isn't the real content at all. Refuse with the
+  // SAME reasons convertLayerToComponent/mergeLayersIntoOne already use.
+  for(var bi=0;bi<indices.length;bi++){
+    var badReason=badComponentSourceReason(state.layers[indices[bi]]);
+    if(badReason){showToast('Impossible de convertir : la sélection contient '+badReason);return;}
+  }
   if(indices.length<2){convertLayerToComponent(indices[0]!==undefined?indices[0]:state.activeLayerIdx);return;}
   saveAllLayerFrames();pushUndo();
   var symId=genSymbolId();
+  // Combine-group remap + merge (2026-07-29 fix, QA-confirmed): each source
+  // layer's own ld.groups may share id strings with another source's (same
+  // reasoning as mergeLayersIntoOne's own remap below), AND — separately —
+  // getEffectiveStrokes's symbolId branch flattens EVERY sub-layer's strokes
+  // into the outer instance's own single userLayers[li].children, so the
+  // OUTER instance needs the UNION of every source's registry to combine
+  // any of them, not just whichever happened to survive. Confirmed bug: the
+  // outer `newLd` below had no .groups property at all, so every
+  // combine-group in a merged component rendered raw/uncombined.
+  var mergedGroups={};
   var symLayers=indices.map(function(i){
     var src=state.layers[i];
-    return{name:src.name,visible:src.visible,locked:false,frames:JSON.parse(JSON.stringify(src.frames)),
+    var framesClone=JSON.parse(JSON.stringify(src.frames));
+    var groupsClone;
+    if(src.groups){
+      var remap={};
+      Object.keys(src.groups).forEach(function(oldGid){remap[oldGid]='grp_'+Date.now().toString(36)+'_'+Math.floor(Math.random()*1e6);});
+      framesClone.forEach(function(f){(f.strokes||[]).forEach(function(sd){if(sd.groupId&&remap[sd.groupId])sd.groupId=remap[sd.groupId];});});
+      groupsClone={};
+      Object.keys(src.groups).forEach(function(oldGid){
+        var grp=src.groups[oldGid];
+        var newOrder=(grp.order||[]).map(function(e){return remap[e]||e;});
+        var newGid=remap[oldGid];
+        groupsClone[newGid]={combineMode:grp.combineMode,order:newOrder};
+        mergedGroups[newGid]=groupsClone[newGid];
+      });
+    }
+    // Same "instance-level vs content-level" distinction as the single-
+    // layer convertLayerToComponent right above (see its own comment) —
+    // here EVERY source becomes pure symbol content (there's no surviving
+    // single instance to keep an "own transform" reading), so unlike that
+    // function's ld.motion, a rig here has nowhere sensible to live except
+    // the symLayer. Deleted from src afterward for the same dead-data
+    // reason.
+    var rigClone=cloneRigForSymbol(src.rig);
+    delete src.rig;
+    return{name:src.name,visible:src.visible,locked:false,frames:framesClone,
       motion:src.motion?JSON.parse(JSON.stringify(src.motion)):undefined,
       motionStatic:src.motionStatic?JSON.parse(JSON.stringify(src.motionStatic)):undefined,
-      elementMotion:src.elementMotion?JSON.parse(JSON.stringify(src.elementMotion)):undefined};
+      elementMotion:src.elementMotion?JSON.parse(JSON.stringify(src.elementMotion)):undefined,
+      groups:groupsClone,
+      rig:rigClone,
+      // matteMode/blendMode dropped entirely here (2026-07-30 fix, Cyril:
+      // "je met 2 calques avec un matte sur l'un que je met dans componant,
+      // je perd le matte") — same CLAUDE.md §1 shape as the Motion-loss bug
+      // this function's own header comment already fixed once: a per-layer
+      // field that only ever got threaded through the ORIGINAL state.layers
+      // object, silently absent from the symLayer clone. matteMode's
+      // adjacency convention (source = the layer directly above, engine-
+      // bridge.js) is preserved for free since `indices` stays sorted and
+      // symLayers keeps that same relative order, so this is purely a
+      // missing-field copy, not a re-derivation.
+      matteMode:src.matteMode,blendMode:src.blendMode};
   });
   state.symbols[symId]={name:'Composant',totalFrames:state.totalFrames,fps:state.fps,layers:symLayers};
   if(window.SMStoryboard)SMStoryboard.addInstanceAuto(symId);
   var insertAt=indices[0];
+  var firstSrc=state.layers[indices[0]]; // captured before the splice below removes it
   for(var k=indices.length-1;k>=0;k--){state.layers.splice(indices[k],1);userLayers.splice(indices[k],1);}
   var newLd={name:'Composant',symbolId:symId,locked:true,visible:true,symPlayMode:'once',symSpeed:1,symPlacedAt:0,symSingleFrame:0,
-    frames:[]};
-  for(var i=0;i<state.totalFrames;i++)newLd.frames.push({strokes:[],isKeyframe:i===0,isInterpolated:false});
+    frames:[],groups:Object.keys(mergedGroups).length?mergedGroups:undefined};
+  // Same field-drop shape as mergeLayersIntoOne/splitLayerIntoElementsCore
+  // (2026-08-16 QA sweep) — this collapses indices.length sources into ONE
+  // new outer instance the same way merge does, so it needs the same
+  // "topmost source wins" inheritance for the old block's visibility window
+  // and relationships, or converting a trimmed/linked/parented block into a
+  // Component silently resets all of it. firstSrc is captured further up
+  // (before the splice loop removes it from state.layers).
+  if(firstSrc.inPoint!=null)newLd.inPoint=firstSrc.inPoint;
+  if(firstSrc.outPoint!=null)newLd.outPoint=firstSrc.outPoint;
+  if(firstSrc.timeLink)newLd.timeLink=JSON.parse(JSON.stringify(firstSrc.timeLink));
+  if(firstSrc.parentLayerUid)newLd.parentLayerUid=firstSrc.parentLayerUid;
+  if(firstSrc.parentLayerUidB)newLd.parentLayerUidB=firstSrc.parentLayerUidB;
+  if(firstSrc.expressions)newLd.expressions=JSON.parse(JSON.stringify(firstSrc.expressions));
+  // threeD/motionBlur/duplicator (2026-08-16): same "topmost source wins"
+  // inheritance as everything else above — these three describe how the
+  // OUTER instance itself renders/multiplies, independent of whatever now
+  // lives inside the Component, so they carry over the same way timeLink/
+  // parentLayerUid do rather than getting silently reset.
+  if(firstSrc.threeD)newLd.threeD=true;
+  if(firstSrc.motionBlur)newLd.motionBlur=true;
+  if(firstSrc.duplicator)newLd.duplicator=JSON.parse(JSON.stringify(firstSrc.duplicator));
+  for(var i=0;i<state.totalFrames;i++)newLd.frames.push({strokes:[],isKeyframe:i===0,isInterpolated:false}); // no componentFrame — see convertLayerToComponent
   var newUl=new Layer({name:'layer-'+state.layers.length});
   state.layers.splice(insertAt,0,newLd);
   userLayers.splice(insertAt,0,newUl);
@@ -1313,12 +2616,86 @@ function splitLayerIntoElementsCore(li,opts){
     }
     var entry=els[e];
     var emh=ld.elementMotion&&ld.elementMotion[entry.strokeId];
-    newLayers.push({
-      name:(ld.name||'Layer')+' — '+SMMotion.elementLabel(entry,e),
+    var nl={
+      // ld passed through (2026-07-31, group/shape tree panel) — a shape
+      // custom-renamed via the tree panel keeps that name as the split-off
+      // layer's own name instead of always falling back to "Forme N".
+      name:(ld.name||'Layer')+' — '+SMMotion.elementLabel(entry,e,ld),
       visible:true,locked:false,frames:frames,color:nextLayerColor(),
       motion:(emh&&emh.motion)?JSON.parse(JSON.stringify(emh.motion)):undefined,
       motionStatic:(emh&&emh.motionStatic)?JSON.parse(JSON.stringify(emh.motionStatic)):undefined,
-    });
+      // blendMode/parentLayerUid(+B)/timeLink (2026-07-30 fix, same
+      // CLAUDE.md §1 shape already fixed once in convertLayersToComponent/
+      // mergeLayersIntoOne): ld's own OUTWARD references describe the whole
+      // original layer's spatial/time parenting, unrelated to which of the
+      // N pieces a given stroke landed in — every split-off layer keeps
+      // moving/timing with the same external parent ld had, or the group
+      // visibly drifts apart the moment any of them gets keyed. blendMode
+      // similarly composites per-layer against the accumulated frame below;
+      // applying it to every split-off layer reproduces the original
+      // single-pass blend exactly for non-overlapping shapes (the common
+      // case here) and is a reasonable approximation otherwise — same
+      // "flag rather than silently drop" tradeoff mergeLayersIntoOne makes.
+      blendMode:ld.blendMode,
+      parentLayerUid:ld.parentLayerUid,parentLayerUidB:ld.parentLayerUidB,
+      timeLink:ld.timeLink?JSON.parse(JSON.stringify(ld.timeLink)):undefined,
+      // Same gap as the fields above (2026-08-16 QA sweep): ld's in/out
+      // point describes the whole original layer's visibility WINDOW, not
+      // which piece a stroke landed in — every split-off layer needs the
+      // same window or N-1 of them un-trim back to the full timeline the
+      // instant the split runs.
+      inPoint:ld.inPoint,outPoint:ld.outPoint,
+      expressions:ld.expressions?JSON.parse(JSON.stringify(ld.expressions)):undefined,
+      // threeD/motionBlur (2026-08-16): same per-layer render toggles as
+      // blendMode a few lines up, and the same reasoning — every split-off
+      // piece keeps rendering the way the whole original layer did.
+      // duplicator is deliberately NOT copied here: unlike a boolean
+      // render toggle, applying one duplicator descriptor to N independent
+      // split-off layers would multiply each piece separately instead of
+      // the original single N-way expansion — a real behavior change, not
+      // a "keep what was already true of this content" carry-over.
+      threeD:ld.threeD,motionBlur:ld.motionBlur,
+    };
+    // matteMode: with a frozen matteSourceLayerUid (2026-07-31, uid-based
+    // mattes) the source no longer depends on array adjacency, so EVERY
+    // split-off piece can keep the matte and still mask against the same
+    // external source — this removes the old documented positional
+    // limitation ("only means something on whichever split-off layer ends
+    // up at ld's OLD highest index"). A legacy ld with matteMode but no
+    // uid keeps the old last-piece-only behavior (adjacency is all it has).
+    if(ld.matteSourceLayerUid){
+      nl.matteMode=ld.matteMode;
+      nl.matteSourceLayerUid=ld.matteSourceLayerUid;
+    }
+    if(e===n-1){
+      // Legacy positional matte (no uid) — see the block above; adjacency
+      // only survives on the last piece (newLayers[n-1] lands at li+n-1,
+      // still directly below whatever used to sit above ld).
+      // Keeping ld's layerUid string alive on this same
+      // layer (instead of leaving it undefined on all N, as before) means
+      // any OTHER layer's parentLayerUid/parentLayerUidB/timeLink.uid that
+      // pointed at ld keeps resolving with zero extra re-point pass needed
+      // — the uid itself never changes, only which layer object answers to it.
+      if(!ld.matteSourceLayerUid)nl.matteMode=ld.matteMode;
+      if(ld.layerUid)nl.layerUid=ld.layerUid;
+    }
+    newLayers.push(nl);
+  }
+  // groups (combine-group definitions): only the LAST new layer can hold
+  // 2+ strokes (the "overflow" slice, strokes.slice(n-1)) — every other one
+  // holds exactly 1 stroke by construction and can't combine with anything.
+  // Even for that layer, only keep entries whose gid still appears on one
+  // of ITS OWN strokes, dropping any whose combine partner landed on a
+  // different single-stroke layer instead — a combine can't span layers,
+  // same unrepresentable-once-split limit matteMode has, just data-driven
+  // here since there's no single adjacency slot to assign it to.
+  if(ld.groups&&newLayers.length){
+    var lastLayer=newLayers[newLayers.length-1];
+    var keepGids={};
+    lastLayer.frames.forEach(function(f){(f.strokes||[]).forEach(function(sd){if(sd.groupId)keepGids[sd.groupId]=1;});});
+    var keptGroups={};
+    Object.keys(ld.groups).forEach(function(gid){if(keepGids[gid])keptGroups[gid]=ld.groups[gid];});
+    if(Object.keys(keptGroups).length)lastLayer.groups=JSON.parse(JSON.stringify(keptGroups));
   }
   var newUls=[];
   arcLayer.activate();
@@ -1382,10 +2759,33 @@ function mergeLayersIntoOne(indices,opts){
     else if(l.nativeVideo)bad=bad||'un calque vidéo';
     else if(l.isNullLayer)bad=bad||'un calque Null';
     else if(l.isEffectLayer)bad=bad||'un calque d\'effet';
+    else if(l.isGuideLayer)bad=bad||'un calque Guide';
     srcs.push(l);
   }
   if(bad){if(!silent)showToast('Impossible de fusionner : la sélection contient '+bad);return false;}
   saveAllLayerFrames();if(!silent)pushUndo();
+  // Combine-group remap (2026-07-29): each source layer's OWN ld.groups may
+  // share id strings with ANOTHER source's — e.g. merging a layer with its
+  // own duplicateLayer() clone, which deliberately keeps the same groupId
+  // strings (see that function's own comment). Mint a fresh gid per group
+  // per source BEFORE concatenating strokes below, mirroring the strokeId
+  // collision-avoidance a few lines down for the exact same reason: reusing
+  // an id string across two originally-separate things silently fuses them
+  // into one wrongly-combined group.
+  var mergedGroups={};
+  srcs.forEach(function(l){
+    if(!l.groups)return;
+    var remap={};
+    Object.keys(l.groups).forEach(function(oldGid){remap[oldGid]='grp_'+Date.now().toString(36)+'_'+Math.floor(Math.random()*1e6);});
+    (l.frames||[]).forEach(function(f){
+      (f.strokes||[]).forEach(function(sd){if(sd.groupId&&remap[sd.groupId])sd.groupId=remap[sd.groupId];});
+    });
+    Object.keys(l.groups).forEach(function(oldGid){
+      var grp=l.groups[oldGid];
+      var newOrder=(grp.order||[]).map(function(e){return remap[e]||e;});
+      mergedGroups[remap[oldGid]]={combineMode:grp.combineMode,order:newOrder};
+    });
+  });
   var target=idx[0];
   // Held-frame resolution WITHOUT motion baking — the plain-layer tail of
   // getEffectiveStrokes, kept separate on purpose (see header comment).
@@ -1444,8 +2844,48 @@ function mergeLayersIntoOne(indices,opts){
     name:name,visible:true,locked:false,frames:frames,
     color:srcs[0].color||nextLayerColor(),
     layerUid:srcs[0].layerUid,parentLayerUid:srcs[0].parentLayerUid,
+    // parentLayerUidB (multi-parent blend): the OTHER-layers re-point pass
+    // a few lines down already updates any layer pointing INTO this merge,
+    // but the merged layer's OWN parentLayerUidB — its half of a 2-parent
+    // blend — was never inherited from srcs[0] here, same class of gap as
+    // the in/out point fix right below (2026-08-16 QA sweep).
+    parentLayerUidB:srcs[0].parentLayerUidB,
+    timeLink:srcs[0].timeLink,
+    expressions:srcs[0].expressions?JSON.parse(JSON.stringify(srcs[0].expressions)):undefined,
+    // matteMode/blendMode: same field-drop bug already fixed once in
+    // convertLayersToComponent (§1) — recurred here in the sibling merge
+    // path. Inherited from the topmost (first) source, matching how
+    // everything else about the merged layer (color, layerUid, timeLink)
+    // is taken from srcs[0].
+    matteMode:srcs[0].matteMode,blendMode:srcs[0].blendMode,
+    // threeD/duplicator/motionBlur (2026-08-16, found testing 3D+duplicator+
+    // motionBlur combinations): same "topmost source wins" inheritance as
+    // everything else in this object — none of the three were here at all,
+    // so merging a 3D layer silently flattened it, merging a duplicator
+    // layer lost its N-way expansion settings, and motionBlur silently
+    // turned off.
+    threeD:srcs[0].threeD,motionBlur:srcs[0].motionBlur,
+    duplicator:srcs[0].duplicator?JSON.parse(JSON.stringify(srcs[0].duplicator)):undefined,
+    // Travels with matteMode (2026-07-31, uid-based mattes) — dropping the
+    // uid alone would silently downgrade the merged layer back to the
+    // legacy adjacency behavior.
+    matteSourceLayerUid:srcs[0].matteSourceLayerUid,
   };
+  // A duplicator layer is always force-locked elsewhere (duplicateLayer,
+  // applyLayerDuplicator) — inheriting the descriptor above without this
+  // would produce the one combination the rest of the app never expects:
+  // an EDITABLE layer with an active N-way expansion.
+  if(merged.duplicator)merged.locked=true;
+  // Same field-drop bug again (2026-08-16 QA sweep): a trimmed source's
+  // in/out point wasn't in this list at all, so merging a layer manually
+  // rogné à [5,50] silently un-trimmed it back to the full timeline —
+  // content past the old out point that used to be hidden was suddenly
+  // visible. Inherited from srcs[0], same "topmost source wins" convention
+  // as color/matteMode/timeLink right above.
+  if(srcs[0].inPoint!=null)merged.inPoint=srcs[0].inPoint;
+  if(srcs[0].outPoint!=null)merged.outPoint=srcs[0].outPoint;
   if(Object.keys(elMotion).length)merged.elementMotion=elMotion;
+  if(Object.keys(mergedGroups).length)merged.groups=mergedGroups;
   // Any OTHER layer parented to one of the layers about to disappear must
   // be re-pointed at the survivor, or its parenting silently goes dead
   // (parentChainMats resolves by uid and just finds nothing) — the exact
@@ -1456,6 +2896,23 @@ function mergeLayersIntoOne(indices,opts){
   state.layers.forEach(function(other,oi){
     if(idx.indexOf(oi)>=0)return;
     if(other.parentLayerUid&&goneUids[other.parentLayerUid])other.parentLayerUid=merged.layerUid||null;
+    // parentLayerUidB (multi-parent blend, 2026-07-30): the spatial parent
+    // re-point above only ever touched parentLayerUid — parentLayerUidB is
+    // the exact same kind of uid reference and needs the same treatment or
+    // a blend's B side silently goes dead when its source gets merged away.
+    if(other.parentLayerUidB&&goneUids[other.parentLayerUidB])other.parentLayerUidB=merged.layerUid||null;
+    // Same re-point for the TIME link (Parent in Time, 2026-07-26): a layer
+    // whose time source disappears into the merge must follow the survivor,
+    // or its link goes dead exactly like the spatial one would.
+    if(other.timeLink&&other.timeLink.uid&&goneUids[other.timeLink.uid]){
+      if(merged.layerUid)other.timeLink.uid=merged.layerUid;else delete other.timeLink;
+    }
+    // Same re-point for the matte source (2026-07-31, uid-based mattes): a
+    // matte whose source layer disappears into the merge follows the
+    // survivor, same family as the three uid references above.
+    if(other.matteSourceLayerUid&&goneUids[other.matteSourceLayerUid]){
+      if(merged.layerUid)other.matteSourceLayerUid=merged.layerUid;else delete other.matteSourceLayerUid;
+    }
   });
   // Paper layers: one fresh Layer replaces the N being removed, inserted
   // where the topmost source sat (same splice-from-the-end discipline the
@@ -1657,13 +3114,30 @@ function enterSymbol(symId){
   // (exitToScene) and for StoryBoard's own document swap (enterMontageView/
   // exitMontageView).
   if(typeof clearSel==='function')clearSel();
-  _sceneSnapshot={layers:state.layers,totalFrames:state.totalFrames,waIn:state.waIn,waOut:state.waOut,activeLayerIdx:state.activeLayerIdx,fps:state.fps,currentFrame:state.currentFrame,userLayers:userLayers,cameraKeys:state.cameraKeys};
+  // markers/motionArcs/tweenOverrides/tweenEasing (2026-07-30 fix, same
+  // shape as cameraKeys just below): a symbol can hold plain vector layers
+  // with real per-shape tween overrides and its own comp markers, exactly
+  // like the outer scene — without swapping these too, they stayed the
+  // OUTER scene's live values the whole time a symbol was open, so editing
+  // easing/markers while inside silently wrote into the outer document's
+  // data at whatever frame indices happened to line up, instead of the
+  // symbol's own. See exitToScene for the write-back half of this pair —
+  // required here because timeline.js/markers.js reassign these wholesale
+  // in several places (trimToWorkArea, import, "clear all markers"), which
+  // severs a plain object/array alias the same way undo's restoreLayersSnapshot
+  // does for state.layers (see exitToScene's own sym.layers comment).
+  _sceneSnapshot={layers:state.layers,totalFrames:state.totalFrames,waIn:state.waIn,waOut:state.waOut,activeLayerIdx:state.activeLayerIdx,fps:state.fps,currentFrame:state.currentFrame,userLayers:userLayers,cameraKeys:state.cameraKeys,
+    markers:state.markers,motionArcs:state.motionArcs,tweenOverrides:state.tweenOverrides,tweenEasing:state.tweenEasing};
   userLayers.forEach(function(l){l.opacity=0.25;});
   var sym=state.symbols[symId];
   var symPaperLayers=ensureSymbolPaperLayers(symId);
   symPaperLayers.forEach(function(l){l.visible=true;l.opacity=1;});
   state.layers=sym.layers;state.totalFrames=sym.totalFrames;state.waIn=0;state.waOut=sym.totalFrames-1;
   state.cameraKeys=sym.cameraKeys||(sym.cameraKeys=[]);
+  state.markers=sym.markers||(sym.markers=[]);
+  state.motionArcs=sym.motionArcs||(sym.motionArcs={});
+  state.tweenOverrides=sym.tweenOverrides||(sym.tweenOverrides={});
+  state.tweenEasing=sym.tweenEasing||(sym.tweenEasing={});
   window._waIn=0;window._waOut=state.waOut;window._totalF=state.totalFrames;
   state.activeLayerIdx=0;state.currentFrame=0;state.fps=sym.fps||state.fps;
   userLayers=symPaperLayers;
@@ -1694,6 +3168,27 @@ function exitToScene(){
     // current array back here makes the alias an optimization rather than a
     // correctness requirement.
     sym.layers=state.layers;
+    // markers/motionArcs/tweenOverrides/tweenEasing write-back — same
+    // reasoning as sym.layers just above (see enterSymbol's comment for the
+    // full explanation): several call sites reassign these wholesale rather
+    // than mutating in place, which would otherwise silently strand any
+    // edit made inside the symbol the instant one of those call sites ran.
+    sym.markers=state.markers;sym.motionArcs=state.motionArcs;sym.tweenOverrides=state.tweenOverrides;sym.tweenEasing=state.tweenEasing;
+    // cameraKeys write-back (2026-07-30 fix) — enterSymbol aliases
+    // state.cameraKeys TO sym.cameraKeys (line ~2998, same pattern as
+    // sym.layers above), so in-place edits (SMCamera.setKey/removeKey,
+    // which push/splice) already write through without this. But camera.js's
+    // "Supprimer le calque caméra" action does `state.cameraKeys=[]` — a
+    // wholesale REPLACE, not a mutation — which silently severs the alias
+    // exactly like restoreLayersSnapshot's own `state.layers=[]` did for
+    // sym.layers before that write-back existed. Without this, deleting the
+    // camera layer while inside a Component looked like it worked (the UI's
+    // own state.cameraKeys really is empty) but sym.cameraKeys still held
+    // every original key, and reappeared in full the next time the
+    // Component was entered. exitMontageView's own identical write-back
+    // (a few hundred lines down) already had this; only this sibling
+    // function was missing it.
+    sym.cameraKeys=state.cameraKeys;
   }
   var symLayers=_symbolPaperLayers[symId];if(symLayers)symLayers.forEach(function(l){l.visible=false;});
   state.layers=_sceneSnapshot.layers;state.totalFrames=_sceneSnapshot.totalFrames;state.waIn=_sceneSnapshot.waIn;state.waOut=_sceneSnapshot.waOut;
@@ -1701,6 +3196,7 @@ function exitToScene(){
   state.activeLayerIdx=_sceneSnapshot.activeLayerIdx;state.currentFrame=_sceneSnapshot.currentFrame;state.fps=_sceneSnapshot.fps;
   userLayers=_sceneSnapshot.userLayers;
   state.cameraKeys=_sceneSnapshot.cameraKeys;
+  state.markers=_sceneSnapshot.markers;state.motionArcs=_sceneSnapshot.motionArcs;state.tweenOverrides=_sceneSnapshot.tweenOverrides;state.tweenEasing=_sceneSnapshot.tweenEasing;
   userLayers.forEach(function(l){l.opacity=1;});
   state.activeSymbolId=null;_sceneSnapshot=null;
   activateUL(state.activeLayerIdx);drawStage();loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderSymbolTabs)renderSymbolTabs();
@@ -1743,7 +3239,33 @@ function enterMontageView(montageId){
   if(!mods.length){showToast('Montage vide — accrochez des instances contre son bloc d\'abord');return;}
   saveAllLayerFrames();
   if(typeof clearSel==='function')clearSel(); // see enterSymbol's own comment — same document-swap stale-selection risk
-  _montageViewSnapshot={layers:state.layers,totalFrames:state.totalFrames,waIn:state.waIn,waOut:state.waOut,activeLayerIdx:state.activeLayerIdx,fps:state.fps,currentFrame:state.currentFrame,userLayers:userLayers,cameraKeys:state.cameraKeys};
+  // markers/motionArcs/tweenOverrides/tweenEasing (2026-07-30 fix) — same
+  // swap+write-back pair as enterSymbol/exitToScene, kept on the montage
+  // module `m` itself (part of state.storyboard, already copied wholesale
+  // by exportJSON, so no new export plumbing needed). Montage-view segments
+  // are locked symbolId placements so genuine per-shape tweening rarely
+  // applies here, but markers plainly can, and leaving any of the four live
+  // against the outer scene's values for the swap's duration risked the
+  // exact same silent cross-context write enterSymbol's own comment covers.
+  _montageViewSnapshot={layers:state.layers,totalFrames:state.totalFrames,waIn:state.waIn,waOut:state.waOut,activeLayerIdx:state.activeLayerIdx,fps:state.fps,currentFrame:state.currentFrame,userLayers:userLayers,cameraKeys:state.cameraKeys,
+    markers:state.markers,motionArcs:state.motionArcs,tweenOverrides:state.tweenOverrides,tweenEasing:state.tweenEasing};
+  state.markers=m.markers||(m.markers=[]);
+  state.motionArcs=m.motionArcs||(m.motionArcs={});
+  state.tweenOverrides=m.tweenOverrides||(m.tweenOverrides={});
+  state.tweenEasing=m.tweenEasing||(m.tweenEasing={});
+  // cameraKeys (2026-07-30 fix, found live by a background exploration
+  // agent — bug missed by the markers/motionArcs/tweenOverrides/tweenEasing
+  // fix right above): unlike those four, cameraKeys was never actually
+  // reassigned here — only CAPTURED by reference into the snapshot above,
+  // exactly like the other four used to be before that fix. state.cameraKeys
+  // stayed the SAME array the whole time inside the montage view, so a
+  // camera key created "inside" wrote straight into the real outer scene's
+  // camera track, and exitMontageView's restore below was a no-op (handing
+  // the reference back to itself, already mutated). enterSymbol/exitToScene
+  // already isolate camera per-symbol (sym.cameraKeys) — this gives montage
+  // view the identical treatment, on the montage module `m` itself (same
+  // storyboard.js persistence story as markers et al. above).
+  state.cameraKeys=m.cameraKeys||(m.cameraKeys=[]);
   userLayers.forEach(function(l){l.opacity=0.25;});
   var total=SMStoryboard.montageTotal(m);
   var newLayers=[],newUls=[],acc=0;
@@ -1783,12 +3305,18 @@ function exitMontageView(){
   if(state.activeSymbolId){showToast('Fermez d\'abord le composant en cours d\'édition');return;}
   saveAllLayerFrames();
   if(typeof clearSel==='function')clearSel(); // see enterSymbol's own comment
+  // Write back markers/motionArcs/tweenOverrides/tweenEasing onto the
+  // montage module itself — same pairing as enterMontageView's swap, same
+  // reasoning as exitToScene's sym.* write-back.
+  var mWB=window.SMStoryboard?SMStoryboard.montageById(state.activeMontageViewId):null;
+  if(mWB){mWB.markers=state.markers;mWB.motionArcs=state.motionArcs;mWB.tweenOverrides=state.tweenOverrides;mWB.tweenEasing=state.tweenEasing;mWB.cameraKeys=state.cameraKeys;}
   userLayers.forEach(function(l){l.remove();});
   state.layers=_montageViewSnapshot.layers;state.totalFrames=_montageViewSnapshot.totalFrames;state.waIn=_montageViewSnapshot.waIn;state.waOut=_montageViewSnapshot.waOut;
   window._waIn=state.waIn;window._waOut=state.waOut;window._totalF=state.totalFrames;
   state.activeLayerIdx=_montageViewSnapshot.activeLayerIdx;state.currentFrame=_montageViewSnapshot.currentFrame;state.fps=_montageViewSnapshot.fps;
   userLayers=_montageViewSnapshot.userLayers;
   state.cameraKeys=_montageViewSnapshot.cameraKeys;
+  state.markers=_montageViewSnapshot.markers;state.motionArcs=_montageViewSnapshot.motionArcs;state.tweenOverrides=_montageViewSnapshot.tweenOverrides;state.tweenEasing=_montageViewSnapshot.tweenEasing;
   userLayers.forEach(function(l){l.opacity=1;});
   state.activeMontageViewId=null;_montageViewSnapshot=null;
   activateUL(state.activeLayerIdx);drawStage();loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderSymbolTabs)renderSymbolTabs();
@@ -1953,8 +3481,39 @@ function _writeBackGhostProxies(layerIdx){
 // screen. One collector, called from both, so a future consumer-list change
 // (a new data.* tag to skip) can't be applied to one path and forgotten in
 // the other.
+// LAST-DITCH defence for CLAUDE.md §1's CompoundPath hazard (2026-07-26).
+// The collect loop below only serializes `instanceof Path` and Raster, so a
+// CompoundPath left in a layer is dropped ENTIRELY and SILENTLY here: measured
+// on a rectangle-with-a-hole, 1 child of area 168575 -> 0 strokes saved -> 0
+// children after the next loadFrame. The artwork is simply gone, no error, no
+// warning, and it renders fine right up until the save.
+//
+// insertBooleanResult is the documented way to add a boolean result to a
+// layer and every current call site uses it — but that is a convention every
+// future author has to remember, and §1 exists precisely because this keeps
+// recurring. Flattening here instead means it cannot cost artwork again no
+// matter which path produced the CompoundPath (a new feature, an import, a
+// script). Same island-splitting + keyhole-merge every other consumer already
+// expects, so nothing downstream learns anything new.
+function _flattenCompoundChildren(li){
+  var layer=userLayers[li];
+  if(typeof CompoundPath==='undefined'||typeof insertBooleanResult!=='function')return;
+  var kids=layer.children.slice();
+  for(var i=0;i<kids.length;i++){
+    var c=kids[i];
+    if(!(c instanceof CompoundPath))continue;
+    var at=layer.children.indexOf(c);
+    if(at<0)continue;
+    var strokeInfo=c.strokeColor?{color:c.strokeColor,width:c.strokeWidth,cap:c.strokeCap,join:c.strokeJoin}:null;
+    try{
+      insertBooleanResult(layer,at,c,c.fillColor,c.opacity,strokeInfo,c.data);
+      console.warn('[save] CompoundPath aplati avant sauvegarde (il aurait été perdu) — voir CLAUDE.md §1');
+    }catch(e){console.warn('[save] aplatissement du CompoundPath impossible',e);}
+  }
+}
 function _collectLayerStrokes(li,ld){
   var strokes=[];
+  _flattenCompoundChildren(li);
   userLayers[li].children.forEach(function(c){if(c.data&&c.data.ghostFrame!==undefined)return;if(c instanceof Path&&c.segments.length>0){enforceChannelStrip(ld,c);strokes.push(serP(c));}else if(c instanceof Raster)strokes.push(serR(c));});
   return strokes;
 }
@@ -1993,10 +3552,69 @@ function _maybePromoteInterpolated(f,strokes){
 // generateTweens) silently wiped the hidden layer's current-frame content.
 // The stored frame data is the source of truth for an unpopulated live
 // layer — leave it alone.
+// Motion caches a component's whole-duration union bounds (the gizmo's fixed
+// reference box, symbolUnionBounds in motion.js); frame content is what it is
+// derived from, so a write to that content must drop it.
+//
+// The gate matters as much as the call. These two writers are NOT a
+// gesture-end path — goToFrame calls saveAllLayerFrames on EVERY frame
+// advance, so invalidating unconditionally meant playback recomputed the
+// 120-frame union on every tick: measured 7505 getEffectiveStrokes calls for
+// 63 played frames (119 per frame = the union's whole loop), 75% of wall
+// clock, 24fps target delivered at 20fps with a 47.7ms repaint interval.
+//
+// A write can only change a SYMBOL's content while you are inside that
+// symbol — enterSymbol swaps state.layers/userLayers to sym.layers, so
+// outside one these writers touch ordinary scene layers, which no
+// symbolUnionBounds result is derived from. exitToScene is covered because it
+// calls saveAllLayerFrames while activeSymbolId is still set. undo/redo are
+// hooked separately (tweens.js) since they restore content without passing
+// through either writer.
+function _invalidateSymbolUnionIfEditingSymbol(){
+  if(!state.activeSymbolId)return;
+  if(window.SMMotion&&SMMotion.invalidateSymbolUnionBounds)SMMotion.invalidateSymbolUnionBounds();
+}
 function saveActiveLayerFrame(){
   window._sceneVersion++;
-  var ld=state.layers[state.activeLayerIdx];if(ld.symbolId||ld.nativeVideo||ld.montageId||ld.isNullLayer||ld.isEffectLayer)return;
+  _invalidateSymbolUnionIfEditingSymbol();
+  // duplicator (unless in edit-source mode): the live Paper layer holds the
+  // N-way EXPANSION (getEffectiveStrokesRendered, loadFrame) — reading it
+  // back here would permanently bake N copies into the stored drawing on
+  // the very first scrub. Same class of skip as symbolId (synthetic live
+  // content, real data lives elsewhere).
+  // ld._rigPoseLive (2026-07-29): a posed-but-not-yet-committed Rig drag —
+  // see the identical guard in saveAllLayerFrames below for why this can't
+  // just rely on "the user will click Commit quickly": found live, the
+  // periodic 30s autosave (setInterval below, timeline.js) calls
+  // saveAllLayerFrames unconditionally and would otherwise bake an
+  // uncommitted pose into frame data on its own schedule, silently
+  // defeating Reset Pose's whole "discard the live drag" contract — the
+  // Rig tool is the one interaction in this app where "live but
+  // uncommitted" is meant to survive far longer than a single gesture
+  // (Commit/Reset are deliberate separate actions, not implied by mouseup).
+  var ld=state.layers[state.activeLayerIdx];if(ld.symbolId||ld.nativeVideo||ld.montageId||ld.isNullLayer||ld.isEffectLayer||ld.isGuideLayer||ld.lfsGroup||(ld.duplicator&&!ld._dupEditSource)||ld._rigPoseLive)return;
   if(!layerIsEffectivelyVisible(state.activeLayerIdx))return;
+  // Same class of bug as the eye/solo guard right above, found live
+  // 2026-07-30 (Cyril: "avec plein d'aller retour, scrub, trim de layer
+  // entre motion et animation 2D on perd des data de keyframes"):
+  // getEffectiveStrokes returns [] for a frame outside layerInPoint/
+  // layerOutPoint (a trimmed layer), so loadFrame leaves THIS layer's live
+  // Paper layer empty whenever the playhead sits on one of its own hidden
+  // frames — even though ld.frames[frame].strokes still holds real drawn
+  // content. Without this gate, saving here (goToFrame's unconditional
+  // pre-navigation save, or the 30s autosave interval, timeline.js) reads
+  // that empty live layer and permanently overwrites the stored keyframe
+  // with []. Reproduced: draw at frames 0/5/10, trim outPoint below 10,
+  // navigate away — frame 10's 2 strokes silently became 0.
+  // `_justEnsuredKeyframeAt` (2026-08-16, see ensureKeyframe's own comment,
+  // tools.js): the ONE call right after a content-creating tool just
+  // promoted this exact frame is never a stale navigation/autosave read —
+  // it's the save that persists the edit the user just made. Consuming the
+  // flag here (whether or not it actually matched) keeps it from lingering
+  // into some later, unrelated saveActiveLayerFrame() call.
+  var freshlyEnsured=ld._justEnsuredKeyframeAt===state.currentFrame;
+  delete ld._justEnsuredKeyframeAt;
+  if(!freshlyEnsured&&layerHasTimeRange(ld)&&(state.currentFrame<layerInPoint(ld)||state.currentFrame>layerOutPoint(ld)))return;
   _writeBackGhostProxies(state.activeLayerIdx);
   var f=ld.frames[state.currentFrame];
   if(!f.isKeyframe&&!f.isInterpolated)return;
@@ -2005,15 +3623,57 @@ function saveActiveLayerFrame(){
   f.strokes=strokes;
 }
 function saveAllLayerFrames(){
+  _invalidateSymbolUnionIfEditingSymbol();
   _writeBackGhostProxies(state.activeLayerIdx);
-  for(var i=0;i<state.layers.length;i++){if(state.layers[i].symbolId||state.layers[i].nativeVideo||state.layers[i].montageId||state.layers[i].isNullLayer||state.layers[i].isEffectLayer)continue;
+  // duplicator skip: same reason as saveActiveLayerFrame's guard above.
+  for(var i=0;i<state.layers.length;i++){if(state.layers[i].symbolId||state.layers[i].nativeVideo||state.layers[i].montageId||state.layers[i].isNullLayer||state.layers[i].isEffectLayer||state.layers[i].isGuideLayer||state.layers[i].lfsGroup||(state.layers[i].duplicator&&!state.layers[i]._dupEditSource)||state.layers[i]._rigPoseLive)continue;
   if(!layerIsEffectivelyVisible(i))continue;
+  // Trim-range guard — see saveActiveLayerFrame's identical check for the
+  // full explanation. Per-layer here (unlike the single active layer
+  // above) since every OTHER layer can each have its own independent
+  // in/out range while sharing the same global state.currentFrame.
+  if(layerHasTimeRange(state.layers[i])&&(state.currentFrame<layerInPoint(state.layers[i])||state.currentFrame>layerOutPoint(state.layers[i])))continue;
   var f=state.layers[i].frames[state.currentFrame];if(!f||(!f.isKeyframe&&!f.isInterpolated))continue;
   var strokes=_collectLayerStrokes(i,state.layers[i]);
   _maybePromoteInterpolated(f,strokes);
   f.strokes=strokes;}
 }
-function loadFrame(idx){
+// Guards for loadFrame's rebuild skip — deliberately conservative: every one
+// of these returning false costs a rebuild (slow), while a wrong `true` would
+// paint stale content (silent). In doubt, rebuild.
+function _canReuseMaterialized(lyr,strokes){
+  // No dirty signal available (engine off, or the _changed probe failed) means
+  // no way to know whether the live items were edited — never reuse.
+  if(!window.__smGeomDirtyHookInstalled)return false;
+  if(lyr._smGeomDirty)return false;
+  if(!lyr._matStrokes||lyr._matStrokes!==strokes)return false;
+  // An empty result is a FRESH array on every call (`return []`), so it could
+  // never match anyway; excluded explicitly so the intent is readable.
+  if(!strokes.length)return false;
+  // Paranoia: desP/desR emit exactly one item per stroke. Any divergence
+  // (a consumer that inserted or removed something) forces a rebuild rather
+  // than trusting the identity test alone.
+  if(lyr.children.length!==strokes.length)return false;
+  return true;
+}
+// `dupOnly` (2026-07-29): renderNow()'s duplicator-refresh guard (engine-
+// bridge.js) used to call loadFrame(idx) UNSCOPED — rebuilding EVERY layer,
+// not just duplicator ones. loadFrame is also the chokepoint that makes a
+// DIRTY layer (_smGeomDirty, e.g. a live Subselect/Eraser/Rig drag not yet
+// saved) discard its uncommitted edit and rebuild from stored data — by
+// design for actual frame navigation (scrub/playback/goToFrame), where
+// abandoning an unsaved edit on the frame you're leaving is correct. But
+// renderNow()'s guard calls loadFrame on the SAME frame purely to force the
+// duplicator's fresh N-way expansion (dupOffset* is only read here) — not a
+// navigation at all. Found live: with ANY duplicator-enabled layer anywhere
+// in the document, every OTHER layer's live drag (Subselect node-drag, Rig
+// pose-drag — anything calling the plain renderNow() per move tick) got
+// silently reverted to its stored (rest) geometry on literally every
+// pointermove, because this same forced rebuild ran across the whole
+// document each time. `dupOnly=true` skips every non-duplicator layer
+// entirely (no removeChildren, no rebuild, no dirty-flag reset) so the
+// duplicator refresh no longer has this collateral blast radius.
+function loadFrame(idx,dupOnly){
   window._sceneVersion++;
   // See _maybePromoteInterpolated's own comment — loadFrame is the one
   // choke point every frame navigation (scrub, playback, goToFrame) goes
@@ -2029,7 +3689,30 @@ function loadFrame(idx){
   // EXPERIMENTAL (native-video-decode branch): natively-decoded video
   // LAYERS follow the playhead through the same choke point.
   if(window.SMNativeVideo)SMNativeVideo.onFrameChanged(idx);
-  for(var i=0;i<state.layers.length;i++){userLayers[i].removeChildren();if(!layerIsEffectivelyVisible(i))continue;
+  for(var i=0;i<state.layers.length;i++){
+  if(dupOnly&&!state.layers[i].duplicator)continue;
+  if(!layerIsEffectivelyVisible(i)){userLayers[i].removeChildren();userLayers[i]._matStrokes=null;continue;}
+  // Skip the rebuild when this layer's effective content is literally the
+  // SAME array it was last built from. getEffectiveStrokes returns the stored
+  // `f.strokes` (or an inherited keyframe's), so every frame that HOLDS on a
+  // keyframe hands back an identical array object — measured 83% of
+  // layer-frames on a 6-frame-hold project. Rebuilding them was 88% of
+  // loadFrame's cost (32.6ms of 37.0ms per frame at 4000 strokes), and it
+  // produced Paper items identical to the ones already sitting there.
+  //
+  // This is an identity test, not a deep compare, and that is the point:
+  // every writer REPLACES the array (f.strokes = strokes, saveActiveLayerFrame)
+  // rather than mutating it in place, so a changed frame always presents a
+  // different object. Component/montage/lfs layers synthesize a fresh array
+  // per call and therefore never match — they keep rebuilding, unchanged.
+  // getEffectiveStrokesRendered = getEffectiveStrokes + the mograph
+  // duplicator's N-way expansion (no-op for every non-duplicator layer —
+  // identical array, so the identity-reuse test below is untouched). A
+  // duplicator layer returns a fresh array per call and therefore always
+  // rebuilds, same accepted cost as component/montage/lfs layers.
+  var strokes=getEffectiveStrokesRendered(i,idx);
+  if(_canReuseMaterialized(userLayers[i],strokes))continue;
+  userLayers[i].removeChildren();
   // No explicit `op` override here (unlike renderOS()'s onion-skin ghosts,
   // which intentionally force a computed fade-opacity regardless of the
   // object's own value) — omitting it lets desR/desP fall through to the
@@ -2039,7 +3722,8 @@ function loadFrame(idx){
   // against the correctly-stored interpolated value permanently flagged
   // untouched inbetweens as "manually edited" the moment you navigated
   // through them.
-  var strokes=getEffectiveStrokes(i,idx);strokes.forEach(function(sd){if(sd.isRaster)desR(sd,userLayers[i]);else desP(sd,userLayers[i]);});relinkBrushCompanions(userLayers[i]);relinkLinkedFills(userLayers[i]);}
+  strokes.forEach(function(sd){if(sd.isRaster)desR(sd,userLayers[i]);else desP(sd,userLayers[i]);});relinkBrushCompanions(userLayers[i]);relinkLinkedFills(userLayers[i]);if(state.layers[i].rig)relinkRigBinds(state.layers[i],userLayers[i]);
+  userLayers[i]._matStrokes=strokes;userLayers[i]._smGeomDirty=false;}
   userLayers[state.activeLayerIdx].activate();
   // Vue caméra (v18) : loadFrame est LE point de passage de tout changement
   // de frame (scrub, lecture, goToFrame) — même raison que le hook
@@ -2176,9 +3860,28 @@ function goToFrame(idx){
   // Already on this frame (e.g. a live-scrub tick that re-dispatched 'change'
   // without the value actually moving) — avoid a redundant save+reload pass.
   if(idx===state.currentFrame)return;
+  // Bug found live (2026-07-29 QA sweep): an INTERRUPTED Subselect node-drag
+  // (pointerdown+move, never released) left window._nodeDrag.active pointing
+  // at a Path that loadFrame() is about to rebuild with a brand-new identity.
+  // Any later stray pointermove/up kept applying the drag delta by segIndex
+  // alone to whatever object now occupies that slot — silently corrupting the
+  // new frame's stored geometry. Scrubbing frames must sever any in-progress
+  // node edit the same way releasing the mouse would, before the rebuild.
+  if(typeof _nodeDrag!=='undefined'){_nodeDrag.active=false;_nodeDrag.path=null;}
+  if(typeof _nmq!=='undefined'){if(_nmq.rect){_nmq.rect.remove();_nmq.rect=null;}_nmq.active=false;}
+  // Bug found live (2026-07-29 QA sweep): loadFrame() below rebuilds every
+  // layer's live Paper.js children with brand-new object identities, but a
+  // pre-existing shape selection (selectedPaths) kept pointing at the OLD,
+  // now-detached objects (.parent===null) — the Transform/Fill/Stroke panel
+  // kept showing and silently "editing" that ghost with zero effect on the
+  // real, on-screen frame. clearSel(true) drops the shape selection (not the
+  // layer selection — the `true` preserves _layerActiveExplicit, unlike a
+  // canvas deselect, so layer-sec doesn't flicker shut on every scrub).
+  if(selectedPaths.length||_nodeSel.length)clearSel(true);
   saveAllLayerFrames();state.currentFrame=idx;window._curFrame=idx;
   if(window.SMAudio&&!state.playing)SMAudio.scrubAt(idx); // scrub audio au deplacement du playhead (v19)
-  loadFrame(idx);if(!state.playing){renderOS();renderArcs();updateUI();}else{updatePlayhead();}
+  // frameOnly: goToFrame changes the frame and nothing else — see updateUI.
+  loadFrame(idx);if(!state.playing){renderOS();renderArcs();updateUI(true);}else{updatePlayhead();}
 }
 
 // F5/insertFrame — Animate's actual convention (corrected: an earlier pass
@@ -2212,9 +3915,24 @@ function insertFrame(){
   var cf=state.currentFrame;
   for(var i=0;i<state.layers.length;i++){
     var blank={strokes:[],isKeyframe:false,isInterpolated:false};
-    if(targets.indexOf(i)>=0)state.layers[i].frames.splice(cf+1,0,blank);
-    else state.layers[i].frames.push(blank);
+    var lyr=state.layers[i];
+    if(targets.indexOf(i)>=0){
+      lyr.frames.splice(cf+1,0,blank);
+      // A manual trim/marker is a raw frame NUMBER (app.js/markers.js), not a
+      // reference into the frames array — splicing a slot in at cf+1 moves
+      // every stored keyframe at or after that point one frame later, but
+      // left these untouched (2026-08-16, found live: trim a layer's in point
+      // to frame 2, F5 at frame 0 — content slides to frame 3, the bar's
+      // visible window still starts at 2, now blank). Only entries AT OR
+      // AFTER the insertion point shift; anything already before cf+1 is
+      // genuinely unaffected by the splice.
+      if(lyr.inPoint!=null&&lyr.inPoint>cf)lyr.inPoint++;
+      if(lyr.outPoint!=null&&lyr.outPoint>cf)lyr.outPoint++;
+      if(lyr.markers)lyr.markers.forEach(function(m){if(m.frame>cf)m.frame++;});
+    }
+    else lyr.frames.push(blank);
   }
+  if(state.markers)state.markers.forEach(function(m){if(m.frame>cf)m.frame++;});
   state.totalFrames++;
   if(state.waOut<state.totalFrames-1)state.waOut++;
   window._waOut=state.waOut;window._totalF=state.totalFrames;
@@ -2227,6 +3945,15 @@ function insertFrame(){
 // No undo/render side effects of its own — callers own that.
 function _insertKeyframeCore(layerIdx,frameIdx){
   var ld=state.layers[layerIdx];var f=ld.frames[frameIdx];
+  if(ld.symbolId){
+    var sym=state.symbols[ld.symbolId];
+    f.strokes=[];
+    f.componentFrame=sym?resolveSymbolFrameIdx(sym,ld,frameIdx):0;
+    delete f.blankOverride;
+    f.isKeyframe=true;f.isInterpolated=false;
+    syncLinkedKeyframeFolder(layerIdx,frameIdx);
+    return;
+  }
   f.strokes=JSON.parse(JSON.stringify(getEffectiveStrokes(layerIdx,frameIdx)));
   f.isKeyframe=true;f.isInterpolated=false;
   syncLinkedKeyframeFolder(layerIdx,frameIdx);
@@ -2247,7 +3974,9 @@ function insertKeyframe(){
   var eligible=targets.filter(function(li){
     var ld=state.layers[li];
     if(!ld)return false;
-    if(ld.locked){lockedHit=true;return false;}
+    // Component instances are locked against editing their internal drawing
+    // on the parent canvas, but their OUTER timing row must remain editable.
+    if(ld.locked&&!ld.symbolId){lockedHit=true;return false;}
     return !ld.frames[cf].isKeyframe;
   });
   if(!eligible.length){showToast(lockedHit?'Calque verrouillé':'Déjà une keyframe');return;}
@@ -2281,7 +4010,7 @@ function nextKeyframeFrame(layerIdx,fromFrame){
 function insertKeyframeAt(layerIdx,frameIdx){
   saveAllLayerFrames();
   var ld=state.layers[layerIdx];var f=ld.frames[frameIdx];
-  if(ld.locked){showToast('Calque verrouillé');return false;}
+  if(ld.locked&&!ld.symbolId){showToast('Calque verrouillé');return false;}
   if(f.isKeyframe){showToast('Déjà une keyframe');return false;}
   pushUndoLayers();
   _insertKeyframeCore(layerIdx,frameIdx);
@@ -2291,7 +4020,7 @@ function insertKeyframeAt(layerIdx,frameIdx){
 }
 function insertBlankKeyframe(){
   var ld=state.layers[state.activeLayerIdx];
-  if(ld.locked){showToast('Calque verrouillé');return;}
+  if(ld.locked&&!ld.symbolId){showToast('Calque verrouillé');return;}
   saveAllLayerFrames();pushUndoLayers();
   var f={strokes:[],isKeyframe:true,isInterpolated:false};
   // On a component layer this main-timeline row is otherwise dead timing
@@ -2304,7 +4033,18 @@ function insertBlankKeyframe(){
   ld.frames[state.currentFrame]=f;
   loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast('Blank keyframe (F7)');
 }
-function removeFrame(){if(state.totalFrames<=1)return;pushUndoLayers();var cf=state.currentFrame;for(var i=0;i<state.layers.length;i++)state.layers[i].frames.splice(cf,1);state.totalFrames--;if(state.waOut>=state.totalFrames)state.waOut=state.totalFrames-1;window._waOut=state.waOut;window._totalF=state.totalFrames;if(state.currentFrame>=state.totalFrames)state.currentFrame=state.totalFrames-1;loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast('Frame supprimée');}
+function removeFrame(){if(state.totalFrames<=1)return;pushUndoLayers();var cf=state.currentFrame;for(var i=0;i<state.layers.length;i++){var lyr=state.layers[i];lyr.frames.splice(cf,1);
+  // Mirror of insertFrame's own fix (2026-08-16): removing the slot at cf
+  // shifts every LATER frame number down by one, same shift a manual trim/
+  // marker needs or it silently points one frame later than the content it
+  // used to mark. A value AT cf needs no adjustment — whatever previously
+  // sat at cf+1 now occupies cf, so the reference is still correct as-is.
+  if(lyr.inPoint!=null&&lyr.inPoint>cf)lyr.inPoint--;
+  if(lyr.outPoint!=null&&lyr.outPoint>cf)lyr.outPoint--;
+  if(lyr.markers)lyr.markers.forEach(function(m){if(m.frame>cf)m.frame--;});
+}
+  if(state.markers)state.markers.forEach(function(m){if(m.frame>cf)m.frame--;});
+  state.totalFrames--;if(state.waOut>=state.totalFrames)state.waOut=state.totalFrames-1;window._waOut=state.waOut;window._totalF=state.totalFrames;if(state.currentFrame>=state.totalFrames)state.currentFrame=state.totalFrames-1;loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast('Frame supprimée');}
 // Animate's "Clear Keyframe" — demotes a keyframe back into a plain
 // extended frame (content reverts to whatever the previous keyframe holds),
 // without removing the frame slot itself (unlike removeFrame/removeFrameSpan).
@@ -2358,4 +4098,3 @@ function duplicateSelectedFrames(){
   state.currentFrame=b.minF+span;window._curFrame=state.currentFrame;
   window.SM.pasteFrames();
 }
-

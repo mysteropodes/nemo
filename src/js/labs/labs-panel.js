@@ -44,13 +44,14 @@
   function mkNum(value, min, max, step, width) {
     var inp = document.createElement('input');
     inp.type = 'number'; inp.value = value; inp.min = min; inp.max = max; inp.step = step || 1;
-    inp.className = 'pi';
+    inp.className = 'pi scrub';
+    inp.dataset.step = step || 1;
     inp.style.cssText = 'flex:none;width:' + (width || 52) + 'px;padding:3px 5px;font-size:11px;';
     return inp;
   }
   function mkSelect(options, value) {
     var sel = document.createElement('select');
-    sel.className = 'pi';
+    sel.className = 'psel';
     sel.style.cssText = 'flex:none;width:auto;padding:3px 5px;font-size:11px;';
     options.forEach(function (o) {
       var opt = document.createElement('option');
@@ -184,6 +185,15 @@
       },
     },
     { name: 'xsheet', label: 'Feuille d\'exposition flottante' },
+    {
+      name: 'reference-3d', label: 'Référence 3D — personnage & mains',
+      hintExtra: 'Mannequins 3D rotatifs pour le dessin : glisser pour tourner, molette pour zoomer. Ils restent une référence écran et ne sont jamais exportés.',
+      extra: function (c) {
+        var row = subRow();
+        [['Avatar CC0', function () { window.SMLabs.openCC0AvatarReference(); }], ['Mains CC0', function () { window.SMLabs.openCC0HandReference(); }], ['Mannequin', function () { window.SMLabs.openCharacterReference('neutral'); }], ['Action', function () { window.SMLabs.openCharacterReference('action'); }], ['Main simple', function () { window.SMLabs.openHandReference('open'); }], ['Poing', function () { window.SMLabs.openHandReference('fist'); }], ['Index', function () { window.SMLabs.openHandReference('point'); }]].forEach(function (d) { var b = mkBtn(d[0]); b.addEventListener('click', d[1]); row.appendChild(b); });
+        c.appendChild(row);
+      },
+    },
     { name: 'multiframe-draw', label: 'Dessin multi-frames', hintExtra: 'Sélectionne plusieurs frames dans la timeline avant de dessiner — le trait est tamponné sur chacune.' },
   ];
 

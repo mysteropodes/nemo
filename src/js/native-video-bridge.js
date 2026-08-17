@@ -190,7 +190,25 @@
         if (ws.waiter) { var w = ws.waiter; ws.waiter = null; w.reject(e); }
       },
     });
-    ws.decoder.configure({ codec: ws.codec, codedWidth: ws.width, codedHeight: ws.height, description: ws.description });
+    // optimizeForLatency (2026-08-17) — THE fix for "décodeur WebCodecs
+    // muet (aucune image en 4s)", reproduced live on a real MP4 and
+    // root-caused by direct measurement, not guessed. By default Chrome's
+    // H.264 decoder holds frames in a reorder buffer and only emits them
+    // once enough have accumulated: measured here, feeding 6 chunks
+    // returned only 5 frames (the newest stays stuck inside), and feeding
+    // exactly 1 chunk returned NOTHING at all. That is fatal for this
+    // bridge specifically, because _decodeWebFrame below feeds exactly
+    // `need` chunks and then waits for `need` outputs — so every seek to
+    // a keyframe (need === 1, the single most common case: any random
+    // scrub, and the frame-0 probe openWeb does before reporting success)
+    // waited forever and hit the 4s timeout. With the flag, measured
+    // again: 1 chunk in → 1 frame out, immediately. Frame-accurate
+    // single-frame decode is exactly the workload this option exists for
+    // (the spec's own stated use case is low-latency/interactive), so it
+    // is the correct setting here rather than a workaround — a media
+    // PLAYER would want the default buffering; a scrubbing timeline
+    // wants each requested frame back now.
+    ws.decoder.configure({ codec: ws.codec, codedWidth: ws.width, codedHeight: ws.height, description: ws.description, optimizeForLatency: true });
   }
 
   async function _decodeWebFrame(ws, frameIndex) {
@@ -474,11 +492,53 @@
     // layer in a browser (loaded project) just fails its lazy re-open with
     // a console error, same as any other unreachable source.
     for (var i = 0; i < state.layers.length; i++) {
-      if (state.layers[i].nativeVideo) _layerFrameSync(i, frame);
+      if (state.layers[i].nativeVideo) _layerFrameSync(i, state.layers[i], frame);
+    }
+    _syncSymbolVideos(frame);
+  }
+  // Nested video (2026-07-30 fix — Cyril: "attaque le chantier pour les
+  // vidéo dans des component"): the loop above only ever walks TOP-LEVEL
+  // state.layers, by index — while editing INSIDE a Component, state.layers
+  // IS sym.layers (enterSymbol's alias), so a nativeVideo sub-layer gets
+  // found and synced there for free under key `i`. Viewed from OUTSIDE
+  // (placed instance, StoryBoard montage), that sub-layer never appears in
+  // state.layers at all — this is the second half of that same gap,
+  // walking every symbolId instance currently in the composited scene and
+  // syncing whatever nativeVideo sub-layers ITS symbol owns, to whichever
+  // INTERNAL frame resolveSymbolFrameIdx says this instance should be
+  // showing right now (same resolution getEffectiveStrokes' symbolId
+  // branch, app.js, already uses for its own `ii`). Key is
+  // 'nvsym:<symbolId>:<subLayerIndex>' — stable across renders regardless
+  // of which outer layer/context is looking at it, deliberately DIFFERENT
+  // from the plain 'nv:<i>' key the same session gets registered under
+  // while editing inside (both point at the same live decode session on
+  // `sl` itself via sl._nvSessionId, which lives on the layer object and
+  // travels with it either way — only the registered IMAGE id and this
+  // file's own JS-side sync-state cache differ, so switching between
+  // inside/outside pays one extra re-upload the first time each is hit,
+  // not a correctness issue).
+  // Single level only: a Component instance nested INSIDE another
+  // Component's own sym.layers is not walked recursively here.
+  function _syncSymbolVideos(outerFrame) {
+    for (var j = 0; j < state.layers.length; j++) {
+      var ld = state.layers[j];
+      if (!ld || !ld.symbolId || ld.visible === false) continue;
+      if (window.layerHasTimeRange && layerHasTimeRange(ld)) {
+        var inF = window.layerInPoint ? layerInPoint(ld) : 0;
+        var outF = window.layerOutPoint ? layerOutPoint(ld) : state.totalFrames - 1;
+        if (outerFrame < inF || outerFrame > outF) continue;
+      }
+      var sym = state.symbols[ld.symbolId];
+      if (!sym) continue;
+      var ii = window.resolveSymbolFrameIdx ? resolveSymbolFrameIdx(sym, ld, outerFrame) : 0;
+      for (var k = 0; k < sym.layers.length; k++) {
+        var sl = sym.layers[k];
+        if (sl && sl.nativeVideo && sl.visible !== false) _layerFrameSync('nvsym:' + ld.symbolId + ':' + k, sl, ii);
+      }
     }
   }
-  function _syncState(li) {
-    return _layerSync[li] || (_layerSync[li] = { busy: false, pending: null, lastShown: -1, jsCache: new Map(), jsBytes: 0, prefetchQueue: [], prefetching: false });
+  function _syncState(key) {
+    return _layerSync[key] || (_layerSync[key] = { busy: false, pending: null, lastShown: -1, jsCache: new Map(), jsBytes: 0, prefetchQueue: [], prefetching: false });
   }
   function _jsCachePut(st, frame, px) {
     if (st.jsCache.has(frame)) { st.jsBytes -= st.jsCache.get(frame).length; st.jsCache.delete(frame); }
@@ -519,8 +579,7 @@
   // engine-bridge.js's nvMat handling), so reusing stale JSON there would
   // freeze the video at its LAST rendered position/scale while only its
   // pixels kept updating. Falls back to a full renderNow() for those.
-  function _canFastRender(li) {
-    var ld = state.layers[li];
+  function _canFastRender(ld) {
     return !(ld && ld.motion && Object.keys(ld.motion).length);
   }
   // Pull frames around `center` into the JS window, nearest-first, both
@@ -529,9 +588,21 @@
   // originals backward pulls would pay a keyframe walk each, so forward
   // only). Single in-flight chain per layer; a new center simply replaces
   // the queue (latest wins, same principle as everywhere else here).
-  function _prefetch(li, center) {
-    var st = _syncState(li);
-    var ld = state.layers[li];
+  //
+  // key/ld (2026-07-30, nested-video-in-Component fix): every function in
+  // this cluster used to take a bare top-level `li` and re-fetch
+  // state.layers[li] itself — meaningless for a nativeVideo layer living
+  // inside a symbol's OWN sym.layers, which isn't in state.layers at all
+  // once you're not actively editing inside it. `key` is either the plain
+  // numeric top-level index (unchanged behavior) or a stable string
+  // 'nvsym:<symbolId>:<subLayerIndex>' (see _syncSymbolVideos above); `ld`
+  // is the layer object itself, passed by the caller instead of looked up,
+  // since sl._nvSessionId lives ON the object and travels with it either
+  // way. Re-deriving `ld` after an await (below) reads straight off the
+  // SAME object reference rather than re-indexing — correct for both cases
+  // as long as the caller didn't literally delete/replace that object.
+  function _prefetch(key, ld, center) {
+    var st = _syncState(key);
     if (!ld || !ld.nativeVideo || !ld._nvSessionId) return;
     var nv = ld.nativeVideo;
     var bidir = !!nv.optimizedPath || _isAllIntra(nv.codec);
@@ -543,7 +614,7 @@
       try {
         while (st.prefetchQueue.length) {
           var f = st.prefetchQueue.shift();
-          var sess = state.layers[li] && state.layers[li]._nvSessionId;
+          var sess = ld._nvSessionId;
           if (!sess) break;
           var px = await frameBytes(sess, f);
           _jsCachePut(st, f, px);
@@ -552,11 +623,10 @@
       st.prefetching = false;
     })();
   }
-  function _layerFrameSync(li, frame) {
-    var ld = state.layers[li];
+  function _layerFrameSync(key, ld, frame) {
     if (!ld || !ld.nativeVideo) return;
     var nv = ld.nativeVideo;
-    var st = _syncState(li);
+    var st = _syncState(key);
     if (ld._nvSessionId && nv.frameCount) {
       var target = _targetFor(nv, frame);
       if (target === st.lastShown) return; // frame unchanged — loadFrame ran for an unrelated reason
@@ -564,7 +634,7 @@
       // upload inside this very loadFrame turn, no decode wait. Must call
       // renderImageOnly() explicitly (NOT rely on tick()'s own dirty-check
       // loop): the scene JSON's image item only carries the id string
-      // 'nv:<li>', never the frame's actual bytes, so it's byte-identical
+      // 'nv:<key>', never the frame's actual bytes, so it's byte-identical
       // before and after this update — tick()'s string-diff would see
       // "no change" and skip rendering entirely, leaving the new frame's
       // pixels sitting unrendered in the engine's image cache (found live
@@ -572,25 +642,24 @@
       var cached = _jsCacheGet(st, target);
       if (cached) {
         var tR = performance.now();
-        if (window.SMEngineBridge) SMEngineBridge.registerImageRaw('nv:' + li, cached, nv.width, nv.height);
+        if (window.SMEngineBridge) SMEngineBridge.registerImageRaw(_imageIdFor(key), cached, nv.width, nv.height);
         st.lastShown = target;
         if (window.SMEngineBridge && SMEngineBridge.isEnabled()) {
-          if (_canFastRender(li)) SMEngineBridge.renderImageOnly(); else SMEngineBridge.renderNow();
+          if (_canFastRender(ld)) SMEngineBridge.renderImageOnly(); else SMEngineBridge.renderNow();
         }
         _stats.serves++; _stats.jsHits++;
         _pushStat(_stats.renderMs, performance.now() - tR);
-        _prefetch(li, target);
+        _prefetch(key, ld, target);
         return;
       }
     }
-    _layerFrameSyncAsync(li, frame);
+    _layerFrameSyncAsync(key, ld, frame);
   }
-  async function _layerFrameSyncAsync(li, frame) {
-    var st = _syncState(li);
+  async function _layerFrameSyncAsync(key, ld, frame) {
+    var st = _syncState(key);
     if (st.busy) { st.pending = frame; return; }
     st.busy = true;
     try {
-      var ld = state.layers[li];
       if (!ld || !ld.nativeVideo) return;
       var nv = ld.nativeVideo;
       // Lazy (re)open from the persisted path — first frame after an
@@ -626,7 +695,14 @@
         if (!info) {
           info = await open(nv.path);
           nv.codec = info.codec || nv.codec || '';
-          _optimizeLayerMedia(li); // no-op if already all-intra or in flight
+          // Background re-optimize (no-op if already all-intra or in
+          // flight) is keyed by a top-level index re-lookup — skipped for
+          // a nested symLayer (string key), which has none. Nested video
+          // simply stays on the slower non-optimized decode path; a real
+          // fix would need _optimizeLayerMedia keyed the same way as
+          // everything else here, deferred as a known scope boundary
+          // rather than blocking correctness on it.
+          if (typeof key === 'number') _optimizeLayerMedia(key);
         }
         ld._nvSessionId = info.session_id; // runtime-only (not in exportJSON's layer whitelist)
         nv.frameCount = Number(info.frame_count);
@@ -639,22 +715,27 @@
       _pushStat(_stats.ipcMs, performance.now() - tI);
       _jsCachePut(st, target, px);
       var tR = performance.now();
-      if (window.SMEngineBridge) SMEngineBridge.registerImageRaw('nv:' + li, px, nv.width, nv.height);
+      if (window.SMEngineBridge) SMEngineBridge.registerImageRaw(_imageIdFor(key), px, nv.width, nv.height);
       st.lastShown = target;
       window._sceneVersion++;
       if (window.SMEngineBridge && SMEngineBridge.isEnabled()) {
-        if (_canFastRender(li)) SMEngineBridge.renderImageOnly(); else SMEngineBridge.renderNow();
+        if (_canFastRender(ld)) SMEngineBridge.renderImageOnly(); else SMEngineBridge.renderNow();
       }
       _stats.serves++;
       _pushStat(_stats.renderMs, performance.now() - tR);
-      _prefetch(li, target);
+      _prefetch(key, ld, target);
     } catch (e) {
-      console.error('[native-video] layer ' + li + ' sync failed:', e);
+      console.error('[native-video] layer ' + key + ' sync failed:', e);
     } finally {
       st.busy = false;
-      if (st.pending != null) { var p = st.pending; st.pending = null; _layerFrameSync(li, p); }
+      if (st.pending != null) { var p = st.pending; st.pending = null; _layerFrameSync(key, ld, p); }
     }
   }
+  // 'nv:<i>' for a top-level layer (unchanged wire id engine-bridge.js's
+  // buildSceneJson already expects), 'nvsym:<key>' for a nested symLayer —
+  // key here is ALREADY the full 'nvsym:<symbolId>:<subLayerIndex>' string
+  // _syncSymbolVideos built, so this just picks the right prefix by type.
+  function _imageIdFor(key) { return typeof key === 'number' ? ('nv:' + key) : key; }
 
   // ---- optimized media (the DaVinci Resolve pattern) ----
   // Long-GOP sources (H.264/HEVC/VP9…) make every seek cost a keyframe
@@ -797,6 +878,23 @@
   // never touches one; the web backend's own decode already round-trips
   // through a canvas internally, see _videoFrameToRgba).
   async function importAsLayer(source) {
+    // Component guard REMOVED (2026-07-30): importing footage while editing
+    // inside a Component used to create a nativeVideo layer that played
+    // fine while still inside, then silently and permanently vanished the
+    // moment you exited — buildSceneJson's video rendering only ever looked
+    // at top-level state.layers[i].nativeVideo, with no path into a
+    // symbol's own sym.layers. Now genuinely supported end-to-end: see
+    // engine-bridge.js's buildSceneJson (the nested-video render block,
+    // keyed 'nvsym:<symbolId>:<subLayerIndex>') and this file's own
+    // _syncSymbolVideos (the matching sync driver, called alongside the
+    // top-level loop from the same onFrameChanged choke point).
+    //
+    // Montage view keeps its own guard, unrelated to the fix above:
+    // enterMontageView (app.js) swaps state.layers to a throwaway
+    // SYNTHETIC per-segment array with no write-back on exit at all
+    // (unlike a symbol's) — a video "imported" there is discarded the
+    // instant you leave regardless of whether rendering could reach it.
+    if (state.activeMontageViewId) { if (window.showToast) showToast('Impossible d’importer une vidéo à l’intérieur d’un montage — fermez-le d’abord'); return -1; }
     var info = await open(source);
     if (window.saveAllLayerFrames) saveAllLayerFrames();
     if (window.pushUndoLayers) pushUndoLayers();
@@ -821,21 +919,68 @@
       codec: info.codec || '',
     };
     ld._nvSessionId = info.session_id;
-    // Fire-and-forget: transcode long-GOP sources to all-intra in the
-    // background and swap the session when ready — import stays instant.
-    _optimizeLayerMedia(idx);
     if (Number(info.frame_count) > state.totalFrames && window.SM && SM.setTotalFrames) SM.setTotalFrames(Number(info.frame_count));
-    // thumbnail for the Médias panel
-    try {
-      var px = await frameBytes(info.session_id, 0);
-      var tc = document.createElement('canvas');
-      var tw = 96, th = Math.max(1, Math.round(96 * info.height / info.width));
-      tc.width = info.width; tc.height = info.height;
-      tc.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(px), info.width, info.height), 0, 0);
-      var sc = document.createElement('canvas'); sc.width = tw; sc.height = th;
-      sc.getContext('2d').drawImage(tc, 0, 0, tw, th);
-      if (window.SMMediaLibrary) SMMediaLibrary.addEntry(name, 'video', sc.toDataURL('image/jpeg', 0.7), ld.name);
-    } catch (e) { /* thumbnail is cosmetic — import already succeeded */ }
+    // Decode the on-screen frame ONCE, right here, before anything else
+    // touches this session (2026-08-17, Cyril: "faire apparaître le
+    // footage rapidement même si l'encodage est en cours") — this used to
+    // happen TWICE: once
+    // implicitly inside loadFrame()'s own _layerFrameSync (cold, no cache
+    // entry yet, so it fell through to the real async decode) a few lines
+    // below, and again right after for the thumbnail's own separate
+    // frameBytes() call. Same frame, same session, decoded from scratch
+    // twice back to back — pure waste, and it meant the canvas had to wait
+    // through BOTH decodes in sequence before showing anything, which is
+    // exactly what read as "the footage takes a while to appear," compounded
+    // whenever a slow first decode landed anywhere near the background
+    // optimize kicking off. Decoding once here, THEN pre-seeding the sync
+    // cache (jsCache + lastShown) below so loadFrame's own sync call is a
+    // cache HIT instead of a second decode, cuts time-to-first-pixel
+    // roughly in half and removes any risk of the two racing each other.
+    // The frame that actually needs to be ON SCREEN is whatever the
+    // playhead is sitting on right now (_targetFor — offsetFrames:0 on a
+    // fresh import, so this is state.currentFrame verbatim unless the
+    // import happened mid-timeline), NOT necessarily the clip's own frame
+    // 0 — importing at frame 50 must show frame 50, not frame 0 mislabeled
+    // as "already correct". The thumbnail is the one place that DOES want
+    // frame 0 specifically (a canonical preview, same as before this
+    // change) — reuse the decode above for it only when they're the same
+    // frame; decode frame 0 separately in the (uncommon: importing with
+    // the playhead already moved) case where they differ.
+    var target0 = _targetFor(ld.nativeVideo, state.currentFrame);
+    var px0 = null;
+    try { px0 = await frameBytes(info.session_id, target0); } catch (e) { /* falls through to loadFrame's own (slower) decode below */ }
+    if (px0) {
+      var st0 = _syncState(idx);
+      _jsCachePut(st0, target0, px0);
+      if (window.SMEngineBridge) SMEngineBridge.registerImageRaw(_imageIdFor(idx), px0, info.width, info.height);
+      st0.lastShown = target0;
+    }
+    var pxThumb = target0 === 0 ? px0 : null;
+    if (!pxThumb) { try { pxThumb = await frameBytes(info.session_id, 0); } catch (e) { /* thumbnail stays cosmetic-only, no fallback needed */ } }
+    // Fire-and-forget: transcode long-GOP sources to all-intra in the
+    // background and swap the session when ready — import stays instant,
+    // and now that frame 0 is already decoded+registered above, there's
+    // nothing left for this background job to visibly delay.
+    _optimizeLayerMedia(idx);
+    // Thumbnail for the Médias panel — reuses pxThumb (frame 0 specifically,
+    // no second decode in the common case where the playhead was already
+    // at frame 0 on import).
+    if (pxThumb) {
+      try {
+        var tc = document.createElement('canvas');
+        var tw = 96, th = Math.max(1, Math.round(96 * info.height / info.width));
+        tc.width = info.width; tc.height = info.height;
+        tc.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(pxThumb), info.width, info.height), 0, 0);
+        var sc = document.createElement('canvas'); sc.width = tw; sc.height = th;
+        sc.getContext('2d').drawImage(tc, 0, 0, tw, th);
+        // linked, not embedded (2026-07-31): a nativeVideo layer only persists
+        // ld.nativeVideo.path — no bytes live in the project file, so the
+        // panel needs to represent "this can go offline if the file moves"
+        // rather than a byte count. isWeb sessions have no real filesystem
+        // path to relink to, so they're marked embedded-ish (no relink offer).
+        if (window.SMMediaLibrary) SMMediaLibrary.addEntry(name, 'video', sc.toDataURL('image/jpeg', 0.7), ld.name, { layerUid: ld.layerUid, linked: !isWeb, path: isWeb ? null : source });
+      } catch (e) { /* thumbnail is cosmetic — import already succeeded */ }
+    }
     if (window.activateUL) activateUL(idx);
     if (window.loadFrame) loadFrame(state.currentFrame);
     if (window.updateUI) updateUI();
@@ -873,8 +1018,51 @@
     }
   }
 
+  // Relink a nativeVideo layer to a different file (2026-07-31, Cyril:
+  // "vrai panel de gestion de fichier importé" — a moved/deleted video had
+  // NO recovery path at all: images.js's replaceFootageSource exists for
+  // the embedded raster kinds but is explicitly hidden for kind==='video'
+  // in the layer-row's footage panel, since a nativeVideo layer has no
+  // per-frame raster src to swap — the source is the DECODE SESSION
+  // itself). Same dialog shape as replaceFootageSource, but the actual
+  // swap follows _optimizeLayerMedia's own session-replace steps: open the
+  // new path, point the layer at the fresh session, drop the old one, and
+  // clear the per-layer sync cache (stale bytes from the OLD decode).
+  async function replaceNativeVideoSource(li) {
+    var ld = state.layers[li];
+    if (!ld || !ld.nativeVideo) { if (window.showToast) showToast('Pas un calque vidéo native'); return; }
+    if (ld.nativeVideo.isWeb) { if (window.showToast) showToast('Relink indisponible pour une vidéo importée sans Tauri — réimporte-la'); return; }
+    if (!tauriOk()) { if (window.showToast) showToast('Relink nécessite l’app Tauri'); return; }
+    var path = await window.__TAURI__.dialog.open({ title: 'Relier / remplacer le fichier vidéo', multiple: false,
+      filters: [{ name: 'Vidéos', extensions: ['mp4', 'mov', 'mkv', 'webm', 'avi'] }] });
+    if (!path) return;
+    var info;
+    try { info = await open(path); }
+    catch (e) { if (window.showToast) showToast('Ouverture impossible : ' + (e && e.message || e), 'warn'); return; }
+    if (window.pushUndo) pushUndo();
+    var oldSession = ld._nvSessionId;
+    var nv = ld.nativeVideo;
+    nv.path = path; nv.isWeb = false; nv.fps = info.fps; nv.frameCount = Number(info.frame_count);
+    nv.width = info.width; nv.height = info.height; nv.codec = info.codec || '';
+    nv.optimizedPath = null; // re-optimize against the new source, the old target no longer matches
+    ld._nvSessionId = info.session_id;
+    var st = _syncState(li);
+    st.jsCache.clear(); st.jsBytes = 0; st.prefetchQueue = []; st.lastShown = -1;
+    if (oldSession) close(oldSession).catch(function () {});
+    if (Number(info.frame_count) > state.totalFrames && window.SM && SM.setTotalFrames) SM.setTotalFrames(Number(info.frame_count));
+    _optimizeLayerMedia(li);
+    // Keep the catalog entry pointed at the same layer/uid but reflect the
+    // new source — refresh path/thumb rather than spawning a second entry.
+    var entry = (state.mediaLibrary || []).find(function (m) { return m.layerUid && m.layerUid === ld.layerUid; });
+    if (entry) { entry.path = path; entry.name = path.split('/').pop().replace(/\.[^.]+$/, ''); if (window.SMMediaLibrary) SMMediaLibrary.reload(); }
+    if (window.loadFrame) loadFrame(state.currentFrame);
+    if (window.updateUI) updateUI();
+    if (window.showToast) showToast('Vidéo reliée : ' + path.split('/').pop());
+  }
+
   window.SMNativeVideo = {
     open: open,
+    replaceNativeVideoSource: replaceNativeVideoSource,
     frameBytes: frameBytes,
     registerFrame: registerFrame,
     close: close,
@@ -900,18 +1088,57 @@
     setTimeout(async function () {
       var cfg = null;
       try { cfg = await invoke('autobench_config'); } catch (e) { return; }
-      if (!cfg || !cfg.videos || !cfg.videos.length) return;
-      console.log('[autobench] starting,', cfg.videos.length, 'videos');
+      // A testImport-only config (no scrub videos) is a legitimate run —
+      // this used to require at least one videos[] entry, which silently
+      // discarded any config that only wanted the import-latency phase
+      // below (see 2026-08-17 addition), an inert-looking no-op with no
+      // error at all.
+      var hasVideos = cfg && cfg.videos && cfg.videos.length;
+      var hasImportTest = cfg && cfg.testImport && cfg.testImport.length;
+      if (!hasVideos && !hasImportTest) return;
+      console.log('[autobench] starting,', hasVideos ? cfg.videos.length : 0, 'videos,', hasImportTest ? cfg.testImport.length : 0, 'import tests');
       var report = {
         startedAt: new Date().toISOString(),
         engineEnabled: !!(window.SMEngineBridge && SMEngineBridge.isEnabled && SMEngineBridge.isEnabled()),
         runs: [],
       };
-      for (var i = 0; i < cfg.videos.length; i++) {
+      for (var i = 0; hasVideos && i < cfg.videos.length; i++) {
         try {
           report.runs.push(await bench(cfg.videos[i], cfg.opts || {}));
         } catch (e) {
           report.runs.push({ path: cfg.videos[i], error: String((e && e.message) || e) });
+        }
+      }
+      // Import-latency phase (2026-08-17, verifying "faire apparaître le
+      // footage rapidement même si l'encodage est en cours") — bench()
+      // above measures steady-state scrub/playback, never importAsLayer()
+      // itself, so it can't see the exact thing that changed: how long
+      // between calling it and the first decoded pixel actually reaching
+      // the engine. Wraps registerImageRaw for the duration of each import
+      // to capture that moment precisely, in addition to the call's own
+      // total wall-clock time (includes thumbnail + loadFrame + updateUI,
+      // NOT the background optimize — that's fire-and-forget by design).
+      if (cfg.testImport && cfg.testImport.length && window.SMNativeVideo) {
+        report.importRuns = [];
+        for (var j = 0; j < cfg.testImport.length; j++) {
+          var p = cfg.testImport[j];
+          var firstPixelMs = null;
+          var origRegister = window.SMEngineBridge && window.SMEngineBridge.registerImageRaw;
+          var t0 = performance.now();
+          if (origRegister) {
+            window.SMEngineBridge.registerImageRaw = function () {
+              if (firstPixelMs === null) firstPixelMs = performance.now() - t0;
+              return origRegister.apply(window.SMEngineBridge, arguments);
+            };
+          }
+          try {
+            await SMNativeVideo.importAsLayer(p);
+            report.importRuns.push({ path: p, totalImportMs: +(performance.now() - t0).toFixed(2), firstPixelMs: firstPixelMs !== null ? +firstPixelMs.toFixed(2) : null });
+          } catch (e) {
+            report.importRuns.push({ path: p, error: String((e && e.message) || e) });
+          } finally {
+            if (origRegister) window.SMEngineBridge.registerImageRaw = origRegister;
+          }
         }
       }
       try {

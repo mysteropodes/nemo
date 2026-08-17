@@ -147,6 +147,105 @@
     if (!selectedPaths.length && window.showToast) showToast('Aucune forme avec cette couleur sur ce calque/cette frame');
   }
 
+  // Builds a row ONCE. Listeners read the CURRENT color from
+  // `row.dataset.hex` (kept fresh by updateColorRow) instead of closing
+  // over `entry` — that is what lets a row survive being REUSED across
+  // renders for a color that keeps changing (a drag), rather than needing
+  // fresh listeners bound to a fresh `entry` every time.
+  function buildColorRow(entry) {
+    var row = document.createElement('div'); row.className = 'pr color-row';
+    // The swatch never opened anything on click — everywhere ELSE in the
+    // app, a color swatch opens ColorPicker's full hue/sat/alpha popover
+    // (see color-picker.js's wireColorSwatches, used by Fill/Stroke); this
+    // one row type was simply never wired up to it, so clicking it looked
+    // broken by omission rather than by a bug (2026-07-28 screenshot,
+    // arrow pointing at the swatch: "je clic là et ça ne fait rien").
+    var sw = document.createElement('div'); sw.className = 'cw-mini'; sw.style.flexShrink = '0'; sw.style.cursor = 'pointer';
+    sw.title = 'Choisir une couleur…';
+    sw.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (!window.ColorPicker) return;
+      // No liveEditing guard here, unlike the two handlers below: the
+      // picker is its OWN floating popover with its OWN hex field — it
+      // never touches this row's inputs directly the way typing/scrubbing
+      // does, so there's nothing here to protect from self-destruction,
+      // and the row's OWN hex/opacity text SHOULD stay live-synced while
+      // the popover is open (first draft copied the guard reflexively and
+      // the row's text visibly lagged the swatch during a picker drag).
+      window.ColorPicker.open(sw, row.dataset.hex, function (newHex) {
+        recolorColor(row.dataset.hex, newHex);
+      });
+    });
+    var hexInput = document.createElement('input');
+    hexInput.type = 'text'; hexInput.className = 'pi color-hex-input'; hexInput.spellcheck = false; hexInput.maxLength = 9;
+    var opacityInput = document.createElement('input');
+    opacityInput.type = 'number'; opacityInput.className = 'pi scrub color-opacity-input'; opacityInput.min = 0; opacityInput.max = 100; opacityInput.dataset.step = '1';
+    var pct = document.createElement('span'); pct.className = 'color-pct'; pct.textContent = '%';
+    var selBtn = document.createElement('div'); selBtn.className = 'lico color-select-btn'; selBtn.title = 'Sélectionner les formes de cette couleur (calque/frame actifs)';
+    selBtn.innerHTML = ICON_CROSSHAIR;
+
+    // `row.dataset.liveEditing` brackets the recolorColor() call so that
+    // the NESTED render it triggers (recolorColor -> updateUI ->
+    // renderSelectedColorsPanel -> updateColorRow, all synchronous) knows
+    // not to overwrite the very field this handler is running for — see
+    // updateColorRow's own comment for why that matters.
+    hexInput.addEventListener('change', function () {
+      var parsed = window.parseHexInput ? parseHexInput(this.value) : null;
+      if (!parsed) { this.value = hexDisplayValue(row.dataset.hex); return; }
+      row.dataset.liveEditing = 'hex';
+      recolorColor(row.dataset.hex, parsed);
+      row.dataset.liveEditing = '';
+    });
+    hexInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') this.blur(); });
+    opacityInput.addEventListener('input', function () {
+      var p = Math.max(0, Math.min(100, parseInt(this.value) || 0));
+      var rgb = row.dataset.hex.replace('#', '').slice(0, 6);
+      var a = Math.round(p / 100 * 255).toString(16).padStart(2, '0');
+      row.dataset.liveEditing = 'opacity';
+      recolorColor(row.dataset.hex, '#' + rgb + (p < 100 ? a : ''));
+      row.dataset.liveEditing = '';
+    });
+    selBtn.addEventListener('click', function () { selectPathsWithColor(row.dataset.hex); });
+
+    row.appendChild(sw); row.appendChild(hexInput); row.appendChild(opacityInput); row.appendChild(pct); row.appendChild(selBtn);
+    updateColorRow(row, entry, true);
+    return row;
+  }
+
+  // Refreshes an EXISTING row's display for `entry`, in place — never
+  // replaces the row or its inputs. `isNew` skips the liveEditing guard
+  // (a freshly built row has no in-progress edit to protect).
+  //
+  // The guard itself (2026-07-28, "j'essaye de drag opacité impossible,
+  // je change la valeur d'opacité celle ci ne se répercute pas sur la
+  // couleur"): the opacity field fires a native 'input' event on EVERY
+  // keystroke AND on every tick of ui.js's drag-to-scrub gesture
+  // (CLAUDE.md §10) — and that scrub mechanism captures ONE specific DOM
+  // element reference at pointerdown and keeps writing `.value` /
+  // dispatching events on THAT SAME node for the whole gesture, calling
+  // `el.setPointerCapture` and `preventDefault()`ing focus in the
+  // process (so the element is deliberately NEVER `document.activeElement`
+  // during a pure scrub — a focus-based guard would miss the scrub case
+  // entirely, which is why this uses a per-row flag set by the handler
+  // itself instead). The OLD implementation rebuilt this whole panel's
+  // `body.innerHTML` from scratch on every one of those events — which
+  // destroyed the very node the scrub was mid-gesture on. Every following
+  // tick then read/wrote a DETACHED node with zero visible effect: the
+  // drag looked "impossible" past its first pixel of movement, and a
+  // typed value could look like it "didn't reflect" if the destroy+rebuild
+  // cost enough of the event loop that a fast second keystroke landed on
+  // nothing. Reusing rows in place removes the destruction entirely; the
+  // liveEditing guard on top stops the row's OWN nested re-render (fired
+  // synchronously by the very call this handler is making) from
+  // overwriting the field mid-edit with a redundant identical value.
+  function updateColorRow(row, entry, isNew) {
+    var sw = row.querySelector('.cw-mini'), hexInput = row.querySelector('.color-hex-input'), opacityInput = row.querySelector('.color-opacity-input');
+    row.dataset.hex = entry.hex;
+    sw.style.background = entry.hex;
+    if (isNew || row.dataset.liveEditing !== 'hex') hexInput.value = hexDisplayValue(entry.hex);
+    if (isNew || row.dataset.liveEditing !== 'opacity') opacityInput.value = alphaPctFromHex(entry.hex);
+  }
+
   function renderSelectedColorsPanel() {
     var body = document.getElementById('selected-colors-body');
     var hdr = document.getElementById('selected-colors-hdr');
@@ -154,8 +253,8 @@
     var hasSel = !!(window.selectedPaths && selectedPaths.length);
     if (hdr) hdr.textContent = SM.t(hasSel ? 'hdrSelectedColors' : 'hdrLayerColors');
     var list = computeUsedColors();
-    body.innerHTML = '';
     if (!list.length) {
+      body.innerHTML = '';
       var empty = document.createElement('div');
       empty.className = 'pr'; empty.style.cssText = 'font-size:9px;color:var(--text-dim)';
       empty.textContent = SM.t('noColorSelected');
@@ -165,36 +264,19 @@
     // No silent cap on real project sizes worth flagging — most projects
     // land well under 100 distinct colors; this is a diagnostics/recolor
     // tool, not a performance-critical hot path, so no truncation here.
-    list.forEach(function (entry) {
-      var row = document.createElement('div'); row.className = 'pr color-row';
-      var sw = document.createElement('div'); sw.className = 'cw-mini'; sw.style.background = entry.hex; sw.style.flexShrink = '0';
-      var hexInput = document.createElement('input');
-      hexInput.type = 'text'; hexInput.className = 'pi color-hex-input'; hexInput.spellcheck = false; hexInput.maxLength = 9;
-      hexInput.value = hexDisplayValue(entry.hex);
-      var opacityInput = document.createElement('input');
-      opacityInput.type = 'number'; opacityInput.className = 'pi scrub color-opacity-input'; opacityInput.min = 0; opacityInput.max = 100; opacityInput.dataset.step = '1';
-      opacityInput.value = alphaPctFromHex(entry.hex);
-      var pct = document.createElement('span'); pct.className = 'color-pct'; pct.textContent = '%';
-      var selBtn = document.createElement('div'); selBtn.className = 'lico color-select-btn'; selBtn.title = 'Sélectionner les formes de cette couleur (calque/frame actifs)';
-      selBtn.innerHTML = ICON_CROSSHAIR;
-
-      hexInput.addEventListener('change', function () {
-        var parsed = window.parseHexInput ? parseHexInput(this.value) : null;
-        if (!parsed) { this.value = hexDisplayValue(entry.hex); return; }
-        recolorColor(entry.hex, parsed);
-      });
-      hexInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') this.blur(); });
-      opacityInput.addEventListener('input', function () {
-        var p = Math.max(0, Math.min(100, parseInt(this.value) || 0));
-        var rgb = entry.hex.replace('#', '').slice(0, 6);
-        var a = Math.round(p / 100 * 255).toString(16).padStart(2, '0');
-        recolorColor(entry.hex, '#' + rgb + (p < 100 ? a : ''));
-      });
-      selBtn.addEventListener('click', function () { selectPathsWithColor(entry.hex); });
-
-      row.appendChild(sw); row.appendChild(hexInput); row.appendChild(opacityInput); row.appendChild(pct); row.appendChild(selBtn);
-      body.appendChild(row);
-    });
+    var existingRows = [].slice.call(body.querySelectorAll('.color-row'));
+    // A color appearing/disappearing (the row COUNT changing) still gets a
+    // full rebuild — reconciling that case row-by-row isn't worth the
+    // complexity, and unlike a single row's own value changing, it isn't
+    // something a drag/keystroke sequence does on every tick (recoloring
+    // EVERY occurrence of a color at once, see recolorColor, keeps the
+    // count of distinct colors stable through an ordinary edit).
+    if (existingRows.length !== list.length) {
+      body.innerHTML = '';
+      list.forEach(function (entry) { body.appendChild(buildColorRow(entry)); });
+      return;
+    }
+    list.forEach(function (entry, i) { updateColorRow(existingRows[i], entry); });
   }
 
   // Cheap early-return so this doesn't cost anything while the section is

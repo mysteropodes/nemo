@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Nemo v0.6.2</title>
+<title>Nemo v0.7.0-alpha.1</title>
 <script src="paper-full.min.js"></script>
 <!-- Manrope (redesign, 2026-07-09) — matches the CSS var font stack's own
      fallback order, so an offline load (no internet, no Tauri font cache)
@@ -159,24 +159,29 @@
          that stroke (or, at a crossing with another stroke, just the bounded
          segment between the two nearest intersections) — Delete/recolor act
          on ONLY the clicked aspect, never both at once. -->
-    <button class="tool-btn" data-tool="fsselect" data-i18n-title="toolFsselect" title="Fill/Stroke Select — click a fill or a stroke segment to select it independently (M)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="8" fill="currentColor" fill-opacity="0.35"/><path d="M4 12a8 8 0 0 1 16 0" stroke-dasharray="2.2 2.2"/></svg><span class="sk">M</span></button>
+    <button class="tool-btn" data-tool="fsselect" data-i18n-title="toolFsselect" title="Fill/Stroke Select — click a fill or a stroke segment to select it independently (M in Animation 2D — Motion mode reserves M to reveal Mattes)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="8" fill="currentColor" fill-opacity="0.35"/><path d="M4 12a8 8 0 0 1 16 0" stroke-dasharray="2.2 2.2"/></svg><span class="sk">M</span></button>
     <div class="tool-sep"></div>
     <button class="tool-btn active" data-tool="draw" data-i18n-title="toolDraw" title="Brush (B)"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M7 14c-1.66 0-3 1.34-3 3 0 1.31-1.16 2-2 2 .92 1.22 2.49 2 4 2 2.21 0 4-1.79 4-4 0-1.66-1.34-3-3-3z"/><path d="M20.71 4.63l-1.34-1.34a1 1 0 00-1.41 0L9 12.25 11.75 15l8.96-8.96a1 1 0 000-1.41z"/></svg><span class="sk">B</span></button>
     <button class="tool-btn" data-tool="pen" data-i18n-title="toolPen" title="Pen — click to place points, drag for curves (P)"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="m4.93 21.482 5.845-5.846a2 2 0 1 0-1.414-1.414l-5.846 5.846-1.06-1.06c2.827-3.3 3.888-6.954 5.302-13.082l6.364-.707 5.657 5.657-.707 6.364c-6.128 1.414-9.782 2.475-13.08 5.303l-1.062-1.06v-.001ZM16.595 2.037l6.347 6.346a.5.5 0 0 1-.277.848l-1.474.23-5.656-5.656.212-1.485a.5.5 0 0 1 .848-.283Z"/></svg><span class="sk">P</span></button>
     <button class="tool-btn" data-tool="fillbrush" data-i18n-title="toolFillbrush" title="Fill brush — paint a freehand filled shape, pressure-sensitive (N)"><span style="font-size:14px;line-height:1">&#x25CF;</span><span class="sk">N</span></button>
+    <!-- Rig tool (2026-07) — bones drawn Pen-tool-style (click=corner,
+         click-drag=curve handle, chainable), rendered live while the tool
+         is active; dragging an existing bone anchor poses it instead
+         (rig-bridge.js unifies both gestures behind one onDown). -->
+    <button class="tool-btn" data-tool="rig" data-i18n-title="toolRig" title="Rig — 3 steps in the panel: 1. Dessiner (click=anchor, drag=curve) 2. Assigner (link shapes to bones) 3. Déplacer (drag an anchor to pose). (S in Animation 2D — Motion mode reserves S for Scale)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="19" r="2.2" fill="currentColor" stroke="none"/><circle cx="12" cy="10" r="2.2" fill="currentColor" stroke="none"/><circle cx="19" cy="5" r="2.2" fill="currentColor" stroke="none"/><path d="M6.6 17.4 10.4 11.6M13.6 8.4 17.4 6.6"/></svg><span class="sk">S</span></button>
     <!-- Missing separator (feedback 2026-07) — freehand painting tools
          (Draw/Pen/Fill brush) and geometric shape tools (Line/Rect/
          Ellipse) read as one undifferentiated group without this; Text
          keeps its own separator right after Ellipse below. -->
     <div class="tool-sep"></div>
-    <button class="tool-btn" data-tool="line" data-i18n-title="toolLine" title="Line (U)"><span class="material-symbols-rounded">&#xf755;</span><span class="sk">U</span></button>
+    <button class="tool-btn" data-tool="line" data-i18n-title="toolLine" title="Line (U in Animation 2D — Motion mode reserves U to reveal animated properties)"><span class="material-symbols-rounded">&#xf755;</span><span class="sk">U</span></button>
     <button class="tool-btn" data-tool="rect" data-i18n-title="toolRect" title="Rectangle (R)"><span class="material-symbols-rounded">&#xe3c6;</span><span class="sk">R</span></button>
     <button class="tool-btn" data-tool="ellipse" data-i18n-title="toolEllipse" title="Ellipse (L)"><span class="material-symbols-rounded">&#xef4a;</span><span class="sk">L</span></button>
     <!-- Text sits right below the Ellipse (feedback #21) — after the shape
          group, not in the middle of the selection tools. -->
-    <button class="tool-btn" data-tool="text" data-i18n-title="toolText" title="Texte — clique le canvas pour poser un bloc de texte (rendu image)"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M5 4h14v3h-2V6h-4v12h2v2H9v-2h2V6H7v1H5z"/></svg></button>
+    <button class="tool-btn" data-tool="text" data-i18n-title="toolText" title="Texte — clique le canvas pour poser un bloc de texte (rendu image) (Y)"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M5 4h14v3h-2V6h-4v12h2v2H9v-2h2V6H7v1H5z"/></svg><span class="sk">Y</span></button>
     <div class="tool-sep"></div>
-    <button class="tool-btn" data-tool="eraser" data-i18n-title="toolEraser" title="Eraser (E)"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M14 19.002h7v2h-9l-3.998.002-6.487-6.487a1 1 0 0 1 0-1.414L12.12 2.496a1 1 0 0 1 1.415 0l7.778 7.778a1 1 0 0 1 0 1.414L14 19.002Zm1.657-4.485 3.535-3.536-6.364-6.364-3.535 3.536 6.364 6.364Z"/></svg><span class="sk">E</span></button>
+    <button class="tool-btn" data-tool="eraser" data-i18n-title="toolEraser" title="Eraser (E in Animation 2D — Motion mode reserves E to reveal Effects)"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M14 19.002h7v2h-9l-3.998.002-6.487-6.487a1 1 0 0 1 0-1.414L12.12 2.496a1 1 0 0 1 1.415 0l7.778 7.778a1 1 0 0 1 0 1.414L14 19.002Zm1.657-4.485 3.535-3.536-6.364-6.364-3.535 3.536 6.364 6.364Z"/></svg><span class="sk">E</span></button>
     <button class="tool-btn" data-tool="fill" data-i18n-title="toolFill" title="Paint bucket — click an enclosed area to fill it (G)"><span class="material-symbols-rounded">&#xe23a;</span><span class="sk">G</span></button>
     <button class="tool-btn" data-tool="eyedropper" data-i18n-title="toolEyedropper" title="Eyedropper (I)"><span class="material-symbols-rounded">&#xe3b8;</span><span class="sk">I</span></button>
     <div class="tool-sep"></div>
@@ -187,7 +192,7 @@
          lives; see #app-topbar below for its new home near the avatar. -->
     <button class="tool-btn" data-tool="hand" data-i18n-title="toolHand" title="Hand — pan the canvas (H or Space)"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M20.5 5A1.5 1.5 0 0 0 19 6.5V11h-1V4.5a1.5 1.5 0 0 0-3 0V11h-1V3.5a1.5 1.5 0 0 0-3 0V11h-1V5.5a1.5 1.5 0 0 0-3 0v10.81l-2.22-3.6a1.504 1.504 0 1 0-2.56 1.58l3.31 5.34A5 5 0 0 0 9.78 22H17a5 5 0 0 0 5-5V6.5A1.5 1.5 0 0 0 20.5 5Z"/></svg><span class="sk">H</span></button>
     <button class="tool-btn" data-tool="zoom" data-i18n-title="toolZoom" title="Zoom — click to zoom in, Alt+click to zoom out (Z)"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.35-4.35" stroke-linecap="round"/></svg><span class="sk">Z</span></button>
-    <button class="tool-btn" data-tool="rotate" data-i18n-title="toolRotate" title="Rotate canvas — drag to spin the stage around its center. Also works as Alt+drag from any other tool."><span style="font-size:15px;line-height:1">&#x21bb;</span></button>
+    <button class="tool-btn" data-tool="rotate" data-i18n-title="toolRotate" title="Rotate canvas — drag to spin the stage around its center. Also works as Alt+drag from any other tool. (W)"><span style="font-size:15px;line-height:1">&#x21bb;</span><span class="sk">W</span></button>
     <!-- Perspective/Symmetry tool buttons removed (feedback 2026-07: "tu
          n'as pas enlevé les boutons de perspective et symétrie dans la
          barre gauche" — a follow-up to the right-panel section removal
@@ -345,14 +350,14 @@
                reaches them — without it the rounded input backgrounds stack
                edge-to-edge and visually fuse. -->
           <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px">
-            <div class="pr"><span class="pl" data-i18n="fieldPosition">Position</span><input type="number" class="pi scrub" id="sp-x" value="0" data-step="1" data-i18n-title="titleDragX" title="X — drag to scrub, click to type"><input type="number" class="pi scrub" id="sp-y" value="0" data-step="1" data-i18n-title="titleDragY" title="Y — drag to scrub, click to type"></div>
+            <div class="pr sp-xform-row"><span class="pl" data-i18n="fieldPosition">Position</span><input type="number" class="pi scrub" id="sp-x" value="0" data-step="1" data-i18n-title="titleDragX" title="X — drag to scrub, click to type"><input type="number" class="pi scrub" id="sp-y" value="0" data-step="1" data-i18n-title="titleDragY" title="Y — drag to scrub, click to type"></div>
             <!-- Proportion lock (2026-07 feedback: "il manque le cadenas sur
                  le size pour lier les 2") — same dims-lock-btn as the
                  Document panel's own W/H lock (index.html above), reused
                  as-is since it's already generic (see btn-sp-size-lock's
                  wiring in timeline.js). -->
-            <div class="pr dims-row"><span class="pl" data-i18n="fieldSize">Size</span><input type="number" class="pi scrub" id="sp-w" value="0" min="1" data-step="1" data-i18n-title="fieldWidth" title="Width"><input type="number" class="pi scrub" id="sp-h" value="0" min="1" data-step="1" data-i18n-title="fieldHeight" title="Height"><button class="dims-lock-btn" id="btn-sp-size-lock" type="button" data-i18n-title="dimsLockTitle" title="Lier largeur/hauteur (garder les proportions)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></button></div>
-            <div class="pr"><span class="pl" data-i18n="fieldRotate">Rotate</span><input type="number" class="pi scrub" id="sp-rot" value="0" data-step="1" data-i18n-title="titleRotateSel" title="Rotation relative to selection state (degrees)"><span style="font-size:9px;color:var(--text-dim)">°</span></div>
+            <div class="pr sp-xform-row"><span class="pl" data-i18n="fieldSize">Size</span><input type="number" class="pi scrub" id="sp-w" value="0" min="1" data-step="1" data-i18n-title="fieldWidth" title="Width"><input type="number" class="pi scrub" id="sp-h" value="0" min="1" data-step="1" data-i18n-title="fieldHeight" title="Height"><button class="dims-lock-btn" id="btn-sp-size-lock" type="button" data-i18n-title="dimsLockTitle" title="Lier largeur/hauteur (garder les proportions)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></button></div>
+            <div class="pr sp-xform-row"><span class="pl" data-i18n="fieldRotate">Rotate</span><input type="number" class="pi scrub" id="sp-rot" value="0" data-step="1" data-i18n-title="titleRotateSel" title="Rotation relative to selection state (degrees)"><span style="font-size:9px;color:var(--text-dim)">°</span></div>
           </div>
           <!-- Anchor point (pivot) picker — redesign 2026-07-09, AE-style
                9-dot widget. Sets state.xformAnchorKey (tools.js), read by
@@ -398,11 +403,81 @@
         </div>
       </div>
     </div>
+    <div class="psec" id="mask-sec" style="display:none">
+      <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrMask">Masque</span></div>
+      <div class="pbdy">
+        <div class="pr"><span class="pl" data-i18n="fieldMaskMode">Mode</span><select class="pi" id="p-mask-mode" data-i18n-title="maskModeTypeTitle" title="Add = union avec les autres masques du calque · Subtract = découpe un trou · Intersect = ne garde que le chevauchement"><option value="add" data-i18n="maskAdd">Add</option><option value="subtract" data-i18n="maskSubtract">Subtract</option><option value="intersect" data-i18n="maskIntersect">Intersect</option></select></div>
+        <div class="pr"><span class="pl" data-i18n="fieldMaskFeather">Feather</span><input type="number" class="pi scrub" id="p-mask-feather" value="0" min="0" max="500" data-step="1" data-i18n-title="maskFeatherTitle" title="Adoucit le bord du masque combiné (partagé entre les masques de ce calque — voir l'audit) — comme le Mask Feather d'After Effects"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
+        <div class="pr"><button class="pbtn" id="btn-mask-unset" style="flex:1;font-size:10px" data-i18n-title="unmaskTitle" title="Redevient une forme normale (n'est plus un masque)" data-i18n="btnUnmask">Retirer comme masque</button></div>
+      </div>
+    </div>
     <div class="psec" id="text-actions-sec" style="display:none">
       <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrText">Texte</span></div>
       <div class="pbdy">
-        <div class="pr" style="font-size:10px;color:var(--text-dim)" data-i18n="textSplitDesc">Éclate ce texte en un caractère par élément — chacun devient animable individuellement (Motion, expressions).</div>
+        <div class="pr" style="font-size:10px;color:var(--text-dim)" id="text-split-desc" data-i18n="textSplitDesc">Éclate ce texte en un caractère par élément — chacun devient animable individuellement (Motion, expressions).</div>
         <div class="pr"><button class="pbtn ac" id="btn-text-split-chars" style="flex:1" data-i18n="textSplitBtn">Découper par caractère</button></div>
+        <!-- Text Animator (2026-08-17, text-animator.js) — shown once the
+             block has per-unit elements to animate: a vector text block
+             (always) or a raster block already split into characters. -->
+        <div class="pr" id="text-animate-row" style="display:none"><button class="pbtn ac" id="btn-text-animate" style="flex:1" data-i18n="textAnimateBtn">Animer le texte…</button></div>
+      </div>
+    </div>
+    <!-- Typography panel (2026-08-16) — live re-editable properties for a
+         selected VECTOR text root (raster text keeps the popover-only flow;
+         see updateTextPropsPanel's own comment, timeline.js, for why). Every
+         field commits through the SAME rebuild path buildVectorTextGroup
+         already used for the popover's re-edit (removes the old glyph
+         group, rebuilds fresh) — this panel is a second, persistent DOOR
+         onto that one mechanism, not a parallel one. -->
+    <div class="psec" id="text-props-sec" style="display:none">
+      <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrTypography">Typographie</span></div>
+      <div class="pbdy">
+        <div class="pr"><textarea id="tp-content" rows="2" style="width:100%;resize:vertical;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:12px;padding:5px;box-sizing:border-box" data-i18n-title="tpContentTitle" title="Contenu du texte"></textarea></div>
+        <div class="pr" style="gap:6px">
+          <select id="tp-font" class="psel" style="flex:1" data-i18n-title="tpFontTitle" title="Police">
+            <option value="Roboto">Roboto</option>
+          </select>
+          <input type="number" id="tp-size" value="48" min="4" max="800" style="width:56px" class="pi scrub" data-step="1" data-i18n-title="textSizeTitle" title="Taille (px)">
+          <input type="color" id="tp-color" value="#000000" style="width:26px;height:24px;padding:0;border:1px solid var(--border);border-radius:5px;background:none" data-i18n-title="colorTitle" title="Couleur">
+        </div>
+        <div class="pr" style="gap:4px" data-i18n-title="alignTitle" title="Alignement">
+          <button class="pbtn tp-align-btn" data-val="left" style="flex:1" data-i18n="alignLeftOpt">Gauche</button>
+          <button class="pbtn tp-align-btn" data-val="center" style="flex:1" data-i18n="alignCenterOpt">Centre</button>
+          <button class="pbtn tp-align-btn" data-val="right" style="flex:1" data-i18n="alignRightOpt">Droite</button>
+        </div>
+        <div class="pr" style="gap:4px" data-i18n-title="tpStyleTitle" title="Style (chaque bouton se togglee indépendamment)">
+          <button class="pbtn tp-style-btn" data-flag="bold" style="flex:1;font-weight:700">B</button>
+          <button class="pbtn tp-style-btn" data-flag="italic" style="flex:1;font-style:italic">I</button>
+          <button class="pbtn tp-style-btn" data-flag="underline" style="flex:1;text-decoration:underline">U</button>
+          <button class="pbtn tp-style-btn" data-flag="strike" style="flex:1;text-decoration:line-through">S</button>
+        </div>
+        <div class="pr" style="gap:4px" data-i18n-title="tpCaseTitle" title="Casse du texte">
+          <button class="pbtn tp-case-btn" data-val="none" style="flex:1" data-i18n="tpCaseNone">Aa</button>
+          <button class="pbtn tp-case-btn" data-val="upper" style="flex:1" data-i18n="tpCaseUpper">AA</button>
+          <button class="pbtn tp-case-btn" data-val="lower" style="flex:1" data-i18n="tpCaseLower">aa</button>
+          <button class="pbtn tp-case-btn" data-val="capitalize" style="flex:1" data-i18n="tpCaseCap">Ab</button>
+        </div>
+        <div class="pr" style="gap:10px">
+          <label style="flex:1;display:flex;flex-direction:column;gap:2px">
+            <span style="font-size:10px;color:var(--text-dim)" data-i18n="tpLetterSpacing">Espacement lettres</span>
+            <input type="number" id="tp-letter-spacing" value="0" step="0.5" style="width:100%" class="pi scrub" data-step="0.5">
+          </label>
+          <label style="flex:1;display:flex;flex-direction:column;gap:2px">
+            <span style="font-size:10px;color:var(--text-dim)" data-i18n="tpLineHeight">Hauteur de ligne</span>
+            <input type="number" id="tp-line-height" value="1.25" step="0.05" min="0.5" max="4" style="width:100%" class="pi scrub" data-step="0.05">
+          </label>
+        </div>
+        <div class="pr">
+          <label style="flex:1;display:flex;flex-direction:column;gap:2px">
+            <span style="font-size:10px;color:var(--text-dim)" data-i18n="tpWordSpacing">Espacement mots</span>
+            <input type="number" id="tp-word-spacing" value="0" step="0.5" style="width:100%" class="pi scrub" data-step="0.5">
+          </label>
+        </div>
+        <div class="pr" style="gap:4px">
+          <button class="pbtn tp-width-btn ac" data-val="auto" style="flex:1" data-i18n="tpWidthAuto">Largeur auto</button>
+          <button class="pbtn tp-width-btn" data-val="fixed" style="flex:1" data-i18n="tpWidthFixed">Largeur fixe</button>
+          <input type="number" id="tp-fixed-width" value="300" min="10" style="width:64px;display:none" class="pi scrub" data-step="1">
+        </div>
       </div>
     </div>
     <!-- Effects stack (2026-07 rewrite, feedback: "organisé les effets dans
@@ -485,24 +560,40 @@
              s'affiche plus que dans le contexte du panneau Layer,
              c'est-à-dire quand un calque est sélectionné, via la même
              condition que Blend/Matte/Flou ci-dessus. -->
-        <div class="pr" style="gap:4px;margin-top:6px">
-          <button class="pbtn" id="btn-ref-import" data-i18n-title="refImportTitle" title="Importer une vidéo, une séquence d'images (sélection multiple) ou une image seule comme référence de rotoscopie" data-i18n="refImportBtn">Référence…</button>
-          <button class="pbtn" id="btn-ref-remove" disabled data-i18n="btnRemove">Retirer</button>
-          <input type="file" id="ref-file-input" accept="video/*,image/*" multiple style="display:none">
-        </div>
-        <div class="pr" style="font-size:9px;color:var(--text-dim)" id="p-ref-name" data-i18n="refNoneLabel">Aucune référence</div>
-        <div class="pr"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="p-ref-on"> <span data-i18n="fieldVisible">Visible</span></label></div>
-        <!-- Scrub field, not a native range slider (feedback 2026-07: "tout
-             ce qui est slider doit être changer en valeur à slider comme
-             les autres propriétés du genre") — matches every other opacity/
-             numeric field in this panel (.pi.scrub, drag-to-change or
-             click-to-type, wired generically in ui.js — no per-field JS
-             needed, reference-bridge.js's existing 'input' listener on
-             #p-ref-opacity already reads .value the same way either type
-             produces it). -->
-        <div class="pr dims-row">
-          <span class="pl" data-i18n="fieldOpacity">Opacity</span><input type="number" class="pi scrub" id="p-ref-opacity" min="5" max="100" value="50" data-step="1">
-          <span class="pl" data-i18n="fieldOffset">Offset</span><input type="number" class="pi scrub" id="p-ref-offset" value="0" data-step="1" data-i18n-title="refOffsetTitle" title="Frame de la timeline où la référence démarre">
+        <!-- Un SEUL contrôle visible (feedback 2026-07-27 : "j'aimerais que
+             ça soit seulement un bouton qui apparait et qui ouvre le menu
+             d'option pour celui ci") — cinq contrôles permanents pour une
+             fonction utilisée ponctuellement mangeaient autant de hauteur de
+             panneau que Blend + Matte réunis. La ligne adopte la forme
+             label + .psel des voisines (Blend/Matte) et affiche l'état
+             courant, pour qu'on sache s'il y a une référence chargée SANS
+             ouvrir le menu.
+             Les contrôles ne sont pas reconstruits dans le popover : ce sont
+             les MÊMES noeuds, simplement déplacés dans #ref-pop, donc toute
+             la logique de reference-bridge.js (getElementById + listeners
+             posés une fois à l'init, syncUI qui repeint même popover fermé)
+             continue de marcher sans duplication. -->
+        <div class="pr"><span class="pl" data-i18n="fieldReference">Référence</span><div class="psel" id="p-ref-menu" role="button" tabindex="0" style="cursor:pointer;user-select:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" data-i18n-title="refMenuTitle" title="Vidéo, séquence d'images ou image fixe affichée sous le dessin pour la rotoscopie" data-i18n="refNoneShort">Aucune</div></div>
+        <input type="file" id="ref-file-input" accept="video/*,image/*" multiple style="display:none">
+        <div id="ref-pop" style="display:none">
+          <div class="pr" style="gap:4px">
+            <button class="pbtn" id="btn-ref-import" style="flex:1" data-i18n-title="refImportTitle" title="Importer une vidéo, une séquence d'images (sélection multiple) ou une image seule comme référence de rotoscopie" data-i18n="refImportBtn">Référence…</button>
+            <button class="pbtn" id="btn-ref-remove" disabled data-i18n="btnRemove">Retirer</button>
+          </div>
+          <div class="pr" style="font-size:9px;color:var(--text-dim)" id="p-ref-name" data-i18n="refNoneLabel">Aucune référence</div>
+          <div class="pr"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="p-ref-on"> <span data-i18n="fieldVisible">Visible</span></label></div>
+          <!-- Scrub field, not a native range slider (feedback 2026-07: "tout
+               ce qui est slider doit être changer en valeur à slider comme
+               les autres propriétés du genre") — matches every other opacity/
+               numeric field in this panel (.pi.scrub, drag-to-change or
+               click-to-type, wired generically in ui.js — no per-field JS
+               needed, reference-bridge.js's existing 'input' listener on
+               #p-ref-opacity already reads .value the same way either type
+               produces it). -->
+          <div class="pr dims-row pair-grid">
+            <span class="pl" data-i18n="fieldOpacity">Opacity</span><input type="number" class="pi scrub" id="p-ref-opacity" min="5" max="100" value="50" data-step="1">
+            <span class="pl" data-i18n="fieldOffset">Offset</span><input type="number" class="pi scrub" id="p-ref-offset" value="0" data-step="1" data-i18n-title="refOffsetTitle" title="Frame de la timeline où la référence démarre">
+          </div>
         </div>
       </div>
     </div>
@@ -519,9 +610,9 @@
              glyph (was two abstract interlocking arcs, reported as "pas
              très clair") — the same link/unlink icon shape used
              everywhere for this exact concept. -->
-        <div class="pr dims-row">
-          <span class="pl" style="min-width:14px" data-i18n="fieldW">W</span><input type="number" class="pi scrub" id="p-cw" value="1920" min="1" max="7680" data-step="1">
-          <span class="pl" style="min-width:14px" data-i18n="fieldH">H</span><input type="number" class="pi scrub" id="p-ch" value="1080" min="1" max="4320" data-step="1">
+        <div class="pr dims-row pair-grid">
+          <span class="pl" data-i18n="fieldW">W</span><input type="number" class="pi scrub" id="p-cw" value="1920" min="1" max="7680" data-step="1">
+          <span class="pl" data-i18n="fieldH">H</span><input type="number" class="pi scrub" id="p-ch" value="1080" min="1" max="4320" data-step="1">
           <button class="dims-lock-btn" id="btn-dims-lock" type="button" data-i18n-title="dimsLockTitle" title="Lier largeur/hauteur (garder les proportions)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></button>
         </div>
         <!-- FPS + Frames paired on one row (2026-07, "dans les différents
@@ -529,7 +620,7 @@
              sur la même ligne") — same dims-row treatment as W/H just
              above (gap + non-growing labels), reused as-is since its CSS
              is generic, not actually dimensions-specific. -->
-        <div class="pr dims-row">
+        <div class="pr dims-row pair-grid">
           <span class="pl">FPS</span><input type="number" class="pi scrub" id="proj-fps" value="12" min="1" max="60" data-step="1">
           <span class="pl">Frames</span><input type="number" class="pi scrub" id="proj-frames" value="24" min="1" max="999" data-step="1">
         </div>
@@ -542,7 +633,6 @@
              label to its natural width; the icon row gets an identical
              (hidden) "BG" label as a spacer so its buttons start at the
              EXACT same x as the swatch above, not a guessed margin. -->
-        <div class="pr dims-row"><span class="pl">BG</span><input type="color" id="p-cbg" value="#ffffff" style="width:28px;height:22px;border:none;cursor:pointer;padding:0;"></div>
         <!-- Icon buttons instead of text (feedback 2026-07: "les boutons
              avec un texte est-ce qu'ils peuvent avoir un bouton icon
              plutôt que texte") — tooltip (title) carries the label, same
@@ -556,13 +646,60 @@
              icon-only + tooltip-carries-the-label convention as Fit/Reset
              View just above, .active toggled on click like every other
              toggle button in this app (btn-ghost-all, btn-loop, etc.). -->
+        <!-- BG swatch and the view/overlay buttons share ONE row (feedback
+             2026-07-26: "les boutons tout en bas doivent être aligné à BG en
+             horizontal avec un séparateur entre bg et icons"). An earlier
+             round had only aligned their LEFT EDGES by giving the icon row a
+             hidden "BG" label as a spacer — the two were still stacked on
+             separate lines, which is what the feedback is actually about.
+             The hidden-label spacer is gone: the real label now sits on the
+             same row, and .pr-vsep marks where the colour control ends and
+             the view/overlay toggles begin. -->
         <div class="pr dims-row" style="gap:4px">
-          <span class="pl" style="visibility:hidden" aria-hidden="true">BG</span>
+          <span class="pl">BG</span><input type="color" id="p-cbg" value="#ffffff" style="width:28px;height:22px;border:none;cursor:pointer;padding:0;">
+          <span class="pr-vsep" aria-hidden="true"></span>
           <button class="pbtn icon-only-btn" id="btn-fit" data-i18n-title="btnFitTitle" title="Fit — fit the canvas to the viewport"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M3 16v3a2 2 0 0 0 2 2h3"/></svg></button>
           <button class="pbtn icon-only-btn" id="btn-resetv" data-i18n-title="btnResetViewTitle" title="Reset View — restore zoom/pan/rotation to default"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 1 3 6.7"/><path d="M3 21v-5h5"/></svg></button>
           <button class="pbtn icon-only-btn" id="btn-clip" data-i18n-title="clipCanvasTitle" title="Clip to canvas — hide artwork outside the canvas bounds (off by default, so you can see and work with content that spills over the edge)"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/></svg></button>
           <button class="pbtn icon-only-btn" id="btn-safety" data-i18n-title="safetyZonesTitle" title="Safety zones — broadcast-safe overlay guides (90% action-safe / 80% title-safe margins, standard TV/film safe areas)"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="1"/><rect x="7" y="8" width="10" height="8" rx="1"/></svg></button>
         </div>
+      </div>
+    </div>
+    <!-- Combine-group panel (2026-07-29 UX fix, "l'interface sur les shape
+         group c'est encore obscur à voir comment l'utiliser") — the ONLY
+         entry points before this were an Alt+click convention on the 4
+         boolean toolbar buttons and a context-menu item, both easy to never
+         discover on your own. Mirrors the Rig/Duplicator panel's own
+         convention (a dedicated, self-explanatory psec instead of a hidden
+         modifier-click) — shown for ANY 1+ selection (updatePropsContext,
+         timeline.js) so "Combiner" is visible the moment you select 2+
+         shapes, and "Sortir du groupe"/"Aplatir" appear once that selection
+         already IS a combine-group (updateCombinePanel, timeline.js). -->
+    <div class="psec" id="combine-opts-sec" style="display:none">
+      <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrCombine">Forme combinée</span></div>
+      <div class="pbdy">
+        <!-- Icons, not a dropdown+separate button (2026-07-29 UX fix, Cyril:
+             "ça pourrait être des boutons et c'est quand même confusant avec
+             les anciens boutons plus haut, faudrait clarifier mieux tout
+             ça") — reuses the EXACT same 4 SVGs as the toolbar's own
+             #btn-bool-* buttons above (union/subtract/intersect/exclude) so
+             the two surfaces read as "the same 4 operations, two doors" at a
+             glance instead of two visually unrelated UIs for the same
+             concept. One click = combine (if not yet) or change mode (if
+             already) — collapses the old two-step (pick mode in a select,
+             THEN press a separate Combiner button) into the one action that
+             actually matters.-->
+        <div class="pr" style="gap:4px">
+          <button class="pbtn combine-mode-btn ac" id="btn-combine-unite" data-mode="unite" data-i18n-title="boolUnion" title="Union — merge shapes into one"><svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M3,12 A6,6 0 1,0 15,12 A6,6 0 1,0 3,12 Z M9,12 A6,6 0 1,0 21,12 A6,6 0 1,0 9,12 Z"/></svg></button>
+          <button class="pbtn combine-mode-btn" id="btn-combine-subtract" data-mode="subtract" data-i18n-title="boolSubtract" title="Subtract — cut later shapes out of the first"><svg viewBox="0 0 24 24" width="15" height="15"><defs><mask id="ic-combine-sub-mask"><circle cx="9" cy="12" r="6" fill="#fff"/><circle cx="15" cy="12" r="6" fill="#000"/></mask></defs><circle cx="9" cy="12" r="6" fill="currentColor" mask="url(#ic-combine-sub-mask)"/><circle cx="15" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="1.3" opacity="0.45"/></svg></button>
+          <button class="pbtn combine-mode-btn" id="btn-combine-intersect" data-mode="intersect" data-i18n-title="boolIntersect" title="Intersect — keep only the overlapping area"><svg viewBox="0 0 24 24" width="15" height="15"><defs><clipPath id="ic-combine-int-clip"><circle cx="15" cy="12" r="6"/></clipPath></defs><circle cx="9" cy="12" r="6" fill="currentColor" clip-path="url(#ic-combine-int-clip)"/><circle cx="9" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.4"/><circle cx="15" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.4"/></svg></button>
+          <button class="pbtn combine-mode-btn" id="btn-combine-exclude" data-mode="exclude" data-i18n-title="boolExclude" title="Exclude — keep everything except the overlap"><svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path fill-rule="evenodd" d="M3,12 A6,6 0 1,0 15,12 A6,6 0 1,0 3,12 Z M9,12 A6,6 0 1,0 21,12 A6,6 0 1,0 9,12 Z"/></svg></button>
+        </div>
+        <div class="pr" id="combine-existing-row" style="gap:6px;display:none">
+          <button class="pbtn" id="btn-combine-remove" style="flex:1" data-i18n-title="combineRemoveTitle" title="Sort la forme sélectionnée du groupe combiné, sans y toucher" data-i18n="combineRemoveBtn">Sortir du groupe</button>
+          <button class="pbtn" id="btn-combine-flatten" style="flex:1" data-i18n-title="combineFlattenTitle" title="Fusionne définitivement en une seule forme — DESTRUCTIF, contrairement à Combiner" data-i18n="combineFlattenBtn">Aplatir</button>
+        </div>
+        <div class="pr" style="font-size:9px;color:var(--text-dim)" data-i18n="combineHint">Astuce : Alt+clic sur un des 4 boutons booléens de la barre d'outils combine aussi, directement.</div>
       </div>
     </div>
     <div class="psec" id="fill-sec">
@@ -597,6 +734,17 @@
           <button class="pbtn fill-grad-btn" id="p-fill-grad-btn" title="Dégradé de fill — sélectionne une seule forme avec l'outil Sélection"><span class="fill-grad-ramp"></span></button>
           <div class="lico color-eye-toggle" id="fill-enable-toggle" data-i18n-title="fillEnableTitle" title="Enable/disable fill"></div>
         </div>
+        <!-- Gradient editor belongs to Fill, not to a second section named
+             Effects. It stays collapsed until the fill-gradient button is
+             used, while retaining the existing control IDs so the canvas
+             gizmo and persistence code continue to share one implementation. -->
+        <div id="p-fill-gradient-editor" class="fill-gradient-editor" style="display:none">
+          <div class="pr"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer" data-i18n-title="gradFillTitle" title="Applique un dégradé au fill de la sélection actuelle (une seule forme à la fois, outil Sélection)"><input type="checkbox" id="p-grad-on" style="accent-color:var(--accent)"> <span data-i18n="gradFillLabel">Dégradé de fill</span></label></div>
+          <div class="pr" id="p-grad-kind-row" style="display:none"><span class="pl" data-i18n="fieldType">Type</span><select class="psel" id="p-grad-kind"><option value="linear" selected data-i18n="gradLinear">Linéaire</option><option value="radial" data-i18n="gradRadial">Radial</option></select></div>
+          <div id="p-grad-stops-list" style="display:none"></div>
+          <div class="pr" id="p-grad-addstop-row" style="display:none;gap:4px"><button class="pbtn" id="btn-grad-add-stop" style="flex:1" data-i18n="btnAddStop">+ Stop</button></div>
+          <div class="pr" id="p-grad-hint-row" style="display:none;font-size:9px;color:var(--text-dim)" data-i18n="gradHint">Glissez le carré/rond sur le canevas pour repositionner le dégradé, glissez un losange pour déplacer un stop.</div>
+        </div>
         <!-- "Propager la couleur…" button removed (feedback 2026-07: "pas
              besoin du bouton propagate color, on verra ça d'un moteur
              séparé") — a dedicated cross-frame color-propagation engine is
@@ -619,6 +767,17 @@
           <input type="number" class="pi scrub color-opacity-input" id="p-stroke-alpha" value="100" min="0" max="100" data-step="1" data-i18n-title="strokeAlphaTitle" title="Opacité du trait (alpha de la couleur)">
           <span class="color-pct">%</span>
           <div class="lico color-eye-toggle" id="stroke-enable-toggle" data-i18n-title="strokeEnableTitle" title="Enable/disable stroke"></div>
+        </div>
+        <!-- Stroke gradient along path (2026-08, "gradient qui tire du
+             début à la fin du trait") — distinct from Fill's spatial
+             linear/radial gradient: this one follows the STROKE's own
+             length, so it always looks right regardless of the shape's
+             position/rotation. v1: exactly 2 stops (from/to), applies to
+             the current canvas selection. -->
+        <div class="pr" id="p-strokegrad-row" data-i18n-title="strokeGradAlongTitle" title="Le trait tire de la couleur 'De' à la couleur 'À' le long de son propre tracé — pas entre 2 points fixes dans l'espace, comme le dégradé du Fill">
+          <label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="p-strokegrad-along" style="accent-color:var(--accent)"> <span data-i18n="strokeGradAlongLabel">Gradient along path</span></label>
+          <div class="cw-mini" id="p-strokegrad-from" style="background:#ff0000;margin-left:auto"><input type="color" id="p-strokegrad-from-c" value="#ff0000"></div>
+          <div class="cw-mini" id="p-strokegrad-to" style="background:#0000ff"><input type="color" id="p-strokegrad-to-c" value="#0000ff"></div>
         </div>
         <!-- Width+Style paired on one row (feedback: "des tailles ou
              position sur une seule ligne") — Cap/Join stay on their own
@@ -747,29 +906,11 @@
         <div class="pr" data-i18n-title="pLiveTitle" title="Live stylus pressure — draw on the canvas to test your tablet"><span class="pl" data-i18n="fieldPLive">P. live</span><div style="flex:1;height:6px;background:var(--bg);border-radius:3px;overflow:hidden"><div id="p-live-fill" style="height:100%;width:0;background:var(--accent);transition:width .05s"></div></div></div>
         <div class="pr" id="p-taper-row"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="p-taper" style="accent-color:var(--accent)"> <span data-i18n="taperEndsLabel">Taper ends (Draw/Pen)</span></label></div>
         <div class="pr" id="p-shadowmode-row" data-i18n-title="shadowModeTitle" title="Tags what you draw as Shadow — draw fills first, then rough shadow-boundary lines over them like a Japanese anime layout; separating Stroke/Fill/Shadow later routes anything drawn with this on into its own Shadow layer instead of Stroke/Fill"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="p-shadowmode" style="accent-color:var(--accent)"> <span data-i18n="shadowModeLabel">Shadow (Draw/Pen/Shape)</span></label></div>
+        <div class="pr" id="p-maskmode-row" data-i18n-title="maskModeTitle" title="Ce que tu dessines devient un MASQUE (clip) pour le calque actif au lieu d'un vrai dessin — comme dessiner un masque sur un calque dans After Effects. Combine/feather réglables dans le panneau Propriétés une fois le masque sélectionné."><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="p-maskmode" style="accent-color:var(--accent)"> <span data-i18n="maskModeLabel">Masque (Draw/Pen/Shape)</span></label><select class="pi" id="p-maskmode-type" style="flex:0 0 auto;width:76px;font-size:9px" data-i18n-title="maskModeTypeTitle" title="Add = union avec les autres masques du calque · Subtract = découpe un trou · Intersect = ne garde que le chevauchement"><option value="add" data-i18n="maskAdd">Add</option><option value="subtract" data-i18n="maskSubtract">Subtract</option><option value="intersect" data-i18n="maskIntersect">Intersect</option></select></div>
         <div class="pr" data-i18n-title="eraserSizeTitle" title="Eraser cuts the path precisely at this width instead of deleting the whole stroke"><span class="pl" data-i18n="fieldEraser">Eraser</span><input type="number" class="pi scrub" id="p-erasersize" value="14" min="4" max="120" data-step="1"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
       </div>
     </div>
-    <div class="psec" id="effects-sec">
-      <div class="phdr" id="phdr-effects"><span class="ar">☰</span> <span data-i18n="hdrEffects">Effects</span></div>
-      <div class="pbdy">
-        <!-- Gradient fill (2026-07, Illustrator/Rive-style) — applies to
-             the SINGLE currently selected shape's fill (Select tool). The
-             from/to endpoints AND each stop's position along the line are
-             edited by dragging the on-canvas gizmo directly (gradient-
-             bridge.js's own pointerdown/move/up, same pattern as
-             perspective-bridge.js/symmetry-bridge.js's guide dragging) —
-             this panel only edits STOP COLORS/count and Linear vs Radial,
-             deliberately no angle/position number fields now that dragging
-             covers that directly. -->
-        <div class="pr"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer" data-i18n-title="gradFillTitle" title="Applique un dégradé au fill de la sélection actuelle (une seule forme à la fois, outil Sélection)"><input type="checkbox" id="p-grad-on" style="accent-color:var(--accent)"> <span data-i18n="gradFillLabel">Dégradé de fill</span></label></div>
-        <div class="pr" id="p-grad-kind-row" style="display:none"><span class="pl" data-i18n="fieldType">Type</span><select class="psel" id="p-grad-kind"><option value="linear" selected data-i18n="gradLinear">Linéaire</option><option value="radial" data-i18n="gradRadial">Radial</option></select></div>
-        <div id="p-grad-stops-list" style="display:none"></div>
-        <div class="pr" id="p-grad-addstop-row" style="display:none;gap:4px"><button class="pbtn" id="btn-grad-add-stop" style="flex:1" data-i18n="btnAddStop">+ Stop</button></div>
-        <div class="pr" id="p-grad-hint-row" style="display:none;font-size:9px;color:var(--text-dim)" data-i18n="gradHint">Glissez le carré/rond sur le canevas pour repositionner le dégradé, glissez un losange pour déplacer un stop.</div>
-      </div>
-    </div>
-    <div class="psec">
+    <div class="psec" id="swatches-sec"><!-- id required: panel-order persistence keys on it (ui.js secKey) -->
       <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrSwatches">Nuancier</span></div>
       <div class="pbdy">
         <div id="palette-tabs" class="palette-tabs"></div>
@@ -819,6 +960,12 @@
           <button class="pbtn" id="btn-media-import-video" style="flex:1" data-i18n="mediaImportVideo">Vidéo…</button>
         </div>
         <div id="media-drop" class="media-drop" data-i18n="mediaDropHint">Glisser des images/vidéos ici, ou cliquer Importer…</div>
+        <div class="pr media-panel-hdr" style="gap:4px">
+          <button class="pbtn" id="btn-media-cleanup" style="flex:1;display:none;font-size:9px">Nettoyer (0)</button>
+          <div class="media-expand-toggle" id="media-expand-toggle" title="Agrandir / réduire la liste">
+            <svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+        </div>
         <div id="media-grid" class="media-grid"></div>
       </div>
     </div>
@@ -837,7 +984,7 @@
     <div class="psec" id="easing-sec">
       <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrEasingCurve">Easing Curve</span></div>
       <div class="pbdy" style="align-items:center">
-        <div id="curve-canvas-wrap" data-i18n-title="curveCanvasTitle" title="Clic+glisser un point pour le déplacer. Double-clic sur une zone vide pour ajouter un point. Suppr/Retour arrière (survol du curseur) pour retirer le point sélectionné (les 2 extrémités ne peuvent pas être retirées).">
+        <div id="curve-canvas-wrap" data-i18n-title="curveCanvasTitle" title="Clic+glisser un point pour le déplacer. Alt+clic sur un point pour afficher/masquer ses tangentes. Double-clic sur une zone vide pour ajouter un point. Suppr/Retour arrière (survol du curseur) pour retirer le point sélectionné (les 2 extrémités ne peuvent pas être retirées).">
           <canvas id="curve-canvas" width="400" height="400"></canvas>
           <div id="curve-resize-handle" data-i18n-title="dragToResize" title="Glisser pour redimensionner"></div>
         </div>
@@ -851,6 +998,24 @@
          right-click popover on the timeline's own onion button (#btn-os) —
          see #onion-pop below and initOnionPopover() in timeline.js
          (feedback #23). Same control ids, same wiring. -->
+    <!-- Footage (image / séquence / vidéo) — 2026-07-27. A video had a layer
+         type and a gizmo; a still or a sequence had neither, so there was
+         nowhere to see WHAT a footage layer points at, let alone swap it.
+         Read-only facts plus the one action that was missing (replace the
+         source in place, keeping the layer, its transform and its keys). -->
+    <div class="psec" id="footage-sec" style="display:none">
+      <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrFootage">Footage</span></div>
+      <div class="pbdy">
+        <div class="pr"><span class="pl" data-i18n="fieldKind">Type</span><div class="psel" id="footage-kind" style="pointer-events:none;background-image:none">—</div></div>
+        <div class="pr"><span class="pl" data-i18n="fieldSource">Source</span><div class="psel" id="footage-name" style="pointer-events:none;background-image:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">—</div></div>
+        <div class="pr dims-row pair-grid">
+          <span class="pl" data-i18n="fieldW">W</span><input type="number" class="pi" id="footage-w" value="0" disabled>
+          <span class="pl" data-i18n="fieldH">H</span><input type="number" class="pi" id="footage-h" value="0" disabled>
+        </div>
+        <div class="pr" id="footage-count-row"><span class="pl" data-i18n="fieldFrames">Frames</span><div class="psel" id="footage-count" style="pointer-events:none;background-image:none">0</div></div>
+        <div class="pr"><button class="pbtn" id="btn-footage-replace" style="flex:1" data-i18n="footageReplace">Remplacer la source…</button></div>
+      </div>
+    </div>
     <div class="psec" id="comp-instance-sec" style="display:none">
       <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrComponentInstance">Component Instance</span></div>
       <div class="pbdy">
@@ -866,6 +1031,127 @@
         </div>
         <div class="pr"><button class="pbtn ac" id="btn-comp-enter" style="flex:1" data-i18n="btnEditComponent">Éditer le composant…</button></div>
         <div class="pr"><button class="pbtn" id="btn-comp-detach" style="flex:1" data-i18n-title="compDetachTitle" title="Bake the component's animation back into a normal layer" data-i18n="compDetachBtn">Décomposer en calque</button></div>
+      </div>
+    </div>
+    <!-- Mograph duplicator (2026-07-29) — static/structural config for
+         ld.duplicator (mode, counts, seed). The ANIMATABLE per-copy deltas
+         (dupOffsetPos/Rot/Scale/Opacity) live as Motion properties, not
+         here. Same .psec shape as #comp-instance-sec above; shown/hidden by
+         updateDuplicatorPanel() (timeline.js). -->
+    <div class="psec" id="duplicator-sec" style="display:none">
+      <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrDuplicator">Duplicator</span></div>
+      <div class="pbdy">
+        <div class="pr"><span class="pl" data-i18n="fieldDupMode">Mode</span>
+          <select class="psel" id="dup-mode">
+            <option value="grid" data-i18n="dupModeGrid">Grille</option>
+            <option value="radial" data-i18n="dupModeRadial">Radial</option>
+            <option value="path" data-i18n="dupModePath">Chemin</option>
+          </select>
+        </div>
+        <div class="pr dims-row" id="dup-grid-row">
+          <span class="pl" data-i18n="fieldDupRows">Lignes</span><input type="number" class="pi scrub" id="dup-rows" value="2" min="1" max="30" data-step="1">
+          <span class="pl" data-i18n="fieldDupCols">Col.</span><input type="number" class="pi scrub" id="dup-cols" value="3" min="1" max="30" data-step="1">
+        </div>
+        <div class="pr dims-row" id="dup-grid-spacing-row">
+          <span class="pl">X</span><input type="number" class="pi scrub" id="dup-spacingx" value="150" data-step="1" data-i18n-title="dupSpacingTitle" title="Espacement entre copies (px)">
+          <span class="pl">Y</span><input type="number" class="pi scrub" id="dup-spacingy" value="150" data-step="1">
+        </div>
+        <div class="pr" id="dup-count-row"><span class="pl" data-i18n="fieldDupCount">Copies</span><input type="number" class="pi scrub" id="dup-count" value="8" min="1" max="500" data-step="1"></div>
+        <div class="pr dims-row" id="dup-radial-row">
+          <span class="pl" data-i18n="fieldDupRadius">Rayon</span><input type="number" class="pi scrub" id="dup-radius" value="200" data-step="1">
+          <span class="pl">°</span><input type="number" class="pi scrub" id="dup-startangle" value="0" data-step="1" data-i18n-title="dupStartAngleTitle" title="Angle de départ (degrés)">
+        </div>
+        <div class="pr" id="dup-radial-orient-row"><label style="display:flex;gap:5px;align-items:center;font-size:10px;cursor:pointer"><input type="checkbox" id="dup-radial-orient"> <span data-i18n="dupOrientRadial">Orienter selon l'angle</span></label></div>
+        <div class="pr" id="dup-path-row"><span class="pl" data-i18n="fieldDupPathLayer">Calque chemin</span><select class="psel" id="dup-path-layer"></select></div>
+        <div class="pr" id="dup-path-align-row"><label style="display:flex;gap:5px;align-items:center;font-size:10px;cursor:pointer"><input type="checkbox" id="dup-path-align" checked> <span data-i18n="dupAlignTangent">Aligner à la tangente</span></label></div>
+        <div class="pr dims-row"><span class="pl" data-i18n="fieldDupSeed">Seed</span><input type="number" class="pi scrub" id="dup-seed" value="0" data-step="1"><button class="pbtn" id="btn-dup-reseed" data-i18n-title="dupReseedTitle" title="Nouveau seed aléatoire">⟳</button></div>
+        <div class="pr" style="flex-wrap:wrap;gap:6px;font-size:10px">
+          <span class="pl" style="flex-basis:100%" data-i18n="dupRandomHdr">Aléatoire (sinon séquentiel)</span>
+          <label style="display:flex;gap:4px;align-items:center;cursor:pointer"><input type="checkbox" id="dup-rand-pos"> <span data-i18n="dupRandPos">Pos</span></label>
+          <label style="display:flex;gap:4px;align-items:center;cursor:pointer"><input type="checkbox" id="dup-rand-rot"> <span data-i18n="dupRandRot">Rot</span></label>
+          <label style="display:flex;gap:4px;align-items:center;cursor:pointer"><input type="checkbox" id="dup-rand-scale"> <span data-i18n="dupRandScale">Échelle</span></label>
+          <label style="display:flex;gap:4px;align-items:center;cursor:pointer"><input type="checkbox" id="dup-rand-op"> <span data-i18n="dupRandOp">Opacité</span></label>
+        </div>
+        <!-- Temporal stagger (2026-07-29, LottieFiles Duplicator "Animation"
+             tab equivalent) — independent of the static Pattern stagger
+             above: each copy re-samples the SEED LAYER'S OWN frame content
+             (its drawn animation / tweens / Component timeline) at a
+             per-copy time offset instead of the current frame, wrapping
+             within the layer's own effective span. Math lives in
+             applyLayerDuplicator (app.js). -->
+        <div class="pr" style="border-top:1px solid var(--border);padding-top:8px;margin-top:2px">
+          <span class="pl" data-i18n="dupAnimHdr">Animation (décalage temporel)</span>
+          <label style="display:flex;gap:5px;align-items:center;font-size:10px;cursor:pointer;margin-left:auto"><input type="checkbox" id="dup-anim-enabled"> <span data-i18n="dupAnimEnabled">Actif</span></label>
+        </div>
+        <div class="pr dims-row" id="dup-anim-row">
+          <span class="pl" data-i18n="fieldDupAnimOffset">Décalage</span><input type="number" class="pi scrub" id="dup-anim-offset" value="1" data-step="1" data-i18n-title="dupAnimOffsetTitle" title="Frames de décalage entre chaque copie">
+          <select class="psel" id="dup-anim-direction">
+            <option value="forward" data-i18n="dupAnimForward">Forward</option>
+            <option value="backward" data-i18n="dupAnimBackward">Backward</option>
+            <option value="centerOut" data-i18n="dupAnimCenterOut">Center Out</option>
+            <option value="random" data-i18n="dupAnimRandom">Random</option>
+          </select>
+        </div>
+        <!-- Effectors (2026-07-29) — spatial falloff, stacked: independent
+             of copy index, an effector's influence depends on each copy's
+             DISTANCE from a draggable point (see the on-canvas handle,
+             motion.js buildOverlayItems). #dup-effectors-list is rebuilt
+             from ld.duplicator.effectors on every updateDuplicatorPanel
+             call (variable-length array, can't be static markup like the
+             fields above). -->
+        <div class="pr" style="border-top:1px solid var(--border);padding-top:8px;margin-top:2px">
+          <span class="pl" data-i18n="dupEffectorsHdr">Effectors</span>
+          <button class="pbtn" id="btn-dup-add-effector" style="margin-left:auto" data-i18n="dupAddEffector" data-i18n-title="dupAddEffectorTitle" title="Ajoute un point d'influence qui modifie les copies proches de lui (comme un Effector Cinema 4D / LottieFiles) — son repère se règle en le glissant sur le canvas, en mode Motion">+ Effector</button>
+        </div>
+        <div id="dup-effectors-list"></div>
+        <div class="pr"><button class="pbtn ac" id="btn-dup-edit-source" style="flex:1" data-i18n="dupEditSource">Modifier la forme source…</button></div>
+      </div>
+    </div>
+    <!-- Rig tool (2026-07) — "à la Shapper": bones are plain-JSON vector
+         paths (ld.rig.bones, rig-bridge.js) drawn Pen-tool-style, never
+         inserted into the real layer. Weight radius controls the falloff
+         used at bind time (rigBindStroke, app.js); Rotate mode toggles
+         tangent-aware rotation vs. pure-translate blend per new bind
+         (applyRigDeform). Only shown while the Rig tool is active
+         (updatePropsContext, timeline.js). -->
+    <div class="psec" id="rig-opts-sec" style="display:none">
+      <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrRig">Rig</span></div>
+      <div class="pbdy">
+        <!-- 3-step redesign (2026-07-29, Cyril's own spec — "il faut faire
+             plus simple: un bouton icon pour dessiner les bones, un bouton
+             d'assignation qui assigne automatiquement les éléments du layer
+             sélectionné aux bones comme dans Shapper par rapport à la
+             proximité, et après un autre bouton pour déplacer les bones. 3
+             étapes distinctes.") — replaces the earlier "Tracer/Sélection"
+             2-mode + manual bone-checklist attempt entirely: THREE separate,
+             single-purpose tools instead of one overloaded canvas gesture.
+             state.rigSubMode is 'draw'|'assign'|'move', read by
+             rig-bridge.js's onDown to pick which of the three a click means
+             — a click NEVER does two different things depending on hidden
+             state anymore. -->
+        <div class="pr" style="gap:4px">
+          <button class="pbtn combine-mode-btn ac" id="btn-rig-mode-draw" style="flex:1" data-i18n-title="rigModeDrawTitle" title="1. Dessiner de nouveaux os"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg></button>
+          <button class="pbtn combine-mode-btn" id="btn-rig-mode-assign" style="flex:1" data-i18n-title="rigModeAssignTitle" title="2. Assigner automatiquement les formes aux os (par proximité, façon Shapper)"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="17" r="3"/><circle cx="17" cy="7" r="3"/><path d="M9.5 14.5l5-5"/></svg></button>
+          <button class="pbtn combine-mode-btn" id="btn-rig-mode-move" style="flex:1" data-i18n-title="rigModeMoveTitle" title="3. Déplacer / poser les os déjà dessinés"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20"/></svg></button>
+        </div>
+        <div class="pr" id="rig-active-bone-row" style="display:none;font-size:9px;color:var(--text-dim)"></div>
+        <!-- Step 2 only: shown while Assigner is active. Weight radius is the
+             DEFAULT influence for a bone that hasn't had its own on-canvas
+             circle dragged yet (bone.radius, app.js rigBindStroke) — dragging
+             a bone's circle in Assign mode overrides it per-bone, same
+             "global default + per-item override" convention as everywhere
+             else in this app. -->
+        <div class="pr" id="rig-assign-row" style="display:none;gap:6px">
+          <button class="pbtn ac" id="btn-rig-auto-assign" style="flex:1" data-i18n-title="rigAutoAssignTitle" title="Lie chaque forme sélectionnable du calque à l'os le plus proche (par distance) — écrase les liaisons existantes" data-i18n="rigAutoAssignBtn">Assigner automatiquement</button>
+        </div>
+        <div class="pr"><span class="pl" data-i18n="fieldRigWeightRadius">Rayon de poids</span><input type="number" class="pi scrub" id="rig-weight-radius" value="200" min="1" max="4000" data-step="1" data-i18n-title="rigWeightRadiusTitle" title="Distance au-delà de laquelle un os n'influence plus un vertex lié — glisser le bord du cercle d'un os (mode Assigner) règle le SIEN spécifiquement"></div>
+        <div class="pr"><span class="pl" data-i18n="fieldRigFalloffSoftness">Adoucissement</span><input type="number" class="pi scrub" id="rig-falloff-softness" value="0" min="0" max="100" data-step="5" data-i18n-title="rigFalloffSoftnessTitle" title="0% = chute linéaire (transition franche au bord du rayon), 100% = chute adoucie (S-curve, comme un dégradé) — s'applique à tous les os du calque, se règle sans toucher au rayon"></div>
+        <div class="pr"><label style="display:flex;gap:5px;align-items:center;font-size:10px;cursor:pointer" data-i18n-title="rigRotateModeTitle" title="Fait tourner localement chaque vertex selon la tangente de l'os (au-delà de Shapper) — désactive si une forme se déchire sur une courbure"><input type="checkbox" id="rig-rotate-mode" checked> <span data-i18n="rigRotateModeLabel">Rotation selon tangente</span></label></div>
+        <div class="pr" style="gap:6px">
+          <button class="pbtn ac" id="btn-rig-commit" style="flex:1" data-i18n="rigCommitBtn">Figer la pose</button>
+          <button class="pbtn" id="btn-rig-reset" style="flex:1" data-i18n="rigResetBtn">Réinitialiser</button>
+        </div>
+        <div class="pr" style="font-size:9px;color:var(--text-dim)" id="rig-hint" data-i18n="rigHint">Clic: nouvel os · Glisser une ancre: dessiner une courbe · Double-clic ou Entrée: terminer l'os · Échap: annuler</div>
       </div>
     </div>
     <!-- Onion Skin right-panel section removed (feedback 2026-07: "plus
@@ -908,7 +1194,7 @@
   <div class="modal-box">
     <div class="modal-hdr"><span data-i18n="exportTitle">Export</span> <button id="export-close" class="modal-x">&times;</button></div>
     <div class="modal-bdy">
-      <div class="pr"><span class="pl" style="width:90px" data-i18n="fieldFormat">Format</span>
+      <div class="pr"><span class="pl" data-i18n="fieldFormat">Format</span>
         <select class="psel" id="exp-format" style="flex:1">
           <option value="svg" data-i18n="expSeqSvg">Séquence SVG</option>
           <option value="png" data-i18n="expSeqPng">Séquence PNG</option>
@@ -923,13 +1209,13 @@
       </div>
       <div class="pr" id="exp-rive-hint" style="display:none;font-size:9px;color:var(--text-dim)" data-i18n="expRiveHint">Nécessite Rive Editor ouvert en local avec le serveur MCP actif (port 9791).</div>
       <div class="pr" id="exp-ae-camera-hint" style="display:none;font-size:9px;color:var(--text-dim)" data-i18n="expAeCameraHint">Génère un script .jsx à lancer dans After Effects (File &gt; Scripts &gt; Run Script File…) — nécessite un calque caméra actif.</div>
-      <div class="pr"><span class="pl" style="width:90px" data-i18n="fieldRange">Plage</span>
+      <div class="pr"><span class="pl" data-i18n="fieldRange">Plage</span>
         <select class="psel" id="exp-range" style="flex:1">
           <option value="wa" data-i18n="rangeWorkArea">Zone de travail</option>
           <option value="all" data-i18n="rangeAll">Toute la timeline</option>
         </select>
       </div>
-      <div class="pr" id="exp-scale-row"><span class="pl" style="width:90px" data-i18n="fieldScale">Échelle</span>
+      <div class="pr" id="exp-scale-row"><span class="pl" data-i18n="fieldScale">Échelle</span>
         <select class="psel" id="exp-scale" style="flex:1" data-i18n-title="expScaleTitle" title="Contenu vectoriel — l'agrandissement reste net à n'importe quelle échelle">
           <option value="0.5">0.5x</option>
           <option value="1" selected>1x</option>
@@ -940,7 +1226,7 @@
           <option value="custom" data-i18n="expScaleCustom">Personnalisé…</option>
         </select>
       </div>
-      <div class="pr" id="exp-size-row" style="display:none"><span class="pl" style="width:90px" data-i18n="fieldSize2">Taille</span>
+      <div class="pr" id="exp-size-row" style="display:none"><span class="pl" data-i18n="fieldSize2">Taille</span>
         <input type="number" class="pi scrub" id="exp-w" min="1" max="16384" style="width:70px" data-step="1">
         <span style="font-size:9px;color:var(--text-dim)">×</span>
         <input type="number" class="pi scrub" id="exp-h" min="1" max="16384" style="width:70px" data-step="1">
@@ -1129,9 +1415,9 @@
     <div class="modal-bdy">
       <div id="kitsu-step-login">
         <div style="font-size:10px;color:var(--text-dim);margin-bottom:10px" data-i18n="kitsuLoginDesc">Connexion à ton studio Kitsu (CGWire) — asynchrone, aucune synchronisation en temps réel avec les autres postes.</div>
-        <div class="pr" style="gap:8px"><span class="pl" style="flex:none;width:70px" data-i18n="kitsuServerUrl">URL serveur</span><input type="text" id="kitsu-url" class="pi" style="flex:1" placeholder="https://kitsu.monstudio.com"></div>
-        <div class="pr" style="gap:8px;margin-top:6px"><span class="pl" style="flex:none;width:70px" data-i18n="kitsuEmail">Email</span><input type="email" id="kitsu-email" class="pi" style="flex:1"></div>
-        <div class="pr" style="gap:8px;margin-top:6px"><span class="pl" style="flex:none;width:70px" data-i18n="kitsuPassword">Mot de passe</span><input type="password" id="kitsu-password" class="pi" style="flex:1"></div>
+        <div class="pr" style="gap:8px"><span class="pl" data-i18n="kitsuServerUrl">URL serveur</span><input type="text" id="kitsu-url" class="pi" style="flex:1" placeholder="https://kitsu.monstudio.com"></div>
+        <div class="pr" style="gap:8px;margin-top:6px"><span class="pl" data-i18n="kitsuEmail">Email</span><input type="email" id="kitsu-email" class="pi" style="flex:1"></div>
+        <div class="pr" style="gap:8px;margin-top:6px"><span class="pl" data-i18n="kitsuPassword">Mot de passe</span><input type="password" id="kitsu-password" class="pi" style="flex:1"></div>
         <div id="kitsu-login-error" style="font-size:10px;color:#ff6b6b;margin-top:6px;display:none"></div>
         <div class="pr" style="margin-top:10px"><button class="pbtn ac" id="kitsu-login-btn" style="flex:1" data-i18n="btnLogin">Se connecter</button></div>
       </div>
@@ -1182,6 +1468,7 @@
   <div style="display:flex;align-items:center;margin-bottom:8px;font-size:10px;font-weight:600;letter-spacing:.03em;color:var(--text-dim);text-transform:uppercase"><span data-i18n="onionSkinLabel">Onion Skin</span> <span id="os-st" style="margin-left:auto;font-size:9px;color:var(--green)">ON</span></div>
   <div class="pr" style="font-size:9px;color:var(--text-dim);margin-bottom:6px" data-i18n="onionDragHint">Glisser les marqueurs rouge/bleu sur la timeline</div>
   <div class="pr" style="margin-bottom:6px"><span class="pl" data-i18n="fieldMode">Mode</span><select class="psel" id="p-omode"><option value="tinted" data-i18n="omodeTinted">Tinted</option><option value="original" data-i18n="omodeOriginal">Original</option><option value="outline" data-i18n="omodeOutline">Outline</option></select></div>
+  <div class="pr" style="margin-bottom:6px"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="p-current-outline"> Frame courante en contour</label></div>
   <div class="pr" style="margin-bottom:6px"><span class="pl" data-i18n="fieldPrevOp">Prev Op</span><input type="number" class="pi scrub" id="p-opop" value="30" min="5" max="80" data-step="1"></div>
   <div class="pr" style="margin-bottom:6px"><span class="pl" data-i18n="fieldNextOp">Next Op</span><input type="number" class="pi scrub" id="p-onop" value="30" min="5" max="80" data-step="1"></div>
   <!-- Marker-range presets, folded in from the now-removed separate
@@ -1266,7 +1553,16 @@
     <button class="tb" id="btn-play" data-i18n-title="btnPlayTitle" title="Play / Stop (Enter)"><span class="material-symbols-rounded">&#xe037;</span></button>
     <button class="tb" id="btn-nf" data-i18n-title="btnNextFrameTitle" title="Next frame"><span class="material-symbols-rounded">&#xe5cc;</span></button>
     <button class="tb" id="btn-lf" data-i18n-title="btnLastFrameTitle" title="Go to last frame"><span class="material-symbols-rounded">&#xe044;</span></button>
-    <button class="tb active" id="btn-loop" data-i18n-title="btnLoopTitle" title="Loop playback (work area) — right-click for ping-pong"><span style="font-size:14px;line-height:1">&#x21bb;</span></button>
+    <button class="tb active" id="btn-loop" data-i18n-title="btnLoopTitle" title="Loop playback (work area) — right-click for ping-pong"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></button>
+    <!-- Manual fallback for the playback bake cache (playback-cache.js) —
+         SVG (not a Material Symbols codepoint) on purpose: this project's
+         embedded font is a subset containing only ALREADY-referenced
+         codepoints, so any new one renders silently blank (see this
+         project's own CLAUDE.md). The cache normally kicks in
+         automatically only when real-time playback can't keep up
+         (timeline.js's rAF-interval monitor) — this button forces the
+         same bake pass on demand, e.g. right before a review/demo. -->
+    <button class="tb" id="btn-bake-cache" title="Forcer le cache de lecture (normalement automatique si la lecture décroche)"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/><path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/></svg></button>
     <span style="width:1px;height:20px;background:var(--border2);flex:none"></span>
     <div class="ti">
       <span data-i18n="fieldFPS">FPS</span><input type="number" class="scrub" id="tl-fps" value="12" min="1" max="60" data-step="1">
@@ -1274,12 +1570,12 @@
     </div>
     <span style="width:1px;height:20px;background:var(--border2);flex:none"></span>
     <button class="tb" id="btn-os" data-i18n-title="btnOnionTitle" title="Onion skin on/off (O)"><span class="material-symbols-rounded" style="font-size:16px">&#xe53b;</span></button>
-    <button class="tb" id="btn-os-outline" data-i18n-title="btnOnionOutlineTitle" title="Onion skin outlines only"><span style="font-size:13px;line-height:1">&#x25ad;</span></button>
+    <button class="tb" id="btn-os-outline" data-i18n-title="btnOnionOutlineTitle" title="Onion skin outlines only"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="13" height="12" rx="1.5" stroke-dasharray="3 2.5"/><rect x="8.5" y="6" width="12.5" height="12" rx="1.5" fill="currentColor" stroke="none" opacity=".3"/></svg></button>
     <!-- "Modify onion markers" (#btn-os-range) removed (2026-07) — its
          marker-range presets moved into the onion-skin button's own
          right-click popover (#onion-pop), see that popover's own comment. -->
-    <button class="tb" id="btn-ghost-all" data-i18n-title="btnGhostAllTitle" title="Ghost all keyframes — shows every keyframe of the active layer at once" style="margin-left:4px"><span style="font-size:13px;line-height:1">&#x2637;</span></button>
-    <button class="tb" id="btn-ghost-select" data-i18n-title="btnGhostSelectTitle" title="Select all keyframes' content to move/transform together"><span style="font-size:12px;line-height:1">&#x2725;</span></button>
+    <button class="tb" id="btn-ghost-all" data-i18n-title="btnGhostAllTitle" title="Ghost all keyframes — shows every keyframe of the active layer at once"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="5.5" height="14" rx="1"/><rect x="9.5" y="5" width="5.5" height="14" rx="1"/><rect x="16.5" y="5" width="5" height="14" rx="1"/></svg></button>
+    <button class="tb" id="btn-ghost-select" data-i18n-title="btnGhostSelectTitle" title="Select all keyframes' content to move/transform together"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="5.5" height="14" rx="1" opacity=".4"/><rect x="9.5" y="5" width="5.5" height="14" rx="1" fill="currentColor" stroke="none"/><rect x="16.5" y="5" width="5" height="14" rx="1" opacity=".4"/></svg></button>
     <!-- Shadow Brush guide-line visibility (2026-07) — hides every
          data.channelTag==='shadow' item across ALL layers/components at
          once (timeline.js's toggleShadowGuides), so guide lines drawn for
@@ -1287,10 +1583,10 @@
          off before a final look, without touching the document itself.
          Same icon as the Shadow Brush floating-panel button (labs-float-
          panel.js) so it reads as the same concept in both places. -->
-    <button class="tb active" id="btn-shadow-guides" data-i18n-title="btnShadowGuidesTitle" title="Afficher/masquer les lignes de guide Shadow sur tous les calques et composants" style="margin-left:4px"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M20.25 19.5h-9.44l7.724-7.715L21 9.31a1.49 1.49 0 0 0 0-2.119l-4.19-4.19a1.51 1.51 0 0 0-2.12 0L3.44 14.25A1.492 1.492 0 0 0 3 15.31v4.19A1.5 1.5 0 0 0 4.5 21h15.75a.75.75 0 1 0 0-1.5ZM4.5 15.31l9-9 4.19 4.19-9 9H4.5v-4.19Z"/></svg></button>
-    <button class="tb" id="btn-revision-view" data-i18n-title="btnRevisionViewTitle" title="Vue de révision — cycle Tout / Mes traits / Corrections" style="margin-left:4px;width:auto;padding:0 8px;font-size:10px" data-i18n="revisionViewAll">Tout</button>
-    <button class="tb" id="btn-cycle" data-i18n-title="btnCycleTitle" title="Cycle — repete N fois la plage de frames selectionnee (walk cycles)" style="margin-left:4px"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></button>
-    <button class="tb" id="btn-tween-curves" data-i18n-title="btnTweenCurvesTitle" title="Afficher/masquer les courbes d'easing sous les calques avec tween — clic sur un segment pour l'éditer individuellement" style="margin-left:4px"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17c3 0 3-10 6-10s3 10 6 10 3-8 6-8"/></svg></button>
+    <button class="tb active" id="btn-shadow-guides" data-i18n-title="btnShadowGuidesTitle" title="Afficher/masquer les lignes de guide Shadow sur tous les calques et composants" ><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M20.25 19.5h-9.44l7.724-7.715L21 9.31a1.49 1.49 0 0 0 0-2.119l-4.19-4.19a1.51 1.51 0 0 0-2.12 0L3.44 14.25A1.492 1.492 0 0 0 3 15.31v4.19A1.5 1.5 0 0 0 4.5 21h15.75a.75.75 0 1 0 0-1.5ZM4.5 15.31l9-9 4.19 4.19-9 9H4.5v-4.19Z"/></svg></button>
+    <button class="tb" id="btn-revision-view" data-i18n-title="btnRevisionViewTitle" title="Vue de révision — cycle Tout / Mes traits / Corrections" style="width:auto;padding:0 8px;font-size:10px" data-i18n="revisionViewAll">Tout</button>
+    <button class="tb" id="btn-cycle" data-i18n-title="btnCycleTitle" title="Cycle — repete N fois la plage de frames selectionnee (walk cycles)" ><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></button>
+    <button class="tb" id="btn-tween-curves" data-i18n-title="btnTweenCurvesTitle" title="Afficher/masquer les courbes d'easing sous les calques avec tween — clic sur un segment pour l'éditer individuellement. Dans l'éditeur : clic sur une zone vide pour ajouter un point, double-clic sur un point pour le retirer" ><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17c3 0 3-10 6-10s3 10 6 10 3-8 6-8"/></svg></button>
     <!-- Graph editor (Motion mode only — shown/hidden by setAppMode). Clic
          droit bascule valeur/vitesse, Alt+clic fige l'échelle verticale. -->
     <!-- Shy switch (AE): hides every layer flagged shy from BOTH panels at
@@ -1298,11 +1594,16 @@
          about taming a long property list, which is a Motion problem. -->
     <!-- BPM guides (Van Dijk 1.2): clic = afficher/masquer, clic droit =
          régler tempo et décalage. -->
-    <button class="tb" id="btn-bpm" title="Grille BPM — clic : afficher/masquer · clic droit : régler le tempo" style="margin-left:4px"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 18V5l10-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="16" cy="16" r="3"/></svg></button>
+    <button class="tb" id="btn-bpm" title="Grille BPM — clic : afficher/masquer · clic droit : régler le tempo" ><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 18V5l10-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="16" cy="16" r="3"/></svg></button>
     <!-- Motion blur (comp switch). Clic droit : échantillons + obturateur. -->
-    <button class="tb" id="btn-mblur" title="Flou de mouvement de la composition — clic droit : échantillons et obturateur" style="margin-left:4px;display:none"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="8" cy="12" r="4"/><path d="M14 9h6M14 12h5M14 15h3"/></svg></button>
-    <button class="tb" id="btn-shy" title="Masquer les calques « shy » (clic droit sur un calque pour le marquer)" style="margin-left:4px;display:none"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></svg></button>
-    <button class="tb" id="btn-mgraph" title="Éditeur de courbes (Maj+F3) — clic droit : valeur/vitesse · Alt+clic : figer l'échelle" style="margin-left:4px;display:none"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20V4"/><path d="M3 20h18"/><path d="M6 16c4 0 3-9 7-9 3 0 3 5 6 5"/><circle cx="6" cy="16" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/></svg></button>
+    <button class="tb" id="btn-mblur" title="Flou de mouvement de la composition — clic droit : échantillons et obturateur" style="display:none"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="8" cy="12" r="4"/><path d="M14 9h6M14 12h5M14 15h3"/></svg></button>
+    <button class="tb" id="btn-shy" title="Masquer les calques « shy » (clic droit sur un calque pour le marquer)" style="display:none"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></svg></button>
+    <button class="tb" id="btn-mgraph" title="Éditeur de courbes (Maj+F3) — clic droit : valeur/vitesse · Alt+clic : figer l'échelle" style="display:none"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20V4"/><path d="M3 20h18"/><path d="M6 16c4 0 3-9 7-9 3 0 3 5 6 5"/><circle cx="6" cy="16" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/></svg></button>
+    <!-- Inline SVG like every other .tb button in this toolbar. It used a
+         material-symbols codepoint (&#xe5d3;) that the loaded font subset
+         does not carry, so the button rendered as an empty box — reported
+         2026-07-27 ("l’icon d’ouverture du dropdown n’a pas d’icon"). -->
+    <button class="tb" id="btn-toolbar-customize" title="Personnaliser les boutons visibles de la barre" aria-label="Personnaliser la barre d’outils"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h10M18 18h2"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="16" cy="18" r="2"/></svg></button>
   </div>
   <div id="tl-content">
     <div id="layer-panel">
@@ -1311,14 +1612,23 @@
            #layer-list the same way frame-hdr+bars-row sit above
            #frame-grid on the timeline side, and it's that match that keeps
            every .lrow lined up with its .frow across the panel split. -->
-      <div style="height:42px;border-bottom:1px solid var(--border);background:var(--panel2);display:flex;align-items:center;padding:0 6px;font-size:9px;color:var(--text-dim)" data-i18n="layersHdr">Layers</div>
-      <div id="layer-list"></div>
-      <div id="layer-ctrls">
+      <!-- The layer buttons live in THIS header row, not in a band under the
+           list (2026-07-27: "revoir l'interface en bas au niveau timeline…
+           ça gagne en espace et clarté"). They used to sit in a 40px strip
+           at the bottom, which the grid side had to mirror with 40px of dead
+           padding purely to keep the two row lists aligned — 40px of
+           timeline height spent on nothing. Up here they reuse the header
+           that already existed, and the reserved bottom band shrinks to the
+           zoom scrollbar alone. The "Layers" caption is gone with it: six
+           labelled icon buttons say what the column is more directly than
+           the word did. -->
+      <div id="layer-hdr">
+        <div id="layer-ctrls">
         <button id="btn-al" data-i18n-title="btnNewLayerTitle" title="New layer"><span class="material-symbols-rounded">&#xe145;</span></button>
         <!-- Camera & audio moved here from the timeline toolbar (feedback
              #16): they both ADD a special layer/track, so they live next to
              the layer "+". Same ids — the JS wiring is untouched. -->
-        <button id="btn-camera" data-i18n-title="btnCameraLayerTitle" title="Calque caméra — clés de cadrage (zoom/pan) interpolées avec courbes de Bézier, comme dans TVPaint/Callipeg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="m17 10 4-2.5v9.4L17 14.4Z" fill="currentColor" stroke="none"/></svg></button>
+        <button id="btn-camera" data-i18n-title="btnCameraLayerTitle" title="Calque caméra — clés de cadrage (zoom/pan) interpolées avec courbes de Bézier, comme le calque Caméra d'After Effects"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="m17 10 4-2.5v9.4L17 14.4Z" fill="currentColor" stroke="none"/></svg></button>
         <button id="btn-audio" data-i18n-title="btnAudioTitle" title="Importer une piste audio (mp3/ogg/wav) — waveform sous la timeline, lecture synchronisée"><span style="font-size:13px;line-height:1">&#x266b;</span></button>
         <input type="file" id="audio-file-input" accept="audio/*" multiple style="display:none">
         <!-- v5: flat filled trash icon instead of the 🗑 emoji — the emoji
@@ -1328,7 +1638,9 @@
         <button id="btn-dl" data-i18n-title="btnDeleteLayerTitle" title="Delete active layer"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 3h6l1 2h4v2H4V5h4z"/><path d="M6 9h12l-1 12H7z"/></svg></button>
         <button id="btn-dupl" data-i18n-title="btnDuplLayerTitle" title="Duplicate active layer"><span class="material-symbols-rounded">&#xe14d;</span></button>
         <button id="btn-comp" data-i18n-title="btnCompLayerTitle" title="Convert layer to component"><span style="font-size:13px;line-height:1">&#x25c8;</span></button>
+        </div>
       </div>
+      <div id="layer-list"></div>
     </div>
     <div id="layer-panel-resize" data-i18n-title="layerPanelResizeTitle" title="Drag to resize the layers panel"></div>
     <!-- Column wrapper so #fg-wrap can end at the separator line while the
@@ -1382,7 +1694,7 @@
 
 <div id="statusbar">
   <span id="statusbar-help" data-i18n-title="statusbarHelpTitle" title="Aide contextuelle — change selon l'outil actif ou l'élément sélectionné"><span class="sc">F5</span><span data-i18n="scFrame">Frame</span> <span class="sc">F6</span><span data-i18n="scKey">Key</span> <span class="sc">F7</span><span data-i18n="scBlank">Blank</span> <span class="sc">T</span><span data-i18n="scTween">Tween</span> <span class="sc">D</span><span data-i18n="scDupli">Dupli</span> <span class="sc">F</span><span data-i18n="scFlip">Flip</span> <span class="sc">X</span><span data-i18n="scMirror">Mirror</span> <span class="sc">Enter</span><span data-i18n="scPlay">Play</span></span>
-  <span id="status-text">Nemo v0.6.2</span>
+  <span id="status-text">Nemo v0.7.0-alpha.1</span>
 </div>
 </div>
 <div id="toast"></div>
@@ -1429,6 +1741,7 @@
 <script src="js/labs/speed-lines.js"></script>
 <script src="js/labs/reference-fill.js"></script>
 <script src="js/labs/pose-library.js"></script>
+<script src="js/labs/reference-3d.js"></script>
 <script src="js/labs/boil-effect.js"></script>
 <script src="js/labs/follow-path.js"></script>
 <script src="js/labs/vector-sculpt.js"></script>
@@ -1440,8 +1753,11 @@
 <script src="js/lottie-preview.js"></script>
 <script src="js/timeline.js"></script>
 <script src="js/i18n.js"></script>
+<script src="js/layer-kind.js"></script>
+<script src="js/svg-import.js"></script>
 <script src="js/camera.js"></script>
 <script src="js/motion.js"></script>
+<script src="js/text-animator.js"></script>
 <script src="js/motion-graph.js"></script>
 <script src="js/nemo-panel.js"></script>
 <script src="js/nemo-script.js"></script>
@@ -1464,6 +1780,7 @@
 <script src="js/palette-panel.js"></script>
 <script src="js/color-manager.js"></script>
 <script src="js/effects-panel.js"></script>
+<script src="js/shader-effects-library.js"></script>
 <script src="js/custom-effects.js"></script>
 <script src="js/project.js"></script>
 <script src="js/feedback-bridge.js"></script>
@@ -1475,6 +1792,8 @@
 <script src="js/media-library.js"></script>
 <script type="module" src="js/geometry-wasm-loader.js"></script>
 <script src="js/engine-bridge.js"></script>
+<script src="js/second-viewer.js"></script>
+<script src="js/playback-cache.js"></script>
 <script src="js/perspective-bridge.js"></script>
 <script src="js/symmetry-bridge.js"></script>
 <script src="js/gradient-bridge.js"></script>
@@ -1492,6 +1811,7 @@
 <script src="js/eraser-bridge.js"></script>
 <script src="js/fill-bridge.js"></script>
 <script src="js/pen-bridge.js"></script>
+<script src="js/rig-bridge.js"></script>
 <script src="js/tutorial.js"></script>
 </body>
 </html>

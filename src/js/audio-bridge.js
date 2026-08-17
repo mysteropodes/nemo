@@ -251,8 +251,28 @@
   }
 
   // ---- playback ----
+  // Component/montage guard (2026-07-30 fix — found live: entering a
+  // Component swaps state.fps to the symbol's own fps and resets
+  // state.currentFrame to 0 (app.js's enterSymbol), same for
+  // enterMontageView's synthetic scene, but state.audioTracks is a single
+  // document-wide array with no per-context swap of its own (by design —
+  // audio genuinely is comp-wide, not per-symbol). tSec below computes
+  // straight off state.fps/state.currentFrame, so playing/scrubbing while
+  // inside silently scheduled against the WRONG timeline: confirmed live,
+  // playback from inside a Component with fps 24→12 rescheduled to a
+  // completely unrelated delay/offset, and scrubAt's own tSec went
+  // negative for every frame inside a component placed later than frame 0,
+  // making its own no-op guard below swallow every scrub with zero
+  // feedback. There's no well-defined "equivalent outer-scene time" while
+  // isolated inside editing a symbol's own internal animation in the first
+  // place (the same symbol can be placed at multiple different points/
+  // speeds elsewhere) — suspending entirely here, rather than computing a
+  // guess, is the same "guard over silent wrong behavior" posture already
+  // used throughout this app's other symbol/montage-context bugs this
+  // session.
+  function _audioContextSuspended() { return !!(state.activeSymbolId || state.activeMontageViewId); }
   function startTrack(track, fromFrame) {
-    if (track.muted || !track._buffer) return;
+    if (track.muted || !track._buffer || _audioContextSuspended()) return;
     var c = ensureCtx();
     if (!c) return;
     var src = c.createBufferSource();
@@ -279,7 +299,11 @@
 
   // ---- import ----
   function addTrackFromDataURL(name, dataURL) {
-    var track = { name: name, dataB64: dataURL, offsetFrames: 0, volume: 1, muted: false };
+    // audioId (2026-07-31, media-library registration): audio tracks had no
+    // stable identity at all — an array index isn't one (reorder/delete
+    // shifts it) — minted here so the catalog entry can find its way back
+    // to the right track for deletion without guessing by name.
+    var track = { name: name, dataB64: dataURL, offsetFrames: 0, volume: 1, muted: false, audioId: 'au' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7) };
     tracks().push(track);
     logAudio('import');
     if (dataURL.length > 8 * 1024 * 1024) {
@@ -287,6 +311,24 @@
     }
     decodeTrack(track);
     renderStrip();
+    // Real asset-panel pass (2026-07-31, Cyril) — audio was a fully working,
+    // separate feature (this whole file) but entirely invisible to the
+    // Médias catalog. No thumb (media-library.js renders a note-icon tile
+    // for kind==='audio'), no owning layer — audioId is what the panel's
+    // "Supprimer la piste" menu entry reuses to find this exact track.
+    if (window.SMMediaLibrary) SMMediaLibrary.addEntry(name, 'audio', null, null, { audioId: track.audioId });
+  }
+  // Removes a track by its stable audioId (2026-07-31) — reuses the exact
+  // stop+splice this file already does elsewhere for track deletion,
+  // rather than the media panel duplicating that logic.
+  function removeTrackByAudioId(audioId) {
+    var list = tracks();
+    var i = list.findIndex(function (t) { return t.audioId === audioId; });
+    if (i < 0) return false;
+    stopTrack(list[i]);
+    list.splice(i, 1);
+    renderStrip();
+    return true;
   }
   function importFile(file) {
     var r = new FileReader();
@@ -300,6 +342,7 @@
   // pas des dizaines de sources superposees.
   var _lastScrubT = 0;
   function scrubAt(frame) {
+    if (_audioContextSuspended()) return; // see startTrack's doc comment above
     var now = performance.now();
     if (now - _lastScrubT < 40) return;
     _lastScrubT = now;
@@ -325,6 +368,7 @@
     renderStrip: renderStrip,
     importFile: importFile,
     addTrackFromDataURL: addTrackFromDataURL,
+    removeTrackByAudioId: removeTrackByAudioId,
     // after importJSON/newProject replaced state.audioTracks wholesale:
     // decode whatever the new list holds and redraw the strip
     reload: function () {

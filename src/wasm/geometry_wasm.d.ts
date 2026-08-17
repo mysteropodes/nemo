@@ -14,6 +14,11 @@ export class VelloEngine {
     private constructor();
     free(): void;
     [Symbol.dispose](): void;
+    /**
+     * Project-load hygiene (importJSON): every stroke dict is new, so every
+     * stored path is garbage at once — cheaper than waiting for the GC.
+     */
+    clear_paths(): void;
     clear_selection(): void;
     get_selection(): string;
     /**
@@ -28,10 +33,21 @@ export class VelloEngine {
     gizmo_handles(scene_json: string): string;
     /**
      * Lets JS skip a redundant `register_image` upload for an image it's
-     * already registered this session (images are cached for the engine's
-     * whole lifetime, not per-scene, so this is a simple presence check).
+     * already registered (presence check — the store is now bounded and JS
+     * may have retired this id, so a `false` here means "upload again").
      */
     has_image(id: string): boolean;
+    /**
+     * Total decoded bytes held by the image store. This used to be unbounded
+     * by design ("cached for the engine's whole lifetime"), which is fine for
+     * a handful of imported rasters and untenable for footage: a 1000-frame
+     * 1920x1080 sequence is 8.3GB of RGBA8. JS drives eviction (it is the
+     * side that knows what the CURRENT scene references and can re-upload
+     * from the Paper Raster / video bridge on demand) — this just reports.
+     */
+    image_store_bytes(): number;
+    image_store_size(): number;
+    path_store_size(): number;
     /**
      * Registers (or re-registers, if `key` already exists — e.g. the
      * author just edited the source) a user-authored custom WGSL effect
@@ -42,14 +58,29 @@ export class VelloEngine {
      * WGSL statements ending in `return vec4<f32>(...)`), wrapped here
      * into a full document that already declares the standard fullscreen-
      * triangle vertex shader, the texture/sampler/Params bindings, and
-     * three convenience locals every author can use without re-deriving
-     * them: `uv` (0..1), `src` (the pixel already sampled at `uv`), and
-     * `texel` (1 texel in UV units, for neighbor-sampling effects). Same
-     * `Params{effect_id,p1,p2,p3,tex_w,tex_h,time,p4}` layout as
-     * simple_fx.wgsl, so an author's `params.p1`..`params.p4` map 1:1 onto
-     * the SAME p1..p4 fields the stack UI's generic param editor already
-     * writes for every other effect type — no separate wiring needed on
-     * the JS side for a custom effect's parameters.
+     * six convenience locals every author can use without re-deriving
+     * them: `uv` (0..1 across the FULL CANVAS), `src` (the pixel already
+     * sampled at `uv`), `texel` (1 texel in UV units, for neighbor-
+     * sampling effects), and — 2026-07-30, see run_one_effect's own doc
+     * comment for the bug this fixes — `bbox_o`/`bbox_s` (the on-screen
+     * device-pixel origin/size of whatever this effect is actually
+     * attached to) and `local_uv` (0..1 across just THAT bbox instead of
+     * the whole canvas, can go outside 0..1 near/past its edges same as
+     * `uv` already can). Any effect with a "center of my own shape"
+     * concept (a twirl/bulge pivot, a wave's phase, a particle grid)
+     * should distort in `local_uv` space and map back to real texture
+     * coordinates via `bbox_o + result * bbox_s` (in device px) before
+     * dividing by `vec2(tex_w, tex_h)` for the final textureSample — NOT
+     * `uv`/`vec2(0.5)` directly, which is the canvas center, not the
+     * shape's — confirmed live: a shipped Twirl effect's pattern visibly
+     * changed under pure panning (zero zoom change) before this existed,
+     * which only makes sense if its reference frame was the viewport.
+     * Same `Params{effect_id,p1,p2,p3,tex_w,tex_h,time,p4,bbox_x,bbox_y,
+     * bbox_w,bbox_h}` layout as simple_fx.wgsl, so an author's
+     * `params.p1`..`params.p4` map 1:1 onto the SAME p1..p4 fields the
+     * stack UI's generic param editor already writes for every other
+     * effect type — no separate wiring needed on the JS side for a custom
+     * effect's parameters.
      *
      * Compiling arbitrary author-supplied WGSL at runtime is safe here:
      * this crate only ever targets the web/WebGPU wgpu backend (built via
@@ -71,6 +102,15 @@ export class VelloEngine {
      * matters for vello's internal upload caching).
      */
     register_image(id: string, rgba: Uint8Array, width: number, height: number): void;
+    /**
+     * Retained path store (see the `paths` field's doc comment). `coords` is
+     * a flat [px,py, hInX,hInY, hOutX,hOutY] × n array — the same
+     * RELATIVE-handle convention as SegIn/serP, 6 slots per segment with
+     * explicit zeros where the JSON form omits a zero handle. Built through
+     * build_bezpath_from_segments so a registered path and an inline one
+     * produce byte-identical curves (single source of truth, §3).
+     */
+    register_path(id: string, coords: Float64Array, closed: boolean): void;
     render(scene_json: string): void;
     /**
      * Phase C6 (export pipeline): renders the scene offscreen and reads the
@@ -96,6 +136,18 @@ export class VelloEngine {
      * this on every resize-observer tick regardless.
      */
     resize(width: number, height: number): void;
+    /**
+     * Drops images by id. Mirrors retire_paths. Never called for an id the
+     * scene being rendered still references — the caller checks that, because
+     * dropping a live id would make the picture lose an image with no signal
+     * beyond a warning in paint_layer_items.
+     */
+    retire_images(ids_json: string): void;
+    /**
+     * Retirement is JS-driven (FinalizationRegistry on the stroke dicts) —
+     * this side never guesses at lifetimes. `ids_json`: JSON array of keys.
+     */
+    retire_paths(ids_json: string): void;
     /**
      * Rotates every selected item in-place around `(pivot_x, pivot_y)` by
      * `angle` radians — mirrors selPropsApplyRotate in tools.js.
@@ -138,7 +190,7 @@ export class VelloEngine {
      * the artboard center (e.g. canvasW/2, canvasH/2) to match Animate's
      * Rotate Stage tool; pass (0,0) for a plain top-left-anchored zoom/pan.
      */
-    set_viewport(pan_x: number, pan_y: number, zoom: number, rotation: number, pivot_x: number, pivot_y: number): void;
+    set_viewport(pan_x: number, pan_y: number, zoom: number, rotation: number, pivot_x: number, pivot_y: number, effect_zoom: number): void;
 }
 
 export function align_pair(a_json: string, b_json: string): string;
@@ -151,6 +203,19 @@ export function auto_match(strokes_a_json: string, strokes_b_json: string): stri
  * don't need to translate between two different vocabularies).
  */
 export function boolean_op(op: string, a_json: string, b_json: string): string;
+
+/**
+ * Same operations as `boolean_op`, but `a_json` is a JSON array of polygons
+ * (a MultiPolygon) instead of a single one. Needed to fold a 3rd+ operand
+ * into an already-disjoint multi-piece accumulator: `boolean_op` can only
+ * take a single polygon per side, so a naive JS-side fold that collapses
+ * the accumulator to "the single largest piece" between folds silently
+ * drops every other disjoint piece already accumulated (e.g. uniting 3
+ * mutually non-overlapping shapes loses the middle one). geo_booleanop's
+ * BooleanOp trait already implements MultiPolygon-vs-Polygon natively
+ * (boolean/mod.rs) — this just exposes that instead of reinventing it.
+ */
+export function boolean_op_multi(op: string, a_json: string, b_json: string): string;
 
 /**
  * Async because WebGPU adapter/device negotiation is inherently async —
@@ -236,39 +301,47 @@ export interface InitOutput {
     readonly memory: WebAssembly.Memory;
     readonly __wbg_velloengine_free: (a: number, b: number) => void;
     readonly create_engine: (a: any, b: number, c: number) => any;
+    readonly velloengine_clear_paths: (a: number) => void;
     readonly velloengine_clear_selection: (a: number) => void;
     readonly velloengine_get_selection: (a: number) => [number, number, number, number];
     readonly velloengine_gizmo_handles: (a: number, b: number, c: number) => [number, number, number, number];
     readonly velloengine_has_image: (a: number, b: number, c: number) => number;
+    readonly velloengine_image_store_bytes: (a: number) => number;
+    readonly velloengine_image_store_size: (a: number) => number;
+    readonly velloengine_path_store_size: (a: number) => number;
     readonly velloengine_register_custom_effect: (a: number, b: number, c: number, d: number, e: number) => [number, number];
     readonly velloengine_register_image: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number];
+    readonly velloengine_register_path: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
     readonly velloengine_render: (a: number, b: number, c: number) => [number, number];
     readonly velloengine_render_to_pixels: (a: number, b: number, c: number) => any;
     readonly velloengine_resize: (a: number, b: number, c: number) => void;
+    readonly velloengine_retire_images: (a: number, b: number, c: number) => [number, number];
+    readonly velloengine_retire_paths: (a: number, b: number, c: number) => [number, number];
     readonly velloengine_rotate_selection: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
     readonly velloengine_scale_selection: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number, number, number];
     readonly velloengine_screen_to_world: (a: number, b: number, c: number) => [number, number];
     readonly velloengine_select_at: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number, number, number];
     readonly velloengine_selection_bounds: (a: number, b: number, c: number) => [number, number, number, number];
-    readonly velloengine_set_viewport: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
+    readonly velloengine_set_viewport: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => void;
     readonly align_pair: (a: number, b: number, c: number, d: number) => [number, number, number, number];
     readonly auto_match: (a: number, b: number, c: number, d: number) => [number, number, number, number];
     readonly resample_stroke: (a: number, b: number, c: number) => [number, number, number, number];
     readonly fill_find: (a: number, b: number) => [number, number, number, number];
+    readonly boolean_op: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
+    readonly boolean_op_multi: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
+    readonly effective_frame_index: (a: number, b: number, c: number) => [number, number, number];
+    readonly hit_test: (a: number, b: number, c: number, d: number, e: number) => [number, number, number, number];
+    readonly resolve_symbol_frame: (a: number, b: number, c: number) => [number, number, number];
     readonly interp_stroke: (a: number, b: number) => [number, number, number, number];
     readonly __wbg_strokemodeler_free: (a: number, b: number) => void;
-    readonly effective_frame_index: (a: number, b: number, c: number) => [number, number, number];
     readonly ellipse_segments: (a: number, b: number, c: number, d: number) => [number, number];
+    readonly erase_at_point: (a: number, b: number) => [number, number, number, number];
     readonly line_segments: (a: number, b: number, c: number, d: number) => [number, number];
     readonly rect_segments: (a: number, b: number, c: number, d: number) => [number, number];
-    readonly resolve_symbol_frame: (a: number, b: number, c: number) => [number, number, number];
     readonly strokemodeler_down: (a: number, b: number, c: number, d: number, e: number) => [number, number];
     readonly strokemodeler_move: (a: number, b: number, c: number, d: number, e: number) => [number, number];
     readonly strokemodeler_new: (a: number, b: number) => number;
     readonly strokemodeler_up: (a: number, b: number, c: number, d: number, e: number) => [number, number];
-    readonly boolean_op: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
-    readonly erase_at_point: (a: number, b: number) => [number, number, number, number];
-    readonly hit_test: (a: number, b: number, c: number, d: number, e: number) => [number, number, number, number];
     readonly wasm_bindgen__convert__closures_____invoke__h4177160f1dac6248: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen__convert__closures_____invoke__h49909fab4bc066b4: (a: number, b: number, c: any, d: any) => void;
     readonly wasm_bindgen__convert__closures_____invoke__h29bfc5eda1199406: (a: number, b: number, c: any) => void;

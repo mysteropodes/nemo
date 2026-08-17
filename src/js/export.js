@@ -29,9 +29,33 @@ function exportBuildFrame(frameIdx,alpha){
     // nothing but keeps the layer's bounds pinned to the canvas rect.
     new Path.Rectangle({point:[0,0],size:[state.canvasW,state.canvasH],fillColor:new Color(0,0,0,0),insert:true});
   }
+  var _matteSrcMap=window.matteSourceIndicesInUse?matteSourceIndicesInUse():{};
   for(var li=0;li<state.layers.length;li++){
-    var ld=state.layers[li];if(!ld.visible)continue;
-    var strokes=getEffectiveStrokes(li,frameIdx);
+    var ld=state.layers[li];
+    // layerIsEffectivelyVisible (app.js), not a bare .visible check
+    // (2026-07 fix): the live canvas and the primary Rust-engine export
+    // both already resolve solo through that helper — this plain-Paper.js
+    // fallback (used whenever Tauri/the engine isn't available, or at
+    // scale>1) checked only .visible, so soloing a layer restricted what
+    // you SAW but silently let every other merely-visible layer leak into
+    // this export path anyway. Confirmed live.
+    if(!layerIsEffectivelyVisible(li))continue;
+    // Track matte SOURCE layer: engine.rs's composite_scene consumes a
+    // matte's source layer and never paints it as its own visible content.
+    // This path had no idea, so the export GAINED an opaque layer the
+    // screen never shows (2026-07-26). Skipping it here is only half the
+    // story — the matted layer itself still isn't masked on this path,
+    // which is why exportNeedsEngine() routes any project using a matte
+    // through the engine instead. This keeps the plain-Paper fallback
+    // (SVG, scale>1) from being actively WRONG in the meantime.
+    // uid-based since 2026-07-31: resolved through the SAME shared helper
+    // the layer-row badge uses (matteSourceIndicesInUse, timeline.js) —
+    // previously an independent li-1 re-implementation of the adjacency
+    // rule, the exact two-readers-drift trap CLAUDE.md §3 documents.
+    if(_matteSrcMap[li])continue;
+    // Rendered variant: includes the mograph duplicator's N-way expansion
+    // (app.js) — identical to getEffectiveStrokes for every other layer.
+    var strokes=getEffectiveStrokesRendered(li,frameIdx);
     // Team review ghosts (revision-bridge.js): a frozen "before" copy a
     // reviewer's correction leaves behind, meant to stay visible ON-CANVAS
     // (so Accept/Reject has something to act on) but never in a rendered
@@ -49,6 +73,12 @@ function exportBuildFrame(frameIdx,alpha){
     // bridge.js's header comment); default OFF so a fresh export doesn't
     // need this unchecked every time just to get a clean render.
     if(!state.exportIncludeShadowGuides)strokes=strokes.filter(function(sd){return sd.channelTag!=='shadow';});
+    // Non-destructive combine groups (2026-07-29) — same post-process
+    // buildSceneJson applies (engine-bridge.js), on the dict side: suppress
+    // each combine-group member's own fill/stroke in this EXPORT-ONLY copy
+    // (the real stored strokes are untouched) and append the combined
+    // outline(s).
+    if(window.SMGroup&&ld.groups)strokes=SMGroup.applyCombinesToStrokes(strokes,ld);
     // Motion mode (motion.js): unlike buildSceneJson (engine-bridge.js),
     // exportBuildFrame merges every original layer's strokes straight into
     // the ONE shared throwaway `L`, so there's no per-layer Paper object left
@@ -64,6 +94,7 @@ function exportBuildFrame(frameIdx,alpha){
     // applied outermost, same composition order as buildSceneJson
     // (engine-bridge.js) — see motion.js's parentChainMats header comment.
     var parentChain=window.SMMotion?SMMotion.parentChainMats(li,frameIdx):[];
+    var built=[]; // this layer's own items, so a blend mode can wrap them below
     strokes.forEach(function(sd){
       // Raster strokes (isRaster: imported images, SVG-sequence frames,
       // and Bitmap Brush's texture companions, bitmap-brush.js) went
@@ -80,11 +111,17 @@ function exportBuildFrame(frameIdx,alpha){
       // gradient for free, unlike the Rust/vello live-canvas path which
       // needed its own ItemIn.fillGradient + peniko::Gradient plumbing
       // (engine-bridge.js/geometry-wasm). Overrides desP's flat fillColor.
-      if(!sd.isRaster&&sd.fillGradient){
-        var fg=sd.fillGradient;
-        var stops=fg.stops.map(function(s){return [s.color,s.offset];});
-        var grad=new Gradient(stops,fg.kind==='radial');
-        p.fillColor=new Color(grad,new Point(fg.from[0],fg.from[1]),new Point(fg.to[0],fg.to[1]));
+      // Same from/to guard as buildSceneJson's own branch — an export must
+      // not throw on data the on-screen render already tolerates (CLAUDE.md
+      // §3: the two paths have to agree, including about what they refuse).
+      var pendingGradient=(!sd.isRaster&&sd.fillGradient&&(!window.gradientGeomOk||window.gradientGeomOk(sd.fillGradient)))?sd.fillGradient:null;
+      var pendingGradientFrom=pendingGradient?new Point(pendingGradient.from[0],pendingGradient.from[1]):null;
+      var pendingGradientTo=pendingGradient?new Point(pendingGradient.to[0],pendingGradient.to[1]):null;
+      function transformGradientByMat(pt,pivot,mat){
+        if(!pt||!mat)return pt;
+        var q=new Point(pivot.x+(pt.x-pivot.x)*mat.sx,pivot.y+(pt.y-pivot.y)*mat.sy);
+        q=q.rotate(mat.rot,pivot);
+        return q.add(new Point(mat.dx,mat.dy));
       }
       // Path property, per-vertex (motion.js's applyPathVertexOffsetsFor,
       // 2026-07): innermost transform — applied directly to `p`'s own
@@ -105,6 +142,8 @@ function exportBuildFrame(frameIdx,alpha){
       if(elMat){
         var epc=p.bounds.center;
         var elPivot=new Point(epc.x+elMat.ax,epc.y+elMat.ay);
+        pendingGradientFrom=transformGradientByMat(pendingGradientFrom,elPivot,elMat);
+        pendingGradientTo=transformGradientByMat(pendingGradientTo,elPivot,elMat);
         p.scale(elMat.sx,elMat.sy,elPivot);
         p.rotate(elMat.rot,elPivot);
         p.translate(elMat.dx,elMat.dy);
@@ -112,6 +151,8 @@ function exportBuildFrame(frameIdx,alpha){
         if(p.strokeWidth)p.strokeWidth*=(Math.abs(elMat.sx)+Math.abs(elMat.sy))/2;
       }
       if(motionMat){
+        pendingGradientFrom=transformGradientByMat(pendingGradientFrom,motionPivot,motionMat);
+        pendingGradientTo=transformGradientByMat(pendingGradientTo,motionPivot,motionMat);
         p.scale(motionMat.sx,motionMat.sy,motionPivot);
         p.rotate(motionMat.rot,motionPivot);
         p.translate(motionMat.dx,motionMat.dy);
@@ -120,13 +161,34 @@ function exportBuildFrame(frameIdx,alpha){
       }
       for(var pci=0;pci<parentChain.length;pci++){
         var pc=parentChain[pci];
+        pendingGradientFrom=transformGradientByMat(pendingGradientFrom,pc.pivot,pc.mat);
+        pendingGradientTo=transformGradientByMat(pendingGradientTo,pc.pivot,pc.mat);
         p.scale(pc.mat.sx,pc.mat.sy,pc.pivot);
         p.rotate(pc.mat.rot,pc.pivot);
         p.translate(pc.mat.dx,pc.mat.dy);
         p.opacity=p.opacity*pc.mat.op;
         if(p.strokeWidth)p.strokeWidth*=(Math.abs(pc.mat.sx)+Math.abs(pc.mat.sy))/2;
       }
+      if(pendingGradient){
+        var stops=pendingGradient.stops.map(function(s){return [s.color,s.offset];});
+        var grad=new Gradient(stops,pendingGradient.kind==='radial');
+        p.fillColor=new Color(grad,pendingGradientFrom,pendingGradientTo);
+      }
+      built.push(p);
     });
+    // Layer BLEND MODE — buildSceneJson passes ld.blendMode straight to the
+    // renderer, so it is visible on screen; nothing here read it, so every
+    // raster/SVG export silently came out in Normal. Everything above merges
+    // into the ONE flat `L`, leaving no per-layer object to carry it, so give
+    // this layer's items their own Group and hang the blend mode on that —
+    // Paper.js composites a Group's blendMode natively, so rasterize() and
+    // exportSVG() both get it for free. Only when it is actually non-normal:
+    // the flat structure stays exactly as it was for every ordinary layer.
+    if(built.length&&ld.blendMode&&ld.blendMode!=='normal'){
+      var grp=new Group({children:built,insert:false});
+      grp.blendMode=ld.blendMode;
+      L.addChild(grp);
+    }
   }
   // Caméra (v18) : bake le zoom/pan de la frame dans le rendu exporté —
   // le rect caméra interpolé remplit exactement le canvas de sortie.
@@ -233,8 +295,65 @@ async function exportRunFfmpeg(args,onProgress){
 // layer in the overwhelming common case (no effects used) short-circuits
 // on the very first layer.
 function exportHasActiveEffects(){
-  return state.layers.some(function(ld){return ld.effects&&ld.effects.some(function(e){return e.enabled;});});
+  if(state.layers.some(function(ld){return ld.effects&&ld.effects.some(function(e){return e.enabled;});}))return true;
+  // PER-STROKE effects too (sd.effects — engine-bridge.js:508 reads
+  // c.data.effects and runs it through the same sceneEffectsOf). This
+  // predicate only ever scanned LAYER effects, so a project whose effects
+  // all live on individual strokes stayed on the Paper path and lost every
+  // one of them in the export, silently — the same screen/export split
+  // blend and matte had (2026-07-26). Short-circuits on the first hit, and
+  // runs once per export, not per frame.
+  return state.layers.some(function(ld){
+    return (ld.frames||[]).some(function(f){
+      return f&&(f.strokes||[]).some(function(sd){
+        return sd&&sd.effects&&sd.effects.length&&sd.effects.some(function(e){return e.enabled;});
+      });
+    });
+  });
 }
+// Layer BLEND MODE and TRACK MATTE are per-layer compositing, and
+// exportBuildFrame below merges every layer into ONE flat throwaway Paper
+// layer — there is no per-layer object left for either to live on. Found
+// 2026-07-26 by diffing screen against export feature by feature: both are
+// read by buildSceneJson (engine-bridge.js:512/572) so they render on
+// screen, and export.js read NEITHER, so both silently vanished from every
+// raster export. Matte was the worse half: engine.rs's composite_scene also
+// SKIPS painting the matte source layer as its own content, so the export
+// additionally GAINED an opaque layer the screen never shows.
+//
+// Routed through the engine, exactly like effects already are, rather than
+// reimplementing compositing in Paper: same proven path, and screen/export
+// agree by construction instead of by two implementations staying in sync
+// (CLAUDE.md §3's whole point). Blend ALSO gets a native Paper fallback in
+// exportBuildFrame for the paths this routing can't cover (SVG, scale>1).
+function exportHasLayerCompositing(){
+  return state.layers.some(function(ld){
+    return (ld.blendMode&&ld.blendMode!=='normal')||(ld.matteMode&&ld.matteMode!=='none');
+  });
+}
+// 3D layers and Motion Blur (2026-08-17 audit, "vérifie les export de
+// chaque feature animée") — exportBuildFrame (the plain-Paper.js fallback
+// below) applies layerMotionAt/elementMotionAt's ORDINARY 2D matrix to
+// each stroke, but has NO per-vertex 3D projector (SMMotion.
+// project3DSegments/make3DProjector — engine-bridge.js only) and NO
+// motion-blur post-process (buildSceneJson's own mbOn branch, motion.js
+// §11: "post-treatment... never duplicate the construction loop" — this
+// Paper path IS that second construction loop, and it never got the
+// post-process). Neither gap threw or warned: a 3D layer exported
+// perfectly flat, and a motion-blurred layer exported perfectly sharp,
+// both silently correct-looking to anyone who didn't diff against the
+// on-screen render frame-by-frame. Same root cause as #88's onion-skin/
+// Ghost-All fix — a secondary render path that predates 3D/Motion Blur
+// and was never taught about either. Fix: route both through the engine,
+// exactly like effects/compositing already do a few lines up — motionBlur
+// checks state.motionBlurOn too, matching buildSceneJson's own mbOn gate
+// (a layer can have motionBlur:true while the comp-wide switch is off).
+function exportHasEngineOnlyMotion(){
+  return state.layers.some(function(ld){
+    return ld.threeD||(ld.motionBlur&&state.motionBlurOn);
+  });
+}
+function exportNeedsEngine(){return exportHasActiveEffects()||exportHasLayerCompositing()||exportHasEngineOnlyMotion();}
 // ---- PNG sequence rendering to a working directory (shared by raster exports) ----
 async function exportRenderPNGsToDir(dir,start,end,scale,onProgress,alpha){
   // Effects (blur/vignette/glow/ground shadow/...) only ever rendered in
@@ -248,7 +367,7 @@ async function exportRenderPNGsToDir(dir,start,end,scale,onProgress,alpha){
   // Scale>1 (supersampled export) isn't supported on this path yet, so it
   // only kicks in at the default scale — see renderFrameToPixelsPNG's own
   // comment for why.
-  var useFx=(scale===1||!scale)&&exportHasActiveEffects()&&window.SMEngineBridge&&window.SMEngineBridge.beginEffectsExport();
+  var useFx=(scale===1||!scale)&&exportNeedsEngine()&&window.SMEngineBridge&&window.SMEngineBridge.beginEffectsExport();
   try{
     for(var f=start,i=1;f<=end;f++,i++){
       var url=useFx?await SMEngineBridge.renderFrameToPixelsPNG(f):exportFrameDataURL(f,scale,alpha);
@@ -259,6 +378,281 @@ async function exportRenderPNGsToDir(dir,start,end,scale,onProgress,alpha){
   }finally{
     if(useFx)SMEngineBridge.endEffectsExport();
   }
+}
+
+// ---- Browser-compatible video export (2026-08-17) ----
+// Cyril: "une méthode différente d'export vidéo compatible avec la
+// version navigateur" — every raster video path above (MP4/GIF/ProRes)
+// shells out to the bundled ffmpeg sidecar via Tauri, so none of them
+// work in the plain browser preview at all (exportTauriAvailable() gate,
+// hard error). MediaRecorder + canvas.captureStream() is the standard
+// browser-native alternative: no ffmpeg, no native binary, works in the
+// preview AND would work in a future pure-web build of this app.
+//
+// Timing is the one real constraint MediaRecorder imposes that ffmpeg
+// doesn't: it's fundamentally a REAL-TIME capture API — a chunk's
+// recorded duration is however long it sat on the canvas in wall-clock
+// time between captureStream(0)'s manual track.requestFrame() calls, not
+// a frame count. So exporting an N-frame clip at F fps necessarily takes
+// ~N/F real seconds here (rendering each frame, pushing it, then
+// sleeping out the rest of that frame's 1000/F ms slot) — slower than
+// ffmpeg's batch encode, but the only way to get correct PLAYBACK speed
+// out of this API. Same frame SOURCE as the ffmpeg path (useFx routes
+// through the engine for effects/compositing/3D/motion-blur projects,
+// exactly like exportRenderPNGsToDir), so what gets recorded matches
+// what the ffmpeg export would have produced, just muxed differently.
+function exportVideoBrowserAvailable(){
+  return typeof MediaRecorder!=='undefined'&&!!(document.createElement('canvas').captureStream);
+}
+// Preference order: real MP4/H.264 first (plays everywhere, including a
+// share/email attachment) when the browser actually supports muxing it
+// (Safari 16+, some Chrome versions with the right flags) — WebM/VP9 as
+// the broadly-supported fallback (every Chromium/Firefox build), VP8 as
+// the last resort for older engines.
+var VIDEO_MIME_CANDIDATES=['video/mp4;codecs=avc1.42E01E','video/mp4','video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'];
+function exportPickVideoMimeType(){
+  if(!window.MediaRecorder||!MediaRecorder.isTypeSupported)return'';
+  for(var i=0;i<VIDEO_MIME_CANDIDATES.length;i++){
+    if(MediaRecorder.isTypeSupported(VIDEO_MIME_CANDIDATES[i]))return VIDEO_MIME_CANDIDATES[i];
+  }
+  return'';
+}
+function exportLoadImage(url){
+  return new Promise(function(resolve,reject){
+    var img=new Image();
+    img.onload=function(){resolve(img);};
+    img.onerror=function(){reject(new Error('image decode failed'));};
+    img.src=url;
+  });
+}
+function exportSleep(ms){return new Promise(function(resolve){setTimeout(resolve,ms);});}
+async function exportVideoBrowser(opts){
+  if(!exportVideoBrowserAvailable())return{ok:false,error:'Export vidéo non supporté par ce navigateur (MediaRecorder/captureStream indisponible).'};
+  var mime=exportPickVideoMimeType();
+  if(!mime)return{ok:false,error:'Aucun codec vidéo (MP4/WebM) supporté par ce navigateur.'};
+  var r=exportFrameRange(opts);var scale=(opts&&opts.scale)||1;var fps=(opts&&opts.fps)||state.fps;
+  var cw=Math.max(1,Math.round(state.canvasW*scale)),ch=Math.max(1,Math.round(state.canvasH*scale));
+  var canvas=document.createElement('canvas');canvas.width=cw;canvas.height=ch;
+  var ctx=canvas.getContext('2d');
+  // captureStream(0) = manual mode: the track only advances when
+  // requestFrame() is called, instead of auto-sampling the canvas at a
+  // fixed rate — lets each drawn frame's ON-SCREEN duration be controlled
+  // precisely by the sleep below rather than racing an independent timer.
+  var stream=canvas.captureStream(0);
+  var track=stream.getVideoTracks()[0];
+  var chunks=[];
+  var rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:8000000});
+  rec.ondataavailable=function(e){if(e.data&&e.data.size)chunks.push(e.data);};
+  var stopped=new Promise(function(resolve){rec.onstop=resolve;});
+  rec.start();
+  var useFx=(scale===1||!scale)&&exportNeedsEngine()&&window.SMEngineBridge&&window.SMEngineBridge.beginEffectsExport();
+  try{
+    var frameMs=1000/fps;
+    for(var f=r.start,i=1;f<=r.end;f++,i++){
+      var t0=performance.now();
+      var url=useFx?await SMEngineBridge.renderFrameToPixelsPNG(f):exportFrameDataURL(f,scale,false);
+      var img=await exportLoadImage(url);
+      ctx.clearRect(0,0,cw,ch);
+      ctx.drawImage(img,0,0,cw,ch);
+      track.requestFrame();
+      if(opts&&opts.onProgress)opts.onProgress(i,r.end-r.start+1);
+      var wait=frameMs-(performance.now()-t0);
+      if(wait>0)await exportSleep(wait);
+    }
+  }finally{
+    if(useFx)SMEngineBridge.endEffectsExport();
+  }
+  // Hold the last frame on screen for one more slot before stopping — a
+  // recorder stopped the instant the final requestFrame() fires can clip
+  // that frame's chunk short (0-duration or dropped), same "flush before
+  // teardown" reasoning as any streaming encoder.
+  await exportSleep(Math.max(50,1000/fps));
+  rec.stop();
+  await stopped;
+  var mimeBase=mime.split(';')[0];
+  var blob=new Blob(chunks,{type:mimeBase});
+  var ext=mimeBase.indexOf('mp4')>=0?'mp4':'webm';
+  var filename=(opts&&opts.filename)||('animation.'+ext);
+  var u=URL.createObjectURL(blob);
+  var a=document.createElement('a');a.href=u;a.download=filename;a.click();
+  URL.revokeObjectURL(u);
+  return{ok:true,browserFallback:true,mimeType:mime,bytes:blob.size,filename:filename};
+}
+
+// ---- Browser-compatible GIF export (2026-08-17) ----
+// Cyril: "étendre l'export navigateur au GIF" — unlike MP4/WebM, no
+// browser exposes a native GIF encoder (MediaRecorder doesn't do GIF),
+// so this is a from-scratch GIF89a writer: median-cut palette
+// quantization (once, from a sample of frames — a per-frame palette
+// would flicker colors frame to frame) + textbook LZW compression, no
+// external library. Self-contained on purpose: this app's dev preview
+// has no bundler/npm install step to pull a GIF encoder in through, and
+// the algorithm itself is small and stable enough that hand-rolling it
+// is less risk than vendoring an unaudited third-party minified blob.
+function exportGifNearestColor(r,g,b,palette){
+  var best=0,bestD=Infinity;
+  for(var i=0;i<palette.length;i+=3){
+    var dr=r-palette[i],dg=g-palette[i+1],db=b-palette[i+2];
+    var d=dr*dr+dg*dg+db*db;
+    if(d<bestD){bestD=d;best=i/3;if(d===0)break;}
+  }
+  return best;
+}
+// Median-cut: recursively splits the sampled pixel set along its widest
+// channel until there are `maxColors` boxes, then averages each box into
+// one palette entry — the standard, well-understood quantizer (same
+// family GIF encoders have used since the format's 1989 spec), chosen
+// over a fancier one (NeuQuant, k-means) for how little code it needs.
+function exportGifMedianCut(pixels,maxColors){
+  var boxes=[pixels];
+  while(boxes.length<maxColors){
+    boxes.sort(function(a,b){return exportGifBoxRange(b)-exportGifBoxRange(a);});
+    var box=boxes.shift();
+    if(box.length<2){boxes.push(box);break;}
+    var ch=exportGifWidestChannel(box);
+    box.sort(function(a,b){return a[ch]-b[ch];});
+    var mid=box.length>>1;
+    boxes.push(box.slice(0,mid),box.slice(mid));
+  }
+  return boxes.map(function(box){
+    var r=0,g=0,b=0;
+    box.forEach(function(p){r+=p[0];g+=p[1];b+=p[2];});
+    var n=box.length||1;
+    return[Math.round(r/n),Math.round(g/n),Math.round(b/n)];
+  });
+}
+function exportGifWidestChannel(box){
+  var min=[255,255,255],max=[0,0,0];
+  box.forEach(function(p){for(var c=0;c<3;c++){if(p[c]<min[c])min[c]=p[c];if(p[c]>max[c])max[c]=p[c];}});
+  var range=[max[0]-min[0],max[1]-min[1],max[2]-min[2]];
+  return range[0]>=range[1]&&range[0]>=range[2]?0:(range[1]>=range[2]?1:2);
+}
+function exportGifBoxRange(box){
+  if(box.length<2)return 0;
+  var ch=exportGifWidestChannel(box);
+  var min=255,max=0;
+  box.forEach(function(p){if(p[ch]<min)min=p[ch];if(p[ch]>max)max=p[ch];});
+  return(max-min)*box.length; // weight by population so big flat boxes still get split
+}
+// LZW encoder, GIF's own variable-code-width variant (codes grow from
+// minCodeSize+1 bits up to 12, clear/end-of-information codes reserved
+// at the bottom of the table) — ports the algorithm every GIF spec
+// walks through, operating on PALETTE INDICES (not RGB) since that's
+// what an Image Data block actually carries.
+function exportGifLZWEncode(indices,minCodeSize){
+  var clearCode=1<<minCodeSize,eoiCode=clearCode+1;
+  var codeSize=minCodeSize+1,nextCode=eoiCode+1;
+  var dict={};
+  var out=[];var bitBuf=0,bitCount=0;
+  function emit(code){
+    bitBuf|=code<<bitCount;bitCount+=codeSize;
+    while(bitCount>=8){out.push(bitBuf&0xff);bitBuf>>=8;bitCount-=8;}
+  }
+  function resetDict(){dict={};nextCode=eoiCode+1;codeSize=minCodeSize+1;for(var i=0;i<clearCode;i++)dict[i]=i;}
+  resetDict();emit(clearCode);
+  var w=indices[0];
+  for(var i=1;i<indices.length;i++){
+    var k=indices[i];var wk=w+','+k;
+    if(dict[wk]!==undefined){w=wk;}
+    else{
+      emit(dict[w]);
+      if(nextCode<4096){dict[wk]=nextCode++;if(nextCode>(1<<codeSize)&&codeSize<12)codeSize++;}
+      else{emit(clearCode);resetDict();}
+      w=''+k;
+    }
+  }
+  emit(dict[w]);emit(eoiCode);
+  if(bitCount>0)out.push(bitBuf&0xff);
+  return out;
+}
+function exportGifAvailable(){
+  return typeof document.createElement('canvas').getContext==='function';
+}
+async function exportGifBrowser(opts){
+  var r=exportFrameRange(opts);var scale=(opts&&opts.scale)||1;var fps=(opts&&opts.fps)||state.fps;
+  var cw=Math.max(1,Math.round(state.canvasW*scale)),ch=Math.max(1,Math.round(state.canvasH*scale));
+  var canvas=document.createElement('canvas');canvas.width=cw;canvas.height=ch;
+  var ctx=canvas.getContext('2d',{willReadFrequently:true});
+  var useFx=(scale===1||!scale)&&exportNeedsEngine()&&window.SMEngineBridge&&window.SMEngineBridge.beginEffectsExport();
+  var frameCount=r.end-r.start+1;
+  var framePixels=[];
+  try{
+    // Pass 1: render every frame to RGBA pixel data, and sample a subset
+    // of pixels across all of them for the palette so colors that only
+    // appear in a few frames (a flash of red mid-animation) still make
+    // the cut — a palette built from frame 0 alone would clip anything
+    // introduced later.
+    var samples=[];
+    for(var f=r.start,i=1;f<=r.end;f++,i++){
+      var url=useFx?await SMEngineBridge.renderFrameToPixelsPNG(f):exportFrameDataURL(f,scale,false);
+      var img=await exportLoadImage(url);
+      ctx.clearRect(0,0,cw,ch);ctx.drawImage(img,0,0,cw,ch);
+      var data=ctx.getImageData(0,0,cw,ch).data;
+      framePixels.push(data);
+      var step=Math.max(1,Math.floor((cw*ch)/2000)); // ~2000 samples/frame, plenty for median-cut
+      for(var p=0;p<data.length;p+=4*step)samples.push([data[p],data[p+1],data[p+2]]);
+      if(opts&&opts.onProgress)opts.onProgress(i,frameCount*2);
+    }
+  }finally{
+    if(useFx)SMEngineBridge.endEffectsExport();
+  }
+  var palette=exportGifMedianCut(samples,255); // 255 + 1 reserved slot kept below 256
+  while(palette.length<256)palette.push([0,0,0]);
+  var flatPalette=[];palette.forEach(function(c){flatPalette.push(c[0],c[1],c[2]);});
+  var minCodeSize=Math.max(2,Math.ceil(Math.log2(palette.length)));
+
+  // ---- GIF89a assembly ----
+  var bytes=[];
+  function pushStr(s){for(var k=0;k<s.length;k++)bytes.push(s.charCodeAt(k));}
+  function push16(n){bytes.push(n&0xff,(n>>8)&0xff);}
+  pushStr('GIF89a');
+  push16(cw);push16(ch);
+  bytes.push(0xF0|(minCodeSize-1)); // global color table present, 256 entries
+  bytes.push(0);bytes.push(0); // bg color index, pixel aspect
+  flatPalette.forEach(function(v){bytes.push(v);});
+  // NETSCAPE2.0 application extension — infinite loop, same convention
+  // every GIF-producing tool (ffmpeg's own palette path included) uses.
+  bytes.push(0x21,0xFF,0x0B);pushStr('NETSCAPE2.0');bytes.push(3,1,0,0,0);
+  var delayCs=Math.max(1,Math.round(100/fps)); // GIF delay unit is 1/100s
+  for(var fi=0;fi<framePixels.length;fi++){
+    var data2=framePixels[fi];
+    var indices=new Array(cw*ch);
+    // Memoized per exact RGB triple (2026-08-17): this app's content is
+    // almost entirely flat-fill vector shapes, so a real frame is
+    // overwhelmingly a handful of distinct colors repeated over huge flat
+    // regions — caching collapses what was previously one brute-force
+    // 256-entry scan PER PIXEL down to one scan per distinct color ever
+    // seen. Measured: brings a 1920×1080 frame from several seconds to
+    // under one on typical vector content (a raster/gradient-heavy frame
+    // with thousands of unique colors degrades toward the uncached cost,
+    // same as it always was — this is a best-case speedup, not a
+    // complexity-class change).
+    var colorCache={};
+    for(var pi=0,di=0;di<data2.length;di+=4,pi++){
+      var key=(data2[di]<<16)|(data2[di+1]<<8)|data2[di+2];
+      var idx=colorCache[key];
+      if(idx===undefined){idx=exportGifNearestColor(data2[di],data2[di+1],data2[di+2],flatPalette);colorCache[key]=idx;}
+      indices[pi]=idx;
+    }
+    bytes.push(0x21,0xF9,4,0x00);push16(delayCs);bytes.push(0,0);
+    bytes.push(0x2C);push16(0);push16(0);push16(cw);push16(ch);bytes.push(0);
+    bytes.push(minCodeSize);
+    var lzw=exportGifLZWEncode(indices,minCodeSize);
+    for(var off=0;off<lzw.length;off+=255){
+      var chunk=lzw.slice(off,off+255);
+      bytes.push(chunk.length);
+      chunk.forEach(function(v){bytes.push(v);});
+    }
+    bytes.push(0);
+    if(opts&&opts.onProgress)opts.onProgress(frameCount+fi+1,frameCount*2);
+  }
+  bytes.push(0x3B);
+  var blob=new Blob([new Uint8Array(bytes)],{type:'image/gif'});
+  var filename=(opts&&opts.filename)||'animation.gif';
+  var u=URL.createObjectURL(blob);
+  var a=document.createElement('a');a.href=u;a.download=filename;a.click();
+  URL.revokeObjectURL(u);
+  return{ok:true,browserFallback:true,bytes:blob.size,filename:filename,paletteSize:palette.length};
 }
 
 // ---- LOTTIE / BODYMOVIN CONVERTER ----
@@ -326,8 +720,74 @@ function lottieShapeValue(sd,camMatrix){
     c:!!sd.closed
   };
 }
-function lottiePathLayer(name,runStrokes,runStart,runEnd,fps,camByFrame,bm){
+// Stroke gradient along path (2026-08, AE feature audit 6.3/9.2) — Lottie
+// has no native "gradient follows the stroke's own length" concept either
+// (its 'gs' gradient-stroke shape is spatial, same 2-point limitation AE
+// itself has) — same reasoning as engine-bridge.js's live-render approach:
+// split into many small solid-colored straight sub-segments, one Lottie
+// shape GROUP per piece, all packed into the layer's `shapes` array
+// together (Lottie composites sibling groups within one shape layer
+// naturally, no separate Lottie layer needed per piece).
+//
+// STATIC approximation, posed at the run's first frame only — unlike the
+// path animation ('sh' keyframes) elsewhere in this exporter, a per-piece
+// split can't easily follow a frame-by-frame ANIMATED path (piece count/
+// positions would need re-deriving every frame, and Lottie has no keyframed
+// "N groups" concept). Stated v1 limitation: a gradient-along-path stroke
+// that ALSO moves/reshapes during this run exports frozen at its start
+// pose — correct for the overwhelmingly common case (a static or lightly
+// keyed decorative stroke), same tradeoff class as Trim Paths' own
+// polyline-not-exact-bezier approximation.
+function lottieGradientAlongPathShapes(first){
+  if(!window.SMMotion)return null;
+  var sg=first.strokeGradientAlongPath;
+  var fromRgba=lottieHexToRGBA(sg.from,1),toRgba=lottieHexToRGBA(sg.to,1);
+  var poly=SMMotion.flattenSegmentsToPolyline(first.segments,first.closed,20);
+  var cumL=[0];
+  for(var i=1;i<poly.length;i++){var dx=poly[i][0]-poly[i-1][0],dy=poly[i][1]-poly[i-1][1];cumL.push(cumL[i-1]+Math.sqrt(dx*dx+dy*dy));}
+  var totalL=cumL[cumL.length-1];
+  if(totalL<=0)return null;
+  var pieceCount=Math.max(6,Math.min(48,Math.round(totalL/40)));
+  var pieceLen=totalL/pieceCount;
+  function pointAtLen(len){
+    for(var qi=1;qi<cumL.length;qi++){
+      if(cumL[qi]>=len){var segLen=cumL[qi]-cumL[qi-1];var t=segLen>0?(len-cumL[qi-1])/segLen:0;return[poly[qi-1][0]+(poly[qi][0]-poly[qi-1][0])*t,poly[qi-1][1]+(poly[qi][1]-poly[qi-1][1])*t];}
+    }
+    return poly[poly.length-1];
+  }
+  var op=first.opacity!==undefined?first.opacity:1;
+  var groups=[];
+  for(var pi=0;pi<pieceCount;pi++){
+    var pA=pointAtLen(pi*pieceLen),pB=pointAtLen((pi+1)*pieceLen);
+    var tMid=(pi+0.5)/pieceCount;
+    var col=[
+      (fromRgba[0]+(toRgba[0]-fromRgba[0])*tMid),
+      (fromRgba[1]+(toRgba[1]-fromRgba[1])*tMid),
+      (fromRgba[2]+(toRgba[2]-fromRgba[2])*tMid),
+      1
+    ];
+    groups.push({ty:'gr',it:[
+      {ty:'sh',ks:{a:0,k:{i:[[0,0],[0,0]],o:[[0,0],[0,0]],v:[pA,pB],c:false}}},
+      {ty:'st',c:{a:0,k:col},o:{a:0,k:op*100},w:{a:0,k:first.strokeWidth||2},lc:first.strokeCap==='round'?2:(first.strokeCap==='square'?3:1),lj:2},
+      {ty:'tr',p:{a:0,k:[0,0]},a:{a:0,k:[0,0]},s:{a:0,k:[100,100]},r:{a:0,k:0},o:{a:0,k:100}},
+    ]});
+  }
+  return groups;
+}
+function lottiePathLayer(name,runStrokes,runStart,runEnd,fps,camByFrame,bm,li){
   var first=runStrokes[runStart];
+  if(first.strokeGradientAlongPath&&first.hasRealStroke&&first.segments&&first.segments.length){
+    var gradShapes=lottieGradientAlongPathShapes(first);
+    if(gradShapes){
+      return{
+        ddd:0,ty:4,nm:name,sr:1,
+        ks:{o:{a:0,k:100},r:{a:0,k:0},p:{a:0,k:[0,0,0]},a:{a:0,k:[0,0,0]},s:{a:0,k:[100,100,100]}},
+        ao:0,
+        shapes:gradShapes,
+        ip:runStart,op:runEnd+1,st:0,bm:bm||0
+      };
+    }
+  }
   // sd.strokeColor defaults to '#ffffff' as a legacy fallback even when the
   // path never had a real stroke (serP, app.js) — CLAUDE.md's documented
   // hasRealStroke field exists precisely so consumers can tell the two
@@ -348,6 +808,23 @@ function lottiePathLayer(name,runStrokes,runStart,runEnd,fps,camByFrame,bm){
   }
   if(first.fillColor){
     shapeItems.push({ty:'fl',c:{a:0,k:lottieHexToRGBA(first.fillColor,1)},o:{a:0,k:(first.opacity!==undefined?first.opacity:1)*100}});
+  }
+  // Trim Paths (2026-08, AE feature audit 9.2) — Lottie has a NATIVE shape
+  // modifier for this ('tm', Bodymovin/lottie-web's own Trim Paths), a
+  // near 1:1 mapping to Nemo's own trimStart/trimEnd/trimOffset: s/e are
+  // the SAME 0-100 percent space, o is in DEGREES (AE's own Trim Paths
+  // Offset property is natively degrees, not percent — Nemo's own o is
+  // percent for UI-simplicity reasons, see motion.js's PROP_DEFAULT
+  // comment, so *3.6 converts one to the other here at the export
+  // boundary only). Keyframed per-frame exactly like the path ('sh')
+  // shape above, since trim is itself an animatable per-element property.
+  if(window.SMMotion&&li!=null&&first.strokeId&&SMMotion.hasTrimMotionFor(li,first.strokeId)){
+    var tmS=[],tmE=[],tmO=[];
+    for(var tf=runStart;tf<=runEnd;tf++){
+      var win=SMMotion.trimWindowAt(li,first.strokeId,tf)||{start:0,end:100,offset:0};
+      tmS.push({t:tf,s:[win.start]});tmE.push({t:tf,s:[win.end]});tmO.push({t:tf,s:[win.offset*3.6]});
+    }
+    shapeItems.push({ty:'tm',s:{a:1,k:tmS},e:{a:1,k:tmE},o:{a:1,k:tmO},m:1});
   }
   shapeItems.push({ty:'tr',p:{a:0,k:[0,0]},a:{a:0,k:[0,0]},s:{a:0,k:[100,100]},r:{a:0,k:0},o:{a:0,k:100}});
   return{
@@ -381,7 +858,10 @@ function lottieBuild(start,end){
   }
 
   for(var li=state.layers.length-1;li>=0;li--){
-    var ld=state.layers[li];if(!ld.visible)continue;
+    var ld=state.layers[li];
+    // Same solo-aware fix as exportBuildFrame above — this Lottie exporter
+    // had the identical bare .visible check, same leak.
+    if(!layerIsEffectivelyVisible(li))continue;
     var bm=lottieBmCode(ld.blendMode);
     // per-frame strokes array for this layer across the export range —
     // drops fully-invisible brush-texture anchors (opacity:0 by convention,
@@ -402,7 +882,25 @@ function lottieBuild(start,end){
     // dab companions are UNAFFECTED — they're real Paths with segments,
     // same as before.
     var framesStrokes=[];
-    for(var f=start;f<=end;f++)framesStrokes[f]=getEffectiveStrokes(li,f).filter(function(sd){return sd.opacity!==0&&!sd.isRaster&&!sd.isRevisionGhost&&(state.exportIncludeShadowGuides||sd.channelTag!=='shadow');});
+    for(var f=start;f<=end;f++){
+      // isMask (2026-08, AE feature audit 9.2 "voir si nos nouvelles
+      // features peuvent être compatible" Lottie): excluded from the
+      // exported shapes, not just left in as a normal visible shape. This
+      // exporter turns every STROKE into its own Lottie shape LAYER (no
+      // per-Nemo-layer grouping), so there's no single Lottie layer a mask
+      // could attach masksProperties to — real Lottie masking needs that
+      // restructure, not done here. Excluding is still strictly better
+      // than the prior behavior: without this, a mask exported as an
+      // ordinary opaque shape in its EDIT-time color (masks are white-
+      // filled only inside the live engine's own render, never in the
+      // persisted stroke data) — a wrong, visible extra shape, worse than
+      // an honestly-missing clip.
+      var fStrokes=getEffectiveStrokesRendered(li,f).filter(function(sd){return sd.opacity!==0&&!sd.isRaster&&!sd.isRevisionGhost&&!sd.isMask&&(state.exportIncludeShadowGuides||sd.channelTag!=='shadow');});
+      // Non-destructive combine groups (2026-07-29) — same post-process as
+      // exportBuildFrame/buildSceneJson.
+      if(window.SMGroup&&ld.groups)fStrokes=SMGroup.applyCombinesToStrokes(fStrokes,ld);
+      framesStrokes[f]=fStrokes;
+    }
 
     // figure out the max stroke-slot count and, for each slot, the
     // contiguous frame runs where that slot exists (count stable)
@@ -418,7 +916,7 @@ function lottieBuild(start,end){
           var runEnd=f-1;
           var runStrokes={};
           for(var rf=runStart;rf<=runEnd;rf++)runStrokes[rf]=framesStrokes[rf][slot];
-          var layer=lottiePathLayer(ld.name+' / shape'+slot,runStrokes,runStart,runEnd,fps,camByFrame,bm);
+          var layer=lottiePathLayer(ld.name+' / shape'+slot,runStrokes,runStart,runEnd,fps,camByFrame,bm,li);
           layer.ind=ind++;
           layers.push(layer);
           runStart=null;
@@ -495,7 +993,7 @@ window.SMExport={
   },
 
   exportGIF:async function(opts){
-    if(!exportTauriAvailable())return{ok:false,error:'Disponible uniquement dans l\'app Nemo (pas en preview navigateur).'};
+    if(!exportTauriAvailable())return exportGifBrowser(opts);
     var r=exportFrameRange(opts);var scale=(opts&&opts.scale)||1;var fps=(opts&&opts.fps)||state.fps;
     var outPath=await exportPickSaveFile('Exporter en GIF','animation.gif',[{name:'GIF',extensions:['gif']}]);
     if(!outPath)return{cancelled:true};
@@ -511,11 +1009,18 @@ window.SMExport={
   },
 
   exportMP4:async function(opts){
-    if(!exportTauriAvailable())return{ok:false,error:'Disponible uniquement dans l\'app Nemo (pas en preview navigateur).'};
+    if(!exportTauriAvailable())return exportVideoBrowser(opts);
     var outPath=await exportPickSaveFile('Exporter en MP4','animation.mp4',[{name:'MP4',extensions:['mp4']}]);
     if(!outPath)return{cancelled:true};
     return exportMP4ToPath(outPath,opts);
   },
+  // Explicit entry point (2026-08-17) for a caller that wants the
+  // MediaRecorder path specifically, regardless of Tauri availability —
+  // exportMP4 above only reaches for it as a browser fallback.
+  exportVideoBrowser:exportVideoBrowser,
+  videoBrowserAvailable:exportVideoBrowserAvailable,
+  exportGifBrowser:exportGifBrowser,
+  gifBrowserAvailable:exportGifAvailable,
   // Kitsu publish (Phase 4) needs the same H.264 render but writing to a
   // caller-chosen temp path with no save dialog — the publish flow already
   // asked the user to confirm once, a second native file picker mid-publish

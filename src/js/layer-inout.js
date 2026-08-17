@@ -16,6 +16,84 @@
   // keeping ONE definition avoids the two drifting apart.
   function inPointOf(ld) { return window.layerInPoint ? layerInPoint(ld) : (ld.inPoint != null ? ld.inPoint : 0); }
   function outPointOf(ld) { return window.layerOutPoint ? layerOutPoint(ld) : (ld.outPoint != null ? ld.outPoint : state.totalFrames - 1); }
+  // Parent-in-Time makes ld.inPoint/outPoint completely inert on a linked
+  // edge — layerInPoint/layerOutPoint (app.js) check resolveLinkedTime
+  // FIRST and return its result unconditionally when the edge is linked,
+  // never even reading ld.inPoint/outPoint. Every drag handler below used
+  // to write straight to those fields regardless, so dragging a linked
+  // child's bar visibly did nothing (found live, Cyril: "les enfants du
+  // parent in time... on ne peut pas les drag"). This redirects the SAME
+  // drag math to timeLinkInOffset/timeLinkOutOffset instead — the ACTUAL
+  // value resolveLinkedTime reads — so the bar genuinely follows the
+  // cursor. `effectiveValue` is what the caller wants this edge to END UP
+  // AT (identical to what it would have assigned to ld.inPoint/outPoint);
+  // this converts that into the offset from the link source's CURRENT
+  // in/out that produces the same effective result. Only the edge(s) the
+  // link's own mode actually covers are redirected — mirrors
+  // resolveLinkedTime's own per-edge mode check exactly, so (e.g.) an
+  // 'in'-only link still lets the OUT handle drag normally. Returns true
+  // when it handled the write (caller skips its own ld.inPoint/outPoint
+  // assignment for that edge); false means the edge isn't linked and the
+  // caller's normal write should proceed unchanged.
+  function trySetLinkedEdge(ld, which, effectiveValue) {
+    if (!ld.timeLink) return false;
+    var mode = ld.timeLink.mode || 'both';
+    if (which === 'in' && mode === 'out') return false;
+    if (which === 'out' && mode === 'in') return false;
+    var src = window.timeLinkSourceOf ? timeLinkSourceOf(ld) : null;
+    if (!src) return false;
+    if (!window.SMMotion || !window.SMMotion.setLayerValue) return false;
+    // Cross-type source (2026-08-16) — same srcAnchor fallback as
+    // resolveLinkedTime (app.js) and setLayerTimeLink (motion.js); absent
+    // for every pre-existing/same-type link, so this changes nothing for
+    // those.
+    var srcWhich = (ld.timeLink.srcAnchor === 'in' || ld.timeLink.srcAnchor === 'out') ? ld.timeLink.srcAnchor : which;
+    var base = srcWhich === 'in' ? inPointOf(src) : outPointOf(src);
+    var prop = which === 'in' ? 'timeLinkInOffset' : 'timeLinkOutOffset';
+    var li = state.layers.indexOf(ld);
+    SMMotion.setLayerValue(li, prop, [effectiveValue - base]);
+    return true;
+  }
+  // Live keyframe-diamond preview during a drag (2026-07-30, Cyril: "les clé
+  // ne bouge pas en temp réel avec calque ou in/outpoint") — mirrors (a
+  // deliberately simplified, "good enough for a preview" copy of) the
+  // retime decision the mouseup handler makes for real a few hundred lines
+  // down, but only calls into motion.js's transform-only preview, never the
+  // actual data commit. `type==='out'` never retimes the layer-wide default
+  // (mirrors mouseup's own toast: "Rogner la fin ne déplace jamais les
+  // keyframes"), so Alt on an out-drag must NOT invert it — same guard
+  // shape as mouseup's `d.type !== 'out'` inside the ternary condition.
+  function livePreviewLayerKeys(li, type, ld, origIn, altKey) {
+    var defaultRetimes = type !== 'out' && (type === 'both' || !!state.activeSymbolId);
+    var retimes = (altKey && type !== 'out') ? !defaultRetimes : defaultRetimes;
+    if (!retimes) return;
+    var dxFrames = inPointOf(ld) - origIn;
+    if (window.SMMotion && SMMotion.previewKeyframeShift) SMMotion.previewKeyframeShift(li, dxFrames, 'layer');
+    previewInOutTicks(li, dxFrames);
+  }
+  // Sibling to previewKeyframeShift's `.motion-key` diamond preview above,
+  // but for the DRAWING-keyframe tick marks (renderKeyTicks) inside this
+  // layer's own in/out bar (2026-08-16, Cyril: "les keyframes ne suivent pas
+  // en temps réel le drag du calque"). Those ticks are positioned relative to
+  // the bar's OWN left edge (`(frameIdx - inF) * FC`) — during a body drag
+  // updateBar keeps rewriting both the bar's left (inF*FC) and every tick's
+  // left off the SAME live-shifting inF, so the two offsets cancel out and
+  // the tick's on-screen position stays glued to its original absolute frame
+  // the whole time (ld.frames itself isn't actually shifted until drop —
+  // "cheap live visual, expensive commit at drop", same split as the
+  // diamonds). A translateX nudge here is the same cheap trick, scoped to
+  // this one layer's bar(s) since a group drag calls this per member.
+  function previewInOutTicks(li, dxFrames) {
+    if (!dxFrames) return;
+    var px = Math.round(dxFrames * FC);
+    document.querySelectorAll('#frame-grid .frow[data-layer="' + li + '"] .layer-inout-key').forEach(function (tick) {
+      tick.style.transform = 'translateX(' + px + 'px)';
+    });
+  }
+  function livePreviewSelectedKeys(dxFrames) {
+    if (!window.SMMotion || !SMMotion.previewKeyframeShift) return;
+    SMMotion.previewKeyframeShift(null, dxFrames, 'selected');
+  }
   // A manually-dragged range OR an auto-detected blank-keyframe trim both
   // count as "not full range" for styling — a naturally-shortened bar
   // (layer stops drawing partway through) should read as visually distinct
@@ -46,6 +124,7 @@
     bar.style.width = Math.max(FC, (outF - inF + 1) * FC) + 'px';
     var custom = hasCustomRange(ld);
     bar.classList.toggle('full-range', !custom);
+    bar.classList.toggle('has-timelink', !!ld.timeLink);
     // Layer-color tint ALWAYS applied now (2026-07-17, explicit request:
     // "il faut que ça couleur soit déjà appliqué quoi qu'il arrive" — a
     // layer previously only showed its own color once trimmed, reading as
@@ -57,16 +136,12 @@
     // it's trimmed" signal survives alongside the always-on color.
     bar.style.background = hexToRgba(ld.color, custom ? 0.55 : 0.22);
     bar.style.borderColor = hexToRgba(ld.color, custom ? 0.95 : 0.5);
-    // Bug found 2026-07 ("si hover ou select avec rectangle le in ou
-    // outpoint celui ci doit se bleuté"): this used to set the handle's
-    // background as an INLINE style, which always wins over any CSS rule
-    // regardless of selector specificity — .layer-inout-handle:hover and
-    // .layer-inout-bar.sel .layer-inout-handle (style.css) existed but
-    // could never actually show through on a trimmed (custom-color) bar.
-    // Routing the layer color through a custom property instead lets
-    // normal CSS cascade rules for hover/selected states win as expected.
-    if (custom) bar.style.setProperty('--io-handle-color', hexToRgba(ld.color, 1));
-    else bar.style.removeProperty('--io-handle-color');
+    // Handle is a uniform white pill now regardless of layer color
+    // (2026-08-16 restyle, nemo-timeline-inout-spec.html) — the bar itself
+    // still carries the per-layer tint above; the handle's per-layer
+    // --io-handle-color override (previously needed to win the CSS cascade
+    // over :hover/.sel on a trimmed bar) is retired along with it, since the
+    // handle no longer varies by layer color at all.
     // Animation 2D's per-frame .fc cells (Motion mode's collapsed spacer row
     // has none — nothing to dim there, the bar alone is enough context).
     var cells = row.querySelectorAll('.fc');
@@ -228,8 +303,18 @@
     bar.classList.toggle('sel', part === 'both');
     var hleft = bar.querySelector('.layer-inout-handle.left');
     var hright = bar.querySelector('.layer-inout-handle.right');
-    if (hleft) hleft.classList.toggle('sel', part === 'in');
-    if (hright) hright.classList.toggle('sel', part === 'out');
+    // 2026-08-16 fix (Cyril, live: "les in out/point des layers... disparaissent
+    // si je les select avec le rec box, il faudrait que celui ci s'assombrisse")
+    // — a whole-bar marquee pick (part==='both') used to leave BOTH handles in
+    // their default light/white pill colour while the bar itself grew a white
+    // .sel box-shadow ring right up against them — a light pill sitting flush
+    // against a white ring reads as gone, not merely unselected. Darkening
+    // both handles whenever the WHOLE bar is selected (in addition to the
+    // existing single-edge darkening) keeps them visible against that ring,
+    // and is the more honest signal anyway: a whole-bar selection DOES cover
+    // both edges.
+    if (hleft) hleft.classList.toggle('sel', part === 'in' || part === 'both');
+    if (hright) hright.classList.toggle('sel', part === 'out' || part === 'both');
   }
   var _marquee = null; // {startX, startY, rectEl, moved}
   function startMarquee(e) {
@@ -352,10 +437,40 @@
   function keySelNow() {
     return (window.SMMotion && SMMotion.getKeySelection) ? SMMotion.getKeySelection() : [];
   }
+  // Shift-range vs Ctrl/Cmd-toggle (2026-07-30 fix, Cyril: "avec shift on
+  // doit pouvoir select plusieurs calques, in out point, et avec ctrl aussi
+  // pour sauter des calque") — previously shiftKey/metaKey/ctrlKey all did
+  // the exact same thing (toggleBarSel, a plain membership flip), so Shift
+  // could only ever build up a selection one bar at a time same as Ctrl,
+  // never grab a contiguous run in one click like the layer-list's own
+  // Shift-click (motion.js row handler) already does. _barAnchorLi tracks
+  // the last EXPLICITLY bar-clicked layer — set on every plain click/toggle,
+  // left untouched by a Shift-click itself so a run of Shift-clicks grows
+  // or shrinks the range from the SAME fixed end rather than drifting.
+  var _barAnchorLi = null;
   function onDown(li, row, type, e) {
     e.stopPropagation(); e.preventDefault();
     var ld = state.layers[li]; if (!ld) return;
-    if (e.shiftKey || e.metaKey || e.ctrlKey) { toggleBarSel(li); return; } // select-only, no drag
+    if (e.metaKey || e.ctrlKey) { // toggle one, no drag
+      toggleBarSel(li); _barAnchorLi = li;
+      // Mirror into _layerSel — without this the bar-built selection never
+      // reached the layer list's highlight or its _layerSel-gated menu items
+      // (2026-07-31 fix; the reverse direction, syncBarSelToLayerSel, was
+      // wired one commit before these modifier branches existed).
+      if (window.SMMotion && SMMotion.syncLayerSelFromBarSel) SMMotion.syncLayerSelFromBarSel(_barSel, li);
+      return;
+    }
+    if (e.shiftKey) { // contiguous range from the anchor to this bar, no drag
+      var anchorLi = (_barAnchorLi != null && state.layers[_barAnchorLi]) ? _barAnchorLi : li;
+      var lo = Math.min(anchorLi, li), hi = Math.max(anchorLi, li);
+      var rangeSel = [];
+      for (var rk = lo; rk <= hi; rk++) rangeSel.push({ li: rk, part: 'both' });
+      _barSel = rangeSel;
+      refreshBarSelClasses();
+      if (window.SMMotion && SMMotion.syncLayerSelFromBarSel) SMMotion.syncLayerSelFromBarSel(_barSel, anchorLi);
+      return;
+    }
+    if (window.SMMotion && SMMotion.clearKeyframeShiftPreview) SMMotion.clearKeyframeShiftPreview(); // never inherit a prior drag's leftover offset
     if (window.pushUndo) pushUndo(); // one undo step for the whole drag, not one per mousemove
     // Flush any live canvas content into ld.frames BEFORE this drag starts
     // touching ld.inPoint/outPoint — mousemove below updates those live,
@@ -368,6 +483,16 @@
     // since made unreliable (bug found live: content was vanishing
     // entirely instead of moving — see shiftLayerFrames' own comment).
     if (window.saveAllLayerFrames) saveAllLayerFrames();
+    // Drag state (2026-08-16, nemo-timeline-inout-spec.html): "conserve
+    // l'état survol tant que le bouton est enfoncé, même hors zone" — the
+    // handle actually grabbed (e.target for a handle mousedown, since the
+    // listener is bound directly to hleft/hright) gets a .hot class the
+    // :hover CSS rule also matches, so it stays lit even once the cursor
+    // drags past its small hitbox. Cleared at mouseup below. null for a
+    // bar-BODY drag (type==='both' from the bar itself, not a handle) —
+    // nothing to highlight there.
+    var handleEl = (type === 'in' || type === 'out') ? e.target : null;
+    if (handleEl) handleEl.classList.add('hot');
     // Grabbing ANY part of an already-selected bar (body OR an edge handle)
     // moves/trims the whole group together — feedback: "je ne peux pas
     // select les inpoint ou outpoint avec le rect de select + drag" (an
@@ -379,12 +504,52 @@
       var members = _barSel.map(function (s) {
         var mld = state.layers[s.li], mrow = _liToRow[s.li];
         if (!mld || !mrow) return null;
-        return { li: s.li, row: mrow, origIn: inPointOf(mld), origOut: outPointOf(mld) };
+        // part travels with each member (2026-07-30 fix, Cyril: "pas
+        // possible de faire bouger un in point d'un calque avec un
+        // outpoint d'un autre... quand ils sont tous les 2 select") — a
+        // marquee can tag different bars with different parts ('in' on
+        // one, 'out' on another, 'both' on a third); the drag below now
+        // moves each member according to ITS OWN part instead of forcing
+        // every member to follow whichever single handle was physically
+        // grabbed to start the gesture.
+        return { li: s.li, row: mrow, origIn: inPointOf(mld), origOut: outPointOf(mld), part: s.part || 'both' };
       }).filter(Boolean);
-      _drag = { group: true, type: type, startX: e.clientX, members: members, alt: !!e.altKey, keySel: keySelNow() };
+      // pressLi: which bar was actually clicked, kept alongside the group so
+      // a plain (no-modifier, no-move) click can narrow the selection down
+      // to just this one layer at mouseup — see that check's own comment.
+      _drag = { group: true, type: type, startX: e.clientX, members: members, alt: !!e.altKey, keySel: keySelNow(), pressLi: li, hotEl: handleEl };
       return;
     }
-    _drag = { li: li, row: row, type: type, startX: e.clientX, origIn: inPointOf(ld), origOut: outPointOf(ld), alt: !!e.altKey, keySel: keySelNow() };
+    _drag = { li: li, row: row, type: type, startX: e.clientX, origIn: inPointOf(ld), origOut: outPointOf(ld), alt: !!e.altKey, keySel: keySelNow(), hotEl: handleEl };
+  }
+  // Parent in Time (2026-07-30 on-timeline connector) — a dragged bar's OWN
+  // position is kept live via updateBar (cheap, see its neighboring comment
+  // below), but a layer TIME-LINKED to whatever's being dragged resolves
+  // its in/out FROM the dragged layer's CURRENT position (resolveLinkedTime,
+  // app.js) — without an equally live update here, its bar visibly froze
+  // until the drag ended and the one full renderTimeline() below finally
+  // ran. Found live: "l'autre calque ne bouge pas en temps réel pendant le
+  // drag du parent." Walks transitively (a chain of links), not just direct
+  // children, same small guard bound resolveLinkedTime itself uses for
+  // cycle-safety — still just a handful of cheap updateBar calls, not a
+  // full rebuild.
+  function updateLinkedChildrenBars(sourceLi) {
+    var srcLd = state.layers[sourceLi];
+    var srcUid = (srcLd && window.SMMotion && window.SMMotion.ensureLayerUid) ? SMMotion.ensureLayerUid(srcLd) : null;
+    if (!srcUid) return;
+    state.layers.forEach(function (l2, li2) {
+      if (!l2.timeLink || !l2.timeLink.uid) return;
+      var cur = l2, guard = 0, found = false;
+      while (cur && cur.timeLink && cur.timeLink.uid && guard++ < 16) {
+        if (cur.timeLink.uid === srcUid) { found = true; break; }
+        var next = null;
+        state.layers.forEach(function (o) { if (o.layerUid === cur.timeLink.uid) next = o; });
+        cur = next;
+      }
+      if (!found) return;
+      var row = _liToRow[li2];
+      if (row) updateBar(row, li2);
+    });
   }
   document.addEventListener('mousemove', function (e) {
     updateMarquee(e);
@@ -398,33 +563,92 @@
       // or OUT handle — so a group in-point trim silently shifted the
       // whole range (out point included) instead of trimming just that
       // edge. Each handle type now only touches the field it owns, exactly
-      // like the single-bar (non-group) branch below — 'in'/'out' clamp
-      // per-member independently (trimming can't break another member),
-      // 'both' keeps the original whole-range shift with its group-wide
-      // bounds check (shifting must stay valid for every member at once,
-      // since duration is preserved).
-      if (_drag.type === 'in') {
-        _drag.members.forEach(function (m) {
-          var mld = state.layers[m.li]; if (!mld) return;
-          mld.inPoint = Math.max(0, Math.min(m.origIn + dx, m.origOut - 1));
-          updateBar(m.row, m.li);
+      // like the single-bar (non-group) branch below.
+      //
+      // 2026-07-30 fix (Cyril: "pas possible de faire bouger un in point
+      // d'un calque avec un outpoint d'un autre et inversement quand ils
+      // sont tous les 2 select") — the type of the ONE handle physically
+      // grabbed to start the drag used to apply to EVERY member uniformly,
+      // so a marquee that tagged layer A's IN and layer B's OUT separately
+      // still moved both the same way once dragged together. Partition by
+      // each member's OWN part instead (copied onto m.part in onDown,
+      // straight from _barSel's marquee-assigned in/out/both tag): 'in'/
+      // 'out' members clamp independently per-member (trimming one can't
+      // break another), 'both' members keep the original group-wide bounds
+      // check so a rigid whole-bar group still stays aligned or doesn't
+      // move at all, never partially clamping some members but not others.
+      var inMembers = [], outMembers = [], bothMembersM = [];
+      _drag.members.forEach(function (m) {
+        var p = m.part || 'both';
+        if (p === 'in') inMembers.push(m); else if (p === 'out') outMembers.push(m); else bothMembersM.push(m);
+      });
+      inMembers.forEach(function (m) {
+        var mld = state.layers[m.li]; if (!mld) return;
+        var mNewIn = Math.max(0, Math.min(m.origIn + dx, m.origOut - 1));
+        if (!trySetLinkedEdge(mld, 'in', mNewIn)) mld.inPoint = mNewIn;
+        updateBar(m.row, m.li);
+        updateLinkedChildrenBars(m.li);
+      });
+      outMembers.forEach(function (m) {
+        var mld = state.layers[m.li]; if (!mld) return;
+        var mNewOut = Math.min(total - 1, Math.max(m.origOut + dx, m.origIn + 1));
+        if (!trySetLinkedEdge(mld, 'out', mNewOut)) mld.outPoint = mNewOut;
+        updateBar(m.row, m.li);
+        updateLinkedChildrenBars(m.li);
+      });
+      if (bothMembersM.length) {
+        // CLAMP the group's shift to what every member can absorb, rather
+        // than refusing the whole gesture the moment ONE member would fall
+        // off an edge (2026-08-16 fix). The old all-or-nothing `ok` check
+        // meant a single boundary-touching member silently froze the entire
+        // group with zero feedback — and since an untrimmed layer spans the
+        // WHOLE timeline by definition (inPointOf 0, outPointOf total-1),
+        // selecting several layers where any one of them was still at its
+        // default range made group-dragging a dead gesture in BOTH
+        // directions. Clamping keeps the group rigid (relative offsets
+        // preserved — members must not desync) while letting it slide as
+        // far as the tightest member allows, which is also what the
+        // single-bar body drag a hundred lines below has always done
+        // (`if (ni + w >= total) ni = total - 1 - w`). A member already
+        // spanning the full timeline still pins dx to 0 — that one is
+        // arithmetic, not a policy choice.
+        var dxLo = -Infinity, dxHi = Infinity;
+        bothMembersM.forEach(function (m) {
+          dxLo = Math.max(dxLo, -m.origIn);
+          dxHi = Math.min(dxHi, total - 1 - m.origOut);
         });
-      } else if (_drag.type === 'out') {
-        _drag.members.forEach(function (m) {
+        var gdx = Math.max(dxLo, Math.min(dx, dxHi));
+        if (dxLo <= dxHi) bothMembersM.forEach(function (m) {
           var mld = state.layers[m.li]; if (!mld) return;
-          mld.outPoint = Math.min(total - 1, Math.max(m.origOut + dx, m.origIn + 1));
+          var mInHandled = trySetLinkedEdge(mld, 'in', m.origIn + gdx);
+          var mOutHandled = trySetLinkedEdge(mld, 'out', m.origOut + gdx);
+          if (!mInHandled) mld.inPoint = m.origIn + gdx;
+          if (!mOutHandled) mld.outPoint = m.origOut + gdx;
           updateBar(m.row, m.li);
+          updateLinkedChildrenBars(m.li);
         });
+      }
+      // Live keyframe preview — one shared selDx read off the first member
+      // that actually moved (matches mouseup's own reconciliation a few
+      // hundred lines down: a group drag shares ONE keySel, not one per
+      // member), otherwise each member previews its own layer-wide shift.
+      if (_drag.keySel && _drag.keySel.length) {
+        if (!e.altKey) {
+          var selDxLive = 0;
+          _drag.members.some(function (m) {
+            var mld = state.layers[m.li]; if (!mld) return false;
+            selDxLive = (_drag.type === 'out' ? outPointOf(mld) - m.origOut : inPointOf(mld) - m.origIn);
+            return !!selDxLive;
+          });
+          livePreviewSelectedKeys(selDxLive);
+        }
       } else {
-        var ok = _drag.members.every(function (m) {
-          var ni = m.origIn + dx, no = m.origOut + dx;
-          return ni >= 0 && no <= total - 1;
-        });
-        if (!ok) return;
         _drag.members.forEach(function (m) {
           var mld = state.layers[m.li]; if (!mld) return;
-          mld.inPoint = m.origIn + dx; mld.outPoint = m.origOut + dx;
-          updateBar(m.row, m.li);
+          // m.part, not _drag.type — this now matches the per-member edge
+          // this specific bar actually moved a few lines up, instead of
+          // whichever handle was grabbed to start the whole gesture.
+          livePreviewLayerKeys(m.li, m.part || 'both', mld, m.origIn, e.altKey);
         });
       }
       if (window.loadFrame) loadFrame(state.currentFrame);
@@ -433,26 +657,163 @@
     }
     var ld = state.layers[_drag.li]; if (!ld) { _drag = null; return; }
     var dx = Math.round((e.clientX - _drag.startX) / FC);
-    if (_drag.type === 'in') ld.inPoint = Math.max(0, Math.min(_drag.origIn + dx, _drag.origOut - 1));
-    else if (_drag.type === 'out') ld.outPoint = Math.min(total - 1, Math.max(_drag.origOut + dx, _drag.origIn + 1));
-    else {
+    if (_drag.type === 'in') {
+      var newIn = Math.max(0, Math.min(_drag.origIn + dx, _drag.origOut - 1));
+      if (!trySetLinkedEdge(ld, 'in', newIn)) ld.inPoint = newIn;
+    } else if (_drag.type === 'out') {
+      var newOut = Math.min(total - 1, Math.max(_drag.origOut + dx, _drag.origIn + 1));
+      if (!trySetLinkedEdge(ld, 'out', newOut)) ld.outPoint = newOut;
+    } else {
       var w = _drag.origOut - _drag.origIn;
       var ni = Math.max(0, _drag.origIn + dx);
       if (ni + w >= total) ni = total - 1 - w;
-      ld.inPoint = ni; ld.outPoint = ni + w;
+      var inHandled = trySetLinkedEdge(ld, 'in', ni);
+      var outHandled = trySetLinkedEdge(ld, 'out', ni + w);
+      if (!inHandled) ld.inPoint = ni;
+      if (!outHandled) ld.outPoint = ni + w;
     }
     updateBar(_drag.row, _drag.li);
+    updateLinkedChildrenBars(_drag.li);
+    if (_drag.keySel && _drag.keySel.length) {
+      if (!e.altKey) {
+        var selDxLive2 = _drag.type === 'out' ? (outPointOf(ld) - _drag.origOut) : (inPointOf(ld) - _drag.origIn);
+        livePreviewSelectedKeys(selDxLive2);
+      }
+    } else {
+      livePreviewLayerKeys(_drag.li, _drag.type, ld, _drag.origIn, e.altKey);
+    }
     // Content visibility for the CURRENT frame must reflect the new range
     // live (dragging the out point below the playhead should hide the
     // layer immediately) — loadFrame() re-derives userLayers[i] from
     // getEffectiveStrokes(), which is the actual gate.
-    if (window.loadFrame) loadFrame(state.currentFrame);
-    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+    //
+    // But only when the range ACTUALLY moved. This is a raw mousemove
+    // handler with no rAF latch, and in/out points are quantised to whole
+    // frames (dx is Math.round'ed above), so a pointer sliding across one
+    // frame's width fired a full Paper scene rebuild + engine render on
+    // every event — dozens of identical rebuilds per frame of travel. The
+    // bar itself still follows the pointer (updateBar, above) because it is
+    // cheap; only the scene rebuild is gated. 2026-07-28.
+    if (ld.inPoint !== _drag.lastIn || ld.outPoint !== _drag.lastOut) {
+      _drag.lastIn = ld.inPoint; _drag.lastOut = ld.outPoint;
+      if (window.loadFrame) loadFrame(state.currentFrame);
+      if (window.SMEngineBridge) SMEngineBridge.renderNow();
+    }
   });
   document.addEventListener('mouseup', function (upEv) {
     endMarquee();
     if (!_drag) return;
     var d = _drag; _drag = null;
+    // Unconditional, before any branch below (including the early-return
+    // "plain click" ones a few lines down, which don't otherwise touch this
+    // element) — a stale .hot surviving past mouseup would leave the handle
+    // looking permanently "grabbed".
+    if (d.hotEl) d.hotEl.classList.remove('hot');
+    // The live preview is a transform on whatever was rendered at drag
+    // start — every branch below either commits data + calls
+    // renderLayerList/renderTimeline (which rebuilds these nodes from
+    // scratch, transform and all) or does nothing further; clearing here
+    // unconditionally means a branch that DOESN'T re-render (e.g. the
+    // click-to-select return just below) can never leave a stale offset
+    // behind either.
+    if (window.SMMotion && SMMotion.clearKeyframeShiftPreview) SMMotion.clearKeyframeShiftPreview();
+    // A press on a bar that never turned into a retime drag is a plain CLICK,
+    // and the bar covers most of the grid half of a layer's row — so without
+    // this that whole strip was unselectable (2026-07-27: "impossible de
+    // select un layer en clicquand de ce côté de la timeline").
+    if (!d.group && d.li != null && Math.abs(upEv.clientX - d.startX) < 3 &&
+        state.appMode === 'motion' && window.SMMotion && SMMotion.selectLayerFromGrid) {
+      _barAnchorLi = d.li;
+      SMMotion.selectLayerFromGrid(d.li);
+      // selectLayerFromGrid always syncs _barSel with part:'both' (whole-bar
+      // ring) since it has no notion of which handle was actually pressed —
+      // right for a body click, wrong for a plain click ON a handle, which
+      // should darken THAT handle instead (spec: "sélectionné -> la poignée
+      // s'assombrit" — found live, Cyril: "quand on select ça ne devient pas
+      // foncé"). Override to the handle-specific selection afterward rather
+      // than duplicate selectLayerFromGrid's layer-activation side effects.
+      if (d.type === 'in' || d.type === 'out') {
+        _barSel = [{ li: d.li, part: d.type }];
+        refreshBarSelClasses();
+      }
+      return;
+    }
+    // A group drag that never actually moved is ALSO a plain click — onDown
+    // only takes this branch because the pressed bar happened to already be
+    // part of a 2+ selection, but the user's gesture is indistinguishable
+    // from any other plain click. Previously this fell straight through to
+    // reconcileTimeLinks/shiftLayerFrames below and did nothing visible, so
+    // a plain click on an already-multi-selected bar silently stopped
+    // selecting anything at all — found live (Cyril: "la selection des
+    // calques... pas hyper bonne"): Shift-click 2 bars, then plain-click one
+    // of them again, expecting it to narrow to just that layer like every
+    // other selection tool in this app. Same convention as a fresh
+    // (non-group) click a few lines up — narrow to the one bar actually
+    // pressed, which also resyncs _barSel via selectLayerFromGrid.
+    if (d.group && d.pressLi != null && Math.abs(upEv.clientX - d.startX) < 3 &&
+        state.appMode === 'motion' && window.SMMotion && SMMotion.selectLayerFromGrid) {
+      _barAnchorLi = d.pressLi;
+      SMMotion.selectLayerFromGrid(d.pressLi);
+      return;
+    }
+    // A time-linked layer (Parent in Time) resolves its in/out from its
+    // SOURCE, so the ld.inPoint/outPoint this drag just wrote would be
+    // ignored — the bar would snap back and the drag would read as broken.
+    // Convert the movement into a change of OFFSET instead: the layer keeps
+    // following its source, now at the distance you just dragged it to.
+    // Same principle as spatial parenting, where moving a child changes the
+    // child's own transform rather than detaching it.
+    (function reconcileTimeLinks() {
+      var members = d.group ? d.members : [{ li: d.li, origIn: d.origIn, origOut: d.origOut }];
+      members.forEach(function (m) {
+        var ld = state.layers[m.li];
+        if (!ld || !ld.timeLink) return;
+        var mode = ld.timeLink.mode || 'both';
+        // What the user dragged the edge TO. trySetLinkedEdge (mousemove,
+        // above) already writes the offset LIVE for any edge this link
+        // covers and never touches ld.inPoint/outPoint while doing so — so
+        // when they're still null here, the drag's real result is the
+        // CURRENT resolved position, not m.origIn (the pre-drag value).
+        // Falling back to origIn silently overwrote every live-linked drag
+        // back to a zero offset on mouseup (bug found live: onDown fires,
+        // setLayerValue fires mid-drag with the right numbers, then this
+        // function stomped them back to the start). ld.inPoint/outPoint are
+        // only ever non-null here for a pre-existing hard value that
+        // predates this link (or an edge the mode doesn't cover, handled by
+        // the mode guards below) — that legacy value is still the right
+        // thing to migrate into an offset once.
+        var wantIn = ld.inPoint != null ? ld.inPoint : inPointOf(ld);
+        var wantOut = ld.outPoint != null ? ld.outPoint : outPointOf(ld);
+        var srcIn = null, srcOut = null;
+        state.layers.forEach(function (o) {
+          if (o !== ld && o.layerUid === ld.timeLink.uid) { srcIn = inPointOf(o); srcOut = outPointOf(o); }
+        });
+        if (srcIn == null) return; // source gone — leave the hard values alone
+        // Cross-type source (2026-08-16): srcAnchor overrides which of the
+        // SOURCE's edges an 'in'/'out'-mode link reads from — same fallback
+        // as resolveLinkedTime (app.js), setLayerTimeLink (motion.js) and
+        // trySetLinkedEdge (mousemove, above). Absent for every pre-existing
+        // / same-type link, so this changes nothing for those. 'both' mode
+        // never sets srcAnchor (no meaning for "my whole range follows your
+        // single point"), so it always reads the same-type srcIn/srcOut.
+        var srcWhich = (ld.timeLink.srcAnchor === 'in' || ld.timeLink.srcAnchor === 'out') ? ld.timeLink.srcAnchor : null;
+        var srcForIn = srcWhich ? (srcWhich === 'in' ? srcIn : srcOut) : srcIn;
+        var srcForOut = srcWhich ? (srcWhich === 'in' ? srcIn : srcOut) : srcOut;
+        // Offsets are Motion properties now (timeLinkInOffset/Out,
+        // 2026-07-30) — write through the same public setter the side-panel
+        // field and the pickwhip use, not the raw legacy field.
+        if (window.SMMotion) {
+          if (mode !== 'out') SMMotion.setLayerValue(m.li, 'timeLinkInOffset', [wantIn - srcForIn]);
+          if (mode !== 'in') SMMotion.setLayerValue(m.li, 'timeLinkOutOffset', [wantOut - srcForOut]);
+        }
+        // The hard values are dead weight on a linked layer; dropping them
+        // keeps a later unlink from resurrecting a stale range. Only for
+        // edges the link actually covers — a partial-mode link's other edge
+        // is a real trim value, just written fresh by this same drag.
+        if (mode !== 'out') delete ld.inPoint;
+        if (mode !== 'in') delete ld.outPoint;
+      });
+    })();
     // Feedback: "il faudrait pouvoir select des in et/out point de calque
     // avec keyframe pour les déplacer ensemble" — a whole-bar BODY move
     // (type:'both') retimes the layer's actual keyframe content along with
@@ -622,20 +983,37 @@
     if (window.loadFrame) loadFrame(state.currentFrame);
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
   }
+  // Shared write path for every batch op below (2026-07-30 fix — found
+  // still outstanding by the broad QA audit, deliberately deferred twice
+  // earlier this session). Every one of these ops used to write straight
+  // to ld.inPoint/outPoint, same bug trySetLinkedEdge's own header comment
+  // already fixed once for the single-bar drag handlers: a linked child's
+  // in/out is completely inert (layerInPoint/layerOutPoint check
+  // resolveLinkedTime FIRST and never read ld.inPoint/outPoint once an edge
+  // is linked), so Align/Distribute/Flip/Stagger silently did nothing to any
+  // Parent-in-Time child caught in the selection — no error, the bar just
+  // never moved. Redirects through the same helper the manual drag path
+  // uses; `w` (each bar's own duration) is always computed from the CURRENT
+  // effective in/out before either write, so the two edges never see a
+  // half-updated width mid-iteration.
+  function setBarEdges(ld, newIn, newOut) {
+    if (!trySetLinkedEdge(ld, 'in', newIn)) ld.inPoint = newIn;
+    if (!trySetLinkedEdge(ld, 'out', newOut)) ld.outPoint = newOut;
+  }
   function alignBars(mode) {
     applyBatch(function (items) {
       if (mode === 'left') {
         var minIn = Math.min.apply(null, items.map(function (x) { return inPointOf(x.ld); }));
-        items.forEach(function (x) { var w = outPointOf(x.ld) - inPointOf(x.ld); x.ld.inPoint = minIn; x.ld.outPoint = minIn + w; });
+        items.forEach(function (x) { var w = outPointOf(x.ld) - inPointOf(x.ld); setBarEdges(x.ld, minIn, minIn + w); });
       } else if (mode === 'right') {
         var maxOut = Math.max.apply(null, items.map(function (x) { return outPointOf(x.ld); }));
-        items.forEach(function (x) { var w = outPointOf(x.ld) - inPointOf(x.ld); x.ld.outPoint = maxOut; x.ld.inPoint = maxOut - w; });
+        items.forEach(function (x) { var w = outPointOf(x.ld) - inPointOf(x.ld); setBarEdges(x.ld, maxOut - w, maxOut); });
       } else {
         var avgCenter = items.reduce(function (s, x) { return s + (inPointOf(x.ld) + outPointOf(x.ld)) / 2; }, 0) / items.length;
         items.forEach(function (x) {
           var w = outPointOf(x.ld) - inPointOf(x.ld);
           var ni = Math.max(0, Math.round(avgCenter - w / 2));
-          x.ld.inPoint = ni; x.ld.outPoint = ni + w;
+          setBarEdges(x.ld, ni, ni + w);
         });
       }
     });
@@ -650,7 +1028,7 @@
       sorted.forEach(function (x, i) {
         var w = outPointOf(x.ld) - inPointOf(x.ld);
         var ni = Math.round(first + step * i);
-        x.ld.inPoint = ni; x.ld.outPoint = ni + w;
+        setBarEdges(x.ld, ni, ni + w);
       });
     });
   }
@@ -663,7 +1041,7 @@
       var reversed = slots.slice().reverse();
       sorted.forEach(function (x, i) {
         var w = outPointOf(x.ld) - inPointOf(x.ld);
-        x.ld.inPoint = reversed[i]; x.ld.outPoint = reversed[i] + w;
+        setBarEdges(x.ld, reversed[i], reversed[i] + w);
       });
     });
   }
@@ -683,7 +1061,7 @@
       sorted.forEach(function (x, i) {
         var w = outPointOf(x.ld) - inPointOf(x.ld);
         var ni = Math.max(0, base + step * i);
-        x.ld.inPoint = ni; x.ld.outPoint = ni + w;
+        setBarEdges(x.ld, ni, ni + w);
       });
     });
   }
@@ -713,6 +1091,36 @@
   // wires its drag handlers. Idempotent-safe to call once per row per
   // render pass (renderTimeline/renderTimelineMotion rebuild rows from
   // scratch every time, same as every other overlay in this codebase).
+  // Parent-in-Time anchor role helpers (2026-08-16 restyle,
+  // nemo-timeline-inout-spec.html). Nemo's ld.timeLink={uid,mode} links the
+  // WHOLE layer to one source by uid, with mode picking which of the
+  // CHILD's own edges are driven — the source is always resolved via the
+  // SAME edge type (trySetLinkedEdge above), so unlike the spec's own
+  // {c:{r,a},p:{r,a}} shape, neither side stores a separate anchor role.
+  // The anchor a link visually belongs to is therefore DERIVED, not
+  // stored: it's whichever on-bar anchor the pickwhip gesture that created
+  // it was dragged FROM — mode:'in' -> the in anchor, 'out' -> the out
+  // anchor, 'both' -> the whole-layer anchor, exactly mirroring
+  // startTimeLinkPickwhip's own mode mapping a few lines below.
+  function timeLinkChildAnchor(ld) {
+    if (!ld || !ld.timeLink) return null;
+    var mode = ld.timeLink.mode || 'both';
+    return mode === 'in' ? 'in' : mode === 'out' ? 'out' : 'whole';
+  }
+  // A layer is a PARENT on anchor `anchorType` when some OTHER layer's link
+  // targets it AND that other layer's own derived child anchor is the SAME
+  // type — symmetric with timeLinkChildAnchor since today's model only ever
+  // resolves same-type-to-same-type (in follows in, out follows out; cross-
+  // type "in follows out" is a separate, larger data-model change, not yet
+  // built).
+  function isTimeLinkParentAnchor(li, anchorType) {
+    var ld = state.layers[li];
+    var uid = ld && ((window.SMMotion && SMMotion.ensureLayerUid) ? SMMotion.ensureLayerUid(ld) : ld.layerUid);
+    if (!uid) return false;
+    return state.layers.some(function (other) {
+      return other !== ld && other.timeLink && other.timeLink.uid === uid && timeLinkChildAnchor(other) === anchorType;
+    });
+  }
   function buildBar(row, li) {
     row.style.position = 'relative';
     var bar = document.createElement('div'); bar.className = 'layer-inout-bar' + (selPartOf(li) === 'both' ? ' sel' : '');
@@ -725,6 +1133,52 @@
     hright.title = 'Point de sortie — glisser pour rogner (les keyframes ne bougent pas : rogner la fin ne déplace rien).';
     bar.title = 'Glisser le corps : déplace le calque ET ses keyframes. Alt+glisser : déplacer la fenêtre de visibilité seule, keyframes en place.';
     bar.appendChild(hleft); bar.appendChild(hright);
+    // Parent in Time — 3 on-timeline connection points (2026-07-30, Van
+    // Dijk 2.1). Glisser directement depuis la barre plutôt que par le
+    // panel latéral "Temps" — même lien (ld.timeLink), juste l'endroit du
+    // geste qui change. Un seul lien par geste (confirmé avec Cyril, pas
+    // de multi-calques en un coup) ; réutilise startTimeLinkPickwhip
+    // (motion.js, exposé via SMMotion) pour le drag/le anti-cycle/la
+    // création du lien, pas une seconde implémentation.
+    var childAnchor = timeLinkChildAnchor(state.layers[li]);
+    ['in', 'whole', 'out'].forEach(function (mode) {
+      var a = document.createElement('div');
+      a.className = 'timelink-anchor ' + mode;
+      // Engaged-anchor coloring (2026-08-16) — "Lecture du lien: rond
+      // foncé = enfant, rond clair = parent... ces deux-là sont TOUJOURS
+      // visibles, Alt ne révèle que les points encore libres" (CSS below
+      // gates the free/default state's visibility on an Alt-held class;
+      // .is-child/.is-parent opt back out of that gate unconditionally).
+      if (childAnchor === mode) a.classList.add('is-child');
+      if (isTimeLinkParentAnchor(li, mode)) a.classList.add('is-parent');
+      a.title = (mode === 'in' ? 'Glisser vers un autre calque : lie le point d’entrée de ce calque à son temps'
+        : mode === 'out' ? 'Glisser vers un autre calque : lie le point de sortie de ce calque à son temps'
+        : 'Glisser vers un autre calque : lie tout le calque (entrée + sortie) à son temps') + ' — clic droit pour délier';
+      a.addEventListener('mousedown', function (e) {
+        if (!window.SMMotion || !window.SMMotion.startTimeLinkPickwhip) return;
+        window.SMMotion.startTimeLinkPickwhip(li, a, e, mode === 'whole' ? 'both' : mode);
+      });
+      // Right-click = instant unlink (2026-07-30, Cyril: "il était
+      // impossible de désactiver le parent in time... ça peut être un
+      // raccourci ou clic droit sur les boutons de parent") — stops
+      // propagation so it doesn't ALSO trigger the bar's own contextmenu
+      // (reset in/out points) a few lines below. A no-op when this layer
+      // isn't linked, so right-clicking a plain anchor before any drag
+      // stays inert rather than erroring.
+      a.addEventListener('contextmenu', function (e) {
+        e.preventDefault(); e.stopPropagation();
+        var ld2 = state.layers[li];
+        if (!ld2 || !ld2.timeLink) return;
+        if (window.pushUndo) pushUndo();
+        if (window.unlinkTimeLinkPreserveRange) unlinkTimeLinkPreserveRange(ld2); else delete ld2.timeLink;
+        if (window.renderLayerList) renderLayerList();
+        if (window.renderTimeline) renderTimeline();
+        if (window.loadFrame) loadFrame(state.currentFrame);
+        if (window.SMEngineBridge) SMEngineBridge.renderNow();
+        if (window.showToast) showToast('Lien temporel retiré');
+      });
+      bar.appendChild(a);
+    });
     row.appendChild(bar);
     updateBar(row, li);
     _rowLayerIdx.set(row, li);
@@ -738,6 +1192,15 @@
       var menu = [
         { label: 'Réinitialiser (pleine durée)', action: function () { if (window.pushUndo) pushUndo(); delete state.layers[li].inPoint; delete state.layers[li].outPoint; if (window.renderTimeline) renderTimeline(); if (window.loadFrame) loadFrame(state.currentFrame); if (window.SMEngineBridge) SMEngineBridge.renderNow(); } },
       ];
+      // Menu-based Parent-in-Time (2026-07-31, Cyril: "clic droit pour
+      // parent in time sur ... keyframe + in/out point") — target layer is
+      // this bar's own; reachable whatever else is selected. Same shared
+      // builder as the Motion layer-row menu (timeline.js).
+      if (window.buildTimeLinkMenuItems) {
+        menu.push({ label: 'Parent in Time — lier le temps à…', action: function () {
+          window.showContextMenu(e.clientX + 8, e.clientY + 8, window.buildTimeLinkMenuItems(li, state.layers[li], function () { if (window.renderLayerList) renderLayerList(); if (window.renderTimeline) renderTimeline(); }));
+        } });
+      }
       // Batch ops act on the WHOLE current selection, not just the bar
       // that was right-clicked — offered once >=2 bars are selected,
       // regardless of which one you right-click.
@@ -759,6 +1222,24 @@
     // e.target===row means the click missed the bar entirely.
     row.addEventListener('mousedown', function (e) { if (e.target === row) startMarquee(e); });
   }
+
+  // Alt-reveal for free (unlinked) timelink-anchor dots (2026-08-16, spec:
+  // "maintiens Alt pour révéler les points libres") — a class on #frame-grid
+  // itself (not on each row, which renderTimeline wipes and rebuilds
+  // constantly) so it survives across re-renders with zero re-registration.
+  // Deliberately its OWN independent Alt-tracking rather than reading
+  // state.altDown (set by timeline.js's onKeyDown/onKeyUp for the UNRELATED
+  // Alt+drag "move visibility window only" gesture on the handles) — reusing
+  // that flag would mean this dot-reveal and that other gesture's meaning
+  // are coupled for no reason, and drift the moment either one's own
+  // key-handling logic changes.
+  function setTimeLinkAltReveal(v) {
+    var grid = document.getElementById('frame-grid');
+    if (grid) grid.classList.toggle('timelink-alt', v);
+  }
+  document.addEventListener('keydown', function (e) { if (e.key === 'Alt') setTimeLinkAltReveal(true); });
+  document.addEventListener('keyup', function (e) { if (e.key === 'Alt') setTimeLinkAltReveal(false); });
+  window.addEventListener('blur', function () { setTimeLinkAltReveal(false); });
 
   // Feedback: "on doit pouvoir drag + rect en dessous les calques même là
   // où y en pas dans la timeline". The per-row listener above only ever
@@ -790,7 +1271,22 @@
     // call this module already makes in the other direction.
     marqueeSelect: applyMarqueeSelection,
     clearSelection: clearBarSel,
+    // Retime layers by a per-layer frame delta, content and property keys
+    // included — the same two calls a bar drag makes at drop, exposed so
+    // motion.js's box edges can stagger a whole selection without
+    // reimplementing (and drifting from) that pair. Callers own the in/out
+    // values themselves; this moves what LIVES at those frames.
+    retimeLayers: function (plan) {
+      (plan || []).forEach(function (p) {
+        if (!p || !p.dx) return;
+        if (window.SM && window.SM.shiftLayerFrames) window.SM.shiftLayerFrames(p.li, p.dx);
+        if (window.SMMotion && SMMotion.shiftLayerMotionKeys) SMMotion.shiftLayerMotionKeys(p.li, p.dx);
+      });
+    },
     getBarSelection: function () { return _barSel.slice(); },
-    setBarSelection: function (sel) { _barSel = sel; refreshBarSelClasses(); },
+    // Optional anchorLi keeps _barAnchorLi in step with the layer-list's own
+    // frozen anchor (motion.js syncBarSelToLayerSel passes it) so Shift-
+    // ranges continue from the user's last click whichever side it was on.
+    setBarSelection: function (sel, anchorLi) { _barSel = sel; if (anchorLi != null && state.layers[anchorLi]) _barAnchorLi = anchorLi; refreshBarSelClasses(); },
   };
 })();

@@ -104,6 +104,254 @@
     }
     return segs;
   }
+  // ---- RETAINED PATH STORE (2026-07-28) -------------------------------
+  // The `register_image`/imageId pattern, extended to vector geometry.
+  //
+  // Why: an item's segments were re-serialized into the scene JSON, re-parsed
+  // by serde and rebuilt into a BezPath on EVERY render even when the
+  // geometry had not changed since the previous frame. Measured: 2000 vector
+  // strokes scrubbed at 31fps where 2000 rasters — six numbers and an id per
+  // item — reached 61fps. 4000 strokes x 24 segments is ~1.15M coordinates
+  // pushed across the JS/WASM boundary per frame.
+  //
+  // The identity trick is the same one that makes images work. For images it
+  // is the `src` string; here it is the STORED STROKE DICT's object identity.
+  // getEffectiveStrokes hands back the very same dict objects for a frame
+  // until an edit replaces the whole array (f.strokes = ..., see
+  // saveActiveLayerFrame) — so a dict that is `===` to the one we registered
+  // from is a promise that the geometry is unchanged. desP stamps the dict it
+  // built from onto `path.data.__engineSrcDict` (app.js).
+  //
+  // That covers reload-from-storage, but NOT live mutation: sculpt/erase/
+  // drag mutate the Paper item in place without touching the stored dict.
+  // Hence the _changed hook below, which nulls the stamp on any GEOMETRY
+  // change so a mutated item falls back to inline serialization until the
+  // next desP rebuild re-stamps it.
+  //
+  // Scope of v1, deliberately narrow: a pathRef is emitted only for items
+  // whose geometry reaches the renderer untransformed (no per-vertex offset,
+  // no element/layer/parent Motion matrix). Those transforms rewrite every
+  // coordinate, so the stored path would be the wrong shape. That is exactly
+  // the measured case (Animation 2D scrub / drawing-heavy documents). The
+  // natural follow-up is an `Affine` alongside the ref for elMat/motionMat/
+  // parentChain — they ARE affine around a pivot — leaving only per-vertex
+  // offsets on the inline path. Not built here: one correctness surface at a
+  // time.
+  var _pathKeyByDict = new WeakMap();
+  // THE assumption this whole mechanism rests on: a stored stroke dict's
+  // object identity IS its geometry identity. That holds only for layer kinds
+  // whose getEffectiveStrokes branch returns the STORED array. Three branches
+  // synthesize instead — `symbolId` (a component instance with a camera or
+  // symMatrix runs every stroke through cloneStrokeForTransform, minting
+  // fresh dicts on EVERY call), `montageId` (StoryBoard-resolved strokes) and
+  // `lfsGroup` (concatenated sub-layer channels). Registering from those grew
+  // the store without bound: measured on the reference project, 0 -> 25 -> 50
+  // -> 75 entries across identical scrub passes over the same frames.
+  //
+  // A "only register a dict seen twice" heuristic was tried first and is NOT
+  // enough: seen-twice means "the scene was built twice while this dict was
+  // alive", which a second render between two loadFrames satisfies trivially.
+  // The gate below is explicit instead — and because CLAUDE.md §1 is exactly
+  // about a new branch being missed by one reader, `_registerCap` is a hard
+  // backstop so any future synthesizing branch degrades into "no speedup"
+  // rather than "unbounded memory".
+  var _registerCap = 250000;
+  var _registerCount = 0;
+  var _capWarned = false;
+  var _pathRefSeq = 0;
+  var _pathRefsEnabled = false;   // flipped on only by a PASSING self-test
+  var _geomFlagMask = 0;
+  var _retireQueue = [];
+  var _pathRegistry = (typeof FinalizationRegistry === 'function')
+    ? new FinalizationRegistry(function (key) { _retireQueue.push(key); })
+    : null;
+
+  // Paper's ChangeFlag bit values are version-specific and not part of its
+  // public API, so they are DISCOVERED rather than hardcoded: mutate a
+  // throwaway path's geometry and record the flags, then change only its
+  // style and subtract those. If anything about that probe looks wrong the
+  // whole feature stays off and the renderer keeps its existing behaviour —
+  // a wrong mask would either null every stamp (slow but correct) or, far
+  // worse, MISS a real geometry edit and paint stale geometry.
+  function installGeometryHook() {
+    if (_pathRefsEnabled || !window.paper || !paper.Path || !paper.Item) return;
+    // TWO prototypes, established by probing rather than assumed: `Path` has
+    // its OWN _changed, and Paper's class system captures `base` as a direct
+    // function reference at definition time — so patching Item.prototype
+    // alone never intercepts a Path's changes (measured: zero callbacks).
+    // CompoundPath and Raster have no own _changed and inherit Item's, so
+    // both prototypes must be wrapped to cover every item type a layer holds.
+    var protos = [];
+    if (Object.prototype.hasOwnProperty.call(paper.Path.prototype, '_changed')) protos.push(paper.Path.prototype);
+    if (Object.prototype.hasOwnProperty.call(paper.Item.prototype, '_changed')) protos.push(paper.Item.prototype);
+    if (!protos.length) return;
+    // The probe MUST run on an INSERTED item: an `insert:false` path fires no
+    // _changed at all (measured), which is exactly how the first version of
+    // this probe silently produced a zero mask.
+    var scratch = new paper.Layer();
+    var probe = new paper.Path({ insert: true });
+    var probeFlags = 0;
+    var origs = protos.map(function (pr) { return pr._changed; });
+    protos.forEach(function (pr, i) {
+      pr._changed = function (flags) { if (this === probe) probeFlags |= flags; return origs[i].apply(this, arguments); };
+    });
+    var geomBits = 0, styleBits = 0;
+    try {
+      probeFlags = 0;
+      probe.add(new paper.Point(0, 0));
+      probe.add(new paper.Point(10, 10));
+      probe.firstSegment.point.x = 5;
+      geomBits = probeFlags;
+      probeFlags = 0;
+      probe.fillColor = '#ff0000';
+      probe.opacity = 0.5;
+      probe.strokeWidth = 3;     // carries its own STROKE bit on top of STYLE
+      styleBits = probeFlags;
+    } catch (e) {
+      protos.forEach(function (pr, i) { pr._changed = origs[i]; });
+      probe.remove(); scratch.remove();
+      console.warn('[engine-bridge] retained-path probe threw, feature disabled', e);
+      return;
+    }
+    protos.forEach(function (pr, i) { pr._changed = origs[i]; });
+    probe.remove(); scratch.remove();
+    // Style changes carry a shared "needs redraw" bit that geometry changes
+    // carry too; subtracting the style set leaves only the geometry-only bits
+    // (measured on this build: geometry 41, style 449 -> mask 40).
+    _geomFlagMask = geomBits & ~styleBits;
+    if (!_geomFlagMask) {
+      console.warn('[engine-bridge] retained paths off: no geometry-only change flag found');
+      return;
+    }
+    // Real hook. Hot path — runs on every mutation of every item — so the
+    // cheap bitmask test comes first, and `_data` is read directly rather
+    // than through Paper's `data` getter, which LAZILY CREATES an object on
+    // every access (the same builder-not-accessor trap as raster.canvas,
+    // CLAUDE.md §5bis).
+    var liveOrigs = protos.map(function (pr) { return pr._changed; });
+    protos.forEach(function (pr, i) {
+      pr._changed = function (flags) {
+        if (flags & _geomFlagMask) {
+          if (this._data && this._data.__engineSrcDict) this._data.__engineSrcDict = null;
+          // Second consumer of the same signal: loadFrame skips rebuilding a
+          // layer whose stored strokes are unchanged, and must NOT do that if
+          // the live items were edited without being saved back (a sculpt on
+          // a non-keyframe, say). Marking the owning Paper layer here is what
+          // makes that skip safe. `_parent` direct, not `.parent` — same
+          // lazy-getter caution as `_data` above.
+          var par = this._parent;
+          if (par) par._smGeomDirty = true;
+        }
+        return liveOrigs[i].apply(this, arguments);
+      };
+    });
+    _pathRefsEnabled = true;
+    // Tells loadFrame (app.js) that the dirty signal it relies on is live.
+    // Without the hook installed there is no way to know a layer was
+    // edited, so loadFrame must keep rebuilding unconditionally.
+    window.__smGeomDirtyHookInstalled = true;
+  }
+
+  // Returns an engine key for this item's geometry, or null to fall back to
+  // inline segments. `segs` must already be the rounded array that WOULD have
+  // been sent, so a registered path and an inline one are byte-identical
+  // geometry (CLAUDE.md §3: the two paths must not drift).
+  // ---- MOTION CHAIN AS ONE AFFINE (2026-07-28, retained-path v2) --------
+  // Every Motion matrix in the item -> element -> layer -> parent chain is an
+  // affine around a pivot, so the whole chain collapses into a single 2x3 the
+  // engine can compose with its view transform. That lets an ANIMATED shape
+  // keep using its registered path instead of falling back to re-serializing
+  // every coordinate, which was v1's biggest gap (Motion was entirely
+  // excluded). Per-vertex path offsets are the one non-affine piece and are
+  // screened out by the caller.
+  //
+  // Convention: [a,b,c,d,e,f] as SVG/kurbo, x' = a*x + c*y + e, y' = b*x + d*y + f.
+  // Mirrors transformSegments (motion.js) EXACTLY — scale in the pivot's local
+  // frame, rotate around the pivot, translate last:
+  //   A = T(dx,dy) . T(P) . R(rot) . S(sx,sy) . T(-P)
+  // If those two ever drift the picture silently changes only for animated
+  // shapes, so they are verified against each other by a pixel A/B, not by
+  // reading (CLAUDE.md §3).
+  function affineFromMotion(m, pivot) {
+    var rad = (m.rot || 0) * Math.PI / 180, cs = Math.cos(rad), sn = Math.sin(rad);
+    var a = cs * m.sx, b = sn * m.sx, c = -sn * m.sy, d = cs * m.sy;
+    return [a, b, c, d,
+      pivot.x + (m.dx || 0) - a * pivot.x - c * pivot.y,
+      pivot.y + (m.dy || 0) - b * pivot.x - d * pivot.y];
+  }
+  // m2 applied AFTER m1.
+  function affineMul(m2, m1) {
+    return [
+      m2[0] * m1[0] + m2[2] * m1[1],
+      m2[1] * m1[0] + m2[3] * m1[1],
+      m2[0] * m1[2] + m2[2] * m1[3],
+      m2[1] * m1[2] + m2[3] * m1[3],
+      m2[0] * m1[4] + m2[2] * m1[5] + m2[4],
+      m2[1] * m1[4] + m2[3] * m1[5] + m2[5],
+    ];
+  }
+  // Uniform scale only. The inline path scales stroke width by
+  // (|sx|+|sy|)/2 while the engine strokes THROUGH the affine, and those two
+  // agree exactly only when sx == sy — a non-uniform chain would draw a
+  // subtly different (elliptical-pen) stroke, so it falls back to inline
+  // rather than quietly changing the picture.
+  function motionChainUniform(elMat, motionMat, parentChain) {
+    var EPS = 1e-9;
+    if (elMat && Math.abs(elMat.sx - elMat.sy) > EPS) return false;
+    if (motionMat && Math.abs(motionMat.sx - motionMat.sy) > EPS) return false;
+    for (var i = 0; i < parentChain.length; i++) {
+      var pm = parentChain[i].mat;
+      if (Math.abs(pm.sx - pm.sy) > EPS) return false;
+    }
+    return true;
+  }
+
+  // Lookup only — must stay free of any serialization, because the whole
+  // point is to answer "already registered?" BEFORE paying for serP().
+  // A first attempt kept serP+roundSegs unconditional and only skipped the
+  // JSON bytes: measured 36fps -> 33fps, i.e. slightly WORSE, because serP
+  // walking the Paper path is the dominant cost and the WeakMap lookup was
+  // pure addition. The saving only exists if the serialization is skipped.
+  function existingPathRef(item) {
+    if (!_pathRefsEnabled || !engine) return null;
+    var d = item._data && item._data.__engineSrcDict;
+    return d ? (_pathKeyByDict.get(d) || null) : null;
+  }
+  function pathRefFor(item, segs, closed) {
+    if (!_pathRefsEnabled || !engine || !engine.register_path) return null;
+    var dict = item._data && item._data.__engineSrcDict;
+    if (!dict) return null;
+    var key = _pathKeyByDict.get(dict);
+    if (key) return key;
+    if (!segs.length) return null;
+    if (_registerCount >= _registerCap) {
+      if (!_capWarned) { _capWarned = true; console.warn('[engine-bridge] retained-path cap reached; new geometry stays inline'); }
+      return null;
+    }
+    key = 'p' + (++_pathRefSeq);
+    var flat = new Float64Array(segs.length * 6);
+    for (var i = 0; i < segs.length; i++) {
+      var s = segs[i], o = i * 6;
+      flat[o] = s.point[0]; flat[o + 1] = s.point[1];
+      if (s.handleIn) { flat[o + 2] = s.handleIn[0]; flat[o + 3] = s.handleIn[1]; }
+      if (s.handleOut) { flat[o + 4] = s.handleOut[0]; flat[o + 5] = s.handleOut[1]; }
+    }
+    engine.register_path(key, flat, !!closed);
+    _registerCount++;
+    _pathKeyByDict.set(dict, key);
+    if (_pathRegistry) _pathRegistry.register(dict, key);
+    return key;
+  }
+
+  // Flushed once per render rather than per collection callback — retiring is
+  // pure bookkeeping and a batched JSON array is one boundary crossing.
+  function flushRetiredPaths() {
+    if (!_retireQueue.length || !engine || !engine.retire_paths) return;
+    var batch = _retireQueue;
+    _retireQueue = [];
+    try { engine.retire_paths(JSON.stringify(batch)); } catch (e) { /* non-fatal */ }
+  }
+
   function registerRasterIfNeeded(raster) {
     // Paper.js's Raster keeps its OWN internal <canvas> representation
     // (`.canvas`, already decoded/ready once `.loaded` is true) rather than
@@ -115,15 +363,75 @@
     // resolution it had when first registered — acceptable for how rasters
     // are used today (imported once via images.js, not interactively
     // resized), revisit if that changes.
-    if (!raster.loaded || !raster.canvas) return null; // not decoded yet — try again next tick
-    var id = raster.data && raster.data.src;
+    // ORDER MATTERS. `raster.canvas` is not an accessor, it is a BUILDER:
+    // Paper allocates a canvas and drawImages the source into it on first
+    // access, per Raster OBJECT — and loadFrame rebuilds every Raster on
+    // every frame. Touching it before the already-registered check meant a
+    // scene of N rasters paid N canvas allocations + N drawImage calls per
+    // frame to re-derive pixels the GPU had held since the first frame.
+    // Measured (2026-07-28, 2000 bitmap items): 24fps target delivered at
+    // 4.4fps, with 16 main-thread long tasks of 150-370ms across 3s — none
+    // of it attributable to any function in the play loop, because the cost
+    // was inside this one property read.
+    //
+    // The id comes from raster.data.src alone (engineIdFor, memoised per
+    // source string), so it costs nothing and needs no decoded canvas.
+    // Checking it first also removes a one-frame flash: a rebuilt Raster
+    // whose image is already on the GPU no longer has to wait for its own
+    // `loaded` flag before the engine can draw it.
+    var id = engineIdFor(raster);
     if (!id) return null;
-    if (registeredImageIds[id]) return id;
+    if (registeredImageIds[id]) { _touchImage(id); return id; }
+    if (!raster.loaded || !raster.canvas) return null; // not decoded yet — try again next tick
     var cv = raster.canvas;
     var ctx = cv.getContext('2d');
     var pixels = ctx.getImageData(0, 0, cv.width, cv.height).data;
     engine.register_image(id, pixels, cv.width, cv.height);
     registeredImageIds[id] = true;
+    _noteImageRegistered(id, cv.width, cv.height);
+    return id;
+  }
+
+  // ---- ENGINE IMAGE ID (2026-07-28) ----
+  // The id handed to the engine used to BE the raster's data URL. The engine
+  // only ever uses it as a HashMap key — it never reads it — but every scene
+  // item carried the whole base64 string, so buildSceneJson emitted it once
+  // per visible raster on EVERY render. Measured on a real project: 24
+  // rasters produced a 4.6MB scene JSON and a 9.3ms full render, which is
+  // what made a Motion drag (one full render per pointermove) unusable while
+  // the same drag in Animation 2D stayed smooth on its cached base prefix.
+  //
+  // A short content-derived id keeps every property that mattered: identical
+  // pixels still collapse to one key, so the GPU texture cache and
+  // registeredImageIds keep deduplicating exactly as before. Namespaced
+  // 'i1:' because the engine's id space is FLAT and already holds
+  // 'nv:<layer>' and the reference-bridge's 'ref:*' — a bare hash could
+  // collide with one of those and swap a video frame for artwork.
+  //
+  // Memoised per distinct source string, not per raster: loadFrame rebuilds
+  // every Raster object each tick, so recomputing would hash megabytes of
+  // base64 per frame — exactly the cost being removed. Collisions are
+  // eliminated rather than made unlikely: on a hash hit the stored source is
+  // compared and a suffix added if it differs, so two images can never
+  // silently become one.
+  var _engineIdBySrc = new Map(), _engineIdSrc = new Map();
+  function _hashSrc(str) {
+    var h1 = 0x811c9dc5, h2 = 0x01000193;
+    for (var i = 0; i < str.length; i++) {
+      var c = str.charCodeAt(i);
+      h1 ^= c; h1 = (h1 * 0x01000193) >>> 0;
+      h2 = (h2 ^ c) >>> 0; h2 = (h2 * 0x85ebca6b) >>> 0;
+    }
+    return str.length.toString(36) + '-' + h1.toString(36) + '-' + h2.toString(36);
+  }
+  function engineIdFor(raster) {
+    var src = raster && raster.data && raster.data.src;
+    if (!src) return null;
+    var known = _engineIdBySrc.get(src);
+    if (known) return known;
+    var base = 'i1:' + _hashSrc(src), id = base, n = 1;
+    while (_engineIdSrc.has(id) && _engineIdSrc.get(id) !== src) { n++; id = base + '#' + n; }
+    _engineIdBySrc.set(src, id); _engineIdSrc.set(id, src);
     return id;
   }
 
@@ -170,17 +478,86 @@
     }
     return { pixels: cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data, w: cv.width, h: cv.height };
   }
+  // ---- BOUNDED IMAGE STORE (2026-07-28) --------------------------------
+  // The engine's image map was unbounded by design — its own comment said
+  // "cached for the engine's whole lifetime". That is fine for a drawing
+  // document with a handful of imported rasters, and untenable for the
+  // footage side of the app: a 1000-frame 1920x1080 sequence is 8.3GB of
+  // decoded RGBA8, and nothing ever dropped a byte of it.
+  //
+  // Eviction is driven from JS, not the engine, for the same reason the
+  // retained path store is: this side knows what the scene being rendered
+  // actually references, and it can always re-upload (the pixels come back
+  // from the Paper Raster's canvas, or from the video/reference bridge's own
+  // per-frame push). An engine-side LRU would have to guess, and a wrong
+  // guess makes an image silently vanish from the picture.
+  //
+  // Policy: least-recently-USED (as in, last emitted into a scene), never
+  // touching anything the CURRENT build references, down to a byte budget.
+  var _imgBytes = new Map();       // id -> decoded bytes held by the engine
+  var _imgLastUsed = new Map();    // id -> build tick when last emitted
+  var _imgUsedThisBuild = null;    // Set, non-null only during a scene build
+  var _imgTick = 0;
+  var _imgBudgetBytes = 384 * 1024 * 1024;
+  var _imgEvictions = 0;
+
+  function _noteImageRegistered(id, w, h) {
+    _imgBytes.set(id, w * h * 4);
+    // Counts as a USE, not merely a registration: an image is uploaded
+    // because the frame being built needs it, so it must join
+    // _imgUsedThisBuild or it becomes an eviction candidate the instant it
+    // arrives — measured, it evicted everything including what was on screen.
+    _touchImage(id);
+  }
+  // Called wherever an image id is emitted into the scene being built.
+  function _touchImage(id) {
+    _imgLastUsed.set(id, ++_imgTick);
+    if (_imgUsedThisBuild) _imgUsedThisBuild.add(id);
+  }
+  function _imgTotalBytes() {
+    var t = 0;
+    _imgBytes.forEach(function (b) { t += b; });
+    return t;
+  }
+  // Run at the END of a scene build, when `_imgUsedThisBuild` is exactly the
+  // set of ids this frame draws. Anything else is a candidate, oldest first.
+  function enforceImageBudget() {
+    var total = _imgTotalBytes();
+    if (total <= _imgBudgetBytes || !engine || !engine.retire_images) return;
+    var cands = [];
+    _imgBytes.forEach(function (bytes, id) {
+      if (_imgUsedThisBuild && _imgUsedThisBuild.has(id)) return;   // on screen now
+      cands.push({ id: id, t: _imgLastUsed.get(id) || 0, b: bytes });
+    });
+    cands.sort(function (a, b) { return a.t - b.t; });
+    var drop = [];
+    for (var i = 0; i < cands.length && total > _imgBudgetBytes; i++) {
+      drop.push(cands[i].id); total -= cands[i].b;
+    }
+    if (!drop.length) return;
+    try { engine.retire_images(JSON.stringify(drop)); } catch (e) { return; }
+    for (var k = 0; k < drop.length; k++) {
+      // Dropping the JS-side gate is what makes the next use re-upload —
+      // registerRasterIfNeeded/registerCachedImage both early-out on it.
+      delete registeredImageIds[drop[k]];
+      _imgBytes.delete(drop[k]); _imgLastUsed.delete(drop[k]);
+    }
+    _imgEvictions += drop.length;
+  }
+
   function registerCachedImage(id, source) {
     if (!engine || registeredImageIds[id]) return;
     var p = drawableToPixels(source);
     engine.register_image(id, p.pixels, p.w, p.h);
     registeredImageIds[id] = true;
+    _noteImageRegistered(id, p.w, p.h);
   }
   function registerImagePixels(id, source) {
     if (!engine) return;
     var p = drawableToPixels(source);
     engine.register_image(id, p.pixels, p.w, p.h);
     registeredImageIds[id] = true;
+    _noteImageRegistered(id, p.w, p.h);
   }
   // Raw-bytes variant (EXPERIMENTAL, native-video-decode branch): the
   // native decoder already produces tightly-packed RGBA8 — going through
@@ -193,6 +570,7 @@
     if (!engine) return false;
     engine.register_image(id, pixels, w, h);
     registeredImageIds[id] = true;
+    _noteImageRegistered(id, w, h);
     return true;
   }
 
@@ -240,8 +618,25 @@
       }
     }
     return inherited.concat((ld.effects || []).map(function (e) {
-      return { effectType: e.type, enabled: !!e.enabled,
+      var out = { effectType: e.type, enabled: !!e.enabled,
                p1: at(e, 'p1', f), p2: at(e, 'p2', f), p3: at(e, 'p3', f), p4: at(e, 'p4', f) };
+      // Zoom-compensate any "spatial" param of a shipped shader-library
+      // effect (2026-07-29 fix, "un effet twirl qui bouge en fonction du
+      // zoom du canvas") — engine.rs's run_one_effect explicitly skips this
+      // for every "custom:" effect (it can't know a generic p1..p4's
+      // meaning), but this library's own param() definitions DO know, via
+      // the `spatial` flag (shader-effects-library.js) — same reasoning/
+      // direction as run_one_effect's own `* z` for the built-in effects.
+      if (typeof e.type === 'string' && e.type.indexOf('custom:') === 0 && window.SMSHADER_EFFECTS) {
+        var libId = e.type.slice('custom:'.length);
+        var def = SMSHADER_EFFECTS.filter(function (d) { return d.id === libId; })[0];
+        if (def) {
+          def.params.forEach(function (p) {
+            if (p.spatial && out[p.key] != null) out[p.key] = out[p.key] * view.zoom;
+          });
+        }
+      }
+      return out;
     }));
   }
 
@@ -254,7 +649,15 @@
   // same invariant export.js's own exportBuildFrame already enforces for
   // the plain (non-effects) export path — this closes the same gap for the
   // WGPU-effects one, which reuses this function instead of exportBuildFrame.
-  function buildSceneJson(skipVolatile, excludeGhosts) {
+  function buildSceneJson(skipVolatile, excludeGhosts, renderContext) {
+    renderContext = renderContext || {};
+    // Opened here and closed at the return below: while a build is in flight
+    // this collects every image id the frame actually draws, which is what
+    // makes eviction safe (nothing on screen is ever a candidate).
+    _imgUsedThisBuild = new Set();
+    var renderFrame = renderContext.frame != null ? renderContext.frame
+      : (_fxFrameOverride != null ? _fxFrameOverride : state.currentFrame);
+    var includeEditorOverlays = renderContext.includeEditorOverlays !== false;
     var layers = [];
     // StoryBoard montage preview (storyboard.js, 2026-07): when the node
     // space has an active montage, the canvas shows THAT montage's frame
@@ -264,11 +667,20 @@
     // item builder every other stroke-data consumer uses (CLAUDE.md §1:
     // no new parallel serialization path).
     var sbPreview = (state.appMode === 'storyboard' && window.SMStoryboard) ? SMStoryboard.getPreviewLayer() : null;
+    // Track matte by uid (2026-07-31): userLayerEntries[i] = the ONE wire
+    // entry that IS state.layers[i]'s own main slot (never a motion-blur
+    // ghost sample). Recorded at all four push sites of the loop below so
+    // the final pass before JSON.stringify can resolve each layer's
+    // matteSourceLayerUid to a concrete wire-array index via OBJECT
+    // IDENTITY (layers.indexOf) — immune to the bg unshift, onion/ghost
+    // splices, and any future overlay insertions, unlike any index math
+    // done mid-loop.
+    var userLayerEntries = [];
     if (sbPreview) {
       layers.push({ items: onionLayerItems(sbPreview) });
     } else
     for (var i = 0; i < state.layers.length; i++) {
-      if (!layerIsEffectivelyVisible(i) || !userLayers[i]) { layers.push({ items: [] }); continue; }
+      if (!layerIsEffectivelyVisible(i) || !userLayers[i]) { layers.push(userLayerEntries[i] = { items: [] }); continue; }
       // Null layer (2026-07, Motion) — pure organizational/pivot layer,
       // never painted (AE's "Null Object"), same "no content, no paint"
       // shape as an invisible layer above, but still emitted as its OWN
@@ -276,7 +688,14 @@
       // other layers can still parent to it via SMMotion's existing
       // parentLayerUid/parentChainMats mechanism, which only needs the
       // layer to exist at some index, not to draw anything).
-      if (state.layers[i].isNullLayer) { layers.push({ items: [] }); continue; }
+      if (state.layers[i].isNullLayer) { layers.push(userLayerEntries[i] = { items: [] }); continue; }
+      // Guide layer (2026-08, AE feature audit 8.6) — a real layer object
+      // (rotatable/parentable/keyable, unlike a classic ruler-drag guide),
+      // same "no content, no paint" shape as Null right above. The actual
+      // guide LINE is drawn separately, as an editor-only overlay
+      // (buildGuideLayerItems, below) — never part of the real/exported
+      // scene, same convention as safety zones/perspective guides.
+      if (state.layers[i].isGuideLayer) { layers.push(userLayerEntries[i] = { items: [] }); continue; }
       // Effect (adjustment) layer (2026-07, Motion; effects stack rewrite
       // 2026-07) — never paints its own content either (ld.frames/strokes
       // are ignored on purpose, matching AE's "Adjustment Layer" toggle),
@@ -284,11 +703,22 @@
       // composite_scene applies each enabled entry to everything already
       // composited below it — see that function's is_effect_layer branch.
       if (state.layers[i].isEffectLayer) {
-        layers.push({ items: [], isEffectLayer: true, effects: sceneEffectsOf(state.layers[i]) });
+        layers.push(userLayerEntries[i] = { items: [], isEffectLayer: true, effects: sceneEffectsOf(state.layers[i]) });
         continue;
       }
       var children = userLayers[i].children;
       var items = [];
+      // Vector masks (2026-08, AE-style "Mask" — see geometry-wasm's
+      // engine.rs LayerIn::masks doc comment for the combine algorithm).
+      // Any Path tagged data.isMask never renders as normal content — it's
+      // pulled out into this layer-scoped list instead, with a forced
+      // solid-white/no-stroke item (only geometry matters engine-side) so
+      // its actual on-canvas paint stays whatever the user set it to for
+      // editing, without affecting the clip. maskFeather is a v1 shared-
+      // per-layer value (max across this layer's own masks), not per-mask
+      // — see the mask-feature audit's deliberate scope note.
+      var layerMasks = [];
+      var layerMaskFeather = 0;
       // Motion mode (motion.js): a keyed position/rotation/scale/opacity
       // transform for this layer at the CURRENT frame, applied ONLY to the
       // JSON items below — never to userLayers[i] itself (see motion.js's
@@ -296,7 +726,7 @@
       // baked into the next saveActiveLayerFrame() permanently). Null (the
       // overwhelmingly common case — no motion on this layer) skips the
       // per-item transform pass entirely below.
-      var motionMat = (window.SMMotion && children.length) ? SMMotion.layerMotionAt(i, state.currentFrame) : null;
+      var motionMat = (window.SMMotion && children.length) ? SMMotion.layerMotionAt(i, renderFrame) : null;
       // Pivot = auto bounds center + the layer's Anchor Point offset
       // (motionMat.ax/ay) — see motion.js's layerMotionAt header comment.
       var motionPivot = motionMat ? { x: userLayers[i].bounds.center.x + motionMat.ax, y: userLayers[i].bounds.center.y + motionMat.ay } : null;
@@ -306,7 +736,53 @@
       // nesting order as elMat-then-motionMat above one level further out.
       // Empty array (the common case, no parent) makes the per-item loop
       // below a no-op cost.
-      var parentChain = window.SMMotion ? SMMotion.parentChainMats(i, state.currentFrame) : [];
+      var parentChain = window.SMMotion ? SMMotion.parentChainMats(i, renderFrame) : [];
+      // 3D layer (2026-07-28, Grease-Pencil-style — see motion.js's
+      // make3DProjector/project3DSegments doc comment) — the layer-level
+      // motionMat/parentChain above get REPLACED by a per-VERTEX 3D
+      // projector (applied inside the per-item loop below, right where
+      // motionMat's own transformSegments call already lived) rather than
+      // a single affine matrix, so suppress them here to their neutral/
+      // no-op state: every downstream per-item consumer already treats
+      // null/[] as "no transform", so this is the one place that needs
+      // changing rather than every scattered call site. Per-ELEMENT motion
+      // (elMat) is untouched — a shape animating inside a 3D layer still
+      // works, composed before the layer's own 3D projection. Parenting
+      // INTO or OUT OF a 3D layer is explicitly out of scope for this pass
+      // (composing a 2D affine parent transform with this layer's own
+      // nonlinear 3D projection is exactly the "nested 3D" complexity the
+      // plan flagged) — a parented 3D layer simply ignores its parent's
+      // transform for now, not silently wrong in a way that's hard to
+      // notice. Images (Raster items) are also out of scope this pass —
+      // the projector below only ever applies to items with `.segments`
+      // (vector paths); an image inside a 3D layer renders unprojected.
+      var is3D = !!state.layers[i].threeD;
+      var project3D = null;
+      // Per-clone 3D projector cache (2026-07-30, "en 3D aussi avec ID de
+      // chaque cloner") — a duplicator+3D layer's clones can each carry
+      // their own extra positionZ/rotationX/rotationY delta on
+      // data.dup3D (applyLayerDuplicator, app.js). Building a fresh
+      // make3DProjector per VERTEX would be wasteful; this caches one per
+      // unique dupIndex instead, reused by every stroke belonging to that
+      // same clone (built lazily below, in the per-item loop, the first
+      // time each dupIndex is actually seen). Stays null/unused for every
+      // ordinary 3D layer (no duplicator) or 2D duplicator (no threeD) —
+      // zero extra cost for the overwhelmingly common cases.
+      var dup3DProjectorCache = null;
+      if (is3D) {
+        motionMat = null; motionPivot = null; parentChain = [];
+        var q3dBounds = userLayers[i].bounds;
+        // Multi-parent crossfade (2026-07-30) — a 3D layer ignores
+        // parentChain entirely (just above), so this is the ONLY path a 3D
+        // layer's 2 parents (if it has both) ever reach it through:
+        // blendedParentContributionFor3D returns null for every OTHER
+        // case (no parents, exactly one parent — same "3D layers don't
+        // parent" boundary as before this feature), so this is a no-op
+        // for the overwhelmingly common case.
+        var parent3D = (window.SMMotion && SMMotion.blendedParentContributionFor3D) ? SMMotion.blendedParentContributionFor3D(i, renderFrame) : null;
+        if (window.SMMotion && q3dBounds) project3D = SMMotion.make3DProjector(state.layers[i], q3dBounds, renderFrame, state.canvasW, state.canvasH, parent3D);
+        if (state.layers[i].duplicator) dup3DProjectorCache = {};
+      }
       // Brush-texture companions (isBrushTextureCopy — bitmap raster or
       // vector dab group) don't get their own Elements row in Motion
       // (motion.js's layerElements folds them into their anchor's, "merge
@@ -316,6 +792,12 @@
       // may not even have, having never been individually keyed). One
       // pass over children building brushGroupId -> anchor strokeId,
       // reused below instead of a lookup per companion.
+      // Only layer kinds whose getEffectiveStrokes branch returns the STORED
+      // stroke array can back a retained path — see the store's comment.
+      // duplicator: 4th synthesizing case — getEffectiveStrokesRendered
+      // (app.js) allocates fresh clone dicts per call, so dict identity
+      // (the store's one invariant) is meaningless for these too.
+      var layerRetainable = !state.layers[i].symbolId && !state.layers[i].montageId && !state.layers[i].lfsGroup && !state.layers[i].duplicator;
       var brushAnchorStrokeId = null;
       for (var bi = 0; bi < children.length; bi++) {
         var bc = children[bi];
@@ -337,20 +819,176 @@
         var nv = state.layers[i].nativeVideo;
         var inF = window.layerInPoint ? layerInPoint(state.layers[i]) : 0;
         var outF = window.layerOutPoint ? layerOutPoint(state.layers[i]) : state.totalFrames - 1;
-        if (state.currentFrame >= inF && state.currentFrame <= outF) {
+        if (renderFrame >= inF && renderFrame <= outF) {
           var nvS = Math.min(state.canvasW / nv.width, state.canvasH / nv.height);
           var nvW = nv.width * nvS, nvH = nv.height * nvS;
-          var nvRect = { x: (state.canvasW - nvW) / 2, y: (state.canvasH - nvH) / 2, width: nvW, height: nvH };
-          var nvOp = 1;
-          var nvMat = window.SMMotion ? SMMotion.layerMotionAt(i, state.currentFrame) : null;
-          if (nvMat) {
-            var nvPivot = { x: nvRect.x + nvRect.width / 2 + nvMat.ax, y: nvRect.y + nvRect.height / 2 + nvMat.ay };
-            nvRect = SMMotion.transformImageRect(nvRect, nvPivot, nvMat);
-            nvOp *= nvMat.op;
+          var nvRectBase = { x: (state.canvasW - nvW) / 2, y: (state.canvasH - nvH) / 2, width: nvW, height: nvH };
+          // Duplicator (2026-07-30): a native video layer has no strokes array
+          // (getEffectiveStrokes short-circuits to [] for nativeVideo, app.js),
+          // so it never reached applyLayerDuplicator/getEffectiveStrokesRendered
+          // — enabling the Duplicator on a video layer used to do nothing at
+          // all. Duplicated HERE, in the video's own local/content space
+          // (nvRectBase, pivot = its own center), exactly mirroring the stroke
+          // path's order: seed content gets duplicated first, THEN the
+          // layer's own Motion transform + parent chain apply uniformly to
+          // every resulting rect below — never the other way around, or a
+          // rotated/scaled layer would duplicate along the wrong axes.
+          // _duplicatorCount/_duplicatorModeOffset/_duplicatorClonePlacement
+          // (app.js) are the SAME functions applyLayerDuplicator itself calls
+          // — never re-derive this math here.
+          var nvDup = state.layers[i].duplicator;
+          var nvCount = nvDup ? _duplicatorCount(nvDup) : 1;
+          var nvRects;
+          if (nvDup && nvCount > 1) {
+            var nvMode = nvDup.mode || 'grid';
+            var nvCols = Math.max(1, nvDup.cols || 1);
+            var nvPathInfo = nvMode === 'path' ? _resolveDuplicatorPath(nvDup, renderFrame) : null;
+            if (nvMode === 'path' && !nvPathInfo) {
+              nvRects = [{ rect: nvRectBase, opacityFactor: 1 }]; // unconfigured path ref: show the seed, not nothing
+            } else {
+              var nvPivot = { x: nvRectBase.x + nvRectBase.width / 2, y: nvRectBase.y + nvRectBase.height / 2 };
+              // No per-clone content resampling exists for video (exactly one
+              // decoded frame backs 'nv:'+i) — temporal stagger is a no-op
+              // here, unlike the stroke path's tOffOn branch.
+              nvRects = [];
+              for (var nvk = 0; nvk < nvCount; nvk++) {
+                var nvOff = _duplicatorModeOffset(nvDup, nvMode, nvk, nvCount, nvCols, nvPathInfo);
+                var nvPlace = _duplicatorClonePlacement(nvDup, nvk, nvPivot, nvOff.baseDx, nvOff.baseDy, nvOff.baseRot, [0, 0], 0, [0, 0], 0, 0, 0, 0, nvDup.staggerRandom || {}, false);
+                nvRects.push({ rect: SMMotion.transformImageRect(nvRectBase, nvPivot, nvPlace), opacityFactor: nvPlace.opacityFactor });
+              }
+              if (nvPathInfo) nvPathInfo.path.remove();
+            }
+          } else {
+            nvRects = [{ rect: nvRectBase, opacityFactor: 1 }];
           }
-          var nvChain = SMMotion.parentChainMats(i, state.currentFrame);
-          for (var nvpc = 0; nvpc < nvChain.length; nvpc++) { nvRect = SMMotion.transformImageRect(nvRect, nvChain[nvpc].pivot, nvChain[nvpc].mat); nvOp *= nvChain[nvpc].mat.op; }
-          items.push({ image: { imageId: 'nv:' + i, x: nvRect.x, y: nvRect.y, width: nvRect.width, height: nvRect.height, opacity: nvOp, rotation: nvRect.rotation || 0 } });
+          // 3D layer (2026-07-30, Cyril: "la 3D sur les footage... marche
+          // pas" — confirmed and fixed, see motion.js's project3DImageRect
+          // doc comment). NOT reusing the shared layer-wide `project3D`
+          // here (unlike the raster branch above, which does) — that one's
+          // pivot comes from userLayers[i].bounds, the layer's real Paper
+          // CHILDREN bounds, which for a nativeVideo layer are ALWAYS
+          // degenerate: a native video has no backing Paper item at all
+          // (getEffectiveStrokes short-circuits to [] for it, app.js), so
+          // the shared projector's pivot silently collapses to the anchor
+          // point alone instead of the video's own visual center — found
+          // live: a pure rotationY produced a WIDER, oddly cropped rect
+          // instead of a foreshortened one. Built fresh here with the
+          // video's own rect as its bounds instead, same "own visual
+          // center is the default pivot" contract every other Motion
+          // transform in this app already follows.
+          var nvMat = (!is3D && window.SMMotion) ? SMMotion.layerMotionAt(i, renderFrame) : null;
+          var nvChain = is3D ? [] : SMMotion.parentChainMats(i, renderFrame);
+          var nvProject3D = (is3D && window.SMMotion) ? SMMotion.make3DProjector(state.layers[i], nvRectBase, renderFrame, state.canvasW, state.canvasH, parent3D) : null;
+          _touchImage('nv:' + i); // one shared texture for every clone — touch once, not per clone
+          for (var nvri = 0; nvri < nvRects.length; nvri++) {
+            var nvRect = nvRects[nvri].rect, nvOp = nvRects[nvri].opacityFactor;
+            if (nvMat) {
+              var nvItemPivot = { x: nvRect.x + nvRect.width / 2 + nvMat.ax, y: nvRect.y + nvRect.height / 2 + nvMat.ay };
+              nvRect = SMMotion.transformImageRect(nvRect, nvItemPivot, nvMat);
+              nvOp *= nvMat.op;
+            }
+            for (var nvpc = 0; nvpc < nvChain.length; nvpc++) { nvRect = SMMotion.transformImageRect(nvRect, nvChain[nvpc].pivot, nvChain[nvpc].mat); nvOp *= nvChain[nvpc].mat.op; }
+            if (nvProject3D) nvRect = SMMotion.project3DImageRect(nvRect, nvProject3D);
+            items.push({ image: { imageId: 'nv:' + i, x: nvRect.x, y: nvRect.y, width: nvRect.width, height: nvRect.height, opacity: nvOp, rotation: nvRect.rotation || 0 } });
+          }
+        }
+      }
+      // Nested video (2026-07-30, "attaque le chantier pour les vidéo dans
+      // des component"): a nativeVideo layer living inside a Component's
+      // OWN sym.layers is invisible to the block above (keyed purely off
+      // this top-level `i`) — native-video-bridge.js's _syncSymbolVideos
+      // (called from the same onFrameChanged choke point as the top-level
+      // sync) is what actually uploads its pixels, under image id
+      // 'nvsym:<symbolId>:<subLayerIndex>'; this is the render-side match
+      // for that upload. Mirrors the block above almost exactly, with one
+      // extra stage: the symbol's OWN internal composition (its layer-level
+      // Motion on the video sub-layer, its OWN camera, and the instance's
+      // symMatrix placement) applies FIRST, in symbol-space — exactly the
+      // same order getEffectiveStrokes' symbolId branch (app.js) already
+      // bakes into stroke content — THEN this outer layer's own Motion/
+      // parent chain applies on top, identical to the plain block above.
+      if (state.layers[i].symbolId && window.SMEngineBridge && window.SMMotion) {
+        var nvsymLd = state.layers[i];
+        var nvsymSym = state.symbols[nvsymLd.symbolId];
+        if (nvsymSym) {
+          var nvsymIi = window.resolveSymbolFrameIdx ? resolveSymbolFrameIdx(nvsymSym, nvsymLd, renderFrame) : 0;
+          for (var nvsymK = 0; nvsymK < nvsymSym.layers.length; nvsymK++) {
+            var sl = nvsymSym.layers[nvsymK];
+            if (!sl || !sl.nativeVideo || sl.visible === false) continue;
+            var nvsymImageId = 'nvsym:' + nvsymLd.symbolId + ':' + nvsymK;
+            if (!registeredImageIds[nvsymImageId]) continue;
+            var nvsymNv = sl.nativeVideo;
+            var nvsymInF = window.layerInPoint ? layerInPoint(sl) : 0;
+            var nvsymOutF = window.layerOutPoint ? layerOutPoint(sl) : (nvsymSym.totalFrames - 1);
+            if (nvsymIi < nvsymInF || nvsymIi > nvsymOutF) continue;
+            var nvsymS = Math.min(state.canvasW / nvsymNv.width, state.canvasH / nvsymNv.height);
+            var nvsymW = nvsymNv.width * nvsymS, nvsymH = nvsymNv.height * nvsymS;
+            var nvsymRectBase = { x: (state.canvasW - nvsymW) / 2, y: (state.canvasH - nvsymH) / 2, width: nvsymW, height: nvsymH };
+            // Duplicator on the video sub-layer itself — same seed-then-
+            // placement order as the top-level block, in the video's own
+            // local/content space, before any of the symbol/instance/outer
+            // transform stages below.
+            var nvsymDup = sl.duplicator;
+            var nvsymCount = nvsymDup ? _duplicatorCount(nvsymDup) : 1;
+            var nvsymRects;
+            if (nvsymDup && nvsymCount > 1) {
+              var nvsymMode = nvsymDup.mode || 'grid';
+              var nvsymCols = Math.max(1, nvsymDup.cols || 1);
+              var nvsymPathInfo = nvsymMode === 'path' ? _resolveDuplicatorPath(nvsymDup, nvsymIi) : null;
+              if (nvsymMode === 'path' && !nvsymPathInfo) {
+                nvsymRects = [{ rect: nvsymRectBase, opacityFactor: 1 }];
+              } else {
+                var nvsymPivot = { x: nvsymRectBase.x + nvsymRectBase.width / 2, y: nvsymRectBase.y + nvsymRectBase.height / 2 };
+                nvsymRects = [];
+                for (var nvsymK2 = 0; nvsymK2 < nvsymCount; nvsymK2++) {
+                  var nvsymOff = _duplicatorModeOffset(nvsymDup, nvsymMode, nvsymK2, nvsymCount, nvsymCols, nvsymPathInfo);
+                  var nvsymPlace = _duplicatorClonePlacement(nvsymDup, nvsymK2, nvsymPivot, nvsymOff.baseDx, nvsymOff.baseDy, nvsymOff.baseRot, [0, 0], 0, [0, 0], 0, 0, 0, 0, nvsymDup.staggerRandom || {}, false);
+                  nvsymRects.push({ rect: SMMotion.transformImageRect(nvsymRectBase, nvsymPivot, nvsymPlace), opacityFactor: nvsymPlace.opacityFactor });
+                }
+                if (nvsymPathInfo) nvsymPathInfo.path.remove();
+              }
+            } else {
+              nvsymRects = [{ rect: nvsymRectBase, opacityFactor: 1 }];
+            }
+            // Symbol-internal stage: the video sub-layer's OWN Motion
+            // (computeMotionMatFor takes the layer OBJECT — sl has no
+            // top-level state.layers index for layerMotionAt to use), then
+            // the symbol's OWN camera, then the instance's symMatrix
+            // placement — same three steps and order getEffectiveStrokes'
+            // symbolId branch already applies to stroke content.
+            var nvsymLayerMat = SMMotion.computeMotionMatFor(sl, nvsymIi);
+            var nvsymOp2 = 1;
+            for (var nvsymRi = 0; nvsymRi < nvsymRects.length; nvsymRi++) {
+              var nvsymRect = nvsymRects[nvsymRi].rect, nvsymOp = nvsymRects[nvsymRi].opacityFactor;
+              if (nvsymLayerMat) {
+                var nvsymLayerPivot = { x: nvsymRect.x + nvsymRect.width / 2 + nvsymLayerMat.ax, y: nvsymRect.y + nvsymRect.height / 2 + nvsymLayerMat.ay };
+                nvsymRect = SMMotion.transformImageRect(nvsymRect, nvsymLayerPivot, nvsymLayerMat);
+                nvsymOp *= nvsymLayerMat.op;
+              }
+              if (nvsymSym.cameraKeys && nvsymSym.cameraKeys.length && window.SMCamera) {
+                var nvsymCamM = SMCamera.cameraMatrixAtFrame(nvsymSym.cameraKeys, nvsymIi, state.canvasW, state.canvasH);
+                if (nvsymCamM) nvsymRect = SMMotion.transformImageRectByMatrix(nvsymRect, nvsymCamM);
+              }
+              if (nvsymLd.symMatrix && window.symMatrixOf) {
+                nvsymRect = SMMotion.transformImageRectByMatrix(nvsymRect, symMatrixOf(nvsymLd));
+              }
+              // Outer stage: the instance layer's OWN Motion + parent
+              // chain — identical treatment to the plain top-level video
+              // block above, and to how a symbolId layer's own baked
+              // strokes get this same pair applied by the per-item loop
+              // further down.
+              var nvsymOuterMat = SMMotion.layerMotionAt(i, renderFrame);
+              if (nvsymOuterMat) {
+                var nvsymOuterPivot = { x: nvsymRect.x + nvsymRect.width / 2 + nvsymOuterMat.ax, y: nvsymRect.y + nvsymRect.height / 2 + nvsymOuterMat.ay };
+                nvsymRect = SMMotion.transformImageRect(nvsymRect, nvsymOuterPivot, nvsymOuterMat);
+                nvsymOp *= nvsymOuterMat.op;
+              }
+              var nvsymChain = SMMotion.parentChainMats(i, renderFrame);
+              for (var nvsymPc = 0; nvsymPc < nvsymChain.length; nvsymPc++) { nvsymRect = SMMotion.transformImageRect(nvsymRect, nvsymChain[nvsymPc].pivot, nvsymChain[nvsymPc].mat); nvsymOp *= nvsymChain[nvsymPc].mat.op; }
+              items.push({ image: { imageId: nvsymImageId, x: nvsymRect.x, y: nvsymRect.y, width: nvsymRect.width, height: nvsymRect.height, opacity: nvsymOp, rotation: nvsymRect.rotation || 0 } });
+            }
+            _touchImage(nvsymImageId);
+          }
         }
       }
       for (var s = 0; s < children.length; s++) {
@@ -382,7 +1020,7 @@
         // AE's shape-group-inside-a-layer composition. null in the common
         // case (this item has no per-element motion of its own).
         var cStrokeId = c.data && ((c.data.isBrushTextureCopy && brushAnchorStrokeId && brushAnchorStrokeId[c.data.brushGroupId]) || c.data.strokeId);
-        var elMat = (window.SMMotion && cStrokeId) ? SMMotion.elementMotionAt(i, cStrokeId, state.currentFrame) : null;
+        var elMat = (window.SMMotion && cStrokeId) ? SMMotion.elementMotionAt(i, cStrokeId, renderFrame) : null;
         var elPivot = elMat ? { x: c.bounds.center.x + elMat.ax, y: c.bounds.center.y + elMat.ay } : null;
         if (c instanceof Raster) {
           var imageId = registerRasterIfNeeded(c);
@@ -392,6 +1030,39 @@
           if (elMat) { rb = SMMotion.transformImageRect(rb, elPivot, elMat); imgOp *= elMat.op; }
           if (motionMat) { rb = SMMotion.transformImageRect(rb, motionPivot, motionMat); imgOp *= motionMat.op; }
           for (var pc = 0; pc < parentChain.length; pc++) { rb = SMMotion.transformImageRect(rb, parentChain[pc].pivot, parentChain[pc].mat); imgOp *= parentChain[pc].mat.op; }
+          // 3D layer (2026-07-30, Cyril: "la 3D sur les footage... marche
+          // pas" — confirmed, see motion.js's project3DImageRect doc
+          // comment for the full reasoning/approximation tradeoff).
+          // motionMat/parentChain are already forced null/[] above when
+          // is3D (elMat is untouched, same as the vector path below), so
+          // this REPLACES what their contribution would have been rather
+          // than stacking on top of it. Per-clone override mirrors the
+          // vector path's own dup3D handling a few hundred lines down
+          // (same cache, same merge-with-parent3D logic) — a duplicated
+          // raster (imported image used as a Duplicator seed) gets its
+          // own clone's positionZ/rotationX/rotationY delta instead of
+          // sharing the layer-wide projector.
+          if (project3D) {
+            var rbProjector = project3D;
+            if (c.data && c.data.dup3D && dup3DProjectorCache) {
+              var rbDk3 = c.data.dupIndex;
+              if (!dup3DProjectorCache[rbDk3]) {
+                var rbCloneDelta = c.data.dup3D;
+                if (parent3D) {
+                  rbCloneDelta = {
+                    dx: (parent3D.dx || 0), dy: (parent3D.dy || 0), drot: (parent3D.drot || 0),
+                    dsxPct: (parent3D.dsxPct || 0), dsyPct: (parent3D.dsyPct || 0),
+                    dz: (rbCloneDelta.dz || 0) + (parent3D.dz || 0),
+                    drx: (rbCloneDelta.drx || 0) + (parent3D.drx || 0),
+                    dry: (rbCloneDelta.dry || 0) + (parent3D.dry || 0),
+                  };
+                }
+                dup3DProjectorCache[rbDk3] = SMMotion.make3DProjector(state.layers[i], q3dBounds, renderFrame, state.canvasW, state.canvasH, rbCloneDelta);
+              }
+              rbProjector = dup3DProjectorCache[rbDk3];
+            }
+            rb = SMMotion.project3DImageRect(rb, rbProjector);
+          }
           items.push({
             image: { imageId: imageId, x: rb.x, y: rb.y, width: rb.width, height: rb.height, opacity: imgOp, rotation: rb.rotation || 0 },
           });
@@ -419,17 +1090,101 @@
         else if (c instanceof Path && c.segments.length >= 2) subPaths = [c];
         else continue;
         subPaths.forEach(function (sub) {
-          var sd = serP(sub);
+          // FAST PATH: geometry provably untransformed AND already registered
+          // -> emit the ref without touching serP/roundSegs at all. This is
+          // the entire point of the retained store; everything below is the
+          // cold path that pays serialization once per new geometry.
+          // v2: the Motion chain no longer disqualifies a retained path — it
+          // is folded into ONE affine sent alongside the ref. Four things
+          // still do, each because it would change the picture:
+          //   - per-vertex path offsets (the only non-affine piece)
+          //   - a non-uniform scale anywhere in the chain (stroke-width
+          //     semantics differ, see motionChainUniform)
+          //   - a gradient fill (its anchors are pre-transformed inline)
+          //   - the current-frame outline overlay (its stroke width is a
+          //     screen-space constant that must NOT ride the affine)
+          // 3D layer (2026-07-28): a 5th exclusion, same reasoning as the
+          // other four — retained-path registration stores `segsBefore`
+          // (the PRE-transform geometry) and relies on `pathTf` (a single
+          // AFFINE matrix) to reproduce the posed result on the Rust side.
+          // The 3D projector below is NONLINEAR (a real perspective
+          // projection, not scale+rotate+translate) — pathTf can't
+          // represent it, so a retained path would render flat/unprojected
+          // whenever this fast path fired. Always take the cold (serP)
+          // path for a 3D layer instead, exactly like symbolId/montageId/
+          // lfsGroup already do for their own "synthesizes new geometry
+          // every call" reasons (layerRetainable, above).
+          var xformable = layerRetainable
+            && !project3D
+            && !(window.SMMotion && cStrokeId && SMMotion.hasPathVertexMotionFor(i, cStrokeId))
+            && !(window.SMMotion && cStrokeId && SMMotion.hasTrimMotionFor(i, cStrokeId))
+            && !(c.data && c.data.fillGradient)
+            && !(c.data && c.data.strokeGradientAlongPath)
+            && !(includeEditorOverlays && state.currentFrameOutline)
+            && motionChainUniform(elMat, motionMat, parentChain);
+          var fastRef = xformable ? existingPathRef(sub) : null;
+          var sd = fastRef ? null : serP(sub);
+          // Identity, not deep-compare: applyPathVertexOffsetsFor returns the
+          // SAME array when the shape has no per-vertex keys, so `!==` is an
+          // exact "were the coordinates rewritten?" test.
+          var segsBefore = sd ? sd.segments : null;
           // Path property, per-vertex (motion.js's applyPathVertexOffsetsFor,
           // 2026-07): innermost layer of the transform stack, applied to the
           // raw geometry BEFORE elMat — a vertex offset is authored in the
           // shape's OWN local space, same as elMat's own pivot is computed
           // from `c.bounds` (the pre-offset bounds), matching AE's model
           // where a path's own points are edited before any transform.
-          if (window.SMMotion && cStrokeId) sd.segments = SMMotion.applyPathVertexOffsetsFor(i, cStrokeId, sd.segments, state.currentFrame);
-          if (elMat) sd.segments = SMMotion.transformSegments(sd.segments, elPivot, elMat);
-          if (motionMat) sd.segments = SMMotion.transformSegments(sd.segments, motionPivot, motionMat);
-          for (var pc2 = 0; pc2 < parentChain.length; pc2++) sd.segments = SMMotion.transformSegments(sd.segments, parentChain[pc2].pivot, parentChain[pc2].mat);
+          if (sd && window.SMMotion && cStrokeId) sd.segments = SMMotion.applyPathVertexOffsetsFor(i, cStrokeId, sd.segments, renderFrame);
+          // Trim Paths (2026-08) — same innermost-layer placement as vertex
+          // offsets right above (authored in the shape's own local space,
+          // before elMat/motionMat), applied right after so a trimmed
+          // portion still rides any per-vertex sculpting done on top of it.
+          if (sd && window.SMMotion && cStrokeId && SMMotion.hasTrimMotionFor(i, cStrokeId)) {
+            var trimmed = SMMotion.applyTrimFor(i, cStrokeId, sd.segments, sd.closed, renderFrame);
+            sd.segments = trimmed.segments; sd.closed = trimmed.closed;
+          }
+          if (sd && elMat) sd.segments = SMMotion.transformSegments(sd.segments, elPivot, elMat);
+          if (sd && motionMat) sd.segments = SMMotion.transformSegments(sd.segments, motionPivot, motionMat);
+          // 3D layer (2026-07-28) — replaces motionMat's role for a 3D-
+          // enabled layer (motionMat is forced null above): projects every
+          // VERTEX through the layer's 3D transform + camera, leaving
+          // strokeWidth/strokeScale (below) completely untouched — the
+          // Grease-Pencil-style contract this feature was explicitly
+          // corrected to (motion.js's make3DProjector doc comment).
+          if (sd && project3D) {
+            // Per-clone 3D override (2026-07-30) — a duplicator copy
+            // carrying its own positionZ/rotationX/rotationY delta
+            // (data.dup3D, app.js's applyLayerDuplicator) gets its OWN
+            // projector instead of the layer-wide `project3D` every other
+            // item here shares, cached per dupIndex so every stroke
+            // belonging to the same clone reuses one build.
+            var itemProjector = project3D;
+            if (c.data && c.data.dup3D && dup3DProjectorCache) {
+              var dk3 = c.data.dupIndex;
+              if (!dup3DProjectorCache[dk3]) {
+                // Merge with the layer-wide parent3D contribution (if any)
+                // — without this, a layer that's BOTH a duplicator AND
+                // multi-parented would apply the parent blend to its
+                // shared `project3D` but silently drop it from every
+                // per-clone override, since dup3D only ever carries the
+                // clone's OWN delta.
+                var cloneDelta = c.data.dup3D;
+                if (parent3D) {
+                  cloneDelta = {
+                    dx: (parent3D.dx || 0), dy: (parent3D.dy || 0), drot: (parent3D.drot || 0),
+                    dsxPct: (parent3D.dsxPct || 0), dsyPct: (parent3D.dsyPct || 0),
+                    dz: (cloneDelta.dz || 0) + (parent3D.dz || 0),
+                    drx: (cloneDelta.drx || 0) + (parent3D.drx || 0),
+                    dry: (cloneDelta.dry || 0) + (parent3D.dry || 0),
+                  };
+                }
+                dup3DProjectorCache[dk3] = SMMotion.make3DProjector(state.layers[i], q3dBounds, renderFrame, state.canvasW, state.canvasH, cloneDelta);
+              }
+              itemProjector = dup3DProjectorCache[dk3];
+            }
+            sd.segments = SMMotion.project3DSegments(sd.segments, itemProjector);
+          }
+          if (sd) for (var pc2 = 0; pc2 < parentChain.length; pc2++) sd.segments = SMMotion.transformSegments(sd.segments, parentChain[pc2].pivot, parentChain[pc2].mat);
           var op = c.opacity !== undefined ? c.opacity : 1;
           if (elMat) op *= elMat.op;
           if (motionMat) op *= motionMat.op;
@@ -453,11 +1208,40 @@
           // `"dashPattern":[],"dashOffset":0,"miterLimit":10,...` on every
           // one of a dab-heavy document's thousands of fill-only items was
           // ~200 bytes/item of dead weight re-parsed by serde every render.
-          var item = {
-            segments: roundSegs(sd.segments),
-            closed: !!sd.closed,
-            fillColor: cssColorToRgba(c.fillColor ? c.fillColor.toCSS(true) : null, op),
-          };
+          // Retained path (see the store's own comment above): only when the
+          // geometry reaches here untouched by the per-vertex / element /
+          // layer / parent transform chain — any of those rewrite every
+          // coordinate, so the stored path would be the wrong shape.
+          var rounded = sd ? roundSegs(sd.segments) : null;
+          // A stored path must live in the shape's OWN space, never a posed
+          // one — so registration reads `segsBefore`, the pre-transform array
+          // (transformSegments returns a new array, it does not mutate). That
+          // is what lets a permanently-animated layer register at all: v2's
+          // first draft registered from the POSED geometry and so a Motion
+          // layer, which never presents an untransformed frame, could never
+          // seed its own store entry.
+          var pathRef = fastRef;
+          if (!pathRef && sd && xformable) pathRef = pathRefFor(sub, roundSegs(segsBefore), sd.closed);
+          var pathTf = null;
+          if (pathRef && (elMat || motionMat || parentChain.length)) {
+            if (elMat) pathTf = affineFromMotion(elMat, elPivot);
+            if (motionMat) { var mm = affineFromMotion(motionMat, motionPivot); pathTf = pathTf ? affineMul(mm, pathTf) : mm; }
+            for (var pcf = 0; pcf < parentChain.length; pcf++) {
+              var pmf = affineFromMotion(parentChain[pcf].mat, parentChain[pcf].pivot);
+              pathTf = pathTf ? affineMul(pmf, pathTf) : pmf;
+            }
+          }
+          var item;
+          if (pathRef) {
+            item = { pathRef: pathRef, fillColor: cssColorToRgba(c.fillColor ? c.fillColor.toCSS(true) : null, op) };
+            if (pathTf) item.pathTransform = pathTf;
+          } else {
+            item = {
+              segments: rounded,
+              closed: !!sd.closed,
+              fillColor: cssColorToRgba(c.fillColor ? c.fillColor.toCSS(true) : null, op),
+            };
+          }
           // Extended per-shape property: Fill color (2026-07) — overrides
           // the item's own painted color with its element holder's
           // 'fillColor' track, [r,g,b,a] 0-255, the exact shape
@@ -465,36 +1249,60 @@
           // the user actually keyed/set it (elementFillColorAt returns
           // null otherwise, see its own comment in motion.js).
           if (window.SMMotion && cStrokeId) {
-            var fcOverride = SMMotion.elementFillColorAt(i, cStrokeId, state.currentFrame);
+            var fcOverride = SMMotion.elementFillColorAt(i, cStrokeId, renderFrame);
             if (fcOverride) item.fillColor = fcOverride;
           }
           // Gradient fill (2026-07) — takes priority over the flat fillColor
           // above on the Rust side (geometry-wasm's paint_fill), same
           // "richer field wins" precedent as centerline/image. Anchor points
-          // are absolute world coordinates authored once when the gradient
-          // is applied (see palette-panel.js's gradient editor) — NOT yet
-          // re-projected through elMat/motionMat/parentChain, a known v1
-          // limitation (documented on ItemIn.fill_gradient in engine.rs too).
-          if (c.data && c.data.fillGradient) {
+          // are document coordinates and follow the exact same element,
+          // layer and parent transform chain as the path geometry.
+          // gradientGeomOk: a from/to-less gradient would send `undefined`
+          // endpoints into the Rust side. Skipping it here leaves the flat
+          // fillColor in place — the shape still draws, just without the
+          // ramp, instead of rendering as garbage.
+          if (c.data && c.data.fillGradient && (!window.gradientGeomOk || window.gradientGeomOk(c.data.fillGradient))) {
             var fg = c.data.fillGradient;
+            function transformedGradientPoint(pt) {
+              var one = [{ point: [pt[0], pt[1]], handleIn: [0, 0], handleOut: [0, 0] }];
+              if (elMat) one = SMMotion.transformSegments(one, elPivot, elMat);
+              if (motionMat) one = SMMotion.transformSegments(one, motionPivot, motionMat);
+              for (var gpc = 0; gpc < parentChain.length; gpc++) one = SMMotion.transformSegments(one, parentChain[gpc].pivot, parentChain[gpc].mat);
+              return one[0].point;
+            }
             item.fillGradient = {
-              kind: fg.kind, from: fg.from, to: fg.to,
+              kind: fg.kind, from: transformedGradientPoint(fg.from), to: transformedGradientPoint(fg.to),
               stops: fg.stops.map(function (s) { return { offset: s.offset, color: cssColorToRgba(s.color, op) || [0, 0, 0, 0] }; }),
             };
           }
           var sc = cssColorToRgba(c.strokeColor ? c.strokeColor.toCSS(true) : null, op);
           if (sc) {
             item.strokeColor = sc;
-            item.strokeWidth = (c.strokeWidth || 1) * strokeScale;
-            item.strokeCap = c.strokeCap;
-            item.strokeJoin = c.strokeJoin;
+            // With pathTransform the engine strokes THROUGH the affine, which
+            // already scales the pen — pre-multiplying here too would square
+            // the scale.
+            item.strokeWidth = (c.strokeWidth || 1) * (item.pathTransform ? 1 : strokeScale);
+            // typeof-guarded — same Option<String> boundary as blendMode/
+            // matteMode above; a Path deserialized from a corrupted/older
+            // save (desP, app.js) could otherwise hand a non-string value
+            // straight through to serde and permanently disable the engine.
+            item.strokeCap = typeof c.strokeCap === 'string' ? c.strokeCap : undefined;
+            item.strokeJoin = typeof c.strokeJoin === 'string' ? c.strokeJoin : undefined;
             item.miterLimit = c.miterLimit;
             if (c.dashArray && c.dashArray.length) {
               item.dashPattern = c.dashArray;
               item.dashOffset = c.dashOffset;
             }
           }
-          if (c.data && c.data.paintOrder) item.paintOrder = c.data.paintOrder;
+          if (includeEditorOverlays && state.currentFrameOutline) {
+            delete item.fillGradient;
+            item.fillColor = null;
+            if (!item.strokeColor) {
+              item.strokeColor = [235, 235, 240, Math.round(255 * op)];
+              item.strokeWidth = Math.max(1 / view.zoom, 0.75);
+            }
+          }
+          if (c.data && typeof c.data.paintOrder === 'string') item.paintOrder = c.data.paintOrder;
           // Per-element effects (2026-07, effects-panel.js — "possible de
           // différencié les effet par éléments sélectionné") — same
           // {effectType,enabled,p1..p4}[] shape sceneEffectsOf already
@@ -502,10 +1310,146 @@
           // engine.rs's paint_layer_items for how an item carrying this is
           // isolated and effect-processed on its own within the layer.
           if (c.data && c.data.effects && c.data.effects.length) item.effects = sceneEffectsOf(c.data);
+          // Stroke gradient along path (2026-08, "gradient qui tire du
+          // début à la fin du trait" — distinct from fillGradient above,
+          // which is a spatial 2-point ramp unrelated to the path's own
+          // shape). No new WGSL/Rust needed: this engine draws ONE flat
+          // color per stroked item, so a gradient becomes many small
+          // straight sub-segments, each solid-colored at its own arc-length
+          // position — the same "split into pieces along the path" idea
+          // buildBitmapBrush's dab-stamping already uses for a different
+          // purpose. v1: exactly 2 stops (from/to), piece count adaptive to
+          // length (denser trait = more pieces, capped both ends so a tiny
+          // trait or a huge one both stay cheap).
+          if (item.segments && item.strokeColor && c.data && c.data.strokeGradientAlongPath && window.SMMotion) {
+            var sg = c.data.strokeGradientAlongPath;
+            var fromRgba = cssColorToRgba(sg.from, op), toRgba = cssColorToRgba(sg.to, op);
+            if (fromRgba && toRgba) {
+              var poly = SMMotion.flattenSegmentsToPolyline(item.segments, item.closed, 20);
+              var cumL = [0];
+              for (var pli = 1; pli < poly.length; pli++) {
+                var pdx = poly[pli][0] - poly[pli - 1][0], pdy = poly[pli][1] - poly[pli - 1][1];
+                cumL.push(cumL[pli - 1] + Math.sqrt(pdx * pdx + pdy * pdy));
+              }
+              var totalL = cumL[cumL.length - 1];
+              if (totalL > 0) {
+                var pieceCount = Math.max(6, Math.min(48, Math.round(totalL / 40)));
+                var pieceLen = totalL / pieceCount;
+                function pointAtLenGrad(len) {
+                  for (var qi = 1; qi < cumL.length; qi++) {
+                    if (cumL[qi] >= len) {
+                      var qSegLen = cumL[qi] - cumL[qi - 1];
+                      var qt = qSegLen > 0 ? (len - cumL[qi - 1]) / qSegLen : 0;
+                      return [poly[qi - 1][0] + (poly[qi][0] - poly[qi - 1][0]) * qt, poly[qi - 1][1] + (poly[qi][1] - poly[qi - 1][1]) * qt];
+                    }
+                  }
+                  return poly[poly.length - 1];
+                }
+                for (var pieceI = 0; pieceI < pieceCount; pieceI++) {
+                  var pA = pointAtLenGrad(pieceI * pieceLen), pB = pointAtLenGrad((pieceI + 1) * pieceLen);
+                  var tMid = (pieceI + 0.5) / pieceCount;
+                  var pieceColor = [
+                    Math.round(fromRgba[0] + (toRgba[0] - fromRgba[0]) * tMid),
+                    Math.round(fromRgba[1] + (toRgba[1] - fromRgba[1]) * tMid),
+                    Math.round(fromRgba[2] + (toRgba[2] - fromRgba[2]) * tMid),
+                    Math.round(fromRgba[3] + (toRgba[3] - fromRgba[3]) * tMid),
+                  ];
+                  items.push({
+                    segments: [{ point: pA, handleIn: [0, 0], handleOut: [0, 0] }, { point: pB, handleIn: [0, 0], handleOut: [0, 0] }],
+                    closed: false, fillColor: null, strokeColor: pieceColor,
+                    strokeWidth: item.strokeWidth, strokeCap: item.strokeCap, strokeJoin: item.strokeJoin,
+                  });
+                }
+                return; // pieces pushed directly — skip the single combined item below
+              }
+            }
+          }
+          // Non-destructive combine groups (2026-07-29) need to find, after
+          // this loop, which JSON item(s) came from which live source item —
+          // stripped again right after use, never sent to the renderer.
+          item.__srcC = sub;
+          // Vector mask (2026-08) — pulled out of `items` (never painted as
+          // normal content) into `layerMasks` instead, geometry/transform
+          // untouched (so it moves/animates exactly like any other Path)
+          // but with a forced solid-white/no-stroke paint: only the SHAPE
+          // matters to the engine's mask combine, never the real color the
+          // user sees while editing it on canvas.
+          if (c.data && c.data.isMask) {
+            var maskItem = {};
+            for (var mik in item) { if (Object.prototype.hasOwnProperty.call(item, mik)) maskItem[mik] = item[mik]; }
+            maskItem.fillColor = [255, 255, 255, 255];
+            delete maskItem.fillGradient;
+            maskItem.strokeColor = null;
+            delete maskItem.strokeWidth; delete maskItem.strokeCap; delete maskItem.strokeJoin; delete maskItem.miterLimit;
+            delete maskItem.dashPattern; delete maskItem.dashOffset; delete maskItem.__srcC; delete maskItem.effects;
+            layerMasks.push({ item: maskItem, mode: (c.data.maskMode === 'subtract' || c.data.maskMode === 'intersect') ? c.data.maskMode : 'add' });
+            if (c.data.maskFeather > 0) layerMaskFeather = Math.max(layerMaskFeather, c.data.maskFeather);
+            return;
+          }
           items.push(item);
         });
       }
+      // Non-destructive combine groups (2026-07-29) — post-process on the
+      // JSON items just built, never on the live document (see the "why not
+      // touch the live document" rationale, group-bridge.js): suppress the
+      // paint of any item whose source is a combine-group member (in the
+      // JSON item only — the live Path keeps its real fill/stroke, still
+      // fully hit-testable/editable), then append the combined outline
+      // (styled from the topmost member). Scoped strictly to this layer's
+      // own ld.groups, cheap no-op for the overwhelmingly common case of no
+      // combine-groups at all.
+      if (window.SMGroup && state.layers[i].groups && Object.keys(state.layers[i].groups).length) {
+        var combineRes = SMGroup.renderCombinesFromChildren(userLayers[i], state.layers[i]);
+        var suppressArr = combineRes.suppress;
+        items.forEach(function (it) {
+          if (suppressArr.length && it.__srcC && suppressArr.indexOf(it.__srcC) !== -1) {
+            it.fillColor = null; it.strokeColor = null; delete it.strokeWidth; delete it.dashPattern; delete it.dashOffset; delete it.fillGradient;
+          }
+          delete it.__srcC;
+        });
+        combineRes.extra.forEach(function (ex) {
+          var op2 = ex.path.opacity !== undefined ? ex.path.opacity : 1;
+          var exSegs = ex.path.segments.map(function (s) { return { point: [s.point.x, s.point.y], handleIn: [s.handleIn.x, s.handleIn.y], handleOut: [s.handleOut.x, s.handleOut.y] }; });
+          // Layer Motion transform (2026-07-29 fix, QA-confirmed "le gizmo/
+          // combine se décale par rapport au calque") — computeGroupCombine
+          // runs on the members' raw LIVE Paper geometry (un-posed, same
+          // §5ter "stored path lives in the shape's own space" contract
+          // every other item in this loop already follows), but unlike
+          // those, this merged item was built straight from that geometry
+          // with no pathTransform/pathRef of its own — every other item
+          // gets motionMat+parentChain applied via pathTransform, so this
+          // one must too, or it stays frozen at the pre-Motion position
+          // while the rest of the layer (and its own now-suppressed
+          // members) moves. No elMat here on purpose: the merge can draw
+          // from several members that could each carry a DIFFERENT
+          // per-element Motion, so there is no single element transform
+          // that's correct for the combined shape — only the layer-level
+          // chain, which is uniform across every item in this layer.
+          if (motionMat) exSegs = SMMotion.transformSegments(exSegs, motionPivot, motionMat);
+          for (var pcx = 0; pcx < parentChain.length; pcx++) exSegs = SMMotion.transformSegments(exSegs, parentChain[pcx].pivot, parentChain[pcx].mat);
+          var extraItem = {
+            segments: roundSegs(exSegs),
+            closed: !!ex.path.closed,
+            fillColor: cssColorToRgba(ex.path.fillColor ? ex.path.fillColor.toCSS(true) : null, op2),
+          };
+          var exSc = cssColorToRgba(ex.path.strokeColor ? ex.path.strokeColor.toCSS(true) : null, op2);
+          if (exSc) { extraItem.strokeColor = exSc; extraItem.strokeWidth = ex.path.strokeWidth || 1; }
+          items.push(extraItem);
+        });
+      } else {
+        items.forEach(function (it) { delete it.__srcC; });
+      }
+      // typeof-guarded (not just truthy) — engine.rs's LayerIn::blend_mode is
+      // Option<String>, and a non-string value here (e.g. a corrupted/older
+      // project file that stored a boolean, or the stale localStorage
+      // 'nemo-auto' autosave restored silently at boot, timeline.js's
+      // importJSON) sails through the `bm && bm !== 'normal'` ternary below
+      // UNCHANGED — Rust's serde then rejects the whole scene, which
+      // tick()'s catch treats exactly like the screen_to_world Float64Array
+      // bug above: setEnabled(false) for the rest of the session, not just
+      // a skipped frame.
       var bm = state.layers[i].blendMode;
+      if (typeof bm !== 'string') bm = undefined;
       // Track matte (2026-07, scouted from Caddis's Layer.matteMode):
       // AE convention — the matte SOURCE is implicitly the layer directly
       // above this one (i+1), never referenced by id. Same wire shape as
@@ -513,6 +1457,7 @@
       // by engine.rs's composite_scene which also SKIPS painting the
       // source layer as its own visible content once it's consumed.
       var mm = state.layers[i].matteMode;
+      if (typeof mm !== 'string') mm = undefined;
       // Effects stack (2026-07 rewrite — was separate blurRadius/gshadow_*
       // fields) — runs on THIS layer's own isolated alpha (see
       // geometry-wasm/src/engine.rs's LayerIn::effects doc comment).
@@ -536,12 +1481,22 @@
       // parented layer blurs on its own movement, not the rig's. Noted
       // rather than silently approximated.
       var mbOn = state.motionBlurOn && state.layers[i].motionBlur && motionMat && items.length;
+      // Computed once and shared with the ghosts below (2026-07 fix) — was
+      // previously only ever called for the real layer's own push, so a
+      // ghost sample always composited plain-Normal/un-effected regardless
+      // of this layer's actual blendMode/effects stack. Re-evaluating per
+      // ghost at its OWN sample time would be more "correct" for a keyed
+      // effect param, but the geometry delta above already only APPROXIMATES
+      // each sample (reusing the sharp frame's built items, not a full
+      // re-render) — reusing the sharp frame's effects here matches that
+      // same established approximation, not a new one.
+      var mbEffects = sceneEffectsOf(state.layers[i]);
       if (mbOn) {
         var mbSamples = Math.max(2, Math.min(16, state.motionBlurSamples || 6));
         var mbShutter = Math.max(0.05, Math.min(2, state.motionBlurShutter || 0.5)); // in frames
         for (var s = 1; s <= mbSamples; s++) {
           var t = (s / mbSamples) * mbShutter;
-          var ms = SMMotion.layerMotionAt(i, state.currentFrame - t);
+          var ms = SMMotion.layerMotionAt(i, renderFrame - t);
           if (!ms) continue;
           var delta = {
             dx: ms.dx - motionMat.dx, dy: ms.dy - motionMat.dy,
@@ -559,14 +1514,38 @@
             var c = {};
             for (var k in it) if (Object.prototype.hasOwnProperty.call(it, k)) c[k] = it[k];
             if (c.segments) c.segments = roundSegs(SMMotion.transformSegments(c.segments, motionPivot, delta));
+            // Retained-path items (pathRef+pathTransform, no segments —
+            // CLAUDE.md §5ter) fell through untouched here: c.pathTransform
+            // got shallow-copied as-is, so every ghost sat at the EXACT
+            // same position as the sharp frame, just faded — stacked
+            // duplicates instead of a smear, for what's now the common case
+            // (any ordinary animated shape layer once geometry retention is
+            // on). Same fix as segments, composed as the OUTERMOST affine —
+            // mirrors how motionMat's own affine gets folded into pathTf
+            // above (affineMul(newer, older)).
+            else if (c.pathTransform) c.pathTransform = affineMul(affineFromMotion(delta, motionPivot), c.pathTransform);
             c.opacity = (c.opacity != null ? c.opacity : 1) * fade;
             return c;
           });
-          layers.push({ items: sampleItems });
+          // blendMode/effects (2026-07 fix): a ghost previously always
+          // composited plain Normal with no effects stack, regardless of
+          // this layer's own settings — a Screen-blend or Glow-effect layer
+          // showed a correctly blended/effected sharp frame trailed by
+          // ghosts that ignored both. matteMode deliberately NOT carried:
+          // engine.rs resolves a matte source by array adjacency (the layer
+          // directly above), and duplicating matteMode across N ghost
+          // entries would change which entries sit adjacent to what without
+          // a way to verify the Rust-side consequence from here — left as a
+          // separate, not-yet-addressed gap rather than guessed at.
+          layers.push({ items: sampleItems, blendMode: (bm && bm !== 'normal') ? bm : undefined, effects: mbEffects });
         }
       }
-      layers.push({ items: items, blendMode: (bm && bm !== 'normal') ? bm : undefined, matteMode: (mm && mm !== 'none') ? mm : undefined,
-        effects: sceneEffectsOf(state.layers[i]) });
+      // 3D layer (2026-07-28) — no special envelope needed: each item's
+      // segments were already projected in place (project3D, above), so
+      // this layer's `items` push through the EXACT SAME path as any
+      // ordinary layer. blendMode/matteMode/effects still apply normally.
+      layers.push(userLayerEntries[i] = { items: items, blendMode: (bm && bm !== 'normal') ? bm : undefined, matteMode: (mm && mm !== 'none') ? mm : undefined,
+        effects: mbEffects, masks: layerMasks.length ? layerMasks : undefined, maskFeather: layerMaskFeather || undefined });
     }
     // artboard background as the bottom item of a synthetic bottom layer,
     // mirroring drawStage()'s background rect
@@ -599,53 +1578,85 @@
     // Onion ghosts sit right above the background but BELOW the current
     // frame's real artwork (layers[1..]) — a faint reference, never
     // obscuring what's actually being drawn on top of it.
-    var onionItems = buildOnionSkinItems();
-    if (onionItems.length) layers.splice(1, 0, { items: onionItems });
-    var ghostAllItems = buildGhostAllItems();
-    if (ghostAllItems.length) layers.splice(1, 0, { items: ghostAllItems });
-    var nodeItems = buildNodeHandleItems();
-    if (nodeItems.length) layers.push({ items: nodeItems });
-    var xformItems = buildTransformBoxItems();
-    if (xformItems.length) layers.push({ items: xformItems });
-    var marqueeItems = buildMarqueeItems();
-    if (marqueeItems.length) layers.push({ items: marqueeItems });
-    var fsSelItems = buildFSSelectionItems();
-    if (fsSelItems.length) layers.push({ items: fsSelItems });
-    var revisionItems = buildRevisionOutlineItems();
-    if (revisionItems.length) layers.push({ items: revisionItems });
-    var commentItems = buildCommentPinItems();
-    if (commentItems.length) layers.push({ items: commentItems });
-    if (window.SMCamera) {
-      var cameraItems = SMCamera.buildOverlayItems();
-      if (cameraItems.length) layers.push({ items: cameraItems.map(function (it) { it.segments = roundSegs(it.segments); return it; }) });
+    if (includeEditorOverlays) {
+      var onionItems = buildOnionSkinItems();
+      if (onionItems.length) layers.splice(1, 0, { items: onionItems });
+      var ghostAllItems = buildGhostAllItems();
+      if (ghostAllItems.length) layers.splice(1, 0, { items: ghostAllItems });
+      var nodeItems = buildNodeHandleItems();
+      if (nodeItems.length) layers.push({ items: nodeItems });
+      var xformItems = buildTransformBoxItems();
+      if (xformItems.length) layers.push({ items: xformItems });
+      var marqueeItems = buildMarqueeItems();
+      if (marqueeItems.length) layers.push({ items: marqueeItems });
+      var fsSelItems = buildFSSelectionItems();
+      if (fsSelItems.length) layers.push({ items: fsSelItems });
+      var revisionItems = buildRevisionOutlineItems();
+      if (revisionItems.length) layers.push({ items: revisionItems });
+      var commentItems = buildCommentPinItems();
+      if (commentItems.length) layers.push({ items: commentItems });
+      if (window.SMCamera) {
+        var cameraItems = SMCamera.buildOverlayItems();
+        if (cameraItems.length) layers.push({ items: cameraItems.map(function (it) { it.segments = roundSegs(it.segments); return it; }) });
+      }
+      if (window.SMMotion) {
+        var motionItems = SMMotion.buildOverlayItems();
+        if (motionItems.length) layers.push({ items: motionItems.map(function (it) { it.segments = roundSegs(it.segments); return it; }) });
+      }
+      if (typeof fillCloseStrokesOverlayItems === 'function') {
+        var fillCloseItems = fillCloseStrokesOverlayItems();
+        if (fillCloseItems.length) layers.push({ items: fillCloseItems.map(function (it) { it.segments = roundSegs(it.segments); return it; }) });
+      }
+      if (!skipVolatile) {
+        var eraserItems = buildEraserCursorItems();
+        if (eraserItems.length) layers.push({ items: eraserItems });
+        var pressureItems = buildPressureCursorItems();
+        if (pressureItems.length) layers.push({ items: pressureItems });
+        var penItems = buildPenPreviewItems();
+        if (penItems.length) layers.push({ items: penItems });
+        var rigItems = buildRigPreviewItems();
+        if (rigItems.length) layers.push({ items: rigItems });
+      }
+      var arcItems = buildArcHandleItems();
+      if (arcItems.length) layers.push({ items: arcItems });
+      var safetyItems = buildSafetyZoneItems();
+      if (safetyItems.length) layers.push({ items: safetyItems });
+      var guideItems = buildGuideLayerItems();
+      if (guideItems.length) layers.push({ items: guideItems });
+      var perspectiveItems = window.buildPerspectiveGuideItems ? window.buildPerspectiveGuideItems() : [];
+      if (perspectiveItems.length) layers.push({ items: perspectiveItems });
+      var symmetryItems = window.buildSymmetryGuideItems ? window.buildSymmetryGuideItems() : [];
+      if (symmetryItems.length) layers.push({ items: symmetryItems });
+      var gradientGizmoItems = window.buildGradientGizmoItems ? window.buildGradientGizmoItems() : [];
+      if (gradientGizmoItems.length) layers.push({ items: gradientGizmoItems });
     }
-    if (window.SMMotion) {
-      var motionItems = SMMotion.buildOverlayItems();
-      if (motionItems.length) layers.push({ items: motionItems.map(function (it) { it.segments = roundSegs(it.segments); return it; }) });
+    // Track matte source resolution (uid-based, 2026-07-31) — runs LAST,
+    // after every unshift/splice above, so layers.indexOf gives the final
+    // wire position of the source's main entry. A missing/dangling/self-
+    // referencing uid leaves matteSourceIndex unset — engine.rs's
+    // resolve_matte_source then applies the legacy implicit-i+1 fallback,
+    // keeping pre-migration scenes rendering exactly as before.
+    for (var mi = 0; mi < state.layers.length; mi++) {
+      var mEntry = userLayerEntries[mi];
+      if (!mEntry || !mEntry.matteMode) continue;
+      var mUid = state.layers[mi].matteSourceLayerUid;
+      if (!mUid) continue;
+      var mSrcIdx = -1;
+      for (var mj = 0; mj < state.layers.length; mj++) {
+        if (mj !== mi && state.layers[mj].layerUid === mUid) { mSrcIdx = mj; break; }
+      }
+      if (mSrcIdx < 0 || !userLayerEntries[mSrcIdx]) continue;
+      var mFinal = layers.indexOf(userLayerEntries[mSrcIdx]);
+      if (mFinal >= 0) mEntry.matteSourceIndex = mFinal;
     }
-    if (typeof fillCloseStrokesOverlayItems === 'function') {
-      var fillCloseItems = fillCloseStrokesOverlayItems();
-      if (fillCloseItems.length) layers.push({ items: fillCloseItems.map(function (it) { it.segments = roundSegs(it.segments); return it; }) });
-    }
-    if (!skipVolatile) {
-      var eraserItems = buildEraserCursorItems();
-      if (eraserItems.length) layers.push({ items: eraserItems });
-      var pressureItems = buildPressureCursorItems();
-      if (pressureItems.length) layers.push({ items: pressureItems });
-      var penItems = buildPenPreviewItems();
-      if (penItems.length) layers.push({ items: penItems });
-    }
-    var arcItems = buildArcHandleItems();
-    if (arcItems.length) layers.push({ items: arcItems });
-    var safetyItems = buildSafetyZoneItems();
-    if (safetyItems.length) layers.push({ items: safetyItems });
-    var perspectiveItems = window.buildPerspectiveGuideItems ? window.buildPerspectiveGuideItems() : [];
-    if (perspectiveItems.length) layers.push({ items: perspectiveItems });
-    var symmetryItems = window.buildSymmetryGuideItems ? window.buildSymmetryGuideItems() : [];
-    if (symmetryItems.length) layers.push({ items: symmetryItems });
-    var gradientGizmoItems = window.buildGradientGizmoItems ? window.buildGradientGizmoItems() : [];
-    if (gradientGizmoItems.length) layers.push({ items: gradientGizmoItems });
-    return JSON.stringify({ layers: layers });
+    var frameForFx = renderFrame || 0;
+    var fpsForFx = Math.max(1, state.fps || 24);
+    var _sceneOut = JSON.stringify({ time: frameForFx / fpsForFx, layers: layers });
+    // Closes the build: `_imgUsedThisBuild` is now exactly what this frame
+    // draws, which is the only moment eviction can be decided safely.
+    enforceImageBudget();
+    _imgUsedThisBuild = null;
+    return _sceneOut;
   }
 
   // Onion skin ghosts (tweens.js's renderOS() keeps onionPrevLayer/
@@ -659,6 +1670,21 @@
   // reading these two dedicated onion layers instead.
   function onionLayerItems(layer) {
     var items = [];
+    // 3D layers (2026-07-30 fix, QA sweep) — onionPrevLayer/onionNextLayer/
+    // ghostAllLayer are always a ghosted copy of the CURRENTLY ACTIVE layer
+    // specifically (renderOS/renderGhostAll, tweens.js, both key off
+    // state.activeLayerIdx), so unlike buildSceneJson's own per-item 3D
+    // branch (which has to handle every layer), this only ever needs ONE
+    // projector for the whole call. Without it, a 3D layer's onion-skin/
+    // Ghost-All ghosts rendered flat/unprojected while the real current-
+    // frame content next to them rendered correctly projected — visibly
+    // misaligned. Exact same pattern as buildRigPreviewItems' own 3D branch
+    // a few hundred lines down in this file (same "active layer only"
+    // scope), reused rather than re-derived.
+    var activeLd = state.layers[state.activeLayerIdx];
+    var is3DActive = !!(activeLd && activeLd.threeD);
+    var bounds3D = (is3DActive && userLayers[state.activeLayerIdx]) ? userLayers[state.activeLayerIdx].bounds : null;
+    var onionProjector3D = (is3DActive && window.SMMotion && SMMotion.make3DProjector && bounds3D) ? SMMotion.make3DProjector(activeLd, bounds3D, state.currentFrame, state.canvasW, state.canvasH) : null;
     layer.children.forEach(function (c) {
       // Same Shadow Brush guide-line filter as buildSceneJson() above — an
       // onion-skin/Ghost-All ghost of a shadow-tagged guide line shouldn't
@@ -672,6 +1698,7 @@
         var imageId = registerRasterIfNeeded(c);
         if (imageId) {
           var rb = rasterImageRect(c); // same rotation-aware rect as buildSceneJson's own Raster branch
+          if (onionProjector3D) rb = SMMotion.project3DImageRect(rb, onionProjector3D);
           items.push({ image: { imageId: imageId, x: rb.x, y: rb.y, width: rb.width, height: rb.height, opacity: c.opacity !== undefined ? c.opacity : 1, rotation: rb.rotation || 0 } });
         }
         return;
@@ -686,6 +1713,7 @@
       else return;
       subPaths.forEach(function (sub) {
         var sd = serP(sub);
+        if (onionProjector3D) sd.segments = SMMotion.project3DSegments(sd.segments, onionProjector3D);
         var op = c.opacity !== undefined ? c.opacity : 1;
         items.push({
           segments: roundSegs(sd.segments),
@@ -699,8 +1727,10 @@
           fillColor: cssColorToRgba(c.fillColor ? c.fillColor.toCSS(true) : null, op),
           strokeColor: cssColorToRgba(c.strokeColor ? c.strokeColor.toCSS(true) : null, op),
           strokeWidth: c.strokeWidth || 1,
-          strokeCap: c.strokeCap,
-          strokeJoin: c.strokeJoin,
+          // typeof-guarded — same Option<String> boundary as the main
+          // per-item loop above (buildSceneJson).
+          strokeCap: typeof c.strokeCap === 'string' ? c.strokeCap : undefined,
+          strokeJoin: typeof c.strokeJoin === 'string' ? c.strokeJoin : undefined,
         });
       });
     });
@@ -782,6 +1812,51 @@
     ];
   }
 
+  // ---- Guide layers (2026-08, AE feature audit 8.6 — "guides as a real
+  // layer object": rotatable, parentable, colored, unlike a classic
+  // ruler-drag guide) ----
+  // A guide layer has no content of its own (see the isGuideLayer skip in
+  // the main per-layer loop) — its line is entirely derived from the SAME
+  // Transform properties every other layer already has: ld.guidePos (a
+  // WORLD anchor point, defaults to canvas center) is the base the layer's
+  // own Position track offsets, and Rotation sets the line's angle
+  // (0°/horizontal by default, +90° if guideOrientation is 'vertical') —
+  // zero new keyframe machinery, reuses layerMotionAt/parentChainMats
+  // exactly like an ordinary layer's own transform chain, so parenting a
+  // guide to an animated layer (or keying the guide itself) just works.
+  // Drawn as a single line spanning well past the canvas (SPAN, same
+  // "comfortably past any realistic content" convention as
+  // CLIP_MASK_SPAN) — never part of the real/exported scene.
+  function buildGuideLayerItems() {
+    if (!window.SMMotion) return [];
+    var items = [], SPAN = 100000, frame = state.currentFrame;
+    for (var i = 0; i < state.layers.length; i++) {
+      var gld = state.layers[i];
+      if (!gld.isGuideLayer || gld.visible === false) continue;
+      var basePos = gld.guidePos || [state.canvasW / 2, state.canvasH / 2];
+      // layerMotionAt just reads the layer's OWN motion/motionStatic dict
+      // (computeMotionMat) — no bounds/pivot needed to call it, that's only
+      // required by callers that go on to transform CONTENT around a
+      // pivot (ordinary layers). A guide has none, so its own dx/dy/rot
+      // apply directly as a flat offset/rotation on the anchor point.
+      var ownMat = SMMotion.layerMotionAt(i, frame);
+      var angleRad = ((gld.guideOrientation === 'vertical' ? 90 : 0) + (ownMat ? ownMat.rot : 0)) * Math.PI / 180;
+      var pt = [{ point: [basePos[0] + (ownMat ? ownMat.dx : 0), basePos[1] + (ownMat ? ownMat.dy : 0)], handleIn: [0, 0], handleOut: [0, 0] }];
+      var parentChain = SMMotion.parentChainMats(i, frame);
+      for (var pc = 0; pc < parentChain.length; pc++) {
+        pt = SMMotion.transformSegments(pt, parentChain[pc].pivot, parentChain[pc].mat);
+        angleRad += (parentChain[pc].mat.rot || 0) * Math.PI / 180;
+      }
+      var cx = pt[0].point[0], cy = pt[0].point[1];
+      var ex = Math.cos(angleRad) * SPAN, ey = Math.sin(angleRad) * SPAN;
+      var col = cssColorToRgba(gld.color || '#00baff', 1) || [0, 186, 255, 255];
+      items.push({
+        segments: [{ point: [cx - ex, cy - ey], handleIn: [0, 0], handleOut: [0, 0] }, { point: [cx + ex, cy + ey], handleIn: [0, 0], handleOut: [0, 0] }],
+        closed: false, fillColor: null, strokeColor: col, strokeWidth: Math.max(1, 1 / view.zoom),
+      });
+    }
+    return items;
+  }
   // ---- Safety zones (Document panel toggle) ----
   // Standard broadcast/film safe-area convention: action-safe = inset 5% of
   // each dimension (90% of canvas visible), title-safe = inset 10% (80%
@@ -984,6 +2059,21 @@
     // stay visually distinct.
     if (_nmq.active && _nmq.rect) {
       var nb = _nmq.rect.bounds;
+      // 2026-07-29 fix: _nmq's own corners now live in raw document space
+      // (subselect-bridge.js's toLocalPoint — same reasoning as
+      // buildNodeHandleItems above), same as everything else this box is
+      // compared against (_nodeSel's containment test). Map the 4 corners
+      // through the active layer's Motion transform so the drawn box
+      // matches where the drag visually happened. Only an axis-aligned
+      // approximation (bounding box of the 4 mapped corners) when the
+      // layer is also rotated — boundsRectItem has no rotated-quad form —
+      // acceptable since the actual selection logic is exact regardless.
+      var motionMap2 = (window.SMMotion && SMMotion.layerMotionPointMap) ? SMMotion.layerMotionPointMap(state.activeLayerIdx) : null;
+      if (motionMap2) {
+        var nCorners = [[nb.left, nb.top], [nb.right, nb.top], [nb.right, nb.bottom], [nb.left, nb.bottom]].map(function (c) { return motionMap2.fwd(c[0], c[1]); });
+        var nxs = nCorners.map(function (c) { return c[0]; }), nys = nCorners.map(function (c) { return c[1]; });
+        return [boundsRectItem(Math.min.apply(null, nxs), Math.min.apply(null, nys), Math.max.apply(null, nxs), Math.max.apply(null, nys), [255, 184, 108, 20], [255, 184, 108, 230], 1 / view.zoom)];
+      }
       return [boundsRectItem(nb.left, nb.top, nb.right, nb.bottom, [255, 184, 108, 20], [255, 184, 108, 230], 1 / view.zoom)];
     }
     return [];
@@ -1190,6 +2280,127 @@
     return items;
   }
 
+  // Rig tool (rig-bridge.js) — bones live as plain JSON on ld.rig.bones,
+  // never inserted into the real Paper layer (that would make them ordinary
+  // artwork geometry — see rig-bridge.js's own header comment), so unlike
+  // everything else rendered here they can't be read off layer.children.
+  // A bone's stored segment shape ({point,handleIn,handleOut}) already
+  // matches an overlay item's own `segments` field one-for-one, so a
+  // finished bone drops straight into an item literal with zero conversion;
+  // only the anchor/tangent-handle markers need building, mirroring
+  // buildPenPreviewItems' own loop above. `_rigDraw` (rig-bridge.js) is a
+  // bare global exactly like tools.js's `_pen` — same reason: this function
+  // needs to read the in-progress WIP path while it's still being drawn,
+  // before it's copied into ld.rig.bones at finalize time.
+  var rigPreviewWorld = null;
+  function setRigPreview(worldPt) { rigPreviewWorld = worldPt; }
+  function buildRigPreviewItems() {
+    if (state.tool !== 'rig') return [];
+    var ld = state.layers[state.activeLayerIdx];
+    if (!ld || !ld.rig) return [];
+    var zs = 1 / view.zoom;
+    var items = [];
+    var boneCol = [255, 200, 60, 235], handleCol = [255, 200, 60, 178];
+    // 2026-07-29 fix — same story as buildNodeHandleItems' own toRendered a
+    // bit below in this file (see its comment, and rig-bridge.js's
+    // toLocalPoint): bone.segments/_rigDraw.path live in raw document space,
+    // but the shape they deform renders through the active layer's own
+    // Motion transform. This overlay used to draw the bone/handles/influence
+    // circle straight from raw coordinates, so on any layer with an active
+    // Motion Scale/Rotation/Position the rig guide visibly sat in the wrong
+    // place relative to the shape it's actually editing. transformSegments
+    // (motion.js) is the SAME point+handle-vector transform buildSceneJson's
+    // own pathTransform composes elsewhere — reused here instead of hand-
+    // rolling the math a second time. Radius uses the average of sx/sy: an
+    // exact ellipse would need a different render primitive than a circle,
+    // and Motion "zoom" is overwhelmingly a uniform scale in practice.
+    // 3D layers (2026-07-29 fix) — the 2D affine map/transformSegments pair
+    // above don't apply here at all (make3DProjector's forward map is a
+    // true perspective projection); project3DSegments (motion.js, already
+    // used by buildSceneJson's own 3D branch) is the correct per-vertex
+    // equivalent of transformSegments for this case.
+    var activeLd = state.layers[state.activeLayerIdx];
+    var is3DActive = !!(activeLd && activeLd.threeD);
+    var bounds3D = (is3DActive && userLayers[state.activeLayerIdx]) ? userLayers[state.activeLayerIdx].bounds : null;
+    var projector3D = (is3DActive && window.SMMotion && SMMotion.make3DProjector && bounds3D) ? SMMotion.make3DProjector(activeLd, bounds3D, state.currentFrame, state.canvasW, state.canvasH) : null;
+    var motionMap = (!projector3D && window.SMMotion && SMMotion.layerMotionPointMap) ? SMMotion.layerMotionPointMap(state.activeLayerIdx) : null;
+    function toRenderedSegs(segs) {
+      if (projector3D) return SMMotion.project3DSegments(segs, projector3D);
+      return motionMap ? SMMotion.transformSegments(segs, motionMap.pivot, motionMap.mat) : segs;
+    }
+    function toRendered(x, y) {
+      if (projector3D) { var p = projector3D(x, y); return [p.x, p.y]; }
+      return motionMap ? motionMap.fwd(x, y) : [x, y];
+    }
+    // No single scale factor exists under perspective — approximated by
+    // probing the actual projected distance from the circle's own (already-
+    // rendered) center to one point on its rim. Fine for a rough visual
+    // guide (never hit-tested against, never exported).
+    function toRenderedRadius(r, cx, cy, renderedC) {
+      if (projector3D) { var rim = projector3D(cx + r, cy); return Math.hypot(rim.x - renderedC[0], rim.y - renderedC[1]); }
+      return motionMap ? r * (motionMap.mat.sx + motionMap.mat.sy) / 2 : r;
+    }
+    function pushHandles(pt, hi, ho) {
+      if (Math.hypot(hi[0], hi[1]) > 0.5) {
+        var hiPt = [pt[0] + hi[0], pt[1] + hi[1]];
+        items.push(lineItem(pt, hiPt, handleCol, 1 * zs));
+        items.push(rectItem(hiPt[0], hiPt[1], 3 * zs, [255, 255, 255, 255], boneCol, 1 * zs));
+      }
+      if (Math.hypot(ho[0], ho[1]) > 0.5) {
+        var hoPt = [pt[0] + ho[0], pt[1] + ho[1]];
+        items.push(lineItem(pt, hoPt, handleCol, 1 * zs));
+        items.push(rectItem(hoPt[0], hoPt[1], 3 * zs, [255, 255, 255, 255], boneCol, 1 * zs));
+      }
+    }
+    // Influence circles (2026-07-29, Assigner mode — "les box d'influences
+    // comme dans Shapper sur les vecteurs que tu peux modifier si
+    // l'assignement automatique ne fonctionne pas") — one dashed ring per
+    // bone, centered on its own bounding-box center (rig-bridge.js's
+    // boneCircleCenter), radius = bone.radius||panel default. Drag the ring
+    // ITSELF (rig-bridge.js's hitRadiusHandle) to resize; release re-runs
+    // auto-assign so the deformation reflects the new radius immediately.
+    var showInfluence = state.rigSubMode === 'assign';
+    var influenceCol = [255, 120, 220, 200];
+    var panelRadiusEl = document.getElementById('rig-weight-radius');
+    var panelDefault = (panelRadiusEl && parseFloat(panelRadiusEl.value)) || 200;
+    Object.keys(ld.rig.bones).forEach(function (bid) {
+      var bone = ld.rig.bones[bid];
+      if (!bone.segments || bone.segments.length < 2) return;
+      // The bone currently being (re-)drawn renders from the live Paper
+      // Path below instead (it has a rubber-band cursor line the stored
+      // JSON copy doesn't have yet) — skip its stored copy here to avoid
+      // drawing it twice.
+      if (typeof _rigDraw !== 'undefined' && _rigDraw.path && _rigDraw.boneId === bid) return;
+      var renderedSegs = toRenderedSegs(bone.segments);
+      items.push({ segments: roundSegs(renderedSegs), closed: !!bone.closed, fillColor: null, strokeColor: boneCol, strokeWidth: 2 * zs });
+      renderedSegs.forEach(function (s) {
+        pushHandles(s.point, s.handleIn || [0, 0], s.handleOut || [0, 0]);
+        items.push(circleItem(s.point[0], s.point[1], 3.5 * zs, [255, 255, 255, 255], boneCol, 1.2 * zs));
+      });
+      if (showInfluence && window.SMRig) {
+        var c0 = SMRig.boneCircleCenter(bone);
+        var r0 = SMRig.boneRadiusOf(bone, panelDefault);
+        var c = toRendered(c0.x, c0.y);
+        var r = toRenderedRadius(r0, c0.x, c0.y, c);
+        items.push({ segments: [{ point: [c[0] - 4 * zs, c[1]] }, { point: [c[0] + 4 * zs, c[1]] }], closed: false, fillColor: null, strokeColor: influenceCol, strokeWidth: 1.4 * zs });
+        items.push({ segments: [{ point: [c[0], c[1] - 4 * zs] }, { point: [c[0], c[1] + 4 * zs] }], closed: false, fillColor: null, strokeColor: influenceCol, strokeWidth: 1.4 * zs });
+        items.push(circleItem(c[0], c[1], r, null, influenceCol, 1.6 * zs));
+      }
+    });
+    if (typeof _rigDraw !== 'undefined' && _rigDraw.path) {
+      if (rigPreviewWorld) {
+        var lastRaw = _rigDraw.path.lastSegment.point;
+        var lastRendered = toRendered(lastRaw.x, lastRaw.y);
+        items.push(lineItem(lastRendered, rigPreviewWorld, [255, 220, 130, 153], 1 * zs));
+      }
+      toRenderedSegs(_rigDraw.path.segments.map(function (s) { return { point: [s.point.x, s.point.y], handleIn: [s.handleIn.x, s.handleIn.y], handleOut: [s.handleOut.x, s.handleOut.y] }; })).forEach(function (s) {
+        pushHandles(s.point, s.handleIn, s.handleOut);
+        items.push(circleItem(s.point[0], s.point[1], 3.5 * zs, [255, 255, 255, 255], boneCol, 1.2 * zs));
+      });
+    }
+    return items;
+  }
+
   // Tween motion-arc handles: renderArcs() in tweens.js draws these into a
   // real Paper `arcLayer` (dashed CUBIC-bezier curve between two matched
   // strokes' centroids + two independent OUT/IN draggable handles, upgraded
@@ -1245,16 +2456,31 @@
     var segs = nodeEditSegmentsData(path);
     var zs = 1 / view.zoom;
     var items = [];
+    // 2026-07-29 fix — see subselect-bridge.js's toLocalPoint comment for
+    // the full story: path.segments/nodeEditSegmentsData live in raw
+    // document space, but the shape itself renders through the active
+    // layer's own Motion transform (buildSceneJson's pathTransform, applied
+    // to THIS layer's items a few hundred lines above in this same
+    // function). Map every handle point through the SAME transform here so
+    // the overlay actually sits on the shape it's editing instead of at its
+    // pre-transform position.
+    var motionMap = (window.SMMotion && SMMotion.layerMotionPointMap) ? SMMotion.layerMotionPointMap(state.activeLayerIdx) : null;
+    // 3D layers (2026-07-29 fix) — layerMotionPointMap returns null for a
+    // 3D-toggled layer even with real rotationX/rotationY set; layerMotion3DPointMap
+    // is the dedicated perspective-correct counterpart (motion.js).
+    if (!motionMap && window.SMMotion && SMMotion.layerMotion3DPointMap) motionMap = SMMotion.layerMotion3DPointMap(state.activeLayerIdx);
+    function toRendered(x, y) { return motionMap ? motionMap.fwd(x, y) : [x, y]; }
     segs.forEach(function (s, i) {
-      var pt = s.point, hi = s.handleIn, ho = s.handleOut;
+      var pt = toRendered(s.point[0], s.point[1]);
+      var hi = s.handleIn, ho = s.handleOut;
       var hiLen = Math.hypot(hi[0], hi[1]), hoLen = Math.hypot(ho[0], ho[1]);
       if (hiLen > 0.5) {
-        var hiPt = [pt[0] + hi[0], pt[1] + hi[1]];
+        var hiPt = toRendered(s.point[0] + hi[0], s.point[1] + hi[1]);
         items.push(lineItem(pt, hiPt, [120, 170, 255, 178], 1 * zs));
         items.push(rectItem(hiPt[0], hiPt[1], 3 * zs, [255, 255, 255, 255], [74, 158, 255, 255], 1 * zs));
       }
       if (hoLen > 0.5) {
-        var hoPt = [pt[0] + ho[0], pt[1] + ho[1]];
+        var hoPt = toRendered(s.point[0] + ho[0], s.point[1] + ho[1]);
         items.push(lineItem(pt, hoPt, [120, 170, 255, 178], 1 * zs));
         items.push(rectItem(hoPt[0], hoPt[1], 3 * zs, [255, 255, 255, 255], [74, 158, 255, 255], 1 * zs));
       }
@@ -1300,7 +2526,7 @@
     var pivotWX = state.canvasW / 2, pivotWY = state.canvasH / 2;
     var panAdjX = panX + pivotWX * (z - 1);
     var panAdjY = panY + pivotWY * (z - 1);
-    engine.set_viewport(panAdjX, panAdjY, z, state.canvasRotation || 0, pivotWX, pivotWY);
+    engine.set_viewport(panAdjX, panAdjY, z, state.canvasRotation || 0, pivotWX, pivotWY, view.zoom);
   }
 
   // Shared with renderWithOverlayItem/renderNow so all three call sites stay
@@ -1340,6 +2566,7 @@
           if (viewportChanged) { syncViewport(); lastViewportKey = viewportKey; }
           lastSceneJson = json;
           window.__lastSceneJson = json;
+          flushRetiredPaths();
           engine.render(json);
         }
         lastSceneVersion = window._sceneVersion;
@@ -1436,6 +2663,9 @@
       // runs) need to be re-registered now, or their pipelines simply
       // won't exist yet and run_one_effect's "custom:" branch would no-op.
       if (window.registerAllCustomEffects) window.registerAllCustomEffects();
+      // Retained path store: probe Paper's change flags and, only if the
+      // probe passes, start emitting pathRefs (see installGeometryHook).
+      installGeometryHook();
       if (window.ResizeObserver) {
         resizeObserver = new ResizeObserver(handleResize);
         resizeObserver.observe(paperCanvas);
@@ -1604,6 +2834,26 @@
     syncViewport();
     lastViewportKey = viewportKeyNow();
     invalidateOverlayBase(); // scene may have mutated without a version bump (eraser/select drags) — never let a stale drag-cache survive this
+    // Mograph duplicator (2026-07-29): unlike every other Motion property,
+    // which applies purely inside buildSceneJson's own per-item matrix
+    // (computeMotionMat) and so is always fresh here, the duplicator's
+    // dupOffset* properties are read by applyLayerDuplicator (app.js) ONLY
+    // when getEffectiveStrokesRendered runs — which only happens inside
+    // loadFrame. Any renderNow() call that isn't preceded by a loadFrame
+    // (drag/type a Dup. field, drag a keyframe's value, paste a keyframe,
+    // box-skew multiple keys…) would otherwise re-serialize the SAME stale
+    // materialized copies — found live, "la duplication n'est pas en temps
+    // réel quand on modifie les value". Patching every individual commit
+    // path is exactly the whack-a-mole CLAUDE.md §1 warns about; a duplicator
+    // layer's own loadFrame is already a no-reuse full rebuild by design
+    // (§6's retained-path exclusion), so re-running it here is a correctness
+    // fix, not a new cost, and every non-duplicator layer's existing
+    // hold-frame reuse (_canReuseMaterialized) keeps this near-free.
+    // dupOnly=true (2026-07-29): scopes the rebuild to duplicator layers
+    // only — see loadFrame's own header comment for the live bug this fixes
+    // (an unscoped call here silently reverted any OTHER layer's in-progress
+    // live drag — Subselect, Eraser, Rig pose — on every render tick).
+    if (state.layers.some(function (l) { return l.duplicator && !l._dupEditSource; })) loadFrame(state.currentFrame, true);
     var json = buildSceneJson();
     lastSceneJson = json;
     window.__lastSceneJson = json;
@@ -1668,16 +2918,43 @@
     _fxExportSavedEngineW = engineW; _fxExportSavedEngineH = engineH;
     return true;
   }
-  async function renderFrameToPixelsPNG(frameIdx) {
-    var cw = state.canvasW, ch = state.canvasH;
-    engine.resize(cw, ch);
-    engine.set_viewport(0, 0, 1, 0, cw / 2, ch / 2);
+  // Resizes the engine's render target for an offscreen (render_to_pixels)
+  // pass — decoupled from #rust-canvas's own on-screen width/height (that's
+  // the whole point of render_to_pixels never touching the visible surface,
+  // see engine.rs's own doc comment). Shared by renderFrameToPixelsPNG
+  // (always native size) and the playback bake cache (playback-cache.js,
+  // resized once to a REDUCED size for the whole bake pass) — one place
+  // that pairs resize()+set_viewport() instead of two copies drifting out
+  // of phase (CLAUDE.md §3).
+  function resizeEngineOffscreen(w, h) {
+    engine.resize(w, h);
+    engine.set_viewport(0, 0, 1, 0, w / 2, h / 2, 1);
+  }
+  // Renders one frame and returns the raw RGBA8 pixels — the actual
+  // GPU-readback call site, factored out so both the PNG-encoding export
+  // path below and the playback bake cache call the exact same
+  // loadFrame/buildSceneJson/render_to_pixels sequence instead of
+  // duplicating it (CLAUDE.md §3). Caller must already have the engine at
+  // the size it wants (resizeEngineOffscreen) before calling this.
+  async function renderFrameRawPixels(frameIdx) {
     loadFrame(frameIdx);
     _fxFrameOverride = frameIdx;
     var json;
-    try { json = buildSceneJson(true, true); } finally { _fxFrameOverride = null; }
+    try {
+      json = buildSceneJson(true, true, {
+        frame: frameIdx,
+        forExport: true,
+        includeEditorOverlays: false,
+      });
+    } finally { _fxFrameOverride = null; }
     var bytes = await engine.render_to_pixels(json);
-    var imgData = new ImageData(new Uint8ClampedArray(bytes.buffer, bytes.byteOffset, bytes.byteLength), cw, ch);
+    return new Uint8ClampedArray(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  }
+  async function renderFrameToPixelsPNG(frameIdx) {
+    var cw = state.canvasW, ch = state.canvasH;
+    resizeEngineOffscreen(cw, ch);
+    var pixels = await renderFrameRawPixels(frameIdx);
+    var imgData = new ImageData(pixels, cw, ch);
     var off = document.createElement('canvas'); off.width = cw; off.height = ch;
     off.getContext('2d').putImageData(imgData, 0, 0);
     return off.toDataURL('image/png');
@@ -1694,7 +2971,18 @@
     _fxExportSavedFrame = null;
   }
 
+  // Duplicate canvas viewer (2026-08, AE feature audit 8.4, "New Viewer" —
+  // a second window/panel on the SAME comp, often locked to a different
+  // frame than the main view). Deliberately narrow: just a frame-scoped
+  // buildSceneJson call, not the whole raw function — second-viewer.js
+  // owns its OWN VelloEngine instance/canvas/viewport entirely, this is
+  // the one seam it needs into engine-bridge's closure. skipVolatile=true
+  // (no drag-cursor previews — a second static viewer has no tool of its
+  // own drawing into it) and includeEditorOverlays=false (no selection
+  // handles/marquee/etc. — those belong to the tool driving the MAIN
+  // canvas, not a read-only reference view).
   window.SMEngineBridge = {
+    buildSceneJsonForFrame: function (frame) { return buildSceneJson(true, false, { frame: frame, includeEditorOverlays: false }); },
     setEnabled: setEnabled,
     isEnabled: function () { return enabled; },
     screenToWorld: screenToWorld,
@@ -1704,7 +2992,78 @@
     setEraserCursor: setEraserCursor,
     setPressureCursor: setPressureCursor,
     setPenPreview: setPenPreview,
+    setRigPreview: setRigPreview,
     registerImagePixels: registerImagePixels,
+    // ONE definition of raster->engine image identity. bitmap-brush.js
+    // re-uploads pixels under this id during erase and live restamp; if it
+    // derived its own, the scene would ask for a key nobody wrote to and
+    // the texture would silently stop updating (CLAUDE.md §1).
+    engineIdFor: engineIdFor,
+    // Project load replaces every stored stroke dict at once, so every
+    // retained path is garbage immediately — dropping them eagerly beats
+    // waiting for the GC to walk thousands of dead WeakMap entries.
+    clearRetainedPaths: function () {
+      _pathKeyByDict = new WeakMap(); _retireQueue = []; _registerCount = 0;
+      if (engine && engine.clear_paths) { try { engine.clear_paths(); } catch (e) { /* non-fatal */ } }
+    },
+    // Kill switch. Retained paths are a deep change to what the renderer is
+    // handed, so there is a way to turn them off at runtime without a
+    // rebuild — both to A/B the output (the whole feature is only worth
+    // shipping if the picture is byte-identical) and as a field escape hatch
+    // if some item type ever turns out to mutate geometry without tripping
+    // the change hook. Turning it OFF also drops every stamp, so the very
+    // next scene build falls back to inline segments immediately rather than
+    // waiting for a desP rebuild.
+    setRetainedPathsEnabled: function (on) {
+      _pathRefsEnabled = !!on && !!_geomFlagMask;
+      if (!on) {
+        for (var i = 0; i < userLayers.length; i++) {
+          var ch = userLayers[i].children;
+          for (var k = 0; k < ch.length; k++) if (ch[k]._data) ch[k]._data.__engineSrcDict = null;
+        }
+        // Dropping the WeakMap alone would ORPHAN every engine-side entry:
+        // retirement fires when the stored DICT is collected, and the dicts
+        // are still very much alive (they are the document). Without this the
+        // engine store grew on every off/on cycle with nothing able to free
+        // it. Disabling means forget everything, both sides.
+        _pathKeyByDict = new WeakMap();
+        _retireQueue = [];
+        _registerCount = 0;
+        if (engine && engine.clear_paths) { try { engine.clear_paths(); } catch (e) { /* non-fatal */ } }
+      }
+      return _pathRefsEnabled;
+    },
+    // Footage memory: the store is bounded now (see enforceImageBudget).
+    // Exposed so a project can be sized against a machine, and so the
+    // eviction policy can be observed rather than assumed.
+    imageStoreStats: function () {
+      return {
+        jsBytes: _imgTotalBytes(),
+        engineBytes: (engine && engine.image_store_bytes) ? engine.image_store_bytes() : -1,
+        engineCount: (engine && engine.image_store_size) ? engine.image_store_size() : -1,
+        budgetBytes: _imgBudgetBytes,
+        evictions: _imgEvictions,
+      };
+    },
+    // Math.floor, NOT `| 0`: bitwise coercion wraps at 2^31, so any budget
+    // above ~2.1GB silently became a tiny number (a 4GB budget landed on 1
+    // byte and evicted the whole store on the first frame).
+    setImageBudgetBytes: function (n) { _imgBudgetBytes = Math.max(1, Math.floor(n)); return _imgBudgetBytes; },
+    // Diagnostics: times the scene serialization in isolation. fps probes
+    // aggregate loadFrame + Paper rebuild + engine render + browser paint,
+    // which swamped the signal this change actually moves.
+    timeSceneBuild: function (n) {
+      n = n || 20;
+      var t = performance.now(), bytes = 0;
+      for (var i = 0; i < n; i++) bytes = buildSceneJson().length;
+      return { msPerBuild: +((performance.now() - t) / n).toFixed(2), bytes: bytes };
+    },
+    // Diagnostics only (perf probes / tests) — not used by app code.
+    retainedPathStats: function () {
+      return { enabled: _pathRefsEnabled, geomFlagMask: _geomFlagMask,
+        registered: (engine && engine.path_store_size) ? engine.path_store_size() : -1,
+        pendingRetire: _retireQueue.length };
+    },
     registerImageRaw: registerImageRaw,
     // Custom WGSL effects (2026-07) — see custom-effects.js's own
     // registerAllCustomEffects for why every definition gets re-sent here
@@ -1728,6 +3087,13 @@
     beginEffectsExport: beginEffectsExport,
     renderFrameToPixelsPNG: renderFrameToPixelsPNG,
     endEffectsExport: endEffectsExport,
+    // Playback bake cache (playback-cache.js) — same offscreen
+    // resize/readback pair the effects-export path above uses, exposed
+    // separately so the bake pass can pick its OWN (reduced) resolution
+    // instead of always native, without duplicating the resize+viewport or
+    // render_to_pixels call sites.
+    resizeEngineOffscreen: function (w, h) { if (!engine) return false; resizeEngineOffscreen(w, h); return true; },
+    renderFrameRawPixels: function (frameIdx) { if (!engine) return Promise.resolve(null); return renderFrameRawPixels(frameIdx); },
   };
 
   // Rust/vello is now the default renderer (no more opt-in checkbox) — per
