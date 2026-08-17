@@ -403,6 +403,14 @@
         </div>
       </div>
     </div>
+    <div class="psec" id="mask-sec" style="display:none">
+      <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrMask">Masque</span></div>
+      <div class="pbdy">
+        <div class="pr"><span class="pl" data-i18n="fieldMaskMode">Mode</span><select class="pi" id="p-mask-mode" data-i18n-title="maskModeTypeTitle" title="Add = union avec les autres masques du calque · Subtract = découpe un trou · Intersect = ne garde que le chevauchement"><option value="add" data-i18n="maskAdd">Add</option><option value="subtract" data-i18n="maskSubtract">Subtract</option><option value="intersect" data-i18n="maskIntersect">Intersect</option></select></div>
+        <div class="pr"><span class="pl" data-i18n="fieldMaskFeather">Feather</span><input type="number" class="pi scrub" id="p-mask-feather" value="0" min="0" max="500" data-step="1" data-i18n-title="maskFeatherTitle" title="Adoucit le bord du masque combiné (partagé entre les masques de ce calque — voir l'audit) — comme le Mask Feather d'After Effects"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
+        <div class="pr"><button class="pbtn" id="btn-mask-unset" style="flex:1;font-size:10px" data-i18n-title="unmaskTitle" title="Redevient une forme normale (n'est plus un masque)" data-i18n="btnUnmask">Retirer comme masque</button></div>
+      </div>
+    </div>
     <div class="psec" id="text-actions-sec" style="display:none">
       <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrText">Texte</span></div>
       <div class="pbdy">
@@ -887,6 +895,7 @@
         <div class="pr" data-i18n-title="pLiveTitle" title="Live stylus pressure — draw on the canvas to test your tablet"><span class="pl" data-i18n="fieldPLive">P. live</span><div style="flex:1;height:6px;background:var(--bg);border-radius:3px;overflow:hidden"><div id="p-live-fill" style="height:100%;width:0;background:var(--accent);transition:width .05s"></div></div></div>
         <div class="pr" id="p-taper-row"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="p-taper" style="accent-color:var(--accent)"> <span data-i18n="taperEndsLabel">Taper ends (Draw/Pen)</span></label></div>
         <div class="pr" id="p-shadowmode-row" data-i18n-title="shadowModeTitle" title="Tags what you draw as Shadow — draw fills first, then rough shadow-boundary lines over them like a Japanese anime layout; separating Stroke/Fill/Shadow later routes anything drawn with this on into its own Shadow layer instead of Stroke/Fill"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="p-shadowmode" style="accent-color:var(--accent)"> <span data-i18n="shadowModeLabel">Shadow (Draw/Pen/Shape)</span></label></div>
+        <div class="pr" id="p-maskmode-row" data-i18n-title="maskModeTitle" title="Ce que tu dessines devient un MASQUE (clip) pour le calque actif au lieu d'un vrai dessin — comme dessiner un masque sur un calque dans After Effects. Combine/feather réglables dans le panneau Propriétés une fois le masque sélectionné."><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="p-maskmode" style="accent-color:var(--accent)"> <span data-i18n="maskModeLabel">Masque (Draw/Pen/Shape)</span></label><select class="pi" id="p-maskmode-type" style="flex:0 0 auto;width:76px;font-size:9px" data-i18n-title="maskModeTypeTitle" title="Add = union avec les autres masques du calque · Subtract = découpe un trou · Intersect = ne garde que le chevauchement"><option value="add" data-i18n="maskAdd">Add</option><option value="subtract" data-i18n="maskSubtract">Subtract</option><option value="intersect" data-i18n="maskIntersect">Intersect</option></select></div>
         <div class="pr" data-i18n-title="eraserSizeTitle" title="Eraser cuts the path precisely at this width instead of deleting the whole stroke"><span class="pl" data-i18n="fieldEraser">Eraser</span><input type="number" class="pi scrub" id="p-erasersize" value="14" min="4" max="120" data-step="1"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
       </div>
     </div>

@@ -701,6 +701,17 @@
       }
       var children = userLayers[i].children;
       var items = [];
+      // Vector masks (2026-08, AE-style "Mask" — see geometry-wasm's
+      // engine.rs LayerIn::masks doc comment for the combine algorithm).
+      // Any Path tagged data.isMask never renders as normal content — it's
+      // pulled out into this layer-scoped list instead, with a forced
+      // solid-white/no-stroke item (only geometry matters engine-side) so
+      // its actual on-canvas paint stays whatever the user set it to for
+      // editing, without affecting the clip. maskFeather is a v1 shared-
+      // per-layer value (max across this layer's own masks), not per-mask
+      // — see the mask-feature audit's deliberate scope note.
+      var layerMasks = [];
+      var layerMaskFeather = 0;
       // Motion mode (motion.js): a keyed position/rotation/scale/opacity
       // transform for this layer at the CURRENT frame, applied ONLY to the
       // JSON items below — never to userLayers[i] itself (see motion.js's
@@ -1254,8 +1265,12 @@
             // already scales the pen — pre-multiplying here too would square
             // the scale.
             item.strokeWidth = (c.strokeWidth || 1) * (item.pathTransform ? 1 : strokeScale);
-            item.strokeCap = c.strokeCap;
-            item.strokeJoin = c.strokeJoin;
+            // typeof-guarded — same Option<String> boundary as blendMode/
+            // matteMode above; a Path deserialized from a corrupted/older
+            // save (desP, app.js) could otherwise hand a non-string value
+            // straight through to serde and permanently disable the engine.
+            item.strokeCap = typeof c.strokeCap === 'string' ? c.strokeCap : undefined;
+            item.strokeJoin = typeof c.strokeJoin === 'string' ? c.strokeJoin : undefined;
             item.miterLimit = c.miterLimit;
             if (c.dashArray && c.dashArray.length) {
               item.dashPattern = c.dashArray;
@@ -1270,7 +1285,7 @@
               item.strokeWidth = Math.max(1 / view.zoom, 0.75);
             }
           }
-          if (c.data && c.data.paintOrder) item.paintOrder = c.data.paintOrder;
+          if (c.data && typeof c.data.paintOrder === 'string') item.paintOrder = c.data.paintOrder;
           // Per-element effects (2026-07, effects-panel.js — "possible de
           // différencié les effet par éléments sélectionné") — same
           // {effectType,enabled,p1..p4}[] shape sceneEffectsOf already
@@ -1282,6 +1297,24 @@
           // this loop, which JSON item(s) came from which live source item —
           // stripped again right after use, never sent to the renderer.
           item.__srcC = sub;
+          // Vector mask (2026-08) — pulled out of `items` (never painted as
+          // normal content) into `layerMasks` instead, geometry/transform
+          // untouched (so it moves/animates exactly like any other Path)
+          // but with a forced solid-white/no-stroke paint: only the SHAPE
+          // matters to the engine's mask combine, never the real color the
+          // user sees while editing it on canvas.
+          if (c.data && c.data.isMask) {
+            var maskItem = {};
+            for (var mik in item) { if (Object.prototype.hasOwnProperty.call(item, mik)) maskItem[mik] = item[mik]; }
+            maskItem.fillColor = [255, 255, 255, 255];
+            delete maskItem.fillGradient;
+            maskItem.strokeColor = null;
+            delete maskItem.strokeWidth; delete maskItem.strokeCap; delete maskItem.strokeJoin; delete maskItem.miterLimit;
+            delete maskItem.dashPattern; delete maskItem.dashOffset; delete maskItem.__srcC; delete maskItem.effects;
+            layerMasks.push({ item: maskItem, mode: (c.data.maskMode === 'subtract' || c.data.maskMode === 'intersect') ? c.data.maskMode : 'add' });
+            if (c.data.maskFeather > 0) layerMaskFeather = Math.max(layerMaskFeather, c.data.maskFeather);
+            return;
+          }
           items.push(item);
         });
       }
@@ -1335,7 +1368,17 @@
       } else {
         items.forEach(function (it) { delete it.__srcC; });
       }
+      // typeof-guarded (not just truthy) — engine.rs's LayerIn::blend_mode is
+      // Option<String>, and a non-string value here (e.g. a corrupted/older
+      // project file that stored a boolean, or the stale localStorage
+      // 'nemo-auto' autosave restored silently at boot, timeline.js's
+      // importJSON) sails through the `bm && bm !== 'normal'` ternary below
+      // UNCHANGED — Rust's serde then rejects the whole scene, which
+      // tick()'s catch treats exactly like the screen_to_world Float64Array
+      // bug above: setEnabled(false) for the rest of the session, not just
+      // a skipped frame.
       var bm = state.layers[i].blendMode;
+      if (typeof bm !== 'string') bm = undefined;
       // Track matte (2026-07, scouted from Caddis's Layer.matteMode):
       // AE convention — the matte SOURCE is implicitly the layer directly
       // above this one (i+1), never referenced by id. Same wire shape as
@@ -1343,6 +1386,7 @@
       // by engine.rs's composite_scene which also SKIPS painting the
       // source layer as its own visible content once it's consumed.
       var mm = state.layers[i].matteMode;
+      if (typeof mm !== 'string') mm = undefined;
       // Effects stack (2026-07 rewrite — was separate blurRadius/gshadow_*
       // fields) — runs on THIS layer's own isolated alpha (see
       // geometry-wasm/src/engine.rs's LayerIn::effects doc comment).
@@ -1430,7 +1474,7 @@
       // this layer's `items` push through the EXACT SAME path as any
       // ordinary layer. blendMode/matteMode/effects still apply normally.
       layers.push(userLayerEntries[i] = { items: items, blendMode: (bm && bm !== 'normal') ? bm : undefined, matteMode: (mm && mm !== 'none') ? mm : undefined,
-        effects: mbEffects });
+        effects: mbEffects, masks: layerMasks.length ? layerMasks : undefined, maskFeather: layerMaskFeather || undefined });
     }
     // artboard background as the bottom item of a synthetic bottom layer,
     // mirroring drawStage()'s background rect
@@ -1610,8 +1654,10 @@
           fillColor: cssColorToRgba(c.fillColor ? c.fillColor.toCSS(true) : null, op),
           strokeColor: cssColorToRgba(c.strokeColor ? c.strokeColor.toCSS(true) : null, op),
           strokeWidth: c.strokeWidth || 1,
-          strokeCap: c.strokeCap,
-          strokeJoin: c.strokeJoin,
+          // typeof-guarded — same Option<String> boundary as the main
+          // per-item loop above (buildSceneJson).
+          strokeCap: typeof c.strokeCap === 'string' ? c.strokeCap : undefined,
+          strokeJoin: typeof c.strokeJoin === 'string' ? c.strokeJoin : undefined,
         });
       });
     });
