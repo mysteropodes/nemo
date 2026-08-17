@@ -986,6 +986,13 @@ window.SM={
     // nothing left to resolve it against. References the SAME source uid,
     // same "keep every relationship" convention as parentLayerUid.
     if(src.timeLink)state.layers[ni].timeLink=JSON.parse(JSON.stringify(src.timeLink));
+    // Same gap again (2026-08-16 QA sweep, found testing expressions
+    // specifically): exportJSON already persists ld.expressions (it's a
+    // real per-layer field, see its own layer-serialization line), but
+    // duplicateLayer never copied it — a duplicated layer with a wiggle()
+    // or cross-layer expression on any property silently lost it, reverting
+    // to the raw keyframed/static value.
+    if(src.expressions)state.layers[ni].expressions=JSON.parse(JSON.stringify(src.expressions));
     activateUL(ni);loadFrame(state.currentFrame);updateUI();},
   setActiveLayer:function(idx){if(idx<0||idx>=state.layers.length)return;saveAllLayerFrames();activateUL(idx);clearSel();
     window._layerActiveExplicit=true; // see clearSel()'s own comment — an explicit timeline row click, not a canvas deselect
