@@ -331,7 +331,29 @@ function exportHasLayerCompositing(){
     return (ld.blendMode&&ld.blendMode!=='normal')||(ld.matteMode&&ld.matteMode!=='none');
   });
 }
-function exportNeedsEngine(){return exportHasActiveEffects()||exportHasLayerCompositing();}
+// 3D layers and Motion Blur (2026-08-17 audit, "vérifie les export de
+// chaque feature animée") — exportBuildFrame (the plain-Paper.js fallback
+// below) applies layerMotionAt/elementMotionAt's ORDINARY 2D matrix to
+// each stroke, but has NO per-vertex 3D projector (SMMotion.
+// project3DSegments/make3DProjector — engine-bridge.js only) and NO
+// motion-blur post-process (buildSceneJson's own mbOn branch, motion.js
+// §11: "post-treatment... never duplicate the construction loop" — this
+// Paper path IS that second construction loop, and it never got the
+// post-process). Neither gap threw or warned: a 3D layer exported
+// perfectly flat, and a motion-blurred layer exported perfectly sharp,
+// both silently correct-looking to anyone who didn't diff against the
+// on-screen render frame-by-frame. Same root cause as #88's onion-skin/
+// Ghost-All fix — a secondary render path that predates 3D/Motion Blur
+// and was never taught about either. Fix: route both through the engine,
+// exactly like effects/compositing already do a few lines up — motionBlur
+// checks state.motionBlurOn too, matching buildSceneJson's own mbOn gate
+// (a layer can have motionBlur:true while the comp-wide switch is off).
+function exportHasEngineOnlyMotion(){
+  return state.layers.some(function(ld){
+    return ld.threeD||(ld.motionBlur&&state.motionBlurOn);
+  });
+}
+function exportNeedsEngine(){return exportHasActiveEffects()||exportHasLayerCompositing()||exportHasEngineOnlyMotion();}
 // ---- PNG sequence rendering to a working directory (shared by raster exports) ----
 async function exportRenderPNGsToDir(dir,start,end,scale,onProgress,alpha){
   // Effects (blur/vignette/glow/ground shadow/...) only ever rendered in
