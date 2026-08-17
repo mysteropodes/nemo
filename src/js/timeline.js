@@ -5894,13 +5894,19 @@ function splitTextIntoCharacters(raster){
     }
   }
   var prev=project.activeLayer;layer.activate();
+  // Text Animator (2026-08-17) grouping — same running-word-index contract
+  // as the vector path (vector-text-bridge.js): incremented once per
+  // whitespace-delimited run, across the whole block, not reset per line.
+  var wordCursor=0,charCursor=0;
   wrapped.forEach(function(line,li){
     if(!line)return;
     var startX=lineDrawX(off,octx,line,d.align||'left');
     var cursor=startX;
+    var atWordStart=true;
     line.split('').forEach(function(ch){
       var chW=octx.measureText(ch).width;
-      if(ch.trim()===''){cursor+=chW;return;}
+      if(ch.trim()===''){cursor+=chW;atWordStart=true;return;}
+      if(atWordStart){wordCursor++;atWordStart=false;}
       var co=document.createElement('canvas');
       co.width=Math.ceil(chW)+8;co.height=Math.ceil(lineH);
       var cctx=co.getContext('2d');
@@ -5910,6 +5916,8 @@ function splitTextIntoCharacters(raster){
       var cr=new Raster(curl);
       cr.data.src=curl;cr.data.isText=true;cr.data.isTextChar=true;cr.data.textGroupId=textGroupId;
       cr.data.text=ch;cr.data.font=d.font||'sans-serif';cr.data.size=d.size||48;cr.data.color=color;
+      cr.data.charIndex=charCursor;cr.data.wordIndex=wordCursor;cr.data.lineIndex=li;
+      charCursor++;
       cr.insertAbove(raster);
       (function(cr,cursorX,lineIdx,coW,coH){
         cr.onLoad=function(){
@@ -5927,19 +5935,25 @@ function splitTextIntoCharacters(raster){
 }
 window.splitTextIntoCharacters=splitTextIntoCharacters;
 // Contextual panel (mirrors updateRevisionPanel's exact shape/precedent) —
-// shown only when exactly one selected item is a whole (not already-split)
-// text block.
+// shown for a whole (not-yet-split) raster text block (split action) AND
+// for anything already granular enough to animate per-unit (vector text,
+// or an already-split raster character) — see text-animator.js.
 function updateTextActionsPanel(){
   var sec=document.getElementById('text-actions-sec');
   if(!sec)return;
   var p=(state.tool==='select'&&selectedPaths.length===1)?selectedPaths[0]:null;
-  // Vector text is excluded: every glyph is already its own Path/element —
-  // there's nothing to "split", it's per-character-animatable from the
-  // moment it's placed (see vector-text-bridge.js's own header comment).
   var isWholeText=!!(p&&p.data&&p.data.isText&&!p.data.isTextChar&&!p.data.isVectorText);
-  sec.style.display=isWholeText?'':'none';
-  if(isWholeText){
-    document.getElementById('btn-text-split-chars').onclick=function(){splitTextIntoCharacters(p);};
+  var animGroupId=window.SMTextAnimator?window.SMTextAnimator.groupIdForItem(p):null;
+  sec.style.display=(isWholeText||animGroupId)?'':'none';
+  document.getElementById('text-split-desc').style.display=isWholeText?'':'none';
+  document.getElementById('btn-text-split-chars').parentElement.style.display=isWholeText?'':'none';
+  if(isWholeText)document.getElementById('btn-text-split-chars').onclick=function(){splitTextIntoCharacters(p);};
+  var animRow=document.getElementById('text-animate-row');
+  animRow.style.display=animGroupId?'':'none';
+  if(animGroupId){
+    document.getElementById('btn-text-animate').onclick=function(){
+      window.SMTextAnimator.openPanel(state.activeLayerIdx,animGroupId);
+    };
   }
 }
 // Typography panel (2026-08-16, "le panneau droite pour le texte") — live,

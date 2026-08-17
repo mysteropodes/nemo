@@ -406,8 +406,12 @@
     <div class="psec" id="text-actions-sec" style="display:none">
       <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrText">Texte</span></div>
       <div class="pbdy">
-        <div class="pr" style="font-size:10px;color:var(--text-dim)" data-i18n="textSplitDesc">Éclate ce texte en un caractère par élément — chacun devient animable individuellement (Motion, expressions).</div>
+        <div class="pr" style="font-size:10px;color:var(--text-dim)" id="text-split-desc" data-i18n="textSplitDesc">Éclate ce texte en un caractère par élément — chacun devient animable individuellement (Motion, expressions).</div>
         <div class="pr"><button class="pbtn ac" id="btn-text-split-chars" style="flex:1" data-i18n="textSplitBtn">Découper par caractère</button></div>
+        <!-- Text Animator (2026-08-17, text-animator.js) — shown once the
+             block has per-unit elements to animate: a vector text block
+             (always) or a raster block already split into characters. -->
+        <div class="pr" id="text-animate-row" style="display:none"><button class="pbtn ac" id="btn-text-animate" style="flex:1" data-i18n="textAnimateBtn">Animer le texte…</button></div>
       </div>
     </div>
     <!-- Typography panel (2026-08-16) — live re-editable properties for a
@@ -1733,6 +1737,7 @@
 <script src="js/svg-import.js"></script>
 <script src="js/camera.js"></script>
 <script src="js/motion.js"></script>
+<script src="js/text-animator.js"></script>
 <script src="js/motion-graph.js"></script>
 <script src="js/nemo-panel.js"></script>
 <script src="js/nemo-script.js"></script>

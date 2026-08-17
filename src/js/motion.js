@@ -974,6 +974,20 @@
     }
     return keyAt(track, state.currentFrame);
   }
+  // Arbitrary-frame sibling of setKeyAtCurrentFrame — for callers that
+  // build several keys across a range in one pass (Text Animator, below)
+  // rather than reacting to the playhead one commit at a time. Same key
+  // shape, curvePoints defaulting to DEFAULT_CURVE when omitted.
+  function setKeyAtFrame(holder, prop, frame, values, curvePoints) {
+    var track = ensureTrack(holder, prop);
+    var k = keyAt(track, frame);
+    if (k) { k.v = values.slice(); if (curvePoints) k.curvePoints = curvePoints; }
+    else {
+      track.keys.push({ frame: frame, v: values.slice(), curvePoints: curvePoints || cloneCurvePts(DEFAULT_CURVE), hOut: [0, 0], hIn: [0, 0] });
+      sortKeys(track);
+    }
+    return keyAt(track, frame);
+  }
   function removeKeyAtCurrentFrame(ld, prop) {
     var track = trackFor(ld, prop);
     if (!track) return;
@@ -6420,6 +6434,14 @@
     selectLayerFromGrid: selectLayerFromGrid,
     layerElements: layerElements,
     elementLabel: elementLabel,
+    // Text Animator (text-animator.js) drives per-glyph/word/line keyframes
+    // through the SAME element-holder + track primitives everything else in
+    // this file uses — ensureElementHolder/setKeyAtFrame are the only two
+    // pieces that weren't already exported for an external caller to build
+    // a multi-key staggered animation in one pass (setValue/setKeyAtCurrentFrame
+    // only ever touch state.currentFrame, one key at a time).
+    ensureElementHolder: ensureElementHolder,
+    setKeyAtFrame: setKeyAtFrame,
     distributeKeys: distributeKeys, flipKeys: flipKeys, selectEveryNthKey: selectEveryNthKey, invertKeySelection: invertKeySelection,
     getKeySelection: function () { return _motionKeySel.slice(); },
     // Move an explicit set of keys by dx frames — used by layer-inout.js so
