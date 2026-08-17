@@ -1110,6 +1110,7 @@
           var xformable = layerRetainable
             && !project3D
             && !(window.SMMotion && cStrokeId && SMMotion.hasPathVertexMotionFor(i, cStrokeId))
+            && !(window.SMMotion && cStrokeId && SMMotion.hasTrimMotionFor(i, cStrokeId))
             && !(c.data && c.data.fillGradient)
             && !(includeEditorOverlays && state.currentFrameOutline)
             && motionChainUniform(elMat, motionMat, parentChain);
@@ -1126,6 +1127,14 @@
           // from `c.bounds` (the pre-offset bounds), matching AE's model
           // where a path's own points are edited before any transform.
           if (sd && window.SMMotion && cStrokeId) sd.segments = SMMotion.applyPathVertexOffsetsFor(i, cStrokeId, sd.segments, renderFrame);
+          // Trim Paths (2026-08) — same innermost-layer placement as vertex
+          // offsets right above (authored in the shape's own local space,
+          // before elMat/motionMat), applied right after so a trimmed
+          // portion still rides any per-vertex sculpting done on top of it.
+          if (sd && window.SMMotion && cStrokeId && SMMotion.hasTrimMotionFor(i, cStrokeId)) {
+            var trimmed = SMMotion.applyTrimFor(i, cStrokeId, sd.segments, sd.closed, renderFrame);
+            sd.segments = trimmed.segments; sd.closed = trimmed.closed;
+          }
           if (sd && elMat) sd.segments = SMMotion.transformSegments(sd.segments, elPivot, elMat);
           if (sd && motionMat) sd.segments = SMMotion.transformSegments(sd.segments, motionPivot, motionMat);
           // 3D layer (2026-07-28) — replaces motionMat's role for a 3D-
