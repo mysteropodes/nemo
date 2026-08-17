@@ -19,8 +19,14 @@
   // Overshoot ("pop") curve — a cubic that dips past 1 before settling,
   // the standard spring-flavoured ease every "pop in" preset (Figma,
   // Lottie, Principle) uses for scale-in. Plain DEFAULT_CURVE (ease-out)
-  // is used for every other preset.
+  // is used for every other "in" preset.
   var POP_CURVE=[{x:0,y:0},{x:0.34,y:1.56},{x:0.64,y:1},{x:1,y:1}];
+  // Ease-IN (slow start, fast finish) — same shape motion.js's own Easy
+  // Ease In keyframe menu applies (CURVE_EASE_IN there), duplicated here
+  // rather than exported: an exit should accelerate AWAY, the mirror of
+  // an entrance's decelerate-INTO-place, so every *Out preset below uses
+  // this instead of the entrance presets' default ease-out feel.
+  var EASE_IN_CURVE=[{x:0,y:0},{x:0.25,y:0.25},{x:0.5,y:0.5},{x:0.75,y:0.91},{x:1,y:1}];
 
   // Every text-carrying stroke dict in this layer belonging to `groupId`
   // (vector: sd.groupId from vector-text-bridge.js; raster split:
@@ -58,20 +64,29 @@
   }
 
   var PRESETS={
-    fadeIn:{props:['opacity'],from:{opacity:[0]},to:{opacity:[100]},curve:null},
-    fadeOut:{props:['opacity'],from:{opacity:[100]},to:{opacity:[0]},curve:null},
-    slideUp:{props:['opacity','position'],from:{opacity:[0],position:[0,40]},to:{opacity:[100],position:[0,0]},curve:null},
-    slideDown:{props:['opacity','position'],from:{opacity:[0],position:[0,-40]},to:{opacity:[100],position:[0,0]},curve:null},
-    slideLeft:{props:['opacity','position'],from:{opacity:[0],position:[40,0]},to:{opacity:[100],position:[0,0]},curve:null},
-    slideRight:{props:['opacity','position'],from:{opacity:[0],position:[-40,0]},to:{opacity:[100],position:[0,0]},curve:null},
-    scaleIn:{props:['opacity','scale'],from:{opacity:[0],scale:[0,0]},to:{opacity:[100],scale:[100,100]},curve:null},
-    popIn:{props:['opacity','scale'],from:{opacity:[0],scale:[140,140]},to:{opacity:[100],scale:[100,100]},curve:POP_CURVE},
+    fadeIn:{props:['opacity'],from:{opacity:[0]},to:{opacity:[100]},curve:null,exit:false},
+    fadeOut:{props:['opacity'],from:{opacity:[100]},to:{opacity:[0]},curve:EASE_IN_CURVE,exit:true},
+    slideUp:{props:['opacity','position'],from:{opacity:[0],position:[0,40]},to:{opacity:[100],position:[0,0]},curve:null,exit:false},
+    slideUpOut:{props:['opacity','position'],from:{opacity:[100],position:[0,0]},to:{opacity:[0],position:[0,-40]},curve:EASE_IN_CURVE,exit:true},
+    slideDown:{props:['opacity','position'],from:{opacity:[0],position:[0,-40]},to:{opacity:[100],position:[0,0]},curve:null,exit:false},
+    slideDownOut:{props:['opacity','position'],from:{opacity:[100],position:[0,0]},to:{opacity:[0],position:[0,40]},curve:EASE_IN_CURVE,exit:true},
+    slideLeft:{props:['opacity','position'],from:{opacity:[0],position:[40,0]},to:{opacity:[100],position:[0,0]},curve:null,exit:false},
+    slideLeftOut:{props:['opacity','position'],from:{opacity:[100],position:[0,0]},to:{opacity:[0],position:[-40,0]},curve:EASE_IN_CURVE,exit:true},
+    slideRight:{props:['opacity','position'],from:{opacity:[0],position:[-40,0]},to:{opacity:[100],position:[0,0]},curve:null,exit:false},
+    slideRightOut:{props:['opacity','position'],from:{opacity:[100],position:[0,0]},to:{opacity:[0],position:[40,0]},curve:EASE_IN_CURVE,exit:true},
+    scaleIn:{props:['opacity','scale'],from:{opacity:[0],scale:[0,0]},to:{opacity:[100],scale:[100,100]},curve:null,exit:false},
+    scaleOut:{props:['opacity','scale'],from:{opacity:[100],scale:[100,100]},to:{opacity:[0],scale:[0,0]},curve:EASE_IN_CURVE,exit:true},
+    popIn:{props:['opacity','scale'],from:{opacity:[0],scale:[140,140]},to:{opacity:[100],scale:[100,100]},curve:POP_CURVE,exit:false},
+    popOut:{props:['opacity','scale'],from:{opacity:[100],scale:[100,100]},to:{opacity:[0],scale:[140,140]},curve:EASE_IN_CURVE,exit:true},
   };
   var PRESET_LABELS={
     fadeIn:'Fondu (apparition)',fadeOut:'Fondu (disparition)',
-    slideUp:'Glisser vers le haut',slideDown:'Glisser vers le bas',
-    slideLeft:'Glisser vers la gauche',slideRight:'Glisser vers la droite',
-    scaleIn:'Zoom (apparition)',popIn:'Rebond (apparition)',
+    slideUp:'Glisser vers le haut (apparition)',slideUpOut:'Glisser vers le haut (disparition)',
+    slideDown:'Glisser vers le bas (apparition)',slideDownOut:'Glisser vers le bas (disparition)',
+    slideLeft:'Glisser vers la gauche (apparition)',slideLeftOut:'Glisser vers la gauche (disparition)',
+    slideRight:'Glisser vers la droite (apparition)',slideRightOut:'Glisser vers la droite (disparition)',
+    scaleIn:'Zoom (apparition)',scaleOut:'Zoom (disparition)',
+    popIn:'Rebond (apparition)',popOut:'Rebond (disparition)',
   };
 
   // Writes the staggered keys for every unit of `groupId` on layer `li`.
@@ -90,8 +105,13 @@
     var staggerFrames=Math.max(0,opts.staggerFrames==null?3:opts.staggerFrames);
     var start=opts.startFrame==null?state.currentFrame:opts.startFrame;
     var curve=preset.curve||null;
+    // An exit staggers LAST unit first (AE/Figma convention: a sentence
+    // dissolves from the end backwards, mirroring how it typed itself in)
+    // — same unit list, just walked in reverse for stagger-offset purposes
+    // only; the unit's own strokeIds are untouched.
+    var order=preset.exit?units.map(function(_,i){return units.length-1-i;}):units.map(function(_,i){return i;});
     units.forEach(function(u,i){
-      var f0=Math.round(start+i*staggerFrames);
+      var f0=Math.round(start+order[i]*staggerFrames);
       var f1=f0+unitFrames;
       u.strokeIds.forEach(function(strokeId){
         var holder=window.SMMotion.ensureElementHolder(ld,strokeId);
