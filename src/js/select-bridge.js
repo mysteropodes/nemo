@@ -1669,6 +1669,20 @@
         items.push({ label: o[1], action: function () { window.SM.applyStrokeProfile(o[0]); } });
       });
     }
+    // Text Animator (2026-08-17, text-animator.js) — right-click access
+    // straight on the canvas, same shortcut every other single-item
+    // action here already gets, instead of only being reachable through
+    // the right-panel text section. Same eligibility check as that panel
+    // (groupIdForItem): a vector-text glyph, or an already-split raster
+    // character — a whole not-yet-split raster block still has nothing
+    // to group into units.
+    if (selectedPaths.length === 1 && window.SMTextAnimator) {
+      var animGid = window.SMTextAnimator.groupIdForItem(p0);
+      if (animGid) {
+        items.push({ sep: true });
+        items.push({ label: 'Animer le texte…', action: function () { window.SMTextAnimator.openPanel(state.activeLayerIdx, animGid); } });
+      }
+    }
     window.showContextMenu(e.clientX, e.clientY, items);
   }
 
