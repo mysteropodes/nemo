@@ -3817,9 +3817,24 @@ function insertFrame(){
   var cf=state.currentFrame;
   for(var i=0;i<state.layers.length;i++){
     var blank={strokes:[],isKeyframe:false,isInterpolated:false};
-    if(targets.indexOf(i)>=0)state.layers[i].frames.splice(cf+1,0,blank);
-    else state.layers[i].frames.push(blank);
+    var lyr=state.layers[i];
+    if(targets.indexOf(i)>=0){
+      lyr.frames.splice(cf+1,0,blank);
+      // A manual trim/marker is a raw frame NUMBER (app.js/markers.js), not a
+      // reference into the frames array — splicing a slot in at cf+1 moves
+      // every stored keyframe at or after that point one frame later, but
+      // left these untouched (2026-08-16, found live: trim a layer's in point
+      // to frame 2, F5 at frame 0 — content slides to frame 3, the bar's
+      // visible window still starts at 2, now blank). Only entries AT OR
+      // AFTER the insertion point shift; anything already before cf+1 is
+      // genuinely unaffected by the splice.
+      if(lyr.inPoint!=null&&lyr.inPoint>cf)lyr.inPoint++;
+      if(lyr.outPoint!=null&&lyr.outPoint>cf)lyr.outPoint++;
+      if(lyr.markers)lyr.markers.forEach(function(m){if(m.frame>cf)m.frame++;});
+    }
+    else lyr.frames.push(blank);
   }
+  if(state.markers)state.markers.forEach(function(m){if(m.frame>cf)m.frame++;});
   state.totalFrames++;
   if(state.waOut<state.totalFrames-1)state.waOut++;
   window._waOut=state.waOut;window._totalF=state.totalFrames;
@@ -3920,7 +3935,18 @@ function insertBlankKeyframe(){
   ld.frames[state.currentFrame]=f;
   loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast('Blank keyframe (F7)');
 }
-function removeFrame(){if(state.totalFrames<=1)return;pushUndoLayers();var cf=state.currentFrame;for(var i=0;i<state.layers.length;i++)state.layers[i].frames.splice(cf,1);state.totalFrames--;if(state.waOut>=state.totalFrames)state.waOut=state.totalFrames-1;window._waOut=state.waOut;window._totalF=state.totalFrames;if(state.currentFrame>=state.totalFrames)state.currentFrame=state.totalFrames-1;loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast('Frame supprimée');}
+function removeFrame(){if(state.totalFrames<=1)return;pushUndoLayers();var cf=state.currentFrame;for(var i=0;i<state.layers.length;i++){var lyr=state.layers[i];lyr.frames.splice(cf,1);
+  // Mirror of insertFrame's own fix (2026-08-16): removing the slot at cf
+  // shifts every LATER frame number down by one, same shift a manual trim/
+  // marker needs or it silently points one frame later than the content it
+  // used to mark. A value AT cf needs no adjustment — whatever previously
+  // sat at cf+1 now occupies cf, so the reference is still correct as-is.
+  if(lyr.inPoint!=null&&lyr.inPoint>cf)lyr.inPoint--;
+  if(lyr.outPoint!=null&&lyr.outPoint>cf)lyr.outPoint--;
+  if(lyr.markers)lyr.markers.forEach(function(m){if(m.frame>cf)m.frame--;});
+}
+  if(state.markers)state.markers.forEach(function(m){if(m.frame>cf)m.frame--;});
+  state.totalFrames--;if(state.waOut>=state.totalFrames)state.waOut=state.totalFrames-1;window._waOut=state.waOut;window._totalF=state.totalFrames;if(state.currentFrame>=state.totalFrames)state.currentFrame=state.totalFrames-1;loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast('Frame supprimée');}
 // Animate's "Clear Keyframe" — demotes a keyframe back into a plain
 // extended frame (content reverts to whatever the previous keyframe holds),
 // without removing the frame slot itself (unlike removeFrame/removeFrameSpan).
