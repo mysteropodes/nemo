@@ -176,7 +176,12 @@
   // second parent must never itself move anything until the user actually
   // animates the blend (same "adding a feature is a visual no-op until
   // deliberately used" precedent enableTimeRemap's own seeded keys follow).
-  var PROP_DEFAULT = { position: [0, 0], anchor: [0, 0], rotation: [0], scale: [100, 100], opacity: [100], timeRemap: [0], positionZ: [0], rotationX: [0], rotationY: [0], dupOffsetPos: [0, 0], dupOffsetRot: [0], dupOffsetScale: [0, 0], dupOffsetOpacity: [0], dupOffsetPosZ: [0], dupOffsetRotX: [0], dupOffsetRotY: [0], parentBlend: [0], timeLinkInOffset: [0], timeLinkOutOffset: [0] };
+  var PROP_DEFAULT = { position: [0, 0], anchor: [0, 0], rotation: [0], scale: [100, 100], opacity: [100], timeRemap: [0], positionZ: [0], rotationX: [0], rotationY: [0], dupOffsetPos: [0, 0], dupOffsetRot: [0], dupOffsetScale: [0, 0], dupOffsetOpacity: [0], dupOffsetPosZ: [0], dupOffsetRotX: [0], dupOffsetRotY: [0], parentBlend: [0], timeLinkInOffset: [0], timeLinkOutOffset: [0],
+    // Trim Paths (2026-08, AE parity — "animer les stroke en in et out"):
+    // start/end as % of the path's own arc length, offset as a % that
+    // shifts the whole [start,end] window — same 3-field shape as AE's own
+    // Trim Paths, see applyTrimFor's doc comment for the combine math.
+    trimStart: [0], trimEnd: [100], trimOffset: [0] };
   // Rows with no stopwatch — layerInPoint/layerOutPoint (app.js) are read at
   // 13 call sites with no frame parameter, so a real keyframe track on these
   // would silently only ever reflect state.currentFrame at read time (export
@@ -1941,6 +1946,118 @@
     var ld = state.layers[li];
     if (!ld || !ld.elementMotion || !strokeId) return segments;
     return applyPathVertexOffsets(segments, ld.elementMotion[strokeId], frameIdx);
+  }
+  // ---- Trim Paths (2026-08, "animer les stroke en in et out") ----
+  // AE's own feature: Start/End (0-100%, position along the path's arc
+  // length) plus Offset (shifts the whole window). Opt-in — untouched
+  // (0/100/0) costs one cheap hasTrimMotion lookup and returns the segments
+  // unchanged, same convention as vtxN/fillColor above.
+  function hasTrimMotion(holder) {
+    if (!holder) return false;
+    if (hasKeys(holder, 'trimStart') || hasKeys(holder, 'trimEnd') || hasKeys(holder, 'trimOffset')) return true;
+    var ms = holder.motionStatic;
+    return !!(ms && (ms.trimStart || ms.trimEnd || ms.trimOffset));
+  }
+  function trimWindowAt(li, strokeId, frameIdx) {
+    var ld = state.layers[li];
+    if (!ld || !ld.elementMotion) return null;
+    var holder = ld.elementMotion[strokeId];
+    if (!hasTrimMotion(holder)) return null;
+    return { start: valueAtFrame(holder, 'trimStart', frameIdx)[0], end: valueAtFrame(holder, 'trimEnd', frameIdx)[0], offset: valueAtFrame(holder, 'trimOffset', frameIdx)[0] };
+  }
+  function cubicPointAt(p0, p1, p2, p3, t) {
+    var mt = 1 - t;
+    var a = mt * mt * mt, b = 3 * mt * mt * t, c = 3 * mt * t * t, d = t * t * t;
+    return [a * p0[0] + b * p1[0] + c * p2[0] + d * p3[0], a * p0[1] + b * p1[1] + c * p2[1] + d * p3[1]];
+  }
+  // Flattens `segments` into a dense polyline for arc-length sampling — 20
+  // samples per original curve segment is enough to look smooth at normal
+  // zoom while staying cheap (a shape rarely has more than a few dozen
+  // segments). SAMPLES_PER_SEG intentionally NOT exposed as a setting: v1
+  // scope, see applyTrimSegments' own doc comment on the polyline tradeoff.
+  var TRIM_SAMPLES_PER_SEG = 20;
+  function buildTrimPolyline(segments, closed) {
+    var n = segments.length;
+    var segCount = closed ? n : n - 1;
+    var pts = [segments[0].point.slice()];
+    for (var i = 0; i < segCount; i++) {
+      var a = segments[i], b = segments[(i + 1) % n];
+      var p0 = a.point, p1 = [a.point[0] + a.handleOut[0], a.point[1] + a.handleOut[1]];
+      var p2 = [b.point[0] + b.handleIn[0], b.point[1] + b.handleIn[1]], p3 = b.point;
+      for (var s = 1; s <= TRIM_SAMPLES_PER_SEG; s++) pts.push(cubicPointAt(p0, p1, p2, p3, s / TRIM_SAMPLES_PER_SEG));
+    }
+    return pts;
+  }
+  // Extracts the [startPct,endPct] (+offsetPct shift) window of `segments`'
+  // own arc length, returning {segments, closed} for the trimmed portion —
+  // NEW straight-line segments (handleIn/handleOut [0,0]), not a partial
+  // reconstruction of the original beziers: a deliberate v1 tradeoff (exact
+  // partial-bezier math is a much bigger undertaking) mitigated by sampling
+  // densely enough (TRIM_SAMPLES_PER_SEG) that the polyline reads as smooth
+  // curve at normal zoom, same spirit as the mask feature's own stated v1
+  // simplifications.
+  //
+  // Offset shifts start/end together. A CLOSED path wraps the window
+  // cyclically (the common "progress ring" case — no seam to speak of). An
+  // OPEN path instead CLIPS the window to the path's actual [0,100] extent
+  // (portion pushed past either end is simply not drawn) rather than
+  // wrapping through a nonexistent loop — matches the overwhelmingly common
+  // write-on/off use case; true AE-style split-into-two-arcs wraparound on
+  // an open path is a known, explicitly out-of-scope gap.
+  function applyTrimSegments(segments, closed, win) {
+    if (!segments || segments.length < 2) return { segments: segments, closed: closed };
+    var s = win.start, e = win.end, off = win.offset || 0;
+    s += off; e += off;
+    if (e <= s) return { segments: [], closed: false }; // fully collapsed window
+    var pts = buildTrimPolyline(segments, closed);
+    var cum = [0];
+    for (var i = 1; i < pts.length; i++) {
+      var dx = pts[i][0] - pts[i - 1][0], dy = pts[i][1] - pts[i - 1][1];
+      cum.push(cum[i - 1] + Math.sqrt(dx * dx + dy * dy));
+    }
+    var total = cum[cum.length - 1];
+    if (total <= 0) return { segments: segments, closed: closed };
+    function lenAtPct(pct) {
+      if (closed) { pct = ((pct % 100) + 100) % 100; return (pct / 100) * total; }
+      return Math.max(0, Math.min(100, pct)) / 100 * total;
+    }
+    function pointAtLen(len) {
+      len = ((len % total) + total) % total;
+      for (var i2 = 1; i2 < cum.length; i2++) {
+        if (cum[i2] >= len) {
+          var segLen = cum[i2] - cum[i2 - 1];
+          var t = segLen > 0 ? (len - cum[i2 - 1]) / segLen : 0;
+          return [pts[i2 - 1][0] + (pts[i2][0] - pts[i2 - 1][0]) * t, pts[i2 - 1][1] + (pts[i2][1] - pts[i2 - 1][1]) * t];
+        }
+      }
+      return pts[pts.length - 1].slice();
+    }
+    var lenS = lenAtPct(s), lenE = lenAtPct(closed ? s + Math.min(100, e - s) : e);
+    if (!closed && lenE <= lenS) return { segments: [], closed: false };
+    var windowLen = closed ? Math.min(total, (e - s) / 100 * total) : (lenE - lenS);
+    if (windowLen <= 0) return { segments: [], closed: false };
+    var out = [{ point: pointAtLen(lenS), handleIn: [0, 0], handleOut: [0, 0] }];
+    var STEP = total / (pts.length - 1); // ~one polyline sample's worth of length
+    for (var d = STEP; d < windowLen; d += STEP) out.push({ point: pointAtLen(lenS + d), handleIn: [0, 0], handleOut: [0, 0] });
+    out.push({ point: pointAtLen(lenS + windowLen), handleIn: [0, 0], handleOut: [0, 0] });
+    return { segments: out, closed: false };
+  }
+  // Resolves the element holder + applies the trim in one call, same
+  // encapsulation shape as applyPathVertexOffsetsFor — engine-bridge.js/
+  // export.js never need to know ld.elementMotion is where this lives.
+  // Returns {segments, closed} always (a no-op trim returns the INPUT
+  // segments/closed unchanged, not a copy — cheap common path).
+  // KNOWN GAP (v1): wired into engine-bridge.js's live render only, NOT
+  // export.js — export.js's own vertex-offset application mutates a LIVE
+  // Path's EXISTING segments in place, index-for-index; Trim Paths changes
+  // both the segment COUNT (a sub-arc has fewer points than the source)
+  // and `closed`, which that in-place-mutation shape can't accommodate
+  // without a larger rework of that function. A trimmed shape currently
+  // exports un-trimmed (full path) until that's addressed.
+  function applyTrimFor(li, strokeId, segments, closed, frameIdx) {
+    var win = trimWindowAt(li, strokeId, frameIdx);
+    if (!win) return { segments: segments, closed: closed };
+    return applyTrimSegments(segments, closed, win);
   }
   // Transforms one item's already-built segments array (engine-bridge.js's
   // {point,handleIn,handleOut} triples, handles as RELATIVE offsets — see
@@ -4366,6 +4483,11 @@
       if (entry.sd.fillColor) {
         renderFillColorRow(list, ensureElementHolder(ld, entry.strokeId), entry.sd.fillColor);
       }
+      // Trim Paths (2026-08, "animer les stroke en in et out"): opt-in,
+      // same visibility gate as Path above (needs real vertex geometry).
+      if (!entry.sd.isRaster && entry.sd.segments && entry.sd.segments.length) {
+        renderTrimPathsGroup(list, ensureElementHolder(ld, entry.strokeId));
+      }
     });
   }
   // Reads a hex6/hex8 string into an [r,g,b,a] 0-255 array — the SAME shape
@@ -4439,6 +4561,81 @@
     });
     row.appendChild(sw); row.appendChild(nm); row.appendChild(swatch);
     list.appendChild(row);
+  }
+  // Trim Paths (2026-08, "animer les stroke en in et out"): 3 scalar rows
+  // (Start/End/Offset, %), same stopwatch/keying contract as
+  // renderFillColorRow but with a numeric scrub field instead of a color
+  // swatch — factored into one row-builder since all 3 share everything
+  // except label/prop/min/max/default.
+  function renderTrimScalarRow(list, holder, prop, label, unit, min, max, defaultVal) {
+    var row = document.createElement('div'); row.className = 'lrow motion-prop-row';
+    row._smHolder = holder; row._smProp = prop;
+    var sw = document.createElement('div');
+    var swOn = isAnimated(holder, prop);
+    var hasKeyHere = swOn && !!keyAt(holder.motion[prop], state.currentFrame);
+    sw.className = 'lico motion-stopwatch' + (swOn ? ' on' : '');
+    sw.title = stopwatchTitle('motionAnimateProp', swOn, hasKeyHere);
+    sw.innerHTML = '<svg viewBox="0 0 24 24" width="12" height="12"><path d="M12 3l9 9-9 9-9-9z" fill="' + (hasKeyHere ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2"/></svg>';
+    function currentVal() {
+      if (hasKeys(holder, prop)) return valueAtFrame(holder, prop, state.currentFrame)[0];
+      if (holder.motionStatic && holder.motionStatic[prop]) return holder.motionStatic[prop][0];
+      return defaultVal;
+    }
+    sw.addEventListener('click', function (e) {
+      e.stopPropagation(); pushUndo();
+      if (!swOn) {
+        if (!holder.motionStatic) holder.motionStatic = {};
+        if (!holder.motionStatic[prop]) holder.motionStatic[prop] = [defaultVal];
+        toggleAnimated(holder, prop);
+      } else if (hasKeyHere) {
+        if (holder.motion[prop].keys.length === 1) {
+          var fv = valueAtFrame(holder, prop, state.currentFrame);
+          holder.motion[prop] = { keys: [] };
+          if (!holder.motionStatic) holder.motionStatic = {};
+          holder.motionStatic[prop] = fv;
+        } else {
+          removeKeyAtCurrentFrame(holder, prop);
+        }
+      } else {
+        setKeyAtCurrentFrame(holder, prop, valueAtFrame(holder, prop, state.currentFrame));
+      }
+      renderLayerList(); renderTimeline();
+      if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+    });
+    var nm = document.createElement('div'); nm.className = 'lnm'; nm.textContent = label;
+    var input = document.createElement('input');
+    input.type = 'number'; input.className = 'pi scrub'; input.min = min; input.max = max; input.dataset.step = '1';
+    input.style.cssText = 'width:52px;margin-left:auto';
+    input.value = currentVal();
+    input.addEventListener('change', function () {
+      pushUndo();
+      var v = Math.max(min, Math.min(max, parseFloat(this.value) || 0));
+      this.value = v;
+      setValue(holder, prop, [v]);
+      renderLayerList(); renderTimeline();
+      if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+    });
+    row.appendChild(sw); row.appendChild(nm); row.appendChild(input);
+    if (unit) { var u = document.createElement('span'); u.style.cssText = 'font-size:9px;color:var(--text-dim);margin-left:2px'; u.textContent = unit; row.appendChild(u); }
+    list.appendChild(row);
+  }
+  function renderTrimPathsGroup(list, holder) {
+    var grp = document.createElement('div'); grp.className = 'lrow motion-group-row';
+    var expanded = window._motionExpandedTrimHolder === holder;
+    var arrow = document.createElement('span'); arrow.className = 'lico larrow'; arrow.textContent = expanded ? '▾' : '▸';
+    var label = document.createElement('span'); label.textContent = 'Trim Paths';
+    grp.title = 'Révèle/masque le trait en animant son parcours (Start/End/Offset, comme After Effects) — clic pour replier/déplier';
+    grp.appendChild(arrow); grp.appendChild(label);
+    grp.addEventListener('click', function (e) {
+      e.stopPropagation();
+      window._motionExpandedTrimHolder = expanded ? null : holder;
+      renderLayerList(); renderTimeline();
+    });
+    list.appendChild(grp);
+    if (!expanded) return;
+    renderTrimScalarRow(list, holder, 'trimStart', 'Start', '%', 0, 100, 0);
+    renderTrimScalarRow(list, holder, 'trimEnd', 'End', '%', 0, 100, 100);
+    renderTrimScalarRow(list, holder, 'trimOffset', 'Offset', '%', -100, 100, 0);
   }
   // "Path" group — one row per vertex, each independently keyable (2026-07,
   // "les properties de path dont les vertices peuvent être animé
@@ -6400,6 +6597,9 @@
     applyParentChainToSegments: applyParentChainToSegments,
     applyParentChainToImageRect: applyParentChainToImageRect,
     applyPathVertexOffsetsFor: applyPathVertexOffsetsFor,
+    applyTrimFor: applyTrimFor,
+    trimWindowAt: trimWindowAt,
+    hasTrimMotion: hasTrimMotion,
     buildOverlayItems: buildOverlayItems,
     renderLayerListMotion: renderLayerListMotion,
     renderTimelineMotion: renderTimelineMotion,
@@ -6424,6 +6624,15 @@
       var ld = state.layers[li];
       if (!ld || !ld.elementMotion || !strokeId) return false;
       return hasPathVertexMotion(ld.elementMotion[strokeId]);
+    },
+    // Same reasoning as hasPathVertexMotionFor right above — Trim Paths
+    // rebuilds the geometry into a wholly different point set (not an
+    // affine of the original), so a trimmed shape can never ride a stored
+    // path either.
+    hasTrimMotionFor: function (li, strokeId) {
+      var ld = state.layers[li];
+      if (!ld || !ld.elementMotion || !strokeId) return false;
+      return hasTrimMotion(ld.elementMotion[strokeId]);
     },
     // Called by the two frame-content writers in app.js — the union is
     // derived from that content, so it must not outlive an edit.
