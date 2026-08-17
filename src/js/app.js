@@ -2488,9 +2488,22 @@ function convertLayersToComponent(indices){
   state.symbols[symId]={name:'Composant',totalFrames:state.totalFrames,fps:state.fps,layers:symLayers};
   if(window.SMStoryboard)SMStoryboard.addInstanceAuto(symId);
   var insertAt=indices[0];
+  var firstSrc=state.layers[indices[0]]; // captured before the splice below removes it
   for(var k=indices.length-1;k>=0;k--){state.layers.splice(indices[k],1);userLayers.splice(indices[k],1);}
   var newLd={name:'Composant',symbolId:symId,locked:true,visible:true,symPlayMode:'once',symSpeed:1,symPlacedAt:0,symSingleFrame:0,
     frames:[],groups:Object.keys(mergedGroups).length?mergedGroups:undefined};
+  // Same field-drop shape as mergeLayersIntoOne/splitLayerIntoElementsCore
+  // (2026-08-16 QA sweep) — this collapses indices.length sources into ONE
+  // new outer instance the same way merge does, so it needs the same
+  // "topmost source wins" inheritance for the old block's visibility window
+  // and relationships, or converting a trimmed/linked/parented block into a
+  // Component silently resets all of it. firstSrc is captured further up
+  // (before the splice loop removes it from state.layers).
+  if(firstSrc.inPoint!=null)newLd.inPoint=firstSrc.inPoint;
+  if(firstSrc.outPoint!=null)newLd.outPoint=firstSrc.outPoint;
+  if(firstSrc.timeLink)newLd.timeLink=JSON.parse(JSON.stringify(firstSrc.timeLink));
+  if(firstSrc.parentLayerUid)newLd.parentLayerUid=firstSrc.parentLayerUid;
+  if(firstSrc.parentLayerUidB)newLd.parentLayerUidB=firstSrc.parentLayerUidB;
   for(var i=0;i<state.totalFrames;i++)newLd.frames.push({strokes:[],isKeyframe:i===0,isInterpolated:false}); // no componentFrame — see convertLayerToComponent
   var newUl=new Layer({name:'layer-'+state.layers.length});
   state.layers.splice(insertAt,0,newLd);
