@@ -8055,7 +8055,19 @@ document.getElementById('tl-cf').addEventListener('change',function(){
   if(state.playing)stopPlay();
   goToFrame(v-1);
 });
-document.getElementById('btn-al').addEventListener('click',function(){window.SM.addLayer();});
+// "+" — plain click still adds a normal layer (muscle-memory default,
+// same as before); the Null/Effect options that were previously reachable
+// ONLY via the layer-list right-click menu (2026-08-17, Cyril: "et aussi
+// via le menu +, qui permet d'ajouter un layer aussi ?") are now also one
+// click away here, After Effects' own "+" layer menu shape.
+document.getElementById('btn-al').addEventListener('click',function(e){
+  var r=this.getBoundingClientRect();
+  window.showContextMenu(r.left,r.bottom+4,[
+    {label:'Calque',action:function(){window.SM.addLayer();}},
+    {label:'Calque Null',action:function(){window.SM.addNullLayer();}},
+    {label:'Calque d’effet',action:function(){window.SM.addEffectLayer();}},
+  ]);
+});
 document.getElementById('btn-dl').addEventListener('click',function(){window.SM.deleteLayer();});
 document.getElementById('btn-dupl').addEventListener('click',function(){window.SM.duplicateLayer();});
 document.getElementById('btn-comp').addEventListener('click',function(){window.SM.convertActiveLayerToComponent();});
