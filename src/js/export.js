@@ -380,6 +380,105 @@ async function exportRenderPNGsToDir(dir,start,end,scale,onProgress,alpha){
   }
 }
 
+// ---- Browser-compatible video export (2026-08-17) ----
+// Cyril: "une méthode différente d'export vidéo compatible avec la
+// version navigateur" — every raster video path above (MP4/GIF/ProRes)
+// shells out to the bundled ffmpeg sidecar via Tauri, so none of them
+// work in the plain browser preview at all (exportTauriAvailable() gate,
+// hard error). MediaRecorder + canvas.captureStream() is the standard
+// browser-native alternative: no ffmpeg, no native binary, works in the
+// preview AND would work in a future pure-web build of this app.
+//
+// Timing is the one real constraint MediaRecorder imposes that ffmpeg
+// doesn't: it's fundamentally a REAL-TIME capture API — a chunk's
+// recorded duration is however long it sat on the canvas in wall-clock
+// time between captureStream(0)'s manual track.requestFrame() calls, not
+// a frame count. So exporting an N-frame clip at F fps necessarily takes
+// ~N/F real seconds here (rendering each frame, pushing it, then
+// sleeping out the rest of that frame's 1000/F ms slot) — slower than
+// ffmpeg's batch encode, but the only way to get correct PLAYBACK speed
+// out of this API. Same frame SOURCE as the ffmpeg path (useFx routes
+// through the engine for effects/compositing/3D/motion-blur projects,
+// exactly like exportRenderPNGsToDir), so what gets recorded matches
+// what the ffmpeg export would have produced, just muxed differently.
+function exportVideoBrowserAvailable(){
+  return typeof MediaRecorder!=='undefined'&&!!(document.createElement('canvas').captureStream);
+}
+// Preference order: real MP4/H.264 first (plays everywhere, including a
+// share/email attachment) when the browser actually supports muxing it
+// (Safari 16+, some Chrome versions with the right flags) — WebM/VP9 as
+// the broadly-supported fallback (every Chromium/Firefox build), VP8 as
+// the last resort for older engines.
+var VIDEO_MIME_CANDIDATES=['video/mp4;codecs=avc1.42E01E','video/mp4','video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'];
+function exportPickVideoMimeType(){
+  if(!window.MediaRecorder||!MediaRecorder.isTypeSupported)return'';
+  for(var i=0;i<VIDEO_MIME_CANDIDATES.length;i++){
+    if(MediaRecorder.isTypeSupported(VIDEO_MIME_CANDIDATES[i]))return VIDEO_MIME_CANDIDATES[i];
+  }
+  return'';
+}
+function exportLoadImage(url){
+  return new Promise(function(resolve,reject){
+    var img=new Image();
+    img.onload=function(){resolve(img);};
+    img.onerror=function(){reject(new Error('image decode failed'));};
+    img.src=url;
+  });
+}
+function exportSleep(ms){return new Promise(function(resolve){setTimeout(resolve,ms);});}
+async function exportVideoBrowser(opts){
+  if(!exportVideoBrowserAvailable())return{ok:false,error:'Export vidéo non supporté par ce navigateur (MediaRecorder/captureStream indisponible).'};
+  var mime=exportPickVideoMimeType();
+  if(!mime)return{ok:false,error:'Aucun codec vidéo (MP4/WebM) supporté par ce navigateur.'};
+  var r=exportFrameRange(opts);var scale=(opts&&opts.scale)||1;var fps=(opts&&opts.fps)||state.fps;
+  var cw=Math.max(1,Math.round(state.canvasW*scale)),ch=Math.max(1,Math.round(state.canvasH*scale));
+  var canvas=document.createElement('canvas');canvas.width=cw;canvas.height=ch;
+  var ctx=canvas.getContext('2d');
+  // captureStream(0) = manual mode: the track only advances when
+  // requestFrame() is called, instead of auto-sampling the canvas at a
+  // fixed rate — lets each drawn frame's ON-SCREEN duration be controlled
+  // precisely by the sleep below rather than racing an independent timer.
+  var stream=canvas.captureStream(0);
+  var track=stream.getVideoTracks()[0];
+  var chunks=[];
+  var rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:8000000});
+  rec.ondataavailable=function(e){if(e.data&&e.data.size)chunks.push(e.data);};
+  var stopped=new Promise(function(resolve){rec.onstop=resolve;});
+  rec.start();
+  var useFx=(scale===1||!scale)&&exportNeedsEngine()&&window.SMEngineBridge&&window.SMEngineBridge.beginEffectsExport();
+  try{
+    var frameMs=1000/fps;
+    for(var f=r.start,i=1;f<=r.end;f++,i++){
+      var t0=performance.now();
+      var url=useFx?await SMEngineBridge.renderFrameToPixelsPNG(f):exportFrameDataURL(f,scale,false);
+      var img=await exportLoadImage(url);
+      ctx.clearRect(0,0,cw,ch);
+      ctx.drawImage(img,0,0,cw,ch);
+      track.requestFrame();
+      if(opts&&opts.onProgress)opts.onProgress(i,r.end-r.start+1);
+      var wait=frameMs-(performance.now()-t0);
+      if(wait>0)await exportSleep(wait);
+    }
+  }finally{
+    if(useFx)SMEngineBridge.endEffectsExport();
+  }
+  // Hold the last frame on screen for one more slot before stopping — a
+  // recorder stopped the instant the final requestFrame() fires can clip
+  // that frame's chunk short (0-duration or dropped), same "flush before
+  // teardown" reasoning as any streaming encoder.
+  await exportSleep(Math.max(50,1000/fps));
+  rec.stop();
+  await stopped;
+  var mimeBase=mime.split(';')[0];
+  var blob=new Blob(chunks,{type:mimeBase});
+  var ext=mimeBase.indexOf('mp4')>=0?'mp4':'webm';
+  var filename=(opts&&opts.filename)||('animation.'+ext);
+  var u=URL.createObjectURL(blob);
+  var a=document.createElement('a');a.href=u;a.download=filename;a.click();
+  URL.revokeObjectURL(u);
+  return{ok:true,browserFallback:true,mimeType:mime,bytes:blob.size,filename:filename};
+}
+
 // ---- LOTTIE / BODYMOVIN CONVERTER ----
 // Frame-by-frame "baked" export: rather than trying to re-derive Lottie's
 // own bezier-shape morphing (which would require the same fragile
@@ -639,11 +738,16 @@ window.SMExport={
   },
 
   exportMP4:async function(opts){
-    if(!exportTauriAvailable())return{ok:false,error:'Disponible uniquement dans l\'app Nemo (pas en preview navigateur).'};
+    if(!exportTauriAvailable())return exportVideoBrowser(opts);
     var outPath=await exportPickSaveFile('Exporter en MP4','animation.mp4',[{name:'MP4',extensions:['mp4']}]);
     if(!outPath)return{cancelled:true};
     return exportMP4ToPath(outPath,opts);
   },
+  // Explicit entry point (2026-08-17) for a caller that wants the
+  // MediaRecorder path specifically, regardless of Tauri availability —
+  // exportMP4 above only reaches for it as a browser fallback.
+  exportVideoBrowser:exportVideoBrowser,
+  videoBrowserAvailable:exportVideoBrowserAvailable,
   // Kitsu publish (Phase 4) needs the same H.264 render but writing to a
   // caller-chosen temp path with no save dialog — the publish flow already
   // asked the user to confirm once, a second native file picker mid-publish

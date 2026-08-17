@@ -8301,7 +8301,11 @@ window.updateCombinePanel=updateCombinePanel;
   }
 
   document.getElementById('btn-export').addEventListener('click',function(){
-    if(!window.SMExport.isAvailable()){
+    // MP4/WebM (2026-08-17, export.js's MediaRecorder fallback) also work
+    // outside Tauri now — only warn when NOTHING beyond SVG/Lottie would
+    // work, instead of unconditionally claiming "Tauri only" the moment
+    // any format needs it.
+    if(!window.SMExport.isAvailable()&&!(window.SMExport.videoBrowserAvailable&&window.SMExport.videoBrowserAvailable())){
       showToast(SM.t('exportTauriOnly'));
     }
     updateScaleVisibility();
