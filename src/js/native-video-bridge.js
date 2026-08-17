@@ -901,26 +901,68 @@
       codec: info.codec || '',
     };
     ld._nvSessionId = info.session_id;
-    // Fire-and-forget: transcode long-GOP sources to all-intra in the
-    // background and swap the session when ready — import stays instant.
-    _optimizeLayerMedia(idx);
     if (Number(info.frame_count) > state.totalFrames && window.SM && SM.setTotalFrames) SM.setTotalFrames(Number(info.frame_count));
-    // thumbnail for the Médias panel
-    try {
-      var px = await frameBytes(info.session_id, 0);
-      var tc = document.createElement('canvas');
-      var tw = 96, th = Math.max(1, Math.round(96 * info.height / info.width));
-      tc.width = info.width; tc.height = info.height;
-      tc.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(px), info.width, info.height), 0, 0);
-      var sc = document.createElement('canvas'); sc.width = tw; sc.height = th;
-      sc.getContext('2d').drawImage(tc, 0, 0, tw, th);
-      // linked, not embedded (2026-07-31): a nativeVideo layer only persists
-      // ld.nativeVideo.path — no bytes live in the project file, so the
-      // panel needs to represent "this can go offline if the file moves"
-      // rather than a byte count. isWeb sessions have no real filesystem
-      // path to relink to, so they're marked embedded-ish (no relink offer).
-      if (window.SMMediaLibrary) SMMediaLibrary.addEntry(name, 'video', sc.toDataURL('image/jpeg', 0.7), ld.name, { layerUid: ld.layerUid, linked: !isWeb, path: isWeb ? null : source });
-    } catch (e) { /* thumbnail is cosmetic — import already succeeded */ }
+    // Decode the on-screen frame ONCE, right here, before anything else
+    // touches this session (2026-08-17, Cyril: "faire apparaître le
+    // footage rapidement même si l'encodage est en cours") — this used to
+    // happen TWICE: once
+    // implicitly inside loadFrame()'s own _layerFrameSync (cold, no cache
+    // entry yet, so it fell through to the real async decode) a few lines
+    // below, and again right after for the thumbnail's own separate
+    // frameBytes() call. Same frame, same session, decoded from scratch
+    // twice back to back — pure waste, and it meant the canvas had to wait
+    // through BOTH decodes in sequence before showing anything, which is
+    // exactly what read as "the footage takes a while to appear," compounded
+    // whenever a slow first decode landed anywhere near the background
+    // optimize kicking off. Decoding once here, THEN pre-seeding the sync
+    // cache (jsCache + lastShown) below so loadFrame's own sync call is a
+    // cache HIT instead of a second decode, cuts time-to-first-pixel
+    // roughly in half and removes any risk of the two racing each other.
+    // The frame that actually needs to be ON SCREEN is whatever the
+    // playhead is sitting on right now (_targetFor — offsetFrames:0 on a
+    // fresh import, so this is state.currentFrame verbatim unless the
+    // import happened mid-timeline), NOT necessarily the clip's own frame
+    // 0 — importing at frame 50 must show frame 50, not frame 0 mislabeled
+    // as "already correct". The thumbnail is the one place that DOES want
+    // frame 0 specifically (a canonical preview, same as before this
+    // change) — reuse the decode above for it only when they're the same
+    // frame; decode frame 0 separately in the (uncommon: importing with
+    // the playhead already moved) case where they differ.
+    var target0 = _targetFor(ld.nativeVideo, state.currentFrame);
+    var px0 = null;
+    try { px0 = await frameBytes(info.session_id, target0); } catch (e) { /* falls through to loadFrame's own (slower) decode below */ }
+    if (px0) {
+      var st0 = _syncState(idx);
+      _jsCachePut(st0, target0, px0);
+      if (window.SMEngineBridge) SMEngineBridge.registerImageRaw(_imageIdFor(idx), px0, info.width, info.height);
+      st0.lastShown = target0;
+    }
+    var pxThumb = target0 === 0 ? px0 : null;
+    if (!pxThumb) { try { pxThumb = await frameBytes(info.session_id, 0); } catch (e) { /* thumbnail stays cosmetic-only, no fallback needed */ } }
+    // Fire-and-forget: transcode long-GOP sources to all-intra in the
+    // background and swap the session when ready — import stays instant,
+    // and now that frame 0 is already decoded+registered above, there's
+    // nothing left for this background job to visibly delay.
+    _optimizeLayerMedia(idx);
+    // Thumbnail for the Médias panel — reuses pxThumb (frame 0 specifically,
+    // no second decode in the common case where the playhead was already
+    // at frame 0 on import).
+    if (pxThumb) {
+      try {
+        var tc = document.createElement('canvas');
+        var tw = 96, th = Math.max(1, Math.round(96 * info.height / info.width));
+        tc.width = info.width; tc.height = info.height;
+        tc.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(pxThumb), info.width, info.height), 0, 0);
+        var sc = document.createElement('canvas'); sc.width = tw; sc.height = th;
+        sc.getContext('2d').drawImage(tc, 0, 0, tw, th);
+        // linked, not embedded (2026-07-31): a nativeVideo layer only persists
+        // ld.nativeVideo.path — no bytes live in the project file, so the
+        // panel needs to represent "this can go offline if the file moves"
+        // rather than a byte count. isWeb sessions have no real filesystem
+        // path to relink to, so they're marked embedded-ish (no relink offer).
+        if (window.SMMediaLibrary) SMMediaLibrary.addEntry(name, 'video', sc.toDataURL('image/jpeg', 0.7), ld.name, { layerUid: ld.layerUid, linked: !isWeb, path: isWeb ? null : source });
+      } catch (e) { /* thumbnail is cosmetic — import already succeeded */ }
+    }
     if (window.activateUL) activateUL(idx);
     if (window.loadFrame) loadFrame(state.currentFrame);
     if (window.updateUI) updateUI();
