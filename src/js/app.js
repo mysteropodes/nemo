@@ -2505,6 +2505,14 @@ function convertLayersToComponent(indices){
   if(firstSrc.parentLayerUid)newLd.parentLayerUid=firstSrc.parentLayerUid;
   if(firstSrc.parentLayerUidB)newLd.parentLayerUidB=firstSrc.parentLayerUidB;
   if(firstSrc.expressions)newLd.expressions=JSON.parse(JSON.stringify(firstSrc.expressions));
+  // threeD/motionBlur/duplicator (2026-08-16): same "topmost source wins"
+  // inheritance as everything else above — these three describe how the
+  // OUTER instance itself renders/multiplies, independent of whatever now
+  // lives inside the Component, so they carry over the same way timeLink/
+  // parentLayerUid do rather than getting silently reset.
+  if(firstSrc.threeD)newLd.threeD=true;
+  if(firstSrc.motionBlur)newLd.motionBlur=true;
+  if(firstSrc.duplicator)newLd.duplicator=JSON.parse(JSON.stringify(firstSrc.duplicator));
   for(var i=0;i<state.totalFrames;i++)newLd.frames.push({strokes:[],isKeyframe:i===0,isInterpolated:false}); // no componentFrame — see convertLayerToComponent
   var newUl=new Layer({name:'layer-'+state.layers.length});
   state.layers.splice(insertAt,0,newLd);
@@ -2608,6 +2616,15 @@ function splitLayerIntoElementsCore(li,opts){
       // instant the split runs.
       inPoint:ld.inPoint,outPoint:ld.outPoint,
       expressions:ld.expressions?JSON.parse(JSON.stringify(ld.expressions)):undefined,
+      // threeD/motionBlur (2026-08-16): same per-layer render toggles as
+      // blendMode a few lines up, and the same reasoning — every split-off
+      // piece keeps rendering the way the whole original layer did.
+      // duplicator is deliberately NOT copied here: unlike a boolean
+      // render toggle, applying one duplicator descriptor to N independent
+      // split-off layers would multiply each piece separately instead of
+      // the original single N-way expansion — a real behavior change, not
+      // a "keep what was already true of this content" carry-over.
+      threeD:ld.threeD,motionBlur:ld.motionBlur,
     };
     // matteMode: with a frozen matteSourceLayerUid (2026-07-31, uid-based
     // mattes) the source no longer depends on array adjacency, so EVERY
@@ -2810,11 +2827,24 @@ function mergeLayersIntoOne(indices,opts){
     // everything else about the merged layer (color, layerUid, timeLink)
     // is taken from srcs[0].
     matteMode:srcs[0].matteMode,blendMode:srcs[0].blendMode,
+    // threeD/duplicator/motionBlur (2026-08-16, found testing 3D+duplicator+
+    // motionBlur combinations): same "topmost source wins" inheritance as
+    // everything else in this object — none of the three were here at all,
+    // so merging a 3D layer silently flattened it, merging a duplicator
+    // layer lost its N-way expansion settings, and motionBlur silently
+    // turned off.
+    threeD:srcs[0].threeD,motionBlur:srcs[0].motionBlur,
+    duplicator:srcs[0].duplicator?JSON.parse(JSON.stringify(srcs[0].duplicator)):undefined,
     // Travels with matteMode (2026-07-31, uid-based mattes) — dropping the
     // uid alone would silently downgrade the merged layer back to the
     // legacy adjacency behavior.
     matteSourceLayerUid:srcs[0].matteSourceLayerUid,
   };
+  // A duplicator layer is always force-locked elsewhere (duplicateLayer,
+  // applyLayerDuplicator) — inheriting the descriptor above without this
+  // would produce the one combination the rest of the app never expects:
+  // an EDITABLE layer with an active N-way expansion.
+  if(merged.duplicator)merged.locked=true;
   // Same field-drop bug again (2026-08-16 QA sweep): a trimmed source's
   // in/out point wasn't in this list at all, so merging a layer manually
   // rogné à [5,50] silently un-trimmed it back to the full timeline —

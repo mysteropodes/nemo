@@ -993,6 +993,12 @@ window.SM={
     // or cross-layer expression on any property silently lost it, reverting
     // to the raw keyframed/static value.
     if(src.expressions)state.layers[ni].expressions=JSON.parse(JSON.stringify(src.expressions));
+    // threeD (2026-08-16, found testing 3D+duplicator+motionBlur
+    // combinations): a plain boolean flag, missed by the same field-drop
+    // shape as everything above it — a duplicated 3D layer silently came
+    // back flat, with its positionZ/rotationX/rotationY keys (inside
+    // src.motion, already copied) now dead data nothing reads.
+    if(src.threeD)state.layers[ni].threeD=true;
     activateUL(ni);loadFrame(state.currentFrame);updateUI();},
   setActiveLayer:function(idx){if(idx<0||idx>=state.layers.length)return;saveAllLayerFrames();activateUL(idx);clearSel();
     window._layerActiveExplicit=true; // see clearSel()'s own comment — an explicit timeline row click, not a canvas deselect
