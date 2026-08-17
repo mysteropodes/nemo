@@ -2504,6 +2504,7 @@ function convertLayersToComponent(indices){
   if(firstSrc.timeLink)newLd.timeLink=JSON.parse(JSON.stringify(firstSrc.timeLink));
   if(firstSrc.parentLayerUid)newLd.parentLayerUid=firstSrc.parentLayerUid;
   if(firstSrc.parentLayerUidB)newLd.parentLayerUidB=firstSrc.parentLayerUidB;
+  if(firstSrc.expressions)newLd.expressions=JSON.parse(JSON.stringify(firstSrc.expressions));
   for(var i=0;i<state.totalFrames;i++)newLd.frames.push({strokes:[],isKeyframe:i===0,isInterpolated:false}); // no componentFrame — see convertLayerToComponent
   var newUl=new Layer({name:'layer-'+state.layers.length});
   state.layers.splice(insertAt,0,newLd);
@@ -2606,6 +2607,7 @@ function splitLayerIntoElementsCore(li,opts){
       // same window or N-1 of them un-trim back to the full timeline the
       // instant the split runs.
       inPoint:ld.inPoint,outPoint:ld.outPoint,
+      expressions:ld.expressions?JSON.parse(JSON.stringify(ld.expressions)):undefined,
     };
     // matteMode: with a frozen matteSourceLayerUid (2026-07-31, uid-based
     // mattes) the source no longer depends on array adjacency, so EVERY
@@ -2793,7 +2795,15 @@ function mergeLayersIntoOne(indices,opts){
   var merged={
     name:name,visible:true,locked:false,frames:frames,
     color:srcs[0].color||nextLayerColor(),
-    layerUid:srcs[0].layerUid,parentLayerUid:srcs[0].parentLayerUid,timeLink:srcs[0].timeLink,
+    layerUid:srcs[0].layerUid,parentLayerUid:srcs[0].parentLayerUid,
+    // parentLayerUidB (multi-parent blend): the OTHER-layers re-point pass
+    // a few lines down already updates any layer pointing INTO this merge,
+    // but the merged layer's OWN parentLayerUidB — its half of a 2-parent
+    // blend — was never inherited from srcs[0] here, same class of gap as
+    // the in/out point fix right below (2026-08-16 QA sweep).
+    parentLayerUidB:srcs[0].parentLayerUidB,
+    timeLink:srcs[0].timeLink,
+    expressions:srcs[0].expressions?JSON.parse(JSON.stringify(srcs[0].expressions)):undefined,
     // matteMode/blendMode: same field-drop bug already fixed once in
     // convertLayersToComponent (§1) — recurred here in the sibling merge
     // path. Inherited from the topmost (first) source, matching how
