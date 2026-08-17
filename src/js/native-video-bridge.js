@@ -190,7 +190,25 @@
         if (ws.waiter) { var w = ws.waiter; ws.waiter = null; w.reject(e); }
       },
     });
-    ws.decoder.configure({ codec: ws.codec, codedWidth: ws.width, codedHeight: ws.height, description: ws.description });
+    // optimizeForLatency (2026-08-17) — THE fix for "décodeur WebCodecs
+    // muet (aucune image en 4s)", reproduced live on a real MP4 and
+    // root-caused by direct measurement, not guessed. By default Chrome's
+    // H.264 decoder holds frames in a reorder buffer and only emits them
+    // once enough have accumulated: measured here, feeding 6 chunks
+    // returned only 5 frames (the newest stays stuck inside), and feeding
+    // exactly 1 chunk returned NOTHING at all. That is fatal for this
+    // bridge specifically, because _decodeWebFrame below feeds exactly
+    // `need` chunks and then waits for `need` outputs — so every seek to
+    // a keyframe (need === 1, the single most common case: any random
+    // scrub, and the frame-0 probe openWeb does before reporting success)
+    // waited forever and hit the 4s timeout. With the flag, measured
+    // again: 1 chunk in → 1 frame out, immediately. Frame-accurate
+    // single-frame decode is exactly the workload this option exists for
+    // (the spec's own stated use case is low-latency/interactive), so it
+    // is the correct setting here rather than a workaround — a media
+    // PLAYER would want the default buffering; a scrubbing timeline
+    // wants each requested frame back now.
+    ws.decoder.configure({ codec: ws.codec, codedWidth: ws.width, codedHeight: ws.height, description: ws.description, optimizeForLatency: true });
   }
 
   async function _decodeWebFrame(ws, frameIndex) {
