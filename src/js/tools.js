@@ -1533,7 +1533,21 @@ function applyShadowBrushTag(p,preferFill){
   }
 }
 function tagOwner(p){
-  if(!p||!p.data||!state.userProfile)return;
+  if(!p||!p.data)return;
+  // Mask mode (2026-08, AE-style "Mask" — see the mask-feature audit):
+  // every draw-tool commit site (Draw/Pen/Fill Brush/Line/Rect/Ellipse)
+  // already calls tagOwner() right after finalizing the new shape, so
+  // hooking the mask tag in here reaches all of them without touching
+  // each site individually — same reasoning as an AE user drawing a mask
+  // with the Pen/Rect/Ellipse tool while a layer (not a new shape layer)
+  // is the active target. maskModeType picks Add/Subtract/Intersect for
+  // shapes drawn WHILE the toggle is on; changing it later per-shape is
+  // done from the mask's own property row (Properties panel), not here.
+  if(state.maskMode){
+    p.data.isMask=true;
+    p.data.maskMode=state.maskModeType||'add';
+  }
+  if(!state.userProfile)return;
   p.data.ownerId=state.userProfile.id;
   p.data.ownerName=state.userProfile.name;
   // Captured at authorship time, not resolved later — this machine may

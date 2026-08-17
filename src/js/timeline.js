@@ -637,6 +637,7 @@ window.SM={
     saveActiveLayerFrame();updateUI();
   },
   setVectorBrush:function(v){state.vectorBrush=v;},setTaperEnds:function(v){state.taperEnds=v;},setShadowMode:function(v){state.shadowMode=v;},
+  setMaskMode:function(v){state.maskMode=v;},setMaskModeType:function(v){state.maskModeType=v;},
   setDrawMode:function(v){state.drawMode=v;},
   setFillBrushMode:function(v){state.fillBrushMode=v;},
   setEraserSize:function(v){state.eraserSize=Math.max(2,parseInt(v)||24);},
@@ -1966,8 +1967,50 @@ function updateUI(frameOnly){
   window._totalF=state.totalFrames;window._waIn=state.waIn;window._waOut=state.waOut;window._curFrame=state.currentFrame;
   window.updateWaBar();window.updateOmMarkers(state.currentFrame,state.totalFrames);
   if(frameOnly)updatePlayhead();else renderTimeline();
-  renderLayerList(frameOnly);updateCompInstancePanel();updateDuplicatorPanel();updateFootagePanel();updateSelPropsPanel();updateFsSelPanel();updateRevisionPanel();updateTextActionsPanel();updateTextPropsPanel();if(window.updateEffectsPanel)window.updateEffectsPanel();updatePropsContext();
+  renderLayerList(frameOnly);updateCompInstancePanel();updateDuplicatorPanel();updateFootagePanel();updateSelPropsPanel();updateFsSelPanel();updateRevisionPanel();updateMaskPanel();updateTextActionsPanel();updateTextPropsPanel();if(window.updateEffectsPanel)window.updateEffectsPanel();updatePropsContext();
 }
+// Vector mask properties (2026-08, AE-style "Mask" — see the mask-feature
+// audit) — same "own dedicated panel section, shown only for a matching
+// single-item selection" template as updateRevisionPanel right above.
+// Mode is per-mask (editable any time, not just at draw time); feather is
+// a SHARED per-layer value (v1 simplification, see LayerIn::mask_feather's
+// doc comment in engine.rs) — editing it here from ANY mask on the layer
+// moves every mask on that layer together, which is why the field is
+// seeded from the layer's current EFFECTIVE feather (max across its own
+// masks), not just this one path's own stored value.
+function updateMaskPanel(){
+  var sec=document.getElementById('mask-sec');
+  if(!sec)return;
+  var p=(state.tool==='select'&&selectedPaths.length===1)?selectedPaths[0]:null;
+  var isMask=!!(p&&p.data&&p.data.isMask);
+  if(!isMask){sec.style.display='none';return;}
+  sec.style.display='';
+  document.getElementById('p-mask-mode').value=p.data.maskMode||'add';
+  var layer=p.layer;
+  var maxFeather=0;
+  if(layer)layer.children.forEach(function(c){if(c.data&&c.data.isMask&&c.data.maskFeather>maxFeather)maxFeather=c.data.maskFeather;});
+  document.getElementById('p-mask-feather').value=maxFeather;
+}
+document.getElementById('p-mask-mode').addEventListener('change',function(){
+  var p=selectedPaths[0];if(!p||!p.data||!p.data.isMask)return;
+  pushUndo();p.data.maskMode=this.value;
+  saveActiveLayerFrame();if(window.SMEngineBridge)SMEngineBridge.renderNow();
+});
+document.getElementById('p-mask-feather').addEventListener('input',function(){
+  var p=selectedPaths[0];if(!p||!p.data||!p.data.isMask||!p.layer)return;
+  var v=Math.max(0,parseFloat(this.value)||0);
+  // Shared per-layer value (see updateMaskPanel's comment) — every mask on
+  // this layer gets the same feather, matching what the engine actually
+  // reads (LayerIn.mask_feather, the max across a layer's own masks).
+  p.layer.children.forEach(function(c){if(c.data&&c.data.isMask)c.data.maskFeather=v;});
+  saveActiveLayerFrame();if(window.SMEngineBridge)SMEngineBridge.renderNow();
+});
+document.getElementById('btn-mask-unset').addEventListener('click',function(){
+  var p=selectedPaths[0];if(!p||!p.data||!p.data.isMask)return;
+  pushUndo();
+  delete p.data.isMask;delete p.data.maskMode;delete p.data.maskFeather;
+  saveActiveLayerFrame();updateUI();if(window.SMEngineBridge)SMEngineBridge.renderNow();
+});
 // Team review Accept/Reject panel — shown when exactly one selected item is
 // either an active (non-ghost) revision (data.revisionParentId) or a
 // delete-revision ghost (data.isRevisionGhost && revisionAction==='delete').
@@ -7658,6 +7701,8 @@ var _pcurveEditBtn=document.getElementById('btn-edit-pcurve');if(_pcurveEditBtn)
 document.getElementById('p-pinv').addEventListener('change',function(){window.SM.setPressureInvert(this.checked);});
 document.getElementById('p-taper').addEventListener('change',function(){window.SM.setTaperEnds(this.checked);});
 document.getElementById('p-shadowmode').addEventListener('change',function(){window.SM.setShadowMode(this.checked);});
+document.getElementById('p-maskmode').addEventListener('change',function(){window.SM.setMaskMode(this.checked);});
+document.getElementById('p-maskmode-type').addEventListener('change',function(){window.SM.setMaskModeType(this.value);});
 document.getElementById('p-cw').addEventListener('change',function(){window.SM.setCanvasSize(parseInt(this.value),state.canvasH);});
 document.getElementById('p-ch').addEventListener('change',function(){window.SM.setCanvasSize(state.canvasW,parseInt(this.value));});
 document.getElementById('p-cbg').addEventListener('input',function(){window.SM.setCanvasBg(this.value);});

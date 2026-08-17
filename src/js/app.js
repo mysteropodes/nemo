@@ -620,7 +620,16 @@ function serP(p){var isVB=!!(p.data&&p.data.isVectorBrush);var center=isVB&&p.da
   textSize:(p.data&&p.data.isTextRoot)?p.data.size:undefined,
   textColor:(p.data&&p.data.isTextRoot)?p.data.color:undefined,
   textAlign:(p.data&&p.data.isTextRoot)?p.data.align:undefined,
-  textFixedWidth:(p.data&&p.data.isTextRoot&&p.data.fixedWidth)?p.data.fixedWidth:undefined};}
+  textFixedWidth:(p.data&&p.data.isTextRoot&&p.data.fixedWidth)?p.data.fixedWidth:undefined,
+  // Vector mask (2026-08, AE-style "Mask") — see engine-bridge.js's
+  // buildSceneJson mask-extraction comment for how these three drive the
+  // engine's clip. §1 consumer check: buildSceneJson reads them (done),
+  // saveActiveLayerFrame/selectedPaths/tween-matching treat a mask as an
+  // ordinary Path (no exclusion needed — it's meant to select/tween/undo
+  // exactly like any other shape, only RENDERING treats it specially).
+  isMask:(p.data&&p.data.isMask)?true:undefined,
+  maskMode:(p.data&&p.data.maskMode)?p.data.maskMode:undefined,
+  maskFeather:(p.data&&p.data.maskFeather)?p.data.maskFeather:undefined};}
 // `closed` was missing from this round-trip entirely — every path rebuilt
 // via desP() (onion-skin ghosts, tween/inbetween generation, undo/redo
 // snapshots, project load: everything that goes through serP/desP) silently
@@ -662,6 +671,7 @@ function desP(d,layer,op){var prev=project.activeLayer;layer.activate();var p=ne
   // current consumer.
   if(d.dupCloneId)p.data.dupCloneId=d.dupCloneId;if(d.dup3D)p.data.dup3D=d.dup3D;
   if(d.isTextRoot){p.data.isTextRoot=true;p.data.text=d.text||'';p.data.vectorFont=d.vectorFont||'Roboto-Regular';p.data.size=d.textSize||48;p.data.color=d.textColor||'#000000';p.data.align=d.textAlign||'left';if(d.textFixedWidth)p.data.fixedWidth=d.textFixedWidth;}
+  if(d.isMask){p.data.isMask=true;p.data.maskMode=d.maskMode||'add';if(d.maskFeather)p.data.maskFeather=d.maskFeather;}
   // Retained-path stamp (engine-bridge.js, 2026-07-28): the stored stroke
   // dict this Paper item was built FROM. Dict object identity is the
   // geometry identity — getEffectiveStrokes returns the SAME stored dict

@@ -16,7 +16,14 @@ use vello::{wgpu, AaConfig, AaSupport, RenderParams, Renderer, RendererOptions, 
 use wasm_bindgen::prelude::*;
 use web_sys::HtmlCanvasElement;
 
-#[derive(Deserialize, Serialize)]
+// Clone (2026-08, masks): composite_scene's Add-mask union step needs a
+// contiguous `&[ItemIn]` of just the Add-mode masks pulled out of
+// LayerIn::masks (a Vec<MaskIn>, not a Vec<ItemIn>) — cloning that handful
+// of mask items into a fresh Vec is the simplest way to get one without
+// changing paint_layer_items' slice-based signature (used elsewhere,
+// CLAUDE.md §3 territory). Cheap: masks are a handful of items, cloned
+// once per frame, nowhere near the hot path.
+#[derive(Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ItemIn {
     // Reference into the engine's retained path store (register_path) — when
@@ -111,7 +118,7 @@ pub(crate) struct ItemIn {
     #[serde(default)]
     pub(crate) effects: Vec<EffectIn>,
 }
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ImageRef {
     pub(crate) image_id: String,
@@ -240,6 +247,41 @@ pub(crate) struct LayerIn {
     // (per-layer only).
     #[serde(default)]
     pub(crate) effects: Vec<EffectIn>,
+    // Vector masks (2026-08, AE-style "Mask", per-layer geometry that clips
+    // this layer's own content — distinct from matte_mode/matte_source_index
+    // above, which clips against ANOTHER layer). JS (engine-bridge.js)
+    // pre-builds each mask's `item` as solid opaque white fill/no stroke —
+    // only its GEOMETRY matters here, never its real on-canvas paint, so
+    // paint_layer_items can render it completely unmodified (see
+    // composite_scene's mask-combine algorithm for why this needs no new
+    // WGSL: Add is a plain union (all Add items painted in one Scene —
+    // overlapping opaque white stays opaque white), Subtract/Intersect
+    // reuse matte_pass's own alpha-multiply math one mask at a time).
+    #[serde(default)]
+    pub(crate) masks: Vec<MaskIn>,
+    // ONE shared feather (world px, pre-scaled by JS same as any other
+    // radius-shaped effect param) applied to the FINAL combined silhouette,
+    // not per-mask — a deliberate v1 simplification (see the mask-feature
+    // audit): AE feathers each mask individually before combining, but the
+    // overwhelmingly common case is one mask per masked layer, where the
+    // two are indistinguishable, and a single shared value avoids a whole
+    // extra per-mask blur+combine interleaving for a rarely-exercised case.
+    #[serde(default)]
+    pub(crate) mask_feather: f64,
+}
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct MaskIn {
+    pub(crate) item: ItemIn,
+    // "add" (union, default) | "subtract" | "intersect" — same vocabulary
+    // as AE's own mask mode dropdown (minus Lighten/Darken/Difference,
+    // dropped for v1: rare in practice and each needs its own compose
+    // formula beyond matte_pass's reusable alpha-multiply).
+    #[serde(default = "default_mask_mode")]
+    pub(crate) mode: String,
+}
+fn default_mask_mode() -> String {
+    "add".to_string()
 }
 
 #[derive(Deserialize, Serialize, Clone)]
@@ -677,6 +719,26 @@ pub struct VelloEngine {
     matte_source_view: wgpu::TextureView,
     matte_result_tex: wgpu::Texture,
     matte_result_view: wgpu::TextureView,
+    // ---- Vector masks (2026-08, AE-style "Mask" — see composite_scene's
+    // mask handling) — NOT a new pipeline: masks reuse matte_pipeline
+    // itself (the "multiply alpha" math a Subtract/Intersect combine needs
+    // IS matte_pass's own alpha-matte formula) and blur_pass for feather.
+    // Only new textures are needed: mask_scratch (vello writes a single
+    // mask's own white-filled geometry here, or the union of every
+    // Add-mode mask in one render — STORAGE_BINDING, same shape as
+    // matte_source), and an accum ping-pong pair + one result texture
+    // (RENDER_ATTACHMENT, our own matte_pass writes these, same shape as
+    // matte_result) for chaining Subtract/Intersect masks one at a time
+    // and then applying the finished silhouette to the layer's own
+    // content. See composite_scene's doc comment on the combine algorithm.
+    mask_scratch_tex: wgpu::Texture,
+    mask_scratch_view: wgpu::TextureView,
+    mask_accum_a_tex: wgpu::Texture,
+    mask_accum_a_view: wgpu::TextureView,
+    mask_accum_b_tex: wgpu::Texture,
+    mask_accum_b_view: wgpu::TextureView,
+    mask_applied_tex: wgpu::Texture,
+    mask_applied_view: wgpu::TextureView,
     // ---- Feather/blur compositor (blur.wgsl, see composite_scene's blur
     // handling and blur.wgsl's own doc comment) ----
     // blur_result reuses matte_result's exact texture shape (RENDER_ATTACHMENT
@@ -936,7 +998,15 @@ fn create_matte_result_texture(device: &wgpu::Device, width: u32, height: u32) -
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,
         format: BLEND_SCRATCH_FORMAT,
-        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+        // COPY_DST (2026-08, masks): the Add-mask union step needs to copy
+        // mask_scratch's vello output (STORAGE_BINDING) into mask_accum_a
+        // (built via this function) so the Subtract/Intersect loop always
+        // reads/writes RENDER_ATTACHMENT-shaped textures — every OTHER
+        // texture built here (matte_result/blur_result/blur_scratch/
+        // bloom_extract) is only ever a render-pass TARGET, never a plain
+        // copy destination, so this flag was never needed before; adding
+        // it is a pure no-op for them.
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
         view_formats: &[],
     });
     let view = tex.create_view(&wgpu::TextureViewDescriptor::default());
@@ -2100,6 +2170,10 @@ pub async fn create_engine(
     let (matte_pipeline, matte_bind_group_layout, matte_sampler, matte_uniform_buf) = create_matte_pipeline(&device);
     let (matte_source_tex, matte_source_view) = create_blend_layer_texture(&device, width, height);
     let (matte_result_tex, matte_result_view) = create_matte_result_texture(&device, width, height);
+    let (mask_scratch_tex, mask_scratch_view) = create_blend_layer_texture(&device, width, height);
+    let (mask_accum_a_tex, mask_accum_a_view) = create_matte_result_texture(&device, width, height);
+    let (mask_accum_b_tex, mask_accum_b_view) = create_matte_result_texture(&device, width, height);
+    let (mask_applied_tex, mask_applied_view) = create_matte_result_texture(&device, width, height);
     let (blur_pipeline, blur_bind_group_layout, blur_sampler, blur_uniform_buf) = create_blur_pipeline(&device);
     let (blur_result_tex, blur_result_view) = create_matte_result_texture(&device, width, height);
     let (blur_scratch_tex, blur_scratch_view) = create_matte_result_texture(&device, width, height);
@@ -2153,6 +2227,14 @@ pub async fn create_engine(
         matte_source_view,
         matte_result_tex,
         matte_result_view,
+        mask_scratch_tex,
+        mask_scratch_view,
+        mask_accum_a_tex,
+        mask_accum_a_view,
+        mask_accum_b_tex,
+        mask_accum_b_view,
+        mask_applied_tex,
+        mask_applied_view,
         blur_pipeline,
         blur_bind_group_layout,
         blur_sampler,
@@ -2589,7 +2671,8 @@ impl VelloEngine {
             l.effects.iter().any(|e| e.enabled) || l.items.iter().any(|it| it.effects.iter().any(|e| e.enabled))
         });
         let has_effect = scene_in.layers.iter().any(|l| l.is_effect_layer.unwrap_or(false));
-        if !has_blend && !has_matte && !has_effects_stack && !has_effect {
+        let has_mask = scene_in.layers.iter().any(|l| !l.masks.is_empty());
+        if !has_blend && !has_matte && !has_effects_stack && !has_effect && !has_mask {
             let mut scene = Scene::new();
             self.push_atlas_keepalive(&mut scene);
             for layer in &scene_in.layers {
@@ -2666,6 +2749,126 @@ impl VelloEngine {
                     .map_err(|e| JsValue::from_str(&format!("render_to_texture failed: {e:?}")))?;
             }
 
+            // Vector masks (2026-08) — combine this layer's own masks (if
+            // any) into one silhouette and multiply it into the layer's
+            // own just-rendered content, BEFORE matte (order doesn't
+            // matter between the two — both are plain alpha multiplies,
+            // see matte_pass — but masks need to run first regardless
+            // since the matte block below reads `masked_view` as ITS
+            // input instead of the layer's raw paint). See LayerIn::masks'
+            // doc comment for the combine algorithm and the v1
+            // shared-feather simplification.
+            let masked_view: &wgpu::TextureView = if !layer.masks.is_empty() {
+                let add_items: Vec<ItemIn> =
+                    layer.masks.iter().filter(|m| m.mode != "subtract" && m.mode != "intersect").map(|m| m.item.clone()).collect();
+                if add_items.is_empty() {
+                    // No Add-mode mask at all (only Subtract/Intersect) —
+                    // start from "everything visible" so a lone Intersect
+                    // shows just that shape and a lone Subtract punches a
+                    // hole in a fully-visible layer, both more intuitive
+                    // than AE's literal top-to-bottom accumulation (see the
+                    // mask-feature audit's deliberate-deviation note).
+                    clear_texture(&self.device, &self.queue, &self.mask_accum_a_view, wgpu::Color::WHITE);
+                } else {
+                    // Union: every Add mask painted white into ONE Scene —
+                    // ordinary src-over of opaque-white-on-opaque-white
+                    // stays opaque white, so overlapping Add shapes union
+                    // for free with zero extra compose passes.
+                    let mut mscene = Scene::new();
+                    self.push_atlas_keepalive(&mut mscene);
+                    paint_layer_items(&mut mscene, &add_items, view_tf, &self.images, &self.paths);
+                    self.renderer
+                        .render_to_texture(&self.device, &self.queue, &mscene, &self.mask_scratch_view, &layer_params)
+                        .map_err(|e| JsValue::from_str(&format!("render_to_texture failed: {e:?}")))?;
+                    // mask_scratch is STORAGE_BINDING (vello writes it);
+                    // mask_accum_a is RENDER_ATTACHMENT (matte_pass writes
+                    // it) — a plain texture copy bridges the two so the
+                    // Subtract/Intersect loop below always reads/writes the
+                    // same RENDER_ATTACHMENT-shaped pair, matching the
+                    // established blend_accum_a/b idiom.
+                    let mut encoder =
+                        self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("mask-add-to-accum-copy") });
+                    encoder.copy_texture_to_texture(
+                        self.mask_scratch_tex.as_image_copy(),
+                        self.mask_accum_a_tex.as_image_copy(),
+                        wgpu::Extent3d { width: self.width, height: self.height, depth_or_array_layers: 1 },
+                    );
+                    self.queue.submit(Some(encoder.finish()));
+                }
+                let mut accum_is_a = true;
+                for m in layer.masks.iter().filter(|m| m.mode == "subtract" || m.mode == "intersect") {
+                    let mut sscene = Scene::new();
+                    self.push_atlas_keepalive(&mut sscene);
+                    paint_layer_items(&mut sscene, std::slice::from_ref(&m.item), view_tf, &self.images, &self.paths);
+                    self.renderer
+                        .render_to_texture(&self.device, &self.queue, &sscene, &self.mask_scratch_view, &layer_params)
+                        .map_err(|e| JsValue::from_str(&format!("render_to_texture failed: {e:?}")))?;
+                    let (cur_view, next_view) =
+                        if accum_is_a { (&self.mask_accum_a_view, &self.mask_accum_b_view) } else { (&self.mask_accum_b_view, &self.mask_accum_a_view) };
+                    // Subtract = matte_pass with invert=true (alpha *=
+                    // 1-this); Intersect = invert=false (alpha *= this) —
+                    // matte_pass's own alpha-matte formula IS the combine
+                    // math a mask compose needs, no new WGSL required.
+                    matte_pass(
+                        &self.device,
+                        &self.queue,
+                        &self.matte_pipeline,
+                        &self.matte_bind_group_layout,
+                        &self.matte_sampler,
+                        &self.matte_uniform_buf,
+                        cur_view,
+                        &self.mask_scratch_view,
+                        0,
+                        m.mode == "subtract",
+                        next_view,
+                    );
+                    accum_is_a = !accum_is_a;
+                }
+                let combined_view: &wgpu::TextureView = if accum_is_a { &self.mask_accum_a_view } else { &self.mask_accum_b_view };
+                // Feather (2026-08, AE parity — the actual ask this
+                // shipped for): softens the FINAL combined silhouette's
+                // edge via the exact same separable Gaussian blur_pass
+                // already used for the Effects panel's own Blur — a true
+                // edge-normal alpha falloff on the mask itself, not a
+                // whole-layer image blur (which would soften the masked
+                // CONTENT instead of just the clip boundary).
+                let feather = layer.mask_feather as f32;
+                let silhouette_view: &wgpu::TextureView = if feather > 0.01 {
+                    blur_pass(
+                        &self.device,
+                        &self.queue,
+                        &self.blur_pipeline,
+                        &self.blur_bind_group_layout,
+                        &self.blur_sampler,
+                        &self.blur_uniform_buf,
+                        combined_view,
+                        feather,
+                        self.width,
+                        self.height,
+                        &self.blur_scratch_view,
+                        &self.blur_result_view,
+                    );
+                    &self.blur_result_view
+                } else {
+                    combined_view
+                };
+                matte_pass(
+                    &self.device,
+                    &self.queue,
+                    &self.matte_pipeline,
+                    &self.matte_bind_group_layout,
+                    &self.matte_sampler,
+                    &self.matte_uniform_buf,
+                    &self.blend_layer_view,
+                    silhouette_view,
+                    0,
+                    false,
+                    &self.mask_applied_view,
+                );
+                &self.mask_applied_view
+            } else {
+                &self.blend_layer_view
+            };
             // Both halves resolved through the SAME helper as the precompute
             // — a matte whose source doesn't resolve (dangling uid, index
             // out of range) degrades to "no matte" instead of masking
@@ -2685,7 +2888,7 @@ impl VelloEngine {
                     &self.matte_bind_group_layout,
                     &self.matte_sampler,
                     &self.matte_uniform_buf,
-                    &self.blend_layer_view,
+                    masked_view,
                     &self.matte_source_view,
                     mode,
                     invert,
@@ -2693,7 +2896,7 @@ impl VelloEngine {
                 );
                 &self.matte_result_view
             } else {
-                &self.blend_layer_view
+                masked_view
             };
             // Effects stack (2026-07 rewrite) — runs on THIS layer's own
             // isolated alpha (real transparency), AFTER matte (so a matted
@@ -3000,6 +3203,18 @@ impl VelloEngine {
         let (matte_result_tex, matte_result_view) = create_matte_result_texture(&self.device, width, height);
         self.matte_result_tex = matte_result_tex;
         self.matte_result_view = matte_result_view;
+        let (mask_scratch_tex, mask_scratch_view) = create_blend_layer_texture(&self.device, width, height);
+        self.mask_scratch_tex = mask_scratch_tex;
+        self.mask_scratch_view = mask_scratch_view;
+        let (mask_accum_a_tex, mask_accum_a_view) = create_matte_result_texture(&self.device, width, height);
+        self.mask_accum_a_tex = mask_accum_a_tex;
+        self.mask_accum_a_view = mask_accum_a_view;
+        let (mask_accum_b_tex, mask_accum_b_view) = create_matte_result_texture(&self.device, width, height);
+        self.mask_accum_b_tex = mask_accum_b_tex;
+        self.mask_accum_b_view = mask_accum_b_view;
+        let (mask_applied_tex, mask_applied_view) = create_matte_result_texture(&self.device, width, height);
+        self.mask_applied_tex = mask_applied_tex;
+        self.mask_applied_view = mask_applied_view;
         let (blur_result_tex, blur_result_view) = create_matte_result_texture(&self.device, width, height);
         self.blur_result_tex = blur_result_tex;
         self.blur_result_view = blur_result_view;
