@@ -27,6 +27,22 @@
   // an entrance's decelerate-INTO-place, so every *Out preset below uses
   // this instead of the entrance presets' default ease-out feel.
   var EASE_IN_CURVE=[{x:0,y:0},{x:0.25,y:0.25},{x:0.5,y:0.5},{x:0.75,y:0.91},{x:1,y:1}];
+  // Explicit easing override (2026-08-17) — same 4 named shapes as
+  // motion.js's own Easy Ease menu (CURVE_LINEAR/EASE/EASE_IN/EASE_OUT
+  // there), duplicated here for the same reason as EASE_IN_CURVE above:
+  // no exported hook onto those constants, and re-deriving them from the
+  // menu labels would need the same numbers anyway. 'default' (null)
+  // keeps each preset's own built-in curve (POP_CURVE for the two
+  // rebond presets, EASE_IN_CURVE for every *Out, null==DEFAULT_CURVE
+  // for the rest) — only picking a NAMED easing here overrides it.
+  var EASING_CURVES={
+    'default':null,
+    linear:[{x:0,y:0},{x:1,y:1}],
+    easeInOut:[{x:0,y:0},{x:0.25,y:0.156},{x:0.5,y:0.5},{x:0.75,y:0.844},{x:1,y:1}],
+    easeIn:EASE_IN_CURVE,
+    easeOut:[{x:0,y:0},{x:0.25,y:0.09},{x:0.5,y:0.5},{x:0.75,y:0.75},{x:1,y:1}],
+  };
+  var EASING_LABELS={'default':'Par défaut du style',linear:'Linéaire',easeInOut:'Douce (in/out)',easeIn:'Accélérer',easeOut:'Décélérer'};
 
   // Every text-carrying stroke dict in this layer belonging to `groupId`
   // (vector: sd.groupId from vector-text-bridge.js; raster split:
@@ -89,22 +105,49 @@
     popIn:'Rebond (apparition)',popOut:'Rebond (disparition)',
   };
 
+  // Every prop any preset can touch — used to clear a stale run before
+  // re-writing (live preview re-applies on every slider tweak; without
+  // clearing first, shortening the duration would leave the OLD end key
+  // behind as an orphan instead of moving it).
+  var ALL_PRESET_PROPS=['opacity','position','scale'];
+  // Clears every element belonging to `groupId`, regardless of unit mode
+  // — a strokeId's elementMotion holder is the same object no matter
+  // which grouping (char/word/line) last wrote to it, so clearing must
+  // walk ALL group members, not just the current mode's units (switching
+  // mode mid-preview would otherwise leave the previous mode's keys
+  // behind as orphans on strokeIds the new grouping doesn't touch).
+  function clearGroup(li, groupId){
+    var ld=state.layers[li]; if(!ld||!ld.elementMotion)return;
+    (window.SMMotion.layerElements(li,ld)||[]).forEach(function(entry){
+      var sd=entry.sd;
+      if((sd.groupId||sd.textGroupId)!==groupId)return;
+      var h=ld.elementMotion[entry.strokeId]; if(!h)return;
+      ALL_PRESET_PROPS.forEach(function(prop){
+        if(h.motion&&h.motion[prop])delete h.motion[prop];
+        if(h.motionStatic&&h.motionStatic[prop])delete h.motionStatic[prop];
+      });
+    });
+  }
   // Writes the staggered keys for every unit of `groupId` on layer `li`.
-  // opts: {mode:'char'|'word'|'line', preset, startFrame, unitFrames,
-  // staggerFrames}. One undo step for the whole operation (pushUndo is
-  // called ONCE up front, matching every other multi-mutation batch
-  // action in this codebase — Cycle, Easy Ease on a multi-key selection,
-  // etc. — never once per unit).
+  // opts: {mode, preset, startFrame, unitFrames, staggerFrames, easing,
+  // skipUndo, skipClear}. One undo step for the whole INTERACTION, not
+  // one per call — the panel below calls this live on every control
+  // tweak with skipUndo=true (a single pushUndo happened once at open,
+  // see openPanel), so "Annuler" always reverts the whole session in one
+  // step regardless of how many times the sliders moved.
   function apply(li, groupId, opts){
     var ld=state.layers[li]; if(!ld)return 0;
     var preset=PRESETS[opts.preset]; if(!preset)return 0;
-    var units=unitsForGroup(li,ld,groupId,opts.mode||'char');
+    var mode=opts.mode||'char';
+    if(!opts.skipUndo&&window.pushUndo)pushUndo();
+    if(!opts.skipClear)clearGroup(li,groupId);
+    var units=unitsForGroup(li,ld,groupId,mode);
     if(!units.length)return 0;
-    if(window.pushUndo)pushUndo();
     var unitFrames=Math.max(1,opts.unitFrames||12);
     var staggerFrames=Math.max(0,opts.staggerFrames==null?3:opts.staggerFrames);
     var start=opts.startFrame==null?state.currentFrame:opts.startFrame;
-    var curve=preset.curve||null;
+    var easingOverride=opts.easing&&opts.easing!=='default'?EASING_CURVES[opts.easing]:null;
+    var curve=easingOverride||preset.curve||null;
     // An exit staggers LAST unit first (AE/Figma convention: a sentence
     // dissolves from the end backwards, mirroring how it typed itself in)
     // — same unit list, just walked in reverse for stagger-offset purposes
@@ -133,11 +176,20 @@
   // already are: a plain DOM node appended to <body>, styled inline off
   // the app's existing CSS custom properties (--panel2/--border/--text-dim)
   // so it matches the surrounding chrome without a new stylesheet entry.
-  var _panel=null;
-  function closePanel(){ if(_panel){_panel.remove();_panel=null;} }
+  // Live preview (2026-08-17, Cyril: "continue" after being asked for a
+  // preview scrub) — the panel writes REAL elementMotion keys on every
+  // control tweak (not a separate scratch copy: this codebase has no
+  // parallel "preview state" concept anywhere else, and the render path
+  // only ever reads ld.elementMotion), gated behind exactly ONE pushUndo
+  // taken at open time. Cancel calls undo() once to revert the whole
+  // session regardless of how many tweaks happened; Terminé just closes,
+  // leaving the already-live result in place — no separate "commit" step.
+  var _panel=null, _panelUndoTaken=false;
+  function closePanel(){ if(_panel){_panel.remove();_panel=null;} _panelUndoTaken=false; }
   function openPanel(li, groupId){
     closePanel();
     var ld=state.layers[li]; if(!ld)return;
+    if(window.pushUndo){pushUndo();_panelUndoTaken=true;}
     var p=document.createElement('div');
     p.id='text-animator-panel';
     p.style.cssText='position:fixed;top:80px;right:280px;z-index:300;width:260px;'+
@@ -173,6 +225,13 @@
     });
     var rPreset=row('Style'); rPreset.appendChild(presetSel); p.appendChild(rPreset);
 
+    var easeSel=document.createElement('select');
+    Object.keys(EASING_CURVES).forEach(function(k){
+      var o=document.createElement('option'); o.value=k; o.textContent=EASING_LABELS[k];
+      easeSel.appendChild(o);
+    });
+    var rEase=row('Accélération'); rEase.appendChild(easeSel); p.appendChild(rEase);
+
     function numInput(val,step){
       var inp=document.createElement('input');
       inp.type='number'; inp.value=val; inp.className='pi scrub'; inp.dataset.step=step||1;
@@ -188,21 +247,69 @@
     var stagInp=numInput(3,1);
     var rStag=row('Décalage entre unités (frames)'); rStag.appendChild(stagInp); p.appendChild(rStag);
 
+    // Scrub slider — previews the animation's own span (start → last
+    // unit's end) without touching the app's main timeline/playhead UI,
+    // so scrubbing here doesn't fight the transport controls if playback
+    // is also on screen. Range/labels are recomputed after every
+    // preview() call since the span itself can change (duration/stagger).
+    var scrubWrap=document.createElement('div');
+    scrubWrap.style.cssText='margin:2px 0 10px';
+    var scrubLabelRow=document.createElement('div');
+    scrubLabelRow.style.cssText='display:flex;justify-content:space-between;color:var(--text-dim);margin-bottom:4px';
+    var scrubLabel=document.createElement('span'); scrubLabel.textContent='Aperçu';
+    var scrubFrameLabel=document.createElement('span');
+    scrubLabelRow.appendChild(scrubLabel); scrubLabelRow.appendChild(scrubFrameLabel);
+    var scrubInp=document.createElement('input');
+    scrubInp.type='range'; scrubInp.style.width='100%'; scrubInp.value=state.currentFrame;
+    scrubWrap.appendChild(scrubLabelRow); scrubWrap.appendChild(scrubInp);
+    p.appendChild(scrubWrap);
+
+    var lastUnitCount=0;
+    function currentOpts(){
+      return {
+        mode:unitSel.value, preset:presetSel.value, easing:easeSel.value,
+        startFrame:parseInt(startInp.value,10)||0,
+        unitFrames:parseInt(durInp.value,10)||12,
+        staggerFrames:parseInt(stagInp.value,10)||0,
+      };
+    }
+    // Live preview: re-applies with skipUndo (the one pushUndo already
+    // happened at open) — clearGroup inside apply() wipes the previous
+    // pass first, so tweaking a slider back and forth never accumulates
+    // orphan keyframes.
+    function preview(){
+      var opts=currentOpts();
+      lastUnitCount=apply(li,groupId,Object.assign({skipUndo:true},opts));
+      var span=opts.startFrame+Math.max(0,lastUnitCount-1)*opts.staggerFrames+opts.unitFrames;
+      scrubInp.min=Math.max(0,opts.startFrame-2);
+      scrubInp.max=Math.min(state.totalFrames-1,span+2);
+      if(+scrubInp.value<+scrubInp.min||+scrubInp.value>+scrubInp.max)scrubInp.value=opts.startFrame;
+      scrubFrameLabel.textContent='frame '+scrubInp.value;
+      scrubToValue();
+    }
+    function scrubToValue(){
+      var f=parseInt(scrubInp.value,10)||0;
+      state.currentFrame=f;
+      if(window.loadFrame)loadFrame(f);
+      if(window.SMEngineBridge)SMEngineBridge.renderNow();
+      scrubFrameLabel.textContent='frame '+f;
+    }
+    [unitSel,presetSel,easeSel].forEach(function(el){el.addEventListener('change',preview);});
+    [startInp,durInp,stagInp].forEach(function(el){el.addEventListener('input',preview);el.addEventListener('change',preview);});
+    scrubInp.addEventListener('input',scrubToValue);
+
     var btnRow=document.createElement('div');
     btnRow.style.cssText='display:flex;gap:8px;margin-top:4px';
     var cancelBtn=document.createElement('button');
     cancelBtn.textContent='Annuler'; cancelBtn.className='pbtn'; cancelBtn.style.flex='1';
-    cancelBtn.onclick=closePanel;
+    cancelBtn.onclick=function(){
+      if(_panelUndoTaken&&window.undo)undo();
+      closePanel();
+    };
     var applyBtn=document.createElement('button');
-    applyBtn.textContent='Appliquer'; applyBtn.className='pbtn ac'; applyBtn.style.flex='1';
+    applyBtn.textContent='Terminé'; applyBtn.className='pbtn ac'; applyBtn.style.flex='1';
     applyBtn.onclick=function(){
-      var n=apply(li,groupId,{
-        mode:unitSel.value, preset:presetSel.value,
-        startFrame:parseInt(startInp.value,10)||0,
-        unitFrames:parseInt(durInp.value,10)||12,
-        staggerFrames:parseInt(stagInp.value,10)||0,
-      });
-      if(window.showToast)showToast(n?('Texte animé — '+n+' unité'+(n>1?'s':'')):'Aucune unité à animer trouvée');
+      if(window.showToast)showToast(lastUnitCount?('Texte animé — '+lastUnitCount+' unité'+(lastUnitCount>1?'s':'')):'Aucune unité à animer trouvée');
       closePanel();
     };
     btnRow.appendChild(cancelBtn); btnRow.appendChild(applyBtn);
@@ -210,6 +317,7 @@
 
     document.body.appendChild(p);
     _panel=p;
+    preview(); // show the default preset live the moment the panel opens
   }
 
   window.SMTextAnimator={
