@@ -1070,18 +1070,57 @@
     setTimeout(async function () {
       var cfg = null;
       try { cfg = await invoke('autobench_config'); } catch (e) { return; }
-      if (!cfg || !cfg.videos || !cfg.videos.length) return;
-      console.log('[autobench] starting,', cfg.videos.length, 'videos');
+      // A testImport-only config (no scrub videos) is a legitimate run —
+      // this used to require at least one videos[] entry, which silently
+      // discarded any config that only wanted the import-latency phase
+      // below (see 2026-08-17 addition), an inert-looking no-op with no
+      // error at all.
+      var hasVideos = cfg && cfg.videos && cfg.videos.length;
+      var hasImportTest = cfg && cfg.testImport && cfg.testImport.length;
+      if (!hasVideos && !hasImportTest) return;
+      console.log('[autobench] starting,', hasVideos ? cfg.videos.length : 0, 'videos,', hasImportTest ? cfg.testImport.length : 0, 'import tests');
       var report = {
         startedAt: new Date().toISOString(),
         engineEnabled: !!(window.SMEngineBridge && SMEngineBridge.isEnabled && SMEngineBridge.isEnabled()),
         runs: [],
       };
-      for (var i = 0; i < cfg.videos.length; i++) {
+      for (var i = 0; hasVideos && i < cfg.videos.length; i++) {
         try {
           report.runs.push(await bench(cfg.videos[i], cfg.opts || {}));
         } catch (e) {
           report.runs.push({ path: cfg.videos[i], error: String((e && e.message) || e) });
+        }
+      }
+      // Import-latency phase (2026-08-17, verifying "faire apparaître le
+      // footage rapidement même si l'encodage est en cours") — bench()
+      // above measures steady-state scrub/playback, never importAsLayer()
+      // itself, so it can't see the exact thing that changed: how long
+      // between calling it and the first decoded pixel actually reaching
+      // the engine. Wraps registerImageRaw for the duration of each import
+      // to capture that moment precisely, in addition to the call's own
+      // total wall-clock time (includes thumbnail + loadFrame + updateUI,
+      // NOT the background optimize — that's fire-and-forget by design).
+      if (cfg.testImport && cfg.testImport.length && window.SMNativeVideo) {
+        report.importRuns = [];
+        for (var j = 0; j < cfg.testImport.length; j++) {
+          var p = cfg.testImport[j];
+          var firstPixelMs = null;
+          var origRegister = window.SMEngineBridge && window.SMEngineBridge.registerImageRaw;
+          var t0 = performance.now();
+          if (origRegister) {
+            window.SMEngineBridge.registerImageRaw = function () {
+              if (firstPixelMs === null) firstPixelMs = performance.now() - t0;
+              return origRegister.apply(window.SMEngineBridge, arguments);
+            };
+          }
+          try {
+            await SMNativeVideo.importAsLayer(p);
+            report.importRuns.push({ path: p, totalImportMs: +(performance.now() - t0).toFixed(2), firstPixelMs: firstPixelMs !== null ? +firstPixelMs.toFixed(2) : null });
+          } catch (e) {
+            report.importRuns.push({ path: p, error: String((e && e.message) || e) });
+          } finally {
+            if (origRegister) window.SMEngineBridge.registerImageRaw = origRegister;
+          }
         }
       }
       try {
