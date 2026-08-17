@@ -161,6 +161,10 @@
     var ld=state.layers[li]; if(!ld)return 0;
     var preset=PRESETS[opts.preset]; if(!preset)return 0;
     var mode=opts.mode||'char';
+    // Bail BEFORE pushUndo/clearGroup on an empty group — an unresolvable
+    // groupId (stale reference, wrong layer) must be a true no-op, not a
+    // wasted undo-stack entry that reverts nothing when popped.
+    if(!unitsForGroup(li,ld,groupId,mode).length)return 0;
     if(!opts.skipUndo&&window.pushUndo)pushUndo();
     if(!opts.skipClear)clearGroup(li,groupId);
     var units=unitsForGroup(li,ld,groupId,mode);
