@@ -816,7 +816,17 @@ window.SM={
       state.motionBlurOn=true;
       var mbBtn=document.getElementById('btn-mblur');if(mbBtn)mbBtn.classList.add('active');
     }
-    if(needsCompOn)showToast('Flou de mouvement activé sur le calque — active aussi l\u2019interrupteur de la comp');
+    // 3D layers replace motionMat/parentChain with a per-vertex projector
+    // (engine-bridge.js's `is3D` branch forces motionMat=null), and mbOn's
+    // own gate requires a truthy motionMat -- so motion blur silently never
+    // renders a single sample on a 3D layer, with nothing anywhere else in
+    // the app saying so (2026-08-16 QA sweep). Unlike the equally-real "3D
+    // layers ignore their parent" gap, which is at least a code comment,
+    // this one had zero user-visible signal. Same toast-driven convention
+    // as the comp-switch fix above, just surfacing a limit instead of
+    // auto-fixing a switch.
+    if(ld.motionBlur&&ld.threeD)showToast('Flou de mouvement activé — sans effet sur un calque 3D pour l\u2019instant');
+    else if(needsCompOn)showToast('Flou de mouvement activé sur le calque — active aussi l\u2019interrupteur de la comp');
     else showToast(ld.motionBlur?'Flou de mouvement activé':'Flou de mouvement désactivé');
     renderLayerList();renderTimeline();
     if(window.SMEngineBridge)SMEngineBridge.renderNow();
