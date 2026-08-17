@@ -5841,7 +5841,10 @@ function onMouseUp(event){
     var textDragWidth=Math.abs(event.point.x-_textDragStart.x);
     if(textDragWidth>20/view.zoom){
       var textTopLeft=new Point(Math.min(_textDragStart.x,event.point.x),Math.min(_textDragStart.y,event.point.y));
-      if(window.openTextPopoverForBox)openTextPopoverForBox(textTopLeft,textDragWidth);
+      // Drag-a-box now types straight on the canvas (AE/Figma-style area
+      // text), no popup — see startInPlaceTextCreation (timeline.js).
+      // Point-click text placement keeps the popover for now.
+      if(window.startInPlaceTextCreation)startInPlaceTextCreation(textTopLeft,textDragWidth);
     }else if(window.openTextPopover)openTextPopover(_textDragStart);
     _textDragStart=null;
   }else if((state.tool==='line'||state.tool==='rect'||state.tool==='ellipse')&&currentPath){

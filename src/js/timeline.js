@@ -5618,13 +5618,35 @@ function closeTextPopover(){var pop=document.getElementById('text-popover');if(p
 // (style.css, 'Nemo Vector Text') loads the SAME bundled Roboto TTFs
 // vector-text-bridge.js parses for glyph outlines, so the overlay LOOKS
 // like the vector result it's about to become, not a generic stand-in.
-var _inplaceTa=null,_inplaceRoot=null,_inplaceHidden=null;
-function openInPlaceTextEditor(root){
+var _inplaceTa=null,_inplaceRoot=null,_inplaceHidden=null,_inplaceIsNew=false;
+// Area-text creation (2026-08-17, same ask as openInPlaceTextEditor above:
+// "comme AI ou Figma" also means the INITIAL drag-a-box placement, not just
+// re-editing) — builds a throwaway single-glyph vector-text root (needed
+// because buildVectorTextGroup only tags a root when there's at least one
+// visible glyph) purely to get a real root+bounds to hand to
+// openInPlaceTextEditor, then immediately blanks root.data.text so the
+// overlay textarea opens empty rather than prefilled with the placeholder
+// glyph. closeInPlaceTextEditor's `isNew` branch deletes the placeholder
+// outright on cancel/empty instead of restoring its (never-shown) glyph.
+function startInPlaceTextCreation(topLeft,widthWorld){
+  var layer=userLayers[state.activeLayerIdx];
+  if(!layer||!window.SMVectorText)return;
+  var size=48,font='Roboto-Regular',color=state.strokeColor||'#000000',align='left';
+  window.SMVectorText.buildVectorTextGroup('M',font,size,color,align,widthWorld||null,topLeft,layer,{}).then(function(res){
+    if(!res.paths.length)return;
+    var root=res.paths[0];
+    root.data.text='';
+    openInPlaceTextEditor(root,true);
+  });
+}
+window.startInPlaceTextCreation=startInPlaceTextCreation;
+function openInPlaceTextEditor(root,isNew){
   if(!root||!root.data||!window.SMVectorText)return;
   if(_inplaceTa)closeInPlaceTextEditor(true); // a stray prior editor (shouldn't happen, but never stack two)
   var d=root.data;
   var members=window.SMVectorText.vectorTextGroupMembers(root);
   if(!members.length)return;
+  _inplaceIsNew=!!isNew;
   var bounds=members.reduce(function(b,p){return b?b.unite(p.bounds):p.bounds.clone();},null);
   members.forEach(function(p){p.visible=false;});
   _inplaceHidden=members;_inplaceRoot=root;
@@ -5664,17 +5686,22 @@ function openInPlaceTextEditor(root){
   ta.focus();ta.select();
 }
 function closeInPlaceTextEditor(cancel){
-  var ta=_inplaceTa,root=_inplaceRoot,hidden=_inplaceHidden;
+  var ta=_inplaceTa,root=_inplaceRoot,hidden=_inplaceHidden,isNew=_inplaceIsNew;
   if(!ta)return;
-  _inplaceTa=null;_inplaceRoot=null;_inplaceHidden=null;
+  _inplaceTa=null;_inplaceRoot=null;_inplaceHidden=null;_inplaceIsNew=false;
   var newText=ta.value;
   ta.remove();
+  // Creation flow (startInPlaceTextCreation) hid a throwaway placeholder
+  // glyph that was never meant to be seen — a discarded NEW block deletes
+  // it outright instead of restoring its visibility (unlike a discarded
+  // re-edit, which restores the real pre-existing glyphs untouched).
+  var discardNew=function(){if(hidden)hidden.forEach(function(p){if(p&&!p.removed)p.remove();});if(window.SMEngineBridge)SMEngineBridge.renderNow();};
   var restore=function(){if(hidden)hidden.forEach(function(p){if(p&&!p.removed)p.visible=true;});};
-  if(cancel||!root||!root.data||!newText.trim()||newText===root.data.text){restore();if(window.SMEngineBridge)SMEngineBridge.renderNow();return;}
+  if(cancel||!root||!root.data||!newText.trim()||(!isNew&&newText===root.data.text)){if(isNew)discardNew();else{restore();if(window.SMEngineBridge)SMEngineBridge.renderNow();}return;}
   var d=root.data;
   var opts={bold:d.bold,italic:d.italic,underline:d.underline,strike:d.strike,letterSpacing:d.letterSpacing,wordSpacing:d.wordSpacing,lineHeightMult:d.lineHeightMult,textCase:d.textCase};
   var layer=root.parent;
-  if(!layer){restore();return;} // layer vanished mid-edit (deleted, mode switch) — bail rather than build into nothing
+  if(!layer){if(isNew)discardNew();else restore();return;} // layer vanished mid-edit (deleted, mode switch) — bail rather than build into nothing
   var groupBounds=window.SMVectorText.vectorTextGroupMembers(root).reduce(function(b,p){return b?b.unite(p.bounds):p.bounds.clone();},null);
   var topLeft=groupBounds.topLeft.clone();
   pushUndo();
