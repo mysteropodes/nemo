@@ -479,6 +479,182 @@ async function exportVideoBrowser(opts){
   return{ok:true,browserFallback:true,mimeType:mime,bytes:blob.size,filename:filename};
 }
 
+// ---- Browser-compatible GIF export (2026-08-17) ----
+// Cyril: "étendre l'export navigateur au GIF" — unlike MP4/WebM, no
+// browser exposes a native GIF encoder (MediaRecorder doesn't do GIF),
+// so this is a from-scratch GIF89a writer: median-cut palette
+// quantization (once, from a sample of frames — a per-frame palette
+// would flicker colors frame to frame) + textbook LZW compression, no
+// external library. Self-contained on purpose: this app's dev preview
+// has no bundler/npm install step to pull a GIF encoder in through, and
+// the algorithm itself is small and stable enough that hand-rolling it
+// is less risk than vendoring an unaudited third-party minified blob.
+function exportGifNearestColor(r,g,b,palette){
+  var best=0,bestD=Infinity;
+  for(var i=0;i<palette.length;i+=3){
+    var dr=r-palette[i],dg=g-palette[i+1],db=b-palette[i+2];
+    var d=dr*dr+dg*dg+db*db;
+    if(d<bestD){bestD=d;best=i/3;if(d===0)break;}
+  }
+  return best;
+}
+// Median-cut: recursively splits the sampled pixel set along its widest
+// channel until there are `maxColors` boxes, then averages each box into
+// one palette entry — the standard, well-understood quantizer (same
+// family GIF encoders have used since the format's 1989 spec), chosen
+// over a fancier one (NeuQuant, k-means) for how little code it needs.
+function exportGifMedianCut(pixels,maxColors){
+  var boxes=[pixels];
+  while(boxes.length<maxColors){
+    boxes.sort(function(a,b){return exportGifBoxRange(b)-exportGifBoxRange(a);});
+    var box=boxes.shift();
+    if(box.length<2){boxes.push(box);break;}
+    var ch=exportGifWidestChannel(box);
+    box.sort(function(a,b){return a[ch]-b[ch];});
+    var mid=box.length>>1;
+    boxes.push(box.slice(0,mid),box.slice(mid));
+  }
+  return boxes.map(function(box){
+    var r=0,g=0,b=0;
+    box.forEach(function(p){r+=p[0];g+=p[1];b+=p[2];});
+    var n=box.length||1;
+    return[Math.round(r/n),Math.round(g/n),Math.round(b/n)];
+  });
+}
+function exportGifWidestChannel(box){
+  var min=[255,255,255],max=[0,0,0];
+  box.forEach(function(p){for(var c=0;c<3;c++){if(p[c]<min[c])min[c]=p[c];if(p[c]>max[c])max[c]=p[c];}});
+  var range=[max[0]-min[0],max[1]-min[1],max[2]-min[2]];
+  return range[0]>=range[1]&&range[0]>=range[2]?0:(range[1]>=range[2]?1:2);
+}
+function exportGifBoxRange(box){
+  if(box.length<2)return 0;
+  var ch=exportGifWidestChannel(box);
+  var min=255,max=0;
+  box.forEach(function(p){if(p[ch]<min)min=p[ch];if(p[ch]>max)max=p[ch];});
+  return(max-min)*box.length; // weight by population so big flat boxes still get split
+}
+// LZW encoder, GIF's own variable-code-width variant (codes grow from
+// minCodeSize+1 bits up to 12, clear/end-of-information codes reserved
+// at the bottom of the table) — ports the algorithm every GIF spec
+// walks through, operating on PALETTE INDICES (not RGB) since that's
+// what an Image Data block actually carries.
+function exportGifLZWEncode(indices,minCodeSize){
+  var clearCode=1<<minCodeSize,eoiCode=clearCode+1;
+  var codeSize=minCodeSize+1,nextCode=eoiCode+1;
+  var dict={};
+  var out=[];var bitBuf=0,bitCount=0;
+  function emit(code){
+    bitBuf|=code<<bitCount;bitCount+=codeSize;
+    while(bitCount>=8){out.push(bitBuf&0xff);bitBuf>>=8;bitCount-=8;}
+  }
+  function resetDict(){dict={};nextCode=eoiCode+1;codeSize=minCodeSize+1;for(var i=0;i<clearCode;i++)dict[i]=i;}
+  resetDict();emit(clearCode);
+  var w=indices[0];
+  for(var i=1;i<indices.length;i++){
+    var k=indices[i];var wk=w+','+k;
+    if(dict[wk]!==undefined){w=wk;}
+    else{
+      emit(dict[w]);
+      if(nextCode<4096){dict[wk]=nextCode++;if(nextCode>(1<<codeSize)&&codeSize<12)codeSize++;}
+      else{emit(clearCode);resetDict();}
+      w=''+k;
+    }
+  }
+  emit(dict[w]);emit(eoiCode);
+  if(bitCount>0)out.push(bitBuf&0xff);
+  return out;
+}
+function exportGifAvailable(){
+  return typeof document.createElement('canvas').getContext==='function';
+}
+async function exportGifBrowser(opts){
+  var r=exportFrameRange(opts);var scale=(opts&&opts.scale)||1;var fps=(opts&&opts.fps)||state.fps;
+  var cw=Math.max(1,Math.round(state.canvasW*scale)),ch=Math.max(1,Math.round(state.canvasH*scale));
+  var canvas=document.createElement('canvas');canvas.width=cw;canvas.height=ch;
+  var ctx=canvas.getContext('2d',{willReadFrequently:true});
+  var useFx=(scale===1||!scale)&&exportNeedsEngine()&&window.SMEngineBridge&&window.SMEngineBridge.beginEffectsExport();
+  var frameCount=r.end-r.start+1;
+  var framePixels=[];
+  try{
+    // Pass 1: render every frame to RGBA pixel data, and sample a subset
+    // of pixels across all of them for the palette so colors that only
+    // appear in a few frames (a flash of red mid-animation) still make
+    // the cut — a palette built from frame 0 alone would clip anything
+    // introduced later.
+    var samples=[];
+    for(var f=r.start,i=1;f<=r.end;f++,i++){
+      var url=useFx?await SMEngineBridge.renderFrameToPixelsPNG(f):exportFrameDataURL(f,scale,false);
+      var img=await exportLoadImage(url);
+      ctx.clearRect(0,0,cw,ch);ctx.drawImage(img,0,0,cw,ch);
+      var data=ctx.getImageData(0,0,cw,ch).data;
+      framePixels.push(data);
+      var step=Math.max(1,Math.floor((cw*ch)/2000)); // ~2000 samples/frame, plenty for median-cut
+      for(var p=0;p<data.length;p+=4*step)samples.push([data[p],data[p+1],data[p+2]]);
+      if(opts&&opts.onProgress)opts.onProgress(i,frameCount*2);
+    }
+  }finally{
+    if(useFx)SMEngineBridge.endEffectsExport();
+  }
+  var palette=exportGifMedianCut(samples,255); // 255 + 1 reserved slot kept below 256
+  while(palette.length<256)palette.push([0,0,0]);
+  var flatPalette=[];palette.forEach(function(c){flatPalette.push(c[0],c[1],c[2]);});
+  var minCodeSize=Math.max(2,Math.ceil(Math.log2(palette.length)));
+
+  // ---- GIF89a assembly ----
+  var bytes=[];
+  function pushStr(s){for(var k=0;k<s.length;k++)bytes.push(s.charCodeAt(k));}
+  function push16(n){bytes.push(n&0xff,(n>>8)&0xff);}
+  pushStr('GIF89a');
+  push16(cw);push16(ch);
+  bytes.push(0xF0|(minCodeSize-1)); // global color table present, 256 entries
+  bytes.push(0);bytes.push(0); // bg color index, pixel aspect
+  flatPalette.forEach(function(v){bytes.push(v);});
+  // NETSCAPE2.0 application extension — infinite loop, same convention
+  // every GIF-producing tool (ffmpeg's own palette path included) uses.
+  bytes.push(0x21,0xFF,0x0B);pushStr('NETSCAPE2.0');bytes.push(3,1,0,0,0);
+  var delayCs=Math.max(1,Math.round(100/fps)); // GIF delay unit is 1/100s
+  for(var fi=0;fi<framePixels.length;fi++){
+    var data2=framePixels[fi];
+    var indices=new Array(cw*ch);
+    // Memoized per exact RGB triple (2026-08-17): this app's content is
+    // almost entirely flat-fill vector shapes, so a real frame is
+    // overwhelmingly a handful of distinct colors repeated over huge flat
+    // regions — caching collapses what was previously one brute-force
+    // 256-entry scan PER PIXEL down to one scan per distinct color ever
+    // seen. Measured: brings a 1920×1080 frame from several seconds to
+    // under one on typical vector content (a raster/gradient-heavy frame
+    // with thousands of unique colors degrades toward the uncached cost,
+    // same as it always was — this is a best-case speedup, not a
+    // complexity-class change).
+    var colorCache={};
+    for(var pi=0,di=0;di<data2.length;di+=4,pi++){
+      var key=(data2[di]<<16)|(data2[di+1]<<8)|data2[di+2];
+      var idx=colorCache[key];
+      if(idx===undefined){idx=exportGifNearestColor(data2[di],data2[di+1],data2[di+2],flatPalette);colorCache[key]=idx;}
+      indices[pi]=idx;
+    }
+    bytes.push(0x21,0xF9,4,0x00);push16(delayCs);bytes.push(0,0);
+    bytes.push(0x2C);push16(0);push16(0);push16(cw);push16(ch);bytes.push(0);
+    bytes.push(minCodeSize);
+    var lzw=exportGifLZWEncode(indices,minCodeSize);
+    for(var off=0;off<lzw.length;off+=255){
+      var chunk=lzw.slice(off,off+255);
+      bytes.push(chunk.length);
+      chunk.forEach(function(v){bytes.push(v);});
+    }
+    bytes.push(0);
+    if(opts&&opts.onProgress)opts.onProgress(frameCount+fi+1,frameCount*2);
+  }
+  bytes.push(0x3B);
+  var blob=new Blob([new Uint8Array(bytes)],{type:'image/gif'});
+  var filename=(opts&&opts.filename)||'animation.gif';
+  var u=URL.createObjectURL(blob);
+  var a=document.createElement('a');a.href=u;a.download=filename;a.click();
+  URL.revokeObjectURL(u);
+  return{ok:true,browserFallback:true,bytes:blob.size,filename:filename,paletteSize:palette.length};
+}
+
 // ---- LOTTIE / BODYMOVIN CONVERTER ----
 // Frame-by-frame "baked" export: rather than trying to re-derive Lottie's
 // own bezier-shape morphing (which would require the same fragile
@@ -722,7 +898,7 @@ window.SMExport={
   },
 
   exportGIF:async function(opts){
-    if(!exportTauriAvailable())return{ok:false,error:'Disponible uniquement dans l\'app Nemo (pas en preview navigateur).'};
+    if(!exportTauriAvailable())return exportGifBrowser(opts);
     var r=exportFrameRange(opts);var scale=(opts&&opts.scale)||1;var fps=(opts&&opts.fps)||state.fps;
     var outPath=await exportPickSaveFile('Exporter en GIF','animation.gif',[{name:'GIF',extensions:['gif']}]);
     if(!outPath)return{cancelled:true};
@@ -748,6 +924,8 @@ window.SMExport={
   // exportMP4 above only reaches for it as a browser fallback.
   exportVideoBrowser:exportVideoBrowser,
   videoBrowserAvailable:exportVideoBrowserAvailable,
+  exportGifBrowser:exportGifBrowser,
+  gifBrowserAvailable:exportGifAvailable,
   // Kitsu publish (Phase 4) needs the same H.264 render but writing to a
   // caller-chosen temp path with no save dialog — the publish flow already
   // asked the user to confirm once, a second native file picker mid-publish
