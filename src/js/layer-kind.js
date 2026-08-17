@@ -88,6 +88,7 @@
     if (ld.nativeVideo) return 'video';
     if (ld.isEffectLayer) return 'effect';
     if (ld.isNullLayer) return 'null';
+    if (ld.isGuideLayer) return 'guide';
     if (ld.isTextLayer) return 'text';
     if (ld.footage && ld.footage.kind) return ld.footage.kind === 'sequence' ? 'sequence' : 'image';
     if (everyStrokeIsRaster(ld)) return distinctSources(ld) > 1 ? 'sequence' : 'image';
