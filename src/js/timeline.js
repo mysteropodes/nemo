@@ -387,6 +387,25 @@ window.SM={
     document.querySelectorAll('.tool-btn').forEach(function(b){b.classList.toggle('active',b.dataset.tool===t);});
     var cc={draw:'crosshair',pen:'crosshair',line:'crosshair',rect:'crosshair',ellipse:'crosshair',select:'default',subselect:'default',fsselect:'default',comment:'crosshair',camera:'move',text:'text',eraser:'pointer',fill:'crosshair',fillbrush:'crosshair',eyedropper:'crosshair',hand:'grab',zoom:'zoom-in',rotate:'grab',perspective:'crosshair',symmetry:'crosshair',rig:'crosshair'};
     canvasEl.style.cursor=cc[t]||'default';
+    // Brush texture presets (Chalk/Charcoal/Pencil…) stamp dabs along a
+    // discrete centerline — Fill Brush commits a filled OUTLINE shape from
+    // a width profile instead (draw-bridge.js's own comment: "not vector-
+    // brush or fill-brush, which have their own width-profile/outline
+    // machinery this jittered-copies technique isn't built to coexist
+    // with"), so applyBrushTexture is never called from its commit path
+    // (tools.js, applyFillBrushPlacement). Before this the picker stayed
+    // fully clickable while Fill Brush was active and silently no-op'd —
+    // found live (2026-08-17 brush QA pass): picking "Charcoal - Rough"
+    // then drawing with Fill Brush produced a plain untextured stroke with
+    // no error or visual sign why. Grey the button out instead so the gap
+    // is visible rather than silent.
+    var _bpBtn=document.getElementById('p-brushpreset-btn');
+    if(_bpBtn){
+      var _bpDisabled=(t==='fillbrush');
+      _bpBtn.disabled=_bpDisabled;
+      _bpBtn.classList.toggle('disabled',_bpDisabled);
+      _bpBtn.title=_bpDisabled?'Non disponible avec Fill Brush (le pinceau à remplissage n\'utilise pas de texture de trait)':'';
+    }
     updatePropsContext();
     if(window.renderLabsFloatPanel)renderLabsFloatPanel();},
   toggleOnion:function(){state.onionSkin=!state.onionSkin;renderOS();
