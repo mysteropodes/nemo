@@ -629,7 +629,11 @@ function serP(p){var isVB=!!(p.data&&p.data.isVectorBrush);var center=isVB&&p.da
   // exactly like any other shape, only RENDERING treats it specially).
   isMask:(p.data&&p.data.isMask)?true:undefined,
   maskMode:(p.data&&p.data.maskMode)?p.data.maskMode:undefined,
-  maskFeather:(p.data&&p.data.maskFeather)?p.data.maskFeather:undefined};}
+  maskFeather:(p.data&&p.data.maskFeather)?p.data.maskFeather:undefined,
+  // Stroke gradient along path (2026-08, "gradient qui tire du début à la
+  // fin du trait") — {from,to} hex strings, distinct from fillGradient
+  // (spatial 2-point ramp) above.
+  strokeGradientAlongPath:(p.data&&p.data.strokeGradientAlongPath)?p.data.strokeGradientAlongPath:undefined};}
 // `closed` was missing from this round-trip entirely — every path rebuilt
 // via desP() (onion-skin ghosts, tween/inbetween generation, undo/redo
 // snapshots, project load: everything that goes through serP/desP) silently
@@ -672,6 +676,7 @@ function desP(d,layer,op){var prev=project.activeLayer;layer.activate();var p=ne
   if(d.dupCloneId)p.data.dupCloneId=d.dupCloneId;if(d.dup3D)p.data.dup3D=d.dup3D;
   if(d.isTextRoot){p.data.isTextRoot=true;p.data.text=d.text||'';p.data.vectorFont=d.vectorFont||'Roboto-Regular';p.data.size=d.textSize||48;p.data.color=d.textColor||'#000000';p.data.align=d.textAlign||'left';if(d.textFixedWidth)p.data.fixedWidth=d.textFixedWidth;}
   if(d.isMask){p.data.isMask=true;p.data.maskMode=d.maskMode||'add';if(d.maskFeather)p.data.maskFeather=d.maskFeather;}
+  if(d.strokeGradientAlongPath)p.data.strokeGradientAlongPath=d.strokeGradientAlongPath;
   // Retained-path stamp (engine-bridge.js, 2026-07-28): the stored stroke
   // dict this Paper item was built FROM. Dict object identity is the
   // geometry identity — getEffectiveStrokes returns the SAME stored dict

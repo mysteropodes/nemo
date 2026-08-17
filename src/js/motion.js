@@ -6600,6 +6600,11 @@
     applyTrimFor: applyTrimFor,
     trimWindowAt: trimWindowAt,
     hasTrimMotion: hasTrimMotion,
+    // Shared arc-length flattener (2026-08) — Trim Paths' own polyline
+    // sampler, exposed for stroke-gradient-along-path (engine-bridge.js) to
+    // reuse rather than duplicating the same bezier-subdivision math a
+    // second time (CLAUDE.md §3's duplicated-pair hazard).
+    flattenSegmentsToPolyline: buildTrimPolyline,
     buildOverlayItems: buildOverlayItems,
     renderLayerListMotion: renderLayerListMotion,
     renderTimelineMotion: renderTimelineMotion,

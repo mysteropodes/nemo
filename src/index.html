@@ -768,6 +768,17 @@
           <span class="color-pct">%</span>
           <div class="lico color-eye-toggle" id="stroke-enable-toggle" data-i18n-title="strokeEnableTitle" title="Enable/disable stroke"></div>
         </div>
+        <!-- Stroke gradient along path (2026-08, "gradient qui tire du
+             début à la fin du trait") — distinct from Fill's spatial
+             linear/radial gradient: this one follows the STROKE's own
+             length, so it always looks right regardless of the shape's
+             position/rotation. v1: exactly 2 stops (from/to), applies to
+             the current canvas selection. -->
+        <div class="pr" id="p-strokegrad-row" data-i18n-title="strokeGradAlongTitle" title="Le trait tire de la couleur 'De' à la couleur 'À' le long de son propre tracé — pas entre 2 points fixes dans l'espace, comme le dégradé du Fill">
+          <label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="p-strokegrad-along" style="accent-color:var(--accent)"> <span data-i18n="strokeGradAlongLabel">Gradient along path</span></label>
+          <div class="cw-mini" id="p-strokegrad-from" style="background:#ff0000;margin-left:auto"><input type="color" id="p-strokegrad-from-c" value="#ff0000"></div>
+          <div class="cw-mini" id="p-strokegrad-to" style="background:#0000ff"><input type="color" id="p-strokegrad-to-c" value="#0000ff"></div>
+        </div>
         <!-- Width+Style paired on one row (feedback: "des tailles ou
              position sur une seule ligne") — Cap/Join stay on their own
              rows below: each is already a 3-button icon group, and this
