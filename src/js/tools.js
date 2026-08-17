@@ -5553,16 +5553,24 @@ function onMouseDrag(event){
   }else if(state.tool==='text'&&_textDragStart){
     // Drag guide rectangle — purely visual (marqueeLayer, never inserted
     // into real content), same pattern as the subselect marquee just below.
-    // Only x matters for the actual box (wrapping is width-only, no fixed-
-    // height clipping in this implementation); a nominal height is drawn
-    // just so the drag reads as "defining a box" rather than a stray line.
+    // Height now tracks the drag's y-delta like Figma/Illustrator's own
+    // type-in-a-box gesture (2026-08-17, "pas de bounding box lorsque l'on
+    // drag avec l'outil texte comme dans figma") — the box previously only
+    // ever grew in width, its height pinned to a nominal 60/zoom regardless
+    // of how far you dragged vertically, which read as "no bounding box" to
+    // anyone dragging down-and-right the way Figma trains you to. A small
+    // floor (24/zoom) keeps a near-zero-height drag from collapsing the
+    // guide into an invisible line — actual text wrapping stays width-only
+    // (commitText/startInPlaceTextCreation never read this rect's height,
+    // only widthWorld), this is purely the visual placement guide.
     if(_textDragRect){_textDragRect.remove();_textDragRect=null;}
     var twv=Math.abs(event.point.x-_textDragStart.x);
     if(twv>4/view.zoom){
       var tx1=Math.min(_textDragStart.x,event.point.x),ty1=Math.min(_textDragStart.y,event.point.y);
       var tx2=Math.max(_textDragStart.x,event.point.x);
+      var thv=Math.max(24/view.zoom,Math.abs(event.point.y-_textDragStart.y));
       var prevTxt=project.activeLayer;marqueeLayer.activate();
-      _textDragRect=new Path.Rectangle({from:new Point(tx1,ty1),to:new Point(tx2,ty1+60/view.zoom),strokeColor:'rgba(255,184,108,.9)',strokeWidth:1/view.zoom,dashArray:[4/view.zoom,3/view.zoom],fillColor:new Color(1,0.72,0.42,0.06),insert:true});
+      _textDragRect=new Path.Rectangle({from:new Point(tx1,ty1),to:new Point(tx2,ty1+thv),strokeColor:'rgba(255,184,108,.9)',strokeWidth:1/view.zoom,dashArray:[4/view.zoom,3/view.zoom],fillColor:new Color(1,0.72,0.42,0.06),insert:true});
       prevTxt.activate();
     }
   }else if(state.tool==='subselect'){
