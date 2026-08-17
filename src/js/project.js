@@ -11,6 +11,16 @@
   var currentPath=null,currentName='Untitled';
 
   function tauriOk(){return typeof window.__TAURI__!=='undefined';}
+  // Browser-mode autosave: localStorage first (sync, ~5-10MB quota), always
+  // mirrored to IndexedDB (async, no practical size ceiling) so a project
+  // with embedded media doesn't silently lose its autosave the moment it
+  // outgrows localStorage — see project-nemo-web-public-beta memory.
+  function autosaveWrite(json){
+    var quotaHit=false;
+    try{localStorage.setItem('nemo-auto',json);}catch(e){quotaHit=true;}
+    if(window.SMIdb)window.SMIdb.set('nemo-auto',json).catch(function(){});
+    if(quotaHit)try{localStorage.removeItem('nemo-auto');}catch(e2){} // stale/truncated slot would win over IDB on next boot otherwise
+  }
   function getRecents(){try{return JSON.parse(localStorage.getItem(RECENTS_KEY)||'[]');}catch(e){return[];}}
   function setRecents(list){try{localStorage.setItem(RECENTS_KEY,JSON.stringify(list));}catch(e){}}
   function touchRecent(path,name,meta){
@@ -80,7 +90,7 @@
     if(window.renderPaletteGrid)window.renderPaletteGrid();
     syncDocFields();
     currentPath=null;currentName=cfg.name||'Untitled';updateCurrentLabel();
-    try{var freshJson=window.SM.exportJSON();markSaved(freshJson);localStorage.setItem('nemo-auto',freshJson);}catch(e){}
+    try{var freshJson=window.SM.exportJSON();markSaved(freshJson);autosaveWrite(freshJson);}catch(e){}
     showToast('New project created');
   }
 
@@ -144,7 +154,7 @@
     var json=window.SM.exportJSON();
     downloadJson((currentName||'Untitled')+'.json',json);
     markSaved(json);
-    try{localStorage.setItem('nemo-auto',json);}catch(e){}
+    autosaveWrite(json);
     showToast('Téléchargé : '+currentName+'.json');
   }
   async function saveAs(){
@@ -371,7 +381,7 @@
     return report;
   }
 
-  window.SMProject={save:save,saveAs:saveAs,open:openDialog,openPath:openPath,newProject:function(cfg){newProject(cfg);hideStartScreen();ensureInitialTab();},pushVersionSnapshot:pushVersionSnapshot,listVersionHistory:listVersionHistory,restoreVersion:restoreVersion,
+  window.SMProject={save:save,saveAs:saveAs,open:openDialog,openPath:openPath,newProject:function(cfg){newProject(cfg);hideStartScreen();ensureInitialTab();},pushVersionSnapshot:pushVersionSnapshot,listVersionHistory:listVersionHistory,restoreVersion:restoreVersion,autosaveWrite:autosaveWrite,
     getSyncFolder:getSyncFolder,chooseSyncFolder:chooseSyncFolder,disableSync:disableSync,publishToShared:publishToShared,checkSharedUpdates:checkSharedUpdates,pullAndMerge:pullAndMerge,
     // Stable per-project filesystem-safe identifier — same slug/hash
     // feedback-bridge.js's local + shared feedback storage keys off, so a
@@ -553,10 +563,15 @@
     var hasAutosave=false;
     try{hasAutosave=!!localStorage.getItem('nemo-auto');}catch(e){}
     var resumeCard=document.getElementById('start-resume');
-    if(hasAutosave){
+    function showResumeCard(){
       resumeCard.style.display='';
       document.getElementById('start-cards').classList.add('has-resume');
     }
+    if(hasAutosave)showResumeCard();
+    // localStorage may be empty because a media-heavy autosave overflowed
+    // its quota and only landed in IndexedDB (see autosaveWrite) — check
+    // async so "Resume" still appears in that case, just a tick later.
+    else if(window.SMIdb)window.SMIdb.get('nemo-auto').then(function(v){if(v)showResumeCard();}).catch(function(){});
     renderRecents();
 
     document.getElementById('start-resume').addEventListener('click',function(){
@@ -567,12 +582,17 @@
       // Resume despite localStorage holding real stroke data).
       var auto=null;
       try{auto=localStorage.getItem('nemo-auto');}catch(e){}
-      if(auto){
-        try{window.SM.importJSON(auto,true);}
-        catch(e){showToast('Impossible de reprendre la session — données corrompues');}
-      }
-      currentPath=null;currentName='Untitled';updateCurrentLabel();
-      hideStartScreen();ensureInitialTab();showToast('Session resumed');
+      var applyAuto=function(auto){
+        if(auto){
+          try{window.SM.importJSON(auto,true);}
+          catch(e){showToast('Impossible de reprendre la session — données corrompues');}
+        }
+        currentPath=null;currentName='Untitled';updateCurrentLabel();
+        hideStartScreen();ensureInitialTab();showToast('Session resumed');
+      };
+      if(auto)applyAuto(auto);
+      else if(window.SMIdb)window.SMIdb.get('nemo-auto').then(applyAuto).catch(function(){applyAuto(null);});
+      else applyAuto(null);
     });
     document.getElementById('start-new').addEventListener('click',function(){
       document.getElementById('start-newpanel').style.display='block';

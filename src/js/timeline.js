@@ -8539,7 +8539,8 @@ setInterval(function(){
   if(state.playing)return;
   saveAllLayerFrames();
   var json=window.SM.exportJSON();
-  try{localStorage.setItem('nemo-auto',json);}catch(e){}
+  if(window.SMProject&&window.SMProject.autosaveWrite)window.SMProject.autosaveWrite(json);
+  else try{localStorage.setItem('nemo-auto',json);}catch(e){}
   // v15: dense on-disk version history (Tauri only) alongside the single-
   // slot localStorage fallback above — see project.js pushVersionSnapshot.
   if(window.SMProject&&window.SMProject.pushVersionSnapshot)window.SMProject.pushVersionSnapshot(json);
