@@ -90,6 +90,11 @@
   function propsFor(holder) {
     var list = (holder && holder.threeD) ? PROPS_WITH_3D : PROPS;
     if (holder && holder.duplicator) list = list.concat(PROPS_DUP_EXTRA);
+    // Dynamic shapes phase 2 (2026-08-18) — a rect's corner radii, keyable
+    // PER SHAPE. `holder` here is an ELEMENT holder (ld.elementMotion[id],
+    // see ensureElementHolder), tagged .paramShapeKind at creation time from
+    // the live item's data.paramShape.kind.
+    if (holder && holder.paramShapeKind === 'rect') list = list.concat(['cornerTL', 'cornerTR', 'cornerBR', 'cornerBL']);
     // Multi-parent crossfade (2026-07-30, "jouer comme une opacité les
     // parents entre eux") — parentBlend only means anything once a SECOND
     // parent exists (parentLayerUidB); an ordinary single-parent layer
@@ -168,9 +173,9 @@
     if (prop === 'timeRemap') return holder.timeRemap || null;
     return (holder.motion && holder.motion[prop]) || null;
   }
-  var PROP_LABEL = { position: 'Position', anchor: 'Anchor Point', rotation: 'Rotation', scale: 'Scale', opacity: 'Opacity', timeRemap: 'Time Remap', positionZ: 'Position Z', rotationX: 'Rotation X', rotationY: 'Rotation Y', dupOffsetPos: 'Dup. Offset', dupOffsetRot: 'Dup. Rotation', dupOffsetScale: 'Dup. Scale', dupOffsetOpacity: 'Dup. Opacity', dupOffsetPosZ: 'Dup. Offset Z', dupOffsetRotX: 'Dup. Rotation X', dupOffsetRotY: 'Dup. Rotation Y', parentBlend: 'Parent Blend', timeLinkInOffset: 'Décalage entrée', timeLinkOutOffset: 'Décalage sortie' };
-  var PROP_DIM = { position: 2, anchor: 2, rotation: 1, scale: 2, opacity: 1, timeRemap: 1, positionZ: 1, rotationX: 1, rotationY: 1, dupOffsetPos: 2, dupOffsetRot: 1, dupOffsetScale: 2, dupOffsetOpacity: 1, dupOffsetPosZ: 1, dupOffsetRotX: 1, dupOffsetRotY: 1, parentBlend: 1, timeLinkInOffset: 1, timeLinkOutOffset: 1 };
-  var PROP_UNIT = { position: 'px', anchor: 'px', rotation: '°', scale: '%', opacity: '%', timeRemap: 'f', positionZ: 'px', rotationX: '°', rotationY: '°', dupOffsetPos: 'px', dupOffsetRot: '°', dupOffsetScale: '%', dupOffsetOpacity: '%', dupOffsetPosZ: 'px', dupOffsetRotX: '°', dupOffsetRotY: '°', parentBlend: '%', timeLinkInOffset: 'f', timeLinkOutOffset: 'f' };
+  var PROP_LABEL = { position: 'Position', anchor: 'Anchor Point', rotation: 'Rotation', scale: 'Scale', opacity: 'Opacity', timeRemap: 'Time Remap', positionZ: 'Position Z', rotationX: 'Rotation X', rotationY: 'Rotation Y', dupOffsetPos: 'Dup. Offset', dupOffsetRot: 'Dup. Rotation', dupOffsetScale: 'Dup. Scale', dupOffsetOpacity: 'Dup. Opacity', dupOffsetPosZ: 'Dup. Offset Z', dupOffsetRotX: 'Dup. Rotation X', dupOffsetRotY: 'Dup. Rotation Y', parentBlend: 'Parent Blend', timeLinkInOffset: 'Décalage entrée', timeLinkOutOffset: 'Décalage sortie', cornerTL: 'Coin ↖', cornerTR: 'Coin ↗', cornerBR: 'Coin ↘', cornerBL: 'Coin ↙' };
+  var PROP_DIM = { position: 2, anchor: 2, rotation: 1, scale: 2, opacity: 1, timeRemap: 1, positionZ: 1, rotationX: 1, rotationY: 1, dupOffsetPos: 2, dupOffsetRot: 1, dupOffsetScale: 2, dupOffsetOpacity: 1, dupOffsetPosZ: 1, dupOffsetRotX: 1, dupOffsetRotY: 1, parentBlend: 1, timeLinkInOffset: 1, timeLinkOutOffset: 1, cornerTL: 1, cornerTR: 1, cornerBR: 1, cornerBL: 1 };
+  var PROP_UNIT = { position: 'px', anchor: 'px', rotation: '°', scale: '%', opacity: '%', timeRemap: 'f', positionZ: 'px', rotationX: '°', rotationY: '°', dupOffsetPos: 'px', dupOffsetRot: '°', dupOffsetScale: '%', dupOffsetOpacity: '%', dupOffsetPosZ: 'px', dupOffsetRotX: '°', dupOffsetRotY: '°', parentBlend: '%', timeLinkInOffset: 'f', timeLinkOutOffset: 'f', cornerTL: 'px', cornerTR: 'px', cornerBR: 'px', cornerBL: 'px' };
   // parentBlend defaults to 0 — "0%" reads as "fully Parent A" (the
   // pre-existing single parent), matching the invariant that assigning a
   // second parent must never itself move anything until the user actually
@@ -181,7 +186,14 @@
     // start/end as % of the path's own arc length, offset as a % that
     // shifts the whole [start,end] window — same 3-field shape as AE's own
     // Trim Paths, see applyTrimFor's doc comment for the combine math.
-    trimStart: [0], trimEnd: [100], trimOffset: [0] };
+    trimStart: [0], trimEnd: [100], trimOffset: [0],
+    // Dynamic shape corners (2026-08-18) — safety-net fallback only; the
+    // REAL per-shape default is each rect's own data.paramShape.tl/tr/br/bl
+    // (every shape has its own baked radii, unlike every other prop here
+    // which shares one constant across all holders), seeded onto the
+    // element holder's motionStatic the moment it's created — see
+    // ensureElementHolder's own comment.
+    cornerTL: [0], cornerTR: [0], cornerBR: [0], cornerBL: [0] };
   // Rows with no stopwatch — layerInPoint/layerOutPoint (app.js) are read at
   // 13 call sites with no frame parameter, so a real keyframe track on these
   // would silently only ever reflect state.currentFrame at read time (export
@@ -1101,7 +1113,26 @@
   // logic needed for the per-element case.
   function ensureElementHolder(ld, strokeId) {
     if (!ld.elementMotion) ld.elementMotion = {};
-    if (!ld.elementMotion[strokeId]) ld.elementMotion[strokeId] = {};
+    if (!ld.elementMotion[strokeId]) {
+      ld.elementMotion[strokeId] = {};
+      // Dynamic shapes phase 2 (2026-08-18) — auto-tag + seed from the live
+      // item's OWN current radii, found once here rather than re-derived on
+      // every propsFor call: unlike Component exposedProps (one shared
+      // default per key across every instance), each rect's un-animated
+      // corner value is genuinely its OWN (data.paramShape.tl/tr/br/bl),
+      // so PROP_DEFAULT can't carry it — motionStatic must, from the start,
+      // or clicking the stopwatch for the first time (toggleAnimated's
+      // OFF→ON reads valueAtFrame → staticValue → PROP_DEFAULT[0] when
+      // nothing else is seeded) would silently snap a 40px corner back to
+      // 0 the instant it's keyed.
+      var li = state.layers.indexOf(ld);
+      var item = li >= 0 ? liveItemByStrokeId(li, strokeId) : null;
+      if (item && item.data && item.data.paramShape && item.data.paramShape.kind === 'rect') {
+        var ps = item.data.paramShape;
+        ld.elementMotion[strokeId].paramShapeKind = 'rect';
+        ld.elementMotion[strokeId].motionStatic = { cornerTL: [ps.tl || 0], cornerTR: [ps.tr || 0], cornerBR: [ps.br || 0], cornerBL: [ps.bl || 0] };
+      }
+    }
     return ld.elementMotion[strokeId];
   }
   function elementHolder(ld, strokeId) { return ld.elementMotion ? ld.elementMotion[strokeId] : null; }
@@ -6821,6 +6852,8 @@
     applyParentChainToImageRect: applyParentChainToImageRect,
     applyPathVertexOffsetsFor: applyPathVertexOffsetsFor,
     applyTrimFor: applyTrimFor,
+    hasParamShapeMotionFor: hasParamShapeMotionFor,
+    applyParamShapeFor: applyParamShapeFor,
     trimWindowAt: trimWindowAt,
     hasTrimMotion: hasTrimMotion,
     // Shared arc-length flattener (2026-08) — Trim Paths' own polyline

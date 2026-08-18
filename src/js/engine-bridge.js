@@ -1281,6 +1281,12 @@
           if (sd && window.SMMotion && cPathOpsStrokeId && SMMotion.hasTextBoundsFollowMotionFor && SMMotion.hasTextBoundsFollowMotionFor(i, cPathOpsStrokeId)) {
             sd.segments = SMMotion.applyTextBoundsFollowFor(i, cPathOpsStrokeId, sd, renderFrame);
           }
+          // Dynamic shapes phase 2 (2026-08-18) — animated corner radii,
+          // same innermost-layer placement as Trim/vertex-offsets right
+          // above (shape's own local space, before elMat/motionMat).
+          if (sd && window.SMMotion && cStrokeId && SMMotion.hasParamShapeMotionFor && SMMotion.hasParamShapeMotionFor(i, cStrokeId)) {
+            sd.segments = SMMotion.applyParamShapeFor(i, cStrokeId, sd, renderFrame);
+          }
           if (sd && elMat) sd.segments = SMMotion.transformSegments(sd.segments, elPivot, elMat);
           if (sd && motionMat) sd.segments = SMMotion.transformSegments(sd.segments, motionPivot, motionMat);
           // 3D layer (2026-07-28) — replaces motionMat's role for a 3D-
