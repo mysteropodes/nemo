@@ -385,7 +385,7 @@ window.SM={
     state.tool=t;renderArcs();
     if(_camToolChanged)renderTimeline();
     document.querySelectorAll('.tool-btn').forEach(function(b){b.classList.toggle('active',b.dataset.tool===t);});
-    var cc={draw:'crosshair',pen:'crosshair',line:'crosshair',rect:'crosshair',ellipse:'crosshair',select:'default',subselect:'default',fsselect:'default',comment:'crosshair',camera:'move',text:'text',eraser:'pointer',fill:'crosshair',fillbrush:'crosshair',eyedropper:'crosshair',hand:'grab',zoom:'zoom-in',rotate:'grab',perspective:'crosshair',symmetry:'crosshair',rig:'crosshair'};
+    var cc={draw:'crosshair',pen:'crosshair',line:'crosshair',rect:'crosshair',ellipse:'crosshair',speechbubble:'crosshair',star:'crosshair',select:'default',subselect:'default',fsselect:'default',comment:'crosshair',camera:'move',text:'text',eraser:'pointer',fill:'crosshair',fillbrush:'crosshair',eyedropper:'crosshair',hand:'grab',zoom:'zoom-in',rotate:'grab',perspective:'crosshair',symmetry:'crosshair',rig:'crosshair'};
     canvasEl.style.cursor=cc[t]||'default';
     // Brush texture presets (Chalk/Charcoal/Pencil…) stamp dabs along a
     // discrete centerline — Fill Brush commits a filled OUTLINE shape from
@@ -1996,7 +1996,7 @@ function updateUI(frameOnly){
   window._totalF=state.totalFrames;window._waIn=state.waIn;window._waOut=state.waOut;window._curFrame=state.currentFrame;
   window.updateWaBar();window.updateOmMarkers(state.currentFrame,state.totalFrames);
   if(frameOnly)updatePlayhead();else renderTimeline();
-  renderLayerList(frameOnly);updateCompInstancePanel();updateDuplicatorPanel();updateFootagePanel();updateSelPropsPanel();updateFsSelPanel();updateRevisionPanel();updateMaskPanel();updateCornersPanel();updateEllipseArcPanel();updateTextActionsPanel();updateTextPropsPanel();if(window.updateEffectsPanel)window.updateEffectsPanel();updatePropsContext();
+  renderLayerList(frameOnly);updateCompInstancePanel();updateDuplicatorPanel();updateFootagePanel();updateSelPropsPanel();updateFsSelPanel();updateRevisionPanel();updateMaskPanel();updateCornersPanel();updateEllipseArcPanel();updateStarPanel();updateTextActionsPanel();updateTextPropsPanel();if(window.updateEffectsPanel)window.updateEffectsPanel();updatePropsContext();
 }
 // Vector mask properties (2026-08, AE-style "Mask" — see the mask-feature
 // audit) — same "own dedicated panel section, shown only for a matching
@@ -2122,6 +2122,39 @@ function commitArcEdit(field,val,isPercent){
 document.getElementById('p-arc-start').addEventListener('input',function(){commitArcEdit('startAngle',this.value,false);});
 document.getElementById('p-arc-sweep').addEventListener('input',function(){commitArcEdit('sweep',this.value,false);});
 document.getElementById('p-arc-inner').addEventListener('input',function(){commitArcEdit('innerRadius',this.value,true);});
+// Dynamic shapes, Star/Polygon (2026-08-18) — same panel pattern as
+// Coins/Camembert. pointCount stays a plain field (no stopwatch/Motion
+// row) — a fractional point count between two integer keyframes has no
+// coherent geometric meaning to interpolate, unlike innerRatio/corner
+// radius which are genuinely continuous. Also feeds state.starPointCount/
+// starInnerRatio (tools.js reads these as the NEXT shape's starting
+// values, same "remembers your last setting" convention brushSize/
+// smoothing/etc already follow).
+function updateStarPanel(){
+  var sec=document.getElementById('star-sec');
+  if(!sec)return;
+  var p=(state.tool==='select'&&selectedPaths.length===1)?selectedPaths[0]:null;
+  var ps=p&&p.data&&p.data.paramShape&&p.data.paramShape.kind==='star'?p.data.paramShape:null;
+  if(!ps){sec.style.display='none';return;}
+  sec.style.display='';
+  document.getElementById('p-star-points').value=ps.pointCount||5;
+  document.getElementById('p-star-inner').value=Math.round((ps.innerRatio!==undefined?ps.innerRatio:0.5)*100);
+  document.getElementById('p-star-corner').value=ps.cornerRadius||0;
+}
+function commitStarEdit(field,val,isPercent){
+  var p=selectedPaths[0];if(!p||!p.data||!p.data.paramShape||p.data.paramShape.kind!=='star')return;
+  pushUndo();
+  var ps=p.data.paramShape;
+  var v=parseFloat(val)||0;
+  if(field==='pointCount'){ps.pointCount=Math.max(3,Math.round(v));state.starPointCount=ps.pointCount;}
+  else if(field==='innerRatio'){ps.innerRatio=Math.max(0.05,Math.min(1,v/100));state.starInnerRatio=ps.innerRatio;}
+  else ps.cornerRadius=Math.max(0,v);
+  window.applyParamShapeStar(p);
+  saveActiveLayerFrame();updateStarPanel();if(window.SMEngineBridge)SMEngineBridge.renderNow();
+}
+document.getElementById('p-star-points').addEventListener('input',function(){commitStarEdit('pointCount',this.value);});
+document.getElementById('p-star-inner').addEventListener('input',function(){commitStarEdit('innerRatio',this.value);});
+document.getElementById('p-star-corner').addEventListener('input',function(){commitStarEdit('cornerRadius',this.value);});
 // Team review Accept/Reject panel — shown when exactly one selected item is
 // either an active (non-ghost) revision (data.revisionParentId) or a
 // delete-revision ghost (data.isRevisionGhost && revisionAction==='delete').
@@ -5390,6 +5423,8 @@ var TOOL_SHORTCUTS=[
   {action:'line',key:'u',label:'Line'},
   {action:'rect',key:'r',label:'Rectangle'},
   {action:'ellipse',key:'l',label:'Ellipse'},
+  {action:'speechbubble',key:'d',label:'Bulle de dialogue'},
+  {action:'star',key:'k',label:'Étoile / Polygone'},
   {action:'eraser',key:'e',label:'Eraser'},
   {action:'fill',key:'g',label:'Fill'},
   {action:'fillbrush',key:'n',label:'Fill Brush'},
