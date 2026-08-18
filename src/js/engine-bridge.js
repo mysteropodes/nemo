@@ -2032,6 +2032,24 @@
     // treatment as the anchor dot.
     var ringDrawRadius = ringRadius + (state.xformRingHovered ? 4 : 0) * zs;
     items.push(circleItem(ap.x, ap.y, ringDrawRadius, null, [74, 158, 255, 160], 1 * zs));
+    // Dynamic shapes phase 3 (2026-08-18) — corner-radius drag handles for
+    // a single selected rect with data.paramShape, orange to read as a
+    // DIFFERENT kind of grip from the blue transform-box handles just
+    // above (same color the mask/trim features already use for a
+    // per-shape, non-transform control). Positions come from the SAME
+    // select-bridge.js helper the hit-test uses (SMParamShapeHandles), so
+    // drawn == grabbable by construction, never two independently
+    // maintained copies of this math.
+    if (window.SMParamShapeHandles) {
+      var pshpSel = window.SMParamShapeHandles.paramShapeSelectionSingle();
+      if (pshpSel) {
+        var hpDraw = window.SMParamShapeHandles.cornerHandleWorldPositions(pshpSel);
+        ['tl', 'tr', 'br', 'bl'].forEach(function (c) {
+          var hp = hpDraw[c];
+          items.push(circleItem(hp.x, hp.y, 4 * zs, [255, 184, 108, 255], [255, 255, 255, 255], 1.2 * zs));
+        });
+      }
+    }
     return items;
   }
   function buildMarqueeItems() {
