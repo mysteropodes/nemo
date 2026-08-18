@@ -1997,7 +1997,7 @@ function updateUI(frameOnly){
   window._totalF=state.totalFrames;window._waIn=state.waIn;window._waOut=state.waOut;window._curFrame=state.currentFrame;
   window.updateWaBar();window.updateOmMarkers(state.currentFrame,state.totalFrames);
   if(frameOnly)updatePlayhead();else renderTimeline();
-  renderLayerList(frameOnly);updateCompInstancePanel();updateDuplicatorPanel();updateFootagePanel();updateSelPropsPanel();updateFsSelPanel();updateRevisionPanel();updateMaskPanel();updateCornersPanel();updateTextActionsPanel();updateTextPropsPanel();if(window.updateEffectsPanel)window.updateEffectsPanel();updatePropsContext();
+  renderLayerList(frameOnly);updateCompInstancePanel();updateDuplicatorPanel();updateFootagePanel();updateSelPropsPanel();updateFsSelPanel();updateRevisionPanel();updateMaskPanel();updateCornersPanel();updateEllipseArcPanel();updateTextActionsPanel();updateTextPropsPanel();if(window.updateEffectsPanel)window.updateEffectsPanel();updatePropsContext();
 }
 // Vector mask properties (2026-08, AE-style "Mask" — see the mask-feature
 // audit) — same "own dedicated panel section, shown only for a matching
@@ -2078,6 +2078,51 @@ function commitCornerEdit(which,val){
 ['tl','tr','br','bl'].forEach(function(which){
   document.getElementById('p-corner-'+which).addEventListener('input',function(){commitCornerEdit(which,this.value);});
 });
+// Dynamic shapes, Ellipse (2026-08-18) — same panel pattern as Coins:
+// shown for exactly one selected path that's EITHER already a dynamic
+// ellipse (fields visible) or a plain ellipse-shaped selection eligible
+// to become one (just the convert button — see buildOvalGuess below for
+// why "plain ellipse" can't be detected from data alone, unlike rect's
+// data.paramShape being stamped at creation time for every rect).
+function looksLikePlainEllipse(p){
+  if(!p||p.data&&p.data.paramShape)return false;
+  if(!(p instanceof Path)||!p.closed)return false;
+  return p.segments.length>=4&&p.segments.length<=8;
+}
+function updateEllipseArcPanel(){
+  var sec=document.getElementById('ellipse-arc-sec');
+  if(!sec)return;
+  var p=(state.tool==='select'&&selectedPaths.length===1)?selectedPaths[0]:null;
+  var ps=p&&p.data&&p.data.paramShape&&p.data.paramShape.kind==='ellipse'?p.data.paramShape:null;
+  var eligible=p&&!ps&&looksLikePlainEllipse(p);
+  if(!ps&&!eligible){sec.style.display='none';return;}
+  sec.style.display='';
+  document.getElementById('ellipse-arc-convert-row').style.display=ps?'none':'';
+  ['ellipse-arc-start-row','ellipse-arc-sweep-row','ellipse-arc-inner-row'].forEach(function(id){document.getElementById(id).style.display=ps?'':'none';});
+  if(ps){
+    document.getElementById('p-arc-start').value=ps.startAngle||0;
+    document.getElementById('p-arc-sweep').value=ps.sweep!==undefined?ps.sweep:359.9;
+    document.getElementById('p-arc-inner').value=Math.round((ps.innerRadius||0)*100);
+  }
+}
+document.getElementById('btn-ellipse-arc-convert').addEventListener('click',function(){
+  var p=selectedPaths[0];if(!p)return;
+  pushUndo();
+  window.convertToDynamicEllipse(p);
+  saveActiveLayerFrame();updateEllipseArcPanel();if(window.SMEngineBridge)SMEngineBridge.renderNow();
+});
+function commitArcEdit(field,val,isPercent){
+  var p=selectedPaths[0];if(!p||!p.data||!p.data.paramShape||p.data.paramShape.kind!=='ellipse')return;
+  pushUndo();
+  var ps=p.data.paramShape;
+  var v=parseFloat(val)||0;
+  ps[field]=isPercent?Math.max(0,Math.min(95,v))/100:v;
+  window.applyParamShapeEllipse(p);
+  saveActiveLayerFrame();updateEllipseArcPanel();if(window.SMEngineBridge)SMEngineBridge.renderNow();
+}
+document.getElementById('p-arc-start').addEventListener('input',function(){commitArcEdit('startAngle',this.value,false);});
+document.getElementById('p-arc-sweep').addEventListener('input',function(){commitArcEdit('sweep',this.value,false);});
+document.getElementById('p-arc-inner').addEventListener('input',function(){commitArcEdit('innerRadius',this.value,true);});
 // Team review Accept/Reject panel — shown when exactly one selected item is
 // either an active (non-ghost) revision (data.revisionParentId) or a
 // delete-revision ghost (data.isRevisionGhost && revisionAction==='delete').
