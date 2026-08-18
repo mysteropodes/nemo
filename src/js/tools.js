@@ -4957,6 +4957,64 @@ function buildRoundRectPath(x1,y1,x2,y2,tl,tr,br,bl){
   return p;
 }
 window.buildRoundRectPath=buildRoundRectPath;
+
+// ---- DYNAMIC SHAPES, Ellipse (2026-08-18) — pie/donut ("camembert"),
+// Figma's own ArcData model (startingAngle/endingAngle/innerRadius,
+// confirmed via its plugin API docs — 0°=+x axis, increasing=clockwise,
+// which matches this canvas's y-down space with plain cos/sin, no sign
+// flip needed). Sweep clamped to (0.1°, 359.9°) rather than allowing a
+// true 360° — that keeps a "donut" a SINGLE-contour Path (a coarse
+// approximation, sampled with straight segments every ~4° rather than
+// true elliptical Bezier arcs — good enough at typical shape sizes,
+// dramatically simpler than getting arc-to-Bezier math exactly right)
+// instead of needing a CompoundPath for a true full ring, which would
+// drag in every consumer CLAUDE.md §1 warns about for that class
+// (insertBooleanResult, saveActiveLayerFrame, tween matching...) for a
+// visual difference nobody would notice (the seam is a tenth of a
+// degree). A plain Ellipse tool shape stays the EXISTING clean
+// Path.Ellipse (4-segment true Bezier) — this is opt-in via "Rendre
+// dynamique" once selected, not the default, so the common case (just
+// draw a circle) never pays this shape's coarser sampling or larger
+// segment count.
+function buildArcEllipsePath(cx,cy,rx,ry,startDeg,sweepDeg,innerRatio){
+  sweepDeg=Math.max(0.1,Math.min(359.9,sweepDeg));
+  var ir=Math.max(0,Math.min(0.95,innerRatio||0));
+  var n=Math.max(8,Math.ceil(sweepDeg/4));
+  var p=new Path({insert:false,closed:true});
+  for(var i=0;i<=n;i++){
+    var a=(startDeg+sweepDeg*i/n)*Math.PI/180;
+    p.add(new Segment(new Point(cx+rx*Math.cos(a),cy+ry*Math.sin(a))));
+  }
+  if(ir>0){
+    for(var j=n;j>=0;j--){
+      var a2=(startDeg+sweepDeg*j/n)*Math.PI/180;
+      p.add(new Segment(new Point(cx+rx*ir*Math.cos(a2),cy+ry*ir*Math.sin(a2))));
+    }
+  }else{
+    p.add(new Segment(new Point(cx,cy))); // pie slice closes through the center
+  }
+  return p;
+}
+function applyParamShapeEllipse(path){
+  var ps=path.data&&path.data.paramShape;if(!ps||ps.kind!=='ellipse')return;
+  var b=path.bounds,cx=b.center.x,cy=b.center.y,rx=b.width/2,ry=b.height/2;
+  var built=buildArcEllipsePath(cx,cy,rx,ry,ps.startAngle||0,ps.sweep!==undefined?ps.sweep:359.9,ps.innerRadius||0);
+  path.segments=built.segments;path.closed=true;
+  built.remove();
+}
+// Converts an existing plain ellipse (or any single-path selection) into
+// a dynamic one in place — same "opt-in, tag then bake" shape as the
+// Speech Bubble tool's own commit, just triggered from the panel instead
+// of at draw time. Defaults (sweep 359.9, no inner radius) render
+// visually near-identical to the path's pre-conversion look.
+function convertToDynamicEllipse(path){
+  if(!path||!path.bounds)return;
+  path.data.paramShape={kind:'ellipse',startAngle:0,sweep:359.9,innerRadius:0};
+  applyParamShapeEllipse(path);
+}
+window.buildArcEllipsePath=buildArcEllipsePath;
+window.applyParamShapeEllipse=applyParamShapeEllipse;
+window.convertToDynamicEllipse=convertToDynamicEllipse;
 function applyParamShapeRect(path){
   var ps=path.data&&path.data.paramShape;if(!ps||ps.kind!=='rect')return;
   var b=path.bounds;
