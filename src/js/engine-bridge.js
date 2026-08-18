@@ -1118,6 +1118,7 @@
             && !project3D
             && !(window.SMMotion && cStrokeId && SMMotion.hasPathVertexMotionFor(i, cStrokeId))
             && !(window.SMMotion && cStrokeId && SMMotion.hasTrimMotionFor(i, cStrokeId))
+            && !(window.SMMotion && cStrokeId && SMMotion.hasParamShapeMotionFor && SMMotion.hasParamShapeMotionFor(i, cStrokeId))
             && !(c.data && c.data.fillGradient)
             && !(c.data && c.data.strokeGradientAlongPath)
             && !(includeEditorOverlays && state.currentFrameOutline)
@@ -1142,6 +1143,12 @@
           if (sd && window.SMMotion && cStrokeId && SMMotion.hasTrimMotionFor(i, cStrokeId)) {
             var trimmed = SMMotion.applyTrimFor(i, cStrokeId, sd.segments, sd.closed, renderFrame);
             sd.segments = trimmed.segments; sd.closed = trimmed.closed;
+          }
+          // Dynamic shapes phase 2 (2026-08-18) — animated corner radii,
+          // same innermost-layer placement as Trim/vertex-offsets right
+          // above (shape's own local space, before elMat/motionMat).
+          if (sd && window.SMMotion && cStrokeId && SMMotion.hasParamShapeMotionFor && SMMotion.hasParamShapeMotionFor(i, cStrokeId)) {
+            sd.segments = SMMotion.applyParamShapeFor(i, cStrokeId, sd, renderFrame);
           }
           if (sd && elMat) sd.segments = SMMotion.transformSegments(sd.segments, elPivot, elMat);
           if (sd && motionMat) sd.segments = SMMotion.transformSegments(sd.segments, motionPivot, motionMat);

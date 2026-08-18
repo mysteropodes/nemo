@@ -4956,6 +4956,7 @@ function buildRoundRectPath(x1,y1,x2,y2,tl,tr,br,bl){
   segs.forEach(function(s){p.add(s);});
   return p;
 }
+window.buildRoundRectPath=buildRoundRectPath;
 function applyParamShapeRect(path){
   var ps=path.data&&path.data.paramShape;if(!ps||ps.kind!=='rect')return;
   var b=path.bounds;
