@@ -1996,7 +1996,7 @@ function updateUI(frameOnly){
   window._totalF=state.totalFrames;window._waIn=state.waIn;window._waOut=state.waOut;window._curFrame=state.currentFrame;
   window.updateWaBar();window.updateOmMarkers(state.currentFrame,state.totalFrames);
   if(frameOnly)updatePlayhead();else renderTimeline();
-  renderLayerList(frameOnly);updateCompInstancePanel();updateDuplicatorPanel();updateFootagePanel();updateSelPropsPanel();updateFsSelPanel();updateRevisionPanel();updateMaskPanel();updateTextActionsPanel();updateTextPropsPanel();if(window.updateEffectsPanel)window.updateEffectsPanel();updatePropsContext();
+  renderLayerList(frameOnly);updateCompInstancePanel();updateDuplicatorPanel();updateFootagePanel();updateSelPropsPanel();updateFsSelPanel();updateRevisionPanel();updateMaskPanel();updateCornersPanel();updateTextActionsPanel();updateTextPropsPanel();if(window.updateEffectsPanel)window.updateEffectsPanel();updatePropsContext();
 }
 // Vector mask properties (2026-08, AE-style "Mask" — see the mask-feature
 // audit) — same "own dedicated panel section, shown only for a matching
@@ -2039,6 +2039,43 @@ document.getElementById('btn-mask-unset').addEventListener('click',function(){
   pushUndo();
   delete p.data.isMask;delete p.data.maskMode;delete p.data.maskFeather;
   saveActiveLayerFrame();updateUI();if(window.SMEngineBridge)SMEngineBridge.renderNow();
+});
+// Dynamic shape, phase 1 (2026-08-18) — corner-radius panel for a
+// selected rect with data.paramShape (see applyParamShapeRect's own
+// comment, tools.js, for why this bakes radii into real segments right
+// away instead of a render-time rebuild). "Lier les 4 coins" mirrors
+// Figma's own link toggle: ON writes the same value to all 4 fields (the
+// common case — most rounded rects are uniform), OFF reveals the other 3
+// so each corner can diverge.
+function updateCornersPanel(){
+  var sec=document.getElementById('corners-sec');
+  if(!sec)return;
+  var p=(state.tool==='select'&&selectedPaths.length===1)?selectedPaths[0]:null;
+  var ps=p&&p.data&&p.data.paramShape&&p.data.paramShape.kind==='rect'?p.data.paramShape:null;
+  if(!ps){sec.style.display='none';return;}
+  sec.style.display='';
+  document.getElementById('p-corner-tl').value=ps.tl||0;
+  document.getElementById('p-corner-tr').value=ps.tr||0;
+  document.getElementById('p-corner-br').value=ps.br||0;
+  document.getElementById('p-corner-bl').value=ps.bl||0;
+  var linked=document.getElementById('p-corners-link').checked;
+  ['corner-tr-row','corner-br-row','corner-bl-row'].forEach(function(id){document.getElementById(id).style.display=linked?'none':'';});
+}
+document.getElementById('p-corners-link').addEventListener('change',function(){
+  ['corner-tr-row','corner-br-row','corner-bl-row'].forEach(function(id){document.getElementById(id).style.display=this.checked?'none':'';}.bind(this));
+});
+function commitCornerEdit(which,val){
+  var p=selectedPaths[0];if(!p||!p.data||!p.data.paramShape||p.data.paramShape.kind!=='rect')return;
+  pushUndo();
+  var ps=p.data.paramShape;
+  var v=Math.max(0,parseFloat(val)||0);
+  if(document.getElementById('p-corners-link').checked){ps.tl=ps.tr=ps.br=ps.bl=v;}
+  else ps[which]=v;
+  window.applyParamShapeRect(p);
+  saveActiveLayerFrame();updateCornersPanel();if(window.SMEngineBridge)SMEngineBridge.renderNow();
+}
+['tl','tr','br','bl'].forEach(function(which){
+  document.getElementById('p-corner-'+which).addEventListener('input',function(){commitCornerEdit(which,this.value);});
 });
 // Team review Accept/Reject panel — shown when exactly one selected item is
 // either an active (non-ghost) revision (data.revisionParentId) or a

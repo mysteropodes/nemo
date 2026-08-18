@@ -4903,6 +4903,67 @@ function computeGroupCombine(paths,mode,layer){
   var folded=foldBooleanOp(mode,paths,layer);
   return flattenBooleanResult(folded.result);
 }
+
+// ---- DYNAMIC SHAPES, phase 1 (2026-08-18) — Rectangle, independent
+// per-corner radius, Figma's own model (topLeft/topRight/bottomRight/
+// bottomLeft radii, each 0..half the shorter side) confirmed via its
+// plugin API docs rather than guessed. data.paramShape={kind:'rect',
+// tl,tr,br,bl} is the shape's declared intent; applyParamShapeRect below
+// is the ONE function that turns those numbers into real segments — every
+// editor (corner panel fields now, per-corner Motion keys later) calls
+// it, never hand-rolls the Bezier math again (CLAUDE.md §3).
+//
+// Deliberately NOT wired into the live render pipeline (engine-bridge.js/
+// export.js) — this bakes the radii into the path's REAL stored segments
+// immediately, the same way dragging a Subselect point already does, so
+// it's free of every retained-path-cache/render-hook concern CLAUDE.md
+// §5ter documents at length (a runtime-rebuilt-per-frame version is a
+// deliberately separate, later step — animating this needs its own
+// non-retainable-path exclusion, not a reason to complicate this first,
+// static slice). Corner drag handles on canvas are a natural interaction
+// follow-up; numeric fields deliver the actual capability first.
+function buildRoundRectPath(x1,y1,x2,y2,tl,tr,br,bl){
+  var maxR=Math.min(x2-x1,y2-y1)/2;
+  tl=Math.max(0,Math.min(tl,maxR));tr=Math.max(0,Math.min(tr,maxR));
+  br=Math.max(0,Math.min(br,maxR));bl=Math.max(0,Math.min(bl,maxR));
+  var k=0.5522847498;
+  // Built via explicit Segment(point,handleIn,handleOut), the ONLY curve-
+  // construction idiom this codebase actually uses (grep confirms zero
+  // .cubicTo call sites anywhere in tools.js) — found live: Paper.js's own
+  // Path has no .cubicTo method under that name (it's Rive/Lua's API, not
+  // Paper's), so the first version of this function threw on every corner.
+  // Each rounded corner is 2 segments: A (where the incoming straight edge
+  // ends, handleOut aimed at the arc) and B (where the outgoing edge
+  // starts, handleIn aimed back at A) — a r=0 corner collapses A/B into
+  // one sharp point with both handles zeroed.
+  var segs=[];
+  if(tl>0)segs.push(new Segment(new Point(x1+tl,y1),new Point(-tl*k,0),new Point(0,0)));
+  else segs.push(new Segment(new Point(x1,y1)));
+  if(tr>0){
+    segs.push(new Segment(new Point(x2-tr,y1),new Point(0,0),new Point(tr*k,0)));
+    segs.push(new Segment(new Point(x2,y1+tr),new Point(0,-tr*k),new Point(0,0)));
+  } else segs.push(new Segment(new Point(x2,y1)));
+  if(br>0){
+    segs.push(new Segment(new Point(x2,y2-br),new Point(0,0),new Point(0,br*k)));
+    segs.push(new Segment(new Point(x2-br,y2),new Point(br*k,0),new Point(0,0)));
+  } else segs.push(new Segment(new Point(x2,y2)));
+  if(bl>0){
+    segs.push(new Segment(new Point(x1+bl,y2),new Point(0,0),new Point(-bl*k,0)));
+    segs.push(new Segment(new Point(x1,y2-bl),new Point(0,bl*k),new Point(0,0)));
+  } else segs.push(new Segment(new Point(x1,y2)));
+  if(tl>0)segs.push(new Segment(new Point(x1,y1+tl),new Point(0,0),new Point(0,-tl*k)));
+  var p=new Path({insert:false,closed:true});
+  segs.forEach(function(s){p.add(s);});
+  return p;
+}
+function applyParamShapeRect(path){
+  var ps=path.data&&path.data.paramShape;if(!ps||ps.kind!=='rect')return;
+  var b=path.bounds;
+  var built=buildRoundRectPath(b.left,b.top,b.right,b.bottom,ps.tl||0,ps.tr||0,ps.br||0,ps.bl||0);
+  path.segments=built.segments;path.closed=true;
+  built.remove();
+}
+window.applyParamShapeRect=applyParamShapeRect;
 function insertBooleanResult(layer,insertAt,result,fillColor,opacity,strokeInfo,srcData){
   function applyStroke(isl){
     if(strokeInfo&&strokeInfo.color){isl.strokeColor=strokeInfo.color;isl.strokeWidth=strokeInfo.width;isl.strokeCap=strokeInfo.cap;isl.strokeJoin=strokeInfo.join;}
@@ -5865,6 +5926,11 @@ function onMouseUp(event){
     if(shapeStart&&event.point.getDistance(shapeStart)<2){currentPath.remove();if(state.undoStack.length)state.undoStack.pop();}
     else{
       if(state.shadowMode)applyShadowBrushTag(currentPath);
+      // Dynamic shape, phase 1 (2026-08-18) — every new rect is corner-
+      // radius-capable from creation (all 4 at 0, i.e. today's sharp-corner
+      // look, zero visual change) rather than an opt-in — matches Figma,
+      // where a rectangle's corners are always independently editable.
+      if(state.tool==='rect')currentPath.data.paramShape={kind:'rect',tl:0,tr:0,br:0,bl:0};
       tagOwner(currentPath);
       if(window.SMSymmetry&&window.SMSymmetry.onStrokeCommitted)window.SMSymmetry.onStrokeCommitted(currentPath,userLayers[state.activeLayerIdx]);
     }
