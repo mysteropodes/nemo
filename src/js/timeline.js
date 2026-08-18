@@ -347,6 +347,7 @@ function retimeTweenSpans(li,pairs,captured){
 // ---- API ----
 var PRODUCER_ALLOWED_TOOLS=['hand','zoom','rotate','comment'];
 window.SM={
+  exposeSymbolProperty:exposeSymbolProperty,
   goToFrame:function(idx){goToFrame(idx);},togglePlay:togglePlay,stopPlay:stopPlay,undo:undo,redo:redo,
   setTool:function(t){
     // RBAC (Phase 3): "producteur" is read-only + comments/validation — see

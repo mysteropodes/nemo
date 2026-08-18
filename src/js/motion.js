@@ -87,9 +87,32 @@
   // panel and the grid must iterate the same list or their rows desync,
   // which is the alignment invariant ROW_H's header comment is about — so
   // there is exactly ONE function that decides, and both sides call it.
+  // Component exposed properties (2026-08-18, "réutilisation dynamique de
+  // component... modifier des properties au dessus", Figma Component
+  // Properties + AE Master Properties synthesis, confirmed with Cyril).
+  // Declared ONCE on the symbol (state.symbols[id].exposedProps, via the
+  // "Exposer…" context menu items in select-bridge.js while editing INSIDE
+  // it), surfaced here as EXTRA ordinary Motion properties on every INSTANCE
+  // layer — same "extra properties, zero new track/keyframe machinery"
+  // precedent as PROPS_WITH_3D/PROPS_DUP_EXTRA above. Registers the row's
+  // PROP_LABEL/PROP_DIM/PROP_UNIT/PROP_DEFAULT on every call (idempotent,
+  // cheap) rather than once at exposure time — exposure happens in app.js,
+  // a project reload never re-runs that code path, and propsFor is the one
+  // function EVERY row (panel AND grid, the ROW_H alignment invariant) is
+  // guaranteed to call before it can render anything, so self-registering
+  // here is the only way that survives both first-use and reload alike.
+  function registerExposedPropMeta(key, label, defaultVal) {
+    PROP_LABEL[key] = label; PROP_DIM[key] = 1; PROP_UNIT[key] = '';
+    PROP_DEFAULT[key] = [defaultVal];
+  }
   function propsFor(holder) {
     var list = (holder && holder.threeD) ? PROPS_WITH_3D : PROPS;
     if (holder && holder.duplicator) list = list.concat(PROPS_DUP_EXTRA);
+    if (holder && holder.symbolId && state.symbols[holder.symbolId] && state.symbols[holder.symbolId].exposedProps && state.symbols[holder.symbolId].exposedProps.length) {
+      var epList = state.symbols[holder.symbolId].exposedProps;
+      epList.forEach(function (ep) { registerExposedPropMeta(ep.key, ep.label, ep.default); });
+      list = list.concat(epList.map(function (ep) { return ep.key; }));
+    }
     // Multi-parent crossfade (2026-07-30, "jouer comme une opacité les
     // parents entre eux") — parentBlend only means anything once a SECOND
     // parent exists (parentLayerUidB); an ordinary single-parent layer
@@ -6656,6 +6679,7 @@
     // only ever touch state.currentFrame, one key at a time).
     ensureElementHolder: ensureElementHolder,
     setKeyAtFrame: setKeyAtFrame,
+    registerExposedPropMeta: registerExposedPropMeta,
     distributeKeys: distributeKeys, flipKeys: flipKeys, selectEveryNthKey: selectEveryNthKey, invertKeySelection: invertKeySelection,
     getKeySelection: function () { return _motionKeySel.slice(); },
     // Move an explicit set of keys by dx frames — used by layer-inout.js so
