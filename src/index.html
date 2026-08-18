@@ -412,6 +412,16 @@
         <div class="pr"><button class="pbtn" id="btn-mask-unset" style="flex:1;font-size:10px" data-i18n-title="unmaskTitle" title="Redevient une forme normale (n'est plus un masque)" data-i18n="btnUnmask">Retirer comme masque</button></div>
       </div>
     </div>
+    <div class="psec" id="corners-sec" style="display:none">
+      <div class="phdr"><span class="ar">☰</span> <span>Coins</span></div>
+      <div class="pbdy">
+        <div class="pr"><label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-dim)"><input type="checkbox" id="p-corners-link" checked> Lier les 4 coins</label></div>
+        <div class="pr"><span class="pl" title="Haut-gauche">↖</span><input type="number" class="pi scrub" id="p-corner-tl" value="0" min="0" data-step="1"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
+        <div class="pr" id="corner-tr-row"><span class="pl" title="Haut-droit">↗</span><input type="number" class="pi scrub" id="p-corner-tr" value="0" min="0" data-step="1"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
+        <div class="pr" id="corner-br-row"><span class="pl" title="Bas-droit">↘</span><input type="number" class="pi scrub" id="p-corner-br" value="0" min="0" data-step="1"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
+        <div class="pr" id="corner-bl-row"><span class="pl" title="Bas-gauche">↙</span><input type="number" class="pi scrub" id="p-corner-bl" value="0" min="0" data-step="1"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
+      </div>
+    </div>
     <div class="psec" id="text-actions-sec" style="display:none">
       <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrText">Texte</span></div>
       <div class="pbdy">
