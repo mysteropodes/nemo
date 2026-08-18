@@ -121,6 +121,7 @@
     // above, one level down (element instead of layer).
     if (holder && holder.paramShapeKind === 'rect') list = list.concat(['cornerTL', 'cornerTR', 'cornerBR', 'cornerBL']);
     if (holder && holder.paramShapeKind === 'ellipse') list = list.concat(['arcStart', 'arcSweep', 'arcInner']);
+    if (holder && holder.paramShapeKind === 'star') list = list.concat(['starInner', 'starCorner']);
     // Multi-parent crossfade (2026-07-30, "jouer comme une opacité les
     // parents entre eux") — parentBlend only means anything once a SECOND
     // parent exists (parentLayerUidB); an ordinary single-parent layer
@@ -199,9 +200,9 @@
     if (prop === 'timeRemap') return holder.timeRemap || null;
     return (holder.motion && holder.motion[prop]) || null;
   }
-  var PROP_LABEL = { position: 'Position', anchor: 'Anchor Point', rotation: 'Rotation', scale: 'Scale', opacity: 'Opacity', timeRemap: 'Time Remap', positionZ: 'Position Z', rotationX: 'Rotation X', rotationY: 'Rotation Y', dupOffsetPos: 'Dup. Offset', dupOffsetRot: 'Dup. Rotation', dupOffsetScale: 'Dup. Scale', dupOffsetOpacity: 'Dup. Opacity', dupOffsetPosZ: 'Dup. Offset Z', dupOffsetRotX: 'Dup. Rotation X', dupOffsetRotY: 'Dup. Rotation Y', parentBlend: 'Parent Blend', timeLinkInOffset: 'Décalage entrée', timeLinkOutOffset: 'Décalage sortie', cornerTL: 'Coin ↖', cornerTR: 'Coin ↗', cornerBR: 'Coin ↘', cornerBL: 'Coin ↙', arcStart: 'Début (arc)', arcSweep: 'Ouverture (arc)', arcInner: 'Rayon interne' };
-  var PROP_DIM = { position: 2, anchor: 2, rotation: 1, scale: 2, opacity: 1, timeRemap: 1, positionZ: 1, rotationX: 1, rotationY: 1, dupOffsetPos: 2, dupOffsetRot: 1, dupOffsetScale: 2, dupOffsetOpacity: 1, dupOffsetPosZ: 1, dupOffsetRotX: 1, dupOffsetRotY: 1, parentBlend: 1, timeLinkInOffset: 1, timeLinkOutOffset: 1, cornerTL: 1, cornerTR: 1, cornerBR: 1, cornerBL: 1, arcStart: 1, arcSweep: 1, arcInner: 1 };
-  var PROP_UNIT = { position: 'px', anchor: 'px', rotation: '°', scale: '%', opacity: '%', timeRemap: 'f', positionZ: 'px', rotationX: '°', rotationY: '°', dupOffsetPos: 'px', dupOffsetRot: '°', dupOffsetScale: '%', dupOffsetOpacity: '%', dupOffsetPosZ: 'px', dupOffsetRotX: '°', dupOffsetRotY: '°', parentBlend: '%', timeLinkInOffset: 'f', timeLinkOutOffset: 'f', cornerTL: 'px', cornerTR: 'px', cornerBR: 'px', cornerBL: 'px', arcStart: '°', arcSweep: '°', arcInner: '%' };
+  var PROP_LABEL = { position: 'Position', anchor: 'Anchor Point', rotation: 'Rotation', scale: 'Scale', opacity: 'Opacity', timeRemap: 'Time Remap', positionZ: 'Position Z', rotationX: 'Rotation X', rotationY: 'Rotation Y', dupOffsetPos: 'Dup. Offset', dupOffsetRot: 'Dup. Rotation', dupOffsetScale: 'Dup. Scale', dupOffsetOpacity: 'Dup. Opacity', dupOffsetPosZ: 'Dup. Offset Z', dupOffsetRotX: 'Dup. Rotation X', dupOffsetRotY: 'Dup. Rotation Y', parentBlend: 'Parent Blend', timeLinkInOffset: 'Décalage entrée', timeLinkOutOffset: 'Décalage sortie', cornerTL: 'Coin ↖', cornerTR: 'Coin ↗', cornerBR: 'Coin ↘', cornerBL: 'Coin ↙', arcStart: 'Début (arc)', arcSweep: 'Ouverture (arc)', arcInner: 'Rayon interne', starInner: 'Rayon interne', starCorner: 'Coins' };
+  var PROP_DIM = { position: 2, anchor: 2, rotation: 1, scale: 2, opacity: 1, timeRemap: 1, positionZ: 1, rotationX: 1, rotationY: 1, dupOffsetPos: 2, dupOffsetRot: 1, dupOffsetScale: 2, dupOffsetOpacity: 1, dupOffsetPosZ: 1, dupOffsetRotX: 1, dupOffsetRotY: 1, parentBlend: 1, timeLinkInOffset: 1, timeLinkOutOffset: 1, cornerTL: 1, cornerTR: 1, cornerBR: 1, cornerBL: 1, arcStart: 1, arcSweep: 1, arcInner: 1, starInner: 1, starCorner: 1 };
+  var PROP_UNIT = { position: 'px', anchor: 'px', rotation: '°', scale: '%', opacity: '%', timeRemap: 'f', positionZ: 'px', rotationX: '°', rotationY: '°', dupOffsetPos: 'px', dupOffsetRot: '°', dupOffsetScale: '%', dupOffsetOpacity: '%', dupOffsetPosZ: 'px', dupOffsetRotX: '°', dupOffsetRotY: '°', parentBlend: '%', timeLinkInOffset: 'f', timeLinkOutOffset: 'f', cornerTL: 'px', cornerTR: 'px', cornerBR: 'px', cornerBL: 'px', arcStart: '°', arcSweep: '°', arcInner: '%', starInner: '%', starCorner: 'px' };
   // parentBlend defaults to 0 — "0%" reads as "fully Parent A" (the
   // pre-existing single parent), matching the invariant that assigning a
   // second parent must never itself move anything until the user actually
@@ -220,7 +221,8 @@
     // element holder's motionStatic the moment it's created — see
     // ensureElementHolder's own comment.
     cornerTL: [0], cornerTR: [0], cornerBR: [0], cornerBL: [0],
-    arcStart: [0], arcSweep: [359.9], arcInner: [0] };
+    arcStart: [0], arcSweep: [359.9], arcInner: [0],
+    starInner: [50], starCorner: [0] };
   // Rows with no stopwatch — layerInPoint/layerOutPoint (app.js) are read at
   // 13 call sites with no frame parameter, so a real keyframe track on these
   // would silently only ever reflect state.currentFrame at read time (export
@@ -1162,6 +1164,10 @@
         var pse = item.data.paramShape;
         ld.elementMotion[strokeId].paramShapeKind = 'ellipse';
         ld.elementMotion[strokeId].motionStatic = { arcStart: [pse.startAngle || 0], arcSweep: [pse.sweep !== undefined ? pse.sweep : 359.9], arcInner: [Math.round((pse.innerRadius || 0) * 100)] };
+      } else if (item && item.data && item.data.paramShape && item.data.paramShape.kind === 'star') {
+        var pss = item.data.paramShape;
+        ld.elementMotion[strokeId].paramShapeKind = 'star';
+        ld.elementMotion[strokeId].motionStatic = { starInner: [Math.round((pss.innerRatio !== undefined ? pss.innerRatio : 0.5) * 100)], starCorner: [pss.cornerRadius || 0] };
       }
     }
     return ld.elementMotion[strokeId];
@@ -2143,6 +2149,9 @@
     if (holder.paramShapeKind === 'ellipse') {
       return isAnimated(holder, 'arcStart') || isAnimated(holder, 'arcSweep') || isAnimated(holder, 'arcInner');
     }
+    if (holder.paramShapeKind === 'star') {
+      return isAnimated(holder, 'starInner') || isAnimated(holder, 'starCorner');
+    }
     return false;
   }
   function applyParamShapeFor(li, strokeId, sd, frameIdx) {
@@ -2160,6 +2169,10 @@
       var startA = cv('arcStart', ps.startAngle || 0), sweepA = cv('arcSweep', ps.sweep !== undefined ? ps.sweep : 359.9), innerPct = cv('arcInner', Math.round((ps.innerRadius || 0) * 100));
       var cx = (x1 + x2) / 2, cy = (y1 + y2) / 2, rx = (x2 - x1) / 2, ry = (y2 - y1) / 2;
       built = window.buildArcEllipsePath(cx, cy, rx, ry, startA, sweepA, innerPct / 100);
+    } else if (ps.kind === 'star') {
+      var innerPctS = cv('starInner', Math.round((ps.innerRatio !== undefined ? ps.innerRatio : 0.5) * 100)), cornerR = cv('starCorner', ps.cornerRadius || 0);
+      var cxs = (x1 + x2) / 2, cys = (y1 + y2) / 2, outerR = Math.min(x2 - x1, y2 - y1) / 2;
+      built = window.buildStarPolygonPath(cxs, cys, outerR, ps.pointCount || 5, innerPctS / 100, cornerR);
     } else return sd.segments;
     var segs = built.segments.map(function (s) { return { point: [s.point.x, s.point.y], handleIn: [s.handleIn.x, s.handleIn.y], handleOut: [s.handleOut.x, s.handleOut.y] }; });
     built.remove();

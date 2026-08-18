@@ -5015,6 +5015,56 @@ function convertToDynamicEllipse(path){
 window.buildArcEllipsePath=buildArcEllipsePath;
 window.applyParamShapeEllipse=applyParamShapeEllipse;
 window.convertToDynamicEllipse=convertToDynamicEllipse;
+
+// ---- DYNAMIC SHAPES, Star/Polygon (2026-08-18) — one tool, Figma's own
+// pointCount/innerRadius/cornerRadius model (confirmed via its plugin API
+// docs: innerRadius is a 0-1 ratio of the outer radius, 1 collapses a
+// star into a regular polygon — this codebase reuses that single tool/
+// data shape rather than building two, since "polygon" is just
+// innerRatio===1 geometrically). Corner rounding generalizes the
+// rectangle's own magic-constant technique (buildRoundRectPath) to an
+// arbitrary vertex angle — NOT a mathematically exact circular fillet
+// (that needs per-angle trig this codebase doesn't otherwise need
+// anywhere), just the same "handle length = distance-to-corner × k"
+// approximation, which reads as a smooth, correct-looking round at any
+// polygon/star point count in practice.
+function buildStarPolygonPath(cx,cy,outerR,pointCount,innerRatio,cornerRadius){
+  pointCount=Math.max(3,Math.round(pointCount||5));
+  innerRatio=Math.max(0.05,Math.min(1,innerRatio===undefined?0.5:innerRatio));
+  var isPolygon=innerRatio>=0.999;
+  var n=isPolygon?pointCount:pointCount*2;
+  var innerR=outerR*innerRatio;
+  var verts=[];
+  for(var i=0;i<n;i++){
+    var r=isPolygon||(i%2===0)?outerR:innerR;
+    var a=-Math.PI/2+i*Math.PI*2/n;
+    verts.push(new Point(cx+r*Math.cos(a),cy+r*Math.sin(a)));
+  }
+  var k=0.5522847498,cr=Math.max(0,cornerRadius||0);
+  var p=new Path({insert:false,closed:true});
+  for(var j=0;j<n;j++){
+    var V=verts[j],Prev=verts[(j-1+n)%n],Next=verts[(j+1)%n];
+    if(cr<=0.01){p.add(new Segment(V));continue;}
+    var dPrev=V.getDistance(Prev),dNext=V.getDistance(Next);
+    var rP=Math.min(cr,dPrev*0.5),rN=Math.min(cr,dNext*0.5);
+    var A=V.add(Prev.subtract(V).normalize(rP));
+    var B=V.add(Next.subtract(V).normalize(rN));
+    var hOutA=V.subtract(A).multiply(k);
+    var hInB=V.subtract(B).multiply(k);
+    p.add(new Segment(A,new Point(0,0),hOutA));
+    p.add(new Segment(B,hInB,new Point(0,0)));
+  }
+  return p;
+}
+function applyParamShapeStar(path){
+  var ps=path.data&&path.data.paramShape;if(!ps||ps.kind!=='star')return;
+  var b=path.bounds,cx=b.center.x,cy=b.center.y,outerR=Math.min(b.width,b.height)/2;
+  var built=buildStarPolygonPath(cx,cy,outerR,ps.pointCount,ps.innerRatio,ps.cornerRadius);
+  path.segments=built.segments;path.closed=true;
+  built.remove();
+}
+window.buildStarPolygonPath=buildStarPolygonPath;
+window.applyParamShapeStar=applyParamShapeStar;
 function applyParamShapeRect(path){
   var ps=path.data&&path.data.paramShape;if(!ps||ps.kind!=='rect')return;
   var b=path.bounds;
@@ -5251,11 +5301,12 @@ function onMouseDown(event){
       _pen.path.add(placePt);
     }
     _pen.draggingHandle=true;
-  }else if(state.tool==='line'||state.tool==='rect'||state.tool==='ellipse'||state.tool==='speechbubble'){
+  }else if(state.tool==='line'||state.tool==='rect'||state.tool==='ellipse'||state.tool==='speechbubble'||state.tool==='star'){
     if(!canEditActiveLayer())return;pushUndo();ensureKeyframe(true);layer.activate();shapeStart=event.point.clone();
     if(state.tool==='line')currentPath=new Path.Line({from:event.point,to:event.point,strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,strokeCap:state.strokeCap,fillColor:null,opacity:state.opacity/100});
     else if(state.tool==='rect')currentPath=new Path.Rectangle({from:event.point,to:event.point.add(new Point(1,1)),strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,fillColor:state.fillEnabled?state.fillColor:null,opacity:state.opacity/100});
     else if(state.tool==='speechbubble')currentPath=new Path.Rectangle({rectangle:new Rectangle(event.point,new Size(1,1)),radius:1,strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,fillColor:state.fillEnabled?state.fillColor:null,opacity:state.opacity/100});
+    else if(state.tool==='star')currentPath=new Path.Rectangle({rectangle:new Rectangle(event.point,new Size(1,1)),strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,fillColor:state.fillEnabled?state.fillColor:null,opacity:state.opacity/100});
     else currentPath=new Path.Ellipse({rectangle:new Rectangle(event.point,new Size(1,1)),strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,fillColor:state.fillEnabled?state.fillColor:null,opacity:state.opacity/100});
   }else if(state.tool==='subselect'){
     var bestNh=null,bestNd=8/view.zoom;
@@ -5654,7 +5705,7 @@ function onMouseDrag(event){
     if(!_pen.path||!_pen.draggingHandle)return;
     var seg=_pen.path.lastSegment;var delta=event.point.subtract(seg.point);
     seg.handleOut=delta;seg.handleIn=delta.multiply(-1);
-  }else if((state.tool==='line'||state.tool==='rect'||state.tool==='ellipse'||state.tool==='speechbubble')&&currentPath&&shapeStart){
+  }else if((state.tool==='line'||state.tool==='rect'||state.tool==='ellipse'||state.tool==='speechbubble'||state.tool==='star')&&currentPath&&shapeStart){
     currentPath.remove();
     // Shift-constrain (UI/UX audit, 2026-07): Illustrator/Figma/Photoshop
     // convention, absent here entirely before this — Rectangle/Ellipse had
@@ -5679,6 +5730,17 @@ function onMouseDrag(event){
       var bbRect=new Rectangle(shapeStart,endPt);
       var bbRadius=Math.max(4,Math.min(bbRect.width,bbRect.height)*0.18);
       currentPath=new Path.Rectangle({rectangle:bbRect,radius:bbRadius,strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,fillColor:state.fillEnabled?state.fillColor:null,opacity:state.opacity/100});
+    }
+    else if(state.tool==='star'){
+      // Live preview is the real star geometry — cheap (no boolean op,
+      // unlike Speech Bubble's tail), so unlike that tool there's no
+      // reason to fall back to a placeholder rect during the drag itself.
+      var sbRect=new Rectangle(shapeStart,endPt);
+      var sOuterR=Math.min(sbRect.width,sbRect.height)/2;
+      currentPath=window.buildStarPolygonPath(sbRect.center.x,sbRect.center.y,sOuterR,state.starPointCount||5,state.starInnerRatio!==undefined?state.starInnerRatio:0.5,0);
+      userLayers[state.activeLayerIdx].addChild(currentPath);
+      currentPath.strokeColor=state.strokeEnabled?state.strokeColor:null;currentPath.strokeWidth=state.brushSize;
+      currentPath.fillColor=state.fillEnabled?state.fillColor:null;currentPath.opacity=state.opacity/100;
     }
     else{currentPath=new Path.Ellipse({rectangle:new Rectangle(shapeStart,endPt),strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,fillColor:state.fillEnabled?state.fillColor:null,opacity:state.opacity/100});}
   }else if(state.tool==='text'&&_textDragStart){
@@ -6000,7 +6062,7 @@ function onMouseUp(event){
       if(window.startInPlaceTextCreation)startInPlaceTextCreation(textTopLeft,textDragWidth);
     }else if(window.openTextPopover)openTextPopover(_textDragStart);
     _textDragStart=null;
-  }else if((state.tool==='line'||state.tool==='rect'||state.tool==='ellipse')&&currentPath){
+  }else if((state.tool==='line'||state.tool==='rect'||state.tool==='ellipse'||state.tool==='star')&&currentPath){
     if(shapeStart&&event.point.getDistance(shapeStart)<2){currentPath.remove();if(state.undoStack.length)state.undoStack.pop();}
     else{
       if(state.shadowMode)applyShadowBrushTag(currentPath);
@@ -6009,6 +6071,12 @@ function onMouseUp(event){
       // look, zero visual change) rather than an opt-in — matches Figma,
       // where a rectangle's corners are always independently editable.
       if(state.tool==='rect')currentPath.data.paramShape={kind:'rect',tl:0,tr:0,br:0,bl:0};
+      // Star/Polygon — always dynamic from creation (unlike Ellipse's
+      // opt-in "Rendre dynamique": there's no plain-native-Bezier
+      // equivalent to fall back to here, the tool's whole point is the
+      // parametric shape) — same tool draws either depending on
+      // innerRatio, see buildStarPolygonPath's own comment.
+      else if(state.tool==='star')currentPath.data.paramShape={kind:'star',pointCount:state.starPointCount||5,innerRatio:state.starInnerRatio!==undefined?state.starInnerRatio:0.5,cornerRadius:0};
       tagOwner(currentPath);
       if(window.SMSymmetry&&window.SMSymmetry.onStrokeCommitted)window.SMSymmetry.onStrokeCommitted(currentPath,userLayers[state.activeLayerIdx]);
     }
