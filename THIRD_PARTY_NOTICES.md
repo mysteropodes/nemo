@@ -62,12 +62,33 @@ means the **build machine** needs the Homebrew formulas listed in
 `rebuild-ffmpeg-lgpl.sh`'s header comment installed; the *distributed* app
 does not need Homebrew.
 
-**Not addressed here, unchanged from before:** ProRes (`prores_ks`) is
-ffmpeg's own native encoder (not from an external GPL/patent-flagged lib),
-kept as-is — Apple's licensing/patent position on ProRes is murkier and
-still worth a dedicated look if that export format matters for a fully
-buttoned-up public release, but it was never part of the GPL/x264/x265
-issue this rebuild resolves.
+**H.264/H.265 export restored via VideoToolbox (2026-08-18, same day).**
+`--enable-videotoolbox` (an Apple system framework, not a Homebrew dep, not
+GPL) exposes `h264_videotoolbox`/`hevc_videotoolbox`/`prores_videotoolbox` —
+Apple's own OS-provided hardware encoders, called through their API rather
+than bundled as a library. Apple already holds whatever patent license its
+own encoder needs to ship in macOS; this app never redistributes an H.264/
+H.265 implementation of its own, exactly the same principle already
+applied to `exportVideoBrowser`'s browser-native MediaRecorder path. No
+Via LA (AVC) or Access Advance (HEVC) registration needed for this path.
+`exportMP4ToPath` (`src/js/export.js`) now uses `h264_videotoolbox` instead
+of the removed `libx264` (quality via `-q:v`, VideoToolbox has no `-crf`
+equivalent). `prores_videotoolbox` also exists as a cleaner alternative to
+the still-present native `prores_ks` reimplementation, not yet wired in —
+worth switching to if the ProRes question below ever gets revisited, since
+it sidesteps that question entirely (Apple's own encoder, not a third-party
+reimplementation of their format).
+
+**Not addressed, still open:** ProRes export currently still runs through
+ffmpeg's native `prores_ks` (not VideoToolbox) in one code path
+(`src/js/export.js`, ProRes 4444/422 branch) — a clean-room reimplementation
+of the now-SMPTE-standardized RDD-36 spec, not Apple's own code. No public
+patent pool exists for ProRes (unlike AVC/HEVC), and the wider ecosystem
+(DaVinci Resolve off-Mac, Adobe, ffmpeg everywhere) has shipped this for
+years without a known enforcement precedent — lower-profile risk than the
+H.264/H.265 issue this rebuild resolved, but still technically unresolved
+if a fully buttoned-up release ever demands it. Switching that one call to
+`prores_videotoolbox` would close even this residual question.
 
 ## Browser export path — no bundled-codec exposure (2026-08-17, new)
 

@@ -455,12 +455,20 @@ Checklist avant `npm run build` :
    chaque `npm run build`**, obligatoire de nouveau, pas optionnel. La machine qui build (pas
    celle qui reçoit l'app) doit avoir les formules Homebrew listées en tête de
    `rebuild-ffmpeg-lgpl.sh` installées.
-   MP4/H.264 n'est plus exportable via ce binaire — WebM (VP9/AV1) devient le défaut desktop,
-   ce qui fait converger le chemin Tauri et le chemin navigateur (`export.js`,
-   `exportVideoBrowser`/`exportGifBrowser`, qui n'embarque de toute façon aucun codec —
-   MediaRecorder délègue au navigateur de l'utilisateur) sur la même famille de codec.
-   ProRes (`prores_ks`, encodeur natif ffmpeg, pas une lib externe) reste inchangé — position
-   Apple sur ses brevets/licence non résolue ici, séparée du problème GPL/x264/x265.
+   ⚠️ **H.264/H.265 restaurés SANS libx264/libx265, via VideoToolbox** (même 2026-08-18) :
+   `--enable-videotoolbox` (framework système Apple, pas une dépendance Homebrew, pas GPL)
+   expose `h264_videotoolbox`/`hevc_videotoolbox`/`prores_videotoolbox` — l'encodeur matériel
+   OS d'Apple, piloté via leur API plutôt qu'embarqué comme lib tierce. Apple a déjà la
+   licence brevet nécessaire pour SON encodeur ; on ne redistribue rien de nous-mêmes — même
+   principe que `exportVideoBrowser` (MediaRecorder du navigateur) côté web. Aucune inscription
+   Via LA (AVC) ni Access Advance (HEVC) nécessaire pour ce chemin. `exportMP4ToPath`
+   (`src/js/export.js`) utilise désormais `h264_videotoolbox` (plus `libx264` — qualité via
+   `-q:v`, VideoToolbox n'a pas d'équivalent `-crf`). `prores_videotoolbox` existe aussi
+   (alternative plus propre à `prores_ks`, pas encore branchée).
+   ProRes (`prores_ks`, encodeur natif ffmpeg, pas une lib externe) reste inchangé pour
+   l'instant — réimplémentation clean-room de RDD-36 (spec SMPTE publiée), aucun pool de
+   brevets public connu contrairement à AVC/HEVC, risque plus faible mais pas fermé ;
+   `prores_videotoolbox` (ci-dessus) le fermerait si besoin un jour.
 4. Si c'est un vrai changement fonctionnel (pas juste un patch de bug) : lancer
    `./scripts/publish-update.sh "notes"` après la build pour que les installs existantes le
    voient — voir §6 pour le détail des tokens nécessaires.

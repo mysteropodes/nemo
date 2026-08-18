@@ -8,6 +8,15 @@
 # fine — MP3's own patents expired in 2017, and LGPL only obligates the lib
 # itself, not what links it, unlike GPL).
 #
+# Also enables --enable-videotoolbox: h264_videotoolbox / hevc_videotoolbox
+# / prores_videotoolbox call Apple's OWN OS-provided hardware encoder via
+# the VideoToolbox framework (always present on macOS, not a Homebrew dep)
+# instead of bundling libx264/libx265/libx265-alternatives. Apple already
+# holds whatever patent license its own encoder needs — same principle
+# already used by exportVideoBrowser's MediaRecorder path in the browser
+# build — so H.264/H.265/ProRes export stay available without touching
+# Via LA/Access Advance registration or re-introducing GPL.
+#
 # Result license: LGPL v2.1+ (confirmed by ffmpeg's own `configure` output
 # when this flag set is used — no --enable-gpl anywhere).
 #
@@ -44,7 +53,7 @@ cd "$BUILD_DIR/ffmpeg-src"
   --enable-libvmaf --enable-libopenjpeg --enable-libopus --enable-libmp3lame \
   --enable-libvpx --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig \
   --enable-libtheora --enable-libvorbis --enable-libsnappy --enable-libaom --enable-libzimg \
-  --enable-libsvtav1 --enable-libharfbuzz \
+  --enable-libsvtav1 --enable-libharfbuzz --enable-videotoolbox \
   --enable-neon --enable-runtime-cpudetect \
   --disable-doc
 

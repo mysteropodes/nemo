@@ -273,7 +273,16 @@ async function exportMP4ToPath(outPath,opts){
   var workDir=(tmp||outPath.replace(/[^/\\]+$/,''))+'sm-export-'+Date.now();
   await exportMkdir(workDir);
   await exportRenderPNGsToDir(workDir,r.start,r.end,scale,opts&&opts.onProgress);
-  await exportRunFfmpeg(['-y','-framerate',String(fps),'-i',workDir+'/frame_%04d.png','-c:v','libx264','-pix_fmt','yuv420p','-crf','18',outPath],opts&&opts.onFfmpeg);
+  // h264_videotoolbox (Apple's own hardware/OS H.264 encoder via the
+  // VideoToolbox framework), not libx264 — the 2026-08-18 license rebuild
+  // (THIRD_PARTY_NOTICES.md) dropped libx264 (GPL + H.264 patent exposure).
+  // VideoToolbox needs no such license: it's Apple's OS-provided encoder,
+  // already licensed by Apple for its own use, same principle already
+  // applied to exportVideoBrowser's MediaRecorder path. -q:v is
+  // VideoToolbox's quality control (no -crf equivalent exists there);
+  // 65 is a high-quality default, roughly matching the visual target the
+  // old -crf 18 aimed for.
+  await exportRunFfmpeg(['-y','-framerate',String(fps),'-i',workDir+'/frame_%04d.png','-c:v','h264_videotoolbox','-pix_fmt','yuv420p','-q:v','65','-profile:v','high',outPath],opts&&opts.onFfmpeg);
   await exportRemoveDir(workDir);
   return{ok:true,path:outPath};
 }
