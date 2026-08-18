@@ -1,18 +1,28 @@
 #!/usr/bin/env python3
 """Make a built Nemo.app self-contained w.r.t. the ffmpeg shared libraries.
 
-WHY THIS EXISTS (2026-07, native video engine graduation): the Rust binary
-links the ffmpeg C libraries (libavcodec & co) at ABSOLUTE Homebrew paths
-(/opt/homebrew/opt/ffmpeg/lib/...) — pkg-config's doing at compile time.
-A build shipped as-is CRASHES AT LAUNCH on any machine without Homebrew
-ffmpeg (dyld: Library not loaded). This script rewrites the bundle to be
-self-contained, the standard macOS way:
+WHY THIS EXISTS AGAIN (2026-08-18): after the GPL/patent audit
+(THIRD_PARTY_NOTICES.md), the bundled ffmpeg sidecar was rebuilt from source
+WITHOUT --enable-gpl and without libx264/libx265/libvvenc/libkvazaar/
+libvidstab (GPL and/or H.264/H.265/H.266 patent exposure) — see
+scripts/rebuild-ffmpeg-lgpl.sh for the exact build. The previous binary was
+statically linked (zero dylib deps, this script was a no-op — see CLAUDE.md
+§7's note from 2026-07). The new one links dynamically against Homebrew's
+libvpx/libaom/libsvtav1/libopus/etc. (all permissive/royalty-free, but real
+shared libraries this time), so this script is needed again to make a built
+.app run on a machine without Homebrew installed:
 
-  1. BFS-collect every /opt/homebrew dylib the binary (transitively) needs.
+  1. BFS-collect every /opt/homebrew dylib EVERY executable in Contents/MacOS
+     (the app's own binary AND the ffmpeg sidecar — a build that only fixed
+     the main binary would ship an app that launches fine but crashes the
+     instant Export is used, since ffmpeg is a separate process, not a
+     linked library of the main binary) transitively needs.
   2. Copy them into Contents/Frameworks/.
   3. install_name_tool: point every reference at @rpath/<name>, give each
-     copied dylib a matching @rpath id, and add an rpath entry on the main
-     binary (@executable_path/../Frameworks).
+     copied dylib a matching @rpath id, and add an rpath entry on EACH
+     executable (@executable_path/../Frameworks — correct for both, since
+     Tauri places the sidecar in Contents/MacOS/ alongside the main binary,
+     so @executable_path resolves the same way from either).
   4. Ad-hoc re-sign everything deepest-first (install_name_tool invalidates
      code signatures; unsigned dylibs won't load on arm64 macOS at all).
 
@@ -22,13 +32,6 @@ USAGE (after `npm run build`):
 
 Then package/publish that .app as usual (publish-update.sh). Idempotent —
 running it twice is safe (already-@rpath references are left alone).
-
-LICENSING NOTE (matters for the commercial build, decided 2026-07 to ship
-this way for the BETA only): Homebrew's ffmpeg is built WITH GPL components
-(x264/x265 encoders). Bundling those dylibs makes the distributed bundle
-GPL-encumbered even though Nemo only DECODES (decoders are LGPL). Before
-selling: build a custom LGPL-only ffmpeg (decode-only, no x264/x265) and
-bundle that instead — smaller too (~15MB vs ~150MB+).
 """
 import os
 import shutil
@@ -77,8 +80,15 @@ def main():
     fw_dir = os.path.join(app, "Contents", "Frameworks")
     os.makedirs(fw_dir, exist_ok=True)
     binaries = [os.path.join(macos_dir, f) for f in os.listdir(macos_dir)
-                if not f.startswith(".")]
-    main_bin = next((b for b in binaries if os.access(b, os.X_OK) and not b.endswith("ffmpeg")), binaries[0])
+                if not f.startswith(".") and os.access(os.path.join(macos_dir, f), os.X_OK)]
+    # Every executable in Contents/MacOS gets scanned — the ffmpeg sidecar
+    # is its OWN process (spawned, not linked), so its Homebrew dependencies
+    # are entirely invisible to a scan that only follows the main binary's
+    # load commands. Missing this was the bug that made an earlier version
+    # of this script report "nothing to do" against the new dynamically-
+    # linked ffmpeg build (the main Nemo binary itself is still static,
+    # zero Homebrew deps — only the ffmpeg sidecar needs this).
+    exes = binaries
 
     # 1. BFS over the Homebrew dependency graph. Two edge kinds:
     #    - absolute /opt/homebrew/... references (the common case), and
@@ -88,7 +98,9 @@ def main():
     needed = {}     # reference as written -> basename
     real_of = {}    # basename -> real file path to copy
     search_dirs = set()
-    to_visit = [(d, os.path.dirname(os.path.realpath(main_bin))) for d in deps_of(main_bin)]
+    to_visit = []
+    for exe in exes:
+        to_visit += [(d, os.path.dirname(os.path.realpath(exe))) for d in deps_of(exe)]
     while to_visit:
         ref, loader_dir = to_visit.pop()
         base = os.path.basename(ref)
@@ -126,10 +138,10 @@ def main():
         subprocess.check_call(["install_name_tool", "-id", f"@rpath/{base}", dst],
                               stderr=subprocess.DEVNULL)
 
-    # 3. Rewrite references in the main binary AND in every copied dylib —
+    # 3. Rewrite references in every executable AND in every copied dylib —
     # every reference whose basename we bundled becomes @rpath/<basename>
     # (flat Frameworks layout), whatever form it was written in.
-    targets = [main_bin] + list(copied.values())
+    targets = list(exes) + list(copied.values())
     for t in targets:
         for dep in raw_deps(t):
             base = os.path.basename(dep)
@@ -137,20 +149,25 @@ def main():
                 subprocess.check_call(
                     ["install_name_tool", "-change", dep, f"@rpath/{base}", t],
                     stderr=subprocess.DEVNULL)
-    # rpath on the main binary (ignore 'duplicate' failure on re-runs)
-    subprocess.call(
-        ["install_name_tool", "-add_rpath", "@executable_path/../Frameworks", main_bin],
-        stderr=subprocess.DEVNULL)
+    # rpath on EVERY executable (ignore 'duplicate' failure on re-runs) —
+    # not just main_bin: the ffmpeg sidecar runs as its own process and
+    # resolves its own @executable_path independently, from Contents/MacOS/
+    # same as the main binary, so it needs the same rpath entry.
+    for exe in exes:
+        subprocess.call(
+            ["install_name_tool", "-add_rpath", "@executable_path/../Frameworks", exe],
+            stderr=subprocess.DEVNULL)
 
-    # 4. Ad-hoc re-sign, innermost first: each dylib, then the main binary
-    # (install_name_tool invalidated its signature too), then the bundle
+    # 4. Ad-hoc re-sign, innermost first: each dylib, then every executable
+    # (install_name_tool invalidated their signatures too), then the bundle
     # itself as best-effort (fails harmlessly on incomplete test shells;
     # on a real .app it refreshes the seal).
     for t in copied.values():
         subprocess.check_call(["codesign", "-f", "-s", "-", t],
                               stderr=subprocess.DEVNULL)
-    subprocess.check_call(["codesign", "-f", "-s", "-", main_bin],
-                          stderr=subprocess.DEVNULL)
+    for exe in exes:
+        subprocess.check_call(["codesign", "-f", "-s", "-", exe],
+                              stderr=subprocess.DEVNULL)
     subprocess.call(["codesign", "-f", "-s", "-", app], stderr=subprocess.DEVNULL)
 
     # Verify: no Homebrew references left anywhere, and every @rpath
@@ -163,7 +180,7 @@ def main():
             elif d.startswith("@rpath/") and not os.path.exists(os.path.join(fw_dir, d.split("/", 1)[1])):
                 # @rpath refs from SYSTEM frameworks aren't ours; only flag
                 # basenames we were supposed to bundle.
-                if os.path.basename(d) in copied or t != main_bin:
+                if os.path.basename(d) in copied or t in exes:
                     problems.append(f"{os.path.basename(t)} references unshipped {d}")
     if problems:
         sys.exit("ERROR:\n  " + "\n  ".join(problems))

@@ -6,8 +6,11 @@
 // pixel data).
 //
 // ARCHITECTURE v2 (2026-07): decodes via a PIPED ffmpeg CLI subprocess
-// (the same statically-linked binary already bundled as the Tauri sidecar
-// for export/optimized-media — resolved at runtime by
+// (the same binary already bundled as the Tauri sidecar for export/
+// optimized-media — statically linked until the 2026-08-18 LGPL rebuild,
+// see CLAUDE.md §7; now dynamically linked against Homebrew dylibs that
+// scripts/bundle-ffmpeg-dylibs.py bundles at package time instead — the
+// resolution logic below is unaffected either way — resolved at runtime by
 // std::env::current_exe().parent().join("ffmpeg"), confirmed empirically
 // to be where Tauri places `externalBin` sidecars in both `tauri dev` and
 // a built bundle: no `tauri::AppHandle` needed, and no async event-channel
