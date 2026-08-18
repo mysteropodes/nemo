@@ -5131,10 +5131,11 @@ function onMouseDown(event){
       _pen.path.add(placePt);
     }
     _pen.draggingHandle=true;
-  }else if(state.tool==='line'||state.tool==='rect'||state.tool==='ellipse'){
+  }else if(state.tool==='line'||state.tool==='rect'||state.tool==='ellipse'||state.tool==='speechbubble'){
     if(!canEditActiveLayer())return;pushUndo();ensureKeyframe(true);layer.activate();shapeStart=event.point.clone();
     if(state.tool==='line')currentPath=new Path.Line({from:event.point,to:event.point,strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,strokeCap:state.strokeCap,fillColor:null,opacity:state.opacity/100});
     else if(state.tool==='rect')currentPath=new Path.Rectangle({from:event.point,to:event.point.add(new Point(1,1)),strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,fillColor:state.fillEnabled?state.fillColor:null,opacity:state.opacity/100});
+    else if(state.tool==='speechbubble')currentPath=new Path.Rectangle({rectangle:new Rectangle(event.point,new Size(1,1)),radius:1,strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,fillColor:state.fillEnabled?state.fillColor:null,opacity:state.opacity/100});
     else currentPath=new Path.Ellipse({rectangle:new Rectangle(event.point,new Size(1,1)),strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,fillColor:state.fillEnabled?state.fillColor:null,opacity:state.opacity/100});
   }else if(state.tool==='subselect'){
     var bestNh=null,bestNd=8/view.zoom;
@@ -5533,7 +5534,7 @@ function onMouseDrag(event){
     if(!_pen.path||!_pen.draggingHandle)return;
     var seg=_pen.path.lastSegment;var delta=event.point.subtract(seg.point);
     seg.handleOut=delta;seg.handleIn=delta.multiply(-1);
-  }else if((state.tool==='line'||state.tool==='rect'||state.tool==='ellipse')&&currentPath&&shapeStart){
+  }else if((state.tool==='line'||state.tool==='rect'||state.tool==='ellipse'||state.tool==='speechbubble')&&currentPath&&shapeStart){
     currentPath.remove();
     // Shift-constrain (UI/UX audit, 2026-07): Illustrator/Figma/Photoshop
     // convention, absent here entirely before this — Rectangle/Ellipse had
@@ -5549,6 +5550,16 @@ function onMouseDrag(event){
     }
     if(state.tool==='line'){currentPath=new Path.Line({from:shapeStart,to:endPt,strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,strokeCap:state.strokeCap,fillColor:null,opacity:state.opacity/100});applyStrokeStyle(currentPath);}
     else if(state.tool==='rect')currentPath=new Path.Rectangle({from:shapeStart,to:endPt,strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,fillColor:state.fillEnabled?state.fillColor:null,opacity:state.opacity/100});
+    else if(state.tool==='speechbubble'){
+      // Live preview during the drag is just the rounded rect — the tail
+      // (a separate triangle, unioned in at commit below) would have to be
+      // rebuilt+re-unioned on every single drag tick otherwise, which is
+      // real boolean-op cost (CLAUDE.md §1: booleans are never free) paid
+      // 60+ times for a shape the user hasn't committed to yet.
+      var bbRect=new Rectangle(shapeStart,endPt);
+      var bbRadius=Math.max(4,Math.min(bbRect.width,bbRect.height)*0.18);
+      currentPath=new Path.Rectangle({rectangle:bbRect,radius:bbRadius,strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,fillColor:state.fillEnabled?state.fillColor:null,opacity:state.opacity/100});
+    }
     else{currentPath=new Path.Ellipse({rectangle:new Rectangle(shapeStart,endPt),strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,fillColor:state.fillEnabled?state.fillColor:null,opacity:state.opacity/100});}
   }else if(state.tool==='text'&&_textDragStart){
     // Drag guide rectangle — purely visual (marqueeLayer, never inserted
@@ -5876,6 +5887,34 @@ function onMouseUp(event){
       tagOwner(currentPath);
       if(window.SMSymmetry&&window.SMSymmetry.onStrokeCommitted)window.SMSymmetry.onStrokeCommitted(currentPath,userLayers[state.activeLayerIdx]);
     }
+    currentPath=null;shapeStart=null;saveActiveLayerFrame();updateUI();
+  }else if(state.tool==='speechbubble'&&currentPath){
+    if(shapeStart&&event.point.getDistance(shapeStart)<2){currentPath.remove();if(state.undoStack.length)state.undoStack.pop();currentPath=null;shapeStart=null;saveActiveLayerFrame();updateUI();return;}
+    // Tail is a small triangle unioned onto the rounded rect at commit
+    // time — real boolean op (CLAUDE.md §1: never insert a raw union
+    // result, always insertBooleanResult so a CompoundPath-producing
+    // union splits into independent Paths correctly) rather than two
+    // stacked same-color paths, so a stroke (if enabled) traces one clean
+    // outline instead of leaving a seam where the tail meets the body.
+    // Bottom-center, pointing down — a fixed placement for v1; dragging
+    // the tail to a chosen edge/position is a natural follow-up once this
+    // proves out, not a blocker for a first usable version.
+    var bb=currentPath.bounds;
+    var tailBase=Math.max(10,Math.min(bb.width,bb.height)*0.28);
+    var tailDrop=Math.max(10,Math.min(bb.width,bb.height)*0.24);
+    var tailCx=bb.left+bb.width*0.28;
+    var tail=new Path({insert:false});
+    tail.moveTo(new Point(tailCx-tailBase/2,bb.bottom-1));
+    tail.lineTo(new Point(tailCx+tailBase/2,bb.bottom-1));
+    tail.lineTo(new Point(tailCx,bb.bottom+tailDrop));
+    tail.closePath();
+    var fillC=currentPath.fillColor,strokeC=currentPath.strokeColor,strokeW=currentPath.strokeWidth,op=currentPath.opacity;
+    var idx=userLayers[state.activeLayerIdx].children.indexOf(currentPath);
+    var united=currentPath.unite(tail,{insert:false});
+    currentPath.remove();
+    var islands=insertBooleanResult(userLayers[state.activeLayerIdx],idx,united,fillC,op,strokeC?{color:strokeC,width:strokeW,cap:'round',join:'round'}:null,null);
+    islands.forEach(function(p){ if(state.shadowMode)applyShadowBrushTag(p); tagOwner(p); });
+    if(window.SMSymmetry&&window.SMSymmetry.onStrokeCommitted&&islands[0])window.SMSymmetry.onStrokeCommitted(islands[0],userLayers[state.activeLayerIdx]);
     currentPath=null;shapeStart=null;saveActiveLayerFrame();updateUI();
   }else if(state.tool==='select'){
     if(_xform.active){

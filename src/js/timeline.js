@@ -385,7 +385,7 @@ window.SM={
     state.tool=t;renderArcs();
     if(_camToolChanged)renderTimeline();
     document.querySelectorAll('.tool-btn').forEach(function(b){b.classList.toggle('active',b.dataset.tool===t);});
-    var cc={draw:'crosshair',pen:'crosshair',line:'crosshair',rect:'crosshair',ellipse:'crosshair',select:'default',subselect:'default',fsselect:'default',comment:'crosshair',camera:'move',text:'text',eraser:'pointer',fill:'crosshair',fillbrush:'crosshair',eyedropper:'crosshair',hand:'grab',zoom:'zoom-in',rotate:'grab',perspective:'crosshair',symmetry:'crosshair',rig:'crosshair'};
+    var cc={draw:'crosshair',pen:'crosshair',line:'crosshair',rect:'crosshair',ellipse:'crosshair',speechbubble:'crosshair',select:'default',subselect:'default',fsselect:'default',comment:'crosshair',camera:'move',text:'text',eraser:'pointer',fill:'crosshair',fillbrush:'crosshair',eyedropper:'crosshair',hand:'grab',zoom:'zoom-in',rotate:'grab',perspective:'crosshair',symmetry:'crosshair',rig:'crosshair'};
     canvasEl.style.cursor=cc[t]||'default';
     // Brush texture presets (Chalk/Charcoal/Pencil…) stamp dabs along a
     // discrete centerline — Fill Brush commits a filled OUTLINE shape from
@@ -5302,6 +5302,7 @@ var TOOL_SHORTCUTS=[
   {action:'line',key:'u',label:'Line'},
   {action:'rect',key:'r',label:'Rectangle'},
   {action:'ellipse',key:'l',label:'Ellipse'},
+  {action:'speechbubble',key:'d',label:'Bulle de dialogue'},
   {action:'eraser',key:'e',label:'Eraser'},
   {action:'fill',key:'g',label:'Fill'},
   {action:'fillbrush',key:'n',label:'Fill Brush'},
