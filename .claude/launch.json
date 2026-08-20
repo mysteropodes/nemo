@@ -1,0 +1,41 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "nemo-subselect-qa",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8734", "-d", "src"],
+      "port": 8734
+    },
+    {
+      "name": "nemo-props-panel-qa",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "24418", "-d", "src"],
+      "port": 24418
+    },
+    {
+      "name": "nemo-tool-audit-qa",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "9609", "-d", "src"],
+      "port": 9609
+    },
+    {
+      "name": "nemo-parent-blend-ui-qa",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "19831", "-d", "src"],
+      "port": 19831
+    },
+    {
+      "name": "nemo-text-animator-qa",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "27541", "-d", "src"],
+      "port": 27541
+    },
+    {
+      "name": "nemo-panel-shape-fx-qa",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "33871", "-d", "src"],
+      "port": 33871
+    }
+  ]
+}

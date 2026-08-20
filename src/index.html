@@ -175,11 +175,23 @@
          Ellipse) read as one undifferentiated group without this; Text
          keeps its own separator right after Ellipse below. -->
     <div class="tool-sep"></div>
-    <button class="tool-btn" data-tool="line" data-i18n-title="toolLine" title="Line (U in Animation 2D — Motion mode reserves U to reveal animated properties)"><span class="material-symbols-rounded">&#xf755;</span><span class="sk">U</span></button>
-    <button class="tool-btn" data-tool="rect" data-i18n-title="toolRect" title="Rectangle (R)"><span class="material-symbols-rounded">&#xe3c6;</span><span class="sk">R</span></button>
-    <button class="tool-btn" data-tool="ellipse" data-i18n-title="toolEllipse" title="Ellipse (L)"><span class="material-symbols-rounded">&#xef4a;</span><span class="sk">L</span></button>
-    <button class="tool-btn" data-tool="speechbubble" data-i18n-title="toolSpeechBubble" title="Speech bubble — rounded rect with an auto tail, drag to size (D)"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M4 4h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H10l-4.2 4.2A1 1 0 0 1 4 20.5V17H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/></svg><span class="sk">D</span></button>
-    <button class="tool-btn" data-tool="star" data-i18n-title="toolStar" title="Star / Polygon — drag to size, adjust point count / inner radius / corner rounding in the panel (K)"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 2.5l2.9 6.6 7.1.7-5.4 4.7 1.7 7-6.3-3.8-6.3 3.8 1.7-7-5.4-4.7 7.1-.7z"/></svg><span class="sk">K</span></button>
+    <!-- Shape-tool group (2026-08, "regrouper les shape dans un mini menu
+         comme dans illustrator ou rive") — all 5 buttons stay REAL DOM
+         elements at their own data-tool selector (tutorial.js spotlights
+         and click-detects these exact selectors across ~15 steps), just
+         stacked on top of one another in one grid cell instead of laid out
+         in a row. timeline.js's shape-tool-group code toggles which one is
+         `.stack-front` (visible, clickable) to match the last-used shape —
+         the others go `visibility:hidden` (NOT display:none), which keeps
+         their real geometry so tutorial.js's getBoundingClientRect-based
+         spotlight still lands in the right place even for a backed shape. -->
+    <div class="tool-stack" id="shape-tool-stack">
+      <button class="tool-btn stack-front" data-tool="rect" data-i18n-title="toolRect" title="Rectangle (R)"><span class="material-symbols-rounded">&#xe3c6;</span><span class="sk">R</span></button>
+      <button class="tool-btn" data-tool="line" data-i18n-title="toolLine" title="Line (U in Animation 2D — Motion mode reserves U to reveal animated properties)"><span class="material-symbols-rounded">&#xf755;</span><span class="sk">U</span></button>
+      <button class="tool-btn" data-tool="ellipse" data-i18n-title="toolEllipse" title="Ellipse (L)"><span class="material-symbols-rounded">&#xef4a;</span><span class="sk">L</span></button>
+      <button class="tool-btn" data-tool="speechbubble" data-i18n-title="toolSpeechBubble" title="Speech bubble — rounded rect with an auto tail, drag to size (D)"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M4 4h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H10l-4.2 4.2A1 1 0 0 1 4 20.5V17H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/></svg><span class="sk">D</span></button>
+      <button class="tool-btn" data-tool="star" data-i18n-title="toolStar" title="Star / Polygon — drag to size, adjust point count / inner radius / corner rounding in the panel (K)"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 2.5l2.9 6.6 7.1.7-5.4 4.7 1.7 7-6.3-3.8-6.3 3.8 1.7-7-5.4-4.7 7.1-.7z"/></svg><span class="sk">K</span></button>
+    </div>
     <!-- Text sits right below the Ellipse (feedback #21) — after the shape
          group, not in the middle of the selection tools. -->
     <button class="tool-btn" data-tool="text" data-i18n-title="toolText" title="Texte — clique le canvas pour poser un bloc de texte (rendu image) (Y)"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M5 4h14v3h-2V6h-4v12h2v2H9v-2h2V6H7v1H5z"/></svg><span class="sk">Y</span></button>

@@ -386,6 +386,7 @@ window.SM={
     state.tool=t;renderArcs();
     if(_camToolChanged)renderTimeline();
     document.querySelectorAll('.tool-btn').forEach(function(b){b.classList.toggle('active',b.dataset.tool===t);});
+    if(window.SMShapeGroup)SMShapeGroup.ensureFront(t);
     var cc={draw:'crosshair',pen:'crosshair',line:'crosshair',rect:'crosshair',ellipse:'crosshair',speechbubble:'crosshair',star:'crosshair',select:'default',subselect:'default',fsselect:'default',comment:'crosshair',camera:'move',text:'text',eraser:'pointer',fill:'crosshair',fillbrush:'crosshair',eyedropper:'crosshair',hand:'grab',zoom:'zoom-in',rotate:'grab',perspective:'crosshair',symmetry:'crosshair',rig:'crosshair'};
     canvasEl.style.cursor=cc[t]||'default';
     // Brush texture presets (Chalk/Charcoal/Pencil…) stamp dabs along a
@@ -2470,8 +2471,14 @@ function updatePropsContext(){
   // an already-visible section, not this much bigger burial problem.
   // layer-sec (Blend/Matte/Flou) is spared: those are genuine per-layer
   // properties still meaningful while animating, not a drawing-tool panel.
+  // canvas-sec (Document) is ALSO spared when ctx==='document' (2026-08,
+  // "si rien n'est select en Motion il faut afficher le panel Document") —
+  // Select/Subselect with an empty canvas selection falls into that branch
+  // above and is the one case where showing it doesn't bury anything (no
+  // Fill/Stroke/Draw tool section competes with #motion-props-sec then).
   if(state.appMode==='motion'){
-    show['sel-props-sec']=show['fill-sec']=show['stroke-sec']=show['tool-opts-sec']=show['canvas-sec']=show['rig-opts-sec']=show['combine-opts-sec']=false;
+    show['sel-props-sec']=show['fill-sec']=show['stroke-sec']=show['tool-opts-sec']=show['rig-opts-sec']=show['combine-opts-sec']=false;
+    if(ctx!=='document')show['canvas-sec']=false;
   }
   Object.keys(show).forEach(function(id){var sec=document.getElementById(id);if(sec)sec.style.display=show[id]?'block':'none';});
   // state.drawMode (Front/Behind) has no effect on Fill Brush — it's always
@@ -2789,6 +2796,7 @@ function selPropsApplyMove(dx,dy,skipUndo){
   selectedPaths.forEach(function(p){
     var d=new Point(dx,dy);
     p.translate(d);
+    if(window.syncParamShapeBoxOnTranslate)window.syncParamShapeBoxOnTranslate(p,dx,dy);
     transformFillGradient(p,function(pt){return pt.add(d);});
     if(p.data&&p.data.isVectorBrush&&p.data.centerSegments)p.data.centerSegments.forEach(function(s){s.point=[s.point[0]+dx,s.point[1]+dy];});
     if(p.data&&p.data.linkedFill&&!p.data.linkedFill.removed)p.data.linkedFill.translate(new Point(dx,dy));
@@ -2802,6 +2810,7 @@ function selPropsApplyScale(sx,sy,anchor,skipUndo){
   if(!skipUndo)pushUndo();
   selectedPaths.forEach(function(p){
     p.scale(sx,sy,anchor);
+    if(window.syncParamShapeBoxOnScale)window.syncParamShapeBoxOnScale(p,sx,sy,anchor);
     transformFillGradient(p,function(pt){return new Point(anchor.x+(pt.x-anchor.x)*sx,anchor.y+(pt.y-anchor.y)*sy);});
     if(p.data&&p.data.isVectorBrush&&p.data.centerSegments){scaleCenterSegments(p.data.centerSegments,sx,sy,anchor.x,anchor.y);rebuildVectorBrushOutline(p);}
   });
@@ -7549,6 +7558,66 @@ document.addEventListener('pointerdown',function(){if(state.spaceDown)state.spac
 
 document.addEventListener('keydown',onKeyDown);document.addEventListener('keyup',onKeyUp);
 document.querySelectorAll('.tool-btn').forEach(function(b){b.addEventListener('click',function(){window.SM.setTool(this.dataset.tool);});});
+// Shape-tool group (2026-08, "regrouper les shape dans un mini menu comme
+// dans illustrator ou rive... click un peu longtemps ça affiche le menu").
+// #shape-tool-stack (index.html) holds all 5 real buttons (Line/Rect/
+// Ellipse/Speech Bubble/Star) stacked in ONE toolbar slot via CSS
+// (.tool-stack, style.css) — only `.stack-front` is visible/clickable, the
+// rest are `visibility:hidden` (not display:none, so their geometry stays
+// real for tutorial.js's getBoundingClientRect-based spotlight). Long-press
+// pops a flyout with the other 4; picking one both selects that tool AND
+// fronts its button, Illustrator-style ("last used becomes the visible
+// icon"). ensureFront (exposed as window.SMShapeGroup) is the single choke
+// point both setTool's active-class sync (timeline.js, ~line 388) and
+// tutorial.js call before spotlighting a grouped tool, so a step targeting
+// e.g. '[data-tool="ellipse"]' fronts it FIRST — otherwise the real click
+// tutorial.js waits for would land on a hidden, unclickable button.
+(function(){
+  var SHAPE_TOOLS=['rect','line','ellipse','speechbubble','star'];
+  var LPRESS_MS=450,pressTimer=null,suppressClick=false,flyoutEl=null;
+  function ensureFront(tool){
+    if(SHAPE_TOOLS.indexOf(tool)<0)return;
+    SHAPE_TOOLS.forEach(function(t){
+      var b=document.querySelector('.tool-btn[data-tool="'+t+'"]');
+      if(b)b.classList.toggle('stack-front',t===tool);
+    });
+  }
+  window.SMShapeGroup={ensureFront:ensureFront};
+  function closeFlyout(){if(flyoutEl){flyoutEl.remove();flyoutEl=null;}document.removeEventListener('pointerdown',onOutsideDown,true);}
+  function onOutsideDown(e){if(flyoutEl&&!flyoutEl.contains(e.target))closeFlyout();}
+  function openFlyout(originBtn){
+    closeFlyout();
+    var rect=originBtn.getBoundingClientRect();
+    flyoutEl=document.createElement('div');
+    flyoutEl.className='shape-tool-flyout';
+    SHAPE_TOOLS.forEach(function(t){
+      var src=document.querySelector('.tool-btn[data-tool="'+t+'"]');
+      if(!src)return;
+      var item=document.createElement('button');
+      item.className='shape-tool-flyout-item'+(t===state.tool?' active':'');
+      item.innerHTML=src.innerHTML.replace(/<span class="sk">.*?<\/span>/,'');
+      item.title=src.title;
+      item.addEventListener('click',function(ev){ev.stopPropagation();ensureFront(t);window.SM.setTool(t);closeFlyout();});
+      flyoutEl.appendChild(item);
+    });
+    document.body.appendChild(flyoutEl);
+    var fr=flyoutEl.getBoundingClientRect();
+    flyoutEl.style.left=Math.min(rect.right+6,window.innerWidth-fr.width-4)+'px';
+    flyoutEl.style.top=Math.max(4,Math.min(rect.top,window.innerHeight-fr.height-4))+'px';
+    setTimeout(function(){document.addEventListener('pointerdown',onOutsideDown,true);},0);
+  }
+  var stack=document.getElementById('shape-tool-stack');
+  if(stack){
+    stack.addEventListener('pointerdown',function(e){
+      var btn=e.target.closest('.tool-btn');
+      if(!btn)return;
+      suppressClick=false;
+      pressTimer=setTimeout(function(){suppressClick=true;openFlyout(btn);},LPRESS_MS);
+    });
+    ['pointerup','pointerleave'].forEach(function(ev){stack.addEventListener(ev,function(){clearTimeout(pressTimer);});});
+    stack.addEventListener('click',function(ev){if(suppressClick){ev.stopImmediatePropagation();suppressClick=false;}},true);
+  }
+})();
 document.getElementById('p-sw').addEventListener('change',function(){window.SM.setBrushSize(parseInt(this.value));});
 // Actively picking a fill color also ENABLES fill (Graphite behavior) —
 // without this, the default-off fill state made "I set my fill to red, drew,

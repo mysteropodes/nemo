@@ -2240,7 +2240,7 @@
       var pshpSel = window.SMParamShapeHandles.paramShapeSelectionSingle();
       if (pshpSel) {
         var hpDraw = window.SMParamShapeHandles.cornerHandleWorldPositions(pshpSel);
-        ['tl', 'tr', 'br', 'bl'].forEach(function (c) {
+        window.SMParamShapeHandles.handleNamesFor(pshpSel).forEach(function (c) {
           var hp = hpDraw[c];
           items.push(circleItem(hp.x, hp.y, 4 * zs, [255, 184, 108, 255], [255, 255, 255, 255], 1.2 * zs));
         });

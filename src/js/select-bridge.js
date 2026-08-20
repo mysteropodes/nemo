@@ -30,10 +30,20 @@
   // point-maps, distort quads); a parallel, narrowly-scoped check kept this
   // additive instead of risking a regression in code this load-bearing.
   var _cornerDrag = null;
+  // Dynamic shapes rework (2026-08-19) — feedback: "la mise en place dans
+  // le canvas est pas fluide" turned out to mean Ellipse (pie/donut) and
+  // Star/Polygon had NO canvas handles at all, only numeric fields —
+  // Rectangle's own corner grips (phase 3, above) were the only kind ever
+  // wired up. Reuses that exact hit-test/drag/render plumbing
+  // (paramShapeSelectionSingle → *HandleWorldPositions → mode==='cornerRadius'
+  // → *RadiusFromDrag, engine-bridge.js's orange-dot overlay) generalized to
+  // all three kinds instead of adding a parallel system — same pattern,
+  // wider `kind` coverage.
   function paramShapeSelectionSingle() {
     if (selectedPaths.length !== 1) return null;
     var p = selectedPaths[0];
-    return (p.data && p.data.paramShape && p.data.paramShape.kind === 'rect') ? p : null;
+    var k = p.data && p.data.paramShape && p.data.paramShape.kind;
+    return (k === 'rect' || k === 'ellipse' || k === 'star') ? p : null;
   }
   // Each handle sits at the rounded corner's own arc MIDPOINT (not the
   // sharp geometric corner) — same visual language as Figma's grip. r=0
@@ -41,7 +51,7 @@
   // corner point until you start dragging it outward, matching "grab the
   // corner to begin rounding it" as a natural gesture rather than needing
   // a pre-existing radius to have something to grab.
-  function cornerHandleWorldPositions(p) {
+  function rectCornerHandleWorldPositions(p) {
     var ps = p.data.paramShape, b = p.bounds, k = 0.70710678;
     var tl = ps.tl || 0, tr = ps.tr || 0, br = ps.br || 0, bl = ps.bl || 0;
     return {
@@ -67,7 +77,107 @@
     var maxR = Math.min(b.width, b.height) / 2;
     return Math.max(0, Math.min(maxR, pt.getDistance(CORNER_POINT[corner](b))));
   }
-  window.SMParamShapeHandles = { cornerHandleWorldPositions: cornerHandleWorldPositions, paramShapeSelectionSingle: paramShapeSelectionSingle };
+  // Ellipse pie/donut — same "box, not live bounds" source as
+  // applyParamShapeEllipse (tools.js) now reads, so a thin pie slice's
+  // handles sit where the FULL ellipse would be, not collapsed onto the
+  // slice's own tiny rendered bbox.
+  function ellipseCenterAndRadii(p) {
+    var ps = p.data.paramShape;
+    var b = (ps.box) || (function () { var pb = p.bounds; return { x1: pb.left, y1: pb.top, x2: pb.right, y2: pb.bottom }; })();
+    return { cx: (b.x1 + b.x2) / 2, cy: (b.y1 + b.y2) / 2, rx: (b.x2 - b.x1) / 2, ry: (b.y2 - b.y1) / 2 };
+  }
+  function ellipseHandleWorldPositions(p) {
+    var ps = p.data.paramShape;
+    var g = ellipseCenterAndRadii(p);
+    var startA = (ps.startAngle || 0) * Math.PI / 180;
+    var endA = ((ps.startAngle || 0) + (ps.sweep !== undefined ? ps.sweep : 359.9)) * Math.PI / 180;
+    // Inner-radius grip: always visible along the start-angle ray, at a
+    // floor ratio when innerRadius is 0 — same "grab it to start rounding"
+    // affordance as a rect's r=0 corner handle sitting exactly on the
+    // sharp point until dragged.
+    var ir = Math.max(ps.innerRadius || 0, 0.12);
+    return {
+      sweep: new Point(g.cx + g.rx * Math.cos(endA), g.cy + g.ry * Math.sin(endA)),
+      inner: new Point(g.cx + g.rx * ir * Math.cos(startA), g.cy + g.ry * ir * Math.sin(startA)),
+    };
+  }
+  function ellipseSweepFromDrag(p, pt) {
+    var ps = p.data.paramShape, g = ellipseCenterAndRadii(p);
+    // Un-warp an elliptical (rx != ry) drag point back to a circle before
+    // taking its angle — dragging straight "around" a squashed ellipse
+    // should still read as a clean angle, not skewed by the aspect ratio.
+    var ux = (pt.x - g.cx) / Math.max(g.rx, 0.01), uy = (pt.y - g.cy) / Math.max(g.ry, 0.01);
+    var angDeg = Math.atan2(uy, ux) * 180 / Math.PI;
+    var sweep = angDeg - (ps.startAngle || 0);
+    sweep = ((sweep % 360) + 360) % 360;
+    if (sweep < 0.1) sweep = 0.1;
+    return Math.min(359.9, sweep);
+  }
+  function ellipseInnerFromDrag(p, pt) {
+    var g = ellipseCenterAndRadii(p);
+    var ux = (pt.x - g.cx) / Math.max(g.rx, 0.01), uy = (pt.y - g.cy) / Math.max(g.ry, 0.01);
+    var ratio = Math.sqrt(ux * ux + uy * uy);
+    return Math.max(0, Math.min(0.95, ratio));
+  }
+  // Star/Polygon — inner-vertex grip only (outer radius already tracks the
+  // shape's own resize handles like any layer; point count has no smooth
+  // drag-continuous meaning, stays a numeric field per its own comment in
+  // timeline.js's updateStarPanel).
+  function starOuterRadius(p) {
+    var ps = p.data.paramShape;
+    var b = (ps.box) || (function () { var pb = p.bounds; return { x1: pb.left, y1: pb.top, x2: pb.right, y2: pb.bottom }; })();
+    return { cx: (b.x1 + b.x2) / 2, cy: (b.y1 + b.y2) / 2, r: Math.min(b.x2 - b.x1, b.y2 - b.y1) / 2 };
+  }
+  function starHandleWorldPositions(p) {
+    var ps = p.data.paramShape;
+    var g = starOuterRadius(p);
+    var n = Math.max(3, Math.round(ps.pointCount || 5));
+    // First INNER vertex's angle in buildStarPolygonPath's own layout
+    // (n=pointCount*2 verts, index 1, a=-PI/2 + i*2PI/(2n)).
+    var a = -Math.PI / 2 + (2 * Math.PI) / (n * 2);
+    var ir = ps.innerRatio !== undefined ? ps.innerRatio : 0.5;
+    return { inner: new Point(g.cx + g.r * ir * Math.cos(a), g.cy + g.r * ir * Math.sin(a)) };
+  }
+  function starInnerFromDrag(p, pt) {
+    var g = starOuterRadius(p);
+    var ratio = pt.getDistance(new Point(g.cx, g.cy)) / Math.max(g.r, 0.01);
+    return Math.max(0.05, Math.min(1, ratio));
+  }
+  // Unified dispatch — one map of {kind: {positions(p), valueFromDrag(p,handle,pt), commit(p,handle,val)}}
+  // instead of a chain of if/else per kind at every call site.
+  var PARAM_HANDLE_KINDS = {
+    rect: {
+      positions: rectCornerHandleWorldPositions,
+      names: ['tl', 'tr', 'br', 'bl'],
+      valueFromDrag: cornerRadiusFromDrag,
+      commit: function (p, handle, val) { p.data.paramShape[handle] = val; window.applyParamShapeRect(p); },
+    },
+    ellipse: {
+      positions: ellipseHandleWorldPositions,
+      names: ['sweep', 'inner'],
+      valueFromDrag: function (p, handle, pt) { return handle === 'sweep' ? ellipseSweepFromDrag(p, pt) : ellipseInnerFromDrag(p, pt); },
+      commit: function (p, handle, val) {
+        if (handle === 'sweep') p.data.paramShape.sweep = val; else p.data.paramShape.innerRadius = val;
+        window.applyParamShapeEllipse(p);
+      },
+    },
+    star: {
+      positions: starHandleWorldPositions,
+      names: ['inner'],
+      valueFromDrag: starInnerFromDrag,
+      commit: function (p, handle, val) { p.data.paramShape.innerRatio = val; window.applyParamShapeStar(p); },
+    },
+  };
+  function paramHandleWorldPositions(p) {
+    var kind = p.data.paramShape.kind;
+    var def = PARAM_HANDLE_KINDS[kind];
+    return def ? def.positions(p) : {};
+  }
+  window.SMParamShapeHandles = {
+    cornerHandleWorldPositions: paramHandleWorldPositions,
+    paramShapeSelectionSingle: paramShapeSelectionSingle,
+    handleNamesFor: function (p) { var def = PARAM_HANDLE_KINDS[p.data.paramShape.kind]; return def ? def.names : []; },
+  };
   // Non-destructive combine groups (2026-07-29) — hit-test confirmatory
   // guard. UNION never has a problem here: the combined visible region is
   // exactly the union of members' own real geometry, so "hit a real
@@ -471,9 +581,9 @@
 
     var pshp0 = paramShapeSelectionSingle();
     if (pshp0) {
-      var hp0 = cornerHandleWorldPositions(pshp0);
+      var hp0 = paramHandleWorldPositions(pshp0);
       var HIT_R0 = 10 / view.zoom, hitCorner0 = null;
-      ['tl', 'tr', 'br', 'bl'].forEach(function (c) { if (!hitCorner0 && pt.getDistance(hp0[c]) < HIT_R0) hitCorner0 = c; });
+      window.SMParamShapeHandles.handleNamesFor(pshp0).forEach(function (c) { if (!hitCorner0 && pt.getDistance(hp0[c]) < HIT_R0) hitCorner0 = c; });
       if (hitCorner0) {
         mode = 'cornerRadius';
         pushUndo();
@@ -947,10 +1057,12 @@
       e.stopImmediatePropagation(); e.preventDefault();
       var wc = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
       var ptc = new Point(wc[0], wc[1]);
-      var rc = cornerRadiusFromDrag(_cornerDrag.path, _cornerDrag.corner, ptc);
-      _cornerDrag.path.data.paramShape[_cornerDrag.corner] = rc;
-      window.applyParamShapeRect(_cornerDrag.path);
+      var kindDef = PARAM_HANDLE_KINDS[_cornerDrag.path.data.paramShape.kind];
+      var rc = kindDef.valueFromDrag(_cornerDrag.path, _cornerDrag.corner, ptc);
+      kindDef.commit(_cornerDrag.path, _cornerDrag.corner, rc);
       if (window.updateCornersPanel) updateCornersPanel();
+      if (window.updateEllipseArcPanel) updateEllipseArcPanel();
+      if (window.updateStarPanel) updateStarPanel();
       window.SMEngineBridge.renderNow();
       return;
     }
@@ -1176,6 +1288,7 @@
       // translate(delta*N) — zero accumulated drift by construction.
       selectedPaths.forEach(function (p) {
         p.translate(delta);
+        if (window.syncParamShapeBoxOnTranslate) window.syncParamShapeBoxOnTranslate(p, delta.x, delta.y);
         transformFillGradient(p, function (gp) { return gp.add(delta); });
         if (p.data && p.data.isVectorBrush && p.data.centerSegments) {
           p.data.centerSegments.forEach(function (s) { s.point = [s.point[0] + delta.x, s.point[1] + delta.y]; });
@@ -1260,6 +1373,7 @@
       }
       selectedPaths.forEach(function (p) {
         p.scale(stepSx, stepSy, anchor);
+        if (window.syncParamShapeBoxOnScale) window.syncParamShapeBoxOnScale(p, stepSx, stepSy, anchor);
         transformFillGradient(p, function (gp) {
           return new Point(anchor.x + (gp.x - anchor.x) * stepSx, anchor.y + (gp.y - anchor.y) * stepSy);
         });
