@@ -178,6 +178,8 @@
     <button class="tool-btn" data-tool="line" data-i18n-title="toolLine" title="Line (U in Animation 2D — Motion mode reserves U to reveal animated properties)"><span class="material-symbols-rounded">&#xf755;</span><span class="sk">U</span></button>
     <button class="tool-btn" data-tool="rect" data-i18n-title="toolRect" title="Rectangle (R)"><span class="material-symbols-rounded">&#xe3c6;</span><span class="sk">R</span></button>
     <button class="tool-btn" data-tool="ellipse" data-i18n-title="toolEllipse" title="Ellipse (L)"><span class="material-symbols-rounded">&#xef4a;</span><span class="sk">L</span></button>
+    <button class="tool-btn" data-tool="speechbubble" data-i18n-title="toolSpeechBubble" title="Speech bubble — rounded rect with an auto tail, drag to size (D)"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M4 4h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H10l-4.2 4.2A1 1 0 0 1 4 20.5V17H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/></svg><span class="sk">D</span></button>
+    <button class="tool-btn" data-tool="star" data-i18n-title="toolStar" title="Star / Polygon — drag to size, adjust point count / inner radius / corner rounding in the panel (K)"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 2.5l2.9 6.6 7.1.7-5.4 4.7 1.7 7-6.3-3.8-6.3 3.8 1.7-7-5.4-4.7 7.1-.7z"/></svg><span class="sk">K</span></button>
     <!-- Text sits right below the Ellipse (feedback #21) — after the shape
          group, not in the middle of the selection tools. -->
     <button class="tool-btn" data-tool="text" data-i18n-title="toolText" title="Texte — clique le canvas pour poser un bloc de texte (rendu image) (Y)"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M5 4h14v3h-2V6h-4v12h2v2H9v-2h2V6H7v1H5z"/></svg><span class="sk">Y</span></button>
@@ -410,6 +412,33 @@
         <div class="pr"><span class="pl" data-i18n="fieldMaskMode">Mode</span><select class="pi" id="p-mask-mode" data-i18n-title="maskModeTypeTitle" title="Add = union avec les autres masques du calque · Subtract = découpe un trou · Intersect = ne garde que le chevauchement"><option value="add" data-i18n="maskAdd">Add</option><option value="subtract" data-i18n="maskSubtract">Subtract</option><option value="intersect" data-i18n="maskIntersect">Intersect</option></select></div>
         <div class="pr"><span class="pl" data-i18n="fieldMaskFeather">Feather</span><input type="number" class="pi scrub" id="p-mask-feather" value="0" min="0" max="500" data-step="1" data-i18n-title="maskFeatherTitle" title="Adoucit le bord du masque combiné (partagé entre les masques de ce calque — voir l'audit) — comme le Mask Feather d'After Effects"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
         <div class="pr"><button class="pbtn" id="btn-mask-unset" style="flex:1;font-size:10px" data-i18n-title="unmaskTitle" title="Redevient une forme normale (n'est plus un masque)" data-i18n="btnUnmask">Retirer comme masque</button></div>
+      </div>
+    </div>
+    <div class="psec" id="corners-sec" style="display:none">
+      <div class="phdr"><span class="ar">☰</span> <span>Coins</span></div>
+      <div class="pbdy">
+        <div class="pr"><label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-dim)"><input type="checkbox" id="p-corners-link" checked> Lier les 4 coins</label></div>
+        <div class="pr"><span class="pl" title="Haut-gauche">↖</span><input type="number" class="pi scrub" id="p-corner-tl" value="0" min="0" data-step="1"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
+        <div class="pr" id="corner-tr-row"><span class="pl" title="Haut-droit">↗</span><input type="number" class="pi scrub" id="p-corner-tr" value="0" min="0" data-step="1"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
+        <div class="pr" id="corner-br-row"><span class="pl" title="Bas-droit">↘</span><input type="number" class="pi scrub" id="p-corner-br" value="0" min="0" data-step="1"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
+        <div class="pr" id="corner-bl-row"><span class="pl" title="Bas-gauche">↙</span><input type="number" class="pi scrub" id="p-corner-bl" value="0" min="0" data-step="1"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
+      </div>
+    </div>
+    <div class="psec" id="ellipse-arc-sec" style="display:none">
+      <div class="phdr"><span class="ar">☰</span> <span>Camembert / Donut</span></div>
+      <div class="pbdy">
+        <div class="pr" id="ellipse-arc-convert-row"><button class="pbtn ac" id="btn-ellipse-arc-convert" style="flex:1">Rendre dynamique</button></div>
+        <div class="pr" id="ellipse-arc-start-row" style="display:none"><span class="pl">Début</span><input type="number" class="pi scrub" id="p-arc-start" value="0" min="0" max="360" data-step="1"><span style="font-size:9px;color:var(--text-dim)">°</span></div>
+        <div class="pr" id="ellipse-arc-sweep-row" style="display:none"><span class="pl">Ouverture</span><input type="number" class="pi scrub" id="p-arc-sweep" value="359.9" min="0.1" max="359.9" data-step="1"><span style="font-size:9px;color:var(--text-dim)">°</span></div>
+        <div class="pr" id="ellipse-arc-inner-row" style="display:none"><span class="pl">Rayon interne</span><input type="number" class="pi scrub" id="p-arc-inner" value="0" min="0" max="95" data-step="1"><span style="font-size:9px;color:var(--text-dim)">%</span></div>
+      </div>
+    </div>
+    <div class="psec" id="star-sec" style="display:none">
+      <div class="phdr"><span class="ar">☰</span> <span>Étoile / Polygone</span></div>
+      <div class="pbdy">
+        <div class="pr"><span class="pl">Branches</span><input type="number" class="pi scrub" id="p-star-points" value="5" min="3" max="24" data-step="1"></div>
+        <div class="pr"><span class="pl">Rayon interne</span><input type="number" class="pi scrub" id="p-star-inner" value="50" min="5" max="100" data-step="1"><span style="font-size:9px;color:var(--text-dim)">%</span></div>
+        <div class="pr"><span class="pl">Coins</span><input type="number" class="pi scrub" id="p-star-corner" value="0" min="0" data-step="1"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
       </div>
     </div>
     <div class="psec" id="text-actions-sec" style="display:none">

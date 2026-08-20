@@ -1281,6 +1281,12 @@
           if (sd && window.SMMotion && cPathOpsStrokeId && SMMotion.hasTextBoundsFollowMotionFor && SMMotion.hasTextBoundsFollowMotionFor(i, cPathOpsStrokeId)) {
             sd.segments = SMMotion.applyTextBoundsFollowFor(i, cPathOpsStrokeId, sd, renderFrame);
           }
+          // Dynamic shapes phase 2 (2026-08-18) — animated corner radii,
+          // same innermost-layer placement as Trim/vertex-offsets right
+          // above (shape's own local space, before elMat/motionMat).
+          if (sd && window.SMMotion && cStrokeId && SMMotion.hasParamShapeMotionFor && SMMotion.hasParamShapeMotionFor(i, cStrokeId)) {
+            sd.segments = SMMotion.applyParamShapeFor(i, cStrokeId, sd, renderFrame);
+          }
           if (sd && elMat) sd.segments = SMMotion.transformSegments(sd.segments, elPivot, elMat);
           if (sd && motionMat) sd.segments = SMMotion.transformSegments(sd.segments, motionPivot, motionMat);
           // 3D layer (2026-07-28) — replaces motionMat's role for a 3D-
@@ -2222,6 +2228,24 @@
     // treatment as the anchor dot.
     var ringDrawRadius = ringRadius + (state.xformRingHovered ? 4 : 0) * zs;
     items.push(circleItem(ap.x, ap.y, ringDrawRadius, null, [74, 158, 255, 160], 1 * zs));
+    // Dynamic shapes phase 3 (2026-08-18) — corner-radius drag handles for
+    // a single selected rect with data.paramShape, orange to read as a
+    // DIFFERENT kind of grip from the blue transform-box handles just
+    // above (same color the mask/trim features already use for a
+    // per-shape, non-transform control). Positions come from the SAME
+    // select-bridge.js helper the hit-test uses (SMParamShapeHandles), so
+    // drawn == grabbable by construction, never two independently
+    // maintained copies of this math.
+    if (window.SMParamShapeHandles) {
+      var pshpSel = window.SMParamShapeHandles.paramShapeSelectionSingle();
+      if (pshpSel) {
+        var hpDraw = window.SMParamShapeHandles.cornerHandleWorldPositions(pshpSel);
+        ['tl', 'tr', 'br', 'bl'].forEach(function (c) {
+          var hp = hpDraw[c];
+          items.push(circleItem(hp.x, hp.y, 4 * zs, [255, 184, 108, 255], [255, 255, 255, 255], 1.2 * zs));
+        });
+      }
+    }
     return items;
   }
   function buildMarqueeItems() {

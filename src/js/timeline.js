@@ -347,6 +347,7 @@ function retimeTweenSpans(li,pairs,captured){
 // ---- API ----
 var PRODUCER_ALLOWED_TOOLS=['hand','zoom','rotate','comment'];
 window.SM={
+  exposeSymbolProperty:exposeSymbolProperty,
   goToFrame:function(idx){goToFrame(idx);},togglePlay:togglePlay,stopPlay:stopPlay,undo:undo,redo:redo,
   setTool:function(t){
     // RBAC (Phase 3): "producteur" is read-only + comments/validation — see
@@ -385,7 +386,7 @@ window.SM={
     state.tool=t;renderArcs();
     if(_camToolChanged)renderTimeline();
     document.querySelectorAll('.tool-btn').forEach(function(b){b.classList.toggle('active',b.dataset.tool===t);});
-    var cc={draw:'crosshair',pen:'crosshair',line:'crosshair',rect:'crosshair',ellipse:'crosshair',select:'default',subselect:'default',fsselect:'default',comment:'crosshair',camera:'move',text:'text',eraser:'pointer',fill:'crosshair',fillbrush:'crosshair',eyedropper:'crosshair',hand:'grab',zoom:'zoom-in',rotate:'grab',perspective:'crosshair',symmetry:'crosshair',rig:'crosshair'};
+    var cc={draw:'crosshair',pen:'crosshair',line:'crosshair',rect:'crosshair',ellipse:'crosshair',speechbubble:'crosshair',star:'crosshair',select:'default',subselect:'default',fsselect:'default',comment:'crosshair',camera:'move',text:'text',eraser:'pointer',fill:'crosshair',fillbrush:'crosshair',eyedropper:'crosshair',hand:'grab',zoom:'zoom-in',rotate:'grab',perspective:'crosshair',symmetry:'crosshair',rig:'crosshair'};
     canvasEl.style.cursor=cc[t]||'default';
     // Brush texture presets (Chalk/Charcoal/Pencil…) stamp dabs along a
     // discrete centerline — Fill Brush commits a filled OUTLINE shape from
@@ -1996,7 +1997,7 @@ function updateUI(frameOnly){
   window._totalF=state.totalFrames;window._waIn=state.waIn;window._waOut=state.waOut;window._curFrame=state.currentFrame;
   window.updateWaBar();window.updateOmMarkers(state.currentFrame,state.totalFrames);
   if(frameOnly)updatePlayhead();else renderTimeline();
-  renderLayerList(frameOnly);updateCompInstancePanel();updateDuplicatorPanel();updateFootagePanel();updateSelPropsPanel();updateFsSelPanel();updateRevisionPanel();updateMaskPanel();updateTextActionsPanel();updateTextPropsPanel();if(window.updateEffectsPanel)window.updateEffectsPanel();updatePropsContext();
+  renderLayerList(frameOnly);updateCompInstancePanel();updateDuplicatorPanel();updateFootagePanel();updateSelPropsPanel();updateFsSelPanel();updateRevisionPanel();updateMaskPanel();updateCornersPanel();updateEllipseArcPanel();updateStarPanel();updateTextActionsPanel();updateTextPropsPanel();if(window.updateEffectsPanel)window.updateEffectsPanel();updatePropsContext();
 }
 // Vector mask properties (2026-08, AE-style "Mask" — see the mask-feature
 // audit) — same "own dedicated panel section, shown only for a matching
@@ -2040,6 +2041,121 @@ document.getElementById('btn-mask-unset').addEventListener('click',function(){
   delete p.data.isMask;delete p.data.maskMode;delete p.data.maskFeather;
   saveActiveLayerFrame();updateUI();if(window.SMEngineBridge)SMEngineBridge.renderNow();
 });
+// Dynamic shape, phase 1 (2026-08-18) — corner-radius panel for a
+// selected rect with data.paramShape (see applyParamShapeRect's own
+// comment, tools.js, for why this bakes radii into real segments right
+// away instead of a render-time rebuild). "Lier les 4 coins" mirrors
+// Figma's own link toggle: ON writes the same value to all 4 fields (the
+// common case — most rounded rects are uniform), OFF reveals the other 3
+// so each corner can diverge.
+function updateCornersPanel(){
+  var sec=document.getElementById('corners-sec');
+  if(!sec)return;
+  var p=(state.tool==='select'&&selectedPaths.length===1)?selectedPaths[0]:null;
+  var ps=p&&p.data&&p.data.paramShape&&p.data.paramShape.kind==='rect'?p.data.paramShape:null;
+  if(!ps){sec.style.display='none';return;}
+  sec.style.display='';
+  document.getElementById('p-corner-tl').value=ps.tl||0;
+  document.getElementById('p-corner-tr').value=ps.tr||0;
+  document.getElementById('p-corner-br').value=ps.br||0;
+  document.getElementById('p-corner-bl').value=ps.bl||0;
+  var linked=document.getElementById('p-corners-link').checked;
+  ['corner-tr-row','corner-br-row','corner-bl-row'].forEach(function(id){document.getElementById(id).style.display=linked?'none':'';});
+}
+document.getElementById('p-corners-link').addEventListener('change',function(){
+  ['corner-tr-row','corner-br-row','corner-bl-row'].forEach(function(id){document.getElementById(id).style.display=this.checked?'none':'';}.bind(this));
+});
+function commitCornerEdit(which,val){
+  var p=selectedPaths[0];if(!p||!p.data||!p.data.paramShape||p.data.paramShape.kind!=='rect')return;
+  pushUndo();
+  var ps=p.data.paramShape;
+  var v=Math.max(0,parseFloat(val)||0);
+  if(document.getElementById('p-corners-link').checked){ps.tl=ps.tr=ps.br=ps.bl=v;}
+  else ps[which]=v;
+  window.applyParamShapeRect(p);
+  saveActiveLayerFrame();updateCornersPanel();if(window.SMEngineBridge)SMEngineBridge.renderNow();
+}
+['tl','tr','br','bl'].forEach(function(which){
+  document.getElementById('p-corner-'+which).addEventListener('input',function(){commitCornerEdit(which,this.value);});
+});
+// Dynamic shapes, Ellipse (2026-08-18) — same panel pattern as Coins:
+// shown for exactly one selected path that's EITHER already a dynamic
+// ellipse (fields visible) or a plain ellipse-shaped selection eligible
+// to become one (just the convert button — see buildOvalGuess below for
+// why "plain ellipse" can't be detected from data alone, unlike rect's
+// data.paramShape being stamped at creation time for every rect).
+function looksLikePlainEllipse(p){
+  if(!p||p.data&&p.data.paramShape)return false;
+  if(!(p instanceof Path)||!p.closed)return false;
+  return p.segments.length>=4&&p.segments.length<=8;
+}
+function updateEllipseArcPanel(){
+  var sec=document.getElementById('ellipse-arc-sec');
+  if(!sec)return;
+  var p=(state.tool==='select'&&selectedPaths.length===1)?selectedPaths[0]:null;
+  var ps=p&&p.data&&p.data.paramShape&&p.data.paramShape.kind==='ellipse'?p.data.paramShape:null;
+  var eligible=p&&!ps&&looksLikePlainEllipse(p);
+  if(!ps&&!eligible){sec.style.display='none';return;}
+  sec.style.display='';
+  document.getElementById('ellipse-arc-convert-row').style.display=ps?'none':'';
+  ['ellipse-arc-start-row','ellipse-arc-sweep-row','ellipse-arc-inner-row'].forEach(function(id){document.getElementById(id).style.display=ps?'':'none';});
+  if(ps){
+    document.getElementById('p-arc-start').value=ps.startAngle||0;
+    document.getElementById('p-arc-sweep').value=ps.sweep!==undefined?ps.sweep:359.9;
+    document.getElementById('p-arc-inner').value=Math.round((ps.innerRadius||0)*100);
+  }
+}
+document.getElementById('btn-ellipse-arc-convert').addEventListener('click',function(){
+  var p=selectedPaths[0];if(!p)return;
+  pushUndo();
+  window.convertToDynamicEllipse(p);
+  saveActiveLayerFrame();updateEllipseArcPanel();if(window.SMEngineBridge)SMEngineBridge.renderNow();
+});
+function commitArcEdit(field,val,isPercent){
+  var p=selectedPaths[0];if(!p||!p.data||!p.data.paramShape||p.data.paramShape.kind!=='ellipse')return;
+  pushUndo();
+  var ps=p.data.paramShape;
+  var v=parseFloat(val)||0;
+  ps[field]=isPercent?Math.max(0,Math.min(95,v))/100:v;
+  window.applyParamShapeEllipse(p);
+  saveActiveLayerFrame();updateEllipseArcPanel();if(window.SMEngineBridge)SMEngineBridge.renderNow();
+}
+document.getElementById('p-arc-start').addEventListener('input',function(){commitArcEdit('startAngle',this.value,false);});
+document.getElementById('p-arc-sweep').addEventListener('input',function(){commitArcEdit('sweep',this.value,false);});
+document.getElementById('p-arc-inner').addEventListener('input',function(){commitArcEdit('innerRadius',this.value,true);});
+// Dynamic shapes, Star/Polygon (2026-08-18) — same panel pattern as
+// Coins/Camembert. pointCount stays a plain field (no stopwatch/Motion
+// row) — a fractional point count between two integer keyframes has no
+// coherent geometric meaning to interpolate, unlike innerRatio/corner
+// radius which are genuinely continuous. Also feeds state.starPointCount/
+// starInnerRatio (tools.js reads these as the NEXT shape's starting
+// values, same "remembers your last setting" convention brushSize/
+// smoothing/etc already follow).
+function updateStarPanel(){
+  var sec=document.getElementById('star-sec');
+  if(!sec)return;
+  var p=(state.tool==='select'&&selectedPaths.length===1)?selectedPaths[0]:null;
+  var ps=p&&p.data&&p.data.paramShape&&p.data.paramShape.kind==='star'?p.data.paramShape:null;
+  if(!ps){sec.style.display='none';return;}
+  sec.style.display='';
+  document.getElementById('p-star-points').value=ps.pointCount||5;
+  document.getElementById('p-star-inner').value=Math.round((ps.innerRatio!==undefined?ps.innerRatio:0.5)*100);
+  document.getElementById('p-star-corner').value=ps.cornerRadius||0;
+}
+function commitStarEdit(field,val,isPercent){
+  var p=selectedPaths[0];if(!p||!p.data||!p.data.paramShape||p.data.paramShape.kind!=='star')return;
+  pushUndo();
+  var ps=p.data.paramShape;
+  var v=parseFloat(val)||0;
+  if(field==='pointCount'){ps.pointCount=Math.max(3,Math.round(v));state.starPointCount=ps.pointCount;}
+  else if(field==='innerRatio'){ps.innerRatio=Math.max(0.05,Math.min(1,v/100));state.starInnerRatio=ps.innerRatio;}
+  else ps.cornerRadius=Math.max(0,v);
+  window.applyParamShapeStar(p);
+  saveActiveLayerFrame();updateStarPanel();if(window.SMEngineBridge)SMEngineBridge.renderNow();
+}
+document.getElementById('p-star-points').addEventListener('input',function(){commitStarEdit('pointCount',this.value);});
+document.getElementById('p-star-inner').addEventListener('input',function(){commitStarEdit('innerRatio',this.value);});
+document.getElementById('p-star-corner').addEventListener('input',function(){commitStarEdit('cornerRadius',this.value);});
 // Team review Accept/Reject panel — shown when exactly one selected item is
 // either an active (non-ghost) revision (data.revisionParentId) or a
 // delete-revision ghost (data.isRevisionGhost && revisionAction==='delete').
@@ -5302,6 +5418,8 @@ var TOOL_SHORTCUTS=[
   {action:'line',key:'u',label:'Line'},
   {action:'rect',key:'r',label:'Rectangle'},
   {action:'ellipse',key:'l',label:'Ellipse'},
+  {action:'speechbubble',key:'d',label:'Bulle de dialogue'},
+  {action:'star',key:'k',label:'Étoile / Polygone'},
   {action:'eraser',key:'e',label:'Eraser'},
   {action:'fill',key:'g',label:'Fill'},
   {action:'fillbrush',key:'n',label:'Fill Brush'},

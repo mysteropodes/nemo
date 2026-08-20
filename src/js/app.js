@@ -591,6 +591,14 @@ function serP(p){var isVB=!!(p.data&&p.data.isVectorBrush);var center=isVB&&p.da
   // Group membership (2026-07, group-bridge.js's Cmd+G) — a stable id
   // shared by every member, same pattern as strokeId/brushGroupId above.
   groupId:(p.data&&p.data.groupId)?p.data.groupId:undefined,
+  // Dynamic shape (2026-08-18, "shape dynamique round corner sur rect...")
+  // — plain data like fillGradient just above, round-trips through JSON
+  // as-is. The item's REAL segments already encode the CURRENT radii
+  // (applyParamShapeRect bakes them in, tools.js) — this is only the
+  // declared intent (which corner is which, for the Coins panel to read
+  // back and for per-corner Motion to target), not a second source of
+  // truth for the geometry itself.
+  paramShape:(p.data&&p.data.paramShape)?p.data.paramShape:undefined,
   // Per-ELEMENT effects (2026-07, effects-panel.js — "possible de
   // différencié les effet par éléments sélectionné"): same {type,enabled,
   // p1,p2,p3,p4}[] shape as ld.effects, but scoped to just this one shape
@@ -660,7 +668,7 @@ function desP(d,layer,op){var prev=project.activeLayer;layer.activate();var p=ne
   // outline it never had ("un trait blanc apparaît autour du fill après
   // ctrl+Z"). Legacy data predating the field (undefined) keeps the old
   // fallback chain untouched.
-  p.strokeColor=d.hasRealStroke===false?null:(d.strokeColor||((d.isVectorBrush||d.brushTexturePreset||d.bitmapBrushSpec||d.isBrushTextureCopy||dNoStrokeChannel||dIsShadowChannel)?null:'#fff'));p.strokeWidth=d.strokeWidth||3;p.strokeCap=typeof d.strokeCap==='string'?d.strokeCap:'round';p.strokeJoin=typeof d.strokeJoin==='string'?d.strokeJoin:'round';if(d.miterLimit!==undefined)p.miterLimit=d.miterLimit;if(d.fillColor)p.fillColor=d.fillColor;else p.fillColor=null;p.opacity=op!==undefined?op:(d.opacity!==undefined?d.opacity:1);if(d.dashArray&&d.dashArray.length)p.dashArray=d.dashArray;if(d.dashOffset!==undefined)p.dashOffset=d.dashOffset;if(d.paintOrder){p.data.paintOrder=d.paintOrder;}if(d.isVectorBrush){p.data.isVectorBrush=true;if(d.centerSegments)p.data.centerSegments=d.centerSegments;if(d.widthProfile)p.data.widthProfile=d.widthProfile;if(d.strokeProfile)p.data.strokeProfile=d.strokeProfile;if(d.profileBase)p.data.profileBase=d.profileBase;if(d.isFillShape)p.data.isFillShape=true;applyBrushKeyline(p);}if(d.fillSeed)p.data.fillSeed=d.fillSeed;if(d.fillSeeds&&d.fillSeeds.length)p.data.fillSeeds=d.fillSeeds;if((d.fillSeed||(d.fillSeeds&&d.fillSeeds.length))&&d.fillGapPx!==undefined)p.data.fillGapPx=d.fillGapPx;if(d.fillWalls)p.data.fillWalls=d.fillWalls;if(d.strokeId)p.data.strokeId=d.strokeId;if(d.brushGroupId)p.data.brushGroupId=d.brushGroupId;if(d.isLinkedFillCompanion)p.data.isLinkedFillCompanion=true;if(d.linkedFillId)p.data.linkedFillId=d.linkedFillId;if(d.tweenOn)p.data.tweenOn=true;if(d.boxAngle)p.data.boxAngle=d.boxAngle;if(d.xformAnchorKey)p.data.xformAnchorKey=d.xformAnchorKey;if(d.xformAnchorCustom)p.data.xformAnchorCustom=d.xformAnchorCustom;if(d.isBrushTextureCopy)p.data.isBrushTextureCopy=true;if(d.brushTexturePreset)p.data.brushTexturePreset=d.brushTexturePreset;if(d.bitmapBrushSpec)p.data.bitmapBrushSpec=d.bitmapBrushSpec;if(d.bitmapPressureProfile)p.data.bitmapPressureProfile=d.bitmapPressureProfile;if(d.preTextureOpacity!==undefined)p.data.preTextureOpacity=d.preTextureOpacity;if(d.preTextureStroke!==undefined)p.data.preTextureStroke=d.preTextureStroke;if(d.channelTag)p.data.channelTag=d.channelTag;if(d.shadowSwatchId)p.data.shadowSwatchId=d.shadowSwatchId;if(d.ownerId)p.data.ownerId=d.ownerId;if(d.ownerName)p.data.ownerName=d.ownerName;if(d.ownerColor)p.data.ownerColor=d.ownerColor;if(d.revisionParentId)p.data.revisionParentId=d.revisionParentId;if(d.isRevisionGhost)p.data.isRevisionGhost=true;if(d.revisionAction)p.data.revisionAction=d.revisionAction;if(d.preRevisionOpacity!==undefined)p.data.preRevisionOpacity=d.preRevisionOpacity;if(d.fillGradient)p.data.fillGradient=d.fillGradient;if(d.groupId)p.data.groupId=d.groupId;if(d.effects&&d.effects.length)p.data.effects=d.effects;
+  p.strokeColor=d.hasRealStroke===false?null:(d.strokeColor||((d.isVectorBrush||d.brushTexturePreset||d.bitmapBrushSpec||d.isBrushTextureCopy||dNoStrokeChannel||dIsShadowChannel)?null:'#fff'));p.strokeWidth=d.strokeWidth||3;p.strokeCap=typeof d.strokeCap==='string'?d.strokeCap:'round';p.strokeJoin=typeof d.strokeJoin==='string'?d.strokeJoin:'round';if(d.miterLimit!==undefined)p.miterLimit=d.miterLimit;if(d.fillColor)p.fillColor=d.fillColor;else p.fillColor=null;p.opacity=op!==undefined?op:(d.opacity!==undefined?d.opacity:1);if(d.dashArray&&d.dashArray.length)p.dashArray=d.dashArray;if(d.dashOffset!==undefined)p.dashOffset=d.dashOffset;if(d.paintOrder){p.data.paintOrder=d.paintOrder;}if(d.isVectorBrush){p.data.isVectorBrush=true;if(d.centerSegments)p.data.centerSegments=d.centerSegments;if(d.widthProfile)p.data.widthProfile=d.widthProfile;if(d.strokeProfile)p.data.strokeProfile=d.strokeProfile;if(d.profileBase)p.data.profileBase=d.profileBase;if(d.isFillShape)p.data.isFillShape=true;applyBrushKeyline(p);}if(d.fillSeed)p.data.fillSeed=d.fillSeed;if(d.fillSeeds&&d.fillSeeds.length)p.data.fillSeeds=d.fillSeeds;if((d.fillSeed||(d.fillSeeds&&d.fillSeeds.length))&&d.fillGapPx!==undefined)p.data.fillGapPx=d.fillGapPx;if(d.fillWalls)p.data.fillWalls=d.fillWalls;if(d.strokeId)p.data.strokeId=d.strokeId;if(d.brushGroupId)p.data.brushGroupId=d.brushGroupId;if(d.isLinkedFillCompanion)p.data.isLinkedFillCompanion=true;if(d.linkedFillId)p.data.linkedFillId=d.linkedFillId;if(d.tweenOn)p.data.tweenOn=true;if(d.boxAngle)p.data.boxAngle=d.boxAngle;if(d.xformAnchorKey)p.data.xformAnchorKey=d.xformAnchorKey;if(d.xformAnchorCustom)p.data.xformAnchorCustom=d.xformAnchorCustom;if(d.isBrushTextureCopy)p.data.isBrushTextureCopy=true;if(d.brushTexturePreset)p.data.brushTexturePreset=d.brushTexturePreset;if(d.bitmapBrushSpec)p.data.bitmapBrushSpec=d.bitmapBrushSpec;if(d.bitmapPressureProfile)p.data.bitmapPressureProfile=d.bitmapPressureProfile;if(d.preTextureOpacity!==undefined)p.data.preTextureOpacity=d.preTextureOpacity;if(d.preTextureStroke!==undefined)p.data.preTextureStroke=d.preTextureStroke;if(d.channelTag)p.data.channelTag=d.channelTag;if(d.shadowSwatchId)p.data.shadowSwatchId=d.shadowSwatchId;if(d.ownerId)p.data.ownerId=d.ownerId;if(d.ownerName)p.data.ownerName=d.ownerName;if(d.ownerColor)p.data.ownerColor=d.ownerColor;if(d.revisionParentId)p.data.revisionParentId=d.revisionParentId;if(d.isRevisionGhost)p.data.isRevisionGhost=true;if(d.revisionAction)p.data.revisionAction=d.revisionAction;if(d.preRevisionOpacity!==undefined)p.data.preRevisionOpacity=d.preRevisionOpacity;if(d.fillGradient)p.data.fillGradient=d.fillGradient;if(d.groupId)p.data.groupId=d.groupId;if(d.paramShape)p.data.paramShape=d.paramShape;if(d.effects&&d.effects.length)p.data.effects=d.effects;
   if(d.isVectorText)p.data.isVectorText=true;if(d.vectorChar)p.data.vectorChar=d.vectorChar;if(d.isText)p.data.isText=true;
   if(d.charIndex!=null)p.data.charIndex=d.charIndex;if(d.wordIndex!=null)p.data.wordIndex=d.wordIndex;if(d.lineIndex!=null)p.data.lineIndex=d.lineIndex;
   // Mograph duplicator copy tags (applyLayerDuplicator) — belt-and-suspenders
@@ -2322,6 +2330,33 @@ function getEffectiveStrokes(layerIdx,frameIdx,countOnly){
       var m=symMatrixOf(ld);
       out=out.map(function(sd){return applyMatrixToStrokeData(cloneStrokeForTransform(sd),m);});
     }
+    // Exposed-property overrides (2026-08-18, see exposeSymbolProperty's own
+    // comment) — resolved LAST, after every transform above, since these
+    // touch paint/visibility fields a matrix never does. `ld` (the INSTANCE
+    // layer, not the symbol) is what carries each property's actual value —
+    // SMMotion.valueAtFrame already knows how to fall back through
+    // animated→static→PROP_DEFAULT for any prop key, exposed ones included,
+    // so this reuses that evaluator directly rather than re-deriving a
+    // default here. Re-registers metadata every call (cheap, idempotent) —
+    // see propsFor's identical reasoning for why this can't be a one-time
+    // registration at exposure time alone.
+    if(sym.exposedProps&&sym.exposedProps.length&&window.SMMotion){
+      sym.exposedProps.forEach(function(ep){if(SMMotion.registerExposedPropMeta)SMMotion.registerExposedPropMeta(ep.key,ep.label,ep.default);});
+      var epByStroke={};
+      sym.exposedProps.forEach(function(ep){(epByStroke[ep.targetStrokeId]=epByStroke[ep.targetStrokeId]||[]).push(ep);});
+      out=out.map(function(sd){
+        if(!sd.strokeId||!epByStroke[sd.strokeId])return sd;
+        var sd2=null,hide=false;
+        epByStroke[sd.strokeId].forEach(function(ep){
+          var val=SMMotion.valueAtFrame(ld,ep.key,frameIdx)[0];
+          if(ep.targetField==='__visible'){if(val<50)hide=true;return;}
+          if(!sd2)sd2=JSON.parse(JSON.stringify(sd));
+          if(ep.targetField==='opacity')sd2.opacity=Math.max(0,Math.min(1,val/100));
+          else sd2[ep.targetField]=val;
+        });
+        return hide?null:(sd2||sd);
+      }).filter(function(sd){return sd;});
+    }
     return out;
   }
   // Plain layer, the overwhelmingly common case — hot path, called every
@@ -2392,6 +2427,30 @@ function cloneRigForSymbol(rig){
   return{bones:rig.bones,ikChains:rig.ikChains,nextId:rig.nextId,
     binds:(rig.binds||[]).map(function(b){return{strokeId:b.strokeId,rest:b.rest,weights:b.weights,rotate:b.rotate};})};
 }
+// Component exposed properties (2026-08-18) — declares a property on the
+// SYMBOL (state.symbols[symId].exposedProps), bound to one stroke inside it
+// by its stable strokeId. Every instance of this symbol then gets it as an
+// ordinary Motion property (propsFor, motion.js — registers PROP_LABEL/DIM/
+// UNIT/DEFAULT there, not here, so a project reload rehydrates it the first
+// time propsFor is called rather than needing a separate boot-time pass).
+// `targetField` is a real field name on a serialized stroke dict
+// ('fillColor','strokeColor','opacity'...) EXCEPT the sentinel '__visible',
+// which getEffectiveStrokes reads as "drop this stroke from the instance's
+// output entirely" rather than writing it onto the dict.
+function exposeSymbolProperty(symId,targetStrokeId,targetField,label,defaultVal){
+  var sym=state.symbols[symId];if(!sym)return null;
+  if(!sym.exposedProps)sym.exposedProps=[];
+  var key='ep_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,6);
+  var entry={key:key,label:label,targetStrokeId:targetStrokeId,targetField:targetField,default:defaultVal};
+  sym.exposedProps.push(entry);
+  if(window.SMMotion&&SMMotion.registerExposedPropMeta)SMMotion.registerExposedPropMeta(key,label,defaultVal);
+  return entry;
+}
+// NOT attached to window.SM here — timeline.js (loaded after this file,
+// index.html) assigns `window.SM={...}` as a fresh object LITERAL, which
+// silently wipes out anything attached to window.SM earlier (found live:
+// `window.SM.exposeSymbolProperty is not a function` despite the bare
+// function parsing fine). Registered in timeline.js's own literal instead.
 function convertLayerToComponent(layerIdx){
   if(state.activeSymbolId){showToast('Fermez d\'abord le composant en cours d\'édition');return;}
   var ld=state.layers[layerIdx];if(!ld){showToast('Calque invalide');return;}

@@ -21,7 +21,53 @@
 // rotate transform box with opposite-corner anchoring, and group move are
 // all ported too.
 (function () {
-  var mode = null; // 'xform-scale' | 'xform-rotate' | 'marquee' | 'move' | 'arc' | 'nv-drag' | 'nv-scale' | 'nv-rotate' | null
+  var mode = null; // 'xform-scale' | 'xform-rotate' | 'marquee' | 'move' | 'arc' | 'nv-drag' | 'nv-scale' | 'nv-rotate' | 'cornerRadius' | null
+  // Dynamic shapes phase 3 (2026-08-18) — canvas drag handles for a rect's
+  // corner radius, Figma's own interaction (a small grip sitting on each
+  // rounded corner's arc, draggable independently). Self-contained state,
+  // deliberately NOT sharing computeHandles()/the 8-handle transform box's
+  // hit-test — that system is already intricate (oriented boxes, Motion
+  // point-maps, distort quads); a parallel, narrowly-scoped check kept this
+  // additive instead of risking a regression in code this load-bearing.
+  var _cornerDrag = null;
+  function paramShapeSelectionSingle() {
+    if (selectedPaths.length !== 1) return null;
+    var p = selectedPaths[0];
+    return (p.data && p.data.paramShape && p.data.paramShape.kind === 'rect') ? p : null;
+  }
+  // Each handle sits at the rounded corner's own arc MIDPOINT (not the
+  // sharp geometric corner) — same visual language as Figma's grip. r=0
+  // collapses the (1-k) term to 0, so the handle sits exactly on the sharp
+  // corner point until you start dragging it outward, matching "grab the
+  // corner to begin rounding it" as a natural gesture rather than needing
+  // a pre-existing radius to have something to grab.
+  function cornerHandleWorldPositions(p) {
+    var ps = p.data.paramShape, b = p.bounds, k = 0.70710678;
+    var tl = ps.tl || 0, tr = ps.tr || 0, br = ps.br || 0, bl = ps.bl || 0;
+    return {
+      tl: new Point(b.left + tl * (1 - k), b.top + tl * (1 - k)),
+      tr: new Point(b.right - tr * (1 - k), b.top + tr * (1 - k)),
+      br: new Point(b.right - br * (1 - k), b.bottom - br * (1 - k)),
+      bl: new Point(b.left + bl * (1 - k), b.bottom - bl * (1 - k)),
+    };
+  }
+  var CORNER_POINT = {
+    tl: function (b) { return new Point(b.left, b.top); },
+    tr: function (b) { return new Point(b.right, b.top); },
+    br: function (b) { return new Point(b.right, b.bottom); },
+    bl: function (b) { return new Point(b.left, b.bottom); },
+  };
+  // Radius tracks straight-line distance from the TRUE corner to the
+  // pointer — simpler than inverting the arc-midpoint placement above, and
+  // reads just as naturally under the hand (drag further from the corner
+  // = bigger radius) without needing to match the handle's rest position
+  // exactly during the drag itself.
+  function cornerRadiusFromDrag(p, corner, pt) {
+    var b = p.bounds;
+    var maxR = Math.min(b.width, b.height) / 2;
+    return Math.max(0, Math.min(maxR, pt.getDistance(CORNER_POINT[corner](b))));
+  }
+  window.SMParamShapeHandles = { cornerHandleWorldPositions: cornerHandleWorldPositions, paramShapeSelectionSingle: paramShapeSelectionSingle };
   // Non-destructive combine groups (2026-07-29) — hit-test confirmatory
   // guard. UNION never has a problem here: the combined visible region is
   // exactly the union of members' own real geometry, so "hit a real
@@ -423,6 +469,18 @@
     lastPt = pt;
     window.SMEngineBridge.suspend();
 
+    var pshp0 = paramShapeSelectionSingle();
+    if (pshp0) {
+      var hp0 = cornerHandleWorldPositions(pshp0);
+      var HIT_R0 = 10 / view.zoom, hitCorner0 = null;
+      ['tl', 'tr', 'br', 'bl'].forEach(function (c) { if (!hitCorner0 && pt.getDistance(hp0[c]) < HIT_R0) hitCorner0 = c; });
+      if (hitCorner0) {
+        mode = 'cornerRadius';
+        pushUndo();
+        _cornerDrag = { path: pshp0, corner: hitCorner0 };
+        return;
+      }
+    }
     var ah = hitTestArc(pt);
     if (ah) {
       mode = 'arc';
@@ -885,6 +943,17 @@
         return;
       }
     }
+    if (mode === 'cornerRadius' && _cornerDrag) {
+      e.stopImmediatePropagation(); e.preventDefault();
+      var wc = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
+      var ptc = new Point(wc[0], wc[1]);
+      var rc = cornerRadiusFromDrag(_cornerDrag.path, _cornerDrag.corner, ptc);
+      _cornerDrag.path.data.paramShape[_cornerDrag.corner] = rc;
+      window.applyParamShapeRect(_cornerDrag.path);
+      if (window.updateCornersPanel) updateCornersPanel();
+      window.SMEngineBridge.renderNow();
+      return;
+    }
     if (!mode) {
       // Hover-only pass (not dragging anything) — tracks whether the
       // pointer sits over the anchor crosshair so engine-bridge.js can draw
@@ -1321,6 +1390,15 @@
       window.SMEngineBridge.renderNow();
       return;
     }
+    if (mode === 'cornerRadius') {
+      _cornerDrag = null;
+      mode = null;
+      saveActiveLayerFrame();
+      window.SMEngineBridge.resume();
+      updateUI();
+      window.SMEngineBridge.renderNow();
+      return;
+    }
     if (mode === 'arc') {
       draggingArc = null;
       arcDragCache = null;
@@ -1729,6 +1807,38 @@
         items.push({ sep: true });
         items.push({ label: 'Animer le texte…', action: function () { window.SMTextAnimator.openPanel(state.activeLayerIdx, animGid); } });
       }
+    }
+    // Component exposed properties (2026-08-18, "réutilisation dynamique de
+    // component... modifier des properties au dessus" — Figma Component
+    // Properties + AE Master Properties synthesis, confirmed with Cyril).
+    // Only makes sense while EDITING INSIDE a symbol (state.activeSymbolId —
+    // enterSymbol/enterComponentLayer set it, exitToScene clears it) on a
+    // single shape with a real strokeId (multi-select or a not-yet-tagged
+    // item has nothing stable to bind to). v1 scope: opacity (number) and
+    // visibility (boolean, stored 0/100 like every other Motion scalar) —
+    // color is a natural v2 (needs its own swatch row; these two reuse the
+    // fully generic Transform row renderer with zero new UI code, see
+    // propsFor's own comment, motion.js).
+    if (state.activeSymbolId && selectedPaths.length === 1 && p0.data && p0.data.strokeId && window.SM && window.SM.exposeSymbolProperty) {
+      items.push({ sep: true });
+      items.push({
+        label: 'Exposer l\'opacité comme propriété de Component…', action: function () {
+          var label = prompt('Nom de cette propriété (visible dans le panneau Motion de chaque instance) :', 'Opacité');
+          if (!label) return;
+          pushUndo();
+          window.SM.exposeSymbolProperty(state.activeSymbolId, p0.data.strokeId, 'opacity', label, Math.round((p0.opacity !== undefined ? p0.opacity : 1) * 100));
+          showToast('Propriété "' + label + '" exposée sur ce Component.');
+        }
+      });
+      items.push({
+        label: 'Exposer la visibilité comme propriété de Component…', action: function () {
+          var label = prompt('Nom de cette propriété (visible dans le panneau Motion de chaque instance) :', 'Visible');
+          if (!label) return;
+          pushUndo();
+          window.SM.exposeSymbolProperty(state.activeSymbolId, p0.data.strokeId, '__visible', label, 100);
+          showToast('Propriété "' + label + '" exposée sur ce Component.');
+        }
+      });
     }
     window.showContextMenu(e.clientX, e.clientY, items);
   }
