@@ -400,7 +400,7 @@
     // this file's own shouldIntercept()-gated logic below.
     if (state.appMode === 'motion' && window.SMMotion) {
       var w0 = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
-      if (SMMotion.onDown({ point: new Point(w0[0], w0[1]) })) {
+      if (SMMotion.onDown({ point: new Point(w0[0], w0[1]), altKey: e.altKey })) {
         e.stopImmediatePropagation(); e.preventDefault();
         return;
       }
@@ -435,7 +435,17 @@
       return;
     }
 
-    var hh = hitTestHandles(pt, e.altKey);
+    // Motion mode has its own COMPLETE, parallel box/ring/anchor hit-test
+    // (motion.js's hitMotionBoxHandle/hitAnchorPoint, tried first via
+    // SMMotion.onDown above) — this one is Animation 2D's, and its own
+    // overlay is already hidden in Motion mode (buildTransformBoxItems,
+    // engine-bridge.js, 2026-08-21). Without this gate the two systems'
+    // hit-zones could still overlap invisibly: SMMotion.onDown returning
+    // false (a Motion click that missed every Motion-specific target)
+    // let a hidden Animation 2D handle still grab the click underneath —
+    // confirmed live as the direct trigger for a real crash a few lines
+    // down (this block's own 2026-08-21 fix comment).
+    var hh = (state.appMode === 'motion') ? null : hitTestHandles(pt, e.altKey);
     if (hh && hh.type === 'anchor') {
       // Direct drag of the anchor crosshair — same UI-preference-not-
       // document-edit reasoning as the Alt+click path a bit further down
@@ -473,8 +483,21 @@
       // before anything below reads/mutates selectedPaths. Skipped in
       // Motion mode — same reasoning as the 'move' grab below: this
       // gesture never touches ld.frames content.
-      if (state.appMode !== 'motion') ensureKeyframe();
-      selectedPaths = state.selectedStrokeIndices.map(function (i) { return userLayers[state.activeLayerIdx].children[i]; }).filter(Boolean);
+      // 2026-08-21 fix ("Cannot read properties of null (reading
+      // 'gCorners')"): the re-hydration line right below is ONLY needed
+      // to recover from ensureKeyframe()'s object rebuild just above —
+      // pointless (and actively harmful) when that call didn't run. Motion
+      // mode never populates state.selectedStrokeIndices the way
+      // Animation 2D does (selectLayerFromGrid sets _layerSel instead,
+      // motion.js) — mapping over it here silently emptied a perfectly
+      // valid Motion selectedPaths (2 elements from a Component) down to
+      // [], so computeHandles() on the very next line returned null and
+      // h.gCorners/h.map crashed a few lines down. Confirmed live: any
+      // scale/rotate-handle grab in Motion mode reliably crashed here.
+      if (state.appMode !== 'motion') {
+        ensureKeyframe();
+        selectedPaths = state.selectedStrokeIndices.map(function (i) { return userLayers[state.activeLayerIdx].children[i]; }).filter(Boolean);
+      }
       var h = computeHandles();
       if (hh.type === 'rotate') {
         mode = 'xform-rotate';
@@ -1018,8 +1041,26 @@
       // Layer under a Motion transform: the pointer moves in RENDERED
       // space, the geometry lives underneath — pull the delta back
       // (inverse rotate + inverse scale) or the drag drifts/overshoots.
+      // ONLY for the raw-geometry translate below (Animation 2D's own
+      // selectedPaths.forEach(p.translate(...))) — Motion mode's own
+      // `position` write further down must NOT go through this inverse.
+      // 2026-08-21 fix ("si je le rotationne et après déplace tout le
+      // group ça déplace bizarrement comme si le x et y était inversé"):
+      // confirmed live — at rotation=90°, mvMap.invVec(50,0) returned
+      // (~0,-50), a pure horizontal drag turned vertical. computeMotionMat's
+      // own header comment is the reason why that's wrong for `position`
+      // specifically: "Position's dx/dy is a plain translation applied
+      // independently on top" of rotate/scale, i.e. position already
+      // lives in the layer's own POST-rotation output space — treating a
+      // position delta like a geometry delta (which DOES need inverse-
+      // rotating, since raw Paper.js points live in PRE-rotation local
+      // space) silently rotated every drag by the layer's own current
+      // rotation. Invisible until now because invVec is the identity at
+      // the default rotation=0/scale=100%, which is what every previous
+      // Motion-mode move drag happened to be tested at.
       var mvMap = (window.SMMotion && SMMotion.layerMotionPointMap) ? SMMotion.layerMotionPointMap(state.activeLayerIdx) : null;
-      if (mvMap) { var dv = mvMap.invVec(delta.x, delta.y); delta = new Point(dv[0], dv[1]); }
+      var geomDelta = delta;
+      if (mvMap) { var dv = mvMap.invVec(delta.x, delta.y); geomDelta = new Point(dv[0], dv[1]); }
       // Motion mode (2026-07-17, "quand on modifie ces properties dans le
       // canvas ça ne modifie ou ne créer pas de nouvelle clés" — a real
       // regression from the transform-box fix a few commits back: making
@@ -1045,6 +1086,12 @@
         window.SMEngineBridge.renderNow();
         return;
       }
+      // Past this point: Animation 2D's raw-geometry path only (Motion
+      // mode always returned above) — this DOES need the inverse-rotated/
+      // scaled delta (real Paper.js points live in pre-rotation local
+      // space), so switch to it here rather than touching every one of
+      // the several `delta` reads below individually.
+      delta = geomDelta;
       // translate(delta), not position=position.add(delta) — .position is
       // a bounds-CENTER getter/setter, so a move via .position re-derives
       // bounds on every single tick of the drag (many times per gesture)

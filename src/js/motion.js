@@ -2059,6 +2059,162 @@
     if (!win) return { segments: segments, closed: closed };
     return applyTrimSegments(segments, closed, win);
   }
+  // Vector-brush ribbon trim (2026-08-20) — "il faudrait mettre en place le
+  // trim du coup": applyTrimSegments/applyTrimFor above trim the ribbon's
+  // already-BAKED outline (the closed polygon rebuildVectorBrushOutline
+  // produces), which has no notion of "one step along the stroke" — arc-
+  // length-slicing that outline instead sliced across the ribbon's own
+  // width, in the same wedge/degenerate-sliver family as the original
+  // fill-wedge bug (see engine-bridge.js's isVectorBrush exclusion,
+  // 18b2d9a). The fix mirrors that commit's own diagnosis: trim BEFORE
+  // the fill-shape's geometry is built, on the shape's actual "spine" —
+  // here that's the ribbon's centerline + width profile, not the outline.
+  //
+  // Reuses buildTrimPolyline unmodified: centerSegments already has the
+  // exact same {point,handleIn,handleOut} shape buildTrimPolyline expects
+  // (relative handles, Paper.js Segment convention — confirmed by
+  // rebuildVectorBrushOutline's own `new Segment(point,handleIn,handleOut)`
+  // call, tools.js), so passing centerSegments straight into it needs no
+  // adapter. widthAtFrac (tools.js, window-exposed, pure math/no Paper
+  // dependency) resolves each dense sample's width the same way
+  // rebuildVectorBrushOutline already does — this function stays
+  // Paper.js-free like the rest of motion.js; engine-bridge.js is the one
+  // that turns the returned {pts,widths} into real Paper Points and feeds
+  // buildVariableWidthPath (tools.js), since it already owns that Paper
+  // object lifecycle for the untrimmed case.
+  //
+  // Returns null when there's no trim window (caller falls back to the
+  // untrimmed centerSegments/widthProfile as-is) or the window collapses
+  // to nothing; otherwise {pts:[[x,y],...], widths:[number,...]} — a
+  // dense, already-windowed sample pair ready for buildVariableWidthPath.
+  function applyTrimToVectorBrush(li, strokeId, centerSegments, widthProfile, frameIdx) {
+    if (!centerSegments || centerSegments.length < 2) return null;
+    var win = trimWindowAt(li, strokeId, frameIdx);
+    if (!win) return null;
+    var s = win.start, e = win.end, off = win.offset || 0;
+    s += off; e += off;
+    if (e <= s) return { pts: [], widths: [] };
+    var pts = buildTrimPolyline(centerSegments, false);
+    var cum = [0];
+    for (var i = 1; i < pts.length; i++) {
+      var dx = pts[i][0] - pts[i - 1][0], dy = pts[i][1] - pts[i - 1][1];
+      cum.push(cum[i - 1] + Math.sqrt(dx * dx + dy * dy));
+    }
+    var total = cum[cum.length - 1];
+    if (!(total > 0)) return null;
+    var fallbackWidth = (widthProfile && widthProfile.length) ? widthProfile[widthProfile.length - 1].width : 1;
+    var widthsArr = pts.map(function (_, idx) {
+      var w = widthAtFrac(widthProfile, cum[idx] / total);
+      return w == null ? fallbackWidth : w;
+    });
+    function lenAtPct(pct) { return Math.max(0, Math.min(100, pct)) / 100 * total; }
+    function sampleAtLen(len) {
+      len = Math.max(0, Math.min(total, len));
+      for (var i2 = 1; i2 < cum.length; i2++) {
+        if (cum[i2] >= len) {
+          var segLen = cum[i2] - cum[i2 - 1];
+          var t = segLen > 0 ? (len - cum[i2 - 1]) / segLen : 0;
+          return {
+            point: [pts[i2 - 1][0] + (pts[i2][0] - pts[i2 - 1][0]) * t, pts[i2 - 1][1] + (pts[i2][1] - pts[i2 - 1][1]) * t],
+            width: widthsArr[i2 - 1] + (widthsArr[i2] - widthsArr[i2 - 1]) * t,
+          };
+        }
+      }
+      return { point: pts[pts.length - 1].slice(), width: widthsArr[widthsArr.length - 1] };
+    }
+    var lenS = lenAtPct(s), lenE = lenAtPct(e);
+    if (lenE <= lenS) return { pts: [], widths: [] };
+    var windowLen = lenE - lenS;
+    var outPts = [], outWidths = [];
+    var first = sampleAtLen(lenS); outPts.push(first.point); outWidths.push(first.width);
+    var STEP = total / Math.max(1, pts.length - 1);
+    for (var d = STEP; d < windowLen; d += STEP) {
+      var smp = sampleAtLen(lenS + d);
+      outPts.push(smp.point); outWidths.push(smp.width);
+    }
+    var last = sampleAtLen(lenE); outPts.push(last.point); outWidths.push(last.width);
+    return { pts: outPts, widths: outWidths };
+  }
+  // Dynamic shapes phase 2 (2026-08-18) — same encapsulation shape as
+  // applyTrimFor just above (engine-bridge.js never needs to know
+  // ld.elementMotion is where this lives), for a rect's per-corner radius.
+  // `sd` is the item's already-serialized dict (serP's output — see
+  // getEffectiveStrokes' render-time note): sd.paramShape carries the
+  // shape's OWN un-animated radii (each rect's real default, unlike every
+  // other Motion prop which shares one constant — see PROP_DEFAULT's own
+  // comment), read only for whichever corner ISN'T currently animated.
+  // Geometry itself is NOT reimplemented here — buildRoundRectPath
+  // (tools.js, window-exposed) is the one place that turns radii into
+  // segments, so the static-edit path (Coins panel) and this per-frame
+  // rebuild can never drift apart (CLAUDE.md §3).
+  function hasParamShapeMotionFor(li, strokeId) {
+    var ld = state.layers[li]; if (!ld) return false;
+    var holder = elementHolder(ld, strokeId);
+    if (!holder) return false;
+    if (holder.paramShapeKind === 'rect') {
+      return isAnimated(holder, 'cornerTL') || isAnimated(holder, 'cornerTR') || isAnimated(holder, 'cornerBR') || isAnimated(holder, 'cornerBL');
+    }
+    if (holder.paramShapeKind === 'ellipse') {
+      return isAnimated(holder, 'arcStart') || isAnimated(holder, 'arcSweep') || isAnimated(holder, 'arcInner');
+    }
+    if (holder.paramShapeKind === 'star') {
+      return isAnimated(holder, 'starInner') || isAnimated(holder, 'starCorner');
+    }
+    return false;
+  }
+  function applyParamShapeFor(li, strokeId, sd, frameIdx) {
+    var ps = sd.paramShape; if (!ps) return sd.segments;
+    var ld = state.layers[li]; var holder = ld && elementHolder(ld, strokeId);
+    if (!holder) return sd.segments;
+    function cv(key, fallback) { return isAnimated(holder, key) ? valueAtFrame(holder, key, frameIdx)[0] : fallback; }
+    var xs = sd.segments.map(function (s) { return s.point[0]; }), ys = sd.segments.map(function (s) { return s.point[1]; });
+    var x1 = Math.min.apply(null, xs), x2 = Math.max.apply(null, xs), y1 = Math.min.apply(null, ys), y2 = Math.max.apply(null, ys);
+    var built;
+    if (ps.kind === 'rect') {
+      var tl = cv('cornerTL', ps.tl || 0), tr = cv('cornerTR', ps.tr || 0), br = cv('cornerBR', ps.br || 0), bl = cv('cornerBL', ps.bl || 0);
+      built = window.buildRoundRectPath(x1, y1, x2, y2, tl, tr, br, bl);
+    } else if (ps.kind === 'ellipse') {
+      var startA = cv('arcStart', ps.startAngle || 0), sweepA = cv('arcSweep', ps.sweep !== undefined ? ps.sweep : 359.9), innerPct = cv('arcInner', Math.round((ps.innerRadius || 0) * 100));
+      var cx = (x1 + x2) / 2, cy = (y1 + y2) / 2, rx = (x2 - x1) / 2, ry = (y2 - y1) / 2;
+      built = window.buildArcEllipsePath(cx, cy, rx, ry, startA, sweepA, innerPct / 100);
+    } else if (ps.kind === 'star') {
+      var innerPctS = cv('starInner', Math.round((ps.innerRatio !== undefined ? ps.innerRatio : 0.5) * 100)), cornerR = cv('starCorner', ps.cornerRadius || 0);
+      var cxs = (x1 + x2) / 2, cys = (y1 + y2) / 2, outerR = Math.min(x2 - x1, y2 - y1) / 2;
+      built = window.buildStarPolygonPath(cxs, cys, outerR, ps.pointCount || 5, innerPctS / 100, cornerR);
+    } else return sd.segments;
+    var segs = built.segments.map(function (s) { return { point: [s.point.x, s.point.y], handleIn: [s.handleIn.x, s.handleIn.y], handleOut: [s.handleOut.x, s.handleOut.y] }; });
+    built.remove();
+    return segs;
+  }
+  // ---- Path-point parenting, "drive" direction (2026-08) — a vertex of
+  // THIS path snaps onto another LAYER's resolved world position every
+  // frame, tagged on the live item's data (data.pathVertexFollow, persisted
+  // via serP/desP like data.paramShape) rather than in Motion state — it's
+  // per-VERTEX config on the shape itself, not a keyable value. Same
+  // render-time-rebuild shape as paramShape (hasXxxMotionFor/applyXxxFor,
+  // §5ter/§1 of CLAUDE.md): both engine-bridge.js's buildSceneJson AND
+  // export.js's exportBuildFrame must call these, or an exported frame
+  // shows the vertex at its static authored position while the live canvas
+  // shows it correctly attached.
+  function hasPathVertexFollowMotionFor(li, strokeId) {
+    var item = liveItemByStrokeId(li, strokeId);
+    return !!(item && item.data && item.data.pathVertexFollow && item.data.pathVertexFollow.length);
+  }
+  function applyPathVertexFollowFor(li, strokeId, sd, frameIdx) {
+    var item = liveItemByStrokeId(li, strokeId);
+    var follows = item && item.data && item.data.pathVertexFollow;
+    var segs = sd.segments.map(function (s) { return { point: s.point.slice(), handleIn: (s.handleIn || [0, 0]).slice(), handleOut: (s.handleOut || [0, 0]).slice() }; });
+    if (!follows || !follows.length) return segs;
+    follows.forEach(function (f) {
+      if (f.vertexIndex == null || f.vertexIndex < 0 || f.vertexIndex >= segs.length) return;
+      var targetLi = findLayerIndexByUid(f.targetLayerUid);
+      if (targetLi < 0 || targetLi === li) return;
+      var wp = resolveLayerWorldOrigin(targetLi, frameIdx);
+      if (!wp) return;
+      segs[f.vertexIndex].point = [wp[0] + (f.offset ? f.offset[0] : 0), wp[1] + (f.offset ? f.offset[1] : 0)];
+    });
+    return segs;
+  }
   // Transforms one item's already-built segments array (engine-bridge.js's
   // {point,handleIn,handleOut} triples, handles as RELATIVE offsets — see
   // serP/lottieShapeValue's shared convention) around `pivot`. Scale+rotate
@@ -2231,15 +2387,27 @@
     // Anchor point — AE-style crosshair-in-circle, ALWAYS shown while a
     // layer/element is expanded (even with zero keyframes on anything), same
     // as AE shows it on any selected layer/shape group. Pivot = bounds
-    // center + anchor offset (see computeMotionMat's header comment);
-    // position/rotation/scale are NOT applied to this preview point on
-    // purpose — it marks where the pivot sits in the target's OWN unmoved
-    // bounds, matching what engine-bridge.js/export.js actually pivot
-    // around at frame 0-equivalent (the anchor is a static geometric
-    // reference, not itself animated relative to the moving artwork).
-    var anc = valueAtFrame(holder, 'anchor', state.currentFrame);
-    var ax = bc.x + anc[0], ay = bc.y + anc[1];
-    var aw=outerWorldPoint(t,{x:ax,y:ay});
+    // center + anchor offset, THEN this target's own position/rotation/
+    // scale (motionBoxGeom's fwd, evaluated at the pivot itself — a
+    // rotation/scale around a point never moves that point, so this is
+    // exactly the render pivot, translated by Position same as the ring/
+    // position-dot below), finally the outer/parent chain.
+    // 2026-08-21 fix ("le cercle de rotation devrait être autour du point
+    // d'ancrage vert"): this used to skip the target's OWN transform
+    // entirely (deliberately, per a since-removed comment — "marks where
+    // the pivot sits in the target's OWN unmoved bounds") while the
+    // rotate ring/scale box (motionHandlePositions, below) and the
+    // position keyframe dot (hitPositionDot et al.) both already included
+    // it. The moment Position was ever non-[0,0], this crosshair stayed
+    // stranded at the un-translated bounds+anchor point while the ring
+    // and the position dot correctly moved together — confirmed live via
+    // SMMotion.buildOverlayItems(): with position=[80,-40], anchor=
+    // [100,50], the ring/dot centered at world (730,410) while this
+    // crosshair stayed at (650,450). hitAnchorPoint (the drag hit-test)
+    // and the 'anchor' onDrag handler are updated to match below, so the
+    // visible marker and its grab zone never disagree again.
+    var g0 = motionBoxGeom(t);
+    var aw = g0 ? outerWorldPoint(t, g0.pivot) : outerWorldPoint(t, { x: bc.x + valueAtFrame(holder, 'anchor', state.currentFrame)[0], y: bc.y + valueAtFrame(holder, 'anchor', state.currentFrame)[1] });
     var ancCol = [80, 220, 140, 255];
     items.push({ segments: [{ point: [aw.x - 9 * zs, aw.y] }, { point: [aw.x + 9 * zs, aw.y] }], closed: false, fillColor: null, strokeColor: ancCol, strokeWidth: 1.5 * zs });
     items.push({ segments: [{ point: [aw.x, aw.y - 9 * zs] }, { point: [aw.x, aw.y + 9 * zs] }], closed: false, fillColor: null, strokeColor: ancCol, strokeWidth: 1.5 * zs });
@@ -2671,8 +2839,14 @@
   }
   function hitAnchorPoint(pt, t) {
     var tol = 9 / view.zoom;
+    // Mirrors buildOverlayItems' anchor crosshair exactly (2026-08-21 fix)
+    // — must use the SAME point the marker is actually drawn at (own
+    // position/rotation/scale included via motionBoxGeom's pivot), or a
+    // click precisely on the visible marker misses the moment Position is
+    // non-[0,0], falling through to a plain body-drag instead.
+    var g0 = motionBoxGeom(t);
     var anc = valueAtFrame(t.holder, 'anchor', state.currentFrame);
-    var aw=outerWorldPoint(t,{x:t.boundsCenter.x+anc[0],y:t.boundsCenter.y+anc[1]});
+    var aw = g0 ? outerWorldPoint(t, g0.pivot) : outerWorldPoint(t, { x: t.boundsCenter.x + anc[0], y: t.boundsCenter.y + anc[1] });
     var ax=aw.x,ay=aw.y;
     return Math.hypot(pt.x - ax, pt.y - ay) < tol ? { holder: t.holder, bc: t.boundsCenter, target:t } : null;
   }
@@ -2803,7 +2977,18 @@
         var pk = hitPositionDot(event.point, ks, pv,t);
         if (pk) { pushUndo(); _motionDrag = { mode: 'point', key: pk, pv: pv,t:t }; return true; }
       }
-      var ap = hitAnchorPoint(event.point, t);
+      // Alt required (2026-08-21, "pour bouger le point d'ancrage c'est
+      // clic + alt + drag il me semble pas le cas là") — matches Animation
+      // 2D's own anchor-crosshair convention (select-bridge.js's
+      // hitTestHandles: "checked FIRST/exclusively, but ONLY while Alt is
+      // held... a click in that same spot now falls through to the normal
+      // move/marquee logic below" when Alt isn't held). Motion mode never
+      // had that gate — a plain click within the small hit radius grabbed
+      // the anchor unconditionally, which is what "il bouge encore" (the
+      // artwork/box moving when the user only meant to click-drag
+      // normally) was really describing: an accidental anchor grab, not
+      // the anchor itself misbehaving.
+      var ap = event.altKey ? hitAnchorPoint(event.point, t) : null;
       if (ap) { pushUndo(); _motionDrag = { mode: 'anchor', holder: ap.holder, bc: ap.bc, t:ap.target }; return true; }
       // Effector handles (2026-07-29) — checked last, lowest priority: they
       // only exist on duplicator layers and the user places them wherever
@@ -2848,8 +3033,46 @@
         k.v[0] += dx; k.v[1] += dy;
       });
     } else if (_motionDrag.mode === 'anchor') {
-      var localAnchor=outerLocalPoint(_motionDrag.t,{x:event.point.x,y:event.point.y});
-      setValue(_motionDrag.holder, 'anchor', [localAnchor.x - _motionDrag.bc.x, localAnchor.y - _motionDrag.bc.y]);
+      // Strip the outer/parent chain first (as before), THEN this target's
+      // OWN position/rotation/scale (motionBoxGeom's inv — the exact
+      // inverse of the fwd() the crosshair is now drawn through, see
+      // buildOverlayItems/hitAnchorPoint's matching 2026-08-21 fix) —
+      // without this second step the anchor silently absorbed the
+      // target's own Position into itself the instant Position was
+      // non-[0,0], dragging the anchor to the wrong spot the moment the
+      // gesture started from the (now correctly Position-shifted)
+      // crosshair.
+      var outerLocal=outerLocalPoint(_motionDrag.t,{x:event.point.x,y:event.point.y});
+      var ganc=motionBoxGeom(_motionDrag.t);
+      var localAnchor=ganc?ganc.inv(outerLocal.x,outerLocal.y):outerLocal;
+      var newAncX=localAnchor.x-_motionDrag.bc.x, newAncY=localAnchor.y-_motionDrag.bc.y;
+      // Position compensation (2026-08-21 fix, "si je le rotationne avant
+      // alors tout le bounding box bougent en même temps si je le
+      // déplace"): with rotation/scale active, moving the pivot (anchor)
+      // ALSO moves every OTHER geometry point relative to it — fwd()
+      // rotates/scales around (px,py)=bc+anchor, so changing anchor alone
+      // re-centers that rotation on a different point and the whole shape
+      // visibly swings/shifts, even though geometry itself never changed.
+      // Only true at rot=0/scale=100% (where fwd(x,y) algebraically
+      // cancels anchor out entirely — confirmed live pre-fix, dragging the
+      // anchor left the artwork untouched) is that a non-issue. AE's own
+      // anchor-drag tool never moves the artwork regardless of rotation —
+      // it does this by adjusting Position to compensate, and this is that
+      // same compensation: re-deriving Position so that fwd(anyPoint)
+      // stays IDENTICAL before/after the anchor change. Derivation: with
+      // fwd(P) = pivot + M·(P-pivot) + pos (M = rotate∘scale, pivot =
+      // bc+anchor), requiring fwd_new(P) == fwd_old(P) for every P gives
+      // pos_new = pos_old + (I-M)·(pivot_old - pivot_new).
+      var oldAnc=valueAtFrame(_motionDrag.holder,'anchor',state.currentFrame);
+      var rotC=valueAtFrame(_motionDrag.holder,'rotation',state.currentFrame)[0];
+      var sclC=valueAtFrame(_motionDrag.holder,'scale',state.currentFrame);
+      var rrC=rotC*Math.PI/180, ccC=Math.cos(rrC), ssC=Math.sin(rrC);
+      var sxC=sclC[0]/100, syC=sclC[1]/100;
+      var dxC=oldAnc[0]-newAncX, dyC=oldAnc[1]-newAncY; // pivot_old - pivot_new (bc cancels)
+      var MxC=sxC*ccC*dxC-syC*ssC*dyC, MyC=sxC*ssC*dxC+syC*ccC*dyC; // M·d
+      var posC=valueAtFrame(_motionDrag.holder,'position',state.currentFrame);
+      setValue(_motionDrag.holder,'position',[posC[0]+(dxC-MxC), posC[1]+(dyC-MyC)]);
+      setValue(_motionDrag.holder, 'anchor', [newAncX, newAncY]);
     } else if (_motionDrag.mode === 'effector') {
       // Plain mutation, not setValue/keyframe — effectors are static
       // per-duplicator config (like its mode/rows/radius/etc.), not a
@@ -6639,6 +6862,7 @@
       if (!ld || !ld.elementMotion || !strokeId) return false;
       return hasTrimMotion(ld.elementMotion[strokeId]);
     },
+    applyTrimToVectorBrush: applyTrimToVectorBrush,
     // Called by the two frame-content writers in app.js — the union is
     // derived from that content, so it must not outlive an edit.
     invalidateSymbolUnionBounds: invalidateSymbolUnionBounds,
