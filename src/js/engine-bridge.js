@@ -1020,6 +1020,24 @@
         // AE's shape-group-inside-a-layer composition. null in the common
         // case (this item has no per-element motion of its own).
         var cStrokeId = c.data && ((c.data.isBrushTextureCopy && brushAnchorStrokeId && brushAnchorStrokeId[c.data.brushGroupId]) || c.data.strokeId);
+        // Path-CONTENT mutations (Trim, per-vertex offsets, animated corner
+        // radii, path-vertex-follow, text-bounds-follow) must never run on a
+        // texture-copy dab's own tiny stamp geometry (isBrushTextureCopy,
+        // typically a 4-point square). cStrokeId above is deliberately
+        // aliased to the ANCHOR's strokeId for a dab so it inherits the
+        // anchor's Motion TRANSFORM (elMat) and fillColor override — both
+        // desired, both harmless to share. But arc-length-trimming (say)
+        // 0-40% of a dab's own 4-point square, or running any other
+        // per-vertex rebuild meant for the whole compound stroke, silently
+        // collapses each dab to a near-zero-area sliver — this is exactly
+        // what made a trimmed bitmap/texture-brush stroke's dabs vanish
+        // (confirmed live: hasTrimMotionFor/applyTrimFor were firing on
+        // every individual dab via the anchor-aliased id). Real strokeId
+        // only (undefined for a dab, since a dab never carries its own
+        // data.strokeId) restores "not applicable" for anything that
+        // reshapes path content — only used below, never for elMat/
+        // elementFillColorAt which should keep sharing the anchor's id.
+        var cPathOpsStrokeId = (c.data && c.data.isBrushTextureCopy) ? undefined : cStrokeId;
         var elMat = (window.SMMotion && cStrokeId) ? SMMotion.elementMotionAt(i, cStrokeId, renderFrame) : null;
         var elPivot = elMat ? { x: c.bounds.center.x + elMat.ax, y: c.bounds.center.y + elMat.ay } : null;
         if (c instanceof Raster) {
@@ -1116,8 +1134,23 @@
           // every call" reasons (layerRetainable, above).
           var xformable = layerRetainable
             && !project3D
-            && !(window.SMMotion && cStrokeId && SMMotion.hasPathVertexMotionFor(i, cStrokeId))
-            && !(window.SMMotion && cStrokeId && SMMotion.hasTrimMotionFor(i, cStrokeId))
+            && !(window.SMMotion && cPathOpsStrokeId && SMMotion.hasPathVertexMotionFor(i, cPathOpsStrokeId))
+            && !(window.SMMotion && cPathOpsStrokeId && SMMotion.hasTrimMotionFor(i, cPathOpsStrokeId))
+            && !(window.SMMotion && cPathOpsStrokeId && SMMotion.hasParamShapeMotionFor && SMMotion.hasParamShapeMotionFor(i, cPathOpsStrokeId))
+            // Path-point parenting "drive" direction + rect-follows-text-
+            // bounds (2026-08): both rebuild sd.segments from scratch every
+            // frame in the cold (sd-populated) path below — a retained
+            // pathRef+pathTransform is a single AFFINE on top of CACHED
+            // geometry, which can't represent "this vertex jumped to
+            // wherever layer X is now" or "this rect's whole outline
+            // matches layer Y's current text bounds". Missing from this
+            // exclusion list meant a vertex-follow/text-bounds-follow
+            // target that happened to also be an otherwise-plain, uniformly
+            // -scaled shape took the fast path and silently never re-shaped
+            // — confirmed live: the SAME hooks below (applyPathVertexFollowFor/
+            // applyTextBoundsFollowFor) never ran because `sd` stayed null.
+            && !(window.SMMotion && cPathOpsStrokeId && SMMotion.hasPathVertexFollowMotionFor && SMMotion.hasPathVertexFollowMotionFor(i, cPathOpsStrokeId))
+            && !(window.SMMotion && cPathOpsStrokeId && SMMotion.hasTextBoundsFollowMotionFor && SMMotion.hasTextBoundsFollowMotionFor(i, cPathOpsStrokeId))
             && !(c.data && c.data.fillGradient)
             && !(c.data && c.data.strokeGradientAlongPath)
             && !(includeEditorOverlays && state.currentFrameOutline)
@@ -1134,14 +1167,34 @@
           // shape's OWN local space, same as elMat's own pivot is computed
           // from `c.bounds` (the pre-offset bounds), matching AE's model
           // where a path's own points are edited before any transform.
-          if (sd && window.SMMotion && cStrokeId) sd.segments = SMMotion.applyPathVertexOffsetsFor(i, cStrokeId, sd.segments, renderFrame);
+          if (sd && window.SMMotion && cPathOpsStrokeId) sd.segments = SMMotion.applyPathVertexOffsetsFor(i, cPathOpsStrokeId, sd.segments, renderFrame);
           // Trim Paths (2026-08) — same innermost-layer placement as vertex
           // offsets right above (authored in the shape's own local space,
           // before elMat/motionMat), applied right after so a trimmed
           // portion still rides any per-vertex sculpting done on top of it.
-          if (sd && window.SMMotion && cStrokeId && SMMotion.hasTrimMotionFor(i, cStrokeId)) {
-            var trimmed = SMMotion.applyTrimFor(i, cStrokeId, sd.segments, sd.closed, renderFrame);
+          if (sd && window.SMMotion && cPathOpsStrokeId && SMMotion.hasTrimMotionFor(i, cPathOpsStrokeId)) {
+            var trimmed = SMMotion.applyTrimFor(i, cPathOpsStrokeId, sd.segments, sd.closed, renderFrame);
             sd.segments = trimmed.segments; sd.closed = trimmed.closed;
+          }
+          // Dynamic shapes phase 2 (2026-08-18) — animated corner radii,
+          // same innermost-layer placement as Trim/vertex-offsets right
+          // above (shape's own local space, before elMat/motionMat).
+          if (sd && window.SMMotion && cPathOpsStrokeId && SMMotion.hasParamShapeMotionFor && SMMotion.hasParamShapeMotionFor(i, cPathOpsStrokeId)) {
+            sd.segments = SMMotion.applyParamShapeFor(i, cPathOpsStrokeId, sd, renderFrame);
+          }
+          // Path-point parenting, "drive" direction (2026-08) — a vertex of
+          // this path snapping onto another layer's world position. The
+          // "follow" direction (this LAYER snapping onto a point on another
+          // path) needs no extra call here — it's inside SMMotion.layerMotionAt
+          // itself, already the source of motionMat above.
+          if (sd && window.SMMotion && cPathOpsStrokeId && SMMotion.hasPathVertexFollowMotionFor && SMMotion.hasPathVertexFollowMotionFor(i, cPathOpsStrokeId)) {
+            sd.segments = SMMotion.applyPathVertexFollowFor(i, cPathOpsStrokeId, sd, renderFrame);
+          }
+          // Rect-follows-text-bounds (2026-08) — whole-shape rebuild from
+          // another layer's resolved bounds, same placement as the two
+          // hooks above (shape's own local space, before elMat/motionMat).
+          if (sd && window.SMMotion && cPathOpsStrokeId && SMMotion.hasTextBoundsFollowMotionFor && SMMotion.hasTextBoundsFollowMotionFor(i, cPathOpsStrokeId)) {
+            sd.segments = SMMotion.applyTextBoundsFollowFor(i, cPathOpsStrokeId, sd, renderFrame);
           }
           if (sd && elMat) sd.segments = SMMotion.transformSegments(sd.segments, elPivot, elMat);
           if (sd && motionMat) sd.segments = SMMotion.transformSegments(sd.segments, motionPivot, motionMat);
@@ -1307,7 +1360,11 @@
           // needs to trim the centerline/widthProfile before
           // rebuildVectorBrushOutline, not the baked outline segments,
           // which is a separate piece of work.
-          if (window.SMMotion && cStrokeId && SMMotion.hasTrimMotionFor(i, cStrokeId)
+          // cPathOpsStrokeId (not cStrokeId) — a texture-copy dab must never
+          // reach this branch at all: see its own comment above. The
+          // isVectorBrush guard stays for the real anchor item, which IS
+          // reached through cPathOpsStrokeId.
+          if (window.SMMotion && cPathOpsStrokeId && SMMotion.hasTrimMotionFor(i, cPathOpsStrokeId)
               && !(c.data && c.data.isVectorBrush)) {
             item.fillColor = null;
             delete item.fillGradient;
