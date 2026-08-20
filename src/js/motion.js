@@ -2977,7 +2977,18 @@
         var pk = hitPositionDot(event.point, ks, pv,t);
         if (pk) { pushUndo(); _motionDrag = { mode: 'point', key: pk, pv: pv,t:t }; return true; }
       }
-      var ap = hitAnchorPoint(event.point, t);
+      // Alt required (2026-08-21, "pour bouger le point d'ancrage c'est
+      // clic + alt + drag il me semble pas le cas là") — matches Animation
+      // 2D's own anchor-crosshair convention (select-bridge.js's
+      // hitTestHandles: "checked FIRST/exclusively, but ONLY while Alt is
+      // held... a click in that same spot now falls through to the normal
+      // move/marquee logic below" when Alt isn't held). Motion mode never
+      // had that gate — a plain click within the small hit radius grabbed
+      // the anchor unconditionally, which is what "il bouge encore" (the
+      // artwork/box moving when the user only meant to click-drag
+      // normally) was really describing: an accidental anchor grab, not
+      // the anchor itself misbehaving.
+      var ap = event.altKey ? hitAnchorPoint(event.point, t) : null;
       if (ap) { pushUndo(); _motionDrag = { mode: 'anchor', holder: ap.holder, bc: ap.bc, t:ap.target }; return true; }
       // Effector handles (2026-07-29) — checked last, lowest priority: they
       // only exist on duplicator layers and the user places them wherever

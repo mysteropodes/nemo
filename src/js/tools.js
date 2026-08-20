@@ -5073,7 +5073,7 @@ function onMouseDown(event){
   // another branch of this tool chain: only consumes the event (returns
   // true) when the click actually lands on a motion handle/keyframe dot;
   // otherwise falls through unchanged into Select/Draw/etc. below.
-  if(state.appMode==='motion'&&window.SMMotion&&SMMotion.onDown(event))return;
+  if(state.appMode==='motion'&&window.SMMotion){event.altKey=!!(event.modifiers&&event.modifiers.alt);if(SMMotion.onDown(event))return;}
   var layer=userLayers[state.activeLayerIdx];
   if(state.tool==='draw'){
     if(!canEditActiveLayer())return;
