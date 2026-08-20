@@ -2387,15 +2387,27 @@
     // Anchor point — AE-style crosshair-in-circle, ALWAYS shown while a
     // layer/element is expanded (even with zero keyframes on anything), same
     // as AE shows it on any selected layer/shape group. Pivot = bounds
-    // center + anchor offset (see computeMotionMat's header comment);
-    // position/rotation/scale are NOT applied to this preview point on
-    // purpose — it marks where the pivot sits in the target's OWN unmoved
-    // bounds, matching what engine-bridge.js/export.js actually pivot
-    // around at frame 0-equivalent (the anchor is a static geometric
-    // reference, not itself animated relative to the moving artwork).
-    var anc = valueAtFrame(holder, 'anchor', state.currentFrame);
-    var ax = bc.x + anc[0], ay = bc.y + anc[1];
-    var aw=outerWorldPoint(t,{x:ax,y:ay});
+    // center + anchor offset, THEN this target's own position/rotation/
+    // scale (motionBoxGeom's fwd, evaluated at the pivot itself — a
+    // rotation/scale around a point never moves that point, so this is
+    // exactly the render pivot, translated by Position same as the ring/
+    // position-dot below), finally the outer/parent chain.
+    // 2026-08-21 fix ("le cercle de rotation devrait être autour du point
+    // d'ancrage vert"): this used to skip the target's OWN transform
+    // entirely (deliberately, per a since-removed comment — "marks where
+    // the pivot sits in the target's OWN unmoved bounds") while the
+    // rotate ring/scale box (motionHandlePositions, below) and the
+    // position keyframe dot (hitPositionDot et al.) both already included
+    // it. The moment Position was ever non-[0,0], this crosshair stayed
+    // stranded at the un-translated bounds+anchor point while the ring
+    // and the position dot correctly moved together — confirmed live via
+    // SMMotion.buildOverlayItems(): with position=[80,-40], anchor=
+    // [100,50], the ring/dot centered at world (730,410) while this
+    // crosshair stayed at (650,450). hitAnchorPoint (the drag hit-test)
+    // and the 'anchor' onDrag handler are updated to match below, so the
+    // visible marker and its grab zone never disagree again.
+    var g0 = motionBoxGeom(t);
+    var aw = g0 ? outerWorldPoint(t, g0.pivot) : outerWorldPoint(t, { x: bc.x + valueAtFrame(holder, 'anchor', state.currentFrame)[0], y: bc.y + valueAtFrame(holder, 'anchor', state.currentFrame)[1] });
     var ancCol = [80, 220, 140, 255];
     items.push({ segments: [{ point: [aw.x - 9 * zs, aw.y] }, { point: [aw.x + 9 * zs, aw.y] }], closed: false, fillColor: null, strokeColor: ancCol, strokeWidth: 1.5 * zs });
     items.push({ segments: [{ point: [aw.x, aw.y - 9 * zs] }, { point: [aw.x, aw.y + 9 * zs] }], closed: false, fillColor: null, strokeColor: ancCol, strokeWidth: 1.5 * zs });
@@ -2827,8 +2839,14 @@
   }
   function hitAnchorPoint(pt, t) {
     var tol = 9 / view.zoom;
+    // Mirrors buildOverlayItems' anchor crosshair exactly (2026-08-21 fix)
+    // — must use the SAME point the marker is actually drawn at (own
+    // position/rotation/scale included via motionBoxGeom's pivot), or a
+    // click precisely on the visible marker misses the moment Position is
+    // non-[0,0], falling through to a plain body-drag instead.
+    var g0 = motionBoxGeom(t);
     var anc = valueAtFrame(t.holder, 'anchor', state.currentFrame);
-    var aw=outerWorldPoint(t,{x:t.boundsCenter.x+anc[0],y:t.boundsCenter.y+anc[1]});
+    var aw = g0 ? outerWorldPoint(t, g0.pivot) : outerWorldPoint(t, { x: t.boundsCenter.x + anc[0], y: t.boundsCenter.y + anc[1] });
     var ax=aw.x,ay=aw.y;
     return Math.hypot(pt.x - ax, pt.y - ay) < tol ? { holder: t.holder, bc: t.boundsCenter, target:t } : null;
   }
@@ -3004,7 +3022,18 @@
         k.v[0] += dx; k.v[1] += dy;
       });
     } else if (_motionDrag.mode === 'anchor') {
-      var localAnchor=outerLocalPoint(_motionDrag.t,{x:event.point.x,y:event.point.y});
+      // Strip the outer/parent chain first (as before), THEN this target's
+      // OWN position/rotation/scale (motionBoxGeom's inv — the exact
+      // inverse of the fwd() the crosshair is now drawn through, see
+      // buildOverlayItems/hitAnchorPoint's matching 2026-08-21 fix) —
+      // without this second step the anchor silently absorbed the
+      // target's own Position into itself the instant Position was
+      // non-[0,0], dragging the anchor to the wrong spot the moment the
+      // gesture started from the (now correctly Position-shifted)
+      // crosshair.
+      var outerLocal=outerLocalPoint(_motionDrag.t,{x:event.point.x,y:event.point.y});
+      var ganc=motionBoxGeom(_motionDrag.t);
+      var localAnchor=ganc?ganc.inv(outerLocal.x,outerLocal.y):outerLocal;
       setValue(_motionDrag.holder, 'anchor', [localAnchor.x - _motionDrag.bc.x, localAnchor.y - _motionDrag.bc.y]);
     } else if (_motionDrag.mode === 'effector') {
       // Plain mutation, not setValue/keyframe — effectors are static
