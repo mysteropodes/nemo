@@ -1275,6 +1275,29 @@
               stops: fg.stops.map(function (s) { return { offset: s.offset, color: cssColorToRgba(s.color, op) || [0, 0, 0, 0] }; }),
             };
           }
+          // Trim Paths (2026-08-19 fix) — feedback: "ça trim ça comme un
+          // fill alors que ça devrait trim comme dans After Effects ou
+          // Redgiant Stroke 3D". applyTrimFor above already replaces
+          // sd.segments with a short OPEN sub-arc, but item.fillColor (and
+          // fillGradient, just above) still carried whatever paint color
+          // the ORIGINAL closed shape had — filling an open partial arc
+          // implicitly closes it edge-to-edge, drawing the classic AE
+          // "pac-man wedge" instead of a clean progressive line reveal.
+          // AE/Stroke 3D's own convention: Trim Paths is a STROKE
+          // operation — the standard workaround for the exact wedge
+          // artifact this fixes is "don't fill a trimmed shape, use only
+          // a stroke", so this makes that the enforced behavior rather
+          // than a manual gotcha the artist has to already know about.
+          // Deliberately unconditional on the trim window (even 0/100 =
+          // "untrimmed") rather than only when partially trimmed: Trim
+          // Paths rebuilds ANY trimmed shape (closed or not) as an open
+          // polyline approximation (applyTrimSegments always returns
+          // closed:false), so the wedge risk exists at any window, not
+          // just a partial one.
+          if (window.SMMotion && cStrokeId && SMMotion.hasTrimMotionFor(i, cStrokeId)) {
+            item.fillColor = null;
+            delete item.fillGradient;
+          }
           var sc = cssColorToRgba(c.strokeColor ? c.strokeColor.toCSS(true) : null, op);
           if (sc) {
             item.strokeColor = sc;
