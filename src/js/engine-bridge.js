@@ -2072,6 +2072,24 @@
   // a cosmetic gap, not a functional one, until dashing is added engine-side.
   function buildTransformBoxItems() {
     if (state.tool !== 'select') return [];
+    // Motion mode (2026-08-21 fix, "2 points d'ancrage et 2 rotation qui
+    // s'affiche" on a Component with several elements): this function is
+    // the Animation 2D transform box — corners/ring/anchor computed from
+    // select-bridge.js's computeHandles(), which knows nothing about a
+    // Motion layer's own Anchor Point offset (motion.js's separate anchor/
+    // position/rotation/scale system). SMMotion.buildOverlayItems() below
+    // (same caller, a few lines down) already draws motion.js's OWN
+    // complete box/ring/anchor/position-dots/vertex/3D-gizmo overlay for
+    // whatever's Motion-selected — nothing gated either one off from firing
+    // together, and selectedPaths ends up populated in Motion mode too
+    // (layer-row selection backs it the same as an Animation 2D pick), so
+    // both fired at once: TWO rings and TWO anchor crosshairs, one pair
+    // frozen at the plain geometric bounds center (this function, blind to
+    // the Anchor Point offset) and one pair correctly following it
+    // (motion.js's own). Confirmed live: dragging the Motion anchor moved
+    // only ONE of the two crosshairs, leaving the other stranded at the
+    // shape's un-offset center — exactly the reported symptom.
+    if (state.appMode === 'motion') return [];
     // Selected native-video layer (2026-07, "une vidéo est un objet comme
     // les autres") — same visual language as the path gizmo below (blue
     // outline, white corner squares, rotate ring), geometry from the ONE
