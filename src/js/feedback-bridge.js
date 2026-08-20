@@ -24,11 +24,8 @@
 
   // Browser-only transport for the two GitHub calls Tauri does via Rust
   // (submit_feedback_issue/upload_feedback_attachment) — see worker-feedback/
-  // (repo root). MUST be updated to the Worker's real URL after its first
-  // deploy (printed in the deploy-feedback-worker.yml Actions log, also on
-  // its Cloudflare dashboard page) — left as the workers.dev default name
-  // here since the account's actual workers.dev subdomain isn't known yet.
-  var FEEDBACK_WORKER_URL = 'https://nemo-feedback.workers.dev';
+  // (repo root).
+  var FEEDBACK_WORKER_URL = 'https://nemo-feedback.mysteropodes-auth.workers.dev';
   async function workerPost(path, payload) {
     var resp = await fetch(FEEDBACK_WORKER_URL + path, {
       method: 'POST',
