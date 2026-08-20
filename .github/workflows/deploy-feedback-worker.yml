@@ -16,10 +16,9 @@ name: Deploy feedback Worker to Cloudflare
 #      can be the same token value or a fresh one).
 #   2. CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID (GitHub Actions repo
 #      secrets) — already added for deploy-web.yml, reused here.
-#   3. Once deployed, set the Worker's ALLOWED_ORIGINS var (Cloudflare
-#      dashboard > nemo-feedback > Settings > Variables) to the editor's
-#      real origin(s), and point src/js/feedback-bridge.js's
-#      FEEDBACK_WORKER_URL at this Worker's URL.
+# ALLOWED_ORIGINS (the editor's real origin(s)) and feedback-bridge.js's
+# FEEDBACK_WORKER_URL are both checked in (wrangler.jsonc `vars`, and the
+# bridge source respectively) — no manual dashboard step needed anymore.
 on:
   push:
     branches: [main]

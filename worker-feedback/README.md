@@ -35,12 +35,11 @@ Both POST-only, JSON in and out:
    `mysteropodes/strokemotion-feedback`, `Issues: write` + `Contents: write`
    — the exact same scope `STROKEMOTION_FEEDBACK_TOKEN` already uses for the
    desktop build. Can be that same token value, or a fresh one.
-2. After the first deploy, set `ALLOWED_ORIGINS` (Cloudflare dashboard >
-   nemo-feedback > Settings > Variables) to the editor's real origin(s) —
-   comma-separated, e.g. `https://editor.nemo.example.com,https://nemo-editor.<subdomain>.workers.dev`.
-   Left unset, the Worker reflects whatever `Origin` header it receives
-   (works everywhere, including anyone else's site — fine while the real
-   origin isn't picked yet, tighten once it is).
-3. Point `FEEDBACK_WORKER_URL` in `src/js/feedback-bridge.js` at this
-   Worker's real URL (printed in the deploy workflow's Actions log, also on
-   its Cloudflare dashboard page).
+2. `ALLOWED_ORIGINS` is set in `wrangler.jsonc`'s `vars` (currently
+   `https://nemo-editor.mysteropodes-auth.workers.dev`, comma-separated if
+   more origins are added later — e.g. a custom domain). Update it there
+   and redeploy if the editor's origin changes.
+3. `FEEDBACK_WORKER_URL` in `src/js/feedback-bridge.js` points at this
+   Worker's real URL (`https://nemo-feedback.mysteropodes-auth.workers.dev`).
+   Update it there if this Worker is ever renamed or moved to a custom
+   domain.
