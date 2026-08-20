@@ -1,0 +1,70 @@
+name: Deploy web beta to Cloudflare Pages
+
+# Same shape as GraphiteEditor/Graphite's own build.yml deploy step (an
+# open-source Rust/WASM editor with the identical "static site, no server"
+# constraint): rebuild the WASM module, then push src/ as a static site via
+# Wrangler. src/wasm/ is committed (see .gitignore's comment) so a fresh
+# build here isn't strictly required to deploy, but doing it anyway catches
+# drift between geometry-wasm/src/ and the committed build before it ships.
+#
+# One-time setup this workflow depends on (can't be done from a workflow
+# file — needs dashboard/CLI access to the Cloudflare account):
+#   1. Create the Pages projects: `npx wrangler pages project create nemo-editor`
+#      and `npx wrangler pages project create nemo-dev` (or via the
+#      Cloudflare dashboard — Workers & Pages > Create > Pages).
+#   2. Add repo secrets (Settings > Secrets and variables > Actions):
+#        CLOUDFLARE_API_TOKEN   — a token scoped to "Cloudflare Pages: Edit"
+#        CLOUDFLARE_ACCOUNT_ID  — found on the right sidebar of any page in
+#                                  the Cloudflare dashboard
+#   3. Point editor.nemo.<yourdomain> (or whatever subdomain) at the
+#      nemo-editor Pages project's custom domain settings.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Cargo/wasm-pack
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: geometry-wasm
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Build geometry-wasm
+        working-directory: geometry-wasm
+        run: wasm-pack build --target web --out-dir ../src/wasm
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Production (push to main) deploys to the stable project; anything
+      # else (manual dispatch from a non-main ref) goes to the dev project —
+      # same production/dev split as Graphite's graphite-editor/graphite-dev.
+      - name: Publish to Cloudflare Pages
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            PROJECT=nemo-editor
+          else
+            PROJECT=nemo-dev
+          fi
+          npx wrangler@3 pages deploy "src" --project-name="$PROJECT" --branch="${{ github.ref_name }}"
