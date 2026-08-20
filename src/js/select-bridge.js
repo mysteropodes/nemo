@@ -1041,8 +1041,26 @@
       // Layer under a Motion transform: the pointer moves in RENDERED
       // space, the geometry lives underneath — pull the delta back
       // (inverse rotate + inverse scale) or the drag drifts/overshoots.
+      // ONLY for the raw-geometry translate below (Animation 2D's own
+      // selectedPaths.forEach(p.translate(...))) — Motion mode's own
+      // `position` write further down must NOT go through this inverse.
+      // 2026-08-21 fix ("si je le rotationne et après déplace tout le
+      // group ça déplace bizarrement comme si le x et y était inversé"):
+      // confirmed live — at rotation=90°, mvMap.invVec(50,0) returned
+      // (~0,-50), a pure horizontal drag turned vertical. computeMotionMat's
+      // own header comment is the reason why that's wrong for `position`
+      // specifically: "Position's dx/dy is a plain translation applied
+      // independently on top" of rotate/scale, i.e. position already
+      // lives in the layer's own POST-rotation output space — treating a
+      // position delta like a geometry delta (which DOES need inverse-
+      // rotating, since raw Paper.js points live in PRE-rotation local
+      // space) silently rotated every drag by the layer's own current
+      // rotation. Invisible until now because invVec is the identity at
+      // the default rotation=0/scale=100%, which is what every previous
+      // Motion-mode move drag happened to be tested at.
       var mvMap = (window.SMMotion && SMMotion.layerMotionPointMap) ? SMMotion.layerMotionPointMap(state.activeLayerIdx) : null;
-      if (mvMap) { var dv = mvMap.invVec(delta.x, delta.y); delta = new Point(dv[0], dv[1]); }
+      var geomDelta = delta;
+      if (mvMap) { var dv = mvMap.invVec(delta.x, delta.y); geomDelta = new Point(dv[0], dv[1]); }
       // Motion mode (2026-07-17, "quand on modifie ces properties dans le
       // canvas ça ne modifie ou ne créer pas de nouvelle clés" — a real
       // regression from the transform-box fix a few commits back: making
@@ -1068,6 +1086,12 @@
         window.SMEngineBridge.renderNow();
         return;
       }
+      // Past this point: Animation 2D's raw-geometry path only (Motion
+      // mode always returned above) — this DOES need the inverse-rotated/
+      // scaled delta (real Paper.js points live in pre-rotation local
+      // space), so switch to it here rather than touching every one of
+      // the several `delta` reads below individually.
+      delta = geomDelta;
       // translate(delta), not position=position.add(delta) — .position is
       // a bounds-CENTER getter/setter, so a move via .position re-derives
       // bounds on every single tick of the drag (many times per gesture)
