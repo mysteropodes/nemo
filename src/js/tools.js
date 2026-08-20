@@ -5100,6 +5100,25 @@ function syncParamShapeBoxOnScale(p,sx,sy,anchor){
   var ny1=anchor.y+(b.y1-anchor.y)*sy,ny2=anchor.y+(b.y2-anchor.y)*sy;
   b.x1=Math.min(nx1,nx2);b.x2=Math.max(nx1,nx2);
   b.y1=Math.min(ny1,ny2);b.y2=Math.max(ny1,ny2);
+  // Rect corners specifically (2026-08-19, feedback: "ça scale alors que
+  // ça devrait rester dynamique afin d'avoir les mêmes corner") — a plain
+  // p.scale(sx,sy) on the BAKED curve stretches each corner's arc into an
+  // ellipse and silently leaves ps.tl/tr/br/bl holding stale pre-resize
+  // values that no longer match what's on screen. Figma's actual rule: a
+  // rounded rect's corner radius is a property of the FRAME, independent
+  // of its size — resizing the frame never touches the radius value
+  // (only the existing clamp-to-half-min-side in buildRoundRectPath can
+  // shrink its VISUAL effect, never the stored number). So a rect
+  // rebuilds fresh from the new box with its UNCHANGED radii — round
+  // corners stay round at any aspect ratio — instead of trusting the
+  // just-applied geometric scale to have kept them consistent, which it
+  // never did. Ellipse/Star are deliberately NOT rebuilt here: their own
+  // arc-sample math is exactly equivalent to a plain scale of the baked
+  // points (verified: (rx·cosθ, ry·sinθ) scaled by (sx,sy) IS (rx·sx·cosθ,
+  // ry·sy·sinθ), the same curve a rebuild with rx'=rx·sx would produce),
+  // so an anisotropic resize correctly and cheaply stretches those into a
+  // non-circular ellipse / elongated star, which IS the wanted result.
+  if(ps.kind==='rect'&&window.applyParamShapeRect)window.applyParamShapeRect(p);
 }
 // Every applyParamShapeXxx below self-heals a missing box (older project
 // data saved before this rework) by stamping one from the CURRENT bounds
