@@ -1286,6 +1286,7 @@
       <button class="settings-tab" data-tab="feedback" data-i18n="settingsTabFeedback">Feedback</button>
       <button class="settings-tab" data-tab="shortcuts" data-i18n="settingsTabShortcuts">Raccourcis</button>
       <button class="settings-tab" data-tab="labs" data-i18n="settingsTabLabs">Labs</button>
+      <button class="settings-tab" data-tab="about" data-i18n="settingsTabAbout">À propos</button>
     </div>
     <div class="modal-bdy">
       <div class="settings-pane" data-pane="general">
@@ -1380,6 +1381,21 @@
         <div id="labs-tools-list" style="display:flex;flex-direction:column;gap:2px"></div>
         <div class="phdr" style="padding:14px 0 4px 0;font-size:9px;color:var(--text-dim)" data-i18n="settingsLabsActions">Actions (coup unique, sur la sélection courante)</div>
         <div id="labs-actions-list" style="display:flex;flex-direction:column;gap:2px"></div>
+      </div>
+      <div class="settings-pane" data-pane="about" style="display:none">
+        <div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px;padding:8px 0 16px 0">
+          <div style="font-size:15px;font-weight:600">Nemo</div>
+          <div style="font-size:10px;color:var(--text-dim)"><span data-i18n="settingsVersionLabel">Version</span> <span id="app-version-txt-about">0.7.0-alpha.1</span></div>
+        </div>
+        <div class="phdr" style="padding:0 0 4px 0;font-size:9px;color:var(--text-dim)" data-i18n="settingsAboutAuthorHdr">Auteur</div>
+        <div style="font-size:10px;color:var(--text-dim);margin-bottom:14px">
+          mysteropodes — <a href="https://github.com/mysteropodes" target="_blank" style="color:var(--accent)">github.com/mysteropodes</a>
+        </div>
+        <div class="phdr" style="padding:0 0 4px 0;font-size:9px;color:var(--text-dim)" data-i18n="settingsAboutSupportHdr">Soutenir le projet</div>
+        <div style="font-size:10px;color:var(--text-dim);margin-bottom:8px" data-i18n="settingsAboutSupportDesc">Nemo est développé par une seule personne. Si l'app t'est utile, un don sur Ko-fi aide à continuer.</div>
+        <div class="pr">
+          <a href="https://ko-fi.com/mysteropodes" target="_blank" class="pbtn" style="flex:1;text-align:center;font-size:11px;padding:7px;font-weight:600;text-decoration:none">☕ <span data-i18n="settingsAboutKofiBtn">Faire un don sur Ko-fi</span></a>
+        </div>
       </div>
     </div>
   </div>
