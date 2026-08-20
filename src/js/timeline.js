@@ -2354,8 +2354,14 @@ function updatePropsContext(){
   // an already-visible section, not this much bigger burial problem.
   // layer-sec (Blend/Matte/Flou) is spared: those are genuine per-layer
   // properties still meaningful while animating, not a drawing-tool panel.
+  // canvas-sec (Document) is ALSO spared when ctx==='document' (2026-08,
+  // "si rien n'est select en Motion il faut afficher le panel Document") —
+  // Select/Subselect with an empty canvas selection falls into that branch
+  // above and is the one case where showing it doesn't bury anything (no
+  // Fill/Stroke/Draw tool section competes with #motion-props-sec then).
   if(state.appMode==='motion'){
-    show['sel-props-sec']=show['fill-sec']=show['stroke-sec']=show['tool-opts-sec']=show['canvas-sec']=show['rig-opts-sec']=show['combine-opts-sec']=false;
+    show['sel-props-sec']=show['fill-sec']=show['stroke-sec']=show['tool-opts-sec']=show['rig-opts-sec']=show['combine-opts-sec']=false;
+    if(ctx!=='document')show['canvas-sec']=false;
   }
   Object.keys(show).forEach(function(id){var sec=document.getElementById(id);if(sec)sec.style.display=show[id]?'block':'none';});
   // state.drawMode (Front/Behind) has no effect on Fill Brush — it's always
@@ -7431,6 +7437,53 @@ document.addEventListener('pointerdown',function(){if(state.spaceDown)state.spac
 
 document.addEventListener('keydown',onKeyDown);document.addEventListener('keyup',onKeyUp);
 document.querySelectorAll('.tool-btn').forEach(function(b){b.addEventListener('click',function(){window.SM.setTool(this.dataset.tool);});});
+// Shape-tool flyout (2026-08, "regrouper les shape dans un mini menu comme
+// dans illustrator ou rive... click un peu longtemps ça affiche le menu").
+// Deliberately additive, not a toolbar restructure: the tutorial system
+// (tutorial.js) has ~15 hardcoded '.tool-btn[data-tool="rect/ellipse/line"]'
+// targets across 25 modules that spotlight/click these exact elements — they
+// stay exactly where they are, always visible, so none of that breaks. A
+// long-press on any one of them instead pops a small flyout beside it
+// listing the other two, Illustrator-style, without touching the DOM
+// structure of the toolbar itself.
+(function(){
+  var SHAPE_TOOLS=['rect','ellipse','line'];
+  var LPRESS_MS=450,pressTimer=null,suppressClick=false,flyoutEl=null;
+  function closeFlyout(){if(flyoutEl){flyoutEl.remove();flyoutEl=null;}document.removeEventListener('pointerdown',onOutsideDown,true);}
+  function onOutsideDown(e){if(flyoutEl&&!flyoutEl.contains(e.target))closeFlyout();}
+  function openFlyout(originBtn){
+    closeFlyout();
+    var rect=originBtn.getBoundingClientRect();
+    flyoutEl=document.createElement('div');
+    flyoutEl.className='shape-tool-flyout';
+    SHAPE_TOOLS.forEach(function(t){
+      var src=document.querySelector('.tool-btn[data-tool="'+t+'"]');
+      if(!src)return;
+      var item=document.createElement('button');
+      item.className='shape-tool-flyout-item'+(t===state.tool?' active':'');
+      item.innerHTML=src.querySelector('svg,span.material-symbols-rounded,span:not(.sk)')?src.innerHTML.replace(/<span class="sk">.*?<\/span>/,''):src.innerHTML;
+      item.title=src.title;
+      item.addEventListener('click',function(ev){ev.stopPropagation();window.SM.setTool(t);closeFlyout();});
+      flyoutEl.appendChild(item);
+    });
+    document.body.appendChild(flyoutEl);
+    var fr=flyoutEl.getBoundingClientRect();
+    flyoutEl.style.left=Math.min(rect.right+6,window.innerWidth-fr.width-4)+'px';
+    flyoutEl.style.top=Math.max(4,Math.min(rect.top,window.innerHeight-fr.height-4))+'px';
+    setTimeout(function(){document.addEventListener('pointerdown',onOutsideDown,true);},0);
+  }
+  SHAPE_TOOLS.forEach(function(t){
+    var btn=document.querySelector('.tool-btn[data-tool="'+t+'"]');
+    if(!btn)return;
+    btn.classList.add('shape-tool-groupable');
+    btn.addEventListener('pointerdown',function(){
+      suppressClick=false;
+      pressTimer=setTimeout(function(){suppressClick=true;openFlyout(btn);},LPRESS_MS);
+    });
+    ['pointerup','pointerleave'].forEach(function(ev){btn.addEventListener(ev,function(){clearTimeout(pressTimer);});});
+    btn.addEventListener('click',function(ev){if(suppressClick){ev.stopImmediatePropagation();suppressClick=false;}},true);
+  });
+})();
 document.getElementById('p-sw').addEventListener('change',function(){window.SM.setBrushSize(parseInt(this.value));});
 // Actively picking a fill color also ENABLES fill (Graphite behavior) —
 // without this, the default-off fill state made "I set my fill to red, drew,
