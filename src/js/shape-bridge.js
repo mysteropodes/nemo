@@ -16,7 +16,8 @@
   function shouldIntercept() {
     return (
       window.SMEngineBridge && window.SMEngineBridge.isEnabled() &&
-      (state.tool === 'line' || state.tool === 'rect' || state.tool === 'ellipse') &&
+      (state.tool === 'line' || state.tool === 'rect' || state.tool === 'ellipse' ||
+       state.tool === 'star' || state.tool === 'speechbubble') &&
       // Same deferral as draw-bridge's own shouldIntercept — the Paper path
       // is where the refusal gets explained (canEditActiveLayer, tools.js).
       !state.playing && !(window.editRefusalReason && window.editRefusalReason())
@@ -66,7 +67,34 @@
   function lineGeomJS(x0, y0, x1, y1) {
     return { segments: [{ point: [x0, y0] }, { point: [x1, y1] }], closed: false };
   }
+  // Dynamic shapes (2026-08) — Star/Polygon and Speech Bubble have no
+  // geometry-wasm equivalent and are PARAMETRIC, so they go through the
+  // same window-exposed builders tools.js and motion.js's applyParamShapeFor
+  // already use (buildStarPolygonPath / buildRoundRectPath). Reusing them
+  // rather than re-deriving the math here is the CLAUDE.md §3 rule: one
+  // definition, so the drag preview, the committed path, and the per-frame
+  // Motion rebuild can never drift apart. Both builders return an
+  // {insert:false} Paper path, so this reads its segments and drops it.
+  function paramGeomFromPath(p) {
+    var segs = p.segments.map(function (s) {
+      return { point: [s.point.x, s.point.y], handleIn: [s.handleIn.x, s.handleIn.y], handleOut: [s.handleOut.x, s.handleOut.y] };
+    });
+    p.remove();
+    return { segments: segs, closed: true };
+  }
   function shapeGeom(tool, x0, y0, x1, y1) {
+    if (tool === 'star') {
+      var scx = (x0 + x1) / 2, scy = (y0 + y1) / 2;
+      var outerR = Math.min(Math.abs(x1 - x0), Math.abs(y1 - y0)) / 2;
+      return paramGeomFromPath(window.buildStarPolygonPath(
+        scx, scy, outerR, state.starPointCount || 5,
+        state.starInnerRatio !== undefined ? state.starInnerRatio : 0.5, 0));
+    }
+    if (tool === 'speechbubble') {
+      var bl = Math.min(x0, x1), br2 = Math.max(x0, x1), bt = Math.min(y0, y1), bb = Math.max(y0, y1);
+      var rad = Math.max(4, Math.min(br2 - bl, bb - bt) * 0.18);
+      return paramGeomFromPath(window.buildRoundRectPath(bl, bt, br2, bb, rad, rad, rad, rad));
+    }
     var wasm = window.GeometryWasm;
     if (wasm && wasm.ready) {
       try {
@@ -196,6 +224,28 @@
       if (state.undoStack.length) state.undoStack.pop();
     } else {
       if (state.shadowMode) applyShadowBrushTag(path);
+      // Dynamic shapes (2026-08) — MUST be stamped here, not only in
+      // tools.js. tools.js's own shape branch is dead code whenever the
+      // Rust engine is on (this file's capture-phase
+      // stopImmediatePropagation stops it ever seeing the event — same
+      // root cause the shift-constrain comment above documents), so the
+      // original phase-1..3 commits stamping only there meant every rect
+      // drawn in the normal engine-on configuration came out as a plain
+      // Path with no corner radii at all: the Coins panel, the canvas
+      // radius handles and the Motion cornerTL..BL properties all had
+      // nothing to attach to. Verified live before/after.
+      if (shapeTool === 'rect') {
+        path.data.paramShape = { kind: 'rect', tl: 0, tr: 0, br: 0, bl: 0 };
+        stampParamShapeBox(path);
+      } else if (shapeTool === 'star') {
+        path.data.paramShape = {
+          kind: 'star',
+          pointCount: state.starPointCount || 5,
+          innerRatio: state.starInnerRatio !== undefined ? state.starInnerRatio : 0.5,
+          cornerRadius: 0,
+        };
+        stampParamShapeBox(path);
+      }
       tagOwner(path);
       // Symmetry guide (symmetry-bridge.js, 2026-07): promoted from
       // brush-only to also cover Line/Rect/Ellipse — this IS the commit
