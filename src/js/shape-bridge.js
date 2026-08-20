@@ -197,6 +197,20 @@
     } else {
       if (state.shadowMode) applyShadowBrushTag(path);
       tagOwner(path);
+      // Dynamic-shape corner radius (tools.js's applyParamShapeRect/
+      // stampParamShapeBox) was authored only against tools.js's own
+      // onMouseUp — this Rust-engine path (C7 cutover) intercepts rect/
+      // ellipse/line BEFORE that code ever runs, so every rect committed
+      // here silently got no paramShape at all (corner-radius handles and
+      // panel never appeared). Ellipse deliberately stays opt-in here too
+      // (the Camembert/Donut panel's own "Rendre dynamique" convert
+      // button), matching tools.js's own creation-time behavior exactly —
+      // only rect (and Star/Polygon, which this file doesn't intercept)
+      // are dynamic from creation.
+      if (shapeTool === 'rect') {
+        path.data.paramShape = { kind: 'rect', tl: 0, tr: 0, br: 0, bl: 0 };
+        if (window.stampParamShapeBox) window.stampParamShapeBox(path);
+      }
       // Symmetry guide (symmetry-bridge.js, 2026-07): promoted from
       // brush-only to also cover Line/Rect/Ellipse — this IS the commit
       // path that actually runs whenever the Rust engine is on (see
