@@ -3034,7 +3034,34 @@
       var outerLocal=outerLocalPoint(_motionDrag.t,{x:event.point.x,y:event.point.y});
       var ganc=motionBoxGeom(_motionDrag.t);
       var localAnchor=ganc?ganc.inv(outerLocal.x,outerLocal.y):outerLocal;
-      setValue(_motionDrag.holder, 'anchor', [localAnchor.x - _motionDrag.bc.x, localAnchor.y - _motionDrag.bc.y]);
+      var newAncX=localAnchor.x-_motionDrag.bc.x, newAncY=localAnchor.y-_motionDrag.bc.y;
+      // Position compensation (2026-08-21 fix, "si je le rotationne avant
+      // alors tout le bounding box bougent en même temps si je le
+      // déplace"): with rotation/scale active, moving the pivot (anchor)
+      // ALSO moves every OTHER geometry point relative to it — fwd()
+      // rotates/scales around (px,py)=bc+anchor, so changing anchor alone
+      // re-centers that rotation on a different point and the whole shape
+      // visibly swings/shifts, even though geometry itself never changed.
+      // Only true at rot=0/scale=100% (where fwd(x,y) algebraically
+      // cancels anchor out entirely — confirmed live pre-fix, dragging the
+      // anchor left the artwork untouched) is that a non-issue. AE's own
+      // anchor-drag tool never moves the artwork regardless of rotation —
+      // it does this by adjusting Position to compensate, and this is that
+      // same compensation: re-deriving Position so that fwd(anyPoint)
+      // stays IDENTICAL before/after the anchor change. Derivation: with
+      // fwd(P) = pivot + M·(P-pivot) + pos (M = rotate∘scale, pivot =
+      // bc+anchor), requiring fwd_new(P) == fwd_old(P) for every P gives
+      // pos_new = pos_old + (I-M)·(pivot_old - pivot_new).
+      var oldAnc=valueAtFrame(_motionDrag.holder,'anchor',state.currentFrame);
+      var rotC=valueAtFrame(_motionDrag.holder,'rotation',state.currentFrame)[0];
+      var sclC=valueAtFrame(_motionDrag.holder,'scale',state.currentFrame);
+      var rrC=rotC*Math.PI/180, ccC=Math.cos(rrC), ssC=Math.sin(rrC);
+      var sxC=sclC[0]/100, syC=sclC[1]/100;
+      var dxC=oldAnc[0]-newAncX, dyC=oldAnc[1]-newAncY; // pivot_old - pivot_new (bc cancels)
+      var MxC=sxC*ccC*dxC-syC*ssC*dyC, MyC=sxC*ssC*dxC+syC*ccC*dyC; // M·d
+      var posC=valueAtFrame(_motionDrag.holder,'position',state.currentFrame);
+      setValue(_motionDrag.holder,'position',[posC[0]+(dxC-MxC), posC[1]+(dyC-MyC)]);
+      setValue(_motionDrag.holder, 'anchor', [newAncX, newAncY]);
     } else if (_motionDrag.mode === 'effector') {
       // Plain mutation, not setValue/keyframe — effectors are static
       // per-duplicator config (like its mode/rows/radius/etc.), not a
