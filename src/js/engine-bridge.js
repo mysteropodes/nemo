@@ -1294,7 +1294,21 @@
           // polyline approximation (applyTrimSegments always returns
           // closed:false), so the wedge risk exists at any window, not
           // just a partial one.
-          if (window.SMMotion && cStrokeId && SMMotion.hasTrimMotionFor(i, cStrokeId)) {
+          // EXCLUDED: vector-brush ribbons (c.data.isVectorBrush). Their
+          // visible ink IS the fill (a filled ribbon built from
+          // centerSegments/widthProfile) — a real drawn stroke's
+          // strokeColor is either null or just a thin keyline hairline
+          // (applyBrushKeyline, app.js), never the main paint. Nulling
+          // fillColor here too would leave a trimmed brush stroke with NO
+          // paint at all (confirmed live: renders fully blank — only the
+          // hairline keyline would remain, if even that). Trim Paths on a
+          // vector-brush stroke keeps the pre-fix wedge-style behavior for
+          // now — a real "reveal the ribbon progressively" implementation
+          // needs to trim the centerline/widthProfile before
+          // rebuildVectorBrushOutline, not the baked outline segments,
+          // which is a separate piece of work.
+          if (window.SMMotion && cStrokeId && SMMotion.hasTrimMotionFor(i, cStrokeId)
+              && !(c.data && c.data.isVectorBrush)) {
             item.fillColor = null;
             delete item.fillGradient;
           }
