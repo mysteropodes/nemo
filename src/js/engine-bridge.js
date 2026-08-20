@@ -799,12 +799,49 @@
       // (the store's one invariant) is meaningless for these too.
       var layerRetainable = !state.layers[i].symbolId && !state.layers[i].montageId && !state.layers[i].lfsGroup && !state.layers[i].duplicator;
       var brushAnchorStrokeId = null;
+      // Texture-brush dab reveal (2026-08-20) — a dab has no arc-length/
+      // position field of its own (applyBrushTexture's dab.data is just
+      // {isBrushTextureCopy,brushGroupId}, tools.js), but buildBrushDabs
+      // walks the anchor's centerline strictly start-to-end and stamps them
+      // in that same order — so a dab's position among its OWN group is
+      // still a faithful (if coarse) proxy for "how far along the stroke"
+      // without adding a new persisted field (CLAUDE.md §1's "new tag
+      // needs checking everywhere" cost, avoided entirely). dabOrdinal maps
+      // each dab item -> its 0..1 fraction within its group, read below to
+      // decide whether Trim Paths should draw it at all.
+      // ⚠️ layer.children order is the REVERSE of creation order, not a
+      // match for it: every dab calls `dab.insertAbove(basePath)`
+      // (applyBrushTexture, tools.js) against the SAME fixed basePath
+      // reference rather than the previously-inserted dab, so each new dab
+      // lands immediately after the anchor, ahead of every dab inserted
+      // before it — the LAST dab stamped (end of stroke) ends up FIRST in
+      // children right after the anchor. Confirmed live: an un-flipped
+      // idx/(n-1) revealed the stroke's END first on trimStart=0/trimEnd=40
+      // instead of its start. Flipped below (1 - idx/(n-1)) so ordinal 0
+      // is the stroke's start and 1 is its end, matching trimWindowAt's
+      // own start/end convention.
+      var brushGroupDabs = null;
       for (var bi = 0; bi < children.length; bi++) {
         var bc = children[bi];
-        if (bc.data && bc.data.brushGroupId && !bc.data.isBrushTextureCopy && bc.data.strokeId) {
-          if (!brushAnchorStrokeId) brushAnchorStrokeId = {};
-          brushAnchorStrokeId[bc.data.brushGroupId] = bc.data.strokeId;
+        if (bc.data && bc.data.brushGroupId) {
+          if (bc.data.isBrushTextureCopy) {
+            if (!brushGroupDabs) brushGroupDabs = {};
+            var gid0 = bc.data.brushGroupId;
+            (brushGroupDabs[gid0] = brushGroupDabs[gid0] || []).push(bc);
+          } else if (bc.data.strokeId) {
+            if (!brushAnchorStrokeId) brushAnchorStrokeId = {};
+            brushAnchorStrokeId[bc.data.brushGroupId] = bc.data.strokeId;
+          }
         }
+      }
+      var dabOrdinal = null;
+      if (brushGroupDabs) {
+        dabOrdinal = new WeakMap();
+        Object.keys(brushGroupDabs).forEach(function (gid) {
+          var list = brushGroupDabs[gid];
+          var n = list.length;
+          list.forEach(function (dab, idx) { dabOrdinal.set(dab, n > 1 ? 1 - idx / (n - 1) : 0); });
+        });
       }
       // EXPERIMENTAL (native-video-decode branch): a natively-decoded video
       // layer has NO Paper children — its picture is one image item under a
@@ -1014,6 +1051,28 @@
         // above: geometry/document data is untouched, only what goes into
         // THIS render is affected.
         if (!state.showShadowGuides && c.data && c.data.channelTag === 'shadow') continue;
+        // Texture-brush dab reveal (2026-08-20) — "il faudrait mettre en
+        // place le trim du coup": a dab (isBrushTextureCopy) isn't shaped
+        // by segments/closed at all (see b7e9b29's own diagnosis of why
+        // trimming the ANCHOR never touched them), so giving Trim Paths any
+        // visible effect on a textured stroke means filtering which dabs
+        // draw, not reshaping anything. dabOrdinal (built above) is each
+        // dab's 0..1 position among its own group, in the same order
+        // buildBrushDabs stamped them; win uses trimWindowAt's own
+        // semantics (start/end/offset, 0-100, clipped — not wrapped, same
+        // "open path" convention applyTrimSegments uses) so a textured
+        // stroke's reveal matches a plain stroke's trim exactly.
+        if (c.data && c.data.isBrushTextureCopy && c.data.brushGroupId && dabOrdinal && window.SMMotion) {
+          var dabAnchorId = brushAnchorStrokeId && brushAnchorStrokeId[c.data.brushGroupId];
+          if (dabAnchorId) {
+            var dabWin = SMMotion.trimWindowAt(i, dabAnchorId, renderFrame);
+            if (dabWin) {
+              var dabPct = (dabOrdinal.get(c) || 0) * 100;
+              var dabS = dabWin.start + (dabWin.offset || 0), dabE = dabWin.end + (dabWin.offset || 0);
+              if (dabPct < Math.max(0, Math.min(100, dabS)) || dabPct > Math.max(0, Math.min(100, dabE))) continue;
+            }
+          }
+        }
         // Element-level Motion target (2026-07): a strokeId-scoped transform
         // nested INSIDE the layer's own — applied FIRST below, pivoted
         // around this item's OWN bounds (never the whole layer's), matching
@@ -1173,8 +1232,34 @@
           // before elMat/motionMat), applied right after so a trimmed
           // portion still rides any per-vertex sculpting done on top of it.
           if (sd && window.SMMotion && cPathOpsStrokeId && SMMotion.hasTrimMotionFor(i, cPathOpsStrokeId)) {
-            var trimmed = SMMotion.applyTrimFor(i, cPathOpsStrokeId, sd.segments, sd.closed, renderFrame);
-            sd.segments = trimmed.segments; sd.closed = trimmed.closed;
+            // Vector-brush ribbon (2026-08-20): trim the CENTERLINE +
+            // width profile and rebuild the outline from just that
+            // window, instead of arc-length-slicing the already-baked
+            // outline polygon (applyTrimFor below) — slicing the OUTLINE
+            // cuts across the ribbon's own width rather than along its
+            // length, the same wedge/sliver family as the fill-wedge bug
+            // this whole feature started from (18b2d9a's own comment).
+            // buildVariableWidthPath (tools.js) is the exact function
+            // rebuildVectorBrushOutline already uses for the untrimmed
+            // case, so a trimmed ribbon gets identical caps/smoothing.
+            if (c.data && c.data.isVectorBrush && c.data.centerSegments && c.data.centerSegments.length >= 2) {
+              var vbTrim = SMMotion.applyTrimToVectorBrush(i, cPathOpsStrokeId, c.data.centerSegments, c.data.widthProfile, renderFrame);
+              var vbOutline = (vbTrim && vbTrim.pts && vbTrim.pts.length >= 2)
+                ? buildVariableWidthPath(vbTrim.pts.map(function (p) { return new Point(p[0], p[1]); }), vbTrim.widths)
+                : null;
+              if (vbOutline) {
+                sd.segments = vbOutline.segments.map(function (s) {
+                  return { point: [s.point.x, s.point.y], handleIn: [s.handleIn.x, s.handleIn.y], handleOut: [s.handleOut.x, s.handleOut.y] };
+                });
+                sd.closed = true;
+                vbOutline.remove();
+              } else {
+                sd.segments = []; sd.closed = false;
+              }
+            } else {
+              var trimmed = SMMotion.applyTrimFor(i, cPathOpsStrokeId, sd.segments, sd.closed, renderFrame);
+              sd.segments = trimmed.segments; sd.closed = trimmed.closed;
+            }
           }
           // Dynamic shapes phase 2 (2026-08-18) — animated corner radii,
           // same innermost-layer placement as Trim/vertex-offsets right

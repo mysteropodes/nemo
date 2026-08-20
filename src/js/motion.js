@@ -2059,6 +2059,162 @@
     if (!win) return { segments: segments, closed: closed };
     return applyTrimSegments(segments, closed, win);
   }
+  // Vector-brush ribbon trim (2026-08-20) — "il faudrait mettre en place le
+  // trim du coup": applyTrimSegments/applyTrimFor above trim the ribbon's
+  // already-BAKED outline (the closed polygon rebuildVectorBrushOutline
+  // produces), which has no notion of "one step along the stroke" — arc-
+  // length-slicing that outline instead sliced across the ribbon's own
+  // width, in the same wedge/degenerate-sliver family as the original
+  // fill-wedge bug (see engine-bridge.js's isVectorBrush exclusion,
+  // 18b2d9a). The fix mirrors that commit's own diagnosis: trim BEFORE
+  // the fill-shape's geometry is built, on the shape's actual "spine" —
+  // here that's the ribbon's centerline + width profile, not the outline.
+  //
+  // Reuses buildTrimPolyline unmodified: centerSegments already has the
+  // exact same {point,handleIn,handleOut} shape buildTrimPolyline expects
+  // (relative handles, Paper.js Segment convention — confirmed by
+  // rebuildVectorBrushOutline's own `new Segment(point,handleIn,handleOut)`
+  // call, tools.js), so passing centerSegments straight into it needs no
+  // adapter. widthAtFrac (tools.js, window-exposed, pure math/no Paper
+  // dependency) resolves each dense sample's width the same way
+  // rebuildVectorBrushOutline already does — this function stays
+  // Paper.js-free like the rest of motion.js; engine-bridge.js is the one
+  // that turns the returned {pts,widths} into real Paper Points and feeds
+  // buildVariableWidthPath (tools.js), since it already owns that Paper
+  // object lifecycle for the untrimmed case.
+  //
+  // Returns null when there's no trim window (caller falls back to the
+  // untrimmed centerSegments/widthProfile as-is) or the window collapses
+  // to nothing; otherwise {pts:[[x,y],...], widths:[number,...]} — a
+  // dense, already-windowed sample pair ready for buildVariableWidthPath.
+  function applyTrimToVectorBrush(li, strokeId, centerSegments, widthProfile, frameIdx) {
+    if (!centerSegments || centerSegments.length < 2) return null;
+    var win = trimWindowAt(li, strokeId, frameIdx);
+    if (!win) return null;
+    var s = win.start, e = win.end, off = win.offset || 0;
+    s += off; e += off;
+    if (e <= s) return { pts: [], widths: [] };
+    var pts = buildTrimPolyline(centerSegments, false);
+    var cum = [0];
+    for (var i = 1; i < pts.length; i++) {
+      var dx = pts[i][0] - pts[i - 1][0], dy = pts[i][1] - pts[i - 1][1];
+      cum.push(cum[i - 1] + Math.sqrt(dx * dx + dy * dy));
+    }
+    var total = cum[cum.length - 1];
+    if (!(total > 0)) return null;
+    var fallbackWidth = (widthProfile && widthProfile.length) ? widthProfile[widthProfile.length - 1].width : 1;
+    var widthsArr = pts.map(function (_, idx) {
+      var w = widthAtFrac(widthProfile, cum[idx] / total);
+      return w == null ? fallbackWidth : w;
+    });
+    function lenAtPct(pct) { return Math.max(0, Math.min(100, pct)) / 100 * total; }
+    function sampleAtLen(len) {
+      len = Math.max(0, Math.min(total, len));
+      for (var i2 = 1; i2 < cum.length; i2++) {
+        if (cum[i2] >= len) {
+          var segLen = cum[i2] - cum[i2 - 1];
+          var t = segLen > 0 ? (len - cum[i2 - 1]) / segLen : 0;
+          return {
+            point: [pts[i2 - 1][0] + (pts[i2][0] - pts[i2 - 1][0]) * t, pts[i2 - 1][1] + (pts[i2][1] - pts[i2 - 1][1]) * t],
+            width: widthsArr[i2 - 1] + (widthsArr[i2] - widthsArr[i2 - 1]) * t,
+          };
+        }
+      }
+      return { point: pts[pts.length - 1].slice(), width: widthsArr[widthsArr.length - 1] };
+    }
+    var lenS = lenAtPct(s), lenE = lenAtPct(e);
+    if (lenE <= lenS) return { pts: [], widths: [] };
+    var windowLen = lenE - lenS;
+    var outPts = [], outWidths = [];
+    var first = sampleAtLen(lenS); outPts.push(first.point); outWidths.push(first.width);
+    var STEP = total / Math.max(1, pts.length - 1);
+    for (var d = STEP; d < windowLen; d += STEP) {
+      var smp = sampleAtLen(lenS + d);
+      outPts.push(smp.point); outWidths.push(smp.width);
+    }
+    var last = sampleAtLen(lenE); outPts.push(last.point); outWidths.push(last.width);
+    return { pts: outPts, widths: outWidths };
+  }
+  // Dynamic shapes phase 2 (2026-08-18) — same encapsulation shape as
+  // applyTrimFor just above (engine-bridge.js never needs to know
+  // ld.elementMotion is where this lives), for a rect's per-corner radius.
+  // `sd` is the item's already-serialized dict (serP's output — see
+  // getEffectiveStrokes' render-time note): sd.paramShape carries the
+  // shape's OWN un-animated radii (each rect's real default, unlike every
+  // other Motion prop which shares one constant — see PROP_DEFAULT's own
+  // comment), read only for whichever corner ISN'T currently animated.
+  // Geometry itself is NOT reimplemented here — buildRoundRectPath
+  // (tools.js, window-exposed) is the one place that turns radii into
+  // segments, so the static-edit path (Coins panel) and this per-frame
+  // rebuild can never drift apart (CLAUDE.md §3).
+  function hasParamShapeMotionFor(li, strokeId) {
+    var ld = state.layers[li]; if (!ld) return false;
+    var holder = elementHolder(ld, strokeId);
+    if (!holder) return false;
+    if (holder.paramShapeKind === 'rect') {
+      return isAnimated(holder, 'cornerTL') || isAnimated(holder, 'cornerTR') || isAnimated(holder, 'cornerBR') || isAnimated(holder, 'cornerBL');
+    }
+    if (holder.paramShapeKind === 'ellipse') {
+      return isAnimated(holder, 'arcStart') || isAnimated(holder, 'arcSweep') || isAnimated(holder, 'arcInner');
+    }
+    if (holder.paramShapeKind === 'star') {
+      return isAnimated(holder, 'starInner') || isAnimated(holder, 'starCorner');
+    }
+    return false;
+  }
+  function applyParamShapeFor(li, strokeId, sd, frameIdx) {
+    var ps = sd.paramShape; if (!ps) return sd.segments;
+    var ld = state.layers[li]; var holder = ld && elementHolder(ld, strokeId);
+    if (!holder) return sd.segments;
+    function cv(key, fallback) { return isAnimated(holder, key) ? valueAtFrame(holder, key, frameIdx)[0] : fallback; }
+    var xs = sd.segments.map(function (s) { return s.point[0]; }), ys = sd.segments.map(function (s) { return s.point[1]; });
+    var x1 = Math.min.apply(null, xs), x2 = Math.max.apply(null, xs), y1 = Math.min.apply(null, ys), y2 = Math.max.apply(null, ys);
+    var built;
+    if (ps.kind === 'rect') {
+      var tl = cv('cornerTL', ps.tl || 0), tr = cv('cornerTR', ps.tr || 0), br = cv('cornerBR', ps.br || 0), bl = cv('cornerBL', ps.bl || 0);
+      built = window.buildRoundRectPath(x1, y1, x2, y2, tl, tr, br, bl);
+    } else if (ps.kind === 'ellipse') {
+      var startA = cv('arcStart', ps.startAngle || 0), sweepA = cv('arcSweep', ps.sweep !== undefined ? ps.sweep : 359.9), innerPct = cv('arcInner', Math.round((ps.innerRadius || 0) * 100));
+      var cx = (x1 + x2) / 2, cy = (y1 + y2) / 2, rx = (x2 - x1) / 2, ry = (y2 - y1) / 2;
+      built = window.buildArcEllipsePath(cx, cy, rx, ry, startA, sweepA, innerPct / 100);
+    } else if (ps.kind === 'star') {
+      var innerPctS = cv('starInner', Math.round((ps.innerRatio !== undefined ? ps.innerRatio : 0.5) * 100)), cornerR = cv('starCorner', ps.cornerRadius || 0);
+      var cxs = (x1 + x2) / 2, cys = (y1 + y2) / 2, outerR = Math.min(x2 - x1, y2 - y1) / 2;
+      built = window.buildStarPolygonPath(cxs, cys, outerR, ps.pointCount || 5, innerPctS / 100, cornerR);
+    } else return sd.segments;
+    var segs = built.segments.map(function (s) { return { point: [s.point.x, s.point.y], handleIn: [s.handleIn.x, s.handleIn.y], handleOut: [s.handleOut.x, s.handleOut.y] }; });
+    built.remove();
+    return segs;
+  }
+  // ---- Path-point parenting, "drive" direction (2026-08) — a vertex of
+  // THIS path snaps onto another LAYER's resolved world position every
+  // frame, tagged on the live item's data (data.pathVertexFollow, persisted
+  // via serP/desP like data.paramShape) rather than in Motion state — it's
+  // per-VERTEX config on the shape itself, not a keyable value. Same
+  // render-time-rebuild shape as paramShape (hasXxxMotionFor/applyXxxFor,
+  // §5ter/§1 of CLAUDE.md): both engine-bridge.js's buildSceneJson AND
+  // export.js's exportBuildFrame must call these, or an exported frame
+  // shows the vertex at its static authored position while the live canvas
+  // shows it correctly attached.
+  function hasPathVertexFollowMotionFor(li, strokeId) {
+    var item = liveItemByStrokeId(li, strokeId);
+    return !!(item && item.data && item.data.pathVertexFollow && item.data.pathVertexFollow.length);
+  }
+  function applyPathVertexFollowFor(li, strokeId, sd, frameIdx) {
+    var item = liveItemByStrokeId(li, strokeId);
+    var follows = item && item.data && item.data.pathVertexFollow;
+    var segs = sd.segments.map(function (s) { return { point: s.point.slice(), handleIn: (s.handleIn || [0, 0]).slice(), handleOut: (s.handleOut || [0, 0]).slice() }; });
+    if (!follows || !follows.length) return segs;
+    follows.forEach(function (f) {
+      if (f.vertexIndex == null || f.vertexIndex < 0 || f.vertexIndex >= segs.length) return;
+      var targetLi = findLayerIndexByUid(f.targetLayerUid);
+      if (targetLi < 0 || targetLi === li) return;
+      var wp = resolveLayerWorldOrigin(targetLi, frameIdx);
+      if (!wp) return;
+      segs[f.vertexIndex].point = [wp[0] + (f.offset ? f.offset[0] : 0), wp[1] + (f.offset ? f.offset[1] : 0)];
+    });
+    return segs;
+  }
   // Transforms one item's already-built segments array (engine-bridge.js's
   // {point,handleIn,handleOut} triples, handles as RELATIVE offsets — see
   // serP/lottieShapeValue's shared convention) around `pivot`. Scale+rotate
@@ -6639,6 +6795,7 @@
       if (!ld || !ld.elementMotion || !strokeId) return false;
       return hasTrimMotion(ld.elementMotion[strokeId]);
     },
+    applyTrimToVectorBrush: applyTrimToVectorBrush,
     // Called by the two frame-content writers in app.js — the union is
     // derived from that content, so it must not outlive an edit.
     invalidateSymbolUnionBounds: invalidateSymbolUnionBounds,
