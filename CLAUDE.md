@@ -421,6 +421,19 @@ uniquement — jamais embarqué dans le build distribué. Une copie de l'app liv
 beta-testeur a ce même panneau de triage dans le code, mais il est inutilisable sans le
 token perso de Cyril.
 
+**Build web (2026-08) : la publication GitHub passe par un Worker, pas par Rust.**
+Sur desktop, `submit_feedback_issue`/`upload_feedback_attachment` tournent en Rust — un
+navigateur n'a pas ce backend pour cacher le token. `worker-feedback/` (racine du repo) est
+un Worker Cloudflare séparé (secret `GITHUB_FEEDBACK_TOKEN` propre, jamais dans le Worker du
+site statique `nemo-editor`) qui joue exactement le même rôle de frontière de confiance.
+`feedback-bridge.js` branche sur `tauriOk()` : Tauri → `invoke()`, sinon → `fetch()` vers ce
+Worker (`FEEDBACK_WORKER_URL`, à mettre à jour après le premier déploiement). **Piège déjà
+tombé une fois** : le premier jet du build web gardait le vieux garde-fou `if (tauriOk())`
+autour de tout l'appel de publication — le feedback s'enregistrait bien en local
+(`localStorage`) et semblait "envoyé", mais ne partait jamais vers GitHub, silencieusement.
+Voir `worker-feedback/README.md` pour le setup (secret Worker à poser une fois via
+`wrangler secret put`, PAS un secret GitHub Actions).
+
 ## 7. Avant chaque build : synchroniser le numéro de version partout
 
 Trois fichiers portent le numéro de version et doivent rester identiques à chaque bump :

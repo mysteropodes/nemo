@@ -22,6 +22,25 @@
   function tauriOk() { return typeof window.__TAURI__ !== 'undefined'; }
   function projectKey() { return (window.SMProject && window.SMProject.getProjectKey()) || 'untitled-autosave'; }
 
+  // Browser-only transport for the two GitHub calls Tauri does via Rust
+  // (submit_feedback_issue/upload_feedback_attachment) — see worker-feedback/
+  // (repo root). MUST be updated to the Worker's real URL after its first
+  // deploy (printed in the deploy-feedback-worker.yml Actions log, also on
+  // its Cloudflare dashboard page) — left as the workers.dev default name
+  // here since the account's actual workers.dev subdomain isn't known yet.
+  var FEEDBACK_WORKER_URL = 'https://nemo-feedback.workers.dev';
+  async function workerPost(path, payload) {
+    var resp = await fetch(FEEDBACK_WORKER_URL + path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    var data = null;
+    try { data = await resp.json(); } catch (e) {}
+    if (!resp.ok) throw new Error((data && data.error) || ('feedback worker error ' + resp.status));
+    return data;
+  }
+
   // ---- Action log (session-only trail feeding actionTrail below) ----
   // Called once per pushUndoLayers() (app.js/tweens.js's single choke point
   // before every meaningful mutation) — consecutive same-tool/same-frame
@@ -278,15 +297,18 @@
     // Best-effort: beta testers have no shared Sync folder (that's a local/
     // network-drive mechanism for Cyril's own machines) — this is THEIR
     // transport instead: one GitHub Issue per feedback entry, in the public
-    // mysteropodes/strokemotion-feedback repo. The actual HTTP call (and the
-    // write-scoped token) lives entirely in Rust (submit_feedback_issue,
-    // src-tauri/src/lib.rs) so the token never appears in this file or in
-    // any devtools-visible fetch() — see that command's own comment.
-    if (tauriOk()) {
-      try {
-        await publishToGitHubIssue(entry);
-      } catch (e) { console.warn('[feedback] GitHub publish failed', e); }
-    }
+    // mysteropodes/strokemotion-feedback repo. On Tauri the write-scoped
+    // token lives entirely in Rust (submit_feedback_issue, src-tauri/src/
+    // lib.rs) so it never appears in this file or a devtools-visible
+    // fetch(); on the web build there IS no Rust backend to hide it behind,
+    // so the same call instead goes to the nemo-feedback Worker (see
+    // githubIssue()/githubAttachment() below), which holds the token
+    // server-side the same way. 2026-08: this used to be Tauri-only and
+    // silently no-op on web — a tester's feedback looked "saved" but never
+    // reached anyone, see worker-feedback/README for the fix.
+    try {
+      await publishToGitHubIssue(entry);
+    } catch (e) { console.warn('[feedback] GitHub publish failed', e); }
     return entry;
   }
 
@@ -306,8 +328,12 @@
     if (!m) return null;
     var ext = m[1] === 'jpeg' ? 'jpg' : m[1];
     var filename = entry.id + '.' + ext;
-    var t = window.__TAURI__;
-    return t.core.invoke('upload_feedback_attachment', { filename: filename, contentBase64: m[2] });
+    if (tauriOk()) {
+      var t = window.__TAURI__;
+      return t.core.invoke('upload_feedback_attachment', { filename: filename, contentBase64: m[2] });
+    }
+    var data = await workerPost('/attachment', { filename: filename, contentBase64: m[2] });
+    return data && data.url;
   }
   async function publishToGitHubIssue(entry) {
     var title = (entry.blocking ? '[BLOQUANT] ' : '') + (entry.note || '(sans titre)').slice(0, 80);
@@ -332,8 +358,12 @@
       '',
       '<!-- sm-feedback-id: ' + entry.id + ' -->',
     ].join('\n');
-    var t = window.__TAURI__;
-    await t.core.invoke('submit_feedback_issue', { title: title, body: body, labels: labels });
+    if (tauriOk()) {
+      var t = window.__TAURI__;
+      await t.core.invoke('submit_feedback_issue', { title: title, body: body, labels: labels });
+      return;
+    }
+    await workerPost('/issue', { title: title, body: body, labels: labels });
   }
 
   // ---- Dev-side triage over the GitHub feedback repo (Cyril only — a

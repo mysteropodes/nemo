@@ -1,0 +1,11 @@
+{
+	// Standalone API Worker — no static assets. Separate from nemo-editor
+	// (wrangler.jsonc at the repo root) on purpose: different secret
+	// (GITHUB_FEEDBACK_TOKEN, scoped to mysteropodes/strokemotion-feedback
+	// only), different deploy trigger (only when this directory changes),
+	// zero reason for the editor's static-site Worker to ever hold a
+	// GitHub write token.
+	"name": "nemo-feedback",
+	"main": "src/index.js",
+	"compatibility_date": "2026-08-01"
+}
