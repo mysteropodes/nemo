@@ -236,13 +236,20 @@ body.tools-docked-away #tools-panel-resize{display:none;}
 .tool-btn .sk{position:absolute;bottom:0;right:1px;font-size:7px;color:var(--text-dark);pointer-events:none;font-family:monospace;}
 .tool-btn.active .sk{color:rgba(255,255,255,.5);}
 .tool-sep{width:24px;height:1px;background:var(--border);margin:4px 0;}
-/* Shape-tool long-press flyout (timeline.js, 2026-08) — the tiny corner
-   triangle is the standard Illustrator/Rive hint that a toolbar button
-   groups more than one tool behind a long-press. */
-.tool-btn.shape-tool-groupable::before{content:'';position:absolute;bottom:1px;right:1px;
+/* Shape-tool group (timeline.js, 2026-08) — Illustrator/Rive-style single
+   toolbar slot: all 5 shape buttons occupy the SAME 34x34 cell, stacked via
+   absolute positioning; only `.stack-front` is visible/clickable, the rest
+   sit `visibility:hidden` (not display:none — keeps real geometry so
+   tutorial.js's getBoundingClientRect spotlight still lands correctly even
+   on a backed button, see index.html's own comment on #shape-tool-stack).
+   The tiny corner triangle is the standard hint that long-press reveals more. */
+.tool-stack{position:relative;width:34px;height:34px;flex:none;}
+.tool-stack .tool-btn{position:absolute;inset:0;visibility:hidden;pointer-events:none;}
+.tool-stack .tool-btn.stack-front{visibility:visible;pointer-events:auto;}
+.tool-stack .tool-btn.stack-front::before{content:'';position:absolute;bottom:1px;right:1px;
   width:0;height:0;border-style:solid;border-width:0 0 4px 4px;
   border-color:transparent transparent rgba(236,234,231,.4) transparent;pointer-events:none;}
-.tool-btn.shape-tool-groupable.active::before{border-bottom-color:rgba(255,255,255,.55);}
+.tool-stack .tool-btn.stack-front.active::before{border-bottom-color:rgba(255,255,255,.55);}
 .shape-tool-flyout{position:fixed;z-index:9999;display:flex;gap:2px;padding:4px;
   background:var(--panel,#2a2a2e);border:1px solid var(--border);border-radius:8px;
   box-shadow:0 4px 16px rgba(0,0,0,.4);}

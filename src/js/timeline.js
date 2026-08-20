@@ -385,6 +385,7 @@ window.SM={
     state.tool=t;renderArcs();
     if(_camToolChanged)renderTimeline();
     document.querySelectorAll('.tool-btn').forEach(function(b){b.classList.toggle('active',b.dataset.tool===t);});
+    if(window.SMShapeGroup)SMShapeGroup.ensureFront(t);
     var cc={draw:'crosshair',pen:'crosshair',line:'crosshair',rect:'crosshair',ellipse:'crosshair',speechbubble:'crosshair',star:'crosshair',select:'default',subselect:'default',fsselect:'default',comment:'crosshair',camera:'move',text:'text',eraser:'pointer',fill:'crosshair',fillbrush:'crosshair',eyedropper:'crosshair',hand:'grab',zoom:'zoom-in',rotate:'grab',perspective:'crosshair',symmetry:'crosshair',rig:'crosshair'};
     canvasEl.style.cursor=cc[t]||'default';
     // Brush texture presets (Chalk/Charcoal/Pencil…) stamp dabs along a
@@ -7556,18 +7557,31 @@ document.addEventListener('pointerdown',function(){if(state.spaceDown)state.spac
 
 document.addEventListener('keydown',onKeyDown);document.addEventListener('keyup',onKeyUp);
 document.querySelectorAll('.tool-btn').forEach(function(b){b.addEventListener('click',function(){window.SM.setTool(this.dataset.tool);});});
-// Shape-tool flyout (2026-08, "regrouper les shape dans un mini menu comme
+// Shape-tool group (2026-08, "regrouper les shape dans un mini menu comme
 // dans illustrator ou rive... click un peu longtemps ça affiche le menu").
-// Deliberately additive, not a toolbar restructure: the tutorial system
-// (tutorial.js) has ~15 hardcoded '.tool-btn[data-tool="rect/ellipse/line"]'
-// targets across 25 modules that spotlight/click these exact elements — they
-// stay exactly where they are, always visible, so none of that breaks. A
-// long-press on any one of them instead pops a small flyout beside it
-// listing the other two, Illustrator-style, without touching the DOM
-// structure of the toolbar itself.
+// #shape-tool-stack (index.html) holds all 5 real buttons (Line/Rect/
+// Ellipse/Speech Bubble/Star) stacked in ONE toolbar slot via CSS
+// (.tool-stack, style.css) — only `.stack-front` is visible/clickable, the
+// rest are `visibility:hidden` (not display:none, so their geometry stays
+// real for tutorial.js's getBoundingClientRect-based spotlight). Long-press
+// pops a flyout with the other 4; picking one both selects that tool AND
+// fronts its button, Illustrator-style ("last used becomes the visible
+// icon"). ensureFront (exposed as window.SMShapeGroup) is the single choke
+// point both setTool's active-class sync (timeline.js, ~line 388) and
+// tutorial.js call before spotlighting a grouped tool, so a step targeting
+// e.g. '[data-tool="ellipse"]' fronts it FIRST — otherwise the real click
+// tutorial.js waits for would land on a hidden, unclickable button.
 (function(){
-  var SHAPE_TOOLS=['rect','ellipse','line'];
+  var SHAPE_TOOLS=['rect','line','ellipse','speechbubble','star'];
   var LPRESS_MS=450,pressTimer=null,suppressClick=false,flyoutEl=null;
+  function ensureFront(tool){
+    if(SHAPE_TOOLS.indexOf(tool)<0)return;
+    SHAPE_TOOLS.forEach(function(t){
+      var b=document.querySelector('.tool-btn[data-tool="'+t+'"]');
+      if(b)b.classList.toggle('stack-front',t===tool);
+    });
+  }
+  window.SMShapeGroup={ensureFront:ensureFront};
   function closeFlyout(){if(flyoutEl){flyoutEl.remove();flyoutEl=null;}document.removeEventListener('pointerdown',onOutsideDown,true);}
   function onOutsideDown(e){if(flyoutEl&&!flyoutEl.contains(e.target))closeFlyout();}
   function openFlyout(originBtn){
@@ -7580,9 +7594,9 @@ document.querySelectorAll('.tool-btn').forEach(function(b){b.addEventListener('c
       if(!src)return;
       var item=document.createElement('button');
       item.className='shape-tool-flyout-item'+(t===state.tool?' active':'');
-      item.innerHTML=src.querySelector('svg,span.material-symbols-rounded,span:not(.sk)')?src.innerHTML.replace(/<span class="sk">.*?<\/span>/,''):src.innerHTML;
+      item.innerHTML=src.innerHTML.replace(/<span class="sk">.*?<\/span>/,'');
       item.title=src.title;
-      item.addEventListener('click',function(ev){ev.stopPropagation();window.SM.setTool(t);closeFlyout();});
+      item.addEventListener('click',function(ev){ev.stopPropagation();ensureFront(t);window.SM.setTool(t);closeFlyout();});
       flyoutEl.appendChild(item);
     });
     document.body.appendChild(flyoutEl);
@@ -7591,17 +7605,17 @@ document.querySelectorAll('.tool-btn').forEach(function(b){b.addEventListener('c
     flyoutEl.style.top=Math.max(4,Math.min(rect.top,window.innerHeight-fr.height-4))+'px';
     setTimeout(function(){document.addEventListener('pointerdown',onOutsideDown,true);},0);
   }
-  SHAPE_TOOLS.forEach(function(t){
-    var btn=document.querySelector('.tool-btn[data-tool="'+t+'"]');
-    if(!btn)return;
-    btn.classList.add('shape-tool-groupable');
-    btn.addEventListener('pointerdown',function(){
+  var stack=document.getElementById('shape-tool-stack');
+  if(stack){
+    stack.addEventListener('pointerdown',function(e){
+      var btn=e.target.closest('.tool-btn');
+      if(!btn)return;
       suppressClick=false;
       pressTimer=setTimeout(function(){suppressClick=true;openFlyout(btn);},LPRESS_MS);
     });
-    ['pointerup','pointerleave'].forEach(function(ev){btn.addEventListener(ev,function(){clearTimeout(pressTimer);});});
-    btn.addEventListener('click',function(ev){if(suppressClick){ev.stopImmediatePropagation();suppressClick=false;}},true);
-  });
+    ['pointerup','pointerleave'].forEach(function(ev){stack.addEventListener(ev,function(){clearTimeout(pressTimer);});});
+    stack.addEventListener('click',function(ev){if(suppressClick){ev.stopImmediatePropagation();suppressClick=false;}},true);
+  }
 })();
 document.getElementById('p-sw').addEventListener('change',function(){window.SM.setBrushSize(parseInt(this.value));});
 // Actively picking a fill color also ENABLES fill (Graphite behavior) —
