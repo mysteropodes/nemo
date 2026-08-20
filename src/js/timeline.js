@@ -2794,6 +2794,7 @@ function selPropsApplyMove(dx,dy,skipUndo){
   selectedPaths.forEach(function(p){
     var d=new Point(dx,dy);
     p.translate(d);
+    if(window.syncParamShapeBoxOnTranslate)window.syncParamShapeBoxOnTranslate(p,dx,dy);
     transformFillGradient(p,function(pt){return pt.add(d);});
     if(p.data&&p.data.isVectorBrush&&p.data.centerSegments)p.data.centerSegments.forEach(function(s){s.point=[s.point[0]+dx,s.point[1]+dy];});
     if(p.data&&p.data.linkedFill&&!p.data.linkedFill.removed)p.data.linkedFill.translate(new Point(dx,dy));
@@ -2807,6 +2808,7 @@ function selPropsApplyScale(sx,sy,anchor,skipUndo){
   if(!skipUndo)pushUndo();
   selectedPaths.forEach(function(p){
     p.scale(sx,sy,anchor);
+    if(window.syncParamShapeBoxOnScale)window.syncParamShapeBoxOnScale(p,sx,sy,anchor);
     transformFillGradient(p,function(pt){return new Point(anchor.x+(pt.x-anchor.x)*sx,anchor.y+(pt.y-anchor.y)*sy);});
     if(p.data&&p.data.isVectorBrush&&p.data.centerSegments){scaleCenterSegments(p.data.centerSegments,sx,sy,anchor.x,anchor.y);rebuildVectorBrushOutline(p);}
   });

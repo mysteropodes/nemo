@@ -4997,7 +4997,13 @@ function buildArcEllipsePath(cx,cy,rx,ry,startDeg,sweepDeg,innerRatio){
 }
 function applyParamShapeEllipse(path){
   var ps=path.data&&path.data.paramShape;if(!ps||ps.kind!=='ellipse')return;
-  var b=path.bounds,cx=b.center.x,cy=b.center.y,rx=b.width/2,ry=b.height/2;
+  // paramShapeBoxOf/stampParamShapeBox are defined further down this file
+  // (Star/Rect's own "stable generator frame" rework) — ellipse is the
+  // FIRST dynamic shape kind built each session in most files that use
+  // this pattern, but declaration order in one script doesn't matter here
+  // since nothing calls applyParamShapeEllipse before the whole file (and
+  // thus every function in it) has parsed.
+  var b=paramShapeBoxOf(path,ps),cx=(b.x1+b.x2)/2,cy=(b.y1+b.y2)/2,rx=(b.x2-b.x1)/2,ry=(b.y2-b.y1)/2;
   var built=buildArcEllipsePath(cx,cy,rx,ry,ps.startAngle||0,ps.sweep!==undefined?ps.sweep:359.9,ps.innerRadius||0);
   path.segments=built.segments;path.closed=true;
   built.remove();
@@ -5056,9 +5062,59 @@ function buildStarPolygonPath(cx,cy,outerR,pointCount,innerRatio,cornerRadius){
   }
   return p;
 }
+// ---- DYNAMIC SHAPES rework (2026-08-19) — stable generator frame ----
+// Feedback: "les paramètres font un peu n'importe quoi" — reproduced live:
+// applyParamShapeEllipse/Star/Rect all rebuilt from path.bounds EVERY edit,
+// but a donut/pie-slice/rounded/starred shape's rendered bbox is routinely
+// SMALLER than its own conceptual frame (a thin pie slice, a heavily
+// rounded star, an inset donut). Nudge one param, the frame silently
+// shrinks to match the new (smaller) bbox; nudge another param that reads
+// that shrunken frame, it shrinks again — a compounding feedback loop with
+// no way back to the original size short of undo. Figma/Graphite avoid
+// this by keeping a shape's FRAME (its own bounding box, resizable like
+// any other layer) completely separate from its internal parameters — the
+// frame only changes via a genuine resize gesture, never as a side effect
+// of an internal param edit. `paramShape.box` is that frame: stamped once
+// at creation (stampParamShapeBox), kept in sync through real move/scale
+// gestures (syncParamShapeBoxOnTranslate/OnScale, called from every
+// p.translate()/p.scale() site that can touch a paramShape path — select-
+// bridge.js's live drag-move/drag-scale and timeline.js's Position/Size
+// panel fields), and otherwise left completely alone. Rotation is a known
+// gap shared with the pre-rework code (a Path bakes rotation into its
+// segments, Paper.js gives no clean way to recover "how rotated is this"
+// afterward) — rebuilding already snapped back to axis-aligned before this
+// change too, not a regression.
+function stampParamShapeBox(path){
+  var ps=path.data&&path.data.paramShape;if(!ps)return;
+  var b=path.bounds;
+  ps.box={x1:b.left,y1:b.top,x2:b.right,y2:b.bottom};
+}
+function syncParamShapeBoxOnTranslate(p,dx,dy){
+  var ps=p&&p.data&&p.data.paramShape;if(!ps||!ps.box)return;
+  ps.box.x1+=dx;ps.box.x2+=dx;ps.box.y1+=dy;ps.box.y2+=dy;
+}
+function syncParamShapeBoxOnScale(p,sx,sy,anchor){
+  var ps=p&&p.data&&p.data.paramShape;if(!ps||!ps.box)return;
+  var b=ps.box;
+  var nx1=anchor.x+(b.x1-anchor.x)*sx,nx2=anchor.x+(b.x2-anchor.x)*sx;
+  var ny1=anchor.y+(b.y1-anchor.y)*sy,ny2=anchor.y+(b.y2-anchor.y)*sy;
+  b.x1=Math.min(nx1,nx2);b.x2=Math.max(nx1,nx2);
+  b.y1=Math.min(ny1,ny2);b.y2=Math.max(ny1,ny2);
+}
+// Every applyParamShapeXxx below self-heals a missing box (older project
+// data saved before this rework) by stamping one from the CURRENT bounds
+// the first time it's touched — same one-time "no box yet" gate `stampParamShapeBox`
+// otherwise runs at creation, just deferred to first edit for pre-existing shapes.
+function paramShapeBoxOf(path,ps){
+  if(!ps.box)stampParamShapeBox(path);
+  return ps.box;
+}
+window.stampParamShapeBox=stampParamShapeBox;
+window.syncParamShapeBoxOnTranslate=syncParamShapeBoxOnTranslate;
+window.syncParamShapeBoxOnScale=syncParamShapeBoxOnScale;
 function applyParamShapeStar(path){
   var ps=path.data&&path.data.paramShape;if(!ps||ps.kind!=='star')return;
-  var b=path.bounds,cx=b.center.x,cy=b.center.y,outerR=Math.min(b.width,b.height)/2;
+  var b=paramShapeBoxOf(path,ps),cx=(b.x1+b.x2)/2,cy=(b.y1+b.y2)/2,outerR=Math.min(b.x2-b.x1,b.y2-b.y1)/2;
   var built=buildStarPolygonPath(cx,cy,outerR,ps.pointCount,ps.innerRatio,ps.cornerRadius);
   path.segments=built.segments;path.closed=true;
   built.remove();
@@ -5067,8 +5123,8 @@ window.buildStarPolygonPath=buildStarPolygonPath;
 window.applyParamShapeStar=applyParamShapeStar;
 function applyParamShapeRect(path){
   var ps=path.data&&path.data.paramShape;if(!ps||ps.kind!=='rect')return;
-  var b=path.bounds;
-  var built=buildRoundRectPath(b.left,b.top,b.right,b.bottom,ps.tl||0,ps.tr||0,ps.br||0,ps.bl||0);
+  var b=paramShapeBoxOf(path,ps);
+  var built=buildRoundRectPath(b.x1,b.y1,b.x2,b.y2,ps.tl||0,ps.tr||0,ps.br||0,ps.bl||0);
   path.segments=built.segments;path.closed=true;
   built.remove();
 }
@@ -6062,13 +6118,13 @@ function onMouseUp(event){
       // radius-capable from creation (all 4 at 0, i.e. today's sharp-corner
       // look, zero visual change) rather than an opt-in — matches Figma,
       // where a rectangle's corners are always independently editable.
-      if(state.tool==='rect')currentPath.data.paramShape={kind:'rect',tl:0,tr:0,br:0,bl:0};
+      if(state.tool==='rect'){currentPath.data.paramShape={kind:'rect',tl:0,tr:0,br:0,bl:0};stampParamShapeBox(currentPath);}
       // Star/Polygon — always dynamic from creation (unlike Ellipse's
       // opt-in "Rendre dynamique": there's no plain-native-Bezier
       // equivalent to fall back to here, the tool's whole point is the
       // parametric shape) — same tool draws either depending on
       // innerRatio, see buildStarPolygonPath's own comment.
-      else if(state.tool==='star')currentPath.data.paramShape={kind:'star',pointCount:state.starPointCount||5,innerRatio:state.starInnerRatio!==undefined?state.starInnerRatio:0.5,cornerRadius:0};
+      else if(state.tool==='star'){currentPath.data.paramShape={kind:'star',pointCount:state.starPointCount||5,innerRatio:state.starInnerRatio!==undefined?state.starInnerRatio:0.5,cornerRadius:0};stampParamShapeBox(currentPath);}
       tagOwner(currentPath);
       if(window.SMSymmetry&&window.SMSymmetry.onStrokeCommitted)window.SMSymmetry.onStrokeCommitted(currentPath,userLayers[state.activeLayerIdx]);
     }
