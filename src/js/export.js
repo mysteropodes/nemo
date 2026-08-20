@@ -149,6 +149,27 @@ function exportBuildFrame(frameIdx,alpha){
       // whole exportBuildFrame call for that frame. Pre-existing gap (any
       // imported image already triggered it), surfaced now because Bitmap
       // Brush adds a Raster companion to nearly every textured stroke.
+      // ⚠️ Corruption bug, found 2026-08-20 and fixed here: every hook below
+      // that does `sd.segments=...` was mutating the object
+      // getEffectiveStrokesRendered handed back — for a plain layer (the
+      // common case) that's documented as "a LIVE reference into the
+      // stored frame's own strokes array... A future caller that mutates
+      // this return value directly would corrupt the STORED keyframe"
+      // (getEffectiveStrokes's own comment, app.js). Confirmed live: a rect
+      // with an animated corner radius, exported at a frame OTHER than its
+      // keyframe, permanently overwrote the KEYFRAME's stored segments
+      // (4 sharp-corner points) with that other frame's rebuilt geometry
+      // (5 rounded-corner points) — every one of these hooks fires on
+      // every export, not just the "export a range" case, so a single
+      // still-frame PNG export was enough to corrupt the project.
+      // sdCloned/ensureSdClone: clone ONCE, lazily, only when at least one
+      // hook actually needs to rewrite something — cheap common case (no
+      // active paramShape/vertex-follow/text-bounds-follow/trim) stays a
+      // zero-cost no-op, matching getEffectiveStrokes's own "Clone with
+      // JSON.parse(JSON.stringify(...)) before any in-place mutation, same
+      // pattern used everywhere else in this file" prescription.
+      var sdCloned=false;
+      function ensureSdClone(){if(!sdCloned){sd=JSON.parse(JSON.stringify(sd));sdCloned=true;}}
       // Dynamic shape params (rect corners / ellipse arc / star, 2026-08):
       // mirrors engine-bridge.js's buildSceneJson hook exactly — same
       // family-of-bug-#1 risk (CLAUDE.md §1), this is a SECOND reader of
@@ -156,6 +177,7 @@ function exportBuildFrame(frameIdx,alpha){
       // corner/arc/star values, or an exported PNG/video shows the static
       // un-animated shape while the live canvas shows it correctly.
       if(!sd.isRaster&&window.SMMotion&&sd.strokeId&&SMMotion.hasParamShapeMotionFor&&SMMotion.hasParamShapeMotionFor(li,sd.strokeId)){
+        ensureSdClone();
         sd.segments=SMMotion.applyParamShapeFor(li,sd.strokeId,sd,frameIdx);
       }
       // Path-point parenting, "drive" direction (2026-08) — same second-
@@ -164,9 +186,11 @@ function exportBuildFrame(frameIdx,alpha){
       // here — it lives inside SMMotion.layerMotionAt, already the source
       // of `motionMat` a few lines below.
       if(!sd.isRaster&&window.SMMotion&&sd.strokeId&&SMMotion.hasPathVertexFollowMotionFor&&SMMotion.hasPathVertexFollowMotionFor(li,sd.strokeId)){
+        ensureSdClone();
         sd.segments=SMMotion.applyPathVertexFollowFor(li,sd.strokeId,sd,frameIdx);
       }
       if(!sd.isRaster&&window.SMMotion&&sd.strokeId&&SMMotion.hasTextBoundsFollowMotionFor&&SMMotion.hasTextBoundsFollowMotionFor(li,sd.strokeId)){
+        ensureSdClone();
         sd.segments=SMMotion.applyTextBoundsFollowFor(li,sd.strokeId,sd,frameIdx);
       }
       // Trim Paths (2026-08-20) — the KNOWN GAP applyTrimFor's own doc
@@ -178,20 +202,11 @@ function exportBuildFrame(frameIdx,alpha){
       // 18b2d9a/de423b1's own reasoning — slicing the outline cuts across
       // the ribbon's own width); a plain stroke slices sd.segments directly
       // and loses its fillColor (18b2d9a — filling a trimmed OPEN arc draws
-      // the AE "pac-man wedge" instead of a clean line).
-      // ⚠️ UNLIKE the three hooks just above (which mutate `sd.segments` on
-      // the object getEffectiveStrokes handed back): trim always changes
-      // the segment COUNT (and often `closed`), and per that function's own
-      // doc comment a plain layer's `strokes` is "a LIVE reference into the
-      // stored frame's own strokes array... A future caller that mutates
-      // this return value directly would corrupt the STORED keyframe" — so
-      // trim reassigns the LOCAL `sd` to a fresh clone first, same
-      // "Clone with JSON.parse(JSON.stringify(...))" convention that
-      // comment itself prescribes, rather than mutating in place like the
-      // three hooks above already do (a separate pre-existing risk, not
-      // touched here — out of scope for this pass).
+      // the AE "pac-man wedge" instead of a clean line). Same ensureSdClone
+      // as the three hooks above — trim always changes the segment COUNT
+      // (and often `closed`), so it can't reuse the original object either.
       if(!sd.isRaster&&window.SMMotion&&sd.strokeId&&SMMotion.hasTrimMotionFor(li,sd.strokeId)){
-        sd=JSON.parse(JSON.stringify(sd));
+        ensureSdClone();
         if(sd.isVectorBrush&&sd.centerSegments&&sd.centerSegments.length>=2){
           var vbTrim=SMMotion.applyTrimToVectorBrush(li,sd.strokeId,sd.centerSegments,sd.widthProfile,frameIdx);
           var vbOutline=(vbTrim&&vbTrim.pts&&vbTrim.pts.length>=2)?buildVariableWidthPath(vbTrim.pts.map(function(pt){return new Point(pt[0],pt[1]);}),vbTrim.widths):null;
