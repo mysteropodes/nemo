@@ -264,8 +264,7 @@
       wrap.addEventListener('click', function (e) {
         e.preventDefault(); e.stopPropagation();
         open(wrap, input.dataset.hex8 || input.value, function (hex) {
-          input.value = hex;
-          input.dataset.hex8 = hex;
+          setHex8Input(input, hex);
           input.dispatchEvent(new Event('input', { bubbles: true }));
         });
         open._lastNone = pair.onNone || null;

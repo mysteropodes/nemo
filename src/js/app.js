@@ -414,6 +414,22 @@ function colorHex8(c){
   function h(n){return Math.max(0,Math.min(255,Math.round(n))).toString(16).padStart(2,'0');}
   return '#'+h(rgba[0])+h(rgba[1])+h(rgba[2])+h(parseFloat(rgba[3])*255);
 }
+// Writes an 8-digit hex (#rrggbbaa) to a native <input type="color"> the
+// CLAUDE.md §2-documented way: dataset.hex8 carries the real alpha-inclusive
+// value, .value gets the plain 6-digit color the input actually accepts.
+// Every call site used to assign the full 8-digit string straight to
+// .value too, "relying on" the input silently truncating it — it does
+// apply the truncated color, but Chrome/WebKit ALSO logs a console warning
+// on every single assignment ("The specified value ... does not conform to
+// the required format"), which is what feedback #44 was actually seeing
+// flood the console every time a stroke/fill color changed. One helper so
+// the ~11 copies of this pattern (timeline.js, tools.js, viewtools-bridge.js)
+// converge on the same fix instead of needing it repeated at each site.
+function setHex8Input(el,hex){
+  if(!el)return;
+  el.value=(hex&&hex.length>7)?hex.slice(0,7):hex;
+  el.dataset.hex8=hex;
+}
 // Copy-pasted across 13 call sites (select-bridge.js, tools.js, timeline.js)
 // before this — the exclusion rule for "is this child a real, independently
 // selectable stroke, or a rendering artifact of its anchor stroke" (linked-

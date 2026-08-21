@@ -2766,7 +2766,7 @@ function updateFsSelPanel(){
   if((_fsSel0.kind==='fill'||_fsSel0.kind==='fillregion')&&p.fillColor&&!isBrushShape){
     var fc=colorHex8(p.fillColor);
     document.getElementById('fill-well').style.background=fc;document.getElementById('pm-fill').style.background=fc;
-    ['color-fill','pm-fill-c'].forEach(function(id){var el=document.getElementById(id);if(el){el.value=fc;el.dataset.hex8=fc;}});
+    ['color-fill','pm-fill-c'].forEach(function(id){setHex8Input(document.getElementById(id),fc);});
     // Was only removing the toggle's 'off' CSS class here (a display-only
     // fix, per this function's own header comment) — leaving the actual
     // state.fillEnabled untouched meant the icon could show "on" while the
@@ -2778,7 +2778,7 @@ function updateFsSelPanel(){
   }else if(_fsSel0.kind==='stroke'&&p.strokeColor){
     var sc=colorHex8(p.strokeColor);
     document.getElementById('stroke-well').style.background=sc;document.getElementById('pm-stroke').style.background=sc;
-    ['color-stroke','pm-stroke-c'].forEach(function(id){var el=document.getElementById(id);if(el){el.value=sc;el.dataset.hex8=sc;}});
+    ['color-stroke','pm-stroke-c'].forEach(function(id){setHex8Input(document.getElementById(id),sc);});
     state.strokeEnabled=true;
     window.SM._syncStrokeEnabledUI(true);
   }
@@ -4753,7 +4753,7 @@ function buildParentCell(row,ld,li){
 function paintStrokeSwatches(v){
   var sw=document.getElementById('stroke-well'); if(sw)sw.style.background=v;
   var pm=document.getElementById('pm-stroke');   if(pm)pm.style.background=v;
-  ['color-stroke','pm-stroke-c'].forEach(function(id){var el=document.getElementById(id);if(el){el.value=v;el.dataset.hex8=v;}});
+  ['color-stroke','pm-stroke-c'].forEach(function(id){setHex8Input(document.getElementById(id),v);});
   var shex=document.getElementById('p-stroke-hex');if(shex&&document.activeElement!==shex)shex.value=hexDisplayValue(v);
   var salpha=document.getElementById('p-stroke-alpha');if(salpha&&document.activeElement!==salpha)salpha.value=alphaPctFromHex(v);
 }
@@ -4763,7 +4763,7 @@ function paintFillSwatches(v){
   // .none overlay is what communicates "off".
   var fw=document.getElementById('fill-well'); if(fw)fw.style.background=v;
   var pf=document.getElementById('pm-fill');   if(pf)pf.style.background=v;
-  ['color-fill','pm-fill-c'].forEach(function(id){var el=document.getElementById(id);if(el){el.value=v;el.dataset.hex8=v;}});
+  ['color-fill','pm-fill-c'].forEach(function(id){setHex8Input(document.getElementById(id),v);});
   // No fill-side alpha field exists (only the stroke has one) — the fill's
   // alpha rides in dataset.hex8 above.
   var fhex=document.getElementById('p-fill-hex');if(fhex&&document.activeElement!==fhex)fhex.value=hexDisplayValue(v);
@@ -6520,7 +6520,7 @@ function syncProfileFields(){
   if(!nameEl||!state.userProfile)return;
   nameEl.value=state.userProfile.name;
   var c=state.userProfile.color;
-  if(colorEl){colorEl.value=c;colorEl.dataset.hex8=c;}
+  setHex8Input(colorEl,c);
   if(wellEl)wellEl.style.background=c;
   var role=state.userProfile.role||'animator';
   if(roleEl)roleEl.value=role;
@@ -7699,7 +7699,7 @@ document.getElementById('p-sw').addEventListener('change',function(){window.SM.s
 // load/selection-sync don't dispatch events, so they can't re-enable fill
 // behind the user's back.
 document.getElementById('color-fill').addEventListener('input',function(){window.SM.setFillColor(this.dataset.hex8||this.value);if(!state.fillEnabled)window.SM.setFillEnabled(true);});
-document.getElementById('pm-fill-c').addEventListener('input',function(){var v=this.dataset.hex8||this.value;window.SM.setFillColor(v);document.getElementById('color-fill').value=v;document.getElementById('color-fill').dataset.hex8=v;if(!state.fillEnabled)window.SM.setFillEnabled(true);});
+document.getElementById('pm-fill-c').addEventListener('input',function(){var v=this.dataset.hex8||this.value;window.SM.setFillColor(v);setHex8Input(document.getElementById('color-fill'),v);if(!state.fillEnabled)window.SM.setFillEnabled(true);});
 document.getElementById('p-fill-on').addEventListener('change',function(){window.SM.setFillEnabled(this.checked);});
 // (fill-enable-toggle / stroke-enable-toggle section-header buttons removed
 // per redesign — the left panel's cw-eye badges are the one on/off switch
@@ -7707,7 +7707,7 @@ document.getElementById('p-fill-on').addEventListener('change',function(){window
 document.getElementById('fill-enable-toggle-lp').addEventListener('click',function(){window.SM.setFillEnabled(!state.fillEnabled);});
 document.getElementById('stroke-enable-toggle-lp').addEventListener('click',function(){window.SM.setStrokeEnabled(!state.strokeEnabled);});
 document.getElementById('color-stroke').addEventListener('input',function(){window.SM.setStrokeColor(this.dataset.hex8||this.value);if(!state.strokeEnabled)window.SM.setStrokeEnabled(true);});
-document.getElementById('pm-stroke-c').addEventListener('input',function(){var v=this.dataset.hex8||this.value;window.SM.setStrokeColor(v);document.getElementById('color-stroke').value=v;document.getElementById('color-stroke').dataset.hex8=v;if(!state.strokeEnabled)window.SM.setStrokeEnabled(true);});
+document.getElementById('pm-stroke-c').addEventListener('input',function(){var v=this.dataset.hex8||this.value;window.SM.setStrokeColor(v);setHex8Input(document.getElementById('color-stroke'),v);if(!state.strokeEnabled)window.SM.setStrokeEnabled(true);});
 // Stroke gradient along path (2026-08) — applies to the current canvas
 // selection only (unlike most Fill/Stroke fields, which also edit the
 // tool's own default when nothing is selected) — this is a per-shape
