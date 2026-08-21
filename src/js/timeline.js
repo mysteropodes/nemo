@@ -2492,6 +2492,12 @@ function updatePropsContext(){
     if(ctx!=='document')show['canvas-sec']=false;
   }
   Object.keys(show).forEach(function(id){var sec=document.getElementById(id);if(sec)sec.style.display=show[id]?'block':'none';});
+  // Collapse-to-rail (2026-08) — keep the rail in sync with whatever this
+  // call decided is relevant, but only pay the DOM-rebuild cost while the
+  // panel is actually collapsed (rail is invisible otherwise).
+  window._lastPropsShow=show;
+  var ppEl=document.getElementById('props-panel');
+  if(ppEl&&ppEl.classList.contains('collapsed')&&window.renderPropsPanelRail)renderPropsPanelRail(show);
   // state.drawMode (Front/Behind) has no effect on Fill Brush — it's always
   // inserted at the back regardless (see draw-bridge.js/tools.js commit) —
   // so showing that dropdown while Fill Brush is active was a dead control.
@@ -8762,4 +8768,70 @@ setInterval(function(){
 // alongside the new start screen (state.js decides whether to actually
 // show that card, and surfaces its own confirmation once chosen).
 try{var saved=localStorage.getItem('nemo-auto');if(saved)window.SM.importJSON(saved,true);}catch(e){}
+
+// Right-panel collapse-to-rail (2026-08, "mettre en place le repli du panel
+// droit en icon pour l'ui"). See index.html's comment on
+// #props-panel-collapse-btn for why the collapsed state is a vertical label
+// rail (one entry per CURRENTLY VISIBLE .psec, from updatePropsContext's own
+// `show` object) rather than a fixed icon set — up to 25 different sections
+// can be relevant depending on tool/selection, unlike a fixed panel dock.
+function renderPropsPanelRail(show){
+  var rail=document.getElementById('props-panel-rail');
+  if(!rail)return;
+  rail.innerHTML='';
+  Object.keys(show).forEach(function(id){
+    if(!show[id])return;
+    var sec=document.getElementById(id);
+    if(!sec)return;
+    var hdr=sec.querySelector('.phdr');
+    var label=hdr?(hdr.textContent||'').trim().replace(/^☰\s*/,''):'';
+    if(!label)return;
+    var btn=document.createElement('button');
+    btn.className='rail-item';
+    btn.textContent=label;
+    btn.title=label;
+    btn.addEventListener('click',function(){
+      togglePropsPanelCollapse(false);
+      if(hdr&&hdr.classList.contains('closed'))hdr.click();
+      requestAnimationFrame(function(){sec.scrollIntoView({block:'start',behavior:'smooth'});});
+    });
+    rail.appendChild(btn);
+  });
+}
+window.renderPropsPanelRail=renderPropsPanelRail;
+function togglePropsPanelCollapse(force){
+  var panel=document.getElementById('props-panel');
+  if(!panel)return;
+  var collapsed=force!==undefined?force:!panel.classList.contains('collapsed');
+  panel.classList.toggle('collapsed',collapsed);
+  // Dragging a 36px rail wider makes no sense — hide the resize handle
+  // rather than leave a control that would just fight the collapsed width.
+  var resizeHandle=document.getElementById('props-panel-resize');
+  if(resizeHandle)resizeHandle.style.display=collapsed?'none':'';
+  if(collapsed&&window._lastPropsShow)renderPropsPanelRail(window._lastPropsShow);
+  syncPropsPanelCollapseTitle();
+  try{localStorage.setItem('nemo-props-panel-collapsed',collapsed?'1':'0');}catch(e){}
+}
+window.togglePropsPanelCollapse=togglePropsPanelCollapse;
+// STATE-dependent title (collapse vs expand) — can't live on data-i18n-title,
+// i18n.js's own sweep would blindly stomp it back to one fixed wording on
+// every language switch even while already collapsed. Registered in
+// SM.afterI18n (i18n.js's documented escape hatch for exactly this) so a
+// language switch re-picks the right one of the two strings instead.
+function syncPropsPanelCollapseTitle(){
+  var btn=document.getElementById('props-panel-collapse-btn');
+  var panel=document.getElementById('props-panel');
+  if(!btn||!panel||!window.SM||!SM.t)return;
+  btn.title=SM.t(panel.classList.contains('collapsed')?'expandPanelTitle':'collapsePanelTitle');
+}
+(function initPropsPanelCollapse(){
+  var btn=document.getElementById('props-panel-collapse-btn');
+  if(btn)btn.addEventListener('click',function(){togglePropsPanelCollapse();});
+  window.SM=window.SM||{};
+  (window.SM.afterI18n=window.SM.afterI18n||[]).push(syncPropsPanelCollapseTitle);
+  var wasCollapsed=false;
+  try{wasCollapsed=localStorage.getItem('nemo-props-panel-collapsed')==='1';}catch(e){}
+  if(wasCollapsed)togglePropsPanelCollapse(true);
+  else syncPropsPanelCollapseTitle();
+})();
 window.SM.setTool(state.userProfile&&state.userProfile.role==='producer'?'hand':'draw');updateUI();renderSymbolTabs();

@@ -350,7 +350,27 @@
   <div id="props-panel-resize" data-i18n-title="dragToResize" title="Glisser pour redimensionner"></div>
 
   <div id="props-panel">
-    <div id="props-context-hdr" data-i18n="hdrDocument" style="padding:8px 10px;font-size:10px;font-weight:600;letter-spacing:.03em;color:var(--text-dim);text-transform:uppercase;border-bottom:1px solid var(--border)">Document</div>
+    <!-- Collapse-to-rail (2026-08, "mettre en place le repli du panel droit
+         en icon") — #props-panel-collapse-btn toggles #props-panel.collapsed
+         (style.css); #props-panel-rail (built live by renderPropsPanelRail,
+         timeline.js, right after updatePropsContext decides which .psec
+         sections are relevant) replaces the full sections with one clickable
+         label per CURRENTLY VISIBLE section — there's no fixed panel identity
+         to hang a real icon on here (up to 25 different .psec ids, shown/
+         hidden per tool/selection, unlike Photoshop's fixed panel dock), so
+         each section's own translated .phdr text is reused vertically
+         instead of inventing 25 new glyphs that would need maintaining. -->
+    <div id="props-panel-hdr-row" style="display:flex;align-items:center;border-bottom:1px solid var(--border)">
+      <div id="props-context-hdr" data-i18n="hdrDocument" style="flex:1;min-width:0;padding:8px 10px;font-size:10px;font-weight:600;letter-spacing:.03em;color:var(--text-dim);text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Document</div>
+      <!-- No data-i18n-title here on purpose: the title is STATE-dependent
+           (collapse vs expand, togglePropsPanelCollapse sets it directly)
+           — i18n.js's own [data-i18n-title] sweep would blindly overwrite it
+           back to the "collapse" wording on every language switch even
+           while already collapsed. Registered in SM.afterI18n instead
+           (timeline.js), i18n.js's documented pattern for exactly this case. -->
+      <button id="props-panel-collapse-btn" title="Collapse panel"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 6l-6 6 6 6"/></svg></button>
+    </div>
+    <div id="props-panel-rail"></div>
     <div id="sel-props-sec" style="display:none;border-bottom:1px solid var(--border)">
       <div class="pbdy" style="padding:13px 16px 12px">
         <!-- Align/distribute toolbar (redesign 2026-07-09, restyled v3 —
