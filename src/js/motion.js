@@ -6537,6 +6537,12 @@
       _layerSel = [];
     }
     state.appMode = mode;
+    // Workspace continuity (2026-08, "retrouver son workspace comme il a
+    // quitté") — remembered independently of any one project's saved JSON:
+    // a fresh/new project should still open in whichever of StoryBoard/
+    // Animation 2D/Motion the user was last working in, not always reset to
+    // Animation 2D's hardcoded default.
+    try { localStorage.setItem('nemo-app-mode', mode); } catch (e) {}
     document.querySelectorAll('.app-mode-btn').forEach(function (b) { b.classList.toggle('active', b.dataset.mode === mode); });
     document.body.classList.toggle('mode-motion', mode === 'motion');
     document.body.classList.toggle('mode-storyboard', mode === 'storyboard');
@@ -7008,4 +7014,15 @@
     hasKeySelection: hasKeySelection,
     hasKeyClipboard: hasKeyClipboard,
   };
+  // Workspace continuity, restore half (2026-08) — runs once at startup,
+  // after timeline.js's own nemo-auto project restore (script tag order:
+  // timeline.js, then this file) so layers/timeline already exist by the
+  // time setAppMode's re-render calls (renderLayerList/renderTimeline)
+  // fire. A brand-new/never-saved profile has no key yet and falls
+  // through to whatever state.appMode's own hardcoded default already is.
+  (function restoreLastAppMode(){
+    var saved=null;
+    try{saved=localStorage.getItem('nemo-app-mode');}catch(e){}
+    if(saved&&saved!==state.appMode&&(saved==='anim2d'||saved==='motion'||saved==='storyboard'))setAppMode(saved);
+  })();
 })();

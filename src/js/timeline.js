@@ -8803,6 +8803,19 @@ function togglePropsPanelCollapse(force){
   var panel=document.getElementById('props-panel');
   if(!panel)return;
   var collapsed=force!==undefined?force:!panel.classList.contains('collapsed');
+  // Panel-width persistence (ui.js) sets a plain inline style.width, which
+  // always wins over the .collapsed class's own `width:36px` rule (inline
+  // beats any selector, regardless of specificity) — without clearing it
+  // here first, a resized-then-collapsed panel would stay visually wide
+  // with just the rail's few narrow items floating in the leftover space.
+  // Stashed on window (not a local var) so ui.js's own startup restore can
+  // prime it too, for the "starts collapsed" case.
+  if(collapsed){
+    if(panel.style.width)window._propsExpandedWidth=panel.style.width;
+    panel.style.width='';
+  }else if(window._propsExpandedWidth){
+    panel.style.width=window._propsExpandedWidth;
+  }
   panel.classList.toggle('collapsed',collapsed);
   // Dragging a 36px rail wider makes no sense — hide the resize handle
   // rather than leave a control that would just fight the collapsed width.

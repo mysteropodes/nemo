@@ -426,7 +426,16 @@ body.tools-docked-away #tools-panel-resize{display:none;}
   color:var(--text-dim);cursor:pointer;border-radius:5px;display:flex;align-items:center;justify-content:center;}
 #props-panel-collapse-btn:hover{background:rgba(255,255,255,.06);color:var(--text);}
 #props-panel-collapse-btn svg{transition:transform .15s;}
-#props-panel.collapsed{width:36px;}
+/* min-width:0 is load-bearing, not decorative — a flex item's default
+   min-width:auto floors its size at its CONTENT's min-content width
+   whenever overflow-x is visible (only overflow-y:auto is set above), so
+   without this the panel refused to shrink below whatever width a user had
+   last dragged it to (real bug found live: collapsed to visually 343px
+   instead of 36px after a resize+collapse, only ever caught because panel
+   widths started persisting across reloads in this same change — previously
+   every reload reset to the 280px default, which happened to already be
+   narrow enough that the clamped floor was never visibly wrong). */
+#props-panel.collapsed{width:36px;min-width:0;}
 #props-panel.collapsed #props-context-hdr{display:none;}
 #props-panel.collapsed #props-panel-collapse-btn{margin:0 auto;}
 #props-panel.collapsed #props-panel-collapse-btn svg{transform:rotate(180deg);}
