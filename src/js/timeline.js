@@ -6342,8 +6342,22 @@ function applyTextPropsEdit(){
   var widthBtn=document.querySelector('.tp-width-btn.ac');
   var fixedWidthWorld=(widthBtn&&widthBtn.dataset.val==='fixed')?(parseFloat(document.getElementById('tp-fixed-width').value)||300):null;
   var layer=root.parent;
-  var groupBounds=window.SMVectorText.vectorTextGroupMembers(root).reduce(function(b,p){return b?b.unite(p.bounds):p.bounds.clone();},null);
-  var topLeft=groupBounds.topLeft.clone();
+  // Re-anchor at the SAME point this group was originally placed from
+  // (d.anchorTopLeft, stamped by buildVectorTextGroup) rather than this
+  // group's own ink bounding-box top — the two are NOT the same point
+  // (buildVectorTextGroup places baselineY at anchor.y+size*0.8, a nominal
+  // ascent approximation that ink bounds only coincidentally match), so
+  // re-deriving the anchor from ink bounds fed a drifted reference back
+  // into that same formula on every single edit, visibly sinking the text
+  // each time a typography value changed (feedback #37). Falls back to the
+  // old ink-bounds derivation only for a pre-existing block saved before
+  // this field existed.
+  var topLeft;
+  if(d.anchorTopLeft)topLeft=new Point(d.anchorTopLeft.x,d.anchorTopLeft.y);
+  else{
+    var groupBounds=window.SMVectorText.vectorTextGroupMembers(root).reduce(function(b,p){return b?b.unite(p.bounds):p.bounds.clone();},null);
+    topLeft=groupBounds.topLeft.clone();
+  }
   pushUndo();
   window.SMVectorText.vectorTextGroupMembers(root).forEach(function(p){p.remove();});
   window.SMVectorText.buildVectorTextGroup(text,d.vectorFont,size,color,align,fixedWidthWorld,topLeft,layer,opts).then(function(res){

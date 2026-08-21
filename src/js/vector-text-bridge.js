@@ -268,6 +268,18 @@ function buildVectorTextGroup(text, fontKey, size, color, align, fixedWidthWorld
       root.data.underline = !!opts.underline; root.data.strike = !!opts.strike;
       root.data.letterSpacing = letterSpacing; root.data.wordSpacing = wordSpacing;
       root.data.lineHeightMult = lineHeightMult; root.data.textCase = opts.textCase || 'none';
+      // The anchor this build actually placed glyphs FROM (baselineY =
+      // topLeftWorld.y + size*0.8, above) — NOT the same point as this
+      // group's own ink bounding-box top (glyph curves rarely start exactly
+      // size*0.8 below topLeftWorld; that's a nominal ascent approximation,
+      // ink bounds depend on which letters are actually present). Stored so
+      // a later rebuild (applyTextPropsEdit, timeline.js) can re-anchor at
+      // the SAME point instead of re-deriving it from the just-built glyphs'
+      // ink bounds — re-deriving from ink bounds was feeding a DIFFERENT
+      // reference back into this same +size*0.8 formula every edit, so the
+      // text visibly sank a bit on every single property change (feedback
+      // #37, "le panel typo fait bouger la typo en position").
+      root.data.anchorTopLeft = { x: topLeftWorld.x, y: topLeftWorld.y };
     }
     allPaths.forEach(function (p) { if (window.tagOwner) tagOwner(p); });
     return { paths: allPaths, groupId: groupId, width: maxW, height: wrapped.length * lineHeight };
