@@ -5473,6 +5473,29 @@
           // down (a later Forme's own Transform/Path/Fill rows) drifted out
           // of alignment with its own keyframe track from that point on.
           if (entry.sd.fillColor) renderTracksFor(grid, elHolder, 'fillColor');
+          // Trim Paths group (mirrors renderElementsList's renderTrimPathsGroup
+          // exactly — same condition, same expand state, same 3 scalar rows).
+          // Bug found live (2026-08-21, QA pass on a bouncing-ball test scene):
+          // this mirror was missing entirely — renderTrimPathsGroup ALWAYS
+          // appends its header row on the panel side (any shape with vertex
+          // geometry gets one, regardless of whether Trim Paths is actually
+          // used), but this grid side had no matching spacer at all, so
+          // #layer-list had one MORE row than #frame-grid for every such
+          // shape even before expanding it, growing to four rows once
+          // expanded — every row further down (a later Forme's own rows, or
+          // the next layer entirely) drifted out of alignment with its own
+          // keyframe track from that point on. Same class of bug as the Fill
+          // row fix just above; confirmed via a live row-count diff (23 grid
+          // rows vs 27 panel rows with Trim Paths expanded) before this fix.
+          if (!entry.sd.isRaster && entry.sd.segments && entry.sd.segments.length) {
+            var trimHdrSpacer = document.createElement('div'); trimHdrSpacer.className = 'frow motion-group-row';
+            grid.appendChild(trimHdrSpacer);
+            if (window._motionExpandedTrimHolder === elHolder) {
+              renderTracksFor(grid, elHolder, 'trimStart');
+              renderTracksFor(grid, elHolder, 'trimEnd');
+              renderTracksFor(grid, elHolder, 'trimOffset');
+            }
+          }
         });
       }
     });
