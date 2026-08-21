@@ -436,31 +436,37 @@
         <div class="pr"><button class="pbtn" id="btn-mask-unset" style="flex:1;font-size:10px" data-i18n-title="unmaskTitle" title="Redevient une forme normale (n'est plus un masque)" data-i18n="btnUnmask">Retirer comme masque</button></div>
       </div>
     </div>
+    <!-- Dynamic-shape panels (2026-08) — restored from the cherry-picked
+         phase 1-3 commits (PR #209) with hardcoded French labels never
+         wired to i18n, unlike every neighboring section (text-actions-sec
+         right below, e.g.) — an EN-mode user saw these three headers stuck
+         in French while everything else around them switched language,
+         the exact "mélange francais/anglais" reported. -->
     <div class="psec" id="corners-sec" style="display:none">
-      <div class="phdr"><span class="ar">☰</span> <span>Coins</span></div>
+      <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrCorners">Coins</span></div>
       <div class="pbdy">
-        <div class="pr"><label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-dim)"><input type="checkbox" id="p-corners-link" checked> Lier les 4 coins</label></div>
-        <div class="pr"><span class="pl" title="Haut-gauche">↖</span><input type="number" class="pi scrub" id="p-corner-tl" value="0" min="0" data-step="1"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
-        <div class="pr" id="corner-tr-row"><span class="pl" title="Haut-droit">↗</span><input type="number" class="pi scrub" id="p-corner-tr" value="0" min="0" data-step="1"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
-        <div class="pr" id="corner-br-row"><span class="pl" title="Bas-droit">↘</span><input type="number" class="pi scrub" id="p-corner-br" value="0" min="0" data-step="1"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
-        <div class="pr" id="corner-bl-row"><span class="pl" title="Bas-gauche">↙</span><input type="number" class="pi scrub" id="p-corner-bl" value="0" min="0" data-step="1"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
+        <div class="pr"><label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-dim)"><input type="checkbox" id="p-corners-link" checked> <span data-i18n="cornersLinkLabel">Lier les 4 coins</span></label></div>
+        <div class="pr"><span class="pl" data-i18n-title="cornerTL" title="Haut-gauche">↖</span><input type="number" class="pi scrub" id="p-corner-tl" value="0" min="0" data-step="1"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
+        <div class="pr" id="corner-tr-row"><span class="pl" data-i18n-title="cornerTR" title="Haut-droit">↗</span><input type="number" class="pi scrub" id="p-corner-tr" value="0" min="0" data-step="1"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
+        <div class="pr" id="corner-br-row"><span class="pl" data-i18n-title="cornerBR" title="Bas-droit">↘</span><input type="number" class="pi scrub" id="p-corner-br" value="0" min="0" data-step="1"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
+        <div class="pr" id="corner-bl-row"><span class="pl" data-i18n-title="cornerBL" title="Bas-gauche">↙</span><input type="number" class="pi scrub" id="p-corner-bl" value="0" min="0" data-step="1"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
       </div>
     </div>
     <div class="psec" id="ellipse-arc-sec" style="display:none">
-      <div class="phdr"><span class="ar">☰</span> <span>Camembert / Donut</span></div>
+      <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrEllipseArc">Camembert / Donut</span></div>
       <div class="pbdy">
-        <div class="pr" id="ellipse-arc-convert-row"><button class="pbtn ac" id="btn-ellipse-arc-convert" style="flex:1">Rendre dynamique</button></div>
-        <div class="pr" id="ellipse-arc-start-row" style="display:none"><span class="pl">Début</span><input type="number" class="pi scrub" id="p-arc-start" value="0" min="0" max="360" data-step="1"><span style="font-size:9px;color:var(--text-dim)">°</span></div>
-        <div class="pr" id="ellipse-arc-sweep-row" style="display:none"><span class="pl">Ouverture</span><input type="number" class="pi scrub" id="p-arc-sweep" value="359.9" min="0.1" max="359.9" data-step="1"><span style="font-size:9px;color:var(--text-dim)">°</span></div>
-        <div class="pr" id="ellipse-arc-inner-row" style="display:none"><span class="pl">Rayon interne</span><input type="number" class="pi scrub" id="p-arc-inner" value="0" min="0" max="95" data-step="1"><span style="font-size:9px;color:var(--text-dim)">%</span></div>
+        <div class="pr" id="ellipse-arc-convert-row"><button class="pbtn ac" id="btn-ellipse-arc-convert" style="flex:1" data-i18n="ellipseArcConvertBtn">Rendre dynamique</button></div>
+        <div class="pr" id="ellipse-arc-start-row" style="display:none"><span class="pl" data-i18n="fieldArcStart">Début</span><input type="number" class="pi scrub" id="p-arc-start" value="0" min="0" max="360" data-step="1"><span style="font-size:9px;color:var(--text-dim)">°</span></div>
+        <div class="pr" id="ellipse-arc-sweep-row" style="display:none"><span class="pl" data-i18n="fieldArcSweep">Ouverture</span><input type="number" class="pi scrub" id="p-arc-sweep" value="359.9" min="0.1" max="359.9" data-step="1"><span style="font-size:9px;color:var(--text-dim)">°</span></div>
+        <div class="pr" id="ellipse-arc-inner-row" style="display:none"><span class="pl" data-i18n="fieldArcInnerRadius">Rayon interne</span><input type="number" class="pi scrub" id="p-arc-inner" value="0" min="0" max="95" data-step="1"><span style="font-size:9px;color:var(--text-dim)">%</span></div>
       </div>
     </div>
     <div class="psec" id="star-sec" style="display:none">
-      <div class="phdr"><span class="ar">☰</span> <span>Étoile / Polygone</span></div>
+      <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrStarPolygon">Étoile / Polygone</span></div>
       <div class="pbdy">
-        <div class="pr"><span class="pl">Branches</span><input type="number" class="pi scrub" id="p-star-points" value="5" min="3" max="24" data-step="1"></div>
-        <div class="pr"><span class="pl">Rayon interne</span><input type="number" class="pi scrub" id="p-star-inner" value="50" min="5" max="100" data-step="1"><span style="font-size:9px;color:var(--text-dim)">%</span></div>
-        <div class="pr"><span class="pl">Coins</span><input type="number" class="pi scrub" id="p-star-corner" value="0" min="0" data-step="1"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
+        <div class="pr"><span class="pl" data-i18n="fieldStarPoints">Branches</span><input type="number" class="pi scrub" id="p-star-points" value="5" min="3" max="24" data-step="1"></div>
+        <div class="pr"><span class="pl" data-i18n="fieldStarInnerRadius">Rayon interne</span><input type="number" class="pi scrub" id="p-star-inner" value="50" min="5" max="100" data-step="1"><span style="font-size:9px;color:var(--text-dim)">%</span></div>
+        <div class="pr"><span class="pl" data-i18n="fieldStarCornerRadius">Coins</span><input type="number" class="pi scrub" id="p-star-corner" value="0" min="0" data-step="1"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
       </div>
     </div>
     <div class="psec" id="text-actions-sec" style="display:none">

@@ -2409,7 +2409,11 @@ function updatePropsContext(){
     // after already knowing the Alt+click/context-menu shortcuts exist.
     show['combine-opts-sec']=true;
     if(window.updateCombinePanel)updateCombinePanel();
-    hdrText=selectedPaths.length+(selectedPaths.length>1?' éléments sélectionnés':' élément sélectionné');
+    // 2026-08 fix: hardcoded French — showed "1 élément sélectionné" even
+    // in English mode, mixed with the rest of this same panel switching
+    // language correctly. thElementsSelected/thElementSelected already
+    // existed in i18n.js for all 4 locales, just never wired up here.
+    hdrText=selectedPaths.length+' '+((window.SM&&SM.t)?SM.t(selectedPaths.length>1?'thElementsSelected':'thElementSelected'):(selectedPaths.length>1?'elements selected':'element selected'));
   }else if(FILL_STROKE_TOOLS.indexOf(state.tool)>=0){
     ctx='tool:'+state.tool;
     // Fill Brush never touches strokeColor at all (it paints a genuine
@@ -2460,7 +2464,7 @@ function updatePropsContext(){
   if(matteSel&&state.layers[state.activeLayerIdx]){
     var mv=state.layers[state.activeLayerIdx].matteMode||'none';
     matteSel.dataset.value=mv;
-    matteSel.textContent=(typeof MATTE_MODE_LABELS!=='undefined'&&MATTE_MODE_LABELS[mv])||mv;
+    matteSel.textContent=(typeof matteModeLabel!=='undefined'&&matteModeLabel(mv))||mv;
   }
   // Flou/Ombre au sol sync moved into effects-panel.js's unified Effects
   // stack (2026-07 rewrite) — see updateEffectsPanel, hooked via updateUI.
@@ -4910,7 +4914,7 @@ function renderLayerList(frameOnly){
     var isMatteSource=!!_matteSrcMap[i];
     if(ld.matteMode||isMatteSource){
       var mb=document.createElement('div');mb.className='lico comp-badge'+(isMatteSource&&!ld.matteMode?' off':'');
-      mb.title=ld.matteMode?('Matte: '+(typeof MATTE_MODE_LABELS!=='undefined'?MATTE_MODE_LABELS[ld.matteMode]:ld.matteMode)+' — clic pour changer'):'Source de matte pour un autre calque';
+      mb.title=ld.matteMode?('Matte: '+(typeof matteModeLabel!=='undefined'?matteModeLabel(ld.matteMode):ld.matteMode)+' — clic pour changer'):'Source de matte pour un autre calque';
       mb.innerHTML='<span style="font-size:9px;line-height:1;font-weight:700">'+(ld.matteMode?'M':'M▲')+'</span>';
       if(ld.matteMode){mb.style.cursor='pointer';mb.addEventListener('click',function(e){e.stopPropagation();state.activeLayerIdx=i;activateUL(i);updatePropsContext();openMatteDropdownAt(mb);});}
       row.appendChild(mb);
@@ -8074,7 +8078,19 @@ var BLEND_MODE_LABELS={normal:'Normal',multiply:'Multiply',screen:'Screen',overl
 // have already diverged once (Blend has no "which OTHER layer" concept;
 // Matte's whole point is the layer above). A shared abstraction would be
 // solving a duplication that isn't really there yet.
-var MATTE_MODE_LABELS={none:'Aucun',alpha:'Alpha',alphaInverted:'Alpha (inversé)',luma:'Luminance',lumaInverted:'Luminance (inversée)'};
+// 2026-08 fix: this used to be a static object hardcoded in French — always
+// showed "Aucun"/"Luminance (inversée)" etc. regardless of app language,
+// even in English mode, while everything else in the same panel switched
+// correctly. matteModeLabel() reads SM.t() live so it always reflects the
+// CURRENT language, including a runtime switch (a static object computed
+// once at load time couldn't). MATTE_MODES is just the fixed key order the
+// dropdown lists, replacing the old Object.keys(MATTE_MODE_LABELS) use.
+var MATTE_MODES=['none','alpha','alphaInverted','luma','lumaInverted'];
+var MATTE_MODE_I18N_KEYS={none:'matteNone',alpha:'matteAlpha',alphaInverted:'matteAlphaInverted',luma:'matteLuma',lumaInverted:'matteLumaInverted'};
+function matteModeLabel(mode){
+  var key=MATTE_MODE_I18N_KEYS[mode];
+  return key&&window.SM&&SM.t?SM.t(key):mode;
+}
 (function initMatteDropdown(){
   var dd=document.getElementById('p-mattemode');if(!dd)return;
   var pop=document.createElement('div');pop.id='matte-pop';document.body.appendChild(pop);
@@ -8086,7 +8102,7 @@ var MATTE_MODE_LABELS={none:'Aucun',alpha:'Alpha',alphaInverted:'Alpha (inversé
     window._sceneVersion=(window._sceneVersion||0)+1;
     if(window.SMEngineBridge&&window.SMEngineBridge.renderNow)window.SMEngineBridge.renderNow();
   }
-  function setLabel(v){dd.dataset.value=v;dd.textContent=MATTE_MODE_LABELS[v]||v;}
+  function setLabel(v){dd.dataset.value=v;dd.textContent=matteModeLabel(v)||v;}
   function close(revert){
     pop.style.display='none';
     if(revert&&origMode!==null)applyPreview(origMode);
@@ -8114,10 +8130,10 @@ var MATTE_MODE_LABELS={none:'Aucun',alpha:'Alpha',alphaInverted:'Alpha (inversé
     }
     origMode=ld.matteMode||'none';
     pop.innerHTML='';
-    Object.keys(MATTE_MODE_LABELS).forEach(function(v){
+    MATTE_MODES.forEach(function(v){
       var it=document.createElement('div');
       it.className='blend-opt'+(v===origMode?' sel':'');
-      it.textContent=MATTE_MODE_LABELS[v];
+      it.textContent=matteModeLabel(v);
       it.addEventListener('mouseenter',function(){applyPreview(v);});
       it.addEventListener('click',function(e){
         e.stopPropagation();
