@@ -358,6 +358,14 @@ window.SM={
       showToast('Profil "Producteur" : lecture seule + commentaires');
       return;
     }
+    // Rig freeze (2026-08, PR #209: "mettre en freeze (in Dev)" — see
+    // index.html's SM_FROZEN_IN_DEV registry, the single source every
+    // frozen-feature gate reads). Blocks the toolbar click AND any
+    // keyboard shortcut that lands on setTool('rig'), not just the button.
+    if(t==='rig'&&window.SM_FROZEN_IN_DEV&&window.SM_FROZEN_IN_DEV.rig){
+      showToast((window.SM&&SM.t)?SM.t('rigFrozenToast'):'Rig tool — in development, not yet available in this build');
+      return;
+    }
     if(t!=='select'&&t!=='subselect'&&t!=='rig')clearSel();if(t!=='fsselect')fsClearSel();if(t!=='pen'&&_pen.path)finalizePen();if(t!=='rig'&&typeof _rigDraw!=='undefined'&&_rigDraw.path&&window.SMRig)window.SMRig.finalizeRigBone();if(t!=='eraser'&&typeof _eraserCursor!=='undefined'&&_eraserCursor){_eraserCursor.remove();_eraserCursor=null;}if(t!=='select'&&window.SMSelectBridge)window.SMSelectBridge.cancelMarquee();
     // Picking a tool always means "I'm done with the timeline frame
     // selection" — leaving it selected made the status bar keep showing
@@ -2402,7 +2410,11 @@ function updatePropsContext(){
     // after already knowing the Alt+click/context-menu shortcuts exist.
     show['combine-opts-sec']=true;
     if(window.updateCombinePanel)updateCombinePanel();
-    hdrText=selectedPaths.length+(selectedPaths.length>1?' éléments sélectionnés':' élément sélectionné');
+    // 2026-08 fix: hardcoded French — showed "1 élément sélectionné" even
+    // in English mode, mixed with the rest of this same panel switching
+    // language correctly. thElementsSelected/thElementSelected already
+    // existed in i18n.js for all 4 locales, just never wired up here.
+    hdrText=selectedPaths.length+' '+((window.SM&&SM.t)?SM.t(selectedPaths.length>1?'thElementsSelected':'thElementSelected'):(selectedPaths.length>1?'elements selected':'element selected'));
   }else if(FILL_STROKE_TOOLS.indexOf(state.tool)>=0){
     ctx='tool:'+state.tool;
     // Fill Brush never touches strokeColor at all (it paints a genuine
@@ -2453,7 +2465,7 @@ function updatePropsContext(){
   if(matteSel&&state.layers[state.activeLayerIdx]){
     var mv=state.layers[state.activeLayerIdx].matteMode||'none';
     matteSel.dataset.value=mv;
-    matteSel.textContent=(typeof MATTE_MODE_LABELS!=='undefined'&&MATTE_MODE_LABELS[mv])||mv;
+    matteSel.textContent=(typeof matteModeLabel!=='undefined'&&matteModeLabel(mv))||mv;
   }
   // Flou/Ombre au sol sync moved into effects-panel.js's unified Effects
   // stack (2026-07 rewrite) — see updateEffectsPanel, hooked via updateUI.
@@ -2481,6 +2493,12 @@ function updatePropsContext(){
     if(ctx!=='document')show['canvas-sec']=false;
   }
   Object.keys(show).forEach(function(id){var sec=document.getElementById(id);if(sec)sec.style.display=show[id]?'block':'none';});
+  // Collapse-to-rail (2026-08) — keep the rail in sync with whatever this
+  // call decided is relevant, but only pay the DOM-rebuild cost while the
+  // panel is actually collapsed (rail is invisible otherwise).
+  window._lastPropsShow=show;
+  var ppEl=document.getElementById('props-panel');
+  if(ppEl&&ppEl.classList.contains('collapsed')&&window.renderPropsPanelRail)renderPropsPanelRail(show);
   // state.drawMode (Front/Behind) has no effect on Fill Brush — it's always
   // inserted at the back regardless (see draw-bridge.js/tools.js commit) —
   // so showing that dropdown while Fill Brush is active was a dead control.
@@ -4903,7 +4921,7 @@ function renderLayerList(frameOnly){
     var isMatteSource=!!_matteSrcMap[i];
     if(ld.matteMode||isMatteSource){
       var mb=document.createElement('div');mb.className='lico comp-badge'+(isMatteSource&&!ld.matteMode?' off':'');
-      mb.title=ld.matteMode?('Matte: '+(typeof MATTE_MODE_LABELS!=='undefined'?MATTE_MODE_LABELS[ld.matteMode]:ld.matteMode)+' — clic pour changer'):'Source de matte pour un autre calque';
+      mb.title=ld.matteMode?('Matte: '+(typeof matteModeLabel!=='undefined'?matteModeLabel(ld.matteMode):ld.matteMode)+' — clic pour changer'):'Source de matte pour un autre calque';
       mb.innerHTML='<span style="font-size:9px;line-height:1;font-weight:700">'+(ld.matteMode?'M':'M▲')+'</span>';
       if(ld.matteMode){mb.style.cursor='pointer';mb.addEventListener('click',function(e){e.stopPropagation();state.activeLayerIdx=i;activateUL(i);updatePropsContext();openMatteDropdownAt(mb);});}
       row.appendChild(mb);
@@ -6562,14 +6580,14 @@ function clickEl(id){var el=document.getElementById(id);if(el)el.click();}
       {label:tt('menuFromKitsu'),id:'ctx-kitsu-open',action:function(){clickEl('btn-kitsu-open');}},
       // Nemo's own extensibility (nemo-script.js / nemo-plugin.js) — this
       // app's model in this app's vocabulary, so it ships.
-      {label:'Ouvrir un script Nemo (.js)…',id:'ctx-nemo-script',
+      {label:tt('menuOpenScript'),id:'ctx-nemo-script',
         action:function(){if(window.SMScript)SMScript.openFile();}},
-      {label:'Ouvrir un plugin Nemo (.zip)…',id:'ctx-nemo-plugin',
+      {label:tt('menuOpenPlugin'),id:'ctx-nemo-plugin',
         action:function(){if(window.SMPlugin)SMPlugin.openFile();}},
       // Duplicate canvas viewer (2026-08, AE feature audit 8.4 "New
       // Viewer") — a second panel on the same comp, independently panned/
       // zoomed and optionally locked to a frame.
-      {label:'Nouvelle vue',action:function(){if(window.SMSecondViewer)SMSecondViewer.open();}},
+      {label:tt('menuNewView'),action:function(){if(window.SMSecondViewer)SMSecondViewer.open();}},
       {label:tt('menuVersionHistory'),id:'ctx-history',action:function(){clickEl('btn-history');}},
       {sep:true},
       {label:tt('menuImportImg'),action:function(){clickEl('btn-import-img');}},
@@ -6586,7 +6604,10 @@ function clickEl(id){var el=document.getElementById(id);if(el)el.click();}
       // only the two bundled CC0 models were ever reachable. This is that
       // missing entry point. It stays a REFERENCE (an overlay you draw from,
       // never exported, never baked), which is what the viewer is today.
-      {label:tt('menuImport3D'),id:'ctx-import-3d',action:openObjReference},
+      // Freeze (2026-08, PR #209) — see index.html's SM_FROZEN_IN_DEV registry.
+      (window.SM_FROZEN_IN_DEV&&window.SM_FROZEN_IN_DEV.import3d)
+        ?{label:tt('menuImport3D')+' '+tt('inDevSuffix'),id:'ctx-import-3d',disabled:true}
+        :{label:tt('menuImport3D'),id:'ctx-import-3d',action:openObjReference},
       {label:tt('menuExport'),id:'ctx-export',action:function(){clickEl('btn-export');}},
       {sep:true},
       {label:tt('menuSettings'),action:function(){clickEl('btn-settings');}},
@@ -8064,7 +8085,19 @@ var BLEND_MODE_LABELS={normal:'Normal',multiply:'Multiply',screen:'Screen',overl
 // have already diverged once (Blend has no "which OTHER layer" concept;
 // Matte's whole point is the layer above). A shared abstraction would be
 // solving a duplication that isn't really there yet.
-var MATTE_MODE_LABELS={none:'Aucun',alpha:'Alpha',alphaInverted:'Alpha (inversé)',luma:'Luminance',lumaInverted:'Luminance (inversée)'};
+// 2026-08 fix: this used to be a static object hardcoded in French — always
+// showed "Aucun"/"Luminance (inversée)" etc. regardless of app language,
+// even in English mode, while everything else in the same panel switched
+// correctly. matteModeLabel() reads SM.t() live so it always reflects the
+// CURRENT language, including a runtime switch (a static object computed
+// once at load time couldn't). MATTE_MODES is just the fixed key order the
+// dropdown lists, replacing the old Object.keys(MATTE_MODE_LABELS) use.
+var MATTE_MODES=['none','alpha','alphaInverted','luma','lumaInverted'];
+var MATTE_MODE_I18N_KEYS={none:'matteNone',alpha:'matteAlpha',alphaInverted:'matteAlphaInverted',luma:'matteLuma',lumaInverted:'matteLumaInverted'};
+function matteModeLabel(mode){
+  var key=MATTE_MODE_I18N_KEYS[mode];
+  return key&&window.SM&&SM.t?SM.t(key):mode;
+}
 (function initMatteDropdown(){
   var dd=document.getElementById('p-mattemode');if(!dd)return;
   var pop=document.createElement('div');pop.id='matte-pop';document.body.appendChild(pop);
@@ -8076,7 +8109,7 @@ var MATTE_MODE_LABELS={none:'Aucun',alpha:'Alpha',alphaInverted:'Alpha (inversé
     window._sceneVersion=(window._sceneVersion||0)+1;
     if(window.SMEngineBridge&&window.SMEngineBridge.renderNow)window.SMEngineBridge.renderNow();
   }
-  function setLabel(v){dd.dataset.value=v;dd.textContent=MATTE_MODE_LABELS[v]||v;}
+  function setLabel(v){dd.dataset.value=v;dd.textContent=matteModeLabel(v)||v;}
   function close(revert){
     pop.style.display='none';
     if(revert&&origMode!==null)applyPreview(origMode);
@@ -8104,10 +8137,10 @@ var MATTE_MODE_LABELS={none:'Aucun',alpha:'Alpha',alphaInverted:'Alpha (inversé
     }
     origMode=ld.matteMode||'none';
     pop.innerHTML='';
-    Object.keys(MATTE_MODE_LABELS).forEach(function(v){
+    MATTE_MODES.forEach(function(v){
       var it=document.createElement('div');
       it.className='blend-opt'+(v===origMode?' sel':'');
-      it.textContent=MATTE_MODE_LABELS[v];
+      it.textContent=matteModeLabel(v);
       it.addEventListener('mouseenter',function(){applyPreview(v);});
       it.addEventListener('click',function(e){
         e.stopPropagation();
@@ -8737,4 +8770,83 @@ setInterval(function(){
 // alongside the new start screen (state.js decides whether to actually
 // show that card, and surfaces its own confirmation once chosen).
 try{var saved=localStorage.getItem('nemo-auto');if(saved)window.SM.importJSON(saved,true);}catch(e){}
+
+// Right-panel collapse-to-rail (2026-08, "mettre en place le repli du panel
+// droit en icon pour l'ui"). See index.html's comment on
+// #props-panel-collapse-btn for why the collapsed state is a vertical label
+// rail (one entry per CURRENTLY VISIBLE .psec, from updatePropsContext's own
+// `show` object) rather than a fixed icon set — up to 25 different sections
+// can be relevant depending on tool/selection, unlike a fixed panel dock.
+function renderPropsPanelRail(show){
+  var rail=document.getElementById('props-panel-rail');
+  if(!rail)return;
+  rail.innerHTML='';
+  Object.keys(show).forEach(function(id){
+    if(!show[id])return;
+    var sec=document.getElementById(id);
+    if(!sec)return;
+    var hdr=sec.querySelector('.phdr');
+    var label=hdr?(hdr.textContent||'').trim().replace(/^☰\s*/,''):'';
+    if(!label)return;
+    var btn=document.createElement('button');
+    btn.className='rail-item';
+    btn.textContent=label;
+    btn.title=label;
+    btn.addEventListener('click',function(){
+      togglePropsPanelCollapse(false);
+      if(hdr&&hdr.classList.contains('closed'))hdr.click();
+      requestAnimationFrame(function(){sec.scrollIntoView({block:'start',behavior:'smooth'});});
+    });
+    rail.appendChild(btn);
+  });
+}
+window.renderPropsPanelRail=renderPropsPanelRail;
+function togglePropsPanelCollapse(force){
+  var panel=document.getElementById('props-panel');
+  if(!panel)return;
+  var collapsed=force!==undefined?force:!panel.classList.contains('collapsed');
+  // Panel-width persistence (ui.js) sets a plain inline style.width, which
+  // always wins over the .collapsed class's own `width:36px` rule (inline
+  // beats any selector, regardless of specificity) — without clearing it
+  // here first, a resized-then-collapsed panel would stay visually wide
+  // with just the rail's few narrow items floating in the leftover space.
+  // Stashed on window (not a local var) so ui.js's own startup restore can
+  // prime it too, for the "starts collapsed" case.
+  if(collapsed){
+    if(panel.style.width)window._propsExpandedWidth=panel.style.width;
+    panel.style.width='';
+  }else if(window._propsExpandedWidth){
+    panel.style.width=window._propsExpandedWidth;
+  }
+  panel.classList.toggle('collapsed',collapsed);
+  // Dragging a 36px rail wider makes no sense — hide the resize handle
+  // rather than leave a control that would just fight the collapsed width.
+  var resizeHandle=document.getElementById('props-panel-resize');
+  if(resizeHandle)resizeHandle.style.display=collapsed?'none':'';
+  if(collapsed&&window._lastPropsShow)renderPropsPanelRail(window._lastPropsShow);
+  syncPropsPanelCollapseTitle();
+  try{localStorage.setItem('nemo-props-panel-collapsed',collapsed?'1':'0');}catch(e){}
+}
+window.togglePropsPanelCollapse=togglePropsPanelCollapse;
+// STATE-dependent title (collapse vs expand) — can't live on data-i18n-title,
+// i18n.js's own sweep would blindly stomp it back to one fixed wording on
+// every language switch even while already collapsed. Registered in
+// SM.afterI18n (i18n.js's documented escape hatch for exactly this) so a
+// language switch re-picks the right one of the two strings instead.
+function syncPropsPanelCollapseTitle(){
+  var btn=document.getElementById('props-panel-collapse-btn');
+  var panel=document.getElementById('props-panel');
+  if(!btn||!panel||!window.SM||!SM.t)return;
+  btn.title=SM.t(panel.classList.contains('collapsed')?'expandPanelTitle':'collapsePanelTitle');
+}
+(function initPropsPanelCollapse(){
+  var btn=document.getElementById('props-panel-collapse-btn');
+  if(btn)btn.addEventListener('click',function(){togglePropsPanelCollapse();});
+  window.SM=window.SM||{};
+  (window.SM.afterI18n=window.SM.afterI18n||[]).push(syncPropsPanelCollapseTitle);
+  var wasCollapsed=false;
+  try{wasCollapsed=localStorage.getItem('nemo-props-panel-collapsed')==='1';}catch(e){}
+  if(wasCollapsed)togglePropsPanelCollapse(true);
+  else syncPropsPanelCollapseTitle();
+})();
 window.SM.setTool(state.userProfile&&state.userProfile.role==='producer'?'hand':'draw');updateUI();renderSymbolTabs();
