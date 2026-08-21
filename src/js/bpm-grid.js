@@ -79,7 +79,7 @@
     state.bpmShow = !state.bpmShow;
     if (state.bpmShow && !state.bpm) state.bpm = 120;
     refresh();
-    if (window.showToast) showToast(state.bpmShow ? ('Grille BPM affichée (' + state.bpm + ')') : 'Grille BPM masquée');
+    if (window.showToast) showToast(state.bpmShow ? (SM.t('toastBpmGridShownSuffix') + state.bpm + ')') : SM.t('toastBpmGridHidden'));
   }
   function refresh() {
     render();

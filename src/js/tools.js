@@ -1260,16 +1260,16 @@ function copySelection(){
   if(!snaps.length)return;
   _canvasClip={snaps:snaps,layerIdx:state.activeLayerIdx,frameIdx:state.currentFrame};
   if(typeof window!=='undefined')window._lastClipKind='canvas';
-  showToast('Copié ('+snaps.length+')');
+  showToast(SM.t('toastCopied')+snaps.length+')');
 }
 function cutSelection(){
   if(!selectedPaths.length)return;
   copySelection();
   window.SM.deleteSelStrokes(); // pushes its own undo entry
-  showToast('Coupé ('+_canvasClip.snaps.length+')');
+  showToast(SM.t('toastCut')+_canvasClip.snaps.length+')');
 }
 function pasteSelection(){
-  if(!_canvasClip||!_canvasClip.snaps.length){showToast('Rien à coller');return;}
+  if(!_canvasClip||!_canvasClip.snaps.length){showToast(SM.t('toastNothingToPaste'));return;}
   pushUndo();
   var layer=userLayers[state.activeLayerIdx];
   var samePlace=(_canvasClip.layerIdx===state.activeLayerIdx&&_canvasClip.frameIdx===state.currentFrame);
@@ -1279,7 +1279,7 @@ function pasteSelection(){
   state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;});
   saveActiveLayerFrame();renderArcs();updateUI();
   if(window.SMEngineBridge)SMEngineBridge.renderNow();
-  showToast('Collé ('+clones.filter(isSelectablePathChild).length+')');
+  showToast(SM.t('toastPasted')+clones.filter(isSelectablePathChild).length+')');
 }
 var canvasEl=document.getElementById('drawing-canvas');
 
@@ -4137,7 +4137,7 @@ function _ptSetHandleIn(isVB,seg,pt){if(isVB)seg.handleIn=[pt.x,pt.y];else seg.h
 function _ptSetHandleOut(isVB,seg,pt){if(isVB)seg.handleOut=[pt.x,pt.y];else seg.handleOut=pt;}
 function setPointType(type){
   var path=nodeEditTargetPath();
-  if(!path||!_nodeSel.length){showToast('Sélectionnez un ou plusieurs points (Subselect)');return;}
+  if(!path||!_nodeSel.length){showToast(SM.t('toastSelectOneOrMorePointsSubselect'));return;}
   pushUndo();
   var isVB=!!(path.data&&path.data.isVectorBrush&&path.data.centerSegments);
   var arr=isVB?path.data.centerSegments:path.segments;
@@ -4334,7 +4334,7 @@ function foldBooleanOp(op,paths,layer){
   return{result:result,companions:extraRemovals};
 }
 function booleanOp(op){
-  if(selectedPaths.length<2){showToast('Sélectionnez au moins 2 formes');return;}
+  if(selectedPaths.length<2){showToast(SM.t('toastSelectAtLeast2Shapes'));return;}
   pushUndo();
   var paths=selectedPaths.slice();
   var boolLayer=userLayers[state.activeLayerIdx];
@@ -4396,7 +4396,7 @@ function booleanOp(op){
   // comment) may have used one of the booleaned shapes as a wall; keep
   // re-tracing those, same as before this fix.
   fillRegenerateLinked(boolLayer,islands[0]);
-  saveActiveLayerFrame();updateUI();showToast('Opération booléenne appliquée');
+  saveActiveLayerFrame();updateUI();showToast(SM.t('toastBooleanOpApplied'));
 }
 
 // ---- PRECISION VECTOR ERASER ----
@@ -5324,7 +5324,7 @@ function onMouseDown(event){
     if(!canEditActiveLayer())return;
     // Same both-eyes-off guard as draw-bridge.js's commitStroke — never
     // commit fully invisible ink.
-    if(!state.strokeEnabled&&!state.fillEnabled){showToast('Stroke et Fill désactivés — rien à dessiner');return;}
+    if(!state.strokeEnabled&&!state.fillEnabled){showToast(SM.t('toastStrokeFillDisabledNothingToDraw'));return;}
     pushUndo();ensureKeyframe(true);layer.activate();
     if(state.vectorBrush){
       _vbLastPenPressure=null;_vbResetPressureFilter();stabQueue=[event.point.clone()];_vb.pts=[event.point.clone()];_vb.widths=[vbPressureOf(event)];_vb.lastT=Date.now();_vb.lastPt=event.point.clone();
@@ -5683,7 +5683,7 @@ function onMouseDown(event){
     pushUndo();ensureKeyframe();
     if(event.modifiers.shift){
       var hitRm=layer.hitTest(event.point,{fill:true,tolerance:12/view.zoom});
-      if(hitRm&&hitRm.item instanceof Path&&hitRm.item.fillColor){hitRm.item.fillColor=null;saveActiveLayerFrame();updateUI();showToast('Fill supprimé');}
+      if(hitRm&&hitRm.item instanceof Path&&hitRm.item.fillColor){hitRm.item.fillColor=null;saveActiveLayerFrame();updateUI();showToast(SM.t('toastFillRemoved'));}
       return;
     }
     // Any queued Alt-drawn closing strokes become real (but disposable)
@@ -5706,15 +5706,15 @@ function onMouseDown(event){
       var hitFill=layer.hitTest(event.point,{fill:true,tolerance:1/view.zoom});
       if(hitFill&&(hitFill.item instanceof Path||hitFill.item instanceof CompoundPath)&&hitFill.item.fillColor){
         hitFill.item.fillColor=state.fillColor;hitFill.item.opacity=state.opacity/100;
-        saveActiveLayerFrame();updateUI();showToast('Couleur remplacée');return;
+        saveActiveLayerFrame();updateUI();showToast(SM.t('toastColorReplaced'));return;
       }
-      showToast('Aucune zone fermée ici');return;
+      showToast(SM.t('toastNoClosedAreaHere'));return;
     }
     var existingMatch=fillFindExistingMatch(layer,res.path);
     if(existingMatch){
       res.path.remove();
       existingMatch.fillColor=state.fillColor;existingMatch.opacity=state.opacity/100;
-      saveActiveLayerFrame();updateUI();showToast('Couleur remplacée');return;
+      saveActiveLayerFrame();updateUI();showToast(SM.t('toastColorReplaced'));return;
     }
     layer.insertChild(fillInsertIndexFor(layer,event.point,res.path),res.path);
     res.path.fillColor=state.fillColor;res.path.strokeColor=null;res.path.opacity=state.opacity/100;
@@ -5727,7 +5727,7 @@ function onMouseDown(event){
     // reshape an already-finished, hand-authored Fill Brush shape it
     // merely borders (see fillMergeSameColor's own comment).
     fillMergeSameColor(layer,res.path);
-    saveActiveLayerFrame();updateUI();showToast('Fill appliqué');
+    saveActiveLayerFrame();updateUI();showToast(SM.t('toastFillApplied'));
   }else if(state.tool==='fillbrush'){
     if(!canEditActiveLayer())return;pushUndo();ensureKeyframe();layer.activate();
     _vbLastPenPressure=null;_vb.pts=[event.point.clone()];_vb.widths=[vbPressureOf(event)];_vb.lastT=Date.now();_vb.lastPt=event.point.clone();

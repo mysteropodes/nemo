@@ -3443,7 +3443,7 @@ function _dedupeFrameStrokeIds(strokes,frameIdx){
 function generateTweens(){
   saveAllLayerFrames();var li=state.activeLayerIdx;var ld=state.layers[li];
   var keys=[];for(var i=0;i<state.totalFrames;i++){if(ld.frames[i].isKeyframe&&ld.frames[i].strokes.length>0)keys.push(i);}
-  if(keys.length<2){showToast('Il faut au moins 2 keyframes dessinées');return;}
+  if(keys.length<2){showToast(SM.t('toastNeedAtLeast2DrawnKeyframes'));return;}
   // A frame selection on this layer restricts regeneration to just those
   // keyframes' own span (start keyframe -> its next keyframe), instead of
   // silently redoing the whole layer — select the frame to fix, hit Tween,
@@ -4010,7 +4010,7 @@ function generateTweens(){
       ld.frames[fi]={strokes:tw,isInterpolated:true,isKeyframe:false};total++;
     }
   }
-  loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast(total+' inbetween(s) générés');
+  loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast(total+SM.t('toastInbetweensGeneratedSuffix'));
 }
 
 // ---- ARCS ----
@@ -4394,14 +4394,14 @@ function restoreLayersSnapshot(s){
 // Both branches below rewrite frame strokes; Motion's component union-bounds
 // cache is derived from those, so drop it here rather than in each branch.
 function undo(){if(window.SMMotion&&SMMotion.invalidateSymbolUnionBounds)SMMotion.invalidateSymbolUnionBounds();
-if(!state.undoStack.length){showToast('Rien à annuler');return;}
+if(!state.undoStack.length){showToast(SM.t('toastNothingToUndo'));return;}
 // Cross-context guard (2026-07-30 fix) — PEEK before popping: a mismatched
 // entry stays on the stack untouched so the user can navigate to the right
 // symbol/montage/scene and undo it from there, instead of it being silently
 // consumed (or worse, silently misapplied) from here.
 var top=state.undoStack[state.undoStack.length-1];
 if(top.type==='layers'&&((top.symbolId||null)!==(state.activeSymbolId||null)||(top.montageViewId||null)!==(state.activeMontageViewId||null))){
-  showToast('Dernière action faite dans '+_undoContextLabel(top.symbolId,top.montageViewId)+' — retournez-y pour l’annuler');
+  showToast(SM.t('toastLastActionMadeInSuffix')+_undoContextLabel(top.symbolId,top.montageViewId)+' — retournez-y pour l’annuler');
   return;
 }
 var s=state.undoStack.pop();var sl=state.undoLabels.pop()||_actionLabelNow();
@@ -4410,11 +4410,11 @@ var cur={frame:state.currentFrame,layers:[]};for(var i=0;i<state.layers.length;i
 // Both branches below rewrite frame strokes; Motion's component union-bounds
 // cache is derived from those, so drop it here rather than in each branch.
 function redo(){if(window.SMMotion&&SMMotion.invalidateSymbolUnionBounds)SMMotion.invalidateSymbolUnionBounds();
-if(!state.redoStack.length){showToast('Rien à refaire');return;}
+if(!state.redoStack.length){showToast(SM.t('toastNothingToRedo'));return;}
 // Same cross-context guard as undo() above, mirrored for the redo stack.
 var top=state.redoStack[state.redoStack.length-1];
 if(top.type==='layers'&&((top.symbolId||null)!==(state.activeSymbolId||null)||(top.montageViewId||null)!==(state.activeMontageViewId||null))){
-  showToast('Dernière action faite dans '+_undoContextLabel(top.symbolId,top.montageViewId)+' — retournez-y pour la refaire');
+  showToast(SM.t('toastLastActionMadeInSuffix')+_undoContextLabel(top.symbolId,top.montageViewId)+' — retournez-y pour la refaire');
   return;
 }
 var s=state.redoStack.pop();var sl=state.redoLabels.pop()||_actionLabelNow();
@@ -4453,7 +4453,7 @@ function cancelReassign(silent){
   _reassign.active=false;_reassign.step=0;_reassign.aIds=[];
   reassignSetStatus(null);
   hideReassignBadge();
-  if(!silent)showToast('Réattribution annulée');
+  if(!silent)showToast(SM.t('toastReassignmentCanceled'));
 }
 function startReassign(){
   if(_reassign.active){cancelReassign();return;}
@@ -4461,22 +4461,22 @@ function startReassign(){
   var li=state.activeLayerIdx,ld=state.layers[li],cf=state.currentFrame;
   var fA=-1;
   for(var i=cf;i>=0;i--){if(ld.frames[i].isKeyframe){fA=i;break;}}
-  if(fA<0){showToast('Placez le playhead sur une keyframe (ou après une keyframe)');return;}
+  if(fA<0){showToast(SM.t('toastPlayheadOnKeyframeHint'));return;}
   var fB=-1;
   for(var j=fA+1;j<state.totalFrames;j++){if(ld.frames[j].isKeyframe){fB=j;break;}}
-  if(fB<0){showToast('Cette keyframe n\'a pas de keyframe suivante à réattribuer');return;}
+  if(fB<0){showToast(SM.t('toastNoNextKeyframeToReassign'));return;}
   _reassign.active=true;_reassign.step=1;_reassign.layer=li;_reassign.frameA=fA;_reassign.frameB=fB;_reassign.aIds=[];
   reassignSetStatus('1/2 — Cliquez l\'élément de départ (plusieurs si un même trait a été séparé), puis Entrée');
-  showToast('Cliquez l\'élément de départ sur le canvas');
+  showToast(SM.t('toastClickStartElement'));
 }
 function confirmReassignStep1(){
   if(!_reassign.active||_reassign.step!==1)return;
-  if(!_reassign.aIds.length){showToast('Cliquez au moins un élément avant de valider');return;}
+  if(!_reassign.aIds.length){showToast(SM.t('toastClickAtLeastOneElement'));return;}
   saveActiveLayerFrame();
   _reassign.step=2;
   goToFrame(_reassign.frameB);
   reassignSetStatus('2/2 — Cliquez l\'élément correspondant sur la keyframe '+(_reassign.frameB+1));
-  showToast('Cliquez l\'élément correspondant sur la keyframe suivante');
+  showToast(SM.t('toastClickMatchingElementNext'));
 }
 function reassignHandleClick(pt){
   if(!_reassign.active)return false;
@@ -4488,7 +4488,7 @@ function reassignHandleClick(pt){
   }
   var layer=userLayers[li];
   var hit=layer.hitTest(pt,{stroke:true,fill:true,tolerance:8/view.zoom});
-  if(!hit||!(hit.item instanceof Path)){showToast('Aucun élément à cet endroit');return true;}
+  if(!hit||!(hit.item instanceof Path)){showToast(SM.t('toastNoElementHere'));return true;}
   var target=resolveBrushAnchor(hit.item,layer);
   var sid=ensureStrokeId(target);
   if(_reassign.step===1){
@@ -4516,7 +4516,7 @@ function reassignHandleClick(pt){
   selClear();selAdd(li,doneA);
   generateTweens();
   selClear();
-  showToast('Inbetween réattribué');
+  showToast(SM.t('toastInbetweenReassigned'));
   return true;
 }
 document.addEventListener('pointerdown',function(e){
@@ -4609,7 +4609,7 @@ function updateReassignBadge(cached){
       selClear();selAdd(li,doneA);
       generateTweens();
       selClear();
-      showToast('Inbetween réattribué');
+      showToast(SM.t('toastInbetweenReassigned'));
     };
     return;
   }
@@ -4637,6 +4637,6 @@ function updateReassignBadge(cached){
     _reassign.active=true;_reassign.step=2;_reassign.layer=state.activeLayerIdx;_reassign.frameA=fA;_reassign.frameB=fB;_reassign.aIds=[aStrokeId];
     goToFrame(fB);
     reassignSetStatus('2/2 — Cliquez l\'élément correspondant sur la keyframe '+(fB+1)+' (ou sélectionnez-le puis cliquez le bouton jaune)');
-    showToast('Sélectionnez l\'élément correspondant, puis cliquez le bouton jaune');
+    showToast(SM.t('toastSelectMatchingElementThenYellowButton'));
   };
 }

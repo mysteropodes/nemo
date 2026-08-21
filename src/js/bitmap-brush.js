@@ -757,7 +757,7 @@
   // both call directly, since there's no longer a button here at all.
   function applyBitmapBrushToSelection() {
     var eligible = selectedPaths.filter(function (p) { return p instanceof Path && !(p.data && (p.data.isVectorBrush || p.data.isFillShape)) && (p.strokeColor || p.fillColor || (p.data && (p.data.brushTexturePreset || p.data.bitmapBrushSpec))); });
-    if (!eligible.length) { if (window.showToast) showToast('Sélectionne au moins un trait'); return; }
+    if (!eligible.length) { if (window.showToast) showToast(SM.t('toastSelectAtLeastOneStroke')); return; }
     pushUndo();
     eligible.forEach(function (p) {
       stripAnyBrushTexture(p);
@@ -765,16 +765,16 @@
     });
     saveActiveLayerFrame(); updateUI();
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
-    if (window.showToast) showToast('Bitmap Brush appliqué à la sélection');
+    if (window.showToast) showToast(SM.t('toastBitmapBrushApplied'));
   }
   function removeBitmapBrushFromSelection() {
     var eligible = selectedPaths.filter(function (p) { return p instanceof Path && p.data && (p.data.bitmapBrushSpec || p.data.brushTexturePreset); });
-    if (!eligible.length) { if (window.showToast) showToast('Aucun trait texturé sélectionné'); return; }
+    if (!eligible.length) { if (window.showToast) showToast(SM.t('toastNoTexturedStrokeSelected')); return; }
     pushUndo();
     eligible.forEach(function (p) { stripAnyBrushTexture(p); });
     saveActiveLayerFrame(); updateUI();
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
-    if (window.showToast) showToast('Texture retirée');
+    if (window.showToast) showToast(SM.t('toastTextureRemoved'));
   }
   window.SM.applyBitmapBrushToSelection = applyBitmapBrushToSelection;
   window.SM.removeBitmapBrushFromSelection = removeBitmapBrushFromSelection;
@@ -822,7 +822,7 @@
     reader.onload = function () {
       var tipsFound;
       try { tipsFound = window.SMAbrImport.readAbrArrayBuffer(reader.result); }
-      catch (e) { if (window.showToast) showToast('Import .abr échoué : ' + e.message); return; }
+      catch (e) { if (window.showToast) showToast(SM.t('toastAbrImportFailedSuffix') + e.message); return; }
       var lastId = null;
       tipsFound.forEach(function (t, i) {
         var id = 'abr_' + Date.now().toString(36) + '_' + i;
@@ -832,9 +832,9 @@
       // Picker swatch (bitmap-tip-picker.js) owns the visible label/
       // preview now — select the just-imported tip and repaint it.
       if (lastId) { state.bitmapTip = lastId; if (window.BitmapTipPicker) window.BitmapTipPicker.paintButton(lastId); }
-      if (window.showToast) showToast(tipsFound.length + ' tip(s) importé(s) depuis ' + file.name);
+      if (window.showToast) showToast(tipsFound.length + SM.t('toastTipsImportedFromSuffix') + file.name);
     };
-    reader.onerror = function () { if (window.showToast) showToast('Lecture du fichier .abr échouée'); };
+    reader.onerror = function () { if (window.showToast) showToast(SM.t('toastAbrReadFailed')); };
     reader.readAsArrayBuffer(file);
   }
   window.SM.importAbrFile = importAbrFile;

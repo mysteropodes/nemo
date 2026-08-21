@@ -76,7 +76,7 @@
       if (dir > 0 && list[i].frame > state.currentFrame) { target = list[i]; break; }
       if (dir < 0 && list[i].frame < state.currentFrame) target = list[i]; // keep the last one before
     }
-    if (!target) { if (window.showToast) showToast(dir > 0 ? 'Aucun repère après' : 'Aucun repère avant'); return; }
+    if (!target) { if (window.showToast) showToast(dir > 0 ? SM.t('toastNoMarkerAfter') : SM.t('toastNoMarkerBefore')); return; }
     if (window.goToFrame) goToFrame(target.frame);
     else { state.currentFrame = target.frame; if (window.loadFrame) loadFrame(target.frame); }
   }
@@ -225,7 +225,7 @@
       if (e.key === '*') {
         e.preventDefault();
         var m = addCompMarker(state.currentFrame, '');
-        if (!m && window.showToast) showToast('Un repère existe déjà sur cette frame');
+        if (!m && window.showToast) showToast(SM.t('toastMarkerAlreadyExistsOnFrame'));
         return;
       }
       if (e.shiftKey && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {

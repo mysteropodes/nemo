@@ -2870,7 +2870,7 @@
   async function ensureEngine() {
     if (engine) return true;
     if (!window.GeometryWasm || !window.GeometryWasm.ready) {
-      showToast('Moteur Rust indisponible (wasm non chargé)');
+      showToast(SM.t('toastRustEngineUnavailableWasm'));
       return false;
     }
     var paperCanvas = document.getElementById('drawing-canvas');
@@ -2879,7 +2879,7 @@
     // 0×0 (or 0×N) surface.configure() during create_engine() is just as
     // fatal to the WebGPU surface as during a later resize.
     if (paperCanvas.width <= 0 || paperCanvas.height <= 0) {
-      showToast('Moteur Rust: canvas pas encore prêt, réessaie');
+      showToast(SM.t('toastRustEngineCanvasNotReady'));
       return false;
     }
     rustCanvas = document.createElement('canvas');
@@ -2912,7 +2912,7 @@
       return true;
     } catch (e) {
       console.error('[engine-bridge] engine creation failed', e);
-      showToast('Moteur Rust: échec WebGPU — ' + e);
+      showToast(SM.t('toastRustEngineWebgpuFailedSuffix') + e);
       rustCanvas.remove();
       rustCanvas = null;
       return false;

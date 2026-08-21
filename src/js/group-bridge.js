@@ -26,7 +26,7 @@
 (function () {
   function groupSelection() {
     if ((state.tool !== 'select' && state.tool !== 'subselect') || !window.selectedPaths || selectedPaths.length < 2) {
-      if (window.showToast) showToast('Sélectionnez au moins 2 éléments pour créer un groupe');
+      if (window.showToast) showToast(SM.t('toastSelectAtLeast2ElementsToGroup'));
       return;
     }
     pushUndo();
@@ -45,26 +45,26 @@
     }
     saveActiveLayerFrame(); updateUI();
     if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
-    if (window.showToast) showToast('Groupe créé (' + selectedPaths.length + ' éléments)');
+    if (window.showToast) showToast(SM.t('toastGroupCreatedSuffix') + selectedPaths.length + SM.t('toastElementsCloseParen'));
   }
   function ungroupSelection() {
     // Both refusals were silent while groupSelection's own ("Sélectionnez au
     // moins 2 calques") is not — so Cmd+Shift+G read as a broken shortcut
     // rather than an inapplicable one (2026-07-25 UX audit).
     if (!window.selectedPaths || !selectedPaths.length) {
-      if (window.showToast) showToast('Sélectionnez d\'abord un groupe à dissocier');
+      if (window.showToast) showToast(SM.t('toastSelectGroupToUngroupFirst'));
       return;
     }
     var hasGroup = selectedPaths.some(function (p) { return p.data && p.data.groupId; });
     if (!hasGroup) {
-      if (window.showToast) showToast('La sélection ne contient aucun groupe');
+      if (window.showToast) showToast(SM.t('toastSelectionHasNoGroup'));
       return;
     }
     pushUndo();
     selectedPaths.forEach(function (p) { if (p.data) delete p.data.groupId; });
     saveActiveLayerFrame(); updateUI();
     if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
-    if (window.showToast) showToast('Groupe dissocié');
+    if (window.showToast) showToast(SM.t('toastGroupUngrouped'));
   }
   // Every sibling in `layer` sharing `p`'s groupId, INCLUDING `p` itself —
   // `[p]` (a one-item "group") when `p` has no groupId, so every caller can
@@ -155,7 +155,7 @@
   // 'unite'/'subtract'/'intersect'/'exclude'.
   function combineSelection(mode) {
     if ((state.tool !== 'select' && state.tool !== 'subselect') || !window.selectedPaths || selectedPaths.length < 2) {
-      if (window.showToast) showToast('Sélectionnez au moins 2 formes pour combiner');
+      if (window.showToast) showToast(SM.t('toastSelectAtLeast2ShapesToCombine'));
       return;
     }
     var li = state.activeLayerIdx, ld = state.layers[li], layer = userLayers[li];
@@ -180,7 +180,7 @@
     }
     saveActiveLayerFrame(); updateUI();
     if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
-    if (window.showToast) showToast('Combiné');
+    if (window.showToast) showToast(SM.t('toastCombined'));
   }
   function setGroupCombineMode(gid, ld, mode) {
     if (!ld || !ld.groups || !ld.groups[gid]) return;

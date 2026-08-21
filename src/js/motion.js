@@ -339,7 +339,7 @@
     // the effect-bearing layers, not only the ones that happen to be keyed.
     _hideUnanimated = false;
     renderLayerList(); renderTimeline();
-    if (window.showToast) showToast(targets.length + ' calque(s) révélé(s)');
+    if (window.showToast) showToast(targets.length + SM.t('toastLayersRevealedSuffix'));
     return true;
   }
   function handleRevealEffectsShortcut() {
@@ -960,7 +960,7 @@
   // mutates `seg.curvePoints` in place.
   function openMotionEaseEditor(ld, prop) {
     var track = trackFor(ld, prop);
-    if (!track || !track.keys.length) { if (window.showToast) showToast('Anime d’abord ' + PROP_LABEL[prop] + ' (icône chrono) pour avoir une courbe'); return; }
+    if (!track || !track.keys.length) { if (window.showToast) showToast('Anime d’abord ' + PROP_LABEL[prop] + SM.t('toastAnimIconTip')); return; }
     // Auto-create the missing second key — explicit request ("créer les
     // clés manquantes si il le faut"): a single-key track has nothing to
     // ease BETWEEN yet, but the user shouldn't have to manually add a
@@ -981,7 +981,7 @@
     var seg = segmentLeftKey(track, state.currentFrame) || track.keys[0];
     var idx = track.keys.indexOf(seg);
     var next = track.keys[idx + 1] || track.keys[idx - 1];
-    if (!next) { if (window.showToast) showToast('Impossible de créer un segment éditable'); return; }
+    if (!next) { if (window.showToast) showToast(SM.t('toastCannotCreateEditableSegment')); return; }
     if (window._curveEditor) window._curveEditor.editMotionSeg(seg, PROP_LABEL[prop] + ' : clé ' + (seg.frame + 1) + ' → ' + (next.frame + 1));
   }
 
@@ -1479,7 +1479,7 @@
       // random, décalage temporel, Effectors...) with zero feedback that
       // anything happened — Time Remap's own enable already toasts a
       // one-line summary (enableTimeRemap below); this had nothing.
-      if (window.showToast) showToast('Duplicator activé — grille 2×3 par défaut, réglable dans le panel');
+      if (window.showToast) showToast(SM.t('toastDuplicatorEnabledHint'));
     }
     loadFrame(state.currentFrame);
     invalidateSymbolUnionBounds(); // same cache-staleness fix as dupRefresh (timeline.js)
@@ -1702,11 +1702,11 @@
     // it, reachable live: drag the pickwhip onto the existing Parent B and
     // land on a meaningless "blend a layer with itself" state.
     if (parentUid && parentUid === ld.parentLayerUidB) {
-      if (window.showToast) showToast('Parent A doit être différent du Parent B');
+      if (window.showToast) showToast(SM.t('toastParentAMustDifferFromB'));
       return;
     }
     if (parentUid && wouldCreateParentCycle(ensureLayerUid(ld), parentUid)) {
-      if (window.showToast) showToast('Parentage refusé : créerait une boucle');
+      if (window.showToast) showToast(SM.t('toastParentingRefusedCycle'));
       return;
     }
     ld.parentLayerUid = parentUid || null;
@@ -1721,11 +1721,11 @@
     var ld = state.layers[li];
     if (!ld) return;
     if (parentUid && parentUid === ld.parentLayerUid) {
-      if (window.showToast) showToast('Parent B doit être différent du Parent A');
+      if (window.showToast) showToast(SM.t('toastParentBMustDifferFromA'));
       return;
     }
     if (parentUid && wouldCreateParentCycle(ensureLayerUid(ld), parentUid)) {
-      if (window.showToast) showToast('Parentage refusé : créerait une boucle');
+      if (window.showToast) showToast(SM.t('toastParentingRefusedCycle'));
       return;
     }
     ld.parentLayerUidB = parentUid || null;
@@ -3289,7 +3289,7 @@
       for (var i = state.layers.length - 1; i >= 0; i--) window.SM.splitLayerIntoElementsCore(i, { silent: true });
       // The way back is not obvious from the result (N rows where there was
       // one) — say it once, with the exact gesture.
-      if (willSplit) showToast('Éclaté en calques — clic droit › « Fusionner les calques sélectionnés » pour revenir en arrière');
+      if (willSplit) showToast(SM.t('toastSplitToLayersUndoHint'));
     }
   }
   // Bar highlighting (layer-inout.js's own _barSel, used for group bar-drags
@@ -3463,7 +3463,7 @@
           renderLayerList(); renderTimeline();
           if (window.loadFrame) loadFrame(state.currentFrame);
           if (window.SMEngineBridge) SMEngineBridge.renderNow();
-          if (window.showToast) showToast('Lien temporel retiré');
+          if (window.showToast) showToast(SM.t('toastTimeLinkRemoved'));
         });
         row.appendChild(tlb2);
       }
@@ -3616,7 +3616,7 @@
                 ld.effectsFrom = ensureLayerUid(other);
                 renderLayerList(); renderTimeline();
                 if (window.SMEngineBridge) SMEngineBridge.renderNow();
-                if (window.showToast) showToast('Effets hérités de « ' + (other.name || ('Layer ' + (oi + 1))) + ' » — ils suivent leurs propres keyframes');
+                if (window.showToast) showToast(SM.t('toastEffectsInheritedFromSuffix') + (other.name || ('Layer ' + (oi + 1))) + ' » — ils suivent leurs propres keyframes');
               } });
             });
             if (!items.length) { if (window.showToast) showToast('Aucun autre calque ne porte d\u2019effets'); return; }
@@ -3827,7 +3827,7 @@
       if (window.setLayerParentB) setLayerParentB(li, null);
       renderLayerList(); renderTimeline();
       if (window.SMEngineBridge) SMEngineBridge.renderNow();
-      if (window.showToast) showToast('Parent retiré');
+      if (window.showToast) showToast(SM.t('toastParentRemoved'));
     });
 
     row.appendChild(pill);
@@ -3871,7 +3871,7 @@
       renderLayerList(); renderTimeline();
       if (window.loadFrame) loadFrame(state.currentFrame);
       if (window.SMEngineBridge) SMEngineBridge.renderNow();
-      if (window.showToast) showToast('Lien temporel retiré');
+      if (window.showToast) showToast(SM.t('toastTimeLinkRemoved'));
     }
     name.addEventListener('contextmenu', function (e) {
       e.stopPropagation(); e.preventDefault();
@@ -3961,7 +3961,7 @@
   function setLayerTimeLink(li, targetIdx, mode, srcAnchor) {
     var ld = state.layers[li], src = state.layers[targetIdx];
     if (!ld || !src || targetIdx === li) return false;
-    if (timeLinkWouldCycle(li, targetIdx)) { if (window.showToast) showToast('Lien impossible : créerait un cycle'); return false; }
+    if (timeLinkWouldCycle(li, targetIdx)) { if (window.showToast) showToast(SM.t('toastLinkImpossibleCycle')); return false; }
     pushUndo();
     mode = mode || 'both';
     var xType = (mode !== 'both' && (srcAnchor === 'in' || srcAnchor === 'out')) ? srcAnchor : mode;
@@ -4489,7 +4489,7 @@
         // Clone the source's OWN expression. Nothing to clone is worth
         // saying out loud rather than silently inserting an empty string.
         var srcEx = t.holder.expressions && t.holder.expressions[t.prop];
-        if (!srcEx || !srcEx.code) { if (window.showToast) showToast('Cette propriété n\u2019a pas d\u2019expression à cloner'); return; }
+        if (!srcEx || !srcEx.code) { if (window.showToast) showToast(SM.t('toastNoExpressionToClone')); return; }
         text = srcEx.code;
       } else {
         var li = state.layers.indexOf(t.holder);
@@ -4498,7 +4498,7 @@
         if (li < 0) state.layers.forEach(function (ld2, i2) {
           if (ld2.elementMotion) Object.keys(ld2.elementMotion).forEach(function (k) { if (ld2.elementMotion[k] === t.holder) li = i2; });
         });
-        if (li < 0) { if (window.showToast) showToast('Propriété non référençable'); return; }
+        if (li < 0) { if (window.showToast) showToast(SM.t('toastPropertyNotReferenceable')); return; }
         text = 'layer("' + ensureLayerUid(state.layers[li]) + '").' + t.prop;
       }
       // Insert at the caret rather than replacing: a pickwhip is usually
@@ -4510,7 +4510,7 @@
       ta.dispatchEvent(new Event('input'));
       commit();
       renderLayerList(); renderTimeline();
-      if (window.showToast) showToast(alt ? 'Expression clonée' : 'Référence insérée');
+      if (window.showToast) showToast(alt ? SM.t('toastExpressionCloned') : SM.t('toastReferenceInserted'));
     }
     function onKey(e) { if (e.key === 'Escape') cleanup(); }
     document.addEventListener('mousemove', onMove, true);
@@ -5517,7 +5517,7 @@
     return groups;
   }
   function distributeKeys() {
-    if (_motionKeySel.length < 2) { if (window.showToast) showToast('Sélectionne au moins 2 clés'); return; }
+    if (_motionKeySel.length < 2) { if (window.showToast) showToast(SM.t('toastSelectAtLeast2Keys')); return; }
     pushUndo();
     _groupKeySelByTrack().forEach(function (g) {
       if (g.items.length < 2) return;
@@ -5531,7 +5531,7 @@
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
   }
   function flipKeys() {
-    if (_motionKeySel.length < 2) { if (window.showToast) showToast('Sélectionne au moins 2 clés'); return; }
+    if (_motionKeySel.length < 2) { if (window.showToast) showToast(SM.t('toastSelectAtLeast2Keys')); return; }
     pushUndo();
     _groupKeySelByTrack().forEach(function (g) {
       if (g.items.length < 2) return;
@@ -5548,7 +5548,7 @@
     var sorted = _motionKeySel.slice().sort(function (a, b) { return a.key.frame - b.key.frame; });
     _motionKeySel = sorted.filter(function (_s, i) { return i % n === 0; });
     renderTimeline();
-    if (window.showToast) showToast(_motionKeySel.length + ' clé(s) sélectionnée(s)');
+    if (window.showToast) showToast(_motionKeySel.length + SM.t('toastKeysSelectedSuffix'));
   }
   // Subdivide: insert a key HALFWAY between each consecutive pair of
   // selected keys on the same track (2026-07-25, Skew Pro's "Subdivide").
@@ -5573,14 +5573,14 @@
     return Math.round(lag * 100);
   }
   function colorSelectedKeys(color) {
-    if (!_motionKeySel.length) { if (window.showToast) showToast('Aucune clé sélectionnée'); return; }
+    if (!_motionKeySel.length) { if (window.showToast) showToast(SM.t('toastNoKeySelected')); return; }
     pushUndo();
     _motionKeySel.forEach(function (s) { if (color) s.key.color = color; else delete s.key.color; });
     renderTimeline();
-    if (window.showToast) showToast(color ? (_motionKeySel.length + ' clé(s) colorée(s)') : 'Couleur retirée');
+    if (window.showToast) showToast(color ? (_motionKeySel.length + SM.t('toastKeysColoredSuffix')) : SM.t('toastColorRemoved'));
   }
   function subdivideKeys() {
-    if (_motionKeySel.length < 2) { if (window.showToast) showToast('Sélectionne au moins 2 clés'); return; }
+    if (_motionKeySel.length < 2) { if (window.showToast) showToast(SM.t('toastSelectAtLeast2Keys')); return; }
     pushUndo();
     var added = 0, skipped = 0, fresh = [];
     _groupKeySelByTrack().forEach(function (g) {
@@ -5605,7 +5605,7 @@
     setKeySel(_motionKeySel.concat(fresh));
     renderLayerList(); renderTimeline();
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
-    if (window.showToast) showToast(added + ' clé(s) insérée(s)' + (skipped ? ' — ' + skipped + ' intervalle(s) trop court(s)' : ''));
+    if (window.showToast) showToast(added + SM.t('toastKeysInsertedSuffix') + (skipped ? ' — ' + skipped + ' intervalle(s) trop court(s)' : ''));
   }
   // Keep a random subset of the current selection (Skew Pro's "Grab
   // Randomly"): the fast way to make a uniform batch of layers/keys feel
@@ -5613,14 +5613,14 @@
   // empty the selection on a small one.
   function grabRandomKeys(percent) {
     var p = Math.max(1, Math.min(100, parseInt(percent, 10) || 50)) / 100;
-    if (!_motionKeySel.length) { if (window.showToast) showToast('Aucune clé sélectionnée'); return; }
+    if (!_motionKeySel.length) { if (window.showToast) showToast(SM.t('toastNoKeySelected')); return; }
     var pool = _motionKeySel.slice();
     var want = Math.max(1, Math.round(pool.length * p));
     var out = [];
     while (out.length < want && pool.length) out.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
     setKeySel(out);
     renderTimeline();
-    if (window.showToast) showToast(out.length + ' clé(s) gardée(s) au hasard');
+    if (window.showToast) showToast(out.length + SM.t('toastKeysKeptRandomSuffix'));
   }
   // Inverts within whatever tracks are CURRENTLY RENDERED (the same
   // universe the marquee itself draws over).
@@ -5830,12 +5830,12 @@
         var rows = buildKeyRows();
         var f0 = Infinity, f1 = -Infinity;
         rows.forEach(function (r) { r.forEach(function (en) { f0 = Math.min(f0, en.orig); f1 = Math.max(f1, en.orig); }); });
-        if (!(f1 > f0)) { if (window.showToast) showToast('Sélectionne des clés sur 2 frames différentes pour les espacer'); return; }
+        if (!(f1 > f0)) { if (window.showToast) showToast(SM.t('toastSelectKeysOn2DifferentFramesToSpace')); return; }
         startSkewDrag(rows, mode, e);
       });
       addStaggerEdges(_keySelBoxEl, function (e, mode) {
         var rows = buildKeyRows();
-        if (rows.length < 2) { if (window.showToast) showToast('Sélectionne des clés sur 2 pistes ou plus pour skewer'); return; }
+        if (rows.length < 2) { if (window.showToast) showToast(SM.t('toastSelectKeysOn2TracksToSkew')); return; }
         startSkewDrag(rows, mode, e);
       });
     }
@@ -5892,7 +5892,7 @@
   // silently, which reads exactly like the tool being broken; say why.
   function noKeysGuard(rows) {
     if (rows.some(function (r) { return r.length; })) return true;
-    if (window.showToast) showToast('Aucune clé sur ces calques — pose des clés, ou glisse le centre de la boîte pour décaler les calques dans le temps');
+    if (window.showToast) showToast(SM.t('toastNoKeyOnLayersHint'));
     return false;
   }
 
@@ -6013,7 +6013,7 @@
         if (!noKeysGuard(rows)) return;
         var f0 = Infinity, f1 = -Infinity;
         rows.forEach(function (r) { r.forEach(function (en) { f0 = Math.min(f0, en.orig); f1 = Math.max(f1, en.orig); }); });
-        if (!(f1 > f0)) { if (window.showToast) showToast('Il faut des clés sur au moins 2 frames différentes pour les espacer'); return; }
+        if (!(f1 > f0)) { if (window.showToast) showToast(SM.t('toastNeedKeysOn2DifferentFrames')); return; }
         startSkewDrag(rows, mode, e);
       });
       // Top/bottom edge on a LAYER selection staggers the LAYERS in time —
@@ -6076,10 +6076,10 @@
   function enableTimeRemap(li) {
     var ld = state.layers[li];
     if (!ld) return false;
-    if (!ld.symbolId) { if (window.showToast) showToast('Le remappage temporel s\u2019applique aux calques composants'); return false; }
+    if (!ld.symbolId) { if (window.showToast) showToast(SM.t('toastTimeRemapAppliesToComponents')); return false; }
     var sym = state.symbols[ld.symbolId];
     if (!sym) return false;
-    if (ld.timeRemap) { if (window.showToast) showToast('Remappage temporel déjà actif'); return false; }
+    if (ld.timeRemap) { if (window.showToast) showToast(SM.t('toastTimeRemapAlreadyActive')); return false; }
     pushUndo();
     var inF = window.layerInPoint ? layerInPoint(ld) : (ld.inPoint != null ? ld.inPoint : 0);
     var outF = window.layerOutPoint ? layerOutPoint(ld) : (ld.outPoint != null ? ld.outPoint : state.totalFrames - 1);
@@ -6091,7 +6091,7 @@
     renderLayerList(); renderTimeline();
     if (window.loadFrame) loadFrame(state.currentFrame);
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
-    if (window.showToast) showToast('Remappage temporel activé — 0 → ' + last);
+    if (window.showToast) showToast(SM.t('toastTimeRemapEnabledFromSuffix') + last);
     return true;
   }
   function disableTimeRemap(li) {
@@ -6102,7 +6102,7 @@
     renderLayerList(); renderTimeline();
     if (window.loadFrame) loadFrame(state.currentFrame);
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
-    if (window.showToast) showToast('Remappage temporel désactivé');
+    if (window.showToast) showToast(SM.t('toastTimeRemapDisabled'));
     return true;
   }
   // The internal frame this instance should show at `frame`, or null when

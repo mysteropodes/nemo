@@ -359,7 +359,7 @@
     var applyBtn=document.createElement('button');
     applyBtn.textContent='Terminé'; applyBtn.className='pbtn ac'; applyBtn.style.flex='1';
     applyBtn.onclick=function(){
-      if(window.showToast)showToast(lastUnitCount?('Texte animé — '+lastUnitCount+' unité'+(lastUnitCount>1?'s':'')):'Aucune unité à animer trouvée');
+      if(window.showToast)showToast(lastUnitCount?(SM.t('toastTextAnimatedSuffix')+lastUnitCount+SM.t('toastUnitSuffix')+(lastUnitCount>1?'s':'')):SM.t('toastNoUnitToAnimate'));
       closePanel();
     };
     btnRow.appendChild(cancelBtn); btnRow.appendChild(applyBtn);

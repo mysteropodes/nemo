@@ -141,9 +141,9 @@ function autoBakeThenResume(){
   if(window.showToast)showToast('Optimisation de la lecture…','info');
   SMPlaybackCache.bakeRange(from,to).then(function(res){
     if(res&&res.started&&window.showToast){
-      if(res.budgetHit)showToast('Cache de lecture : '+res.cached+'/'+res.total+' images (limite mémoire atteinte)','warn');
-      else if(res.cancelled)showToast('Cache de lecture annulé ('+res.cached+' images)','warn');
-      else showToast('Cache de lecture prêt ('+res.cached+' images)','success');
+      if(res.budgetHit)showToast('Cache de lecture : '+res.cached+'/'+res.total+SM.t('toastImagesMemoryLimitSuffix'),'warn');
+      else if(res.cancelled)showToast(SM.t('toastPlaybackCacheCanceled')+res.cached+' images)','warn');
+      else showToast(SM.t('toastPlaybackCacheReady')+res.cached+' images)','success');
     }
     state.playDir=savedDir;
     startPlay();
@@ -155,15 +155,15 @@ function autoBakeThenResume(){
 // user asked for the cache to be ready, not for playback to begin.
 function manualBakeCache(){
   if(!window.SMPlaybackCache){return;}
-  if(SMPlaybackCache.isBaking()){showToast('Cache de lecture déjà en cours…','info');return;}
+  if(SMPlaybackCache.isBaking()){showToast(SM.t('toastPlaybackCacheInProgress'),'info');return;}
   if(state.playing)stopPlay();
   showToast('Mise en cache de la lecture…','info');
   SMPlaybackCache.bakeRange(state.waIn,state.waOut).then(function(res){
     if(!res)return;
     if(!res.started){showToast('Cache de lecture indisponible','warn');return;}
-    if(res.budgetHit)showToast('Cache de lecture : '+res.cached+'/'+res.total+' images (limite mémoire atteinte)','warn');
-    else if(res.cancelled)showToast('Cache de lecture annulé ('+res.cached+' images)','warn');
-    else showToast('Cache de lecture prêt ('+res.cached+' images)','success');
+    if(res.budgetHit)showToast('Cache de lecture : '+res.cached+'/'+res.total+SM.t('toastImagesMemoryLimitSuffix'),'warn');
+    else if(res.cancelled)showToast(SM.t('toastPlaybackCacheCanceled')+res.cached+' images)','warn');
+    else showToast(SM.t('toastPlaybackCacheReady')+res.cached+' images)','success');
   });
 }
 function stopPlay(){if(!state.playing)return;state.playing=false;
@@ -766,7 +766,7 @@ window.SM={
       window.SM.setTool('select');renderLayerList();renderTimeline();updateUI();
       if(window.updateCameraPanel)window.updateCameraPanel();
       if(window.SMEngineBridge)window.SMEngineBridge.renderNow();
-      showToast('Calque caméra supprimé');
+      showToast(SM.t('toastCameraLayerDeleted'));
       return;
     }
     // Refusing to delete the last layer is right — a document with no layer
@@ -792,7 +792,7 @@ window.SM={
     });
     _layerSel=[];
     if(state.activeLayerIdx>=state.layers.length)state.activeLayerIdx=state.layers.length-1;
-    activateUL(state.activeLayerIdx);loadFrame(state.currentFrame);updateUI();showToast('Calque(s) supprimé(s) — ⌘Z pour annuler');
+    activateUL(state.activeLayerIdx);loadFrame(state.currentFrame);updateUI();showToast(SM.t('toastLayersDeletedUndoHint'));
   },
   // Standing "keyframes follow this edge" lock (Van Dijk 2.2). Stored per
   // layer so it survives the session and needs no modifier at drag time.
@@ -815,11 +815,11 @@ window.SM={
     // synthetic per-segment array with no write-back on exit (unlike a
     // symbol's), so the toast would claim success and every bit of it
     // reverts the moment you leave.
-    if(state.activeSymbolId){showToast('Fermez d\'abord le composant en cours d\'édition');return;}
-    if(state.activeMontageViewId){showToast('Fermez d\'abord le montage en cours d\'édition');return;}
+    if(state.activeSymbolId){showToast(SM.t('toastCloseComponentFirst'));return;}
+    if(state.activeMontageViewId){showToast(SM.t('toastCloseMontageFirst'));return;}
     var inF=state.waIn||0,outF=(state.waOut!=null?state.waOut:state.totalFrames-1);
     if(outF<=inF){showToast('Zone de travail trop courte');return;}
-    if(inF===0&&outF===state.totalFrames-1){showToast('La zone de travail couvre déjà tout');return;}
+    if(inF===0&&outF===state.totalFrames-1){showToast(SM.t('toastWorkAreaAlreadyCoversAll'));return;}
     saveAllLayerFrames();pushUndoLayers();
     var n=outF-inF+1;
     state.layers.forEach(function(ld,li){
@@ -837,13 +837,13 @@ window.SM={
     state.currentFrame=Math.max(0,Math.min(n-1,state.currentFrame-inF));
     loadFrame(state.currentFrame);renderLayerList();renderTimeline();updateUI();
     if(window.updateWaBar)updateWaBar();
-    showToast('Composition réduite à la zone de travail ('+n+' frames)');
+    showToast(SM.t('toastCompReducedToWorkArea')+n+' frames)');
   },
   setLayerKeyLock:function(li,mode){
     var ld=state.layers[li==null?state.activeLayerIdx:li];if(!ld)return;
     pushUndo();
     if(mode)ld.keyLock=mode;else delete ld.keyLock;
-    showToast(mode?('Keyframes verrouillées sur '+(mode==='in'?'le point d\u2019entrée':mode==='out'?'le point de sortie':'le calque')):'Verrou de keyframes retiré');
+    showToast(mode?(SM.t('toastKeyframesLockedOnSuffix')+(mode==='in'?SM.t('toastInPointLabel'):mode==='out'?SM.t('toastOutPointLabel'):SM.t('toastLayerLabel'))):SM.t('toastKeyframeLockRemoved'));
     renderLayerList();renderTimeline();
   },
   toggleLayerMotionBlur:function(li){
@@ -873,16 +873,16 @@ window.SM={
     // this one had zero user-visible signal. Same toast-driven convention
     // as the comp-switch fix above, just surfacing a limit instead of
     // auto-fixing a switch.
-    if(ld.motionBlur&&ld.threeD)showToast('Flou de mouvement activé — sans effet sur un calque 3D pour l\u2019instant');
-    else if(needsCompOn)showToast('Flou de mouvement activé sur le calque — active aussi l\u2019interrupteur de la comp');
-    else showToast(ld.motionBlur?'Flou de mouvement activé':'Flou de mouvement désactivé');
+    if(ld.motionBlur&&ld.threeD)showToast(SM.t('toastMotionBlurEnabledNo3DEffectHint'));
+    else if(needsCompOn)showToast(SM.t('toastMotionBlurEnabledLayerCompHint'));
+    else showToast(ld.motionBlur?SM.t('toastMotionBlurEnabled'):SM.t('toastMotionBlurDisabled'));
     renderLayerList();renderTimeline();
     if(window.SMEngineBridge)SMEngineBridge.renderNow();
   },
   toggleMotionBlurComp:function(){
     state.motionBlurOn=!state.motionBlurOn;
     var n=state.layers.filter(function(l){return l.motionBlur;}).length;
-    showToast(state.motionBlurOn?('Flou de mouvement activé sur la comp ('+n+' calque(s))'):'Flou de mouvement désactivé sur la comp');
+    showToast(state.motionBlurOn?(SM.t('toastMotionBlurEnabledOnCompSuffix')+n+' calque(s))'):SM.t('toastMotionBlurDisabledOnComp'));
     var b=document.getElementById('btn-mblur');if(b)b.classList.toggle('active',!!state.motionBlurOn);
     renderLayerList();renderTimeline();
     if(window.SMEngineBridge)SMEngineBridge.renderNow();
@@ -905,13 +905,13 @@ window.SM={
       state.shyEnabled=true;
       var shyBtn=document.getElementById('btn-shy');if(shyBtn)shyBtn.classList.add('active');
     }
-    if(needsShyOn)showToast('Calque marqué « shy » — active l\u2019interrupteur pour le masquer');
+    if(needsShyOn)showToast(SM.t('toastLayerMarkedShyHint'));
     renderLayerList();renderTimeline();
   },
   toggleShyMode:function(){
     state.shyEnabled=!state.shyEnabled;
     var n=state.layers.filter(function(l){return l.shy;}).length;
-    showToast(state.shyEnabled?('Calques shy masqués ('+n+')'):'Tous les calques affichés');
+    showToast(state.shyEnabled?(SM.t('toastShyLayersHiddenSuffix')+n+')'):SM.t('toastAllLayersShown'));
     renderLayerList();renderTimeline();
   },
   // AE's Cmd+Shift+D: cut the layer in TWO at the playhead. Both halves keep
@@ -924,7 +924,7 @@ window.SM={
     var f=state.currentFrame;
     var inF=window.layerInPoint?layerInPoint(ld):(ld.inPoint!=null?ld.inPoint:0);
     var outF=window.layerOutPoint?layerOutPoint(ld):(ld.outPoint!=null?ld.outPoint:state.totalFrames-1);
-    if(f<=inF||f>outF){showToast('Place la tête de lecture à l\u2019intérieur du calque pour le couper');return;}
+    if(f<=inF||f>outF){showToast(SM.t('toastPlayheadInsideLayerToCut'));return;}
     saveAllLayerFrames();pushUndoLayers();
     var ni=createUserLayer(ld.name+' (2)');
     var dst=state.layers[ni];
@@ -942,7 +942,7 @@ window.SM={
     // Splitting materialises hard in/out values on both halves, which a
     // time link would then override — so the link is dropped rather than
     // left to silently win over the cut the user just made.
-    if(ld.timeLink){delete ld.timeLink;delete dst.timeLink;showToast('Lien temporel retiré : la coupe fixe les points d\u2019entrée/sortie');}
+    if(ld.timeLink){delete ld.timeLink;delete dst.timeLink;showToast(SM.t('toastTimeLinkRemovedCutFixesInOutHint'));}
     else delete dst.timeLink;
     // createUserLayer appends to the TOP of the stack, which would drop the
     // second half far from the one it was cut out of. AE leaves the two
@@ -960,7 +960,7 @@ window.SM={
     }
     activateUL(ni);_layerSel=[ni];_layerSelAnchor=ni;loadFrame(state.currentFrame);renderLayerList();renderTimeline();updateUI();
     if(window.SMEngineBridge)SMEngineBridge.renderNow();
-    showToast('Calque coupé à la frame '+(f+1));
+    showToast(SM.t('toastLayerCutAtFrame')+(f+1));
   },
   duplicateLayer:function(){saveAllLayerFrames();pushUndoLayers();var src=state.layers[state.activeLayerIdx];var ni=createUserLayer(src.name+' copy');state.layers[ni].frames=JSON.parse(JSON.stringify(src.frames));if(src.blendMode)state.layers[ni].blendMode=src.blendMode;state.layers[ni].color=src.color;if(src.motion)state.layers[ni].motion=JSON.parse(JSON.stringify(src.motion));if(src.motionStatic)state.layers[ni].motionStatic=JSON.parse(JSON.stringify(src.motionStatic));
     // matteMode was dropped here entirely (pre-existing, found by the
@@ -1098,7 +1098,7 @@ window.SM={
     // (toggleLayerDuplicator/setDuplicatorEditSource, motion.js) — a direct
     // padlock unlock would let edits hit the N-way-expanded live layer and
     // desync locked/_dupEditSource. Route through the panel's own button.
-    if(state.layers[idx].duplicator&&!state.layers[idx]._dupEditSource&&state.layers[idx].locked){showToast('Calque duplicateur — « Modifier la forme source » (panneau Duplicator) pour éditer');return;}
+    if(state.layers[idx].duplicator&&!state.layers[idx]._dupEditSource&&state.layers[idx].locked){showToast(SM.t('toastDuplicatorLayerEditHint'));return;}
     state.layers[idx].locked=!state.layers[idx].locked;
     // Locking a layer that already has content selected (selected before the
     // lock, or the lock toggled while it's the active layer) must drop that
@@ -1120,14 +1120,14 @@ window.SM={
   // one undo step for the whole batch, like every other selection command.
   applyStrokeProfile:function(kind){
     var paths=(window.selectedPaths||[]).filter(function(p){return p&&p.segments;});
-    if(!paths.length){showToast('Sélectionne un ou plusieurs traits');return;}
+    if(!paths.length){showToast(SM.t('toastSelectOneOrMoreStrokes'));return;}
     pushUndo();
     var done=0,skipped=0;
     paths.forEach(function(p){ if(applyStrokeProfileToPath(p,kind))done++; else skipped++; });
     saveActiveLayerFrame();
     loadFrame(state.currentFrame);updateUI();
     if(window.SMEngineBridge)SMEngineBridge.renderNow();
-    showToast(done?(done+' trait(s) profilé(s)'+(skipped?' — '+skipped+' ignoré(s)':'')):'Aucun trait convertible dans la sélection');
+    showToast(done?(done+SM.t('toastStrokedShapesSuffix')+(skipped?' — '+skipped+SM.t('toastIgnoredSuffix'):'')):SM.t('toastNoConvertibleStrokeInSel'));
   },
   convertActiveLayerToComponent:function(){
     if(_layerSel.length>1)convertLayersToComponent(_layerSel);
@@ -1218,7 +1218,7 @@ window.SM={
       var tgtLd=state.layers[tl];
       return !(tgtLd&&tgtLd.locked);
     });
-    if(!sel.length){showToast('Calque verrouillé');return;}
+    if(!sel.length){showToast(SM.t('toastLayerLocked'));return;}
     pushUndo();saveAllLayerFrames();
     var data=[];
     sel.forEach(function(s){
@@ -1272,11 +1272,11 @@ window.SM={
       if(tl>=0&&tl<state.layers.length&&tf>=0&&tf<state.totalFrames)selAdd(tl,tf);
     });
     loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
-    showToast('Frames déplacées');
+    showToast(SM.t('toastFramesMoved'));
   },
   copyFrames:function(){
     saveAllLayerFrames();
-    if(!_sel.frames.length){showToast('Aucune sélection');return;}
+    if(!_sel.frames.length){showToast(SM.t('toastNoSelection'));return;}
     var b=selBounds();
     _sel.clipboard=[];
     _sel.frames.forEach(function(s){
@@ -1285,11 +1285,11 @@ window.SM={
     });
     _sel.clipOp='copy';
     if(typeof window!=='undefined')window._lastClipKind='frames';
-    showToast('Copié ('+_sel.frames.length+' frames)');
+    showToast(SM.t('toastCopied')+_sel.frames.length+' frames)');
   },
   cutFrames:function(){
     saveAllLayerFrames();
-    if(!_sel.frames.length){showToast('Aucune sélection');return;}
+    if(!_sel.frames.length){showToast(SM.t('toastNoSelection'));return;}
     pushUndo();
     var b=selBounds();
     _sel.clipboard=[];
@@ -1302,10 +1302,10 @@ window.SM={
     _sel.clipOp='cut';
     if(typeof window!=='undefined')window._lastClipKind='frames';
     selClear();loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
-    showToast('Coupé ('+_sel.clipboard.length+' frames)');
+    showToast(SM.t('toastCut')+_sel.clipboard.length+' frames)');
   },
   pasteFrames:function(){
-    if(!_sel.clipboard||!_sel.clipboard.length){showToast('Rien à coller');return;}
+    if(!_sel.clipboard||!_sel.clipboard.length){showToast(SM.t('toastNothingToPaste'));return;}
     pushUndo();saveAllLayerFrames();
     var baseL=state.activeLayerIdx,baseF=state.currentFrame;
     _sel.clipboard.forEach(function(d){
@@ -1330,7 +1330,7 @@ window.SM={
       if(tl>=0&&tl<state.layers.length&&tf>=0&&tf<state.totalFrames)selAdd(tl,tf);
     });
     loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
-    showToast('Collé ('+_sel.clipboard.length+' frames)');
+    showToast(SM.t('toastPasted')+_sel.clipboard.length+' frames)');
   },
   deleteSelectedFrames:function(){
     if(!_sel.frames.length)return;
@@ -1340,7 +1340,7 @@ window.SM={
       ld.frames[s.frame]={strokes:[],isKeyframe:false,isInterpolated:false};
     });
     selClear();loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
-    showToast('Frames supprimées');
+    showToast(SM.t('toastFramesDeleted'));
   },
   // Was dead code (defined, never called from any UI path) until Motion
   // mode's in/out bar (layer-inout.js) started drawing per-keyframe tick
@@ -1410,7 +1410,7 @@ window.SM={
       mkPairs.push({fA:fA,fB:fB,newFA:newFA,newFB:newFB});
     }
     retimeTweenSpans(layerIdx,mkPairs,capturedIb);
-    loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast('Keyframe déplacée → '+(toFrame+1));
+    loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast(SM.t('toastKeyframeMovedArrowSuffix')+(toFrame+1));
     return true;
   },
   // Shifts EVERY keyframe/content frame of a layer by dx frames at once —
@@ -1487,21 +1487,21 @@ window.SM={
   },
   duplicateKeyframe:function(){
     saveAllLayerFrames();var li=state.activeLayerIdx;var ld=state.layers[li];var cf=state.currentFrame;
-    if(ld.locked){showToast('Calque verrouillé');return;}
-    var strokes=getEffectiveStrokes(li,cf);if(!strokes.length){showToast('Rien à dupliquer');return;}
+    if(ld.locked){showToast(SM.t('toastLayerLocked'));return;}
+    var strokes=getEffectiveStrokes(li,cf);if(!strokes.length){showToast(SM.t('toastNothingToDuplicate'));return;}
     pushUndo();for(var i=0;i<state.layers.length;i++)state.layers[i].frames.splice(cf+1,0,{strokes:[],isKeyframe:false,isInterpolated:false});
     state.totalFrames++;if(state.waOut<state.totalFrames-1)state.waOut++;window._waOut=state.waOut;window._totalF=state.totalFrames;
     ld.frames[cf+1]={strokes:JSON.parse(JSON.stringify(strokes)),isKeyframe:true,isInterpolated:false};
-    goToFrame(cf+1);showToast('Keyframe dupliquée');
+    goToFrame(cf+1);showToast(SM.t('toastKeyframeDuplicated'));
   },
   extendExposure:function(n){
     saveAllLayerFrames();var li=state.activeLayerIdx;var cf=state.currentFrame;
     pushUndo();n=n||1;for(var x=0;x<n;x++){for(var i=0;i<state.layers.length;i++)state.layers[i].frames.splice(cf+1,0,{strokes:[],isKeyframe:false,isInterpolated:false});state.totalFrames++;}
     if(state.waOut<state.totalFrames-1)state.waOut=state.totalFrames-1;window._waOut=state.waOut;window._totalF=state.totalFrames;
-    updateUI();showToast('Exposition étendue +'+n);
+    updateUI();showToast(SM.t('toastExposureExtendedPlus')+n);
   },
   flipHorizontal:function(){
-    if(state.tool!=='select'||!selectedPaths.length){showToast('Sélectionnez des traits');return;}
+    if(state.tool!=='select'||!selectedPaths.length){showToast(SM.t('toastSelectStrokes'));return;}
     pushUndo();var bounds=null;selectedPaths.forEach(function(p){if(!bounds)bounds=p.bounds.clone();else bounds=bounds.unite(p.bounds);});
     var cx=bounds.center.x;
     selectedPaths.forEach(function(p){p.scale(-1,1,new Point(cx,bounds.center.y));
@@ -1512,7 +1512,7 @@ window.SM={
     saveActiveLayerFrame();updateUI();showToast('Flip horizontal');
   },
   flipVertical:function(){
-    if(state.tool!=='select'||!selectedPaths.length){showToast('Sélectionnez des traits');return;}
+    if(state.tool!=='select'||!selectedPaths.length){showToast(SM.t('toastSelectStrokes'));return;}
     pushUndo();var bounds=null;selectedPaths.forEach(function(p){if(!bounds)bounds=p.bounds.clone();else bounds=bounds.unite(p.bounds);});
     var cy=bounds.center.y;
     selectedPaths.forEach(function(p){p.scale(1,-1,new Point(bounds.center.x,cy));
@@ -1726,7 +1726,7 @@ window.SM={
       }
     }
     loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
-    showToast(anyLayerCycled?('Cycle : plage repetee '+times+' fois'):'Cycle : aucun calque à répéter (calques Component ignorés)');
+    showToast(anyLayerCycled?('Cycle : plage repetee '+times+' fois'):SM.t('toastCycleNoLayerToRepeat'));
   },
   // Propagation de couleur (v19) : applique la couleur du fill/trait
   // selectionne a TOUTES les occurrences du meme strokeId sur toutes les
@@ -1782,7 +1782,7 @@ window.SM={
     // user knows an app update is needed and not to overwrite the file.
     // NOT gated on `silent` — openPath passes silent=true (it shows its own
     // "Opened" toast), and a data-integrity warning must never be muted.
-    if(d.version&&d.version>13)showToast('⚠ Fichier créé par une version plus récente de Nemo (format v'+d.version+') — mettre à jour l’app avant de re-sauvegarder ce fichier');
+    if(d.version&&d.version>13)showToast(SM.t('toastFileFromNewerVersionHint')+d.version+SM.t('toastUpdateAppBeforeResave'));
     if(!d.layers)d.layers=[{name:'Layer 1',visible:true,locked:false,frames:d.frames}];
     // Validate the FULL layer/frame structure BEFORE the teardown below —
     // the old shallow `!d.layers` check let a file that parses but is
@@ -1962,7 +1962,7 @@ window.SM={
     if(window.SMMotion&&SMMotion.migrateLegacyCurves)SMMotion.migrateLegacyCurves();
     state.currentFrame=0;state.activeLayerIdx=0;activateUL(0);drawStage();loadFrame(0);renderOS();renderArcs();updateUI();renderSymbolTabs();
     syncDocFields();
-    if(!silent)showToast('Projet chargé');}catch(e){showToast('Erreur: '+e.message);}},
+    if(!silent)showToast(SM.t('toastProjectLoaded'));}catch(e){showToast('Erreur: '+e.message);}},
   getState:function(){return state;},
 };
 
@@ -2826,7 +2826,7 @@ function selectGhostAll(){
   selectedPaths=layer.children.filter(function(c){return c instanceof Path&&isSelectablePathChild(c);});
   state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;});
   renderArcs();updateUI();
-  showToast(count+' élément(s) sur '+frameCount+' image(s) clé — déplacez/transformez ensemble');
+  showToast(count+SM.t('toastElementsOnSuffix')+frameCount+SM.t('toastKeyframeMoveTogetherSuffix'));
 }
 function clearGhostSelection(){
   if(!_ghostProxyActive)return;
@@ -3623,7 +3623,7 @@ document.getElementById('frame-grid').addEventListener('mousedown',function(e){
   e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();
   var fi=parseInt(cell.dataset.frame),li=parseInt(cell.dataset.layer);
   var ld=state.layers[li];
-  if(ld.locked){showToast('Calque verrouillé');return;} // span-end drag is a keyframe edit like any other (feedback #18)
+  if(ld.locked){showToast(SM.t('toastLayerLocked'));return;} // span-end drag is a keyframe edit like any other (feedback #18)
   var srcFi=fi;for(var pi=fi;pi>=0;pi--){if(ld.frames[pi].isKeyframe){srcFi=pi;break;}}
   var nextKeyFi=-1;
   if(ld.frames[fi+1]&&ld.frames[fi+1].isKeyframe)nextKeyFi=fi+1;
@@ -4346,10 +4346,10 @@ function computeLayerRenderOrder(){
 // derives a folder's membership purely from adjacency, so a non-contiguous
 // selection would render wrong: reorder first, like Animate requires too).
 function groupSelectionIntoFolder(){
-  if(_layerSel.length<2){showToast('Sélectionnez au moins 2 calques');return;}
+  if(_layerSel.length<2){showToast(SM.t('toastSelectAtLeast2LayersCap'));return;}
   var sorted=_layerSel.slice().sort(function(a,b){return a-b;});
-  for(var k=1;k<sorted.length;k++)if(sorted[k]!==sorted[k-1]+1){showToast('Les calques doivent être consécutifs — réordonnez-les d\'abord');return;}
-  if(sorted.some(function(i){return state.layers[i].folderId;})){showToast('Un calque sélectionné est déjà dans un dossier');return;}
+  for(var k=1;k<sorted.length;k++)if(sorted[k]!==sorted[k-1]+1){showToast(SM.t('toastLayersMustBeConsecutive'));return;}
+  if(sorted.some(function(i){return state.layers[i].folderId;})){showToast(SM.t('toastSelectedLayerAlreadyInFolder'));return;}
   var fid='folder-'+Date.now()+'-'+Math.floor(Math.random()*1000);
   state.layerFolders[fid]={name:'Dossier',collapsed:false};
   sorted.forEach(function(i){state.layers[i].folderId=fid;});
@@ -4724,7 +4724,7 @@ function buildParentCell(row,ld,li){
     if(M.setLayerParentB)M.setLayerParentB(li,null);
     renderLayerList();renderTimeline();
     if(window.SMEngineBridge)SMEngineBridge.renderNow();
-    if(window.showToast)showToast('Parent retiré');
+    if(window.showToast)showToast(SM.t('toastParentRemoved'));
   });
   row.appendChild(cell);
 }
@@ -4985,7 +4985,7 @@ function renderLayerList(frameOnly){
         renderLayerList();renderTimeline();
         if(window.loadFrame)loadFrame(state.currentFrame);
         if(window.SMEngineBridge)SMEngineBridge.renderNow();
-        if(window.showToast)showToast('Lien temporel retiré');
+        if(window.showToast)showToast(SM.t('toastTimeLinkRemoved'));
       });
       row.appendChild(tlb);
     }
@@ -5075,7 +5075,7 @@ function renderLayerList(frameOnly){
         {label:'Décomposer le composant',disabled:!l4.symbolId,action:function(){window.SM.convertComponentToLayer();}},
         {sep:true},
         {label:'Séparer Stroke/Fill/Shadow (3 calques liés, keyframes partagées)',disabled:!!l4.symbolId||!!l4.lfsGroup||!!l4.linkGroupId,action:function(){window.SM.convertActiveLayerToStrokeFillShadow();}},
-        {label:'Dissocier ce calque du groupe Stroke/Fill/Shadow',disabled:!l4.linkGroupId,action:function(){delete l4.channel;delete l4.linkGroupId;renderLayerList();renderTimeline();showToast('Calque dissocié — reste un calque normal, keyframes plus liées');}},
+        {label:'Dissocier ce calque du groupe Stroke/Fill/Shadow',disabled:!l4.linkGroupId,action:function(){delete l4.channel;delete l4.linkGroupId;renderLayerList();renderTimeline();showToast(SM.t('toastLayerUnlinkedNormal'));}},
         {label:'Grouper (Ligne/Plein/Ombre)',disabled:!!l4.symbolId||!!l4.lfsGroup,action:function(){window.SM.convertActiveLayerToLFSGroup();}},
         {label:'Éditer Ligne',disabled:!l4.lfsGroup,action:function(){window.SM.enterSymbol(l4.lfsIds.line);}},
         {label:'Éditer Plein',disabled:!l4.lfsGroup,action:function(){window.SM.enterSymbol(l4.lfsIds.full);}},
@@ -5754,15 +5754,15 @@ function initCommentPopover(){
     // discarding whatever was being recorded.
     if(_recording)stopRecording();
     var note=document.getElementById('comment-text').value;
-    if(!note.trim()){showToast('Écris une note avant d\'enregistrer le feedback');return;}
+    if(!note.trim()){showToast(SM.t('toastWriteNoteBeforeSavingFeedback'));return;}
     var blocking=document.getElementById('comment-fb-blocking').checked;
     window.SMFeedback.submitFeedback({
       note:note,tags:_activeFbTags.slice(),blocking:blocking,
       pos:new Point(_activeComment.x,_activeComment.y),
       actionTrail:_recordedActionTrail,clickTrail:_recordedClickTrail,
       screenshotDataUrl:_activeShotDataUrl,
-    }).then(function(){showToast(_activeShotDataUrl?'Feedback + capture envoyés':'Feedback enregistré (hors projet)');})
-      .catch(function(e){console.warn('[feedback] submit failed',e);showToast('Échec de l\'enregistrement du feedback');});
+    }).then(function(){showToast(_activeShotDataUrl?SM.t('toastFeedbackAndCaptureSent'):SM.t('toastFeedbackSavedOutsideProject'));})
+      .catch(function(e){console.warn('[feedback] submit failed',e);showToast(SM.t('toastFeedbackSaveFailed'));});
     closeCommentPopover();
   });
   saveBtn.addEventListener('click',function(){
@@ -5980,7 +5980,7 @@ function closeInPlaceTextEditor(cancel){
     if(window.SMEngineBridge)SMEngineBridge.renderNow();
   }).catch(function(e){
     console.warn('[in-place text] rebuild failed',e);
-    showToast('Édition du texte : échec de la reconstruction');
+    showToast(SM.t('toastTextEditRebuildFailed'));
     restore();
   });
 }
@@ -6064,7 +6064,7 @@ function commitVectorText(txt,fontKey,size,align,color,fixedWidthWorld){
     if(window.SMEngineBridge)window.SMEngineBridge.renderNow();
   }).catch(function(e){
     console.warn('[vector-text] build failed',e);
-    showToast('Texte vectoriel : échec du chargement de la police');
+    showToast(SM.t('toastVectorTextFontLoadFailed'));
   });
 }
 function commitText(){
@@ -6372,7 +6372,7 @@ function applyTextPropsEdit(){
     if(window.SMEngineBridge)window.SMEngineBridge.renderNow();
   }).catch(function(e){
     console.warn('[text-props] rebuild failed',e);
-    showToast('Édition du texte : échec de la reconstruction');
+    showToast(SM.t('toastTextEditRebuildFailed'));
   });
 }
 (function(){
@@ -6429,7 +6429,7 @@ function initFillGradientButton(){
     if(cb.disabled){
       // The checkbox disables itself when there is no single shape selected —
       // say why instead of looking broken (same rule as the rest of this file).
-      showToast('Sélectionne une seule forme avec l\'outil Sélection pour lui appliquer un dégradé');
+      showToast(SM.t('toastSelectSingleShapeForGradient'));
       return;
     }
     if(editor)editor.style.display='block';
@@ -6467,7 +6467,7 @@ function initCycleAndPropagate(){
     // with nothing selected was completely silent. Same message, raised to the
     // point where it's actually useful.
     if(typeof selBounds==='function'&&!selBounds()){
-      showToast('Sélectionne d\'abord une plage de frames dans la timeline');
+      showToast(SM.t('toastSelectFrameRangeFirst'));
       return;
     }
     var n=prompt('Repeter la plage selectionnee combien de fois ?','2');
@@ -6507,7 +6507,7 @@ function initSettingsModal(){
   var resetBtn=document.getElementById('shortcuts-reset');
   if(resetBtn)resetBtn.addEventListener('click',function(){
     _shortcutOverrides={};try{localStorage.removeItem('nemo-shortcuts');}catch(e){}
-    renderShortcutsList();showToast('Raccourcis réinitialisés');
+    renderShortcutsList();showToast(SM.t('toastShortcutsReset'));
   });
 }
 var ROLE_HINTS={
@@ -6572,7 +6572,7 @@ function initAppMenu(){
       var sh=prompt('Ouverture d\u2019obturateur, en frames (0.05-2)',String(state.motionBlurShutter!=null?state.motionBlurShutter:0.5));
       if(sh===null)return;
       window.SM.setMotionBlurSettings(s,sh);
-      showToast('Flou : '+state.motionBlurSamples+' échantillons · obturateur '+state.motionBlurShutter+' f');
+      showToast('Flou : '+state.motionBlurSamples+SM.t('toastSamplesShutterSuffix')+state.motionBlurShutter+' f');
     });
   })();
   (function bindShy(){
@@ -6597,7 +6597,7 @@ function openObjReference(){
       filters:[{name:'OBJ',extensions:['obj']}]}).then(function(path){
       if(!path)return;
       return window.__TAURI__.fs.readTextFile(path).then(feed);
-    }).catch(function(e){showToast('Import OBJ échoué : '+e.message);});
+    }).catch(function(e){showToast(SM.t('toastObjImportFailedSuffix')+e.message);});
     return;
   }
   var inp=document.createElement('input');inp.type='file';inp.accept='.obj';inp.style.display='none';
@@ -6795,9 +6795,9 @@ function initFeedbackUI(){
     pullBtn.disabled=true;var orig=pullBtn.textContent;pullBtn.textContent='Recherche…';
     window.SMFeedback.pullAllIncoming().then(function(imported){
       pullBtn.disabled=false;pullBtn.textContent=orig;
-      showToast(imported.length?imported.length+' feedback récupéré(s), en attente d\'approbation':'Rien de nouveau');
+      showToast(imported.length?imported.length+SM.t('toastFeedbackRetrievedSuffix'):'Rien de nouveau');
       refreshFeedbackList();
-    }).catch(function(e){pullBtn.disabled=false;pullBtn.textContent=orig;console.warn('[feedback] pull failed',e);showToast('Échec de la récupération');});
+    }).catch(function(e){pullBtn.disabled=false;pullBtn.textContent=orig;console.warn('[feedback] pull failed',e);showToast(SM.t('toastRetrievalFailed'));});
   });
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initFeedbackUI);else initFeedbackUI();
@@ -7057,7 +7057,7 @@ function initGithubFeedbackUI(){
   tokenInput.value=window.SMFeedback.githubTriageToken();
   saveBtn.addEventListener('click',function(){
     window.SMFeedback.setGithubTriageToken(tokenInput.value.trim());
-    showToast('Token enregistré (local uniquement)');
+    showToast(SM.t('toastTokenSavedLocalOnly'));
   });
   if(openBtn)openBtn.addEventListener('click',openFbDashboard);
   if(closeBtn)closeBtn.addEventListener('click',closeFbDashboard);
@@ -7559,7 +7559,7 @@ function onKeyDown(event){
         var isCenter=!!(ntp.data&&ntp.data.isVectorBrush&&ntp.data.centerSegments);
         var curLen=isCenter?ntp.data.centerSegments.length:ntp.segments.length;
         var minPts=isCenter?2:(ntp.closed?3:2);
-        if(curLen-_nodeSel.length<minPts){showToast('Pas assez de points restants');}
+        if(curLen-_nodeSel.length<minPts){showToast(SM.t('toastNotEnoughPointsLeft'));}
         else{
           pushUndo();
           var idxsDesc=_nodeSel.slice().sort(function(a,b){return b-a;});
@@ -8035,7 +8035,7 @@ function applyVectorBrushToSelection(preset){
     stripAnyBrushTexture(p);
     if(preset&&preset!=='none')applyBrushTexture(p,preset);
   });
-  saveActiveLayerFrame();updateUI();showToast('Brush appliqué à la sélection');
+  saveActiveLayerFrame();updateUI();showToast(SM.t('toastBrushAppliedToSel'));
 }
 window.SM.applyVectorBrushToSelection=applyVectorBrushToSelection;
 if(window.BrushPresetPicker)window.BrushPresetPicker.paintButton(state.brushPreset);
@@ -8605,8 +8605,8 @@ window.renderRigModeUI=renderRigModeUI;
     // this gap, with only a console.warn, so a plain "0 forme(s)
     // assignée(s)" toast read exactly like a bug instead of an honest
     // "not supported yet" — surfaced explicitly instead of guessing.
-    if(res.n===0&&res.skippedUnsupported>0)showToast(window.SM&&SM.t?SM.t('rigAutoAssignBrushUnsupportedToast'):'Les formes avec des trous (résultats booléens) ne sont pas encore supportées par le Rig');
-    else showToast(res.n+(window.SM&&SM.t?SM.t('rigAutoAssignedToast'):' forme(s) assignée(s) automatiquement'));
+    if(res.n===0&&res.skippedUnsupported>0)showToast(window.SM&&SM.t?SM.t('rigAutoAssignBrushUnsupportedToast'):SM.t('toastShapesWithHolesNotSupportedByRig'));
+    else showToast(res.n+(window.SM&&SM.t?SM.t('rigAutoAssignedToast'):SM.t('toastShapesAutoAssignedSuffix')));
   });
   document.getElementById('btn-rig-commit').addEventListener('click',function(){
     var ld=state.layers[state.activeLayerIdx];
@@ -8619,7 +8619,7 @@ window.renderRigModeUI=renderRigModeUI;
     pushUndo();
     rigResetPose(ld);
     if(window.SMEngineBridge)SMEngineBridge.renderNow();
-    showToast('Pose du rig réinitialisée');
+    showToast(SM.t('toastRigPoseReset'));
   });
 })();
 // ---- Combine-group panel (2026-07-29 UX fix) ----

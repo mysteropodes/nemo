@@ -676,7 +676,7 @@
         if (nv.isWeb) {
           if (!st.webReopenWarned) {
             st.webReopenWarned = true;
-            if (window.showToast) showToast('Vidéo "' + nv.path + '" : source non rechargeable après un rechargement de page — réimporte le fichier.', 'warn');
+            if (window.showToast) showToast(SM.t('toastVideoQuote') + nv.path + SM.t('toastVideoUnreloadable'), 'warn');
           }
           return;
         }
@@ -795,7 +795,7 @@
       st.prefetchQueue = [];
       st.lastShown = -1;
       if (oldSession) close(oldSession).catch(function () {});
-      if (window.showToast) showToast('Média optimisé : ' + (nv.path.split('/').pop()) + ' — scrub instantané');
+      if (window.showToast) showToast(SM.t('toastOptimizedMediaSuffix') + (nv.path.split('/').pop()) + SM.t('toastInstantScrubSuffix'));
       if (window.loadFrame) loadFrame(state.currentFrame);
     } catch (e) {
       // Was silent (console.warn only) — a failure here means this video
@@ -806,7 +806,7 @@
       // fix the underlying transcode failure, but at least makes it
       // diagnosable without opening devtools.
       console.warn('[native-video] optimization skipped for ' + nv.path + ':', e && e.message || e);
-      if (window.showToast) showToast('Optimisation vidéo échouée pour ' + (nv.path.split('/').pop()) + ' (scrub restera plus lent) — ' + (e && e.message || e), 'warn');
+      if (window.showToast) showToast(SM.t('toastVideoOptimizationFailedForSuffix') + (nv.path.split('/').pop()) + ' (scrub restera plus lent) — ' + (e && e.message || e), 'warn');
     } finally {
       delete _optimizing[nv.path];
     }
@@ -894,7 +894,7 @@
     // SYNTHETIC per-segment array with no write-back on exit at all
     // (unlike a symbol's) — a video "imported" there is discarded the
     // instant you leave regardless of whether rendering could reach it.
-    if (state.activeMontageViewId) { if (window.showToast) showToast('Impossible d’importer une vidéo à l’intérieur d’un montage — fermez-le d’abord'); return -1; }
+    if (state.activeMontageViewId) { if (window.showToast) showToast(SM.t('toastCannotImportVideoInsideMontage')); return -1; }
     var info = await open(source);
     if (window.saveAllLayerFrames) saveAllLayerFrames();
     if (window.pushUndoLayers) pushUndoLayers();
@@ -984,7 +984,7 @@
     if (window.activateUL) activateUL(idx);
     if (window.loadFrame) loadFrame(state.currentFrame);
     if (window.updateUI) updateUI();
-    if (window.showToast) showToast('Vidéo native : ' + name + ' (' + info.width + '×' + info.height + ', ' + Number(info.frame_count) + ' images) — import instantané');
+    if (window.showToast) showToast(SM.t('toastNativeVideoSuffix') + name + ' (' + info.width + '×' + info.height + ', ' + Number(info.frame_count) + SM.t('toastImagesInstantImportSuffix'));
     return idx;
   }
 
@@ -1030,9 +1030,9 @@
   // clear the per-layer sync cache (stale bytes from the OLD decode).
   async function replaceNativeVideoSource(li) {
     var ld = state.layers[li];
-    if (!ld || !ld.nativeVideo) { if (window.showToast) showToast('Pas un calque vidéo native'); return; }
-    if (ld.nativeVideo.isWeb) { if (window.showToast) showToast('Relink indisponible pour une vidéo importée sans Tauri — réimporte-la'); return; }
-    if (!tauriOk()) { if (window.showToast) showToast('Relink nécessite l’app Tauri'); return; }
+    if (!ld || !ld.nativeVideo) { if (window.showToast) showToast(SM.t('toastNotANativeVideoLayer')); return; }
+    if (ld.nativeVideo.isWeb) { if (window.showToast) showToast(SM.t('toastRelinkUnavailableNoTauri')); return; }
+    if (!tauriOk()) { if (window.showToast) showToast(SM.t('toastRelinkRequiresTauriApp')); return; }
     var path = await window.__TAURI__.dialog.open({ title: 'Relier / remplacer le fichier vidéo', multiple: false,
       filters: [{ name: 'Vidéos', extensions: ['mp4', 'mov', 'mkv', 'webm', 'avi'] }] });
     if (!path) return;
@@ -1057,7 +1057,7 @@
     if (entry) { entry.path = path; entry.name = path.split('/').pop().replace(/\.[^.]+$/, ''); if (window.SMMediaLibrary) SMMediaLibrary.reload(); }
     if (window.loadFrame) loadFrame(state.currentFrame);
     if (window.updateUI) updateUI();
-    if (window.showToast) showToast('Vidéo reliée : ' + path.split('/').pop());
+    if (window.showToast) showToast(SM.t('toastVideoRelinkedSuffix') + path.split('/').pop());
   }
 
   window.SMNativeVideo = {

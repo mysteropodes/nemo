@@ -140,7 +140,7 @@
         if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(myCodeField.value);
         else document.execCommand('copy');
       }
-      if (window.showToast) showToast('Code copié');
+      if (window.showToast) showToast(SM.t('toastCodeCopied'));
     });
     var addBtn = document.getElementById('p2p-add-contact');
     var input = document.getElementById('p2p-invite-input');
@@ -150,7 +150,7 @@
         var res = addContact(input.value);
         if (!res.ok) { if (window.showToast) showToast(res.error); return; }
         input.value = '';
-        if (window.showToast) showToast('Contact ajouté : ' + res.contact.displayName);
+        if (window.showToast) showToast(SM.t('toastContactAdded') + res.contact.displayName);
       };
       addBtn.addEventListener('click', doAdd);
       input.addEventListener('keydown', function (e) { if (e.key === 'Enter') doAdd(); });

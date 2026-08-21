@@ -874,13 +874,13 @@
     //     anyway, through shiftLayerMotionKeys).
     var hasKeySel = !!(d.keySel && d.keySel.length);
     if (altHeld && d.type === 'out') {
-      if (window.showToast) showToast('Rogner la fin ne déplace jamais les keyframes — utilise le point d\'entrée ou le corps de la barre');
+      if (window.showToast) showToast(SM.t('toastTrimEndNeverMovesKeysHint'));
     }
     var retimes = (altHeld && !hasKeySel && d.type !== 'out') ? !defaultRetimes : defaultRetimes;
     if (altHeld && !hasKeySel && d.type !== 'out' && window.showToast) {
-      showToast(retimes ? 'Keyframes déplacées avec le calque' : 'Fenêtre de visibilité seule — keyframes laissées en place');
+      showToast(retimes ? SM.t('toastKeyframesMovedWithLayerFull') : SM.t('toastVisibilityWindowOnly'));
     }
-    if (altHeld && hasKeySel && window.showToast) showToast('Keyframes sélectionnées laissées en place');
+    if (altHeld && hasKeySel && window.showToast) showToast(SM.t('toastKeyframesSelectedLeftInPlace'));
     // An explicit keyframe selection travels with the handle, whatever the
     // handle's own retime default is (2026-07-25: "il faut pouvoir bouger
     // les in/out point de calque avec les keyframes selectionnées aussi").
@@ -927,7 +927,7 @@
       }
       if (selDx && window.SMMotion && SMMotion.shiftKeySelection) {
         SMMotion.shiftKeySelection(d.keySel, selDx);
-        if (window.showToast) showToast(d.keySel.length + ' keyframe(s) déplacée(s) avec le calque');
+        if (window.showToast) showToast(d.keySel.length + SM.t('toastKeyframesMovedWithLayerSuffix'));
       }
     }
     if (retimes && window.SM && window.SM.shiftLayerFrames) {
@@ -993,7 +993,7 @@
   }
   function applyBatch(fn) {
     var items = selectedLayers();
-    if (items.length < 2) { if (window.showToast) showToast('Sélectionne au moins 2 calques'); return; }
+    if (items.length < 2) { if (window.showToast) showToast(SM.t('toastSelectAtLeast2Layers')); return; }
     if (window.pushUndo) pushUndo();
     fn(items);
     if (window.renderTimeline) renderTimeline();
@@ -1087,7 +1087,7 @@
     var sorted = _barSel.slice().sort(function (a, b) { return inPointOf(state.layers[a.li]) - inPointOf(state.layers[b.li]); });
     _barSel = sorted.filter(function (_s, i) { return i % n === 0; });
     refreshBarSelClasses();
-    if (window.showToast) showToast(_barSel.length + ' calque(s) sélectionné(s)');
+    if (window.showToast) showToast(_barSel.length + SM.t('toastLayersSelectedSuffix'));
   }
   // Selects every layer that HAS a bar row currently rendered and is NOT
   // already selected — inverts within the same universe Box Select draws
@@ -1192,7 +1192,7 @@
         if (window.renderTimeline) renderTimeline();
         if (window.loadFrame) loadFrame(state.currentFrame);
         if (window.SMEngineBridge) SMEngineBridge.renderNow();
-        if (window.showToast) showToast('Lien temporel retiré');
+        if (window.showToast) showToast(SM.t('toastTimeLinkRemoved'));
       });
       bar.appendChild(a);
     });

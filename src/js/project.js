@@ -145,7 +145,7 @@
     downloadJson((currentName||'Untitled')+'.json',json);
     markSaved(json);
     try{localStorage.setItem('nemo-auto',json);}catch(e){}
-    showToast('Téléchargé : '+currentName+'.json');
+    showToast(SM.t('toastDownloadedSuffix')+currentName+'.json');
   }
   async function saveAs(){
     if(!tauriOk()){saveAsDownload();return;}
@@ -157,7 +157,7 @@
     // to miss, and quitting right after meant silent data loss (disk full,
     // permissions, network volume gone...).
     try{await writeProjectTo(path);}
-    catch(e){showToast('ÉCHEC de la sauvegarde : '+(e&&e.message||e));throw e;}
+    catch(e){showToast(SM.t('toastSaveFailedSuffix')+(e&&e.message||e));throw e;}
     showToast('Saved: '+baseName(path));
   }
   async function save(){
@@ -165,7 +165,7 @@
     if(!currentPath){await saveAs();return;}
     saveAllLayerFrames();
     try{await writeProjectTo(currentPath);}
-    catch(e){showToast('ÉCHEC de la sauvegarde : '+(e&&e.message||e));throw e;}
+    catch(e){showToast(SM.t('toastSaveFailedSuffix')+(e&&e.message||e));throw e;}
     showToast('Saved');
   }
   async function openPath(path){
@@ -248,7 +248,7 @@
     var json=await window.__TAURI__.fs.readTextFile(path);
     window.SM.importJSON(json,true);
     ensureInitialTab();
-    showToast('Version restaurée');
+    showToast(SM.t('toastVersionRestored'));
   }
 
   function relTime(ts){
@@ -304,19 +304,19 @@
   function setSyncFolder(path){try{if(path)localStorage.setItem(syncFolderKey(),path);else localStorage.removeItem(syncFolderKey());}catch(e){}}
   function profileDir(root,profileId){return root.replace(/[\\/]+$/,'')+'/'+profileId;}
   async function chooseSyncFolder(){
-    if(!tauriOk()){showToast('Sync équipe nécessite l\'app desktop');return null;}
+    if(!tauriOk()){showToast(SM.t('toastTeamSyncRequiresDesktop'));return null;}
     var path=await window.__TAURI__.dialog.open({title:'Dossier partagé (kDrive, S3 monté, etc.)',directory:true});
     if(!path)return null;
     path=Array.isArray(path)?path[0]:path;
     setSyncFolder(path);
-    showToast('Dossier de sync configuré');
+    showToast(SM.t('toastSyncFolderConfigured'));
     return path;
   }
   function disableSync(){setSyncFolder(null);}
   async function publishToShared(){
     var root=getSyncFolder();
     if(!root){showToast('Configurez un dossier de sync d\'abord');return;}
-    if(!tauriOk()){showToast('Sync équipe nécessite l\'app desktop');return;}
+    if(!tauriOk()){showToast(SM.t('toastTeamSyncRequiresDesktop'));return;}
     saveAllLayerFrames();
     var json=window.SM.exportJSON();
     var dir=profileDir(root,state.userProfile.id);
@@ -330,8 +330,8 @@
         var victim=names.shift();
         try{await window.__TAURI__.fs.remove(dir+'/'+victim);}catch(e){}
       }
-      showToast('Publié pour l\'équipe');
-    }catch(e){console.warn('[sync] publish failed',e);showToast('Échec de la publication');}
+      showToast(SM.t('toastPublishedForTeam'));
+    }catch(e){console.warn('[sync] publish failed',e);showToast(SM.t('toastPublishFailed'));}
   }
   async function checkSharedUpdates(){
     var root=getSyncFolder();
@@ -367,7 +367,7 @@
     var data=JSON.parse(json);
     var report=window.SM.mergeRemoteSnapshot(data,{id:entry.profileId,name:entry.profileName,color:entry.profileColor});
     saveAllLayerFrames();
-    showToast('Fusion de '+entry.profileName+' : +'+report.added+' ajout(s)'+(report.conflicts?', '+report.conflicts+' conflit(s) à résoudre':''));
+    showToast('Fusion de '+entry.profileName+' : +'+report.added+' ajout(s)'+(report.conflicts?', '+report.conflicts+SM.t('toastConflictsToResolveSuffix'):''));
     return report;
   }
 
@@ -426,7 +426,7 @@
           }catch(e){
             // dialog unavailable (permission/API) — err on the side of NOT
             // losing work: block this close so the user can save manually.
-            showToast('Modifications non sauvegardées — sauvegarde avant de quitter');
+            showToast(SM.t('toastUnsavedChangesSaveBeforeQuit'));
           }
         });
       }catch(e){console.warn('[close-guard] indisponible',e);}
@@ -581,7 +581,7 @@
       try{auto=localStorage.getItem('nemo-auto');}catch(e){}
       if(auto){
         try{window.SM.importJSON(auto,true);}
-        catch(e){showToast('Impossible de reprendre la session — données corrompues');}
+        catch(e){showToast(SM.t('toastCannotResumeSessionCorrupt'));}
       }
       currentPath=null;currentName='Untitled';updateCurrentLabel();
       hideStartScreen();ensureInitialTab();showToast('Session resumed');
