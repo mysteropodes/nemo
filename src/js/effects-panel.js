@@ -177,6 +177,34 @@
     var ld = activeLayer();
     return ld ? { obj: ld, isElement: false } : null;
   }
+  // Vector-brush ribbon + linked fill companion (2026-08-21, feedback:
+  // "l'effet ne s'applique pas au fill seulement au stroke de l'objet
+  // select") — a Fill-enabled vector-brush stroke is really TWO Paper.js
+  // items (findLinkedFillCompanion's own doc comment, tools.js): the ribbon
+  // (the only one ever in selectedPaths — its companion is permanently
+  // excluded from selection, isSelectablePathChild) and the filled backdrop
+  // painted behind it. singleSelectedElement()/effectsTarget() above target
+  // selectedPaths[0] exclusively, so every mutation below was writing
+  // data.effects onto the ribbon ONLY — visually the effect appeared to
+  // "skip the fill" because the fill is a wholly separate item that never
+  // received it. Called after every mutation rather than made part of
+  // effectsTarget() itself, since that function returns BEFORE the caller
+  // actually mutates t.obj.effects.
+  function syncCompanionEffects(t) {
+    if (!t || !t.isElement || !t.item) return;
+    var layer = userLayers[state.activeLayerIdx];
+    var companion = layer && typeof findLinkedFillCompanion === 'function' ? findLinkedFillCompanion(layer, t.item) : null;
+    if (!companion) return;
+    if (!companion.data) companion.data = {};
+    // A real copy, not a shared reference — CLAUDE.md §1's "a live
+    // reference never survives save/reload" trap: serP serializes each
+    // item independently, so a shared array would desync into two
+    // silently-diverging copies the moment either side is edited again
+    // after a reload (each gets its OWN reconstructed array, no longer the
+    // same object). Called after every mutation instead, so a plain
+    // JSON clone stays correct without needing live identity.
+    companion.data.effects = JSON.parse(JSON.stringify(t.obj.effects));
+  }
 
   // Custom WGSL effects (custom-effects.js) live in state.customEffects,
   // not in the static tables above — these three helpers fall back to a
@@ -314,6 +342,7 @@
     var d = defaultsArrFor(type);
     t.obj.effects.push({ type: type, enabled: true, p1: d[0], p2: d[1], p3: d[2], p4: d[3] });
     expandedIdx = t.obj.effects.length - 1; // open the new one immediately
+    syncCompanionEffects(t);
     saveActiveLayerFrame(); renderEffectsSection(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
   }
   window.addEffectToActiveLayer = addEffect; // custom-effects.js calls this right after authoring a brand-new shader
@@ -321,6 +350,7 @@
     var t = effectsTarget(); if (!t || !t.obj.effects || !t.obj.effects[idx]) return;
     pushUndo();
     t.obj.effects[idx].enabled = !t.obj.effects[idx].enabled;
+    syncCompanionEffects(t);
     saveActiveLayerFrame(); renderEffectsSection(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
   }
   function deleteEffect(idx) {
@@ -328,6 +358,7 @@
     pushUndo();
     t.obj.effects.splice(idx, 1);
     if (expandedIdx === idx) expandedIdx = -1; else if (expandedIdx > idx) expandedIdx--;
+    syncCompanionEffects(t);
     saveActiveLayerFrame(); renderEffectsSection(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
   }
   // ---- keyable effect parameters (2026-07-25) ----
@@ -417,6 +448,7 @@
     } else {
       setParamKey(idx, key, state.currentFrame, eff[key]);
     }
+    syncCompanionEffects(t);
     saveActiveLayerFrame(); renderEffectsList();
     if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
   }
@@ -464,6 +496,7 @@
     } else {
       setParamKey(idx, key, state.currentFrame, paramValueAt(eff, key, state.currentFrame));
     }
+    syncCompanionEffects(t);
     saveActiveLayerFrame(); renderEffectsList();
     if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
   }
@@ -475,6 +508,7 @@
     // than the static value — same as dragging a keyed property in Motion.
     if (paramKeyed(eff, key)) setParamKey(idx, key, state.currentFrame, raw);
     else eff[key] = raw;
+    syncCompanionEffects(t);
     saveActiveLayerFrame(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
   }
 
