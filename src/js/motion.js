@@ -6537,9 +6537,27 @@
     // genuinely corrupted stroke data (27 strokes materializing on a frame that
     // held 2) — real, permanent data loss/corruption, not just a stale render.
     // "Scene" (exitToScene) remains the one way out of a symbol everywhere else
-    // in the app; this makes the mode toggle consistent with that instead of a
-    // silent trap.
-    if (state.activeSymbolId) { if (window.showToast) showToast('Fermez d\'abord le composant en cours d\'édition'); return; }
+    // in the app.
+    //
+    // 2026-08-21 (feedback #47, "il faudrait pouvoir le faire"): re-permitted,
+    // with the same defensive save enterSymbol/exitToScene themselves take at
+    // their own transition points. state.layers/userLayers are ALIASED to the
+    // symbol's own arrays while activeSymbolId is set (enterSymbol) — every
+    // consumer below this point (renderLayerList/renderTimeline/renderNow)
+    // reads whichever object is CURRENTLY state.layers, so it already renders
+    // the symbol's own content correctly in either mode; nothing from here to
+    // the end of this function reaches into the outer scene. The corruption
+    // this guard was built to stop traced to aliasing gaps in enterSymbol/
+    // exitToScene themselves (sym.layers/markers/motionArcs/tweenOverrides/
+    // tweenEasing/cameraKeys not written back on exit if something replaced
+    // rather than mutated them) — those were fixed in the following weeks
+    // (2026-07-25, 2026-07-30) and are unconditionally in effect by the time
+    // exitToScene runs, regardless of which mode was active while inside.
+    // saveAllLayerFrames() here is the same belt-and-suspenders enterSymbol
+    // takes on its own way in, so a save lands before the mode's own render
+    // pass runs rather than depending on some earlier caller having already
+    // flushed the live canvas into ld.frames.
+    if (state.activeSymbolId) saveAllLayerFrames();
     // Leaving Motion mode: the shared ease-curve widget (see
     // openMotionEaseEditor) may still be pointed at a motion key whose row
     // is about to disappear — fall back to the plain tween-curve view, same
