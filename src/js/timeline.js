@@ -362,7 +362,7 @@ window.SM={
     // frozen-feature gate reads). Blocks the toolbar click AND any
     // keyboard shortcut that lands on setTool('rig'), not just the button.
     if(t==='rig'&&window.SM_FROZEN_IN_DEV&&window.SM_FROZEN_IN_DEV.rig){
-      showToast('Outil Rig — en développement, pas encore disponible dans cette build');
+      showToast((window.SM&&SM.t)?SM.t('rigFrozenToast'):'Rig tool — in development, not yet available in this build');
       return;
     }
     if(t!=='select'&&t!=='subselect'&&t!=='rig')clearSel();if(t!=='fsselect')fsClearSel();if(t!=='pen'&&_pen.path)finalizePen();if(t!=='rig'&&typeof _rigDraw!=='undefined'&&_rigDraw.path&&window.SMRig)window.SMRig.finalizeRigBone();if(t!=='eraser'&&typeof _eraserCursor!=='undefined'&&_eraserCursor){_eraserCursor.remove();_eraserCursor=null;}if(t!=='select'&&window.SMSelectBridge)window.SMSelectBridge.cancelMarquee();
@@ -6573,14 +6573,14 @@ function clickEl(id){var el=document.getElementById(id);if(el)el.click();}
       {label:tt('menuFromKitsu'),id:'ctx-kitsu-open',action:function(){clickEl('btn-kitsu-open');}},
       // Nemo's own extensibility (nemo-script.js / nemo-plugin.js) — this
       // app's model in this app's vocabulary, so it ships.
-      {label:'Ouvrir un script Nemo (.js)…',id:'ctx-nemo-script',
+      {label:tt('menuOpenScript'),id:'ctx-nemo-script',
         action:function(){if(window.SMScript)SMScript.openFile();}},
-      {label:'Ouvrir un plugin Nemo (.zip)…',id:'ctx-nemo-plugin',
+      {label:tt('menuOpenPlugin'),id:'ctx-nemo-plugin',
         action:function(){if(window.SMPlugin)SMPlugin.openFile();}},
       // Duplicate canvas viewer (2026-08, AE feature audit 8.4 "New
       // Viewer") — a second panel on the same comp, independently panned/
       // zoomed and optionally locked to a frame.
-      {label:'Nouvelle vue',action:function(){if(window.SMSecondViewer)SMSecondViewer.open();}},
+      {label:tt('menuNewView'),action:function(){if(window.SMSecondViewer)SMSecondViewer.open();}},
       {label:tt('menuVersionHistory'),id:'ctx-history',action:function(){clickEl('btn-history');}},
       {sep:true},
       {label:tt('menuImportImg'),action:function(){clickEl('btn-import-img');}},
@@ -6599,7 +6599,7 @@ function clickEl(id){var el=document.getElementById(id);if(el)el.click();}
       // never exported, never baked), which is what the viewer is today.
       // Freeze (2026-08, PR #209) — see index.html's SM_FROZEN_IN_DEV registry.
       (window.SM_FROZEN_IN_DEV&&window.SM_FROZEN_IN_DEV.import3d)
-        ?{label:tt('menuImport3D')+' (en développement)',id:'ctx-import-3d',disabled:true}
+        ?{label:tt('menuImport3D')+' '+tt('inDevSuffix'),id:'ctx-import-3d',disabled:true}
         :{label:tt('menuImport3D'),id:'ctx-import-3d',action:openObjReference},
       {label:tt('menuExport'),id:'ctx-export',action:function(){clickEl('btn-export');}},
       {sep:true},

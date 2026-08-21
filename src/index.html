@@ -115,10 +115,12 @@
   <button id="app-menu-btn" data-i18n-title="menuBtn" title="Menu"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
   <div id="app-mode-switch">
     <!-- Freeze (2026-08, PR #209) — see index.html's SM_FROZEN_IN_DEV
-         registry and setAppMode's gate (motion.js). data-i18n-title dropped
-         for the same reason as the Rig tool button above (survives i18n.js's
-         re-scan) — restore data-i18n-title="modeStoryboard" when un-freezing. -->
-    <button class="app-mode-btn in-dev-locked" data-mode="storyboard" disabled title="StoryBoard — en développement, pas encore disponible dans cette build">StoryBoard<span class="in-dev-badge">en dev</span></button>
+         registry and setAppMode's gate (motion.js). Points at the freeze-
+         specific storyboardFrozenTitle key (not modeStoryboard, that's the
+         real description for once un-frozen) so this title still switches
+         language like the rest of the app instead of staying stuck in
+         French — restore data-i18n-title="modeStoryboard" when un-freezing. -->
+    <button class="app-mode-btn in-dev-locked" data-mode="storyboard" disabled data-i18n-title="storyboardFrozenTitle" title="StoryBoard — en développement, pas encore disponible dans cette build">StoryBoard<span class="in-dev-badge">en dev</span></button>
     <button class="app-mode-btn active" data-mode="anim2d" data-i18n-title="modeAnim2d" title="Animation 2D">Animation 2D</button>
     <button class="app-mode-btn" data-mode="motion" data-i18n-title="modeMotion" title="Motion — keyframes de propriétés (position/rotation/échelle/opacité), style After Effects">Motion</button>
   </div>
@@ -174,12 +176,12 @@
          (rig-bridge.js unifies both gestures behind one onDown). -->
     <!-- Freeze (2026-08, PR #209: "mettre en freeze (in Dev)" — see the
          SM_FROZEN_IN_DEV registry above and SM.setTool's gate, timeline.js).
-         `data-i18n-title` dropped deliberately so this explanatory title
-         survives i18n.js's re-scan (it overwrites `.title` from the
-         `toolRig` key on every locale switch/init, which would otherwise
-         clobber this temporary text) — restore data-i18n-title="toolRig"
+         Points at the freeze-specific rigFrozenTitle key (not toolRig,
+         that's the real tool description for once un-frozen) so this
+         title still switches language like everything else instead of
+         staying stuck in one language — restore data-i18n-title="toolRig"
          when un-freezing. -->
-    <button class="tool-btn in-dev-locked" data-tool="rig" disabled title="Rig — en développement, pas encore disponible dans cette build"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="19" r="2.2" fill="currentColor" stroke="none"/><circle cx="12" cy="10" r="2.2" fill="currentColor" stroke="none"/><circle cx="19" cy="5" r="2.2" fill="currentColor" stroke="none"/><path d="M6.6 17.4 10.4 11.6M13.6 8.4 17.4 6.6"/></svg></button>
+    <button class="tool-btn in-dev-locked" data-tool="rig" disabled data-i18n-title="rigFrozenTitle" title="Rig — en développement, pas encore disponible dans cette build"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="19" r="2.2" fill="currentColor" stroke="none"/><circle cx="12" cy="10" r="2.2" fill="currentColor" stroke="none"/><circle cx="19" cy="5" r="2.2" fill="currentColor" stroke="none"/><path d="M6.6 17.4 10.4 11.6M13.6 8.4 17.4 6.6"/></svg></button>
     <!-- Missing separator (feedback 2026-07) — freehand painting tools
          (Draw/Pen/Fill brush) and geometric shape tools (Line/Rect/
          Ellipse) read as one undifferentiated group without this; Text

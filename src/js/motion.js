@@ -6485,7 +6485,7 @@
     // (nemo-script.js) all get the same refusal instead of three separate
     // gates that could drift out of sync.
     if (mode === 'storyboard' && window.SM_FROZEN_IN_DEV && window.SM_FROZEN_IN_DEV.storyboard) {
-      if (window.showToast) showToast('StoryBoard — en développement, pas encore disponible dans cette build');
+      if (window.showToast) showToast((window.SM&&SM.t)?SM.t('storyboardFrozenToast'):'StoryBoard — in development, not yet available in this build');
       return;
     }
     // Every other risky action while inside a Component (convertLayerToComponent,
