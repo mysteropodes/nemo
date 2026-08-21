@@ -15,6 +15,10 @@
 // picks up _pen.path's live segments same as any other layer content).
 (function () {
   var draggingHandle = false;
+  // Set only by the Alt+drag-on-an-existing-anchor gesture below — tells
+  // onMove to reshape THAT stored segment instead of the path's own
+  // lastSegment (the normal placement-drag target). Cleared in onUp.
+  var reshapingSeg = null;
 
   function shouldIntercept() {
     return (
@@ -30,6 +34,31 @@
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
     var pt = new Point(w[0], w[1]);
     var layer = userLayers[state.activeLayerIdx];
+
+    // Alt+drag directly on an ALREADY-PLACED anchor of the in-progress path
+    // reshapes that anchor's outgoing tangent handle without switching to
+    // Subselect first — the standard Illustrator/AE Pen convention for
+    // going back and adjusting an earlier point's curve mid-path (feedback
+    // #38, "on voit les vecteurs et tangentes... [ça devrait fonctionner]
+    // comme dans n'importe quel soft de vecto"). Distinct from the
+    // pre-existing Alt behavior in onMove (breaking a JUST-dragged handle's
+    // symmetry while placing a brand new anchor) — this one targets an
+    // anchor by PROXIMITY, gated on _pen.path already existing, so it never
+    // fires on the very first click of a fresh path.
+    if (_pen.path && e.altKey) {
+      var rTol = 10 / view.zoom, rBestD = rTol, rBestSeg = null;
+      _pen.path.segments.forEach(function (s) {
+        var d = pt.getDistance(s.point);
+        if (d < rBestD) { rBestD = d; rBestSeg = s; }
+      });
+      if (rBestSeg) {
+        reshapingSeg = rBestSeg;
+        draggingHandle = true;
+        window.SMEngineBridge.suspend();
+        window.SMEngineBridge.renderNow();
+        return;
+      }
+    }
 
     var now = Date.now();
     var isDoubleClick = _pen.path && (now - _pen.lastClickTime < 350) && _pen.lastClickPt && pt.getDistance(_pen.lastClickPt) < 10 / view.zoom;
@@ -116,7 +145,7 @@
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
     window.SMEngineBridge.setPenPreview(w);
     if (draggingHandle && _pen.path) {
-      var seg = _pen.path.lastSegment;
+      var seg = reshapingSeg || _pen.path.lastSegment;
       var pt = new Point(w[0], w[1]);
       var delta = pt.subtract(seg.point);
       seg.handleOut = delta;
@@ -126,6 +155,11 @@
       // without switching tools. Same idiom subselect-bridge.js already
       // uses for editing handles after the fact; the Pen tool's own live
       // drag never had it.
+      // reshapingSeg's whole gesture is held under Alt from mousedown (see
+      // onDown), so this is always false there — correct: reshaping an
+      // already-placed anchor only pulls its OUT tangent, leaving whatever
+      // IN handle it already had untouched, rather than yanking a curve
+      // that was already committed on the other side.
       if (!e.altKey) seg.handleIn = delta.multiply(-1);
     }
     window.SMEngineBridge.renderNow();
@@ -147,6 +181,7 @@
     e.stopImmediatePropagation();
     e.preventDefault();
     draggingHandle = false;
+    reshapingSeg = null;
     window.SMEngineBridge.resume();
     window.SMEngineBridge.renderNow();
   }
