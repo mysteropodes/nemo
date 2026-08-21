@@ -6479,6 +6479,15 @@
   // ---- mode switching ----
   function setAppMode(mode) {
     if (state.appMode === mode) return;
+    // StoryBoard freeze (2026-08, PR #209: "il faudrait mettre en freeze
+    // (in Dev) StoryBoard") — single choke point so the button click,
+    // any keyboard shortcut, and the Nemo scripting API's SMMotion.setAppMode
+    // (nemo-script.js) all get the same refusal instead of three separate
+    // gates that could drift out of sync.
+    if (mode === 'storyboard' && window.SM_FROZEN_IN_DEV && window.SM_FROZEN_IN_DEV.storyboard) {
+      if (window.showToast) showToast('StoryBoard — en développement, pas encore disponible dans cette build');
+      return;
+    }
     // Every other risky action while inside a Component (convertLayerToComponent,
     // mergeLayersIntoOne, splitLayerIntoElements, enterSymbol itself, etc. — app.js
     // lines 2276/2318/2410/2651/2674/2699/2741/2806/2896/2942) refuses with this

@@ -114,7 +114,11 @@
 <div id="app-topbar">
   <button id="app-menu-btn" data-i18n-title="menuBtn" title="Menu"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
   <div id="app-mode-switch">
-    <button class="app-mode-btn" data-mode="storyboard" data-i18n-title="modeStoryboard" title="StoryBoard — montage nodal : instances de composants, montages, son">StoryBoard</button>
+    <!-- Freeze (2026-08, PR #209) — see index.html's SM_FROZEN_IN_DEV
+         registry and setAppMode's gate (motion.js). data-i18n-title dropped
+         for the same reason as the Rig tool button above (survives i18n.js's
+         re-scan) — restore data-i18n-title="modeStoryboard" when un-freezing. -->
+    <button class="app-mode-btn in-dev-locked" data-mode="storyboard" disabled title="StoryBoard — en développement, pas encore disponible dans cette build">StoryBoard<span class="in-dev-badge">en dev</span></button>
     <button class="app-mode-btn active" data-mode="anim2d" data-i18n-title="modeAnim2d" title="Animation 2D">Animation 2D</button>
     <button class="app-mode-btn" data-mode="motion" data-i18n-title="modeMotion" title="Motion — keyframes de propriétés (position/rotation/échelle/opacité), style After Effects">Motion</button>
   </div>
@@ -168,7 +172,14 @@
          click-drag=curve handle, chainable), rendered live while the tool
          is active; dragging an existing bone anchor poses it instead
          (rig-bridge.js unifies both gestures behind one onDown). -->
-    <button class="tool-btn" data-tool="rig" data-i18n-title="toolRig" title="Rig — 3 steps in the panel: 1. Dessiner (click=anchor, drag=curve) 2. Assigner (link shapes to bones) 3. Déplacer (drag an anchor to pose). (S in Animation 2D — Motion mode reserves S for Scale)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="19" r="2.2" fill="currentColor" stroke="none"/><circle cx="12" cy="10" r="2.2" fill="currentColor" stroke="none"/><circle cx="19" cy="5" r="2.2" fill="currentColor" stroke="none"/><path d="M6.6 17.4 10.4 11.6M13.6 8.4 17.4 6.6"/></svg><span class="sk">S</span></button>
+    <!-- Freeze (2026-08, PR #209: "mettre en freeze (in Dev)" — see the
+         SM_FROZEN_IN_DEV registry above and SM.setTool's gate, timeline.js).
+         `data-i18n-title` dropped deliberately so this explanatory title
+         survives i18n.js's re-scan (it overwrites `.title` from the
+         `toolRig` key on every locale switch/init, which would otherwise
+         clobber this temporary text) — restore data-i18n-title="toolRig"
+         when un-freezing. -->
+    <button class="tool-btn in-dev-locked" data-tool="rig" disabled title="Rig — en développement, pas encore disponible dans cette build"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="19" r="2.2" fill="currentColor" stroke="none"/><circle cx="12" cy="10" r="2.2" fill="currentColor" stroke="none"/><circle cx="19" cy="5" r="2.2" fill="currentColor" stroke="none"/><path d="M6.6 17.4 10.4 11.6M13.6 8.4 17.4 6.6"/></svg></button>
     <!-- Missing separator (feedback 2026-07) — freehand painting tools
          (Draw/Pen/Fill brush) and geometric shape tools (Line/Rect/
          Ellipse) read as one undifferentiated group without this; Text
@@ -1740,7 +1751,14 @@
 </div>
 <div id="toast"></div>
 
-
+<!-- Freeze registry (2026-08, PR #209: "mettre en freeze (in Dev)" Rig /
+     StoryBoard / import 3D obj) — inline and first so it's defined before
+     ANY other script runs, regardless of future load-order changes. A
+     single flat map instead of three separate booleans scattered across
+     files: every gate (SM.setTool for Rig, timeline.js; setAppMode for
+     StoryBoard, motion.js; the ctx-import-3d menu row, timeline.js) reads
+     the SAME source, so un-freezing a feature later is one line here. -->
+<script>window.SM_FROZEN_IN_DEV={rig:true,storyboard:true,import3d:true};</script>
 <script src="js/ui.js"></script>
 <script src="js/color-picker.js"></script>
 <script src="js/app.js"></script>

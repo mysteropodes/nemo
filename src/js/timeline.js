@@ -357,6 +357,14 @@ window.SM={
       showToast('Profil "Producteur" : lecture seule + commentaires');
       return;
     }
+    // Rig freeze (2026-08, PR #209: "mettre en freeze (in Dev)" — see
+    // index.html's SM_FROZEN_IN_DEV registry, the single source every
+    // frozen-feature gate reads). Blocks the toolbar click AND any
+    // keyboard shortcut that lands on setTool('rig'), not just the button.
+    if(t==='rig'&&window.SM_FROZEN_IN_DEV&&window.SM_FROZEN_IN_DEV.rig){
+      showToast('Outil Rig — en développement, pas encore disponible dans cette build');
+      return;
+    }
     if(t!=='select'&&t!=='subselect'&&t!=='rig')clearSel();if(t!=='fsselect')fsClearSel();if(t!=='pen'&&_pen.path)finalizePen();if(t!=='rig'&&typeof _rigDraw!=='undefined'&&_rigDraw.path&&window.SMRig)window.SMRig.finalizeRigBone();if(t!=='eraser'&&typeof _eraserCursor!=='undefined'&&_eraserCursor){_eraserCursor.remove();_eraserCursor=null;}if(t!=='select'&&window.SMSelectBridge)window.SMSelectBridge.cancelMarquee();
     // Picking a tool always means "I'm done with the timeline frame
     // selection" — leaving it selected made the status bar keep showing
@@ -6585,7 +6593,10 @@ function clickEl(id){var el=document.getElementById(id);if(el)el.click();}
       // only the two bundled CC0 models were ever reachable. This is that
       // missing entry point. It stays a REFERENCE (an overlay you draw from,
       // never exported, never baked), which is what the viewer is today.
-      {label:tt('menuImport3D'),id:'ctx-import-3d',action:openObjReference},
+      // Freeze (2026-08, PR #209) — see index.html's SM_FROZEN_IN_DEV registry.
+      (window.SM_FROZEN_IN_DEV&&window.SM_FROZEN_IN_DEV.import3d)
+        ?{label:tt('menuImport3D')+' (en développement)',id:'ctx-import-3d',disabled:true}
+        :{label:tt('menuImport3D'),id:'ctx-import-3d',action:openObjReference},
       {label:tt('menuExport'),id:'ctx-export',action:function(){clickEl('btn-export');}},
       {sep:true},
       {label:tt('menuSettings'),action:function(){clickEl('btn-settings');}},

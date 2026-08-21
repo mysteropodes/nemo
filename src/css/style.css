@@ -74,6 +74,17 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--gutter);color:
 .app-mode-btn:hover:not(:disabled){color:var(--text);}
 .app-mode-btn.active{background:var(--panel3);color:var(--text);}
 .app-mode-btn:disabled{color:var(--text-dark);cursor:default;}
+/* Freeze badge (2026-08, PR #209 — Rig/StoryBoard/import 3D "in Dev"):
+   small amber pill, reused on both the text mode-switch button and the
+   icon-only toolbar button (.tool-btn.in-dev-locked gets it via ::after
+   since it has no room for inline text). */
+.in-dev-badge{display:inline-block;margin-left:5px;padding:1px 5px;border-radius:8px;
+  font-size:8px;font-weight:700;letter-spacing:.02em;text-transform:uppercase;
+  background:rgba(255,180,60,.18);color:#ffb43c;vertical-align:1px;}
+.tool-btn.in-dev-locked{opacity:.45;cursor:default;}
+.tool-btn.in-dev-locked::after{content:'dev';position:absolute;bottom:-1px;right:-1px;
+  padding:0 3px;border-radius:4px;font-size:6px;font-weight:700;line-height:1.3;
+  background:rgba(255,180,60,.85);color:#1a1206;pointer-events:none;}
 #app-topbar-spacer{flex:1;min-width:8px;}
 /* macOS overlay titlebar (tauri.conf.json's titleBarStyle:"Overlay") — the
    native traffic lights float over our content at macOS's own default
