@@ -3669,7 +3669,16 @@
       // showing Éléments here lets a single shape inside a placed
       // instance be animated right from the Scene view, without needing
       // to double-click all the way into the component first.
-      renderElementsList(list, li, ld);
+      //
+      // Gated on the MANUAL accordion specifically (_motionExpandedLayer),
+      // not the broader `expanded` (isLayerExpanded also returns true for
+      // a property-shortcut reveal set, _motionRevealedLayers) — P/U/S/etc
+      // (handlePropShortcut/handleRevealAnimatedShortcut) are meant to
+      // reveal a layer's own Transform properties, not cascade into every
+      // element's breakdown too (feedback #42, "il ne faut pas afficher
+      // éléments"). A real row click still shows elements exactly as
+      // before — this only narrows what a SHORTCUT-driven reveal shows.
+      if (window._motionExpandedLayer === li) renderElementsList(list, li, ld);
     });
     // Right-panel mirror of the active layer's Transform group ("il
     // faudrait afficher les properties d'un calque sélectionné et la
@@ -5398,7 +5407,13 @@
       // layers; a group-header node's `.strokeId` is undefined so it can
       // never match _motionExpandedElement and never expands here — group
       // rows have no per-group Transform in this pass).
-      var els = buildShapeTree(li, ld);
+      // Same narrowing as renderLayerListMotion's own renderElementsList
+      // gate just above (feedback #42) — a property-shortcut reveal
+      // (_motionRevealedLayers, part of `expanded` via isLayerExpanded)
+      // must not pull in the per-element tree here either, or this side
+      // renders MORE rows than the panel for the exact same layer, which
+      // is precisely the row-count divergence CLAUDE.md §11 warns about.
+      var els = (window._motionExpandedLayer === li) ? buildShapeTree(li, ld) : [];
       if (els.length) {
         var elHdrSpacer = document.createElement('div'); elHdrSpacer.className = 'frow motion-group-row';
         grid.appendChild(elHdrSpacer);
