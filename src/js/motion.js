@@ -2578,7 +2578,7 @@
     // renders. unifiedMotionTargets/buildUnifiedOverlay already summed
     // position deltas onto a centroid the same delta-aware way — this
     // brings the single-target view in line with it.
-    var pvx = ax, pvy = ay;
+    var pvx = aw.x, pvy = aw.y;
     var track = holder.motion.position;
     var ks = track.keys;
     for (var i = 0; i < ks.length - 1; i++) {
