@@ -152,8 +152,25 @@
   function lsWriteAll(list) { localStorage.setItem(lsKey(), JSON.stringify(list)); }
 
   var _devServerChecked = null;
+  // Only scripts/dev_server.py implements /__feedback/* — a plain
+  // `python -m http.server` (every other local preview in this codebase)
+  // and any REAL deployment (feedback #33: nemo-editor.mysteropodes-auth.
+  // workers.dev, a Cloudflare Worker with no such route) both 404 on it.
+  // fetch() only REJECTS on a network-level failure, not on a non-2xx
+  // status — the try/catch below already handled the 404 fine logically
+  // (r.ok=false → same fallback to localStorage), but Chrome logs any
+  // non-2xx request to the console regardless of whether JS catches it,
+  // which is what actually got reported ("j'ai cette erreur dans la
+  // console"). Cheapest fix: never issue the probe outside an actual
+  // local-dev hostname, where dev_server.py is the only thing that could
+  // possibly be listening.
+  function isLocalDevHost() {
+    var h = location.hostname;
+    return h === 'localhost' || h === '127.0.0.1' || h === '';
+  }
   async function devServerAvailable() {
     if (tauriOk()) return false; // Tauri always wins when present, dev server is browser-preview-only
+    if (!isLocalDevHost()) return false;
     if (_devServerChecked !== null) return _devServerChecked;
     try {
       var r = await fetch('/__feedback/ping');
