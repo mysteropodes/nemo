@@ -1109,7 +1109,7 @@
       stabilizerTitle:'Lisse la POSITION en direct pendant que tu dessines (corrige le tremblement de la main) — agit AVANT que le trait soit posé, indépendamment de Smooth ci-dessous. Off/Low/Medium/High : moyenne glissante classique. Plume : modèle physique ressort-amortisseur (Google ink-stroke-modeler, comme rnote), rattrape la pointe au relâcher. Mets ça sur Off si tu veux un tracé qui suit ta main au pixel près.',
       startKitsuSub:'Se connecter à la production (async, pas de temps réel)',
       startKitsuTitle:'Ouvrir depuis Kitsu…',
-      startNewSub:'Choose canvas size &amp; frame rate',
+      startNewSub:'Choisir la taille du canevas et la fréquence d\'images',
       startNewTitle:'Nouveau projet',
       startOpenSub:'Parcourir pour un fichier projet .json',
       startOpenTitle:'Ouvrir un projet…',
