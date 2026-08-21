@@ -307,7 +307,7 @@
       });
     }
     var coordsEl=document.getElementById('curve-coords');
-    if(coordsEl)coordsEl.textContent=isMotionMode()?motionEaseLabel:(isTweenMode()?tweenEaseLabel:(pts.length+' '+SM.t('curvePointsSuffix')));
+    if(coordsEl)coordsEl.textContent=isMotionMode()?motionEaseLabel:(isTweenMode()?tweenEaseLabel:(pts.length+' '+(window.SM&&window.SM.t?window.SM.t('curvePointsSuffix'):'points')));
   }
   function drawH(nx,ny,c,yr,r){ctx.beginPath();ctx.arc(tX(nx),tY(ny,yr),r,0,Math.PI*2);ctx.fillStyle=c;ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.stroke();}
   function hitT(mx,my){
