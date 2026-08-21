@@ -491,6 +491,16 @@ window.SM={
           var peak=0;cs.forEach(function(s){if((s.width||0)>peak)peak=s.width||0;});
           var ratio=peak>0?v/peak:1;
           cs.forEach(function(s){s.width=(s.width||v)*ratio;});
+          // 2026-08-21 fix (feedback #34, "tous les paramètres stroke ne
+          // fonctionnent pas") — the rescale above was a near-total no-op
+          // on an ALREADY-DRAWN stroke: rebuildVectorBrushOutline prefers
+          // the dense data.widthProfile (via widthAtFrac) over these sparse
+          // centerSegments[i].width values, only falling back to the
+          // latter when a fraction genuinely has no profile coverage —
+          // which for a real profile is essentially never. Scaling only
+          // centerSegments left the profile — the value that actually
+          // renders — untouched, so dragging Width visibly did nothing.
+          if(p.data.widthProfile)p.data.widthProfile.forEach(function(pt){pt.width=(pt.width||v)*ratio;});
           rebuildVectorBrushOutline(p);
         }else{
           p.strokeWidth=v;applyStrokeStyle(p);
@@ -2672,6 +2682,32 @@ function updateSelPropsPanel(){
         paintIconGroup('p-paintorder-grp',state.paintOrder);syncMiterLimitEnabled();
         document.getElementById('p-miterlimit').value=state.miterLimit;
         document.getElementById('p-dashoffset').value=state.dashOffset;
+      }
+      // Stroke Width staleness fix (2026-08-21, feedback #34: "tous les
+      // paramètres stroke ne fonctionnent pas pour modifié la stroke") —
+      // #p-sw only ever showed state.brushSize (the tool default queued for
+      // the NEXT new stroke), never refreshed to reflect the item actually
+      // selected — same staleness bug the Cap/Join/Miter/Dash block above
+      // already fixes for its own fields, just missing here. For a vector-
+      // brush ribbon the visible width is the widthProfile's PEAK, not the
+      // thin 2-3px Bezier-fit ref.strokeWidth the underlying Path carries
+      // (see setBrushSize's own identical "peak as the current-size
+      // baseline" ratio logic, a few dozen lines up in this file) — showing
+      // that thin number meant editing Width started from a baseline with
+      // no relationship to what was actually on screen, so nothing visible
+      // seemed to happen until the value happened to cross it.
+      var swField=document.getElementById('p-sw');
+      if(swField){
+        var vbCs=ref.data&&ref.data.isVectorBrush&&ref.data.centerSegments;
+        var swVal;
+        if(vbCs){
+          var peakW=0;vbCs.forEach(function(s){if((s.width||0)>peakW)peakW=s.width||0;});
+          swVal=peakW||state.brushSize;
+        }else{
+          swVal=ref.strokeWidth||state.brushSize;
+        }
+        state.brushSize=swVal;
+        swField.value=Math.round(swVal);
       }
       // Bitmap Brush panel staleness fix — same "reflect the selection,
       // don't leave the tool-default stale" convention as Fill/Stroke/Cap
