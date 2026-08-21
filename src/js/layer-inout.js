@@ -512,7 +512,8 @@
         // moves each member according to ITS OWN part instead of forcing
         // every member to follow whichever single handle was physically
         // grabbed to start the gesture.
-        return { li: s.li, row: mrow, origIn: inPointOf(mld), origOut: outPointOf(mld), part: s.part || 'both' };
+        var mOrigIn = inPointOf(mld), mOrigOut = outPointOf(mld);
+        return { li: s.li, row: mrow, origIn: mOrigIn, origOut: mOrigOut, part: s.part || 'both', lastIn: mOrigIn, lastOut: mOrigOut };
       }).filter(Boolean);
       // pressLi: which bar was actually clicked, kept alongside the group so
       // a plain (no-modifier, no-move) click can narrow the selection down
@@ -582,12 +583,23 @@
         var p = m.part || 'both';
         if (p === 'in') inMembers.push(m); else if (p === 'out') outMembers.push(m); else bothMembersM.push(m);
       });
+      // Same "only rebuild when a value actually changed" gate the single-
+      // bar branch below already has (2026-07-28 fix) — this group branch
+      // never got it, so dragging a marquee of several in/out points ran a
+      // full loadFrame+engine render on EVERY mousemove regardless of
+      // whether frame-quantised dx had actually moved any member since the
+      // last event (feedback #39, "manque de fluidité... en sélection de
+      // plusieurs out point en même temps"). Tracked per-member (m.lastIn/
+      // lastOut) rather than one shared flag, since clamping can make
+      // members stop moving at different times as the drag nears an edge.
+      var anyChanged = false;
       inMembers.forEach(function (m) {
         var mld = state.layers[m.li]; if (!mld) return;
         var mNewIn = Math.max(0, Math.min(m.origIn + dx, m.origOut - 1));
         if (!trySetLinkedEdge(mld, 'in', mNewIn)) mld.inPoint = mNewIn;
         updateBar(m.row, m.li);
         updateLinkedChildrenBars(m.li);
+        if (mld.inPoint !== m.lastIn) { m.lastIn = mld.inPoint; anyChanged = true; }
       });
       outMembers.forEach(function (m) {
         var mld = state.layers[m.li]; if (!mld) return;
@@ -595,6 +607,7 @@
         if (!trySetLinkedEdge(mld, 'out', mNewOut)) mld.outPoint = mNewOut;
         updateBar(m.row, m.li);
         updateLinkedChildrenBars(m.li);
+        if (mld.outPoint !== m.lastOut) { m.lastOut = mld.outPoint; anyChanged = true; }
       });
       if (bothMembersM.length) {
         // CLAMP the group's shift to what every member can absorb, rather
@@ -626,6 +639,8 @@
           if (!mOutHandled) mld.outPoint = m.origOut + gdx;
           updateBar(m.row, m.li);
           updateLinkedChildrenBars(m.li);
+          if (mld.inPoint !== m.lastIn) { m.lastIn = mld.inPoint; anyChanged = true; }
+          if (mld.outPoint !== m.lastOut) { m.lastOut = mld.outPoint; anyChanged = true; }
         });
       }
       // Live keyframe preview — one shared selDx read off the first member
@@ -651,8 +666,10 @@
           livePreviewLayerKeys(m.li, m.part || 'both', mld, m.origIn, e.altKey);
         });
       }
-      if (window.loadFrame) loadFrame(state.currentFrame);
-      if (window.SMEngineBridge) SMEngineBridge.renderNow();
+      if (anyChanged) {
+        if (window.loadFrame) loadFrame(state.currentFrame);
+        if (window.SMEngineBridge) SMEngineBridge.renderNow();
+      }
       return;
     }
     var ld = state.layers[_drag.li]; if (!ld) { _drag = null; return; }

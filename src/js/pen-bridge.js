@@ -15,6 +15,11 @@
 // picks up _pen.path's live segments same as any other layer content).
 (function () {
   var draggingHandle = false;
+  // Set only by the Alt+drag-on-an-existing-anchor gesture below — tells
+  // onMove to reshape THAT stored segment instead of the path's own
+  // lastSegment (the normal placement-drag target). Cleared in onUp.
+  var reshapingSeg = null;
+  var canvasEl = null; // set in init(), read by the cursor-affordance hover check in onMove
 
   function shouldIntercept() {
     return (
@@ -31,6 +36,31 @@
     var pt = new Point(w[0], w[1]);
     var layer = userLayers[state.activeLayerIdx];
 
+    // Alt+drag directly on an ALREADY-PLACED anchor of the in-progress path
+    // reshapes that anchor's outgoing tangent handle without switching to
+    // Subselect first — the standard Illustrator/AE Pen convention for
+    // going back and adjusting an earlier point's curve mid-path (feedback
+    // #38, "on voit les vecteurs et tangentes... [ça devrait fonctionner]
+    // comme dans n'importe quel soft de vecto"). Distinct from the
+    // pre-existing Alt behavior in onMove (breaking a JUST-dragged handle's
+    // symmetry while placing a brand new anchor) — this one targets an
+    // anchor by PROXIMITY, gated on _pen.path already existing, so it never
+    // fires on the very first click of a fresh path.
+    if (_pen.path && e.altKey) {
+      var rTol = 10 / view.zoom, rBestD = rTol, rBestSeg = null;
+      _pen.path.segments.forEach(function (s) {
+        var d = pt.getDistance(s.point);
+        if (d < rBestD) { rBestD = d; rBestSeg = s; }
+      });
+      if (rBestSeg) {
+        reshapingSeg = rBestSeg;
+        draggingHandle = true;
+        window.SMEngineBridge.suspend();
+        window.SMEngineBridge.renderNow();
+        return;
+      }
+    }
+
     var now = Date.now();
     var isDoubleClick = _pen.path && (now - _pen.lastClickTime < 350) && _pen.lastClickPt && pt.getDistance(_pen.lastClickPt) < 10 / view.zoom;
     _pen.lastClickTime = now;
@@ -38,6 +68,7 @@
 
     if (isDoubleClick) {
       finalizePen();
+      if (canvasEl) canvasEl.style.cursor = 'crosshair'; // undo any lingering hover-affordance cursor (pointer/grab) from just before finishing
       window.SMEngineBridge.renderNow();
       return;
     }
@@ -116,7 +147,7 @@
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
     window.SMEngineBridge.setPenPreview(w);
     if (draggingHandle && _pen.path) {
-      var seg = _pen.path.lastSegment;
+      var seg = reshapingSeg || _pen.path.lastSegment;
       var pt = new Point(w[0], w[1]);
       var delta = pt.subtract(seg.point);
       seg.handleOut = delta;
@@ -126,7 +157,32 @@
       // without switching tools. Same idiom subselect-bridge.js already
       // uses for editing handles after the fact; the Pen tool's own live
       // drag never had it.
+      // reshapingSeg's whole gesture is held under Alt from mousedown (see
+      // onDown), so this is always false there — correct: reshaping an
+      // already-placed anchor only pulls its OUT tangent, leaving whatever
+      // IN handle it already had untouched, rather than yanking a curve
+      // that was already committed on the other side.
       if (!e.altKey) seg.handleIn = delta.multiply(-1);
+    } else if (_pen.path && canvasEl) {
+      // Cursor affordances (feedback #38) — the same two hints every vector
+      // app gives before you commit to a click: hovering back near the
+      // start of an open, closeable path previews that clicking here closes
+      // it (mirrors the actual hit-test in onDown, 10/view.zoom); Alt
+      // hovering an existing anchor previews the reshape-drag added above.
+      // Both are dynamic overrides of the tool's normal static cursor
+      // (SM.setTool's cc['pen']='crosshair'), so anything that doesn't
+      // match falls back to that same default rather than getting stuck.
+      var pt = new Point(w[0], w[1]);
+      var tol = 10 / view.zoom;
+      var nearAnchor = false;
+      if (e.altKey) {
+        for (var ci = 0; ci < _pen.path.segments.length; ci++) {
+          if (pt.getDistance(_pen.path.segments[ci].point) < tol) { nearAnchor = true; break; }
+        }
+      }
+      var nearStart = !e.altKey && !_pen.path.closed && _pen.path.segments.length > 1 &&
+        pt.getDistance(_pen.path.firstSegment.point) < tol;
+      canvasEl.style.cursor = nearAnchor ? 'grab' : (nearStart ? 'pointer' : 'crosshair');
     }
     window.SMEngineBridge.renderNow();
   }
@@ -147,12 +203,14 @@
     e.stopImmediatePropagation();
     e.preventDefault();
     draggingHandle = false;
+    reshapingSeg = null;
     window.SMEngineBridge.resume();
     window.SMEngineBridge.renderNow();
   }
 
   function init() {
     var target = document.getElementById('canvas-area') || document.getElementById('drawing-canvas');
+    canvasEl = target;
     target.addEventListener('pointerdown', onDown, { capture: true });
     target.addEventListener('pointermove', onMove, { capture: true });
     target.addEventListener('pointerup', onUp, { capture: true });

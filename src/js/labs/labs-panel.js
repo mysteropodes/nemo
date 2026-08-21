@@ -349,11 +349,16 @@
       },
     },
     {
-      name: 'vector-trim', label: 'Gomme vectorielle aux intersections',
+      name: 'vector-trim', label: 'Couteau vectoriel aux intersections',
       build: function (row) {
-        var btn = mkBtn('Couper au curseur');
-        btn.title = 'Positionne le curseur sur le trait à couper, puis clique ce bouton';
-        btn.addEventListener('click', function () { window.SMLabs.trimAtPointer(); });
+        var btn = mkBtn(window.SMLabs.isKnifeTrimActive() ? 'Couteau : activé' : 'Activer le couteau');
+        btn.classList.toggle('ac', window.SMLabs.isKnifeTrimActive());
+        btn.title = 'Une fois activé : glisse un trait à travers une ou plusieurs lignes du dessin pour les couper à leurs intersections les plus proches';
+        btn.addEventListener('click', function () {
+          window.SMLabs.setKnifeTrimActive(!window.SMLabs.isKnifeTrimActive());
+          btn.textContent = window.SMLabs.isKnifeTrimActive() ? 'Couteau : activé' : 'Activer le couteau';
+          btn.classList.toggle('ac', window.SMLabs.isKnifeTrimActive());
+        });
         row.appendChild(btn);
       },
     },

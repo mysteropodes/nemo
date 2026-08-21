@@ -629,6 +629,7 @@ function serP(p){var isVB=!!(p.data&&p.data.isVectorBrush);var center=isVB&&p.da
   textColor:(p.data&&p.data.isTextRoot)?p.data.color:undefined,
   textAlign:(p.data&&p.data.isTextRoot)?p.data.align:undefined,
   textFixedWidth:(p.data&&p.data.isTextRoot&&p.data.fixedWidth)?p.data.fixedWidth:undefined,
+  anchorTopLeft:(p.data&&p.data.isTextRoot&&p.data.anchorTopLeft)?{x:p.data.anchorTopLeft.x,y:p.data.anchorTopLeft.y}:undefined,
   // Vector mask (2026-08, AE-style "Mask") — see engine-bridge.js's
   // buildSceneJson mask-extraction comment for how these three drive the
   // engine's clip. §1 consumer check: buildSceneJson reads them (done),
@@ -682,7 +683,7 @@ function desP(d,layer,op){var prev=project.activeLayer;layer.activate();var p=ne
   // live object here for its per-clone 3D projector cache — the one real,
   // current consumer.
   if(d.dupCloneId)p.data.dupCloneId=d.dupCloneId;if(d.dup3D)p.data.dup3D=d.dup3D;
-  if(d.isTextRoot){p.data.isTextRoot=true;p.data.text=d.text||'';p.data.vectorFont=d.vectorFont||'Roboto-Regular';p.data.size=d.textSize||48;p.data.color=d.textColor||'#000000';p.data.align=d.textAlign||'left';if(d.textFixedWidth)p.data.fixedWidth=d.textFixedWidth;}
+  if(d.isTextRoot){p.data.isTextRoot=true;p.data.text=d.text||'';p.data.vectorFont=d.vectorFont||'Roboto-Regular';p.data.size=d.textSize||48;p.data.color=d.textColor||'#000000';p.data.align=d.textAlign||'left';if(d.textFixedWidth)p.data.fixedWidth=d.textFixedWidth;if(d.anchorTopLeft)p.data.anchorTopLeft={x:d.anchorTopLeft.x,y:d.anchorTopLeft.y};}
   if(d.isMask){p.data.isMask=true;p.data.maskMode=d.maskMode||'add';if(d.maskFeather)p.data.maskFeather=d.maskFeather;}
   if(d.strokeGradientAlongPath)p.data.strokeGradientAlongPath=d.strokeGradientAlongPath;
   // Retained-path stamp (engine-bridge.js, 2026-07-28): the stored stroke
