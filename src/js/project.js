@@ -409,7 +409,19 @@
               {title:'Modifications non sauvegardées',kind:'warning',okLabel:'Quitter sans sauvegarder',cancelLabel:'Annuler'});
             if(leave){
               allowConfirmedClose=true;
-              await appWindow.close();
+              // destroy(), not close() (feedback #27, "quand on fait quitter
+              // sans sauvegarder ne quitte pas l'app"): close() re-issues a
+              // FRESH CloseRequested event (the comment above already knew
+              // this — that's the whole reason allowConfirmedClose exists),
+              // so the app's actual exit depends on that second event being
+              // dispatched, caught by this same listener, and let through —
+              // one more asynchronous round trip that can silently swallow
+              // the close. destroy() skips the event loop entirely and forces
+              // the window closed immediately, which is Tauri's own
+              // documented pattern for exactly this "confirm then really
+              // close" flow. core:window:allow-destroy was already granted
+              // in capabilities/default.json — just never actually called.
+              await appWindow.destroy();
             }
           }catch(e){
             // dialog unavailable (permission/API) — err on the side of NOT
