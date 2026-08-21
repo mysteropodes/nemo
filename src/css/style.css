@@ -419,7 +419,16 @@ body.tools-docked-away #tools-panel-resize{display:none;}
    editing its base rule directly is exactly as scoped as an explicit
    `#props-panel .psec` prefix would be, without the extra specificity
    fight against the unprefixed rule below.  */
-#props-panel{width:280px;flex-shrink:0;background:var(--panel2);border-left:none;overflow-y:auto;padding:0;transition:width .15s;}
+/* No width transition (feedback #30, 2026-08-21: "quand on collapse ou
+   expand le panel droit, le canvas scintille pendant l'animation") — every
+   intermediate frame of an animated width change fires app.js's
+   #canvas-area ResizeObserver, which fires engine-bridge.js's own
+   ResizeObserver on #drawing-canvas, which eagerly calls engine.resize()
+   and forces a full scene rebuild (lastSceneJson='') — dozens of times
+   over a 150ms transition, each one a real WebGPU resize+redraw. No
+   existing panel transition elsewhere in the app animates width for the
+   same reason; collapsing/expanding here snaps instantly instead. */
+#props-panel{width:280px;flex-shrink:0;background:var(--panel2);border-left:none;overflow-y:auto;padding:0;}
 /* Collapse-to-rail (2026-08) — see index.html's own comment on
    #props-panel-collapse-btn for why this is a label rail, not fixed icons. */
 #props-panel-collapse-btn{flex:none;width:22px;height:22px;margin-right:6px;border:none;background:transparent;
