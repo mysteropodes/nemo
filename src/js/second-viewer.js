@@ -63,18 +63,19 @@
 
   function updateFrameLabel() {
     var lab = document.getElementById('sv-frame-label');
-    if (lab) lab.textContent = (locked ? 'Frame ' + (lockedFrame + 1) + ' (verrouillée)' : 'Frame ' + (state.currentFrame + 1) + ' (suit le playhead)');
+    var tt = (window.SM && window.SM.t) ? window.SM.t : function (k) { return k; };
+    if (lab) lab.textContent = 'Frame ' + (locked ? (lockedFrame + 1) + ' ' + tt('svLockedSuffix') : (state.currentFrame + 1) + ' ' + tt('svFollowsSuffix'));
   }
 
   async function ensureEngine2() {
     if (engine2) return true;
-    if (!window.GeometryWasm || !window.GeometryWasm.ready) { showToast('Moteur Rust indisponible (wasm non chargé)'); return false; }
+    if (!window.GeometryWasm || !window.GeometryWasm.ready) { showToast((window.SM && window.SM.t) ? SM.t('svEngineUnavailable') : 'Rust engine unavailable (wasm not loaded)'); return false; }
     try {
       engine2 = await window.GeometryWasm.create_engine(canvas, canvas.width, canvas.height);
       return true;
     } catch (e) {
       console.error('[second-viewer] engine creation failed', e);
-      showToast('Nouvelle vue : échec WebGPU — ' + e);
+      showToast(((window.SM && window.SM.t) ? SM.t('svWebgpuFailed') : 'New view: WebGPU failed — ') + e);
       return false;
     }
   }
@@ -83,15 +84,23 @@
     panel = document.createElement('div');
     panel.id = 'second-viewer-panel';
     panel.style.cssText = 'position:fixed;top:80px;right:24px;width:420px;height:320px;background:var(--panel,#1c1c26);border:1px solid var(--border2,#333);border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,.5);z-index:500;display:flex;flex-direction:column;overflow:hidden;resize:both;min-width:240px;min-height:180px;';
+    var tt0 = (window.SM && window.SM.t) ? window.SM.t : function (k) { return k; };
     var header = document.createElement('div');
     header.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--panel2,#242430);cursor:move;user-select:none;font-size:11px;color:var(--text-dim,#999);';
-    header.innerHTML = '<span style="font-weight:600;color:var(--text,#ddd)">Nouvelle vue</span><span style="flex:1"></span>';
+    var titleSpan = document.createElement('span');
+    titleSpan.style.cssText = 'font-weight:600;color:var(--text,#ddd)';
+    titleSpan.textContent = tt0('menuNewView');
+    header.appendChild(titleSpan);
+    header.appendChild(document.createElement('span')).style.flex = '1';
     var lockLabel = document.createElement('label');
     lockLabel.style.cssText = 'display:flex;align-items:center;gap:4px;cursor:pointer;';
-    lockLabel.innerHTML = '<input type="checkbox" id="sv-lock"> Verrouiller sur la frame';
+    var lockCb = document.createElement('input');
+    lockCb.type = 'checkbox'; lockCb.id = 'sv-lock';
+    lockLabel.appendChild(lockCb);
+    lockLabel.appendChild(document.createTextNode(' ' + tt0('svLockToFrame')));
     var closeBtn = document.createElement('button');
     closeBtn.textContent = '✕';
-    closeBtn.title = 'Fermer';
+    closeBtn.title = tt0('svClose');
     closeBtn.style.cssText = 'background:none;border:none;color:inherit;cursor:pointer;font-size:14px;line-height:1;padding:2px 4px;';
     closeBtn.addEventListener('click', function () { window.SMSecondViewer.close(); });
     header.appendChild(lockLabel);
