@@ -19,6 +19,7 @@
   // onMove to reshape THAT stored segment instead of the path's own
   // lastSegment (the normal placement-drag target). Cleared in onUp.
   var reshapingSeg = null;
+  var canvasEl = null; // set in init(), read by the cursor-affordance hover check in onMove
 
   function shouldIntercept() {
     return (
@@ -67,6 +68,7 @@
 
     if (isDoubleClick) {
       finalizePen();
+      if (canvasEl) canvasEl.style.cursor = 'crosshair'; // undo any lingering hover-affordance cursor (pointer/grab) from just before finishing
       window.SMEngineBridge.renderNow();
       return;
     }
@@ -161,6 +163,26 @@
       // IN handle it already had untouched, rather than yanking a curve
       // that was already committed on the other side.
       if (!e.altKey) seg.handleIn = delta.multiply(-1);
+    } else if (_pen.path && canvasEl) {
+      // Cursor affordances (feedback #38) — the same two hints every vector
+      // app gives before you commit to a click: hovering back near the
+      // start of an open, closeable path previews that clicking here closes
+      // it (mirrors the actual hit-test in onDown, 10/view.zoom); Alt
+      // hovering an existing anchor previews the reshape-drag added above.
+      // Both are dynamic overrides of the tool's normal static cursor
+      // (SM.setTool's cc['pen']='crosshair'), so anything that doesn't
+      // match falls back to that same default rather than getting stuck.
+      var pt = new Point(w[0], w[1]);
+      var tol = 10 / view.zoom;
+      var nearAnchor = false;
+      if (e.altKey) {
+        for (var ci = 0; ci < _pen.path.segments.length; ci++) {
+          if (pt.getDistance(_pen.path.segments[ci].point) < tol) { nearAnchor = true; break; }
+        }
+      }
+      var nearStart = !e.altKey && !_pen.path.closed && _pen.path.segments.length > 1 &&
+        pt.getDistance(_pen.path.firstSegment.point) < tol;
+      canvasEl.style.cursor = nearAnchor ? 'grab' : (nearStart ? 'pointer' : 'crosshair');
     }
     window.SMEngineBridge.renderNow();
   }
@@ -188,6 +210,7 @@
 
   function init() {
     var target = document.getElementById('canvas-area') || document.getElementById('drawing-canvas');
+    canvasEl = target;
     target.addEventListener('pointerdown', onDown, { capture: true });
     target.addEventListener('pointermove', onMove, { capture: true });
     target.addEventListener('pointerup', onUp, { capture: true });

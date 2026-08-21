@@ -2475,8 +2475,25 @@
     var zs = 1 / view.zoom;
     var items = [];
     if (penPreviewWorld) {
-      var last = _pen.path.lastSegment.point;
-      items.push(lineItem([last.x, last.y], penPreviewWorld, [120, 170, 255, 153], 1 * zs));
+      var lastSeg = _pen.path.lastSegment, last = lastSeg.point;
+      // Curved rubber-band, not a straight guess (feedback #38, "on voit
+      // les vecteurs et tangentes... comme dans n'importe quel soft de
+      // vecto") — Illustrator/AE preview the NEXT segment as it would
+      // actually render if you clicked now: a real cubic curve carrying the
+      // last anchor's own handleOut, ending flat into the cursor (handleIn
+      // [0,0], since a plain hover has no next-anchor handle to show yet —
+      // only a click-drag, live in onMove already via seg.handleOut, would
+      // add one). When the last anchor has no handleOut (a plain corner
+      // point) both handles are zero and this reduces to exactly the same
+      // straight line the old lineItem drew, so this is a strict upgrade,
+      // not a behavior change for the common straight-segment case.
+      items.push({
+        segments: [
+          { point: [last.x, last.y], handleIn: [0, 0], handleOut: [lastSeg.handleOut.x, lastSeg.handleOut.y] },
+          { point: [penPreviewWorld[0], penPreviewWorld[1]], handleIn: [0, 0], handleOut: [0, 0] },
+        ],
+        closed: false, fillColor: null, strokeColor: [120, 170, 255, 153], strokeWidth: 1 * zs,
+      });
     }
     // Anchors + tangent handles of the in-progress pen path (feedback #19)
     // — same visual language as the Subselection tool's node handles
