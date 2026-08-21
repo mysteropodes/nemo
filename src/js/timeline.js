@@ -725,7 +725,7 @@ window.SM={
     // array already does (see layerInPoint/layerOutPoint, app.js).
     if(state.waIn>=state.waOut)state.waIn=Math.max(0,state.waOut-1);
     window._waIn=state.waIn;window._waOut=state.waOut;if(state.currentFrame>=v)goToFrame(v-1);updateUI();},
-  addLayer:function(){saveAllLayerFrames();pushUndoLayers();var idx=createUserLayer(nextLayerName());activateUL(idx);loadFrame(state.currentFrame);updateUI();},
+  addLayer:function(){saveAllLayerFrames();pushUndoLayers();var idx=createUserLayer(nextLayerName());activateUL(idx);_layerSel=[idx];_layerSelAnchor=idx;loadFrame(state.currentFrame);updateUI();},
   // Null layer (2026-07, Motion) — AE's "Null Object": exists purely as a
   // parenting/pivot target for other layers (SMMotion's existing
   // parentLayerUid/parentChainMats — a Null is just any other layer as far
@@ -736,7 +736,7 @@ window.SM={
   // as symbolId/nativeVideo/montageId in saveActiveLayerFrame/
   // saveAllLayerFrames/getEffectiveStrokes (app.js) so nothing ever tries
   // to read/write strokes on it.
-  addNullLayer:function(){saveAllLayerFrames();pushUndoLayers();var idx=createUserLayer(nextLayerName().replace(/^Layer/,'Null'));state.layers[idx].isNullLayer=true;activateUL(idx);loadFrame(state.currentFrame);updateUI();},
+  addNullLayer:function(){saveAllLayerFrames();pushUndoLayers();var idx=createUserLayer(nextLayerName().replace(/^Layer/,'Null'));state.layers[idx].isNullLayer=true;activateUL(idx);_layerSel=[idx];_layerSelAnchor=idx;loadFrame(state.currentFrame);updateUI();},
   // Effect (adjustment) layer (2026-07, Motion) — AE's "Adjustment Layer":
   // no painted content of its own (frames/strokes ignored on purpose,
   // same as a Null layer), but its effectType/effectP1/effectP2 apply to
@@ -746,7 +746,7 @@ window.SM={
   // full JS<->Rust wire contract. Defaults to a mild blur so placing one
   // has an immediately visible (if subtle) effect rather than looking
   // like a no-op.
-  addEffectLayer:function(){saveAllLayerFrames();pushUndoLayers();var idx=createUserLayer(nextLayerName().replace(/^Layer/,'Effet'));state.layers[idx].isEffectLayer=true;state.layers[idx].effects=[];activateUL(idx);loadFrame(state.currentFrame);updateUI();},
+  addEffectLayer:function(){saveAllLayerFrames();pushUndoLayers();var idx=createUserLayer(nextLayerName().replace(/^Layer/,'Effet'));state.layers[idx].isEffectLayer=true;state.layers[idx].effects=[];activateUL(idx);_layerSel=[idx];_layerSelAnchor=idx;loadFrame(state.currentFrame);updateUI();},
   // Guide layer (2026-08, AE feature audit 8.6) — a real layer object
   // (rotatable/parentable/keyable Transform, colored) instead of a classic
   // ruler-drag guide: no content of its own (same "no real content" guard
@@ -755,7 +755,7 @@ window.SM={
   // OWN Position/Rotation Transform (guidePos is the anchor Position
   // offsets from; Rotation sets the angle) — zero new keyframe machinery.
   // Defaults to horizontal through canvas center.
-  addGuideLayer:function(){saveAllLayerFrames();pushUndoLayers();var idx=createUserLayer(nextLayerName().replace(/^Layer/,'Guide'));state.layers[idx].isGuideLayer=true;state.layers[idx].guidePos=[state.canvasW/2,state.canvasH/2];state.layers[idx].guideOrientation='horizontal';state.layers[idx].color='#00baff';activateUL(idx);loadFrame(state.currentFrame);updateUI();},
+  addGuideLayer:function(){saveAllLayerFrames();pushUndoLayers();var idx=createUserLayer(nextLayerName().replace(/^Layer/,'Guide'));state.layers[idx].isGuideLayer=true;state.layers[idx].guidePos=[state.canvasW/2,state.canvasH/2];state.layers[idx].guideOrientation='horizontal';state.layers[idx].color='#00baff';activateUL(idx);_layerSel=[idx];_layerSelAnchor=idx;loadFrame(state.currentFrame);updateUI();},
   deleteLayer:function(){
     // The camera row isn't in state.layers (synthetic pseudo-layer, see
     // camera.js) — the generic layer-panel trash button silently did
@@ -958,7 +958,7 @@ window.SM={
       userLayers.forEach(function(l){l.insertBelow(arcLayer);});
       ni=at;
     }
-    activateUL(ni);loadFrame(state.currentFrame);renderLayerList();renderTimeline();updateUI();
+    activateUL(ni);_layerSel=[ni];_layerSelAnchor=ni;loadFrame(state.currentFrame);renderLayerList();renderTimeline();updateUI();
     if(window.SMEngineBridge)SMEngineBridge.renderNow();
     showToast('Calque coupé à la frame '+(f+1));
   },
@@ -1057,7 +1057,7 @@ window.SM={
     // back flat, with its positionZ/rotationX/rotationY keys (inside
     // src.motion, already copied) now dead data nothing reads.
     if(src.threeD)state.layers[ni].threeD=true;
-    activateUL(ni);loadFrame(state.currentFrame);updateUI();},
+    activateUL(ni);_layerSel=[ni];_layerSelAnchor=ni;loadFrame(state.currentFrame);updateUI();},
   setActiveLayer:function(idx){if(idx<0||idx>=state.layers.length)return;saveAllLayerFrames();activateUL(idx);clearSel();
     window._layerActiveExplicit=true; // see clearSel()'s own comment — an explicit timeline row click, not a canvas deselect
     // The camera row is a synthetic pseudo-layer (not a real state.layers
