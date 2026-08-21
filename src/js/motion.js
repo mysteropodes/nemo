@@ -2578,7 +2578,23 @@
     // renders. unifiedMotionTargets/buildUnifiedOverlay already summed
     // position deltas onto a centroid the same delta-aware way — this
     // brings the single-target view in line with it.
-    var pvx = aw.x, pvy = aw.y;
+    // NOT `aw` (the crosshair's own point, a few lines up) — aw deliberately
+    // includes the CURRENT FRAME's own interpolated Position (2026-08-21 fix,
+    // so the crosshair tracks where the object visually renders THIS frame).
+    // Reusing it here was a mistake made fixing the ax/ay crash (feedback
+    // #36/#40): position is exactly the thing being plotted per-key below,
+    // so every key's dot inherited a live, current-frame-dependent shift on
+    // top of its own value — dragging one key (which updates the value AT
+    // the current frame while the playhead sits on/near it) visibly dragged
+    // every OTHER key's dot along with it too, even though only the grabbed
+    // key's data actually changed (feedback #41, "l'ensemble des clé bouge
+    // quand je bouge la position d'une seule keyframe"). This pivot must
+    // stay position-INDEPENDENT — exactly "bounds center + anchor offset"
+    // per this block's own original comment above, matching motionBoxGeom's
+    // pre-position px/py and onDown's hit-test `pv` a few hundred lines down
+    // (which never included position either — only the drawing side did).
+    var pvAnc = valueAtFrame(holder, 'anchor', state.currentFrame);
+    var pvx = bc.x + pvAnc[0], pvy = bc.y + pvAnc[1];
     var track = holder.motion.position;
     var ks = track.keys;
     for (var i = 0; i < ks.length - 1; i++) {
