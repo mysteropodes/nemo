@@ -2065,7 +2065,26 @@
       return Math.max(0, Math.min(100, pct)) / 100 * total;
     }
     function pointAtLen(len) {
-      len = ((len % total) + total) % total;
+      // Wrap ONLY for a closed path — the cyclic "progress ring" case this
+      // function's own header comment describes, where a window running past
+      // 100% legitimately continues through the seam.
+      //
+      // On an OPEN path the window is already clamped to [0,total] by
+      // lenAtPct, so the modulo could only ever fire on the single exact
+      // value len === total — where `total % total` is 0 and it returned the
+      // path's START point instead of its END. That put the last vertex of
+      // the trimmed result back at the beginning of the stroke, drawing a
+      // long spurious segment all the way back across the shape.
+      // Bug found live 2026-08-21 (QA on brush types): trimStart=60/
+      // trimEnd=100 on an open stroke returned first point x=1015 (right)
+      // but last point x=129 (the start) instead of 1606; trimStart=60/
+      // trimEnd=99 was correct, which is what pinned it to the exact
+      // endpoint. Bites the DEFAULT trimEnd of 100 too, so every partially
+      // trimmed open shape was affected, not an edge case.
+      // applyTrimToVectorBrush's own sampleAtLen already clamps this way —
+      // this brings the two into line (CLAUDE.md §3's duplicated-pair trap).
+      if (closed) len = ((len % total) + total) % total;
+      else len = Math.max(0, Math.min(total, len));
       for (var i2 = 1; i2 < cum.length; i2++) {
         if (cum[i2] >= len) {
           var segLen = cum[i2] - cum[i2 - 1];

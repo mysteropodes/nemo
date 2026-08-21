@@ -561,6 +561,37 @@
     };
   }
 
+  // Trim Paths support (2026-08-21) — a bitmap-brush stroke's visible ink is
+  // ONE baked Raster spanning the whole stroke, not N per-dab items, so the
+  // per-dab reveal engine-bridge.js uses for the VECTOR texture presets
+  // (dabOrdinal: drop each dab whose position along the stroke falls outside
+  // the window) degenerates to a single dab at ordinal 0 — i.e. all-or-
+  // nothing, and in practice never trimmed at all. Confirmed live before
+  // this existed: at trimEnd=40 the anchor path trimmed correctly (world x
+  // 129→720) while the raster kept its full 105→1630 extent, so the stroke
+  // looked completely untouched.
+  //
+  // Same idea as recordForTween just above: rebuild a throwaway Path from
+  // the ALREADY-TRIMMED anchor segments and re-bake the texture from it, so
+  // the dabs are stamped along the trimmed centerline only. Returns
+  // bakeToCanvas's own {canvas,minX,minY,w,h} (no toDataURL — the caller
+  // uploads the canvas straight to the engine, and a per-frame toDataURL is
+  // exactly the synchronous freeze bakeToCanvas's MAX_TEX comment warns
+  // about). null when the window collapses to nothing, which the caller
+  // reads as "draw no ink at all".
+  function bakeTrimmed(segmentsData, closed, spec) {
+    if (!segmentsData || segmentsData.length < 2 || !spec) return null;
+    var p = new Path({ insert: false });
+    segmentsData.forEach(function (s) {
+      p.add(new Segment(new Point(s.point[0], s.point[1]), new Point(s.handleIn[0], s.handleIn[1]), new Point(s.handleOut[0], s.handleOut[1])));
+    });
+    if (closed) p.closed = true;
+    if (p.segments.length < 2) { p.remove(); return null; }
+    var bake = bakeToCanvas(p, spec, null);
+    p.remove();
+    return bake;
+  }
+
   // regenerateBrushTexture's (tools.js) bitmap branch — remove this
   // anchor's companions and re-stamp from its CURRENT geometry, reusing
   // the stored spec (same seed: a re-stamp after a node drag must not make
@@ -845,6 +876,7 @@
     regenerate: regenerate,
     liveRestamp: liveRestamp,
     recordForTween: recordForTween,
+    bakeTrimmed: bakeTrimmed,
     eraseBite: eraseBite,
     flushEraseDirty: flushEraseDirty,
     beginLivePreview: beginLivePreview,
