@@ -62,7 +62,12 @@
     // hidden modifier-key convention — no VISIBLE way to pick a mode, which
     // is what was actually asked for. These two entries give it real toggle
     // buttons, same pattern as everything else in this panel.
-    fsselect: ['fs-select-rect', 'fs-select-lasso'],
+    // 'fs-break-intersect' (2026-08, "il faudrait une option qui supprime
+    // les stroke d'intersection... au drag... comme une brush") — the
+    // classic animation cleanup "cassure": armed, a drag over a stroke
+    // highlights every point where it crosses ANOTHER stroke, cutting a
+    // small gap at each on release (tools.js's fsBreak* functions).
+    fsselect: ['fs-select-rect', 'fs-select-lasso', 'fs-break-intersect'],
     hand: ['canvas-grid'],
   };
   // Real `state.*`-backed features (NOT Labs prototypes — no localStorage
@@ -142,6 +147,21 @@
       isActive: function () { return !!(window.state && state.fsSelectMode === 'lasso'); },
       onClick: function () { if (window.state) state.fsSelectMode = 'lasso'; renderLabsFloatPanel(); },
     },
+    // "Break at intersections" brush (2026-08) — stays armed like Shadow
+    // Brush above (isActive reflects state.fsBreakMode itself, not just
+    // "a popover happens to be open"), since the whole point is to drag
+    // repeatedly across several crossings without re-clicking a mode button
+    // between each one. Clears any live pending-cut markers on disarm so a
+    // half-finished drag never leaves stale dots on screen.
+    'fs-break-intersect': {
+      isActive: function () { return !!(window.state && state.fsBreakMode); },
+      onClick: function () {
+        if (!window.state) return;
+        state.fsBreakMode = !state.fsBreakMode;
+        if (!state.fsBreakMode && window.SMEngineBridge) window.SMEngineBridge.setFSBreakMarks([]);
+        renderLabsFloatPanel();
+      },
+    },
   };
   // Tools armed by a held key regardless of the active tool (flip-roll=R,
   // mirror-check=M, lagoon-menu=Q) — always available, shown after a
@@ -174,6 +194,7 @@
     'lagoon-menu': "Menu radial d'outils (maintenir Q)",
     'fs-select-rect': 'Sélection rectangle (Fill/Stroke Select)',
     'fs-select-lasso': 'Sélection lasso (Fill/Stroke Select) — Alt+glisser inverse temporairement',
+    'fs-break-intersect': 'Casser aux intersections — glisser sur un trait pour marquer ses croisements avec d\'autres traits, relâcher pour les couper',
   };
 
   // Solid/filled icons (2026-07, "les icônes ne sont pas trop flat design
@@ -214,6 +235,12 @@
     'fs-select-rect': '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="5" width="16" height="14" rx="1" stroke-dasharray="3.2 2.4"/></svg>',
     // Freehand wavy loop = lasso, distinct silhouette from the rectangle.
     'fs-select-lasso': '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3c-4.5 0-8 2.7-8 6.5 0 3 2.3 5.3 5.6 6.1L8 20l2.2-1.1c.6.1 1.2.1 1.8.1 4.5 0 8-2.7 8-6.5S16.5 3 12 3z" stroke-dasharray="2.6 2.2"/></svg>',
+    // Two crossing strokes, one drawn UNBROKEN (the one being crossed) and
+    // the other with a small gap right at the crossing point (the one the
+    // brush just cut) — reads directly as "break where lines cross"
+    // without needing scissors iconography that'd be ambiguous next to the
+    // Eraser tool's own icon.
+    'fs-break-intersect': '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l16 16"/><path d="M20 4l-6.2 6.2M9.8 14.2 4 20"/></svg>',
   };
 
   // Adjustable-parameter tools get a second row below the icon strip

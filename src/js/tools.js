@@ -260,6 +260,196 @@ function fsIntersectionOffsets(path,layer){
   offsets.forEach(function(o){if(!out.length||o-out[out.length-1]>0.01)out.push(o);});
   return out;
 }
+// "Break at intersections" brush (2026-08, "il faudrait une option qui
+// supprime les stroke d'intersection... au drag... comme une brush qui va
+// select les intersection et les supprimer quand on relève la souris") —
+// cuts a small gap in `path` centered on each offset in `offsets` (a
+// SUBSET of fsIntersectionOffsets(path,layer)'s full crossing list — only
+// the ones the brush actually swept over), keeping every resulting piece
+// (unlike fsDeleteSegment, which discards the arc BETWEEN two offsets).
+// Only `path` itself is cut — the strokes it crosses are left untouched,
+// matching the classic animation "cassure" cleanup gesture (the line
+// UNDER the pencil breaks, not the one it crosses).
+function fsBreakStrokeAtOffsets(path,offsets,layer,gapPx){
+  if(!offsets||!offsets.length)return[path];
+  var gap=(gapPx||6)/view.zoom;
+  var len=path.length;
+  if(len<gap*2.2)return[path]; // too short to notch safely
+  var ranges=offsets.slice().sort(function(a,b){return a-b;}).map(function(o){
+    return{start:Math.max(0,o-gap/2),end:Math.min(len,o+gap/2)};
+  });
+  // Merge overlapping gap ranges (two crossings closer together than `gap`).
+  var merged=[];
+  ranges.forEach(function(r){
+    var last=merged[merged.length-1];
+    if(last&&r.start<=last.end+0.01)last.end=Math.max(last.end,r.end);
+    else merged.push({start:r.start,end:r.end});
+  });
+  var work=path;
+  if(work.closed){
+    // Open the loop at the FIRST gap exactly like fsDeleteSegment's closed-
+    // path split: re-base the seam to that gap's start, then split at its
+    // end — `work` becomes the tiny first-gap sliver (discarded) and
+    // `remainder` becomes the WHOLE REST of the loop as one open path.
+    // Every other gap's offset gets re-expressed relative to remainder's
+    // new start (originally `g0.end`) so the open-path pass below can
+    // treat it identically to a plain open stroke.
+    var loopLen=work.length,g0=merged[0];
+    work.splitAt(work.getLocationAt(g0.start));
+    var remainder=work.splitAt(work.getLocationAt(g0.end-g0.start));
+    if(work&&work.remove)work.remove();
+    if(!remainder)return[path]; // shouldn't happen — bail safely
+    work=remainder;
+    merged=merged.slice(1).map(function(r){
+      return{
+        start:((r.start-g0.end)%loopLen+loopLen)%loopLen,
+        end:((r.end-g0.end)%loopLen+loopLen)%loopLen,
+      };
+    });
+  }
+  // Descending start order so cutting one gap never invalidates an
+  // earlier offset still waiting to be cut (same precedent as
+  // fsPromoteSelectionForTransform's own sort comment above).
+  merged.sort(function(a,b){return b.start-a.start;});
+  // Vector-brush strokes (data.isVectorBrush) carry a separate centerline/
+  // width-profile record (data.centerSegments/widthProfile) that a plain
+  // splitAt piece would otherwise drag along unchanged and now-mismatched
+  // against its own (shorter) segment span — CLAUDE.md §1's "live data tied
+  // to a path must never survive a structural split silently unlinked".
+  // Neither fsDeleteSegment/fsRealizeStrokeSegment above special-case this
+  // either, but this function can produce many more pieces from one
+  // gesture, so stripping it here rather than carrying the risk forward:
+  // each piece bakes down to its own plain (no longer width-editable)
+  // outline, exactly like any other stroke this tool cuts.
+  function finalizePiece(p){
+    fsUnlinkFillRegen(p);tagOwner(p);delete p.data.strokeId;
+    delete p.data.centerSegments;delete p.data.widthProfile;
+    delete p.data.strokeProfile;delete p.data.profileBase;delete p.data.isVectorBrush;
+    return p;
+  }
+  var pieces=[],remaining=work;
+  merged.forEach(function(r){
+    var tail=remaining.splitAt(remaining.getLocationAt(r.end));
+    if(tail){
+      if(tail.length>0.01)pieces.unshift(finalizePiece(tail));
+      else tail.remove();
+    }
+    var gapArc=remaining.splitAt(remaining.getLocationAt(r.start));
+    if(gapArc)gapArc.remove();
+  });
+  if(remaining.length>0.01)pieces.unshift(finalizePiece(remaining));
+  else remaining.remove();
+  return pieces.length?pieces:[path];
+}
+// Given a path that may carry BOTH a fill and a stroke, splits the fill off
+// onto the original object (untouched, stays exactly as drawn) and returns
+// a fresh stroke-only clone to actually cut — same reasoning as
+// fsPromoteSelectionForTransform's own whole-stroke-with-fillColor branch:
+// cutting a still-filled path would leave each resulting open arc
+// implicitly re-closed for its (now nonsensical) fill.
+function fsStrokeOnlyForBreak(path,layer){
+  // A vector-brush stroke's fillColor IS its ink (the baked variable-width
+  // outline) — not a separate fill region to protect, unlike a plain
+  // shape/pen path that happens to have both a stroke and a fill. Only the
+  // latter needs splitting off first.
+  if(!path.fillColor||(path.data&&path.data.isVectorBrush))return path;
+  var strokeOnly=path.clone({insert:false,deep:true});
+  strokeOnly.fillColor=null;
+  if(strokeOnly.data)delete strokeOnly.data.fillGradient;
+  path.strokeColor=null;
+  layer.insertChild(layer.children.indexOf(path)+1,strokeOnly);
+  return strokeOnly;
+}
+// ---- Drag state for the break-brush, armed by state.fsBreakMode (toggled
+// from the Fill/Stroke Select floating panel, labs-float-panel.js) ----
+var _fsBreak=null; // {marks:Map<path,Set<offset>>, cache:Map<path,offsets[]>, activePath}
+var FS_BREAK_RADIUS=14; // screen px — matches this file's other hit tolerances' rough scale
+// Nearest stroke under the brush — deliberately singular, not every stroke
+// within radius. Right AT a crossing two strokes sit at the exact same
+// point (distance 0 to both), so a plain "every stroke within radius"
+// hover would mark — and cut — BOTH sides of the crossing, not just the
+// one being dragged along. Only the stroke the user is actually following
+// should break; the one it crosses stays untouched, matching the classic
+// "cassure" gesture the request described. Ties (mid-crossing) stick with
+// whichever stroke the gesture already started on rather than flip-
+// flopping between the two.
+function fsBreakNearestStroke(layer,pt){
+  var tol=FS_BREAK_RADIUS/view.zoom,best=null,bestD=Infinity;
+  layer.children.forEach(function(c){
+    if(!(c instanceof Path)||c.segments.length<2||!c.strokeColor)return;
+    if(!c.bounds.expand(tol*2).contains(pt))return;
+    var loc;try{loc=c.getNearestLocation(pt);}catch(e){loc=null;}
+    if(!loc)return;
+    var d=loc.point.getDistance(pt);
+    if(d>tol)return;
+    var sticky=_fsBreak&&_fsBreak.activePath===c;
+    if(d<bestD-0.001||(sticky&&d<=bestD+0.001)){best=c;bestD=d;}
+  });
+  return best;
+}
+function fsBreakUpdateMarks(pt){
+  if(!_fsBreak)return;
+  var layer=userLayers[state.activeLayerIdx];
+  var tol=FS_BREAK_RADIUS/view.zoom;
+  var path=fsBreakNearestStroke(layer,pt);
+  if(path){
+    _fsBreak.activePath=path;
+    var offs=_fsBreak.cache.get(path);
+    if(!offs){offs=fsIntersectionOffsets(path,layer);_fsBreak.cache.set(path,offs);}
+    if(offs.length){
+      var set=_fsBreak.marks.get(path);
+      if(!set){set=new Set();_fsBreak.marks.set(path,set);}
+      offs.forEach(function(o){
+        if(set.has(o))return;
+        var p=path.getPointAt(o);
+        if(p&&p.getDistance(pt)<=tol)set.add(o);
+      });
+    }
+  }
+  var pts=[];
+  _fsBreak.marks.forEach(function(set,p){
+    if(p.removed)return;
+    set.forEach(function(o){var p2=p.getPointAt(o);if(p2)pts.push([p2.x,p2.y]);});
+  });
+  if(window.SMEngineBridge)window.SMEngineBridge.setFSBreakMarks(pts);
+}
+function fsBreakCommit(){
+  if(!_fsBreak)return;
+  var layer=userLayers[state.activeLayerIdx];
+  var any=false;
+  _fsBreak.marks.forEach(function(set,path){
+    if(!set.size||path.removed)return;
+    any=true;
+    var target=fsStrokeOnlyForBreak(path,layer);
+    fsBreakStrokeAtOffsets(target,Array.from(set),layer);
+  });
+  _fsBreak=null;
+  if(window.SMEngineBridge)window.SMEngineBridge.setFSBreakMarks([]);
+  if(any){saveActiveLayerFrame();fsClearSel();renderArcs();updateUI();}
+}
+document.addEventListener('pointerdown',function(e){
+  var onStage=e.target===canvasEl||(e.target&&e.target.id==='rust-canvas');
+  if(e.button!==0||state.tool!=='fsselect'||!state.fsBreakMode||!window.SMEngineBridge||!SMEngineBridge.isEnabled()||!onStage)return;
+  pushUndo();
+  _fsBreak={marks:new Map(),cache:new Map()};
+  var w=SMEngineBridge.screenToWorld(e.clientX,e.clientY);
+  fsBreakUpdateMarks(new Point(w[0],w[1]));
+  if(window.SMEngineBridge.renderNow)window.SMEngineBridge.renderNow();
+  e.preventDefault();e.stopImmediatePropagation();
+},{capture:true});
+document.addEventListener('pointermove',function(e){
+  if(!_fsBreak)return;
+  var w=SMEngineBridge.screenToWorld(e.clientX,e.clientY);
+  fsBreakUpdateMarks(new Point(w[0],w[1]));
+  if(window.SMEngineBridge.renderNow)window.SMEngineBridge.renderNow();
+  e.preventDefault();e.stopImmediatePropagation();
+},{capture:true});
+document.addEventListener('pointerup',function(e){
+  if(!_fsBreak)return;
+  fsBreakCommit();
+  if(window.SMEngineBridge&&window.SMEngineBridge.renderNow)window.SMEngineBridge.renderNow();
+  e.preventDefault();e.stopImmediatePropagation();
+},{capture:true});
 // Given the full sorted crossing-offset list and where the user actually
 // clicked, returns the {segStart,segEnd} pair bracketing the click — or
 // the whole path (0..length) when there are no crossings to bound it.

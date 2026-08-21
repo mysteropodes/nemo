@@ -1776,6 +1776,8 @@
       if (marqueeItems.length) layers.push({ items: marqueeItems });
       var fsSelItems = buildFSSelectionItems();
       if (fsSelItems.length) layers.push({ items: fsSelItems });
+      var fsBreakItems = buildFSBreakMarkItems();
+      if (fsBreakItems.length) layers.push({ items: fsBreakItems });
       var revisionItems = buildRevisionOutlineItems();
       if (revisionItems.length) layers.push({ items: revisionItems });
       var commentItems = buildCommentPinItems();
@@ -2434,6 +2436,25 @@
   // shows the width that's ACTUALLY about to be cut, matching the pressure
   // brush's own cursor convention (setPressureCursor below).
   function setEraserCursor(worldPt, radius) { eraserCursorWorld = worldPt; eraserCursorRadius = radius; }
+
+  // Fill/Stroke Select — "break at intersections" brush (2026-08). While
+  // dragging in this mode (tools.js), every crossing point currently under
+  // the brush gets pushed here each pointermove so it renders live as a
+  // small dot BEFORE the actual cut commits on pointerup — same "preview
+  // now, commit later" shape as the eraser cursor above, just markers
+  // instead of a single circle. Cleared (empty array) on pointerup/tool
+  // change by the caller.
+  var fsBreakMarksWorld = [];
+  function setFSBreakMarks(points) { fsBreakMarksWorld = points || []; }
+  function buildFSBreakMarkItems() {
+    if (state.tool !== 'fsselect' || !fsBreakMarksWorld.length) return [];
+    var zs = 1 / view.zoom;
+    // Same orange as buildFSSelectionItems' own highlight color — reads as
+    // "this tool's own accent" rather than a new unrelated hue.
+    return fsBreakMarksWorld.map(function (pt) {
+      return circleItem(pt[0], pt[1], 5 * zs, [255, 152, 0, 255], [255, 255, 255, 255], 1.2 * zs);
+    });
+  }
   function buildEraserCursorItems() {
     if (state.tool !== 'eraser' || !eraserCursorWorld) return [];
     var r = eraserCursorRadius != null ? eraserCursorRadius : state.eraserSize / 2;
@@ -3211,6 +3232,7 @@
     renderNow: renderNow,
     renderImageOnly: renderImageOnly,
     setEraserCursor: setEraserCursor,
+    setFSBreakMarks: setFSBreakMarks,
     setPressureCursor: setPressureCursor,
     setPenPreview: setPenPreview,
     setRigPreview: setRigPreview,
