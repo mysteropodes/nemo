@@ -341,8 +341,17 @@
     if (isStrokeSelected(c.li, paintStrokeIdFor(entry, kind))) row.classList.add('act');
     var spacer = document.createElement('span'); spacer.className = 'lico larrow-spacer';
     row.appendChild(spacer);
+    // Distinct icon per aspect (2026-08, "faire en sorte que les icon fill
+    // et stroke soit bien distincte") — both used to be the exact same
+    // plain color square, just a different color, easy to misread at a
+    // glance. Fill stays a solid square (matches the parent shape's own
+    // combined swatch); Stroke is a hollow RING instead — transparent
+    // center, border in the stroke color — same "filled square vs ring"
+    // convention Illustrator/Figma swatches use, and the same visual
+    // language the parent row's own combined swatch already introduced.
     var swatch = document.createElement('div'); swatch.className = 'motion-elem-swatch';
-    swatch.style.background = (kind === 'fill' ? entry.sd.fillColor : entry.sd.strokeColor) || 'transparent';
+    if (kind === 'fill') swatch.style.background = entry.sd.fillColor || 'transparent';
+    else { swatch.style.background = 'transparent'; swatch.style.borderColor = entry.sd.strokeColor || 'transparent'; swatch.style.borderWidth = '2px'; }
     var nm = document.createElement('div'); nm.className = 'lnm';
     nm.textContent = SM.t(kind === 'fill' ? 'elementsFill' : 'elementsStroke');
     row.appendChild(swatch); row.appendChild(nm);
