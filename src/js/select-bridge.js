@@ -1551,7 +1551,27 @@
         // (unlike 'move', which can fire on a plain click) — fork every
         // foreign-owned item in the gesture before it's persisted.
         selectedPaths.forEach(function (p) { forkIfForeignOwner(p); });
-        fillRegenerateLinked(userLayers[state.activeLayerIdx], null);
+        // A fill-bucket result the user just scaled/rotated/distorted THEMSELVES
+        // is exactly the "manual edit must stay put" case fsUnlinkFillRegen's
+        // own header comment already describes — without this, the very next
+        // line's unrestricted fillRegenerateLinked(…,null) re-traces this same
+        // path from its OLD, now-stale fillSeed/fillWalls (the walls the user
+        // moved may not even be part of them) and silently snaps it back.
+        selectedPaths.forEach(function (p) { fsUnlinkFillRegen(p); });
+        // touchedPath=null used to mean "check every fill in the layer,
+        // unconditionally" — sounds thorough but is actually WEAKER than
+        // passing the real path: fillRegenerateLinked's own retry ladder
+        // (re-trace from the fill's old seed, then its current interior
+        // point, THEN touchedPath's interior point as a last resort) only
+        // reaches that last rung when touchedPath is real. A wall stroke
+        // dragged just far enough that the fill's old seed no longer lands
+        // inside anything hit both earlier rungs and returned null, then
+        // silently left the fill exactly where it was — confirmed live: a
+        // moved wall circle's bounds updated, the petal fill it used to
+        // bound did not budge into the gap that opened up. One call per
+        // moved path (not once for the whole gesture) gives every one of
+        // them a real shot at being the successful last-resort seed.
+        selectedPaths.forEach(function (p) { fillRegenerateLinked(userLayers[state.activeLayerIdx], p); });
         // Bitmap Brush anchors: the live drag above only scaled/rotated the
         // EXISTING raster companion in place (cheap, matches its geometry
         // during the drag but stays at its original bake resolution/
@@ -1582,7 +1602,12 @@
       renderArcs(); updateUI();
     } else if (mode === 'xform-distort') {
       selectedPaths.forEach(function (p) { forkIfForeignOwner(p); });
-      fillRegenerateLinked(userLayers[state.activeLayerIdx], null);
+      // See the xform-scale/xform-rotate branch's own comment above — same
+      // "manual edit must stay put" unlink, same reason.
+      selectedPaths.forEach(function (p) { fsUnlinkFillRegen(p); });
+      // Per-path calls, not one null call — see the xform-scale/xform-rotate
+      // branch's own comment above for why.
+      selectedPaths.forEach(function (p) { fillRegenerateLinked(userLayers[state.activeLayerIdx], p); });
       // Same re-bake as the xform-scale/xform-rotate tail above — a corner-pin
       // distort warps the path's own segments live, but never touched the
       // bitmap-brush raster companion (not a simple scale/rotate, so onMove
@@ -1666,7 +1691,22 @@
         // someone else's stroke doesn't spawn a spurious identical-geometry
         // ghost.
         if (didMove) selectedPaths.forEach(function (p) { forkIfForeignOwner(p); });
-        fillRegenerateLinked(userLayers[state.activeLayerIdx], null);
+        // Same "manual edit must stay put" unlink as the xform branches above
+        // — a fill-bucket result the user just DRAGGED must not have the next
+        // line's unrestricted fillRegenerateLinked(…,null) re-trace it from
+        // its old fillSeed/fillWalls and silently snap it back to where it
+        // was before the drag (confirmed live: bounds moved, the very next
+        // render put it right back). Same didMove gate as the fork above —
+        // a plain click-release never touched geometry, nothing to unlink.
+        if (didMove) selectedPaths.forEach(function (p) { fsUnlinkFillRegen(p); });
+        // Per-path calls (not one null call) when something actually moved —
+        // see the xform-scale/xform-rotate branch's own comment above for
+        // why touchedPath=null can't reach fillRegenerateLinked's own last-
+        // resort retry rung. A plain click-release (didMove false) never
+        // touched geometry, so the cheap unconditional null call is still
+        // fine there — nothing to re-trace from a real touched path anyway.
+        if (didMove) selectedPaths.forEach(function (p) { fillRegenerateLinked(userLayers[state.activeLayerIdx], p); });
+        else fillRegenerateLinked(userLayers[state.activeLayerIdx], null);
         saveActiveLayerFrame();
         // Same stale-onion-ghost fix as the xform-scale/xform-rotate branch
         // above — a plain move commits through this branch too.

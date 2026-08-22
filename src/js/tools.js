@@ -612,7 +612,7 @@ function fsHighlightPath(sel){
 // the tracking unconditionally so a manual edit always wins and stays put.
 function fsUnlinkFillRegen(p){
   if(!p||!p.data)return;
-  delete p.data.fillSeed;delete p.data.fillWalls;delete p.data.fillGapPx;
+  delete p.data.fillSeed;delete p.data.fillWalls;delete p.data.fillGapPx;delete p.data.fillSeeds;
 }
 function fsApplyDelete(){
   if(!_fsSel.length)return;
