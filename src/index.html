@@ -677,6 +677,22 @@
         </div>
       </div>
     </div>
+    <!-- Elements panel (2026-08, Animation 2D) — the same shape/group tree
+         Motion's own "Éléments" list already builds (SMMotion.buildShapeTree/
+         layerElements, motion.js — reused as-is, not reimplemented, see
+         shapes-panel.js), just surfaced here as its own right-panel section
+         instead of Motion's left-side layer list. Figma/Rive-style: click a
+         row to select that shape/group on canvas, double-click to rename,
+         right-click for group/select actions. Populated by renderShapesPanel
+         (shapes-panel.js), gated alongside #layer-sec in updatePropsContext
+         (timeline.js) — visible whenever a real layer is active, in ANY
+         non-Motion mode (Motion already has its own equivalent panel). -->
+    <div class="psec" id="shapes-sec" style="display:none">
+      <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrElements">Elements</span></div>
+      <div class="pbdy">
+        <div id="shapes-list"></div>
+      </div>
+    </div>
     <div class="psec" id="canvas-sec">
       <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrDocument">Document</span></div>
       <div class="pbdy">
@@ -1844,6 +1860,7 @@
 <script src="js/svg-import.js"></script>
 <script src="js/camera.js"></script>
 <script src="js/motion.js"></script>
+<script src="js/shapes-panel.js"></script>
 <script src="js/text-animator.js"></script>
 <script src="js/motion-graph.js"></script>
 <script src="js/nemo-panel.js"></script>

@@ -6896,6 +6896,8 @@
     // 2D's own layer-row shape list (timeline.js) so both modes' trees can
     // never diverge in content or z-order.
     buildShapeTree: buildShapeTree,
+    selectShapesByStrokeIds: selectShapesByStrokeIds,
+    elementLabel: elementLabel,
     layerElements: layerElements,
     elementLabel: elementLabel,
     liveItemByStrokeId: liveItemByStrokeId,

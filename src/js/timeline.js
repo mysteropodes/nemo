@@ -2378,11 +2378,11 @@ function updateStatusBarHelp(){
 function updatePropsContext(){
   var hasSel=(state.tool==='select'||state.tool==='subselect')&&selectedPaths.length>0;
   var ctx,hdrText;
-  var show={'sel-props-sec':false,'fill-sec':false,'stroke-sec':false,'tool-opts-sec':false,'canvas-sec':false,'layer-sec':false,'rig-opts-sec':false,'combine-opts-sec':false};
+  var show={'sel-props-sec':false,'fill-sec':false,'stroke-sec':false,'tool-opts-sec':false,'canvas-sec':false,'layer-sec':false,'rig-opts-sec':false,'combine-opts-sec':false,'shapes-sec':false};
   if(state.tool==='rig'){
     ctx='rig';
     show['rig-opts-sec']=true;
-    show['layer-sec']=!!(state.layers[state.activeLayerIdx]);
+    show['layer-sec']=show['shapes-sec']=!!(state.layers[state.activeLayerIdx]);
     if(window.renderRigModeUI)renderRigModeUI();
     hdrText=(window.SM&&SM.t?SM.t('toolRig'):'Rig')+' — Options';
   }else if(state.tool==='fsselect'&&_fsSel.length){
@@ -2410,7 +2410,7 @@ function updatePropsContext(){
     // useful given over to the Position/Size/Rotation-of-selected-vertices
     // fields (updateSelPropsPanel) that section sits right above.
     show['canvas-sec']=state.tool!=='subselect';
-    show['layer-sec']=!!(state.layers[state.activeLayerIdx]);
+    show['layer-sec']=show['shapes-sec']=!!(state.layers[state.activeLayerIdx]);
     // Rig bind (2026-07-29 fix, "on ne sait pas comment select l'élément qui
     // doit y être associé"): #rig-opts-sec (with the "Lier la sélection"
     // button) used to be shown ONLY while state.tool==='rig' — but binding a
@@ -2460,7 +2460,7 @@ function updatePropsContext(){
     // this flag, activeLayerIdx being ALWAYS a valid index (never "none")
     // meant this branch showed the last-active layer's properties even
     // right after deselecting everything on canvas.
-    show['layer-sec']=!!window._layerActiveExplicit&&!!(state.layers[state.activeLayerIdx]);
+    show['layer-sec']=show['shapes-sec']=!!window._layerActiveExplicit&&!!(state.layers[state.activeLayerIdx]);
     hdrText='Document';
   }
   // p-blendmode sync moved OUT of the 'document' branch above: it only ran
@@ -2508,10 +2508,17 @@ function updatePropsContext(){
   // above and is the one case where showing it doesn't bury anything (no
   // Fill/Stroke/Draw tool section competes with #motion-props-sec then).
   if(state.appMode==='motion'){
-    show['sel-props-sec']=show['fill-sec']=show['stroke-sec']=show['tool-opts-sec']=show['rig-opts-sec']=show['combine-opts-sec']=false;
+    // shapes-sec joins this list (not the layer-sec/canvas-sec "spared"
+    // set below) — Motion already has its own equivalent shape/group tree
+    // (SMMotion's own "Éléments" list, left panel), so this right-panel
+    // copy would just be a redundant second place showing the same thing.
+    show['sel-props-sec']=show['fill-sec']=show['stroke-sec']=show['tool-opts-sec']=show['rig-opts-sec']=show['combine-opts-sec']=show['shapes-sec']=false;
     if(ctx!=='document')show['canvas-sec']=false;
   }
   Object.keys(show).forEach(function(id){var sec=document.getElementById(id);if(sec)sec.style.display=show[id]?'block':'none';});
+  // Only pays the tree-rebuild cost while the section is actually visible
+  // (same "don't do free work" principle as the rail render just below).
+  if(show['shapes-sec']&&window.renderShapesPanel)renderShapesPanel();
   // Collapse-to-rail (2026-08) — keep the rail in sync with whatever this
   // call decided is relevant, but only pay the DOM-rebuild cost while the
   // panel is actually collapsed (rail is invisible otherwise).
