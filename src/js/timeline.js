@@ -2379,10 +2379,26 @@ function updatePropsContext(){
   var hasSel=(state.tool==='select'||state.tool==='subselect')&&selectedPaths.length>0;
   var ctx,hdrText;
   var show={'sel-props-sec':false,'fill-sec':false,'stroke-sec':false,'tool-opts-sec':false,'canvas-sec':false,'layer-sec':false,'rig-opts-sec':false,'combine-opts-sec':false,'shapes-sec':false};
+  // Elements panel (2026-08 fix, "la selection dans le canvas ne reflète
+  // pas bien la selection dans le panel") — a real layers/elements panel
+  // (Figma, Rive) is ALWAYS visible once there's something to show; only
+  // the HIGHLIGHT inside it should react to selection, never the panel's
+  // own presence. Previously show['shapes-sec'] was set inside 3 of the 5
+  // branches below (mirroring layer-sec, which genuinely IS selection-
+  // dependent — Blend/Matte only make sense once something's active) and
+  // left untouched (false) in the other 2 (fsselect, an active Fill/
+  // Stroke/Draw tool with no selection yet) — so the panel popped in and
+  // out of existence on every tool switch and every deselect, which is
+  // what actually broke the "selection sync" the user reported: by the
+  // time it reappeared, its last render was however stale it had gone.
+  // Decoupled here, unconditional on tool/selection state, computed once
+  // for every branch — Motion mode still force-hides it a few lines down
+  // (it has its own equivalent left-panel list), untouched by this.
+  show['shapes-sec']=!!(state.layers[state.activeLayerIdx]);
   if(state.tool==='rig'){
     ctx='rig';
     show['rig-opts-sec']=true;
-    show['layer-sec']=show['shapes-sec']=!!(state.layers[state.activeLayerIdx]);
+    show['layer-sec']=!!(state.layers[state.activeLayerIdx]);
     if(window.renderRigModeUI)renderRigModeUI();
     hdrText=(window.SM&&SM.t?SM.t('toolRig'):'Rig')+' — Options';
   }else if(state.tool==='fsselect'&&_fsSel.length){
@@ -2410,7 +2426,7 @@ function updatePropsContext(){
     // useful given over to the Position/Size/Rotation-of-selected-vertices
     // fields (updateSelPropsPanel) that section sits right above.
     show['canvas-sec']=state.tool!=='subselect';
-    show['layer-sec']=show['shapes-sec']=!!(state.layers[state.activeLayerIdx]);
+    show['layer-sec']=!!(state.layers[state.activeLayerIdx]);
     // Rig bind (2026-07-29 fix, "on ne sait pas comment select l'élément qui
     // doit y être associé"): #rig-opts-sec (with the "Lier la sélection"
     // button) used to be shown ONLY while state.tool==='rig' — but binding a
@@ -2460,7 +2476,7 @@ function updatePropsContext(){
     // this flag, activeLayerIdx being ALWAYS a valid index (never "none")
     // meant this branch showed the last-active layer's properties even
     // right after deselecting everything on canvas.
-    show['layer-sec']=show['shapes-sec']=!!window._layerActiveExplicit&&!!(state.layers[state.activeLayerIdx]);
+    show['layer-sec']=!!window._layerActiveExplicit&&!!(state.layers[state.activeLayerIdx]);
     hdrText='Document';
   }
   // p-blendmode sync moved OUT of the 'document' branch above: it only ran

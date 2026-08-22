@@ -39,6 +39,43 @@
     var item = window.SMMotion.liveItemByStrokeId(li, strokeId);
     return !!item && window.selectedPaths.indexOf(item) >= 0;
   }
+  // Multi-select (2026-08, "impossible d'avoir le multiselect shift ou
+  // alt dans le panel") — SMMotion.selectShapesByStrokeIds always REPLACES
+  // the whole selection, same as every click in this panel used before
+  // this fix; there was no additive path at all (confirmed: Motion's own
+  // left-panel Éléments list has the identical gap, so there was no
+  // existing helper to reuse here). additive=true toggles the clicked
+  // strokeId(s) in/out of the CURRENT selection instead of replacing it —
+  // same toggle semantics select-bridge.js's own canvas Shift-click
+  // already uses (add if entirely absent, remove if already present), so
+  // canvas and panel behave identically under Shift/Alt. Alt is treated
+  // the same as Shift here — Cyril asked for "shift ou alt", and neither
+  // this panel nor Motion's own list has a distinct meaning to give Alt
+  // beyond "also multi-select", so inventing one would be undirected
+  // scope, not a fix.
+  function applySelection(li, strokeIds, additive) {
+    if (!additive) { window.SMMotion.selectShapesByStrokeIds(li, strokeIds); return; }
+    var items = strokeIds.map(function (sid) { return window.SMMotion.liveItemByStrokeId(li, sid); }).filter(Boolean);
+    if (!items.length) return;
+    // setActiveLayer(li) unconditionally calls clearSel() (timeline.js),
+    // even when li is ALREADY the active layer — which it always is here
+    // (this panel only ever lists the current layer's own shapes, see
+    // currentLayer()). Calling it anyway wiped whatever was already in
+    // selectedPaths a split second before reading it below, so every
+    // additive click ever ended up with just the ONE just-clicked item —
+    // found live (two Shift-clicks on different shapes left selCount at 1,
+    // not 2). Guarded, not removed outright, in case this ever runs
+    // against a different layer than the one currently active.
+    if (window.state && window.state.activeLayerIdx !== li) window.SM.setActiveLayer(li);
+    var sel = window.selectedPaths;
+    var allIn = items.every(function (it) { return sel.indexOf(it) >= 0; });
+    if (allIn) items.forEach(function (it) { var ix = sel.indexOf(it); if (ix >= 0) sel.splice(ix, 1); });
+    else items.forEach(function (it) { if (sel.indexOf(it) < 0) sel.push(it); });
+    if (window.state) state.selectedStrokeIndices = sel.map(function (it) { return typeof getSI === 'function' ? getSI(it) : -1; }).filter(function (i2) { return i2 >= 0; });
+    if (window.renderArcs) renderArcs();
+    if (window.updateUI) updateUI();
+    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+  }
   // Same inline input-swap idiom as timeline.js's startLayerRename and
   // motion.js's startShapeTreeRename — a third small, stable copy rather
   // than exporting/reusing motion.js's version, which calls Motion's OWN
@@ -68,11 +105,26 @@
     if (isStrokeSelected(c.li, entry.strokeId)) row.classList.add('act');
     var swatch = document.createElement('div'); swatch.className = 'motion-elem-swatch';
     if (entry.sd.isRaster) { swatch.classList.add('icon'); swatch.innerHTML = ICO_IMAGE; }
-    else swatch.style.background = entry.sd.fillColor || entry.sd.strokeColor || 'transparent';
+    else {
+      // Fill + Stroke, distinguishable on one swatch (2026-08, "le stroke
+      // et fill devrait être dans le même groupe et pouvoir se distinguer
+      // l'un de l'autre visuellement") — this app's data model has no
+      // separate Fill/Stroke sub-items to list (one Path carries both
+      // paint fields at once, confirmed against engine-bridge.js's own
+      // per-item construction), so "same group, visually distinct" means
+      // both painted on the ONE existing swatch rather than the old
+      // `fillColor || strokeColor` fallback, which silently dropped
+      // whichever one lost. Center = fill (or empty if none), ring =
+      // stroke color when the shape has a real stroke — same "filled
+      // square with an outline in a different color" convention
+      // Illustrator/Figma's own swatches use.
+      swatch.style.background = entry.sd.fillColor || 'transparent';
+      if (entry.sd.strokeColor) { swatch.style.borderColor = entry.sd.strokeColor; swatch.style.borderWidth = '2px'; }
+    }
     var nm = document.createElement('div'); nm.className = 'lnm';
     nm.textContent = window.SMMotion.elementLabel(entry, idx, c.ld);
     row.appendChild(swatch); row.appendChild(nm);
-    row.addEventListener('click', function () { window.SMMotion.selectShapesByStrokeIds(c.li, [entry.strokeId]); });
+    row.addEventListener('click', function (e) { applySelection(c.li, [entry.strokeId], e.shiftKey || e.altKey); });
     function commitShapeRename(v) {
       pushUndo();
       if (!c.ld.shapeNames) c.ld.shapeNames = {};
@@ -134,7 +186,7 @@
           if (window.SMGroup && SMGroup.renameGroup) SMGroup.renameGroup(node.gid, c.ld, v, memberIds);
           saveActiveLayerFrame(); renderShapesPanel();
         }
-        grow.addEventListener('click', function () { window.SMMotion.selectShapesByStrokeIds(c.li, memberIds); });
+        grow.addEventListener('click', function (e) { applySelection(c.li, memberIds, e.shiftKey || e.altKey); });
         grow.addEventListener('dblclick', function (e) { e.stopPropagation(); startRename(grow, node.name, commitGroupRename); });
         grow.addEventListener('contextmenu', function (e) {
           e.preventDefault(); e.stopPropagation();
