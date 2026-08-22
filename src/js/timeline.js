@@ -487,8 +487,18 @@ window.SM={
           // single number — rescale every sample by the same ratio so the
           // taper shape is preserved, using the profile's own peak as the
           // "current size" baseline (matches what the size actually reads as).
+          // Peak from widthProfile, NOT centerSegments (2026-08-22 fix, same
+          // root cause as the p-sw display staleness fix above this
+          // function) — centerSegments is only the sparse control-point
+          // list; widthProfile is the dense actually-rendered curve, whose
+          // extremum between two control points is routinely higher. Using
+          // the sparse peak as the ratio's denominator overshot the target:
+          // measured live, setting Width to 100 on a stroke whose
+          // centerSegments peak was 40 but widthProfile peak was 55 landed
+          // the real rendered peak at 138, not 100.
           var cs=p.data.centerSegments;
-          var peak=0;cs.forEach(function(s){if((s.width||0)>peak)peak=s.width||0;});
+          var wpForPeak=p.data.widthProfile&&p.data.widthProfile.length?p.data.widthProfile:cs;
+          var peak=0;wpForPeak.forEach(function(s){if((s.width||0)>peak)peak=s.width||0;});
           var ratio=peak>0?v/peak:1;
           cs.forEach(function(s){s.width=(s.width||v)*ratio;});
           // 2026-08-21 fix (feedback #34, "tous les paramètres stroke ne
@@ -2698,10 +2708,22 @@ function updateSelPropsPanel(){
       // seemed to happen until the value happened to cross it.
       var swField=document.getElementById('p-sw');
       if(swField){
-        var vbCs=ref.data&&ref.data.isVectorBrush&&ref.data.centerSegments;
+        // Bug found live (2026-08-22, QA pass on the right panel): this read
+        // centerSegments' peak, not widthProfile's, contradicting this
+        // block's OWN comment above ("the visible width is the widthProfile's
+        // PEAK"). The two peaks can genuinely differ — widthProfile is dense
+        // (tens of samples along the fitted Bezier curve) while
+        // centerSegments is the sparse handful of CONTROL points, and a
+        // curve's extremum between two control points is routinely higher
+        // than either of them. Measured live: centerSegments peak 40 vs the
+        // actual rendered widthProfile peak 55 on the same stroke — a
+        // ~38% understatement that then made setBrushSize's own rescale
+        // (ratio = target / this peak) overshoot the target by the same
+        // margin, in addition to the field simply showing the wrong number.
+        var vbWp=ref.data&&ref.data.isVectorBrush&&ref.data.widthProfile;
         var swVal;
-        if(vbCs){
-          var peakW=0;vbCs.forEach(function(s){if((s.width||0)>peakW)peakW=s.width||0;});
+        if(vbWp&&vbWp.length){
+          var peakW=0;vbWp.forEach(function(s){if((s.width||0)>peakW)peakW=s.width||0;});
           swVal=peakW||state.brushSize;
         }else{
           swVal=ref.strokeWidth||state.brushSize;
