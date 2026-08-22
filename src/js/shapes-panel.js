@@ -109,6 +109,21 @@
     var sec = document.getElementById(kind === 'fill' ? 'fill-sec' : 'stroke-sec');
     if (sec) sec.scrollIntoView({ block: 'nearest' });
   }
+  // Real stroke check (2026-08, "j'arrive pas à select le fill dans
+  // group>forme 2 individuellement") — found live: serP (app.js) bakes a
+  // '#ffffff' FALLBACK into the stored strokeColor field for any ordinary
+  // shape with no real stroke at all (its own comment: the fallback exists
+  // for a different case, texture-anchor camouflage) — the actual truth
+  // lives in the separate hasRealStroke field, which app.js's own
+  // deserialization already checks (`d.hasRealStroke===false?null:...`)
+  // but this panel didn't. Result: a shape with NO stroke (like a plain
+  // fill-only rectangle) got a phantom "Stroke" sub-row with a meaningless
+  // white swatch and a right-panel Stroke section that never matched what
+  // was actually on screen — confusing enough that clicking the REAL
+  // "Fill" row next to it read as "selecting individually doesn't work".
+  function hasRealStroke(sd) {
+    return !!sd.strokeColor && sd.hasRealStroke !== false;
+  }
   // A brush-drawn stroke with Fill enabled is really TWO live Paths (the
   // stroke itself + a separate linkedFill backdrop, draw-bridge.js) folded
   // into one Elements row by layerElements (motion.js) — see that
@@ -374,7 +389,7 @@
     if (isStrokeSelected(c.li, entry.strokeId)) row.classList.add('act');
     // "Open a shape" (2026-08) — a chevron only when there's something to
     // open (a raster has no fill/stroke paint fields at all).
-    var canOpen = !entry.sd.isRaster && (entry.sd.fillColor || entry.sd.strokeColor);
+    var canOpen = !entry.sd.isRaster && (entry.sd.fillColor || hasRealStroke(entry.sd));
     var expanded = canOpen && !!expandedShapes[entry.strokeId];
     if (canOpen) {
       var arrow = document.createElement('span'); arrow.className = 'lico larrow'; arrow.textContent = expanded ? '▾' : '▸';
@@ -404,7 +419,7 @@
       // square with an outline in a different color" convention
       // Illustrator/Figma's own swatches use.
       swatch.style.background = entry.sd.fillColor || 'transparent';
-      if (entry.sd.strokeColor) { swatch.style.borderColor = entry.sd.strokeColor; swatch.style.borderWidth = '2px'; }
+      if (hasRealStroke(entry.sd)) { swatch.style.borderColor = entry.sd.strokeColor; swatch.style.borderWidth = '2px'; }
     }
     var nm = document.createElement('div'); nm.className = 'lnm';
     nm.textContent = window.SMMotion.elementLabel(entry, idx, c.ld);
@@ -435,7 +450,7 @@
       // reads as "what's on top" before the user ever drags anything.
       paintRowOrder(c, entry).forEach(function (kind) {
         if (kind === 'fill' && entry.sd.fillColor) buildPaintSubRow(list, c, entry, 'fill', indent + 20);
-        if (kind === 'stroke' && entry.sd.strokeColor) buildPaintSubRow(list, c, entry, 'stroke', indent + 20);
+        if (kind === 'stroke' && hasRealStroke(entry.sd)) buildPaintSubRow(list, c, entry, 'stroke', indent + 20);
       });
     }
   }
