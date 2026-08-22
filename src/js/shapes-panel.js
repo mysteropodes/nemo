@@ -12,10 +12,32 @@
 // file existed). Only the RENDERING is new here — a right-panel row
 // instead of a left-panel one — so the two can never diverge in which
 // shapes/groups exist or in what order (CLAUDE.md §3).
+//
+// Hierarchy pass (2026-08, "graphiquement tu peux te rapprocher de figma
+// ou rive pour la hiérarchie") — a group used to be a dead-end row: click
+// selected its members but there was no way to actually SEE them nested
+// underneath, the one thing that makes a "hierarchy" panel read as a
+// hierarchy rather than a flat list with a folder icon. Two additions,
+// both reusing existing app conventions rather than inventing new ones:
+// a real expand/collapse chevron (.larrow, same ▸/▾ glyph-toggle idiom as
+// every other collapsible group in this codebase — Trim Paths, Path,
+// Duplicator) revealing indented member rows, and a selection-highlight
+// (.lrow.act, the SAME class/style timeline.js's own layer rows use for
+// "this is the active one") so the panel reflects canvas selection state
+// instead of only ever driving it one-way.
 (function () {
+  // Session-only UI state (which groups are expanded) — never persisted,
+  // same "not part of the document" precedent as window._motionExpandedLayer
+  // and friends (motion.js) or window._anchorGridOpenFor.
+  var expandedGroups = {};
   function currentLayer() {
     var li = state.activeLayerIdx;
     return { li: li, ld: state.layers[li] };
+  }
+  function isStrokeSelected(li, strokeId) {
+    if (!window.selectedPaths || !window.selectedPaths.length) return false;
+    var item = window.SMMotion.liveItemByStrokeId(li, strokeId);
+    return !!item && window.selectedPaths.indexOf(item) >= 0;
   }
   // Same inline input-swap idiom as timeline.js's startLayerRename and
   // motion.js's startShapeTreeRename — a third small, stable copy rather
@@ -37,6 +59,37 @@
     input.addEventListener('mousedown', function (e) { e.stopPropagation(); });
     input.addEventListener('dblclick', function (e) { e.stopPropagation(); });
   }
+  // Builds one shape row — used both at top level and, indented, as a
+  // group's expanded member row, so the two never visually drift apart.
+  function buildShapeRow(list, c, node, idx, indent) {
+    var entry = { strokeId: node.strokeId, sd: node.sd };
+    var row = document.createElement('div'); row.className = 'lrow motion-elem-row';
+    if (indent) row.style.paddingLeft = (24 + indent) + 'px';
+    if (isStrokeSelected(c.li, entry.strokeId)) row.classList.add('act');
+    var swatch = document.createElement('div'); swatch.className = 'motion-elem-swatch';
+    if (entry.sd.isRaster) { swatch.style.background = 'transparent'; swatch.textContent = '🖼'; swatch.style.fontSize = '9px'; }
+    else swatch.style.background = entry.sd.fillColor || entry.sd.strokeColor || 'transparent';
+    var nm = document.createElement('div'); nm.className = 'lnm';
+    nm.textContent = window.SMMotion.elementLabel(entry, idx, c.ld);
+    row.appendChild(swatch); row.appendChild(nm);
+    row.addEventListener('click', function () { window.SMMotion.selectShapesByStrokeIds(c.li, [entry.strokeId]); });
+    function commitShapeRename(v) {
+      pushUndo();
+      if (!c.ld.shapeNames) c.ld.shapeNames = {};
+      c.ld.shapeNames[entry.strokeId] = v;
+      saveActiveLayerFrame(); renderShapesPanel();
+    }
+    row.addEventListener('dblclick', function (e) { e.stopPropagation(); startRename(row, nm.textContent, commitShapeRename); });
+    row.addEventListener('contextmenu', function (e) {
+      e.preventDefault(); e.stopPropagation();
+      if (!window.showContextMenu) return;
+      window.showContextMenu(e.clientX, e.clientY, [
+        { label: SM.t('elementsRename'), action: function () { startRename(row, nm.textContent, commitShapeRename); } },
+        { label: SM.t('elementsSelect'), action: function () { window.SMMotion.selectShapesByStrokeIds(c.li, [entry.strokeId]); } },
+      ]);
+    });
+    list.appendChild(row);
+  }
   function renderShapesPanel() {
     var list = document.getElementById('shapes-list');
     if (!list) return;
@@ -55,16 +108,27 @@
     var shapeIdx = 0;
     tree.forEach(function (node) {
       if (node.type === 'group') {
-        var grow = document.createElement('div'); grow.className = 'lrow motion-elem-row motion-elem-group';
-        var gswatch = document.createElement('div'); gswatch.className = 'motion-elem-swatch'; gswatch.textContent = '▤'; gswatch.style.background = 'transparent';
-        var gnm = document.createElement('div'); gnm.className = 'lnm'; gnm.textContent = node.name;
-        grow.appendChild(gswatch); grow.appendChild(gnm);
         // Recompute this group's own member strokeIds from the flat list
         // (layerElements), not the already-collapsed tree — same reason
-        // motion.js's own renderElementsList does this (click-select and
-        // rename both need the full membership, not just "a group exists
-        // here").
-        var memberIds = window.SMMotion.layerElements(c.li, c.ld).filter(function (e) { return e.sd.groupId === node.gid; }).map(function (e) { return e.strokeId; });
+        // motion.js's own renderElementsList does this (click-select,
+        // rename and now expand-render all need the full membership, not
+        // just "a group exists here").
+        var memberEntries = window.SMMotion.layerElements(c.li, c.ld).filter(function (e) { return e.sd.groupId === node.gid; });
+        var memberIds = memberEntries.map(function (e) { return e.strokeId; });
+        var expanded = !!expandedGroups[node.gid];
+        var anySelected = memberIds.some(function (sid) { return isStrokeSelected(c.li, sid); });
+
+        var grow = document.createElement('div'); grow.className = 'lrow motion-elem-row motion-elem-group';
+        if (anySelected) grow.classList.add('act');
+        var arrow = document.createElement('span'); arrow.className = 'lico larrow'; arrow.textContent = expanded ? '▾' : '▸';
+        arrow.addEventListener('click', function (e) {
+          e.stopPropagation();
+          expandedGroups[node.gid] = !expanded;
+          renderShapesPanel();
+        });
+        var gswatch = document.createElement('div'); gswatch.className = 'motion-elem-swatch'; gswatch.textContent = '▤'; gswatch.style.background = 'transparent';
+        var gnm = document.createElement('div'); gnm.className = 'lnm'; gnm.textContent = node.name;
+        grow.appendChild(arrow); grow.appendChild(gswatch); grow.appendChild(gnm);
         function commitGroupRename(v) {
           pushUndo();
           if (window.SMGroup && SMGroup.renameGroup) SMGroup.renameGroup(node.gid, c.ld, v, memberIds);
@@ -85,38 +149,20 @@
                 if (it && it.data) delete it.data.groupId;
               });
               if (c.ld.groups) delete c.ld.groups[node.gid];
+              delete expandedGroups[node.gid];
               saveActiveLayerFrame(); renderShapesPanel();
               if (window.SMEngineBridge) SMEngineBridge.renderNow();
             } },
           ]);
         });
         list.appendChild(grow);
-      } else {
-        var entry = { strokeId: node.strokeId, sd: node.sd };
-        var idx = shapeIdx++;
-        var row = document.createElement('div'); row.className = 'lrow motion-elem-row';
-        var swatch = document.createElement('div'); swatch.className = 'motion-elem-swatch';
-        swatch.style.background = entry.sd.fillColor || entry.sd.strokeColor || 'transparent';
-        var nm = document.createElement('div'); nm.className = 'lnm';
-        nm.textContent = window.SMMotion.elementLabel(entry, idx, c.ld);
-        row.appendChild(swatch); row.appendChild(nm);
-        row.addEventListener('click', function () { window.SMMotion.selectShapesByStrokeIds(c.li, [entry.strokeId]); });
-        function commitShapeRename(v) {
-          pushUndo();
-          if (!c.ld.shapeNames) c.ld.shapeNames = {};
-          c.ld.shapeNames[entry.strokeId] = v;
-          saveActiveLayerFrame(); renderShapesPanel();
+        if (expanded) {
+          memberEntries.forEach(function (me) {
+            buildShapeRow(list, c, { strokeId: me.strokeId, sd: me.sd }, shapeIdx++, 20);
+          });
         }
-        row.addEventListener('dblclick', function (e) { e.stopPropagation(); startRename(row, nm.textContent, commitShapeRename); });
-        row.addEventListener('contextmenu', function (e) {
-          e.preventDefault(); e.stopPropagation();
-          if (!window.showContextMenu) return;
-          window.showContextMenu(e.clientX, e.clientY, [
-            { label: SM.t('elementsRename'), action: function () { startRename(row, nm.textContent, commitShapeRename); } },
-            { label: SM.t('elementsSelect'), action: function () { window.SMMotion.selectShapesByStrokeIds(c.li, [entry.strokeId]); } },
-          ]);
-        });
-        list.appendChild(row);
+      } else {
+        buildShapeRow(list, c, node, shapeIdx++, 0);
       }
     });
   }
