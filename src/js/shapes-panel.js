@@ -44,6 +44,18 @@
   // (motion.js) or window._anchorGridOpenFor.
   var expandedGroups = {};
   var expandedShapes = {};
+  // Which paint aspect is "focused" (2026-08, "impossible de select le
+  // stroke ou fill individuellement les deux s'affiche select") — Fill and
+  // Stroke both highlighted .act together, unconditionally, because both
+  // sub-rows' highlight was really just "is the PARENT shape selected",
+  // with no way to tell which of the two was actually clicked. This tracks
+  // the last paint sub-row clicked ({shapeStrokeId, kind}); a sub-row only
+  // highlights when it's BOTH the selected shape's own row AND matches
+  // this. Cleared whenever the shape itself gets selected some other way
+  // (its own row, canvas, Elements panel elsewhere) — a plain shape
+  // selection doesn't imply "fill" or "stroke" specifically, so neither
+  // sub-row should read as focused until one is actually clicked again.
+  var _paintFocus = null;
   function currentLayer() {
     var li = state.activeLayerIdx;
     return { li: li, ld: state.layers[li] };
@@ -68,6 +80,7 @@
   // beyond "also multi-select", so inventing one would be undirected
   // scope, not a fix.
   function applySelection(li, strokeIds, additive) {
+    _paintFocus = null; // a plain shape selection doesn't imply fill or stroke specifically
     if (!additive) { window.SMMotion.selectShapesByStrokeIds(li, strokeIds); return; }
     var items = strokeIds.map(function (sid) { return window.SMMotion.liveItemByStrokeId(li, sid); }).filter(Boolean);
     if (!items.length) return;
@@ -103,9 +116,14 @@
   // stays) and scrolls the right panel to bring that specific section
   // into view, rather than pretending there's a fill-only vs stroke-only
   // selection mode that the panel doesn't actually have.
-  function selectPaintAspect(li, strokeId, kind) {
+  function selectPaintAspect(li, strokeId, shapeStrokeId, kind) {
+    // MUST be set before selectShapesByStrokeIds — that call triggers a
+    // SYNCHRONOUS updateUI -> renderShapesPanel itself (found live: setting
+    // it after left the panel re-rendered against the still-null/stale
+    // focus, so the row that just got clicked never actually highlighted).
+    _paintFocus = { shapeStrokeId: shapeStrokeId, kind: kind };
     if (window.SM && window.SM.setTool) window.SM.setTool('select');
-    window.SMMotion.selectShapesByStrokeIds(li, [strokeId]); // triggers updateUI -> renderShapesPanel itself
+    window.SMMotion.selectShapesByStrokeIds(li, [strokeId]);
     var sec = document.getElementById(kind === 'fill' ? 'fill-sec' : 'stroke-sec');
     if (sec) sec.scrollIntoView({ block: 'nearest' });
   }
@@ -294,6 +312,7 @@
       item.data = item.data || {};
       item.data.paintOrder = srcKind === 'fill' ? 'fillFirst' : 'strokeFirst';
     }
+    _paintFocus = { shapeStrokeId: shapeStrokeId, kind: srcKind }; // the just-dragged aspect stays the focused one
     saveActiveLayerFrame();
     renderShapesPanel();
     if (window.renderArcs) renderArcs();
@@ -353,7 +372,8 @@
     var row = document.createElement('div'); row.className = 'lrow motion-elem-row motion-elem-subrow';
     row.style.paddingLeft = (24 + indent) + 'px';
     row.dataset.paintid = entry.strokeId + ':' + kind;
-    if (isStrokeSelected(c.li, paintStrokeIdFor(entry, kind))) row.classList.add('act');
+    var isFocused = !!_paintFocus && _paintFocus.shapeStrokeId === entry.strokeId && _paintFocus.kind === kind;
+    if (isFocused && isStrokeSelected(c.li, paintStrokeIdFor(entry, kind))) row.classList.add('act');
     var spacer = document.createElement('span'); spacer.className = 'lico larrow-spacer';
     row.appendChild(spacer);
     // Distinct icon per aspect (2026-08, "faire en sorte que les icon fill
@@ -373,7 +393,7 @@
     row.addEventListener('click', function (e) {
       e.stopPropagation();
       if (window._elDragJustEnded) { window._elDragJustEnded = false; return; }
-      selectPaintAspect(c.li, paintStrokeIdFor(entry, kind), kind);
+      selectPaintAspect(c.li, paintStrokeIdFor(entry, kind), entry.strokeId, kind);
     });
     row.addEventListener('mousedown', function (e) { e.stopPropagation(); armDrag(e, 'paint', entry.strokeId + ':' + kind); });
     list.appendChild(row);
