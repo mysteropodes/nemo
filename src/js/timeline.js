@@ -4458,6 +4458,28 @@ var ICO_DUP='<svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx=
 // panel uses for a group row.
 var ICO_GROUP='<svg viewBox="0 0 24 24"><path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 var ICO_IMAGE='<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="1.8" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="8.5" cy="9.5" r="1.6" fill="currentColor"/><path d="M4.5 17.5l5-5.2a1.4 1.4 0 0 1 2 0l3 3.2 1.5-1.5a1.4 1.4 0 0 1 2 0l2.5 2.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+// Combined Shape mode icons (2026-08, Elements panel group row) — the
+// EXACT SAME markup as the toolbar's own #btn-combine-* buttons
+// (index.html), copied verbatim rather than referencing the DOM so the
+// panel's indicator always looks identical to the toolbar even though
+// they're two separate elements. ICO_COMBINE_NONE is new — the toolbar
+// has no "no combine" button (combineSelection() only ever CREATES one of
+// the 4 real modes), but the group row needs a neutral glyph for
+// combineMode==='none' (either never combined, or reset via "Remove
+// combine"): two plain circle OUTLINES, no fill relationship, reading as
+// "not doing anything" next to the 4 shaded variants.
+var ICO_COMBINE_UNITE='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3,12 A6,6 0 1,0 15,12 A6,6 0 1,0 3,12 Z M9,12 A6,6 0 1,0 21,12 A6,6 0 1,0 9,12 Z"/></svg>';
+var ICO_COMBINE_EXCLUDE='<svg viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M3,12 A6,6 0 1,0 15,12 A6,6 0 1,0 3,12 Z M9,12 A6,6 0 1,0 21,12 A6,6 0 1,0 9,12 Z"/></svg>';
+var ICO_COMBINE_NONE='<svg viewBox="0 0 24 24"><circle cx="9" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="1.3" opacity="0.55"/><circle cx="15" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="1.3" opacity="0.55"/></svg>';
+// Subtract/Intersect reference an SVG <mask>/<clipPath> by id — a plain
+// constant string would collide the instant 2+ groups show this icon at
+// once (duplicate ids in the same DOM resolve to whichever element the
+// browser finds first, silently rendering the WRONG icon on every group
+// after the first). Functions taking a caller-supplied unique suffix
+// instead — group-bridge.js/shapes-panel.js pass the group's own gid,
+// which is already unique per document by construction.
+function icoCombineSubtract(uid){var m='ic-csub-'+uid;return '<svg viewBox="0 0 24 24"><defs><mask id="'+m+'"><circle cx="9" cy="12" r="6" fill="#fff"/><circle cx="15" cy="12" r="6" fill="#000"/></mask></defs><circle cx="9" cy="12" r="6" fill="currentColor" mask="url(#'+m+')"/><circle cx="15" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="1.3" opacity="0.45"/></svg>';}
+function icoCombineIntersect(uid){var c='ic-cint-'+uid;return '<svg viewBox="0 0 24 24"><defs><clipPath id="'+c+'"><circle cx="15" cy="12" r="6"/></clipPath></defs><circle cx="9" cy="12" r="6" fill="currentColor" clip-path="url(#'+c+')"/><circle cx="9" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.4"/><circle cx="15" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.4"/></svg>';}
 // Layer color label picker (v5) — a small predefined-swatch "nuancier"
 // instead of jumping straight to the full SV/hue/hex ColorPicker. Reuses
 // LAYER_COLOR_PALETTE (app.js) so the choices match the auto-assigned

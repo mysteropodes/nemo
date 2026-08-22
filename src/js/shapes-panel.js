@@ -173,6 +173,29 @@
     }
     return entry.sd.paintOrder === 'strokeFirst' ? ['stroke', 'fill'] : ['fill', 'stroke'];
   }
+  // Combined Shape indicator + one-click cycle (2026-08, "afficher icon de
+  // combined shape à côté d'un groupe et... pouvoir switch appuyer pour
+  // afficher les différentes combinaison et avoir une neutre sans
+  // combined") — same 4 modes the toolbar's own #btn-combine-* buttons
+  // already write via SMGroup.setGroupCombineMode, plus 'none' (the
+  // toolbar has no button for that — combineSelection() only ever CREATES
+  // one of the 4 real modes — but a plain Cmd+G group, or one reset via
+  // "Remove combine", needs a neutral state to cycle through too).
+  var COMBINE_CYCLE = ['none', 'unite', 'subtract', 'intersect', 'exclude'];
+  function nextCombineMode(mode) {
+    var i = COMBINE_CYCLE.indexOf(mode);
+    return COMBINE_CYCLE[(i + 1) % COMBINE_CYCLE.length];
+  }
+  function combineIconHtml(mode, uid) {
+    if (mode === 'unite') return ICO_COMBINE_UNITE;
+    if (mode === 'subtract') return icoCombineSubtract(uid);
+    if (mode === 'intersect') return icoCombineIntersect(uid);
+    if (mode === 'exclude') return ICO_COMBINE_EXCLUDE;
+    return ICO_COMBINE_NONE;
+  }
+  function combineModeLabelKey(mode) {
+    return mode === 'unite' ? 'combineUnion' : mode === 'subtract' ? 'combineSubtract' : mode === 'intersect' ? 'combineIntersect' : mode === 'exclude' ? 'combineExclude' : 'combineNone';
+  }
   // Same inline input-swap idiom as timeline.js's startLayerRename and
   // motion.js's startShapeTreeRename — a third small, stable copy rather
   // than exporting/reusing motion.js's version, which calls Motion's OWN
@@ -208,7 +231,7 @@
   // "<shapeStrokeId>:<fill|stroke>" key; the only valid drop target is the
   // SAME shape's OTHER paint sub-row (see performPaintSwap), so this never
   // needs to match against data-toplevel rows at all.
-  var _elDrag = { active: false, kind: null, id: null, startY: 0, moved: false };
+  var _elDrag = { active: false, kind: null, id: null, extra: null, startY: 0, moved: false };
   function dragSelectorFor(kind, id) {
     if (kind === 'group') return '.lrow[data-gid="' + id + '"]';
     if (kind === 'paint') return '.lrow[data-paintid="' + id + '"]';
@@ -260,6 +283,8 @@
     var el = document.elementFromPoint(e.clientX, e.clientY);
     var row = _elDrag.kind === 'paint'
       ? el && el.closest('#shapes-list .lrow[data-paintid]')
+      : _elDrag.kind === 'member'
+      ? el && el.closest('#shapes-list .lrow[data-groupmember]')
       : el && el.closest('#shapes-list .lrow[data-toplevel]');
     if (row) row.classList.add('drag-over');
   });
@@ -329,8 +354,32 @@
     if (window.renderArcs) renderArcs();
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
   }
+  // Reorder within a group (2026-08, "impossible de réorganiser des
+  // formes dans un groupe actuellement") — same insertAbove primitive as
+  // the top-level shape/group reorder above, just gated to require the
+  // drop target be a member of the exact SAME group as the dragged item
+  // (_elDrag.extra, stamped at mousedown — see buildShapeRow's member
+  // branch). Dropping on a member of a DIFFERENT group, or anywhere with
+  // no data-groupmember at all, is a no-op rather than silently moving a
+  // shape out of its group — that's a distinct, bigger feature (dragging
+  // INTO/OUT of a group) nobody asked for here.
+  function performMemberReorder(overRow) {
+    var destGroupGid = overRow.dataset.groupmember, destStrokeId = overRow.dataset.strokeid;
+    if (!destGroupGid || destGroupGid !== _elDrag.extra || destStrokeId === _elDrag.id) return;
+    var c = currentLayer(); if (!c.ld) return;
+    var srcItem = window.SMMotion.liveItemByStrokeId(c.li, _elDrag.id);
+    var destItem = window.SMMotion.liveItemByStrokeId(c.li, destStrokeId);
+    if (!srcItem || !destItem) return;
+    pushUndo();
+    srcItem.insertAbove(destItem);
+    saveActiveLayerFrame();
+    renderShapesPanel();
+    if (window.renderArcs) renderArcs();
+    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+  }
   function performReorder(overRow) {
     if (_elDrag.kind === 'paint') { performPaintSwap(overRow); return; }
+    if (_elDrag.kind === 'member') { performMemberReorder(overRow); return; }
     var c = currentLayer(); if (!c.ld) return;
     var destGid = overRow.dataset.gid, destStrokeId = overRow.dataset.strokeid;
     if (_elDrag.kind === 'group' && destGid === _elDrag.id) return; // dropped on itself
@@ -363,9 +412,9 @@
     if (window.renderArcs) renderArcs();
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
   }
-  function armDrag(e, kind, id) {
+  function armDrag(e, kind, id, extra) {
     if (e.button !== 0 || e.target.closest('.lico')) return;
-    _elDrag.active = true; _elDrag.kind = kind; _elDrag.id = id; _elDrag.startY = e.clientY; _elDrag.moved = false;
+    _elDrag.active = true; _elDrag.kind = kind; _elDrag.id = id; _elDrag.extra = extra; _elDrag.startY = e.clientY; _elDrag.moved = false;
   }
   // Fill/Stroke sub-row under an expanded shape — reuses selectPaintAspect
   // above, no boolean-op or paint logic of its own.
@@ -411,11 +460,12 @@
   }
   // Builds one shape row — used both at top level and, indented, as a
   // group's expanded member row, so the two never visually drift apart.
-  function buildShapeRow(list, c, node, idx, indent, topLevel) {
+  function buildShapeRow(list, c, node, idx, indent, topLevel, groupGid) {
     var entry = { strokeId: node.strokeId, sd: node.sd };
     var row = document.createElement('div'); row.className = 'lrow motion-elem-row';
     if (indent) row.style.paddingLeft = (24 + indent) + 'px';
     if (topLevel) row.dataset.toplevel = '1';
+    if (groupGid) row.dataset.groupmember = groupGid;
     row.dataset.strokeid = entry.strokeId;
     if (isStrokeSelected(c.li, entry.strokeId)) row.classList.add('act');
     // "Open a shape" (2026-08) — a chevron only when there's something to
@@ -460,6 +510,15 @@
       applySelection(c.li, [entry.strokeId], e.shiftKey || e.altKey);
     });
     if (topLevel) row.addEventListener('mousedown', function (e) { armDrag(e, 'shape', entry.strokeId); });
+    // Reorder WITHIN a group (2026-08, "impossible de réorganiser des
+    // formes dans un groupe actuellement") — v1 deliberately scoped drag
+    // sources/targets to top-level rows only; member rows got no mousedown
+    // wiring at all, so a member could never be dragged even though its
+    // OWN z-order among its siblings is exactly as real (and exactly as
+    // insertAbove-able) as any top-level shape's. Same 'shape'-family drag
+    // machinery, just tagged 'member' so performReorder can require the
+    // drop target to be a member of the SAME group (see its own comment).
+    else if (groupGid) row.addEventListener('mousedown', function (e) { armDrag(e, 'member', entry.strokeId, groupGid); });
     function commitShapeRename(v) {
       pushUndo();
       if (!c.ld.shapeNames) c.ld.shapeNames = {};
@@ -525,6 +584,20 @@
         var gswatch = document.createElement('div'); gswatch.className = 'motion-elem-swatch icon'; gswatch.innerHTML = ICO_GROUP;
         var gnm = document.createElement('div'); gnm.className = 'lnm'; gnm.textContent = node.name;
         grow.appendChild(arrow); grow.appendChild(gswatch); grow.appendChild(gnm);
+        // Combined Shape indicator (2026-08) — .lico so armDrag's own
+        // e.target.closest('.lico') guard already keeps a click here from
+        // arming the row's group-drag; click cycles to the next mode.
+        var curCombineMode = (c.ld.groups && c.ld.groups[node.gid] && c.ld.groups[node.gid].combineMode) || 'none';
+        var combineBadge = document.createElement('div'); combineBadge.className = 'lico motion-combine-badge';
+        combineBadge.innerHTML = combineIconHtml(curCombineMode, node.gid);
+        combineBadge.title = SM.t(combineModeLabelKey(curCombineMode));
+        combineBadge.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var cur = (c.ld.groups && c.ld.groups[node.gid] && c.ld.groups[node.gid].combineMode) || 'none';
+          if (window.SMGroup && SMGroup.setGroupCombineMode) SMGroup.setGroupCombineMode(node.gid, c.ld, nextCombineMode(cur));
+          renderShapesPanel();
+        });
+        grow.appendChild(combineBadge);
         function commitGroupRename(v) {
           pushUndo();
           if (window.SMGroup && SMGroup.renameGroup) SMGroup.renameGroup(node.gid, c.ld, v, memberIds);
@@ -580,7 +653,7 @@
         list.appendChild(grow);
         if (expanded) {
           memberEntries.forEach(function (me) {
-            buildShapeRow(list, c, { strokeId: me.strokeId, sd: me.sd }, shapeIdx++, 20, false);
+            buildShapeRow(list, c, { strokeId: me.strokeId, sd: me.sd }, shapeIdx++, 20, false, node.gid);
           });
         }
       } else {
