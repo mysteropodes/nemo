@@ -2524,11 +2524,14 @@ function updatePropsContext(){
   // above and is the one case where showing it doesn't bury anything (no
   // Fill/Stroke/Draw tool section competes with #motion-props-sec then).
   if(state.appMode==='motion'){
-    // shapes-sec joins this list (not the layer-sec/canvas-sec "spared"
-    // set below) — Motion already has its own equivalent shape/group tree
-    // (SMMotion's own "Éléments" list, left panel), so this right-panel
-    // copy would just be a redundant second place showing the same thing.
-    show['sel-props-sec']=show['fill-sec']=show['stroke-sec']=show['tool-opts-sec']=show['rig-opts-sec']=show['combine-opts-sec']=show['shapes-sec']=false;
+    // shapes-sec now joins layer-sec in the SPARED set (2026-08 reversal,
+    // Cyril: "en vrai affiché aussi Elements dans motion") — it used to be
+    // force-hidden here on the theory that Motion's own left-panel
+    // "Éléments" list already covers the same ground, but this right-panel
+    // version has since grown real capability that list doesn't have
+    // (drag-reorder, per-group Combined Shape modes, per-shape Fill/Stroke
+    // sub-rows via the fs-select tool) — genuinely not redundant anymore.
+    show['sel-props-sec']=show['fill-sec']=show['stroke-sec']=show['tool-opts-sec']=show['rig-opts-sec']=show['combine-opts-sec']=false;
     if(ctx!=='document')show['canvas-sec']=false;
   }
   Object.keys(show).forEach(function(id){var sec=document.getElementById(id);if(sec)sec.style.display=show[id]?'block':'none';});

@@ -1,4 +1,4 @@
-// ---- ELEMENTS PANEL (2026-08, Animation 2D) ----
+// ---- ELEMENTS PANEL (2026-08, Animation 2D + Motion) ----
 // Figma/Rive-style shape/group tree, surfaced as its own right-panel
 // section (#shapes-sec, index.html) rather than copying Motion's own
 // left-side "Éléments" list — Cyril: "surtout motion, en anim 2D peut-être
@@ -14,22 +14,36 @@
 // shapes/groups exist or in what order (CLAUDE.md §3).
 //
 // Hierarchy pass (2026-08, "graphiquement tu peux te rapprocher de figma
-// ou rive pour la hiérarchie") — a group used to be a dead-end row: click
-// selected its members but there was no way to actually SEE them nested
-// underneath, the one thing that makes a "hierarchy" panel read as a
-// hierarchy rather than a flat list with a folder icon. Two additions,
-// both reusing existing app conventions rather than inventing new ones:
-// a real expand/collapse chevron (.larrow, same ▸/▾ glyph-toggle idiom as
-// every other collapsible group in this codebase — Trim Paths, Path,
-// Duplicator) revealing indented member rows, and a selection-highlight
-// (.lrow.act, the SAME class/style timeline.js's own layer rows use for
-// "this is the active one") so the panel reflects canvas selection state
-// instead of only ever driving it one-way.
+// ou rive pour la hiérarchie") — a real expand/collapse chevron (.larrow,
+// same ▸/▾ glyph-toggle idiom as every other collapsible group in this
+// codebase) revealing indented member rows, and a selection-highlight
+// (.lrow.act) so the panel reflects canvas selection state both ways.
+//
+// "Shape layer" pass (2026-08, "Elements doit agir un peu comme pour les
+// shape layer" — AE's Shape Layer > Contents tree) — three additions,
+// each reusing an existing mechanism rather than inventing a parallel one:
+//  - Drag-to-reorder: manual mouse drag (NOT HTML5 draggable — same reason
+//    timeline.js's own layer-row drag avoids it, inconsistent inside the
+//    Tauri webview), moving the LIVE Paper item(s) via insertAbove, the
+//    same primitive every other z-order operation in this codebase uses
+//    (tools.js/draw-bridge.js/symmetry-bridge.js all call it directly).
+//  - Combined Shape modes on a group's context menu: same
+//    SMGroup.setGroupCombineMode the existing toolbar buttons already call
+//    (timeline.js's updateCombinePanel) — no new boolean-op code.
+//  - "Open a shape" for separate Fill/Stroke: this app's data model has no
+//    separate Fill/Stroke sub-objects (one Path carries both paint fields
+//    at once). Clicking "Fill" or "Stroke" under an expanded shape selects
+//    the shape the ORDINARY way (state.tool stays 'select' — Cyril: "la
+//    sélection... toujours en select") and scrolls the right panel to
+//    that section; Select's own hasSel branch already shows Fill AND
+//    Stroke together the instant a shape is selected, so there was no
+//    need for a second, fsselect-tool-based selection mode after all.
 (function () {
-  // Session-only UI state (which groups are expanded) — never persisted,
-  // same "not part of the document" precedent as window._motionExpandedLayer
-  // and friends (motion.js) or window._anchorGridOpenFor.
+  // Session-only UI state — never persisted, same "not part of the
+  // document" precedent as window._motionExpandedLayer and friends
+  // (motion.js) or window._anchorGridOpenFor.
   var expandedGroups = {};
+  var expandedShapes = {};
   function currentLayer() {
     var li = state.activeLayerIdx;
     return { li: li, ld: state.layers[li] };
@@ -76,6 +90,25 @@
     if (window.updateUI) updateUI();
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
   }
+  // "Open a shape" for separate Fill/Stroke (2026-08, revised — Cyril:
+  // "la sélection quand on clic sur un layer... stroke ou fill, toujours
+  // en select"). First cut routed through the fs-select tool (_fsSel,
+  // tools.js), which works but SWITCHES state.tool away from 'select' —
+  // losing the canvas transform box and, since setTool('fsselect') also
+  // runs clearSel(), the normal canvas selection. Not needed anyway: the
+  // Select tool's own hasSel branch (timeline.js updatePropsContext)
+  // already shows Fill AND Stroke sections TOGETHER the moment a shape is
+  // selected normally — so "open Fill" / "open Stroke" now just selects
+  // the shape the ordinary way (state.tool stays 'select', transform box
+  // stays) and scrolls the right panel to bring that specific section
+  // into view, rather than pretending there's a fill-only vs stroke-only
+  // selection mode that the panel doesn't actually have.
+  function selectPaintAspect(li, strokeId, kind) {
+    if (window.SM && window.SM.setTool) window.SM.setTool('select');
+    window.SMMotion.selectShapesByStrokeIds(li, [strokeId]); // triggers updateUI -> renderShapesPanel itself
+    var sec = document.getElementById(kind === 'fill' ? 'fill-sec' : 'stroke-sec');
+    if (sec) sec.scrollIntoView({ block: 'nearest' });
+  }
   // Same inline input-swap idiom as timeline.js's startLayerRename and
   // motion.js's startShapeTreeRename — a third small, stable copy rather
   // than exporting/reusing motion.js's version, which calls Motion's OWN
@@ -96,13 +129,168 @@
     input.addEventListener('mousedown', function (e) { e.stopPropagation(); });
     input.addEventListener('dblclick', function (e) { e.stopPropagation(); });
   }
+  // ---- Drag-to-reorder (2026-08, "on ne peut pas réarranger l'ordre") ----
+  // Manual mouse drag mirroring timeline.js's own _layerDrag exactly (see
+  // that block's comment for why not HTML5 draggable) — mousedown arms it,
+  // a 4px move threshold before it's a "real" drag (so a plain click still
+  // reaches the row's click handler), global mousemove tracks the
+  // drag-over target, global mouseup performs the move. Only TOP-LEVEL
+  // rows (data-toplevel) are valid drag sources/targets in v1 — reordering
+  // a group's own members, or dragging a shape into/out of a group, is a
+  // separate, bigger feature (dropping ONTO a group here just moves the
+  // dragged item to sit right in front of that whole group block).
+  var _elDrag = { active: false, kind: null, id: null, startY: 0, moved: false };
+  function dragSelectorFor(kind, id) {
+    return kind === 'group' ? '.lrow[data-gid="' + id + '"]' : '.lrow[data-strokeid="' + id + '"]';
+  }
+  // Floating drag-ghost (2026-08, "quand on drag la ligne doit suivre la
+  // souris pour mieux voir ce que l'on prend") — the row being dragged
+  // used to just dim in place (.dragging{opacity:.4}, same as timeline.js's
+  // own layer-row drag) with no feedback attached to the cursor itself.
+  // A cloned copy of the row, position:fixed, its own top re-set on every
+  // mousemove tick, gives a real "picked up" affordance — removed on
+  // mouseup regardless of whether the drop lands anywhere.
+  var _dragGhost = null;
+  function startDragGhost(rowEl, e) {
+    var rect = rowEl.getBoundingClientRect();
+    _dragGhost = rowEl.cloneNode(true);
+    _dragGhost.classList.remove('dragging', 'act', 'drag-over');
+    _dragGhost.style.position = 'fixed';
+    _dragGhost.style.left = rect.left + 'px';
+    _dragGhost.style.width = rect.width + 'px';
+    _dragGhost.style.top = (e.clientY - rect.height / 2) + 'px';
+    _dragGhost.style.pointerEvents = 'none';
+    _dragGhost.style.zIndex = 99999;
+    _dragGhost.style.opacity = '0.92';
+    _dragGhost.style.boxShadow = '0 6px 16px rgba(0,0,0,.5)';
+    _dragGhost.style.background = 'var(--panel3, #2a2a33)';
+    _dragGhost.style.borderRadius = '4px';
+    _dragGhost.style.display = 'flex';
+    _dragGhost.style.alignItems = 'center';
+    document.body.appendChild(_dragGhost);
+  }
+  function moveDragGhost(e) {
+    if (_dragGhost) _dragGhost.style.top = (e.clientY - _dragGhost.offsetHeight / 2) + 'px';
+  }
+  function stopDragGhost() {
+    if (_dragGhost) { _dragGhost.remove(); _dragGhost = null; }
+  }
+  window.addEventListener('mousemove', function (e) {
+    if (!_elDrag.active) return;
+    if (!_elDrag.moved) {
+      if (Math.abs(e.clientY - _elDrag.startY) < 4) return;
+      _elDrag.moved = true;
+      var src = document.querySelector(dragSelectorFor(_elDrag.kind, _elDrag.id));
+      if (src) { src.classList.add('dragging'); startDragGhost(src, e); }
+    }
+    moveDragGhost(e);
+    var list = document.getElementById('shapes-list'); if (!list) return;
+    Array.prototype.forEach.call(list.querySelectorAll('.lrow'), function (r) { r.classList.remove('drag-over'); });
+    var el = document.elementFromPoint(e.clientX, e.clientY);
+    var row = el && el.closest('#shapes-list .lrow[data-toplevel]');
+    if (row) row.classList.add('drag-over');
+  });
+  window.addEventListener('mouseup', function () {
+    if (!_elDrag.active) return;
+    if (_elDrag.moved) {
+      window._elDragJustEnded = true;
+      var list = document.getElementById('shapes-list');
+      var overRow = list && list.querySelector('.lrow.drag-over');
+      if (overRow) performReorder(overRow);
+    }
+    stopDragGhost();
+    var list2 = document.getElementById('shapes-list');
+    if (list2) Array.prototype.forEach.call(list2.querySelectorAll('.lrow'), function (r) { r.classList.remove('dragging', 'drag-over'); });
+    _elDrag.active = false; _elDrag.moved = false;
+  });
+  function performReorder(overRow) {
+    var c = currentLayer(); if (!c.ld) return;
+    var destGid = overRow.dataset.gid, destStrokeId = overRow.dataset.strokeid;
+    if (_elDrag.kind === 'group' && destGid === _elDrag.id) return; // dropped on itself
+    if (_elDrag.kind === 'shape' && destStrokeId === _elDrag.id) return;
+    var destItem;
+    if (destGid) {
+      var destMembers = window.SMMotion.layerElements(c.li, c.ld).filter(function (e) { return e.sd.groupId === destGid; });
+      if (!destMembers.length) return;
+      // Front-most (last) member — the dragged block lands adjacent to the
+      // WHOLE group rather than injected into its middle.
+      destItem = window.SMMotion.liveItemByStrokeId(c.li, destMembers[destMembers.length - 1].strokeId);
+    } else if (destStrokeId) {
+      destItem = window.SMMotion.liveItemByStrokeId(c.li, destStrokeId);
+    }
+    if (!destItem) return;
+    var srcItems;
+    if (_elDrag.kind === 'group') {
+      var srcMembers = window.SMMotion.layerElements(c.li, c.ld).filter(function (e) { return e.sd.groupId === _elDrag.id; });
+      srcItems = srcMembers.map(function (e) { return window.SMMotion.liveItemByStrokeId(c.li, e.strokeId); }).filter(Boolean);
+    } else {
+      var it = window.SMMotion.liveItemByStrokeId(c.li, _elDrag.id);
+      srcItems = it ? [it] : [];
+    }
+    if (!srcItems.length) return;
+    pushUndo();
+    var anchor = destItem;
+    srcItems.forEach(function (it) { it.insertAbove(anchor); anchor = it; });
+    saveActiveLayerFrame();
+    renderShapesPanel();
+    if (window.renderArcs) renderArcs();
+    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+  }
+  function armDrag(e, kind, id) {
+    if (e.button !== 0 || e.target.closest('.lico')) return;
+    _elDrag.active = true; _elDrag.kind = kind; _elDrag.id = id; _elDrag.startY = e.clientY; _elDrag.moved = false;
+  }
+  // Fill/Stroke sub-row under an expanded shape — reuses selectPaintAspect
+  // above, no boolean-op or paint logic of its own.
+  //
+  // Alignment fix (2026-08, "fais attention à la hiérarchie décalée
+  // toujours quand on ouvre une shape") — a shape row's own swatch sits
+  // AFTER its chevron/spacer .lico (20px + gap), but this sub-row had NO
+  // such leading element, only padding-left — at indent+20 that put its
+  // swatch to the LEFT of the shape's own swatch above it (44px vs the
+  // parent's 50px), reading as mis-nested rather than nested further in.
+  // Same leading spacer as the parent's own non-openable-row case fixes
+  // it: both start their swatch at an identical spacer-width offset, so
+  // the +20 padding-left difference is the ONLY thing separating them.
+  function buildPaintSubRow(list, c, entry, kind, indent) {
+    var row = document.createElement('div'); row.className = 'lrow motion-elem-row motion-elem-subrow';
+    row.style.paddingLeft = (24 + indent) + 'px';
+    if (isStrokeSelected(c.li, entry.strokeId)) row.classList.add('act');
+    var spacer = document.createElement('span'); spacer.className = 'lico larrow-spacer';
+    row.appendChild(spacer);
+    var swatch = document.createElement('div'); swatch.className = 'motion-elem-swatch';
+    swatch.style.background = (kind === 'fill' ? entry.sd.fillColor : entry.sd.strokeColor) || 'transparent';
+    var nm = document.createElement('div'); nm.className = 'lnm';
+    nm.textContent = SM.t(kind === 'fill' ? 'elementsFill' : 'elementsStroke');
+    row.appendChild(swatch); row.appendChild(nm);
+    row.addEventListener('click', function (e) { e.stopPropagation(); selectPaintAspect(c.li, entry.strokeId, kind); });
+    list.appendChild(row);
+  }
   // Builds one shape row — used both at top level and, indented, as a
   // group's expanded member row, so the two never visually drift apart.
-  function buildShapeRow(list, c, node, idx, indent) {
+  function buildShapeRow(list, c, node, idx, indent, topLevel) {
     var entry = { strokeId: node.strokeId, sd: node.sd };
     var row = document.createElement('div'); row.className = 'lrow motion-elem-row';
     if (indent) row.style.paddingLeft = (24 + indent) + 'px';
+    if (topLevel) row.dataset.toplevel = '1';
+    row.dataset.strokeid = entry.strokeId;
     if (isStrokeSelected(c.li, entry.strokeId)) row.classList.add('act');
+    // "Open a shape" (2026-08) — a chevron only when there's something to
+    // open (a raster has no fill/stroke paint fields at all).
+    var canOpen = !entry.sd.isRaster && (entry.sd.fillColor || entry.sd.strokeColor);
+    var expanded = canOpen && !!expandedShapes[entry.strokeId];
+    if (canOpen) {
+      var arrow = document.createElement('span'); arrow.className = 'lico larrow'; arrow.textContent = expanded ? '▾' : '▸';
+      arrow.addEventListener('click', function (e) {
+        e.stopPropagation();
+        expandedShapes[entry.strokeId] = !expanded;
+        renderShapesPanel();
+      });
+      row.appendChild(arrow);
+    } else {
+      var spacer = document.createElement('span'); spacer.className = 'lico larrow-spacer';
+      row.appendChild(spacer);
+    }
     var swatch = document.createElement('div'); swatch.className = 'motion-elem-swatch';
     if (entry.sd.isRaster) { swatch.classList.add('icon'); swatch.innerHTML = ICO_IMAGE; }
     else {
@@ -124,7 +312,11 @@
     var nm = document.createElement('div'); nm.className = 'lnm';
     nm.textContent = window.SMMotion.elementLabel(entry, idx, c.ld);
     row.appendChild(swatch); row.appendChild(nm);
-    row.addEventListener('click', function (e) { applySelection(c.li, [entry.strokeId], e.shiftKey || e.altKey); });
+    row.addEventListener('click', function (e) {
+      if (window._elDragJustEnded) { window._elDragJustEnded = false; return; } // trailing click after a drag-drop, see armDrag/mouseup
+      applySelection(c.li, [entry.strokeId], e.shiftKey || e.altKey);
+    });
+    if (topLevel) row.addEventListener('mousedown', function (e) { armDrag(e, 'shape', entry.strokeId); });
     function commitShapeRename(v) {
       pushUndo();
       if (!c.ld.shapeNames) c.ld.shapeNames = {};
@@ -141,6 +333,10 @@
       ]);
     });
     list.appendChild(row);
+    if (expanded) {
+      if (entry.sd.fillColor) buildPaintSubRow(list, c, entry, 'fill', indent + 20);
+      if (entry.sd.strokeColor) buildPaintSubRow(list, c, entry, 'stroke', indent + 20);
+    }
   }
   function renderShapesPanel() {
     var list = document.getElementById('shapes-list');
@@ -171,6 +367,7 @@
         var anySelected = memberIds.some(function (sid) { return isStrokeSelected(c.li, sid); });
 
         var grow = document.createElement('div'); grow.className = 'lrow motion-elem-row motion-elem-group';
+        grow.dataset.toplevel = '1'; grow.dataset.gid = node.gid;
         if (anySelected) grow.classList.add('act');
         var arrow = document.createElement('span'); arrow.className = 'lico larrow'; arrow.textContent = expanded ? '▾' : '▸';
         arrow.addEventListener('click', function (e) {
@@ -186,14 +383,40 @@
           if (window.SMGroup && SMGroup.renameGroup) SMGroup.renameGroup(node.gid, c.ld, v, memberIds);
           saveActiveLayerFrame(); renderShapesPanel();
         }
-        grow.addEventListener('click', function (e) { applySelection(c.li, memberIds, e.shiftKey || e.altKey); });
+        grow.addEventListener('click', function (e) {
+          if (window._elDragJustEnded) { window._elDragJustEnded = false; return; }
+          applySelection(c.li, memberIds, e.shiftKey || e.altKey);
+        });
+        grow.addEventListener('mousedown', function (e) { armDrag(e, 'group', node.gid); });
         grow.addEventListener('dblclick', function (e) { e.stopPropagation(); startRename(grow, node.name, commitGroupRename); });
         grow.addEventListener('contextmenu', function (e) {
           e.preventDefault(); e.stopPropagation();
           if (!window.showContextMenu) return;
+          // Combined Shape (2026-08, "peut être avoir les combined shape
+          // option pour le groupe") — same SMGroup.setGroupCombineMode the
+          // existing toolbar buttons call (timeline.js's updateCombinePanel/
+          // COMBINE_MODE_BTN_IDS), just reachable from this row's own menu
+          // instead of only via canvas selection + the right-panel toolbar.
+          // groupSelection() already seeds ld.groups[gid].combineMode:'none'
+          // at creation time, so this never hits setGroupCombineMode's own
+          // "group doesn't exist yet" early-return.
+          var curMode = (c.ld.groups && c.ld.groups[node.gid] && c.ld.groups[node.gid].combineMode) || 'none';
+          function combineItem(mode, key) {
+            return { label: SM.t(key) + (curMode === mode ? ' ✓' : ''), action: function () {
+              if (window.SMGroup && SMGroup.setGroupCombineMode) SMGroup.setGroupCombineMode(node.gid, c.ld, mode);
+              renderShapesPanel();
+            } };
+          }
           window.showContextMenu(e.clientX, e.clientY, [
             { label: SM.t('elementsRename'), action: function () { startRename(grow, node.name, commitGroupRename); } },
             { label: SM.t('elementsSelectMembers'), action: function () { window.SMMotion.selectShapesByStrokeIds(c.li, memberIds); } },
+            { sep: true },
+            combineItem('unite', 'combineUnion'),
+            combineItem('subtract', 'combineSubtract'),
+            combineItem('intersect', 'combineIntersect'),
+            combineItem('exclude', 'combineExclude'),
+            combineItem('none', 'combineNone'),
+            { sep: true },
             { label: SM.t('elementsUngroup'), action: function () {
               pushUndo();
               memberIds.forEach(function (sid) {
@@ -210,11 +433,11 @@
         list.appendChild(grow);
         if (expanded) {
           memberEntries.forEach(function (me) {
-            buildShapeRow(list, c, { strokeId: me.strokeId, sd: me.sd }, shapeIdx++, 20);
+            buildShapeRow(list, c, { strokeId: me.strokeId, sd: me.sd }, shapeIdx++, 20, false);
           });
         }
       } else {
-        buildShapeRow(list, c, node, shapeIdx++, 0);
+        buildShapeRow(list, c, node, shapeIdx++, 0, true);
       }
     });
   }
