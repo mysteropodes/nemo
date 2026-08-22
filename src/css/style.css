@@ -449,6 +449,7 @@ body.tools-docked-away #tools-panel-resize{display:none;}
 #props-panel.collapsed #props-panel-collapse-btn{margin:0 auto;}
 #props-panel.collapsed #props-panel-collapse-btn svg{transform:rotate(180deg);}
 #props-panel.collapsed .psec{display:none!important;}
+#props-panel.collapsed #sel-props-sec{display:none!important;}
 #props-panel-rail{display:none;flex-direction:column;}
 #props-panel.collapsed #props-panel-rail{display:flex;}
 .rail-item{width:100%;padding:10px 0;border:none;background:transparent;cursor:pointer;
