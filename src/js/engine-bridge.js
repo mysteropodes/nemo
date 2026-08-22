@@ -1557,6 +1557,22 @@
               item.dashPattern = c.dashArray;
               item.dashOffset = c.dashOffset;
             }
+            // Extended per-shape properties: Stroke color/width (2026-08 —
+            // second slice of the "propriétés étendues par forme" chantier,
+            // same shape as Fill color's own override above). Only reachable
+            // inside this `if(sc)` block — same "can't animate a stroke into
+            // existence on a strokeless shape" scope Fill color's own
+            // comment establishes for fills. Width gets the SAME strokeScale
+            // treatment as the base width just above it (a keyed width is
+            // the shape's own LOCAL value, composed with elMat/motionMat
+            // exactly like c.strokeWidth already is — not a finished,
+            // already-posed number).
+            if (window.SMMotion && cStrokeId) {
+              var scOverride = SMMotion.elementStrokeColorAt(i, cStrokeId, renderFrame);
+              if (scOverride) item.strokeColor = scOverride;
+              var swOverride = SMMotion.elementStrokeWidthAt(i, cStrokeId, renderFrame);
+              if (swOverride !== null) item.strokeWidth = swOverride * (item.pathTransform ? 1 : strokeScale);
+            }
           }
           if (includeEditorOverlays && state.currentFrameOutline) {
             delete item.fillGradient;

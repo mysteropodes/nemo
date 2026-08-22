@@ -1946,6 +1946,29 @@
     if (!hasKeys(holder, 'fillColor') && !(holder.motionStatic && holder.motionStatic.fillColor)) return null;
     return valueAtFrame(holder, 'fillColor', frameIdx);
   }
+  // Extended per-shape properties: Stroke color / Stroke width (2026-08 —
+  // second slice of the "propriétés étendues par forme" chantier, same
+  // exact shape as Fill color above). Stroke color is [r,g,b,a] 0-255 like
+  // Fill; stroke width is a single scalar, so it's stored as the usual
+  // 1-element array every other scalar prop uses (rotation/opacity) and
+  // unwrapped here so callers get a plain number, not an array — matching
+  // what engine-bridge.js's own item.strokeWidth already expects.
+  function elementStrokeColorAt(li, strokeId, frameIdx) {
+    var ld = state.layers[li];
+    if (!ld || !ld.elementMotion) return null;
+    var holder = ld.elementMotion[strokeId];
+    if (!holder) return null;
+    if (!hasKeys(holder, 'strokeColor') && !(holder.motionStatic && holder.motionStatic.strokeColor)) return null;
+    return valueAtFrame(holder, 'strokeColor', frameIdx);
+  }
+  function elementStrokeWidthAt(li, strokeId, frameIdx) {
+    var ld = state.layers[li];
+    if (!ld || !ld.elementMotion) return null;
+    var holder = ld.elementMotion[strokeId];
+    if (!holder) return null;
+    if (!hasKeys(holder, 'strokeWidth') && !(holder.motionStatic && holder.motionStatic.strokeWidth)) return null;
+    return valueAtFrame(holder, 'strokeWidth', frameIdx)[0];
+  }
   // Path property, per-vertex (2026-07, "les properties de path dans motion
   // dont les vertices peuvent être animé séparément"): reuses the EXACT
   // same holder/track machinery as the 5 base Transform properties
@@ -4793,6 +4816,21 @@
       if (entry.sd.fillColor) {
         renderFillColorRow(list, ensureElementHolder(ld, entry.strokeId), entry.sd.fillColor);
       }
+      // Stroke color/width (2026-08 — second slice of the "propriétés
+      // étendues par forme" chantier, same convention as Fill color above):
+      // hidden unless the element actually has a real stroke. Width reuses
+      // renderTrimScalarRow as-is (a plain scalar row is a plain scalar
+      // row) rather than writing a near-identical function — its default
+      // comes from THIS shape's own current width, same "per-shape, not
+      // one shared constant" principle ensureElementHolder's corner-radii
+      // seeding already establishes for paramShapeKind.
+      if (entry.sd.strokeColor) {
+        var strokeHolder = ensureElementHolder(ld, entry.strokeId);
+        renderStrokeColorRow(list, strokeHolder, entry.sd.strokeColor);
+        if (entry.sd.strokeWidth !== undefined) {
+          renderTrimScalarRow(list, strokeHolder, 'strokeWidth', 'Stroke Width', 'px', 0, 200, entry.sd.strokeWidth);
+        }
+      }
       // Trim Paths (2026-08, "animer les stroke en in et out"): opt-in,
       // same visibility gate as Path above (needs real vertex geometry).
       if (!entry.sd.isRaster && entry.sd.segments && entry.sd.segments.length) {
@@ -4816,9 +4854,12 @@
   // Single row (not an accordion group — one color, nothing to expand),
   // same stopwatch/keying contract as renderVertexRow but with a color
   // swatch instead of numeric scrub fields. Opens the SAME color-picker
-  // popover the layer-color dot uses elsewhere (timeline.js).
-  function renderFillColorRow(list, holder, currentFillColorHex) {
-    var prop = 'fillColor';
+  // popover the layer-color dot uses elsewhere (timeline.js). Generalized
+  // over `prop`/`label`/`swatchTitle` (2026-08) so Fill and Stroke color
+  // share one implementation instead of drifting apart as two copies
+  // (CLAUDE.md §3) — renderFillColorRow/renderStrokeColorRow below are thin
+  // wrappers so existing call sites don't need to change.
+  function renderColorRow(list, holder, prop, label, swatchTitle, currentColorHex) {
     var row = document.createElement('div'); row.className = 'lrow motion-prop-row';
     var sw = document.createElement('div');
     var swOn = isAnimated(holder, prop);
@@ -4829,13 +4870,13 @@
     function currentRgba() {
       if (hasKeys(holder, prop)) return valueAtFrame(holder, prop, state.currentFrame);
       if (holder.motionStatic && holder.motionStatic[prop]) return holder.motionStatic[prop];
-      return hexToRgba255(currentFillColorHex);
+      return hexToRgba255(currentColorHex);
     }
     sw.addEventListener('click', function (e) {
       e.stopPropagation(); pushUndo();
       if (!swOn) {
         if (!holder.motionStatic) holder.motionStatic = {};
-        if (!holder.motionStatic[prop]) holder.motionStatic[prop] = hexToRgba255(currentFillColorHex);
+        if (!holder.motionStatic[prop]) holder.motionStatic[prop] = hexToRgba255(currentColorHex);
         toggleAnimated(holder, prop);
       } else if (hasKeyHere) {
         if (holder.motion[prop].keys.length === 1) {
@@ -4852,12 +4893,12 @@
       renderLayerList(); renderTimeline();
       if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
     });
-    var nm = document.createElement('div'); nm.className = 'lnm'; nm.textContent = 'Fill';
+    var nm = document.createElement('div'); nm.className = 'lnm'; nm.textContent = label;
     var swatch = document.createElement('div');
     swatch.style.cssText = 'width:16px;height:16px;border-radius:3px;border:1px solid var(--border2);cursor:pointer;margin-left:auto;';
     var rgba = currentRgba();
     swatch.style.background = 'rgba(' + rgba[0] + ',' + rgba[1] + ',' + rgba[2] + ',' + ((rgba[3] !== undefined ? rgba[3] : 255) / 255) + ')';
-    swatch.title = 'Couleur de fill de cette forme';
+    swatch.title = swatchTitle;
     swatch.addEventListener('click', function (e) {
       e.stopPropagation();
       if (!window.openLayerColorSwatches) return;
@@ -4871,6 +4912,12 @@
     });
     row.appendChild(sw); row.appendChild(nm); row.appendChild(swatch);
     list.appendChild(row);
+  }
+  function renderFillColorRow(list, holder, currentFillColorHex) {
+    renderColorRow(list, holder, 'fillColor', 'Fill', 'Couleur de fill de cette forme', currentFillColorHex);
+  }
+  function renderStrokeColorRow(list, holder, currentStrokeColorHex) {
+    renderColorRow(list, holder, 'strokeColor', 'Stroke', 'Couleur de stroke de cette forme', currentStrokeColorHex);
   }
   // Trim Paths (2026-08, "animer les stroke en in et out"): 3 scalar rows
   // (Start/End/Offset, %), same stopwatch/keying contract as
@@ -5492,6 +5539,13 @@
           // down (a later Forme's own Transform/Path/Fill rows) drifted out
           // of alignment with its own keyframe track from that point on.
           if (entry.sd.fillColor) renderTracksFor(grid, elHolder, 'fillColor');
+          // Stroke color/width (mirrors renderElementsList's own Stroke
+          // block exactly — same condition, same order: color row then,
+          // only if the shape also reports a width, the width row).
+          if (entry.sd.strokeColor) {
+            renderTracksFor(grid, elHolder, 'strokeColor');
+            if (entry.sd.strokeWidth !== undefined) renderTracksFor(grid, elHolder, 'strokeWidth');
+          }
           // Trim Paths group (mirrors renderElementsList's renderTrimPathsGroup
           // exactly — same condition, same expand state, same 3 scalar rows).
           // Bug found live (2026-08-21, QA pass on a bouncing-ball test scene):
@@ -6934,6 +6988,8 @@
     computeMotionMatFor: computeMotionMat,
     elementMotionAt: elementMotionAt,
     elementFillColorAt: elementFillColorAt,
+    elementStrokeColorAt: elementStrokeColorAt,
+    elementStrokeWidthAt: elementStrokeWidthAt,
     transformSegments: transformSegments,
     transformImageRect: transformImageRect,
     transformImageRectByMatrix: transformImageRectByMatrix,
