@@ -8834,6 +8834,10 @@ setInterval(function(){
   // v15: dense on-disk version history (Tauri only) alongside the single-
   // slot localStorage fallback above — see project.js pushVersionSnapshot.
   if(window.SMProject&&window.SMProject.pushVersionSnapshot)window.SMProject.pushVersionSnapshot(json);
+  // Reuses the `json` this tick already paid to serialize — see
+  // refreshActiveTabDirtyDot's own comment (project.js) for why this isn't
+  // triggered on every edit instead.
+  if(window.SMProject&&window.SMProject.refreshActiveTabDirtyDot)window.SMProject.refreshActiveTabDirtyDot(json);
 },30000);
 // Restored quietly into memory so it's ready the instant the start screen's
 // "Resume Last Session" card is clicked — the toast there was confusing

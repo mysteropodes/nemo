@@ -126,11 +126,10 @@ body.mac-overlay-titlebar #app{padding-top:28px;}
    background), replacing the earlier browser-style rounded-top tab strip. */
 #project-tabs-bar{flex:none;height:32px;display:flex;align-items:center;gap:14px;padding:0 14px;background:var(--panel2);border-radius:8px 8px 0 0;}
 /* Tabs list hugs its own content (not flex:1 anymore) so "+" sits right
-   after the last tab, not stretched to the bar's far edge — the spacer
-   below is what actually pushes the settings gear out to the true right
-   edge, matching the reference prototype's layout. */
+   after the last tab, not stretched to the bar's far edge. #project-tabs-
+   settings now lives in the top titlebar strip, not as a sibling of this
+   list, so there's no spacer element to push apart here anymore. */
 #project-tabs-list{flex:0 1 auto;display:flex;align-items:center;gap:22px;overflow-x:auto;min-width:0;height:100%;}
-#project-tabs-spacer{flex:1;min-width:8px;}
 #project-tabs-settings{flex:none;width:24px;height:24px;border-radius:6px;background:transparent;border:none;color:rgba(236,234,231,.45);cursor:pointer;display:flex;align-items:center;justify-content:center;}
 #project-tabs-settings:hover{background:var(--panel3);color:var(--text);}
 /* Collaborator avatars: current profile + everyone who's left a feedback
@@ -1080,8 +1079,6 @@ body:not(.mode-motion) #motion-props-sec{display:none;}
   height:auto;width:3px;transform:translateX(-50%);}
 .motion-keysel-edge-left:hover::after,.motion-keysel-edge-right:hover::after{opacity:.85;}
 .motion-keysel-edge-left.grabbing::after,.motion-keysel-edge-right.grabbing::after{opacity:1;width:5px;}
-.lrow.motion-disabled{cursor:not-allowed;opacity:.45;}
-.lrow.motion-disabled:hover{background:transparent;}
 body.mode-motion #layer-panel{width:260px;}
 /* Motion mode row height (feedback 2026-07: 34px — Animation 2D's default —
    read as needlessly sparse once a layer's 5 Transform properties, its
@@ -1608,7 +1605,6 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
    drag (see fadeDragSourceSpans in timeline.js) — recedes instead of
    staying fully solid while the ghost preview shows the new location. */
 .fc.tl-drag-fading{opacity:.32;}
-.tl-sel-rect{position:absolute;border:1px dashed var(--accent);background:rgba(74,158,255,.1);pointer-events:none;z-index:11;}
 
 /* STATUSBAR */
 #statusbar{height:20px;flex-shrink:0;background:transparent;border-top:none;display:flex;align-items:center;justify-content:space-between;padding:0 6px;font-size:10.5px;color:rgba(236,234,231,.4);font-weight:500;}
