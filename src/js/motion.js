@@ -2021,6 +2021,18 @@
     }
     return false;
   }
+  // Whole-document check (layer OR any element on any layer) — export.js's
+  // exportHasEngineOnlyMotion uses this to decide whether a render needs to
+  // route through the engine (buildSceneJson, engine-bridge.js) instead of
+  // its own plain-Paper.js fallback loop, which has no idea what Order even
+  // is, same "engine-only feature, route the whole export through the
+  // engine rather than reimplement it a second time" fix already applied to
+  // 3D layers/Motion Blur.
+  function anyOrderUsedAnywhere() {
+    if (anyLayerHasOrder()) return true;
+    for (var k = 0; k < state.layers.length; k++) if (layerElementsHaveOrder(state.layers[k])) return true;
+    return false;
+  }
   // Extended per-shape property: Brush size (2026-08 — third slice of the
   // "propriétés étendues par forme" chantier, the "brush" piece of
   // fill/stroke/brush/path). A vector-brush stroke's ink IS its fill (see
@@ -7099,6 +7111,7 @@
     elementOrderAt: elementOrderAt,
     anyLayerHasOrder: anyLayerHasOrder,
     layerElementsHaveOrder: layerElementsHaveOrder,
+    anyOrderUsedAnywhere: anyOrderUsedAnywhere,
     hasBrushSizeMotionFor: hasBrushSizeMotionFor,
     applyBrushSizeFor: applyBrushSizeFor,
     transformSegments: transformSegments,

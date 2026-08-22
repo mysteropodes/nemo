@@ -465,6 +465,15 @@ function exportHasLayerCompositing(){
 // checks state.motionBlurOn too, matching buildSceneJson's own mbOn gate
 // (a layer can have motionBlur:true while the comp-wide switch is off).
 function exportHasEngineOnlyMotion(){
+  // Order (2026-08) — same "engine-only feature" shape as 3D/Motion Blur
+  // above: exportBuildFrame's plain-Paper.js loop below just walks
+  // state.layers/layer.children in their raw stored order with no concept
+  // of a z-index override at all, so a keyed Order silently did nothing in
+  // export while working perfectly on screen. Checked once for the whole
+  // document (anyOrderUsedAnywhere covers both layer- and element-level),
+  // not per-layer like the other two, since a re-order can move ANY
+  // layer/shape regardless of which one carries the actual keys.
+  if(window.SMMotion&&window.SMMotion.anyOrderUsedAnywhere&&window.SMMotion.anyOrderUsedAnywhere())return true;
   return state.layers.some(function(ld){
     return ld.threeD||(ld.motionBlur&&state.motionBlurOn);
   });
