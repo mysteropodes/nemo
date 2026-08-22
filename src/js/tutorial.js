@@ -1598,7 +1598,7 @@
     if (tt) tt.classList.remove('on');
     if (mod && completed) {
       markDone(mod.id);
-      if (window.showToast) showToast(T('Module "%s" terminé ✓').replace('%s', T(mod.title)));
+      if (window.showToast) showToast(T(SM.t('toastModuleDoneSuffix')).replace('%s', T(mod.title)));
     }
   }
 

@@ -682,7 +682,7 @@
       var rd = new FileReader();
       rd.onload = function () {
         var r = run(String(rd.result), { name: f.name });
-        if (window.showToast) showToast(r.ok ? ('Script « ' + f.name + ' » exécuté') : ('« ' + f.name + ' » : ' + r.error));
+        if (window.showToast) showToast(r.ok ? ('Script « ' + f.name + SM.t('toastExecutedSuffix')) : ('« ' + f.name + ' » : ' + r.error));
         window.__nemoScriptLast = r;
         inp.remove();
       };

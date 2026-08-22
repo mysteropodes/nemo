@@ -106,11 +106,11 @@
       // otherwise silently truncate an alpha-bearing hex to 6 digits, and
       // every other reader of this input prefers dataset.hex8 for exactly
       // that reason (see color-picker.js's own comment on this).
-      ['color-stroke', 'pm-stroke-c'].forEach(function (id) { var el = document.getElementById(id); if (el) { el.value = css; el.dataset.hex8 = css; } });
+      ['color-stroke', 'pm-stroke-c'].forEach(function (id) { setHex8Input(document.getElementById(id), css); });
       ['stroke-well', 'pm-stroke'].forEach(function (id) { var el = document.getElementById(id); if (el) el.style.background = css; });
     } else {
       state.fillColor = css; state.fillEnabled = true;
-      ['color-fill', 'pm-fill-c'].forEach(function (id) { var el = document.getElementById(id); if (el) { el.value = css; el.dataset.hex8 = css; } });
+      ['color-fill', 'pm-fill-c'].forEach(function (id) { setHex8Input(document.getElementById(id), css); });
       var pmFill = document.getElementById('pm-fill'); if (pmFill) pmFill.style.background = css;
       var fillWell = document.getElementById('fill-well'); if (fillWell) { fillWell.style.background = css; fillWell.classList.remove('none'); }
       var onCb = document.getElementById('p-fill-on'); if (onCb) onCb.checked = true;

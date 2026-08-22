@@ -364,7 +364,7 @@
     // the effect-bearing layers, not only the ones that happen to be keyed.
     _hideUnanimated = false;
     renderLayerList(); renderTimeline();
-    if (window.showToast) showToast(targets.length + ' calque(s) révélé(s)');
+    if (window.showToast) showToast(targets.length + SM.t('toastLayersRevealedSuffix'));
     return true;
   }
   function handleRevealEffectsShortcut() {
@@ -985,7 +985,7 @@
   // mutates `seg.curvePoints` in place.
   function openMotionEaseEditor(ld, prop) {
     var track = trackFor(ld, prop);
-    if (!track || !track.keys.length) { if (window.showToast) showToast('Anime d’abord ' + PROP_LABEL[prop] + ' (icône chrono) pour avoir une courbe'); return; }
+    if (!track || !track.keys.length) { if (window.showToast) showToast('Anime d’abord ' + PROP_LABEL[prop] + SM.t('toastAnimIconTip')); return; }
     // Auto-create the missing second key — explicit request ("créer les
     // clés manquantes si il le faut"): a single-key track has nothing to
     // ease BETWEEN yet, but the user shouldn't have to manually add a
@@ -1006,7 +1006,7 @@
     var seg = segmentLeftKey(track, state.currentFrame) || track.keys[0];
     var idx = track.keys.indexOf(seg);
     var next = track.keys[idx + 1] || track.keys[idx - 1];
-    if (!next) { if (window.showToast) showToast('Impossible de créer un segment éditable'); return; }
+    if (!next) { if (window.showToast) showToast(SM.t('toastCannotCreateEditableSegment')); return; }
     if (window._curveEditor) window._curveEditor.editMotionSeg(seg, PROP_LABEL[prop] + ' : clé ' + (seg.frame + 1) + ' → ' + (next.frame + 1));
   }
 
@@ -1504,7 +1504,7 @@
       // random, décalage temporel, Effectors...) with zero feedback that
       // anything happened — Time Remap's own enable already toasts a
       // one-line summary (enableTimeRemap below); this had nothing.
-      if (window.showToast) showToast('Duplicator activé — grille 2×3 par défaut, réglable dans le panel');
+      if (window.showToast) showToast(SM.t('toastDuplicatorEnabledHint'));
     }
     loadFrame(state.currentFrame);
     invalidateSymbolUnionBounds(); // same cache-staleness fix as dupRefresh (timeline.js)
@@ -1727,11 +1727,11 @@
     // it, reachable live: drag the pickwhip onto the existing Parent B and
     // land on a meaningless "blend a layer with itself" state.
     if (parentUid && parentUid === ld.parentLayerUidB) {
-      if (window.showToast) showToast('Parent A doit être différent du Parent B');
+      if (window.showToast) showToast(SM.t('toastParentAMustDifferFromB'));
       return;
     }
     if (parentUid && wouldCreateParentCycle(ensureLayerUid(ld), parentUid)) {
-      if (window.showToast) showToast('Parentage refusé : créerait une boucle');
+      if (window.showToast) showToast(SM.t('toastParentingRefusedCycle'));
       return;
     }
     ld.parentLayerUid = parentUid || null;
@@ -1746,11 +1746,11 @@
     var ld = state.layers[li];
     if (!ld) return;
     if (parentUid && parentUid === ld.parentLayerUid) {
-      if (window.showToast) showToast('Parent B doit être différent du Parent A');
+      if (window.showToast) showToast(SM.t('toastParentBMustDifferFromA'));
       return;
     }
     if (parentUid && wouldCreateParentCycle(ensureLayerUid(ld), parentUid)) {
-      if (window.showToast) showToast('Parentage refusé : créerait une boucle');
+      if (window.showToast) showToast(SM.t('toastParentingRefusedCycle'));
       return;
     }
     ld.parentLayerUidB = parentUid || null;
@@ -2090,7 +2090,26 @@
       return Math.max(0, Math.min(100, pct)) / 100 * total;
     }
     function pointAtLen(len) {
-      len = ((len % total) + total) % total;
+      // Wrap ONLY for a closed path — the cyclic "progress ring" case this
+      // function's own header comment describes, where a window running past
+      // 100% legitimately continues through the seam.
+      //
+      // On an OPEN path the window is already clamped to [0,total] by
+      // lenAtPct, so the modulo could only ever fire on the single exact
+      // value len === total — where `total % total` is 0 and it returned the
+      // path's START point instead of its END. That put the last vertex of
+      // the trimmed result back at the beginning of the stroke, drawing a
+      // long spurious segment all the way back across the shape.
+      // Bug found live 2026-08-21 (QA on brush types): trimStart=60/
+      // trimEnd=100 on an open stroke returned first point x=1015 (right)
+      // but last point x=129 (the start) instead of 1606; trimStart=60/
+      // trimEnd=99 was correct, which is what pinned it to the exact
+      // endpoint. Bites the DEFAULT trimEnd of 100 too, so every partially
+      // trimmed open shape was affected, not an edge case.
+      // applyTrimToVectorBrush's own sampleAtLen already clamps this way —
+      // this brings the two into line (CLAUDE.md §3's duplicated-pair trap).
+      if (closed) len = ((len % total) + total) % total;
+      else len = Math.max(0, Math.min(total, len));
       for (var i2 = 1; i2 < cum.length; i2++) {
         if (cum[i2] >= len) {
           var segLen = cum[i2] - cum[i2 - 1];
@@ -2603,7 +2622,23 @@
     // renders. unifiedMotionTargets/buildUnifiedOverlay already summed
     // position deltas onto a centroid the same delta-aware way — this
     // brings the single-target view in line with it.
-    var pvx = aw.x, pvy = aw.y;
+    // NOT `aw` (the crosshair's own point, a few lines up) — aw deliberately
+    // includes the CURRENT FRAME's own interpolated Position (2026-08-21 fix,
+    // so the crosshair tracks where the object visually renders THIS frame).
+    // Reusing it here was a mistake made fixing the ax/ay crash (feedback
+    // #36/#40): position is exactly the thing being plotted per-key below,
+    // so every key's dot inherited a live, current-frame-dependent shift on
+    // top of its own value — dragging one key (which updates the value AT
+    // the current frame while the playhead sits on/near it) visibly dragged
+    // every OTHER key's dot along with it too, even though only the grabbed
+    // key's data actually changed (feedback #41, "l'ensemble des clé bouge
+    // quand je bouge la position d'une seule keyframe"). This pivot must
+    // stay position-INDEPENDENT — exactly "bounds center + anchor offset"
+    // per this block's own original comment above, matching motionBoxGeom's
+    // pre-position px/py and onDown's hit-test `pv` a few hundred lines down
+    // (which never included position either — only the drawing side did).
+    var pvAnc = valueAtFrame(holder, 'anchor', state.currentFrame);
+    var pvx = bc.x + pvAnc[0], pvy = bc.y + pvAnc[1];
     var track = holder.motion.position;
     var ks = track.keys;
     for (var i = 0; i < ks.length - 1; i++) {
@@ -3326,7 +3361,7 @@
       for (var i = state.layers.length - 1; i >= 0; i--) window.SM.splitLayerIntoElementsCore(i, { silent: true });
       // The way back is not obvious from the result (N rows where there was
       // one) — say it once, with the exact gesture.
-      if (willSplit) showToast('Éclaté en calques — clic droit › « Fusionner les calques sélectionnés » pour revenir en arrière');
+      if (willSplit) showToast(SM.t('toastSplitToLayersUndoHint'));
     }
   }
   // Bar highlighting (layer-inout.js's own _barSel, used for group bar-drags
@@ -3500,7 +3535,7 @@
           renderLayerList(); renderTimeline();
           if (window.loadFrame) loadFrame(state.currentFrame);
           if (window.SMEngineBridge) SMEngineBridge.renderNow();
-          if (window.showToast) showToast('Lien temporel retiré');
+          if (window.showToast) showToast(SM.t('toastTimeLinkRemoved'));
         });
         row.appendChild(tlb2);
       }
@@ -3653,7 +3688,7 @@
                 ld.effectsFrom = ensureLayerUid(other);
                 renderLayerList(); renderTimeline();
                 if (window.SMEngineBridge) SMEngineBridge.renderNow();
-                if (window.showToast) showToast('Effets hérités de « ' + (other.name || ('Layer ' + (oi + 1))) + ' » — ils suivent leurs propres keyframes');
+                if (window.showToast) showToast(SM.t('toastEffectsInheritedFromSuffix') + (other.name || ('Layer ' + (oi + 1))) + ' » — ils suivent leurs propres keyframes');
               } });
             });
             if (!items.length) { if (window.showToast) showToast('Aucun autre calque ne porte d\u2019effets'); return; }
@@ -3706,7 +3741,16 @@
       // showing Éléments here lets a single shape inside a placed
       // instance be animated right from the Scene view, without needing
       // to double-click all the way into the component first.
-      renderElementsList(list, li, ld);
+      //
+      // Gated on the MANUAL accordion specifically (_motionExpandedLayer),
+      // not the broader `expanded` (isLayerExpanded also returns true for
+      // a property-shortcut reveal set, _motionRevealedLayers) — P/U/S/etc
+      // (handlePropShortcut/handleRevealAnimatedShortcut) are meant to
+      // reveal a layer's own Transform properties, not cascade into every
+      // element's breakdown too (feedback #42, "il ne faut pas afficher
+      // éléments"). A real row click still shows elements exactly as
+      // before — this only narrows what a SHORTCUT-driven reveal shows.
+      if (window._motionExpandedLayer === li) renderElementsList(list, li, ld);
     });
     // Right-panel mirror of the active layer's Transform group ("il
     // faudrait afficher les properties d'un calque sélectionné et la
@@ -3855,7 +3899,7 @@
       if (window.setLayerParentB) setLayerParentB(li, null);
       renderLayerList(); renderTimeline();
       if (window.SMEngineBridge) SMEngineBridge.renderNow();
-      if (window.showToast) showToast('Parent retiré');
+      if (window.showToast) showToast(SM.t('toastParentRemoved'));
     });
 
     row.appendChild(pill);
@@ -3899,7 +3943,7 @@
       renderLayerList(); renderTimeline();
       if (window.loadFrame) loadFrame(state.currentFrame);
       if (window.SMEngineBridge) SMEngineBridge.renderNow();
-      if (window.showToast) showToast('Lien temporel retiré');
+      if (window.showToast) showToast(SM.t('toastTimeLinkRemoved'));
     }
     name.addEventListener('contextmenu', function (e) {
       e.stopPropagation(); e.preventDefault();
@@ -3989,7 +4033,7 @@
   function setLayerTimeLink(li, targetIdx, mode, srcAnchor) {
     var ld = state.layers[li], src = state.layers[targetIdx];
     if (!ld || !src || targetIdx === li) return false;
-    if (timeLinkWouldCycle(li, targetIdx)) { if (window.showToast) showToast('Lien impossible : créerait un cycle'); return false; }
+    if (timeLinkWouldCycle(li, targetIdx)) { if (window.showToast) showToast(SM.t('toastLinkImpossibleCycle')); return false; }
     pushUndo();
     mode = mode || 'both';
     var xType = (mode !== 'both' && (srcAnchor === 'in' || srcAnchor === 'out')) ? srcAnchor : mode;
@@ -4517,7 +4561,7 @@
         // Clone the source's OWN expression. Nothing to clone is worth
         // saying out loud rather than silently inserting an empty string.
         var srcEx = t.holder.expressions && t.holder.expressions[t.prop];
-        if (!srcEx || !srcEx.code) { if (window.showToast) showToast('Cette propriété n\u2019a pas d\u2019expression à cloner'); return; }
+        if (!srcEx || !srcEx.code) { if (window.showToast) showToast(SM.t('toastNoExpressionToClone')); return; }
         text = srcEx.code;
       } else {
         var li = state.layers.indexOf(t.holder);
@@ -4526,7 +4570,7 @@
         if (li < 0) state.layers.forEach(function (ld2, i2) {
           if (ld2.elementMotion) Object.keys(ld2.elementMotion).forEach(function (k) { if (ld2.elementMotion[k] === t.holder) li = i2; });
         });
-        if (li < 0) { if (window.showToast) showToast('Propriété non référençable'); return; }
+        if (li < 0) { if (window.showToast) showToast(SM.t('toastPropertyNotReferenceable')); return; }
         text = 'layer("' + ensureLayerUid(state.layers[li]) + '").' + t.prop;
       }
       // Insert at the caret rather than replacing: a pickwhip is usually
@@ -4538,7 +4582,7 @@
       ta.dispatchEvent(new Event('input'));
       commit();
       renderLayerList(); renderTimeline();
-      if (window.showToast) showToast(alt ? 'Expression clonée' : 'Référence insérée');
+      if (window.showToast) showToast(alt ? SM.t('toastExpressionCloned') : SM.t('toastReferenceInserted'));
     }
     function onKey(e) { if (e.key === 'Escape') cleanup(); }
     document.addEventListener('mousemove', onMove, true);
@@ -5435,7 +5479,13 @@
       // layers; a group-header node's `.strokeId` is undefined so it can
       // never match _motionExpandedElement and never expands here — group
       // rows have no per-group Transform in this pass).
-      var els = buildShapeTree(li, ld);
+      // Same narrowing as renderLayerListMotion's own renderElementsList
+      // gate just above (feedback #42) — a property-shortcut reveal
+      // (_motionRevealedLayers, part of `expanded` via isLayerExpanded)
+      // must not pull in the per-element tree here either, or this side
+      // renders MORE rows than the panel for the exact same layer, which
+      // is precisely the row-count divergence CLAUDE.md §11 warns about.
+      var els = (window._motionExpandedLayer === li) ? buildShapeTree(li, ld) : [];
       if (els.length) {
         var elHdrSpacer = document.createElement('div'); elHdrSpacer.className = 'frow motion-group-row';
         grid.appendChild(elHdrSpacer);
@@ -5495,6 +5545,29 @@
           // down (a later Forme's own Transform/Path/Fill rows) drifted out
           // of alignment with its own keyframe track from that point on.
           if (entry.sd.fillColor) renderTracksFor(grid, elHolder, 'fillColor');
+          // Trim Paths group (mirrors renderElementsList's renderTrimPathsGroup
+          // exactly — same condition, same expand state, same 3 scalar rows).
+          // Bug found live (2026-08-21, QA pass on a bouncing-ball test scene):
+          // this mirror was missing entirely — renderTrimPathsGroup ALWAYS
+          // appends its header row on the panel side (any shape with vertex
+          // geometry gets one, regardless of whether Trim Paths is actually
+          // used), but this grid side had no matching spacer at all, so
+          // #layer-list had one MORE row than #frame-grid for every such
+          // shape even before expanding it, growing to four rows once
+          // expanded — every row further down (a later Forme's own rows, or
+          // the next layer entirely) drifted out of alignment with its own
+          // keyframe track from that point on. Same class of bug as the Fill
+          // row fix just above; confirmed via a live row-count diff (23 grid
+          // rows vs 27 panel rows with Trim Paths expanded) before this fix.
+          if (!entry.sd.isRaster && entry.sd.segments && entry.sd.segments.length) {
+            var trimHdrSpacer = document.createElement('div'); trimHdrSpacer.className = 'frow motion-group-row';
+            grid.appendChild(trimHdrSpacer);
+            if (window._motionExpandedTrimHolder === elHolder) {
+              renderTracksFor(grid, elHolder, 'trimStart');
+              renderTracksFor(grid, elHolder, 'trimEnd');
+              renderTracksFor(grid, elHolder, 'trimOffset');
+            }
+          }
         });
       }
     });
@@ -5539,7 +5612,7 @@
     return groups;
   }
   function distributeKeys() {
-    if (_motionKeySel.length < 2) { if (window.showToast) showToast('Sélectionne au moins 2 clés'); return; }
+    if (_motionKeySel.length < 2) { if (window.showToast) showToast(SM.t('toastSelectAtLeast2Keys')); return; }
     pushUndo();
     _groupKeySelByTrack().forEach(function (g) {
       if (g.items.length < 2) return;
@@ -5553,7 +5626,7 @@
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
   }
   function flipKeys() {
-    if (_motionKeySel.length < 2) { if (window.showToast) showToast('Sélectionne au moins 2 clés'); return; }
+    if (_motionKeySel.length < 2) { if (window.showToast) showToast(SM.t('toastSelectAtLeast2Keys')); return; }
     pushUndo();
     _groupKeySelByTrack().forEach(function (g) {
       if (g.items.length < 2) return;
@@ -5570,7 +5643,7 @@
     var sorted = _motionKeySel.slice().sort(function (a, b) { return a.key.frame - b.key.frame; });
     _motionKeySel = sorted.filter(function (_s, i) { return i % n === 0; });
     renderTimeline();
-    if (window.showToast) showToast(_motionKeySel.length + ' clé(s) sélectionnée(s)');
+    if (window.showToast) showToast(_motionKeySel.length + SM.t('toastKeysSelectedSuffix'));
   }
   // Subdivide: insert a key HALFWAY between each consecutive pair of
   // selected keys on the same track (2026-07-25, Skew Pro's "Subdivide").
@@ -5595,14 +5668,14 @@
     return Math.round(lag * 100);
   }
   function colorSelectedKeys(color) {
-    if (!_motionKeySel.length) { if (window.showToast) showToast('Aucune clé sélectionnée'); return; }
+    if (!_motionKeySel.length) { if (window.showToast) showToast(SM.t('toastNoKeySelected')); return; }
     pushUndo();
     _motionKeySel.forEach(function (s) { if (color) s.key.color = color; else delete s.key.color; });
     renderTimeline();
-    if (window.showToast) showToast(color ? (_motionKeySel.length + ' clé(s) colorée(s)') : 'Couleur retirée');
+    if (window.showToast) showToast(color ? (_motionKeySel.length + SM.t('toastKeysColoredSuffix')) : SM.t('toastColorRemoved'));
   }
   function subdivideKeys() {
-    if (_motionKeySel.length < 2) { if (window.showToast) showToast('Sélectionne au moins 2 clés'); return; }
+    if (_motionKeySel.length < 2) { if (window.showToast) showToast(SM.t('toastSelectAtLeast2Keys')); return; }
     pushUndo();
     var added = 0, skipped = 0, fresh = [];
     _groupKeySelByTrack().forEach(function (g) {
@@ -5627,7 +5700,7 @@
     setKeySel(_motionKeySel.concat(fresh));
     renderLayerList(); renderTimeline();
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
-    if (window.showToast) showToast(added + ' clé(s) insérée(s)' + (skipped ? ' — ' + skipped + ' intervalle(s) trop court(s)' : ''));
+    if (window.showToast) showToast(added + SM.t('toastKeysInsertedSuffix') + (skipped ? ' — ' + skipped + ' intervalle(s) trop court(s)' : ''));
   }
   // Keep a random subset of the current selection (Skew Pro's "Grab
   // Randomly"): the fast way to make a uniform batch of layers/keys feel
@@ -5635,14 +5708,14 @@
   // empty the selection on a small one.
   function grabRandomKeys(percent) {
     var p = Math.max(1, Math.min(100, parseInt(percent, 10) || 50)) / 100;
-    if (!_motionKeySel.length) { if (window.showToast) showToast('Aucune clé sélectionnée'); return; }
+    if (!_motionKeySel.length) { if (window.showToast) showToast(SM.t('toastNoKeySelected')); return; }
     var pool = _motionKeySel.slice();
     var want = Math.max(1, Math.round(pool.length * p));
     var out = [];
     while (out.length < want && pool.length) out.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
     setKeySel(out);
     renderTimeline();
-    if (window.showToast) showToast(out.length + ' clé(s) gardée(s) au hasard');
+    if (window.showToast) showToast(out.length + SM.t('toastKeysKeptRandomSuffix'));
   }
   // Inverts within whatever tracks are CURRENTLY RENDERED (the same
   // universe the marquee itself draws over).
@@ -5852,12 +5925,12 @@
         var rows = buildKeyRows();
         var f0 = Infinity, f1 = -Infinity;
         rows.forEach(function (r) { r.forEach(function (en) { f0 = Math.min(f0, en.orig); f1 = Math.max(f1, en.orig); }); });
-        if (!(f1 > f0)) { if (window.showToast) showToast('Sélectionne des clés sur 2 frames différentes pour les espacer'); return; }
+        if (!(f1 > f0)) { if (window.showToast) showToast(SM.t('toastSelectKeysOn2DifferentFramesToSpace')); return; }
         startSkewDrag(rows, mode, e);
       });
       addStaggerEdges(_keySelBoxEl, function (e, mode) {
         var rows = buildKeyRows();
-        if (rows.length < 2) { if (window.showToast) showToast('Sélectionne des clés sur 2 pistes ou plus pour skewer'); return; }
+        if (rows.length < 2) { if (window.showToast) showToast(SM.t('toastSelectKeysOn2TracksToSkew')); return; }
         startSkewDrag(rows, mode, e);
       });
     }
@@ -5914,7 +5987,7 @@
   // silently, which reads exactly like the tool being broken; say why.
   function noKeysGuard(rows) {
     if (rows.some(function (r) { return r.length; })) return true;
-    if (window.showToast) showToast('Aucune clé sur ces calques — pose des clés, ou glisse le centre de la boîte pour décaler les calques dans le temps');
+    if (window.showToast) showToast(SM.t('toastNoKeyOnLayersHint'));
     return false;
   }
 
@@ -6035,7 +6108,7 @@
         if (!noKeysGuard(rows)) return;
         var f0 = Infinity, f1 = -Infinity;
         rows.forEach(function (r) { r.forEach(function (en) { f0 = Math.min(f0, en.orig); f1 = Math.max(f1, en.orig); }); });
-        if (!(f1 > f0)) { if (window.showToast) showToast('Il faut des clés sur au moins 2 frames différentes pour les espacer'); return; }
+        if (!(f1 > f0)) { if (window.showToast) showToast(SM.t('toastNeedKeysOn2DifferentFrames')); return; }
         startSkewDrag(rows, mode, e);
       });
       // Top/bottom edge on a LAYER selection staggers the LAYERS in time —
@@ -6098,10 +6171,10 @@
   function enableTimeRemap(li) {
     var ld = state.layers[li];
     if (!ld) return false;
-    if (!ld.symbolId) { if (window.showToast) showToast('Le remappage temporel s\u2019applique aux calques composants'); return false; }
+    if (!ld.symbolId) { if (window.showToast) showToast(SM.t('toastTimeRemapAppliesToComponents')); return false; }
     var sym = state.symbols[ld.symbolId];
     if (!sym) return false;
-    if (ld.timeRemap) { if (window.showToast) showToast('Remappage temporel déjà actif'); return false; }
+    if (ld.timeRemap) { if (window.showToast) showToast(SM.t('toastTimeRemapAlreadyActive')); return false; }
     pushUndo();
     var inF = window.layerInPoint ? layerInPoint(ld) : (ld.inPoint != null ? ld.inPoint : 0);
     var outF = window.layerOutPoint ? layerOutPoint(ld) : (ld.outPoint != null ? ld.outPoint : state.totalFrames - 1);
@@ -6113,7 +6186,7 @@
     renderLayerList(); renderTimeline();
     if (window.loadFrame) loadFrame(state.currentFrame);
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
-    if (window.showToast) showToast('Remappage temporel activé — 0 → ' + last);
+    if (window.showToast) showToast(SM.t('toastTimeRemapEnabledFromSuffix') + last);
     return true;
   }
   function disableTimeRemap(li) {
@@ -6124,7 +6197,7 @@
     renderLayerList(); renderTimeline();
     if (window.loadFrame) loadFrame(state.currentFrame);
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
-    if (window.showToast) showToast('Remappage temporel désactivé');
+    if (window.showToast) showToast(SM.t('toastTimeRemapDisabled'));
     return true;
   }
   // The internal frame this instance should show at `frame`, or null when
@@ -6559,9 +6632,27 @@
     // genuinely corrupted stroke data (27 strokes materializing on a frame that
     // held 2) — real, permanent data loss/corruption, not just a stale render.
     // "Scene" (exitToScene) remains the one way out of a symbol everywhere else
-    // in the app; this makes the mode toggle consistent with that instead of a
-    // silent trap.
-    if (state.activeSymbolId) { if (window.showToast) showToast('Fermez d\'abord le composant en cours d\'édition'); return; }
+    // in the app.
+    //
+    // 2026-08-21 (feedback #47, "il faudrait pouvoir le faire"): re-permitted,
+    // with the same defensive save enterSymbol/exitToScene themselves take at
+    // their own transition points. state.layers/userLayers are ALIASED to the
+    // symbol's own arrays while activeSymbolId is set (enterSymbol) — every
+    // consumer below this point (renderLayerList/renderTimeline/renderNow)
+    // reads whichever object is CURRENTLY state.layers, so it already renders
+    // the symbol's own content correctly in either mode; nothing from here to
+    // the end of this function reaches into the outer scene. The corruption
+    // this guard was built to stop traced to aliasing gaps in enterSymbol/
+    // exitToScene themselves (sym.layers/markers/motionArcs/tweenOverrides/
+    // tweenEasing/cameraKeys not written back on exit if something replaced
+    // rather than mutated them) — those were fixed in the following weeks
+    // (2026-07-25, 2026-07-30) and are unconditionally in effect by the time
+    // exitToScene runs, regardless of which mode was active while inside.
+    // saveAllLayerFrames() here is the same belt-and-suspenders enterSymbol
+    // takes on its own way in, so a save lands before the mode's own render
+    // pass runs rather than depending on some earlier caller having already
+    // flushed the live canvas into ld.frames.
+    if (state.activeSymbolId) saveAllLayerFrames();
     // Leaving Motion mode: the shared ease-curve widget (see
     // openMotionEaseEditor) may still be pointed at a motion key whose row
     // is about to disappear — fall back to the plain tween-curve view, same

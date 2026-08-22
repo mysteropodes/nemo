@@ -61,7 +61,7 @@
         hitRm.item.fillColor = null;
         saveActiveLayerFrame();
         updateUI();
-        showToast('Fill supprimé');
+        showToast(SM.t('toastFillRemoved'));
         window.SMEngineBridge.renderNow();
       }
       return;
@@ -87,11 +87,11 @@
         hitFill.item.opacity = state.opacity / 100;
         saveActiveLayerFrame();
         updateUI();
-        showToast('Couleur remplacée');
+        showToast(SM.t('toastColorReplaced'));
         window.SMEngineBridge.renderNow();
         return;
       }
-      showToast('Aucune zone fermée ici');
+      showToast(SM.t('toastNoClosedAreaHere'));
       return;
     }
     // Recolor-in-place (see fillFindExistingMatch's comment, tools.js) —
@@ -104,7 +104,7 @@
       existingMatch.opacity = state.opacity / 100;
       saveActiveLayerFrame();
       updateUI();
-      showToast('Couleur remplacée');
+      showToast(SM.t('toastColorReplaced'));
       window.SMEngineBridge.renderNow();
       return;
     }
@@ -123,7 +123,7 @@
     fillMergeSameColor(layer, res.path);
     saveActiveLayerFrame();
     updateUI();
-    showToast('Fill appliqué');
+    showToast(SM.t('toastFillApplied'));
     window.SMEngineBridge.renderNow();
   }
 

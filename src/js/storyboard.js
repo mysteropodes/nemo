@@ -672,7 +672,7 @@
   }
 
   function openSymbol(m) {
-    if (!state.symbols[m.symbolId]) { showToast('Ce composant n’existe plus'); return; }
+    if (!state.symbols[m.symbolId]) { showToast(SM.t('toastComponentNoLongerExists')); return; }
     if (window.SMMotion) SMMotion.setAppMode('anim2d');
     window.SM.enterSymbol(m.symbolId);
   }
@@ -1266,14 +1266,14 @@
     return sb().modules.find(function (x) { return x.type === 'montage' && x.id === id; }) || null;
   }
   function placeMontageAsLayer(m) {
-    if (!chainMods(m).length) { showToast('Le montage est vide — snappez des instances contre son bloc d’abord'); return; }
+    if (!chainMods(m).length) { showToast(SM.t('toastMontageEmptySnapHint')); return; }
     // One layer per montage: re-placing focuses the existing one instead
     // of stacking duplicates.
     for (var i = 0; i < state.layers.length; i++) {
       if (state.layers[i].montageId === m.id) {
         if (window.SMMotion) SMMotion.setAppMode('anim2d');
         state.activeLayerIdx = i; activateUL(i); updateUI();
-        showToast('Ce montage est déjà placé — calque « ' + state.layers[i].name + ' »');
+        showToast(SM.t('toastMontageAlreadyPlacedLayer') + state.layers[i].name + ' »');
         return;
       }
     }
@@ -1284,7 +1284,7 @@
     if (window.SMMotion) SMMotion.setAppMode('anim2d');
     state.activeLayerIdx = idx; activateUL(idx);
     loadFrame(state.currentFrame); updateUI();
-    showToast('Montage placé comme calque « ' + m.name + ' » (' + montageTotal(m) + ' images, en boucle)');
+    showToast(SM.t('toastMontagePlacedAsLayerSuffix') + m.name + ' » (' + montageTotal(m) + ' images, en boucle)');
   }
 
   window.SMStoryboard = {

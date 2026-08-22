@@ -561,6 +561,37 @@
     };
   }
 
+  // Trim Paths support (2026-08-21) — a bitmap-brush stroke's visible ink is
+  // ONE baked Raster spanning the whole stroke, not N per-dab items, so the
+  // per-dab reveal engine-bridge.js uses for the VECTOR texture presets
+  // (dabOrdinal: drop each dab whose position along the stroke falls outside
+  // the window) degenerates to a single dab at ordinal 0 — i.e. all-or-
+  // nothing, and in practice never trimmed at all. Confirmed live before
+  // this existed: at trimEnd=40 the anchor path trimmed correctly (world x
+  // 129→720) while the raster kept its full 105→1630 extent, so the stroke
+  // looked completely untouched.
+  //
+  // Same idea as recordForTween just above: rebuild a throwaway Path from
+  // the ALREADY-TRIMMED anchor segments and re-bake the texture from it, so
+  // the dabs are stamped along the trimmed centerline only. Returns
+  // bakeToCanvas's own {canvas,minX,minY,w,h} (no toDataURL — the caller
+  // uploads the canvas straight to the engine, and a per-frame toDataURL is
+  // exactly the synchronous freeze bakeToCanvas's MAX_TEX comment warns
+  // about). null when the window collapses to nothing, which the caller
+  // reads as "draw no ink at all".
+  function bakeTrimmed(segmentsData, closed, spec) {
+    if (!segmentsData || segmentsData.length < 2 || !spec) return null;
+    var p = new Path({ insert: false });
+    segmentsData.forEach(function (s) {
+      p.add(new Segment(new Point(s.point[0], s.point[1]), new Point(s.handleIn[0], s.handleIn[1]), new Point(s.handleOut[0], s.handleOut[1])));
+    });
+    if (closed) p.closed = true;
+    if (p.segments.length < 2) { p.remove(); return null; }
+    var bake = bakeToCanvas(p, spec, null);
+    p.remove();
+    return bake;
+  }
+
   // regenerateBrushTexture's (tools.js) bitmap branch — remove this
   // anchor's companions and re-stamp from its CURRENT geometry, reusing
   // the stored spec (same seed: a re-stamp after a node drag must not make
@@ -757,7 +788,7 @@
   // both call directly, since there's no longer a button here at all.
   function applyBitmapBrushToSelection() {
     var eligible = selectedPaths.filter(function (p) { return p instanceof Path && !(p.data && (p.data.isVectorBrush || p.data.isFillShape)) && (p.strokeColor || p.fillColor || (p.data && (p.data.brushTexturePreset || p.data.bitmapBrushSpec))); });
-    if (!eligible.length) { if (window.showToast) showToast('Sélectionne au moins un trait'); return; }
+    if (!eligible.length) { if (window.showToast) showToast(SM.t('toastSelectAtLeastOneStroke')); return; }
     pushUndo();
     eligible.forEach(function (p) {
       stripAnyBrushTexture(p);
@@ -765,16 +796,16 @@
     });
     saveActiveLayerFrame(); updateUI();
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
-    if (window.showToast) showToast('Bitmap Brush appliqué à la sélection');
+    if (window.showToast) showToast(SM.t('toastBitmapBrushApplied'));
   }
   function removeBitmapBrushFromSelection() {
     var eligible = selectedPaths.filter(function (p) { return p instanceof Path && p.data && (p.data.bitmapBrushSpec || p.data.brushTexturePreset); });
-    if (!eligible.length) { if (window.showToast) showToast('Aucun trait texturé sélectionné'); return; }
+    if (!eligible.length) { if (window.showToast) showToast(SM.t('toastNoTexturedStrokeSelected')); return; }
     pushUndo();
     eligible.forEach(function (p) { stripAnyBrushTexture(p); });
     saveActiveLayerFrame(); updateUI();
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
-    if (window.showToast) showToast('Texture retirée');
+    if (window.showToast) showToast(SM.t('toastTextureRemoved'));
   }
   window.SM.applyBitmapBrushToSelection = applyBitmapBrushToSelection;
   window.SM.removeBitmapBrushFromSelection = removeBitmapBrushFromSelection;
@@ -822,7 +853,7 @@
     reader.onload = function () {
       var tipsFound;
       try { tipsFound = window.SMAbrImport.readAbrArrayBuffer(reader.result); }
-      catch (e) { if (window.showToast) showToast('Import .abr échoué : ' + e.message); return; }
+      catch (e) { if (window.showToast) showToast(SM.t('toastAbrImportFailedSuffix') + e.message); return; }
       var lastId = null;
       tipsFound.forEach(function (t, i) {
         var id = 'abr_' + Date.now().toString(36) + '_' + i;
@@ -832,9 +863,9 @@
       // Picker swatch (bitmap-tip-picker.js) owns the visible label/
       // preview now — select the just-imported tip and repaint it.
       if (lastId) { state.bitmapTip = lastId; if (window.BitmapTipPicker) window.BitmapTipPicker.paintButton(lastId); }
-      if (window.showToast) showToast(tipsFound.length + ' tip(s) importé(s) depuis ' + file.name);
+      if (window.showToast) showToast(tipsFound.length + SM.t('toastTipsImportedFromSuffix') + file.name);
     };
-    reader.onerror = function () { if (window.showToast) showToast('Lecture du fichier .abr échouée'); };
+    reader.onerror = function () { if (window.showToast) showToast(SM.t('toastAbrReadFailed')); };
     reader.readAsArrayBuffer(file);
   }
   window.SM.importAbrFile = importAbrFile;
@@ -845,6 +876,7 @@
     regenerate: regenerate,
     liveRestamp: liveRestamp,
     recordForTween: recordForTween,
+    bakeTrimmed: bakeTrimmed,
     eraseBite: eraseBite,
     flushEraseDirty: flushEraseDirty,
     beginLivePreview: beginLivePreview,

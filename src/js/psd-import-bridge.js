@@ -105,10 +105,10 @@
       if (!file) return;
       if (window.showToast) showToast('Import PSD…');
       importFile(file).then(function (count) {
-        if (window.showToast) showToast(count + ' calque' + (count > 1 ? 's' : '') + ' importé' + (count > 1 ? 's' : '') + ' depuis le PSD');
+        if (window.showToast) showToast(count + ' calque' + (count > 1 ? 's' : '') + SM.t('toastImportedSuffix') + (count > 1 ? 's' : '') + ' depuis le PSD');
       }).catch(function (err) {
         console.error('[psd-import] failed', err);
-        if (window.showToast) showToast('Échec de l’import PSD : ' + (err && err.message ? err.message : 'erreur inconnue'));
+        if (window.showToast) showToast(SM.t('toastPsdImportFailedSuffix') + (err && err.message ? err.message : 'erreur inconnue'));
       });
     });
   }

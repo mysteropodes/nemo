@@ -153,7 +153,7 @@
 
     var ld = state.layers[state.activeLayerIdx];
     if (!ld || ld.locked || ld.symbolId) {
-      if (typeof showToast === 'function') showToast('Calque invalide/verrouillé');
+      if (typeof showToast === 'function') showToast(SM.t('toastInvalidLockedLayer'));
       baked.forEach(function (c) { c.remove(); });
       return 0;
     }

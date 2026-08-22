@@ -435,6 +435,52 @@
     return id;
   }
 
+  // ---- BITMAP-BRUSH TRIM (2026-08-21) ----
+  // A bitmap-brush stroke's ink is ONE baked Raster covering the whole
+  // stroke, so the per-dab reveal used for the VECTOR texture presets can't
+  // trim it (see bakeTrimmed's own comment in bitmap-brush.js for the
+  // measured before/after). Instead: trim the ANCHOR's centerline, re-bake
+  // the texture along just that window, and hand the engine the new pixels.
+  //
+  // Cached on the window, because buildSceneJson runs on EVERY frame and a
+  // bake is a full canvas stamp pass — without this an untouched static trim
+  // would re-bake 60x/second. The key rounds the window to 0.1% so an
+  // ANIMATED trim re-bakes only when the value actually moves, and the id is
+  // derived from that key so identical windows reuse the GPU upload too
+  // (registerImagePixels is idempotent per id, same contract liveRestamp
+  // relies on). One entry per anchor — an animated trim overwrites its own
+  // slot each time the window changes rather than growing without bound.
+  var _bmbTrimCache = Object.create(null);
+  function bitmapTrimmedImage(li, anchorItem, anchorStrokeId, frameIdx) {
+    var spec = anchorItem && anchorItem.data && anchorItem.data.bitmapBrushSpec;
+    if (!spec || !window.SMBitmapBrush || !SMBitmapBrush.bakeTrimmed || !window.SMMotion) return undefined;
+    var win = SMMotion.trimWindowAt(li, anchorStrokeId, frameIdx);
+    if (!win) return undefined; // no trim on this stroke — caller keeps the normal path
+    var key = anchorStrokeId + '|' + Math.round(win.start * 10) + '|' + Math.round(win.end * 10) + '|' + Math.round((win.offset || 0) * 10);
+    var hit = _bmbTrimCache[anchorStrokeId];
+    if (hit && hit.key === key) { if (hit.id) _touchImage(hit.id); return hit.value; }
+    // Trim the anchor's own geometry exactly like the vector path does, then
+    // re-stamp along the result. serP is NOT used here: this needs the live
+    // anchor's segments in the shape applyTrimFor expects, nothing else off
+    // the serialized dict.
+    var segs = anchorItem.segments.map(function (s) {
+      return { point: [s.point.x, s.point.y], handleIn: [s.handleIn.x, s.handleIn.y], handleOut: [s.handleOut.x, s.handleOut.y] };
+    });
+    var trimmed = SMMotion.applyTrimFor(li, anchorStrokeId, segs, !!anchorItem.closed, frameIdx);
+    var bake = (trimmed && trimmed.segments && trimmed.segments.length >= 2)
+      ? SMBitmapBrush.bakeTrimmed(trimmed.segments, trimmed.closed, spec)
+      : null;
+    var value = null; // null = window collapsed, draw nothing
+    var id = null;
+    if (bake) {
+      id = 'bmbtrim:' + _hashSrc(key);
+      registerImagePixels(id, bake.canvas);
+      value = { id: id, rect: { x: bake.minX, y: bake.minY, width: bake.w, height: bake.h, rotation: 0 } };
+    }
+    _bmbTrimCache[anchorStrokeId] = { key: key, value: value, id: id };
+    return value;
+  }
+
   // A Raster's DISPLAY rect + its own rotation, for the engine's image
   // item (2026-07 — image items now carry `rotation`, engine.rs ImageRef).
   // c.bounds is the AXIS-ALIGNED envelope: correct while the raster is
@@ -821,6 +867,7 @@
       // is the stroke's start and 1 is its end, matching trimWindowAt's
       // own start/end convention.
       var brushGroupDabs = null;
+      var brushAnchorItem = null;
       for (var bi = 0; bi < children.length; bi++) {
         var bc = children[bi];
         if (bc.data && bc.data.brushGroupId) {
@@ -831,6 +878,12 @@
           } else if (bc.data.strokeId) {
             if (!brushAnchorStrokeId) brushAnchorStrokeId = {};
             brushAnchorStrokeId[bc.data.brushGroupId] = bc.data.strokeId;
+            // The anchor ITEM too, not just its id (2026-08-21): the bitmap
+            // -brush trim path below needs its bitmapBrushSpec AND its live
+            // geometry to re-bake, and re-finding it by id would mean a
+            // second scan of children per raster.
+            if (!brushAnchorItem) brushAnchorItem = {};
+            brushAnchorItem[bc.data.brushGroupId] = bc;
           }
         }
       }
@@ -1062,7 +1115,18 @@
         // semantics (start/end/offset, 0-100, clipped — not wrapped, same
         // "open path" convention applyTrimSegments uses) so a textured
         // stroke's reveal matches a plain stroke's trim exactly.
-        if (c.data && c.data.isBrushTextureCopy && c.data.brushGroupId && dabOrdinal && window.SMMotion) {
+        // NOT for a BITMAP-brush group (2026-08-21): its ink is one baked
+        // Raster, so it has exactly one "dab" sitting at ordinal 0 — this
+        // per-dab test then degenerates to all-or-nothing (kept whole for
+        // any window starting at 0, dropped entirely for any window starting
+        // past it), which is why trim looked like a complete no-op on a
+        // bitmap stroke. Those groups are trimmed properly by re-baking the
+        // texture along the trimmed centerline instead (bitmapTrimmedImage,
+        // applied in the Raster branch below).
+        if (c.data && c.data.isBrushTextureCopy && c.data.brushGroupId && dabOrdinal && window.SMMotion
+            && !(brushAnchorItem && brushAnchorItem[c.data.brushGroupId]
+                 && brushAnchorItem[c.data.brushGroupId].data
+                 && brushAnchorItem[c.data.brushGroupId].data.bitmapBrushSpec)) {
           var dabAnchorId = brushAnchorStrokeId && brushAnchorStrokeId[c.data.brushGroupId];
           if (dabAnchorId) {
             var dabWin = SMMotion.trimWindowAt(i, dabAnchorId, renderFrame);
@@ -1100,9 +1164,24 @@
         var elMat = (window.SMMotion && cStrokeId) ? SMMotion.elementMotionAt(i, cStrokeId, renderFrame) : null;
         var elPivot = elMat ? { x: c.bounds.center.x + elMat.ax, y: c.bounds.center.y + elMat.ay } : null;
         if (c instanceof Raster) {
-          var imageId = registerRasterIfNeeded(c);
+          // Bitmap-brush Trim Paths (2026-08-21) — a trimmed bitmap stroke
+          // draws a texture re-baked along the trimmed centerline instead of
+          // its full-length one. undefined = this raster isn't a trimmed
+          // bitmap-brush companion, take the normal path; null = the trim
+          // window collapsed to nothing, draw no ink at all.
+          var bmbTrim;
+          if (c.data && c.data.isBrushTextureCopy && c.data.brushGroupId && brushAnchorItem) {
+            var bmbAnchor = brushAnchorItem[c.data.brushGroupId];
+            var bmbAnchorId = brushAnchorStrokeId && brushAnchorStrokeId[c.data.brushGroupId];
+            if (bmbAnchor && bmbAnchorId) bmbTrim = bitmapTrimmedImage(i, bmbAnchor, bmbAnchorId, renderFrame);
+          }
+          if (bmbTrim === null) continue;
+          var imageId = bmbTrim ? bmbTrim.id : registerRasterIfNeeded(c);
           if (!imageId) continue;
-          var rb = rasterImageRect(c); // un-rotated display rect + the raster's own spin (see helper)
+          // un-rotated display rect + the raster's own spin (see helper); a
+          // re-baked trim carries its OWN rect (the bake's bounds shrink with
+          // the window), so it must not reuse the full-length raster's.
+          var rb = bmbTrim ? bmbTrim.rect : rasterImageRect(c);
           var imgOp = c.opacity !== undefined ? c.opacity : 1;
           if (elMat) { rb = SMMotion.transformImageRect(rb, elPivot, elMat); imgOp *= elMat.op; }
           if (motionMat) { rb = SMMotion.transformImageRect(rb, motionPivot, motionMat); imgOp *= motionMat.op; }
@@ -2891,7 +2970,7 @@
   async function ensureEngine() {
     if (engine) return true;
     if (!window.GeometryWasm || !window.GeometryWasm.ready) {
-      showToast('Moteur Rust indisponible (wasm non chargé)');
+      showToast(SM.t('toastRustEngineUnavailableWasm'));
       return false;
     }
     var paperCanvas = document.getElementById('drawing-canvas');
@@ -2900,7 +2979,7 @@
     // 0×0 (or 0×N) surface.configure() during create_engine() is just as
     // fatal to the WebGPU surface as during a later resize.
     if (paperCanvas.width <= 0 || paperCanvas.height <= 0) {
-      showToast('Moteur Rust: canvas pas encore prêt, réessaie');
+      showToast(SM.t('toastRustEngineCanvasNotReady'));
       return false;
     }
     rustCanvas = document.createElement('canvas');
@@ -2933,7 +3012,7 @@
       return true;
     } catch (e) {
       console.error('[engine-bridge] engine creation failed', e);
-      showToast('Moteur Rust: échec WebGPU — ' + e);
+      showToast(SM.t('toastRustEngineWebgpuFailedSuffix') + e);
       rustCanvas.remove();
       rustCanvas = null;
       return false;

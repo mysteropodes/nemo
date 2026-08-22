@@ -65,10 +65,10 @@
     // error (distinct from the "was a layer, now gone" orphan case below).
     if (!m.layerName && !m.layerUid) return;
     var ld = resolveSrcLayer(m);
-    if (!ld) { if (window.showToast) showToast('Calque source introuvable (supprimé ou renommé)'); return; }
+    if (!ld) { if (window.showToast) showToast(SM.t('toastSourceLayerNotFound')); return; }
     var idx = state.layers.indexOf(ld);
     if (window.SM) SM.setActiveLayer(idx);
-    if (window.showToast) showToast('Calque « ' + ld.name + ' » sélectionné');
+    if (window.showToast) showToast('Calque « ' + ld.name + SM.t('toastSelectedSuffix'));
   }
 
   function removeEntry(id) {
@@ -97,7 +97,7 @@
       ld.frames[state.currentFrame].strokes.push({ isRaster: true, src: m.thumb, x: worldPt ? worldPt.x : state.canvasW / 2, y: worldPt ? worldPt.y : state.canvasH / 2, width: fw, height: fh, opacity: 1 });
       if (window.loadFrame) loadFrame(state.currentFrame);
       if (window.updateUI) updateUI();
-      if (window.showToast) showToast('Image insérée depuis la bibliothèque');
+      if (window.showToast) showToast(SM.t('toastImageInsertedFromLibrary'));
     };
     img.src = m.thumb;
   }
@@ -244,7 +244,7 @@
     });
     var removed = before - state.mediaLibrary.length;
     render();
-    if (window.showToast) showToast(removed + ' entrée(s) orpheline(s) retirée(s) du catalogue');
+    if (window.showToast) showToast(removed + SM.t('toastOrphanEntriesRemovedSuffix'));
   }
 
   // OS drag-and-drop onto the panel's own drop zone (#media-drop) — separate
@@ -266,7 +266,7 @@
       var videos = files.filter(function (f) { return f.type.indexOf('video/') === 0; });
       if (images.length && window.SM && window.SM.importImageFiles) window.SM.importImageFiles(images);
       videos.forEach(function (f) { if (window.SM && window.SM.importVideoFile) window.SM.importVideoFile(f); });
-      if (!images.length && !videos.length && window.showToast) showToast('Format non reconnu — dépose une image ou une vidéo');
+      if (!images.length && !videos.length && window.showToast) showToast(SM.t('toastFormatNotRecognizedDropHint'));
     });
   }
 

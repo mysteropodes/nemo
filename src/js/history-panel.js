@@ -58,7 +58,7 @@ function renderHistoryPanel(){
     e.stopPropagation();
     state.undoStack=[];state.undoLabels=[];state.redoStack=[];state.redoLabels=[];
     renderHistoryPanel();
-    showToast('Historique vidé');
+    showToast(SM.t('toastHistoryCleared'));
   });
   header.appendChild(clear);
   pop.appendChild(header);

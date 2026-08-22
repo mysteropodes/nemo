@@ -45,6 +45,8 @@
     "dialog:default",
     "dialog:allow-save",
     "dialog:allow-open",
+    "dialog:allow-ask",
+    "dialog:allow-confirm",
     {
       "identifier": "http:default",
       "allow": [
