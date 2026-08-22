@@ -310,7 +310,18 @@
       if (!item) return;
       pushUndo();
       item.data = item.data || {};
-      item.data.paintOrder = srcKind === 'fill' ? 'fillFirst' : 'strokeFirst';
+      // A real TOGGLE, not "set from srcKind" (2026-08, "impossible de
+      // mettre stroke en dessous fill" — found live: dragging Fill onto
+      // Stroke worked, but dragging Stroke onto Fill silently did nothing
+      // whenever Stroke was ALREADY in front, because the old code set
+      // paintOrder to 'strokeFirst' unconditionally whenever the SOURCE
+      // was the Stroke row — reasserting the current value instead of
+      // swapping it. With only 2 rows and 2 states, any completed drag
+      // between the pair means "swap them", independent of which one was
+      // physically grabbed — the linked-fill branch above already gets
+      // this right for free (insertAbove is a real relative move), this
+      // just brings the flag-based branch in line with it.
+      item.data.paintOrder = item.data.paintOrder === 'strokeFirst' ? 'fillFirst' : 'strokeFirst';
     }
     _paintFocus = { shapeStrokeId: shapeStrokeId, kind: srcKind }; // the just-dragged aspect stays the focused one
     saveActiveLayerFrame();
