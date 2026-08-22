@@ -1969,6 +1969,44 @@
     if (!hasKeys(holder, 'strokeWidth') && !(holder.motionStatic && holder.motionStatic.strokeWidth)) return null;
     return valueAtFrame(holder, 'strokeWidth', frameIdx)[0];
   }
+  // Extended per-shape property: Brush size (2026-08 — third slice of the
+  // "propriétés étendues par forme" chantier, the "brush" piece of
+  // fill/stroke/brush/path). A vector-brush stroke's ink IS its fill (see
+  // CLAUDE.md's own note on isVectorBrush), so this is genuinely new
+  // ground, not something Fill/Stroke color already cover — it's a % scale
+  // on the ribbon's whole width profile, same unit convention as the base
+  // Scale property. Same shape as ParamShape (hasXFor/applyXFor rebuilding
+  // segments), not the simple item-field-override Fill/Stroke color use,
+  // because scaling width means re-deriving the outline geometry, not just
+  // overriding a paint field.
+  function hasBrushSizeMotionFor(li, strokeId) {
+    var ld = state.layers[li]; if (!ld) return false;
+    var holder = elementHolder(ld, strokeId);
+    if (!holder) return false;
+    return isAnimated(holder, 'brushSize') || !!(holder.motionStatic && holder.motionStatic.brushSize);
+  }
+  // sd.centerSegments/sd.widthProfile are the shape's OWN static pressure
+  // recording (serP's output, app.js) — untouched by this scale, so
+  // repeated calls across frames always start from the same source instead
+  // of compounding. Scoped to the case Trim Paths' own vector-brush special
+  // case (engine-bridge.js) does NOT already handle — composing an
+  // animated Trim window with an animated Brush Size on the SAME stroke at
+  // the same time is a real future case, not attempted here (see the call
+  // site's own comment for the exact boundary).
+  function applyBrushSizeFor(li, strokeId, sd, frameIdx) {
+    var ld = state.layers[li]; var holder = ld && elementHolder(ld, strokeId);
+    if (!holder || !sd.centerSegments || sd.centerSegments.length < 2) return null;
+    var pct = valueAtFrame(holder, 'brushSize', frameIdx)[0];
+    if (!window.sampleVectorBrushCenterline || !window.buildVariableWidthPath) return null;
+    var sampled = window.sampleVectorBrushCenterline(sd.centerSegments, sd.widthProfile);
+    var scale = pct / 100;
+    var scaledWidths = sampled.widths.map(function (w) { return w * scale; });
+    var outline = window.buildVariableWidthPath(sampled.pts, scaledWidths);
+    if (!outline) return null;
+    var segs = outline.segments.map(function (s) { return { point: [s.point.x, s.point.y], handleIn: [s.handleIn.x, s.handleIn.y], handleOut: [s.handleOut.x, s.handleOut.y] }; });
+    outline.remove();
+    return segs;
+  }
   // Path property, per-vertex (2026-07, "les properties de path dans motion
   // dont les vertices peuvent être animé séparément"): reuses the EXACT
   // same holder/track machinery as the 5 base Transform properties
@@ -4831,6 +4869,14 @@
           renderTrimScalarRow(list, strokeHolder, 'strokeWidth', 'Stroke Width', 'px', 0, 200, entry.sd.strokeWidth);
         }
       }
+      // Brush size (2026-08 — third slice, the "brush" piece of
+      // fill/stroke/brush/path): opt-in, hidden unless this is actually a
+      // vector-brush ribbon (isVectorBrush) with real centerline data —
+      // a plain shape has no width profile to scale. % of the shape's own
+      // recorded pressure widths, same convention as the base Scale prop.
+      if (entry.sd.isVectorBrush && entry.sd.centerSegments && entry.sd.centerSegments.length >= 2) {
+        renderTrimScalarRow(list, ensureElementHolder(ld, entry.strokeId), 'brushSize', 'Brush Size', '%', 10, 500, 100);
+      }
       // Trim Paths (2026-08, "animer les stroke en in et out"): opt-in,
       // same visibility gate as Path above (needs real vertex geometry).
       if (!entry.sd.isRaster && entry.sd.segments && entry.sd.segments.length) {
@@ -5545,6 +5591,11 @@
           if (entry.sd.strokeColor) {
             renderTracksFor(grid, elHolder, 'strokeColor');
             if (entry.sd.strokeWidth !== undefined) renderTracksFor(grid, elHolder, 'strokeWidth');
+          }
+          // Brush size (mirrors renderElementsList's own Brush size row —
+          // same condition).
+          if (entry.sd.isVectorBrush && entry.sd.centerSegments && entry.sd.centerSegments.length >= 2) {
+            renderTracksFor(grid, elHolder, 'brushSize');
           }
           // Trim Paths group (mirrors renderElementsList's renderTrimPathsGroup
           // exactly — same condition, same expand state, same 3 scalar rows).
@@ -6990,6 +7041,8 @@
     elementFillColorAt: elementFillColorAt,
     elementStrokeColorAt: elementStrokeColorAt,
     elementStrokeWidthAt: elementStrokeWidthAt,
+    hasBrushSizeMotionFor: hasBrushSizeMotionFor,
+    applyBrushSizeFor: applyBrushSizeFor,
     transformSegments: transformSegments,
     transformImageRect: transformImageRect,
     transformImageRectByMatrix: transformImageRectByMatrix,

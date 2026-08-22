@@ -1340,6 +1340,18 @@
               sd.segments = trimmed.segments; sd.closed = trimmed.closed;
             }
           }
+          // Brush size (2026-08) — same innermost-layer placement as Trim
+          // right above, and deliberately `else if` with it: both rebuild
+          // this same vector-brush's outline from its centerline+width
+          // profile, and composing an animated Trim window with an
+          // animated Brush Size on the SAME stroke at the same time needs
+          // the trim's OWN pts/widths as Brush Size's input, not the
+          // shape's un-trimmed static data — a real future case, not
+          // attempted here. Trim wins when both are set.
+          else if (sd && window.SMMotion && cPathOpsStrokeId && SMMotion.hasBrushSizeMotionFor && SMMotion.hasBrushSizeMotionFor(i, cPathOpsStrokeId)) {
+            var bsSegs = SMMotion.applyBrushSizeFor(i, cPathOpsStrokeId, sd, renderFrame);
+            if (bsSegs) { sd.segments = bsSegs; sd.closed = true; }
+          }
           // Dynamic shapes phase 2 (2026-08-18) — animated corner radii,
           // same innermost-layer placement as Trim/vertex-offsets right
           // above (shape's own local space, before elMat/motionMat).
