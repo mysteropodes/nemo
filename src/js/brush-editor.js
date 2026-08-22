@@ -143,7 +143,7 @@
       params.customStamp = res.stamp;
       refreshCaptureStatus();
       renderPreview();
-      showToast('Forme capturée (' + res.stamp.pointCount + ' points)');
+      showToast(SM.t('toastShapeCapturedSuffix') + res.stamp.pointCount + ' points)');
     });
     syncCaptureRowVisibility();
 
@@ -188,7 +188,7 @@
       state.customBrushPresets[id] = params;
       closePopover();
       if (onApply) onApply(id);
-      showToast('Brush "' + params.label + '" enregistré');
+      showToast('Brush "' + params.label + SM.t('toastSavedSuffix'));
     });
 
     // Anchored center-screen (this panel is bigger/more of a destination

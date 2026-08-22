@@ -323,7 +323,7 @@ function reorderLayer(fromIdx,toIdx){
   else if(fromIdx<state.activeLayerIdx&&toIdx>=state.activeLayerIdx)state.activeLayerIdx--;
   else if(fromIdx>state.activeLayerIdx&&toIdx<=state.activeLayerIdx)state.activeLayerIdx++;
   activateUL(state.activeLayerIdx);
-  loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast('Calque réordonné');
+  loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast(SM.t('toastLayerReordered'));
 }
 
 // Batch version of reorderLayer() — moves every index in `fromIndices` as a
@@ -352,7 +352,7 @@ function reorderLayersBatch(fromIndices,toIdx){
   var newActiveIdx=state.layers.indexOf(activeLd);
   state.activeLayerIdx=newActiveIdx>=0?newActiveIdx:0;
   activateUL(state.activeLayerIdx);
-  loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast('Calques réordonnés');
+  loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast(SM.t('toastLayersReordered'));
 }
 function drawStage(){stageLayer.removeChildren();stageLayer.activate();
   new Path.Rectangle({point:[0,0],size:[state.canvasW,state.canvasH],fillColor:state.canvasBg,strokeColor:new Color(0,0,0,.08),strokeWidth:1});
@@ -413,6 +413,22 @@ function colorHex8(c){
   var rgba=c.toCSS(false).match(/[\d.]+/g);
   function h(n){return Math.max(0,Math.min(255,Math.round(n))).toString(16).padStart(2,'0');}
   return '#'+h(rgba[0])+h(rgba[1])+h(rgba[2])+h(parseFloat(rgba[3])*255);
+}
+// Writes an 8-digit hex (#rrggbbaa) to a native <input type="color"> the
+// CLAUDE.md §2-documented way: dataset.hex8 carries the real alpha-inclusive
+// value, .value gets the plain 6-digit color the input actually accepts.
+// Every call site used to assign the full 8-digit string straight to
+// .value too, "relying on" the input silently truncating it — it does
+// apply the truncated color, but Chrome/WebKit ALSO logs a console warning
+// on every single assignment ("The specified value ... does not conform to
+// the required format"), which is what feedback #44 was actually seeing
+// flood the console every time a stroke/fill color changed. One helper so
+// the ~11 copies of this pattern (timeline.js, tools.js, viewtools-bridge.js)
+// converge on the same fix instead of needing it repeated at each site.
+function setHex8Input(el,hex){
+  if(!el)return;
+  el.value=(hex&&hex.length>7)?hex.slice(0,7):hex;
+  el.dataset.hex8=hex;
 }
 // Copy-pasted across 13 call sites (select-bridge.js, tools.js, timeline.js)
 // before this — the exclusion rule for "is this child a real, independently
@@ -591,6 +607,14 @@ function serP(p){var isVB=!!(p.data&&p.data.isVectorBrush);var center=isVB&&p.da
   // Group membership (2026-07, group-bridge.js's Cmd+G) — a stable id
   // shared by every member, same pattern as strokeId/brushGroupId above.
   groupId:(p.data&&p.data.groupId)?p.data.groupId:undefined,
+  // Dynamic shape (2026-08-18, "shape dynamique round corner sur rect...")
+  // — plain data like fillGradient just above, round-trips through JSON
+  // as-is. The item's REAL segments already encode the CURRENT radii
+  // (applyParamShapeRect bakes them in, tools.js) — this is only the
+  // declared intent (which corner is which, for the Coins panel to read
+  // back and for per-corner Motion to target), not a second source of
+  // truth for the geometry itself.
+  paramShape:(p.data&&p.data.paramShape)?p.data.paramShape:undefined,
   // Per-ELEMENT effects (2026-07, effects-panel.js — "possible de
   // différencié les effet par éléments sélectionné"): same {type,enabled,
   // p1,p2,p3,p4}[] shape as ld.effects, but scoped to just this one shape
@@ -621,6 +645,7 @@ function serP(p){var isVB=!!(p.data&&p.data.isVectorBrush);var center=isVB&&p.da
   textColor:(p.data&&p.data.isTextRoot)?p.data.color:undefined,
   textAlign:(p.data&&p.data.isTextRoot)?p.data.align:undefined,
   textFixedWidth:(p.data&&p.data.isTextRoot&&p.data.fixedWidth)?p.data.fixedWidth:undefined,
+  anchorTopLeft:(p.data&&p.data.isTextRoot&&p.data.anchorTopLeft)?{x:p.data.anchorTopLeft.x,y:p.data.anchorTopLeft.y}:undefined,
   // Vector mask (2026-08, AE-style "Mask") — see engine-bridge.js's
   // buildSceneJson mask-extraction comment for how these three drive the
   // engine's clip. §1 consumer check: buildSceneJson reads them (done),
@@ -660,7 +685,7 @@ function desP(d,layer,op){var prev=project.activeLayer;layer.activate();var p=ne
   // outline it never had ("un trait blanc apparaît autour du fill après
   // ctrl+Z"). Legacy data predating the field (undefined) keeps the old
   // fallback chain untouched.
-  p.strokeColor=d.hasRealStroke===false?null:(d.strokeColor||((d.isVectorBrush||d.brushTexturePreset||d.bitmapBrushSpec||d.isBrushTextureCopy||dNoStrokeChannel||dIsShadowChannel)?null:'#fff'));p.strokeWidth=d.strokeWidth||3;p.strokeCap=typeof d.strokeCap==='string'?d.strokeCap:'round';p.strokeJoin=typeof d.strokeJoin==='string'?d.strokeJoin:'round';if(d.miterLimit!==undefined)p.miterLimit=d.miterLimit;if(d.fillColor)p.fillColor=d.fillColor;else p.fillColor=null;p.opacity=op!==undefined?op:(d.opacity!==undefined?d.opacity:1);if(d.dashArray&&d.dashArray.length)p.dashArray=d.dashArray;if(d.dashOffset!==undefined)p.dashOffset=d.dashOffset;if(d.paintOrder){p.data.paintOrder=d.paintOrder;}if(d.isVectorBrush){p.data.isVectorBrush=true;if(d.centerSegments)p.data.centerSegments=d.centerSegments;if(d.widthProfile)p.data.widthProfile=d.widthProfile;if(d.strokeProfile)p.data.strokeProfile=d.strokeProfile;if(d.profileBase)p.data.profileBase=d.profileBase;if(d.isFillShape)p.data.isFillShape=true;applyBrushKeyline(p);}if(d.fillSeed)p.data.fillSeed=d.fillSeed;if(d.fillSeeds&&d.fillSeeds.length)p.data.fillSeeds=d.fillSeeds;if((d.fillSeed||(d.fillSeeds&&d.fillSeeds.length))&&d.fillGapPx!==undefined)p.data.fillGapPx=d.fillGapPx;if(d.fillWalls)p.data.fillWalls=d.fillWalls;if(d.strokeId)p.data.strokeId=d.strokeId;if(d.brushGroupId)p.data.brushGroupId=d.brushGroupId;if(d.isLinkedFillCompanion)p.data.isLinkedFillCompanion=true;if(d.linkedFillId)p.data.linkedFillId=d.linkedFillId;if(d.tweenOn)p.data.tweenOn=true;if(d.boxAngle)p.data.boxAngle=d.boxAngle;if(d.xformAnchorKey)p.data.xformAnchorKey=d.xformAnchorKey;if(d.xformAnchorCustom)p.data.xformAnchorCustom=d.xformAnchorCustom;if(d.isBrushTextureCopy)p.data.isBrushTextureCopy=true;if(d.brushTexturePreset)p.data.brushTexturePreset=d.brushTexturePreset;if(d.bitmapBrushSpec)p.data.bitmapBrushSpec=d.bitmapBrushSpec;if(d.bitmapPressureProfile)p.data.bitmapPressureProfile=d.bitmapPressureProfile;if(d.preTextureOpacity!==undefined)p.data.preTextureOpacity=d.preTextureOpacity;if(d.preTextureStroke!==undefined)p.data.preTextureStroke=d.preTextureStroke;if(d.channelTag)p.data.channelTag=d.channelTag;if(d.shadowSwatchId)p.data.shadowSwatchId=d.shadowSwatchId;if(d.ownerId)p.data.ownerId=d.ownerId;if(d.ownerName)p.data.ownerName=d.ownerName;if(d.ownerColor)p.data.ownerColor=d.ownerColor;if(d.revisionParentId)p.data.revisionParentId=d.revisionParentId;if(d.isRevisionGhost)p.data.isRevisionGhost=true;if(d.revisionAction)p.data.revisionAction=d.revisionAction;if(d.preRevisionOpacity!==undefined)p.data.preRevisionOpacity=d.preRevisionOpacity;if(d.fillGradient)p.data.fillGradient=d.fillGradient;if(d.groupId)p.data.groupId=d.groupId;if(d.effects&&d.effects.length)p.data.effects=d.effects;
+  p.strokeColor=d.hasRealStroke===false?null:(d.strokeColor||((d.isVectorBrush||d.brushTexturePreset||d.bitmapBrushSpec||d.isBrushTextureCopy||dNoStrokeChannel||dIsShadowChannel)?null:'#fff'));p.strokeWidth=d.strokeWidth||3;p.strokeCap=typeof d.strokeCap==='string'?d.strokeCap:'round';p.strokeJoin=typeof d.strokeJoin==='string'?d.strokeJoin:'round';if(d.miterLimit!==undefined)p.miterLimit=d.miterLimit;if(d.fillColor)p.fillColor=d.fillColor;else p.fillColor=null;p.opacity=op!==undefined?op:(d.opacity!==undefined?d.opacity:1);if(d.dashArray&&d.dashArray.length)p.dashArray=d.dashArray;if(d.dashOffset!==undefined)p.dashOffset=d.dashOffset;if(d.paintOrder){p.data.paintOrder=d.paintOrder;}if(d.isVectorBrush){p.data.isVectorBrush=true;if(d.centerSegments)p.data.centerSegments=d.centerSegments;if(d.widthProfile)p.data.widthProfile=d.widthProfile;if(d.strokeProfile)p.data.strokeProfile=d.strokeProfile;if(d.profileBase)p.data.profileBase=d.profileBase;if(d.isFillShape)p.data.isFillShape=true;applyBrushKeyline(p);}if(d.fillSeed)p.data.fillSeed=d.fillSeed;if(d.fillSeeds&&d.fillSeeds.length)p.data.fillSeeds=d.fillSeeds;if((d.fillSeed||(d.fillSeeds&&d.fillSeeds.length))&&d.fillGapPx!==undefined)p.data.fillGapPx=d.fillGapPx;if(d.fillWalls)p.data.fillWalls=d.fillWalls;if(d.strokeId)p.data.strokeId=d.strokeId;if(d.brushGroupId)p.data.brushGroupId=d.brushGroupId;if(d.isLinkedFillCompanion)p.data.isLinkedFillCompanion=true;if(d.linkedFillId)p.data.linkedFillId=d.linkedFillId;if(d.tweenOn)p.data.tweenOn=true;if(d.boxAngle)p.data.boxAngle=d.boxAngle;if(d.xformAnchorKey)p.data.xformAnchorKey=d.xformAnchorKey;if(d.xformAnchorCustom)p.data.xformAnchorCustom=d.xformAnchorCustom;if(d.isBrushTextureCopy)p.data.isBrushTextureCopy=true;if(d.brushTexturePreset)p.data.brushTexturePreset=d.brushTexturePreset;if(d.bitmapBrushSpec)p.data.bitmapBrushSpec=d.bitmapBrushSpec;if(d.bitmapPressureProfile)p.data.bitmapPressureProfile=d.bitmapPressureProfile;if(d.preTextureOpacity!==undefined)p.data.preTextureOpacity=d.preTextureOpacity;if(d.preTextureStroke!==undefined)p.data.preTextureStroke=d.preTextureStroke;if(d.channelTag)p.data.channelTag=d.channelTag;if(d.shadowSwatchId)p.data.shadowSwatchId=d.shadowSwatchId;if(d.ownerId)p.data.ownerId=d.ownerId;if(d.ownerName)p.data.ownerName=d.ownerName;if(d.ownerColor)p.data.ownerColor=d.ownerColor;if(d.revisionParentId)p.data.revisionParentId=d.revisionParentId;if(d.isRevisionGhost)p.data.isRevisionGhost=true;if(d.revisionAction)p.data.revisionAction=d.revisionAction;if(d.preRevisionOpacity!==undefined)p.data.preRevisionOpacity=d.preRevisionOpacity;if(d.fillGradient)p.data.fillGradient=d.fillGradient;if(d.groupId)p.data.groupId=d.groupId;if(d.paramShape)p.data.paramShape=d.paramShape;if(d.effects&&d.effects.length)p.data.effects=d.effects;
   if(d.isVectorText)p.data.isVectorText=true;if(d.vectorChar)p.data.vectorChar=d.vectorChar;if(d.isText)p.data.isText=true;
   if(d.charIndex!=null)p.data.charIndex=d.charIndex;if(d.wordIndex!=null)p.data.wordIndex=d.wordIndex;if(d.lineIndex!=null)p.data.lineIndex=d.lineIndex;
   // Mograph duplicator copy tags (applyLayerDuplicator) — belt-and-suspenders
@@ -674,7 +699,7 @@ function desP(d,layer,op){var prev=project.activeLayer;layer.activate();var p=ne
   // live object here for its per-clone 3D projector cache — the one real,
   // current consumer.
   if(d.dupCloneId)p.data.dupCloneId=d.dupCloneId;if(d.dup3D)p.data.dup3D=d.dup3D;
-  if(d.isTextRoot){p.data.isTextRoot=true;p.data.text=d.text||'';p.data.vectorFont=d.vectorFont||'Roboto-Regular';p.data.size=d.textSize||48;p.data.color=d.textColor||'#000000';p.data.align=d.textAlign||'left';if(d.textFixedWidth)p.data.fixedWidth=d.textFixedWidth;}
+  if(d.isTextRoot){p.data.isTextRoot=true;p.data.text=d.text||'';p.data.vectorFont=d.vectorFont||'Roboto-Regular';p.data.size=d.textSize||48;p.data.color=d.textColor||'#000000';p.data.align=d.textAlign||'left';if(d.textFixedWidth)p.data.fixedWidth=d.textFixedWidth;if(d.anchorTopLeft)p.data.anchorTopLeft={x:d.anchorTopLeft.x,y:d.anchorTopLeft.y};}
   if(d.isMask){p.data.isMask=true;p.data.maskMode=d.maskMode||'add';if(d.maskFeather)p.data.maskFeather=d.maskFeather;}
   if(d.strokeGradientAlongPath)p.data.strokeGradientAlongPath=d.strokeGradientAlongPath;
   // Retained-path stamp (engine-bridge.js, 2026-07-28): the stored stroke
@@ -1812,7 +1837,7 @@ function rigResetPose(ld){
 // deform (ensureKeyframe's own loadFrame just rebuilt fresh, undeformed
 // Paper items from the newly-promoted keyframe's stored data), THEN save.
 function rigCommitFrame(ld){
-  if(!ld.rig||!ld.rig.binds.length){showToast('Aucun trait riggé');return false;}
+  if(!ld.rig||!ld.rig.binds.length){showToast(SM.t('toastNoRiggedStroke'));return false;}
   if(!canEditActiveLayer())return false;
   // Skip when a pose-drag already pushed its own checkpoint (rig-bridge.js,
   // 2026-07-29 fix) — by NOW, bone.segments has already been live-mutated
@@ -1829,7 +1854,7 @@ function rigCommitFrame(ld){
   ld._rigPoseLive=false;
   saveActiveLayerFrame();updateUI();
   if(window.SMEngineBridge)SMEngineBridge.renderNow();
-  showToast('Pose du rig figée sur cette frame');
+  showToast(SM.t('toastRigPoseFrozenOnFrame'));
   return true;
 }
 // ---- IK (3-point chain, 2-bone law-of-cosines) — ported verbatim from
@@ -2322,6 +2347,33 @@ function getEffectiveStrokes(layerIdx,frameIdx,countOnly){
       var m=symMatrixOf(ld);
       out=out.map(function(sd){return applyMatrixToStrokeData(cloneStrokeForTransform(sd),m);});
     }
+    // Exposed-property overrides (2026-08-18, see exposeSymbolProperty's own
+    // comment) — resolved LAST, after every transform above, since these
+    // touch paint/visibility fields a matrix never does. `ld` (the INSTANCE
+    // layer, not the symbol) is what carries each property's actual value —
+    // SMMotion.valueAtFrame already knows how to fall back through
+    // animated→static→PROP_DEFAULT for any prop key, exposed ones included,
+    // so this reuses that evaluator directly rather than re-deriving a
+    // default here. Re-registers metadata every call (cheap, idempotent) —
+    // see propsFor's identical reasoning for why this can't be a one-time
+    // registration at exposure time alone.
+    if(sym.exposedProps&&sym.exposedProps.length&&window.SMMotion){
+      sym.exposedProps.forEach(function(ep){if(SMMotion.registerExposedPropMeta)SMMotion.registerExposedPropMeta(ep.key,ep.label,ep.default);});
+      var epByStroke={};
+      sym.exposedProps.forEach(function(ep){(epByStroke[ep.targetStrokeId]=epByStroke[ep.targetStrokeId]||[]).push(ep);});
+      out=out.map(function(sd){
+        if(!sd.strokeId||!epByStroke[sd.strokeId])return sd;
+        var sd2=null,hide=false;
+        epByStroke[sd.strokeId].forEach(function(ep){
+          var val=SMMotion.valueAtFrame(ld,ep.key,frameIdx)[0];
+          if(ep.targetField==='__visible'){if(val<50)hide=true;return;}
+          if(!sd2)sd2=JSON.parse(JSON.stringify(sd));
+          if(ep.targetField==='opacity')sd2.opacity=Math.max(0,Math.min(1,val/100));
+          else sd2[ep.targetField]=val;
+        });
+        return hide?null:(sd2||sd);
+      }).filter(function(sd){return sd;});
+    }
     return out;
   }
   // Plain layer, the overwhelmingly common case — hot path, called every
@@ -2392,8 +2444,32 @@ function cloneRigForSymbol(rig){
   return{bones:rig.bones,ikChains:rig.ikChains,nextId:rig.nextId,
     binds:(rig.binds||[]).map(function(b){return{strokeId:b.strokeId,rest:b.rest,weights:b.weights,rotate:b.rotate};})};
 }
+// Component exposed properties (2026-08-18) — declares a property on the
+// SYMBOL (state.symbols[symId].exposedProps), bound to one stroke inside it
+// by its stable strokeId. Every instance of this symbol then gets it as an
+// ordinary Motion property (propsFor, motion.js — registers PROP_LABEL/DIM/
+// UNIT/DEFAULT there, not here, so a project reload rehydrates it the first
+// time propsFor is called rather than needing a separate boot-time pass).
+// `targetField` is a real field name on a serialized stroke dict
+// ('fillColor','strokeColor','opacity'...) EXCEPT the sentinel '__visible',
+// which getEffectiveStrokes reads as "drop this stroke from the instance's
+// output entirely" rather than writing it onto the dict.
+function exposeSymbolProperty(symId,targetStrokeId,targetField,label,defaultVal){
+  var sym=state.symbols[symId];if(!sym)return null;
+  if(!sym.exposedProps)sym.exposedProps=[];
+  var key='ep_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,6);
+  var entry={key:key,label:label,targetStrokeId:targetStrokeId,targetField:targetField,default:defaultVal};
+  sym.exposedProps.push(entry);
+  if(window.SMMotion&&SMMotion.registerExposedPropMeta)SMMotion.registerExposedPropMeta(key,label,defaultVal);
+  return entry;
+}
+// NOT attached to window.SM here — timeline.js (loaded after this file,
+// index.html) assigns `window.SM={...}` as a fresh object LITERAL, which
+// silently wipes out anything attached to window.SM earlier (found live:
+// `window.SM.exposeSymbolProperty is not a function` despite the bare
+// function parsing fine). Registered in timeline.js's own literal instead.
 function convertLayerToComponent(layerIdx){
-  if(state.activeSymbolId){showToast('Fermez d\'abord le composant en cours d\'édition');return;}
+  if(state.activeSymbolId){showToast(SM.t('toastCloseComponentFirst'));return;}
   var ld=state.layers[layerIdx];if(!ld){showToast('Calque invalide');return;}
   var bad=badComponentSourceReason(ld);
   if(bad){showToast('Impossible de convertir : '+bad);return;}
@@ -2436,7 +2512,7 @@ function convertLayerToComponent(layerIdx){
   // report from the day before, same single cause.
   ld.frames=[];for(var i=0;i<state.totalFrames;i++)ld.frames.push({strokes:[],isKeyframe:i===0,isInterpolated:false});
   loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderSymbolTabs)renderSymbolTabs();
-  showToast('Composant créé: '+state.symbols[symId].name);
+  showToast(SM.t('toastComponentCreated')+state.symbols[symId].name);
 }
 // Batch version: merges every selected layer into ONE new component (a
 // symbol whose `layers` array — already supported, symbols aren't limited
@@ -2447,7 +2523,7 @@ function convertLayerToComponent(layerIdx){
 // single-layer version leaving the rest of the selection untouched and
 // creating N separate one-layer components instead of one N-layer component.
 function convertLayersToComponent(indices){
-  if(state.activeSymbolId){showToast('Fermez d\'abord le composant en cours d\'édition');return;}
+  if(state.activeSymbolId){showToast(SM.t('toastCloseComponentFirst'));return;}
   indices=indices.slice().sort(function(a,b){return a-b;}).filter(function(i){return state.layers[i]&&!state.layers[i].symbolId;});
   // Type guard (2026-07-30 fix): the filter above only ever dropped
   // already-symbolId layers silently — a montage/video/Null/effect layer
@@ -2456,7 +2532,7 @@ function convertLayersToComponent(indices){
   // SAME reasons convertLayerToComponent/mergeLayersIntoOne already use.
   for(var bi=0;bi<indices.length;bi++){
     var badReason=badComponentSourceReason(state.layers[indices[bi]]);
-    if(badReason){showToast('Impossible de convertir : la sélection contient '+badReason);return;}
+    if(badReason){showToast(SM.t('toastCannotConvertSelectionContains')+badReason);return;}
   }
   if(indices.length<2){convertLayerToComponent(indices[0]!==undefined?indices[0]:state.activeLayerIdx);return;}
   saveAllLayerFrames();pushUndo();
@@ -2551,7 +2627,7 @@ function convertLayersToComponent(indices){
   state.activeLayerIdx=insertAt;_layerSel=[insertAt];
   activateUL(state.activeLayerIdx);
   loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderSymbolTabs)renderSymbolTabs();
-  showToast('Composant créé avec '+indices.length+' calques');
+  showToast(SM.t('toastComponentCreatedWith')+indices.length+' calques');
 }
 // "Release to Layers" (Illustrator-style) — Motion's double-click-a-layer-row
 // gesture (2026-07) EXPLODES the layer into N real top-level layers, one per
@@ -2580,7 +2656,7 @@ function convertLayersToComponent(indices){
 // request called for: a shape already animated individually in Motion
 // keeps that exact animation, now as a normal layer-level track.
 function splitLayerIntoElements(li){
-  if(state.activeSymbolId){showToast('Fermez d\'abord le composant en cours d\'édition');return;}
+  if(state.activeSymbolId){showToast(SM.t('toastCloseComponentFirst'));return;}
   splitLayerIntoElementsCore(li);
 }
 // Core split, no activeSymbolId guard — reused by enterComponentLayer
@@ -2598,10 +2674,10 @@ function splitLayerIntoElements(li){
 // re-entry's auto-split pass no-ops via the `els.length<2` guard below.
 function splitLayerIntoElementsCore(li,opts){
   var silent=!!(opts&&opts.silent);
-  var ld=state.layers[li];if(!ld||ld.symbolId){if(!silent)showToast('Rien à éclater ici');return false;}
+  var ld=state.layers[li];if(!ld||ld.symbolId){if(!silent)showToast(SM.t('toastNothingToSplitHere'));return false;}
   if(!window.SMMotion)return false;
   var els=SMMotion.layerElements(li,ld);
-  if(!els||els.length<2){if(!silent)showToast('Il faut au moins 2 éléments pour éclater ce calque');return false;}
+  if(!els||els.length<2){if(!silent)showToast(SM.t('toastNeedAtLeast2ElementsToSplit'));return false;}
   saveAllLayerFrames();if(!silent)pushUndo();
   var n=els.length;
   var newLayers=[];
@@ -2708,7 +2784,7 @@ function splitLayerIntoElementsCore(li,opts){
   _layerSel=newLayers.map(function(_x,idx){return li+idx;});
   activateUL(state.activeLayerIdx);
   loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
-  if(!silent)showToast('Calque éclaté en '+n+' calques');
+  if(!silent)showToast(SM.t('toastLayerSplitIntoSuffix')+n+' calques');
   return true;
 }
 // True inverse of splitLayerIntoElementsCore — merges N layers back into a
@@ -2745,7 +2821,7 @@ function mergeLayersIntoOne(indices,opts){
   var idx=(indices||[]).slice().sort(function(a,b){return a-b;});
   // de-dup — a caller can easily pass the active layer twice (selection + active)
   idx=idx.filter(function(v,i){return i===0||v!==idx[i-1];});
-  if(idx.length<2){if(!silent)showToast('Sélectionnez au moins 2 calques à fusionner');return false;}
+  if(idx.length<2){if(!silent)showToast(SM.t('toastSelectAtLeast2LayersToMerge'));return false;}
   var srcs=[],bad=null;
   for(var a=0;a<idx.length;a++){
     var l=state.layers[idx[a]];
@@ -2762,7 +2838,7 @@ function mergeLayersIntoOne(indices,opts){
     else if(l.isGuideLayer)bad=bad||'un calque Guide';
     srcs.push(l);
   }
-  if(bad){if(!silent)showToast('Impossible de fusionner : la sélection contient '+bad);return false;}
+  if(bad){if(!silent)showToast(SM.t('toastCannotMergeSelectionContains')+bad);return false;}
   saveAllLayerFrames();if(!silent)pushUndo();
   // Combine-group remap (2026-07-29): each source layer's OWN ld.groups may
   // share id strings with ANOTHER source's — e.g. merging a layer with its
@@ -2933,8 +3009,8 @@ function mergeLayersIntoOne(indices,opts){
   loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
   if(!silent){
     showToast(approximated
-      ? idx.length+' calques fusionnés — animation reportée par forme (pivot approché sur '+approximated+' calque(s) multi-formes)'
-      : idx.length+' calques fusionnés en « '+name+' »');
+      ? idx.length+SM.t('toastLayersMergedShapePivotSuffix')+approximated+' calque(s) multi-formes)'
+      : idx.length+SM.t('toastLayersMergedIntoSuffix')+name+' »');
   }
   return true;
 }
@@ -2946,8 +3022,8 @@ function mergeLayersIntoOne(indices,opts){
 // repeating keyframes rather than a keyframe on every single frame. The
 // symbol itself stays in the library for any other instance.
 function convertComponentToLayer(layerIdx){
-  if(state.activeSymbolId){showToast('Fermez d\'abord le composant en cours d\'édition');return;}
-  var ld=state.layers[layerIdx];if(!ld||!ld.symbolId){showToast('Pas un composant');return;}
+  if(state.activeSymbolId){showToast(SM.t('toastCloseComponentFirst'));return;}
+  var ld=state.layers[layerIdx];if(!ld||!ld.symbolId){showToast(SM.t('toastNotAComponent'));return;}
   if(!state.symbols[ld.symbolId]){showToast('Composant introuvable');return;}
   pushUndoLayers();
   var frames=[],prevJson=null;
@@ -2960,7 +3036,7 @@ function convertComponentToLayer(layerIdx){
   delete ld.symbolId;delete ld.symPlayMode;delete ld.symSpeed;delete ld.symPlacedAt;delete ld.symSingleFrame;
   ld.locked=false;ld.frames=frames;
   loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderSymbolTabs)renderSymbolTabs();
-  showToast('Composant décomposé en calque normal');
+  showToast(SM.t('toastComponentBrokenToLayer'));
 }
 // Groups a plain layer into 3 independent sub-timelines (Ligne/Plein/Ombre),
 // each modeled as its own state.symbols entry so enterSymbol/exitToScene/
@@ -2969,8 +3045,8 @@ function convertComponentToLayer(layerIdx){
 // (Full/flat-color) pass by default since that's normally the bulk of the
 // linework already on a layer being grouped; Ligne/Ombre start empty.
 function convertLayerToLFSGroup(layerIdx){
-  if(state.activeSymbolId){showToast('Fermez d\'abord le composant en cours d\'édition');return;}
-  var ld=state.layers[layerIdx];if(!ld||ld.symbolId||ld.lfsGroup){showToast('Calque déjà groupé ou invalide');return;}
+  if(state.activeSymbolId){showToast(SM.t('toastCloseComponentFirst'));return;}
+  var ld=state.layers[layerIdx];if(!ld||ld.symbolId||ld.lfsGroup){showToast(SM.t('toastLayerAlreadyGrouped'));return;}
   saveAllLayerFrames();pushUndo();
   var lfsIds={},lfsSettings={};
   ['line','full','shadow'].forEach(function(key){
@@ -2987,15 +3063,15 @@ function convertLayerToLFSGroup(layerIdx){
   ld.lfsGroup=true;ld.lfsIds=lfsIds;ld.lfsSettings=lfsSettings;ld.locked=true;
   ld.frames=[];for(var i=0;i<state.totalFrames;i++)ld.frames.push({strokes:[],isKeyframe:i===0,isInterpolated:false});
   loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderSymbolTabs)renderSymbolTabs();
-  showToast('Calque groupé en Ligne/Plein/Ombre');
+  showToast(SM.t('toastLayerGroupedLFS'));
 }
 // Inverse: bakes the composited Ligne+Plein+Ombre result of each main-timeline
 // frame (via getEffectiveStrokes, which already stacks all 3 sub-symbols)
 // back into plain layer keyframes, then detaches the 3 sub-symbols. Mirrors
 // convertComponentToLayer's collapse-identical-frames logic.
 function convertLFSGroupToLayer(layerIdx){
-  if(state.activeSymbolId){showToast('Fermez d\'abord le composant en cours d\'édition');return;}
-  var ld=state.layers[layerIdx];if(!ld||!ld.lfsGroup){showToast('Pas un groupe Ligne/Plein/Ombre');return;}
+  if(state.activeSymbolId){showToast(SM.t('toastCloseComponentFirst'));return;}
+  var ld=state.layers[layerIdx];if(!ld||!ld.lfsGroup){showToast(SM.t('toastNotALFSGroup'));return;}
   pushUndoLayers();
   var frames=[],prevJson=null;
   for(var fi=0;fi<state.totalFrames;fi++){
@@ -3007,7 +3083,7 @@ function convertLFSGroupToLayer(layerIdx){
   delete ld.lfsGroup;delete ld.lfsIds;delete ld.lfsSettings;
   ld.locked=false;ld.frames=frames;
   loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderSymbolTabs)renderSymbolTabs();
-  showToast('Groupe Ligne/Plein/Ombre décomposé en calque normal');
+  showToast(SM.t('toastGroupLFSBrokenToLayer'));
 }
 // Propagation engine: takes whichever Plein/Ombre keyframes the user already
 // painted by hand (identified by data.fillSeed, exactly like
@@ -3036,8 +3112,8 @@ function _lineBoundsFromStrokes(strokes){
   return{x:minX,y:minY,width:maxX-minX,height:maxY-minY};
 }
 function propagateLFSFill(layerIdx,which){
-  if(state.activeSymbolId){showToast('Fermez d\'abord le composant en cours d\'édition');return;}
-  var ld=state.layers[layerIdx];if(!ld||!ld.lfsGroup){showToast('Pas un groupe Ligne/Plein/Ombre');return;}
+  if(state.activeSymbolId){showToast(SM.t('toastCloseComponentFirst'));return;}
+  var ld=state.layers[layerIdx];if(!ld||!ld.lfsGroup){showToast(SM.t('toastNotALFSGroup'));return;}
   var targetSymId=ld.lfsIds[which];var targetSym=targetSymId&&state.symbols[targetSymId];
   if(!targetSym){showToast('Sous-timeline introuvable');return;}
   var targetLayer=targetSym.layers[0];
@@ -3097,11 +3173,11 @@ function propagateLFSFill(layerIdx,which){
   scratch.remove();
   targetLayer.frames=newFrames;
   loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
-  showToast(applied+' image(s) '+(which==='full'?'Plein':'Ombre')+' généré(s) par propagation');
+  showToast(applied+' image(s) '+(which==='full'?'Plein':'Ombre')+SM.t('toastGeneratedByPropagationSuffix'));
 }
 function enterSymbol(symId){
   if(state.activeSymbolId===symId)return;
-  if(state.activeSymbolId){showToast('Composants imbriqués non supportés — fermez le composant courant');return;}
+  if(state.activeSymbolId){showToast(SM.t('toastNestedComponentsUnsupported'));return;}
   if(!state.symbols[symId])return;
   saveAllLayerFrames();
   // "double clic sur un component le bounding box de la selection reste"
@@ -3230,9 +3306,9 @@ function closeSymbolTab(symId){
 // mid-clip trim shows correctly instead of always starting the symbol's
 // own frame 0.
 function enterMontageView(montageId){
-  if(state.activeSymbolId){showToast('Fermez d\'abord le composant en cours d\'édition');return;}
+  if(state.activeSymbolId){showToast(SM.t('toastCloseComponentFirst'));return;}
   if(state.activeMontageViewId===montageId)return;
-  if(state.activeMontageViewId){showToast('Fermez d\'abord le montage en cours d\'édition');return;}
+  if(state.activeMontageViewId){showToast(SM.t('toastCloseMontageFirst'));return;}
   if(!window.SMStoryboard)return;
   var m=SMStoryboard.montageById(montageId);if(!m)return;
   var mods=SMStoryboard.chainModsForView(m);
@@ -3302,7 +3378,7 @@ function enterMontageView(montageId){
 }
 function exitMontageView(){
   if(!state.activeMontageViewId||!_montageViewSnapshot)return;
-  if(state.activeSymbolId){showToast('Fermez d\'abord le composant en cours d\'édition');return;}
+  if(state.activeSymbolId){showToast(SM.t('toastCloseComponentFirst'));return;}
   saveAllLayerFrames();
   if(typeof clearSel==='function')clearSel(); // see enterSymbol's own comment
   // Write back markers/motionArcs/tweenOverrides/tweenEasing onto the
@@ -3853,7 +3929,7 @@ function convertLayerToStrokeFillShadowFolder(layerIdx){
   activateUL(state.activeLayerIdx);
   loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
   if(window.renderLayerList)window.renderLayerList();if(window.renderTimeline)window.renderTimeline();
-  showToast('Calque séparé en Stroke / Fill / Shadow');
+  showToast(SM.t('toastLayerSplitSFS'));
 }
 function goToFrame(idx){
   if(idx<0||idx>=state.totalFrames)return;
@@ -3910,7 +3986,7 @@ function insertFrame(){
   // left to insert into, so it aborts with a toast instead of silently
   // becoming a no-op "insert into every layer" fallback.
   targets=targets.filter(function(i){return !state.layers[i].locked;});
-  if(explicitSel&&!targets.length){showToast('Calque verrouillé');return;}
+  if(explicitSel&&!targets.length){showToast(SM.t('toastLayerLocked'));return;}
   pushUndoLayers();
   var cf=state.currentFrame;
   for(var i=0;i<state.layers.length;i++){
@@ -3937,7 +4013,7 @@ function insertFrame(){
   if(state.waOut<state.totalFrames-1)state.waOut++;
   window._waOut=state.waOut;window._totalF=state.totalFrames;
   goToFrame(cf+1);
-  showToast('Frame insérée (F5)'+(targets.length<state.layers.length?' — '+targets.length+' calque(s)':''));
+  showToast(SM.t('toastFrameInsertedF5')+(targets.length<state.layers.length?' — '+targets.length+' calque(s)':''));
 }
 // Core per-layer step shared by insertKeyframeAt (single layer+frame, own
 // undo/render — used by the span-end drag handle in timeline.js) and
@@ -3979,11 +4055,11 @@ function insertKeyframe(){
     if(ld.locked&&!ld.symbolId){lockedHit=true;return false;}
     return !ld.frames[cf].isKeyframe;
   });
-  if(!eligible.length){showToast(lockedHit?'Calque verrouillé':'Déjà une keyframe');return;}
+  if(!eligible.length){showToast(lockedHit?SM.t('toastLayerLocked'):SM.t('toastAlreadyAKeyframe'));return;}
   pushUndoLayers();
   eligible.forEach(function(li){_insertKeyframeCore(li,cf);});
   loadFrame(cf);renderOS();renderArcs();updateUI();
-  showToast(eligible.length>1?eligible.length+' keyframes insérées':'Keyframe insérée');
+  showToast(eligible.length>1?eligible.length+SM.t('toastKeyframesInsertedSuffix'):SM.t('toastKeyframeInserted'));
 }
 // Same as insertKeyframe() but for an arbitrary layer/frame instead of only
 // the active layer at the current playhead — used to shorten a held/
@@ -4010,17 +4086,17 @@ function nextKeyframeFrame(layerIdx,fromFrame){
 function insertKeyframeAt(layerIdx,frameIdx){
   saveAllLayerFrames();
   var ld=state.layers[layerIdx];var f=ld.frames[frameIdx];
-  if(ld.locked&&!ld.symbolId){showToast('Calque verrouillé');return false;}
-  if(f.isKeyframe){showToast('Déjà une keyframe');return false;}
+  if(ld.locked&&!ld.symbolId){showToast(SM.t('toastLayerLocked'));return false;}
+  if(f.isKeyframe){showToast(SM.t('toastAlreadyAKeyframe'));return false;}
   pushUndoLayers();
   _insertKeyframeCore(layerIdx,frameIdx);
   if(layerIdx===state.activeLayerIdx)loadFrame(state.currentFrame);
-  renderOS();renderArcs();updateUI();showToast('Keyframe insérée');
+  renderOS();renderArcs();updateUI();showToast(SM.t('toastKeyframeInserted'));
   return true;
 }
 function insertBlankKeyframe(){
   var ld=state.layers[state.activeLayerIdx];
-  if(ld.locked&&!ld.symbolId){showToast('Calque verrouillé');return;}
+  if(ld.locked&&!ld.symbolId){showToast(SM.t('toastLayerLocked'));return;}
   saveAllLayerFrames();pushUndoLayers();
   var f={strokes:[],isKeyframe:true,isInterpolated:false};
   // On a component layer this main-timeline row is otherwise dead timing
@@ -4044,17 +4120,17 @@ function removeFrame(){if(state.totalFrames<=1)return;pushUndoLayers();var cf=st
   if(lyr.markers)lyr.markers.forEach(function(m){if(m.frame>cf)m.frame--;});
 }
   if(state.markers)state.markers.forEach(function(m){if(m.frame>cf)m.frame--;});
-  state.totalFrames--;if(state.waOut>=state.totalFrames)state.waOut=state.totalFrames-1;window._waOut=state.waOut;window._totalF=state.totalFrames;if(state.currentFrame>=state.totalFrames)state.currentFrame=state.totalFrames-1;loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast('Frame supprimée');}
+  state.totalFrames--;if(state.waOut>=state.totalFrames)state.waOut=state.totalFrames-1;window._waOut=state.waOut;window._totalF=state.totalFrames;if(state.currentFrame>=state.totalFrames)state.currentFrame=state.totalFrames-1;loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast(SM.t('toastFrameDeleted'));}
 // Animate's "Clear Keyframe" — demotes a keyframe back into a plain
 // extended frame (content reverts to whatever the previous keyframe holds),
 // without removing the frame slot itself (unlike removeFrame/removeFrameSpan).
 function clearKeyframe(){
   var ld=state.layers[state.activeLayerIdx];var cf=state.currentFrame;var f=ld.frames[cf];
-  if(ld.locked){showToast('Calque verrouillé');return;}
-  if(!f||!f.isKeyframe){showToast('Pas une keyframe');return;}
+  if(ld.locked){showToast(SM.t('toastLayerLocked'));return;}
+  if(!f||!f.isKeyframe){showToast(SM.t('toastNotAKeyframe'));return;}
   pushUndo();f.strokes=[];f.isKeyframe=false;f.isInterpolated=false;
   syncLinkedKeyframeFolder(state.activeLayerIdx,cf);
-  loadFrame(cf);renderOS();renderArcs();updateUI();showToast('Keyframe effacée');
+  loadFrame(cf);renderOS();renderArcs();updateUI();showToast(SM.t('toastKeyframeCleared'));
 }
 // Animate's "Convert to Keyframes" — bakes whatever's currently displayed
 // (a tweened inbetween, or content inherited from an earlier keyframe) into
@@ -4063,15 +4139,15 @@ function clearKeyframe(){
 // disturbing the rest of the tween.
 function convertToKeyframes(){
   var li=state.activeLayerIdx;var ld=state.layers[li];
-  if(ld.locked){showToast('Calque verrouillé');return;}
+  if(ld.locked){showToast(SM.t('toastLayerLocked'));return;}
   var frames=_sel.frames.length?_sel.frames.filter(function(s){return s.layer===li;}).map(function(s){return s.frame;}):[state.currentFrame];
-  if(!frames.length){showToast('Aucune sélection');return;}
+  if(!frames.length){showToast(SM.t('toastNoSelection'));return;}
   pushUndo();saveAllLayerFrames();var count=0;
   frames.forEach(function(fi){
     var f=ld.frames[fi];if(!f||f.isKeyframe)return;
     f.strokes=JSON.parse(JSON.stringify(getEffectiveStrokes(li,fi)));f.isKeyframe=true;f.isInterpolated=false;count++;
   });
-  loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast(count+' image(s) clé(s) créée(s)');
+  loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast(count+SM.t('toastKeyframesCreatedSuffix'));
 }
 // Animate's "Remove Frames" on a range selection — removes the whole
 // selected frame span (across every layer, since frame count is global
@@ -4086,13 +4162,13 @@ function removeFrameSpan(){
   state.totalFrames-=count;
   if(state.waOut>=state.totalFrames)state.waOut=state.totalFrames-1;window._waOut=state.waOut;window._totalF=state.totalFrames;
   if(state.currentFrame>=state.totalFrames)state.currentFrame=state.totalFrames-1;
-  selClear();loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast(count+' frame(s) supprimée(s)');
+  selClear();loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast(count+SM.t('toastFramesDeletedSuffix'));
 }
 // Duplicate the current frame selection in place, right after itself —
 // equivalent to copy + paste-at-selection-end, exposed as one menu action.
 function duplicateSelectedFrames(){
   var b=selBounds();
-  if(!b){showToast('Aucune sélection');return;}
+  if(!b){showToast(SM.t('toastNoSelection'));return;}
   window.SM.copyFrames();
   var span=b.maxF-b.minF+1;
   state.currentFrame=b.minF+span;window._curFrame=state.currentFrame;

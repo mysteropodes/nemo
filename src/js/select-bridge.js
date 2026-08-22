@@ -21,7 +21,163 @@
 // rotate transform box with opposite-corner anchoring, and group move are
 // all ported too.
 (function () {
-  var mode = null; // 'xform-scale' | 'xform-rotate' | 'marquee' | 'move' | 'arc' | 'nv-drag' | 'nv-scale' | 'nv-rotate' | null
+  var mode = null; // 'xform-scale' | 'xform-rotate' | 'marquee' | 'move' | 'arc' | 'nv-drag' | 'nv-scale' | 'nv-rotate' | 'cornerRadius' | null
+  // Dynamic shapes phase 3 (2026-08-18) — canvas drag handles for a rect's
+  // corner radius, Figma's own interaction (a small grip sitting on each
+  // rounded corner's arc, draggable independently). Self-contained state,
+  // deliberately NOT sharing computeHandles()/the 8-handle transform box's
+  // hit-test — that system is already intricate (oriented boxes, Motion
+  // point-maps, distort quads); a parallel, narrowly-scoped check kept this
+  // additive instead of risking a regression in code this load-bearing.
+  var _cornerDrag = null;
+  // Dynamic shapes rework (2026-08-19) — feedback: "la mise en place dans
+  // le canvas est pas fluide" turned out to mean Ellipse (pie/donut) and
+  // Star/Polygon had NO canvas handles at all, only numeric fields —
+  // Rectangle's own corner grips (phase 3, above) were the only kind ever
+  // wired up. Reuses that exact hit-test/drag/render plumbing
+  // (paramShapeSelectionSingle → *HandleWorldPositions → mode==='cornerRadius'
+  // → *RadiusFromDrag, engine-bridge.js's orange-dot overlay) generalized to
+  // all three kinds instead of adding a parallel system — same pattern,
+  // wider `kind` coverage.
+  function paramShapeSelectionSingle() {
+    if (selectedPaths.length !== 1) return null;
+    var p = selectedPaths[0];
+    var k = p.data && p.data.paramShape && p.data.paramShape.kind;
+    return (k === 'rect' || k === 'ellipse' || k === 'star') ? p : null;
+  }
+  // Each handle sits at the rounded corner's own arc MIDPOINT (not the
+  // sharp geometric corner) — same visual language as Figma's grip. r=0
+  // collapses the (1-k) term to 0, so the handle sits exactly on the sharp
+  // corner point until you start dragging it outward, matching "grab the
+  // corner to begin rounding it" as a natural gesture rather than needing
+  // a pre-existing radius to have something to grab.
+  function rectCornerHandleWorldPositions(p) {
+    var ps = p.data.paramShape, b = p.bounds, k = 0.70710678;
+    var tl = ps.tl || 0, tr = ps.tr || 0, br = ps.br || 0, bl = ps.bl || 0;
+    return {
+      tl: new Point(b.left + tl * (1 - k), b.top + tl * (1 - k)),
+      tr: new Point(b.right - tr * (1 - k), b.top + tr * (1 - k)),
+      br: new Point(b.right - br * (1 - k), b.bottom - br * (1 - k)),
+      bl: new Point(b.left + bl * (1 - k), b.bottom - bl * (1 - k)),
+    };
+  }
+  var CORNER_POINT = {
+    tl: function (b) { return new Point(b.left, b.top); },
+    tr: function (b) { return new Point(b.right, b.top); },
+    br: function (b) { return new Point(b.right, b.bottom); },
+    bl: function (b) { return new Point(b.left, b.bottom); },
+  };
+  // Radius tracks straight-line distance from the TRUE corner to the
+  // pointer — simpler than inverting the arc-midpoint placement above, and
+  // reads just as naturally under the hand (drag further from the corner
+  // = bigger radius) without needing to match the handle's rest position
+  // exactly during the drag itself.
+  function cornerRadiusFromDrag(p, corner, pt) {
+    var b = p.bounds;
+    var maxR = Math.min(b.width, b.height) / 2;
+    return Math.max(0, Math.min(maxR, pt.getDistance(CORNER_POINT[corner](b))));
+  }
+  // Ellipse pie/donut — same "box, not live bounds" source as
+  // applyParamShapeEllipse (tools.js) now reads, so a thin pie slice's
+  // handles sit where the FULL ellipse would be, not collapsed onto the
+  // slice's own tiny rendered bbox.
+  function ellipseCenterAndRadii(p) {
+    var ps = p.data.paramShape;
+    var b = (ps.box) || (function () { var pb = p.bounds; return { x1: pb.left, y1: pb.top, x2: pb.right, y2: pb.bottom }; })();
+    return { cx: (b.x1 + b.x2) / 2, cy: (b.y1 + b.y2) / 2, rx: (b.x2 - b.x1) / 2, ry: (b.y2 - b.y1) / 2 };
+  }
+  function ellipseHandleWorldPositions(p) {
+    var ps = p.data.paramShape;
+    var g = ellipseCenterAndRadii(p);
+    var startA = (ps.startAngle || 0) * Math.PI / 180;
+    var endA = ((ps.startAngle || 0) + (ps.sweep !== undefined ? ps.sweep : 359.9)) * Math.PI / 180;
+    // Inner-radius grip: always visible along the start-angle ray, at a
+    // floor ratio when innerRadius is 0 — same "grab it to start rounding"
+    // affordance as a rect's r=0 corner handle sitting exactly on the
+    // sharp point until dragged.
+    var ir = Math.max(ps.innerRadius || 0, 0.12);
+    return {
+      sweep: new Point(g.cx + g.rx * Math.cos(endA), g.cy + g.ry * Math.sin(endA)),
+      inner: new Point(g.cx + g.rx * ir * Math.cos(startA), g.cy + g.ry * ir * Math.sin(startA)),
+    };
+  }
+  function ellipseSweepFromDrag(p, pt) {
+    var ps = p.data.paramShape, g = ellipseCenterAndRadii(p);
+    // Un-warp an elliptical (rx != ry) drag point back to a circle before
+    // taking its angle — dragging straight "around" a squashed ellipse
+    // should still read as a clean angle, not skewed by the aspect ratio.
+    var ux = (pt.x - g.cx) / Math.max(g.rx, 0.01), uy = (pt.y - g.cy) / Math.max(g.ry, 0.01);
+    var angDeg = Math.atan2(uy, ux) * 180 / Math.PI;
+    var sweep = angDeg - (ps.startAngle || 0);
+    sweep = ((sweep % 360) + 360) % 360;
+    if (sweep < 0.1) sweep = 0.1;
+    return Math.min(359.9, sweep);
+  }
+  function ellipseInnerFromDrag(p, pt) {
+    var g = ellipseCenterAndRadii(p);
+    var ux = (pt.x - g.cx) / Math.max(g.rx, 0.01), uy = (pt.y - g.cy) / Math.max(g.ry, 0.01);
+    var ratio = Math.sqrt(ux * ux + uy * uy);
+    return Math.max(0, Math.min(0.95, ratio));
+  }
+  // Star/Polygon — inner-vertex grip only (outer radius already tracks the
+  // shape's own resize handles like any layer; point count has no smooth
+  // drag-continuous meaning, stays a numeric field per its own comment in
+  // timeline.js's updateStarPanel).
+  function starOuterRadius(p) {
+    var ps = p.data.paramShape;
+    var b = (ps.box) || (function () { var pb = p.bounds; return { x1: pb.left, y1: pb.top, x2: pb.right, y2: pb.bottom }; })();
+    return { cx: (b.x1 + b.x2) / 2, cy: (b.y1 + b.y2) / 2, r: Math.min(b.x2 - b.x1, b.y2 - b.y1) / 2 };
+  }
+  function starHandleWorldPositions(p) {
+    var ps = p.data.paramShape;
+    var g = starOuterRadius(p);
+    var n = Math.max(3, Math.round(ps.pointCount || 5));
+    // First INNER vertex's angle in buildStarPolygonPath's own layout
+    // (n=pointCount*2 verts, index 1, a=-PI/2 + i*2PI/(2n)).
+    var a = -Math.PI / 2 + (2 * Math.PI) / (n * 2);
+    var ir = ps.innerRatio !== undefined ? ps.innerRatio : 0.5;
+    return { inner: new Point(g.cx + g.r * ir * Math.cos(a), g.cy + g.r * ir * Math.sin(a)) };
+  }
+  function starInnerFromDrag(p, pt) {
+    var g = starOuterRadius(p);
+    var ratio = pt.getDistance(new Point(g.cx, g.cy)) / Math.max(g.r, 0.01);
+    return Math.max(0.05, Math.min(1, ratio));
+  }
+  // Unified dispatch — one map of {kind: {positions(p), valueFromDrag(p,handle,pt), commit(p,handle,val)}}
+  // instead of a chain of if/else per kind at every call site.
+  var PARAM_HANDLE_KINDS = {
+    rect: {
+      positions: rectCornerHandleWorldPositions,
+      names: ['tl', 'tr', 'br', 'bl'],
+      valueFromDrag: cornerRadiusFromDrag,
+      commit: function (p, handle, val) { p.data.paramShape[handle] = val; window.applyParamShapeRect(p); },
+    },
+    ellipse: {
+      positions: ellipseHandleWorldPositions,
+      names: ['sweep', 'inner'],
+      valueFromDrag: function (p, handle, pt) { return handle === 'sweep' ? ellipseSweepFromDrag(p, pt) : ellipseInnerFromDrag(p, pt); },
+      commit: function (p, handle, val) {
+        if (handle === 'sweep') p.data.paramShape.sweep = val; else p.data.paramShape.innerRadius = val;
+        window.applyParamShapeEllipse(p);
+      },
+    },
+    star: {
+      positions: starHandleWorldPositions,
+      names: ['inner'],
+      valueFromDrag: starInnerFromDrag,
+      commit: function (p, handle, val) { p.data.paramShape.innerRatio = val; window.applyParamShapeStar(p); },
+    },
+  };
+  function paramHandleWorldPositions(p) {
+    var kind = p.data.paramShape.kind;
+    var def = PARAM_HANDLE_KINDS[kind];
+    return def ? def.positions(p) : {};
+  }
+  window.SMParamShapeHandles = {
+    cornerHandleWorldPositions: paramHandleWorldPositions,
+    paramShapeSelectionSingle: paramShapeSelectionSingle,
+    handleNamesFor: function (p) { var def = PARAM_HANDLE_KINDS[p.data.paramShape.kind]; return def ? def.names : []; },
+  };
   // Non-destructive combine groups (2026-07-29) — hit-test confirmatory
   // guard. UNION never has a problem here: the combined visible region is
   // exactly the union of members' own real geometry, so "hit a real
@@ -400,7 +556,7 @@
     // this file's own shouldIntercept()-gated logic below.
     if (state.appMode === 'motion' && window.SMMotion) {
       var w0 = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
-      if (SMMotion.onDown({ point: new Point(w0[0], w0[1]) })) {
+      if (SMMotion.onDown({ point: new Point(w0[0], w0[1]), altKey: e.altKey })) {
         e.stopImmediatePropagation(); e.preventDefault();
         return;
       }
@@ -423,6 +579,18 @@
     lastPt = pt;
     window.SMEngineBridge.suspend();
 
+    var pshp0 = paramShapeSelectionSingle();
+    if (pshp0) {
+      var hp0 = paramHandleWorldPositions(pshp0);
+      var HIT_R0 = 10 / view.zoom, hitCorner0 = null;
+      window.SMParamShapeHandles.handleNamesFor(pshp0).forEach(function (c) { if (!hitCorner0 && pt.getDistance(hp0[c]) < HIT_R0) hitCorner0 = c; });
+      if (hitCorner0) {
+        mode = 'cornerRadius';
+        pushUndo();
+        _cornerDrag = { path: pshp0, corner: hitCorner0 };
+        return;
+      }
+    }
     var ah = hitTestArc(pt);
     if (ah) {
       mode = 'arc';
@@ -435,7 +603,17 @@
       return;
     }
 
-    var hh = hitTestHandles(pt, e.altKey);
+    // Motion mode has its own COMPLETE, parallel box/ring/anchor hit-test
+    // (motion.js's hitMotionBoxHandle/hitAnchorPoint, tried first via
+    // SMMotion.onDown above) — this one is Animation 2D's, and its own
+    // overlay is already hidden in Motion mode (buildTransformBoxItems,
+    // engine-bridge.js, 2026-08-21). Without this gate the two systems'
+    // hit-zones could still overlap invisibly: SMMotion.onDown returning
+    // false (a Motion click that missed every Motion-specific target)
+    // let a hidden Animation 2D handle still grab the click underneath —
+    // confirmed live as the direct trigger for a real crash a few lines
+    // down (this block's own 2026-08-21 fix comment).
+    var hh = (state.appMode === 'motion') ? null : hitTestHandles(pt, e.altKey);
     if (hh && hh.type === 'anchor') {
       // Direct drag of the anchor crosshair — same UI-preference-not-
       // document-edit reasoning as the Alt+click path a bit further down
@@ -473,8 +651,21 @@
       // before anything below reads/mutates selectedPaths. Skipped in
       // Motion mode — same reasoning as the 'move' grab below: this
       // gesture never touches ld.frames content.
-      if (state.appMode !== 'motion') ensureKeyframe();
-      selectedPaths = state.selectedStrokeIndices.map(function (i) { return userLayers[state.activeLayerIdx].children[i]; }).filter(Boolean);
+      // 2026-08-21 fix ("Cannot read properties of null (reading
+      // 'gCorners')"): the re-hydration line right below is ONLY needed
+      // to recover from ensureKeyframe()'s object rebuild just above —
+      // pointless (and actively harmful) when that call didn't run. Motion
+      // mode never populates state.selectedStrokeIndices the way
+      // Animation 2D does (selectLayerFromGrid sets _layerSel instead,
+      // motion.js) — mapping over it here silently emptied a perfectly
+      // valid Motion selectedPaths (2 elements from a Component) down to
+      // [], so computeHandles() on the very next line returned null and
+      // h.gCorners/h.map crashed a few lines down. Confirmed live: any
+      // scale/rotate-handle grab in Motion mode reliably crashed here.
+      if (state.appMode !== 'motion') {
+        ensureKeyframe();
+        selectedPaths = state.selectedStrokeIndices.map(function (i) { return userLayers[state.activeLayerIdx].children[i]; }).filter(Boolean);
+      }
       var h = computeHandles();
       if (hh.type === 'rotate') {
         mode = 'xform-rotate';
@@ -862,6 +1053,19 @@
         return;
       }
     }
+    if (mode === 'cornerRadius' && _cornerDrag) {
+      e.stopImmediatePropagation(); e.preventDefault();
+      var wc = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
+      var ptc = new Point(wc[0], wc[1]);
+      var kindDef = PARAM_HANDLE_KINDS[_cornerDrag.path.data.paramShape.kind];
+      var rc = kindDef.valueFromDrag(_cornerDrag.path, _cornerDrag.corner, ptc);
+      kindDef.commit(_cornerDrag.path, _cornerDrag.corner, rc);
+      if (window.updateCornersPanel) updateCornersPanel();
+      if (window.updateEllipseArcPanel) updateEllipseArcPanel();
+      if (window.updateStarPanel) updateStarPanel();
+      window.SMEngineBridge.renderNow();
+      return;
+    }
     if (!mode) {
       // Hover-only pass (not dragging anything) — tracks whether the
       // pointer sits over the anchor crosshair so engine-bridge.js can draw
@@ -1018,8 +1222,26 @@
       // Layer under a Motion transform: the pointer moves in RENDERED
       // space, the geometry lives underneath — pull the delta back
       // (inverse rotate + inverse scale) or the drag drifts/overshoots.
+      // ONLY for the raw-geometry translate below (Animation 2D's own
+      // selectedPaths.forEach(p.translate(...))) — Motion mode's own
+      // `position` write further down must NOT go through this inverse.
+      // 2026-08-21 fix ("si je le rotationne et après déplace tout le
+      // group ça déplace bizarrement comme si le x et y était inversé"):
+      // confirmed live — at rotation=90°, mvMap.invVec(50,0) returned
+      // (~0,-50), a pure horizontal drag turned vertical. computeMotionMat's
+      // own header comment is the reason why that's wrong for `position`
+      // specifically: "Position's dx/dy is a plain translation applied
+      // independently on top" of rotate/scale, i.e. position already
+      // lives in the layer's own POST-rotation output space — treating a
+      // position delta like a geometry delta (which DOES need inverse-
+      // rotating, since raw Paper.js points live in PRE-rotation local
+      // space) silently rotated every drag by the layer's own current
+      // rotation. Invisible until now because invVec is the identity at
+      // the default rotation=0/scale=100%, which is what every previous
+      // Motion-mode move drag happened to be tested at.
       var mvMap = (window.SMMotion && SMMotion.layerMotionPointMap) ? SMMotion.layerMotionPointMap(state.activeLayerIdx) : null;
-      if (mvMap) { var dv = mvMap.invVec(delta.x, delta.y); delta = new Point(dv[0], dv[1]); }
+      var geomDelta = delta;
+      if (mvMap) { var dv = mvMap.invVec(delta.x, delta.y); geomDelta = new Point(dv[0], dv[1]); }
       // Motion mode (2026-07-17, "quand on modifie ces properties dans le
       // canvas ça ne modifie ou ne créer pas de nouvelle clés" — a real
       // regression from the transform-box fix a few commits back: making
@@ -1045,6 +1267,12 @@
         window.SMEngineBridge.renderNow();
         return;
       }
+      // Past this point: Animation 2D's raw-geometry path only (Motion
+      // mode always returned above) — this DOES need the inverse-rotated/
+      // scaled delta (real Paper.js points live in pre-rotation local
+      // space), so switch to it here rather than touching every one of
+      // the several `delta` reads below individually.
+      delta = geomDelta;
       // translate(delta), not position=position.add(delta) — .position is
       // a bounds-CENTER getter/setter, so a move via .position re-derives
       // bounds on every single tick of the drag (many times per gesture)
@@ -1060,6 +1288,7 @@
       // translate(delta*N) — zero accumulated drift by construction.
       selectedPaths.forEach(function (p) {
         p.translate(delta);
+        if (window.syncParamShapeBoxOnTranslate) window.syncParamShapeBoxOnTranslate(p, delta.x, delta.y);
         transformFillGradient(p, function (gp) { return gp.add(delta); });
         if (p.data && p.data.isVectorBrush && p.data.centerSegments) {
           p.data.centerSegments.forEach(function (s) { s.point = [s.point[0] + delta.x, s.point[1] + delta.y]; });
@@ -1144,6 +1373,7 @@
       }
       selectedPaths.forEach(function (p) {
         p.scale(stepSx, stepSy, anchor);
+        if (window.syncParamShapeBoxOnScale) window.syncParamShapeBoxOnScale(p, stepSx, stepSy, anchor);
         transformFillGradient(p, function (gp) {
           return new Point(anchor.x + (gp.x - anchor.x) * stepSx, anchor.y + (gp.y - anchor.y) * stepSy);
         });
@@ -1274,6 +1504,15 @@
       window.SMEngineBridge.renderNow();
       return;
     }
+    if (mode === 'cornerRadius') {
+      _cornerDrag = null;
+      mode = null;
+      saveActiveLayerFrame();
+      window.SMEngineBridge.resume();
+      updateUI();
+      window.SMEngineBridge.renderNow();
+      return;
+    }
     if (mode === 'arc') {
       draggingArc = null;
       arcDragCache = null;
@@ -1312,7 +1551,27 @@
         // (unlike 'move', which can fire on a plain click) — fork every
         // foreign-owned item in the gesture before it's persisted.
         selectedPaths.forEach(function (p) { forkIfForeignOwner(p); });
-        fillRegenerateLinked(userLayers[state.activeLayerIdx], null);
+        // A fill-bucket result the user just scaled/rotated/distorted THEMSELVES
+        // is exactly the "manual edit must stay put" case fsUnlinkFillRegen's
+        // own header comment already describes — without this, the very next
+        // line's unrestricted fillRegenerateLinked(…,null) re-traces this same
+        // path from its OLD, now-stale fillSeed/fillWalls (the walls the user
+        // moved may not even be part of them) and silently snaps it back.
+        selectedPaths.forEach(function (p) { fsUnlinkFillRegen(p); });
+        // touchedPath=null used to mean "check every fill in the layer,
+        // unconditionally" — sounds thorough but is actually WEAKER than
+        // passing the real path: fillRegenerateLinked's own retry ladder
+        // (re-trace from the fill's old seed, then its current interior
+        // point, THEN touchedPath's interior point as a last resort) only
+        // reaches that last rung when touchedPath is real. A wall stroke
+        // dragged just far enough that the fill's old seed no longer lands
+        // inside anything hit both earlier rungs and returned null, then
+        // silently left the fill exactly where it was — confirmed live: a
+        // moved wall circle's bounds updated, the petal fill it used to
+        // bound did not budge into the gap that opened up. One call per
+        // moved path (not once for the whole gesture) gives every one of
+        // them a real shot at being the successful last-resort seed.
+        selectedPaths.forEach(function (p) { fillRegenerateLinked(userLayers[state.activeLayerIdx], p); });
         // Bitmap Brush anchors: the live drag above only scaled/rotated the
         // EXISTING raster companion in place (cheap, matches its geometry
         // during the drag but stays at its original bake resolution/
@@ -1343,7 +1602,12 @@
       renderArcs(); updateUI();
     } else if (mode === 'xform-distort') {
       selectedPaths.forEach(function (p) { forkIfForeignOwner(p); });
-      fillRegenerateLinked(userLayers[state.activeLayerIdx], null);
+      // See the xform-scale/xform-rotate branch's own comment above — same
+      // "manual edit must stay put" unlink, same reason.
+      selectedPaths.forEach(function (p) { fsUnlinkFillRegen(p); });
+      // Per-path calls, not one null call — see the xform-scale/xform-rotate
+      // branch's own comment above for why.
+      selectedPaths.forEach(function (p) { fillRegenerateLinked(userLayers[state.activeLayerIdx], p); });
       // Same re-bake as the xform-scale/xform-rotate tail above — a corner-pin
       // distort warps the path's own segments live, but never touched the
       // bitmap-brush raster companion (not a simple scale/rotate, so onMove
@@ -1427,11 +1691,34 @@
         // someone else's stroke doesn't spawn a spurious identical-geometry
         // ghost.
         if (didMove) selectedPaths.forEach(function (p) { forkIfForeignOwner(p); });
-        fillRegenerateLinked(userLayers[state.activeLayerIdx], null);
+        // Same "manual edit must stay put" unlink as the xform branches above
+        // — a fill-bucket result the user just DRAGGED must not have the next
+        // line's unrestricted fillRegenerateLinked(…,null) re-trace it from
+        // its old fillSeed/fillWalls and silently snap it back to where it
+        // was before the drag (confirmed live: bounds moved, the very next
+        // render put it right back). Same didMove gate as the fork above —
+        // a plain click-release never touched geometry, nothing to unlink.
+        if (didMove) selectedPaths.forEach(function (p) { fsUnlinkFillRegen(p); });
+        // Per-path calls (not one null call) when something actually moved —
+        // see the xform-scale/xform-rotate branch's own comment above for
+        // why touchedPath=null can't reach fillRegenerateLinked's own last-
+        // resort retry rung. A plain click-release (didMove false) never
+        // touched geometry, so the cheap unconditional null call is still
+        // fine there — nothing to re-trace from a real touched path anyway.
+        if (didMove) selectedPaths.forEach(function (p) { fillRegenerateLinked(userLayers[state.activeLayerIdx], p); });
+        else fillRegenerateLinked(userLayers[state.activeLayerIdx], null);
         saveActiveLayerFrame();
         // Same stale-onion-ghost fix as the xform-scale/xform-rotate branch
         // above — a plain move commits through this branch too.
         if (didMove) renderOS();
+        // Every sibling commit branch in this handler (xform-scale/rotate,
+        // xform-distort, marquee-select) ends with renderArcs()+updateUI() —
+        // this one didn't, so the right panel's Position/Size numeric fields
+        // (updateSelPropsPanel, timeline.js) kept showing the PRE-drag
+        // bounds until some unrelated action happened to trigger a refresh.
+        // Confirmed live: dragged a shape, bounds genuinely moved (checked
+        // layer.children directly), panel still read the old numbers.
+        renderArcs(); updateUI();
       }
     }
     mode = null;
@@ -1682,6 +1969,38 @@
         items.push({ sep: true });
         items.push({ label: 'Animer le texte…', action: function () { window.SMTextAnimator.openPanel(state.activeLayerIdx, animGid); } });
       }
+    }
+    // Component exposed properties (2026-08-18, "réutilisation dynamique de
+    // component... modifier des properties au dessus" — Figma Component
+    // Properties + AE Master Properties synthesis, confirmed with Cyril).
+    // Only makes sense while EDITING INSIDE a symbol (state.activeSymbolId —
+    // enterSymbol/enterComponentLayer set it, exitToScene clears it) on a
+    // single shape with a real strokeId (multi-select or a not-yet-tagged
+    // item has nothing stable to bind to). v1 scope: opacity (number) and
+    // visibility (boolean, stored 0/100 like every other Motion scalar) —
+    // color is a natural v2 (needs its own swatch row; these two reuse the
+    // fully generic Transform row renderer with zero new UI code, see
+    // propsFor's own comment, motion.js).
+    if (state.activeSymbolId && selectedPaths.length === 1 && p0.data && p0.data.strokeId && window.SM && window.SM.exposeSymbolProperty) {
+      items.push({ sep: true });
+      items.push({
+        label: 'Exposer l\'opacité comme propriété de Component…', action: function () {
+          var label = prompt('Nom de cette propriété (visible dans le panneau Motion de chaque instance) :', 'Opacité');
+          if (!label) return;
+          pushUndo();
+          window.SM.exposeSymbolProperty(state.activeSymbolId, p0.data.strokeId, 'opacity', label, Math.round((p0.opacity !== undefined ? p0.opacity : 1) * 100));
+          showToast('Propriété "' + label + '" exposée sur ce Component.');
+        }
+      });
+      items.push({
+        label: 'Exposer la visibilité comme propriété de Component…', action: function () {
+          var label = prompt('Nom de cette propriété (visible dans le panneau Motion de chaque instance) :', 'Visible');
+          if (!label) return;
+          pushUndo();
+          window.SM.exposeSymbolProperty(state.activeSymbolId, p0.data.strokeId, '__visible', label, 100);
+          showToast('Propriété "' + label + '" exposée sur ce Component.');
+        }
+      });
     }
     window.showContextMenu(e.clientX, e.clientY, items);
   }

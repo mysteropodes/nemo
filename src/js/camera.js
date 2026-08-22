@@ -567,7 +567,7 @@
   }
   function openCameraEaseEditor() {
     var seg = segmentLeftKey(state.currentFrame);
-    if (!seg) { showToast('Ajoute au moins 2 clés pour avoir une courbe'); return; }
+    if (!seg) { showToast(SM.t('toastAddAtLeast2KeysForCurve')); return; }
     var ks = state.cameraKeys, next = ks[ks.indexOf(seg) + 1];
     // pushUndo() happens per-drag-start in ui.js's own camera-mode mousedown
     // handler, not here — opening the editor alone isn't an edit yet.

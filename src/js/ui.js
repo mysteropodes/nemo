@@ -307,7 +307,7 @@
       });
     }
     var coordsEl=document.getElementById('curve-coords');
-    if(coordsEl)coordsEl.textContent=isMotionMode()?motionEaseLabel:(isTweenMode()?tweenEaseLabel:(pts.length+' '+SM.t('curvePointsSuffix')));
+    if(coordsEl)coordsEl.textContent=isMotionMode()?motionEaseLabel:(isTweenMode()?tweenEaseLabel:(pts.length+' '+(window.SM&&window.SM.t?window.SM.t('curvePointsSuffix'):'points')));
   }
   function drawH(nx,ny,c,yr,r){ctx.beginPath();ctx.arc(tX(nx),tY(ny,yr),r,0,Math.PI*2);ctx.fillStyle=c;ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.stroke();}
   function hitT(mx,my){
@@ -722,10 +722,27 @@
 
   // Layers panel horizontal resize — same drag-a-thin-bar pattern as the
   // timeline's own vertical #tl-resize above.
+  // Workspace continuity (2026-08, "retrouver son workspace comme il a
+  // quitté") — panel widths used to reset to their CSS default on every
+  // reload despite the drag-to-resize handles below happily remembering
+  // nothing. restorePanelWidth applies a saved px value (if any) BEFORE the
+  // drag listeners are wired, savePanelWidth is called from each handle's
+  // own mouseup (end of a genuine resize, not every intermediate mousemove
+  // tick — no reason to hit localStorage 60+ times per drag).
+  function restorePanelWidth(key,el){
+    var v=null;
+    try{v=localStorage.getItem(key);}catch(e){}
+    if(v)el.style.width=v;
+  }
+  function savePanelWidth(key,el){
+    try{localStorage.setItem(key,el.style.width);}catch(e){}
+  }
+
   var lpr=document.getElementById('layer-panel-resize'),lp=document.getElementById('layer-panel'),lprx,lprw;
+  restorePanelWidth('nemo-layer-panel-width',lp);
   lpr.addEventListener('mousedown',function(e){lprx=e.clientX;lprw=lp.offsetWidth;window._lpResize=true;lpr.classList.add('active');e.preventDefault();});
   window.addEventListener('mousemove',function(e){if(!window._lpResize)return;lp.style.width=Math.max(90,Math.min(400,lprw+(e.clientX-lprx)))+'px';});
-  window.addEventListener('mouseup',function(){window._lpResize=false;lpr.classList.remove('active');});
+  window.addEventListener('mouseup',function(){if(!window._lpResize)return;window._lpResize=false;lpr.classList.remove('active');savePanelWidth('nemo-layer-panel-width',lp);});
 
   // Left (tools) and right (props) panel horizontal resize — same
   // drag-a-thin-bar pattern as #layer-panel-resize above. Each move also
@@ -734,14 +751,23 @@
   // its old size while the panels moved, pushing the props panel clean off
   // the window edge (reported layout bug).
   var tpr=document.getElementById('tools-panel-resize'),tp=document.getElementById('tools-panel'),tprx,tprw;
+  restorePanelWidth('nemo-tools-panel-width',tp);
   tpr.addEventListener('mousedown',function(e){tprx=e.clientX;tprw=tp.offsetWidth;window._tpResize=true;tpr.classList.add('active');e.preventDefault();});
   window.addEventListener('mousemove',function(e){if(!window._tpResize)return;tp.style.width=Math.max(50,Math.min(160,tprw+(e.clientX-tprx)))+'px';window.dispatchEvent(new Event('resize'));});
-  window.addEventListener('mouseup',function(){if(!window._tpResize)return;window._tpResize=false;tpr.classList.remove('active');window.dispatchEvent(new Event('resize'));});
+  window.addEventListener('mouseup',function(){if(!window._tpResize)return;window._tpResize=false;tpr.classList.remove('active');window.dispatchEvent(new Event('resize'));savePanelWidth('nemo-tools-panel-width',tp);});
 
   var ppr=document.getElementById('props-panel-resize'),pp=document.getElementById('props-panel'),pprx,pprw;
+  // Collapse-to-rail (timeline.js, PR #209) applies AFTER this file runs
+  // (script tag order) — restoring the inline width unconditionally here is
+  // still correct even if the panel is about to collapse: that later call
+  // stashes this inline value into window._propsExpandedWidth and clears it
+  // itself before adding .collapsed, all synchronously before first paint,
+  // so there's no visible flash of a wide collapsed panel.
+  restorePanelWidth('nemo-props-panel-width',pp);
+  if(pp.style.width)window._propsExpandedWidth=pp.style.width;
   ppr.addEventListener('mousedown',function(e){pprx=e.clientX;pprw=pp.offsetWidth;window._ppResize=true;ppr.classList.add('active');e.preventDefault();});
   window.addEventListener('mousemove',function(e){if(!window._ppResize)return;pp.style.width=Math.max(240,Math.min(520,pprw-(e.clientX-pprx)))+'px';window.dispatchEvent(new Event('resize'));});
-  window.addEventListener('mouseup',function(){if(!window._ppResize)return;window._ppResize=false;ppr.classList.remove('active');window.dispatchEvent(new Event('resize'));});
+  window.addEventListener('mouseup',function(){if(!window._ppResize)return;window._ppResize=false;ppr.classList.remove('active');window.dispatchEvent(new Event('resize'));savePanelWidth('nemo-props-panel-width',pp);});
 
   // No local FC here (was a stale hardcoded 14, a duplicate of app.js's
   // global FC that drifted out of sync with it — real bug, caused the

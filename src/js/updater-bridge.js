@@ -24,6 +24,8 @@
       var v = await window.__TAURI__.app.getVersion();
       var vEl = document.getElementById('app-version-txt');
       if (vEl) vEl.textContent = v;
+      var vElAbout = document.getElementById('app-version-txt-about');
+      if (vElAbout) vElAbout.textContent = v;
       var statusEl = document.getElementById('status-text');
       if (statusEl) statusEl.textContent = 'Nemo v' + v;
       document.title = 'Nemo v' + v;

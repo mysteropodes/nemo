@@ -198,7 +198,7 @@
       var f = inp.files && inp.files[0];
       if (!f) { inp.remove(); return; }
       f.arrayBuffer().then(loadArchive).then(function (r) {
-        if (window.showToast) showToast('Plugin « ' + r.manifest.name + ' » chargé');
+        if (window.showToast) showToast('Plugin « ' + r.manifest.name + SM.t('toastLoadedSuffix'));
         window.__nemoPluginLast = r;
       }).catch(function (e) {
         if (window.showToast) showToast('« ' + f.name + ' » : ' + e.message);

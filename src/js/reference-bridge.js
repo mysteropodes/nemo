@@ -238,9 +238,9 @@
       rd.onload = function (ev) {
         var dataUrl = ev.target.result;
         verifyVideoDecodable(dataUrl).then(function (ok) {
-          if (!ok) { showToast('Vidéo non lisible (codec non supporté par le navigateur) — essayez "Importer…" en app pour le décodage ffmpeg'); return; }
+          if (!ok) { showToast(SM.t('toastVideoUnplayableCodecHint')); return; }
           setRef({ type: 'video', name: f0.name, src: dataUrl, opacity: 0.5, visible: true, offsetFrames: 0 });
-          if (dataUrl.length > 12 * 1024 * 1024) showToast('Vidéo volumineuse : sera incluse dans le fichier projet');
+          if (dataUrl.length > 12 * 1024 * 1024) showToast(SM.t('toastVideoTooLargeIncludedInProject'));
         });
       };
       rd.readAsDataURL(f0);
@@ -249,7 +249,7 @@
     // images: 1 file = static image, several = sequence (sorted by name —
     // the universal convention for numbered image sequences)
     var imgs = Array.prototype.filter.call(files, function (f) { return f.type.indexOf('image/') === 0; });
-    if (!imgs.length) { showToast('Format non reconnu (vidéo ou images)'); return; }
+    if (!imgs.length) { showToast(SM.t('toastFormatNotRecognizedVideoImages')); return; }
     imgs.sort(function (a, b) { return a.name.localeCompare(b.name, undefined, { numeric: true }); });
     var readers = imgs.map(function (f) {
       return new Promise(function (res) {
@@ -276,7 +276,7 @@
   // static image sequences use, deliberately NOT 'video': no <video>
   // element, no seek/watchdog machinery, no way to hang.
   async function decodeReferenceVideoFfmpeg(path) {
-    showToast('Décodage de la référence vidéo (ffmpeg)…');
+    showToast(SM.t('toastDecodingReferenceVideo'));
     var tmp = window.exportTempDirPath ? await exportTempDirPath() : null;
     var workDir = (tmp || '') + 'sm-ref-video-' + Date.now();
     await exportMkdir(workDir);
@@ -320,13 +320,13 @@
     var list = Array.isArray(paths) ? paths : [paths];
     var ext = extOf(list[0]);
     if (VIDEO_EXTS[ext]) {
-      if (list.length > 1) showToast('Une seule vidéo à la fois — la première sera utilisée');
+      if (list.length > 1) showToast(SM.t('toastOneVideoAtATime'));
       try {
         var frames = await decodeReferenceVideoFfmpeg(list[0]);
         setRef({ type: 'imageseq', name: baseName(list[0]), frames: frames, opacity: 0.5, visible: true, offsetFrames: 0 });
-        showToast('Référence vidéo importée : ' + frames.length + ' images (alpha préservé)');
+        showToast(SM.t('toastReferenceVideoImportedSuffix') + frames.length + SM.t('toastImagesAlphaPreservedSuffix'));
       } catch (e) {
-        showToast('Vidéo non lisible : ' + e.message);
+        showToast(SM.t('toastVideoUnplayableSuffix') + e.message);
       }
       return;
     }
@@ -336,7 +336,7 @@
       if (urls.length === 1) setRef({ type: 'image', name: baseName(list[0]), src: urls[0], opacity: 0.5, visible: true, offsetFrames: 0 });
       else setRef({ type: 'imageseq', name: baseName(list[0]) + ' (+' + (urls.length - 1) + ')', frames: urls, opacity: 0.5, visible: true, offsetFrames: 0 });
     } catch (e) {
-      showToast('Import référence échoué : ' + e.message);
+      showToast(SM.t('toastReferenceImportFailedSuffix') + e.message);
     }
   }
 

@@ -1,0 +1,73 @@
+name: Deploy web beta to Cloudflare Workers
+
+# Static-site deploy for the browser build (Rust/wasm engine + plain JS,
+# no bundler — src/ is the site root as-is). Uses Workers + static assets
+# (`wrangler deploy`), not `wrangler pages deploy` — Cloudflare's own
+# Pages-to-Workers migration guide names this the current recommended path
+# for new deployments; Workers assets-only projects auto-create on first
+# deploy, so unlike Pages there's no separate "create the project" step in
+# the dashboard first. src/wasm/ is committed (see .gitignore's comment) so
+# rebuilding it here isn't strictly required to deploy, but doing it anyway
+# catches drift between geometry-wasm/src/ and the committed build before
+# it ships.
+#
+# One-time setup this workflow depends on (can't be done from a workflow
+# file — needs dashboard/CLI access to the Cloudflare account):
+#   1. Add repo secrets (Settings > Secrets and variables > Actions):
+#        CLOUDFLARE_API_TOKEN   — a token scoped to "Workers Scripts: Edit"
+#        CLOUDFLARE_ACCOUNT_ID  — found on the right sidebar of any page in
+#                                  the Cloudflare dashboard
+#   2. Once deployed, point a custom domain at the Worker from its page in
+#      the dashboard (Workers & Pages > nemo-editor > Settings > Domains &
+#      Routes > Add > Custom Domain).
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Cargo/wasm-pack
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: geometry-wasm
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Build geometry-wasm
+        working-directory: geometry-wasm
+        run: wasm-pack build --target web --out-dir ../src/wasm
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Production (push to main) deploys as "nemo-editor" (wrangler.jsonc's
+      # name); anything else (manual dispatch from a non-main ref) deploys
+      # under "nemo-dev" via --name override — same stable/dev split
+      # Graphite uses for editor.graphite.art/dev.graphite.art, just on
+      # Worker names instead of Pages project names.
+      - name: Publish to Cloudflare Workers
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            npx wrangler@4 deploy
+          else
+            npx wrangler@4 deploy --name nemo-dev
+          fi

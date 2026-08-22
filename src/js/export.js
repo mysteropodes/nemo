@@ -94,8 +94,52 @@ function exportBuildFrame(frameIdx,alpha){
     // applied outermost, same composition order as buildSceneJson
     // (engine-bridge.js) — see motion.js's parentChainMats header comment.
     var parentChain=window.SMMotion?SMMotion.parentChainMats(li,frameIdx):[];
+    // Trim Paths (2026-08-20) — texture-brush dab reveal, mirrors
+    // engine-bridge.js's buildSceneJson computation exactly (same
+    // "brushGroupId -> anchor strokeId" map, same per-group ordinal, same
+    // reversed-order flip — see that file's own comment on why
+    // insertAbove(basePath) makes layer/array order the REVERSE of stamp
+    // order). Rebuilt once per li from the DICT array (not live Paper
+    // items — export.js never touches userLayers[li] itself), but dict
+    // array order is the same order serP captured the live children in,
+    // so the ordinals match.
+    var brushAnchorStrokeId=null,brushGroupDabs=null;
+    strokes.forEach(function(bc){
+      if(bc.brushGroupId){
+        if(bc.isBrushTextureCopy){
+          if(!brushGroupDabs)brushGroupDabs={};
+          (brushGroupDabs[bc.brushGroupId]=brushGroupDabs[bc.brushGroupId]||[]).push(bc);
+        }else if(bc.strokeId){
+          if(!brushAnchorStrokeId)brushAnchorStrokeId={};
+          brushAnchorStrokeId[bc.brushGroupId]=bc.strokeId;
+        }
+      }
+    });
+    var dabOrdinal=null;
+    if(brushGroupDabs){
+      dabOrdinal=new WeakMap();
+      Object.keys(brushGroupDabs).forEach(function(gid){
+        var list=brushGroupDabs[gid],n=list.length;
+        list.forEach(function(dab,idx){dabOrdinal.set(dab,n>1?1-idx/(n-1):0);});
+      });
+    }
     var built=[]; // this layer's own items, so a blend mode can wrap them below
     strokes.forEach(function(sd){
+      // Trim Paths (2026-08-20) — a dab isn't shaped by segments/closed at
+      // all (its geometry is a fixed small stamp), so trimming means
+      // filtering which dabs draw, not reshaping anything — same reasoning
+      // as engine-bridge.js's own dab-reveal filter.
+      if(sd.isBrushTextureCopy&&sd.brushGroupId&&dabOrdinal&&window.SMMotion){
+        var dabAnchorId=brushAnchorStrokeId&&brushAnchorStrokeId[sd.brushGroupId];
+        if(dabAnchorId){
+          var dabWin=SMMotion.trimWindowAt(li,dabAnchorId,frameIdx);
+          if(dabWin){
+            var dabPct=(dabOrdinal.get(sd)||0)*100;
+            var dabS=dabWin.start+(dabWin.offset||0),dabE=dabWin.end+(dabWin.offset||0);
+            if(dabPct<Math.max(0,Math.min(100,dabS))||dabPct>Math.max(0,Math.min(100,dabE)))return;
+          }
+        }
+      }
       // Raster strokes (isRaster: imported images, SVG-sequence frames,
       // and Bitmap Brush's texture companions, bitmap-brush.js) went
       // through desP() unconditionally before this — desP expects
@@ -105,6 +149,78 @@ function exportBuildFrame(frameIdx,alpha){
       // whole exportBuildFrame call for that frame. Pre-existing gap (any
       // imported image already triggered it), surfaced now because Bitmap
       // Brush adds a Raster companion to nearly every textured stroke.
+      // ⚠️ Corruption bug, found 2026-08-20 and fixed here: every hook below
+      // that does `sd.segments=...` was mutating the object
+      // getEffectiveStrokesRendered handed back — for a plain layer (the
+      // common case) that's documented as "a LIVE reference into the
+      // stored frame's own strokes array... A future caller that mutates
+      // this return value directly would corrupt the STORED keyframe"
+      // (getEffectiveStrokes's own comment, app.js). Confirmed live: a rect
+      // with an animated corner radius, exported at a frame OTHER than its
+      // keyframe, permanently overwrote the KEYFRAME's stored segments
+      // (4 sharp-corner points) with that other frame's rebuilt geometry
+      // (5 rounded-corner points) — every one of these hooks fires on
+      // every export, not just the "export a range" case, so a single
+      // still-frame PNG export was enough to corrupt the project.
+      // sdCloned/ensureSdClone: clone ONCE, lazily, only when at least one
+      // hook actually needs to rewrite something — cheap common case (no
+      // active paramShape/vertex-follow/text-bounds-follow/trim) stays a
+      // zero-cost no-op, matching getEffectiveStrokes's own "Clone with
+      // JSON.parse(JSON.stringify(...)) before any in-place mutation, same
+      // pattern used everywhere else in this file" prescription.
+      var sdCloned=false;
+      function ensureSdClone(){if(!sdCloned){sd=JSON.parse(JSON.stringify(sd));sdCloned=true;}}
+      // Dynamic shape params (rect corners / ellipse arc / star, 2026-08):
+      // mirrors engine-bridge.js's buildSceneJson hook exactly — same
+      // family-of-bug-#1 risk (CLAUDE.md §1), this is a SECOND reader of
+      // sd.segments that must rebuild geometry from the SAME per-frame
+      // corner/arc/star values, or an exported PNG/video shows the static
+      // un-animated shape while the live canvas shows it correctly.
+      if(!sd.isRaster&&window.SMMotion&&sd.strokeId&&SMMotion.hasParamShapeMotionFor&&SMMotion.hasParamShapeMotionFor(li,sd.strokeId)){
+        ensureSdClone();
+        sd.segments=SMMotion.applyParamShapeFor(li,sd.strokeId,sd,frameIdx);
+      }
+      // Path-point parenting, "drive" direction (2026-08) — same second-
+      // reader risk as paramShape just above, mirrors engine-bridge.js's
+      // buildSceneJson hook exactly. The "follow" direction needs no call
+      // here — it lives inside SMMotion.layerMotionAt, already the source
+      // of `motionMat` a few lines below.
+      if(!sd.isRaster&&window.SMMotion&&sd.strokeId&&SMMotion.hasPathVertexFollowMotionFor&&SMMotion.hasPathVertexFollowMotionFor(li,sd.strokeId)){
+        ensureSdClone();
+        sd.segments=SMMotion.applyPathVertexFollowFor(li,sd.strokeId,sd,frameIdx);
+      }
+      if(!sd.isRaster&&window.SMMotion&&sd.strokeId&&SMMotion.hasTextBoundsFollowMotionFor&&SMMotion.hasTextBoundsFollowMotionFor(li,sd.strokeId)){
+        ensureSdClone();
+        sd.segments=SMMotion.applyTextBoundsFollowFor(li,sd.strokeId,sd,frameIdx);
+      }
+      // Trim Paths (2026-08-20) — the KNOWN GAP applyTrimFor's own doc
+      // comment named ("wired into engine-bridge.js's live render only, NOT
+      // export.js... a trimmed shape currently exports un-trimmed"). Mirrors
+      // buildSceneJson's own trim branch: vector-brush ribbons trim their
+      // CENTERLINE+widthProfile and rebuild via buildVariableWidthPath
+      // (tools.js) rather than arc-length-slicing the baked outline (see
+      // 18b2d9a/de423b1's own reasoning — slicing the outline cuts across
+      // the ribbon's own width); a plain stroke slices sd.segments directly
+      // and loses its fillColor (18b2d9a — filling a trimmed OPEN arc draws
+      // the AE "pac-man wedge" instead of a clean line). Same ensureSdClone
+      // as the three hooks above — trim always changes the segment COUNT
+      // (and often `closed`), so it can't reuse the original object either.
+      if(!sd.isRaster&&window.SMMotion&&sd.strokeId&&SMMotion.hasTrimMotionFor(li,sd.strokeId)){
+        ensureSdClone();
+        if(sd.isVectorBrush&&sd.centerSegments&&sd.centerSegments.length>=2){
+          var vbTrim=SMMotion.applyTrimToVectorBrush(li,sd.strokeId,sd.centerSegments,sd.widthProfile,frameIdx);
+          var vbOutline=(vbTrim&&vbTrim.pts&&vbTrim.pts.length>=2)?buildVariableWidthPath(vbTrim.pts.map(function(pt){return new Point(pt[0],pt[1]);}),vbTrim.widths):null;
+          if(vbOutline){
+            sd.segments=vbOutline.segments.map(function(s){return{point:[s.point.x,s.point.y],handleIn:[s.handleIn.x,s.handleIn.y],handleOut:[s.handleOut.x,s.handleOut.y]};});
+            sd.closed=true;
+            vbOutline.remove();
+          }else{sd.segments=[];sd.closed=false;}
+        }else{
+          var trimmed=SMMotion.applyTrimFor(li,sd.strokeId,sd.segments,sd.closed,frameIdx);
+          sd.segments=trimmed.segments;sd.closed=trimmed.closed;
+          if(!sd.isVectorBrush){sd.fillColor=null;delete sd.fillGradient;}
+        }
+      }
       var p=sd.isRaster?desR(sd,L,sd.opacity!==undefined?sd.opacity:1):desP(sd,L,sd.opacity!==undefined?sd.opacity:1);
       // Gradient fill (2026-07) — Paper.js has native Gradient support, so
       // export/preview through THIS (pure-Paper.js) path gets a real
@@ -273,7 +389,16 @@ async function exportMP4ToPath(outPath,opts){
   var workDir=(tmp||outPath.replace(/[^/\\]+$/,''))+'sm-export-'+Date.now();
   await exportMkdir(workDir);
   await exportRenderPNGsToDir(workDir,r.start,r.end,scale,opts&&opts.onProgress);
-  await exportRunFfmpeg(['-y','-framerate',String(fps),'-i',workDir+'/frame_%04d.png','-c:v','libx264','-pix_fmt','yuv420p','-crf','18',outPath],opts&&opts.onFfmpeg);
+  // h264_videotoolbox (Apple's own hardware/OS H.264 encoder via the
+  // VideoToolbox framework), not libx264 — the 2026-08-18 license rebuild
+  // (THIRD_PARTY_NOTICES.md) dropped libx264 (GPL + H.264 patent exposure).
+  // VideoToolbox needs no such license: it's Apple's OS-provided encoder,
+  // already licensed by Apple for its own use, same principle already
+  // applied to exportVideoBrowser's MediaRecorder path. -q:v is
+  // VideoToolbox's quality control (no -crf equivalent exists there);
+  // 65 is a high-quality default, roughly matching the visual target the
+  // old -crf 18 aimed for.
+  await exportRunFfmpeg(['-y','-framerate',String(fps),'-i',workDir+'/frame_%04d.png','-c:v','h264_videotoolbox','-pix_fmt','yuv420p','-q:v','65','-profile:v','high',outPath],opts&&opts.onFfmpeg);
   await exportRemoveDir(workDir);
   return{ok:true,path:outPath};
 }
@@ -349,6 +474,15 @@ function exportHasLayerCompositing(){
 // checks state.motionBlurOn too, matching buildSceneJson's own mbOn gate
 // (a layer can have motionBlur:true while the comp-wide switch is off).
 function exportHasEngineOnlyMotion(){
+  // Order (2026-08) — same "engine-only feature" shape as 3D/Motion Blur
+  // above: exportBuildFrame's plain-Paper.js loop below just walks
+  // state.layers/layer.children in their raw stored order with no concept
+  // of a z-index override at all, so a keyed Order silently did nothing in
+  // export while working perfectly on screen. Checked once for the whole
+  // document (anyOrderUsedAnywhere covers both layer- and element-level),
+  // not per-layer like the other two, since a re-order can move ANY
+  // layer/shape regardless of which one carries the actual keys.
+  if(window.SMMotion&&window.SMMotion.anyOrderUsedAnywhere&&window.SMMotion.anyOrderUsedAnywhere())return true;
   return state.layers.some(function(ld){
     return ld.threeD||(ld.motionBlur&&state.motionBlurOn);
   });

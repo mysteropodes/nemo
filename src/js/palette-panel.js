@@ -21,7 +21,7 @@
 
   function addColor(hex) {
     var pal = activePalette();
-    if (pal.colors.indexOf(hex) >= 0) { showToast('Déjà dans la palette'); return; }
+    if (pal.colors.indexOf(hex) >= 0) { showToast(SM.t('toastAlreadyInPalette')); return; }
     pal.colors.push(hex);
     render();
   }
@@ -109,7 +109,7 @@
         if (replaceArmed) {
           if (replaceSource === null) { replaceSource = hex; render(); return; }
           var n = replaceInActiveLayer(replaceSource, hex);
-          showToast(n ? (n + ' couleur(s) remplacée(s)') : 'Aucune correspondance dans le calque actif');
+          showToast(n ? (n + SM.t('toastColorsReplacedSuffix')) : 'Aucune correspondance dans le calque actif');
           cancelReplace();
           return;
         }

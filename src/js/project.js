@@ -9,8 +9,25 @@
 (function(){
   var RECENTS_KEY='nemo-recents',MAX_RECENTS=8;
   var currentPath=null,currentName='Untitled';
+  // Declared up here (not down with the rest of the tab-bar code below) so
+  // it's already initialized by the time initCloseGuard's IIFE runs and
+  // calls markSaved() for its boot-time baseline — markSaved touches
+  // activeTab()/renderTabBar(), both of which read `tabs`. Textually
+  // "var tabs=[]" further down would only be hoisted as undefined at that
+  // point, not yet assigned array — .find()/.forEach() on it would throw.
+  var tabs=[],activeTabId=null;
 
   function tauriOk(){return typeof window.__TAURI__!=='undefined';}
+  // Browser-mode autosave: localStorage first (sync, ~5-10MB quota), always
+  // mirrored to IndexedDB (async, no practical size ceiling) so a project
+  // with embedded media doesn't silently lose its autosave the moment it
+  // outgrows localStorage — see project-nemo-web-public-beta memory.
+  function autosaveWrite(json){
+    var quotaHit=false;
+    try{localStorage.setItem('nemo-auto',json);}catch(e){quotaHit=true;}
+    if(window.SMIdb)window.SMIdb.set('nemo-auto',json).catch(function(){});
+    if(quotaHit)try{localStorage.removeItem('nemo-auto');}catch(e2){} // stale/truncated slot would win over IDB on next boot otherwise
+  }
   function getRecents(){try{return JSON.parse(localStorage.getItem(RECENTS_KEY)||'[]');}catch(e){return[];}}
   function setRecents(list){try{localStorage.setItem(RECENTS_KEY,JSON.stringify(list));}catch(e){}}
   function touchRecent(path,name,meta){
@@ -80,7 +97,7 @@
     if(window.renderPaletteGrid)window.renderPaletteGrid();
     syncDocFields();
     currentPath=null;currentName=cfg.name||'Untitled';updateCurrentLabel();
-    try{var freshJson=window.SM.exportJSON();markSaved(freshJson);localStorage.setItem('nemo-auto',freshJson);}catch(e){}
+    try{var freshJson=window.SM.exportJSON();markSaved(freshJson);autosaveWrite(freshJson);}catch(e){}
     showToast('New project created');
   }
 
@@ -89,7 +106,12 @@
   // empty document counts as clean until it's actually drawn on (newProject
   // and openPath both stamp it).
   var lastSavedJson=null;
-  function markSaved(json){lastSavedJson=json;}
+  function markSaved(json){
+    lastSavedJson=json;
+    var t=activeTab();
+    if(t)t.dirty=false;
+    renderTabBar();
+  }
   function isDirty(){
     try{return lastSavedJson!==null&&window.SM.exportJSON()!==lastSavedJson;}
     catch(e){return true;} // can't serialize → assume dirty, never skip the warning
@@ -144,8 +166,8 @@
     var json=window.SM.exportJSON();
     downloadJson((currentName||'Untitled')+'.json',json);
     markSaved(json);
-    try{localStorage.setItem('nemo-auto',json);}catch(e){}
-    showToast('Téléchargé : '+currentName+'.json');
+    autosaveWrite(json);
+    showToast(SM.t('toastDownloadedSuffix')+currentName+'.json');
   }
   async function saveAs(){
     if(!tauriOk()){saveAsDownload();return;}
@@ -157,7 +179,7 @@
     // to miss, and quitting right after meant silent data loss (disk full,
     // permissions, network volume gone...).
     try{await writeProjectTo(path);}
-    catch(e){showToast('ÉCHEC de la sauvegarde : '+(e&&e.message||e));throw e;}
+    catch(e){showToast(SM.t('toastSaveFailedSuffix')+(e&&e.message||e));throw e;}
     showToast('Saved: '+baseName(path));
   }
   async function save(){
@@ -165,7 +187,7 @@
     if(!currentPath){await saveAs();return;}
     saveAllLayerFrames();
     try{await writeProjectTo(currentPath);}
-    catch(e){showToast('ÉCHEC de la sauvegarde : '+(e&&e.message||e));throw e;}
+    catch(e){showToast(SM.t('toastSaveFailedSuffix')+(e&&e.message||e));throw e;}
     showToast('Saved');
   }
   async function openPath(path){
@@ -248,7 +270,7 @@
     var json=await window.__TAURI__.fs.readTextFile(path);
     window.SM.importJSON(json,true);
     ensureInitialTab();
-    showToast('Version restaurée');
+    showToast(SM.t('toastVersionRestored'));
   }
 
   function relTime(ts){
@@ -304,19 +326,19 @@
   function setSyncFolder(path){try{if(path)localStorage.setItem(syncFolderKey(),path);else localStorage.removeItem(syncFolderKey());}catch(e){}}
   function profileDir(root,profileId){return root.replace(/[\\/]+$/,'')+'/'+profileId;}
   async function chooseSyncFolder(){
-    if(!tauriOk()){showToast('Sync équipe nécessite l\'app desktop');return null;}
+    if(!tauriOk()){showToast(SM.t('toastTeamSyncRequiresDesktop'));return null;}
     var path=await window.__TAURI__.dialog.open({title:'Dossier partagé (kDrive, S3 monté, etc.)',directory:true});
     if(!path)return null;
     path=Array.isArray(path)?path[0]:path;
     setSyncFolder(path);
-    showToast('Dossier de sync configuré');
+    showToast(SM.t('toastSyncFolderConfigured'));
     return path;
   }
   function disableSync(){setSyncFolder(null);}
   async function publishToShared(){
     var root=getSyncFolder();
     if(!root){showToast('Configurez un dossier de sync d\'abord');return;}
-    if(!tauriOk()){showToast('Sync équipe nécessite l\'app desktop');return;}
+    if(!tauriOk()){showToast(SM.t('toastTeamSyncRequiresDesktop'));return;}
     saveAllLayerFrames();
     var json=window.SM.exportJSON();
     var dir=profileDir(root,state.userProfile.id);
@@ -330,8 +352,8 @@
         var victim=names.shift();
         try{await window.__TAURI__.fs.remove(dir+'/'+victim);}catch(e){}
       }
-      showToast('Publié pour l\'équipe');
-    }catch(e){console.warn('[sync] publish failed',e);showToast('Échec de la publication');}
+      showToast(SM.t('toastPublishedForTeam'));
+    }catch(e){console.warn('[sync] publish failed',e);showToast(SM.t('toastPublishFailed'));}
   }
   async function checkSharedUpdates(){
     var root=getSyncFolder();
@@ -367,17 +389,18 @@
     var data=JSON.parse(json);
     var report=window.SM.mergeRemoteSnapshot(data,{id:entry.profileId,name:entry.profileName,color:entry.profileColor});
     saveAllLayerFrames();
-    showToast('Fusion de '+entry.profileName+' : +'+report.added+' ajout(s)'+(report.conflicts?', '+report.conflicts+' conflit(s) à résoudre':''));
+    showToast('Fusion de '+entry.profileName+' : +'+report.added+' ajout(s)'+(report.conflicts?', '+report.conflicts+SM.t('toastConflictsToResolveSuffix'):''));
     return report;
   }
 
-  window.SMProject={save:save,saveAs:saveAs,open:openDialog,openPath:openPath,newProject:function(cfg){newProject(cfg);hideStartScreen();ensureInitialTab();},pushVersionSnapshot:pushVersionSnapshot,listVersionHistory:listVersionHistory,restoreVersion:restoreVersion,
+  window.SMProject={save:save,saveAs:saveAs,open:openDialog,openPath:openPath,newProject:function(cfg){newProject(cfg);hideStartScreen();ensureInitialTab();},pushVersionSnapshot:pushVersionSnapshot,listVersionHistory:listVersionHistory,restoreVersion:restoreVersion,autosaveWrite:autosaveWrite,
     getSyncFolder:getSyncFolder,chooseSyncFolder:chooseSyncFolder,disableSync:disableSync,publishToShared:publishToShared,checkSharedUpdates:checkSharedUpdates,pullAndMerge:pullAndMerge,
     // Stable per-project filesystem-safe identifier — same slug/hash
     // feedback-bridge.js's local + shared feedback storage keys off, so a
     // feedback thread and this project's own history/sync folders always
     // agree on which project they belong to without re-deriving the logic.
-    getProjectKey:historyKey,profileDir:profileDir,isDirty:isDirty,markSaved:function(){try{markSaved(window.SM.exportJSON());}catch(e){}},getCurrentLabel:getCurrentLabel};
+    getProjectKey:historyKey,profileDir:profileDir,isDirty:isDirty,markSaved:function(){try{markSaved(window.SM.exportJSON());}catch(e){}},getCurrentLabel:getCurrentLabel,
+    refreshActiveTabDirtyDot:refreshActiveTabDirtyDot};
 
   // ---- Close-with-unsaved-work guard ----
   // Cmd+Q / window-close with unsaved changes asked NOTHING before this —
@@ -409,12 +432,24 @@
               {title:'Modifications non sauvegardées',kind:'warning',okLabel:'Quitter sans sauvegarder',cancelLabel:'Annuler'});
             if(leave){
               allowConfirmedClose=true;
-              await appWindow.close();
+              // destroy(), not close() (feedback #27, "quand on fait quitter
+              // sans sauvegarder ne quitte pas l'app"): close() re-issues a
+              // FRESH CloseRequested event (the comment above already knew
+              // this — that's the whole reason allowConfirmedClose exists),
+              // so the app's actual exit depends on that second event being
+              // dispatched, caught by this same listener, and let through —
+              // one more asynchronous round trip that can silently swallow
+              // the close. destroy() skips the event loop entirely and forces
+              // the window closed immediately, which is Tauri's own
+              // documented pattern for exactly this "confirm then really
+              // close" flow. core:window:allow-destroy was already granted
+              // in capabilities/default.json — just never actually called.
+              await appWindow.destroy();
             }
           }catch(e){
             // dialog unavailable (permission/API) — err on the side of NOT
             // losing work: block this close so the user can save manually.
-            showToast('Modifications non sauvegardées — sauvegarde avant de quitter');
+            showToast(SM.t('toastUnsavedChangesSaveBeforeQuit'));
           }
         });
       }catch(e){console.warn('[close-guard] indisponible',e);}
@@ -436,13 +471,20 @@
   // Genuinely separate projects (own layers/frames/palettes/etc.), not a
   // cosmetic tab strip — confirmed against the user's own clarification
   // ("real management of several completely different projects").
-  var tabs=[],activeTabId=null;
+  // `tabs`/`activeTabId` themselves are declared up near RECENTS_KEY —
+  // see the comment there for why.
   function makeTabId(){return 't'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
   function activeTab(){return tabs.find(function(t){return t.id===activeTabId;});}
   function snapshotActiveIntoTab(){
     var t=activeTab();if(!t)return;
     saveAllLayerFrames();
-    t.json=window.SM.exportJSON();t.name=currentName;t.path=currentPath;
+    t.json=window.SM.exportJSON();
+    // Captured HERE, before any import happens — isDirty()'s raw-string
+    // comparison against lastSavedJson is only trustworthy same-generation
+    // (live export vs. live export). Carrying this as a plain boolean past
+    // an import boundary avoids the trap below (see switchToTab).
+    t.dirty=isDirty();
+    t.name=currentName;t.path=currentPath;
   }
   function ensureInitialTab(){
     // Called after every entry point that makes a project "live" (new,
@@ -452,7 +494,12 @@
     // rather than spawning a duplicate.
     if(!tabs.length){
       activeTabId=makeTabId();
-      tabs.push({id:activeTabId,name:currentName,json:null,path:currentPath});
+      // isDirty() here reflects whatever markSaved() call already ran
+      // before this point (newProject/openPath: clean) or didn't (Resume
+      // Last Session deliberately never calls markSaved — an unsaved
+      // autosave restore correctly starts dirty, matching the close-guard's
+      // own pre-existing behavior).
+      tabs.push({id:activeTabId,name:currentName,json:null,path:currentPath,dirty:isDirty()});
     }else{
       var t=activeTab();
       if(t){t.name=currentName;t.path=currentPath;}
@@ -464,8 +511,24 @@
     var target=tabs.find(function(t){return t.id===id;});if(!target)return;
     snapshotActiveIntoTab();
     activeTabId=id;
-    if(target.json)window.SM.importJSON(target.json,true);
-    else newProject({w:1920,h:1080,fps:24,name:target.name});
+    if(target.json){
+      window.SM.importJSON(target.json,true);
+      // importJSON normalizes (fills defaults, pads frames — same trap
+      // openPath's own comment already documents), so a fresh exportJSON()
+      // right after this import can differ textually from target.json even
+      // with zero real changes. Comparing the OLD pre-import string against
+      // the NEW post-import baseline would false-positive as dirty on every
+      // switch back to an untouched tab. Since target.dirty was captured
+      // pre-import (same-generation, reliable), branch on THAT instead:
+      // clean → re-export now and use that as the fresh baseline; dirty →
+      // there's no real "last saved" string to compare against without
+      // re-importing an old disk copy we don't have handy, so force
+      // isDirty() to keep reading true with a baseline no live export can
+      // ever equal (isDirty() itself treats plain null as "not dirty yet",
+      // so that sentinel specifically can't be null).
+      lastSavedJson=target.dirty?'':window.SM.exportJSON();
+    }
+    else newProject({w:1920,h:1080,fps:24,name:target.name}); // stamps lastSavedJson/tab.dirty itself via markSaved
     currentPath=target.path||null;currentName=target.name;updateCurrentLabel();
     renderTabBar();
   }
@@ -487,7 +550,10 @@
     if(wasActive){
       var next=tabs[Math.max(0,idx-1)];
       activeTabId=next.id; // switchToTab no-ops on equal id, so load directly
-      if(next.json)window.SM.importJSON(next.json,true);
+      if(next.json){
+        window.SM.importJSON(next.json,true);
+        lastSavedJson=next.dirty?'':window.SM.exportJSON(); // see switchToTab's comment for why
+      }
       else newProject({w:1920,h:1080,fps:24,name:next.name});
       currentPath=next.path||null;currentName=next.name;updateCurrentLabel();
     }
@@ -506,20 +572,41 @@
     input.addEventListener('blur',commit);
     input.addEventListener('keydown',function(e){e.stopPropagation();if(e.key==='Enter')input.blur();else if(e.key==='Escape'){input.value=t.name;input.blur();}});
   }
+  // Per-tab "unsaved changes" dirty state. The active tab's own document
+  // lives in live `state`, not in its tab.json (that only gets refreshed on
+  // switch-away by snapshotActiveIntoTab) — so it needs isDirty()'s live
+  // exportJSON() comparison. An inactive tab's content is frozen since the
+  // switch away from it, and t.dirty was captured at that exact moment
+  // (see snapshotActiveIntoTab) — just read it back, no comparison needed.
+  function tabIsDirty(t){
+    return t.id===activeTabId?isDirty():!!t.dirty;
+  }
   function renderTabBar(){
     var list=document.getElementById('project-tabs-list');if(!list)return;
     list.innerHTML='';
     tabs.forEach(function(t){
       var el=document.createElement('div');el.className='project-tab'+(t.id===activeTabId?' act':'');el.dataset.tab=t.id;
+      if(tabIsDirty(t))el.classList.add('dirty');
       var dot=document.createElement('span');dot.className='pt-dot';
+      var dirtyDot=document.createElement('span');dirtyDot.className='pt-dirty';dirtyDot.title='Modifications non enregistrées';
       var nm=document.createElement('span');nm.className='pt-name';nm.textContent=t.name;
       var close=document.createElement('span');close.className='pt-close';close.textContent='×';close.title='Fermer l\'onglet';
       close.addEventListener('click',function(e){e.stopPropagation();closeTab(t.id);});
-      el.appendChild(dot);el.appendChild(nm);el.appendChild(close);
+      el.appendChild(dot);el.appendChild(dirtyDot);el.appendChild(nm);el.appendChild(close);
       el.addEventListener('click',function(){switchToTab(t.id);});
       el.addEventListener('dblclick',function(e){e.stopPropagation();startTabRename(t.id);});
       list.appendChild(el);
     });
+  }
+  // Cheap DOM-only refresh for the active tab's dot, called from the
+  // existing 30s autosave tick (timeline.js) — reuses the exportJSON() it
+  // already pays for instead of triggering a second full-document
+  // serialization just to keep this indicator current while the user
+  // keeps editing the same tab without switching/saving/adding another.
+  function refreshActiveTabDirtyDot(liveJson){
+    var el=document.querySelector('.project-tab[data-tab="'+activeTabId+'"]');
+    if(!el)return;
+    el.classList.toggle('dirty',lastSavedJson!==null&&liveJson!==lastSavedJson);
   }
   document.getElementById('project-tab-add')&&document.getElementById('project-tab-add').addEventListener('click',addTab);
 
@@ -553,10 +640,15 @@
     var hasAutosave=false;
     try{hasAutosave=!!localStorage.getItem('nemo-auto');}catch(e){}
     var resumeCard=document.getElementById('start-resume');
-    if(hasAutosave){
+    function showResumeCard(){
       resumeCard.style.display='';
       document.getElementById('start-cards').classList.add('has-resume');
     }
+    if(hasAutosave)showResumeCard();
+    // localStorage may be empty because a media-heavy autosave overflowed
+    // its quota and only landed in IndexedDB (see autosaveWrite) — check
+    // async so "Resume" still appears in that case, just a tick later.
+    else if(window.SMIdb)window.SMIdb.get('nemo-auto').then(function(v){if(v)showResumeCard();}).catch(function(){});
     renderRecents();
 
     document.getElementById('start-resume').addEventListener('click',function(){
@@ -567,12 +659,17 @@
       // Resume despite localStorage holding real stroke data).
       var auto=null;
       try{auto=localStorage.getItem('nemo-auto');}catch(e){}
-      if(auto){
-        try{window.SM.importJSON(auto,true);}
-        catch(e){showToast('Impossible de reprendre la session — données corrompues');}
-      }
-      currentPath=null;currentName='Untitled';updateCurrentLabel();
-      hideStartScreen();ensureInitialTab();showToast('Session resumed');
+      var applyAuto=function(auto){
+        if(auto){
+          try{window.SM.importJSON(auto,true);}
+          catch(e){showToast(SM.t('toastCannotResumeSessionCorrupt'));}
+        }
+        currentPath=null;currentName='Untitled';updateCurrentLabel();
+        hideStartScreen();ensureInitialTab();showToast('Session resumed');
+      };
+      if(auto)applyAuto(auto);
+      else if(window.SMIdb)window.SMIdb.get('nemo-auto').then(applyAuto).catch(function(){applyAuto(null);});
+      else applyAuto(null);
     });
     document.getElementById('start-new').addEventListener('click',function(){
       document.getElementById('start-newpanel').style.display='block';

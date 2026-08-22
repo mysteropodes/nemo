@@ -260,6 +260,196 @@ function fsIntersectionOffsets(path,layer){
   offsets.forEach(function(o){if(!out.length||o-out[out.length-1]>0.01)out.push(o);});
   return out;
 }
+// "Break at intersections" brush (2026-08, "il faudrait une option qui
+// supprime les stroke d'intersection... au drag... comme une brush qui va
+// select les intersection et les supprimer quand on relève la souris") —
+// cuts a small gap in `path` centered on each offset in `offsets` (a
+// SUBSET of fsIntersectionOffsets(path,layer)'s full crossing list — only
+// the ones the brush actually swept over), keeping every resulting piece
+// (unlike fsDeleteSegment, which discards the arc BETWEEN two offsets).
+// Only `path` itself is cut — the strokes it crosses are left untouched,
+// matching the classic animation "cassure" cleanup gesture (the line
+// UNDER the pencil breaks, not the one it crosses).
+function fsBreakStrokeAtOffsets(path,offsets,layer,gapPx){
+  if(!offsets||!offsets.length)return[path];
+  var gap=(gapPx||6)/view.zoom;
+  var len=path.length;
+  if(len<gap*2.2)return[path]; // too short to notch safely
+  var ranges=offsets.slice().sort(function(a,b){return a-b;}).map(function(o){
+    return{start:Math.max(0,o-gap/2),end:Math.min(len,o+gap/2)};
+  });
+  // Merge overlapping gap ranges (two crossings closer together than `gap`).
+  var merged=[];
+  ranges.forEach(function(r){
+    var last=merged[merged.length-1];
+    if(last&&r.start<=last.end+0.01)last.end=Math.max(last.end,r.end);
+    else merged.push({start:r.start,end:r.end});
+  });
+  var work=path;
+  if(work.closed){
+    // Open the loop at the FIRST gap exactly like fsDeleteSegment's closed-
+    // path split: re-base the seam to that gap's start, then split at its
+    // end — `work` becomes the tiny first-gap sliver (discarded) and
+    // `remainder` becomes the WHOLE REST of the loop as one open path.
+    // Every other gap's offset gets re-expressed relative to remainder's
+    // new start (originally `g0.end`) so the open-path pass below can
+    // treat it identically to a plain open stroke.
+    var loopLen=work.length,g0=merged[0];
+    work.splitAt(work.getLocationAt(g0.start));
+    var remainder=work.splitAt(work.getLocationAt(g0.end-g0.start));
+    if(work&&work.remove)work.remove();
+    if(!remainder)return[path]; // shouldn't happen — bail safely
+    work=remainder;
+    merged=merged.slice(1).map(function(r){
+      return{
+        start:((r.start-g0.end)%loopLen+loopLen)%loopLen,
+        end:((r.end-g0.end)%loopLen+loopLen)%loopLen,
+      };
+    });
+  }
+  // Descending start order so cutting one gap never invalidates an
+  // earlier offset still waiting to be cut (same precedent as
+  // fsPromoteSelectionForTransform's own sort comment above).
+  merged.sort(function(a,b){return b.start-a.start;});
+  // Vector-brush strokes (data.isVectorBrush) carry a separate centerline/
+  // width-profile record (data.centerSegments/widthProfile) that a plain
+  // splitAt piece would otherwise drag along unchanged and now-mismatched
+  // against its own (shorter) segment span — CLAUDE.md §1's "live data tied
+  // to a path must never survive a structural split silently unlinked".
+  // Neither fsDeleteSegment/fsRealizeStrokeSegment above special-case this
+  // either, but this function can produce many more pieces from one
+  // gesture, so stripping it here rather than carrying the risk forward:
+  // each piece bakes down to its own plain (no longer width-editable)
+  // outline, exactly like any other stroke this tool cuts.
+  function finalizePiece(p){
+    fsUnlinkFillRegen(p);tagOwner(p);delete p.data.strokeId;
+    delete p.data.centerSegments;delete p.data.widthProfile;
+    delete p.data.strokeProfile;delete p.data.profileBase;delete p.data.isVectorBrush;
+    return p;
+  }
+  var pieces=[],remaining=work;
+  merged.forEach(function(r){
+    var tail=remaining.splitAt(remaining.getLocationAt(r.end));
+    if(tail){
+      if(tail.length>0.01)pieces.unshift(finalizePiece(tail));
+      else tail.remove();
+    }
+    var gapArc=remaining.splitAt(remaining.getLocationAt(r.start));
+    if(gapArc)gapArc.remove();
+  });
+  if(remaining.length>0.01)pieces.unshift(finalizePiece(remaining));
+  else remaining.remove();
+  return pieces.length?pieces:[path];
+}
+// Given a path that may carry BOTH a fill and a stroke, splits the fill off
+// onto the original object (untouched, stays exactly as drawn) and returns
+// a fresh stroke-only clone to actually cut — same reasoning as
+// fsPromoteSelectionForTransform's own whole-stroke-with-fillColor branch:
+// cutting a still-filled path would leave each resulting open arc
+// implicitly re-closed for its (now nonsensical) fill.
+function fsStrokeOnlyForBreak(path,layer){
+  // A vector-brush stroke's fillColor IS its ink (the baked variable-width
+  // outline) — not a separate fill region to protect, unlike a plain
+  // shape/pen path that happens to have both a stroke and a fill. Only the
+  // latter needs splitting off first.
+  if(!path.fillColor||(path.data&&path.data.isVectorBrush))return path;
+  var strokeOnly=path.clone({insert:false,deep:true});
+  strokeOnly.fillColor=null;
+  if(strokeOnly.data)delete strokeOnly.data.fillGradient;
+  path.strokeColor=null;
+  layer.insertChild(layer.children.indexOf(path)+1,strokeOnly);
+  return strokeOnly;
+}
+// ---- Drag state for the break-brush, armed by state.fsBreakMode (toggled
+// from the Fill/Stroke Select floating panel, labs-float-panel.js) ----
+var _fsBreak=null; // {marks:Map<path,Set<offset>>, cache:Map<path,offsets[]>, activePath}
+var FS_BREAK_RADIUS=14; // screen px — matches this file's other hit tolerances' rough scale
+// Nearest stroke under the brush — deliberately singular, not every stroke
+// within radius. Right AT a crossing two strokes sit at the exact same
+// point (distance 0 to both), so a plain "every stroke within radius"
+// hover would mark — and cut — BOTH sides of the crossing, not just the
+// one being dragged along. Only the stroke the user is actually following
+// should break; the one it crosses stays untouched, matching the classic
+// "cassure" gesture the request described. Ties (mid-crossing) stick with
+// whichever stroke the gesture already started on rather than flip-
+// flopping between the two.
+function fsBreakNearestStroke(layer,pt){
+  var tol=FS_BREAK_RADIUS/view.zoom,best=null,bestD=Infinity;
+  layer.children.forEach(function(c){
+    if(!(c instanceof Path)||c.segments.length<2||!c.strokeColor)return;
+    if(!c.bounds.expand(tol*2).contains(pt))return;
+    var loc;try{loc=c.getNearestLocation(pt);}catch(e){loc=null;}
+    if(!loc)return;
+    var d=loc.point.getDistance(pt);
+    if(d>tol)return;
+    var sticky=_fsBreak&&_fsBreak.activePath===c;
+    if(d<bestD-0.001||(sticky&&d<=bestD+0.001)){best=c;bestD=d;}
+  });
+  return best;
+}
+function fsBreakUpdateMarks(pt){
+  if(!_fsBreak)return;
+  var layer=userLayers[state.activeLayerIdx];
+  var tol=FS_BREAK_RADIUS/view.zoom;
+  var path=fsBreakNearestStroke(layer,pt);
+  if(path){
+    _fsBreak.activePath=path;
+    var offs=_fsBreak.cache.get(path);
+    if(!offs){offs=fsIntersectionOffsets(path,layer);_fsBreak.cache.set(path,offs);}
+    if(offs.length){
+      var set=_fsBreak.marks.get(path);
+      if(!set){set=new Set();_fsBreak.marks.set(path,set);}
+      offs.forEach(function(o){
+        if(set.has(o))return;
+        var p=path.getPointAt(o);
+        if(p&&p.getDistance(pt)<=tol)set.add(o);
+      });
+    }
+  }
+  var pts=[];
+  _fsBreak.marks.forEach(function(set,p){
+    if(p.removed)return;
+    set.forEach(function(o){var p2=p.getPointAt(o);if(p2)pts.push([p2.x,p2.y]);});
+  });
+  if(window.SMEngineBridge)window.SMEngineBridge.setFSBreakMarks(pts);
+}
+function fsBreakCommit(){
+  if(!_fsBreak)return;
+  var layer=userLayers[state.activeLayerIdx];
+  var any=false;
+  _fsBreak.marks.forEach(function(set,path){
+    if(!set.size||path.removed)return;
+    any=true;
+    var target=fsStrokeOnlyForBreak(path,layer);
+    fsBreakStrokeAtOffsets(target,Array.from(set),layer);
+  });
+  _fsBreak=null;
+  if(window.SMEngineBridge)window.SMEngineBridge.setFSBreakMarks([]);
+  if(any){saveActiveLayerFrame();fsClearSel();renderArcs();updateUI();}
+}
+document.addEventListener('pointerdown',function(e){
+  var onStage=e.target===canvasEl||(e.target&&e.target.id==='rust-canvas');
+  if(e.button!==0||state.tool!=='fsselect'||!state.fsBreakMode||!window.SMEngineBridge||!SMEngineBridge.isEnabled()||!onStage)return;
+  pushUndo();
+  _fsBreak={marks:new Map(),cache:new Map()};
+  var w=SMEngineBridge.screenToWorld(e.clientX,e.clientY);
+  fsBreakUpdateMarks(new Point(w[0],w[1]));
+  if(window.SMEngineBridge.renderNow)window.SMEngineBridge.renderNow();
+  e.preventDefault();e.stopImmediatePropagation();
+},{capture:true});
+document.addEventListener('pointermove',function(e){
+  if(!_fsBreak)return;
+  var w=SMEngineBridge.screenToWorld(e.clientX,e.clientY);
+  fsBreakUpdateMarks(new Point(w[0],w[1]));
+  if(window.SMEngineBridge.renderNow)window.SMEngineBridge.renderNow();
+  e.preventDefault();e.stopImmediatePropagation();
+},{capture:true});
+document.addEventListener('pointerup',function(e){
+  if(!_fsBreak)return;
+  fsBreakCommit();
+  if(window.SMEngineBridge&&window.SMEngineBridge.renderNow)window.SMEngineBridge.renderNow();
+  e.preventDefault();e.stopImmediatePropagation();
+},{capture:true});
 // Given the full sorted crossing-offset list and where the user actually
 // clicked, returns the {segStart,segEnd} pair bracketing the click — or
 // the whole path (0..length) when there are no crossings to bound it.
@@ -612,7 +802,7 @@ function fsHighlightPath(sel){
 // the tracking unconditionally so a manual edit always wins and stays put.
 function fsUnlinkFillRegen(p){
   if(!p||!p.data)return;
-  delete p.data.fillSeed;delete p.data.fillWalls;delete p.data.fillGapPx;
+  delete p.data.fillSeed;delete p.data.fillWalls;delete p.data.fillGapPx;delete p.data.fillSeeds;
 }
 function fsApplyDelete(){
   if(!_fsSel.length)return;
@@ -1260,16 +1450,16 @@ function copySelection(){
   if(!snaps.length)return;
   _canvasClip={snaps:snaps,layerIdx:state.activeLayerIdx,frameIdx:state.currentFrame};
   if(typeof window!=='undefined')window._lastClipKind='canvas';
-  showToast('Copié ('+snaps.length+')');
+  showToast(SM.t('toastCopied')+snaps.length+')');
 }
 function cutSelection(){
   if(!selectedPaths.length)return;
   copySelection();
   window.SM.deleteSelStrokes(); // pushes its own undo entry
-  showToast('Coupé ('+_canvasClip.snaps.length+')');
+  showToast(SM.t('toastCut')+_canvasClip.snaps.length+')');
 }
 function pasteSelection(){
-  if(!_canvasClip||!_canvasClip.snaps.length){showToast('Rien à coller');return;}
+  if(!_canvasClip||!_canvasClip.snaps.length){showToast(SM.t('toastNothingToPaste'));return;}
   pushUndo();
   var layer=userLayers[state.activeLayerIdx];
   var samePlace=(_canvasClip.layerIdx===state.activeLayerIdx&&_canvasClip.frameIdx===state.currentFrame);
@@ -1279,7 +1469,7 @@ function pasteSelection(){
   state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;});
   saveActiveLayerFrame();renderArcs();updateUI();
   if(window.SMEngineBridge)SMEngineBridge.renderNow();
-  showToast('Collé ('+clones.filter(isSelectablePathChild).length+')');
+  showToast(SM.t('toastPasted')+clones.filter(isSelectablePathChild).length+')');
 }
 var canvasEl=document.getElementById('drawing-canvas');
 
@@ -4049,10 +4239,16 @@ function applyStrokeProfileToPath(path, kind, baseOverride) {
   rebuildVectorBrushOutline(path); // synchronous: nothing else ever calls it
   return true;
 }
-function rebuildVectorBrushOutline(path){
-  var cs=path.data&&path.data.centerSegments;
-  if(!cs||cs.length<2)return;
-  var profile=path.data.widthProfile;
+// Dense arc-length sampling of a vector-brush centerline (2026-08, factored
+// out of rebuildVectorBrushOutline unchanged — see that function's own
+// history for the sampling rationale): given the sparse editable
+// centerSegments + the dense pressure widthProfile, returns evenly-spaced
+// {pts, widths} ready for buildVariableWidthPath. Shared rather than
+// duplicated (CLAUDE.md §3) because Motion's own Brush Size property
+// (motion.js) needs the EXACT same sampling to scale on top of, and a
+// second copy of this arc-length math would drift the moment either side
+// changed its curve-fitting.
+function sampleVectorBrushCenterline(cs,profile){
   var center=new Path({insert:false});
   cs.forEach(function(s){center.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));});
   var len=center.length;
@@ -4081,6 +4277,23 @@ function rebuildVectorBrushOutline(path){
     }
     widths.push(w);
   }
+  // Real Segment objects (not [x,y,...] plain data) so callers that need
+  // the fitted centerline itself (rebuildVectorBrushOutline's linked-fill
+  // sync) can build a Path from them directly, same shape `center`'s own
+  // .segments already were before this got factored out — only the LIVE
+  // `center` item itself is thrown away here (insert:false, never in any
+  // scene graph, but removed anyway for hygiene).
+  var centerSegs=center.segments.map(function(s){return new Segment(s.point,s.handleIn,s.handleOut);});
+  center.remove();
+  return {pts:pts,widths:widths,centerSegments:centerSegs};
+}
+window.sampleVectorBrushCenterline=sampleVectorBrushCenterline;
+function rebuildVectorBrushOutline(path){
+  var cs=path.data&&path.data.centerSegments;
+  if(!cs||cs.length<2)return;
+  var profile=path.data.widthProfile;
+  var sampled=sampleVectorBrushCenterline(cs,profile);
+  var pts=sampled.pts,widths=sampled.widths;
   // Sync the linked fill backdrop (Fill enabled while drawing with the
   // Pressure brush — see draw-bridge.js's commitStroke) to the SAME curve
   // just fit through the centerline anchors, rather than an independently-
@@ -4094,10 +4307,9 @@ function rebuildVectorBrushOutline(path){
   // goes through here.
   var linkedFill=path.data&&path.data.linkedFill;
   if(linkedFill&&!linkedFill.removed){
-    linkedFill.segments=center.segments.map(function(s){return new Segment(s.point,s.handleIn,s.handleOut);});
+    linkedFill.segments=sampled.centerSegments.map(function(s){return new Segment(s.point,s.handleIn,s.handleOut);});
     linkedFill.closed=true;
   }
-  center.remove();
   var outline=buildVariableWidthPath(pts,widths);
   if(outline){
     path.segments=outline.segments;path.closed=true;outline.remove();
@@ -4137,7 +4349,7 @@ function _ptSetHandleIn(isVB,seg,pt){if(isVB)seg.handleIn=[pt.x,pt.y];else seg.h
 function _ptSetHandleOut(isVB,seg,pt){if(isVB)seg.handleOut=[pt.x,pt.y];else seg.handleOut=pt;}
 function setPointType(type){
   var path=nodeEditTargetPath();
-  if(!path||!_nodeSel.length){showToast('Sélectionnez un ou plusieurs points (Subselect)');return;}
+  if(!path||!_nodeSel.length){showToast(SM.t('toastSelectOneOrMorePointsSubselect'));return;}
   pushUndo();
   var isVB=!!(path.data&&path.data.isVectorBrush&&path.data.centerSegments);
   var arr=isVB?path.data.centerSegments:path.segments;
@@ -4334,7 +4546,7 @@ function foldBooleanOp(op,paths,layer){
   return{result:result,companions:extraRemovals};
 }
 function booleanOp(op){
-  if(selectedPaths.length<2){showToast('Sélectionnez au moins 2 formes');return;}
+  if(selectedPaths.length<2){showToast(SM.t('toastSelectAtLeast2Shapes'));return;}
   pushUndo();
   var paths=selectedPaths.slice();
   var boolLayer=userLayers[state.activeLayerIdx];
@@ -4396,7 +4608,7 @@ function booleanOp(op){
   // comment) may have used one of the booleaned shapes as a wall; keep
   // re-tracing those, same as before this fix.
   fillRegenerateLinked(boolLayer,islands[0]);
-  saveActiveLayerFrame();updateUI();showToast('Opération booléenne appliquée');
+  saveActiveLayerFrame();updateUI();showToast(SM.t('toastBooleanOpApplied'));
 }
 
 // ---- PRECISION VECTOR ERASER ----
@@ -4903,6 +5115,251 @@ function computeGroupCombine(paths,mode,layer){
   var folded=foldBooleanOp(mode,paths,layer);
   return flattenBooleanResult(folded.result);
 }
+
+// ---- DYNAMIC SHAPES, phase 1 (2026-08-18) — Rectangle, independent
+// per-corner radius, Figma's own model (topLeft/topRight/bottomRight/
+// bottomLeft radii, each 0..half the shorter side) confirmed via its
+// plugin API docs rather than guessed. data.paramShape={kind:'rect',
+// tl,tr,br,bl} is the shape's declared intent; applyParamShapeRect below
+// is the ONE function that turns those numbers into real segments — every
+// editor (corner panel fields now, per-corner Motion keys later) calls
+// it, never hand-rolls the Bezier math again (CLAUDE.md §3).
+//
+// Deliberately NOT wired into the live render pipeline (engine-bridge.js/
+// export.js) — this bakes the radii into the path's REAL stored segments
+// immediately, the same way dragging a Subselect point already does, so
+// it's free of every retained-path-cache/render-hook concern CLAUDE.md
+// §5ter documents at length (a runtime-rebuilt-per-frame version is a
+// deliberately separate, later step — animating this needs its own
+// non-retainable-path exclusion, not a reason to complicate this first,
+// static slice). Corner drag handles on canvas are a natural interaction
+// follow-up; numeric fields deliver the actual capability first.
+function buildRoundRectPath(x1,y1,x2,y2,tl,tr,br,bl){
+  var maxR=Math.min(x2-x1,y2-y1)/2;
+  tl=Math.max(0,Math.min(tl,maxR));tr=Math.max(0,Math.min(tr,maxR));
+  br=Math.max(0,Math.min(br,maxR));bl=Math.max(0,Math.min(bl,maxR));
+  var k=0.5522847498;
+  // Built via explicit Segment(point,handleIn,handleOut), the ONLY curve-
+  // construction idiom this codebase actually uses (grep confirms zero
+  // .cubicTo call sites anywhere in tools.js) — found live: Paper.js's own
+  // Path has no .cubicTo method under that name (it's Rive/Lua's API, not
+  // Paper's), so the first version of this function threw on every corner.
+  // Each rounded corner is 2 segments: A (where the incoming straight edge
+  // ends, handleOut aimed at the arc) and B (where the outgoing edge
+  // starts, handleIn aimed back at A) — a r=0 corner collapses A/B into
+  // one sharp point with both handles zeroed.
+  var segs=[];
+  if(tl>0)segs.push(new Segment(new Point(x1+tl,y1),new Point(-tl*k,0),new Point(0,0)));
+  else segs.push(new Segment(new Point(x1,y1)));
+  if(tr>0){
+    segs.push(new Segment(new Point(x2-tr,y1),new Point(0,0),new Point(tr*k,0)));
+    segs.push(new Segment(new Point(x2,y1+tr),new Point(0,-tr*k),new Point(0,0)));
+  } else segs.push(new Segment(new Point(x2,y1)));
+  if(br>0){
+    segs.push(new Segment(new Point(x2,y2-br),new Point(0,0),new Point(0,br*k)));
+    segs.push(new Segment(new Point(x2-br,y2),new Point(br*k,0),new Point(0,0)));
+  } else segs.push(new Segment(new Point(x2,y2)));
+  if(bl>0){
+    segs.push(new Segment(new Point(x1+bl,y2),new Point(0,0),new Point(-bl*k,0)));
+    segs.push(new Segment(new Point(x1,y2-bl),new Point(0,bl*k),new Point(0,0)));
+  } else segs.push(new Segment(new Point(x1,y2)));
+  if(tl>0)segs.push(new Segment(new Point(x1,y1+tl),new Point(0,0),new Point(0,-tl*k)));
+  var p=new Path({insert:false,closed:true});
+  segs.forEach(function(s){p.add(s);});
+  return p;
+}
+window.buildRoundRectPath=buildRoundRectPath;
+
+// ---- DYNAMIC SHAPES, Ellipse (2026-08-18) — pie/donut ("camembert"),
+// Figma's own ArcData model (startingAngle/endingAngle/innerRadius,
+// confirmed via its plugin API docs — 0°=+x axis, increasing=clockwise,
+// which matches this canvas's y-down space with plain cos/sin, no sign
+// flip needed). Sweep clamped to (0.1°, 359.9°) rather than allowing a
+// true 360° — that keeps a "donut" a SINGLE-contour Path (a coarse
+// approximation, sampled with straight segments every ~4° rather than
+// true elliptical Bezier arcs — good enough at typical shape sizes,
+// dramatically simpler than getting arc-to-Bezier math exactly right)
+// instead of needing a CompoundPath for a true full ring, which would
+// drag in every consumer CLAUDE.md §1 warns about for that class
+// (insertBooleanResult, saveActiveLayerFrame, tween matching...) for a
+// visual difference nobody would notice (the seam is a tenth of a
+// degree). A plain Ellipse tool shape stays the EXISTING clean
+// Path.Ellipse (4-segment true Bezier) — this is opt-in via "Rendre
+// dynamique" once selected, not the default, so the common case (just
+// draw a circle) never pays this shape's coarser sampling or larger
+// segment count.
+function buildArcEllipsePath(cx,cy,rx,ry,startDeg,sweepDeg,innerRatio){
+  sweepDeg=Math.max(0.1,Math.min(359.9,sweepDeg));
+  var ir=Math.max(0,Math.min(0.95,innerRatio||0));
+  var n=Math.max(8,Math.ceil(sweepDeg/4));
+  var p=new Path({insert:false,closed:true});
+  for(var i=0;i<=n;i++){
+    var a=(startDeg+sweepDeg*i/n)*Math.PI/180;
+    p.add(new Segment(new Point(cx+rx*Math.cos(a),cy+ry*Math.sin(a))));
+  }
+  if(ir>0){
+    for(var j=n;j>=0;j--){
+      var a2=(startDeg+sweepDeg*j/n)*Math.PI/180;
+      p.add(new Segment(new Point(cx+rx*ir*Math.cos(a2),cy+ry*ir*Math.sin(a2))));
+    }
+  }else{
+    p.add(new Segment(new Point(cx,cy))); // pie slice closes through the center
+  }
+  return p;
+}
+function applyParamShapeEllipse(path){
+  var ps=path.data&&path.data.paramShape;if(!ps||ps.kind!=='ellipse')return;
+  // paramShapeBoxOf/stampParamShapeBox are defined further down this file
+  // (Star/Rect's own "stable generator frame" rework) — ellipse is the
+  // FIRST dynamic shape kind built each session in most files that use
+  // this pattern, but declaration order in one script doesn't matter here
+  // since nothing calls applyParamShapeEllipse before the whole file (and
+  // thus every function in it) has parsed.
+  var b=paramShapeBoxOf(path,ps),cx=(b.x1+b.x2)/2,cy=(b.y1+b.y2)/2,rx=(b.x2-b.x1)/2,ry=(b.y2-b.y1)/2;
+  var built=buildArcEllipsePath(cx,cy,rx,ry,ps.startAngle||0,ps.sweep!==undefined?ps.sweep:359.9,ps.innerRadius||0);
+  path.segments=built.segments;path.closed=true;
+  built.remove();
+}
+// Converts an existing plain ellipse (or any single-path selection) into
+// a dynamic one in place — same "opt-in, tag then bake" shape as the
+// Speech Bubble tool's own commit, just triggered from the panel instead
+// of at draw time. Defaults (sweep 359.9, no inner radius) render
+// visually near-identical to the path's pre-conversion look.
+function convertToDynamicEllipse(path){
+  if(!path||!path.bounds)return;
+  path.data.paramShape={kind:'ellipse',startAngle:0,sweep:359.9,innerRadius:0};
+  applyParamShapeEllipse(path);
+}
+window.buildArcEllipsePath=buildArcEllipsePath;
+window.applyParamShapeEllipse=applyParamShapeEllipse;
+window.convertToDynamicEllipse=convertToDynamicEllipse;
+
+// ---- DYNAMIC SHAPES, Star/Polygon (2026-08-18) — one tool, Figma's own
+// pointCount/innerRadius/cornerRadius model (confirmed via its plugin API
+// docs: innerRadius is a 0-1 ratio of the outer radius, 1 collapses a
+// star into a regular polygon — this codebase reuses that single tool/
+// data shape rather than building two, since "polygon" is just
+// innerRatio===1 geometrically). Corner rounding generalizes the
+// rectangle's own magic-constant technique (buildRoundRectPath) to an
+// arbitrary vertex angle — NOT a mathematically exact circular fillet
+// (that needs per-angle trig this codebase doesn't otherwise need
+// anywhere), just the same "handle length = distance-to-corner × k"
+// approximation, which reads as a smooth, correct-looking round at any
+// polygon/star point count in practice.
+function buildStarPolygonPath(cx,cy,outerR,pointCount,innerRatio,cornerRadius){
+  pointCount=Math.max(3,Math.round(pointCount||5));
+  innerRatio=Math.max(0.05,Math.min(1,innerRatio===undefined?0.5:innerRatio));
+  var isPolygon=innerRatio>=0.999;
+  var n=isPolygon?pointCount:pointCount*2;
+  var innerR=outerR*innerRatio;
+  var verts=[];
+  for(var i=0;i<n;i++){
+    var r=isPolygon||(i%2===0)?outerR:innerR;
+    var a=-Math.PI/2+i*Math.PI*2/n;
+    verts.push(new Point(cx+r*Math.cos(a),cy+r*Math.sin(a)));
+  }
+  var k=0.5522847498,cr=Math.max(0,cornerRadius||0);
+  var p=new Path({insert:false,closed:true});
+  for(var j=0;j<n;j++){
+    var V=verts[j],Prev=verts[(j-1+n)%n],Next=verts[(j+1)%n];
+    if(cr<=0.01){p.add(new Segment(V));continue;}
+    var dPrev=V.getDistance(Prev),dNext=V.getDistance(Next);
+    var rP=Math.min(cr,dPrev*0.5),rN=Math.min(cr,dNext*0.5);
+    var A=V.add(Prev.subtract(V).normalize(rP));
+    var B=V.add(Next.subtract(V).normalize(rN));
+    var hOutA=V.subtract(A).multiply(k);
+    var hInB=V.subtract(B).multiply(k);
+    p.add(new Segment(A,new Point(0,0),hOutA));
+    p.add(new Segment(B,hInB,new Point(0,0)));
+  }
+  return p;
+}
+// ---- DYNAMIC SHAPES rework (2026-08-19) — stable generator frame ----
+// Feedback: "les paramètres font un peu n'importe quoi" — reproduced live:
+// applyParamShapeEllipse/Star/Rect all rebuilt from path.bounds EVERY edit,
+// but a donut/pie-slice/rounded/starred shape's rendered bbox is routinely
+// SMALLER than its own conceptual frame (a thin pie slice, a heavily
+// rounded star, an inset donut). Nudge one param, the frame silently
+// shrinks to match the new (smaller) bbox; nudge another param that reads
+// that shrunken frame, it shrinks again — a compounding feedback loop with
+// no way back to the original size short of undo. Figma/Graphite avoid
+// this by keeping a shape's FRAME (its own bounding box, resizable like
+// any other layer) completely separate from its internal parameters — the
+// frame only changes via a genuine resize gesture, never as a side effect
+// of an internal param edit. `paramShape.box` is that frame: stamped once
+// at creation (stampParamShapeBox), kept in sync through real move/scale
+// gestures (syncParamShapeBoxOnTranslate/OnScale, called from every
+// p.translate()/p.scale() site that can touch a paramShape path — select-
+// bridge.js's live drag-move/drag-scale and timeline.js's Position/Size
+// panel fields), and otherwise left completely alone. Rotation is a known
+// gap shared with the pre-rework code (a Path bakes rotation into its
+// segments, Paper.js gives no clean way to recover "how rotated is this"
+// afterward) — rebuilding already snapped back to axis-aligned before this
+// change too, not a regression.
+function stampParamShapeBox(path){
+  var ps=path.data&&path.data.paramShape;if(!ps)return;
+  var b=path.bounds;
+  ps.box={x1:b.left,y1:b.top,x2:b.right,y2:b.bottom};
+}
+function syncParamShapeBoxOnTranslate(p,dx,dy){
+  var ps=p&&p.data&&p.data.paramShape;if(!ps||!ps.box)return;
+  ps.box.x1+=dx;ps.box.x2+=dx;ps.box.y1+=dy;ps.box.y2+=dy;
+}
+function syncParamShapeBoxOnScale(p,sx,sy,anchor){
+  var ps=p&&p.data&&p.data.paramShape;if(!ps||!ps.box)return;
+  var b=ps.box;
+  var nx1=anchor.x+(b.x1-anchor.x)*sx,nx2=anchor.x+(b.x2-anchor.x)*sx;
+  var ny1=anchor.y+(b.y1-anchor.y)*sy,ny2=anchor.y+(b.y2-anchor.y)*sy;
+  b.x1=Math.min(nx1,nx2);b.x2=Math.max(nx1,nx2);
+  b.y1=Math.min(ny1,ny2);b.y2=Math.max(ny1,ny2);
+  // Rect corners specifically (2026-08-19, feedback: "ça scale alors que
+  // ça devrait rester dynamique afin d'avoir les mêmes corner") — a plain
+  // p.scale(sx,sy) on the BAKED curve stretches each corner's arc into an
+  // ellipse and silently leaves ps.tl/tr/br/bl holding stale pre-resize
+  // values that no longer match what's on screen. Figma's actual rule: a
+  // rounded rect's corner radius is a property of the FRAME, independent
+  // of its size — resizing the frame never touches the radius value
+  // (only the existing clamp-to-half-min-side in buildRoundRectPath can
+  // shrink its VISUAL effect, never the stored number). So a rect
+  // rebuilds fresh from the new box with its UNCHANGED radii — round
+  // corners stay round at any aspect ratio — instead of trusting the
+  // just-applied geometric scale to have kept them consistent, which it
+  // never did. Ellipse/Star are deliberately NOT rebuilt here: their own
+  // arc-sample math is exactly equivalent to a plain scale of the baked
+  // points (verified: (rx·cosθ, ry·sinθ) scaled by (sx,sy) IS (rx·sx·cosθ,
+  // ry·sy·sinθ), the same curve a rebuild with rx'=rx·sx would produce),
+  // so an anisotropic resize correctly and cheaply stretches those into a
+  // non-circular ellipse / elongated star, which IS the wanted result.
+  if(ps.kind==='rect'&&window.applyParamShapeRect)window.applyParamShapeRect(p);
+}
+// Every applyParamShapeXxx below self-heals a missing box (older project
+// data saved before this rework) by stamping one from the CURRENT bounds
+// the first time it's touched — same one-time "no box yet" gate `stampParamShapeBox`
+// otherwise runs at creation, just deferred to first edit for pre-existing shapes.
+function paramShapeBoxOf(path,ps){
+  if(!ps.box)stampParamShapeBox(path);
+  return ps.box;
+}
+window.stampParamShapeBox=stampParamShapeBox;
+window.syncParamShapeBoxOnTranslate=syncParamShapeBoxOnTranslate;
+window.syncParamShapeBoxOnScale=syncParamShapeBoxOnScale;
+function applyParamShapeStar(path){
+  var ps=path.data&&path.data.paramShape;if(!ps||ps.kind!=='star')return;
+  var b=paramShapeBoxOf(path,ps),cx=(b.x1+b.x2)/2,cy=(b.y1+b.y2)/2,outerR=Math.min(b.x2-b.x1,b.y2-b.y1)/2;
+  var built=buildStarPolygonPath(cx,cy,outerR,ps.pointCount,ps.innerRatio,ps.cornerRadius);
+  path.segments=built.segments;path.closed=true;
+  built.remove();
+}
+window.buildStarPolygonPath=buildStarPolygonPath;
+window.applyParamShapeStar=applyParamShapeStar;
+function applyParamShapeRect(path){
+  var ps=path.data&&path.data.paramShape;if(!ps||ps.kind!=='rect')return;
+  var b=paramShapeBoxOf(path,ps);
+  var built=buildRoundRectPath(b.x1,b.y1,b.x2,b.y2,ps.tl||0,ps.tr||0,ps.br||0,ps.bl||0);
+  path.segments=built.segments;path.closed=true;
+  built.remove();
+}
+window.applyParamShapeRect=applyParamShapeRect;
 function insertBooleanResult(layer,insertAt,result,fillColor,opacity,strokeInfo,srcData){
   function applyStroke(isl){
     if(strokeInfo&&strokeInfo.color){isl.strokeColor=strokeInfo.color;isl.strokeWidth=strokeInfo.width;isl.strokeCap=strokeInfo.cap;isl.strokeJoin=strokeInfo.join;}
@@ -5073,13 +5530,13 @@ function onMouseDown(event){
   // another branch of this tool chain: only consumes the event (returns
   // true) when the click actually lands on a motion handle/keyframe dot;
   // otherwise falls through unchanged into Select/Draw/etc. below.
-  if(state.appMode==='motion'&&window.SMMotion&&SMMotion.onDown(event))return;
+  if(state.appMode==='motion'&&window.SMMotion){event.altKey=!!(event.modifiers&&event.modifiers.alt);if(SMMotion.onDown(event))return;}
   var layer=userLayers[state.activeLayerIdx];
   if(state.tool==='draw'){
     if(!canEditActiveLayer())return;
     // Same both-eyes-off guard as draw-bridge.js's commitStroke — never
     // commit fully invisible ink.
-    if(!state.strokeEnabled&&!state.fillEnabled){showToast('Stroke et Fill désactivés — rien à dessiner');return;}
+    if(!state.strokeEnabled&&!state.fillEnabled){showToast(SM.t('toastStrokeFillDisabledNothingToDraw'));return;}
     pushUndo();ensureKeyframe(true);layer.activate();
     if(state.vectorBrush){
       _vbLastPenPressure=null;_vbResetPressureFilter();stabQueue=[event.point.clone()];_vb.pts=[event.point.clone()];_vb.widths=[vbPressureOf(event)];_vb.lastT=Date.now();_vb.lastPt=event.point.clone();
@@ -5131,10 +5588,12 @@ function onMouseDown(event){
       _pen.path.add(placePt);
     }
     _pen.draggingHandle=true;
-  }else if(state.tool==='line'||state.tool==='rect'||state.tool==='ellipse'){
+  }else if(state.tool==='line'||state.tool==='rect'||state.tool==='ellipse'||state.tool==='speechbubble'||state.tool==='star'){
     if(!canEditActiveLayer())return;pushUndo();ensureKeyframe(true);layer.activate();shapeStart=event.point.clone();
     if(state.tool==='line')currentPath=new Path.Line({from:event.point,to:event.point,strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,strokeCap:state.strokeCap,fillColor:null,opacity:state.opacity/100});
     else if(state.tool==='rect')currentPath=new Path.Rectangle({from:event.point,to:event.point.add(new Point(1,1)),strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,fillColor:state.fillEnabled?state.fillColor:null,opacity:state.opacity/100});
+    else if(state.tool==='speechbubble')currentPath=new Path.Rectangle({rectangle:new Rectangle(event.point,new Size(1,1)),radius:1,strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,fillColor:state.fillEnabled?state.fillColor:null,opacity:state.opacity/100});
+    else if(state.tool==='star')currentPath=new Path.Rectangle({rectangle:new Rectangle(event.point,new Size(1,1)),strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,fillColor:state.fillEnabled?state.fillColor:null,opacity:state.opacity/100});
     else currentPath=new Path.Ellipse({rectangle:new Rectangle(event.point,new Size(1,1)),strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,fillColor:state.fillEnabled?state.fillColor:null,opacity:state.opacity/100});
   }else if(state.tool==='subselect'){
     var bestNh=null,bestNd=8/view.zoom;
@@ -5436,7 +5895,7 @@ function onMouseDown(event){
     pushUndo();ensureKeyframe();
     if(event.modifiers.shift){
       var hitRm=layer.hitTest(event.point,{fill:true,tolerance:12/view.zoom});
-      if(hitRm&&hitRm.item instanceof Path&&hitRm.item.fillColor){hitRm.item.fillColor=null;saveActiveLayerFrame();updateUI();showToast('Fill supprimé');}
+      if(hitRm&&hitRm.item instanceof Path&&hitRm.item.fillColor){hitRm.item.fillColor=null;saveActiveLayerFrame();updateUI();showToast(SM.t('toastFillRemoved'));}
       return;
     }
     // Any queued Alt-drawn closing strokes become real (but disposable)
@@ -5459,15 +5918,15 @@ function onMouseDown(event){
       var hitFill=layer.hitTest(event.point,{fill:true,tolerance:1/view.zoom});
       if(hitFill&&(hitFill.item instanceof Path||hitFill.item instanceof CompoundPath)&&hitFill.item.fillColor){
         hitFill.item.fillColor=state.fillColor;hitFill.item.opacity=state.opacity/100;
-        saveActiveLayerFrame();updateUI();showToast('Couleur remplacée');return;
+        saveActiveLayerFrame();updateUI();showToast(SM.t('toastColorReplaced'));return;
       }
-      showToast('Aucune zone fermée ici');return;
+      showToast(SM.t('toastNoClosedAreaHere'));return;
     }
     var existingMatch=fillFindExistingMatch(layer,res.path);
     if(existingMatch){
       res.path.remove();
       existingMatch.fillColor=state.fillColor;existingMatch.opacity=state.opacity/100;
-      saveActiveLayerFrame();updateUI();showToast('Couleur remplacée');return;
+      saveActiveLayerFrame();updateUI();showToast(SM.t('toastColorReplaced'));return;
     }
     layer.insertChild(fillInsertIndexFor(layer,event.point,res.path),res.path);
     res.path.fillColor=state.fillColor;res.path.strokeColor=null;res.path.opacity=state.opacity/100;
@@ -5480,7 +5939,7 @@ function onMouseDown(event){
     // reshape an already-finished, hand-authored Fill Brush shape it
     // merely borders (see fillMergeSameColor's own comment).
     fillMergeSameColor(layer,res.path);
-    saveActiveLayerFrame();updateUI();showToast('Fill appliqué');
+    saveActiveLayerFrame();updateUI();showToast(SM.t('toastFillApplied'));
   }else if(state.tool==='fillbrush'){
     if(!canEditActiveLayer())return;pushUndo();ensureKeyframe();layer.activate();
     _vbLastPenPressure=null;_vb.pts=[event.point.clone()];_vb.widths=[vbPressureOf(event)];_vb.lastT=Date.now();_vb.lastPt=event.point.clone();
@@ -5496,10 +5955,10 @@ function onMouseDown(event){
       // away a picked color's real transparency; .dataset.hex8 alongside
       // .value for the same reason as everywhere else this pattern appears
       // — the native <input type=color> truncates alpha out of .value.
-      if(isVB&&ep.fillColor){state.strokeColor=colorHex8(ep.fillColor);document.getElementById('color-stroke').value=state.strokeColor;document.getElementById('color-stroke').dataset.hex8=state.strokeColor;document.getElementById('pm-stroke-c').value=state.strokeColor;document.getElementById('pm-stroke-c').dataset.hex8=state.strokeColor;document.getElementById('stroke-well').style.background=state.strokeColor;document.getElementById('pm-stroke').style.background=state.strokeColor;}
+      if(isVB&&ep.fillColor){state.strokeColor=colorHex8(ep.fillColor);setHex8Input(document.getElementById('color-stroke'),state.strokeColor);setHex8Input(document.getElementById('pm-stroke-c'),state.strokeColor);document.getElementById('stroke-well').style.background=state.strokeColor;document.getElementById('pm-stroke').style.background=state.strokeColor;}
       else{
-        if(ep.strokeColor){state.strokeColor=colorHex8(ep.strokeColor);document.getElementById('color-stroke').value=state.strokeColor;document.getElementById('color-stroke').dataset.hex8=state.strokeColor;document.getElementById('pm-stroke-c').value=state.strokeColor;document.getElementById('pm-stroke-c').dataset.hex8=state.strokeColor;document.getElementById('stroke-well').style.background=state.strokeColor;document.getElementById('pm-stroke').style.background=state.strokeColor;}
-        if(ep.fillColor){state.fillColor=colorHex8(ep.fillColor);state.fillEnabled=true;document.getElementById('color-fill').value=state.fillColor;document.getElementById('color-fill').dataset.hex8=state.fillColor;document.getElementById('pm-fill-c').value=state.fillColor;document.getElementById('pm-fill-c').dataset.hex8=state.fillColor;document.getElementById('pm-fill').style.background=state.fillColor;document.getElementById('fill-well').style.background=state.fillColor;document.getElementById('fill-well').classList.remove('none');document.getElementById('p-fill-on').checked=true;}
+        if(ep.strokeColor){state.strokeColor=colorHex8(ep.strokeColor);setHex8Input(document.getElementById('color-stroke'),state.strokeColor);setHex8Input(document.getElementById('pm-stroke-c'),state.strokeColor);document.getElementById('stroke-well').style.background=state.strokeColor;document.getElementById('pm-stroke').style.background=state.strokeColor;}
+        if(ep.fillColor){state.fillColor=colorHex8(ep.fillColor);state.fillEnabled=true;setHex8Input(document.getElementById('color-fill'),state.fillColor);setHex8Input(document.getElementById('pm-fill-c'),state.fillColor);document.getElementById('pm-fill').style.background=state.fillColor;document.getElementById('fill-well').style.background=state.fillColor;document.getElementById('fill-well').classList.remove('none');document.getElementById('p-fill-on').checked=true;}
       }
       if(ep.strokeWidth){state.brushSize=ep.strokeWidth;document.getElementById('p-sw').value=Math.round(ep.strokeWidth);}
       showToast('Color picked');}
@@ -5533,7 +5992,7 @@ function onMouseDrag(event){
     if(!_pen.path||!_pen.draggingHandle)return;
     var seg=_pen.path.lastSegment;var delta=event.point.subtract(seg.point);
     seg.handleOut=delta;seg.handleIn=delta.multiply(-1);
-  }else if((state.tool==='line'||state.tool==='rect'||state.tool==='ellipse')&&currentPath&&shapeStart){
+  }else if((state.tool==='line'||state.tool==='rect'||state.tool==='ellipse'||state.tool==='speechbubble'||state.tool==='star')&&currentPath&&shapeStart){
     currentPath.remove();
     // Shift-constrain (UI/UX audit, 2026-07): Illustrator/Figma/Photoshop
     // convention, absent here entirely before this — Rectangle/Ellipse had
@@ -5549,20 +6008,49 @@ function onMouseDrag(event){
     }
     if(state.tool==='line'){currentPath=new Path.Line({from:shapeStart,to:endPt,strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,strokeCap:state.strokeCap,fillColor:null,opacity:state.opacity/100});applyStrokeStyle(currentPath);}
     else if(state.tool==='rect')currentPath=new Path.Rectangle({from:shapeStart,to:endPt,strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,fillColor:state.fillEnabled?state.fillColor:null,opacity:state.opacity/100});
+    else if(state.tool==='speechbubble'){
+      // Live preview during the drag is just the rounded rect — the tail
+      // (a separate triangle, unioned in at commit below) would have to be
+      // rebuilt+re-unioned on every single drag tick otherwise, which is
+      // real boolean-op cost (CLAUDE.md §1: booleans are never free) paid
+      // 60+ times for a shape the user hasn't committed to yet.
+      var bbRect=new Rectangle(shapeStart,endPt);
+      var bbRadius=Math.max(4,Math.min(bbRect.width,bbRect.height)*0.18);
+      currentPath=new Path.Rectangle({rectangle:bbRect,radius:bbRadius,strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,fillColor:state.fillEnabled?state.fillColor:null,opacity:state.opacity/100});
+    }
+    else if(state.tool==='star'){
+      // Live preview is the real star geometry — cheap (no boolean op,
+      // unlike Speech Bubble's tail), so unlike that tool there's no
+      // reason to fall back to a placeholder rect during the drag itself.
+      var sbRect=new Rectangle(shapeStart,endPt);
+      var sOuterR=Math.min(sbRect.width,sbRect.height)/2;
+      currentPath=window.buildStarPolygonPath(sbRect.center.x,sbRect.center.y,sOuterR,state.starPointCount||5,state.starInnerRatio!==undefined?state.starInnerRatio:0.5,0);
+      userLayers[state.activeLayerIdx].addChild(currentPath);
+      currentPath.strokeColor=state.strokeEnabled?state.strokeColor:null;currentPath.strokeWidth=state.brushSize;
+      currentPath.fillColor=state.fillEnabled?state.fillColor:null;currentPath.opacity=state.opacity/100;
+    }
     else{currentPath=new Path.Ellipse({rectangle:new Rectangle(shapeStart,endPt),strokeColor:state.strokeEnabled?state.strokeColor:null,strokeWidth:state.brushSize,fillColor:state.fillEnabled?state.fillColor:null,opacity:state.opacity/100});}
   }else if(state.tool==='text'&&_textDragStart){
     // Drag guide rectangle — purely visual (marqueeLayer, never inserted
     // into real content), same pattern as the subselect marquee just below.
-    // Only x matters for the actual box (wrapping is width-only, no fixed-
-    // height clipping in this implementation); a nominal height is drawn
-    // just so the drag reads as "defining a box" rather than a stray line.
+    // Height now tracks the drag's y-delta like Figma/Illustrator's own
+    // type-in-a-box gesture (2026-08-17, "pas de bounding box lorsque l'on
+    // drag avec l'outil texte comme dans figma") — the box previously only
+    // ever grew in width, its height pinned to a nominal 60/zoom regardless
+    // of how far you dragged vertically, which read as "no bounding box" to
+    // anyone dragging down-and-right the way Figma trains you to. A small
+    // floor (24/zoom) keeps a near-zero-height drag from collapsing the
+    // guide into an invisible line — actual text wrapping stays width-only
+    // (commitText/startInPlaceTextCreation never read this rect's height,
+    // only widthWorld), this is purely the visual placement guide.
     if(_textDragRect){_textDragRect.remove();_textDragRect=null;}
     var twv=Math.abs(event.point.x-_textDragStart.x);
     if(twv>4/view.zoom){
       var tx1=Math.min(_textDragStart.x,event.point.x),ty1=Math.min(_textDragStart.y,event.point.y);
       var tx2=Math.max(_textDragStart.x,event.point.x);
+      var thv=Math.max(24/view.zoom,Math.abs(event.point.y-_textDragStart.y));
       var prevTxt=project.activeLayer;marqueeLayer.activate();
-      _textDragRect=new Path.Rectangle({from:new Point(tx1,ty1),to:new Point(tx2,ty1+60/view.zoom),strokeColor:'rgba(255,184,108,.9)',strokeWidth:1/view.zoom,dashArray:[4/view.zoom,3/view.zoom],fillColor:new Color(1,0.72,0.42,0.06),insert:true});
+      _textDragRect=new Path.Rectangle({from:new Point(tx1,ty1),to:new Point(tx2,ty1+thv),strokeColor:'rgba(255,184,108,.9)',strokeWidth:1/view.zoom,dashArray:[4/view.zoom,3/view.zoom],fillColor:new Color(1,0.72,0.42,0.06),insert:true});
       prevTxt.activate();
     }
   }else if(state.tool==='subselect'){
@@ -5861,13 +6349,52 @@ function onMouseUp(event){
       if(window.startInPlaceTextCreation)startInPlaceTextCreation(textTopLeft,textDragWidth);
     }else if(window.openTextPopover)openTextPopover(_textDragStart);
     _textDragStart=null;
-  }else if((state.tool==='line'||state.tool==='rect'||state.tool==='ellipse')&&currentPath){
+  }else if((state.tool==='line'||state.tool==='rect'||state.tool==='ellipse'||state.tool==='star')&&currentPath){
     if(shapeStart&&event.point.getDistance(shapeStart)<2){currentPath.remove();if(state.undoStack.length)state.undoStack.pop();}
     else{
       if(state.shadowMode)applyShadowBrushTag(currentPath);
+      // Dynamic shape, phase 1 (2026-08-18) — every new rect is corner-
+      // radius-capable from creation (all 4 at 0, i.e. today's sharp-corner
+      // look, zero visual change) rather than an opt-in — matches Figma,
+      // where a rectangle's corners are always independently editable.
+      if(state.tool==='rect'){currentPath.data.paramShape={kind:'rect',tl:0,tr:0,br:0,bl:0};stampParamShapeBox(currentPath);}
+      // Star/Polygon — always dynamic from creation (unlike Ellipse's
+      // opt-in "Rendre dynamique": there's no plain-native-Bezier
+      // equivalent to fall back to here, the tool's whole point is the
+      // parametric shape) — same tool draws either depending on
+      // innerRatio, see buildStarPolygonPath's own comment.
+      else if(state.tool==='star'){currentPath.data.paramShape={kind:'star',pointCount:state.starPointCount||5,innerRatio:state.starInnerRatio!==undefined?state.starInnerRatio:0.5,cornerRadius:0};stampParamShapeBox(currentPath);}
       tagOwner(currentPath);
       if(window.SMSymmetry&&window.SMSymmetry.onStrokeCommitted)window.SMSymmetry.onStrokeCommitted(currentPath,userLayers[state.activeLayerIdx]);
     }
+    currentPath=null;shapeStart=null;saveActiveLayerFrame();updateUI();
+  }else if(state.tool==='speechbubble'&&currentPath){
+    if(shapeStart&&event.point.getDistance(shapeStart)<2){currentPath.remove();if(state.undoStack.length)state.undoStack.pop();currentPath=null;shapeStart=null;saveActiveLayerFrame();updateUI();return;}
+    // Tail is a small triangle unioned onto the rounded rect at commit
+    // time — real boolean op (CLAUDE.md §1: never insert a raw union
+    // result, always insertBooleanResult so a CompoundPath-producing
+    // union splits into independent Paths correctly) rather than two
+    // stacked same-color paths, so a stroke (if enabled) traces one clean
+    // outline instead of leaving a seam where the tail meets the body.
+    // Bottom-center, pointing down — a fixed placement for v1; dragging
+    // the tail to a chosen edge/position is a natural follow-up once this
+    // proves out, not a blocker for a first usable version.
+    var bb=currentPath.bounds;
+    var tailBase=Math.max(10,Math.min(bb.width,bb.height)*0.28);
+    var tailDrop=Math.max(10,Math.min(bb.width,bb.height)*0.24);
+    var tailCx=bb.left+bb.width*0.28;
+    var tail=new Path({insert:false});
+    tail.moveTo(new Point(tailCx-tailBase/2,bb.bottom-1));
+    tail.lineTo(new Point(tailCx+tailBase/2,bb.bottom-1));
+    tail.lineTo(new Point(tailCx,bb.bottom+tailDrop));
+    tail.closePath();
+    var fillC=currentPath.fillColor,strokeC=currentPath.strokeColor,strokeW=currentPath.strokeWidth,op=currentPath.opacity;
+    var idx=userLayers[state.activeLayerIdx].children.indexOf(currentPath);
+    var united=currentPath.unite(tail,{insert:false});
+    currentPath.remove();
+    var islands=insertBooleanResult(userLayers[state.activeLayerIdx],idx,united,fillC,op,strokeC?{color:strokeC,width:strokeW,cap:'round',join:'round'}:null,null);
+    islands.forEach(function(p){ if(state.shadowMode)applyShadowBrushTag(p); tagOwner(p); });
+    if(window.SMSymmetry&&window.SMSymmetry.onStrokeCommitted&&islands[0])window.SMSymmetry.onStrokeCommitted(islands[0],userLayers[state.activeLayerIdx]);
     currentPath=null;shapeStart=null;saveActiveLayerFrame();updateUI();
   }else if(state.tool==='select'){
     if(_xform.active){

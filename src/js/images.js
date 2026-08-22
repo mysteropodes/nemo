@@ -27,7 +27,7 @@
   // through naturalSize's existing onerror->1x1 fallback, same as before).
   var PRO_IMAGE_EXTS={tiff:1,tif:1,exr:1,psd:1,dpx:1};
   async function decodeProImageFfmpeg(path){
-    showToast('Décodage de l’image (ffmpeg)…');
+    showToast(SM.t('toastDecodingImageFfmpeg'));
     var tmp=window.exportTempDirPath?await exportTempDirPath():null;
     var workDir=(tmp||'')+'sm-img-import-'+Date.now();
     await exportMkdir(workDir);
@@ -115,7 +115,7 @@
     return Math.max(1,Math.round(state.fps/seqFps));
   }
   async function importSequence(items,prefix,seqFps){
-    showToast('Import de la séquence…');
+    showToast(SM.t('toastImportingSequence'));
     var rep=seqRepeatCount(seqFps);
     var frames=[];
     for(var i=0;i<items.length;i++){
@@ -136,7 +136,7 @@
     state.layers[idx].footage={kind:'sequence',count:frames.length};
     activateUL(idx);loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
     if(window.SMMediaLibrary)SMMediaLibrary.addEntry(state.layers[idx].name,'image',frames[0].strokes[0].src,state.layers[idx].name,{layerUid:state.layers[idx].layerUid});
-    showToast('Séquence importée: '+items.length+' images sur le calque "'+prefix+'"');
+    showToast(SM.t('toastSequenceImportedSuffix')+items.length+' images sur le calque "'+prefix+'"');
   }
 
   // A still used to be pushed onto whatever layer happened to be active,
@@ -167,7 +167,7 @@
       if(window.SMMediaLibrary)SMMediaLibrary.addEntry(nm,'image',dataUrl,ldN.name,{layerUid:ldN.layerUid});
     }
     loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
-    showToast(paths.length>1?paths.length+' images importées sur leurs calques':'Image importée sur son calque');
+    showToast(paths.length>1?paths.length+SM.t('toastImagesImportedOwnLayersSuffix'):SM.t('toastImageImportedOwnLayer'));
   }
 
   async function importImages(){
@@ -204,7 +204,7 @@
     var seq=files.length>=2?detectSequence(names):{isSeq:false};
     if(seq.isSeq){
       var seqFps=promptSequenceFps(),rep=seqRepeatCount(seqFps);
-      showToast('Import de la séquence…');
+      showToast(SM.t('toastImportingSequence'));
       var frames=[];
       for(var i=0;i<seq.items.length;i++){
         var file=files[names.indexOf(seq.items[i].path)];
@@ -220,7 +220,7 @@
       state.layers[idx].footage={kind:'sequence',count:frames.length};
       activateUL(idx);loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
       if(window.SMMediaLibrary)SMMediaLibrary.addEntry(state.layers[idx].name,'image',frames[0].strokes[0].src,state.layers[idx].name,{layerUid:state.layers[idx].layerUid});
-      showToast('Séquence importée: '+seq.items.length+' images');
+      showToast(SM.t('toastSequenceImportedSuffix')+seq.items.length+' images');
     }else{
       saveAllLayerFrames();pushUndoLayers();
       var ld=state.layers[state.activeLayerIdx];
@@ -236,7 +236,7 @@
         if(window.SMMediaLibrary)SMMediaLibrary.addEntry(files[j].name,'image',du,ld.name,{layerUid:ld.layerUid});
       }
       loadFrame(state.currentFrame);updateUI();
-      showToast(files.length>1?files.length+' images importées':'Image importée');
+      showToast(files.length>1?files.length+SM.t('toastImagesImportedSuffix'):SM.t('toastImageImported'));
     }
   }
   document.getElementById('image-input').addEventListener('change',function(e){
@@ -342,7 +342,7 @@
     firstFrameThumb=firstFrameThumb&&firstFrameThumb[0]&&firstFrameThumb[0].src;
     convertLayerToComponent(idx);
     if(window.SMMediaLibrary&&firstFrameThumb)SMMediaLibrary.addEntry(state.layers[idx].name,'video',firstFrameThumb,state.layers[idx].name,{layerUid:state.layers[idx].layerUid});
-    showToast('Vidéo importée : '+frames.filter(function(f){return f.strokes.length;}).length+' images sur le calque "'+prefix+'"');
+    showToast(SM.t('toastVideoImportedSuffix')+frames.filter(function(f){return f.strokes.length;}).length+' images sur le calque "'+prefix+'"');
   }
   async function importVideoFile(file){
     // WebCodecs instant-import path (2026-07, browser-only — the Tauri
@@ -354,9 +354,9 @@
     // codec, or a browser without WebCodecs — e.g. older Firefox).
     if(window.SMNativeVideo){
       try{await SMNativeVideo.importAsLayer(file);return;}
-      catch(e){showToast('Décodeur WebCodecs indisponible ('+(e&&e.message||e)+') — import classique…');}
+      catch(e){showToast(SM.t('toastWebCodecsUnavailable')+(e&&e.message||e)+') — import classique…');}
     }
-    showToast('Décodage de la vidéo…');
+    showToast(SM.t('toastDecodingVideo'));
     var blobUrl=URL.createObjectURL(file);
     try{
       var frames=await decodeVideoFrames(blobUrl);
@@ -386,7 +386,7 @@
     // (odd container, or a build without the ffmpeg libs linked).
     if(window.SMNativeVideo){
       try{await SMNativeVideo.importAsLayer(path);return;}
-      catch(e){showToast('Décodeur natif indisponible ('+(e&&e.message||e)+') — import classique…');}
+      catch(e){showToast(SM.t('toastNativeDecoderUnavailable')+(e&&e.message||e)+') — import classique…');}
     }
     var frames=await decodeVideoFramesFfmpeg(path);
     await importVideoFrames(frames,baseName(path).replace(/\.[^.]+$/,''));
@@ -398,7 +398,7 @@
   // plain top-level globals, not IIFE-scoped, already used for the export
   // side of the exact same sidecar) rather than duplicating that plumbing.
   async function decodeVideoFramesFfmpeg(path){
-    showToast('Décodage de la vidéo (ffmpeg)…');
+    showToast(SM.t('toastDecodingVideoFfmpeg'));
     var tmp=window.exportTempDirPath?await exportTempDirPath():null;
     var workDir=(tmp||'')+'sm-video-import-'+Date.now();
     await exportMkdir(workDir);
@@ -474,7 +474,7 @@
     if(ld.footage){ld.footage.name=nm||ld.footage.name;ld.footage.w=nat.w;ld.footage.h=nat.h;}
     loadFrame(state.currentFrame);updateUI();
     if(window.SMEngineBridge)SMEngineBridge.renderNow();
-    showToast(n?'Source remplacée ('+n+' image(s))':'Aucune image à remplacer sur ce calque');
+    showToast(n?SM.t('toastSourceReplacedSuffix')+n+' image(s))':SM.t('toastNoImageToReplace'));
   }
   // A video layer's source is a decode session (ld.nativeVideo), not a
   // per-frame raster src — dispatched to native-video-bridge.js's own

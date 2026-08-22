@@ -57,7 +57,7 @@
     }).catch(function (e) {
       track._decoding = false;
       console.warn('[audio] decode failed', e);
-      showToast('Audio: format non décodable (' + track.name + ')');
+      showToast(SM.t('toastAudioUndecodable') + track.name + ')');
       return null;
     });
   }
@@ -307,7 +307,7 @@
     tracks().push(track);
     logAudio('import');
     if (dataURL.length > 8 * 1024 * 1024) {
-      showToast('Audio volumineux : préférer mp3/ogg (l’autosave navigateur peut ne plus suivre)');
+      showToast(SM.t('toastAudioTooLarge'));
     }
     decodeTrack(track);
     renderStrip();

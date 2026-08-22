@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Nemo v0.7.0-alpha.1</title>
+<script src="js/gpu-gate.js"></script>
 <script src="paper-full.min.js"></script>
 <!-- Manrope (redesign, 2026-07-09) — matches the CSS var font stack's own
      fallback order, so an offline load (no internet, no Tauri font cache)
@@ -114,7 +115,13 @@
 <div id="app-topbar">
   <button id="app-menu-btn" data-i18n-title="menuBtn" title="Menu"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
   <div id="app-mode-switch">
-    <button class="app-mode-btn" data-mode="storyboard" data-i18n-title="modeStoryboard" title="StoryBoard — montage nodal : instances de composants, montages, son">StoryBoard</button>
+    <!-- Freeze (2026-08, PR #209) — see index.html's SM_FROZEN_IN_DEV
+         registry and setAppMode's gate (motion.js). Points at the freeze-
+         specific storyboardFrozenTitle key (not modeStoryboard, that's the
+         real description for once un-frozen) so this title still switches
+         language like the rest of the app instead of staying stuck in
+         French — restore data-i18n-title="modeStoryboard" when un-freezing. -->
+    <button class="app-mode-btn in-dev-locked" data-mode="storyboard" disabled data-i18n-title="storyboardFrozenTitle" title="StoryBoard — en développement, pas encore disponible dans cette build">StoryBoard<span class="in-dev-badge">en dev</span></button>
     <button class="app-mode-btn active" data-mode="anim2d" data-i18n-title="modeAnim2d" title="Animation 2D">Animation 2D</button>
     <button class="app-mode-btn" data-mode="motion" data-i18n-title="modeMotion" title="Motion — keyframes de propriétés (position/rotation/échelle/opacité), style After Effects">Motion</button>
   </div>
@@ -168,15 +175,36 @@
          click-drag=curve handle, chainable), rendered live while the tool
          is active; dragging an existing bone anchor poses it instead
          (rig-bridge.js unifies both gestures behind one onDown). -->
-    <button class="tool-btn" data-tool="rig" data-i18n-title="toolRig" title="Rig — 3 steps in the panel: 1. Dessiner (click=anchor, drag=curve) 2. Assigner (link shapes to bones) 3. Déplacer (drag an anchor to pose). (S in Animation 2D — Motion mode reserves S for Scale)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="19" r="2.2" fill="currentColor" stroke="none"/><circle cx="12" cy="10" r="2.2" fill="currentColor" stroke="none"/><circle cx="19" cy="5" r="2.2" fill="currentColor" stroke="none"/><path d="M6.6 17.4 10.4 11.6M13.6 8.4 17.4 6.6"/></svg><span class="sk">S</span></button>
+    <!-- Freeze (2026-08, PR #209: "mettre en freeze (in Dev)" — see the
+         SM_FROZEN_IN_DEV registry above and SM.setTool's gate, timeline.js).
+         Points at the freeze-specific rigFrozenTitle key (not toolRig,
+         that's the real tool description for once un-frozen) so this
+         title still switches language like everything else instead of
+         staying stuck in one language — restore data-i18n-title="toolRig"
+         when un-freezing. -->
+    <button class="tool-btn in-dev-locked" data-tool="rig" disabled data-i18n-title="rigFrozenTitle" title="Rig — en développement, pas encore disponible dans cette build"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="19" r="2.2" fill="currentColor" stroke="none"/><circle cx="12" cy="10" r="2.2" fill="currentColor" stroke="none"/><circle cx="19" cy="5" r="2.2" fill="currentColor" stroke="none"/><path d="M6.6 17.4 10.4 11.6M13.6 8.4 17.4 6.6"/></svg></button>
     <!-- Missing separator (feedback 2026-07) — freehand painting tools
          (Draw/Pen/Fill brush) and geometric shape tools (Line/Rect/
          Ellipse) read as one undifferentiated group without this; Text
          keeps its own separator right after Ellipse below. -->
     <div class="tool-sep"></div>
-    <button class="tool-btn" data-tool="line" data-i18n-title="toolLine" title="Line (U in Animation 2D — Motion mode reserves U to reveal animated properties)"><span class="material-symbols-rounded">&#xf755;</span><span class="sk">U</span></button>
-    <button class="tool-btn" data-tool="rect" data-i18n-title="toolRect" title="Rectangle (R)"><span class="material-symbols-rounded">&#xe3c6;</span><span class="sk">R</span></button>
-    <button class="tool-btn" data-tool="ellipse" data-i18n-title="toolEllipse" title="Ellipse (L)"><span class="material-symbols-rounded">&#xef4a;</span><span class="sk">L</span></button>
+    <!-- Shape-tool group (2026-08, "regrouper les shape dans un mini menu
+         comme dans illustrator ou rive") — all 5 buttons stay REAL DOM
+         elements at their own data-tool selector (tutorial.js spotlights
+         and click-detects these exact selectors across ~15 steps), just
+         stacked on top of one another in one grid cell instead of laid out
+         in a row. timeline.js's shape-tool-group code toggles which one is
+         `.stack-front` (visible, clickable) to match the last-used shape —
+         the others go `visibility:hidden` (NOT display:none), which keeps
+         their real geometry so tutorial.js's getBoundingClientRect-based
+         spotlight still lands in the right place even for a backed shape. -->
+    <div class="tool-stack" id="shape-tool-stack">
+      <button class="tool-btn stack-front" data-tool="rect" data-i18n-title="toolRect" title="Rectangle (R)"><span class="material-symbols-rounded">&#xe3c6;</span><span class="sk">R</span></button>
+      <button class="tool-btn" data-tool="line" data-i18n-title="toolLine" title="Line (U in Animation 2D — Motion mode reserves U to reveal animated properties)"><span class="material-symbols-rounded">&#xf755;</span><span class="sk">U</span></button>
+      <button class="tool-btn" data-tool="ellipse" data-i18n-title="toolEllipse" title="Ellipse (L)"><span class="material-symbols-rounded">&#xef4a;</span><span class="sk">L</span></button>
+      <button class="tool-btn" data-tool="speechbubble" data-i18n-title="toolSpeechBubble" title="Speech bubble — rounded rect with an auto tail, drag to size (D)"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M4 4h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H10l-4.2 4.2A1 1 0 0 1 4 20.5V17H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/></svg><span class="sk">D</span></button>
+      <button class="tool-btn" data-tool="star" data-i18n-title="toolStar" title="Star / Polygon — drag to size, adjust point count / inner radius / corner rounding in the panel (K)"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 2.5l2.9 6.6 7.1.7-5.4 4.7 1.7 7-6.3-3.8-6.3 3.8 1.7-7-5.4-4.7 7.1-.7z"/></svg><span class="sk">K</span></button>
+    </div>
     <!-- Text sits right below the Ellipse (feedback #21) — after the shape
          group, not in the middle of the selection tools. -->
     <button class="tool-btn" data-tool="text" data-i18n-title="toolText" title="Texte — clique le canvas pour poser un bloc de texte (rendu image) (Y)"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M5 4h14v3h-2V6h-4v12h2v2H9v-2h2V6H7v1H5z"/></svg><span class="sk">Y</span></button>
@@ -323,7 +351,27 @@
   <div id="props-panel-resize" data-i18n-title="dragToResize" title="Glisser pour redimensionner"></div>
 
   <div id="props-panel">
-    <div id="props-context-hdr" data-i18n="hdrDocument" style="padding:8px 10px;font-size:10px;font-weight:600;letter-spacing:.03em;color:var(--text-dim);text-transform:uppercase;border-bottom:1px solid var(--border)">Document</div>
+    <!-- Collapse-to-rail (2026-08, "mettre en place le repli du panel droit
+         en icon") — #props-panel-collapse-btn toggles #props-panel.collapsed
+         (style.css); #props-panel-rail (built live by renderPropsPanelRail,
+         timeline.js, right after updatePropsContext decides which .psec
+         sections are relevant) replaces the full sections with one clickable
+         label per CURRENTLY VISIBLE section — there's no fixed panel identity
+         to hang a real icon on here (up to 25 different .psec ids, shown/
+         hidden per tool/selection, unlike Photoshop's fixed panel dock), so
+         each section's own translated .phdr text is reused vertically
+         instead of inventing 25 new glyphs that would need maintaining. -->
+    <div id="props-panel-hdr-row" style="display:flex;align-items:center;border-bottom:1px solid var(--border)">
+      <div id="props-context-hdr" data-i18n="hdrDocument" style="flex:1;min-width:0;padding:8px 10px;font-size:10px;font-weight:600;letter-spacing:.03em;color:var(--text-dim);text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Document</div>
+      <!-- No data-i18n-title here on purpose: the title is STATE-dependent
+           (collapse vs expand, togglePropsPanelCollapse sets it directly)
+           — i18n.js's own [data-i18n-title] sweep would blindly overwrite it
+           back to the "collapse" wording on every language switch even
+           while already collapsed. Registered in SM.afterI18n instead
+           (timeline.js), i18n.js's documented pattern for exactly this case. -->
+      <button id="props-panel-collapse-btn" title="Collapse panel"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 6l-6 6 6 6"/></svg></button>
+    </div>
+    <div id="props-panel-rail"></div>
     <div id="sel-props-sec" style="display:none;border-bottom:1px solid var(--border)">
       <div class="pbdy" style="padding:13px 16px 12px">
         <!-- Align/distribute toolbar (redesign 2026-07-09, restyled v3 —
@@ -409,6 +457,39 @@
         <div class="pr"><span class="pl" data-i18n="fieldMaskMode">Mode</span><select class="pi" id="p-mask-mode" data-i18n-title="maskModeTypeTitle" title="Add = union avec les autres masques du calque · Subtract = découpe un trou · Intersect = ne garde que le chevauchement"><option value="add" data-i18n="maskAdd">Add</option><option value="subtract" data-i18n="maskSubtract">Subtract</option><option value="intersect" data-i18n="maskIntersect">Intersect</option></select></div>
         <div class="pr"><span class="pl" data-i18n="fieldMaskFeather">Feather</span><input type="number" class="pi scrub" id="p-mask-feather" value="0" min="0" max="500" data-step="1" data-i18n-title="maskFeatherTitle" title="Adoucit le bord du masque combiné (partagé entre les masques de ce calque — voir l'audit) — comme le Mask Feather d'After Effects"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
         <div class="pr"><button class="pbtn" id="btn-mask-unset" style="flex:1;font-size:10px" data-i18n-title="unmaskTitle" title="Redevient une forme normale (n'est plus un masque)" data-i18n="btnUnmask">Retirer comme masque</button></div>
+      </div>
+    </div>
+    <!-- Dynamic-shape panels (2026-08) — restored from the cherry-picked
+         phase 1-3 commits (PR #209) with hardcoded French labels never
+         wired to i18n, unlike every neighboring section (text-actions-sec
+         right below, e.g.) — an EN-mode user saw these three headers stuck
+         in French while everything else around them switched language,
+         the exact "mélange francais/anglais" reported. -->
+    <div class="psec" id="corners-sec" style="display:none">
+      <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrCorners">Coins</span></div>
+      <div class="pbdy">
+        <div class="pr"><label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-dim)"><input type="checkbox" id="p-corners-link" checked> <span data-i18n="cornersLinkLabel">Lier les 4 coins</span></label></div>
+        <div class="pr"><span class="pl" data-i18n-title="cornerTL" title="Haut-gauche">↖</span><input type="number" class="pi scrub" id="p-corner-tl" value="0" min="0" data-step="1"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
+        <div class="pr" id="corner-tr-row"><span class="pl" data-i18n-title="cornerTR" title="Haut-droit">↗</span><input type="number" class="pi scrub" id="p-corner-tr" value="0" min="0" data-step="1"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
+        <div class="pr" id="corner-br-row"><span class="pl" data-i18n-title="cornerBR" title="Bas-droit">↘</span><input type="number" class="pi scrub" id="p-corner-br" value="0" min="0" data-step="1"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
+        <div class="pr" id="corner-bl-row"><span class="pl" data-i18n-title="cornerBL" title="Bas-gauche">↙</span><input type="number" class="pi scrub" id="p-corner-bl" value="0" min="0" data-step="1"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
+      </div>
+    </div>
+    <div class="psec" id="ellipse-arc-sec" style="display:none">
+      <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrEllipseArc">Camembert / Donut</span></div>
+      <div class="pbdy">
+        <div class="pr" id="ellipse-arc-convert-row"><button class="pbtn ac" id="btn-ellipse-arc-convert" style="flex:1" data-i18n="ellipseArcConvertBtn">Rendre dynamique</button></div>
+        <div class="pr" id="ellipse-arc-start-row" style="display:none"><span class="pl" data-i18n="fieldArcStart">Début</span><input type="number" class="pi scrub" id="p-arc-start" value="0" min="0" max="360" data-step="1"><span style="font-size:9px;color:var(--text-dim)">°</span></div>
+        <div class="pr" id="ellipse-arc-sweep-row" style="display:none"><span class="pl" data-i18n="fieldArcSweep">Ouverture</span><input type="number" class="pi scrub" id="p-arc-sweep" value="359.9" min="0.1" max="359.9" data-step="1"><span style="font-size:9px;color:var(--text-dim)">°</span></div>
+        <div class="pr" id="ellipse-arc-inner-row" style="display:none"><span class="pl" data-i18n="fieldArcInnerRadius">Rayon interne</span><input type="number" class="pi scrub" id="p-arc-inner" value="0" min="0" max="95" data-step="1"><span style="font-size:9px;color:var(--text-dim)">%</span></div>
+      </div>
+    </div>
+    <div class="psec" id="star-sec" style="display:none">
+      <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrStarPolygon">Étoile / Polygone</span></div>
+      <div class="pbdy">
+        <div class="pr"><span class="pl" data-i18n="fieldStarPoints">Branches</span><input type="number" class="pi scrub" id="p-star-points" value="5" min="3" max="24" data-step="1"></div>
+        <div class="pr"><span class="pl" data-i18n="fieldStarInnerRadius">Rayon interne</span><input type="number" class="pi scrub" id="p-star-inner" value="50" min="5" max="100" data-step="1"><span style="font-size:9px;color:var(--text-dim)">%</span></div>
+        <div class="pr"><span class="pl" data-i18n="fieldStarCornerRadius">Coins</span><input type="number" class="pi scrub" id="p-star-corner" value="0" min="0" data-step="1"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
       </div>
     </div>
     <div class="psec" id="text-actions-sec" style="display:none">
@@ -595,6 +676,22 @@
             <span class="pl" data-i18n="fieldOffset">Offset</span><input type="number" class="pi scrub" id="p-ref-offset" value="0" data-step="1" data-i18n-title="refOffsetTitle" title="Frame de la timeline où la référence démarre">
           </div>
         </div>
+      </div>
+    </div>
+    <!-- Elements panel (2026-08, Animation 2D) — the same shape/group tree
+         Motion's own "Éléments" list already builds (SMMotion.buildShapeTree/
+         layerElements, motion.js — reused as-is, not reimplemented, see
+         shapes-panel.js), just surfaced here as its own right-panel section
+         instead of Motion's left-side layer list. Figma/Rive-style: click a
+         row to select that shape/group on canvas, double-click to rename,
+         right-click for group/select actions. Populated by renderShapesPanel
+         (shapes-panel.js), gated alongside #layer-sec in updatePropsContext
+         (timeline.js) — visible whenever a real layer is active, in ANY
+         non-Motion mode (Motion already has its own equivalent panel). -->
+    <div class="psec" id="shapes-sec" style="display:none">
+      <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrElements">Elements</span></div>
+      <div class="pbdy">
+        <div id="shapes-list"></div>
       </div>
     </div>
     <div class="psec" id="canvas-sec">
@@ -1285,6 +1382,7 @@
       <button class="settings-tab" data-tab="feedback" data-i18n="settingsTabFeedback">Feedback</button>
       <button class="settings-tab" data-tab="shortcuts" data-i18n="settingsTabShortcuts">Raccourcis</button>
       <button class="settings-tab" data-tab="labs" data-i18n="settingsTabLabs">Labs</button>
+      <button class="settings-tab" data-tab="about" data-i18n="settingsTabAbout">À propos</button>
     </div>
     <div class="modal-bdy">
       <div class="settings-pane" data-pane="general">
@@ -1379,6 +1477,21 @@
         <div id="labs-tools-list" style="display:flex;flex-direction:column;gap:2px"></div>
         <div class="phdr" style="padding:14px 0 4px 0;font-size:9px;color:var(--text-dim)" data-i18n="settingsLabsActions">Actions (coup unique, sur la sélection courante)</div>
         <div id="labs-actions-list" style="display:flex;flex-direction:column;gap:2px"></div>
+      </div>
+      <div class="settings-pane" data-pane="about" style="display:none">
+        <div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px;padding:8px 0 16px 0">
+          <div style="font-size:15px;font-weight:600">Nemo</div>
+          <div style="font-size:10px;color:var(--text-dim)"><span data-i18n="settingsVersionLabel">Version</span> <span id="app-version-txt-about">0.7.0-alpha.1</span></div>
+        </div>
+        <div class="phdr" style="padding:0 0 4px 0;font-size:9px;color:var(--text-dim)" data-i18n="settingsAboutAuthorHdr">Auteur</div>
+        <div style="font-size:10px;color:var(--text-dim);margin-bottom:14px">
+          mysteropodes — <a href="https://github.com/mysteropodes" target="_blank" style="color:var(--accent)">github.com/mysteropodes</a>
+        </div>
+        <div class="phdr" style="padding:0 0 4px 0;font-size:9px;color:var(--text-dim)" data-i18n="settingsAboutSupportHdr">Soutenir le projet</div>
+        <div style="font-size:10px;color:var(--text-dim);margin-bottom:8px" data-i18n="settingsAboutSupportDesc">Nemo est développé par une seule personne. Si l'app t'est utile, un don sur Ko-fi aide à continuer.</div>
+        <div class="pr">
+          <a href="https://ko-fi.com/mysteropodes" target="_blank" class="pbtn" style="flex:1;text-align:center;font-size:11px;padding:7px;font-weight:600;text-decoration:none">☕ <span data-i18n="settingsAboutKofiBtn">Faire un don sur Ko-fi</span></a>
+        </div>
       </div>
     </div>
   </div>
@@ -1699,7 +1812,14 @@
 </div>
 <div id="toast"></div>
 
-
+<!-- Freeze registry (2026-08, PR #209: "mettre en freeze (in Dev)" Rig /
+     StoryBoard / import 3D obj) — inline and first so it's defined before
+     ANY other script runs, regardless of future load-order changes. A
+     single flat map instead of three separate booleans scattered across
+     files: every gate (SM.setTool for Rig, timeline.js; setAppMode for
+     StoryBoard, motion.js; the ctx-import-3d menu row, timeline.js) reads
+     the SAME source, so un-freezing a feature later is one line here. -->
+<script>window.SM_FROZEN_IN_DEV={rig:true,storyboard:true,import3d:true};</script>
 <script src="js/ui.js"></script>
 <script src="js/color-picker.js"></script>
 <script src="js/app.js"></script>
@@ -1751,12 +1871,14 @@
 <script src="js/labs/labs-float-panel.js"></script>
 <script src="js/tools-panel-dock.js"></script>
 <script src="js/lottie-preview.js"></script>
+<script src="js/idb-store.js"></script>
 <script src="js/timeline.js"></script>
 <script src="js/i18n.js"></script>
 <script src="js/layer-kind.js"></script>
 <script src="js/svg-import.js"></script>
 <script src="js/camera.js"></script>
 <script src="js/motion.js"></script>
+<script src="js/shapes-panel.js"></script>
 <script src="js/text-animator.js"></script>
 <script src="js/motion-graph.js"></script>
 <script src="js/nemo-panel.js"></script>

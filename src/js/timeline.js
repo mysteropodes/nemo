@@ -141,9 +141,9 @@ function autoBakeThenResume(){
   if(window.showToast)showToast('Optimisation de la lecture…','info');
   SMPlaybackCache.bakeRange(from,to).then(function(res){
     if(res&&res.started&&window.showToast){
-      if(res.budgetHit)showToast('Cache de lecture : '+res.cached+'/'+res.total+' images (limite mémoire atteinte)','warn');
-      else if(res.cancelled)showToast('Cache de lecture annulé ('+res.cached+' images)','warn');
-      else showToast('Cache de lecture prêt ('+res.cached+' images)','success');
+      if(res.budgetHit)showToast('Cache de lecture : '+res.cached+'/'+res.total+SM.t('toastImagesMemoryLimitSuffix'),'warn');
+      else if(res.cancelled)showToast(SM.t('toastPlaybackCacheCanceled')+res.cached+' images)','warn');
+      else showToast(SM.t('toastPlaybackCacheReady')+res.cached+' images)','success');
     }
     state.playDir=savedDir;
     startPlay();
@@ -155,15 +155,15 @@ function autoBakeThenResume(){
 // user asked for the cache to be ready, not for playback to begin.
 function manualBakeCache(){
   if(!window.SMPlaybackCache){return;}
-  if(SMPlaybackCache.isBaking()){showToast('Cache de lecture déjà en cours…','info');return;}
+  if(SMPlaybackCache.isBaking()){showToast(SM.t('toastPlaybackCacheInProgress'),'info');return;}
   if(state.playing)stopPlay();
   showToast('Mise en cache de la lecture…','info');
   SMPlaybackCache.bakeRange(state.waIn,state.waOut).then(function(res){
     if(!res)return;
     if(!res.started){showToast('Cache de lecture indisponible','warn');return;}
-    if(res.budgetHit)showToast('Cache de lecture : '+res.cached+'/'+res.total+' images (limite mémoire atteinte)','warn');
-    else if(res.cancelled)showToast('Cache de lecture annulé ('+res.cached+' images)','warn');
-    else showToast('Cache de lecture prêt ('+res.cached+' images)','success');
+    if(res.budgetHit)showToast('Cache de lecture : '+res.cached+'/'+res.total+SM.t('toastImagesMemoryLimitSuffix'),'warn');
+    else if(res.cancelled)showToast(SM.t('toastPlaybackCacheCanceled')+res.cached+' images)','warn');
+    else showToast(SM.t('toastPlaybackCacheReady')+res.cached+' images)','success');
   });
 }
 function stopPlay(){if(!state.playing)return;state.playing=false;
@@ -347,6 +347,7 @@ function retimeTweenSpans(li,pairs,captured){
 // ---- API ----
 var PRODUCER_ALLOWED_TOOLS=['hand','zoom','rotate','comment'];
 window.SM={
+  exposeSymbolProperty:exposeSymbolProperty,
   goToFrame:function(idx){goToFrame(idx);},togglePlay:togglePlay,stopPlay:stopPlay,undo:undo,redo:redo,
   setTool:function(t){
     // RBAC (Phase 3): "producteur" is read-only + comments/validation — see
@@ -355,6 +356,14 @@ window.SM={
     // honor-system only (no server-side enforcement in v1).
     if(state.userProfile&&state.userProfile.role==='producer'&&PRODUCER_ALLOWED_TOOLS.indexOf(t)<0){
       showToast('Profil "Producteur" : lecture seule + commentaires');
+      return;
+    }
+    // Rig freeze (2026-08, PR #209: "mettre en freeze (in Dev)" — see
+    // index.html's SM_FROZEN_IN_DEV registry, the single source every
+    // frozen-feature gate reads). Blocks the toolbar click AND any
+    // keyboard shortcut that lands on setTool('rig'), not just the button.
+    if(t==='rig'&&window.SM_FROZEN_IN_DEV&&window.SM_FROZEN_IN_DEV.rig){
+      showToast((window.SM&&SM.t)?SM.t('rigFrozenToast'):'Rig tool — in development, not yet available in this build');
       return;
     }
     if(t!=='select'&&t!=='subselect'&&t!=='rig')clearSel();if(t!=='fsselect')fsClearSel();if(t!=='pen'&&_pen.path)finalizePen();if(t!=='rig'&&typeof _rigDraw!=='undefined'&&_rigDraw.path&&window.SMRig)window.SMRig.finalizeRigBone();if(t!=='eraser'&&typeof _eraserCursor!=='undefined'&&_eraserCursor){_eraserCursor.remove();_eraserCursor=null;}if(t!=='select'&&window.SMSelectBridge)window.SMSelectBridge.cancelMarquee();
@@ -385,7 +394,8 @@ window.SM={
     state.tool=t;renderArcs();
     if(_camToolChanged)renderTimeline();
     document.querySelectorAll('.tool-btn').forEach(function(b){b.classList.toggle('active',b.dataset.tool===t);});
-    var cc={draw:'crosshair',pen:'crosshair',line:'crosshair',rect:'crosshair',ellipse:'crosshair',select:'default',subselect:'default',fsselect:'default',comment:'crosshair',camera:'move',text:'text',eraser:'pointer',fill:'crosshair',fillbrush:'crosshair',eyedropper:'crosshair',hand:'grab',zoom:'zoom-in',rotate:'grab',perspective:'crosshair',symmetry:'crosshair',rig:'crosshair'};
+    if(window.SMShapeGroup)SMShapeGroup.ensureFront(t);
+    var cc={draw:'crosshair',pen:'crosshair',line:'crosshair',rect:'crosshair',ellipse:'crosshair',speechbubble:'crosshair',star:'crosshair',select:'default',subselect:'default',fsselect:'default',comment:'crosshair',camera:'move',text:'text',eraser:'pointer',fill:'crosshair',fillbrush:'crosshair',eyedropper:'crosshair',hand:'grab',zoom:'zoom-in',rotate:'grab',perspective:'crosshair',symmetry:'crosshair',rig:'crosshair'};
     canvasEl.style.cursor=cc[t]||'default';
     // Brush texture presets (Chalk/Charcoal/Pencil…) stamp dabs along a
     // discrete centerline — Fill Brush commits a filled OUTLINE shape from
@@ -478,10 +488,30 @@ window.SM={
           // single number — rescale every sample by the same ratio so the
           // taper shape is preserved, using the profile's own peak as the
           // "current size" baseline (matches what the size actually reads as).
+          // Peak from widthProfile, NOT centerSegments (2026-08-22 fix, same
+          // root cause as the p-sw display staleness fix above this
+          // function) — centerSegments is only the sparse control-point
+          // list; widthProfile is the dense actually-rendered curve, whose
+          // extremum between two control points is routinely higher. Using
+          // the sparse peak as the ratio's denominator overshot the target:
+          // measured live, setting Width to 100 on a stroke whose
+          // centerSegments peak was 40 but widthProfile peak was 55 landed
+          // the real rendered peak at 138, not 100.
           var cs=p.data.centerSegments;
-          var peak=0;cs.forEach(function(s){if((s.width||0)>peak)peak=s.width||0;});
+          var wpForPeak=p.data.widthProfile&&p.data.widthProfile.length?p.data.widthProfile:cs;
+          var peak=0;wpForPeak.forEach(function(s){if((s.width||0)>peak)peak=s.width||0;});
           var ratio=peak>0?v/peak:1;
           cs.forEach(function(s){s.width=(s.width||v)*ratio;});
+          // 2026-08-21 fix (feedback #34, "tous les paramètres stroke ne
+          // fonctionnent pas") — the rescale above was a near-total no-op
+          // on an ALREADY-DRAWN stroke: rebuildVectorBrushOutline prefers
+          // the dense data.widthProfile (via widthAtFrac) over these sparse
+          // centerSegments[i].width values, only falling back to the
+          // latter when a fraction genuinely has no profile coverage —
+          // which for a real profile is essentially never. Scaling only
+          // centerSegments left the profile — the value that actually
+          // renders — untouched, so dragging Width visibly did nothing.
+          if(p.data.widthProfile)p.data.widthProfile.forEach(function(pt){pt.width=(pt.width||v)*ratio;});
           rebuildVectorBrushOutline(p);
         }else{
           p.strokeWidth=v;applyStrokeStyle(p);
@@ -706,7 +736,7 @@ window.SM={
     // array already does (see layerInPoint/layerOutPoint, app.js).
     if(state.waIn>=state.waOut)state.waIn=Math.max(0,state.waOut-1);
     window._waIn=state.waIn;window._waOut=state.waOut;if(state.currentFrame>=v)goToFrame(v-1);updateUI();},
-  addLayer:function(){saveAllLayerFrames();pushUndoLayers();var idx=createUserLayer(nextLayerName());activateUL(idx);loadFrame(state.currentFrame);updateUI();},
+  addLayer:function(){saveAllLayerFrames();pushUndoLayers();var idx=createUserLayer(nextLayerName());activateUL(idx);_layerSel=[idx];_layerSelAnchor=idx;loadFrame(state.currentFrame);updateUI();},
   // Null layer (2026-07, Motion) — AE's "Null Object": exists purely as a
   // parenting/pivot target for other layers (SMMotion's existing
   // parentLayerUid/parentChainMats — a Null is just any other layer as far
@@ -717,7 +747,7 @@ window.SM={
   // as symbolId/nativeVideo/montageId in saveActiveLayerFrame/
   // saveAllLayerFrames/getEffectiveStrokes (app.js) so nothing ever tries
   // to read/write strokes on it.
-  addNullLayer:function(){saveAllLayerFrames();pushUndoLayers();var idx=createUserLayer(nextLayerName().replace(/^Layer/,'Null'));state.layers[idx].isNullLayer=true;activateUL(idx);loadFrame(state.currentFrame);updateUI();},
+  addNullLayer:function(){saveAllLayerFrames();pushUndoLayers();var idx=createUserLayer(nextLayerName().replace(/^Layer/,'Null'));state.layers[idx].isNullLayer=true;activateUL(idx);_layerSel=[idx];_layerSelAnchor=idx;loadFrame(state.currentFrame);updateUI();},
   // Effect (adjustment) layer (2026-07, Motion) — AE's "Adjustment Layer":
   // no painted content of its own (frames/strokes ignored on purpose,
   // same as a Null layer), but its effectType/effectP1/effectP2 apply to
@@ -727,7 +757,7 @@ window.SM={
   // full JS<->Rust wire contract. Defaults to a mild blur so placing one
   // has an immediately visible (if subtle) effect rather than looking
   // like a no-op.
-  addEffectLayer:function(){saveAllLayerFrames();pushUndoLayers();var idx=createUserLayer(nextLayerName().replace(/^Layer/,'Effet'));state.layers[idx].isEffectLayer=true;state.layers[idx].effects=[];activateUL(idx);loadFrame(state.currentFrame);updateUI();},
+  addEffectLayer:function(){saveAllLayerFrames();pushUndoLayers();var idx=createUserLayer(nextLayerName().replace(/^Layer/,'Effet'));state.layers[idx].isEffectLayer=true;state.layers[idx].effects=[];activateUL(idx);_layerSel=[idx];_layerSelAnchor=idx;loadFrame(state.currentFrame);updateUI();},
   // Guide layer (2026-08, AE feature audit 8.6) — a real layer object
   // (rotatable/parentable/keyable Transform, colored) instead of a classic
   // ruler-drag guide: no content of its own (same "no real content" guard
@@ -736,7 +766,7 @@ window.SM={
   // OWN Position/Rotation Transform (guidePos is the anchor Position
   // offsets from; Rotation sets the angle) — zero new keyframe machinery.
   // Defaults to horizontal through canvas center.
-  addGuideLayer:function(){saveAllLayerFrames();pushUndoLayers();var idx=createUserLayer(nextLayerName().replace(/^Layer/,'Guide'));state.layers[idx].isGuideLayer=true;state.layers[idx].guidePos=[state.canvasW/2,state.canvasH/2];state.layers[idx].guideOrientation='horizontal';state.layers[idx].color='#00baff';activateUL(idx);loadFrame(state.currentFrame);updateUI();},
+  addGuideLayer:function(){saveAllLayerFrames();pushUndoLayers();var idx=createUserLayer(nextLayerName().replace(/^Layer/,'Guide'));state.layers[idx].isGuideLayer=true;state.layers[idx].guidePos=[state.canvasW/2,state.canvasH/2];state.layers[idx].guideOrientation='horizontal';state.layers[idx].color='#00baff';activateUL(idx);_layerSel=[idx];_layerSelAnchor=idx;loadFrame(state.currentFrame);updateUI();},
   deleteLayer:function(){
     // The camera row isn't in state.layers (synthetic pseudo-layer, see
     // camera.js) — the generic layer-panel trash button silently did
@@ -747,7 +777,7 @@ window.SM={
       window.SM.setTool('select');renderLayerList();renderTimeline();updateUI();
       if(window.updateCameraPanel)window.updateCameraPanel();
       if(window.SMEngineBridge)window.SMEngineBridge.renderNow();
-      showToast('Calque caméra supprimé');
+      showToast(SM.t('toastCameraLayerDeleted'));
       return;
     }
     // Refusing to delete the last layer is right — a document with no layer
@@ -773,7 +803,7 @@ window.SM={
     });
     _layerSel=[];
     if(state.activeLayerIdx>=state.layers.length)state.activeLayerIdx=state.layers.length-1;
-    activateUL(state.activeLayerIdx);loadFrame(state.currentFrame);updateUI();showToast('Calque(s) supprimé(s) — ⌘Z pour annuler');
+    activateUL(state.activeLayerIdx);loadFrame(state.currentFrame);updateUI();showToast(SM.t('toastLayersDeletedUndoHint'));
   },
   // Standing "keyframes follow this edge" lock (Van Dijk 2.2). Stored per
   // layer so it survives the session and needs no modifier at drag time.
@@ -796,11 +826,11 @@ window.SM={
     // synthetic per-segment array with no write-back on exit (unlike a
     // symbol's), so the toast would claim success and every bit of it
     // reverts the moment you leave.
-    if(state.activeSymbolId){showToast('Fermez d\'abord le composant en cours d\'édition');return;}
-    if(state.activeMontageViewId){showToast('Fermez d\'abord le montage en cours d\'édition');return;}
+    if(state.activeSymbolId){showToast(SM.t('toastCloseComponentFirst'));return;}
+    if(state.activeMontageViewId){showToast(SM.t('toastCloseMontageFirst'));return;}
     var inF=state.waIn||0,outF=(state.waOut!=null?state.waOut:state.totalFrames-1);
     if(outF<=inF){showToast('Zone de travail trop courte');return;}
-    if(inF===0&&outF===state.totalFrames-1){showToast('La zone de travail couvre déjà tout');return;}
+    if(inF===0&&outF===state.totalFrames-1){showToast(SM.t('toastWorkAreaAlreadyCoversAll'));return;}
     saveAllLayerFrames();pushUndoLayers();
     var n=outF-inF+1;
     state.layers.forEach(function(ld,li){
@@ -818,13 +848,13 @@ window.SM={
     state.currentFrame=Math.max(0,Math.min(n-1,state.currentFrame-inF));
     loadFrame(state.currentFrame);renderLayerList();renderTimeline();updateUI();
     if(window.updateWaBar)updateWaBar();
-    showToast('Composition réduite à la zone de travail ('+n+' frames)');
+    showToast(SM.t('toastCompReducedToWorkArea')+n+' frames)');
   },
   setLayerKeyLock:function(li,mode){
     var ld=state.layers[li==null?state.activeLayerIdx:li];if(!ld)return;
     pushUndo();
     if(mode)ld.keyLock=mode;else delete ld.keyLock;
-    showToast(mode?('Keyframes verrouillées sur '+(mode==='in'?'le point d\u2019entrée':mode==='out'?'le point de sortie':'le calque')):'Verrou de keyframes retiré');
+    showToast(mode?(SM.t('toastKeyframesLockedOnSuffix')+(mode==='in'?SM.t('toastInPointLabel'):mode==='out'?SM.t('toastOutPointLabel'):SM.t('toastLayerLabel'))):SM.t('toastKeyframeLockRemoved'));
     renderLayerList();renderTimeline();
   },
   toggleLayerMotionBlur:function(li){
@@ -854,16 +884,16 @@ window.SM={
     // this one had zero user-visible signal. Same toast-driven convention
     // as the comp-switch fix above, just surfacing a limit instead of
     // auto-fixing a switch.
-    if(ld.motionBlur&&ld.threeD)showToast('Flou de mouvement activé — sans effet sur un calque 3D pour l\u2019instant');
-    else if(needsCompOn)showToast('Flou de mouvement activé sur le calque — active aussi l\u2019interrupteur de la comp');
-    else showToast(ld.motionBlur?'Flou de mouvement activé':'Flou de mouvement désactivé');
+    if(ld.motionBlur&&ld.threeD)showToast(SM.t('toastMotionBlurEnabledNo3DEffectHint'));
+    else if(needsCompOn)showToast(SM.t('toastMotionBlurEnabledLayerCompHint'));
+    else showToast(ld.motionBlur?SM.t('toastMotionBlurEnabled'):SM.t('toastMotionBlurDisabled'));
     renderLayerList();renderTimeline();
     if(window.SMEngineBridge)SMEngineBridge.renderNow();
   },
   toggleMotionBlurComp:function(){
     state.motionBlurOn=!state.motionBlurOn;
     var n=state.layers.filter(function(l){return l.motionBlur;}).length;
-    showToast(state.motionBlurOn?('Flou de mouvement activé sur la comp ('+n+' calque(s))'):'Flou de mouvement désactivé sur la comp');
+    showToast(state.motionBlurOn?(SM.t('toastMotionBlurEnabledOnCompSuffix')+n+' calque(s))'):SM.t('toastMotionBlurDisabledOnComp'));
     var b=document.getElementById('btn-mblur');if(b)b.classList.toggle('active',!!state.motionBlurOn);
     renderLayerList();renderTimeline();
     if(window.SMEngineBridge)SMEngineBridge.renderNow();
@@ -886,13 +916,13 @@ window.SM={
       state.shyEnabled=true;
       var shyBtn=document.getElementById('btn-shy');if(shyBtn)shyBtn.classList.add('active');
     }
-    if(needsShyOn)showToast('Calque marqué « shy » — active l\u2019interrupteur pour le masquer');
+    if(needsShyOn)showToast(SM.t('toastLayerMarkedShyHint'));
     renderLayerList();renderTimeline();
   },
   toggleShyMode:function(){
     state.shyEnabled=!state.shyEnabled;
     var n=state.layers.filter(function(l){return l.shy;}).length;
-    showToast(state.shyEnabled?('Calques shy masqués ('+n+')'):'Tous les calques affichés');
+    showToast(state.shyEnabled?(SM.t('toastShyLayersHiddenSuffix')+n+')'):SM.t('toastAllLayersShown'));
     renderLayerList();renderTimeline();
   },
   // AE's Cmd+Shift+D: cut the layer in TWO at the playhead. Both halves keep
@@ -905,7 +935,7 @@ window.SM={
     var f=state.currentFrame;
     var inF=window.layerInPoint?layerInPoint(ld):(ld.inPoint!=null?ld.inPoint:0);
     var outF=window.layerOutPoint?layerOutPoint(ld):(ld.outPoint!=null?ld.outPoint:state.totalFrames-1);
-    if(f<=inF||f>outF){showToast('Place la tête de lecture à l\u2019intérieur du calque pour le couper');return;}
+    if(f<=inF||f>outF){showToast(SM.t('toastPlayheadInsideLayerToCut'));return;}
     saveAllLayerFrames();pushUndoLayers();
     var ni=createUserLayer(ld.name+' (2)');
     var dst=state.layers[ni];
@@ -923,7 +953,7 @@ window.SM={
     // Splitting materialises hard in/out values on both halves, which a
     // time link would then override — so the link is dropped rather than
     // left to silently win over the cut the user just made.
-    if(ld.timeLink){delete ld.timeLink;delete dst.timeLink;showToast('Lien temporel retiré : la coupe fixe les points d\u2019entrée/sortie');}
+    if(ld.timeLink){delete ld.timeLink;delete dst.timeLink;showToast(SM.t('toastTimeLinkRemovedCutFixesInOutHint'));}
     else delete dst.timeLink;
     // createUserLayer appends to the TOP of the stack, which would drop the
     // second half far from the one it was cut out of. AE leaves the two
@@ -939,9 +969,9 @@ window.SM={
       userLayers.forEach(function(l){l.insertBelow(arcLayer);});
       ni=at;
     }
-    activateUL(ni);loadFrame(state.currentFrame);renderLayerList();renderTimeline();updateUI();
+    activateUL(ni);_layerSel=[ni];_layerSelAnchor=ni;loadFrame(state.currentFrame);renderLayerList();renderTimeline();updateUI();
     if(window.SMEngineBridge)SMEngineBridge.renderNow();
-    showToast('Calque coupé à la frame '+(f+1));
+    showToast(SM.t('toastLayerCutAtFrame')+(f+1));
   },
   duplicateLayer:function(){saveAllLayerFrames();pushUndoLayers();var src=state.layers[state.activeLayerIdx];var ni=createUserLayer(src.name+' copy');state.layers[ni].frames=JSON.parse(JSON.stringify(src.frames));if(src.blendMode)state.layers[ni].blendMode=src.blendMode;state.layers[ni].color=src.color;if(src.motion)state.layers[ni].motion=JSON.parse(JSON.stringify(src.motion));if(src.motionStatic)state.layers[ni].motionStatic=JSON.parse(JSON.stringify(src.motionStatic));
     // matteMode was dropped here entirely (pre-existing, found by the
@@ -1038,7 +1068,7 @@ window.SM={
     // back flat, with its positionZ/rotationX/rotationY keys (inside
     // src.motion, already copied) now dead data nothing reads.
     if(src.threeD)state.layers[ni].threeD=true;
-    activateUL(ni);loadFrame(state.currentFrame);updateUI();},
+    activateUL(ni);_layerSel=[ni];_layerSelAnchor=ni;loadFrame(state.currentFrame);updateUI();},
   setActiveLayer:function(idx){if(idx<0||idx>=state.layers.length)return;saveAllLayerFrames();activateUL(idx);clearSel();
     window._layerActiveExplicit=true; // see clearSel()'s own comment — an explicit timeline row click, not a canvas deselect
     // The camera row is a synthetic pseudo-layer (not a real state.layers
@@ -1079,7 +1109,7 @@ window.SM={
     // (toggleLayerDuplicator/setDuplicatorEditSource, motion.js) — a direct
     // padlock unlock would let edits hit the N-way-expanded live layer and
     // desync locked/_dupEditSource. Route through the panel's own button.
-    if(state.layers[idx].duplicator&&!state.layers[idx]._dupEditSource&&state.layers[idx].locked){showToast('Calque duplicateur — « Modifier la forme source » (panneau Duplicator) pour éditer');return;}
+    if(state.layers[idx].duplicator&&!state.layers[idx]._dupEditSource&&state.layers[idx].locked){showToast(SM.t('toastDuplicatorLayerEditHint'));return;}
     state.layers[idx].locked=!state.layers[idx].locked;
     // Locking a layer that already has content selected (selected before the
     // lock, or the lock toggled while it's the active layer) must drop that
@@ -1101,14 +1131,14 @@ window.SM={
   // one undo step for the whole batch, like every other selection command.
   applyStrokeProfile:function(kind){
     var paths=(window.selectedPaths||[]).filter(function(p){return p&&p.segments;});
-    if(!paths.length){showToast('Sélectionne un ou plusieurs traits');return;}
+    if(!paths.length){showToast(SM.t('toastSelectOneOrMoreStrokes'));return;}
     pushUndo();
     var done=0,skipped=0;
     paths.forEach(function(p){ if(applyStrokeProfileToPath(p,kind))done++; else skipped++; });
     saveActiveLayerFrame();
     loadFrame(state.currentFrame);updateUI();
     if(window.SMEngineBridge)SMEngineBridge.renderNow();
-    showToast(done?(done+' trait(s) profilé(s)'+(skipped?' — '+skipped+' ignoré(s)':'')):'Aucun trait convertible dans la sélection');
+    showToast(done?(done+SM.t('toastStrokedShapesSuffix')+(skipped?' — '+skipped+SM.t('toastIgnoredSuffix'):'')):SM.t('toastNoConvertibleStrokeInSel'));
   },
   convertActiveLayerToComponent:function(){
     if(_layerSel.length>1)convertLayersToComponent(_layerSel);
@@ -1199,7 +1229,7 @@ window.SM={
       var tgtLd=state.layers[tl];
       return !(tgtLd&&tgtLd.locked);
     });
-    if(!sel.length){showToast('Calque verrouillé');return;}
+    if(!sel.length){showToast(SM.t('toastLayerLocked'));return;}
     pushUndo();saveAllLayerFrames();
     var data=[];
     sel.forEach(function(s){
@@ -1253,11 +1283,11 @@ window.SM={
       if(tl>=0&&tl<state.layers.length&&tf>=0&&tf<state.totalFrames)selAdd(tl,tf);
     });
     loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
-    showToast('Frames déplacées');
+    showToast(SM.t('toastFramesMoved'));
   },
   copyFrames:function(){
     saveAllLayerFrames();
-    if(!_sel.frames.length){showToast('Aucune sélection');return;}
+    if(!_sel.frames.length){showToast(SM.t('toastNoSelection'));return;}
     var b=selBounds();
     _sel.clipboard=[];
     _sel.frames.forEach(function(s){
@@ -1266,11 +1296,11 @@ window.SM={
     });
     _sel.clipOp='copy';
     if(typeof window!=='undefined')window._lastClipKind='frames';
-    showToast('Copié ('+_sel.frames.length+' frames)');
+    showToast(SM.t('toastCopied')+_sel.frames.length+' frames)');
   },
   cutFrames:function(){
     saveAllLayerFrames();
-    if(!_sel.frames.length){showToast('Aucune sélection');return;}
+    if(!_sel.frames.length){showToast(SM.t('toastNoSelection'));return;}
     pushUndo();
     var b=selBounds();
     _sel.clipboard=[];
@@ -1283,10 +1313,10 @@ window.SM={
     _sel.clipOp='cut';
     if(typeof window!=='undefined')window._lastClipKind='frames';
     selClear();loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
-    showToast('Coupé ('+_sel.clipboard.length+' frames)');
+    showToast(SM.t('toastCut')+_sel.clipboard.length+' frames)');
   },
   pasteFrames:function(){
-    if(!_sel.clipboard||!_sel.clipboard.length){showToast('Rien à coller');return;}
+    if(!_sel.clipboard||!_sel.clipboard.length){showToast(SM.t('toastNothingToPaste'));return;}
     pushUndo();saveAllLayerFrames();
     var baseL=state.activeLayerIdx,baseF=state.currentFrame;
     _sel.clipboard.forEach(function(d){
@@ -1311,7 +1341,7 @@ window.SM={
       if(tl>=0&&tl<state.layers.length&&tf>=0&&tf<state.totalFrames)selAdd(tl,tf);
     });
     loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
-    showToast('Collé ('+_sel.clipboard.length+' frames)');
+    showToast(SM.t('toastPasted')+_sel.clipboard.length+' frames)');
   },
   deleteSelectedFrames:function(){
     if(!_sel.frames.length)return;
@@ -1321,7 +1351,7 @@ window.SM={
       ld.frames[s.frame]={strokes:[],isKeyframe:false,isInterpolated:false};
     });
     selClear();loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
-    showToast('Frames supprimées');
+    showToast(SM.t('toastFramesDeleted'));
   },
   // Was dead code (defined, never called from any UI path) until Motion
   // mode's in/out bar (layer-inout.js) started drawing per-keyframe tick
@@ -1391,7 +1421,7 @@ window.SM={
       mkPairs.push({fA:fA,fB:fB,newFA:newFA,newFB:newFB});
     }
     retimeTweenSpans(layerIdx,mkPairs,capturedIb);
-    loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast('Keyframe déplacée → '+(toFrame+1));
+    loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast(SM.t('toastKeyframeMovedArrowSuffix')+(toFrame+1));
     return true;
   },
   // Shifts EVERY keyframe/content frame of a layer by dx frames at once —
@@ -1468,21 +1498,21 @@ window.SM={
   },
   duplicateKeyframe:function(){
     saveAllLayerFrames();var li=state.activeLayerIdx;var ld=state.layers[li];var cf=state.currentFrame;
-    if(ld.locked){showToast('Calque verrouillé');return;}
-    var strokes=getEffectiveStrokes(li,cf);if(!strokes.length){showToast('Rien à dupliquer');return;}
+    if(ld.locked){showToast(SM.t('toastLayerLocked'));return;}
+    var strokes=getEffectiveStrokes(li,cf);if(!strokes.length){showToast(SM.t('toastNothingToDuplicate'));return;}
     pushUndo();for(var i=0;i<state.layers.length;i++)state.layers[i].frames.splice(cf+1,0,{strokes:[],isKeyframe:false,isInterpolated:false});
     state.totalFrames++;if(state.waOut<state.totalFrames-1)state.waOut++;window._waOut=state.waOut;window._totalF=state.totalFrames;
     ld.frames[cf+1]={strokes:JSON.parse(JSON.stringify(strokes)),isKeyframe:true,isInterpolated:false};
-    goToFrame(cf+1);showToast('Keyframe dupliquée');
+    goToFrame(cf+1);showToast(SM.t('toastKeyframeDuplicated'));
   },
   extendExposure:function(n){
     saveAllLayerFrames();var li=state.activeLayerIdx;var cf=state.currentFrame;
     pushUndo();n=n||1;for(var x=0;x<n;x++){for(var i=0;i<state.layers.length;i++)state.layers[i].frames.splice(cf+1,0,{strokes:[],isKeyframe:false,isInterpolated:false});state.totalFrames++;}
     if(state.waOut<state.totalFrames-1)state.waOut=state.totalFrames-1;window._waOut=state.waOut;window._totalF=state.totalFrames;
-    updateUI();showToast('Exposition étendue +'+n);
+    updateUI();showToast(SM.t('toastExposureExtendedPlus')+n);
   },
   flipHorizontal:function(){
-    if(state.tool!=='select'||!selectedPaths.length){showToast('Sélectionnez des traits');return;}
+    if(state.tool!=='select'||!selectedPaths.length){showToast(SM.t('toastSelectStrokes'));return;}
     pushUndo();var bounds=null;selectedPaths.forEach(function(p){if(!bounds)bounds=p.bounds.clone();else bounds=bounds.unite(p.bounds);});
     var cx=bounds.center.x;
     selectedPaths.forEach(function(p){p.scale(-1,1,new Point(cx,bounds.center.y));
@@ -1493,7 +1523,7 @@ window.SM={
     saveActiveLayerFrame();updateUI();showToast('Flip horizontal');
   },
   flipVertical:function(){
-    if(state.tool!=='select'||!selectedPaths.length){showToast('Sélectionnez des traits');return;}
+    if(state.tool!=='select'||!selectedPaths.length){showToast(SM.t('toastSelectStrokes'));return;}
     pushUndo();var bounds=null;selectedPaths.forEach(function(p){if(!bounds)bounds=p.bounds.clone();else bounds=bounds.unite(p.bounds);});
     var cy=bounds.center.y;
     selectedPaths.forEach(function(p){p.scale(1,-1,new Point(bounds.center.x,cy));
@@ -1707,7 +1737,7 @@ window.SM={
       }
     }
     loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
-    showToast(anyLayerCycled?('Cycle : plage repetee '+times+' fois'):'Cycle : aucun calque à répéter (calques Component ignorés)');
+    showToast(anyLayerCycled?('Cycle : plage repetee '+times+' fois'):SM.t('toastCycleNoLayerToRepeat'));
   },
   // Propagation de couleur (v19) : applique la couleur du fill/trait
   // selectionne a TOUTES les occurrences du meme strokeId sur toutes les
@@ -1763,7 +1793,7 @@ window.SM={
     // user knows an app update is needed and not to overwrite the file.
     // NOT gated on `silent` — openPath passes silent=true (it shows its own
     // "Opened" toast), and a data-integrity warning must never be muted.
-    if(d.version&&d.version>13)showToast('⚠ Fichier créé par une version plus récente de Nemo (format v'+d.version+') — mettre à jour l’app avant de re-sauvegarder ce fichier');
+    if(d.version&&d.version>13)showToast(SM.t('toastFileFromNewerVersionHint')+d.version+SM.t('toastUpdateAppBeforeResave'));
     if(!d.layers)d.layers=[{name:'Layer 1',visible:true,locked:false,frames:d.frames}];
     // Validate the FULL layer/frame structure BEFORE the teardown below —
     // the old shallow `!d.layers` check let a file that parses but is
@@ -1943,7 +1973,7 @@ window.SM={
     if(window.SMMotion&&SMMotion.migrateLegacyCurves)SMMotion.migrateLegacyCurves();
     state.currentFrame=0;state.activeLayerIdx=0;activateUL(0);drawStage();loadFrame(0);renderOS();renderArcs();updateUI();renderSymbolTabs();
     syncDocFields();
-    if(!silent)showToast('Projet chargé');}catch(e){showToast('Erreur: '+e.message);}},
+    if(!silent)showToast(SM.t('toastProjectLoaded'));}catch(e){showToast('Erreur: '+e.message);}},
   getState:function(){return state;},
 };
 
@@ -1996,7 +2026,7 @@ function updateUI(frameOnly){
   window._totalF=state.totalFrames;window._waIn=state.waIn;window._waOut=state.waOut;window._curFrame=state.currentFrame;
   window.updateWaBar();window.updateOmMarkers(state.currentFrame,state.totalFrames);
   if(frameOnly)updatePlayhead();else renderTimeline();
-  renderLayerList(frameOnly);updateCompInstancePanel();updateDuplicatorPanel();updateFootagePanel();updateSelPropsPanel();updateFsSelPanel();updateRevisionPanel();updateMaskPanel();updateTextActionsPanel();updateTextPropsPanel();if(window.updateEffectsPanel)window.updateEffectsPanel();updatePropsContext();
+  renderLayerList(frameOnly);updateCompInstancePanel();updateDuplicatorPanel();updateFootagePanel();updateSelPropsPanel();updateFsSelPanel();updateRevisionPanel();updateMaskPanel();updateCornersPanel();updateEllipseArcPanel();updateStarPanel();updateTextActionsPanel();updateTextPropsPanel();if(window.updateEffectsPanel)window.updateEffectsPanel();updatePropsContext();
 }
 // Vector mask properties (2026-08, AE-style "Mask" — see the mask-feature
 // audit) — same "own dedicated panel section, shown only for a matching
@@ -2040,6 +2070,121 @@ document.getElementById('btn-mask-unset').addEventListener('click',function(){
   delete p.data.isMask;delete p.data.maskMode;delete p.data.maskFeather;
   saveActiveLayerFrame();updateUI();if(window.SMEngineBridge)SMEngineBridge.renderNow();
 });
+// Dynamic shape, phase 1 (2026-08-18) — corner-radius panel for a
+// selected rect with data.paramShape (see applyParamShapeRect's own
+// comment, tools.js, for why this bakes radii into real segments right
+// away instead of a render-time rebuild). "Lier les 4 coins" mirrors
+// Figma's own link toggle: ON writes the same value to all 4 fields (the
+// common case — most rounded rects are uniform), OFF reveals the other 3
+// so each corner can diverge.
+function updateCornersPanel(){
+  var sec=document.getElementById('corners-sec');
+  if(!sec)return;
+  var p=(state.tool==='select'&&selectedPaths.length===1)?selectedPaths[0]:null;
+  var ps=p&&p.data&&p.data.paramShape&&p.data.paramShape.kind==='rect'?p.data.paramShape:null;
+  if(!ps){sec.style.display='none';return;}
+  sec.style.display='';
+  document.getElementById('p-corner-tl').value=ps.tl||0;
+  document.getElementById('p-corner-tr').value=ps.tr||0;
+  document.getElementById('p-corner-br').value=ps.br||0;
+  document.getElementById('p-corner-bl').value=ps.bl||0;
+  var linked=document.getElementById('p-corners-link').checked;
+  ['corner-tr-row','corner-br-row','corner-bl-row'].forEach(function(id){document.getElementById(id).style.display=linked?'none':'';});
+}
+document.getElementById('p-corners-link').addEventListener('change',function(){
+  ['corner-tr-row','corner-br-row','corner-bl-row'].forEach(function(id){document.getElementById(id).style.display=this.checked?'none':'';}.bind(this));
+});
+function commitCornerEdit(which,val){
+  var p=selectedPaths[0];if(!p||!p.data||!p.data.paramShape||p.data.paramShape.kind!=='rect')return;
+  pushUndo();
+  var ps=p.data.paramShape;
+  var v=Math.max(0,parseFloat(val)||0);
+  if(document.getElementById('p-corners-link').checked){ps.tl=ps.tr=ps.br=ps.bl=v;}
+  else ps[which]=v;
+  window.applyParamShapeRect(p);
+  saveActiveLayerFrame();updateCornersPanel();if(window.SMEngineBridge)SMEngineBridge.renderNow();
+}
+['tl','tr','br','bl'].forEach(function(which){
+  document.getElementById('p-corner-'+which).addEventListener('input',function(){commitCornerEdit(which,this.value);});
+});
+// Dynamic shapes, Ellipse (2026-08-18) — same panel pattern as Coins:
+// shown for exactly one selected path that's EITHER already a dynamic
+// ellipse (fields visible) or a plain ellipse-shaped selection eligible
+// to become one (just the convert button — see buildOvalGuess below for
+// why "plain ellipse" can't be detected from data alone, unlike rect's
+// data.paramShape being stamped at creation time for every rect).
+function looksLikePlainEllipse(p){
+  if(!p||p.data&&p.data.paramShape)return false;
+  if(!(p instanceof Path)||!p.closed)return false;
+  return p.segments.length>=4&&p.segments.length<=8;
+}
+function updateEllipseArcPanel(){
+  var sec=document.getElementById('ellipse-arc-sec');
+  if(!sec)return;
+  var p=(state.tool==='select'&&selectedPaths.length===1)?selectedPaths[0]:null;
+  var ps=p&&p.data&&p.data.paramShape&&p.data.paramShape.kind==='ellipse'?p.data.paramShape:null;
+  var eligible=p&&!ps&&looksLikePlainEllipse(p);
+  if(!ps&&!eligible){sec.style.display='none';return;}
+  sec.style.display='';
+  document.getElementById('ellipse-arc-convert-row').style.display=ps?'none':'';
+  ['ellipse-arc-start-row','ellipse-arc-sweep-row','ellipse-arc-inner-row'].forEach(function(id){document.getElementById(id).style.display=ps?'':'none';});
+  if(ps){
+    document.getElementById('p-arc-start').value=ps.startAngle||0;
+    document.getElementById('p-arc-sweep').value=ps.sweep!==undefined?ps.sweep:359.9;
+    document.getElementById('p-arc-inner').value=Math.round((ps.innerRadius||0)*100);
+  }
+}
+document.getElementById('btn-ellipse-arc-convert').addEventListener('click',function(){
+  var p=selectedPaths[0];if(!p)return;
+  pushUndo();
+  window.convertToDynamicEllipse(p);
+  saveActiveLayerFrame();updateEllipseArcPanel();if(window.SMEngineBridge)SMEngineBridge.renderNow();
+});
+function commitArcEdit(field,val,isPercent){
+  var p=selectedPaths[0];if(!p||!p.data||!p.data.paramShape||p.data.paramShape.kind!=='ellipse')return;
+  pushUndo();
+  var ps=p.data.paramShape;
+  var v=parseFloat(val)||0;
+  ps[field]=isPercent?Math.max(0,Math.min(95,v))/100:v;
+  window.applyParamShapeEllipse(p);
+  saveActiveLayerFrame();updateEllipseArcPanel();if(window.SMEngineBridge)SMEngineBridge.renderNow();
+}
+document.getElementById('p-arc-start').addEventListener('input',function(){commitArcEdit('startAngle',this.value,false);});
+document.getElementById('p-arc-sweep').addEventListener('input',function(){commitArcEdit('sweep',this.value,false);});
+document.getElementById('p-arc-inner').addEventListener('input',function(){commitArcEdit('innerRadius',this.value,true);});
+// Dynamic shapes, Star/Polygon (2026-08-18) — same panel pattern as
+// Coins/Camembert. pointCount stays a plain field (no stopwatch/Motion
+// row) — a fractional point count between two integer keyframes has no
+// coherent geometric meaning to interpolate, unlike innerRatio/corner
+// radius which are genuinely continuous. Also feeds state.starPointCount/
+// starInnerRatio (tools.js reads these as the NEXT shape's starting
+// values, same "remembers your last setting" convention brushSize/
+// smoothing/etc already follow).
+function updateStarPanel(){
+  var sec=document.getElementById('star-sec');
+  if(!sec)return;
+  var p=(state.tool==='select'&&selectedPaths.length===1)?selectedPaths[0]:null;
+  var ps=p&&p.data&&p.data.paramShape&&p.data.paramShape.kind==='star'?p.data.paramShape:null;
+  if(!ps){sec.style.display='none';return;}
+  sec.style.display='';
+  document.getElementById('p-star-points').value=ps.pointCount||5;
+  document.getElementById('p-star-inner').value=Math.round((ps.innerRatio!==undefined?ps.innerRatio:0.5)*100);
+  document.getElementById('p-star-corner').value=ps.cornerRadius||0;
+}
+function commitStarEdit(field,val,isPercent){
+  var p=selectedPaths[0];if(!p||!p.data||!p.data.paramShape||p.data.paramShape.kind!=='star')return;
+  pushUndo();
+  var ps=p.data.paramShape;
+  var v=parseFloat(val)||0;
+  if(field==='pointCount'){ps.pointCount=Math.max(3,Math.round(v));state.starPointCount=ps.pointCount;}
+  else if(field==='innerRatio'){ps.innerRatio=Math.max(0.05,Math.min(1,v/100));state.starInnerRatio=ps.innerRatio;}
+  else ps.cornerRadius=Math.max(0,v);
+  window.applyParamShapeStar(p);
+  saveActiveLayerFrame();updateStarPanel();if(window.SMEngineBridge)SMEngineBridge.renderNow();
+}
+document.getElementById('p-star-points').addEventListener('input',function(){commitStarEdit('pointCount',this.value);});
+document.getElementById('p-star-inner').addEventListener('input',function(){commitStarEdit('innerRatio',this.value);});
+document.getElementById('p-star-corner').addEventListener('input',function(){commitStarEdit('cornerRadius',this.value);});
 // Team review Accept/Reject panel — shown when exactly one selected item is
 // either an active (non-ghost) revision (data.revisionParentId) or a
 // delete-revision ghost (data.isRevisionGhost && revisionAction==='delete').
@@ -2234,11 +2379,11 @@ function updateStatusBarHelp(){
 function updatePropsContext(){
   var hasSel=(state.tool==='select'||state.tool==='subselect')&&selectedPaths.length>0;
   var ctx,hdrText;
-  var show={'sel-props-sec':false,'fill-sec':false,'stroke-sec':false,'tool-opts-sec':false,'canvas-sec':false,'layer-sec':false,'rig-opts-sec':false,'combine-opts-sec':false};
+  var show={'sel-props-sec':false,'fill-sec':false,'stroke-sec':false,'tool-opts-sec':false,'canvas-sec':false,'layer-sec':false,'rig-opts-sec':false,'combine-opts-sec':false,'shapes-sec':false};
   if(state.tool==='rig'){
     ctx='rig';
     show['rig-opts-sec']=true;
-    show['layer-sec']=!!(state.layers[state.activeLayerIdx]);
+    show['layer-sec']=show['shapes-sec']=!!(state.layers[state.activeLayerIdx]);
     if(window.renderRigModeUI)renderRigModeUI();
     hdrText=(window.SM&&SM.t?SM.t('toolRig'):'Rig')+' — Options';
   }else if(state.tool==='fsselect'&&_fsSel.length){
@@ -2266,7 +2411,7 @@ function updatePropsContext(){
     // useful given over to the Position/Size/Rotation-of-selected-vertices
     // fields (updateSelPropsPanel) that section sits right above.
     show['canvas-sec']=state.tool!=='subselect';
-    show['layer-sec']=!!(state.layers[state.activeLayerIdx]);
+    show['layer-sec']=show['shapes-sec']=!!(state.layers[state.activeLayerIdx]);
     // Rig bind (2026-07-29 fix, "on ne sait pas comment select l'élément qui
     // doit y être associé"): #rig-opts-sec (with the "Lier la sélection"
     // button) used to be shown ONLY while state.tool==='rig' — but binding a
@@ -2285,7 +2430,11 @@ function updatePropsContext(){
     // after already knowing the Alt+click/context-menu shortcuts exist.
     show['combine-opts-sec']=true;
     if(window.updateCombinePanel)updateCombinePanel();
-    hdrText=selectedPaths.length+(selectedPaths.length>1?' éléments sélectionnés':' élément sélectionné');
+    // 2026-08 fix: hardcoded French — showed "1 élément sélectionné" even
+    // in English mode, mixed with the rest of this same panel switching
+    // language correctly. thElementsSelected/thElementSelected already
+    // existed in i18n.js for all 4 locales, just never wired up here.
+    hdrText=selectedPaths.length+' '+((window.SM&&SM.t)?SM.t(selectedPaths.length>1?'thElementsSelected':'thElementSelected'):(selectedPaths.length>1?'elements selected':'element selected'));
   }else if(FILL_STROKE_TOOLS.indexOf(state.tool)>=0){
     ctx='tool:'+state.tool;
     // Fill Brush never touches strokeColor at all (it paints a genuine
@@ -2312,7 +2461,7 @@ function updatePropsContext(){
     // this flag, activeLayerIdx being ALWAYS a valid index (never "none")
     // meant this branch showed the last-active layer's properties even
     // right after deselecting everything on canvas.
-    show['layer-sec']=!!window._layerActiveExplicit&&!!(state.layers[state.activeLayerIdx]);
+    show['layer-sec']=show['shapes-sec']=!!window._layerActiveExplicit&&!!(state.layers[state.activeLayerIdx]);
     hdrText='Document';
   }
   // p-blendmode sync moved OUT of the 'document' branch above: it only ran
@@ -2336,7 +2485,7 @@ function updatePropsContext(){
   if(matteSel&&state.layers[state.activeLayerIdx]){
     var mv=state.layers[state.activeLayerIdx].matteMode||'none';
     matteSel.dataset.value=mv;
-    matteSel.textContent=(typeof MATTE_MODE_LABELS!=='undefined'&&MATTE_MODE_LABELS[mv])||mv;
+    matteSel.textContent=(typeof matteModeLabel!=='undefined'&&matteModeLabel(mv))||mv;
   }
   // Flou/Ombre au sol sync moved into effects-panel.js's unified Effects
   // stack (2026-07 rewrite) — see updateEffectsPanel, hooked via updateUI.
@@ -2354,10 +2503,29 @@ function updatePropsContext(){
   // an already-visible section, not this much bigger burial problem.
   // layer-sec (Blend/Matte/Flou) is spared: those are genuine per-layer
   // properties still meaningful while animating, not a drawing-tool panel.
+  // canvas-sec (Document) is ALSO spared when ctx==='document' (2026-08,
+  // "si rien n'est select en Motion il faut afficher le panel Document") —
+  // Select/Subselect with an empty canvas selection falls into that branch
+  // above and is the one case where showing it doesn't bury anything (no
+  // Fill/Stroke/Draw tool section competes with #motion-props-sec then).
   if(state.appMode==='motion'){
-    show['sel-props-sec']=show['fill-sec']=show['stroke-sec']=show['tool-opts-sec']=show['canvas-sec']=show['rig-opts-sec']=show['combine-opts-sec']=false;
+    // shapes-sec joins this list (not the layer-sec/canvas-sec "spared"
+    // set below) — Motion already has its own equivalent shape/group tree
+    // (SMMotion's own "Éléments" list, left panel), so this right-panel
+    // copy would just be a redundant second place showing the same thing.
+    show['sel-props-sec']=show['fill-sec']=show['stroke-sec']=show['tool-opts-sec']=show['rig-opts-sec']=show['combine-opts-sec']=show['shapes-sec']=false;
+    if(ctx!=='document')show['canvas-sec']=false;
   }
   Object.keys(show).forEach(function(id){var sec=document.getElementById(id);if(sec)sec.style.display=show[id]?'block':'none';});
+  // Only pays the tree-rebuild cost while the section is actually visible
+  // (same "don't do free work" principle as the rail render just below).
+  if(show['shapes-sec']&&window.renderShapesPanel)renderShapesPanel();
+  // Collapse-to-rail (2026-08) — keep the rail in sync with whatever this
+  // call decided is relevant, but only pay the DOM-rebuild cost while the
+  // panel is actually collapsed (rail is invisible otherwise).
+  window._lastPropsShow=show;
+  var ppEl=document.getElementById('props-panel');
+  if(ppEl&&ppEl.classList.contains('collapsed')&&window.renderPropsPanelRail)renderPropsPanelRail(show);
   // state.drawMode (Front/Behind) has no effect on Fill Brush — it's always
   // inserted at the back regardless (see draw-bridge.js/tools.js commit) —
   // so showing that dropdown while Fill Brush is active was a dead control.
@@ -2533,6 +2701,44 @@ function updateSelPropsPanel(){
         document.getElementById('p-miterlimit').value=state.miterLimit;
         document.getElementById('p-dashoffset').value=state.dashOffset;
       }
+      // Stroke Width staleness fix (2026-08-21, feedback #34: "tous les
+      // paramètres stroke ne fonctionnent pas pour modifié la stroke") —
+      // #p-sw only ever showed state.brushSize (the tool default queued for
+      // the NEXT new stroke), never refreshed to reflect the item actually
+      // selected — same staleness bug the Cap/Join/Miter/Dash block above
+      // already fixes for its own fields, just missing here. For a vector-
+      // brush ribbon the visible width is the widthProfile's PEAK, not the
+      // thin 2-3px Bezier-fit ref.strokeWidth the underlying Path carries
+      // (see setBrushSize's own identical "peak as the current-size
+      // baseline" ratio logic, a few dozen lines up in this file) — showing
+      // that thin number meant editing Width started from a baseline with
+      // no relationship to what was actually on screen, so nothing visible
+      // seemed to happen until the value happened to cross it.
+      var swField=document.getElementById('p-sw');
+      if(swField){
+        // Bug found live (2026-08-22, QA pass on the right panel): this read
+        // centerSegments' peak, not widthProfile's, contradicting this
+        // block's OWN comment above ("the visible width is the widthProfile's
+        // PEAK"). The two peaks can genuinely differ — widthProfile is dense
+        // (tens of samples along the fitted Bezier curve) while
+        // centerSegments is the sparse handful of CONTROL points, and a
+        // curve's extremum between two control points is routinely higher
+        // than either of them. Measured live: centerSegments peak 40 vs the
+        // actual rendered widthProfile peak 55 on the same stroke — a
+        // ~38% understatement that then made setBrushSize's own rescale
+        // (ratio = target / this peak) overshoot the target by the same
+        // margin, in addition to the field simply showing the wrong number.
+        var vbWp=ref.data&&ref.data.isVectorBrush&&ref.data.widthProfile;
+        var swVal;
+        if(vbWp&&vbWp.length){
+          var peakW=0;vbWp.forEach(function(s){if((s.width||0)>peakW)peakW=s.width||0;});
+          swVal=peakW||state.brushSize;
+        }else{
+          swVal=ref.strokeWidth||state.brushSize;
+        }
+        state.brushSize=swVal;
+        swField.value=Math.round(swVal);
+      }
       // Bitmap Brush panel staleness fix — same "reflect the selection,
       // don't leave the tool-default stale" convention as Fill/Stroke/Cap
       // above, applied to the checkbox+fields the user reported as wrong
@@ -2590,7 +2796,7 @@ function updateFsSelPanel(){
   if((_fsSel0.kind==='fill'||_fsSel0.kind==='fillregion')&&p.fillColor&&!isBrushShape){
     var fc=colorHex8(p.fillColor);
     document.getElementById('fill-well').style.background=fc;document.getElementById('pm-fill').style.background=fc;
-    ['color-fill','pm-fill-c'].forEach(function(id){var el=document.getElementById(id);if(el){el.value=fc;el.dataset.hex8=fc;}});
+    ['color-fill','pm-fill-c'].forEach(function(id){setHex8Input(document.getElementById(id),fc);});
     // Was only removing the toggle's 'off' CSS class here (a display-only
     // fix, per this function's own header comment) — leaving the actual
     // state.fillEnabled untouched meant the icon could show "on" while the
@@ -2602,7 +2808,7 @@ function updateFsSelPanel(){
   }else if(_fsSel0.kind==='stroke'&&p.strokeColor){
     var sc=colorHex8(p.strokeColor);
     document.getElementById('stroke-well').style.background=sc;document.getElementById('pm-stroke').style.background=sc;
-    ['color-stroke','pm-stroke-c'].forEach(function(id){var el=document.getElementById(id);if(el){el.value=sc;el.dataset.hex8=sc;}});
+    ['color-stroke','pm-stroke-c'].forEach(function(id){setHex8Input(document.getElementById(id),sc);});
     state.strokeEnabled=true;
     window.SM._syncStrokeEnabledUI(true);
   }
@@ -2650,7 +2856,7 @@ function selectGhostAll(){
   selectedPaths=layer.children.filter(function(c){return c instanceof Path&&isSelectablePathChild(c);});
   state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;});
   renderArcs();updateUI();
-  showToast(count+' élément(s) sur '+frameCount+' image(s) clé — déplacez/transformez ensemble');
+  showToast(count+SM.t('toastElementsOnSuffix')+frameCount+SM.t('toastKeyframeMoveTogetherSuffix'));
 }
 function clearGhostSelection(){
   if(!_ghostProxyActive)return;
@@ -2673,6 +2879,7 @@ function selPropsApplyMove(dx,dy,skipUndo){
   selectedPaths.forEach(function(p){
     var d=new Point(dx,dy);
     p.translate(d);
+    if(window.syncParamShapeBoxOnTranslate)window.syncParamShapeBoxOnTranslate(p,dx,dy);
     transformFillGradient(p,function(pt){return pt.add(d);});
     if(p.data&&p.data.isVectorBrush&&p.data.centerSegments)p.data.centerSegments.forEach(function(s){s.point=[s.point[0]+dx,s.point[1]+dy];});
     if(p.data&&p.data.linkedFill&&!p.data.linkedFill.removed)p.data.linkedFill.translate(new Point(dx,dy));
@@ -2686,6 +2893,7 @@ function selPropsApplyScale(sx,sy,anchor,skipUndo){
   if(!skipUndo)pushUndo();
   selectedPaths.forEach(function(p){
     p.scale(sx,sy,anchor);
+    if(window.syncParamShapeBoxOnScale)window.syncParamShapeBoxOnScale(p,sx,sy,anchor);
     transformFillGradient(p,function(pt){return new Point(anchor.x+(pt.x-anchor.x)*sx,anchor.y+(pt.y-anchor.y)*sy);});
     if(p.data&&p.data.isVectorBrush&&p.data.centerSegments){scaleCenterSegments(p.data.centerSegments,sx,sy,anchor.x,anchor.y);rebuildVectorBrushOutline(p);}
   });
@@ -3445,7 +3653,7 @@ document.getElementById('frame-grid').addEventListener('mousedown',function(e){
   e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();
   var fi=parseInt(cell.dataset.frame),li=parseInt(cell.dataset.layer);
   var ld=state.layers[li];
-  if(ld.locked){showToast('Calque verrouillé');return;} // span-end drag is a keyframe edit like any other (feedback #18)
+  if(ld.locked){showToast(SM.t('toastLayerLocked'));return;} // span-end drag is a keyframe edit like any other (feedback #18)
   var srcFi=fi;for(var pi=fi;pi>=0;pi--){if(ld.frames[pi].isKeyframe){srcFi=pi;break;}}
   var nextKeyFi=-1;
   if(ld.frames[fi+1]&&ld.frames[fi+1].isKeyframe)nextKeyFi=fi+1;
@@ -4168,10 +4376,10 @@ function computeLayerRenderOrder(){
 // derives a folder's membership purely from adjacency, so a non-contiguous
 // selection would render wrong: reorder first, like Animate requires too).
 function groupSelectionIntoFolder(){
-  if(_layerSel.length<2){showToast('Sélectionnez au moins 2 calques');return;}
+  if(_layerSel.length<2){showToast(SM.t('toastSelectAtLeast2LayersCap'));return;}
   var sorted=_layerSel.slice().sort(function(a,b){return a-b;});
-  for(var k=1;k<sorted.length;k++)if(sorted[k]!==sorted[k-1]+1){showToast('Les calques doivent être consécutifs — réordonnez-les d\'abord');return;}
-  if(sorted.some(function(i){return state.layers[i].folderId;})){showToast('Un calque sélectionné est déjà dans un dossier');return;}
+  for(var k=1;k<sorted.length;k++)if(sorted[k]!==sorted[k-1]+1){showToast(SM.t('toastLayersMustBeConsecutive'));return;}
+  if(sorted.some(function(i){return state.layers[i].folderId;})){showToast(SM.t('toastSelectedLayerAlreadyInFolder'));return;}
   var fid='folder-'+Date.now()+'-'+Math.floor(Math.random()*1000);
   state.layerFolders[fid]={name:'Dossier',collapsed:false};
   sorted.forEach(function(i){state.layers[i].folderId=fid;});
@@ -4224,6 +4432,14 @@ var ICO_3D='<svg viewBox="0 0 24 24"><path d="M12 3 L20 7.5 L20 16.5 L12 21 L4 1
 // (the seed) and three outlined (the copies). Same inline-SVG convention as
 // ICO_3D above.
 var ICO_DUP='<svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.2" fill="currentColor"/><rect x="13.5" y="4" width="7" height="7" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="4" y="13.5" width="7" height="7" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>';
+// Elements panel (2026-08, shapes-panel.js) — group and raster-entry icons,
+// same inline-SVG convention as every icon above (was ▤/🖼 text glyphs,
+// font/emoji-rendering-dependent and visibly out of place next to this
+// monochrome flat set — Cyril: "les icônes aussi sont flat design ?").
+// Frame-corner brackets for "group" — same shorthand Figma's own layers
+// panel uses for a group row.
+var ICO_GROUP='<svg viewBox="0 0 24 24"><path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+var ICO_IMAGE='<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="1.8" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="8.5" cy="9.5" r="1.6" fill="currentColor"/><path d="M4.5 17.5l5-5.2a1.4 1.4 0 0 1 2 0l3 3.2 1.5-1.5a1.4 1.4 0 0 1 2 0l2.5 2.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 // Layer color label picker (v5) — a small predefined-swatch "nuancier"
 // instead of jumping straight to the full SV/hue/hex ColorPicker. Reuses
 // LAYER_COLOR_PALETTE (app.js) so the choices match the auto-assigned
@@ -4546,7 +4762,7 @@ function buildParentCell(row,ld,li){
     if(M.setLayerParentB)M.setLayerParentB(li,null);
     renderLayerList();renderTimeline();
     if(window.SMEngineBridge)SMEngineBridge.renderNow();
-    if(window.showToast)showToast('Parent retiré');
+    if(window.showToast)showToast(SM.t('toastParentRemoved'));
   });
   row.appendChild(cell);
 }
@@ -4575,7 +4791,7 @@ function buildParentCell(row,ld,li){
 function paintStrokeSwatches(v){
   var sw=document.getElementById('stroke-well'); if(sw)sw.style.background=v;
   var pm=document.getElementById('pm-stroke');   if(pm)pm.style.background=v;
-  ['color-stroke','pm-stroke-c'].forEach(function(id){var el=document.getElementById(id);if(el){el.value=v;el.dataset.hex8=v;}});
+  ['color-stroke','pm-stroke-c'].forEach(function(id){setHex8Input(document.getElementById(id),v);});
   var shex=document.getElementById('p-stroke-hex');if(shex&&document.activeElement!==shex)shex.value=hexDisplayValue(v);
   var salpha=document.getElementById('p-stroke-alpha');if(salpha&&document.activeElement!==salpha)salpha.value=alphaPctFromHex(v);
 }
@@ -4585,7 +4801,7 @@ function paintFillSwatches(v){
   // .none overlay is what communicates "off".
   var fw=document.getElementById('fill-well'); if(fw)fw.style.background=v;
   var pf=document.getElementById('pm-fill');   if(pf)pf.style.background=v;
-  ['color-fill','pm-fill-c'].forEach(function(id){var el=document.getElementById(id);if(el){el.value=v;el.dataset.hex8=v;}});
+  ['color-fill','pm-fill-c'].forEach(function(id){setHex8Input(document.getElementById(id),v);});
   // No fill-side alpha field exists (only the stroke has one) — the fill's
   // alpha rides in dataset.hex8 above.
   var fhex=document.getElementById('p-fill-hex');if(fhex&&document.activeElement!==fhex)fhex.value=hexDisplayValue(v);
@@ -4778,7 +4994,7 @@ function renderLayerList(frameOnly){
     var isMatteSource=!!_matteSrcMap[i];
     if(ld.matteMode||isMatteSource){
       var mb=document.createElement('div');mb.className='lico comp-badge'+(isMatteSource&&!ld.matteMode?' off':'');
-      mb.title=ld.matteMode?('Matte: '+(typeof MATTE_MODE_LABELS!=='undefined'?MATTE_MODE_LABELS[ld.matteMode]:ld.matteMode)+' — clic pour changer'):'Source de matte pour un autre calque';
+      mb.title=ld.matteMode?('Matte: '+(typeof matteModeLabel!=='undefined'?matteModeLabel(ld.matteMode):ld.matteMode)+' — clic pour changer'):'Source de matte pour un autre calque';
       mb.innerHTML='<span style="font-size:9px;line-height:1;font-weight:700">'+(ld.matteMode?'M':'M▲')+'</span>';
       if(ld.matteMode){mb.style.cursor='pointer';mb.addEventListener('click',function(e){e.stopPropagation();state.activeLayerIdx=i;activateUL(i);updatePropsContext();openMatteDropdownAt(mb);});}
       row.appendChild(mb);
@@ -4807,7 +5023,7 @@ function renderLayerList(frameOnly){
         renderLayerList();renderTimeline();
         if(window.loadFrame)loadFrame(state.currentFrame);
         if(window.SMEngineBridge)SMEngineBridge.renderNow();
-        if(window.showToast)showToast('Lien temporel retiré');
+        if(window.showToast)showToast(SM.t('toastTimeLinkRemoved'));
       });
       row.appendChild(tlb);
     }
@@ -4897,7 +5113,7 @@ function renderLayerList(frameOnly){
         {label:'Décomposer le composant',disabled:!l4.symbolId,action:function(){window.SM.convertComponentToLayer();}},
         {sep:true},
         {label:'Séparer Stroke/Fill/Shadow (3 calques liés, keyframes partagées)',disabled:!!l4.symbolId||!!l4.lfsGroup||!!l4.linkGroupId,action:function(){window.SM.convertActiveLayerToStrokeFillShadow();}},
-        {label:'Dissocier ce calque du groupe Stroke/Fill/Shadow',disabled:!l4.linkGroupId,action:function(){delete l4.channel;delete l4.linkGroupId;renderLayerList();renderTimeline();showToast('Calque dissocié — reste un calque normal, keyframes plus liées');}},
+        {label:'Dissocier ce calque du groupe Stroke/Fill/Shadow',disabled:!l4.linkGroupId,action:function(){delete l4.channel;delete l4.linkGroupId;renderLayerList();renderTimeline();showToast(SM.t('toastLayerUnlinkedNormal'));}},
         {label:'Grouper (Ligne/Plein/Ombre)',disabled:!!l4.symbolId||!!l4.lfsGroup,action:function(){window.SM.convertActiveLayerToLFSGroup();}},
         {label:'Éditer Ligne',disabled:!l4.lfsGroup,action:function(){window.SM.enterSymbol(l4.lfsIds.line);}},
         {label:'Éditer Plein',disabled:!l4.lfsGroup,action:function(){window.SM.enterSymbol(l4.lfsIds.full);}},
@@ -5302,6 +5518,8 @@ var TOOL_SHORTCUTS=[
   {action:'line',key:'u',label:'Line'},
   {action:'rect',key:'r',label:'Rectangle'},
   {action:'ellipse',key:'l',label:'Ellipse'},
+  {action:'speechbubble',key:'d',label:'Bulle de dialogue'},
+  {action:'star',key:'k',label:'Étoile / Polygone'},
   {action:'eraser',key:'e',label:'Eraser'},
   {action:'fill',key:'g',label:'Fill'},
   {action:'fillbrush',key:'n',label:'Fill Brush'},
@@ -5574,15 +5792,15 @@ function initCommentPopover(){
     // discarding whatever was being recorded.
     if(_recording)stopRecording();
     var note=document.getElementById('comment-text').value;
-    if(!note.trim()){showToast('Écris une note avant d\'enregistrer le feedback');return;}
+    if(!note.trim()){showToast(SM.t('toastWriteNoteBeforeSavingFeedback'));return;}
     var blocking=document.getElementById('comment-fb-blocking').checked;
     window.SMFeedback.submitFeedback({
       note:note,tags:_activeFbTags.slice(),blocking:blocking,
       pos:new Point(_activeComment.x,_activeComment.y),
       actionTrail:_recordedActionTrail,clickTrail:_recordedClickTrail,
       screenshotDataUrl:_activeShotDataUrl,
-    }).then(function(){showToast(_activeShotDataUrl?'Feedback + capture envoyés':'Feedback enregistré (hors projet)');})
-      .catch(function(e){console.warn('[feedback] submit failed',e);showToast('Échec de l\'enregistrement du feedback');});
+    }).then(function(){showToast(_activeShotDataUrl?SM.t('toastFeedbackAndCaptureSent'):SM.t('toastFeedbackSavedOutsideProject'));})
+      .catch(function(e){console.warn('[feedback] submit failed',e);showToast(SM.t('toastFeedbackSaveFailed'));});
     closeCommentPopover();
   });
   saveBtn.addEventListener('click',function(){
@@ -5800,7 +6018,7 @@ function closeInPlaceTextEditor(cancel){
     if(window.SMEngineBridge)SMEngineBridge.renderNow();
   }).catch(function(e){
     console.warn('[in-place text] rebuild failed',e);
-    showToast('Édition du texte : échec de la reconstruction');
+    showToast(SM.t('toastTextEditRebuildFailed'));
     restore();
   });
 }
@@ -5884,7 +6102,7 @@ function commitVectorText(txt,fontKey,size,align,color,fixedWidthWorld){
     if(window.SMEngineBridge)window.SMEngineBridge.renderNow();
   }).catch(function(e){
     console.warn('[vector-text] build failed',e);
-    showToast('Texte vectoriel : échec du chargement de la police');
+    showToast(SM.t('toastVectorTextFontLoadFailed'));
   });
 }
 function commitText(){
@@ -6162,8 +6380,22 @@ function applyTextPropsEdit(){
   var widthBtn=document.querySelector('.tp-width-btn.ac');
   var fixedWidthWorld=(widthBtn&&widthBtn.dataset.val==='fixed')?(parseFloat(document.getElementById('tp-fixed-width').value)||300):null;
   var layer=root.parent;
-  var groupBounds=window.SMVectorText.vectorTextGroupMembers(root).reduce(function(b,p){return b?b.unite(p.bounds):p.bounds.clone();},null);
-  var topLeft=groupBounds.topLeft.clone();
+  // Re-anchor at the SAME point this group was originally placed from
+  // (d.anchorTopLeft, stamped by buildVectorTextGroup) rather than this
+  // group's own ink bounding-box top — the two are NOT the same point
+  // (buildVectorTextGroup places baselineY at anchor.y+size*0.8, a nominal
+  // ascent approximation that ink bounds only coincidentally match), so
+  // re-deriving the anchor from ink bounds fed a drifted reference back
+  // into that same formula on every single edit, visibly sinking the text
+  // each time a typography value changed (feedback #37). Falls back to the
+  // old ink-bounds derivation only for a pre-existing block saved before
+  // this field existed.
+  var topLeft;
+  if(d.anchorTopLeft)topLeft=new Point(d.anchorTopLeft.x,d.anchorTopLeft.y);
+  else{
+    var groupBounds=window.SMVectorText.vectorTextGroupMembers(root).reduce(function(b,p){return b?b.unite(p.bounds):p.bounds.clone();},null);
+    topLeft=groupBounds.topLeft.clone();
+  }
   pushUndo();
   window.SMVectorText.vectorTextGroupMembers(root).forEach(function(p){p.remove();});
   window.SMVectorText.buildVectorTextGroup(text,d.vectorFont,size,color,align,fixedWidthWorld,topLeft,layer,opts).then(function(res){
@@ -6178,7 +6410,7 @@ function applyTextPropsEdit(){
     if(window.SMEngineBridge)window.SMEngineBridge.renderNow();
   }).catch(function(e){
     console.warn('[text-props] rebuild failed',e);
-    showToast('Édition du texte : échec de la reconstruction');
+    showToast(SM.t('toastTextEditRebuildFailed'));
   });
 }
 (function(){
@@ -6235,7 +6467,7 @@ function initFillGradientButton(){
     if(cb.disabled){
       // The checkbox disables itself when there is no single shape selected —
       // say why instead of looking broken (same rule as the rest of this file).
-      showToast('Sélectionne une seule forme avec l\'outil Sélection pour lui appliquer un dégradé');
+      showToast(SM.t('toastSelectSingleShapeForGradient'));
       return;
     }
     if(editor)editor.style.display='block';
@@ -6273,7 +6505,7 @@ function initCycleAndPropagate(){
     // with nothing selected was completely silent. Same message, raised to the
     // point where it's actually useful.
     if(typeof selBounds==='function'&&!selBounds()){
-      showToast('Sélectionne d\'abord une plage de frames dans la timeline');
+      showToast(SM.t('toastSelectFrameRangeFirst'));
       return;
     }
     var n=prompt('Repeter la plage selectionnee combien de fois ?','2');
@@ -6313,7 +6545,7 @@ function initSettingsModal(){
   var resetBtn=document.getElementById('shortcuts-reset');
   if(resetBtn)resetBtn.addEventListener('click',function(){
     _shortcutOverrides={};try{localStorage.removeItem('nemo-shortcuts');}catch(e){}
-    renderShortcutsList();showToast('Raccourcis réinitialisés');
+    renderShortcutsList();showToast(SM.t('toastShortcutsReset'));
   });
 }
 var ROLE_HINTS={
@@ -6326,7 +6558,7 @@ function syncProfileFields(){
   if(!nameEl||!state.userProfile)return;
   nameEl.value=state.userProfile.name;
   var c=state.userProfile.color;
-  if(colorEl){colorEl.value=c;colorEl.dataset.hex8=c;}
+  setHex8Input(colorEl,c);
   if(wellEl)wellEl.style.background=c;
   var role=state.userProfile.role||'animator';
   if(roleEl)roleEl.value=role;
@@ -6378,7 +6610,7 @@ function initAppMenu(){
       var sh=prompt('Ouverture d\u2019obturateur, en frames (0.05-2)',String(state.motionBlurShutter!=null?state.motionBlurShutter:0.5));
       if(sh===null)return;
       window.SM.setMotionBlurSettings(s,sh);
-      showToast('Flou : '+state.motionBlurSamples+' échantillons · obturateur '+state.motionBlurShutter+' f');
+      showToast('Flou : '+state.motionBlurSamples+SM.t('toastSamplesShutterSuffix')+state.motionBlurShutter+' f');
     });
   })();
   (function bindShy(){
@@ -6403,7 +6635,7 @@ function openObjReference(){
       filters:[{name:'OBJ',extensions:['obj']}]}).then(function(path){
       if(!path)return;
       return window.__TAURI__.fs.readTextFile(path).then(feed);
-    }).catch(function(e){showToast('Import OBJ échoué : '+e.message);});
+    }).catch(function(e){showToast(SM.t('toastObjImportFailedSuffix')+e.message);});
     return;
   }
   var inp=document.createElement('input');inp.type='file';inp.accept='.obj';inp.style.display='none';
@@ -6435,14 +6667,14 @@ function clickEl(id){var el=document.getElementById(id);if(el)el.click();}
       {label:tt('menuFromKitsu'),id:'ctx-kitsu-open',action:function(){clickEl('btn-kitsu-open');}},
       // Nemo's own extensibility (nemo-script.js / nemo-plugin.js) — this
       // app's model in this app's vocabulary, so it ships.
-      {label:'Ouvrir un script Nemo (.js)…',id:'ctx-nemo-script',
+      {label:tt('menuOpenScript'),id:'ctx-nemo-script',
         action:function(){if(window.SMScript)SMScript.openFile();}},
-      {label:'Ouvrir un plugin Nemo (.zip)…',id:'ctx-nemo-plugin',
+      {label:tt('menuOpenPlugin'),id:'ctx-nemo-plugin',
         action:function(){if(window.SMPlugin)SMPlugin.openFile();}},
       // Duplicate canvas viewer (2026-08, AE feature audit 8.4 "New
       // Viewer") — a second panel on the same comp, independently panned/
       // zoomed and optionally locked to a frame.
-      {label:'Nouvelle vue',action:function(){if(window.SMSecondViewer)SMSecondViewer.open();}},
+      {label:tt('menuNewView'),action:function(){if(window.SMSecondViewer)SMSecondViewer.open();}},
       {label:tt('menuVersionHistory'),id:'ctx-history',action:function(){clickEl('btn-history');}},
       {sep:true},
       {label:tt('menuImportImg'),action:function(){clickEl('btn-import-img');}},
@@ -6459,7 +6691,10 @@ function clickEl(id){var el=document.getElementById(id);if(el)el.click();}
       // only the two bundled CC0 models were ever reachable. This is that
       // missing entry point. It stays a REFERENCE (an overlay you draw from,
       // never exported, never baked), which is what the viewer is today.
-      {label:tt('menuImport3D'),id:'ctx-import-3d',action:openObjReference},
+      // Freeze (2026-08, PR #209) — see index.html's SM_FROZEN_IN_DEV registry.
+      (window.SM_FROZEN_IN_DEV&&window.SM_FROZEN_IN_DEV.import3d)
+        ?{label:tt('menuImport3D')+' '+tt('inDevSuffix'),id:'ctx-import-3d',disabled:true}
+        :{label:tt('menuImport3D'),id:'ctx-import-3d',action:openObjReference},
       {label:tt('menuExport'),id:'ctx-export',action:function(){clickEl('btn-export');}},
       {sep:true},
       {label:tt('menuSettings'),action:function(){clickEl('btn-settings');}},
@@ -6598,9 +6833,9 @@ function initFeedbackUI(){
     pullBtn.disabled=true;var orig=pullBtn.textContent;pullBtn.textContent='Recherche…';
     window.SMFeedback.pullAllIncoming().then(function(imported){
       pullBtn.disabled=false;pullBtn.textContent=orig;
-      showToast(imported.length?imported.length+' feedback récupéré(s), en attente d\'approbation':'Rien de nouveau');
+      showToast(imported.length?imported.length+SM.t('toastFeedbackRetrievedSuffix'):'Rien de nouveau');
       refreshFeedbackList();
-    }).catch(function(e){pullBtn.disabled=false;pullBtn.textContent=orig;console.warn('[feedback] pull failed',e);showToast('Échec de la récupération');});
+    }).catch(function(e){pullBtn.disabled=false;pullBtn.textContent=orig;console.warn('[feedback] pull failed',e);showToast(SM.t('toastRetrievalFailed'));});
   });
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initFeedbackUI);else initFeedbackUI();
@@ -6860,7 +7095,7 @@ function initGithubFeedbackUI(){
   tokenInput.value=window.SMFeedback.githubTriageToken();
   saveBtn.addEventListener('click',function(){
     window.SMFeedback.setGithubTriageToken(tokenInput.value.trim());
-    showToast('Token enregistré (local uniquement)');
+    showToast(SM.t('toastTokenSavedLocalOnly'));
   });
   if(openBtn)openBtn.addEventListener('click',openFbDashboard);
   if(closeBtn)closeBtn.addEventListener('click',closeFbDashboard);
@@ -7362,7 +7597,7 @@ function onKeyDown(event){
         var isCenter=!!(ntp.data&&ntp.data.isVectorBrush&&ntp.data.centerSegments);
         var curLen=isCenter?ntp.data.centerSegments.length:ntp.segments.length;
         var minPts=isCenter?2:(ntp.closed?3:2);
-        if(curLen-_nodeSel.length<minPts){showToast('Pas assez de points restants');}
+        if(curLen-_nodeSel.length<minPts){showToast(SM.t('toastNotEnoughPointsLeft'));}
         else{
           pushUndo();
           var idxsDesc=_nodeSel.slice().sort(function(a,b){return b-a;});
@@ -7431,6 +7666,66 @@ document.addEventListener('pointerdown',function(){if(state.spaceDown)state.spac
 
 document.addEventListener('keydown',onKeyDown);document.addEventListener('keyup',onKeyUp);
 document.querySelectorAll('.tool-btn').forEach(function(b){b.addEventListener('click',function(){window.SM.setTool(this.dataset.tool);});});
+// Shape-tool group (2026-08, "regrouper les shape dans un mini menu comme
+// dans illustrator ou rive... click un peu longtemps ça affiche le menu").
+// #shape-tool-stack (index.html) holds all 5 real buttons (Line/Rect/
+// Ellipse/Speech Bubble/Star) stacked in ONE toolbar slot via CSS
+// (.tool-stack, style.css) — only `.stack-front` is visible/clickable, the
+// rest are `visibility:hidden` (not display:none, so their geometry stays
+// real for tutorial.js's getBoundingClientRect-based spotlight). Long-press
+// pops a flyout with the other 4; picking one both selects that tool AND
+// fronts its button, Illustrator-style ("last used becomes the visible
+// icon"). ensureFront (exposed as window.SMShapeGroup) is the single choke
+// point both setTool's active-class sync (timeline.js, ~line 388) and
+// tutorial.js call before spotlighting a grouped tool, so a step targeting
+// e.g. '[data-tool="ellipse"]' fronts it FIRST — otherwise the real click
+// tutorial.js waits for would land on a hidden, unclickable button.
+(function(){
+  var SHAPE_TOOLS=['rect','line','ellipse','speechbubble','star'];
+  var LPRESS_MS=450,pressTimer=null,suppressClick=false,flyoutEl=null;
+  function ensureFront(tool){
+    if(SHAPE_TOOLS.indexOf(tool)<0)return;
+    SHAPE_TOOLS.forEach(function(t){
+      var b=document.querySelector('.tool-btn[data-tool="'+t+'"]');
+      if(b)b.classList.toggle('stack-front',t===tool);
+    });
+  }
+  window.SMShapeGroup={ensureFront:ensureFront};
+  function closeFlyout(){if(flyoutEl){flyoutEl.remove();flyoutEl=null;}document.removeEventListener('pointerdown',onOutsideDown,true);}
+  function onOutsideDown(e){if(flyoutEl&&!flyoutEl.contains(e.target))closeFlyout();}
+  function openFlyout(originBtn){
+    closeFlyout();
+    var rect=originBtn.getBoundingClientRect();
+    flyoutEl=document.createElement('div');
+    flyoutEl.className='shape-tool-flyout';
+    SHAPE_TOOLS.forEach(function(t){
+      var src=document.querySelector('.tool-btn[data-tool="'+t+'"]');
+      if(!src)return;
+      var item=document.createElement('button');
+      item.className='shape-tool-flyout-item'+(t===state.tool?' active':'');
+      item.innerHTML=src.innerHTML.replace(/<span class="sk">.*?<\/span>/,'');
+      item.title=src.title;
+      item.addEventListener('click',function(ev){ev.stopPropagation();ensureFront(t);window.SM.setTool(t);closeFlyout();});
+      flyoutEl.appendChild(item);
+    });
+    document.body.appendChild(flyoutEl);
+    var fr=flyoutEl.getBoundingClientRect();
+    flyoutEl.style.left=Math.min(rect.right+6,window.innerWidth-fr.width-4)+'px';
+    flyoutEl.style.top=Math.max(4,Math.min(rect.top,window.innerHeight-fr.height-4))+'px';
+    setTimeout(function(){document.addEventListener('pointerdown',onOutsideDown,true);},0);
+  }
+  var stack=document.getElementById('shape-tool-stack');
+  if(stack){
+    stack.addEventListener('pointerdown',function(e){
+      var btn=e.target.closest('.tool-btn');
+      if(!btn)return;
+      suppressClick=false;
+      pressTimer=setTimeout(function(){suppressClick=true;openFlyout(btn);},LPRESS_MS);
+    });
+    ['pointerup','pointerleave'].forEach(function(ev){stack.addEventListener(ev,function(){clearTimeout(pressTimer);});});
+    stack.addEventListener('click',function(ev){if(suppressClick){ev.stopImmediatePropagation();suppressClick=false;}},true);
+  }
+})();
 document.getElementById('p-sw').addEventListener('change',function(){window.SM.setBrushSize(parseInt(this.value));});
 // Actively picking a fill color also ENABLES fill (Graphite behavior) —
 // without this, the default-off fill state made "I set my fill to red, drew,
@@ -7442,7 +7737,7 @@ document.getElementById('p-sw').addEventListener('change',function(){window.SM.s
 // load/selection-sync don't dispatch events, so they can't re-enable fill
 // behind the user's back.
 document.getElementById('color-fill').addEventListener('input',function(){window.SM.setFillColor(this.dataset.hex8||this.value);if(!state.fillEnabled)window.SM.setFillEnabled(true);});
-document.getElementById('pm-fill-c').addEventListener('input',function(){var v=this.dataset.hex8||this.value;window.SM.setFillColor(v);document.getElementById('color-fill').value=v;document.getElementById('color-fill').dataset.hex8=v;if(!state.fillEnabled)window.SM.setFillEnabled(true);});
+document.getElementById('pm-fill-c').addEventListener('input',function(){var v=this.dataset.hex8||this.value;window.SM.setFillColor(v);setHex8Input(document.getElementById('color-fill'),v);if(!state.fillEnabled)window.SM.setFillEnabled(true);});
 document.getElementById('p-fill-on').addEventListener('change',function(){window.SM.setFillEnabled(this.checked);});
 // (fill-enable-toggle / stroke-enable-toggle section-header buttons removed
 // per redesign — the left panel's cw-eye badges are the one on/off switch
@@ -7450,7 +7745,7 @@ document.getElementById('p-fill-on').addEventListener('change',function(){window
 document.getElementById('fill-enable-toggle-lp').addEventListener('click',function(){window.SM.setFillEnabled(!state.fillEnabled);});
 document.getElementById('stroke-enable-toggle-lp').addEventListener('click',function(){window.SM.setStrokeEnabled(!state.strokeEnabled);});
 document.getElementById('color-stroke').addEventListener('input',function(){window.SM.setStrokeColor(this.dataset.hex8||this.value);if(!state.strokeEnabled)window.SM.setStrokeEnabled(true);});
-document.getElementById('pm-stroke-c').addEventListener('input',function(){var v=this.dataset.hex8||this.value;window.SM.setStrokeColor(v);document.getElementById('color-stroke').value=v;document.getElementById('color-stroke').dataset.hex8=v;if(!state.strokeEnabled)window.SM.setStrokeEnabled(true);});
+document.getElementById('pm-stroke-c').addEventListener('input',function(){var v=this.dataset.hex8||this.value;window.SM.setStrokeColor(v);setHex8Input(document.getElementById('color-stroke'),v);if(!state.strokeEnabled)window.SM.setStrokeEnabled(true);});
 // Stroke gradient along path (2026-08) — applies to the current canvas
 // selection only (unlike most Fill/Stroke fields, which also edit the
 // tool's own default when nothing is selected) — this is a per-shape
@@ -7778,7 +8073,7 @@ function applyVectorBrushToSelection(preset){
     stripAnyBrushTexture(p);
     if(preset&&preset!=='none')applyBrushTexture(p,preset);
   });
-  saveActiveLayerFrame();updateUI();showToast('Brush appliqué à la sélection');
+  saveActiveLayerFrame();updateUI();showToast(SM.t('toastBrushAppliedToSel'));
 }
 window.SM.applyVectorBrushToSelection=applyVectorBrushToSelection;
 if(window.BrushPresetPicker)window.BrushPresetPicker.paintButton(state.brushPreset);
@@ -7877,7 +8172,19 @@ var BLEND_MODE_LABELS={normal:'Normal',multiply:'Multiply',screen:'Screen',overl
 // have already diverged once (Blend has no "which OTHER layer" concept;
 // Matte's whole point is the layer above). A shared abstraction would be
 // solving a duplication that isn't really there yet.
-var MATTE_MODE_LABELS={none:'Aucun',alpha:'Alpha',alphaInverted:'Alpha (inversé)',luma:'Luminance',lumaInverted:'Luminance (inversée)'};
+// 2026-08 fix: this used to be a static object hardcoded in French — always
+// showed "Aucun"/"Luminance (inversée)" etc. regardless of app language,
+// even in English mode, while everything else in the same panel switched
+// correctly. matteModeLabel() reads SM.t() live so it always reflects the
+// CURRENT language, including a runtime switch (a static object computed
+// once at load time couldn't). MATTE_MODES is just the fixed key order the
+// dropdown lists, replacing the old Object.keys(MATTE_MODE_LABELS) use.
+var MATTE_MODES=['none','alpha','alphaInverted','luma','lumaInverted'];
+var MATTE_MODE_I18N_KEYS={none:'matteNone',alpha:'matteAlpha',alphaInverted:'matteAlphaInverted',luma:'matteLuma',lumaInverted:'matteLumaInverted'};
+function matteModeLabel(mode){
+  var key=MATTE_MODE_I18N_KEYS[mode];
+  return key&&window.SM&&SM.t?SM.t(key):mode;
+}
 (function initMatteDropdown(){
   var dd=document.getElementById('p-mattemode');if(!dd)return;
   var pop=document.createElement('div');pop.id='matte-pop';document.body.appendChild(pop);
@@ -7889,7 +8196,7 @@ var MATTE_MODE_LABELS={none:'Aucun',alpha:'Alpha',alphaInverted:'Alpha (inversé
     window._sceneVersion=(window._sceneVersion||0)+1;
     if(window.SMEngineBridge&&window.SMEngineBridge.renderNow)window.SMEngineBridge.renderNow();
   }
-  function setLabel(v){dd.dataset.value=v;dd.textContent=MATTE_MODE_LABELS[v]||v;}
+  function setLabel(v){dd.dataset.value=v;dd.textContent=matteModeLabel(v)||v;}
   function close(revert){
     pop.style.display='none';
     if(revert&&origMode!==null)applyPreview(origMode);
@@ -7917,10 +8224,10 @@ var MATTE_MODE_LABELS={none:'Aucun',alpha:'Alpha',alphaInverted:'Alpha (inversé
     }
     origMode=ld.matteMode||'none';
     pop.innerHTML='';
-    Object.keys(MATTE_MODE_LABELS).forEach(function(v){
+    MATTE_MODES.forEach(function(v){
       var it=document.createElement('div');
       it.className='blend-opt'+(v===origMode?' sel':'');
-      it.textContent=MATTE_MODE_LABELS[v];
+      it.textContent=matteModeLabel(v);
       it.addEventListener('mouseenter',function(){applyPreview(v);});
       it.addEventListener('click',function(e){
         e.stopPropagation();
@@ -8336,8 +8643,8 @@ window.renderRigModeUI=renderRigModeUI;
     // this gap, with only a console.warn, so a plain "0 forme(s)
     // assignée(s)" toast read exactly like a bug instead of an honest
     // "not supported yet" — surfaced explicitly instead of guessing.
-    if(res.n===0&&res.skippedUnsupported>0)showToast(window.SM&&SM.t?SM.t('rigAutoAssignBrushUnsupportedToast'):'Les formes avec des trous (résultats booléens) ne sont pas encore supportées par le Rig');
-    else showToast(res.n+(window.SM&&SM.t?SM.t('rigAutoAssignedToast'):' forme(s) assignée(s) automatiquement'));
+    if(res.n===0&&res.skippedUnsupported>0)showToast(window.SM&&SM.t?SM.t('rigAutoAssignBrushUnsupportedToast'):SM.t('toastShapesWithHolesNotSupportedByRig'));
+    else showToast(res.n+(window.SM&&SM.t?SM.t('rigAutoAssignedToast'):SM.t('toastShapesAutoAssignedSuffix')));
   });
   document.getElementById('btn-rig-commit').addEventListener('click',function(){
     var ld=state.layers[state.activeLayerIdx];
@@ -8350,7 +8657,7 @@ window.renderRigModeUI=renderRigModeUI;
     pushUndo();
     rigResetPose(ld);
     if(window.SMEngineBridge)SMEngineBridge.renderNow();
-    showToast('Pose du rig réinitialisée');
+    showToast(SM.t('toastRigPoseReset'));
   });
 })();
 // ---- Combine-group panel (2026-07-29 UX fix) ----
@@ -8539,14 +8846,98 @@ setInterval(function(){
   if(state.playing)return;
   saveAllLayerFrames();
   var json=window.SM.exportJSON();
-  try{localStorage.setItem('nemo-auto',json);}catch(e){}
+  if(window.SMProject&&window.SMProject.autosaveWrite)window.SMProject.autosaveWrite(json);
+  else try{localStorage.setItem('nemo-auto',json);}catch(e){}
   // v15: dense on-disk version history (Tauri only) alongside the single-
   // slot localStorage fallback above — see project.js pushVersionSnapshot.
   if(window.SMProject&&window.SMProject.pushVersionSnapshot)window.SMProject.pushVersionSnapshot(json);
+  // Reuses the `json` this tick already paid to serialize — see
+  // refreshActiveTabDirtyDot's own comment (project.js) for why this isn't
+  // triggered on every edit instead.
+  if(window.SMProject&&window.SMProject.refreshActiveTabDirtyDot)window.SMProject.refreshActiveTabDirtyDot(json);
 },30000);
 // Restored quietly into memory so it's ready the instant the start screen's
 // "Resume Last Session" card is clicked — the toast there was confusing
 // alongside the new start screen (state.js decides whether to actually
 // show that card, and surfaces its own confirmation once chosen).
 try{var saved=localStorage.getItem('nemo-auto');if(saved)window.SM.importJSON(saved,true);}catch(e){}
+
+// Right-panel collapse-to-rail (2026-08, "mettre en place le repli du panel
+// droit en icon pour l'ui"). See index.html's comment on
+// #props-panel-collapse-btn for why the collapsed state is a vertical label
+// rail (one entry per CURRENTLY VISIBLE .psec, from updatePropsContext's own
+// `show` object) rather than a fixed icon set — up to 25 different sections
+// can be relevant depending on tool/selection, unlike a fixed panel dock.
+function renderPropsPanelRail(show){
+  var rail=document.getElementById('props-panel-rail');
+  if(!rail)return;
+  rail.innerHTML='';
+  Object.keys(show).forEach(function(id){
+    if(!show[id])return;
+    var sec=document.getElementById(id);
+    if(!sec)return;
+    var hdr=sec.querySelector('.phdr');
+    var label=hdr?(hdr.textContent||'').trim().replace(/^☰\s*/,''):'';
+    if(!label)return;
+    var btn=document.createElement('button');
+    btn.className='rail-item';
+    btn.textContent=label;
+    btn.title=label;
+    btn.addEventListener('click',function(){
+      togglePropsPanelCollapse(false);
+      if(hdr&&hdr.classList.contains('closed'))hdr.click();
+      requestAnimationFrame(function(){sec.scrollIntoView({block:'start',behavior:'smooth'});});
+    });
+    rail.appendChild(btn);
+  });
+}
+window.renderPropsPanelRail=renderPropsPanelRail;
+function togglePropsPanelCollapse(force){
+  var panel=document.getElementById('props-panel');
+  if(!panel)return;
+  var collapsed=force!==undefined?force:!panel.classList.contains('collapsed');
+  // Panel-width persistence (ui.js) sets a plain inline style.width, which
+  // always wins over the .collapsed class's own `width:36px` rule (inline
+  // beats any selector, regardless of specificity) — without clearing it
+  // here first, a resized-then-collapsed panel would stay visually wide
+  // with just the rail's few narrow items floating in the leftover space.
+  // Stashed on window (not a local var) so ui.js's own startup restore can
+  // prime it too, for the "starts collapsed" case.
+  if(collapsed){
+    if(panel.style.width)window._propsExpandedWidth=panel.style.width;
+    panel.style.width='';
+  }else if(window._propsExpandedWidth){
+    panel.style.width=window._propsExpandedWidth;
+  }
+  panel.classList.toggle('collapsed',collapsed);
+  // Dragging a 36px rail wider makes no sense — hide the resize handle
+  // rather than leave a control that would just fight the collapsed width.
+  var resizeHandle=document.getElementById('props-panel-resize');
+  if(resizeHandle)resizeHandle.style.display=collapsed?'none':'';
+  if(collapsed&&window._lastPropsShow)renderPropsPanelRail(window._lastPropsShow);
+  syncPropsPanelCollapseTitle();
+  try{localStorage.setItem('nemo-props-panel-collapsed',collapsed?'1':'0');}catch(e){}
+}
+window.togglePropsPanelCollapse=togglePropsPanelCollapse;
+// STATE-dependent title (collapse vs expand) — can't live on data-i18n-title,
+// i18n.js's own sweep would blindly stomp it back to one fixed wording on
+// every language switch even while already collapsed. Registered in
+// SM.afterI18n (i18n.js's documented escape hatch for exactly this) so a
+// language switch re-picks the right one of the two strings instead.
+function syncPropsPanelCollapseTitle(){
+  var btn=document.getElementById('props-panel-collapse-btn');
+  var panel=document.getElementById('props-panel');
+  if(!btn||!panel||!window.SM||!SM.t)return;
+  btn.title=SM.t(panel.classList.contains('collapsed')?'expandPanelTitle':'collapsePanelTitle');
+}
+(function initPropsPanelCollapse(){
+  var btn=document.getElementById('props-panel-collapse-btn');
+  if(btn)btn.addEventListener('click',function(){togglePropsPanelCollapse();});
+  window.SM=window.SM||{};
+  (window.SM.afterI18n=window.SM.afterI18n||[]).push(syncPropsPanelCollapseTitle);
+  var wasCollapsed=false;
+  try{wasCollapsed=localStorage.getItem('nemo-props-panel-collapsed')==='1';}catch(e){}
+  if(wasCollapsed)togglePropsPanelCollapse(true);
+  else syncPropsPanelCollapseTitle();
+})();
 window.SM.setTool(state.userProfile&&state.userProfile.role==='producer'?'hand':'draw');updateUI();renderSymbolTabs();

@@ -421,6 +421,19 @@ uniquement — jamais embarqué dans le build distribué. Une copie de l'app liv
 beta-testeur a ce même panneau de triage dans le code, mais il est inutilisable sans le
 token perso de Cyril.
 
+**Build web (2026-08) : la publication GitHub passe par un Worker, pas par Rust.**
+Sur desktop, `submit_feedback_issue`/`upload_feedback_attachment` tournent en Rust — un
+navigateur n'a pas ce backend pour cacher le token. `worker-feedback/` (racine du repo) est
+un Worker Cloudflare séparé (secret `GITHUB_FEEDBACK_TOKEN` propre, jamais dans le Worker du
+site statique `nemo-editor`) qui joue exactement le même rôle de frontière de confiance.
+`feedback-bridge.js` branche sur `tauriOk()` : Tauri → `invoke()`, sinon → `fetch()` vers ce
+Worker (`FEEDBACK_WORKER_URL`, à mettre à jour après le premier déploiement). **Piège déjà
+tombé une fois** : le premier jet du build web gardait le vieux garde-fou `if (tauriOk())`
+autour de tout l'appel de publication — le feedback s'enregistrait bien en local
+(`localStorage`) et semblait "envoyé", mais ne partait jamais vers GitHub, silencieusement.
+Voir `worker-feedback/README.md` pour le setup (secret Worker à poser une fois via
+`wrangler secret put`, PAS un secret GitHub Actions).
+
 ## 7. Avant chaque build : synchroniser le numéro de version partout
 
 Trois fichiers portent le numéro de version et doivent rester identiques à chaque bump :
@@ -436,30 +449,39 @@ flash à l'ouverture (et tout le preview navigateur) montre encore l'ancien num�
 Checklist avant `npm run build` :
 1. Bump `version` dans `package.json` ET `src-tauri/tauri.conf.json` (même valeur).
 2. Bump le fallback statique dans `src/index.html` (`<title>` + `#status-text`).
-3. **Étape dylibs devenue INUTILE depuis le décodeur v2 (pipe ffmpeg, 2026-07)** :
-   `scripts/bundle-ffmpeg-dylibs.py` existe toujours mais n'a plus rien à faire — le moteur
-   vidéo natif (`src-tauri/src/video_decode.rs`) ne lie plus aucune lib ffmpeg directement
-   dans le binaire Rust (plus de crate `video-rs`/`ffmpeg-sys-next`). Il pilote désormais le
-   binaire CLI ffmpeg **déjà embarqué** en sous-processus (pipe stdout, résolu au runtime via
-   `current_exe().parent().join("ffmpeg")`) — ce binaire est **statiquement lié** (confirmé via
-   `otool -L` : uniquement des frameworks système, zéro dépendance Homebrew), donc aucun dylib
-   à embarquer, aucun crash au lancement. Vérifié : `otool -L target/release/nemo | grep
-   homebrew` → 0 résultat.
-   ⚠️ **Licence, nuance importante** : le binaire ffmpeg embarqué reste GPL (`ffmpeg -version`
-   confirme `--enable-gpl --enable-libx264 --enable-libx265`). Le piper en sous-processus est
-   de la "simple agrégation" (le pattern standard de tout logiciel de montage commercial qui
-   embarque ffmpeg), nettement plus sain juridiquement que le linkage direct qu'on avait avant
-   — mais ça ne fait pas disparaître la dépendance GPL en soi, ni la question SÉPARÉE des
-   brevets logiciels H.264/H.265 (libx264/libx265) qui touche même une build 100% conforme GPL.
-   **Ce n'est plus seulement "avant toute vente" — passage open source (2026-08-17, audit
-   complet dans [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)) : rendu bloquant avant toute
-   publication publique du repo tel quel.** Correctif recommandé : build ffmpeg custom
-   `--disable-gpl` sans libx264/libx265 (garder libvpx/libaom-libsvtav1/libopus =
-   royalty-free), ce qui fait converger le MP4 desktop et le WebM navigateur (`export.js`,
-   `exportVideoBrowser`/`exportGifBrowser`, 2026-08-17) sur la même famille de codec — le
-   chemin navigateur, lui, n'embarque AUCUN codec (MediaRecorder délègue au navigateur de
-   l'utilisateur, licence déjà payée par l'éditeur du navigateur) et n'a donc aucun problème
-   équivalent.
+3. **Étape dylibs REDEVENUE nécessaire (2026-08-18, rebuild LGPL)** :
+   `scripts/bundle-ffmpeg-dylibs.py` avait un commentaire "n'a plus rien à faire" écrit quand
+   le binaire ffmpeg embarqué était encore l'ancien build GPL, **statiquement lié** (zéro
+   dépendance Homebrew, confirmé par `otool -L`). Ce n'est plus vrai : suite à l'audit licence
+   du 2026-08-17 ([THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)), le binaire a été
+   **recompilé sans `--enable-gpl`** et sans `libx264`/`libx265`/`libvvenc`/`libkvazaar`/
+   `libvidstab` (GPL et/ou brevets H.264/H.265/H.266) — reproductible via
+   `scripts/rebuild-ffmpeg-lgpl.sh`. `ffmpeg -version` confirme désormais **License: LGPL
+   version 2.1 or later**, plus aucune trace de `--enable-gpl`. Contrepartie : ce nouveau
+   binaire est **lié dynamiquement** contre les dylibs Homebrew (libvpx/libaom/libsvtav1/
+   libopus/libwebp/libass/freetype/fontconfig/libtheora/libvorbis/libmp3lame/libsnappy/libzimg/
+   libharfbuzz/libopenjpeg/libvmaf — toutes permissives ou LGPL, voir THIRD_PARTY_NOTICES.md).
+   `bundle-ffmpeg-dylibs.py` a donc été corrigé pour scanner TOUS les exécutables de
+   `Contents/MacOS/` (le binaire principal ET le sidecar ffmpeg — l'ancienne version ne
+   scannait que le binaire principal, ce qui aurait silencieusement laissé le sidecar ffmpeg
+   sans ses dylibs, crash à l'export sur une machine sans Homebrew) et à exécuter **après
+   chaque `npm run build`**, obligatoire de nouveau, pas optionnel. La machine qui build (pas
+   celle qui reçoit l'app) doit avoir les formules Homebrew listées en tête de
+   `rebuild-ffmpeg-lgpl.sh` installées.
+   ⚠️ **H.264/H.265 restaurés SANS libx264/libx265, via VideoToolbox** (même 2026-08-18) :
+   `--enable-videotoolbox` (framework système Apple, pas une dépendance Homebrew, pas GPL)
+   expose `h264_videotoolbox`/`hevc_videotoolbox`/`prores_videotoolbox` — l'encodeur matériel
+   OS d'Apple, piloté via leur API plutôt qu'embarqué comme lib tierce. Apple a déjà la
+   licence brevet nécessaire pour SON encodeur ; on ne redistribue rien de nous-mêmes — même
+   principe que `exportVideoBrowser` (MediaRecorder du navigateur) côté web. Aucune inscription
+   Via LA (AVC) ni Access Advance (HEVC) nécessaire pour ce chemin. `exportMP4ToPath`
+   (`src/js/export.js`) utilise désormais `h264_videotoolbox` (plus `libx264` — qualité via
+   `-q:v`, VideoToolbox n'a pas d'équivalent `-crf`). `prores_videotoolbox` existe aussi
+   (alternative plus propre à `prores_ks`, pas encore branchée).
+   ProRes (`prores_ks`, encodeur natif ffmpeg, pas une lib externe) reste inchangé pour
+   l'instant — réimplémentation clean-room de RDD-36 (spec SMPTE publiée), aucun pool de
+   brevets public connu contrairement à AVC/HEVC, risque plus faible mais pas fermé ;
+   `prores_videotoolbox` (ci-dessus) le fermerait si besoin un jour.
 4. Si c'est un vrai changement fonctionnel (pas juste un patch de bug) : lancer
    `./scripts/publish-update.sh "notes"` après la build pour que les installs existantes le
    voient — voir §6 pour le détail des tokens nécessaires.
@@ -589,6 +611,20 @@ mutuellement. Règles à suivre **sans qu'on ait besoin de le redemander** :
   signature), jamais partagés même avec un collaborateur de confiance. Pour du dev normal,
   des valeurs placeholder (`STROKEMOTION_FEEDBACK_TOKEN=dev-placeholder
   STROKEMOTION_UPDATER_TOKEN=dev-placeholder`) suffisent à compiler et lancer `npm run dev`.
+- **Avant de partir en investigation sur un bug rapporté (surtout Motion/canvas), vérifier
+  les branches sœurs AVANT de diagnostiquer soi-même** — quand plusieurs sessions Claude
+  travaillent en parallèle dans des worktrees séparés (ex. `nemo` sur `claude/web-public-beta`
+  vs `nemo-motion` sur `claude/trim-and-motion-anchor-fixes`), le SEUL canal entre elles est
+  Git, de façon asynchrone : rien n'informe une session que l'autre a déjà committé un fix
+  tant qu'un `git fetch` explicite n'est pas fait. Incident du 2026-08-22 : un bug de
+  keyframes Position en Motion a été diagnostiqué et corrigé en profondeur (deux causes
+  distinctes trouvées par du reverse-engineering en direct) — alors qu'un fix pour une
+  troisième cause du MÊME bug (`29f4e7e`, feedback #41) était déjà poussé sur
+  `claude/trim-and-motion-anchor-fixes` depuis la VEILLE, avant même le début de
+  l'investigation. `git fetch` + `git log <branche-sœur> --oneline` (ou une recherche de
+  mots-clés du bug rapporté) est un coût de quelques secondes contre potentiellement une
+  heure de diagnostic redondant — à faire SYSTÉMATIQUEMENT en tout début d'investigation
+  d'un bug, pas seulement juste avant un déploiement.
 
 ## 10. Tout champ numérique doit supporter le "scrub" (glisser pour changer la valeur)
 

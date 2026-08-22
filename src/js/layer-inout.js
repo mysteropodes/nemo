@@ -512,7 +512,8 @@
         // moves each member according to ITS OWN part instead of forcing
         // every member to follow whichever single handle was physically
         // grabbed to start the gesture.
-        return { li: s.li, row: mrow, origIn: inPointOf(mld), origOut: outPointOf(mld), part: s.part || 'both' };
+        var mOrigIn = inPointOf(mld), mOrigOut = outPointOf(mld);
+        return { li: s.li, row: mrow, origIn: mOrigIn, origOut: mOrigOut, part: s.part || 'both', lastIn: mOrigIn, lastOut: mOrigOut };
       }).filter(Boolean);
       // pressLi: which bar was actually clicked, kept alongside the group so
       // a plain (no-modifier, no-move) click can narrow the selection down
@@ -582,12 +583,23 @@
         var p = m.part || 'both';
         if (p === 'in') inMembers.push(m); else if (p === 'out') outMembers.push(m); else bothMembersM.push(m);
       });
+      // Same "only rebuild when a value actually changed" gate the single-
+      // bar branch below already has (2026-07-28 fix) — this group branch
+      // never got it, so dragging a marquee of several in/out points ran a
+      // full loadFrame+engine render on EVERY mousemove regardless of
+      // whether frame-quantised dx had actually moved any member since the
+      // last event (feedback #39, "manque de fluidité... en sélection de
+      // plusieurs out point en même temps"). Tracked per-member (m.lastIn/
+      // lastOut) rather than one shared flag, since clamping can make
+      // members stop moving at different times as the drag nears an edge.
+      var anyChanged = false;
       inMembers.forEach(function (m) {
         var mld = state.layers[m.li]; if (!mld) return;
         var mNewIn = Math.max(0, Math.min(m.origIn + dx, m.origOut - 1));
         if (!trySetLinkedEdge(mld, 'in', mNewIn)) mld.inPoint = mNewIn;
         updateBar(m.row, m.li);
         updateLinkedChildrenBars(m.li);
+        if (mld.inPoint !== m.lastIn) { m.lastIn = mld.inPoint; anyChanged = true; }
       });
       outMembers.forEach(function (m) {
         var mld = state.layers[m.li]; if (!mld) return;
@@ -595,6 +607,7 @@
         if (!trySetLinkedEdge(mld, 'out', mNewOut)) mld.outPoint = mNewOut;
         updateBar(m.row, m.li);
         updateLinkedChildrenBars(m.li);
+        if (mld.outPoint !== m.lastOut) { m.lastOut = mld.outPoint; anyChanged = true; }
       });
       if (bothMembersM.length) {
         // CLAMP the group's shift to what every member can absorb, rather
@@ -626,6 +639,8 @@
           if (!mOutHandled) mld.outPoint = m.origOut + gdx;
           updateBar(m.row, m.li);
           updateLinkedChildrenBars(m.li);
+          if (mld.inPoint !== m.lastIn) { m.lastIn = mld.inPoint; anyChanged = true; }
+          if (mld.outPoint !== m.lastOut) { m.lastOut = mld.outPoint; anyChanged = true; }
         });
       }
       // Live keyframe preview — one shared selDx read off the first member
@@ -651,8 +666,10 @@
           livePreviewLayerKeys(m.li, m.part || 'both', mld, m.origIn, e.altKey);
         });
       }
-      if (window.loadFrame) loadFrame(state.currentFrame);
-      if (window.SMEngineBridge) SMEngineBridge.renderNow();
+      if (anyChanged) {
+        if (window.loadFrame) loadFrame(state.currentFrame);
+        if (window.SMEngineBridge) SMEngineBridge.renderNow();
+      }
       return;
     }
     var ld = state.layers[_drag.li]; if (!ld) { _drag = null; return; }
@@ -857,13 +874,13 @@
     //     anyway, through shiftLayerMotionKeys).
     var hasKeySel = !!(d.keySel && d.keySel.length);
     if (altHeld && d.type === 'out') {
-      if (window.showToast) showToast('Rogner la fin ne déplace jamais les keyframes — utilise le point d\'entrée ou le corps de la barre');
+      if (window.showToast) showToast(SM.t('toastTrimEndNeverMovesKeysHint'));
     }
     var retimes = (altHeld && !hasKeySel && d.type !== 'out') ? !defaultRetimes : defaultRetimes;
     if (altHeld && !hasKeySel && d.type !== 'out' && window.showToast) {
-      showToast(retimes ? 'Keyframes déplacées avec le calque' : 'Fenêtre de visibilité seule — keyframes laissées en place');
+      showToast(retimes ? SM.t('toastKeyframesMovedWithLayerFull') : SM.t('toastVisibilityWindowOnly'));
     }
-    if (altHeld && hasKeySel && window.showToast) showToast('Keyframes sélectionnées laissées en place');
+    if (altHeld && hasKeySel && window.showToast) showToast(SM.t('toastKeyframesSelectedLeftInPlace'));
     // An explicit keyframe selection travels with the handle, whatever the
     // handle's own retime default is (2026-07-25: "il faut pouvoir bouger
     // les in/out point de calque avec les keyframes selectionnées aussi").
@@ -910,7 +927,7 @@
       }
       if (selDx && window.SMMotion && SMMotion.shiftKeySelection) {
         SMMotion.shiftKeySelection(d.keySel, selDx);
-        if (window.showToast) showToast(d.keySel.length + ' keyframe(s) déplacée(s) avec le calque');
+        if (window.showToast) showToast(d.keySel.length + SM.t('toastKeyframesMovedWithLayerSuffix'));
       }
     }
     if (retimes && window.SM && window.SM.shiftLayerFrames) {
@@ -976,7 +993,7 @@
   }
   function applyBatch(fn) {
     var items = selectedLayers();
-    if (items.length < 2) { if (window.showToast) showToast('Sélectionne au moins 2 calques'); return; }
+    if (items.length < 2) { if (window.showToast) showToast(SM.t('toastSelectAtLeast2Layers')); return; }
     if (window.pushUndo) pushUndo();
     fn(items);
     if (window.renderTimeline) renderTimeline();
@@ -1070,7 +1087,7 @@
     var sorted = _barSel.slice().sort(function (a, b) { return inPointOf(state.layers[a.li]) - inPointOf(state.layers[b.li]); });
     _barSel = sorted.filter(function (_s, i) { return i % n === 0; });
     refreshBarSelClasses();
-    if (window.showToast) showToast(_barSel.length + ' calque(s) sélectionné(s)');
+    if (window.showToast) showToast(_barSel.length + SM.t('toastLayersSelectedSuffix'));
   }
   // Selects every layer that HAS a bar row currently rendered and is NOT
   // already selected — inverts within the same universe Box Select draws
@@ -1175,7 +1192,7 @@
         if (window.renderTimeline) renderTimeline();
         if (window.loadFrame) loadFrame(state.currentFrame);
         if (window.SMEngineBridge) SMEngineBridge.renderNow();
-        if (window.showToast) showToast('Lien temporel retiré');
+        if (window.showToast) showToast(SM.t('toastTimeLinkRemoved'));
       });
       bar.appendChild(a);
     });

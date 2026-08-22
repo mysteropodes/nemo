@@ -1458,7 +1458,18 @@
     if (active && active.clickHandler) { document.removeEventListener('click', active.clickHandler, true); active.clickHandler = null; }
   }
 
+  // Shape-tool group (timeline.js, 2026-08): rect/line/ellipse/speechbubble/
+  // star share one stacked toolbar slot, only the "front" one clickable —
+  // front it first so a step targeting e.g. '[data-tool="ellipse"]' both
+  // spotlights the right place AND is actually clickable by the user.
+  function frontShapeToolIfNeeded(target) {
+    if (!target || !window.SMShapeGroup) return;
+    var m = /data-tool="([a-z]+)"/.exec(target);
+    if (m) window.SMShapeGroup.ensureFront(m[1]);
+  }
+
   function positionFor(target) {
+    frontShapeToolIfNeeded(target);
     var el = target ? $(target) : null;
     if (!el) return null;
     var r = el.getBoundingClientRect();
@@ -1587,7 +1598,7 @@
     if (tt) tt.classList.remove('on');
     if (mod && completed) {
       markDone(mod.id);
-      if (window.showToast) showToast(T('Module "%s" terminé ✓').replace('%s', T(mod.title)));
+      if (window.showToast) showToast(T(SM.t('toastModuleDoneSuffix')).replace('%s', T(mod.title)));
     }
   }
 

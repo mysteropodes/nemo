@@ -42,7 +42,19 @@
   // constant exists to prevent (per explicit feedback: "fait attention au
   // alignement des keyframes aux properties").
   var ROW_H = 22;
-  var PROPS = ['position', 'anchor', 'rotation', 'scale', 'opacity'];
+  // Order (2026-08, "système pour animer l'id index de calque ou de
+  // shape/éléments") — a plain z-index: NOT a paint attribute, it's WHICH
+  // POSITION in the render list this holder ends up at. Deliberately a base
+  // PROPS entry rather than an opt-in extended one (like Fill/Stroke/Brush)
+  // because it applies to literally every holder unconditionally, same as
+  // Position/Rotation/Opacity — and since propsFor/PROP_* already serve BOTH
+  // a layer holder (ld) and an element holder (ld.elementMotion[id])
+  // identically, putting it here is the "même mécanisme" for both
+  // granularities in one place, confirmed with Cyril rather than building
+  // two parallel systems. Consumed by engine-bridge.js as a STABLE sort key
+  // (default 0 ties keep original document order, exactly like CSS
+  // z-index) — see layerOrderAt/elementOrderAt below.
+  var PROPS = ['position', 'anchor', 'rotation', 'scale', 'opacity', 'order'];
   // 3D layer (2026-07-28, After-Effects-style "3D layer" toggle,
   // ld.threeD) — three EXTRA scalar properties, revealed only when the
   // layer/holder has 3D on: positionZ (depth), rotationX/rotationY (the
@@ -52,7 +64,7 @@
   // three independent dim-1 properties reuse the exact same generic
   // track/keyframe/interpolation machinery 'rotation'/'opacity' already
   // do, zero changes needed to that machinery.
-  var PROPS_WITH_3D = ['position', 'positionZ', 'anchor', 'rotation', 'rotationX', 'rotationY', 'scale', 'opacity'];
+  var PROPS_WITH_3D = ['position', 'positionZ', 'anchor', 'rotation', 'rotationX', 'rotationY', 'scale', 'opacity', 'order'];
   // Mograph duplicator (2026-07-29, ld.duplicator) — four EXTRA keyframable
   // per-copy DELTAS (each copy k gets k× the delta, or a seeded random in
   // ±delta — see applyLayerDuplicator, app.js), revealed only when the
@@ -87,9 +99,41 @@
   // panel and the grid must iterate the same list or their rows desync,
   // which is the alignment invariant ROW_H's header comment is about — so
   // there is exactly ONE function that decides, and both sides call it.
+  // Component exposed properties (2026-08-18, "réutilisation dynamique de
+  // component... modifier des properties au dessus", Figma Component
+  // Properties + AE Master Properties synthesis, confirmed with Cyril).
+  // Declared ONCE on the symbol (state.symbols[id].exposedProps, via the
+  // "Exposer…" context menu items in select-bridge.js while editing INSIDE
+  // it), surfaced here as EXTRA ordinary Motion properties on every INSTANCE
+  // layer — same "extra properties, zero new track/keyframe machinery"
+  // precedent as PROPS_WITH_3D/PROPS_DUP_EXTRA above. Registers the row's
+  // PROP_LABEL/PROP_DIM/PROP_UNIT/PROP_DEFAULT on every call (idempotent,
+  // cheap) rather than once at exposure time — exposure happens in app.js,
+  // a project reload never re-runs that code path, and propsFor is the one
+  // function EVERY row (panel AND grid, the ROW_H alignment invariant) is
+  // guaranteed to call before it can render anything, so self-registering
+  // here is the only way that survives both first-use and reload alike.
+  function registerExposedPropMeta(key, label, defaultVal) {
+    PROP_LABEL[key] = label; PROP_DIM[key] = 1; PROP_UNIT[key] = '';
+    PROP_DEFAULT[key] = [defaultVal];
+  }
   function propsFor(holder) {
     var list = (holder && holder.threeD) ? PROPS_WITH_3D : PROPS;
     if (holder && holder.duplicator) list = list.concat(PROPS_DUP_EXTRA);
+    if (holder && holder.symbolId && state.symbols[holder.symbolId] && state.symbols[holder.symbolId].exposedProps && state.symbols[holder.symbolId].exposedProps.length) {
+      var epList = state.symbols[holder.symbolId].exposedProps;
+      epList.forEach(function (ep) { registerExposedPropMeta(ep.key, ep.label, ep.default); });
+      list = list.concat(epList.map(function (ep) { return ep.key; }));
+    }
+    // Dynamic shapes phase 2 (2026-08-18) — a rect's corner radii, keyable
+    // PER SHAPE. `holder` here is an ELEMENT holder (ld.elementMotion[id],
+    // see ensureElementHolder), tagged .paramShapeKind at creation time from
+    // the live item's data.paramShape.kind — same "extra properties on a
+    // tagged holder" shape as the layer-level exposedProps branch just
+    // above, one level down (element instead of layer).
+    if (holder && holder.paramShapeKind === 'rect') list = list.concat(['cornerTL', 'cornerTR', 'cornerBR', 'cornerBL']);
+    if (holder && holder.paramShapeKind === 'ellipse') list = list.concat(['arcStart', 'arcSweep', 'arcInner']);
+    if (holder && holder.paramShapeKind === 'star') list = list.concat(['starInner', 'starCorner']);
     // Multi-parent crossfade (2026-07-30, "jouer comme une opacité les
     // parents entre eux") — parentBlend only means anything once a SECOND
     // parent exists (parentLayerUidB); an ordinary single-parent layer
@@ -168,20 +212,29 @@
     if (prop === 'timeRemap') return holder.timeRemap || null;
     return (holder.motion && holder.motion[prop]) || null;
   }
-  var PROP_LABEL = { position: 'Position', anchor: 'Anchor Point', rotation: 'Rotation', scale: 'Scale', opacity: 'Opacity', timeRemap: 'Time Remap', positionZ: 'Position Z', rotationX: 'Rotation X', rotationY: 'Rotation Y', dupOffsetPos: 'Dup. Offset', dupOffsetRot: 'Dup. Rotation', dupOffsetScale: 'Dup. Scale', dupOffsetOpacity: 'Dup. Opacity', dupOffsetPosZ: 'Dup. Offset Z', dupOffsetRotX: 'Dup. Rotation X', dupOffsetRotY: 'Dup. Rotation Y', parentBlend: 'Parent Blend', timeLinkInOffset: 'Décalage entrée', timeLinkOutOffset: 'Décalage sortie' };
-  var PROP_DIM = { position: 2, anchor: 2, rotation: 1, scale: 2, opacity: 1, timeRemap: 1, positionZ: 1, rotationX: 1, rotationY: 1, dupOffsetPos: 2, dupOffsetRot: 1, dupOffsetScale: 2, dupOffsetOpacity: 1, dupOffsetPosZ: 1, dupOffsetRotX: 1, dupOffsetRotY: 1, parentBlend: 1, timeLinkInOffset: 1, timeLinkOutOffset: 1 };
-  var PROP_UNIT = { position: 'px', anchor: 'px', rotation: '°', scale: '%', opacity: '%', timeRemap: 'f', positionZ: 'px', rotationX: '°', rotationY: '°', dupOffsetPos: 'px', dupOffsetRot: '°', dupOffsetScale: '%', dupOffsetOpacity: '%', dupOffsetPosZ: 'px', dupOffsetRotX: '°', dupOffsetRotY: '°', parentBlend: '%', timeLinkInOffset: 'f', timeLinkOutOffset: 'f' };
+  var PROP_LABEL = { position: 'Position', anchor: 'Anchor Point', rotation: 'Rotation', scale: 'Scale', opacity: 'Opacity', order: 'Order', timeRemap: 'Time Remap', positionZ: 'Position Z', rotationX: 'Rotation X', rotationY: 'Rotation Y', dupOffsetPos: 'Dup. Offset', dupOffsetRot: 'Dup. Rotation', dupOffsetScale: 'Dup. Scale', dupOffsetOpacity: 'Dup. Opacity', dupOffsetPosZ: 'Dup. Offset Z', dupOffsetRotX: 'Dup. Rotation X', dupOffsetRotY: 'Dup. Rotation Y', parentBlend: 'Parent Blend', timeLinkInOffset: 'Décalage entrée', timeLinkOutOffset: 'Décalage sortie', cornerTL: 'Coin ↖', cornerTR: 'Coin ↗', cornerBR: 'Coin ↘', cornerBL: 'Coin ↙', arcStart: 'Début (arc)', arcSweep: 'Ouverture (arc)', arcInner: 'Rayon interne', starInner: 'Rayon interne', starCorner: 'Coins' };
+  var PROP_DIM = { position: 2, anchor: 2, rotation: 1, scale: 2, opacity: 1, order: 1, timeRemap: 1, positionZ: 1, rotationX: 1, rotationY: 1, dupOffsetPos: 2, dupOffsetRot: 1, dupOffsetScale: 2, dupOffsetOpacity: 1, dupOffsetPosZ: 1, dupOffsetRotX: 1, dupOffsetRotY: 1, parentBlend: 1, timeLinkInOffset: 1, timeLinkOutOffset: 1, cornerTL: 1, cornerTR: 1, cornerBR: 1, cornerBL: 1, arcStart: 1, arcSweep: 1, arcInner: 1, starInner: 1, starCorner: 1 };
+  var PROP_UNIT = { position: 'px', anchor: 'px', rotation: '°', scale: '%', opacity: '%', order: '', timeRemap: 'f', positionZ: 'px', rotationX: '°', rotationY: '°', dupOffsetPos: 'px', dupOffsetRot: '°', dupOffsetScale: '%', dupOffsetOpacity: '%', dupOffsetPosZ: 'px', dupOffsetRotX: '°', dupOffsetRotY: '°', parentBlend: '%', timeLinkInOffset: 'f', timeLinkOutOffset: 'f', cornerTL: 'px', cornerTR: 'px', cornerBR: 'px', cornerBL: 'px', arcStart: '°', arcSweep: '°', arcInner: '%', starInner: '%', starCorner: 'px' };
   // parentBlend defaults to 0 — "0%" reads as "fully Parent A" (the
   // pre-existing single parent), matching the invariant that assigning a
   // second parent must never itself move anything until the user actually
   // animates the blend (same "adding a feature is a visual no-op until
   // deliberately used" precedent enableTimeRemap's own seeded keys follow).
-  var PROP_DEFAULT = { position: [0, 0], anchor: [0, 0], rotation: [0], scale: [100, 100], opacity: [100], timeRemap: [0], positionZ: [0], rotationX: [0], rotationY: [0], dupOffsetPos: [0, 0], dupOffsetRot: [0], dupOffsetScale: [0, 0], dupOffsetOpacity: [0], dupOffsetPosZ: [0], dupOffsetRotX: [0], dupOffsetRotY: [0], parentBlend: [0], timeLinkInOffset: [0], timeLinkOutOffset: [0],
+  var PROP_DEFAULT = { position: [0, 0], anchor: [0, 0], rotation: [0], scale: [100, 100], opacity: [100], order: [0], timeRemap: [0], positionZ: [0], rotationX: [0], rotationY: [0], dupOffsetPos: [0, 0], dupOffsetRot: [0], dupOffsetScale: [0, 0], dupOffsetOpacity: [0], dupOffsetPosZ: [0], dupOffsetRotX: [0], dupOffsetRotY: [0], parentBlend: [0], timeLinkInOffset: [0], timeLinkOutOffset: [0],
     // Trim Paths (2026-08, AE parity — "animer les stroke en in et out"):
     // start/end as % of the path's own arc length, offset as a % that
     // shifts the whole [start,end] window — same 3-field shape as AE's own
     // Trim Paths, see applyTrimFor's doc comment for the combine math.
-    trimStart: [0], trimEnd: [100], trimOffset: [0] };
+    trimStart: [0], trimEnd: [100], trimOffset: [0],
+    // Dynamic shape corners (2026-08-18) — safety-net fallback only; the
+    // REAL per-shape default is each rect's own data.paramShape.tl/tr/br/bl
+    // (every shape has its own baked radii, unlike every other prop here
+    // which shares one constant across all holders), seeded onto the
+    // element holder's motionStatic the moment it's created — see
+    // ensureElementHolder's own comment.
+    cornerTL: [0], cornerTR: [0], cornerBR: [0], cornerBL: [0],
+    arcStart: [0], arcSweep: [359.9], arcInner: [0],
+    starInner: [50], starCorner: [0] };
   // Rows with no stopwatch — layerInPoint/layerOutPoint (app.js) are read at
   // 13 call sites with no frame parameter, so a real keyframe track on these
   // would silently only ever reflect state.currentFrame at read time (export
@@ -323,7 +376,7 @@
     // the effect-bearing layers, not only the ones that happen to be keyed.
     _hideUnanimated = false;
     renderLayerList(); renderTimeline();
-    if (window.showToast) showToast(targets.length + ' calque(s) révélé(s)');
+    if (window.showToast) showToast(targets.length + SM.t('toastLayersRevealedSuffix'));
     return true;
   }
   function handleRevealEffectsShortcut() {
@@ -944,7 +997,7 @@
   // mutates `seg.curvePoints` in place.
   function openMotionEaseEditor(ld, prop) {
     var track = trackFor(ld, prop);
-    if (!track || !track.keys.length) { if (window.showToast) showToast('Anime d’abord ' + PROP_LABEL[prop] + ' (icône chrono) pour avoir une courbe'); return; }
+    if (!track || !track.keys.length) { if (window.showToast) showToast('Anime d’abord ' + PROP_LABEL[prop] + SM.t('toastAnimIconTip')); return; }
     // Auto-create the missing second key — explicit request ("créer les
     // clés manquantes si il le faut"): a single-key track has nothing to
     // ease BETWEEN yet, but the user shouldn't have to manually add a
@@ -965,7 +1018,7 @@
     var seg = segmentLeftKey(track, state.currentFrame) || track.keys[0];
     var idx = track.keys.indexOf(seg);
     var next = track.keys[idx + 1] || track.keys[idx - 1];
-    if (!next) { if (window.showToast) showToast('Impossible de créer un segment éditable'); return; }
+    if (!next) { if (window.showToast) showToast(SM.t('toastCannotCreateEditableSegment')); return; }
     if (window._curveEditor) window._curveEditor.editMotionSeg(seg, PROP_LABEL[prop] + ' : clé ' + (seg.frame + 1) + ' → ' + (next.frame + 1));
   }
 
@@ -1101,7 +1154,34 @@
   // logic needed for the per-element case.
   function ensureElementHolder(ld, strokeId) {
     if (!ld.elementMotion) ld.elementMotion = {};
-    if (!ld.elementMotion[strokeId]) ld.elementMotion[strokeId] = {};
+    if (!ld.elementMotion[strokeId]) {
+      ld.elementMotion[strokeId] = {};
+      // Dynamic shapes phase 2 (2026-08-18) — auto-tag + seed from the live
+      // item's OWN current radii, found once here rather than re-derived on
+      // every propsFor call: unlike Component exposedProps (one shared
+      // default per key across every instance), each rect's un-animated
+      // corner value is genuinely its OWN (data.paramShape.tl/tr/br/bl),
+      // so PROP_DEFAULT can't carry it — motionStatic must, from the start,
+      // or clicking the stopwatch for the first time (toggleAnimated's
+      // OFF→ON reads valueAtFrame → staticValue → PROP_DEFAULT[0] when
+      // nothing else is seeded) would silently snap a 40px corner back to
+      // 0 the instant it's keyed.
+      var li = state.layers.indexOf(ld);
+      var item = li >= 0 ? liveItemByStrokeId(li, strokeId) : null;
+      if (item && item.data && item.data.paramShape && item.data.paramShape.kind === 'rect') {
+        var ps = item.data.paramShape;
+        ld.elementMotion[strokeId].paramShapeKind = 'rect';
+        ld.elementMotion[strokeId].motionStatic = { cornerTL: [ps.tl || 0], cornerTR: [ps.tr || 0], cornerBR: [ps.br || 0], cornerBL: [ps.bl || 0] };
+      } else if (item && item.data && item.data.paramShape && item.data.paramShape.kind === 'ellipse') {
+        var pse = item.data.paramShape;
+        ld.elementMotion[strokeId].paramShapeKind = 'ellipse';
+        ld.elementMotion[strokeId].motionStatic = { arcStart: [pse.startAngle || 0], arcSweep: [pse.sweep !== undefined ? pse.sweep : 359.9], arcInner: [Math.round((pse.innerRadius || 0) * 100)] };
+      } else if (item && item.data && item.data.paramShape && item.data.paramShape.kind === 'star') {
+        var pss = item.data.paramShape;
+        ld.elementMotion[strokeId].paramShapeKind = 'star';
+        ld.elementMotion[strokeId].motionStatic = { starInner: [Math.round((pss.innerRatio !== undefined ? pss.innerRatio : 0.5) * 100)], starCorner: [pss.cornerRadius || 0] };
+      }
+    }
     return ld.elementMotion[strokeId];
   }
   function elementHolder(ld, strokeId) { return ld.elementMotion ? ld.elementMotion[strokeId] : null; }
@@ -1436,7 +1516,7 @@
       // random, décalage temporel, Effectors...) with zero feedback that
       // anything happened — Time Remap's own enable already toasts a
       // one-line summary (enableTimeRemap below); this had nothing.
-      if (window.showToast) showToast('Duplicator activé — grille 2×3 par défaut, réglable dans le panel');
+      if (window.showToast) showToast(SM.t('toastDuplicatorEnabledHint'));
     }
     loadFrame(state.currentFrame);
     invalidateSymbolUnionBounds(); // same cache-staleness fix as dupRefresh (timeline.js)
@@ -1659,11 +1739,11 @@
     // it, reachable live: drag the pickwhip onto the existing Parent B and
     // land on a meaningless "blend a layer with itself" state.
     if (parentUid && parentUid === ld.parentLayerUidB) {
-      if (window.showToast) showToast('Parent A doit être différent du Parent B');
+      if (window.showToast) showToast(SM.t('toastParentAMustDifferFromB'));
       return;
     }
     if (parentUid && wouldCreateParentCycle(ensureLayerUid(ld), parentUid)) {
-      if (window.showToast) showToast('Parentage refusé : créerait une boucle');
+      if (window.showToast) showToast(SM.t('toastParentingRefusedCycle'));
       return;
     }
     ld.parentLayerUid = parentUid || null;
@@ -1678,11 +1758,11 @@
     var ld = state.layers[li];
     if (!ld) return;
     if (parentUid && parentUid === ld.parentLayerUid) {
-      if (window.showToast) showToast('Parent B doit être différent du Parent A');
+      if (window.showToast) showToast(SM.t('toastParentBMustDifferFromA'));
       return;
     }
     if (parentUid && wouldCreateParentCycle(ensureLayerUid(ld), parentUid)) {
-      if (window.showToast) showToast('Parentage refusé : créerait une boucle');
+      if (window.showToast) showToast(SM.t('toastParentingRefusedCycle'));
       return;
     }
     ld.parentLayerUidB = parentUid || null;
@@ -1903,6 +1983,119 @@
     if (!hasKeys(holder, 'fillColor') && !(holder.motionStatic && holder.motionStatic.fillColor)) return null;
     return valueAtFrame(holder, 'fillColor', frameIdx);
   }
+  // Extended per-shape properties: Stroke color / Stroke width (2026-08 —
+  // second slice of the "propriétés étendues par forme" chantier, same
+  // exact shape as Fill color above). Stroke color is [r,g,b,a] 0-255 like
+  // Fill; stroke width is a single scalar, so it's stored as the usual
+  // 1-element array every other scalar prop uses (rotation/opacity) and
+  // unwrapped here so callers get a plain number, not an array — matching
+  // what engine-bridge.js's own item.strokeWidth already expects.
+  function elementStrokeColorAt(li, strokeId, frameIdx) {
+    var ld = state.layers[li];
+    if (!ld || !ld.elementMotion) return null;
+    var holder = ld.elementMotion[strokeId];
+    if (!holder) return null;
+    if (!hasKeys(holder, 'strokeColor') && !(holder.motionStatic && holder.motionStatic.strokeColor)) return null;
+    return valueAtFrame(holder, 'strokeColor', frameIdx);
+  }
+  function elementStrokeWidthAt(li, strokeId, frameIdx) {
+    var ld = state.layers[li];
+    if (!ld || !ld.elementMotion) return null;
+    var holder = ld.elementMotion[strokeId];
+    if (!holder) return null;
+    if (!hasKeys(holder, 'strokeWidth') && !(holder.motionStatic && holder.motionStatic.strokeWidth)) return null;
+    return valueAtFrame(holder, 'strokeWidth', frameIdx)[0];
+  }
+  // Order (2026-08, "système pour animer l'id index de calque ou de shape/
+  // éléments") — unlike Fill/Stroke/Brush above, this NEVER returns null:
+  // every holder has a z-position (default 0, same neutral CSS-z-index
+  // meaning as everyone else), so engine-bridge.js's stable sort can just
+  // call this unconditionally for whichever items it already knows have
+  // *some* order track (see its own _anyLayerOrder/_anyElemOrder guards —
+  // the guard lives THERE, not here, so this stays a plain, cheap read).
+  function layerOrderAt(li, frameIdx) {
+    var ld = state.layers[li];
+    if (!ld) return 0;
+    return valueAtFrame(ld, 'order', frameIdx)[0];
+  }
+  function elementOrderAt(li, strokeId, frameIdx) {
+    var ld = state.layers[li];
+    if (!ld || !ld.elementMotion) return 0;
+    var holder = ld.elementMotion[strokeId];
+    if (!holder) return 0;
+    return valueAtFrame(holder, 'order', frameIdx)[0];
+  }
+  // Cheap "does ANY layer/element on this layer actually use Order" scans —
+  // engine-bridge.js calls these ONCE per buildSceneJson / once per layer
+  // respectively, so the stable-sort + per-item lookup below them is fully
+  // skipped (zero overhead) for the overwhelming default case of a
+  // document that never touches this property, same "test the cheap guard
+  // first" discipline as this codebase's own §5bis perf lessons.
+  function anyLayerHasOrder() {
+    for (var k = 0; k < state.layers.length; k++) {
+      var ld = state.layers[k];
+      if ((ld.motion && ld.motion.order) || (ld.motionStatic && ld.motionStatic.order)) return true;
+    }
+    return false;
+  }
+  function layerElementsHaveOrder(ld) {
+    if (!ld.elementMotion) return false;
+    for (var k in ld.elementMotion) {
+      var h = ld.elementMotion[k];
+      if (h && ((h.motion && h.motion.order) || (h.motionStatic && h.motionStatic.order))) return true;
+    }
+    return false;
+  }
+  // Whole-document check (layer OR any element on any layer) — export.js's
+  // exportHasEngineOnlyMotion uses this to decide whether a render needs to
+  // route through the engine (buildSceneJson, engine-bridge.js) instead of
+  // its own plain-Paper.js fallback loop, which has no idea what Order even
+  // is, same "engine-only feature, route the whole export through the
+  // engine rather than reimplement it a second time" fix already applied to
+  // 3D layers/Motion Blur.
+  function anyOrderUsedAnywhere() {
+    if (anyLayerHasOrder()) return true;
+    for (var k = 0; k < state.layers.length; k++) if (layerElementsHaveOrder(state.layers[k])) return true;
+    return false;
+  }
+  // Extended per-shape property: Brush size (2026-08 — third slice of the
+  // "propriétés étendues par forme" chantier, the "brush" piece of
+  // fill/stroke/brush/path). A vector-brush stroke's ink IS its fill (see
+  // CLAUDE.md's own note on isVectorBrush), so this is genuinely new
+  // ground, not something Fill/Stroke color already cover — it's a % scale
+  // on the ribbon's whole width profile, same unit convention as the base
+  // Scale property. Same shape as ParamShape (hasXFor/applyXFor rebuilding
+  // segments), not the simple item-field-override Fill/Stroke color use,
+  // because scaling width means re-deriving the outline geometry, not just
+  // overriding a paint field.
+  function hasBrushSizeMotionFor(li, strokeId) {
+    var ld = state.layers[li]; if (!ld) return false;
+    var holder = elementHolder(ld, strokeId);
+    if (!holder) return false;
+    return isAnimated(holder, 'brushSize') || !!(holder.motionStatic && holder.motionStatic.brushSize);
+  }
+  // sd.centerSegments/sd.widthProfile are the shape's OWN static pressure
+  // recording (serP's output, app.js) — untouched by this scale, so
+  // repeated calls across frames always start from the same source instead
+  // of compounding. Scoped to the case Trim Paths' own vector-brush special
+  // case (engine-bridge.js) does NOT already handle — composing an
+  // animated Trim window with an animated Brush Size on the SAME stroke at
+  // the same time is a real future case, not attempted here (see the call
+  // site's own comment for the exact boundary).
+  function applyBrushSizeFor(li, strokeId, sd, frameIdx) {
+    var ld = state.layers[li]; var holder = ld && elementHolder(ld, strokeId);
+    if (!holder || !sd.centerSegments || sd.centerSegments.length < 2) return null;
+    var pct = valueAtFrame(holder, 'brushSize', frameIdx)[0];
+    if (!window.sampleVectorBrushCenterline || !window.buildVariableWidthPath) return null;
+    var sampled = window.sampleVectorBrushCenterline(sd.centerSegments, sd.widthProfile);
+    var scale = pct / 100;
+    var scaledWidths = sampled.widths.map(function (w) { return w * scale; });
+    var outline = window.buildVariableWidthPath(sampled.pts, scaledWidths);
+    if (!outline) return null;
+    var segs = outline.segments.map(function (s) { return { point: [s.point.x, s.point.y], handleIn: [s.handleIn.x, s.handleIn.y], handleOut: [s.handleOut.x, s.handleOut.y] }; });
+    outline.remove();
+    return segs;
+  }
   // Path property, per-vertex (2026-07, "les properties de path dans motion
   // dont les vertices peuvent être animé séparément"): reuses the EXACT
   // same holder/track machinery as the 5 base Transform properties
@@ -2022,7 +2215,26 @@
       return Math.max(0, Math.min(100, pct)) / 100 * total;
     }
     function pointAtLen(len) {
-      len = ((len % total) + total) % total;
+      // Wrap ONLY for a closed path — the cyclic "progress ring" case this
+      // function's own header comment describes, where a window running past
+      // 100% legitimately continues through the seam.
+      //
+      // On an OPEN path the window is already clamped to [0,total] by
+      // lenAtPct, so the modulo could only ever fire on the single exact
+      // value len === total — where `total % total` is 0 and it returned the
+      // path's START point instead of its END. That put the last vertex of
+      // the trimmed result back at the beginning of the stroke, drawing a
+      // long spurious segment all the way back across the shape.
+      // Bug found live 2026-08-21 (QA on brush types): trimStart=60/
+      // trimEnd=100 on an open stroke returned first point x=1015 (right)
+      // but last point x=129 (the start) instead of 1606; trimStart=60/
+      // trimEnd=99 was correct, which is what pinned it to the exact
+      // endpoint. Bites the DEFAULT trimEnd of 100 too, so every partially
+      // trimmed open shape was affected, not an edge case.
+      // applyTrimToVectorBrush's own sampleAtLen already clamps this way —
+      // this brings the two into line (CLAUDE.md §3's duplicated-pair trap).
+      if (closed) len = ((len % total) + total) % total;
+      else len = Math.max(0, Math.min(total, len));
       for (var i2 = 1; i2 < cum.length; i2++) {
         if (cum[i2] >= len) {
           var segLen = cum[i2] - cum[i2 - 1];
@@ -2058,6 +2270,162 @@
     var win = trimWindowAt(li, strokeId, frameIdx);
     if (!win) return { segments: segments, closed: closed };
     return applyTrimSegments(segments, closed, win);
+  }
+  // Vector-brush ribbon trim (2026-08-20) — "il faudrait mettre en place le
+  // trim du coup": applyTrimSegments/applyTrimFor above trim the ribbon's
+  // already-BAKED outline (the closed polygon rebuildVectorBrushOutline
+  // produces), which has no notion of "one step along the stroke" — arc-
+  // length-slicing that outline instead sliced across the ribbon's own
+  // width, in the same wedge/degenerate-sliver family as the original
+  // fill-wedge bug (see engine-bridge.js's isVectorBrush exclusion,
+  // 18b2d9a). The fix mirrors that commit's own diagnosis: trim BEFORE
+  // the fill-shape's geometry is built, on the shape's actual "spine" —
+  // here that's the ribbon's centerline + width profile, not the outline.
+  //
+  // Reuses buildTrimPolyline unmodified: centerSegments already has the
+  // exact same {point,handleIn,handleOut} shape buildTrimPolyline expects
+  // (relative handles, Paper.js Segment convention — confirmed by
+  // rebuildVectorBrushOutline's own `new Segment(point,handleIn,handleOut)`
+  // call, tools.js), so passing centerSegments straight into it needs no
+  // adapter. widthAtFrac (tools.js, window-exposed, pure math/no Paper
+  // dependency) resolves each dense sample's width the same way
+  // rebuildVectorBrushOutline already does — this function stays
+  // Paper.js-free like the rest of motion.js; engine-bridge.js is the one
+  // that turns the returned {pts,widths} into real Paper Points and feeds
+  // buildVariableWidthPath (tools.js), since it already owns that Paper
+  // object lifecycle for the untrimmed case.
+  //
+  // Returns null when there's no trim window (caller falls back to the
+  // untrimmed centerSegments/widthProfile as-is) or the window collapses
+  // to nothing; otherwise {pts:[[x,y],...], widths:[number,...]} — a
+  // dense, already-windowed sample pair ready for buildVariableWidthPath.
+  function applyTrimToVectorBrush(li, strokeId, centerSegments, widthProfile, frameIdx) {
+    if (!centerSegments || centerSegments.length < 2) return null;
+    var win = trimWindowAt(li, strokeId, frameIdx);
+    if (!win) return null;
+    var s = win.start, e = win.end, off = win.offset || 0;
+    s += off; e += off;
+    if (e <= s) return { pts: [], widths: [] };
+    var pts = buildTrimPolyline(centerSegments, false);
+    var cum = [0];
+    for (var i = 1; i < pts.length; i++) {
+      var dx = pts[i][0] - pts[i - 1][0], dy = pts[i][1] - pts[i - 1][1];
+      cum.push(cum[i - 1] + Math.sqrt(dx * dx + dy * dy));
+    }
+    var total = cum[cum.length - 1];
+    if (!(total > 0)) return null;
+    var fallbackWidth = (widthProfile && widthProfile.length) ? widthProfile[widthProfile.length - 1].width : 1;
+    var widthsArr = pts.map(function (_, idx) {
+      var w = widthAtFrac(widthProfile, cum[idx] / total);
+      return w == null ? fallbackWidth : w;
+    });
+    function lenAtPct(pct) { return Math.max(0, Math.min(100, pct)) / 100 * total; }
+    function sampleAtLen(len) {
+      len = Math.max(0, Math.min(total, len));
+      for (var i2 = 1; i2 < cum.length; i2++) {
+        if (cum[i2] >= len) {
+          var segLen = cum[i2] - cum[i2 - 1];
+          var t = segLen > 0 ? (len - cum[i2 - 1]) / segLen : 0;
+          return {
+            point: [pts[i2 - 1][0] + (pts[i2][0] - pts[i2 - 1][0]) * t, pts[i2 - 1][1] + (pts[i2][1] - pts[i2 - 1][1]) * t],
+            width: widthsArr[i2 - 1] + (widthsArr[i2] - widthsArr[i2 - 1]) * t,
+          };
+        }
+      }
+      return { point: pts[pts.length - 1].slice(), width: widthsArr[widthsArr.length - 1] };
+    }
+    var lenS = lenAtPct(s), lenE = lenAtPct(e);
+    if (lenE <= lenS) return { pts: [], widths: [] };
+    var windowLen = lenE - lenS;
+    var outPts = [], outWidths = [];
+    var first = sampleAtLen(lenS); outPts.push(first.point); outWidths.push(first.width);
+    var STEP = total / Math.max(1, pts.length - 1);
+    for (var d = STEP; d < windowLen; d += STEP) {
+      var smp = sampleAtLen(lenS + d);
+      outPts.push(smp.point); outWidths.push(smp.width);
+    }
+    var last = sampleAtLen(lenE); outPts.push(last.point); outWidths.push(last.width);
+    return { pts: outPts, widths: outWidths };
+  }
+  // Dynamic shapes phase 2 (2026-08-18) — same encapsulation shape as
+  // applyTrimFor just above (engine-bridge.js never needs to know
+  // ld.elementMotion is where this lives), for a rect's per-corner radius.
+  // `sd` is the item's already-serialized dict (serP's output — see
+  // getEffectiveStrokes' render-time note): sd.paramShape carries the
+  // shape's OWN un-animated radii (each rect's real default, unlike every
+  // other Motion prop which shares one constant — see PROP_DEFAULT's own
+  // comment), read only for whichever corner ISN'T currently animated.
+  // Geometry itself is NOT reimplemented here — buildRoundRectPath
+  // (tools.js, window-exposed) is the one place that turns radii into
+  // segments, so the static-edit path (Coins panel) and this per-frame
+  // rebuild can never drift apart (CLAUDE.md §3).
+  function hasParamShapeMotionFor(li, strokeId) {
+    var ld = state.layers[li]; if (!ld) return false;
+    var holder = elementHolder(ld, strokeId);
+    if (!holder) return false;
+    if (holder.paramShapeKind === 'rect') {
+      return isAnimated(holder, 'cornerTL') || isAnimated(holder, 'cornerTR') || isAnimated(holder, 'cornerBR') || isAnimated(holder, 'cornerBL');
+    }
+    if (holder.paramShapeKind === 'ellipse') {
+      return isAnimated(holder, 'arcStart') || isAnimated(holder, 'arcSweep') || isAnimated(holder, 'arcInner');
+    }
+    if (holder.paramShapeKind === 'star') {
+      return isAnimated(holder, 'starInner') || isAnimated(holder, 'starCorner');
+    }
+    return false;
+  }
+  function applyParamShapeFor(li, strokeId, sd, frameIdx) {
+    var ps = sd.paramShape; if (!ps) return sd.segments;
+    var ld = state.layers[li]; var holder = ld && elementHolder(ld, strokeId);
+    if (!holder) return sd.segments;
+    function cv(key, fallback) { return isAnimated(holder, key) ? valueAtFrame(holder, key, frameIdx)[0] : fallback; }
+    var xs = sd.segments.map(function (s) { return s.point[0]; }), ys = sd.segments.map(function (s) { return s.point[1]; });
+    var x1 = Math.min.apply(null, xs), x2 = Math.max.apply(null, xs), y1 = Math.min.apply(null, ys), y2 = Math.max.apply(null, ys);
+    var built;
+    if (ps.kind === 'rect') {
+      var tl = cv('cornerTL', ps.tl || 0), tr = cv('cornerTR', ps.tr || 0), br = cv('cornerBR', ps.br || 0), bl = cv('cornerBL', ps.bl || 0);
+      built = window.buildRoundRectPath(x1, y1, x2, y2, tl, tr, br, bl);
+    } else if (ps.kind === 'ellipse') {
+      var startA = cv('arcStart', ps.startAngle || 0), sweepA = cv('arcSweep', ps.sweep !== undefined ? ps.sweep : 359.9), innerPct = cv('arcInner', Math.round((ps.innerRadius || 0) * 100));
+      var cx = (x1 + x2) / 2, cy = (y1 + y2) / 2, rx = (x2 - x1) / 2, ry = (y2 - y1) / 2;
+      built = window.buildArcEllipsePath(cx, cy, rx, ry, startA, sweepA, innerPct / 100);
+    } else if (ps.kind === 'star') {
+      var innerPctS = cv('starInner', Math.round((ps.innerRatio !== undefined ? ps.innerRatio : 0.5) * 100)), cornerR = cv('starCorner', ps.cornerRadius || 0);
+      var cxs = (x1 + x2) / 2, cys = (y1 + y2) / 2, outerR = Math.min(x2 - x1, y2 - y1) / 2;
+      built = window.buildStarPolygonPath(cxs, cys, outerR, ps.pointCount || 5, innerPctS / 100, cornerR);
+    } else return sd.segments;
+    var segs = built.segments.map(function (s) { return { point: [s.point.x, s.point.y], handleIn: [s.handleIn.x, s.handleIn.y], handleOut: [s.handleOut.x, s.handleOut.y] }; });
+    built.remove();
+    return segs;
+  }
+  // ---- Path-point parenting, "drive" direction (2026-08) — a vertex of
+  // THIS path snaps onto another LAYER's resolved world position every
+  // frame, tagged on the live item's data (data.pathVertexFollow, persisted
+  // via serP/desP like data.paramShape) rather than in Motion state — it's
+  // per-VERTEX config on the shape itself, not a keyable value. Same
+  // render-time-rebuild shape as paramShape (hasXxxMotionFor/applyXxxFor,
+  // §5ter/§1 of CLAUDE.md): both engine-bridge.js's buildSceneJson AND
+  // export.js's exportBuildFrame must call these, or an exported frame
+  // shows the vertex at its static authored position while the live canvas
+  // shows it correctly attached.
+  function hasPathVertexFollowMotionFor(li, strokeId) {
+    var item = liveItemByStrokeId(li, strokeId);
+    return !!(item && item.data && item.data.pathVertexFollow && item.data.pathVertexFollow.length);
+  }
+  function applyPathVertexFollowFor(li, strokeId, sd, frameIdx) {
+    var item = liveItemByStrokeId(li, strokeId);
+    var follows = item && item.data && item.data.pathVertexFollow;
+    var segs = sd.segments.map(function (s) { return { point: s.point.slice(), handleIn: (s.handleIn || [0, 0]).slice(), handleOut: (s.handleOut || [0, 0]).slice() }; });
+    if (!follows || !follows.length) return segs;
+    follows.forEach(function (f) {
+      if (f.vertexIndex == null || f.vertexIndex < 0 || f.vertexIndex >= segs.length) return;
+      var targetLi = findLayerIndexByUid(f.targetLayerUid);
+      if (targetLi < 0 || targetLi === li) return;
+      var wp = resolveLayerWorldOrigin(targetLi, frameIdx);
+      if (!wp) return;
+      segs[f.vertexIndex].point = [wp[0] + (f.offset ? f.offset[0] : 0), wp[1] + (f.offset ? f.offset[1] : 0)];
+    });
+    return segs;
   }
   // Transforms one item's already-built segments array (engine-bridge.js's
   // {point,handleIn,handleOut} triples, handles as RELATIVE offsets — see
@@ -2231,15 +2599,27 @@
     // Anchor point — AE-style crosshair-in-circle, ALWAYS shown while a
     // layer/element is expanded (even with zero keyframes on anything), same
     // as AE shows it on any selected layer/shape group. Pivot = bounds
-    // center + anchor offset (see computeMotionMat's header comment);
-    // position/rotation/scale are NOT applied to this preview point on
-    // purpose — it marks where the pivot sits in the target's OWN unmoved
-    // bounds, matching what engine-bridge.js/export.js actually pivot
-    // around at frame 0-equivalent (the anchor is a static geometric
-    // reference, not itself animated relative to the moving artwork).
-    var anc = valueAtFrame(holder, 'anchor', state.currentFrame);
-    var ax = bc.x + anc[0], ay = bc.y + anc[1];
-    var aw=outerWorldPoint(t,{x:ax,y:ay});
+    // center + anchor offset, THEN this target's own position/rotation/
+    // scale (motionBoxGeom's fwd, evaluated at the pivot itself — a
+    // rotation/scale around a point never moves that point, so this is
+    // exactly the render pivot, translated by Position same as the ring/
+    // position-dot below), finally the outer/parent chain.
+    // 2026-08-21 fix ("le cercle de rotation devrait être autour du point
+    // d'ancrage vert"): this used to skip the target's OWN transform
+    // entirely (deliberately, per a since-removed comment — "marks where
+    // the pivot sits in the target's OWN unmoved bounds") while the
+    // rotate ring/scale box (motionHandlePositions, below) and the
+    // position keyframe dot (hitPositionDot et al.) both already included
+    // it. The moment Position was ever non-[0,0], this crosshair stayed
+    // stranded at the un-translated bounds+anchor point while the ring
+    // and the position dot correctly moved together — confirmed live via
+    // SMMotion.buildOverlayItems(): with position=[80,-40], anchor=
+    // [100,50], the ring/dot centered at world (730,410) while this
+    // crosshair stayed at (650,450). hitAnchorPoint (the drag hit-test)
+    // and the 'anchor' onDrag handler are updated to match below, so the
+    // visible marker and its grab zone never disagree again.
+    var g0 = motionBoxGeom(t);
+    var aw = g0 ? outerWorldPoint(t, g0.pivot) : outerWorldPoint(t, { x: bc.x + valueAtFrame(holder, 'anchor', state.currentFrame)[0], y: bc.y + valueAtFrame(holder, 'anchor', state.currentFrame)[1] });
     var ancCol = [80, 220, 140, 255];
     items.push({ segments: [{ point: [aw.x - 9 * zs, aw.y] }, { point: [aw.x + 9 * zs, aw.y] }], closed: false, fillColor: null, strokeColor: ancCol, strokeWidth: 1.5 * zs });
     items.push({ segments: [{ point: [aw.x, aw.y - 9 * zs] }, { point: [aw.x, aw.y + 9 * zs] }], closed: false, fillColor: null, strokeColor: ancCol, strokeWidth: 1.5 * zs });
@@ -2367,7 +2747,23 @@
     // renders. unifiedMotionTargets/buildUnifiedOverlay already summed
     // position deltas onto a centroid the same delta-aware way — this
     // brings the single-target view in line with it.
-    var pvx = ax, pvy = ay;
+    // NOT `aw` (the crosshair's own point, a few lines up) — aw deliberately
+    // includes the CURRENT FRAME's own interpolated Position (2026-08-21 fix,
+    // so the crosshair tracks where the object visually renders THIS frame).
+    // Reusing it here was a mistake made fixing the ax/ay crash (feedback
+    // #36/#40): position is exactly the thing being plotted per-key below,
+    // so every key's dot inherited a live, current-frame-dependent shift on
+    // top of its own value — dragging one key (which updates the value AT
+    // the current frame while the playhead sits on/near it) visibly dragged
+    // every OTHER key's dot along with it too, even though only the grabbed
+    // key's data actually changed (feedback #41, "l'ensemble des clé bouge
+    // quand je bouge la position d'une seule keyframe"). This pivot must
+    // stay position-INDEPENDENT — exactly "bounds center + anchor offset"
+    // per this block's own original comment above, matching motionBoxGeom's
+    // pre-position px/py and onDown's hit-test `pv` a few hundred lines down
+    // (which never included position either — only the drawing side did).
+    var pvAnc = valueAtFrame(holder, 'anchor', state.currentFrame);
+    var pvx = bc.x + pvAnc[0], pvy = bc.y + pvAnc[1];
     var track = holder.motion.position;
     var ks = track.keys;
     for (var i = 0; i < ks.length - 1; i++) {
@@ -2376,11 +2772,22 @@
       var pts = [];
       var steps = 24;
       for (var s = 0; s <= steps; s++) {
-        var t = s / steps, v = 1 - t;
+        // Named `bt` (bezier t), NOT `t` — this function's outer `t` is the
+        // Motion TARGET object (activeMotionTarget()), which outerWorldPoint
+        // needs as its first argument. `var t` here used to shadow it (var
+        // is function-scoped, not block-scoped), so outerWorldPoint below —
+        // and every call after this loop for the REST of the function,
+        // including the position-key diamonds' own outerWorldPoint calls —
+        // silently ran with `t` clobbered to a plain 0..1 number instead of
+        // the target object once ks.length>=2 (single-keyframe projects
+        // never entered this loop, so the bug only showed once a second key
+        // existed). This is what "le motion path devrait être sur le point
+        // d'ancrage" was actually describing.
+        var bt = s / steps, v = 1 - bt;
         var rawPathPoint={
           x:
-            pvx + v * v * v * a.v[0] + 3 * v * v * t * (a.v[0] + ho[0]) + 3 * v * t * t * (b.v[0] + hi[0]) + t * t * t * b.v[0],
-          y:pvy + v * v * v * a.v[1] + 3 * v * v * t * (a.v[1] + ho[1]) + 3 * v * t * t * (b.v[1] + hi[1]) + t * t * t * b.v[1]
+            pvx + v * v * v * a.v[0] + 3 * v * v * bt * (a.v[0] + ho[0]) + 3 * v * bt * bt * (b.v[0] + hi[0]) + bt * bt * bt * b.v[0],
+          y:pvy + v * v * v * a.v[1] + 3 * v * v * bt * (a.v[1] + ho[1]) + 3 * v * bt * bt * (b.v[1] + hi[1]) + bt * bt * bt * b.v[1]
         };
         var worldPathPoint=outerWorldPoint(t,rawPathPoint);
         pts.push({point:[worldPathPoint.x,worldPathPoint.y]});
@@ -2604,9 +3011,26 @@
     }
     return null;
   }
+  // Only grabs a dot for the CURRENTLY SCRUBBED frame (2026-08-21, "je
+  // bouge le rectangle toutes les keyframes bougent") — every other key's
+  // dot sits wherever the render happens to place it at ITS OWN frame,
+  // which with a single keyframe (or several coincident on screen) is
+  // exactly where the shape is drawn RIGHT NOW regardless of playhead
+  // position. Without this guard, a plain "move the shape" drag at any
+  // frame always re-grabbed and mutated whichever existing key's dot
+  // visually overlapped the click — so a second keyframe could never be
+  // created by dragging on canvas, only the first one ever got edited.
+  // Restricting to the current frame's own key means: parked ON a
+  // keyframe, dragging the shape edits THAT keyframe (unchanged, correct
+  // AE behavior); parked anywhere else, this returns null and onDown
+  // falls through to the plain-move path below, which correctly creates
+  // a NEW key at state.currentFrame (setValue/setKeyAtCurrentFrame).
   function hitPositionDot(pt, ks, pv, target) {
     var tol = 8 / view.zoom;
-    for (var i = 0; i < ks.length; i++){var wp=outerWorldPoint(target,{x:pv.x+ks[i].v[0],y:pv.y+ks[i].v[1]});if(Math.hypot(pt.x-wp.x,pt.y-wp.y)<tol)return ks[i];}
+    for (var i = 0; i < ks.length; i++){
+      if (ks[i].frame !== state.currentFrame) continue;
+      var wp=outerWorldPoint(target,{x:pv.x+ks[i].v[0],y:pv.y+ks[i].v[1]});if(Math.hypot(pt.x-wp.x,pt.y-wp.y)<tol)return ks[i];
+    }
     return null;
   }
   // Finds the LIVE Paper item for a strokeId within a layer (including
@@ -2671,8 +3095,14 @@
   }
   function hitAnchorPoint(pt, t) {
     var tol = 9 / view.zoom;
+    // Mirrors buildOverlayItems' anchor crosshair exactly (2026-08-21 fix)
+    // — must use the SAME point the marker is actually drawn at (own
+    // position/rotation/scale included via motionBoxGeom's pivot), or a
+    // click precisely on the visible marker misses the moment Position is
+    // non-[0,0], falling through to a plain body-drag instead.
+    var g0 = motionBoxGeom(t);
     var anc = valueAtFrame(t.holder, 'anchor', state.currentFrame);
-    var aw=outerWorldPoint(t,{x:t.boundsCenter.x+anc[0],y:t.boundsCenter.y+anc[1]});
+    var aw = g0 ? outerWorldPoint(t, g0.pivot) : outerWorldPoint(t, { x: t.boundsCenter.x + anc[0], y: t.boundsCenter.y + anc[1] });
     var ax=aw.x,ay=aw.y;
     return Math.hypot(pt.x - ax, pt.y - ay) < tol ? { holder: t.holder, bc: t.boundsCenter, target:t } : null;
   }
@@ -2803,7 +3233,18 @@
         var pk = hitPositionDot(event.point, ks, pv,t);
         if (pk) { pushUndo(); _motionDrag = { mode: 'point', key: pk, pv: pv,t:t }; return true; }
       }
-      var ap = hitAnchorPoint(event.point, t);
+      // Alt required (2026-08-21, "pour bouger le point d'ancrage c'est
+      // clic + alt + drag il me semble pas le cas là") — matches Animation
+      // 2D's own anchor-crosshair convention (select-bridge.js's
+      // hitTestHandles: "checked FIRST/exclusively, but ONLY while Alt is
+      // held... a click in that same spot now falls through to the normal
+      // move/marquee logic below" when Alt isn't held). Motion mode never
+      // had that gate — a plain click within the small hit radius grabbed
+      // the anchor unconditionally, which is what "il bouge encore" (the
+      // artwork/box moving when the user only meant to click-drag
+      // normally) was really describing: an accidental anchor grab, not
+      // the anchor itself misbehaving.
+      var ap = event.altKey ? hitAnchorPoint(event.point, t) : null;
       if (ap) { pushUndo(); _motionDrag = { mode: 'anchor', holder: ap.holder, bc: ap.bc, t:ap.target }; return true; }
       // Effector handles (2026-07-29) — checked last, lowest priority: they
       // only exist on duplicator layers and the user places them wherever
@@ -2848,8 +3289,46 @@
         k.v[0] += dx; k.v[1] += dy;
       });
     } else if (_motionDrag.mode === 'anchor') {
-      var localAnchor=outerLocalPoint(_motionDrag.t,{x:event.point.x,y:event.point.y});
-      setValue(_motionDrag.holder, 'anchor', [localAnchor.x - _motionDrag.bc.x, localAnchor.y - _motionDrag.bc.y]);
+      // Strip the outer/parent chain first (as before), THEN this target's
+      // OWN position/rotation/scale (motionBoxGeom's inv — the exact
+      // inverse of the fwd() the crosshair is now drawn through, see
+      // buildOverlayItems/hitAnchorPoint's matching 2026-08-21 fix) —
+      // without this second step the anchor silently absorbed the
+      // target's own Position into itself the instant Position was
+      // non-[0,0], dragging the anchor to the wrong spot the moment the
+      // gesture started from the (now correctly Position-shifted)
+      // crosshair.
+      var outerLocal=outerLocalPoint(_motionDrag.t,{x:event.point.x,y:event.point.y});
+      var ganc=motionBoxGeom(_motionDrag.t);
+      var localAnchor=ganc?ganc.inv(outerLocal.x,outerLocal.y):outerLocal;
+      var newAncX=localAnchor.x-_motionDrag.bc.x, newAncY=localAnchor.y-_motionDrag.bc.y;
+      // Position compensation (2026-08-21 fix, "si je le rotationne avant
+      // alors tout le bounding box bougent en même temps si je le
+      // déplace"): with rotation/scale active, moving the pivot (anchor)
+      // ALSO moves every OTHER geometry point relative to it — fwd()
+      // rotates/scales around (px,py)=bc+anchor, so changing anchor alone
+      // re-centers that rotation on a different point and the whole shape
+      // visibly swings/shifts, even though geometry itself never changed.
+      // Only true at rot=0/scale=100% (where fwd(x,y) algebraically
+      // cancels anchor out entirely — confirmed live pre-fix, dragging the
+      // anchor left the artwork untouched) is that a non-issue. AE's own
+      // anchor-drag tool never moves the artwork regardless of rotation —
+      // it does this by adjusting Position to compensate, and this is that
+      // same compensation: re-deriving Position so that fwd(anyPoint)
+      // stays IDENTICAL before/after the anchor change. Derivation: with
+      // fwd(P) = pivot + M·(P-pivot) + pos (M = rotate∘scale, pivot =
+      // bc+anchor), requiring fwd_new(P) == fwd_old(P) for every P gives
+      // pos_new = pos_old + (I-M)·(pivot_old - pivot_new).
+      var oldAnc=valueAtFrame(_motionDrag.holder,'anchor',state.currentFrame);
+      var rotC=valueAtFrame(_motionDrag.holder,'rotation',state.currentFrame)[0];
+      var sclC=valueAtFrame(_motionDrag.holder,'scale',state.currentFrame);
+      var rrC=rotC*Math.PI/180, ccC=Math.cos(rrC), ssC=Math.sin(rrC);
+      var sxC=sclC[0]/100, syC=sclC[1]/100;
+      var dxC=oldAnc[0]-newAncX, dyC=oldAnc[1]-newAncY; // pivot_old - pivot_new (bc cancels)
+      var MxC=sxC*ccC*dxC-syC*ssC*dyC, MyC=sxC*ssC*dxC+syC*ccC*dyC; // M·d
+      var posC=valueAtFrame(_motionDrag.holder,'position',state.currentFrame);
+      setValue(_motionDrag.holder,'position',[posC[0]+(dxC-MxC), posC[1]+(dyC-MyC)]);
+      setValue(_motionDrag.holder, 'anchor', [newAncX, newAncY]);
     } else if (_motionDrag.mode === 'effector') {
       // Plain mutation, not setValue/keyframe — effectors are static
       // per-duplicator config (like its mode/rows/radius/etc.), not a
@@ -3007,7 +3486,7 @@
       for (var i = state.layers.length - 1; i >= 0; i--) window.SM.splitLayerIntoElementsCore(i, { silent: true });
       // The way back is not obvious from the result (N rows where there was
       // one) — say it once, with the exact gesture.
-      if (willSplit) showToast('Éclaté en calques — clic droit › « Fusionner les calques sélectionnés » pour revenir en arrière');
+      if (willSplit) showToast(SM.t('toastSplitToLayersUndoHint'));
     }
   }
   // Bar highlighting (layer-inout.js's own _barSel, used for group bar-drags
@@ -3181,7 +3660,7 @@
           renderLayerList(); renderTimeline();
           if (window.loadFrame) loadFrame(state.currentFrame);
           if (window.SMEngineBridge) SMEngineBridge.renderNow();
-          if (window.showToast) showToast('Lien temporel retiré');
+          if (window.showToast) showToast(SM.t('toastTimeLinkRemoved'));
         });
         row.appendChild(tlb2);
       }
@@ -3334,7 +3813,7 @@
                 ld.effectsFrom = ensureLayerUid(other);
                 renderLayerList(); renderTimeline();
                 if (window.SMEngineBridge) SMEngineBridge.renderNow();
-                if (window.showToast) showToast('Effets hérités de « ' + (other.name || ('Layer ' + (oi + 1))) + ' » — ils suivent leurs propres keyframes');
+                if (window.showToast) showToast(SM.t('toastEffectsInheritedFromSuffix') + (other.name || ('Layer ' + (oi + 1))) + ' » — ils suivent leurs propres keyframes');
               } });
             });
             if (!items.length) { if (window.showToast) showToast('Aucun autre calque ne porte d\u2019effets'); return; }
@@ -3387,7 +3866,16 @@
       // showing Éléments here lets a single shape inside a placed
       // instance be animated right from the Scene view, without needing
       // to double-click all the way into the component first.
-      renderElementsList(list, li, ld);
+      //
+      // Gated on the MANUAL accordion specifically (_motionExpandedLayer),
+      // not the broader `expanded` (isLayerExpanded also returns true for
+      // a property-shortcut reveal set, _motionRevealedLayers) — P/U/S/etc
+      // (handlePropShortcut/handleRevealAnimatedShortcut) are meant to
+      // reveal a layer's own Transform properties, not cascade into every
+      // element's breakdown too (feedback #42, "il ne faut pas afficher
+      // éléments"). A real row click still shows elements exactly as
+      // before — this only narrows what a SHORTCUT-driven reveal shows.
+      if (window._motionExpandedLayer === li) renderElementsList(list, li, ld);
     });
     // Right-panel mirror of the active layer's Transform group ("il
     // faudrait afficher les properties d'un calque sélectionné et la
@@ -3536,7 +4024,7 @@
       if (window.setLayerParentB) setLayerParentB(li, null);
       renderLayerList(); renderTimeline();
       if (window.SMEngineBridge) SMEngineBridge.renderNow();
-      if (window.showToast) showToast('Parent retiré');
+      if (window.showToast) showToast(SM.t('toastParentRemoved'));
     });
 
     row.appendChild(pill);
@@ -3580,7 +4068,7 @@
       renderLayerList(); renderTimeline();
       if (window.loadFrame) loadFrame(state.currentFrame);
       if (window.SMEngineBridge) SMEngineBridge.renderNow();
-      if (window.showToast) showToast('Lien temporel retiré');
+      if (window.showToast) showToast(SM.t('toastTimeLinkRemoved'));
     }
     name.addEventListener('contextmenu', function (e) {
       e.stopPropagation(); e.preventDefault();
@@ -3670,7 +4158,7 @@
   function setLayerTimeLink(li, targetIdx, mode, srcAnchor) {
     var ld = state.layers[li], src = state.layers[targetIdx];
     if (!ld || !src || targetIdx === li) return false;
-    if (timeLinkWouldCycle(li, targetIdx)) { if (window.showToast) showToast('Lien impossible : créerait un cycle'); return false; }
+    if (timeLinkWouldCycle(li, targetIdx)) { if (window.showToast) showToast(SM.t('toastLinkImpossibleCycle')); return false; }
     pushUndo();
     mode = mode || 'both';
     var xType = (mode !== 'both' && (srcAnchor === 'in' || srcAnchor === 'out')) ? srcAnchor : mode;
@@ -4198,7 +4686,7 @@
         // Clone the source's OWN expression. Nothing to clone is worth
         // saying out loud rather than silently inserting an empty string.
         var srcEx = t.holder.expressions && t.holder.expressions[t.prop];
-        if (!srcEx || !srcEx.code) { if (window.showToast) showToast('Cette propriété n\u2019a pas d\u2019expression à cloner'); return; }
+        if (!srcEx || !srcEx.code) { if (window.showToast) showToast(SM.t('toastNoExpressionToClone')); return; }
         text = srcEx.code;
       } else {
         var li = state.layers.indexOf(t.holder);
@@ -4207,7 +4695,7 @@
         if (li < 0) state.layers.forEach(function (ld2, i2) {
           if (ld2.elementMotion) Object.keys(ld2.elementMotion).forEach(function (k) { if (ld2.elementMotion[k] === t.holder) li = i2; });
         });
-        if (li < 0) { if (window.showToast) showToast('Propriété non référençable'); return; }
+        if (li < 0) { if (window.showToast) showToast(SM.t('toastPropertyNotReferenceable')); return; }
         text = 'layer("' + ensureLayerUid(state.layers[li]) + '").' + t.prop;
       }
       // Insert at the caret rather than replacing: a pickwhip is usually
@@ -4219,7 +4707,7 @@
       ta.dispatchEvent(new Event('input'));
       commit();
       renderLayerList(); renderTimeline();
-      if (window.showToast) showToast(alt ? 'Expression clonée' : 'Référence insérée');
+      if (window.showToast) showToast(alt ? SM.t('toastExpressionCloned') : SM.t('toastReferenceInserted'));
     }
     function onKey(e) { if (e.key === 'Escape') cleanup(); }
     document.addEventListener('mousemove', onMove, true);
@@ -4483,6 +4971,29 @@
       if (entry.sd.fillColor) {
         renderFillColorRow(list, ensureElementHolder(ld, entry.strokeId), entry.sd.fillColor);
       }
+      // Stroke color/width (2026-08 — second slice of the "propriétés
+      // étendues par forme" chantier, same convention as Fill color above):
+      // hidden unless the element actually has a real stroke. Width reuses
+      // renderTrimScalarRow as-is (a plain scalar row is a plain scalar
+      // row) rather than writing a near-identical function — its default
+      // comes from THIS shape's own current width, same "per-shape, not
+      // one shared constant" principle ensureElementHolder's corner-radii
+      // seeding already establishes for paramShapeKind.
+      if (entry.sd.strokeColor) {
+        var strokeHolder = ensureElementHolder(ld, entry.strokeId);
+        renderStrokeColorRow(list, strokeHolder, entry.sd.strokeColor);
+        if (entry.sd.strokeWidth !== undefined) {
+          renderTrimScalarRow(list, strokeHolder, 'strokeWidth', 'Stroke Width', 'px', 0, 200, entry.sd.strokeWidth);
+        }
+      }
+      // Brush size (2026-08 — third slice, the "brush" piece of
+      // fill/stroke/brush/path): opt-in, hidden unless this is actually a
+      // vector-brush ribbon (isVectorBrush) with real centerline data —
+      // a plain shape has no width profile to scale. % of the shape's own
+      // recorded pressure widths, same convention as the base Scale prop.
+      if (entry.sd.isVectorBrush && entry.sd.centerSegments && entry.sd.centerSegments.length >= 2) {
+        renderTrimScalarRow(list, ensureElementHolder(ld, entry.strokeId), 'brushSize', 'Brush Size', '%', 10, 500, 100);
+      }
       // Trim Paths (2026-08, "animer les stroke en in et out"): opt-in,
       // same visibility gate as Path above (needs real vertex geometry).
       if (!entry.sd.isRaster && entry.sd.segments && entry.sd.segments.length) {
@@ -4506,9 +5017,12 @@
   // Single row (not an accordion group — one color, nothing to expand),
   // same stopwatch/keying contract as renderVertexRow but with a color
   // swatch instead of numeric scrub fields. Opens the SAME color-picker
-  // popover the layer-color dot uses elsewhere (timeline.js).
-  function renderFillColorRow(list, holder, currentFillColorHex) {
-    var prop = 'fillColor';
+  // popover the layer-color dot uses elsewhere (timeline.js). Generalized
+  // over `prop`/`label`/`swatchTitle` (2026-08) so Fill and Stroke color
+  // share one implementation instead of drifting apart as two copies
+  // (CLAUDE.md §3) — renderFillColorRow/renderStrokeColorRow below are thin
+  // wrappers so existing call sites don't need to change.
+  function renderColorRow(list, holder, prop, label, swatchTitle, currentColorHex) {
     var row = document.createElement('div'); row.className = 'lrow motion-prop-row';
     var sw = document.createElement('div');
     var swOn = isAnimated(holder, prop);
@@ -4519,13 +5033,13 @@
     function currentRgba() {
       if (hasKeys(holder, prop)) return valueAtFrame(holder, prop, state.currentFrame);
       if (holder.motionStatic && holder.motionStatic[prop]) return holder.motionStatic[prop];
-      return hexToRgba255(currentFillColorHex);
+      return hexToRgba255(currentColorHex);
     }
     sw.addEventListener('click', function (e) {
       e.stopPropagation(); pushUndo();
       if (!swOn) {
         if (!holder.motionStatic) holder.motionStatic = {};
-        if (!holder.motionStatic[prop]) holder.motionStatic[prop] = hexToRgba255(currentFillColorHex);
+        if (!holder.motionStatic[prop]) holder.motionStatic[prop] = hexToRgba255(currentColorHex);
         toggleAnimated(holder, prop);
       } else if (hasKeyHere) {
         if (holder.motion[prop].keys.length === 1) {
@@ -4542,12 +5056,12 @@
       renderLayerList(); renderTimeline();
       if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
     });
-    var nm = document.createElement('div'); nm.className = 'lnm'; nm.textContent = 'Fill';
+    var nm = document.createElement('div'); nm.className = 'lnm'; nm.textContent = label;
     var swatch = document.createElement('div');
     swatch.style.cssText = 'width:16px;height:16px;border-radius:3px;border:1px solid var(--border2);cursor:pointer;margin-left:auto;';
     var rgba = currentRgba();
     swatch.style.background = 'rgba(' + rgba[0] + ',' + rgba[1] + ',' + rgba[2] + ',' + ((rgba[3] !== undefined ? rgba[3] : 255) / 255) + ')';
-    swatch.title = 'Couleur de fill de cette forme';
+    swatch.title = swatchTitle;
     swatch.addEventListener('click', function (e) {
       e.stopPropagation();
       if (!window.openLayerColorSwatches) return;
@@ -4561,6 +5075,12 @@
     });
     row.appendChild(sw); row.appendChild(nm); row.appendChild(swatch);
     list.appendChild(row);
+  }
+  function renderFillColorRow(list, holder, currentFillColorHex) {
+    renderColorRow(list, holder, 'fillColor', 'Fill', 'Couleur de fill de cette forme', currentFillColorHex);
+  }
+  function renderStrokeColorRow(list, holder, currentStrokeColorHex) {
+    renderColorRow(list, holder, 'strokeColor', 'Stroke', 'Couleur de stroke de cette forme', currentStrokeColorHex);
   }
   // Trim Paths (2026-08, "animer les stroke en in et out"): 3 scalar rows
   // (Start/End/Offset, %), same stopwatch/keying contract as
@@ -5116,7 +5636,13 @@
       // layers; a group-header node's `.strokeId` is undefined so it can
       // never match _motionExpandedElement and never expands here — group
       // rows have no per-group Transform in this pass).
-      var els = buildShapeTree(li, ld);
+      // Same narrowing as renderLayerListMotion's own renderElementsList
+      // gate just above (feedback #42) — a property-shortcut reveal
+      // (_motionRevealedLayers, part of `expanded` via isLayerExpanded)
+      // must not pull in the per-element tree here either, or this side
+      // renders MORE rows than the panel for the exact same layer, which
+      // is precisely the row-count divergence CLAUDE.md §11 warns about.
+      var els = (window._motionExpandedLayer === li) ? buildShapeTree(li, ld) : [];
       if (els.length) {
         var elHdrSpacer = document.createElement('div'); elHdrSpacer.className = 'frow motion-group-row';
         grid.appendChild(elHdrSpacer);
@@ -5176,6 +5702,41 @@
           // down (a later Forme's own Transform/Path/Fill rows) drifted out
           // of alignment with its own keyframe track from that point on.
           if (entry.sd.fillColor) renderTracksFor(grid, elHolder, 'fillColor');
+          // Stroke color/width (mirrors renderElementsList's own Stroke
+          // block exactly — same condition, same order: color row then,
+          // only if the shape also reports a width, the width row).
+          if (entry.sd.strokeColor) {
+            renderTracksFor(grid, elHolder, 'strokeColor');
+            if (entry.sd.strokeWidth !== undefined) renderTracksFor(grid, elHolder, 'strokeWidth');
+          }
+          // Brush size (mirrors renderElementsList's own Brush size row —
+          // same condition).
+          if (entry.sd.isVectorBrush && entry.sd.centerSegments && entry.sd.centerSegments.length >= 2) {
+            renderTracksFor(grid, elHolder, 'brushSize');
+          }
+          // Trim Paths group (mirrors renderElementsList's renderTrimPathsGroup
+          // exactly — same condition, same expand state, same 3 scalar rows).
+          // Bug found live (2026-08-21, QA pass on a bouncing-ball test scene):
+          // this mirror was missing entirely — renderTrimPathsGroup ALWAYS
+          // appends its header row on the panel side (any shape with vertex
+          // geometry gets one, regardless of whether Trim Paths is actually
+          // used), but this grid side had no matching spacer at all, so
+          // #layer-list had one MORE row than #frame-grid for every such
+          // shape even before expanding it, growing to four rows once
+          // expanded — every row further down (a later Forme's own rows, or
+          // the next layer entirely) drifted out of alignment with its own
+          // keyframe track from that point on. Same class of bug as the Fill
+          // row fix just above; confirmed via a live row-count diff (23 grid
+          // rows vs 27 panel rows with Trim Paths expanded) before this fix.
+          if (!entry.sd.isRaster && entry.sd.segments && entry.sd.segments.length) {
+            var trimHdrSpacer = document.createElement('div'); trimHdrSpacer.className = 'frow motion-group-row';
+            grid.appendChild(trimHdrSpacer);
+            if (window._motionExpandedTrimHolder === elHolder) {
+              renderTracksFor(grid, elHolder, 'trimStart');
+              renderTracksFor(grid, elHolder, 'trimEnd');
+              renderTracksFor(grid, elHolder, 'trimOffset');
+            }
+          }
         });
       }
     });
@@ -5220,7 +5781,7 @@
     return groups;
   }
   function distributeKeys() {
-    if (_motionKeySel.length < 2) { if (window.showToast) showToast('Sélectionne au moins 2 clés'); return; }
+    if (_motionKeySel.length < 2) { if (window.showToast) showToast(SM.t('toastSelectAtLeast2Keys')); return; }
     pushUndo();
     _groupKeySelByTrack().forEach(function (g) {
       if (g.items.length < 2) return;
@@ -5234,7 +5795,7 @@
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
   }
   function flipKeys() {
-    if (_motionKeySel.length < 2) { if (window.showToast) showToast('Sélectionne au moins 2 clés'); return; }
+    if (_motionKeySel.length < 2) { if (window.showToast) showToast(SM.t('toastSelectAtLeast2Keys')); return; }
     pushUndo();
     _groupKeySelByTrack().forEach(function (g) {
       if (g.items.length < 2) return;
@@ -5251,7 +5812,7 @@
     var sorted = _motionKeySel.slice().sort(function (a, b) { return a.key.frame - b.key.frame; });
     _motionKeySel = sorted.filter(function (_s, i) { return i % n === 0; });
     renderTimeline();
-    if (window.showToast) showToast(_motionKeySel.length + ' clé(s) sélectionnée(s)');
+    if (window.showToast) showToast(_motionKeySel.length + SM.t('toastKeysSelectedSuffix'));
   }
   // Subdivide: insert a key HALFWAY between each consecutive pair of
   // selected keys on the same track (2026-07-25, Skew Pro's "Subdivide").
@@ -5276,14 +5837,14 @@
     return Math.round(lag * 100);
   }
   function colorSelectedKeys(color) {
-    if (!_motionKeySel.length) { if (window.showToast) showToast('Aucune clé sélectionnée'); return; }
+    if (!_motionKeySel.length) { if (window.showToast) showToast(SM.t('toastNoKeySelected')); return; }
     pushUndo();
     _motionKeySel.forEach(function (s) { if (color) s.key.color = color; else delete s.key.color; });
     renderTimeline();
-    if (window.showToast) showToast(color ? (_motionKeySel.length + ' clé(s) colorée(s)') : 'Couleur retirée');
+    if (window.showToast) showToast(color ? (_motionKeySel.length + SM.t('toastKeysColoredSuffix')) : SM.t('toastColorRemoved'));
   }
   function subdivideKeys() {
-    if (_motionKeySel.length < 2) { if (window.showToast) showToast('Sélectionne au moins 2 clés'); return; }
+    if (_motionKeySel.length < 2) { if (window.showToast) showToast(SM.t('toastSelectAtLeast2Keys')); return; }
     pushUndo();
     var added = 0, skipped = 0, fresh = [];
     _groupKeySelByTrack().forEach(function (g) {
@@ -5308,7 +5869,7 @@
     setKeySel(_motionKeySel.concat(fresh));
     renderLayerList(); renderTimeline();
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
-    if (window.showToast) showToast(added + ' clé(s) insérée(s)' + (skipped ? ' — ' + skipped + ' intervalle(s) trop court(s)' : ''));
+    if (window.showToast) showToast(added + SM.t('toastKeysInsertedSuffix') + (skipped ? ' — ' + skipped + ' intervalle(s) trop court(s)' : ''));
   }
   // Keep a random subset of the current selection (Skew Pro's "Grab
   // Randomly"): the fast way to make a uniform batch of layers/keys feel
@@ -5316,14 +5877,14 @@
   // empty the selection on a small one.
   function grabRandomKeys(percent) {
     var p = Math.max(1, Math.min(100, parseInt(percent, 10) || 50)) / 100;
-    if (!_motionKeySel.length) { if (window.showToast) showToast('Aucune clé sélectionnée'); return; }
+    if (!_motionKeySel.length) { if (window.showToast) showToast(SM.t('toastNoKeySelected')); return; }
     var pool = _motionKeySel.slice();
     var want = Math.max(1, Math.round(pool.length * p));
     var out = [];
     while (out.length < want && pool.length) out.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
     setKeySel(out);
     renderTimeline();
-    if (window.showToast) showToast(out.length + ' clé(s) gardée(s) au hasard');
+    if (window.showToast) showToast(out.length + SM.t('toastKeysKeptRandomSuffix'));
   }
   // Inverts within whatever tracks are CURRENTLY RENDERED (the same
   // universe the marquee itself draws over).
@@ -5533,12 +6094,12 @@
         var rows = buildKeyRows();
         var f0 = Infinity, f1 = -Infinity;
         rows.forEach(function (r) { r.forEach(function (en) { f0 = Math.min(f0, en.orig); f1 = Math.max(f1, en.orig); }); });
-        if (!(f1 > f0)) { if (window.showToast) showToast('Sélectionne des clés sur 2 frames différentes pour les espacer'); return; }
+        if (!(f1 > f0)) { if (window.showToast) showToast(SM.t('toastSelectKeysOn2DifferentFramesToSpace')); return; }
         startSkewDrag(rows, mode, e);
       });
       addStaggerEdges(_keySelBoxEl, function (e, mode) {
         var rows = buildKeyRows();
-        if (rows.length < 2) { if (window.showToast) showToast('Sélectionne des clés sur 2 pistes ou plus pour skewer'); return; }
+        if (rows.length < 2) { if (window.showToast) showToast(SM.t('toastSelectKeysOn2TracksToSkew')); return; }
         startSkewDrag(rows, mode, e);
       });
     }
@@ -5595,7 +6156,7 @@
   // silently, which reads exactly like the tool being broken; say why.
   function noKeysGuard(rows) {
     if (rows.some(function (r) { return r.length; })) return true;
-    if (window.showToast) showToast('Aucune clé sur ces calques — pose des clés, ou glisse le centre de la boîte pour décaler les calques dans le temps');
+    if (window.showToast) showToast(SM.t('toastNoKeyOnLayersHint'));
     return false;
   }
 
@@ -5716,7 +6277,7 @@
         if (!noKeysGuard(rows)) return;
         var f0 = Infinity, f1 = -Infinity;
         rows.forEach(function (r) { r.forEach(function (en) { f0 = Math.min(f0, en.orig); f1 = Math.max(f1, en.orig); }); });
-        if (!(f1 > f0)) { if (window.showToast) showToast('Il faut des clés sur au moins 2 frames différentes pour les espacer'); return; }
+        if (!(f1 > f0)) { if (window.showToast) showToast(SM.t('toastNeedKeysOn2DifferentFrames')); return; }
         startSkewDrag(rows, mode, e);
       });
       // Top/bottom edge on a LAYER selection staggers the LAYERS in time —
@@ -5779,10 +6340,10 @@
   function enableTimeRemap(li) {
     var ld = state.layers[li];
     if (!ld) return false;
-    if (!ld.symbolId) { if (window.showToast) showToast('Le remappage temporel s\u2019applique aux calques composants'); return false; }
+    if (!ld.symbolId) { if (window.showToast) showToast(SM.t('toastTimeRemapAppliesToComponents')); return false; }
     var sym = state.symbols[ld.symbolId];
     if (!sym) return false;
-    if (ld.timeRemap) { if (window.showToast) showToast('Remappage temporel déjà actif'); return false; }
+    if (ld.timeRemap) { if (window.showToast) showToast(SM.t('toastTimeRemapAlreadyActive')); return false; }
     pushUndo();
     var inF = window.layerInPoint ? layerInPoint(ld) : (ld.inPoint != null ? ld.inPoint : 0);
     var outF = window.layerOutPoint ? layerOutPoint(ld) : (ld.outPoint != null ? ld.outPoint : state.totalFrames - 1);
@@ -5794,7 +6355,7 @@
     renderLayerList(); renderTimeline();
     if (window.loadFrame) loadFrame(state.currentFrame);
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
-    if (window.showToast) showToast('Remappage temporel activé — 0 → ' + last);
+    if (window.showToast) showToast(SM.t('toastTimeRemapEnabledFromSuffix') + last);
     return true;
   }
   function disableTimeRemap(li) {
@@ -5805,7 +6366,7 @@
     renderLayerList(); renderTimeline();
     if (window.loadFrame) loadFrame(state.currentFrame);
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
-    if (window.showToast) showToast('Remappage temporel désactivé');
+    if (window.showToast) showToast(SM.t('toastTimeRemapDisabled'));
     return true;
   }
   // The internal frame this instance should show at `frame`, or null when
@@ -6213,6 +6774,15 @@
   // ---- mode switching ----
   function setAppMode(mode) {
     if (state.appMode === mode) return;
+    // StoryBoard freeze (2026-08, PR #209: "il faudrait mettre en freeze
+    // (in Dev) StoryBoard") — single choke point so the button click,
+    // any keyboard shortcut, and the Nemo scripting API's SMMotion.setAppMode
+    // (nemo-script.js) all get the same refusal instead of three separate
+    // gates that could drift out of sync.
+    if (mode === 'storyboard' && window.SM_FROZEN_IN_DEV && window.SM_FROZEN_IN_DEV.storyboard) {
+      if (window.showToast) showToast((window.SM&&SM.t)?SM.t('storyboardFrozenToast'):'StoryBoard — in development, not yet available in this build');
+      return;
+    }
     // Every other risky action while inside a Component (convertLayerToComponent,
     // mergeLayersIntoOne, splitLayerIntoElements, enterSymbol itself, etc. — app.js
     // lines 2276/2318/2410/2651/2674/2699/2741/2806/2896/2942) refuses with this
@@ -6231,9 +6801,27 @@
     // genuinely corrupted stroke data (27 strokes materializing on a frame that
     // held 2) — real, permanent data loss/corruption, not just a stale render.
     // "Scene" (exitToScene) remains the one way out of a symbol everywhere else
-    // in the app; this makes the mode toggle consistent with that instead of a
-    // silent trap.
-    if (state.activeSymbolId) { if (window.showToast) showToast('Fermez d\'abord le composant en cours d\'édition'); return; }
+    // in the app.
+    //
+    // 2026-08-21 (feedback #47, "il faudrait pouvoir le faire"): re-permitted,
+    // with the same defensive save enterSymbol/exitToScene themselves take at
+    // their own transition points. state.layers/userLayers are ALIASED to the
+    // symbol's own arrays while activeSymbolId is set (enterSymbol) — every
+    // consumer below this point (renderLayerList/renderTimeline/renderNow)
+    // reads whichever object is CURRENTLY state.layers, so it already renders
+    // the symbol's own content correctly in either mode; nothing from here to
+    // the end of this function reaches into the outer scene. The corruption
+    // this guard was built to stop traced to aliasing gaps in enterSymbol/
+    // exitToScene themselves (sym.layers/markers/motionArcs/tweenOverrides/
+    // tweenEasing/cameraKeys not written back on exit if something replaced
+    // rather than mutated them) — those were fixed in the following weeks
+    // (2026-07-25, 2026-07-30) and are unconditionally in effect by the time
+    // exitToScene runs, regardless of which mode was active while inside.
+    // saveAllLayerFrames() here is the same belt-and-suspenders enterSymbol
+    // takes on its own way in, so a save lands before the mode's own render
+    // pass runs rather than depending on some earlier caller having already
+    // flushed the live canvas into ld.frames.
+    if (state.activeSymbolId) saveAllLayerFrames();
     // Leaving Motion mode: the shared ease-curve widget (see
     // openMotionEaseEditor) may still be pointed at a motion key whose row
     // is about to disappear — fall back to the plain tween-curve view, same
@@ -6262,6 +6850,12 @@
       _layerSel = [];
     }
     state.appMode = mode;
+    // Workspace continuity (2026-08, "retrouver son workspace comme il a
+    // quitté") — remembered independently of any one project's saved JSON:
+    // a fresh/new project should still open in whichever of StoryBoard/
+    // Animation 2D/Motion the user was last working in, not always reset to
+    // Animation 2D's hardcoded default.
+    try { localStorage.setItem('nemo-app-mode', mode); } catch (e) {}
     document.querySelectorAll('.app-mode-btn').forEach(function (b) { b.classList.toggle('active', b.dataset.mode === mode); });
     document.body.classList.toggle('mode-motion', mode === 'motion');
     document.body.classList.toggle('mode-storyboard', mode === 'storyboard');
@@ -6419,6 +7013,8 @@
     // 2D's own layer-row shape list (timeline.js) so both modes' trees can
     // never diverge in content or z-order.
     buildShapeTree: buildShapeTree,
+    selectShapesByStrokeIds: selectShapesByStrokeIds,
+    elementLabel: elementLabel,
     layerElements: layerElements,
     elementLabel: elementLabel,
     liveItemByStrokeId: liveItemByStrokeId,
@@ -6562,6 +7158,15 @@
     computeMotionMatFor: computeMotionMat,
     elementMotionAt: elementMotionAt,
     elementFillColorAt: elementFillColorAt,
+    elementStrokeColorAt: elementStrokeColorAt,
+    elementStrokeWidthAt: elementStrokeWidthAt,
+    layerOrderAt: layerOrderAt,
+    elementOrderAt: elementOrderAt,
+    anyLayerHasOrder: anyLayerHasOrder,
+    layerElementsHaveOrder: layerElementsHaveOrder,
+    anyOrderUsedAnywhere: anyOrderUsedAnywhere,
+    hasBrushSizeMotionFor: hasBrushSizeMotionFor,
+    applyBrushSizeFor: applyBrushSizeFor,
     transformSegments: transformSegments,
     transformImageRect: transformImageRect,
     transformImageRectByMatrix: transformImageRectByMatrix,
@@ -6598,6 +7203,8 @@
     applyParentChainToImageRect: applyParentChainToImageRect,
     applyPathVertexOffsetsFor: applyPathVertexOffsetsFor,
     applyTrimFor: applyTrimFor,
+    hasParamShapeMotionFor: hasParamShapeMotionFor,
+    applyParamShapeFor: applyParamShapeFor,
     trimWindowAt: trimWindowAt,
     hasTrimMotion: hasTrimMotion,
     // Shared arc-length flattener (2026-08) — Trim Paths' own polyline
@@ -6639,6 +7246,7 @@
       if (!ld || !ld.elementMotion || !strokeId) return false;
       return hasTrimMotion(ld.elementMotion[strokeId]);
     },
+    applyTrimToVectorBrush: applyTrimToVectorBrush,
     // Called by the two frame-content writers in app.js — the union is
     // derived from that content, so it must not outlive an edit.
     invalidateSymbolUnionBounds: invalidateSymbolUnionBounds,
@@ -6656,6 +7264,7 @@
     // only ever touch state.currentFrame, one key at a time).
     ensureElementHolder: ensureElementHolder,
     setKeyAtFrame: setKeyAtFrame,
+    registerExposedPropMeta: registerExposedPropMeta,
     distributeKeys: distributeKeys, flipKeys: flipKeys, selectEveryNthKey: selectEveryNthKey, invertKeySelection: invertKeySelection,
     getKeySelection: function () { return _motionKeySel.slice(); },
     // Move an explicit set of keys by dx frames — used by layer-inout.js so
@@ -6730,4 +7339,15 @@
     hasKeySelection: hasKeySelection,
     hasKeyClipboard: hasKeyClipboard,
   };
+  // Workspace continuity, restore half (2026-08) — runs once at startup,
+  // after timeline.js's own nemo-auto project restore (script tag order:
+  // timeline.js, then this file) so layers/timeline already exist by the
+  // time setAppMode's re-render calls (renderLayerList/renderTimeline)
+  // fire. A brand-new/never-saved profile has no key yet and falls
+  // through to whatever state.appMode's own hardcoded default already is.
+  (function restoreLastAppMode(){
+    var saved=null;
+    try{saved=localStorage.getItem('nemo-app-mode');}catch(e){}
+    if(saved&&saved!==state.appMode&&(saved==='anim2d'||saved==='motion'||saved==='storyboard'))setAppMode(saved);
+  })();
 })();

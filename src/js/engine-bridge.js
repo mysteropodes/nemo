@@ -435,6 +435,52 @@
     return id;
   }
 
+  // ---- BITMAP-BRUSH TRIM (2026-08-21) ----
+  // A bitmap-brush stroke's ink is ONE baked Raster covering the whole
+  // stroke, so the per-dab reveal used for the VECTOR texture presets can't
+  // trim it (see bakeTrimmed's own comment in bitmap-brush.js for the
+  // measured before/after). Instead: trim the ANCHOR's centerline, re-bake
+  // the texture along just that window, and hand the engine the new pixels.
+  //
+  // Cached on the window, because buildSceneJson runs on EVERY frame and a
+  // bake is a full canvas stamp pass — without this an untouched static trim
+  // would re-bake 60x/second. The key rounds the window to 0.1% so an
+  // ANIMATED trim re-bakes only when the value actually moves, and the id is
+  // derived from that key so identical windows reuse the GPU upload too
+  // (registerImagePixels is idempotent per id, same contract liveRestamp
+  // relies on). One entry per anchor — an animated trim overwrites its own
+  // slot each time the window changes rather than growing without bound.
+  var _bmbTrimCache = Object.create(null);
+  function bitmapTrimmedImage(li, anchorItem, anchorStrokeId, frameIdx) {
+    var spec = anchorItem && anchorItem.data && anchorItem.data.bitmapBrushSpec;
+    if (!spec || !window.SMBitmapBrush || !SMBitmapBrush.bakeTrimmed || !window.SMMotion) return undefined;
+    var win = SMMotion.trimWindowAt(li, anchorStrokeId, frameIdx);
+    if (!win) return undefined; // no trim on this stroke — caller keeps the normal path
+    var key = anchorStrokeId + '|' + Math.round(win.start * 10) + '|' + Math.round(win.end * 10) + '|' + Math.round((win.offset || 0) * 10);
+    var hit = _bmbTrimCache[anchorStrokeId];
+    if (hit && hit.key === key) { if (hit.id) _touchImage(hit.id); return hit.value; }
+    // Trim the anchor's own geometry exactly like the vector path does, then
+    // re-stamp along the result. serP is NOT used here: this needs the live
+    // anchor's segments in the shape applyTrimFor expects, nothing else off
+    // the serialized dict.
+    var segs = anchorItem.segments.map(function (s) {
+      return { point: [s.point.x, s.point.y], handleIn: [s.handleIn.x, s.handleIn.y], handleOut: [s.handleOut.x, s.handleOut.y] };
+    });
+    var trimmed = SMMotion.applyTrimFor(li, anchorStrokeId, segs, !!anchorItem.closed, frameIdx);
+    var bake = (trimmed && trimmed.segments && trimmed.segments.length >= 2)
+      ? SMBitmapBrush.bakeTrimmed(trimmed.segments, trimmed.closed, spec)
+      : null;
+    var value = null; // null = window collapsed, draw nothing
+    var id = null;
+    if (bake) {
+      id = 'bmbtrim:' + _hashSrc(key);
+      registerImagePixels(id, bake.canvas);
+      value = { id: id, rect: { x: bake.minX, y: bake.minY, width: bake.w, height: bake.h, rotation: 0 } };
+    }
+    _bmbTrimCache[anchorStrokeId] = { key: key, value: value, id: id };
+    return value;
+  }
+
   // A Raster's DISPLAY rect + its own rotation, for the engine's image
   // item (2026-07 — image items now carry `rotation`, engine.rs ImageRef).
   // c.bounds is the AXIS-ALIGNED envelope: correct while the raster is
@@ -676,6 +722,10 @@
     // splices, and any future overlay insertions, unlike any index math
     // done mid-loop.
     var userLayerEntries = [];
+    // Order (2026-08) — cheap up-front check so an untouched document (the
+    // overwhelming default) pays nothing for the stable-sort right after
+    // this loop below.
+    var _anyLayerOrder = window.SMMotion ? SMMotion.anyLayerHasOrder() : false;
     if (sbPreview) {
       layers.push({ items: onionLayerItems(sbPreview) });
     } else
@@ -799,12 +849,56 @@
       // (the store's one invariant) is meaningless for these too.
       var layerRetainable = !state.layers[i].symbolId && !state.layers[i].montageId && !state.layers[i].lfsGroup && !state.layers[i].duplicator;
       var brushAnchorStrokeId = null;
+      // Texture-brush dab reveal (2026-08-20) — a dab has no arc-length/
+      // position field of its own (applyBrushTexture's dab.data is just
+      // {isBrushTextureCopy,brushGroupId}, tools.js), but buildBrushDabs
+      // walks the anchor's centerline strictly start-to-end and stamps them
+      // in that same order — so a dab's position among its OWN group is
+      // still a faithful (if coarse) proxy for "how far along the stroke"
+      // without adding a new persisted field (CLAUDE.md §1's "new tag
+      // needs checking everywhere" cost, avoided entirely). dabOrdinal maps
+      // each dab item -> its 0..1 fraction within its group, read below to
+      // decide whether Trim Paths should draw it at all.
+      // ⚠️ layer.children order is the REVERSE of creation order, not a
+      // match for it: every dab calls `dab.insertAbove(basePath)`
+      // (applyBrushTexture, tools.js) against the SAME fixed basePath
+      // reference rather than the previously-inserted dab, so each new dab
+      // lands immediately after the anchor, ahead of every dab inserted
+      // before it — the LAST dab stamped (end of stroke) ends up FIRST in
+      // children right after the anchor. Confirmed live: an un-flipped
+      // idx/(n-1) revealed the stroke's END first on trimStart=0/trimEnd=40
+      // instead of its start. Flipped below (1 - idx/(n-1)) so ordinal 0
+      // is the stroke's start and 1 is its end, matching trimWindowAt's
+      // own start/end convention.
+      var brushGroupDabs = null;
+      var brushAnchorItem = null;
       for (var bi = 0; bi < children.length; bi++) {
         var bc = children[bi];
-        if (bc.data && bc.data.brushGroupId && !bc.data.isBrushTextureCopy && bc.data.strokeId) {
-          if (!brushAnchorStrokeId) brushAnchorStrokeId = {};
-          brushAnchorStrokeId[bc.data.brushGroupId] = bc.data.strokeId;
+        if (bc.data && bc.data.brushGroupId) {
+          if (bc.data.isBrushTextureCopy) {
+            if (!brushGroupDabs) brushGroupDabs = {};
+            var gid0 = bc.data.brushGroupId;
+            (brushGroupDabs[gid0] = brushGroupDabs[gid0] || []).push(bc);
+          } else if (bc.data.strokeId) {
+            if (!brushAnchorStrokeId) brushAnchorStrokeId = {};
+            brushAnchorStrokeId[bc.data.brushGroupId] = bc.data.strokeId;
+            // The anchor ITEM too, not just its id (2026-08-21): the bitmap
+            // -brush trim path below needs its bitmapBrushSpec AND its live
+            // geometry to re-bake, and re-finding it by id would mean a
+            // second scan of children per raster.
+            if (!brushAnchorItem) brushAnchorItem = {};
+            brushAnchorItem[bc.data.brushGroupId] = bc;
+          }
         }
+      }
+      var dabOrdinal = null;
+      if (brushGroupDabs) {
+        dabOrdinal = new WeakMap();
+        Object.keys(brushGroupDabs).forEach(function (gid) {
+          var list = brushGroupDabs[gid];
+          var n = list.length;
+          list.forEach(function (dab, idx) { dabOrdinal.set(dab, n > 1 ? 1 - idx / (n - 1) : 0); });
+        });
       }
       // EXPERIMENTAL (native-video-decode branch): a natively-decoded video
       // layer has NO Paper children — its picture is one image item under a
@@ -991,6 +1085,11 @@
           }
         }
       }
+      // Order (2026-08) — same per-layer cheap guard as _anyLayerOrder
+      // above, scoped to just this layer's own elementMotion so a document
+      // where only ONE layer's shapes use Order doesn't pay the per-item
+      // tag+sort cost on every other layer.
+      var _anyElemOrder = window.SMMotion && SMMotion.layerElementsHaveOrder(state.layers[i]);
       for (var s = 0; s < children.length; s++) {
         var c = children[s];
         // Team review view filter — 'mine' hides everyone else's content
@@ -1014,18 +1113,84 @@
         // above: geometry/document data is untouched, only what goes into
         // THIS render is affected.
         if (!state.showShadowGuides && c.data && c.data.channelTag === 'shadow') continue;
+        // Texture-brush dab reveal (2026-08-20) — "il faudrait mettre en
+        // place le trim du coup": a dab (isBrushTextureCopy) isn't shaped
+        // by segments/closed at all (see b7e9b29's own diagnosis of why
+        // trimming the ANCHOR never touched them), so giving Trim Paths any
+        // visible effect on a textured stroke means filtering which dabs
+        // draw, not reshaping anything. dabOrdinal (built above) is each
+        // dab's 0..1 position among its own group, in the same order
+        // buildBrushDabs stamped them; win uses trimWindowAt's own
+        // semantics (start/end/offset, 0-100, clipped — not wrapped, same
+        // "open path" convention applyTrimSegments uses) so a textured
+        // stroke's reveal matches a plain stroke's trim exactly.
+        // NOT for a BITMAP-brush group (2026-08-21): its ink is one baked
+        // Raster, so it has exactly one "dab" sitting at ordinal 0 — this
+        // per-dab test then degenerates to all-or-nothing (kept whole for
+        // any window starting at 0, dropped entirely for any window starting
+        // past it), which is why trim looked like a complete no-op on a
+        // bitmap stroke. Those groups are trimmed properly by re-baking the
+        // texture along the trimmed centerline instead (bitmapTrimmedImage,
+        // applied in the Raster branch below).
+        if (c.data && c.data.isBrushTextureCopy && c.data.brushGroupId && dabOrdinal && window.SMMotion
+            && !(brushAnchorItem && brushAnchorItem[c.data.brushGroupId]
+                 && brushAnchorItem[c.data.brushGroupId].data
+                 && brushAnchorItem[c.data.brushGroupId].data.bitmapBrushSpec)) {
+          var dabAnchorId = brushAnchorStrokeId && brushAnchorStrokeId[c.data.brushGroupId];
+          if (dabAnchorId) {
+            var dabWin = SMMotion.trimWindowAt(i, dabAnchorId, renderFrame);
+            if (dabWin) {
+              var dabPct = (dabOrdinal.get(c) || 0) * 100;
+              var dabS = dabWin.start + (dabWin.offset || 0), dabE = dabWin.end + (dabWin.offset || 0);
+              if (dabPct < Math.max(0, Math.min(100, dabS)) || dabPct > Math.max(0, Math.min(100, dabE))) continue;
+            }
+          }
+        }
         // Element-level Motion target (2026-07): a strokeId-scoped transform
         // nested INSIDE the layer's own — applied FIRST below, pivoted
         // around this item's OWN bounds (never the whole layer's), matching
         // AE's shape-group-inside-a-layer composition. null in the common
         // case (this item has no per-element motion of its own).
         var cStrokeId = c.data && ((c.data.isBrushTextureCopy && brushAnchorStrokeId && brushAnchorStrokeId[c.data.brushGroupId]) || c.data.strokeId);
+        // Path-CONTENT mutations (Trim, per-vertex offsets, animated corner
+        // radii, path-vertex-follow, text-bounds-follow) must never run on a
+        // texture-copy dab's own tiny stamp geometry (isBrushTextureCopy,
+        // typically a 4-point square). cStrokeId above is deliberately
+        // aliased to the ANCHOR's strokeId for a dab so it inherits the
+        // anchor's Motion TRANSFORM (elMat) and fillColor override — both
+        // desired, both harmless to share. But arc-length-trimming (say)
+        // 0-40% of a dab's own 4-point square, or running any other
+        // per-vertex rebuild meant for the whole compound stroke, silently
+        // collapses each dab to a near-zero-area sliver — this is exactly
+        // what made a trimmed bitmap/texture-brush stroke's dabs vanish
+        // (confirmed live: hasTrimMotionFor/applyTrimFor were firing on
+        // every individual dab via the anchor-aliased id). Real strokeId
+        // only (undefined for a dab, since a dab never carries its own
+        // data.strokeId) restores "not applicable" for anything that
+        // reshapes path content — only used below, never for elMat/
+        // elementFillColorAt which should keep sharing the anchor's id.
+        var cPathOpsStrokeId = (c.data && c.data.isBrushTextureCopy) ? undefined : cStrokeId;
         var elMat = (window.SMMotion && cStrokeId) ? SMMotion.elementMotionAt(i, cStrokeId, renderFrame) : null;
         var elPivot = elMat ? { x: c.bounds.center.x + elMat.ax, y: c.bounds.center.y + elMat.ay } : null;
         if (c instanceof Raster) {
-          var imageId = registerRasterIfNeeded(c);
+          // Bitmap-brush Trim Paths (2026-08-21) — a trimmed bitmap stroke
+          // draws a texture re-baked along the trimmed centerline instead of
+          // its full-length one. undefined = this raster isn't a trimmed
+          // bitmap-brush companion, take the normal path; null = the trim
+          // window collapsed to nothing, draw no ink at all.
+          var bmbTrim;
+          if (c.data && c.data.isBrushTextureCopy && c.data.brushGroupId && brushAnchorItem) {
+            var bmbAnchor = brushAnchorItem[c.data.brushGroupId];
+            var bmbAnchorId = brushAnchorStrokeId && brushAnchorStrokeId[c.data.brushGroupId];
+            if (bmbAnchor && bmbAnchorId) bmbTrim = bitmapTrimmedImage(i, bmbAnchor, bmbAnchorId, renderFrame);
+          }
+          if (bmbTrim === null) continue;
+          var imageId = bmbTrim ? bmbTrim.id : registerRasterIfNeeded(c);
           if (!imageId) continue;
-          var rb = rasterImageRect(c); // un-rotated display rect + the raster's own spin (see helper)
+          // un-rotated display rect + the raster's own spin (see helper); a
+          // re-baked trim carries its OWN rect (the bake's bounds shrink with
+          // the window), so it must not reuse the full-length raster's.
+          var rb = bmbTrim ? bmbTrim.rect : rasterImageRect(c);
           var imgOp = c.opacity !== undefined ? c.opacity : 1;
           if (elMat) { rb = SMMotion.transformImageRect(rb, elPivot, elMat); imgOp *= elMat.op; }
           if (motionMat) { rb = SMMotion.transformImageRect(rb, motionPivot, motionMat); imgOp *= motionMat.op; }
@@ -1116,8 +1281,23 @@
           // every call" reasons (layerRetainable, above).
           var xformable = layerRetainable
             && !project3D
-            && !(window.SMMotion && cStrokeId && SMMotion.hasPathVertexMotionFor(i, cStrokeId))
-            && !(window.SMMotion && cStrokeId && SMMotion.hasTrimMotionFor(i, cStrokeId))
+            && !(window.SMMotion && cPathOpsStrokeId && SMMotion.hasPathVertexMotionFor(i, cPathOpsStrokeId))
+            && !(window.SMMotion && cPathOpsStrokeId && SMMotion.hasTrimMotionFor(i, cPathOpsStrokeId))
+            && !(window.SMMotion && cPathOpsStrokeId && SMMotion.hasParamShapeMotionFor && SMMotion.hasParamShapeMotionFor(i, cPathOpsStrokeId))
+            // Path-point parenting "drive" direction + rect-follows-text-
+            // bounds (2026-08): both rebuild sd.segments from scratch every
+            // frame in the cold (sd-populated) path below — a retained
+            // pathRef+pathTransform is a single AFFINE on top of CACHED
+            // geometry, which can't represent "this vertex jumped to
+            // wherever layer X is now" or "this rect's whole outline
+            // matches layer Y's current text bounds". Missing from this
+            // exclusion list meant a vertex-follow/text-bounds-follow
+            // target that happened to also be an otherwise-plain, uniformly
+            // -scaled shape took the fast path and silently never re-shaped
+            // — confirmed live: the SAME hooks below (applyPathVertexFollowFor/
+            // applyTextBoundsFollowFor) never ran because `sd` stayed null.
+            && !(window.SMMotion && cPathOpsStrokeId && SMMotion.hasPathVertexFollowMotionFor && SMMotion.hasPathVertexFollowMotionFor(i, cPathOpsStrokeId))
+            && !(window.SMMotion && cPathOpsStrokeId && SMMotion.hasTextBoundsFollowMotionFor && SMMotion.hasTextBoundsFollowMotionFor(i, cPathOpsStrokeId))
             && !(c.data && c.data.fillGradient)
             && !(c.data && c.data.strokeGradientAlongPath)
             && !(includeEditorOverlays && state.currentFrameOutline)
@@ -1134,14 +1314,78 @@
           // shape's OWN local space, same as elMat's own pivot is computed
           // from `c.bounds` (the pre-offset bounds), matching AE's model
           // where a path's own points are edited before any transform.
-          if (sd && window.SMMotion && cStrokeId) sd.segments = SMMotion.applyPathVertexOffsetsFor(i, cStrokeId, sd.segments, renderFrame);
+          if (sd && window.SMMotion && cPathOpsStrokeId) sd.segments = SMMotion.applyPathVertexOffsetsFor(i, cPathOpsStrokeId, sd.segments, renderFrame);
           // Trim Paths (2026-08) — same innermost-layer placement as vertex
           // offsets right above (authored in the shape's own local space,
           // before elMat/motionMat), applied right after so a trimmed
           // portion still rides any per-vertex sculpting done on top of it.
-          if (sd && window.SMMotion && cStrokeId && SMMotion.hasTrimMotionFor(i, cStrokeId)) {
-            var trimmed = SMMotion.applyTrimFor(i, cStrokeId, sd.segments, sd.closed, renderFrame);
-            sd.segments = trimmed.segments; sd.closed = trimmed.closed;
+          if (sd && window.SMMotion && cPathOpsStrokeId && SMMotion.hasTrimMotionFor(i, cPathOpsStrokeId)) {
+            // Vector-brush ribbon (2026-08-20): trim the CENTERLINE +
+            // width profile and rebuild the outline from just that
+            // window, instead of arc-length-slicing the already-baked
+            // outline polygon (applyTrimFor below) — slicing the OUTLINE
+            // cuts across the ribbon's own width rather than along its
+            // length, the same wedge/sliver family as the fill-wedge bug
+            // this whole feature started from (18b2d9a's own comment).
+            // buildVariableWidthPath (tools.js) is the exact function
+            // rebuildVectorBrushOutline already uses for the untrimmed
+            // case, so a trimmed ribbon gets identical caps/smoothing.
+            if (c.data && c.data.isVectorBrush && c.data.centerSegments && c.data.centerSegments.length >= 2) {
+              var vbTrim = SMMotion.applyTrimToVectorBrush(i, cPathOpsStrokeId, c.data.centerSegments, c.data.widthProfile, renderFrame);
+              var vbOutline = (vbTrim && vbTrim.pts && vbTrim.pts.length >= 2)
+                ? buildVariableWidthPath(vbTrim.pts.map(function (p) { return new Point(p[0], p[1]); }), vbTrim.widths)
+                : null;
+              if (vbOutline) {
+                sd.segments = vbOutline.segments.map(function (s) {
+                  return { point: [s.point.x, s.point.y], handleIn: [s.handleIn.x, s.handleIn.y], handleOut: [s.handleOut.x, s.handleOut.y] };
+                });
+                sd.closed = true;
+                vbOutline.remove();
+              } else {
+                sd.segments = []; sd.closed = false;
+              }
+            } else {
+              var trimmed = SMMotion.applyTrimFor(i, cPathOpsStrokeId, sd.segments, sd.closed, renderFrame);
+              sd.segments = trimmed.segments; sd.closed = trimmed.closed;
+            }
+          }
+          // Brush size (2026-08) — same innermost-layer placement as Trim
+          // right above, and deliberately `else if` with it: both rebuild
+          // this same vector-brush's outline from its centerline+width
+          // profile, and composing an animated Trim window with an
+          // animated Brush Size on the SAME stroke at the same time needs
+          // the trim's OWN pts/widths as Brush Size's input, not the
+          // shape's un-trimmed static data — a real future case, not
+          // attempted here. Trim wins when both are set.
+          else if (sd && window.SMMotion && cPathOpsStrokeId && SMMotion.hasBrushSizeMotionFor && SMMotion.hasBrushSizeMotionFor(i, cPathOpsStrokeId)) {
+            var bsSegs = SMMotion.applyBrushSizeFor(i, cPathOpsStrokeId, sd, renderFrame);
+            if (bsSegs) { sd.segments = bsSegs; sd.closed = true; }
+          }
+          // Dynamic shapes phase 2 (2026-08-18) — animated corner radii,
+          // same innermost-layer placement as Trim/vertex-offsets right
+          // above (shape's own local space, before elMat/motionMat).
+          if (sd && window.SMMotion && cPathOpsStrokeId && SMMotion.hasParamShapeMotionFor && SMMotion.hasParamShapeMotionFor(i, cPathOpsStrokeId)) {
+            sd.segments = SMMotion.applyParamShapeFor(i, cPathOpsStrokeId, sd, renderFrame);
+          }
+          // Path-point parenting, "drive" direction (2026-08) — a vertex of
+          // this path snapping onto another layer's world position. The
+          // "follow" direction (this LAYER snapping onto a point on another
+          // path) needs no extra call here — it's inside SMMotion.layerMotionAt
+          // itself, already the source of motionMat above.
+          if (sd && window.SMMotion && cPathOpsStrokeId && SMMotion.hasPathVertexFollowMotionFor && SMMotion.hasPathVertexFollowMotionFor(i, cPathOpsStrokeId)) {
+            sd.segments = SMMotion.applyPathVertexFollowFor(i, cPathOpsStrokeId, sd, renderFrame);
+          }
+          // Rect-follows-text-bounds (2026-08) — whole-shape rebuild from
+          // another layer's resolved bounds, same placement as the two
+          // hooks above (shape's own local space, before elMat/motionMat).
+          if (sd && window.SMMotion && cPathOpsStrokeId && SMMotion.hasTextBoundsFollowMotionFor && SMMotion.hasTextBoundsFollowMotionFor(i, cPathOpsStrokeId)) {
+            sd.segments = SMMotion.applyTextBoundsFollowFor(i, cPathOpsStrokeId, sd, renderFrame);
+          }
+          // Dynamic shapes phase 2 (2026-08-18) — animated corner radii,
+          // same innermost-layer placement as Trim/vertex-offsets right
+          // above (shape's own local space, before elMat/motionMat).
+          if (sd && window.SMMotion && cStrokeId && SMMotion.hasParamShapeMotionFor && SMMotion.hasParamShapeMotionFor(i, cStrokeId)) {
+            sd.segments = SMMotion.applyParamShapeFor(i, cStrokeId, sd, renderFrame);
           }
           if (sd && elMat) sd.segments = SMMotion.transformSegments(sd.segments, elPivot, elMat);
           if (sd && motionMat) sd.segments = SMMotion.transformSegments(sd.segments, motionPivot, motionMat);
@@ -1275,6 +1519,47 @@
               stops: fg.stops.map(function (s) { return { offset: s.offset, color: cssColorToRgba(s.color, op) || [0, 0, 0, 0] }; }),
             };
           }
+          // Trim Paths (2026-08-19 fix) — feedback: "ça trim ça comme un
+          // fill alors que ça devrait trim comme dans After Effects ou
+          // Redgiant Stroke 3D". applyTrimFor above already replaces
+          // sd.segments with a short OPEN sub-arc, but item.fillColor (and
+          // fillGradient, just above) still carried whatever paint color
+          // the ORIGINAL closed shape had — filling an open partial arc
+          // implicitly closes it edge-to-edge, drawing the classic AE
+          // "pac-man wedge" instead of a clean progressive line reveal.
+          // AE/Stroke 3D's own convention: Trim Paths is a STROKE
+          // operation — the standard workaround for the exact wedge
+          // artifact this fixes is "don't fill a trimmed shape, use only
+          // a stroke", so this makes that the enforced behavior rather
+          // than a manual gotcha the artist has to already know about.
+          // Deliberately unconditional on the trim window (even 0/100 =
+          // "untrimmed") rather than only when partially trimmed: Trim
+          // Paths rebuilds ANY trimmed shape (closed or not) as an open
+          // polyline approximation (applyTrimSegments always returns
+          // closed:false), so the wedge risk exists at any window, not
+          // just a partial one.
+          // EXCLUDED: vector-brush ribbons (c.data.isVectorBrush). Their
+          // visible ink IS the fill (a filled ribbon built from
+          // centerSegments/widthProfile) — a real drawn stroke's
+          // strokeColor is either null or just a thin keyline hairline
+          // (applyBrushKeyline, app.js), never the main paint. Nulling
+          // fillColor here too would leave a trimmed brush stroke with NO
+          // paint at all (confirmed live: renders fully blank — only the
+          // hairline keyline would remain, if even that). Trim Paths on a
+          // vector-brush stroke keeps the pre-fix wedge-style behavior for
+          // now — a real "reveal the ribbon progressively" implementation
+          // needs to trim the centerline/widthProfile before
+          // rebuildVectorBrushOutline, not the baked outline segments,
+          // which is a separate piece of work.
+          // cPathOpsStrokeId (not cStrokeId) — a texture-copy dab must never
+          // reach this branch at all: see its own comment above. The
+          // isVectorBrush guard stays for the real anchor item, which IS
+          // reached through cPathOpsStrokeId.
+          if (window.SMMotion && cPathOpsStrokeId && SMMotion.hasTrimMotionFor(i, cPathOpsStrokeId)
+              && !(c.data && c.data.isVectorBrush)) {
+            item.fillColor = null;
+            delete item.fillGradient;
+          }
           var sc = cssColorToRgba(c.strokeColor ? c.strokeColor.toCSS(true) : null, op);
           if (sc) {
             item.strokeColor = sc;
@@ -1292,6 +1577,22 @@
             if (c.dashArray && c.dashArray.length) {
               item.dashPattern = c.dashArray;
               item.dashOffset = c.dashOffset;
+            }
+            // Extended per-shape properties: Stroke color/width (2026-08 —
+            // second slice of the "propriétés étendues par forme" chantier,
+            // same shape as Fill color's own override above). Only reachable
+            // inside this `if(sc)` block — same "can't animate a stroke into
+            // existence on a strokeless shape" scope Fill color's own
+            // comment establishes for fills. Width gets the SAME strokeScale
+            // treatment as the base width just above it (a keyed width is
+            // the shape's own LOCAL value, composed with elMat/motionMat
+            // exactly like c.strokeWidth already is — not a finished,
+            // already-posed number).
+            if (window.SMMotion && cStrokeId) {
+              var scOverride = SMMotion.elementStrokeColorAt(i, cStrokeId, renderFrame);
+              if (scOverride) item.strokeColor = scOverride;
+              var swOverride = SMMotion.elementStrokeWidthAt(i, cStrokeId, renderFrame);
+              if (swOverride !== null) item.strokeWidth = swOverride * (item.pathTransform ? 1 : strokeScale);
             }
           }
           if (includeEditorOverlays && state.currentFrameOutline) {
@@ -1368,6 +1669,10 @@
           // this loop, which JSON item(s) came from which live source item —
           // stripped again right after use, never sent to the renderer.
           item.__srcC = sub;
+          // Order (2026-08) — tagged here, consumed by the stable sort right
+          // after this loop, stripped before that sort returns (never sent
+          // to the renderer, same lifecycle as __srcC above).
+          if (_anyElemOrder && window.SMMotion && cStrokeId) item.__ord = SMMotion.elementOrderAt(i, cStrokeId, renderFrame);
           // Vector mask (2026-08) — pulled out of `items` (never painted as
           // normal content) into `layerMasks` instead, geometry/transform
           // untouched (so it moves/animates exactly like any other Path)
@@ -1388,6 +1693,23 @@
           }
           items.push(item);
         });
+      }
+      // Order (2026-08, "système pour animer l'id index de calque ou de
+      // shape/éléments") — element-level z-stacking within this one layer.
+      // Every item pushed above by a shape carrying an Order track/static
+      // got tagged with __ord; a STABLE sort here turns that into actual
+      // draw position (ties — the default, __ord undefined/0 — keep
+      // original document order, same neutral CSS-z-index meaning as the
+      // layer-level sort in the main loop above). Runs BEFORE the combine-
+      // groups block below so it only ever touches real per-shape items,
+      // never the synthetic merged-outline item combine-groups appends
+      // (which always lands last regardless — acceptable v1 scope, a
+      // combined shape has no single per-member Order that would be
+      // correct for it anyway).
+      if (_anyElemOrder) {
+        items.forEach(function (it, ix) { it.__ordIx = ix; });
+        items.sort(function (a, b) { return ((a.__ord || 0) - (b.__ord || 0)) || (a.__ordIx - b.__ordIx); });
+        items.forEach(function (it) { delete it.__ord; delete it.__ordIx; });
       }
       // Non-destructive combine groups (2026-07-29) — post-process on the
       // JSON items just built, never on the live document (see the "why not
@@ -1547,6 +1869,23 @@
       layers.push(userLayerEntries[i] = { items: items, blendMode: (bm && bm !== 'normal') ? bm : undefined, matteMode: (mm && mm !== 'none') ? mm : undefined,
         effects: mbEffects, masks: layerMasks.length ? layerMasks : undefined, maskFeather: layerMaskFeather || undefined });
     }
+    // Order (2026-08, "système pour animer l'id index de calque ou de
+    // shape/éléments") — layer-level z-stacking. At this exact point
+    // `layers` holds EXACTLY one entry per state.layers[i], still in
+    // original array order, nothing else pushed yet (background/onion/
+    // overlays all come after) — the one safe moment to reorder it. A
+    // STABLE sort by each layer's evaluated Order value (default 0 keeps
+    // the layer at its natural position, same neutral meaning as CSS
+    // z-index) — ties keep original index, so a document that never
+    // touches this property renders through unchanged. Matte source
+    // resolution further down finds its target via `layers.indexOf`
+    // (object identity), which this comment block's own header already
+    // documents as immune to exactly this kind of reordering.
+    if (_anyLayerOrder) {
+      var _orderPairs = layers.map(function (entry, idx) { return { entry: entry, idx: idx, ord: SMMotion.layerOrderAt(idx, renderFrame) }; });
+      _orderPairs.sort(function (a, b) { return (a.ord - b.ord) || (a.idx - b.idx); });
+      layers = _orderPairs.map(function (p) { return p.entry; });
+    }
     // artboard background as the bottom item of a synthetic bottom layer,
     // mirroring drawStage()'s background rect
     var bgItems = [{
@@ -1591,6 +1930,8 @@
       if (marqueeItems.length) layers.push({ items: marqueeItems });
       var fsSelItems = buildFSSelectionItems();
       if (fsSelItems.length) layers.push({ items: fsSelItems });
+      var fsBreakItems = buildFSBreakMarkItems();
+      if (fsBreakItems.length) layers.push({ items: fsBreakItems });
       var revisionItems = buildRevisionOutlineItems();
       if (revisionItems.length) layers.push({ items: revisionItems });
       var commentItems = buildCommentPinItems();
@@ -1893,6 +2234,24 @@
   // a cosmetic gap, not a functional one, until dashing is added engine-side.
   function buildTransformBoxItems() {
     if (state.tool !== 'select') return [];
+    // Motion mode (2026-08-21 fix, "2 points d'ancrage et 2 rotation qui
+    // s'affiche" on a Component with several elements): this function is
+    // the Animation 2D transform box — corners/ring/anchor computed from
+    // select-bridge.js's computeHandles(), which knows nothing about a
+    // Motion layer's own Anchor Point offset (motion.js's separate anchor/
+    // position/rotation/scale system). SMMotion.buildOverlayItems() below
+    // (same caller, a few lines down) already draws motion.js's OWN
+    // complete box/ring/anchor/position-dots/vertex/3D-gizmo overlay for
+    // whatever's Motion-selected — nothing gated either one off from firing
+    // together, and selectedPaths ends up populated in Motion mode too
+    // (layer-row selection backs it the same as an Animation 2D pick), so
+    // both fired at once: TWO rings and TWO anchor crosshairs, one pair
+    // frozen at the plain geometric bounds center (this function, blind to
+    // the Anchor Point offset) and one pair correctly following it
+    // (motion.js's own). Confirmed live: dragging the Motion anchor moved
+    // only ONE of the two crosshairs, leaving the other stranded at the
+    // shape's un-offset center — exactly the reported symptom.
+    if (state.appMode === 'motion') return [];
     // Selected native-video layer (2026-07, "une vidéo est un objet comme
     // les autres") — same visual language as the path gizmo below (blue
     // outline, white corner squares, rotate ring), geometry from the ONE
@@ -2025,6 +2384,24 @@
     // treatment as the anchor dot.
     var ringDrawRadius = ringRadius + (state.xformRingHovered ? 4 : 0) * zs;
     items.push(circleItem(ap.x, ap.y, ringDrawRadius, null, [74, 158, 255, 160], 1 * zs));
+    // Dynamic shapes phase 3 (2026-08-18) — corner-radius drag handles for
+    // a single selected rect with data.paramShape, orange to read as a
+    // DIFFERENT kind of grip from the blue transform-box handles just
+    // above (same color the mask/trim features already use for a
+    // per-shape, non-transform control). Positions come from the SAME
+    // select-bridge.js helper the hit-test uses (SMParamShapeHandles), so
+    // drawn == grabbable by construction, never two independently
+    // maintained copies of this math.
+    if (window.SMParamShapeHandles) {
+      var pshpSel = window.SMParamShapeHandles.paramShapeSelectionSingle();
+      if (pshpSel) {
+        var hpDraw = window.SMParamShapeHandles.cornerHandleWorldPositions(pshpSel);
+        window.SMParamShapeHandles.handleNamesFor(pshpSel).forEach(function (c) {
+          var hp = hpDraw[c];
+          items.push(circleItem(hp.x, hp.y, 4 * zs, [255, 184, 108, 255], [255, 255, 255, 255], 1.2 * zs));
+        });
+      }
+    }
     return items;
   }
   function buildMarqueeItems() {
@@ -2213,6 +2590,25 @@
   // shows the width that's ACTUALLY about to be cut, matching the pressure
   // brush's own cursor convention (setPressureCursor below).
   function setEraserCursor(worldPt, radius) { eraserCursorWorld = worldPt; eraserCursorRadius = radius; }
+
+  // Fill/Stroke Select — "break at intersections" brush (2026-08). While
+  // dragging in this mode (tools.js), every crossing point currently under
+  // the brush gets pushed here each pointermove so it renders live as a
+  // small dot BEFORE the actual cut commits on pointerup — same "preview
+  // now, commit later" shape as the eraser cursor above, just markers
+  // instead of a single circle. Cleared (empty array) on pointerup/tool
+  // change by the caller.
+  var fsBreakMarksWorld = [];
+  function setFSBreakMarks(points) { fsBreakMarksWorld = points || []; }
+  function buildFSBreakMarkItems() {
+    if (state.tool !== 'fsselect' || !fsBreakMarksWorld.length) return [];
+    var zs = 1 / view.zoom;
+    // Same orange as buildFSSelectionItems' own highlight color — reads as
+    // "this tool's own accent" rather than a new unrelated hue.
+    return fsBreakMarksWorld.map(function (pt) {
+      return circleItem(pt[0], pt[1], 5 * zs, [255, 152, 0, 255], [255, 255, 255, 255], 1.2 * zs);
+    });
+  }
   function buildEraserCursorItems() {
     if (state.tool !== 'eraser' || !eraserCursorWorld) return [];
     var r = eraserCursorRadius != null ? eraserCursorRadius : state.eraserSize / 2;
@@ -2254,8 +2650,25 @@
     var zs = 1 / view.zoom;
     var items = [];
     if (penPreviewWorld) {
-      var last = _pen.path.lastSegment.point;
-      items.push(lineItem([last.x, last.y], penPreviewWorld, [120, 170, 255, 153], 1 * zs));
+      var lastSeg = _pen.path.lastSegment, last = lastSeg.point;
+      // Curved rubber-band, not a straight guess (feedback #38, "on voit
+      // les vecteurs et tangentes... comme dans n'importe quel soft de
+      // vecto") — Illustrator/AE preview the NEXT segment as it would
+      // actually render if you clicked now: a real cubic curve carrying the
+      // last anchor's own handleOut, ending flat into the cursor (handleIn
+      // [0,0], since a plain hover has no next-anchor handle to show yet —
+      // only a click-drag, live in onMove already via seg.handleOut, would
+      // add one). When the last anchor has no handleOut (a plain corner
+      // point) both handles are zero and this reduces to exactly the same
+      // straight line the old lineItem drew, so this is a strict upgrade,
+      // not a behavior change for the common straight-segment case.
+      items.push({
+        segments: [
+          { point: [last.x, last.y], handleIn: [0, 0], handleOut: [lastSeg.handleOut.x, lastSeg.handleOut.y] },
+          { point: [penPreviewWorld[0], penPreviewWorld[1]], handleIn: [0, 0], handleOut: [0, 0] },
+        ],
+        closed: false, fillColor: null, strokeColor: [120, 170, 255, 153], strokeWidth: 1 * zs,
+      });
     }
     // Anchors + tangent handles of the in-progress pen path (feedback #19)
     // — same visual language as the Subselection tool's node handles
@@ -2632,7 +3045,7 @@
   async function ensureEngine() {
     if (engine) return true;
     if (!window.GeometryWasm || !window.GeometryWasm.ready) {
-      showToast('Moteur Rust indisponible (wasm non chargé)');
+      showToast(SM.t('toastRustEngineUnavailableWasm'));
       return false;
     }
     var paperCanvas = document.getElementById('drawing-canvas');
@@ -2641,7 +3054,7 @@
     // 0×0 (or 0×N) surface.configure() during create_engine() is just as
     // fatal to the WebGPU surface as during a later resize.
     if (paperCanvas.width <= 0 || paperCanvas.height <= 0) {
-      showToast('Moteur Rust: canvas pas encore prêt, réessaie');
+      showToast(SM.t('toastRustEngineCanvasNotReady'));
       return false;
     }
     rustCanvas = document.createElement('canvas');
@@ -2674,7 +3087,7 @@
       return true;
     } catch (e) {
       console.error('[engine-bridge] engine creation failed', e);
-      showToast('Moteur Rust: échec WebGPU — ' + e);
+      showToast(SM.t('toastRustEngineWebgpuFailedSuffix') + e);
       rustCanvas.remove();
       rustCanvas = null;
       return false;
@@ -2990,6 +3403,7 @@
     renderNow: renderNow,
     renderImageOnly: renderImageOnly,
     setEraserCursor: setEraserCursor,
+    setFSBreakMarks: setFSBreakMarks,
     setPressureCursor: setPressureCursor,
     setPenPreview: setPenPreview,
     setRigPreview: setRigPreview,

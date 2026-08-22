@@ -1,0 +1,9 @@
+{
+	// Assets-only Worker (per Cloudflare's own Pages->Workers migration guide —
+	// this is now the recommended path over `wrangler pages deploy`): src/ is
+	// already the full static site root (plain <script> tags, no bundler), so
+	// no "main" field is needed, just the directory to serve.
+	"name": "nemo-editor",
+	"compatibility_date": "2026-08-01",
+	"assets": { "directory": "./src" }
+}
