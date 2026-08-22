@@ -109,6 +109,37 @@
     var sec = document.getElementById(kind === 'fill' ? 'fill-sec' : 'stroke-sec');
     if (sec) sec.scrollIntoView({ block: 'nearest' });
   }
+  // A brush-drawn stroke with Fill enabled is really TWO live Paths (the
+  // stroke itself + a separate linkedFill backdrop, draw-bridge.js) folded
+  // into one Elements row by layerElements (motion.js) — see that
+  // function's own comment. The Fill aspect must resolve to the REAL
+  // companion item, not the stroke's own strokeId, or clicking/dragging
+  // "Fill" would silently operate on the wrong Path.
+  function paintStrokeIdFor(entry, kind) {
+    if (kind === 'fill' && entry.sd.__linkedFillStrokeId) return entry.sd.__linkedFillStrokeId;
+    return entry.strokeId;
+  }
+  // Front-most-first order for the two paint sub-rows ("le stroke et
+  // fill... pouvoir se distinguer" + "pourquoi pas possible de select fill
+  // et stroke individuellement pour les réorganiser") — top of the pair
+  // reads as "in front", matching the drag-swap below. Two real different
+  // cases: a linked-fill pair is genuinely two separate Paths with a real
+  // z-position (compared via their index in layer.children); a plain
+  // shape has ONE Path with both paint fields, ordered by its
+  // data.paintOrder flag instead (the SAME 'fillFirst'/'strokeFirst' the
+  // existing right-panel Paint Order toggle already writes — see
+  // timeline.js's setPaintOrder).
+  function paintRowOrder(c, entry) {
+    if (entry.sd.__linkedFillStrokeId) {
+      var layer = window.userLayers[c.li];
+      var fillItem = window.SMMotion.liveItemByStrokeId(c.li, entry.sd.__linkedFillStrokeId);
+      var strokeItem = window.SMMotion.liveItemByStrokeId(c.li, entry.strokeId);
+      var fi = fillItem ? layer.children.indexOf(fillItem) : -1;
+      var si = strokeItem ? layer.children.indexOf(strokeItem) : -1;
+      return fi > si ? ['fill', 'stroke'] : ['stroke', 'fill'];
+    }
+    return entry.sd.paintOrder === 'strokeFirst' ? ['stroke', 'fill'] : ['fill', 'stroke'];
+  }
   // Same inline input-swap idiom as timeline.js's startLayerRename and
   // motion.js's startShapeTreeRename — a third small, stable copy rather
   // than exporting/reusing motion.js's version, which calls Motion's OWN
@@ -139,9 +170,16 @@
   // a group's own members, or dragging a shape into/out of a group, is a
   // separate, bigger feature (dropping ONTO a group here just moves the
   // dragged item to sit right in front of that whole group block).
+  // "paint" kind (2026-08, "pourquoi il est pas possible de select fill et
+  // stroke individuellement pour les réorganiser") — id is a composite
+  // "<shapeStrokeId>:<fill|stroke>" key; the only valid drop target is the
+  // SAME shape's OTHER paint sub-row (see performPaintSwap), so this never
+  // needs to match against data-toplevel rows at all.
   var _elDrag = { active: false, kind: null, id: null, startY: 0, moved: false };
   function dragSelectorFor(kind, id) {
-    return kind === 'group' ? '.lrow[data-gid="' + id + '"]' : '.lrow[data-strokeid="' + id + '"]';
+    if (kind === 'group') return '.lrow[data-gid="' + id + '"]';
+    if (kind === 'paint') return '.lrow[data-paintid="' + id + '"]';
+    return '.lrow[data-strokeid="' + id + '"]';
   }
   // Floating drag-ghost (2026-08, "quand on drag la ligne doit suivre la
   // souris pour mieux voir ce que l'on prend") — the row being dragged
@@ -187,7 +225,9 @@
     var list = document.getElementById('shapes-list'); if (!list) return;
     Array.prototype.forEach.call(list.querySelectorAll('.lrow'), function (r) { r.classList.remove('drag-over'); });
     var el = document.elementFromPoint(e.clientX, e.clientY);
-    var row = el && el.closest('#shapes-list .lrow[data-toplevel]');
+    var row = _elDrag.kind === 'paint'
+      ? el && el.closest('#shapes-list .lrow[data-paintid]')
+      : el && el.closest('#shapes-list .lrow[data-toplevel]');
     if (row) row.classList.add('drag-over');
   });
   window.addEventListener('mouseup', function () {
@@ -203,7 +243,49 @@
     if (list2) Array.prototype.forEach.call(list2.querySelectorAll('.lrow'), function (r) { r.classList.remove('dragging', 'drag-over'); });
     _elDrag.active = false; _elDrag.moved = false;
   });
+  // Fill<->Stroke swap (2026-08, "pourquoi il est pas possible de select
+  // fill et stroke individuellement pour les réorganiser") — the only
+  // valid drop target for a 'paint' drag is the SAME shape's other paint
+  // sub-row (data-paintid's shapeStrokeId half must match); anything else
+  // is a no-op. Two real cases, matching paintRowOrder's own split: a
+  // linked-fill pair is two separate live Paths, reordered via the SAME
+  // insertAbove primitive every other z-order operation in this codebase
+  // uses; a plain shape is ONE Path with both paint fields, so there is no
+  // real z-order to change — the drag instead toggles data.paintOrder
+  // (the SAME 'fillFirst'/'strokeFirst' flag the right-panel Paint Order
+  // toggle already writes, engine-bridge.js:1606), scoped to just this
+  // one shape rather than routed through setPaintOrder (which also
+  // overwrites state.paintOrder, the default for the NEXT shape drawn —
+  // an unwanted global side effect for what should be a per-shape swap).
+  function performPaintSwap(overRow) {
+    var destPaintId = overRow.dataset.paintid;
+    if (!destPaintId || destPaintId === _elDrag.id) return;
+    var srcParts = _elDrag.id.split(':'), destParts = destPaintId.split(':');
+    if (srcParts[0] !== destParts[0] || srcParts[1] === destParts[1]) return;
+    var shapeStrokeId = srcParts[0], srcKind = srcParts[1];
+    var c = currentLayer(); if (!c.ld) return;
+    var entry = window.SMMotion.layerElements(c.li, c.ld).filter(function (e) { return e.strokeId === shapeStrokeId; })[0];
+    if (!entry) return;
+    if (entry.sd.__linkedFillStrokeId) {
+      var fillItem = window.SMMotion.liveItemByStrokeId(c.li, entry.sd.__linkedFillStrokeId);
+      var strokeItem = window.SMMotion.liveItemByStrokeId(c.li, entry.strokeId);
+      if (!fillItem || !strokeItem) return;
+      pushUndo();
+      if (srcKind === 'fill') fillItem.insertAbove(strokeItem); else strokeItem.insertAbove(fillItem);
+    } else {
+      var item = window.SMMotion.liveItemByStrokeId(c.li, entry.strokeId);
+      if (!item) return;
+      pushUndo();
+      item.data = item.data || {};
+      item.data.paintOrder = srcKind === 'fill' ? 'fillFirst' : 'strokeFirst';
+    }
+    saveActiveLayerFrame();
+    renderShapesPanel();
+    if (window.renderArcs) renderArcs();
+    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+  }
   function performReorder(overRow) {
+    if (_elDrag.kind === 'paint') { performPaintSwap(overRow); return; }
     var c = currentLayer(); if (!c.ld) return;
     var destGid = overRow.dataset.gid, destStrokeId = overRow.dataset.strokeid;
     if (_elDrag.kind === 'group' && destGid === _elDrag.id) return; // dropped on itself
@@ -255,7 +337,8 @@
   function buildPaintSubRow(list, c, entry, kind, indent) {
     var row = document.createElement('div'); row.className = 'lrow motion-elem-row motion-elem-subrow';
     row.style.paddingLeft = (24 + indent) + 'px';
-    if (isStrokeSelected(c.li, entry.strokeId)) row.classList.add('act');
+    row.dataset.paintid = entry.strokeId + ':' + kind;
+    if (isStrokeSelected(c.li, paintStrokeIdFor(entry, kind))) row.classList.add('act');
     var spacer = document.createElement('span'); spacer.className = 'lico larrow-spacer';
     row.appendChild(spacer);
     var swatch = document.createElement('div'); swatch.className = 'motion-elem-swatch';
@@ -263,7 +346,12 @@
     var nm = document.createElement('div'); nm.className = 'lnm';
     nm.textContent = SM.t(kind === 'fill' ? 'elementsFill' : 'elementsStroke');
     row.appendChild(swatch); row.appendChild(nm);
-    row.addEventListener('click', function (e) { e.stopPropagation(); selectPaintAspect(c.li, entry.strokeId, kind); });
+    row.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (window._elDragJustEnded) { window._elDragJustEnded = false; return; }
+      selectPaintAspect(c.li, paintStrokeIdFor(entry, kind), kind);
+    });
+    row.addEventListener('mousedown', function (e) { e.stopPropagation(); armDrag(e, 'paint', entry.strokeId + ':' + kind); });
     list.appendChild(row);
   }
   // Builds one shape row — used both at top level and, indented, as a
@@ -334,8 +422,12 @@
     });
     list.appendChild(row);
     if (expanded) {
-      if (entry.sd.fillColor) buildPaintSubRow(list, c, entry, 'fill', indent + 20);
-      if (entry.sd.strokeColor) buildPaintSubRow(list, c, entry, 'stroke', indent + 20);
+      // Front-most first (paintRowOrder) so the row ORDER itself already
+      // reads as "what's on top" before the user ever drags anything.
+      paintRowOrder(c, entry).forEach(function (kind) {
+        if (kind === 'fill' && entry.sd.fillColor) buildPaintSubRow(list, c, entry, 'fill', indent + 20);
+        if (kind === 'stroke' && entry.sd.strokeColor) buildPaintSubRow(list, c, entry, 'stroke', indent + 20);
+      });
     }
   }
   function renderShapesPanel() {

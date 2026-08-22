@@ -4672,6 +4672,32 @@
   function layerElements(li, ld) {
     var strokes = getEffectiveStrokes(li, state.currentFrame) || [];
     var out = [];
+    // Linked-fill companion (2026-08, "quand je dessine avec brush il me
+    // fait 2 forme pour le fill et le stroke") — a stroke drawn with Fill
+    // enabled gets a SEPARATE Path for the fill backdrop, tagged
+    // isLinkedFillCompanion + a shared linkedFillId (draw-bridge.js
+    // commitStroke). That file's own comment on the flag is explicit: "This
+    // flag is how selectedPaths building code excludes it from ever being
+    // added as its own entry" — layerElements was the one consumer that
+    // still listed it as one, same family-of-bug-#1 shape as the
+    // isBrushTextureCopy fold below. Indexed here so the owning stroke can
+    // borrow its fillColor for display and shapes-panel.js can resolve the
+    // real companion item when "Fill" gets clicked/dragged separately.
+    var companionByLinkId = {};
+    strokes.forEach(function (sd, ci) {
+      if (!sd.isLinkedFillCompanion || !sd.linkedFillId) return;
+      // Same lazy-stamp as the main loop below — a companion is skipped
+      // BEFORE reaching that code, so it needs its own stamp here or
+      // __linkedFillStrokeId would point nowhere on a legacy stroke drawn
+      // before strokeId existed.
+      if (!sd.strokeId) {
+        sd.strokeId = 's' + Date.now().toString(36) + '_' + ci + '_' + Math.floor(Math.random() * 1e6);
+        var cLiveLayer = window.userLayers && userLayers[li];
+        var cLiveItem = cLiveLayer && cLiveLayer.children[ci];
+        if (cLiveItem && cLiveItem.data && !cLiveItem.data.strokeId) cLiveItem.data.strokeId = sd.strokeId;
+      }
+      companionByLinkId[sd.linkedFillId] = sd;
+    });
     strokes.forEach(function (sd, i) {
       // A brush-texture companion (bitmap raster or vector dab group, both
       // tagged isBrushTextureCopy + a brushGroupId shared with their
@@ -4686,6 +4712,7 @@
       // so animating "the shape" (the one row left) carries the texture
       // along automatically.
       if (sd.isBrushTextureCopy) return;
+      if (sd.isLinkedFillCompanion) return; // folded into its owning stroke below
       // Lazily stamp a strokeId onto legacy stroke data that predates this
       // feature (or fillWalls/team-review, the other lazy-assign consumers)
       // — getEffectiveStrokes returns the LIVE array reference for a real
@@ -4711,7 +4738,20 @@
         var liveItem = liveLayer && liveLayer.children[i];
         if (liveItem && liveItem.data && !liveItem.data.strokeId) liveItem.data.strokeId = sd.strokeId;
       }
-      out.push({ strokeId: sd.strokeId, sd: sd });
+      var outSd = sd;
+      var companion = sd.linkedFillId && companionByLinkId[sd.linkedFillId];
+      if (companion) {
+        // Shallow merged VIEW only — never mutates the stored stroke dict.
+        // fillColor borrowed from the real companion so the swatch/label
+        // reflect it; __linkedFillStrokeId lets a caller resolve the real
+        // separate live item when Fill needs its own selection/reorder
+        // (see shapes-panel.js's buildPaintSubRow).
+        outSd = {};
+        for (var k in sd) if (Object.prototype.hasOwnProperty.call(sd, k)) outSd[k] = sd[k];
+        outSd.fillColor = companion.fillColor;
+        outSd.__linkedFillStrokeId = companion.strokeId;
+      }
+      out.push({ strokeId: sd.strokeId, sd: outSd });
     });
     return out;
   }
