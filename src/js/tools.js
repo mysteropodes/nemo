@@ -802,7 +802,7 @@ function fsHighlightPath(sel){
 // the tracking unconditionally so a manual edit always wins and stays put.
 function fsUnlinkFillRegen(p){
   if(!p||!p.data)return;
-  delete p.data.fillSeed;delete p.data.fillWalls;delete p.data.fillGapPx;
+  delete p.data.fillSeed;delete p.data.fillWalls;delete p.data.fillGapPx;delete p.data.fillSeeds;
 }
 function fsApplyDelete(){
   if(!_fsSel.length)return;
@@ -4239,10 +4239,16 @@ function applyStrokeProfileToPath(path, kind, baseOverride) {
   rebuildVectorBrushOutline(path); // synchronous: nothing else ever calls it
   return true;
 }
-function rebuildVectorBrushOutline(path){
-  var cs=path.data&&path.data.centerSegments;
-  if(!cs||cs.length<2)return;
-  var profile=path.data.widthProfile;
+// Dense arc-length sampling of a vector-brush centerline (2026-08, factored
+// out of rebuildVectorBrushOutline unchanged — see that function's own
+// history for the sampling rationale): given the sparse editable
+// centerSegments + the dense pressure widthProfile, returns evenly-spaced
+// {pts, widths} ready for buildVariableWidthPath. Shared rather than
+// duplicated (CLAUDE.md §3) because Motion's own Brush Size property
+// (motion.js) needs the EXACT same sampling to scale on top of, and a
+// second copy of this arc-length math would drift the moment either side
+// changed its curve-fitting.
+function sampleVectorBrushCenterline(cs,profile){
   var center=new Path({insert:false});
   cs.forEach(function(s){center.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));});
   var len=center.length;
@@ -4271,6 +4277,23 @@ function rebuildVectorBrushOutline(path){
     }
     widths.push(w);
   }
+  // Real Segment objects (not [x,y,...] plain data) so callers that need
+  // the fitted centerline itself (rebuildVectorBrushOutline's linked-fill
+  // sync) can build a Path from them directly, same shape `center`'s own
+  // .segments already were before this got factored out — only the LIVE
+  // `center` item itself is thrown away here (insert:false, never in any
+  // scene graph, but removed anyway for hygiene).
+  var centerSegs=center.segments.map(function(s){return new Segment(s.point,s.handleIn,s.handleOut);});
+  center.remove();
+  return {pts:pts,widths:widths,centerSegments:centerSegs};
+}
+window.sampleVectorBrushCenterline=sampleVectorBrushCenterline;
+function rebuildVectorBrushOutline(path){
+  var cs=path.data&&path.data.centerSegments;
+  if(!cs||cs.length<2)return;
+  var profile=path.data.widthProfile;
+  var sampled=sampleVectorBrushCenterline(cs,profile);
+  var pts=sampled.pts,widths=sampled.widths;
   // Sync the linked fill backdrop (Fill enabled while drawing with the
   // Pressure brush — see draw-bridge.js's commitStroke) to the SAME curve
   // just fit through the centerline anchors, rather than an independently-
@@ -4284,10 +4307,9 @@ function rebuildVectorBrushOutline(path){
   // goes through here.
   var linkedFill=path.data&&path.data.linkedFill;
   if(linkedFill&&!linkedFill.removed){
-    linkedFill.segments=center.segments.map(function(s){return new Segment(s.point,s.handleIn,s.handleOut);});
+    linkedFill.segments=sampled.centerSegments.map(function(s){return new Segment(s.point,s.handleIn,s.handleOut);});
     linkedFill.closed=true;
   }
-  center.remove();
   var outline=buildVariableWidthPath(pts,widths);
   if(outline){
     path.segments=outline.segments;path.closed=true;outline.remove();

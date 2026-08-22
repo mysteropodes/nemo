@@ -9,6 +9,13 @@
 (function(){
   var RECENTS_KEY='nemo-recents',MAX_RECENTS=8;
   var currentPath=null,currentName='Untitled';
+  // Declared up here (not down with the rest of the tab-bar code below) so
+  // it's already initialized by the time initCloseGuard's IIFE runs and
+  // calls markSaved() for its boot-time baseline — markSaved touches
+  // activeTab()/renderTabBar(), both of which read `tabs`. Textually
+  // "var tabs=[]" further down would only be hoisted as undefined at that
+  // point, not yet assigned array — .find()/.forEach() on it would throw.
+  var tabs=[],activeTabId=null;
 
   function tauriOk(){return typeof window.__TAURI__!=='undefined';}
   // Browser-mode autosave: localStorage first (sync, ~5-10MB quota), always
@@ -99,7 +106,12 @@
   // empty document counts as clean until it's actually drawn on (newProject
   // and openPath both stamp it).
   var lastSavedJson=null;
-  function markSaved(json){lastSavedJson=json;}
+  function markSaved(json){
+    lastSavedJson=json;
+    var t=activeTab();
+    if(t)t.dirty=false;
+    renderTabBar();
+  }
   function isDirty(){
     try{return lastSavedJson!==null&&window.SM.exportJSON()!==lastSavedJson;}
     catch(e){return true;} // can't serialize → assume dirty, never skip the warning
@@ -387,7 +399,8 @@
     // feedback-bridge.js's local + shared feedback storage keys off, so a
     // feedback thread and this project's own history/sync folders always
     // agree on which project they belong to without re-deriving the logic.
-    getProjectKey:historyKey,profileDir:profileDir,isDirty:isDirty,markSaved:function(){try{markSaved(window.SM.exportJSON());}catch(e){}},getCurrentLabel:getCurrentLabel};
+    getProjectKey:historyKey,profileDir:profileDir,isDirty:isDirty,markSaved:function(){try{markSaved(window.SM.exportJSON());}catch(e){}},getCurrentLabel:getCurrentLabel,
+    refreshActiveTabDirtyDot:refreshActiveTabDirtyDot};
 
   // ---- Close-with-unsaved-work guard ----
   // Cmd+Q / window-close with unsaved changes asked NOTHING before this —
@@ -458,13 +471,20 @@
   // Genuinely separate projects (own layers/frames/palettes/etc.), not a
   // cosmetic tab strip — confirmed against the user's own clarification
   // ("real management of several completely different projects").
-  var tabs=[],activeTabId=null;
+  // `tabs`/`activeTabId` themselves are declared up near RECENTS_KEY —
+  // see the comment there for why.
   function makeTabId(){return 't'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
   function activeTab(){return tabs.find(function(t){return t.id===activeTabId;});}
   function snapshotActiveIntoTab(){
     var t=activeTab();if(!t)return;
     saveAllLayerFrames();
-    t.json=window.SM.exportJSON();t.name=currentName;t.path=currentPath;
+    t.json=window.SM.exportJSON();
+    // Captured HERE, before any import happens — isDirty()'s raw-string
+    // comparison against lastSavedJson is only trustworthy same-generation
+    // (live export vs. live export). Carrying this as a plain boolean past
+    // an import boundary avoids the trap below (see switchToTab).
+    t.dirty=isDirty();
+    t.name=currentName;t.path=currentPath;
   }
   function ensureInitialTab(){
     // Called after every entry point that makes a project "live" (new,
@@ -474,7 +494,12 @@
     // rather than spawning a duplicate.
     if(!tabs.length){
       activeTabId=makeTabId();
-      tabs.push({id:activeTabId,name:currentName,json:null,path:currentPath});
+      // isDirty() here reflects whatever markSaved() call already ran
+      // before this point (newProject/openPath: clean) or didn't (Resume
+      // Last Session deliberately never calls markSaved — an unsaved
+      // autosave restore correctly starts dirty, matching the close-guard's
+      // own pre-existing behavior).
+      tabs.push({id:activeTabId,name:currentName,json:null,path:currentPath,dirty:isDirty()});
     }else{
       var t=activeTab();
       if(t){t.name=currentName;t.path=currentPath;}
@@ -486,8 +511,24 @@
     var target=tabs.find(function(t){return t.id===id;});if(!target)return;
     snapshotActiveIntoTab();
     activeTabId=id;
-    if(target.json)window.SM.importJSON(target.json,true);
-    else newProject({w:1920,h:1080,fps:24,name:target.name});
+    if(target.json){
+      window.SM.importJSON(target.json,true);
+      // importJSON normalizes (fills defaults, pads frames — same trap
+      // openPath's own comment already documents), so a fresh exportJSON()
+      // right after this import can differ textually from target.json even
+      // with zero real changes. Comparing the OLD pre-import string against
+      // the NEW post-import baseline would false-positive as dirty on every
+      // switch back to an untouched tab. Since target.dirty was captured
+      // pre-import (same-generation, reliable), branch on THAT instead:
+      // clean → re-export now and use that as the fresh baseline; dirty →
+      // there's no real "last saved" string to compare against without
+      // re-importing an old disk copy we don't have handy, so force
+      // isDirty() to keep reading true with a baseline no live export can
+      // ever equal (isDirty() itself treats plain null as "not dirty yet",
+      // so that sentinel specifically can't be null).
+      lastSavedJson=target.dirty?'':window.SM.exportJSON();
+    }
+    else newProject({w:1920,h:1080,fps:24,name:target.name}); // stamps lastSavedJson/tab.dirty itself via markSaved
     currentPath=target.path||null;currentName=target.name;updateCurrentLabel();
     renderTabBar();
   }
@@ -509,7 +550,10 @@
     if(wasActive){
       var next=tabs[Math.max(0,idx-1)];
       activeTabId=next.id; // switchToTab no-ops on equal id, so load directly
-      if(next.json)window.SM.importJSON(next.json,true);
+      if(next.json){
+        window.SM.importJSON(next.json,true);
+        lastSavedJson=next.dirty?'':window.SM.exportJSON(); // see switchToTab's comment for why
+      }
       else newProject({w:1920,h:1080,fps:24,name:next.name});
       currentPath=next.path||null;currentName=next.name;updateCurrentLabel();
     }
@@ -528,20 +572,41 @@
     input.addEventListener('blur',commit);
     input.addEventListener('keydown',function(e){e.stopPropagation();if(e.key==='Enter')input.blur();else if(e.key==='Escape'){input.value=t.name;input.blur();}});
   }
+  // Per-tab "unsaved changes" dirty state. The active tab's own document
+  // lives in live `state`, not in its tab.json (that only gets refreshed on
+  // switch-away by snapshotActiveIntoTab) — so it needs isDirty()'s live
+  // exportJSON() comparison. An inactive tab's content is frozen since the
+  // switch away from it, and t.dirty was captured at that exact moment
+  // (see snapshotActiveIntoTab) — just read it back, no comparison needed.
+  function tabIsDirty(t){
+    return t.id===activeTabId?isDirty():!!t.dirty;
+  }
   function renderTabBar(){
     var list=document.getElementById('project-tabs-list');if(!list)return;
     list.innerHTML='';
     tabs.forEach(function(t){
       var el=document.createElement('div');el.className='project-tab'+(t.id===activeTabId?' act':'');el.dataset.tab=t.id;
+      if(tabIsDirty(t))el.classList.add('dirty');
       var dot=document.createElement('span');dot.className='pt-dot';
+      var dirtyDot=document.createElement('span');dirtyDot.className='pt-dirty';dirtyDot.title='Modifications non enregistrées';
       var nm=document.createElement('span');nm.className='pt-name';nm.textContent=t.name;
       var close=document.createElement('span');close.className='pt-close';close.textContent='×';close.title='Fermer l\'onglet';
       close.addEventListener('click',function(e){e.stopPropagation();closeTab(t.id);});
-      el.appendChild(dot);el.appendChild(nm);el.appendChild(close);
+      el.appendChild(dot);el.appendChild(dirtyDot);el.appendChild(nm);el.appendChild(close);
       el.addEventListener('click',function(){switchToTab(t.id);});
       el.addEventListener('dblclick',function(e){e.stopPropagation();startTabRename(t.id);});
       list.appendChild(el);
     });
+  }
+  // Cheap DOM-only refresh for the active tab's dot, called from the
+  // existing 30s autosave tick (timeline.js) — reuses the exportJSON() it
+  // already pays for instead of triggering a second full-document
+  // serialization just to keep this indicator current while the user
+  // keeps editing the same tab without switching/saving/adding another.
+  function refreshActiveTabDirtyDot(liveJson){
+    var el=document.querySelector('.project-tab[data-tab="'+activeTabId+'"]');
+    if(!el)return;
+    el.classList.toggle('dirty',lastSavedJson!==null&&liveJson!==lastSavedJson);
   }
   document.getElementById('project-tab-add')&&document.getElementById('project-tab-add').addEventListener('click',addTab);
 

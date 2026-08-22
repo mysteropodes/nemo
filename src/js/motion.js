@@ -42,7 +42,19 @@
   // constant exists to prevent (per explicit feedback: "fait attention au
   // alignement des keyframes aux properties").
   var ROW_H = 22;
-  var PROPS = ['position', 'anchor', 'rotation', 'scale', 'opacity'];
+  // Order (2026-08, "système pour animer l'id index de calque ou de
+  // shape/éléments") — a plain z-index: NOT a paint attribute, it's WHICH
+  // POSITION in the render list this holder ends up at. Deliberately a base
+  // PROPS entry rather than an opt-in extended one (like Fill/Stroke/Brush)
+  // because it applies to literally every holder unconditionally, same as
+  // Position/Rotation/Opacity — and since propsFor/PROP_* already serve BOTH
+  // a layer holder (ld) and an element holder (ld.elementMotion[id])
+  // identically, putting it here is the "même mécanisme" for both
+  // granularities in one place, confirmed with Cyril rather than building
+  // two parallel systems. Consumed by engine-bridge.js as a STABLE sort key
+  // (default 0 ties keep original document order, exactly like CSS
+  // z-index) — see layerOrderAt/elementOrderAt below.
+  var PROPS = ['position', 'anchor', 'rotation', 'scale', 'opacity', 'order'];
   // 3D layer (2026-07-28, After-Effects-style "3D layer" toggle,
   // ld.threeD) — three EXTRA scalar properties, revealed only when the
   // layer/holder has 3D on: positionZ (depth), rotationX/rotationY (the
@@ -52,7 +64,7 @@
   // three independent dim-1 properties reuse the exact same generic
   // track/keyframe/interpolation machinery 'rotation'/'opacity' already
   // do, zero changes needed to that machinery.
-  var PROPS_WITH_3D = ['position', 'positionZ', 'anchor', 'rotation', 'rotationX', 'rotationY', 'scale', 'opacity'];
+  var PROPS_WITH_3D = ['position', 'positionZ', 'anchor', 'rotation', 'rotationX', 'rotationY', 'scale', 'opacity', 'order'];
   // Mograph duplicator (2026-07-29, ld.duplicator) — four EXTRA keyframable
   // per-copy DELTAS (each copy k gets k× the delta, or a seeded random in
   // ±delta — see applyLayerDuplicator, app.js), revealed only when the
@@ -200,15 +212,15 @@
     if (prop === 'timeRemap') return holder.timeRemap || null;
     return (holder.motion && holder.motion[prop]) || null;
   }
-  var PROP_LABEL = { position: 'Position', anchor: 'Anchor Point', rotation: 'Rotation', scale: 'Scale', opacity: 'Opacity', timeRemap: 'Time Remap', positionZ: 'Position Z', rotationX: 'Rotation X', rotationY: 'Rotation Y', dupOffsetPos: 'Dup. Offset', dupOffsetRot: 'Dup. Rotation', dupOffsetScale: 'Dup. Scale', dupOffsetOpacity: 'Dup. Opacity', dupOffsetPosZ: 'Dup. Offset Z', dupOffsetRotX: 'Dup. Rotation X', dupOffsetRotY: 'Dup. Rotation Y', parentBlend: 'Parent Blend', timeLinkInOffset: 'Décalage entrée', timeLinkOutOffset: 'Décalage sortie', cornerTL: 'Coin ↖', cornerTR: 'Coin ↗', cornerBR: 'Coin ↘', cornerBL: 'Coin ↙', arcStart: 'Début (arc)', arcSweep: 'Ouverture (arc)', arcInner: 'Rayon interne', starInner: 'Rayon interne', starCorner: 'Coins' };
-  var PROP_DIM = { position: 2, anchor: 2, rotation: 1, scale: 2, opacity: 1, timeRemap: 1, positionZ: 1, rotationX: 1, rotationY: 1, dupOffsetPos: 2, dupOffsetRot: 1, dupOffsetScale: 2, dupOffsetOpacity: 1, dupOffsetPosZ: 1, dupOffsetRotX: 1, dupOffsetRotY: 1, parentBlend: 1, timeLinkInOffset: 1, timeLinkOutOffset: 1, cornerTL: 1, cornerTR: 1, cornerBR: 1, cornerBL: 1, arcStart: 1, arcSweep: 1, arcInner: 1, starInner: 1, starCorner: 1 };
-  var PROP_UNIT = { position: 'px', anchor: 'px', rotation: '°', scale: '%', opacity: '%', timeRemap: 'f', positionZ: 'px', rotationX: '°', rotationY: '°', dupOffsetPos: 'px', dupOffsetRot: '°', dupOffsetScale: '%', dupOffsetOpacity: '%', dupOffsetPosZ: 'px', dupOffsetRotX: '°', dupOffsetRotY: '°', parentBlend: '%', timeLinkInOffset: 'f', timeLinkOutOffset: 'f', cornerTL: 'px', cornerTR: 'px', cornerBR: 'px', cornerBL: 'px', arcStart: '°', arcSweep: '°', arcInner: '%', starInner: '%', starCorner: 'px' };
+  var PROP_LABEL = { position: 'Position', anchor: 'Anchor Point', rotation: 'Rotation', scale: 'Scale', opacity: 'Opacity', order: 'Order', timeRemap: 'Time Remap', positionZ: 'Position Z', rotationX: 'Rotation X', rotationY: 'Rotation Y', dupOffsetPos: 'Dup. Offset', dupOffsetRot: 'Dup. Rotation', dupOffsetScale: 'Dup. Scale', dupOffsetOpacity: 'Dup. Opacity', dupOffsetPosZ: 'Dup. Offset Z', dupOffsetRotX: 'Dup. Rotation X', dupOffsetRotY: 'Dup. Rotation Y', parentBlend: 'Parent Blend', timeLinkInOffset: 'Décalage entrée', timeLinkOutOffset: 'Décalage sortie', cornerTL: 'Coin ↖', cornerTR: 'Coin ↗', cornerBR: 'Coin ↘', cornerBL: 'Coin ↙', arcStart: 'Début (arc)', arcSweep: 'Ouverture (arc)', arcInner: 'Rayon interne', starInner: 'Rayon interne', starCorner: 'Coins' };
+  var PROP_DIM = { position: 2, anchor: 2, rotation: 1, scale: 2, opacity: 1, order: 1, timeRemap: 1, positionZ: 1, rotationX: 1, rotationY: 1, dupOffsetPos: 2, dupOffsetRot: 1, dupOffsetScale: 2, dupOffsetOpacity: 1, dupOffsetPosZ: 1, dupOffsetRotX: 1, dupOffsetRotY: 1, parentBlend: 1, timeLinkInOffset: 1, timeLinkOutOffset: 1, cornerTL: 1, cornerTR: 1, cornerBR: 1, cornerBL: 1, arcStart: 1, arcSweep: 1, arcInner: 1, starInner: 1, starCorner: 1 };
+  var PROP_UNIT = { position: 'px', anchor: 'px', rotation: '°', scale: '%', opacity: '%', order: '', timeRemap: 'f', positionZ: 'px', rotationX: '°', rotationY: '°', dupOffsetPos: 'px', dupOffsetRot: '°', dupOffsetScale: '%', dupOffsetOpacity: '%', dupOffsetPosZ: 'px', dupOffsetRotX: '°', dupOffsetRotY: '°', parentBlend: '%', timeLinkInOffset: 'f', timeLinkOutOffset: 'f', cornerTL: 'px', cornerTR: 'px', cornerBR: 'px', cornerBL: 'px', arcStart: '°', arcSweep: '°', arcInner: '%', starInner: '%', starCorner: 'px' };
   // parentBlend defaults to 0 — "0%" reads as "fully Parent A" (the
   // pre-existing single parent), matching the invariant that assigning a
   // second parent must never itself move anything until the user actually
   // animates the blend (same "adding a feature is a visual no-op until
   // deliberately used" precedent enableTimeRemap's own seeded keys follow).
-  var PROP_DEFAULT = { position: [0, 0], anchor: [0, 0], rotation: [0], scale: [100, 100], opacity: [100], timeRemap: [0], positionZ: [0], rotationX: [0], rotationY: [0], dupOffsetPos: [0, 0], dupOffsetRot: [0], dupOffsetScale: [0, 0], dupOffsetOpacity: [0], dupOffsetPosZ: [0], dupOffsetRotX: [0], dupOffsetRotY: [0], parentBlend: [0], timeLinkInOffset: [0], timeLinkOutOffset: [0],
+  var PROP_DEFAULT = { position: [0, 0], anchor: [0, 0], rotation: [0], scale: [100, 100], opacity: [100], order: [0], timeRemap: [0], positionZ: [0], rotationX: [0], rotationY: [0], dupOffsetPos: [0, 0], dupOffsetRot: [0], dupOffsetScale: [0, 0], dupOffsetOpacity: [0], dupOffsetPosZ: [0], dupOffsetRotX: [0], dupOffsetRotY: [0], parentBlend: [0], timeLinkInOffset: [0], timeLinkOutOffset: [0],
     // Trim Paths (2026-08, AE parity — "animer les stroke en in et out"):
     // start/end as % of the path's own arc length, offset as a % that
     // shifts the whole [start,end] window — same 3-field shape as AE's own
@@ -1970,6 +1982,119 @@
     if (!holder) return null;
     if (!hasKeys(holder, 'fillColor') && !(holder.motionStatic && holder.motionStatic.fillColor)) return null;
     return valueAtFrame(holder, 'fillColor', frameIdx);
+  }
+  // Extended per-shape properties: Stroke color / Stroke width (2026-08 —
+  // second slice of the "propriétés étendues par forme" chantier, same
+  // exact shape as Fill color above). Stroke color is [r,g,b,a] 0-255 like
+  // Fill; stroke width is a single scalar, so it's stored as the usual
+  // 1-element array every other scalar prop uses (rotation/opacity) and
+  // unwrapped here so callers get a plain number, not an array — matching
+  // what engine-bridge.js's own item.strokeWidth already expects.
+  function elementStrokeColorAt(li, strokeId, frameIdx) {
+    var ld = state.layers[li];
+    if (!ld || !ld.elementMotion) return null;
+    var holder = ld.elementMotion[strokeId];
+    if (!holder) return null;
+    if (!hasKeys(holder, 'strokeColor') && !(holder.motionStatic && holder.motionStatic.strokeColor)) return null;
+    return valueAtFrame(holder, 'strokeColor', frameIdx);
+  }
+  function elementStrokeWidthAt(li, strokeId, frameIdx) {
+    var ld = state.layers[li];
+    if (!ld || !ld.elementMotion) return null;
+    var holder = ld.elementMotion[strokeId];
+    if (!holder) return null;
+    if (!hasKeys(holder, 'strokeWidth') && !(holder.motionStatic && holder.motionStatic.strokeWidth)) return null;
+    return valueAtFrame(holder, 'strokeWidth', frameIdx)[0];
+  }
+  // Order (2026-08, "système pour animer l'id index de calque ou de shape/
+  // éléments") — unlike Fill/Stroke/Brush above, this NEVER returns null:
+  // every holder has a z-position (default 0, same neutral CSS-z-index
+  // meaning as everyone else), so engine-bridge.js's stable sort can just
+  // call this unconditionally for whichever items it already knows have
+  // *some* order track (see its own _anyLayerOrder/_anyElemOrder guards —
+  // the guard lives THERE, not here, so this stays a plain, cheap read).
+  function layerOrderAt(li, frameIdx) {
+    var ld = state.layers[li];
+    if (!ld) return 0;
+    return valueAtFrame(ld, 'order', frameIdx)[0];
+  }
+  function elementOrderAt(li, strokeId, frameIdx) {
+    var ld = state.layers[li];
+    if (!ld || !ld.elementMotion) return 0;
+    var holder = ld.elementMotion[strokeId];
+    if (!holder) return 0;
+    return valueAtFrame(holder, 'order', frameIdx)[0];
+  }
+  // Cheap "does ANY layer/element on this layer actually use Order" scans —
+  // engine-bridge.js calls these ONCE per buildSceneJson / once per layer
+  // respectively, so the stable-sort + per-item lookup below them is fully
+  // skipped (zero overhead) for the overwhelming default case of a
+  // document that never touches this property, same "test the cheap guard
+  // first" discipline as this codebase's own §5bis perf lessons.
+  function anyLayerHasOrder() {
+    for (var k = 0; k < state.layers.length; k++) {
+      var ld = state.layers[k];
+      if ((ld.motion && ld.motion.order) || (ld.motionStatic && ld.motionStatic.order)) return true;
+    }
+    return false;
+  }
+  function layerElementsHaveOrder(ld) {
+    if (!ld.elementMotion) return false;
+    for (var k in ld.elementMotion) {
+      var h = ld.elementMotion[k];
+      if (h && ((h.motion && h.motion.order) || (h.motionStatic && h.motionStatic.order))) return true;
+    }
+    return false;
+  }
+  // Whole-document check (layer OR any element on any layer) — export.js's
+  // exportHasEngineOnlyMotion uses this to decide whether a render needs to
+  // route through the engine (buildSceneJson, engine-bridge.js) instead of
+  // its own plain-Paper.js fallback loop, which has no idea what Order even
+  // is, same "engine-only feature, route the whole export through the
+  // engine rather than reimplement it a second time" fix already applied to
+  // 3D layers/Motion Blur.
+  function anyOrderUsedAnywhere() {
+    if (anyLayerHasOrder()) return true;
+    for (var k = 0; k < state.layers.length; k++) if (layerElementsHaveOrder(state.layers[k])) return true;
+    return false;
+  }
+  // Extended per-shape property: Brush size (2026-08 — third slice of the
+  // "propriétés étendues par forme" chantier, the "brush" piece of
+  // fill/stroke/brush/path). A vector-brush stroke's ink IS its fill (see
+  // CLAUDE.md's own note on isVectorBrush), so this is genuinely new
+  // ground, not something Fill/Stroke color already cover — it's a % scale
+  // on the ribbon's whole width profile, same unit convention as the base
+  // Scale property. Same shape as ParamShape (hasXFor/applyXFor rebuilding
+  // segments), not the simple item-field-override Fill/Stroke color use,
+  // because scaling width means re-deriving the outline geometry, not just
+  // overriding a paint field.
+  function hasBrushSizeMotionFor(li, strokeId) {
+    var ld = state.layers[li]; if (!ld) return false;
+    var holder = elementHolder(ld, strokeId);
+    if (!holder) return false;
+    return isAnimated(holder, 'brushSize') || !!(holder.motionStatic && holder.motionStatic.brushSize);
+  }
+  // sd.centerSegments/sd.widthProfile are the shape's OWN static pressure
+  // recording (serP's output, app.js) — untouched by this scale, so
+  // repeated calls across frames always start from the same source instead
+  // of compounding. Scoped to the case Trim Paths' own vector-brush special
+  // case (engine-bridge.js) does NOT already handle — composing an
+  // animated Trim window with an animated Brush Size on the SAME stroke at
+  // the same time is a real future case, not attempted here (see the call
+  // site's own comment for the exact boundary).
+  function applyBrushSizeFor(li, strokeId, sd, frameIdx) {
+    var ld = state.layers[li]; var holder = ld && elementHolder(ld, strokeId);
+    if (!holder || !sd.centerSegments || sd.centerSegments.length < 2) return null;
+    var pct = valueAtFrame(holder, 'brushSize', frameIdx)[0];
+    if (!window.sampleVectorBrushCenterline || !window.buildVariableWidthPath) return null;
+    var sampled = window.sampleVectorBrushCenterline(sd.centerSegments, sd.widthProfile);
+    var scale = pct / 100;
+    var scaledWidths = sampled.widths.map(function (w) { return w * scale; });
+    var outline = window.buildVariableWidthPath(sampled.pts, scaledWidths);
+    if (!outline) return null;
+    var segs = outline.segments.map(function (s) { return { point: [s.point.x, s.point.y], handleIn: [s.handleIn.x, s.handleIn.y], handleOut: [s.handleOut.x, s.handleOut.y] }; });
+    outline.remove();
+    return segs;
   }
   // Path property, per-vertex (2026-07, "les properties de path dans motion
   // dont les vertices peuvent être animé séparément"): reuses the EXACT
@@ -4846,6 +4971,29 @@
       if (entry.sd.fillColor) {
         renderFillColorRow(list, ensureElementHolder(ld, entry.strokeId), entry.sd.fillColor);
       }
+      // Stroke color/width (2026-08 — second slice of the "propriétés
+      // étendues par forme" chantier, same convention as Fill color above):
+      // hidden unless the element actually has a real stroke. Width reuses
+      // renderTrimScalarRow as-is (a plain scalar row is a plain scalar
+      // row) rather than writing a near-identical function — its default
+      // comes from THIS shape's own current width, same "per-shape, not
+      // one shared constant" principle ensureElementHolder's corner-radii
+      // seeding already establishes for paramShapeKind.
+      if (entry.sd.strokeColor) {
+        var strokeHolder = ensureElementHolder(ld, entry.strokeId);
+        renderStrokeColorRow(list, strokeHolder, entry.sd.strokeColor);
+        if (entry.sd.strokeWidth !== undefined) {
+          renderTrimScalarRow(list, strokeHolder, 'strokeWidth', 'Stroke Width', 'px', 0, 200, entry.sd.strokeWidth);
+        }
+      }
+      // Brush size (2026-08 — third slice, the "brush" piece of
+      // fill/stroke/brush/path): opt-in, hidden unless this is actually a
+      // vector-brush ribbon (isVectorBrush) with real centerline data —
+      // a plain shape has no width profile to scale. % of the shape's own
+      // recorded pressure widths, same convention as the base Scale prop.
+      if (entry.sd.isVectorBrush && entry.sd.centerSegments && entry.sd.centerSegments.length >= 2) {
+        renderTrimScalarRow(list, ensureElementHolder(ld, entry.strokeId), 'brushSize', 'Brush Size', '%', 10, 500, 100);
+      }
       // Trim Paths (2026-08, "animer les stroke en in et out"): opt-in,
       // same visibility gate as Path above (needs real vertex geometry).
       if (!entry.sd.isRaster && entry.sd.segments && entry.sd.segments.length) {
@@ -4869,9 +5017,12 @@
   // Single row (not an accordion group — one color, nothing to expand),
   // same stopwatch/keying contract as renderVertexRow but with a color
   // swatch instead of numeric scrub fields. Opens the SAME color-picker
-  // popover the layer-color dot uses elsewhere (timeline.js).
-  function renderFillColorRow(list, holder, currentFillColorHex) {
-    var prop = 'fillColor';
+  // popover the layer-color dot uses elsewhere (timeline.js). Generalized
+  // over `prop`/`label`/`swatchTitle` (2026-08) so Fill and Stroke color
+  // share one implementation instead of drifting apart as two copies
+  // (CLAUDE.md §3) — renderFillColorRow/renderStrokeColorRow below are thin
+  // wrappers so existing call sites don't need to change.
+  function renderColorRow(list, holder, prop, label, swatchTitle, currentColorHex) {
     var row = document.createElement('div'); row.className = 'lrow motion-prop-row';
     var sw = document.createElement('div');
     var swOn = isAnimated(holder, prop);
@@ -4882,13 +5033,13 @@
     function currentRgba() {
       if (hasKeys(holder, prop)) return valueAtFrame(holder, prop, state.currentFrame);
       if (holder.motionStatic && holder.motionStatic[prop]) return holder.motionStatic[prop];
-      return hexToRgba255(currentFillColorHex);
+      return hexToRgba255(currentColorHex);
     }
     sw.addEventListener('click', function (e) {
       e.stopPropagation(); pushUndo();
       if (!swOn) {
         if (!holder.motionStatic) holder.motionStatic = {};
-        if (!holder.motionStatic[prop]) holder.motionStatic[prop] = hexToRgba255(currentFillColorHex);
+        if (!holder.motionStatic[prop]) holder.motionStatic[prop] = hexToRgba255(currentColorHex);
         toggleAnimated(holder, prop);
       } else if (hasKeyHere) {
         if (holder.motion[prop].keys.length === 1) {
@@ -4905,12 +5056,12 @@
       renderLayerList(); renderTimeline();
       if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
     });
-    var nm = document.createElement('div'); nm.className = 'lnm'; nm.textContent = 'Fill';
+    var nm = document.createElement('div'); nm.className = 'lnm'; nm.textContent = label;
     var swatch = document.createElement('div');
     swatch.style.cssText = 'width:16px;height:16px;border-radius:3px;border:1px solid var(--border2);cursor:pointer;margin-left:auto;';
     var rgba = currentRgba();
     swatch.style.background = 'rgba(' + rgba[0] + ',' + rgba[1] + ',' + rgba[2] + ',' + ((rgba[3] !== undefined ? rgba[3] : 255) / 255) + ')';
-    swatch.title = 'Couleur de fill de cette forme';
+    swatch.title = swatchTitle;
     swatch.addEventListener('click', function (e) {
       e.stopPropagation();
       if (!window.openLayerColorSwatches) return;
@@ -4924,6 +5075,12 @@
     });
     row.appendChild(sw); row.appendChild(nm); row.appendChild(swatch);
     list.appendChild(row);
+  }
+  function renderFillColorRow(list, holder, currentFillColorHex) {
+    renderColorRow(list, holder, 'fillColor', 'Fill', 'Couleur de fill de cette forme', currentFillColorHex);
+  }
+  function renderStrokeColorRow(list, holder, currentStrokeColorHex) {
+    renderColorRow(list, holder, 'strokeColor', 'Stroke', 'Couleur de stroke de cette forme', currentStrokeColorHex);
   }
   // Trim Paths (2026-08, "animer les stroke en in et out"): 3 scalar rows
   // (Start/End/Offset, %), same stopwatch/keying contract as
@@ -5545,6 +5702,18 @@
           // down (a later Forme's own Transform/Path/Fill rows) drifted out
           // of alignment with its own keyframe track from that point on.
           if (entry.sd.fillColor) renderTracksFor(grid, elHolder, 'fillColor');
+          // Stroke color/width (mirrors renderElementsList's own Stroke
+          // block exactly — same condition, same order: color row then,
+          // only if the shape also reports a width, the width row).
+          if (entry.sd.strokeColor) {
+            renderTracksFor(grid, elHolder, 'strokeColor');
+            if (entry.sd.strokeWidth !== undefined) renderTracksFor(grid, elHolder, 'strokeWidth');
+          }
+          // Brush size (mirrors renderElementsList's own Brush size row —
+          // same condition).
+          if (entry.sd.isVectorBrush && entry.sd.centerSegments && entry.sd.centerSegments.length >= 2) {
+            renderTracksFor(grid, elHolder, 'brushSize');
+          }
           // Trim Paths group (mirrors renderElementsList's renderTrimPathsGroup
           // exactly — same condition, same expand state, same 3 scalar rows).
           // Bug found live (2026-08-21, QA pass on a bouncing-ball test scene):
@@ -6844,6 +7013,8 @@
     // 2D's own layer-row shape list (timeline.js) so both modes' trees can
     // never diverge in content or z-order.
     buildShapeTree: buildShapeTree,
+    selectShapesByStrokeIds: selectShapesByStrokeIds,
+    elementLabel: elementLabel,
     layerElements: layerElements,
     elementLabel: elementLabel,
     liveItemByStrokeId: liveItemByStrokeId,
@@ -6987,6 +7158,15 @@
     computeMotionMatFor: computeMotionMat,
     elementMotionAt: elementMotionAt,
     elementFillColorAt: elementFillColorAt,
+    elementStrokeColorAt: elementStrokeColorAt,
+    elementStrokeWidthAt: elementStrokeWidthAt,
+    layerOrderAt: layerOrderAt,
+    elementOrderAt: elementOrderAt,
+    anyLayerHasOrder: anyLayerHasOrder,
+    layerElementsHaveOrder: layerElementsHaveOrder,
+    anyOrderUsedAnywhere: anyOrderUsedAnywhere,
+    hasBrushSizeMotionFor: hasBrushSizeMotionFor,
+    applyBrushSizeFor: applyBrushSizeFor,
     transformSegments: transformSegments,
     transformImageRect: transformImageRect,
     transformImageRectByMatrix: transformImageRectByMatrix,
