@@ -1711,6 +1711,14 @@
         // Same stale-onion-ghost fix as the xform-scale/xform-rotate branch
         // above — a plain move commits through this branch too.
         if (didMove) renderOS();
+        // Every sibling commit branch in this handler (xform-scale/rotate,
+        // xform-distort, marquee-select) ends with renderArcs()+updateUI() —
+        // this one didn't, so the right panel's Position/Size numeric fields
+        // (updateSelPropsPanel, timeline.js) kept showing the PRE-drag
+        // bounds until some unrelated action happened to trigger a refresh.
+        // Confirmed live: dragged a shape, bounds genuinely moved (checked
+        // layer.children directly), panel still read the old numbers.
+        renderArcs(); updateUI();
       }
     }
     mode = null;
