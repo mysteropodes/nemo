@@ -2612,11 +2612,22 @@
       var pts = [];
       var steps = 24;
       for (var s = 0; s <= steps; s++) {
-        var t = s / steps, v = 1 - t;
+        // Named `bt` (bezier t), NOT `t` — this function's outer `t` is the
+        // Motion TARGET object (activeMotionTarget()), which outerWorldPoint
+        // needs as its first argument. `var t` here used to shadow it (var
+        // is function-scoped, not block-scoped), so outerWorldPoint below —
+        // and every call after this loop for the REST of the function,
+        // including the position-key diamonds' own outerWorldPoint calls —
+        // silently ran with `t` clobbered to a plain 0..1 number instead of
+        // the target object once ks.length>=2 (single-keyframe projects
+        // never entered this loop, so the bug only showed once a second key
+        // existed). This is what "le motion path devrait être sur le point
+        // d'ancrage" was actually describing.
+        var bt = s / steps, v = 1 - bt;
         var rawPathPoint={
           x:
-            pvx + v * v * v * a.v[0] + 3 * v * v * t * (a.v[0] + ho[0]) + 3 * v * t * t * (b.v[0] + hi[0]) + t * t * t * b.v[0],
-          y:pvy + v * v * v * a.v[1] + 3 * v * v * t * (a.v[1] + ho[1]) + 3 * v * t * t * (b.v[1] + hi[1]) + t * t * t * b.v[1]
+            pvx + v * v * v * a.v[0] + 3 * v * v * bt * (a.v[0] + ho[0]) + 3 * v * bt * bt * (b.v[0] + hi[0]) + bt * bt * bt * b.v[0],
+          y:pvy + v * v * v * a.v[1] + 3 * v * v * bt * (a.v[1] + ho[1]) + 3 * v * bt * bt * (b.v[1] + hi[1]) + bt * bt * bt * b.v[1]
         };
         var worldPathPoint=outerWorldPoint(t,rawPathPoint);
         pts.push({point:[worldPathPoint.x,worldPathPoint.y]});
@@ -2840,9 +2851,26 @@
     }
     return null;
   }
+  // Only grabs a dot for the CURRENTLY SCRUBBED frame (2026-08-21, "je
+  // bouge le rectangle toutes les keyframes bougent") — every other key's
+  // dot sits wherever the render happens to place it at ITS OWN frame,
+  // which with a single keyframe (or several coincident on screen) is
+  // exactly where the shape is drawn RIGHT NOW regardless of playhead
+  // position. Without this guard, a plain "move the shape" drag at any
+  // frame always re-grabbed and mutated whichever existing key's dot
+  // visually overlapped the click — so a second keyframe could never be
+  // created by dragging on canvas, only the first one ever got edited.
+  // Restricting to the current frame's own key means: parked ON a
+  // keyframe, dragging the shape edits THAT keyframe (unchanged, correct
+  // AE behavior); parked anywhere else, this returns null and onDown
+  // falls through to the plain-move path below, which correctly creates
+  // a NEW key at state.currentFrame (setValue/setKeyAtCurrentFrame).
   function hitPositionDot(pt, ks, pv, target) {
     var tol = 8 / view.zoom;
-    for (var i = 0; i < ks.length; i++){var wp=outerWorldPoint(target,{x:pv.x+ks[i].v[0],y:pv.y+ks[i].v[1]});if(Math.hypot(pt.x-wp.x,pt.y-wp.y)<tol)return ks[i];}
+    for (var i = 0; i < ks.length; i++){
+      if (ks[i].frame !== state.currentFrame) continue;
+      var wp=outerWorldPoint(target,{x:pv.x+ks[i].v[0],y:pv.y+ks[i].v[1]});if(Math.hypot(pt.x-wp.x,pt.y-wp.y)<tol)return ks[i];
+    }
     return null;
   }
   // Finds the LIVE Paper item for a strokeId within a layer (including
