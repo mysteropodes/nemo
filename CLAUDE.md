@@ -611,6 +611,20 @@ mutuellement. Règles à suivre **sans qu'on ait besoin de le redemander** :
   signature), jamais partagés même avec un collaborateur de confiance. Pour du dev normal,
   des valeurs placeholder (`STROKEMOTION_FEEDBACK_TOKEN=dev-placeholder
   STROKEMOTION_UPDATER_TOKEN=dev-placeholder`) suffisent à compiler et lancer `npm run dev`.
+- **Avant de partir en investigation sur un bug rapporté (surtout Motion/canvas), vérifier
+  les branches sœurs AVANT de diagnostiquer soi-même** — quand plusieurs sessions Claude
+  travaillent en parallèle dans des worktrees séparés (ex. `nemo` sur `claude/web-public-beta`
+  vs `nemo-motion` sur `claude/trim-and-motion-anchor-fixes`), le SEUL canal entre elles est
+  Git, de façon asynchrone : rien n'informe une session que l'autre a déjà committé un fix
+  tant qu'un `git fetch` explicite n'est pas fait. Incident du 2026-08-22 : un bug de
+  keyframes Position en Motion a été diagnostiqué et corrigé en profondeur (deux causes
+  distinctes trouvées par du reverse-engineering en direct) — alors qu'un fix pour une
+  troisième cause du MÊME bug (`29f4e7e`, feedback #41) était déjà poussé sur
+  `claude/trim-and-motion-anchor-fixes` depuis la VEILLE, avant même le début de
+  l'investigation. `git fetch` + `git log <branche-sœur> --oneline` (ou une recherche de
+  mots-clés du bug rapporté) est un coût de quelques secondes contre potentiellement une
+  heure de diagnostic redondant — à faire SYSTÉMATIQUEMENT en tout début d'investigation
+  d'un bug, pas seulement juste avant un déploiement.
 
 ## 10. Tout champ numérique doit supporter le "scrub" (glisser pour changer la valeur)
 
