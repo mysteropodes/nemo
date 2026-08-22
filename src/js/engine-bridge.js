@@ -722,6 +722,10 @@
     // splices, and any future overlay insertions, unlike any index math
     // done mid-loop.
     var userLayerEntries = [];
+    // Order (2026-08) — cheap up-front check so an untouched document (the
+    // overwhelming default) pays nothing for the stable-sort right after
+    // this loop below.
+    var _anyLayerOrder = window.SMMotion ? SMMotion.anyLayerHasOrder() : false;
     if (sbPreview) {
       layers.push({ items: onionLayerItems(sbPreview) });
     } else
@@ -1081,6 +1085,11 @@
           }
         }
       }
+      // Order (2026-08) — same per-layer cheap guard as _anyLayerOrder
+      // above, scoped to just this layer's own elementMotion so a document
+      // where only ONE layer's shapes use Order doesn't pay the per-item
+      // tag+sort cost on every other layer.
+      var _anyElemOrder = window.SMMotion && SMMotion.layerElementsHaveOrder(state.layers[i]);
       for (var s = 0; s < children.length; s++) {
         var c = children[s];
         // Team review view filter — 'mine' hides everyone else's content
@@ -1660,6 +1669,10 @@
           // this loop, which JSON item(s) came from which live source item —
           // stripped again right after use, never sent to the renderer.
           item.__srcC = sub;
+          // Order (2026-08) — tagged here, consumed by the stable sort right
+          // after this loop, stripped before that sort returns (never sent
+          // to the renderer, same lifecycle as __srcC above).
+          if (_anyElemOrder && window.SMMotion && cStrokeId) item.__ord = SMMotion.elementOrderAt(i, cStrokeId, renderFrame);
           // Vector mask (2026-08) — pulled out of `items` (never painted as
           // normal content) into `layerMasks` instead, geometry/transform
           // untouched (so it moves/animates exactly like any other Path)
@@ -1680,6 +1693,23 @@
           }
           items.push(item);
         });
+      }
+      // Order (2026-08, "système pour animer l'id index de calque ou de
+      // shape/éléments") — element-level z-stacking within this one layer.
+      // Every item pushed above by a shape carrying an Order track/static
+      // got tagged with __ord; a STABLE sort here turns that into actual
+      // draw position (ties — the default, __ord undefined/0 — keep
+      // original document order, same neutral CSS-z-index meaning as the
+      // layer-level sort in the main loop above). Runs BEFORE the combine-
+      // groups block below so it only ever touches real per-shape items,
+      // never the synthetic merged-outline item combine-groups appends
+      // (which always lands last regardless — acceptable v1 scope, a
+      // combined shape has no single per-member Order that would be
+      // correct for it anyway).
+      if (_anyElemOrder) {
+        items.forEach(function (it, ix) { it.__ordIx = ix; });
+        items.sort(function (a, b) { return ((a.__ord || 0) - (b.__ord || 0)) || (a.__ordIx - b.__ordIx); });
+        items.forEach(function (it) { delete it.__ord; delete it.__ordIx; });
       }
       // Non-destructive combine groups (2026-07-29) — post-process on the
       // JSON items just built, never on the live document (see the "why not
@@ -1838,6 +1868,23 @@
       // ordinary layer. blendMode/matteMode/effects still apply normally.
       layers.push(userLayerEntries[i] = { items: items, blendMode: (bm && bm !== 'normal') ? bm : undefined, matteMode: (mm && mm !== 'none') ? mm : undefined,
         effects: mbEffects, masks: layerMasks.length ? layerMasks : undefined, maskFeather: layerMaskFeather || undefined });
+    }
+    // Order (2026-08, "système pour animer l'id index de calque ou de
+    // shape/éléments") — layer-level z-stacking. At this exact point
+    // `layers` holds EXACTLY one entry per state.layers[i], still in
+    // original array order, nothing else pushed yet (background/onion/
+    // overlays all come after) — the one safe moment to reorder it. A
+    // STABLE sort by each layer's evaluated Order value (default 0 keeps
+    // the layer at its natural position, same neutral meaning as CSS
+    // z-index) — ties keep original index, so a document that never
+    // touches this property renders through unchanged. Matte source
+    // resolution further down finds its target via `layers.indexOf`
+    // (object identity), which this comment block's own header already
+    // documents as immune to exactly this kind of reordering.
+    if (_anyLayerOrder) {
+      var _orderPairs = layers.map(function (entry, idx) { return { entry: entry, idx: idx, ord: SMMotion.layerOrderAt(idx, renderFrame) }; });
+      _orderPairs.sort(function (a, b) { return (a.ord - b.ord) || (a.idx - b.idx); });
+      layers = _orderPairs.map(function (p) { return p.entry; });
     }
     // artboard background as the bottom item of a synthetic bottom layer,
     // mirroring drawStage()'s background rect
