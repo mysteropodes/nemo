@@ -4431,6 +4431,14 @@ var ICO_3D='<svg viewBox="0 0 24 24"><path d="M12 3 L20 7.5 L20 16.5 L12 21 L4 1
 // (the seed) and three outlined (the copies). Same inline-SVG convention as
 // ICO_3D above.
 var ICO_DUP='<svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.2" fill="currentColor"/><rect x="13.5" y="4" width="7" height="7" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="4" y="13.5" width="7" height="7" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>';
+// Elements panel (2026-08, shapes-panel.js) — group and raster-entry icons,
+// same inline-SVG convention as every icon above (was ▤/🖼 text glyphs,
+// font/emoji-rendering-dependent and visibly out of place next to this
+// monochrome flat set — Cyril: "les icônes aussi sont flat design ?").
+// Frame-corner brackets for "group" — same shorthand Figma's own layers
+// panel uses for a group row.
+var ICO_GROUP='<svg viewBox="0 0 24 24"><path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+var ICO_IMAGE='<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="1.8" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="8.5" cy="9.5" r="1.6" fill="currentColor"/><path d="M4.5 17.5l5-5.2a1.4 1.4 0 0 1 2 0l3 3.2 1.5-1.5a1.4 1.4 0 0 1 2 0l2.5 2.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 // Layer color label picker (v5) — a small predefined-swatch "nuancier"
 // instead of jumping straight to the full SV/hue/hex ColorPicker. Reuses
 // LAYER_COLOR_PALETTE (app.js) so the choices match the auto-assigned

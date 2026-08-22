@@ -67,7 +67,7 @@
     if (indent) row.style.paddingLeft = (24 + indent) + 'px';
     if (isStrokeSelected(c.li, entry.strokeId)) row.classList.add('act');
     var swatch = document.createElement('div'); swatch.className = 'motion-elem-swatch';
-    if (entry.sd.isRaster) { swatch.style.background = 'transparent'; swatch.textContent = '🖼'; swatch.style.fontSize = '9px'; }
+    if (entry.sd.isRaster) { swatch.classList.add('icon'); swatch.innerHTML = ICO_IMAGE; }
     else swatch.style.background = entry.sd.fillColor || entry.sd.strokeColor || 'transparent';
     var nm = document.createElement('div'); nm.className = 'lnm';
     nm.textContent = window.SMMotion.elementLabel(entry, idx, c.ld);
@@ -126,7 +126,7 @@
           expandedGroups[node.gid] = !expanded;
           renderShapesPanel();
         });
-        var gswatch = document.createElement('div'); gswatch.className = 'motion-elem-swatch'; gswatch.textContent = '▤'; gswatch.style.background = 'transparent';
+        var gswatch = document.createElement('div'); gswatch.className = 'motion-elem-swatch icon'; gswatch.innerHTML = ICO_GROUP;
         var gnm = document.createElement('div'); gnm.className = 'lnm'; gnm.textContent = node.name;
         grow.appendChild(arrow); grow.appendChild(gswatch); grow.appendChild(gnm);
         function commitGroupRename(v) {

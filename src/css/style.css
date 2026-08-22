@@ -881,6 +881,11 @@ input[type="checkbox"]:disabled{opacity:.4;cursor:not-allowed;}
 .motion-elem-row:hover{background:rgba(255,255,255,.03);}
 .motion-elem-swatch{width:12px;height:12px;border-radius:3px;border:1px solid rgba(255,255,255,.25);flex-shrink:0;}
 .motion-elem-swatch.has-motion{box-shadow:0 0 0 1.5px var(--accent);}
+/* Icon variant (group/raster rows, shapes-panel.js) — same slot as the
+   color swatch above, but holding a monochrome ICO_* SVG instead of a
+   fill/stroke color, so it needs no border/background of its own. */
+.motion-elem-swatch.icon{border:none;background:transparent;color:var(--text-dim);display:flex;align-items:center;justify-content:center;}
+.motion-elem-swatch.icon svg{width:100%;height:100%;display:block;}
 /* Single diamond per property row, three states (2026-07 — merged with what
    used to be a second, redundant .motion-addkey diamond further along the
    same row): neutral/hollow when unanimated, accent-outline hollow when
