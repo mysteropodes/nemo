@@ -379,6 +379,9 @@ Branche : `codex/rust-js-batching`, créée depuis
    reconstruire un objet `{x,y,p}` pour chaque point du stylet.
 3. `f8ff1b0` — recherche binaire du segment de clés dans `evalTrack` et
    `rawValueAtFrame`; interpolation, courbes spatiales et holds inchangés.
+4. `0014abe` — coalescence rAF des reconstructions complètes de timeline
+   pendant les drags Motion (clé, groupe, connecteur et boîte skew/space/
+   liquify), avec flush synchrone du dernier état au relâchement.
 
 Mesures isolées sur le WASM release : 500 traits × 122 événements,
 sortie compacte **12,30 ms** contre JSON+parse **44,39 ms** (3,61×), même
@@ -397,6 +400,9 @@ adaptateur choisit l'API compacte une fois par geste, et une ancienne version
 du WASM continue donc à fonctionner. Tests ajoutés pour la parité
 JSON/compacte, le fallback historique, la consommation par triplets, la
 complexité logarithmique, les bornes, l'interpolation linéaire et les holds.
+Le test de drag envoie 40 demandes avant une frame et vérifie qu'une seule
+reconstruction est planifiée; il vérifie aussi que le relâchement annule la
+frame en attente, rend exactement une fois, puis qu'un second flush est neutre.
 
 Le navigateur automatisé Codex ne permet pas une validation UI fiable de ce
 lot : son instrumentation fait échouer Paper.js au chargement avec
