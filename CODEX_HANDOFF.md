@@ -382,12 +382,28 @@ Branche : `codex/rust-js-batching`, créée depuis
 4. `0014abe` — coalescence rAF des reconstructions complètes de timeline
    pendant les drags Motion (clé, groupe, connecteur et boîte skew/space/
    liquify), avec flush synchrone du dernier état au relâchement.
+5. `d7eb344` — recherche binaire d'une clé Motion exacte (`keyAt`), utilisée
+   notamment par la création, le déplacement et les collisions de clés.
+6. `56ef184` — coalescence rAF commune des événements `input` et `change`
+   des champs numériques scrubbables, avec flush synchrone de la dernière
+   valeur au relâchement et conservation d'une seule entrée d'undo.
+7. `6df6e98` — recherche binaire de la clé la plus proche utilisée par
+   `nearestKey()` dans les expressions Motion; en cas d'égalité la clé
+   précédente continue de gagner comme avec l'ancien parcours linéaire.
 
 Mesures isolées sur le WASM release : 500 traits × 122 événements,
 sortie compacte **12,30 ms** contre JSON+parse **44,39 ms** (3,61×), même
 nombre de triplets. Recherche Motion : 200 000 requêtes dans 4 096 clés,
 **11,29 ms** contre **443,54 ms** pour le parcours linéaire (39,30×), mêmes
 indices sur toutes les requêtes.
+
+Mesures complémentaires sur 200 000 requêtes / 4 096 clés : recherche de clé
+exacte **12,00 ms** contre **236,00 ms** (19,67×), mêmes clés présentes ou
+absentes; `nearestKey()` d'expression **11,02 ms** contre **584,67 ms**
+(53,03×), mêmes indices, bornes et égalités. Le test de scrub envoie 40
+`pointermove` avant une frame et vérifie un seul `input` + un seul `change`;
+il vérifie aussi qu'un relâchement avant la frame applique immédiatement la
+dernière valeur, annule la callback en attente et ne pousse qu'un undo.
 
 Un batch `align_pairs` a été implémenté et mesuré, puis entièrement retiré :
 sorties identiques mais aucune accélération (22,16 ms batch contre 22,37 ms
@@ -403,6 +419,9 @@ complexité logarithmique, les bornes, l'interpolation linéaire et les holds.
 Le test de drag envoie 40 demandes avant une frame et vérifie qu'une seule
 reconstruction est planifiée; il vérifie aussi que le relâchement annule la
 frame en attente, rend exactement une fois, puis qu'un second flush est neutre.
+La suite Node contient désormais 12 tests de régression et passe intégralement;
+la syntaxe de tous les scripts JS passe également (`geometry-wasm-loader.js`
+est contrôlé en mode ES module).
 
 Le navigateur automatisé Codex ne permet pas une validation UI fiable de ce
 lot : son instrumentation fait échouer Paper.js au chargement avec
