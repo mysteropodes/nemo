@@ -305,6 +305,33 @@ test('motion key lookup is logarithmic and selects the same containing segment',
   assert.equal(evalSandbox.evalTrackTest(null, 5, 99), 99);
 });
 
+test('exact motion key lookup is logarithmic and preserves missing-key behavior', () => {
+  const source = fs.readFileSync(path.join(root, 'src/js/motion.js'), 'utf8');
+  const start = source.indexOf('function keyAt(');
+  const end = source.indexOf('function staticValue(', start);
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+  const sandbox = {};
+  vm.runInNewContext(`${source.slice(start, end)}\nthis.keyAtTest = keyAt;`, sandbox);
+  const find = sandbox.keyAtTest;
+  const keys = [{ frame: 0 }, { frame: 3 }, { frame: 10 }, { frame: 11 }, { frame: 40 }];
+  const track = { keys };
+  assert.equal(find(track, 0), keys[0]);
+  assert.equal(find(track, 10), keys[2]);
+  assert.equal(find(track, 40), keys[4]);
+  assert.equal(find(track, 9), null);
+  assert.equal(find(track, 41), null);
+  assert.equal(find({ keys: [] }, 0), null);
+  assert.equal(find(null, 0), null);
+
+  let reads = 0;
+  const many = Array.from({ length: 4096 }, (_, index) => ({
+    get frame() { reads++; return index * 2; },
+  }));
+  assert.equal(find({ keys: many }, 7000), many[3500]);
+  assert.ok(reads < 50, `expected logarithmic exact lookup, observed ${reads} frame reads`);
+});
+
 test('motion drag timeline rebuilds are coalesced and flushed on release', () => {
   const source = fs.readFileSync(path.join(root, 'src/js/motion.js'), 'utf8');
   const start = source.indexOf('var _motionDragTimelineRaf = 0;');

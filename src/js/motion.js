@@ -652,7 +652,18 @@
   function hasKeys(ld, prop) { var t = trackFor(ld, prop); return !!(t && t.keys && t.keys.length); }
   function isAnimated(ld, prop) { return hasKeys(ld, prop); }
   function sortKeys(track) { track.keys.sort(function (a, b) { return a.frame - b.frame; }); }
-  function keyAt(track, frame) { return track.keys.find(function (k) { return k.frame === frame; }) || null; }
+  function keyAt(track, frame) {
+    if (!track || !track.keys || !track.keys.length) return null;
+    var keys = track.keys, lo = 0, hi = keys.length - 1;
+    while (lo <= hi) {
+      var mid = (lo + hi) >> 1;
+      var keyFrame = keys[mid].frame;
+      if (keyFrame < frame) lo = mid + 1;
+      else if (keyFrame > frame) hi = mid - 1;
+      else return keys[mid];
+    }
+    return null;
+  }
   function staticValue(ld, prop) {
     var st = ld.motionStatic && ld.motionStatic[prop];
     if (st) return st.slice();
