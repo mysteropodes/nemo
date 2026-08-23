@@ -370,3 +370,69 @@ test('motion drag timeline rebuilds are coalesced and flushed on release', () =>
   const dragSection = source.slice(source.indexOf('function onDragMove('), source.indexOf('document.addEventListener(\'mousemove\', onDragMove)'));
   assert.equal((dragSection.match(/requestMotionDragTimelineRender\(\)/g) || []).length, 4);
 });
+
+test('numeric scrub coalesces input and change work and flushes its final value', () => {
+  const source = fs.readFileSync(path.join(root, 'src/js/ui.js'), 'utf8');
+  const start = source.indexOf('var scrubState=null;');
+  const end = source.indexOf('})();', start);
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+
+  const documentListeners = new Map();
+  const windowListeners = new Map();
+  const callbacks = new Map();
+  let nextId = 1;
+  let undoCount = 0;
+  const document = {
+    activeElement: null,
+    addEventListener(type, callback) { documentListeners.set(type, callback); },
+  };
+  const window = {
+    pushUndo() { undoCount++; },
+    addEventListener(type, callback) { windowListeners.set(type, callback); },
+  };
+  class EventStub {
+    constructor(type, options) { this.type = type; this.bubbles = !!(options && options.bubbles); }
+  }
+  vm.runInNewContext(source.slice(start, end), {
+    document,
+    window,
+    Event: EventStub,
+    Math,
+    requestAnimationFrame(callback) { const id = nextId++; callbacks.set(id, callback); return id; },
+    cancelAnimationFrame(id) { callbacks.delete(id); },
+  });
+
+  const classes = new Set();
+  const eventCounts = { input: 0, change: 0 };
+  const input = {
+    value: '10', min: '', max: '', dataset: { step: '1' },
+    closest(selector) { return selector === 'input.scrub' ? this : null; },
+    setPointerCapture() {}, focus() {}, select() {},
+    classList: { add(name) { classes.add(name); }, remove(name) { classes.delete(name); } },
+    dispatchEvent(event) { eventCounts[event.type]++; },
+  };
+  documentListeners.get('pointerdown')({
+    target: input, pointerId: 7, clientX: 100, preventDefault() {},
+  });
+  for (let i = 1; i <= 40; i++) {
+    documentListeners.get('pointermove')({ pointerId: 7, clientX: 103 + i });
+  }
+  assert.equal(callbacks.size, 1);
+  assert.deepEqual(eventCounts, { input: 0, change: 0 });
+  assert.equal(undoCount, 1);
+  const firstCallback = callbacks.values().next().value;
+  callbacks.clear();
+  firstCallback();
+  assert.deepEqual(eventCounts, { input: 1, change: 1 });
+
+  for (let i = 1; i <= 20; i++) {
+    documentListeners.get('pointermove')({ pointerId: 7, clientX: 143 + i });
+  }
+  assert.equal(callbacks.size, 1);
+  documentListeners.get('pointerup')({ pointerId: 7 });
+  assert.equal(callbacks.size, 0);
+  assert.deepEqual(eventCounts, { input: 2, change: 2 });
+  assert.equal(window._scrubLiveActive, false);
+  assert.equal(classes.has('scrubbing'), false);
+});
