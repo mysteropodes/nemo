@@ -6619,6 +6619,26 @@
     }
   }
 
+  // Key drags can emit well above the display refresh rate. Their collision
+  // and retiming logic below updates the data synchronously, but rebuilding
+  // the entire Motion grid for every mousemove only paints intermediate
+  // states the screen can never display. Coalesce the DOM work to one rebuild
+  // per animation frame and flush the latest state on pointer release.
+  var _motionDragTimelineRaf = 0;
+  function requestMotionDragTimelineRender() {
+    if (_motionDragTimelineRaf) return;
+    _motionDragTimelineRaf = requestAnimationFrame(function () {
+      _motionDragTimelineRaf = 0;
+      renderTimeline();
+    });
+  }
+  function flushMotionDragTimelineRender() {
+    if (!_motionDragTimelineRaf) return;
+    cancelAnimationFrame(_motionDragTimelineRaf);
+    _motionDragTimelineRaf = 0;
+    renderTimeline();
+  }
+
   // Drag-to-retime a keyframe (mousemove/up delegated from ui.js's global
   // pointer handlers via SMMotion.onDragMove/onDragUp, same pattern as the
   // span-end/keyframe drag handlers already in timeline.js).
@@ -6662,7 +6682,7 @@
         cd.a.frame = cd.startAFrame + d; cd.b.frame = cd.startBFrame + d;
         sortKeys(track);
       }
-      renderTimeline();
+      requestMotionDragTimelineRender();
       if (window.SMEngineBridge) SMEngineBridge.renderNow();
       return;
     }
@@ -6727,7 +6747,7 @@
         if (touched.indexOf(p.track) < 0) touched.push(p.track);
       });
       touched.forEach(sortKeys);
-      renderTimeline();
+      requestMotionDragTimelineRender();
       // Live stage feedback (2026-07: "un component ne bouge pas en temps
       // réel quand on drag" — the timeline diamond tracked the cursor via
       // renderTimeline() above, but the interpolated value AT THE CURRENT
@@ -6756,7 +6776,7 @@
       if (!ok) return;
       d.keys.forEach(function (s) { s.key.frame += deltaFrames; sortKeys(trackFor(s.holder, s.prop)); });
       d.startX = e.clientX; // re-baseline so the next move is a fresh delta from here
-      renderTimeline();
+      requestMotionDragTimelineRender();
       if (window.SMEngineBridge) SMEngineBridge.renderNow(); // live stage feedback — see skew-drag branch's own comment above
       return;
     }
@@ -6765,16 +6785,17 @@
     var track = trackFor(d.ld, d.prop);
     if (keyAt(track, nf)) return; // don't stomp an existing key
     d.key.frame = nf; sortKeys(track);
-    renderTimeline();
+    requestMotionDragTimelineRender();
     if (window.SMEngineBridge) SMEngineBridge.renderNow(); // live stage feedback — see skew-drag branch's own comment above
   }
   function onDragUp() {
     if (onLayerSkewUp()) return;
     endMarquee();
-    if (window._motionSkewDrag) { window._motionSkewDrag = null; if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); return; }
-    if (window._motionConnectDrag) { window._motionConnectDrag = null; document.body.style.cursor = ''; if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); return; }
+    if (window._motionSkewDrag) { window._motionSkewDrag = null; flushMotionDragTimelineRender(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); return; }
+    if (window._motionConnectDrag) { window._motionConnectDrag = null; document.body.style.cursor = ''; flushMotionDragTimelineRender(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); return; }
     if (!window._motionKeyDrag) return;
     window._motionKeyDrag = null;
+    flushMotionDragTimelineRender();
     if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
   }
   document.addEventListener('mousemove', onDragMove);

@@ -304,3 +304,42 @@ test('motion key lookup is logarithmic and selects the same containing segment',
   assert.equal(evalSandbox.evalTrackTest(track, 20, 99), 70);
   assert.equal(evalSandbox.evalTrackTest(null, 5, 99), 99);
 });
+
+test('motion drag timeline rebuilds are coalesced and flushed on release', () => {
+  const source = fs.readFileSync(path.join(root, 'src/js/motion.js'), 'utf8');
+  const start = source.indexOf('var _motionDragTimelineRaf = 0;');
+  const end = source.indexOf('// Drag-to-retime a keyframe', start);
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+  let nextId = 1;
+  let renders = 0;
+  const callbacks = new Map();
+  const sandbox = {
+    requestAnimationFrame(callback) { const id = nextId++; callbacks.set(id, callback); return id; },
+    cancelAnimationFrame(id) { callbacks.delete(id); },
+    renderTimeline() { renders++; },
+  };
+  vm.runInNewContext(
+    `${source.slice(start, end)}\nthis.requestTest = requestMotionDragTimelineRender; this.flushTest = flushMotionDragTimelineRender;`,
+    sandbox,
+  );
+
+  for (let i = 0; i < 40; i++) sandbox.requestTest();
+  assert.equal(callbacks.size, 1);
+  assert.equal(renders, 0);
+  const firstCallback = callbacks.values().next().value;
+  callbacks.clear();
+  firstCallback();
+  assert.equal(renders, 1);
+
+  for (let i = 0; i < 40; i++) sandbox.requestTest();
+  assert.equal(callbacks.size, 1);
+  sandbox.flushTest();
+  assert.equal(callbacks.size, 0);
+  assert.equal(renders, 2);
+  sandbox.flushTest();
+  assert.equal(renders, 2);
+
+  const dragSection = source.slice(source.indexOf('function onDragMove('), source.indexOf('document.addEventListener(\'mousemove\', onDragMove)'));
+  assert.equal((dragSection.match(/requestMotionDragTimelineRender\(\)/g) || []).length, 4);
+});
