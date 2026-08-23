@@ -52,6 +52,22 @@ Le test Node compare les classes attendues sur clés vides/pleines,
 interpolation et fins de span, puis instrumente 1 000 frames vides et refuse
 plus de 2 000 accès indexés. `npm test` passe à 3/3.
 
+### Lot 3 — calques d'effet : une copie GPU plein écran supprimée
+
+Pour un calque d'effet, `apply_effect_stack_into` conserve le ping-pong des
+passes intermédiaires mais écrit la dernière passe directement dans
+l'accumulateur suivant. L'ancienne copie `effect-stack-to-accum-copy` et son
+`queue.submit()` disparaissent. La pile ordinaire ne construit plus non plus
+un `Vec` temporaire des effets activés à chaque rendu.
+
+Validation : `cargo test` natif (3/3, dont toute la bibliothèque WGSL), build
+des tests wasm32, `wasm-pack build --target web --release --out-dir
+../src/wasm`, puis test visuel au port 1420 sur un projet 1920×1080 avec un
+calque d'effet : Invert seul, puis Invert + Sepia. Les deux rendus sont
+corrects et le journal navigateur ne contient aucune erreur ou alerte WebGPU.
+Ne pas tenter un `cargo fmt` global : le crate préexistant n'est pas formaté
+et cela réécrirait des milliers de lignes sans rapport.
+
 ## Mise à jour Codex — lot autonome des 37 feedbacks
 
 Branche de travail : `codex/feedback-2026-07-26`, créée depuis le

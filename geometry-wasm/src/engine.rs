@@ -2583,16 +2583,48 @@ impl VelloEngine {
     /// had via 0-valued radius/opacity) — this function assumes at least
     /// one enabled entry exists.
     fn apply_effect_stack(&self, initial_source: &wgpu::TextureView, effects: &[EffectIn], bbox: (f32, f32, f32, f32)) -> bool {
-        let enabled: Vec<&EffectIn> = effects.iter().filter(|e| e.enabled).collect();
         let mut current: &wgpu::TextureView = initial_source;
         let mut use_a = true;
-        for eff in &enabled {
+        for eff in effects.iter().filter(|e| e.enabled) {
             let target: &wgpu::TextureView = if use_a { &self.effect_stack_a_view } else { &self.effect_stack_b_view };
             self.run_one_effect(eff, current, target, bbox);
             current = target;
             use_a = !use_a;
         }
         !use_a
+    }
+
+    /// Adjustment-layer variant of `apply_effect_stack`: intermediate
+    /// effects still ping-pong through the private stack textures, but the
+    /// final effect writes straight into the caller's next accumulator.
+    /// This removes the old full-frame texture copy and its extra queue
+    /// submission for every enabled adjustment layer without changing pass
+    /// order or shader inputs.
+    fn apply_effect_stack_into(
+        &self,
+        initial_source: &wgpu::TextureView,
+        effects: &[EffectIn],
+        bbox: (f32, f32, f32, f32),
+        final_target: &wgpu::TextureView,
+    ) {
+        let enabled_count = effects.iter().filter(|e| e.enabled).count();
+        debug_assert!(enabled_count > 0);
+        let mut current = initial_source;
+        let mut use_a = true;
+        let mut rendered = 0usize;
+        for eff in effects.iter().filter(|e| e.enabled) {
+            rendered += 1;
+            let target = if rendered == enabled_count {
+                final_target
+            } else if use_a {
+                &self.effect_stack_a_view
+            } else {
+                &self.effect_stack_b_view
+            };
+            self.run_one_effect(eff, current, target, bbox);
+            current = target;
+            use_a = !use_a;
+        }
     }
 
     /// Union on-screen (device-pixel) bounding box of `items` after
@@ -2797,16 +2829,8 @@ impl VelloEngine {
                     // target itself is only the editor viewport and is not a
                     // stable procedural coordinate system under zoom/pan.
                     let bbox = document_bbox_px(&self.viewport, self.width, self.height);
-                    let in_a = self.apply_effect_stack(backdrop_view, &layer.effects, bbox);
-                    let result_tex = if in_a { &self.effect_stack_a_tex } else { &self.effect_stack_b_tex };
-                    let target_tex = if accum_is_a { &self.blend_accum_b } else { &self.blend_accum_a };
-                    let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("effect-stack-to-accum-copy") });
-                    encoder.copy_texture_to_texture(
-                        result_tex.as_image_copy(),
-                        target_tex.as_image_copy(),
-                        wgpu::Extent3d { width: self.width, height: self.height, depth_or_array_layers: 1 },
-                    );
-                    self.queue.submit(Some(encoder.finish()));
+                    let target_view = if accum_is_a { &self.blend_accum_b_view } else { &self.blend_accum_a_view };
+                    self.apply_effect_stack_into(backdrop_view, &layer.effects, bbox, target_view);
                 } else {
                     // No enabled effects on this adjustment layer — pass
                     // the backdrop through unchanged (matches AE: a layer
