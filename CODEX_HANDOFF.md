@@ -434,3 +434,23 @@ s'appuie sur les tests JS, Rust natifs, compilation wasm32 et exécution directe
 du module WASM release. Les fichiers utilisateur préexistants
 `.claude/launch.json`, `src/.DS_Store`, `STRATEGY.md`, `logo.ai` et
 `nemo_timeline.html` restent intacts et hors commits.
+
+### Validation exploratoire navigateur après optimisation
+
+Une inspection DOM du navigateur Codex provoque toujours l'erreur Paper.js
+ci-dessus, mais le pilotage visuel sans cette inspection charge bien Nemo sur
+`http://127.0.0.1:1420`. Scénario exécuté intégralement le 23/08/2026 : projet
+1920×1080/24 fps, deux calques Animation 2D, trois clés dessinées sur chaque
+calque (frames 1/12/24 et 1/15/30), passage en Motion, navigation aux frames
+1/12/15/24/30, sélection d'un autre calque depuis le canevas, puis lecture.
+Les contenus tenus changent aux six frames attendues et la sélection canevas
+synchronise correctement la surbrillance de la ligne Motion.
+
+Une clé Rotation a ensuite converti automatiquement le premier calque dessiné
+en composant, puis un scrub à la frame 1 a créé `-14°` face à `0°` à la frame
+30; la frame 15 affiche `-7,3°`. Le second calque a été converti de la même
+façon et testé avec Position X `14 → 0`. Lecture simultanée jusqu'aux frames
+74/75, arrêt, puis aller-retour Animation 2D → Motion : contenus, boîtes,
+valeurs finales et deux lignes de composants restent cohérents. Les champs de
+propriété sont volontairement rafraîchis à l'arrêt de lecture (la scène, elle,
+évolue pendant la lecture). Aucun `error`/`warn` navigateur n'a été enregistré.
