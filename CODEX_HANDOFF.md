@@ -68,6 +68,21 @@ corrects et le journal navigateur ne contient aucune erreur ou alerte WebGPU.
 Ne pas tenter un `cargo fmt` global : le crate préexistant n'est pas formaté
 et cela réécrirait des milliers de lignes sans rapport.
 
+### Lot 4 — undo : suppression des doubles write-back
+
+Vingt chemins appelaient `saveAllLayerFrames()` juste avant `pushUndo()` ou
+`pushUndoLayers()`, qui rappelait la même sauvegarde. Le point central accepte
+maintenant `alreadySaved=true`; tous les chemins explicitement appariés le
+passent, tandis que les centaines d'appels ordinaires conservent exactement
+le comportement historique. Le garde `_scrubLiveActive` reste prioritaire.
+
+Deux tests verrouillent la sémantique (sauvegarde implicite, réutilisation,
+scrub) et interdisent le motif double dans `app.js`, `images.js` et
+`timeline.js`. `npm test` passe à 5/5. L'ajout de calque a aussi été rejoué
+dans l'UI sans erreur console. Le harnais navigateur n'a pas su transmettre
+Meta avec Z (il activait l'outil Z) : aucune validation Cmd+Z n'est revendiquée
+à partir de ce geste invalide ; le test automatisé du point central fait foi.
+
 ## Mise à jour Codex — lot autonome des 37 feedbacks
 
 Branche de travail : `codex/feedback-2026-07-26`, créée depuis le

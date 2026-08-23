@@ -4259,7 +4259,7 @@ function renderOS(){
 // and JS strings are immutable, so sharing the heavy fields by reference is
 // unconditionally safe. Same split the render path already uses
 // (cloneStrokeForTransform, app.js). 2026-07-28.
-function pushUndo(){pushUndoLayers();}
+function pushUndo(alreadySaved){pushUndoLayers(alreadySaved);}
 // Walks every stroke of a layers tree in a deterministic order. Both the
 // live tree and its clone have identical shape, so two walks stay in lockstep
 // and a flat array indexed by visit order is enough to pair them up.
@@ -4339,7 +4339,7 @@ function _actionLabelNow(){
 // snapshot par tick aurait pollué la pile pour un seul geste. ui.js pousse
 // UN snapshot pré-geste au premier mouvement puis lève ce flag ; ici on
 // no-op tant qu'il est levé (y compris le 'change' final du release).
-function pushUndoLayers(){if(window._scrubLiveActive)return;saveAllLayerFrames();state.undoStack.push(layersSnapshotNow());state.undoLabels.push(_actionLabelNow());if(state.undoStack.length>state.maxUndo){state.undoStack.shift();state.undoLabels.shift();}state.redoStack=[];state.redoLabels=[];if(window.SMFeedback)SMFeedback.logAction();if(window.renderHistoryPanelIfOpen)renderHistoryPanelIfOpen();
+function pushUndoLayers(alreadySaved){if(window._scrubLiveActive)return;if(!alreadySaved)saveAllLayerFrames();state.undoStack.push(layersSnapshotNow());state.undoLabels.push(_actionLabelNow());if(state.undoStack.length>state.maxUndo){state.undoStack.shift();state.undoLabels.shift();}state.redoStack=[];state.redoLabels=[];if(window.SMFeedback)SMFeedback.logAction();if(window.renderHistoryPanelIfOpen)renderHistoryPanelIfOpen();
   // Playback bake cache (playback-cache.js): this is the SAME chokepoint
   // SMFeedback.logAction() right above already trusts as "a real content-
   // mutating action happened" — any baked bitmap for the frame(s) this

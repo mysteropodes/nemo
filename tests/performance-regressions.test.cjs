@@ -175,3 +175,47 @@ test('timeline held-span rendering is linear and preserves inherited classes', (
   longHarness.render(longHarness.document.createElement('div'), 0);
   assert.ok(indexedReads < 2000, `expected a linear frame walk, observed ${indexedReads} indexed reads`);
 });
+
+test('undo can reuse an explicit frame save without saving twice', () => {
+  const source = fs.readFileSync(path.join(root, 'src/js/tweens.js'), 'utf8');
+  const start = source.indexOf('function pushUndoLayers(');
+  const end = source.indexOf('function restoreLayersSnapshot(', start);
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+  let saves = 0;
+  const window = { _scrubLiveActive: false };
+  const state = { undoStack: [], undoLabels: [], redoStack: [{}], redoLabels: [{}], maxUndo: 60 };
+  const sandbox = {
+    window,
+    state,
+    saveAllLayerFrames() { saves++; },
+    layersSnapshotNow() { return { snapshot: true }; },
+    _actionLabelNow() { return { label: 'test' }; },
+  };
+  vm.runInNewContext(`${source.slice(start, end)}\nthis.pushUndoLayersTest = pushUndoLayers;`, sandbox);
+
+  sandbox.pushUndoLayersTest(true);
+  assert.equal(saves, 0);
+  assert.equal(state.undoStack.length, 1);
+  assert.equal(state.redoStack.length, 0);
+
+  sandbox.pushUndoLayersTest();
+  assert.equal(saves, 1);
+  assert.equal(state.undoStack.length, 2);
+
+  window._scrubLiveActive = true;
+  sandbox.pushUndoLayersTest();
+  assert.equal(saves, 1);
+  assert.equal(state.undoStack.length, 2);
+});
+
+test('explicit save plus undo call sites declare that the save is reusable', () => {
+  for (const file of ['src/js/app.js', 'src/js/images.js', 'src/js/timeline.js']) {
+    const source = fs.readFileSync(path.join(root, file), 'utf8');
+    assert.equal(
+      /saveAllLayerFrames\(\);\s*pushUndo(?:Layers)?\(\)/.test(source),
+      false,
+      `${file} still performs two consecutive full saves`,
+    );
+  }
+});

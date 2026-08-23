@@ -736,7 +736,7 @@ window.SM={
     // array already does (see layerInPoint/layerOutPoint, app.js).
     if(state.waIn>=state.waOut)state.waIn=Math.max(0,state.waOut-1);
     window._waIn=state.waIn;window._waOut=state.waOut;if(state.currentFrame>=v)goToFrame(v-1);updateUI();},
-  addLayer:function(){saveAllLayerFrames();pushUndoLayers();var idx=createUserLayer(nextLayerName());activateUL(idx);_layerSel=[idx];_layerSelAnchor=idx;loadFrame(state.currentFrame);updateUI();},
+  addLayer:function(){saveAllLayerFrames();pushUndoLayers(true);var idx=createUserLayer(nextLayerName());activateUL(idx);_layerSel=[idx];_layerSelAnchor=idx;loadFrame(state.currentFrame);updateUI();},
   // Null layer (2026-07, Motion) — AE's "Null Object": exists purely as a
   // parenting/pivot target for other layers (SMMotion's existing
   // parentLayerUid/parentChainMats — a Null is just any other layer as far
@@ -747,7 +747,7 @@ window.SM={
   // as symbolId/nativeVideo/montageId in saveActiveLayerFrame/
   // saveAllLayerFrames/getEffectiveStrokes (app.js) so nothing ever tries
   // to read/write strokes on it.
-  addNullLayer:function(){saveAllLayerFrames();pushUndoLayers();var idx=createUserLayer(nextLayerName().replace(/^Layer/,'Null'));state.layers[idx].isNullLayer=true;activateUL(idx);_layerSel=[idx];_layerSelAnchor=idx;loadFrame(state.currentFrame);updateUI();},
+  addNullLayer:function(){saveAllLayerFrames();pushUndoLayers(true);var idx=createUserLayer(nextLayerName().replace(/^Layer/,'Null'));state.layers[idx].isNullLayer=true;activateUL(idx);_layerSel=[idx];_layerSelAnchor=idx;loadFrame(state.currentFrame);updateUI();},
   // Effect (adjustment) layer (2026-07, Motion) — AE's "Adjustment Layer":
   // no painted content of its own (frames/strokes ignored on purpose,
   // same as a Null layer), but its effectType/effectP1/effectP2 apply to
@@ -757,7 +757,7 @@ window.SM={
   // full JS<->Rust wire contract. Defaults to a mild blur so placing one
   // has an immediately visible (if subtle) effect rather than looking
   // like a no-op.
-  addEffectLayer:function(){saveAllLayerFrames();pushUndoLayers();var idx=createUserLayer(nextLayerName().replace(/^Layer/,'Effet'));state.layers[idx].isEffectLayer=true;state.layers[idx].effects=[];activateUL(idx);_layerSel=[idx];_layerSelAnchor=idx;loadFrame(state.currentFrame);updateUI();},
+  addEffectLayer:function(){saveAllLayerFrames();pushUndoLayers(true);var idx=createUserLayer(nextLayerName().replace(/^Layer/,'Effet'));state.layers[idx].isEffectLayer=true;state.layers[idx].effects=[];activateUL(idx);_layerSel=[idx];_layerSelAnchor=idx;loadFrame(state.currentFrame);updateUI();},
   // Guide layer (2026-08, AE feature audit 8.6) — a real layer object
   // (rotatable/parentable/keyable Transform, colored) instead of a classic
   // ruler-drag guide: no content of its own (same "no real content" guard
@@ -766,7 +766,7 @@ window.SM={
   // OWN Position/Rotation Transform (guidePos is the anchor Position
   // offsets from; Rotation sets the angle) — zero new keyframe machinery.
   // Defaults to horizontal through canvas center.
-  addGuideLayer:function(){saveAllLayerFrames();pushUndoLayers();var idx=createUserLayer(nextLayerName().replace(/^Layer/,'Guide'));state.layers[idx].isGuideLayer=true;state.layers[idx].guidePos=[state.canvasW/2,state.canvasH/2];state.layers[idx].guideOrientation='horizontal';state.layers[idx].color='#00baff';activateUL(idx);_layerSel=[idx];_layerSelAnchor=idx;loadFrame(state.currentFrame);updateUI();},
+  addGuideLayer:function(){saveAllLayerFrames();pushUndoLayers(true);var idx=createUserLayer(nextLayerName().replace(/^Layer/,'Guide'));state.layers[idx].isGuideLayer=true;state.layers[idx].guidePos=[state.canvasW/2,state.canvasH/2];state.layers[idx].guideOrientation='horizontal';state.layers[idx].color='#00baff';activateUL(idx);_layerSel=[idx];_layerSelAnchor=idx;loadFrame(state.currentFrame);updateUI();},
   deleteLayer:function(){
     // The camera row isn't in state.layers (synthetic pseudo-layer, see
     // camera.js) — the generic layer-panel trash button silently did
@@ -786,7 +786,7 @@ window.SM={
     // says why; this one now does too.
     if(state.layers.length<=1){showToast('Impossible de supprimer le dernier calque');return;}
     saveAllLayerFrames();
-    pushUndoLayers();
+    pushUndoLayers(true);
     var sel=(_layerSel.length?_layerSel.slice():[state.activeLayerIdx]).sort(function(a,b){return b-a;});
     sel.forEach(function(idx){
       if(state.layers.length<=1||idx<0||idx>=state.layers.length)return;
@@ -831,7 +831,7 @@ window.SM={
     var inF=state.waIn||0,outF=(state.waOut!=null?state.waOut:state.totalFrames-1);
     if(outF<=inF){showToast('Zone de travail trop courte');return;}
     if(inF===0&&outF===state.totalFrames-1){showToast(SM.t('toastWorkAreaAlreadyCoversAll'));return;}
-    saveAllLayerFrames();pushUndoLayers();
+    saveAllLayerFrames();pushUndoLayers(true);
     var n=outF-inF+1;
     state.layers.forEach(function(ld,li){
       ld.frames=ld.frames.slice(inF,outF+1);
@@ -936,7 +936,7 @@ window.SM={
     var inF=window.layerInPoint?layerInPoint(ld):(ld.inPoint!=null?ld.inPoint:0);
     var outF=window.layerOutPoint?layerOutPoint(ld):(ld.outPoint!=null?ld.outPoint:state.totalFrames-1);
     if(f<=inF||f>outF){showToast(SM.t('toastPlayheadInsideLayerToCut'));return;}
-    saveAllLayerFrames();pushUndoLayers();
+    saveAllLayerFrames();pushUndoLayers(true);
     var ni=createUserLayer(ld.name+' (2)');
     var dst=state.layers[ni];
     dst.frames=JSON.parse(JSON.stringify(ld.frames));
@@ -973,7 +973,7 @@ window.SM={
     if(window.SMEngineBridge)SMEngineBridge.renderNow();
     showToast(SM.t('toastLayerCutAtFrame')+(f+1));
   },
-  duplicateLayer:function(){saveAllLayerFrames();pushUndoLayers();var src=state.layers[state.activeLayerIdx];var ni=createUserLayer(src.name+' copy');state.layers[ni].frames=JSON.parse(JSON.stringify(src.frames));if(src.blendMode)state.layers[ni].blendMode=src.blendMode;state.layers[ni].color=src.color;if(src.motion)state.layers[ni].motion=JSON.parse(JSON.stringify(src.motion));if(src.motionStatic)state.layers[ni].motionStatic=JSON.parse(JSON.stringify(src.motionStatic));
+  duplicateLayer:function(){saveAllLayerFrames();pushUndoLayers(true);var src=state.layers[state.activeLayerIdx];var ni=createUserLayer(src.name+' copy');state.layers[ni].frames=JSON.parse(JSON.stringify(src.frames));if(src.blendMode)state.layers[ni].blendMode=src.blendMode;state.layers[ni].color=src.color;if(src.motion)state.layers[ni].motion=JSON.parse(JSON.stringify(src.motion));if(src.motionStatic)state.layers[ni].motionStatic=JSON.parse(JSON.stringify(src.motionStatic));
     // matteMode was dropped here entirely (pre-existing, found by the
     // 2026-07-31 uid-matte scoping) — a duplicated matted layer silently
     // lost its matte. The uid travels with it (the duplicate masks against

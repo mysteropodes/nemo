@@ -315,7 +315,7 @@ activateUL(0);
 // above everything inserted so far, ending with the highest index on top).
 function reorderLayer(fromIdx,toIdx){
   if(fromIdx===toIdx||fromIdx<0||toIdx<0||fromIdx>=state.layers.length||toIdx>=state.layers.length)return;
-  saveAllLayerFrames();pushUndoLayers();
+  saveAllLayerFrames();pushUndoLayers(true);
   var ld=state.layers.splice(fromIdx,1)[0];state.layers.splice(toIdx,0,ld);
   var ul=userLayers.splice(fromIdx,1)[0];userLayers.splice(toIdx,0,ul);
   userLayers.forEach(function(l){l.insertBelow(arcLayer);});
@@ -335,7 +335,7 @@ function reorderLayer(fromIdx,toIdx){
 function reorderLayersBatch(fromIndices,toIdx){
   fromIndices=fromIndices.slice().sort(function(a,b){return a-b;});
   if(!fromIndices.length||fromIndices.indexOf(toIdx)>=0)return;
-  saveAllLayerFrames();pushUndoLayers();
+  saveAllLayerFrames();pushUndoLayers(true);
   var destLd=state.layers[toIdx];
   var activeLd=state.layers[state.activeLayerIdx];
   var movedLd=[],movedUL=[];
@@ -2473,7 +2473,7 @@ function convertLayerToComponent(layerIdx){
   var ld=state.layers[layerIdx];if(!ld){showToast('Calque invalide');return;}
   var bad=badComponentSourceReason(ld);
   if(bad){showToast('Impossible de convertir : '+bad);return;}
-  saveAllLayerFrames();pushUndo();
+  saveAllLayerFrames();pushUndo(true);
   var symId=genSymbolId();
   // groups (2026-07-29 fix, QA-confirmed combine-groups regression): the
   // OUTER instance (`ld` itself, reused below) keeps its .groups by
@@ -2535,7 +2535,7 @@ function convertLayersToComponent(indices){
     if(badReason){showToast(SM.t('toastCannotConvertSelectionContains')+badReason);return;}
   }
   if(indices.length<2){convertLayerToComponent(indices[0]!==undefined?indices[0]:state.activeLayerIdx);return;}
-  saveAllLayerFrames();pushUndo();
+  saveAllLayerFrames();pushUndo(true);
   var symId=genSymbolId();
   // Combine-group remap + merge (2026-07-29 fix, QA-confirmed): each source
   // layer's own ld.groups may share id strings with another source's (same
@@ -3047,7 +3047,7 @@ function convertComponentToLayer(layerIdx){
 function convertLayerToLFSGroup(layerIdx){
   if(state.activeSymbolId){showToast(SM.t('toastCloseComponentFirst'));return;}
   var ld=state.layers[layerIdx];if(!ld||ld.symbolId||ld.lfsGroup){showToast(SM.t('toastLayerAlreadyGrouped'));return;}
-  saveAllLayerFrames();pushUndo();
+  saveAllLayerFrames();pushUndo(true);
   var lfsIds={},lfsSettings={};
   ['line','full','shadow'].forEach(function(key){
     var symId=genSymbolId();
@@ -3139,7 +3139,7 @@ function propagateLFSFill(layerIdx,which){
   });
   var sourceFis=Object.keys(sourceFrames).map(Number).sort(function(a,b){return a-b;});
   if(!sourceFis.length){showToast('Aucun remplissage source — peignez au moins un '+(which==='full'?'Plein':'Ombre')+' avec le Pot de peinture d\'abord');return;}
-  saveAllLayerFrames();pushUndoLayers();
+  saveAllLayerFrames();pushUndoLayers(true);
   var scratch=new Layer({name:'lfs-propagate-scratch'});scratch.visible=false;
   var newFrames=targetLayer.frames.slice();
   var applied=0;
@@ -3882,7 +3882,7 @@ function convertLayerToStrokeFillShadowFolder(layerIdx){
   if(!src)return;
   if(src.symbolId||src.lfsGroup){showToast('Impossible sur un composant ou un groupe LFS existant');return;}
   saveAllLayerFrames();
-  pushUndoLayers();
+  pushUndoLayers(true);
   // Items drawn with the Draw tool's "Shadow" toggle on carry
   // data.channelTag='shadow' (persisted via serP as sd.channelTag) — those
   // route to the Shadow channel wholesale, keeping BOTH their stroke and
@@ -4097,7 +4097,7 @@ function insertKeyframeAt(layerIdx,frameIdx){
 function insertBlankKeyframe(){
   var ld=state.layers[state.activeLayerIdx];
   if(ld.locked&&!ld.symbolId){showToast(SM.t('toastLayerLocked'));return;}
-  saveAllLayerFrames();pushUndoLayers();
+  saveAllLayerFrames();pushUndoLayers(true);
   var f={strokes:[],isKeyframe:true,isInterpolated:false};
   // On a component layer this main-timeline row is otherwise dead timing
   // decoration (getEffectiveStrokes' symbolId branch never reads it) — the
