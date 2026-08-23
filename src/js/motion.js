@@ -514,7 +514,7 @@
       g.keys.forEach(function (k) {
         var nf = k.frame + delta;
         if (nf < 0 || nf > state.totalFrames - 1) ok = false;
-        var occupant = g.track.keys.find(function (o) { return o.frame === nf; });
+        var occupant = keyAt(g.track, nf);
         if (occupant && g.keys.indexOf(occupant) < 0) ok = false;
       });
     });
@@ -567,7 +567,7 @@
       var f = state.currentFrame + c.dt;
       if (f < 0 || f > state.totalFrames - 1) return;
       var track = ensureTrack(ld, c.prop);
-      var ex = track.keys.find(function (k) { return k.frame === f; });
+      var ex = keyAt(track, f);
       if (ex) { ex.v = c.v.slice(); ex.hold = c.hold; ex.curvePoints = cloneCurvePts(c.curvePoints); }
       else track.keys.push({ frame: f, v: c.v.slice(), hold: c.hold, curvePoints: cloneCurvePts(c.curvePoints), hOut: [0, 0], hIn: [0, 0] });
       sortKeys(track); n++;
@@ -3309,7 +3309,7 @@
       var uf = _motionDrag.frame;
       _motionDrag.u.targets.forEach(function (t) {
         var track = t.holder.motion.position;
-        var k = track.keys.find(function (kk) { return kk.frame === uf; });
+        var k = keyAt(track, uf);
         if (!k) {
           // no key here yet on THIS element — freeze its interpolated
           // value as a new key so the group edit doesn't yank its whole

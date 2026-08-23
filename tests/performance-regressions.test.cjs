@@ -330,6 +330,12 @@ test('exact motion key lookup is logarithmic and preserves missing-key behavior'
   }));
   assert.equal(find({ keys: many }, 7000), many[3500]);
   assert.ok(reads < 50, `expected logarithmic exact lookup, observed ${reads} frame reads`);
+
+  assert.equal(
+    /(?:\w+\.)?track\.keys\.find\(function\s*\([^)]*\)\s*\{\s*return\s+[^;]*\.frame\s*===/.test(source),
+    false,
+    'motion.js still bypasses keyAt with a local linear exact-frame scan',
+  );
 });
 
 test('expression nearestKey lookup is logarithmic and keeps earlier-key ties', () => {
