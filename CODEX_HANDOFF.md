@@ -390,6 +390,9 @@ Branche : `codex/rust-js-batching`, créée depuis
 7. `6df6e98` — recherche binaire de la clé la plus proche utilisée par
    `nearestKey()` dans les expressions Motion; en cas d'égalité la clé
    précédente continue de gagner comme avec l'ancien parcours linéaire.
+8. `94aa598` — les trois scans exacts qui restaient locaux (collision de
+   nudge, collage et déplacement unifié) passent eux aussi par `keyAt`; un
+   test interdit de réintroduire ce motif linéaire dans `motion.js`.
 
 Mesures isolées sur le WASM release : 500 traits × 122 événements,
 sortie compacte **12,30 ms** contre JSON+parse **44,39 ms** (3,61×), même
