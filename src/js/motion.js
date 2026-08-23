@@ -885,16 +885,27 @@
     var track = trackFor(holder, prop);
     return (track && track.keys) ? track.keys.length : 0;
   }
+  function nearestKeyIndex(keys, targetFrame) {
+    var lo = 0, hi = keys.length;
+    while (lo < hi) {
+      var mid = (lo + hi) >> 1;
+      if (keys[mid].frame < targetFrame) lo = mid + 1;
+      else hi = mid;
+    }
+    if (lo === 0) return 0;
+    if (lo === keys.length) return keys.length - 1;
+    var prevDistance = targetFrame - keys[lo - 1].frame;
+    var nextDistance = keys[lo].frame - targetFrame;
+    // Preserve the historical linear scan's tie behavior: because it only
+    // replaced the winner on a strictly smaller distance, the earlier key
+    // won when the target sat exactly halfway between two keys.
+    return nextDistance < prevDistance ? lo : lo - 1;
+  }
   function exprNearestKey(holder, prop, t) {
     var track = trackFor(holder, prop);
     if (!track || !track.keys || !track.keys.length) return null;
     var targetFrame = t * (state.fps || 24);
-    var bestI = 0, bestD = Infinity;
-    for (var i = 0; i < track.keys.length; i++) {
-      var d = Math.abs(track.keys[i].frame - targetFrame);
-      if (d < bestD) { bestD = d; bestI = i; }
-    }
-    return exprKeyAt(holder, prop, bestI + 1);
+    return exprKeyAt(holder, prop, nearestKeyIndex(track.keys, targetFrame) + 1);
   }
   // Project-wide expression preamble (Van Dijk 7.2, "set global variables":
   // define something once and use it from every expression instead of

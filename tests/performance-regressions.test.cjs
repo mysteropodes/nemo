@@ -332,6 +332,33 @@ test('exact motion key lookup is logarithmic and preserves missing-key behavior'
   assert.ok(reads < 50, `expected logarithmic exact lookup, observed ${reads} frame reads`);
 });
 
+test('expression nearestKey lookup is logarithmic and keeps earlier-key ties', () => {
+  const source = fs.readFileSync(path.join(root, 'src/js/motion.js'), 'utf8');
+  const start = source.indexOf('function nearestKeyIndex(');
+  const end = source.indexOf('function exprNearestKey(', start);
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+  const sandbox = {};
+  vm.runInNewContext(`${source.slice(start, end)}\nthis.nearestKeyIndexTest = nearestKeyIndex;`, sandbox);
+  const find = sandbox.nearestKeyIndexTest;
+  const keys = [{ frame: 0 }, { frame: 3 }, { frame: 10 }, { frame: 20 }, { frame: 40 }];
+  assert.equal(find(keys, -10), 0);
+  assert.equal(find(keys, 0), 0);
+  assert.equal(find(keys, 2), 1);
+  assert.equal(find(keys, 6.5), 1);
+  assert.equal(find(keys, 9), 2);
+  assert.equal(find(keys, 30), 3);
+  assert.equal(find(keys, 35), 4);
+  assert.equal(find(keys, 100), 4);
+
+  let reads = 0;
+  const many = Array.from({ length: 4096 }, (_, index) => ({
+    get frame() { reads++; return index * 2; },
+  }));
+  assert.equal(find(many, 7001), 3500);
+  assert.ok(reads < 50, `expected logarithmic nearest-key lookup, observed ${reads} frame reads`);
+});
+
 test('motion drag timeline rebuilds are coalesced and flushed on release', () => {
   const source = fs.readFileSync(path.join(root, 'src/js/motion.js'), 'utf8');
   const start = source.indexOf('var _motionDragTimelineRaf = 0;');
