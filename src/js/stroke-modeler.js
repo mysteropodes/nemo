@@ -169,6 +169,15 @@
   WasmModeler.prototype.up = function (x, y, t, p) {
     return this.packed ? unpackPoints(this.inner.up_packed(x, y, t, p)) : JSON.parse(this.inner.up(x, y, t, p));
   };
+  WasmModeler.prototype.downPacked = function (x, y, t, p) {
+    return this.packed ? this.inner.down_packed(x, y, t, p) : null;
+  };
+  WasmModeler.prototype.movePacked = function (x, y, t, p) {
+    return this.packed ? this.inner.move_packed(x, y, t, p) : null;
+  };
+  WasmModeler.prototype.upPacked = function (x, y, t, p) {
+    return this.packed ? this.inner.up_packed(x, y, t, p) : null;
+  };
 
   window.SMStrokeModeler = {
     LEVELS: LEVELS,

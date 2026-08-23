@@ -234,13 +234,15 @@ test('stroke modeler prefers packed wasm output and preserves legacy fallback', 
   const packedWindow = { GeometryWasm: { ready: true, StrokeModeler: PackedModeler } };
   vm.runInNewContext(source, { window: packedWindow, console, JSON, Math, Array, Float64Array });
   const packed = packedWindow.SMStrokeModeler.create(2, 1.5);
+  assert.equal(packed.packed, true);
+  assert.equal(packed.downPacked(10, 20, 1, 0.4) instanceof Float64Array, true);
   assert.equal(JSON.stringify(packed.down(10, 20, 1, 0.4)), JSON.stringify([{ x: 1, y: 2, p: 0.25 }]));
   assert.equal(JSON.stringify(packed.move(11, 21, 1.1, 0.6)), JSON.stringify([
     { x: 3, y: 4, p: 0.5 },
     { x: 5, y: 6, p: 0.75 },
   ]));
   assert.equal(JSON.stringify(packed.up(12, 22, 1.2, 0.7)), '[]');
-  assert.deepEqual(packedCalls.map((call) => call[0]), ['down', 'move', 'up']);
+  assert.deepEqual(packedCalls.map((call) => call[0]), ['down', 'down', 'move', 'up']);
 
   class LegacyModeler {
     down() { return '[{"x":7,"y":8,"p":0.9}]'; }
@@ -250,4 +252,12 @@ test('stroke modeler prefers packed wasm output and preserves legacy fallback', 
   const legacyWindow = { GeometryWasm: { ready: true, StrokeModeler: LegacyModeler } };
   vm.runInNewContext(source, { window: legacyWindow, console, JSON, Math, Array });
   assert.equal(JSON.stringify(legacyWindow.SMStrokeModeler.create(1, 1).down(0, 0, 0, 1)), '[{"x":7,"y":8,"p":0.9}]');
+});
+
+test('draw bridge consumes packed modeler triplets without object unpacking', () => {
+  const source = fs.readFileSync(path.join(root, 'src/js/draw-bridge.js'), 'utf8');
+  assert.match(source, /if \(modeler\.packed\) modeler\.downPacked\(/);
+  assert.match(source, /var packedOuts = modeler\.movePacked\(/);
+  assert.match(source, /mpi \+= 3/);
+  assert.match(source, /var packedOuts = modeler\.upPacked\(/);
 });

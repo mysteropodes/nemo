@@ -462,7 +462,8 @@
       // unitScale = view.zoom at stroke start: the wobble speed thresholds
       // and end-of-stroke stop distance are calibrated in SCREEN px.
       modeler = window.SMStrokeModeler.create(modelerLevel(), view.zoom);
-      modeler.down(w[0], w[1], performance.now() / 1000, pressure);
+      if (modeler.packed) modeler.downPacked(w[0], w[1], performance.now() / 1000, pressure);
+      else modeler.down(w[0], w[1], performance.now() / 1000, pressure);
     }
     samples.push([w[0], w[1], widthFor(pressure)]);
     if (state.vectorBrush) window.SMEngineBridge.setPressureCursor(w, widthFor(pressure) / 2);
@@ -502,10 +503,19 @@
       // The modeler upsamples: one raw input can yield several modeled
       // points. Width is computed per modeled point from its own carried
       // (interpolated) pressure, so the ribbon tracks the modeled line.
-      var outs = modeler.move(w[0], w[1], performance.now() / 1000, pressure);
-      for (var mi = 0; mi < outs.length; mi++) samples.push([outs[mi].x, outs[mi].y, widthFor(outs[mi].p)]);
-      var lastOut = outs.length ? outs[outs.length - 1] : null;
-      if (state.vectorBrush && lastOut) window.SMEngineBridge.setPressureCursor([lastOut.x, lastOut.y], widthFor(lastOut.p) / 2);
+      if (modeler.packed) {
+        var packedOuts = modeler.movePacked(w[0], w[1], performance.now() / 1000, pressure);
+        for (var mpi = 0; mpi < packedOuts.length; mpi += 3) samples.push([packedOuts[mpi], packedOuts[mpi + 1], widthFor(packedOuts[mpi + 2])]);
+        if (state.vectorBrush && packedOuts.length) {
+          var lastPacked = packedOuts.length - 3;
+          window.SMEngineBridge.setPressureCursor([packedOuts[lastPacked], packedOuts[lastPacked + 1]], widthFor(packedOuts[lastPacked + 2]) / 2);
+        }
+      } else {
+        var outs = modeler.move(w[0], w[1], performance.now() / 1000, pressure);
+        for (var mi = 0; mi < outs.length; mi++) samples.push([outs[mi].x, outs[mi].y, widthFor(outs[mi].p)]);
+        var lastOut = outs.length ? outs[outs.length - 1] : null;
+        if (state.vectorBrush && lastOut) window.SMEngineBridge.setPressureCursor([lastOut.x, lastOut.y], widthFor(lastOut.p) / 2);
+      }
     } else {
       w = stabilizePoint(w);
       samples.push([w[0], w[1], widthFor(pressure)]);
@@ -563,8 +573,13 @@
       // the line converges onto the lift-off point) replaces the raw-point
       // splice below — that splice exists to fix the moving average's
       // trailing lag, which this mode doesn't have.
-      var outs = modeler.up(w[0], w[1], performance.now() / 1000, pressure);
-      for (var mi = 0; mi < outs.length; mi++) samples.push([outs[mi].x, outs[mi].y, widthFor(outs[mi].p)]);
+      if (modeler.packed) {
+        var packedOuts = modeler.upPacked(w[0], w[1], performance.now() / 1000, pressure);
+        for (var mpi = 0; mpi < packedOuts.length; mpi += 3) samples.push([packedOuts[mpi], packedOuts[mpi + 1], widthFor(packedOuts[mpi + 2])]);
+      } else {
+        var outs = modeler.up(w[0], w[1], performance.now() / 1000, pressure);
+        for (var mi = 0; mi < outs.length; mi++) samples.push([outs[mi].x, outs[mi].y, widthFor(outs[mi].p)]);
+      }
       modeler = null;
     } else {
       samples.push([w[0], w[1], widthFor(pressure)]);
