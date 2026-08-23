@@ -19,11 +19,14 @@ fn wrapped(body: &str) -> String {
 }}
 @group(0) @binding(0) var src_tex: texture_2d<f32>;
 @group(0) @binding(1) var tex_sampler: sampler;
-struct Params {{ effect_id:f32, p1:f32, p2:f32, p3:f32, tex_w:f32, tex_h:f32, time:f32, p4:f32, }};
+struct Params {{ effect_id:f32, p1:f32, p2:f32, p3:f32, tex_w:f32, tex_h:f32, time:f32, p4:f32, bbox_x:f32, bbox_y:f32, bbox_w:f32, bbox_h:f32, }};
 @group(0) @binding(2) var<uniform> params: Params;
 @fragment fn fs_main(in: VsOut) -> @location(0) vec4<f32> {{
   let uv = in.uv; let texel = vec2<f32>(1.0 / max(params.tex_w, 1.0), 1.0 / max(params.tex_h, 1.0));
   let src = textureSample(src_tex, tex_sampler, uv);
+  let bbox_o = vec2<f32>(params.bbox_x, params.bbox_y);
+  let bbox_s = vec2<f32>(max(params.bbox_w, 1.0), max(params.bbox_h, 1.0));
+  let local_uv = (uv * vec2<f32>(params.tex_w, params.tex_h) - bbox_o) / bbox_s;
   {body}
 }}"#
     )

@@ -14,6 +14,7 @@ use vello::kurbo::{Affine, BezPath, Rect, Shape, Stroke};
 use vello::peniko::Color;
 use vello::{wgpu, AaConfig, AaSupport, RenderParams, Renderer, RendererOptions, Scene};
 use wasm_bindgen::prelude::*;
+#[cfg(target_arch = "wasm32")]
 use web_sys::HtmlCanvasElement;
 
 // Clone (2026-08, masks): composite_scene's Add-mask union step needs a
@@ -602,6 +603,87 @@ impl Viewport {
             * Affine::rotate(self.rotation)
             * Affine::scale(self.zoom)
             * Affine::translate((-pivot.0, -pivot.1))
+    }
+}
+
+/// Device-pixel bounding box of the document under the current viewport.
+///
+/// JS deliberately passes the artboard centre as the viewport pivot (see
+/// engine-bridge.js::syncViewport and resizeEngineOffscreen), so twice that
+/// pivot is the document's stable world-space size. Adjustment/effect layers
+/// need this box as their procedural reference frame: the render target is the
+/// editor viewport and therefore stays a fixed screen size while zoom/pan
+/// changes. Using the render-target rectangle made custom shader patterns
+/// regenerate in viewport space whenever the user zoomed.
+///
+/// Keep the full-target fallback for callers that intentionally use the
+/// documented `(0,0)` pivot convention or render before set_viewport().
+fn document_bbox_px(
+    viewport: &Viewport,
+    target_width: u32,
+    target_height: u32,
+) -> (f32, f32, f32, f32) {
+    if viewport.pivot_x <= 0.0 || viewport.pivot_y <= 0.0 {
+        return (0.0, 0.0, target_width as f32, target_height as f32);
+    }
+    let document = Rect::new(0.0, 0.0, viewport.pivot_x * 2.0, viewport.pivot_y * 2.0);
+    let rect = viewport.transform().transform_rect_bbox(document);
+    (
+        rect.x0 as f32,
+        rect.y0 as f32,
+        rect.width() as f32,
+        rect.height() as f32,
+    )
+}
+
+#[cfg(test)]
+mod viewport_document_bbox_tests {
+    use super::*;
+
+    fn viewport_for_zoom(zoom: f64, pan_x: f64, pan_y: f64) -> Viewport {
+        let pivot_x = 960.0;
+        let pivot_y = 540.0;
+        Viewport {
+            // Same adjusted-pan convention as engine-bridge.js::syncViewport.
+            pan_x: pan_x + pivot_x * (zoom - 1.0),
+            pan_y: pan_y + pivot_y * (zoom - 1.0),
+            zoom,
+            effect_zoom: zoom,
+            rotation: 0.0,
+            pivot_x,
+            pivot_y,
+        }
+    }
+
+    #[test]
+    fn document_local_coordinates_are_invariant_under_zoom_and_pan() {
+        let world = vello::kurbo::Point::new(480.0, 270.0);
+        for viewport in [
+            viewport_for_zoom(0.48, 37.0, -21.0),
+            viewport_for_zoom(1.01, -83.0, 46.0),
+        ] {
+            let bbox = document_bbox_px(&viewport, 1400, 900);
+            let screen = viewport.transform() * world;
+            let local_x = (screen.x - bbox.0 as f64) / bbox.2 as f64;
+            let local_y = (screen.y - bbox.1 as f64) / bbox.3 as f64;
+            assert!(
+                (local_x - 0.25).abs() < 1e-6,
+                "x changed with viewport: {local_x}"
+            );
+            assert!(
+                (local_y - 0.25).abs() < 1e-6,
+                "y changed with viewport: {local_y}"
+            );
+        }
+    }
+
+    #[test]
+    fn missing_document_pivot_preserves_the_legacy_full_target_box() {
+        let viewport = Viewport::default();
+        assert_eq!(
+            document_bbox_px(&viewport, 1400, 900),
+            (0.0, 0.0, 1400.0, 900.0)
+        );
     }
 }
 
@@ -2052,6 +2134,7 @@ fn paint_layer_items(
 /// — and produced a `NoCompatibleDevice` error until this was pinned to
 /// `Backends::BROWSER_WEBGPU` explicitly.
 #[wasm_bindgen]
+#[cfg(target_arch = "wasm32")]
 pub async fn create_engine(
     canvas: HtmlCanvasElement,
     width: u32,
@@ -2705,13 +2788,16 @@ impl VelloEngine {
             if layer.is_effect_layer.unwrap_or(false) {
                 let backdrop_view = if accum_is_a { &self.blend_accum_a_view } else { &self.blend_accum_b_view };
                 if layer.effects.iter().any(|e| e.enabled) {
-                    // Full-canvas bbox, deliberately NOT items_bbox_px: an
+                    // Full-document bbox, deliberately NOT items_bbox_px: an
                     // adjustment/effect layer has no shape of its own (its
                     // own `items` are ignored entirely, is_effect_layer's
                     // whole point) — it grades/distorts everything already
                     // composited below it, so "my own content" IS the whole
-                    // frame, same as a real AE adjustment layer.
-                    let in_a = self.apply_effect_stack(backdrop_view, &layer.effects, (0.0, 0.0, self.width as f32, self.height as f32));
+                    // document, same as a real adjustment layer. The render
+                    // target itself is only the editor viewport and is not a
+                    // stable procedural coordinate system under zoom/pan.
+                    let bbox = document_bbox_px(&self.viewport, self.width, self.height);
+                    let in_a = self.apply_effect_stack(backdrop_view, &layer.effects, bbox);
                     let result_tex = if in_a { &self.effect_stack_a_tex } else { &self.effect_stack_b_tex };
                     let target_tex = if accum_is_a { &self.blend_accum_b } else { &self.blend_accum_a };
                     let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("effect-stack-to-accum-copy") });

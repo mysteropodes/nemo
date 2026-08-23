@@ -24,8 +24,22 @@ préexistantes. Ne pas attribuer à ce lot les diffs déjà présents dans
 Validation du lot : `npm test` (2/2), `node --check` sur tous les scripts
 (loader WASM vérifié en mode module), `git diff --check`, et compilation des
 tests Rust/WASM avec `cargo test --manifest-path geometry-wasm/Cargo.toml
---target wasm32-unknown-unknown --no-run`. Le test Rust natif n'est pas une
-cible valide pour ce crate navigateur (`wgpu::SurfaceTarget::Canvas`).
+--target wasm32-unknown-unknown --no-run`. Le checkpoint suivant rend aussi
+la validation native exécutable sans essayer d'ouvrir une surface Canvas.
+
+### Checkpoint effets existants et garde-fou WGSL
+
+Les modifications locales déjà présentes sur Film Grain, Watercolor,
+Anamorphic Flare, Cinematic Lens Flare et la boîte document stable sous
+zoom/pan ont été isolées dans un commit dédié avec leur binaire WASM. Elles
+ne font pas partie du refactoring de timeline.
+
+Le test `shader_library_validation.rs` a été remis en état : son wrapper
+déclare maintenant `bbox_o`, `bbox_s`, `local_uv` et les 12 floats réels de
+`Params`. `create_engine` est exporté uniquement en `wasm32`, ce qui permet
+à `cargo test` natif de compiler le reste du moteur et d'exécuter Naga sans
+changer le build navigateur. Résultat : 2 tests de coordonnées viewport et
+la validation Naga de toute la bibliothèque WGSL passent réellement.
 
 ## Mise à jour Codex — lot autonome des 37 feedbacks
 

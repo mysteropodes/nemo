@@ -15,7 +15,9 @@ use wasm_bindgen::prelude::*;
 mod fill;
 pub use fill::fill_find;
 mod engine;
-pub use engine::{create_engine, VelloEngine};
+pub use engine::VelloEngine;
+#[cfg(target_arch = "wasm32")]
+pub use engine::create_engine;
 mod hit;
 pub use hit::hit_test;
 mod tween;
