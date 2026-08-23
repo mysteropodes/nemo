@@ -41,6 +41,17 @@ déclare maintenant `bbox_o`, `bbox_s`, `local_uv` et les 12 floats réels de
 changer le build navigateur. Résultat : 2 tests de coordonnées viewport et
 la validation Naga de toute la bibliothèque WGSL passent réellement.
 
+### Lot 2 — timeline : suppression d'un parcours quadratique
+
+`renderKeyframeCellsInto` mémorise désormais la dernière vraie clé et son
+état plein/vide pendant son parcours vers l'avant. L'ancien code rescannait
+les frames précédentes pour chaque cellule tenue, soit O(frames²) sur une
+longue piste vide ou avec une clé ancienne. Le résultat reste O(frames).
+
+Le test Node compare les classes attendues sur clés vides/pleines,
+interpolation et fins de span, puis instrumente 1 000 frames vides et refuse
+plus de 2 000 accès indexés. `npm test` passe à 3/3.
+
 ## Mise à jour Codex — lot autonome des 37 feedbacks
 
 Branche de travail : `codex/feedback-2026-07-26`, créée depuis le

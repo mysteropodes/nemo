@@ -6,6 +6,42 @@ const vm = require('node:vm');
 
 const root = path.resolve(__dirname, '..');
 
+function timelineCellRenderer(state) {
+  const source = fs.readFileSync(path.join(root, 'src/js/timeline.js'), 'utf8');
+  const start = source.indexOf('function renderKeyframeCellsInto(');
+  const end = source.indexOf('// ---- HELD-KEYFRAME SPAN SHRINK/TRIM HANDLE ----', start);
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+  const document = {
+    createElement() {
+      const classes = new Set();
+      const el = {
+        children: [],
+        dataset: {},
+        style: { setProperty() {} },
+        classList: {
+          add(...names) { names.forEach((name) => classes.add(name)); },
+          contains(name) { return classes.has(name); },
+        },
+        appendChild(child) { this.children.push(child); },
+      };
+      Object.defineProperty(el, 'className', {
+        get() { return [...classes].join(' '); },
+        set(value) { classes.clear(); String(value).split(/\s+/).filter(Boolean).forEach((name) => classes.add(name)); },
+      });
+      return el;
+    },
+  };
+  const sandbox = {
+    document,
+    state,
+    selHas() { return false; },
+    hexToRgbTriplet() { return '0,0,0'; },
+  };
+  vm.runInNewContext(`${source.slice(start, end)}\nthis.renderCells = renderKeyframeCellsInto;`, sandbox);
+  return { render: sandbox.renderCells, document };
+}
+
 test('only the promoted timeline zoom module is loaded', () => {
   const html = fs.readFileSync(path.join(root, 'src/index.html'), 'utf8');
   assert.equal((html.match(/<script src="js\/timeline-zoom\.js"><\/script>/g) || []).length, 1);
@@ -89,4 +125,53 @@ test('cached playback keeps its canvas backing store between equal-sized frames'
   assert.equal(window.SMPlaybackCache.blitFrame(0), true);
   assert.equal(widthWrites, 1);
   assert.equal(heightWrites, 1);
+});
+
+test('timeline held-span rendering is linear and preserves inherited classes', () => {
+  const frames = [
+    { strokes: [], isKeyframe: false, isInterpolated: false },
+    { strokes: [], isKeyframe: true, isInterpolated: false },
+    { strokes: [], isKeyframe: false, isInterpolated: false },
+    { strokes: [], isKeyframe: false, isInterpolated: true },
+    { strokes: [], isKeyframe: false, isInterpolated: false },
+    { strokes: [{}], isKeyframe: true, isInterpolated: false },
+    { strokes: [], isKeyframe: false, isInterpolated: false },
+    { strokes: [], isKeyframe: false, isInterpolated: false },
+  ];
+  const state = {
+    totalFrames: frames.length,
+    currentFrame: -1,
+    waIn: 0,
+    waOut: frames.length - 1,
+    symbols: {},
+    layers: [{ frames }],
+  };
+  const harness = timelineCellRenderer(state);
+  const row = harness.document.createElement('div');
+  harness.render(row, 0);
+  const has = (frame, name) => row.children[frame].classList.contains(name);
+  assert.equal(has(0, 'span-empty'), false);
+  assert.equal(has(1, 'kf-empty'), true);
+  assert.equal(has(2, 'span-empty'), true);
+  assert.equal(has(3, 'tw'), true);
+  assert.equal(has(4, 'span-empty'), true);
+  assert.equal(has(4, 'span-end'), true);
+  assert.equal(has(5, 'kf-full'), true);
+  assert.equal(has(6, 'span-full'), true);
+  assert.equal(has(7, 'span-full'), true);
+  assert.equal(has(7, 'span-end'), true);
+
+  let indexedReads = 0;
+  const emptyFrames = new Proxy(Array.from({ length: 1000 }, () => ({
+    strokes: [], isKeyframe: false, isInterpolated: false,
+  })), {
+    get(target, property, receiver) {
+      if (/^\d+$/.test(String(property))) indexedReads++;
+      return Reflect.get(target, property, receiver);
+    },
+  });
+  const longState = { ...state, totalFrames: 1000, waOut: 999, layers: [{ frames: emptyFrames }] };
+  const longHarness = timelineCellRenderer(longState);
+  longHarness.render(longHarness.document.createElement('div'), 0);
+  assert.ok(indexedReads < 2000, `expected a linear frame walk, observed ${indexedReads} indexed reads`);
 });

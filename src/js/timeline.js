@@ -3571,6 +3571,12 @@ function renderKeyframeCellsInto(rowEl,li,contentLayerIdxs){
     if(!contentLayerIdxs)return ld.frames[fi].strokes.length>0;
     return contentLayerIdxs.some(function(idx){var f=state.layers[idx]&&state.layers[idx].frames[fi];return f&&f.strokes.length>0;});
   }
+  // Held cells inherit the content state of the previous real keyframe.
+  // Keep that state while walking forward instead of scanning backwards
+  // from every held cell. The previous implementation became O(frames²)
+  // on long layers with no key (or one early key), inside every full
+  // timeline rebuild; this produces exactly the same classes in O(frames).
+  var heldSourceFound=false,heldSourceHasContent=false;
   for(var fi=0;fi<state.totalFrames;fi++){var cell=document.createElement('div');cell.className='fc';cell.dataset.frame=fi;cell.dataset.layer=li;
     if(fi===state.currentFrame)cell.classList.add('cur');if(fi<state.waIn||fi>state.waOut)cell.classList.add('outside-wa');
     if(selHas(li,fi))cell.classList.add('sel');
@@ -3583,6 +3589,7 @@ function renderKeyframeCellsInto(rowEl,li,contentLayerIdxs){
     var fr=frOf(fi);
     if(fr.isKeyframe){
       var full=hasContentAt(fi);
+      heldSourceFound=true;heldSourceHasContent=full;
       var mk=document.createElement('div');mk.className='km '+(full?'fl':'hl');
       cell.appendChild(mk);
       // the keyframe cell itself carries the span tint so the band reads
@@ -3597,10 +3604,8 @@ function renderKeyframeCellsInto(rowEl,li,contentLayerIdxs){
       // they trace back to an empty or a drawn keyframe, and the last
       // extended cell before the next keyframe gets an end-of-span tick
       // — both distinctions Animate shows and this app previously didn't.
-      var hc=false,srcFound=false;
-      for(var pi=fi;pi>=0;pi--){var pfr=frOf(pi);if(pfr.isKeyframe){hc=hasContentAt(pi);srcFound=true;break;}}
-      if(srcFound){
-        cell.classList.add(hc?'span-full':'span-empty');
+      if(heldSourceFound){
+        cell.classList.add(heldSourceHasContent?'span-full':'span-empty');
         var nextFr=(fi+1<state.totalFrames)?frOf(fi+1):null;
         if(!nextFr||nextFr.isKeyframe||nextFr.isInterpolated)cell.classList.add('span-end');
       }
