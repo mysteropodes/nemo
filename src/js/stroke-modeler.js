@@ -145,10 +145,30 @@
 
   // Thin adapter over the Rust port (geometry-wasm strokemodeler.rs) so
   // draw-bridge.js talks to ONE shape of object regardless of backend.
-  function WasmModeler(inner) { this.inner = inner; }
-  WasmModeler.prototype.down = function (x, y, t, p) { return JSON.parse(this.inner.down(x, y, t, p)); };
-  WasmModeler.prototype.move = function (x, y, t, p) { return JSON.parse(this.inner.move(x, y, t, p)); };
-  WasmModeler.prototype.up = function (x, y, t, p) { return JSON.parse(this.inner.up(x, y, t, p)); };
+  function unpackPoints(packed) {
+    var out = new Array(Math.floor(packed.length / 3));
+    for (var i = 0, j = 0; i < packed.length; i += 3, j++) {
+      out[j] = { x: packed[i], y: packed[i + 1], p: packed[i + 2] };
+    }
+    return out;
+  }
+  function WasmModeler(inner) {
+    this.inner = inner;
+    // A stale wasm binary can coexist briefly with fresh glue during local
+    // development. Select the packed API once per gesture, not once per
+    // point, and retain the legacy JSON route as a compatibility fallback.
+    this.packed = typeof inner.down_packed === 'function' &&
+      typeof inner.move_packed === 'function' && typeof inner.up_packed === 'function';
+  }
+  WasmModeler.prototype.down = function (x, y, t, p) {
+    return this.packed ? unpackPoints(this.inner.down_packed(x, y, t, p)) : JSON.parse(this.inner.down(x, y, t, p));
+  };
+  WasmModeler.prototype.move = function (x, y, t, p) {
+    return this.packed ? unpackPoints(this.inner.move_packed(x, y, t, p)) : JSON.parse(this.inner.move(x, y, t, p));
+  };
+  WasmModeler.prototype.up = function (x, y, t, p) {
+    return this.packed ? unpackPoints(this.inner.up_packed(x, y, t, p)) : JSON.parse(this.inner.up(x, y, t, p));
+  };
 
   window.SMStrokeModeler = {
     LEVELS: LEVELS,
@@ -162,5 +182,6 @@
       return new JsModeler(level, unitScale);
     },
     createJs: function (level, unitScale) { return new JsModeler(level, unitScale); }, // test hook: force the JS reference
+    unpackPoints: unpackPoints, // test hook: validates the wasm boundary without loading a browser
   };
 })();

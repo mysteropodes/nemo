@@ -219,3 +219,35 @@ test('explicit save plus undo call sites declare that the save is reusable', () 
     );
   }
 });
+
+test('stroke modeler prefers packed wasm output and preserves legacy fallback', () => {
+  const source = fs.readFileSync(path.join(root, 'src/js/stroke-modeler.js'), 'utf8');
+  const packedCalls = [];
+  class PackedModeler {
+    down_packed(...args) { packedCalls.push(['down', ...args]); return new Float64Array([1, 2, 0.25]); }
+    move_packed(...args) { packedCalls.push(['move', ...args]); return new Float64Array([3, 4, 0.5, 5, 6, 0.75]); }
+    up_packed(...args) { packedCalls.push(['up', ...args]); return new Float64Array(0); }
+    down() { throw new Error('packed modeler must not use JSON'); }
+    move() { throw new Error('packed modeler must not use JSON'); }
+    up() { throw new Error('packed modeler must not use JSON'); }
+  }
+  const packedWindow = { GeometryWasm: { ready: true, StrokeModeler: PackedModeler } };
+  vm.runInNewContext(source, { window: packedWindow, console, JSON, Math, Array, Float64Array });
+  const packed = packedWindow.SMStrokeModeler.create(2, 1.5);
+  assert.equal(JSON.stringify(packed.down(10, 20, 1, 0.4)), JSON.stringify([{ x: 1, y: 2, p: 0.25 }]));
+  assert.equal(JSON.stringify(packed.move(11, 21, 1.1, 0.6)), JSON.stringify([
+    { x: 3, y: 4, p: 0.5 },
+    { x: 5, y: 6, p: 0.75 },
+  ]));
+  assert.equal(JSON.stringify(packed.up(12, 22, 1.2, 0.7)), '[]');
+  assert.deepEqual(packedCalls.map((call) => call[0]), ['down', 'move', 'up']);
+
+  class LegacyModeler {
+    down() { return '[{"x":7,"y":8,"p":0.9}]'; }
+    move() { return '[]'; }
+    up() { return '[]'; }
+  }
+  const legacyWindow = { GeometryWasm: { ready: true, StrokeModeler: LegacyModeler } };
+  vm.runInNewContext(source, { window: legacyWindow, console, JSON, Math, Array });
+  assert.equal(JSON.stringify(legacyWindow.SMStrokeModeler.create(1, 1).down(0, 0, 0, 1)), '[{"x":7,"y":8,"p":0.9}]');
+});
