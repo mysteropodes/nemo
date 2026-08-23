@@ -1,5 +1,32 @@
 # Consignes pour Codex — session Nemo du 26/07/2026
 
+## Mise à jour Codex — audit performance et refactoring progressif (23/08/2026)
+
+Branche : `codex/performance-refactor-handoff`, créée depuis
+`claude/web-public-beta` (`48b3bb7`) en conservant les modifications locales
+préexistantes. Ne pas attribuer à ce lot les diffs déjà présents dans
+`.claude/launch.json`, `geometry-wasm/src/engine.rs`,
+`src/js/shader-effects-library.js`, `src/wasm/geometry_wasm_bg.wasm`,
+`src/.DS_Store` et les fichiers non suivis historiques.
+
+### Lot 1 — optimisations sans changement fonctionnel
+
+- `playback-cache.js` ne réaffecte plus `canvas.width/height` à chaque cache
+  hit lorsque la taille est inchangée. Une affectation recréait le backing
+  store complet à chaque frame.
+- Le prototype `labs/timeline-zoom.js` n'est plus chargé par `index.html` :
+  sa version promue `timeline-zoom.js` est la seule active. Cela supprime un
+  second listener `Ctrl/Cmd+wheel` et évite un double zoom si l'ancien Lab
+  était activé.
+- `npm test` exécute les tests Node de `tests/performance-regressions.test.cjs`.
+  Ils verrouillent les deux invariants ci-dessus.
+
+Validation du lot : `npm test` (2/2), `node --check` sur tous les scripts
+(loader WASM vérifié en mode module), `git diff --check`, et compilation des
+tests Rust/WASM avec `cargo test --manifest-path geometry-wasm/Cargo.toml
+--target wasm32-unknown-unknown --no-run`. Le test Rust natif n'est pas une
+cible valide pour ce crate navigateur (`wgpu::SurfaceTarget::Canvas`).
+
 ## Mise à jour Codex — lot autonome des 37 feedbacks
 
 Branche de travail : `codex/feedback-2026-07-26`, créée depuis le
