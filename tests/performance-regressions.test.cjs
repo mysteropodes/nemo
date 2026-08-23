@@ -261,3 +261,46 @@ test('draw bridge consumes packed modeler triplets without object unpacking', ()
   assert.match(source, /mpi \+= 3/);
   assert.match(source, /var packedOuts = modeler\.upPacked\(/);
 });
+
+test('motion key lookup is logarithmic and selects the same containing segment', () => {
+  const source = fs.readFileSync(path.join(root, 'src/js/motion.js'), 'utf8');
+  const start = source.indexOf('function segmentIndexAtFrame(');
+  const end = source.indexOf('// The value of `prop`', start);
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+  const sandbox = { Math };
+  vm.runInNewContext(`${source.slice(start, end)}\nthis.segmentIndexAtFrameTest = segmentIndexAtFrame;`, sandbox);
+  const find = sandbox.segmentIndexAtFrameTest;
+  const keys = [{ frame: 0 }, { frame: 3 }, { frame: 10 }, { frame: 11 }, { frame: 40 }];
+  assert.equal(find(keys, 0), 0);
+  assert.equal(find(keys, 2.9), 0);
+  assert.equal(find(keys, 3), 1);
+  assert.equal(find(keys, 10.5), 2);
+  assert.equal(find(keys, 39.9), 3);
+
+  let reads = 0;
+  const many = Array.from({ length: 4096 }, (_, index) => ({
+    get frame() { reads++; return index * 2; },
+  }));
+  assert.equal(find(many, 7001), 3500);
+  assert.ok(reads < 50, `expected logarithmic lookup, observed ${reads} frame reads`);
+
+  const evalEnd = source.indexOf('function rawValueAtFrame(', start);
+  const evalSandbox = {
+    Math,
+    DEFAULT_CURVE: [],
+    evalCurvePoints(_curve, t) { return t; },
+  };
+  vm.runInNewContext(`${source.slice(start, evalEnd)}\nthis.evalTrackTest = evalTrack;`, evalSandbox);
+  const track = { keys: [
+    { frame: 0, v: [10] },
+    { frame: 10, v: [30], hold: true },
+    { frame: 20, v: [70] },
+  ] };
+  assert.equal(evalSandbox.evalTrackTest(track, -2, 99), 10);
+  assert.equal(evalSandbox.evalTrackTest(track, 5, 99), 20);
+  assert.equal(evalSandbox.evalTrackTest(track, 10, 99), 30);
+  assert.equal(evalSandbox.evalTrackTest(track, 19.9, 99), 30);
+  assert.equal(evalSandbox.evalTrackTest(track, 20, 99), 70);
+  assert.equal(evalSandbox.evalTrackTest(null, 5, 99), 99);
+});
