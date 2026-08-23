@@ -83,6 +83,31 @@ dans l'UI sans erreur console. Le harnais navigateur n'a pas su transmettre
 Meta avec Z (il activait l'outil Z) : aucune validation Cmd+Z n'est revendiquée
 à partir de ce geste invalide ; le test automatisé du point central fait foi.
 
+### Validation finale et reprise Claude
+
+Commits, dans l'ordre :
+
+1. `aec24d0` — cache de lecture + doublon Timeline Zoom + tests Node.
+2. `afbda66` — checkpoint shaders/Watercolor + validation WGSL exécutable.
+3. `981fd75` — rendu linéaire des spans de timeline.
+4. `c094f78` — dernière passe d'un calque d'effet vers l'accumulateur.
+5. `2b5dfbf` — réutilisation des sauvegardes lors du push undo.
+
+Validation finale : `npm test` 5/5, syntaxe de tous les JS, `cargo test`
+Rust 3/3, compilation des tests wasm32, build WASM release, `cargo check`
+Tauri avec jetons factices de compilation, et `git diff --check`. Les quatre
+warnings Tauri `objc/cargo-clippy` sont préexistants. `cargo check` régénère
+temporairement `src-tauri/gen/schemas/capabilities.json`; cette sortie a été
+restaurée et ne fait partie d'aucun commit.
+
+Reste volontairement hors scope de ces lots sûrs : virtualisation DOM de la
+timeline, délégation globale de ses événements, snapshots undo différentiels
+et regroupement de toutes les passes GPU dans un encoder unique. Ces travaux
+nécessitent des tests Tauri plus larges et ne doivent pas être fusionnés dans
+une réécriture unique. Les modifications préexistantes `.claude/launch.json`,
+`src/.DS_Store`, `STRATEGY.md`, `logo.ai` et `nemo_timeline.html` restent
+intactes et non commitées.
+
 ## Mise à jour Codex — lot autonome des 37 feedbacks
 
 Branche de travail : `codex/feedback-2026-07-26`, créée depuis le
