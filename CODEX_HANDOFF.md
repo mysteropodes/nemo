@@ -367,3 +367,42 @@ demain ce qui a été traité sans relire tous les commits.
   y touche** — ça peut écrire dans `src/wasm/*` pendant qu'un autre
   process compile. Vérifie qu'aucun build n'est en cours
   (`ps aux | grep -i tauri` ou demande avant de lancer).
+
+## Mise à jour Codex — frontières Rust/JS et Motion (2026-08-23)
+
+Branche : `codex/rust-js-batching`, créée depuis
+`codex/performance-refactor-handoff`. Commits de ce lot :
+
+1. `b22118f` — sorties `Float64Array` du StrokeModeler Rust, anciennes
+   méthodes JSON conservées et fallback JS inchangé.
+2. `bb26baa` — consommation directe des triplets par `draw-bridge.js`, sans
+   reconstruire un objet `{x,y,p}` pour chaque point du stylet.
+3. `f8ff1b0` — recherche binaire du segment de clés dans `evalTrack` et
+   `rawValueAtFrame`; interpolation, courbes spatiales et holds inchangés.
+
+Mesures isolées sur le WASM release : 500 traits × 122 événements,
+sortie compacte **12,30 ms** contre JSON+parse **44,39 ms** (3,61×), même
+nombre de triplets. Recherche Motion : 200 000 requêtes dans 4 096 clés,
+**11,29 ms** contre **443,54 ms** pour le parcours linéaire (39,30×), mêmes
+indices sur toutes les requêtes.
+
+Un batch `align_pairs` a été implémenté et mesuré, puis entièrement retiré :
+sorties identiques mais aucune accélération (22,16 ms batch contre 22,37 ms
+unitaire sur 48 paires fermées; 12,91 contre 12,76 ms sur 160 paires
+ouvertes). Le calcul géométrique domine la frontière, donc ne pas réintroduire
+ce batch sans changer le format de données ou l'algorithme.
+
+Garde-fous : les méthodes JSON `down/move/up` existent toujours, le nouvel
+adaptateur choisit l'API compacte une fois par geste, et une ancienne version
+du WASM continue donc à fonctionner. Tests ajoutés pour la parité
+JSON/compacte, le fallback historique, la consommation par triplets, la
+complexité logarithmique, les bornes, l'interpolation linéaire et les holds.
+
+Le navigateur automatisé Codex ne permet pas une validation UI fiable de ce
+lot : son instrumentation fait échouer Paper.js au chargement avec
+`TypeError: this.setItem is not a function`, avant l'initialisation de Nemo.
+Cette erreur n'est pas revendiquée comme un bug produit. La validation finale
+s'appuie sur les tests JS, Rust natifs, compilation wasm32 et exécution directe
+du module WASM release. Les fichiers utilisateur préexistants
+`.claude/launch.json`, `src/.DS_Store`, `STRATEGY.md`, `logo.ai` et
+`nemo_timeline.html` restent intacts et hors commits.
