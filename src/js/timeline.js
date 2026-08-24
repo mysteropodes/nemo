@@ -757,7 +757,42 @@ window.SM={
   // as symbolId/nativeVideo/montageId in saveActiveLayerFrame/
   // saveAllLayerFrames/getEffectiveStrokes (app.js) so nothing ever tries
   // to read/write strokes on it.
-  addNullLayer:function(){saveAllLayerFrames();pushUndoLayers(true);var idx=createUserLayer(nextLayerName().replace(/^Layer/,'Null'));state.layers[idx].isNullLayer=true;activateUL(idx);_layerSel=[idx];_layerSelAnchor=idx;loadFrame(state.currentFrame);updateUI();},
+  // 2026-08, feedback #59 — a Null created with layers pre-selected now
+  // auto-centers on their combined world bounds and auto-parents them to
+  // it (both AE conveniences; previously a Null always dropped at canvas
+  // center with zero relationship to the selection). createUserLayer always
+  // PUSHES (state.layers.push), so it's appended at the end — the indices
+  // captured in preSel before creation stay valid after, no re-indexing
+  // needed. nullPos/nullShape are the new persisted fields (see the
+  // exportJSON/import + saveActiveLayerFrame/saveAllLayerFrames "no real
+  // content" guard already covering isNullLayer, per CLAUDE.md §1).
+  addNullLayer:function(){
+    saveAllLayerFrames();pushUndoLayers(true);
+    var preSel=_layerSel.slice();
+    var idx=createUserLayer(nextLayerName().replace(/^Layer/,'Null'));
+    var ld=state.layers[idx];
+    ld.isNullLayer=true;
+    ld.nullShape='cross';
+    // Same reasoning as addGuideLayer's own explicit color below: without
+    // this, createUserLayer's nextLayerColor() cycling default gets read
+    // by buildNullLayerItems' marker (it falls back to ld.color first, on
+    // purpose — so a user CAN still recolor a Null later, same as a guide),
+    // giving each new Null an arbitrary/possibly-reused hue instead of a
+    // consistent, recognizable default.
+    ld.color='#ff2d78';
+    var validSel=preSel.filter(function(li){return li!==idx&&state.layers[li];});
+    var center=null;
+    if(window.SMMotion&&validSel.length){
+      var u=SMMotion.layerWorldBoundsUnion(validSel,state.currentFrame);
+      if(u)center=[u.cx,u.cy];
+    }
+    ld.nullPos=center||[state.canvasW/2,state.canvasH/2];
+    if(window.SMMotion&&validSel.length){
+      var nullUid=SMMotion.ensureLayerUid(ld);
+      validSel.forEach(function(li){SMMotion.setLayerParent(li,nullUid);});
+    }
+    activateUL(idx);_layerSel=[idx];_layerSelAnchor=idx;loadFrame(state.currentFrame);updateUI();
+  },
   // Effect (adjustment) layer (2026-07, Motion) — AE's "Adjustment Layer":
   // no painted content of its own (frames/strokes ignored on purpose,
   // same as a Null layer), but its effectType/effectP1/effectP2 apply to
@@ -1608,7 +1643,7 @@ window.SM={
       }
     }
     return JSON.stringify({version:13,totalFrames:sceneTotal,fps:sceneFps,canvasW:state.canvasW,canvasH:state.canvasH,canvasBg:state.canvasBg,waIn:sceneWaIn,waOut:sceneWaOut,
-      layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color,motion:l.motion,motionStatic:l.motionStatic,elementMotion:l.elementMotion,inPoint:l.inPoint,outPoint:l.outPoint,nativeVideo:l.nativeVideo,matteMode:l.matteMode,matteSourceLayerUid:l.matteSourceLayerUid,montageId:l.montageId,expressions:l.expressions,isTextLayer:l.isTextLayer,isNullLayer:l.isNullLayer,isEffectLayer:l.isEffectLayer,isGuideLayer:l.isGuideLayer,guidePos:l.guidePos,guideOrientation:l.guideOrientation,effects:l.effects,footage:l.footage,
+      layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color,motion:l.motion,motionStatic:l.motionStatic,elementMotion:l.elementMotion,inPoint:l.inPoint,outPoint:l.outPoint,nativeVideo:l.nativeVideo,matteMode:l.matteMode,matteSourceLayerUid:l.matteSourceLayerUid,montageId:l.montageId,expressions:l.expressions,isTextLayer:l.isTextLayer,isNullLayer:l.isNullLayer,nullPos:l.nullPos,nullShape:l.nullShape,isEffectLayer:l.isEffectLayer,isGuideLayer:l.isGuideLayer,guidePos:l.guidePos,guideOrientation:l.guideOrientation,effects:l.effects,footage:l.footage,
         // Layer parenting (2026-07-25). BOTH of these were missing from this
         // list, so every parent link was silently dropped on save — a rig
         // survived the session and nothing more. `uid` is the stable identity
@@ -1841,7 +1876,7 @@ window.SM={
       if(typeof ld.matteSourceLayerUid==='string')state.layers[idx].matteSourceLayerUid=ld.matteSourceLayerUid;
       if(ld.expressions)state.layers[idx].expressions=ld.expressions;
       if(ld.isTextLayer)state.layers[idx].isTextLayer=true;
-      if(ld.isNullLayer)state.layers[idx].isNullLayer=true;
+      if(ld.isNullLayer){state.layers[idx].isNullLayer=true;state.layers[idx].nullPos=(ld.nullPos||[state.canvasW/2,state.canvasH/2]).slice();state.layers[idx].nullShape=ld.nullShape||'cross';}
       if(ld.isEffectLayer){state.layers[idx].isEffectLayer=true;}
       if(ld.isGuideLayer){state.layers[idx].isGuideLayer=true;state.layers[idx].guidePos=(ld.guidePos||[state.canvasW/2,state.canvasH/2]).slice();state.layers[idx].guideOrientation=ld.guideOrientation||'horizontal';}
       state.layers[idx].effects=ld.effects||[];
@@ -5049,7 +5084,26 @@ function renderLayerList(frameOnly){
     // text-glyph convention as every badge above (this project's embedded
     // icon font is subsetted and silently renders blank for un-included
     // codepoints, see the lock-icon fix comment further up this function).
-    if(ld.isNullLayer){var nlb=document.createElement('div');nlb.className='lico comp-badge';nlb.title='Calque Null — jamais rendu, sert de pivot/parent pour d’autres calques';nlb.innerHTML='<span style="font-size:11px;line-height:1;font-weight:700">⊘</span>';row.appendChild(nlb);}
+    // Clickable since 2026-08 (feedback #59) — cycles ld.nullShape, the
+    // same glyph the canvas marker itself uses (buildNullLayerItems,
+    // engine-bridge.js) so the badge always previews what's drawn.
+    if(ld.isNullLayer){
+      var NULL_SHAPE_GLYPHS={cross:'✛',square:'□',circle:'○',diamond:'◇'};
+      var NULL_SHAPE_ORDER=['cross','square','circle','diamond'];
+      var curNullShape=ld.nullShape||'cross';
+      var nlb=document.createElement('div');nlb.className='lico comp-badge';nlb.style.cursor='pointer';
+      nlb.title='Calque Null — jamais rendu, sert de pivot/parent pour d’autres calques. Clic : changer la forme du repère';
+      nlb.innerHTML='<span style="font-size:11px;line-height:1;font-weight:700">'+(NULL_SHAPE_GLYPHS[curNullShape]||'✛')+'</span>';
+      nlb.addEventListener('click',function(e){
+        e.stopPropagation();
+        var cur=state.layers[i].nullShape||'cross';
+        pushUndoLayers(true);
+        state.layers[i].nullShape=NULL_SHAPE_ORDER[(NULL_SHAPE_ORDER.indexOf(cur)+1)%NULL_SHAPE_ORDER.length];
+        window.SMEngineBridge.renderNow();
+        renderLayerList();
+      });
+      row.appendChild(nlb);
+    }
     if(ld.isGuideLayer){var glb=document.createElement('div');glb.className='lico comp-badge';glb.title='Calque Guide — ligne repère visible en édition seulement, jamais exportée. Position/Rotation pilotent la ligne, comme n’importe quel calque';glb.style.color=ld.color||'#00baff';glb.innerHTML='<span style="font-size:11px;line-height:1;font-weight:700">┆</span>';row.appendChild(glb);}
     if(ld.isEffectLayer){
       var fxLabels=window.EFFECT_LABELS||{};

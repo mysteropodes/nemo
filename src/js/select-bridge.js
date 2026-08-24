@@ -21,7 +21,7 @@
 // rotate transform box with opposite-corner anchoring, and group move are
 // all ported too.
 (function () {
-  var mode = null; // 'xform-scale' | 'xform-rotate' | 'marquee' | 'move' | 'arc' | 'nv-drag' | 'nv-scale' | 'nv-rotate' | 'cornerRadius' | null
+  var mode = null; // 'xform-scale' | 'xform-rotate' | 'marquee' | 'move' | 'arc' | 'nv-drag' | 'nv-scale' | 'nv-rotate' | 'null-drag' | 'cornerRadius' | null
   // Dynamic shapes phase 3 (2026-08-18) — canvas drag handles for a rect's
   // corner radius, Figma's own interaction (a small grip sitting on each
   // rounded corner's arc, draggable independently). Self-contained state,
@@ -218,6 +218,7 @@
   // scale-by-vertical-motion gesture is retired: corner handles replace it.)
   var nvIdx = -1, nvStartPt = null, nvStartPos = null, nvStartScale = null, nvScaleMode = false, nvMoved = false;
   var nvPivot = null, nvOrigDist = 1, nvStartAngle = 0, nvOrigRot = 0;
+  var nullIdx = -1, nullStartPt = null, nullStartPos = null, nullMoved = false;
   function nvClearSelection() {
     if (window._nvSelectedLayer != null) { window._nvSelectedLayer = null; }
   }
@@ -988,6 +989,43 @@
         window.SMEngineBridge.renderNow();
         return;
       }
+      // Null layer markers (2026-08, feedback #59 — a Null had zero canvas
+      // presence before this). Hit-test against the SAME resolved screen
+      // position buildNullLayerItems (engine-bridge.js) draws its marker
+      // at — nullPos composed through the layer's own Motion transform +
+      // full parent chain, mirroring buildNullLayerItems exactly so what's
+      // clickable always matches what's drawn.
+      var nullHit = -1;
+      if (window.SMMotion) {
+        var nullTol = 12 / view.zoom;
+        for (var nli = state.layers.length - 1; nli >= 0; nli--) {
+          var nlld = state.layers[nli];
+          if (!nlld || !nlld.isNullLayer || !nlld.visible || nlld.locked) continue;
+          var nBase = nlld.nullPos || [state.canvasW / 2, state.canvasH / 2];
+          var nOwnMat = SMMotion.layerMotionAt(nli, state.currentFrame);
+          var nPt = [{ point: [nBase[0] + (nOwnMat ? nOwnMat.dx : 0), nBase[1] + (nOwnMat ? nOwnMat.dy : 0)], handleIn: [0, 0], handleOut: [0, 0] }];
+          var nChain = SMMotion.parentChainMats(nli, state.currentFrame);
+          for (var npc = 0; npc < nChain.length; npc++) nPt = SMMotion.transformSegments(nPt, nChain[npc].pivot, nChain[npc].mat);
+          var ncx = nPt[0].point[0], ncy = nPt[0].point[1];
+          if (pt.getDistance(new Point(ncx, ncy)) <= nullTol) { nullHit = nli; break; }
+        }
+      }
+      if (nullHit >= 0) {
+        nvClearSelection();
+        if (!e.shiftKey) clearSel();
+        state.activeLayerIdx = nullHit;
+        activateUL(nullHit);
+        _layerSel = [nullHit]; _layerSelAnchor = nullHit;
+        syncMotionLayerSelection(nullHit, e.shiftKey);
+        mode = 'null-drag';
+        nullIdx = nullHit;
+        nullStartPt = pt.clone();
+        nullStartPos = (state.layers[nullHit].nullPos || [state.canvasW / 2, state.canvasH / 2]).slice();
+        nullMoved = false;
+        renderArcs(); updateUI();
+        window.SMEngineBridge.renderNow();
+        return;
+      }
       nvClearSelection(); // clicked empty canvas/another target — video deselects like any object would
       var compHit = hitTestComponentLayers(pt);
       if (compHit) {
@@ -1286,6 +1324,16 @@
         _marquee.rect = new Path.Rectangle({ from: new Point(mx1, my1), to: new Point(mx2, my2) });
       }
       prevA.activate();
+    } else if (mode === 'null-drag') {
+      // nullPos is a WORLD anchor (same convention as a guide layer's
+      // guidePos) — Motion's own Position track, if keyed, still composes
+      // on TOP of this as an additional offset (see buildNullLayerItems),
+      // so plain repositioning here never fights an existing animation.
+      if (!nullMoved) { pushUndo(); nullMoved = true; }
+      var nulld = pt.subtract(nullStartPt);
+      state.layers[nullIdx].nullPos = [nullStartPos[0] + nulld.x, nullStartPos[1] + nulld.y];
+      window._sceneVersion++;
+      window.SMEngineBridge.renderNow();
     } else if (mode === 'nv-drag') {
       if (!nvMoved) { pushUndo(); nvMoved = true; }
       var nvd = pt.subtract(nvStartPt);
@@ -1618,6 +1666,12 @@
       mode = null; nvIdx = -1; nvStartPt = null; nvPivot = null;
       // One panel/timeline refresh at gesture end (not per tick — the
       // Transform fields and Motion rows re-read motionStatic/keys).
+      updateUI();
+      window.SMEngineBridge.renderNow();
+      return;
+    }
+    if (mode === 'null-drag') {
+      mode = null; nullIdx = -1; nullStartPt = null;
       updateUI();
       window.SMEngineBridge.renderNow();
       return;
