@@ -15,6 +15,79 @@
   var rafId = 0;
   var lastSceneJson = '';
   var engineW = 0, engineH = 0;
+  // Adaptive live-preview render resolution (2026-08, feedback #60 part 2 —
+  // "l'échantillonnage pour la preview... temps réel mais de bonne qualité
+  // en fonction de la config de l'ordinateur"). engineW/engineH are ALREADY
+  // just "however many actual device pixels the WebGPU surface has" —
+  // decoupled from the canvas element's CSS display size by construction
+  // (screenToWorld's own `engineW / rect.width` ratio, syncViewport's
+  // `scale = engineW / view.viewSize.width` — both comments explicitly call
+  // out "an extra devicePixelRatio-style factor between the two"). Nothing
+  // outside this file even reads engineW/engineH (grepped). So reducing
+  // them by a `_previewRenderScale` factor below 1 — fewer texels for the
+  // GPU to shade, same CSS box, same effect_zoom (deliberately EXCLUDES
+  // this ratio already, exactly like it excludes real DPR, for the same
+  // reason: an effect's radius must stay CSS/document-relative, not texel-
+  // relative) — needs ZERO changes anywhere else: composite_scene,
+  // screen_to_world, and every hit-test already work in whatever pixel
+  // space engineW/engineH currently describe. Verified live: content
+  // position and effect radii both stay visually correct at any scale,
+  // same reasoning (and same pivot/pan algebra) already proven for
+  // resizeEngineOffscreenAtScale's export-side supersampling above.
+  var _previewRenderScale = 1.0;
+  var PREVIEW_SCALE_FLOOR = 0.5;
+  // One-shot startup calibration, not continuous monitoring: rAF-interval
+  // probes are explicitly documented elsewhere in this codebase as
+  // unreliable (aliasing against the engine's own coalesced render calls,
+  // contradictory results run to run) — measuring the real render() JS-call
+  // duration over the first several ACTUAL renders after engine creation
+  // (tick()'s own dirty-check already means every call here is real GPU
+  // work, never an idle no-op) is a steadier signal, and deciding ONCE
+  // avoids fighting/oscillating quality up and down mid-session.
+  var _calibSamples = [];
+  var _calibDone = false;
+  var CALIB_SAMPLE_COUNT = 12;
+  var CALIB_SLOW_MS = 14; // ~60fps budget (16.6ms) minus headroom for other per-frame JS
+  var CALIB_FAST_MS = 8;  // comfortably fast — no reduction needed at all
+  function recordCalibSample(ms) {
+    if (_calibDone) return;
+    _calibSamples.push(ms);
+    if (_calibSamples.length < CALIB_SAMPLE_COUNT) return;
+    _calibDone = true;
+    var avg = _calibSamples.reduce(function (a, b) { return a + b; }, 0) / _calibSamples.length;
+    if (avg > CALIB_SLOW_MS) {
+      // One step down is enough for the common case (a render that's ~2x
+      // over budget needs roughly half the pixels, and area scales with
+      // the square of the linear factor) — a hard-slow machine still gets
+      // real relief; not iterating further keeps this predictable rather
+      // than hunting for an exact fps target.
+      setPreviewRenderScale(avg > CALIB_SLOW_MS * 1.8 ? PREVIEW_SCALE_FLOOR : 0.75);
+    } else if (avg <= CALIB_FAST_MS) {
+      // Already at 1.0 by default — nothing to do, just documents the
+      // "comfortably fast, stay at full quality" branch explicitly.
+    }
+  }
+  function setPreviewRenderScale(scale) {
+    scale = Math.max(PREVIEW_SCALE_FLOOR, Math.min(1.0, scale));
+    if (scale === _previewRenderScale) return;
+    _previewRenderScale = scale;
+    if (engine && paperCanvasEl) applyEngineSize(paperCanvasEl.width, paperCanvasEl.height);
+  }
+  // Shared by handleResize/ensureEngine so the renderScale multiply lives
+  // in exactly one place (CLAUDE.md §3) — ALWAYS derived from the Paper
+  // canvas's own current device-pixel size, never compounded onto a
+  // previous already-scaled engineW/engineH.
+  var _nativeEngineW = 0, _nativeEngineH = 0; // last paperCanvas size applyEngineSize saw, PRE-scale
+  function applyEngineSize(nativeW, nativeH) {
+    _nativeEngineW = nativeW; _nativeEngineH = nativeH;
+    var w = Math.max(1, Math.round(nativeW * _previewRenderScale));
+    var h = Math.max(1, Math.round(nativeH * _previewRenderScale));
+    engineW = w; engineH = h;
+    rustCanvas.width = w; rustCanvas.height = h;
+    engine.resize(w, h);
+    lastSceneJson = ''; lastViewportKey = ''; lastSceneVersion = -1;
+    invalidateOverlayBase();
+  }
   // Set by draw-bridge.js (or any future intercepted tool) for the duration
   // of an active drag: tick()'s own rAF loop keeps running the whole time
   // (it's unconditional, not started per-drag), and renderWithOverlayItem
@@ -2999,7 +3072,21 @@
     var pivotWX = state.canvasW / 2, pivotWY = state.canvasH / 2;
     var panAdjX = panX + pivotWX * (z - 1);
     var panAdjY = panY + pivotWY * (z - 1);
-    engine.set_viewport(panAdjX, panAdjY, z, state.canvasRotation || 0, pivotWX, pivotWY, view.zoom);
+    // effect_zoom deliberately excludes `scale` (DPR) so a pixel-space
+    // effect stays the SAME apparent size on screen as document/CSS zoom
+    // changes — but _previewRenderScale (2026-08, feedback #60 part 2) is a
+    // DIFFERENT axis: unlike DPR, which only makes geometry crisper for the
+    // SAME apparent content, reducing render scale makes composite_scene's
+    // target texture genuinely SMALLER for the SAME CSS box. Leaving
+    // effect_zoom unscaled would keep a blur's radius pinned to a FIXED
+    // texel count while the canvas shrinks around it — the SAME setting
+    // would visibly look blurrier at a lower render scale (measured live:
+    // a 10-texel transition width is 0.88% of a 1134px-wide canvas but
+    // 1.47% of a 680px one — the same texels covering more of a smaller
+    // picture). Multiplying it in here keeps a blur's on-screen size
+    // constant across any render scale, exactly like it already is
+    // between the live preview and a native-resolution export.
+    engine.set_viewport(panAdjX, panAdjY, z, state.canvasRotation || 0, pivotWX, pivotWY, view.zoom * _previewRenderScale);
   }
 
   // Shared with renderWithOverlayItem/renderNow so all three call sites stay
@@ -3040,7 +3127,9 @@
           lastSceneJson = json;
           window.__lastSceneJson = json;
           flushRetiredPaths();
+          var _renderT0 = _calibDone ? 0 : performance.now();
           engine.render(json);
+          if (!_calibDone) recordCalibSample(performance.now() - _renderT0);
         }
         lastSceneVersion = window._sceneVersion;
       }
@@ -3085,21 +3174,19 @@
     // out entirely on a zero-sized read; the ResizeObserver fires again as
     // soon as layout finishes settling, with the real final size.
     if (w <= 0 || h <= 0) return;
-    if (w === engineW && h === engineH) return;
-    engineW = w; engineH = h;
-    rustCanvas.width = w;
-    rustCanvas.height = h;
+    // Compared against the NATIVE size applyEngineSize last saw, not
+    // engineW/engineH directly — those are the SCALED values once
+    // _previewRenderScale < 1, which would never equal the native w/h
+    // again and make this guard permanently false (re-resizing on every
+    // spurious duplicate ResizeObserver firing instead of just real ones).
+    if (w === _nativeEngineW && h === _nativeEngineH) return;
     try {
-      engine.resize(w, h);
+      applyEngineSize(w, h);
     } catch (e) {
       console.error('[engine-bridge] resize failed, disabling', e);
       setEnabled(false);
       return;
     }
-    lastSceneJson = ''; // force a full re-render at the new size
-    lastViewportKey = '';
-    lastSceneVersion = -1; // force tick() to actually rebuild, not just skip on an unchanged version
-    invalidateOverlayBase();
   }
 
   async function ensureEngine() {
@@ -3120,7 +3207,10 @@
     rustCanvas = document.createElement('canvas');
     rustCanvas.id = 'rust-canvas';
     // device-pixel size copied from the Paper canvas so world coordinates
-    // line up 1:1; CSS position stacked directly over it
+    // line up 1:1; CSS position stacked directly over it. renderScale is
+    // always 1.0 here (calibration hasn't run yet — that needs a live
+    // engine to measure against), so this is the native size verbatim.
+    _nativeEngineW = paperCanvas.width; _nativeEngineH = paperCanvas.height;
     engineW = paperCanvas.width;
     engineH = paperCanvas.height;
     rustCanvas.width = engineW;
@@ -3483,6 +3573,12 @@
     buildSceneJsonForFrame: function (frame) { return buildSceneJson(true, false, { frame: frame, includeEditorOverlays: false }); },
     setEnabled: setEnabled,
     isEnabled: function () { return enabled; },
+    // Adaptive preview render scale (feedback #60 part 2) — read-only
+    // status plus a manual override for a future Settings toggle/QA.
+    getPreviewRenderScale: function () { return _previewRenderScale; },
+    getPreviewCalibStatus: function () { return { done: _calibDone, samples: _calibSamples.slice() }; },
+    setPreviewRenderScale: function (scale) { setPreviewRenderScale(scale); return _previewRenderScale; },
+    forcePreviewCalibration: function () { _calibDone = false; _calibSamples = []; },
     screenToWorld: screenToWorld,
     renderWithOverlayItem: renderWithOverlayItem,
     renderNow: renderNow,
