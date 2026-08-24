@@ -274,6 +274,33 @@
     closeAddMenu();
     var menu = document.createElement('div');
     menu.className = 'fx-addmenu';
+    var search = document.createElement('input');
+    search.type = 'search';
+    search.className = 'fx-addmenu-search';
+    search.placeholder = window.SM.t('fxSearchPlaceholder');
+    search.setAttribute('aria-label', search.placeholder);
+    var categoryWrap = document.createElement('div');
+    var results = document.createElement('div');
+    results.className = 'fx-addmenu-results';
+    results.style.display = 'none';
+    var searchable = [];
+    function searchableItem(label, preview, action, category) {
+      searchable.push({ label: label, preview: preview, action: action, category: category || '' });
+    }
+    function resultRow(item) {
+      var row = document.createElement('div');
+      row.className = 'fx-submenu-item fx-search-result';
+      var prev = document.createElement('div');
+      prev.className = 'fx-prev' + (item.preview ? ' fx-prev-' + item.preview : ' fx-prev-generic');
+      var copy = document.createElement('span');
+      var label = document.createElement('span'); label.textContent = item.label;
+      var cat = document.createElement('small'); cat.textContent = item.category;
+      copy.appendChild(label); copy.appendChild(cat);
+      row.appendChild(prev); row.appendChild(copy);
+      row.addEventListener('click', function (e) { e.stopPropagation(); closeAddMenu(); item.action(); });
+      return row;
+    }
+    menu.appendChild(search);
     EFFECT_CATEGORIES.forEach(function (cat) {
       if (isAdjustment && cat.layerOnly) return;
       var row = document.createElement('div');
@@ -286,7 +313,10 @@
       };
       row.addEventListener('mouseenter', open);
       row.addEventListener('click', function (e) { e.stopPropagation(); open(); });
-      menu.appendChild(row);
+      categoryWrap.appendChild(row);
+      cat.types.forEach(function (type) {
+        searchableItem(EFFECT_LABELS[type] || type, type, function () { addEffect(type); }, window.SM.t(cat.label));
+      });
     });
     if (window.SMSHADER_EFFECT_CATEGORIES && window.SMSHADER_EFFECTS) {
       window.SMSHADER_EFFECT_CATEGORIES.forEach(function (catName) {
@@ -305,7 +335,10 @@
         };
         row.addEventListener('mouseenter', open);
         row.addEventListener('click', function (e) { e.stopPropagation(); open(); });
-        menu.appendChild(row);
+        categoryWrap.appendChild(row);
+        defs.forEach(function (def) {
+          searchableItem(def.name, def.id, function () { addEffect('custom:' + def.id); }, 'Shaders · ' + catName);
+        });
       });
     }
     // Custom shaders (2026-07) — user-authored effects saved in
@@ -322,13 +355,43 @@
     };
     customRow.addEventListener('mouseenter', openCustom);
     customRow.addEventListener('click', function (e) { e.stopPropagation(); openCustom(); });
-    menu.appendChild(customRow);
+    categoryWrap.appendChild(customRow);
+    (state.customEffects || []).forEach(function (c) {
+      searchableItem(c.name, c.id, function () { addEffect('custom:' + c.id); }, window.SM.t('fxCatCustom'));
+    });
+    menu.appendChild(categoryWrap);
+    menu.appendChild(results);
+    search.addEventListener('input', function () {
+      if (subMenuEl) { subMenuEl.remove(); subMenuEl = null; }
+      var q = search.value.trim().toLocaleLowerCase();
+      categoryWrap.style.display = q ? 'none' : '';
+      results.style.display = q ? '' : 'none';
+      results.innerHTML = '';
+      if (!q) return;
+      var matches = searchable.filter(function (item) {
+        return (item.label + ' ' + item.category).toLocaleLowerCase().indexOf(q) >= 0;
+      });
+      matches.forEach(function (item) { results.appendChild(resultRow(item)); });
+      if (!matches.length) {
+        var empty = document.createElement('div');
+        empty.className = 'fx-search-empty';
+        empty.textContent = window.SM.t('fxSearchEmpty');
+        results.appendChild(empty);
+      }
+    });
+    search.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') {
+        var first = results.querySelector('.fx-search-result');
+        if (first) { e.preventDefault(); first.click(); }
+      }
+    });
     document.body.appendChild(menu);
     var r = anchorEl.getBoundingClientRect();
     var mw = menu.offsetWidth, mh = menu.offsetHeight;
     menu.style.left = Math.min(r.left, window.innerWidth - mw - 4) + 'px';
     menu.style.top = Math.min(r.bottom + 2, window.innerHeight - mh - 4) + 'px';
     addMenuEl = menu;
+    setTimeout(function () { if (addMenuEl === menu) search.focus(); }, 0);
   }
   document.addEventListener('pointerdown', function (e) {
     if (addMenuEl && !addMenuEl.contains(e.target) && (!subMenuEl || !subMenuEl.contains(e.target)) && e.target.id !== 'p-add-effect-btn') closeAddMenu();

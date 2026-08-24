@@ -124,7 +124,7 @@
       var fit=fitSize(nat.w,nat.h);
       for(var r=0;r<rep;r++)frames.push({strokes:[{isRaster:true,src:dataUrl,x:state.canvasW/2,y:state.canvasH/2,width:fit.w,height:fit.h,opacity:1}],isKeyframe:r===0,isInterpolated:r!==0});
     }
-    saveAllLayerFrames();pushUndoLayers();
+    saveAllLayerFrames();pushUndoLayers(true);
     if(frames.length>state.totalFrames)window.SM.setTotalFrames(frames.length);
     var idx=createUserLayer(prefix);
     while(frames.length<state.totalFrames)frames.push({strokes:[],isKeyframe:false,isInterpolated:false});
@@ -146,7 +146,7 @@
   // One layer per image now, tagged as footage, same as its siblings; the
   // layer is the thing you then move, key and swap.
   async function importStandalone(paths){
-    saveAllLayerFrames();pushUndoLayers();
+    saveAllLayerFrames();pushUndoLayers(true);
     for(var i=0;i<paths.length;i++){
       var dataUrl=await readAsDataUrl(paths[i]);
       var nat=await naturalSize(dataUrl);
@@ -212,7 +212,7 @@
         var nat=await naturalSize(dataUrl);var fit=fitSize(nat.w,nat.h);
         for(var r=0;r<rep;r++)frames.push({strokes:[{isRaster:true,src:dataUrl,x:state.canvasW/2,y:state.canvasH/2,width:fit.w,height:fit.h,opacity:1}],isKeyframe:r===0,isInterpolated:r!==0});
       }
-      saveAllLayerFrames();pushUndoLayers();
+      saveAllLayerFrames();pushUndoLayers(true);
       if(frames.length>state.totalFrames)window.SM.setTotalFrames(frames.length);
       var idx=createUserLayer(seq.prefix);
       while(frames.length<state.totalFrames)frames.push({strokes:[],isKeyframe:false,isInterpolated:false});
@@ -222,7 +222,7 @@
       if(window.SMMediaLibrary)SMMediaLibrary.addEntry(state.layers[idx].name,'image',frames[0].strokes[0].src,state.layers[idx].name,{layerUid:state.layers[idx].layerUid});
       showToast(SM.t('toastSequenceImportedSuffix')+seq.items.length+' images');
     }else{
-      saveAllLayerFrames();pushUndoLayers();
+      saveAllLayerFrames();pushUndoLayers(true);
       var ld=state.layers[state.activeLayerIdx];
       if(!ld.frames[state.currentFrame].isKeyframe&&!ld.frames[state.currentFrame].isInterpolated){
         ld.frames[state.currentFrame].strokes=JSON.parse(JSON.stringify(getEffectiveStrokes(state.activeLayerIdx,state.currentFrame)));
@@ -294,7 +294,7 @@
     return frames;
   }
   async function importVideoFrames(frames,prefix){
-    saveAllLayerFrames();pushUndoLayers();
+    saveAllLayerFrames();pushUndoLayers(true);
     if(frames.length>state.totalFrames)window.SM.setTotalFrames(frames.length);
     var idx=createUserLayer(prefix);
     while(frames.length<state.totalFrames)frames.push({strokes:[],isKeyframe:false,isInterpolated:false});
@@ -457,7 +457,7 @@
       if(!dataUrl)return;
     }
     var nat=await naturalSize(dataUrl);
-    saveAllLayerFrames();pushUndoLayers();
+    saveAllLayerFrames();pushUndoLayers(true);
     var n=0;
     (ld.frames||[]).forEach(function(f){
       (f&&f.strokes||[]).forEach(function(st){

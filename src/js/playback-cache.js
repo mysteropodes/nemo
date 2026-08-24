@@ -75,7 +75,13 @@
     var canvas = _ensurePreviewCanvas();
     if (!canvas) return false;
     var bmp = _cache.get(f);
-    canvas.width = state.canvasW; canvas.height = state.canvasH;
+    // Assigning width/height resets the whole backing store, even when the
+    // value did not change. Cached playback calls this once per displayed
+    // frame, so the unconditional assignments used to discard and recreate
+    // a full-canvas buffer on every cache hit. Resize only when the document
+    // size actually changed; clearRect below remains the per-frame reset.
+    if (canvas.width !== state.canvasW) canvas.width = state.canvasW;
+    if (canvas.height !== state.canvasH) canvas.height = state.canvasH;
     var ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);

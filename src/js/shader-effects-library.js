@@ -137,6 +137,298 @@
       'for (var i = -2; i <= 2; i = i + 1) { for (var j = -2; j <= 2; j = j + 1) { let c = textureSample(src_tex, tex_sampler, uv + vec2<f32>(f32(i), f32(j)) * texel * r).rgb; mn = min(mn, c); mx = max(mx, c); } }',
       'return vec4<f32>(select(mn, mx, params.p2 > 0.5), src.a);',
     ]),
+    // Port of the public-domain "Film Grain" shader by zfedoran (MIT,
+    // requested 2026-08-22: "un autre effet pour du procedural grain").
+    // iTime -> p3 'Evolution' (same manual-animation convention as the
+    // Musk flare above, no free-running clock in this sandbox); iMouse's
+    // vertical-wipe intensity preview is dropped (editor-only debug aid in
+    // the original, not a real param); iChannel0 sampling -> src (this
+    // effect already receives the shape's own rendered pixel as `src`, no
+    // texture fetch needed). BLEND_MODE's 5 compile-time branches become a
+    // single 'Mode' param (0-4) switched at runtime with plain if/else —
+    // same idea as shader_minimax's p2 'Mode', just more branches.
+    fx('shader_film_grain', 'Film Grain', 'Stylize', [
+      param('p1', 'Intensity', 0, 1, 0.01, '', 0.15),
+      param('p2', 'Variance', 0.05, 1, 0.01, '', 0.5),
+      param('p3', 'Evolution', -3600, 3600, 1, 'deg', 0),
+      param('p4', 'Mode', 0, 4, 1, '', 0),
+    ], [
+      'let seed = dot(uv, vec2<f32>(12.9898, 78.233));',
+      'let evo = params.p3 * 0.1;',
+      'var n = fract(sin(seed) * 43758.5453 + evo);',
+      'let variance = max(params.p2, 0.02);',
+      'n = (1.0 / (variance * 2.5066282746)) * exp(-(n * n) / (2.0 * variance * variance));',
+      'let grain = vec3<f32>(n) * (1.0 - src.rgb);',
+      'let w = clamp(params.p1, 0.0, 1.0);',
+      'let m = params.p4;',
+      'var rgb = src.rgb;',
+      'if (m < 0.5) {',
+      '  rgb = src.rgb + grain * w;',
+      '} else if (m < 1.5) {',
+      '  rgb = mix(src.rgb, vec3<f32>(1.0) - (vec3<f32>(1.0) - src.rgb) * (vec3<f32>(1.0) - grain), w);',
+      '} else if (m < 2.5) {',
+      '  let lo = 2.0 * src.rgb * grain;',
+      '  let hi = vec3<f32>(1.0) - 2.0 * (vec3<f32>(1.0) - src.rgb) * (vec3<f32>(1.0) - grain);',
+      '  let ov = select(lo, hi, src.rgb >= vec3<f32>(0.5));',
+      '  rgb = mix(src.rgb, ov, w);',
+      '} else if (m < 3.5) {',
+      '  let sl = pow(max(src.rgb, vec3<f32>(0.0001)), pow(vec3<f32>(2.0), 2.0 * (vec3<f32>(0.5) - grain)));',
+      '  rgb = mix(src.rgb, sl, w);',
+      '} else {',
+      '  rgb = max(src.rgb, grain * w);',
+      '}',
+      'return vec4<f32>(clamp(rgb, vec3<f32>(0.0), vec3<f32>(1.0)), src.a);',
+    ]),
+    // Watercolor applies the original wet/dry edge, pigment and paper
+    // visualization to existing layered artwork. Its procedural circle SDF
+    // is replaced by a signed distance estimate sampled from src_tex, then
+    // advected through a coherent wet-flow field. It never generates shapes.
+    fx('shader_watercolor', 'Watercolor', 'Stylize', [
+      param('p1', 'Diffusion radius', 4, 150, 1, 'px', 45, true),
+      param('p2', 'Wet diffusion', 0, 1, 0.01, '', 0.65),
+      param('p3', 'Blend', 0, 1, 0.01, '', 1),
+      param('p4', 'Paper', 0, 1, 0.01, '', 0.4),
+    ], [
+      // All procedural fields live in the affected content's coordinate
+      // system, not in viewport UV. Zooming and panning therefore reveal the
+      // same wash instead of generating a different one.
+      'let localAspect = bbox_s.x / max(bbox_s.y, 1.0);',
+      'let nuv = vec2<f32>((local_uv.x * 2.0 - 1.0) * localAspect, local_uv.y * 2.0 - 1.0);',
+      'let radiusPx = max(params.p1, 1.0);',
+      'let diffusion = clamp(params.p2, 0.0, 1.0);',
+      'let organicTime = params.time * 0.12;',
+      'let timeOffset = 133.7 + organicTime;',
+      // A coherent two-component flow field bends diffusion paths like
+      // pigment carried by water. It changes slowly over the canvas, so the
+      // result forms broad blooms instead of per-pixel jitter.
+      'let flowDrift = vec2<f32>(cos(organicTime * 0.37), sin(organicTime * 0.29));',
+      'let flowP = nuv * 2.35 + flowDrift * 0.42 + vec2<f32>(timeOffset * 0.004, -timeOffset * 0.003);',
+      'let flowI = floor(flowP); let flowF = fract(flowP); let flowU = flowF * flowF * (vec2<f32>(3.0) - 2.0 * flowF);',
+      'let flowA = fract(sin(dot(flowI, vec2<f32>(127.1, 311.7))) * 43758.5453);',
+      'let flowB = fract(sin(dot(flowI + vec2<f32>(1.0, 0.0), vec2<f32>(127.1, 311.7))) * 43758.5453);',
+      'let flowC = fract(sin(dot(flowI + vec2<f32>(0.0, 1.0), vec2<f32>(127.1, 311.7))) * 43758.5453);',
+      'let flowD = fract(sin(dot(flowI + vec2<f32>(1.0, 1.0), vec2<f32>(127.1, 311.7))) * 43758.5453);',
+      'let flowN1 = mix(mix(flowA, flowB, flowU.x), mix(flowC, flowD, flowU.x), flowU.y);',
+      'let flowP2 = flowP + vec2<f32>(19.17, -7.43);',
+      'let flowI2 = floor(flowP2); let flowF2 = fract(flowP2); let flowU2 = flowF2 * flowF2 * (vec2<f32>(3.0) - 2.0 * flowF2);',
+      'let flowA2 = fract(sin(dot(flowI2, vec2<f32>(127.1, 311.7))) * 43758.5453);',
+      'let flowB2 = fract(sin(dot(flowI2 + vec2<f32>(1.0, 0.0), vec2<f32>(127.1, 311.7))) * 43758.5453);',
+      'let flowC2 = fract(sin(dot(flowI2 + vec2<f32>(0.0, 1.0), vec2<f32>(127.1, 311.7))) * 43758.5453);',
+      'let flowD2 = fract(sin(dot(flowI2 + vec2<f32>(1.0, 1.0), vec2<f32>(127.1, 311.7))) * 43758.5453);',
+      'let flowN2 = mix(mix(flowA2, flowB2, flowU2.x), mix(flowC2, flowD2, flowU2.x), flowU2.y);',
+      'let waterFlow = vec2<f32>(flowN1 - 0.5, flowN2 - 0.5);',
+      'let flowDir = normalize(waterFlow + vec2<f32>(0.0001, 0.0));',
+      // A second, smaller-scale field decides where water actually escapes.
+      // Keeping direction and wetness at different scales avoids a global,
+      // uniformly blurred halo.
+      'let detailP = nuv * 8.5 + flowDrift.yx * 0.73 + vec2<f32>(timeOffset * 0.008, timeOffset * 0.005);',
+      'let detailI = floor(detailP); let detailF = fract(detailP); let detailU = detailF * detailF * (vec2<f32>(3.0) - 2.0 * detailF);',
+      'let detailA = fract(sin(dot(detailI, vec2<f32>(127.1, 311.7))) * 43758.5453);',
+      'let detailB = fract(sin(dot(detailI + vec2<f32>(1.0, 0.0), vec2<f32>(127.1, 311.7))) * 43758.5453);',
+      'let detailC = fract(sin(dot(detailI + vec2<f32>(0.0, 1.0), vec2<f32>(127.1, 311.7))) * 43758.5453);',
+      'let detailD = fract(sin(dot(detailI + vec2<f32>(1.0, 1.0), vec2<f32>(127.1, 311.7))) * 43758.5453);',
+      'let detailWet = mix(mix(detailA, detailB, detailU.x), mix(detailC, detailD, detailU.x), detailU.y);',
+      'let waterPulse = 0.82 + 0.18 * sin(organicTime * 0.61 + detailWet * 6.28318);',
+      'let wetBloom = smoothstep(0.43, 0.72, (detailWet * 0.62 + max(flowN1, flowN2) * 0.38) * waterPulse);',
+      // The already-composited paper/background colour is estimated from
+      // all four corners. Both RGB and alpha distance are used, so this also
+      // works when an Effect Layer receives a fully opaque scene.
+      'let texSize = vec2<f32>(params.tex_w, params.tex_h);',
+      'let contentMinUv = clamp((bbox_o + vec2<f32>(2.0)) / texSize, vec2<f32>(0.002), vec2<f32>(0.998));',
+      'let contentMaxUv = clamp((bbox_o + bbox_s - vec2<f32>(2.0)) / texSize, vec2<f32>(0.002), vec2<f32>(0.998));',
+      'let bg0 = textureSample(src_tex, tex_sampler, contentMinUv);',
+      'let bg1 = textureSample(src_tex, tex_sampler, vec2<f32>(contentMaxUv.x, contentMinUv.y));',
+      'let bg2 = textureSample(src_tex, tex_sampler, vec2<f32>(contentMinUv.x, contentMaxUv.y));',
+      'let bg3 = textureSample(src_tex, tex_sampler, contentMaxUv);',
+      // Averaging corners contaminated the paper colour whenever one corner
+      // touched the canvas border. Component-wise maximum reliably selects
+      // white paper while remaining unchanged for a uniformly dark ground.
+      'let bg = max(max(bg0, bg1), max(bg2, bg3));',
+      'let centerDelta = length(src.rgb - bg.rgb) * 0.577350269 + abs(src.a - bg.a);',
+      'let centerMask = smoothstep(0.025, 0.14, centerDelta);',
+      'let centerInside = centerMask > 0.5;',
+      // Probe the real layer image over a Vogel disk. A golden-angle spiral
+      // has no repeated rings or preferred axes, unlike a polar grid.
+      'var maskSum = centerMask;',
+      'var maskWeight = 1.0;',
+      'var pigmentSum = src.rgb * centerMask;',
+      'var pigmentSqSum = src.rgb * src.rgb * centerMask;',
+      'var opticalSum = -log(max(src.rgb, vec3<f32>(0.008))) * centerMask;',
+      'var pigmentWeight = centerMask;',
+      'let spiralRotation = (detailWet - 0.5) * 0.9 + organicTime * 0.07;',
+      // 384 taps favour final-image quality over the first uncached frame.
+      // Nemo's playback cache absorbs that higher cost after rendering, while
+      // the denser disk avoids sparse coverage along long edges and corners.
+      'for (var tap = 0; tap < 384; tap = tap + 1) {',
+      '  let sampleIndex = f32(tap) + 0.5;',
+      '  let rr = sqrt(sampleIndex / 384.0);',
+      '  let angle = sampleIndex * 2.39996323 + spiralRotation;',
+      '  let ray = vec2<f32>(cos(angle), sin(angle));',
+      '  let directionalFlow = dot(ray, flowDir);',
+      '  let irregularReach = clamp(0.74 + diffusion * (directionalFlow * 0.42 + wetBloom * 0.68), 0.34, 1.38);',
+      '  let mobileFlow = waterFlow * (0.78 + 0.22 * sin(organicTime * 0.43 + rr * 5.0));',
+      '  let probePx = ray * rr * radiusPx * irregularReach + mobileFlow * radiusPx * rr * diffusion * 0.48;',
+      '  let sampleUv = clamp(uv + probePx * texel, vec2<f32>(0.0), vec2<f32>(1.0));',
+      '  let s = textureSample(src_tex, tex_sampler, sampleUv);',
+      '  let sampleDelta = length(s.rgb - bg.rgb) * 0.577350269 + abs(s.a - bg.a);',
+      '  let sampleMask = smoothstep(0.025, 0.14, sampleDelta);',
+      // The Gaussian alone still has about 12% weight at rr == 1, then is
+      // truncated abruptly by the finite sampling disk. That non-zero rim
+      // reproduces the source silhouette at exactly radiusPx. A compact C1
+      // window brings both weight and slope smoothly to zero at the support
+      // boundary, so broad flat edges dissolve instead of ending as plates.
+      '  let supportFade = 1.0 - smoothstep(0.55, 1.0, rr);',
+      '  let rw = exp(-rr * rr * 1.35) * supportFade * supportFade;',
+      '  maskSum = maskSum + sampleMask * rw;',
+      '  maskWeight = maskWeight + rw;',
+      '  pigmentSum = pigmentSum + s.rgb * sampleMask * rw;',
+      '  pigmentSqSum = pigmentSqSum + s.rgb * s.rgb * sampleMask * rw;',
+      '  opticalSum = opticalSum - log(max(s.rgb, vec3<f32>(0.008))) * sampleMask * rw;',
+      '  pigmentWeight = pigmentWeight + sampleMask * rw;',
+      '}',
+      'let blurredMask = maskSum / max(maskWeight, 0.001);',
+      'let pigmentRgb = select(src.rgb, pigmentSum / max(pigmentWeight, 0.001), pigmentWeight > 0.001);',
+      'let pigmentMeanSq = pigmentSqSum / max(pigmentWeight, 0.001);',
+      'let pigmentVariance = length(max(pigmentMeanSq - pigmentRgb * pigmentRgb, vec3<f32>(0.0)));',
+      'let colourMeeting = smoothstep(0.008, 0.16, pigmentVariance) * diffusion;',
+      // Optical density approximates Beer-Lambert mixing of multiple wet
+      // pigments. Flat single-colour regions retain the cheaper RGB average.
+      'let opticalPigment = exp(-opticalSum / max(pigmentWeight, 0.001));',
+      'let mixedPigment = mix(pigmentRgb, opticalPigment, colourMeeting * 0.82);',
+      'let pigmentCoverage = clamp(pigmentWeight / max(maskWeight, 0.001) * 2.4, 0.0, 1.0);',
+      // A purely continuous distance proxy prevents visible diffusion
+      // terraces. The previous nearest-crossing term could only return one
+      // of 96 sample distances and exposed repeated silhouettes.
+      'var dist = (0.5 - blurredMask) * 0.46;',
+      // Wet blooms locally push the front beyond the geometric contour.
+      // blurredMask gates them to actual nearby artwork, never generated
+      // geometry or a full-canvas colour wash.
+      'let bloomGate = smoothstep(0.004, 0.22, blurredMask);',
+      'dist = dist - wetBloom * bloomGate * diffusion * 0.16;',
+      // Slowly evolving cauliflower/backrun fronts break the wet boundary
+      // into connected lobes rather than random static noise.
+      'let backrunWave = sin(detailWet * 9.0 + flowN1 * 5.0 - organicTime * 0.55);',
+      'dist = dist + backrunWave * bloomGate * diffusion * 0.026;',
+      // Original one-octave small noise (freq 20), used only to roughen the
+      // reconstructed boundary.
+      'let pS = nuv * 20.0 + vec2<f32>(timeOffset * 0.013, -timeOffset * 0.017);',
+      'let iS = floor(pS); let fS = fract(pS); let uS = fS * fS * (vec2<f32>(3.0) - 2.0 * fS);',
+      'let sA = fract(sin(dot(iS, vec2<f32>(127.1, 311.7))) * 43758.5453);',
+      'let sB = fract(sin(dot(iS + vec2<f32>(1.0, 0.0), vec2<f32>(127.1, 311.7))) * 43758.5453);',
+      'let sC = fract(sin(dot(iS + vec2<f32>(0.0, 1.0), vec2<f32>(127.1, 311.7))) * 43758.5453);',
+      'let sD = fract(sin(dot(iS + vec2<f32>(1.0, 1.0), vec2<f32>(127.1, 311.7))) * 43758.5453);',
+      'let smallNoise = mix(mix(sA, sB, uS.x), mix(sC, sD, uS.x), uS.y);',
+      'dist = dist + 0.01 * (smallNoise * 2.0 - 1.0);',
+      // Original one-octave large deformation.
+      'let largeFreq = 1.0 + sin(timeOffset) * 0.5;',
+      'let pL = nuv * largeFreq + vec2<f32>(timeOffset * 0.011, timeOffset * 0.007);',
+      'let iL = floor(pL); let fL = fract(pL); let uL = fL * fL * (vec2<f32>(3.0) - 2.0 * fL);',
+      'let lA = fract(sin(dot(iL, vec2<f32>(127.1, 311.7))) * 43758.5453);',
+      'let lB = fract(sin(dot(iL + vec2<f32>(1.0, 0.0), vec2<f32>(127.1, 311.7))) * 43758.5453);',
+      'let lC = fract(sin(dot(iL + vec2<f32>(0.0, 1.0), vec2<f32>(127.1, 311.7))) * 43758.5453);',
+      'let lD = fract(sin(dot(iL + vec2<f32>(1.0, 1.0), vec2<f32>(127.1, 311.7))) * 43758.5453);',
+      'let largeNoise = mix(mix(lA, lB, uL.x), mix(lC, lD, uL.x), uL.y);',
+      'dist = dist - mix(0.07, 0.18, diffusion) * bloomGate * smoothstep(0.35, 1.0, largeNoise);',
+      // Original wetness field and dry/wet edge contrast. The Wet diffusion
+      // control scales the physical reach while retaining the source curve.
+      'let wetFreq = 2.0 + sin(timeOffset);',
+      'let pW = nuv * wetFreq + vec2<f32>(-timeOffset * 0.009, timeOffset * 0.015);',
+      'let iW = floor(pW); let fW = fract(pW); let uW = fW * fW * (vec2<f32>(3.0) - 2.0 * fW);',
+      'let wA = fract(sin(dot(iW, vec2<f32>(127.1, 311.7))) * 43758.5453);',
+      'let wB = fract(sin(dot(iW + vec2<f32>(1.0, 0.0), vec2<f32>(127.1, 311.7))) * 43758.5453);',
+      'let wC = fract(sin(dot(iW + vec2<f32>(0.0, 1.0), vec2<f32>(127.1, 311.7))) * 43758.5453);',
+      'let wD = fract(sin(dot(iW + vec2<f32>(1.0, 1.0), vec2<f32>(127.1, 311.7))) * 43758.5453);',
+      'let wetNoise = mix(mix(wA, wB, uW.x), mix(wC, wD, uW.x), uW.y);',
+      'let wetNoiseStrength = (0.15 + sin(timeOffset) * 0.05) * mix(0.45, 1.55, diffusion);',
+      'let wetness = clamp(smoothstep(0.55, 0.55 + wetNoiseStrength, wetNoise), 0.0, 1.0);',
+      'let aaDelta = 0.006;',
+      'let edgeDry = 0.02;',
+      'let edgeWet = 0.24 * mix(0.4, 1.4, diffusion);',
+      'let edge1 = mix(edgeDry, edgeWet, wetness) + aaDelta;',
+      'var value = 0.0; var valueSlim = 1.0;',
+      'if (dist < 0.0) { value = dist; valueSlim = 1.0; } else { value = smoothstep(edgeDry, edge1, dist); valueSlim = pow(clamp(1.0 - smoothstep(0.0, edge1, dist), 0.0, 1.0), 0.15); }',
+      'value = value + 0.28 * valueSlim;',
+      // Original post-noise breakup (freq 15).
+      'let pP = nuv * 15.0 + vec2<f32>(timeOffset * 0.019, -timeOffset * 0.005);',
+      'let iP = floor(pP); let fP = fract(pP); let uP = fP * fP * (vec2<f32>(3.0) - 2.0 * fP);',
+      'let pA = fract(sin(dot(iP, vec2<f32>(127.1, 311.7))) * 43758.5453);',
+      'let pB = fract(sin(dot(iP + vec2<f32>(1.0, 0.0), vec2<f32>(127.1, 311.7))) * 43758.5453);',
+      'let pC = fract(sin(dot(iP + vec2<f32>(0.0, 1.0), vec2<f32>(127.1, 311.7))) * 43758.5453);',
+      'let pD = fract(sin(dot(iP + vec2<f32>(1.0, 1.0), vec2<f32>(127.1, 311.7))) * 43758.5453);',
+      'let postNoise = mix(mix(pA, pB, uP.x), mix(pC, pD, uP.x), uP.y);',
+      'value = value + value * (1.0 - wetNoise) * smoothstep(0.0, max(postNoise, 0.001), value);',
+      // Wyatt's original paper() function, including its 3x3 fibre hash.
+      // Paper is stationary while water and mobile pigment move over it.
+      'let paperCoord = local_uv * vec2<f32>(1024.0 * localAspect, 1024.0);',
+      'var paperV = 0.005 * (sin(0.6 * paperCoord.x + 0.1 * paperCoord.y) + sin(0.7 * paperCoord.y - 0.1 * paperCoord.x));',
+      'for (var yy = -1; yy <= 1; yy = yy + 1) {',
+      '  for (var xx = -1; xx <= 1; xx = xx + 1) {',
+      '    let hp = paperCoord + vec2<f32>(f32(xx), f32(yy));',
+      '    var ph = fract(vec3<f32>(hp.x, hp.y, hp.x) * 0.1031);',
+      '    ph = ph + vec3<f32>(dot(ph, ph.yzx + vec3<f32>(33.33)));',
+      '    paperV = paperV + 0.01875 * fract((ph.x + ph.y) * ph.z);',
+      '  }',
+      '}',
+      'let paperEff = paperV * clamp(params.p4, 0.0, 1.0);',
+      // Keep the actual colours of the layers. A small amount of the
+      // original cosine palette supplies the subtle chromatic variation,
+      // instead of replacing the artwork with a generated palette.
+      'let gradient = 0.5 * (nuv.x + nuv.y);',
+      'let palT = gradient + timeOffset * 0.1;',
+      'let paletteCol = vec3<f32>(0.8, 0.5, 0.4) + vec3<f32>(0.2, 0.4, 0.2) * cos(6.28318 * (vec3<f32>(2.0, 1.0, 1.0) * palT + vec3<f32>(0.0, 0.25, 0.25)));',
+      'let paletteAmount = (0.025 + diffusion * 0.055) * pigmentCoverage;',
+      'let distCol = mix(mixedPigment, paletteCol, paletteAmount);',
+      'let colors = mix(distCol, vec3<f32>(1.0), value - paperEff * 2.0);',
+      'var washed = clamp(colors, vec3<f32>(0.0), vec3<f32>(1.0)) - paperEff * 0.3;',
+      // Diffusion outside the source is not enough on its own: centerMask is
+      // still fully opaque immediately inside a vector edge and can leave
+      // one side visibly cut while the opposite wet lobe is soft. Rebuild
+      // pigment coverage from the same isotropic blurred field on both sides
+      // of the contour. The document background, rather than hard-coded
+      // white, is revealed progressively through the thinning wash.
+      'let bodyCoverageRaw = smoothstep(0.0, mix(0.70, 0.84, diffusion), blurredMask);',
+      'let bodyCoverage = pow(bodyCoverageRaw, 1.35);',
+      'washed = mix(bg.rgb, washed, bodyCoverage);',
+      // A dilute chromatic halo precedes the denser pigment body. It uses
+      // only continuous coverage ramps, so it can glow beyond the artwork
+      // without revealing the finite sampling support as another plate.
+      'let haloCoverage = smoothstep(0.0, 0.13, blurredMask) * (1.0 - bodyCoverage);',
+      'let haloStrength = haloCoverage * mix(0.12, 0.34, diffusion) * mix(0.55, 1.0, wetBloom);',
+      'let haloColor = mix(bg.rgb, mixedPigment, 0.52);',
+      'washed = mix(washed, haloColor, haloStrength);',
+      // Limit edge pooling to a translucent pigment rim. The previous
+      // extrapolation could collapse anti-aliased edge pixels toward black.
+      'let edgeProximity = 1.0 - smoothstep(0.035, 0.19, abs(dist));',
+      'let safePigment = mix(washed, max(washed, mixedPigment * 0.58), edgeProximity * pigmentCoverage);',
+      'washed = mix(safePigment, mixedPigment * 0.9, edgeProximity * colourMeeting * 0.16);',
+      // Pigment deposits at a moving wet/dry frontier. This produces subtle
+      // backruns without the hard permanent outline of the previous pass.
+      'let drying = smoothstep(0.48, 0.82, 0.5 + 0.5 * sin(detailWet * 7.0 + flowN2 * 3.0 - organicTime * 0.31));',
+      'let depositRim = edgeProximity * wetBloom * drying * pigmentCoverage;',
+      'washed = mix(washed, mixedPigment * 0.82, depositRim * 0.14);',
+      // Thin capillary deposit at the reconstructed source boundary. The two
+      // opposing smoothsteps form a narrow soft band; paper/post noise breaks
+      // its continuity like the fine darker rim in the reference wash.
+      'let fineRim = smoothstep(0.28, 0.46, blurredMask) * (1.0 - smoothstep(0.46, 0.66, blurredMask));',
+      'let rimBreakup = mix(0.58, 1.0, postNoise) * mix(0.72, 1.0, wetness);',
+      'let fineRimStrength = fineRim * rimBreakup * mix(0.09, 0.18, diffusion);',
+      'washed = mix(washed, mixedPigment * 0.74, fineRimStrength);',
+      // Apply chromatic diffusion only to real pigment and to connected wet
+      // lobes. Pixels farther away remain exactly the incoming layer image.
+      // A finite diffusion kernel necessarily ends at radiusPx. If the
+      // smallest non-zero coverage is promoted too quickly, its last Vogel
+      // samples expose that limit as a crisp protruding plate. Two continuous
+      // coverage ramps keep the useful wet body while making the final wash
+      // asymptotically disappear into the paper.
+      'let outerFeather = smoothstep(0.0, 0.085, blurredMask);',
+      'let wetTail = outerFeather * smoothstep(0.0, 0.18, blurredMask) * mix(0.12, 1.0, wetBloom);',
+      // Coverage, not wetBloom, decides where edge reconstruction is active.
+      // This keeps dry sides and corners as soft as the visibly wet sides;
+      // wetBloom remains free to shape only the organic protrusions.
+      'let localInfluence = clamp(max(centerMask, max(bodyCoverage, max(wetTail, haloCoverage))), 0.0, 1.0);',
+      'let blend = clamp(params.p3, 0.0, 1.0) * clamp(src.a * 3.0, 0.0, 1.0) * localInfluence;',
+      'return vec4<f32>(mix(src.rgb, clamp(washed, vec3<f32>(0.0), vec3<f32>(1.0)), blend), src.a);',
+    ]),
     fx('shader_grid', 'Grid', 'Generate', [
       param('p1', 'Size', 4, 160, 1, 'px', 40, true),
       param('p2', 'Width', 0.5, 12, 0.5, 'px', 1, true),
@@ -189,6 +481,87 @@
       'let c = vec2<f32>(params.p2, params.p3); let d = distance(uv, c); let core = 1.0 / (1.0 + d * d * 180.0);',
       'let ray = pow(abs(sin((uv.x - c.x) * 80.0) * sin((uv.y - c.y) * 80.0)), 18.0);',
       'return vec4<f32>(src.rgb + vec3<f32>(1.0, 0.78, 0.42) * (core + ray * 0.25) * params.p1, src.a);',
+    ]),
+    // Anamorphic-lens streak look (2026-08, "possible d'avoir un flare
+    // comme ça" — reference: a horizontal light streak off a bright source
+    // plus one or two chromatic ghost rings strung along the axis toward
+    // frame center), distinct from the plain sun-flare above. Aspect-
+    // corrected (`aspect` multiplies x before any distance/length call) so
+    // the streak stays a clean horizontal line and the rings stay circular
+    // on non-square canvases instead of squashing to the canvas's own w/h
+    // ratio. Ghost ring positions/radii and the warm/cool tint split are
+    // fixed constants tuned to the reference look, not exposed as params —
+    // matches this library's existing "opinionated look, few knobs"
+    // convention (e.g. Ground Shadow, Contour Brut above) rather than a
+    // fully general N-ring flare system.
+    fx('shader_anamorphic_flare', 'Anamorphic Flare', 'Generate', [
+      param('p1', 'Brightness', 0, 3, 0.05, '', 1),
+      param('p2', 'X', 0, 1, 0.01, '', 0.75),
+      param('p3', 'Y', 0, 1, 0.01, '', 0.35),
+      param('p4', 'Streak Length', 0.02, 1, 0.01, '', 0.35),
+    ], [
+      'let aspect = params.tex_w / max(params.tex_h, 1.0);',
+      'let c = vec2<f32>(params.p2, params.p3);',
+      'let d = uv - c; let dp = vec2<f32>(d.x * aspect, d.y);',
+      'let core = 1.0 / (1.0 + dot(dp, dp) * 900.0);',
+      'let len = max(params.p4, 0.02);',
+      'let streak = exp(-dp.y * dp.y * 3000.0) * exp(-abs(d.x) / len);',
+      'let toC = vec2<f32>(0.5, 0.5) - c;',
+      'let g1 = c + toC * 0.4; let g1p = vec2<f32>((uv.x - g1.x) * aspect, uv.y - g1.y); let r1 = length(g1p);',
+      'let ring1 = smoothstep(0.012, 0.0, abs(r1 - 0.045));',
+      'let g2 = c + toC * 0.75; let g2p = vec2<f32>((uv.x - g2.x) * aspect, uv.y - g2.y); let r2 = length(g2p);',
+      'let ring2 = smoothstep(0.02, 0.0, abs(r2 - 0.09));',
+      'let warm = vec3<f32>(1.0, 0.82, 0.55); let cool = vec3<f32>(0.55, 0.75, 1.0);',
+      'let flareColor = warm * (core + streak * 0.6) + cool * ring1 * 0.8 + warm * ring2 * 0.5;',
+      'return vec4<f32>(src.rgb + flareColor * params.p1, src.a);',
+    ]),
+    // Port of "Musk's lens flare" (icecool's mod of Shadertoy 4sX3Rs),
+    // requested 2026-08-22 as a richer alternative to the flare above. The
+    // original samples iChannel0 (a noise texture) offset by iTime for its
+    // ring wobble/shimmer — neither exists in this custom-effect sandbox
+    // (no texture channels, no clock uniform), so both are replaced: the
+    // noise() calls become inline hash functions (same fract(sin(dot(...)))
+    // trick as shader_fractal_noise above), and iTime becomes the p4
+    // 'Evolution' param — same pattern as Fractal Noise/Turbulent Displace,
+    // i.e. a value the user animates by hand via keyframes rather than a
+    // free-running clock.
+    fx('shader_musk_flare', 'Cinematic Lens Flare', 'Generate', [
+      param('p1', 'Brightness', 0, 3, 0.05, '', 1),
+      param('p2', 'X', 0, 1, 0.01, '', 0.5),
+      param('p3', 'Y', 0, 1, 0.01, '', 0.5),
+      param('p4', 'Evolution', -3600, 3600, 1, 'deg', 0),
+    ], [
+      'let aspect = params.tex_w / max(params.tex_h, 1.0);',
+      'let evo = params.p4 * 0.0174532925;',
+      'let uvC = uv - vec2<f32>(0.5); let uvA = vec2<f32>(uvC.x * aspect, uvC.y);',
+      'let posC = vec2<f32>(params.p2, params.p3) - vec2<f32>(0.5); let posA = vec2<f32>(posC.x * aspect, posC.y);',
+      'let main = uvA - posA; let uvd = uvA * length(uvA);',
+      'let ang = atan2(main.y, main.x);',
+      'var dist = length(main); dist = pow(max(dist, 0.0001), 0.1);',
+      'let nP = vec2<f32>((ang - evo * 6.0) * 16.0, dist * 32.0);',
+      'let n = fract(sin(dot(nP, vec2<f32>(127.1, 311.7))) * 43758.5453);',
+      'let n2 = fract(sin((abs(ang) + n * 0.5) * 127.1) * 43758.5453);',
+      'var f0 = 1.0 / (length(uvA - posA) * 16.0 + 1.0);',
+      'f0 = f0 + f0 * (sin((ang + evo * 3.0 + n2 * 2.0) * 12.0) * 0.1 + dist * 0.1 + 0.8);',
+      'let f2 = max(1.0 / (1.0 + 32.0 * pow(length(uvd + 0.8 * posA), 2.0)), 0.0) * 0.25;',
+      'let f22 = max(1.0 / (1.0 + 32.0 * pow(length(uvd + 0.85 * posA), 2.0)), 0.0) * 0.23;',
+      'let f23 = max(1.0 / (1.0 + 32.0 * pow(length(uvd + 0.9 * posA), 2.0)), 0.0) * 0.21;',
+      'var uvx = mix(uvA, uvd, -0.5);',
+      'let f4 = max(0.01 - pow(length(uvx + 0.4 * posA), 2.4), 0.0) * 6.0;',
+      'let f42 = max(0.01 - pow(length(uvx + 0.45 * posA), 2.4), 0.0) * 5.0;',
+      'let f43 = max(0.01 - pow(length(uvx + 0.5 * posA), 2.4), 0.0) * 3.0;',
+      'uvx = mix(uvA, uvd, -0.4);',
+      'let f5 = max(0.01 - pow(length(uvx + 0.2 * posA), 5.5), 0.0) * 2.0;',
+      'let f52 = max(0.01 - pow(length(uvx + 0.4 * posA), 5.5), 0.0) * 2.0;',
+      'let f53 = max(0.01 - pow(length(uvx + 0.6 * posA), 5.5), 0.0) * 2.0;',
+      'uvx = mix(uvA, uvd, -0.5);',
+      'let f6 = max(0.01 - pow(length(uvx - 0.3 * posA), 1.6), 0.0) * 6.0;',
+      'let f62 = max(0.01 - pow(length(uvx - 0.325 * posA), 1.6), 0.0) * 3.0;',
+      'let f63 = max(0.01 - pow(length(uvx - 0.35 * posA), 1.6), 0.0) * 5.0;',
+      'var c = vec3<f32>(f2 + f4 + f5 + f6, f22 + f42 + f52 + f62, f23 + f43 + f53 + f63);',
+      'c = c + vec3<f32>(f0); c = c * vec3<f32>(1.4, 1.2, 1.0);',
+      'let w = c.x + c.y + c.z; c = mix(c, vec3<f32>(w) * 0.5, w * 0.1);',
+      'return vec4<f32>(src.rgb + c * params.p1, src.a);',
     ]),
     // 2026-07-30: 'Distort' effects below were rewritten to operate in
     // local_uv (0..1 across THIS shape's own on-screen bbox, see

@@ -222,12 +222,62 @@
     if (window._nvSelectedLayer != null) { window._nvSelectedLayer = null; }
   }
   function syncMotionLayerSelection(li, additive) {
-    if (state.appMode !== 'motion' || typeof _layerSel === 'undefined') return;
+    if (typeof _layerSel === 'undefined') return;
+    // Empty-canvas deselection is shared by Animation 2D and Motion now
+    // that both modes can expose a layer-level multi-selection box.
     if (li == null) { if (!additive) _layerSel = []; return; }
+    if (state.appMode !== 'motion') return;
     if (additive) {
       if (_layerSel.indexOf(li) < 0) _layerSel.push(li);
     } else _layerSel = [li];
   }
+  // Animation 2D counterpart of Motion's layer-selection box (feedback
+  // #54). Keep this separate from selectedPaths: that array and
+  // state.selectedStrokeIndices intentionally describe ONE active layer at
+  // dozens of call sites. A dedicated layer-level selection preserves that
+  // invariant while still making Cmd/Shift-selected timeline rows one
+  // transformable canvas target.
+  function multiLayerSelectionBox() {
+    if (state.appMode === 'motion' || state.tool !== 'select' || typeof _layerSel === 'undefined' || _layerSel.length < 2) return null;
+    var targets = [], left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
+    _layerSel.forEach(function (li) {
+      var ld = state.layers[li], layer = userLayers[li];
+      if (!ld || !layer || ld.locked || !ld.visible || ld.symbolId || ld.nativeVideo || ld.isNullLayer || ld.isEffectLayer || ld.isGuideLayer) return;
+      var paths = layer.children.filter(function (c) { return (c instanceof Path || c instanceof Raster) && isSelectablePathChild(c); });
+      if (!paths.length) return;
+      var b = layer.bounds;
+      if (!b || !isFinite(b.width) || !isFinite(b.height)) return;
+      left = Math.min(left, b.left); top = Math.min(top, b.top); right = Math.max(right, b.right); bottom = Math.max(bottom, b.bottom);
+      targets.push({ li: li, layer: layer, paths: paths });
+    });
+    if (targets.length < 2 || left === Infinity) return null;
+    var bounds = new Rectangle(new Point(left, top), new Point(right, bottom));
+    var zs = 1 / Math.max(0.0001, view.zoom);
+    return { targets: targets, bounds: bounds, pivot: bounds.center, ringRadius: Math.min(36 * zs, Math.max(bounds.width, bounds.height) * 0.3) };
+  }
+  function multiLayerHit(box, pt) {
+    if (!box) return null;
+    var zs = 1 / Math.max(0.0001, view.zoom), b = box.bounds;
+    if (Math.abs(pt.getDistance(box.pivot) - box.ringRadius) < 7 * zs) return { type: 'rotate' };
+    var corners = { nw: b.topLeft, ne: b.topRight, se: b.bottomRight, sw: b.bottomLeft };
+    var hit = null;
+    Object.keys(corners).forEach(function (k) { if (!hit && pt.getDistance(corners[k]) < 9 * zs) hit = { type: 'scale', dir: k, point: corners[k] }; });
+    if (hit) return hit;
+    return b.contains(pt) ? { type: 'move' } : null;
+  }
+  function forEachMultiPath(drag, fn) {
+    drag.targets.forEach(function (target) { target.paths.forEach(function (p) { if (p && !p.removed) fn(p, target); }); });
+  }
+  function multiTranslatePath(p, delta) {
+    p.translate(delta);
+    if (window.syncParamShapeBoxOnTranslate) window.syncParamShapeBoxOnTranslate(p, delta.x, delta.y);
+    transformFillGradient(p, function (gp) { return gp.add(delta); });
+    if (p.data && p.data.isVectorBrush && p.data.centerSegments) p.data.centerSegments.forEach(function (s) { s.point = [s.point[0] + delta.x, s.point[1] + delta.y]; });
+    if (p.data && p.data.linkedFill && !p.data.linkedFill.removed) p.data.linkedFill.translate(delta);
+    if (p.data && p.data.brushCompanions) p.data.brushCompanions.forEach(function (c) { if (!c.removed) c.translate(delta); });
+    if (p.data && p.data.xformAnchorCustom) p.data.xformAnchorCustom = [p.data.xformAnchorCustom[0] + delta.x, p.data.xformAnchorCustom[1] + delta.y];
+  }
+  var _multiLayerDrag = null;
   var xformDir = null, xformAnchor = null, xformOrigHandlePos = null, xformLastSx = 1, xformLastSy = 1;
   var xformMap = null; // geometry<->rendered-world mapper when the active layer has a Motion transform
   // Ctrl+drag corner = free-transform DISTORT pins (2026-07, "avec l'outil
@@ -578,6 +628,33 @@
     var pt = new Point(w[0], w[1]);
     lastPt = pt;
     window.SMEngineBridge.suspend();
+
+    var mlBox = multiLayerSelectionBox();
+    var mlHit = multiLayerHit(mlBox, pt);
+    if (mlBox && mlHit) {
+      // Materialize held frames for every participating layer before taking
+      // object references; _insertKeyframeCore/loadFrame rebuilds all Paper
+      // items and would otherwise leave the snapshot stale.
+      saveAllLayerFrames(); pushUndoLayers(true);
+      var promoted = false;
+      mlBox.targets.forEach(function (target) {
+        var f = state.layers[target.li].frames[state.currentFrame];
+        if (f && !f.isKeyframe && !f.isInterpolated) { _insertKeyframeCore(target.li, state.currentFrame); promoted = true; }
+      });
+      if (promoted) loadFrame(state.currentFrame);
+      mlBox = multiLayerSelectionBox();
+      if (!mlBox) { window.SMEngineBridge.resume(); return; }
+      mode = 'layer-multi-' + mlHit.type;
+      _multiLayerDrag = { targets: mlBox.targets, pivot: mlBox.pivot, start: pt.clone(), last: pt.clone(), lastSx: 1, lastSy: 1, lastAngle: 0 };
+      if (mlHit.type === 'scale') {
+        _multiLayerDrag.dir = mlHit.dir;
+        _multiLayerDrag.orig = mlHit.point.subtract(mlBox.pivot);
+      } else if (mlHit.type === 'rotate') {
+        _multiLayerDrag.startAngle = Math.atan2(pt.y - mlBox.pivot.y, pt.x - mlBox.pivot.x) * 180 / Math.PI;
+      }
+      window.SMEngineBridge.renderNow();
+      return;
+    }
 
     var pshp0 = paramShapeSelectionSingle();
     if (pshp0) {
@@ -1019,6 +1096,7 @@
       state.selectedStrokeIndices = selectedPaths.map(getSI).filter(function (i2) { return i2 >= 0; });
       mode = selectedPaths.length ? 'move' : null;
       moveStarted = false;
+      _multiLayerDrag = null;
     } else {
       if (!e.shiftKey) clearSel();
       syncMotionLayerSelection(null, e.shiftKey);
@@ -1137,6 +1215,50 @@
     e.preventDefault();
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
     var pt = new Point(w[0], w[1]);
+
+    if (_multiLayerDrag && mode.indexOf('layer-multi-') === 0) {
+      if (mode === 'layer-multi-move') {
+        var md = pt.subtract(_multiLayerDrag.last);
+        forEachMultiPath(_multiLayerDrag, function (p) { multiTranslatePath(p, md); });
+        _multiLayerDrag.last = pt.clone();
+      } else if (mode === 'layer-multi-scale') {
+        var o = _multiLayerDrag.orig;
+        var cur = pt.subtract(_multiLayerDrag.pivot);
+        var sx = Math.abs(o.x) > 1e-6 ? cur.x / o.x : 1;
+        var sy = Math.abs(o.y) > 1e-6 ? cur.y / o.y : 1;
+        if (e.shiftKey) {
+          var ratio = o.length > 1e-6 ? cur.length / o.length : 1;
+          sx = ratio * (sx < 0 ? -1 : 1); sy = ratio * (sy < 0 ? -1 : 1);
+        }
+        if (Math.abs(sx) < 0.05) sx = sx < 0 ? -0.05 : 0.05;
+        if (Math.abs(sy) < 0.05) sy = sy < 0 ? -0.05 : 0.05;
+        var stepX = sx / _multiLayerDrag.lastSx, stepY = sy / _multiLayerDrag.lastSy, pivot = _multiLayerDrag.pivot;
+        forEachMultiPath(_multiLayerDrag, function (p) {
+          p.scale(stepX, stepY, pivot);
+          if (window.syncParamShapeBoxOnScale) window.syncParamShapeBoxOnScale(p, stepX, stepY, pivot);
+          transformFillGradient(p, function (gp) { return new Point(pivot.x + (gp.x - pivot.x) * stepX, pivot.y + (gp.y - pivot.y) * stepY); });
+          if (p.data && p.data.isVectorBrush && p.data.centerSegments) { scaleCenterSegments(p.data.centerSegments, stepX, stepY, pivot.x, pivot.y); rebuildVectorBrushOutline(p); }
+          if (p.data && p.data.brushCompanions) p.data.brushCompanions.forEach(function (c) { if (!c.removed) c.scale(stepX, stepY, pivot); });
+        });
+        _multiLayerDrag.lastSx = sx; _multiLayerDrag.lastSy = sy;
+      } else if (mode === 'layer-multi-rotate') {
+        var ang = Math.atan2(pt.y - _multiLayerDrag.pivot.y, pt.x - _multiLayerDrag.pivot.x) * 180 / Math.PI;
+        var total = ang - _multiLayerDrag.startAngle;
+        if (e.shiftKey) total = Math.round(total / 15) * 15;
+        var step = total - _multiLayerDrag.lastAngle, rp = _multiLayerDrag.pivot;
+        forEachMultiPath(_multiLayerDrag, function (p) {
+          p.rotate(step, rp);
+          transformFillGradient(p, function (gp) { return gp.rotate(step, rp); });
+          if (p.data && p.data.isVectorBrush && p.data.centerSegments) { rotateCenterSegments(p.data.centerSegments, step, rp.x, rp.y); rebuildVectorBrushOutline(p); }
+          if (p.data && p.data.brushCompanions) p.data.brushCompanions.forEach(function (c) { if (!c.removed) c.rotate(step, rp); });
+          if (p.data) p.data.boxAngle = (((p.data.boxAngle || 0) + step) % 360);
+        });
+        _multiLayerDrag.lastAngle = total;
+      }
+      lastPt = pt;
+      window.SMEngineBridge.renderNow();
+      return;
+    }
 
     if (mode === 'xform-anchor-drag') {
       // Live-follows the pointer — Shift held snaps to the nearest of the
@@ -1481,6 +1603,17 @@
     if (!mode) return;
     e.stopImmediatePropagation();
     e.preventDefault();
+    if (_multiLayerDrag && mode.indexOf('layer-multi-') === 0) {
+      forEachMultiPath(_multiLayerDrag, function (p, target) {
+        forkIfForeignOwner(p); fsUnlinkFillRegen(p); fillRegenerateLinked(target.layer, p);
+        if (window.SMBitmapBrush && p.data && p.data.bitmapBrushSpec) SMBitmapBrush.regenerate(p, target.layer);
+      });
+      saveAllLayerFrames();
+      _multiLayerDrag = null; mode = null;
+      renderOS(); renderArcs(); updateUI();
+      window.SMEngineBridge.resume(); window.SMEngineBridge.renderNow();
+      return;
+    }
     if (mode === 'nv-drag' || mode === 'nv-scale' || mode === 'nv-rotate') {
       mode = null; nvIdx = -1; nvStartPt = null; nvPivot = null;
       // One panel/timeline refresh at gesture end (not per tick — the
@@ -2078,6 +2211,7 @@
     getDistortState: function () {
       return mode === 'xform-distort' ? { dir: distortDir, quad: distortDstQuad } : null;
     },
+    getMultiLayerBox: multiLayerSelectionBox,
     // Switching tools mid-marquee-drag (2026-07-29, QA-confirmed) used to
     // leave a stuck ghost selection rectangle: onUp's own finalization
     // (removing the rect, folding it into selectedPaths) only ever runs on

@@ -182,7 +182,7 @@
   function transformRowPlan(holder) {
     var rows = [], dupProps = [];
     propsFor(holder).forEach(function (prop) {
-      if (isPropFiltered(prop) || (_hideUnanimated && !propHasContent(holder, prop))) return;
+      if (isPropFiltered(prop) || (_hideUnanimated && !propHasContent(holder, prop)) || !motionPropMatchesView(holder, prop)) return;
       if (PROPS_DUP_EXTRA.indexOf(prop) >= 0) { dupProps.push(prop); return; }
       rows.push({ row: 'prop', prop: prop });
     });
@@ -285,8 +285,46 @@
   // untouched default-value property gets hidden). Global toggle (not
   // per-layer/per-group) — one button affects everything.
   var _hideUnanimated = false;
+  // Motion timeline workspace filters. They are UI-only: project data stays
+  // untouched, while the column/filter preferences follow the workstation.
+  var _motionSearch = '';
+  var _motionFilterMode = 'all';
+  var _motionColumnPreset = 'animation';
+  var _motionSnapEnabled = true;
+  try {
+    _motionFilterMode = localStorage.getItem('nemo-motion-filter') || 'all';
+    _motionColumnPreset = localStorage.getItem('nemo-motion-columns') || 'animation';
+    _motionSnapEnabled = localStorage.getItem('nemo-motion-snap') !== '0';
+  } catch (e) {}
   function propHasContent(holder, prop) { return isAnimated(holder, prop) || !!(holder.motionStatic && holder.motionStatic[prop]); }
   function isPropFiltered(prop) { return !!_propFilter && _propFilter.indexOf(prop) < 0; }
+  function propHasExpression(holder, prop) {
+    return !!(holder && holder.expressions && holder.expressions[prop] && holder.expressions[prop].enabled);
+  }
+  function propHasExpressionError(holder, prop) {
+    return !!(propHasExpression(holder, prop) && holder.expressions[prop].lastError);
+  }
+  function motionPropMatchesView(holder, prop) {
+    if (_motionSearch && String(PROP_LABEL[prop] || prop).toLowerCase().indexOf(_motionSearch) < 0 &&
+        String((holder && holder.name) || '').toLowerCase().indexOf(_motionSearch) < 0) return false;
+    if (_motionFilterMode === 'animated') return isAnimated(holder, prop);
+    if (_motionFilterMode === 'modified') return propHasContent(holder, prop);
+    if (_motionFilterMode === 'expressions') return propHasExpression(holder, prop);
+    if (_motionFilterMode === 'errors') return propHasExpressionError(holder, prop);
+    return true;
+  }
+  function layerMatchesMotionView(ld) {
+    if (!ld) return false;
+    var nameMatch = !_motionSearch || String(ld.name || '').toLowerCase().indexOf(_motionSearch) >= 0;
+    if (_motionFilterMode === 'effects') {
+      if (!((ld.effects && ld.effects.length) || ld.effectsFrom || ld.isEffectLayer)) return false;
+      return nameMatch;
+    }
+    var props = propsFor(ld);
+    var propMatch = props.some(function (prop) { return motionPropMatchesView(ld, prop); });
+    return nameMatch ? (_motionFilterMode === 'all' || propMatch) : propMatch;
+  }
+  function motionViewIsNarrowed() { return !!_motionSearch || _motionFilterMode !== 'all'; }
   // The "TRANSFORM" header earns its row when it groups a list you're
   // scanning. Once a shortcut has narrowed the view to one property it groups
   // nothing — you asked for Position, so show Position (2026-07-27: "quand on
@@ -350,7 +388,9 @@
   // track grid) must agree on — see CLAUDE.md §3 on why a duplicated
   // predicate would be a bug waiting to happen.
   function isLayerExpanded(li) {
-    return window._motionExpandedLayer === li || (window._motionRevealedLayers && window._motionRevealedLayers.indexOf(li) >= 0);
+    return window._motionExpandedLayer === li ||
+      (window._motionRevealedLayers && window._motionRevealedLayers.indexOf(li) >= 0) ||
+      (motionViewIsNarrowed() && layerMatchesMotionView(state.layers[li]));
   }
   function handleRevealAnimatedShortcut() {
     if (state.appMode !== 'motion') return false;
@@ -465,6 +505,23 @@
     var i = track.keys.indexOf(key);
     return i > 0 ? track.keys[i - 1] : null;
   }
+  function curveMatchesPreset(points, preset) {
+    if (!points || points.length !== preset.length) return false;
+    for (var i = 0; i < preset.length; i++) {
+      if (Math.abs((points[i].x || 0) - preset[i].x) > 1e-6 || Math.abs((points[i].y || 0) - preset[i].y) > 1e-6) return false;
+      if (typeof points[i].tx === 'number' || typeof points[i].ty === 'number') return false;
+    }
+    return true;
+  }
+  function keyInterpolationKind(key) {
+    if (key && key.hold) return 'hold';
+    if (key && curveMatchesPreset(key.curvePoints || DEFAULT_CURVE, CURVE_LINEAR)) return 'linear';
+    return 'smooth';
+  }
+  function keyInterpolationLabel(key) {
+    var kind = keyInterpolationKind(key);
+    return kind === 'hold' ? 'Bloc / maintien' : (kind === 'linear' ? 'Linéaire' : 'Lissée');
+  }
   function applyCurveToSelection(kind) {
     var sel = _motionKeySel;
     if (!sel || !sel.length) return 0;
@@ -474,6 +531,10 @@
       var track = trackFor(s.holder, s.prop);
       if (!track) return;
       if (kind === 'hold') { s.key.hold = !s.key.hold; n++; return; }
+      // Switching away from Hold must genuinely restore interpolation; the
+      // old code changed curvePoints but left hold=true, so the icon and the
+      // evaluated animation remained blocked despite choosing Linear/Ease.
+      s.key.hold = false;
       var outPts = kind === 'linear' ? CURVE_LINEAR : (kind === 'easeIn' ? CURVE_EASE_IN : (kind === 'easeOut' ? CURVE_EASE_OUT : CURVE_EASE));
       // easeIn shapes the segment ARRIVING at this key, so it belongs on the
       // previous key; the others shape the outgoing segment.
@@ -514,7 +575,7 @@
       g.keys.forEach(function (k) {
         var nf = k.frame + delta;
         if (nf < 0 || nf > state.totalFrames - 1) ok = false;
-        var occupant = g.track.keys.find(function (o) { return o.frame === nf; });
+        var occupant = keyAt(g.track, nf);
         if (occupant && g.keys.indexOf(occupant) < 0) ok = false;
       });
     });
@@ -567,7 +628,7 @@
       var f = state.currentFrame + c.dt;
       if (f < 0 || f > state.totalFrames - 1) return;
       var track = ensureTrack(ld, c.prop);
-      var ex = track.keys.find(function (k) { return k.frame === f; });
+      var ex = keyAt(track, f);
       if (ex) { ex.v = c.v.slice(); ex.hold = c.hold; ex.curvePoints = cloneCurvePts(c.curvePoints); }
       else track.keys.push({ frame: f, v: c.v.slice(), hold: c.hold, curvePoints: cloneCurvePts(c.curvePoints), hOut: [0, 0], hIn: [0, 0] });
       sortKeys(track); n++;
@@ -652,7 +713,18 @@
   function hasKeys(ld, prop) { var t = trackFor(ld, prop); return !!(t && t.keys && t.keys.length); }
   function isAnimated(ld, prop) { return hasKeys(ld, prop); }
   function sortKeys(track) { track.keys.sort(function (a, b) { return a.frame - b.frame; }); }
-  function keyAt(track, frame) { return track.keys.find(function (k) { return k.frame === frame; }) || null; }
+  function keyAt(track, frame) {
+    if (!track || !track.keys || !track.keys.length) return null;
+    var keys = track.keys, lo = 0, hi = keys.length - 1;
+    while (lo <= hi) {
+      var mid = (lo + hi) >> 1;
+      var keyFrame = keys[mid].frame;
+      if (keyFrame < frame) lo = mid + 1;
+      else if (keyFrame > frame) hi = mid - 1;
+      else return keys[mid];
+    }
+    return null;
+  }
   function staticValue(ld, prop) {
     var st = ld.motionStatic && ld.motionStatic[prop];
     if (st) return st.slice();
@@ -663,6 +735,23 @@
     // exactly like PROP_DEFAULT.position would be if it existed there.
     var def = PROP_DEFAULT[prop];
     return def ? def.slice() : [0, 0];
+  }
+
+  // Callers clamp before the first/after the last key, so the remaining
+  // query is always inside one segment. Motion evaluation runs this lookup
+  // for every animated property and element on every rendered frame: a
+  // linear walk made long productions progressively slower even though the
+  // keys are already sorted. Keep the interpolation itself unchanged and
+  // locate only its left key in O(log n).
+  function segmentIndexAtFrame(keys, frame) {
+    var lo = 0, hi = keys.length - 2;
+    while (lo <= hi) {
+      var mid = (lo + hi) >> 1;
+      if (frame < keys[mid].frame) hi = mid - 1;
+      else if (frame >= keys[mid + 1].frame) lo = mid + 1;
+      else return mid;
+    }
+    return Math.max(0, Math.min(keys.length - 2, lo));
   }
 
   // The value of `prop` on layer `ld` at `frame` — exact key, interpolated,
@@ -682,16 +771,12 @@
     if (frame <= ks[0].frame) return ks[0].v[0];
     var last = ks[ks.length - 1];
     if (frame >= last.frame) return last.v[0];
-    for (var i = 0; i < ks.length - 1; i++) {
-      var a = ks[i], b = ks[i + 1];
-      if (frame >= a.frame && frame < b.frame) {
-        if (a.hold) return a.v[0];
-        var t = (frame - a.frame) / (b.frame - a.frame);
-        var y = evalCurvePoints(a.curvePoints || DEFAULT_CURVE, t);
-        return a.v[0] + (b.v[0] - a.v[0]) * y;
-      }
-    }
-    return last.v[0];
+    var i = segmentIndexAtFrame(ks, frame);
+    var a = ks[i], b = ks[i + 1];
+    if (a.hold) return a.v[0];
+    var t = (frame - a.frame) / (b.frame - a.frame);
+    var y = evalCurvePoints(a.curvePoints || DEFAULT_CURVE, t);
+    return a.v[0] + (b.v[0] - a.v[0]) * y;
   }
   function rawValueAtFrame(ld, prop, frame) {
     var track = trackFor(ld, prop);
@@ -700,35 +785,31 @@
     if (frame <= ks[0].frame) return ks[0].v.slice();
     var last = ks[ks.length - 1];
     if (frame >= last.frame) return last.v.slice();
-    for (var i = 0; i < ks.length - 1; i++) {
-      var a = ks[i], b = ks[i + 1];
-      if (frame >= a.frame && frame < b.frame) {
-        // Hold keyframe (Caddis/AE convention, 2026-07): the value stays
-        // pinned to `a` for the whole segment, then jumps to `b` the
-        // instant frame reaches b.frame — no interpolation. Flag lives on
-        // the LEFT key (a), matching AE's own model (hold is a property of
-        // the OUTGOING keyframe, not the segment).
-        if (a.hold) return a.v.slice();
-        var t = (frame - a.frame) / (b.frame - a.frame);
-        var y = evalCurvePoints(a.curvePoints || DEFAULT_CURVE, t);
-        // Position gets real spatial-bezier curvature through its
-        // hOut/hIn handles (same construction as camera.js's motion
-        // path) whenever either handle is non-zero — a straight [0,0]
-        // handle collapses to the plain linear-in-eased-t case below.
-        if (prop === 'position' && ((a.hOut && (a.hOut[0] || a.hOut[1])) || (b.hIn && (b.hIn[0] || b.hIn[1])))) {
-          var ho = a.hOut || [0, 0], hi = b.hIn || [0, 0];
-          var p1x = a.v[0] + ho[0], p1y = a.v[1] + ho[1], p2x = b.v[0] + hi[0], p2y = b.v[1] + hi[1];
-          var v = 1 - y;
-          var px = v * v * v * a.v[0] + 3 * v * v * y * p1x + 3 * v * y * y * p2x + y * y * y * b.v[0];
-          var py = v * v * v * a.v[1] + 3 * v * v * y * p1y + 3 * v * y * y * p2y + y * y * y * b.v[1];
-          return [px, py];
-        }
-        var out = [];
-        for (var d = 0; d < a.v.length; d++) out.push(a.v[d] + (b.v[d] - a.v[d]) * y);
-        return out;
-      }
+    var i = segmentIndexAtFrame(ks, frame);
+    var a = ks[i], b = ks[i + 1];
+    // Hold keyframe (Caddis/AE convention, 2026-07): the value stays
+    // pinned to `a` for the whole segment, then jumps to `b` the
+    // instant frame reaches b.frame — no interpolation. Flag lives on
+    // the LEFT key (a), matching AE's own model (hold is a property of
+    // the OUTGOING keyframe, not the segment).
+    if (a.hold) return a.v.slice();
+    var t = (frame - a.frame) / (b.frame - a.frame);
+    var y = evalCurvePoints(a.curvePoints || DEFAULT_CURVE, t);
+    // Position gets real spatial-bezier curvature through its
+    // hOut/hIn handles (same construction as camera.js's motion
+    // path) whenever either handle is non-zero — a straight [0,0]
+    // handle collapses to the plain linear-in-eased-t case below.
+    if (prop === 'position' && ((a.hOut && (a.hOut[0] || a.hOut[1])) || (b.hIn && (b.hIn[0] || b.hIn[1])))) {
+      var ho = a.hOut || [0, 0], hi = b.hIn || [0, 0];
+      var p1x = a.v[0] + ho[0], p1y = a.v[1] + ho[1], p2x = b.v[0] + hi[0], p2y = b.v[1] + hi[1];
+      var v = 1 - y;
+      var px = v * v * v * a.v[0] + 3 * v * v * y * p1x + 3 * v * y * y * p2x + y * y * y * b.v[0];
+      var py = v * v * v * a.v[1] + 3 * v * v * y * p1y + 3 * v * y * y * p2y + y * y * y * b.v[1];
+      return [px, py];
     }
-    return last.v.slice();
+    var out = [];
+    for (var d = 0; d < a.v.length; d++) out.push(a.v[d] + (b.v[d] - a.v[d]) * y);
+    return out;
   }
 
   // ---- Expression engine (2026-07) — a modernized take on AE's per-
@@ -865,16 +946,27 @@
     var track = trackFor(holder, prop);
     return (track && track.keys) ? track.keys.length : 0;
   }
+  function nearestKeyIndex(keys, targetFrame) {
+    var lo = 0, hi = keys.length;
+    while (lo < hi) {
+      var mid = (lo + hi) >> 1;
+      if (keys[mid].frame < targetFrame) lo = mid + 1;
+      else hi = mid;
+    }
+    if (lo === 0) return 0;
+    if (lo === keys.length) return keys.length - 1;
+    var prevDistance = targetFrame - keys[lo - 1].frame;
+    var nextDistance = keys[lo].frame - targetFrame;
+    // Preserve the historical linear scan's tie behavior: because it only
+    // replaced the winner on a strictly smaller distance, the earlier key
+    // won when the target sat exactly halfway between two keys.
+    return nextDistance < prevDistance ? lo : lo - 1;
+  }
   function exprNearestKey(holder, prop, t) {
     var track = trackFor(holder, prop);
     if (!track || !track.keys || !track.keys.length) return null;
     var targetFrame = t * (state.fps || 24);
-    var bestI = 0, bestD = Infinity;
-    for (var i = 0; i < track.keys.length; i++) {
-      var d = Math.abs(track.keys[i].frame - targetFrame);
-      if (d < bestD) { bestD = d; bestI = i; }
-    }
-    return exprKeyAt(holder, prop, bestI + 1);
+    return exprKeyAt(holder, prop, nearestKeyIndex(track.keys, targetFrame) + 1);
   }
   // Project-wide expression preamble (Van Dijk 7.2, "set global variables":
   // define something once and use it from every expression instead of
@@ -2587,6 +2679,8 @@
     return items;
   }
   function buildOverlayItems() {
+    var ml = multiLayerBox();
+    if (ml) return multiLayerOverlay(ml);
     var u = unifiedMotionTargets();
     if (u) return buildUnifiedOverlay(u); // multi-selection: the unified path replaces the single-target one entirely
     var t = activeMotionTarget();
@@ -2969,6 +3063,46 @@
     var ringRadius = Math.min(36 * zs, Math.max(b.width * (g.scl[0] / 100), b.height * (g.scl[1] / 100)) * 0.3);
     return { g: g, corners: corners, ringCenter: g.pivot, ringRadius: ringRadius };
   }
+  // Whole-layer multi-selection box (feedback #54). `_layerSel` already is
+  // the source of truth for Cmd/Shift-selected rows; derive one world-space
+  // union from every layer's rendered Motion box so canvas and timeline
+  // describe the same selection.
+  function multiLayerBox() {
+    if (state.appMode !== 'motion' || typeof _layerSel === 'undefined' || _layerSel.length < 2) return null;
+    var targets = [], minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    _layerSel.forEach(function (li) {
+      var ld = state.layers[li], ul = userLayers[li];
+      if (!ld || !ul || ld.locked || !ld.visible || ld.threeD) return;
+      var ub = ld.symbolId ? symbolUnionBounds(li) : null;
+      var lb = ub || ul.bounds;
+      if (!lb || !isFinite(lb.width) || !isFinite(lb.height)) return;
+      var t = { li: li, strokeId: null, holder: ld, boundsCenter: lb.center, bounds: lb };
+      var h = motionHandlePositions(t); if (!h) return;
+      var cs = h.corners;
+      Object.keys(cs).forEach(function (k) {
+        minX = Math.min(minX, cs[k].x); minY = Math.min(minY, cs[k].y);
+        maxX = Math.max(maxX, cs[k].x); maxY = Math.max(maxY, cs[k].y);
+      });
+      targets.push({ t: t, center: { x: (cs.nw.x + cs.ne.x + cs.se.x + cs.sw.x) / 4, y: (cs.nw.y + cs.ne.y + cs.se.y + cs.sw.y) / 4 } });
+    });
+    if (targets.length < 2 || minX === Infinity) return null;
+    var bounds = { left: minX, top: minY, right: maxX, bottom: maxY, width: maxX - minX, height: maxY - minY };
+    bounds.center = { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
+    var zs = 1 / Math.max(0.0001, view.zoom);
+    return { targets: targets, bounds: bounds, pivot: bounds.center, ringRadius: Math.min(36 * zs, Math.max(bounds.width, bounds.height) * 0.3) };
+  }
+  function multiLayerOverlay(m) {
+    var b = m.bounds, zs = 1 / Math.max(0.0001, view.zoom), col = [74, 158, 255, 220], items = [];
+    var corners = [{ x: b.left, y: b.top }, { x: b.right, y: b.top }, { x: b.right, y: b.bottom }, { x: b.left, y: b.bottom }];
+    for (var i = 0; i < 4; i++) {
+      var a = corners[i], n = corners[(i + 1) % 4];
+      items.push({ segments: [{ point: [a.x, a.y] }, { point: [n.x, n.y] }], closed: false, fillColor: null, strokeColor: col, strokeWidth: 1.2 * zs });
+      var hs = 3.8 * zs;
+      items.push({ segments: [{ point: [a.x - hs, a.y - hs] }, { point: [a.x + hs, a.y - hs] }, { point: [a.x + hs, a.y + hs] }, { point: [a.x - hs, a.y + hs] }], closed: true, fillColor: [255, 255, 255, 255], strokeColor: col, strokeWidth: 1.2 * zs });
+    }
+    items.push({ segments: circleSegs(m.pivot.x, m.pivot.y, m.ringRadius), closed: true, fillColor: null, strokeColor: [74, 158, 255, 170], strokeWidth: 1.1 * zs });
+    return items;
+  }
   // Ring band test first (anywhere within ~7px of the circumference, not
   // one fixed point), then nearest-wins over the corners — same convention
   // as select-bridge.js's hitTestHandles. Kept as a scoped v1 to UNIFORM
@@ -3123,6 +3257,31 @@
     return null;
   }
   function onDown(event) {
+    var ml = multiLayerBox();
+    if (ml) {
+      var mb = ml.bounds, mz = 1 / Math.max(0.0001, view.zoom);
+      var dRing = Math.abs(Math.hypot(event.point.x - ml.pivot.x, event.point.y - ml.pivot.y) - ml.ringRadius);
+      var hitCorner = false;
+      [{x:mb.left,y:mb.top},{x:mb.right,y:mb.top},{x:mb.right,y:mb.bottom},{x:mb.left,y:mb.bottom}].forEach(function(p){
+        if(Math.hypot(event.point.x-p.x,event.point.y-p.y)<9*mz)hitCorner=true;
+      });
+      var inside = event.point.x >= mb.left && event.point.x <= mb.right && event.point.y >= mb.top && event.point.y <= mb.bottom;
+      if (dRing < 7 * mz || hitCorner || inside) {
+        pushUndo();
+        var records = ml.targets.map(function (rec) {
+          return { t: rec.t, center: rec.center, pos: valueAtFrame(rec.t.holder, 'position', state.currentFrame).slice(), scale: valueAtFrame(rec.t.holder, 'scale', state.currentFrame).slice(), rot: valueAtFrame(rec.t.holder, 'rotation', state.currentFrame)[0] };
+        });
+        if (dRing < 7 * mz) {
+          _motionDrag = { mode: 'multiLayerRotate', pivot: ml.pivot, startAngle: Math.atan2(event.point.y-ml.pivot.y,event.point.x-ml.pivot.x)*180/Math.PI, records: records };
+        } else if (hitCorner) {
+          _motionDrag = { mode: 'multiLayerScale', pivot: ml.pivot, origDist: Math.max(1e-6,Math.hypot(event.point.x-ml.pivot.x,event.point.y-ml.pivot.y)), records: records };
+        } else {
+          _motionDrag = { mode: 'multiLayerMove', start: {x:event.point.x,y:event.point.y}, records: records };
+        }
+        return true;
+      }
+      return false;
+    }
     // Unified multi-selection path first — while it's active the overlay
     // shows ONLY the unified dots (see buildOverlayItems), so the single-
     // target hit-tests below would grab invisible geometry.
@@ -3257,7 +3416,33 @@
   }
   function onDrag(event) {
     if (!_motionDrag) return false;
-    if (_motionDrag.mode === 'vertex') {
+    if (_motionDrag.mode === 'multiLayerMove') {
+      var mdx=event.point.x-_motionDrag.start.x,mdy=event.point.y-_motionDrag.start.y;
+      _motionDrag.records.forEach(function(r){setValue(r.t.holder,'position',[r.pos[0]+mdx,r.pos[1]+mdy]);});
+    } else if (_motionDrag.mode === 'multiLayerScale') {
+      var mDist=Math.hypot(event.point.x-_motionDrag.pivot.x,event.point.y-_motionDrag.pivot.y);
+      var mRatio=Math.max(0.01,mDist/_motionDrag.origDist);
+      _motionDrag.records.forEach(function(r){
+        setValue(r.t.holder,'scale',[r.scale[0]*mRatio,r.scale[1]*mRatio]);
+        var h=motionHandlePositions(r.t);if(!h)return;
+        var cs=h.corners,cur={x:(cs.nw.x+cs.ne.x+cs.se.x+cs.sw.x)/4,y:(cs.nw.y+cs.ne.y+cs.se.y+cs.sw.y)/4};
+        var desired={x:_motionDrag.pivot.x+(r.center.x-_motionDrag.pivot.x)*mRatio,y:_motionDrag.pivot.y+(r.center.y-_motionDrag.pivot.y)*mRatio};
+        var p=valueAtFrame(r.t.holder,'position',state.currentFrame);
+        setValue(r.t.holder,'position',[p[0]+desired.x-cur.x,p[1]+desired.y-cur.y]);
+      });
+    } else if (_motionDrag.mode === 'multiLayerRotate') {
+      var ma=Math.atan2(event.point.y-_motionDrag.pivot.y,event.point.x-_motionDrag.pivot.x)*180/Math.PI;
+      var mDeg=ma-_motionDrag.startAngle,mRad=mDeg*Math.PI/180,mc=Math.cos(mRad),ms=Math.sin(mRad);
+      _motionDrag.records.forEach(function(r){
+        setValue(r.t.holder,'rotation',[r.rot+mDeg]);
+        var h=motionHandlePositions(r.t);if(!h)return;
+        var cs=h.corners,cur={x:(cs.nw.x+cs.ne.x+cs.se.x+cs.sw.x)/4,y:(cs.nw.y+cs.ne.y+cs.se.y+cs.sw.y)/4};
+        var dx=r.center.x-_motionDrag.pivot.x,dy=r.center.y-_motionDrag.pivot.y;
+        var desired={x:_motionDrag.pivot.x+dx*mc-dy*ms,y:_motionDrag.pivot.y+dx*ms+dy*mc};
+        var p=valueAtFrame(r.t.holder,'position',state.currentFrame);
+        setValue(r.t.holder,'position',[p[0]+desired.x-cur.x,p[1]+desired.y-cur.y]);
+      });
+    } else if (_motionDrag.mode === 'vertex') {
       // World -> local via the SAME position/rotation/scale pipeline the
       // vertex dot itself was drawn through (motionBoxGeom's fwd/inv are
       // exact inverses) — recomputed fresh each tick since the shape's own
@@ -3278,7 +3463,7 @@
       var uf = _motionDrag.frame;
       _motionDrag.u.targets.forEach(function (t) {
         var track = t.holder.motion.position;
-        var k = track.keys.find(function (kk) { return kk.frame === uf; });
+        var k = keyAt(track, uf);
         if (!k) {
           // no key here yet on THIS element — freeze its interpolated
           // value as a new key so the group edit doesn't yank its whole
@@ -3396,14 +3581,60 @@
 
   // ---- Motion mode UI: layer list (Transform property rows) ----
   function fmtVal(n) { return Math.round(n * 10) / 10; }
-  function scrubField(value, onCommit) {
+  function scrubField(value, onCommit, mixed) {
     var inp = document.createElement('input');
-    inp.type = 'number'; inp.className = 'pi scrub motion-val'; inp.value = fmtVal(value);
+    // Typed edits are absolute (useful to align several keys). A horizontal
+    // scrub is relative: ui.js raises _scrubLiveActive while it dispatches
+    // the live/final change events, so each emitted input value can be
+    // converted into a delta and added to every selected key without
+    // collapsing their existing spacing.
+    var lastScrubValue = mixed ? 0 : (Number(value) || 0);
+    inp.type = 'number'; inp.className = 'pi scrub motion-val' + (mixed ? ' mixed' : '');
+    inp.value = mixed ? '' : fmtVal(value);
+    if (mixed) { inp.placeholder = '—'; inp.title = 'Valeurs multiples — saisir une valeur pour l’appliquer aux clés sélectionnées'; }
     inp.step = 1;
-    inp.addEventListener('change', function () { onCommit(parseFloat(inp.value) || 0); });
+    inp.addEventListener('change', function () {
+      if (inp.value === '' || !isFinite(parseFloat(inp.value))) return;
+      var nextValue = parseFloat(inp.value);
+      var relative = !!window._scrubLiveActive;
+      onCommit(nextValue, { relative: relative, delta: relative ? nextValue - lastScrubValue : 0 });
+      lastScrubValue = nextValue;
+    });
     inp.addEventListener('click', function (e) { e.stopPropagation(); });
     inp.addEventListener('mousedown', function (e) { e.stopPropagation(); });
     return inp;
+  }
+  function selectedKeysForEditableProperty(holder, prop) {
+    if (!isMotionPropSelected(holder, prop)) return [];
+    // Editing one selected Position row applies to every selected Position
+    // track, including other layers, but never leaks into a simultaneously
+    // selected Rotation/Opacity row whose dimensional meaning is different.
+    return _motionKeySel.filter(function (s) { return s.prop === prop && s.key && s.key.v; });
+  }
+  function selectedDimensionDisplay(holder, prop, dim, fallback) {
+    var keys = selectedKeysForEditableProperty(holder, prop).filter(function (s) { return dim < s.key.v.length; });
+    if (!keys.length) return { value: fallback, mixed: false };
+    var first = Number(keys[0].key.v[dim]) || 0;
+    var mixed = keys.some(function (s) { return Math.abs((Number(s.key.v[dim]) || 0) - first) > 1e-9; });
+    return { value: first, mixed: mixed };
+  }
+  function setSelectedKeyDimension(holder, prop, dim, value) {
+    var keys = selectedKeysForEditableProperty(holder, prop).filter(function (s) { return dim < s.key.v.length; });
+    if (!keys.length) return 0;
+    keys.forEach(function (s) { s.key.v[dim] = value; });
+    return keys.length;
+  }
+  function offsetSelectedKeyDimension(holder, prop, dim, delta) {
+    var keys = selectedKeysForEditableProperty(holder, prop).filter(function (s) { return dim < s.key.v.length; });
+    if (!keys.length) return 0;
+    if (Math.abs(delta) > 1e-12) keys.forEach(function (s) { s.key.v[dim] = (Number(s.key.v[dim]) || 0) + delta; });
+    return keys.length;
+  }
+  function setSelectedKeyVector(holder, prop, values) {
+    var keys = selectedKeysForEditableProperty(holder, prop);
+    if (!keys.length) return 0;
+    keys.forEach(function (s) { s.key.v = values.slice(); });
+    return keys.length;
   }
   // ---- Double-click a layer row (2026-07) ----
   // First tried as an "enter layer as precomp" in-place grouped view
@@ -3527,7 +3758,86 @@
     if (anchorLi != null && state.layers[anchorLi]) _layerSelAnchor = anchorLi;
     renderLayerList(); renderTimeline();
   }
+  function syncMotionContextHeader() {
+    var label = document.getElementById('motion-context-label');
+    var list = document.getElementById('layer-list');
+    if (!label || !list || state.appMode !== 'motion') return;
+    var lr = list.getBoundingClientRect();
+    var rows = list.querySelectorAll('.lrow[data-layer]');
+    var li = state.activeLayerIdx;
+    if (rows.length) li = parseInt(rows[0].dataset.layer, 10);
+    for (var i = 0; i < rows.length; i++) {
+      var rr = rows[i].getBoundingClientRect();
+      // Keep the last layer header that has crossed the top edge. Its
+      // property rows may still fill the viewport even though the header
+      // itself has scrolled away; choosing the next header merely because
+      // it exists below would announce the wrong context too early.
+      if (rr.top <= lr.top + 2) li = parseInt(rows[i].dataset.layer, 10);
+      else break;
+    }
+    var ld = state.layers[li];
+    label.textContent = ld ? (ld.name || ('Layer ' + (li + 1))) : 'Motion';
+    label.title = ld ? ('Contexte visible : ' + label.textContent) : 'Motion';
+  }
+  function ensureMotionHeaderTools() {
+    var hdr = document.getElementById('layer-hdr');
+    var panel = document.getElementById('layer-panel');
+    var list = document.getElementById('layer-list');
+    if (!hdr || !panel || !list) return;
+    panel.dataset.motionColumns = _motionColumnPreset;
+    var tools = document.getElementById('motion-header-tools');
+    if (!tools) {
+      tools = document.createElement('div'); tools.id = 'motion-header-tools';
+      var label = document.createElement('span'); label.id = 'motion-context-label'; label.textContent = 'Motion';
+      var btn = document.createElement('button'); btn.id = 'motion-filter-trigger'; btn.type = 'button';
+      btn.title = 'Rechercher, filtrer et configurer les colonnes';
+      btn.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg>';
+      tools.appendChild(label); tools.appendChild(btn); hdr.appendChild(tools);
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var old = document.getElementById('motion-filter-pop');
+        if (old) { old.remove(); return; }
+        var pop = document.createElement('div'); pop.id = 'motion-filter-pop'; pop.className = 'ctx-menu motion-filter-pop';
+        var search = document.createElement('input'); search.type = 'search'; search.className = 'motion-filter-search';
+        search.placeholder = 'Calque ou propriété…'; search.value = _motionSearch;
+        var filterLabel = document.createElement('label'); filterLabel.textContent = 'Afficher';
+        var filter = document.createElement('select'); filter.className = 'motion-filter-select';
+        [['all','Tout'],['animated','Animé'],['modified','Modifié'],['expressions','Expressions'],['errors','Erreurs'],['effects','Effets']].forEach(function (it) {
+          var o = document.createElement('option'); o.value = it[0]; o.textContent = it[1]; filter.appendChild(o);
+        });
+        filter.value = _motionFilterMode;
+        var colLabel = document.createElement('label'); colLabel.textContent = 'Colonnes';
+        var cols = document.createElement('select'); cols.className = 'motion-filter-select';
+        [['compact','Compact'],['animation','Animation'],['compositing','Compositing'],['3d','3D / Mograph']].forEach(function (it) {
+          var o = document.createElement('option'); o.value = it[0]; o.textContent = it[1]; cols.appendChild(o);
+        });
+        cols.value = _motionColumnPreset;
+        var snapRow = document.createElement('label'); snapRow.className = 'motion-filter-check';
+        var snap = document.createElement('input'); snap.type = 'checkbox'; snap.checked = _motionSnapEnabled;
+        snapRow.appendChild(snap); snapRow.appendChild(document.createTextNode(' Magnétisme des clés'));
+        var hint = document.createElement('div'); hint.className = 'motion-filter-hint'; hint.textContent = 'Cmd/Ctrl pendant le glisser désactive temporairement le magnétisme.';
+        pop.appendChild(search); pop.appendChild(filterLabel); pop.appendChild(filter); pop.appendChild(colLabel); pop.appendChild(cols); pop.appendChild(snapRow); pop.appendChild(hint);
+        document.body.appendChild(pop);
+        var br = btn.getBoundingClientRect();
+        pop.style.left = Math.max(6, Math.min(window.innerWidth - pop.offsetWidth - 6, br.left)) + 'px';
+        pop.style.top = Math.min(window.innerHeight - pop.offsetHeight - 6, br.bottom + 5) + 'px';
+        function rerender() { renderLayerList(); renderTimeline(); }
+        search.addEventListener('input', function () { _motionSearch = search.value.trim().toLowerCase(); rerender(); });
+        filter.addEventListener('change', function () { _motionFilterMode = filter.value; try { localStorage.setItem('nemo-motion-filter', _motionFilterMode); } catch (x) {} rerender(); });
+        cols.addEventListener('change', function () { _motionColumnPreset = cols.value; panel.dataset.motionColumns = _motionColumnPreset; try { localStorage.setItem('nemo-motion-columns', _motionColumnPreset); } catch (x) {} });
+        snap.addEventListener('change', function () { _motionSnapEnabled = snap.checked; try { localStorage.setItem('nemo-motion-snap', _motionSnapEnabled ? '1' : '0'); } catch (x) {} });
+        function close(ev) { if (!pop.contains(ev.target) && ev.target !== btn) { pop.remove(); document.removeEventListener('pointerdown', close, true); } }
+        setTimeout(function () { document.addEventListener('pointerdown', close, true); search.focus(); search.select(); }, 0);
+      });
+    }
+    if (!list._motionContextBound) {
+      list._motionContextBound = true;
+      list.addEventListener('scroll', syncMotionContextHeader, { passive: true });
+    }
+    requestAnimationFrame(syncMotionContextHeader);
+  }
   function renderLayerListMotion(list) {
+    ensureMotionHeaderTools();
     if (!list._motionEmptySelectBound) {
       list._motionEmptySelectBound = true;
       list.addEventListener('pointerdown', function (e) {
@@ -3549,6 +3859,7 @@
     order.forEach(function (entry) {
       if (entry.type !== 'layer' || entry.hidden) return;
       var li = entry.idx, ld = state.layers[li];
+      if (!layerMatchesMotionView(ld)) return;
       // Component instances DO now get a layer-level Transform group
       // (2026-07-17, "un calque animé dans motion... devient
       // automatiquement un component que l'on retrouvera dans animation
@@ -3599,33 +3910,33 @@
       // (app.js), the same choke point Motion's own render pipeline already
       // goes through — no extra plumbing needed for the toggles to actually
       // affect what's shown.
-      var cdot = document.createElement('div'); cdot.className = 'lico layer-color-dot'; cdot.title = 'Couleur du calque';
+      var cdot = document.createElement('div'); cdot.className = 'lico layer-color-dot motion-col-color'; cdot.title = 'Couleur du calque';
       cdot.style.setProperty('--dot-color', ld.color || '#8b8b9e');
       cdot.addEventListener('click', function (e) {
         e.stopPropagation();
         openLayerColorSwatches(cdot, ld.color || '#8b8b9e', function (hex) { ld.color = hex; cdot.style.setProperty('--dot-color', hex); renderTimeline(); });
       });
       row.appendChild(cdot);
-      var eye = document.createElement('div'); eye.className = 'lico' + (ld.visible ? '' : ' off'); eye.title = SM.t('layerEyeTitle'); eye.innerHTML = ld.visible ? ICO_EYE : ICO_EYE_CLOSED;
+      var eye = document.createElement('div'); eye.className = 'lico motion-col-visibility' + (ld.visible ? '' : ' off'); eye.title = SM.t('layerEyeTitle'); eye.innerHTML = ld.visible ? ICO_EYE : ICO_EYE_CLOSED;
       eye.addEventListener('click', function (e) { e.stopPropagation(); window.SM.toggleLayerVis(li); });
       row.appendChild(eye);
-      var lock = document.createElement('div'); lock.className = 'lico' + (ld.locked ? '' : ' off'); lock.title = SM.t('layerLockTitle'); lock.innerHTML = ld.locked ? ICO_LOCK : ICO_UNLOCK;
+      var lock = document.createElement('div'); lock.className = 'lico motion-col-lock' + (ld.locked ? '' : ' off'); lock.title = SM.t('layerLockTitle'); lock.innerHTML = ld.locked ? ICO_LOCK : ICO_UNLOCK;
       lock.addEventListener('click', function (e) { e.stopPropagation(); window.SM.toggleLayerLock(li); });
       row.appendChild(lock);
-      var solo = document.createElement('div'); solo.className = 'lico solo-btn' + (ld.solo ? ' on' : ' off'); solo.title = SM.t('layerSoloTitle'); solo.textContent = 'S';
+      var solo = document.createElement('div'); solo.className = 'lico solo-btn motion-col-solo' + (ld.solo ? ' on' : ' off'); solo.title = SM.t('layerSoloTitle'); solo.textContent = 'S';
       solo.addEventListener('click', function (e) { e.stopPropagation(); window.SM.toggleLayerSolo(li); });
       row.appendChild(solo);
       // 3D layer toggle (2026-07-28) — same icon/button as Animation 2D's
       // own layer list (timeline.js renderLayerList), shown here too since
       // this is precisely where the Position Z/Rotation X/Y properties it
       // reveals actually live and get keyframed.
-      var d3 = document.createElement('div'); d3.className = 'lico' + (ld.threeD ? '' : ' off'); d3.title = '3D Layer'; d3.innerHTML = ICO_3D;
+      var d3 = document.createElement('div'); d3.className = 'lico motion-col-3d' + (ld.threeD ? '' : ' off'); d3.title = '3D Layer'; d3.innerHTML = ICO_3D;
       d3.addEventListener('click', function (e) { e.stopPropagation(); toggleLayer3D(li); renderLayerList(); });
       row.appendChild(d3);
       // Mograph duplicator toggle — shown here too since the dupOffset*
       // properties it reveals live/get keyframed in this list (same
       // reasoning as the 3D toggle above).
-      var ddup = document.createElement('div'); ddup.className = 'lico' + (ld.duplicator ? '' : ' off'); ddup.title = 'Duplicator (grille / radial / chemin)'; ddup.innerHTML = ICO_DUP;
+      var ddup = document.createElement('div'); ddup.className = 'lico motion-col-duplicator' + (ld.duplicator ? '' : ' off'); ddup.title = 'Duplicator (grille / radial / chemin)'; ddup.innerHTML = ICO_DUP;
       ddup.addEventListener('click', function (e) { e.stopPropagation(); toggleLayerDuplicator(li); });
       row.appendChild(ddup);
       // Same badge as Animation 2D's rows, from the same decider — Motion is
@@ -3675,7 +3986,10 @@
       // and Animation 2D already had it here. Same function, so the cycle
       // refusal, the descendant greying and the new pickwhip come along for
       // free rather than being reimplemented (and drifting) per timeline.
-      if (typeof buildParentCell === 'function') buildParentCell(row, ld, li);
+      if (typeof buildParentCell === 'function') {
+        buildParentCell(row, ld, li);
+        if (row.lastElementChild && row.lastElementChild.classList.contains('lparent')) row.lastElementChild.classList.add('motion-col-parent');
+      }
       row.addEventListener('click', function (e) {
         // A completed drag-drop still fires a trailing native 'click' on
         // mouseup — same guard timeline.js's own layer rows use (see its
@@ -3759,10 +4073,12 @@
       // is a bare top-level var (timeline.js is not IIFE-wrapped), and its
       // handlers only depend on `.lrow` + `data-layer`, both already set
       // above, so no duplicate drag logic needed here at all.
-      row.addEventListener('mousedown', function (e) {
+      function beginMotionLayerReorder(e) {
         if (e.button !== 0 || e.target.closest('.lico')) return;
-        _layerDrag.active = true; _layerDrag.srcIdx = li; _layerDrag.startY = e.clientY; _layerDrag.moved = false;
-      });
+        armLayerReorder(e, li, 'panel', row);
+      }
+      row.addEventListener('mousedown', beginMotionLayerReorder);
+      row.addEventListener('pointerdown', beginMotionLayerReorder);
       row.addEventListener('dblclick', function (e) {
         if (e.target.closest('.lico')) return;
         // Re-reversed 2026-07-17 ("montage des éléments dans le
@@ -4363,6 +4679,7 @@
       });
       var pnm = document.createElement('div'); pnm.className = 'lnm motion-prop-name';
       pnm.innerHTML = '<span>' + PROP_LABEL[prop] + '</span>';
+      decorateMotionPropertyRow(pr, holder, prop, pnm);
       var exprOn = holder.expressions && holder.expressions[prop] && holder.expressions[prop].enabled;
       var exprErr = holder.expressions && holder.expressions[prop] && holder.expressions[prop].lastError;
       var exprBtn = document.createElement('div');
@@ -4416,11 +4733,17 @@
             var dl = document.createElement('span'); dl.className = 'motion-dim-label'; dl.textContent = DIM_LABEL[dim];
             fieldWrap.appendChild(dl);
           }
-          var f = scrubField(vals[dim], function (nv) {
+          var display = selectedDimensionDisplay(holder, prop, dim, vals[dim]);
+          var f = scrubField(display.value, function (nv, edit) {
             pushUndo();
-            var nvals = isAnimated(holder, prop) ? valueAtFrame(holder, prop, state.currentFrame) : staticValue(holder, prop);
-            nvals[dim] = nv;
-            setValue(holder, prop, nvals);
+            var changed = edit && edit.relative
+              ? offsetSelectedKeyDimension(holder, prop, dim, edit.delta)
+              : setSelectedKeyDimension(holder, prop, dim, nv);
+            if (!changed) {
+              var nvals = isAnimated(holder, prop) ? valueAtFrame(holder, prop, state.currentFrame) : staticValue(holder, prop);
+              nvals[dim] = nv;
+              setValue(holder, prop, nvals);
+            }
             // renderLayerList too (not just the timeline, the original
             // single-panel behavior): these same rows now render in TWO
             // places (bottom Transform group + right-panel mirror,
@@ -4430,7 +4753,7 @@
             renderLayerList(); renderTimeline();
             reloadIfTimeLinkOffset(prop);
             if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
-          });
+          }, display.mixed);
           fieldWrap.appendChild(f);
         })(d);
       }
@@ -5064,6 +5387,7 @@
   // wrappers so existing call sites don't need to change.
   function renderColorRow(list, holder, prop, label, swatchTitle, currentColorHex) {
     var row = document.createElement('div'); row.className = 'lrow motion-prop-row';
+    row._smHolder = holder; row._smProp = prop;
     var sw = document.createElement('div');
     var swOn = isAnimated(holder, prop);
     var hasKeyHere = swOn && !!keyAt(holder.motion[prop], state.currentFrame);
@@ -5097,6 +5421,7 @@
       if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
     });
     var nm = document.createElement('div'); nm.className = 'lnm'; nm.textContent = label;
+    decorateMotionPropertyRow(row, holder, prop, nm);
     var swatch = document.createElement('div');
     swatch.style.cssText = 'width:16px;height:16px;border-radius:3px;border:1px solid var(--border2);cursor:pointer;margin-left:auto;';
     var rgba = currentRgba();
@@ -5108,7 +5433,7 @@
       openLayerColorSwatches(swatch, rgba255ToHex(currentRgba()), function (hex) {
         pushUndo();
         var v = hexToRgba255(hex);
-        setValue(holder, prop, v);
+        if (!setSelectedKeyVector(holder, prop, v)) setValue(holder, prop, v);
         renderLayerList(); renderTimeline();
         if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
       });
@@ -5163,15 +5488,25 @@
       if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
     });
     var nm = document.createElement('div'); nm.className = 'lnm'; nm.textContent = label;
+    decorateMotionPropertyRow(row, holder, prop, nm);
     var input = document.createElement('input');
     input.type = 'number'; input.className = 'pi scrub'; input.min = min; input.max = max; input.dataset.step = '1';
     input.style.cssText = 'width:52px;margin-left:auto';
-    input.value = currentVal();
+    var trimDisplay = selectedDimensionDisplay(holder, prop, 0, currentVal());
+    input.value = trimDisplay.mixed ? '' : trimDisplay.value;
+    var lastTrimScrubValue = trimDisplay.mixed ? 0 : (Number(trimDisplay.value) || 0);
+    if (trimDisplay.mixed) { input.placeholder = '—'; input.classList.add('mixed'); input.title = 'Valeurs multiples'; }
     input.addEventListener('change', function () {
+      if (this.value === '' || !isFinite(parseFloat(this.value))) return;
       pushUndo();
-      var v = Math.max(min, Math.min(max, parseFloat(this.value) || 0));
+      var v = Math.max(min, Math.min(max, parseFloat(this.value)));
       this.value = v;
-      setValue(holder, prop, [v]);
+      var relative = !!window._scrubLiveActive;
+      var changed = relative
+        ? offsetSelectedKeyDimension(holder, prop, 0, v - lastTrimScrubValue)
+        : setSelectedKeyDimension(holder, prop, 0, v);
+      lastTrimScrubValue = v;
+      if (!changed) setValue(holder, prop, [v]);
       renderLayerList(); renderTimeline();
       if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
     });
@@ -5232,6 +5567,7 @@
   function renderVertexRow(list, holder, vi) {
     var prop = 'vtx' + vi;
     var row = document.createElement('div'); row.className = 'lrow motion-prop-row motion-vertex-row';
+    row._smHolder = holder; row._smProp = prop;
     var sw = document.createElement('div');
     var swOn = isAnimated(holder, prop);
     var hasKeyHere = swOn && !!keyAt(holder.motion[prop], state.currentFrame);
@@ -5259,6 +5595,7 @@
     });
     row.appendChild(sw);
     var nm = document.createElement('div'); nm.className = 'lnm'; nm.textContent = 'Vertex ' + (vi + 1);
+    decorateMotionPropertyRow(row, holder, prop, nm);
     row.appendChild(nm);
     list.appendChild(row);
   }
@@ -5276,6 +5613,7 @@
     // holder/prop does this row belong to" from a DOM hit-test without
     // threading extra state through render calls).
     rowEl._smHolder = ld; rowEl._smProp = prop;
+    rowEl.classList.toggle('prop-selected', isMotionPropSelected(ld, prop));
     var track = trackFor(ld, prop);
     var w = state.totalFrames * FC;
     var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -5358,6 +5696,7 @@
             window._motionConnectDrag = {
               ld: ld, prop: prop, a: keyA, b: keyB,
               startX: e.clientX, startAFrame: keyA.frame, startBFrame: keyB.frame,
+              startScrollLeft: motionDragScrollLeft(),
               retime: e.altKey,
             };
             document.body.style.cursor = e.altKey ? 'e-resize' : 'ew-resize';
@@ -5378,26 +5717,25 @@
         // Hold keys render as a square, not the usual diamond (AE/Caddis
         // convention — the shape itself communicates "no interpolation
         // out of this key" without needing to open the curve editor).
-        dia.className = 'motion-key' + (fi === state.currentFrame ? ' cur' : '') + (isKeySelected(ld, prop, k) ? ' sel' : '') + (k.hold ? ' hold' : '');
+        var interpKind = keyInterpolationKind(k);
+        dia.className = 'motion-key ' + interpKind + (fi === state.currentFrame ? ' cur' : '') + (isKeySelected(ld, prop, k) ? ' sel' : '');
+        dia.title = (PROP_LABEL[prop] || prop) + ' · image ' + (fi + 1) + ' · ' + keyInterpolationLabel(k);
         // Per-key colour (Van Dijk 3.4: "sometimes you have so many
         // keyframes it becomes difficult to know what does what — like
         // layers, we could color keyframes to highlight a group"). Only a
         // paint job: nothing reads k.color at evaluation time.
         if (k.color) { dia.classList.add('tinted'); dia.style.setProperty('--key-color', k.color); }
-        // Velocity read-out (3.5): the ease actually applied out of this key,
-        // as a percentage, shown on the SELECTED key instead of living in a
-        // dialog. Derived from the same curvePoints the interpolator uses,
-        // so it can never disagree with what the animation does.
-        if (isKeySelected(ld, prop, k)) {
-          var vel = easeOutPercent(k);
-          if (vel != null) {
-            var vl = document.createElement('span');
-            vl.className = 'motion-key-vel';
-            vl.textContent = vel + '%';
-            dia.appendChild(vl);
-          }
-        }
         c.appendChild(dia);
+        // Compact bidirectional ease controls. Only the primary key in a
+        // multi-selection owns the boxes; changing either side propagates
+        // to every selected key that actually has that incoming/outgoing
+        // segment, avoiding a forest of overlapping inputs.
+        if (isPrimarySelectedKey(ld, prop, k)) {
+          var easeInBox = buildKeyEaseBox(ld, prop, k, 'in');
+          var easeOutBox = buildKeyEaseBox(ld, prop, k, 'out');
+          if (easeInBox) c.appendChild(easeInBox);
+          if (easeOutBox) c.appendChild(easeOutBox);
+        }
       }
       (function (frameIdx, key) {
         c.addEventListener('mousedown', function (e) {
@@ -5451,6 +5789,16 @@
             return;
           }
           if (key) {
+            // Navigate before creating the plain-click selection. goToFrame
+            // refreshes the Motion UI and can replace the live key object;
+            // selecting the pre-refresh object made a real click move the
+            // playhead but immediately lose its visible .sel state. Re-read
+            // the key from the refreshed track so click, drag and the value
+            // fields all share the same live reference.
+            if (frameIdx !== state.currentFrame) {
+              goToFrame(frameIdx);
+              key = keyAt(trackFor(ld, prop), frameIdx) || key;
+            }
             // Dragging a key that's already part of a multi-selection moves
             // the WHOLE group together, one frame-delta shared by all of
             // them; grabbing an unselected key resets the selection to just
@@ -5461,16 +5809,30 @@
             // kept as a shortcut alongside the selection box's own edges.
             pushUndo();
             if (isKeySelected(ld, prop, key)) {
+              _keyAnchor = { holder: ld, prop: prop, frame: key.frame };
               var skewRows = e.altKey && _motionKeySel.length >= 2 ? buildKeyRows() : null;
               if (skewRows && skewRows.length >= 2) {
-                window._motionSkewDrag = { startX: e.clientX, mode: 'bottom', rows: skewRows };
+                window._motionSkewDrag = { startX: e.clientX, startScrollLeft: motionDragScrollLeft(), mode: 'bottom', rows: skewRows };
               } else {
-                window._motionKeyDrag = { group: true, startX: e.clientX, keys: _motionKeySel.slice() };
+                window._motionKeyDrag = {
+                  group: true, startX: e.clientX, startScrollLeft: motionDragScrollLeft(),
+                  keys: _motionKeySel.map(function (s) { return { holder: s.holder, prop: s.prop, key: s.key, origFrame: s.key.frame }; })
+                };
               }
+              // Move the pair of influence boxes to the selected key that
+              // was actually grabbed, while preserving the whole group.
+              renderTimeline();
             } else {
               setKeySel([{ holder: ld, prop: prop, key: key }]);
               _keyAnchor = { holder: ld, prop: prop, frame: key.frame };
-              window._motionKeyDrag = { ld: ld, prop: prop, key: key, startX: e.clientX, startFrame: key.frame };
+              window._motionKeyDrag = { ld: ld, prop: prop, key: key, startX: e.clientX, startScrollLeft: motionDragScrollLeft(), startFrame: key.frame };
+              // setKeySel updates the selection model/box, but a plain key
+              // click also needs to rebuild the diamond itself: selected
+              // keys contain a velocity badge in addition to the .sel class.
+              // Without this render, the click worked internally while the
+              // key stayed visually indistinguishable until another UI
+              // action happened to repaint the timeline.
+              renderTimeline();
             }
           } else {
             startMarquee(e);
@@ -5638,6 +6000,7 @@
     order.forEach(function (entry) {
       if (entry.type !== 'layer' || entry.hidden) return;
       var li = entry.idx, ld = state.layers[li];
+      if (!layerMatchesMotionView(ld)) return;
       var expanded = isLayerExpanded(li);
       // SAME class string renderLayerListMotion puts on this layer's row —
       // the grid half was left plain, so a selected layer lit up on the left
@@ -5646,6 +6009,7 @@
       var spacer = document.createElement('div');
       spacer.className = 'frow' + (_layerSel.indexOf(li) >= 0 ? ' act motion-selected' : '');
       spacer.dataset.layer = li;
+      if (window.installLayerReorderGrip) installLayerReorderGrip(spacer, li);
       if (window.SMLayerInOut) SMLayerInOut.buildBar(spacer, li);
       grid.appendChild(spacer);
       if (!expanded) return;
@@ -5795,6 +6159,13 @@
   // matter which), then drag any ONE of the selected diamonds to retime
   // the whole group together by the same frame delta.
   var _motionKeySel = []; // [{holder, prop, key}]
+  // Property rows are first-class selection targets, like AE's twirled-open
+  // property names. Selecting a property selects all its keys; Cmd adds or
+  // removes tracks and Shift extends through the visible property rows.
+  // Object identity is intentional: element holders do not all have a uid,
+  // while the live holder object is stable across timeline re-renders.
+  var _motionPropSel = []; // [{holder, prop}]
+  var _motionPropAnchor = null;
   // Frozen Shift-range anchor for keyframe clicks (2026-07-31 unification —
   // same contract as layer-inout.js's _barAnchorLi and timeline.js's
   // _layerSelAnchor): set on every plain click and Ctrl-toggle on a key,
@@ -5804,7 +6175,79 @@
   function isKeySelected(holder, prop, key) {
     return _motionKeySel.some(function (s) { return s.holder === holder && s.prop === prop && s.key === key; });
   }
-  function setKeySel(sel) { _motionKeySel = sel; updateKeySelectionBox(); }
+  function isMotionPropSelected(holder, prop) {
+    return _motionPropSel.some(function (s) { return s.holder === holder && s.prop === prop; });
+  }
+  function uniquePropSelection(sel) {
+    var out = [];
+    (sel || []).forEach(function (s) {
+      if (!s || !s.holder || !s.prop || out.some(function (p) { return p.holder === s.holder && p.prop === s.prop; })) return;
+      out.push({ holder: s.holder, prop: s.prop });
+    });
+    return out;
+  }
+  function paintMotionPropertySelection() {
+    document.querySelectorAll('.motion-prop-row,.motion-track-row').forEach(function (row) {
+      row.classList.toggle('prop-selected', !!(row._smHolder && row._smProp && isMotionPropSelected(row._smHolder, row._smProp)));
+    });
+  }
+  function setKeySel(sel) {
+    _motionKeySel = sel || [];
+    _motionPropSel = uniquePropSelection(_motionKeySel);
+    if (_motionPropSel.length) _motionPropAnchor = _motionPropSel[_motionPropSel.length - 1];
+    paintMotionPropertySelection();
+    updateKeySelectionBox();
+  }
+  function keysForPropertySelection() {
+    var out = [];
+    _motionPropSel.forEach(function (s) {
+      var track = trackFor(s.holder, s.prop);
+      if (!track || !track.keys) return;
+      track.keys.forEach(function (key) { out.push({ holder: s.holder, prop: s.prop, key: key }); });
+    });
+    return out;
+  }
+  function visibleMotionPropertySelectionOrder() {
+    var out = [];
+    document.querySelectorAll('#layer-list .motion-prop-row').forEach(function (row) {
+      if (!row._smHolder || !row._smProp) return;
+      if (!out.some(function (s) { return s.holder === row._smHolder && s.prop === row._smProp; })) out.push({ holder: row._smHolder, prop: row._smProp });
+    });
+    return out;
+  }
+  function selectMotionProperty(holder, prop, e) {
+    var current = { holder: holder, prop: prop };
+    if (e && e.shiftKey && _motionPropAnchor) {
+      var order = visibleMotionPropertySelectionOrder();
+      var ai = order.findIndex(function (s) { return s.holder === _motionPropAnchor.holder && s.prop === _motionPropAnchor.prop; });
+      var bi = order.findIndex(function (s) { return s.holder === holder && s.prop === prop; });
+      if (ai >= 0 && bi >= 0) _motionPropSel = order.slice(Math.min(ai, bi), Math.max(ai, bi) + 1);
+      else _motionPropSel = [current];
+    } else if (e && (e.metaKey || e.ctrlKey)) {
+      var at = _motionPropSel.findIndex(function (s) { return s.holder === holder && s.prop === prop; });
+      if (at >= 0) _motionPropSel.splice(at, 1); else _motionPropSel.push(current);
+      _motionPropAnchor = current;
+    } else {
+      _motionPropSel = [current];
+      _motionPropAnchor = current;
+    }
+    _motionPropSel = uniquePropSelection(_motionPropSel);
+    _motionKeySel = keysForPropertySelection();
+    renderLayerList(); renderTimeline();
+    updateKeySelectionBox();
+  }
+  function decorateMotionPropertyRow(row, holder, prop, labelEl) {
+    if (!row || !holder || !prop) return;
+    row._smHolder = holder; row._smProp = prop;
+    row.classList.toggle('prop-selected', isMotionPropSelected(holder, prop));
+    var target = labelEl || row;
+    target.classList.add('motion-prop-select-target');
+    target.title = (target.title ? target.title + ' · ' : '') + 'Clic : sélectionner toutes les clés · Cmd : ajouter/retirer · Maj : plage de propriétés';
+    target.addEventListener('click', function (e) {
+      e.stopPropagation();
+      selectMotionProperty(holder, prop, e);
+    });
+  }
   // ---- batch operations on the current keyframe selection (Distribute/
   // Flip/Select Every/Invert Selection — no Align here, unlike layer bars:
   // a keyframe has no duration, "align" doesn't map onto a single point).
@@ -5875,6 +6318,109 @@
     if (!p || !p.x) return 0;
     var lag = Math.max(0, Math.min(1, 1 - (p.y / p.x)));
     return Math.round(lag * 100);
+  }
+  function easeInPercent(k) {
+    var pts = k && k.curvePoints;
+    if (!pts || pts.length < 2) return null;
+    var p = pts[pts.length - 2];
+    if (!p || p.x >= 1) return 0;
+    var lead = Math.max(0, Math.min(1, (p.y - p.x) / (1 - p.x)));
+    return Math.round(lead * 100);
+  }
+  function editableInfluenceCurve(key) {
+    var pts = cloneCurvePts(key.curvePoints || CURVE_LINEAR);
+    // Linear only has its two endpoints. Promote it to the ordinary
+    // five-point representation so either edge can be bent independently
+    // while the untouched edge remains exactly linear.
+    if (pts.length < 4) pts = [
+      { x: 0, y: 0 }, { x: 0.25, y: 0.25 }, { x: 0.5, y: 0.5 },
+      { x: 0.75, y: 0.75 }, { x: 1, y: 1 }
+    ];
+    return pts;
+  }
+  function setSegmentInfluence(key, side, percent) {
+    if (!key) return false;
+    var amount = Math.max(0, Math.min(100, Number(percent) || 0)) / 100;
+    var pts = editableInfluenceCurve(key);
+    var p;
+    if (side === 'out') {
+      p = pts[1];
+      p.y = p.x * (1 - amount);
+    } else {
+      p = pts[pts.length - 2];
+      p.y = p.x + (1 - p.x) * amount;
+    }
+    // A manually specified waypoint tangent would override the visible
+    // edge change. This control owns that one edge, so release only that
+    // waypoint's tangent and preserve every other custom point untouched.
+    delete p.tx; delete p.ty;
+    key.hold = false;
+    key.curvePoints = pts;
+    return true;
+  }
+  function keyEaseInfluence(holder, prop, key, side) {
+    var track = trackFor(holder, prop);
+    if (!track) return null;
+    var idx = track.keys.indexOf(key);
+    if (side === 'out') return idx >= 0 && idx < track.keys.length - 1 ? easeOutPercent(key) : null;
+    var prev = idx > 0 ? track.keys[idx - 1] : null;
+    return prev ? easeInPercent(prev) : null;
+  }
+  function setSelectedEaseInfluence(side, value) {
+    if (!_motionKeySel.length) return 0;
+    pushUndo();
+    var n = 0;
+    _motionKeySel.forEach(function (s) {
+      var track = trackFor(s.holder, s.prop);
+      if (!track) return;
+      var idx = track.keys.indexOf(s.key);
+      var segment = side === 'out'
+        ? (idx >= 0 && idx < track.keys.length - 1 ? s.key : null)
+        : (idx > 0 ? track.keys[idx - 1] : null);
+      if (segment && setSegmentInfluence(segment, side, value)) n++;
+    });
+    if (n) {
+      renderLayerList(); renderTimeline();
+      if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+    }
+    return n;
+  }
+  function isPrimarySelectedKey(holder, prop, key) {
+    if (!isKeySelected(holder, prop, key)) return false;
+    if (_keyAnchor) {
+      var anchorIsSelected = _motionKeySel.some(function (s) {
+        return s.holder === _keyAnchor.holder && s.prop === _keyAnchor.prop && s.key.frame === _keyAnchor.frame;
+      });
+      if (anchorIsSelected) return _keyAnchor.holder === holder && _keyAnchor.prop === prop && _keyAnchor.frame === key.frame;
+    }
+    var last = _motionKeySel[_motionKeySel.length - 1];
+    return !!last && last.holder === holder && last.prop === prop && last.key === key;
+  }
+  function buildKeyEaseBox(holder, prop, key, side) {
+    var value = keyEaseInfluence(holder, prop, key, side);
+    if (value == null) return null;
+    var box = document.createElement('label');
+    box.className = 'motion-key-ease-box ' + side;
+    box.title = side === 'in'
+      ? 'Lissage entrant — glisser ou saisir une influence (0–100 %)'
+      : 'Lissage sortant — glisser ou saisir une influence (0–100 %)';
+    var marker = document.createElement('span');
+    marker.className = 'motion-key-ease-marker'; marker.textContent = side === 'in' ? '◀' : '▶';
+    var input = document.createElement('input');
+    input.type = 'number'; input.className = 'scrub motion-key-ease-input';
+    input.min = 0; input.max = 100; input.dataset.step = 1; input.value = value;
+    input.addEventListener('mousedown', function (e) { e.stopPropagation(); });
+    input.addEventListener('click', function (e) { e.stopPropagation(); });
+    input.addEventListener('keydown', function (e) { e.stopPropagation(); });
+    input.addEventListener('change', function () {
+      if (input.value === '' || !isFinite(parseFloat(input.value))) return;
+      var v = Math.max(0, Math.min(100, parseFloat(input.value)));
+      input.value = v;
+      setSelectedEaseInfluence(side, v);
+    });
+    if (side === 'in') { box.appendChild(input); box.appendChild(marker); }
+    else { box.appendChild(marker); box.appendChild(input); }
+    return box;
   }
   function colorSelectedKeys(color) {
     if (!_motionKeySel.length) { if (window.showToast) showToast(SM.t('toastNoKeySelected')); return; }
@@ -6055,7 +6601,7 @@
     // falloff is centred there, not on the selection's middle.
     var grid = document.getElementById('frame-grid');
     var grabFrame = grid ? ((e.clientX - grid.getBoundingClientRect().left) / FC) : (fMin + fMax) / 2;
-    window._motionSkewDrag = { startX: e.clientX, mode: mode, rows: rows, fMin: fMin, fMax: fMax, grabFrame: grabFrame };
+    window._motionSkewDrag = { startX: e.clientX, startScrollLeft: motionDragScrollLeft(), mode: mode, rows: rows, fMin: fMin, fMax: fMax, grabFrame: grabFrame };
   }
   // Key box rows = one row per PROPERTY TRACK holding selected keys, in
   // rendered (document) order — matches the reference where each visible
@@ -6650,6 +7196,125 @@
     }
   }
 
+  // Key drags can emit well above the display refresh rate. Their collision
+  // and retiming logic below updates the data synchronously, but rebuilding
+  // the entire Motion grid for every mousemove only paints intermediate
+  // states the screen can never display. Coalesce the DOM work to one rebuild
+  // per animation frame and flush the latest state on pointer release.
+  var _motionDragTimelineRaf = 0;
+  function requestMotionDragTimelineRender() {
+    if (_motionDragTimelineRaf) return;
+    _motionDragTimelineRaf = requestAnimationFrame(function () {
+      _motionDragTimelineRaf = 0;
+      renderTimeline();
+    });
+  }
+  function flushMotionDragTimelineRender() {
+    if (!_motionDragTimelineRaf) return;
+    cancelAnimationFrame(_motionDragTimelineRaf);
+    _motionDragTimelineRaf = 0;
+    renderTimeline();
+  }
+
+  function motionDragScrollLeft() {
+    var wrap = document.getElementById('fg-wrap');
+    return wrap ? wrap.scrollLeft : 0;
+  }
+  var _motionAutoScrollRaf = 0;
+  var _motionAutoScrollEvent = null;
+  function motionDragIsActive() {
+    return !!(window._motionKeyDrag || window._motionConnectDrag || window._motionSkewDrag);
+  }
+  function stopMotionAutoScroll() {
+    if (_motionAutoScrollRaf) cancelAnimationFrame(_motionAutoScrollRaf);
+    _motionAutoScrollRaf = 0; _motionAutoScrollEvent = null;
+  }
+  function autoScrollMotionDrag(e) {
+    var wrap = document.getElementById('fg-wrap');
+    if (!wrap) return;
+    var r = wrap.getBoundingClientRect(), edge = 34, step = 0;
+    if (e.clientX < r.left + edge) step = -Math.ceil((r.left + edge - e.clientX) / 3);
+    else if (e.clientX > r.right - edge) step = Math.ceil((e.clientX - (r.right - edge)) / 3);
+    if (!step) { stopMotionAutoScroll(); return; }
+    var before = wrap.scrollLeft;
+    wrap.scrollLeft = Math.max(0, Math.min(wrap.scrollWidth - wrap.clientWidth, before + step));
+    if (wrap.scrollLeft === before) { stopMotionAutoScroll(); return; }
+    _motionAutoScrollEvent = {
+      clientX: e.clientX, clientY: e.clientY,
+      metaKey: !!e.metaKey, ctrlKey: !!e.ctrlKey, shiftKey: !!e.shiftKey, altKey: !!e.altKey,
+    };
+    if (!_motionAutoScrollRaf) {
+      _motionAutoScrollRaf = requestAnimationFrame(function tickMotionAutoScroll() {
+        _motionAutoScrollRaf = 0;
+        if (!motionDragIsActive() || !_motionAutoScrollEvent) { stopMotionAutoScroll(); return; }
+        // Re-enter the same absolute drag calculation after the viewport has
+        // moved. If the pointer stays at the edge this schedules the next
+        // frame, so scrolling continues without requiring fresh mousemove
+        // events from the OS.
+        onDragMove(_motionAutoScrollEvent);
+      });
+    }
+  }
+  function motionDragDeltaFrames(e, drag) {
+    autoScrollMotionDrag(e);
+    return Math.round((e.clientX - drag.startX + motionDragScrollLeft() - (drag.startScrollLeft || 0)) / FC);
+  }
+  function collectMotionSnapCandidates(excludedKeys) {
+    var byFrame = Object.create(null);
+    function add(frame, label) {
+      frame = Math.round(Number(frame));
+      if (frame < 0 || frame >= state.totalFrames || byFrame[frame]) return;
+      byFrame[frame] = label;
+    }
+    add(state.currentFrame, 'Tête de lecture');
+    add(state.waIn, 'Début zone'); add(state.waOut, 'Fin zone');
+    (state.markers || []).forEach(function (m) { add(m.frame, m.name || 'Repère'); });
+    function addTrack(track) {
+      if (!track || !track.keys) return;
+      track.keys.forEach(function (k) { if (!excludedKeys || excludedKeys.indexOf(k) < 0) add(k.frame, 'Clé'); });
+    }
+    function addHolder(holder) {
+      if (!holder) return;
+      Object.keys(holder.motion || {}).forEach(function (prop) { addTrack(holder.motion[prop]); });
+    }
+    state.layers.forEach(function (ld) {
+      addHolder(ld); addTrack(ld.timeRemap);
+      (ld.markers || []).forEach(function (m) { add(m.frame, m.name || 'Repère calque'); });
+      Object.keys(ld.elementMotion || {}).forEach(function (id) { addHolder(ld.elementMotion[id]); });
+      (ld.effects || []).forEach(function (eff) { Object.keys((eff && eff.keys) || {}).forEach(function (p) { addTrack(eff.keys[p]); }); });
+    });
+    if (state.bpmShow && state.bpm > 0 && state.fps > 0) {
+      var beat = state.fps * 60 / state.bpm, off = Number(state.bpmOffset) || 0;
+      for (var f = off; f < state.totalFrames; f += beat) add(f, 'Temps BPM');
+    }
+    return Object.keys(byFrame).map(function (f) { return { frame: Number(f), label: byFrame[f] }; });
+  }
+  function showMotionSnapGuide(frame, label) {
+    var wrap = document.getElementById('fg-wrap');
+    if (!wrap) return;
+    var guide = document.getElementById('motion-snap-guide');
+    if (!guide) { guide = document.createElement('div'); guide.id = 'motion-snap-guide'; guide.className = 'motion-snap-guide'; wrap.appendChild(guide); }
+    guide.style.left = (frame * FC + FC / 2) + 'px';
+    guide.dataset.label = (label || 'Aligné') + ' · ' + (frame + 1);
+  }
+  function clearMotionSnapGuide() {
+    var guide = document.getElementById('motion-snap-guide');
+    if (guide) guide.remove();
+  }
+  function snapMotionFrame(frame, excludedKeys, e) {
+    clearMotionSnapGuide();
+    if (!_motionSnapEnabled || (e && (e.metaKey || e.ctrlKey))) return frame;
+    var threshold = Math.max(1, Math.ceil(8 / Math.max(1, FC)));
+    var best = null;
+    collectMotionSnapCandidates(excludedKeys).forEach(function (c) {
+      var dist = Math.abs(c.frame - frame);
+      if (dist <= threshold && (!best || dist < best.dist)) best = { frame: c.frame, label: c.label, dist: dist };
+    });
+    if (!best) return frame;
+    showMotionSnapGuide(best.frame, best.label);
+    return best.frame;
+  }
+
   // Drag-to-retime a keyframe (mousemove/up delegated from ui.js's global
   // pointer handlers via SMMotion.onDragMove/onDragUp, same pattern as the
   // span-end/keyframe drag handlers already in timeline.js).
@@ -6669,7 +7334,7 @@
       var ia = track.keys.indexOf(cd.a), ib = track.keys.indexOf(cd.b);
       var prevKey = ia > 0 ? track.keys[ia - 1] : null;
       var nextKey = ib >= 0 && ib < track.keys.length - 1 ? track.keys[ib + 1] : null;
-      var deltaFrames = Math.round((e.clientX - cd.startX) / FC);
+      var deltaFrames = motionDragDeltaFrames(e, cd);
       if (cd.retime) {
         // First key stays planted; only the second moves — stretches or
         // compresses the segment in place. Bounded by A itself (can never
@@ -6677,6 +7342,7 @@
         var lo = cd.startAFrame + 1;
         var hi = Math.min(state.totalFrames - 1, nextKey ? nextKey.frame - 1 : state.totalFrames - 1);
         var nb = Math.max(lo, Math.min(hi, cd.startBFrame + deltaFrames));
+        nb = Math.max(lo, Math.min(hi, snapMotionFrame(nb, [cd.a, cd.b], e)));
         if (nb === cd.b.frame) return;
         cd.b.frame = nb; sortKeys(track);
       } else {
@@ -6689,11 +7355,13 @@
           nextKey ? (nextKey.frame - 1 - cd.startBFrame) : Infinity
         );
         var d = Math.max(loD, Math.min(hiD, deltaFrames));
-        if (!d) return;
+        var snappedA = snapMotionFrame(cd.startAFrame + d, [cd.a, cd.b], e);
+        d = Math.max(loD, Math.min(hiD, snappedA - cd.startAFrame));
+        if (cd.a.frame === cd.startAFrame + d && cd.b.frame === cd.startBFrame + d) return;
         cd.a.frame = cd.startAFrame + d; cd.b.frame = cd.startBFrame + d;
         sortKeys(track);
       }
-      renderTimeline();
+      requestMotionDragTimelineRender();
       if (window.SMEngineBridge) SMEngineBridge.renderNow();
       return;
     }
@@ -6706,7 +7374,8 @@
       // so fractional middle rows land exactly on round(fraction × total)
       // with zero drift, and dragging back to the start restores every key
       // to its exact original frame.
-      var total = (e.clientX - sk.startX) / FC;
+      autoScrollMotionDrag(e);
+      var total = (e.clientX - sk.startX + motionDragScrollLeft() - (sk.startScrollLeft || 0)) / FC;
       var n = sk.rows.length;
       var dragged = [];
       sk.rows.forEach(function (row) { row.forEach(function (en) { dragged.push(en.key); }); });
@@ -6758,7 +7427,7 @@
         if (touched.indexOf(p.track) < 0) touched.push(p.track);
       });
       touched.forEach(sortKeys);
-      renderTimeline();
+      requestMotionDragTimelineRender();
       // Live stage feedback (2026-07: "un component ne bouge pas en temps
       // réel quand on drag" — the timeline diamond tracked the cursor via
       // renderTimeline() above, but the interpolated value AT THE CURRENT
@@ -6770,42 +7439,62 @@
       return;
     }
     var d = window._motionKeyDrag; if (!d) return;
-    var deltaFrames = Math.round((e.clientX - d.startX) / FC);
+    var deltaFrames = motionDragDeltaFrames(e, d);
     if (d.group) {
       // Whole-group move: compute the delta from ONE reference key (the
       // first), then check EVERY selected key can land there without
       // colliding with an UNselected key already at the target frame —
       // an all-or-nothing move keeps the group's relative spacing intact
       // rather than silently dropping just the colliding member.
-      if (!deltaFrames) return;
-      var ok = d.keys.every(function (s) {
-        var nf = s.key.frame + deltaFrames;
-        if (nf < 0 || nf >= state.totalFrames) return false;
-        var existing = keyAt(trackFor(s.holder, s.prop), nf);
-        return !existing || existing === s.key;
-      });
+      var movedKeys = d.keys.map(function (s) { return s.key; });
+      var rawDeltaFrames = deltaFrames;
+      if (d.keys.length) deltaFrames = snapMotionFrame(d.keys[0].origFrame + deltaFrames, movedKeys, e) - d.keys[0].origFrame;
+      function groupCanMove(by) {
+        return d.keys.every(function (s) {
+          var target = s.origFrame + by;
+          if (target < 0 || target >= state.totalFrames) return false;
+          var existing = keyAt(trackFor(s.holder, s.prop), target);
+          return !existing || existing === s.key || movedKeys.indexOf(existing) >= 0;
+        });
+      }
+      var ok = groupCanMove(deltaFrames);
+      if (!ok && deltaFrames !== rawDeltaFrames && groupCanMove(rawDeltaFrames)) {
+        clearMotionSnapGuide(); deltaFrames = rawDeltaFrames; ok = true;
+      }
       if (!ok) return;
-      d.keys.forEach(function (s) { s.key.frame += deltaFrames; sortKeys(trackFor(s.holder, s.prop)); });
-      d.startX = e.clientX; // re-baseline so the next move is a fresh delta from here
-      renderTimeline();
+      var changed = d.keys.some(function (s) { return s.key.frame !== s.origFrame + deltaFrames; });
+      if (!changed) return;
+      d.keys.forEach(function (s) { s.key.frame = s.origFrame + deltaFrames; sortKeys(trackFor(s.holder, s.prop)); });
+      requestMotionDragTimelineRender();
       if (window.SMEngineBridge) SMEngineBridge.renderNow(); // live stage feedback — see skew-drag branch's own comment above
       return;
     }
     var nf = Math.max(0, Math.min(state.totalFrames - 1, d.startFrame + deltaFrames));
+    var unsnappedNf = nf;
+    nf = snapMotionFrame(nf, [d.key], e);
     if (nf === d.key.frame) return;
     var track = trackFor(d.ld, d.prop);
-    if (keyAt(track, nf)) return; // don't stomp an existing key
+    if (keyAt(track, nf)) {
+      // A magnetic target occupied by another key must not create a dead
+      // zone around it: keep the nearest free raw frame instead.
+      clearMotionSnapGuide();
+      nf = unsnappedNf;
+      if (nf === d.key.frame || keyAt(track, nf)) return;
+    }
     d.key.frame = nf; sortKeys(track);
-    renderTimeline();
+    requestMotionDragTimelineRender();
     if (window.SMEngineBridge) SMEngineBridge.renderNow(); // live stage feedback — see skew-drag branch's own comment above
   }
   function onDragUp() {
     if (onLayerSkewUp()) return;
+    stopMotionAutoScroll();
     endMarquee();
-    if (window._motionSkewDrag) { window._motionSkewDrag = null; if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); return; }
-    if (window._motionConnectDrag) { window._motionConnectDrag = null; document.body.style.cursor = ''; if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); return; }
+    if (window._motionSkewDrag) { window._motionSkewDrag = null; clearMotionSnapGuide(); flushMotionDragTimelineRender(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); return; }
+    if (window._motionConnectDrag) { window._motionConnectDrag = null; clearMotionSnapGuide(); document.body.style.cursor = ''; flushMotionDragTimelineRender(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); return; }
     if (!window._motionKeyDrag) return;
     window._motionKeyDrag = null;
+    clearMotionSnapGuide();
+    flushMotionDragTimelineRender();
     if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
   }
   document.addEventListener('mousemove', onDragMove);

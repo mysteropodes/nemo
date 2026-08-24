@@ -78,6 +78,14 @@ struct OutPoint {
     p: f64,
 }
 
+fn pack_points(points: &[OutPoint]) -> Vec<f64> {
+    let mut packed = Vec::with_capacity(points.len() * 3);
+    for point in points {
+        packed.extend_from_slice(&[point.x, point.y, point.p]);
+    }
+    packed
+}
+
 #[wasm_bindgen]
 pub struct StrokeModeler {
     params: Params,
@@ -188,12 +196,33 @@ impl StrokeModeler {
         serde_json::to_string(&self.down_impl(x, y, t, p)).unwrap()
     }
 
+    /// Allocation-light browser path. The legacy JSON methods stay exported
+    /// for compatibility; new JS consumes these packed x/y/pressure triplets
+    /// without stringify/parse on every pointer event.
+    pub fn down_packed(&mut self, x: f64, y: f64, t: f64, p: f64) -> Vec<f64> {
+        pack_points(&self.down_impl(x, y, t, p))
+    }
+
     #[wasm_bindgen(js_name = move)]
     pub fn move_(&mut self, x: f64, y: f64, t: f64, p: f64) -> String {
         serde_json::to_string(&self.move_impl(x, y, t, p)).unwrap()
     }
 
+    pub fn move_packed(&mut self, x: f64, y: f64, t: f64, p: f64) -> Vec<f64> {
+        pack_points(&self.move_impl(x, y, t, p))
+    }
+
     pub fn up(&mut self, x: f64, y: f64, t: f64, p: f64) -> String {
+        serde_json::to_string(&self.up_impl(x, y, t, p)).unwrap()
+    }
+
+    pub fn up_packed(&mut self, x: f64, y: f64, t: f64, p: f64) -> Vec<f64> {
+        pack_points(&self.up_impl(x, y, t, p))
+    }
+}
+
+impl StrokeModeler {
+    fn up_impl(&mut self, x: f64, y: f64, t: f64, p: f64) -> Vec<OutPoint> {
         let mut out = self.move_impl(x, y, t, p);
         // End-of-stroke catch-up toward the FINAL raw input — Google's
         // ModelEndOfStroke (position_modeler.h) verbatim: overshooting
@@ -232,6 +261,50 @@ impl StrokeModeler {
                 break;
             }
         }
-        serde_json::to_string(&out).unwrap()
+        out
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn assert_same_points(json: &str, packed: &[f64]) {
+        let decoded: Vec<serde_json::Value> = serde_json::from_str(json).unwrap();
+        assert_eq!(packed.len(), decoded.len() * 3);
+        for (index, point) in decoded.iter().enumerate() {
+            for (offset, key) in ["x", "y", "p"].iter().enumerate() {
+                let expected = point[*key].as_f64().unwrap();
+                let actual = packed[index * 3 + offset];
+                assert!(
+                    (actual - expected).abs() <= f64::EPSILON * actual.abs().max(1.0),
+                    "point {index} {key}: packed={actual}, json={expected}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn packed_api_matches_legacy_json_for_a_complete_stroke() {
+        let mut json_modeler = StrokeModeler::new(2, 1.25);
+        let mut packed_modeler = StrokeModeler::new(2, 1.25);
+
+        let json = json_modeler.down(12.0, 18.0, 1.0, 0.4);
+        let packed = packed_modeler.down_packed(12.0, 18.0, 1.0, 0.4);
+        assert_same_points(&json, &packed);
+
+        for &(x, y, t, p) in &[
+            (14.0, 19.0, 1.008, 0.5),
+            (22.0, 25.0, 1.021, 0.8),
+            (31.0, 21.0, 1.045, 0.65),
+        ] {
+            let json = json_modeler.move_(x, y, t, p);
+            let packed = packed_modeler.move_packed(x, y, t, p);
+            assert_same_points(&json, &packed);
+        }
+
+        let json = json_modeler.up(36.0, 24.0, 1.06, 0.3);
+        let packed = packed_modeler.up_packed(36.0, 24.0, 1.06, 0.3);
+        assert_same_points(&json, &packed);
     }
 }
