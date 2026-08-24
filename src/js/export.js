@@ -364,13 +364,12 @@ async function exportRenderPNGsToDir(dir,start,end,scale,onProgress,alpha){
   // effect, route every frame through the engine instead so the export
   // matches what the user sees on screen — see engine-bridge.js's
   // beginEffectsExport/renderFrameToPixelsPNG/endEffectsExport.
-  // Scale>1 (supersampled export) isn't supported on this path yet, so it
-  // only kicks in at the default scale — see renderFrameToPixelsPNG's own
-  // comment for why.
-  var useFx=(scale===1||!scale)&&exportNeedsEngine()&&window.SMEngineBridge&&window.SMEngineBridge.beginEffectsExport();
+  // scale (supersampled export, 2026-08 feedback #60) renders natively at
+  // cw*scale x ch*scale through the engine too — see renderFrameToPixelsPNG.
+  var useFx=exportNeedsEngine()&&window.SMEngineBridge&&window.SMEngineBridge.beginEffectsExport();
   try{
     for(var f=start,i=1;f<=end;f++,i++){
-      var url=useFx?await SMEngineBridge.renderFrameToPixelsPNG(f):exportFrameDataURL(f,scale,alpha);
+      var url=useFx?await SMEngineBridge.renderFrameToPixelsPNG(f,scale):exportFrameDataURL(f,scale,alpha);
       var bytes=exportDataURLToBytes(url);
       await exportWriteBytes(dir+'/frame_'+pad4(i)+'.png',bytes);
       if(onProgress)onProgress(i,end-start+1);
@@ -445,12 +444,12 @@ async function exportVideoBrowser(opts){
   rec.ondataavailable=function(e){if(e.data&&e.data.size)chunks.push(e.data);};
   var stopped=new Promise(function(resolve){rec.onstop=resolve;});
   rec.start();
-  var useFx=(scale===1||!scale)&&exportNeedsEngine()&&window.SMEngineBridge&&window.SMEngineBridge.beginEffectsExport();
+  var useFx=exportNeedsEngine()&&window.SMEngineBridge&&window.SMEngineBridge.beginEffectsExport();
   try{
     var frameMs=1000/fps;
     for(var f=r.start,i=1;f<=r.end;f++,i++){
       var t0=performance.now();
-      var url=useFx?await SMEngineBridge.renderFrameToPixelsPNG(f):exportFrameDataURL(f,scale,false);
+      var url=useFx?await SMEngineBridge.renderFrameToPixelsPNG(f,scale):exportFrameDataURL(f,scale,false);
       var img=await exportLoadImage(url);
       ctx.clearRect(0,0,cw,ch);
       ctx.drawImage(img,0,0,cw,ch);
@@ -573,7 +572,7 @@ async function exportGifBrowser(opts){
   var cw=Math.max(1,Math.round(state.canvasW*scale)),ch=Math.max(1,Math.round(state.canvasH*scale));
   var canvas=document.createElement('canvas');canvas.width=cw;canvas.height=ch;
   var ctx=canvas.getContext('2d',{willReadFrequently:true});
-  var useFx=(scale===1||!scale)&&exportNeedsEngine()&&window.SMEngineBridge&&window.SMEngineBridge.beginEffectsExport();
+  var useFx=exportNeedsEngine()&&window.SMEngineBridge&&window.SMEngineBridge.beginEffectsExport();
   var frameCount=r.end-r.start+1;
   var framePixels=[];
   try{
@@ -584,7 +583,7 @@ async function exportGifBrowser(opts){
     // introduced later.
     var samples=[];
     for(var f=r.start,i=1;f<=r.end;f++,i++){
-      var url=useFx?await SMEngineBridge.renderFrameToPixelsPNG(f):exportFrameDataURL(f,scale,false);
+      var url=useFx?await SMEngineBridge.renderFrameToPixelsPNG(f,scale):exportFrameDataURL(f,scale,false);
       var img=await exportLoadImage(url);
       ctx.clearRect(0,0,cw,ch);ctx.drawImage(img,0,0,cw,ch);
       var data=ctx.getImageData(0,0,cw,ch).data;
