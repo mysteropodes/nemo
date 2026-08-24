@@ -530,7 +530,7 @@ window.SM={
       saveActiveLayerFrame();updateUI();
     }},
   setStrokeColor:function(v){state.strokeColor=v;paintStrokeSwatches(v);
-    if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(p.data&&p.data.isVectorBrush)p.fillColor=v;else if(p.strokeColor)p.strokeColor=v;});saveActiveLayerFrame();updateUI();}
+    if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(p.data&&p.data.isVectorBrush){p.fillColor=v;applyBrushKeyline(p);}else if(p.strokeColor)p.strokeColor=v;});saveActiveLayerFrame();updateUI();}
     // Fill/Stroke Select tool: recolor ONLY the clicked aspect — a 'stroke'
     // selection here means strokeColor, never touches fillColor even on a
     // combined shape (that's the whole point of this tool vs plain Select).
@@ -574,7 +574,17 @@ window.SM={
   // the quick phdr toggle button since disabling stroke without it required
   // opening the color popover and hunting for "None".
   setStrokeEnabled:function(v){state.strokeEnabled=v;window.SM._syncStrokeEnabledUI(v);
-    if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(p.data&&p.data.isVectorBrush)return;p.strokeColor=v?state.strokeColor:null;});saveActiveLayerFrame();updateUI();}
+    if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){
+      if(p.data&&p.data.isVectorBrush){
+        var c=p.fillColor?p.fillColor.clone():new Color(state.strokeColor);
+        var targetInk=new Color(state.strokeColor);
+        if(targetInk.alpha<=0)targetInk.alpha=1;
+        if(v&&c.alpha<=0)c=targetInk.clone();
+        c.alpha=v?targetInk.alpha:0;
+        p.fillColor=c;applyBrushKeyline(p);return;
+      }
+      p.strokeColor=v?state.strokeColor:null;
+    });saveActiveLayerFrame();updateUI();}
     // fsselect's 'stroke' selection can be just a bounded segment (between
     // two crossings), which has no standalone color to null — disabling it
     // means the same real split-and-remove fsApplyDelete's Delete key does.
@@ -1126,6 +1136,7 @@ window.SM={
   toggleLayerSolo:function(idx){state.layers[idx].solo=!state.layers[idx].solo;loadFrame(state.currentFrame);updateUI();},
   renameLayer:function(idx,n){state.layers[idx].name=n;updateUI();},
   reorderLayer:function(fromIdx,toIdx){reorderLayer(fromIdx,toIdx);},
+  reorderLayersAtGap:function(fromIndices,gapIdx){reorderLayersAtGap(fromIndices,gapIdx);},
   reorderLayersBatch:function(fromIndices,toIdx){reorderLayersBatch(fromIndices,toIdx);},
   // Stroke profiles (van Dijk 6.2). Acts on the current canvas selection;
   // one undo step for the whole batch, like every other selection command.
@@ -2673,6 +2684,19 @@ function updateSelPropsPanel(){
       // FUTURE stroke invisible and skipping the bitmap-brush branch
       // entirely.
       var isBrushShape=ref.data&&(ref.data.isVectorBrush||ref.data.isFillShape||ref.data.bitmapBrushSpec||ref.data.brushTexturePreset||ref.data.isBrushTextureCopy);
+      // A Pressure Brush is represented by a filled ribbon, but it is still
+      // authored through the Stroke controls. Mirror its actual ribbon ink
+      // into those controls (including alpha/on-off) so Width, colour and
+      // visibility all describe and edit the selected object instead of a
+      // stale future-brush default. Fill Brush remains excluded: it belongs
+      // to the Fill channel and has different semantics.
+      var isPressureRibbon=ref.data&&ref.data.isVectorBrush&&!ref.data.isFillShape;
+      if(isPressureRibbon&&ref.fillColor){
+        var pressureCss=colorHex8(ref.fillColor);
+        state.strokeColor=pressureCss;paintStrokeSwatches(pressureCss);
+        state.strokeEnabled=ref.fillColor.alpha>0;
+        window.SM._syncStrokeEnabledUI(state.strokeEnabled);
+      }
       if(!isBrushShape){
         var hasFill=!!ref.fillColor;
         // colorHex8(), not .toCSS(true) — the latter always forces alpha to
@@ -3147,6 +3171,10 @@ function renderTimeline(){
     // markers rendered in Motion and vanished here). Same attribute, same
     // meaning, both modes — the row already knows its index.
     row.dataset.layer=li;
+    // The right half can reorder the same layer stack too. A narrow sticky
+    // grip keeps that gesture distinct from frame/key drags and remains
+    // reachable while the timeline is horizontally scrolled.
+    installLayerReorderGrip(row,li);
     // Tween curve strips (below) need this row taller than the default
     // ROW_H when it has a tween span to show — plain document flow handles
     // the actual reflow of rows below it for free, no cumulative-height
@@ -3925,7 +3953,15 @@ function syncLayerSelFromFrameSel(){
   _sel.frames.forEach(function(s){if(layers.indexOf(s.layer)<0)layers.push(s.layer);});
   layers.sort(function(a,b){return a-b;});
   _layerSel=layers;
+  // A layer-level multi-selection owns the canvas gizmo. Leaving an old
+  // active-layer element in selectedPaths would expose a second transform
+  // target and could make that one object participate twice in a drag.
+  if(_layerSel.length>1)clearSel(true);
   renderLayerList();
+  // The Animation 2D canvas now visualizes a multi-layer row selection as
+  // one transform box. Frame-cell selection can change _layerSel without a
+  // scene mutation, so explicitly refresh the overlay here.
+  if(window.SMEngineBridge)SMEngineBridge.renderNow();
 }
 document.getElementById('frame-grid').addEventListener('mousedown',function(e){
   if(e.button!==0)return;
@@ -5127,10 +5163,16 @@ function renderLayerList(frameOnly){
       window.SM.setActiveLayer(idx);
     });
     row.addEventListener('dblclick',function(){var idx3=parseInt(this.dataset.layer);var l2=state.layers[idx3];if(l2.symbolId){window.SM.enterSymbol(l2.symbolId);return;}if(l2.lfsGroup){window.SM.enterSymbol(l2.lfsIds.full);return;}startLayerRename(idx3);});
-    row.addEventListener('mousedown',function(e){
+    function beginLayerReorder(e){
       if(e.button!==0||e.target.closest('.lico'))return;
-      _layerDrag.active=true;_layerDrag.srcIdx=parseInt(this.dataset.layer);_layerDrag.startY=e.clientY;_layerDrag.moved=false;
-    });
+      armLayerReorder(e,parseInt(this.dataset.layer),'panel',this);
+    }
+    // Keep both event families. Tauri's WKWebView reliably emits the
+    // legacy mouse sequence for this custom drag while browser automation
+    // and some pen devices only emit pointer events. The shared active flag
+    // makes the compatibility mouse event that follows pointerdown harmless.
+    row.addEventListener('mousedown',beginLayerReorder);
+    row.addEventListener('pointerdown',beginLayerReorder);
     row.addEventListener('contextmenu',function(e){
       e.preventDefault();
       var idx4=parseInt(this.dataset.layer);window.SM.setActiveLayer(idx4);
@@ -5207,41 +5249,114 @@ function renderLayerList(frameOnly){
 // Manual mouse-based drag-to-reorder (kept consistent with the frame grid's
 // custom drag rather than HTML5 draggable, which behaves inconsistently
 // inside the Tauri webview).
-var _layerDrag={active:false,srcIdx:-1,startY:0,moved:false};
-window.addEventListener('mousemove',function(e){
+var _layerDrag={active:false,srcIdx:-1,startX:0,startY:0,moved:false,dropGap:-1,indicator:null,ghost:null,origin:'panel',grabOffsetY:0};
+function armLayerReorder(e,srcIdx,origin,sourceRow){
+  if(e.button!==0||_layerDrag.active)return;
+  var r=sourceRow&&sourceRow.getBoundingClientRect?sourceRow.getBoundingClientRect():null;
+  _layerDrag.active=true;
+  _layerDrag.srcIdx=srcIdx;
+  _layerDrag.startX=e.clientX;
+  _layerDrag.startY=e.clientY;
+  _layerDrag.moved=false;
+  _layerDrag.origin=origin||'panel';
+  _layerDrag.grabOffsetY=r?Math.max(0,Math.min(r.height,e.clientY-r.top)):17;
+}
+function installLayerReorderGrip(row,li){
+  if(!row||row.querySelector('.layer-reorder-grip'))return;
+  var grip=document.createElement('div');
+  grip.className='layer-reorder-grip';
+  grip.title='Glisser verticalement pour réordonner le calque';
+  function begin(e){
+    if(e.button!==0)return;
+    e.preventDefault();e.stopPropagation();
+    armLayerReorder(e,li,'grid',row);
+  }
+  grip.addEventListener('mousedown',begin);
+  grip.addEventListener('pointerdown',begin);
+  row.insertBefore(grip,row.firstChild);
+}
+window.installLayerReorderGrip=installLayerReorderGrip;
+function ensureLayerDragGhost(e){
+  if(_layerDrag.ghost)return;
+  var ghost=document.createElement('div');
+  ghost.className='layer-drag-ghost';
+  var source=document.querySelector((_layerDrag.origin==='grid'?'#frame-grid .frow':'#layer-list .lrow')+'[data-layer="'+_layerDrag.srcIdx+'"]');
+  var r=source&&source.getBoundingClientRect?source.getBoundingClientRect():null;
+  ghost.style.width=Math.round(Math.max(150,Math.min(300,r?r.width:220)))+'px';
+  ghost.style.height=Math.round(Math.max(18,r?r.height:34))+'px';
+  var ld=state.layers[_layerDrag.srcIdx];
+  if(ld&&ld.color)ghost.style.setProperty('--layer-drag-color',ld.color);
+  document.body.appendChild(ghost);
+  _layerDrag.ghost=ghost;
+  updateLayerDragGhost(e);
+}
+function updateLayerDragGhost(e){
+  if(!_layerDrag.ghost)return;
+  var w=_layerDrag.ghost.offsetWidth;
+  var left=Math.max(6,Math.min(window.innerWidth-w-6,e.clientX+12));
+  var top=Math.max(6,Math.min(window.innerHeight-_layerDrag.ghost.offsetHeight-6,e.clientY-_layerDrag.grabOffsetY));
+  _layerDrag.ghost.style.transform='translate3d('+Math.round(left)+'px,'+Math.round(top)+'px,0)';
+}
+function clearLayerDropIndicator(){
+  if(_layerDrag.indicator){_layerDrag.indicator.remove();_layerDrag.indicator=null;}
+  _layerDrag.dropGap=-1;
+}
+function moveLayerReorder(e){
   if(!_layerDrag.active)return;
   if(!_layerDrag.moved){
-    if(Math.abs(e.clientY-_layerDrag.startY)<4)return;
+    var dx=Math.abs(e.clientX-_layerDrag.startX),dy=Math.abs(e.clientY-_layerDrag.startY);
+    // Reordering is deliberately a vertical gesture. A small horizontal
+    // wobble must not steal a click from the layer row or its timeline.
+    if(dy<4||dy<dx*.55)return;
     _layerDrag.moved=true;
-    var src=document.querySelector('.lrow[data-layer="'+_layerDrag.srcIdx+'"]');if(src)src.classList.add('dragging');
+    ensureLayerDragGhost(e);
+    document.querySelectorAll('.lrow[data-layer="'+_layerDrag.srcIdx+'"],#frame-grid .frow[data-layer="'+_layerDrag.srcIdx+'"]').forEach(function(src){src.classList.add('dragging');});
   }
-  document.querySelectorAll('.lrow').forEach(function(r){r.classList.remove('drag-over');});
+  updateLayerDragGhost(e);
   var el=document.elementFromPoint(e.clientX,e.clientY);
-  var row=el&&el.closest('.lrow');
-  if(row)row.classList.add('drag-over');
-});
-window.addEventListener('mouseup',function(){
+  var row=el&&el.closest('.lrow[data-layer],#frame-grid .frow[data-layer]');
+  if(row&&row.dataset.layer!==undefined){
+    var rr=row.getBoundingClientRect();
+    var after=e.clientY>=rr.top+rr.height/2;
+    // Layer rows are painted top-to-bottom in reverse state-array order:
+    // visually BEFORE layer i is array gap i+1, visually AFTER it is gap i.
+    // Keeping this inversion here makes the blue line's screen position and
+    // reorderLayersAtGap's array-space destination describe the same gap.
+    _layerDrag.dropGap=parseInt(row.dataset.layer)+(after?0:1);
+    if(!_layerDrag.indicator){
+      _layerDrag.indicator=document.createElement('div');
+      _layerDrag.indicator.className='layer-drop-indicator';
+      document.body.appendChild(_layerDrag.indicator);
+    }
+    var surface=row.closest('#frame-grid')?document.getElementById('fg-wrap'):document.getElementById('layer-list');
+    var listRect=surface.getBoundingClientRect();
+    _layerDrag.indicator.style.left=listRect.left+'px';
+    _layerDrag.indicator.style.width=listRect.width+'px';
+    _layerDrag.indicator.style.top=(after?rr.bottom:rr.top)+'px';
+  }else clearLayerDropIndicator();
+}
+window.addEventListener('mousemove',moveLayerReorder);
+window.addEventListener('pointermove',moveLayerReorder);
+function finishLayerReorder(){
   if(!_layerDrag.active)return;
   if(_layerDrag.moved){
     window._layerDragJustEnded=true;
-    var overRow=document.querySelector('.lrow.drag-over');
-    if(overRow){
-      var destIdx=parseInt(overRow.dataset.layer);
+    if(_layerDrag.dropGap>=0){
       // Dragging one row of an active multi-selection moves the WHOLE
       // selection together, as one contiguous block — dragging a row that
-      // ISN'T part of the current selection still moves just that one row
-      // (matches how most apps treat a drag starting outside the selection
-      // as replacing it with a single-item drag).
-      if(_layerSel.length>1&&_layerSel.indexOf(_layerDrag.srcIdx)>=0&&_layerSel.indexOf(destIdx)<0){
-        window.SM.reorderLayersBatch(_layerSel,destIdx);
-      }else if(destIdx!==_layerDrag.srcIdx){
-        window.SM.reorderLayer(_layerDrag.srcIdx,destIdx);
-      }
+      // isn't part of it moves only that row. The gap-based API keeps the
+      // visible insertion line and the committed ordering identical.
+      var moving=(_layerSel.length>1&&_layerSel.indexOf(_layerDrag.srcIdx)>=0)?_layerSel.slice():[_layerDrag.srcIdx];
+      window.SM.reorderLayersAtGap(moving,_layerDrag.dropGap);
     }
   }
-  document.querySelectorAll('.lrow').forEach(function(r){r.classList.remove('dragging','drag-over');});
+  document.querySelectorAll('.lrow,.frow').forEach(function(r){r.classList.remove('dragging','drag-over');});
+  if(_layerDrag.ghost){_layerDrag.ghost.remove();_layerDrag.ghost=null;}
+  clearLayerDropIndicator();
   _layerDrag.active=false;_layerDrag.moved=false;
-});
+}
+window.addEventListener('mouseup',finishLayerReorder);
+window.addEventListener('pointerup',finishLayerReorder);
 function renderSymbolTabs(){
   var bar=document.getElementById('symbol-tabs');if(!bar)return;bar.innerHTML='';
   var scene=document.createElement('div');scene.className='sym-tab'+((state.activeSymbolId||state.activeMontageViewId)?'':' act');scene.textContent='Scene';
@@ -6751,7 +6866,7 @@ function clickEl(id){var el=document.getElementById(id);if(el)el.click();}
       }},
       {label:tt('menuAboutNemo'),action:function(){
         clickEl('btn-settings');
-        var t=document.querySelector('#settings-tabs .settings-tab[data-tab="updates"]');
+        var t=document.querySelector('#settings-tabs .settings-tab[data-tab="about"]');
         if(t)t.click();
       }}
     ];

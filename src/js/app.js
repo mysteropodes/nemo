@@ -354,6 +354,40 @@ function reorderLayersBatch(fromIndices,toIdx){
   activateUL(state.activeLayerIdx);
   loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast(SM.t('toastLayersReordered'));
 }
+// Gap-based counterpart used by the layer-panel drag affordance. A gap is
+// unambiguous (0 = before the first row, layers.length = after the last),
+// unlike a destination row which cannot distinguish its upper/lower edge.
+// Keeping this translation beside the actual array mutation guarantees the
+// blue insertion line and the committed order describe the same operation.
+function reorderLayersAtGap(fromIndices,gapIdx){
+  var moving=fromIndices.filter(function(i){return i>=0&&i<state.layers.length;})
+    .filter(function(i,p,a){return a.indexOf(i)===p;}).sort(function(a,b){return a-b;});
+  if(!moving.length)return;
+  gapIdx=Math.max(0,Math.min(state.layers.length,Math.round(gapIdx)));
+  var insertIdx=0;
+  for(var i=0;i<gapIdx;i++)if(moving.indexOf(i)<0)insertIdx++;
+  var activeLd=state.layers[state.activeLayerIdx];
+  var movedLd=moving.map(function(i){return state.layers[i];});
+  var movedUL=moving.map(function(i){return userLayers[i];});
+  var keptLd=state.layers.filter(function(_l,i){return moving.indexOf(i)<0;});
+  var keptUL=userLayers.filter(function(_l,i){return moving.indexOf(i)<0;});
+  // Dropping back into the block's existing gap is a real no-op — avoid an
+  // unnecessary undo entry and full scene rebuild.
+  var same=moving.every(function(orig,j){return orig===insertIdx+j;});
+  if(same)return;
+  saveAllLayerFrames();pushUndoLayers(true);
+  var nextLd=keptLd.slice(0,insertIdx).concat(movedLd,keptLd.slice(insertIdx));
+  var nextUL=keptUL.slice(0,insertIdx).concat(movedUL,keptUL.slice(insertIdx));
+  // Mutate the existing arrays instead of replacing them: inside a
+  // Component, state.layers is deliberately aliased to sym.layers.
+  Array.prototype.splice.apply(state.layers,[0,state.layers.length].concat(nextLd));
+  Array.prototype.splice.apply(userLayers,[0,userLayers.length].concat(nextUL));
+  userLayers.forEach(function(l){l.insertBelow(arcLayer);});
+  var newActiveIdx=state.layers.indexOf(activeLd);
+  state.activeLayerIdx=newActiveIdx>=0?newActiveIdx:0;
+  activateUL(state.activeLayerIdx);
+  loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast(SM.t(moving.length>1?'toastLayersReordered':'toastLayerReordered'));
+}
 function drawStage(){stageLayer.removeChildren();stageLayer.activate();
   new Path.Rectangle({point:[0,0],size:[state.canvasW,state.canvasH],fillColor:state.canvasBg,strokeColor:new Color(0,0,0,.08),strokeWidth:1});
   userLayers[state.activeLayerIdx].activate();}
@@ -437,37 +471,14 @@ function setHex8Input(el,hex){
 // tag (CLAUDE.md's own example) can't be added to one call site and
 // forgotten in the other twelve.
 function isSelectablePathChild(c){return !(c.data&&(c.data.isLinkedFillCompanion||c.data.isBrushTextureCopy));}
-// Pressure-brush ribbons are filled shapes with no real stroke (strokeColor
-// null, hasRealStroke false — see below) — two same-color strokes drawn
-// touching/overlapping had no visible seam and read as one fused trait
-// ("quand on fait un trait à côté d'un autre ils se joignent"). This hairline
-// is a pure RENDER detail: a live Paper.js strokeColor set directly on the
-// ribbon Path so buildSceneJson (engine-bridge.js) picks it up like any
-// other item, but never serialized as the real strokeColor field and never
-// flipping hasRealStroke (see serP's isVB override just below) — so tween
-// matching/export/onion-skin, all gated on hasRealStroke rather than raw
-// strokeColor, keep treating these strokes exactly as before.
-function brushKeylineColor(fillColor){
-  if(!fillColor)return null;
-  return new Color({hue:fillColor.hue,saturation:Math.min(1,fillColor.saturation*1.15),brightness:Math.max(0,fillColor.brightness*0.6),alpha:0.45});
-}
-function brushKeylineWidth(centerSegments){
-  if(!centerSegments||!centerSegments.length)return 1;
-  var sum=0,n=0;
-  centerSegments.forEach(function(s){if(typeof s.width==='number'){sum+=s.width;n++;}});
-  var avg=n?sum/n:6;
-  return Math.min(2.5,Math.max(0.4,avg*0.12));
-}
+// Pressure-brush ribbons are already the exact visible outline of the
+// authored stroke. A second, darker Paper stroke around that outline read as
+// an unintended double contour (feedback #52), especially after changing
+// width/opacity. Keep this choke point because every rebuild/load calls it,
+// but make its contract explicit: a pressure ribbon has no cosmetic keyline.
 function applyBrushKeyline(p){
-  // isFillShape excludes the separate Fill Brush tool (tools.js) — that one
-  // is meant to pour continuous, seamlessly-blending regions on purpose
-  // (same reason fillMergeSameColor/applyFillBrushPlacement treat it
-  // differently from the stroke-only pressure brush); only the plain
-  // stroke-brush ribbon gets the visual-separation hairline.
   if(!p.data||!p.data.isVectorBrush||p.data.isBrushTextureCopy||p.data.isFillShape)return;
-  var kl=brushKeylineColor(p.fillColor);
-  if(!kl)return;
-  p.strokeColor=kl;p.strokeWidth=brushKeylineWidth(p.data.centerSegments);p.strokeCap='round';p.strokeJoin='round';
+  p.strokeColor=null;
 }
 function serP(p){var isVB=!!(p.data&&p.data.isVectorBrush);var center=isVB&&p.data.centerSegments?p.data.centerSegments:undefined;
   var widthProfile=isVB&&p.data.widthProfile?p.data.widthProfile:undefined;
@@ -580,14 +591,9 @@ function serP(p){var isVB=!!(p.data&&p.data.isVectorBrush);var center=isVB&&p.da
   // items into the Stroke vs Fill channel) must read THIS, not strokeColor —
   // otherwise every fill-only shape's phantom '#ffffff' gets misread as a
   // real stroke and the shape is wrongly cloned into the Stroke channel too.
-  // Vector-brush ribbons carry a cosmetic hairline (brushKeylineColor, tools.js)
-  // so two same-color strokes drawn touching/overlapping stay visually
-  // distinguishable — it's a live Paper.js strokeColor, but purely a render
-  // detail, never a real drawn stroke. isVB forces hasRealStroke false
-  // regardless of that cosmetic value, so tween matching/export/onion-skin
-  // (all gated on hasRealStroke, never raw strokeColor — see realStrokeColor()
-  // in tweens.js) keep treating these strokes as fill-only, exactly as before
-  // this cosmetic hairline existed.
+  // Vector-brush ribbons paint through fillColor and never carry a real
+  // stroke channel. isVB therefore forces hasRealStroke false regardless of
+  // any legacy live strokeColor left by an older session.
   var hasRealStroke=isVB?false:!!p.strokeColor;
   return{segments:p.segments.map(function(s){return{point:[s.point.x,s.point.y],handleIn:[s.handleIn.x,s.handleIn.y],handleOut:[s.handleOut.x,s.handleOut.y]};}),closed:!!p.closed,strokeColor:(isVB||isNoStrokeChannel||isShadowNoStroke||isTexAnchor&&!p.strokeColor)?null:(p.strokeColor?colorHex8(p.strokeColor):'#ffffff'),hasRealStroke:hasRealStroke,strokeWidth:p.strokeWidth,strokeCap:p.strokeCap||'round',strokeJoin:p.strokeJoin||'round',miterLimit:p.miterLimit,fillColor:p.fillColor?colorHex8(p.fillColor):null,opacity:p.opacity!==undefined?p.opacity:1,dashArray:(p.dashArray&&p.dashArray.length)?p.dashArray.slice():undefined,dashOffset:p.dashOffset,paintOrder:(p.data&&p.data.paintOrder)?p.data.paintOrder:undefined,isVectorBrush:isVB||undefined,isFillShape:(p.data&&p.data.isFillShape)?true:undefined,centerSegments:center,widthProfile:widthProfile,strokeProfile:(p.data&&p.data.strokeProfile)||undefined,profileBase:(p.data&&p.data.profileBase)||undefined,fillSeed:fillSeed,fillSeeds:fillSeeds,fillGapPx:fillGapPx,fillWalls:fillWalls,strokeId:strokeId,brushGroupId:brushGroupId,isLinkedFillCompanion:isLinkedFillCompanion,linkedFillId:linkedFillId,tweenOn:(p.data&&p.data.tweenOn)?true:undefined,boxAngle:(p.data&&p.data.boxAngle)?p.data.boxAngle:undefined,
   // Rotate/scale anchor choice (2026-07, "la position du point d'ancrage

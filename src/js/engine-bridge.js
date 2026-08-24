@@ -1542,7 +1542,7 @@
           // visible ink IS the fill (a filled ribbon built from
           // centerSegments/widthProfile) — a real drawn stroke's
           // strokeColor is either null or just a thin keyline hairline
-          // (applyBrushKeyline, app.js), never the main paint. Nulling
+          // (legacy applyBrushKeyline output), never the main paint. Nulling
           // fillColor here too would leave a trimmed brush stroke with NO
           // paint at all (confirmed live: renders fully blank — only the
           // hairline keyline would remain, if even that). Trim Paths on a
@@ -2252,6 +2252,20 @@
     // only ONE of the two crosshairs, leaving the other stranded at the
     // shape's un-offset center — exactly the reported symptom.
     if (state.appMode === 'motion') return [];
+    // Timeline multi-layer selection in Animation 2D. The selection bridge
+    // owns the exact same bounds/hit-test data; render it here ahead of the
+    // ordinary selectedPaths box so the user sees one transform target for
+    // all selected rows instead of a misleading box on the active layer.
+    var ml = window.SMSelectBridge && SMSelectBridge.getMultiLayerBox ? SMSelectBridge.getMultiLayerBox() : null;
+    if (ml) {
+      var mb = ml.bounds, mzs = 1 / view.zoom, mItems = [];
+      mItems.push(boundsRectItem(mb.left, mb.top, mb.right, mb.bottom, null, [74, 158, 255, 220], 1.2 * mzs));
+      [mb.topLeft, mb.topRight, mb.bottomRight, mb.bottomLeft].forEach(function (p) {
+        mItems.push(rectItem(p.x, p.y, 3.8 * mzs, [255, 255, 255, 255], [74, 158, 255, 255], 1.2 * mzs));
+      });
+      mItems.push(circleItem(ml.pivot.x, ml.pivot.y, ml.ringRadius, null, [74, 158, 255, 180], 1.1 * mzs));
+      return mItems;
+    }
     // Selected native-video layer (2026-07, "une vidéo est un objet comme
     // les autres") — same visual language as the path gizmo below (blue
     // outline, white corner squares, rotate ring), geometry from the ONE

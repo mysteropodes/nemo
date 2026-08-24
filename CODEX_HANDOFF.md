@@ -454,3 +454,127 @@ façon et testé avec Position X `14 → 0`. Lecture simultanée jusqu'aux frame
 valeurs finales et deux lignes de composants restent cohérents. Les champs de
 propriété sont volontairement rafraîchis à l'arrêt de lecture (la scène, elle,
 évolue pendant la lecture). Aucun `error`/`warn` navigateur n'a été enregistré.
+
+## Mise à jour Codex — P1 ergonomie timeline Motion (2026-08-23)
+
+Travail local sur `codex/feedback-2026-08-22`, volontairement non commité
+séparément tant que le lot de feedbacks déjà présent dans le worktree n'est
+pas checkpointé. Fichiers de ce P1 : `src/js/motion.js`,
+`src/css/style.css` et assertions ajoutées dans
+`tests/feedback-2026-08-22.test.cjs`. Ne pas écraser les autres diffs déjà
+présents sur cette branche.
+
+Changements :
+
+- barre principale spécifique au mode Motion : les commandes Onion/Ghost/
+  Révision/Cycle/Tween propres à Animation 2D sont masquées uniquement dans
+  ce mode et réapparaissent sans mutation au retour en Animation 2D ;
+- en-tête Motion compact utilisant la bande existante de 42 px, avec nom du
+  calque actuellement visible, recherche calque/propriété, filtres Tout /
+  Animé / Modifié / Expressions / Erreurs / Effets, préréglages de colonnes
+  Compact / Animation / Compositing / 3D-Mograph et interrupteur de snapping ;
+- le filtrage des calques et le plan de propriétés sont des fonctions
+  communes consommées par `renderLayerListMotion` ET
+  `renderTimelineMotion`, afin de conserver l'invariant d'alignement gauche /
+  grille de `CLAUDE.md` §11 ;
+- la timeline basse garde ses champs numériques rapides, réduits à 28 px,
+  ainsi que le nom, la clé et la piste ; seuls les éditeurs secondaires
+  expression/grille d'ancre restent dans l'inspecteur droit. Les en-têtes de
+  groupes (Transform compris) passent de 34 px + marge à 22 px + 2 px, avec
+  exactement la même hauteur dans la grille ;
+- déplacement de clés sensible au scroll horizontal, auto-scroll près des
+  bords, snapping sur tête de lecture, work area, repères comp/calque, autres
+  clés et grille BPM, avec guide bleu et libellé. Cmd/Ctrl désactive
+  temporairement le snapping. Un snap vers une frame déjà occupée retombe
+  sur la frame libre brute au lieu de bloquer le drag.
+
+Validation : `node --check src/js/motion.js`, `git diff --check` et
+`npm test` passent (21/21). Test navigateur sur `127.0.0.1:1424` avec projet
+1920×1080/24 fps : ouverture/repli de Transform, recherche `rotation` (une
+seule ligne des deux côtés), création et déplacement de deux clés Position,
+retour Animation 2D (barre complète et ligne historique intactes), puis
+retour Motion. Le panneau droit conserve les valeurs complètes et la liste
+basse garde les valeurs compactes. Aucune ligne n'a été ajoutée d'un seul côté.
+
+Complément P1 du même jour : l'auto-scroll horizontal des clés utilise
+maintenant une boucle rAF tant que le pointeur
+reste dans la zone de bord : il ne dépend plus de nouveaux événements souris,
+et s'arrête explicitement au relâchement ou à la limite du scroll.
+
+Validation complémentaire sur le port sans cache `1426` : deux clés Position
+créées puis la seconde déplacée jusqu'au bord droit avec progression de la
+timeline. Les favoris et le menu d'actions `•••`, ajoutés pendant cette passe,
+ont été retirés à la demande de Cyril afin de conserver la présentation P1
+précédente.
+
+Complément réordonnancement : les calques peuvent maintenant être déplacés
+verticalement depuis la grille temporelle droite, en Animation 2D comme en
+Motion, via une prise étroite et sticky au bord visible de la grille. Les
+drags initiés depuis la liste gauche et depuis cette prise droite utilisent
+la même machine `reorderLayersAtGap`, le même indicateur d'insertion et un
+fantôme transparent limité à un liseré discret qui suit le pointeur. Cette
+prise dédiée évite toute collision avec les drags horizontaux de clés et de
+barres in/out.
+
+Validation navigateur sans cache sur `127.0.0.1:1427` : projet neuf, calque
+dupliqué, déplacement du calque supérieur sous l'autre depuis la prise de la
+grille Animation 2D, passage en Motion puis même déplacement depuis la grille,
+et troisième déplacement depuis la liste gauche. L'ordre visible s'inverse à
+chaque dépôt et aucun fantôme/indicateur ne subsiste après relâchement. Tests
+Node : 22/22.
+
+### Complément P1 — sélection et édition des clés Motion
+
+La sélection est désormais cohérente entre la liste et la grille : un clic sur
+une clé la sélectionne, un clic sur le nom d'une propriété sélectionne toutes
+ses clés, Cmd/Ctrl ajoute ou retire une propriété et Shift sélectionne une plage
+de propriétés visibles. Les pistes et propriétés sélectionnées reçoivent la
+même surbrillance. Les champs compacts affichent `—` lorsque les valeurs sont
+mixtes et une saisie numérique applique une valeur absolue à toutes les clés
+compatibles sélectionnées, y compris sur plusieurs calques, sans créer de clé à
+la tête de lecture.
+
+Les clés distinguent maintenant visuellement les interpolations : carré pour
+Hold/bloc, losange pour Linear et rond pour Smooth. Le passage de Hold vers
+Linear ou Smooth désactive réellement le flag `hold`, ce qui évite une ancienne
+incohérence entre l'icône, la courbe et l'évaluation.
+
+Important : la barre interactive reliant deux clés de valeurs différentes
+(`motion-key-connect`) a été volontairement conservée. Elle permet toujours de
+sélectionner ses deux extrémités, de déplacer le segment complet et de retimer
+avec Alt ; elle est protégée par un test de régression dédié.
+
+Validation navigateur sans cache sur `127.0.0.1:1428` : quatre clés Position /
+Rotation sur deux frames, sélection de deux clés par propriété, ajout de la
+seconde propriété avec Cmd, modification groupée de Position X à `50`, puis
+conversion de la sélection successivement en Hold, Smooth et Linear. Les
+comptages DOM confirment 2 clés dans chaque état visuel et aucune clé
+supplémentaire. `git diff --check`, `node --check src/js/motion.js` et la suite
+Node passent : 26/26.
+
+Suites utiles, non incluses dans ce lot : vélocité/influence numériques, distinction entre
+interpolation temporelle et spatiale, poignées Bézier continues/cassées et
+roving keyframes. Le copier-coller multi-calques mérite aussi une passe dédiée
+pour préserver explicitement le mapping calque/propriété.
+
+### Ajustement sélection visuelle et scrub relatif (2026-08-23, soir)
+
+À la suite du retour visuel de Cyril, Linear conserve explicitement le losange,
+Hold utilise un carré plein et Smooth un cercle. Une clé sélectionnée garde sa
+silhouette mais reçoit maintenant un remplissage bleu clair, un bord blanc, un
+halo bleu discret et un léger agrandissement. L'état courant orange reste
+distinct de l'état sélectionné.
+
+Un défaut réel découvert pendant la validation a également été corrigé : le
+clic simple sélectionnait le modèle de clé avant la navigation puis ne
+repeignait pas toujours le diamant. La navigation se fait désormais avant la
+résolution de la clé vivante et le clic simple reconstruit immédiatement son
+contenu/classe sélectionnée. Test sans cache sur `127.0.0.1:1429` : clic sur
+une clé non courante → exactement une clé `.sel`, visible dès le même geste.
+
+Les champs numériques Motion ont maintenant deux sémantiques complémentaires :
+une valeur tapée reste absolue (alignement de toutes les clés sélectionnées),
+alors qu'un scrub horizontal applique son delta à chacune. Scénario navigateur
+avec deux X distincts : scrub de `+10`, valeurs `0 → 10` et `50 → 60`; l'écart
+est préservé. La barre `motion-key-connect` reste inchangée. Validation finale :
+`git diff --check`, syntaxe JS et 26/26 tests Node.
