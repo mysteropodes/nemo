@@ -3379,10 +3379,13 @@
   // params are now zoom-scaled (see run_one_effect, engine.rs) and must
   // match the true document size to look right in the export.
   //
-  // Scope limitation: unlike exportFrameDataURL, this path doesn't support
-  // a supersampling `scale` factor — export.js only takes it for scale=1
-  // when routing through here. Revisit if higher-res effect exports are
-  // ever needed.
+  // Supersampled effects export (2026-08, feedback #60 — "il faudrait
+  // augmenter la résolution [du] rendu final pour avoir une qualité pro"):
+  // renderFrameToPixelsPNG now takes the same `scale` factor
+  // exportFrameDataURL always supported, rendering at cw*scale × ch*scale
+  // instead of native size. This is NOT a resize-then-blit upscale — the
+  // whole scene (vector geometry AND effect params) renders natively at
+  // the higher pixel density, via resizeEngineOffscreenAtScale below.
   var _fxExportSavedFrame = null, _fxExportSavedEngineW = 0, _fxExportSavedEngineH = 0;
   function beginEffectsExport() {
     if (!engine) return false;
@@ -3402,6 +3405,28 @@
   function resizeEngineOffscreen(w, h) {
     engine.resize(w, h);
     engine.set_viewport(0, 0, 1, 0, w / 2, h / 2, 1);
+  }
+  // Same idea as resizeEngineOffscreen, but for a render target that's a
+  // uniform SCALE factor of the document's own native size rather than an
+  // arbitrary independent w/h — the pivot must stay the NATIVE document
+  // center (nativeW/2, nativeH/2), not half of the scaled target, or the
+  // content renders at the wrong density/position the moment scale != 1.
+  // Exact same pan-compensation algebra as syncViewport's panAdjX/panAdjY
+  // (see that function's own derivation) with the "desired pan before
+  // pivot compensation" fixed at 0 (no on-screen pan concept applies to an
+  // offscreen export) and z fixed at `scale`: pan = pivot*(scale-1) is what
+  // keeps world (0,0) landing on pixel (0,0) instead of drifting by the
+  // pivot's own offset once zoom != 1. effect_zoom is set to the SAME
+  // `scale` (not 1) so effect radii — already expressed as document pixels,
+  // scaled by effect_zoom in engine.rs's run_one_effect — grow with the
+  // render density instead of looking relatively thinner at higher scale.
+  function resizeEngineOffscreenAtScale(nativeW, nativeH, scale) {
+    var w = Math.max(1, Math.round(nativeW * scale)), h = Math.max(1, Math.round(nativeH * scale));
+    engine.resize(w, h);
+    var pivotWX = nativeW / 2, pivotWY = nativeH / 2;
+    var panAdjX = pivotWX * (scale - 1), panAdjY = pivotWY * (scale - 1);
+    engine.set_viewport(panAdjX, panAdjY, scale, 0, pivotWX, pivotWY, scale);
+    return { w: w, h: h };
   }
   // Renders one frame and returns the raw RGBA8 pixels — the actual
   // GPU-readback call site, factored out so both the PNG-encoding export
@@ -3423,12 +3448,12 @@
     var bytes = await engine.render_to_pixels(json);
     return new Uint8ClampedArray(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   }
-  async function renderFrameToPixelsPNG(frameIdx) {
+  async function renderFrameToPixelsPNG(frameIdx, scale) {
     var cw = state.canvasW, ch = state.canvasH;
-    resizeEngineOffscreen(cw, ch);
+    var size = resizeEngineOffscreenAtScale(cw, ch, scale || 1);
     var pixels = await renderFrameRawPixels(frameIdx);
-    var imgData = new ImageData(pixels, cw, ch);
-    var off = document.createElement('canvas'); off.width = cw; off.height = ch;
+    var imgData = new ImageData(pixels, size.w, size.h);
+    var off = document.createElement('canvas'); off.width = size.w; off.height = size.h;
     off.getContext('2d').putImageData(imgData, 0, 0);
     return off.toDataURL('image/png');
   }
