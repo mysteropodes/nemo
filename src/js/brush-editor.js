@@ -15,11 +15,25 @@
     { key: 'spaceJitter', label: 'Var. espacement', min: 0, max: 1, step: 0.05 },
     { key: 'rotationJitter', label: 'Var. rotation (°)', min: 0, max: 180, step: 5 },
     { key: 'sizeJitter', label: 'Var. taille', min: 0, max: 1, step: 0.05 },
+    // Pression start/milieu/fin (p5.brush, feedback #61) — un multiplicateur
+    // FIXE le long du trait, indépendant de la pression réelle du stylet
+    // (qui reste gérée à part, voir data.widthProfile) : les deux se
+    // COMBINENT (multiplication), donc un preset "fin→épais→fin" garde son
+    // galbe même dessiné très légèrement ou très fort. 1/1/1 = aucun effet,
+    // identique au comportement d'avant cette fonctionnalité.
+    { key: 'pressureStart', label: 'Pression début', min: 0.1, max: 2.5, step: 0.05 },
+    { key: 'pressureMid', label: 'Pression milieu', min: 0.1, max: 2.5, step: 0.05 },
+    { key: 'pressureEnd', label: 'Pression fin', min: 0.1, max: 2.5, step: 0.05 },
     { key: 'opacity', label: 'Opacité', min: 0.05, max: 1, step: 0.05 },
     { key: 'opacityJitter', label: 'Var. opacité', min: 0, max: 1, step: 0.05 },
     { key: 'scatter', label: 'Dispersion', min: 0, max: 1, step: 0.05 },
     { key: 'dashGap', label: 'Trous (bord cassé)', min: 0, max: 0.6, step: 0.02 },
     { key: 'edgeNoise', label: 'Bord irrégulier', min: 0, max: 0.4, step: 0.02 },
+    // Bord doux (p5.brush "sharpness", feedback #61) — 1 = net (identique
+    // à avant), plus bas = halo dégressif simulé par dabs concentriques
+    // (buildBrushDabs, tools.js) puisque tout ici reste 100% vectoriel,
+    // sans passe de flou raster.
+    { key: 'sharpness', label: 'Netteté du bord', min: 0.1, max: 1, step: 0.05 },
     { key: 'polySides', label: 'Côtés (polygone)', min: 3, max: 10, step: 1 },
     { key: 'bristleCount', label: 'Nb. de poils (bristle)', min: 2, max: 12, step: 1 },
     // Scribble-fill (tipShape:'scribble') — a woven patch of short,
@@ -43,7 +57,7 @@
     { value: 'scribble', label: 'Gribouillis (graphite/fusain)' },
     { value: 'custom', label: 'Personnalisé (dessiné)…' },
   ];
-  var DEFAULT_PARAMS = { nibSize: 1, roundness: 0.9, spacing: 0.4, spaceJitter: 0.2, rotationMode: 'tangent', rotationJitter: 20, sizeJitter: 0.2, opacity: 0.6, opacityJitter: 0.2, scatter: 0.15, dashGap: 0, tipShape: 'ellipse', edgeNoise: 0, polySides: 5, bristleCount: 5, tipCorner: 0.15, scribbleCount: 8, scribbleLen: 1.4, scribbleLenJitter: 0.4, scribbleWidth: 0.12, scribbleSpread: 0.6, scribbleAngleSpread: 70 };
+  var DEFAULT_PARAMS = { nibSize: 1, roundness: 0.9, spacing: 0.4, spaceJitter: 0.2, rotationMode: 'tangent', rotationJitter: 20, sizeJitter: 0.2, opacity: 0.6, opacityJitter: 0.2, scatter: 0.15, dashGap: 0, tipShape: 'ellipse', edgeNoise: 0, polySides: 5, bristleCount: 5, tipCorner: 0.15, scribbleCount: 8, scribbleLen: 1.4, scribbleLenJitter: 0.4, scribbleWidth: 0.12, scribbleSpread: 0.6, scribbleAngleSpread: 70, pressureStart: 1, pressureMid: 1, pressureEnd: 1, sharpness: 1, markerTip: true };
 
   function closePopover() {
     if (!popover) return;
@@ -99,6 +113,9 @@
       '<div class="bpe-row bpe-capture-row" id="bpe-capture-row" style="display:none">' +
       '<span class="bpe-lbl"></span><button class="pbtn" id="bpe-capture-btn">Capturer la sélection</button>' +
       '<span class="bpe-val" id="bpe-capture-status"></span></div>' +
+      '<div class="bpe-row" id="bpe-markertip-row" style="display:none"><span class="bpe-lbl">Empâtement (marqueur)</span><select id="bpe-markertip">' +
+      '<option value="1">Oui</option><option value="0">Non</option>' +
+      '</select></div>' +
       '<div class="bpe-row"><span class="bpe-lbl">Rotation</span><select class="bpe-rotmode" id="bpe-rotmode">' +
       '<option value="tangent">Suit le tracé</option><option value="random">Aléatoire</option><option value="fixed">Fixe</option>' +
       '</select></div>' +
@@ -117,6 +134,13 @@
     tipSel.value = params.tipShape || 'ellipse';
     var captureRow = el.querySelector('#bpe-capture-row');
     var captureStatus = el.querySelector('#bpe-capture-status');
+    var markerTipRow = el.querySelector('#bpe-markertip-row');
+    var markerTipSel = el.querySelector('#bpe-markertip');
+    markerTipSel.value = (params.markerTip !== false) ? '1' : '0';
+    function syncMarkerTipVisibility() {
+      markerTipRow.style.display = params.tipShape === 'rect' ? 'flex' : 'none';
+    }
+    markerTipSel.addEventListener('change', function () { params.markerTip = markerTipSel.value === '1'; renderPreview(); });
 
     // "dessiner sa texture de brush" — capture whatever's currently
     // selected on the canvas (drawn with Pen/Draw beforehand, same
@@ -146,6 +170,7 @@
       showToast(SM.t('toastShapeCapturedSuffix') + res.stamp.pointCount + ' points)');
     });
     syncCaptureRowVisibility();
+    syncMarkerTipVisibility();
 
     function renderPreview() {
       var ctx = canvas.getContext('2d'), w = canvas.width, h = canvas.height;
@@ -176,7 +201,7 @@
       });
     });
     rotSel.addEventListener('change', function () { params.rotationMode = rotSel.value; renderPreview(); });
-    tipSel.addEventListener('change', function () { params.tipShape = tipSel.value; syncCaptureRowVisibility(); renderPreview(); });
+    tipSel.addEventListener('change', function () { params.tipShape = tipSel.value; syncCaptureRowVisibility(); syncMarkerTipVisibility(); renderPreview(); });
 
     renderPreview();
 

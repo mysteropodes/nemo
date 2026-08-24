@@ -126,6 +126,7 @@
       { label: 'Formes de pointe', keys: ['marker-flat', 'ink-chisel', 'pastel-chip', 'chalk-facet', 'ink-splatter', 'drybrush-bristle', 'watercolor-edge'] },
       { label: 'Distribution (rnote)', keys: ['airbrush-soft', 'marker-dry'] },
       { label: 'Scribble-fill', keys: ['graphite-scribble'] },
+      { label: 'p5.brush (pression / bord doux)', keys: ['calligraphy-taper', 'airbrush-blur'] },
     ];
   }
   function customKeys() {
