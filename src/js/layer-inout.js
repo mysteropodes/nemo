@@ -448,7 +448,24 @@
   // left untouched by a Shift-click itself so a run of Shift-clicks grows
   // or shrinks the range from the SAME fixed end rather than drifting.
   var _barAnchorLi = null;
-  function onDown(li, row, type, e) {
+  // forceHandleEl (2026-08, feedback: "quand les calques sont calé au tout
+  // début c'est compliqué d'attraper le in point avec la souris") — the
+  // sticky reorder grip (installLayerReorderGrip, timeline.js) sits at
+  // z-index:9, ABOVE this bar's own z-index:2 stacking context, so the
+  // instant a bar's inPoint lands near frame 0 (or a scroll parks the
+  // viewport's left edge inside a bar), the in-handle physically
+  // coincides with the grip and every mousedown resolves to the grip
+  // first — the handle becomes literally unclickable, not just fiddly.
+  // Raising the WHOLE bar's z-index above the grip was rejected: the
+  // grip's sole reason to exist is staying reachable even while a long
+  // bar's BODY covers the viewport's left edge after scrolling — that
+  // would trade one unreachable target for another. Instead the grip's
+  // own handler (installLayerReorderGrip) hit-tests for a handle first
+  // and, when the click is really on one, calls this SAME onDown with
+  // the real handle element passed explicitly — forceHandleEl lets that
+  // caller's e.target (the grip, not the handle) not leak into the
+  // handle's own hover-lock behavior (.hot class below).
+  function onDown(li, row, type, e, forceHandleEl) {
     e.stopPropagation(); e.preventDefault();
     var ld = state.layers[li]; if (!ld) return;
     if (e.metaKey || e.ctrlKey) { // toggle one, no drag
@@ -491,7 +508,7 @@
     // drags past its small hitbox. Cleared at mouseup below. null for a
     // bar-BODY drag (type==='both' from the bar itself, not a handle) —
     // nothing to highlight there.
-    var handleEl = (type === 'in' || type === 'out') ? e.target : null;
+    var handleEl = forceHandleEl || ((type === 'in' || type === 'out') ? e.target : null);
     if (handleEl) handleEl.classList.add('hot');
     // Grabbing ANY part of an already-selected bar (body OR an edge handle)
     // moves/trims the whole group together — feedback: "je ne peux pas
@@ -1280,6 +1297,10 @@
 
   window.SMLayerInOut = {
     inPointOf: inPointOf, outPointOf: outPointOf, hasCustomRange: hasCustomRange, buildBar: buildBar, updateBar: updateBar,
+    // Exposed so the reorder grip (timeline.js) can hand off a mousedown
+    // that's really meant for an in/out handle it happens to be covering —
+    // see onDown's own forceHandleEl comment for why this exists.
+    onDown: onDown,
     alignBars: alignBars, distributeBars: distributeBars, flipBars: flipBars, staggerBars: staggerBars, selectEveryNth: selectEveryNth, invertBarSelection: invertBarSelection,
     // Exposed so Motion's own grid marquee can drive bar selection too —
     // it intercepts the mousedown in capture phase before this module's

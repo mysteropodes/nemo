@@ -5268,6 +5268,29 @@ function installLayerReorderGrip(row,li){
   grip.title='Glisser verticalement pour réordonner le calque';
   function begin(e){
     if(e.button!==0)return;
+    // Grip sits at z-index:9 (sticky, always reachable even while a long
+    // bar's body scrolls under it) — ABOVE the in/out bar's own z-index:2,
+    // so a bar whose inPoint lands near frame 0 puts its in-handle
+    // physically under this grip: every native click there resolves to
+    // the grip first, making the handle unclickable (feedback 2026-08:
+    // "quand les calques sont calé au tout début c'est compliqué
+    // d'attraper le in point"). Hit-test for a handle FIRST — same ±6px
+    // tolerance as the handle's own CSS ::before hitbox — and hand off to
+    // its real onDown instead of reordering when the click is really on
+    // one; native reordering is unaffected everywhere else, including the
+    // long-bar-scrolled-under-the-grip case this grip exists for (a
+    // handle is never physically there in that case).
+    if(window.SMLayerInOut&&window.SMLayerInOut.onDown){
+      var handles=row.querySelectorAll('.layer-inout-handle');
+      for(var hi=0;hi<handles.length;hi++){
+        var h=handles[hi],r=h.getBoundingClientRect();
+        if(e.clientX>=r.left-6&&e.clientX<=r.right+6&&e.clientY>=r.top-6&&e.clientY<=r.bottom+6){
+          e.preventDefault();e.stopPropagation();
+          window.SMLayerInOut.onDown(li,row,h.classList.contains('left')?'in':'out',e,h);
+          return;
+        }
+      }
+    }
     e.preventDefault();e.stopPropagation();
     armLayerReorder(e,li,'grid',row);
   }
