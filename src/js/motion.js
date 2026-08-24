@@ -1796,6 +1796,38 @@
     if (!ld.layerUid) ld.layerUid = 'ly_' + Date.now().toString(36) + '_' + Math.floor(Math.random() * 1e6);
     return ld.layerUid;
   }
+  // World-space union bounds of several TOP-LEVEL layers, at a given frame
+  // (2026-08, feedback #59 — "le null doit être placé au centre de tout les
+  // calques en fonction des éléments qu'ils contiennent"). Deliberately NOT
+  // userLayers[li].bounds directly: that's the LIVE Paper geometry in its
+  // own untransformed space — Motion's Position/Rotation/Scale/parenting is
+  // a separate JS-level system applied at RENDER time (pathTransform), so a
+  // layer with existing Motion keys would report its ORIGINAL position, not
+  // where it currently sits on screen. Same corner-transform technique
+  // buildGuideLayerItems (engine-bridge.js) already uses for a single
+  // point, just done for the 4 corners of each layer's raw bounds and
+  // unioned across every layer in the list.
+  function layerWorldBoundsUnion(indices, frame) {
+    var left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
+    indices.forEach(function (li) {
+      var ld = state.layers[li], layer = window.userLayers && userLayers[li];
+      if (!ld || !layer) return;
+      var b = layer.bounds;
+      if (!b || !isFinite(b.width) || !isFinite(b.height) || (b.width === 0 && b.height === 0)) return;
+      var corners = [[b.left, b.top], [b.right, b.top], [b.right, b.bottom], [b.left, b.bottom]];
+      var pts = corners.map(function (c) { return { point: c, handleIn: [0, 0], handleOut: [0, 0] }; });
+      var ownMat = layerMotionAt(li, frame);
+      if (ownMat) pts = transformSegments(pts, { x: b.center.x + ownMat.ax, y: b.center.y + ownMat.ay }, ownMat);
+      var parentChain = parentChainMats(li, frame);
+      for (var pc = 0; pc < parentChain.length; pc++) pts = transformSegments(pts, parentChain[pc].pivot, parentChain[pc].mat);
+      pts.forEach(function (p) {
+        left = Math.min(left, p.point[0]); top = Math.min(top, p.point[1]);
+        right = Math.max(right, p.point[0]); bottom = Math.max(bottom, p.point[1]);
+      });
+    });
+    if (left === Infinity) return null;
+    return { x: left, y: top, w: right - left, h: bottom - top, cx: (left + right) / 2, cy: (top + bottom) / 2 };
+  }
   function findLayerIndexByUid(uid) {
     if (!uid) return -1;
     for (var i = 0; i < state.layers.length; i++) if (state.layers[i].layerUid === uid) return i;
@@ -7901,6 +7933,7 @@
     transformImageRectByMatrix: transformImageRectByMatrix,
     project3DImageRect: project3DImageRect,
     ensureLayerUid: ensureLayerUid,
+    layerWorldBoundsUnion: layerWorldBoundsUnion,
     findLayerIndexByUid: findLayerIndexByUid,
     setLayerParent: setLayerParent,
     setLayerParentB: setLayerParentB,

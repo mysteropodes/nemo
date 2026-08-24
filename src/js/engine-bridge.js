@@ -1964,6 +1964,8 @@
       if (safetyItems.length) layers.push({ items: safetyItems });
       var guideItems = buildGuideLayerItems();
       if (guideItems.length) layers.push({ items: guideItems });
+      var nullItems = buildNullLayerItems();
+      if (nullItems.length) layers.push({ items: nullItems });
       var perspectiveItems = window.buildPerspectiveGuideItems ? window.buildPerspectiveGuideItems() : [];
       if (perspectiveItems.length) layers.push({ items: perspectiveItems });
       var symmetryItems = window.buildSymmetryGuideItems ? window.buildSymmetryGuideItems() : [];
@@ -2195,6 +2197,50 @@
         segments: [{ point: [cx - ex, cy - ey], handleIn: [0, 0], handleOut: [0, 0] }, { point: [cx + ex, cy + ey], handleIn: [0, 0], handleOut: [0, 0] }],
         closed: false, fillColor: null, strokeColor: col, strokeWidth: Math.max(1, 1 / view.zoom),
       });
+    }
+    return items;
+  }
+  // ---- Null layers (2026-08, feedback #59 — a Null Object layer had zero
+  // canvas presence: no marker to click/drag, so parenting or centering one
+  // required editing raw fields). Same non-content-layer pattern as a guide
+  // layer just above: position is ld.nullPos (a WORLD anchor, defaults to
+  // canvas center — see addNullLayer, timeline.js, which also auto-centers
+  // it on the layers pre-selected at creation time), composed through the
+  // layer's OWN Motion transform + full parent chain exactly like any
+  // ordinary layer's pivot (layerMotionAt/parentChainMats — a Null has no
+  // bounds/pivot of its own to worry about, same simplification as a
+  // guide's flat dx/dy offset). Drawn as a small SCREEN-CONSTANT-SIZE
+  // marker (divided by view.zoom, same convention as circleItem's pressure
+  // cursor above) — a Null has no real-world extent, so scaling its marker
+  // with canvas zoom would be meaningless. Shape (ld.nullShape) is cosmetic
+  // only, to help tell several Nulls apart at a glance.
+  function buildNullLayerItems() {
+    if (!window.SMMotion) return [];
+    var items = [], frame = state.currentFrame, HS = 12 / view.zoom, sw = 1.5 / view.zoom;
+    for (var i = 0; i < state.layers.length; i++) {
+      var nld = state.layers[i];
+      if (!nld.isNullLayer || nld.visible === false) continue;
+      var basePos = nld.nullPos || [state.canvasW / 2, state.canvasH / 2];
+      var ownMat = SMMotion.layerMotionAt(i, frame);
+      var pt = [{ point: [basePos[0] + (ownMat ? ownMat.dx : 0), basePos[1] + (ownMat ? ownMat.dy : 0)], handleIn: [0, 0], handleOut: [0, 0] }];
+      var parentChain = SMMotion.parentChainMats(i, frame);
+      for (var pc = 0; pc < parentChain.length; pc++) {
+        pt = SMMotion.transformSegments(pt, parentChain[pc].pivot, parentChain[pc].mat);
+      }
+      var cx = pt[0].point[0], cy = pt[0].point[1];
+      var col = cssColorToRgba(nld.color || '#ff2d78', 1) || [255, 45, 120, 255];
+      var shape = nld.nullShape || 'cross';
+      if (shape === 'circle') {
+        items.push(circleItem(cx, cy, HS, null, col, sw));
+      } else if (shape === 'square') {
+        items.push(rectItem(cx, cy, HS, null, col, sw));
+      } else if (shape === 'diamond') {
+        var dseg = [{ point: [cx, cy - HS] }, { point: [cx + HS, cy] }, { point: [cx, cy + HS] }, { point: [cx - HS, cy] }];
+        items.push({ segments: roundSegs(dseg), closed: true, fillColor: null, strokeColor: col, strokeWidth: sw });
+      } else {
+        items.push(lineItem([cx - HS, cy], [cx + HS, cy], col, sw));
+        items.push(lineItem([cx, cy - HS], [cx, cy + HS], col, sw));
+      }
     }
     return items;
   }
