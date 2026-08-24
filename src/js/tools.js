@@ -3510,6 +3510,13 @@ var BRUSH_PRESETS={
   // patch of short independently-angled marks instead of a line of blobs,
   // the graphite/charcoal "scribbled shading" look from the reference pack.
   'graphite-scribble':{nibSize:1.4,roundness:1,  spacing:.5, spaceJitter:.25,rotationMode:'tangent',rotationJitter:0, sizeJitter:0,   opacity:.5, opacityJitter:.3, scatter:0,   dashGap:0, tipShape:'scribble',scribbleCount:9,scribbleLen:1.5,scribbleLenJitter:.4,scribbleWidth:.1,scribbleSpread:.7,scribbleAngleSpread:75},
+  // p5.brush-inspired (2026-08, feedback #61) — the two settings p5.brush
+  // exposes that nothing above did: a fixed start/mid/end width curve
+  // ("pressure", independent of the stylet) and a soft/blurred edge
+  // ("sharpness"). These two presets exist to make both features
+  // immediately reachable/visible, not just buried in the editor sliders.
+  'calligraphy-taper':{nibSize:1.4,roundness:.3, spacing:.25,spaceJitter:.05,rotationMode:'fixed',fixedAngle:35,rotationJitter:3, sizeJitter:.05,opacity:.9, opacityJitter:.05,scatter:.02,dashGap:0, tipShape:'rect',tipCorner:.05,pressureStart:.15,pressureMid:1,pressureEnd:.15},
+  'airbrush-blur':    {nibSize:1.6,roundness:1,  spacing:.35,spaceJitter:.2, rotationMode:'random',rotationJitter:180,sizeJitter:.2, opacity:.35,opacityJitter:.2, scatter:.1, dashGap:0, sharpness:.35},
 };
 // Hard ceiling on dabs per stroke, regardless of preset/length — protects
 // against a very long stroke with tight spacing multiplying scene-
@@ -3533,6 +3540,13 @@ var BRUSH_PRESETS={
 // (60fps at ~2600 scene items); 1500 measured 58ms, a real risk of a
 // felt commit hitch, so NOT raised further than this.
 var BRUSH_MAX_DABS=900;
+// Concentric layers a soft-edge (sharpness<1) dab stamp expands into —
+// see buildBrushDabs' default-tip branch. 3 is the minimum that reads as
+// a genuine falloff (center + mid + outer halo) rather than a visible
+// double-outline; more layers would look smoother but the budget math
+// above already divides maxPositions by this, so raising it thins out
+// long strokes faster for a marginal quality gain.
+var SHARPNESS_LAYERS=3;
 // Single lookup point for a preset's parameters, whether built-in or one of
 // the user's own saved presets (state.customBrushPresets, keyed by a
 // generated id — see brush-editor.js) — every reader of BRUSH_PRESETS[key]
@@ -3701,6 +3715,25 @@ function sampleAcrossWidth(rand,distribution){
     default:return u; // 'uniform' — exact historical behavior
   }
 }
+// p5.brush-style pressure curve (2026-08, feedback #61 — "j'aimerais que
+// tu t'inspire de [p5.brush] avec les mêmes réglages"): a PRESET-level
+// width multiplier along the stroke, independent of any real stylet
+// pressure. p5.brush calls this "pressure" and accepts [start,end] or
+// [start,mid,end] — this is the 3-point form (defaults 1/1/1, a pure
+// no-op, so every existing preset without these fields is bit-for-bit
+// unaffected). Deliberately MULTIPLIES onto whatever localWidth already
+// resolved (a fixed baseWidth OR a real widthProfile pressure ribbon) —
+// unlike p5.brush, where "pressure" IS the whole width signal, here the
+// two combine: a "thin→thick→thin" preset curve still swells further
+// under a harder stylet push, rather than one replacing the other.
+function pressureCurveMul(preset,frac){
+  var s=preset.pressureStart!==undefined?preset.pressureStart:1;
+  var m=preset.pressureMid!==undefined?preset.pressureMid:1;
+  var e=preset.pressureEnd!==undefined?preset.pressureEnd:1;
+  if(s===1&&m===1&&e===1)return 1; // fast path — no-op for every preset that never sets these
+  if(frac<=.5)return s+(m-s)*(frac/.5);
+  return m+(e-m)*((frac-.5)/.5);
+}
 function buildBrushDabs(pathLike,preset,baseWidth,rng,widthProfile){
   var rand=rng||Math.random;
   var len=pathLike.length;
@@ -3708,8 +3741,8 @@ function buildBrushDabs(pathLike,preset,baseWidth,rng,widthProfile){
   var nibScale=preset.nibSize!==undefined?preset.nibSize:1;
   var spacingFrac=preset.spacing!==undefined?preset.spacing:.35;
   function localWidth(at){
-    if(!widthProfile||!widthProfile.length)return baseWidth;
-    return widthAtFrac(widthProfile,len>0?at/len:0);
+    var base=(!widthProfile||!widthProfile.length)?baseWidth:widthAtFrac(widthProfile,len>0?at/len:0);
+    return base*pressureCurveMul(preset,len>0?at/len:0);
   }
   // Cap-safety spacing floor: derived from the SMALLEST width along the
   // profile (or baseWidth when constant) so the total-dab-count bound
@@ -3724,9 +3757,16 @@ function buildBrushDabs(pathLike,preset,baseWidth,rng,widthProfile){
   // Bristle/scribble tips emit several sub-marks PER stamp position (see
   // below) — divide the position budget by that count up front so total
   // emitted dabs still respects BRUSH_MAX_DABS regardless of tip shape.
+  // Sharpness < 1 (soft edge, feedback #61) does the same on the default
+  // tip branch — SHARPNESS_LAYERS concentric dabs per position instead
+  // of one — only for that branch (bristle/scribble are already
+  // composite, multi-mark tips where a separate soft-edge halo per
+  // strand/mark would be visual noise, not a clearer soft edge).
   var bristleCount=preset.tipShape==='bristle'?Math.max(1,preset.bristleCount||5):1;
   var scribbleCount=preset.tipShape==='scribble'?Math.max(1,preset.scribbleCount||8):1;
-  var perPositionCount=Math.max(bristleCount,scribbleCount);
+  var sharpness=preset.sharpness!==undefined?preset.sharpness:1;
+  var softLayerCount=(bristleCount===1&&scribbleCount===1&&sharpness<1)?SHARPNESS_LAYERS:1;
+  var perPositionCount=Math.max(bristleCount,scribbleCount,softLayerCount);
   var maxPositions=Math.max(1,Math.floor(BRUSH_MAX_DABS/perPositionCount));
   // Cap-safety compression (task #106: a long stroke at a tiny fixed pitch
   // blows through BRUSH_MAX_DABS) — ONLY kicks in when the stroke would
@@ -3826,14 +3866,71 @@ function buildBrushDabs(pathLike,preset,baseWidth,rng,widthProfile){
         var w2=Math.max(.3,nibDiam*sizeMul2);
         var h2=Math.max(.3,w2*roundness);
         var angle2=angleBase+(rand()*2-1)*(preset.rotationJitter||0);
-        var dab2=buildDabShape(w2,h2,preset,rand);
-        dab2.rotate(angle2);
-        dab2.position=center2;
-        dab2.data={dabOpacity:Math.max(0,Math.min(1,(preset.opacity!==undefined?preset.opacity:.5)*(1+(rand()*2-1)*(preset.opacityJitter||0))))};
-        dabs.push(dab2);
+        var baseOp=Math.max(0,Math.min(1,(preset.opacity!==undefined?preset.opacity:.5)*(1+(rand()*2-1)*(preset.opacityJitter||0))));
+        if(sharpness>=1){
+          var dab2=buildDabShape(w2,h2,preset,rand);
+          dab2.rotate(angle2);
+          dab2.position=center2;
+          dab2.data={dabOpacity:baseOp};
+          dabs.push(dab2);
+        }else{
+          // Soft edge (feedback #61, p5.brush's "sharpness") simulated in
+          // pure vector terms: SHARPNESS_LAYERS concentric copies, growing
+          // outward with falling opacity, instead of one crisp dab — a
+          // solid center plus a fading halo reads as a blurred edge at
+          // normal viewing/zoom without any raster blur pass. haloScale is
+          // how far past the nib's own size the softest layer reaches;
+          // opMul is a Gaussian-shaped falloff (never a POW that hits exact
+          // 0 at the outer layer — found live: Math.pow(1-lt,2) put the
+          // LAST layer at opacity 0, a fully invisible dab burning budget
+          // for nothing) — exp(-lt²·2.5) front-loads the falloff near the
+          // center like a real Gaussian, but the outermost layer still
+          // lands around 8% opacity, a genuinely visible faint edge.
+          var haloScale=1+(1-sharpness)*1.4;
+          for(var sl=0;sl<SHARPNESS_LAYERS&&dabs.length<BRUSH_MAX_DABS;sl++){
+            var lt=SHARPNESS_LAYERS>1?sl/(SHARPNESS_LAYERS-1):0;
+            var layerScale=1+lt*(haloScale-1);
+            var opMul=Math.exp(-lt*lt*2.5);
+            var layerDab=buildDabShape(w2*layerScale,h2*layerScale,preset,rand);
+            layerDab.rotate(angle2);
+            layerDab.position=center2;
+            // opMul is already exactly 1 at lt=0 (the center layer) — no
+            // sl===0 special case needed, the formula covers it.
+            layerDab.data={dabOpacity:baseOp*opMul};
+            dabs.push(layerDab);
+          }
+        }
       }
     }
     d+=spacing*(1+(rand()*2-1)*(preset.spaceJitter||0));
+  }
+  // Marker buildup (feedback #61, p5.brush's "markerTip", default true —
+  // matches p5.brush's own default): felt-tips/markers pool a little
+  // extra ink where the pen touches down and lifts off, a flat rect tip
+  // otherwise can't produce since every stamp along the stroke is
+  // identical. A FIXED handful of slightly-oversized, extra-opaque dabs
+  // right at t=0 and t=len — independent of stroke length, so it never
+  // meaningfully eats into BRUSH_MAX_DABS the way a proportional addition
+  // would on a long stroke. Only the 'rect' (flat/marker) tip: an
+  // ellipse/polygon/etc. stamped repeatedly already looks like buildup by
+  // construction, this specifically compensates for a flat tip's uniform
+  // silhouette.
+  if(preset.tipShape==='rect'&&preset.markerTip!==false){
+    [0,len].forEach(function(endAt){
+      var pt=pathLike.getPointAt(endAt);
+      var tan=pathLike.getTangentAt(endAt)||new Point(1,0);
+      var localW=localWidth(endAt);
+      var nibDiam=Math.max(.5,localW*nibScale);
+      var baseOp=Math.max(0,Math.min(1,preset.opacity!==undefined?preset.opacity:.5));
+      for(var bk=0;bk<2&&dabs.length<BRUSH_MAX_DABS;bk++){
+        var bMul=.85+bk*.2;
+        var buildDab=buildDabShape(nibDiam*bMul,nibDiam*roundness*bMul,preset,rand);
+        buildDab.rotate(tan.angle);
+        buildDab.position=pt;
+        buildDab.data={dabOpacity:Math.min(1,baseOp*1.4)};
+        dabs.push(buildDab);
+      }
+    });
   }
   return dabs;
 }
