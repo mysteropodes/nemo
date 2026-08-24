@@ -514,7 +514,7 @@
       g.keys.forEach(function (k) {
         var nf = k.frame + delta;
         if (nf < 0 || nf > state.totalFrames - 1) ok = false;
-        var occupant = g.track.keys.find(function (o) { return o.frame === nf; });
+        var occupant = keyAt(g.track, nf);
         if (occupant && g.keys.indexOf(occupant) < 0) ok = false;
       });
     });
@@ -567,7 +567,7 @@
       var f = state.currentFrame + c.dt;
       if (f < 0 || f > state.totalFrames - 1) return;
       var track = ensureTrack(ld, c.prop);
-      var ex = track.keys.find(function (k) { return k.frame === f; });
+      var ex = keyAt(track, f);
       if (ex) { ex.v = c.v.slice(); ex.hold = c.hold; ex.curvePoints = cloneCurvePts(c.curvePoints); }
       else track.keys.push({ frame: f, v: c.v.slice(), hold: c.hold, curvePoints: cloneCurvePts(c.curvePoints), hOut: [0, 0], hIn: [0, 0] });
       sortKeys(track); n++;
@@ -652,7 +652,18 @@
   function hasKeys(ld, prop) { var t = trackFor(ld, prop); return !!(t && t.keys && t.keys.length); }
   function isAnimated(ld, prop) { return hasKeys(ld, prop); }
   function sortKeys(track) { track.keys.sort(function (a, b) { return a.frame - b.frame; }); }
-  function keyAt(track, frame) { return track.keys.find(function (k) { return k.frame === frame; }) || null; }
+  function keyAt(track, frame) {
+    if (!track || !track.keys || !track.keys.length) return null;
+    var keys = track.keys, lo = 0, hi = keys.length - 1;
+    while (lo <= hi) {
+      var mid = (lo + hi) >> 1;
+      var keyFrame = keys[mid].frame;
+      if (keyFrame < frame) lo = mid + 1;
+      else if (keyFrame > frame) hi = mid - 1;
+      else return keys[mid];
+    }
+    return null;
+  }
   function staticValue(ld, prop) {
     var st = ld.motionStatic && ld.motionStatic[prop];
     if (st) return st.slice();
@@ -663,6 +674,23 @@
     // exactly like PROP_DEFAULT.position would be if it existed there.
     var def = PROP_DEFAULT[prop];
     return def ? def.slice() : [0, 0];
+  }
+
+  // Callers clamp before the first/after the last key, so the remaining
+  // query is always inside one segment. Motion evaluation runs this lookup
+  // for every animated property and element on every rendered frame: a
+  // linear walk made long productions progressively slower even though the
+  // keys are already sorted. Keep the interpolation itself unchanged and
+  // locate only its left key in O(log n).
+  function segmentIndexAtFrame(keys, frame) {
+    var lo = 0, hi = keys.length - 2;
+    while (lo <= hi) {
+      var mid = (lo + hi) >> 1;
+      if (frame < keys[mid].frame) hi = mid - 1;
+      else if (frame >= keys[mid + 1].frame) lo = mid + 1;
+      else return mid;
+    }
+    return Math.max(0, Math.min(keys.length - 2, lo));
   }
 
   // The value of `prop` on layer `ld` at `frame` — exact key, interpolated,
@@ -682,16 +710,12 @@
     if (frame <= ks[0].frame) return ks[0].v[0];
     var last = ks[ks.length - 1];
     if (frame >= last.frame) return last.v[0];
-    for (var i = 0; i < ks.length - 1; i++) {
-      var a = ks[i], b = ks[i + 1];
-      if (frame >= a.frame && frame < b.frame) {
-        if (a.hold) return a.v[0];
-        var t = (frame - a.frame) / (b.frame - a.frame);
-        var y = evalCurvePoints(a.curvePoints || DEFAULT_CURVE, t);
-        return a.v[0] + (b.v[0] - a.v[0]) * y;
-      }
-    }
-    return last.v[0];
+    var i = segmentIndexAtFrame(ks, frame);
+    var a = ks[i], b = ks[i + 1];
+    if (a.hold) return a.v[0];
+    var t = (frame - a.frame) / (b.frame - a.frame);
+    var y = evalCurvePoints(a.curvePoints || DEFAULT_CURVE, t);
+    return a.v[0] + (b.v[0] - a.v[0]) * y;
   }
   function rawValueAtFrame(ld, prop, frame) {
     var track = trackFor(ld, prop);
@@ -700,35 +724,31 @@
     if (frame <= ks[0].frame) return ks[0].v.slice();
     var last = ks[ks.length - 1];
     if (frame >= last.frame) return last.v.slice();
-    for (var i = 0; i < ks.length - 1; i++) {
-      var a = ks[i], b = ks[i + 1];
-      if (frame >= a.frame && frame < b.frame) {
-        // Hold keyframe (Caddis/AE convention, 2026-07): the value stays
-        // pinned to `a` for the whole segment, then jumps to `b` the
-        // instant frame reaches b.frame — no interpolation. Flag lives on
-        // the LEFT key (a), matching AE's own model (hold is a property of
-        // the OUTGOING keyframe, not the segment).
-        if (a.hold) return a.v.slice();
-        var t = (frame - a.frame) / (b.frame - a.frame);
-        var y = evalCurvePoints(a.curvePoints || DEFAULT_CURVE, t);
-        // Position gets real spatial-bezier curvature through its
-        // hOut/hIn handles (same construction as camera.js's motion
-        // path) whenever either handle is non-zero — a straight [0,0]
-        // handle collapses to the plain linear-in-eased-t case below.
-        if (prop === 'position' && ((a.hOut && (a.hOut[0] || a.hOut[1])) || (b.hIn && (b.hIn[0] || b.hIn[1])))) {
-          var ho = a.hOut || [0, 0], hi = b.hIn || [0, 0];
-          var p1x = a.v[0] + ho[0], p1y = a.v[1] + ho[1], p2x = b.v[0] + hi[0], p2y = b.v[1] + hi[1];
-          var v = 1 - y;
-          var px = v * v * v * a.v[0] + 3 * v * v * y * p1x + 3 * v * y * y * p2x + y * y * y * b.v[0];
-          var py = v * v * v * a.v[1] + 3 * v * v * y * p1y + 3 * v * y * y * p2y + y * y * y * b.v[1];
-          return [px, py];
-        }
-        var out = [];
-        for (var d = 0; d < a.v.length; d++) out.push(a.v[d] + (b.v[d] - a.v[d]) * y);
-        return out;
-      }
+    var i = segmentIndexAtFrame(ks, frame);
+    var a = ks[i], b = ks[i + 1];
+    // Hold keyframe (Caddis/AE convention, 2026-07): the value stays
+    // pinned to `a` for the whole segment, then jumps to `b` the
+    // instant frame reaches b.frame — no interpolation. Flag lives on
+    // the LEFT key (a), matching AE's own model (hold is a property of
+    // the OUTGOING keyframe, not the segment).
+    if (a.hold) return a.v.slice();
+    var t = (frame - a.frame) / (b.frame - a.frame);
+    var y = evalCurvePoints(a.curvePoints || DEFAULT_CURVE, t);
+    // Position gets real spatial-bezier curvature through its
+    // hOut/hIn handles (same construction as camera.js's motion
+    // path) whenever either handle is non-zero — a straight [0,0]
+    // handle collapses to the plain linear-in-eased-t case below.
+    if (prop === 'position' && ((a.hOut && (a.hOut[0] || a.hOut[1])) || (b.hIn && (b.hIn[0] || b.hIn[1])))) {
+      var ho = a.hOut || [0, 0], hi = b.hIn || [0, 0];
+      var p1x = a.v[0] + ho[0], p1y = a.v[1] + ho[1], p2x = b.v[0] + hi[0], p2y = b.v[1] + hi[1];
+      var v = 1 - y;
+      var px = v * v * v * a.v[0] + 3 * v * v * y * p1x + 3 * v * y * y * p2x + y * y * y * b.v[0];
+      var py = v * v * v * a.v[1] + 3 * v * v * y * p1y + 3 * v * y * y * p2y + y * y * y * b.v[1];
+      return [px, py];
     }
-    return last.v.slice();
+    var out = [];
+    for (var d = 0; d < a.v.length; d++) out.push(a.v[d] + (b.v[d] - a.v[d]) * y);
+    return out;
   }
 
   // ---- Expression engine (2026-07) — a modernized take on AE's per-
@@ -865,16 +885,27 @@
     var track = trackFor(holder, prop);
     return (track && track.keys) ? track.keys.length : 0;
   }
+  function nearestKeyIndex(keys, targetFrame) {
+    var lo = 0, hi = keys.length;
+    while (lo < hi) {
+      var mid = (lo + hi) >> 1;
+      if (keys[mid].frame < targetFrame) lo = mid + 1;
+      else hi = mid;
+    }
+    if (lo === 0) return 0;
+    if (lo === keys.length) return keys.length - 1;
+    var prevDistance = targetFrame - keys[lo - 1].frame;
+    var nextDistance = keys[lo].frame - targetFrame;
+    // Preserve the historical linear scan's tie behavior: because it only
+    // replaced the winner on a strictly smaller distance, the earlier key
+    // won when the target sat exactly halfway between two keys.
+    return nextDistance < prevDistance ? lo : lo - 1;
+  }
   function exprNearestKey(holder, prop, t) {
     var track = trackFor(holder, prop);
     if (!track || !track.keys || !track.keys.length) return null;
     var targetFrame = t * (state.fps || 24);
-    var bestI = 0, bestD = Infinity;
-    for (var i = 0; i < track.keys.length; i++) {
-      var d = Math.abs(track.keys[i].frame - targetFrame);
-      if (d < bestD) { bestD = d; bestI = i; }
-    }
-    return exprKeyAt(holder, prop, bestI + 1);
+    return exprKeyAt(holder, prop, nearestKeyIndex(track.keys, targetFrame) + 1);
   }
   // Project-wide expression preamble (Van Dijk 7.2, "set global variables":
   // define something once and use it from every expression instead of
@@ -3278,7 +3309,7 @@
       var uf = _motionDrag.frame;
       _motionDrag.u.targets.forEach(function (t) {
         var track = t.holder.motion.position;
-        var k = track.keys.find(function (kk) { return kk.frame === uf; });
+        var k = keyAt(track, uf);
         if (!k) {
           // no key here yet on THIS element — freeze its interpolated
           // value as a new key so the group edit doesn't yank its whole
@@ -6610,6 +6641,26 @@
     }
   }
 
+  // Key drags can emit well above the display refresh rate. Their collision
+  // and retiming logic below updates the data synchronously, but rebuilding
+  // the entire Motion grid for every mousemove only paints intermediate
+  // states the screen can never display. Coalesce the DOM work to one rebuild
+  // per animation frame and flush the latest state on pointer release.
+  var _motionDragTimelineRaf = 0;
+  function requestMotionDragTimelineRender() {
+    if (_motionDragTimelineRaf) return;
+    _motionDragTimelineRaf = requestAnimationFrame(function () {
+      _motionDragTimelineRaf = 0;
+      renderTimeline();
+    });
+  }
+  function flushMotionDragTimelineRender() {
+    if (!_motionDragTimelineRaf) return;
+    cancelAnimationFrame(_motionDragTimelineRaf);
+    _motionDragTimelineRaf = 0;
+    renderTimeline();
+  }
+
   // Drag-to-retime a keyframe (mousemove/up delegated from ui.js's global
   // pointer handlers via SMMotion.onDragMove/onDragUp, same pattern as the
   // span-end/keyframe drag handlers already in timeline.js).
@@ -6653,7 +6704,7 @@
         cd.a.frame = cd.startAFrame + d; cd.b.frame = cd.startBFrame + d;
         sortKeys(track);
       }
-      renderTimeline();
+      requestMotionDragTimelineRender();
       if (window.SMEngineBridge) SMEngineBridge.renderNow();
       return;
     }
@@ -6718,7 +6769,7 @@
         if (touched.indexOf(p.track) < 0) touched.push(p.track);
       });
       touched.forEach(sortKeys);
-      renderTimeline();
+      requestMotionDragTimelineRender();
       // Live stage feedback (2026-07: "un component ne bouge pas en temps
       // réel quand on drag" — the timeline diamond tracked the cursor via
       // renderTimeline() above, but the interpolated value AT THE CURRENT
@@ -6747,7 +6798,7 @@
       if (!ok) return;
       d.keys.forEach(function (s) { s.key.frame += deltaFrames; sortKeys(trackFor(s.holder, s.prop)); });
       d.startX = e.clientX; // re-baseline so the next move is a fresh delta from here
-      renderTimeline();
+      requestMotionDragTimelineRender();
       if (window.SMEngineBridge) SMEngineBridge.renderNow(); // live stage feedback — see skew-drag branch's own comment above
       return;
     }
@@ -6756,16 +6807,17 @@
     var track = trackFor(d.ld, d.prop);
     if (keyAt(track, nf)) return; // don't stomp an existing key
     d.key.frame = nf; sortKeys(track);
-    renderTimeline();
+    requestMotionDragTimelineRender();
     if (window.SMEngineBridge) SMEngineBridge.renderNow(); // live stage feedback — see skew-drag branch's own comment above
   }
   function onDragUp() {
     if (onLayerSkewUp()) return;
     endMarquee();
-    if (window._motionSkewDrag) { window._motionSkewDrag = null; if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); return; }
-    if (window._motionConnectDrag) { window._motionConnectDrag = null; document.body.style.cursor = ''; if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); return; }
+    if (window._motionSkewDrag) { window._motionSkewDrag = null; flushMotionDragTimelineRender(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); return; }
+    if (window._motionConnectDrag) { window._motionConnectDrag = null; document.body.style.cursor = ''; flushMotionDragTimelineRender(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); return; }
     if (!window._motionKeyDrag) return;
     window._motionKeyDrag = null;
+    flushMotionDragTimelineRender();
     if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
   }
   document.addEventListener('mousemove', onDragMove);
