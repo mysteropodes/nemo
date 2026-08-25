@@ -2696,11 +2696,34 @@
   // pass through the containing layer and every parent exactly like the
   // rendered path. Keeping the inverse alongside it makes canvas dragging
   // write the element-local key value even when a parent is rotated/scaled.
+  //
+  // 2026-08 fix (feedback: "si je bouge un élément parenté à un élément
+  // avec des transformation cela inverse les commande x" — also the
+  // Motion PATH/dots drawing in the wrong place for a parented layer,
+  // and the anchor-drag gesture on one): this used to return [] outright
+  // for ANY layer-level target (`!t.strokeId`), on the assumption a plain
+  // layer's own motionBoxGeom pivot was already "the" local point and
+  // needed no outer wrapping. That's true for an UNPARENTED layer, but
+  // the moment ld.parentLayerUid is set, the render pipeline
+  // (getEffectiveStrokes/buildSceneJson, via parentChainMats) composes
+  // the parent chain on top regardless — every consumer of
+  // outerWorldPoint/outerLocalPoint (position path+dots draw, anchor
+  // crosshair draw+hit-test+drag, position-dot drag, effector drag) needs
+  // that SAME chain or it silently disagrees with where the object
+  // actually renders, worse the more the parent is rotated/scaled. The
+  // "add this layer's OWN motion" step stays gated on t.strokeId — that
+  // part is ONLY relevant when nesting an ELEMENT inside its containing
+  // layer's transform; for a plain layer target, t.holder already IS
+  // that layer's own motion (baked into motionBoxGeom's fwd/pivot
+  // directly), so re-adding it here would compose it twice.
   function outerMotionMaps(t){
-    if(!t||!t.strokeId)return[];
-    var out=[],lm=layerMotionAt(t.li,state.currentFrame);
-    if(lm&&userLayers[t.li]){
-      out.push({mat:lm,pivot:{x:userLayers[t.li].bounds.center.x+lm.ax,y:userLayers[t.li].bounds.center.y+lm.ay}});
+    if(!t||t.li==null)return[];
+    var out=[];
+    if(t.strokeId){
+      var lm=layerMotionAt(t.li,state.currentFrame);
+      if(lm&&userLayers[t.li]){
+        out.push({mat:lm,pivot:{x:userLayers[t.li].bounds.center.x+lm.ax,y:userLayers[t.li].bounds.center.y+lm.ay}});
+      }
     }
     return out.concat(parentChainMats(t.li,state.currentFrame));
   }
@@ -2935,8 +2958,11 @@
     var mh = is3DTargetForBox ? null : motionHandlePositions(t);
     if (mh) {
       var boxCol = [74, 158, 255, 204];
-      var lb = mh.g.bounds;
-      var bc1 = mh.g.fwd(lb.left, lb.top), bc2 = mh.g.fwd(lb.right, lb.top), bc3 = mh.g.fwd(lb.right, lb.bottom), bc4 = mh.g.fwd(lb.left, lb.bottom);
+      // Reuses mh.corners (already outer-wrapped by motionHandlePositions)
+      // instead of recomputing via mh.g.fwd directly — that used to bypass
+      // the outer/parent-chain wrapping entirely (2026-08 fix, same root
+      // cause as the box-misaligned-after-parenting bug above).
+      var bc1 = mh.corners.nw, bc2 = mh.corners.ne, bc3 = mh.corners.se, bc4 = mh.corners.sw;
       [[bc1, bc2], [bc2, bc3], [bc3, bc4], [bc4, bc1]].forEach(function (seg) {
         items.push({ segments: [{ point: [seg[0].x, seg[0].y] }, { point: [seg[1].x, seg[1].y] }], closed: false, fillColor: null, strokeColor: boxCol, strokeWidth: 1 * zs });
       });
@@ -3186,35 +3212,23 @@
     var px = t.boundsCenter.x + anc[0], py = t.boundsCenter.y + anc[1];
     var r = rot * Math.PI / 180, c = Math.cos(r), s = Math.sin(r);
     var sx = scl[0] / 100, sy = scl[1] / 100;
-    // Parent chain (2026-08 fix, feedback: "quand un calque est parenté
-    // le bounding box est décalé par rapport à l'objet") — LAYER-level
-    // target only (t.strokeId unset): an element target's outer wrapping
-    // (containing layer + ITS parent chain) is already added separately
-    // by outerWorldPoint/outerMotionMaps in buildOverlayItems, untouched
-    // here to avoid composing the chain twice. Before this, a plain
-    // parented layer's box/anchor/hit-test never agreed with where
-    // getEffectiveStrokes/buildSceneJson actually render it — those both
-    // apply parentChainMats, this never did (outerMotionMaps was already
-    // a no-op for a layer-level target, gated on t.strokeId, so nothing
-    // downstream of THIS function ever added it either).
-    var chain = (!t.strokeId && t.li != null) ? parentChainMats(t.li, state.currentFrame) : [];
+    // LOCAL only — this target's own position/rotation/scale, no outer
+    // (parent chain / containing-layer) wrapping. Every caller composes
+    // that separately via outerWorldPoint/outerLocalPoint (2026-08 fix,
+    // see outerMotionMaps' own comment for why the wrapping lives THERE,
+    // once, rather than being duplicated into this function too).
     function fwd(x, y) {
       var lx = (x - px) * sx, ly = (y - py) * sy;
-      var w = { x: px + lx * c - ly * s + pos[0], y: py + lx * s + ly * c + pos[1] };
-      for (var i = 0; i < chain.length; i++) w = applyMotionPoint(w, chain[i].pivot, chain[i].mat);
-      return w;
+      return { x: px + lx * c - ly * s + pos[0], y: py + lx * s + ly * c + pos[1] };
     }
     // Inverse of fwd — world point back to the shape's own local space.
     // [c -s; s c] is a pure rotation matrix, so its inverse is just its
     // transpose ([c s; -s c]); added for vertex dragging (buildOverlayItems'
     // vertex dots / onDown/onDrag's 'vertex' mode below), which needs to go
     // world->local to recover the vertex's LOCAL offset from wherever the
-    // mouse currently is in world space. Undoes the chain FIRST (outermost
-    // ancestor first), mirroring fwd's own last-applied-first symmetry.
+    // mouse currently is in world space.
     function inv(wx, wy) {
-      var w = { x: wx, y: wy };
-      for (var i = chain.length - 1; i >= 0; i--) w = invertMotionPoint(w, chain[i].pivot, chain[i].mat);
-      var ux = w.x - pos[0] - px, uy = w.y - pos[1] - py;
+      var ux = wx - pos[0] - px, uy = wy - pos[1] - py;
       var lx = ux * c + uy * s, ly = -ux * s + uy * c;
       return { x: lx / sx + px, y: ly / sy + py };
     }
@@ -3229,7 +3243,15 @@
     var g = motionBoxGeom(t);
     if (!g) return null;
     var b = g.bounds;
-    var corners = { nw: g.fwd(b.left, b.top), ne: g.fwd(b.right, b.top), se: g.fwd(b.right, b.bottom), sw: g.fwd(b.left, b.bottom) };
+    // Outer (parent chain / containing-layer) wrapping applied HERE, once
+    // — motionBoxGeom's fwd is local-only (2026-08 fix, see
+    // outerMotionMaps' own comment). Corners used to be plain g.fwd(...)
+    // with no outer wrapping at all, so a parented layer's box never
+    // agreed with where it actually renders.
+    var corners = {
+      nw: outerWorldPoint(t, g.fwd(b.left, b.top)), ne: outerWorldPoint(t, g.fwd(b.right, b.top)),
+      se: outerWorldPoint(t, g.fwd(b.right, b.bottom)), sw: outerWorldPoint(t, g.fwd(b.left, b.bottom)),
+    };
     var zs = 1 / Math.max(0.0001, view.zoom);
     // Rotate RING (2026-07, replacing the tiny offset stem+dot — same
     // change/formula as select-bridge.js's computeHandles and
@@ -3240,7 +3262,7 @@
     // the layer's own current Scale, since rotation alone doesn't change
     // size) only so it shrinks gracefully on a genuinely small selection.
     var ringRadius = Math.min(36 * zs, Math.max(b.width * (g.scl[0] / 100), b.height * (g.scl[1] / 100)) * 0.3);
-    return { g: g, corners: corners, ringCenter: g.pivot, ringRadius: ringRadius };
+    return { g: g, corners: corners, ringCenter: outerWorldPoint(t, g.pivot), ringRadius: ringRadius };
   }
   // Whole-layer multi-selection box (feedback #54). `_layerSel` already is
   // the source of truth for Cmd/Shift-selected rows; derive one world-space
