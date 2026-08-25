@@ -1150,40 +1150,24 @@
   // "manual edit wins" principle CLAUDE.md documents for fill-merge —
   // switching modes must never silently snap a layer back to its neutral
   // default.
-  // Auto-convert to a Component on the FIRST layer-level property edit.
-  // Originally (2026-07-17) scoped to layers with 2+ elements ("un calque
-  // animé dans motion si il contient plusieurs élément devient
-  // automatiquement un component") — widened 2026-07 to ANY layer,
-  // including a single shape: StoryBoard exclusively works with Components
-  // (§8 CLAUDE.md, "StoryBoard ne manipule QUE des Components"), so a
-  // single-element layer that never converted could animate fine in Motion
-  // but could never be placed in a StoryBoard montage — a real dead end
-  // found live ("j'ai essayé avec une shape dessinné et ça ne créer pas de
-  // component"). The friction this used to avoid (locking a trivial single
-  // shape into a symbol) is mitigated by double-clicking the shape ON THE
-  // CANVAS, which already enters the symbol for editing (enterSymbol,
-  // wired in select-bridge.js — a separate, pre-existing mechanism from
-  // Motion's own layer-row double-click, see splitLayerIntoElements below),
-  // so editing the shape after conversion is one extra click, not a dead
-  // end — and convertComponentToLayer stays available to reverse it.
-  // Guards: only for a genuine LAYER target (state.layers.indexOf finds
-  // it; a per-element holder from ensureElementHolder is a bare {} never
-  // in that array), not already a component. convertLayerToComponent
-  // (app.js) mutates `ld` IN PLACE (sets ld.symbolId, clears ld.frames)
-  // rather than replacing the object, so whatever the caller attaches
-  // right after this call still lands on the correct (now-converted)
-  // layer. Shared by BOTH entry points that can start animating a property
-  // — the stopwatch toggle (toggleAnimated) AND a direct canvas drag
-  // (setValue, wired up by select-bridge.js's Motion-mode drag handling).
-  // Idempotent (guarded by `!ld.symbolId`), so calling it on every drag
-  // tick is safe — it only ever actually converts once.
-  function maybeAutoConvertToComponent(ld) {
-    var li = state.layers.indexOf(ld);
-    if (li >= 0 && !ld.symbolId && userLayers[li]) {
-      var elCount = userLayers[li].children.filter(function (c) { return (c instanceof Path || c instanceof Raster) && isSelectablePathChild(c); }).length;
-      if (elCount >= 1) convertLayerToComponent(li);
-    }
-  }
+  // Component conversion is a MANUAL action (2026-08, feedback: "évite de
+  // faire automatiquement des composant dans motion, ça doit être
+  // manuelle"). This used to auto-convert a layer to a Component on its
+  // FIRST layer-level property edit — originally (2026-07-17) scoped to
+  // 2+-element layers, then widened to ANY layer (including a single
+  // shape) so it could also be placed in a StoryBoard montage (§8
+  // CLAUDE.md, "StoryBoard ne manipule QUE des Components"). Rendering a
+  // plain (non-Component) layer's own Motion keys was always correct
+  // either way — engine-bridge.js's buildSceneJson applies `motionMat`
+  // to every layer's own content regardless of symbolId, entirely
+  // independent of this conversion; the auto-convert was purely a UX
+  // shortcut (and the StoryBoard-eligibility side effect), never a
+  // rendering requirement. The manual entry point already existed before
+  // this (timeline.js's layer-row/context-menu action ->
+  // convertLayerToComponent/convertLayersToComponent) and still does —
+  // this only removes the SILENT trigger from toggleAnimated/setValue
+  // below, so keying a plain layer's Position/Rotation/etc. now just
+  // keys it, no surprise conversion.
   function toggleAnimated(ld, prop) {
     // The Time Remap row's stopwatch IS the remap switch (AE behavior) —
     // there is no "static timeRemap" fallback to freeze into, the feature
@@ -1201,7 +1185,6 @@
       if (!ld.motionStatic) ld.motionStatic = {};
       ld.motionStatic[prop] = v;
     } else {
-      maybeAutoConvertToComponent(ld);
       var cur = staticValue(ld, prop);
       ensureTrack(ld, prop).keys = [{ frame: state.currentFrame, v: cur, curvePoints: cloneCurvePts(DEFAULT_CURVE), hOut: [0, 0], hIn: [0, 0] }];
     }
@@ -1211,7 +1194,7 @@
   // animated, it's just the static override.
   function setValue(ld, prop, values) {
     if (isAnimated(ld, prop)) setKeyAtCurrentFrame(ld, prop, values);
-    else { maybeAutoConvertToComponent(ld); if (!ld.motionStatic) ld.motionStatic = {}; ld.motionStatic[prop] = values.slice(); }
+    else { if (!ld.motionStatic) ld.motionStatic = {}; ld.motionStatic[prop] = values.slice(); }
   }
 
   // ---- render-time transform (engine-bridge.js hook — see header
@@ -4297,12 +4280,12 @@
       row.addEventListener('dblclick', function (e) {
         if (e.target.closest('.lico')) return;
         // Re-reversed 2026-07-17 ("montage des éléments dans le
-        // component") — a Component layer (already converted via its
-        // first Position/etc keyframe, see maybeAutoConvertToComponent)
-        // now DOES have an "enter as precomp" double-click again, but only
-        // once it's a Component: a plain layer with several unrelated
-        // shapes still gets the old Release-to-Layers split, since there's
-        // no "inside" to browse before that first key exists.
+        // component") — a Component layer (converted manually, see
+        // convertLayerToComponent) now DOES have an "enter as precomp"
+        // double-click again, but only once it's a Component: a plain
+        // layer with several unrelated shapes still gets the old
+        // Release-to-Layers split, since there's no "inside" to browse
+        // for a layer that was never converted.
         if (ld.symbolId) { enterComponentLayer(li); return; }
         splitLayerIntoElements(li);
       });

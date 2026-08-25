@@ -1737,12 +1737,14 @@ window.SM={
     // Component layers (state.layers[l].symbolId) store no frames of their
     // own to repeat (their content/timing comes from the symbol's own
     // Frame/Speed/Offset model) — correctly skipped below. Found live
-    // (2026-07-30 QA sweep): with every selected layer a Component (which
-    // happens automatically the instant a layer gets its first Motion
-    // layer-level keyframe — see maybeAutoConvertToComponent, motion.js),
-    // EVERY layer got skipped and nothing happened at all, yet the toast
-    // still unconditionally claimed success. Track whether anything was
-    // actually cycled so the toast can tell the truth.
+    // (2026-07-30 QA sweep, back when a layer's first Motion keyframe
+    // auto-converted it to a Component — that trigger was removed 2026-08,
+    // conversion is manual now, see CLAUDE.md §8): with every selected
+    // layer a Component, EVERY layer got skipped and nothing happened at
+    // all, yet the toast still unconditionally claimed success. Track
+    // whether anything was actually cycled so the toast can tell the
+    // truth — still worth keeping since a manually-converted Component
+    // hits the exact same skip today.
     var anyLayerCycled=false;
     for(var l=b.minL;l<=b.maxL;l++){
       if(!state.layers[l]||state.layers[l].symbolId)continue;
