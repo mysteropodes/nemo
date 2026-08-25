@@ -1020,7 +1020,7 @@
         mode = 'null-drag';
         nullIdx = nullHit;
         nullStartPt = pt.clone();
-        nullStartPos = (state.layers[nullHit].nullPos || [state.canvasW / 2, state.canvasH / 2]).slice();
+        nullStartPos = SMMotion.getLayerValue(nullHit, 'position');
         nullMoved = false;
         renderArcs(); updateUI();
         window.SMEngineBridge.renderNow();
@@ -1168,6 +1168,12 @@
         e.stopImmediatePropagation(); e.preventDefault();
         return;
       }
+      // Hover highlight (2026-08, feedback: "quand on roll over un élément
+      // dans le canvas un rec de bounding box de l'élément doit apparaitre
+      // comme dans after effects") — only while idle (onDrag above already
+      // returned false, so nothing is being dragged), passive read like
+      // Animation 2D's own hover-only pass just below.
+      if (window.SMMotion.onHoverMove({ x: w1[0], y: w1[1] })) window.SMEngineBridge.renderNow();
     }
     if (mode === 'cornerRadius' && _cornerDrag) {
       e.stopImmediatePropagation(); e.preventDefault();
@@ -1325,13 +1331,17 @@
       }
       prevA.activate();
     } else if (mode === 'null-drag') {
-      // nullPos is a WORLD anchor (same convention as a guide layer's
-      // guidePos) — Motion's own Position track, if keyed, still composes
-      // on TOP of this as an additional offset (see buildNullLayerItems),
-      // so plain repositioning here never fights an existing animation.
+      // nullPos (set once at creation, see addNullLayer) is the Null's REST
+      // base — canvas drag writes through the standard Position track
+      // instead, exactly like nv-drag/mv-drag below (2026-08 fix, feedback:
+      // dragging a Null never moved its children — legacyParentChainMats
+      // only reads a parent's Motion position, and writing straight to
+      // nullPos here meant computeMotionMat(null) stayed null forever, so
+      // the Null contributed NOTHING — not even a no-op — to its own parent
+      // chain; see motion.js's isNullLayer branch there).
       if (!nullMoved) { pushUndo(); nullMoved = true; }
       var nulld = pt.subtract(nullStartPt);
-      state.layers[nullIdx].nullPos = [nullStartPos[0] + nulld.x, nullStartPos[1] + nulld.y];
+      SMMotion.setLayerValue(nullIdx, 'position', [nullStartPos[0] + nulld.x, nullStartPos[1] + nulld.y]);
       window._sceneVersion++;
       window.SMEngineBridge.renderNow();
     } else if (mode === 'nv-drag') {

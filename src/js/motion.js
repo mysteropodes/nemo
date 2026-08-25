@@ -1854,6 +1854,34 @@
     }
     return false;
   }
+  // A layer's own pivot BASE in its unparented local space — same
+  // convention legacyParentChainMats already uses when THIS layer is
+  // read as someone else's ancestor (nullPos for a Null, bounds.center
+  // otherwise), kept consistent on purpose rather than inventing a second
+  // pivot convention for the compensation math below.
+  function ownPivotBase(li) {
+    var ld = state.layers[li];
+    if (!ld) return [state.canvasW / 2, state.canvasH / 2];
+    if (ld.isNullLayer) return ld.nullPos || [state.canvasW / 2, state.canvasH / 2];
+    var b = userLayers[li] && userLayers[li].bounds;
+    return b ? [b.center.x, b.center.y] : [state.canvasW / 2, state.canvasH / 2];
+  }
+  // World position of a layer's own pivot point, own Motion translation
+  // (dx/dy — rotate/scale never move the point they're pivoted around)
+  // THEN the live parent chain — same two-step composition
+  // buildNullLayerItems (engine-bridge.js) and layerWorldBoundsUnion
+  // (above) already use. Reads state.layers[li].parentLayerUid LIVE, so
+  // calling this before vs. after mutating that field is exactly how
+  // setLayerParent below measures "did reparenting move this layer".
+  function composedPivotWorld(li, frame) {
+    var ld = state.layers[li];
+    var base = ownPivotBase(li);
+    var m = computeMotionMat(ld, frame);
+    var pt = [{ point: [base[0] + (m ? m.dx : 0), base[1] + (m ? m.dy : 0)], handleIn: [0, 0], handleOut: [0, 0] }];
+    var chain = parentChainMats(li, frame);
+    for (var k = 0; k < chain.length; k++) pt = transformSegments(pt, chain[k].pivot, chain[k].mat);
+    return pt[0].point;
+  }
   function setLayerParent(li, parentUid) {
     var ld = state.layers[li];
     if (!ld) return;
@@ -1870,7 +1898,27 @@
       if (window.showToast) showToast(SM.t('toastParentingRefusedCycle'));
       return;
     }
+    // Keep-transform compensation (2026-08, feedback: "quand on parent un
+    // objet au null il doit conserver sa position initiale (offset)") —
+    // without this, parenting to a target that isn't currently sitting at
+    // its own rest position (e.g. a Null already dragged elsewhere) made
+    // the child instantly jump by the parent's full current offset, same
+    // as re-parenting onto ANY already-moved layer. Measures this layer's
+    // own pivot point in world space before/after the reassignment and
+    // folds the difference into its own Position track so nothing visibly
+    // moves at the moment of parenting — translation only (matches the
+    // overwhelmingly common case: a Null moved but not rotated/scaled);
+    // a rotated/scaled parent still reorients the child going forward,
+    // same as After Effects.
+    var frame = state.currentFrame;
+    var before = composedPivotWorld(li, frame);
     ld.parentLayerUid = parentUid || null;
+    var after = composedPivotWorld(li, frame);
+    var dx = before[0] - after[0], dy = before[1] - after[1];
+    if (dx || dy) {
+      var pos = valueAtFrame(ld, 'position', frame);
+      setValue(ld, 'position', [pos[0] + dx, pos[1] + dy]);
+    }
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
   }
   // Second parent slot (2026-07-30, "plusieurs parent... jouer comme une
@@ -2052,7 +2100,20 @@
       if (idx < 0 || visited[idx]) break;
       visited[idx] = true;
       var m = computeMotionMat(state.layers[idx], frameIdx);
-      if (m && userLayers[idx] && userLayers[idx].bounds) {
+      // A Null has no Paper.js geometry, so no userLayers[idx].bounds to
+      // pivot from — its own on-canvas marker is nullPos (world anchor,
+      // see buildNullLayerItems/engine-bridge.js), not a shape's
+      // bounds.center. Without this branch a Null contributed NOTHING to
+      // its children's transform: `m` above only carries the Position
+      // TRACK offset (dx/dy), and the `bounds` check below always failed
+      // for a content-less layer — so dragging a Null (or keying its
+      // Position) never moved anything parented to it (2026-08 fix).
+      if (state.layers[idx].isNullLayer) {
+        if (m) {
+          var nBase = state.layers[idx].nullPos || [state.canvasW / 2, state.canvasH / 2];
+          mats.push({ mat: m, pivot: { x: nBase[0] + m.ax, y: nBase[1] + m.ay } });
+        }
+      } else if (m && userLayers[idx] && userLayers[idx].bounds) {
         mats.push({ mat: m, pivot: { x: userLayers[idx].bounds.center.x + m.ax, y: userLayers[idx].bounds.center.y + m.ay } });
       }
       curUid = state.layers[idx].parentLayerUid;
@@ -2710,7 +2771,56 @@
     });
     return items;
   }
+  // Hover highlight (2026-08, feedback: "quand on roll over un élément dans
+  // le canvas un rec de bounding box de l'élément doit apparaitre comme
+  // dans after effects") — AE shows this for whatever's under the cursor
+  // regardless of selection, so it's computed and drawn OUTSIDE
+  // buildOverlayItemsInner's early-return paths (multi-select union box,
+  // unified multi-target box, or nothing selected at all) via the thin
+  // wrapper below, not threaded through each of those branches.
+  var _hoverLi = -1;
+  function hitTestLayerAt(pt, frame) {
+    // Reverse (topmost-drawn-first) — same z-order convention the Null
+    // marker hit-test already uses (select-bridge.js). Skips locked/hidden/
+    // 3D layers (3D's screen bounds need the projector, out of scope here,
+    // same exclusion multiLayerBox already makes) — layerWorldBoundsUnion
+    // itself already returns null for a content-less layer (Null/Guide/
+    // Effect all have zero-size Paper bounds), so no extra type check needed.
+    for (var li = state.layers.length - 1; li >= 0; li--) {
+      var ld = state.layers[li];
+      if (!ld || ld.locked || ld.visible === false || ld.threeD) continue;
+      var b = layerWorldBoundsUnion([li], frame);
+      if (!b) continue;
+      if (pt.x >= b.x && pt.x <= b.x + b.w && pt.y >= b.y && pt.y <= b.y + b.h) return li;
+    }
+    return -1;
+  }
+  // Returns true when the hover target changed (caller re-renders only
+  // then, avoiding a redraw on every pixel of idle mouse movement).
+  function onHoverMove(pt) {
+    if (state.appMode !== 'motion') { var had = _hoverLi !== -1; _hoverLi = -1; return had; }
+    var li = hitTestLayerAt(pt, state.currentFrame);
+    if (li === _hoverLi) return false;
+    _hoverLi = li;
+    return true;
+  }
+  function hoverOverlayItems() {
+    if (_hoverLi < 0 || _hoverLi === state.activeLayerIdx) return [];
+    var ld = state.layers[_hoverLi];
+    if (!ld) return [];
+    var b = layerWorldBoundsUnion([_hoverLi], state.currentFrame);
+    if (!b) return [];
+    var zs = 1 / Math.max(0.0001, view.zoom);
+    var col = [255, 255, 255, 170];
+    var c1 = { x: b.x, y: b.y }, c2 = { x: b.x + b.w, y: b.y }, c3 = { x: b.x + b.w, y: b.y + b.h }, c4 = { x: b.x, y: b.y + b.h };
+    return [[c1, c2], [c2, c3], [c3, c4], [c4, c1]].map(function (seg) {
+      return { segments: [{ point: [seg[0].x, seg[0].y] }, { point: [seg[1].x, seg[1].y] }], closed: false, fillColor: null, strokeColor: col, strokeWidth: 1 * zs, dashPattern: [4 * zs, 3 * zs] };
+    });
+  }
   function buildOverlayItems() {
+    return buildOverlayItemsInner().concat(hoverOverlayItems());
+  }
+  function buildOverlayItemsInner() {
     var ml = multiLayerBox();
     if (ml) return multiLayerOverlay(ml);
     var u = unifiedMotionTargets();
@@ -2814,6 +2924,13 @@
     // request) — showing both at once would be two overlapping, partially-
     // redundant control systems (the box's own rotate ring is 2D-only Z
     // rotation, which the 3D gizmo's blue ring already covers).
+    // A Null DOES get this box (2026-08, feedback: "toujours pas de
+    // bounding box" — an earlier pass suppressed it on the "AE nulls have
+    // no bbox" assumption; the user wants the same visual/selection
+    // consistency every other layer type gets here). motionBoxGeom now
+    // special-cases a Null's bounds to a fixed screen-constant square
+    // around nullPos instead of userLayers[].bounds' degenerate zero-size
+    // rect, so this is no longer the phantom-at-origin box it used to be.
     var is3DTargetForBox = t.li != null && state.layers[t.li] && state.layers[t.li].threeD && !t.strokeId;
     var mh = is3DTargetForBox ? null : motionHandlePositions(t);
     if (mh) {
@@ -3047,7 +3164,20 @@
   }
   function motionBoxGeom(t) {
     var ld = state.layers[t.li];
-    var lb = (ld && ld.symbolId) ? symbolUnionBounds(t.li) : (userLayers[t.li] && userLayers[t.li].bounds);
+    var lb;
+    if (ld && ld.isNullLayer) {
+      // A Null has no Paper.js bounds — fixed screen-constant square
+      // matching buildNullLayerItems' own marker size (engine-bridge.js,
+      // HS = 12/view.zoom), centered on t.boundsCenter (nullPos, see
+      // activeMotionTarget's isNullLayer branch) so re-enabling the box
+      // here (2026-08, feedback: "toujours pas de bounding box") doesn't
+      // resurrect the old degenerate-at-(0,0) bug the anchor gizmo had.
+      var hs = 12 / Math.max(0.0001, view.zoom);
+      var nb = t.boundsCenter;
+      lb = { left: nb.x - hs, top: nb.y - hs, right: nb.x + hs, bottom: nb.y + hs, width: hs * 2, height: hs * 2, center: { x: nb.x, y: nb.y } };
+    } else {
+      lb = (ld && ld.symbolId) ? symbolUnionBounds(t.li) : (userLayers[t.li] && userLayers[t.li].bounds);
+    }
     if (!lb) return null;
     var anc = valueAtFrame(t.holder, 'anchor', state.currentFrame);
     var pos = valueAtFrame(t.holder, 'position', state.currentFrame);
@@ -3056,18 +3186,35 @@
     var px = t.boundsCenter.x + anc[0], py = t.boundsCenter.y + anc[1];
     var r = rot * Math.PI / 180, c = Math.cos(r), s = Math.sin(r);
     var sx = scl[0] / 100, sy = scl[1] / 100;
+    // Parent chain (2026-08 fix, feedback: "quand un calque est parenté
+    // le bounding box est décalé par rapport à l'objet") — LAYER-level
+    // target only (t.strokeId unset): an element target's outer wrapping
+    // (containing layer + ITS parent chain) is already added separately
+    // by outerWorldPoint/outerMotionMaps in buildOverlayItems, untouched
+    // here to avoid composing the chain twice. Before this, a plain
+    // parented layer's box/anchor/hit-test never agreed with where
+    // getEffectiveStrokes/buildSceneJson actually render it — those both
+    // apply parentChainMats, this never did (outerMotionMaps was already
+    // a no-op for a layer-level target, gated on t.strokeId, so nothing
+    // downstream of THIS function ever added it either).
+    var chain = (!t.strokeId && t.li != null) ? parentChainMats(t.li, state.currentFrame) : [];
     function fwd(x, y) {
       var lx = (x - px) * sx, ly = (y - py) * sy;
-      return { x: px + lx * c - ly * s + pos[0], y: py + lx * s + ly * c + pos[1] };
+      var w = { x: px + lx * c - ly * s + pos[0], y: py + lx * s + ly * c + pos[1] };
+      for (var i = 0; i < chain.length; i++) w = applyMotionPoint(w, chain[i].pivot, chain[i].mat);
+      return w;
     }
     // Inverse of fwd — world point back to the shape's own local space.
     // [c -s; s c] is a pure rotation matrix, so its inverse is just its
     // transpose ([c s; -s c]); added for vertex dragging (buildOverlayItems'
     // vertex dots / onDown/onDrag's 'vertex' mode below), which needs to go
     // world->local to recover the vertex's LOCAL offset from wherever the
-    // mouse currently is in world space.
+    // mouse currently is in world space. Undoes the chain FIRST (outermost
+    // ancestor first), mirroring fwd's own last-applied-first symmetry.
     function inv(wx, wy) {
-      var ux = wx - pos[0] - px, uy = wy - pos[1] - py;
+      var w = { x: wx, y: wy };
+      for (var i = chain.length - 1; i >= 0; i--) w = invertMotionPoint(w, chain[i].pivot, chain[i].mat);
+      var ux = w.x - pos[0] - px, uy = w.y - pos[1] - py;
       var lx = ux * c + uy * s, ly = -ux * s + uy * c;
       return { x: lx / sx + px, y: ly / sy + py };
     }
@@ -3250,6 +3397,20 @@
     // center here too, so the gizmo's PIVOT doesn't jump around alongside
     // its box (motionBoxGeom, above) as the scrub crosses different
     // keyframes.
+    // A Null has a real (permanently empty) Paper.js Layer in userLayers —
+    // its own .bounds getter on an empty Layer returns a degenerate
+    // Rectangle centered at (0,0), NOT null/undefined, so this used to
+    // silently fall through to the branch below and pivot the anchor
+    // crosshair/box near the canvas origin instead of the Null's actual
+    // nullPos (2026-08 fix, feedback: "le point d'ancrage est décalé de
+    // la forme du null" — same bounds-based-logic-breaks-for-a-content-
+    // less-Null root cause as legacyParentChainMats' isNullLayer branch
+    // just added above). Mirrors buildNullLayerItems' own basePos.
+    if (ld.isNullLayer) {
+      var nBase = ld.nullPos || [state.canvasW / 2, state.canvasH / 2];
+      var nRect = { left: nBase[0], top: nBase[1], right: nBase[0], bottom: nBase[1], width: 0, height: 0, center: { x: nBase[0], y: nBase[1] } };
+      return { li: li, strokeId: null, holder: ld, boundsCenter: nRect.center, bounds: nRect };
+    }
     var ub = ld.symbolId ? symbolUnionBounds(li) : null;
     var lb = ub || userLayers[li].bounds;
     return { li: li, strokeId: null, holder: ld, boundsCenter: lb.center, bounds: lb };
@@ -4255,8 +4416,37 @@
     nameRow.textContent = (ld.name || ('Layer ' + (state.activeLayerIdx + 1))) + (ld.symbolId ? ' (composant)' : '');
     body.appendChild(nameRow);
     renderParentRow(body, ld, state.activeLayerIdx);
+    if (ld.isNullLayer) renderNullShapeRow(body, ld);
     renderTimeLinkRow(body, ld, state.activeLayerIdx);
     renderTransformGroup(body, ld, 'Transform');
+  }
+  // Null shape selector, IN Layer Properties (2026-08 fix, feedback: "le
+  // menu pour changé la forme du null doit apparaitre dans layer
+  // properties" / "je vois le menu en dehors du menu Layer Prop") — a
+  // first pass put this in a separate static psec elsewhere in the
+  // properties column; moved here, right into #motion-props-body next to
+  // Parent, alongside every other per-layer control. Still writes the
+  // same ld.nullShape field the layer-row badge cycles (timeline.js), so
+  // both stay in sync.
+  function renderNullShapeRow(body, ld) {
+    var row = document.createElement('div'); row.className = 'lrow motion-prop-row';
+    var label = document.createElement('span'); label.textContent = 'Forme'; label.style.minWidth = '70px';
+    row.appendChild(label);
+    var sel = document.createElement('select'); sel.className = 'psel';
+    [['cross', 'Croix'], ['square', 'Carré'], ['circle', 'Cercle'], ['diamond', 'Losange']].forEach(function (o) {
+      var opt = document.createElement('option'); opt.value = o[0]; opt.textContent = o[1];
+      if ((ld.nullShape || 'cross') === o[0]) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    sel.addEventListener('change', function () {
+      pushUndoLayers(true);
+      ld.nullShape = sel.value;
+      window._sceneVersion++;
+      if (window.SMEngineBridge) SMEngineBridge.renderNow();
+      if (window.renderLayerList) renderLayerList();
+    });
+    row.appendChild(sel);
+    body.appendChild(row);
   }
   // Layer parenting (2026-07, "gestion de parentage de calque dans motion
   // comme dans after, avec la possibilité de changer de parent en
@@ -7975,6 +8165,7 @@
     // second time (CLAUDE.md §3's duplicated-pair hazard).
     flattenSegmentsToPolyline: buildTrimPolyline,
     buildOverlayItems: buildOverlayItems,
+    onHoverMove: onHoverMove,
     renderLayerListMotion: renderLayerListMotion,
     renderTimelineMotion: renderTimelineMotion,
     setAppMode: setAppMode,
