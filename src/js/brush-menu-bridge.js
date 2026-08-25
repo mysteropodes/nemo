@@ -204,6 +204,32 @@
     numRow(params, 'Lissage', state.smoothing || 0, 0, 60, 1, function (v) { driveOriginal('p-smooth', v, false, 'input'); }, SMOOTH_TITLE);
     checkRow(params, 'Pressure brush', !!state.vectorBrush, function (v) { driveOriginal('p-vecbrush', v, true, 'change'); });
     checkRow(params, 'Taper ends', !!state.taperEnds, function (v) { driveOriginal('p-taper', v, true, 'change'); });
+    // Créer/éditer un brush personnalisé (2026-08, feedback: "on a pas les
+    // brush personnalisé dans les brush panel flottant") — window.BrushEditor
+    // (le vrai Nib-panel façon Brush Maker de p5.brush, sliders pression/
+    // sharpness/etc.) était déjà entièrement construit mais n'avait plus
+    // AUCUN point d'entrée depuis l'UI réelle : le seul appelant existant
+    // (brush-preset-picker.js's `open()`, avec son propre bouton "Éditer /
+    // créer un brush…") n'est lui-même jamais déclenché nulle part dans le
+    // codebase — un panel mort, remplacé par CE fichier sans que le bouton
+    // ait jamais été porté. state.customBrushPresets restait donc
+    // structurellement toujours vide en usage normal, ce qui explique aussi
+    // pourquoi "Mes brushes" ne s'affichait jamais plus bas (ce groupe EST
+    // bien câblé, voir buildVectorGrid — il n'avait juste jamais rien à
+    // montrer).
+    var createRow = document.createElement('div'); createRow.className = 'pr';
+    var createLbl = document.createElement('span'); createLbl.className = 'pl';
+    var createBtn = document.createElement('button'); createBtn.className = 'pbtn'; createBtn.style.cssText = 'flex:1;font-size:10px'; createBtn.type = 'button'; createBtn.textContent = 'Créer un brush personnalisé…';
+    createBtn.addEventListener('click', function () {
+      if (!window.BrushEditor) return;
+      var startKey = state.brushPreset && state.brushPreset !== 'none' ? state.brushPreset : null;
+      window.BrushEditor.open(startKey, function (newKey) {
+        if (window.BrushPresetPicker) window.BrushPresetPicker.selectPreset(newKey);
+        if (popover) buildContent(popover); // rebuild header+grid so the new preset shows under "Mes brushes" and is highlighted active
+      });
+    });
+    createRow.appendChild(createLbl); createRow.appendChild(createBtn);
+    params.appendChild(createRow);
   }
   function buildBitmapParams(params) {
     // No manual Bitmap on/off switch here: choosing a bitmap tip activates
@@ -284,13 +310,13 @@
         // undoStack-length check, not just visually).
         window.BrushPresetPicker.selectPreset(key);
         buildVectorGrid(container);
-      })); });
+      }, true, function () { buildVectorGrid(container); })); });
       container.appendChild(cgrid);
     }
   }
-  function makeBrushItem(key, active, onSelect) {
+  function makeBrushItem(key, active, onSelect, isCustom, onRefresh) {
     var btn = document.createElement('button');
-    btn.className = 'bp-item' + (active ? ' active' : '');
+    btn.className = 'bp-item' + (active ? ' active' : '') + (isCustom ? ' bp-item-custom' : '');
     var canvas = document.createElement('canvas'); canvas.width = 150; canvas.height = 26;
     var span = document.createElement('span'); span.textContent = window.BrushPresetPicker.labelFor(key);
     btn.appendChild(canvas); btn.appendChild(span);
@@ -298,6 +324,29 @@
     btn.addEventListener('click', function () { onSelect(key); });
     btn.addEventListener('mouseenter', function () { previewVectorBrush(key); });
     btn.addEventListener('mouseleave', function () { revertBrushPreview(); });
+    if (isCustom) {
+      // Double-clic pour rouvrir le Nib panel (BrushEditor) pré-rempli sur
+      // ce preset — même flux que "Créer un brush…" mais en édition, pas de
+      // second bouton dédié : DOUBLE-CLIC sur une entrée personnalisée pour
+      // l'éditer est le même geste déjà établi ailleurs dans l'app pour
+      // "ouvrir/entrer dans" un élément (double-clic sur un Component).
+      btn.title = 'Cliquer pour sélectionner — double-clic pour éditer';
+      btn.addEventListener('dblclick', function (e) {
+        e.preventDefault(); e.stopPropagation();
+        if (window.BrushEditor) window.BrushEditor.open(key, function (newKey) {
+          window.BrushPresetPicker.selectPreset(newKey);
+          if (onRefresh) onRefresh();
+        });
+      });
+      var delBtn = document.createElement('span'); delBtn.className = 'bp-item-del'; delBtn.title = 'Supprimer'; delBtn.textContent = '×';
+      delBtn.addEventListener('click', function (e) {
+        e.preventDefault(); e.stopPropagation();
+        if (window.state && state.customBrushPresets) delete state.customBrushPresets[key];
+        if (state.brushPreset === key) { window.BrushPresetPicker.selectPreset('none'); }
+        if (onRefresh) onRefresh();
+      });
+      btn.appendChild(delBtn);
+    }
     return btn;
   }
 
