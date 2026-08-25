@@ -536,8 +536,45 @@
       'let warmCore = vec3<f32>(1.0, 0.9, 0.72) * core * 1.3;',
       'let ringColor = vec3<f32>(1.0, 0.55, 0.28) * ringWarm * 0.85 + vec3<f32>(0.95, 0.92, 0.82) * ringMid * 0.5 + vec3<f32>(0.35, 0.68, 1.0) * ringCool * 1.0;',
       'let rayColor = vec3<f32>(1.0, 0.85, 0.65) * rays;',
-      'let flareColor = warmCore + ringColor + rayColor;',
-      'return vec4<f32>(src.rgb + flareColor * params.p1, src.a);',
+      // Secondary bokeh chain (2026-08, feedback with a reference video —
+      // "ne travail pas le flare comme un vrai où tu as des bokeh aligné
+      // sur une ligne de perspective comme optical flare pour after") —
+      // Video Copilot Optical Flares' signature look: a string of small
+      // iris/aperture-shaped ghosts running along the axis from the light
+      // THROUGH the frame center and out the far side, each a different
+      // size/color/distance. Fixed constants (position along the axis,
+      // radius, color, strength per element) — same "opinionated, few
+      // knobs" convention this file already uses elsewhere (Ground Shadow,
+      // the ring above) rather than a fully general N-ghost system; the
+      // axis itself follows p2/p3 (Brightness/Halo Size still drive the
+      // main ring, this chain reads only position + params.p1). Each
+      // ghost's "iris" shape is a soft disc with a mild hexagonal ripple
+      // (cos of angle × 6) rather than a plain circle — a plain smoothstep
+      // circle reads as a glowing dot, the angular ripple is what makes it
+      // read as a lens APERTURE the same way a real 6-blade iris does.
+      'let centerA = vec2<f32>(0.5 * aspect, 0.5);',
+      'let lightA = vec2<f32>(c.x * aspect, c.y);',
+      'let axisV = centerA - lightA;',
+      'let b1d = dp - axisV * 0.18; let b1r = length(b1d) / 0.032; let b1ripple = 1.0 + 0.12 * cos(atan2(b1d.y, b1d.x) * 6.0); let b1s = smoothstep(1.0 * b1ripple, 0.68 * b1ripple, b1r);',
+      'let b2d = dp - axisV * 0.4; let b2r = length(b2d) / 0.05; let b2ripple = 1.0 + 0.12 * cos(atan2(b2d.y, b2d.x) * 6.0); let b2s = smoothstep(1.0 * b2ripple, 0.68 * b2ripple, b2r);',
+      'let b3d = dp - axisV * 0.65; let b3r = length(b3d) / 0.022; let b3ripple = 1.0 + 0.12 * cos(atan2(b3d.y, b3d.x) * 6.0); let b3s = smoothstep(1.0 * b3ripple, 0.68 * b3ripple, b3r);',
+      'let b4d = dp - axisV * 0.92; let b4r = length(b4d) / 0.058; let b4ripple = 1.0 + 0.12 * cos(atan2(b4d.y, b4d.x) * 6.0); let b4s = smoothstep(1.0 * b4ripple, 0.68 * b4ripple, b4r);',
+      'let b5d = dp - axisV * 1.18; let b5r = length(b5d) / 0.03; let b5ripple = 1.0 + 0.12 * cos(atan2(b5d.y, b5d.x) * 6.0); let b5s = smoothstep(1.0 * b5ripple, 0.68 * b5ripple, b5r);',
+      'let secondary = vec3<f32>(1.0, 0.6, 0.32) * b1s * 0.4 + vec3<f32>(0.4, 0.72, 1.0) * b2s * 0.3 + vec3<f32>(1.0, 0.82, 0.42) * b3s * 0.32 + vec3<f32>(0.42, 0.78, 1.0) * b4s * 0.2 + vec3<f32>(1.0, 0.5, 0.62) * b5s * 0.26;',
+      'let flareColor = warmCore + ringColor + rayColor + secondary;',
+      // Alpha (2026-08, same feedback — "le halo n\'a pas d\'alpha"):
+      // returning src.a unchanged meant a fully-transparent background
+      // pixel stayed fully transparent even where this pass just added a
+      // bright glow — invisible the moment the layer is exported/composited
+      // with its alpha respected (a real flare "element", à la Optical
+      // Flares, is opaque wherever it's visible regardless of what's
+      // under it). Growing alpha by the added light's own luma — never
+      // shrinking it — keeps a fully-opaque background exactly as opaque
+      // as before (max already-1.0 stays 1.0) and only matters for a
+      // transparent/semi-transparent one.
+      'let addedLuma = clamp(dot(flareColor * params.p1, vec3<f32>(0.4, 0.4, 0.4)), 0.0, 1.0);',
+      'let outAlpha = clamp(src.a + addedLuma, 0.0, 1.0);',
+      'return vec4<f32>(src.rgb + flareColor * params.p1, outAlpha);',
     ]),
     // Port of "Musk's lens flare" (icecool's mod of Shadertoy 4sX3Rs),
     // requested 2026-08-22 as a richer alternative to the flare above. The
