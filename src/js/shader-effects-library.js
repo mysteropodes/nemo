@@ -513,10 +513,10 @@
       param('p2', 'X', 0, 1, 0.01, '', 0.75),
       param('p3', 'Y', 0, 1, 0.01, '', 0.35),
       param('p4', 'Halo Size', 0.05, 1, 0.01, '', 0.3),
-      param('p5', 'Ring Width', 0.03, 0.6, 0.01, '', 0.22),
-      param('p6', 'Chromatic Spread', 0, 0.3, 0.01, '', 0.1),
-      param('p7', 'Ray Count', 0, 24, 1, '', 12),
-      param('p8', 'Ray Intensity', 0, 2, 0.05, '', 0.55),
+      param('p5', 'Ring Width', 0.01, 0.4, 0.005, '', 0.07),
+      param('p6', 'Chromatic Dispersion', 0, 0.5, 0.01, '', 0.16),
+      param('p7', 'Radial Streaks', 0, 1, 0.05, '', 0.55),
+      param('p8', 'Bokeh Chain', 0, 2, 0.05, '', 0.6),
     ], [
       'let aspect = params.tex_w / max(params.tex_h, 1.0);',
       'let c = vec2<f32>(params.p2, params.p3);',
@@ -524,18 +524,50 @@
       'let dist = length(dp);',
       'let size = max(params.p4, 0.05);',
       'let r = dist / size;',
-      'let core = exp(-dist * dist / (size * size * 0.03));',
-      'let ringW = max(params.p5, 0.03);',
-      'let spread = max(params.p6, 0.0);',
-      'let t1 = (r - (1.0 - spread)) / ringW; let ringWarm = exp(-t1 * t1);',
-      'let t2 = (r - 1.0) / ringW; let ringMid = exp(-t2 * t2);',
-      'let t3 = (r - (1.0 + spread * 1.25)) / ringW; let ringCool = exp(-t3 * t3);',
       'let ang = atan2(dp.y, dp.x);',
-      'let rayFreq = max(params.p7, 0.0) * 0.5;',
-      'let rays = pow(abs(sin(ang * rayFreq)), 10.0) * exp(-r * 1.1) * params.p8;',
-      'let warmCore = vec3<f32>(1.0, 0.9, 0.72) * core * 1.3;',
-      'let ringColor = vec3<f32>(1.0, 0.55, 0.28) * ringWarm * 0.85 + vec3<f32>(0.95, 0.92, 0.82) * ringMid * 0.5 + vec3<f32>(0.35, 0.68, 1.0) * ringCool * 1.0;',
-      'let rayColor = vec3<f32>(1.0, 0.85, 0.65) * rays;',
+      // Tight core: the reference's light source is a small hot point, and
+      // the RING is the subject — a wide core blows out to a white disc and
+      // swallows the ring it's supposed to sit inside. Kept under 1.0 so
+      // Brightness has headroom before it clips.
+      'let core = exp(-dist * dist / (size * size * 0.004)) * 0.85;',
+      // Radial striation = the "flou directionnel" in the reference: a
+      // value that varies with ANGLE ONLY is constant along each radius,
+      // so it reads as fine lines smeared outward from the light — which
+      // is exactly what a radial/directional blur of a point source looks
+      // like. Three incommensurate harmonics rather than a hash: a hash
+      // gives hard-edged wedges, stacked sines give the soft irregular
+      // spacing real lens striation has.
+      'let streakAmt = clamp(params.p7, 0.0, 1.0);',
+      'let sN = 0.5 + 0.5 * (sin(ang * 41.0) * 0.5 + sin(ang * 89.0 + 1.3) * 0.32 + sin(ang * 173.0 + 2.7) * 0.18);',
+      'let streak = mix(1.0, sN, streakAmt);',
+      // TRUE chromatic dispersion (feedback: "aberration chromatique").
+      // The previous version faked it with three discrete Gaussian rings
+      // at fixed radii in fixed colors — which reads as three separate
+      // colored bands, not as one white ring split by a prism. Here the
+      // ring profile is sampled once per wavelength across the visible
+      // spectrum, each at its OWN slightly-scaled radius (that radius
+      // shift IS the dispersion), and the samples are summed. The result
+      // is a single ring with continuous rainbow fringing whose inner and
+      // outer edges shade opposite ways, exactly like real lens halation.
+      'let ringW = max(params.p5, 0.01);',
+      'let disp = clamp(params.p6, 0.0, 0.5);',
+      'var ringAccum = vec3<f32>(0.0);',
+      'for (var i: i32 = 0; i < 12; i = i + 1) {',
+      '  let t = f32(i) / 11.0;',
+      '  let scl = 1.0 + (t - 0.5) * disp;',
+      '  let rr = (r / scl - 1.0) / ringW;',
+      '  let band = exp(-rr * rr);',
+      '  let sr = clamp(1.5 * t - 0.3, 0.0, 1.0);',
+      '  let sg = clamp(1.0 - abs(t - 0.5) * 2.6, 0.0, 1.0);',
+      '  let sb = clamp(1.2 - 2.0 * t, 0.0, 1.0);',
+      '  ringAccum = ringAccum + vec3<f32>(sr, sg, sb) * band;',
+      '}',
+      'let ringColor = ringAccum * (0.34 / 12.0) * streak;',
+      // Wide outward haze carrying the same striation — the soft glow the
+      // ring sits inside, not a second ring.
+      'let hazeAmt = exp(-r * 1.5) * 0.16 * streak;',
+      'let rayColor = vec3<f32>(1.0, 0.8, 0.58) * hazeAmt;',
+      'let warmCore = vec3<f32>(1.0, 0.93, 0.8) * core;',
       // Secondary bokeh chain (2026-08, feedback with a reference video —
       // "ne travail pas le flare comme un vrai où tu as des bokeh aligné
       // sur une ligne de perspective comme optical flare pour after") —
@@ -560,7 +592,7 @@
       'let b3d = dp - axisV * 0.65; let b3r = length(b3d) / 0.022; let b3ripple = 1.0 + 0.12 * cos(atan2(b3d.y, b3d.x) * 6.0); let b3s = smoothstep(1.0 * b3ripple, 0.68 * b3ripple, b3r);',
       'let b4d = dp - axisV * 0.92; let b4r = length(b4d) / 0.058; let b4ripple = 1.0 + 0.12 * cos(atan2(b4d.y, b4d.x) * 6.0); let b4s = smoothstep(1.0 * b4ripple, 0.68 * b4ripple, b4r);',
       'let b5d = dp - axisV * 1.18; let b5r = length(b5d) / 0.03; let b5ripple = 1.0 + 0.12 * cos(atan2(b5d.y, b5d.x) * 6.0); let b5s = smoothstep(1.0 * b5ripple, 0.68 * b5ripple, b5r);',
-      'let secondary = vec3<f32>(1.0, 0.6, 0.32) * b1s * 0.4 + vec3<f32>(0.4, 0.72, 1.0) * b2s * 0.3 + vec3<f32>(1.0, 0.82, 0.42) * b3s * 0.32 + vec3<f32>(0.42, 0.78, 1.0) * b4s * 0.2 + vec3<f32>(1.0, 0.5, 0.62) * b5s * 0.26;',
+      'let secondary = (vec3<f32>(1.0, 0.6, 0.32) * b1s * 0.4 + vec3<f32>(0.4, 0.72, 1.0) * b2s * 0.3 + vec3<f32>(1.0, 0.82, 0.42) * b3s * 0.32 + vec3<f32>(0.42, 0.78, 1.0) * b4s * 0.2 + vec3<f32>(1.0, 0.5, 0.62) * b5s * 0.26) * max(params.p8, 0.0);',
       'let flareColor = warmCore + ringColor + rayColor + secondary;',
       // Alpha (2026-08, same feedback — "le halo n\'a pas d\'alpha"):
       // returning src.a unchanged meant a fully-transparent background
