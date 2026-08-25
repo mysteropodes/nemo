@@ -2924,16 +2924,15 @@
     // request) — showing both at once would be two overlapping, partially-
     // redundant control systems (the box's own rotate ring is 2D-only Z
     // rotation, which the 3D gizmo's blue ring already covers).
-    // A Null has no real bounds to scale/resize (same as After Effects —
-    // a null object has no bounding box either), and motionBoxGeom's
-    // fallback userLayers[].bounds for it is a degenerate zero-size rect
-    // at world (0,0) — drawing it would just flash a phantom box at the
-    // canvas origin (2026-08 fix, feedback: "pourquoi j'ai pas la
-    // bounding box de modif du null" — turns out one WAS being attempted,
-    // just invisible/wrong-positioned, not intentionally absent).
-    var isNullTargetForBox = t.li != null && state.layers[t.li] && state.layers[t.li].isNullLayer && !t.strokeId;
+    // A Null DOES get this box (2026-08, feedback: "toujours pas de
+    // bounding box" — an earlier pass suppressed it on the "AE nulls have
+    // no bbox" assumption; the user wants the same visual/selection
+    // consistency every other layer type gets here). motionBoxGeom now
+    // special-cases a Null's bounds to a fixed screen-constant square
+    // around nullPos instead of userLayers[].bounds' degenerate zero-size
+    // rect, so this is no longer the phantom-at-origin box it used to be.
     var is3DTargetForBox = t.li != null && state.layers[t.li] && state.layers[t.li].threeD && !t.strokeId;
-    var mh = (is3DTargetForBox || isNullTargetForBox) ? null : motionHandlePositions(t);
+    var mh = is3DTargetForBox ? null : motionHandlePositions(t);
     if (mh) {
       var boxCol = [74, 158, 255, 204];
       var lb = mh.g.bounds;
@@ -3165,7 +3164,20 @@
   }
   function motionBoxGeom(t) {
     var ld = state.layers[t.li];
-    var lb = (ld && ld.symbolId) ? symbolUnionBounds(t.li) : (userLayers[t.li] && userLayers[t.li].bounds);
+    var lb;
+    if (ld && ld.isNullLayer) {
+      // A Null has no Paper.js bounds — fixed screen-constant square
+      // matching buildNullLayerItems' own marker size (engine-bridge.js,
+      // HS = 12/view.zoom), centered on t.boundsCenter (nullPos, see
+      // activeMotionTarget's isNullLayer branch) so re-enabling the box
+      // here (2026-08, feedback: "toujours pas de bounding box") doesn't
+      // resurrect the old degenerate-at-(0,0) bug the anchor gizmo had.
+      var hs = 12 / Math.max(0.0001, view.zoom);
+      var nb = t.boundsCenter;
+      lb = { left: nb.x - hs, top: nb.y - hs, right: nb.x + hs, bottom: nb.y + hs, width: hs * 2, height: hs * 2, center: { x: nb.x, y: nb.y } };
+    } else {
+      lb = (ld && ld.symbolId) ? symbolUnionBounds(t.li) : (userLayers[t.li] && userLayers[t.li].bounds);
+    }
     if (!lb) return null;
     var anc = valueAtFrame(t.holder, 'anchor', state.currentFrame);
     var pos = valueAtFrame(t.holder, 'position', state.currentFrame);
@@ -3174,18 +3186,35 @@
     var px = t.boundsCenter.x + anc[0], py = t.boundsCenter.y + anc[1];
     var r = rot * Math.PI / 180, c = Math.cos(r), s = Math.sin(r);
     var sx = scl[0] / 100, sy = scl[1] / 100;
+    // Parent chain (2026-08 fix, feedback: "quand un calque est parenté
+    // le bounding box est décalé par rapport à l'objet") — LAYER-level
+    // target only (t.strokeId unset): an element target's outer wrapping
+    // (containing layer + ITS parent chain) is already added separately
+    // by outerWorldPoint/outerMotionMaps in buildOverlayItems, untouched
+    // here to avoid composing the chain twice. Before this, a plain
+    // parented layer's box/anchor/hit-test never agreed with where
+    // getEffectiveStrokes/buildSceneJson actually render it — those both
+    // apply parentChainMats, this never did (outerMotionMaps was already
+    // a no-op for a layer-level target, gated on t.strokeId, so nothing
+    // downstream of THIS function ever added it either).
+    var chain = (!t.strokeId && t.li != null) ? parentChainMats(t.li, state.currentFrame) : [];
     function fwd(x, y) {
       var lx = (x - px) * sx, ly = (y - py) * sy;
-      return { x: px + lx * c - ly * s + pos[0], y: py + lx * s + ly * c + pos[1] };
+      var w = { x: px + lx * c - ly * s + pos[0], y: py + lx * s + ly * c + pos[1] };
+      for (var i = 0; i < chain.length; i++) w = applyMotionPoint(w, chain[i].pivot, chain[i].mat);
+      return w;
     }
     // Inverse of fwd — world point back to the shape's own local space.
     // [c -s; s c] is a pure rotation matrix, so its inverse is just its
     // transpose ([c s; -s c]); added for vertex dragging (buildOverlayItems'
     // vertex dots / onDown/onDrag's 'vertex' mode below), which needs to go
     // world->local to recover the vertex's LOCAL offset from wherever the
-    // mouse currently is in world space.
+    // mouse currently is in world space. Undoes the chain FIRST (outermost
+    // ancestor first), mirroring fwd's own last-applied-first symmetry.
     function inv(wx, wy) {
-      var ux = wx - pos[0] - px, uy = wy - pos[1] - py;
+      var w = { x: wx, y: wy };
+      for (var i = chain.length - 1; i >= 0; i--) w = invertMotionPoint(w, chain[i].pivot, chain[i].mat);
+      var ux = w.x - pos[0] - px, uy = w.y - pos[1] - py;
       var lx = ux * c + uy * s, ly = -ux * s + uy * c;
       return { x: lx / sx + px, y: ly / sy + py };
     }
@@ -3533,7 +3562,7 @@
       // Skipped entirely for a 3D layer — the box isn't drawn there (see
       // buildOverlayItems' is3DTargetForBox), so it must not still be a
       // live (invisible) hit-target either.
-      var boxHit = (t.li != null && state.layers[t.li] && (state.layers[t.li].threeD || state.layers[t.li].isNullLayer) && !t.strokeId) ? null : hitMotionBoxHandle(event.point, t);
+      var boxHit = (t.li != null && state.layers[t.li] && state.layers[t.li].threeD && !t.strokeId) ? null : hitMotionBoxHandle(event.point, t);
       if (boxHit) {
         pushUndo();
         var g = motionBoxGeom(t);
@@ -4387,8 +4416,37 @@
     nameRow.textContent = (ld.name || ('Layer ' + (state.activeLayerIdx + 1))) + (ld.symbolId ? ' (composant)' : '');
     body.appendChild(nameRow);
     renderParentRow(body, ld, state.activeLayerIdx);
+    if (ld.isNullLayer) renderNullShapeRow(body, ld);
     renderTimeLinkRow(body, ld, state.activeLayerIdx);
     renderTransformGroup(body, ld, 'Transform');
+  }
+  // Null shape selector, IN Layer Properties (2026-08 fix, feedback: "le
+  // menu pour changé la forme du null doit apparaitre dans layer
+  // properties" / "je vois le menu en dehors du menu Layer Prop") — a
+  // first pass put this in a separate static psec elsewhere in the
+  // properties column; moved here, right into #motion-props-body next to
+  // Parent, alongside every other per-layer control. Still writes the
+  // same ld.nullShape field the layer-row badge cycles (timeline.js), so
+  // both stay in sync.
+  function renderNullShapeRow(body, ld) {
+    var row = document.createElement('div'); row.className = 'lrow motion-prop-row';
+    var label = document.createElement('span'); label.textContent = 'Forme'; label.style.minWidth = '70px';
+    row.appendChild(label);
+    var sel = document.createElement('select'); sel.className = 'psel';
+    [['cross', 'Croix'], ['square', 'Carré'], ['circle', 'Cercle'], ['diamond', 'Losange']].forEach(function (o) {
+      var opt = document.createElement('option'); opt.value = o[0]; opt.textContent = o[1];
+      if ((ld.nullShape || 'cross') === o[0]) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    sel.addEventListener('change', function () {
+      pushUndoLayers(true);
+      ld.nullShape = sel.value;
+      window._sceneVersion++;
+      if (window.SMEngineBridge) SMEngineBridge.renderNow();
+      if (window.renderLayerList) renderLayerList();
+    });
+    row.appendChild(sel);
+    body.appendChild(row);
   }
   // Layer parenting (2026-07, "gestion de parentage de calque dans motion
   // comme dans after, avec la possibilité de changer de parent en
