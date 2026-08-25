@@ -2827,8 +2827,16 @@
     // request) — showing both at once would be two overlapping, partially-
     // redundant control systems (the box's own rotate ring is 2D-only Z
     // rotation, which the 3D gizmo's blue ring already covers).
+    // A Null has no real bounds to scale/resize (same as After Effects —
+    // a null object has no bounding box either), and motionBoxGeom's
+    // fallback userLayers[].bounds for it is a degenerate zero-size rect
+    // at world (0,0) — drawing it would just flash a phantom box at the
+    // canvas origin (2026-08 fix, feedback: "pourquoi j'ai pas la
+    // bounding box de modif du null" — turns out one WAS being attempted,
+    // just invisible/wrong-positioned, not intentionally absent).
+    var isNullTargetForBox = t.li != null && state.layers[t.li] && state.layers[t.li].isNullLayer && !t.strokeId;
     var is3DTargetForBox = t.li != null && state.layers[t.li] && state.layers[t.li].threeD && !t.strokeId;
-    var mh = is3DTargetForBox ? null : motionHandlePositions(t);
+    var mh = (is3DTargetForBox || isNullTargetForBox) ? null : motionHandlePositions(t);
     if (mh) {
       var boxCol = [74, 158, 255, 204];
       var lb = mh.g.bounds;
@@ -3263,6 +3271,20 @@
     // center here too, so the gizmo's PIVOT doesn't jump around alongside
     // its box (motionBoxGeom, above) as the scrub crosses different
     // keyframes.
+    // A Null has a real (permanently empty) Paper.js Layer in userLayers —
+    // its own .bounds getter on an empty Layer returns a degenerate
+    // Rectangle centered at (0,0), NOT null/undefined, so this used to
+    // silently fall through to the branch below and pivot the anchor
+    // crosshair/box near the canvas origin instead of the Null's actual
+    // nullPos (2026-08 fix, feedback: "le point d'ancrage est décalé de
+    // la forme du null" — same bounds-based-logic-breaks-for-a-content-
+    // less-Null root cause as legacyParentChainMats' isNullLayer branch
+    // just added above). Mirrors buildNullLayerItems' own basePos.
+    if (ld.isNullLayer) {
+      var nBase = ld.nullPos || [state.canvasW / 2, state.canvasH / 2];
+      var nRect = { left: nBase[0], top: nBase[1], right: nBase[0], bottom: nBase[1], width: 0, height: 0, center: { x: nBase[0], y: nBase[1] } };
+      return { li: li, strokeId: null, holder: ld, boundsCenter: nRect.center, bounds: nRect };
+    }
     var ub = ld.symbolId ? symbolUnionBounds(li) : null;
     var lb = ub || userLayers[li].bounds;
     return { li: li, strokeId: null, holder: ld, boundsCenter: lb.center, bounds: lb };
@@ -3414,7 +3436,7 @@
       // Skipped entirely for a 3D layer — the box isn't drawn there (see
       // buildOverlayItems' is3DTargetForBox), so it must not still be a
       // live (invisible) hit-target either.
-      var boxHit = (t.li != null && state.layers[t.li] && state.layers[t.li].threeD && !t.strokeId) ? null : hitMotionBoxHandle(event.point, t);
+      var boxHit = (t.li != null && state.layers[t.li] && (state.layers[t.li].threeD || state.layers[t.li].isNullLayer) && !t.strokeId) ? null : hitMotionBoxHandle(event.point, t);
       if (boxHit) {
         pushUndo();
         var g = motionBoxGeom(t);
