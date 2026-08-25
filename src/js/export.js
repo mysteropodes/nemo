@@ -503,7 +503,11 @@ async function exportRenderPNGsToDir(dir,start,end,scale,onProgress,alpha){
   var useFx=exportNeedsEngine()&&window.SMEngineBridge&&window.SMEngineBridge.beginEffectsExport();
   try{
     for(var f=start,i=1;f<=end;f++,i++){
-      var url=useFx?await SMEngineBridge.renderFrameToPixelsPNG(f,scale):exportFrameDataURL(f,scale,alpha);
+      // `alpha` reaches BOTH paths now (2026-08): it used to be passed
+      // only to exportFrameDataURL, so "Fond transparent" was silently
+      // ignored on every export that routed through the engine — i.e.
+      // every export with an effect in it.
+      var url=useFx?await SMEngineBridge.renderFrameToPixelsPNG(f,scale,alpha):exportFrameDataURL(f,scale,alpha);
       var bytes=exportDataURLToBytes(url);
       await exportWriteBytes(dir+'/frame_'+pad4(i)+'.png',bytes);
       if(onProgress)onProgress(i,end-start+1);

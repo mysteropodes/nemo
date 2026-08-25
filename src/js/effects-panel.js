@@ -10,7 +10,8 @@
 // "Calque d'effet" grid (effect/adjustment layers only, one effect type
 // max) and the old fixed Flou/Ombre-au-sol fields in the Layer section
 // (ordinary layers only, one of each max). Both now read/write the SAME
-// `ld.effects` array — {type, enabled, p1, p2, p3, p4}[] — matching AE's
+// `ld.effects` array — {type, enabled, p1..p8}[] (p5..p8 added 2026-08 —
+// see defaultsArrFor's own comment) — matching AE's
 // own per-layer effect STACK (any number, independently toggleable,
 // applied in order). See engine.rs's LayerIn::effects doc comment for why
 // one array works for both contexts (ordinary layers run it on their own
@@ -18,6 +19,13 @@
 (function () {
   var ICON_EYE = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>';
   var ICON_EYE_OFF = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3l18 18M10.6 10.6a3 3 0 004.24 4.24M9.9 4.24A10.94 10.94 0 0112 4c7 0 11 7 11 7a13.2 13.2 0 01-3.22 3.94M6.5 6.5C3.5 8.3 1 12 1 12s2.2 3.9 6 5.9"/></svg>';
+
+  // Single source of truth for "which slot in a defaults array does this
+  // param key mean" (2026-08, extended p1..p4 -> p1..p8 — see
+  // defaultsArrFor's own comment) — was inlined as a literal object at its
+  // one call site; pulled out once a second call site needed the exact
+  // same map, so the two can't drift out of sync with each other.
+  var PARAM_KEY_INDEX = { p1: 0, p2: 1, p3: 2, p4: 3, p5: 4, p6: 5, p7: 6, p8: 7 };
 
   // p1..p4 param config per effect type — same meaning/defaults as the
   // Rust side's own per-type defaults (engine.rs's run_one_effect), just
@@ -225,10 +233,16 @@
     var cd = customDefFor(type);
     return cd ? cd.params : (EFFECT_PARAM_CONFIG[type] || []);
   }
+  // 8 slots (2026-08, "possibilité de sortir plus de paramètres
+  // d'effets" — params struct grew from p1..p4 to p1..p8, engine.rs). A
+  // built-in effect's own EFFECT_DEFAULTS entries are still only ever
+  // 4 long — concat+slice pads them out the same way it already padded a
+  // shorter custom-effect params list, so PARAM_KEY_INDEX below never
+  // reads past the end of either kind of array.
   function defaultsArrFor(type) {
     var cd = customDefFor(type);
-    if (cd) return cd.params.map(function (p) { return p.defaultValue !== undefined ? p.defaultValue : p.min; }).concat([0, 0, 0, 0]).slice(0, 4);
-    return EFFECT_DEFAULTS[type] || [0, 0, 0, 0];
+    if (cd) return cd.params.map(function (p) { return p.defaultValue !== undefined ? p.defaultValue : p.min; }).concat([0, 0, 0, 0, 0, 0, 0, 0]).slice(0, 8);
+    return (EFFECT_DEFAULTS[type] || [0, 0, 0, 0]).concat([0, 0, 0, 0, 0, 0, 0, 0]).slice(0, 8);
   }
 
   // Categorized flyout menu with preview thumbnails (2026-07 rewrite —
@@ -403,7 +417,7 @@
     pushUndo();
     if (!t.obj.effects) t.obj.effects = [];
     var d = defaultsArrFor(type);
-    t.obj.effects.push({ type: type, enabled: true, p1: d[0], p2: d[1], p3: d[2], p4: d[3] });
+    t.obj.effects.push({ type: type, enabled: true, p1: d[0], p2: d[1], p3: d[2], p4: d[3], p5: d[4], p6: d[5], p7: d[6], p8: d[7] });
     expandedIdx = t.obj.effects.length - 1; // open the new one immediately
     syncCompanionEffects(t);
     saveActiveLayerFrame(); renderEffectsSection(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
@@ -608,7 +622,7 @@
       var input = document.createElement('input');
       input.type = 'number'; input.className = 'pi scrub';
       input.min = p.min; input.max = p.max; input.dataset.step = p.step;
-      var def = defaultsArrFor(eff.type)[{ p1: 0, p2: 1, p3: 2, p4: 3 }[p.key]];
+      var def = defaultsArrFor(eff.type)[PARAM_KEY_INDEX[p.key]];
       var stored = eff[p.key] !== undefined ? eff[p.key] : def;
       // Shows the value AT THE CURRENT FRAME once keyed, so scrubbing the
       // timeline moves the field — the field is a readout of the animation,

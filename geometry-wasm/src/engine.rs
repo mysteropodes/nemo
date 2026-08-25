@@ -314,6 +314,21 @@ pub(crate) struct EffectIn {
     pub(crate) p3: Option<f32>,
     #[serde(default)]
     pub(crate) p4: Option<f32>,
+    // p5..p8 (2026-08, "possibilité de sortir plus de paramètres
+    // d'effets") — same #[serde(default)] contract as p1..p4: an older
+    // saved project's effect entries simply have none of these fields at
+    // all, which deserializes to None/0.0 here, never an error. Every
+    // BUILT-IN effect (run_one_effect) still only ever reads p1..p4 — only
+    // "custom:" shader-library effects (simple_fx_pass's other caller) can
+    // define param() entries using p5..p8 today.
+    #[serde(default)]
+    pub(crate) p5: Option<f32>,
+    #[serde(default)]
+    pub(crate) p6: Option<f32>,
+    #[serde(default)]
+    pub(crate) p7: Option<f32>,
+    #[serde(default)]
+    pub(crate) p8: Option<f32>,
 }
 
 // FIXED (was "KNOWN BROKEN, v17 investigation" — see git history for the
@@ -1777,13 +1792,14 @@ fn create_simple_fx_pipeline(device: &wgpu::Device) -> (wgpu::RenderPipeline, wg
         min_filter: wgpu::FilterMode::Linear,
         ..Default::default()
     });
-    // 48 bytes: effect_id, p1, p2, p3, tex_w, tex_h, time, p4, bbox_x,
-    // bbox_y, bbox_w, bbox_h — see simple_fx.wgsl's Params. (2026-07-30:
-    // grew from 32 bytes to add the bbox_* fields — see run_one_effect's
-    // own doc comment for why.)
+    // 64 bytes: effect_id, p1, p2, p3, tex_w, tex_h, time, p4, bbox_x,
+    // bbox_y, bbox_w, bbox_h, p5, p6, p7, p8 — see simple_fx.wgsl's Params.
+    // (2026-07-30: grew from 32 to 48 bytes to add the bbox_* fields; 2026-08:
+    // grew from 48 to 64 to append p5..p8 — see run_one_effect's and
+    // simple_fx_pass's own doc comments for why.)
     let uniform_buf = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("simple-fx-params"),
-        size: 48,
+        size: 64,
         usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         mapped_at_creation: false,
     });
@@ -1859,9 +1875,19 @@ fn simple_fx_pass(
     bbox_y: f32,
     bbox_w: f32,
     bbox_h: f32,
+    // p5..p8 (2026-08, "possibilité de sortir plus de paramètres
+    // d'effets") — appended as a NEW trailing 16-byte block (bytes 48..64)
+    // rather than interleaved among the existing fields, so every byte
+    // offset above stays exactly where it already was — zero risk of
+    // silently shifting bbox_x/y/w/h under any of the many existing
+    // effect-type call sites that don't pass p5..p8 at all yet.
+    p5: f32,
+    p6: f32,
+    p7: f32,
+    p8: f32,
     target_view: &wgpu::TextureView,
 ) {
-    let mut payload = [0u8; 48];
+    let mut payload = [0u8; 64];
     payload[0..4].copy_from_slice(&effect_id.to_le_bytes());
     payload[4..8].copy_from_slice(&p1.to_le_bytes());
     payload[8..12].copy_from_slice(&p2.to_le_bytes());
@@ -1874,6 +1900,10 @@ fn simple_fx_pass(
     payload[36..40].copy_from_slice(&bbox_y.to_le_bytes());
     payload[40..44].copy_from_slice(&bbox_w.to_le_bytes());
     payload[44..48].copy_from_slice(&bbox_h.to_le_bytes());
+    payload[48..52].copy_from_slice(&p5.to_le_bytes());
+    payload[52..56].copy_from_slice(&p6.to_le_bytes());
+    payload[56..60].copy_from_slice(&p7.to_le_bytes());
+    payload[60..64].copy_from_slice(&p8.to_le_bytes());
     queue.write_buffer(uniform_buf, 0, &payload);
     let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("simple-fx-bind-group"),
@@ -2464,7 +2494,8 @@ impl VelloEngine {
                     &self.device, &self.queue, &self.simple_fx_pipeline, &self.simple_fx_bind_group_layout, &self.simple_fx_sampler, &self.simple_fx_uniform_buf,
                     source, 14.0,
                     eff.p1.unwrap_or(0.55), 0.0, eff.p3.unwrap_or(1.4), eff.p4.unwrap_or(0.25),
-                    self.fx_time, self.width as f32, self.height as f32, 0.0, 0.0, self.width as f32, self.height as f32, &self.bloom_extract_view,
+                    self.fx_time, self.width as f32, self.height as f32, 0.0, 0.0, self.width as f32, self.height as f32,
+                    0.0, 0.0, 0.0, 0.0, &self.bloom_extract_view,
                 );
                 blur_pass(
                     &self.device, &self.queue, &self.blur_pipeline, &self.blur_bind_group_layout, &self.blur_sampler, &self.blur_uniform_buf,
@@ -2536,7 +2567,8 @@ impl VelloEngine {
                         &self.device, &self.queue, &self.simple_fx_pipeline, &self.simple_fx_bind_group_layout, &self.simple_fx_sampler, &self.simple_fx_uniform_buf,
                         source, effect_id,
                         p1, eff.p2.unwrap_or(default_p2), eff.p3.unwrap_or(default_p3), eff.p4.unwrap_or(default_p4),
-                        self.fx_time, self.width as f32, self.height as f32, bbox.0, bbox.1, bbox.2, bbox.3, target,
+                        self.fx_time, self.width as f32, self.height as f32, bbox.0, bbox.1, bbox.2, bbox.3,
+                        0.0, 0.0, 0.0, 0.0, target,
                     );
                 }
             }
@@ -2557,7 +2589,8 @@ impl VelloEngine {
                         &self.device, &self.queue, pipeline, &self.simple_fx_bind_group_layout, &self.simple_fx_sampler, &self.simple_fx_uniform_buf,
                         source, 0.0,
                         eff.p1.unwrap_or(0.0), eff.p2.unwrap_or(0.0), eff.p3.unwrap_or(0.0), eff.p4.unwrap_or(0.0),
-                        self.fx_time, self.width as f32, self.height as f32, bbox.0, bbox.1, bbox.2, bbox.3, target,
+                        self.fx_time, self.width as f32, self.height as f32, bbox.0, bbox.1, bbox.2, bbox.3,
+                        eff.p5.unwrap_or(0.0), eff.p6.unwrap_or(0.0), eff.p7.unwrap_or(0.0), eff.p8.unwrap_or(0.0), target,
                     );
                 }
             }
@@ -3391,7 +3424,7 @@ impl VelloEngine {
     /// never a Rust panic or a corrupted wasm instance.
     pub fn register_custom_effect(&mut self, key: String, fs_body: String) -> Result<(), JsValue> {
         let source = format!(
-            "struct VsOut {{\n    @builtin(position) pos: vec4<f32>,\n    @location(0) uv: vec2<f32>,\n}};\n\n@vertex\nfn vs_main(@builtin(vertex_index) vid: u32) -> VsOut {{\n    var positions = array<vec2<f32>, 3>(\n        vec2<f32>(-1.0, -1.0),\n        vec2<f32>(3.0, -1.0),\n        vec2<f32>(-1.0, 3.0),\n    );\n    let p = positions[vid];\n    var out: VsOut;\n    out.pos = vec4<f32>(p, 0.0, 1.0);\n    out.uv = vec2<f32>(p.x * 0.5 + 0.5, 1.0 - (p.y * 0.5 + 0.5));\n    return out;\n}}\n\n@group(0) @binding(0) var src_tex: texture_2d<f32>;\n@group(0) @binding(1) var tex_sampler: sampler;\n\nstruct Params {{\n    effect_id: f32,\n    p1: f32,\n    p2: f32,\n    p3: f32,\n    tex_w: f32,\n    tex_h: f32,\n    time: f32,\n    p4: f32,\n    bbox_x: f32,\n    bbox_y: f32,\n    bbox_w: f32,\n    bbox_h: f32,\n}};\n@group(0) @binding(2) var<uniform> params: Params;\n\n@fragment\nfn fs_main(in: VsOut) -> @location(0) vec4<f32> {{\n    let uv = in.uv;\n    let texel = vec2<f32>(1.0 / max(params.tex_w, 1.0), 1.0 / max(params.tex_h, 1.0));\n    let src = textureSample(src_tex, tex_sampler, uv);\n    let bbox_o = vec2<f32>(params.bbox_x, params.bbox_y);\n    let bbox_s = vec2<f32>(max(params.bbox_w, 1.0), max(params.bbox_h, 1.0));\n    let local_uv = (uv * vec2<f32>(params.tex_w, params.tex_h) - bbox_o) / bbox_s;\n{fs_body}\n}}\n"
+            "struct VsOut {{\n    @builtin(position) pos: vec4<f32>,\n    @location(0) uv: vec2<f32>,\n}};\n\n@vertex\nfn vs_main(@builtin(vertex_index) vid: u32) -> VsOut {{\n    var positions = array<vec2<f32>, 3>(\n        vec2<f32>(-1.0, -1.0),\n        vec2<f32>(3.0, -1.0),\n        vec2<f32>(-1.0, 3.0),\n    );\n    let p = positions[vid];\n    var out: VsOut;\n    out.pos = vec4<f32>(p, 0.0, 1.0);\n    out.uv = vec2<f32>(p.x * 0.5 + 0.5, 1.0 - (p.y * 0.5 + 0.5));\n    return out;\n}}\n\n@group(0) @binding(0) var src_tex: texture_2d<f32>;\n@group(0) @binding(1) var tex_sampler: sampler;\n\nstruct Params {{\n    effect_id: f32,\n    p1: f32,\n    p2: f32,\n    p3: f32,\n    tex_w: f32,\n    tex_h: f32,\n    time: f32,\n    p4: f32,\n    bbox_x: f32,\n    bbox_y: f32,\n    bbox_w: f32,\n    bbox_h: f32,\n    p5: f32,\n    p6: f32,\n    p7: f32,\n    p8: f32,\n}};\n@group(0) @binding(2) var<uniform> params: Params;\n\n@fragment\nfn fs_main(in: VsOut) -> @location(0) vec4<f32> {{\n    let uv = in.uv;\n    let texel = vec2<f32>(1.0 / max(params.tex_w, 1.0), 1.0 / max(params.tex_h, 1.0));\n    let src = textureSample(src_tex, tex_sampler, uv);\n    let bbox_o = vec2<f32>(params.bbox_x, params.bbox_y);\n    let bbox_s = vec2<f32>(max(params.bbox_w, 1.0), max(params.bbox_h, 1.0));\n    let local_uv = (uv * vec2<f32>(params.tex_w, params.tex_h) - bbox_o) / bbox_s;\n{fs_body}\n}}\n"
         );
         let pipeline = create_custom_effect_pipeline(&self.device, &self.simple_fx_bind_group_layout, &source);
         self.custom_effect_pipelines.insert(key, pipeline);

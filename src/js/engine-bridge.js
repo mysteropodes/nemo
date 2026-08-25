@@ -738,7 +738,18 @@
     }
     return inherited.concat((ld.effects || []).map(function (e) {
       var out = { effectType: e.type, enabled: !!e.enabled,
-               p1: at(e, 'p1', f), p2: at(e, 'p2', f), p3: at(e, 'p3', f), p4: at(e, 'p4', f) };
+               p1: at(e, 'p1', f), p2: at(e, 'p2', f), p3: at(e, 'p3', f), p4: at(e, 'p4', f),
+               // p5..p8 (2026-08, "possibilité de sortir plus de
+               // paramètres d'effets") — undefined on every effect entry
+               // predating this (every built-in EFFECT_PARAM_CONFIG type,
+               // any shader-library effect saved before its own p5..p8
+               // param() calls existed) reads as `undefined` through
+               // `at()` here, JSON-serializes to nothing, and
+               // engine.rs's `#[serde(default)] p5..p8: Option<f32>`
+               // deserializes that as None → 0.0 at the Rust side, the
+               // same "missing field, not an error" contract p1..p4
+               // already had before this.
+               p5: at(e, 'p5', f), p6: at(e, 'p6', f), p7: at(e, 'p7', f), p8: at(e, 'p8', f) };
       // Zoom-compensate any "spatial" param of a shipped shader-library
       // effect (2026-07-29 fix, "un effet twirl qui bouge en fonction du
       // zoom du canvas") — engine.rs's run_one_effect explicitly skips this
@@ -777,6 +788,17 @@
     var renderFrame = renderContext.frame != null ? renderContext.frame
       : (_fxFrameOverride != null ? _fxFrameOverride : state.currentFrame);
     var includeEditorOverlays = renderContext.includeEditorOverlays !== false;
+    // Transparent-background export (2026-08, feedback: "le halo n'a pas
+    // d'alpha", twice — the literal alpha channel, not the look). The
+    // Export panel's "Fond transparent (alpha)" checkbox was honored ONLY
+    // by the Paper.js export path (exportBuildFrame's `if(!alpha)` skips
+    // its bg rect); the ENGINE path — the one taken whenever any effect is
+    // in play, i.e. exactly when you'd export a flare as an element —
+    // never received the flag at all (exportRenderPNGsToDir passed `alpha`
+    // to exportFrameDataURL but not to renderFrameToPixelsPNG), and the bg
+    // rect below hardcoded its alpha to 1. So a flare exported for
+    // compositing silently came out on an opaque canvas-colored plate.
+    var alphaBg = !!renderContext.alphaBg;
     var layers = [];
     // StoryBoard montage preview (storyboard.js, 2026-07): when the node
     // space has an active montage, the canvas shows THAT montage's frame
@@ -1967,7 +1989,11 @@
         { point: [state.canvasW, state.canvasH] }, { point: [0, state.canvasH] },
       ],
       closed: true,
-      fillColor: cssColorToRgba(state.canvasBg, 1),
+      // alpha 0 rather than omitting the rect entirely — mirrors
+      // exportBuildFrame's own transparent-export branch (export.js) and
+      // its reasoning, and keeps this array's shape identical for the
+      // reference-item push just below.
+      fillColor: cssColorToRgba(state.canvasBg, alphaBg ? 0 : 1),
       strokeColor: null,
       strokeWidth: 1,
     }];
@@ -3524,7 +3550,7 @@
   // loadFrame/buildSceneJson/render_to_pixels sequence instead of
   // duplicating it (CLAUDE.md §3). Caller must already have the engine at
   // the size it wants (resizeEngineOffscreen) before calling this.
-  async function renderFrameRawPixels(frameIdx) {
+  async function renderFrameRawPixels(frameIdx, alphaBg) {
     loadFrame(frameIdx);
     _fxFrameOverride = frameIdx;
     var json;
@@ -3533,15 +3559,16 @@
         frame: frameIdx,
         forExport: true,
         includeEditorOverlays: false,
+        alphaBg: !!alphaBg,
       });
     } finally { _fxFrameOverride = null; }
     var bytes = await engine.render_to_pixels(json);
     return new Uint8ClampedArray(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   }
-  async function renderFrameToPixelsPNG(frameIdx, scale) {
+  async function renderFrameToPixelsPNG(frameIdx, scale, alphaBg) {
     var cw = state.canvasW, ch = state.canvasH;
     var size = resizeEngineOffscreenAtScale(cw, ch, scale || 1);
-    var pixels = await renderFrameRawPixels(frameIdx);
+    var pixels = await renderFrameRawPixels(frameIdx, alphaBg);
     var imgData = new ImageData(pixels, size.w, size.h);
     var off = document.createElement('canvas'); off.width = size.w; off.height = size.h;
     off.getContext('2d').putImageData(imgData, 0, 0);

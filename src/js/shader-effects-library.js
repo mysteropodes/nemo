@@ -482,38 +482,131 @@
       'let ray = pow(abs(sin((uv.x - c.x) * 80.0) * sin((uv.y - c.y) * 80.0)), 18.0);',
       'return vec4<f32>(src.rgb + vec3<f32>(1.0, 0.78, 0.42) * (core + ray * 0.25) * params.p1, src.a);',
     ]),
-    // Anamorphic-lens streak look (2026-08, "possible d'avoir un flare
-    // comme ça" — reference: a horizontal light streak off a bright source
-    // plus one or two chromatic ghost rings strung along the axis toward
-    // frame center), distinct from the plain sun-flare above. Aspect-
-    // corrected (`aspect` multiplies x before any distance/length call) so
-    // the streak stays a clean horizontal line and the rings stay circular
-    // on non-square canvases instead of squashing to the canvas's own w/h
-    // ratio. Ghost ring positions/radii and the warm/cool tint split are
-    // fixed constants tuned to the reference look, not exposed as params —
-    // matches this library's existing "opinionated look, few knobs"
-    // convention (e.g. Ground Shadow, Contour Brut above) rather than a
-    // fully general N-ring flare system.
+    // Anamorphic halo (2026-08, revised — reference photos: a big soft
+    // circular halo/iris artifact from an overexposed practical light, warm
+    // core bleeding into a chromatic ring edge (orange/warm on the inner
+    // side, blue/cool on the outer — real lens halation splits color by
+    // wavelength), faint soft spokes radiating through the haze. NOT the
+    // earlier version's small hard-edged twin ghost-rings + horizontal
+    // streak — these references show no directional streak at all, just a
+    // large soft ring, so the streak param/term is gone entirely, replaced
+    // by Halo Size (the ring's own radius, previously "Streak Length" —
+    // same slot, size now IS the whole effect's controlling scale).
+    // Ring Width/Chromatic Spread/Ray Count/Ray Intensity (p5..p8, 2026-08
+    // — the params struct grew from 4 to 8 slots for exactly this) expose
+    // what used to be fixed constants tuned to the reference look — every
+    // default below reproduces that exact prior look bit-for-bit (ringW
+    // 0.22, spread 0.1 → warm@0.9/cool@1.125 ≈ the old 0.9/1.12, rayCount
+    // 12 → sin(ang*6.0) same as before, rayIntensity 0.55), so an existing
+    // saved project with no p5..p8 (defaulting to 0 via Option<f32>, NOT
+    // these UI defaults) would look different — every read below goes
+    // through a `max(params.pN, floor)` or equivalent so a genuinely-0
+    // stored value never divides-by-zero or nukes the effect, but see
+    // shader-effects-library.js's own param()-default vs. stored-value
+    // distinction (defaultsArrFor, effects-panel.js) for why a NEWLY added
+    // effect gets the tuned defaults instead of 0. Squaring done as `t*t`,
+    // never `pow(x, 2.0)` — WGSL's pow is only defined for a non-negative
+    // base and (r - ringCenter) here is routinely negative, which pow
+    // would silently turn to NaN.
     fx('shader_anamorphic_flare', 'Anamorphic Flare', 'Generate', [
       param('p1', 'Brightness', 0, 3, 0.05, '', 1),
       param('p2', 'X', 0, 1, 0.01, '', 0.75),
       param('p3', 'Y', 0, 1, 0.01, '', 0.35),
-      param('p4', 'Streak Length', 0.02, 1, 0.01, '', 0.35),
+      param('p4', 'Halo Size', 0.05, 1, 0.01, '', 0.3),
+      param('p5', 'Ring Width', 0.01, 0.4, 0.005, '', 0.07),
+      param('p6', 'Chromatic Dispersion', 0, 0.5, 0.01, '', 0.16),
+      param('p7', 'Radial Streaks', 0, 1, 0.05, '', 0.55),
+      param('p8', 'Bokeh Chain', 0, 2, 0.05, '', 0.6),
     ], [
       'let aspect = params.tex_w / max(params.tex_h, 1.0);',
       'let c = vec2<f32>(params.p2, params.p3);',
       'let d = uv - c; let dp = vec2<f32>(d.x * aspect, d.y);',
-      'let core = 1.0 / (1.0 + dot(dp, dp) * 900.0);',
-      'let len = max(params.p4, 0.02);',
-      'let streak = exp(-dp.y * dp.y * 3000.0) * exp(-abs(d.x) / len);',
-      'let toC = vec2<f32>(0.5, 0.5) - c;',
-      'let g1 = c + toC * 0.4; let g1p = vec2<f32>((uv.x - g1.x) * aspect, uv.y - g1.y); let r1 = length(g1p);',
-      'let ring1 = smoothstep(0.012, 0.0, abs(r1 - 0.045));',
-      'let g2 = c + toC * 0.75; let g2p = vec2<f32>((uv.x - g2.x) * aspect, uv.y - g2.y); let r2 = length(g2p);',
-      'let ring2 = smoothstep(0.02, 0.0, abs(r2 - 0.09));',
-      'let warm = vec3<f32>(1.0, 0.82, 0.55); let cool = vec3<f32>(0.55, 0.75, 1.0);',
-      'let flareColor = warm * (core + streak * 0.6) + cool * ring1 * 0.8 + warm * ring2 * 0.5;',
-      'return vec4<f32>(src.rgb + flareColor * params.p1, src.a);',
+      'let dist = length(dp);',
+      'let size = max(params.p4, 0.05);',
+      'let r = dist / size;',
+      'let ang = atan2(dp.y, dp.x);',
+      // Tight core: the reference's light source is a small hot point, and
+      // the RING is the subject — a wide core blows out to a white disc and
+      // swallows the ring it's supposed to sit inside. Kept under 1.0 so
+      // Brightness has headroom before it clips.
+      'let core = exp(-dist * dist / (size * size * 0.004)) * 0.85;',
+      // Radial striation = the "flou directionnel" in the reference: a
+      // value that varies with ANGLE ONLY is constant along each radius,
+      // so it reads as fine lines smeared outward from the light — which
+      // is exactly what a radial/directional blur of a point source looks
+      // like. Three incommensurate harmonics rather than a hash: a hash
+      // gives hard-edged wedges, stacked sines give the soft irregular
+      // spacing real lens striation has.
+      'let streakAmt = clamp(params.p7, 0.0, 1.0);',
+      'let sN = 0.5 + 0.5 * (sin(ang * 41.0) * 0.5 + sin(ang * 89.0 + 1.3) * 0.32 + sin(ang * 173.0 + 2.7) * 0.18);',
+      'let streak = mix(1.0, sN, streakAmt);',
+      // TRUE chromatic dispersion (feedback: "aberration chromatique").
+      // The previous version faked it with three discrete Gaussian rings
+      // at fixed radii in fixed colors — which reads as three separate
+      // colored bands, not as one white ring split by a prism. Here the
+      // ring profile is sampled once per wavelength across the visible
+      // spectrum, each at its OWN slightly-scaled radius (that radius
+      // shift IS the dispersion), and the samples are summed. The result
+      // is a single ring with continuous rainbow fringing whose inner and
+      // outer edges shade opposite ways, exactly like real lens halation.
+      'let ringW = max(params.p5, 0.01);',
+      'let disp = clamp(params.p6, 0.0, 0.5);',
+      'var ringAccum = vec3<f32>(0.0);',
+      'for (var i: i32 = 0; i < 12; i = i + 1) {',
+      '  let t = f32(i) / 11.0;',
+      '  let scl = 1.0 + (t - 0.5) * disp;',
+      '  let rr = (r / scl - 1.0) / ringW;',
+      '  let band = exp(-rr * rr);',
+      '  let sr = clamp(1.5 * t - 0.3, 0.0, 1.0);',
+      '  let sg = clamp(1.0 - abs(t - 0.5) * 2.6, 0.0, 1.0);',
+      '  let sb = clamp(1.2 - 2.0 * t, 0.0, 1.0);',
+      '  ringAccum = ringAccum + vec3<f32>(sr, sg, sb) * band;',
+      '}',
+      'let ringColor = ringAccum * (0.34 / 12.0) * streak;',
+      // Wide outward haze carrying the same striation — the soft glow the
+      // ring sits inside, not a second ring.
+      'let hazeAmt = exp(-r * 1.5) * 0.16 * streak;',
+      'let rayColor = vec3<f32>(1.0, 0.8, 0.58) * hazeAmt;',
+      'let warmCore = vec3<f32>(1.0, 0.93, 0.8) * core;',
+      // Secondary bokeh chain (2026-08, feedback with a reference video —
+      // "ne travail pas le flare comme un vrai où tu as des bokeh aligné
+      // sur une ligne de perspective comme optical flare pour after") —
+      // Video Copilot Optical Flares' signature look: a string of small
+      // iris/aperture-shaped ghosts running along the axis from the light
+      // THROUGH the frame center and out the far side, each a different
+      // size/color/distance. Fixed constants (position along the axis,
+      // radius, color, strength per element) — same "opinionated, few
+      // knobs" convention this file already uses elsewhere (Ground Shadow,
+      // the ring above) rather than a fully general N-ghost system; the
+      // axis itself follows p2/p3 (Brightness/Halo Size still drive the
+      // main ring, this chain reads only position + params.p1). Each
+      // ghost's "iris" shape is a soft disc with a mild hexagonal ripple
+      // (cos of angle × 6) rather than a plain circle — a plain smoothstep
+      // circle reads as a glowing dot, the angular ripple is what makes it
+      // read as a lens APERTURE the same way a real 6-blade iris does.
+      'let centerA = vec2<f32>(0.5 * aspect, 0.5);',
+      'let lightA = vec2<f32>(c.x * aspect, c.y);',
+      'let axisV = centerA - lightA;',
+      'let b1d = dp - axisV * 0.18; let b1r = length(b1d) / 0.032; let b1ripple = 1.0 + 0.12 * cos(atan2(b1d.y, b1d.x) * 6.0); let b1s = smoothstep(1.0 * b1ripple, 0.68 * b1ripple, b1r);',
+      'let b2d = dp - axisV * 0.4; let b2r = length(b2d) / 0.05; let b2ripple = 1.0 + 0.12 * cos(atan2(b2d.y, b2d.x) * 6.0); let b2s = smoothstep(1.0 * b2ripple, 0.68 * b2ripple, b2r);',
+      'let b3d = dp - axisV * 0.65; let b3r = length(b3d) / 0.022; let b3ripple = 1.0 + 0.12 * cos(atan2(b3d.y, b3d.x) * 6.0); let b3s = smoothstep(1.0 * b3ripple, 0.68 * b3ripple, b3r);',
+      'let b4d = dp - axisV * 0.92; let b4r = length(b4d) / 0.058; let b4ripple = 1.0 + 0.12 * cos(atan2(b4d.y, b4d.x) * 6.0); let b4s = smoothstep(1.0 * b4ripple, 0.68 * b4ripple, b4r);',
+      'let b5d = dp - axisV * 1.18; let b5r = length(b5d) / 0.03; let b5ripple = 1.0 + 0.12 * cos(atan2(b5d.y, b5d.x) * 6.0); let b5s = smoothstep(1.0 * b5ripple, 0.68 * b5ripple, b5r);',
+      'let secondary = (vec3<f32>(1.0, 0.6, 0.32) * b1s * 0.4 + vec3<f32>(0.4, 0.72, 1.0) * b2s * 0.3 + vec3<f32>(1.0, 0.82, 0.42) * b3s * 0.32 + vec3<f32>(0.42, 0.78, 1.0) * b4s * 0.2 + vec3<f32>(1.0, 0.5, 0.62) * b5s * 0.26) * max(params.p8, 0.0);',
+      'let flareColor = warmCore + ringColor + rayColor + secondary;',
+      // Alpha (2026-08, same feedback — "le halo n\'a pas d\'alpha"):
+      // returning src.a unchanged meant a fully-transparent background
+      // pixel stayed fully transparent even where this pass just added a
+      // bright glow — invisible the moment the layer is exported/composited
+      // with its alpha respected (a real flare "element", à la Optical
+      // Flares, is opaque wherever it's visible regardless of what's
+      // under it). Growing alpha by the added light's own luma — never
+      // shrinking it — keeps a fully-opaque background exactly as opaque
+      // as before (max already-1.0 stays 1.0) and only matters for a
+      // transparent/semi-transparent one.
+      'let addedLuma = clamp(dot(flareColor * params.p1, vec3<f32>(0.4, 0.4, 0.4)), 0.0, 1.0);',
+      'let outAlpha = clamp(src.a + addedLuma, 0.0, 1.0);',
+      'return vec4<f32>(src.rgb + flareColor * params.p1, outAlpha);',
     ]),
     // Port of "Musk's lens flare" (icecool's mod of Shadertoy 4sX3Rs),
     // requested 2026-08-22 as a richer alternative to the flare above. The
