@@ -2052,7 +2052,20 @@
       if (idx < 0 || visited[idx]) break;
       visited[idx] = true;
       var m = computeMotionMat(state.layers[idx], frameIdx);
-      if (m && userLayers[idx] && userLayers[idx].bounds) {
+      // A Null has no Paper.js geometry, so no userLayers[idx].bounds to
+      // pivot from — its own on-canvas marker is nullPos (world anchor,
+      // see buildNullLayerItems/engine-bridge.js), not a shape's
+      // bounds.center. Without this branch a Null contributed NOTHING to
+      // its children's transform: `m` above only carries the Position
+      // TRACK offset (dx/dy), and the `bounds` check below always failed
+      // for a content-less layer — so dragging a Null (or keying its
+      // Position) never moved anything parented to it (2026-08 fix).
+      if (state.layers[idx].isNullLayer) {
+        if (m) {
+          var nBase = state.layers[idx].nullPos || [state.canvasW / 2, state.canvasH / 2];
+          mats.push({ mat: m, pivot: { x: nBase[0] + m.ax, y: nBase[1] + m.ay } });
+        }
+      } else if (m && userLayers[idx] && userLayers[idx].bounds) {
         mats.push({ mat: m, pivot: { x: userLayers[idx].bounds.center.x + m.ax, y: userLayers[idx].bounds.center.y + m.ay } });
       }
       curUid = state.layers[idx].parentLayerUid;

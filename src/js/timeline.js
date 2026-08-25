@@ -2072,7 +2072,7 @@ function updateUI(frameOnly){
   window._totalF=state.totalFrames;window._waIn=state.waIn;window._waOut=state.waOut;window._curFrame=state.currentFrame;
   window.updateWaBar();window.updateOmMarkers(state.currentFrame,state.totalFrames);
   if(frameOnly)updatePlayhead();else renderTimeline();
-  renderLayerList(frameOnly);updateCompInstancePanel();updateDuplicatorPanel();updateFootagePanel();updateSelPropsPanel();updateFsSelPanel();updateRevisionPanel();updateMaskPanel();updateCornersPanel();updateEllipseArcPanel();updateStarPanel();updateTextActionsPanel();updateTextPropsPanel();if(window.updateEffectsPanel)window.updateEffectsPanel();updatePropsContext();
+  renderLayerList(frameOnly);updateCompInstancePanel();updateDuplicatorPanel();updateFootagePanel();updateSelPropsPanel();updateFsSelPanel();updateRevisionPanel();updateNullPanel();updateMaskPanel();updateCornersPanel();updateEllipseArcPanel();updateStarPanel();updateTextActionsPanel();updateTextPropsPanel();if(window.updateEffectsPanel)window.updateEffectsPanel();updatePropsContext();
 }
 // Vector mask properties (2026-08, AE-style "Mask" — see the mask-feature
 // audit) — same "own dedicated panel section, shown only for a matching
@@ -2083,6 +2083,29 @@ function updateUI(frameOnly){
 // moves every mask on that layer together, which is why the field is
 // seeded from the layer's current EFFECTIVE feather (max across its own
 // masks), not just this one path's own stored value.
+// Null layer properties (2026-08) — the shape glyph was previously only
+// changeable by clicking the tiny layer-row badge, no labeled control in
+// the properties panel. Same select-value-mirrors-badge convention as
+// p-mask-mode above; NULL_SHAPE_ORDER/glyph mapping still lives in
+// timeline.js's layer-row rendering (badge stays in sync since both write
+// the same ld.nullShape field).
+function updateNullPanel(){
+  var sec=document.getElementById('null-sec');
+  if(!sec)return;
+  var ld=state.layers[state.activeLayerIdx];
+  if(!ld||!ld.isNullLayer){sec.style.display='none';return;}
+  sec.style.display='';
+  document.getElementById('p-null-shape').value=ld.nullShape||'cross';
+}
+document.getElementById('p-null-shape').addEventListener('change',function(){
+  var ld=state.layers[state.activeLayerIdx];
+  if(!ld||!ld.isNullLayer)return;
+  pushUndoLayers(true);
+  ld.nullShape=this.value;
+  window._sceneVersion++;
+  if(window.SMEngineBridge)SMEngineBridge.renderNow();
+  renderLayerList();
+});
 function updateMaskPanel(){
   var sec=document.getElementById('mask-sec');
   if(!sec)return;
