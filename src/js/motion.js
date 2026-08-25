@@ -1854,6 +1854,34 @@
     }
     return false;
   }
+  // A layer's own pivot BASE in its unparented local space — same
+  // convention legacyParentChainMats already uses when THIS layer is
+  // read as someone else's ancestor (nullPos for a Null, bounds.center
+  // otherwise), kept consistent on purpose rather than inventing a second
+  // pivot convention for the compensation math below.
+  function ownPivotBase(li) {
+    var ld = state.layers[li];
+    if (!ld) return [state.canvasW / 2, state.canvasH / 2];
+    if (ld.isNullLayer) return ld.nullPos || [state.canvasW / 2, state.canvasH / 2];
+    var b = userLayers[li] && userLayers[li].bounds;
+    return b ? [b.center.x, b.center.y] : [state.canvasW / 2, state.canvasH / 2];
+  }
+  // World position of a layer's own pivot point, own Motion translation
+  // (dx/dy — rotate/scale never move the point they're pivoted around)
+  // THEN the live parent chain — same two-step composition
+  // buildNullLayerItems (engine-bridge.js) and layerWorldBoundsUnion
+  // (above) already use. Reads state.layers[li].parentLayerUid LIVE, so
+  // calling this before vs. after mutating that field is exactly how
+  // setLayerParent below measures "did reparenting move this layer".
+  function composedPivotWorld(li, frame) {
+    var ld = state.layers[li];
+    var base = ownPivotBase(li);
+    var m = computeMotionMat(ld, frame);
+    var pt = [{ point: [base[0] + (m ? m.dx : 0), base[1] + (m ? m.dy : 0)], handleIn: [0, 0], handleOut: [0, 0] }];
+    var chain = parentChainMats(li, frame);
+    for (var k = 0; k < chain.length; k++) pt = transformSegments(pt, chain[k].pivot, chain[k].mat);
+    return pt[0].point;
+  }
   function setLayerParent(li, parentUid) {
     var ld = state.layers[li];
     if (!ld) return;
@@ -1870,7 +1898,27 @@
       if (window.showToast) showToast(SM.t('toastParentingRefusedCycle'));
       return;
     }
+    // Keep-transform compensation (2026-08, feedback: "quand on parent un
+    // objet au null il doit conserver sa position initiale (offset)") —
+    // without this, parenting to a target that isn't currently sitting at
+    // its own rest position (e.g. a Null already dragged elsewhere) made
+    // the child instantly jump by the parent's full current offset, same
+    // as re-parenting onto ANY already-moved layer. Measures this layer's
+    // own pivot point in world space before/after the reassignment and
+    // folds the difference into its own Position track so nothing visibly
+    // moves at the moment of parenting — translation only (matches the
+    // overwhelmingly common case: a Null moved but not rotated/scaled);
+    // a rotated/scaled parent still reorients the child going forward,
+    // same as After Effects.
+    var frame = state.currentFrame;
+    var before = composedPivotWorld(li, frame);
     ld.parentLayerUid = parentUid || null;
+    var after = composedPivotWorld(li, frame);
+    var dx = before[0] - after[0], dy = before[1] - after[1];
+    if (dx || dy) {
+      var pos = valueAtFrame(ld, 'position', frame);
+      setValue(ld, 'position', [pos[0] + dx, pos[1] + dy]);
+    }
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
   }
   // Second parent slot (2026-07-30, "plusieurs parent... jouer comme une
@@ -2723,7 +2771,56 @@
     });
     return items;
   }
+  // Hover highlight (2026-08, feedback: "quand on roll over un élément dans
+  // le canvas un rec de bounding box de l'élément doit apparaitre comme
+  // dans after effects") — AE shows this for whatever's under the cursor
+  // regardless of selection, so it's computed and drawn OUTSIDE
+  // buildOverlayItemsInner's early-return paths (multi-select union box,
+  // unified multi-target box, or nothing selected at all) via the thin
+  // wrapper below, not threaded through each of those branches.
+  var _hoverLi = -1;
+  function hitTestLayerAt(pt, frame) {
+    // Reverse (topmost-drawn-first) — same z-order convention the Null
+    // marker hit-test already uses (select-bridge.js). Skips locked/hidden/
+    // 3D layers (3D's screen bounds need the projector, out of scope here,
+    // same exclusion multiLayerBox already makes) — layerWorldBoundsUnion
+    // itself already returns null for a content-less layer (Null/Guide/
+    // Effect all have zero-size Paper bounds), so no extra type check needed.
+    for (var li = state.layers.length - 1; li >= 0; li--) {
+      var ld = state.layers[li];
+      if (!ld || ld.locked || ld.visible === false || ld.threeD) continue;
+      var b = layerWorldBoundsUnion([li], frame);
+      if (!b) continue;
+      if (pt.x >= b.x && pt.x <= b.x + b.w && pt.y >= b.y && pt.y <= b.y + b.h) return li;
+    }
+    return -1;
+  }
+  // Returns true when the hover target changed (caller re-renders only
+  // then, avoiding a redraw on every pixel of idle mouse movement).
+  function onHoverMove(pt) {
+    if (state.appMode !== 'motion') { var had = _hoverLi !== -1; _hoverLi = -1; return had; }
+    var li = hitTestLayerAt(pt, state.currentFrame);
+    if (li === _hoverLi) return false;
+    _hoverLi = li;
+    return true;
+  }
+  function hoverOverlayItems() {
+    if (_hoverLi < 0 || _hoverLi === state.activeLayerIdx) return [];
+    var ld = state.layers[_hoverLi];
+    if (!ld) return [];
+    var b = layerWorldBoundsUnion([_hoverLi], state.currentFrame);
+    if (!b) return [];
+    var zs = 1 / Math.max(0.0001, view.zoom);
+    var col = [255, 255, 255, 170];
+    var c1 = { x: b.x, y: b.y }, c2 = { x: b.x + b.w, y: b.y }, c3 = { x: b.x + b.w, y: b.y + b.h }, c4 = { x: b.x, y: b.y + b.h };
+    return [[c1, c2], [c2, c3], [c3, c4], [c4, c1]].map(function (seg) {
+      return { segments: [{ point: [seg[0].x, seg[0].y] }, { point: [seg[1].x, seg[1].y] }], closed: false, fillColor: null, strokeColor: col, strokeWidth: 1 * zs, dashPattern: [4 * zs, 3 * zs] };
+    });
+  }
   function buildOverlayItems() {
+    return buildOverlayItemsInner().concat(hoverOverlayItems());
+  }
+  function buildOverlayItemsInner() {
     var ml = multiLayerBox();
     if (ml) return multiLayerOverlay(ml);
     var u = unifiedMotionTargets();
@@ -8010,6 +8107,7 @@
     // second time (CLAUDE.md §3's duplicated-pair hazard).
     flattenSegmentsToPolyline: buildTrimPolyline,
     buildOverlayItems: buildOverlayItems,
+    onHoverMove: onHoverMove,
     renderLayerListMotion: renderLayerListMotion,
     renderTimelineMotion: renderTimelineMotion,
     setAppMode: setAppMode,

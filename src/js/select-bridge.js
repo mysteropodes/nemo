@@ -1168,6 +1168,12 @@
         e.stopImmediatePropagation(); e.preventDefault();
         return;
       }
+      // Hover highlight (2026-08, feedback: "quand on roll over un élément
+      // dans le canvas un rec de bounding box de l'élément doit apparaitre
+      // comme dans after effects") — only while idle (onDrag above already
+      // returned false, so nothing is being dragged), passive read like
+      // Animation 2D's own hover-only pass just below.
+      if (window.SMMotion.onHoverMove({ x: w1[0], y: w1[1] })) window.SMEngineBridge.renderNow();
     }
     if (mode === 'cornerRadius' && _cornerDrag) {
       e.stopImmediatePropagation(); e.preventDefault();
