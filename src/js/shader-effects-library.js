@@ -482,37 +482,61 @@
       'let ray = pow(abs(sin((uv.x - c.x) * 80.0) * sin((uv.y - c.y) * 80.0)), 18.0);',
       'return vec4<f32>(src.rgb + vec3<f32>(1.0, 0.78, 0.42) * (core + ray * 0.25) * params.p1, src.a);',
     ]),
-    // Anamorphic-lens streak look (2026-08, "possible d'avoir un flare
-    // comme ça" — reference: a horizontal light streak off a bright source
-    // plus one or two chromatic ghost rings strung along the axis toward
-    // frame center), distinct from the plain sun-flare above. Aspect-
-    // corrected (`aspect` multiplies x before any distance/length call) so
-    // the streak stays a clean horizontal line and the rings stay circular
-    // on non-square canvases instead of squashing to the canvas's own w/h
-    // ratio. Ghost ring positions/radii and the warm/cool tint split are
-    // fixed constants tuned to the reference look, not exposed as params —
-    // matches this library's existing "opinionated look, few knobs"
-    // convention (e.g. Ground Shadow, Contour Brut above) rather than a
-    // fully general N-ring flare system.
+    // Anamorphic halo (2026-08, revised — reference photos: a big soft
+    // circular halo/iris artifact from an overexposed practical light, warm
+    // core bleeding into a chromatic ring edge (orange/warm on the inner
+    // side, blue/cool on the outer — real lens halation splits color by
+    // wavelength), faint soft spokes radiating through the haze. NOT the
+    // earlier version's small hard-edged twin ghost-rings + horizontal
+    // streak — these references show no directional streak at all, just a
+    // large soft ring, so the streak param/term is gone entirely, replaced
+    // by Halo Size (the ring's own radius, previously "Streak Length" —
+    // same slot, size now IS the whole effect's controlling scale).
+    // Ring Width/Chromatic Spread/Ray Count/Ray Intensity (p5..p8, 2026-08
+    // — the params struct grew from 4 to 8 slots for exactly this) expose
+    // what used to be fixed constants tuned to the reference look — every
+    // default below reproduces that exact prior look bit-for-bit (ringW
+    // 0.22, spread 0.1 → warm@0.9/cool@1.125 ≈ the old 0.9/1.12, rayCount
+    // 12 → sin(ang*6.0) same as before, rayIntensity 0.55), so an existing
+    // saved project with no p5..p8 (defaulting to 0 via Option<f32>, NOT
+    // these UI defaults) would look different — every read below goes
+    // through a `max(params.pN, floor)` or equivalent so a genuinely-0
+    // stored value never divides-by-zero or nukes the effect, but see
+    // shader-effects-library.js's own param()-default vs. stored-value
+    // distinction (defaultsArrFor, effects-panel.js) for why a NEWLY added
+    // effect gets the tuned defaults instead of 0. Squaring done as `t*t`,
+    // never `pow(x, 2.0)` — WGSL's pow is only defined for a non-negative
+    // base and (r - ringCenter) here is routinely negative, which pow
+    // would silently turn to NaN.
     fx('shader_anamorphic_flare', 'Anamorphic Flare', 'Generate', [
       param('p1', 'Brightness', 0, 3, 0.05, '', 1),
       param('p2', 'X', 0, 1, 0.01, '', 0.75),
       param('p3', 'Y', 0, 1, 0.01, '', 0.35),
-      param('p4', 'Streak Length', 0.02, 1, 0.01, '', 0.35),
+      param('p4', 'Halo Size', 0.05, 1, 0.01, '', 0.3),
+      param('p5', 'Ring Width', 0.03, 0.6, 0.01, '', 0.22),
+      param('p6', 'Chromatic Spread', 0, 0.3, 0.01, '', 0.1),
+      param('p7', 'Ray Count', 0, 24, 1, '', 12),
+      param('p8', 'Ray Intensity', 0, 2, 0.05, '', 0.55),
     ], [
       'let aspect = params.tex_w / max(params.tex_h, 1.0);',
       'let c = vec2<f32>(params.p2, params.p3);',
       'let d = uv - c; let dp = vec2<f32>(d.x * aspect, d.y);',
-      'let core = 1.0 / (1.0 + dot(dp, dp) * 900.0);',
-      'let len = max(params.p4, 0.02);',
-      'let streak = exp(-dp.y * dp.y * 3000.0) * exp(-abs(d.x) / len);',
-      'let toC = vec2<f32>(0.5, 0.5) - c;',
-      'let g1 = c + toC * 0.4; let g1p = vec2<f32>((uv.x - g1.x) * aspect, uv.y - g1.y); let r1 = length(g1p);',
-      'let ring1 = smoothstep(0.012, 0.0, abs(r1 - 0.045));',
-      'let g2 = c + toC * 0.75; let g2p = vec2<f32>((uv.x - g2.x) * aspect, uv.y - g2.y); let r2 = length(g2p);',
-      'let ring2 = smoothstep(0.02, 0.0, abs(r2 - 0.09));',
-      'let warm = vec3<f32>(1.0, 0.82, 0.55); let cool = vec3<f32>(0.55, 0.75, 1.0);',
-      'let flareColor = warm * (core + streak * 0.6) + cool * ring1 * 0.8 + warm * ring2 * 0.5;',
+      'let dist = length(dp);',
+      'let size = max(params.p4, 0.05);',
+      'let r = dist / size;',
+      'let core = exp(-dist * dist / (size * size * 0.03));',
+      'let ringW = max(params.p5, 0.03);',
+      'let spread = max(params.p6, 0.0);',
+      'let t1 = (r - (1.0 - spread)) / ringW; let ringWarm = exp(-t1 * t1);',
+      'let t2 = (r - 1.0) / ringW; let ringMid = exp(-t2 * t2);',
+      'let t3 = (r - (1.0 + spread * 1.25)) / ringW; let ringCool = exp(-t3 * t3);',
+      'let ang = atan2(dp.y, dp.x);',
+      'let rayFreq = max(params.p7, 0.0) * 0.5;',
+      'let rays = pow(abs(sin(ang * rayFreq)), 10.0) * exp(-r * 1.1) * params.p8;',
+      'let warmCore = vec3<f32>(1.0, 0.9, 0.72) * core * 1.3;',
+      'let ringColor = vec3<f32>(1.0, 0.55, 0.28) * ringWarm * 0.85 + vec3<f32>(0.95, 0.92, 0.82) * ringMid * 0.5 + vec3<f32>(0.35, 0.68, 1.0) * ringCool * 1.0;',
+      'let rayColor = vec3<f32>(1.0, 0.85, 0.65) * rays;',
+      'let flareColor = warmCore + ringColor + rayColor;',
       'return vec4<f32>(src.rgb + flareColor * params.p1, src.a);',
     ]),
     // Port of "Musk's lens flare" (icecool's mod of Shadertoy 4sX3Rs),

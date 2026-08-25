@@ -738,7 +738,18 @@
     }
     return inherited.concat((ld.effects || []).map(function (e) {
       var out = { effectType: e.type, enabled: !!e.enabled,
-               p1: at(e, 'p1', f), p2: at(e, 'p2', f), p3: at(e, 'p3', f), p4: at(e, 'p4', f) };
+               p1: at(e, 'p1', f), p2: at(e, 'p2', f), p3: at(e, 'p3', f), p4: at(e, 'p4', f),
+               // p5..p8 (2026-08, "possibilité de sortir plus de
+               // paramètres d'effets") — undefined on every effect entry
+               // predating this (every built-in EFFECT_PARAM_CONFIG type,
+               // any shader-library effect saved before its own p5..p8
+               // param() calls existed) reads as `undefined` through
+               // `at()` here, JSON-serializes to nothing, and
+               // engine.rs's `#[serde(default)] p5..p8: Option<f32>`
+               // deserializes that as None → 0.0 at the Rust side, the
+               // same "missing field, not an error" contract p1..p4
+               // already had before this.
+               p5: at(e, 'p5', f), p6: at(e, 'p6', f), p7: at(e, 'p7', f), p8: at(e, 'p8', f) };
       // Zoom-compensate any "spatial" param of a shipped shader-library
       // effect (2026-07-29 fix, "un effet twirl qui bouge en fonction du
       // zoom du canvas") — engine.rs's run_one_effect explicitly skips this
