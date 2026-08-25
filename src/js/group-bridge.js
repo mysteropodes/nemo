@@ -310,16 +310,34 @@
         var islands;
         try { islands = computeGroupCombine(members, grp.combineMode, layer); }
         catch (e) { console.warn('[SMGroup] combine failed for group', gid, e); return; }
-        // Stroke-only style source (2026-07-29 fix, QA-confirmed live:
-        // combining two stroke-only brush strokes rendered as a thin
-        // outline tracing the merged silhouette instead of a solid merged
-        // stroke) — computeGroupCombine already expands a stroke-only
-        // member into its real filled ribbon geometry (foldBooleanOp), so
-        // painting that geometry with ONLY strokeColor (no fill) drew just
-        // its outline. Flip to filled-with-the-stroke's-own-color, same
-        // convention as eraseExpandStrokeToFill/booleanOp's identical fix.
-        var isl_fill = styleSource.fillColor || styleSource.strokeColor;
-        var isl_stroke = styleSource.fillColor ? styleSource.strokeColor : null;
+        // Vector-brush ribbon style source (2026-08 fix, feedback: "les
+        // combine gère mal stroke plus fill" for Pressure-brush shapes) —
+        // a ribbon's OWN fillColor is its ink/stroke color, never a real
+        // fill (isVectorBrush ribbons paint through fillColor — see
+        // app.js's serP comment); any real Fill the user set lives on a
+        // completely separate companion Path. Reading styleSource.fillColor
+        // unconditionally as "the fill" painted the combined shape solid
+        // in the STROKE's own color with no fill at all — confirmed live.
+        // Resolve both from the ribbon's own companion, same lookup
+        // foldBooleanOp already uses to fold it into the boolean operand.
+        var srcIsVB = !!(styleSource.data && styleSource.data.isVectorBrush);
+        var isl_fill, isl_stroke;
+        if (srcIsVB) {
+          var srcCompanion = findLinkedFillCompanion(layer, styleSource);
+          isl_fill = srcCompanion ? srcCompanion.fillColor : null;
+          isl_stroke = styleSource.fillColor;
+        } else {
+          // Stroke-only style source (2026-07-29 fix, QA-confirmed live:
+          // combining two stroke-only brush strokes rendered as a thin
+          // outline tracing the merged silhouette instead of a solid merged
+          // stroke) — computeGroupCombine already expands a stroke-only
+          // member into its real filled ribbon geometry (foldBooleanOp), so
+          // painting that geometry with ONLY strokeColor (no fill) drew just
+          // its outline. Flip to filled-with-the-stroke's-own-color, same
+          // convention as eraseExpandStrokeToFill/booleanOp's identical fix.
+          isl_fill = styleSource.fillColor || styleSource.strokeColor;
+          isl_stroke = styleSource.fillColor ? styleSource.strokeColor : null;
+        }
         islands.forEach(function (isl) {
           isl.fillColor = isl_fill;
           isl.strokeColor = isl_stroke;
@@ -389,7 +407,21 @@
             })[0];
             if (companionDict && companionDict.segments && companionDict.segments.length) {
               var cp = dictToPath(companionDict);
-              try { var merged = p.unite(cp, { insert: false }); if (merged) { p.remove(); p = merged; } } catch (e) {}
+              // Same ring-vs-boolean problem as foldBooleanOp's own
+              // pre-step (tools.js) — p.unite(cp) on a closed vector-brush
+              // ribbon (a self-touching "sliced ring" Path, see
+              // _findRingRevisit's comment there) can come back empty. The
+              // companion already fills the ring's own hole by
+              // construction, so recovering the ring's outer boundary
+              // alone — no boolean call — sidesteps it here too.
+              var unsliced = _unsliceRingPath(p);
+              if (unsliced) {
+                var outerP = new Path({ insert: false, closed: true });
+                unsliced.exterior.forEach(function (seg) { outerP.add(seg); });
+                p.remove(); p = outerP;
+              } else {
+                try { var merged = p.unite(cp, { insert: false }); if (merged) { p.remove(); p = merged; } } catch (e) {}
+              }
               cp.remove();
               suppressed.push(companionDict);
             }
@@ -398,16 +430,30 @@
         });
         memberDicts.forEach(function (sd) { suppressed.push(sd); });
         var styleSource = memberDicts[memberDicts.length - 1];
-        // Stroke-only style source (2026-07-29 fix, same one as
-        // renderCombinesFromChildren's twin above) — computeGroupCombine
-        // just expanded a stroke-only member into a real filled ribbon
-        // (dictToPath's new paint-carrying + foldBooleanOp's own
-        // eraseExpandStrokeToFill step), so the exported dict must flip to
-        // filled-with-the-stroke's-color too, or it round-trips as an
-        // outline-only shape (or, pre-fix, nothing visible at all).
-        var srcHasRealStroke = !!styleSource.hasRealStroke;
-        var combFill = styleSource.fillColor || (srcHasRealStroke ? styleSource.strokeColor : null);
-        var combStroke = (styleSource.fillColor && srcHasRealStroke) ? styleSource.strokeColor : null;
+        var combFill, combStroke;
+        if (styleSource.isVectorBrush) {
+          // Same fix as renderCombinesFromChildren's twin above, dict
+          // form: a ribbon dict's own fillColor is its ink/stroke color,
+          // never a real fill — the real Fill (if any) is a separate
+          // companion dict, same lookup used a few lines up to merge its
+          // geometry in.
+          var styleCompanion = styleSource.linkedFillId ? strokes.filter(function (d) {
+            return d.isLinkedFillCompanion && d.linkedFillId === styleSource.linkedFillId && (d.dupIndex || 0) === (styleSource.dupIndex || 0);
+          })[0] : null;
+          combFill = styleCompanion ? styleCompanion.fillColor : null;
+          combStroke = styleSource.fillColor;
+        } else {
+          // Stroke-only style source (2026-07-29 fix, same one as
+          // renderCombinesFromChildren's twin above) — computeGroupCombine
+          // just expanded a stroke-only member into a real filled ribbon
+          // (dictToPath's new paint-carrying + foldBooleanOp's own
+          // eraseExpandStrokeToFill step), so the exported dict must flip to
+          // filled-with-the-stroke's-color too, or it round-trips as an
+          // outline-only shape (or, pre-fix, nothing visible at all).
+          var srcHasRealStroke = !!styleSource.hasRealStroke;
+          combFill = styleSource.fillColor || (srcHasRealStroke ? styleSource.strokeColor : null);
+          combStroke = (styleSource.fillColor && srcHasRealStroke) ? styleSource.strokeColor : null;
+        }
         var islands;
         try { islands = computeGroupCombine(paths, grp.combineMode, null); }
         catch (e) { console.warn('[SMGroup] combine failed for group', gid, e); return; }

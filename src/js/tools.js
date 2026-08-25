@@ -3428,6 +3428,81 @@ function buildClosedRingOutline(pts,widths,avgW){
   leftPath.remove();rightPath.remove();boolResult.remove();
   return merged;
 }
+// Reverses buildClosedRingOutline's own zero-width-seam merge (2026-08,
+// "les combine gère mal stroke plus fill" for Pressure-brush shapes) —
+// read-only detection, never mutates `path`. A closed vector-brush ring
+// (drawn as a loop — trace a circle, say) is stored as ONE simple
+// self-touching Path rather than a real CompoundPath with a hole, because
+// almost everything else in this codebase (subselect node editing, tween
+// centerline matching, serP/desP) needs a flat .segments array, not a
+// CompoundPath tree. That's the right call for editing/storage, but a
+// boolean op fed this self-crossing loop directly sees a near-zero-area
+// bowtie instead of "a ring with a real hole" — confirmed live: Paper.js's
+// own path.unite(otherPath) returned an EMPTY 0-segment result for a
+// ring ribbon united with its own linked-fill companion (the exact
+// foldBooleanOp pre-step below), and the WASM boundary would hit the same
+// wall via a self-intersecting "simple" polygon (_pathToPolygonInput has
+// no holes support for a single Path at all). Same distance+area-guard
+// revisit signature _eraseDegenerateSelfLoops already uses to tell a real
+// hole-merge seam apart from ordinary unite() clipper noise — kept as its
+// own read-only pass rather than reusing that function directly, since
+// this one only needs the FIRST real revisit and must never touch the
+// live path (a boolean-op operand is a transient clone, but the ribbon
+// itself sometimes isn't).
+function _findRingRevisit(path){
+  if(!path||!path.segments||path.segments.length<6)return null;
+  var segs=path.segments,n=segs.length;
+  // Tight, near-exact tolerance — NOT _eraseDegenerateSelfLoops' 1.5px
+  // (tuned for Paper's OWN unite() output, where a revisit is freshly
+  // RE-INTERSECTED and can legitimately land a fraction of a px off).
+  // buildClosedRingOutline's seam instead literally REUSES the same
+  // source Point value twice (`new Segment(backSeg.point,...)`), so the
+  // true revisit sits at floating-point-identical distance — found live:
+  // 1.5px picked up false positives everywhere on a THIN ring, since its
+  // outer and inner edges sit only ~one stroke-width apart at every
+  // angle, not just at the seam — the first (smallest-index) accidental
+  // near-miss won instead of the real seam, splitting into two bowtie
+  // halves instead of a real exterior+hole.
+  var REVISIT_TOL=0.01;
+  var bb=path.bounds,bbArea=Math.max(1,bb.width*bb.height);
+  var minLoopArea=Math.max(1,bbArea*0.002);
+  function subLoopArea(from,to){
+    var a=0;
+    for(var k=from;k<=to;k++){
+      var p=segs[k].point,q=segs[k===to?from:k+1].point;
+      a+=p.x*q.y-q.x*p.y;
+    }
+    return Math.abs(a)/2;
+  }
+  for(var i=0;i<n;i++){
+    for(var j=0;j<i;j++){
+      if(segs[i].point.getDistance(segs[j].point)<=REVISIT_TOL&&subLoopArea(j,i)>minLoopArea){
+        return{outerEndIdx:j,innerFrom:j+1,innerTo:i-1,outerResumeIdx:i};
+      }
+    }
+  }
+  return null;
+}
+// Splits a sliced-ring Path (see _findRingRevisit) into its two real simple
+// closed loops as real Segments (point+handles preserved, so a caller that
+// rebuilds a smooth Path from these doesn't flatten the curve into a
+// dense polygon) — exterior (everything OUTSIDE the revisit pair) and hole
+// (everything BETWEEN it). Returns null for an ordinary path with no such
+// revisit — callers fall back to treating it as one plain loop, unchanged
+// from before this fix.
+function _unsliceRingPath(path){
+  var split=_findRingRevisit(path);
+  if(!split)return null;
+  var segs=path.segments;
+  function cloneSeg(s){return new Segment(s.point,s.handleIn,s.handleOut);}
+  var exterior=[];
+  for(var k=0;k<=split.outerEndIdx;k++)exterior.push(cloneSeg(segs[k]));
+  for(var k2=split.outerResumeIdx;k2<segs.length;k2++)exterior.push(cloneSeg(segs[k2]));
+  var hole=[];
+  for(var h=split.innerFrom;h<=split.innerTo;h++)hole.push(cloneSeg(segs[h]));
+  if(exterior.length<3||hole.length<3)return null;
+  return{exterior:exterior,hole:hole};
+}
 // Places a freshly-committed Fill Brush stroke per state.fillBrushMode —
 // shared by draw-bridge.js and tools.js's own legacy commit so the three
 // icon options (Above/Below/Merge) behave identically regardless of which
@@ -4484,8 +4559,24 @@ function setPointType(type){
 // ---- Rust/WASM geometry integration (Phase B — see geometry-wasm/) ----
 // Pure JS<->polygon conversion helpers used only by the WASM path; the
 // pure-JS Paper.js boolean ops below are untouched and remain the fallback.
+function _flattenSegsToPoints(segs,closed){
+  var p=new Path({insert:false,segments:segs,closed:closed});
+  p.flatten(1);
+  var pts=p.segments.map(function(s){return[s.point.x,s.point.y];});
+  p.remove();
+  return pts;
+}
 function _pathToPolygonInput(path){
   if(path.className==='CompoundPath')throw new Error('compound path input not supported by the WASM op yet');
+  // Closed vector-brush ring with no linked-fill companion to shortcut
+  // through (foldBooleanOp's own pre-step handles the WITH-companion
+  // case) — same self-touching-seam problem, see _findRingRevisit's
+  // comment: fed as one loop, the WASM clipper would see a self-
+  // intersecting "simple" polygon instead of a ring with a real hole.
+  // Un-slice it back into its true exterior+hole here too, so a
+  // stroke-only closed brush stroke (Fill disabled) combines correctly.
+  var unsliced=_unsliceRingPath(path);
+  if(unsliced)return{exterior:_flattenSegsToPoints(unsliced.exterior,true),holes:[_flattenSegsToPoints(unsliced.hole,true)]};
   var flat=path.clone({insert:false});
   flat.flatten(1);
   var exterior=flat.segments.map(function(s){return[s.point.x,s.point.y];});
@@ -4624,6 +4715,23 @@ function foldBooleanOp(op,paths,layer){
     var companion=findLinkedFillCompanion(layer,p);
     if(!companion)return p;
     extraRemovals.push(companion);
+    // A closed ring ribbon (see _findRingRevisit's own comment) fed
+    // straight into Paper.js's path.unite(companion) came back EMPTY —
+    // confirmed live, a self-crossing "simple" loop isn't geometry its
+    // boolean clipper handles. The companion is, by construction, exactly
+    // the ring's own hole filled in (rebuildVectorBrushOutline keeps it
+    // pinned to the SAME centerline) — so "ring ∪ companion" is simply the
+    // ring's OUTER boundary alone, no boolean call needed at all. Recovered
+    // by un-slicing the ribbon back into its real exterior/hole loops and
+    // keeping only the exterior. Non-ring ribbons (an open stroke —
+    // _unsliceRingPath returns null there) fall through to the original
+    // union unchanged.
+    var unsliced=_unsliceRingPath(p);
+    if(unsliced){
+      var outer=new Path({insert:false,closed:true});
+      unsliced.exterior.forEach(function(seg){outer.add(seg);});
+      return outer;
+    }
     try{return p.unite(companion,{insert:false})||p;}
     catch(e){return p;}
   });
