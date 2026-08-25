@@ -140,7 +140,39 @@
   // was actually on screen — confusing enough that clicking the REAL
   // "Fill" row next to it read as "selecting individually doesn't work".
   function hasRealStroke(sd) {
-    return !!sd.strokeColor && sd.hasRealStroke !== false;
+    // Vector-brush ribbons (Pressure brush ON — Draw tool's default) paint
+    // their "stroke" through fillColor, never strokeColor (app.js's serP:
+    // `hasRealStroke=isVB?false:!!p.strokeColor`, correct for ITS OWN
+    // consumers — e.g. classifying Stroke vs Fill channel — where a ribbon
+    // genuinely has no strokeColor). This panel's question is different
+    // ("does the user have a visible stroke aspect to select/edit here"),
+    // and for a ribbon the answer is yes regardless of brush preset —
+    // found live (feedback: "peu importe la brush si on active le stroke
+    // alors il devrait apparaitre dans éléments"): every Pressure-brush
+    // stroke, textured or plain, was silently missing its "Stroke" sub-row
+    // because sd.strokeColor is always null on a ribbon by construction.
+    return !!sd.isVectorBrush || (!!sd.strokeColor && sd.hasRealStroke !== false);
+  }
+  // A vector-brush ribbon's visible ink lives in fillColor, not
+  // strokeColor (see hasRealStroke above) — swatches showing the "stroke"
+  // color must read the right field for each shape kind, not just
+  // strokeColor unconditionally, or a ribbon's Stroke row/ring renders
+  // with a null/invalid border color.
+  // entry.sd.fillColor is NOT reliable for this when a linked-fill
+  // companion exists: layerElements (motion.js) deliberately overwrites
+  // it with the companion's OWN fillColor ("borrowed... so the swatch/
+  // label reflect it", that file's own comment) so the Fill sub-row shows
+  // the real fill — which means the SAME field now reads as the fill
+  // color, not the ribbon's ink, for this Stroke swatch. Found live: a
+  // Fill+Stroke ribbon's Stroke ring rendered in the FILL's color. Read
+  // the live ribbon item's own fillColor instead — sd is a merged view,
+  // the canvas item is the one place the ribbon's true ink color survives.
+  function strokeSwatchColor(c, entry) {
+    var sd = entry.sd;
+    if (!sd.isVectorBrush) return sd.strokeColor;
+    var item = window.SMMotion && window.SMMotion.liveItemByStrokeId(c.li, entry.strokeId);
+    if (item && item.fillColor) return item.fillColor.toCSS(true);
+    return sd.__linkedFillStrokeId ? null : sd.fillColor;
   }
   // A brush-drawn stroke with Fill enabled is really TWO live Paths (the
   // stroke itself + a separate linkedFill backdrop, draw-bridge.js) folded
@@ -446,7 +478,7 @@
     // language the parent row's own combined swatch already introduced.
     var swatch = document.createElement('div'); swatch.className = 'motion-elem-swatch';
     if (kind === 'fill') swatch.style.background = entry.sd.fillColor || 'transparent';
-    else { swatch.style.background = 'transparent'; swatch.style.borderColor = entry.sd.strokeColor || 'transparent'; swatch.style.borderWidth = '2px'; }
+    else { swatch.style.background = 'transparent'; swatch.style.borderColor = strokeSwatchColor(c, entry) || 'transparent'; swatch.style.borderWidth = '2px'; }
     var nm = document.createElement('div'); nm.className = 'lnm';
     nm.textContent = SM.t(kind === 'fill' ? 'elementsFill' : 'elementsStroke');
     row.appendChild(swatch); row.appendChild(nm);
@@ -500,7 +532,7 @@
       // square with an outline in a different color" convention
       // Illustrator/Figma's own swatches use.
       swatch.style.background = entry.sd.fillColor || 'transparent';
-      if (hasRealStroke(entry.sd)) { swatch.style.borderColor = entry.sd.strokeColor; swatch.style.borderWidth = '2px'; }
+      if (hasRealStroke(entry.sd)) { swatch.style.borderColor = strokeSwatchColor(c, entry); swatch.style.borderWidth = '2px'; }
     }
     var nm = document.createElement('div'); nm.className = 'lnm';
     nm.textContent = window.SMMotion.elementLabel(entry, idx, c.ld);
