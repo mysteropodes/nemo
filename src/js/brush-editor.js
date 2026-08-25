@@ -13,6 +13,11 @@
     { key: 'roundness', label: 'Rondeur', min: 0.1, max: 1, step: 0.05 },
     { key: 'spacing', label: 'Espacement', min: 0.05, max: 1.5, step: 0.05 },
     { key: 'spaceJitter', label: 'Var. espacement', min: 0, max: 1, step: 0.05 },
+    // Grain (p5.brush, feedback #61) — module l'espacement effectif dans le
+    // sens INVERSE : plus haut = plus dense/continu (comme un grain fin),
+    // plus bas = dabs plus espacés/visibles individuellement (texture
+    // granuleuse). 1 = neutre, comportement identique à avant.
+    { key: 'grain', label: 'Grain (densité texture)', min: 0.2, max: 2, step: 0.1 },
     { key: 'rotationJitter', label: 'Var. rotation (°)', min: 0, max: 180, step: 5 },
     { key: 'sizeJitter', label: 'Var. taille', min: 0, max: 1, step: 0.05 },
     // Pression start/milieu/fin (p5.brush, feedback #61) — un multiplicateur
@@ -26,6 +31,10 @@
     { key: 'pressureEnd', label: 'Pression fin', min: 0.1, max: 2.5, step: 0.05 },
     { key: 'opacity', label: 'Opacité', min: 0.05, max: 1, step: 0.05 },
     { key: 'opacityJitter', label: 'Var. opacité', min: 0, max: 1, step: 0.05 },
+    // Noise (p5.brush, feedback #61) — variation d'opacité PAR TRAIT ENTIER
+    // (échantillonnée une seule fois au tracé), distincte d'opacityJitter
+    // ci-dessus qui varie PAR TAMPON — les deux se cumulent. 0 = neutre.
+    { key: 'noise', label: 'Var. opacité par trait', min: 0, max: 1, step: 0.05 },
     { key: 'scatter', label: 'Dispersion', min: 0, max: 1, step: 0.05 },
     { key: 'dashGap', label: 'Trous (bord cassé)', min: 0, max: 0.6, step: 0.02 },
     { key: 'edgeNoise', label: 'Bord irrégulier', min: 0, max: 0.4, step: 0.02 },
@@ -57,7 +66,7 @@
     { value: 'scribble', label: 'Gribouillis (graphite/fusain)' },
     { value: 'custom', label: 'Personnalisé (dessiné)…' },
   ];
-  var DEFAULT_PARAMS = { nibSize: 1, roundness: 0.9, spacing: 0.4, spaceJitter: 0.2, rotationMode: 'tangent', rotationJitter: 20, sizeJitter: 0.2, opacity: 0.6, opacityJitter: 0.2, scatter: 0.15, dashGap: 0, tipShape: 'ellipse', edgeNoise: 0, polySides: 5, bristleCount: 5, tipCorner: 0.15, scribbleCount: 8, scribbleLen: 1.4, scribbleLenJitter: 0.4, scribbleWidth: 0.12, scribbleSpread: 0.6, scribbleAngleSpread: 70, pressureStart: 1, pressureMid: 1, pressureEnd: 1, sharpness: 1, markerTip: true };
+  var DEFAULT_PARAMS = { nibSize: 1, roundness: 0.9, spacing: 0.4, spaceJitter: 0.2, rotationMode: 'tangent', rotationJitter: 20, sizeJitter: 0.2, opacity: 0.6, opacityJitter: 0.2, scatter: 0.15, dashGap: 0, tipShape: 'ellipse', edgeNoise: 0, polySides: 5, bristleCount: 5, tipCorner: 0.15, scribbleCount: 8, scribbleLen: 1.4, scribbleLenJitter: 0.4, scribbleWidth: 0.12, scribbleSpread: 0.6, scribbleAngleSpread: 70, pressureStart: 1, pressureMid: 1, pressureEnd: 1, sharpness: 1, markerTip: true, grain: 1, noise: 0 };
 
   function closePopover() {
     if (!popover) return;

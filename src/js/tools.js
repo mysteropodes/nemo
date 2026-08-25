@@ -3734,12 +3734,35 @@ function pressureCurveMul(preset,frac){
   if(frac<=.5)return s+(m-s)*(frac/.5);
   return m+(e-m)*((frac-.5)/.5);
 }
+// One Gaussian sample per STROKE (not per dab — see the "noise" preset
+// field below), Box-Muller, mirrors sampleAcrossWidth's own 'normal' case
+// above rather than a second RNG scheme.
+function sampleGaussian(rand){
+  var u1=Math.max(1e-12,rand()),u2=rand();
+  return Math.sqrt(-2*Math.log(u1))*Math.cos(2*Math.PI*u2);
+}
 function buildBrushDabs(pathLike,preset,baseWidth,rng,widthProfile){
   var rand=rng||Math.random;
   var len=pathLike.length;
   if(!(len>0))return[];
   var nibScale=preset.nibSize!==undefined?preset.nibSize:1;
-  var spacingFrac=preset.spacing!==undefined?preset.spacing:.35;
+  // grain (feedback #61, p5.brush's "grain" — "controls how dense the
+  // texture is, higher = smoother/more continuous line"): a MULTIPLIER on
+  // spacingFrac, inverted (higher grain = denser = SMALLER effective
+  // spacing) so 1 (default) reproduces today's spacing exactly, and
+  // lowering it opens up the gaps between dabs into a visibly grainier,
+  // more broken texture instead of a continuous line.
+  var grain=preset.grain!==undefined?preset.grain:1;
+  var spacingFrac=(preset.spacing!==undefined?preset.spacing:.35)*(grain<=0?4:1/Math.max(.1,grain));
+  // noise (p5.brush: "per-stroke opacity variation... samples a Gaussian to
+  // randomly shift the WHOLE STROKE slightly lighter or darker than its
+  // base alpha") — sampled ONCE per call (per stroke), not per dab like
+  // opacityJitter already is; the two are independent and stack (a preset
+  // can have per-dab flicker AND an overall per-stroke tint). 0 (default)
+  // reproduces the exact prior behavior — no allocation/branch cost beyond
+  // one extra multiply already folded into every dabOpacity computation.
+  var noiseAmt=preset.noise!==undefined?preset.noise:0;
+  var strokeNoiseMul=noiseAmt>0?Math.max(0,1+sampleGaussian(rand)*noiseAmt*.3):1;
   function localWidth(at){
     var base=(!widthProfile||!widthProfile.length)?baseWidth:widthAtFrac(widthProfile,len>0?at/len:0);
     return base*pressureCurveMul(preset,len>0?at/len:0);
@@ -3836,7 +3859,7 @@ function buildBrushDabs(pathLike,preset,baseWidth,rng,widthProfile){
           // real scribbling gets darker), not through each mark being
           // opaque on its own; a full-opacity mark here would read as one
           // solid stripe instead of a woven texture.
-          mark.data={dabOpacity:Math.max(0,Math.min(1,(preset.opacity!==undefined?preset.opacity:.5)*(1+(rand()*2-1)*(preset.opacityJitter||0))*.6))};
+          mark.data={dabOpacity:Math.max(0,Math.min(1,(preset.opacity!==undefined?preset.opacity:.5)*(1+(rand()*2-1)*(preset.opacityJitter||0))*.6*strokeNoiseMul))};
           dabs.push(mark);
         }
       }else if(preset.tipShape==='bristle'){
@@ -3856,7 +3879,7 @@ function buildBrushDabs(pathLike,preset,baseWidth,rng,widthProfile){
           var dab=buildDabShape(w,h,preset,rand);
           dab.rotate(angle);
           dab.position=center;
-          dab.data={dabOpacity:Math.max(0,Math.min(1,(preset.opacity!==undefined?preset.opacity:.5)*(1+(rand()*2-1)*(preset.opacityJitter||0))*.7))};
+          dab.data={dabOpacity:Math.max(0,Math.min(1,(preset.opacity!==undefined?preset.opacity:.5)*(1+(rand()*2-1)*(preset.opacityJitter||0))*.7*strokeNoiseMul))};
           dabs.push(dab);
         }
       }else{
@@ -3866,7 +3889,7 @@ function buildBrushDabs(pathLike,preset,baseWidth,rng,widthProfile){
         var w2=Math.max(.3,nibDiam*sizeMul2);
         var h2=Math.max(.3,w2*roundness);
         var angle2=angleBase+(rand()*2-1)*(preset.rotationJitter||0);
-        var baseOp=Math.max(0,Math.min(1,(preset.opacity!==undefined?preset.opacity:.5)*(1+(rand()*2-1)*(preset.opacityJitter||0))));
+        var baseOp=Math.max(0,Math.min(1,(preset.opacity!==undefined?preset.opacity:.5)*(1+(rand()*2-1)*(preset.opacityJitter||0))*strokeNoiseMul));
         if(sharpness>=1){
           var dab2=buildDabShape(w2,h2,preset,rand);
           dab2.rotate(angle2);
@@ -3921,7 +3944,7 @@ function buildBrushDabs(pathLike,preset,baseWidth,rng,widthProfile){
       var tan=pathLike.getTangentAt(endAt)||new Point(1,0);
       var localW=localWidth(endAt);
       var nibDiam=Math.max(.5,localW*nibScale);
-      var baseOp=Math.max(0,Math.min(1,preset.opacity!==undefined?preset.opacity:.5));
+      var baseOp=Math.max(0,Math.min(1,(preset.opacity!==undefined?preset.opacity:.5)*strokeNoiseMul));
       for(var bk=0;bk<2&&dabs.length<BRUSH_MAX_DABS;bk++){
         var bMul=.85+bk*.2;
         var buildDab=buildDabShape(nibDiam*bMul,nibDiam*roundness*bMul,preset,rand);
