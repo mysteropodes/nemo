@@ -895,10 +895,29 @@
     // (unlike a symbol's) — a video "imported" there is discarded the
     // instant you leave regardless of whether rendering could reach it.
     if (state.activeMontageViewId) { if (window.showToast) showToast(SM.t('toastCannotImportVideoInsideMontage')); return -1; }
-    var info = await open(source);
+    // Media Library entry appears INSTANTLY, before open()/decode even start
+    // (2026-08 fix, feedback: "afficher l'instance dans média
+    // instantanément... avec wait et ready") — open() itself is the first
+    // real async gap here (on the web path it reads the WHOLE file via
+    // arrayBuffer(), see this file's own openWeb/_demux), so waiting until
+    // AFTER it resolves to show anything in the panel was the actual delay,
+    // not just the frame-0 decode below (which was already optimized in a
+    // prior pass — see that block's own comment). status:'loading' renders
+    // as a spinner + indeterminate progress bar (media-library.js); flipped
+    // to the real thumbnail via updateEntry() once decode actually lands,
+    // or removed outright if open() itself fails.
+    var nameEarly = _sourceName(source).replace(/\.[^.]+$/, '');
+    var pendingMediaId = window.SMMediaLibrary ? SMMediaLibrary.addEntry(nameEarly, 'video', null, null, { status: 'loading' }) : null;
+    var info;
+    try {
+      info = await open(source);
+    } catch (e) {
+      if (pendingMediaId && window.SMMediaLibrary) SMMediaLibrary.removeEntry(pendingMediaId);
+      throw e; // unchanged: images.js's own caller catches this and falls through to the slower bake-every-frame path
+    }
     if (window.saveAllLayerFrames) saveAllLayerFrames();
     if (window.pushUndoLayers) pushUndoLayers();
-    var name = _sourceName(source).replace(/\.[^.]+$/, '');
+    var name = nameEarly;
     var idx = createUserLayer(name);
     var ld = state.layers[idx];
     var isWeb = source instanceof Blob;
@@ -964,7 +983,12 @@
     _optimizeLayerMedia(idx);
     // Thumbnail for the Médias panel — reuses pxThumb (frame 0 specifically,
     // no second decode in the common case where the playhead was already
-    // at frame 0 on import).
+    // at frame 0 on import). This is also the point where the 'loading'
+    // entry started above flips to 'ready' — updateEntry() on the SAME id
+    // rather than a second addEntry() call, so the panel shows one row
+    // throughout the import, not a loading row that gets replaced by a
+    // second, separate ready row.
+    var readyPatch = { layerUid: ld.layerUid, linked: !isWeb, path: isWeb ? null : source, status: 'ready' };
     if (pxThumb) {
       try {
         var tc = document.createElement('canvas');
@@ -973,13 +997,17 @@
         tc.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(pxThumb), info.width, info.height), 0, 0);
         var sc = document.createElement('canvas'); sc.width = tw; sc.height = th;
         sc.getContext('2d').drawImage(tc, 0, 0, tw, th);
-        // linked, not embedded (2026-07-31): a nativeVideo layer only persists
-        // ld.nativeVideo.path — no bytes live in the project file, so the
-        // panel needs to represent "this can go offline if the file moves"
-        // rather than a byte count. isWeb sessions have no real filesystem
-        // path to relink to, so they're marked embedded-ish (no relink offer).
-        if (window.SMMediaLibrary) SMMediaLibrary.addEntry(name, 'video', sc.toDataURL('image/jpeg', 0.7), ld.name, { layerUid: ld.layerUid, linked: !isWeb, path: isWeb ? null : source });
-      } catch (e) { /* thumbnail is cosmetic — import already succeeded */ }
+        readyPatch.thumb = sc.toDataURL('image/jpeg', 0.7);
+      } catch (e) { /* thumbnail is cosmetic — import already succeeded, ready-flip below still happens */ }
+    }
+    if (window.SMMediaLibrary) {
+      // linked, not embedded (2026-07-31): a nativeVideo layer only persists
+      // ld.nativeVideo.path — no bytes live in the project file, so the
+      // panel needs to represent "this can go offline if the file moves"
+      // rather than a byte count. isWeb sessions have no real filesystem
+      // path to relink to, so they're marked embedded-ish (no relink offer).
+      if (pendingMediaId) SMMediaLibrary.updateEntry(pendingMediaId, readyPatch);
+      else SMMediaLibrary.addEntry(name, 'video', readyPatch.thumb || null, ld.name, readyPatch);
     }
     if (window.activateUL) activateUL(idx);
     if (window.loadFrame) loadFrame(state.currentFrame);
