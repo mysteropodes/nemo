@@ -268,7 +268,15 @@
     // Empty-canvas deselection is shared by Animation 2D and Motion now
     // that both modes can expose a layer-level multi-selection box.
     if (li == null) { if (!additive) _layerSel = []; return; }
-    if (state.appMode !== 'motion') return;
+    // 2026-08 fix (feedback: "j'avait effet de select, dans le canvas j'ai
+    // select l'élément du layer 2, effet n'a pas totalement été deselect")
+    // — this used to return here for Animation 2D, leaving _layerSel (and
+    // therefore both the layer-list row's 'sel' class, timeline.js's
+    // renderLayerList, AND multiLayerSelectionBox below) stuck on whatever
+    // layer was selected BEFORE this canvas click. Picking a layer THROUGH
+    // its own row (addLayer/addEffectLayer/the row's click handler) already
+    // updates _layerSel directly — canvas clicks routing through here were
+    // the one path that didn't, in either mode.
     if (additive) {
       if (_layerSel.indexOf(li) < 0) _layerSel.push(li);
     } else _layerSel = [li];
