@@ -3060,9 +3060,28 @@
     for (var i = 0; i < ks.length - 1; i++) {
       var a = ks[i], b = ks[i + 1];
       var ho = a.hOut || [0, 0], hi = b.hIn || [0, 0];
-      var pts = [];
-      var steps = 24;
-      for (var s = 0; s <= steps; s++) {
+      // Dash density must encode SPEED (2026-08 fix, feedback: "les tirets
+      // ne reflètent pas visuellement les keyframes et leur rapprochement
+      // en fonction du lissage de keyframe") — the After Effects convention
+      // this is copying packs dashes tightly where the object moves slowly
+      // (eased-out near a key) and spreads them out where it moves fast.
+      // The engine's native dashPattern (still used elsewhere in this file)
+      // dashes at UNIFORM ARC LENGTH along whatever polyline it's given —
+      // completely blind to how the sample points feeding that polyline
+      // were spaced, so the old fixed dashPattern here could never have
+      // shown this regardless of sampling. Instead: sample one point per
+      // FRAME through this key's own easing curve (evalCurvePoints — the
+      // same evaluator rawValueAtFrame above uses for the real animation,
+      // just never reused here before), then draw every other frame-to-
+      // frame segment ourselves as a short solid dash. A flat/slow stretch
+      // of the eased curve packs consecutive frame-points close together in
+      // world space, so the dashes AND gaps both shrink there; a steep/fast
+      // stretch spreads them out — the spacing IS the speed, no native dash
+      // pattern involved.
+      var nFrames = Math.max(1, b.frame - a.frame);
+      var framePts = [];
+      for (var f = 0; f <= nFrames; f++) {
+        var tt = f / nFrames;
         // Named `bt` (bezier t), NOT `t` — this function's outer `t` is the
         // Motion TARGET object (activeMotionTarget()), which outerWorldPoint
         // needs as its first argument. `var t` here used to shadow it (var
@@ -3074,16 +3093,25 @@
         // never entered this loop, so the bug only showed once a second key
         // existed). This is what "le motion path devrait être sur le point
         // d'ancrage" was actually describing.
-        var bt = s / steps, v = 1 - bt;
+        var bt = a.hold ? 0 : evalCurvePoints(a.curvePoints || DEFAULT_CURVE, tt);
+        var v = 1 - bt;
         var rawPathPoint={
           x:
             pvx + v * v * v * a.v[0] + 3 * v * v * bt * (a.v[0] + ho[0]) + 3 * v * bt * bt * (b.v[0] + hi[0]) + bt * bt * bt * b.v[0],
           y:pvy + v * v * v * a.v[1] + 3 * v * v * bt * (a.v[1] + ho[1]) + 3 * v * bt * bt * (b.v[1] + hi[1]) + bt * bt * bt * b.v[1]
         };
         var worldPathPoint=outerWorldPoint(t,rawPathPoint);
-        pts.push({point:[worldPathPoint.x,worldPathPoint.y]});
+        framePts.push([worldPathPoint.x, worldPathPoint.y]);
       }
-      items.push({ segments: pts, closed: false, fillColor: null, strokeColor: pathCol, strokeWidth: 1.5 * zs, dashPattern: [5 * zs, 4 * zs] });
+      // Stride caps dash count on very long segments (e.g. a key held for
+      // hundreds of frames) — no visual benefit past a point, and it bloats
+      // scene JSON rebuilt on every render tick while this overlay is live.
+      var maxDashes = 120;
+      var stride = Math.max(1, Math.ceil(framePts.length / maxDashes));
+      for (var fi = 0; fi < framePts.length - 1; fi += stride * 2) {
+        var p0 = framePts[fi], p1 = framePts[Math.min(fi + stride, framePts.length - 1)];
+        items.push({ segments: [{ point: p0 }, { point: p1 }], closed: false, fillColor: null, strokeColor: pathCol, strokeWidth: 1.5 * zs });
+      }
     }
     ks.forEach(function (k, ki) {
       var isCur = k.frame === state.currentFrame;
