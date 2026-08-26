@@ -1492,6 +1492,26 @@
         <div class="pr">
           <a href="https://ko-fi.com/mysteropodes" target="_blank" class="pbtn" style="flex:1;text-align:center;font-size:11px;padding:7px;font-weight:600;text-decoration:none">☕ <span data-i18n="settingsAboutKofiBtn">Faire un don sur Ko-fi</span></a>
         </div>
+        <!-- Key libraries & licenses (2026-08) — Nemo's ACTUAL dependencies,
+             sourced from src-tauri/Cargo.toml + Cargo.lock, geometry-wasm/
+             Cargo.toml, and THIRD_PARTY_NOTICES.md's own front-end audit
+             (Paper.js/opentype.js/Roboto). Static list, not JS-generated —
+             this changes about as often as the About pane's own copy. Not a
+             substitute for a full `cargo license`/`cargo about` pass before
+             a public release; this is the short "what's actually bundled"
+             summary a user sees here, same spirit as THIRD_PARTY_NOTICES.md. -->
+        <div class="phdr" style="padding:14px 0 4px 0;font-size:9px;color:var(--text-dim)" data-i18n="settingsAboutLibsHdr">Bibliothèques clés &amp; licences</div>
+        <div style="border:1px solid var(--border2);border-radius:6px;overflow:hidden;font-size:10px">
+          <div style="display:flex;justify-content:space-between;padding:6px 9px;background:var(--panel3)"><span>Tauri</span><span style="color:var(--text-dim)">MIT / Apache-2.0</span></div>
+          <div style="display:flex;justify-content:space-between;padding:6px 9px"><span>Paper.js</span><span style="color:var(--text-dim)">MIT</span></div>
+          <div style="display:flex;justify-content:space-between;padding:6px 9px;background:var(--panel3)"><span>opentype.js</span><span style="color:var(--text-dim)">MIT</span></div>
+          <div style="display:flex;justify-content:space-between;padding:6px 9px"><span>Roboto</span><span style="color:var(--text-dim)">Apache-2.0</span></div>
+          <div style="display:flex;justify-content:space-between;padding:6px 9px;background:var(--panel3)"><span>vello</span><span style="color:var(--text-dim)">Apache-2.0</span></div>
+          <div style="display:flex;justify-content:space-between;padding:6px 9px"><span>wasm-bindgen</span><span style="color:var(--text-dim)">MIT / Apache-2.0</span></div>
+          <div style="display:flex;justify-content:space-between;padding:6px 9px;background:var(--panel3)"><span>serde / serde_json</span><span style="color:var(--text-dim)">MIT / Apache-2.0</span></div>
+          <div style="display:flex;justify-content:space-between;padding:6px 9px"><span>reqwest</span><span style="color:var(--text-dim)">MIT / Apache-2.0</span></div>
+          <div style="display:flex;justify-content:space-between;padding:6px 9px;background:var(--panel3)"><span>uuid</span><span style="color:var(--text-dim)">MIT / Apache-2.0</span></div>
+        </div>
       </div>
     </div>
   </div>

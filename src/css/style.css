@@ -2228,15 +2228,20 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
    doit foncé comme pour les autres propriété et doivent apparaître au
    hover si on a key select") — hidden by default, same convention as this
    app's other on-demand controls (.project-tab .pt-close, .layer-inout-bar
-   .timelink-anchor); revealed by hovering the frame cell that owns it, or
-   forced on via .dragging (added by buildKeyEaseBox's own mousedown
-   handler) so an active drag never gets cut off mid-gesture just because
-   the pointer strayed off this small a target. */
+   .timelink-anchor). Revealed by hovering the BOX'S OWN rendered area, not
+   the key diamond it sits beside (2026-08 follow-up, feedback: "ce n'est
+   pas en roll hover de la clé mais si on roll hover sur les box à droite
+   ou à gauche elle même") — pointer-events stays 'auto' even while
+   invisible so the box can register its own :hover though it renders no
+   pixels, rather than gating visibility on the unrelated .motion-fc cell
+   underneath. Forced on via .dragging (added by buildKeyEaseBox's own
+   mousedown handler) so an active drag never gets cut off mid-gesture
+   just because the pointer strayed off this small a target. */
 .motion-key-ease-box{position:absolute;top:50%;z-index:8;height:16px;display:flex;align-items:center;
   box-sizing:border-box;border:1px solid #4b4e59;border-radius:2px;background:var(--panel3);color:var(--text-dim);
   transform:translateY(-50%);overflow:hidden;cursor:ew-resize;
-  opacity:0;pointer-events:none;transition:opacity .12s linear;}
-.motion-fc:hover .motion-key-ease-box,.motion-key-ease-box.dragging{opacity:1;pointer-events:auto;}
+  opacity:0;pointer-events:auto;transition:opacity .12s linear;}
+.motion-key-ease-box:hover,.motion-key-ease-box.dragging{opacity:1;}
 .motion-key-ease-box.in{right:calc(50% + 7px);}
 .motion-key-ease-box.out{left:calc(50% + 7px);}
 .motion-key-ease-marker{width:11px;display:flex;align-items:center;justify-content:center;font-size:7px;line-height:1;
