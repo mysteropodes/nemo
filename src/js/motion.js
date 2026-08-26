@@ -6672,26 +6672,39 @@
   // loop works without re-selecting, and a pair only one frame apart is
   // skipped (no room for a key between them) rather than silently
   // overwriting one of its own endpoints.
-  // How much ease leaves this key, as a percentage. 0% = linear out, 100% =
-  // fully eased out. Read off the curve's FIRST span: with the on-curve
-  // waypoint model used everywhere here (see DEFAULT_CURVE), a key that
-  // leaves linearly has its first waypoint on the diagonal, and the further
-  // that point sits below the diagonal the slower the start.
+  // Influence, After-Effects style (2026-08 rework — feedback: "inversé la
+  // logique 0% les clé sont éloigné et 100% rapproché", confirmed via
+  // follow-up: at 100% "la poignée d'easing s'étire presque jusqu'à toucher
+  // l'autre clé"). Previously this only varied the waypoint's Y (how flat
+  // the curve sits, at a FIXED x=0.25) — 0%/100% distinguished "linear" from
+  // "fully held", but the waypoint's TIME position never moved, so nothing
+  // ever visually "reached toward" the other key regardless of the value.
+  // Now percent drives the waypoint's X too: 0% keeps it hugging its own
+  // key's time (negligible reach — "éloigné" from the other key, the ease
+  // barely exists) and 100% pushes it out toward the segment's own midpoint
+  // — "rapproché", the ease's flat/held region stretching as far toward the
+  // other key as this curve system's structure allows a waypoint to go
+  // (the on-curve waypoint model used everywhere here — see DEFAULT_CURVE —
+  // has a fixed midpoint at x=0.5 that the out-side waypoint can approach
+  // but never cross, and the in-side mirrors it from the other end; MARGIN
+  // keeps it strictly short of coinciding with either neighbor, which would
+  // degenerate curveSegFor's segment lookup into a zero-width span).
+  var EASE_INFLUENCE_MARGIN = 0.02;
   function easeOutPercent(k) {
     var pts = k && k.curvePoints;
     if (!pts || pts.length < 2) return null;
     var p = pts[1];
-    if (!p || !p.x) return 0;
-    var lag = Math.max(0, Math.min(1, 1 - (p.y / p.x)));
-    return Math.round(lag * 100);
+    if (!p) return 0;
+    var amount = (p.x - EASE_INFLUENCE_MARGIN) / (0.5 - 2 * EASE_INFLUENCE_MARGIN);
+    return Math.round(Math.max(0, Math.min(1, amount)) * 100);
   }
   function easeInPercent(k) {
     var pts = k && k.curvePoints;
     if (!pts || pts.length < 2) return null;
     var p = pts[pts.length - 2];
-    if (!p || p.x >= 1) return 0;
-    var lead = Math.max(0, Math.min(1, (p.y - p.x) / (1 - p.x)));
-    return Math.round(lead * 100);
+    if (!p) return 0;
+    var amount = (1 - p.x - EASE_INFLUENCE_MARGIN) / (0.5 - 2 * EASE_INFLUENCE_MARGIN);
+    return Math.round(Math.max(0, Math.min(1, amount)) * 100);
   }
   function editableInfluenceCurve(key) {
     var pts = cloneCurvePts(key.curvePoints || CURVE_LINEAR);
@@ -6707,14 +6720,20 @@
   function setSegmentInfluence(key, side, percent) {
     if (!key) return false;
     var amount = Math.max(0, Math.min(100, Number(percent) || 0)) / 100;
+    var reach = EASE_INFLUENCE_MARGIN + amount * (0.5 - 2 * EASE_INFLUENCE_MARGIN);
     var pts = editableInfluenceCurve(key);
     var p;
     if (side === 'out') {
       p = pts[1];
+      p.x = reach;
+      // Deepens toward the key's own value (y->0) as the reach grows, same
+      // "hold near this key, then catch up" shape the old fixed-x version
+      // had — just now paired with an X that actually moves too.
       p.y = p.x * (1 - amount);
     } else {
       p = pts[pts.length - 2];
-      p.y = p.x + (1 - p.x) * amount;
+      p.x = 1 - reach;
+      p.y = 1 - (1 - p.x) * (1 - amount);
     }
     // A manually specified waypoint tangent would override the visible
     // edge change. This control owns that one edge, so release only that
