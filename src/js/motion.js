@@ -3060,9 +3060,30 @@
     for (var i = 0; i < ks.length - 1; i++) {
       var a = ks[i], b = ks[i + 1];
       var ho = a.hOut || [0, 0], hi = b.hIn || [0, 0];
-      var pts = [];
-      var steps = 24;
-      for (var s = 0; s <= steps; s++) {
+      // Dot density must encode SPEED (2026-08 fix, feedback: "les tirets
+      // ne reflètent pas visuellement les keyframes et leur rapprochement
+      // en fonction du lissage de keyframe") — the After Effects convention
+      // this is copying draws a thin CONTINUOUS path line plus one small dot
+      // per frame, packed tightly where the object moves slowly (eased-out
+      // near a key) and spread out where it moves fast. A first attempt drew
+      // the path itself as alternating dash/gap segments instead of dots —
+      // reasonable in theory, but on a real (non-uniform, non-extreme)
+      // easing curve it reads as a broken, disconnected scribble rather than
+      // a path (feedback: "le motion path ça va pas du tout... il faut un
+      // trait bleu fin avec des petits points représentant les keyframes").
+      // The engine's native dashPattern (still used elsewhere in this file)
+      // dashes at UNIFORM ARC LENGTH along whatever polyline it's given —
+      // completely blind to how the sample points feeding that polyline
+      // were spaced, so a fixed dashPattern here could never have shown
+      // speed regardless of sampling; sampling one point per FRAME through
+      // this key's own easing curve (evalCurvePoints — the same evaluator
+      // rawValueAtFrame above uses for the real animation, just never reused
+      // here before) and dropping a dot at each one does, while the
+      // underlying line stays unbroken.
+      var nFrames = Math.max(1, b.frame - a.frame);
+      var framePts = [];
+      for (var f = 0; f <= nFrames; f++) {
+        var tt = f / nFrames;
         // Named `bt` (bezier t), NOT `t` — this function's outer `t` is the
         // Motion TARGET object (activeMotionTarget()), which outerWorldPoint
         // needs as its first argument. `var t` here used to shadow it (var
@@ -3074,16 +3095,29 @@
         // never entered this loop, so the bug only showed once a second key
         // existed). This is what "le motion path devrait être sur le point
         // d'ancrage" was actually describing.
-        var bt = s / steps, v = 1 - bt;
+        var bt = a.hold ? 0 : evalCurvePoints(a.curvePoints || DEFAULT_CURVE, tt);
+        var v = 1 - bt;
         var rawPathPoint={
           x:
             pvx + v * v * v * a.v[0] + 3 * v * v * bt * (a.v[0] + ho[0]) + 3 * v * bt * bt * (b.v[0] + hi[0]) + bt * bt * bt * b.v[0],
           y:pvy + v * v * v * a.v[1] + 3 * v * v * bt * (a.v[1] + ho[1]) + 3 * v * bt * bt * (b.v[1] + hi[1]) + bt * bt * bt * b.v[1]
         };
         var worldPathPoint=outerWorldPoint(t,rawPathPoint);
-        pts.push({point:[worldPathPoint.x,worldPathPoint.y]});
+        framePts.push({ point: worldPathPoint });
       }
-      items.push({ segments: pts, closed: false, fillColor: null, strokeColor: pathCol, strokeWidth: 1.5 * zs, dashPattern: [5 * zs, 4 * zs] });
+      // One unbroken thin line for the whole segment — always reads as a
+      // path no matter how the frame points happen to be spaced.
+      items.push({ segments: framePts, closed: false, fillColor: null, strokeColor: pathCol, strokeWidth: 1 * zs });
+      // Stride caps dot count on very long segments (e.g. a key held for
+      // hundreds of frames) — no visual benefit past a point, and it bloats
+      // scene JSON rebuilt on every render tick while this overlay is live.
+      var maxDots = 120;
+      var dotStride = Math.max(1, Math.ceil(framePts.length / maxDots));
+      var dotR = 1.3 * zs;
+      for (var fi = 0; fi < framePts.length; fi += dotStride) {
+        var dp = framePts[fi].point;
+        items.push({ segments: circleSegs(dp.x, dp.y, dotR), closed: true, fillColor: pathCol, strokeColor: null, strokeWidth: 0 });
+      }
     }
     ks.forEach(function (k, ki) {
       var isCur = k.frame === state.currentFrame;
@@ -6026,9 +6060,35 @@
         // multi-selection owns the boxes; changing either side propagates
         // to every selected key that actually has that incoming/outgoing
         // segment, avoiding a forest of overlapping inputs.
-        if (isPrimarySelectedKey(ld, prop, k)) {
-          var easeInBox = buildKeyEaseBox(ld, prop, k, 'in');
-          var easeOutBox = buildKeyEaseBox(ld, prop, k, 'out');
+        if (isPrimarySelectedKey(ld, prop, k) && !window._motionKeyDrag && !window._motionSkewDrag) {
+          // Never build the ease boxes while a keyframe itself is being
+          // dragged along the timeline (2026-08 fix, feedback: "les boite de
+          // lissage ne doivent pas apparraitre si on drag la keyframe") —
+          // window._motionKeyDrag/_motionSkewDrag are set for exactly that
+          // gesture (see the row's own mousedown handler a few hundred
+          // lines up, and onUp's cleanup below). The boxes are positioned
+          // relative to the key's CURRENT frame, so during a drag they'd
+          // otherwise pop in and visibly slide around mid-gesture — a
+          // distraction from (and visual noise on top of) the actual
+          // keyframe being moved.
+          // Hide a side's ease box when the neighboring key is too close on
+          // screen for it to fit (2026-08 fix, feedback: "j'utilise glisser
+          // dézoomer sur la timeline... les visuels de keyframe sont
+          // écrasés") — each box is a fixed ~38px (27px input + 11px arrow)
+          // positioned off the key's OWN center regardless of zoom, so at a
+          // low pixels-per-frame (window.FC) zoom the two boxes (and the
+          // neighboring key's own diamond) end up crammed on top of each
+          // other into unreadable mush instead of just not being there.
+          // minGapPx leaves a little breathing room past the box's own
+          // width so it never touches the neighboring diamond either.
+          var kIdx = track.keys.indexOf(k);
+          var prevKey = kIdx > 0 ? track.keys[kIdx - 1] : null;
+          var nextKey = kIdx >= 0 && kIdx < track.keys.length - 1 ? track.keys[kIdx + 1] : null;
+          var minGapPx = 46;
+          var roomIn = !prevKey || (k.frame - prevKey.frame) * window.FC >= minGapPx;
+          var roomOut = !nextKey || (nextKey.frame - k.frame) * window.FC >= minGapPx;
+          var easeInBox = roomIn ? buildKeyEaseBox(ld, prop, k, 'in') : null;
+          var easeOutBox = roomOut ? buildKeyEaseBox(ld, prop, k, 'out') : null;
           if (easeInBox) c.appendChild(easeInBox);
           if (easeOutBox) c.appendChild(easeOutBox);
         }
@@ -6455,6 +6515,16 @@
   // matter which), then drag any ONE of the selected diamonds to retime
   // the whole group together by the same frame delta.
   var _motionKeySel = []; // [{holder, prop, key}]
+  // Whether an ease-box scrub drag is currently in progress (2026-08 fix,
+  // feedback: "la boite disparait si je drag le nombre dans la box") —
+  // module-level, not a DOM class alone: a live scrub 'input' dispatch can
+  // trigger a re-render mid-drag (renderTimeline rebuilds every .motion-key-
+  // ease-box fresh), and a class added to the OLD node doesn't carry over to
+  // its replacement. buildKeyEaseBox reads this flag at BUILD time so a
+  // freshly rebuilt box picks the drag state back up instead of starting
+  // hidden and staying that way for the rest of the gesture (real :hover
+  // has usually already left the tiny box by then).
+  var _easeBoxDragging = false;
   // Property rows are first-class selection targets, like AE's twirled-open
   // property names. Selecting a property selects all its keys; Cmd adds or
   // removes tracks and Shift extends through the visible property rows.
@@ -6602,26 +6672,39 @@
   // loop works without re-selecting, and a pair only one frame apart is
   // skipped (no room for a key between them) rather than silently
   // overwriting one of its own endpoints.
-  // How much ease leaves this key, as a percentage. 0% = linear out, 100% =
-  // fully eased out. Read off the curve's FIRST span: with the on-curve
-  // waypoint model used everywhere here (see DEFAULT_CURVE), a key that
-  // leaves linearly has its first waypoint on the diagonal, and the further
-  // that point sits below the diagonal the slower the start.
+  // Influence, After-Effects style (2026-08 rework — feedback: "inversé la
+  // logique 0% les clé sont éloigné et 100% rapproché", confirmed via
+  // follow-up: at 100% "la poignée d'easing s'étire presque jusqu'à toucher
+  // l'autre clé"). Previously this only varied the waypoint's Y (how flat
+  // the curve sits, at a FIXED x=0.25) — 0%/100% distinguished "linear" from
+  // "fully held", but the waypoint's TIME position never moved, so nothing
+  // ever visually "reached toward" the other key regardless of the value.
+  // Now percent drives the waypoint's X too: 0% keeps it hugging its own
+  // key's time (negligible reach — "éloigné" from the other key, the ease
+  // barely exists) and 100% pushes it out toward the segment's own midpoint
+  // — "rapproché", the ease's flat/held region stretching as far toward the
+  // other key as this curve system's structure allows a waypoint to go
+  // (the on-curve waypoint model used everywhere here — see DEFAULT_CURVE —
+  // has a fixed midpoint at x=0.5 that the out-side waypoint can approach
+  // but never cross, and the in-side mirrors it from the other end; MARGIN
+  // keeps it strictly short of coinciding with either neighbor, which would
+  // degenerate curveSegFor's segment lookup into a zero-width span).
+  var EASE_INFLUENCE_MARGIN = 0.02;
   function easeOutPercent(k) {
     var pts = k && k.curvePoints;
     if (!pts || pts.length < 2) return null;
     var p = pts[1];
-    if (!p || !p.x) return 0;
-    var lag = Math.max(0, Math.min(1, 1 - (p.y / p.x)));
-    return Math.round(lag * 100);
+    if (!p) return 0;
+    var amount = (p.x - EASE_INFLUENCE_MARGIN) / (0.5 - 2 * EASE_INFLUENCE_MARGIN);
+    return Math.round(Math.max(0, Math.min(1, amount)) * 100);
   }
   function easeInPercent(k) {
     var pts = k && k.curvePoints;
     if (!pts || pts.length < 2) return null;
     var p = pts[pts.length - 2];
-    if (!p || p.x >= 1) return 0;
-    var lead = Math.max(0, Math.min(1, (p.y - p.x) / (1 - p.x)));
-    return Math.round(lead * 100);
+    if (!p) return 0;
+    var amount = (1 - p.x - EASE_INFLUENCE_MARGIN) / (0.5 - 2 * EASE_INFLUENCE_MARGIN);
+    return Math.round(Math.max(0, Math.min(1, amount)) * 100);
   }
   function editableInfluenceCurve(key) {
     var pts = cloneCurvePts(key.curvePoints || CURVE_LINEAR);
@@ -6637,14 +6720,20 @@
   function setSegmentInfluence(key, side, percent) {
     if (!key) return false;
     var amount = Math.max(0, Math.min(100, Number(percent) || 0)) / 100;
+    var reach = EASE_INFLUENCE_MARGIN + amount * (0.5 - 2 * EASE_INFLUENCE_MARGIN);
     var pts = editableInfluenceCurve(key);
     var p;
     if (side === 'out') {
       p = pts[1];
+      p.x = reach;
+      // Deepens toward the key's own value (y->0) as the reach grows, same
+      // "hold near this key, then catch up" shape the old fixed-x version
+      // had — just now paired with an X that actually moves too.
       p.y = p.x * (1 - amount);
     } else {
       p = pts[pts.length - 2];
-      p.y = p.x + (1 - p.x) * amount;
+      p.x = 1 - reach;
+      p.y = 1 - (1 - p.x) * (1 - amount);
     }
     // A manually specified waypoint tangent would override the visible
     // edge change. This control owns that one edge, so release only that
@@ -6696,7 +6785,7 @@
     var value = keyEaseInfluence(holder, prop, key, side);
     if (value == null) return null;
     var box = document.createElement('label');
-    box.className = 'motion-key-ease-box ' + side;
+    box.className = 'motion-key-ease-box ' + side + (_easeBoxDragging ? ' dragging' : '');
     box.title = side === 'in'
       ? 'Lissage entrant — glisser ou saisir une influence (0–100 %)'
       : 'Lissage sortant — glisser ou saisir une influence (0–100 %)';
@@ -6706,6 +6795,32 @@
     input.type = 'number'; input.className = 'scrub motion-key-ease-input';
     input.min = 0; input.max = 100; input.dataset.step = 1; input.value = value;
     input.addEventListener('mousedown', function (e) { e.stopPropagation(); });
+    // Force-visible for the whole drag (2026-08 fix, feedback: "la boite
+    // disparait si je drag le nombre dans la box") — the actual scrub drag
+    // (ui.js's `.scrub` mechanism) is driven by a DOCUMENT-level `pointerdown`
+    // listener, which fires and completes (including its own preventDefault())
+    // BEFORE the browser's compatibility `mousedown` is even dispatched — a
+    // `pointerdown`'s preventDefault() suppresses that follow-up mousedown
+    // entirely, so the class-toggle used to live on 'mousedown' above never
+    // actually ran during a real drag (only in synthetic MouseEvent tests,
+    // which bypass that chain — the gap this fix closes). Listens on
+    // 'pointerdown' here too, WITHOUT stopPropagation, so ui.js's own
+    // document-level listener still sees the event and starts the real drag
+    // normally — this one only piggybacks to flip the visibility class.
+    // One-shot pointerup listener per press, not a persistent one, so
+    // nothing accumulates.
+    input.addEventListener('pointerdown', function () {
+      _easeBoxDragging = true;
+      box.classList.add('dragging');
+      window.addEventListener('pointerup', function () {
+        _easeBoxDragging = false;
+        // `box` may have been replaced by a mid-drag re-render (see the
+        // module-level flag's own comment) — clearing the class on this
+        // possibly-stale reference is harmless either way, the flag is
+        // what the NEXT build actually reads.
+        box.classList.remove('dragging');
+      }, { once: true });
+    });
     input.addEventListener('click', function (e) { e.stopPropagation(); });
     input.addEventListener('keydown', function (e) { e.stopPropagation(); });
     input.addEventListener('change', function () {
@@ -7506,9 +7621,20 @@
     });
   }
   function flushMotionDragTimelineRender() {
-    if (!_motionDragTimelineRaf) return;
-    cancelAnimationFrame(_motionDragTimelineRaf);
-    _motionDragTimelineRaf = 0;
+    // 2026-08 fix (feedback: "aprés je bouge la keyframe je n'arrive pas à
+    // revoir la box de lissage") — this used to early-return when there was
+    // no PENDING rAF, which is the common case: a drag lasting more than one
+    // frame (i.e. any real drag) already has its last mid-drag rAF fire and
+    // reset _motionDragTimelineRaf to 0 well before mouseup, so by the time
+    // onDragUp calls this, there's nothing to "flush" and it did nothing at
+    // all — leaving the grid stuck on whatever it looked like at that last
+    // mid-drag frame, rendered while window._motionKeyDrag was still truthy
+    // (suppressing the ease boxes, see the isPrimarySelectedKey gate above).
+    // Clearing the drag flags in onDragUp right before this call never
+    // triggered the render needed to pick that back up. This function's own
+    // name/comment ("flush the latest state on pointer release") always
+    // meant to render unconditionally here — only the early-return was wrong.
+    if (_motionDragTimelineRaf) { cancelAnimationFrame(_motionDragTimelineRaf); _motionDragTimelineRaf = 0; }
     renderTimeline();
   }
 

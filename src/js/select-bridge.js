@@ -22,6 +22,47 @@
 // all ported too.
 (function () {
   var mode = null; // 'xform-scale' | 'xform-rotate' | 'marquee' | 'move' | 'arc' | 'nv-drag' | 'nv-scale' | 'nv-rotate' | 'null-drag' | 'cornerRadius' | null
+  // Animation 2D hover-highlight box (2026-08, feedback: "roll hover n'existe
+  // pas sur animation 2D" — Motion mode already has this, see SMMotion's own
+  // _hoverLi/onHoverMove/hoverOverlayItems; this is the same idea for a plain
+  // shape on the active/other layer). Only tracks the Paper Path itself —
+  // the overlay rectangle is built in engine-bridge.js's buildTransformBoxItems
+  // (same split as getMultiLayerBox: this module owns hit-testing/state,
+  // engine-bridge.js owns turning it into scene-JSON draw items).
+  var _hoverPathA2D = null;
+  function onHoverMoveA2D(pt) {
+    if (state.appMode === 'motion' || state.tool !== 'select' || state.playing) {
+      var hadA2D = !!_hoverPathA2D; _hoverPathA2D = null; return hadA2D;
+    }
+    var hitA2D = null;
+    // Active layer first, then every other visible/unlocked normal layer —
+    // same order onDown's own click hit-test already uses a few hundred
+    // lines down, so hover always finds exactly what a click would select.
+    var activeLdA2D = state.layers[state.activeLayerIdx];
+    var activeLayerA2D = userLayers[state.activeLayerIdx];
+    if (activeLayerA2D && !(activeLdA2D && activeLdA2D.locked && !activeLdA2D.symbolId)) {
+      hitA2D = activeLayerA2D.hitTest(pt, { stroke: true, fill: true, tolerance: 8 / view.zoom });
+    }
+    if (!hitA2D) {
+      for (var pliA2D = project.layers.length - 1; pliA2D >= 0; pliA2D--) {
+        var plA2D = project.layers[pliA2D];
+        var oliA2D = userLayers.indexOf(plA2D);
+        if (oliA2D < 0 || oliA2D === state.activeLayerIdx) continue;
+        var ld2A2D = state.layers[oliA2D];
+        if (!ld2A2D || ld2A2D.locked || !ld2A2D.visible || ld2A2D.symbolId) continue;
+        var hA2D = plA2D.hitTest(pt, { stroke: true, fill: true, tolerance: 8 / view.zoom });
+        if (hA2D) { hitA2D = hA2D; break; }
+      }
+    }
+    var itemA2D = (hitA2D && hitA2D.item) ? hitA2D.item : null;
+    // Don't highlight something already selected — same convention as
+    // Motion's hoverOverlayItems (curSel.indexOf check), avoids a redundant
+    // hover box drawn right on top of the real selection gizmo.
+    if (itemA2D && selectedPaths.indexOf(itemA2D) >= 0) itemA2D = null;
+    if (itemA2D === _hoverPathA2D) return false;
+    _hoverPathA2D = itemA2D;
+    return true;
+  }
   // Dynamic shapes phase 3 (2026-08-18) — canvas drag handles for a rect's
   // corner radius, Figma's own interaction (a small grip sitting on each
   // rounded corner's arc, draggable independently). Self-contained state,
@@ -227,7 +268,15 @@
     // Empty-canvas deselection is shared by Animation 2D and Motion now
     // that both modes can expose a layer-level multi-selection box.
     if (li == null) { if (!additive) _layerSel = []; return; }
-    if (state.appMode !== 'motion') return;
+    // 2026-08 fix (feedback: "j'avait effet de select, dans le canvas j'ai
+    // select l'élément du layer 2, effet n'a pas totalement été deselect")
+    // — this used to return here for Animation 2D, leaving _layerSel (and
+    // therefore both the layer-list row's 'sel' class, timeline.js's
+    // renderLayerList, AND multiLayerSelectionBox below) stuck on whatever
+    // layer was selected BEFORE this canvas click. Picking a layer THROUGH
+    // its own row (addLayer/addEffectLayer/the row's click handler) already
+    // updates _layerSel directly — canvas clicks routing through here were
+    // the one path that didn't, in either mode.
     if (additive) {
       if (_layerSel.indexOf(li) < 0) _layerSel.push(li);
     } else _layerSel = [li];
@@ -1213,6 +1262,16 @@
       return;
     }
     if (!mode) {
+      // Shape hover highlight (2026-08, feedback: "roll hover n'existe pas
+      // sur animation 2D") — runs regardless of whether anything is already
+      // selected, unlike the anchor/ring hover block below which only makes
+      // sense once selectedPaths.length.
+      if (shouldIntercept()) {
+        var whA2D = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
+        if (onHoverMoveA2D(new Point(whA2D[0], whA2D[1]))) window.SMEngineBridge.renderNow();
+      } else if (_hoverPathA2D) {
+        _hoverPathA2D = null;
+      }
       // Hover-only pass (not dragging anything) — tracks whether the
       // pointer sits over the anchor crosshair so engine-bridge.js can draw
       // it slightly larger, live UX feedback requested 2026-07 ("un petit
@@ -2308,6 +2367,9 @@
       return mode === 'xform-distort' ? { dir: distortDir, quad: distortDstQuad } : null;
     },
     getMultiLayerBox: multiLayerSelectionBox,
+    getHoverBounds: function () {
+      return (_hoverPathA2D && !_hoverPathA2D.removed) ? _hoverPathA2D.strokeBounds : null;
+    },
     // Switching tools mid-marquee-drag (2026-07-29, QA-confirmed) used to
     // leave a stuck ghost selection rectangle: onUp's own finalization
     // (removing the rect, folding it into selectedPaths) only ever runs on

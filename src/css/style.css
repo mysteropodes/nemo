@@ -2224,18 +2224,33 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
 /* Inline incoming/outgoing influence editors on the primary selected key.
    They are siblings of the key, not children, so Linear's 45° transform
    never rotates the controls. Flat borders only: no selection halo. */
+/* Hover-to-reveal (2026-08 fix, feedback: "les box pour changé le lissage
+   doit foncé comme pour les autres propriété et doivent apparaître au
+   hover si on a key select") — hidden by default, same convention as this
+   app's other on-demand controls (.project-tab .pt-close, .layer-inout-bar
+   .timelink-anchor). Revealed by hovering the BOX'S OWN rendered area, not
+   the key diamond it sits beside (2026-08 follow-up, feedback: "ce n'est
+   pas en roll hover de la clé mais si on roll hover sur les box à droite
+   ou à gauche elle même") — pointer-events stays 'auto' even while
+   invisible so the box can register its own :hover though it renders no
+   pixels, rather than gating visibility on the unrelated .motion-fc cell
+   underneath. Forced on via .dragging (added by buildKeyEaseBox's own
+   mousedown handler) so an active drag never gets cut off mid-gesture
+   just because the pointer strayed off this small a target. */
 .motion-key-ease-box{position:absolute;top:50%;z-index:8;height:16px;display:flex;align-items:center;
-  box-sizing:border-box;border:1px solid #4b4e59;border-radius:2px;background:#292b32;color:#aeb3c2;
-  transform:translateY(-50%);overflow:hidden;cursor:ew-resize;}
+  box-sizing:border-box;border:1px solid #4b4e59;border-radius:2px;background:var(--panel3);color:var(--text-dim);
+  transform:translateY(-50%);overflow:hidden;cursor:ew-resize;
+  opacity:0;pointer-events:auto;transition:opacity .12s linear;}
+.motion-key-ease-box:hover,.motion-key-ease-box.dragging{opacity:1;}
 .motion-key-ease-box.in{right:calc(50% + 7px);}
 .motion-key-ease-box.out{left:calc(50% + 7px);}
 .motion-key-ease-marker{width:11px;display:flex;align-items:center;justify-content:center;font-size:7px;line-height:1;
   color:var(--accent-hover);pointer-events:none;}
 .motion-key-ease-input{width:27px;height:14px;box-sizing:border-box;border:0;border-radius:0;outline:0;
-  padding:0 2px;background:#f0f1f4;color:#23252b;text-align:right;font:600 9px/14px var(--font-mono,monospace);
+  padding:0 2px;background:var(--panel3);color:var(--text);text-align:right;font:600 9px/14px var(--font-mono,monospace);
   cursor:ew-resize;-moz-appearance:textfield;}
 .motion-key-ease-input::-webkit-inner-spin-button,.motion-key-ease-input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}
-.motion-key-ease-input:focus{background:#fff;color:#111;}
+.motion-key-ease-input:focus{background:var(--panel2);color:var(--text);}
 
 /* Expression row extras (Van Dijk 7.2 / 7.4) */
 .motion-expr-raw{margin-left:10px;font-size:9.5px;color:var(--text-dim);}
