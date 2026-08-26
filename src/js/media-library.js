@@ -247,13 +247,13 @@
     if (window.showToast) showToast(removed + SM.t('toastOrphanEntriesRemovedSuffix'));
   }
 
-  // OS drag-and-drop onto the panel's own drop zone (#media-drop) — separate
-  // from drop-import.js's canvas/timeline drop target, which is scoped to
-  // the rotoscopy reference (SMReference.importFiles) and deliberately left
-  // untouched here to avoid changing that existing workflow. Dropping onto
-  // THIS zone routes through images.js's real import pipeline instead
-  // (images.js:importImageFiles/importVideoFile), same as the toolbar
-  // buttons, so entries land as normal layers AND register a library entry.
+  // OS drag-and-drop onto the panel's own drop zone (#media-drop) — routes
+  // through images.js's real import pipeline (images.js:importImageFiles/
+  // importVideoFile), same as the toolbar buttons, so entries land as
+  // normal layers AND register a library entry. drop-import.js's canvas/
+  // timeline drop target now routes image/video files through this exact
+  // same pipeline too (2026-08 fix) — only genuinely unrecognized file
+  // types still fall back to the rotoscopy reference importer there.
   function initDropZone() {
     var zone = document.getElementById('media-drop'); if (!zone) return;
     zone.addEventListener('dragover', function (e) { if (e.dataTransfer && e.dataTransfer.types.indexOf('Files') >= 0) { e.preventDefault(); zone.classList.add('drop-hover'); } });
