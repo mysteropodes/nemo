@@ -76,7 +76,7 @@ views of the same document.
 - GPU effects library (WGSL shaders) plus built-in blur, color, distort, and stylize effects
 - Export to **MP4, MOV, WebM, GIF**, and JSON; PNG sequences; OCA export
 - Import PSD files, ABR brushes, images, video, and audio
-- After Effects camera export, Lottie preview
+- Camera export as a `.jsx` script, Lottie preview
 - **Scripting API** (`nemo.*`) with HTML panels and plugins
 - **Labs** — ~35 experimental tools behind a panel (lipsync assistant, speed lines,
   screentone, French curve, predictive stroke, pose library, and more)

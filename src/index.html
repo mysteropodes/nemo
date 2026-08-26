@@ -123,7 +123,7 @@
          French — restore data-i18n-title="modeStoryboard" when un-freezing. -->
     <button class="app-mode-btn in-dev-locked" data-mode="storyboard" disabled data-i18n-title="storyboardFrozenTitle" title="StoryBoard — en développement, pas encore disponible dans cette build">StoryBoard<span class="in-dev-badge">en dev</span></button>
     <button class="app-mode-btn active" data-mode="anim2d" data-i18n-title="modeAnim2d" title="Animation 2D">Animation 2D</button>
-    <button class="app-mode-btn" data-mode="motion" data-i18n-title="modeMotion" title="Motion — keyframes de propriétés (position/rotation/échelle/opacité), style After Effects">Motion</button>
+    <button class="app-mode-btn" data-mode="motion" data-i18n-title="modeMotion" title="Motion — keyframes de propriétés (position/rotation/échelle/opacité)">Motion</button>
   </div>
   <div id="app-topbar-spacer"></div>
   <!-- Feedback avatars + settings gear stay pinned to the top bar (their
@@ -455,7 +455,7 @@
       <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrMask">Masque</span></div>
       <div class="pbdy">
         <div class="pr"><span class="pl" data-i18n="fieldMaskMode">Mode</span><select class="pi" id="p-mask-mode" data-i18n-title="maskModeTypeTitle" title="Add = union avec les autres masques du calque · Subtract = découpe un trou · Intersect = ne garde que le chevauchement"><option value="add" data-i18n="maskAdd">Add</option><option value="subtract" data-i18n="maskSubtract">Subtract</option><option value="intersect" data-i18n="maskIntersect">Intersect</option></select></div>
-        <div class="pr"><span class="pl" data-i18n="fieldMaskFeather">Feather</span><input type="number" class="pi scrub" id="p-mask-feather" value="0" min="0" max="500" data-step="1" data-i18n-title="maskFeatherTitle" title="Adoucit le bord du masque combiné (partagé entre les masques de ce calque — voir l'audit) — comme le Mask Feather d'After Effects"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
+        <div class="pr"><span class="pl" data-i18n="fieldMaskFeather">Feather</span><input type="number" class="pi scrub" id="p-mask-feather" value="0" min="0" max="500" data-step="1" data-i18n-title="maskFeatherTitle" title="Adoucit le bord du masque combiné (partagé entre les masques de ce calque — voir l'audit)"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
         <div class="pr"><button class="pbtn" id="btn-mask-unset" style="flex:1;font-size:10px" data-i18n-title="unmaskTitle" title="Redevient une forme normale (n'est plus un masque)" data-i18n="btnUnmask">Retirer comme masque</button></div>
       </div>
     </div>
@@ -582,7 +582,7 @@
     <div class="psec" id="effects-stack-sec" style="display:none">
       <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrEffects">Effects</span></div>
       <div class="pbdy">
-        <div class="pr" id="effects-adj-hint" style="font-size:10px;color:var(--text-dim);display:none" data-i18n="effectLayerDesc">Appliqué à tout ce qui est en dessous de ce calque dans la pile (comme un Adjustment Layer After Effects).</div>
+        <div class="pr" id="effects-adj-hint" style="font-size:10px;color:var(--text-dim);display:none" data-i18n="effectLayerDesc">Appliqué à tout ce qui est en dessous de ce calque dans la pile (comme un calque de réglage).</div>
         <!-- Per-element targeting (2026-07: "possible de différencié les
              effet par éléments sélectionné") — shown only while exactly one
              shape is selected, so it's clear "+ Add Effect" is about to
@@ -1003,7 +1003,7 @@
         <div class="pr" data-i18n-title="pLiveTitle" title="Live stylus pressure — draw on the canvas to test your tablet"><span class="pl" data-i18n="fieldPLive">P. live</span><div style="flex:1;height:6px;background:var(--bg);border-radius:3px;overflow:hidden"><div id="p-live-fill" style="height:100%;width:0;background:var(--accent);transition:width .05s"></div></div></div>
         <div class="pr" id="p-taper-row"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="p-taper" style="accent-color:var(--accent)"> <span data-i18n="taperEndsLabel">Taper ends (Draw/Pen)</span></label></div>
         <div class="pr" id="p-shadowmode-row" data-i18n-title="shadowModeTitle" title="Tags what you draw as Shadow — draw fills first, then rough shadow-boundary lines over them like a Japanese anime layout; separating Stroke/Fill/Shadow later routes anything drawn with this on into its own Shadow layer instead of Stroke/Fill"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="p-shadowmode" style="accent-color:var(--accent)"> <span data-i18n="shadowModeLabel">Shadow (Draw/Pen/Shape)</span></label></div>
-        <div class="pr" id="p-maskmode-row" data-i18n-title="maskModeTitle" title="Ce que tu dessines devient un MASQUE (clip) pour le calque actif au lieu d'un vrai dessin — comme dessiner un masque sur un calque dans After Effects. Combine/feather réglables dans le panneau Propriétés une fois le masque sélectionné."><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="p-maskmode" style="accent-color:var(--accent)"> <span data-i18n="maskModeLabel">Masque (Draw/Pen/Shape)</span></label><select class="pi" id="p-maskmode-type" style="flex:0 0 auto;width:76px;font-size:9px" data-i18n-title="maskModeTypeTitle" title="Add = union avec les autres masques du calque · Subtract = découpe un trou · Intersect = ne garde que le chevauchement"><option value="add" data-i18n="maskAdd">Add</option><option value="subtract" data-i18n="maskSubtract">Subtract</option><option value="intersect" data-i18n="maskIntersect">Intersect</option></select></div>
+        <div class="pr" id="p-maskmode-row" data-i18n-title="maskModeTitle" title="Ce que tu dessines devient un MASQUE (clip) pour le calque actif au lieu d'un vrai dessin — comme dessiner un masque sur un calque dans un logiciel de compositing. Combine/feather réglables dans le panneau Propriétés une fois le masque sélectionné."><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="p-maskmode" style="accent-color:var(--accent)"> <span data-i18n="maskModeLabel">Masque (Draw/Pen/Shape)</span></label><select class="pi" id="p-maskmode-type" style="flex:0 0 auto;width:76px;font-size:9px" data-i18n-title="maskModeTypeTitle" title="Add = union avec les autres masques du calque · Subtract = découpe un trou · Intersect = ne garde que le chevauchement"><option value="add" data-i18n="maskAdd">Add</option><option value="subtract" data-i18n="maskSubtract">Subtract</option><option value="intersect" data-i18n="maskIntersect">Intersect</option></select></div>
         <div class="pr" data-i18n-title="eraserSizeTitle" title="Eraser cuts the path precisely at this width instead of deleting the whole stroke"><span class="pl" data-i18n="fieldEraser">Eraser</span><input type="number" class="pi scrub" id="p-erasersize" value="14" min="4" max="120" data-step="1"><span style="font-size:9px;color:var(--text-dim)">px</span></div>
       </div>
     </div>
@@ -1301,11 +1301,11 @@
           <option value="prores">ProRes (.mov)</option>
           <option value="lottie">Lottie JSON</option>
           <option value="rive">Rive (via MCP)</option>
-          <option value="ae-camera" data-i18n="expAeCamera">Caméra → After Effects (.jsx)</option>
+          <option value="ae-camera" data-i18n="expAeCamera">Caméra → script .jsx</option>
         </select>
       </div>
       <div class="pr" id="exp-rive-hint" style="display:none;font-size:9px;color:var(--text-dim)" data-i18n="expRiveHint">Nécessite Rive Editor ouvert en local avec le serveur MCP actif (port 9791).</div>
-      <div class="pr" id="exp-ae-camera-hint" style="display:none;font-size:9px;color:var(--text-dim)" data-i18n="expAeCameraHint">Génère un script .jsx à lancer dans After Effects (File &gt; Scripts &gt; Run Script File…) — nécessite un calque caméra actif.</div>
+      <div class="pr" id="exp-ae-camera-hint" style="display:none;font-size:9px;color:var(--text-dim)" data-i18n="expAeCameraHint">Génère un script .jsx à lancer dans ton logiciel de compositing (File &gt; Scripts &gt; Run Script File…) — nécessite un calque caméra actif.</div>
       <div class="pr"><span class="pl" data-i18n="fieldRange">Plage</span>
         <select class="psel" id="exp-range" style="flex:1">
           <option value="wa" data-i18n="rangeWorkArea">Zone de travail</option>
@@ -1761,7 +1761,7 @@
         <!-- Camera & audio moved here from the timeline toolbar (feedback
              #16): they both ADD a special layer/track, so they live next to
              the layer "+". Same ids — the JS wiring is untouched. -->
-        <button id="btn-camera" data-i18n-title="btnCameraLayerTitle" title="Calque caméra — clés de cadrage (zoom/pan) interpolées avec courbes de Bézier, comme le calque Caméra d'After Effects"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="m17 10 4-2.5v9.4L17 14.4Z" fill="currentColor" stroke="none"/></svg></button>
+        <button id="btn-camera" data-i18n-title="btnCameraLayerTitle" title="Calque caméra — clés de cadrage (zoom/pan) interpolées avec courbes de Bézier"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="m17 10 4-2.5v9.4L17 14.4Z" fill="currentColor" stroke="none"/></svg></button>
         <button id="btn-audio" data-i18n-title="btnAudioTitle" title="Importer une piste audio (mp3/ogg/wav) — waveform sous la timeline, lecture synchronisée"><span style="font-size:13px;line-height:1">&#x266b;</span></button>
         <input type="file" id="audio-file-input" accept="audio/*" multiple style="display:none">
         <!-- v5: flat filled trash icon instead of the 🗑 emoji — the emoji
