@@ -2025,6 +2025,8 @@
       if (nodeItems.length) layers.push({ items: nodeItems });
       var xformItems = buildTransformBoxItems();
       if (xformItems.length) layers.push({ items: xformItems });
+      var hoverBoxItems = buildHoverBoxItems();
+      if (hoverBoxItems.length) layers.push({ items: hoverBoxItems });
       var marqueeItems = buildMarqueeItems();
       if (marqueeItems.length) layers.push({ items: marqueeItems });
       var fsSelItems = buildFSSelectionItems();
@@ -2377,6 +2379,26 @@
   // simplification: dashed strokes aren't supported by the engine's Stroke
   // type yet, so the dashed outline/marquee border render as solid instead —
   // a cosmetic gap, not a functional one, until dashing is added engine-side.
+  // Animation 2D shape hover box (2026-08, feedback: "roll hover n'existe
+  // pas sur animation 2D" — Motion mode's own hover box, SMMotion's
+  // hoverOverlayItems, already did this; this is the same idea for a plain
+  // shape hovered on the active/other layer). select-bridge.js owns the
+  // hit-testing/hover state (onHoverMoveA2D/_hoverPathA2D — same split as
+  // getMultiLayerBox above), this just turns its bounds into a draw item —
+  // deliberately a SEPARATE function from buildTransformBoxItems below,
+  // since a hover box must show even with nothing selected/tool idle.
+  function buildHoverBoxItems() {
+    if (state.appMode === 'motion' || !window.SMSelectBridge || !SMSelectBridge.getHoverBounds) return [];
+    var hb = SMSelectBridge.getHoverBounds();
+    if (!hb) return [];
+    var hzs = 1 / view.zoom;
+    // Same solid-blue color/weight as Motion's own hover box (hoverOverlayItems,
+    // motion.js) — confirmed via a temporary oversized magenta stroke that the
+    // pipeline draws correctly; 1.5px (vs Motion's 1px) since this box often
+    // coincides exactly with the shape's own edge and needs to read over both
+    // the shape's fill and the page background.
+    return [boundsRectItem(hb.left, hb.top, hb.right, hb.bottom, null, [74, 158, 255, 220], 1.5 * hzs)];
+  }
   function buildTransformBoxItems() {
     if (state.tool !== 'select') return [];
     // Motion mode (2026-08-21 fix, "2 points d'ancrage et 2 rotation qui
