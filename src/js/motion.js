@@ -2103,6 +2103,28 @@
     }
     return mats;
   }
+  // World-space DELTA VECTOR -> local space, undoing only the PARENT
+  // chain's rotation/scale (no translation/pivot — a vector between two
+  // points transforms via the linear part alone). Shared by every canvas
+  // drag that writes a Position DELTA on a parented layer (2026-08 fix,
+  // feedback: "si je bouge un élément parenté... à droite il va en bas"
+  // — select-bridge.js's body-drag 'move' mode added the raw mouse delta
+  // straight to Position with zero parent compensation; the layer's OWN
+  // rotation was already excluded there via layerMotionPointMap/invVec,
+  // correctly, per computeMotionMat's "Position lives in POST-own-
+  // rotation, PRE-parent-chain space" — this fills the other half). Undone
+  // outermost-ancestor-first, mirroring every other parent-chain inverse
+  // in this file (composedPivotWorld, motionBoxGeom.inv, outerLocalPoint).
+  function invertVectorThroughParentChain(li, frameIdx, dx, dy) {
+    var chain = parentChainMats(li, frameIdx);
+    for (var i = chain.length - 1; i >= 0; i--) {
+      var m = chain[i].mat;
+      var rad = -m.rot * Math.PI / 180, c = Math.cos(rad), s = Math.sin(rad);
+      var rx = dx * c - dy * s, ry = dx * s + dy * c;
+      dx = rx / (m.sx || 1); dy = ry / (m.sy || 1);
+    }
+    return [dx, dy];
+  }
   function applyParentChainToSegments(segments, li, frameIdx) {
     var chain = parentChainMats(li, frameIdx);
     for (var k = 0; k < chain.length; k++) segments = transformSegments(segments, chain[k].pivot, chain[k].mat);
@@ -3368,8 +3390,24 @@
   // otherwise the expanded LAYER itself. Both the canvas overlay
   // (buildOverlayItems) and the drag handlers below resolve through this so
   // they always agree on the same target and the same pivot-bounds source.
+  // Set by select-bridge.js's empty-canvas click (2026-08 fix, feedback:
+  // "impossible de tout déselect dans le canvas en cliquant sur une zone
+  // où y a rien") — clearSel()/syncMotionLayerSelection(null,...) already
+  // ran there, correctly emptying selectedPaths/_layerSel, but
+  // state.activeLayerIdx itself was never cleared (no "-1"/"nothing"
+  // convention exists for it anywhere in this codebase, and introducing
+  // one would touch every one of its ~27 read/write sites app-wide) — so
+  // this box/gizmo and the Properties panel below kept showing whatever
+  // was active before the click, unchanged. This flag is a narrow,
+  // Motion-canvas-only override instead: true only right after an empty
+  // click, cleared by every genuine re-selection (a layer-list row via
+  // setActiveLayer, or a canvas hit on a Null/shape/component in
+  // select-bridge.js) so it never gets "stuck" hiding a real selection.
+  var _motionCanvasEmptyClick = false;
+  function setMotionCanvasEmptyClick(v) { _motionCanvasEmptyClick = !!v; }
   function activeMotionTarget() {
     if (state.appMode !== 'motion') return null;
+    if (_motionCanvasEmptyClick) return null;
     // Bug found 2026-07 ("quand tu select un calque ça select pas dans le
     // canvas"): this used to require window._motionExpandedLayer (a row's
     // Transform group toggled OPEN) — merely clicking a layer row (setting
@@ -4411,7 +4449,7 @@
     var body = document.getElementById('motion-props-body');
     if (!body) return;
     body.innerHTML = '';
-    var ld = state.layers[state.activeLayerIdx];
+    var ld = _motionCanvasEmptyClick ? null : state.layers[state.activeLayerIdx];
     var nameRow = document.createElement('div');
     nameRow.className = 'motion-props-layername';
     if (!ld) { nameRow.textContent = SM.t('noLayerSelected'); body.appendChild(nameRow); return; }
@@ -8156,6 +8194,8 @@
     disableTimeRemap: disableTimeRemap,
     timeRemapValue: timeRemapValue,
     parentChainMats: parentChainMats,
+    invertVectorThroughParentChain: invertVectorThroughParentChain,
+    setMotionCanvasEmptyClick: setMotionCanvasEmptyClick,
     applyParentChainToSegments: applyParentChainToSegments,
     applyParentChainToImageRect: applyParentChainToImageRect,
     applyPathVertexOffsetsFor: applyPathVertexOffsetsFor,

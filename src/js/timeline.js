@@ -1116,6 +1116,7 @@ window.SM={
     activateUL(ni);_layerSel=[ni];_layerSelAnchor=ni;loadFrame(state.currentFrame);updateUI();},
   setActiveLayer:function(idx){if(idx<0||idx>=state.layers.length)return;saveAllLayerFrames();activateUL(idx);clearSel();
     window._layerActiveExplicit=true; // see clearSel()'s own comment — an explicit timeline row click, not a canvas deselect
+    if(window.SMMotion)SMMotion.setMotionCanvasEmptyClick(false); // a real row pick always un-hides Motion's box/panel, see its own comment
     // The camera row is a synthetic pseudo-layer (not a real state.layers
     // entry — see camera.js's renderPanelRow) selected by switching TO the
     // camera tool, never by an activeLayerIdx change; picking a real layer

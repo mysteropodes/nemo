@@ -905,7 +905,23 @@
         if (oli < 0 || oli === state.activeLayerIdx) continue;
         var ld2 = state.layers[oli];
         if (!ld2 || ld2.locked || !ld2.visible || ld2.symbolId) continue;
-        var oh = pl.hitTest(pt, { stroke: true, fill: true, tolerance: 8 / view.zoom });
+        // Same inverse-motion mapping the ACTIVE layer already gets above
+        // (hitPt) — without this, clicking a NON-active layer's VISIBLE
+        // (Motion-keyed) position missed entirely the moment it had any
+        // Position/Rotation/Scale of its own, since its raw Paper.js
+        // geometry never actually moves (2026-08 fix, feedback:
+        // "impossible de select le layer 1 en cliquant dessus ssi le null
+        // est select" — reproducible with ANY other layer active, not
+        // Null-specific, but a Null is what the report happened to test:
+        // Layer 1 had Motion keys of its own, so its clickable geometry
+        // and its visible position had already diverged).
+        var oPt = pt;
+        if (state.appMode === 'motion' && window.SMMotion) {
+          var oMap = SMMotion.layerMotionPointMap(oli);
+          if (!oMap && SMMotion.layerMotion3DPointMap) oMap = SMMotion.layerMotion3DPointMap(oli);
+          if (oMap) { var og = oMap.inv(pt.x, pt.y); oPt = new Point(og[0], og[1]); }
+        }
+        var oh = pl.hitTest(oPt, { stroke: true, fill: true, tolerance: 8 / view.zoom });
         if (oh) { hit = oh; hitOtherLayerIdx = oli; break; }
       }
     }
@@ -1013,6 +1029,7 @@
       if (nullHit >= 0) {
         nvClearSelection();
         if (!e.shiftKey) clearSel();
+        if (window.SMMotion) SMMotion.setMotionCanvasEmptyClick(false);
         state.activeLayerIdx = nullHit;
         activateUL(nullHit);
         _layerSel = [nullHit]; _layerSelAnchor = nullHit;
@@ -1033,6 +1050,7 @@
         var isDbl = _compClick.layerIdx === compHit.layerIdx && (now2 - _compClick.time < 350);
         _compClick.layerIdx = compHit.layerIdx; _compClick.time = now2;
         if (!e.shiftKey) clearSel();
+        if (window.SMMotion) SMMotion.setMotionCanvasEmptyClick(false);
         state.activeLayerIdx = compHit.layerIdx;
         activateUL(compHit.layerIdx);
         syncMotionLayerSelection(compHit.layerIdx, e.shiftKey);
@@ -1049,6 +1067,7 @@
 
     if (hit && (hit.item instanceof Path || hit.item instanceof Raster)) {
       nvClearSelection(); // selecting a stroke/image deselects any selected video, like any selection change
+      if (window.SMMotion) SMMotion.setMotionCanvasEmptyClick(false);
       if (hitOtherLayerIdx >= 0) {
         state.activeLayerIdx = hitOtherLayerIdx;
         activateUL(hitOtherLayerIdx);
@@ -1138,6 +1157,11 @@
     } else {
       if (!e.shiftKey) clearSel();
       syncMotionLayerSelection(null, e.shiftKey);
+      // Empty-canvas deselect (2026-08 fix, feedback: "impossible de tout
+      // déselect dans le canvas") — see setMotionCanvasEmptyClick's own
+      // comment (motion.js): only additive-free (no shift) clicks actually
+      // mean "deselect", matching clearSel's own shiftKey gate just above.
+      if (state.appMode === 'motion' && window.SMMotion && !e.shiftKey) SMMotion.setMotionCanvasEmptyClick(true);
       mode = 'marquee';
       marqueeStart = pt.clone();
       var prevA = project.activeLayer;
@@ -1441,7 +1465,15 @@
       if (state.appMode === 'motion') {
         var mvLi = state.activeLayerIdx;
         var mvCur = SMMotion.getLayerValue(mvLi, 'position');
-        SMMotion.setLayerValue(mvLi, 'position', [mvCur[0] + delta.x, mvCur[1] + delta.y]);
+        // Parent chain (2026-08 fix, feedback: "si je bouge un élément
+        // parenté... à droite il va en bas") — delta above is raw WORLD
+        // space; a parented layer's Position lives just BEFORE the parent
+        // chain is applied (same space computeMotionMat's own dx/dy does),
+        // so a rotated/scaled parent needs this undone or the drag axes
+        // silently skew/invert, same bug class as mvMap/invVec right above
+        // already fixed for the layer's OWN rotation.
+        var mvPd = (window.SMMotion && SMMotion.invertVectorThroughParentChain) ? SMMotion.invertVectorThroughParentChain(mvLi, state.currentFrame, delta.x, delta.y) : [delta.x, delta.y];
+        SMMotion.setLayerValue(mvLi, 'position', [mvCur[0] + mvPd[0], mvCur[1] + mvPd[1]]);
         window._sceneVersion++;
         lastPt = pt;
         window.SMEngineBridge.renderNow();
