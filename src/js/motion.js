@@ -6505,6 +6505,16 @@
   // matter which), then drag any ONE of the selected diamonds to retime
   // the whole group together by the same frame delta.
   var _motionKeySel = []; // [{holder, prop, key}]
+  // Whether an ease-box scrub drag is currently in progress (2026-08 fix,
+  // feedback: "la boite disparait si je drag le nombre dans la box") —
+  // module-level, not a DOM class alone: a live scrub 'input' dispatch can
+  // trigger a re-render mid-drag (renderTimeline rebuilds every .motion-key-
+  // ease-box fresh), and a class added to the OLD node doesn't carry over to
+  // its replacement. buildKeyEaseBox reads this flag at BUILD time so a
+  // freshly rebuilt box picks the drag state back up instead of starting
+  // hidden and staying that way for the rest of the gesture (real :hover
+  // has usually already left the tiny box by then).
+  var _easeBoxDragging = false;
   // Property rows are first-class selection targets, like AE's twirled-open
   // property names. Selecting a property selects all its keys; Cmd adds or
   // removes tracks and Shift extends through the visible property rows.
@@ -6746,7 +6756,7 @@
     var value = keyEaseInfluence(holder, prop, key, side);
     if (value == null) return null;
     var box = document.createElement('label');
-    box.className = 'motion-key-ease-box ' + side;
+    box.className = 'motion-key-ease-box ' + side + (_easeBoxDragging ? ' dragging' : '');
     box.title = side === 'in'
       ? 'Lissage entrant — glisser ou saisir une influence (0–100 %)'
       : 'Lissage sortant — glisser ou saisir une influence (0–100 %)';
@@ -6755,16 +6765,32 @@
     var input = document.createElement('input');
     input.type = 'number'; input.className = 'scrub motion-key-ease-input';
     input.min = 0; input.max = 100; input.dataset.step = 1; input.value = value;
-    input.addEventListener('mousedown', function (e) {
-      e.stopPropagation();
-      // Force-visible for the whole drag (2026-08 fix, feedback: "elle ne
-      // disparaissent pas si on drag la valeur") — the box is hover-only by
-      // default (style.css), and a scrub drag routinely carries the pointer
-      // off the tiny box itself, which would otherwise end the CSS :hover
-      // mid-gesture and hide the very field being dragged. One-shot pointerup
-      // listener per press, not a persistent one — nothing to leak.
+    input.addEventListener('mousedown', function (e) { e.stopPropagation(); });
+    // Force-visible for the whole drag (2026-08 fix, feedback: "la boite
+    // disparait si je drag le nombre dans la box") — the actual scrub drag
+    // (ui.js's `.scrub` mechanism) is driven by a DOCUMENT-level `pointerdown`
+    // listener, which fires and completes (including its own preventDefault())
+    // BEFORE the browser's compatibility `mousedown` is even dispatched — a
+    // `pointerdown`'s preventDefault() suppresses that follow-up mousedown
+    // entirely, so the class-toggle used to live on 'mousedown' above never
+    // actually ran during a real drag (only in synthetic MouseEvent tests,
+    // which bypass that chain — the gap this fix closes). Listens on
+    // 'pointerdown' here too, WITHOUT stopPropagation, so ui.js's own
+    // document-level listener still sees the event and starts the real drag
+    // normally — this one only piggybacks to flip the visibility class.
+    // One-shot pointerup listener per press, not a persistent one, so
+    // nothing accumulates.
+    input.addEventListener('pointerdown', function () {
+      _easeBoxDragging = true;
       box.classList.add('dragging');
-      window.addEventListener('pointerup', function () { box.classList.remove('dragging'); }, { once: true });
+      window.addEventListener('pointerup', function () {
+        _easeBoxDragging = false;
+        // `box` may have been replaced by a mid-drag re-render (see the
+        // module-level flag's own comment) — clearing the class on this
+        // possibly-stale reference is harmless either way, the flag is
+        // what the NEXT build actually reads.
+        box.classList.remove('dragging');
+      }, { once: true });
     });
     input.addEventListener('click', function (e) { e.stopPropagation(); });
     input.addEventListener('keydown', function (e) { e.stopPropagation(); });
