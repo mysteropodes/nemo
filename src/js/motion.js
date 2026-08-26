@@ -6060,7 +6060,17 @@
         // multi-selection owns the boxes; changing either side propagates
         // to every selected key that actually has that incoming/outgoing
         // segment, avoiding a forest of overlapping inputs.
-        if (isPrimarySelectedKey(ld, prop, k)) {
+        if (isPrimarySelectedKey(ld, prop, k) && !window._motionKeyDrag && !window._motionSkewDrag) {
+          // Never build the ease boxes while a keyframe itself is being
+          // dragged along the timeline (2026-08 fix, feedback: "les boite de
+          // lissage ne doivent pas apparraitre si on drag la keyframe") —
+          // window._motionKeyDrag/_motionSkewDrag are set for exactly that
+          // gesture (see the row's own mousedown handler a few hundred
+          // lines up, and onUp's cleanup below). The boxes are positioned
+          // relative to the key's CURRENT frame, so during a drag they'd
+          // otherwise pop in and visibly slide around mid-gesture — a
+          // distraction from (and visual noise on top of) the actual
+          // keyframe being moved.
           // Hide a side's ease box when the neighboring key is too close on
           // screen for it to fit (2026-08 fix, feedback: "j'utilise glisser
           // dézoomer sur la timeline... les visuels de keyframe sont
