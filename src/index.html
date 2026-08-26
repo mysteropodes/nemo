@@ -1484,14 +1484,27 @@
           <div style="font-size:10px;color:var(--text-dim)"><span data-i18n="settingsVersionLabel">Version</span> <span id="app-version-txt-about">0.7.0-alpha.1</span></div>
         </div>
         <div class="phdr" style="padding:0 0 4px 0;font-size:9px;color:var(--text-dim)" data-i18n="settingsAboutAuthorHdr">Auteur</div>
-        <div style="font-size:10px;color:var(--text-dim);margin-bottom:14px">
-          mysteropodes — <a href="https://github.com/mysteropodes" target="_blank" style="color:var(--accent)">github.com/mysteropodes</a>
+        <div style="font-size:10px;color:var(--text-dim);margin-bottom:8px">mysteropodes</div>
+        <!-- Icon pill-buttons (2026-08, matching a reference mockup) — replaces
+             the plain inline GitHub text link + full-width Ko-fi button with a
+             matched pair, same .pbtn base every other button in this panel
+             already uses. GitHub mark is the standard open-source octocat
+             glyph; Ko-fi is a plain coffee-cup outline (this app's own icon
+             style, stroke-based like ICON_EYE etc. in effects-panel.js) rather
+             than Ko-fi's trademarked wordmark/logo — same "☕" idea the old
+             button already used, just as a real icon instead of an emoji. -->
+        <div class="pr" style="gap:8px;margin-bottom:14px">
+          <a href="https://github.com/mysteropodes" target="_blank" class="pbtn" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;font-size:11px;padding:7px;text-decoration:none">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M12 .5C5.73.5.75 5.48.75 11.75c0 5.02 3.26 9.28 7.78 10.78.57.1.78-.25.78-.55 0-.27-.01-1.16-.02-2.11-3.17.69-3.84-1.34-3.84-1.34-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.75 1.18 1.75 1.18 1.02 1.75 2.68 1.24 3.33.95.1-.74.4-1.24.72-1.53-2.53-.29-5.19-1.27-5.19-5.63 0-1.24.44-2.26 1.17-3.06-.12-.29-.51-1.45.11-3.02 0 0 .96-.31 3.14 1.17a10.9 10.9 0 0 1 5.72 0c2.18-1.48 3.14-1.17 3.14-1.17.62 1.57.23 2.73.11 3.02.73.8 1.17 1.82 1.17 3.06 0 4.37-2.67 5.34-5.21 5.62.41.36.77 1.07.77 2.15 0 1.56-.01 2.81-.01 3.19 0 .3.2.66.79.55 4.51-1.51 7.77-5.77 7.77-10.78C23.25 5.48 18.27.5 12 .5z"/></svg>
+            <span data-i18n="settingsAboutGithubBtn">GitHub</span>
+          </a>
+          <a href="https://ko-fi.com/mysteropodes" target="_blank" class="pbtn" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;font-size:11px;padding:7px;text-decoration:none">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h13v6a5 5 0 0 1-5 5H8a5 5 0 0 1-5-5V8z"/><path d="M16 9.5h1.5a3 3 0 0 1 0 6H16"/><path d="M7 4.5v1.5M10.5 4v2M14 4.5v1.5"/></svg>
+            <span data-i18n="settingsAboutKofiBtn">Ko-fi</span>
+          </a>
         </div>
         <div class="phdr" style="padding:0 0 4px 0;font-size:9px;color:var(--text-dim)" data-i18n="settingsAboutSupportHdr">Soutenir le projet</div>
-        <div style="font-size:10px;color:var(--text-dim);margin-bottom:8px" data-i18n="settingsAboutSupportDesc">Nemo est développé par une seule personne. Si l'app t'est utile, un don sur Ko-fi aide à continuer.</div>
-        <div class="pr">
-          <a href="https://ko-fi.com/mysteropodes" target="_blank" class="pbtn" style="flex:1;text-align:center;font-size:11px;padding:7px;font-weight:600;text-decoration:none">☕ <span data-i18n="settingsAboutKofiBtn">Faire un don sur Ko-fi</span></a>
-        </div>
+        <div style="font-size:10px;color:var(--text-dim);margin-bottom:14px" data-i18n="settingsAboutSupportDesc">Nemo est développé par une seule personne. Si l'app t'est utile, un don sur Ko-fi aide à continuer.</div>
         <!-- Key libraries & licenses (2026-08) — Nemo's ACTUAL dependencies,
              sourced from src-tauri/Cargo.toml + Cargo.lock, geometry-wasm/
              Cargo.toml, and THIRD_PARTY_NOTICES.md's own front-end audit
