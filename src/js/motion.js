@@ -7621,9 +7621,20 @@
     });
   }
   function flushMotionDragTimelineRender() {
-    if (!_motionDragTimelineRaf) return;
-    cancelAnimationFrame(_motionDragTimelineRaf);
-    _motionDragTimelineRaf = 0;
+    // 2026-08 fix (feedback: "aprés je bouge la keyframe je n'arrive pas à
+    // revoir la box de lissage") — this used to early-return when there was
+    // no PENDING rAF, which is the common case: a drag lasting more than one
+    // frame (i.e. any real drag) already has its last mid-drag rAF fire and
+    // reset _motionDragTimelineRaf to 0 well before mouseup, so by the time
+    // onDragUp calls this, there's nothing to "flush" and it did nothing at
+    // all — leaving the grid stuck on whatever it looked like at that last
+    // mid-drag frame, rendered while window._motionKeyDrag was still truthy
+    // (suppressing the ease boxes, see the isPrimarySelectedKey gate above).
+    // Clearing the drag flags in onDragUp right before this call never
+    // triggered the render needed to pick that back up. This function's own
+    // name/comment ("flush the latest state on pointer release") always
+    // meant to render unconditionally here — only the early-return was wrong.
+    if (_motionDragTimelineRaf) { cancelAnimationFrame(_motionDragTimelineRaf); _motionDragTimelineRaf = 0; }
     renderTimeline();
   }
 
