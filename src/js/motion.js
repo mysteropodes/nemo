@@ -6061,8 +6061,24 @@
         // to every selected key that actually has that incoming/outgoing
         // segment, avoiding a forest of overlapping inputs.
         if (isPrimarySelectedKey(ld, prop, k)) {
-          var easeInBox = buildKeyEaseBox(ld, prop, k, 'in');
-          var easeOutBox = buildKeyEaseBox(ld, prop, k, 'out');
+          // Hide a side's ease box when the neighboring key is too close on
+          // screen for it to fit (2026-08 fix, feedback: "j'utilise glisser
+          // dézoomer sur la timeline... les visuels de keyframe sont
+          // écrasés") — each box is a fixed ~38px (27px input + 11px arrow)
+          // positioned off the key's OWN center regardless of zoom, so at a
+          // low pixels-per-frame (window.FC) zoom the two boxes (and the
+          // neighboring key's own diamond) end up crammed on top of each
+          // other into unreadable mush instead of just not being there.
+          // minGapPx leaves a little breathing room past the box's own
+          // width so it never touches the neighboring diamond either.
+          var kIdx = track.keys.indexOf(k);
+          var prevKey = kIdx > 0 ? track.keys[kIdx - 1] : null;
+          var nextKey = kIdx >= 0 && kIdx < track.keys.length - 1 ? track.keys[kIdx + 1] : null;
+          var minGapPx = 46;
+          var roomIn = !prevKey || (k.frame - prevKey.frame) * window.FC >= minGapPx;
+          var roomOut = !nextKey || (nextKey.frame - k.frame) * window.FC >= minGapPx;
+          var easeInBox = roomIn ? buildKeyEaseBox(ld, prop, k, 'in') : null;
+          var easeOutBox = roomOut ? buildKeyEaseBox(ld, prop, k, 'out') : null;
           if (easeInBox) c.appendChild(easeInBox);
           if (easeOutBox) c.appendChild(easeOutBox);
         }
@@ -6739,7 +6755,17 @@
     var input = document.createElement('input');
     input.type = 'number'; input.className = 'scrub motion-key-ease-input';
     input.min = 0; input.max = 100; input.dataset.step = 1; input.value = value;
-    input.addEventListener('mousedown', function (e) { e.stopPropagation(); });
+    input.addEventListener('mousedown', function (e) {
+      e.stopPropagation();
+      // Force-visible for the whole drag (2026-08 fix, feedback: "elle ne
+      // disparaissent pas si on drag la valeur") — the box is hover-only by
+      // default (style.css), and a scrub drag routinely carries the pointer
+      // off the tiny box itself, which would otherwise end the CSS :hover
+      // mid-gesture and hide the very field being dragged. One-shot pointerup
+      // listener per press, not a persistent one — nothing to leak.
+      box.classList.add('dragging');
+      window.addEventListener('pointerup', function () { box.classList.remove('dragging'); }, { once: true });
+    });
     input.addEventListener('click', function (e) { e.stopPropagation(); });
     input.addEventListener('keydown', function (e) { e.stopPropagation(); });
     input.addEventListener('change', function () {
