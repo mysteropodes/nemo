@@ -57,6 +57,64 @@ async function githubFetch(env, path, init) {
   });
 }
 
+// ---- Content filter (2026-08) ----------------------------------------------
+// The Worker is the only mandatory choke point: spam won't arrive through the
+// app, it arrives as a direct POST here, so filtering client-side would do
+// nothing. Everything below therefore runs server-side.
+//
+// Tuned to never reject a real tester. Two traps this deliberately avoids:
+//  - Nemo ships in en/fr/ja/es. Anything resembling a "non-ASCII = spam" or
+//    "must look like English" rule would silently drop every Japanese report.
+//    No rule here looks at the script or language of the text.
+//  - A genuine report may legitimately carry a link (a repro clip, a paste).
+//    So links are counted, not banned — 3+ is the signal, 1 is normal.
+// A rejection returns 400 with a readable reason rather than dropping the
+// entry silently, so a false positive is visible to the person reporting.
+
+const MAX_BODY = 30000;
+
+// Multi-word, unambiguous commercial spam. Single generic words ("crypto",
+// "free") are avoided on purpose — they appear in honest sentences.
+const SPAM_PHRASES = [
+  /\bbuy\s+(cheap|now|followers|likes|views)\b/i,
+  /\b(casino|viagra|cialis|porn|escort)\b/i,
+  /\bseo\s+(services?|expert|agency)\b/i,
+  /\b(forex|binary\s+options?|bitcoin\s+doubler)\b/i,
+  /\b(work\s+from\s+home|make\s+money\s+(fast|online)|earn\s+\$\d)/i,
+  /\bclick\s+here\s+to\s+(win|claim)\b/i,
+  /\bfree\s+(gift\s?cards?|giveaway|crypto)\b/i,
+];
+
+function looksLikeSpam(title, body) {
+  const text = `${title}\n${body}`;
+  const stripped = text.replace(/\s+/g, '');
+  if (stripped.length < 8) return 'message is empty or too short to act on';
+  if (body.length > MAX_BODY) return `body exceeds ${MAX_BODY} characters`;
+
+  const links = (text.match(/https?:\/\//gi) || []).length;
+  if (links >= 3) return 'too many links';
+
+  for (const re of SPAM_PHRASES) {
+    if (re.test(text)) return 'message matched a spam pattern';
+  }
+
+  // Keyboard mashing / padding: one character repeated far beyond any real
+  // word, or one word repeated far beyond any real sentence.
+  if (/(.)\1{29,}/.test(text)) return 'repeated characters';
+  const words = text.toLowerCase().match(/[\p{L}\p{N}]+/gu) || [];
+  if (words.length >= 20) {
+    const counts = new Map();
+    for (const w of words) counts.set(w, (counts.get(w) || 0) + 1);
+    if (Math.max(...counts.values()) > words.length * 0.5) return 'repeated words';
+  }
+  return null;
+}
+
+// Attachments are rendered inline in issue bodies from raw.githubusercontent,
+// so only real image types are accepted — the filename regex below already
+// blocks path traversal, this narrows what the file can be.
+const IMAGE_EXT = /\.(png|jpe?g|gif|webp)$/i;
+
 async function handleIssue(request, env, cors) {
   let payload;
   try {
@@ -69,6 +127,10 @@ async function handleIssue(request, env, cors) {
   const labels = Array.isArray(payload && payload.labels) ? payload.labels : [];
   if (!title || typeof title !== 'string' || title.length > 300) {
     return json({ error: 'title is required (max 300 chars)' }, 400, cors);
+  }
+  const spam = looksLikeSpam(title, body);
+  if (spam) {
+    return json({ error: `rejected: ${spam}` }, 400, cors);
   }
   const resp = await githubFetch(env, '/issues', {
     method: 'POST',
@@ -95,6 +157,9 @@ async function handleAttachment(request, env, cors) {
   // than trust it, since it becomes part of a repo file path.
   if (!filename || typeof filename !== 'string' || !/^[\w-]+\.[a-zA-Z0-9]+$/.test(filename)) {
     return json({ error: 'invalid filename' }, 400, cors);
+  }
+  if (!IMAGE_EXT.test(filename)) {
+    return json({ error: 'attachment must be a png, jpg, gif or webp image' }, 400, cors);
   }
   if (!contentBase64 || typeof contentBase64 !== 'string' || contentBase64.length > 8_000_000) {
     return json({ error: 'invalid or oversized content' }, 400, cors);
