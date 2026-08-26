@@ -31,3 +31,13 @@ geometry-wasm/target/
 /design-v4/
 /docs/
 *.zip
+
+# Pre-public cleanup (2026-08). Kept on disk, out of the repo:
+#  - /index.html is the original single-file "StrokeMotion v1.2" prototype,
+#    untouched since the initial import and referenced by nothing. The real
+#    entry point is src/index.html — note the leading slash, without it this
+#    pattern would ignore that one too and silently break the build.
+#  - CODEX_HANDOFF.md is internal agent-to-agent session handoff notes
+#    (branch names, feedback triage), not documentation for contributors.
+/index.html
+/CODEX_HANDOFF.md
