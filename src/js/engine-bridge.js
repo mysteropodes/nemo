@@ -1004,6 +1004,36 @@
       // Motion-mode transforms are computed independently of the
       // children.length gate above (an empty Paper layer has no usable
       // bounds, so the pivot is the video rect's own center).
+      // Placeholder while a native video's first frame hasn't decoded/
+      // registered yet (2026-08 fix, feedback: "avant que une vidéo soit
+      // ready un placeholder dans le canvas à la bonne taille") — nv.width/
+      // height are known synchronously right after native-video-bridge.js's
+      // open() resolves, well before any pixel is actually decoded (that
+      // file's own importAsLayer already decodes frame 0 first specifically
+      // to minimize this window, but it's still a real async gap — a piped
+      // ffmpeg probe or a whole-file arrayBuffer() read on the web path).
+      // Deliberately NOT the full render branch below (duplicator/3D/
+      // parent-chain) — this is a transient state, a plain rect at the
+      // right size/position/rotation covers it without duplicating that
+      // whole pipeline for something that shows for a few hundred ms.
+      if (state.layers[i].nativeVideo && window.SMEngineBridge && !registeredImageIds['nv:' + i]) {
+        var nvPH = state.layers[i].nativeVideo;
+        var inFPH = window.layerInPoint ? layerInPoint(state.layers[i]) : 0;
+        var outFPH = window.layerOutPoint ? layerOutPoint(state.layers[i]) : state.totalFrames - 1;
+        if (renderFrame >= inFPH && renderFrame <= outFPH && nvPH.width && nvPH.height) {
+          var phS = Math.min(state.canvasW / nvPH.width, state.canvasH / nvPH.height);
+          var phW = nvPH.width * phS, phH = nvPH.height * phS;
+          var phRect = { x: (state.canvasW - phW) / 2, y: (state.canvasH - phH) / 2, width: phW, height: phH };
+          var phMat = (!is3D && window.SMMotion) ? SMMotion.layerMotionAt(i, renderFrame) : null;
+          var phOp = 1;
+          if (phMat) {
+            var phPivot = { x: phRect.x + phRect.width / 2 + phMat.ax, y: phRect.y + phRect.height / 2 + phMat.ay };
+            phRect = SMMotion.transformImageRect(phRect, phPivot, phMat);
+            phOp = phMat.op;
+          }
+          items.push(boundsRectItem(phRect.x, phRect.y, phRect.x + phRect.width, phRect.y + phRect.height, [38, 36, 42, Math.round(255 * phOp)], [110, 110, 122, Math.round(200 * phOp)], 1.5));
+        }
+      }
       if (state.layers[i].nativeVideo && window.SMEngineBridge && registeredImageIds['nv:' + i]) {
         var nv = state.layers[i].nativeVideo;
         var inF = window.layerInPoint ? layerInPoint(state.layers[i]) : 0;
