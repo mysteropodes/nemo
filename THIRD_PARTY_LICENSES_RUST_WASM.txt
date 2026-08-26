@@ -1,0 +1,17 @@
+# Raw `cargo license --avoid-dev-deps` output for geometry-wasm (WebGPU render engine)
+# Generated 2026-08-26. Reproduce: cd geometry-wasm && cargo license --avoid-dev-deps
+# 158 total crate instances (a name can appear more than once at different pinned versions).
+# See THIRD_PARTY_NOTICES.md for the summary/analysis.
+
+(Apache-2.0 OR MIT) AND Unicode-3.0 (1): unicode-ident
+0BSD OR Apache-2.0 OR MIT (1): adler2
+Apache-2.0 (6): approx, codespan-reporting, gl_generator, glutin_wgl_sys, khronos_api, spirv
+Apache-2.0 OR BSD-2-Clause OR MIT (2): zerocopy, zerocopy-derive
+Apache-2.0 OR MIT (113): allocator-api2, android_system_properties, arrayvec, ash, autocfg, bit-set, bit-vec, bitflags, bumpalo, cfg-if, color, console_log, crc32fast, document-features, equivalent, euclid, fdeflate, flate2, font-types, futures-channel, futures-core, futures-intrusive, futures-task, futures-util, geo-types, gpu-allocator, gpu-descriptor, gpu-descriptor-types, guillotiere, half, hashbrown, hashbrown, hashbrown, indexmap, itoa, jni-sys, jni-sys, jni-sys-macros, js-sys, khronos-egl, kurbo, libc, linebender_resource_handle, litrs, lock_api, log, naga, ndk-sys, num-traits, once_cell, parking_lot, parking_lot_core, peniko, pin-project-lite, pkg-config, png, polycool, portable-atomic, portable-atomic-util, presser, proc-macro2, profiling, quote, range-alloc, raw-window-metal, read-fonts, renderdoc-sys, robust, rustc-hash, rustversion, scopeguard, serde, serde_core, serde_derive, serde_json, skrifa, smallvec, static_assertions, svg_fmt, syn, thiserror, thiserror-impl, unicode-width, vello, vello_encoding, vello_shaders, version_check, wasm-bindgen, wasm-bindgen-futures, wasm-bindgen-macro, wasm-bindgen-macro-support, wasm-bindgen-shared, web-sys, wgpu, wgpu-core, wgpu-core-deps-apple, wgpu-core-deps-emscripten, wgpu-core-deps-windows-linux-android, wgpu-hal, wgpu-naga-bridge, wgpu-types, windows, windows-collections, windows-core, windows-future, windows-implement, windows-interface, windows-link, windows-numerics, windows-result, windows-strings, windows-sys, windows-threading
+Apache-2.0 OR MIT OR Zlib (9): bytemuck, bytemuck_derive, dispatch2, glow, miniz_oxide, objc2-core-foundation, objc2-metal, objc2-quartz-core, raw-window-handle
+CC0-1.0 (1): hexf-parse
+ISC (1): libloading
+MIT (17): block2, cfg_aliases, crunchy, dlib, float_next_after, geo-booleanop, libm, objc2, objc2-encode, objc2-foundation, ordered-float, redox_syscall, simd-adler32, slab, wayland-sys, xml-rs, zmij
+MIT OR Unlicense (3): memchr, termcolor, winapi-util
+N/A (1): geometry-wasm
+Zlib (3): foldhash, foldhash, slotmap

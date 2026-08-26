@@ -6,10 +6,11 @@ Tauri desktop build). This catalogs everything bundled or vendored in this
 repository that isn't original code written for this project, its license, and
 what (if anything) needs to happen before public/open-source distribution.
 
-No LICENSE file exists for Nemo's own code yet — that's a choice only Cyril can
-make (MIT/Apache/GPL/source-available/etc. all have different implications for a
-commercial product going open source), so this document doesn't presume one. It
-only covers what's *bundled inside* the app.
+**Update 2026-08-18:** Nemo's own code adopted **GPL-3.0-or-later** (`LICENSE`,
+`package.json`'s `license` field, `CONTRIBUTING.md` — commit `b317764`). The
+paragraph above described this as an open decision at the time of the original
+2026-08-17 audit; it no longer is. This document still only covers what's
+*bundled inside* the app (third-party code), not Nemo's own license terms.
 
 ## Clean — no action needed
 
@@ -103,3 +104,56 @@ third-party or patent-encumbered code:
 
 This means the **browser build has no equivalent of the ffmpeg problem above**
 — it was already open-source-safe before this audit, and stays that way.
+
+## Full Rust dependency audit (2026-08-26, `cargo license`)
+
+The earlier tables above cover what's *vendored/bundled by hand* (JS libs,
+fonts, the ffmpeg binary). This is the exhaustive pass the earlier version of
+this document flagged as still outstanding: every crate pulled in transitively
+through Cargo, across both Rust crates in this repo.
+
+**Tool:** [`cargo-license`](https://github.com/onur/cargo-license)
+(`cargo install cargo-license`), run as `cargo license --avoid-dev-deps` in
+each crate directory (dev-only dependencies — test/build tooling that never
+ships in a distributed binary — excluded on purpose; only what's actually
+compiled into the app matters here).
+
+**Result: clean.** No GPL, AGPL, SSPL, or any other copyleft-with-obligations
+license anywhere in either dependency tree, and no crate with missing/unknown
+license metadata. Every license found is permissive (MIT, Apache-2.0, BSD-2/3,
+ISC, Zlib, 0BSD, Unlicense, CC0-1.0, CDLA-Permissive-2.0, Unicode-3.0) or weak
+copyleft that's well-established as GPL-compatible (MPL-2.0, 5 crates in the
+Tauri tree — `cssparser`/`cssparser-macros`/`dtoa-short`/`option-ext`/
+`selectors`, all pulled in through Tauri's GTK/WebKit bindings on Linux; MPL
+2.0 doesn't set the "Incompatible With Secondary Licenses" flag by default,
+which is precisely what makes it safe to combine into a GPL-licensed "Larger
+Work" — Firefox itself works the same way). The one crate offering an
+LGPL option (`r-efi`, UEFI bindings, irrelevant to any platform Nemo actually
+ships on) licenses under **three** alternatives — `Apache-2.0 OR
+LGPL-2.1-or-later OR MIT` — so picking either permissive option avoids any
+LGPL obligation entirely; this isn't a forced copyleft dependency.
+
+| Crate (workspace member) | Total crate instances* | Distinct license expressions | GPL/AGPL/unknown found |
+|---|---|---|---|
+| `src-tauri` (desktop app backend) | 511 | 24 | None |
+| `geometry-wasm` (WebGPU render engine) | 158 | 12 | None |
+
+\* A name can appear more than once at different pinned versions across the
+dependency graph — that's why this is higher than the count of distinct
+package *names*.
+
+Full raw output (every crate name, grouped by exact license expression):
+[THIRD_PARTY_LICENSES_RUST_TAURI.txt](THIRD_PARTY_LICENSES_RUST_TAURI.txt),
+[THIRD_PARTY_LICENSES_RUST_WASM.txt](THIRD_PARTY_LICENSES_RUST_WASM.txt).
+
+**What this does NOT cover** (still worth doing before a fully buttoned-up
+release, not done here): actual license *text* collection for bundling with
+distributed binaries (`cargo-about` generates a combined NOTICES file with
+full license texts, not just names — required for strict MIT/Apache-2.0
+compliance since the license text itself must travel with the software, the
+same point already made about Paper.js above); re-running this audit whenever
+`Cargo.lock` changes meaningfully (dependency licenses can change between
+versions, rare but not impossible); and the JS side has no equivalent
+automated tool run here (`package.json`'s only runtime entries are the
+already-audited Paper.js/opentype.js — Tauri/Vite/build tooling are dev-only
+and don't ship, so this is lower-priority than the Rust side was).

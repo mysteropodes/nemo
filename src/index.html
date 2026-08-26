@@ -1528,10 +1528,13 @@
              sourced from src-tauri/Cargo.toml + Cargo.lock, geometry-wasm/
              Cargo.toml, and THIRD_PARTY_NOTICES.md's own front-end audit
              (Paper.js/opentype.js/Roboto). Static list, not JS-generated —
-             this changes about as often as the About pane's own copy. Not a
-             substitute for a full `cargo license`/`cargo about` pass before
-             a public release; this is the short "what's actually bundled"
-             summary a user sees here, same spirit as THIRD_PARTY_NOTICES.md. -->
+             this changes about as often as the About pane's own copy. Just
+             the ~9 headline dependencies, not exhaustive by design — the
+             full transitive tree (511 crate instances in src-tauri, 158 in
+             geometry-wasm) was actually run via `cargo license` on
+             2026-08-26 and is clean (no GPL/AGPL/unknown licenses found);
+             see THIRD_PARTY_NOTICES.md's own "Full Rust dependency audit"
+             section for the complete breakdown, linked below this table. -->
         <div class="phdr" style="padding:14px 0 4px 0;font-size:9px;color:var(--text-dim)" data-i18n="settingsAboutLibsHdr">Bibliothèques clés &amp; licences</div>
         <div style="border:1px solid var(--border2);border-radius:6px;overflow:hidden;font-size:10px">
           <div style="display:flex;justify-content:space-between;padding:6px 9px;background:var(--panel3)"><span>Tauri</span><span style="color:var(--text-dim)">MIT / Apache-2.0</span></div>
