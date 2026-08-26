@@ -1114,8 +1114,13 @@ window.SM={
     // src.motion, already copied) now dead data nothing reads.
     if(src.threeD)state.layers[ni].threeD=true;
     activateUL(ni);_layerSel=[ni];_layerSelAnchor=ni;loadFrame(state.currentFrame);updateUI();},
-  setActiveLayer:function(idx){if(idx<0||idx>=state.layers.length)return;saveAllLayerFrames();activateUL(idx);clearSel();
+  setActiveLayer:function(idx,preserveLayerSel){if(idx<0||idx>=state.layers.length)return;saveAllLayerFrames();activateUL(idx);clearSel();
     window._layerActiveExplicit=true; // see clearSel()'s own comment — an explicit timeline row click, not a canvas deselect
+    // canonical entry point: every caller (canvas hit, camera/media-library/nemo-script/shapes-panel)
+    // gets the row highlight for free. preserveLayerSel=true is for the row's own Cmd/Shift-click
+    // handlers (motion.js), which build a multi-item _layerSel BEFORE calling this — overwriting it
+    // here would collapse their multi-select back to a single row.
+    if(!preserveLayerSel){_layerSel=[idx];_layerSelAnchor=idx;}
     if(window.SMMotion)SMMotion.setMotionCanvasEmptyClick(false); // a real row pick always un-hides Motion's box/panel, see its own comment
     // The camera row is a synthetic pseudo-layer (not a real state.layers
     // entry — see camera.js's renderPanelRow) selected by switching TO the

@@ -4274,7 +4274,7 @@
           var p = _layerSel.indexOf(li); if (p >= 0) _layerSel.splice(p, 1); else _layerSel.push(li);
           _layerSelAnchor = li;
           syncBarSelToLayerSel();
-          window.SM.setActiveLayer(li);
+          window.SM.setActiveLayer(li, true);
           renderLayerList(); renderTimeline();
           return;
         }
@@ -4294,7 +4294,7 @@
           _layerSel = [];
           for (var l = Math.min(anchor, li); l <= Math.max(anchor, li); l++) _layerSel.push(l);
           syncBarSelToLayerSel();
-          window.SM.setActiveLayer(li);
+          window.SM.setActiveLayer(li, true);
           renderLayerList(); renderTimeline();
           return;
         }
