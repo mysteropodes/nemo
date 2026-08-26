@@ -1150,40 +1150,24 @@
   // "manual edit wins" principle CLAUDE.md documents for fill-merge —
   // switching modes must never silently snap a layer back to its neutral
   // default.
-  // Auto-convert to a Component on the FIRST layer-level property edit.
-  // Originally (2026-07-17) scoped to layers with 2+ elements ("un calque
-  // animé dans motion si il contient plusieurs élément devient
-  // automatiquement un component") — widened 2026-07 to ANY layer,
-  // including a single shape: StoryBoard exclusively works with Components
-  // (§8 CLAUDE.md, "StoryBoard ne manipule QUE des Components"), so a
-  // single-element layer that never converted could animate fine in Motion
-  // but could never be placed in a StoryBoard montage — a real dead end
-  // found live ("j'ai essayé avec une shape dessinné et ça ne créer pas de
-  // component"). The friction this used to avoid (locking a trivial single
-  // shape into a symbol) is mitigated by double-clicking the shape ON THE
-  // CANVAS, which already enters the symbol for editing (enterSymbol,
-  // wired in select-bridge.js — a separate, pre-existing mechanism from
-  // Motion's own layer-row double-click, see splitLayerIntoElements below),
-  // so editing the shape after conversion is one extra click, not a dead
-  // end — and convertComponentToLayer stays available to reverse it.
-  // Guards: only for a genuine LAYER target (state.layers.indexOf finds
-  // it; a per-element holder from ensureElementHolder is a bare {} never
-  // in that array), not already a component. convertLayerToComponent
-  // (app.js) mutates `ld` IN PLACE (sets ld.symbolId, clears ld.frames)
-  // rather than replacing the object, so whatever the caller attaches
-  // right after this call still lands on the correct (now-converted)
-  // layer. Shared by BOTH entry points that can start animating a property
-  // — the stopwatch toggle (toggleAnimated) AND a direct canvas drag
-  // (setValue, wired up by select-bridge.js's Motion-mode drag handling).
-  // Idempotent (guarded by `!ld.symbolId`), so calling it on every drag
-  // tick is safe — it only ever actually converts once.
-  function maybeAutoConvertToComponent(ld) {
-    var li = state.layers.indexOf(ld);
-    if (li >= 0 && !ld.symbolId && userLayers[li]) {
-      var elCount = userLayers[li].children.filter(function (c) { return (c instanceof Path || c instanceof Raster) && isSelectablePathChild(c); }).length;
-      if (elCount >= 1) convertLayerToComponent(li);
-    }
-  }
+  // Component conversion is a MANUAL action (2026-08, feedback: "évite de
+  // faire automatiquement des composant dans motion, ça doit être
+  // manuelle"). This used to auto-convert a layer to a Component on its
+  // FIRST layer-level property edit — originally (2026-07-17) scoped to
+  // 2+-element layers, then widened to ANY layer (including a single
+  // shape) so it could also be placed in a StoryBoard montage (§8
+  // CLAUDE.md, "StoryBoard ne manipule QUE des Components"). Rendering a
+  // plain (non-Component) layer's own Motion keys was always correct
+  // either way — engine-bridge.js's buildSceneJson applies `motionMat`
+  // to every layer's own content regardless of symbolId, entirely
+  // independent of this conversion; the auto-convert was purely a UX
+  // shortcut (and the StoryBoard-eligibility side effect), never a
+  // rendering requirement. The manual entry point already existed before
+  // this (timeline.js's layer-row/context-menu action ->
+  // convertLayerToComponent/convertLayersToComponent) and still does —
+  // this only removes the SILENT trigger from toggleAnimated/setValue
+  // below, so keying a plain layer's Position/Rotation/etc. now just
+  // keys it, no surprise conversion.
   function toggleAnimated(ld, prop) {
     // The Time Remap row's stopwatch IS the remap switch (AE behavior) —
     // there is no "static timeRemap" fallback to freeze into, the feature
@@ -1201,7 +1185,6 @@
       if (!ld.motionStatic) ld.motionStatic = {};
       ld.motionStatic[prop] = v;
     } else {
-      maybeAutoConvertToComponent(ld);
       var cur = staticValue(ld, prop);
       ensureTrack(ld, prop).keys = [{ frame: state.currentFrame, v: cur, curvePoints: cloneCurvePts(DEFAULT_CURVE), hOut: [0, 0], hIn: [0, 0] }];
     }
@@ -1211,7 +1194,7 @@
   // animated, it's just the static override.
   function setValue(ld, prop, values) {
     if (isAnimated(ld, prop)) setKeyAtCurrentFrame(ld, prop, values);
-    else { maybeAutoConvertToComponent(ld); if (!ld.motionStatic) ld.motionStatic = {}; ld.motionStatic[prop] = values.slice(); }
+    else { if (!ld.motionStatic) ld.motionStatic = {}; ld.motionStatic[prop] = values.slice(); }
   }
 
   // ---- render-time transform (engine-bridge.js hook — see header
@@ -2120,6 +2103,28 @@
     }
     return mats;
   }
+  // World-space DELTA VECTOR -> local space, undoing only the PARENT
+  // chain's rotation/scale (no translation/pivot — a vector between two
+  // points transforms via the linear part alone). Shared by every canvas
+  // drag that writes a Position DELTA on a parented layer (2026-08 fix,
+  // feedback: "si je bouge un élément parenté... à droite il va en bas"
+  // — select-bridge.js's body-drag 'move' mode added the raw mouse delta
+  // straight to Position with zero parent compensation; the layer's OWN
+  // rotation was already excluded there via layerMotionPointMap/invVec,
+  // correctly, per computeMotionMat's "Position lives in POST-own-
+  // rotation, PRE-parent-chain space" — this fills the other half). Undone
+  // outermost-ancestor-first, mirroring every other parent-chain inverse
+  // in this file (composedPivotWorld, motionBoxGeom.inv, outerLocalPoint).
+  function invertVectorThroughParentChain(li, frameIdx, dx, dy) {
+    var chain = parentChainMats(li, frameIdx);
+    for (var i = chain.length - 1; i >= 0; i--) {
+      var m = chain[i].mat;
+      var rad = -m.rot * Math.PI / 180, c = Math.cos(rad), s = Math.sin(rad);
+      var rx = dx * c - dy * s, ry = dx * s + dy * c;
+      dx = rx / (m.sx || 1); dy = ry / (m.sy || 1);
+    }
+    return [dx, dy];
+  }
   function applyParentChainToSegments(segments, li, frameIdx) {
     var chain = parentChainMats(li, frameIdx);
     for (var k = 0; k < chain.length; k++) segments = transformSegments(segments, chain[k].pivot, chain[k].mat);
@@ -2696,11 +2701,34 @@
   // pass through the containing layer and every parent exactly like the
   // rendered path. Keeping the inverse alongside it makes canvas dragging
   // write the element-local key value even when a parent is rotated/scaled.
+  //
+  // 2026-08 fix (feedback: "si je bouge un élément parenté à un élément
+  // avec des transformation cela inverse les commande x" — also the
+  // Motion PATH/dots drawing in the wrong place for a parented layer,
+  // and the anchor-drag gesture on one): this used to return [] outright
+  // for ANY layer-level target (`!t.strokeId`), on the assumption a plain
+  // layer's own motionBoxGeom pivot was already "the" local point and
+  // needed no outer wrapping. That's true for an UNPARENTED layer, but
+  // the moment ld.parentLayerUid is set, the render pipeline
+  // (getEffectiveStrokes/buildSceneJson, via parentChainMats) composes
+  // the parent chain on top regardless — every consumer of
+  // outerWorldPoint/outerLocalPoint (position path+dots draw, anchor
+  // crosshair draw+hit-test+drag, position-dot drag, effector drag) needs
+  // that SAME chain or it silently disagrees with where the object
+  // actually renders, worse the more the parent is rotated/scaled. The
+  // "add this layer's OWN motion" step stays gated on t.strokeId — that
+  // part is ONLY relevant when nesting an ELEMENT inside its containing
+  // layer's transform; for a plain layer target, t.holder already IS
+  // that layer's own motion (baked into motionBoxGeom's fwd/pivot
+  // directly), so re-adding it here would compose it twice.
   function outerMotionMaps(t){
-    if(!t||!t.strokeId)return[];
-    var out=[],lm=layerMotionAt(t.li,state.currentFrame);
-    if(lm&&userLayers[t.li]){
-      out.push({mat:lm,pivot:{x:userLayers[t.li].bounds.center.x+lm.ax,y:userLayers[t.li].bounds.center.y+lm.ay}});
+    if(!t||t.li==null)return[];
+    var out=[];
+    if(t.strokeId){
+      var lm=layerMotionAt(t.li,state.currentFrame);
+      if(lm&&userLayers[t.li]){
+        out.push({mat:lm,pivot:{x:userLayers[t.li].bounds.center.x+lm.ax,y:userLayers[t.li].bounds.center.y+lm.ay}});
+      }
     }
     return out.concat(parentChainMats(t.li,state.currentFrame));
   }
@@ -2805,16 +2833,33 @@
     return true;
   }
   function hoverOverlayItems() {
-    if (_hoverLi < 0 || _hoverLi === state.activeLayerIdx) return [];
+    // Same fix as activeMotionTarget's own (2026-08, layer-list deselect
+    // follow-up): state.activeLayerIdx never actually becomes "nothing"
+    // (no such convention exists), so comparing _hoverLi against it raw
+    // kept suppressing the hover box on the layer that WAS active even
+    // after a genuine empty-canvas deselect — checked _layerSel (the
+    // same source of truth the row highlight and activeMotionTarget both
+    // already use) instead of the raw index.
+    var curSel = (typeof _layerSel !== 'undefined') ? _layerSel : [];
+    if (_hoverLi < 0 || curSel.indexOf(_hoverLi) >= 0) return [];
     var ld = state.layers[_hoverLi];
     if (!ld) return [];
     var b = layerWorldBoundsUnion([_hoverLi], state.currentFrame);
     if (!b) return [];
     var zs = 1 / Math.max(0.0001, view.zoom);
-    var col = [255, 255, 255, 170];
+    // Solid blue, same accent as the selection box (2026-08 fix, feedback:
+    // "Le roll hover ne marche pas... attention rectangle bleu pas de
+    // tiret ni jaune") — it DID fire correctly (verified via
+    // SMMotion.onHoverMove directly), the real problem was contrast: white
+    // 170-alpha dashes on a white canvas background are nearly invisible,
+    // reading as "broken" when it was actually just unseeable. Matches
+    // buildOverlayItemsInner's own boxCol exactly, solid (no dashPattern),
+    // so hover reads as a preview of that same selection box, not a
+    // different/unrelated affordance.
+    var col = [74, 158, 255, 204];
     var c1 = { x: b.x, y: b.y }, c2 = { x: b.x + b.w, y: b.y }, c3 = { x: b.x + b.w, y: b.y + b.h }, c4 = { x: b.x, y: b.y + b.h };
     return [[c1, c2], [c2, c3], [c3, c4], [c4, c1]].map(function (seg) {
-      return { segments: [{ point: [seg[0].x, seg[0].y] }, { point: [seg[1].x, seg[1].y] }], closed: false, fillColor: null, strokeColor: col, strokeWidth: 1 * zs, dashPattern: [4 * zs, 3 * zs] };
+      return { segments: [{ point: [seg[0].x, seg[0].y] }, { point: [seg[1].x, seg[1].y] }], closed: false, fillColor: null, strokeColor: col, strokeWidth: 1 * zs };
     });
   }
   function buildOverlayItems() {
@@ -2935,8 +2980,11 @@
     var mh = is3DTargetForBox ? null : motionHandlePositions(t);
     if (mh) {
       var boxCol = [74, 158, 255, 204];
-      var lb = mh.g.bounds;
-      var bc1 = mh.g.fwd(lb.left, lb.top), bc2 = mh.g.fwd(lb.right, lb.top), bc3 = mh.g.fwd(lb.right, lb.bottom), bc4 = mh.g.fwd(lb.left, lb.bottom);
+      // Reuses mh.corners (already outer-wrapped by motionHandlePositions)
+      // instead of recomputing via mh.g.fwd directly — that used to bypass
+      // the outer/parent-chain wrapping entirely (2026-08 fix, same root
+      // cause as the box-misaligned-after-parenting bug above).
+      var bc1 = mh.corners.nw, bc2 = mh.corners.ne, bc3 = mh.corners.se, bc4 = mh.corners.sw;
       [[bc1, bc2], [bc2, bc3], [bc3, bc4], [bc4, bc1]].forEach(function (seg) {
         items.push({ segments: [{ point: [seg[0].x, seg[0].y] }, { point: [seg[1].x, seg[1].y] }], closed: false, fillColor: null, strokeColor: boxCol, strokeWidth: 1 * zs });
       });
@@ -3186,35 +3234,23 @@
     var px = t.boundsCenter.x + anc[0], py = t.boundsCenter.y + anc[1];
     var r = rot * Math.PI / 180, c = Math.cos(r), s = Math.sin(r);
     var sx = scl[0] / 100, sy = scl[1] / 100;
-    // Parent chain (2026-08 fix, feedback: "quand un calque est parenté
-    // le bounding box est décalé par rapport à l'objet") — LAYER-level
-    // target only (t.strokeId unset): an element target's outer wrapping
-    // (containing layer + ITS parent chain) is already added separately
-    // by outerWorldPoint/outerMotionMaps in buildOverlayItems, untouched
-    // here to avoid composing the chain twice. Before this, a plain
-    // parented layer's box/anchor/hit-test never agreed with where
-    // getEffectiveStrokes/buildSceneJson actually render it — those both
-    // apply parentChainMats, this never did (outerMotionMaps was already
-    // a no-op for a layer-level target, gated on t.strokeId, so nothing
-    // downstream of THIS function ever added it either).
-    var chain = (!t.strokeId && t.li != null) ? parentChainMats(t.li, state.currentFrame) : [];
+    // LOCAL only — this target's own position/rotation/scale, no outer
+    // (parent chain / containing-layer) wrapping. Every caller composes
+    // that separately via outerWorldPoint/outerLocalPoint (2026-08 fix,
+    // see outerMotionMaps' own comment for why the wrapping lives THERE,
+    // once, rather than being duplicated into this function too).
     function fwd(x, y) {
       var lx = (x - px) * sx, ly = (y - py) * sy;
-      var w = { x: px + lx * c - ly * s + pos[0], y: py + lx * s + ly * c + pos[1] };
-      for (var i = 0; i < chain.length; i++) w = applyMotionPoint(w, chain[i].pivot, chain[i].mat);
-      return w;
+      return { x: px + lx * c - ly * s + pos[0], y: py + lx * s + ly * c + pos[1] };
     }
     // Inverse of fwd — world point back to the shape's own local space.
     // [c -s; s c] is a pure rotation matrix, so its inverse is just its
     // transpose ([c s; -s c]); added for vertex dragging (buildOverlayItems'
     // vertex dots / onDown/onDrag's 'vertex' mode below), which needs to go
     // world->local to recover the vertex's LOCAL offset from wherever the
-    // mouse currently is in world space. Undoes the chain FIRST (outermost
-    // ancestor first), mirroring fwd's own last-applied-first symmetry.
+    // mouse currently is in world space.
     function inv(wx, wy) {
-      var w = { x: wx, y: wy };
-      for (var i = chain.length - 1; i >= 0; i--) w = invertMotionPoint(w, chain[i].pivot, chain[i].mat);
-      var ux = w.x - pos[0] - px, uy = w.y - pos[1] - py;
+      var ux = wx - pos[0] - px, uy = wy - pos[1] - py;
       var lx = ux * c + uy * s, ly = -ux * s + uy * c;
       return { x: lx / sx + px, y: ly / sy + py };
     }
@@ -3229,7 +3265,15 @@
     var g = motionBoxGeom(t);
     if (!g) return null;
     var b = g.bounds;
-    var corners = { nw: g.fwd(b.left, b.top), ne: g.fwd(b.right, b.top), se: g.fwd(b.right, b.bottom), sw: g.fwd(b.left, b.bottom) };
+    // Outer (parent chain / containing-layer) wrapping applied HERE, once
+    // — motionBoxGeom's fwd is local-only (2026-08 fix, see
+    // outerMotionMaps' own comment). Corners used to be plain g.fwd(...)
+    // with no outer wrapping at all, so a parented layer's box never
+    // agreed with where it actually renders.
+    var corners = {
+      nw: outerWorldPoint(t, g.fwd(b.left, b.top)), ne: outerWorldPoint(t, g.fwd(b.right, b.top)),
+      se: outerWorldPoint(t, g.fwd(b.right, b.bottom)), sw: outerWorldPoint(t, g.fwd(b.left, b.bottom)),
+    };
     var zs = 1 / Math.max(0.0001, view.zoom);
     // Rotate RING (2026-07, replacing the tiny offset stem+dot — same
     // change/formula as select-bridge.js's computeHandles and
@@ -3240,7 +3284,7 @@
     // the layer's own current Scale, since rotation alone doesn't change
     // size) only so it shrinks gracefully on a genuinely small selection.
     var ringRadius = Math.min(36 * zs, Math.max(b.width * (g.scl[0] / 100), b.height * (g.scl[1] / 100)) * 0.3);
-    return { g: g, corners: corners, ringCenter: g.pivot, ringRadius: ringRadius };
+    return { g: g, corners: corners, ringCenter: outerWorldPoint(t, g.pivot), ringRadius: ringRadius };
   }
   // Whole-layer multi-selection box (feedback #54). `_layerSel` already is
   // the source of truth for Cmd/Shift-selected rows; derive one world-space
@@ -3363,8 +3407,37 @@
   // otherwise the expanded LAYER itself. Both the canvas overlay
   // (buildOverlayItems) and the drag handlers below resolve through this so
   // they always agree on the same target and the same pivot-bounds source.
+  // Set by select-bridge.js's empty-canvas click (2026-08 fix, feedback:
+  // "impossible de tout déselect dans le canvas en cliquant sur une zone
+  // où y a rien") — clearSel()/syncMotionLayerSelection(null,...) already
+  // ran there, correctly emptying selectedPaths/_layerSel, but
+  // state.activeLayerIdx itself was never cleared (no "-1"/"nothing"
+  // convention exists for it anywhere in this codebase, and introducing
+  // one would touch every one of its ~27 read/write sites app-wide) — so
+  // this box/gizmo and the Properties panel below kept showing whatever
+  // was active before the click, unchanged. This flag is a narrow,
+  // Motion-canvas-only override instead: true only right after an empty
+  // click, cleared by every genuine re-selection (a layer-list row via
+  // setActiveLayer, or a canvas hit on a Null/shape/component in
+  // select-bridge.js) so it never gets "stuck" hiding a real selection.
+  var _motionCanvasEmptyClick = false;
+  function setMotionCanvasEmptyClick(v) { _motionCanvasEmptyClick = !!v; }
+  // 2026-08 follow-up fix: the flag above, checked alone, could drift out
+  // of sync with the layer LIST's own highlight — found live (feedback:
+  // "quand on deselect tout le calque layer 1 n'est pas deselect au
+  // niveau timeline") — the row's ".act.motion-selected" white-outline
+  // CSS (style.css ~line 1170) is driven entirely by `_layerSel`, a
+  // SEPARATE, older, far-more-thoroughly-wired selection tracker (every
+  // row click, null/shape/component canvas hit already keeps it correct
+  // via syncMotionLayerSelection) — this bespoke flag only got threaded
+  // through a handful of call sites and could miss one. `_layerSel.length
+  // === 0` is now the PRIMARY signal (matching the row highlight exactly,
+  // so the two can never show different things); the flag stays as an
+  // extra OR-condition, not the sole source of truth anymore.
   function activeMotionTarget() {
     if (state.appMode !== 'motion') return null;
+    if (_motionCanvasEmptyClick) return null;
+    if (window._motionExpandedLayer == null && typeof _layerSel !== 'undefined' && _layerSel.length === 0) return null;
     // Bug found 2026-07 ("quand tu select un calque ça select pas dans le
     // canvas"): this used to require window._motionExpandedLayer (a row's
     // Transform group toggled OPEN) — merely clicking a layer row (setting
@@ -4201,7 +4274,7 @@
           var p = _layerSel.indexOf(li); if (p >= 0) _layerSel.splice(p, 1); else _layerSel.push(li);
           _layerSelAnchor = li;
           syncBarSelToLayerSel();
-          window.SM.setActiveLayer(li);
+          window.SM.setActiveLayer(li, true);
           renderLayerList(); renderTimeline();
           return;
         }
@@ -4221,7 +4294,7 @@
           _layerSel = [];
           for (var l = Math.min(anchor, li); l <= Math.max(anchor, li); l++) _layerSel.push(l);
           syncBarSelToLayerSel();
-          window.SM.setActiveLayer(li);
+          window.SM.setActiveLayer(li, true);
           renderLayerList(); renderTimeline();
           return;
         }
@@ -4275,12 +4348,12 @@
       row.addEventListener('dblclick', function (e) {
         if (e.target.closest('.lico')) return;
         // Re-reversed 2026-07-17 ("montage des éléments dans le
-        // component") — a Component layer (already converted via its
-        // first Position/etc keyframe, see maybeAutoConvertToComponent)
-        // now DOES have an "enter as precomp" double-click again, but only
-        // once it's a Component: a plain layer with several unrelated
-        // shapes still gets the old Release-to-Layers split, since there's
-        // no "inside" to browse before that first key exists.
+        // component") — a Component layer (converted manually, see
+        // convertLayerToComponent) now DOES have an "enter as precomp"
+        // double-click again, but only once it's a Component: a plain
+        // layer with several unrelated shapes still gets the old
+        // Release-to-Layers split, since there's no "inside" to browse
+        // for a layer that was never converted.
         if (ld.symbolId) { enterComponentLayer(li); return; }
         splitLayerIntoElements(li);
       });
@@ -4406,7 +4479,8 @@
     var body = document.getElementById('motion-props-body');
     if (!body) return;
     body.innerHTML = '';
-    var ld = state.layers[state.activeLayerIdx];
+    var motionDeselected = _motionCanvasEmptyClick || (window._motionExpandedLayer == null && typeof _layerSel !== 'undefined' && _layerSel.length === 0);
+    var ld = motionDeselected ? null : state.layers[state.activeLayerIdx];
     var nameRow = document.createElement('div');
     nameRow.className = 'motion-props-layername';
     if (!ld) { nameRow.textContent = SM.t('noLayerSelected'); body.appendChild(nameRow); return; }
@@ -8151,6 +8225,8 @@
     disableTimeRemap: disableTimeRemap,
     timeRemapValue: timeRemapValue,
     parentChainMats: parentChainMats,
+    invertVectorThroughParentChain: invertVectorThroughParentChain,
+    setMotionCanvasEmptyClick: setMotionCanvasEmptyClick,
     applyParentChainToSegments: applyParentChainToSegments,
     applyParentChainToImageRect: applyParentChainToImageRect,
     applyPathVertexOffsetsFor: applyPathVertexOffsetsFor,

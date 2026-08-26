@@ -1114,8 +1114,14 @@ window.SM={
     // src.motion, already copied) now dead data nothing reads.
     if(src.threeD)state.layers[ni].threeD=true;
     activateUL(ni);_layerSel=[ni];_layerSelAnchor=ni;loadFrame(state.currentFrame);updateUI();},
-  setActiveLayer:function(idx){if(idx<0||idx>=state.layers.length)return;saveAllLayerFrames();activateUL(idx);clearSel();
+  setActiveLayer:function(idx,preserveLayerSel){if(idx<0||idx>=state.layers.length)return;saveAllLayerFrames();activateUL(idx);clearSel();
     window._layerActiveExplicit=true; // see clearSel()'s own comment — an explicit timeline row click, not a canvas deselect
+    // canonical entry point: every caller (canvas hit, camera/media-library/nemo-script/shapes-panel)
+    // gets the row highlight for free. preserveLayerSel=true is for the row's own Cmd/Shift-click
+    // handlers (motion.js), which build a multi-item _layerSel BEFORE calling this — overwriting it
+    // here would collapse their multi-select back to a single row.
+    if(!preserveLayerSel){_layerSel=[idx];_layerSelAnchor=idx;}
+    if(window.SMMotion)SMMotion.setMotionCanvasEmptyClick(false); // a real row pick always un-hides Motion's box/panel, see its own comment
     // The camera row is a synthetic pseudo-layer (not a real state.layers
     // entry — see camera.js's renderPanelRow) selected by switching TO the
     // camera tool, never by an activeLayerIdx change; picking a real layer
@@ -1737,12 +1743,14 @@ window.SM={
     // Component layers (state.layers[l].symbolId) store no frames of their
     // own to repeat (their content/timing comes from the symbol's own
     // Frame/Speed/Offset model) — correctly skipped below. Found live
-    // (2026-07-30 QA sweep): with every selected layer a Component (which
-    // happens automatically the instant a layer gets its first Motion
-    // layer-level keyframe — see maybeAutoConvertToComponent, motion.js),
-    // EVERY layer got skipped and nothing happened at all, yet the toast
-    // still unconditionally claimed success. Track whether anything was
-    // actually cycled so the toast can tell the truth.
+    // (2026-07-30 QA sweep, back when a layer's first Motion keyframe
+    // auto-converted it to a Component — that trigger was removed 2026-08,
+    // conversion is manual now, see CLAUDE.md §8): with every selected
+    // layer a Component, EVERY layer got skipped and nothing happened at
+    // all, yet the toast still unconditionally claimed success. Track
+    // whether anything was actually cycled so the toast can tell the
+    // truth — still worth keeping since a manually-converted Component
+    // hits the exact same skip today.
     var anyLayerCycled=false;
     for(var l=b.minL;l<=b.maxL;l++){
       if(!state.layers[l]||state.layers[l].symbolId)continue;

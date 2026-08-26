@@ -499,14 +499,18 @@ règle d'auto-conversion que côté Motion (ci-dessous), déclenchée par un poi
 Un calque plat (non-Component) ne peut pas être placé/séquencé directement dans un montage
 StoryBoard.
 
-**Animation 2D ↔ Motion, niveau CALQUE : le déclencheur de conversion est la clé, pas le geste.**
-Un calque plat et sa vue Motion sont la MÊME chose tant qu'aucune propriété de NIVEAU CALQUE
-n'a de clé. Dès la première clé posée sur une propriété du calque (Position/Anchor/Rotation/
-Scale/Opacity — que ce soit via le stopwatch OU un drag direct sur le canvas, les deux doivent
-converger vers la même conversion, cf. `maybeAutoConvertToComponent` dans motion.js), le calque
-(s'il contient 2+ éléments sélectionnables) devient un Component. Une clé posée sur une propriété
-d'un SEUL élément (pas le calque entier) NE déclenche PAS cette conversion — c'est la distinction
-layer-holder vs element-holder déjà dans `state.layers.indexOf(ld)` (motion.js).
+**Animation 2D ↔ Motion, niveau CALQUE : la conversion en Component est MANUELLE (revu 2026-08,
+feedback "évite de faire automatiquement des composant dans motion, ça doit être manuelle").**
+Keyer une propriété de niveau calque (Position/Anchor/Rotation/Scale/Opacity, stopwatch OU drag
+canvas) sur un calque plat ne convertit plus rien tout seul — `toggleAnimated`/`setValue`
+(motion.js) ont perdu leur appel à l'ancien `maybeAutoConvertToComponent` (supprimé). Le rendu
+d'un calque plat animé reste correct sans conversion (`buildSceneJson` applique déjà `motionMat`
+à N'IMPORTE QUEL calque, `symbolId` ou non — la conversion n'a jamais été une exigence de rendu,
+seulement un raccourci UX + le prérequis StoryBoard ci-dessus). Conversion toujours possible à la
+main (menu calque/contexte → `convertLayerToComponent`/`convertLayersToComponent`, timeline.js) ;
+un pivot Rotation/Scale sur un calque à plusieurs formes non converties pivote autour du centre
+des bounds du calque entier (peut sembler "faux" si les formes sont dispersées — c'est le prix
+du contrôle manuel, pas un bug).
 
 **Motion, niveau SHAPE : double-clic sur un calque Component = entrer dedans comme un precomp
 After Effects (construit 2026-07-17).** Décision re-tranchée avec l'utilisateur après un premier
