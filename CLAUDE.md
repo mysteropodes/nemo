@@ -1,4 +1,4 @@
-# StrokeMotion — guidelines pour éviter les bugs déjà rencontrés
+# Nemo — guidelines pour éviter les bugs déjà rencontrés
 
 Tauri v2, hybride Paper.js (modèle de document, source de vérité) + Rust/vello WebGPU
 (`geometry-wasm/`, moteur de rendu **sans état** JSON→JSON, bridgé via `src/js/engine-bridge.js`).
@@ -585,10 +585,10 @@ Component partagé par StoryBoard et Animation2D/Motion — trois lacunes concr�
    survolée (jamais toutes à la fois — coût déjà rejeté par le commentaire historique de
    `thumbDataUrl`), qui revient à la vignette statique au `mouseleave`.
 
-## 9. Collaboration Git (2026-07) — repo privé `mysteropodes/nemo`
+## 9. Collaboration Git (2026-07) — repo `mysteropodes/nemo`
 
 Depuis l'arrivée d'un collaborateur (pencilpark), ce dossier n'est plus le seul endroit où le
-code vit — `origin` pointe vers un vrai repo GitHub privé, et il faut éviter de s'écraser
+code vit — `origin` pointe vers un vrai repo GitHub (public depuis 2026-08-26), et il faut éviter de s'écraser
 mutuellement. Règles à suivre **sans qu'on ait besoin de le redemander** :
 
 - **Jamais de commit direct sur `main`.** Toujours une branche dédiée par tâche/session :
