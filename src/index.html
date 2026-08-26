@@ -1483,6 +1483,25 @@
           <div style="font-size:15px;font-weight:600">Nemo</div>
           <div style="font-size:10px;color:var(--text-dim)"><span data-i18n="settingsVersionLabel">Version</span> <span id="app-version-txt-about">0.7.0-alpha.1</span></div>
         </div>
+        <!-- License notice (2026-08) — GPL-3.0-or-later was adopted for
+             Nemo's own code (LICENSE, package.json's "license" field,
+             CONTRIBUTING.md — commit b317764) but never surfaced anywhere IN
+             the app itself. GPLv3 §0 defines "Appropriate Legal Notices" for
+             an interactive interface as needing (1) a copyright notice, (2)
+             a no-warranty statement, (3) confirmation the work may be
+             conveyed under this License, and (4) how to view a copy of it —
+             this block is that notice; the third-party "Key libraries &
+             licences" list further down remains separate (those are OTHER
+             projects' licenses, not Nemo's own). Copyright year is a plain
+             literal 2026 rather than a computed "current year" — GPL
+             copyright years mark when THIS code was written, not whenever
+             someone happens to be looking at the About panel. -->
+        <div class="phdr" style="padding:0 0 4px 0;font-size:9px;color:var(--text-dim)" data-i18n="settingsAboutLicenseHdr">Licence</div>
+        <div style="font-size:10px;color:var(--text-dim);margin-bottom:14px">
+          <div style="margin-bottom:4px">© 2026 mysteropodes — <strong style="color:var(--text)">GPL-3.0-or-later</strong></div>
+          <div data-i18n="settingsAboutLicenseNotice">Nemo est un logiciel libre : vous pouvez le redistribuer et/ou le modifier selon les termes de cette licence. Fourni SANS AUCUNE GARANTIE.</div>
+          <a href="https://github.com/mysteropodes/nemo/blob/main/LICENSE" target="_blank" style="color:var(--accent)" data-i18n="settingsAboutLicenseLink">Lire le texte complet de la licence</a>
+        </div>
         <div class="phdr" style="padding:0 0 4px 0;font-size:9px;color:var(--text-dim)" data-i18n="settingsAboutAuthorHdr">Auteur</div>
         <div style="font-size:10px;color:var(--text-dim);margin-bottom:8px">mysteropodes</div>
         <!-- Icon pill-buttons (2026-08, matching a reference mockup) — replaces
@@ -1524,6 +1543,9 @@
           <div style="display:flex;justify-content:space-between;padding:6px 9px;background:var(--panel3)"><span>serde / serde_json</span><span style="color:var(--text-dim)">MIT / Apache-2.0</span></div>
           <div style="display:flex;justify-content:space-between;padding:6px 9px"><span>reqwest</span><span style="color:var(--text-dim)">MIT / Apache-2.0</span></div>
           <div style="display:flex;justify-content:space-between;padding:6px 9px;background:var(--panel3)"><span>uuid</span><span style="color:var(--text-dim)">MIT / Apache-2.0</span></div>
+        </div>
+        <div style="font-size:9px;color:var(--text-dim);margin-top:6px">
+          <a href="https://github.com/mysteropodes/nemo/blob/main/THIRD_PARTY_NOTICES.md" target="_blank" style="color:var(--accent)" data-i18n="settingsAboutFullNoticesLink">Liste complète &amp; notes de licence</a>
         </div>
       </div>
     </div>
