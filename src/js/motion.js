@@ -2833,16 +2833,33 @@
     return true;
   }
   function hoverOverlayItems() {
-    if (_hoverLi < 0 || _hoverLi === state.activeLayerIdx) return [];
+    // Same fix as activeMotionTarget's own (2026-08, layer-list deselect
+    // follow-up): state.activeLayerIdx never actually becomes "nothing"
+    // (no such convention exists), so comparing _hoverLi against it raw
+    // kept suppressing the hover box on the layer that WAS active even
+    // after a genuine empty-canvas deselect — checked _layerSel (the
+    // same source of truth the row highlight and activeMotionTarget both
+    // already use) instead of the raw index.
+    var curSel = (typeof _layerSel !== 'undefined') ? _layerSel : [];
+    if (_hoverLi < 0 || curSel.indexOf(_hoverLi) >= 0) return [];
     var ld = state.layers[_hoverLi];
     if (!ld) return [];
     var b = layerWorldBoundsUnion([_hoverLi], state.currentFrame);
     if (!b) return [];
     var zs = 1 / Math.max(0.0001, view.zoom);
-    var col = [255, 255, 255, 170];
+    // Solid blue, same accent as the selection box (2026-08 fix, feedback:
+    // "Le roll hover ne marche pas... attention rectangle bleu pas de
+    // tiret ni jaune") — it DID fire correctly (verified via
+    // SMMotion.onHoverMove directly), the real problem was contrast: white
+    // 170-alpha dashes on a white canvas background are nearly invisible,
+    // reading as "broken" when it was actually just unseeable. Matches
+    // buildOverlayItemsInner's own boxCol exactly, solid (no dashPattern),
+    // so hover reads as a preview of that same selection box, not a
+    // different/unrelated affordance.
+    var col = [74, 158, 255, 204];
     var c1 = { x: b.x, y: b.y }, c2 = { x: b.x + b.w, y: b.y }, c3 = { x: b.x + b.w, y: b.y + b.h }, c4 = { x: b.x, y: b.y + b.h };
     return [[c1, c2], [c2, c3], [c3, c4], [c4, c1]].map(function (seg) {
-      return { segments: [{ point: [seg[0].x, seg[0].y] }, { point: [seg[1].x, seg[1].y] }], closed: false, fillColor: null, strokeColor: col, strokeWidth: 1 * zs, dashPattern: [4 * zs, 3 * zs] };
+      return { segments: [{ point: [seg[0].x, seg[0].y] }, { point: [seg[1].x, seg[1].y] }], closed: false, fillColor: null, strokeColor: col, strokeWidth: 1 * zs };
     });
   }
   function buildOverlayItems() {
@@ -3405,9 +3422,22 @@
   // select-bridge.js) so it never gets "stuck" hiding a real selection.
   var _motionCanvasEmptyClick = false;
   function setMotionCanvasEmptyClick(v) { _motionCanvasEmptyClick = !!v; }
+  // 2026-08 follow-up fix: the flag above, checked alone, could drift out
+  // of sync with the layer LIST's own highlight — found live (feedback:
+  // "quand on deselect tout le calque layer 1 n'est pas deselect au
+  // niveau timeline") — the row's ".act.motion-selected" white-outline
+  // CSS (style.css ~line 1170) is driven entirely by `_layerSel`, a
+  // SEPARATE, older, far-more-thoroughly-wired selection tracker (every
+  // row click, null/shape/component canvas hit already keeps it correct
+  // via syncMotionLayerSelection) — this bespoke flag only got threaded
+  // through a handful of call sites and could miss one. `_layerSel.length
+  // === 0` is now the PRIMARY signal (matching the row highlight exactly,
+  // so the two can never show different things); the flag stays as an
+  // extra OR-condition, not the sole source of truth anymore.
   function activeMotionTarget() {
     if (state.appMode !== 'motion') return null;
     if (_motionCanvasEmptyClick) return null;
+    if (window._motionExpandedLayer == null && typeof _layerSel !== 'undefined' && _layerSel.length === 0) return null;
     // Bug found 2026-07 ("quand tu select un calque ça select pas dans le
     // canvas"): this used to require window._motionExpandedLayer (a row's
     // Transform group toggled OPEN) — merely clicking a layer row (setting
@@ -4449,7 +4479,8 @@
     var body = document.getElementById('motion-props-body');
     if (!body) return;
     body.innerHTML = '';
-    var ld = _motionCanvasEmptyClick ? null : state.layers[state.activeLayerIdx];
+    var motionDeselected = _motionCanvasEmptyClick || (window._motionExpandedLayer == null && typeof _layerSel !== 'undefined' && _layerSel.length === 0);
+    var ld = motionDeselected ? null : state.layers[state.activeLayerIdx];
     var nameRow = document.createElement('div');
     nameRow.className = 'motion-props-layername';
     if (!ld) { nameRow.textContent = SM.t('noLayerSelected'); body.appendChild(nameRow); return; }
