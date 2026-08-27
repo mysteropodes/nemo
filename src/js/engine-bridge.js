@@ -798,7 +798,12 @@
     // to exportFrameDataURL but not to renderFrameToPixelsPNG), and the bg
     // rect below hardcoded its alpha to 1. So a flare exported for
     // compositing silently came out on an opaque canvas-colored plate.
-    var alphaBg = !!renderContext.alphaBg;
+    // Live preview toggle (2026-08-27, "il manque un bouton pour afficher
+    // ou pas le fond en alpha") — explicit renderContext.alphaBg (export
+    // call sites, which pass their own dialog checkbox value) always
+    // wins; the ordinary live-render call sites never set this field at
+    // all, so they fall through to the persistent live-preview flag.
+    var alphaBg = renderContext.alphaBg !== undefined ? !!renderContext.alphaBg : !!state.previewAlphaBg;
     var layers = [];
     // StoryBoard montage preview (storyboard.js, 2026-07): when the node
     // space has an active montage, the canvas shows THAT montage's frame

@@ -8549,6 +8549,25 @@ if(_btnRulers){
     this.classList.toggle('active',!!state.rulersOn);
   });
 }
+// Live transparency preview (2026-08-27, "un bouton pour afficher ou pas
+// le fond en alpha") — toggles state.previewAlphaBg, which
+// engine-bridge.js's buildSceneJson falls back to whenever a caller
+// doesn't pass its own explicit renderContext.alphaBg (i.e. every
+// ordinary live-render call site, as opposed to Export's own checkbox).
+// #alpha-bg-checker only shows through where the Rust-rendered canvas is
+// ACTUALLY transparent — sits behind drawing-canvas at all times, just
+// hidden by default so it's never visible unless the canvas itself has
+// something to show through it.
+var _btnAlphaBg=document.getElementById('btn-alphabg');
+if(_btnAlphaBg){
+  _btnAlphaBg.addEventListener('click',function(){
+    state.previewAlphaBg=!state.previewAlphaBg;
+    this.classList.toggle('active',state.previewAlphaBg);
+    var checker=document.getElementById('alpha-bg-checker');
+    if(checker)checker.style.display=state.previewAlphaBg?'block':'none';
+    if(window.SMEngineBridge)SMEngineBridge.renderNow();
+  });
+}
 // Flou/Ombre au sol/effect-layer type/param wiring all moved into
 // effects-panel.js's unified Effects stack (2026-07 rewrite).
 // Perspective/Symmetry Guide (feedback 2026-07: "les onglet guide symétrie

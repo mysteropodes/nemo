@@ -327,7 +327,13 @@ body.tools-docked-away #tools-panel-resize{display:none;}
    growing a side panel can't shrink the canvas area, so the props panel
    gets pushed straight off the window edge instead (reported layout bug). */
 #canvas-area{flex:1;min-width:0;min-height:0;position:relative;overflow:hidden;background:var(--panel);}
-#drawing-canvas{width:100%;height:100%;cursor:crosshair;}
+#drawing-canvas{width:100%;height:100%;cursor:crosshair;position:relative;z-index:1;}
+/* Transparency checkerboard (rulers-bridge.js-adjacent toggle, wired in
+   timeline.js) — standard 8px two-tone grid, same convention as every
+   other design app's "show transparency" background. */
+#alpha-bg-checker{position:absolute;inset:0;z-index:0;
+  background-image:linear-gradient(45deg,#808080 25%,transparent 25%),linear-gradient(-45deg,#808080 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#808080 75%),linear-gradient(-45deg,transparent 75%,#808080 75%);
+  background-size:16px 16px;background-position:0 0,0 8px,8px -8px,-8px 0;background-color:#b3b3b3;}
 #canvas-info{position:absolute;top:16px;left:20px;pointer-events:none;font-size:11.5px;color:rgba(236,234,231,.38);font-weight:500;}
 /* Rulers + guides (rulers-bridge.js) — RULER_SIZE (18px) must match the
    JS constant of the same name, both places comment each other. */
