@@ -4211,19 +4211,21 @@ function renderOS(){
   // desP — a Raster has no fillColor/strokeColor, so tinted/outline modes
   // (which recolor the stroke) fall back to a plain opacity fade for it,
   // same as its normal on-canvas rendering just dimmer.
-  // Brush-texture scaffolding (the invisible anchor behind the dabs,
-  // isBrushTextureCopy dab stamps themselves) is skipped entirely here —
-  // 'tinted'/'outline' onion modes unconditionally FORCE a visible
-  // strokeColor onto every ghosted item, which bypassed the anchor's
-  // opacity:0/strokeColor:null invisibility convention (applyBrushTexture,
-  // tools.js) and showed it as a stray thin blue/red line running the
-  // length of any textured stroke on an adjacent frame (reported: "filet
-  // bleu derrière les brush avec preset de texture") — same "new tag
-  // handled in one consumer (buildSceneJson/live render) but not another
-  // (onion)" bug family documented in this repo's CLAUDE.md. The dabs
-  // themselves are cheap, regenerated-per-frame stamps (not meaningful as a
-  // traced reference), so onion just omits texture-preset strokes
-  // altogether rather than trying to half-render them.
+  // Brush-texture scaffolding (the invisible anchor behind the dabs, the
+  // isBrushTextureCopy dab stamps themselves) used to be skipped entirely
+  // here to dodge a real bug: 'tinted'/'outline' onion modes unconditionally
+  // FORCE a visible strokeColor onto every ghosted item, which bypassed the
+  // anchor's opacity:0/strokeColor:null invisibility convention
+  // (applyBrushTexture, tools.js) and showed it as a stray thin blue/red
+  // line running the length of any textured stroke on an adjacent frame
+  // (reported: "filet bleu derrière les brush avec preset de texture") —
+  // same "new tag handled in one consumer (buildSceneJson/live render) but
+  // not another (onion)" bug family documented in this repo's CLAUDE.md. The
+  // fix at the time was to omit texture-preset strokes from onion
+  // altogether — which just traded one bug for another ("onion skin qui
+  // marche pas avec des brush différentes vector", 2026-08-27): a textured
+  // stroke ghosted as nothing. See the per-item `isTex` handling in the two
+  // loops below, which now ghosts these properly instead of omitting them.
   // Falloff denominator scales with the ACTUAL configured onion range
   // (cf-onionIn / onionOut-cf), not a fixed ~5-frame distance — the old
   // `1-dist*.2` floored out (Math.max(.15,...)) by dist=4.25 regardless of
@@ -4267,8 +4269,22 @@ function renderOS(){
   // isBrushTextureCopy/brushTexturePreset return above, so anything
   // reaching this line with a fillColor and no real stroke is a genuine
   // plain fill shape, not a texture-camouflaged one.
-  for(var fi=cf-1;fi>=state.onionIn&&fi>=0;fi--){var strokes=getEffectiveStrokes(li,fi);if(!strokes.length)continue;if(window.SMGroup&&osLd&&osLd.groups)strokes=SMGroup.applyCombinesToStrokes(strokes,osLd);var dist=cf-fi;var op=(state.onionPrevOpacity/100)*Math.max(.15,1-(dist/prevRangeSpan)*.85);strokes.forEach(function(sd){if(sd.isBrushTextureCopy||sd.brushTexturePreset)return;if(sd.isRaster){var pr=desR(sd,onionPrevLayer);pr.opacity=op;return;}var p=desP(sd,onionPrevLayer,op);var canTint=sd.hasRealStroke||sd.fillColor;if(state.onionMode==='tinted'&&canTint)p.strokeColor=new Color(1,.3,.3,op);else if(state.onionMode==='outline'&&canTint){p.fillColor=null;p.strokeColor=new Color(1,.3,.3,op*.8);p.strokeWidth=1;}else p.opacity=op;});}
-  for(var fi2=cf+1;fi2<=state.onionOut&&fi2<state.totalFrames;fi2++){var strokes2=getEffectiveStrokes(li,fi2);if(!strokes2.length)continue;if(window.SMGroup&&osLd&&osLd.groups)strokes2=SMGroup.applyCombinesToStrokes(strokes2,osLd);var dist2=fi2-cf;var op2=(state.onionNextOpacity/100)*Math.max(.15,1-(dist2/nextRangeSpan)*.85);strokes2.forEach(function(sd){if(sd.isBrushTextureCopy||sd.brushTexturePreset)return;if(sd.isRaster){var nr=desR(sd,onionNextLayer);nr.opacity=op2;return;}var p=desP(sd,onionNextLayer,op2);var canTint2=sd.hasRealStroke||sd.fillColor;if(state.onionMode==='tinted'&&canTint2)p.strokeColor=new Color(.3,.55,1,op2);else if(state.onionMode==='outline'&&canTint2){p.fillColor=null;p.strokeColor=new Color(.3,.55,1,op2*.8);p.strokeWidth=1;}else p.opacity=op2;});}
+  // Texture-tagged items (isBrushTextureCopy dabs, brushTexturePreset
+  // anchors) used to be skipped entirely here — a textured vector/bitmap
+  // brush stroke ghosted as nothing at all ("onion skin qui marche pas avec
+  // des brush différentes vector", 2026-08-27). They're let through now:
+  // the anchor's own serialized opacity (0 for a no-fill/pressure anchor,
+  // its real value when a fill was kept visible — applyBrushTexture, tools.js)
+  // is folded into the ghost opacity via effOp instead of being discarded —
+  // desP(sd,layer,op) ignores d.opacity whenever an explicit op is passed,
+  // so passing the plain ghost `op` straight through would have resurrected
+  // the invisible anchor at full ghost opacity. A dab's own dabOpacity comes
+  // along the same way, preserving the texture's speckle variance. Tint/
+  // outline modes still never touch texture-tagged items (canTint excludes
+  // them) — that's the original stray-blue-line halo bug this skip was
+  // added to prevent, still guarded, just no longer by omitting them outright.
+  for(var fi=cf-1;fi>=state.onionIn&&fi>=0;fi--){var strokes=getEffectiveStrokes(li,fi);if(!strokes.length)continue;if(window.SMGroup&&osLd&&osLd.groups)strokes=SMGroup.applyCombinesToStrokes(strokes,osLd);var dist=cf-fi;var op=(state.onionPrevOpacity/100)*Math.max(.15,1-(dist/prevRangeSpan)*.85);strokes.forEach(function(sd){var isTex=!!(sd.isBrushTextureCopy||sd.brushTexturePreset);if(sd.isRaster){var pr=desR(sd,onionPrevLayer);pr.opacity=op;return;}var effOp=isTex?op*(sd.opacity!==undefined?sd.opacity:1):op;var p=desP(sd,onionPrevLayer,effOp);var canTint=(sd.hasRealStroke||sd.fillColor)&&!isTex;if(state.onionMode==='tinted'&&canTint)p.strokeColor=new Color(1,.3,.3,op);else if(state.onionMode==='outline'&&canTint){p.fillColor=null;p.strokeColor=new Color(1,.3,.3,op*.8);p.strokeWidth=1;}else p.opacity=effOp;});}
+  for(var fi2=cf+1;fi2<=state.onionOut&&fi2<state.totalFrames;fi2++){var strokes2=getEffectiveStrokes(li,fi2);if(!strokes2.length)continue;if(window.SMGroup&&osLd&&osLd.groups)strokes2=SMGroup.applyCombinesToStrokes(strokes2,osLd);var dist2=fi2-cf;var op2=(state.onionNextOpacity/100)*Math.max(.15,1-(dist2/nextRangeSpan)*.85);strokes2.forEach(function(sd){var isTex2=!!(sd.isBrushTextureCopy||sd.brushTexturePreset);if(sd.isRaster){var nr=desR(sd,onionNextLayer);nr.opacity=op2;return;}var effOp2=isTex2?op2*(sd.opacity!==undefined?sd.opacity:1):op2;var p=desP(sd,onionNextLayer,effOp2);var canTint2=(sd.hasRealStroke||sd.fillColor)&&!isTex2;if(state.onionMode==='tinted'&&canTint2)p.strokeColor=new Color(.3,.55,1,op2);else if(state.onionMode==='outline'&&canTint2){p.fillColor=null;p.strokeColor=new Color(.3,.55,1,op2*.8);p.strokeWidth=1;}else p.opacity=effOp2;});}
   userLayers[state.activeLayerIdx].activate();
 }
 

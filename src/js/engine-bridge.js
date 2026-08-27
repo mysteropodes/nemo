@@ -798,7 +798,27 @@
     // to exportFrameDataURL but not to renderFrameToPixelsPNG), and the bg
     // rect below hardcoded its alpha to 1. So a flare exported for
     // compositing silently came out on an opaque canvas-colored plate.
-    var alphaBg = !!renderContext.alphaBg;
+    // Live preview toggle (2026-08-27, "il manque un bouton pour afficher
+    // ou pas le fond en alpha") — explicit renderContext.alphaBg (export
+    // call sites, which pass their own dialog checkbox value) always
+    // wins; the ordinary live-render call sites never set this field at
+    // all, so they fall through to the persistent live-preview flag.
+    var alphaBg = renderContext.alphaBg !== undefined ? !!renderContext.alphaBg : !!state.previewAlphaBg;
+    // Live "show transparency" checkerboard (2026-08-27 revision — the
+    // original approach tried to make the on-screen <canvas> itself
+    // composite against a CSS backdrop behind it, which turned out to be
+    // blocked: the WebGPU surface isn't configured for alpha compositing
+    // against the page (wgpu::CompositeAlphaMode, set in Rust's own
+    // surface.configure(), not reachable from JS) — confirmed both in this
+    // preview and live in the real app: the canvas stayed opaque white
+    // either way. Drawing the checkerboard as real scene CONTENT instead
+    // sidesteps that entirely — no Rust/canvas-config change needed, same
+    // guaranteed-to-render path as every other shape in the scene.
+    // Export must NEVER get this: a real transparent-PNG export
+    // (renderContext.alphaBg explicitly passed) still needs true alpha=0
+    // pixels, not a baked-in checkerboard — only the AMBIENT live-preview
+    // fallback (no explicit renderContext.alphaBg at all) draws it.
+    var showAlphaChecker = renderContext.alphaBg === undefined && !!state.previewAlphaBg;
     var layers = [];
     // StoryBoard montage preview (storyboard.js, 2026-07): when the node
     // space has an active montage, the canvas shows THAT montage's frame
@@ -2013,20 +2033,68 @@
     }
     // artboard background as the bottom item of a synthetic bottom layer,
     // mirroring drawStage()'s background rect
-    var bgItems = [{
-      segments: [
-        { point: [0, 0] }, { point: [state.canvasW, 0] },
-        { point: [state.canvasW, state.canvasH] }, { point: [0, state.canvasH] },
-      ],
-      closed: true,
-      // alpha 0 rather than omitting the rect entirely — mirrors
-      // exportBuildFrame's own transparent-export branch (export.js) and
-      // its reasoning, and keeps this array's shape identical for the
-      // reference-item push just below.
-      fillColor: cssColorToRgba(state.canvasBg, alphaBg ? 0 : 1),
-      strokeColor: null,
-      strokeWidth: 1,
-    }];
+    var bgItems;
+    if (showAlphaChecker) {
+      // Zoom-aware tile size (feedback, "la grille est trop grosse, se
+      // rapprocher de celle d'Adobe") — the first version used a FIXED
+      // 20-column WORLD-space grid, so its on-screen tile size scaled
+      // with view.zoom instead of staying constant like every reference
+      // app's checkerboard (Photoshop/AE/Figma all target a fixed ~8px
+      // SCREEN tile regardless of zoom or canvas size). Deriving the
+      // world-space tile size from the current zoom (tile = target /
+      // view.zoom) reproduces that directly.
+      // Tile-count cap, not a screen-size cap: zooming in far enough that
+      // an 8px-screen tile would need tens of thousands of world-space
+      // rects to cover the canvas is exactly the CLAUDE.md §5 "don't do
+      // free work" case this file's own perf notes warn about — past
+      // MAX_CHECK_TILES the tile is allowed to grow past the ideal 8px
+      // (coarser than Adobe at extreme zoom, same tradeoff Adobe itself
+      // makes by switching to a fixed-pixel overlay instead of scene
+      // content) rather than ever drawing more rects than that.
+      var CHECK_TARGET_SCREEN_PX = 8, MAX_CHECK_TILES = 4000;
+      var checkTile = CHECK_TARGET_SCREEN_PX / Math.max(0.001, view.zoom);
+      var idealCols = state.canvasW / checkTile, idealRows = state.canvasH / checkTile;
+      if (idealCols * idealRows > MAX_CHECK_TILES) {
+        var growth = Math.sqrt((idealCols * idealRows) / MAX_CHECK_TILES);
+        checkTile *= growth;
+      }
+      var checkCols = Math.max(1, Math.round(state.canvasW / checkTile));
+      var checkTileW = state.canvasW / checkCols;
+      var checkRows = Math.max(1, Math.round(state.canvasH / checkTile));
+      var checkTileH = state.canvasH / checkRows;
+      var checkA = [222, 222, 222, 255], checkB = [255, 255, 255, 255];
+      bgItems = [];
+      for (var cy = 0; cy < checkRows; cy++) {
+        for (var cx = 0; cx < checkCols; cx++) {
+          var x0 = cx * checkTileW, y0 = cy * checkTileH;
+          bgItems.push({
+            segments: [
+              { point: [x0, y0] }, { point: [x0 + checkTileW, y0] },
+              { point: [x0 + checkTileW, y0 + checkTileH] }, { point: [x0, y0 + checkTileH] },
+            ],
+            closed: true,
+            fillColor: (cx + cy) % 2 === 0 ? checkA : checkB,
+            strokeColor: null,
+            strokeWidth: 1,
+          });
+        }
+      }
+    } else {
+      bgItems = [{
+        segments: [
+          { point: [0, 0] }, { point: [state.canvasW, 0] },
+          { point: [state.canvasW, state.canvasH] }, { point: [0, state.canvasH] },
+        ],
+        closed: true,
+        // alpha 0 rather than omitting the rect entirely — mirrors
+        // exportBuildFrame's own transparent-export branch (export.js) and
+        // its reasoning, and keeps this array's shape identical for the
+        // reference-item push just below.
+        fillColor: cssColorToRgba(state.canvasBg, alphaBg ? 0 : 1),
+        strokeColor: null,
+        strokeWidth: 1,
+      }];
+    }
     // Rotoscopy reference (reference-bridge.js) — above the artboard rect,
     // below every drawing layer, exactly where tracing reference belongs.
     if (window.SMReference) {

@@ -27,8 +27,8 @@
    in the SAME face while the user is typing, so the illusion holds:
    what's on screen during editing looks like the vector glyphs it's about
    to become, not a generic system font standing in for them. */
-@font-face{font-family:'Nemo Vector Text';font-weight:400;src:url('fonts/Roboto-Regular.ttf') format('truetype');}
-@font-face{font-family:'Nemo Vector Text';font-weight:700;src:url('fonts/Roboto-Bold.ttf') format('truetype');}
+@font-face{font-family:'Nemo Vector Text';font-weight:400;src:url('../fonts/Roboto-Regular.ttf') format('truetype');}
+@font-face{font-family:'Nemo Vector Text';font-weight:700;src:url('../fonts/Roboto-Bold.ttf') format('truetype');}
 #tp-inplace-editor{position:fixed;z-index:210;background:transparent;border:none;outline:none;resize:none;
   overflow:hidden;padding:0;margin:0;font-family:'Nemo Vector Text',sans-serif;white-space:pre;}
 html,body{width:100%;height:100%;overflow:hidden;background:var(--gutter);color:var(--text);

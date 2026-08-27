@@ -1953,6 +1953,41 @@
             if (p.data && p.data.bitmapBrushSpec) SMBitmapBrush.regenerate(p, userLayers[state.activeLayerIdx]);
           });
         }
+        // Vector text: sync the group's own font metadata after a resize
+        // handle drag (feedback #79, "pas de resize de la bounding box").
+        // p.scale() above already transformed every glyph's raw geometry —
+        // generic, text-agnostic code — but a text group's actual FONT
+        // SIZE lives in root.data.size/fixedWidth/letterSpacing/
+        // wordSpacing, entirely separate from that geometry. Left unsynced,
+        // the resize looked like it worked (glyphs visibly bigger) but any
+        // LATER typography-panel edit (rebuildVectorTextFromPopover)
+        // rebuilds from the STALE original size, silently snapping back —
+        // reproduced live: d.size stayed 48 after a visible drag-scale to
+        // ~124% height. anchorTopLeft (this file's own recent fix, same
+        // feedback ticket) must go through the identical pivot+scale the
+        // glyphs themselves just did, or the NEXT re-edit re-anchors from
+        // a stale pre-scale point.
+        if (mode === 'xform-scale' && (Math.abs(xformLastSx - 1) > 1e-6 || Math.abs(xformLastSy - 1) > 1e-6)) {
+          var _syncedTextRoots = {};
+          selectedPaths.forEach(function (p) {
+            if (!p.data || !p.data.isVectorText || !p.data.groupId) return;
+            var gid = p.data.groupId;
+            if (_syncedTextRoots[gid]) return;
+            _syncedTextRoots[gid] = true;
+            var troot = userLayers[state.activeLayerIdx].children.filter(function (c) { return c.data && c.data.groupId === gid && c.data.isTextRoot; })[0];
+            if (!troot) return;
+            var avgScale = (Math.abs(xformLastSx) + Math.abs(xformLastSy)) / 2;
+            troot.data.size = Math.max(1, (troot.data.size || 48) * avgScale);
+            if (troot.data.fixedWidth) troot.data.fixedWidth = troot.data.fixedWidth * Math.abs(xformLastSx);
+            if (troot.data.letterSpacing) troot.data.letterSpacing *= Math.abs(xformLastSx);
+            if (troot.data.wordSpacing) troot.data.wordSpacing *= Math.abs(xformLastSx);
+            if (troot.data.anchorTopLeft) {
+              var apt = new Point(troot.data.anchorTopLeft.x, troot.data.anchorTopLeft.y);
+              apt = new Point(xformAnchor.x + (apt.x - xformAnchor.x) * xformLastSx, xformAnchor.y + (apt.y - xformAnchor.y) * xformLastSy);
+              troot.data.anchorTopLeft = { x: apt.x, y: apt.y };
+            }
+          });
+        }
         saveActiveLayerFrame();
         // Reported "trace fantôme" bug (root cause #2, distinct from the
         // team-review fork gated above): onionPrevLayer/onionNextLayer

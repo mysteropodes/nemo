@@ -6291,7 +6291,19 @@ function openInPlaceTextEditor(root,isNew){
   var members=window.SMVectorText.vectorTextGroupMembers(root);
   if(!members.length)return;
   _inplaceIsNew=!!isNew;
-  var bounds=members.reduce(function(b,p){return b?b.unite(p.bounds):p.bounds.clone();},null);
+  // Anchor at d.anchorTopLeft, NOT the group's own ink bounding-box top —
+  // same bug/fix as rebuildVectorTextFromPopover's identical comment a
+  // few hundred lines up (feedback #37): buildVectorTextGroup places
+  // baselineY at anchor.y+size*0.8, a nominal ascent approximation ink
+  // bounds only coincidentally match. This in-place editor (added later,
+  // 2026-08-16) reintroduced the exact same bug the popover editor was
+  // already fixed for — deriving position from tight ink bounds instead,
+  // which drifts per-CONTENT (a lowercase-only string like "sdfsdfsdf"
+  // has a higher/different ink-top than one with tall ascenders), showing
+  // up as the editor visibly floating away from the text's real box on
+  // re-edit (reported 2026-08-27, feedback #79, with a screenshot).
+  var groupBounds=members.reduce(function(b,p){return b?b.unite(p.bounds):p.bounds.clone();},null);
+  var bounds=d.anchorTopLeft?new Rectangle(new Point(d.anchorTopLeft.x,d.anchorTopLeft.y),new Size(groupBounds.width,groupBounds.height)):groupBounds;
   members.forEach(function(p){p.visible=false;});
   _inplaceHidden=members;_inplaceRoot=root;
   var ta=document.createElement('textarea');
@@ -8535,6 +8547,22 @@ if(_btnRulers){
   _btnRulers.addEventListener('click',function(){
     if(window.SMRulers)SMRulers.toggleOn();
     this.classList.toggle('active',!!state.rulersOn);
+  });
+}
+// Live transparency preview (2026-08-27, "un bouton pour afficher ou pas
+// le fond en alpha", revised same day after the DOM-compositing approach
+// turned out to be blocked — see engine-bridge.js's showAlphaChecker
+// comment) — toggles state.previewAlphaBg, which buildSceneJson reads to
+// draw a real checkerboard AS SCENE CONTENT whenever a caller doesn't
+// pass its own explicit renderContext.alphaBg (i.e. every ordinary
+// live-render call site, as opposed to Export's own checkbox, which
+// still gets true alpha=0 pixels, never the checkerboard).
+var _btnAlphaBg=document.getElementById('btn-alphabg');
+if(_btnAlphaBg){
+  _btnAlphaBg.addEventListener('click',function(){
+    state.previewAlphaBg=!state.previewAlphaBg;
+    this.classList.toggle('active',state.previewAlphaBg);
+    if(window.SMEngineBridge)SMEngineBridge.renderNow();
   });
 }
 // Flou/Ombre au sol/effect-layer type/param wiring all moved into

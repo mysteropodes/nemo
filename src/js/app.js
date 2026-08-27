@@ -113,6 +113,15 @@ var state={
   resamplePts:50,tweenStep:1,
   canvasW:1920,canvasH:1080,canvasBg:'#ffffff',canvasClip:false,safetyZones:false,ghostAllFrames:false,currentFrameOutline:false,
   rulersOn:true,guidesLocked:false,guidesSnap:true,guides:{h:[],v:[]},
+  // Live "show transparency" preview (2026-08-27, "il manque un bouton
+  // pour afficher ou pas le fond en alpha") — the Export panel already
+  // has its own "Fond transparent (alpha)" checkbox (engine-bridge.js's
+  // renderContext.alphaBg), honored only at export time; this is the
+  // same underlying capability, just toggleable live while EDITING
+  // instead of only at export. Session-only by design (not persisted in
+  // the project JSON) — a per-viewer display preference, not document
+  // data, same category as view.zoom/center.
+  previewAlphaBg:false,
   // Multi-palette swatch library (Shade-for-AE-style, palette-panel.js) —
   // an array (not a map) so tab order IS display order, no separate sort
   // field needed. colorPalette (flat array) is kept as a legacy field ONLY
