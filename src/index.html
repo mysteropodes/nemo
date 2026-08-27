@@ -271,12 +271,6 @@
       <button id="project-tab-add" data-i18n-title="newProjectTabTitle" title="Nouveau projet (nouvel onglet)">+</button>
     </div>
     <div id="canvas-area">
-      <!-- Transparency checkerboard backdrop (2026-08-27, "un bouton pour
-           afficher ou pas le fond en alpha") — sits BEHIND drawing-canvas;
-           only shows through where the Rust-rendered canvas itself is
-           actually transparent (state.previewAlphaBg makes the canvas-bg
-           rect alpha 0, engine-bridge.js). Hidden by default. -->
-      <div id="alpha-bg-checker" style="display:none"></div>
       <canvas id="drawing-canvas" resize></canvas>
       <!-- Rulers + guides (rulers-bridge.js, 2026-08-27 — "mettre en place
            les repères et rulers comme dans tout bon soft"). Overlaid on

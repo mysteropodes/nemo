@@ -8550,21 +8550,18 @@ if(_btnRulers){
   });
 }
 // Live transparency preview (2026-08-27, "un bouton pour afficher ou pas
-// le fond en alpha") — toggles state.previewAlphaBg, which
-// engine-bridge.js's buildSceneJson falls back to whenever a caller
-// doesn't pass its own explicit renderContext.alphaBg (i.e. every
-// ordinary live-render call site, as opposed to Export's own checkbox).
-// #alpha-bg-checker only shows through where the Rust-rendered canvas is
-// ACTUALLY transparent — sits behind drawing-canvas at all times, just
-// hidden by default so it's never visible unless the canvas itself has
-// something to show through it.
+// le fond en alpha", revised same day after the DOM-compositing approach
+// turned out to be blocked — see engine-bridge.js's showAlphaChecker
+// comment) — toggles state.previewAlphaBg, which buildSceneJson reads to
+// draw a real checkerboard AS SCENE CONTENT whenever a caller doesn't
+// pass its own explicit renderContext.alphaBg (i.e. every ordinary
+// live-render call site, as opposed to Export's own checkbox, which
+// still gets true alpha=0 pixels, never the checkerboard).
 var _btnAlphaBg=document.getElementById('btn-alphabg');
 if(_btnAlphaBg){
   _btnAlphaBg.addEventListener('click',function(){
     state.previewAlphaBg=!state.previewAlphaBg;
     this.classList.toggle('active',state.previewAlphaBg);
-    var checker=document.getElementById('alpha-bg-checker');
-    if(checker)checker.style.display=state.previewAlphaBg?'block':'none';
     if(window.SMEngineBridge)SMEngineBridge.renderNow();
   });
 }

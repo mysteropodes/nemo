@@ -804,6 +804,21 @@
     // wins; the ordinary live-render call sites never set this field at
     // all, so they fall through to the persistent live-preview flag.
     var alphaBg = renderContext.alphaBg !== undefined ? !!renderContext.alphaBg : !!state.previewAlphaBg;
+    // Live "show transparency" checkerboard (2026-08-27 revision — the
+    // original approach tried to make the on-screen <canvas> itself
+    // composite against a CSS backdrop behind it, which turned out to be
+    // blocked: the WebGPU surface isn't configured for alpha compositing
+    // against the page (wgpu::CompositeAlphaMode, set in Rust's own
+    // surface.configure(), not reachable from JS) — confirmed both in this
+    // preview and live in the real app: the canvas stayed opaque white
+    // either way. Drawing the checkerboard as real scene CONTENT instead
+    // sidesteps that entirely — no Rust/canvas-config change needed, same
+    // guaranteed-to-render path as every other shape in the scene.
+    // Export must NEVER get this: a real transparent-PNG export
+    // (renderContext.alphaBg explicitly passed) still needs true alpha=0
+    // pixels, not a baked-in checkerboard — only the AMBIENT live-preview
+    // fallback (no explicit renderContext.alphaBg at all) draws it.
+    var showAlphaChecker = renderContext.alphaBg === undefined && !!state.previewAlphaBg;
     var layers = [];
     // StoryBoard montage preview (storyboard.js, 2026-07): when the node
     // space has an active montage, the canvas shows THAT montage's frame
@@ -2018,20 +2033,52 @@
     }
     // artboard background as the bottom item of a synthetic bottom layer,
     // mirroring drawStage()'s background rect
-    var bgItems = [{
-      segments: [
-        { point: [0, 0] }, { point: [state.canvasW, 0] },
-        { point: [state.canvasW, state.canvasH] }, { point: [0, state.canvasH] },
-      ],
-      closed: true,
-      // alpha 0 rather than omitting the rect entirely — mirrors
-      // exportBuildFrame's own transparent-export branch (export.js) and
-      // its reasoning, and keeps this array's shape identical for the
-      // reference-item push just below.
-      fillColor: cssColorToRgba(state.canvasBg, alphaBg ? 0 : 1),
-      strokeColor: null,
-      strokeWidth: 1,
-    }];
+    var bgItems;
+    if (showAlphaChecker) {
+      // Fixed 20-column grid regardless of canvas size — a coarse but
+      // instantly-recognizable checkerboard (Photoshop/After Effects
+      // "show transparency" convention) at a bounded, predictable item
+      // count (currently 20x~11 ≈ 220 rects for a 16:9 canvas) rather
+      // than one item per fixed-pixel tile, which would scale into the
+      // thousands on a large canvas and undercut the exact perf work
+      // CLAUDE.md §5 documents for this same render path.
+      var checkCols = 20;
+      var checkTile = state.canvasW / checkCols;
+      var checkRows = Math.max(1, Math.round(state.canvasH / checkTile));
+      var checkTileH = state.canvasH / checkRows;
+      var checkA = [222, 222, 222, 255], checkB = [255, 255, 255, 255];
+      bgItems = [];
+      for (var cy = 0; cy < checkRows; cy++) {
+        for (var cx = 0; cx < checkCols; cx++) {
+          var x0 = cx * checkTile, y0 = cy * checkTileH;
+          bgItems.push({
+            segments: [
+              { point: [x0, y0] }, { point: [x0 + checkTile, y0] },
+              { point: [x0 + checkTile, y0 + checkTileH] }, { point: [x0, y0 + checkTileH] },
+            ],
+            closed: true,
+            fillColor: (cx + cy) % 2 === 0 ? checkA : checkB,
+            strokeColor: null,
+            strokeWidth: 1,
+          });
+        }
+      }
+    } else {
+      bgItems = [{
+        segments: [
+          { point: [0, 0] }, { point: [state.canvasW, 0] },
+          { point: [state.canvasW, state.canvasH] }, { point: [0, state.canvasH] },
+        ],
+        closed: true,
+        // alpha 0 rather than omitting the rect entirely — mirrors
+        // exportBuildFrame's own transparent-export branch (export.js) and
+        // its reasoning, and keeps this array's shape identical for the
+        // reference-item push just below.
+        fillColor: cssColorToRgba(state.canvasBg, alphaBg ? 0 : 1),
+        strokeColor: null,
+        strokeWidth: 1,
+      }];
+    }
     // Rotoscopy reference (reference-bridge.js) — above the artboard rect,
     // below every drawing layer, exactly where tracing reference belongs.
     if (window.SMReference) {
