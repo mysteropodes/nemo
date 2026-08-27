@@ -68,7 +68,33 @@
   // track width — verified live, the handle stalled at ~63px thumbW,
   // exactly what FC=64 produces there) — not a math bug in the drag
   // itself, just a ceiling too low to ever let the gesture finish.
-  function clamp(n) { return Math.max(4, Math.min(400, Math.round(n))); }
+  //
+  // Same bug, opposite edge (2026-08, "impossible d'étirer la barre de
+  // zoom dézoom jusqu'au bout pour voir toute la timeline jusqu'à la
+  // fin"): a FIXED 4px floor stalls the WIDEN-the-thumb gesture the exact
+  // same way once totalFrames is long enough that even FC=4 doesn't fit
+  // the whole timeline in the track — verified live at 999 frames on a
+  // 529px track: FC hit the 4px floor but content stayed 3996px, thumb
+  // stuck at ~70px (visRatio ~0.13) no matter how far past the bar's edge
+  // the drag went. The floor now adapts to the CURRENT track width and
+  // project length — low enough that "drag the handle as far as it goes"
+  // can always reach thumbW===trackW (whole timeline visible, nothing
+  // left to scroll) for any project length, not just ones short enough
+  // for the old fixed 4 to happen to cover.
+  function minFloor() {
+    var wrap = wrapEl();
+    var trackW = wrap ? wrap.clientWidth : 0;
+    var total = Math.max(1, (state && state.totalFrames) || 1);
+    if (!trackW) return 1;
+    // Never ABOVE 4 (the previous fixed floor, still right for any
+    // project short enough not to need going lower) — only ever relaxes
+    // it further for a long one. Hard floor of 0.1: a project so long
+    // that even sub-pixel-per-frame can't fit is a display limit, not
+    // something to chase further (ruler labels are illegible long before
+    // this anyway).
+    return Math.max(0.1, Math.min(4, trackW / total));
+  }
+  function clamp(n) { return Math.max(minFloor(), Math.min(400, n)); }
   function refresh() {
     if (typeof renderTimeline === 'function') renderTimeline();
     if (typeof updatePlayhead === 'function') updatePlayhead();
@@ -285,7 +311,7 @@
   window.SMTimelineZoom = {
     set: function (px) {
       var v = apply(px);
-      if (typeof showToast === 'function') showToast('Zoom timeline : ' + v + 'px/frame');
+      if (typeof showToast === 'function') showToast('Zoom timeline : ' + (Math.round(v * 10) / 10) + 'px/frame');
       return v;
     },
     zoomIn: function () { return window.SMTimelineZoom.set(window.FC * 1.25); },
@@ -331,7 +357,11 @@
       apply(DEFAULT_FC);
       return;
     }
-    var saved = parseInt(localStorage.getItem(KEY), 10);
+    // parseFloat, not parseInt (2026-08 fix) — the dynamic floor (minFloor)
+    // can now persist a sub-1 value for a long project; truncating it back
+    // to an integer on reload would silently re-zoom in past what the user
+    // had actually set.
+    var saved = parseFloat(localStorage.getItem(KEY));
     if (!isNaN(saved) && saved !== window.FC) apply(saved);
     else redrawScrollbar();
   }
