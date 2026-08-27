@@ -1618,7 +1618,7 @@
   </div>
   <div class="pr"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="p-om-follow" style="accent-color:var(--accent)"> <span data-i18n="onionFollowLabel">Marqueurs suivent le curseur</span></label></div>
 </div>
-<div id="comment-popover" style="display:none;position:absolute;z-index:200;width:240px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);padding:8px">
+<div id="comment-popover" style="display:none;position:absolute;z-index:200;width:240px;max-height:calc(100vh - 24px);overflow-y:auto;background:var(--panel2);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);padding:8px">
   <div id="comment-author-row" style="font-size:10px;color:var(--text-dim);margin-bottom:4px"></div>
   <textarea id="comment-text" rows="3" style="width:100%;resize:vertical;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:11px;padding:5px;box-sizing:border-box"></textarea>
   <!-- Debug/team-feedback options (feedback-bridge.js) — only meaningful for

@@ -657,6 +657,18 @@
     // about to act on. Left as a no-op here (no stopPropagation) so
     // 'contextmenu' fires completely normally afterward.
     if (e.button !== undefined && e.button !== 0) return;
+    // One-shot guard (2026-08 fix, "je select une forme dans le groupe...
+    // si j'essaie de bouger la forme dans le canvas alors ça select le
+    // groupe") — set by motion.js's selectShapesByStrokeIds (Elements panel
+    // click) right before this mousedown, consumed here regardless of which
+    // branch below ends up handling the click so it only ever protects the
+    // ONE gesture immediately following a panel pick. See its own comment
+    // for why selectedPaths alone can't distinguish "deliberately narrowed
+    // via the panel" from "Subselect left one member selected", the other
+    // case the two group-widening sites below (bodyHandle shortcut, idx2>=0
+    // click) exist for.
+    var skipGroupWiden = !!window._skipGroupWidenOnce;
+    window._skipGroupWidenOnce = false;
     // Motion mode's position-keyframe/spatial-handle canvas dragging
     // (motion.js's onDown/onDrag/onUp — the bezier-handle motion path,
     // same gizmo pattern as the camera layer) was originally wired ONLY
@@ -893,7 +905,7 @@
           // chance to run: a Subselect edit leaving just one member
           // selected meant clicking that member again to grab "the whole
           // group" only ever dragged the one member.
-          if (window.SMGroup) {
+          if (window.SMGroup && !skipGroupWiden) {
             var bodyLd = state.layers[state.activeLayerIdx];
             if (!(bodyLd && bodyLd.locked && !bodyLd.symbolId)) {
               var bodyLayer = userLayers[state.activeLayerIdx];
@@ -1250,7 +1262,7 @@
         // several unrelated shapes, one of which happens to be `p`) must
         // still survive a click-to-drag on one of its members, same
         // reasoning the idx2>=0 short-circuit existed for in the first place.
-        clickedSet.forEach(function (m) { if (selectedPaths.indexOf(m) < 0) selectedPaths.push(m); });
+        if (!skipGroupWiden) clickedSet.forEach(function (m) { if (selectedPaths.indexOf(m) < 0) selectedPaths.push(m); });
       }
       state.selectedStrokeIndices = selectedPaths.map(getSI).filter(function (i2) { return i2 >= 0; });
       mode = selectedPaths.length ? 'move' : null;
@@ -1321,9 +1333,18 @@
       // sense once selectedPaths.length.
       if (shouldIntercept()) {
         var whA2D = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
-        if (onHoverMoveA2D(new Point(whA2D[0], whA2D[1]))) window.SMEngineBridge.renderNow();
+        if (onHoverMoveA2D(new Point(whA2D[0], whA2D[1]))) {
+          // 2026-08 tween-reassign hover badge ("au roll hover les id de
+          // forme en couleur verte") — piggybacks on this SAME hitTest pass
+          // (only fires when the hover TARGET actually changed, exactly
+          // like the highlight box above) instead of tweens.js running its
+          // own hitTest on every mousemove.
+          if (window.updateReassignBadgeHover) window.updateReassignBadgeHover(_hoverPathA2D);
+          window.SMEngineBridge.renderNow();
+        }
       } else if (_hoverPathA2D) {
         _hoverPathA2D = null;
+        if (window.updateReassignBadgeHover) window.updateReassignBadgeHover(null);
       }
       // Hover-only pass (not dragging anything) — tracks whether the
       // pointer sits over the anchor crosshair so engine-bridge.js can draw
