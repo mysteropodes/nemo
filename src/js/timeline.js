@@ -6261,6 +6261,17 @@ function openInPlaceTextEditor(root,isNew){
     if(d.fixedWidth){ta.style.whiteSpace='pre-wrap';ta.style.width=(d.fixedWidth*view.zoom)+'px';}
     else{ta.style.whiteSpace='pre';ta.style.width=Math.max(20,ta.scrollWidth)+'px';}
     ta.style.height=ta.scrollHeight+'px';
+    // Live bounding box (2026-08, "un bounding box comme dans tout éditeur
+    // de texte") — screen px back to world units (÷view.zoom, mirroring
+    // fontPx's own ×view.zoom a few lines up) so buildTextDragBoxItems
+    // (engine-bridge.js) can draw it through the Rust-rendered scene, same
+    // as every other canvas overlay in this app.
+    window._inplaceTextBoxBounds={
+      left:bounds.left,top:bounds.top,
+      right:bounds.left+parseFloat(ta.style.width)/view.zoom,
+      bottom:bounds.top+parseFloat(ta.style.height)/view.zoom,
+    };
+    if(window.SMEngineBridge)SMEngineBridge.renderNow();
   }
   reposition();
   ta.addEventListener('input',reposition);
@@ -6276,6 +6287,8 @@ function closeInPlaceTextEditor(cancel){
   var ta=_inplaceTa,root=_inplaceRoot,hidden=_inplaceHidden,isNew=_inplaceIsNew;
   if(!ta)return;
   _inplaceTa=null;_inplaceRoot=null;_inplaceHidden=null;_inplaceIsNew=false;
+  window._inplaceTextBoxBounds=null;
+  if(window.SMEngineBridge)SMEngineBridge.renderNow();
   var newText=ta.value;
   ta.remove();
   // Creation flow (startInPlaceTextCreation) hid a throwaway placeholder

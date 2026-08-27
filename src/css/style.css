@@ -1333,6 +1333,16 @@ body.mode-motion #frame-grid .motion-group-row{height:22px;min-height:22px;margi
    inset white pill sits inside, matching the spec's visual reference. */
 .layer-inout-bar{position:absolute;left:0;top:2px;bottom:2px;background:rgba(63,107,245,.32);border:1px solid rgba(63,107,245,.85);border-radius:6px;cursor:grab;z-index:2;box-sizing:border-box;}
 .layer-inout-bar.full-range{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.28);}
+/* Overflow caps (2026-08, layer-inout.js updateBar) — the part of a bar
+   that sits before frame 0 or past totalFrames-1 (Cavalry-style trim past
+   the composition's own range). Hatched, not solid, so it reads as "past
+   what actually plays" at a glance; rounded only on its OUTER edge so the
+   bar still reads as one continuous capsule. */
+.layer-inout-overflow-left,.layer-inout-overflow-right{position:absolute;top:0;bottom:0;
+  background:repeating-linear-gradient(45deg,rgba(0,0,0,.4),rgba(0,0,0,.4) 3px,transparent 3px,transparent 6px);
+  pointer-events:none;z-index:1;}
+.layer-inout-overflow-left{left:0;border-radius:5px 0 0 5px;border-right:1px dashed rgba(255,255,255,.35);}
+.layer-inout-overflow-right{right:0;border-radius:0 5px 5px 0;border-left:1px dashed rgba(255,255,255,.35);}
 /* 2026-08-16 restyle (nemo-timeline-inout-spec.html, Cyril): a permanent
    white pill INSET inside the bar, not an edge-flush full-height sliver
    colored by the layer's own tint — the bar already carries that color, the
