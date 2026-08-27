@@ -219,6 +219,16 @@
       var id = editingCustomId || ('custom-' + Date.now().toString(36) + '-' + Math.floor(Math.random() * 1e4));
       if (!state.customBrushPresets) state.customBrushPresets = {};
       params.label = nameInput.value.trim() || 'Mon brush';
+      // Diameter (2026-08-27, feedback #73 — "ajouter la possibilité
+      // d'enregistrer les paramètres de réglage de l'outil (diamètre,
+      // etc.)"): every FIELDS.* param above is a texture-SHAPE ratio
+      // (nibSize is a multiplier of state.brushSize, not an absolute
+      // value) — none of them remembered the actual brush diameter the
+      // user had dialed in when they saved. Custom presets only (a
+      // built-in preset is meant to apply at WHATEVER size is currently
+      // set, same as before); restored on selection in
+      // SM.setBrushPreset (timeline.js).
+      params.savedBrushSize = state.brushSize;
       state.customBrushPresets[id] = params;
       closePopover();
       if (onApply) onApply(id);

@@ -603,6 +603,15 @@ window.SM={
   },
   setFillBrushSize:function(v){state.fillBrushSize=Math.max(1,parseInt(v)||40);},
   setBrushPreset:function(v){state.brushPreset=v||'none';
+    // Restore the saved diameter for a custom preset (feedback #73 — see
+    // brush-editor.js's own comment on savedBrushSize for why this is
+    // custom-preset-only). Syncs the real UI field too, not just state,
+    // so the size slider reflects it immediately.
+    var _customP=state.customBrushPresets&&state.customBrushPresets[v];
+    if(_customP&&typeof _customP.savedBrushSize==='number'){
+      state.brushSize=_customP.savedBrushSize;
+      var _swEl=document.getElementById('p-sw');if(_swEl)_swEl.value=Math.round(state.brushSize);
+    }
     // Every other Trait field (Width/Color/Cap/Join/Style/Dash…) auto-
     // applies to the current selection the moment it changes — the vector
     // Brush preset (dynamic dab texture, "brush dynamique") was the one
@@ -2648,6 +2657,21 @@ function updatePropsContext(){
     _propsCtxSig=ctx;
     Object.keys(show).forEach(function(id){
       if(!show[id])return;
+      // shapes-sec (Elements) excluded (2026-08-27, "le menu element s'ouvre
+      // systematiquement à chaque trait") — unlike every other entry here,
+      // show['shapes-sec'] is TRUE for almost every ctx (any active layer,
+      // per its own comment above: "a real layers/elements panel... is
+      // ALWAYS visible once there's something to show; only the HIGHLIGHT
+      // inside it should react to selection, never the panel's own
+      // presence"). That comment covers show/hide, but this force-open loop
+      // was ALSO sweeping its collapse state along with genuinely tool-
+      // specific sections (Fill/Stroke/Tool Options) — so switching tools
+      // even once (draw→select→draw, routine mid-animation) reopened it
+      // every time regardless of the user having just collapsed it.
+      // Reproduced live: closed it, called setTool('select') then
+      // setTool('draw') — reopened both times. Same carve-out precedent as
+      // 'selected-colors-hdr' just above.
+      if(id==='shapes-sec')return;
       var sec=document.getElementById(id);if(!sec)return;
       var h=sec.querySelector('.phdr'),b=sec.querySelector('.pbdy');
       if(h&&b){b.classList.remove('hid');h.classList.remove('closed');}
