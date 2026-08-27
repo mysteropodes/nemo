@@ -41,7 +41,8 @@
     // from day one, not just after an explicit rename.
     if (ld) {
       ensureLayerGroups(ld);
-      ld.groups[gid] = { name: 'Groupe', combineMode: 'none', order: selectedPaths.map(function (p) { return p.data.strokeId; }) };
+      // 2026-08 fix: hardcoded French default name, shown regardless of locale.
+      ld.groups[gid] = { name: SM.t('autoNameGroup'), combineMode: 'none', order: selectedPaths.map(function (p) { return p.data.strokeId; }) };
     }
     saveActiveLayerFrame(); updateUI();
     if (window.SMEngineBridge) window.SMEngineBridge.renderNow();

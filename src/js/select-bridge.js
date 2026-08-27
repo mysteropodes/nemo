@@ -657,6 +657,18 @@
     // about to act on. Left as a no-op here (no stopPropagation) so
     // 'contextmenu' fires completely normally afterward.
     if (e.button !== undefined && e.button !== 0) return;
+    // One-shot guard (2026-08 fix, "je select une forme dans le groupe...
+    // si j'essaie de bouger la forme dans le canvas alors ça select le
+    // groupe") — set by motion.js's selectShapesByStrokeIds (Elements panel
+    // click) right before this mousedown, consumed here regardless of which
+    // branch below ends up handling the click so it only ever protects the
+    // ONE gesture immediately following a panel pick. See its own comment
+    // for why selectedPaths alone can't distinguish "deliberately narrowed
+    // via the panel" from "Subselect left one member selected", the other
+    // case the two group-widening sites below (bodyHandle shortcut, idx2>=0
+    // click) exist for.
+    var skipGroupWiden = !!window._skipGroupWidenOnce;
+    window._skipGroupWidenOnce = false;
     // Motion mode's position-keyframe/spatial-handle canvas dragging
     // (motion.js's onDown/onDrag/onUp — the bezier-handle motion path,
     // same gizmo pattern as the camera layer) was originally wired ONLY
@@ -893,7 +905,7 @@
           // chance to run: a Subselect edit leaving just one member
           // selected meant clicking that member again to grab "the whole
           // group" only ever dragged the one member.
-          if (window.SMGroup) {
+          if (window.SMGroup && !skipGroupWiden) {
             var bodyLd = state.layers[state.activeLayerIdx];
             if (!(bodyLd && bodyLd.locked && !bodyLd.symbolId)) {
               var bodyLayer = userLayers[state.activeLayerIdx];
@@ -1250,7 +1262,7 @@
         // several unrelated shapes, one of which happens to be `p`) must
         // still survive a click-to-drag on one of its members, same
         // reasoning the idx2>=0 short-circuit existed for in the first place.
-        clickedSet.forEach(function (m) { if (selectedPaths.indexOf(m) < 0) selectedPaths.push(m); });
+        if (!skipGroupWiden) clickedSet.forEach(function (m) { if (selectedPaths.indexOf(m) < 0) selectedPaths.push(m); });
       }
       state.selectedStrokeIndices = selectedPaths.map(getSI).filter(function (i2) { return i2 >= 0; });
       mode = selectedPaths.length ? 'move' : null;
