@@ -1657,7 +1657,7 @@ window.SM={
         // be just as useless. Note isNullLayer above was already persisted,
         // and its own tooltip calls a null layer a "pivot/parent pour d'autres
         // calques" — the pivot came back, everything hung off it did not.
-        layerUid:l.layerUid,parentLayerUid:l.parentLayerUid,parentLayerUidB:l.parentLayerUidB,markers:l.markers,shy:l.shy,keyLock:l.keyLock,timeRemap:l.timeRemap,motionBlur:l.motionBlur,effectsFrom:l.effectsFrom,timeLink:l.timeLink,
+        layerUid:l.layerUid,parentLayerUid:l.parentLayerUid,parentLayerUidB:l.parentLayerUidB,followPath:l.followPath,markers:l.markers,shy:l.shy,keyLock:l.keyLock,timeRemap:l.timeRemap,motionBlur:l.motionBlur,effectsFrom:l.effectsFrom,timeLink:l.timeLink,
         // 3D layer toggle (2026-07-28) — see motion.js's compute3DCorners.
         threeD:l.threeD,
         // Mograph duplicator (2026-07-29) — copied wholesale like
@@ -1899,6 +1899,7 @@ window.SM={
       if(ld.layerUid)state.layers[idx].layerUid=ld.layerUid;
       if(ld.parentLayerUid)state.layers[idx].parentLayerUid=ld.parentLayerUid;
       if(ld.parentLayerUidB)state.layers[idx].parentLayerUidB=ld.parentLayerUidB;
+      if(ld.followPath)state.layers[idx].followPath=ld.followPath;
       if(ld.motion)state.layers[idx].motion=ld.motion;
       if(ld.elementMotion)state.layers[idx].elementMotion=ld.elementMotion;
       if(ld.motionStatic)state.layers[idx].motionStatic=ld.motionStatic;
@@ -4763,6 +4764,33 @@ function buildParentMenuItems(li,ld,onChanged){
   return items;
 }
 window.buildParentMenuItems=buildParentMenuItems;
+// Follow Path target picker — same click-to-choose menu shape as
+// buildParentMenuItems, no cycle guard needed (setLayerFollowPath's own
+// comment explains why a cycle here just means each side ignores the
+// other's contribution, not infinite recursion).
+function buildFollowPathMenuItems(li,ld,onChanged){
+  var M=window.SMMotion;
+  if(!M||!M.setLayerFollowPath)return [{label:'Chemin indisponible',disabled:true}];
+  var items=[{label:'Chemin : Aucun',disabled:!(ld.followPath&&ld.followPath.targetLayerUid),action:function(){
+    pushUndo(); M.setLayerFollowPath(li,null); onChanged();
+    if(window.SMEngineBridge)SMEngineBridge.renderNow();
+  }}];
+  var curUid=ld.followPath?ld.followPath.targetLayerUid:null;
+  state.layers.forEach(function(other,oi){
+    if(oi===li)return; // a layer can't follow itself
+    var uid=M.ensureLayerUid(other);
+    items.push({
+      label:'Chemin : '+(other.name||('Layer '+(oi+1))),
+      disabled:curUid===uid,
+      action:function(){
+        pushUndo(); M.setLayerFollowPath(li,uid); onChanged();
+        if(window.SMEngineBridge)SMEngineBridge.renderNow();
+      }
+    });
+  });
+  return items;
+}
+window.buildFollowPathMenuItems=buildFollowPathMenuItems;
 // Parent-in-Time picker — the menu-based sibling of the pickwhip drag
 // (2026-07-31, Cyril: "gestion du clic droit pour parent in time sur select
 // keyframe + layer, keyframe + in/out point"). Same shape as

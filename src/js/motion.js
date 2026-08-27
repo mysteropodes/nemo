@@ -140,6 +140,17 @@
     // shows nothing extra here, same "hidden until its prerequisite is
     // set" precedent Time Remap already establishes for symbolId.
     if (holder && holder.parentLayerUidB) list = list.concat(['parentBlend']);
+    // Follow Path (2026-08, motion path unifié — see FollowPathEffect
+    // research note). Layer-level only for v1 (ld.followPath, not per-
+    // element) — same "static config field, extra keyable rows only once
+    // it's set" precedent as parentLayerUidB/timeLink just above.
+    // pathInfluence only means anything once "Align to path" is on (it
+    // blends the path's tangent INTO rotation — position always follows
+    // the path at full strength, matching FollowPathEffect's own design).
+    if (holder && holder.followPath && holder.followPath.targetLayerUid) {
+      list = list.concat(['pathPercent']);
+      if (holder.followPath.align) list = list.concat(['pathInfluence']);
+    }
     // Parent in Time (Van Dijk 2.1, "Time... In/Out Points become values...
     // linked together with Expressions") — offset rows only appear for
     // whichever edge(s) the current link mode actually drives (mirrors
@@ -212,9 +223,9 @@
     if (prop === 'timeRemap') return holder.timeRemap || null;
     return (holder.motion && holder.motion[prop]) || null;
   }
-  var PROP_LABEL = { position: 'Position', anchor: 'Anchor Point', rotation: 'Rotation', scale: 'Scale', opacity: 'Opacity', order: 'Order', timeRemap: 'Time Remap', positionZ: 'Position Z', rotationX: 'Rotation X', rotationY: 'Rotation Y', dupOffsetPos: 'Dup. Offset', dupOffsetRot: 'Dup. Rotation', dupOffsetScale: 'Dup. Scale', dupOffsetOpacity: 'Dup. Opacity', dupOffsetPosZ: 'Dup. Offset Z', dupOffsetRotX: 'Dup. Rotation X', dupOffsetRotY: 'Dup. Rotation Y', parentBlend: 'Parent Blend', timeLinkInOffset: 'Décalage entrée', timeLinkOutOffset: 'Décalage sortie', cornerTL: 'Coin ↖', cornerTR: 'Coin ↗', cornerBR: 'Coin ↘', cornerBL: 'Coin ↙', arcStart: 'Début (arc)', arcSweep: 'Ouverture (arc)', arcInner: 'Rayon interne', starInner: 'Rayon interne', starCorner: 'Coins' };
-  var PROP_DIM = { position: 2, anchor: 2, rotation: 1, scale: 2, opacity: 1, order: 1, timeRemap: 1, positionZ: 1, rotationX: 1, rotationY: 1, dupOffsetPos: 2, dupOffsetRot: 1, dupOffsetScale: 2, dupOffsetOpacity: 1, dupOffsetPosZ: 1, dupOffsetRotX: 1, dupOffsetRotY: 1, parentBlend: 1, timeLinkInOffset: 1, timeLinkOutOffset: 1, cornerTL: 1, cornerTR: 1, cornerBR: 1, cornerBL: 1, arcStart: 1, arcSweep: 1, arcInner: 1, starInner: 1, starCorner: 1 };
-  var PROP_UNIT = { position: 'px', anchor: 'px', rotation: '°', scale: '%', opacity: '%', order: '', timeRemap: 'f', positionZ: 'px', rotationX: '°', rotationY: '°', dupOffsetPos: 'px', dupOffsetRot: '°', dupOffsetScale: '%', dupOffsetOpacity: '%', dupOffsetPosZ: 'px', dupOffsetRotX: '°', dupOffsetRotY: '°', parentBlend: '%', timeLinkInOffset: 'f', timeLinkOutOffset: 'f', cornerTL: 'px', cornerTR: 'px', cornerBR: 'px', cornerBL: 'px', arcStart: '°', arcSweep: '°', arcInner: '%', starInner: '%', starCorner: 'px' };
+  var PROP_LABEL = { position: 'Position', anchor: 'Anchor Point', rotation: 'Rotation', scale: 'Scale', opacity: 'Opacity', order: 'Order', timeRemap: 'Time Remap', positionZ: 'Position Z', rotationX: 'Rotation X', rotationY: 'Rotation Y', dupOffsetPos: 'Dup. Offset', dupOffsetRot: 'Dup. Rotation', dupOffsetScale: 'Dup. Scale', dupOffsetOpacity: 'Dup. Opacity', dupOffsetPosZ: 'Dup. Offset Z', dupOffsetRotX: 'Dup. Rotation X', dupOffsetRotY: 'Dup. Rotation Y', parentBlend: 'Parent Blend', timeLinkInOffset: 'Décalage entrée', timeLinkOutOffset: 'Décalage sortie', cornerTL: 'Coin ↖', cornerTR: 'Coin ↗', cornerBR: 'Coin ↘', cornerBL: 'Coin ↙', arcStart: 'Début (arc)', arcSweep: 'Ouverture (arc)', arcInner: 'Rayon interne', starInner: 'Rayon interne', starCorner: 'Coins', pathPercent: 'Position sur le chemin', pathInfluence: 'Influence (rotation)' };
+  var PROP_DIM = { position: 2, anchor: 2, rotation: 1, scale: 2, opacity: 1, order: 1, timeRemap: 1, positionZ: 1, rotationX: 1, rotationY: 1, dupOffsetPos: 2, dupOffsetRot: 1, dupOffsetScale: 2, dupOffsetOpacity: 1, dupOffsetPosZ: 1, dupOffsetRotX: 1, dupOffsetRotY: 1, parentBlend: 1, timeLinkInOffset: 1, timeLinkOutOffset: 1, cornerTL: 1, cornerTR: 1, cornerBR: 1, cornerBL: 1, arcStart: 1, arcSweep: 1, arcInner: 1, starInner: 1, starCorner: 1, pathPercent: 1, pathInfluence: 1 };
+  var PROP_UNIT = { position: 'px', anchor: 'px', rotation: '°', scale: '%', opacity: '%', order: '', timeRemap: 'f', positionZ: 'px', rotationX: '°', rotationY: '°', dupOffsetPos: 'px', dupOffsetRot: '°', dupOffsetScale: '%', dupOffsetOpacity: '%', dupOffsetPosZ: 'px', dupOffsetRotX: '°', dupOffsetRotY: '°', parentBlend: '%', timeLinkInOffset: 'f', timeLinkOutOffset: 'f', cornerTL: 'px', cornerTR: 'px', cornerBR: 'px', cornerBL: 'px', arcStart: '°', arcSweep: '°', arcInner: '%', starInner: '%', starCorner: 'px', pathPercent: '%', pathInfluence: '%' };
   // parentBlend defaults to 0 — "0%" reads as "fully Parent A" (the
   // pre-existing single parent), matching the invariant that assigning a
   // second parent must never itself move anything until the user actually
@@ -226,6 +237,11 @@
     // shifts the whole [start,end] window — same 3-field shape as AE's own
     // Trim Paths, see applyTrimFor's doc comment for the combine math.
     trimStart: [0], trimEnd: [100], trimOffset: [0],
+    // Follow Path (2026-08) — 0% = start of the target path; influence
+    // defaults to 100 (rotation fully follows the path's tangent once
+    // "Align" is on — matching Friction's own default, see the research
+    // note on FollowPathEffect).
+    pathPercent: [0], pathInfluence: [100],
     // Dynamic shape corners (2026-08-18) — safety-net fallback only; the
     // REAL per-shape default is each rect's own data.paramShape.tl/tr/br/bl
     // (every shape has its own baked radii, unlike every other prop here
@@ -1749,6 +1765,60 @@
     }
     return best;
   }
+  // ---- Follow Path (2026-08, "motion path unifié") --------------------
+  // A constraint, not a track: the target layer's own path geometry (its
+  // FIRST stroke with 2+ points, raw un-transformed segments as stored in
+  // ld.frames) is sampled at an arc-length percentage (keyable pathPercent)
+  // and the result is composed through the TARGET's own world transform
+  // (its Motion + parent chain — layerWorldBoundsUnion, above, is the exact
+  // same "raw local points -> world" recipe, just for bounds corners
+  // instead of a path point) so a moving/parented guide still works.
+  // Deliberately calls computeMotionMat on the TARGET directly rather than
+  // layerMotionAt (which would recurse back into this function) — a target
+  // that itself has followPath is simply read as a plain (non-path-driven)
+  // layer, which sidesteps cycles by construction instead of detecting them.
+  function sampleFollowPathAt(ld, frameIdx) {
+    var fp = ld && ld.followPath;
+    if (!fp || !fp.targetLayerUid) return null;
+    var ti = findLayerIndexByUid(fp.targetLayerUid);
+    if (ti < 0) return null;
+    var strokes = getEffectiveStrokes(ti, frameIdx);
+    var src = null;
+    for (var i = 0; i < strokes.length; i++) {
+      if (strokes[i] && strokes[i].segments && strokes[i].segments.length > 1) { src = strokes[i]; break; }
+    }
+    if (!src) return null;
+    var path = new Path({
+      segments: src.segments.map(function (s) {
+        return new Segment(new Point(s.point[0], s.point[1]), new Point((s.handleIn || [0, 0])[0], (s.handleIn || [0, 0])[1]), new Point((s.handleOut || [0, 0])[0], (s.handleOut || [0, 0])[1]));
+      }),
+      closed: !!src.closed, insert: false,
+    });
+    var len = path.length;
+    if (!len) { path.remove(); return null; }
+    var per = Math.max(0, Math.min(100, valueAtFrame(ld, 'pathPercent', frameIdx)[0] || 0)) / 100;
+    var offset = Math.max(0, Math.min(len, per * len));
+    var pt = path.getPointAt(offset);
+    var tan = path.getTangentAt(offset);
+    path.remove();
+    if (!pt) return null;
+    // Two points (sampled position + a point 10 units along the tangent)
+    // riding through the SAME world-space composition together, so the
+    // tangent survives the target's own rotation/scale intact.
+    var pts = [
+      { point: [pt.x, pt.y], handleIn: [0, 0], handleOut: [0, 0] },
+      { point: [pt.x + (tan ? tan.x * 10 : 10), pt.y + (tan ? tan.y * 10 : 0)], handleIn: [0, 0], handleOut: [0, 0] },
+    ];
+    var tLayer = window.userLayers && userLayers[ti];
+    var tb = tLayer ? tLayer.bounds : null;
+    var tMat = computeMotionMat(state.layers[ti], frameIdx);
+    if (tMat && tb) pts = transformSegments(pts, { x: tb.center.x + tMat.ax, y: tb.center.y + tMat.ay }, tMat);
+    var tChain = parentChainMats(ti, frameIdx);
+    for (var pc = 0; pc < tChain.length; pc++) pts = transformSegments(pts, tChain[pc].pivot, tChain[pc].mat);
+    var wx = pts[0].point[0], wy = pts[0].point[1];
+    var angle = Math.atan2(pts[1].point[1] - wy, pts[1].point[0] - wx) * 180 / Math.PI;
+    return { x: wx, y: wy, angle: angle };
+  }
   function layerMotionAt(li, frameIdx) {
     var ld = state.layers[li];
     if (!ld) return null;
@@ -1764,7 +1834,29 @@
     // composable transforms, exactly AE's precomp-layer model. Confirmed
     // live: rotating/scaling a converted component pivots around its own
     // bounds+anchor correctly, matches an ordinary layer.
-    return computeMotionMat(ld, frameIdx);
+    var mat = computeMotionMat(ld, frameIdx);
+    if (ld.followPath && ld.followPath.targetLayerUid) {
+      var fp = sampleFollowPathAt(ld, frameIdx);
+      if (fp) {
+        if (!mat) mat = { dx: 0, dy: 0, rot: 0, sx: 1, sy: 1, op: 1, ax: 0, ay: 0 };
+        var layer = window.userLayers && userLayers[li];
+        var b = layer ? layer.bounds : null;
+        if (b) {
+          // Additive, not an override (matches FollowPathEffect's own
+          // `posX += posXChange`): a Position value the user ALSO keys
+          // stays a relative offset FROM the path point, so pathPercent=0
+          // + Position=[0,0] places the pivot exactly ON the path, and any
+          // manual Position tweak just nudges it off that.
+          mat.dx += fp.x - b.center.x - mat.ax;
+          mat.dy += fp.y - b.center.y - mat.ay;
+        }
+        if (ld.followPath.align) {
+          var infl = (valueAtFrame(ld, 'pathInfluence', frameIdx)[0] || 0) / 100;
+          mat.rot += fp.angle * infl;
+        }
+      }
+    }
+    return mat;
   }
   // ---- LAYER PARENTING (2026-07, "parentage de calque comme dans After
   // Effects, changeable en properties d'animation") ----
@@ -1921,6 +2013,19 @@
       return;
     }
     ld.parentLayerUidB = parentUid || null;
+    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+  }
+  // Follow Path's ONE UI entry point (setter, mirrors setLayerParent's own
+  // contract) — no cycle check needed: sampleFollowPathAt reads the
+  // target's PLAIN computeMotionMat, never layerMotionAt, so a cycle (A
+  // follows B follows A) just means each one ignores the other's path
+  // contribution rather than recursing infinitely.
+  function setLayerFollowPath(li, targetUid) {
+    var ld = state.layers[li];
+    if (!ld) return;
+    if (!targetUid) { ld.followPath = null; if (window.SMEngineBridge) SMEngineBridge.renderNow(); return; }
+    if (targetUid === ensureLayerUid(ld)) return; // can't follow itself
+    ld.followPath = { targetLayerUid: targetUid, align: (ld.followPath && ld.followPath.align) || false };
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
   }
   // ---- Multi-parent crossfade (2026-07-30, "plusieurs parent... jouer
@@ -4525,6 +4630,7 @@
     body.appendChild(nameRow);
     renderParentRow(body, ld, state.activeLayerIdx);
     if (ld.isNullLayer) renderNullShapeRow(body, ld);
+    renderFollowPathRow(body, ld, state.activeLayerIdx);
     renderTimeLinkRow(body, ld, state.activeLayerIdx);
     renderTransformGroup(body, ld, 'Transform');
   }
@@ -4554,6 +4660,60 @@
       if (window.renderLayerList) renderLayerList();
     });
     row.appendChild(sel);
+    body.appendChild(row);
+  }
+  // Follow Path (2026-08, "motion path unifié" — see the FollowPathEffect
+  // research note). Same pill-and-menu idiom as the Parent row right below
+  // (deliberately NOT a pickwhip like Parent — a plain click-to-choose menu
+  // is enough here, this constraint is set far less often than parenting).
+  // "Align" is a small toggle button next to the pill: it just flips
+  // ld.followPath.align, which in turn reveals/hides the pathInfluence row
+  // in the ordinary Transform group below (propsFor) — no separate
+  // keyframe machinery of its own.
+  function renderFollowPathRow(body, ld, li) {
+    var row = document.createElement('div'); row.className = 'lrow motion-prop-row';
+    var label = document.createElement('span'); label.textContent = 'Chemin'; label.style.minWidth = '70px';
+    label.title = 'Fait suivre la Position de ce calque le long du tracé d’un autre calque (Position sur le chemin, en %) — comme un rail de déplacement.';
+    row.appendChild(label);
+
+    var fp = ld.followPath;
+    var tIdx = fp ? SMMotion.findLayerIndexByUid(fp.targetLayerUid) : -1;
+    var tName = (tIdx >= 0 && state.layers[tIdx]) ? (state.layers[tIdx].name || ('Layer ' + (tIdx + 1))) : null;
+
+    var pill = document.createElement('div');
+    pill.className = 'lparent motion-parent-pill' + (tName ? '' : ' none');
+    pill.title = tName ? ('Chemin : ' + tName + ' — cliquer pour changer') : 'Aucun chemin — cliquer pour en choisir un';
+    var lbl = document.createElement('span'); lbl.className = 'mp-label'; lbl.textContent = tName || '—';
+    pill.appendChild(lbl);
+    pill.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (!window.showContextMenu || !window.buildFollowPathMenuItems) return;
+      var items = window.buildFollowPathMenuItems(li, ld, function () { renderMotionPropsPanel(); renderLayerList(); renderTimeline(); });
+      var r = pill.getBoundingClientRect();
+      window.showContextMenu(r.left, r.bottom + 2, items);
+    });
+    pill.addEventListener('contextmenu', function (e) {
+      e.stopPropagation(); e.preventDefault();
+      if (!tName) return;
+      pushUndo(); setLayerFollowPath(li, null);
+      renderMotionPropsPanel(); renderLayerList(); renderTimeline();
+      if (window.SMEngineBridge) SMEngineBridge.renderNow();
+    });
+    row.appendChild(pill);
+
+    if (tName) {
+      var alignBtn = document.createElement('button');
+      alignBtn.type = 'button'; alignBtn.className = 'mp-align-btn' + (fp.align ? ' on' : '');
+      alignBtn.textContent = 'Aligner';
+      alignBtn.title = 'Aligne aussi la Rotation sur la tangente du chemin (réglable via Influence)';
+      alignBtn.addEventListener('click', function (e) {
+        e.stopPropagation(); pushUndo();
+        ld.followPath.align = !ld.followPath.align;
+        renderMotionPropsPanel(); renderLayerList(); renderTimeline();
+        if (window.SMEngineBridge) SMEngineBridge.renderNow();
+      });
+      row.appendChild(alignBtn);
+    }
     body.appendChild(row);
   }
   // Layer parenting (2026-07, "gestion de parentage de calque dans motion
@@ -8327,6 +8487,7 @@
     findLayerIndexByUid: findLayerIndexByUid,
     setLayerParent: setLayerParent,
     setLayerParentB: setLayerParentB,
+    setLayerFollowPath: setLayerFollowPath,
     blendedParentContributionFor3D: blendedParentContributionFor3D,
     shiftLayerMotionKeys: shiftLayerMotionKeys,
     previewKeyframeShift: previewKeyframeShift,

@@ -2132,6 +2132,14 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
   border-right:1.5px solid var(--accent);pointer-events:none;}
 .motion-parent-pill .mp-label{position:relative;z-index:1;}
 
+/* Follow Path row's "Align" toggle (motion.js renderFollowPathRow) — same
+   pill-adjacent small-button idiom as other on/off toggles in this panel. */
+.mp-align-btn{flex:0 0 auto;margin-left:4px;font-size:9.5px;color:var(--text-dim);
+  padding:2px 6px;border-radius:4px;border:1px solid var(--border);background:var(--panel2);
+  cursor:pointer;line-height:1.4;}
+.mp-align-btn:hover{color:var(--text);border-color:var(--border2);}
+.mp-align-btn.on{color:var(--accent,#5b6cff);border-color:var(--accent,#5b6cff);background:rgba(91,108,255,.12);}
+
 /* Effects count on the collapsed section header (effects-panel.js) — the
    header is all that's on screen while the section is collapsed, so it has to
    carry the "this layer has effects" signal by itself. */
