@@ -1416,6 +1416,14 @@
     e.preventDefault();
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
     var pt = new Point(w[0], w[1]);
+    // Snap-to-guides (rulers-bridge.js, "comme dans tout bon soft") —
+    // scoped to a plain single-selection MOVE drag in Animation 2D only,
+    // not the multi-layer/Motion-mode branches below (those aren't the
+    // canvas-guide use case guides were built for, and mvMap's inverse-
+    // rotate math a few lines down expects the RAW pointer delta, not a
+    // magnetically-adjusted one). SMRulers.snapPoint no-ops (returns pt
+    // unchanged) whenever rulers/snap are off or nothing's close enough.
+    if (mode === 'move' && state.appMode !== 'motion' && window.SMRulers) pt = window.SMRulers.snapPoint(pt, 8);
 
     if (_multiLayerDrag && mode.indexOf('layer-multi-') === 0) {
       if (mode === 'layer-multi-move') {
