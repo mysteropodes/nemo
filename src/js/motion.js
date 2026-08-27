@@ -4644,10 +4644,14 @@
   // both stay in sync.
   function renderNullShapeRow(body, ld) {
     var row = document.createElement('div'); row.className = 'lrow motion-prop-row';
-    var label = document.createElement('span'); label.textContent = 'Forme'; label.style.minWidth = '70px';
+    // 2026-08 fix: label and option text were hardcoded French, showing up
+    // even with English (or any other) locale selected — reuse the
+    // existing fieldNullShape/nullShapeCross/-Square/-Circle/-Diamond keys
+    // (already translated in all 4 locales, just never read from here).
+    var label = document.createElement('span'); label.textContent = SM.t('fieldNullShape'); label.style.minWidth = '70px';
     row.appendChild(label);
     var sel = document.createElement('select'); sel.className = 'psel';
-    [['cross', 'Croix'], ['square', 'Carré'], ['circle', 'Cercle'], ['diamond', 'Losange']].forEach(function (o) {
+    [['cross', SM.t('nullShapeCross')], ['square', SM.t('nullShapeSquare')], ['circle', SM.t('nullShapeCircle')], ['diamond', SM.t('nullShapeDiamond')]].forEach(function (o) {
       var opt = document.createElement('option'); opt.value = o[0]; opt.textContent = o[1];
       if ((ld.nullShape || 'cross') === o[0]) opt.selected = true;
       sel.appendChild(opt);
@@ -4672,7 +4676,8 @@
   // keyframe machinery of its own.
   function renderFollowPathRow(body, ld, li) {
     var row = document.createElement('div'); row.className = 'lrow motion-prop-row';
-    var label = document.createElement('span'); label.textContent = 'Chemin'; label.style.minWidth = '70px';
+    // 2026-08 fix: hardcoded French, shown regardless of locale.
+    var label = document.createElement('span'); label.textContent = SM.t('fieldFollowPath'); label.style.minWidth = '70px';
     label.title = 'Fait suivre la Position de ce calque le long du tracé d’un autre calque (Position sur le chemin, en %) — comme un rail de déplacement.';
     row.appendChild(label);
 
@@ -4843,7 +4848,8 @@
   // plain frame fields (scrub-enabled per CLAUDE.md §10).
   function renderTimeLinkRow(body, ld, li) {
     var row = document.createElement('div'); row.className = 'lrow motion-prop-row';
-    var label = document.createElement('span'); label.textContent = 'Temps'; label.style.minWidth = '70px';
+    // 2026-08 fix: hardcoded French, shown regardless of locale.
+    var label = document.createElement('span'); label.textContent = SM.t('fieldTimeLink'); label.style.minWidth = '70px';
     label.title = 'Lie le temps de ce calque à celui d’un autre — quand le calque source avance, recule ou est décalé dans la timeline, celui-ci suit. Utile pour garder plusieurs calques synchronisés sans les animer un par un.';
     row.appendChild(label);
 
@@ -5628,7 +5634,9 @@
     // shape; falls back to the existing auto-generated text when unset.
     if (ld && ld.shapeNames && ld.shapeNames[entry.strokeId]) return ld.shapeNames[entry.strokeId];
     if (sd.isRaster) return 'Image ' + (idx + 1);
-    return (sd.fillColor ? 'Forme' : 'Trait') + ' ' + (idx + 1);
+    // 2026-08 fix: hardcoded French leaking into every locale ("Forme 1"
+    // shown even with English selected) — i18n keys, not a literal.
+    return SM.t(sd.fillColor ? 'autoNameShape' : 'autoNameStroke') + ' ' + (idx + 1);
   }
   // Group/shape tree (2026-07-31, Cyril: "vrai panel de gestion de group et
   // shape layer") — flat, z-ordered wrapper around layerElements() that
@@ -5647,7 +5655,7 @@
         if (!emittedGroups[gid]) {
           emittedGroups[gid] = true;
           var meta = ld.groups && ld.groups[gid];
-          out.push({ type: 'group', gid: gid, name: (meta && meta.name) || 'Groupe' });
+          out.push({ type: 'group', gid: gid, name: (meta && meta.name) || SM.t('autoNameGroup') });
         }
       } else {
         out.push({ type: 'shape', strokeId: entry.strokeId, sd: entry.sd });
@@ -5696,6 +5704,18 @@
     if (!items.length) return;
     window.SM.setActiveLayer(li);
     selectedPaths = items;
+    // 2026-08 fix, "je select une forme dans le groupe... si j'essaie de
+    // bouger/transformer la forme dans le canvas alors ça select le groupe
+    // et pas la forme": select-bridge.js's onDown widens ANY click/drag on
+    // an already-selected group member back to the whole group (built for
+    // recovering full-group selection after a Subselect edit leaves one
+    // member selected — see its own comments) — indistinguishable from this
+    // panel selection by state alone (both leave selectedPaths as exactly
+    // [that one shape]). This one-shot flag marks "the narrowing was
+    // deliberate", consumed by onDown's very next mousedown so only that
+    // first canvas interaction after a panel pick is protected; a normal
+    // click on the shape afterward re-widens to the group as usual.
+    window._skipGroupWidenOnce = true;
     if (window.state) state.selectedStrokeIndices = items.map(function (it) { return typeof getSI === 'function' ? getSI(it) : -1; }).filter(function (i2) { return i2 >= 0; });
     if (window.renderArcs) renderArcs();
     if (window.updateUI) updateUI();
@@ -5718,7 +5738,8 @@
   function renderElementsList(list, li, ld) {
     var tree = buildShapeTree(li, ld);
     if (!tree.length) return;
-    var hdr = document.createElement('div'); hdr.className = 'lrow motion-group-row'; hdr.textContent = 'Éléments';
+    // 2026-08 fix: hardcoded French header, shown regardless of locale.
+    var hdr = document.createElement('div'); hdr.className = 'lrow motion-group-row'; hdr.textContent = SM.t('hdrElements');
     list.appendChild(hdr);
     var shapeIdx = 0;
     tree.forEach(function (node) {
@@ -5745,10 +5766,13 @@
         grow.addEventListener('contextmenu', function (e) {
           e.preventDefault(); e.stopPropagation();
           if (!window.showContextMenu) return;
+          // 2026-08 fix: hardcoded French context-menu labels, shown
+          // regardless of locale — reuses the same elements* keys
+          // shapes-panel.js's own equivalent menu already relies on.
           window.showContextMenu(e.clientX, e.clientY, [
-            { label: 'Renommer', action: function () { startShapeTreeRename(grow, node.name, commitGroupRename); } },
-            { label: 'Sélectionner les membres', action: function () { selectShapesByStrokeIds(li, memberIds); } },
-            { label: 'Dissocier le groupe', action: function () {
+            { label: SM.t('elementsRename'), action: function () { startShapeTreeRename(grow, node.name, commitGroupRename); } },
+            { label: SM.t('elementsSelectMembers'), action: function () { selectShapesByStrokeIds(li, memberIds); } },
+            { label: SM.t('elementsUngroup'), action: function () {
               pushUndo();
               memberIds.forEach(function (sid) { var it = liveItemByStrokeId(li, sid); if (it && it.data) delete it.data.groupId; });
               if (ld.groups) delete ld.groups[node.gid];
@@ -5787,10 +5811,12 @@
       row.addEventListener('contextmenu', function (e) {
         e.preventDefault(); e.stopPropagation();
         if (!window.showContextMenu) return;
+        // 2026-08 fix: hardcoded French context-menu labels (same as the
+        // group row's own menu right above).
         window.showContextMenu(e.clientX, e.clientY, [
-          { label: 'Renommer', action: function () { startShapeTreeRename(row, elementLabel(entry, idx, ld), function (v) { pushUndo(); if (!ld.shapeNames) ld.shapeNames = {}; ld.shapeNames[entry.strokeId] = v; saveActiveLayerFrame(); renderLayerList(); renderTimeline(); }); } },
-          { label: 'Sélectionner', action: function () { selectShapesByStrokeIds(li, [entry.strokeId]); } },
-          { label: 'Supprimer', action: function () {
+          { label: SM.t('elementsRename'), action: function () { startShapeTreeRename(row, elementLabel(entry, idx, ld), function (v) { pushUndo(); if (!ld.shapeNames) ld.shapeNames = {}; ld.shapeNames[entry.strokeId] = v; saveActiveLayerFrame(); renderLayerList(); renderTimeline(); }); } },
+          { label: SM.t('elementsSelect'), action: function () { selectShapesByStrokeIds(li, [entry.strokeId]); } },
+          { label: SM.t('elementsDelete'), action: function () {
             var item = liveItemByStrokeId(li, entry.strokeId);
             if (!item) return;
             pushUndo();
@@ -5811,7 +5837,8 @@
       });
       list.appendChild(row);
       if (!expanded) return;
-      renderTransformGroup(list, ensureElementHolder(ld, entry.strokeId), 'Transform (élément)');
+      // 2026-08 fix: hardcoded French group header.
+      renderTransformGroup(list, ensureElementHolder(ld, entry.strokeId), SM.t('hdrTransformElement'));
       // Path property (2026-07): opt-in extended property, hidden unless
       // the element actually has vertex geometry (a Raster/image entry
       // never does) — same "hidden by default, opt-in" convention CLAUDE.md

@@ -4359,7 +4359,8 @@ function renderShapeTreeRowsInto(list,li,ld){
   if(!window.SMMotion||!SMMotion.buildShapeTree)return;
   var tree=SMMotion.buildShapeTree(li,ld);
   if(!tree.length)return;
-  var hdr=document.createElement('div');hdr.className='lrow motion-group-row';hdr.textContent='Formes';
+  // 2026-08 fix: hardcoded French header, shown regardless of locale.
+  var hdr=document.createElement('div');hdr.className='lrow motion-group-row';hdr.textContent=SM.t('hdrShapes');
   list.appendChild(hdr);
   var shapeIdx=0;
   tree.forEach(function(node){
