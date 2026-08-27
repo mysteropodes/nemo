@@ -272,6 +272,16 @@
     </div>
     <div id="canvas-area">
       <canvas id="drawing-canvas" resize></canvas>
+      <!-- Rulers + guides (rulers-bridge.js, 2026-08-27 — "mettre en place
+           les repères et rulers comme dans tout bon soft"). Overlaid on
+           the canvas edges rather than shrinking the drawing-canvas
+           viewport — simplest option that never touches the Rust
+           engine's own resize/viewport math. Corner square first in the
+           DOM so the two ruler canvases naturally paint over its shared
+           edge pixel, matching every reference app's ruler corner. -->
+      <div id="ruler-corner"></div>
+      <canvas id="ruler-h"></canvas>
+      <canvas id="ruler-v"></canvas>
       <!-- Motion mode "enter Component as precomp" (2026-07-17): double-
            clicking a Component layer in Motion (motion.js's
            enterComponentLayer) just calls the REAL enterSymbol (app.js) —
@@ -759,6 +769,7 @@
           <button class="pbtn icon-only-btn" id="btn-resetv" data-i18n-title="btnResetViewTitle" title="Reset View — restore zoom/pan/rotation to default"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 1 3 6.7"/><path d="M3 21v-5h5"/></svg></button>
           <button class="pbtn icon-only-btn" id="btn-clip" data-i18n-title="clipCanvasTitle" title="Clip to canvas — hide artwork outside the canvas bounds (off by default, so you can see and work with content that spills over the edge)"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/></svg></button>
           <button class="pbtn icon-only-btn" id="btn-safety" data-i18n-title="safetyZonesTitle" title="Safety zones — broadcast-safe overlay guides (90% action-safe / 80% title-safe margins, standard TV/film safe areas)"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="1"/><rect x="7" y="8" width="10" height="8" rx="1"/></svg></button>
+          <button class="pbtn icon-only-btn" id="btn-rulers" data-i18n-title="rulersTitle" title="Rulers — drag out from the top/left bar to place a guide; drag a guide back onto its bar to remove it"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="1"/><path d="M3 8h4M3 13h3M3 18h4M8 3v4M13 3v3M18 3v4"/></svg></button>
         </div>
       </div>
     </div>
@@ -1967,6 +1978,7 @@
 <script src="js/subselect-bridge.js"></script>
 <script src="js/shape-bridge.js"></script>
 <script src="js/eraser-bridge.js"></script>
+<script src="js/rulers-bridge.js"></script>
 <script src="js/fill-bridge.js"></script>
 <script src="js/pen-bridge.js"></script>
 <script src="js/rig-bridge.js"></script>
