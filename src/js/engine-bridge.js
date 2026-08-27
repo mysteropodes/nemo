@@ -1004,6 +1004,36 @@
       // Motion-mode transforms are computed independently of the
       // children.length gate above (an empty Paper layer has no usable
       // bounds, so the pivot is the video rect's own center).
+      // Placeholder while a native video's first frame hasn't decoded/
+      // registered yet (2026-08 fix, feedback: "avant que une vidéo soit
+      // ready un placeholder dans le canvas à la bonne taille") — nv.width/
+      // height are known synchronously right after native-video-bridge.js's
+      // open() resolves, well before any pixel is actually decoded (that
+      // file's own importAsLayer already decodes frame 0 first specifically
+      // to minimize this window, but it's still a real async gap — a piped
+      // ffmpeg probe or a whole-file arrayBuffer() read on the web path).
+      // Deliberately NOT the full render branch below (duplicator/3D/
+      // parent-chain) — this is a transient state, a plain rect at the
+      // right size/position/rotation covers it without duplicating that
+      // whole pipeline for something that shows for a few hundred ms.
+      if (state.layers[i].nativeVideo && window.SMEngineBridge && !registeredImageIds['nv:' + i]) {
+        var nvPH = state.layers[i].nativeVideo;
+        var inFPH = window.layerInPoint ? layerInPoint(state.layers[i]) : 0;
+        var outFPH = window.layerOutPoint ? layerOutPoint(state.layers[i]) : state.totalFrames - 1;
+        if (renderFrame >= inFPH && renderFrame <= outFPH && nvPH.width && nvPH.height) {
+          var phS = Math.min(state.canvasW / nvPH.width, state.canvasH / nvPH.height);
+          var phW = nvPH.width * phS, phH = nvPH.height * phS;
+          var phRect = { x: (state.canvasW - phW) / 2, y: (state.canvasH - phH) / 2, width: phW, height: phH };
+          var phMat = (!is3D && window.SMMotion) ? SMMotion.layerMotionAt(i, renderFrame) : null;
+          var phOp = 1;
+          if (phMat) {
+            var phPivot = { x: phRect.x + phRect.width / 2 + phMat.ax, y: phRect.y + phRect.height / 2 + phMat.ay };
+            phRect = SMMotion.transformImageRect(phRect, phPivot, phMat);
+            phOp = phMat.op;
+          }
+          items.push(boundsRectItem(phRect.x, phRect.y, phRect.x + phRect.width, phRect.y + phRect.height, [38, 36, 42, Math.round(255 * phOp)], [110, 110, 122, Math.round(200 * phOp)], 1.5));
+        }
+      }
       if (state.layers[i].nativeVideo && window.SMEngineBridge && registeredImageIds['nv:' + i]) {
         var nv = state.layers[i].nativeVideo;
         var inF = window.layerInPoint ? layerInPoint(state.layers[i]) : 0;
@@ -2027,6 +2057,8 @@
       if (xformItems.length) layers.push({ items: xformItems });
       var hoverBoxItems = buildHoverBoxItems();
       if (hoverBoxItems.length) layers.push({ items: hoverBoxItems });
+      var textBoxItems = buildTextDragBoxItems();
+      if (textBoxItems.length) layers.push({ items: textBoxItems });
       var marqueeItems = buildMarqueeItems();
       if (marqueeItems.length) layers.push({ items: marqueeItems });
       var fsSelItems = buildFSSelectionItems();
@@ -2397,7 +2429,46 @@
     // pipeline draws correctly; 1.5px (vs Motion's 1px) since this box often
     // coincides exactly with the shape's own edge and needs to read over both
     // the shape's fill and the page background.
-    return [boundsRectItem(hb.left, hb.top, hb.right, hb.bottom, null, [74, 158, 255, 220], 1.5 * hzs)];
+    var col = [74, 158, 255, 220], sw = 1.5 * hzs;
+    var b = hb.b;
+    // hb is now an ORIENTED box (orientedBoxForPath, tools.js): {b,angle,pivot}
+    // in the shape's own de-rotated space — same shape as orientedSelBox's
+    // return, so a rotated shape draws its true rotated outline instead of
+    // an axis-aligned box that no longer matches its size/rotation (2026-08
+    // fix, "la box du hover ne correspond pas à la forme du bounding box").
+    if (!hb.angle) return [boundsRectItem(b.left, b.top, b.right, b.bottom, null, col, sw)];
+    var c1 = selBoxPt(b.left, b.top, hb), c2 = selBoxPt(b.right, b.top, hb);
+    var c3 = selBoxPt(b.right, b.bottom, hb), c4 = selBoxPt(b.left, b.bottom, hb);
+    return [
+      lineItem([c1.x, c1.y], [c2.x, c2.y], col, sw),
+      lineItem([c2.x, c2.y], [c3.x, c3.y], col, sw),
+      lineItem([c3.x, c3.y], [c4.x, c4.y], col, sw),
+      lineItem([c4.x, c4.y], [c1.x, c1.y], col, sw),
+    ];
+  }
+  // Text tool's live bounding box (2026-08, "quand on dessine le rectangle
+  // du texte il faut lui faire apparaître le texte... avec un bounding box
+  // comme dans tout éditeur de texte") — TWO sources, drawn identically:
+  // _textDragRect (tools.js) while dragging out the initial placement box
+  // (a real Paper Path in marqueeLayer — was already being built, but
+  // NEVER reached the screen: it only ever lived in the Paper.js model,
+  // invisible the moment the Rust engine took over rendering, CLAUDE.md §5),
+  // and window._inplaceTextBoxBounds (timeline.js's openInPlaceTextEditor)
+  // while the in-canvas textarea is open, tracking its live-growing size.
+  // Solid, not dashed — same pre-existing engine limitation buildTransformBoxItems'
+  // own comment already notes (the engine's Stroke type has no dash support yet).
+  function buildTextDragBoxItems() {
+    var items = [];
+    var col = [255, 184, 108, 230], sw = 1 / view.zoom;
+    if (window._textDragRect && !window._textDragRect.removed) {
+      var b = window._textDragRect.bounds;
+      items.push(boundsRectItem(b.left, b.top, b.right, b.bottom, [255, 184, 108, 15], col, sw));
+    }
+    if (window._inplaceTextBoxBounds) {
+      var tb = window._inplaceTextBoxBounds;
+      items.push(boundsRectItem(tb.left, tb.top, tb.right, tb.bottom, null, col, sw));
+    }
+    return items;
   }
   function buildTransformBoxItems() {
     if (state.tool !== 'select') return [];

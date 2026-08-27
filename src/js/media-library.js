@@ -32,10 +32,18 @@
   // - linked/path: nativeVideo entries only persist a filesystem path (no
   //   embedded bytes) and can go offline if the file moves — surfaced as a
   //   badge instead of a size, and is what gates the relink action.
+  // status (2026-08, feedback: "afficher l'instance dans média
+  // instantanément... avec wait et ready") — 'loading' | 'ready', default
+  // 'ready' for every EXISTING call site (nothing else in the codebase sets
+  // it, so they keep behaving exactly as before). native-video-bridge.js's
+  // importAsLayer is the one caller that now adds a 'loading' entry the
+  // instant a video is dropped (before its own async open()/decode even
+  // starts — see that file), using the id this function now returns, then
+  // calls updateEntry() below once the real thumbnail/metadata land.
   function addEntry(name, kind, thumb, layerName, opts) {
     if (!state.mediaLibrary) state.mediaLibrary = [];
     opts = opts || {};
-    state.mediaLibrary.push({
+    var entry = {
       id: uid(), name: name, kind: kind, thumb: thumb, layerName: layerName || null,
       layerUid: opts.layerUid || null, linked: !!opts.linked, path: opts.path || null,
       // audioId: audio tracks have no owning layer at all (state.audioTracks
@@ -44,8 +52,24 @@
       audioId: opts.audioId || null,
       sizeBytes: opts.linked ? null : dataUrlBytes(thumb),
       importedAt: Date.now(),
-    });
+      status: opts.status || 'ready',
+    };
+    state.mediaLibrary.push(entry);
     render();
+    return entry.id;
+  }
+  // Patches an existing entry in place (fields present in `patch` overwrite,
+  // everything else untouched) and re-renders — the counterpart to a
+  // 'loading' addEntry() call above, or any other in-place metadata update.
+  // No-ops quietly if the entry was removed in the meantime (e.g. the user
+  // deleted it from the panel mid-decode).
+  function updateEntry(id, patch) {
+    var m = (state.mediaLibrary || []).find(function (x) { return x.id === id; });
+    if (!m) return false;
+    Object.keys(patch || {}).forEach(function (k) { m[k] = patch[k]; });
+    if (patch && 'thumb' in patch && !('sizeBytes' in patch) && !m.linked) m.sizeBytes = dataUrlBytes(m.thumb);
+    render();
+    return true;
   }
 
   // uid-first resolve (2026-07-31) with a name fallback for pre-migration
@@ -137,9 +161,16 @@
     grid.innerHTML = '';
     var orphanCount = 0;
     (state.mediaLibrary || []).forEach(function (m) {
-      var row = document.createElement('div'); row.className = 'media-row'; row.title = m.name;
+      var row = document.createElement('div'); row.className = 'media-row' + (m.status === 'loading' ? ' loading' : ''); row.title = m.name;
       var thumb = document.createElement('div'); thumb.className = 'media-row-thumb';
-      if (m.kind === 'audio') {
+      if (m.status === 'loading') {
+        // Decoding placeholder (2026-08, feedback: "afficher l'instance dans
+        // média instantanément... avec wait et ready") — no thumb exists yet
+        // (addEntry was called before the source was even opened), so this
+        // is a plain spinner rather than an <img> with no src.
+        thumb.classList.add('media-row-thumb-loading');
+        var sp = document.createElement('div'); sp.className = 'media-row-spinner'; thumb.appendChild(sp);
+      } else if (m.kind === 'audio') {
         thumb.classList.add('media-row-thumb-icon'); thumb.textContent = '♪';
       } else {
         var img = document.createElement('img'); img.src = m.thumb; img.draggable = m.kind === 'image';
@@ -151,6 +182,22 @@
       var main = document.createElement('div'); main.className = 'media-row-main';
       var nameEl = document.createElement('div'); nameEl.className = 'media-row-name'; nameEl.textContent = m.name;
       main.appendChild(nameEl);
+
+      if (m.status === 'loading') {
+        // Indeterminate — there's no real byte-progress signal from the
+        // decode pipeline to drive a determinate bar off (see
+        // native-video-bridge.js's own comment on this), so an honest
+        // "working on it" animation beats a fake percentage.
+        var barWrap = document.createElement('div'); barWrap.className = 'media-row-progress';
+        var bar = document.createElement('div'); bar.className = 'media-row-progress-bar'; barWrap.appendChild(bar);
+        main.appendChild(barWrap);
+        var waitEl = document.createElement('div'); waitEl.className = 'media-row-meta'; waitEl.style.color = 'var(--text-dim)';
+        waitEl.textContent = SM && SM.t ? SM.t('mediaDecoding') : 'Décodage…';
+        main.appendChild(waitEl);
+        row.appendChild(main);
+        grid.appendChild(row);
+        return; // no context menu / drag / owner lookup on a not-yet-real entry
+      }
 
       var meta = document.createElement('div'); meta.className = 'media-row-meta';
       var kindBadge = document.createElement('span'); kindBadge.className = 'media-row-badge kind-' + m.kind; kindBadge.textContent = KIND_LABEL[m.kind] || m.kind;
@@ -316,5 +363,5 @@
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 
-  window.SMMediaLibrary = { addEntry: addEntry, reload: render };
+  window.SMMediaLibrary = { addEntry: addEntry, updateEntry: updateEntry, removeEntry: removeEntry, reload: render };
 })();

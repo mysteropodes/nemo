@@ -1333,6 +1333,16 @@ body.mode-motion #frame-grid .motion-group-row{height:22px;min-height:22px;margi
    inset white pill sits inside, matching the spec's visual reference. */
 .layer-inout-bar{position:absolute;left:0;top:2px;bottom:2px;background:rgba(63,107,245,.32);border:1px solid rgba(63,107,245,.85);border-radius:6px;cursor:grab;z-index:2;box-sizing:border-box;}
 .layer-inout-bar.full-range{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.28);}
+/* Overflow caps (2026-08, layer-inout.js updateBar) — the part of a bar
+   that sits before frame 0 or past totalFrames-1 (Cavalry-style trim past
+   the composition's own range). Hatched, not solid, so it reads as "past
+   what actually plays" at a glance; rounded only on its OUTER edge so the
+   bar still reads as one continuous capsule. */
+.layer-inout-overflow-left,.layer-inout-overflow-right{position:absolute;top:0;bottom:0;
+  background:repeating-linear-gradient(45deg,rgba(0,0,0,.4),rgba(0,0,0,.4) 3px,transparent 3px,transparent 6px);
+  pointer-events:none;z-index:1;}
+.layer-inout-overflow-left{left:0;border-radius:5px 0 0 5px;border-right:1px dashed rgba(255,255,255,.35);}
+.layer-inout-overflow-right{right:0;border-radius:0 5px 5px 0;border-left:1px dashed rgba(255,255,255,.35);}
 /* 2026-08-16 restyle (nemo-timeline-inout-spec.html, Cyril): a permanent
    white pill INSET inside the bar, not an edge-flush full-height sliver
    colored by the layer's own tint — the bar already carries that color, the
@@ -1996,6 +2006,16 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
 .media-row-owner-dot{width:6px;height:6px;border-radius:50%;flex:none;}
 .media-row-owner.orphan{color:var(--red);font-style:italic;}
 .media-row-date{font-size:8px;color:var(--text-dim);opacity:.75;}
+/* Decoding placeholder (2026-08, feedback: "afficher l'instance dans média
+   instantanément... avec wait et ready") — shown while a media-library entry
+   has status:'loading' (media-library.js's addEntry/updateEntry). */
+.media-row.loading{cursor:default;}
+.media-row-thumb-loading{display:flex;align-items:center;justify-content:center;}
+.media-row-spinner{width:14px;height:14px;border-radius:50%;border:2px solid rgba(236,234,231,.2);border-top-color:var(--accent);animation:media-row-spin .8s linear infinite;}
+@keyframes media-row-spin{to{transform:rotate(360deg);}}
+.media-row-progress{height:3px;border-radius:2px;background:var(--panel2);overflow:hidden;margin-top:1px;}
+.media-row-progress-bar{width:40%;height:100%;border-radius:2px;background:var(--accent);animation:media-row-progress-slide 1.1s ease-in-out infinite;}
+@keyframes media-row-progress-slide{0%{margin-left:-40%;}100%{margin-left:100%;}}
 
 /* Transform anchor-point picker (redesign 2026-07-09) */
 .xform-anchor-grid{width:56px;height:56px;flex:none;position:relative;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);border:1px solid var(--border2);border-radius:4px;margin-top:2px;}
@@ -2121,6 +2141,14 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
   background:linear-gradient(90deg,rgba(63,107,245,.5),rgba(63,107,245,.3));
   border-right:1.5px solid var(--accent);pointer-events:none;}
 .motion-parent-pill .mp-label{position:relative;z-index:1;}
+
+/* Follow Path row's "Align" toggle (motion.js renderFollowPathRow) — same
+   pill-adjacent small-button idiom as other on/off toggles in this panel. */
+.mp-align-btn{flex:0 0 auto;margin-left:4px;font-size:9.5px;color:var(--text-dim);
+  padding:2px 6px;border-radius:4px;border:1px solid var(--border);background:var(--panel2);
+  cursor:pointer;line-height:1.4;}
+.mp-align-btn:hover{color:var(--text);border-color:var(--border2);}
+.mp-align-btn.on{color:var(--accent,#5b6cff);border-color:var(--accent,#5b6cff);background:rgba(91,108,255,.12);}
 
 /* Effects count on the collapsed section header (effects-panel.js) — the
    header is all that's on screen while the section is collapsed, so it has to

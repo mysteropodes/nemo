@@ -1657,7 +1657,7 @@ window.SM={
         // be just as useless. Note isNullLayer above was already persisted,
         // and its own tooltip calls a null layer a "pivot/parent pour d'autres
         // calques" — the pivot came back, everything hung off it did not.
-        layerUid:l.layerUid,parentLayerUid:l.parentLayerUid,parentLayerUidB:l.parentLayerUidB,markers:l.markers,shy:l.shy,keyLock:l.keyLock,timeRemap:l.timeRemap,motionBlur:l.motionBlur,effectsFrom:l.effectsFrom,timeLink:l.timeLink,
+        layerUid:l.layerUid,parentLayerUid:l.parentLayerUid,parentLayerUidB:l.parentLayerUidB,followPath:l.followPath,markers:l.markers,shy:l.shy,keyLock:l.keyLock,timeRemap:l.timeRemap,motionBlur:l.motionBlur,effectsFrom:l.effectsFrom,timeLink:l.timeLink,
         // 3D layer toggle (2026-07-28) — see motion.js's compute3DCorners.
         threeD:l.threeD,
         // Mograph duplicator (2026-07-29) — copied wholesale like
@@ -1899,6 +1899,7 @@ window.SM={
       if(ld.layerUid)state.layers[idx].layerUid=ld.layerUid;
       if(ld.parentLayerUid)state.layers[idx].parentLayerUid=ld.parentLayerUid;
       if(ld.parentLayerUidB)state.layers[idx].parentLayerUidB=ld.parentLayerUidB;
+      if(ld.followPath)state.layers[idx].followPath=ld.followPath;
       if(ld.motion)state.layers[idx].motion=ld.motion;
       if(ld.elementMotion)state.layers[idx].elementMotion=ld.elementMotion;
       if(ld.motionStatic)state.layers[idx].motionStatic=ld.motionStatic;
@@ -2991,6 +2992,13 @@ function selPropsApplyRotate(deltaDeg,center,skipUndo){
   if(!skipUndo)pushUndo();
   selectedPaths.forEach(function(p){
     p.rotate(deltaDeg,center);
+    // Keep data.boxAngle in sync (2026-08 fix, "la box du hover ne correspond
+    // pas... taille + rotation"): the canvas drag-rotate handle already
+    // accumulates this (select-bridge.js/tools.js, same %360 pattern below),
+    // but this numeric-field path never did — a shape rotated only via this
+    // field kept boxAngle at its old value (usually 0), so orientedSelBox/
+    // orientedBoxForPath (tools.js) drew a stale, unrotated box for it.
+    if(p.data)p.data.boxAngle=(((p.data.boxAngle||0)+deltaDeg)%360);
     transformFillGradient(p,function(pt){return pt.rotate(deltaDeg,center);});
     if(p.data&&p.data.isVectorBrush&&p.data.centerSegments){rotateCenterSegments(p.data.centerSegments,deltaDeg,center.x,center.y);rebuildVectorBrushOutline(p);}
   });
@@ -4756,6 +4764,33 @@ function buildParentMenuItems(li,ld,onChanged){
   return items;
 }
 window.buildParentMenuItems=buildParentMenuItems;
+// Follow Path target picker — same click-to-choose menu shape as
+// buildParentMenuItems, no cycle guard needed (setLayerFollowPath's own
+// comment explains why a cycle here just means each side ignores the
+// other's contribution, not infinite recursion).
+function buildFollowPathMenuItems(li,ld,onChanged){
+  var M=window.SMMotion;
+  if(!M||!M.setLayerFollowPath)return [{label:'Chemin indisponible',disabled:true}];
+  var items=[{label:'Chemin : Aucun',disabled:!(ld.followPath&&ld.followPath.targetLayerUid),action:function(){
+    pushUndo(); M.setLayerFollowPath(li,null); onChanged();
+    if(window.SMEngineBridge)SMEngineBridge.renderNow();
+  }}];
+  var curUid=ld.followPath?ld.followPath.targetLayerUid:null;
+  state.layers.forEach(function(other,oi){
+    if(oi===li)return; // a layer can't follow itself
+    var uid=M.ensureLayerUid(other);
+    items.push({
+      label:'Chemin : '+(other.name||('Layer '+(oi+1))),
+      disabled:curUid===uid,
+      action:function(){
+        pushUndo(); M.setLayerFollowPath(li,uid); onChanged();
+        if(window.SMEngineBridge)SMEngineBridge.renderNow();
+      }
+    });
+  });
+  return items;
+}
+window.buildFollowPathMenuItems=buildFollowPathMenuItems;
 // Parent-in-Time picker — the menu-based sibling of the pickwhip drag
 // (2026-07-31, Cyril: "gestion du clic droit pour parent in time sur select
 // keyframe + layer, keyframe + in/out point"). Same shape as
@@ -6226,6 +6261,17 @@ function openInPlaceTextEditor(root,isNew){
     if(d.fixedWidth){ta.style.whiteSpace='pre-wrap';ta.style.width=(d.fixedWidth*view.zoom)+'px';}
     else{ta.style.whiteSpace='pre';ta.style.width=Math.max(20,ta.scrollWidth)+'px';}
     ta.style.height=ta.scrollHeight+'px';
+    // Live bounding box (2026-08, "un bounding box comme dans tout éditeur
+    // de texte") — screen px back to world units (÷view.zoom, mirroring
+    // fontPx's own ×view.zoom a few lines up) so buildTextDragBoxItems
+    // (engine-bridge.js) can draw it through the Rust-rendered scene, same
+    // as every other canvas overlay in this app.
+    window._inplaceTextBoxBounds={
+      left:bounds.left,top:bounds.top,
+      right:bounds.left+parseFloat(ta.style.width)/view.zoom,
+      bottom:bounds.top+parseFloat(ta.style.height)/view.zoom,
+    };
+    if(window.SMEngineBridge)SMEngineBridge.renderNow();
   }
   reposition();
   ta.addEventListener('input',reposition);
@@ -6241,6 +6287,8 @@ function closeInPlaceTextEditor(cancel){
   var ta=_inplaceTa,root=_inplaceRoot,hidden=_inplaceHidden,isNew=_inplaceIsNew;
   if(!ta)return;
   _inplaceTa=null;_inplaceRoot=null;_inplaceHidden=null;_inplaceIsNew=false;
+  window._inplaceTextBoxBounds=null;
+  if(window.SMEngineBridge)SMEngineBridge.renderNow();
   var newText=ta.value;
   ta.remove();
   // Creation flow (startInPlaceTextCreation) hid a throwaway placeholder

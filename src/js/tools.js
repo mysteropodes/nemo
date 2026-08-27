@@ -1159,6 +1159,23 @@ function orientedSelBox(){
   });
   return b?{b:b,angle:ang,pivot:pivot}:null;
 }
+// Same idea as orientedSelBox() but for a SINGLE unselected path — used by
+// the Animation 2D hover highlight (select-bridge.js getHoverBounds/
+// engine-bridge.js buildHoverBoxItems) so the box drawn on hover always
+// matches the shape's actual size+rotation instead of its axis-aligned
+// stroke bounds (2026-08, feedback: "la box du hover ne correspond pas à
+// la forme du bounding box... je parle juste de la taille + rotation").
+function orientedBoxForPath(p){
+  if(!p||!p.bounds)return null;
+  var ang=(p.data&&p.data.boxAngle)||0;
+  if(!ang)return{b:p.bounds,angle:0,pivot:p.bounds.center};
+  var pivot=p.bounds.center;
+  var c=p.clone({insert:false});
+  c.rotate(-ang,pivot);
+  var b=c.bounds.clone();
+  c.remove();
+  return{b:b,angle:ang,pivot:pivot};
+}
 // De-rotated-space point -> world (rotate by the box angle around its pivot).
 function selBoxPt(x,y,box){
   if(!box.angle)return new Point(x,y);
@@ -6281,6 +6298,14 @@ function onMouseDrag(event){
       _textDragRect=new Path.Rectangle({from:new Point(tx1,ty1),to:new Point(tx2,ty1+thv),strokeColor:'rgba(255,184,108,.9)',strokeWidth:1/view.zoom,dashArray:[4/view.zoom,3/view.zoom],fillColor:new Color(1,0.72,0.42,0.06),insert:true});
       prevTxt.activate();
     }
+    // 2026-08 fix: this box lived only in the Paper.js model (marqueeLayer,
+    // insert:true) — invisible whenever the Rust engine is active (the
+    // default, view.autoUpdate=false, CLAUDE.md §5), unlike _marquee/_nmq
+    // which have their own explicit engine-bridge.js scene-item builders.
+    // buildTextDragBoxItems (engine-bridge.js) now reads this same
+    // _textDragRect.bounds — just needs a render kicked here since nothing
+    // else in this tool's drag branch was ever pushing one.
+    if(window.SMEngineBridge)window.SMEngineBridge.renderNow();
   }else if(state.tool==='subselect'){
     var nodeEventPoint=event.point,nodeEventDelta=event.delta;
     if(_nodeDrag.active&&(_nodeDrag.type==='point'||_nodeDrag.type==='group')){
@@ -6567,7 +6592,7 @@ function onMouseUp(event){
   }else if(state.tool==='pen'){
     _pen.draggingHandle=false;
   }else if(state.tool==='text'&&_textDragStart){
-    if(_textDragRect){_textDragRect.remove();_textDragRect=null;}
+    if(_textDragRect){_textDragRect.remove();_textDragRect=null;if(window.SMEngineBridge)window.SMEngineBridge.renderNow();}
     var textDragWidth=Math.abs(event.point.x-_textDragStart.x);
     if(textDragWidth>20/view.zoom){
       var textTopLeft=new Point(Math.min(_textDragStart.x,event.point.x),Math.min(_textDragStart.y,event.point.y));

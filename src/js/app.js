@@ -2119,6 +2119,22 @@ function layerInPoint(ld,_seen,_depth){
   var auto=autoInPointFromBlankKeyframe(ld);
   return auto!=null?_clampToTimeline(auto):0;
 }
+// Unclamped counterpart (2026-08, "les layer dans motion doivent pouvoir
+// aller au delà de la timeline ou en amont comme sur cavalry") — same
+// resolution order as layerInPoint, just without _clampToTimeline's own
+// floor/ceiling. layerInPoint itself stays untouched: every CONTENT-
+// affecting reader (getEffectiveStrokes, saveActiveLayerFrame's range
+// guard) keeps clamping to what can actually render, exactly as
+// _clampToTimeline's own header comment intends — only the BAR (layer-
+// inout.js's updateBar/drag handlers) needs the raw value, purely to draw
+// and drag past the timeline's edges like an AE/Cavalry trim handle.
+function layerInPointRaw(ld,_seen,_depth){
+  var linked=resolveLinkedTime(ld,'in',_seen,_depth||0);
+  if(linked!=null)return linked;
+  if(ld.inPoint!=null)return ld.inPoint;
+  var auto=autoInPointFromBlankKeyframe(ld);
+  return auto!=null?auto:0;
+}
 // When the user hasn't manually dragged an out point, default to where the
 // layer's own drawing actually stops (its last blank keyframe — F7,
 // insertBlankKeyframe — with no non-blank keyframe after it) instead of
@@ -2145,6 +2161,14 @@ function layerOutPoint(ld,_seen,_depth){
   if(ld.outPoint!=null)return _clampToTimeline(ld.outPoint);
   var auto=autoOutPointFromBlankKeyframe(ld);
   return auto!=null?_clampToTimeline(auto):state.totalFrames-1;
+}
+// Unclamped counterpart — see layerInPointRaw's own comment just above.
+function layerOutPointRaw(ld,_seen,_depth){
+  var linked=resolveLinkedTime(ld,'out',_seen,_depth||0);
+  if(linked!=null)return linked;
+  if(ld.outPoint!=null)return ld.outPoint;
+  var auto=autoOutPointFromBlankKeyframe(ld);
+  return auto!=null?auto:state.totalFrames-1;
 }
 // Right-click unlink (2026-07-30, on-timeline anchors/badges/Temps row) must
 // leave the layer exactly where it LOOKED while linked — a bare `delete
