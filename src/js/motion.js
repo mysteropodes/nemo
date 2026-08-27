@@ -7628,7 +7628,15 @@
         if (holders.indexOf(rowEl._smHolder) < 0) return;
         dias = rowEl.querySelectorAll('.motion-key');
       }
-      dias.forEach(function (d) { d.style.transform = 'translateX(' + px + 'px)'; });
+      // transition:none (2026-08-27, "décalage... comme un lag" — reported
+      // again after the connector/box resync fix above): .motion-key has a
+      // CSS transition on `transform` (for its select/interp-type scale-
+      // rotate animations), so writing style.transform here on every
+      // mousemove made the diamond EASE toward the cursor over 80ms instead
+      // of snapping — visibly trailing behind the (transition-free) green
+      // connector bar between two diamonds it's supposed to move in lockstep
+      // with. clearKeyframeShiftPreview restores it at drag end/start.
+      dias.forEach(function (d) { d.style.transition = 'none'; d.style.transform = 'translateX(' + px + 'px)'; });
       // SVG connector bars + duration blocks (trackRowHtml) must track the
       // diamonds live too — they were the one element family this preview
       // skipped, so they visibly froze mid-drag while everything else moved
@@ -7678,7 +7686,7 @@
   // rebuilds via renderTimeline() but only on the branches that actually
   // reach it (defensive here rather than trusting every return path does).
   function clearKeyframeShiftPreview() {
-    document.querySelectorAll('#frame-grid .motion-key, #frame-grid .motion-key-connect, #frame-grid .motion-key-durblock').forEach(function (d) { if (d.style.transform) d.style.transform = ''; });
+    document.querySelectorAll('#frame-grid .motion-key, #frame-grid .motion-key-connect, #frame-grid .motion-key-durblock').forEach(function (d) { if (d.style.transform) d.style.transform = ''; if (d.style.transition) d.style.transition = ''; });
   }
   function shiftLayerMotionKeys(li, dx) {
     var ld = state.layers[li];
