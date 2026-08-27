@@ -603,6 +603,15 @@ window.SM={
   },
   setFillBrushSize:function(v){state.fillBrushSize=Math.max(1,parseInt(v)||40);},
   setBrushPreset:function(v){state.brushPreset=v||'none';
+    // Restore the saved diameter for a custom preset (feedback #73 — see
+    // brush-editor.js's own comment on savedBrushSize for why this is
+    // custom-preset-only). Syncs the real UI field too, not just state,
+    // so the size slider reflects it immediately.
+    var _customP=state.customBrushPresets&&state.customBrushPresets[v];
+    if(_customP&&typeof _customP.savedBrushSize==='number'){
+      state.brushSize=_customP.savedBrushSize;
+      var _swEl=document.getElementById('p-sw');if(_swEl)_swEl.value=Math.round(state.brushSize);
+    }
     // Every other Trait field (Width/Color/Cap/Join/Style/Dash…) auto-
     // applies to the current selection the moment it changes — the vector
     // Brush preset (dynamic dab texture, "brush dynamique") was the one
@@ -2648,6 +2657,21 @@ function updatePropsContext(){
     _propsCtxSig=ctx;
     Object.keys(show).forEach(function(id){
       if(!show[id])return;
+      // shapes-sec (Elements) excluded (2026-08-27, "le menu element s'ouvre
+      // systematiquement à chaque trait") — unlike every other entry here,
+      // show['shapes-sec'] is TRUE for almost every ctx (any active layer,
+      // per its own comment above: "a real layers/elements panel... is
+      // ALWAYS visible once there's something to show; only the HIGHLIGHT
+      // inside it should react to selection, never the panel's own
+      // presence"). That comment covers show/hide, but this force-open loop
+      // was ALSO sweeping its collapse state along with genuinely tool-
+      // specific sections (Fill/Stroke/Tool Options) — so switching tools
+      // even once (draw→select→draw, routine mid-animation) reopened it
+      // every time regardless of the user having just collapsed it.
+      // Reproduced live: closed it, called setTool('select') then
+      // setTool('draw') — reopened both times. Same carve-out precedent as
+      // 'selected-colors-hdr' just above.
+      if(id==='shapes-sec')return;
       var sec=document.getElementById(id);if(!sec)return;
       var h=sec.querySelector('.phdr'),b=sec.querySelector('.pbdy');
       if(h&&b){b.classList.remove('hid');h.classList.remove('closed');}
@@ -6024,6 +6048,9 @@ function openCommentPopover(worldPt,existing){
   document.getElementById('comment-author-row').textContent=
     (existing?'Par ':'Nouveau — ')+(_activeComment.authorName||'Anonyme')+' · frame '+(_activeComment.frame+1);
   document.getElementById('comment-text').value=_activeComment.text||'';
+  var fbNameEl0=document.getElementById('comment-fb-name'),fbEmailEl0=document.getElementById('comment-fb-email');
+  if(fbNameEl0)fbNameEl0.value=(state.userProfile&&state.userProfile.name)||'';
+  if(fbEmailEl0)fbEmailEl0.value=(state.userProfile&&state.userProfile.email)||'';
   document.getElementById('comment-resolved').checked=!!_activeComment.resolved;
   document.getElementById('comment-delete').style.display=existing?'':'none';
   _activeFbTags=[];
@@ -6089,6 +6116,14 @@ function initCommentPopover(){
     var note=document.getElementById('comment-text').value;
     if(!note.trim()){showToast(SM.t('toastWriteNoteBeforeSavingFeedback'));return;}
     var blocking=document.getElementById('comment-fb-blocking').checked;
+    // Optional name/email (feedback #: "avoir un nom d'utilisateur et mail
+    // optionnel... afin de contacter pour question") — persisted back to
+    // state.userProfile so submitFeedback's entry.author (built FROM that
+    // profile) picks them up, and every future feedback is pre-filled too.
+    var fbNameEl=document.getElementById('comment-fb-name'),fbEmailEl=document.getElementById('comment-fb-email');
+    if(fbNameEl&&fbNameEl.value.trim())state.userProfile.name=fbNameEl.value.trim();
+    if(fbEmailEl)state.userProfile.email=fbEmailEl.value.trim();
+    saveUserProfile();
     window.SMFeedback.submitFeedback({
       note:note,tags:_activeFbTags.slice(),blocking:blocking,
       pos:new Point(_activeComment.x,_activeComment.y),
@@ -6862,9 +6897,10 @@ var ROLE_HINTS={
   producer:'Lecture seule + commentaires. Les outils de dessin/édition sont désactivés.'
 };
 function syncProfileFields(){
-  var nameEl=document.getElementById('profile-name'),colorEl=document.getElementById('profile-color'),wellEl=document.getElementById('profile-color-well'),roleEl=document.getElementById('profile-role'),hintEl=document.getElementById('profile-role-hint');
+  var nameEl=document.getElementById('profile-name'),colorEl=document.getElementById('profile-color'),wellEl=document.getElementById('profile-color-well'),roleEl=document.getElementById('profile-role'),hintEl=document.getElementById('profile-role-hint'),emailEl=document.getElementById('profile-email');
   if(!nameEl||!state.userProfile)return;
   nameEl.value=state.userProfile.name;
+  if(emailEl)emailEl.value=state.userProfile.email||'';
   var c=state.userProfile.color;
   setHex8Input(colorEl,c);
   if(wellEl)wellEl.style.background=c;
@@ -6873,11 +6909,15 @@ function syncProfileFields(){
   if(hintEl)hintEl.textContent=ROLE_HINTS[role]||'';
 }
 function initProfileFields(){
-  var nameEl=document.getElementById('profile-name'),colorEl=document.getElementById('profile-color'),roleEl=document.getElementById('profile-role');
+  var nameEl=document.getElementById('profile-name'),colorEl=document.getElementById('profile-color'),roleEl=document.getElementById('profile-role'),emailEl=document.getElementById('profile-email');
   if(!nameEl||!colorEl)return;
   syncProfileFields();
   nameEl.addEventListener('input',function(){
     state.userProfile.name=this.value||'Animateur';
+    saveUserProfile();
+  });
+  if(emailEl)emailEl.addEventListener('input',function(){
+    state.userProfile.email=this.value||'';
     saveUserProfile();
   });
   colorEl.addEventListener('input',function(){
@@ -7994,6 +8034,66 @@ window.addEventListener('blur',function(){
 document.addEventListener('pointerdown',function(){if(state.spaceDown)state.spaceUsedForPan=true;},true);
 
 document.addEventListener('keydown',onKeyDown);document.addEventListener('keyup',onKeyUp);
+// Cmd/Ctrl-HOLD temporarily switches to Select (2026-08-27, feedback #64
+// — "pomme en cliquant pour passer a l'outil selection", and Cyril:
+// "command est utilisé un peu dans tout logiciel, voit comment mettre ça
+// en place sans faire de conflit"). Illustrator/Photoshop convention:
+// hold Cmd while using another tool, canvas clicks act like Select;
+// release, back to what you were doing.
+//
+// The hazard: Cmd/Ctrl is the FIRST key of ~15 shortcuts already in
+// onKeyDown (Z, S, C, X, V, A, G, D, L…) — a real keypress of any combo
+// fires a genuine 'keydown' with key:'Meta'/'Control' the instant the
+// modifier itself goes down, BEFORE the letter's own keydown. Switching
+// tools on that alone would flicker the tool (and its cursor) on every
+// single Cmd+shortcut the user already relies on.
+// Fix: a short arm-delay (matches the SPACE_TAP_MS precedent above for
+// the exact same class of tap-vs-hold ambiguity). The modifier alone
+// only counts as "hold to select" if it's STILL down, with no other key
+// pressed meanwhile, after this delay — a real shortcut's letter always
+// lands well inside that window. Any other keydown while armed cancels
+// immediately (this is what actually prevents the conflict, the delay
+// alone is just what makes cancellation possible in the first place).
+var _cmdHoldTimer=null,_cmdHoldPrevTool=null,_cmdHoldDown=false;
+var CMD_HOLD_MS=180;
+function _cmdHoldEligible(){
+  return !(document.activeElement&&(document.activeElement.tagName==='INPUT'||document.activeElement.tagName==='SELECT'||document.activeElement.tagName==='TEXTAREA'||document.activeElement.isContentEditable))
+    &&!state.playing&&state.tool!=='select'&&state.tool!=='subselect'
+    &&!(_pen&&_pen.path)&&!state.spaceDown;
+}
+document.addEventListener('keydown',function(e){
+  if(e.key==='Meta'||e.key==='Control'){
+    if(_cmdHoldDown)return; // already tracking this hold (no native repeat for modifiers, but stay safe)
+    _cmdHoldDown=true;
+    if(!_cmdHoldEligible())return;
+    _cmdHoldTimer=setTimeout(function(){
+      _cmdHoldTimer=null;
+      if(!_cmdHoldDown||!_cmdHoldEligible())return; // released, or state changed during the wait
+      _cmdHoldPrevTool=state.tool;
+      window.SM.setTool('select');
+    },CMD_HOLD_MS);
+  }else if(_cmdHoldTimer){
+    // A real key landed while the modifier was still just "maybe about to
+    // be a hold" — this IS a shortcut combo, not a hold gesture. Cancel
+    // silently; the shortcut's own Cmd+<key> handler (already gated on
+    // event.metaKey/ctrlKey) fires completely normally afterward.
+    clearTimeout(_cmdHoldTimer);_cmdHoldTimer=null;
+  }
+});
+document.addEventListener('keyup',function(e){
+  if(e.key!=='Meta'&&e.key!=='Control')return;
+  _cmdHoldDown=false;
+  if(_cmdHoldTimer){clearTimeout(_cmdHoldTimer);_cmdHoldTimer=null;return;} // never actually armed — nothing to restore
+  if(_cmdHoldPrevTool){window.SM.setTool(_cmdHoldPrevTool);_cmdHoldPrevTool=null;}
+});
+// Same stuck-modifier safety net as state.spaceDown's own window-blur
+// listener above (e.g. Cmd+Tab stealing focus mid-hold) — without this,
+// losing focus while armed would leave the tool stuck on Select forever.
+window.addEventListener('blur',function(){
+  if(_cmdHoldTimer){clearTimeout(_cmdHoldTimer);_cmdHoldTimer=null;}
+  _cmdHoldDown=false;
+  if(_cmdHoldPrevTool){window.SM.setTool(_cmdHoldPrevTool);_cmdHoldPrevTool=null;}
+});
 document.querySelectorAll('.tool-btn').forEach(function(b){b.addEventListener('click',function(){window.SM.setTool(this.dataset.tool);});});
 // Shape-tool group (2026-08, "regrouper les shape dans un mini menu comme
 // dans illustrator ou rive... click un peu longtemps ça affiche le menu").
