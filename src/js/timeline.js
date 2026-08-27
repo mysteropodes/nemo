@@ -395,7 +395,7 @@ window.SM={
     if(_camToolChanged)renderTimeline();
     document.querySelectorAll('.tool-btn').forEach(function(b){b.classList.toggle('active',b.dataset.tool===t);});
     if(window.SMShapeGroup)SMShapeGroup.ensureFront(t);
-    var cc={draw:'crosshair',pen:'crosshair',line:'crosshair',rect:'crosshair',ellipse:'crosshair',speechbubble:'crosshair',star:'crosshair',select:'default',subselect:'default',fsselect:'default',comment:'crosshair',camera:'move',text:'text',eraser:'pointer',fill:'crosshair',fillbrush:'crosshair',eyedropper:'crosshair',hand:'grab',zoom:'zoom-in',rotate:'grab',perspective:'crosshair',symmetry:'crosshair',rig:'crosshair'};
+    var cc={draw:'crosshair',pen:'crosshair',line:'crosshair',rect:'crosshair',ellipse:'crosshair',speechbubble:'crosshair',star:'crosshair',select:'default',subselect:'default',fsselect:'default',comment:'crosshair',camera:'move',text:'text',eraser:'crosshair',fill:'crosshair',fillbrush:'crosshair',eyedropper:'crosshair',hand:'grab',zoom:'zoom-in',rotate:'grab',perspective:'crosshair',symmetry:'crosshair',rig:'crosshair'};
     canvasEl.style.cursor=cc[t]||'default';
     // Brush texture presets (Chalk/Charcoal/Pencil…) stamp dabs along a
     // discrete centerline — Fill Brush commits a filled OUTLINE shape from
@@ -6006,8 +6006,21 @@ function openCommentPopover(worldPt,existing){
   var ca=document.getElementById('canvas-area');
   var rect=ca.getBoundingClientRect();
   var vp=view.projectToView(worldPt);
-  pop.style.left=Math.round(rect.left+vp.x+12)+'px';
-  pop.style.top=Math.round(rect.top+vp.y-8)+'px';
+  var rawLeft=rect.left+vp.x+12,rawTop=rect.top+vp.y-8;
+  // Clamp fully on-screen (2026-08-27, "si la fenetre de feedback est trop
+  // basse dans l'ecran aucun moyen de la faire defiler pour valider") — a
+  // comment pinned near the bottom/right edge of the canvas positioned this
+  // popover's TOP-LEFT there unconditionally, so a tall popover (screenshot
+  // drop zone + tags + Save/Delete) ran off the bottom of the viewport with
+  // nothing to scroll it back into view. Popover isn't visible yet (still
+  // display:none below) so offsetWidth/Height read 0 here — 240px matches
+  // the CSS width above; height is a generous estimate since it varies with
+  // content (screenshot attached, tags shown) — the CSS max-height+overflow
+  // added alongside this is the real safety net for whatever this estimate
+  // undershoots.
+  var estW=240,estH=420,margin=8;
+  pop.style.left=Math.round(Math.max(margin,Math.min(rawLeft,window.innerWidth-estW-margin)))+'px';
+  pop.style.top=Math.round(Math.max(margin,Math.min(rawTop,window.innerHeight-estH-margin)))+'px';
   document.getElementById('comment-author-row').textContent=
     (existing?'Par ':'Nouveau — ')+(_activeComment.authorName||'Anonyme')+' · frame '+(_activeComment.frame+1);
   document.getElementById('comment-text').value=_activeComment.text||'';
@@ -7738,7 +7751,19 @@ function onKeyDown(event){
   // no mode and nothing to learn. Same resolution here: this handler only ever
   // ARMS the pan (unchanged behaviour); onKeyUp decides, from whether a drag
   // actually happened and how long the key was held, whether it was a tap.
-  else if(k===' '){
+  // Cmd/Ctrl+Space is the OS's own shortcut (Spotlight on macOS, IME switch
+  // on some layouts) — 2026-08-27, "apres avoir fait commande + espace,
+  // impossible de repasser au pinceau ... n'importe quel outil". macOS steals
+  // focus to Spotlight the instant that combo is pressed, so the matching
+  // keyup for Space (below) never reaches the app; state.spaceDown was being
+  // armed here unconditionally and stayed stuck true forever, and
+  // viewtools-bridge.js's shouldPan()/shouldRotate() treat spaceDown as
+  // "always pan" regardless of the actually-selected tool — every click
+  // panned instead of drawing/erasing/etc. Excluding the modified combo
+  // means plain Space (the only gesture this handler is actually for) is
+  // unaffected; the window-blur listener below is a second-layer safety net
+  // for any other modifier combo that steals focus the same way.
+  else if(k===' '&&!event.metaKey&&!event.ctrlKey){
     event.preventDefault();
     if(!state.spaceDown){
       state.spaceDown=true;
@@ -7946,12 +7971,21 @@ function onKeyUp(event){if(event.key===' '){
   var held=((window.performance&&performance.now)?performance.now():Date.now())-(state._spaceAt||0);
   var tapped=wasDown&&!state.spaceUsedForPan&&held<SPACE_TAP_MS;
   state.spaceDown=false;state.isPanning=false;state.spaceUsedForPan=false;
-  var cc={draw:'crosshair',pen:'crosshair',line:'crosshair',rect:'crosshair',ellipse:'crosshair',select:'default',subselect:'default',eraser:'pointer',fill:'crosshair',fillbrush:'crosshair',eyedropper:'crosshair',hand:'grab',zoom:'zoom-in',rotate:'grab',perspective:'crosshair'};canvasEl.style.cursor=cc[state.tool]||'default';
+  var cc={draw:'crosshair',pen:'crosshair',line:'crosshair',rect:'crosshair',ellipse:'crosshair',select:'default',subselect:'default',eraser:'crosshair',fill:'crosshair',fillbrush:'crosshair',eyedropper:'crosshair',hand:'grab',zoom:'zoom-in',rotate:'grab',perspective:'crosshair'};canvasEl.style.cursor=cc[state.tool]||'default';
   // Mid-path the Pen tool owns Enter/Escape to finish or cancel; starting
   // playback under it would strand a half-drawn path, so Space stays inert
   // there — the one place the tap gesture is suppressed.
   if(tapped&&!(state.tool==='pen'&&_pen.path))togglePlay();
 }else if(event.key==='Alt'){state.altDown=false;}}
+// Second-layer safety net for the same stuck-spaceDown class of bug as the
+// Cmd/Ctrl+Space exclusion above: if focus ever leaves the window while
+// spaceDown/altDown is armed (any OS shortcut that steals focus before its
+// keyup reaches us — Spotlight is only the one actually reported), force a
+// clean reset on return rather than leaving the app permanently stuck in
+// "everything pans" / "everything rotates".
+window.addEventListener('blur',function(){
+  state.spaceDown=false;state.isPanning=false;state.spaceUsedForPan=false;state.altDown=false;
+});
 // One capture-phase listener marks "the Space hold was actually used", rather
 // than touching either pan implementation: panning lives in BOTH tools.js
 // (Paper.js path) and viewtools-bridge.js (Rust engine path), and any pointer

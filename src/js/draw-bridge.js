@@ -739,6 +739,29 @@
       path.data.widthProfile = fbCs.widthProfile;
       path.data.isVectorBrush = true; // scaffold flag ONLY for the duration of this call — cleared right below
       rebuildVectorBrushOutline(path);
+      // Self-intersection normalization (2026-08-27, "fill brush bug et ne
+      // fait pas une forme qui rempli"): a back-and-forth/zigzag stroke —
+      // ordinary Fill Brush usage, scribbling to fill an area rather than
+      // tracing one simple closed loop — produces a self-crossing outline
+      // whose nonzero-winding sub-regions cancel each other out, rendering
+      // as a broken/near-invisible fill even though path.segments looks
+      // superficially fine (reproduced: a zigzag scribble's outline came
+      // out with a NEGATIVE path.area). Self-uniting resolves the winding
+      // into simple, non-overlapping regions; segments are swapped in
+      // place on the SAME `path` object rather than replacing it, so this
+      // stays a pure geometry fix with zero effect on the data/layer
+      // bookkeeping below. Silently keeps the original outline on the rare
+      // disjoint-islands case (a true figure-eight scribble, where the
+      // union isn't a single Path) or any boolean-op failure, rather than
+      // risk losing or corrupting the stroke.
+      try {
+        var normalizedOutline = path.unite(path, { insert: false });
+        if (normalizedOutline && normalizedOutline.className === 'Path' && normalizedOutline.segments && normalizedOutline.segments.length) {
+          path.removeSegments();
+          path.addSegments(normalizedOutline.segments);
+          path.closed = true;
+        }
+      } catch (eNorm) { /* keep original outline */ }
       // Fill Brush is meant to draw a genuine filled SHAPE, editable like
       // any hand-plotted Pen path — real anchors sitting directly ON the
       // outline, standard node/tangent editing (Subselect). The centerline+

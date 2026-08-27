@@ -6242,6 +6242,20 @@
         // layers, we could color keyframes to highlight a group"). Only a
         // paint job: nothing reads k.color at evaluation time.
         if (k.color) { dia.classList.add('tinted'); dia.style.setProperty('--key-color', k.color); }
+        // Cap the diamond's own size to the per-frame column width at low
+        // zoom (2026-08-27, "les keyframe sont toujours écrasé visuelement
+        // le rond des keyframes si je dezoom la timeline"). `.motion-key`
+        // is a fixed 7px (9px .cur) in CSS (body.mode-motion rules) — FC
+        // (timeline-zoom.js) can shrink well below that on long projects,
+        // so two adjacent keys' diamonds started overlapping even though
+        // their FRAME positions were still distinct. Inline style wins over
+        // the CSS class rules by specificity, same pattern already used a
+        // few lines up for `--key-color`. Floor of 3px keeps a dot visibly
+        // clickable instead of vanishing.
+        if (typeof FC === 'number' && FC > 0 && FC < 7) {
+          var dsz = Math.max(3, FC);
+          dia.style.width = dsz + 'px'; dia.style.height = dsz + 'px';
+        }
         c.appendChild(dia);
         // Compact bidirectional ease controls. Only the primary key in a
         // multi-selection owns the boxes; changing either side propagates
@@ -7645,6 +7659,17 @@
         rects.forEach(function (r) { r.style.transform = 'translateX(' + px + 'px)'; });
       }
     });
+    // Multi-row selection box (2026-08-27, "y a un decalage not in real
+    // time des keyframe par rapport au layer ou inpoint"): the diamonds and
+    // connectors above already track the drag live (per the header comment
+    // — this was already fixed once for those), but `_keySelBoxEl` was only
+    // ever recomputed from a full renderTimeline() or setKeySel(), so it
+    // stayed glued to its pre-drag rect while the diamonds it's drawn
+    // around visibly moved out from under it. updateKeySelectionBox()
+    // re-measures straight from the (now-translated) `.motion-key.sel`
+    // rects, so calling it here is a correct, self-contained resync — it
+    // no-ops instantly when the box isn't currently shown.
+    updateKeySelectionBox();
   }
   // Called once at drag START (before the first preview) and at drop —
   // stray transforms must never survive past either boundary: a fresh drag
