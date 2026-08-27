@@ -32,6 +32,22 @@
   // Alt-drag-to-rotate explicitly cedes Alt to the brushes for this.
   var sizing = false, sizeStartX = 0, sizeStartVal = 0, sizeAnchorW = null;
   var samples = []; // [x,y,width]
+  // Live brush-preset dab cache (2026-08-27): buildBrushDabs is a full
+  // rebuild "not cheap per mousemove" (see its other caller,
+  // regenerateBrushTexture, tools.js) — a stylus fires 120-240 events/s
+  // (CLAUDE.md §5.2) but the screen only repaints at ~60. Recomputing at
+  // most once per rAF tick (~16ms) reuses the same "only the last state
+  // per frame matters" coalescing already applied to the actual render
+  // submission, but one level earlier — on the JS-side compute itself,
+  // which the render-side coalescing alone can't save.
+  var _liveDabCache = null, _liveDabCacheAt = 0;
+  function liveBrushDabs(pathLike, preset, baseWidth, widthProfile) {
+    var now = performance.now();
+    if (_liveDabCache && now - _liveDabCacheAt < 16) return _liveDabCache;
+    _liveDabCache = buildBrushDabs(pathLike, preset, baseWidth, null, widthProfile);
+    _liveDabCacheAt = now;
+    return _liveDabCache;
+  }
   // Perspective guide hard-lock (2026-07, perspective-bridge.js's
   // findGuideRayNear/projectOnRay — see their own header comment for why
   // this replaced a pure per-point magnet). Set once at pointerdown, held
@@ -330,6 +346,35 @@
     }
     if (state.vectorBrush) {
       var ribbon = { centerline: samples, fillColor: hexToRgba(state.strokeColor, state.opacity) };
+      // Vector brush-preset texture live preview, pressure-ribbon case
+      // (2026-08-27, same bug/fix as the plain-stroke branch below —
+      // applyBrushTexture's `isPressure` path is what actually runs at
+      // commit for a pressure ribbon with a preset selected, so the ribbon
+      // preview above is what a chalk/charcoal stroke showed for the whole
+      // gesture before this). Mirrors applyBrushTexture: centerline +
+      // per-sample width profile (samples already carry width as their
+      // 3rd element) fed to the same buildBrushDabs used at commit.
+      if (state.strokeEnabled && state.brushPreset && state.brushPreset !== 'none' && samples.length >= 2) {
+        var ribbonPreset = resolveBrushPreset(state.brushPreset);
+        if (ribbonPreset) {
+          var rPts = samples.map(function (s) { return new Point(s[0], s[1]); });
+          var rWidths = samples.map(function (s) { return s[2]; });
+          var rProfile = buildWidthProfile(rPts, rWidths);
+          var rBaseW = rProfile.reduce(function (sum, p) { return sum + p.width; }, 0) / rProfile.length;
+          var rCenterline = new Path({ insert: false });
+          for (var rp = 0; rp < rPts.length; rp++) rCenterline.add(rPts[rp]);
+          var rDabs = liveBrushDabs(rCenterline, ribbonPreset, rBaseW, rProfile);
+          ribbon = rDabs.map(function (dab) {
+            return {
+              segments: dab.segments.map(function (seg) {
+                return { point: [seg.point.x, seg.point.y], handleIn: [seg.handleIn.x, seg.handleIn.y], handleOut: [seg.handleOut.x, seg.handleOut.y] };
+              }),
+              closed: dab.closed,
+              fillColor: hexToRgba(state.strokeColor, state.opacity * dab.data.dabOpacity),
+            };
+          });
+        }
+      }
       // Stroke eye OFF (left panel): the ribbon IS the stroke — preview only
       // the enclosed region's fill, matching what commitStroke() will
       // actually produce in that mode.
@@ -346,7 +391,7 @@
       // enclosed by the centerline underneath the ribbon, same live-fill
       // behavior the plain-stroke mode already has.
       if (state.fillEnabled && !state.shadowMode) {
-        return [regionPreview, ribbon];
+        return [regionPreview].concat(ribbon);
       }
       return ribbon;
     }
@@ -389,6 +434,44 @@
     // §1 on the two texture-anchor camouflage modes).
     var bmLive = bitmapLive();
     if (bmLive && !state.fillEnabled) return [];
+    // Vector brush-preset texture (chalk/charcoal/etc.) live preview
+    // (2026-08-27, reported "quand je dessine avec brush genre chalk...
+    // ce n'est pas la bonne brush qui est utilisé... c'est qu'à la fin
+    // du dessin qu'elle s'applique"): this branch previously fell
+    // through to the plain constant-width stroke below for ANY preset —
+    // buildBrushDabs/applyBrushTexture only ever ran once, at pointerup
+    // (draw-bridge.js's commitStroke). Rebuilt here from `decimated` on
+    // every overlay tick — rAF-coalesced same as the rest of this
+    // function (CLAUDE.md §5.2), NOT per raw pointermove sample, since
+    // buildBrushDabs is documented elsewhere (regenerateBrushTexture,
+    // tools.js) as "not cheap per mousemove" — so the live preview shows
+    // the same texture the committed stroke will get, instead of a flat
+    // line that pops into the real texture on release.
+    if (state.strokeEnabled && state.brushPreset && state.brushPreset !== 'none' && !bmLive && decimated.length >= 2) {
+      var livePreset = resolveBrushPreset(state.brushPreset);
+      if (livePreset) {
+        var liveAnchor = new Path({ insert: false });
+        for (var lp = 0; lp < decimated.length; lp++) liveAnchor.add(new Point(decimated[lp][0], decimated[lp][1]));
+        var liveDabs = liveBrushDabs(liveAnchor, livePreset, state.brushSize, undefined);
+        var liveItems = liveDabs.map(function (dab) {
+          return {
+            segments: dab.segments.map(function (seg) {
+              return { point: [seg.point.x, seg.point.y], handleIn: [seg.handleIn.x, seg.handleIn.y], handleOut: [seg.handleOut.x, seg.handleOut.y] };
+            }),
+            closed: dab.closed,
+            fillColor: hexToRgba(state.strokeColor, state.opacity * dab.data.dabOpacity),
+          };
+        });
+        if (state.fillEnabled) {
+          liveItems.unshift({
+            segments: decimated.map(function (s) { return { point: [s[0], s[1]], handleIn: [0, 0], handleOut: [0, 0] }; }),
+            closed: true,
+            fillColor: hexToRgba(state.fillColor, state.opacity),
+          });
+        }
+        return liveItems;
+      }
+    }
     var item = {
       segments: decimated.map(function (s) { return { point: [s[0], s[1]], handleIn: [0, 0], handleOut: [0, 0] }; }),
       closed: false,
@@ -443,6 +526,7 @@
     }
     dragging = true;
     samples = [];
+    _liveDabCache = null; _liveDabCacheAt = 0;
     lastMoveT = 0; lastWorldPt = null; lastPenPressure = null;
     stabQueue = []; resetPressureFilter();
     var w0 = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
