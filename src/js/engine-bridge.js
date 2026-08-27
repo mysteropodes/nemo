@@ -2057,6 +2057,8 @@
       if (xformItems.length) layers.push({ items: xformItems });
       var hoverBoxItems = buildHoverBoxItems();
       if (hoverBoxItems.length) layers.push({ items: hoverBoxItems });
+      var textBoxItems = buildTextDragBoxItems();
+      if (textBoxItems.length) layers.push({ items: textBoxItems });
       var marqueeItems = buildMarqueeItems();
       if (marqueeItems.length) layers.push({ items: marqueeItems });
       var fsSelItems = buildFSSelectionItems();
@@ -2443,6 +2445,30 @@
       lineItem([c3.x, c3.y], [c4.x, c4.y], col, sw),
       lineItem([c4.x, c4.y], [c1.x, c1.y], col, sw),
     ];
+  }
+  // Text tool's live bounding box (2026-08, "quand on dessine le rectangle
+  // du texte il faut lui faire apparaître le texte... avec un bounding box
+  // comme dans tout éditeur de texte") — TWO sources, drawn identically:
+  // _textDragRect (tools.js) while dragging out the initial placement box
+  // (a real Paper Path in marqueeLayer — was already being built, but
+  // NEVER reached the screen: it only ever lived in the Paper.js model,
+  // invisible the moment the Rust engine took over rendering, CLAUDE.md §5),
+  // and window._inplaceTextBoxBounds (timeline.js's openInPlaceTextEditor)
+  // while the in-canvas textarea is open, tracking its live-growing size.
+  // Solid, not dashed — same pre-existing engine limitation buildTransformBoxItems'
+  // own comment already notes (the engine's Stroke type has no dash support yet).
+  function buildTextDragBoxItems() {
+    var items = [];
+    var col = [255, 184, 108, 230], sw = 1 / view.zoom;
+    if (window._textDragRect && !window._textDragRect.removed) {
+      var b = window._textDragRect.bounds;
+      items.push(boundsRectItem(b.left, b.top, b.right, b.bottom, [255, 184, 108, 15], col, sw));
+    }
+    if (window._inplaceTextBoxBounds) {
+      var tb = window._inplaceTextBoxBounds;
+      items.push(boundsRectItem(tb.left, tb.top, tb.right, tb.bottom, null, col, sw));
+    }
+    return items;
   }
   function buildTransformBoxItems() {
     if (state.tool !== 'select') return [];

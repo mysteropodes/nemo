@@ -10,12 +10,18 @@
 // collapsed layer row (motion.js) — a layer's visible range is a layer-
 // level concept, not specific to either timeline view.
 (function () {
-  // Delegates to the shared globals in app.js (layerInPoint/layerOutPoint) —
-  // layerOutPoint's own default now auto-detects a blank-keyframe tail
-  // (see its header comment there) instead of always the full timeline;
-  // keeping ONE definition avoids the two drifting apart.
-  function inPointOf(ld) { return window.layerInPoint ? layerInPoint(ld) : (ld.inPoint != null ? ld.inPoint : 0); }
-  function outPointOf(ld) { return window.layerOutPoint ? layerOutPoint(ld) : (ld.outPoint != null ? ld.outPoint : state.totalFrames - 1); }
+  // Delegates to the shared globals in app.js — the RAW (unclamped)
+  // layerInPointRaw/layerOutPointRaw, not layerInPoint/layerOutPoint
+  // (2026-08, "les layer dans motion doivent pouvoir aller au delà de la
+  // timeline ou en amont comme sur cavalry"). This whole file is UI-only
+  // (its own header comment) — the actual render/content gate stays the
+  // CLAMPED layerInPoint/layerOutPoint, used by getEffectiveStrokes
+  // (app.js) and completely untouched by this change; only the bar's own
+  // drawn position/drag math needs the raw value, so a layer can visibly
+  // start before frame 0 or run past the timeline's end, like an AE/Cavalry
+  // trim handle, without changing what actually renders in-range.
+  function inPointOf(ld) { return window.layerInPointRaw ? layerInPointRaw(ld) : (ld.inPoint != null ? ld.inPoint : 0); }
+  function outPointOf(ld) { return window.layerOutPointRaw ? layerOutPointRaw(ld) : (ld.outPoint != null ? ld.outPoint : state.totalFrames - 1); }
   // Parent-in-Time makes ld.inPoint/outPoint completely inert on a linked
   // edge — layerInPoint/layerOutPoint (app.js) check resolveLinkedTime
   // FIRST and return its result unconditionally when the edge is linked,
@@ -122,6 +128,27 @@
     var inF = inPointOf(ld), outF = outPointOf(ld);
     bar.style.left = (inF * FC) + 'px';
     bar.style.width = Math.max(FC, (outF - inF + 1) * FC) + 'px';
+    // Overflow hatching (2026-08, Cavalry-style bar beyond the timeline) —
+    // the segment of the bar before frame 0 or after totalFrames-1 (now
+    // reachable since inPointOf/outPointOf read the RAW, unclamped value)
+    // gets a hatched look so it reads as "past the composition's actual
+    // range", distinct from the solid in-range portion. Two reused child
+    // overlays, positioned relative to the bar itself (bar is already
+    // position:absolute, so `left:0`/`right:0` land exactly on ITS own
+    // edges) — cheaper than splitting the bar into 3 separate elements.
+    var lastF = state.totalFrames - 1;
+    var overLeftF = Math.max(0, Math.min(-inF, outF - inF + 1));
+    var overRightF = Math.max(0, Math.min(outF - lastF, outF - inF + 1));
+    var overL = bar.querySelector('.layer-inout-overflow-left');
+    if (overLeftF > 0) {
+      if (!overL) { overL = document.createElement('div'); overL.className = 'layer-inout-overflow-left'; bar.appendChild(overL); }
+      overL.style.width = (overLeftF * FC) + 'px';
+    } else if (overL) overL.remove();
+    var overR = bar.querySelector('.layer-inout-overflow-right');
+    if (overRightF > 0) {
+      if (!overR) { overR = document.createElement('div'); overR.className = 'layer-inout-overflow-right'; bar.appendChild(overR); }
+      overR.style.width = (overRightF * FC) + 'px';
+    } else if (overR) overR.remove();
     var custom = hasCustomRange(ld);
     bar.classList.toggle('full-range', !custom);
     bar.classList.toggle('has-timelink', !!ld.timeLink);
@@ -573,6 +600,13 @@
     updateMarquee(e);
     if (!_drag) return;
     var total = state.totalFrames;
+    // Overflow margin (2026-08, Cavalry-style bar beyond the timeline) —
+    // how far past frame 0 / totalFrames-1 a bar can be dragged. Generous
+    // but finite (half the timeline's own length, floor 10 frames) rather
+    // than unbounded: content beyond [0,total-1] never renders anyway
+    // (getEffectiveStrokes' own clamp, untouched), this is purely a
+    // trim-handle affordance, not a claim that anything plays out there.
+    var margin = Math.max(10, Math.round(total * 0.5));
     if (_drag.group) {
       var dx = Math.round((e.clientX - _drag.startX) / FC);
       if (!dx) return;
@@ -612,7 +646,7 @@
       var anyChanged = false;
       inMembers.forEach(function (m) {
         var mld = state.layers[m.li]; if (!mld) return;
-        var mNewIn = Math.max(0, Math.min(m.origIn + dx, m.origOut - 1));
+        var mNewIn = Math.max(-margin, Math.min(m.origIn + dx, m.origOut - 1));
         if (!trySetLinkedEdge(mld, 'in', mNewIn)) mld.inPoint = mNewIn;
         updateBar(m.row, m.li);
         updateLinkedChildrenBars(m.li);
@@ -620,7 +654,7 @@
       });
       outMembers.forEach(function (m) {
         var mld = state.layers[m.li]; if (!mld) return;
-        var mNewOut = Math.min(total - 1, Math.max(m.origOut + dx, m.origIn + 1));
+        var mNewOut = Math.min(total - 1 + margin, Math.max(m.origOut + dx, m.origIn + 1));
         if (!trySetLinkedEdge(mld, 'out', mNewOut)) mld.outPoint = mNewOut;
         updateBar(m.row, m.li);
         updateLinkedChildrenBars(m.li);
@@ -644,8 +678,8 @@
         // arithmetic, not a policy choice.
         var dxLo = -Infinity, dxHi = Infinity;
         bothMembersM.forEach(function (m) {
-          dxLo = Math.max(dxLo, -m.origIn);
-          dxHi = Math.min(dxHi, total - 1 - m.origOut);
+          dxLo = Math.max(dxLo, -margin - m.origIn);
+          dxHi = Math.min(dxHi, total - 1 + margin - m.origOut);
         });
         var gdx = Math.max(dxLo, Math.min(dx, dxHi));
         if (dxLo <= dxHi) bothMembersM.forEach(function (m) {
@@ -692,15 +726,15 @@
     var ld = state.layers[_drag.li]; if (!ld) { _drag = null; return; }
     var dx = Math.round((e.clientX - _drag.startX) / FC);
     if (_drag.type === 'in') {
-      var newIn = Math.max(0, Math.min(_drag.origIn + dx, _drag.origOut - 1));
+      var newIn = Math.max(-margin, Math.min(_drag.origIn + dx, _drag.origOut - 1));
       if (!trySetLinkedEdge(ld, 'in', newIn)) ld.inPoint = newIn;
     } else if (_drag.type === 'out') {
-      var newOut = Math.min(total - 1, Math.max(_drag.origOut + dx, _drag.origIn + 1));
+      var newOut = Math.min(total - 1 + margin, Math.max(_drag.origOut + dx, _drag.origIn + 1));
       if (!trySetLinkedEdge(ld, 'out', newOut)) ld.outPoint = newOut;
     } else {
       var w = _drag.origOut - _drag.origIn;
-      var ni = Math.max(0, _drag.origIn + dx);
-      if (ni + w >= total) ni = total - 1 - w;
+      var ni = Math.max(-margin, _drag.origIn + dx);
+      if (ni + w >= total + margin) ni = total - 1 + margin - w;
       var inHandled = trySetLinkedEdge(ld, 'in', ni);
       var outHandled = trySetLinkedEdge(ld, 'out', ni + w);
       if (!inHandled) ld.inPoint = ni;
