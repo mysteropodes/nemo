@@ -337,8 +337,8 @@ body.tools-docked-away #tools-panel-resize{display:none;}
 #ruler-v{top:18px;left:0;bottom:0;width:18px;cursor:e-resize;}
 body.rulers-off #ruler-h,body.rulers-off #ruler-v,body.rulers-off #ruler-corner{display:none;}
 .guide-line{position:absolute;z-index:39;pointer-events:none;}
-.guide-line.h{left:0;right:0;height:1px;border-top:1px dashed #4ade80;}
-.guide-line.v{top:0;bottom:0;width:1px;border-left:1px dashed #4ade80;}
+.guide-line.h{left:0;right:0;height:1px;border-top:1px dashed var(--accent);}
+.guide-line.v{top:0;bottom:0;width:1px;border-left:1px dashed var(--accent);}
 .guide-hit{position:absolute;z-index:42;background:transparent;}
 .guide-hit.h{left:18px;right:0;height:7px;cursor:ns-resize;}
 .guide-hit.v{top:18px;bottom:0;width:7px;cursor:ew-resize;}

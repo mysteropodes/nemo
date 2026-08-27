@@ -8732,9 +8732,22 @@ document.getElementById('zoom-scrub').addEventListener('input',function(){
 });
 document.getElementById('canvas-fit-btn').addEventListener('click',function(e){
   var r=this.getBoundingClientRect();
-  window.showContextMenu(r.left,r.top-70,[
+  // Rulers/guides toggle (2026-08-27, "l'affichage des regle et rulers
+  // dans un menu ici") — pointed at THIS exact menu (Fit/zoom dropdown),
+  // alongside the pre-existing standalone toolbar button next to Safety
+  // Zones rather than replacing it (more discoverable from two places,
+  // costs nothing to keep both in sync — both read/write the same
+  // state.rulersOn via SMRulers.toggleOn). showContextMenu has no native
+  // checkbox item type, so the ON state is a plain checkmark prefix, same
+  // convention used elsewhere in this menu system.
+  window.showContextMenu(r.left,r.top-98,[
     {label:'Fit',action:function(){window.SM.fitCanvas();}},
     {label:'Reset View (100%)',action:function(){window.SM.resetView();}},
+    {sep:true},
+    {label:(state.rulersOn?'✓ ':'')+(SM&&SM.t?SM.t('rulersMenuLabel'):'Rulers & Guides'),action:function(){
+      if(window.SMRulers)SMRulers.toggleOn();
+      var btn=document.getElementById('btn-rulers');if(btn)btn.classList.toggle('active',!!state.rulersOn);
+    }},
   ]);
 });
 document.getElementById('p-resamp').addEventListener('input',function(){window.SM.setResamplePts(parseInt(this.value));});
