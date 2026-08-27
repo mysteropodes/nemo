@@ -4024,8 +4024,15 @@ var arcHandles=[],draggingArc=null;
 // Only the dragged handle's OWN position changes during a drag; which
 // strokes match which never does (that's re-decided by generateTweens()
 // on drag-end, mode==='arc' in select-bridge.js/tools.js).
-function computeArcMatchState(){
-  if(state.tool!=='select'||!state.selectedStrokeIndices.length)return null;
+// Shared by computeArcMatchState (selection-scoped, drives the arc handles)
+// and matchStateForPath (single-path-scoped, drives the 2026-08 hover badge
+// below) — everything up to "which original index does the selection/hover
+// target land on" is identical between the two, only the final filter step
+// differs. Extracted so the hover path can reuse the exact same match
+// (never a second, possibly-divergent Hungarian run) instead of
+// reimplementing this.
+function computeArcMatchBase(){
+  if(state.tool!=='select')return null;
   var li=state.activeLayerIdx;var ld=state.layers[li];
   var keys=[];for(var i=0;i<state.totalFrames;i++){if(ld.frames[i].isKeyframe&&ld.frames[i].strokes.length>0)keys.push(i);}
   if(keys.length<2)return null;
@@ -4055,14 +4062,37 @@ function computeArcMatchState(){
     forcedPairs.push({a:aIdx,b:bIdx,mi:-1-forcedPairs.length});
   });
   var matches=autoMatch(sA,sB);if(!matches.length&&!forcedPairs.length)return null;
+  return {fA:fA,fB:fB,sA:sA,sB:sB,spA:spA,spB:spB,matches:matches,forcedAIdx:forcedAIdx,forcedBIdx:forcedBIdx,forcedPairs:forcedPairs};
+}
+function computeArcMatchState(){
+  if(!state.selectedStrokeIndices.length)return null;
+  var base=computeArcMatchBase();if(!base)return null;
   var sel=state.selectedStrokeIndices;var fm=[];
-  forcedPairs.forEach(function(fp){if(sel.indexOf(spA.orig[fp.a])>=0)fm.push(fp);});
-  matches.forEach(function(m,idx){
-    if(forcedAIdx[m.a]||forcedBIdx[m.b])return; // superseded by a forced override, same as generateTweens
-    if(sel.indexOf(spA.orig[m.a])>=0)fm.push({a:m.a,b:m.b,mi:idx});
+  base.forcedPairs.forEach(function(fp){if(sel.indexOf(base.spA.orig[fp.a])>=0)fm.push(fp);});
+  base.matches.forEach(function(m,idx){
+    if(base.forcedAIdx[m.a]||base.forcedBIdx[m.b])return; // superseded by a forced override, same as generateTweens
+    if(sel.indexOf(base.spA.orig[m.a])>=0)fm.push({a:m.a,b:m.b,mi:idx});
   });
   if(!fm.length)return null;
-  return {fA:fA,fB:fB,sA:sA,sB:sB,matches:matches,fm:fm};
+  return {fA:base.fA,fB:base.fB,sA:base.sA,sB:base.sB,matches:base.matches,fm:fm};
+}
+// 2026-08 ("au roll hover les id de forme en couleur verte afin de clic sur
+// l'id qui va réassigner") — same shape as computeArcMatchState's return,
+// but scoped to ONE specific Path (the currently-hovered shape) instead of
+// state.selectedStrokeIndices, so the green reassign badge can surface
+// without requiring a click-to-select first.
+function matchStateForPath(path){
+  if(!path)return null;
+  var base=computeArcMatchBase();if(!base)return null;
+  var origIdx=getSI(path);if(origIdx<0)return null;
+  var fm=[];
+  base.forcedPairs.forEach(function(fp){if(base.spA.orig[fp.a]===origIdx)fm.push(fp);});
+  base.matches.forEach(function(m,idx){
+    if(base.forcedAIdx[m.a]||base.forcedBIdx[m.b])return;
+    if(base.spA.orig[m.a]===origIdx)fm.push({a:m.a,b:m.b,mi:idx});
+  });
+  if(fm.length!==1)return null;
+  return {fA:base.fA,fB:base.fB,sA:base.sA,sB:base.sB,matches:base.matches,fm:fm};
 }
 function renderArcs(cached){
   // Computed BEFORE updateReassignBadge and handed to it — see its own
@@ -4559,6 +4589,18 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 // the shape directly (reassignHandleClick's step-2 branch), just a more
 // discoverable explicit action instead of an invisible click-anywhere.
 var _reassignBadgeAction=null;
+// 2026-08 hover state, set by select-bridge.js's onHoverMoveA2D via the
+// well-known-global-function hook below (same "if(window.XXX)XXX()"
+// cross-file convention used throughout this app) whenever the Animation
+// 2D shape-hover target changes — deliberately event-driven off that
+// EXISTING hitTest pass rather than a second one here (CLAUDE.md §5's own
+// "ne pas dupliquer le matcher" precedent).
+var _reassignHoverPath=null;
+function updateReassignBadgeHover(path){
+  _reassignHoverPath=(path&&path instanceof Path)?path:null;
+  updateReassignBadge();
+}
+window.updateReassignBadgeHover=updateReassignBadgeHover;
 function reassignBadgeEl(){return document.getElementById('tween-reassign-badge');}
 function hideReassignBadge(){var el=reassignBadgeEl();if(el)el.style.display='none';_reassignBadgeAction=null;}
 // Purely cosmetic: strokeId is a long opaque string, not meaningful shown
@@ -4614,6 +4656,30 @@ function updateReassignBadge(cached){
     return;
   }
   if(_reassign.active){hideReassignBadge();return;} // mid legacy step-1 multi-click flow -- avoid a stale green badge underneath
+  // Hover-driven badge (2026-08, "au roll hover les id de forme en couleur
+  // verte afin de clic sur l'id qui va réassigner") — takes priority over
+  // the selection-based badge below: the whole point is surfacing a
+  // shape's id WITHOUT first clicking to select it. Falls through to the
+  // selection-based path when nothing valid is hovered (mouse left the
+  // canvas, hovering empty space, or the hovered shape has no single
+  // match to the next keyframe).
+  if(_reassignHoverPath&&userLayers[state.activeLayerIdx]&&userLayers[state.activeLayerIdx].children.indexOf(_reassignHoverPath)>=0){
+    var hst=matchStateForPath(_reassignHoverPath);
+    if(hst){
+      var hm=hst.fm[0],hsd=hst.sA[hm.a],hp=_reassignHoverPath;
+      var haId=hsd.strokeId||ensureStrokeId(hp);
+      var hfA=hst.fA,hfB=hst.fB;
+      positionReassignBadge(hp.bounds,shortIdLabel(haId),'green');
+      _reassignBadgeAction=function(){
+        saveAllLayerFrames();
+        _reassign.active=true;_reassign.step=2;_reassign.layer=state.activeLayerIdx;_reassign.frameA=hfA;_reassign.frameB=hfB;_reassign.aIds=[haId];
+        goToFrame(hfB);
+        reassignSetStatus('2/2 — Cliquez l\'élément correspondant sur la keyframe '+(hfB+1)+' (ou sélectionnez-le puis cliquez le bouton jaune)');
+        showToast(SM.t('toastSelectMatchingElementThenYellowButton'));
+      };
+      return;
+    }
+  }
   // The three SELECTION guards below used to sit AFTER computeArcMatchState(),
   // so the badge paid a full O(n^3) Hungarian match just to discover the
   // selection wasn't a single path. They depend on nothing the matcher

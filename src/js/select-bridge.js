@@ -1333,9 +1333,18 @@
       // sense once selectedPaths.length.
       if (shouldIntercept()) {
         var whA2D = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
-        if (onHoverMoveA2D(new Point(whA2D[0], whA2D[1]))) window.SMEngineBridge.renderNow();
+        if (onHoverMoveA2D(new Point(whA2D[0], whA2D[1]))) {
+          // 2026-08 tween-reassign hover badge ("au roll hover les id de
+          // forme en couleur verte") — piggybacks on this SAME hitTest pass
+          // (only fires when the hover TARGET actually changed, exactly
+          // like the highlight box above) instead of tweens.js running its
+          // own hitTest on every mousemove.
+          if (window.updateReassignBadgeHover) window.updateReassignBadgeHover(_hoverPathA2D);
+          window.SMEngineBridge.renderNow();
+        }
       } else if (_hoverPathA2D) {
         _hoverPathA2D = null;
+        if (window.updateReassignBadgeHover) window.updateReassignBadgeHover(null);
       }
       // Hover-only pass (not dragging anything) — tracks whether the
       // pointer sits over the anchor crosshair so engine-bridge.js can draw
