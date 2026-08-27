@@ -258,9 +258,14 @@ var state={
 function initUserProfile(){
   try{
     var saved=JSON.parse(localStorage.getItem('nemo-profile')||'null');
-    if(saved&&saved.id){if(!saved.role)saved.role='animator';state.userProfile=saved;return;}
+    // email (2026-08-27, feedback: "avoir un nom d'utilisateur et mail
+    // optionnel qu'il puisse entrer afin de contacter pour question") —
+    // migrated in for profiles saved before this field existed, same
+    // pattern as the .role migration right below it. Always optional,
+    // never required anywhere it's read (feedback-bridge.js's issue body).
+    if(saved&&saved.id){if(!saved.role)saved.role='animator';if(saved.email===undefined)saved.email='';state.userProfile=saved;return;}
   }catch(e){}
-  state.userProfile={id:'u_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8),name:'Animateur',color:'#4a9eff',role:'animator'};
+  state.userProfile={id:'u_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8),name:'Animateur',color:'#4a9eff',role:'animator',email:''};
   try{localStorage.setItem('nemo-profile',JSON.stringify(state.userProfile));}catch(e){}
 }
 function saveUserProfile(){

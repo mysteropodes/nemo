@@ -6048,6 +6048,9 @@ function openCommentPopover(worldPt,existing){
   document.getElementById('comment-author-row').textContent=
     (existing?'Par ':'Nouveau — ')+(_activeComment.authorName||'Anonyme')+' · frame '+(_activeComment.frame+1);
   document.getElementById('comment-text').value=_activeComment.text||'';
+  var fbNameEl0=document.getElementById('comment-fb-name'),fbEmailEl0=document.getElementById('comment-fb-email');
+  if(fbNameEl0)fbNameEl0.value=(state.userProfile&&state.userProfile.name)||'';
+  if(fbEmailEl0)fbEmailEl0.value=(state.userProfile&&state.userProfile.email)||'';
   document.getElementById('comment-resolved').checked=!!_activeComment.resolved;
   document.getElementById('comment-delete').style.display=existing?'':'none';
   _activeFbTags=[];
@@ -6113,6 +6116,14 @@ function initCommentPopover(){
     var note=document.getElementById('comment-text').value;
     if(!note.trim()){showToast(SM.t('toastWriteNoteBeforeSavingFeedback'));return;}
     var blocking=document.getElementById('comment-fb-blocking').checked;
+    // Optional name/email (feedback #: "avoir un nom d'utilisateur et mail
+    // optionnel... afin de contacter pour question") — persisted back to
+    // state.userProfile so submitFeedback's entry.author (built FROM that
+    // profile) picks them up, and every future feedback is pre-filled too.
+    var fbNameEl=document.getElementById('comment-fb-name'),fbEmailEl=document.getElementById('comment-fb-email');
+    if(fbNameEl&&fbNameEl.value.trim())state.userProfile.name=fbNameEl.value.trim();
+    if(fbEmailEl)state.userProfile.email=fbEmailEl.value.trim();
+    saveUserProfile();
     window.SMFeedback.submitFeedback({
       note:note,tags:_activeFbTags.slice(),blocking:blocking,
       pos:new Point(_activeComment.x,_activeComment.y),
@@ -6886,9 +6897,10 @@ var ROLE_HINTS={
   producer:'Lecture seule + commentaires. Les outils de dessin/édition sont désactivés.'
 };
 function syncProfileFields(){
-  var nameEl=document.getElementById('profile-name'),colorEl=document.getElementById('profile-color'),wellEl=document.getElementById('profile-color-well'),roleEl=document.getElementById('profile-role'),hintEl=document.getElementById('profile-role-hint');
+  var nameEl=document.getElementById('profile-name'),colorEl=document.getElementById('profile-color'),wellEl=document.getElementById('profile-color-well'),roleEl=document.getElementById('profile-role'),hintEl=document.getElementById('profile-role-hint'),emailEl=document.getElementById('profile-email');
   if(!nameEl||!state.userProfile)return;
   nameEl.value=state.userProfile.name;
+  if(emailEl)emailEl.value=state.userProfile.email||'';
   var c=state.userProfile.color;
   setHex8Input(colorEl,c);
   if(wellEl)wellEl.style.background=c;
@@ -6897,11 +6909,15 @@ function syncProfileFields(){
   if(hintEl)hintEl.textContent=ROLE_HINTS[role]||'';
 }
 function initProfileFields(){
-  var nameEl=document.getElementById('profile-name'),colorEl=document.getElementById('profile-color'),roleEl=document.getElementById('profile-role');
+  var nameEl=document.getElementById('profile-name'),colorEl=document.getElementById('profile-color'),roleEl=document.getElementById('profile-role'),emailEl=document.getElementById('profile-email');
   if(!nameEl||!colorEl)return;
   syncProfileFields();
   nameEl.addEventListener('input',function(){
     state.userProfile.name=this.value||'Animateur';
+    saveUserProfile();
+  });
+  if(emailEl)emailEl.addEventListener('input',function(){
+    state.userProfile.email=this.value||'';
     saveUserProfile();
   });
   colorEl.addEventListener('input',function(){
