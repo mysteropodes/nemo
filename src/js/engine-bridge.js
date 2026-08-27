@@ -2035,26 +2035,42 @@
     // mirroring drawStage()'s background rect
     var bgItems;
     if (showAlphaChecker) {
-      // Fixed 20-column grid regardless of canvas size — a coarse but
-      // instantly-recognizable checkerboard (Photoshop/After Effects
-      // "show transparency" convention) at a bounded, predictable item
-      // count (currently 20x~11 ≈ 220 rects for a 16:9 canvas) rather
-      // than one item per fixed-pixel tile, which would scale into the
-      // thousands on a large canvas and undercut the exact perf work
-      // CLAUDE.md §5 documents for this same render path.
-      var checkCols = 20;
-      var checkTile = state.canvasW / checkCols;
+      // Zoom-aware tile size (feedback, "la grille est trop grosse, se
+      // rapprocher de celle d'Adobe") — the first version used a FIXED
+      // 20-column WORLD-space grid, so its on-screen tile size scaled
+      // with view.zoom instead of staying constant like every reference
+      // app's checkerboard (Photoshop/AE/Figma all target a fixed ~8px
+      // SCREEN tile regardless of zoom or canvas size). Deriving the
+      // world-space tile size from the current zoom (tile = target /
+      // view.zoom) reproduces that directly.
+      // Tile-count cap, not a screen-size cap: zooming in far enough that
+      // an 8px-screen tile would need tens of thousands of world-space
+      // rects to cover the canvas is exactly the CLAUDE.md §5 "don't do
+      // free work" case this file's own perf notes warn about — past
+      // MAX_CHECK_TILES the tile is allowed to grow past the ideal 8px
+      // (coarser than Adobe at extreme zoom, same tradeoff Adobe itself
+      // makes by switching to a fixed-pixel overlay instead of scene
+      // content) rather than ever drawing more rects than that.
+      var CHECK_TARGET_SCREEN_PX = 8, MAX_CHECK_TILES = 4000;
+      var checkTile = CHECK_TARGET_SCREEN_PX / Math.max(0.001, view.zoom);
+      var idealCols = state.canvasW / checkTile, idealRows = state.canvasH / checkTile;
+      if (idealCols * idealRows > MAX_CHECK_TILES) {
+        var growth = Math.sqrt((idealCols * idealRows) / MAX_CHECK_TILES);
+        checkTile *= growth;
+      }
+      var checkCols = Math.max(1, Math.round(state.canvasW / checkTile));
+      var checkTileW = state.canvasW / checkCols;
       var checkRows = Math.max(1, Math.round(state.canvasH / checkTile));
       var checkTileH = state.canvasH / checkRows;
       var checkA = [222, 222, 222, 255], checkB = [255, 255, 255, 255];
       bgItems = [];
       for (var cy = 0; cy < checkRows; cy++) {
         for (var cx = 0; cx < checkCols; cx++) {
-          var x0 = cx * checkTile, y0 = cy * checkTileH;
+          var x0 = cx * checkTileW, y0 = cy * checkTileH;
           bgItems.push({
             segments: [
-              { point: [x0, y0] }, { point: [x0 + checkTile, y0] },
-              { point: [x0 + checkTile, y0 + checkTileH] }, { point: [x0, y0 + checkTileH] },
+              { point: [x0, y0] }, { point: [x0 + checkTileW, y0] },
+              { point: [x0 + checkTileW, y0 + checkTileH] }, { point: [x0, y0 + checkTileH] },
             ],
             closed: true,
             fillColor: (cx + cy) % 2 === 0 ? checkA : checkB,
