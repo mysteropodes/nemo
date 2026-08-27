@@ -1403,6 +1403,10 @@
           <div class="cw-mini" id="profile-color-well" style="background:#4a9eff"><input type="color" id="profile-color"></div>
         </div>
         <div class="pr" style="gap:8px;margin-top:6px">
+          <span class="pl" data-i18n="settingsEmail">Email</span>
+          <input type="email" id="profile-email" class="pi" style="flex:1" placeholder="optionnel — pour te recontacter" data-i18n-placeholder="settingsEmailPh">
+        </div>
+        <div class="pr" style="gap:8px;margin-top:6px">
           <span class="pl" data-i18n="settingsRole">Rôle</span>
           <select id="profile-role" class="pi" style="flex:1">
             <option value="animator" data-i18n="roleAnimator">Animateur</option>
@@ -1636,6 +1640,19 @@
     <button type="button" class="pbtn fb-tag" data-tag="polish" style="font-size:9px;padding:3px 7px">✨ <span data-i18n="fbTagPolish">polish</span></button>
   </div>
   <label style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text-dim);cursor:pointer;margin-top:4px"><input type="checkbox" id="comment-fb-blocking"> <span data-i18n="commentBlockingLabel">Ça me bloque</span></label>
+  <!-- Optional name/email, feedback path only (2026-08-27 — "actuellement
+       c'est envoyé anonymement... avoir un nom d'utilisateur et mail
+       optionnel qu'il puisse entrer afin de contacter pour question"):
+       right where a tester is already filing feedback, rather than only
+       reachable via Réglages > Profil (easy to never notice). Pre-filled
+       from state.userProfile, edits here save back to it (timeline.js) so
+       it's remembered for every future feedback too — never required. -->
+  <div class="pr" style="margin-top:6px;gap:6px">
+    <input type="text" id="comment-fb-name" class="pi" style="flex:1;font-size:10px" placeholder="Ton nom (optionnel)" data-i18n-placeholder="commentFbNamePh">
+  </div>
+  <div class="pr" style="margin-top:4px;gap:6px">
+    <input type="email" id="comment-fb-email" class="pi" style="flex:1;font-size:10px" placeholder="Email (optionnel, pour te recontacter)" data-i18n-placeholder="commentFbEmailPh">
+  </div>
   <!-- Screenshot attachment (feedback only) — drag&drop, click-to-browse,
        or Cmd+V paste while the popover is focused. Read client-side as a
        data URL for a thumbnail preview; the actual upload (base64 → GitHub
