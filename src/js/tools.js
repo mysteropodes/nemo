@@ -1159,6 +1159,23 @@ function orientedSelBox(){
   });
   return b?{b:b,angle:ang,pivot:pivot}:null;
 }
+// Same idea as orientedSelBox() but for a SINGLE unselected path — used by
+// the Animation 2D hover highlight (select-bridge.js getHoverBounds/
+// engine-bridge.js buildHoverBoxItems) so the box drawn on hover always
+// matches the shape's actual size+rotation instead of its axis-aligned
+// stroke bounds (2026-08, feedback: "la box du hover ne correspond pas à
+// la forme du bounding box... je parle juste de la taille + rotation").
+function orientedBoxForPath(p){
+  if(!p||!p.bounds)return null;
+  var ang=(p.data&&p.data.boxAngle)||0;
+  if(!ang)return{b:p.bounds,angle:0,pivot:p.bounds.center};
+  var pivot=p.bounds.center;
+  var c=p.clone({insert:false});
+  c.rotate(-ang,pivot);
+  var b=c.bounds.clone();
+  c.remove();
+  return{b:b,angle:ang,pivot:pivot};
+}
 // De-rotated-space point -> world (rotate by the box angle around its pivot).
 function selBoxPt(x,y,box){
   if(!box.angle)return new Point(x,y);

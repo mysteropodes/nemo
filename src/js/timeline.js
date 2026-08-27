@@ -2991,6 +2991,13 @@ function selPropsApplyRotate(deltaDeg,center,skipUndo){
   if(!skipUndo)pushUndo();
   selectedPaths.forEach(function(p){
     p.rotate(deltaDeg,center);
+    // Keep data.boxAngle in sync (2026-08 fix, "la box du hover ne correspond
+    // pas... taille + rotation"): the canvas drag-rotate handle already
+    // accumulates this (select-bridge.js/tools.js, same %360 pattern below),
+    // but this numeric-field path never did — a shape rotated only via this
+    // field kept boxAngle at its old value (usually 0), so orientedSelBox/
+    // orientedBoxForPath (tools.js) drew a stale, unrotated box for it.
+    if(p.data)p.data.boxAngle=(((p.data.boxAngle||0)+deltaDeg)%360);
     transformFillGradient(p,function(pt){return pt.rotate(deltaDeg,center);});
     if(p.data&&p.data.isVectorBrush&&p.data.centerSegments){rotateCenterSegments(p.data.centerSegments,deltaDeg,center.x,center.y);rebuildVectorBrushOutline(p);}
   });
